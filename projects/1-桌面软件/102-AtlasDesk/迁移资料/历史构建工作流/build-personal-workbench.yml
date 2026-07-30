@@ -1,24 +1,28 @@
-name: Build Personal Workbench Native
+name: Build Personal Workbench Lightweight
 
 on:
   push:
     branches:
       - main
-      - personal-workbench-webview2
     paths:
       - 'personal-workbench-native/**'
+      - 'personal-workbench-launcher/**'
+      - '.github/workflows/build-personal-workbench.yml'
+  pull_request:
+    paths:
+      - 'personal-workbench-native/**'
+      - 'personal-workbench-launcher/**'
       - '.github/workflows/build-personal-workbench.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-  issues: write
   pull-requests: write
 
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -29,43 +33,106 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+
       - name: Restore
         run: dotnet restore personal-workbench-native/PersonalWorkbench.csproj
 
-      - name: Build
-        run: dotnet build personal-workbench-native/PersonalWorkbench.csproj -c Release --no-restore
-
-      - name: Publish portable EXE
+      - name: Publish framework-dependent app payload
         run: >-
           dotnet publish personal-workbench-native/PersonalWorkbench.csproj
           -c Release
           -r win-x64
-          --self-contained true
+          --self-contained false
           --no-restore
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:EnableCompressionInSingleFile=true
-          -o artifacts/PersonalWorkbench_v0.3.0_Portable
+          -o build/app
+
+      - name: Validate lightweight app payload
+        shell: pwsh
+        run: |
+          $app = 'build/app/PersonalWorkbench.App.exe'
+          if (!(Test-Path $app)) { throw 'PersonalWorkbench.App.exe was not produced.' }
+
+          $forbidden = @(
+            'coreclr.dll',
+            'clrjit.dll',
+            'hostfxr.dll',
+            'hostpolicy.dll',
+            'System.Private.CoreLib.dll'
+          )
+          foreach ($name in $forbidden) {
+            if (Get-ChildItem build/app -Recurse -File -Filter $name -ErrorAction SilentlyContinue) {
+              throw "Bundled runtime file detected: $name"
+            }
+          }
+
+          $payloadSize = (Get-Item $app).Length
+          if ($payloadSize -gt 25MB) {
+            throw "App payload is unexpectedly large: $([math]::Round($payloadSize / 1MB, 2)) MB"
+          }
+          "APP_PAYLOAD_BYTES=$payloadSize" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Embed app payload in native launcher
+        shell: pwsh
+        run: |
+          Copy-Item build/app/PersonalWorkbench.App.exe personal-workbench-launcher/payload/PersonalWorkbench.App.exe -Force
+          New-Item -ItemType Directory -Path artifacts/PersonalWorkbench_v0.3.1_Lightweight -Force | Out-Null
+          Push-Location personal-workbench-launcher
+          go build -trimpath -ldflags '-s -w -H windowsgui' -o ../artifacts/PersonalWorkbench_v0.3.1_Lightweight/PersonalWorkbench.exe .
+          Pop-Location
+
+      - name: Validate final package size
+        shell: pwsh
+        run: |
+          $exe = 'artifacts/PersonalWorkbench_v0.3.1_Lightweight/PersonalWorkbench.exe'
+          if (!(Test-Path $exe)) { throw 'Lightweight launcher was not produced.' }
+          $size = (Get-Item $exe).Length
+          if ($size -gt 35MB) {
+            throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB"
+          }
+          @"
+          Personal Workbench v0.3.1 Lightweight
+
+          This package contains only the Personal Workbench application and launcher.
+          It does not bundle the .NET Desktop Runtime or WebView2 Runtime.
+
+          On first launch, missing Microsoft runtimes are detected and can be downloaded
+          and installed automatically from official Microsoft download endpoints.
+          "@ | Set-Content artifacts/PersonalWorkbench_v0.3.1_Lightweight/README.txt -Encoding UTF8
+          "FINAL_EXE_BYTES=$size" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Package
         shell: pwsh
         run: |
-          Compress-Archive -Path artifacts/PersonalWorkbench_v0.3.0_Portable/* -DestinationPath artifacts/PersonalWorkbench_v0.3.0_Portable.zip -Force
-          Get-FileHash artifacts/PersonalWorkbench_v0.3.0_Portable/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
+          Compress-Archive -Path artifacts/PersonalWorkbench_v0.3.1_Lightweight/* -DestinationPath artifacts/PersonalWorkbench_v0.3.1_Lightweight.zip -Force
+          Get-FileHash artifacts/PersonalWorkbench_v0.3.1_Lightweight/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
+          @"
+          app_payload_bytes=$env:APP_PAYLOAD_BYTES
+          final_exe_bytes=$env:FINAL_EXE_BYTES
+          self_contained=false
+          bundled_dotnet_runtime=false
+          bundled_webview2_runtime=false
+          "@ | Set-Content artifacts/build-manifest.txt -Encoding UTF8
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PersonalWorkbench-v0.3.0-win-x64
+          name: PersonalWorkbench-v0.3.1-lightweight-win-x64
           path: |
-            artifacts/PersonalWorkbench_v0.3.0_Portable.zip
-            artifacts/PersonalWorkbench_v0.3.0_Portable/PersonalWorkbench.exe
+            artifacts/PersonalWorkbench_v0.3.1_Lightweight.zip
+            artifacts/PersonalWorkbench_v0.3.1_Lightweight/PersonalWorkbench.exe
             artifacts/SHA256.txt
+            artifacts/build-manifest.txt
           if-no-files-found: error
           retention-days: 14
 
-      - name: Report build run
-        if: always()
+      - name: Report pull-request build
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
           BUILD_STATUS: ${{ job.status }}
@@ -74,6 +141,6 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: 2,
-              body: `PERSONAL_WORKBENCH_BUILD run_id=${context.runId} status=${process.env.BUILD_STATUS} sha=${context.sha}`
+              issue_number: context.issue.number,
+              body: `PERSONAL_WORKBENCH_LIGHTWEIGHT_BUILD run_id=${context.runId} status=${process.env.BUILD_STATUS} sha=${context.sha}`
             });
