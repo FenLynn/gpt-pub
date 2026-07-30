@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   build:
@@ -61,3 +63,17 @@ jobs:
             artifacts/SHA256.txt
           if-no-files-found: error
           retention-days: 14
+
+      - name: Report build run
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          BUILD_STATUS: ${{ job.status }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 2,
+              body: `PERSONAL_WORKBENCH_BUILD run_id=${context.runId} status=${process.env.BUILD_STATUS} sha=${context.sha}`
+            });
