@@ -43,7 +43,7 @@ jobs:
         run: |
           $path = 'personal-workbench-launcher/main_windows.go'
           $content = Get-Content $path -Raw
-          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', 'appVersion = "0.3.2"')
+          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', 'appVersion = "0.3.3"')
           Set-Content $path $content -Encoding UTF8
 
       - name: Restore
@@ -89,36 +89,36 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item build/app/PersonalWorkbench.App.exe personal-workbench-launcher/payload/PersonalWorkbench.App.exe -Force
-          New-Item -ItemType Directory -Path artifacts/PersonalWorkbench_v0.3.2_Lightweight -Force | Out-Null
+          New-Item -ItemType Directory -Path artifacts/PersonalWorkbench_v0.3.3_Lightweight -Force | Out-Null
           Push-Location personal-workbench-launcher
-          go build -trimpath -ldflags '-s -w -H windowsgui' -o ../artifacts/PersonalWorkbench_v0.3.2_Lightweight/PersonalWorkbench.exe .
+          go build -trimpath -ldflags '-s -w -H windowsgui' -o ../artifacts/PersonalWorkbench_v0.3.3_Lightweight/PersonalWorkbench.exe .
           Pop-Location
 
       - name: Validate final package size
         shell: pwsh
         run: |
-          $exe = 'artifacts/PersonalWorkbench_v0.3.2_Lightweight/PersonalWorkbench.exe'
+          $exe = 'artifacts/PersonalWorkbench_v0.3.3_Lightweight/PersonalWorkbench.exe'
           if (!(Test-Path $exe)) { throw 'Lightweight launcher was not produced.' }
           $size = (Get-Item $exe).Length
           if ($size -gt 35MB) {
             throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB"
           }
           @"
-          Personal Workbench v0.3.2 Lightweight
+          Personal Workbench v0.3.3 Lightweight
 
           This package contains only the Personal Workbench application and launcher.
           It does not bundle the .NET Desktop Runtime or WebView2 Runtime.
 
-          Unicode symbol icons have been replaced by native WPF vector paths so the
-          interface remains clear and consistent across Windows font configurations.
-          "@ | Set-Content artifacts/PersonalWorkbench_v0.3.2_Lightweight/README.txt -Encoding UTF8
+          The collapsed sidebar now always has a visible expand control, the bottom area
+          uses distinct settings and user elements, and the home screen uses compact cards.
+          "@ | Set-Content artifacts/PersonalWorkbench_v0.3.3_Lightweight/README.txt -Encoding UTF8
           "FINAL_EXE_BYTES=$size" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Package
         shell: pwsh
         run: |
-          Compress-Archive -Path artifacts/PersonalWorkbench_v0.3.2_Lightweight/* -DestinationPath artifacts/PersonalWorkbench_v0.3.2_Lightweight.zip -Force
-          Get-FileHash artifacts/PersonalWorkbench_v0.3.2_Lightweight/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
+          Compress-Archive -Path artifacts/PersonalWorkbench_v0.3.3_Lightweight/* -DestinationPath artifacts/PersonalWorkbench_v0.3.3_Lightweight.zip -Force
+          Get-FileHash artifacts/PersonalWorkbench_v0.3.3_Lightweight/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
           @"
           app_payload_bytes=$env:APP_PAYLOAD_BYTES
           final_exe_bytes=$env:FINAL_EXE_BYTES
@@ -126,15 +126,17 @@ jobs:
           bundled_dotnet_runtime=false
           bundled_webview2_runtime=false
           icon_rendering=wpf_vector_paths
+          sidebar_expand_control=persistent_brand_button
+          home_layout=compact_fixed_cards
           "@ | Set-Content artifacts/build-manifest.txt -Encoding UTF8
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PersonalWorkbench-v0.3.2-lightweight-win-x64
+          name: PersonalWorkbench-v0.3.3-lightweight-win-x64
           path: |
-            artifacts/PersonalWorkbench_v0.3.2_Lightweight.zip
-            artifacts/PersonalWorkbench_v0.3.2_Lightweight/PersonalWorkbench.exe
+            artifacts/PersonalWorkbench_v0.3.3_Lightweight.zip
+            artifacts/PersonalWorkbench_v0.3.3_Lightweight/PersonalWorkbench.exe
             artifacts/SHA256.txt
             artifacts/build-manifest.txt
           if-no-files-found: error

@@ -5,6 +5,15 @@
     <Application.Resources>
         <FontFamily x:Key="AppFont">Segoe UI, Microsoft YaHei UI</FontFamily>
 
+        <DrawingImage x:Key="AppWindowIcon">
+            <DrawingImage.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#5D7AF0" Geometry="M2,2 H30 V30 H2 Z"/>
+                    <GeometryDrawing Brush="White" Geometry="M7,8 L11,24 L16,15 L21,24 L25,8 L21.5,8 L19.5,18 L16,11 L12.5,18 L10.5,8 Z"/>
+                </DrawingGroup>
+            </DrawingImage.Drawing>
+        </DrawingImage>
+
         <SolidColorBrush x:Key="TextPrimary" Color="#1F2A3D"/>
         <SolidColorBrush x:Key="TextSecondary" Color="#64748B"/>
         <SolidColorBrush x:Key="LineBrush" Color="#DCE4EF"/>
@@ -28,103 +37,35 @@
             <Setter Property="Stretch" Value="Uniform"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
         </Style>
-
         <Style x:Key="NavIconPath" TargetType="Path" BasedOn="{StaticResource VectorPathBase}">
             <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}"/>
         </Style>
-
         <Style x:Key="ButtonIconPath" TargetType="Path" BasedOn="{StaticResource VectorPathBase}">
             <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"/>
         </Style>
 
         <Style x:Key="IconButton" TargetType="Button">
-            <Setter Property="Width" Value="34"/>
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#5F7087"/>
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="9">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bg" Property="Background" Value="#EEF3FA"/>
-                                <Setter Property="Foreground" Value="#2F6FDB"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bg" Property="Background" Value="#E2EAF5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Width" Value="34"/><Setter Property="Height" Value="34"/><Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/><Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#5F7087"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="9"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bg" Property="Background" Value="#EEF3FA"/><Setter Property="Foreground" Value="#2F6FDB"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Bg" Property="Background" Value="#E2EAF5"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
         </Style>
 
         <Style x:Key="NavButton" TargetType="RadioButton">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="Margin" Value="0,2"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#4F6077"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Root" Background="Transparent" CornerRadius="10" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#F1F5FA"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#EAF2FF"/>
-                                <Setter Property="Foreground" Value="#2C6FEA"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Height" Value="40"/><Setter Property="Margin" Value="0,2"/><Setter Property="Padding" Value="13,0,5,0"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="#4F6077"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Root" Background="Transparent" CornerRadius="10" Padding="{TemplateBinding Padding}"><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#F1F5FA"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Root" Property="Background" Value="#EAF2FF"/><Setter Property="Foreground" Value="#2C6FEA"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
         </Style>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Padding" Value="16,0"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="#4285F4"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="10">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Opacity" Value="0.9"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Height" Value="34"/><Setter Property="MinWidth" Value="108"/><Setter Property="Padding" Value="14,0"/>
+            <Setter Property="BorderThickness" Value="0"/><Setter Property="Background" Value="#4285F4"/><Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="13"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.9"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.82"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
         </Style>
-
-        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="#EEF3FA"/>
-            <Setter Property="Foreground" Value="#38516F"/>
-        </Style>
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"><Setter Property="Background" Value="#EEF3FA"/><Setter Property="Foreground" Value="#38516F"/></Style>
+        <Style x:Key="HomeCard" TargetType="Border"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#E1E8F1"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="14"/><Setter Property="Padding" Value="16"/></Style>
     </Application.Resources>
 </Application>
