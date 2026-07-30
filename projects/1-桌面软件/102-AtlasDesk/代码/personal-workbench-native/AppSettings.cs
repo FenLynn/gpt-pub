@@ -12,6 +12,9 @@ public sealed class AppSettings
     public string WorkspaceRoot { get; set; } = string.Empty;
     public string ZoteroDbPath { get; set; } = string.Empty;
     public string PythonPath { get; set; } = string.Empty;
+    public string CondaPath { get; set; } = string.Empty;
+    public string UvPath { get; set; } = string.Empty;
+    public string SelectedPythonEnvironment { get; set; } = string.Empty;
     public string GitPath { get; set; } = string.Empty;
     public string CodexDir { get; set; } = string.Empty;
     public string GeminiDir { get; set; } = string.Empty;
