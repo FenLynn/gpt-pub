@@ -8,11 +8,11 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>PersonalWorkbench.App</AssemblyName>
     <RootNamespace>PersonalWorkbench</RootNamespace>
-    <Version>0.4.0</Version>
-    <FileVersion>0.4.0.0</FileVersion>
-    <AssemblyVersion>0.4.0.0</AssemblyVersion>
+    <Version>0.5.0</Version>
+    <FileVersion>0.5.0.0</FileVersion>
+    <AssemblyVersion>0.5.0.0</AssemblyVersion>
 
-    <!-- Lightweight distribution: bundle only the app and its direct dependencies. -->
+    <!-- Lightweight distribution: bundle only the app and direct UI dependencies. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
@@ -25,6 +25,7 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3240.44" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.7" />
     <Using Include="System.IO" />
+    <EmbeddedResource Include="TerminalAssets\**\*" />
   </ItemGroup>
 
   <Target Name="NormalizeSources" BeforeTargets="PrepareForBuild">
