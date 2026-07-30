@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="vendor/xterm.css" />
+  <style>
+    html, body, #terminal { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0d1320; }
+    body { font-family: 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace; }
+    .xterm { padding: 7px 9px 5px 9px; box-sizing: border-box; }
+    .xterm-viewport::-webkit-scrollbar { width: 10px; }
+    .xterm-viewport::-webkit-scrollbar-thumb { background: #33445d; border-radius: 7px; border: 2px solid #0d1320; }
+    .xterm-viewport::-webkit-scrollbar-track { background: #0d1320; }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="terminal-host.js"></script>
+</body>
+</html>
