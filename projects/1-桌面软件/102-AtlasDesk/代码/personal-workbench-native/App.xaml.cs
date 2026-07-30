@@ -5,6 +5,8 @@ namespace PersonalWorkbench;
 
 public partial class App : Application
 {
+    private WorkbenchEnhancer? _enhancer;
+
     public static string AppDataDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "PersonalWorkbench");
@@ -16,7 +18,7 @@ public partial class App : Application
     {
         Directory.CreateDirectory(AppDataDirectory);
         Directory.CreateDirectory(LogDirectory);
-        Log("Starting Personal Workbench 0.3.0");
+        Log("Starting Personal Workbench 0.5.0");
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -38,7 +40,25 @@ public partial class App : Application
             args.SetObserved();
         };
 
+        Activated += App_Activated;
         base.OnStartup(e);
+    }
+
+    private void App_Activated(object? sender, EventArgs e)
+    {
+        if (_enhancer is not null || MainWindow is not MainWindow window)
+            return;
+        try
+        {
+            _enhancer = WorkbenchEnhancer.Attach(window);
+            Log("Workbench v0.5 feature modules attached");
+        }
+        catch (Exception ex)
+        {
+            Log("Feature enhancer failed: " + ex);
+            MessageBox.Show("工作台功能模块初始化失败：\n" + ex.Message + "\n\n日志：" + LogPath,
+                "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     public static void Log(string message)
