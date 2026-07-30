@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Personal Workbench" Width="1460" Height="900" MinWidth="1020" MinHeight="650"
-        WindowStartupLocation="CenterScreen" Background="#EEF3F9"
+        WindowStartupLocation="CenterScreen"
         FontFamily="{StaticResource AppFont}"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType"
@@ -54,7 +54,11 @@
                         <TextBlock Text="Workbench" FontSize="14" FontWeight="SemiBold"/>
                         <TextBlock Text="Personal OS" FontSize="10.5" Foreground="#7B899B" Margin="0,1,0,0"/>
                     </StackPanel>
-                    <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="☰" ToolTip="折叠或展开目录" Click="ToggleSidebar_Click"/>
+                    <Button Grid.Column="2" Style="{StaticResource IconButton}" ToolTip="折叠或展开目录" Click="ToggleSidebar_Click">
+                        <Viewbox Width="18" Height="18">
+                            <Path Style="{StaticResource ButtonIconPath}" Data="M4,7 L20,7 M4,12 L20,12 M4,17 L20,17"/>
+                        </Viewbox>
+                    </Button>
                 </Grid>
 
                 <Button Grid.Row="1" x:Name="CommandButton" Height="36" Margin="0,2,0,2" Background="#F1F5FA" BorderBrush="#E3EAF3" BorderThickness="1" Cursor="Hand" Click="CommandButton_Click">
@@ -65,7 +69,9 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="24"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="⌕" FontSize="17" Foreground="#73839A" VerticalAlignment="Center"/>
+                                    <Viewbox Width="17" Height="17" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Path Data="M10.5,4 C6.9,4 4,6.9 4,10.5 C4,14.1 6.9,17 10.5,17 C14.1,17 17,14.1 17,10.5 C17,6.9 14.1,4 10.5,4 Z M15.3,15.3 L20,20" Stroke="#73839A" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Fill="Transparent"/>
+                                    </Viewbox>
                                     <TextBlock x:Name="SearchText" Grid.Column="1" Text="搜索或执行" FontSize="12.5" Foreground="#66758A" VerticalAlignment="Center"/>
                                     <Border x:Name="Shortcut" Grid.Column="2" Background="#E6ECF4" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
                                         <TextBlock Text="Ctrl K" FontSize="9.5" Foreground="#8794A5"/>
@@ -79,35 +85,59 @@
                 <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,8">
                     <StackPanel>
                         <TextBlock x:Name="WorkLabel" Text="工作台" FontSize="10.5" Foreground="#9AA6B5" Margin="10,2,0,4"/>
-                        <RadioButton x:Name="HomeNav" GroupName="Navigation" Style="{StaticResource NavButton}" IsChecked="True" Tag="home" Checked="Navigation_Checked">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="⌂" FontSize="16" Width="26"/><TextBlock x:Name="HomeNavText" Text="首页"/></StackPanel>
+                        <RadioButton x:Name="HomeNav" GroupName="Navigation" Style="{StaticResource NavButton}" IsChecked="True" Tag="home" ToolTip="首页" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M3,11 L12,3 L21,11 M5,10 L5,21 L19,21 L19,10 M9,21 L9,14 L15,14 L15,21"/></Viewbox>
+                                <TextBlock x:Name="HomeNavText" Text="首页"/>
+                            </StackPanel>
                         </RadioButton>
-                        <RadioButton x:Name="WorkspaceNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="workspace" Checked="Navigation_Checked">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="▦" FontSize="15" Width="26"/><TextBlock x:Name="WorkspaceNavText" Text="工作区"/></StackPanel>
+                        <RadioButton x:Name="WorkspaceNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="workspace" ToolTip="工作区" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M4,4 H10 V10 H4 Z M14,4 H20 V10 H14 Z M4,14 H10 V20 H4 Z M14,14 H20 V20 H14 Z"/></Viewbox>
+                                <TextBlock x:Name="WorkspaceNavText" Text="工作区"/>
+                            </StackPanel>
                         </RadioButton>
-                        <RadioButton x:Name="LibraryNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="library" Checked="Navigation_Checked">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="▤" FontSize="15" Width="26"/><TextBlock x:Name="LibraryNavText" Text="资料库"/></StackPanel>
+                        <RadioButton x:Name="LibraryNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="library" ToolTip="资料库" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M5,4 H16 C18,4 19,5 19,7 V20 H8 C6,20 5,19 5,17 Z M5,17 C6,16 7,16 8,16 H19 M8,8 H16 M8,12 H16"/></Viewbox>
+                                <TextBlock x:Name="LibraryNavText" Text="资料库"/>
+                            </StackPanel>
                         </RadioButton>
 
                         <TextBlock x:Name="AbilityLabel" Text="能力" FontSize="10.5" Foreground="#9AA6B5" Margin="10,12,0,4"/>
-                        <RadioButton x:Name="DevelopmentNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="development" Checked="Navigation_Checked">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="›_" FontSize="15" Width="26"/><TextBlock x:Name="DevelopmentNavText" Text="开发"/></StackPanel>
+                        <RadioButton x:Name="DevelopmentNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="development" ToolTip="开发" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M4,5 H20 V19 H4 Z M7,9 L10,12 L7,15 M12,15 H17"/></Viewbox>
+                                <TextBlock x:Name="DevelopmentNavText" Text="开发"/>
+                            </StackPanel>
                         </RadioButton>
-                        <RadioButton x:Name="ToolsNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="tools" Checked="Navigation_Checked">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="⚒" FontSize="15" Width="26"/><TextBlock x:Name="ToolsNavText" Text="工具"/></StackPanel>
+                        <RadioButton x:Name="ToolsNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="tools" ToolTip="工具" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M4,7 H20 M4,12 H20 M4,17 H20 M8,5 V9 M15,10 V14 M10,15 V19"/></Viewbox>
+                                <TextBlock x:Name="ToolsNavText" Text="工具"/>
+                            </StackPanel>
                         </RadioButton>
-                        <RadioButton x:Name="DashboardNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="dashboard" Checked="Navigation_Checked">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="☁" FontSize="16" Width="26"/><TextBlock x:Name="DashboardNavText" Text="Dashboard"/></StackPanel>
+                        <RadioButton x:Name="DashboardNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="dashboard" ToolTip="Dashboard" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M6,18 H18 C20.2,18 22,16.2 22,14 C22,11.8 20.2,10 18,10 C17.4,6.6 14.5,4 11,4 C7.8,4 5.1,6.2 4.3,9.2 C2.4,9.8 1,11.6 1,13.7 C1,16.1 3,18 6,18 Z"/></Viewbox>
+                                <TextBlock x:Name="DashboardNavText" Text="Dashboard"/>
+                            </StackPanel>
                         </RadioButton>
-                        <RadioButton x:Name="TasksNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="tasks" Checked="Navigation_Checked">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="⌁" FontSize="16" Width="26"/><TextBlock x:Name="TasksNavText" Text="任务"/></StackPanel>
+                        <RadioButton x:Name="TasksNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="tasks" ToolTip="任务" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M9,6 H20 M9,12 H20 M9,18 H20 M3,6 L4.5,7.5 L7,4.5 M3,12 L4.5,13.5 L7,10.5 M3,18 L4.5,19.5 L7,16.5"/></Viewbox>
+                                <TextBlock x:Name="TasksNavText" Text="任务"/>
+                            </StackPanel>
                         </RadioButton>
                     </StackPanel>
                 </ScrollViewer>
 
                 <StackPanel Grid.Row="3">
-                    <RadioButton x:Name="SettingsNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="settings" Checked="Navigation_Checked">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="⚙" FontSize="15" Width="26"/><TextBlock x:Name="SettingsNavText" Text="设置"/></StackPanel>
+                    <RadioButton x:Name="SettingsNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="settings" ToolTip="设置" Checked="Navigation_Checked">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="18" Height="18" Margin="0,0,8,0"><Path Style="{StaticResource NavIconPath}" Data="M4,7 H20 M4,12 H20 M4,17 H20 M8,5 V9 M15,10 V14 M10,15 V19"/></Viewbox>
+                            <TextBlock x:Name="SettingsNavText" Text="设置"/>
+                        </StackPanel>
                     </RadioButton>
                     <Border Height="48" Margin="0,6,0,0" Background="#F3F6FA" CornerRadius="11" Padding="8">
                         <Grid>
@@ -136,7 +166,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Grid x:Name="TopBar" Grid.Row="0" Background="#FAFCFE" Margin="0">
+                <Grid x:Name="TopBar" Grid.Row="0" Background="#FAFCFE">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -144,10 +174,18 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel x:Name="BrowserControls" Orientation="Horizontal" Margin="10,0,5,0" VerticalAlignment="Center" Visibility="Collapsed">
-                        <Button Style="{StaticResource IconButton}" Content="←" ToolTip="后退" Click="Back_Click"/>
-                        <Button Style="{StaticResource IconButton}" Content="→" ToolTip="前进" Click="Forward_Click"/>
-                        <Button Style="{StaticResource IconButton}" Content="↻" ToolTip="刷新" Click="Refresh_Click"/>
-                        <Button Style="{StaticResource IconButton}" Content="⌂" ToolTip="Dashboard 首页" Click="DashboardHome_Click"/>
+                        <Button Style="{StaticResource IconButton}" ToolTip="后退" Click="Back_Click">
+                            <Viewbox Width="17" Height="17"><Path Style="{StaticResource ButtonIconPath}" Data="M19,12 H5 M11,6 L5,12 L11,18"/></Viewbox>
+                        </Button>
+                        <Button Style="{StaticResource IconButton}" ToolTip="前进" Click="Forward_Click">
+                            <Viewbox Width="17" Height="17"><Path Style="{StaticResource ButtonIconPath}" Data="M5,12 H19 M13,6 L19,12 L13,18"/></Viewbox>
+                        </Button>
+                        <Button Style="{StaticResource IconButton}" ToolTip="刷新" Click="Refresh_Click">
+                            <Viewbox Width="17" Height="17"><Path Style="{StaticResource ButtonIconPath}" Data="M20,11 C19.5,7 16.1,4 12,4 C7.6,4 4,7.6 4,12 C4,16.4 7.6,20 12,20 C15,20 17.6,18.3 19,16 M20,11 V5 M20,11 H14"/></Viewbox>
+                        </Button>
+                        <Button Style="{StaticResource IconButton}" ToolTip="Dashboard 首页" Click="DashboardHome_Click">
+                            <Viewbox Width="17" Height="17"><Path Style="{StaticResource ButtonIconPath}" Data="M3,11 L12,3 L21,11 M5,10 L5,21 L19,21 L19,10 M9,21 L9,14 L15,14 L15,21"/></Viewbox>
+                        </Button>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,10,0">
@@ -157,11 +195,20 @@
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,10,0">
                         <Border x:Name="AccessBadge" Background="#EAF8F2" CornerRadius="9" Padding="9,5" Margin="0,0,6,0" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="●" FontSize="9" Foreground="#25A46C" Margin="0,0,5,0"/><TextBlock x:Name="AccessStatusText" Text="会话目录已启用" FontSize="11.5" Foreground="#2F7E60"/></StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" Fill="#25A46C" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="AccessStatusText" Text="会话目录已启用" FontSize="11.5" Foreground="#2F7E60"/>
+                            </StackPanel>
                         </Border>
-                        <Button x:Name="PopoutButton" Style="{StaticResource IconButton}" Content="↗" ToolTip="弹出或收回 Dashboard" Click="Popout_Click" Visibility="Collapsed"/>
-                        <Button x:Name="FullscreenButton" Style="{StaticResource IconButton}" Content="⛶" ToolTip="全屏" Click="Fullscreen_Click" Visibility="Collapsed"/>
-                        <Button Style="{StaticResource IconButton}" Content="⌕" ToolTip="命令面板" Click="CommandButton_Click"/>
+                        <Button x:Name="PopoutButton" Style="{StaticResource IconButton}" ToolTip="弹出或收回 Dashboard" Click="Popout_Click" Visibility="Collapsed">
+                            <Viewbox Width="17" Height="17"><Path Style="{StaticResource ButtonIconPath}" Data="M14,4 H20 V10 M20,4 L11,13 M18,13 V20 H4 V6 H11"/></Viewbox>
+                        </Button>
+                        <Button x:Name="FullscreenButton" Style="{StaticResource IconButton}" ToolTip="全屏" Click="Fullscreen_Click" Visibility="Collapsed">
+                            <Viewbox Width="17" Height="17"><Path Style="{StaticResource ButtonIconPath}" Data="M9,4 H4 V9 M15,4 H20 V9 M20,15 V20 H15 M9,20 H4 V15"/></Viewbox>
+                        </Button>
+                        <Button Style="{StaticResource IconButton}" ToolTip="命令面板" Click="CommandButton_Click">
+                            <Viewbox Width="17" Height="17"><Path Style="{StaticResource ButtonIconPath}" Data="M10.5,4 C6.9,4 4,6.9 4,10.5 C4,14.1 6.9,17 10.5,17 C14.1,17 17,14.1 17,10.5 C17,6.9 14.1,4 10.5,4 Z M15.3,15.3 L20,20"/></Viewbox>
+                        </Button>
                     </StackPanel>
                     <ProgressBar x:Name="NavigationProgress" Grid.ColumnSpan="3" Height="2" VerticalAlignment="Bottom" IsIndeterminate="True" Foreground="#4285F4" Visibility="Collapsed"/>
                 </Grid>
@@ -175,13 +222,26 @@
                         </StackPanel>
                         <UniformGrid Grid.Row="2" Columns="3" Rows="2">
                             <Border Margin="0,0,10,10" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="18">
-                                <StackPanel><TextBlock Text="☁" FontSize="24" Foreground="#4285F4"/><TextBlock Text="Cloudflare Dashboard" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/><TextBlock Text="在主窗口内打开，Access 登录状态长期保存。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/><Button Content="打开 Dashboard" Style="{StaticResource PrimaryButton}" Margin="0,16,0,0" HorizontalAlignment="Left" Click="OpenDashboard_Click"/></StackPanel>
+                                <StackPanel>
+                                    <Viewbox Width="26" Height="26" HorizontalAlignment="Left"><Path Data="M6,18 H18 C20.2,18 22,16.2 22,14 C22,11.8 20.2,10 18,10 C17.4,6.6 14.5,4 11,4 C7.8,4 5.1,6.2 4.3,9.2 C2.4,9.8 1,11.6 1,13.7 C1,16.1 3,18 6,18 Z" Stroke="#4285F4" StrokeThickness="1.8" StrokeLineJoin="Round" Fill="Transparent"/></Viewbox>
+                                    <TextBlock Text="Cloudflare Dashboard" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                                    <TextBlock Text="在主窗口内打开，Access 登录状态长期保存。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/>
+                                    <Button Content="打开 Dashboard" Style="{StaticResource PrimaryButton}" Margin="0,16,0,0" HorizontalAlignment="Left" Click="OpenDashboard_Click"/>
+                                </StackPanel>
                             </Border>
                             <Border Margin="0,0,10,10" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="18">
-                                <StackPanel><TextBlock Text="›_" FontSize="24" Foreground="#7B67E8"/><TextBlock Text="开发环境" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/><TextBlock Text="Python、终端、Git、Codex 和 Gemini 将在这里统一组织。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/></StackPanel>
+                                <StackPanel>
+                                    <Viewbox Width="26" Height="26" HorizontalAlignment="Left"><Path Data="M4,5 H20 V19 H4 Z M7,9 L10,12 L7,15 M12,15 H17" Stroke="#7B67E8" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Fill="Transparent"/></Viewbox>
+                                    <TextBlock Text="开发环境" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                                    <TextBlock Text="Python、终端、Git、Codex 和 Gemini 将在这里统一组织。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/>
+                                </StackPanel>
                             </Border>
                             <Border Margin="0,0,0,10" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="18">
-                                <StackPanel><TextBlock Text="▤" FontSize="24" Foreground="#2A9CAA"/><TextBlock Text="资料库" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/><TextBlock Text="Zotero 只读检索、PDF 和 Markdown 笔记。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/></StackPanel>
+                                <StackPanel>
+                                    <Viewbox Width="26" Height="26" HorizontalAlignment="Left"><Path Data="M5,4 H16 C18,4 19,5 19,7 V20 H8 C6,20 5,19 5,17 Z M5,17 C6,16 7,16 8,16 H19 M8,8 H16 M8,12 H16" Stroke="#2A9CAA" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Fill="Transparent"/></Viewbox>
+                                    <TextBlock Text="资料库" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                                    <TextBlock Text="Zotero 只读检索、PDF 和 Markdown 笔记。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/>
+                                </StackPanel>
                             </Border>
                         </UniformGrid>
                     </Grid>
@@ -190,7 +250,9 @@
                         <Grid x:Name="DashboardHost" Background="White"/>
                         <Border x:Name="DashboardEmpty" Background="#F7F9FC" Visibility="Collapsed">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="430">
-                                <Border Width="58" Height="58" Background="#EAF2FF" CornerRadius="18"><TextBlock Text="☁" Foreground="#4285F4" FontSize="25" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <Border Width="58" Height="58" Background="#EAF2FF" CornerRadius="18">
+                                    <Viewbox Width="27" Height="27" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="M6,18 H18 C20.2,18 22,16.2 22,14 C22,11.8 20.2,10 18,10 C17.4,6.6 14.5,4 11,4 C7.8,4 5.1,6.2 4.3,9.2 C2.4,9.8 1,11.6 1,13.7 C1,16.1 3,18 6,18 Z" Stroke="#4285F4" StrokeThickness="1.8" StrokeLineJoin="Round" Fill="Transparent"/></Viewbox>
+                                </Border>
                                 <TextBlock x:Name="DashboardEmptyTitle" Text="尚未配置 Dashboard" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,16,0,5"/>
                                 <TextBlock x:Name="DashboardEmptyDetail" Text="请在设置中填写 Cloudflare Pages 地址。" FontSize="13" Foreground="#718096" TextAlignment="Center" TextWrapping="Wrap"/>
                                 <Button Content="打开设置" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Center" Margin="0,18,0,0" Click="OpenSettings_Click"/>
