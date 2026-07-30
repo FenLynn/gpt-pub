@@ -22,13 +22,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3240.44" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <Using Include="System.IO" />
-    <EmbeddedResource Include="TerminalAssets\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="TerminalAssets\terminal.html" />
+    <EmbeddedResource Include="TerminalAssets\terminal-host.js" />
+    <EmbeddedResource Include="TerminalAssets\vendor\xterm.js" />
+    <EmbeddedResource Include="TerminalAssets\vendor\xterm.css" />
+    <EmbeddedResource Include="TerminalAssets\vendor\addon-fit.js" />
   </ItemGroup>
 
   <Target Name="NormalizeSources" BeforeTargets="PrepareForBuild">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$p='$(MSBuildProjectDirectory)\MainWindow.xaml'; $c=[IO.File]::ReadAllText($p); $c=$c.Replace(' TextTrimming=\&quot;CharacterEllipsis\&quot;',''); [IO.File]::WriteAllText($p,$c,[Text.UTF8Encoding]::new($false))&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$p='$(MSBuildProjectDirectory)\MainWindow.xaml'; $c=[IO.File]::ReadAllText($p); $c=$c.Replace(' TextTrimming=\&quot;CharacterEllipsis\&quot;',''); $c=$c.Replace('v0.4.0 开始进入真实功能阶段：先做只读、轻量、可手动配置的文献与 Python 环境入口。','v0.5.0：Zotero 三栏资料库与内置多标签终端已接入，仍坚持只读、轻量和手动可控。'); [IO.File]::WriteAllText($p,$c,[Text.UTF8Encoding]::new($false)); $z='$(MSBuildProjectDirectory)\ZoteroLibrary.cs'; $s=[IO.File]::ReadAllText($z); $s=$s.Replace('AND i.itemType=@itemType','AND instr('','' || @itemType || '','', '','' || i.itemType || '','') &gt; 0'); [IO.File]::WriteAllText($z,$s,[Text.UTF8Encoding]::new($false))&quot;" />
   </Target>
 </Project>
