@@ -1,0 +1,63 @@
+name: Build Personal Workbench Native
+
+on:
+  push:
+    branches:
+      - main
+      - personal-workbench-webview2
+    paths:
+      - 'personal-workbench-native/**'
+      - '.github/workflows/build-personal-workbench.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore personal-workbench-native/PersonalWorkbench.csproj
+
+      - name: Build
+        run: dotnet build personal-workbench-native/PersonalWorkbench.csproj -c Release --no-restore
+
+      - name: Publish portable EXE
+        run: >-
+          dotnet publish personal-workbench-native/PersonalWorkbench.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          --no-restore
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -o artifacts/PersonalWorkbench_v0.3.0_Portable
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/PersonalWorkbench_v0.3.0_Portable/* -DestinationPath artifacts/PersonalWorkbench_v0.3.0_Portable.zip -Force
+          Get-FileHash artifacts/PersonalWorkbench_v0.3.0_Portable/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PersonalWorkbench-v0.3.0-win-x64
+          path: |
+            artifacts/PersonalWorkbench_v0.3.0_Portable.zip
+            artifacts/PersonalWorkbench_v0.3.0_Portable/PersonalWorkbench.exe
+            artifacts/SHA256.txt
+          if-no-files-found: error
+          retention-days: 14

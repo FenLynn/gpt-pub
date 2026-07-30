@@ -1,0 +1,262 @@
+<Window x:Class="PersonalWorkbench.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Personal Workbench" Width="1460" Height="900" MinWidth="1020" MinHeight="650"
+        WindowStartupLocation="CenterScreen" Background="#EEF3F9"
+        FontFamily="{StaticResource AppFont}"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextHintingMode="Fixed">
+    <Window.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#F5F8FC" Offset="0"/>
+            <GradientStop Color="#EDF3FA" Offset="0.56"/>
+            <GradientStop Color="#F5F1FA" Offset="1"/>
+        </LinearGradientBrush>
+    </Window.Background>
+
+    <Grid x:Name="RootGrid" Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SidebarColumn" Width="224"/>
+            <ColumnDefinition Width="10"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border x:Name="Sidebar" Grid.Column="0" CornerRadius="18" BorderBrush="#DDE6F1" BorderThickness="1" Background="#F9FBFEDD">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.09" Color="#43536A"/>
+            </Border.Effect>
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="48"/>
+                    <RowDefinition Height="40"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="38"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="36"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Width="34" Height="34" CornerRadius="11" VerticalAlignment="Center">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#4C8CF8" Offset="0"/>
+                                <GradientStop Color="#7777EB" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock Text="W" Foreground="White" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel x:Name="BrandText" Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Workbench" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="Personal OS" FontSize="10.5" Foreground="#7B899B" Margin="0,1,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="☰" ToolTip="折叠或展开目录" Click="ToggleSidebar_Click"/>
+                </Grid>
+
+                <Button Grid.Row="1" x:Name="CommandButton" Height="36" Margin="0,2,0,2" Background="#F1F5FA" BorderBrush="#E3EAF3" BorderThickness="1" Cursor="Hand" Click="CommandButton_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10" Padding="10,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="⌕" FontSize="17" Foreground="#73839A" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="SearchText" Grid.Column="1" Text="搜索或执行" FontSize="12.5" Foreground="#66758A" VerticalAlignment="Center"/>
+                                    <Border x:Name="Shortcut" Grid.Column="2" Background="#E6ECF4" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
+                                        <TextBlock Text="Ctrl K" FontSize="9.5" Foreground="#8794A5"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,8">
+                    <StackPanel>
+                        <TextBlock x:Name="WorkLabel" Text="工作台" FontSize="10.5" Foreground="#9AA6B5" Margin="10,2,0,4"/>
+                        <RadioButton x:Name="HomeNav" GroupName="Navigation" Style="{StaticResource NavButton}" IsChecked="True" Tag="home" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="⌂" FontSize="16" Width="26"/><TextBlock x:Name="HomeNavText" Text="首页"/></StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="WorkspaceNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="workspace" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="▦" FontSize="15" Width="26"/><TextBlock x:Name="WorkspaceNavText" Text="工作区"/></StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="LibraryNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="library" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="▤" FontSize="15" Width="26"/><TextBlock x:Name="LibraryNavText" Text="资料库"/></StackPanel>
+                        </RadioButton>
+
+                        <TextBlock x:Name="AbilityLabel" Text="能力" FontSize="10.5" Foreground="#9AA6B5" Margin="10,12,0,4"/>
+                        <RadioButton x:Name="DevelopmentNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="development" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="›_" FontSize="15" Width="26"/><TextBlock x:Name="DevelopmentNavText" Text="开发"/></StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="ToolsNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="tools" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="⚒" FontSize="15" Width="26"/><TextBlock x:Name="ToolsNavText" Text="工具"/></StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="DashboardNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="dashboard" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="☁" FontSize="16" Width="26"/><TextBlock x:Name="DashboardNavText" Text="Dashboard"/></StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="TasksNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="tasks" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="⌁" FontSize="16" Width="26"/><TextBlock x:Name="TasksNavText" Text="任务"/></StackPanel>
+                        </RadioButton>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="3">
+                    <RadioButton x:Name="SettingsNav" GroupName="Navigation" Style="{StaticResource NavButton}" Tag="settings" Checked="Navigation_Checked">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="⚙" FontSize="15" Width="26"/><TextBlock x:Name="SettingsNavText" Text="设置"/></StackPanel>
+                    </RadioButton>
+                    <Border Height="48" Margin="0,6,0,0" Background="#F3F6FA" CornerRadius="11" Padding="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="34"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/></Grid.ColumnDefinitions>
+                            <Border Width="30" Height="30" CornerRadius="9" Background="#6688F0">
+                                <TextBlock Text="F" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel x:Name="UserText" Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="UserNameText" Text="Fenlynn" FontSize="12.5" FontWeight="SemiBold"/>
+                                <TextBlock Text="本地工作台" FontSize="10" Foreground="#8A97A8"/>
+                            </StackPanel>
+                            <Ellipse Grid.Column="2" Width="7" Height="7" Fill="#31B675" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="2" CornerRadius="18" BorderBrush="#DDE6F1" BorderThickness="1" Background="#FBFCFEF2" ClipToBounds="True">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.08" Color="#43536A"/>
+            </Border.Effect>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="TopBarRow" Height="52"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid x:Name="TopBar" Grid.Row="0" Background="#FAFCFE" Margin="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel x:Name="BrowserControls" Orientation="Horizontal" Margin="10,0,5,0" VerticalAlignment="Center" Visibility="Collapsed">
+                        <Button Style="{StaticResource IconButton}" Content="←" ToolTip="后退" Click="Back_Click"/>
+                        <Button Style="{StaticResource IconButton}" Content="→" ToolTip="前进" Click="Forward_Click"/>
+                        <Button Style="{StaticResource IconButton}" Content="↻" ToolTip="刷新" Click="Refresh_Click"/>
+                        <Button Style="{StaticResource IconButton}" Content="⌂" ToolTip="Dashboard 首页" Click="DashboardHome_Click"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,10,0">
+                        <TextBlock x:Name="PageTitle" Text="首页" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="PageSubtitle" Text="  ·  Personal Workbench" FontSize="12" Foreground="#8390A1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,10,0">
+                        <Border x:Name="AccessBadge" Background="#EAF8F2" CornerRadius="9" Padding="9,5" Margin="0,0,6,0" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="●" FontSize="9" Foreground="#25A46C" Margin="0,0,5,0"/><TextBlock x:Name="AccessStatusText" Text="会话目录已启用" FontSize="11.5" Foreground="#2F7E60"/></StackPanel>
+                        </Border>
+                        <Button x:Name="PopoutButton" Style="{StaticResource IconButton}" Content="↗" ToolTip="弹出或收回 Dashboard" Click="Popout_Click" Visibility="Collapsed"/>
+                        <Button x:Name="FullscreenButton" Style="{StaticResource IconButton}" Content="⛶" ToolTip="全屏" Click="Fullscreen_Click" Visibility="Collapsed"/>
+                        <Button Style="{StaticResource IconButton}" Content="⌕" ToolTip="命令面板" Click="CommandButton_Click"/>
+                    </StackPanel>
+                    <ProgressBar x:Name="NavigationProgress" Grid.ColumnSpan="3" Height="2" VerticalAlignment="Bottom" IsIndeterminate="True" Foreground="#4285F4" Visibility="Collapsed"/>
+                </Grid>
+
+                <Grid Grid.Row="1" x:Name="ContentGrid" Background="#F7F9FC">
+                    <Grid x:Name="HomeView" Margin="22">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="个人工作台" FontSize="24" FontWeight="SemiBold"/>
+                            <TextBlock Text="项目、资料、开发环境和 Cloudflare Dashboard 的统一入口。" FontSize="13.5" Foreground="#6B7A90" Margin="0,5,0,0"/>
+                        </StackPanel>
+                        <UniformGrid Grid.Row="2" Columns="3" Rows="2">
+                            <Border Margin="0,0,10,10" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="18">
+                                <StackPanel><TextBlock Text="☁" FontSize="24" Foreground="#4285F4"/><TextBlock Text="Cloudflare Dashboard" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/><TextBlock Text="在主窗口内打开，Access 登录状态长期保存。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/><Button Content="打开 Dashboard" Style="{StaticResource PrimaryButton}" Margin="0,16,0,0" HorizontalAlignment="Left" Click="OpenDashboard_Click"/></StackPanel>
+                            </Border>
+                            <Border Margin="0,0,10,10" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="18">
+                                <StackPanel><TextBlock Text="›_" FontSize="24" Foreground="#7B67E8"/><TextBlock Text="开发环境" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/><TextBlock Text="Python、终端、Git、Codex 和 Gemini 将在这里统一组织。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/></StackPanel>
+                            </Border>
+                            <Border Margin="0,0,0,10" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="18">
+                                <StackPanel><TextBlock Text="▤" FontSize="24" Foreground="#2A9CAA"/><TextBlock Text="资料库" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4"/><TextBlock Text="Zotero 只读检索、PDF 和 Markdown 笔记。" FontSize="12.5" Foreground="#738197" TextWrapping="Wrap"/></StackPanel>
+                            </Border>
+                        </UniformGrid>
+                    </Grid>
+
+                    <Grid x:Name="DashboardView" Visibility="Collapsed">
+                        <Grid x:Name="DashboardHost" Background="White"/>
+                        <Border x:Name="DashboardEmpty" Background="#F7F9FC" Visibility="Collapsed">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="430">
+                                <Border Width="58" Height="58" Background="#EAF2FF" CornerRadius="18"><TextBlock Text="☁" Foreground="#4285F4" FontSize="25" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <TextBlock x:Name="DashboardEmptyTitle" Text="尚未配置 Dashboard" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,16,0,5"/>
+                                <TextBlock x:Name="DashboardEmptyDetail" Text="请在设置中填写 Cloudflare Pages 地址。" FontSize="13" Foreground="#718096" TextAlignment="Center" TextWrapping="Wrap"/>
+                                <Button Content="打开设置" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Center" Margin="0,18,0,0" Click="OpenSettings_Click"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="DashboardError" Background="#F7F9FC" Visibility="Collapsed">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="540">
+                                <TextBlock Text="Dashboard 初始化失败" FontSize="18" FontWeight="SemiBold" Foreground="#B23B49" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="DashboardErrorText" FontSize="13" Foreground="#5F6F84" TextAlignment="Center" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
+                                    <Button Content="重试" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="RetryDashboard_Click"/>
+                                    <Button Content="打开日志目录" Style="{StaticResource SecondaryButton}" Click="OpenLogs_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Grid x:Name="PlaceholderView" Visibility="Collapsed" Margin="24">
+                        <StackPanel>
+                            <TextBlock x:Name="PlaceholderTitle" Text="工作区" FontSize="23" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="PlaceholderSubtitle" Text="模块骨架已经就位。" FontSize="13.5" Foreground="#6B7A90" Margin="0,5,0,18"/>
+                            <Border Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="22">
+                                <TextBlock Text="这一轮优先确保 Dashboard、Access 登录、窗口与清晰度可靠。后续功能会在此架构上逐项接入。" FontSize="13" Foreground="#63738A" TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <ScrollViewer x:Name="SettingsView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <Grid Margin="24" MaxWidth="900" HorizontalAlignment="Left">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="18"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="设置" FontSize="23" FontWeight="SemiBold"/>
+                                <TextBlock Text="手动绑定路径与服务，配置仅保存在本机。" FontSize="13.5" Foreground="#6B7A90" Margin="0,5,0,0"/>
+                            </StackPanel>
+                            <Border Grid.Row="2" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="14" Padding="22">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="520"/></Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="14"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="14"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="14"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="14"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="20"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="用户名" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="UserNameBox" Grid.Row="0" Grid.Column="1" Height="38" Padding="10,7" FontSize="13" BorderBrush="#D8E1EC" Background="#FBFCFE"/>
+                                    <TextBlock Grid.Row="2" Text="Dashboard 名称" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="DashboardNameBox" Grid.Row="2" Grid.Column="1" Height="38" Padding="10,7" FontSize="13" BorderBrush="#D8E1EC" Background="#FBFCFE"/>
+                                    <TextBlock Grid.Row="4" Text="Cloudflare Pages" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="DashboardUrlBox" Grid.Row="4" Grid.Column="1" Height="38" Padding="10,7" FontSize="13" BorderBrush="#D8E1EC" Background="#FBFCFE" ToolTip="例如 https://dashboard.example.com"/>
+                                    <TextBlock Grid.Row="6" Text="工作区目录" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="WorkspaceBox" Grid.Row="6" Grid.Column="1" Height="38" Padding="10,7" FontSize="13" BorderBrush="#D8E1EC" Background="#FBFCFE"/>
+                                    <TextBlock Grid.Row="8" Text="Zotero 数据库" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="ZoteroBox" Grid.Row="8" Grid.Column="1" Height="38" Padding="10,7" FontSize="13" BorderBrush="#D8E1EC" Background="#FBFCFE"/>
+                                    <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="保存设置" Style="{StaticResource PrimaryButton}" Click="SaveSettings_Click"/>
+                                        <Button Content="清除 Access 会话" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="ClearSession_Click"/>
+                                        <Button Content="打开配置目录" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="OpenConfig_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
