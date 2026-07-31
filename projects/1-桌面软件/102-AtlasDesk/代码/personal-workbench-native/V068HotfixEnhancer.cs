@@ -191,7 +191,12 @@ public sealed class V068HotfixEnhancer
             UpdateTopTerminalButtonVisibility();
 
             if (openDefaultSession && !_terminal.HasSessions)
-                await _terminal.OpenShellAsync(_settings.DefaultShell, title: "开发终端");
+            {
+                if (string.Equals(_settings.DefaultShell, "cmd", StringComparison.OrdinalIgnoreCase))
+                    await _terminal.OpenAsync(TerminalReliability.CreateCmd(_settings, "开发终端"));
+                else
+                    await _terminal.OpenShellAsync(_settings.DefaultShell, title: "开发终端");
+            }
         }
         catch (Exception ex)
         {

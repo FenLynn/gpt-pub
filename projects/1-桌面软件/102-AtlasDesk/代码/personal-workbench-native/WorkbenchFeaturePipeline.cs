@@ -17,6 +17,8 @@ public sealed class WorkbenchFeaturePipeline
         Tools = V065ToolsEnhancer.Attach(window, this);
         Backup = V066BackupEnhancer.Attach(window);
         Hotfix = V068HotfixEnhancer.Attach(window, this);
+        UiFixes = V069UiFixEnhancer.Attach(window, this);
+        TerminalPresentation = V0610TerminalPresentationEnhancer.Attach(this);
     }
 
     public V067VisualFixes VisualFixes { get; }
@@ -28,6 +30,8 @@ public sealed class WorkbenchFeaturePipeline
     public V065ToolsEnhancer Tools { get; }
     public V066BackupEnhancer Backup { get; }
     public V068HotfixEnhancer Hotfix { get; }
+    public V069UiFixEnhancer UiFixes { get; }
+    public V0610TerminalPresentationEnhancer TerminalPresentation { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);

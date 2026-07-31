@@ -109,6 +109,8 @@ public sealed class ConPtySession : IAsyncDisposable, IDisposable
     private IntPtr _pseudoConsole;
     private IntPtr _processHandle;
     private IntPtr _threadHandle;
+    private IntPtr _pseudoInputHandle;
+    private IntPtr _pseudoOutputHandle;
     private SafeFileHandle? _inputHandle;
     private SafeFileHandle? _outputHandle;
     private FileStream? _inputStream;
@@ -222,12 +224,13 @@ public sealed class ConPtySession : IAsyncDisposable, IDisposable
                 _threadHandle = processInfo.hThread;
                 ProcessId = unchecked((int)processInfo.dwProcessId);
 
-                // The pseudoconsole must retain valid channel ends until the hosted process has
-                // been created and attached. Closing these before CreateProcess can leave the
-                // child on the caller's console instead of the pseudoconsole transport.
-                CloseHandle(inputRead);
+                // Keep both pseudoconsole-side channel ends alive for the complete
+                // session. Microsoft vs-pty.net retains all four pipe handles until
+                // disposal; closing these ends here can make CMD observe an input EOF
+                // after its first line and exit cleanly with code 0.
+                _pseudoInputHandle = inputRead;
                 inputRead = IntPtr.Zero;
-                CloseHandle(outputWrite);
+                _pseudoOutputHandle = outputWrite;
                 outputWrite = IntPtr.Zero;
             }
             finally
@@ -255,6 +258,16 @@ public sealed class ConPtySession : IAsyncDisposable, IDisposable
             {
                 ClosePseudoConsole(_pseudoConsole);
                 _pseudoConsole = IntPtr.Zero;
+            }
+            if (_pseudoInputHandle != IntPtr.Zero)
+            {
+                CloseHandle(_pseudoInputHandle);
+                _pseudoInputHandle = IntPtr.Zero;
+            }
+            if (_pseudoOutputHandle != IntPtr.Zero)
+            {
+                CloseHandle(_pseudoOutputHandle);
+                _pseudoOutputHandle = IntPtr.Zero;
             }
             throw;
         }
@@ -375,13 +388,20 @@ public sealed class ConPtySession : IAsyncDisposable, IDisposable
             CloseHandle(_processHandle);
             _processHandle = IntPtr.Zero;
         }
-        if (_pseudoConsole != IntPtr.Zero)
+
+        var pseudoConsole = _pseudoConsole;
+        var pseudoInput = _pseudoInputHandle;
+        var pseudoOutput = _pseudoOutputHandle;
+        _pseudoConsole = IntPtr.Zero;
+        _pseudoInputHandle = IntPtr.Zero;
+        _pseudoOutputHandle = IntPtr.Zero;
+        if (pseudoConsole != IntPtr.Zero || pseudoInput != IntPtr.Zero || pseudoOutput != IntPtr.Zero)
         {
-            var handle = _pseudoConsole;
-            _pseudoConsole = IntPtr.Zero;
             _ = Task.Run(() =>
             {
-                try { ClosePseudoConsole(handle); } catch { }
+                try { if (pseudoConsole != IntPtr.Zero) ClosePseudoConsole(pseudoConsole); } catch { }
+                try { if (pseudoInput != IntPtr.Zero) CloseHandle(pseudoInput); } catch { }
+                try { if (pseudoOutput != IntPtr.Zero) CloseHandle(pseudoOutput); } catch { }
             });
         }
         _cts.Dispose();

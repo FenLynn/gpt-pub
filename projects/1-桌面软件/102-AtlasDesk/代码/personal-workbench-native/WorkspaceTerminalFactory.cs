@@ -13,17 +13,7 @@ public static class WorkspaceTerminalFactory
                 : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
         if (string.Equals(shell, "cmd", StringComparison.OrdinalIgnoreCase))
-        {
-            var command = Environment.GetEnvironmentVariable("ComSpec") ?? Path.Combine(Environment.SystemDirectory, "cmd.exe");
-            return new TerminalLaunchSpec
-            {
-                Title = title ?? "CMD",
-                Executable = command,
-                Arguments = "/d /q",
-                WorkingDirectory = directory,
-                InitialInput = $"cd /d \"{directory}\"\r\n"
-            };
-        }
+            return TerminalReliability.CreateCmd(settings, title ?? "CMD", directory);
 
         var pwsh = FindExecutable("pwsh.exe");
         var executable = !string.IsNullOrWhiteSpace(pwsh)

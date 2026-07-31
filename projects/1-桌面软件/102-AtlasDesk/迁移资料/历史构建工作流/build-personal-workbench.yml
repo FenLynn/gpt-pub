@@ -7,12 +7,14 @@ on:
     paths:
       - 'personal-workbench-native/**'
       - 'personal-workbench-launcher/**'
+      - 'personal-workbench-terminal-host/**'
       - 'personal-workbench-smoke/**'
       - '.github/workflows/build-personal-workbench.yml'
   pull_request:
     paths:
       - 'personal-workbench-native/**'
       - 'personal-workbench-launcher/**'
+      - 'personal-workbench-terminal-host/**'
       - 'personal-workbench-smoke/**'
       - '.github/workflows/build-personal-workbench.yml'
   workflow_dispatch:
@@ -48,6 +50,18 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Build native terminal host
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSROOT=%%i"
+          if not defined VSROOT exit /b 1
+          call "%VSROOT%\VC\Auxiliary\Build\vcvars64.bat"
+          if not exist build\terminal-host mkdir build\terminal-host
+          cl /nologo /std:c++20 /O2 /EHsc /MT /DUNICODE /D_UNICODE "personal-workbench-terminal-host\terminal_host.cpp" /link /SUBSYSTEM:WINDOWS /OUT:"build\terminal-host\PersonalWorkbench.TerminalHost.exe"
+          if errorlevel 1 exit /b %errorlevel%
+          if not exist "build\terminal-host\PersonalWorkbench.TerminalHost.exe" exit /b 1
+          echo PWB_TERMINAL_HOST_PATH=%CD%\build\terminal-host\PersonalWorkbench.TerminalHost.exe>>"%GITHUB_ENV%"
 
       - name: Setup Go
         if: env.PACKAGE_BUILD == 'true'
@@ -109,25 +123,36 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
           -o build/app
 
+      - name: Assemble native terminal host
+        shell: pwsh
+        run: Copy-Item build/terminal-host/PersonalWorkbench.TerminalHost.exe build/app/PersonalWorkbench.TerminalHost.exe -Force
+
       - name: Validate lightweight app payload
         shell: pwsh
         run: |
           $app = 'build/app/PersonalWorkbench.App.exe'
+          $terminalHostPath = 'build/app/PersonalWorkbench.TerminalHost.exe'
           if (!(Test-Path $app)) { throw 'PersonalWorkbench.App.exe was not produced.' }
-          $forbidden = @('coreclr.dll','clrjit.dll','hostfxr.dll','hostpolicy.dll','System.Private.CoreLib.dll','python.exe','conda.exe','uv.exe','node.exe')
+          if (!(Test-Path $terminalHostPath)) { throw 'PersonalWorkbench.TerminalHost.exe was not assembled.' }
+          $forbidden = @('coreclr.dll','clrjit.dll','hostfxr.dll','hostpolicy.dll','System.Private.CoreLib.dll','python.exe','conda.exe','uv.exe','node.exe','conpty.dll')
           foreach ($name in $forbidden) {
             if (Get-ChildItem build/app -Recurse -File -Filter $name -ErrorAction SilentlyContinue) { throw "Bundled runtime file detected: $name" }
           }
           $payloadSize = (Get-Item $app).Length
+          $hostSize = (Get-Item $terminalHostPath).Length
           if ($payloadSize -gt 44MB) { throw "App payload is unexpectedly large: $([math]::Round($payloadSize / 1MB, 2)) MB" }
+          if ($hostSize -gt 2MB) { throw "Terminal host is unexpectedly large: $([math]::Round($hostSize / 1MB, 2)) MB" }
           "APP_PAYLOAD_BYTES=$payloadSize" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TERMINAL_HOST_BYTES=$hostSize" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Embed app payload in native launcher
         if: env.PACKAGE_BUILD == 'true'
         shell: pwsh
         run: |
           $folder = "artifacts/PersonalWorkbench_v$env:WORKBENCH_VERSION`_Lightweight"
-          Copy-Item build/app/PersonalWorkbench.App.exe personal-workbench-launcher/payload/PersonalWorkbench.App.exe -Force
+          New-Item -ItemType Directory -Path personal-workbench-launcher/payload -Force | Out-Null
+          Remove-Item personal-workbench-launcher/payload/* -Force -ErrorAction SilentlyContinue
+          Copy-Item build/app/* personal-workbench-launcher/payload/ -Force
           New-Item -ItemType Directory -Path $folder -Force | Out-Null
           Push-Location personal-workbench-launcher
           go build -trimpath -ldflags '-s -w -H windowsgui' -o "../$folder/PersonalWorkbench.exe" .
@@ -141,7 +166,7 @@ jobs:
           $exe = "artifacts/PersonalWorkbench_v$env:WORKBENCH_VERSION`_Lightweight/PersonalWorkbench.exe"
           if (!(Test-Path $exe)) { throw 'Lightweight launcher was not produced.' }
           $size = (Get-Item $exe).Length
-          if ($size -gt 56MB) { throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB" }
+          if ($size -gt 58MB) { throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB" }
           "FINAL_EXE_BYTES=$size" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Package
@@ -155,6 +180,7 @@ jobs:
           @"
           version=$env:WORKBENCH_VERSION
           app_payload_bytes=$env:APP_PAYLOAD_BYTES
+          terminal_host_bytes=$env:TERMINAL_HOST_BYTES
           final_exe_bytes=$env:FINAL_EXE_BYTES
           smoke_tests=passed
           self_contained=false
@@ -166,7 +192,7 @@ jobs:
           bundled_uv=false
           bundled_pdf_engine=false
           terminal_renderer=xterm.js_6.0.0
-          terminal_backend=windows_conpty
+          terminal_backend=native_gui_bridge_windows_system_conpty
           zotero_access=read_only_sqlite
           workspace_editor=lightweight_wpf
           markdown_preview=flowdocument
