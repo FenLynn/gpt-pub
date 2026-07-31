@@ -43,7 +43,7 @@ jobs:
         run: |
           $path = 'personal-workbench-launcher/main_windows.go'
           $content = Get-Content $path -Raw
-          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', 'appVersion = "0.6.0"')
+          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', 'appVersion = "0.6.1"')
           Set-Content $path $content -Encoding UTF8
 
       - name: Prepare embedded xterm assets
@@ -85,47 +85,47 @@ jobs:
             if (Get-ChildItem build/app -Recurse -File -Filter $name -ErrorAction SilentlyContinue) { throw "Bundled runtime file detected: $name" }
           }
           $payloadSize = (Get-Item $app).Length
-          if ($payloadSize -gt 38MB) { throw "App payload is unexpectedly large: $([math]::Round($payloadSize / 1MB, 2)) MB" }
+          if ($payloadSize -gt 40MB) { throw "App payload is unexpectedly large: $([math]::Round($payloadSize / 1MB, 2)) MB" }
           "APP_PAYLOAD_BYTES=$payloadSize" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Embed app payload in native launcher
         shell: pwsh
         run: |
           Copy-Item build/app/PersonalWorkbench.App.exe personal-workbench-launcher/payload/PersonalWorkbench.App.exe -Force
-          New-Item -ItemType Directory -Path artifacts/PersonalWorkbench_v0.6.0_Lightweight -Force | Out-Null
+          New-Item -ItemType Directory -Path artifacts/PersonalWorkbench_v0.6.1_Lightweight -Force | Out-Null
           Push-Location personal-workbench-launcher
-          go build -trimpath -ldflags '-s -w -H windowsgui' -o ../artifacts/PersonalWorkbench_v0.6.0_Lightweight/PersonalWorkbench.exe .
+          go build -trimpath -ldflags '-s -w -H windowsgui' -o ../artifacts/PersonalWorkbench_v0.6.1_Lightweight/PersonalWorkbench.exe .
           Pop-Location
 
       - name: Validate final package size
         shell: pwsh
         run: |
-          $exe = 'artifacts/PersonalWorkbench_v0.6.0_Lightweight/PersonalWorkbench.exe'
+          $exe = 'artifacts/PersonalWorkbench_v0.6.1_Lightweight/PersonalWorkbench.exe'
           if (!(Test-Path $exe)) { throw 'Lightweight launcher was not produced.' }
           $size = (Get-Item $exe).Length
-          if ($size -gt 50MB) { throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB" }
+          if ($size -gt 52MB) { throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB" }
           @"
-          Personal Workbench v0.6.0 Lightweight
+          Personal Workbench v0.6.1 Lightweight
 
           This package contains only the Personal Workbench application, its launcher,
           the read-only Zotero adapter, the small xterm.js renderer, and the local
           workspace/Markdown components. It does not bundle the .NET Desktop Runtime,
           WebView2 Runtime, Node.js, Python, Conda, uv, a PDF engine, or Python packages.
 
-          New in v0.6.0:
-          - Unified visual design across navigation, forms, tables, cards and empty states.
-          - Local workspace with folder tree, file list, recent files and filename search.
-          - Lightweight Markdown edit, split preview and preview-only modes.
-          - Debounced optional auto-save, external file opening and Explorer reveal.
-          - Open the integrated ConPTY terminal directly in the selected workspace folder.
-          "@ | Set-Content artifacts/PersonalWorkbench_v0.6.0_Lightweight/README.txt -Encoding UTF8
+          New in v0.6.1:
+          - Real-status home dashboard with recent workspace files.
+          - Ctrl+K global search across pages, workspace files, Zotero and commands.
+          - Search results can open directly inside Workspace or Zotero.
+          - Project-aware integrated terminal launch from the current directory.
+          - Existing Markdown editing, preview and lightweight packaging are preserved.
+          "@ | Set-Content artifacts/PersonalWorkbench_v0.6.1_Lightweight/README.txt -Encoding UTF8
           "FINAL_EXE_BYTES=$size" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Package
         shell: pwsh
         run: |
-          Compress-Archive -Path artifacts/PersonalWorkbench_v0.6.0_Lightweight/* -DestinationPath artifacts/PersonalWorkbench_v0.6.0_Lightweight.zip -Force
-          Get-FileHash artifacts/PersonalWorkbench_v0.6.0_Lightweight/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
+          Compress-Archive -Path artifacts/PersonalWorkbench_v0.6.1_Lightweight/* -DestinationPath artifacts/PersonalWorkbench_v0.6.1_Lightweight.zip -Force
+          Get-FileHash artifacts/PersonalWorkbench_v0.6.1_Lightweight/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
           @"
           app_payload_bytes=$env:APP_PAYLOAD_BYTES
           final_exe_bytes=$env:FINAL_EXE_BYTES
@@ -142,15 +142,16 @@ jobs:
           zotero_access=read_only_sqlite
           workspace_editor=lightweight_wpf
           markdown_preview=flowdocument
+          global_search=pages_workspace_zotero_commands
           "@ | Set-Content artifacts/build-manifest.txt -Encoding UTF8
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PersonalWorkbench-v0.6.0-lightweight-win-x64
+          name: PersonalWorkbench-v0.6.1-lightweight-win-x64
           path: |
-            artifacts/PersonalWorkbench_v0.6.0_Lightweight.zip
-            artifacts/PersonalWorkbench_v0.6.0_Lightweight/PersonalWorkbench.exe
+            artifacts/PersonalWorkbench_v0.6.1_Lightweight.zip
+            artifacts/PersonalWorkbench_v0.6.1_Lightweight/PersonalWorkbench.exe
             artifacts/SHA256.txt
             artifacts/build-manifest.txt
           if-no-files-found: error

@@ -6,6 +6,7 @@ namespace PersonalWorkbench;
 public partial class App : Application
 {
     private WorkbenchEnhancer? _enhancer;
+    private V061ExperienceEnhancer? _experience;
 
     public static string AppDataDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -18,7 +19,8 @@ public partial class App : Application
     {
         Directory.CreateDirectory(AppDataDirectory);
         Directory.CreateDirectory(LogDirectory);
-        Log("Starting Personal Workbench 0.6.0");
+        GlobalShortcutBootstrap.Initialize();
+        Log("Starting Personal Workbench 0.6.1");
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -51,7 +53,8 @@ public partial class App : Application
         try
         {
             _enhancer = WorkbenchEnhancer.Attach(window);
-            Log("Workbench v0.6 feature modules attached");
+            _experience = V061ExperienceEnhancer.Attach(window, _enhancer);
+            Log("Workbench v0.6.1 modules attached");
         }
         catch (Exception ex)
         {
