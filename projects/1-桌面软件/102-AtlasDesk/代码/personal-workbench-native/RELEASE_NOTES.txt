@@ -1,18 +1,19 @@
-Personal Workbench v0.6.8
+Personal Workbench v0.6.9
 
-- Fixed the unreadable black tooltip boxes by enforcing high-contrast tooltip text throughout the WPF application.
-- Consolidated Local Workspace into a single VS Code-style explorer tree with search, filtering, creation and location actions inside the left pane.
-- Removed the separate full-width Workspace search bar and aligned the right side around the document header, editor modes and content area.
-- Compacted the Zotero title area and fixed search at the top of the center results pane.
-- Replaced document-type, source and local-PDF labels with compact icons and explanatory tooltips.
-- Refined the Zotero collection tree and retained recursive parent-collection listing and search across every descendant collection.
-- Reorganized the integrated terminal into a multi-tab terminal canvas on the left and a dedicated session-settings pane on the right.
-- Added visible terminal loading, initialization timeout, failure details and one-click retry instead of leaving a blank panel when WebView2 cannot initialize.
-- Preserved independent per-tab pop-out windows, optional always-on-top mode and redocking to the bottom drawer.
-- Preserved the v0.6.7 synchronous ConPTY transport fixes for CMD, PowerShell, Conda and uv sessions.
+This is a corrective release for v0.6.8. It does not advance the later module roadmap.
+
+- Repaired the Local Workspace crash loop caused by persisting a directory before proving that it could be loaded safely.
+- Automatically isolates an inaccessible or abnormal persisted workspace root instead of crashing again whenever Workspace is opened.
+- Moved directory enumeration off the UI thread, limited each visible directory to 1,200 entries, and excluded reparse points and common generated dependency folders.
+- Kept recursive filename search, but bounded directory traversal and prevented junction/symbolic-link loops.
+- Clarified the Workspace model: one selected project or material folder, a lazy VS Code-style tree on the left, and lightweight text/code/Markdown editing on the right.
+- Repaired the Zotero and Development host grids so their replacement controls fill the complete content area rather than occupying only the legacy Auto row and leaving a large blank lower region.
+- Reworked terminal placement without recreating sessions: the same multi-tab terminal can occupy the Development main area, remain fixed in the global bottom drawer across other pages, or pop into an independent window.
+- Added explicit bottom-dock and Development-embed actions, plus full-screen, always-on-top and re-embed controls for floating terminals.
+- Added one guarded automatic retry for a shell that exits immediately and a visible manual restart action; a user-entered exit command remains a normal intentional exit.
 
 Verification checkpoint
-- Windows WPF/XAML compilation and framework-dependent publishing passed.
-- The smoke suite launched a real CMD process through ConPTY, received terminal output, sent the exit command and observed clean process termination.
-- Workspace, Zotero and terminal controls retained their existing named bindings and event entry points.
-- The final main-branch package build repeats the complete regression suite before producing the lightweight executable.
+- Windows WPF/XAML compilation and framework-dependent publishing must pass before merge.
+- The smoke suite must launch a real CMD process through ConPTY, receive output, send exit, and observe clean process termination.
+- Workspace recovery must preserve the previous valid directory when a newly selected directory fails and must clear a poisoned persisted root during automatic restore.
+- Zotero and Development replacement controls must own the full host grid after legacy row definitions are removed.

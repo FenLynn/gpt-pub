@@ -1,11 +1,18 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace PersonalWorkbench;
+
+public enum TerminalHostMode
+{
+    Bottom,
+    Development
+}
 
 public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
 {
@@ -16,6 +23,9 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
     private int _sequence;
 
     public event EventHandler? CollapseRequested;
+    public event EventHandler? DockBottomRequested;
+    public event EventHandler? EmbedDevelopmentRequested;
+    public event EventHandler? SessionCountChanged;
 
     public TerminalDrawerControl() : this(AppSettings.Load()) { }
 
@@ -24,6 +34,24 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         _settings = settings;
         InitializeComponent();
         UpdateSummary();
+        UpdateSelectedDetails();
+        SetHostMode(TerminalHostMode.Bottom);
+    }
+
+    public bool HasSessions => _tabs.Count > 0;
+    public TerminalHostMode HostMode { get; private set; } = TerminalHostMode.Bottom;
+
+    public void SetHostMode(TerminalHostMode mode)
+    {
+        HostMode = mode;
+        HostActionButton.Content = mode == TerminalHostMode.Development ? "固定到底部" : "收起";
+        HostActionButton.ToolTip = mode == TerminalHostMode.Development
+            ? "将全部终端会话固定到工作台底部，切换页面后继续显示"
+            : "收起底部终端栏，所有会话继续保留";
+        HostModeButton.Content = mode == TerminalHostMode.Development ? "固定到底部" : "嵌入开发页";
+        HostModeButton.ToolTip = mode == TerminalHostMode.Development
+            ? "将终端固定到全局底部栏"
+            : "返回开发页主区域";
         UpdateSelectedDetails();
     }
 
@@ -129,16 +157,18 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
                     await StartSessionAsync(state, cols, rows);
                     break;
                 case "input":
-                    if (state.Session is not null && root.TryGetProperty("data", out var input))
-                        await state.Session.WriteAsync(input.GetString() ?? string.Empty);
+                    if (root.TryGetProperty("data", out var input))
+                    {
+                        var data = input.GetString() ?? string.Empty;
+                        TrackInput(state, data);
+                        if (state.Session is not null)
+                            await state.Session.WriteAsync(data);
+                    }
                     break;
                 case "resize":
-                    if (state.Session is not null)
-                    {
-                        var resizeCols = root.TryGetProperty("cols", out var c) ? c.GetInt32() : 100;
-                        var resizeRows = root.TryGetProperty("rows", out var r) ? r.GetInt32() : 28;
-                        state.Session.Resize(resizeCols, resizeRows);
-                    }
+                    state.Columns = root.TryGetProperty("cols", out var c) ? c.GetInt32() : 100;
+                    state.Rows = root.TryGetProperty("rows", out var r) ? r.GetInt32() : 28;
+                    state.Session?.Resize(state.Columns, state.Rows);
                     break;
                 case "copy":
                     if (root.TryGetProperty("data", out var copy))
@@ -159,25 +189,66 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         }
     }
 
+    private static void TrackInput(TerminalTabState state, string data)
+    {
+        foreach (var character in data)
+        {
+            if (character is '\r' or '\n')
+            {
+                var command = state.InputLine.ToString().Trim();
+                if (command.Equals("exit", StringComparison.OrdinalIgnoreCase)
+                    || command.StartsWith("exit ", StringComparison.OrdinalIgnoreCase))
+                    state.IntentionalExit = true;
+                state.InputLine.Clear();
+            }
+            else if (character is '\b' or '\u007f')
+            {
+                if (state.InputLine.Length > 0)
+                    state.InputLine.Length--;
+            }
+            else if (character == '\u0003')
+            {
+                state.InputLine.Clear();
+            }
+            else if (!char.IsControl(character) && state.InputLine.Length < 4096)
+            {
+                state.InputLine.Append(character);
+            }
+        }
+    }
+
     private async Task StartSessionAsync(TerminalTabState state, int columns, int rows)
     {
-        if (state.Session is not null || state.Closing) return;
+        if (state.Session is not null || state.Closing || !_tabs.ContainsKey(state.Tab)) return;
         try
         {
-            state.Session = ConPtySession.Start(state.Spec, columns, rows);
-            state.Session.OutputReceived += (_, text) => Dispatcher.BeginInvoke(() => Post(state, new { type = "output", data = text }));
-            state.Session.Exited += (_, code) => Dispatcher.BeginInvoke(() =>
+            state.Exited = false;
+            state.ErrorMessage = string.Empty;
+            state.IntentionalExit = false;
+            state.InputLine.Clear();
+            state.StartedUtc = DateTime.UtcNow;
+            state.Columns = Math.Clamp(columns, 20, 500);
+            state.Rows = Math.Clamp(rows, 5, 300);
+
+            var session = ConPtySession.Start(state.Spec, state.Columns, state.Rows);
+            state.Session = session;
+            session.OutputReceived += (_, text) => Dispatcher.BeginInvoke(() =>
             {
-                Post(state, new { type = "output", data = $"\r\n\u001b[90m[进程已退出，代码 {code}]\u001b[0m\r\n" });
-                state.Exited = true;
-                state.Tab.Header = BuildHeader(state.Spec.Title + " · 已退出");
-                UpdateSelectedDetails();
+                if (ReferenceEquals(state.Session, session) && !state.Closing)
+                    Post(state, new { type = "output", data = text });
             });
+            session.Exited += (_, code) => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _ = HandleSessionExitedAsync(state, session, code);
+            }));
+
+            state.Tab.Header = BuildHeader(state.Spec.Title);
             Post(state, new { type = "settings", fontSize = _settings.TerminalFontSize, scrollback = _settings.TerminalScrollback });
             if (!string.IsNullOrWhiteSpace(state.Spec.InitialInput))
             {
                 await Task.Delay(90);
-                await state.Session.WriteAsync(state.Spec.InitialInput);
+                if (ReferenceEquals(state.Session, session))
+                    await session.WriteAsync(state.Spec.InitialInput);
             }
             Post(state, new { type = "focus" });
             UpdateSelectedDetails();
@@ -185,16 +256,57 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         catch (Exception ex)
         {
             App.Log("ConPTY session start failed: " + ex);
+            state.Session = null;
+            state.Exited = true;
             state.ErrorMessage = ex.Message;
             Post(state, new { type = "output", data = "\r\n\u001b[31m内置终端启动失败：" + Sanitize(ex.Message) + "\u001b[0m\r\n" });
+            state.Tab.Header = BuildHeader(state.Spec.Title + " · 启动失败");
             UpdateSelectedDetails();
         }
+    }
+
+    private async Task HandleSessionExitedAsync(TerminalTabState state, ConPtySession session, int code)
+    {
+        if (state.Closing || !_tabs.ContainsKey(state.Tab) || !ReferenceEquals(state.Session, session)) return;
+
+        state.Session = null;
+        try { await session.DisposeAsync(); } catch { }
+
+        var lifetime = DateTime.UtcNow - state.StartedUtc;
+        var earlyUnexpectedExit = !state.IntentionalExit
+                                  && !state.AutoRetryUsed
+                                  && lifetime < TimeSpan.FromSeconds(4);
+        if (earlyUnexpectedExit)
+        {
+            state.AutoRetryUsed = true;
+            Post(state, new
+            {
+                type = "output",
+                data = $"\r\n\u001b[33m[终端进程启动后立即退出，代码 {code}；正在自动重试一次…]\u001b[0m\r\n"
+            });
+            await Task.Delay(320);
+            if (!state.Closing && _tabs.ContainsKey(state.Tab))
+                await StartSessionAsync(state, state.Columns, state.Rows);
+            return;
+        }
+
+        state.Exited = true;
+        Post(state, new
+        {
+            type = "output",
+            data = state.IntentionalExit
+                ? $"\r\n\u001b[90m[进程已正常退出，代码 {code}]\u001b[0m\r\n"
+                : $"\r\n\u001b[90m[进程已退出，代码 {code}；可在右侧重新启动]\u001b[0m\r\n"
+        });
+        state.Tab.Header = BuildHeader(state.Spec.Title + " · 已退出");
+        UpdateSelectedDetails();
     }
 
     private void SetFrontendFailure(TerminalTabState state, string message)
     {
         if (state.Closing || !_tabs.ContainsKey(state.Tab)) return;
         state.ErrorMessage = string.IsNullOrWhiteSpace(message) ? "未知错误" : message.Trim();
+        state.Exited = true;
         state.Tab.Content = BuildFailurePanel(state);
         state.Tab.Header = BuildHeader(state.Spec.Title + " · 启动失败");
         UpdateSelectedDetails();
@@ -265,12 +377,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
             Margin = new Thickness(0, 14, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Center
         };
-        retry.Click += async (_, _) =>
-        {
-            TerminalTabs.SelectedItem = state.Tab;
-            await CloseSelectedAsync();
-            await OpenAsync(state.Spec);
-        };
+        retry.Click += async (_, _) => await RestartStateAsync(state);
         stack.Children.Add(retry);
         return new Grid
         {
@@ -286,6 +393,35 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         try { state.View.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(message)); } catch { }
     }
 
+    private async Task RestartStateAsync(TerminalTabState state)
+    {
+        if (state.Closing || !_tabs.ContainsKey(state.Tab)) return;
+
+        if (!state.FrontendReady || state.View.CoreWebView2 is null)
+        {
+            var spec = state.Spec;
+            TerminalTabs.SelectedItem = state.Tab;
+            await CloseSelectedAsync();
+            await OpenAsync(spec);
+            return;
+        }
+
+        var oldSession = state.Session;
+        state.Session = null;
+        if (oldSession is not null)
+        {
+            try { await oldSession.DisposeAsync(); } catch { }
+        }
+        state.AutoRetryUsed = false;
+        state.IntentionalExit = false;
+        state.Exited = false;
+        state.ErrorMessage = string.Empty;
+        state.InputLine.Clear();
+        state.Tab.Header = BuildHeader(state.Spec.Title);
+        Post(state, new { type = "reset" });
+        await StartSessionAsync(state, state.Columns, state.Rows);
+    }
+
     private async Task CloseSelectedAsync()
     {
         if (TerminalTabs.SelectedItem is not TabItem tab || !_tabs.Remove(tab, out var state)) return;
@@ -298,6 +434,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         }
         TerminalTabs.Items.Remove(tab);
         if (state.Session is not null) await state.Session.DisposeAsync();
+        state.Session = null;
         state.View.Dispose();
         UpdateSummary();
         UpdateSelectedDetails();
@@ -367,6 +504,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
     {
         SessionSummary.Text = $"{_tabs.Count} 个会话";
         TerminalEmptyState.Visibility = _tabs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        SessionCountChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void UpdateSelectedDetails()
@@ -374,21 +512,27 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         if (TerminalTabs.SelectedItem is not TabItem tab || !_tabs.TryGetValue(tab, out var state))
         {
             SelectedTitleText.Text = "尚未选择会话";
-            SelectedModeText.Text = string.Empty;
+            SelectedModeText.Text = HostMode == TerminalHostMode.Development ? "开发页主区域" : "底部固定栏";
             SelectedPathText.Text = string.Empty;
             SelectedProcessText.Text = string.Empty;
+            RestartButton.IsEnabled = false;
             return;
         }
 
         SelectedTitleText.Text = state.Spec.Title;
         SelectedModeText.Text = Path.GetFileNameWithoutExtension(state.Spec.Executable)
-                                + (state.FloatingWindow is null ? " · 底部停靠" : " · 独立窗口");
+                                + (state.FloatingWindow is not null
+                                    ? " · 独立窗口"
+                                    : HostMode == TerminalHostMode.Development
+                                        ? " · 开发页主区域"
+                                        : " · 底部固定栏");
         SelectedPathText.Text = state.Spec.WorkingDirectory;
         SelectedProcessText.Text = state.ErrorMessage.Length > 0
             ? "启动失败 · " + state.ErrorMessage
             : state.Session is null
-                ? "正在初始化终端"
-                : state.Exited ? "进程已退出" : $"PID {state.Session.ProcessId}";
+                ? state.Exited ? "进程已退出" : "正在初始化终端"
+                : $"PID {state.Session.ProcessId}";
+        RestartButton.IsEnabled = state.Exited || state.ErrorMessage.Length > 0;
     }
 
     private async void NewPowerShell_Click(object sender, RoutedEventArgs e) => await OpenShellAsync("powershell");
@@ -400,9 +544,30 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
             Post(state, new { type = "clear" });
     }
 
+    private async void Restart_Click(object sender, RoutedEventArgs e)
+    {
+        if (TerminalTabs.SelectedItem is TabItem tab && _tabs.TryGetValue(tab, out var state))
+            await RestartStateAsync(state);
+    }
+
+    private void HostMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (HostMode == TerminalHostMode.Development)
+            DockBottomRequested?.Invoke(this, EventArgs.Empty);
+        else
+            EmbedDevelopmentRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     private void PopOut_Click(object sender, RoutedEventArgs e) => PopOutSelected();
     private async void CloseTab_Click(object sender, RoutedEventArgs e) => await CloseSelectedAsync();
-    private void Collapse_Click(object sender, RoutedEventArgs e) => CollapseRequested?.Invoke(this, EventArgs.Empty);
+
+    private void Collapse_Click(object sender, RoutedEventArgs e)
+    {
+        if (HostMode == TerminalHostMode.Development)
+            DockBottomRequested?.Invoke(this, EventArgs.Empty);
+        else
+            CollapseRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     private void TerminalTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -446,5 +611,11 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         public string ErrorMessage { get; set; } = string.Empty;
         public bool Exited { get; set; }
         public bool Closing { get; set; }
+        public bool IntentionalExit { get; set; }
+        public bool AutoRetryUsed { get; set; }
+        public DateTime StartedUtc { get; set; }
+        public int Columns { get; set; } = 100;
+        public int Rows { get; set; } = 28;
+        public StringBuilder InputLine { get; } = new();
     }
 }

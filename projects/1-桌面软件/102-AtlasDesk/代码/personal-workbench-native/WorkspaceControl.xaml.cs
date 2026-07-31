@@ -10,6 +10,20 @@ using System.Windows.Threading;
 
 namespace PersonalWorkbench;
 
+public sealed class WorkspaceChildrenSnapshot
+{
+    public WorkspaceChildrenSnapshot(IReadOnlyList<WorkspaceNode> items, bool truncated, string errorMessage)
+    {
+        Items = items;
+        Truncated = truncated;
+        ErrorMessage = errorMessage;
+    }
+
+    public IReadOnlyList<WorkspaceNode> Items { get; }
+    public bool Truncated { get; }
+    public string ErrorMessage { get; }
+}
+
 public sealed class WorkspaceNode
 {
     public WorkspaceNode(string path, bool placeholder = false)
@@ -37,33 +51,73 @@ public sealed class WorkspaceNode
     public bool IsPdf => !IsDirectory && Extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase);
     public bool IsMarkdown => !IsDirectory && Extension is ".md" or ".markdown";
     public bool IsLoaded { get; private set; }
+    public bool IsLoading { get; private set; }
     public bool IsExpanded { get; set; }
     public ObservableCollection<WorkspaceNode> Children { get; } = new();
 
-    public void LoadChildren(bool showHidden)
+    public bool TryBeginLoad()
     {
-        if (IsPlaceholder || !IsDirectory || IsLoaded) return;
-        Children.Clear();
+        if (IsPlaceholder || !IsDirectory || IsLoaded || IsLoading) return false;
+        IsLoading = true;
+        return true;
+    }
+
+    public WorkspaceChildrenSnapshot ReadChildren(bool showHidden, int limit)
+    {
+        var entries = new List<(string Path, bool IsDirectory)>();
+        var truncated = false;
+        var error = string.Empty;
         try
         {
-            var directories = Directory.EnumerateDirectories(FullPath)
-                .Where(path => (showHidden || !WorkspaceFileItem.IsHidden(path)) && !WorkspaceFileItem.IsIgnoredDirectory(path))
-                .OrderBy(path => Path.GetFileName(path), StringComparer.CurrentCultureIgnoreCase);
-            foreach (var directory in directories)
-                Children.Add(new WorkspaceNode(directory));
+            foreach (var entry in Directory.EnumerateFileSystemEntries(FullPath))
+            {
+                FileAttributes attributes;
+                try { attributes = File.GetAttributes(entry); }
+                catch { continue; }
 
-            var files = Directory.EnumerateFiles(FullPath)
-                .Where(path => (showHidden || !WorkspaceFileItem.IsHidden(path))
-                               && WorkspaceControl.IsSupportedExtension(Path.GetExtension(path)))
-                .OrderBy(path => Path.GetFileName(path), StringComparer.CurrentCultureIgnoreCase);
-            foreach (var file in files)
-                Children.Add(new WorkspaceNode(file));
+                var isDirectory = attributes.HasFlag(FileAttributes.Directory);
+                if (!showHidden && WorkspaceFileItem.IsHidden(entry, attributes)) continue;
+                if (isDirectory)
+                {
+                    if (WorkspaceFileItem.IsIgnoredDirectory(entry, attributes)) continue;
+                }
+                else if (!WorkspaceControl.IsSupportedExtension(Path.GetExtension(entry)))
+                {
+                    continue;
+                }
+
+                entries.Add((entry, isDirectory));
+                if (entries.Count >= limit)
+                {
+                    truncated = true;
+                    break;
+                }
+            }
         }
         catch (Exception ex)
         {
-            App.Log("Workspace tree load failed: " + ex.Message);
+            error = ex.Message;
         }
+
+        var nodes = entries
+            .OrderByDescending(item => item.IsDirectory)
+            .ThenBy(item => Path.GetFileName(item.Path), StringComparer.CurrentCultureIgnoreCase)
+            .Select(item => new WorkspaceNode(item.Path))
+            .ToArray();
+        return new WorkspaceChildrenSnapshot(nodes, truncated, error);
+    }
+
+    public void ApplyChildren(WorkspaceChildrenSnapshot snapshot)
+    {
+        Children.Clear();
+        foreach (var child in snapshot.Items) Children.Add(child);
         IsLoaded = true;
+        IsLoading = false;
+    }
+
+    public void CancelLoad()
+    {
+        IsLoading = false;
     }
 
     private static WorkspaceNode Placeholder() => new(string.Empty, true);
@@ -110,21 +164,40 @@ public sealed class WorkspaceFileItem
 
     public static bool IsHidden(string path)
     {
-        try
-        {
-            var name = Path.GetFileName(path);
-            return (File.GetAttributes(path) & FileAttributes.Hidden) != 0
-                   || (!string.IsNullOrEmpty(name) && name.StartsWith('.'));
-        }
+        try { return IsHidden(path, File.GetAttributes(path)); }
         catch { return false; }
+    }
+
+    public static bool IsHidden(string path, FileAttributes attributes)
+    {
+        var name = Path.GetFileName(path);
+        return attributes.HasFlag(FileAttributes.Hidden)
+               || attributes.HasFlag(FileAttributes.System)
+               || (!string.IsNullOrEmpty(name) && name.StartsWith('.'));
     }
 
     public static bool IsIgnoredDirectory(string path)
     {
+        try { return IsIgnoredDirectory(path, File.GetAttributes(path)); }
+        catch { return true; }
+    }
+
+    public static bool IsIgnoredDirectory(string path, FileAttributes attributes)
+    {
+        if (attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
         var name = Path.GetFileName(path);
         return name.Equals(".git", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(".svn", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(".hg", StringComparison.OrdinalIgnoreCase)
             || name.Equals("node_modules", StringComparison.OrdinalIgnoreCase)
             || name.Equals("__pycache__", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(".venv", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("venv", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(".vs", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(".idea", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(".cache", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("dist", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("build", StringComparison.OrdinalIgnoreCase)
             || name.Equals("bin", StringComparison.OrdinalIgnoreCase)
             || name.Equals("obj", StringComparison.OrdinalIgnoreCase);
     }
@@ -149,6 +222,8 @@ public sealed class RecentWorkspaceItem
 public partial class WorkspaceControl : UserControl
 {
     private const long MaxEditableBytes = 5L * 1024 * 1024;
+    private const int MaxChildrenPerDirectory = 1200;
+    private const int MaxSearchDirectories = 12000;
     private static readonly HashSet<string> MarkdownExtensions = new(StringComparer.OrdinalIgnoreCase) { ".md", ".markdown" };
     private static readonly HashSet<string> CodeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -171,6 +246,8 @@ public partial class WorkspaceControl : UserControl
     private bool _loadingDocument;
     private bool _loaded;
     private bool _dirty;
+    private bool _loadingWorkspace;
+    private bool _searchingWorkspace;
 
     public event EventHandler<TerminalOpenRequestEventArgs>? OpenTerminalRequested;
     public event EventHandler? OpenSettingsRequested;
@@ -193,14 +270,8 @@ public partial class WorkspaceControl : UserControl
             _previewTimer.Stop();
             UpdatePreview();
         };
-        IsVisibleChanged += async (_, _) =>
-        {
-            if (IsVisible) await EnsureLoadedAsync();
-        };
-        Unloaded += async (_, _) =>
-        {
-            if (_settings.WorkspaceAutoSave) await SaveCurrentAsync(false);
-        };
+        IsVisibleChanged += Workspace_IsVisibleChanged;
+        Unloaded += Workspace_Unloaded;
         ApplySettings();
     }
 
@@ -219,6 +290,7 @@ public partial class WorkspaceControl : UserControl
     public void InvalidateWorkspace()
     {
         _loaded = false;
+        _loadingWorkspace = false;
         FolderTree.ItemsSource = null;
         _selectedNode = null;
         _currentDirectory = string.Empty;
@@ -229,94 +301,191 @@ public partial class WorkspaceControl : UserControl
 
     public async Task EnsureLoadedAsync()
     {
-        if (_loaded) return;
-        if (!Directory.Exists(_settings.WorkspaceRoot))
+        if (_loaded || _loadingWorkspace) return;
+        var configuredRoot = _settings.WorkspaceRoot;
+        if (!Directory.Exists(configuredRoot))
         {
-            RootBadgeText.Text = "尚未选择目录";
-            StatusText.Text = "请点击“选择目录”，或在设置中指定默认工作区。";
+            ShowNoWorkspace("尚未选择目录", "请选择一个项目或资料目录。工作区不会扫描整台电脑。", clearTree: true);
+            _loaded = true;
             return;
         }
 
-        await LoadRootAsync(_settings.WorkspaceRoot);
-        if (File.Exists(_settings.LastWorkspaceFile) && IsInsideRoot(_settings.LastWorkspaceFile))
+        var loaded = await LoadRootAsync(configuredRoot, persistOnSuccess: true, recoverPersistedFailure: true);
+        if (loaded && File.Exists(_settings.LastWorkspaceFile) && IsInsideRoot(_settings.LastWorkspaceFile))
             await OpenFileAsync(WorkspaceFileItem.FromPath(_settings.LastWorkspaceFile));
         _loaded = true;
     }
 
-    private async Task LoadRootAsync(string root)
+    private async Task<bool> LoadRootAsync(string root, bool persistOnSuccess = true, bool recoverPersistedFailure = false)
     {
-        if (!await CommitBeforeNavigationAsync()) return;
-        root = Path.GetFullPath(root);
-        _settings.WorkspaceRoot = root;
-        _settings.Save();
-        _currentDirectory = root;
-        SearchBox.Text = string.Empty;
+        if (_loadingWorkspace) return false;
+        _loadingWorkspace = true;
+        try
+        {
+            if (!await CommitBeforeNavigationAsync()) return false;
+            if (string.IsNullOrWhiteSpace(root)) throw new DirectoryNotFoundException("工作区路径为空。");
 
-        var node = new WorkspaceNode(root) { IsExpanded = true };
-        node.LoadChildren(_settings.WorkspaceShowHiddenFiles);
-        FolderTree.ItemsSource = new[] { node };
-        RootBadgeText.Text = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } name ? name : root;
+            var normalized = Path.GetFullPath(root);
+            if (!Directory.Exists(normalized))
+                throw new DirectoryNotFoundException("目录不存在或当前不可访问：" + normalized);
+
+            StatusText.Text = "正在安全读取工作区…";
+            var node = new WorkspaceNode(normalized) { IsExpanded = true };
+            if (!node.TryBeginLoad()) throw new IOException("无法初始化工作区目录。");
+            var snapshot = await Task.Run(() => node.ReadChildren(_settings.WorkspaceShowHiddenFiles, MaxChildrenPerDirectory));
+            if (snapshot.Items.Count == 0 && !string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
+                throw new IOException(snapshot.ErrorMessage);
+            node.ApplyChildren(snapshot);
+
+            _currentDirectory = normalized;
+            _selectedNode = node;
+            SearchBox.Text = string.Empty;
+            FolderTree.ItemsSource = new[] { node };
+            RootBadgeText.Text = Path.GetFileName(normalized.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } name
+                ? name
+                : normalized;
+            RootBadgeText.ToolTip = normalized;
+            ExplorerTitleText.Text = "资源管理器";
+            ExplorerCountText.Text = snapshot.Truncated ? $"前 {snapshot.Items.Count} 项" : $"{snapshot.Items.Count} 项";
+            StatusText.Text = snapshot.Truncated
+                ? $"目录项目较多，当前显示前 {snapshot.Items.Count} 项；可使用上方递归搜索。"
+                : normalized;
+
+            if (persistOnSuccess)
+            {
+                _settings.WorkspaceRoot = normalized;
+                _settings.Save();
+            }
+            NormalizeRecentFiles();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log("Workspace root load failed: " + ex);
+            if (recoverPersistedFailure)
+                ClearPersistedWorkspaceRoot(root);
+            ShowWorkspaceFailure(root, ex.Message, recoverPersistedFailure);
+            return false;
+        }
+        finally
+        {
+            _loadingWorkspace = false;
+        }
+    }
+
+    private void ClearPersistedWorkspaceRoot(string failedRoot)
+    {
+        try
+        {
+            if (PathsEqual(_settings.WorkspaceRoot, failedRoot))
+            {
+                _settings.WorkspaceRoot = string.Empty;
+                _settings.LastWorkspaceFile = string.Empty;
+                _settings.Save();
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log("Clear failed workspace root failed: " + ex.Message);
+        }
+    }
+
+    private void ShowWorkspaceFailure(string root, string message, bool recovered)
+    {
+        if (!Directory.Exists(_currentDirectory)) FolderTree.ItemsSource = null;
+        RootBadgeText.Text = recovered ? "已隔离异常目录" : "目录读取失败";
         RootBadgeText.ToolTip = root;
         ExplorerTitleText.Text = "资源管理器";
-        ExplorerCountText.Text = $"{node.Children.Count} 项";
-        StatusText.Text = root;
-        NormalizeRecentFiles();
+        ExplorerCountText.Text = string.Empty;
+        StatusText.Text = recovered
+            ? "此前保存的工作区无法安全读取，已自动解除绑定。请重新选择目录。"
+            : "无法读取所选目录：" + message;
+    }
+
+    private void ShowNoWorkspace(string badge, string status, bool clearTree)
+    {
+        RootBadgeText.Text = badge;
+        RootBadgeText.ToolTip = null;
+        StatusText.Text = status;
+        ExplorerTitleText.Text = "资源管理器";
+        ExplorerCountText.Text = string.Empty;
+        if (clearTree) FolderTree.ItemsSource = null;
     }
 
     private async Task LoadDirectoryAsync(string directory)
     {
         if (!Directory.Exists(directory)) return;
         if (!await CommitBeforeNavigationAsync()) return;
-        _currentDirectory = Path.GetFullPath(directory);
-        StatusText.Text = _currentDirectory;
+        var normalized = Path.GetFullPath(directory);
+        _currentDirectory = normalized;
+        StatusText.Text = normalized;
 
         if (!Directory.Exists(_settings.WorkspaceRoot)
-            || !IsInsideRoot(_currentDirectory + Path.DirectorySeparatorChar))
+            || !IsInsideRoot(normalized + Path.DirectorySeparatorChar))
         {
-            await LoadRootAsync(_currentDirectory);
+            await LoadRootAsync(normalized, persistOnSuccess: true);
             return;
         }
 
-        ExplorerTitleText.Text = Path.GetFileName(_currentDirectory.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } name
+        ExplorerTitleText.Text = Path.GetFileName(normalized.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } name
             ? name
             : "资源管理器";
     }
 
     private async Task SearchWorkspaceAsync()
     {
-        if (!Directory.Exists(_settings.WorkspaceRoot)) return;
-        var query = SearchBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(query))
+        if (_searchingWorkspace || !Directory.Exists(_settings.WorkspaceRoot)) return;
+        _searchingWorkspace = true;
+        try
         {
-            await LoadRootAsync(_settings.WorkspaceRoot);
-            return;
-        }
+            var query = SearchBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                await LoadRootAsync(_settings.WorkspaceRoot, persistOnSuccess: false);
+                return;
+            }
 
-        StatusText.Text = "正在搜索工作区…";
-        var filter = (TypeFilter.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
-        var results = await Task.Run(() => SearchFiles(_settings.WorkspaceRoot, query, filter, 1500));
-        FolderTree.ItemsSource = results.Select(item => new WorkspaceNode(item.FullPath)).ToArray();
-        ExplorerTitleText.Text = "搜索结果";
-        ExplorerCountText.Text = $"{results.Count} 项";
-        StatusText.Text = results.Count >= 1500 ? "已显示前 1500 项，请缩小关键词。" : $"找到 {results.Count} 项。";
+            StatusText.Text = "正在递归搜索工作区…";
+            var filter = (TypeFilter.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
+            var results = await Task.Run(() => SearchFiles(_settings.WorkspaceRoot, query, filter, 1500));
+            FolderTree.ItemsSource = results.Select(item => new WorkspaceNode(item.FullPath)).ToArray();
+            ExplorerTitleText.Text = "搜索结果";
+            ExplorerCountText.Text = $"{results.Count} 项";
+            StatusText.Text = results.Count >= 1500 ? "已显示前 1500 项，请缩小关键词。" : $"找到 {results.Count} 项。";
+        }
+        catch (Exception ex)
+        {
+            App.Log("Workspace search failed: " + ex);
+            StatusText.Text = "搜索失败：" + ex.Message;
+        }
+        finally
+        {
+            _searchingWorkspace = false;
+        }
     }
 
     private List<WorkspaceFileItem> SearchFiles(string root, string query, string filter, int limit)
     {
         var results = new List<WorkspaceFileItem>();
         var stack = new Stack<string>();
-        stack.Push(root);
-        while (stack.Count > 0 && results.Count < limit)
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        stack.Push(Path.GetFullPath(root));
+        while (stack.Count > 0 && results.Count < limit && visited.Count < MaxSearchDirectories)
         {
             var directory = stack.Pop();
+            if (!visited.Add(directory)) continue;
             try
             {
                 foreach (var child in Directory.EnumerateFileSystemEntries(directory))
                 {
-                    if (!_settings.WorkspaceShowHiddenFiles && WorkspaceFileItem.IsHidden(child)) continue;
-                    if (Directory.Exists(child))
+                    FileAttributes attributes;
+                    try { attributes = File.GetAttributes(child); }
+                    catch { continue; }
+                    if (!_settings.WorkspaceShowHiddenFiles && WorkspaceFileItem.IsHidden(child, attributes)) continue;
+                    if (attributes.HasFlag(FileAttributes.Directory))
                     {
-                        if (!WorkspaceFileItem.IsIgnoredDirectory(child)) stack.Push(child);
+                        if (!WorkspaceFileItem.IsIgnoredDirectory(child, attributes))
+                            stack.Push(Path.GetFullPath(child));
                         continue;
                     }
 
@@ -346,6 +515,11 @@ public partial class WorkspaceControl : UserControl
         if (item.IsDirectory)
         {
             await LoadDirectoryAsync(item.FullPath);
+            return;
+        }
+        if (!File.Exists(item.FullPath))
+        {
+            StatusText.Text = "文件不存在或已被移动。";
             return;
         }
         if (!item.IsEditable || item.Size > MaxEditableBytes)
@@ -382,7 +556,7 @@ public partial class WorkspaceControl : UserControl
         catch (Exception ex)
         {
             App.Log("Workspace file open failed: " + ex);
-            MessageBox.Show("无法打开文件：\n" + ex.Message, "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "无法打开文件：" + ex.Message;
         }
         finally
         {
@@ -425,8 +599,7 @@ public partial class WorkspaceControl : UserControl
         catch (Exception ex)
         {
             App.Log("Workspace save failed: " + ex);
-            if (showStatus)
-                MessageBox.Show("保存失败：\n" + ex.Message, "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "保存失败：" + ex.Message;
         }
     }
 
@@ -452,7 +625,15 @@ public partial class WorkspaceControl : UserControl
     {
         if (string.IsNullOrWhiteSpace(_currentFile)
             || !MarkdownExtensions.Contains(Path.GetExtension(_currentFile))) return;
-        PreviewViewer.Document = MarkdownDocumentRenderer.Render(EditorBox.Text, Math.Max(12, _settings.WorkspaceEditorFontSize));
+        try
+        {
+            PreviewViewer.Document = MarkdownDocumentRenderer.Render(EditorBox.Text, Math.Max(12, _settings.WorkspaceEditorFontSize));
+        }
+        catch (Exception ex)
+        {
+            App.Log("Workspace preview failed: " + ex.Message);
+            StatusText.Text = "Markdown 预览失败，编辑内容未受影响。";
+        }
     }
 
     private void UpdateEditorMode()
@@ -489,12 +670,24 @@ public partial class WorkspaceControl : UserControl
     {
         try
         {
-            var root = Path.GetFullPath(_settings.WorkspaceRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (string.IsNullOrWhiteSpace(_settings.WorkspaceRoot)) return false;
+            var root = Path.GetFullPath(_settings.WorkspaceRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             var candidate = Path.GetFullPath(path);
             return candidate.Equals(root.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)
                    || candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        try
+        {
+            return string.Equals(Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return string.Equals(left, right, StringComparison.OrdinalIgnoreCase); }
     }
 
     private static void OpenExternal(string path)
@@ -503,59 +696,110 @@ public partial class WorkspaceControl : UserControl
         {
             if (Directory.Exists(path))
                 Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
-            else
+            else if (File.Exists(path))
                 Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
-            MessageBox.Show("无法调用外部程序：\n" + ex.Message, "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            App.Log("Workspace external open failed: " + ex.Message);
         }
+    }
+
+    private async void Workspace_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (!IsVisible) return;
+        try { await EnsureLoadedAsync(); }
+        catch (Exception ex)
+        {
+            App.Log("Workspace visibility load failed: " + ex);
+            ClearPersistedWorkspaceRoot(_settings.WorkspaceRoot);
+            ShowWorkspaceFailure(_settings.WorkspaceRoot, ex.Message, recovered: true);
+            _loaded = true;
+        }
+    }
+
+    private async void Workspace_Unloaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_settings.WorkspaceAutoSave) await SaveCurrentAsync(false);
+        }
+        catch (Exception ex) { App.Log("Workspace unload save failed: " + ex.Message); }
     }
 
     private async void ChooseRoot_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFolderDialog { Title = "选择本地工作区目录", Multiselect = false };
-        if (Directory.Exists(_settings.WorkspaceRoot)) dialog.InitialDirectory = _settings.WorkspaceRoot;
-        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
-        _loaded = false;
-        await LoadRootAsync(dialog.FolderName);
-        _loaded = true;
+        try
+        {
+            var dialog = new OpenFolderDialog { Title = "选择本地工作区目录", Multiselect = false };
+            if (Directory.Exists(_settings.WorkspaceRoot)) dialog.InitialDirectory = _settings.WorkspaceRoot;
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+            _loaded = false;
+            var success = await LoadRootAsync(dialog.FolderName, persistOnSuccess: true);
+            _loaded = success;
+        }
+        catch (Exception ex)
+        {
+            App.Log("Choose workspace failed: " + ex);
+            StatusText.Text = "选择目录失败：" + ex.Message;
+        }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        if (Directory.Exists(_settings.WorkspaceRoot)) await LoadRootAsync(_settings.WorkspaceRoot);
+        try
+        {
+            if (Directory.Exists(_settings.WorkspaceRoot))
+                await LoadRootAsync(_settings.WorkspaceRoot, persistOnSuccess: false);
+        }
+        catch (Exception ex) { App.Log("Workspace refresh failed: " + ex.Message); }
     }
 
     private async void NewNote_Click(object sender, RoutedEventArgs e)
     {
-        var directory = Directory.Exists(CurrentDirectory) ? CurrentDirectory : _settings.WorkspaceRoot;
-        if (!Directory.Exists(directory))
+        try
         {
-            ChooseRoot_Click(sender, e);
-            return;
-        }
+            var directory = Directory.Exists(CurrentDirectory) ? CurrentDirectory : _settings.WorkspaceRoot;
+            if (!Directory.Exists(directory))
+            {
+                ChooseRoot_Click(sender, e);
+                return;
+            }
 
-        var baseName = "Note " + DateTime.Now.ToString("yyyy-MM-dd HHmm");
-        var path = Path.Combine(directory, baseName + ".md");
-        var suffix = 2;
-        while (File.Exists(path)) path = Path.Combine(directory, baseName + $" ({suffix++}).md");
-        await File.WriteAllTextAsync(path, $"# {Path.GetFileNameWithoutExtension(path)}\n\n", new UTF8Encoding(false));
-        await LoadRootAsync(_settings.WorkspaceRoot);
-        await OpenFileAsync(WorkspaceFileItem.FromPath(path));
-        EditorBox.Focus();
-        EditorBox.CaretIndex = EditorBox.Text.Length;
+            var baseName = "Note " + DateTime.Now.ToString("yyyy-MM-dd HHmm");
+            var path = Path.Combine(directory, baseName + ".md");
+            var suffix = 2;
+            while (File.Exists(path)) path = Path.Combine(directory, baseName + $" ({suffix++}).md");
+            await File.WriteAllTextAsync(path, $"# {Path.GetFileNameWithoutExtension(path)}\n\n", new UTF8Encoding(false));
+            await LoadRootAsync(_settings.WorkspaceRoot, persistOnSuccess: false);
+            await OpenFileAsync(WorkspaceFileItem.FromPath(path));
+            EditorBox.Focus();
+            EditorBox.CaretIndex = EditorBox.Text.Length;
+        }
+        catch (Exception ex)
+        {
+            App.Log("Create workspace note failed: " + ex);
+            StatusText.Text = "新建笔记失败：" + ex.Message;
+        }
     }
 
     private async void NewFolder_Click(object sender, RoutedEventArgs e)
     {
-        var directory = Directory.Exists(CurrentDirectory) ? CurrentDirectory : _settings.WorkspaceRoot;
-        if (!Directory.Exists(directory)) return;
-        var path = Path.Combine(directory, "New Folder");
-        var suffix = 2;
-        while (Directory.Exists(path)) path = Path.Combine(directory, $"New Folder ({suffix++})");
-        Directory.CreateDirectory(path);
-        await LoadRootAsync(_settings.WorkspaceRoot);
+        try
+        {
+            var directory = Directory.Exists(CurrentDirectory) ? CurrentDirectory : _settings.WorkspaceRoot;
+            if (!Directory.Exists(directory)) return;
+            var path = Path.Combine(directory, "New Folder");
+            var suffix = 2;
+            while (Directory.Exists(path)) path = Path.Combine(directory, $"New Folder ({suffix++})");
+            Directory.CreateDirectory(path);
+            await LoadRootAsync(_settings.WorkspaceRoot, persistOnSuccess: false);
+        }
+        catch (Exception ex)
+        {
+            App.Log("Create workspace folder failed: " + ex);
+            StatusText.Text = "新建目录失败：" + ex.Message;
+        }
     }
 
     private void OpenTerminal_Click(object sender, RoutedEventArgs e)
@@ -564,28 +808,36 @@ public partial class WorkspaceControl : UserControl
         OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs
         {
             Shell = _settings.DefaultShell,
-            Title = Path.GetFileName(CurrentDirectory.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } name ? name : "Workspace",
+            Title = Path.GetFileName(CurrentDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } name ? name : "Workspace",
             WorkingDirectory = CurrentDirectory
         });
     }
 
     private void RevealRoot_Click(object sender, RoutedEventArgs e)
     {
-        var path = _selectedNode?.FullPath;
-        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
-            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true });
-        else if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
-            Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
-        else if (Directory.Exists(_settings.WorkspaceRoot))
-            Process.Start(new ProcessStartInfo("explorer.exe", _settings.WorkspaceRoot) { UseShellExecute = true });
-        else
-            OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+        try
+        {
+            var path = _selectedNode?.FullPath;
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true });
+            else if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+                Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
+            else if (Directory.Exists(_settings.WorkspaceRoot))
+                Process.Start(new ProcessStartInfo("explorer.exe", _settings.WorkspaceRoot) { UseShellExecute = true });
+            else
+                OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception ex) { App.Log("Reveal workspace path failed: " + ex.Message); }
     }
 
     private void RevealFile_Click(object sender, RoutedEventArgs e)
     {
-        if (File.Exists(_currentFile))
-            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{_currentFile}\"") { UseShellExecute = true });
+        try
+        {
+            if (File.Exists(_currentFile))
+                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{_currentFile}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex) { App.Log("Reveal workspace file failed: " + ex.Message); }
     }
 
     private void OpenExternal_Click(object sender, RoutedEventArgs e)
@@ -594,31 +846,49 @@ public partial class WorkspaceControl : UserControl
         else if (File.Exists(_currentFile)) OpenExternal(_currentFile);
     }
 
-    private void FolderItem_Expanded(object sender, RoutedEventArgs e)
+    private async void FolderItem_Expanded(object sender, RoutedEventArgs e)
     {
-        if (sender is TreeViewItem { DataContext: WorkspaceNode node })
+        if (sender is not TreeViewItem { DataContext: WorkspaceNode node } || !node.TryBeginLoad()) return;
+        try
         {
-            node.LoadChildren(_settings.WorkspaceShowHiddenFiles);
+            var snapshot = await Task.Run(() => node.ReadChildren(_settings.WorkspaceShowHiddenFiles, MaxChildrenPerDirectory));
+            node.ApplyChildren(snapshot);
             FolderTree.Items.Refresh();
-            ExplorerCountText.Text = node.IsDirectory ? $"{node.Children.Count} 项" : ExplorerCountText.Text;
+            ExplorerCountText.Text = snapshot.Truncated ? $"前 {snapshot.Items.Count} 项" : $"{snapshot.Items.Count} 项";
+            if (!string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
+                StatusText.Text = "部分项目无法读取：" + snapshot.ErrorMessage;
+        }
+        catch (Exception ex)
+        {
+            node.CancelLoad();
+            App.Log("Workspace directory expansion failed: " + ex);
+            StatusText.Text = "目录展开失败：" + ex.Message;
         }
     }
 
     private async void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (e.NewValue is not WorkspaceNode { IsPlaceholder: false } node) return;
-        _selectedNode = node;
-        if (node.IsDirectory)
+        try
         {
-            _currentDirectory = node.FullPath;
-            ExplorerTitleText.Text = node.Name;
-            ExplorerCountText.Text = node.IsLoaded ? $"{node.Children.Count} 项" : string.Empty;
-            StatusText.Text = node.FullPath;
-            return;
-        }
+            _selectedNode = node;
+            if (node.IsDirectory)
+            {
+                _currentDirectory = node.FullPath;
+                ExplorerTitleText.Text = node.Name;
+                ExplorerCountText.Text = node.IsLoaded ? $"{node.Children.Count} 项" : string.Empty;
+                StatusText.Text = node.FullPath;
+                return;
+            }
 
-        _currentDirectory = Path.GetDirectoryName(node.FullPath) ?? _settings.WorkspaceRoot;
-        await OpenFileAsync(WorkspaceFileItem.FromPath(node.FullPath));
+            _currentDirectory = Path.GetDirectoryName(node.FullPath) ?? _settings.WorkspaceRoot;
+            await OpenFileAsync(WorkspaceFileItem.FromPath(node.FullPath));
+        }
+        catch (Exception ex)
+        {
+            App.Log("Workspace selection failed: " + ex);
+            StatusText.Text = "无法打开所选项目：" + ex.Message;
+        }
     }
 
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchWorkspaceAsync();

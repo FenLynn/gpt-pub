@@ -16,6 +16,7 @@ public sealed class WorkbenchFeaturePipeline
         Tasks = V064TaskEnhancer.Attach(window, this);
         Tools = V065ToolsEnhancer.Attach(window, this);
         Backup = V066BackupEnhancer.Attach(window);
+        Hotfix = V068HotfixEnhancer.Attach(window, this);
     }
 
     public V067VisualFixes VisualFixes { get; }
@@ -26,6 +27,7 @@ public sealed class WorkbenchFeaturePipeline
     public V064TaskEnhancer Tasks { get; }
     public V065ToolsEnhancer Tools { get; }
     public V066BackupEnhancer Backup { get; }
+    public V068HotfixEnhancer Hotfix { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);

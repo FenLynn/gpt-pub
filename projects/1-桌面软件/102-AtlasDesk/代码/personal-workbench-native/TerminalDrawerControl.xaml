@@ -29,7 +29,7 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <Button Content="新建 CMD" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,5,0" Click="NewCmd_Click"/>
                     <Button Content="新建 PowerShell" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,5,0" Click="NewPowerShell_Click"/>
-                    <Button Content="收起" Style="{StaticResource TerminalHeaderButton}" Click="Collapse_Click"/>
+                    <Button x:Name="HostActionButton" Content="收起" Style="{StaticResource TerminalHeaderButton}" Click="Collapse_Click"/>
                 </StackPanel>
             </Grid>
 
@@ -91,7 +91,7 @@
                             </Border>
                             <TextBlock Text="新建一个终端会话" Foreground="#D7E3F2" FontSize="14.5" FontWeight="SemiBold"
                                        TextAlignment="Center" Margin="0,13,0,0"/>
-                            <TextBlock Text="支持多个 CMD、PowerShell 与 Python 环境标签；每个标签都可以单独弹出。"
+                            <TextBlock Text="支持多个 CMD、PowerShell 与 Python 环境标签；同一会话可在开发页、底部固定栏和独立窗口之间移动。"
                                        Foreground="#7387A2" FontSize="11.3" TextAlignment="Center" TextWrapping="Wrap"
                                        LineHeight="18" Margin="0,6,0,0"/>
                         </StackPanel>
@@ -122,14 +122,14 @@
                             <TextBlock Text="当前标签" Foreground="#8EA2BC" FontSize="10.8" FontWeight="SemiBold" Margin="0,8,0,0"/>
                             <UniformGrid Columns="2" Margin="0,7,0,0">
                                 <Button Content="清屏" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,4,6" Click="Clear_Click"/>
-                                <Button Content="弹出" Style="{StaticResource TerminalHeaderButton}" Margin="4,0,0,6" Click="PopOut_Click"/>
-                                <Button Content="关闭" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,4,6" Click="CloseTab_Click"/>
-                                <Button Content="底部停靠" Style="{StaticResource TerminalHeaderButton}" Margin="4,0,0,6"
-                                        IsEnabled="False" ToolTip="当前终端区域已固定在工作台底部"/>
+                                <Button x:Name="RestartButton" Content="重新启动" Style="{StaticResource TerminalHeaderButton}" Margin="4,0,0,6" IsEnabled="False" Click="Restart_Click"/>
+                                <Button Content="弹出" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,4,6" Click="PopOut_Click"/>
+                                <Button Content="关闭" Style="{StaticResource TerminalHeaderButton}" Margin="4,0,0,6" Click="CloseTab_Click"/>
+                                <Button x:Name="HostModeButton" Content="嵌入开发页" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,4,6" Click="HostMode_Click"/>
                             </UniformGrid>
 
                             <Border Background="#172235" BorderBrush="#293B54" BorderThickness="1" CornerRadius="9" Padding="10" Margin="0,11,0,0">
-                                <TextBlock Text="弹出后可在独立窗口中勾选“置顶”，也可随时重新停靠到底部。&#x0a;&#x0a;复制：Ctrl+Shift+C&#x0a;粘贴：Ctrl+Shift+V 或右键"
+                                <TextBlock Text="开发页中可将整组终端固定到底部；切换到其他页面后，会话继续保留。单个标签弹出后可置顶、全屏，并随时嵌回工作台。&#x0a;&#x0a;复制：Ctrl+Shift+C&#x0a;粘贴：Ctrl+Shift+V 或右键"
                                            Foreground="#8094AE" FontSize="10.4" TextWrapping="Wrap" LineHeight="17"/>
                             </Border>
                         </StackPanel>
