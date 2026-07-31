@@ -22,7 +22,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -43,8 +43,23 @@ jobs:
         run: |
           $path = 'personal-workbench-launcher/main_windows.go'
           $content = Get-Content $path -Raw
-          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', 'appVersion = "0.4.0"')
+          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', 'appVersion = "0.5.0"')
           Set-Content $path $content -Encoding UTF8
+
+      - name: Prepare embedded xterm assets
+        shell: pwsh
+        run: |
+          $temp = Join-Path $env:RUNNER_TEMP 'workbench-xterm'
+          New-Item -ItemType Directory -Path $temp -Force | Out-Null
+          npm install --prefix $temp @xterm/xterm@6.0.0 @xterm/addon-fit@0.11.0 --ignore-scripts --no-audit --no-fund
+          $vendor = 'personal-workbench-native/TerminalAssets/vendor'
+          New-Item -ItemType Directory -Path $vendor -Force | Out-Null
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/lib/xterm.js') (Join-Path $vendor 'xterm.js') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/css/xterm.css') (Join-Path $vendor 'xterm.css') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/addon-fit/lib/addon-fit.js') (Join-Path $vendor 'addon-fit.js') -Force
+          foreach ($file in @('xterm.js','xterm.css','addon-fit.js')) {
+            if (!(Test-Path (Join-Path $vendor $file))) { throw "Missing terminal asset: $file" }
+          }
 
       - name: Restore
         run: dotnet restore personal-workbench-native/PersonalWorkbench.csproj
@@ -71,7 +86,11 @@ jobs:
             'clrjit.dll',
             'hostfxr.dll',
             'hostpolicy.dll',
-            'System.Private.CoreLib.dll'
+            'System.Private.CoreLib.dll',
+            'python.exe',
+            'conda.exe',
+            'uv.exe',
+            'node.exe'
           )
           foreach ($name in $forbidden) {
             if (Get-ChildItem build/app -Recurse -File -Filter $name -ErrorAction SilentlyContinue) {
@@ -80,7 +99,7 @@ jobs:
           }
 
           $payloadSize = (Get-Item $app).Length
-          if ($payloadSize -gt 28MB) {
+          if ($payloadSize -gt 34MB) {
             throw "App payload is unexpectedly large: $([math]::Round($payloadSize / 1MB, 2)) MB"
           }
           "APP_PAYLOAD_BYTES=$payloadSize" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -89,60 +108,66 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item build/app/PersonalWorkbench.App.exe personal-workbench-launcher/payload/PersonalWorkbench.App.exe -Force
-          New-Item -ItemType Directory -Path artifacts/PersonalWorkbench_v0.4.0_Lightweight -Force | Out-Null
+          New-Item -ItemType Directory -Path artifacts/PersonalWorkbench_v0.5.0_Lightweight -Force | Out-Null
           Push-Location personal-workbench-launcher
-          go build -trimpath -ldflags '-s -w -H windowsgui' -o ../artifacts/PersonalWorkbench_v0.4.0_Lightweight/PersonalWorkbench.exe .
+          go build -trimpath -ldflags '-s -w -H windowsgui' -o ../artifacts/PersonalWorkbench_v0.5.0_Lightweight/PersonalWorkbench.exe .
           Pop-Location
 
       - name: Validate final package size
         shell: pwsh
         run: |
-          $exe = 'artifacts/PersonalWorkbench_v0.4.0_Lightweight/PersonalWorkbench.exe'
+          $exe = 'artifacts/PersonalWorkbench_v0.5.0_Lightweight/PersonalWorkbench.exe'
           if (!(Test-Path $exe)) { throw 'Lightweight launcher was not produced.' }
           $size = (Get-Item $exe).Length
-          if ($size -gt 38MB) {
+          if ($size -gt 45MB) {
             throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB"
           }
           @"
-          Personal Workbench v0.4.0 Lightweight
+          Personal Workbench v0.5.0 Lightweight
 
-          This package contains only the Personal Workbench application and launcher.
-          It does not bundle the .NET Desktop Runtime, WebView2 Runtime, Python, Conda,
-          uv, or any Python packages.
+          This package contains only the Personal Workbench application, its launcher,
+          the read-only Zotero adapter, and the small xterm.js terminal renderer.
+          It does not bundle the .NET Desktop Runtime, WebView2 Runtime, Node.js,
+          Python, Conda, uv, or any Python packages.
 
-          New in v0.4.0:
-          - Dashboard remains alive when switching modules.
-          - Read-only Zotero SQLite search with auto detection and manual selection.
-          - Lightweight Conda, uv, venv and system Python discovery.
-          - Reduced top toolbar height.
-          "@ | Set-Content artifacts/PersonalWorkbench_v0.4.0_Lightweight/README.txt -Encoding UTF8
+          New in v0.5.0:
+          - Zotero collection tree, metadata details, notes, tags and attachments.
+          - External PDF reader support; no embedded PDF engine or annotation parser.
+          - Default 250-item calibration mode plus optional full-library mode.
+          - Integrated multi-tab ConPTY terminal for PowerShell, CMD, Conda and venv.
+          - Zotero and Python paths moved into Settings.
+          "@ | Set-Content artifacts/PersonalWorkbench_v0.5.0_Lightweight/README.txt -Encoding UTF8
           "FINAL_EXE_BYTES=$size" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Package
         shell: pwsh
         run: |
-          Compress-Archive -Path artifacts/PersonalWorkbench_v0.4.0_Lightweight/* -DestinationPath artifacts/PersonalWorkbench_v0.4.0_Lightweight.zip -Force
-          Get-FileHash artifacts/PersonalWorkbench_v0.4.0_Lightweight/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
+          Compress-Archive -Path artifacts/PersonalWorkbench_v0.5.0_Lightweight/* -DestinationPath artifacts/PersonalWorkbench_v0.5.0_Lightweight.zip -Force
+          Get-FileHash artifacts/PersonalWorkbench_v0.5.0_Lightweight/PersonalWorkbench.exe -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
           @"
           app_payload_bytes=$env:APP_PAYLOAD_BYTES
           final_exe_bytes=$env:FINAL_EXE_BYTES
           self_contained=false
           bundled_dotnet_runtime=false
           bundled_webview2_runtime=false
+          bundled_node_runtime=false
           bundled_python=false
           bundled_conda=false
           bundled_uv=false
+          terminal_renderer=xterm.js_6.0.0
+          terminal_backend=windows_conpty
           zotero_access=read_only_sqlite
-          dashboard_state=preserved_between_views
+          pdf_reader=external
+          zotero_default_limit=250
           "@ | Set-Content artifacts/build-manifest.txt -Encoding UTF8
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PersonalWorkbench-v0.4.0-lightweight-win-x64
+          name: PersonalWorkbench-v0.5.0-lightweight-win-x64
           path: |
-            artifacts/PersonalWorkbench_v0.4.0_Lightweight.zip
-            artifacts/PersonalWorkbench_v0.4.0_Lightweight/PersonalWorkbench.exe
+            artifacts/PersonalWorkbench_v0.5.0_Lightweight.zip
+            artifacts/PersonalWorkbench_v0.5.0_Lightweight/PersonalWorkbench.exe
             artifacts/SHA256.txt
             artifacts/build-manifest.txt
           if-no-files-found: error

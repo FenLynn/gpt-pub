@@ -1,0 +1,72 @@
+<UserControl x:Class="PersonalWorkbench.DevelopmentControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FontFamily="{StaticResource AppFont}">
+    <Grid Margin="14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="10"/><RowDefinition Height="56"/><RowDefinition Height="10"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Python 与终端" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="发现现有 Conda、uv、venv 与系统 Python；所有命令均在内置 ConPTY 终端中运行。" FontSize="12.3" Foreground="#6B7A90" Margin="0,3,0,0"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="PowerShell" Style="{StaticResource SecondaryButton}" Click="OpenPowerShell_Click"/>
+                <Button Content="CMD" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="OpenCmd_Click"/>
+                <Button Content="刷新环境" Style="{StaticResource PrimaryButton}" Margin="7,0,0,0" Click="Refresh_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="11" Padding="11">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="1"/><ColumnDefinition Width="*"/><ColumnDefinition Width="1"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <StackPanel Margin="2,0,14,0"><TextBlock Text="Conda" FontSize="11" Foreground="#8995A5"/><TextBlock x:Name="CondaSummary" Text="尚未检测" FontSize="12.4" FontWeight="SemiBold" Foreground="#43536A" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
+                <Border Grid.Column="1" Background="#E7ECF3"/>
+                <StackPanel Grid.Column="2" Margin="14,0"><TextBlock Text="uv" FontSize="11" Foreground="#8995A5"/><TextBlock x:Name="UvSummary" Text="尚未检测" FontSize="12.4" FontWeight="SemiBold" Foreground="#43536A" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
+                <Border Grid.Column="3" Background="#E7ECF3"/>
+                <StackPanel Grid.Column="4" Margin="14,0,2,0"><TextBlock Text="环境" FontSize="11" Foreground="#8995A5"/><TextBlock x:Name="EnvironmentSummary" Text="等待刷新" FontSize="12.4" FontWeight="SemiBold" Foreground="#43536A" Margin="0,4,0,0"/></StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="1.45*"/><ColumnDefinition Width="9"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
+            <Border Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="12" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="7"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <TextBlock x:Name="StatusText" Text="进入页面后自动发现环境。" FontSize="11.4" Foreground="#748296" Margin="4,2"/>
+                    <ListView x:Name="EnvironmentList" Grid.Row="2" BorderThickness="0" Background="Transparent"
+                              SelectionChanged="EnvironmentList_SelectionChanged" MouseDoubleClick="EnvironmentList_MouseDoubleClick"
+                              VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
+                        <ListView.View><GridView>
+                            <GridViewColumn Header="环境" Width="170" DisplayMemberBinding="{Binding DisplayName}"/>
+                            <GridViewColumn Header="类型" Width="105" DisplayMemberBinding="{Binding KindLabel}"/>
+                            <GridViewColumn Header="Python" Width="82" DisplayMemberBinding="{Binding Version}"/>
+                            <GridViewColumn Header="路径" Width="430" DisplayMemberBinding="{Binding Prefix}"/>
+                        </GridView></ListView.View>
+                    </ListView>
+                </Grid>
+            </Border>
+            <Border Grid.Column="2" Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="12" Padding="16">
+                <StackPanel>
+                    <TextBlock x:Name="DetailName" Text="选择一个 Python 环境" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="DetailKind" FontSize="12" Foreground="#607189" Margin="0,7,0,0"/>
+                    <TextBlock Text="解释器" FontSize="10.8" Foreground="#8793A4" Margin="0,16,0,0"/>
+                    <TextBlock x:Name="DetailPython" FontSize="12.2" Foreground="#45586F" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <TextBlock Text="环境目录" FontSize="10.8" Foreground="#8793A4" Margin="0,12,0,0"/>
+                    <TextBlock x:Name="DetailPrefix" FontSize="12.2" Foreground="#45586F" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <TextBlock Text="发现来源" FontSize="10.8" Foreground="#8793A4" Margin="0,12,0,0"/>
+                    <TextBlock x:Name="DetailSource" FontSize="12" Foreground="#45586F" Margin="0,4,0,0"/>
+                    <WrapPanel Margin="0,18,0,0">
+                        <Button x:Name="OpenIntegratedButton" Content="在内置终端打开" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="OpenIntegrated_Click"/>
+                        <Button x:Name="SetDefaultButton" Content="设为默认" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="SetDefault_Click"/>
+                        <Button x:Name="CopyPathButton" Content="复制解释器" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="CopyPath_Click"/>
+                        <Button x:Name="OpenFolderButton" Content="打开目录" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="OpenFolder_Click"/>
+                    </WrapPanel>
+                    <Border Background="#F2F6FB" CornerRadius="10" Padding="11" Margin="0,18,0,0">
+                        <TextBlock Text="终端复制：Ctrl+Shift+C；粘贴：Ctrl+Shift+V 或右键。存在选区时 Ctrl+C 复制，无选区时仍向命令发送中断。" FontSize="11.3" Foreground="#66778D" TextWrapping="Wrap"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
