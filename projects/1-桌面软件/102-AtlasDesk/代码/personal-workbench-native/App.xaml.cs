@@ -5,8 +5,7 @@ namespace PersonalWorkbench;
 
 public partial class App : Application
 {
-    private WorkbenchEnhancer? _enhancer;
-    private V061ExperienceEnhancer? _experience;
+    private WorkbenchFeaturePipeline? _pipeline;
 
     public static string AppDataDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -19,8 +18,10 @@ public partial class App : Application
     {
         Directory.CreateDirectory(AppDataDirectory);
         Directory.CreateDirectory(LogDirectory);
+        StartupGuard.Begin(WorkbenchVersion.Current);
+        Exit += (_, _) => StartupGuard.Complete();
         GlobalShortcutBootstrap.Initialize();
-        Log("Starting Personal Workbench 0.6.1");
+        Log("Starting Personal Workbench " + WorkbenchVersion.Current);
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -48,17 +49,16 @@ public partial class App : Application
 
     private void App_Activated(object? sender, EventArgs e)
     {
-        if (_enhancer is not null || MainWindow is not MainWindow window)
+        if (_pipeline is not null || MainWindow is not MainWindow window)
             return;
         try
         {
-            _enhancer = WorkbenchEnhancer.Attach(window);
-            _experience = V061ExperienceEnhancer.Attach(window, _enhancer);
-            Log("Workbench v0.6.1 modules attached");
+            _pipeline = WorkbenchFeaturePipeline.Attach(window);
+            Log("Workbench " + WorkbenchVersion.Current + " modules attached");
         }
         catch (Exception ex)
         {
-            Log("Feature enhancer failed: " + ex);
+            Log("Feature pipeline failed: " + ex);
             MessageBox.Show("工作台功能模块初始化失败：\n" + ex.Message + "\n\n日志：" + LogPath,
                 "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
         }

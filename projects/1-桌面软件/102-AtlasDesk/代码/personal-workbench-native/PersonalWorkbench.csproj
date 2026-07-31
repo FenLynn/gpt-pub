@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="Version.props" />
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -8,9 +9,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>PersonalWorkbench.App</AssemblyName>
     <RootNamespace>PersonalWorkbench</RootNamespace>
-    <Version>0.6.1</Version>
-    <FileVersion>0.6.1.0</FileVersion>
-    <AssemblyVersion>0.6.1.0</AssemblyVersion>
+    <Version>$(WorkbenchVersion)</Version>
+    <FileVersion>$(WorkbenchVersion).0</FileVersion>
+    <AssemblyVersion>$(WorkbenchVersion).0</AssemblyVersion>
 
     <!-- Lightweight distribution: bundle only the app and direct UI dependencies. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -36,6 +37,6 @@
   </ItemGroup>
 
   <Target Name="NormalizeSources" BeforeTargets="PrepareForBuild">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$p='$(MSBuildProjectDirectory)\MainWindow.xaml'; $c=[IO.File]::ReadAllText($p); $c=$c.Replace(' TextTrimming=\&quot;CharacterEllipsis\&quot;',''); $c=$c.Replace('v0.5.0：Zotero 三栏资料库与内置多标签终端已接入，仍坚持只读、轻量和手动可控。','v0.6.1：本地工作区、Markdown、真实首页与全局搜索已接入。'); $c=$c.Replace('v0.6.0：统一视觉系统与本地工作区已接入，支持轻量 Markdown 编辑、预览和外部文件协作。','v0.6.1：本地工作区、Markdown、真实首页与全局搜索已接入。'); [IO.File]::WriteAllText($p,$c,[Text.UTF8Encoding]::new($false)); $z='$(MSBuildProjectDirectory)\ZoteroLibrary.cs'; $s=[IO.File]::ReadAllText($z); $s=$s.Replace('AND i.itemType=@itemType','AND instr('','' || @itemType || '','', '','' || i.itemType || '','') &gt; 0'); [IO.File]::WriteAllText($z,$s,[Text.UTF8Encoding]::new($false)); $w='$(MSBuildProjectDirectory)\WorkspaceControl.xaml.cs'; $wc=[IO.File]::ReadAllText($w); $wc=$wc.Replace('await Task.Run(() =&gt; node.LoadChildren(_settings.WorkspaceShowHiddenFiles));','node.LoadChildren(_settings.WorkspaceShowHiddenFiles);'); [IO.File]::WriteAllText($w,$wc,[Text.UTF8Encoding]::new($false)); $x='$(MSBuildProjectDirectory)\WorkspaceControl.xaml'; $xc=[IO.File]::ReadAllText($x); $xc=$xc.Replace('x:Name=\&quot;EditorBox\&quot; AcceptsReturn=\&quot;True\&quot;','x:Name=\&quot;EditorBox\&quot; VerticalContentAlignment=\&quot;Top\&quot; AcceptsReturn=\&quot;True\&quot;'); [IO.File]::WriteAllText($x,$xc,[Text.UTF8Encoding]::new($false))&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$p='$(MSBuildProjectDirectory)\MainWindow.xaml'; $c=[IO.File]::ReadAllText($p); $c=$c.Replace(' TextTrimming=\&quot;CharacterEllipsis\&quot;',''); $c=$c.Replace('v0.5.0：Zotero 三栏资料库与内置多标签终端已接入，仍坚持只读、轻量和手动可控。','v0.6.2：启动保护、诊断中心与自动烟雾测试已接入。'); $c=$c.Replace('v0.6.0：统一视觉系统与本地工作区已接入，支持轻量 Markdown 编辑、预览和外部文件协作。','v0.6.2：启动保护、诊断中心与自动烟雾测试已接入。'); $c=$c.Replace('v0.6.1：本地工作区、Markdown、真实首页与全局搜索已接入。','v0.6.2：启动保护、诊断中心与自动烟雾测试已接入。'); [IO.File]::WriteAllText($p,$c,[Text.UTF8Encoding]::new($false)); $z='$(MSBuildProjectDirectory)\ZoteroLibrary.cs'; $s=[IO.File]::ReadAllText($z); $s=$s.Replace('AND i.itemType=@itemType','AND instr('','' || @itemType || '','', '','' || i.itemType || '','') &gt; 0'); [IO.File]::WriteAllText($z,$s,[Text.UTF8Encoding]::new($false)); $w='$(MSBuildProjectDirectory)\WorkspaceControl.xaml.cs'; $wc=[IO.File]::ReadAllText($w); $wc=$wc.Replace('await Task.Run(() =&gt; node.LoadChildren(_settings.WorkspaceShowHiddenFiles));','node.LoadChildren(_settings.WorkspaceShowHiddenFiles);'); [IO.File]::WriteAllText($w,$wc,[Text.UTF8Encoding]::new($false)); $x='$(MSBuildProjectDirectory)\WorkspaceControl.xaml'; $xc=[IO.File]::ReadAllText($x); $xc=$xc.Replace('x:Name=\&quot;EditorBox\&quot; AcceptsReturn=\&quot;True\&quot;','x:Name=\&quot;EditorBox\&quot; VerticalContentAlignment=\&quot;Top\&quot; AcceptsReturn=\&quot;True\&quot;'); [IO.File]::WriteAllText($x,$xc,[Text.UTF8Encoding]::new($false))&quot;" />
   </Target>
 </Project>

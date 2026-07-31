@@ -1,0 +1,14 @@
+Personal Workbench v0.6.2
+
+- Added a startup clean-exit marker to distinguish likely abnormal shutdowns.
+- Added a native diagnostics center for WebView2, paths, ConPTY, logs and local configuration.
+- Added privacy-aware support bundle export; browser profiles and credentials are never included.
+- Added a reusable feature pipeline for staged upgrades.
+- Added a standalone smoke-test project used by Windows CI.
+- Preserved Dashboard, Markdown workspace, Zotero read-only access and the integrated terminal.
+
+Verification checkpoint
+- Iteration 1 caught and isolated a WPF type ambiguity before packaging.
+- Iteration 2 completed compilation and exercised privacy tests.
+- Iteration 3 passed smoke tests, publish and payload validation.
+- Iteration 4 is the final regression and downloadable package build.
