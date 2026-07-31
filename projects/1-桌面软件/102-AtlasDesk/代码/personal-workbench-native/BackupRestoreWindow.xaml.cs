@@ -77,9 +77,10 @@ public partial class BackupRestoreWindow : Window
             }
 
             var confirmation = MessageBox.Show(this,
-                validation.Summary + "\n\n恢复将替换当前 settings.json 和备份中包含的任务历史。"
-                + "\n恢复前会自动创建当前配置快照。是否继续？",
-                "确认恢复备份", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                validation.Summary + "\n\n恢复包将在当前运行中完成再次校验并安全暂存。"
+                + "\n真正的配置替换将在下次启动、任何模块加载之前执行。"
+                + "\n暂存前会自动创建当前配置快照。是否继续？",
+                "确认暂存恢复", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirmation != MessageBoxResult.Yes)
             {
                 ResultTitle.Text = "恢复已取消";
@@ -87,24 +88,28 @@ public partial class BackupRestoreWindow : Window
                 return;
             }
 
-            ResultTitle.Text = "正在恢复…";
-            ResultSubtitle.Text = "正在创建恢复前快照并原子写入配置。";
-            var restored = await WorkbenchBackupService.RestoreAsync(path, App.AppDataDirectory, createPreRestoreSnapshot: true);
-            _lastPath = restored.PreRestoreSnapshotPath;
+            ResultTitle.Text = "正在暂存恢复包…";
+            ResultSubtitle.Text = "当前 settings.json 和任务历史不会在本次运行中被替换。";
+            var staged = await PendingRestoreService.StageAsync(path, App.AppDataDirectory);
+            _lastPath = staged.PreRestoreSnapshotPath;
             _lastResult = string.Join(Environment.NewLine, new[]
             {
-                "恢复完成",
-                "已恢复：" + (restored.RestoredFiles.Count == 0 ? "无文件" : string.Join("、", restored.RestoredFiles)),
-                "来源：" + restored.BackupPath,
-                "恢复前快照：" + restored.PreRestoreSnapshotPath,
+                "恢复已安全暂存",
+                "待恢复：" + (staged.Files.Count == 0 ? "无文件" : string.Join("、", staged.Files)),
+                "来源：" + staged.SourceBackupPath,
+                "暂存包：" + staged.PendingBackupPath,
+                "恢复前快照：" + staged.PreRestoreSnapshotPath,
                 string.Empty,
-                "请关闭并重新启动 Personal Workbench，使设置完整生效。"
+                "当前运行中的配置没有被替换。",
+                "请关闭并重新启动 Personal Workbench；下次启动会在模块加载前再次校验并应用。"
             });
-            ResultTitle.Text = "恢复完成";
-            ResultSubtitle.Text = "恢复前快照已保留；重启工作台后生效。";
+            ResultTitle.Text = "恢复已暂存";
+            ResultSubtitle.Text = "恢复前快照已保留；重启后自动应用。";
             ResultText.Text = _lastResult;
             EnableResultActions();
-            MessageBox.Show(this, "配置已恢复。请重启 Personal Workbench。", "备份与迁移", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this,
+                "恢复包已暂存，当前配置未改变。\n\n请关闭并重新启动 Personal Workbench。",
+                "备份与迁移", MessageBoxButton.OK, MessageBoxImage.Information);
         });
     }
 
