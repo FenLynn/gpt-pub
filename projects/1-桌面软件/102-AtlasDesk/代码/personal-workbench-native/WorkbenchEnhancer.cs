@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
 
 namespace PersonalWorkbench;
 
@@ -97,7 +96,7 @@ public sealed class WorkbenchEnhancer
             ToolTip = "显示或收起终端（Ctrl+`）"
         };
         var viewbox = new Viewbox { Width = 16, Height = 16 };
-        viewbox.Child = new Path
+        viewbox.Child = new System.Windows.Shapes.Path
         {
             Data = Geometry.Parse("M4,5 H20 V19 H4 Z M7,9 L10,12 L7,15 M12,15 H17"),
             Stroke = new SolidColorBrush(Color.FromRgb(95,112,135)), StrokeThickness = 1.8,
