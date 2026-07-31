@@ -18,6 +18,7 @@ public partial class App : Application
     {
         Directory.CreateDirectory(AppDataDirectory);
         Directory.CreateDirectory(LogDirectory);
+        ApplyPendingRestoreBeforeStartup();
         StartupGuard.Begin(WorkbenchVersion.Current);
         Exit += (_, _) => StartupGuard.Complete();
         GlobalShortcutBootstrap.Initialize();
@@ -45,6 +46,28 @@ public partial class App : Application
 
         Activated += App_Activated;
         base.OnStartup(e);
+    }
+
+    private static void ApplyPendingRestoreBeforeStartup()
+    {
+        try
+        {
+            var result = PendingRestoreService.ApplyIfPendingAsync(AppDataDirectory).GetAwaiter().GetResult();
+            if (result is not null)
+                Log("Applied pending restore before startup: " + string.Join(", ", result.RestoredFiles));
+        }
+        catch (Exception ex)
+        {
+            Log("Pending restore failed before startup: " + ex);
+            MessageBox.Show(
+                "暂存的配置恢复未能应用。\n\n"
+                + "暂存包已保留，现有配置不会以半恢复状态继续写入。\n"
+                + "可在备份与迁移中心重新检查备份，或查看日志：\n" + LogPath + "\n\n"
+                + ex.Message,
+                "Personal Workbench 恢复失败",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
     }
 
     private void App_Activated(object? sender, EventArgs e)
