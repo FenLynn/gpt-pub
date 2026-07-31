@@ -9,6 +9,7 @@ namespace PersonalWorkbench;
 public sealed class SettingsSavedEventArgs : EventArgs
 {
     public bool DashboardChanged { get; init; }
+    public bool WorkspaceChanged { get; init; }
     public bool ZoteroChanged { get; init; }
     public bool PythonChanged { get; init; }
     public bool TerminalChanged { get; init; }
@@ -36,6 +37,10 @@ public partial class SettingsControl : UserControl
         DashboardNameBox.Text = _settings.DashboardName;
         DashboardUrlBox.Text = _settings.DashboardUrl;
         WorkspaceBox.Text = _settings.WorkspaceRoot;
+        WorkspaceAutoSaveCheck.IsChecked = _settings.WorkspaceAutoSave;
+        WorkspaceHiddenCheck.IsChecked = _settings.WorkspaceShowHiddenFiles;
+        WorkspaceRecentLimitBox.Text = _settings.WorkspaceRecentLimit.ToString();
+        SelectComboByContent(WorkspaceFontSizeBox, _settings.WorkspaceEditorFontSize.ToString(), 2);
         ZoteroBox.Text = _settings.ZoteroDbPath;
         SystemPdfCheck.IsChecked = _settings.UseSystemPdfReader;
         PdfReaderBox.Text = _settings.PdfReaderPath;
@@ -48,14 +53,18 @@ public partial class SettingsControl : UserControl
             if (string.Equals(item.Tag?.ToString(), _settings.DefaultShell, StringComparison.OrdinalIgnoreCase))
                 DefaultShellBox.SelectedItem = item;
         DefaultShellBox.SelectedIndex = DefaultShellBox.SelectedIndex < 0 ? 0 : DefaultShellBox.SelectedIndex;
-        foreach (ComboBoxItem item in TerminalFontSizeBox.Items)
-            if (item.Content?.ToString() == _settings.TerminalFontSize.ToString())
-                TerminalFontSizeBox.SelectedItem = item;
-        TerminalFontSizeBox.SelectedIndex = TerminalFontSizeBox.SelectedIndex < 0 ? 2 : TerminalFontSizeBox.SelectedIndex;
+        SelectComboByContent(TerminalFontSizeBox, _settings.TerminalFontSize.ToString(), 2);
         TerminalHeightBox.Text = _settings.TerminalDrawerHeight.ToString();
         UpdatePdfControls();
         UpdateLoadModeControls();
         SaveStatus.Text = string.Empty;
+    }
+
+    private static void SelectComboByContent(ComboBox box, string value, int fallbackIndex)
+    {
+        foreach (ComboBoxItem item in box.Items)
+            if (item.Content?.ToString() == value) box.SelectedItem = item;
+        box.SelectedIndex = box.SelectedIndex < 0 ? Math.Clamp(fallbackIndex, 0, box.Items.Count - 1) : box.SelectedIndex;
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -68,18 +77,27 @@ public partial class SettingsControl : UserControl
         }
         if (!int.TryParse(CalibrationLimitBox.Text, out var limit)) limit = 250;
         if (!int.TryParse(TerminalHeightBox.Text, out var terminalHeight)) terminalHeight = 320;
-        var fontText = (TerminalFontSizeBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
-        if (!int.TryParse(fontText, out var terminalFont)) terminalFont = 14;
+        if (!int.TryParse(WorkspaceRecentLimitBox.Text, out var recentLimit)) recentLimit = 12;
+        var terminalFontText = (TerminalFontSizeBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
+        if (!int.TryParse(terminalFontText, out var terminalFont)) terminalFont = 14;
+        var workspaceFontText = (WorkspaceFontSizeBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
+        if (!int.TryParse(workspaceFontText, out var workspaceFont)) workspaceFont = 14;
         var shell = (DefaultShellBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "powershell";
+        var workspaceRoot = WorkspaceBox.Text.Trim();
 
         var dashboardChanged = !string.Equals(_settings.DashboardUrl.TrimEnd('/'), url.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
                                || !string.Equals(_settings.DashboardName, DashboardNameBox.Text.Trim(), StringComparison.Ordinal);
+        var workspaceChanged = !string.Equals(_settings.WorkspaceRoot, workspaceRoot, StringComparison.OrdinalIgnoreCase)
+                               || _settings.WorkspaceAutoSave != (WorkspaceAutoSaveCheck.IsChecked == true)
+                               || _settings.WorkspaceShowHiddenFiles != (WorkspaceHiddenCheck.IsChecked == true)
+                               || _settings.WorkspaceEditorFontSize != workspaceFont
+                               || _settings.WorkspaceRecentLimit != recentLimit;
         var zoteroChanged = !string.Equals(_settings.ZoteroDbPath, ZoteroBox.Text.Trim(), StringComparison.OrdinalIgnoreCase)
                             || _settings.ZoteroLoadFullLibrary != (FullModeRadio.IsChecked == true)
                             || _settings.ZoteroCalibrationLimit != limit
                             || _settings.UseSystemPdfReader != (SystemPdfCheck.IsChecked == true)
                             || !string.Equals(_settings.PdfReaderPath, PdfReaderBox.Text.Trim(), StringComparison.OrdinalIgnoreCase);
-        var pythonChanged = !string.Equals(_settings.WorkspaceRoot, WorkspaceBox.Text.Trim(), StringComparison.OrdinalIgnoreCase)
+        var pythonChanged = !string.Equals(_settings.WorkspaceRoot, workspaceRoot, StringComparison.OrdinalIgnoreCase)
                             || !string.Equals(_settings.CondaPath, CondaBox.Text.Trim(), StringComparison.OrdinalIgnoreCase)
                             || !string.Equals(_settings.UvPath, UvBox.Text.Trim(), StringComparison.OrdinalIgnoreCase);
         var terminalChanged = !string.Equals(_settings.DefaultShell, shell, StringComparison.OrdinalIgnoreCase)
@@ -89,7 +107,11 @@ public partial class SettingsControl : UserControl
         _settings.UserName = UserNameBox.Text.Trim();
         _settings.DashboardName = DashboardNameBox.Text.Trim();
         _settings.DashboardUrl = url;
-        _settings.WorkspaceRoot = WorkspaceBox.Text.Trim();
+        _settings.WorkspaceRoot = workspaceRoot;
+        _settings.WorkspaceAutoSave = WorkspaceAutoSaveCheck.IsChecked == true;
+        _settings.WorkspaceShowHiddenFiles = WorkspaceHiddenCheck.IsChecked == true;
+        _settings.WorkspaceEditorFontSize = Math.Clamp(workspaceFont, 11, 24);
+        _settings.WorkspaceRecentLimit = Math.Clamp(recentLimit, 4, 50);
         _settings.ZoteroDbPath = ZoteroBox.Text.Trim();
         _settings.ZoteroLoadFullLibrary = FullModeRadio.IsChecked == true;
         _settings.ZoteroCalibrationLimit = Math.Clamp(limit, 50, 5000);
@@ -105,8 +127,11 @@ public partial class SettingsControl : UserControl
         SaveStatus.Text = "已保存";
         SettingsSaved?.Invoke(this, new SettingsSavedEventArgs
         {
-            DashboardChanged = dashboardChanged, ZoteroChanged = zoteroChanged,
-            PythonChanged = pythonChanged, TerminalChanged = terminalChanged
+            DashboardChanged = dashboardChanged,
+            WorkspaceChanged = workspaceChanged,
+            ZoteroChanged = zoteroChanged,
+            PythonChanged = pythonChanged,
+            TerminalChanged = terminalChanged
         });
     }
 

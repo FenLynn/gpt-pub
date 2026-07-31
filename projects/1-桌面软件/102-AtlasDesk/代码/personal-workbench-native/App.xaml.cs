@@ -18,7 +18,7 @@ public partial class App : Application
     {
         Directory.CreateDirectory(AppDataDirectory);
         Directory.CreateDirectory(LogDirectory);
-        Log("Starting Personal Workbench 0.5.0");
+        Log("Starting Personal Workbench 0.6.0");
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -51,7 +51,7 @@ public partial class App : Application
         try
         {
             _enhancer = WorkbenchEnhancer.Attach(window);
-            Log("Workbench v0.5 feature modules attached");
+            Log("Workbench v0.6 feature modules attached");
         }
         catch (Exception ex)
         {

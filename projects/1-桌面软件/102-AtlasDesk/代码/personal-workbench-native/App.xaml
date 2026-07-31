@@ -16,8 +16,11 @@
 
         <SolidColorBrush x:Key="TextPrimary" Color="#1F2A3D"/>
         <SolidColorBrush x:Key="TextSecondary" Color="#64748B"/>
-        <SolidColorBrush x:Key="LineBrush" Color="#DCE4EF"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#4285F4"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#8A98AA"/>
+        <SolidColorBrush x:Key="LineBrush" Color="#DEE6F0"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SurfaceSoftBrush" Color="#F7F9FC"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#3F7FEA"/>
         <SolidColorBrush x:Key="AccentSoftBrush" Color="#EAF2FF"/>
 
         <Style TargetType="TextBlock">
@@ -26,6 +29,19 @@
             <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
             <Setter Property="TextOptions.TextHintingMode" Value="Fixed"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        </Style>
+
+        <Style x:Key="PageHeading" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="#213047"/>
+        </Style>
+        <Style x:Key="PageDescription" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.3"/><Setter Property="Foreground" Value="#6B7A90"/><Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+        <Style x:Key="SectionHeading" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="#52647B"/>
+        </Style>
+        <Style x:Key="EmptyStateText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.2"/><Setter Property="Foreground" Value="#7A899D"/><Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
         <Style x:Key="VectorPathBase" TargetType="Path">
@@ -37,29 +53,69 @@
         <Style x:Key="NavIconPath" TargetType="Path" BasedOn="{StaticResource VectorPathBase}"><Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}"/></Style>
         <Style x:Key="ButtonIconPath" TargetType="Path" BasedOn="{StaticResource VectorPathBase}"><Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"/></Style>
 
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#26354A"/><Setter Property="Foreground" Value="White"/><Setter Property="Padding" Value="8,5"/><Setter Property="FontSize" Value="11"/><Setter Property="BorderThickness" Value="0"/><Setter Property="HasDropShadow" Value="True"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="#354860"/><Setter Property="Background" Value="#FBFCFE"/>
+            <Setter Property="BorderBrush" Value="#D9E2ED"/><Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="9,5"/><Setter Property="CaretBrush" Value="#3676E5"/>
+            <Setter Property="SelectionBrush" Value="#BFD5FF"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#40536B"/><Setter Property="Background" Value="#FBFCFE"/>
+            <Setter Property="BorderBrush" Value="#D9E2ED"/><Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="7,3"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="#53657C"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="ListViewItem">
+            <Setter Property="Padding" Value="5,4"/><Setter Property="Margin" Value="0,1"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Foreground" Value="#3D5068"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListViewItem"><Border x:Name="Root" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}"><GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}" Content="{TemplateBinding Content}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#F1F5FA"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Root" Property="Background" Value="#E7F0FF"/><Setter Property="Foreground" Value="#265FBE"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style TargetType="TreeViewItem">
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="12.3"/><Setter Property="Foreground" Value="#465A72"/><Setter Property="Padding" Value="2"/>
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="11.8"/><Setter Property="Foreground" Value="#6A798C"/><Setter Property="Padding" Value="12,6"/>
+        </Style>
+
         <Style x:Key="IconButton" TargetType="Button">
-            <Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="29"/><Setter Property="Height" Value="29"/><Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/><Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#5F7087"/><Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="8"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bg" Property="Background" Value="#EEF3FA"/><Setter Property="Foreground" Value="#2F6FDB"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Bg" Property="Background" Value="#E2EAF5"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
         </Style>
 
         <Style x:Key="NavButton" TargetType="RadioButton">
-            <Setter Property="Height" Value="40"/><Setter Property="Margin" Value="0,2"/><Setter Property="Padding" Value="13,0,5,0"/>
+            <Setter Property="Height" Value="39"/><Setter Property="Margin" Value="0,2"/><Setter Property="Padding" Value="13,0,5,0"/>
             <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="#4F6077"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Root" Background="Transparent" CornerRadius="10" Padding="{TemplateBinding Padding}"><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#F1F5FA"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Root" Property="Background" Value="#EAF2FF"/><Setter Property="Foreground" Value="#2C6FEA"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Root" Background="Transparent" CornerRadius="10" Padding="{TemplateBinding Padding}"><Grid><Border x:Name="Indicator" Width="3" Height="18" CornerRadius="2" Background="#4A7FEB" HorizontalAlignment="Left" Margin="-9,0,0,0" Opacity="0"/><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#F0F4F9"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Root" Property="Background" Value="#E9F1FF"/><Setter Property="Foreground" Value="#2C6FEA"/><Setter TargetName="Indicator" Property="Opacity" Value="1"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
         </Style>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Height" Value="34"/><Setter Property="MinWidth" Value="104"/><Setter Property="Padding" Value="14,0"/>
-            <Setter Property="BorderThickness" Value="0"/><Setter Property="Background" Value="#4285F4"/><Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="13"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.9"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.82"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+            <Setter Property="Height" Value="33"/><Setter Property="MinWidth" Value="96"/><Setter Property="Padding" Value="14,0"/>
+            <Setter Property="BorderThickness" Value="0"/><Setter Property="Background" Value="#3F7FEA"/><Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/><Setter Property="FontSize" Value="12.5"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}"><Border.Effect><DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.12" Color="#2C65C5"/></Border.Effect><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#3375E4"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Root" Property="Background" Value="#2C69CD"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Root" Property="Opacity" Value="0.5"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
         </Style>
-        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"><Setter Property="Background" Value="#EEF3FA"/><Setter Property="Foreground" Value="#38516F"/></Style>
-        <Style x:Key="HomeCard" TargetType="Border"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#E1E8F1"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="14"/><Setter Property="Padding" Value="16"/></Style>
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"><Setter Property="Background" Value="#EEF3FA"/><Setter Property="Foreground" Value="#38516F"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="#E0E7F0" BorderThickness="1" CornerRadius="9" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#E6EDF7"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Root" Property="Background" Value="#DDE6F2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Root" Property="Opacity" Value="0.48"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+        <Style x:Key="TextButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="Foreground" Value="#4676C6"/><Setter Property="FontSize" Value="10.8"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Background="Transparent"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="#255EBC"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+
+        <Style x:Key="SurfaceCard" TargetType="Border">
+            <Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#E0E7F0"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="13"/>
+            <Setter Property="Effect"><Setter.Value><DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.055" Color="#49617F"/></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="ToolbarCard" TargetType="Border" BasedOn="{StaticResource SurfaceCard}"><Setter Property="CornerRadius" Value="11"/><Setter Property="Effect"><Setter.Value><DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.035"/></Setter.Value></Setter></Style>
+        <Style x:Key="HomeCard" TargetType="Border" BasedOn="{StaticResource SurfaceCard}"><Setter Property="Padding" Value="16"/></Style>
 
         <Style x:Key="TerminalHeaderButton" TargetType="Button">
             <Setter Property="Height" Value="26"/><Setter Property="MinWidth" Value="58"/><Setter Property="Padding" Value="9,0"/>

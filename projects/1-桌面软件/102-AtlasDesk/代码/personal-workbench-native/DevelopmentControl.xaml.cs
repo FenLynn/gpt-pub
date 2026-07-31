@@ -10,6 +10,7 @@ public sealed class TerminalOpenRequestEventArgs : EventArgs
     public string Shell { get; init; } = "powershell";
     public PythonEnvironmentInfo? Environment { get; init; }
     public string Title { get; init; } = string.Empty;
+    public string WorkingDirectory { get; init; } = string.Empty;
 }
 
 public partial class DevelopmentControl : UserControl
@@ -99,10 +100,10 @@ public partial class DevelopmentControl : UserControl
     }
 
     private void OpenPowerShell_Click(object sender, RoutedEventArgs e) =>
-        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs { Shell = "powershell", Title = "PowerShell" });
+        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs { Shell = "powershell", Title = "PowerShell", WorkingDirectory = _settings.WorkspaceRoot });
 
     private void OpenCmd_Click(object sender, RoutedEventArgs e) =>
-        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs { Shell = "cmd", Title = "CMD" });
+        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs { Shell = "cmd", Title = "CMD", WorkingDirectory = _settings.WorkspaceRoot });
 
     private void EnvironmentList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -138,7 +139,8 @@ public partial class DevelopmentControl : UserControl
         if (_selected is null) return;
         OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs
         {
-            Shell = "cmd", Environment = _selected, Title = _selected.DisplayName
+            Shell = "cmd", Environment = _selected, Title = _selected.DisplayName,
+            WorkingDirectory = Directory.Exists(_settings.WorkspaceRoot) ? _settings.WorkspaceRoot : _selected.Prefix
         });
     }
 

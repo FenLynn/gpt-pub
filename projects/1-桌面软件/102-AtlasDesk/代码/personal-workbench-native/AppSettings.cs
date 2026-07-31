@@ -10,6 +10,12 @@ public sealed class AppSettings
     public string DashboardUrl { get; set; } = string.Empty;
     public string Accent { get; set; } = "blue";
     public string WorkspaceRoot { get; set; } = string.Empty;
+    public bool WorkspaceAutoSave { get; set; } = true;
+    public bool WorkspaceShowHiddenFiles { get; set; }
+    public int WorkspaceEditorFontSize { get; set; } = 14;
+    public int WorkspaceRecentLimit { get; set; } = 12;
+    public string LastWorkspaceFile { get; set; } = string.Empty;
+    public List<string> RecentWorkspaceFiles { get; set; } = new();
 
     public string ZoteroDbPath { get; set; } = string.Empty;
     public bool ZoteroLoadFullLibrary { get; set; }
@@ -65,6 +71,14 @@ public sealed class AppSettings
     private static AppSettings Normalize(AppSettings value)
     {
         value.ZoteroCalibrationLimit = Math.Clamp(value.ZoteroCalibrationLimit <= 0 ? 250 : value.ZoteroCalibrationLimit, 50, 5000);
+        value.WorkspaceEditorFontSize = Math.Clamp(value.WorkspaceEditorFontSize <= 0 ? 14 : value.WorkspaceEditorFontSize, 11, 24);
+        value.WorkspaceRecentLimit = Math.Clamp(value.WorkspaceRecentLimit <= 0 ? 12 : value.WorkspaceRecentLimit, 4, 50);
+        value.RecentWorkspaceFiles ??= new List<string>();
+        value.RecentWorkspaceFiles = value.RecentWorkspaceFiles
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(value.WorkspaceRecentLimit)
+            .ToList();
         value.TerminalFontSize = Math.Clamp(value.TerminalFontSize <= 0 ? 14 : value.TerminalFontSize, 10, 24);
         value.TerminalScrollback = Math.Clamp(value.TerminalScrollback <= 0 ? 8000 : value.TerminalScrollback, 1000, 100000);
         value.TerminalDrawerHeight = Math.Clamp(value.TerminalDrawerHeight <= 0 ? 320 : value.TerminalDrawerHeight, 180, 700);
