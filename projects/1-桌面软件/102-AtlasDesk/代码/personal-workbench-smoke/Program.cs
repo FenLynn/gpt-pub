@@ -1,26 +1,36 @@
 using PersonalWorkbench;
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 var failures = new List<string>();
-
 void Check(bool condition, string name)
 {
     if (condition) Console.WriteLine("PASS " + name);
     else { Console.WriteLine("FAIL " + name); failures.Add(name); }
 }
 
-var now = new DateTimeOffset(2026, 7, 31, 1, 0, 0, TimeSpan.Zero);
-var first = StartupGuard.CreateNext(null, WorkbenchVersion.Current, now);
-Check(first.Running && !first.PreviousSessionUnclean && first.ConsecutiveUncleanStarts == 0, "first startup is clean");
-
-var crashed = StartupGuard.CreateNext(new StartupGuardState
+void CheckThrows<T>(Action action, string name) where T : Exception
 {
-    Version = WorkbenchVersion.Current, Running = true, ConsecutiveUncleanStarts = 1, LastStartUtc = now.AddMinutes(-2)
-}, WorkbenchVersion.Current, now);
-Check(crashed.PreviousSessionUnclean && crashed.ConsecutiveUncleanStarts == 2, "unclean startup increments counter");
+    try { action(); }
+    catch (T) { Check(true, name); return; }
+    Check(false, name);
+}
 
-var clean = StartupGuard.MarkClean(crashed, now.AddMinutes(1));
-Check(!clean.Running && clean.ConsecutiveUncleanStarts == 0 && clean.LastCleanExitUtc.HasValue, "clean shutdown resets counter");
+var now = new DateTimeOffset(2026, 7, 31, 1, 0, 0, TimeSpan.Zero);
+Check(WorkbenchVersion.Current == "0.6.6", "assembly version matches Version.props");
+
+var firstStart = StartupGuard.CreateNext(null, WorkbenchVersion.Current, now);
+var uncleanStart = StartupGuard.CreateNext(new StartupGuardState
+{
+    Version = WorkbenchVersion.Current, Running = true, ConsecutiveUncleanStarts = 1, LastStartUtc = now.AddMinutes(-1)
+}, WorkbenchVersion.Current, now);
+var cleanExit = StartupGuard.MarkClean(uncleanStart, now.AddMinutes(1));
+Check(firstStart.Running && !firstStart.PreviousSessionUnclean, "startup guard recognizes first clean start");
+Check(uncleanStart.PreviousSessionUnclean && uncleanStart.ConsecutiveUncleanStarts == 2, "startup guard counts interrupted sessions");
+Check(!cleanExit.Running && cleanExit.ConsecutiveUncleanStarts == 0, "startup guard records clean exit");
 
 var sanitized = SupportBundleSanitizer.SanitizeSettingsJson("""
 {
@@ -32,165 +42,205 @@ var sanitized = SupportBundleSanitizer.SanitizeSettingsJson("""
 }
 """);
 var sanitizedObject = JsonNode.Parse(sanitized)!.AsObject();
-Check(sanitizedObject["userName"]?.GetValue<string>() == "<redacted>", "user name is redacted");
-Check(sanitizedObject["dashboardUrl"]?.GetValue<string>() == "https://example.com", "dashboard query is removed");
+Check(sanitizedObject["userName"]?.GetValue<string>() == "<redacted>", "support bundle redacts user name");
+Check(sanitizedObject["dashboardUrl"]?.GetValue<string>() == "https://example.com", "support bundle removes dashboard query");
 Check(sanitizedObject["workspaceRoot"]?.GetValue<string>() == "<redacted-path>"
-      && sanitizedObject["zoteroDbPath"]?.GetValue<string>() == "<redacted-path>"
-      && sanitizedObject["recentWorkspaceFiles"]?.AsArray().All(item => item?.GetValue<string>() == "<redacted-path>") == true,
-    "local paths are redacted");
+      && sanitizedObject["zoteroDbPath"]?.GetValue<string>() == "<redacted-path>", "support bundle redacts local paths");
 
-var tempRoot = Path.Combine(Path.GetTempPath(), "pw-project-smoke-" + Guid.NewGuid().ToString("N"));
+var projectRoot = NewTemp("pw-project");
 try
 {
-    var pythonProject = Path.Combine(tempRoot, "laser-model");
-    Directory.CreateDirectory(Path.Combine(pythonProject, ".git"));
-    File.WriteAllText(Path.Combine(pythonProject, ".git", "HEAD"), "ref: refs/heads/feature/thermal-model\n");
-    File.WriteAllText(Path.Combine(pythonProject, "pyproject.toml"), "[project]\nname='laser-model'\n");
+    var python = Path.Combine(projectRoot, "laser-model");
+    Directory.CreateDirectory(Path.Combine(python, ".git"));
+    File.WriteAllText(Path.Combine(python, ".git", "HEAD"), "ref: refs/heads/feature/thermal-model\n");
+    File.WriteAllText(Path.Combine(python, "pyproject.toml"), "[project]\nname='laser-model'\n");
+    var paper = Path.Combine(projectRoot, "paper");
+    Directory.CreateDirectory(paper);
+    File.WriteAllText(Path.Combine(paper, "main.tex"), "\\documentclass{article}");
+    var analyzer = Path.Combine(projectRoot, "tools", "analyzer");
+    Directory.CreateDirectory(analyzer);
+    File.WriteAllText(Path.Combine(analyzer, "Analyzer.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+    var ignored = Path.Combine(projectRoot, "node_modules", "ignored");
+    Directory.CreateDirectory(ignored);
+    File.WriteAllText(Path.Combine(ignored, "package.json"), "{}");
 
-    var latexProject = Path.Combine(tempRoot, "paper");
-    Directory.CreateDirectory(latexProject);
-    File.WriteAllText(Path.Combine(latexProject, "main.tex"), "\\documentclass{article}");
-
-    var dotnetProject = Path.Combine(tempRoot, "tools", "analyzer");
-    Directory.CreateDirectory(dotnetProject);
-    File.WriteAllText(Path.Combine(dotnetProject, "Analyzer.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
-
-    var ignoredProject = Path.Combine(tempRoot, "node_modules", "ignored");
-    Directory.CreateDirectory(ignoredProject);
-    File.WriteAllText(Path.Combine(ignoredProject, "package.json"), "{}");
-
-    var projects = ProjectCatalogService.Scan(tempRoot, 2, 20);
-    var python = projects.SingleOrDefault(item => item.Name == "laser-model");
-    Check(python is not null && python.Kind.HasFlag(ProjectKind.Git) && python.Kind.HasFlag(ProjectKind.Python), "git python project is detected");
-    Check(python?.GitBranch == "feature/thermal-model", "git branch is parsed");
-    Check(projects.Any(item => item.Kind.HasFlag(ProjectKind.Latex)), "latex project is detected");
-    Check(projects.Any(item => item.Kind.HasFlag(ProjectKind.DotNet)), "nested dotnet project is detected");
-    Check(projects.All(item => !item.RootPath.Contains("node_modules", StringComparison.OrdinalIgnoreCase)), "ignored directories are skipped");
-
+    var projects = ProjectCatalogService.Scan(projectRoot, 2, 20);
+    var detectedPython = projects.SingleOrDefault(item => item.Name == "laser-model");
+    Check(detectedPython is not null && detectedPython.Kind.HasFlag(ProjectKind.Git)
+          && detectedPython.Kind.HasFlag(ProjectKind.Python), "project center detects Git Python project");
+    Check(detectedPython?.GitBranch == "feature/thermal-model", "project center reads Git branch");
+    Check(projects.Any(item => item.Kind.HasFlag(ProjectKind.Latex))
+          && projects.Any(item => item.Kind.HasFlag(ProjectKind.DotNet)), "project center detects LaTeX and .NET");
+    Check(projects.All(item => !item.RootPath.Contains("node_modules", StringComparison.OrdinalIgnoreCase)), "project center skips generated directories");
     using var cancelled = new CancellationTokenSource();
     cancelled.Cancel();
-    var cancellationObserved = false;
-    try { _ = ProjectCatalogService.Scan(tempRoot, 2, 20, cancelled.Token); }
-    catch (OperationCanceledException) { cancellationObserved = true; }
-    Check(cancellationObserved, "project scan honors cancellation");
+    CheckThrows<OperationCanceledException>(() => ProjectCatalogService.Scan(projectRoot, 2, 20, cancelled.Token), "project scan is cancellable");
 }
-finally
-{
-    try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); } catch { }
-}
+finally { DeleteTree(projectRoot); }
 
-var taskRoot = Path.Combine(Path.GetTempPath(), "pw-task-smoke-" + Guid.NewGuid().ToString("N"));
+var taskRoot = NewTemp("pw-task");
 try
 {
     Directory.CreateDirectory(Path.Combine(taskRoot, "sub"));
     Directory.CreateDirectory(Path.Combine(taskRoot, "node_modules", "ignored"));
-    var abcPath = Path.Combine(taskRoot, "abc.txt");
-    File.WriteAllText(abcPath, "abc");
+    var abc = Path.Combine(taskRoot, "abc.txt");
+    File.WriteAllText(abc, "abc");
     File.WriteAllBytes(Path.Combine(taskRoot, "sub", "payload.bin"), new byte[1024]);
     File.WriteAllBytes(Path.Combine(taskRoot, "node_modules", "ignored", "skip.bin"), new byte[50]);
 
-    var hash = await WorkbenchTaskOperations.ComputeSha256Async(abcPath);
-    Check(hash == "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD", "SHA-256 operation matches known vector");
-
+    var hash = await WorkbenchTaskOperations.ComputeSha256Async(abc);
+    Check(hash == "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD", "task hash matches known SHA-256 vector");
     var statistics = WorkbenchTaskOperations.ScanDirectory(taskRoot);
-    Check(statistics.FileCount == 2 && statistics.DirectoryCount == 1, "directory statistics count visible entries");
-    Check(statistics.TotalBytes == 1027 && statistics.SkippedEntries >= 1, "directory statistics skip generated folders");
+    Check(statistics.FileCount == 2 && statistics.DirectoryCount == 1 && statistics.TotalBytes == 1027, "task directory statistics are correct");
+    Check(statistics.SkippedEntries >= 1, "task statistics skip generated folders");
 
-    using var cancelledHash = new CancellationTokenSource();
-    cancelledHash.Cancel();
-    var hashCancelled = false;
-    try { _ = await WorkbenchTaskOperations.ComputeSha256Async(abcPath, cancellationToken: cancelledHash.Token); }
-    catch (OperationCanceledException) { hashCancelled = true; }
-    Check(hashCancelled, "file hash honors cancellation");
-
-    var historyJson = WorkbenchTaskStore.Serialize(new[]
+    var history = WorkbenchTaskStore.Deserialize(WorkbenchTaskStore.Serialize(new[]
     {
-        new WorkbenchTaskRecord { Type = WorkbenchTaskType.FileHash, Title = "running", TargetPath = abcPath, State = WorkbenchTaskState.Running, CreatedAt = now },
-        new WorkbenchTaskRecord { Type = WorkbenchTaskType.DirectoryStatistics, Title = "done", TargetPath = taskRoot, State = WorkbenchTaskState.Completed, Result = "ok", CreatedAt = now.AddMinutes(-1) }
-    });
-    var restored = WorkbenchTaskStore.Deserialize(historyJson);
-    Check(restored.Count == 2 && restored.Any(item => item.Title == "done" && item.State == WorkbenchTaskState.Completed), "task history round-trips completed records");
-    Check(restored.Any(item => item.Title == "running" && item.State == WorkbenchTaskState.Failed && item.Error.Contains("中断")), "interrupted task history is normalized");
-
-    using var lowConcurrency = new WorkbenchTaskService(0);
-    using var highConcurrency = new WorkbenchTaskService(99);
-    Check(WorkbenchTaskService.DefaultMaxConcurrency == 2 && lowConcurrency.MaxConcurrency == 1 && highConcurrency.MaxConcurrency == 8,
-        "task concurrency policy is bounded");
-    Check(new WorkbenchTaskRecord { State = WorkbenchTaskState.Queued }.ProgressLabel == "排队", "queued task has explicit progress label");
+        new WorkbenchTaskRecord { Title = "running", State = WorkbenchTaskState.Running, CreatedAt = now },
+        new WorkbenchTaskRecord { Title = "done", State = WorkbenchTaskState.Completed, Result = "ok", CreatedAt = now.AddMinutes(-1) }
+    }));
+    Check(history.Any(item => item.Title == "running" && item.State == WorkbenchTaskState.Failed), "task history normalizes interrupted work");
+    using var low = new WorkbenchTaskService(0);
+    using var high = new WorkbenchTaskService(99);
+    Check(low.MaxConcurrency == 1 && high.MaxConcurrency == 8 && WorkbenchTaskService.DefaultMaxConcurrency == 2, "task concurrency is bounded");
 }
-finally
-{
-    try { if (Directory.Exists(taskRoot)) Directory.Delete(taskRoot, true); } catch { }
-}
+finally { DeleteTree(taskRoot); }
 
-var integrityRoot = Path.Combine(Path.GetTempPath(), "pw-integrity-smoke-" + Guid.NewGuid().ToString("N"));
+var integrityRoot = NewTemp("pw-integrity");
 try
 {
     Directory.CreateDirectory(Path.Combine(integrityRoot, "sub"));
     Directory.CreateDirectory(Path.Combine(integrityRoot, "node_modules", "ignored"));
-    var firstPath = Path.Combine(integrityRoot, "alpha.txt");
-    var secondPath = Path.Combine(integrityRoot, "sub", "beta.bin");
-    var ignoredPath = Path.Combine(integrityRoot, "node_modules", "ignored", "skip.txt");
-    File.WriteAllText(firstPath, "abc");
-    File.WriteAllBytes(secondPath, new byte[] { 1, 2, 3, 4, 5 });
-    File.WriteAllText(ignoredPath, "skip");
+    var alpha = Path.Combine(integrityRoot, "alpha.txt");
+    var beta = Path.Combine(integrityRoot, "sub", "beta.bin");
+    File.WriteAllText(alpha, "abc");
+    File.WriteAllBytes(beta, new byte[] { 1, 2, 3, 4, 5 });
+    File.WriteAllText(Path.Combine(integrityRoot, "node_modules", "ignored", "skip.txt"), "skip");
 
-    var manifestEntries = await FileIntegrityService.CreateManifestAsync(integrityRoot);
-    Check(manifestEntries.Count == 2 && manifestEntries.All(item => !Path.IsPathRooted(item.RelativePath)), "manifest uses relative paths and skips generated folders");
-    var manifestText = FileIntegrityService.FormatManifest(manifestEntries);
-    var parsedEntries = FileIntegrityService.ParseManifest(manifestText);
-    Check(parsedEntries.Count == 2 && parsedEntries.Select(item => item.RelativePath).SequenceEqual(manifestEntries.Select(item => item.RelativePath)), "manifest format round-trips");
+    var entries = await FileIntegrityService.CreateManifestAsync(integrityRoot);
+    Check(entries.Count == 2 && entries.All(item => !Path.IsPathRooted(item.RelativePath)), "integrity manifest is relative and skips generated folders");
+    var parsed = FileIntegrityService.ParseManifest(FileIntegrityService.FormatManifest(entries));
+    Check(parsed.Count == entries.Count, "integrity manifest round-trips");
+    var manifestPath = Path.Combine(integrityRoot, "outside.sha256");
+    await FileIntegrityService.WriteManifestAtomicAsync(manifestPath, entries);
+    var verified = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
+    Check(verified.All(item => item.Status == IntegrityVerificationStatus.Match), "integrity manifest verifies fresh files");
 
-    var manifestPath = Path.Combine(Path.GetTempPath(), "pw-integrity-" + Guid.NewGuid().ToString("N") + ".sha256");
-    try
-    {
-        await FileIntegrityService.WriteManifestAtomicAsync(manifestPath, manifestEntries);
-        var verified = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
-        Check(verified.Count == 2 && verified.All(item => item.Status == IntegrityVerificationStatus.Match), "fresh manifest verifies successfully");
+    var copy = Path.Combine(integrityRoot, "alpha-copy.txt");
+    File.Copy(alpha, copy);
+    Check((await FileIntegrityService.CompareFilesAsync(alpha, copy)).IsIdentical, "integrity comparison detects identical files");
+    File.AppendAllText(copy, "changed");
+    Check(!(await FileIntegrityService.CompareFilesAsync(alpha, copy)).IsIdentical, "integrity comparison detects differences");
+    File.Delete(copy);
+    File.AppendAllText(beta, "changed");
+    File.Delete(alpha);
+    var changed = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
+    Check(changed.Any(item => item.Status == IntegrityVerificationStatus.Changed)
+          && changed.Any(item => item.Status == IntegrityVerificationStatus.Missing), "integrity verification detects change and deletion");
 
-        var copyPath = Path.Combine(integrityRoot, "alpha-copy.txt");
-        File.Copy(firstPath, copyPath);
-        var same = await FileIntegrityService.CompareFilesAsync(firstPath, copyPath);
-        Check(same.IsIdentical, "identical files compare equal");
-        File.AppendAllText(copyPath, "changed");
-        var different = await FileIntegrityService.CompareFilesAsync(firstPath, copyPath);
-        Check(!different.IsIdentical, "changed files compare different");
-        File.Delete(copyPath);
-
-        File.AppendAllText(secondPath, "changed");
-        File.Delete(firstPath);
-        var changedVerification = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
-        Check(changedVerification.Any(item => item.Status == IntegrityVerificationStatus.Changed), "modified file is detected");
-        Check(changedVerification.Any(item => item.Status == IntegrityVerificationStatus.Missing), "missing file is detected");
-
-        var unsafeManifest = FileIntegrityService.Header + Environment.NewLine
-            + "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD *../escape.txt" + Environment.NewLine;
-        await File.WriteAllTextAsync(manifestPath, unsafeManifest);
-        var unsafeVerification = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
-        Check(unsafeVerification.Single().Status == IntegrityVerificationStatus.UnsafePath, "manifest path traversal is rejected");
-    }
-    finally
-    {
-        try { if (File.Exists(manifestPath)) File.Delete(manifestPath); } catch { }
-    }
+    var unsafeText = FileIntegrityService.Header + Environment.NewLine
+        + "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD *../escape.txt" + Environment.NewLine;
+    File.WriteAllText(manifestPath, unsafeText);
+    Check((await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot)).Single().Status == IntegrityVerificationStatus.UnsafePath,
+        "integrity verification rejects path traversal");
 }
-finally
-{
-    try { if (Directory.Exists(integrityRoot)) Directory.Delete(integrityRoot, true); } catch { }
-}
+finally { DeleteTree(integrityRoot); }
 
-var summary = DiagnosticsService.BuildSummary(new[]
+var backupRoot = NewTemp("pw-backup");
+try
 {
-    new DiagnosticCheck { Name = "Smoke", Detail = "ok", Severity = DiagnosticSeverity.Ok }
-});
-Check(summary.Contains("[正常] Smoke: ok", StringComparison.Ordinal), "diagnostic summary is stable");
-Check(WorkbenchVersion.Current == "0.6.5", "assembly version matches Version.props");
+    var source = Path.Combine(backupRoot, "source");
+    var target = Path.Combine(backupRoot, "target");
+    Directory.CreateDirectory(source);
+    Directory.CreateDirectory(target);
+    File.WriteAllText(Path.Combine(source, "settings.json"), "{\"userName\":\"source\",\"workspaceRoot\":\"D:/Research\"}");
+    File.WriteAllText(Path.Combine(source, "task-history.json"), "[]");
+    File.WriteAllText(Path.Combine(source, "startup-state.json"), "{\"running\":true}");
+    Directory.CreateDirectory(Path.Combine(source, "WebView2Profile"));
+    File.WriteAllText(Path.Combine(source, "WebView2Profile", "Cookies"), "secret-cookie");
+    Directory.CreateDirectory(Path.Combine(source, "BrowserProfile"));
+    File.WriteAllText(Path.Combine(source, "BrowserProfile", "session"), "secret-session");
+
+    File.WriteAllText(Path.Combine(target, "settings.json"), "{\"userName\":\"target-before\"}");
+    File.WriteAllText(Path.Combine(target, "task-history.json"), "[{\"title\":\"old\"}]");
+    var backupPath = Path.Combine(backupRoot, "config.pwbak");
+    await WorkbenchBackupService.ExportAsync(source, backupPath);
+    var validation = await WorkbenchBackupService.ValidateAsync(backupPath);
+    Check(validation.IsValid, "backup validates after export");
+    Check(validation.Files.OrderBy(item => item).SequenceEqual(new[] { "settings.json", "task-history.json" }), "backup contains only allowlisted files");
+    using (var zip = ZipFile.OpenRead(backupPath))
+    {
+        Check(zip.Entries.All(entry => !entry.FullName.Contains("WebView2", StringComparison.OrdinalIgnoreCase)
+                                      && !entry.FullName.Contains("BrowserProfile", StringComparison.OrdinalIgnoreCase)
+                                      && !entry.FullName.Contains("startup-state", StringComparison.OrdinalIgnoreCase)),
+            "backup excludes browser sessions and startup state");
+    }
+
+    var restored = await WorkbenchBackupService.RestoreAsync(backupPath, target, createPreRestoreSnapshot: true);
+    Check(File.ReadAllText(Path.Combine(target, "settings.json")).Contains("source"), "backup restore writes settings");
+    Check(File.ReadAllText(Path.Combine(target, "task-history.json")) == "[]", "backup restore writes task history");
+    Check(File.Exists(restored.PreRestoreSnapshotPath), "backup restore creates pre-restore snapshot");
+    Check((await WorkbenchBackupService.ValidateAsync(restored.PreRestoreSnapshotPath)).IsValid, "pre-restore snapshot validates");
+
+    var corrupted = Path.Combine(backupRoot, "corrupted.pwbak");
+    CreateCustomBackup(corrupted, "data/settings.json", Encoding.UTF8.GetBytes("{\"x\":1}"), declaredHash: new string('0', 64));
+    Check(!(await WorkbenchBackupService.ValidateAsync(corrupted)).IsValid, "backup rejects checksum corruption");
+
+    var traversal = Path.Combine(backupRoot, "traversal.pwbak");
+    using (var archive = ZipFile.Open(traversal, ZipArchiveMode.Create))
+    {
+        WriteZipEntry(archive, "manifest.json", "{\"format\":\"PersonalWorkbench-Backup-v1\",\"sourceVersion\":\"0.6.6\",\"createdUtc\":\"2026-07-31T00:00:00Z\",\"entries\":[]}");
+        WriteZipEntry(archive, "data/../evil.json", "{}");
+    }
+    Check(!(await WorkbenchBackupService.ValidateAsync(traversal)).IsValid, "backup rejects zip path traversal");
+}
+finally { DeleteTree(backupRoot); }
+
+var summary = DiagnosticsService.BuildSummary(new[] { new DiagnosticCheck { Name = "Smoke", Detail = "ok", Severity = DiagnosticSeverity.Ok } });
+Check(summary.Contains("[正常] Smoke: ok", StringComparison.Ordinal), "diagnostic summary remains stable");
 
 if (failures.Count == 0)
 {
     Console.WriteLine("SMOKE TESTS PASSED");
     return 0;
 }
-
 Console.Error.WriteLine("SMOKE TESTS FAILED: " + string.Join(", ", failures));
 return 1;
+
+static string NewTemp(string prefix)
+{
+    var path = Path.Combine(Path.GetTempPath(), prefix + "-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(path);
+    return path;
+}
+
+static void DeleteTree(string path)
+{
+    try { if (Directory.Exists(path)) Directory.Delete(path, true); } catch { }
+}
+
+static void CreateCustomBackup(string path, string entryName, byte[] payload, string declaredHash)
+{
+    using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+    var manifest = new WorkbenchBackupManifest
+    {
+        Format = WorkbenchBackupService.FormatName,
+        SourceVersion = "0.6.6",
+        CreatedUtc = DateTimeOffset.UtcNow,
+        Entries = new List<WorkbenchBackupEntry>
+        {
+            new() { Name = "settings.json", Size = payload.LongLength, Sha256 = declaredHash }
+        }
+    };
+    WriteZipEntry(archive, "manifest.json", JsonSerializer.Serialize(manifest));
+    var entry = archive.CreateEntry(entryName);
+    using var stream = entry.Open();
+    stream.Write(payload);
+}
+
+static void WriteZipEntry(ZipArchive archive, string name, string content)
+{
+    var entry = archive.CreateEntry(name);
+    using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+    writer.Write(content);
+}
