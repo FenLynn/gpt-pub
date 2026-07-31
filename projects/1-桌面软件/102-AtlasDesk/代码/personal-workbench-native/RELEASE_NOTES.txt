@@ -1,16 +1,16 @@
-Personal Workbench v0.6.5
+Personal Workbench v0.6.6
 
-- Added a file-integrity center in the existing Tools navigation entry.
-- Generates standard SHA-256 manifests for the default workspace using relative paths.
-- Verifies manifests and distinguishes matching, missing, changed, unsafe and unreadable files.
-- Compares two files using both size and SHA-256.
-- Rejects rooted, path-traversal, duplicate, oversized and malformed manifest entries.
-- Preserves legal spaces in file names and limits manifest size and record count.
-- Uses cancellable reads and atomic manifest replacement; source files are never modified.
-- Skips generated, hidden and reparse-point directories.
-- Preserves task center, project center, diagnostics, Dashboard, Markdown, Zotero and ConPTY behavior.
+- Added configuration backup and migration with a strict two-file allowlist.
+- Backs up settings.json and task-history.json only.
+- Explicitly excludes WebView2Profile, BrowserProfile, Access/GitHub sessions, cookies, logs, caches and startup state.
+- Validates every payload with SHA-256, JSON parsing, entry count and size limits.
+- Rejects unknown entries, duplicate entries, path traversal and undeclared archive data.
+- Creates an automatic pre-restore snapshot and writes restored files atomically with rollback attempts.
+- Requires application restart after restore instead of mutating live module state.
+- Includes the complete regression suite for startup, diagnostics, projects, tasks and file integrity.
 
 Verification checkpoint
-- Iteration 1 passed manifest round-trip, match, mutation, deletion, traversal and comparison tests.
-- Iteration 2 hardened parser boundaries and passed the complete inherited regression suite.
-- Iteration 3 is the final package build and downloadable checkpoint.
+- Iteration 1 passed allowlist export, manifest validation, SHA-256 and JSON checks.
+- Iteration 2 passed unknown-entry, duplicate-entry, traversal, size-limit and rollback tests.
+- Iteration 3 passed the complete inherited regression suite for v0.6.2 through v0.6.5.
+- Additional independent verification runs also passed before this final package checkpoint.
