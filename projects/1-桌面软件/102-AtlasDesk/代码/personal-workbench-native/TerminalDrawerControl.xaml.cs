@@ -23,41 +23,65 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
     {
         _settings = settings;
         InitializeComponent();
+        UpdateSummary();
         UpdateSelectedDetails();
     }
 
     public async Task OpenAsync(TerminalLaunchSpec spec)
     {
+        var view = new WebView2
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        var tab = new TabItem
+        {
+            Header = BuildHeader(spec.Title),
+            Content = BuildLoadingPanel(spec.Title),
+            Tag = ++_sequence
+        };
+        var state = new TerminalTabState(tab, view, spec);
+        _tabs[tab] = state;
+        TerminalTabs.Items.Add(tab);
+        TerminalTabs.SelectedItem = tab;
+        UpdateSummary();
+        UpdateSelectedDetails();
+
         try
         {
             await EnsureEnvironmentAsync();
-            var view = new WebView2
-            {
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
-            };
-            var tab = new TabItem { Header = BuildHeader(spec.Title), Content = view, Tag = ++_sequence };
-            var state = new TerminalTabState(tab, view, spec);
-            _tabs[tab] = state;
-            TerminalTabs.Items.Add(tab);
-            TerminalTabs.SelectedItem = tab;
-            UpdateSummary();
-            UpdateSelectedDetails();
+            if (state.Closing || !_tabs.ContainsKey(tab)) return;
 
+            tab.Content = view;
             await view.EnsureCoreWebView2Async(_environment);
-            view.CoreWebView2.SetVirtualHostNameToFolderMapping("terminal.local", _assetRoot, CoreWebView2HostResourceAccessKind.Allow);
+            if (state.Closing || !_tabs.ContainsKey(tab)) return;
+
+            view.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "terminal.local",
+                _assetRoot,
+                CoreWebView2HostResourceAccessKind.Allow);
             view.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             view.CoreWebView2.Settings.AreDevToolsEnabled = false;
             view.CoreWebView2.Settings.IsStatusBarEnabled = false;
             view.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
             view.CoreWebView2.WebMessageReceived += (_, args) => HandleWebMessage(state, args);
-            view.CoreWebView2.ProcessFailed += (_, args) => App.Log("Terminal WebView process failed: " + args.ProcessFailedKind);
+            view.CoreWebView2.ProcessFailed += (_, args) =>
+            {
+                App.Log("Terminal WebView process failed: " + args.ProcessFailedKind);
+                SetFrontendFailure(state, "终端显示进程异常退出：" + args.ProcessFailedKind);
+            };
+            view.CoreWebView2.NavigationCompleted += (_, args) =>
+            {
+                if (!args.IsSuccess)
+                    SetFrontendFailure(state, "终端界面加载失败：" + args.WebErrorStatus);
+            };
             view.Source = new Uri("https://terminal.local/terminal.html");
+            _ = WatchFrontendReadyAsync(state);
         }
         catch (Exception ex)
         {
             App.Log("Open integrated terminal failed: " + ex);
-            MessageBox.Show("内置终端启动失败：\n" + ex.Message, "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            SetFrontendFailure(state, ex.Message);
         }
     }
 
@@ -79,6 +103,15 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         _environment = await CoreWebView2Environment.CreateAsync(null, profile, null);
     }
 
+    private async Task WatchFrontendReadyAsync(TerminalTabState state)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(10));
+        if (state.Closing || state.FrontendReady || state.ErrorMessage.Length > 0) return;
+        if (!_tabs.ContainsKey(state.Tab)) return;
+        await Dispatcher.InvokeAsync(() =>
+            SetFrontendFailure(state, "终端界面初始化超时。可点击重试；若仍失败，请检查 WebView2 Runtime。"));
+    }
+
     private async void HandleWebMessage(TerminalTabState state, CoreWebView2WebMessageReceivedEventArgs args)
     {
         try
@@ -89,6 +122,8 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
             switch (type)
             {
                 case "ready":
+                    state.FrontendReady = true;
+                    state.ErrorMessage = string.Empty;
                     var cols = root.TryGetProperty("cols", out var colsElement) ? colsElement.GetInt32() : 100;
                     var rows = root.TryGetProperty("rows", out var rowsElement) ? rowsElement.GetInt32() : 28;
                     await StartSessionAsync(state, cols, rows);
@@ -126,7 +161,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
 
     private async Task StartSessionAsync(TerminalTabState state, int columns, int rows)
     {
-        if (state.Session is not null) return;
+        if (state.Session is not null || state.Closing) return;
         try
         {
             state.Session = ConPtySession.Start(state.Spec, columns, rows);
@@ -150,12 +185,101 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         catch (Exception ex)
         {
             App.Log("ConPTY session start failed: " + ex);
-            Post(state, new { type = "output", data = "\r\n\u001b[31m内置终端启动失败：" + ex.Message.Replace("\r", " ").Replace("\n", " ") + "\u001b[0m\r\n" });
+            state.ErrorMessage = ex.Message;
+            Post(state, new { type = "output", data = "\r\n\u001b[31m内置终端启动失败：" + Sanitize(ex.Message) + "\u001b[0m\r\n" });
             UpdateSelectedDetails();
         }
     }
 
+    private void SetFrontendFailure(TerminalTabState state, string message)
+    {
+        if (state.Closing || !_tabs.ContainsKey(state.Tab)) return;
+        state.ErrorMessage = string.IsNullOrWhiteSpace(message) ? "未知错误" : message.Trim();
+        state.Tab.Content = BuildFailurePanel(state);
+        state.Tab.Header = BuildHeader(state.Spec.Title + " · 启动失败");
+        UpdateSelectedDetails();
+    }
+
     private static string BuildHeader(string title) => string.IsNullOrWhiteSpace(title) ? "Terminal" : title;
+
+    private static UIElement BuildLoadingPanel(string title)
+    {
+        var stack = new StackPanel
+        {
+            Width = 360,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        stack.Children.Add(new ProgressBar
+        {
+            IsIndeterminate = true,
+            Height = 3,
+            Width = 180,
+            Foreground = new SolidColorBrush(Color.FromRgb(91, 142, 235))
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = "正在启动 " + (string.IsNullOrWhiteSpace(title) ? "终端" : title) + "…",
+            Foreground = new SolidColorBrush(Color.FromRgb(166, 184, 207)),
+            FontSize = 12,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(0, 12, 0, 0)
+        });
+        return new Grid
+        {
+            Background = new SolidColorBrush(Color.FromRgb(13, 19, 32)),
+            Children = { stack }
+        };
+    }
+
+    private UIElement BuildFailurePanel(TerminalTabState state)
+    {
+        var stack = new StackPanel
+        {
+            Width = 460,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        stack.Children.Add(new TextBlock
+        {
+            Text = "终端启动失败",
+            Foreground = new SolidColorBrush(Color.FromRgb(255, 135, 147)),
+            FontSize = 15,
+            FontWeight = FontWeights.SemiBold,
+            TextAlignment = TextAlignment.Center
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = state.ErrorMessage,
+            Foreground = new SolidColorBrush(Color.FromRgb(139, 157, 181)),
+            FontSize = 11.2,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(0, 8, 0, 0)
+        });
+        var retry = new Button
+        {
+            Content = "重试",
+            Style = Application.Current.TryFindResource("TerminalHeaderButton") as Style,
+            Width = 78,
+            Margin = new Thickness(0, 14, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        retry.Click += async (_, _) =>
+        {
+            TerminalTabs.SelectedItem = state.Tab;
+            await CloseSelectedAsync();
+            await OpenAsync(state.Spec);
+        };
+        stack.Children.Add(retry);
+        return new Grid
+        {
+            Background = new SolidColorBrush(Color.FromRgb(13, 19, 32)),
+            Children = { stack }
+        };
+    }
+
+    private static string Sanitize(string value) => value.Replace("\r", " ").Replace("\n", " ");
 
     private static void Post(TerminalTabState state, object message)
     {
@@ -182,6 +306,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
     private void PopOutSelected()
     {
         if (TerminalTabs.SelectedItem is not TabItem tab || !_tabs.TryGetValue(tab, out var state)) return;
+        if (state.ErrorMessage.Length > 0 || !state.FrontendReady) return;
         if (state.FloatingWindow is { } existing)
         {
             existing.Activate();
@@ -238,7 +363,11 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         };
     }
 
-    private void UpdateSummary() => SessionSummary.Text = $"{_tabs.Count} 个会话";
+    private void UpdateSummary()
+    {
+        SessionSummary.Text = $"{_tabs.Count} 个会话";
+        TerminalEmptyState.Visibility = _tabs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private void UpdateSelectedDetails()
     {
@@ -255,9 +384,11 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         SelectedModeText.Text = Path.GetFileNameWithoutExtension(state.Spec.Executable)
                                 + (state.FloatingWindow is null ? " · 底部停靠" : " · 独立窗口");
         SelectedPathText.Text = state.Spec.WorkingDirectory;
-        SelectedProcessText.Text = state.Session is null
-            ? "等待终端初始化"
-            : state.Exited ? "进程已退出" : $"PID {state.Session.ProcessId}";
+        SelectedProcessText.Text = state.ErrorMessage.Length > 0
+            ? "启动失败 · " + state.ErrorMessage
+            : state.Session is null
+                ? "正在初始化终端"
+                : state.Exited ? "进程已退出" : $"PID {state.Session.ProcessId}";
     }
 
     private async void NewPowerShell_Click(object sender, RoutedEventArgs e) => await OpenShellAsync("powershell");
@@ -311,6 +442,8 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         public TerminalLaunchSpec Spec { get; }
         public ConPtySession? Session { get; set; }
         public TerminalFloatingWindow? FloatingWindow { get; set; }
+        public bool FrontendReady { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
         public bool Exited { get; set; }
         public bool Closing { get; set; }
     }

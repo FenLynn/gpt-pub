@@ -1,20 +1,18 @@
-Personal Workbench v0.6.7
+Personal Workbench v0.6.8
 
-- Replaced unreadable system tooltips with an explicit light, high-contrast WPF template.
-- Rebuilt Local Workspace around one VS Code-style explorer tree containing folders and supported files.
-- Removed the separate middle file table; the right side is now dedicated to editing and Markdown preview.
-- Reorganized Zotero into a compact title row, a center search toolbar and icon-based type/PDF indicators.
-- Improved the Zotero collection tree and made parent collections include all descendant collections in listing and search.
-- Redesigned the integrated terminal as a tabbed main workspace with a right-side session and action panel.
-- Added detachable terminal windows, optional always-on-top mode and automatic redocking to the bottom drawer.
-- Fixed CMD and Conda terminal startup by using synchronous ConPTY channel handles on dedicated background threads.
-- Corrected pseudoconsole channel-handle lifetime and buffered startup output that arrives before the UI subscribes.
-- Preserved Dashboard state, read-only Zotero access, external PDF handling, Markdown editing and lightweight packaging.
+- Fixed the unreadable black tooltip boxes by enforcing high-contrast tooltip text throughout the WPF application.
+- Consolidated Local Workspace into a single VS Code-style explorer tree with search, filtering, creation and location actions inside the left pane.
+- Removed the separate full-width Workspace search bar and aligned the right side around the document header, editor modes and content area.
+- Compacted the Zotero title area and fixed search at the top of the center results pane.
+- Replaced document-type, source and local-PDF labels with compact icons and explanatory tooltips.
+- Refined the Zotero collection tree and retained recursive parent-collection listing and search across every descendant collection.
+- Reorganized the integrated terminal into a multi-tab terminal canvas on the left and a dedicated session-settings pane on the right.
+- Added visible terminal loading, initialization timeout, failure details and one-click retry instead of leaving a blank panel when WebView2 cannot initialize.
+- Preserved independent per-tab pop-out windows, optional always-on-top mode and redocking to the bottom drawer.
+- Preserved the v0.6.7 synchronous ConPTY transport fixes for CMD, PowerShell, Conda and uv sessions.
 
 Verification checkpoint
-- Iteration 1 reproduced and removed the asynchronous FileStream handle exception shown on the user machine.
-- Iteration 2 compiled the one-tree Workspace, compact Zotero layout and descendant-collection search.
-- Iteration 3 compiled detachable/topmost/redock terminal behavior and the new right-side terminal controls.
-- Windows runtime regression launched a real interactive CMD session through ConPTY, received output, sent input and observed clean process exit.
-- A second independent Windows regression repeated the complete CMD, WPF/XAML and lightweight-payload checks successfully.
-- The final package build repeats the entire regression suite before generating the downloadable executable.
+- Windows WPF/XAML compilation and framework-dependent publishing passed.
+- The smoke suite launched a real CMD process through ConPTY, received terminal output, sent the exit command and observed clean process termination.
+- Workspace, Zotero and terminal controls retained their existing named bindings and event entry points.
+- The final main-branch package build repeats the complete regression suite before producing the lightweight executable.
