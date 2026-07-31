@@ -14,6 +14,7 @@ public sealed class WorkbenchFeaturePipeline
         Projects = V063ProjectEnhancer.Attach(window, this);
         Tasks = V064TaskEnhancer.Attach(window, this);
         Tools = V065ToolsEnhancer.Attach(window, this);
+        Backup = V066BackupEnhancer.Attach(window);
     }
 
     public WorkbenchEnhancer Base { get; }
@@ -22,6 +23,7 @@ public sealed class WorkbenchFeaturePipeline
     public V063ProjectEnhancer Projects { get; }
     public V064TaskEnhancer Tasks { get; }
     public V065ToolsEnhancer Tools { get; }
+    public V066BackupEnhancer Backup { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);
