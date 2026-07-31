@@ -13,7 +13,10 @@ public static class TerminalSessionFactory
 {
     public static ITerminalSession Start(TerminalLaunchSpec spec, int columns, int rows)
     {
-        if (TerminalReliability.IsSupervisedCmd(spec))
+        // Every real Windows CMD session uses the native GUI bridge. This is the
+        // same path exercised by the five-session reliability suite; production
+        // UI code must not silently fall back to the legacy managed pipe host.
+        if (TerminalReliability.IsSystemCmd(spec))
             return NativeTerminalHostSession.Start(spec, columns, rows);
         return new ConPtyTerminalSession(ConPtySession.Start(spec, columns, rows));
     }

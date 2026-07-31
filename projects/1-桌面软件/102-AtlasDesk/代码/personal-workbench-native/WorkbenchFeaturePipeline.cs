@@ -19,6 +19,7 @@ public sealed class WorkbenchFeaturePipeline
         Hotfix = V068HotfixEnhancer.Attach(window, this);
         UiFixes = V069UiFixEnhancer.Attach(window, this);
         TerminalPresentation = V0610TerminalPresentationEnhancer.Attach(this);
+        Corrective = V0611CorrectiveEnhancer.Attach(this);
     }
 
     public V067VisualFixes VisualFixes { get; }
@@ -32,6 +33,7 @@ public sealed class WorkbenchFeaturePipeline
     public V068HotfixEnhancer Hotfix { get; }
     public V069UiFixEnhancer UiFixes { get; }
     public V0610TerminalPresentationEnhancer TerminalPresentation { get; }
+    public V0611CorrectiveEnhancer Corrective { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);

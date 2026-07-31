@@ -13,10 +13,9 @@ public static class TerminalReliability
                 : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var command = Path.Combine(Environment.SystemDirectory, "cmd.exe");
 
-        // Working directory is supplied directly to CreateProcess. /K executes a
-        // one-time, silent UTF-8 initialization command and then keeps the same
-        // real system CMD process in interactive mode. No input is injected after
-        // the process has been created.
+        // The working directory is supplied directly to CreateProcess. /K performs
+        // one silent UTF-8 initialization command and then keeps the same real
+        // Windows CMD process alive in interactive mode.
         return new TerminalLaunchSpec
         {
             Title = string.IsNullOrWhiteSpace(title) ? "CMD" : title,
@@ -27,11 +26,26 @@ public static class TerminalReliability
         };
     }
 
+    public static bool IsSystemCmd(TerminalLaunchSpec spec)
+    {
+        if (spec is null || string.IsNullOrWhiteSpace(spec.Executable)) return false;
+        try
+        {
+            var executable = Path.GetFullPath(spec.Executable);
+            var systemCmd = Path.GetFullPath(Path.Combine(Environment.SystemDirectory, "cmd.exe"));
+            return executable.Equals(systemCmd, StringComparison.OrdinalIgnoreCase)
+                   || Path.GetFileName(executable).Equals("cmd.exe", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return Path.GetFileName(spec.Executable).Equals("cmd.exe", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     public static bool IsSupervisedCmd(TerminalLaunchSpec spec)
-        => Path.GetFileName(spec.Executable).Equals("cmd.exe", StringComparison.OrdinalIgnoreCase)
+        => IsSystemCmd(spec)
            && spec.Arguments.Contains(NativeHostMarker, StringComparison.OrdinalIgnoreCase)
-           && string.IsNullOrEmpty(spec.InitialInput)
-           && spec.Title.StartsWith("CMD", StringComparison.OrdinalIgnoreCase);
+           && string.IsNullOrEmpty(spec.InitialInput);
 
     public static string ResolveProxyPath()
         => Path.Combine(Environment.SystemDirectory, "cmd.exe");

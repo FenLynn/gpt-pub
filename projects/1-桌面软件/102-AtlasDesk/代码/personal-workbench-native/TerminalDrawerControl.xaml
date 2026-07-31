@@ -2,6 +2,53 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FontFamily="{StaticResource AppFont}">
+    <UserControl.Resources>
+        <Style x:Key="TerminalHeaderButton" TargetType="Button">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinWidth" Value="62"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Background" Value="#243650"/>
+            <Setter Property="Foreground" Value="#F4F8FF"/>
+            <Setter Property="BorderBrush" Value="#4A6382"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="10.9"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#315078"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#6F94C5"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#3B5F8D"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Background" Value="#172438"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#31445E"/>
+                                <Setter Property="Foreground" Value="#7D8EA5"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Border Background="#0D1320" BorderBrush="#26364D" BorderThickness="1,1,0,0">
         <Grid>
             <Grid.RowDefinitions>
@@ -17,13 +64,13 @@
                 <StackPanel Orientation="Horizontal" Margin="11,0" VerticalAlignment="Center">
                     <Viewbox Width="15" Height="15">
                         <Path Data="M4,5 H20 V19 H4 Z M7,9 L10,12 L7,15 M12,15 H17"
-                              Stroke="#8FB5FF" StrokeThickness="1.8" Fill="Transparent"
+                              Stroke="#9FC1FF" StrokeThickness="1.8" Fill="Transparent"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     </Viewbox>
-                    <TextBlock Text="终端" Foreground="#DCE6F5" FontSize="12.4" FontWeight="SemiBold" Margin="7,0,0,0"/>
-                    <TextBlock x:Name="SessionSummary" Text="0 个会话" Foreground="#7F91A9" FontSize="10.7" Margin="8,1,0,0"/>
-                    <Border Background="#19263A" CornerRadius="6" Padding="6,2" Margin="7,0,0,0">
-                        <TextBlock Text="ConPTY" Foreground="#7891B2" FontSize="9.8"/>
+                    <TextBlock Text="终端" Foreground="#EEF4FF" FontSize="12.4" FontWeight="SemiBold" Margin="7,0,0,0"/>
+                    <TextBlock x:Name="SessionSummary" Text="0 个会话" Foreground="#9AAAC0" FontSize="10.7" Margin="8,1,0,0"/>
+                    <Border Background="#1D2D44" CornerRadius="6" Padding="6,2" Margin="7,0,0,0">
+                        <TextBlock Text="ConPTY" Foreground="#9BB2CF" FontSize="9.8"/>
                     </Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
@@ -48,7 +95,7 @@
                                 SelectionChanged="TerminalTabs_SelectionChanged">
                         <TabControl.Resources>
                             <Style TargetType="TabItem">
-                                <Setter Property="Foreground" Value="#9DAEC3"/>
+                                <Setter Property="Foreground" Value="#AEBFD4"/>
                                 <Setter Property="Background" Value="#111A29"/>
                                 <Setter Property="BorderBrush" Value="#26364D"/>
                                 <Setter Property="Padding" Value="14,7"/>
@@ -61,16 +108,18 @@
                                                     BorderBrush="{TemplateBinding BorderBrush}"
                                                     BorderThickness="0,0,1,1"
                                                     Padding="{TemplateBinding Padding}">
-                                                <ContentPresenter ContentSource="Header" HorizontalAlignment="Center"/>
+                                                <ContentPresenter ContentSource="Header" HorizontalAlignment="Center"
+                                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="TabBorder" Property="Background" Value="#1A2638"/>
-                                                    <Setter TargetName="TabBorder" Property="BorderBrush" Value="#4F7EC5"/>
-                                                    <Setter Property="Foreground" Value="#EAF2FF"/>
+                                                    <Setter TargetName="TabBorder" Property="Background" Value="#1D2B40"/>
+                                                    <Setter TargetName="TabBorder" Property="BorderBrush" Value="#5B8FD9"/>
+                                                    <Setter Property="Foreground" Value="#F4F8FF"/>
                                                 </Trigger>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="TabBorder" Property="Background" Value="#172235"/>
+                                                    <Setter TargetName="TabBorder" Property="Background" Value="#19263A"/>
+                                                    <Setter Property="Foreground" Value="#E8F0FC"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -85,14 +134,14 @@
                             <Border Width="54" Height="54" CornerRadius="16" Background="#17243A" HorizontalAlignment="Center">
                                 <Viewbox Width="25" Height="25">
                                     <Path Data="M4,5 H20 V19 H4 Z M7,9 L10,12 L7,15 M12,15 H17"
-                                          Stroke="#7EA8F7" StrokeThickness="1.8" Fill="Transparent"
+                                          Stroke="#8DB4FF" StrokeThickness="1.8" Fill="Transparent"
                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                                 </Viewbox>
                             </Border>
-                            <TextBlock Text="新建一个终端会话" Foreground="#D7E3F2" FontSize="14.5" FontWeight="SemiBold"
+                            <TextBlock Text="新建一个终端会话" Foreground="#EAF1FB" FontSize="14.5" FontWeight="SemiBold"
                                        TextAlignment="Center" Margin="0,13,0,0"/>
                             <TextBlock Text="支持多个 CMD、PowerShell 与 Python 环境标签；同一会话可在开发页、底部固定栏和独立窗口之间移动。"
-                                       Foreground="#7387A2" FontSize="11.3" TextAlignment="Center" TextWrapping="Wrap"
+                                       Foreground="#94A6BD" FontSize="11.3" TextAlignment="Center" TextWrapping="Wrap"
                                        LineHeight="18" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Grid>
@@ -103,23 +152,23 @@
                 <Border Grid.Column="2" Background="#111A29" Padding="13,12">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
-                            <TextBlock Text="会话设置" Foreground="#D7E2F1" FontSize="12.4" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="SelectedTitleText" Text="尚未选择会话" Foreground="#B5C7DC"
+                            <TextBlock Text="会话设置" Foreground="#F0F5FC" FontSize="12.4" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="SelectedTitleText" Text="尚未选择会话" Foreground="#D2DDEC"
                                        FontSize="12" FontWeight="SemiBold" Margin="0,11,0,0" TextWrapping="Wrap"/>
-                            <TextBlock x:Name="SelectedModeText" Foreground="#71859F" FontSize="10.5" Margin="0,4,0,0"/>
-                            <TextBlock x:Name="SelectedPathText" Foreground="#71859F" FontSize="10.3" Margin="0,4,0,0"
+                            <TextBlock x:Name="SelectedModeText" Foreground="#9CAEC5" FontSize="10.5" Margin="0,4,0,0"/>
+                            <TextBlock x:Name="SelectedPathText" Foreground="#9CAEC5" FontSize="10.3" Margin="0,4,0,0"
                                        TextWrapping="Wrap" MaxHeight="52"/>
-                            <TextBlock x:Name="SelectedProcessText" Foreground="#71859F" FontSize="10.3" Margin="0,3,0,0"
+                            <TextBlock x:Name="SelectedProcessText" Foreground="#9CAEC5" FontSize="10.3" Margin="0,3,0,0"
                                        TextWrapping="Wrap"/>
 
-                            <Border Height="1" Background="#283950" Margin="0,13"/>
-                            <TextBlock Text="新建会话" Foreground="#8EA2BC" FontSize="10.8" FontWeight="SemiBold"/>
+                            <Border Height="1" Background="#30435D" Margin="0,13"/>
+                            <TextBlock Text="新建会话" Foreground="#B8C8DB" FontSize="10.8" FontWeight="SemiBold"/>
                             <UniformGrid Columns="1" Margin="0,7,0,0">
                                 <Button Content="CMD" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,0,6" Click="NewCmd_Click"/>
                                 <Button Content="PowerShell" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,0,6" Click="NewPowerShell_Click"/>
                             </UniformGrid>
 
-                            <TextBlock Text="当前标签" Foreground="#8EA2BC" FontSize="10.8" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                            <TextBlock Text="当前标签" Foreground="#B8C8DB" FontSize="10.8" FontWeight="SemiBold" Margin="0,8,0,0"/>
                             <UniformGrid Columns="2" Margin="0,7,0,0">
                                 <Button Content="清屏" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,4,6" Click="Clear_Click"/>
                                 <Button x:Name="RestartButton" Content="重新启动" Style="{StaticResource TerminalHeaderButton}" Margin="4,0,0,6" IsEnabled="False" Click="Restart_Click"/>
@@ -128,9 +177,9 @@
                                 <Button x:Name="HostModeButton" Content="嵌入开发页" Style="{StaticResource TerminalHeaderButton}" Margin="0,0,4,6" Click="HostMode_Click"/>
                             </UniformGrid>
 
-                            <Border Background="#172235" BorderBrush="#293B54" BorderThickness="1" CornerRadius="9" Padding="10" Margin="0,11,0,0">
+                            <Border Background="#18263A" BorderBrush="#344A67" BorderThickness="1" CornerRadius="9" Padding="10" Margin="0,11,0,0">
                                 <TextBlock Text="开发页中可将整组终端固定到底部；切换到其他页面后，会话继续保留。单个标签弹出后可置顶、全屏，并随时嵌回工作台。&#x0a;&#x0a;复制：Ctrl+Shift+C&#x0a;粘贴：Ctrl+Shift+V 或右键"
-                                           Foreground="#8094AE" FontSize="10.4" TextWrapping="Wrap" LineHeight="17"/>
+                                           Foreground="#A5B7CD" FontSize="10.4" TextWrapping="Wrap" LineHeight="17"/>
                             </Border>
                         </StackPanel>
                     </ScrollViewer>

@@ -113,8 +113,13 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         }
     }
 
-    public async Task OpenShellAsync(string shell, PythonEnvironmentInfo? environment = null, string? title = null)
-        => await OpenAsync(TerminalLaunchSpec.Create(_settings, shell, environment, title));
+    public Task OpenShellAsync(string shell, PythonEnvironmentInfo? environment = null, string? title = null)
+    {
+        var spec = environment is null && string.Equals(shell, "cmd", StringComparison.OrdinalIgnoreCase)
+            ? TerminalReliability.CreateCmd(_settings, title)
+            : TerminalLaunchSpec.Create(_settings, shell, environment, title);
+        return OpenAsync(spec);
+    }
 
     public void ApplySettings()
     {
@@ -230,7 +235,10 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
             state.Columns = Math.Clamp(columns, 20, 500);
             state.Rows = Math.Clamp(rows, 5, 300);
 
-            var session = ConPtySession.Start(state.Spec, state.Columns, state.Rows);
+            // This is deliberately the same factory used by the real Windows smoke
+            // suite. Direct calls to ConPtySession.Start would bypass the verified
+            // native CMD bridge and recreate the clean code-0 early exit bug.
+            var session = TerminalSessionFactory.Start(state.Spec, state.Columns, state.Rows);
             state.Session = session;
             session.OutputReceived += (_, text) => Dispatcher.BeginInvoke(() =>
             {
@@ -246,7 +254,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
             Post(state, new { type = "settings", fontSize = _settings.TerminalFontSize, scrollback = _settings.TerminalScrollback });
             if (!string.IsNullOrWhiteSpace(state.Spec.InitialInput))
             {
-                await Task.Delay(90);
+                await Task.Delay(120);
                 if (ReferenceEquals(state.Session, session))
                     await session.WriteAsync(state.Spec.InitialInput);
             }
@@ -255,7 +263,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            App.Log("ConPTY session start failed: " + ex);
+            App.Log("Terminal session start failed: " + ex);
             state.Session = null;
             state.Exited = true;
             state.ErrorMessage = ex.Message;
@@ -265,7 +273,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         }
     }
 
-    private async Task HandleSessionExitedAsync(TerminalTabState state, ConPtySession session, int code)
+    private async Task HandleSessionExitedAsync(TerminalTabState state, ITerminalSession session, int code)
     {
         if (state.Closing || !_tabs.ContainsKey(state.Tab) || !ReferenceEquals(state.Session, session)) return;
 
@@ -282,9 +290,9 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
             Post(state, new
             {
                 type = "output",
-                data = $"\r\n\u001b[33m[终端进程启动后立即退出，代码 {code}；正在自动重试一次…]\u001b[0m\r\n"
+                data = $"\r\n\u001b[33m[终端进程启动后立即退出，代码 {code}；正在使用同一原生后台重试一次…]\u001b[0m\r\n"
             });
-            await Task.Delay(320);
+            await Task.Delay(350);
             if (!state.Closing && _tabs.ContainsKey(state.Tab))
                 await StartSessionAsync(state, state.Columns, state.Rows);
             return;
@@ -332,7 +340,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         stack.Children.Add(new TextBlock
         {
             Text = "正在启动 " + (string.IsNullOrWhiteSpace(title) ? "终端" : title) + "…",
-            Foreground = new SolidColorBrush(Color.FromRgb(166, 184, 207)),
+            Foreground = new SolidColorBrush(Color.FromRgb(190, 207, 228)),
             FontSize = 12,
             TextAlignment = TextAlignment.Center,
             Margin = new Thickness(0, 12, 0, 0)
@@ -355,7 +363,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         stack.Children.Add(new TextBlock
         {
             Text = "终端启动失败",
-            Foreground = new SolidColorBrush(Color.FromRgb(255, 135, 147)),
+            Foreground = new SolidColorBrush(Color.FromRgb(255, 151, 160)),
             FontSize = 15,
             FontWeight = FontWeights.SemiBold,
             TextAlignment = TextAlignment.Center
@@ -363,7 +371,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         stack.Children.Add(new TextBlock
         {
             Text = state.ErrorMessage,
-            Foreground = new SolidColorBrush(Color.FromRgb(139, 157, 181)),
+            Foreground = new SolidColorBrush(Color.FromRgb(163, 183, 207)),
             FontSize = 11.2,
             TextWrapping = TextWrapping.Wrap,
             TextAlignment = TextAlignment.Center,
@@ -372,7 +380,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         var retry = new Button
         {
             Content = "重试",
-            Style = Application.Current.TryFindResource("TerminalHeaderButton") as Style,
+            Style = TryFindResource("TerminalHeaderButton") as Style,
             Width = 78,
             Margin = new Thickness(0, 14, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Center
@@ -491,7 +499,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
                 new TextBlock
                 {
                     Text = string.IsNullOrWhiteSpace(title) ? "该终端已在独立窗口中运行" : title + " 已在独立窗口中运行",
-                    Foreground = new SolidColorBrush(Color.FromRgb(116, 137, 163)),
+                    Foreground = new SolidColorBrush(Color.FromRgb(139, 160, 185)),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     FontSize = 12.5
@@ -605,7 +613,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         public TabItem Tab { get; }
         public WebView2 View { get; }
         public TerminalLaunchSpec Spec { get; }
-        public ConPtySession? Session { get; set; }
+        public ITerminalSession? Session { get; set; }
         public TerminalFloatingWindow? FloatingWindow { get; set; }
         public bool FrontendReady { get; set; }
         public string ErrorMessage { get; set; } = string.Empty;

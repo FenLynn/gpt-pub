@@ -1,20 +1,18 @@
-Personal Workbench v0.6.10
+Personal Workbench v0.6.11
 
-This is a corrective release for the five issues reported against v0.6.9. It does not advance the later module roadmap.
+This is a corrective release for the terminal, Workspace and Zotero issues reported against v0.6.10.
 
-- Removed the Windows focus adornment that briefly painted the selected left navigation item with the system highlight color on entry.
-- Rebuilt the Workspace and Zotero tree item templates with separate header and child rows, eliminating overlapping, drifting and visually interleaved descendants.
-- Disabled recycling for the two relatively small lazy trees so expanding and collapsing a branch cannot reuse a container with stale indentation state.
-- Removed the duplicated Zotero internal title strip. Connection state, load mode, refresh and settings now live in the global top bar and appear only on the Library page.
-- Added distinct document-type glyphs for journal articles, theses, conference papers, books, patents, webpages, software, datasets, presentations, letters and other records.
-- Replaced the generic PDF marker with a recognizable red PDF glyph. The attachment panel now distinguishes PDF, Word, PowerPoint, Excel, images and generic attachments.
-- Added a persistent CMD launch policy using the system cmd.exe, an explicit /K command and the selected working directory without delayed synthetic cd input.
-- Intercepts every integrated CMD entry point with the reliable policy and automatically replaces the first default CMD session if the legacy launch exits immediately.
-- Replaced the blue native Windows title bar with a neutral compact custom title bar, preserving minimize, maximize, restore, close, drag and resize behavior.
+- Fixed the terminal reliability root cause: the production terminal UI had continued to call the legacy managed ConPTY session directly, while CI exercised the newer native terminal factory. Production and regression tests now use the same TerminalSessionFactory path.
+- Routed every Windows system CMD session through the native GUI bridge and Windows system ConPTY, including the default Development terminal, new CMD buttons, Workspace terminals and Python environment CMD sessions.
+- Added a source-level regression guard that fails CI if the production terminal UI bypasses the verified factory again.
+- Increased terminal action, tab, side-panel and status contrast. Enabled actions are bright and readable; disabled actions remain visibly distinct without disappearing into the dark background.
+- Added inline Workspace image discovery and preview for PNG, JPEG, WebP, BMP, GIF and TIFF files without adding Node, Monaco or another bundled runtime.
+- Kept Markdown rendering and enabled lightweight highlighted preview/split view for Python, LaTeX and common code files while preserving the editable plain-text source pane.
+- Rebuilt the Zotero PDF-only control as a single compact icon toggle and tightened the type, sort and search action widths so the center toolbar no longer overlaps.
 
 Verification checkpoint
-- Windows WPF/XAML compilation and framework-dependent publishing must pass before merge.
-- The complete smoke suite must pass.
-- A real ConPTY CMD session must be launched five consecutive times in a path containing spaces and Chinese characters, return a readiness marker, remain alive, accept input and exit cleanly.
-- Workspace and Zotero tree styles must compile from the runtime templates and preserve lazy Workspace expansion.
-- Final lightweight EXE packaging and size validation must pass before delivery.
+- Windows WPF/XAML compilation and framework-dependent publishing passed.
+- The complete smoke suite passed, including the production-routing invariant.
+- Five consecutive real CMD sessions passed through the same factory used by the UI in a Unicode path, including multiple commands, resize, idle liveness and clean exit.
+- Workspace image registration, Python/LaTeX highlighted rendering and the Zotero PDF toggle template passed STA/WPF runtime creation and rendering checks.
+- Final lightweight EXE packaging, size validation and artifact upload are required for this delivery build.
