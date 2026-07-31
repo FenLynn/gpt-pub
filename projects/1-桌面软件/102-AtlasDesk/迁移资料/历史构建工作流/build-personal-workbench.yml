@@ -84,6 +84,17 @@ jobs:
       - name: Restore app and smoke tests
         run: dotnet restore personal-workbench-smoke/PersonalWorkbench.Smoke.csproj
 
+      - name: Stamp smoke expected version
+        shell: pwsh
+        run: |
+          $path = 'personal-workbench-smoke/Program.cs'
+          $content = Get-Content $path -Raw
+          $pattern = 'Check\(WorkbenchVersion\.Current == "[^"]+", "assembly version matches Version\.props"\);'
+          $replacement = "Check(WorkbenchVersion.Current == `"$env:WORKBENCH_VERSION`", `"assembly version matches Version.props`");"
+          $updated = [regex]::Replace($content, $pattern, $replacement, 1)
+          if ($updated -eq $content) { throw 'Smoke-test version assertion could not be stamped.' }
+          Set-Content $path $updated -Encoding UTF8
+
       - name: Run smoke tests
         run: dotnet run --project personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
 

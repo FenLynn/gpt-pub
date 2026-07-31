@@ -3,6 +3,7 @@ using Microsoft.Web.WebView2.Wpf;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace PersonalWorkbench;
 
@@ -22,6 +23,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
     {
         _settings = settings;
         InitializeComponent();
+        UpdateSelectedDetails();
     }
 
     public async Task OpenAsync(TerminalLaunchSpec spec)
@@ -29,13 +31,18 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
         try
         {
             await EnsureEnvironmentAsync();
-            var view = new WebView2 { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+            var view = new WebView2
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
             var tab = new TabItem { Header = BuildHeader(spec.Title), Content = view, Tag = ++_sequence };
             var state = new TerminalTabState(tab, view, spec);
             _tabs[tab] = state;
             TerminalTabs.Items.Add(tab);
             TerminalTabs.SelectedItem = tab;
             UpdateSummary();
+            UpdateSelectedDetails();
 
             await view.EnsureCoreWebView2Async(_environment);
             view.CoreWebView2.SetVirtualHostNameToFolderMapping("terminal.local", _assetRoot, CoreWebView2HostResourceAccessKind.Allow);
@@ -129,6 +136,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
                 Post(state, new { type = "output", data = $"\r\n\u001b[90m[进程已退出，代码 {code}]\u001b[0m\r\n" });
                 state.Exited = true;
                 state.Tab.Header = BuildHeader(state.Spec.Title + " · 已退出");
+                UpdateSelectedDetails();
             });
             Post(state, new { type = "settings", fontSize = _settings.TerminalFontSize, scrollback = _settings.TerminalScrollback });
             if (!string.IsNullOrWhiteSpace(state.Spec.InitialInput))
@@ -137,11 +145,13 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
                 await state.Session.WriteAsync(state.Spec.InitialInput);
             }
             Post(state, new { type = "focus" });
+            UpdateSelectedDetails();
         }
         catch (Exception ex)
         {
             App.Log("ConPTY session start failed: " + ex);
             Post(state, new { type = "output", data = "\r\n\u001b[31m内置终端启动失败：" + ex.Message.Replace("\r", " ").Replace("\n", " ") + "\u001b[0m\r\n" });
+            UpdateSelectedDetails();
         }
     }
 
@@ -155,33 +165,132 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
     private async Task CloseSelectedAsync()
     {
         if (TerminalTabs.SelectedItem is not TabItem tab || !_tabs.Remove(tab, out var state)) return;
+        state.Closing = true;
+        if (state.FloatingWindow is { } floating)
+        {
+            floating.ReleaseContent();
+            state.FloatingWindow = null;
+            floating.Close();
+        }
         TerminalTabs.Items.Remove(tab);
         if (state.Session is not null) await state.Session.DisposeAsync();
         state.View.Dispose();
         UpdateSummary();
+        UpdateSelectedDetails();
+    }
+
+    private void PopOutSelected()
+    {
+        if (TerminalTabs.SelectedItem is not TabItem tab || !_tabs.TryGetValue(tab, out var state)) return;
+        if (state.FloatingWindow is { } existing)
+        {
+            existing.Activate();
+            return;
+        }
+
+        tab.Content = BuildFloatingPlaceholder(state.Spec.Title);
+        var window = new TerminalFloatingWindow(state.Spec.Title, state.View)
+        {
+            Owner = Window.GetWindow(this)
+        };
+        state.FloatingWindow = window;
+        window.DockRequested += (_, _) => DockState(state, closeWindow: true);
+        window.Closed += (_, _) =>
+        {
+            if (!state.Closing && ReferenceEquals(state.FloatingWindow, window))
+                DockState(state, closeWindow: false);
+        };
+        window.Show();
+        UpdateSelectedDetails();
+    }
+
+    private void DockState(TerminalTabState state, bool closeWindow)
+    {
+        var window = state.FloatingWindow;
+        if (window is null) return;
+        var content = window.ReleaseContent();
+        state.FloatingWindow = null;
+        if (content is not null)
+            state.Tab.Content = content;
+        TerminalTabs.SelectedItem = state.Tab;
+        if (closeWindow && window.IsVisible)
+            window.Close();
+        Post(state, new { type = "focus" });
+        UpdateSelectedDetails();
+    }
+
+    private static UIElement BuildFloatingPlaceholder(string title)
+    {
+        return new Grid
+        {
+            Background = new SolidColorBrush(Color.FromRgb(13, 19, 32)),
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = string.IsNullOrWhiteSpace(title) ? "该终端已在独立窗口中运行" : title + " 已在独立窗口中运行",
+                    Foreground = new SolidColorBrush(Color.FromRgb(116, 137, 163)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontSize = 12.5
+                }
+            }
+        };
     }
 
     private void UpdateSummary() => SessionSummary.Text = $"{_tabs.Count} 个会话";
 
+    private void UpdateSelectedDetails()
+    {
+        if (TerminalTabs.SelectedItem is not TabItem tab || !_tabs.TryGetValue(tab, out var state))
+        {
+            SelectedTitleText.Text = "尚未选择会话";
+            SelectedModeText.Text = string.Empty;
+            SelectedPathText.Text = string.Empty;
+            SelectedProcessText.Text = string.Empty;
+            return;
+        }
+
+        SelectedTitleText.Text = state.Spec.Title;
+        SelectedModeText.Text = Path.GetFileNameWithoutExtension(state.Spec.Executable)
+                                + (state.FloatingWindow is null ? " · 底部停靠" : " · 独立窗口");
+        SelectedPathText.Text = state.Spec.WorkingDirectory;
+        SelectedProcessText.Text = state.Session is null
+            ? "等待终端初始化"
+            : state.Exited ? "进程已退出" : $"PID {state.Session.ProcessId}";
+    }
+
     private async void NewPowerShell_Click(object sender, RoutedEventArgs e) => await OpenShellAsync("powershell");
     private async void NewCmd_Click(object sender, RoutedEventArgs e) => await OpenShellAsync("cmd");
+
     private void Clear_Click(object sender, RoutedEventArgs e)
     {
         if (TerminalTabs.SelectedItem is TabItem tab && _tabs.TryGetValue(tab, out var state))
             Post(state, new { type = "clear" });
     }
+
+    private void PopOut_Click(object sender, RoutedEventArgs e) => PopOutSelected();
     private async void CloseTab_Click(object sender, RoutedEventArgs e) => await CloseSelectedAsync();
     private void Collapse_Click(object sender, RoutedEventArgs e) => CollapseRequested?.Invoke(this, EventArgs.Empty);
+
     private void TerminalTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (TerminalTabs.SelectedItem is TabItem tab && _tabs.TryGetValue(tab, out var state))
             Post(state, new { type = "focus" });
+        UpdateSelectedDetails();
     }
 
     public async ValueTask DisposeAsync()
     {
         foreach (var state in _tabs.Values.ToArray())
         {
+            state.Closing = true;
+            if (state.FloatingWindow is { } floating)
+            {
+                floating.ReleaseContent();
+                state.FloatingWindow = null;
+                floating.Close();
+            }
             if (state.Session is not null) await state.Session.DisposeAsync();
             state.View.Dispose();
         }
@@ -190,11 +299,19 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
 
     private sealed class TerminalTabState
     {
-        public TerminalTabState(TabItem tab, WebView2 view, TerminalLaunchSpec spec) { Tab=tab; View=view; Spec=spec; }
+        public TerminalTabState(TabItem tab, WebView2 view, TerminalLaunchSpec spec)
+        {
+            Tab = tab;
+            View = view;
+            Spec = spec;
+        }
+
         public TabItem Tab { get; }
         public WebView2 View { get; }
         public TerminalLaunchSpec Spec { get; }
         public ConPtySession? Session { get; set; }
+        public TerminalFloatingWindow? FloatingWindow { get; set; }
         public bool Exited { get; set; }
+        public bool Closing { get; set; }
     }
 }

@@ -5,31 +5,42 @@
              FontFamily="{StaticResource AppFont}">
     <UserControl.Resources>
         <HierarchicalDataTemplate DataType="{x:Type local:WorkspaceNode}" ItemsSource="{Binding Children}">
-            <Grid Margin="0,1">
+            <Grid Margin="0,1" ToolTip="{Binding FullPath}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="19"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Viewbox Width="14" Height="14" VerticalAlignment="Center">
-                    <Path Data="M3,6 H9 L11,8 H21 V19 H3 Z" Stroke="#647A96" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"/>
+                    <Path x:Name="NodeIcon" Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20" Stroke="#7387A0" StrokeThickness="1.65" Fill="Transparent" StrokeLineJoin="Round"/>
                 </Viewbox>
-                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12.5" Foreground="#3E5068" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12.35" Foreground="#3E5068" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
             </Grid>
+            <HierarchicalDataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsDirectory}" Value="True">
+                    <Setter TargetName="NodeIcon" Property="Data" Value="M3,6 H9 L11,8 H21 V19 H3 Z"/>
+                    <Setter TargetName="NodeIcon" Property="Stroke" Value="#5A7698"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsPdf}" Value="True"><Setter TargetName="NodeIcon" Property="Stroke" Value="#C9525E"/></DataTrigger>
+                <DataTrigger Binding="{Binding IsMarkdown}" Value="True"><Setter TargetName="NodeIcon" Property="Stroke" Value="#557FD2"/></DataTrigger>
+            </HierarchicalDataTemplate.Triggers>
         </HierarchicalDataTemplate>
-        <DataTemplate x:Key="RecentFileTemplate">
-            <Grid Margin="0,2">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="19"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Viewbox Width="13" Height="13" VerticalAlignment="Center"><Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20" Stroke="#7286A0" StrokeThickness="1.6" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox>
-                <StackPanel Grid.Column="1">
-                    <TextBlock Text="{Binding Name}" FontSize="12" Foreground="#40536B" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding DirectoryName}" FontSize="9.8" Foreground="#94A0B0" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
-                </StackPanel>
-            </Grid>
-        </DataTemplate>
+        <Style x:Key="WorkspaceTreeItemStyle" TargetType="TreeViewItem">
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+            <EventSetter Event="Expanded" Handler="FolderItem_Expanded"/>
+        </Style>
         <Style x:Key="WorkspaceSegment" TargetType="RadioButton">
-            <Setter Property="Height" Value="29"/><Setter Property="MinWidth" Value="58"/><Setter Property="Padding" Value="10,0"/><Setter Property="FontSize" Value="11.5"/><Setter Property="Foreground" Value="#66778D"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Root" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#F0F4F9"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Root" Property="Background" Value="White"/><Setter Property="Foreground" Value="#2868D7"/><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="Root" Property="Effect"><Setter.Value><DropShadowEffect BlurRadius="7" ShadowDepth="1" Opacity="0.12"/></Setter.Value></Setter></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+            <Setter Property="Height" Value="28"/><Setter Property="MinWidth" Value="54"/><Setter Property="Padding" Value="9,0"/>
+            <Setter Property="FontSize" Value="11.5"/><Setter Property="Foreground" Value="#66778D"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+                <Border x:Name="Root" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#F0F4F9"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Root" Property="Background" Value="White"/><Setter Property="Foreground" Value="#2868D7"/><Setter Property="FontWeight" Value="SemiBold"/></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
         </Style>
     </UserControl.Resources>
 
     <Grid Margin="14">
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="10"/><RowDefinition Height="40"/><RowDefinition Height="10"/><RowDefinition Height="*"/><RowDefinition Height="8"/><RowDefinition Height="26"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="9"/><RowDefinition Height="38"/><RowDefinition Height="9"/><RowDefinition Height="*"/><RowDefinition Height="7"/><RowDefinition Height="24"/></Grid.RowDefinitions>
 
         <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -39,78 +50,60 @@
                     <Border Background="#E9F2FF" CornerRadius="8" Padding="8,4" Margin="10,0,0,0" VerticalAlignment="Center"><TextBlock x:Name="RootBadgeText" Text="尚未选择目录" FontSize="10.8" Foreground="#2E6FCB"/></Border>
                     <Border Background="#EAF8F2" CornerRadius="8" Padding="8,4" Margin="6,0,0,0" VerticalAlignment="Center"><TextBlock x:Name="AutoSaveBadgeText" Text="自动保存" FontSize="10.8" Foreground="#2F7E60"/></Border>
                 </StackPanel>
-                <TextBlock Text="轻量浏览、编辑与组织本地 Markdown、代码和文本；PDF 与二进制文件交给外部程序。" Style="{StaticResource PageDescription}"/>
+                <TextBlock Text="VS Code 式单一资源树；右侧专注编辑和预览。" Style="{StaticResource PageDescription}"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Content="选择目录" Style="{StaticResource SecondaryButton}" Click="ChooseRoot_Click"/>
                 <Button Content="新建笔记" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="NewNote_Click"/>
                 <Button Content="终端" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="OpenTerminal_Click"/>
-                <Button Content="刷新" Style="{StaticResource PrimaryButton}" Margin="7,0,0,0" MinWidth="76" Click="Refresh_Click"/>
+                <Button Content="刷新" Style="{StaticResource PrimaryButton}" Margin="7,0,0,0" MinWidth="72" Click="Refresh_Click"/>
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="2" Style="{StaticResource ToolbarCard}" Padding="7">
+        <Border Grid.Row="2" Style="{StaticResource ToolbarCard}" Padding="6">
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="145"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <TextBox x:Name="SearchBox" Height="28" ToolTip="在工作区文件名中搜索；按 Enter 执行" KeyDown="SearchBox_KeyDown"/>
-                <ComboBox x:Name="TypeFilter" Grid.Column="2" Height="28" SelectionChanged="TypeFilter_SelectionChanged">
-                    <ComboBoxItem Content="全部支持文件" Tag="all" IsSelected="True"/><ComboBoxItem Content="Markdown" Tag="markdown"/><ComboBoxItem Content="代码" Tag="code"/><ComboBoxItem Content="文本与配置" Tag="text"/><ComboBoxItem Content="PDF" Tag="pdf"/>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="7"/><ColumnDefinition Width="130"/><ColumnDefinition Width="7"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBox x:Name="SearchBox" Height="27" ToolTip="在当前工作区按文件名搜索，清空后恢复目录树" KeyDown="SearchBox_KeyDown"/>
+                <ComboBox x:Name="TypeFilter" Grid.Column="2" Height="27" SelectionChanged="TypeFilter_SelectionChanged">
+                    <ComboBoxItem Content="全部文件" Tag="all" IsSelected="True"/><ComboBoxItem Content="Markdown" Tag="markdown"/><ComboBoxItem Content="代码" Tag="code"/><ComboBoxItem Content="文本" Tag="text"/><ComboBoxItem Content="PDF" Tag="pdf"/>
                 </ComboBox>
-                <Button Grid.Column="4" Content="搜索" Style="{StaticResource PrimaryButton}" Height="28" MinWidth="72" Click="Search_Click"/>
+                <Button Grid.Column="4" Content="搜索" Style="{StaticResource PrimaryButton}" Height="27" MinWidth="68" Click="Search_Click"/>
             </Grid>
         </Border>
 
         <Grid Grid.Row="4">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="235"/><ColumnDefinition Width="8"/><ColumnDefinition Width="315"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-
-            <Border Style="{StaticResource SurfaceCard}" Padding="8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="9"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource SurfaceCard}" Padding="0">
                 <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="6"/><RowDefinition Height="2*"/><RowDefinition Height="8"/><RowDefinition Height="Auto"/><RowDefinition Height="5"/><RowDefinition Height="1*"/></Grid.RowDefinitions>
-                    <Grid Margin="4,1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="目录" Style="{StaticResource SectionHeading}"/><Button Grid.Column="1" Content="在资源管理器打开" Style="{StaticResource TextButton}" Click="RevealRoot_Click"/></Grid>
-                    <TreeView x:Name="FolderTree" Grid.Row="2" BorderThickness="0" Background="Transparent" SelectedItemChanged="FolderTree_SelectedItemChanged" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
-                        <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem"><Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/><EventSetter Event="Expanded" Handler="FolderItem_Expanded"/></Style></TreeView.ItemContainerStyle>
-                    </TreeView>
-                    <Border Grid.Row="3" Height="1" Background="#E8EDF4"/>
-                    <TextBlock Grid.Row="4" Text="最近文件" Style="{StaticResource SectionHeading}" Margin="4,0"/>
-                    <ListBox x:Name="RecentFilesList" Grid.Row="6" BorderThickness="0" Background="Transparent" ItemTemplate="{StaticResource RecentFileTemplate}" MouseDoubleClick="RecentFilesList_MouseDoubleClick"/>
+                    <Grid.RowDefinitions><RowDefinition Height="39"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid Margin="11,0,8,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="15" Height="15"><Path Data="M3,6 H9 L11,8 H21 V19 H3 Z" Stroke="#58708E" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox>
+                            <TextBlock x:Name="ExplorerTitleText" Text="资源管理器" Style="{StaticResource SectionHeading}" Margin="7,0,0,0"/>
+                            <TextBlock x:Name="ExplorerCountText" FontSize="10.3" Foreground="#93A0B1" Margin="7,1,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="新建目录" Style="{StaticResource TextButton}" Click="NewFolder_Click"/>
+                            <Button Content="外部打开" Style="{StaticResource TextButton}" Margin="9,0,0,0" Click="OpenExternal_Click"/>
+                            <Button Content="定位" Style="{StaticResource TextButton}" Margin="9,0,0,0" Click="RevealRoot_Click"/>
+                        </StackPanel>
+                    </Grid>
+                    <Border Grid.Row="1" Background="#E7EDF4"/>
+                    <TreeView x:Name="FolderTree" Grid.Row="2" BorderThickness="0" Background="Transparent" Padding="7,5"
+                              ItemContainerStyle="{StaticResource WorkspaceTreeItemStyle}" SelectedItemChanged="FolderTree_SelectedItemChanged"
+                              VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"/>
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2" Style="{StaticResource SurfaceCard}" Padding="7">
+            <Border Grid.Column="2" Style="{StaticResource SurfaceCard}" Padding="0">
                 <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="6"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <Grid Margin="4,1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel Orientation="Horizontal"><TextBlock x:Name="FolderTitleText" Text="文件" Style="{StaticResource SectionHeading}"/><TextBlock x:Name="ItemCountText" Text="" FontSize="10.5" Foreground="#93A0B1" Margin="8,1,0,0"/></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal"><Button Content="新建文件夹" Style="{StaticResource TextButton}" Click="NewFolder_Click"/><Button Content="打开外部" Style="{StaticResource TextButton}" Margin="8,0,0,0" Click="OpenExternal_Click"/></StackPanel></Grid>
-                    <ListView x:Name="FileList" Grid.Row="2" BorderThickness="0" Background="Transparent" SelectionChanged="FileList_SelectionChanged" MouseDoubleClick="FileList_MouseDoubleClick" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
-                        <ListView.View><GridView>
-                            <GridViewColumn Header="名称" Width="190" DisplayMemberBinding="{Binding Name}"/>
-                            <GridViewColumn Header="类型" Width="72" DisplayMemberBinding="{Binding TypeLabel}"/>
-                            <GridViewColumn Header="大小" Width="64" DisplayMemberBinding="{Binding SizeLabel}"/>
-                            <GridViewColumn Header="修改" Width="112" DisplayMemberBinding="{Binding ModifiedLabel}"/>
-                        </GridView></ListView.View>
-                    </ListView>
-                </Grid>
-            </Border>
-
-            <Border Grid.Column="4" Style="{StaticResource SurfaceCard}" Padding="0">
-                <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="43"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <Grid Margin="10,0">
+                    <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid Margin="11,0">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock x:Name="DocumentTitleText" Text="选择一个文件" FontSize="13.5" FontWeight="SemiBold" Foreground="#293A51" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock x:Name="DocumentPathText" FontSize="9.8" Foreground="#929FAF" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
-                        </StackPanel>
-                        <Border Grid.Column="1" Background="#EEF2F7" CornerRadius="8" Padding="2" VerticalAlignment="Center" Margin="8,0">
-                            <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Name="EditModeButton" Content="编辑" GroupName="EditorMode" Style="{StaticResource WorkspaceSegment}" IsChecked="True" Checked="EditorMode_Changed"/>
-                                <RadioButton x:Name="SplitModeButton" Content="分栏" GroupName="EditorMode" Style="{StaticResource WorkspaceSegment}" Checked="EditorMode_Changed"/>
-                                <RadioButton x:Name="PreviewModeButton" Content="预览" GroupName="EditorMode" Style="{StaticResource WorkspaceSegment}" Checked="EditorMode_Changed"/>
-                            </StackPanel>
-                        </Border>
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button x:Name="SaveButton" Content="保存" Style="{StaticResource PrimaryButton}" Height="29" MinWidth="64" IsEnabled="False" Click="Save_Click"/>
-                            <Button x:Name="RevealFileButton" Content="定位" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="58" Margin="6,0,0,0" IsEnabled="False" Click="RevealFile_Click"/>
-                        </StackPanel>
+                        <StackPanel VerticalAlignment="Center"><TextBlock x:Name="DocumentTitleText" Text="选择一个文件" FontSize="13.5" FontWeight="SemiBold" Foreground="#293A51" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="DocumentPathText" FontSize="9.8" Foreground="#929FAF" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/></StackPanel>
+                        <Border Grid.Column="1" Background="#EEF2F7" CornerRadius="8" Padding="2" VerticalAlignment="Center" Margin="8,0"><StackPanel Orientation="Horizontal"><RadioButton x:Name="EditModeButton" Content="编辑" GroupName="EditorMode" Style="{StaticResource WorkspaceSegment}" IsChecked="True" Checked="EditorMode_Changed"/><RadioButton x:Name="SplitModeButton" Content="分栏" GroupName="EditorMode" Style="{StaticResource WorkspaceSegment}" Checked="EditorMode_Changed"/><RadioButton x:Name="PreviewModeButton" Content="预览" GroupName="EditorMode" Style="{StaticResource WorkspaceSegment}" Checked="EditorMode_Changed"/></StackPanel></Border>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"><Button x:Name="SaveButton" Content="保存" Style="{StaticResource PrimaryButton}" Height="28" MinWidth="60" IsEnabled="False" Click="Save_Click"/><Button x:Name="RevealFileButton" Content="定位" Style="{StaticResource SecondaryButton}" Height="28" MinWidth="54" Margin="6,0,0,0" IsEnabled="False" Click="RevealFile_Click"/></StackPanel>
                     </Grid>
                     <Border Grid.Row="1" Background="#E6ECF3"/>
                     <Grid Grid.Row="2" x:Name="EditorHost">
@@ -118,22 +111,12 @@
                         <TextBox x:Name="EditorBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" BorderThickness="0" Background="#FCFDFE" Padding="16" FontFamily="Cascadia Mono, Consolas, Microsoft YaHei UI" FontSize="14" TextChanged="EditorBox_TextChanged" PreviewKeyDown="EditorBox_PreviewKeyDown"/>
                         <GridSplitter x:Name="PreviewSplitter" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#E5EBF2" Visibility="Collapsed"/>
                         <FlowDocumentScrollViewer x:Name="PreviewViewer" Grid.Column="2" Background="White" VerticalScrollBarVisibility="Auto" Padding="12" Visibility="Collapsed"/>
-                        <Grid x:Name="EditorEmptyState" Background="#FBFCFE">
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="330">
-                                <Border Width="52" Height="52" CornerRadius="16" Background="#EDF3FF" HorizontalAlignment="Center"><Viewbox Width="24" Height="24"><Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,13 H17 M9,17 H15" Stroke="#4B7EE8" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Viewbox></Border>
-                                <TextBlock Text="选择 Markdown、代码或文本文件" FontSize="15" FontWeight="SemiBold" TextAlignment="Center" Margin="0,12,0,0"/>
-                                <TextBlock Text="双击 PDF 或其他文件会交给 Windows 默认程序；工作台不会内置大型编辑器或 PDF 引擎。" Style="{StaticResource EmptyStateText}" TextAlignment="Center" Margin="0,6,0,0"/>
-                            </StackPanel>
-                        </Grid>
+                        <Grid x:Name="EditorEmptyState" Background="#FBFCFE"><StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="330"><Border Width="52" Height="52" CornerRadius="16" Background="#EDF3FF" HorizontalAlignment="Center"><Viewbox Width="24" Height="24"><Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,13 H17 M9,17 H15" Stroke="#4B7EE8" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Viewbox></Border><TextBlock Text="从左侧资源树选择文件" FontSize="15" FontWeight="SemiBold" TextAlignment="Center" Margin="0,12,0,0"/><TextBlock Text="PDF 与二进制文件仍交给外部程序打开。" Style="{StaticResource EmptyStateText}" TextAlignment="Center" Margin="0,6,0,0"/></StackPanel></Grid>
                     </Grid>
                 </Grid>
             </Border>
         </Grid>
 
-        <Grid Grid.Row="6">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <TextBlock x:Name="StatusText" Text="选择一个工作区目录开始。" FontSize="10.8" Foreground="#748399" VerticalAlignment="Center"/>
-            <TextBlock x:Name="EncodingText" Grid.Column="1" Text="UTF-8" FontSize="10.5" Foreground="#96A2B2" VerticalAlignment="Center"/>
-        </Grid>
+        <Grid Grid.Row="6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="StatusText" Text="选择一个工作区目录开始。" FontSize="10.8" Foreground="#748399" VerticalAlignment="Center"/><TextBlock x:Name="EncodingText" Grid.Column="1" Text="UTF-8" FontSize="10.5" Foreground="#96A2B2" VerticalAlignment="Center"/></Grid>
     </Grid>
 </UserControl>

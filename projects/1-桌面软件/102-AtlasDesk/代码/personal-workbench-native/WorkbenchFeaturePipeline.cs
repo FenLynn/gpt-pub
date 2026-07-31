@@ -6,6 +6,7 @@ public sealed class WorkbenchFeaturePipeline
 {
     private WorkbenchFeaturePipeline(MainWindow window)
     {
+        VisualFixes = V067VisualFixes.Attach();
         Base = WorkbenchEnhancer.Attach(window);
         Settings = Base.GetType().GetField("_settings", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(Base) as AppSettings
                    ?? AppSettings.Load();
@@ -17,6 +18,7 @@ public sealed class WorkbenchFeaturePipeline
         Backup = V066BackupEnhancer.Attach(window);
     }
 
+    public V067VisualFixes VisualFixes { get; }
     public WorkbenchEnhancer Base { get; }
     public V061ExperienceEnhancer Experience { get; }
     public V062StabilityEnhancer Stability { get; }
