@@ -79,12 +79,56 @@ finally
     try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); } catch { }
 }
 
+var taskRoot = Path.Combine(Path.GetTempPath(), "pw-task-smoke-" + Guid.NewGuid().ToString("N"));
+try
+{
+    Directory.CreateDirectory(Path.Combine(taskRoot, "sub"));
+    Directory.CreateDirectory(Path.Combine(taskRoot, "node_modules", "ignored"));
+    var abcPath = Path.Combine(taskRoot, "abc.txt");
+    File.WriteAllText(abcPath, "abc");
+    File.WriteAllBytes(Path.Combine(taskRoot, "sub", "payload.bin"), new byte[1024]);
+    File.WriteAllBytes(Path.Combine(taskRoot, "node_modules", "ignored", "skip.bin"), new byte[50]);
+
+    var hash = await WorkbenchTaskOperations.ComputeSha256Async(abcPath);
+    Check(hash == "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD", "SHA-256 operation matches known vector");
+
+    var statistics = WorkbenchTaskOperations.ScanDirectory(taskRoot);
+    Check(statistics.FileCount == 2 && statistics.DirectoryCount == 1, "directory statistics count visible entries");
+    Check(statistics.TotalBytes == 1027 && statistics.SkippedEntries >= 1, "directory statistics skip generated folders");
+
+    using var cancelledHash = new CancellationTokenSource();
+    cancelledHash.Cancel();
+    var hashCancelled = false;
+    try { _ = await WorkbenchTaskOperations.ComputeSha256Async(abcPath, cancellationToken: cancelledHash.Token); }
+    catch (OperationCanceledException) { hashCancelled = true; }
+    Check(hashCancelled, "file hash honors cancellation");
+
+    var historyJson = WorkbenchTaskStore.Serialize(new[]
+    {
+        new WorkbenchTaskRecord { Type = WorkbenchTaskType.FileHash, Title = "running", TargetPath = abcPath, State = WorkbenchTaskState.Running, CreatedAt = now },
+        new WorkbenchTaskRecord { Type = WorkbenchTaskType.DirectoryStatistics, Title = "done", TargetPath = taskRoot, State = WorkbenchTaskState.Completed, Result = "ok", CreatedAt = now.AddMinutes(-1) }
+    });
+    var restored = WorkbenchTaskStore.Deserialize(historyJson);
+    Check(restored.Count == 2 && restored.Any(item => item.Title == "done" && item.State == WorkbenchTaskState.Completed), "task history round-trips completed records");
+    Check(restored.Any(item => item.Title == "running" && item.State == WorkbenchTaskState.Failed && item.Error.Contains("中断")), "interrupted task history is normalized");
+
+    using var lowConcurrency = new WorkbenchTaskService(0);
+    using var highConcurrency = new WorkbenchTaskService(99);
+    Check(WorkbenchTaskService.DefaultMaxConcurrency == 2 && lowConcurrency.MaxConcurrency == 1 && highConcurrency.MaxConcurrency == 8,
+        "task concurrency policy is bounded");
+    Check(new WorkbenchTaskRecord { State = WorkbenchTaskState.Queued }.ProgressLabel == "排队", "queued task has explicit progress label");
+}
+finally
+{
+    try { if (Directory.Exists(taskRoot)) Directory.Delete(taskRoot, true); } catch { }
+}
+
 var summary = DiagnosticsService.BuildSummary(new[]
 {
     new DiagnosticCheck { Name = "Smoke", Detail = "ok", Severity = DiagnosticSeverity.Ok }
 });
 Check(summary.Contains("[正常] Smoke: ok", StringComparison.Ordinal), "diagnostic summary is stable");
-Check(WorkbenchVersion.Current == "0.6.3", "assembly version matches Version.props");
+Check(WorkbenchVersion.Current == "0.6.4", "assembly version matches Version.props");
 
 if (failures.Count == 0)
 {

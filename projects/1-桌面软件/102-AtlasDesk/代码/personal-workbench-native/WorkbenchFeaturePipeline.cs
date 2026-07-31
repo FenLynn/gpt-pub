@@ -12,12 +12,14 @@ public sealed class WorkbenchFeaturePipeline
         Experience = V061ExperienceEnhancer.Attach(window, Base);
         Stability = V062StabilityEnhancer.Attach(window, Settings);
         Projects = V063ProjectEnhancer.Attach(window, this);
+        Tasks = V064TaskEnhancer.Attach(window, this);
     }
 
     public WorkbenchEnhancer Base { get; }
     public V061ExperienceEnhancer Experience { get; }
     public V062StabilityEnhancer Stability { get; }
     public V063ProjectEnhancer Projects { get; }
+    public V064TaskEnhancer Tasks { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);

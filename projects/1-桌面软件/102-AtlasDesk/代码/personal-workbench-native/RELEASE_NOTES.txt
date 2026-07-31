@@ -1,14 +1,15 @@
-Personal Workbench v0.6.3
+Personal Workbench v0.6.4
 
-- Added a lightweight project center above the existing local workspace.
-- Detects Git, Python, Node.js, .NET, LaTeX, Rust and Go projects without running project code.
-- Reads the current Git branch directly from repository metadata, including worktree-style .git pointers.
-- Opens a selected project in the existing workspace, Explorer or integrated ConPTY terminal.
-- Skips generated, hidden and reparse-point directories to avoid expensive or cyclic scans.
-- Project scans are cancellable; repeated refreshes replace stale scans safely.
-- Preserves the v0.6.2 diagnostics, support bundle and startup protection.
+- Added a real task center in the existing Tasks navigation entry.
+- Runs read-only SHA-256 file hashing and default-workspace directory statistics.
+- Shows queued/running state, progress, elapsed time, results and errors.
+- Supports cancellation, persisted history and interrupted-task recovery.
+- Limits background I/O to two concurrent tasks; additional tasks remain cancellable in a queue.
+- Directory statistics skip generated, hidden and reparse-point directories.
+- Does not execute project scripts, package managers or arbitrary commands.
+- Preserves project center, diagnostics, Dashboard, Markdown, Zotero and ConPTY behavior.
 
 Verification checkpoint
-- Iteration 1 passed synthetic multi-project detection, WPF compile and publish validation.
-- Iteration 2 added cancellation and stale-result protection; all regression tests passed.
-- Iteration 3 is the final package build with the complete inherited smoke-test suite.
+- Iteration 1 passed known SHA-256 vectors, directory counts, cancellation and history recovery.
+- Iteration 2 added bounded concurrency and explicit queued-state handling; all regressions passed.
+- Iteration 3 is the final package build with the full inherited smoke-test suite.
