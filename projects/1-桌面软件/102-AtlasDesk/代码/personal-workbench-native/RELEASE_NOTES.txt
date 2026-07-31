@@ -8,3 +8,9 @@ Personal Workbench v0.6.6
 - Creates an automatic pre-restore snapshot and writes restored files atomically with rollback attempts.
 - Requires application restart after restore instead of mutating live module state.
 - Includes the complete regression suite for startup, diagnostics, projects, tasks and file integrity.
+
+Verification checkpoint
+- Iteration 1 passed allowlist export, manifest validation, SHA-256 and JSON checks.
+- Iteration 2 passed unknown-entry, duplicate-entry, traversal, size-limit and rollback tests.
+- Iteration 3 passed the complete inherited regression suite for v0.6.2 through v0.6.5.
+- Additional independent verification runs also passed before this final package checkpoint.
