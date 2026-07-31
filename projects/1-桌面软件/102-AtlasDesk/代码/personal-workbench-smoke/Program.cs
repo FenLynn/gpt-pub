@@ -10,13 +10,13 @@ void Check(bool condition, string name)
 }
 
 var now = new DateTimeOffset(2026, 7, 31, 1, 0, 0, TimeSpan.Zero);
-var first = StartupGuard.CreateNext(null, "0.6.2", now);
+var first = StartupGuard.CreateNext(null, WorkbenchVersion.Current, now);
 Check(first.Running && !first.PreviousSessionUnclean && first.ConsecutiveUncleanStarts == 0, "first startup is clean");
 
 var crashed = StartupGuard.CreateNext(new StartupGuardState
 {
-    Version = "0.6.2", Running = true, ConsecutiveUncleanStarts = 1, LastStartUtc = now.AddMinutes(-2)
-}, "0.6.2", now);
+    Version = WorkbenchVersion.Current, Running = true, ConsecutiveUncleanStarts = 1, LastStartUtc = now.AddMinutes(-2)
+}, WorkbenchVersion.Current, now);
 Check(crashed.PreviousSessionUnclean && crashed.ConsecutiveUncleanStarts == 2, "unclean startup increments counter");
 
 var clean = StartupGuard.MarkClean(crashed, now.AddMinutes(1));
@@ -39,12 +39,52 @@ Check(sanitizedObject["workspaceRoot"]?.GetValue<string>() == "<redacted-path>"
       && sanitizedObject["recentWorkspaceFiles"]?.AsArray().All(item => item?.GetValue<string>() == "<redacted-path>") == true,
     "local paths are redacted");
 
+var tempRoot = Path.Combine(Path.GetTempPath(), "pw-project-smoke-" + Guid.NewGuid().ToString("N"));
+try
+{
+    var pythonProject = Path.Combine(tempRoot, "laser-model");
+    Directory.CreateDirectory(Path.Combine(pythonProject, ".git"));
+    File.WriteAllText(Path.Combine(pythonProject, ".git", "HEAD"), "ref: refs/heads/feature/thermal-model\n");
+    File.WriteAllText(Path.Combine(pythonProject, "pyproject.toml"), "[project]\nname='laser-model'\n");
+
+    var latexProject = Path.Combine(tempRoot, "paper");
+    Directory.CreateDirectory(latexProject);
+    File.WriteAllText(Path.Combine(latexProject, "main.tex"), "\\documentclass{article}");
+
+    var dotnetProject = Path.Combine(tempRoot, "tools", "analyzer");
+    Directory.CreateDirectory(dotnetProject);
+    File.WriteAllText(Path.Combine(dotnetProject, "Analyzer.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+
+    var ignoredProject = Path.Combine(tempRoot, "node_modules", "ignored");
+    Directory.CreateDirectory(ignoredProject);
+    File.WriteAllText(Path.Combine(ignoredProject, "package.json"), "{}");
+
+    var projects = ProjectCatalogService.Scan(tempRoot, 2, 20);
+    var python = projects.SingleOrDefault(item => item.Name == "laser-model");
+    Check(python is not null && python.Kind.HasFlag(ProjectKind.Git) && python.Kind.HasFlag(ProjectKind.Python), "git python project is detected");
+    Check(python?.GitBranch == "feature/thermal-model", "git branch is parsed");
+    Check(projects.Any(item => item.Kind.HasFlag(ProjectKind.Latex)), "latex project is detected");
+    Check(projects.Any(item => item.Kind.HasFlag(ProjectKind.DotNet)), "nested dotnet project is detected");
+    Check(projects.All(item => !item.RootPath.Contains("node_modules", StringComparison.OrdinalIgnoreCase)), "ignored directories are skipped");
+
+    using var cancelled = new CancellationTokenSource();
+    cancelled.Cancel();
+    var cancellationObserved = false;
+    try { _ = ProjectCatalogService.Scan(tempRoot, 2, 20, cancelled.Token); }
+    catch (OperationCanceledException) { cancellationObserved = true; }
+    Check(cancellationObserved, "project scan honors cancellation");
+}
+finally
+{
+    try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); } catch { }
+}
+
 var summary = DiagnosticsService.BuildSummary(new[]
 {
     new DiagnosticCheck { Name = "Smoke", Detail = "ok", Severity = DiagnosticSeverity.Ok }
 });
 Check(summary.Contains("[正常] Smoke: ok", StringComparison.Ordinal), "diagnostic summary is stable");
-Check(WorkbenchVersion.Current == "0.6.2", "assembly version matches Version.props");
+Check(WorkbenchVersion.Current == "0.6.3", "assembly version matches Version.props");
 
 if (failures.Count == 0)
 {

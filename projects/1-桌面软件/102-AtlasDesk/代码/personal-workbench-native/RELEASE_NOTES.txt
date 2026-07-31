@@ -1,14 +1,14 @@
-Personal Workbench v0.6.2
+Personal Workbench v0.6.3
 
-- Added a startup clean-exit marker to distinguish likely abnormal shutdowns.
-- Added a native diagnostics center for WebView2, paths, ConPTY, logs and local configuration.
-- Added privacy-aware support bundle export; browser profiles and credentials are never included.
-- Added a reusable feature pipeline for staged upgrades.
-- Added a standalone smoke-test project used by Windows CI.
-- Preserved Dashboard, Markdown workspace, Zotero read-only access and the integrated terminal.
+- Added a lightweight project center above the existing local workspace.
+- Detects Git, Python, Node.js, .NET, LaTeX, Rust and Go projects without running project code.
+- Reads the current Git branch directly from repository metadata, including worktree-style .git pointers.
+- Opens a selected project in the existing workspace, Explorer or integrated ConPTY terminal.
+- Skips generated, hidden and reparse-point directories to avoid expensive or cyclic scans.
+- Project scans are cancellable; repeated refreshes replace stale scans safely.
+- Preserves the v0.6.2 diagnostics, support bundle and startup protection.
 
 Verification checkpoint
-- Iteration 1 caught and isolated a WPF type ambiguity before packaging.
-- Iteration 2 completed compilation and exercised privacy tests.
-- Iteration 3 passed smoke tests, publish and payload validation.
-- Iteration 4 is the final regression and downloadable package build.
+- Iteration 1 passed synthetic multi-project detection, WPF compile and publish validation.
+- Iteration 2 added cancellation and stale-result protection; all regression tests passed.
+- Iteration 3 is the final package build with the complete inherited smoke-test suite.
