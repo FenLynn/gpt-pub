@@ -123,12 +123,68 @@ finally
     try { if (Directory.Exists(taskRoot)) Directory.Delete(taskRoot, true); } catch { }
 }
 
+var integrityRoot = Path.Combine(Path.GetTempPath(), "pw-integrity-smoke-" + Guid.NewGuid().ToString("N"));
+try
+{
+    Directory.CreateDirectory(Path.Combine(integrityRoot, "sub"));
+    Directory.CreateDirectory(Path.Combine(integrityRoot, "node_modules", "ignored"));
+    var firstPath = Path.Combine(integrityRoot, "alpha.txt");
+    var secondPath = Path.Combine(integrityRoot, "sub", "beta.bin");
+    var ignoredPath = Path.Combine(integrityRoot, "node_modules", "ignored", "skip.txt");
+    File.WriteAllText(firstPath, "abc");
+    File.WriteAllBytes(secondPath, new byte[] { 1, 2, 3, 4, 5 });
+    File.WriteAllText(ignoredPath, "skip");
+
+    var manifestEntries = await FileIntegrityService.CreateManifestAsync(integrityRoot);
+    Check(manifestEntries.Count == 2 && manifestEntries.All(item => !Path.IsPathRooted(item.RelativePath)), "manifest uses relative paths and skips generated folders");
+    var manifestText = FileIntegrityService.FormatManifest(manifestEntries);
+    var parsedEntries = FileIntegrityService.ParseManifest(manifestText);
+    Check(parsedEntries.Count == 2 && parsedEntries.Select(item => item.RelativePath).SequenceEqual(manifestEntries.Select(item => item.RelativePath)), "manifest format round-trips");
+
+    var manifestPath = Path.Combine(Path.GetTempPath(), "pw-integrity-" + Guid.NewGuid().ToString("N") + ".sha256");
+    try
+    {
+        await FileIntegrityService.WriteManifestAtomicAsync(manifestPath, manifestEntries);
+        var verified = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
+        Check(verified.Count == 2 && verified.All(item => item.Status == IntegrityVerificationStatus.Match), "fresh manifest verifies successfully");
+
+        var copyPath = Path.Combine(integrityRoot, "alpha-copy.txt");
+        File.Copy(firstPath, copyPath);
+        var same = await FileIntegrityService.CompareFilesAsync(firstPath, copyPath);
+        Check(same.IsIdentical, "identical files compare equal");
+        File.AppendAllText(copyPath, "changed");
+        var different = await FileIntegrityService.CompareFilesAsync(firstPath, copyPath);
+        Check(!different.IsIdentical, "changed files compare different");
+        File.Delete(copyPath);
+
+        File.AppendAllText(secondPath, "changed");
+        File.Delete(firstPath);
+        var changedVerification = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
+        Check(changedVerification.Any(item => item.Status == IntegrityVerificationStatus.Changed), "modified file is detected");
+        Check(changedVerification.Any(item => item.Status == IntegrityVerificationStatus.Missing), "missing file is detected");
+
+        var unsafeManifest = FileIntegrityService.Header + Environment.NewLine
+            + "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD *../escape.txt" + Environment.NewLine;
+        await File.WriteAllTextAsync(manifestPath, unsafeManifest);
+        var unsafeVerification = await FileIntegrityService.VerifyManifestAsync(manifestPath, integrityRoot);
+        Check(unsafeVerification.Single().Status == IntegrityVerificationStatus.UnsafePath, "manifest path traversal is rejected");
+    }
+    finally
+    {
+        try { if (File.Exists(manifestPath)) File.Delete(manifestPath); } catch { }
+    }
+}
+finally
+{
+    try { if (Directory.Exists(integrityRoot)) Directory.Delete(integrityRoot, true); } catch { }
+}
+
 var summary = DiagnosticsService.BuildSummary(new[]
 {
     new DiagnosticCheck { Name = "Smoke", Detail = "ok", Severity = DiagnosticSeverity.Ok }
 });
 Check(summary.Contains("[正常] Smoke: ok", StringComparison.Ordinal), "diagnostic summary is stable");
-Check(WorkbenchVersion.Current == "0.6.4", "assembly version matches Version.props");
+Check(WorkbenchVersion.Current == "0.6.5", "assembly version matches Version.props");
 
 if (failures.Count == 0)
 {

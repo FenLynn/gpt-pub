@@ -1,15 +1,16 @@
-Personal Workbench v0.6.4
+Personal Workbench v0.6.5
 
-- Added a real task center in the existing Tasks navigation entry.
-- Runs read-only SHA-256 file hashing and default-workspace directory statistics.
-- Shows queued/running state, progress, elapsed time, results and errors.
-- Supports cancellation, persisted history and interrupted-task recovery.
-- Limits background I/O to two concurrent tasks; additional tasks remain cancellable in a queue.
-- Directory statistics skip generated, hidden and reparse-point directories.
-- Does not execute project scripts, package managers or arbitrary commands.
-- Preserves project center, diagnostics, Dashboard, Markdown, Zotero and ConPTY behavior.
+- Added a file-integrity center in the existing Tools navigation entry.
+- Generates standard SHA-256 manifests for the default workspace using relative paths.
+- Verifies manifests and distinguishes matching, missing, changed, unsafe and unreadable files.
+- Compares two files using both size and SHA-256.
+- Rejects rooted, path-traversal, duplicate, oversized and malformed manifest entries.
+- Preserves legal spaces in file names and limits manifest size and record count.
+- Uses cancellable reads and atomic manifest replacement; source files are never modified.
+- Skips generated, hidden and reparse-point directories.
+- Preserves task center, project center, diagnostics, Dashboard, Markdown, Zotero and ConPTY behavior.
 
 Verification checkpoint
-- Iteration 1 passed known SHA-256 vectors, directory counts, cancellation and history recovery.
-- Iteration 2 added bounded concurrency and explicit queued-state handling; all regressions passed.
-- Iteration 3 is the final package build with the full inherited smoke-test suite.
+- Iteration 1 passed manifest round-trip, match, mutation, deletion, traversal and comparison tests.
+- Iteration 2 hardened parser boundaries and passed the complete inherited regression suite.
+- Iteration 3 is the final package build and downloadable checkpoint.
