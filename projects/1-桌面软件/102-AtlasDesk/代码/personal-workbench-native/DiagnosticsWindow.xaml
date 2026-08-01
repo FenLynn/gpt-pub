@@ -1,0 +1,59 @@
+<Window x:Class="PersonalWorkbench.DiagnosticsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="诊断中心" Width="820" Height="650" MinWidth="680" MinHeight="500"
+        WindowStartupLocation="CenterOwner" Background="#F4F7FB" FontFamily="{StaticResource AppFont}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="*"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="诊断中心" Style="{StaticResource PageHeading}"/>
+                <TextBlock Text="检查启动状态、本地路径、WebView2、终端和日志；支持导出已脱敏的支持包。" Style="{StaticResource PageDescription}"/>
+            </StackPanel>
+            <Border Grid.Column="1" Background="#EAF2FF" CornerRadius="9" Padding="10,6" VerticalAlignment="Center">
+                <TextBlock x:Name="VersionText" Foreground="#326FD6" FontSize="11" FontWeight="SemiBold"/>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource SurfaceCard}" Padding="8">
+            <Grid>
+                <ListBox x:Name="ChecksList" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,2"/>
+                            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border Background="Transparent" CornerRadius="9" Padding="10,9"><ContentPresenter/></Border></ControlTemplate></Setter.Value></Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="92"/><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Background="{Binding BadgeBackground}" CornerRadius="7" Padding="8,4" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Status}" Foreground="{Binding BadgeForeground}" FontSize="10.5" FontWeight="SemiBold"/>
+                                </Border>
+                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="11.5" Foreground="#697A91" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel x:Name="LoadingPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="180" Height="4"/>
+                    <TextBlock Text="正在执行本地检查…" FontSize="11.5" Foreground="#718198" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" FontSize="11" Foreground="#68798F" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="打开日志" Style="{StaticResource SecondaryButton}" Click="OpenLogs_Click"/>
+                <Button Content="复制摘要" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="CopySummary_Click"/>
+                <Button Content="重新检查" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="Refresh_Click"/>
+                <Button Content="导出支持包" Style="{StaticResource PrimaryButton}" Margin="7,0,0,0" Click="Export_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

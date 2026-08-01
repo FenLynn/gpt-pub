@@ -1,0 +1,2 @@
+The Windows build workflow replaces this placeholder with the framework-dependent PersonalWorkbench.App.exe payload before compiling the launcher.
+This file is never included in the released executable.

@@ -1,0 +1,261 @@
+name: Build Personal Workbench Lightweight
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'personal-workbench-native/**'
+      - 'personal-workbench-launcher/**'
+      - 'personal-workbench-terminal-host/**'
+      - 'personal-workbench-smoke/**'
+      - '.github/workflows/build-personal-workbench.yml'
+  pull_request:
+    paths:
+      - 'personal-workbench-native/**'
+      - 'personal-workbench-launcher/**'
+      - 'personal-workbench-terminal-host/**'
+      - 'personal-workbench-smoke/**'
+      - '.github/workflows/build-personal-workbench.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Report push build start
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'pending',
+              context: 'Personal Workbench Lightweight',
+              description: 'Build and verification in progress',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Read version and build mode
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content 'personal-workbench-native/Version.props'
+          $version = [string]$props.Project.PropertyGroup.WorkbenchVersion
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'WorkbenchVersion is missing.' }
+          $messages = (git log -2 --pretty=%B) -join "`n"
+          $package = ('${{ github.event_name }}' -eq 'push') -or ($messages -match '\[package\]')
+          "WORKBENCH_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PACKAGE_BUILD=$($package.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Version=$version Package=$package"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build native terminal host
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSROOT=%%i"
+          if not defined VSROOT exit /b 1
+          call "%VSROOT%\VC\Auxiliary\Build\vcvars64.bat"
+          if not exist build\terminal-host mkdir build\terminal-host
+          cl /nologo /std:c++20 /O2 /EHsc /MT /DUNICODE /D_UNICODE "personal-workbench-terminal-host\terminal_host.cpp" /link /SUBSYSTEM:WINDOWS /OUT:"build\terminal-host\PersonalWorkbench.TerminalHost.exe"
+          if errorlevel 1 exit /b %errorlevel%
+          if not exist "build\terminal-host\PersonalWorkbench.TerminalHost.exe" exit /b 1
+          echo PWB_TERMINAL_HOST_PATH=%CD%\build\terminal-host\PersonalWorkbench.TerminalHost.exe>>"%GITHUB_ENV%"
+
+      - name: Setup Go
+        if: env.PACKAGE_BUILD == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+
+      - name: Stamp launcher version
+        if: env.PACKAGE_BUILD == 'true'
+        shell: pwsh
+        run: |
+          $path = 'personal-workbench-launcher/main_windows.go'
+          $content = Get-Content $path -Raw
+          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', "appVersion = `"$env:WORKBENCH_VERSION`"")
+          Set-Content $path $content -Encoding UTF8
+
+      - name: Prepare embedded xterm assets
+        shell: pwsh
+        run: |
+          $temp = Join-Path $env:RUNNER_TEMP 'workbench-xterm'
+          New-Item -ItemType Directory -Path $temp -Force | Out-Null
+          npm install --prefix $temp @xterm/xterm@6.0.0 @xterm/addon-fit@0.11.0 --ignore-scripts --no-audit --no-fund
+          $vendor = 'personal-workbench-native/TerminalAssets/vendor'
+          New-Item -ItemType Directory -Path $vendor -Force | Out-Null
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/lib/xterm.js') (Join-Path $vendor 'xterm.js') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/css/xterm.css') (Join-Path $vendor 'xterm.css') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/addon-fit/lib/addon-fit.js') (Join-Path $vendor 'xterm.js.map') -Force -ErrorAction SilentlyContinue
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/addon-fit/lib/addon-fit.js') (Join-Path $vendor 'addon-fit.js') -Force
+          foreach ($file in @('xterm.js','xterm.css','addon-fit.js')) {
+            if (!(Test-Path (Join-Path $vendor $file))) { throw "Missing terminal asset: $file" }
+          }
+
+      - name: Restore app and smoke tests
+        run: dotnet restore personal-workbench-smoke/PersonalWorkbench.Smoke.csproj
+
+      - name: Stamp smoke expected version
+        shell: pwsh
+        run: |
+          $path = 'personal-workbench-smoke/Program.cs'
+          $content = Get-Content $path -Raw
+          $pattern = 'Check\(WorkbenchVersion\.Current == "[^"]+", "assembly version matches Version\.props"\);'
+          $replacement = "Check(WorkbenchVersion.Current == `"$env:WORKBENCH_VERSION`", `"assembly version matches Version.props`");"
+          $updated = [regex]::Replace($content, $pattern, $replacement, 1)
+          if ($updated -eq $content) { throw 'Smoke-test version assertion could not be stamped.' }
+          Set-Content $path $updated -Encoding UTF8
+
+      - name: Run smoke tests
+        run: dotnet run --project personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
+
+      - name: Publish framework-dependent app payload
+        run: >-
+          dotnet publish personal-workbench-native/PersonalWorkbench.csproj
+          -c Release
+          -r win-x64
+          --self-contained false
+          --no-restore
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o build/app
+
+      - name: Assemble native terminal host
+        shell: pwsh
+        run: Copy-Item build/terminal-host/PersonalWorkbench.TerminalHost.exe build/app/PersonalWorkbench.TerminalHost.exe -Force
+
+      - name: Validate lightweight app payload
+        shell: pwsh
+        run: |
+          $app = 'build/app/PersonalWorkbench.App.exe'
+          $terminalHostPath = 'build/app/PersonalWorkbench.TerminalHost.exe'
+          if (!(Test-Path $app)) { throw 'PersonalWorkbench.App.exe was not produced.' }
+          if (!(Test-Path $terminalHostPath)) { throw 'PersonalWorkbench.TerminalHost.exe was not assembled.' }
+          $forbidden = @('coreclr.dll','clrjit.dll','hostfxr.dll','hostpolicy.dll','System.Private.CoreLib.dll','python.exe','conda.exe','uv.exe','node.exe','conpty.dll')
+          foreach ($name in $forbidden) {
+            if (Get-ChildItem build/app -Recurse -File -Filter $name -ErrorAction SilentlyContinue) { throw "Bundled runtime file detected: $name" }
+          }
+          $payloadSize = (Get-Item $app).Length
+          $hostSize = (Get-Item $terminalHostPath).Length
+          if ($payloadSize -gt 44MB) { throw "App payload is unexpectedly large: $([math]::Round($payloadSize / 1MB, 2)) MB" }
+          if ($hostSize -gt 2MB) { throw "Terminal host is unexpectedly large: $([math]::Round($hostSize / 1MB, 2)) MB" }
+          "APP_PAYLOAD_BYTES=$payloadSize" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TERMINAL_HOST_BYTES=$hostSize" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Embed app payload in native launcher
+        if: env.PACKAGE_BUILD == 'true'
+        shell: pwsh
+        run: |
+          $folder = "artifacts/PersonalWorkbench_v$env:WORKBENCH_VERSION`_Lightweight"
+          New-Item -ItemType Directory -Path personal-workbench-launcher/payload -Force | Out-Null
+          Remove-Item personal-workbench-launcher/payload/* -Force -ErrorAction SilentlyContinue
+          Copy-Item build/app/* personal-workbench-launcher/payload/ -Force
+          New-Item -ItemType Directory -Path $folder -Force | Out-Null
+          Push-Location personal-workbench-launcher
+          go build -trimpath -ldflags '-s -w -H windowsgui' -o "../$folder/PersonalWorkbench.exe" .
+          Pop-Location
+          Copy-Item personal-workbench-native/RELEASE_NOTES.txt "$folder/README.txt" -Force
+
+      - name: Validate final package size
+        if: env.PACKAGE_BUILD == 'true'
+        shell: pwsh
+        run: |
+          $exe = "artifacts/PersonalWorkbench_v$env:WORKBENCH_VERSION`_Lightweight/PersonalWorkbench.exe"
+          if (!(Test-Path $exe)) { throw 'Lightweight launcher was not produced.' }
+          $size = (Get-Item $exe).Length
+          if ($size -gt 58MB) { throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB" }
+          "FINAL_EXE_BYTES=$size" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Package
+        if: env.PACKAGE_BUILD == 'true'
+        shell: pwsh
+        run: |
+          $folder = "artifacts/PersonalWorkbench_v$env:WORKBENCH_VERSION`_Lightweight"
+          $zip = "$folder.zip"
+          Compress-Archive -Path "$folder/*" -DestinationPath $zip -Force
+          Get-FileHash "$folder/PersonalWorkbench.exe" -Algorithm SHA256 | Format-List | Out-File artifacts/SHA256.txt
+          @"
+          version=$env:WORKBENCH_VERSION
+          app_payload_bytes=$env:APP_PAYLOAD_BYTES
+          terminal_host_bytes=$env:TERMINAL_HOST_BYTES
+          final_exe_bytes=$env:FINAL_EXE_BYTES
+          smoke_tests=passed
+          self_contained=false
+          bundled_dotnet_runtime=false
+          bundled_webview2_runtime=false
+          bundled_node_runtime=false
+          bundled_python=false
+          bundled_conda=false
+          bundled_uv=false
+          bundled_pdf_engine=false
+          terminal_renderer=xterm.js_6.0.0
+          terminal_backend=native_gui_bridge_windows_system_conpty
+          zotero_access=read_only_sqlite
+          workspace_editor=lightweight_wpf
+          markdown_preview=flowdocument
+          diagnostics=sanitized_support_bundle
+          "@ | Set-Content artifacts/build-manifest.txt -Encoding UTF8
+
+      - name: Upload artifact
+        if: env.PACKAGE_BUILD == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PersonalWorkbench-v${{ env.WORKBENCH_VERSION }}-lightweight-win-x64
+          path: |
+            artifacts/PersonalWorkbench_v${{ env.WORKBENCH_VERSION }}_Lightweight.zip
+            artifacts/PersonalWorkbench_v${{ env.WORKBENCH_VERSION }}_Lightweight/PersonalWorkbench.exe
+            artifacts/SHA256.txt
+            artifacts/build-manifest.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Report pull-request build
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          BUILD_STATUS: ${{ job.status }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `PERSONAL_WORKBENCH_VERIFY version=${process.env.WORKBENCH_VERSION} package=${process.env.PACKAGE_BUILD} run_id=${context.runId} status=${process.env.BUILD_STATUS} sha=${context.sha}`
+            });
+
+      - name: Report push build result
+        if: always() && github.event_name == 'push'
+        uses: actions/github-script@v7
+        env:
+          BUILD_STATUS: ${{ job.status }}
+        with:
+          script: |
+            const succeeded = process.env.BUILD_STATUS === 'success';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: succeeded ? 'success' : 'failure',
+              context: 'Personal Workbench Lightweight',
+              description: succeeded ? 'Build, verification and package passed' : 'Build or verification failed',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
