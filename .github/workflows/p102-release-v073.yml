@@ -1,0 +1,153 @@
+name: Release P102 AtlasDesk v0.7.3
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.release/p102-v0.7.3.txt'
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout full public repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify release target and tested source equivalence
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='df66c9246706439c35f082027a82eb34e827de69'
+          tested='885eaa320b9db6efcfb7665631b2650348e368ad'
+          test "$(git rev-parse HEAD)" != ''
+          git cat-file -e "$target^{commit}"
+          git cat-file -e "$tested^{commit}"
+          product_diff=$(git -c core.quotePath=false diff --name-only "$tested" "$target" -- \
+            'projects/1-桌面软件/102-AtlasDesk/**' \
+            '.github/workflows/p102-atlasdesk-ci.yml' || true)
+          if [[ -n "$product_diff" ]]; then
+            echo 'Tested PR head and release target differ in P102 product or active CI:'
+            echo "$product_diff"
+            exit 1
+          fi
+          test "$(git show "$target:projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/Version.props" | grep -c '<WorkbenchVersion>0.7.3</WorkbenchVersion>')" = '1'
+
+      - name: Download exact verified PR Artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/p102-release/outer /tmp/p102-release/files
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            /repos/FenLynn/gpt-pub/actions/artifacts/8817462686/zip \
+            > /tmp/p102-release/artifact.zip
+          echo '1f2564f6429595a049140b684d5b8e4d301c5e47ca273259cac576063230bda3  /tmp/p102-release/artifact.zip' | sha256sum -c -
+          unzip -q /tmp/p102-release/artifact.zip -d /tmp/p102-release/outer
+
+      - name: Verify release assets and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=/tmp/p102-release/outer
+          portable="$root/AtlasDesk_v0.7.3_Lightweight.zip"
+          exe="$root/AtlasDesk_v0.7.3_Lightweight/AtlasDesk.exe"
+          checksum="$root/SHA256.txt"
+          manifest="$root/build-manifest.txt"
+
+          echo 'cf6fdf10b0806b1d81806b1c036323785f6622bc4f7afd57789ff9a199890720  '"$portable" | sha256sum -c -
+          echo '78a034923a6d522fb0d2e0c3e2f701dd9ad0be30e21dd33f4edb0c14605825ff  '"$exe" | sha256sum -c -
+          grep -Fx '78a034923a6d522fb0d2e0c3e2f701dd9ad0be30e21dd33f4edb0c14605825ff  AtlasDesk.exe' "$checksum"
+          grep -Fx 'product=AtlasDesk' "$manifest"
+          grep -Fx 'project=P102' "$manifest"
+          grep -Fx 'repository=FenLynn/gpt-pub' "$manifest"
+          grep -Fx 'version=0.7.3' "$manifest"
+          grep -Fx 'compatibility_identity=PersonalWorkbench' "$manifest"
+          grep -Fx 'source_commit=c48180a2ac74b6336220bce484c8051551d4e2fb' "$manifest"
+          grep -Fx 'public_filtered_head=f8493a0bcb73ed0e05f039144890dc07b5d885fb' "$manifest"
+          grep -Fx 'smoke_tests=passed' "$manifest"
+          grep -Fx 'self_contained=false' "$manifest"
+          for key in bundled_dotnet_runtime bundled_webview2_runtime bundled_node_runtime bundled_python bundled_conda bundled_uv bundled_pdf_engine; do
+            grep -Fx "$key=false" "$manifest"
+          done
+
+          rm -rf /tmp/p102-release/portable
+          mkdir -p /tmp/p102-release/portable
+          unzip -q "$portable" -d /tmp/p102-release/portable
+          echo '78a034923a6d522fb0d2e0c3e2f701dd9ad0be30e21dd33f4edb0c14605825ff  /tmp/p102-release/portable/AtlasDesk.exe' | sha256sum -c -
+          cmp -s "$exe" /tmp/p102-release/portable/AtlasDesk.exe
+
+          cp "$portable" /tmp/p102-release/files/AtlasDesk_v0.7.3_Lightweight.zip
+          cp "$exe" /tmp/p102-release/files/AtlasDesk.exe
+          cp "$checksum" /tmp/p102-release/files/SHA256.txt
+          cp "$manifest" /tmp/p102-release/files/build-manifest.txt
+
+      - name: Create fixed tag and public Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          target='df66c9246706439c35f082027a82eb34e827de69'
+          tag='p102-v0.7.3'
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            test "$(git ls-remote --tags origin "refs/tags/$tag" | awk '{print $1}')" = "$target"
+          else
+            git tag "$tag" "$target"
+            git push origin "refs/tags/$tag"
+          fi
+
+          if gh release view "$tag" --repo FenLynn/gpt-pub >/dev/null 2>&1; then
+            echo 'Release already exists; verifying target tag only.'
+          else
+            gh release create "$tag" \
+              /tmp/p102-release/files/AtlasDesk_v0.7.3_Lightweight.zip \
+              /tmp/p102-release/files/AtlasDesk.exe \
+              /tmp/p102-release/files/SHA256.txt \
+              /tmp/p102-release/files/build-manifest.txt \
+              --repo FenLynn/gpt-pub \
+              --target "$target" \
+              --title 'P102 AtlasDesk v0.7.3' \
+              --notes 'First audited public baseline of AtlasDesk in GPT-Pub. Preserves the PersonalWorkbench compatibility identity and the verified lightweight Windows x64 build. Source migration PR: #5. Windows verification run: 30696517002.'
+          fi
+          gh release view "$tag" --repo FenLynn/gpt-pub --json url,tagName,targetCommitish > /tmp/p102-release/release.json
+
+      - name: Record public release result
+        uses: actions/github-script@v7
+        env:
+          TARGET_SHA: df66c9246706439c35f082027a82eb34e827de69
+          TAG_NAME: p102-v0.7.3
+        with:
+          script: |
+            const fs = require('fs');
+            const release = JSON.parse(fs.readFileSync('/tmp/p102-release/release.json', 'utf8'));
+            const body = [
+              'P102_RELEASE_RESULT status=success',
+              `run_id=${context.runId}`,
+              `target=${process.env.TARGET_SHA}`,
+              `tag=${process.env.TAG_NAME}`,
+              `release=${release.url}`,
+              'verified_pr_run=30696517002',
+              'artifact_id=8817462686',
+              'artifact_sha256=1f2564f6429595a049140b684d5b8e4d301c5e47ca273259cac576063230bda3',
+              'portable_zip_sha256=cf6fdf10b0806b1d81806b1c036323785f6622bc4f7afd57789ff9a199890720',
+              'atlasdesk_exe_sha256=78a034923a6d522fb0d2e0c3e2f701dd9ad0be30e21dd33f4edb0c14605825ff',
+              'compatibility_identity=PersonalWorkbench'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 8,
+              body
+            });
