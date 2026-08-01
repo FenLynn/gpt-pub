@@ -1,3 +1,0 @@
-project=P102
-version=0.8.0
-purpose=trigger-one-time-apply
