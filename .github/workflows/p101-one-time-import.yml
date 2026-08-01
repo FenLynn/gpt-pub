@@ -104,7 +104,7 @@ jobs:
           test -s /tmp/Mediova_tests.exe
           test -s /tmp/Mediova.exe
 
-      - name: Create clean P101 import branch with two ordinary commits
+      - name: Create clean P101 product baseline branch
         shell: bash
         run: |
           set -euo pipefail
@@ -116,14 +116,6 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add 'projects/1-桌面软件/101-Mediova'
           git commit -m 'P101: establish Mediova v4.0.0 product baseline'
-
-          cp '/tmp/payload/README.md' README.md
-          cp '/tmp/payload/目录.md' 目录.md
-          cp '/tmp/payload/projects/1-桌面软件/README.md' 'projects/1-桌面软件/README.md'
-          mkdir -p .github/workflows
-          cp '/tmp/payload/.github/workflows/p101-mediova-ci.yml' '.github/workflows/p101-mediova-ci.yml'
-          git add README.md 目录.md 'projects/1-桌面软件/README.md' '.github/workflows/p101-mediova-ci.yml'
-          git commit -m 'P101: establish public documentation and layered CI'
           git push --force origin HEAD:refs/heads/p101-import-v400
 
   windows-native-release:
