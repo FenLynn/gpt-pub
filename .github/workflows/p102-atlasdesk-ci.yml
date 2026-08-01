@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           chunks='projects/1-桌面软件/102-AtlasDesk/.maintenance/v080'
-          cat "$chunks"/chunk-*.txt | base64 -d > "$RUNNER_TEMP/p102-v080.patch.gz"
+          cat "$chunks"/chunk-*.txt | tr -d '\r\n' | base64 -d > "$RUNNER_TEMP/p102-v080.patch.gz"
           echo '23750ca35e065f02e8cf837d13d14aa5d4893ed4962ae31317f7a722d70dd58a  '"$RUNNER_TEMP"'/p102-v080.patch.gz' | sha256sum -c -
           gzip -dc "$RUNNER_TEMP/p102-v080.patch.gz" > "$RUNNER_TEMP/p102-v080.patch"
           git config user.name 'github-actions[bot]'
