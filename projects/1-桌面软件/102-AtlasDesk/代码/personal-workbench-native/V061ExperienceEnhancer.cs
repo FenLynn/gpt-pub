@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace PersonalWorkbench;
 
@@ -33,6 +34,7 @@ public sealed class V061ExperienceEnhancer
                            ?? throw new InvalidOperationException("Settings module is unavailable.");
         _home = new HomeDashboardControl(_settings);
 
+        _window.Title = "AtlasDesk";
         InstallHome();
         InstallSearchEntry();
         WireEvents();
@@ -55,9 +57,15 @@ public sealed class V061ExperienceEnhancer
     private void InstallSearchEntry()
     {
         if (_window.FindName("CommandButton") is not Button commandButton) return;
-        commandButton.ToolTip = "全局搜索页面、工作区文件、Zotero 文献和命令";
+        commandButton.ToolTip = "AtlasDesk Command Center · 搜索页面、项目、文件、任务、文献和命令";
         commandButton.PreviewMouseLeftButtonDown += (_, args) =>
         {
+            args.Handled = true;
+            OpenGlobalSearch();
+        };
+        commandButton.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key is not (Key.Enter or Key.Space)) return;
             args.Handled = true;
             OpenGlobalSearch();
         };
@@ -85,6 +93,7 @@ public sealed class V061ExperienceEnhancer
         if (_searchWindow is { IsVisible: true })
         {
             _searchWindow.Activate();
+            _searchWindow.Focus();
             return;
         }
         _searchWindow = new GlobalSearchWindow(_settings) { Owner = _window };
@@ -106,12 +115,20 @@ public sealed class V061ExperienceEnhancer
             case "open-root":
                 if (!OpenExternal(_settings.WorkspaceRoot)) NavigateTo("settings");
                 break;
+            case "open-config":
+            case "open-logs":
+                OpenExternal(result.Target);
+                break;
             case "refresh-home":
                 NavigateTo("home");
                 await _home.RefreshAsync();
                 break;
             case "workspace-item":
+            case "project-item":
                 await OpenWorkspaceItemAsync(result.Target);
+                break;
+            case "task-item":
+                NavigateTo("tasks");
                 break;
             case "zotero-item":
                 NavigateTo("library");
