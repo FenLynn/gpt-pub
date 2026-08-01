@@ -1,0 +1,4 @@
+project=P101
+product=Mediova
+version=4.0.0
+purpose=final-documentation-and-branch-cleanup
