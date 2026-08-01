@@ -1,0 +1,6 @@
+代码/build/
+代码/MediovaData/
+代码/testdata/
+代码/**/*.exe
+代码/portable.mode
+代码/**/*.log
