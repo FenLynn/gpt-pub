@@ -1,0 +1,514 @@
+{
+  "source_repository": "FenLynn/agent-foundry",
+  "source_commit": "1f9f043dcbc31bf39397757f0eb07a137b586cf1",
+  "source_version": "0.7.2",
+  "target_project": "P202 AtlasDesk",
+  "file_count": 101,
+  "files": [
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-launcher/additional_payload_windows.go",
+      "bytes": 1331,
+      "sha256": "237ed3b1b25c36956ea616ab22cf7f6484e5bb336a773a3b793f40f1237a26c7"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-launcher/go.mod",
+      "bytes": 44,
+      "sha256": "d340b072a44602be9cae71f43bdad150b3f270a1f21c1a025d262542b637ac67"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-launcher/main_windows.go",
+      "bytes": 10652,
+      "sha256": "4d207cb72505c6f96232c4902262ef005764a8f6ecd7e8e9abbcb13e76eb25d3"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-launcher/payload/placeholder.txt",
+      "bytes": 203,
+      "sha256": "ab5e7a0cfa72132bc3d9606c1e5a7b5758e9184e81b44f95f0fb17e71fee7df6"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/App.xaml",
+      "bytes": 14531,
+      "sha256": "4cc9ff978f6f7ce4816fb355ee5851316d85e1b30d0a4fa08e347fe6ced63566"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/App.xaml.cs",
+      "bytes": 3648,
+      "sha256": "52d9c5e9e5a941538d136a18b657cd195e33e791eab9a6ec836f315d999ba051"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/AppSettings.cs",
+      "bytes": 5418,
+      "sha256": "e4a273beb4305179c924706fa3324b145ab04aa6ee927951e5a12b7ff5d91ebd"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/BackupRestoreWindow.xaml",
+      "bytes": 7080,
+      "sha256": "492741e043900e58c46279d9809b50f8a3b6d33c9076619d83460cd1be98a572"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/BackupRestoreWindow.xaml.cs",
+      "bytes": 8198,
+      "sha256": "218556d721f60b56b75787093a1d4481cca921d202b8a329e37135279f2de852"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/CodeDocumentRenderer.cs",
+      "bytes": 7007,
+      "sha256": "f2116b54300918cc6b69e5e4b6ae033b6b7cfddfc5b4375e3d6e0660e52ad482"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ConPtySession.cs",
+      "bytes": 20956,
+      "sha256": "b94215abf3a9624e41372a3a0a875cc076c3983e1a2c51ecd79ffcae141c98f3"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/DevelopmentControl.xaml",
+      "bytes": 6808,
+      "sha256": "b2d5c6be746854cffc211649f7adf25e72b2f895d170fb6a99623599712a680d"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/DevelopmentControl.xaml.cs",
+      "bytes": 6752,
+      "sha256": "c0691853e3d3c7728823dcb5b38e5e30edd9534fbfa8b2a4c69e1e49334ea528"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/DiagnosticsService.cs",
+      "bytes": 10256,
+      "sha256": "974b200895c220663ce9a470e6382cf406b6d8185ec0c9465374328b32fb3004"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/DiagnosticsWindow.xaml",
+      "bytes": 4575,
+      "sha256": "6e6a31cd144fdb73003a51e34231cbce2e4cd5df4b1b160a0656627b8a2ee496"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/DiagnosticsWindow.xaml.cs",
+      "bytes": 3363,
+      "sha256": "34548b2ca3a57465c641c23cedda017e7730222339eb03d51939d9e5bd884cf7"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/EchoConTerminalSession.cs",
+      "bytes": 18835,
+      "sha256": "11d420b1a5c83c06694ff5c5cf7e503ceaff34c6ffddb2946165270cf4b3eacd"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/FileIntegrityService.cs",
+      "bytes": 17013,
+      "sha256": "8c34384046089649e994394016b41c8138898abe3ae9ce5266c062d083400e8b"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/GlobalSearchWindow.xaml",
+      "bytes": 5297,
+      "sha256": "803ed9ae3f4af9d05a85367a23af3268006739b125d752236a051d1ebec73159"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/GlobalSearchWindow.xaml.cs",
+      "bytes": 9961,
+      "sha256": "ae4786d7da47162a226bfe2bcada15276ec8015cae583b684e88c4c0924fd071"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/GlobalShortcutBootstrap.cs",
+      "bytes": 799,
+      "sha256": "0695b9bab2da744fc5b8e30a465d1938f10b4a465596821ed04cc8a66fabaf6b"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/HomeDashboardControl.xaml",
+      "bytes": 14000,
+      "sha256": "4b877f07fdd1e68a6eea77fbb935113052931e658afbcdcf6d9feb8ea470d94b"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/HomeDashboardControl.xaml.cs",
+      "bytes": 5515,
+      "sha256": "87ce5ff27dd078f25961006cdac6fc020238d45155481d6b0f707c12f76bb75a"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/MainWindow.xaml",
+      "bytes": 34829,
+      "sha256": "efa8751cf8eeb21b2515c54867e0beb7ca54f50f59a90213f789548779b7a4c2"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/MainWindow.xaml.cs",
+      "bytes": 40651,
+      "sha256": "763528289e4dd6fae522659e0a58e8e9334fda3beb416305eeaefa68ec326d77"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/MarkdownDocumentRenderer.cs",
+      "bytes": 19202,
+      "sha256": "ab9a09c3db818f5f0fb0db92d13e992e5f406bd29efca783df6916b6e2b60c13"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/MarkdownImageLoader.cs",
+      "bytes": 2296,
+      "sha256": "d68b70f3f1c42887a10547002d5b755a77afb6a0899220fe799744b36dd28679"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/NativeTerminalHostSession.cs",
+      "bytes": 13369,
+      "sha256": "2524dca55643125c1b5e0238b07c46e61a267e344d5e8ec0590fd50cd3dd46af"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/PendingRestoreService.cs",
+      "bytes": 3341,
+      "sha256": "acec8c3876e23a408a488890b8074b95d3886a4aa3c8f515e6a85f024a5024c3"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/PersonalWorkbench.csproj",
+      "bytes": 5692,
+      "sha256": "787a36a481fc81651319c2b76de4521f1f27bdc87fd42f6906dfaa5114868041"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ProjectCatalogService.cs",
+      "bytes": 8260,
+      "sha256": "1973caf2cf7a2fd989057e3a604e647f4e4e61c8df44e117ffa5807021746a79"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ProjectCenterControl.xaml",
+      "bytes": 6007,
+      "sha256": "0bc380af287f0c0b186db0d9d997f7be59a0a1e3acfcd98fb2e97016470f115b"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ProjectCenterControl.xaml.cs",
+      "bytes": 7201,
+      "sha256": "7e6ab0dce954b5b7d2e4d487d101e4aa8ab88d342735069c814fbae029e78d9c"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ProjectHubWindow.xaml",
+      "bytes": 5854,
+      "sha256": "3e0e05ee5b53a0c006de489e1c0427f40a9fe456a8199c25b5f67a874c59ce48"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ProjectHubWindow.xaml.cs",
+      "bytes": 6872,
+      "sha256": "2c76a082b953386cb2bb068082fb22043ad4b5c6c9479d6346e25d345b9d1cc4"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/PythonEnvironmentService.cs",
+      "bytes": 14594,
+      "sha256": "fa74e0e9b7470e04f644b4d30f2faca05699a1d08ca5049a219b520c78c3a5ed"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/README.md",
+      "bytes": 275,
+      "sha256": "5c67c79fdd0d547a421a00b1dc146e80d46e77c280a3b5518f57e6d865e12450"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/RELEASE_NOTES.txt",
+      "bytes": 1377,
+      "sha256": "187f7255954d27743003c9534cbf4d9978e50c9fb87b782b8c65e550a9706eab"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/SettingsControl.xaml",
+      "bytes": 11630,
+      "sha256": "5158770ae5354389532143431727b50cbbced2e62167e6501580e49b232455fd"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/SettingsControl.xaml.cs",
+      "bytes": 11365,
+      "sha256": "5e64494ca16d073c367dc19c66f91a43f73b4178a3515a298c8cbe0643e813eb"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/StartupGuard.cs",
+      "bytes": 3199,
+      "sha256": "4bf853c1fd1aa1689f09943230d1ba914bae62649bfa72d41b2d77b2f19e4225"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TaskCenterControl.xaml",
+      "bytes": 9587,
+      "sha256": "29fe085a31bf0c3a5d846601030dddb36ebe4a0e493813b0cca9c2945f4af550"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TaskCenterControl.xaml.cs",
+      "bytes": 8998,
+      "sha256": "dbd61413f2b3a4381e53cbbc88bb878e63e98cb252f110ed81284077b6d0201c"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalAssetManager.cs",
+      "bytes": 2910,
+      "sha256": "3da1bb3852dbcada87953c06615c49bb0080be240f02345c74103d14b3a0628f"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalAssets/terminal-host.js",
+      "bytes": 3077,
+      "sha256": "3782848b60f9605facda308a66fb87fcd679e7e6712326a1fecb9e2b4a1f1f32"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalAssets/terminal.html",
+      "bytes": 1060,
+      "sha256": "4ba1fca51ef95ad218fdc8e019bb0495c2fcfea87b93e8a70b31caca97cccd14"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalDrawerControl.xaml",
+      "bytes": 14922,
+      "sha256": "e22eb381e0695fb4cb3a6cc4ba44212cb4b29fdca80c38fd68f6d6d0d1616bd9"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalDrawerControl.xaml.cs",
+      "bytes": 24881,
+      "sha256": "13a498fe5b3cab4870012ee541040debdca97d87a29557b2b1e9aac9291e6c3c"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalFloatingWindow.cs",
+      "bytes": 5222,
+      "sha256": "e91ee8856c0852527d3496f1e14ae8fca15ef4cc3b1674ffac99cfc72a378b1b"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalReliability.cs",
+      "bytes": 2225,
+      "sha256": "9eaf8d11942c69a795af782b4164f807a357cc2c3e851ab41495fdac2eac813b"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/TerminalSessions.cs",
+      "bytes": 1615,
+      "sha256": "8617f9f081bb9c5ffc7d4f5e06515f3b22fc09cd99ae8eb8874b267d2d98be86"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ToolTipContrastBootstrap.cs",
+      "bytes": 1945,
+      "sha256": "ebf995a35de523d1b69cb5f5624c71309d2e694e12dad3088f85f02fe7c61658"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ToolsCenterControl.xaml",
+      "bytes": 9318,
+      "sha256": "5f70cb640a47359c147cdace311bab3a86b7f0315e0b9fd0df3edd94f96702b8"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ToolsCenterControl.xaml.cs",
+      "bytes": 11973,
+      "sha256": "ebc963fb42384e7fb6356aed372eb54f24963d8f0952a74c7caac4072b6b99e0"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/UiRuntimeVerifier.cs",
+      "bytes": 10182,
+      "sha256": "9475a0b083122bf169d8df24c4c2bc40e25408ec14a5f6f54458ad084073b4d8"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V0610TerminalPresentationEnhancer.cs",
+      "bytes": 2482,
+      "sha256": "3a54c766398c21bfc33e2eda6dde561696582cde31810903e3a07a36ec8b2db1"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V0611CorrectiveEnhancer.cs",
+      "bytes": 5480,
+      "sha256": "9faa85b940b9c9a168b50ab44bd94c7d46f05e75fc07a22829826282af507c73"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V0612ExperienceEnhancer.cs",
+      "bytes": 20825,
+      "sha256": "7df9dd8cdd542d9276293df04eb72f3a39337d43686a37d14fc764c62e6bc442"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V061ExperienceEnhancer.cs",
+      "bytes": 7105,
+      "sha256": "ce97de6ca09c8b11bb723418047e2f2423649ff6b658d1f306aa962c3c9b7105"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V062StabilityEnhancer.cs",
+      "bytes": 2875,
+      "sha256": "24a3935d3142d9d4a74a0cd3be9273cdbfc994b268ecb17ecdb6d765e5a73077"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V063ProjectEnhancer.cs",
+      "bytes": 4368,
+      "sha256": "e964790eed6cec213cfcf6b9a1a575df4e6b3ce98fea5e04a4cb99c49d857cd1"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V064TaskEnhancer.cs",
+      "bytes": 2225,
+      "sha256": "c01efe46e85c08c37dbf45431933b8b4e8b3f8763bf9c9f989f75d330b5c760d"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V065ToolsEnhancer.cs",
+      "bytes": 2231,
+      "sha256": "3845d10a18c7c98cc1d74a19fade4e5471b24f5a83c74f510980dc326c5e6121"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V066BackupEnhancer.cs",
+      "bytes": 1969,
+      "sha256": "06681c797cec4d789447ff296ef5ae5308a2cba9058cf6611203b048b84069b0"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V067VisualFixes.cs",
+      "bytes": 2433,
+      "sha256": "1f82c455dd620fcb03b3c3b2b8a70c2791c55ea40d5f6311d8f4caea082f2d3e"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V068HotfixEnhancer.cs",
+      "bytes": 11469,
+      "sha256": "accfba4c70e983871568013ae989aee2988442edd2c01a196b30c7cb9d3a63fb"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V069UiFixEnhancer.cs",
+      "bytes": 24496,
+      "sha256": "31aee821232e2ee0a06fb182c7894e5e99005de3dd7a7112bdf8bc8a96d09e46"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V070ProjectCenterEnhancer.cs",
+      "bytes": 5076,
+      "sha256": "bacf48c0540f825dc217d9cbbc4ef0084d049970419b97215bacfc0bfa8caede"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V070RuntimeVerifier.cs",
+      "bytes": 1155,
+      "sha256": "3dbef8bf8c7c34650e97a26a5f7f5557fb49c95a6fe077b0079ded81be7c78a5"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V071RuntimeVerifier.cs",
+      "bytes": 1064,
+      "sha256": "264cab08a9bb8551ed4ed9d073f1df0645e33af645f289da4589c33a88f38aac"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/V072RuntimeVerifier.cs",
+      "bytes": 1134,
+      "sha256": "c5e072884dfba200ddc7610ec38b7b6f699e5450b0487ab7555c9405068607ce"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/Version.props",
+      "bytes": 105,
+      "sha256": "37f7f63f91dc72b8a7e10b1afcfaf4fedc722d8edb791a4b09cfe29ffab8167d"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkbenchBackupService.cs",
+      "bytes": 16009,
+      "sha256": "7619988f5c68d0186071f3d0593b6e93aab7ab98df1d77cc0f78e800d07b2c57"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkbenchEnhancer.cs",
+      "bytes": 16418,
+      "sha256": "e47a4d1cc3dbc93db35e349d8df76b00d83e47b8ef5b62dbc17ac661c9543bf6"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkbenchFeaturePipeline.cs",
+      "bytes": 2054,
+      "sha256": "1470a28a785b1b6a04d7c1167c16e93cd2f4feeadc3c21bb332a637fbe18146f"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkbenchTaskService.cs",
+      "bytes": 17275,
+      "sha256": "e57450dfb6516f9a6e5ee061d0421b19e12258be12b5dbace2768d0e6f7eb63d"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkbenchVersion.cs",
+      "bytes": 326,
+      "sha256": "2a877da0ebbeb71885c3460f7ed5b8317f6b0d44be428fa9e399c6039c1de6e6"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkspaceControl.Search.cs",
+      "bytes": 398,
+      "sha256": "b0e9970c076b7057453da58a96388f994c0f88968e8cda2da476b099358c9c91"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkspaceControl.xaml",
+      "bytes": 20301,
+      "sha256": "69c256b1dbfdcde7c5804b17cc123d603d4656531467923b8ec2128a914b9e26"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkspaceControl.xaml.cs",
+      "bytes": 37500,
+      "sha256": "020de36c014c4e73b735f14a825528d8730d29711c9828f521eb991f8a193ce4"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkspaceMediaAndSyntax.cs",
+      "bytes": 12971,
+      "sha256": "43679b3ac71cc089064e8d50e6872bc6f8d422a46b694c08a25621cc4f9e4011"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkspaceNodeExtensions.cs",
+      "bytes": 749,
+      "sha256": "861961a4fb7777a893b42190fe464807950e7d3c5a7e8f4c51c093815c561695"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkspaceTerminalFactory.cs",
+      "bytes": 1881,
+      "sha256": "cbfb71d990fcf4323e3328dc8b1dea0b456d0283c187cc0340652b440164b7d4"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/WorkspaceV0612Polish.cs",
+      "bytes": 5531,
+      "sha256": "c4f1949286f85302880698b7be2d2a094cea2050e4ae795fb1de388b8bb755d5"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ZoteroLibrary.cs",
+      "bytes": 36615,
+      "sha256": "6fc4ad2a417c69ee3b4d342f7d41cefbb264e60edffe1c64e488c07f70be6607"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ZoteroLibraryControl.Search.cs",
+      "bytes": 423,
+      "sha256": "89d2b0ce06f491601699777548c0feb99d54673589e3f1dd5a532006c5a7ac89"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ZoteroLibraryControl.xaml",
+      "bytes": 25826,
+      "sha256": "1306dd4b7c1946f209413ecd355fcca98bdddc92f6acc754d632cc10289d9efe"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ZoteroLibraryControl.xaml.cs",
+      "bytes": 15417,
+      "sha256": "284ea7c01bcf0ae7e6ede2d22844883bee7f6dcd5174b0ffc8f2d259b138bc2a"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ZoteroV0612Polish.cs",
+      "bytes": 2702,
+      "sha256": "ae5c1a1e050760d01c81bae704589e48fdf881c52d912b606e77b7f6816bbc16"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/ZoteroVisualElements.cs",
+      "bytes": 16504,
+      "sha256": "ccd01d34cb2b7dc2bf9cf8981c8c3aef1ca071bf26f9a387b1655fae0224cf1a"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-native/app.manifest",
+      "bytes": 1121,
+      "sha256": "647b6add0d3c9cf23647f22ef6ee9bcc9571b58f833fc57aad04d73a526abf4c"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/ConPtySmokeModule.cs",
+      "bytes": 1805,
+      "sha256": "9aba7d5a4b9002d45cae4ca98c2c1337c2a0c9a07f98aa2d36d8aa9ebf1b5e7b"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/IntegrityBoundarySmoke.cs",
+      "bytes": 1982,
+      "sha256": "cc7bc68233de22fba0065c1c76301c306e014781e166bc1607bb860f7edaf6b8"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj",
+      "bytes": 458,
+      "sha256": "8de01dafde958c0dd321aeb65b3bce5176ea66461c48412c227d6ba33d07be31"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/Program.cs",
+      "bytes": 13594,
+      "sha256": "194eff835d5a43952919b7a3c16dadfabe71ef7faab22af258bfe54c1c7371ca"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/TerminalProductionRoutingSmokeModule.cs",
+      "bytes": 2672,
+      "sha256": "2fce27303fee5f9bd4f65da81b62e0d7fd93421ff2fb21551b6df99e1323f045"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/TerminalReliabilitySmokeModule.cs",
+      "bytes": 8810,
+      "sha256": "0fd6f6b92a3990191c78fd71dbfba535f2a105d6b97c83e5c6171ae71570e4ea"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/UiRuntimeSmokeModule.cs",
+      "bytes": 1119,
+      "sha256": "6b8171bee6ee05e29d56a66d020ee56dfcab782769f3a4802bceffa16c2d1081"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/WorkspaceSafetySmokeModule.cs",
+      "bytes": 2262,
+      "sha256": "5c14b0bb650cba3bf890b887e76264eb0ba3dd9683a75e2cdf71184f712dc561"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-terminal-host/terminal_host.cpp",
+      "bytes": 9761,
+      "sha256": "5b97d323adc070334ed7b80919c58085eee02627aff36454fc4ef65fb4d25d4e"
+    },
+    {
+      "path": "projects/2-桌面软件/202-AtlasDesk/迁移资料/历史构建工作流/build-personal-workbench.yml",
+      "bytes": 12423,
+      "sha256": "438b91073370098718560c0ae6046c2021430b50511f4c7f42ee34e2e62cf1b4"
+    }
+  ]
+}

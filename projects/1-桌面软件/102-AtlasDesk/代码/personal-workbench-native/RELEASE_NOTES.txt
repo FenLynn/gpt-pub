@@ -1,0 +1,19 @@
+AtlasDesk v0.7.3
+
+This release is the first feature version developed entirely in GPT-Hub after the lossless v0.7.2 migration. It turns the existing Ctrl+K search surface into the AtlasDesk Command Center without adding a background index, database, AI search, or arbitrary script execution.
+
+- Added page navigation for Home, Dashboard, Workspace, Library, Development, Tools, Tasks and Settings.
+- Added on-demand project search using the existing bounded, read-only project catalog.
+- Added recent workspace files and bounded filename search with cancellation, depth, directory, entry and result limits.
+- Added read-only task-history results and direct navigation to the Task Center.
+- Added verified tool entries for Project Center, File Integrity and Task Center.
+- Preserved Zotero read-only search and PowerShell/CMD terminal commands.
+- Added configuration and log-directory commands.
+- Updated the command surface and main window product title to AtlasDesk while retaining the PersonalWorkbench compatibility identity and AppData path.
+- Added real STA/WPF runtime verification for Command Center structure, project results, bounded file search and cancellation.
+
+Verification checkpoint
+- Windows WPF/XAML compilation and framework-dependent publishing are required.
+- Existing Project Center, Task Center, Tools Center, backup, Zotero, Markdown and terminal regression suites must remain green.
+- Native CMD/ConPTY production routing must remain green.
+- Final AtlasDesk v0.7.3 lightweight EXE packaging, size validation, SHA-256 and artifact upload are required before merge.

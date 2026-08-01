@@ -1,0 +1,68 @@
+66835947ed785ee494872413bba7e2c10ccda926	2026-07-30T22:26:41+08:00	Build native Personal Workbench WebView2 prototype
+c6f24153fbc8596045c2428b1ced2c56a426e1c3	2026-07-30T22:27:32+08:00	Trigger native Personal Workbench build
+e6f390b1fa5bc4758fd58a3ecb34f61cac43bd8d	2026-07-30T22:31:54+08:00	Report Personal Workbench build run for artifact retrieval
+a44fa5334b2b632bdcb4a3f07a86e630e722c54e	2026-07-30T22:37:05+08:00	Fix duplicate WPF background before markup compilation
+25b76a5db833ac31ef1dcf1a0cd76b31191e6599	2026-07-30T22:39:25+08:00	Normalize tuple names before native build
+c864f7fc8772b9d982d6e951f27fdfa183595c45	2026-07-30T22:41:23+08:00	Trigger corrected Personal Workbench build
+c9aa8fdfb01fe042ced5f9604e6555ac6e3cd71d	2026-07-30T23:27:08+08:00	Build lightweight Personal Workbench v0.3.1
+8edc1e00ec63c0008aa473b74f9aaa3de1368d1f	2026-07-30T23:57:17+08:00	Use stable UI fonts and vector icon styles
+201e9a4b331a3c8fdb15688137c34ae62c0f23e2	2026-07-30T23:59:30+08:00	Replace Unicode glyph icons with WPF vector paths
+f19931d47166730d7130e831340d74884c4618d0	2026-07-30T23:59:48+08:00	Bump Personal Workbench to v0.3.2
+97284e27369a6dc99534535799c076bf033aeae2	2026-07-31T00:00:54+08:00	Build lightweight Personal Workbench v0.3.2
+620c13f0e8217badf2b83d82b3970917cb091908	2026-07-31T00:05:14+08:00	Fix Personal Workbench icon rendering in v0.3.2
+61539913bf721bcedc4242708fb4a3bc85c5e8bd	2026-07-31T00:32:53+08:00	Fix collapsed sidebar and compact home in v0.3.3
+6b67352c01ed0b2070ed7116a9abb4c577c87729	2026-07-31T06:40:26+08:00	Add Zotero and Python environment modules in v0.4.0
+8bbfe1780d6277eb64fe358abc91ef48bd4ac16b	2026-07-31T07:39:06+08:00	Extend workbench settings for Zotero, PDF reader and terminal
+2d0d0c97bec1e72c6f1ee0f95a21bba47b763ef6	2026-07-31T07:41:55+08:00	Expand Zotero read-only data model and collection queries
+0df66ca80ab9fff0ac8030cccbf0da210241b441	2026-07-31T07:43:13+08:00	Add full three-pane Zotero library view
+51281b6ee8e33228e92134aaf96b66d8980423b4	2026-07-31T07:44:15+08:00	Implement Zotero library interaction and external PDF opening
+e5c2b58fa1665871f3a31bdaf7c74fb8d6bd4872	2026-07-31T07:44:57+08:00	Add streamlined Python environment view for integrated terminal
+8035755f0b637fe75f69d067b48ff8d23f6a65ac	2026-07-31T07:45:34+08:00	Implement Python environment actions for integrated terminal
+75783406c4532b142938387741184838a7b3416f	2026-07-31T07:46:28+08:00	Add organized settings panel for local integrations
+a227afdd8892b962244be0e9139124df2cac8d75	2026-07-31T07:47:17+08:00	Implement consolidated integration settings
+9914d0ba04a0a734383e7778c47e89eeae7b85ee	2026-07-31T07:47:36+08:00	Add local xterm terminal host page
+8e8edd11992a8f7bb024f37d0acc4e38de1fea6f	2026-07-31T07:48:03+08:00	Implement xterm host messaging and clipboard behavior
+c9834c1e6916c41f1c293c947e0a84893f8e9466	2026-07-31T07:48:25+08:00	Add embedded terminal asset extraction
+20c1e706bfa338e23e9b57abcf8e41ef5a9cd590	2026-07-31T07:49:58+08:00	Add native Windows ConPTY terminal session host
+3a01db155bcd8ee7e9dc4c93668088e3142b4f2b	2026-07-31T07:50:27+08:00	Add integrated multi-tab terminal drawer UI
+d1e285995f860943a2f690ea814bedc2ef15d794	2026-07-31T07:51:22+08:00	Implement xterm and ConPTY multi-tab terminal bridge
+a5153a57f20ad98fd400707f64c7f6a5af5b10b5	2026-07-31T07:52:53+08:00	Add terminal header styling
+4cf19e0f6756506018e350de94070b43bf3bc1cd	2026-07-31T07:54:01+08:00	Wire upgraded modules and global terminal into the main shell
+283f5caec943a6ec83a3a13a1806650b0f6eb9bc	2026-07-31T07:54:27+08:00	Attach v0.5 feature enhancer at startup
+474083b64b17ed940f6426fe7b70e44300e4051d	2026-07-31T07:57:28+08:00	Embed terminal assets and bump v0.5.0
+568c6dfb9b99514edc38acf530a0ee1e0b3a4ed3	2026-07-31T07:58:15+08:00	Build v0.5.0 terminal assets without bundling runtimes
+ef8af5ac926c08aa8ae0866afdce3cc043026cf9	2026-07-31T07:58:33+08:00	Upgrade dependencies and finalize embedded terminal assets
+1a3e7be7156db91abba9d7ec233c7650fa6af83b	2026-07-31T08:02:00+08:00	Resolve terminal icon Path ambiguity
+d4c888d89b921db9aba5abfea2d478124b01e752	2026-07-31T08:07:38+08:00	Personal Workbench v0.5.0: Zotero 2.0 and integrated terminal
+b162656009c292d76afb24aaff5c485126fbb0f8	2026-07-31T08:48:17+08:00	Personal Workbench v0.6.0: polished UI and local workspace
+fd14a516f22add2cc9929e08fc733b7163b19f09	2026-07-31T09:15:43+08:00	Personal Workbench v0.6.1: real home and global search
+bf8e4ffadbdae7e5993aac4346c424d8b101305d	2026-07-31T09:59:01+08:00	Personal Workbench v0.6.2: stability and diagnostics
+6b96e5f53ea07e7ed0e94944674894634a4aade4	2026-07-31T10:15:53+08:00	Personal Workbench v0.6.3: project hub
+1a725824004913bd8fc86b342cc2b3c5083cd1be	2026-07-31T10:37:05+08:00	Personal Workbench v0.6.4: task center
+314ec0b22d33835dc16a61f3fd20b0cc0bd0a7fb	2026-07-31T10:55:29+08:00	Personal Workbench v0.6.5: file integrity center
+01b6b5f8a54abf13c9057f265bcbbce349fdfc9f	2026-07-31T10:57:14+08:00	v0.6.6 iteration 1: advance central version
+34aa15ee1cf8227fdb92c30f60b0e1e7d51b5f1e	2026-07-31T10:58:50+08:00	v0.6.6 iteration 1: add allowlisted backup and restore engine
+e9672ef619d7591bb866189481bd9c951172b8ca	2026-07-31T10:59:41+08:00	v0.6.6 iteration 1: add backup and migration UI
+2d8eeaf162dfec63c2542337fb8ea361c1c0c92a	2026-07-31T11:00:33+08:00	v0.6.6 iteration 1: wire export, validation and guarded restore
+89ea8c345cabc94158ad8b959b2b8f66145a3df4	2026-07-31T11:00:58+08:00	v0.6.6 iteration 1: expose backup and migration center
+0dec9b595d3e2dd82b6822335724ca3236cf43da	2026-07-31T11:01:30+08:00	v0.6.6 iteration 1: attach backup and migration stage
+0db509eb85cd3e6891d4031a7dc1f1aece85293f	2026-07-31T11:03:44+08:00	v0.6.6 iteration 1: add full backup and migration regression suite
+745902f6bf07c047b0306daba437c63b87335e46	2026-07-31T11:04:46+08:00	v0.6.6 iteration 1: update final release caption
+a91ab2c36db4ccb0e431639fe52ff48071d80b0e	2026-07-31T11:05:15+08:00	v0.6.6 iteration 1: add backup and migration release notes
+803c94731e8862c1a32441b242ec0a69156f3097	2026-07-31T11:09:56+08:00	v0.6.6 iteration 2: stage restores for next startup
+08890ffee2b7d9d87d5e1dd90cb32ee739e30d7a	2026-07-31T11:12:23+08:00	v0.6.6 iteration 2: defer restore until next startup
+1ab60223c886601fd17010788001df7a499170ef	2026-07-31T11:12:50+08:00	v0.6.6 iteration 2: apply pending restore before modules load
+46d49a9836065d03c41ebfc1dbc9fcad3e44d0ed	2026-07-31T11:13:16+08:00	v0.6.6 iteration 2: verify deferred restore lifecycle
+750376d03de9652ee6a4d19a7c813afef451b64b	2026-07-31T11:18:14+08:00	v0.6.6 iteration 2: remove async module initializer smoke
+c753545a982ca8462c60e585c9f8ccd252f304c9	2026-07-31T11:34:18+08:00	[package] v0.6.6 final verified package
+e0f26c9773c678a35ffa26881033f0003bb58ac4	2026-07-31T11:39:17+08:00	Personal Workbench v0.6.6 backup and migration
+88d31eee8a239ce59c2a8b1844c67ee830294193	2026-07-31T13:30:57+08:00	Personal Workbench v0.6.7 layout and terminal polish
+47d399c2917fe5c708efa6f17a435c0d89134c0d	2026-07-31T16:44:53+08:00	Personal Workbench v0.6.8 interface and terminal closure
+543c333b5a681152d16a163f170124586a1d8589	2026-07-31T18:49:46+08:00	v0.6.9: repair workspace, terminal and library
+157afc7734dda5e37a4eddb74b0086b56489cc5b	2026-08-01T01:42:38+08:00	fix: v0.6.10 trees, Zotero chrome, CMD and title bar (#37)
+67c22b13fd2d2381d9b90e4cadf14981c640c3e7	2026-08-01T01:46:52+08:00	ci: expose push build status and run link
+41c1943791d709ed7d8954a7aefba60fe98e5876	2026-08-01T02:56:01+08:00	Personal Workbench v0.6.11 terminal and workspace corrective release
+46d2da3c6246c80c6f7b9a2b521ad3f4b19b475d	2026-08-01T10:07:53+08:00	Personal Workbench v0.6.12 interface and content polish
+b2021a3b82735ee9844c4ceb23fb633a3db3f551	2026-08-01T10:30:04+08:00	Personal Workbench v0.7.0 integrated project center
+56a47af5e30d4784815968713877d0ef55f1cb61	2026-08-01T10:46:00+08:00	Personal Workbench v0.7.1 task center refinement
+07fb6b79e9d476d132ca8abb405b885ff369c7c6	2026-08-01T10:56:28+08:00	Personal Workbench v0.7.2 Tools Center structure
