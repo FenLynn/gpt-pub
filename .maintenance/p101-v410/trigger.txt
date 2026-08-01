@@ -1,0 +1,5 @@
+project=P101
+product=Mediova
+version=4.1.0
+purpose=apply-ui-runtime-architecture
+payload_sha256=ea412d8c6a56021795a6ca39bf31f82ece76cc36fa26c3d40252fd8a5dbfb1f2
