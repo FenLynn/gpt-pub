@@ -19,7 +19,6 @@ concurrency:
 
 jobs:
   apply:
-    if: ${{ hashFiles('.maintenance/p102-v080/chunk-01.txt') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
