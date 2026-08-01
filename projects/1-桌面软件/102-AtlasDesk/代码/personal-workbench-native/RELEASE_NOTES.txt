@@ -1,18 +1,18 @@
-Personal Workbench v0.7.1
+Personal Workbench v0.7.2
 
-This release advances only the planned Task Center refinement. It preserves existing task types, history format and concurrency behavior.
+This release advances only the planned Tools Center structure. It keeps File Integrity as the single installed tool and does not add new execution capabilities.
 
-- Reorganized Task Center into a left launch/filter pane, central task history and right result/details pane.
-- Kept the existing SHA-256 and default-workspace statistics tasks; no new executable task type was added.
-- Added task-history search by title, type or path.
-- Added status filters for active, completed and failed/cancelled tasks.
-- Kept cancellation, bounded concurrency, persisted history and interrupted-task recovery unchanged.
-- Improved visible/total counts, empty states and compact task actions.
-- Preserved open-location and copy-result actions for historical tasks.
+- Reframed the existing File Integrity page as a formal Tools Center.
+- Added a left tool catalog with File Integrity as the only active, verified tool.
+- Moved manifest generation, manifest verification, file comparison and cancellation into the tool action pane.
+- Preserved the central verification-result table and right-side progress/detail panel.
+- Kept all SHA-256, path-safety, atomic manifest writing, cancellation and comparison algorithms unchanged.
+- Did not add automatic scanning, source-file modification, script execution or additional tool types.
+- Retained the existing workspace badge, result copy and Explorer location actions.
 
 Verification checkpoint
 - Windows WPF/XAML compilation and framework-dependent publishing passed.
-- Task Center constructed successfully in a real STA/WPF runtime with launch, search, filter, list and detail panes.
-- Existing SHA-256, directory statistics, cancellation, concurrency and history smoke tests remained green.
-- Project Center and production terminal regression suites remained green.
+- Tools Center constructed successfully in a real STA/WPF runtime with catalog, action, result and detail regions.
+- Existing manifest generation/verification, path traversal rejection and file comparison smoke tests remained green.
+- Project Center, Task Center and production terminal regression suites remained green.
 - Final lightweight EXE packaging, size validation and artifact upload are required by this package build before merge.
