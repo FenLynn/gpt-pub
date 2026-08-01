@@ -1,0 +1,4 @@
+project=P102
+version=0.7.4
+branch=p102-exp
+operation=replace-exact-visible-legacy-phrase
