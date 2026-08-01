@@ -18,12 +18,13 @@ internal static class UiRuntimeSmokeModule
                     app.InitializeComponent();
                 }
                 UiRuntimeVerifier.VerifyCorrectiveVisuals();
+                V070RuntimeVerifier.Verify();
             }
             catch (Exception ex) { failure = ex; }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        if (!thread.Join(TimeSpan.FromSeconds(30)))
+        if (!thread.Join(TimeSpan.FromSeconds(35)))
             throw new TimeoutException("Corrective UI runtime verification timed out.");
         if (failure is not null)
             throw new InvalidOperationException("Corrective UI runtime verification failed.", failure);

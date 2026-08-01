@@ -1,0 +1,87 @@
+<UserControl x:Class="PersonalWorkbench.ProjectCenterControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FontFamily="{StaticResource AppFont}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="项目中心" Style="{StaticResource PageHeading}"/>
+                <TextBlock Text="识别默认工作区中的项目，并统一进入工作区、终端和资源管理器。" Style="{StaticResource PageDescription}"/>
+            </StackPanel>
+            <Border Grid.Column="1" Background="#EAF2FF" CornerRadius="9" Padding="10,6" VerticalAlignment="Center">
+                <TextBlock x:Name="RootBadgeText" Foreground="#326FD6" FontSize="10.8" FontWeight="SemiBold"
+                           MaxWidth="360" TextTrimming="CharacterEllipsis"/>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource ToolbarCard}" Padding="9">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="155"/><ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="SearchBox" Height="32" TextChanged="SearchBox_TextChanged"
+                         ToolTip="按名称、类型、分支或相对路径搜索项目"/>
+                <ComboBox x:Name="TypeFilter" Grid.Column="2" Height="32" SelectionChanged="TypeFilter_SelectionChanged">
+                    <ComboBoxItem Content="全部类型" Tag="all" IsSelected="True"/>
+                    <ComboBoxItem Content="Git" Tag="git"/><ComboBoxItem Content="Python" Tag="python"/>
+                    <ComboBoxItem Content="Node" Tag="node"/><ComboBoxItem Content=".NET" Tag="dotnet"/>
+                    <ComboBoxItem Content="LaTeX" Tag="latex"/><ComboBoxItem Content="Rust / Go" Tag="native"/>
+                </ComboBox>
+                <Button Grid.Column="4" Content="重新扫描" Style="{StaticResource SecondaryButton}" Click="Refresh_Click"/>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="4" Style="{StaticResource SurfaceCard}" Padding="8">
+            <Grid>
+                <ListView x:Name="ProjectList" BorderThickness="0" Background="Transparent"
+                          SelectionChanged="ProjectList_SelectionChanged" MouseDoubleClick="ProjectList_MouseDoubleClick">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="项目" Width="210" DisplayMemberBinding="{Binding Name}"/>
+                            <GridViewColumn Header="类型" Width="180" DisplayMemberBinding="{Binding KindLabel}"/>
+                            <GridViewColumn Header="分支" Width="130" DisplayMemberBinding="{Binding GitBranch}"/>
+                            <GridViewColumn Header="相对路径" Width="300" DisplayMemberBinding="{Binding RelativePath}"/>
+                            <GridViewColumn Header="最近修改" Width="145" DisplayMemberBinding="{Binding ModifiedLabel}"/>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+                <StackPanel x:Name="EmptyState" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="没有识别到项目" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="选择有效默认工作区，或调整搜索和类型筛选。" FontSize="11.2" Foreground="#7B899C" Margin="0,6,0,0"/>
+                </StackPanel>
+                <StackPanel x:Name="LoadingPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="190" Height="4"/>
+                    <TextBlock Text="正在扫描项目标记…" FontSize="11.2" Foreground="#718198" Margin="0,10,0,0" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="6">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock x:Name="SelectionTitle" Text="选择一个项目" FontSize="12.5" FontWeight="SemiBold"/>
+                <TextBlock x:Name="StatusText" Text="等待扫描" FontSize="10.8" Foreground="#718198" Margin="0,3,0,0"
+                           TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="CopyPathButton" Content="复制路径" Style="{StaticResource SecondaryButton}" IsEnabled="False" Click="CopyPath_Click"/>
+                <Button x:Name="ExplorerButton" Content="资源管理器" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="Explorer_Click"/>
+                <Button x:Name="TerminalButton" Content="项目终端" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="Terminal_Click"/>
+                <Button x:Name="WorkspaceButton" Content="在工作区打开" Style="{StaticResource PrimaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="Workspace_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

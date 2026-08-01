@@ -21,6 +21,7 @@ public sealed class WorkbenchFeaturePipeline
         TerminalPresentation = V0610TerminalPresentationEnhancer.Attach(this);
         Corrective = V0611CorrectiveEnhancer.Attach(this);
         ExperiencePolish = V0612ExperienceEnhancer.Attach(window, this);
+        ProjectCenter = V070ProjectCenterEnhancer.Attach(window, this);
     }
 
     public V067VisualFixes VisualFixes { get; }
@@ -36,6 +37,7 @@ public sealed class WorkbenchFeaturePipeline
     public V0610TerminalPresentationEnhancer TerminalPresentation { get; }
     public V0611CorrectiveEnhancer Corrective { get; }
     public V0612ExperienceEnhancer ExperiencePolish { get; }
+    public V070ProjectCenterEnhancer ProjectCenter { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);
