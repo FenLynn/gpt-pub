@@ -1,0 +1,111 @@
+name: Release AtlasDesk v0.8.0 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.maintenance/p102-v080-release-trigger.txt'
+      - '.github/workflows/p102-v080-release-once.yml'
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: p102-v0.8.0
+  RELEASE_COMMIT: 65c433239419ad57d381da65c88f6d57cf01a334
+  SOURCE_RUN_ID: '30719585177'
+  EXPECTED_RUNTIME_ZIP_SHA256: 0f43e71a930e9bcd114e77c1b4e8a80b56dfafa63332bae318a241b43a00bc46
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download fixed verified Runtime
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atlasdesk-artifact
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name AtlasDesk-v0.8.0-Runtime \
+            --dir /tmp/atlasdesk-artifact
+          source_zip=$(find /tmp/atlasdesk-artifact -type f -name 'AtlasDesk_v0.8.0_Runtime.zip' -print -quit)
+          test -n "$source_zip"
+          cp "$source_zip" /tmp/AtlasDesk-v0.8.0-Runtime.zip
+          echo "$EXPECTED_RUNTIME_ZIP_SHA256  /tmp/AtlasDesk-v0.8.0-Runtime.zip" | sha256sum -c -
+
+      - name: Verify Runtime privacy and manifest
+        shell: pwsh
+        run: |
+          $zip = '/tmp/AtlasDesk-v0.8.0-Runtime.zip'
+          $expanded = Join-Path $env:RUNNER_TEMP 'atlasdesk-v080-release-check'
+          Expand-Archive $zip -DestinationPath $expanded -Force
+          $manifestPath = Join-Path $expanded 'runtime-manifest.json'
+          if (!(Test-Path $manifestPath)) { throw 'runtime-manifest.json is missing.' }
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          if ($manifest.product -ne 'AtlasDesk' -or $manifest.version -ne '0.8.0') { throw 'Runtime identity mismatch.' }
+          if ($manifest.deployment -ne 'folder-runtime') { throw 'Runtime deployment mismatch.' }
+          if (!(Test-Path (Join-Path $expanded 'AtlasDesk.exe'))) { throw 'AtlasDesk.exe is missing.' }
+          if (!(Test-Path (Join-Path $expanded 'AtlasDesk.TerminalHost.exe'))) { throw 'AtlasDesk.TerminalHost.exe is missing.' }
+          foreach ($entry in $manifest.files) {
+            $path = Join-Path $expanded ($entry.path -replace '/', '\')
+            if (!(Test-Path $path -PathType Leaf)) { throw "Manifest file missing: $($entry.path)" }
+            $actual = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $entry.sha256) { throw "Manifest hash mismatch: $($entry.path)" }
+          }
+          foreach ($private in @('settings.json','security.json','vault.bin','task-history.json','atlasdesk.log','AtlasDesk.App.exe')) {
+            if (Get-ChildItem $expanded -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) {
+              throw "Private or obsolete file found: $private"
+            }
+          }
+          if (Get-ChildItem $expanded -Recurse -File -Filter '*.xml' -ErrorAction SilentlyContinue) {
+            throw 'Documentation XML files should not be in the formal Runtime.'
+          }
+
+      - name: Create fixed tag and Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse "$RELEASE_COMMIT^{commit}")" = "$RELEASE_COMMIT"
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$RELEASE_COMMIT"
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "$RELEASE_TAG" "$RELEASE_COMMIT" -m 'AtlasDesk v0.8.0'
+            git push origin "$RELEASE_TAG"
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            /tmp/AtlasDesk-v0.8.0-Runtime.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_COMMIT" \
+            --title 'AtlasDesk v0.8.0' \
+            --notes $'AtlasDesk v0.8.0 completes the Runtime/Data architecture separation.\n\n- Folder-based public Runtime; no executable files in AppData\n- Direct AtlasDesk.exe and AtlasDesk.TerminalHost.exe\n- Lightweight roaming configuration and machine-local WebView2/cache/log data\n- Argon2id + AES-GCM local vault\n- Google Authenticator-compatible TOTP\n- Optional four-digit temporary UI lock\n- Opaque sidebar background to prevent login-stage color blending\n\nRuntime ZIP SHA-256: 0f43e71a930e9bcd114e77c1b4e8a80b56dfafa63332bae318a241b43a00bc46\nVerified by Windows CI run 30719585177.'
+
+      - name: Remove one-time machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -rf .maintenance/p102-v080
+          rm -f .maintenance/p102-v080-release-trigger.txt
+          rm -f .github/workflows/p102-v080-one-time-apply.yml
+          rm -f .github/workflows/p102-v080-release-once.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m '仓库｜移除 AtlasDesk v0.8.0 一次性发布载荷'
+            git push origin HEAD:main
+          fi
