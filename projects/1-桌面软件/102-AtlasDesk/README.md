@@ -15,13 +15,22 @@ AtlasDesk 是面向个人科研与软件开发的 Windows 桌面工作台，统�
 
 - 当前项目编号：`P202`；
 - 当前产品名：`AtlasDesk`；
-- 当前基线：`v0.7.2`；
+- 当前基线：`v0.7.3`；
 - 当前源码目录：[`代码/`](代码/)；
 - 原仓库：`FenLynn/agent-foundry`；
 - 原固定提交：`1f9f043dcbc31bf39397757f0eb07a137b586cf1`；
 - 后续唯一维护仓库：`FenLynn/gpt-hub`。
 
-旧提交、PR、分支和原始报告中的 `Personal Workbench` 名称不改写。迁移后的新版本统一使用 AtlasDesk；为保证旧配置和用户数据无损接续，内部兼容标识在完成显式迁移验证前不得随意更改。
+旧提交、PR、分支和原始报告中的 `Personal Workbench` 名称不改写。v0.7.3 已完全在 GPT-Hub 中开发、验证和打包，证明新仓库能够无损接续。为保证旧配置和用户数据兼容，内部 Assembly、namespace、AppData 和配置标识暂时保留历史名称。
+
+## 当前产品能力
+
+- 本地工作区、轻量编辑和 Markdown 预览；
+- Zotero 只读资料库；
+- 项目中心与 Python 环境管理；
+- xterm.js 与 Windows 原生 ConPTY 终端；
+- 任务中心、文件完整性工具、备份恢复和脱敏诊断；
+- `AtlasDesk Command Center`：通过 Ctrl+K 按需检索页面、项目、文件、任务、工具、文献和常用命令。
 
 ## 工程结构
 
@@ -33,13 +42,13 @@ AtlasDesk 是面向个人科研与软件开发的 Windows 桌面工作台，统�
 └── personal-workbench-smoke/          # 运行时与回归验证
 ```
 
-目录名暂时保留历史名称，以避免在迁移 PR 中把路径重构和功能开发混在一起。后续如需重命名工程目录，必须单独立项并验证构建、配置、诊断和升级路径。
+目录名暂时保留历史名称，避免把兼容迁移与功能开发混在一起。后续如需重命名工程目录，必须单独立项并验证构建、配置、诊断和升级路径。
 
 ## 长期产品边界
 
 - 本地优先、轻量、按需读取；
 - Zotero 只读 SQLite，不修改用户文献库；
-- 项目扫描有界且只读，不执行项目代码；
+- 项目扫描和命令中心检索均有界、可取消且不执行项目代码；
 - 终端生产路径与测试路径必须共同使用已验证的 Windows ConPTY 后端；
 - 不捆绑 .NET、WebView2、Node、Python、Conda、uv 或 PDF 运行时；
 - 不在 v0.7.x 引入 AI 编排平台、插件市场、任意脚本自动化或全盘后台索引；
@@ -56,7 +65,7 @@ dotnet restore projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-s
 dotnet run --project projects/2-桌面软件/202-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
 ```
 
-正式准入还必须在 Windows Runner 上完成 WPF/XAML 构建、原生终端宿主、真实 CMD/ConPTY、轻量发布、体积检查、打包和 SHA-256。
+正式准入还必须在 Windows Runner 上完成 WPF/XAML、STA runtime verifier、原生终端宿主、真实 CMD/ConPTY、轻量发布、体积检查、打包和 SHA-256。
 
 ## 分支与版本
 
@@ -66,4 +75,4 @@ dotnet run --project projects/2-桌面软件/202-AtlasDesk/代码/personal-workb
 - 合并后删除工作分支；
 - 正式版本使用 `p202-vX.Y.Z` 标签，不保留常驻 release 分支。
 
-当前下一任务见 [`阶段记录.md`](阶段记录.md)。
+当前状态、验证结果和下一任务见 [`阶段记录.md`](阶段记录.md)。
