@@ -1,0 +1,6 @@
+product=Mediova
+version=4.0.0
+project_files=60
+project_bytes=764326
+payload_sha256=65431485f36ca4ab59059b55facbe08c6a9646b1accdfcc249c3714401bb3cae
+attempt=baseline-only
