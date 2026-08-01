@@ -1,0 +1,6 @@
+project=P101
+product=Mediova
+version=4.1.0
+source_branch=p101-exp
+attempt=3
+mode=observable-pr
