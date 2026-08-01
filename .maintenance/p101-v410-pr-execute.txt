@@ -2,5 +2,6 @@ project=P101
 product=Mediova
 version=4.1.0
 source_branch=p101-exp
-attempt=3
+attempt=5
 mode=observable-pr
+post_patch=enabled
