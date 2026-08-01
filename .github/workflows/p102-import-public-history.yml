@@ -1,38 +1,38 @@
 name: Import P102 AtlasDesk public history
 
 on:
-  issue_comment:
+  pull_request:
+    branches:
+      - main
     types:
-      - created
+      - edited
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   import:
     if: >-
-      github.event.issue.pull_request &&
       github.actor == 'FenLynn' &&
-      startsWith(github.event.comment.body, 'P102_IMPORT_URL=')
+      github.head_ref == 'p102-import-v073' &&
+      github.base_ref == 'main' &&
+      contains(github.event.pull_request.body, 'P102_IMPORT_URL=')
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Validate exact import pull request
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            if (pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` ||
-                pr.data.head.ref !== 'p102-import-v073' ||
-                pr.data.base.ref !== 'main') {
-              core.setFailed('P102 import comment is not attached to the exact same-repository import PR.');
-            }
+      - name: Validate exact same-repository import pull request
+        shell: bash
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          test "$HEAD_REPOSITORY" = 'FenLynn/gpt-pub'
+          test "$HEAD_BRANCH" = 'p102-import-v073'
+          test "$BASE_BRANCH" = 'main'
 
       - name: Checkout P102 import branch
         uses: actions/checkout@v4
@@ -43,11 +43,10 @@ jobs:
       - name: Download and verify audited public bundle
         shell: bash
         env:
-          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
-          url=${COMMENT_BODY#P102_IMPORT_URL=}
-          url=$(printf '%s' "$url" | tr -d '\r\n')
+          url=$(printf '%s\n' "$PR_BODY" | sed -n 's/^P102_IMPORT_URL=//p' | tail -n 1 | tr -d '\r\n')
           test -n "$url"
 
           rm -rf /tmp/p102-import
@@ -128,11 +127,7 @@ jobs:
                   failures.append(f'mismatch: {path}')
 
           root = Path('projects/1-桌面软件/102-AtlasDesk')
-          current = {
-              path.as_posix()
-              for path in root.rglob('*')
-              if path.is_file()
-          }
+          current = {path.as_posix() for path in root.rglob('*') if path.is_file()}
           if current != actual_paths:
               failures.append(f'file set mismatch: expected={len(actual_paths)} actual={len(current)}')
           if failures:
@@ -150,13 +145,13 @@ jobs:
           git commit -m 'P102: import AtlasDesk v0.7.3 audited public history'
           test "$(git rev-list --parents -n 1 HEAD | awk '{print NF}')" = '3'
 
-          bad=$(git diff --name-only origin/main...HEAD | grep -Ev '^projects/1-桌面软件/102-AtlasDesk/' || true)
+          bad=$(git -c core.quotePath=false diff --name-only origin/main...HEAD | grep -Ev '^projects/1-桌面软件/102-AtlasDesk/' || true)
           if [[ -n "$bad" ]]; then
             echo 'Out-of-scope public import changes:'
             echo "$bad"
             exit 1
           fi
-          if git diff --name-only origin/main...HEAD | grep -Eq '^(projects/1-桌面软件/101-|GPT_RULES\.md$|\.github/workflows/)'; then
+          if git -c core.quotePath=false diff --name-only origin/main...HEAD | grep -Eq '^(projects/1-桌面软件/101-|GPT_RULES\.md$|\.github/workflows/)'; then
             echo 'Protected public repository path changed.'
             exit 1
           fi
