@@ -58,7 +58,7 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="PERSONAL WORKBENCH  ·  TODAY" FontSize="9.8" FontWeight="SemiBold" Foreground="#6E7F97"/>
+                            <TextBlock Text="ATLASDESK  ·  TODAY" FontSize="9.8" FontWeight="SemiBold" Foreground="#6E7F97"/>
                             <TextBlock x:Name="GreetingText" Text="早上好，Fenlynn" FontSize="24" FontWeight="SemiBold" Foreground="#18263B" Margin="0,5,0,0"/>
                             <TextBlock x:Name="DateText" Text="今天" FontSize="11.3" Foreground="#65768E" Margin="0,4,0,13"/>
                             <StackPanel Orientation="Horizontal">
