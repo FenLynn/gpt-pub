@@ -6,7 +6,7 @@
 
 | 编号 | 项目 | 状态 | 正式路径 |
 |---|---|---|---|
-| P101 | [Mediova](101-Mediova/) | v4.0.0 公开迁移验证中 | `101-Mediova/` |
+| P101 | [Mediova](101-Mediova/) | v4.0.0 已正式发布 | `101-Mediova/` |
 | P102 | [AtlasDesk](102-AtlasDesk/) | v0.7.4 已正式发布 | `102-AtlasDesk/` |
 
 ## 分支模型
