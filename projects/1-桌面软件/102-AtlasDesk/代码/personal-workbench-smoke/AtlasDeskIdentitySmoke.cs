@@ -12,8 +12,8 @@ internal static class AtlasDeskIdentitySmoke
             throw new InvalidOperationException("AtlasDesk roaming data directory is incorrect.");
 
         var root = Path.Combine(Path.GetTempPath(), "atlasdesk-identity-" + Guid.NewGuid().ToString("N"));
-        var legacy = Path.Combine(root, "PersonalWorkbench");
-        var target = Path.Combine(root, "AtlasDesk");
+        var legacy = Path.Combine(root, ProductIdentity.LegacyStorageName);
+        var target = Path.Combine(root, ProductIdentity.ProductName);
         try
         {
             Directory.CreateDirectory(legacy);
@@ -42,9 +42,10 @@ internal static class AtlasDeskIdentitySmoke
         {
             ".cs", ".xaml", ".go", ".txt", ".md"
         };
+        var legacyVisiblePhrase = "Personal" + " Workbench";
         var legacyVisibleNameFiles = Directory.EnumerateFiles(codeRoot, "*", SearchOption.AllDirectories)
             .Where(path => extensions.Contains(Path.GetExtension(path)))
-            .Where(path => File.ReadAllText(path).Contains("Personal Workbench", StringComparison.Ordinal))
+            .Where(path => File.ReadAllText(path).Contains(legacyVisiblePhrase, StringComparison.Ordinal))
             .Select(path => Path.GetRelativePath(repositoryRoot, path))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -56,7 +57,7 @@ internal static class AtlasDeskIdentitySmoke
             new DiagnosticCheck { Name = "Identity", Detail = "ok", Severity = DiagnosticSeverity.Ok }
         });
         if (!summary.StartsWith("AtlasDesk ", StringComparison.Ordinal)
-            || summary.Contains("Personal Workbench", StringComparison.Ordinal))
+            || summary.Contains(legacyVisiblePhrase, StringComparison.Ordinal))
             throw new InvalidOperationException("Diagnostics still expose the legacy product name.");
     }
 }
