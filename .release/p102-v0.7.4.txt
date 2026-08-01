@@ -1,7 +1,0 @@
-project=P102
-product=AtlasDesk
-version=0.7.4
-target=9c342af9ed1eeb8bf8a7334c3d10af4c0acf876a
-verified_main_run=30699520753
-artifact_id=8818367199
-release_assets=AtlasDesk.exe
