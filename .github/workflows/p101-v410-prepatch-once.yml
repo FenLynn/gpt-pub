@@ -1,0 +1,68 @@
+name: Prepatch Mediova v4.1.0 source once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.maintenance/p101-v410-prepatch-trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  prepatch:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/p101-v410-prepatch-v1'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p101-exp
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Patch generated string source and Runtime expectation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          @'
+          from pathlib import Path
+
+          main=Path('projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/main_windows.go')
+          text=main.read_text(encoding='utf-8')
+          old='组件已安装到软件专用目录。'
+          new='组件已安装到 Mediova Runtime 的 Components\\\\FFmpeg 目录。'
+          if old not in text:
+              raise SystemExit('source message marker not found')
+          main.write_text(text.replace(old,new,1),encoding='utf-8',newline='\n')
+
+          test=Path('projects/1-桌面软件/101-Mediova/代码/internal/media/recovery_features_test.go')
+          text=test.read_text(encoding='utf-8')
+          old='''\tcleanRoot := strings.ToLower(filepath.Clean(dataRoot))
+\tif !strings.HasPrefix(strings.ToLower(filepath.Clean(ff)), cleanRoot) || !strings.HasPrefix(strings.ToLower(filepath.Clean(fp)), cleanRoot) {
+\t\tt.Fatalf("test escaped isolated data root: ffmpeg=%s ffprobe=%s root=%s", ff, fp, dataRoot)
+\t}
+'''
+          new='''\tcleanRoot := strings.ToLower(filepath.Clean(dataRoot))
+\truntimeSuffix := strings.ToLower(filepath.Clean(filepath.Join("Components", "FFmpeg", "bin")))
+\tcleanFF := strings.ToLower(filepath.Clean(ff))
+\tcleanFP := strings.ToLower(filepath.Clean(fp))
+\tif !strings.Contains(cleanFF, runtimeSuffix) || !strings.Contains(cleanFP, runtimeSuffix) {
+\t\tt.Fatalf("components were not installed into Runtime: ffmpeg=%s ffprobe=%s", ff, fp)
+\t}
+\tif strings.HasPrefix(cleanFF, cleanRoot) || strings.HasPrefix(cleanFP, cleanRoot) {
+\t\tt.Fatalf("Runtime component leaked into Data: ffmpeg=%s ffprobe=%s root=%s", ff, fp, dataRoot)
+\t}
+'''
+          if old not in text:
+              raise SystemExit('legacy FFmpeg assertion not found')
+          test.write_text(text.replace(old,new,1),encoding='utf-8',newline='\n')
+          '@ | python -
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- 'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/main_windows.go' 'projects/1-桌面软件/101-Mediova/代码/internal/media/recovery_features_test.go'
+          git commit -m 'P101｜预修正 v4.1.0 Runtime 字符串与测试'
+          git push origin HEAD:p101-exp
