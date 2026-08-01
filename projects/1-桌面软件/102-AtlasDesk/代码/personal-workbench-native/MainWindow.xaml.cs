@@ -209,7 +209,7 @@ public partial class MainWindow : Window
 
             if (_webViewEnvironment is null)
             {
-                var profilePath = Path.Combine(App.AppDataDirectory, "WebView2Profile");
+                var profilePath = App.DashboardProfileDirectory;
                 Directory.CreateDirectory(profilePath);
                 App.Log("Creating WebView2 environment at " + profilePath);
                 _webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, profilePath, null);

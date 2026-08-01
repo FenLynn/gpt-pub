@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyName>PersonalWorkbench.App</AssemblyName>
+    <AssemblyName>AtlasDesk</AssemblyName>
     <RootNamespace>PersonalWorkbench</RootNamespace>
     <Version>$(WorkbenchVersion)</Version>
     <FileVersion>$(WorkbenchVersion).0</FileVersion>
@@ -18,7 +18,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
@@ -27,15 +27,17 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <PackageReference Include="WpfMath" Version="2.1.0" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
     <Using Include="System.IO" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="TerminalAssets\terminal.html" />
-    <EmbeddedResource Include="TerminalAssets\terminal-host.js" />
-    <EmbeddedResource Include="TerminalAssets\vendor\xterm.js" />
-    <EmbeddedResource Include="TerminalAssets\vendor\xterm.css" />
-    <EmbeddedResource Include="TerminalAssets\vendor\addon-fit.js" />
+    <Content Include="TerminalAssets\**\*">
+      <Link>Assets\Terminal\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="NormalizeSources" BeforeTargets="PrepareForBuild">

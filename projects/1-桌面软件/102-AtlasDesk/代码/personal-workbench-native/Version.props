@@ -1,5 +1,5 @@
 <Project>
   <PropertyGroup>
-    <WorkbenchVersion>0.7.4</WorkbenchVersion>
+    <WorkbenchVersion>0.8.0</WorkbenchVersion>
   </PropertyGroup>
 </Project>
