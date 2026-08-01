@@ -1,5 +1,0 @@
-project=P102
-version=0.8.0
-source_commit=65c433239419ad57d381da65c88f6d57cf01a334
-source_run=30719585177
-runtime_zip_sha256=0f43e71a930e9bcd114e77c1b4e8a80b56dfafa63332bae318a241b43a00bc46
