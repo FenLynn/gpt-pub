@@ -1,19 +1,17 @@
-AtlasDesk v0.7.3
+AtlasDesk v0.7.4
 
-This release is the first feature version developed entirely in GPT-Hub after the lossless v0.7.2 migration. It turns the existing Ctrl+K search surface into the AtlasDesk Command Center without adding a background index, database, AI search, or arbitrary script execution.
+This is a deliberately small continuity release used to verify the complete GPT-Pub development path from p102-exp to p102-stable and main.
 
-- Added page navigation for Home, Dashboard, Workspace, Library, Development, Tools, Tasks and Settings.
-- Added on-demand project search using the existing bounded, read-only project catalog.
-- Added recent workspace files and bounded filename search with cancellation, depth, directory, entry and result limits.
-- Added read-only task-history results and direct navigation to the Task Center.
-- Added verified tool entries for Project Center, File Integrity and Task Center.
-- Preserved Zotero read-only search and PowerShell/CMD terminal commands.
-- Added configuration and log-directory commands.
-- Updated the command surface and main window product title to AtlasDesk while retaining the PersonalWorkbench compatibility identity and AppData path.
-- Added real STA/WPF runtime verification for Command Center structure, project results, bounded file search and cancellation.
+- Standardized all user-visible product wording on AtlasDesk.
+- Changed the roaming configuration and log directory to %APPDATA%\AtlasDesk.
+- Added safe first-start migration from %APPDATA%\PersonalWorkbench when the AtlasDesk directory does not yet exist.
+- Changed the launcher extraction directory to %LOCALAPPDATA%\AtlasDesk\App\<version> and the extracted application name to AtlasDesk.App.exe.
+- Updated launcher dialogs, diagnostics, support bundles, settings warnings and backup UI to AtlasDesk.
+- Kept historical namespace, assembly, backup schema and embedded payload identifiers as internal compatibility details.
+- Added automated path-migration tests and a source regression that rejects the old user-visible product phrase.
 
 Verification checkpoint
-- Windows WPF/XAML compilation and framework-dependent publishing are required.
-- Existing Project Center, Task Center, Tools Center, backup, Zotero, Markdown and terminal regression suites must remain green.
-- Native CMD/ConPTY production routing must remain green.
-- Final AtlasDesk v0.7.3 lightweight EXE packaging, size validation, SHA-256 and artifact upload are required before merge.
+- Windows WPF/XAML compilation and complete smoke tests are required.
+- Legacy roaming data must move to AtlasDesk without overwriting an existing AtlasDesk directory.
+- Existing backup files, settings, task history, Zotero, Markdown, Command Center and CMD/ConPTY regressions must remain green.
+- Framework-dependent publishing, Go launcher embedding, lightweight size validation, ZIP/EXE consistency and SHA-256 are required before promotion.
