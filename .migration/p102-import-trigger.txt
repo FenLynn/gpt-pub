@@ -1,0 +1,6 @@
+source_repository=FenLynn/gpt-hub
+source_commit=c48180a2ac74b6336220bce484c8051551d4e2fb
+source_version=0.7.3
+public_project=P102
+public_filtered_head=f8493a0bcb73ed0e05f039144890dc07b5d885fb
+retry=fresh-artifact-url
