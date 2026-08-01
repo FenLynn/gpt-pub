@@ -65,6 +65,7 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           python .maintenance/p101-v410/apply.py
+          python .maintenance/p101-v410/post_patch.py
           Set-Location 'projects/1-桌面软件/101-Mediova/代码'
           gofmt -w ./cmd ./internal
           @'
