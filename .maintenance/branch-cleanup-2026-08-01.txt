@@ -1,0 +1,4 @@
+repository=FenLynn/gpt-pub
+date=2026-08-01
+keep=main,p102-stable,p102-exp,p101-migration-payload
+issue=18
