@@ -45,7 +45,7 @@ internal static class AtlasDeskIdentitySmoke
         var legacyVisiblePhrase = "Personal" + " Workbench";
         var legacyVisibleNameFiles = Directory.EnumerateFiles(codeRoot, "*", SearchOption.AllDirectories)
             .Where(path => extensions.Contains(Path.GetExtension(path)))
-            .Where(path => File.ReadAllText(path).Contains(legacyVisiblePhrase, StringComparison.Ordinal))
+            .Where(path => File.ReadAllText(path).Contains(legacyVisiblePhrase, StringComparison.OrdinalIgnoreCase))
             .Select(path => Path.GetRelativePath(repositoryRoot, path))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -57,7 +57,7 @@ internal static class AtlasDeskIdentitySmoke
             new DiagnosticCheck { Name = "Identity", Detail = "ok", Severity = DiagnosticSeverity.Ok }
         });
         if (!summary.StartsWith("AtlasDesk ", StringComparison.Ordinal)
-            || summary.Contains(legacyVisiblePhrase, StringComparison.Ordinal))
+            || summary.Contains(legacyVisiblePhrase, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Diagnostics still expose the legacy product name.");
     }
 }
