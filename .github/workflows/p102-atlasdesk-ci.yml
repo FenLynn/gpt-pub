@@ -42,7 +42,7 @@ jobs:
           git diff --cached --check
           git commit -m 'P102｜建立 AtlasDesk v0.8.0 完整项目树'
           git switch -C p102-v080-built origin/p102-exp
-          git checkout p102-v080-source -- '.github/workflows/p102-atlasdesk-ci.yml' 'projects/1-桌面软件/102-AtlasDesk'
+          git checkout p102-v080-source -- 'projects/1-桌面软件/102-AtlasDesk'
           rm -rf 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-launcher'
           rm -f 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/AtlasDeskIdentitySmoke.cs'
           rm -rf 'projects/1-桌面软件/102-AtlasDesk/.maintenance'
