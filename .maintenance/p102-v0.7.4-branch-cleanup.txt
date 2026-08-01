@@ -1,0 +1,4 @@
+project=P102
+version=0.7.4
+keep=main,p102-stable,p102-exp,p101-migration-payload
+issue=24
