@@ -1,5 +1,0 @@
-project=P101
-product=Mediova
-version=4.1.0
-purpose=register-one-time-main-runner
-scope=P101-only
