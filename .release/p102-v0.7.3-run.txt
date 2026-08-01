@@ -1,4 +1,4 @@
 project=P102
 version=0.7.3
 target=df66c9246706439c35f082027a82eb34e827de69
-retry=traceable-pr-run
+retry=normalized-windows-text
