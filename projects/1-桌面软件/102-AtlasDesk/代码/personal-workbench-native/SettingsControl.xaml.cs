@@ -72,7 +72,7 @@ public partial class SettingsControl : UserControl
         var url = DashboardUrlBox.Text.Trim();
         if (!string.IsNullOrWhiteSpace(url) && (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)))
         {
-            MessageBox.Show("Dashboard 地址必须以 http:// 或 https:// 开头。", "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Dashboard 地址必须以 http:// 或 https:// 开头。", ProductIdentity.ProductName, MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (!int.TryParse(CalibrationLimitBox.Text, out var limit)) limit = 250;
