@@ -1,30 +1,30 @@
 name: Apply P102 AtlasDesk v0.8.1 once
 
 on:
-  push:
+  pull_request:
     branches:
       - p102-exp
     paths:
-      - '.github/workflows/p102-v081-apply-once.yml'
+      - '.maintenance/p102-v081-run-trigger.txt'
 
 permissions:
   contents: write
 
 concurrency:
-  group: p102-v081-apply-once
+  group: p102-v081-apply-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   apply-and-verify:
-    if: github.repository == 'FenLynn/gpt-pub'
+    if: github.repository == 'FenLynn/gpt-pub' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: windows-latest
     timeout-minutes: 45
 
     steps:
-      - name: Checkout P102 development branch
+      - name: Checkout implementation branch
         uses: actions/checkout@v4
         with:
-          ref: p102-exp
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -154,7 +154,8 @@ jobs:
             'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/Program.cs',
             '.github/workflows/p102-atlasdesk-ci.yml',
             '.github/workflows/p102-v081-apply-once.yml',
-            '.maintenance/p102-v081-apply.py'
+            '.maintenance/p102-v081-apply.py',
+            '.maintenance/p102-v081-run-trigger.txt'
           )
           $changed = @(git -c core.quotePath=false status --short | ForEach-Object { $_.Substring(3) })
           $bad = @($changed | Where-Object { $allowed -notcontains $_ })
@@ -171,9 +172,10 @@ jobs:
         run: |
           Remove-Item '.github/workflows/p102-v081-apply-once.yml' -Force
           Remove-Item '.maintenance/p102-v081-apply.py' -Force
+          Remove-Item '.maintenance/p102-v081-run-trigger.txt' -Force
           git config user.name 'AtlasDesk Release Bot'
           git config user.email 'actions@users.noreply.github.com'
           git add -A
           git commit -m 'P102｜实施 AtlasDesk v0.8.1 核心修复'
           if ($LASTEXITCODE -ne 0) { throw 'No verified product commit was created.' }
-          git push origin HEAD:p102-exp
+          git push origin HEAD:${{ github.head_ref }}
