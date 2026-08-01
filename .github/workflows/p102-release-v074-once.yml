@@ -1,0 +1,130 @@
+name: Release P102 AtlasDesk v0.7.4
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.release/p102-v0.7.4.txt'
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout complete repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify target and tested tree equivalence
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='9c342af9ed1eeb8bf8a7334c3d10af4c0acf876a'
+          tested='ed6b4202394de1ff7590ef860ffc82a1e4675ba9'
+          git cat-file -e "$target^{commit}"
+          git cat-file -e "$tested^{commit}"
+          changed=$(git -c core.quotePath=false diff --name-only "$tested" "$target" -- \
+            'projects/1-桌面软件/102-AtlasDesk/**' \
+            '.github/workflows/p102-atlasdesk-ci.yml' \
+            '目录.md' || true)
+          if [[ -n "$changed" ]]; then
+            echo 'Tested stable tree differs from the main release target:'
+            echo "$changed"
+            exit 1
+          fi
+          test "$(git show "$target:projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/Version.props" | grep -c '<WorkbenchVersion>0.7.4</WorkbenchVersion>')" = '1'
+
+      - name: Download and verify exact public artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atlasdesk-v074
+          curl -fsSL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/FenLynn/gpt-pub/actions/artifacts/8818367199/zip' \
+            -o /tmp/atlasdesk-v074/artifact.zip
+          echo '77aebf06308457858f4fd9dd2c312d047eaa3b88ee58f3117f50122a1e1b76bd  /tmp/atlasdesk-v074/artifact.zip' | sha256sum -c -
+          unzip -q /tmp/atlasdesk-v074/artifact.zip -d /tmp/atlasdesk-v074/outer
+          exe='/tmp/atlasdesk-v074/outer/AtlasDesk_v0.7.4_Lightweight/AtlasDesk.exe'
+          portable='/tmp/atlasdesk-v074/outer/AtlasDesk_v0.7.4_Lightweight.zip'
+          manifest='/tmp/atlasdesk-v074/outer/build-manifest.txt'
+          checksum='/tmp/atlasdesk-v074/outer/SHA256.txt'
+          test -f "$exe"
+          test -f "$portable"
+          test -f "$manifest"
+          test -f "$checksum"
+          echo '431c1651bf6f4f7d79baafe148331135b6863cb768b2295612fa52a185b5452c  '"$exe" | sha256sum -c -
+          echo '82fa94495793dcb275a5efc5b8e8e97b34a3e7be4179c7276b26ea11189c3467  '"$portable" | sha256sum -c -
+          tr -d '\r' < "$checksum" | grep -Fx '431c1651bf6f4f7d79baafe148331135b6863cb768b2295612fa52a185b5452c  AtlasDesk.exe'
+          tr -d '\r' < "$manifest" | grep -Fx 'product=AtlasDesk'
+          tr -d '\r' < "$manifest" | grep -Fx 'project=P102'
+          tr -d '\r' < "$manifest" | grep -Fx 'repository=FenLynn/gpt-pub'
+          tr -d '\r' < "$manifest" | grep -Fx 'version=0.7.4'
+          tr -d '\r' < "$manifest" | grep -Fx 'data_directory=AtlasDesk'
+          tr -d '\r' < "$manifest" | grep -Fx 'extracted_application=AtlasDesk.App.exe'
+          tr -d '\r' < "$manifest" | grep -Fx 'smoke_tests=passed'
+          rm -rf /tmp/atlasdesk-v074/portable
+          mkdir -p /tmp/atlasdesk-v074/portable
+          unzip -q "$portable" -d /tmp/atlasdesk-v074/portable
+          echo '431c1651bf6f4f7d79baafe148331135b6863cb768b2295612fa52a185b5452c  /tmp/atlasdesk-v074/portable/AtlasDesk.exe' | sha256sum -c -
+          cmp -s "$exe" /tmp/atlasdesk-v074/portable/AtlasDesk.exe
+          cp "$exe" /tmp/atlasdesk-v074/AtlasDesk.exe
+
+      - name: Create fixed tag and EXE-only Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          target='9c342af9ed1eeb8bf8a7334c3d10af4c0acf876a'
+          tag='p102-v0.7.4'
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            test "$(git ls-remote --tags origin "refs/tags/$tag" | awk '{print $1}')" = "$target"
+          else
+            git tag "$tag" "$target"
+            git push origin "refs/tags/$tag"
+          fi
+          if ! gh release view "$tag" --repo FenLynn/gpt-pub >/dev/null 2>&1; then
+            gh release create "$tag" /tmp/atlasdesk-v074/AtlasDesk.exe \
+              --repo FenLynn/gpt-pub \
+              --target "$target" \
+              --title 'P102 AtlasDesk v0.7.4' \
+              --notes 'Small continuity release validating the complete GPT-Pub flow. Standardizes the user-visible AtlasDesk identity, migrates roaming data to %APPDATA%\AtlasDesk, and moves extracted application files to %LOCALAPPDATA%\AtlasDesk. Windows verification run: 30699520753. SHA-256: 431c1651bf6f4f7d79baafe148331135b6863cb768b2295612fa52a185b5452c.'
+          fi
+          gh release view "$tag" --repo FenLynn/gpt-pub --json url,tagName,targetCommitish > /tmp/atlasdesk-v074/release.json
+
+      - name: Record result
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const release = JSON.parse(fs.readFileSync('/tmp/atlasdesk-v074/release.json', 'utf8'));
+            const body = [
+              'P102_V074_RELEASE_RESULT status=success',
+              `run_id=${context.runId}`,
+              'target=9c342af9ed1eeb8bf8a7334c3d10af4c0acf876a',
+              'tag=p102-v0.7.4',
+              `release=${release.url}`,
+              'verified_main_run=30699520753',
+              'artifact_id=8818367199',
+              'artifact_sha256=77aebf06308457858f4fd9dd2c312d047eaa3b88ee58f3117f50122a1e1b76bd',
+              'atlasdesk_exe_sha256=431c1651bf6f4f7d79baafe148331135b6863cb768b2295612fa52a185b5452c',
+              'atlasdesk_exe_bytes=11501568',
+              'release_assets=AtlasDesk.exe'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 24,
+              body
+            });
