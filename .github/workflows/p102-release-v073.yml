@@ -6,6 +6,14 @@ on:
       - main
     paths:
       - '.release/p102-v0.7.3.txt'
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+    paths:
+      - '.release/p102-v0.7.3-run.txt'
 
 permissions:
   actions: read
@@ -14,6 +22,12 @@ permissions:
 
 jobs:
   release:
+    if: >-
+      github.event_name == 'push' ||
+      (github.actor == 'FenLynn' &&
+       github.head_ref == 'repo-run-p102-release-v073' &&
+       github.base_ref == 'main' &&
+       github.event.pull_request.head.repo.full_name == 'FenLynn/gpt-pub')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -29,7 +43,6 @@ jobs:
           set -euo pipefail
           target='df66c9246706439c35f082027a82eb34e827de69'
           tested='885eaa320b9db6efcfb7665631b2650348e368ad'
-          test "$(git rev-parse HEAD)" != ''
           git cat-file -e "$target^{commit}"
           git cat-file -e "$tested^{commit}"
           product_diff=$(git -c core.quotePath=false diff --name-only "$tested" "$target" -- \
@@ -49,10 +62,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/p102-release/outer /tmp/p102-release/files
-          gh api \
+          curl -fsSL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
             -H 'Accept: application/vnd.github+json' \
-            /repos/FenLynn/gpt-pub/actions/artifacts/8817462686/zip \
-            > /tmp/p102-release/artifact.zip
+            'https://api.github.com/repos/FenLynn/gpt-pub/actions/artifacts/8817462686/zip' \
+            -o /tmp/p102-release/artifact.zip
           echo '1f2564f6429595a049140b684d5b8e4d301c5e47ca273259cac576063230bda3  /tmp/p102-release/artifact.zip' | sha256sum -c -
           unzip -q /tmp/p102-release/artifact.zip -d /tmp/p102-release/outer
 
