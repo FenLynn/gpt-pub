@@ -41,7 +41,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python .github/scripts/verify_p102_v073_release.py
+        run: python .github/scripts/verify_p102_v073_release_v2.py
 
       - name: Create fixed tag and public Release
         shell: bash
