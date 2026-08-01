@@ -1,0 +1,67 @@
+{
+  "source_repository": "FenLynn/gpt-hub",
+  "source_commit": "c48180a2ac74b6336220bce484c8051551d4e2fb",
+  "source_version": "0.7.3",
+  "public_project": "P102",
+  "public_filtered_head": "f8493a0bcb73ed0e05f039144890dc07b5d885fb",
+  "v072_public_mapped_head": "397e142b1160d8065dc39670864cba38b592fec2",
+  "commit_count": 86,
+  "source_file_count": 108,
+  "source_total_bytes": 925277,
+  "artifact_sha256": "ca2f18cf915b0dfe28cff4472b1c8ef85fea5d193dd1788b6a7b2681d5654bbd",
+  "audit_zip_sha256": "57b43be7c6c7744e8b45ce43c08aa11cff27215a74d53047a8b72032f3702205",
+  "bundle_sha256": "b7d777a65628de42f1fe5b3290d83f8c94ad56d52e31333b4cc83ec44cc2d177",
+  "history_sanitization": {
+    "removed_paths": [
+      "projects/1-桌面软件/102-AtlasDesk/迁移载荷/**"
+    ],
+    "reason": "one-time migration payloads contained temporary private Artifact URLs",
+    "author_email_rewrite": {
+      "from": "Feiyu Li <lfypku@gmail.com>",
+      "to": "Feiyu Li <9024248+FenLynn@users.noreply.github.com>"
+    },
+    "current_source_test_build_and_public_docs_changed": false
+  },
+  "current_tree_secret_scan": {
+    "tool": "detect-secrets 1.5.0",
+    "unexpected_findings": 0,
+    "accepted_test_fixtures": [
+      {
+        "path": "projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/IntegrityBoundarySmoke.cs",
+        "line": 9,
+        "type": "Hex High Entropy String",
+        "reason": "standard SHA-256(abc) test vector"
+      },
+      {
+        "path": "projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/Program.cs",
+        "line": 92,
+        "type": "Hex High Entropy String",
+        "reason": "standard SHA-256(abc) test vector"
+      },
+      {
+        "path": "projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/TerminalReliabilitySmokeModule.cs",
+        "line": 59,
+        "type": "Secret Keyword",
+        "reason": "pwdMarker/cwdSentinel command-test identifiers"
+      }
+    ]
+  },
+  "full_history_blob_scan": {
+    "unique_blob_count": 253,
+    "scanned_text_blobs": 253,
+    "binary_blobs_skipped_by_content": 0,
+    "oversized_blobs_skipped": 0,
+    "high_confidence_private_pattern_hits": 0,
+    "accepted_synthetic_path_fixture": {
+      "path": "projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/Program.cs",
+      "match": "C:\\Users\\Fenlynn\\Research",
+      "reason": "synthetic support-bundle redaction fixture with sanitizer context"
+    }
+  },
+  "commit_message_scope_scan": "passed",
+  "current_and_historical_blob_path_scope": "passed",
+  "public_commit_identities": [
+    "Feiyu Li <9024248+FenLynn@users.noreply.github.com>",
+    "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+  ]
+}
