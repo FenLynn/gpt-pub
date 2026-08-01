@@ -1,0 +1,4 @@
+project=P101
+product=Mediova
+version=4.1.0
+purpose=prepatch-string-and-runtime-test
