@@ -6,6 +6,8 @@ on:
     paths:
       - '.maintenance/p102-v080/**'
       - '.github/workflows/p102-v080-one-time-apply.yml'
+  issues:
+    types: [opened]
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
