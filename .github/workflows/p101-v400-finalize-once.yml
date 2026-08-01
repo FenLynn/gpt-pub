@@ -1,0 +1,65 @@
+name: Finalize Mediova v4.0.0 branches once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.maintenance/p101-v400-finalize-trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove residual P101 one-time files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .maintenance/p101-v400-finalize-trigger.txt
+          rm -f .github/workflows/p101-v400-finalize-once.yml
+          rm -f .github/workflows/p101-one-time-import.yml
+          rm -f .github/workflows/p101-release-v400.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m '仓库｜完成 Mediova v4.0.0 公开收尾'
+            git push origin HEAD:main
+          fi
+          echo "FINAL_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Align maintained P101 branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin "$FINAL_SHA:refs/heads/p101-stable" --force
+          git push origin "$FINAL_SHA:refs/heads/p101-exp" --force
+
+      - name: Delete temporary P101 branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          branches=(
+            p101-finalize-v400-public-cutover
+            p101-import-v400
+            p101-migration-payload
+            p101-release-v400
+            repo-fix-p101-baseline-push
+            repo-fix-p101-public-artifact-importer
+            repo-register-p101-v400-release
+            agent/p101-finalize-docs
+          )
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              git push origin --delete "$branch"
+            fi
+          done
