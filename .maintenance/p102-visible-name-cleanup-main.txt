@@ -1,5 +1,0 @@
-project=P102
-branch=p102-exp
-version=0.7.4
-operation=replace-exact-visible-legacy-phrase
-trigger=workflow-and-marker-merged-together
