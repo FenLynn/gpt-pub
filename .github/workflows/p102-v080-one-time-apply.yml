@@ -6,6 +6,9 @@ on:
     paths:
       - '.maintenance/p102-v080/**'
       - '.github/workflows/p102-v080-one-time-apply.yml'
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,8 +19,9 @@ concurrency:
 
 jobs:
   apply:
+    if: ${{ hashFiles('.maintenance/p102-v080/chunk-01.txt') != '' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout full repository
         uses: actions/checkout@v4
@@ -34,19 +38,37 @@ jobs:
           gzip -dc /tmp/p102-v080.patch.gz > /tmp/p102-v080.patch
           test -s /tmp/p102-v080.patch
 
-      - name: Apply v0.8.0 to p102-exp
+      - name: Build exact v0.8.0 project tree
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main p102-exp
-          git switch p102-exp
-          git reset --hard origin/p102-exp
-          git apply --3way --index /tmp/p102-v080.patch
+          git switch --detach f8493a0bcb73ed0e05f039144890dc07b5d885fb
+          git switch -c p102-v080-source
+          git apply --index /tmp/p102-v080.patch
           rm -rf 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-launcher'
           rm -f 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/AtlasDeskIdentitySmoke.cs'
           git add -A
+          git diff --cached --check
+          git commit -m 'P102｜建立 AtlasDesk v0.8.0 完整项目树'
+
+      - name: Replace only P102 on experimental branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch -C p102-exp origin/p102-exp
+          git merge --no-commit --no-ff p102-v080-source || true
+          git checkout p102-v080-source -- '.github/workflows/p102-atlasdesk-ci.yml' 'projects/1-桌面软件/102-AtlasDesk'
+          rm -rf 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-launcher'
+          rm -f 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/AtlasDeskIdentitySmoke.cs'
+          git add -A
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo 'Unresolved merge paths remain:'
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
           git diff --cached --check
           git commit -m 'P102｜重构 AtlasDesk v0.8.0 Runtime/Data 与本地安全'
           git push origin HEAD:p102-exp
@@ -56,8 +78,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git switch main
-          git reset --hard origin/main
+          git switch -C main origin/main
           rm -rf .maintenance/p102-v080
           rm -f .github/workflows/p102-v080-one-time-apply.yml
           git add -A
