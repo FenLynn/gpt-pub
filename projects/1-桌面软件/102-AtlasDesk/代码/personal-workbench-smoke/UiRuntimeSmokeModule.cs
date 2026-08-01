@@ -21,6 +21,7 @@ internal static class UiRuntimeSmokeModule
                 V070RuntimeVerifier.Verify();
                 V071RuntimeVerifier.Verify();
                 V072RuntimeVerifier.Verify();
+                V073RuntimeVerifier.Verify();
             }
             catch (Exception ex) { failure = ex; }
         });
