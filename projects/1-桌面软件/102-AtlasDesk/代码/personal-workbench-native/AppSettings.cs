@@ -5,6 +5,17 @@ namespace PersonalWorkbench;
 
 public sealed class AppSettings
 {
+    private static readonly string[] DefaultZoteroColumns =
+    {
+        "type", "title", "authors", "year", "publication", "dateAdded", "pdf"
+    };
+
+    private static readonly HashSet<string> AllowedZoteroColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "type", "title", "authors", "year", "publication", "dateAdded", "dateModified",
+        "tags", "notes", "attachments", "pdf"
+    };
+
     public string UserName { get; set; } = "Fenlynn";
     public string DashboardName { get; set; } = "Cloudflare Dashboard";
     public string DashboardUrl { get; set; } = string.Empty;
@@ -12,6 +23,7 @@ public sealed class AppSettings
     public string WorkspaceRoot { get; set; } = string.Empty;
     public bool WorkspaceAutoSave { get; set; } = true;
     public bool WorkspaceShowHiddenFiles { get; set; }
+    public bool WorkspaceWordWrap { get; set; } = true;
     public int WorkspaceEditorFontSize { get; set; } = 14;
     public int WorkspaceRecentLimit { get; set; } = 12;
     public string LastWorkspaceFile { get; set; } = string.Empty;
@@ -20,6 +32,7 @@ public sealed class AppSettings
     public string ZoteroDbPath { get; set; } = string.Empty;
     public bool ZoteroLoadFullLibrary { get; set; }
     public int ZoteroCalibrationLimit { get; set; } = 250;
+    public List<string> ZoteroVisibleColumns { get; set; } = DefaultZoteroColumns.ToList();
     public string PdfReaderPath { get; set; } = string.Empty;
     public bool UseSystemPdfReader { get; set; } = true;
 
@@ -79,6 +92,17 @@ public sealed class AppSettings
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(value.WorkspaceRecentLimit)
             .ToList();
+
+        value.ZoteroVisibleColumns ??= DefaultZoteroColumns.ToList();
+        value.ZoteroVisibleColumns = value.ZoteroVisibleColumns
+            .Where(column => !string.IsNullOrWhiteSpace(column) && AllowedZoteroColumns.Contains(column))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (!value.ZoteroVisibleColumns.Contains("title", StringComparer.OrdinalIgnoreCase))
+            value.ZoteroVisibleColumns.Insert(0, "title");
+        if (value.ZoteroVisibleColumns.Count == 0)
+            value.ZoteroVisibleColumns = DefaultZoteroColumns.ToList();
+
         value.TerminalFontSize = Math.Clamp(value.TerminalFontSize <= 0 ? 14 : value.TerminalFontSize, 10, 24);
         value.TerminalScrollback = Math.Clamp(value.TerminalScrollback <= 0 ? 8000 : value.TerminalScrollback, 1000, 100000);
         value.TerminalDrawerHeight = Math.Clamp(value.TerminalDrawerHeight <= 0 ? 320 : value.TerminalDrawerHeight, 180, 700);

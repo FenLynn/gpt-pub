@@ -43,6 +43,7 @@ public partial class HomeDashboardControl : UserControl
         {
             _loading = true;
             GreetingText.Text = BuildGreeting();
+            DateText.Text = DateTime.Now.ToString("yyyy 年 M 月 d 日  ·  dddd", System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
             var root = _settings.WorkspaceRoot;
             WorkspaceNameText.Text = Directory.Exists(root) ? new DirectoryInfo(root).Name : "尚未配置";
             WorkspacePathText.Text = Directory.Exists(root) ? root : "在设置中选择目录";
@@ -85,7 +86,7 @@ public partial class HomeDashboardControl : UserControl
             var recent = _settings.RecentWorkspaceFiles.Where(File.Exists).Take(7).Select(path => new RecentWorkspaceItem(path)).ToList();
             RecentFilesList.ItemsSource = recent;
             WorkspaceValue.Text = $"{recent.Count:N0} 个最近文件";
-            WorkspaceDetail.Text = Directory.Exists(root) ? "Markdown / 代码 / PDF" : "等待选择目录";
+            WorkspaceDetail.Text = Directory.Exists(root) ? "Markdown / 代码 / 图片" : "等待选择目录";
         }
         catch (Exception ex) { App.Log("Home dashboard refresh failed: " + ex); }
         finally { _loading = false; }

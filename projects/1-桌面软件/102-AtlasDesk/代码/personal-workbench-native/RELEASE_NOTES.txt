@@ -1,18 +1,20 @@
-Personal Workbench v0.6.11
+Personal Workbench v0.6.12
 
-This is a corrective release for the terminal, Workspace and Zotero issues reported against v0.6.10.
+This release is limited to the eight Home, window chrome, Workspace, Markdown, Zotero and terminal presentation issues reported against v0.6.11. It does not advance the later module roadmap or change the verified CMD backend.
 
-- Fixed the terminal reliability root cause: the production terminal UI had continued to call the legacy managed ConPTY session directly, while CI exercised the newer native terminal factory. Production and regression tests now use the same TerminalSessionFactory path.
-- Routed every Windows system CMD session through the native GUI bridge and Windows system ConPTY, including the default Development terminal, new CMD buttons, Workspace terminals and Python environment CMD sessions.
-- Added a source-level regression guard that fails CI if the production terminal UI bypasses the verified factory again.
-- Increased terminal action, tab, side-panel and status contrast. Enabled actions are bright and readable; disabled actions remain visibly distinct without disappearing into the dark background.
-- Added inline Workspace image discovery and preview for PNG, JPEG, WebP, BMP, GIF and TIFF files without adding Node, Monaco or another bundled runtime.
-- Kept Markdown rendering and enabled lightweight highlighted preview/split view for Python, LaTeX and common code files while preserving the editable plain-text source pane.
-- Rebuilt the Zotero PDF-only control as a single compact icon toggle and tightened the type, sort and search action widths so the center toolbar no longer overlaps.
+- Reworked the custom application title bar with a neutral gray active state and white inactive state. Minimize, maximize/restore and close now use aligned vector glyphs instead of uneven text symbols.
+- Replaced the legacy placeholder Home page with a responsive, scrollable daily workbench containing a distinctive hero, current context, environment status, recent work and quick actions. Home is reattached whenever the page is entered so the old placeholder cannot reappear.
+- Moved Workspace-level choose-folder, new-note, terminal and refresh actions into the global top bar. The root name and autosave state are now conveyed through tooltips instead of consuming a separate page row.
+- Reflowed the current file title and path into one horizontal line and added a persistent automatic word-wrap toggle.
+- Extended Markdown preview with local/relative and remote images, inline and display LaTeX mathematics, task lists and graceful fallback when a resource cannot be rendered.
+- Rebuilt the Zotero center table with configurable visible columns, added/modified time, tags, notes and attachment counts, clickable header sorting and a persistent column menu.
+- Integrated Zotero authors into the record header as one compact name list and removed the repeated per-person author-role block from the information tab.
+- Reorganized the terminal into one top row: session count at the far left, tabs immediately after it, and CMD/PowerShell/host actions at the right. The side panel now contains only compact auto-width current-session actions with higher contrast.
 
 Verification checkpoint
-- Windows WPF/XAML compilation and framework-dependent publishing passed.
-- The complete smoke suite passed, including the production-routing invariant.
-- Five consecutive real CMD sessions passed through the same factory used by the UI in a Unicode path, including multiple commands, resize, idle liveness and clean exit.
-- Workspace image registration, Python/LaTeX highlighted rendering and the Zotero PDF toggle template passed STA/WPF runtime creation and rendering checks.
-- Final lightweight EXE packaging, size validation and artifact upload are required for this delivery build.
+- Windows WPF/XAML compilation and framework-dependent publishing passed on the release branch.
+- The real Home control, custom title bar, Workspace top chrome and terminal template passed STA/WPF runtime construction checks.
+- Markdown local image and WPF-Math formula rendering passed runtime verification.
+- Zotero configurable columns, header sorting and compact detail layout passed runtime verification.
+- The production terminal routing invariant and five consecutive real CMD/ConPTY sessions remained green.
+- Final lightweight EXE packaging, size validation and artifact upload must pass before delivery.

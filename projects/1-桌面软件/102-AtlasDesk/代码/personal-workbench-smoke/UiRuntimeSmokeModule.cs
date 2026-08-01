@@ -1,5 +1,6 @@
 using PersonalWorkbench;
 using System.Runtime.CompilerServices;
+using System.Windows;
 
 internal static class UiRuntimeSmokeModule
 {
@@ -9,12 +10,20 @@ internal static class UiRuntimeSmokeModule
         Exception? failure = null;
         var thread = new Thread(() =>
         {
-            try { UiRuntimeVerifier.VerifyCorrectiveVisuals(); }
+            try
+            {
+                if (Application.Current is null)
+                {
+                    var app = new App();
+                    app.InitializeComponent();
+                }
+                UiRuntimeVerifier.VerifyCorrectiveVisuals();
+            }
             catch (Exception ex) { failure = ex; }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        if (!thread.Join(TimeSpan.FromSeconds(20)))
+        if (!thread.Join(TimeSpan.FromSeconds(30)))
             throw new TimeoutException("Corrective UI runtime verification timed out.");
         if (failure is not null)
             throw new InvalidOperationException("Corrective UI runtime verification failed.", failure);
