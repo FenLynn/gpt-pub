@@ -1,0 +1,179 @@
+name: Apply P102 AtlasDesk v0.8.1 once
+
+on:
+  push:
+    branches:
+      - p102-exp
+    paths:
+      - '.github/workflows/p102-v081-apply-once.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p102-v081-apply-once
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: github.repository == 'FenLynn/gpt-pub'
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout P102 development branch
+        uses: actions/checkout@v4
+        with:
+          ref: p102-exp
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Apply deterministic source patch
+        shell: pwsh
+        run: |
+          python .maintenance/p102-v081-apply.py
+          if ($LASTEXITCODE -ne 0) { throw 'AtlasDesk v0.8.1 patch failed.' }
+
+      - name: Build native terminal host
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSROOT=%%i"
+          if not defined VSROOT exit /b 1
+          call "%VSROOT%\VC\Auxiliary\Build\vcvars64.bat"
+          if not exist build\terminal-host mkdir build\terminal-host
+          cl /nologo /std:c++20 /O2 /EHsc /MT /DUNICODE /D_UNICODE "projects\1-桌面软件\102-AtlasDesk\代码\personal-workbench-terminal-host\terminal_host.cpp" /link /SUBSYSTEM:WINDOWS /OUT:"build\terminal-host\AtlasDesk.TerminalHost.exe"
+          if errorlevel 1 exit /b %errorlevel%
+          if not exist "build\terminal-host\AtlasDesk.TerminalHost.exe" exit /b 1
+          echo PWB_TERMINAL_HOST_PATH=%CD%\build\terminal-host\AtlasDesk.TerminalHost.exe>>"%GITHUB_ENV%"
+
+      - name: Prepare terminal web assets
+        shell: pwsh
+        run: |
+          $temp = Join-Path $env:RUNNER_TEMP 'atlasdesk-xterm-v081'
+          New-Item -ItemType Directory -Path $temp -Force | Out-Null
+          npm install --prefix $temp @xterm/xterm@6.0.0 @xterm/addon-fit@0.11.0 --ignore-scripts --no-audit --no-fund
+          $vendor = 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/TerminalAssets/vendor'
+          New-Item -ItemType Directory -Path $vendor -Force | Out-Null
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/lib/xterm.js') (Join-Path $vendor 'xterm.js') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/css/xterm.css') (Join-Path $vendor 'xterm.css') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/addon-fit/lib/addon-fit.js') (Join-Path $vendor 'addon-fit.js') -Force
+
+      - name: Restore and run smoke suite
+        shell: pwsh
+        run: |
+          dotnet restore projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
+          dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke suite failed.' }
+
+      - name: Publish direct Runtime candidate
+        shell: pwsh
+        run: |
+          dotnet publish projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/PersonalWorkbench.csproj `
+            -c Release -r win-x64 --self-contained false --no-restore `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false `
+            -o build/runtime-v081
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime publish failed.' }
+          Copy-Item build/terminal-host/AtlasDesk.TerminalHost.exe build/runtime-v081/AtlasDesk.TerminalHost.exe -Force
+          if (!(Test-Path build/runtime-v081/AtlasDesk.exe)) { throw 'AtlasDesk.exe missing.' }
+          if (!(Test-Path build/runtime-v081/AtlasDesk.TerminalHost.exe)) { throw 'AtlasDesk.TerminalHost.exe missing.' }
+
+      - name: Verify repaired source boundaries
+        shell: pwsh
+        run: |
+          $root = 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native'
+          $version = Get-Content "$root/Version.props" -Raw
+          if ($version -notmatch '<WorkbenchVersion>0.8.1</WorkbenchVersion>') { throw 'Version was not advanced to 0.8.1.' }
+
+          $policy = Get-Content "$root/DashboardNavigationPolicy.cs" -Raw
+          foreach ($required in @('MainDashboard','AuthenticationPopup','ExternalBrowser','SameOrigin')) {
+            if ($policy -notmatch [regex]::Escape($required)) { throw "Missing route policy: $required" }
+          }
+
+          $main = Get-Content "$root/MainWindow.xaml.cs" -Raw
+          foreach ($required in @('RecoverDashboardAsync','OpenExternalUri','DashboardNavigationPolicy.Classify')) {
+            if ($main -notmatch [regex]::Escape($required)) { throw "Missing Dashboard behavior: $required" }
+          }
+
+          $hotfix = Get-Content "$root/V068HotfixEnhancer.cs" -Raw
+          if ($hotfix -match 'SetHostMode\(TerminalHostMode\.Development\)' -or
+              $hotfix -match '_development\.Visibility\s*=\s*Visibility\.Collapsed') {
+            throw 'Legacy terminal-over-environment path remains.'
+          }
+
+          $chrome = Get-Content "$root/V069UiFixEnhancer.cs" -Raw
+          if ($chrome -notmatch 'WM_GETMINMAXINFO' -or $chrome -notmatch 'MonitorFromWindow') {
+            throw 'WorkArea hook is incomplete.'
+          }
+
+          $shell = Get-Content "$root/WorkbenchEnhancer.cs" -Raw
+          if ($shell -notmatch 'shell-divider' -or $shell -notmatch 'content\.Effect = null') {
+            throw 'Flat shell implementation is incomplete.'
+          }
+
+      - name: Remove build-time source mutations and generated assets
+        shell: pwsh
+        run: |
+          $generatedMutations = @(
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/MainWindow.xaml',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/ZoteroLibrary.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/WorkspaceControl.xaml.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/WorkspaceControl.xaml',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/MarkdownDocumentRenderer.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/TerminalDrawerControl.xaml.cs'
+          )
+          foreach ($path in $generatedMutations) {
+            if (Test-Path $path) { git checkout -- $path }
+          }
+          Remove-Item 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/TerminalAssets/vendor' -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item build -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Verify change scope
+        shell: pwsh
+        run: |
+          $allowed = @(
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/Version.props',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/RELEASE_NOTES.txt',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/DashboardNavigationPolicy.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/MainWindow.xaml.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/WorkbenchEnhancer.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/V068HotfixEnhancer.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/V069UiFixEnhancer.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/V070ProjectCenterEnhancer.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/V0612ExperienceEnhancer.cs',
+            'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/Program.cs',
+            '.github/workflows/p102-atlasdesk-ci.yml',
+            '.github/workflows/p102-v081-apply-once.yml',
+            '.maintenance/p102-v081-apply.py'
+          )
+          $changed = @(git -c core.quotePath=false status --short | ForEach-Object { $_.Substring(3) })
+          $bad = @($changed | Where-Object { $allowed -notcontains $_ })
+          if ($bad.Count -gt 0) {
+            Write-Host 'Unexpected changed files:'
+            $bad | ForEach-Object { Write-Host $_ }
+            throw 'Patch changed files outside the approved scope.'
+          }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'git diff --check failed.' }
+
+      - name: Commit verified v0.8.1 source
+        shell: pwsh
+        run: |
+          Remove-Item '.github/workflows/p102-v081-apply-once.yml' -Force
+          Remove-Item '.maintenance/p102-v081-apply.py' -Force
+          git config user.name 'AtlasDesk Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'P102｜实施 AtlasDesk v0.8.1 核心修复'
+          if ($LASTEXITCODE -ne 0) { throw 'No verified product commit was created.' }
+          git push origin HEAD:p102-exp
