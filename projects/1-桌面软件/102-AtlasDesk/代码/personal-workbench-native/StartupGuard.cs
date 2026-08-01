@@ -17,7 +17,7 @@ public static class StartupGuard
     private static readonly object Sync = new();
     private static StartupGuardState? _state;
 
-    public static string StatePath => Path.Combine(App.AppDataDirectory, "startup-state.json");
+    public static string StatePath => Path.Combine(App.StateDirectory, "startup-state.json");
     public static StartupGuardState Current => _state ?? new StartupGuardState();
     public static bool PreviousSessionUnclean => Current.PreviousSessionUnclean;
 
@@ -83,7 +83,7 @@ public static class StartupGuard
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? App.AppDataDirectory);
+            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? App.StateDirectory);
             var temp = path + ".tmp";
             File.WriteAllText(temp, JsonSerializer.Serialize(state, JsonOptions()));
             File.Move(temp, path, true);

@@ -1,17 +1,23 @@
-AtlasDesk v0.7.4
+AtlasDesk v0.8.0
 
-This is a deliberately small continuity release used to verify the complete GPT-Pub development path from p102-exp to p102-stable and main.
+This release changes AtlasDesk from a self-extracting launcher into a transparent folder runtime.
 
-- Standardized all user-visible product wording on AtlasDesk.
-- Changed the roaming configuration and log directory to %APPDATA%\AtlasDesk.
-- Added safe first-start migration from %APPDATA%\PersonalWorkbench when the AtlasDesk directory does not yet exist.
-- Changed the launcher extraction directory to %LOCALAPPDATA%\AtlasDesk\App\<version> and the extracted application name to AtlasDesk.App.exe.
-- Updated launcher dialogs, diagnostics, support bundles, settings warnings and backup UI to AtlasDesk.
-- Kept historical namespace, assembly, backup schema and embedded payload identifiers as internal compatibility details.
-- Added automated path-migration tests and a source regression that rejects the old user-visible product phrase.
+Runtime and Data
+- AtlasDesk.exe is now the real WPF application. It runs directly from the user-created AtlasDesk folder.
+- AtlasDesk.TerminalHost.exe and terminal web assets remain beside the main program in the same public Runtime folder.
+- No executable, DLL or terminal asset is written to AppData.
+- %APPDATA%\AtlasDesk contains only small, important private settings and encrypted data.
+- %LOCALAPPDATA%\AtlasDesk contains machine-local WebView2 state, terminal profile, logs, cache and startup state.
+- Automatic legacy migration was removed from product code. A one-time external migration script is provided separately.
 
-Verification checkpoint
-- Windows WPF/XAML compilation and complete smoke tests are required.
-- Legacy roaming data must move to AtlasDesk without overwriting an existing AtlasDesk directory.
-- Existing backup files, settings, task history, Zotero, Markdown, Command Center and CMD/ConPTY regressions must remain green.
-- Framework-dependent publishing, Go launcher embedding, lightweight size validation, ZIP/EXE consistency and SHA-256 are required before promotion.
+Security and privacy
+- Added an optional local encrypted vault protected by a 20-character-or-longer master password and Google Authenticator compatible TOTP.
+- Added local QR setup, Argon2id password derivation and AES-256-GCM encrypted vault storage.
+- Added a generic encrypted key/value editor for passwords, tokens and private notes.
+- Added an optional four-digit temporary UI lock. It is manual, can be disabled, and never participates in encryption.
+- Runtime remains fully public and contains no user paths, cookies, logs, tokens or account data.
+
+Interface and reliability
+- Fixed the sidebar to an opaque neutral background so Dashboard login rendering cannot tint it yellow.
+- Added direct access to the roaming configuration directory and the machine-local data directory.
+- The encrypted vault key is cleared when AtlasDesk exits or when the user locks the vault.

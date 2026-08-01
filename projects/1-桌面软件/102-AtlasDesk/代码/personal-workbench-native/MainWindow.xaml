@@ -22,7 +22,7 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Border x:Name="Sidebar" Grid.Column="0" CornerRadius="18" BorderBrush="#DDE6F1" BorderThickness="1" Background="#F9FBFEDD">
+        <Border x:Name="Sidebar" Grid.Column="0" CornerRadius="18" BorderBrush="#DDE6F1" BorderThickness="1" Background="#FBFCFE">
             <Border.Effect><DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.09" Color="#43536A"/></Border.Effect>
             <Grid Margin="10">
                 <Grid.RowDefinitions>
@@ -54,7 +54,7 @@
                         </Button.Template>
                     </Button>
                     <StackPanel x:Name="BrandText" Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="Workbench" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="AtlasDesk" FontSize="14" FontWeight="SemiBold"/>
                         <TextBlock Text="Personal OS" FontSize="10.5" Foreground="#7B899B" Margin="0,1,0,0"/>
                     </StackPanel>
                 </Grid>

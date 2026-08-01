@@ -49,7 +49,7 @@ jobs:
   build:
     needs: scope
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -64,11 +64,10 @@ jobs:
           $version = [string]$props.Project.PropertyGroup.WorkbenchVersion
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'WorkbenchVersion is missing.' }
           try { $parsedVersion = [version]$version }
-          catch { throw "WorkbenchVersion is not a valid semantic version: $version" }
-          if ($parsedVersion -lt [version]'0.7.3') { throw "AtlasDesk version must not move below the public baseline: $version" }
+          catch { throw "WorkbenchVersion is not a valid version: $version" }
+          if ($parsedVersion -lt [version]'0.8.0') { throw "AtlasDesk version must not move below 0.8.0: $version" }
 
           $event = '${{ github.event_name }}'
-          $head = '${{ github.head_ref }}'
           $base = '${{ github.base_ref }}'
           $ref = '${{ github.ref_name }}'
           $full = ($event -eq 'workflow_dispatch') -or
@@ -79,8 +78,7 @@ jobs:
 
           "WORKBENCH_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FULL_VERIFICATION=$($full.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "PACKAGE_BUILD=$($full.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Append
-          Write-Host "Version=$version FullVerification=$full Event=$event Head=$head Base=$base Ref=$ref"
+          Write-Host "Version=$version FullVerification=$full Event=$event Base=$base Ref=$ref"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -94,12 +92,12 @@ jobs:
           if not defined VSROOT exit /b 1
           call "%VSROOT%\VC\Auxiliary\Build\vcvars64.bat"
           if not exist build\terminal-host mkdir build\terminal-host
-          cl /nologo /std:c++20 /O2 /EHsc /MT /DUNICODE /D_UNICODE "projects\1-桌面软件\102-AtlasDesk\代码\personal-workbench-terminal-host\terminal_host.cpp" /link /SUBSYSTEM:WINDOWS /OUT:"build\terminal-host\PersonalWorkbench.TerminalHost.exe"
+          cl /nologo /std:c++20 /O2 /EHsc /MT /DUNICODE /D_UNICODE "projects\1-桌面软件\102-AtlasDesk\代码\personal-workbench-terminal-host\terminal_host.cpp" /link /SUBSYSTEM:WINDOWS /OUT:"build\terminal-host\AtlasDesk.TerminalHost.exe"
           if errorlevel 1 exit /b %errorlevel%
-          if not exist "build\terminal-host\PersonalWorkbench.TerminalHost.exe" exit /b 1
-          echo PWB_TERMINAL_HOST_PATH=%CD%\build\terminal-host\PersonalWorkbench.TerminalHost.exe>>"%GITHUB_ENV%"
+          if not exist "build\terminal-host\AtlasDesk.TerminalHost.exe" exit /b 1
+          echo PWB_TERMINAL_HOST_PATH=%CD%\build\terminal-host\AtlasDesk.TerminalHost.exe>>"%GITHUB_ENV%"
 
-      - name: Prepare embedded xterm assets
+      - name: Prepare Runtime terminal assets
         shell: pwsh
         run: |
           $temp = Join-Path $env:RUNNER_TEMP 'atlasdesk-xterm'
@@ -131,35 +129,36 @@ jobs:
       - name: Run complete smoke suite
         run: dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
 
-      - name: Verify AtlasDesk identity and migration boundary
+      - name: Verify Runtime/Data and security boundary
         shell: pwsh
         run: |
-          $identity = Get-Content 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/ProductIdentity.cs' -Raw
-          if ($identity -notmatch 'ProductName\s*=\s*"AtlasDesk"') { throw 'AtlasDesk product identity is missing.' }
-          if ($identity -notmatch 'LegacyStorageName\s*=\s*"PersonalWorkbench"') { throw 'Legacy storage migration identity is missing.' }
-          $app = Get-Content 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/App.xaml.cs' -Raw
-          if ($app -notmatch 'ProductIdentity\.AppDataDirectory') { throw 'AtlasDesk AppData path is not active.' }
-          $launcher = Get-Content 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-launcher/main_windows.go' -Raw
-          if ($launcher -notmatch 'productName\s*=\s*"AtlasDesk"') { throw 'AtlasDesk launcher identity is missing.' }
-          if ($launcher -notmatch 'target := filepath\.Join\(root, "AtlasDesk\.App\.exe"\)') { throw 'AtlasDesk extracted application name is missing.' }
+          $root = 'projects/1-桌面软件/102-AtlasDesk/代码'
+          if (Test-Path "$root/personal-workbench-launcher") { throw 'Self-extracting launcher remains.' }
 
-      - name: Setup Go
-        if: env.PACKAGE_BUILD == 'true'
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23.x'
-          cache: false
+          $identity = Get-Content "$root/personal-workbench-native/ProductIdentity.cs" -Raw
+          foreach ($required in @('RuntimeDirectory','RoamingDataDirectory','LocalDataDirectory','TerminalAssetsDirectory')) {
+            if ($identity -notmatch $required) { throw "Missing architecture path: $required" }
+          }
+          if ($identity -match 'MigrateLegacy|LegacyAppData') { throw 'Legacy migration entered product code.' }
 
-      - name: Stamp launcher version
-        if: env.PACKAGE_BUILD == 'true'
-        shell: pwsh
-        run: |
-          $path = 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-launcher/main_windows.go'
-          $content = Get-Content $path -Raw
-          $content = [regex]::Replace($content, 'appVersion\s*=\s*"[^"]+"', "appVersion = `"$env:WORKBENCH_VERSION`"")
-          Set-Content $path $content -Encoding UTF8
+          $project = Get-Content "$root/personal-workbench-native/PersonalWorkbench.csproj" -Raw
+          if ($project -notmatch '<AssemblyName>AtlasDesk</AssemblyName>') { throw 'Direct AtlasDesk.exe output is not configured.' }
+          if ($project -notmatch 'QRCoder' -or $project -notmatch 'Konscious.Security.Cryptography.Argon2') {
+            throw 'Security dependencies are incomplete.'
+          }
 
-      - name: Publish framework-dependent app payload
+          $security = Get-Content "$root/personal-workbench-native/SecurityService.cs" -Raw
+          foreach ($required in @('Argon2id','AesGcm','HMACSHA1','MasterPasswordMinimumLength = 20','PinEnabled')) {
+            if ($security -notmatch [regex]::Escape($required)) { throw "Missing security boundary: $required" }
+          }
+
+          $all = Get-ChildItem "$root/personal-workbench-native" -Recurse -File |
+            ForEach-Object { Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue }
+          if (($all -join "`n") -match '%LOCALAPPDATA%\\AtlasDesk\\App|AtlasDesk\.App\.exe') {
+            throw 'Old AppData Runtime architecture remains.'
+          }
+
+      - name: Publish direct Runtime
         if: env.FULL_VERIFICATION == 'true'
         run: >-
           dotnet publish projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/PersonalWorkbench.csproj
@@ -168,142 +167,111 @@ jobs:
           --self-contained false
           --no-restore
           -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -o build/app
+          -p:IncludeNativeLibrariesForSelfExtract=false
+          -o build/runtime
 
-      - name: Assemble native terminal host
-        if: env.FULL_VERIFICATION == 'true'
-        shell: pwsh
-        run: Copy-Item build/terminal-host/PersonalWorkbench.TerminalHost.exe build/app/PersonalWorkbench.TerminalHost.exe -Force
-
-      - name: Validate lightweight app payload
+      - name: Assemble and verify Runtime
         if: env.FULL_VERIFICATION == 'true'
         shell: pwsh
         run: |
-          $app = 'build/app/PersonalWorkbench.App.exe'
-          $terminalHostPath = 'build/app/PersonalWorkbench.TerminalHost.exe'
-          if (!(Test-Path $app)) { throw 'Internal app payload was not produced.' }
-          if (!(Test-Path $terminalHostPath)) { throw 'Internal terminal host was not assembled.' }
-          $forbidden = @('coreclr.dll','clrjit.dll','hostfxr.dll','hostpolicy.dll','System.Private.CoreLib.dll','python.exe','conda.exe','uv.exe','node.exe','conpty.dll')
-          foreach ($name in $forbidden) {
-            if (Get-ChildItem build/app -Recurse -File -Filter $name -ErrorAction SilentlyContinue) { throw "Bundled runtime file detected: $name" }
+          Copy-Item build/terminal-host/AtlasDesk.TerminalHost.exe build/runtime/AtlasDesk.TerminalHost.exe -Force
+          Copy-Item projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/RELEASE_NOTES.txt build/runtime/README.txt -Force
+
+          # Documentation XML files are build-time reference material, not Runtime dependencies.
+          Get-ChildItem build/runtime -File -Filter '*.xml' -ErrorAction SilentlyContinue |
+            Remove-Item -Force
+
+          if (!(Test-Path build/runtime/AtlasDesk.exe)) { throw 'AtlasDesk.exe missing.' }
+          if (!(Test-Path build/runtime/AtlasDesk.TerminalHost.exe)) { throw 'AtlasDesk.TerminalHost.exe missing.' }
+
+          foreach ($required in @('terminal.html','terminal-host.js','vendor/xterm.js','vendor/xterm.css','vendor/addon-fit.js')) {
+            if (!(Test-Path (Join-Path 'build/runtime/Assets/Terminal' $required))) {
+              throw "Runtime asset missing: $required"
+            }
           }
-          $payloadSize = (Get-Item $app).Length
-          $hostSize = (Get-Item $terminalHostPath).Length
-          if ($payloadSize -gt 44MB) { throw "App payload is unexpectedly large: $([math]::Round($payloadSize / 1MB, 2)) MB" }
-          if ($hostSize -gt 2MB) { throw "Terminal host is unexpectedly large: $([math]::Round($hostSize / 1MB, 2)) MB" }
-          "APP_PAYLOAD_BYTES=$payloadSize" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "TERMINAL_HOST_BYTES=$hostSize" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Embed app payload in AtlasDesk launcher
-        if: env.PACKAGE_BUILD == 'true'
-        shell: pwsh
-        run: |
-          $folder = "artifacts/AtlasDesk_v$env:WORKBENCH_VERSION`_Lightweight"
-          $launcher = 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-launcher'
-          New-Item -ItemType Directory -Path (Join-Path $launcher 'payload') -Force | Out-Null
-          Remove-Item (Join-Path $launcher 'payload/*') -Force -ErrorAction SilentlyContinue
-          Copy-Item build/app/* (Join-Path $launcher 'payload/') -Force
+          foreach ($private in @('settings.json','security.json','vault.bin','task-history.json','atlasdesk.log','WebView2','Cache','Logs','Crash')) {
+            if (Test-Path (Join-Path build/runtime $private)) { throw "Private Data leaked into Runtime: $private" }
+          }
+
+          if (Get-ChildItem build/runtime -Recurse -File -Filter 'AtlasDesk.App.exe' -ErrorAction SilentlyContinue) {
+            throw 'Old extracted application leaked into Runtime.'
+          }
+
+          $folder = "artifacts/AtlasDesk_v$env:WORKBENCH_VERSION`_Runtime"
           New-Item -ItemType Directory -Path $folder -Force | Out-Null
-          Push-Location $launcher
-          go build -trimpath -ldflags '-s -w -H windowsgui' -o "$env:GITHUB_WORKSPACE/$folder/AtlasDesk.exe" .
-          Pop-Location
-          Copy-Item projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/RELEASE_NOTES.txt "$folder/README.txt" -Force
+          Copy-Item build/runtime/* $folder -Recurse -Force
 
-      - name: Validate final package size
-        if: env.PACKAGE_BUILD == 'true'
-        shell: pwsh
-        run: |
-          $exe = "artifacts/AtlasDesk_v$env:WORKBENCH_VERSION`_Lightweight/AtlasDesk.exe"
-          if (!(Test-Path $exe)) { throw 'AtlasDesk launcher was not produced.' }
-          $size = (Get-Item $exe).Length
-          if ($size -gt 58MB) { throw "Final executable is unexpectedly large: $([math]::Round($size / 1MB, 2)) MB" }
-          "FINAL_EXE_BYTES=$size" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $files = Get-ChildItem $folder -Recurse -File | Sort-Object FullName | ForEach-Object {
+            [pscustomobject]@{
+              path = [IO.Path]::GetRelativePath((Resolve-Path $folder), $_.FullName).Replace('\','/')
+              bytes = $_.Length
+              sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          }
 
-      - name: Package and write manifest
-        if: env.PACKAGE_BUILD == 'true'
-        shell: pwsh
-        run: |
-          $folder = "artifacts/AtlasDesk_v$env:WORKBENCH_VERSION`_Lightweight"
+          [pscustomobject]@{
+            product = 'AtlasDesk'
+            version = $env:WORKBENCH_VERSION
+            architecture = 'win-x64'
+            deployment = 'folder-runtime'
+            data_roaming = '%APPDATA%\AtlasDesk'
+            data_local = '%LOCALAPPDATA%\AtlasDesk'
+            files = $files
+          } | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $folder 'runtime-manifest.json') -Encoding UTF8
+
           $zip = "$folder.zip"
           Compress-Archive -Path "$folder/*" -DestinationPath $zip -Force
-          $exeHash = (Get-FileHash "$folder/AtlasDesk.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$exeHash  AtlasDesk.exe" | Set-Content artifacts/SHA256.txt -Encoding ASCII
-          @"
-          product=AtlasDesk
-          project=P102
-          repository=FenLynn/gpt-pub
-          version=$env:WORKBENCH_VERSION
-          data_directory=AtlasDesk
-          extracted_application=AtlasDesk.App.exe
-          legacy_storage_identity=PersonalWorkbench
-          source_commit=c48180a2ac74b6336220bce484c8051551d4e2fb
-          public_filtered_head=f8493a0bcb73ed0e05f039144890dc07b5d885fb
-          app_payload_bytes=$env:APP_PAYLOAD_BYTES
-          terminal_host_bytes=$env:TERMINAL_HOST_BYTES
-          final_exe_bytes=$env:FINAL_EXE_BYTES
-          smoke_tests=passed
-          self_contained=false
-          bundled_dotnet_runtime=false
-          bundled_webview2_runtime=false
-          bundled_node_runtime=false
-          bundled_python=false
-          bundled_conda=false
-          bundled_uv=false
-          bundled_pdf_engine=false
-          terminal_renderer=xterm.js_6.0.0
-          terminal_backend=native_gui_bridge_windows_system_conpty
-          zotero_access=read_only_sqlite
-          workspace_editor=lightweight_wpf
-          markdown_preview=flowdocument
-          diagnostics=sanitized_support_bundle
-          "@ | Set-Content artifacts/build-manifest.txt -Encoding UTF8
+          "RUNTIME_ZIP_SHA256=$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant())" |
+            Out-File -FilePath $env:GITHUB_ENV -Append
+          "ATLASDESK_EXE_SHA256=$((Get-FileHash (Join-Path $folder 'AtlasDesk.exe') -Algorithm SHA256).Hash.ToLowerInvariant())" |
+            Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Verify portable ZIP and checksum consistency
-        if: env.PACKAGE_BUILD == 'true'
+      - name: Verify Runtime ZIP consistency
+        if: env.FULL_VERIFICATION == 'true'
         shell: pwsh
         run: |
-          $folder = "artifacts/AtlasDesk_v$env:WORKBENCH_VERSION`_Lightweight"
+          $folder = "artifacts/AtlasDesk_v$env:WORKBENCH_VERSION`_Runtime"
           $zip = "$folder.zip"
-          $expected = ((Get-Content artifacts/SHA256.txt -Raw) -split '\s+')[0].Trim().ToLowerInvariant()
-          $outer = (Get-FileHash "$folder/AtlasDesk.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($outer -ne $expected) { throw 'Outer EXE hash does not match SHA256.txt.' }
-          $expanded = Join-Path $env:RUNNER_TEMP 'atlasdesk-portable-check'
+          $expanded = Join-Path $env:RUNNER_TEMP 'atlasdesk-runtime-check'
           Remove-Item $expanded -Recurse -Force -ErrorAction SilentlyContinue
           Expand-Archive $zip -DestinationPath $expanded -Force
-          $inner = (Get-FileHash (Join-Path $expanded 'AtlasDesk.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($inner -ne $expected) { throw 'Portable ZIP EXE hash does not match SHA256.txt.' }
-          $manifest = Get-Content artifacts/build-manifest.txt -Raw
-          foreach ($required in @('product=AtlasDesk','project=P102',"version=$env:WORKBENCH_VERSION",'data_directory=AtlasDesk','extracted_application=AtlasDesk.App.exe','legacy_storage_identity=PersonalWorkbench','smoke_tests=passed','self_contained=false')) {
-            if ($manifest -notmatch [regex]::Escape($required)) { throw "Manifest entry missing: $required" }
-          }
-          "PORTABLE_ZIP_SHA256=$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "ATLASDESK_EXE_SHA256=$expected" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Upload verified package
-        if: env.PACKAGE_BUILD == 'true'
+          $manifest = Get-Content (Join-Path $expanded 'runtime-manifest.json') -Raw | ConvertFrom-Json
+          if ($manifest.product -ne 'AtlasDesk' -or $manifest.version -ne $env:WORKBENCH_VERSION) {
+            throw 'Runtime manifest identity mismatch.'
+          }
+          if ($manifest.deployment -ne 'folder-runtime') { throw 'Runtime deployment mode mismatch.' }
+
+          foreach ($entry in $manifest.files) {
+            $path = Join-Path $expanded ($entry.path -replace '/', '\')
+            if (!(Test-Path $path -PathType Leaf)) { throw "Manifest file missing: $($entry.path)" }
+            $actual = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $entry.sha256) { throw "Manifest hash mismatch: $($entry.path)" }
+          }
+
+      - name: Upload Runtime
+        if: env.FULL_VERIFICATION == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: AtlasDesk-v${{ env.WORKBENCH_VERSION }}-lightweight-win-x64
+          name: AtlasDesk-v${{ env.WORKBENCH_VERSION }}-Runtime
           path: |
-            artifacts/AtlasDesk_v${{ env.WORKBENCH_VERSION }}_Lightweight.zip
-            artifacts/AtlasDesk_v${{ env.WORKBENCH_VERSION }}_Lightweight/AtlasDesk.exe
-            artifacts/SHA256.txt
-            artifacts/build-manifest.txt
+            artifacts/AtlasDesk_v${{ env.WORKBENCH_VERSION }}_Runtime.zip
+            artifacts/AtlasDesk_v${{ env.WORKBENCH_VERSION }}_Runtime/runtime-manifest.json
           if-no-files-found: error
-          retention-days: 90
 
-      - name: Write verification summary
+      - name: Write summary
         if: always()
         shell: pwsh
         run: |
           @"
-          ## P102 AtlasDesk verification
-
+          ## AtlasDesk P102
           - Version: $env:WORKBENCH_VERSION
           - Full verification: $env:FULL_VERIFICATION
-          - Package build: $env:PACKAGE_BUILD
-          - Data directory: AtlasDesk
-          - EXE SHA-256: $env:ATLASDESK_EXE_SHA256
-          - Portable ZIP SHA-256: $env:PORTABLE_ZIP_SHA256
+          - Deployment: folder-runtime
+          - Runtime root: user-selected AtlasDesk folder
+          - Roaming Data: %APPDATA%\AtlasDesk
+          - Local Data: %LOCALAPPDATA%\AtlasDesk
+          - Runtime ZIP SHA-256: $env:RUNTIME_ZIP_SHA256
+          - AtlasDesk.exe SHA-256: $env:ATLASDESK_EXE_SHA256
           "@ | Add-Content $env:GITHUB_STEP_SUMMARY

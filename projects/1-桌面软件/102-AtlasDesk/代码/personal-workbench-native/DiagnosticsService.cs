@@ -67,7 +67,9 @@ public static class DiagnosticsService
     public static IReadOnlyList<DiagnosticCheck> Run(AppSettings settings)
     {
         var checks = new List<DiagnosticCheck>();
-        checks.Add(CheckAppData());
+        checks.Add(CheckRuntimeBoundary());
+        checks.Add(CheckRoamingData());
+        checks.Add(CheckLocalData());
         checks.Add(new DiagnosticCheck
         {
             Name = "应用版本",
@@ -115,17 +117,43 @@ public static class DiagnosticsService
         return builder.ToString();
     }
 
-    private static DiagnosticCheck CheckAppData()
+    private static DiagnosticCheck CheckRuntimeBoundary()
     {
         try
         {
-            Directory.CreateDirectory(App.AppDataDirectory);
-            var probe = Path.Combine(App.AppDataDirectory, ".write-test-" + Guid.NewGuid().ToString("N"));
+            var executable = Path.Combine(App.RuntimeDirectory, "AtlasDesk.exe");
+            var forbidden = new[] { "settings.json", "security.json", "vault.bin", "atlasdesk.log" }
+                .Where(name => File.Exists(Path.Combine(App.RuntimeDirectory, name)))
+                .ToArray();
+            if (forbidden.Length > 0)
+                return new DiagnosticCheck { Name = "Runtime 边界", Severity = DiagnosticSeverity.Error, Detail = "程序目录出现私人数据文件：" + string.Join("、", forbidden) };
+            return new DiagnosticCheck
+            {
+                Name = "Runtime 边界",
+                Severity = File.Exists(executable) ? DiagnosticSeverity.Ok : DiagnosticSeverity.Warning,
+                Detail = File.Exists(executable) ? "程序目录只读边界正常" : "当前可能从开发构建目录运行"
+            };
+        }
+        catch (Exception ex) { return new DiagnosticCheck { Name = "Runtime 边界", Severity = DiagnosticSeverity.Warning, Detail = ex.Message }; }
+    }
+
+    private static DiagnosticCheck CheckRoamingData()
+        => CheckWritableDirectory("轻量配置目录", App.AppDataDirectory);
+
+    private static DiagnosticCheck CheckLocalData()
+        => CheckWritableDirectory("本机数据目录", App.LocalDataDirectory);
+
+    private static DiagnosticCheck CheckWritableDirectory(string name, string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var probe = Path.Combine(directory, ".write-test-" + Guid.NewGuid().ToString("N"));
             File.WriteAllText(probe, "ok");
             File.Delete(probe);
-            return new DiagnosticCheck { Name = "配置目录", Severity = DiagnosticSeverity.Ok, Detail = "可读写 · " + App.AppDataDirectory };
+            return new DiagnosticCheck { Name = name, Severity = DiagnosticSeverity.Ok, Detail = "可读写" };
         }
-        catch (Exception ex) { return new DiagnosticCheck { Name = "配置目录", Severity = DiagnosticSeverity.Error, Detail = ex.Message }; }
+        catch (Exception ex) { return new DiagnosticCheck { Name = name, Severity = DiagnosticSeverity.Error, Detail = ex.Message }; }
     }
 
     private static DiagnosticCheck CheckStartupState()
@@ -182,7 +210,6 @@ public static class DiagnosticsService
 
     private static string BuildEnvironmentSummary() => string.Join(Environment.NewLine, new[]
     {
-        "Product=AtlasDesk",
         "Version=" + WorkbenchVersion.Current,
         "OS=" + Environment.OSVersion.VersionString,
         "Architecture=" + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture,

@@ -65,9 +65,9 @@ internal sealed class NativeTerminalHostSession : ITerminalSession
 
         var suffix = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture)
             + "-" + Guid.NewGuid().ToString("N");
-        var inputName = "PersonalWorkbench-Terminal-" + suffix + "-in";
-        var outputName = "PersonalWorkbench-Terminal-" + suffix + "-out";
-        var controlName = "PersonalWorkbench-Terminal-" + suffix + "-control";
+        var inputName = "AtlasDesk-Terminal-" + suffix + "-in";
+        var outputName = "AtlasDesk-Terminal-" + suffix + "-out";
+        var controlName = "AtlasDesk-Terminal-" + suffix + "-control";
 
         var inputPipe = new NamedPipeServerStream(
             inputName,
@@ -370,6 +370,6 @@ internal sealed class NativeTerminalHostSession : ITerminalSession
     {
         var configured = Environment.GetEnvironmentVariable("PWB_TERMINAL_HOST_PATH");
         if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
-        return Path.Combine(AppContext.BaseDirectory, "PersonalWorkbench.TerminalHost.exe");
+        return Path.Combine(App.RuntimeDirectory, "AtlasDesk.TerminalHost.exe");
     }
 }

@@ -131,7 +131,7 @@ public partial class TerminalDrawerControl : UserControl, IAsyncDisposable
     {
         if (_environment is not null) return;
         _assetRoot = TerminalAssetManager.EnsureExtracted();
-        var profile = Path.Combine(App.AppDataDirectory, "TerminalWebView2Profile");
+        var profile = App.TerminalProfileDirectory;
         Directory.CreateDirectory(profile);
         _environment = await CoreWebView2Environment.CreateAsync(null, profile, null);
     }
