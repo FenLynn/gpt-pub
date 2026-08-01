@@ -575,7 +575,7 @@ public partial class WorkspaceControl : UserControl
 
         var result = MessageBox.Show(
             "当前文件尚未保存。是否保存后继续？",
-            "Personal Workbench",
+            "AtlasDesk",
             MessageBoxButton.YesNoCancel,
             MessageBoxImage.Question);
         if (result == MessageBoxResult.Cancel) return false;

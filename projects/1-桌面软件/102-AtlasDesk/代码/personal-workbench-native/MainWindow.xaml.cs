@@ -126,7 +126,7 @@ public partial class MainWindow : Window
         {
             case "home":
                 PageTitle.Text = "首页";
-                PageSubtitle.Text = "  ·  Personal Workbench";
+                PageSubtitle.Text = "  ·  AtlasDesk";
                 HomeView.Visibility = Visibility.Visible;
                 break;
 
@@ -454,7 +454,7 @@ public partial class MainWindow : Window
         {
             App.Log("Zotero search failed: " + ex);
             ZoteroStatusText.Text = "读取失败：" + ex.Message;
-            MessageBox.Show("Zotero 数据库读取失败：\n\n" + ex.Message + "\n\n数据库始终以只读方式打开，原文件未被修改。", "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("Zotero 数据库读取失败：\n\n" + ex.Message + "\n\n数据库始终以只读方式打开，原文件未被修改。", "AtlasDesk", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -639,7 +639,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             App.Log("Popout failed: " + ex);
-            MessageBox.Show("Dashboard 弹出失败：\n" + ex.Message, "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("Dashboard 弹出失败：\n" + ex.Message, "AtlasDesk", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -911,7 +911,7 @@ public partial class MainWindow : Window
         var url = DashboardUrlBox.Text.Trim();
         if (!string.IsNullOrWhiteSpace(url) && !IsValidHttpUrl(url))
         {
-            MessageBox.Show("Dashboard 地址必须以 http:// 或 https:// 开头。", "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Dashboard 地址必须以 http:// 或 https:// 开头。", "AtlasDesk", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -946,7 +946,7 @@ public partial class MainWindow : Window
             _pythonInitialized = false;
         UpdateHomeStatus();
         PageTitle.Text = "设置";
-        MessageBox.Show("设置已保存。", "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show("设置已保存。", "AtlasDesk", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private async void ClearSession_Click(object sender, RoutedEventArgs e)
@@ -967,7 +967,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             App.Log("Clear session failed: " + ex);
-            MessageBox.Show("清除会话失败：\n" + ex.Message, "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("清除会话失败：\n" + ex.Message, "AtlasDesk", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

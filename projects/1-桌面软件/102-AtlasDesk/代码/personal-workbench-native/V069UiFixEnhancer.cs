@@ -393,7 +393,7 @@ public sealed class V069UiFixEnhancer
         });
         identity.Children.Add(new TextBlock
         {
-            Text = "Personal Workbench",
+            Text = "AtlasDesk",
             FontSize = 11.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(48, 57, 71)),

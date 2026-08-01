@@ -388,7 +388,7 @@ public partial class ZoteroLibraryControl : UserControl
         catch (Exception ex)
         {
             App.Log("Open PDF failed: " + ex);
-            MessageBox.Show("无法打开 PDF：\n" + ex.Message, "Personal Workbench", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("无法打开 PDF：\n" + ex.Message, "AtlasDesk", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

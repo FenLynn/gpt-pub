@@ -21,9 +21,9 @@ public partial class BackupRestoreWindow : Window
     {
         var dialog = new SaveFileDialog
         {
-            Title = "导出 Personal Workbench 备份",
-            Filter = "Personal Workbench 备份 (*.pwbak)|*.pwbak|ZIP 文件 (*.zip)|*.zip",
-            FileName = $"PersonalWorkbench_{WorkbenchVersion.Current}_{DateTime.Now:yyyyMMdd_HHmmss}.pwbak",
+            Title = "导出 AtlasDesk 备份",
+            Filter = "AtlasDesk 备份 (*.pwbak)|*.pwbak|ZIP 文件 (*.zip)|*.zip",
+            FileName = $"AtlasDesk_{WorkbenchVersion.Current}_{DateTime.Now:yyyyMMdd_HHmmss}.pwbak",
             DefaultExt = ".pwbak",
             AddExtension = true
         };
@@ -101,14 +101,14 @@ public partial class BackupRestoreWindow : Window
                 "恢复前快照：" + staged.PreRestoreSnapshotPath,
                 string.Empty,
                 "当前运行中的配置没有被替换。",
-                "请关闭并重新启动 Personal Workbench；下次启动会在模块加载前再次校验并应用。"
+                "请关闭并重新启动 AtlasDesk；下次启动会在模块加载前再次校验并应用。"
             });
             ResultTitle.Text = "恢复已暂存";
             ResultSubtitle.Text = "恢复前快照已保留；重启后自动应用。";
             ResultText.Text = _lastResult;
             EnableResultActions();
             MessageBox.Show(this,
-                "恢复包已暂存，当前配置未改变。\n\n请关闭并重新启动 Personal Workbench。",
+                "恢复包已暂存，当前配置未改变。\n\n请关闭并重新启动 AtlasDesk。",
                 "备份与迁移", MessageBoxButton.OK, MessageBoxImage.Information);
         });
     }
@@ -149,7 +149,7 @@ public partial class BackupRestoreWindow : Window
         var dialog = new OpenFileDialog
         {
             Title = title,
-            Filter = "Personal Workbench 备份 (*.pwbak;*.zip)|*.pwbak;*.zip|所有文件 (*.*)|*.*",
+            Filter = "AtlasDesk 备份 (*.pwbak;*.zip)|*.pwbak;*.zip|所有文件 (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false
         };

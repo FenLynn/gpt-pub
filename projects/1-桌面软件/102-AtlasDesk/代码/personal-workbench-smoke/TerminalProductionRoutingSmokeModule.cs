@@ -54,7 +54,7 @@ internal static class TerminalProductionRoutingSmokeModule
                 current = current.Parent;
             }
         }
-        throw new DirectoryNotFoundException("Unable to locate the Personal Workbench repository root.");
+        throw new DirectoryNotFoundException("Unable to locate the AtlasDesk repository root.");
     }
 
     private static void Require(bool condition, string message)

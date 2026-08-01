@@ -68,9 +68,9 @@ public partial class DiagnosticsWindow : Window
     {
         var dialog = new SaveFileDialog
         {
-            Title = "导出 Personal Workbench 支持包",
+            Title = "导出 AtlasDesk 支持包",
             Filter = "ZIP 支持包 (*.zip)|*.zip",
-            FileName = $"PersonalWorkbench_Support_{DateTime.Now:yyyyMMdd_HHmmss}.zip",
+            FileName = $"AtlasDesk_Support_{DateTime.Now:yyyyMMdd_HHmmss}.zip",
             AddExtension = true,
             DefaultExt = ".zip"
         };

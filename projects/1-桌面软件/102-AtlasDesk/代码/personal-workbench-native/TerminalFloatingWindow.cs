@@ -18,7 +18,7 @@ public sealed class TerminalFloatingWindow : Window
 
     public TerminalFloatingWindow(string title, UIElement terminalContent)
     {
-        Title = string.IsNullOrWhiteSpace(title) ? "Personal Workbench Terminal" : title + " · Personal Workbench";
+        Title = string.IsNullOrWhiteSpace(title) ? "AtlasDesk Terminal" : title + " · AtlasDesk";
         Width = 1080;
         Height = 680;
         MinWidth = 720;

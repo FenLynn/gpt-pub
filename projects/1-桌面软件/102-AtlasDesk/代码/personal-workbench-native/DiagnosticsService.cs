@@ -72,7 +72,7 @@ public static class DiagnosticsService
         {
             Name = "应用版本",
             Severity = DiagnosticSeverity.Ok,
-            Detail = $"Personal Workbench {WorkbenchVersion.Current} · .NET {Environment.Version} · {Environment.OSVersion.VersionString}"
+            Detail = $"AtlasDesk {WorkbenchVersion.Current} · .NET {Environment.Version} · {Environment.OSVersion.VersionString}"
         });
         checks.Add(CheckStartupState());
         checks.Add(CheckWebView2());
@@ -102,13 +102,13 @@ public static class DiagnosticsService
         if (File.Exists(StartupGuard.StatePath))
             WriteText(archive, "startup-state.json", await File.ReadAllTextAsync(StartupGuard.StatePath));
         if (File.Exists(App.LogPath))
-            WriteText(archive, "logs/workbench-native.tail.log", await ReadTailAsync(App.LogPath, 2 * 1024 * 1024));
+            WriteText(archive, "logs/atlasdesk.tail.log", await ReadTailAsync(App.LogPath, 2 * 1024 * 1024));
     }
 
     public static string BuildSummary(IEnumerable<DiagnosticCheck> checks)
     {
         var builder = new StringBuilder();
-        builder.AppendLine($"Personal Workbench {WorkbenchVersion.Current} diagnostics");
+        builder.AppendLine($"AtlasDesk {WorkbenchVersion.Current} diagnostics");
         builder.AppendLine($"Generated: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
         builder.AppendLine();
         foreach (var check in checks) builder.AppendLine($"[{check.Status}] {check.Name}: {check.Detail}");
@@ -182,6 +182,7 @@ public static class DiagnosticsService
 
     private static string BuildEnvironmentSummary() => string.Join(Environment.NewLine, new[]
     {
+        "Product=AtlasDesk",
         "Version=" + WorkbenchVersion.Current,
         "OS=" + Environment.OSVersion.VersionString,
         "Architecture=" + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture,
