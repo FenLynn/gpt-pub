@@ -1,0 +1,3 @@
+AtlasDesk v0.8.1 implementation trigger
+branch=p102-v081-implementation
+base=p102-exp
