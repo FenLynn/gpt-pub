@@ -1,18 +1,18 @@
-Personal Workbench v0.7.0
+Personal Workbench v0.7.1
 
-This release advances the next planned core module only: Project Center. It preserves the verified Workspace, terminal, Zotero and environment backends.
+This release advances only the planned Task Center refinement. It preserves existing task types, history format and concurrency behavior.
 
-- Integrated Project Center into the Development page instead of opening a separate window.
-- Added a clear Project / Environment tab structure; existing Conda, uv, venv and system Python detection remains intact under Environment.
-- Reused the existing bounded read-only project scanner for Git, Python, Node, .NET, LaTeX, Rust and Go projects.
-- Added project search and type filters without adding a background index or executing project code.
-- Added direct actions to open a project in Workspace, create a project terminal, reveal it in Explorer or copy its path.
-- Removed the redundant global Project Center pop-out button after the integrated page is attached.
-- Preserved scan cancellation, generated-directory skipping and the existing scan depth/item limits.
+- Reorganized Task Center into a left launch/filter pane, central task history and right result/details pane.
+- Kept the existing SHA-256 and default-workspace statistics tasks; no new executable task type was added.
+- Added task-history search by title, type or path.
+- Added status filters for active, completed and failed/cancelled tasks.
+- Kept cancellation, bounded concurrency, persisted history and interrupted-task recovery unchanged.
+- Improved visible/total counts, empty states and compact task actions.
+- Preserved open-location and copy-result actions for historical tasks.
 
 Verification checkpoint
 - Windows WPF/XAML compilation and framework-dependent publishing passed.
-- Project Center and Environment tabs constructed successfully in a real STA/WPF runtime.
-- Project catalog scanning, filtering and cancellation smoke tests remained green.
-- Production terminal routing and five consecutive real CMD/ConPTY sessions remained green.
+- Task Center constructed successfully in a real STA/WPF runtime with launch, search, filter, list and detail panes.
+- Existing SHA-256, directory statistics, cancellation, concurrency and history smoke tests remained green.
+- Project Center and production terminal regression suites remained green.
 - Final lightweight EXE packaging, size validation and artifact upload are required by this package build before merge.

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 
 namespace PersonalWorkbench;
 
@@ -11,7 +12,9 @@ public partial class TaskCenterControl : UserControl, IDisposable
 {
     private readonly AppSettings _settings;
     private readonly WorkbenchTaskService _service;
+    private readonly ICollectionView _taskView;
     private WorkbenchTaskRecord? _selected;
+    private bool _viewReady;
     private bool _disposed;
 
     public TaskCenterControl() : this(AppSettings.Load()) { }
@@ -23,10 +26,14 @@ public partial class TaskCenterControl : UserControl, IDisposable
         InitializeComponent();
         DataContext = _service;
         HistoryPathText.Text = WorkbenchTaskService.HistoryPath;
+        _taskView = CollectionViewSource.GetDefaultView(_service.Tasks);
+        _taskView.Filter = FilterTask;
+        TaskList.ItemsSource = _taskView;
+        _viewReady = true;
         _service.Tasks.CollectionChanged += Tasks_CollectionChanged;
         foreach (var record in _service.Tasks) record.PropertyChanged += Record_PropertyChanged;
         UpdateOverview();
-        if (_service.Tasks.Count > 0) TaskList.SelectedIndex = 0;
+        if (!_taskView.IsEmpty) TaskList.SelectedIndex = 0;
     }
 
     private void Tasks_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -35,14 +42,45 @@ public partial class TaskCenterControl : UserControl, IDisposable
             foreach (WorkbenchTaskRecord item in e.OldItems) item.PropertyChanged -= Record_PropertyChanged;
         if (e.NewItems is not null)
             foreach (WorkbenchTaskRecord item in e.NewItems) item.PropertyChanged += Record_PropertyChanged;
+        _taskView.Refresh();
         UpdateOverview();
-        if (TaskList.SelectedItem is null && _service.Tasks.Count > 0) TaskList.SelectedIndex = 0;
+        if (TaskList.SelectedItem is null && !_taskView.IsEmpty) TaskList.SelectedIndex = 0;
     }
 
     private void Record_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(WorkbenchTaskRecord.State) or nameof(WorkbenchTaskRecord.StateLabel))
+            _taskView.Refresh();
         UpdateOverview();
         if (ReferenceEquals(sender, _selected)) UpdateDetails();
+    }
+
+    private bool FilterTask(object item)
+    {
+        if (item is not WorkbenchTaskRecord record) return false;
+        var query = TaskSearchBox?.Text?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(query)
+            && !record.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+            && !record.TargetPath.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+            && !record.TypeLabel.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            return false;
+
+        var filter = (TaskFilter?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
+        return filter switch
+        {
+            "active" => record.State is WorkbenchTaskState.Queued or WorkbenchTaskState.Running,
+            "completed" => record.State == WorkbenchTaskState.Completed,
+            "problem" => record.State is WorkbenchTaskState.Failed or WorkbenchTaskState.Cancelled,
+            _ => true
+        };
+    }
+
+    private void TaskFilter_Changed(object sender, EventArgs e)
+    {
+        if (!_viewReady) return;
+        _taskView.Refresh();
+        UpdateOverview();
+        if (TaskList.SelectedItem is null && !_taskView.IsEmpty) TaskList.SelectedIndex = 0;
     }
 
     private void UpdateOverview()
@@ -52,7 +90,9 @@ public partial class TaskCenterControl : UserControl, IDisposable
         RunningBadgeText.Text = queued > 0
             ? $"{running} 运行 · {queued} 排队"
             : running + " 个运行中";
-        EmptyState.Visibility = _service.Tasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var visible = _taskView.Cast<object>().Count();
+        VisibleCountText.Text = $"{visible} / {_service.Tasks.Count}";
+        EmptyState.Visibility = visible == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateDetails()
@@ -102,6 +142,9 @@ public partial class TaskCenterControl : UserControl, IDisposable
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
         var record = _service.StartFileHash(dialog.FileName);
+        TaskFilter.SelectedIndex = 0;
+        TaskSearchBox.Clear();
+        _taskView.Refresh();
         TaskList.SelectedItem = record;
     }
 
@@ -113,13 +156,18 @@ public partial class TaskCenterControl : UserControl, IDisposable
             return;
         }
         var record = _service.StartDirectoryStatistics(_settings.WorkspaceRoot);
+        TaskFilter.SelectedIndex = 0;
+        TaskSearchBox.Clear();
+        _taskView.Refresh();
         TaskList.SelectedItem = record;
     }
 
     private void ClearFinished_Click(object sender, RoutedEventArgs e)
     {
         _service.ClearFinished();
-        if (_service.Tasks.Count == 0) SelectTask(null);
+        _taskView.Refresh();
+        if (_taskView.IsEmpty) SelectTask(null);
+        UpdateOverview();
     }
 
     private void TaskList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -151,13 +199,9 @@ public partial class TaskCenterControl : UserControl, IDisposable
         try
         {
             if (File.Exists(_selected.TargetPath))
-            {
                 Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + _selected.TargetPath + "\"") { UseShellExecute = true });
-            }
             else if (Directory.Exists(_selected.TargetPath))
-            {
                 Process.Start(new ProcessStartInfo("explorer.exe", _selected.TargetPath) { UseShellExecute = true });
-            }
         }
         catch (Exception ex) { App.Log("Task target open failed: " + ex.Message); }
     }
