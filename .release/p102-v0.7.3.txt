@@ -1,6 +1,0 @@
-project=P102
-product=AtlasDesk
-version=0.7.3
-target=df66c9246706439c35f082027a82eb34e827de69
-verified_pr_run=30696517002
-artifact_id=8817462686
