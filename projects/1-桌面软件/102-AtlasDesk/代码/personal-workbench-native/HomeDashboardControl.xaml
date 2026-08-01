@@ -155,7 +155,7 @@
             <Border Grid.Row="6" Background="#F7F9FC" BorderBrush="#E3E9F1" BorderThickness="1" CornerRadius="11" Padding="12,8">
                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <TextBlock Text="本地优先 · 工作区、Zotero 与环境状态只在本机读取" FontSize="10.4" Foreground="#78879A"/>
-                    <TextBlock Grid.Column="1" Text="Personal Workbench" FontSize="10.2" Foreground="#9AA5B4"/>
+                    <TextBlock Grid.Column="1" Text="AtlasDesk" FontSize="10.2" Foreground="#9AA5B4"/>
                 </Grid>
             </Border>
         </Grid>
