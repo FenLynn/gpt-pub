@@ -6,6 +6,7 @@ on:
       - main
     types:
       - edited
+      - synchronize
 
 permissions:
   contents: write
