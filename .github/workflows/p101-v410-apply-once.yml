@@ -1,0 +1,147 @@
+name: Apply Mediova v4.1.0 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.maintenance/p101-v410-run-trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: windows-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p101-exp
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Verify and reconstruct transformer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          @'
+          from pathlib import Path
+          import base64, gzip, hashlib, py_compile
+          root=Path('.maintenance/p101-v410/small')
+          expected=[
+          '94f57abcfb0cf2cf43347026f6d732218730fe60','7b94bb66bc0b1152658dea756b6f01f6dcb6b570',
+          '76c0d432abda69efe422ae4e0c2154fc68637ac2','6d40d7bdf142f16f1b2e771f162aa43bb44a27c9',
+          '104f009da3d10393d58f94eb3ec401d7d0bb7a73','beda294dfbe0a8c04e52390f13b01d6fe4b9a793',
+          '0c2d36aaac4c1a5a79f967efaf4bb34c6a3ed85f','440f1f0d1dff4c7075952b0e20d1e903ee74aec9',
+          'ff622cac8e2acdfd489c6844e5e5eb9caa0c9e80','e8dd64ce659cb4fa8f81484cf93fbcc2cfd062f4',
+          '30e4fc565a70e3a9d2ee1eed0c63c1291a6242c6','eb7e024709c6511741b2a428186906ccec171d20',
+          'd7eadb604015fed414cf0c53af8fd2e15a85df96','3dff4bcf2cfdf26487f0d5c57d3d3428471ed924',
+          '8eca530f85300d97a5a09e755aa1d4c10d889ab6','76343c408b0824f9d40dcd2eb30d0a6a94842bfb',
+          'a1bdc05ea70e487d5f36b6b376751c657bc6ec5c','8a4846fc0fb2db7c39a1238bb1f71fef38486a8b',
+          'fc5bb3f36ba405e5883c9f2fd38ab05c1c859500','cc0a9c8a12e84a7692bc2b109acb32ec2723cbad',
+          '6773f8095128eaa415c1ad097c2309c4eb9f6354','146c9742ff1765c4d9ed836ee2c4346889101c2b',
+          '8ad712f3031e21c15519ea06aebbb2c58db1fe7a','4bb4a719353c20510b79b7e1dfe4444afd2f3bb4']
+          parts=[]
+          for i,want in enumerate(expected):
+              data=(root/f'{i:02d}').read_bytes()
+              got=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              if got!=want: raise SystemExit(f'part {i:02d} blob mismatch: {got}')
+              parts.append(data)
+          b64=b''.join(parts)
+          if hashlib.sha256(b64).hexdigest()!='beeb0701ad077cdab3d8750c988a51c2b6eeba12334cfd21299eb6c89604c64c':
+              raise SystemExit('joined payload mismatch')
+          script=gzip.decompress(base64.b64decode(b64))
+          if hashlib.sha256(script).hexdigest()!='ea412d8c6a56021795a6ca39bf31f82ece76cc36fa26c3d40252fd8a5dbfb1f2':
+              raise SystemExit('transformer mismatch')
+          path=Path('.maintenance/p101-v410/apply.py')
+          path.write_bytes(script)
+          py_compile.compile(str(path),doraise=True)
+          '@ | python -
+
+      - name: Apply source transformation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python .maintenance/p101-v410/apply.py
+          Set-Location 'projects/1-桌面软件/101-Mediova/代码'
+          gofmt -w ./cmd ./internal
+          @'
+          from pathlib import Path
+          import hashlib
+          root=Path('.')
+          manifest=root/'SOURCE_FILES_SHA256.txt'
+          lines=[]
+          for p in sorted(root.rglob('*')):
+              if not p.is_file() or p==manifest or 'build' in p.parts: continue
+              lines.append(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.as_posix()}")
+          manifest.write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
+          '@ | python -
+          go test -count=1 ./...
+          if ($LASTEXITCODE -ne 0) { throw 'go test failed' }
+          go vet -unsafeptr=false ./...
+          if ($LASTEXITCODE -ne 0) { throw 'go vet failed' }
+
+      - name: Provide real FFmpeg
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue) -or -not (Get-Command ffprobe -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress }
+          $ff=Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+          $fp=Get-Command ffprobe.exe -ErrorAction SilentlyContinue
+          if (-not $ff -or -not $fp) {
+            $tools=Join-Path $env:ChocolateyInstall 'lib\ffmpeg\tools'
+            $ff=Get-ChildItem $tools -Recurse -Filter ffmpeg.exe -File | Where-Object {$_.Length -gt 1MB} | Select-Object -First 1
+            $fp=Get-ChildItem $tools -Recurse -Filter ffprobe.exe -File | Where-Object {$_.Length -gt 1MB} | Select-Object -First 1
+          }
+          if (-not $ff -or -not $fp) { throw 'Real FFmpeg pair not found' }
+          $dir=if ($ff.Source) { Split-Path $ff.Source -Parent } else { $ff.Directory.FullName }
+          "FFMPEG_BIN=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build and validate v4.1.0 Runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          Set-Location 'projects/1-桌面软件/101-Mediova/代码'
+          ./build_v4.1.0.ps1 -FFmpegBin $env:FFMPEG_BIN -SkipTests
+          $build=Join-Path $PWD 'build'
+          $runtime=Join-Path $build 'Runtime'
+          $exe=Join-Path $runtime 'Mediova.exe'
+          $report=Join-Path $build 'apply_self_test.json'
+          $proc=Start-Process -FilePath $exe -WorkingDirectory $runtime -ArgumentList @('--self-test',"--self-test-output=$report") -PassThru
+          if (-not $proc.WaitForExit(480000)) { Stop-Process -Id $proc.Id -Force; throw 'self-test timeout' }
+          $json=Get-Content $report -Raw | ConvertFrom-Json
+          $checks=@($json.checks.PSObject.Properties)
+          if (-not $json.passed -or $json.version -ne '4.1.0' -or $checks.Count -lt 57) { throw 'self-test failed' }
+          $manifest=Get-Content (Join-Path $runtime 'runtime-manifest.json') -Raw | ConvertFrom-Json
+          if ($manifest.product -ne 'Mediova' -or $manifest.version -ne '4.1.0' -or $manifest.deployment -ne 'folder-runtime') { throw 'manifest identity mismatch' }
+          if (!(Test-Path (Join-Path $runtime 'Components/FFmpeg/bin/ffmpeg.exe'))) { throw 'runtime ffmpeg missing' }
+          foreach ($private in @('config.json','history.json','session.json','crash.log','settings.json','vault.bin')) {
+            if (Get-ChildItem $runtime -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "private data leaked: $private" }
+          }
+
+      - name: Commit verified implementation and remove one-time runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          Remove-Item '.maintenance/p101-v410' -Recurse -Force
+          Remove-Item '.github/workflows/p101-v410-apply-once.yml' -Force
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- 'projects/1-桌面软件/101-Mediova' '.github/workflows/p101-mediova-ci.yml' '.github/workflows/p101-v410-apply-once.yml' '.maintenance/p101-v410'
+          git commit -m 'P101｜实现 Mediova v4.1.0 界面与 Runtime 架构'
+          git push origin HEAD:p101-exp
+
+          git fetch origin main
+          git switch -C p101-v410-main-cleanup origin/main
+          Remove-Item '.github/workflows/p101-v410-apply-once.yml' -Force
+          Remove-Item '.maintenance/p101-v410-run-trigger.txt' -Force -ErrorAction SilentlyContinue
+          git add -A -- '.github/workflows/p101-v410-apply-once.yml' '.maintenance/p101-v410-run-trigger.txt'
+          git commit -m '仓库｜移除 Mediova v4.1.0 一次性实施器'
+          git push origin HEAD:main
