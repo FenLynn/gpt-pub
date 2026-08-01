@@ -53,12 +53,13 @@ public sealed class BackupRestoreResult
 
 public static class WorkbenchBackupService
 {
-    public const string FormatName = "PersonalWorkbench-Backup-v1";
+    public const string FormatName = "AtlasDesk-Backup-v2";
+    public const string LegacyFormatName = "PersonalWorkbench-Backup-v1";
     public const long MaxArchiveBytes = 32L * 1024 * 1024;
     public const long MaxSingleFileBytes = 16L * 1024 * 1024;
     public const long MaxTotalUncompressedBytes = 24L * 1024 * 1024;
 
-    private static readonly string[] AllowedFiles = { "settings.json", "task-history.json" };
+    private static readonly string[] AllowedFiles = { "settings.json", "task-history.json", "security.json", "vault.bin" };
     private static readonly HashSet<string> AllowedSet = new(AllowedFiles, StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -248,7 +249,9 @@ public static class WorkbenchBackupService
         var manifestBytes = await ReadEntryAsync(manifestEntry, cancellationToken);
         var manifest = JsonSerializer.Deserialize<WorkbenchBackupManifest>(manifestBytes, JsonOptions)
                        ?? throw new InvalidDataException("备份清单无法解析。");
-        if (!string.Equals(manifest.Format, FormatName, StringComparison.Ordinal)) throw new InvalidDataException("不支持的备份格式。");
+        if (!string.Equals(manifest.Format, FormatName, StringComparison.Ordinal)
+            && !string.Equals(manifest.Format, LegacyFormatName, StringComparison.Ordinal))
+            throw new InvalidDataException("不支持的备份格式。");
         manifest.Entries ??= new List<WorkbenchBackupEntry>();
         if (manifest.Entries.Count > AllowedFiles.Length) throw new InvalidDataException("备份清单文件数超过白名单。");
 

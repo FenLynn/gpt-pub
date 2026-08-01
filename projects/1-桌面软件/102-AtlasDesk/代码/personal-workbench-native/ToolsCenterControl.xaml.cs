@@ -53,7 +53,7 @@ public partial class ToolsCenterControl : UserControl, IDisposable
             {
                 "SHA-256 清单已写入：", dialog.FileName, string.Empty,
                 $"根目录：{_settings.WorkspaceRoot}", $"记录数：{entries.Count:N0}",
-                "格式：PersonalWorkbench SHA256 v1"
+                "格式：AtlasDesk SHA256 v1"
             });
             DetailTitle.Text = "生成完成";
             DetailSubtitle.Text = "清单采用相对路径，不写入本机绝对工作区路径。";

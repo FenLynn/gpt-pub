@@ -67,7 +67,7 @@ public sealed class FileComparisonResult
 
 public static class FileIntegrityService
 {
-    public const string Header = "# PersonalWorkbench SHA256 v1";
+    public const string Header = "# AtlasDesk SHA256 v1";
     public const int MaxManifestEntries = 500_000;
     public const int MaxManifestLineLength = 32_768;
     public const long MaxManifestBytes = 64L * 1024 * 1024;

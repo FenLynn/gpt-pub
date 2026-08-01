@@ -7,35 +7,32 @@ public partial class App : Application
 {
     private WorkbenchFeaturePipeline? _pipeline;
 
-    public static string AppDataDirectory => ProductIdentity.AppDataDirectory;
-    public static string LogDirectory { get; } = Path.Combine(AppDataDirectory, "logs");
+    public static string RuntimeDirectory => ProductIdentity.RuntimeDirectory;
+    public static string AppDataDirectory => ProductIdentity.RoamingDataDirectory;
+    public static string LocalDataDirectory => ProductIdentity.LocalDataDirectory;
+    public static string DashboardProfileDirectory => ProductIdentity.DashboardProfileDirectory;
+    public static string TerminalProfileDirectory => ProductIdentity.TerminalProfileDirectory;
+    public static string CacheDirectory => ProductIdentity.CacheDirectory;
+    public static string LogDirectory => ProductIdentity.LogDirectory;
+    public static string StateDirectory => ProductIdentity.StateDirectory;
+    public static string CrashDirectory => ProductIdentity.CrashDirectory;
     public static string LogPath { get; } = Path.Combine(LogDirectory, "atlasdesk.log");
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        Exception? migrationError = null;
-        LegacyDataMigrationResult? migration = null;
-        try
-        {
-            migration = ProductIdentity.MigrateLegacyAppDataIfNeeded();
-        }
-        catch (Exception ex)
-        {
-            migrationError = ex;
-        }
-
-        Directory.CreateDirectory(AppDataDirectory);
-        Directory.CreateDirectory(LogDirectory);
-        if (migration is { Migrated: true })
-            Log($"Migrated legacy app data via {migration.Status}: {migration.LegacyDirectory} -> {migration.TargetDirectory}");
-        if (migrationError is not null)
-            Log("Legacy app-data migration failed: " + migrationError);
-
+        ProductIdentity.EnsureDataDirectories();
         ApplyPendingRestoreBeforeStartup();
         StartupGuard.Begin(WorkbenchVersion.Current);
-        Exit += (_, _) => StartupGuard.Complete();
+        Exit += (_, _) =>
+        {
+            StartupGuard.Complete();
+            SecurityService.LockVault();
+        };
         GlobalShortcutBootstrap.Initialize();
-        Log("Starting AtlasDesk " + WorkbenchVersion.Current);
+        Log($"Starting AtlasDesk {WorkbenchVersion.Current}");
+        Log("Runtime=" + RuntimeDirectory);
+        Log("RoamingData=" + AppDataDirectory);
+        Log("LocalData=" + LocalDataDirectory);
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -59,18 +56,6 @@ public partial class App : Application
 
         Activated += App_Activated;
         base.OnStartup(e);
-
-        if (migrationError is not null)
-        {
-            MessageBox.Show(
-                "旧配置目录未能自动迁移到 AtlasDesk。\n\n"
-                + "旧数据仍保留在：\n" + ProductIdentity.LegacyAppDataDirectory + "\n\n"
-                + "AtlasDesk 当前使用：\n" + AppDataDirectory + "\n\n"
-                + "详情已写入日志。",
-                "AtlasDesk 配置迁移",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
     }
 
     private static void ApplyPendingRestoreBeforeStartup()

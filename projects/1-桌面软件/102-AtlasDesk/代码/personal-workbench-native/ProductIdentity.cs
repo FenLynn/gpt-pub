@@ -2,81 +2,43 @@ using System.IO;
 
 namespace PersonalWorkbench;
 
-public enum LegacyDataMigrationStatus
-{
-    NotNeeded,
-    Moved,
-    Copied,
-    TargetAlreadyExists
-}
-
-public sealed record LegacyDataMigrationResult(
-    LegacyDataMigrationStatus Status,
-    string LegacyDirectory,
-    string TargetDirectory)
-{
-    public bool Migrated => Status is LegacyDataMigrationStatus.Moved or LegacyDataMigrationStatus.Copied;
-}
-
+/// <summary>
+/// AtlasDesk has one public runtime root and two private data roots.
+/// The runtime directory is the folder that contains AtlasDesk.exe and is never
+/// used for generated user data. Roaming data stays small and important;
+/// machine-local browser state, logs and caches stay under LocalAppData.
+/// </summary>
 public static class ProductIdentity
 {
     public const string ProductName = "AtlasDesk";
-    public const string LegacyStorageName = "PersonalWorkbench";
 
-    public static string AppDataDirectory { get; } = Path.Combine(
+    public static string RuntimeDirectory { get; } = Path.GetFullPath(AppContext.BaseDirectory);
+
+    public static string RoamingDataDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         ProductName);
 
-    public static string LegacyAppDataDirectory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        LegacyStorageName);
+    public static string LocalDataDirectory { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        ProductName);
 
-    public static LegacyDataMigrationResult MigrateLegacyAppDataIfNeeded()
-        => MigrateLegacyDirectory(LegacyAppDataDirectory, AppDataDirectory);
+    public static string DashboardProfileDirectory { get; } = Path.Combine(LocalDataDirectory, "WebView2");
+    public static string TerminalProfileDirectory { get; } = Path.Combine(LocalDataDirectory, "Terminal", "WebView2");
+    public static string CacheDirectory { get; } = Path.Combine(LocalDataDirectory, "Cache");
+    public static string LogDirectory { get; } = Path.Combine(LocalDataDirectory, "Logs");
+    public static string StateDirectory { get; } = Path.Combine(LocalDataDirectory, "State");
+    public static string CrashDirectory { get; } = Path.Combine(LocalDataDirectory, "Crash");
+    public static string TerminalAssetsDirectory { get; } = Path.Combine(RuntimeDirectory, "Assets", "Terminal");
 
-    public static LegacyDataMigrationResult MigrateLegacyDirectory(string legacyDirectory, string targetDirectory)
+    public static void EnsureDataDirectories()
     {
-        if (string.IsNullOrWhiteSpace(legacyDirectory))
-            throw new ArgumentException("Legacy directory is required.", nameof(legacyDirectory));
-        if (string.IsNullOrWhiteSpace(targetDirectory))
-            throw new ArgumentException("Target directory is required.", nameof(targetDirectory));
-
-        legacyDirectory = Path.GetFullPath(legacyDirectory);
-        targetDirectory = Path.GetFullPath(targetDirectory);
-
-        if (!Directory.Exists(legacyDirectory))
-            return new LegacyDataMigrationResult(LegacyDataMigrationStatus.NotNeeded, legacyDirectory, targetDirectory);
-        if (Directory.Exists(targetDirectory))
-            return new LegacyDataMigrationResult(LegacyDataMigrationStatus.TargetAlreadyExists, legacyDirectory, targetDirectory);
-
-        Directory.CreateDirectory(Path.GetDirectoryName(targetDirectory) ?? Environment.CurrentDirectory);
-        try
-        {
-            Directory.Move(legacyDirectory, targetDirectory);
-            return new LegacyDataMigrationResult(LegacyDataMigrationStatus.Moved, legacyDirectory, targetDirectory);
-        }
-        catch (IOException)
-        {
-            CopyDirectory(legacyDirectory, targetDirectory);
-            return new LegacyDataMigrationResult(LegacyDataMigrationStatus.Copied, legacyDirectory, targetDirectory);
-        }
-    }
-
-    private static void CopyDirectory(string sourceDirectory, string targetDirectory)
-    {
-        Directory.CreateDirectory(targetDirectory);
-        foreach (var directory in Directory.EnumerateDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
-        {
-            var relative = Path.GetRelativePath(sourceDirectory, directory);
-            Directory.CreateDirectory(Path.Combine(targetDirectory, relative));
-        }
-
-        foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
-        {
-            var relative = Path.GetRelativePath(sourceDirectory, file);
-            var target = Path.Combine(targetDirectory, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(target) ?? targetDirectory);
-            File.Copy(file, target, overwrite: false);
-        }
+        Directory.CreateDirectory(RoamingDataDirectory);
+        Directory.CreateDirectory(LocalDataDirectory);
+        Directory.CreateDirectory(DashboardProfileDirectory);
+        Directory.CreateDirectory(TerminalProfileDirectory);
+        Directory.CreateDirectory(CacheDirectory);
+        Directory.CreateDirectory(LogDirectory);
+        Directory.CreateDirectory(StateDirectory);
+        Directory.CreateDirectory(CrashDirectory);
     }
 }

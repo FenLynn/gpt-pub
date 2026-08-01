@@ -58,6 +58,7 @@ public partial class SettingsControl : UserControl
         UpdatePdfControls();
         UpdateLoadModeControls();
         SaveStatus.Text = string.Empty;
+        UpdateSecurityStatus();
     }
 
     private static void SelectComboByContent(ComboBox box, string value, int fallbackIndex)
@@ -214,4 +215,34 @@ public partial class SettingsControl : UserControl
         Directory.CreateDirectory(App.AppDataDirectory);
         Process.Start(new ProcessStartInfo("explorer.exe", App.AppDataDirectory) { UseShellExecute = true });
     }
+
+    private void OpenSecurity_Click(object sender, RoutedEventArgs e)
+    {
+        new SecurityCenterWindow { Owner = Window.GetWindow(this) }.ShowDialog();
+        UpdateSecurityStatus();
+    }
+
+    private void LockNow_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SecurityService.IsPinEnabled)
+        {
+            MessageBox.Show("尚未设置四位临时密码。请先打开安全中心进行设置。",
+                ProductIdentity.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        new TemporaryLockWindow { Owner = Window.GetWindow(this) }.ShowDialog();
+    }
+
+    private void OpenLocalData_Click(object sender, RoutedEventArgs e)
+    {
+        Directory.CreateDirectory(App.LocalDataDirectory);
+        Process.Start(new ProcessStartInfo("explorer.exe", App.LocalDataDirectory) { UseShellExecute = true });
+    }
+
+    private void UpdateSecurityStatus()
+    {
+        if (SecurityStatusText is not null)
+            SecurityStatusText.Text = SecurityService.GetStatusSummary();
+    }
+
 }

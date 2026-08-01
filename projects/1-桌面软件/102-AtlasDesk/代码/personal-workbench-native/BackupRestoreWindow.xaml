@@ -36,13 +36,13 @@
                         <Border Background="#E7F7F0" CornerRadius="9" Padding="10,8">
                             <StackPanel>
                                 <TextBlock Text="会包含" Foreground="#187A58" FontSize="11" FontWeight="SemiBold"/>
-                                <TextBlock Text="settings.json · task-history.json" FontSize="12.2" Margin="0,4,0,0"/>
+                                <TextBlock Text="settings.json · task-history.json · security.json · vault.bin" FontSize="12.2" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Background="#FDEAEA" CornerRadius="9" Padding="10,8" Margin="0,8,0,0">
                             <StackPanel>
                                 <TextBlock Text="绝不包含" Foreground="#B13D48" FontSize="11" FontWeight="SemiBold"/>
-                                <TextBlock Text="WebView2Profile、BrowserProfile、Access/GitHub 登录、Cookie、日志、缓存、终端资产和启动状态" FontSize="11.5" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                <TextBlock Text="WebView2 登录状态、Cookie、本机日志、缓存、终端资源和启动状态" FontSize="11.5" TextWrapping="Wrap" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -78,6 +78,6 @@
             </Border>
         </Grid>
 
-        <TextBlock Grid.Row="6" x:Name="StatusText" Text="配置目录：%APPDATA%\PersonalWorkbench" FontSize="10.8" Foreground="#718198" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Grid.Row="6" x:Name="StatusText" Text="配置目录：%APPDATA%\AtlasDesk" FontSize="10.8" Foreground="#718198" TextTrimming="CharacterEllipsis"/>
     </Grid>
 </Window>

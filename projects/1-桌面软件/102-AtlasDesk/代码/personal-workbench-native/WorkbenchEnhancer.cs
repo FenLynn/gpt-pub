@@ -37,6 +37,7 @@ public sealed class WorkbenchEnhancer
         InstallPlaceholderModules();
         (_terminalSplitterRow, _terminalRow, _splitter) = InstallTerminalDrawer();
         InstallTopTerminalButton();
+        InstallTopLockButton();
         ApplyVisualPolish();
         WireEvents();
         SuppressLegacyFeatureLoaders();
@@ -172,6 +173,41 @@ public sealed class WorkbenchEnhancer
         actions.Children.Insert(Math.Max(0, actions.Children.Count - 1), button);
     }
 
+
+    private void InstallTopLockButton()
+    {
+        if (_window.FindName("PopoutButton") is not Button popout || popout.Parent is not StackPanel actions)
+            return;
+        var button = new Button
+        {
+            Style = Application.Current.TryFindResource("IconButton") as Style,
+            ToolTip = "临时锁定 AtlasDesk"
+        };
+        var viewbox = new Viewbox { Width = 16, Height = 16 };
+        viewbox.Child = new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse("M7,10 V7 C7,4.8 8.8,3 11,3 H13 C15.2,3 17,4.8 17,7 V10 M5,10 H19 V21 H5 Z M12,14 V17"),
+            Stroke = new SolidColorBrush(Color.FromRgb(95,112,135)), StrokeThickness = 1.8,
+            Fill = Brushes.Transparent, StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round
+        };
+        button.Content = viewbox;
+        button.Click += (_, _) => ShowTemporaryLock();
+        actions.Children.Insert(Math.Max(0, actions.Children.Count - 1), button);
+    }
+
+    private void ShowTemporaryLock()
+    {
+        if (!SecurityService.IsPinEnabled)
+        {
+            NavigateToSettings();
+            MessageBox.Show("尚未设置四位临时密码。可在“设置 → 安全与隐私”中启用。",
+                ProductIdentity.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        new TemporaryLockWindow { Owner = _window }.ShowDialog();
+    }
+
     private void ApplyVisualPolish()
     {
         _window.Background = new LinearGradientBrush(
@@ -181,8 +217,7 @@ public sealed class WorkbenchEnhancer
         {
             sidebar.CornerRadius = new CornerRadius(16);
             sidebar.BorderBrush = new SolidColorBrush(Color.FromRgb(218, 227, 239));
-            sidebar.Background = new LinearGradientBrush(
-                Color.FromArgb(246, 251, 253, 255), Color.FromArgb(246, 247, 250, 255), new Point(0, 0), new Point(0, 1));
+            sidebar.Background = new SolidColorBrush(Color.FromRgb(250, 252, 255));
         }
         if (_window.FindName("TopBarRow") is RowDefinition topBarRow) topBarRow.Height = new GridLength(40);
         if (_window.FindName("TopBar") is Grid topBar)
