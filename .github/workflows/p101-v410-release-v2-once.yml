@@ -1,4 +1,4 @@
-name: Release Mediova v4.1.0 once v3
+name: Release Mediova v4.1.0 once v4
 
 on:
   pull_request:
@@ -62,7 +62,6 @@ jobs:
           import pathlib
           import re
           import subprocess
-          import sys
 
           source_sha = os.environ["SOURCE_SHA"]
           prefix = subprocess.check_output(
@@ -287,7 +286,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin --tags --force
 
-          $existing=(git ls-remote --tags origin "refs/tags/$env:TAG_NAME").Trim()
+          $existing=([string](git ls-remote --tags origin "refs/tags/$env:TAG_NAME")).Trim()
           if ($existing) {
             git fetch origin "refs/tags/$env:TAG_NAME:refs/tags/$env:TAG_NAME" --force
             $tagCommit=(git rev-list -n 1 $env:TAG_NAME).Trim()
