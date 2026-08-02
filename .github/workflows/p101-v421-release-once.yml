@@ -1,0 +1,282 @@
+name: Release P101 Mediova v4.2.1 light package once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: p101-v421-release-once
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.head_ref == 'repo-p101-v421-release-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_COMMIT: 69478925548c8878482a792ba8f0350fe6371e62
+      CI_HEAD: ba83564a58bed074ac2c7aadfc57a1e16b56779b
+      CI_RUN_ID: '30752170256'
+      ARTIFACT_NAME: P101-Mediova-v4.2.1-CI
+      TAG_NAME: p101-v4.2.1
+      VERSION: 4.2.1
+      EXE_SHA256: f554628e296d21898d5c324729e43de77066c95008c6a2c25a119240714d0e1a
+      RUNTIME_ZIP_SHA256: d989a61d1bd57b975a814cc65690dddf4b5719a40f3f30684455f5fe13c1b455
+    steps:
+      - name: Checkout exact formal source
+        uses: actions/checkout@v4
+        with:
+          ref: 69478925548c8878482a792ba8f0350fe6371e62
+          fetch-depth: 0
+
+      - name: Verify formal P101 source and CI identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          git fetch origin "$CI_HEAD" --depth=1
+          git diff --quiet "$CI_HEAD" "$SOURCE_COMMIT" -- \
+            'projects/1-桌面软件/101-Mediova' \
+            '.github/workflows/p101-mediova-ci.yml'
+          run_head="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}" --jq .head_sha)"
+          run_conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}" --jq .conclusion)"
+          test "$run_head" = "$CI_HEAD"
+          test "$run_conclusion" = 'success'
+
+      - name: Download fixed formal CI Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: P101-Mediova-v4.2.1-CI
+          path: release-input
+          repository: FenLynn/gpt-pub
+          run-id: 30752170256
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-verify Runtime, self-test and UI evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release-input/Mediova-v4.2.1-Runtime.zip
+          test -f release-input/SHA256.txt
+          test -f release-input/ci_self_test.json
+          test -f release-input/Runtime/runtime-manifest.json
+          test -f release-input/ui-preview/Mediova-v4.2.1-video-wide-1650x930.png
+          test -f release-input/ui-preview/Mediova-v4.2.1-video-compact-1120x720.png
+          test -f release-input/ui-preview/Mediova-v4.2.1-image-1450x820.png
+          test -f release-input/ui-preview/Mediova-v4.2.1-held-1450x820.png
+          echo "$RUNTIME_ZIP_SHA256  release-input/Mediova-v4.2.1-Runtime.zip" | sha256sum -c -
+          rm -rf runtime-check release-assets light
+          mkdir -p runtime-check release-assets light
+          unzip -q release-input/Mediova-v4.2.1-Runtime.zip -d runtime-check
+          echo "$EXE_SHA256  runtime-check/Mediova.exe" | sha256sum -c -
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import struct
+          from pathlib import Path
+
+          root = Path('runtime-check')
+          manifest = json.loads((root / 'runtime-manifest.json').read_text(encoding='utf-8-sig'))
+          assert manifest['product'] == 'Mediova'
+          assert manifest['version'] == '4.2.1'
+          assert manifest['platform'] == 'Windows x64'
+          assert manifest['deployment'] == 'folder-runtime'
+          for entry in manifest['files']:
+              rel = entry['path'].replace('\\', '/')
+              path = root / rel
+              assert path.is_file(), rel
+              data = path.read_bytes()
+              assert len(data) == int(entry['size']), rel
+              assert hashlib.sha256(data).hexdigest() == entry['sha256'], rel
+          for private in ('config.json','history.json','session.json','crash.log','settings.json','task-history.json','security.json','vault.bin'):
+              assert not list(root.rglob(private)), private
+
+          report = json.loads(Path('release-input/ci_self_test.json').read_text(encoding='utf-8-sig'))
+          assert report['version'] == '4.2.1'
+          assert report['passed'] is True
+          checks = report['checks']
+          assert len(checks) == 62
+          assert all(checks.values())
+          assert checks['list_progress_cells_centered_preferred_height'] is True
+          assert checks['list_progress_cells_custom_draw_active'] is True
+
+          def png_size(path: Path):
+              data = path.read_bytes()[:24]
+              assert data[:8] == b'\x89PNG\r\n\x1a\n'
+              return struct.unpack('>II', data[16:24])
+
+          expected = {
+              'Mediova-v4.2.1-video-wide-1650x930.png': (1650, 930),
+              'Mediova-v4.2.1-video-compact-1120x720.png': (1120, 720),
+              'Mediova-v4.2.1-image-1450x820.png': (1450, 820),
+              'Mediova-v4.2.1-held-1450x820.png': (1450, 820),
+          }
+          for name, size in expected.items():
+              assert png_size(Path('release-input/ui-preview') / name) == size, name
+
+          sha_lines = Path('release-input/SHA256.txt').read_text(encoding='ascii').splitlines()
+          assert 'f554628e296d21898d5c324729e43de77066c95008c6a2c25a119240714d0e1a  Runtime/Mediova.exe' in sha_lines
+          assert 'd989a61d1bd57b975a814cc65690dddf4b5719a40f3f30684455f5fe13c1b455  Mediova-v4.2.1-Runtime.zip' in sha_lines
+          PY
+
+      - name: Build lightweight overwrite package without FFmpeg
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp runtime-check/Mediova.exe light/Mediova.exe
+          cat > light/README.txt <<'EOF'
+          Mediova v4.2.1 轻量覆盖更新包（不含 FFmpeg）
+
+          适用于从 Mediova v4.2.0 更新到 v4.2.1，也可作为不含 FFmpeg 的轻量部署包。
+
+          更新步骤：
+          1. 完全退出 Mediova；
+          2. 保留原安装目录中的 Components\FFmpeg\bin；
+          3. 将本压缩包四个文件解压到原 Mediova 根目录并覆盖同名文件；
+          4. 重新运行 Mediova.exe。
+
+          本包不会包含或删除 ffmpeg.exe、ffprobe.exe，也不会包含、覆盖或删除 AppData 中的配置、历史、会话、缓存和日志。
+
+          首次部署时，请在软件中选择已有 FFmpeg/FFprobe 路径，或自行将二者放入 Components\FFmpeg\bin。
+          EOF
+          cat > light/THIRD_PARTY_NOTICES.md <<'EOF'
+          # Third-party notices
+
+          This lightweight Mediova package does not bundle FFmpeg or FFprobe.
+          Mediova can use user-provided FFmpeg/FFprobe components or an existing `Components\FFmpeg\bin` directory.
+
+          - Project: FFmpeg
+          - Homepage: https://ffmpeg.org/
+          - Source and license information: https://ffmpeg.org/legal.html
+
+          Runtime updates must never contain, overwrite or delete user Data.
+          EOF
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+
+          root = 'light'
+
+          def digest(path):
+              h = hashlib.sha256()
+              with open(path, 'rb') as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          files = []
+          for name in ('Mediova.exe', 'README.txt', 'THIRD_PARTY_NOTICES.md'):
+              path = os.path.join(root, name)
+              files.append({'path': name, 'size': os.path.getsize(path), 'sha256': digest(path)})
+          manifest = {
+              'product': 'Mediova',
+              'version': '4.2.1',
+              'platform': 'Windows x64',
+              'deployment': 'folder-runtime',
+              'files': files,
+              'external_components': [{
+                  'name': 'FFmpeg/FFprobe',
+                  'required_for': 'media conversion',
+                  'bundled': False,
+                  'expected_default_path': 'Components\\FFmpeg\\bin'
+              }]
+          }
+          with open(os.path.join(root, 'runtime-manifest.json'), 'w', encoding='utf-8', newline='\n') as handle:
+              json.dump(manifest, handle, ensure_ascii=False, indent=2)
+              handle.write('\n')
+          PY
+          (
+            cd light
+            zip -X -9 ../Mediova-v4.2.1-Light.zip Mediova.exe README.txt runtime-manifest.json THIRD_PARTY_NOTICES.md
+          )
+          test "$(unzip -Z1 Mediova-v4.2.1-Light.zip | wc -l)" = '4'
+          printf '%s\n' Mediova.exe README.txt runtime-manifest.json THIRD_PARTY_NOTICES.md | sort > expected-files.txt
+          unzip -Z1 Mediova-v4.2.1-Light.zip | sort > actual-files.txt
+          diff -u expected-files.txt actual-files.txt
+          test "$(unzip -Z1 Mediova-v4.2.1-Light.zip | grep -Eic '(^|/)(ffmpeg|ffprobe)(\.exe)?$|^Components/' || true)" = '0'
+          test "$(stat -c %s Mediova-v4.2.1-Light.zip)" -lt 10000000
+          test "$(sha256sum light/Mediova.exe | awk '{print $1}')" = "$EXE_SHA256"
+          {
+            sha256sum Mediova-v4.2.1-Light.zip
+            sha256sum light/Mediova.exe | sed 's#  light/#  #'
+          } > Mediova-v4.2.1-Light-SHA256.txt
+          cat Mediova-v4.2.1-Light-SHA256.txt
+          unzip -l Mediova-v4.2.1-Light.zip
+
+      - name: Create immutable tag and lightweight GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name 'P101 Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
+            tagged="$(git rev-list -n 1 "$TAG_NAME")"
+            test "$tagged" = "$SOURCE_COMMIT"
+          else
+            git tag -a "$TAG_NAME" "$SOURCE_COMMIT" -m 'Mediova v4.2.1'
+            git push origin "refs/tags/$TAG_NAME"
+          fi
+          cat > RELEASE_NOTES.md <<'EOF'
+          # Mediova v4.2.1
+
+          v4.2.1 是针对 v4.2.0 实机反馈的桌面交互与目录输出修复版。
+
+          ## 主要修复
+
+          - 首次显示即完成工具栏布局，不再需要手动缩放窗口触发刷新。
+          - 顶部状态灯按 DPI 缩放，输出目录“浏览”和“全部恢复默认”显示完整。
+          - 删除右下角旧“应用到选中”，保留右侧个体参数面板中的正常应用按钮。
+          - 右键菜单只由单一事件触发并可靠销毁。
+          - 压缩与进度条采用 24 px 优选高度、垂直居中，并修复真实 Windows/PrintWindow 中轨道和填充不可见的问题。
+          - 导入顶层文件夹时完整保留顶层目录与子目录结构，并恢复输出文件及目录时间戳。
+          - 减少搁置编辑切换时的重复控件刷新。
+
+          ## 安装与更新
+
+          下载 `Mediova-v4.2.1-Light.zip`。从 v4.2.0 更新时，退出软件后将压缩包内容覆盖到原 Mediova 根目录，并保留原有 `Components\FFmpeg\bin`。
+
+          本 Release 不提供携带 FFmpeg 的大体积 Runtime。完整 FFmpeg Runtime 已在正式 CI 中完成真实组件、manifest、私人 Data 边界与原生自检验证，仅保留为内部 Artifact。
+
+          ## 正式验证
+
+          - 正式源提交：`69478925548c8878482a792ba8f0350fe6371e62`
+          - 正式 CI：`30752170256`
+          - 范围、固定哈希、普通测试、竞态测试、go vet 与 Windows 双交叉构建：通过
+          - Windows 隔离 Data、真实 FFmpeg、完整 Runtime、版本资源和 manifest：通过
+          - 原生 self-test：62/62
+          - 四套真实 Windows 截图：通过尺寸门禁并完成可见条形人工复核
+          - Authenticode：未签名
+
+          125%～175% DPI、多显示器、不同 Windows 主题、显卡驱动、拖放、托盘、PotPlayer 和特殊媒体仍属于持续真实桌面观察项。
+          EOF
+          assets=(
+            Mediova-v4.2.1-Light.zip
+            Mediova-v4.2.1-Light-SHA256.txt
+          )
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --title 'Mediova v4.2.1' --notes-file RELEASE_NOTES.md --draft=false --prerelease=false --latest
+          else
+            gh release create "$TAG_NAME" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --title 'Mediova v4.2.1' --notes-file RELEASE_NOTES.md --latest
+          fi
+          test "$(git rev-list -n 1 "$TAG_NAME")" = "$SOURCE_COMMIT"
+          test "$(gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = 'false'
+          test "$(gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)" = 'false'
+          test "$(gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)" = "$TAG_NAME"
+          gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets | map(.name) | sort | join("\n")' > release-assets.txt
+          printf '%s\n' Mediova-v4.2.1-Light-SHA256.txt Mediova-v4.2.1-Light.zip | sort > expected-assets.txt
+          diff -u expected-assets.txt release-assets.txt
+          gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[] | [.name, .size, .url] | @tsv'
