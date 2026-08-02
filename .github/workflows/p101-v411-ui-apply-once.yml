@@ -1,0 +1,108 @@
+name: Apply P101 v4.1.1 UI patch once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-v411-ui-apply-once
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.head_ref == 'repo-p101-v411-ui-apply-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact P101 task branch
+        uses: actions/checkout@v4
+        with:
+          ref: p101-v411-ui-visual-fix
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Apply exact UI transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd 'projects/1-桌面软件/101-Mediova/代码'
+          python -m py_compile tools_v411_ui_patch.py
+          python tools_v411_ui_patch.py
+          rm tools_v411_ui_patch.py
+          gofmt -w cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/ui_rules.go cmd/mediaworkbench/ui_rules_test.go
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root = Path('.')
+          manifest = root / 'SOURCE_FILES_SHA256.txt'
+          out = []
+          for raw in manifest.read_text(encoding='utf-8').splitlines():
+              raw = raw.strip()
+              if not raw:
+                  continue
+              _, rel = raw.split('  ', 1)
+              path = root / rel
+              if not path.is_file():
+                  raise SystemExit(f'manifest source missing: {rel}')
+              out.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {rel}")
+          manifest.write_text('\n'.join(out) + '\n', encoding='utf-8', newline='\n')
+          PY
+
+      - name: Verify source and UI rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd 'projects/1-桌面软件/101-Mediova/代码'
+          sha256sum -c SOURCE_FILES_SHA256.txt
+          go test -count=1 ./...
+          go test -race -count=1 ./internal/config ./internal/media
+          go vet -unsafeptr=false ./...
+          GOOS=windows GOARCH=amd64 go test -c ./cmd/mediaworkbench -o "$RUNNER_TEMP/mediova-v411-ui-tests.exe"
+          test -s "$RUNNER_TEMP/mediova-v411-ui-tests.exe"
+
+      - name: Verify exact file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          allowed='^(projects/1-桌面软件/101-Mediova/代码/(SOURCE_FILES_SHA256.txt|cmd/mediaworkbench/(main_windows.go|ui_rules.go|ui_rules_test.go)|tools_v411_ui_patch.py))$'
+          changed="$(git status --short | sed -E 's/^...//')"
+          printf '%s\n' "$changed"
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            if ! printf '%s\n' "$path" | grep -Eq "$allowed"; then
+              echo "Unexpected path: $path" >&2
+              exit 1
+            fi
+          done <<< "$changed"
+          test ! -e 'projects/1-桌面软件/101-Mediova/代码/tools_v411_ui_patch.py'
+
+      - name: Commit verified implementation to task branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'P101 UI Implementation Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add --all -- \
+            'projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt' \
+            'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/main_windows.go' \
+            'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/ui_rules.go' \
+            'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/ui_rules_test.go' \
+            'projects/1-桌面软件/101-Mediova/代码/tools_v411_ui_patch.py'
+          if git diff --cached --quiet; then
+            echo 'No implementation changes were produced.' >&2
+            exit 1
+          fi
+          git commit -m 'P101: implement v4.1.1 UI visual repair'
+          git push origin HEAD:p101-v411-ui-visual-fix
