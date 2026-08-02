@@ -54,7 +54,7 @@ func drawContrastCenteredText(hdc uintptr, text string, bar, fill rect, font uin
 	if fill.Right > bar.Right {
 		fill.Right = bar.Right
 	}
-	withRoundedClip(hdc, fill, 1, func() {
+	withRoundedClip(hdc, fill, 4, func() {
 		drawCenteredText(hdc, text, bar, font, colorRef(255, 255, 255))
 	})
 }

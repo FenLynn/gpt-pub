@@ -49,7 +49,7 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 	if strings.Contains(main, "diameter := scaleDPI(14)") {
 		t.Fatal("low-resolution GDI status ellipse returned")
 	}
-	for _, want := range []string{`drawCenteredText(hdc, "●"`, `withRoundedClip(hdc, fill, 1`, `func taskDurationText`, `func (a *application) v422SummarizeProgress`} {
+	for _, want := range []string{`drawCenteredText(hdc, "●"`, `withRoundedClip(hdc, fill, 4`, `func taskDurationText`, `func (a *application) v422SummarizeProgress`} {
 		if !strings.Contains(helper, want) {
 			t.Fatalf("missing helper contract %q", want)
 		}
