@@ -1,15 +1,26 @@
-AtlasDesk v0.8.4
+AtlasDesk v0.8.5
 
-This maintenance release prevents a large or busy Zotero database from blocking the AtlasDesk WPF interface.
+This maintenance release hardens the main shell, Dashboard recovery and Windows display adaptation without adding a new feature module.
 
-Zotero responsiveness
-- Zotero database reads are no longer connected to ZoteroLibraryControl visibility changes. Reparenting, layout and page visibility transitions cannot start SQLite work.
-- The current library surface loads only after the user explicitly selects the Library navigation item or requests refresh/search.
-- Microsoft.Data.Sqlite exposes async-shaped methods while SQLite still performs the database work synchronously. AtlasDesk now enters all snapshot, search and item-detail reads through a dedicated Task.Run scheduler so the WPF Dispatcher remains responsive.
-- A single SemaphoreSlim gate serializes AtlasDesk Zotero reads. Descendant collection searches no longer open a Task.WhenAll batch of read connections against the live Zotero database.
-- Slow snapshot, search and detail work now keeps the interface interactive and shows background-reading status instead of making the main window appear hung.
-- Stale list and item-detail results are discarded when the selection or library configuration changes.
+Dashboard resilience
+- A shell-owned watchdog checks Dashboard health only while the Dashboard page is active.
+- Missing or failed WebView2 instances enter the existing rebuild path instead of leaving a dead page behind.
+- Automatic rebuilds are serialized, rate-limited and capped at three attempts in a 30-second burst so a damaged renderer cannot make the AtlasDesk window unresponsive.
+- After the cap is reached AtlasDesk keeps the shell alive, stops the loop and exposes the existing reload action.
+
+Windows display adaptation
+- WM_GETMINMAXINFO uses the active monitor work area, so maximized AtlasDesk no longer extends behind that monitor's taskbar.
+- DPI and display topology changes schedule a safe layout refresh and clamp a normal window back into the nearest monitor work area.
+- Layout rounding and device-pixel snapping remain enabled across display changes.
+
+Navigation lifecycle
+- Rapid navigation changes use a monotonic request version. Only the final selected page performs shell stabilization.
+- Stale Dashboard progress is collapsed after leaving the page, and Dashboard-only controls are normalized to the final route.
+- The coordinator is cross-cutting infrastructure rather than another version-named visual enhancer.
+
+Known limitation
+- Direct reads from the live Zotero database may still be incompatible with running Zotero on some installations. This remains a non-blocking known limitation; close Zotero before using the AtlasDesk library.
 
 Regression protection
-- Smoke tests verify that Zotero reads execute on a worker thread, visibility-triggered loading is absent, collection reads remain serial, and Library navigation is the explicit owner of initial loading.
-- Existing v0.8.3 startup residency, development lifecycle, Dashboard, terminal, Runtime/Data and security boundaries remain unchanged.
+- New smoke gates require monitor work-area handling, bounded Dashboard recovery and final-route navigation stabilization.
+- Existing startup residency, Development, terminal, Zotero background-read, Runtime/Data and security boundaries remain unchanged.
