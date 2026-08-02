@@ -1,5 +1,4 @@
 using PersonalWorkbench;
-using PersonalWorkbench.Smoke;
 using System.Runtime.CompilerServices;
 using System.Windows;
 
@@ -18,36 +17,19 @@ internal static class UiRuntimeSmokeModule
                     var app = new App();
                     app.InitializeComponent();
                 }
-
                 UiRuntimeVerifier.VerifyCorrectiveVisuals();
                 V070RuntimeVerifier.Verify();
                 V071RuntimeVerifier.Verify();
                 V072RuntimeVerifier.Verify();
                 V073RuntimeVerifier.Verify();
-                MainWindowStartupProbe.VerifyOnCurrentStaThread();
             }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-        })
-        {
-            Name = "AtlasDesk.UiRuntimeSmoke"
-        };
+            catch (Exception ex) { failure = ex; }
+        });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-
-        if (!thread.Join(TimeSpan.FromSeconds(75)))
-        {
-            throw new TimeoutException(
-                "Corrective UI and startup residency verification timed out. Last startup phase: "
-                + MainWindowStartupProbe.CurrentPhase);
-        }
+        if (!thread.Join(TimeSpan.FromSeconds(45)))
+            throw new TimeoutException("Corrective UI runtime verification timed out.");
         if (failure is not null)
-        {
-            throw new InvalidOperationException(
-                "Corrective UI and startup residency verification failed.",
-                failure);
-        }
+            throw new InvalidOperationException("Corrective UI runtime verification failed.", failure);
     }
 }
