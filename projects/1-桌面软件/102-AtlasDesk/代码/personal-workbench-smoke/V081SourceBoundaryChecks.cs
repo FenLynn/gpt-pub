@@ -43,7 +43,7 @@ internal static class V081SourceBoundaryChecks
             "content.Effect = null",
             "sidebar.Effect = null");
 
-        var projectCenterPath = Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs");
+        var projectCenterPath = Path.Combine(nativeRoot, "ProjectWorkflowCoordinator.cs");
         var projectCenter = File.ReadAllText(projectCenterPath);
         RequireTokens(
             projectCenterPath,
@@ -55,14 +55,16 @@ internal static class V081SourceBoundaryChecks
             "TerminalHostMode.Development",
             "_terminalHost.Content = _terminal",
             "handledEventsToo: true",
-            "ApplyTerminalButtonContrast");
+            "ApplyTerminalButtonContrast",
+            "ProjectSelectionChanged",
+            "ProjectContextService.ReadAsync");
         RequireOrder(
             projectCenter,
             "_tabs = BuildTabs();",
-            "_tabs.SelectionChanged += Tabs_SelectionChanged;",
-            "_tabs.SelectedIndex = ProjectTabIndex;");
+            "_tabs.SelectedIndex = ProjectTabIndex;",
+            "_tabs.SelectionChanged += Tabs_SelectionChanged;");
         RejectExactLine(projectCenter, "tabs.SelectedIndex = 0;",
-            "project center selects a local TabControl before the _tabs field is assigned");
+            "project workflow selects a local TabControl before the _tabs field is assigned");
 
         var diagnosticsPath = Path.Combine(nativeRoot, "DashboardScriptDiagnostics.cs");
         var diagnostics = File.ReadAllText(diagnosticsPath);
@@ -104,7 +106,7 @@ internal static class V081SourceBoundaryChecks
             "DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings)",
             "public DashboardInteractionCoordinator DashboardInteraction");
 
-        Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development terminal, Dashboard navigation, fullscreen exit, startup-order and script-diagnostic source boundaries");
+        Console.WriteLine("PASS AtlasDesk shell, WorkArea, development terminal, Dashboard navigation, project workflow startup-order and script-diagnostic source boundaries");
     }
 
     private static string FindNativeSourceRoot()
@@ -130,7 +132,7 @@ internal static class V081SourceBoundaryChecks
         }
 
         throw new DirectoryNotFoundException(
-            "Unable to locate the AtlasDesk native source tree for v0.8.1 boundary checks.");
+            "Unable to locate the AtlasDesk native source tree for boundary checks.");
     }
 
     private static void RequireTokens(string path, params string[] tokens)

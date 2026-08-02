@@ -43,13 +43,14 @@ internal static class V087WorkspaceTerminalContinuityChecks
         Reject(shell, "_terminal.OpenShellAsync(_settings.DefaultShell)",
             "base shell still creates Ctrl+Shift+T sessions");
 
-        var projectCenter = File.ReadAllText(Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"));
+        var projectWorkflowPath = Path.Combine(nativeRoot, "ProjectWorkflowCoordinator.cs");
+        var projectWorkflow = File.ReadAllText(projectWorkflowPath);
         RequireTokens(
-            Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"),
+            projectWorkflowPath,
             "_pipeline.WorkspaceTerminal.OpenProjectTerminalAsync",
             "reopenLast");
-        Reject(projectCenter, "_terminal.OpenAsync(WorkspaceTerminalFactory.Create",
-            "project center bypasses the terminal continuity owner");
+        Reject(projectWorkflow, "_terminal.OpenAsync(WorkspaceTerminalFactory.Create",
+            "project workflow bypasses the terminal continuity owner");
 
         RequireTokens(
             Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs"),

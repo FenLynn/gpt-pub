@@ -4,6 +4,11 @@ using System.Windows.Input;
 
 namespace PersonalWorkbench;
 
+public sealed class ProjectSelectionChangedEventArgs : EventArgs
+{
+    public ProjectDescriptor? Project { get; init; }
+}
+
 public partial class ProjectCenterControl : UserControl, IDisposable
 {
     private readonly AppSettings _settings;
@@ -15,12 +20,16 @@ public partial class ProjectCenterControl : UserControl, IDisposable
     private bool _loadedOnce;
 
     public event EventHandler<ProjectActionEventArgs>? ActionRequested;
+    public event EventHandler<ProjectSelectionChangedEventArgs>? ProjectSelectionChanged;
+    public ProjectDescriptor? SelectedProject => _selected;
 
     public ProjectCenterControl(AppSettings settings)
     {
         _settings = settings;
         InitializeComponent();
-        Loaded += ProjectCenterControl_Loaded;
+        // Project discovery is intentionally not bound to Loaded or visibility.
+        // ProjectWorkflowCoordinator calls RefreshIfNeededAsync only after the user
+        // explicitly opens Development → Project, and Refresh remains user initiated.
         Unloaded += (_, _) => CancelScan();
         UpdateRootBadge();
     }
@@ -37,10 +46,25 @@ public partial class ProjectCenterControl : UserControl, IDisposable
         UpdateRootBadge();
     }
 
-    private async void ProjectCenterControl_Loaded(object sender, RoutedEventArgs e)
+    public void ShowContextLoading(ProjectDescriptor project)
     {
-        await RefreshIfNeededAsync();
+        if (!IsSelected(project.RootPath)) return;
+        SelectionTitle.Text = project.Name + " · " + project.KindLabel;
+        StatusText.Text = "正在读取项目上下文…";
     }
+
+    public void ApplyContext(ProjectWorkflowContext context)
+    {
+        if (!IsSelected(context.ProjectRoot) || _selected is null) return;
+        SelectionTitle.Text = _selected.Name + " · " + _selected.KindLabel + context.TitleSuffix;
+        StatusText.Text = string.IsNullOrWhiteSpace(context.DetailSummary)
+            ? _selected.RootPath
+            : context.DetailSummary;
+    }
+
+    private bool IsSelected(string rootPath)
+        => _selected is not null
+           && string.Equals(_selected.RootPath, rootPath, StringComparison.OrdinalIgnoreCase);
 
     private void UpdateRootBadge()
     {
@@ -134,6 +158,7 @@ public partial class ProjectCenterControl : UserControl, IDisposable
 
     private void SelectProject(ProjectDescriptor? project)
     {
+        var changed = !string.Equals(_selected?.RootPath, project?.RootPath, StringComparison.OrdinalIgnoreCase);
         _selected = project;
         var enabled = project is not null && Directory.Exists(project.RootPath);
         WorkspaceButton.IsEnabled = enabled;
@@ -142,6 +167,8 @@ public partial class ProjectCenterControl : UserControl, IDisposable
         CopyPathButton.IsEnabled = enabled;
         SelectionTitle.Text = project is null ? "选择一个项目" : project.Name + " · " + project.KindLabel;
         if (project is not null) StatusText.Text = project.RootPath;
+        if (changed)
+            ProjectSelectionChanged?.Invoke(this, new ProjectSelectionChangedEventArgs { Project = project });
     }
 
     private void CancelScan()

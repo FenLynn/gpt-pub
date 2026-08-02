@@ -11,9 +11,9 @@ public sealed class WorkbenchFeaturePipeline
         Settings = Base.GetType().GetField("_settings", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(Base) as AppSettings
                    ?? AppSettings.Load();
 
-        // The V070 three-tab development surface owns environment discovery.
-        // Disable MainWindow's retained pre-project-center discovery path so one
-        // navigation can never start two independent Conda/Python scans.
+        // The Project / Environment / Terminal development surface owns environment
+        // discovery. Disable MainWindow's retained legacy path so one navigation can
+        // never start two independent Conda/Python scans.
         DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window);
 
         Experience = V061ExperienceEnhancer.Attach(window, Base);
@@ -32,7 +32,7 @@ public sealed class WorkbenchFeaturePipeline
         TerminalPresentation = V0610TerminalPresentationEnhancer.Attach(this);
         Corrective = V0611CorrectiveEnhancer.Attach(this);
         ExperiencePolish = V0612ExperienceEnhancer.Attach(window, this);
-        ProjectCenter = V070ProjectCenterEnhancer.Attach(window, this);
+        ProjectWorkflow = ProjectWorkflowCoordinator.Attach(window, this);
     }
 
     public V067VisualFixes VisualFixes { get; }
@@ -53,7 +53,7 @@ public sealed class WorkbenchFeaturePipeline
     public V0610TerminalPresentationEnhancer TerminalPresentation { get; }
     public V0611CorrectiveEnhancer Corrective { get; }
     public V0612ExperienceEnhancer ExperiencePolish { get; }
-    public V070ProjectCenterEnhancer ProjectCenter { get; }
+    public ProjectWorkflowCoordinator ProjectWorkflow { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);
