@@ -23,8 +23,6 @@ internal static class V081SourceBoundaryChecks
             "DashboardNavigationPolicy.Classify");
 
         var hotfix = File.ReadAllText(Path.Combine(nativeRoot, "V068HotfixEnhancer.cs"));
-        Reject(hotfix, "SetHostMode(TerminalHostMode.Development)",
-            "legacy terminal-over-environment host mode remains");
         Reject(hotfix, "_development.Visibility = Visibility.Collapsed",
             "legacy environment hiding path remains");
 
@@ -40,17 +38,24 @@ internal static class V081SourceBoundaryChecks
             "content.Effect = null",
             "sidebar.Effect = null");
 
-        var projectCenter = File.ReadAllText(Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"));
+        var projectCenterPath = Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs");
+        var projectCenter = File.ReadAllText(projectCenterPath);
         RequireTokens(
-            Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"),
+            projectCenterPath,
             "Tabs_SelectionChanged",
             "_tabs.SelectionChanged += Tabs_SelectionChanged",
-            "_tabs.SelectedIndex = 0");
+            "_tabs.SelectedIndex = ProjectTabIndex",
+            "Header = \"终端\"",
+            "ShowTerminalPage",
+            "TerminalHostMode.Development",
+            "_terminalHost.Content = _terminal",
+            "handledEventsToo: true",
+            "ApplyTerminalButtonContrast");
         RequireOrder(
             projectCenter,
             "_tabs = BuildTabs();",
             "_tabs.SelectionChanged += Tabs_SelectionChanged;",
-            "_tabs.SelectedIndex = 0;");
+            "_tabs.SelectedIndex = ProjectTabIndex;");
         RejectExactLine(projectCenter, "tabs.SelectedIndex = 0;",
             "project center selects a local TabControl before the _tabs field is assigned");
 
@@ -75,12 +80,26 @@ internal static class V081SourceBoundaryChecks
         Reject(diagnostics, "window.prompt =",
             "Dashboard diagnostics replaced normal prompt behavior");
 
+        var interactionPath = Path.Combine(nativeRoot, "DashboardInteractionCoordinator.cs");
+        RequireTokens(
+            interactionPath,
+            "ShouldOpenExternally",
+            "NavigationStarting += Core_NavigationStarting",
+            "NavigationCompleted += Core_NavigationCompleted",
+            "args.Cancel = true",
+            "Dashboard top-level external navigation redirected to default browser",
+            "FullscreenExitHandleWindow",
+            "退出全屏   Esc",
+            "ToggleFocusMode",
+            "TogglePopupFullscreen");
+
         RequireTokens(
             Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs"),
             "DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window)",
-            "public DashboardScriptDiagnostics DashboardDiagnostics");
+            "DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings)",
+            "public DashboardInteractionCoordinator DashboardInteraction");
 
-        Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development, Dashboard, startup-order and script-diagnostic source boundaries");
+        Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development terminal, Dashboard navigation, fullscreen exit, startup-order and script-diagnostic source boundaries");
     }
 
     private static string FindNativeSourceRoot()
