@@ -69,6 +69,13 @@ jobs:
           \t}''',
           )
 
+          # Delete the obsolete bottom control instead of merely hiding it.
+          replace_once(
+              main,
+              '''\ta.hApplySelected = createControl("BUTTON", "应用到选中", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1286, 730, 132, 32, a.hwnd, IDC_APPLY_SELECTED)\n''',
+              '',
+          )
+
           """
           path.write_text(text[:start] + replacement + text[end:], encoding='utf-8', newline='\n')
           PY
