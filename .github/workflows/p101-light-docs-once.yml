@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           expected=$'projects/1-桌面软件/101-Mediova/Mediova_v4.2.0_版本说明.md\nprojects/1-桌面软件/101-Mediova/README.md\nprojects/1-桌面软件/101-Mediova/工作记录.md\nprojects/1-桌面软件/101-Mediova/开发约束.md\nprojects/1-桌面软件/101-Mediova/软件开发总结.md\nprojects/1-桌面软件/101-Mediova/阶段记录.md'
-          actual="$(git diff --name-only | sort)"
+          actual="$(git -c core.quotePath=false diff --name-only | sort)"
           test "$actual" = "$expected"
           git diff --check
           git config user.name 'github-actions[bot]'
