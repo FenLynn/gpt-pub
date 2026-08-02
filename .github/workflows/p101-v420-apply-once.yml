@@ -29,8 +29,8 @@ jobs:
         run: |
           set -euo pipefail
           cd 'projects/1-桌面软件/101-Mediova/代码'
-          python3 tools_v420_transform_fix2.py
-          rm tools_v420_transform.py tools_v420_transform_fix1.py tools_v420_transform_fix2.py
+          python3 tools_v420_transform_fix3.py
+          rm tools_v420_transform.py tools_v420_transform_fix1.py tools_v420_transform_fix2.py tools_v420_transform_fix3.py
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           gofmt -w cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/v420_windows.go cmd/mediaworkbench/v420_context_windows.go internal/model/model.go internal/model/v420_queue_test.go internal/workflow/queue.go internal/workflow/queue_test.go internal/config/config.go
 
