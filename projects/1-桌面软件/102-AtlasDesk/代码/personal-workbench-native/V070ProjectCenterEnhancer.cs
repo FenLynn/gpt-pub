@@ -2,18 +2,26 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace PersonalWorkbench;
 
 public sealed class V070ProjectCenterEnhancer
 {
+    private const int ProjectTabIndex = 0;
+    private const int EnvironmentTabIndex = 1;
+    private const int TerminalTabIndex = 2;
+
     private readonly MainWindow _window;
     private readonly WorkbenchFeaturePipeline _pipeline;
     private readonly WorkspaceControl _workspace;
     private readonly TerminalDrawerControl _terminal;
     private readonly DevelopmentControl _development;
     private readonly ProjectCenterControl _projects;
+    private readonly ContentControl _terminalHost;
     private readonly TabControl _tabs;
+    private bool _movingTerminal;
 
     private V070ProjectCenterEnhancer(MainWindow window, WorkbenchFeaturePipeline pipeline)
     {
@@ -27,16 +35,23 @@ public sealed class V070ProjectCenterEnhancer
                        ?? throw new InvalidOperationException("Development environment module is unavailable.");
         _projects = new ProjectCenterControl(pipeline.Settings);
         _projects.ActionRequested += ProjectActionRequested;
+        _terminalHost = new ContentControl
+        {
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Stretch,
+            Background = new SolidColorBrush(Color.FromRgb(13, 19, 32))
+        };
 
         // Assign the field before selecting the first tab. Setting SelectedIndex raises
         // SelectionChanged synchronously, and the handler reads _tabs.
         _tabs = BuildTabs();
         _tabs.SelectionChanged += Tabs_SelectionChanged;
-        _tabs.SelectedIndex = 0;
+        _tabs.SelectedIndex = ProjectTabIndex;
 
         Install();
         RemoveLegacyProjectButton();
         WireNavigation();
+        WireTerminalPage();
         _window.Closed += (_, _) => _projects.Dispose();
     }
 
@@ -48,19 +63,19 @@ public sealed class V070ProjectCenterEnhancer
 
     private TabControl BuildTabs()
     {
-        if (_development.Parent is Panel parent) parent.Children.Remove(_development);
-        else if (_development.Parent is ContentControl content) content.Content = null;
+        RemoveFromParent(_development);
         _development.Visibility = Visibility.Visible;
 
         var tabs = new TabControl
         {
-            Background = System.Windows.Media.Brushes.Transparent,
+            Background = Brushes.Transparent,
             BorderThickness = new Thickness(0),
             Padding = new Thickness(0),
             Margin = new Thickness(0)
         };
         tabs.Items.Add(new TabItem { Header = "项目", Content = _projects });
         tabs.Items.Add(new TabItem { Header = "环境", Content = _development });
+        tabs.Items.Add(new TabItem { Header = "终端", Content = _terminalHost });
         return tabs;
     }
 
@@ -81,14 +96,19 @@ public sealed class V070ProjectCenterEnhancer
 
     private async Task RefreshSelectedTabAsync()
     {
-        if (_tabs.SelectedIndex == 0)
+        switch (_tabs.SelectedIndex)
         {
-            await _projects.RefreshIfNeededAsync();
-            return;
+            case ProjectTabIndex:
+                await _projects.RefreshIfNeededAsync();
+                break;
+            case EnvironmentTabIndex:
+                _development.Visibility = Visibility.Visible;
+                await _development.EnsureLoadedAsync();
+                break;
+            case TerminalTabIndex:
+                ShowTerminalPage();
+                break;
         }
-
-        _development.Visibility = Visibility.Visible;
-        await _development.EnsureLoadedAsync();
     }
 
     private void Install()
@@ -116,13 +136,145 @@ public sealed class V070ProjectCenterEnhancer
             {
                 try
                 {
-                    await RefreshSelectedTabAsync();
+                    if (_tabs.SelectedIndex == TerminalTabIndex)
+                        ShowTerminalPage();
+                    else
+                        await RefreshSelectedTabAsync();
                 }
                 catch (Exception ex)
                 {
                     App.Log("Refresh development navigation failed: " + ex);
                 }
             };
+        }
+    }
+
+    private void WireTerminalPage()
+    {
+        // WorkbenchEnhancer still owns session creation and optional bottom docking.
+        // This layer only owns the explicit full-height terminal page.
+        _development.OpenTerminalRequested += (_, _) => ShowTerminalPage();
+        _terminal.EmbedDevelopmentRequested += (_, _) => ShowTerminalPage();
+        _terminal.DockBottomRequested += (_, _) =>
+        {
+            _terminalHost.Content = null;
+            if (_tabs.SelectedIndex == TerminalTabIndex)
+                _tabs.SelectedIndex = EnvironmentTabIndex;
+        };
+
+        if (FindTopTerminalButton() is { } terminalButton)
+        {
+            terminalButton.PreviewMouseLeftButtonDown += (_, args) =>
+            {
+                ShowTerminalPage();
+                args.Handled = true;
+            };
+            terminalButton.PreviewKeyDown += (_, args) =>
+            {
+                if (args.Key is Key.Enter or Key.Space)
+                {
+                    ShowTerminalPage();
+                    args.Handled = true;
+                }
+            };
+            terminalButton.ToolTip = "打开开发终端（Ctrl+`）";
+        }
+
+        _window.AddHandler(
+            Keyboard.PreviewKeyDownEvent,
+            new KeyEventHandler((_, args) =>
+            {
+                var openExisting = args.Key == Key.Oem3 && Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+                var openNew = args.Key == Key.T
+                              && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+                              && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+                if (openExisting || openNew)
+                    ShowTerminalPage();
+            }),
+            handledEventsToo: true);
+    }
+
+    private Button? FindTopTerminalButton()
+    {
+        if (_window.FindName("PopoutButton") is not Button popout || popout.Parent is not StackPanel actions)
+            return null;
+        return actions.Children
+            .OfType<Button>()
+            .FirstOrDefault(button => button.ToolTip?.ToString()?.Contains("终端", StringComparison.Ordinal) == true);
+    }
+
+    private void ShowTerminalPage()
+    {
+        if (_movingTerminal)
+            return;
+
+        try
+        {
+            _movingTerminal = true;
+            if (_window.FindName("DevelopmentNav") is RadioButton developmentNav
+                && developmentNav.IsChecked != true)
+            {
+                developmentNav.IsChecked = true;
+            }
+
+            // Collapse any previously requested bottom drawer before reparenting the
+            // same live terminal control into the dedicated development tab.
+            try
+            {
+                _pipeline.Base.GetType()
+                    .GetMethod("HideTerminal", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(_pipeline.Base, null);
+            }
+            catch (Exception ex)
+            {
+                App.Log("Hide bottom terminal before page hosting failed: " + ex.Message);
+            }
+
+            RemoveFromParent(_terminal);
+            _terminalHost.Content = _terminal;
+            _terminal.Visibility = Visibility.Visible;
+            _terminal.HorizontalAlignment = HorizontalAlignment.Stretch;
+            _terminal.VerticalAlignment = VerticalAlignment.Stretch;
+            _terminal.SetHostMode(TerminalHostMode.Development);
+            if (_tabs.SelectedIndex != TerminalTabIndex)
+                _tabs.SelectedIndex = TerminalTabIndex;
+
+            _terminal.Dispatcher.BeginInvoke(new Action(ApplyTerminalButtonContrast));
+        }
+        catch (Exception ex)
+        {
+            App.Log("Show dedicated terminal page failed: " + ex);
+        }
+        finally
+        {
+            _movingTerminal = false;
+        }
+    }
+
+    private void ApplyTerminalButtonContrast()
+    {
+        foreach (var button in FindVisualChildren<Button>(_terminal))
+        {
+            button.Foreground = Brushes.White;
+            button.Background = new SolidColorBrush(button.IsEnabled
+                ? Color.FromRgb(42, 77, 116)
+                : Color.FromRgb(35, 52, 75));
+            button.BorderBrush = new SolidColorBrush(button.IsEnabled
+                ? Color.FromRgb(105, 145, 193)
+                : Color.FromRgb(72, 91, 117));
+            button.Opacity = 1;
+        }
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+                yield return match;
+            foreach (var nested in FindVisualChildren<T>(child))
+                yield return nested;
         }
     }
 
@@ -136,7 +288,7 @@ public sealed class V070ProjectCenterEnhancer
                 await _workspace.OpenFromGlobalSearchAsync(e.Project.RootPath);
                 break;
             case "terminal":
-                ShowTerminal();
+                ShowTerminalPage();
                 await _terminal.OpenAsync(WorkspaceTerminalFactory.Create(
                     _pipeline.Settings, _pipeline.Settings.DefaultShell, e.Project.RootPath, e.Project.Name));
                 break;
@@ -147,12 +299,13 @@ public sealed class V070ProjectCenterEnhancer
         }
     }
 
-    private void ShowTerminal()
+    private static void RemoveFromParent(FrameworkElement element)
     {
-        try
-        {
-            _pipeline.Base.GetType().GetMethod("ShowTerminal", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(_pipeline.Base, null);
-        }
-        catch (Exception ex) { App.Log("Show integrated project terminal failed: " + ex.Message); }
+        if (element.Parent is Panel panel)
+            panel.Children.Remove(element);
+        else if (element.Parent is Decorator decorator)
+            decorator.Child = null;
+        else if (element.Parent is ContentControl content)
+            content.Content = null;
     }
 }
