@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-$version = "4.1.0"
+$version = "4.1.1"
 $buildRoot = Join-Path $PSScriptRoot "build"
 $runtimeRoot = Join-Path $buildRoot "Runtime"
 $componentBin = Join-Path $runtimeRoot "Components/FFmpeg/bin"

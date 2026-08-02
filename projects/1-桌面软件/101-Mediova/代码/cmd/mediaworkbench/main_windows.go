@@ -30,7 +30,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const appVersion = "4.1.0"
+const appVersion = "4.1.1"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -391,7 +391,7 @@ func main() {
 	uiFont = createUIFont("Microsoft YaHei UI", -16, 400)
 	uiFontBold = createUIFont("Microsoft YaHei UI", -16, 550)
 	uiFontTitle = createUIFont("Microsoft YaHei UI", -18, 600)
-	iconFont = createUIFont("Segoe MDL2 Assets", -20, 400)
+	iconFont = createUIFont("Segoe MDL2 Assets", -18, 400)
 	uiCanvasBrush, _, _ = procCreateSolidBrush.Call(colorRef(250, 251, 253))
 	uiSurfaceBrush, _, _ = procCreateSolidBrush.Call(colorRef(250, 251, 253))
 	writeStartupStage("fonts_created")
@@ -411,8 +411,8 @@ func main() {
 	uiPreview := parseUIPreviewArgs(os.Args[1:])
 	settings := config.Load()
 	settings.FFmpegPath = config.NormalizeConfiguredFFmpegPath(settings.FFmpegPath)
-	if settings.UILayoutRevision < 410 {
-		settings.UILayoutRevision = 410
+	if settings.UILayoutRevision < 411 {
+		settings.UILayoutRevision = 411
 		settings.RightPanelVisible = true
 		settings.ShowPerformanceStats = false
 		settings.TaskColumnWidths = nil
@@ -443,7 +443,7 @@ func main() {
 	app.player, app.playerOK, _ = media.DetectPotPlayer(app.settings.PlayerPath)
 	writeStartupStage("components_discovered")
 	hInst, _, _ := procGetModuleHandleW.Call(0)
-	className := p("MediovaDesktop410")
+	className := p("MediovaDesktop411")
 	app.hIcon = loadEmbeddedIcon()
 	if r, _, _ := procRegisterWindowMessageW.Call(uintptr(unsafe.Pointer(p("TaskbarCreated")))); r != 0 {
 		taskbarCreatedMessage = uint32(r)
@@ -1016,47 +1016,61 @@ func (a *application) drawToolbarButton(dis *drawItemStruct) bool {
 	pressed := dis.ItemState&ODS_SELECTED != 0
 	disabled := dis.ItemState&ODS_DISABLED != 0
 	hovered := a.hovered(dis.HwndItem)
+	state := controlVisualState{Active: active, Hovered: hovered, Pressed: pressed, Disabled: disabled}
+	treatment := toolbarSurfaceTreatment(state)
 
-	bg := colorRef(250, 251, 253)
-	iconColor := colorRef(45, 55, 69)
-	textColor := colorRef(48, 58, 72)
-	border := colorRef(231, 235, 240)
-	if hovered && !disabled {
-		bg = colorRef(242, 247, 253)
-		border = colorRef(164, 192, 225)
+	canvas := colorRef(250, 251, 253)
+	bg := canvas
+	border := colorRef(242, 244, 247)
+	iconColor := colorRef(48, 58, 72)
+	textColor := colorRef(50, 60, 74)
+	if treatment.Fill {
+		bg = colorRef(241, 247, 254)
 	}
-	if active {
-		bg = colorRef(239, 246, 255)
-		iconColor = colorRef(23, 101, 190)
-		textColor = colorRef(19, 91, 177)
-		border = colorRef(118, 164, 220)
+	if treatment.Strength >= 2 {
+		border = colorRef(151, 184, 222)
 	}
-	if pressed && !disabled {
-		bg = colorRef(229, 240, 253)
-		border = colorRef(105, 151, 208)
+	if treatment.Strength >= 3 {
+		bg = colorRef(228, 240, 253)
+		border = colorRef(102, 150, 207)
+	}
+	if active && !disabled {
+		bg = colorRef(238, 246, 255)
+		border = colorRef(112, 159, 216)
+		iconColor = colorRef(22, 99, 186)
+		textColor = colorRef(18, 88, 172)
 	}
 	if disabled {
-		iconColor = colorRef(170, 178, 188)
-		textColor = colorRef(155, 163, 174)
-		border = colorRef(239, 241, 244)
+		bg = canvas
+		border = colorRef(246, 247, 249)
+		iconColor = colorRef(171, 178, 188)
+		textColor = colorRef(157, 164, 174)
 	}
 
 	rc := dis.RcItem
-	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	fillSolid(dis.HDC, rc, canvas)
 	inner := rect{Left: rc.Left + 2, Top: rc.Top + 2, Right: rc.Right - 2, Bottom: rc.Bottom - 2}
-	withRoundedClip(dis.HDC, inner, 6, func() { fillSolid(dis.HDC, inner, bg) })
-	drawRoundedBorder(dis.HDC, inner, 6, border)
+	if treatment.Fill {
+		withRoundedClip(dis.HDC, inner, 4, func() { fillSolid(dis.HDC, inner, bg) })
+	}
+	if treatment.Border {
+		drawRoundedBorder(dis.HDC, inner, 4, border)
+	}
+	if treatment.Accent {
+		fillSolid(dis.HDC, rect{Left: inner.Left + 13, Top: inner.Bottom - 2, Right: inner.Right - 13, Bottom: inner.Bottom}, colorRef(37, 108, 201))
+	}
+
 	buttonW := rc.Right - rc.Left
-	if buttonW < 56 {
+	if buttonW < 54 {
 		drawCenteredText(dis.HDC, icon, rc, iconFont, iconColor)
 	} else {
 		iconRC := rc
-		iconRC.Top += 6
-		iconRC.Bottom = iconRC.Top + 22
+		iconRC.Top += 8
+		iconRC.Bottom = iconRC.Top + 19
 		drawCenteredText(dis.HDC, icon, iconRC, iconFont, iconColor)
 		labelRC := rc
-		labelRC.Top += 27
-		labelRC.Bottom -= 4
+		labelRC.Top += 30
+		labelRC.Bottom -= 5
 		drawCenteredText(dis.HDC, label, labelRC, uiFontSmall, textColor)
 	}
 	return true
@@ -1149,26 +1163,35 @@ func (a *application) drawSecondaryButton(dis *drawItemStruct) bool {
 	pressed := dis.ItemState&ODS_SELECTED != 0
 	disabled := dis.ItemState&ODS_DISABLED != 0
 	hovered := a.hovered(dis.HwndItem)
-	bg := colorRef(250, 251, 253)
-	border := colorRef(222, 227, 234)
-	textColor := colorRef(48, 58, 72)
-	if hovered && !disabled {
+	treatment := secondarySurfaceTreatment(controlVisualState{Hovered: hovered, Pressed: pressed, Disabled: disabled})
+	canvas := colorRef(250, 251, 253)
+	bg := canvas
+	border := colorRef(238, 241, 245)
+	textColor := colorRef(49, 59, 73)
+	if treatment.Fill {
 		bg = colorRef(241, 247, 254)
-		border = colorRef(160, 190, 225)
 	}
-	if pressed && !disabled {
-		bg = colorRef(229, 240, 253)
-		border = colorRef(126, 171, 228)
+	if treatment.Strength >= 2 {
+		border = colorRef(153, 186, 222)
+	}
+	if treatment.Strength >= 3 {
+		bg = colorRef(228, 240, 253)
+		border = colorRef(111, 157, 211)
 	}
 	if disabled {
-		border = colorRef(236, 239, 243)
-		textColor = colorRef(166, 174, 184)
+		bg = canvas
+		border = colorRef(245, 246, 248)
+		textColor = colorRef(166, 173, 183)
 	}
 	rc := dis.RcItem
-	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	fillSolid(dis.HDC, rc, canvas)
 	inner := rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}
-	withRoundedClip(dis.HDC, inner, 6, func() { fillSolid(dis.HDC, inner, bg) })
-	drawRoundedBorder(dis.HDC, inner, 6, border)
+	if treatment.Fill {
+		withRoundedClip(dis.HDC, inner, 4, func() { fillSolid(dis.HDC, inner, bg) })
+	}
+	if treatment.Border {
+		drawRoundedBorder(dis.HDC, inner, 4, border)
+	}
 	if dis.HwndItem == a.hRightToggle {
 		drawChevron(dis.HDC, rc, !a.rightVisible, textColor)
 		return true
@@ -1178,9 +1201,9 @@ func (a *application) drawSecondaryButton(dis *drawItemStruct) bool {
 	if glyph != "" && rc.Right-rc.Left >= 72 {
 		iconRC := rc
 		iconRC.Left += 7
-		iconRC.Right = iconRC.Left + 21
+		iconRC.Right = iconRC.Left + 19
 		drawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
-		textRC.Left += 20
+		textRC.Left += 19
 	}
 	drawCenteredText(dis.HDC, label, textRC, uiFontSmall, textColor)
 	return true
@@ -1256,10 +1279,10 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 		return false
 	}
 	rc := dis.RcItem
-	bar := rect{Left: rc.Left + 1, Top: rc.Top + 3, Right: rc.Right - 1, Bottom: rc.Bottom - 3}
+	bar := rect{Left: rc.Left + 1, Top: rc.Top + 4, Right: rc.Right - 1, Bottom: rc.Bottom - 4}
 	fraction := clamp01(a.overallProgress / 100)
-	withRoundedClip(dis.HDC, bar, 7, func() {
-		fillSolid(dis.HDC, bar, colorRef(243, 246, 250))
+	withRoundedClip(dis.HDC, bar, 4, func() {
+		fillSolid(dis.HDC, bar, colorRef(248, 250, 252))
 		if fraction > 0 {
 			fill := bar
 			fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
@@ -1267,9 +1290,9 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 				fill.Right = fill.Left + 4
 			}
 			if a.overallPaused {
-				drawHorizontalGradient(dis.HDC, fill, colorRef(255, 225, 168), colorRef(226, 156, 40))
+				drawHorizontalGradient(dis.HDC, fill, colorRef(255, 229, 178), colorRef(225, 157, 43))
 			} else {
-				drawHorizontalGradient(dis.HDC, fill, colorRef(142, 190, 245), colorRef(55, 121, 215))
+				drawHorizontalGradient(dis.HDC, fill, colorRef(151, 196, 245), colorRef(58, 122, 214))
 			}
 		}
 	})
@@ -1374,19 +1397,20 @@ func (a *application) drawStatusChip(dis *drawItemStruct) bool {
 	rc := dis.RcItem
 	pressed := dis.ItemState&ODS_SELECTED != 0
 	hovered := a.hovered(dis.HwndItem)
-	bg := colorRef(250, 251, 253)
-	if hovered {
-		bg = colorRef(241, 247, 254)
-	}
-	if pressed {
-		bg = colorRef(229, 240, 253)
-	}
-	fillSolid(dis.HDC, rc, bg)
+	canvas := colorRef(250, 251, 253)
+	fillSolid(dis.HDC, rc, canvas)
 	if hovered || pressed {
-		drawRoundedBorder(dis.HDC, rect{Left: rc.Left, Top: rc.Top, Right: rc.Right - 1, Bottom: rc.Bottom - 1}, 5, colorRef(217, 224, 233))
+		inner := rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}
+		bg := colorRef(241, 247, 254)
+		border := colorRef(157, 188, 223)
+		if pressed {
+			bg, border = colorRef(228, 240, 253), colorRef(112, 158, 212)
+		}
+		withRoundedClip(dis.HDC, inner, 4, func() { fillSolid(dis.HDC, inner, bg) })
+		drawRoundedBorder(dis.HDC, inner, 4, border)
 	}
-	diameter := int32(10)
-	dotLeft := rc.Left + 7
+	diameter := int32(11)
+	dotLeft := rc.Left + 6
 	dotTop := (rc.Top + rc.Bottom - diameter) / 2
 	brush, _, _ := procCreateSolidBrush.Call(dot)
 	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
@@ -1676,23 +1700,23 @@ func (a *application) resetTaskColumnWidths() {
 
 func (a *application) initControls() {
 	// Top toolbar: native desktop density, small line icons and quiet surfaces.
-	a.hVideo = createControl("BUTTON", "视频转换", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW|BS_DEFPUSHBUTTON, 8, 8, 86, 50, a.hwnd, IDC_TAB_VIDEO)
-	a.hImage = createControl("BUTTON", "图片压缩", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 100, 8, 86, 50, a.hwnd, IDC_TAB_IMAGE)
+	a.hVideo = createControl("BUTTON", "视频转换", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW|BS_DEFPUSHBUTTON, 8, 5, 86, 58, a.hwnd, IDC_TAB_VIDEO)
+	a.hImage = createControl("BUTTON", "图片压缩", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 100, 5, 86, 58, a.hwnd, IDC_TAB_IMAGE)
 	a.hToolbarDivider = createControl("STATIC", "", WS_CHILD|WS_VISIBLE|SS_OWNERDRAW, 191, 14, 1, 38, a.hwnd, 0)
-	a.hAddFiles = createControl("BUTTON", "添加文件", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 194, 8, 78, 50, a.hwnd, IDC_ADD_FILES)
-	a.hAddFolder = createControl("BUTTON", "添加文件夹", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 278, 8, 88, 50, a.hwnd, IDC_ADD_FOLDER)
-	a.hRemove = createControl("BUTTON", "移除", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 372, 8, 66, 50, a.hwnd, IDC_REMOVE)
-	a.hClear = createControl("BUTTON", "清空", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 444, 8, 66, 50, a.hwnd, IDC_CLEAR)
-	a.hSelectAll = createControl("BUTTON", "全选", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 516, 8, 66, 50, a.hwnd, IDC_SELECT_ALL)
-	a.hInvert = createControl("BUTTON", "反选", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 588, 8, 66, 50, a.hwnd, IDC_INVERT)
-	a.hSourceDir = createControl("BUTTON", "源目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 660, 8, 76, 50, a.hwnd, IDC_SOURCE_DIR)
-	a.hOutputDir = createControl("BUTTON", "输出目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 742, 8, 82, 50, a.hwnd, IDC_OUTPUT_DIR)
+	a.hAddFiles = createControl("BUTTON", "添加文件", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 194, 5, 78, 58, a.hwnd, IDC_ADD_FILES)
+	a.hAddFolder = createControl("BUTTON", "添加文件夹", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 278, 5, 88, 58, a.hwnd, IDC_ADD_FOLDER)
+	a.hRemove = createControl("BUTTON", "移除", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 372, 5, 66, 58, a.hwnd, IDC_REMOVE)
+	a.hClear = createControl("BUTTON", "清空", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 444, 5, 66, 58, a.hwnd, IDC_CLEAR)
+	a.hSelectAll = createControl("BUTTON", "全选", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 516, 5, 66, 58, a.hwnd, IDC_SELECT_ALL)
+	a.hInvert = createControl("BUTTON", "反选", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 588, 5, 66, 58, a.hwnd, IDC_INVERT)
+	a.hSourceDir = createControl("BUTTON", "源目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 660, 5, 76, 58, a.hwnd, IDC_SOURCE_DIR)
+	a.hOutputDir = createControl("BUTTON", "输出目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 742, 5, 82, 58, a.hwnd, IDC_OUTPUT_DIR)
 
 	a.hSearch = createControlEx(0, "EDIT", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL, 930, 18, 320, 30, a.hwnd, IDC_SEARCH)
 	procSetWindowTheme.Call(a.hSearch, uintptr(unsafe.Pointer(p("Explorer"))), 0)
 	send(a.hSearch, EM_SETCUEBANNER, 1, uintptr(unsafe.Pointer(p("搜索文件名、路径或状态"))))
 	a.hFilter = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL, 1260, 17, 126, 220, a.hwnd, IDC_FILTER)
-	procSetWindowTheme.Call(a.hFilter, uintptr(unsafe.Pointer(p("Explorer"))), 0)
+	procSetWindowTheme.Call(a.hFilter, uintptr(unsafe.Pointer(p("CFD"))), 0)
 	comboFill(a.hFilter, []string{"全部状态", "准备中", "队列中", "转换中", "暂停", "完成", "失败", "已跳过", "已停止"}, "全部状态")
 
 	// Status chips are owner drawn so their dots remain visible and text never clips.
@@ -1745,7 +1769,7 @@ func (a *application) initControls() {
 	a.hTaskVolume = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 1444, 222, 205, 220, a.hwnd, IDC_TASK_VOLUME)
 	a.hTaskRotation = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 1444, 260, 205, 240, a.hwnd, IDC_TASK_ROTATION)
 	for _, h := range []uintptr{a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation} {
-		procSetWindowTheme.Call(h, uintptr(unsafe.Pointer(p("Explorer"))), 0)
+		procSetWindowTheme.Call(h, uintptr(unsafe.Pointer(p("CFD"))), 0)
 		send(h, WM_SETFONT, uiFontSmall, 1)
 	}
 	comboFill(a.hTaskRes, videoResolutions(), "1080P")
@@ -1769,21 +1793,21 @@ func (a *application) initControls() {
 	a.hOutputEdit = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWN|CBS_AUTOHSCROLL|WS_VSCROLL, 130, 730, 560, 240, a.hwnd, IDC_OUTPUT_EDIT)
 	a.hOutputPick = createControl("BUTTON", "浏览…", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 696, 730, 72, 32, a.hwnd, IDC_OUTPUT_PICK)
 	send(a.hOutputEdit, WM_SETFONT, uiFont, 1)
-	procSetWindowTheme.Call(a.hOutputEdit, uintptr(unsafe.Pointer(p("Explorer"))), 0)
+	procSetWindowTheme.Call(a.hOutputEdit, uintptr(unsafe.Pointer(p("CFD"))), 0)
 	a.refreshOutputHistory()
 	for _, text := range []string{"输出", "格式", "质量", "体积", "旋转"} {
 		h := createControl("STATIC", text, WS_CHILD|WS_VISIBLE|SS_CENTER, 0, 0, 34, 28, a.hwnd, 0)
 		send(h, WM_SETFONT, uiFontSmall, 1)
 		a.globalLabels = append(a.globalLabels, h)
 	}
-	a.hResolution = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 760, 730, 96, 220, a.hwnd, IDC_RESOLUTION)
-	a.hCodec = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 862, 730, 92, 180, a.hwnd, IDC_CODEC)
-	a.hQuality = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 960, 730, 68, 180, a.hwnd, IDC_QUALITY)
+	a.hResolution = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 760, 730, 84, 220, a.hwnd, IDC_RESOLUTION)
+	a.hCodec = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 862, 730, 78, 180, a.hwnd, IDC_CODEC)
+	a.hQuality = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 960, 730, 72, 180, a.hwnd, IDC_QUALITY)
 	a.hSpeedMode = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 1034, 730, 92, 180, a.hwnd, IDC_SPEED_MODE)
-	a.hVolume = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 1034, 730, 132, 240, a.hwnd, IDC_VOLUME)
-	a.hRotation = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 1172, 730, 108, 260, a.hwnd, IDC_ROTATION)
+	a.hVolume = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 1034, 730, 126, 240, a.hwnd, IDC_VOLUME)
+	a.hRotation = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, 1172, 730, 98, 260, a.hwnd, IDC_ROTATION)
 	for _, h := range []uintptr{a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation} {
-		procSetWindowTheme.Call(h, uintptr(unsafe.Pointer(p("Explorer"))), 0)
+		procSetWindowTheme.Call(h, uintptr(unsafe.Pointer(p("CFD"))), 0)
 		send(h, WM_SETFONT, uiFontSmall, 1)
 	}
 	comboFill(a.hResolution, videoResolutions(), a.settings.Resolution)
@@ -1869,7 +1893,7 @@ func (a *application) recreateFontsForDPI() {
 	uiFont = createUIFont("Microsoft YaHei UI", -16, 400)
 	uiFontBold = createUIFont("Microsoft YaHei UI", -16, 550)
 	uiFontTitle = createUIFont("Microsoft YaHei UI", -18, 600)
-	iconFont = createUIFont("Segoe MDL2 Assets", -20, 400)
+	iconFont = createUIFont("Segoe MDL2 Assets", -18, 400)
 	for _, h := range old {
 		if h != 0 {
 			procDeleteObject.Call(h)
@@ -2032,13 +2056,13 @@ type topBand struct {
 func topBandForWidth(w int32) topBand {
 	switch {
 	case w >= 1500:
-		return topBand{[]int32{92, 92, 84, 94, 66, 66, 66, 66, 80, 86}, 7, 290, 122, 206, 24}
+		return topBand{[]int32{92, 92, 84, 94, 66, 66, 66, 66, 80, 86}, 8, 282, 122, 206, 24}
 	case w >= 1320:
-		return topBand{[]int32{82, 82, 72, 80, 58, 58, 58, 58, 68, 72}, 6, 210, 104, 184, 24}
+		return topBand{[]int32{82, 82, 72, 80, 58, 58, 58, 58, 68, 72}, 7, 202, 104, 184, 24}
 	case w >= 1120:
-		return topBand{[]int32{66, 66, 56, 60, 48, 48, 48, 48, 54, 56}, 4, 160, 96, 168, 23}
+		return topBand{[]int32{66, 66, 56, 60, 48, 48, 48, 48, 54, 56}, 5, 152, 96, 168, 23}
 	default:
-		return topBand{[]int32{48, 48, 42, 42, 40, 40, 40, 40, 42, 42}, 2, 120, 82, 142, 22}
+		return topBand{[]int32{48, 48, 42, 42, 40, 40, 40, 40, 42, 42}, 3, 112, 82, 142, 22}
 	}
 }
 
@@ -2076,20 +2100,20 @@ func (a *application) layout(w, h int32) {
 	toolHandles := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir}
 	xTool := int32(8)
 	for i, control := range toolHandles {
-		move(control, xTool, 7, band.toolWidths[i], 54)
+		move(control, xTool, 5, band.toolWidths[i], 58)
 		xTool += band.toolWidths[i] + band.toolGap
 		if i == 1 {
-			move(a.hToolbarDivider, xTool, 15, 1, 38)
+			move(a.hToolbarDivider, xTool, 14, 1, 40)
 			xTool += 6
 		}
 	}
 
-	toggleW := int32(26)
+	toggleW := int32(22)
 	if w < 1120 {
-		toggleW = 24
+		toggleW = 20
 	}
 	toggleX := w - 8 - toggleW
-	move(a.hRightToggle, toggleX, 18, toggleW, 30)
+	move(a.hRightToggle, toggleX, 19, toggleW, 28)
 	gridGap := int32(4)
 	gridX := toggleX - 7 - band.statusGridW
 	cellW := (band.statusGridW - gridGap) / 2
@@ -2116,6 +2140,7 @@ func (a *application) layout(w, h int32) {
 	move(a.hSearch, searchRight-searchW, 19, searchW, 30)
 
 	compactBottom := w < 1320
+	bottomWidths := bottomParameterWidths()
 	bottomBar := int32(126)
 	if compactBottom {
 		bottomBar = 164
@@ -2203,7 +2228,7 @@ func (a *application) layout(w, h int32) {
 			pairs := []struct {
 				label, combo uintptr
 				wd           int32
-			}{{a.globalLabels[0], a.hResolution, 92}, {a.globalLabels[1], a.hCodec, 82}, {a.globalLabels[2], a.hQuality, 68}, {a.globalLabels[3], a.hVolume, 122}, {a.globalLabels[4], a.hRotation, 100}}
+			}{{a.globalLabels[0], a.hResolution, bottomWidths.Resolution}, {a.globalLabels[1], a.hCodec, bottomWidths.Codec}, {a.globalLabels[2], a.hQuality, bottomWidths.Quality}, {a.globalLabels[3], a.hVolume, bottomWidths.Volume}, {a.globalLabels[4], a.hRotation, bottomWidths.Rotation}}
 			for _, pair := range pairs {
 				move(pair.label, x, row2+4, 38, 24)
 				x += 38
@@ -2221,7 +2246,7 @@ func (a *application) layout(w, h int32) {
 		move(a.hStop, w-104, barY+107, 88, 38)
 	} else {
 		move(a.hOutputBrowse, 8, barY, 116, 32)
-		fixed := int32(38 + 92 + 7 + 34 + 82 + 7 + 34 + 68 + 7 + 34 + 132 + 7 + 34 + 104 + 8 + 122 + 8 + 146)
+		fixed := int32(38 + bottomWidths.Resolution + 7 + 34 + bottomWidths.Codec + 7 + 34 + bottomWidths.Quality + 7 + 34 + bottomWidths.Volume + 7 + 34 + bottomWidths.Rotation + 8 + 122 + 8 + 146)
 		editW := w - 8 - 116 - 6 - 72 - 8 - fixed - 8
 		if simple {
 			editW = w - 8 - 116 - 6 - 72 - 8 - (106 + 7 + 92 + 7 + 122) - 8
@@ -2244,7 +2269,7 @@ func (a *application) layout(w, h int32) {
 			pairs := []struct {
 				label, combo   uintptr
 				labelW, comboW int32
-			}{{a.globalLabels[0], a.hResolution, 38, 92}, {a.globalLabels[1], a.hCodec, 34, 82}, {a.globalLabels[2], a.hQuality, 34, 68}, {a.globalLabels[3], a.hVolume, 34, 132}, {a.globalLabels[4], a.hRotation, 34, 104}}
+			}{{a.globalLabels[0], a.hResolution, 38, bottomWidths.Resolution}, {a.globalLabels[1], a.hCodec, 34, bottomWidths.Codec}, {a.globalLabels[2], a.hQuality, 34, bottomWidths.Quality}, {a.globalLabels[3], a.hVolume, 34, bottomWidths.Volume}, {a.globalLabels[4], a.hRotation, 34, bottomWidths.Rotation}}
 			for _, pair := range pairs {
 				move(pair.label, x, barY+4, pair.labelW, 24)
 				x += pair.labelW
@@ -2919,11 +2944,12 @@ func drawSelectedCell(hdc uintptr, rc rect, label string, active bool) {
 }
 
 func fullCellBarRect(rc rect) rect {
-	bar := rect{Left: rc.Left + 2, Top: rc.Top + 5, Right: rc.Right - 2, Bottom: rc.Bottom - 5}
-	if bar.Bottom-bar.Top < 16 {
+	insets := listCellBarInsets()
+	bar := rect{Left: rc.Left + insets.Horizontal, Top: rc.Top + insets.Vertical, Right: rc.Right - insets.Horizontal, Bottom: rc.Bottom - insets.Vertical}
+	if bar.Bottom-bar.Top < insets.MinimumHeight {
 		cy := (rc.Top + rc.Bottom) / 2
-		bar.Top = cy - 8
-		bar.Bottom = cy + 8
+		bar.Top = cy - insets.MinimumHeight/2
+		bar.Bottom = bar.Top + insets.MinimumHeight
 	}
 	return bar
 }
@@ -2935,15 +2961,15 @@ func drawProgressPill(hdc uintptr, rc rect, fraction float64, label string, sele
 	}
 	fraction = clamp01(fraction)
 	bar := fullCellBarRect(rc)
-	withRoundedClip(hdc, bar, 5, func() {
-		fillSolid(hdc, bar, colorRef(244, 247, 250))
+	withRoundedClip(hdc, bar, 3, func() {
+		fillSolid(hdc, bar, colorRef(250, 251, 253))
 		if fraction > 0 {
 			fill := bar
 			fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
 			if fill.Right < fill.Left+3 {
 				fill.Right = fill.Left + 3
 			}
-			drawHorizontalGradient(hdc, fill, colorRef(165, 202, 244), colorRef(78, 140, 222))
+			drawHorizontalGradient(hdc, fill, colorRef(169, 204, 243), colorRef(76, 138, 220))
 		}
 	})
 	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(39, 55, 78))
@@ -2952,15 +2978,15 @@ func drawProgressPill(hdc uintptr, rc rect, fraction float64, label string, sele
 func compressionColorPair(visual compressionVisual) (uintptr, uintptr) {
 	switch visual.Tone {
 	case compressionYellow:
-		return colorRef(255, 239, 184), colorRef(232, 181, 52)
+		return colorRef(255, 240, 188), colorRef(232, 181, 52)
 	case compressionGreen:
-		return mixColor(colorRef(218, 244, 226), colorRef(165, 222, 182), visual.Intensity),
-			mixColor(colorRef(103, 190, 132), colorRef(32, 145, 78), visual.Intensity)
+		return mixColor(colorRef(220, 245, 228), colorRef(164, 222, 181), visual.Intensity),
+			mixColor(colorRef(103, 190, 132), colorRef(30, 143, 76), visual.Intensity)
 	case compressionRed:
-		return mixColor(colorRef(255, 226, 222), colorRef(245, 176, 168), visual.Intensity),
-			mixColor(colorRef(224, 91, 82), colorRef(184, 43, 39), visual.Intensity)
+		return mixColor(colorRef(255, 228, 224), colorRef(244, 178, 170), visual.Intensity),
+			mixColor(colorRef(224, 91, 82), colorRef(182, 42, 38), visual.Intensity)
 	default:
-		return colorRef(239, 243, 248), colorRef(221, 227, 235)
+		return colorRef(248, 250, 252), colorRef(232, 236, 241)
 	}
 }
 
@@ -2970,9 +2996,9 @@ func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, s
 		return
 	}
 	bar := fullCellBarRect(rc)
-	withRoundedClip(hdc, bar, 5, func() {
+	withRoundedClip(hdc, bar, 3, func() {
 		if task == nil || task.InputSize <= 0 || task.OutputSize <= 0 {
-			fillSolid(hdc, bar, colorRef(244, 247, 250))
+			fillSolid(hdc, bar, colorRef(250, 251, 253))
 			return
 		}
 		visual := compressionVisualFor(task.InputSize, task.OutputSize)
@@ -2987,7 +3013,7 @@ func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, s
 		left.Right = split
 		right := bar
 		right.Left = split
-		fillSolid(hdc, left, colorRef(238, 242, 247))
+		fillSolid(hdc, left, colorRef(247, 249, 251))
 		start, finish := compressionColorPair(visual)
 		drawHorizontalGradient(hdc, right, start, finish)
 	})

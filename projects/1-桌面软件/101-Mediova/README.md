@@ -5,10 +5,11 @@ Mediova 是面向 Windows 10/11 x64 的本地媒体处理与创作工作站，�
 ## 当前入口
 
 - 当前正式基线：[阶段记录](阶段记录.md)（Mediova v4.1.0，标签与 Release `p101-v4.1.0`）
-- 当前工作：[工作记录](工作记录.md)
+- 当前候选：Mediova v4.1.1 UI 视觉修复，状态与待验证项见 [工作记录](工作记录.md)
 - 项目长期规则：[开发约束](开发约束.md)
 - 设计与演进：[软件开发总结](软件开发总结.md)
-- v4.1.0 用户可见变化：[版本说明](Mediova_v4.1.0_版本说明.md)
+- v4.1.1 用户可见变化：[候选版本说明](Mediova_v4.1.1_版本说明.md)
+- v4.1.0 用户可见变化：[正式版本说明](Mediova_v4.1.0_版本说明.md)
 - v4.0.0 公开迁移证据：[迁移校验清单](迁移校验清单.md)
 
 新对话必须先按 A｜`/GPT_RULES.md` → B｜`../开发约束.md` → C｜本项目 `开发约束.md` 读取约束，再读取本 README、阶段记录和工作记录。旧聊天记录只作为补充。
@@ -21,18 +22,18 @@ Mediova 是面向 Windows 10/11 x64 的本地媒体处理与创作工作站，�
 - 日常分支：`p101-exp`
 - 稳定分支：`p101-stable`
 
-构建完整 v4.1.0 Runtime：
+构建完整 v4.1.1 Runtime：
 
 ```powershell
 cd projects/1-桌面软件/101-Mediova/代码
-./build_v4.1.0.ps1 -FFmpegBin "C:\path\to\ffmpeg\bin"
+./build_v4.1.1.ps1 -FFmpegBin "C:\path\to\ffmpeg\bin"
 ```
 
 输出位于：
 
 ```text
 代码/build/Runtime/
-代码/build/Mediova-v4.1.0-Runtime.zip
+代码/build/Mediova-v4.1.1-Runtime.zip
 代码/build/SHA256.txt
 ```
 
@@ -46,7 +47,7 @@ Mediova 保留一个直接启动的 `Mediova.exe`，公开运行依赖位于透�
 最新 main
 → p101-exp
 → PR：p101-exp → p101-stable
-→ 完整准入
+→ 完整准入与 UI 截图复核
 → PR：p101-stable → main
 → 标签与 Release
 → main 回流 p101-stable / p101-exp
