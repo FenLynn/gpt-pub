@@ -24,6 +24,19 @@ internal static class WindowWorkAreaGuard
         window.Closed += (_, _) => source.RemoveHook(WindowProc);
     }
 
+    internal static (int X, int Y, int Width, int Height) CalculateMaximizedBounds(
+        int monitorLeft,
+        int monitorTop,
+        int workLeft,
+        int workTop,
+        int workRight,
+        int workBottom)
+        => (
+            workLeft - monitorLeft,
+            workTop - monitorTop,
+            workRight - workLeft,
+            workBottom - workTop);
+
     private static IntPtr WindowProc(
         IntPtr hwnd,
         int message,
@@ -34,16 +47,15 @@ internal static class WindowWorkAreaGuard
         if (message != WmGetMinMaxInfo || lParam == IntPtr.Zero)
             return IntPtr.Zero;
 
-        ApplyMonitorWorkArea(hwnd, lParam);
-        handled = true;
+        handled = TryApplyMonitorWorkArea(hwnd, lParam);
         return IntPtr.Zero;
     }
 
-    private static void ApplyMonitorWorkArea(IntPtr hwnd, IntPtr lParam)
+    private static bool TryApplyMonitorWorkArea(IntPtr hwnd, IntPtr lParam)
     {
         var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
         if (monitor == IntPtr.Zero)
-            return;
+            return false;
 
         var monitorInfo = new MonitorInfo
         {
@@ -51,20 +63,28 @@ internal static class WindowWorkAreaGuard
         };
 
         if (!GetMonitorInfo(monitor, ref monitorInfo))
-            return;
+            return false;
 
         var work = monitorInfo.WorkArea;
-        var bounds = monitorInfo.MonitorArea;
+        var monitorBounds = monitorInfo.MonitorArea;
+        var bounds = CalculateMaximizedBounds(
+            monitorBounds.Left,
+            monitorBounds.Top,
+            work.Left,
+            work.Top,
+            work.Right,
+            work.Bottom);
         var minMax = Marshal.PtrToStructure<MinMaxInfo>(lParam);
 
-        minMax.MaxPosition.X = work.Left - bounds.Left;
-        minMax.MaxPosition.Y = work.Top - bounds.Top;
-        minMax.MaxSize.X = work.Right - work.Left;
-        minMax.MaxSize.Y = work.Bottom - work.Top;
-        minMax.MaxTrackSize.X = minMax.MaxSize.X;
-        minMax.MaxTrackSize.Y = minMax.MaxSize.Y;
+        minMax.MaxPosition.X = bounds.X;
+        minMax.MaxPosition.Y = bounds.Y;
+        minMax.MaxSize.X = bounds.Width;
+        minMax.MaxSize.Y = bounds.Height;
+        minMax.MaxTrackSize.X = bounds.Width;
+        minMax.MaxTrackSize.Y = bounds.Height;
 
         Marshal.StructureToPtr(minMax, lParam, false);
+        return true;
     }
 
     [DllImport("user32.dll")]
