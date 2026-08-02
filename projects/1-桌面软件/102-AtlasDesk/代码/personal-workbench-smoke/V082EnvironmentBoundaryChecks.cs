@@ -2,15 +2,15 @@ using System.Runtime.CompilerServices;
 
 namespace PersonalWorkbench.Smoke;
 
-internal static class V082EnvironmentBoundaryChecks
+internal static class V083StartupBoundaryChecks
 {
     [ModuleInitializer]
     internal static void Verify()
     {
         VerifyPythonLauncherParsing();
-        VerifyWorkspaceEnvironmentDiscovery();
         VerifySourceBoundaries();
-        Console.WriteLine("PASS AtlasDesk v0.8.2 optional Python launcher, workspace environments and refresh-state boundaries");
+        Console.WriteLine(
+            "PASS AtlasDesk v0.8.3 lazy environment discovery, single discovery owner and startup residency boundaries");
     }
 
     private static void VerifyPythonLauncherParsing()
@@ -22,76 +22,85 @@ internal static class V082EnvironmentBoundaryChecks
             + " invalid launcher line\r\n");
 
         if (parsed.Count != 2
-            || !parsed.Contains("C:\\Users\\tester\\AppData\\Local\\Programs\\Python\\Python312\\python.exe", StringComparer.OrdinalIgnoreCase)
-            || !parsed.Contains("C:\\Program Files\\Python311\\python.exe", StringComparer.OrdinalIgnoreCase))
+            || !parsed.Contains(
+                "C:\\Users\\tester\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                StringComparer.OrdinalIgnoreCase)
+            || !parsed.Contains(
+                "C:\\Program Files\\Python311\\python.exe",
+                StringComparer.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Python Launcher output parsing or de-duplication regressed.");
-        }
-    }
-
-    private static void VerifyWorkspaceEnvironmentDiscovery()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "atlasdesk-v082-env-" + Guid.NewGuid().ToString("N"));
-        try
-        {
-            CreateFakeEnvironment(Path.Combine(root, ".venv"));
-            CreateFakeEnvironment(Path.Combine(root, "laser-model", "venv"));
-            CreateFakeEnvironment(Path.Combine(root, "node_modules", "ignored", ".venv"));
-
-            var prefixes = PythonEnvironmentService.EnumerateWorkspaceEnvironmentPrefixes(root);
-            var expectedRoot = Path.GetFullPath(Path.Combine(root, ".venv"));
-            var expectedProject = Path.GetFullPath(Path.Combine(root, "laser-model", "venv"));
-            if (prefixes.Count != 2
-                || !prefixes.Contains(expectedRoot, StringComparer.OrdinalIgnoreCase)
-                || !prefixes.Contains(expectedProject, StringComparer.OrdinalIgnoreCase)
-                || prefixes.Any(path => path.Contains("node_modules", StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new InvalidOperationException("Workspace Python environment discovery did not preserve the bounded one-level policy.");
-            }
-        }
-        finally
-        {
-            try { if (Directory.Exists(root)) Directory.Delete(root, true); } catch { }
+            throw new InvalidOperationException(
+                "Python Launcher output parsing or de-duplication regressed.");
         }
     }
 
     private static void VerifySourceBoundaries()
     {
         var nativeRoot = FindNativeSourceRoot();
+
         var servicePath = Path.Combine(nativeRoot, "PythonEnvironmentService.cs");
         var service = File.ReadAllText(servicePath);
         RequireTokens(
             servicePath,
-            "FindOnPathAsync(\"py.exe\"",
-            "RunToolAsync(launcher, \"-0p\", 5000, cancellationToken, logFailure: false)",
-            "SemaphoreSlim(4)",
-            "EnumerateWorkspaceEnvironmentCandidates",
-            "IgnoredWorkspaceDirectories",
-            "CancellationToken cancellationToken = default");
+            "FindOnPathAsync(\"py.exe\")",
+            "RunToolAsync(launcher, \"-0p\", 5000, logFailure: false)",
+            "Keep discovery deliberately serial and bounded");
         Reject(service, "RunToolAsync(\"py.exe\", \"-0p\"",
-            "optional Python Launcher is still started directly without discovery");
+            "optional Python Launcher is still started directly");
+        Reject(service, "SemaphoreSlim",
+            "parallel interpreter probing was reintroduced into the recovery build");
+        Reject(service, "CreateLinkedTokenSource",
+            "cancellable process-tree probing was reintroduced into the recovery build");
+        Reject(service, "EnumerateWorkspaceEnvironmentCandidates",
+            "unbounded project environment scanning was reintroduced into the recovery build");
 
+        var developmentPath = Path.Combine(nativeRoot, "DevelopmentControl.xaml.cs");
+        var development = File.ReadAllText(developmentPath);
         RequireTokens(
-            Path.Combine(nativeRoot, "DevelopmentControl.xaml"),
-            "x:Name=\"RefreshButton\"",
-            "x:Name=\"DiscoveryProgress\"",
-            "IsIndeterminate=\"True\"");
-        RequireTokens(
-            Path.Combine(nativeRoot, "DevelopmentControl.xaml.cs"),
-            "CancellationTokenSource? _refreshCancellation",
+            developmentPath,
+            "Environment discovery is deliberately not bound to IsVisibleChanged",
+            "public async Task EnsureLoadedAsync()",
             "SetBusyState(true)",
-            "SetBusyState(false)",
-            "已包含工作区根目录与一级项目目录");
+            "SetBusyState(false)");
+        Reject(development, "IsVisibleChanged +=",
+            "environment discovery can still start during control reparenting");
+        Reject(development, "CancellationTokenSource",
+            "the unstable refresh cancellation chain remains in DevelopmentControl");
+
+        RequireTokens(
+            Path.Combine(nativeRoot, "DevelopmentLifecycleGuard.cs"),
+            "SuppressLegacyEnvironmentDiscovery",
+            "_pythonInitialized");
+        RequireTokens(
+            Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs"),
+            "DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window)");
+        RequireTokens(
+            Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"),
+            "case EnvironmentTabIndex:",
+            "await _development.EnsureLoadedAsync()");
+
+        var probeRoot = FindSmokeSourceRoot();
+        RequireTokens(
+            Path.Combine(probeRoot, "MainWindowStartupProbe.cs"),
+            "window.Show()",
+            "PumpDispatcher(TimeSpan.FromSeconds(8))",
+            "tabs.SelectedIndex = 1",
+            "Main window closed while the Environment tab was active");
+
+        RequireTokens(
+            Path.Combine(nativeRoot, "App.xaml.cs"),
+            "Application Exit event",
+            "CLR ProcessExit event",
+            "Main window Closing event");
     }
 
-    private static void CreateFakeEnvironment(string prefix)
-    {
-        var scripts = Path.Combine(prefix, "Scripts");
-        Directory.CreateDirectory(scripts);
-        File.WriteAllBytes(Path.Combine(scripts, "python.exe"), [0x4D, 0x5A]);
-    }
+    private static string FindNativeSourceRoot() =>
+        FindProjectSourceRoot("personal-workbench-native");
 
-    private static string FindNativeSourceRoot()
+    private static string FindSmokeSourceRoot() =>
+        FindProjectSourceRoot("personal-workbench-smoke");
+
+    private static string FindProjectSourceRoot(string projectDirectory)
     {
         foreach (var candidate in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
         {
@@ -100,7 +109,7 @@ internal static class V082EnvironmentBoundaryChecks
             {
                 var path = Path.Combine(
                     current.FullName,
-                    "projects", "1-桌面软件", "102-AtlasDesk", "代码", "personal-workbench-native");
+                    "projects", "1-桌面软件", "102-AtlasDesk", "代码", projectDirectory);
                 if (Directory.Exists(path))
                     return path;
                 current = current.Parent;
@@ -108,7 +117,7 @@ internal static class V082EnvironmentBoundaryChecks
         }
 
         throw new DirectoryNotFoundException(
-            "Unable to locate the AtlasDesk native source tree for v0.8.2 environment checks.");
+            "Unable to locate the AtlasDesk source tree for v0.8.3 startup checks.");
     }
 
     private static void RequireTokens(string path, params string[] tokens)
@@ -117,7 +126,10 @@ internal static class V082EnvironmentBoundaryChecks
         foreach (var token in tokens)
         {
             if (!source.Contains(token, StringComparison.Ordinal))
-                throw new InvalidOperationException($"Missing required AtlasDesk v0.8.2 token '{token}' in {path}.");
+            {
+                throw new InvalidOperationException(
+                    $"Missing required AtlasDesk v0.8.3 token '{token}' in {path}.");
+            }
         }
     }
 
