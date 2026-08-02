@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time patch workflow. Do not merge.
 
-Reload the timestamp-injection-corrected patch from latest main.
+Reload the control-deletion-corrected patch from latest main.
