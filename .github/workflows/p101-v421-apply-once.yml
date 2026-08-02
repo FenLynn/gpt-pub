@@ -92,7 +92,26 @@ jobs:
           main.write_text(_apply_text, encoding='utf-8', newline='\n')
 
           """
-          path.write_text(text[:start] + replacement + text[end:], encoding='utf-8', newline='\n')
+          new_text = text[:start] + replacement + text[end:]
+          test_call = 'subprocess.run(["go", "test", "-count=1", "./..."], cwd=CODE, check=True)'
+          if new_text.count(test_call) != 1:
+              raise SystemExit('go test footer is not unique')
+          diagnostics = r'''print("=== V421 SOURCE CONTRACT TEST ===")
+          _diag_test = CODE / "cmd" / "mediaworkbench" / "v421_source_contract_test.go"
+          if _diag_test.exists():
+              print(_diag_test.read_text(encoding="utf-8"))
+          else:
+              print("<missing v421_source_contract_test.go>")
+          print("=== APPLY-SELECTED SOURCE REFERENCES ===")
+          for _diag_file in sorted((CODE / "cmd" / "mediaworkbench").glob("*.go")):
+              _diag_source = _diag_file.read_text(encoding="utf-8")
+              for _diag_no, _diag_line in enumerate(_diag_source.splitlines(), 1):
+                  if any(_token in _diag_line for _token in ("应用到选中", "hApplySelected", "IDC_APPLY_SELECTED", "1286, 730")):
+                      print(f"{_diag_file.name}:{_diag_no}:{_diag_line}")
+          print("=== END V421 DIAGNOSTICS ===")
+          '''
+          new_text = new_text.replace(test_call, diagnostics + '\n' + test_call, 1)
+          path.write_text(new_text, encoding='utf-8', newline='\n')
           PY
           python -m py_compile /tmp/p101_v421_patch.py
           cd work
