@@ -67,7 +67,7 @@ func TestTaskStateCapabilities(t *testing.T) {
 		{StatusReady, true, false, false},
 		{StatusQueued, false, true, true},
 		{StatusProcessing, false, true, true},
-		{StatusPaused, false, true, false},
+		{StatusPaused, false, true, true},
 		{StatusHeld, false, true, false},
 		{StatusDone, false, false, false},
 	}
