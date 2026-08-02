@@ -17,12 +17,45 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: p101-mediova-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Enforce P101 pull-request scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          bad=$(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+            | grep -Ev '^(projects/1-桌面软件/101-Mediova/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p101-mediova-ci\.yml$)' || true)
+          if [[ -n "$bad" ]]; then
+            echo 'Out-of-scope P101 changes:'
+            echo "$bad"
+            exit 1
+          fi
+
   linux:
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23.x'
@@ -41,11 +74,16 @@ jobs:
           test -s /tmp/Mediova.exe
 
   windows-native:
+    needs: scope
     if: github.base_ref == 'p101-stable' || github.base_ref == 'main' || github.ref == 'refs/heads/p101-stable'
     runs-on: windows-latest
     timeout-minutes: 100
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23.x'
