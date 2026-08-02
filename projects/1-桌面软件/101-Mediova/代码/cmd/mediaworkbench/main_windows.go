@@ -7022,13 +7022,36 @@ func (a *application) runSelfTest() {
 	progressCell, progressOK := listSubItemBounds(a.hList, 0, 8)
 	compressionBar := fullCellBarRect(compressionCell)
 	progressBar := fullCellBarRect(progressCell)
-	report.Checks["list_progress_cells_use_full_row_height"] = rowOK && compressionOK && progressOK &&
+	centeredPreferredBar := func(cell, bar rect) bool {
+		insets := listCellBarInsets()
+		available := cell.Bottom - cell.Top - 2*scaleDPI(insets.Vertical)
+		wantHeight := scaleDPI(24)
+		if wantHeight > available {
+			wantHeight = available
+		}
+		if minimum := scaleDPI(insets.MinimumHeight); wantHeight < minimum && available >= minimum {
+			wantHeight = minimum
+		}
+		if wantHeight < 1 {
+			wantHeight = 1
+		}
+		topGap := bar.Top - cell.Top
+		bottomGap := cell.Bottom - bar.Bottom
+		gapDelta := topGap - bottomGap
+		if gapDelta < 0 {
+			gapDelta = -gapDelta
+		}
+		return bar.Left == cell.Left+scaleDPI(insets.Horizontal) &&
+			bar.Right == cell.Right-scaleDPI(insets.Horizontal) &&
+			bar.Bottom-bar.Top == wantHeight && gapDelta <= 1
+	}
+	report.Checks["list_progress_cells_centered_preferred_height"] = rowOK && compressionOK && progressOK &&
 		compressionCell.Top == row.Top && compressionCell.Bottom == row.Bottom &&
 		progressCell.Top == row.Top && progressCell.Bottom == row.Bottom &&
-		compressionBar.Bottom-compressionBar.Top >= row.Bottom-row.Top-12 &&
-		progressBar.Bottom-progressBar.Top >= row.Bottom-row.Top-12
-	if !report.Checks["list_progress_cells_use_full_row_height"] {
-		report.Details["list_progress_cells_use_full_row_height"] = fmt.Sprintf("row=%+v compression=%+v bar=%+v progress=%+v bar=%+v", row, compressionCell, compressionBar, progressCell, progressBar)
+		centeredPreferredBar(compressionCell, compressionBar) &&
+		centeredPreferredBar(progressCell, progressBar)
+	if !report.Checks["list_progress_cells_centered_preferred_height"] {
+		report.Details["list_progress_cells_centered_preferred_height"] = fmt.Sprintf("row=%+v compression=%+v bar=%+v progress=%+v bar=%+v", row, compressionCell, compressionBar, progressCell, progressBar)
 	}
 	report.Checks["status_grid_two_rows"] = func() bool {
 		ff, okFF := childClientRect(a.hFFStatus, a.hwnd)
