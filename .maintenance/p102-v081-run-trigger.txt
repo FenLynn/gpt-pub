@@ -1,5 +1,5 @@
 AtlasDesk v0.8.1 implementation trigger
 branch=p102-v081-implementation
 base=p102-exp
-attempt=2
-fix=literal-regex-replacement
+attempt=3
+fix=literal-regex-replacement-without-circular-import
