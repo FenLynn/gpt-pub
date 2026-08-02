@@ -49,7 +49,7 @@ jobs:
               raise SystemExit('timestamp patch markers are not unique')
           start = text.index(start_marker)
           end = text.index(end_marker, start)
-          replacement = r'''# Preserve the directory tree after the output file has been committed and file times restored.
+          replacement = r"""# Preserve the directory tree after the output file has been committed and file times restored.
           replace_once(
               main,
               '''\tif settings.PreserveTimes {
@@ -69,7 +69,7 @@ jobs:
           \t}''',
           )
 
-          '''
+          """
           path.write_text(text[:start] + replacement + text[end:], encoding='utf-8', newline='\n')
           PY
           python -m py_compile /tmp/p101_v421_patch.py
