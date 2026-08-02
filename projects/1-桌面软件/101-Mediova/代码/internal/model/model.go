@@ -16,6 +16,7 @@ const (
 	StatusQueued     Status = "队列中"
 	StatusProcessing Status = "转换中"
 	StatusPaused     Status = "暂停"
+	StatusHeld       Status = "搁置·待修改"
 	StatusDone       Status = "完成"
 	StatusFailed     Status = "失败"
 	StatusSkipped    Status = "已跳过"
@@ -31,6 +32,9 @@ type Crop struct {
 }
 
 type TaskOptions struct {
+	// FollowDefaults is retained for v4.1.x session/config compatibility. v4.2.0
+	// materialises explicit options on every ready task; new queue logic must not
+	// depend on this flag as a live reference to mutable global settings.
 	FollowDefaults bool    `json:"follow_defaults"`
 	Resolution     string  `json:"resolution"`
 	Codec          string  `json:"codec"`
@@ -45,6 +49,23 @@ type TaskOptions struct {
 	ImageFormat    string  `json:"image_format"`
 	ImageSize      string  `json:"image_size"`
 	ImageLimit     string  `json:"image_limit"`
+}
+
+type QueueSnapshot struct {
+	Options        TaskOptions `json:"options"`
+	OutputRoot     string      `json:"output_root"`
+	OutputPath     string      `json:"output_path"`
+	ConflictPolicy string      `json:"conflict_policy"`
+	QueuedAt       time.Time   `json:"queued_at"`
+	Sequence       int64       `json:"sequence"`
+}
+
+type HoldState struct {
+	FromStatus   Status      `json:"from_status"`
+	Original     TaskOptions `json:"original_options"`
+	Queue        *QueueSnapshot `json:"queue_snapshot,omitempty"`
+	ReservedSlot bool        `json:"reserved_slot"`
+	HeldAt       time.Time   `json:"held_at"`
 }
 
 type Task struct {
@@ -79,8 +100,43 @@ type Task struct {
 	Pinned                bool        `json:"pinned"`
 	ThumbnailIndex        int         `json:"-"`
 	Options               TaskOptions `json:"options"`
+	Queue                 *QueueSnapshot `json:"queue_snapshot,omitempty"`
+	Hold                  *HoldState     `json:"hold_state,omitempty"`
 	StartedAt             time.Time   `json:"started_at"`
 	FinishedAt            time.Time   `json:"finished_at"`
+}
+
+func (t *Task) IsReadyEditable() bool {
+	return t != nil && t.Status == StatusReady
+}
+
+func (t *Task) IsLocked() bool {
+	if t == nil {
+		return false
+	}
+	switch t.Status {
+	case StatusQueued, StatusProcessing, StatusPaused, StatusHeld:
+		return true
+	default:
+		return false
+	}
+}
+
+func (t *Task) CanHoldForEdit() bool {
+	return t != nil && (t.Status == StatusQueued || t.Status == StatusProcessing)
+}
+
+func (t *Task) CanRemoveSafely() bool {
+	if t == nil {
+		return false
+	}
+	switch t.Status {
+	case StatusReady, StatusQueued, StatusProcessing, StatusPaused, StatusHeld,
+		StatusDone, StatusFailed, StatusSkipped, StatusCancelled:
+		return true
+	default:
+		return false
+	}
 }
 
 type BenchmarkProfile struct {
@@ -105,7 +161,9 @@ type Preset struct {
 
 type Settings struct {
 	OutputDir              string           `json:"output_dir"`
+	ImageOutputDir         string           `json:"image_output_dir,omitempty"`
 	RecentOutputDirs       []string         `json:"recent_output_dirs,omitempty"`
+	RecentImageOutputDirs  []string         `json:"recent_image_output_dirs,omitempty"`
 	Resolution             string           `json:"resolution"`
 	Codec                  string           `json:"codec"`
 	Quality                string           `json:"quality"`
@@ -155,6 +213,7 @@ type Settings struct {
 	LastInputDir           string           `json:"last_input_dir"`
 	LastImageInputDir      string           `json:"last_image_input_dir"`
 	LastOutputDir          string           `json:"last_output_dir"`
+	LastImageOutputDir     string           `json:"last_image_output_dir,omitempty"`
 	QuickCustom1           *Preset          `json:"quick_custom_1,omitempty"`
 	QuickCustom2           *Preset          `json:"quick_custom_2,omitempty"`
 	QuickCustom3           *Preset          `json:"quick_custom_3,omitempty"`
@@ -177,7 +236,7 @@ func DefaultSettings() Settings {
 		InterfaceMode:          "完整",
 		ShowPerformanceStats:   false,
 		RightPanelVisible:      true,
-		UILayoutRevision:       410,
+		UILayoutRevision:       420,
 		AutoBenchmark:          false,
 		AutoDetectPlayer:       true,
 		UseGPU:                 true,
@@ -204,21 +263,53 @@ func DefaultSettings() Settings {
 	}
 }
 
-func (s Settings) EffectiveOptions(t *Task) TaskOptions {
-	if t != nil && !t.Options.FollowDefaults {
-		if t.Kind == KindImage && t.Options.ImageSize != "" {
-			return t.Options
-		}
-		if t.Kind == KindVideo && t.Options.Resolution != "" {
-			return t.Options
+func (s Settings) OutputDirFor(kind Kind) string {
+	if kind == KindImage {
+		if s.ImageOutputDir != "" {
+			return s.ImageOutputDir
 		}
 	}
+	return s.OutputDir
+}
+
+func (s *Settings) SetOutputDirFor(kind Kind, dir string) {
+	if s == nil {
+		return
+	}
+	if kind == KindImage {
+		s.ImageOutputDir = dir
+		s.LastImageOutputDir = dir
+		return
+	}
+	s.OutputDir = dir
+	s.LastOutputDir = dir
+}
+
+func (s Settings) RecentOutputDirsFor(kind Kind) []string {
+	if kind == KindImage {
+		return s.RecentImageOutputDirs
+	}
+	return s.RecentOutputDirs
+}
+
+func (s *Settings) SetRecentOutputDirsFor(kind Kind, dirs []string) {
+	if s == nil {
+		return
+	}
+	if kind == KindImage {
+		s.RecentImageOutputDirs = dirs
+		return
+	}
+	s.RecentOutputDirs = dirs
+}
+
+func (s Settings) DefaultOptions(kind Kind) TaskOptions {
 	quality := s.Quality
-	if t != nil && t.Kind == KindImage {
+	if kind == KindImage {
 		quality = s.ImageQuality
 	}
 	return TaskOptions{
-		FollowDefaults: true,
+		FollowDefaults: false,
 		Resolution:     s.Resolution,
 		Codec:          s.Codec,
 		Quality:        quality,
@@ -230,4 +321,23 @@ func (s Settings) EffectiveOptions(t *Task) TaskOptions {
 		ImageSize:      s.ImageSize,
 		ImageLimit:     s.ImageLimit,
 	}
+}
+
+func (s Settings) EffectiveOptions(t *Task) TaskOptions {
+	if t != nil {
+		if t.Queue != nil {
+			return t.Queue.Options
+		}
+		if t.Kind == KindImage && t.Options.ImageSize != "" {
+			return t.Options
+		}
+		if t.Kind == KindVideo && t.Options.Resolution != "" {
+			return t.Options
+		}
+	}
+	kind := KindVideo
+	if t != nil {
+		kind = t.Kind
+	}
+	return s.DefaultOptions(kind)
 }
