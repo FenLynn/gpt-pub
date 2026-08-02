@@ -1,0 +1,107 @@
+name: Clean P101 Mediova v4.2.0 legacy bottom control
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-v420-bottom-control-cleanup
+  cancel-in-progress: true
+
+jobs:
+  clean:
+    if: github.head_ref == 'repo-p101-v420-bottom-control-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact P101 candidate
+        uses: actions/checkout@v4
+        with:
+          ref: p101-exp
+          fetch-depth: 0
+
+      - name: Remove legacy bottom apply control at the source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd 'projects/1-桌面软件/101-Mediova/代码'
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('cmd/mediaworkbench/main_windows.go')
+          text = path.read_text(encoding='utf-8')
+          old_control = '\ta.hApplySelected = createControl("BUTTON", "应用到选中", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1286, 730, 132, 32, a.hwnd, IDC_APPLY_SELECTED)\n'
+          new_control = '\t// v4.2.0 removed the duplicate bottom apply action. Individual edits are committed only from the right panel.\n\ta.hApplySelected = 0\n'
+          if text.count(old_control) != 1:
+              raise RuntimeError(f'legacy bottom apply control marker count={text.count(old_control)}')
+          text = text.replace(old_control, new_control, 1)
+
+          old_check = '\treport.Checks["critical_controls"] = a.validateCriticalControls() == nil\n'
+          new_check = old_check + '\treport.Checks["legacy_bottom_apply_removed"] = a.hApplySelected == 0\n'
+          if text.count(old_check) != 1:
+              raise RuntimeError(f'critical controls self-test marker count={text.count(old_check)}')
+          text = text.replace(old_check, new_check, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          gofmt -w cmd/mediaworkbench/main_windows.go
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess
+          paths = subprocess.check_output(['git','ls-files','--','.'], text=True).splitlines()
+          include = []
+          for raw in paths:
+              p = Path(raw)
+              if raw == 'SOURCE_FILES_SHA256.txt' or not p.is_file():
+                  continue
+              if p.parts and p.parts[0] == 'build':
+                  continue
+              if p.suffix.lower() in {'.go','.py','.ps1','.mod','.sum','.mwrsrc','.ico'}:
+                  include.append(raw)
+          lines = [f"{hashlib.sha256(Path(raw).read_bytes()).hexdigest()}  {raw}" for raw in sorted(include)]
+          Path('SOURCE_FILES_SHA256.txt').write_text('\n'.join(lines)+'\n', encoding='ascii')
+          PY
+
+      - name: Validate cleaned candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd 'projects/1-桌面软件/101-Mediova/代码'
+          sha256sum -c SOURCE_FILES_SHA256.txt
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet -unsafeptr=false ./...
+          mkdir -p build/check
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -buildvcs=false -trimpath -o build/check/Mediova-v4.2.0-check.exe ./cmd/mediaworkbench
+          test -s build/check/Mediova-v4.2.0-check.exe
+
+      - name: Enforce exact P101 scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config core.quotepath false
+          mapfile -t changed < <({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)
+          printf '%s\n' "${changed[@]}"
+          test ${#changed[@]} -gt 0
+          for path in "${changed[@]}"; do
+            case "$path" in
+              projects/1-桌面软件/101-Mediova/*) ;;
+              *) echo "Out-of-scope path: $path" >&2; exit 1 ;;
+            esac
+          done
+
+      - name: Commit validated cleanup
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- 'projects/1-桌面软件/101-Mediova'
+          git diff --cached --quiet && { echo 'No validated cleanup to commit'; exit 1; }
+          git commit -m 'P101: 移除 v4.2.0 底部重复应用控件'
+          git push origin HEAD:p101-exp
