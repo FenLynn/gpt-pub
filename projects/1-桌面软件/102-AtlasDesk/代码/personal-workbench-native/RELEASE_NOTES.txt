@@ -1,24 +1,22 @@
-AtlasDesk v0.8.1
+AtlasDesk v0.8.2
 
-This maintenance release repairs the shell, Windows maximize behavior, the development environment page and Dashboard external-link handling discovered during real Windows use of v0.8.0.
+This maintenance release stabilizes Python environment discovery in the Development workspace after the v0.8.1 terminal and Dashboard repairs.
 
-Interface and window behavior
-- Replaced the two large outer cards with one continuous application surface and a single divider between navigation and content.
-- Removed redundant outer shadows, borders and background layers while retaining local cards only where they express real information groups.
-- Added monitor WorkArea handling for the custom title bar so maximized windows no longer extend behind the taskbar.
-- Aligned title text and caption buttons within a consistent 36-pixel title bar.
+Python environment discovery
+- The optional Windows Python Launcher is now located before execution. Systems without py.exe no longer produce a Win32Exception stack trace during normal discovery.
+- PATH Python, Python Launcher, Conda and workspace environments are de-duplicated by their resolved interpreter path.
+- The workspace root and each immediate project directory are checked for .venv, venv and .python environments.
+- Generated and dependency directories such as node_modules, bin, obj, build and caches are excluded from project environment scanning.
+- Interpreter version checks use bounded parallelism so a machine with many Conda environments does not make the page unnecessarily slow.
 
-Development workspace
-- Removed the legacy path that automatically embedded the terminal over the development environment page.
-- Project and environment tabs remain independent, and the environment tab actively refreshes Conda, uv, venv and system Python discovery.
-- Terminal sessions remain in the global bottom drawer or their explicit window instead of replacing the environment page.
+Refresh behavior
+- Environment discovery is cancellable and a repeated refresh cancels the previous pass before starting a new one.
+- The Refresh button and environment list are temporarily locked while detection is active.
+- A compact indeterminate progress indicator shows that discovery is running.
+- The previously selected environment is preserved after refresh when it is still available.
+- Settings are saved only when newly discovered Conda or uv paths actually change the configuration.
 
-Dashboard reliability
-- Dashboard same-origin routes remain inside AtlasDesk.
-- Cloudflare Access and supported identity-provider login windows remain in the shared WebView2 profile.
-- All other cross-origin links open in the Windows default browser.
-- Added automatic WebView2 reconstruction after render-process failure or unresponsiveness.
-
-Architecture
-- No Runtime/Data boundary changes were made.
-- No new version-named Enhancer layer was added; the existing controlling paths were consolidated.
+Verification
+- Added executable smoke coverage for Python Launcher output parsing, duplicate removal, root and immediate-project virtual environments, and generated-directory exclusion.
+- Added source-boundary checks preventing a return to direct optional py.exe execution.
+- No Runtime/Data or security boundary changes were made.
