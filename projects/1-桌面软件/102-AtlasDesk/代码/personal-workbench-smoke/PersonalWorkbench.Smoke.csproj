@@ -9,5 +9,12 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\personal-workbench-native\PersonalWorkbench.csproj" />
+    <ProjectReference Include="..\personal-workbench-residency-smoke\AtlasDesk.ResidencySmoke.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <Target Name="RunAtlasDeskResidencySmoke"
+          AfterTargets="Build"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true'">
+    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\personal-workbench-residency-smoke\AtlasDesk.ResidencySmoke.csproj&quot; --configuration $(Configuration) --no-build --no-restore" />
+  </Target>
 </Project>
