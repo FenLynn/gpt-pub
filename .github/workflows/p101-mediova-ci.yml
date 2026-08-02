@@ -223,10 +223,22 @@ jobs:
           public static class MediovaCaptureNative {
               [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
               [DllImport("user32.dll", SetLastError=true)] public static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
+              [DllImport("user32.dll", SetLastError=true)] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int width, int height, uint flags);
               [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
               [DllImport("user32.dll", SetLastError=true)] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint flags);
           }
           "@
+          $resolutionCommand=Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue
+          if ($resolutionCommand) {
+            try {
+              Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop
+              Start-Sleep -Seconds 2
+            } catch {
+              Write-Warning "Unable to raise display resolution: $($_.Exception.Message)"
+            }
+          }
+          $screen=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          Write-Host "Primary screen: $($screen.Width)x$($screen.Height)"
           $previewDir=Join-Path $PWD 'build/ui-preview'
           New-Item $previewDir -ItemType Directory -Force | Out-Null
           function Save-MediovaMode([string]$mode, [int]$width, [int]$height, [string]$name) {
@@ -243,12 +255,25 @@ jobs:
               }
               if ($handle -eq [IntPtr]::Zero) { throw "Mediova main window was not created for $mode preview." }
               if (-not [MediovaCaptureNative]::MoveWindow($handle, 0, 0, $width, $height, $true)) { throw "MoveWindow failed for $mode." }
-              Start-Sleep -Milliseconds 900
+              Start-Sleep -Milliseconds 700
               $rect=New-Object MediovaCaptureNative+RECT
               if (-not [MediovaCaptureNative]::GetWindowRect($handle, [ref]$rect)) { throw "GetWindowRect failed for $mode." }
               $actualWidth=$rect.Right-$rect.Left
               $actualHeight=$rect.Bottom-$rect.Top
-              if ([math]::Abs($actualWidth-$width) -gt 8 -or [math]::Abs($actualHeight-$height) -gt 8) { throw "Window was clamped for ${mode}: requested ${width}x${height}, actual ${actualWidth}x${actualHeight}." }
+              if ([math]::Abs($actualWidth-$width) -gt 8 -or [math]::Abs($actualHeight-$height) -gt 8) {
+                [void][MediovaCaptureNative]::SetWindowPos($handle, [IntPtr]::Zero, 0, 0, $width, $height, 0x0414)
+                Start-Sleep -Milliseconds 700
+                if (-not [MediovaCaptureNative]::GetWindowRect($handle, [ref]$rect)) { throw "GetWindowRect retry failed for $mode." }
+                $actualWidth=$rect.Right-$rect.Left
+                $actualHeight=$rect.Bottom-$rect.Top
+              }
+              Write-Host "Preview ${mode}: requested ${width}x${height}; actual ${actualWidth}x${actualHeight}"
+              if ($actualWidth -lt 1000 -or $actualHeight -lt 700) {
+                throw "Runner desktop is too small for meaningful ${mode} preview: ${actualWidth}x${actualHeight}."
+              }
+              if ([math]::Abs($actualWidth-$width) -gt 8 -or [math]::Abs($actualHeight-$height) -gt 8) {
+                Write-Warning "Runner clamped ${mode} preview; capturing the maximum available window."
+              }
               $path=Join-Path $previewDir $name
               $bmp=New-Object System.Drawing.Bitmap($actualWidth, $actualHeight)
               $graphics=[System.Drawing.Graphics]::FromImage($bmp)
