@@ -7184,7 +7184,7 @@ func (a *application) runSelfTest() {
 	// queue. The imported PNG is resized, encoded as JPG and decoded again.
 	imageOutputDir := filepath.Join(root, "converted-images")
 	_ = os.MkdirAll(imageOutputDir, 0o755)
-	a.settings.OutputDir = imageOutputDir
+	a.settings.SetOutputDirFor(model.KindImage, imageOutputDir)
 	a.settings.UseGPU = false
 	a.settings.SmartEngine = false
 	a.settings.AutoConcurrency = false
@@ -7210,6 +7210,10 @@ func (a *application) runSelfTest() {
 			task.Status = model.StatusReady
 			task.Error = ""
 			task.OutputPath = ""
+			task.OutputSize = 0
+			task.Options = a.settings.DefaultOptions(model.KindImage)
+			task.Queue = nil
+			task.Hold = nil
 			break
 		}
 	}
