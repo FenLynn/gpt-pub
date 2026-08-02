@@ -1,0 +1,7 @@
+project=P101
+product=Mediova
+version=4.1.0
+release=p101-v4.1.0
+main_before_cleanup=4a999ce1da2272a4a9a3a26f546e43acba33cc4f
+mode=exact-whitelist-delete-self-remove-and-ref-align
+protected_refs=main,p101-stable,p101-exp
