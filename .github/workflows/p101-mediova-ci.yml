@@ -20,7 +20,7 @@ permissions:
 jobs:
   linux:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -43,7 +43,7 @@ jobs:
   windows-native:
     if: github.base_ref == 'p101-stable' || github.base_ref == 'main' || github.ref == 'refs/heads/p101-stable'
     runs-on: windows-latest
-    timeout-minutes: 100
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -53,137 +53,51 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-
-      - name: Test source with isolated Data roots
+      - name: Test and build
         shell: pwsh
-        working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
-          function Invoke-WithIsolatedData([scriptblock]$Action) {
-            $root=Join-Path $env:RUNNER_TEMP ('Mediova-CI-' + [guid]::NewGuid().ToString('N'))
-            New-Item $root -ItemType Directory -Force | Out-Null
-            $oldAppData=$env:APPDATA
-            $oldLocalAppData=$env:LOCALAPPDATA
-            $oldXdg=$env:XDG_CONFIG_HOME
-            $oldRuntime=$env:MEDIOVA_RUNTIME_DIR
-            try {
-              $env:APPDATA=$root
-              $env:LOCALAPPDATA=$root
-              $env:XDG_CONFIG_HOME=$root
-              $env:MEDIOVA_RUNTIME_DIR=Join-Path $root 'Runtime'
-              & $Action
-              if ($LASTEXITCODE -ne 0) { throw "command failed with exit code $LASTEXITCODE" }
-            } finally {
-              $env:APPDATA=$oldAppData
-              $env:LOCALAPPDATA=$oldLocalAppData
-              $env:XDG_CONFIG_HOME=$oldXdg
-              $env:MEDIOVA_RUNTIME_DIR=$oldRuntime
-              Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
-          Invoke-WithIsolatedData { go test -count=1 ./... }
-          Invoke-WithIsolatedData { go test -race -count=1 ./internal/config ./internal/media }
+          Set-Location 'projects/1-桌面软件/101-Mediova/代码'
+          go test -count=1 ./...
+          if ($LASTEXITCODE -ne 0) { throw 'Windows go test failed' }
           go vet -unsafeptr=false ./...
           if ($LASTEXITCODE -ne 0) { throw 'Windows go vet failed' }
-
-      - name: Download fixed-channel real FFmpeg
-        shell: pwsh
-        run: |
-          $ErrorActionPreference='Stop'
-          $uri='https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
-          $archive=Join-Path $env:RUNNER_TEMP 'btbn-ffmpeg-win64-gpl.zip'
-          $expanded=Join-Path $env:RUNNER_TEMP 'btbn-ffmpeg-win64-gpl'
-          $downloaded=$false
-          for ($attempt=1; $attempt -le 3; $attempt++) {
-            try {
-              Invoke-WebRequest -Uri $uri -OutFile $archive -Headers @{'User-Agent'='Mediova-v4.1.0-CI'}
-              $downloaded=$true
-              break
-            } catch {
-              Remove-Item $archive -Force -ErrorAction SilentlyContinue
-              if ($attempt -lt 3) { Start-Sleep -Seconds (5 * $attempt) }
-            }
-          }
-          if (-not $downloaded) { throw 'Unable to download the BtbN FFmpeg Runtime package.' }
-          Expand-Archive $archive -DestinationPath $expanded -Force
-          $ffmpeg=Get-ChildItem $expanded -Recurse -Filter ffmpeg.exe -File | Select-Object -First 1
-          $ffprobe=Get-ChildItem $expanded -Recurse -Filter ffprobe.exe -File | Select-Object -First 1
-          if (-not $ffmpeg -or -not $ffprobe -or $ffmpeg.Directory.FullName -ne $ffprobe.Directory.FullName) {
-            throw 'Downloaded package does not contain a colocated FFmpeg/FFprobe pair.'
-          }
-          & $ffmpeg.FullName -version | Select-Object -First 1
-          if ($LASTEXITCODE -ne 0) { throw 'Downloaded FFmpeg is not runnable.' }
-          "FFMPEG_BIN=$($ffmpeg.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Build complete v4.1.0 Runtime
-        shell: pwsh
-        working-directory: projects/1-桌面软件/101-Mediova/代码
-        run: |
-          $ErrorActionPreference='Stop'
-          ./build_v4.1.0.ps1 -FFmpegBin $env:FFMPEG_BIN -SkipTests
-          if ($LASTEXITCODE -ne 0) { throw 'Mediova v4.1.0 Runtime build failed' }
-          $build=Join-Path $PWD 'build'
-          $runtime=Join-Path $build 'Runtime'
-          $exe=Join-Path $runtime 'Mediova.exe'
-          $zip=Join-Path $build 'Mediova-v4.1.0-Runtime.zip'
-          if (!(Test-Path $exe) -or !(Test-Path $zip)) { throw 'Runtime EXE or ZIP is missing.' }
+          ./build_v4.0.0.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Mediova build failed' }
+          $exe=Resolve-Path 'build/Mediova_v4.0.0.exe'
           $info=(Get-Item $exe).VersionInfo
-          if (($info.FileVersion -notlike '4.1.0*') -or ($info.ProductVersion -notlike '4.1.0*') -or ($info.ProductName -notlike '*Mediova*')) {
-            throw 'Version resource mismatch.'
-          }
-
-      - name: Verify Runtime boundary and manifest
+          if (($info.FileVersion -notlike '4.0.0*') -or ($info.ProductVersion -notlike '4.0.0*') -or ($info.ProductName -notlike '*Mediova*')) { throw 'Version resource mismatch' }
+      - name: Provide real FFmpeg
         shell: pwsh
-        working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
-          $runtime=Join-Path $PWD 'build/Runtime'
-          $manifestPath=Join-Path $runtime 'runtime-manifest.json'
-          $manifest=Get-Content $manifestPath -Raw | ConvertFrom-Json
-          if ($manifest.product -ne 'Mediova' -or $manifest.version -ne '4.1.0' -or $manifest.platform -ne 'Windows x64' -or $manifest.deployment -ne 'folder-runtime') {
-            throw 'Runtime manifest identity mismatch.'
-          }
-          foreach ($entry in $manifest.files) {
-            $path=Join-Path $runtime ($entry.path -replace '/', '\')
-            if (!(Test-Path $path -PathType Leaf)) { throw "Manifest file missing: $($entry.path)" }
-            $actual=(Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($actual -ne $entry.sha256) { throw "Manifest hash mismatch: $($entry.path)" }
-            if ((Get-Item $path).Length -ne [int64]$entry.size) { throw "Manifest size mismatch: $($entry.path)" }
-          }
-          foreach ($required in @('Mediova.exe','Components/FFmpeg/bin/ffmpeg.exe','Components/FFmpeg/bin/ffprobe.exe','THIRD_PARTY_NOTICES.md','README.txt')) {
-            if (!(Test-Path (Join-Path $runtime $required))) { throw "Required Runtime file missing: $required" }
-          }
-          foreach ($private in @('config.json','history.json','session.json','crash.log','settings.json','task-history.json','security.json','vault.bin')) {
-            if (Get-ChildItem $runtime -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) {
-              throw "Private Data leaked into Runtime: $private"
-            }
-          }
-
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue) -or -not (Get-Command ffprobe -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress }
+          $tools=Join-Path $env:ChocolateyInstall 'lib\ffmpeg\tools'
+          $ffmpeg=Get-ChildItem $tools -Recurse -Filter ffmpeg.exe -File | Where-Object {$_.Length -gt 1MB} | Select-Object -First 1
+          $ffprobe=Get-ChildItem $tools -Recurse -Filter ffprobe.exe -File | Where-Object {$_.Length -gt 1MB} | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) { throw 'Real FFmpeg not found' }
+          $build='projects/1-桌面软件/101-Mediova/代码/build'
+          Copy-Item $ffmpeg.FullName (Join-Path $build 'ffmpeg.exe') -Force
+          Copy-Item $ffprobe.FullName (Join-Path $build 'ffprobe.exe') -Force
       - name: Run native self-test
         shell: pwsh
-        working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
-          $build=Join-Path $PWD 'build'
-          $runtime=Join-Path $build 'Runtime'
-          $exe=Join-Path $runtime 'Mediova.exe'
+          $build=Join-Path $PWD 'projects/1-桌面软件/101-Mediova/代码/build'
+          $exe=Join-Path $build 'Mediova_v4.0.0.exe'
           $report=Join-Path $build 'ci_self_test.json'
-          $proc=Start-Process -FilePath $exe -WorkingDirectory $runtime -ArgumentList @('--self-test', "--self-test-output=$report") -PassThru
-          if (-not $proc.WaitForExit(480000)) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue; throw 'Native self-test timeout' }
-          if (!(Test-Path $report)) { throw 'Native self-test report missing' }
+          $proc=Start-Process -FilePath $exe -ArgumentList @('--self-test', "--self-test-output=$report") -PassThru
+          if (-not $proc.WaitForExit(420000)) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue; throw 'Native self-test timeout' }
           $json=Get-Content $report -Raw | ConvertFrom-Json
           $checks=@($json.checks.PSObject.Properties)
-          if (-not $json.passed -or $json.version -ne '4.1.0' -or $checks.Count -lt 57) { throw 'Native self-test failed' }
+          if (-not $json.passed -or $json.version -ne '4.0.0' -or $checks.Count -lt 57) { throw 'Native self-test failed' }
           if (@($checks | Where-Object {-not [bool]$_.Value}).Count -gt 0) { throw 'Native self-test contains failed checks' }
-
       - uses: actions/upload-artifact@v4
         with:
-          name: P101-Mediova-v4.1.0-CI
+          name: P101-Mediova-CI
           path: |
-            projects/1-桌面软件/101-Mediova/代码/build/Mediova-v4.1.0-Runtime.zip
+            projects/1-桌面软件/101-Mediova/代码/build/Mediova_v4.0.0.exe
             projects/1-桌面软件/101-Mediova/代码/build/SHA256.txt
             projects/1-桌面软件/101-Mediova/代码/build/ci_self_test.json
-            projects/1-桌面软件/101-Mediova/代码/build/Runtime/runtime-manifest.json
-            projects/1-桌面软件/101-Mediova/代码/build/Runtime/THIRD_PARTY_NOTICES.md
           if-no-files-found: error
           retention-days: 14
