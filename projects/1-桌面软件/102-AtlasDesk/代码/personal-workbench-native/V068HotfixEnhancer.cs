@@ -14,7 +14,6 @@ public sealed class V068HotfixEnhancer
     private readonly MainWindow _window;
     private readonly WorkbenchFeaturePipeline _pipeline;
     private readonly WorkbenchEnhancer _base;
-    private readonly AppSettings _settings;
     private readonly WorkspaceControl _workspace;
     private readonly ZoteroLibraryControl _zotero;
     private readonly DevelopmentControl _development;
@@ -24,9 +23,7 @@ public sealed class V068HotfixEnhancer
     private readonly RowDefinition _terminalRow;
     private readonly GridSplitter _splitter;
     private readonly int _bottomTerminalRowIndex;
-    private readonly Grid _developmentStage = new();
     private Button? _topTerminalButton;
-    private bool _preferBottomDock;
     private bool _movingTerminal;
 
     private V068HotfixEnhancer(MainWindow window, WorkbenchFeaturePipeline pipeline)
@@ -34,7 +31,6 @@ public sealed class V068HotfixEnhancer
         _window = window;
         _pipeline = pipeline;
         _base = pipeline.Base;
-        _settings = pipeline.Settings;
         _workspace = ReadField<WorkspaceControl>(_base, "_workspace")
                      ?? throw new InvalidOperationException("Workspace module is unavailable.");
         _zotero = ReadField<ZoteroLibraryControl>(_base, "_zotero")
@@ -91,12 +87,10 @@ public sealed class V068HotfixEnhancer
             development.RowDefinitions.Clear();
             development.ColumnDefinitions.Clear();
             development.Margin = new Thickness(0);
-            _developmentStage.HorizontalAlignment = HorizontalAlignment.Stretch;
-            _developmentStage.VerticalAlignment = VerticalAlignment.Stretch;
             _development.HorizontalAlignment = HorizontalAlignment.Stretch;
             _development.VerticalAlignment = VerticalAlignment.Stretch;
-            _developmentStage.Children.Add(_development);
-            development.Children.Add(_developmentStage);
+            _development.Visibility = Visibility.Visible;
+            development.Children.Add(_development);
         }
 
         _terminal.SetHostMode(TerminalHostMode.Bottom);
@@ -113,21 +107,13 @@ public sealed class V068HotfixEnhancer
 
     private void WireEvents()
     {
-        _terminal.DockBottomRequested += (_, _) =>
+        _terminal.DockBottomRequested += (_, _) => DockTerminalBottom(show: _terminal.HasSessions);
+        _terminal.EmbedDevelopmentRequested += (_, _) =>
         {
-            _preferBottomDock = true;
-            DockTerminalBottom(show: _terminal.HasSessions);
-        };
-        _terminal.EmbedDevelopmentRequested += async (_, _) =>
-        {
-            _preferBottomDock = false;
-            if (_window.FindName("DevelopmentNav") is RadioButton developmentNav)
-            {
-                if (developmentNav.IsChecked != true)
-                    developmentNav.IsChecked = true;
-                else
-                    await EmbedTerminalInDevelopmentAsync(openDefaultSession: true);
-            }
+            if (_window.FindName("DevelopmentNav") is RadioButton developmentNav
+                && developmentNav.IsChecked != true)
+                developmentNav.IsChecked = true;
+            DockTerminalBottom(show: true);
         };
         _terminal.SessionCountChanged += (_, _) =>
         {
@@ -155,12 +141,9 @@ public sealed class V068HotfixEnhancer
 
     private async Task Development_CheckedAsync()
     {
-        if (_preferBottomDock)
-        {
-            DockTerminalBottom(show: _terminal.HasSessions);
-            return;
-        }
-        await EmbedTerminalInDevelopmentAsync(openDefaultSession: true);
+        DockTerminalBottom(show: _terminal.HasSessions);
+        _development.Visibility = Visibility.Visible;
+        await _development.EnsureLoadedAsync();
     }
 
     private void NonDevelopment_Checked()
@@ -170,43 +153,6 @@ public sealed class V068HotfixEnhancer
             DockTerminalBottom(show: _terminal.HasSessions);
         else
             UpdateTopTerminalButtonVisibility();
-    }
-
-    private async Task EmbedTerminalInDevelopmentAsync(bool openDefaultSession)
-    {
-        if (_movingTerminal) return;
-        try
-        {
-            _movingTerminal = true;
-            RemoveFromParent(_terminal);
-            HideBottomRows();
-            _development.Visibility = Visibility.Collapsed;
-            _developmentStage.Children.Add(_terminal);
-            Grid.SetRow(_terminal, 0);
-            Grid.SetColumn(_terminal, 0);
-            _terminal.HorizontalAlignment = HorizontalAlignment.Stretch;
-            _terminal.VerticalAlignment = VerticalAlignment.Stretch;
-            _terminal.Visibility = Visibility.Visible;
-            _terminal.SetHostMode(TerminalHostMode.Development);
-            UpdateTopTerminalButtonVisibility();
-
-            if (openDefaultSession && !_terminal.HasSessions)
-            {
-                if (string.Equals(_settings.DefaultShell, "cmd", StringComparison.OrdinalIgnoreCase))
-                    await _terminal.OpenAsync(TerminalReliability.CreateCmd(_settings, "开发终端"));
-                else
-                    await _terminal.OpenShellAsync(_settings.DefaultShell, title: "开发终端");
-            }
-        }
-        catch (Exception ex)
-        {
-            App.Log("Embed development terminal failed: " + ex);
-            DockTerminalBottom(show: _terminal.HasSessions);
-        }
-        finally
-        {
-            _movingTerminal = false;
-        }
     }
 
     private void DockTerminalBottom(bool show)
@@ -250,10 +196,8 @@ public sealed class V068HotfixEnhancer
 
     private void UpdateTopTerminalButtonVisibility()
     {
-        if (_topTerminalButton is null) return;
-        _topTerminalButton.Visibility = _terminal.HostMode == TerminalHostMode.Development
-            ? Visibility.Collapsed
-            : Visibility.Visible;
+        if (_topTerminalButton is not null)
+            _topTerminalButton.Visibility = Visibility.Visible;
     }
 
     private static void RemoveFromParent(FrameworkElement element)

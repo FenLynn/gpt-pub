@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private bool _focusMode;
     private bool _isInitializingDashboard;
     private bool _dashboardHasNavigated;
+    private bool _dashboardRecoveryInProgress;
     private string _dashboardRootUrl = string.Empty;
     private bool _zoteroInitialized;
     private bool _pythonInitialized;
@@ -320,7 +321,7 @@ public partial class MainWindow : Window
         {
             App.Log("WebView2 process failed: " + args.ProcessFailedKind);
             if (isMainDashboard)
-                Dispatcher.Invoke(() => ShowDashboardError(new InvalidOperationException("WebView2 进程异常退出：" + args.ProcessFailedKind)));
+                Dispatcher.BeginInvoke(new Action(() => _ = RecoverDashboardAsync(args.ProcessFailedKind.ToString())));
         };
     }
 
@@ -329,14 +330,40 @@ public partial class MainWindow : Window
         var deferral = args.GetDeferral();
         try
         {
-            App.Log("New window requested: " + args.Uri);
-            if (_webViewEnvironment is null)
+            var target = DashboardNavigationPolicy.Classify(args.Uri, _settings.DashboardUrl);
+            App.Log($"New window requested: {args.Uri} [{target}]");
+
+            if (target == DashboardNavigationTarget.ExternalBrowser)
+            {
+                args.Handled = true;
+                OpenExternalUri(args.Uri);
                 return;
+            }
+
+            if (target == DashboardNavigationTarget.MainDashboard)
+            {
+                args.Handled = true;
+                if (_dashboardWebView?.CoreWebView2 is { } dashboard)
+                    dashboard.Navigate(args.Uri);
+                else
+                    OpenExternalUri(args.Uri);
+                return;
+            }
+
+            if (_webViewEnvironment is null)
+            {
+                args.Handled = true;
+                OpenExternalUri(args.Uri);
+                return;
+            }
+
+            _dashboardPopup?.Close();
+            _popupWebView?.Dispose();
 
             var popupView = new WebView2();
             var popup = new Window
             {
-                Title = "Cloudflare Access 登录",
+                Title = "AtlasDesk 登录验证",
                 Width = 1080,
                 Height = 760,
                 MinWidth = 720,
@@ -351,9 +378,14 @@ public partial class MainWindow : Window
             ConfigureWebView(popupView, isMainDashboard: false);
             args.NewWindow = popupView.CoreWebView2;
             args.Handled = true;
+            _dashboardPopup = popup;
+            _popupWebView = popupView;
+
             popup.Closed += (_, _) =>
             {
                 popupView.Dispose();
+                if (ReferenceEquals(_dashboardPopup, popup)) _dashboardPopup = null;
+                if (ReferenceEquals(_popupWebView, popupView)) _popupWebView = null;
                 try
                 {
                     if (!_dashboardHasNavigated && IsValidHttpUrl(_settings.DashboardUrl))
@@ -361,18 +393,93 @@ public partial class MainWindow : Window
                     else
                         _dashboardWebView?.Reload();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    App.Log("Dashboard refresh after authentication failed: " + ex.Message);
+                }
             };
             popup.Show();
         }
         catch (Exception ex)
         {
             App.Log("New window handling failed: " + ex);
-            args.Handled = false;
+            args.Handled = true;
+            OpenExternalUri(args.Uri);
         }
         finally
         {
             deferral.Complete();
+        }
+    }
+
+    private void OpenExternalUri(string? target)
+    {
+        if (!Uri.TryCreate(target, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https"))
+        {
+            App.Log("External link rejected because it is not a valid HTTP URL: " + target);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            App.Log("Opened external link in the default browser: " + uri.AbsoluteUri);
+        }
+        catch (Exception ex)
+        {
+            App.Log("Open external browser failed: " + ex);
+            MessageBox.Show("无法使用默认浏览器打开该链接：\n\n" + uri.AbsoluteUri + "\n\n" + ex.Message,
+                ProductIdentity.ProductName, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async Task RecoverDashboardAsync(string reason)
+    {
+        if (_dashboardRecoveryInProgress)
+            return;
+
+        _dashboardRecoveryInProgress = true;
+        try
+        {
+            App.Log("Rebuilding main Dashboard WebView2 after process failure: " + reason);
+            DashboardHost.Visibility = Visibility.Visible;
+            DashboardEmpty.Visibility = Visibility.Collapsed;
+            DashboardError.Visibility = Visibility.Visible;
+            DashboardErrorText.Text = "Dashboard 渲染进程异常，AtlasDesk 正在自动重建页面…\n\n原因：" + reason;
+            if (_currentView == "dashboard")
+                NavigationProgress.Visibility = Visibility.Visible;
+
+            var failedView = _dashboardWebView;
+            _dashboardWebView = null;
+            if (failedView is not null)
+            {
+                DashboardHost.Children.Remove(failedView);
+                failedView.Dispose();
+            }
+
+            _dashboardHasNavigated = false;
+            _dashboardRootUrl = string.Empty;
+            _isInitializingDashboard = false;
+            await Task.Delay(350);
+            await EnsureDashboardAsync();
+
+            if (_dashboardWebView is not null)
+            {
+                DashboardHost.Visibility = Visibility.Visible;
+                DashboardError.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log("Dashboard automatic recovery failed: " + ex);
+            ShowDashboardError(new InvalidOperationException("Dashboard 自动恢复失败：" + ex.Message, ex));
+        }
+        finally
+        {
+            _dashboardRecoveryInProgress = false;
+            if (_currentView == "dashboard")
+                NavigationProgress.Visibility = Visibility.Collapsed;
         }
     }
 
