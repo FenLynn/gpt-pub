@@ -34,6 +34,8 @@ const appVersion = "4.2.1"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
+var listCompressionDrawCount atomic.Int64
+var listProgressDrawCount atomic.Int64
 
 //go:embed assets/icon.ico
 var embeddedIcon []byte
@@ -2980,17 +2982,18 @@ func drawProgressPill(hdc uintptr, rc rect, fraction float64, label string, sele
 	}
 	fraction = clamp01(fraction)
 	bar := fullCellBarRect(rc)
-	withRoundedClip(hdc, bar, 3, func() {
-		fillSolid(hdc, bar, colorRef(247, 249, 252))
-		if fraction > 0 {
-			fill := bar
-			fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
-			if fill.Right < fill.Left+3 {
-				fill.Right = fill.Left + 3
-			}
-			drawHorizontalGradient(hdc, fill, colorRef(169, 204, 243), colorRef(76, 138, 220))
+	// Draw directly in the ListView custom-draw HDC. Region clipping can
+	// disappear in PrintWindow and some themed ListView paint paths.
+	fillSolid(hdc, bar, colorRef(239, 243, 248))
+	if fraction > 0 {
+		fill := bar
+		fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
+		if fill.Right < fill.Left+3 {
+			fill.Right = fill.Left + 3
 		}
-	})
+		drawHorizontalGradient(hdc, fill, colorRef(169, 204, 243), colorRef(76, 138, 220))
+	}
+	drawRoundedBorder(hdc, bar, 3, colorRef(218, 225, 234))
 	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(35, 51, 74))
 }
 
@@ -3021,11 +3024,8 @@ func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, s
 		fillSolid(hdc, rc, colorRef(255, 255, 255))
 	}
 	bar := fullCellBarRect(rc)
-	withRoundedClip(hdc, bar, 3, func() {
-		if task == nil || task.InputSize <= 0 || task.OutputSize <= 0 {
-			fillSolid(hdc, bar, colorRef(247, 249, 252))
-			return
-		}
+	fillSolid(hdc, bar, colorRef(239, 243, 248))
+	if task != nil && task.InputSize > 0 && task.OutputSize > 0 {
 		visual := compressionVisualFor(task.InputSize, task.OutputSize)
 		split := bar.Left + int32(float64(bar.Right-bar.Left)*visual.InputFraction)
 		if split <= bar.Left {
@@ -3041,7 +3041,8 @@ func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, s
 		fillSolid(hdc, left, colorRef(247, 249, 251))
 		start, finish := compressionColorPair(visual)
 		drawHorizontalGradient(hdc, right, start, finish)
-	})
+	}
+	drawRoundedBorder(hdc, bar, 3, colorRef(218, 225, 234))
 	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(35, 51, 70))
 }
 
@@ -3102,17 +3103,22 @@ func (a *application) drawTaskListCell(cd *nmListViewCustomDraw) uintptr {
 		}
 		cell := cd.NMCD.Rc
 		if exact, ok := listSubItemBounds(a.hList, int(cd.NMCD.ItemSpec), int(cd.ISubItem)); ok {
-			cell = exact
+			// Keep the custom-draw vertical band because it matches the HDC
+			// clipping band; use exact ListView bounds only for columns.
+			cell.Left = exact.Left
+			cell.Right = exact.Right
 		}
 		selected := listItemSelected(a.hList, int(cd.NMCD.ItemSpec))
 		focus, _, _ := procGetFocus.Call()
 		activeSelection := selected && focus == a.hList
 		if cd.ISubItem == 7 {
+			listCompressionDrawCount.Add(1)
 			_, label, _ := compressionCellMetrics(&task)
 			drawCompressionPill(cd.NMCD.HDC, cell, &task, label, selected, activeSelection)
 			return CDRF_SKIPDEFAULT
 		}
 		if cd.ISubItem == 8 {
+			listProgressDrawCount.Add(1)
 			fraction, label := progressCellMetrics(&task)
 			drawProgressPill(cd.NMCD.HDC, cell, fraction, label, selected, activeSelection)
 			return CDRF_SKIPDEFAULT
@@ -7052,6 +7058,15 @@ func (a *application) runSelfTest() {
 		centeredPreferredBar(progressCell, progressBar)
 	if !report.Checks["list_progress_cells_centered_preferred_height"] {
 		report.Details["list_progress_cells_centered_preferred_height"] = fmt.Sprintf("row=%+v compression=%+v bar=%+v progress=%+v bar=%+v", row, compressionCell, compressionBar, progressCell, progressBar)
+	}
+	compressionDrawBefore := listCompressionDrawCount.Load()
+	progressDrawBefore := listProgressDrawCount.Load()
+	procRedrawWindow.Call(a.hList, 0, 0, RDW_INVALIDATE|RDW_ERASE|RDW_UPDATENOW|RDW_ALLCHILDREN)
+	compressionDrawAfter := listCompressionDrawCount.Load()
+	progressDrawAfter := listProgressDrawCount.Load()
+	report.Checks["list_progress_cells_custom_draw_active"] = compressionDrawAfter > compressionDrawBefore && progressDrawAfter > progressDrawBefore
+	if !report.Checks["list_progress_cells_custom_draw_active"] {
+		report.Details["list_progress_cells_custom_draw_active"] = fmt.Sprintf("compression=%d->%d progress=%d->%d", compressionDrawBefore, compressionDrawAfter, progressDrawBefore, progressDrawAfter)
 	}
 	report.Checks["status_grid_two_rows"] = func() bool {
 		ff, okFF := childClientRect(a.hFFStatus, a.hwnd)
