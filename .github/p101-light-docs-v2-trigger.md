@@ -2,4 +2,4 @@
 
 Trigger only. Do not merge.
 
-Load corrected workflow from latest main.
+Load corrected workflow and Chinese-path scope check from latest main.
