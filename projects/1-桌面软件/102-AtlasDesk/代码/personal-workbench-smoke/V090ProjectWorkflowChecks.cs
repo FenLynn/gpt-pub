@@ -38,32 +38,48 @@ internal static class V090ProjectWorkflowChecks
             "ProjectSelectionChanged += ProjectSelectionChanged",
             "Interlocked.Increment(ref _contextGeneration)",
             "ProjectContextService.ReadAsync",
-            "generation != _contextGeneration",
+            "generation != Interlocked.Read(ref _contextGeneration)",
+            "Dispatcher.InvokeAsync",
             "CancelContextRead",
             "OpenFromGlobalSearchAsync",
             "WorkspaceTerminal.OpenProjectTerminalAsync",
             "Header = \"项目\"",
             "Header = \"环境\"",
-            "Header = \"终端\"");
+            "Header = \"终端\"",
+            "_tabs.SelectedIndex = ProjectTabIndex",
+            "_tabs.SelectionChanged += Tabs_SelectionChanged");
         Reject(workflow, "IsVisibleChanged", "project workflow starts from visibility");
+        RequireOrder(
+            workflow,
+            "_tabs = BuildTabs();",
+            "_tabs.SelectedIndex = ProjectTabIndex;",
+            "_tabs.SelectionChanged += Tabs_SelectionChanged;");
 
+        var projectControlPath = Path.Combine(nativeRoot, "ProjectCenterControl.xaml.cs");
+        var projectControl = File.ReadAllText(projectControlPath);
         RequireTokens(
-            Path.Combine(nativeRoot, "ProjectCenterControl.xaml.cs"),
+            projectControlPath,
             "ProjectSelectionChanged",
             "ShowContextLoading",
             "ApplyContext",
-            "SelectedProject");
+            "SelectedProject",
+            "Project discovery is intentionally not bound to Loaded or visibility");
+        Reject(projectControl, "Loaded += ProjectCenterControl_Loaded",
+            "project discovery still starts during control load");
+        Reject(projectControl, "ProjectCenterControl_Loaded(",
+            "obsolete project Loaded handler remains");
+
         RequireTokens(
             Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs"),
             "ProjectWorkflow = ProjectWorkflowCoordinator.Attach(window, this)",
             "public ProjectWorkflowCoordinator ProjectWorkflow { get; }");
 
-        VerifyLocalContextAsync(nativeRoot).GetAwaiter().GetResult();
+        VerifyLocalContextAsync().GetAwaiter().GetResult();
         Console.WriteLine(
             "PASS AtlasDesk v0.9.0 explicit project selection drives bounded context, workspace and terminal workflow");
     }
 
-    private static async Task VerifyLocalContextAsync(string nativeRoot)
+    private static async Task VerifyLocalContextAsync()
     {
         var root = Path.Combine(Path.GetTempPath(), "atlasdesk-project-context-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -112,6 +128,20 @@ internal static class V090ProjectWorkflowChecks
         {
             if (!source.Contains(token, StringComparison.Ordinal))
                 throw new InvalidOperationException($"Missing v0.9.0 token '{token}' in {path}.");
+        }
+    }
+
+    private static void RequireOrder(string source, params string[] tokens)
+    {
+        var previous = -1;
+        foreach (var token in tokens)
+        {
+            var current = source.IndexOf(token, previous + 1, StringComparison.Ordinal);
+            if (current < 0)
+                throw new InvalidOperationException("Missing v0.9.0 order token: " + token);
+            if (current <= previous)
+                throw new InvalidOperationException("Invalid v0.9.0 initialization order near: " + token);
+            previous = current;
         }
     }
 
