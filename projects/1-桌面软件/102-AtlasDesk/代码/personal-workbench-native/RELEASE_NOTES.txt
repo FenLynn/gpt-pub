@@ -4,9 +4,11 @@ This emergency maintenance release removes the v0.8.2 startup regression reporte
 
 Startup and development lifecycle
 - Environment discovery is no longer connected to DevelopmentControl visibility changes. Reparenting the control while the three development tabs are assembled cannot start Conda or Python tools during application startup.
-- The retained legacy MainWindow Python page is explicitly disabled after the current project/environment/terminal development surface attaches. Selecting Development now has one environment-discovery owner instead of two concurrent paths.
+- The retained legacy MainWindow Python page is explicitly disabled after the current project/environment/terminal development surface attaches, leaving one environment-discovery owner.
+- A real-window residency test reproduced the hidden trigger: opening the Development project page could produce a transient internal Environment-tab selection and start discovery even though the user did not choose Environment.
+- DevelopmentControl now validates the source of every load request. Environment tools may start only when focus or mouse interaction is inside the development TabControl. Non-interactive Environment selections are rejected and the Project tab is restored.
 - Environment discovery returns to the proven serial and bounded v0.8.1 sequence. The v0.8.2 parallel interpreter probing, project-directory scanning and refresh cancellation chain have been removed.
-- Environment detection starts only after the user selects the Environment tab or presses Refresh.
+- Environment detection starts only after an explicit Environment-tab interaction or the user presses Refresh.
 
 Python Launcher
 - py.exe remains optional. AtlasDesk resolves it through PATH before execution and silently skips the Launcher when it is not installed.
@@ -14,5 +16,6 @@ Python Launcher
 
 Diagnostics and verification
 - The log now records the WPF Application Exit event, CLR ProcessExit event, and MainWindow Closing/Closed events so a future native or external termination can be distinguished from a normal close.
-- The Windows smoke probe now shows the real MainWindow, attaches the complete feature pipeline, enters Development > Environment, pumps the Dispatcher while discovery runs, and fails if the window closes.
+- A separate Windows STA process now creates the real App and MainWindow, attaches the complete feature pipeline, holds the window for ten seconds, opens Development on the Project tab, verifies that environment discovery remains idle, and then closes normally.
+- The isolated residency test is a dedicated GitHub Actions step with its own timeout and complete phase output; it is no longer hidden inside an MSBuild target or module initializer.
 - No Runtime/Data, WebView2 profile, terminal, vault or security boundary changes were made.
