@@ -54,7 +54,33 @@ internal static class V081SourceBoundaryChecks
         RejectExactLine(projectCenter, "tabs.SelectedIndex = 0;",
             "project center selects a local TabControl before the _tabs field is assigned");
 
-        Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development, Dashboard and startup-order source boundaries");
+        var diagnosticsPath = Path.Combine(nativeRoot, "DashboardScriptDiagnostics.cs");
+        var diagnostics = File.ReadAllText(diagnosticsPath);
+        RequireTokens(
+            diagnosticsPath,
+            "AddScriptToExecuteOnDocumentCreatedAsync",
+            "ExecuteScriptAsync",
+            "WebMessageReceived",
+            "window.addEventListener('error'",
+            "window.addEventListener('unhandledrejection'",
+            "window.alert = value =>",
+            "Cannot use 'in' operator to search for 'type' in undefined",
+            "url.search = ''",
+            "url.hash = ''",
+            "AreDefaultScriptDialogsEnabled = true");
+        Reject(diagnostics, "AreDefaultScriptDialogsEnabled = false",
+            "Dashboard diagnostics disabled all native website dialogs");
+        Reject(diagnostics, "window.confirm =",
+            "Dashboard diagnostics replaced normal confirm behavior");
+        Reject(diagnostics, "window.prompt =",
+            "Dashboard diagnostics replaced normal prompt behavior");
+
+        RequireTokens(
+            Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs"),
+            "DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window)",
+            "public DashboardScriptDiagnostics DashboardDiagnostics");
+
+        Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development, Dashboard, startup-order and script-diagnostic source boundaries");
     }
 
     private static string FindNativeSourceRoot()
