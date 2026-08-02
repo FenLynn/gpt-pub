@@ -210,24 +210,57 @@ public sealed class WorkbenchEnhancer
 
     private void ApplyVisualPolish()
     {
-        _window.Background = new LinearGradientBrush(
-            Color.FromRgb(243, 247, 252), Color.FromRgb(239, 244, 251), new Point(0, 0), new Point(1, 1));
-        if (_window.FindName("RootGrid") is Grid root) root.Margin = new Thickness(8);
+        _window.Background = new SolidColorBrush(Color.FromRgb(247, 248, 250));
+        if (_window.FindName("RootGrid") is Grid root)
+        {
+            root.Margin = new Thickness(0);
+            root.Background = new SolidColorBrush(Color.FromRgb(247, 248, 250));
+            if (root.ColumnDefinitions.Count > 1)
+                root.ColumnDefinitions[1].Width = new GridLength(1);
+
+            var divider = root.Children.OfType<Border>()
+                .FirstOrDefault(border => Equals(border.Tag, "shell-divider"));
+            if (divider is null)
+            {
+                divider = new Border
+                {
+                    Tag = "shell-divider",
+                    Background = new SolidColorBrush(Color.FromRgb(226, 229, 234)),
+                    IsHitTestVisible = false
+                };
+                Grid.SetColumn(divider, 1);
+                root.Children.Add(divider);
+            }
+
+            var content = root.Children.OfType<Border>()
+                .FirstOrDefault(border => Grid.GetColumn(border) == 2);
+            if (content is not null)
+            {
+                content.CornerRadius = new CornerRadius(0);
+                content.BorderThickness = new Thickness(0);
+                content.BorderBrush = Brushes.Transparent;
+                content.Background = Brushes.White;
+                content.Effect = null;
+                content.ClipToBounds = true;
+            }
+        }
         if (_window.FindName("Sidebar") is Border sidebar)
         {
-            sidebar.CornerRadius = new CornerRadius(16);
-            sidebar.BorderBrush = new SolidColorBrush(Color.FromRgb(218, 227, 239));
-            sidebar.Background = new SolidColorBrush(Color.FromRgb(250, 252, 255));
+            sidebar.CornerRadius = new CornerRadius(0);
+            sidebar.BorderThickness = new Thickness(0);
+            sidebar.BorderBrush = Brushes.Transparent;
+            sidebar.Background = new SolidColorBrush(Color.FromRgb(248, 249, 251));
+            sidebar.Effect = null;
         }
-        if (_window.FindName("TopBarRow") is RowDefinition topBarRow) topBarRow.Height = new GridLength(40);
+        if (_window.FindName("TopBarRow") is RowDefinition topBarRow) topBarRow.Height = new GridLength(42);
         if (_window.FindName("TopBar") is Grid topBar)
         {
-            topBar.Background = new SolidColorBrush(Color.FromRgb(252, 253, 255));
+            topBar.Background = Brushes.White;
             if (!topBar.Children.OfType<Border>().Any(border => Equals(border.Tag, "polish-divider")))
             {
                 var divider = new Border
                 {
-                    Tag = "polish-divider", Height = 1, Background = new SolidColorBrush(Color.FromRgb(229, 235, 243)),
+                    Tag = "polish-divider", Height = 1, Background = new SolidColorBrush(Color.FromRgb(229, 232, 237)),
                     VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false
                 };
                 Grid.SetColumnSpan(divider, 3);
@@ -238,9 +271,10 @@ public sealed class WorkbenchEnhancer
         if (_window.FindName("PageSubtitle") is TextBlock subtitle) subtitle.FontSize = 11;
         if (_window.FindName("UserCard") is Border userCard)
         {
-            userCard.Background = new SolidColorBrush(Color.FromRgb(244, 247, 251));
-            userCard.BorderBrush = new SolidColorBrush(Color.FromRgb(228, 234, 242));
-            userCard.BorderThickness = new Thickness(1);
+            userCard.Background = Brushes.Transparent;
+            userCard.BorderBrush = Brushes.Transparent;
+            userCard.BorderThickness = new Thickness(0);
+            userCard.CornerRadius = new CornerRadius(0);
         }
     }
 
