@@ -381,11 +381,35 @@ func TestTopToolbarResponsiveBandsKeepSearchGap(t *testing.T) {
 }
 
 func TestFullCellBarsUseRowHeightAndCompressionRatio(t *testing.T) {
-	row := rect{Left: 800, Top: 100, Right: 940, Bottom: 150}
-	bar := fullCellBarRect(row)
-	if bar.Top != 105 || bar.Bottom != 145 || bar.Bottom-bar.Top != 40 {
-		t.Fatalf("bar rect=%+v, want full-height inset", bar)
+	checkCentered := func(name string, row rect) {
+		t.Helper()
+		bar := fullCellBarRect(row)
+		insets := listCellBarInsets()
+		wantLeft := row.Left + scaleDPI(insets.Horizontal)
+		wantRight := row.Right - scaleDPI(insets.Horizontal)
+		available := row.Bottom - row.Top - 2*scaleDPI(insets.Vertical)
+		wantHeight := scaleDPI(24)
+		if wantHeight > available {
+			wantHeight = available
+		}
+		if minimum := scaleDPI(insets.MinimumHeight); wantHeight < minimum && available >= minimum {
+			wantHeight = minimum
+		}
+		if wantHeight < 1 {
+			wantHeight = 1
+		}
+		topGap := bar.Top - row.Top
+		bottomGap := row.Bottom - bar.Bottom
+		gapDelta := topGap - bottomGap
+		if gapDelta < 0 {
+			gapDelta = -gapDelta
+		}
+		if bar.Left != wantLeft || bar.Right != wantRight || bar.Bottom-bar.Top != wantHeight || gapDelta > 1 {
+			t.Fatalf("%s bar=%+v row=%+v gaps=%d/%d, want horizontal inset, height %d and vertical centring", name, bar, row, topGap, bottomGap, wantHeight)
+		}
 	}
+	checkCentered("synthetic-50px-row", rect{Left: 800, Top: 100, Right: 940, Bottom: 150})
+	checkCentered("realistic-30px-row", rect{Left: 800, Top: 100, Right: 940, Bottom: 130})
 	task := &model.Task{InputSize: 100, OutputSize: 50}
 	fraction, label, active := compressionCellMetrics(task)
 	if !active || fraction != .5 || label != "50 B (50.0%)" {
