@@ -1,4 +1,4 @@
-name: Release Mediova v4.1.0 once
+name: Release Mediova v4.1.0 once v2
 
 on:
   pull_request:
@@ -38,18 +38,26 @@ jobs:
           go-version: '1.23.x'
           cache: false
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Verify formal source identity
+      - name: Verify formal source and source manifest
         shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
           $actual=(git rev-parse HEAD).Trim()
           if ($actual -ne $env:SOURCE_SHA) { throw "Source mismatch: $actual" }
           Write-Host "Release source commit: $actual"
           Write-Host "Release source tree: $((git rev-parse 'HEAD^{tree}').Trim())"
+
+          foreach ($line in Get-Content 'SOURCE_FILES_SHA256.txt') {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            $match=[regex]::Match($line,'^([0-9a-fA-F]{64})\s{2}(.+)$')
+            if (-not $match.Success) { throw "Invalid source manifest line: $line" }
+            $expected=$match.Groups[1].Value.ToLowerInvariant()
+            $relative=$match.Groups[2].Value.Trim()
+            if (!(Test-Path -LiteralPath $relative -PathType Leaf)) { throw "Manifest file missing: $relative" }
+            $actualHash=(Get-FileHash -LiteralPath $relative -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualHash -ne $expected) { throw "Source manifest mismatch: $relative" }
+          }
 
       - name: Validate source with isolated Data roots
         shell: pwsh
@@ -78,11 +86,6 @@ jobs:
               Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
             }
           }
-          if (-not (Get-Command sha256sum -ErrorAction SilentlyContinue)) {
-            throw 'sha256sum is required for the source manifest check.'
-          }
-          sha256sum -c SOURCE_FILES_SHA256.txt
-          if ($LASTEXITCODE -ne 0) { throw 'Source manifest check failed.' }
           Invoke-WithIsolatedData { go test -count=1 ./... }
           Invoke-WithIsolatedData { go test -race -count=1 ./internal/config ./internal/media }
           go vet -unsafeptr=false ./...
@@ -139,25 +142,19 @@ jobs:
           }
 
           $info=(Get-Item $exe).VersionInfo
-          if (($info.FileVersion -notlike '4.1.0*') -or ($info.ProductVersion -notlike '4.1.0*') -or ($info.ProductName -notlike '*Mediova*')) {
-            throw 'Version resource mismatch.'
-          }
+          if (($info.FileVersion -notlike '4.1.0*') -or ($info.ProductVersion -notlike '4.1.0*') -or ($info.ProductName -notlike '*Mediova*')) { throw 'Version resource mismatch.' }
 
           $manifest=Get-Content $manifestPath -Raw | ConvertFrom-Json
-          if ($manifest.product -ne 'Mediova' -or $manifest.version -ne '4.1.0' -or $manifest.platform -ne 'Windows x64' -or $manifest.deployment -ne 'folder-runtime') {
-            throw 'Runtime manifest identity mismatch.'
-          }
+          if ($manifest.product -ne 'Mediova' -or $manifest.version -ne '4.1.0' -or $manifest.platform -ne 'Windows x64' -or $manifest.deployment -ne 'folder-runtime') { throw 'Runtime manifest identity mismatch.' }
           foreach ($entry in $manifest.files) {
             $path=Join-Path $runtime ($entry.path -replace '/', '\')
             if (!(Test-Path $path -PathType Leaf)) { throw "Manifest file missing: $($entry.path)" }
-            $actual=(Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($actual -ne $entry.sha256) { throw "Manifest hash mismatch: $($entry.path)" }
+            $actualHash=(Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualHash -ne $entry.sha256) { throw "Manifest hash mismatch: $($entry.path)" }
             if ((Get-Item $path).Length -ne [int64]$entry.size) { throw "Manifest size mismatch: $($entry.path)" }
           }
           foreach ($private in @('config.json','history.json','session.json','crash.log','settings.json','task-history.json','security.json','vault.bin')) {
-            if (Get-ChildItem $runtime -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) {
-              throw "Private Data leaked into Runtime: $private"
-            }
+            if (Get-ChildItem $runtime -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private Data leaked into Runtime: $private" }
           }
 
           $proc=Start-Process -FilePath $exe -WorkingDirectory $runtime -ArgumentList @('--self-test',"--self-test-output=$report") -PassThru
@@ -177,22 +174,14 @@ jobs:
           $zipSize=(Get-Item $zip).Length
           $signature=(Get-AuthenticodeSignature $exe).Status.ToString()
           $record=[ordered]@{
-            product='Mediova'
-            version='4.1.0'
-            tag=$env:TAG_NAME
+            product='Mediova'; version='4.1.0'; tag=$env:TAG_NAME
             source_commit=$env:SOURCE_SHA
             formal_pr_ci_run='30727129758'
             release_workflow_run=$env:GITHUB_RUN_ID
             native_self_test_checks=$checks.Count
-            exe_path='Runtime/Mediova.exe'
-            exe_size=[int64]$exeSize
-            exe_sha256=$exeHash
-            runtime_zip='Mediova-v4.1.0-Runtime.zip'
-            runtime_zip_size=[int64]$zipSize
-            runtime_zip_sha256=$zipHash
-            runtime_manifest='verified'
-            private_data_scan='passed'
-            authenticode_status=$signature
+            exe_path='Runtime/Mediova.exe'; exe_size=[int64]$exeSize; exe_sha256=$exeHash
+            runtime_zip='Mediova-v4.1.0-Runtime.zip'; runtime_zip_size=[int64]$zipSize; runtime_zip_sha256=$zipHash
+            runtime_manifest='verified'; private_data_scan='passed'; authenticode_status=$signature
           }
           $recordPath=Join-Path $build 'release-record.json'
           $record | ConvertTo-Json -Depth 6 | Set-Content $recordPath -Encoding UTF8
@@ -222,18 +211,12 @@ jobs:
 
           ## 完整性
 
-          - `Runtime/Mediova.exe`
-            - Size: `$exeSize` bytes
-            - SHA-256: `$exeHash`
-          - `Mediova-v4.1.0-Runtime.zip`
-            - Size: `$zipSize` bytes
-            - SHA-256: `$zipHash`
+          - `Runtime/Mediova.exe`: `$exeSize` bytes; SHA-256 `$exeHash`
+          - `Mediova-v4.1.0-Runtime.zip`: `$zipSize` bytes; SHA-256 `$zipHash`
 
           首次部署必须解压完整 Runtime ZIP，不要只复制 `Mediova.exe`。
           "@
-          $notesPath=Join-Path $build 'release-notes.md'
-          Set-Content $notesPath $notes -Encoding UTF8
-
+          Set-Content (Join-Path $build 'release-notes.md') $notes -Encoding UTF8
           Write-Host "Mediova.exe size: $exeSize"
           Write-Host "Mediova.exe SHA-256: $exeHash"
           Write-Host "Runtime ZIP size: $zipSize"
@@ -265,24 +248,22 @@ jobs:
           }
 
           $build=Join-Path $repoRoot 'projects/1-桌面软件/101-Mediova/代码/build'
-          $assets=@(
-            (Join-Path $build 'Mediova-v4.1.0-Runtime.zip'),
-            (Join-Path $build 'SHA256.txt'),
-            (Join-Path $build 'Runtime/runtime-manifest.json'),
-            (Join-Path $build 'release_self_test.json'),
-            (Join-Path $build 'release-record.json')
-          )
+          $zip=Join-Path $build 'Mediova-v4.1.0-Runtime.zip'
+          $shaFile=Join-Path $build 'SHA256.txt'
+          $manifest=Join-Path $build 'Runtime/runtime-manifest.json'
+          $report=Join-Path $build 'release_self_test.json'
+          $record=Join-Path $build 'release-record.json'
           $notes=Join-Path $build 'release-notes.md'
 
           gh release view $env:TAG_NAME --repo $env:GITHUB_REPOSITORY *> $null
           $releaseExists=($LASTEXITCODE -eq 0)
           if ($releaseExists) {
-            gh release upload $env:TAG_NAME @assets --repo $env:GITHUB_REPOSITORY --clobber
+            & gh release upload $env:TAG_NAME $zip $shaFile $manifest $report $record --repo $env:GITHUB_REPOSITORY --clobber
             if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed.' }
-            gh release edit $env:TAG_NAME --repo $env:GITHUB_REPOSITORY --title 'Mediova v4.1.0' --notes-file $notes --target $env:SOURCE_SHA
+            & gh release edit $env:TAG_NAME --repo $env:GITHUB_REPOSITORY --title 'Mediova v4.1.0' --notes-file $notes --target $env:SOURCE_SHA
             if ($LASTEXITCODE -ne 0) { throw 'Release update failed.' }
           } else {
-            gh release create $env:TAG_NAME @assets --repo $env:GITHUB_REPOSITORY --verify-tag --target $env:SOURCE_SHA --title 'Mediova v4.1.0' --notes-file $notes
+            & gh release create $env:TAG_NAME $zip $shaFile $manifest $report $record --repo $env:GITHUB_REPOSITORY --verify-tag --target $env:SOURCE_SHA --title 'Mediova v4.1.0' --notes-file $notes
             if ($LASTEXITCODE -ne 0) { throw 'Release creation failed.' }
           }
 
