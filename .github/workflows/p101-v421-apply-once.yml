@@ -69,12 +69,17 @@ jobs:
           \t}''',
           )
 
-          # Delete the obsolete bottom control instead of merely hiding it.
-          replace_once(
-              main,
-              '''\ta.hApplySelected = createControl("BUTTON", "应用到选中", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1286, 730, 132, 32, a.hwnd, IDC_APPLY_SELECTED)\n''',
-              '',
-          )
+          # Delete the obsolete bottom control by semantic identity, because earlier
+          # layout patches may already have changed its coordinates or style flags.
+          _apply_lines = main.splitlines(keepends=True)
+          _apply_matches = [
+              i for i, line in enumerate(_apply_lines)
+              if 'a.hApplySelected = createControl' in line and '"应用到选中"' in line
+          ]
+          if len(_apply_matches) != 1:
+              raise SystemExit(f'expected one obsolete bottom apply control, found {len(_apply_matches)}')
+          del _apply_lines[_apply_matches[0]]
+          main = ''.join(_apply_lines)
 
           """
           path.write_text(text[:start] + replacement + text[end:], encoding='utf-8', newline='\n')
