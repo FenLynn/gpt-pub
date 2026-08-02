@@ -40,7 +40,7 @@ jobs:
           cd 'projects/1-桌面软件/101-Mediova/代码'
           python -m py_compile tools_v411_ui_patch.py
           python tools_v411_ui_patch.py
-          rm tools_v411_ui_patch.py
+          rm -rf tools_v411_ui_patch.py __pycache__
           gofmt -w cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/ui_rules.go cmd/mediaworkbench/ui_rules_test.go
           python - <<'PY'
           from pathlib import Path
@@ -76,8 +76,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git config core.quotepath false
           allowed='^(projects/1-桌面软件/101-Mediova/代码/(SOURCE_FILES_SHA256.txt|cmd/mediaworkbench/(main_windows.go|ui_rules.go|ui_rules_test.go)|tools_v411_ui_patch.py))$'
-          changed="$(git status --short | sed -E 's/^...//')"
+          changed="$(git status --short --untracked-files=all | sed -E 's/^...//')"
           printf '%s\n' "$changed"
           while IFS= read -r path; do
             [ -z "$path" ] && continue
