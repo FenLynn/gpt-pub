@@ -160,8 +160,10 @@ jobs:
           if (-not $ffmpeg -or -not $ffprobe -or $ffmpeg.Directory.FullName -ne $ffprobe.Directory.FullName) {
             throw 'Downloaded package does not contain a colocated FFmpeg/FFprobe pair.'
           }
-          & $ffmpeg.FullName -version | Select-Object -First 1
-          if ($LASTEXITCODE -ne 0) { throw 'Downloaded FFmpeg is not runnable.' }
+          $versionOutput=@(& $ffmpeg.FullName -version 2>&1)
+          $ffmpegExit=$LASTEXITCODE
+          $versionOutput | Select-Object -First 1
+          if ($ffmpegExit -ne 0) { throw 'Downloaded FFmpeg is not runnable.' }
           "FFMPEG_BIN=$($ffmpeg.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build complete v4.1.0 Runtime
