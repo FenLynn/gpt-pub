@@ -27,7 +27,13 @@ public sealed class V070ProjectCenterEnhancer
                        ?? throw new InvalidOperationException("Development environment module is unavailable.");
         _projects = new ProjectCenterControl(pipeline.Settings);
         _projects.ActionRequested += ProjectActionRequested;
+
+        // Assign the field before selecting the first tab. Setting SelectedIndex raises
+        // SelectionChanged synchronously, and the handler reads _tabs.
         _tabs = BuildTabs();
+        _tabs.SelectionChanged += Tabs_SelectionChanged;
+        _tabs.SelectedIndex = 0;
+
         Install();
         RemoveLegacyProjectButton();
         WireNavigation();
@@ -55,13 +61,22 @@ public sealed class V070ProjectCenterEnhancer
         };
         tabs.Items.Add(new TabItem { Header = "项目", Content = _projects });
         tabs.Items.Add(new TabItem { Header = "环境", Content = _development });
-        tabs.SelectionChanged += async (_, args) =>
-        {
-            if (ReferenceEquals(args.Source, tabs))
-                await RefreshSelectedTabAsync();
-        };
-        tabs.SelectedIndex = 0;
         return tabs;
+    }
+
+    private async void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs args)
+    {
+        if (!ReferenceEquals(args.Source, _tabs))
+            return;
+
+        try
+        {
+            await RefreshSelectedTabAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Log("Refresh project center tab failed: " + ex);
+        }
     }
 
     private async Task RefreshSelectedTabAsync()
@@ -97,7 +112,17 @@ public sealed class V070ProjectCenterEnhancer
     {
         if (_window.FindName("DevelopmentNav") is RadioButton developmentNav)
         {
-            developmentNav.Checked += async (_, _) => await RefreshSelectedTabAsync();
+            developmentNav.Checked += async (_, _) =>
+            {
+                try
+                {
+                    await RefreshSelectedTabAsync();
+                }
+                catch (Exception ex)
+                {
+                    App.Log("Refresh development navigation failed: " + ex);
+                }
+            };
         }
     }
 
