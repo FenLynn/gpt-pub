@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time patch workflow. Do not merge.
 
-Reload the path-aware semantic-control-deletion patch from latest main.
+Reload the full-obsolete-control-reference-cleanup patch from latest main.
