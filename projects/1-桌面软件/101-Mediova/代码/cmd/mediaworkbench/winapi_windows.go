@@ -236,6 +236,7 @@ const (
 	DT_CENTER                    = 0x00000001
 	DT_VCENTER                   = 0x00000004
 	DT_SINGLELINE                = 0x00000020
+	DT_CALCRECT                  = 0x00000400
 	CF_UNICODETEXT               = 13
 	GMEM_MOVEABLE                = 0x0002
 	LR_DEFAULTSIZE               = 0x40

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unsafe"
 
 	"mediaworkbench/internal/media"
 	"mediaworkbench/internal/model"
@@ -40,23 +41,53 @@ func drawCompactResetGlyph(hdc uintptr, rc rect, color uintptr) {
 	procDeleteObject.Call(pen)
 }
 
-// drawContrastCenteredText paints dark text over the unfilled track and then
-// repaints only the filled part in white. A percentage straddling the fill
-// boundary therefore remains readable on both sides, matching the original UI.
+// drawContrastCenteredText measures the complete label, keeps it centred, and
+// paints every glyph according to the background under its centre. This avoids
+// ListView/PrintWindow clipping inconsistencies while preserving white text on
+// blue fill and dark text on the light remainder of partially filled bars.
 func drawContrastCenteredText(hdc uintptr, text string, bar, fill rect, font uintptr) {
-	drawCenteredText(hdc, text, bar, font, colorRef(35, 51, 74))
-	if fill.Right <= fill.Left || fill.Bottom <= fill.Top {
+	if text == "" {
 		return
 	}
-	if fill.Left < bar.Left {
-		fill.Left = bar.Left
+	oldFont, _, _ := procSelectObject.Call(hdc, font)
+	defer func() {
+		if oldFont != 0 {
+			procSelectObject.Call(hdc, oldFont)
+		}
+	}()
+	procSetBkMode.Call(hdc, TRANSPARENT)
+
+	units := []rune(text)
+	widths := make([]int32, len(units))
+	var total int32
+	for i, unit := range units {
+		measure := rect{Right: 32767, Bottom: bar.Bottom - bar.Top}
+		unitText := string(unit)
+		procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(unitText))), ^uintptr(0), uintptr(unsafe.Pointer(&measure)), DT_LEFT|DT_SINGLELINE|DT_CALCRECT)
+		width := measure.Right - measure.Left
+		if width <= 0 {
+			width = scaleDPI(8)
+		}
+		widths[i] = width
+		total += width
 	}
-	if fill.Right > bar.Right {
-		fill.Right = bar.Right
+
+	x := bar.Left + (bar.Right-bar.Left-total)/2
+	dark := colorRef(35, 51, 74)
+	light := colorRef(255, 255, 255)
+	for i, unit := range units {
+		width := widths[i]
+		colour := dark
+		centre := x + width/2
+		if fill.Right > fill.Left && centre >= fill.Left && centre <= fill.Right {
+			colour = light
+		}
+		procSetTextColor.Call(hdc, colour)
+		unitRC := rect{Left: x, Top: bar.Top, Right: x + width + 1, Bottom: bar.Bottom}
+		unitText := string(unit)
+		procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(unitText))), ^uintptr(0), uintptr(unsafe.Pointer(&unitRC)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+		x += width
 	}
-	withRoundedClip(hdc, fill, 4, func() {
-		drawCenteredText(hdc, text, bar, font, colorRef(255, 255, 255))
-	})
 }
 
 func taskDurationText(task *model.Task) string {
