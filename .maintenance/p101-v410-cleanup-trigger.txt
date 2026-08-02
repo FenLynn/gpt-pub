@@ -1,0 +1,4 @@
+project=P101
+product=Mediova
+version=4.1.0
+purpose=wait-for-release-and-cleanup
