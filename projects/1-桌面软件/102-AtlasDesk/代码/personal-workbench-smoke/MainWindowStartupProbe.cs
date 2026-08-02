@@ -1,6 +1,4 @@
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -10,44 +8,22 @@ namespace PersonalWorkbench.Smoke;
 
 internal static class MainWindowStartupProbe
 {
-    private static string _phase = "scheduled";
+    internal static string CurrentPhase { get; private set; } = "not started";
 
-    [ModuleInitializer]
-    internal static void Start()
+    internal static void VerifyOnCurrentStaThread()
     {
-        // Never wait for this thread from the module initializer. The worker may
-        // execute code from this assembly only after the initializer returns and
-        // releases the CLR module-initialization lock.
-        var thread = new Thread(RunProbe)
-        {
-            IsBackground = false,
-            Name = "AtlasDesk.MainWindowStartupProbe"
-        };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-    }
+        if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
+            throw new InvalidOperationException("Startup residency probe requires an STA thread.");
+        if (Application.Current is null)
+            throw new InvalidOperationException("Startup residency probe requires the shared WPF Application.");
 
-    private static void RunProbe()
-    {
         var workspace = Path.Combine(
             Path.GetTempPath(),
             "atlasdesk-startup-probe-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
 
-        using var watchdog = new Timer(
-            _ => Environment.FailFast(
-                "AtlasDesk startup residency probe exceeded 30 seconds. Last phase: "
-                + Volatile.Read(ref _phase)),
-            null,
-            TimeSpan.FromSeconds(30),
-            Timeout.InfiniteTimeSpan);
-
         try
         {
-            SetPhase("creating WPF application");
-            var app = new App();
-            app.InitializeComponent();
-
             SetPhase("constructing main window");
             var window = new MainWindow();
             var settingsField = typeof(MainWindow)
@@ -109,21 +85,19 @@ internal static class MainWindowStartupProbe
         }
         catch (Exception ex)
         {
-            Environment.FailFast(
-                "AtlasDesk startup residency probe failed during phase: "
-                + Volatile.Read(ref _phase),
+            throw new InvalidOperationException(
+                "AtlasDesk startup residency probe failed during phase: " + CurrentPhase,
                 ex);
         }
         finally
         {
             try { Directory.Delete(workspace, true); } catch { }
-            Dispatcher.CurrentDispatcher.InvokeShutdown();
         }
     }
 
     private static void SetPhase(string value)
     {
-        Volatile.Write(ref _phase, value);
+        CurrentPhase = value;
         Console.WriteLine("PROBE " + value);
     }
 
