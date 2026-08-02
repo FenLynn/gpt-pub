@@ -27,7 +27,9 @@ public partial class ProjectCenterControl : UserControl, IDisposable
     {
         _settings = settings;
         InitializeComponent();
-        Loaded += ProjectCenterControl_Loaded;
+        // Project discovery is intentionally not bound to Loaded or visibility.
+        // ProjectWorkflowCoordinator calls RefreshIfNeededAsync only after the user
+        // explicitly opens Development → Project, and Refresh remains user initiated.
         Unloaded += (_, _) => CancelScan();
         UpdateRootBadge();
     }
@@ -63,11 +65,6 @@ public partial class ProjectCenterControl : UserControl, IDisposable
     private bool IsSelected(string rootPath)
         => _selected is not null
            && string.Equals(_selected.RootPath, rootPath, StringComparison.OrdinalIgnoreCase);
-
-    private async void ProjectCenterControl_Loaded(object sender, RoutedEventArgs e)
-    {
-        await RefreshIfNeededAsync();
-    }
 
     private void UpdateRootBadge()
     {
