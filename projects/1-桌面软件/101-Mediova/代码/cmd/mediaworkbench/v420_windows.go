@@ -169,24 +169,25 @@ func (a *application) v420UpdateStartAction() {
 		return
 	}
 	a.runMu.Lock()
-	running, runKind := a.running, a.runKind
+	running, runKind, paused := a.running, a.runKind, a.paused
 	a.runMu.Unlock()
 	ready := a.v420ReadyCount(a.currentKind)
+	ownsRun := running && a.currentKind == runKind
+	enable(a.hPause, ownsRun)
+	enable(a.hStop, ownsRun)
+	setText(a.hPause, queuePauseLabel(a.currentKind, ownsRun && paused))
+	setText(a.hStop, queueStopLabel(a.currentKind))
 	if running {
-		if a.currentKind == runKind {
+		if ownsRun {
 			setText(a.hStart, "加入队列")
 			enable(a.hStart, ready > 0)
 		} else {
-			setText(a.hStart, "等待当前队列")
+			setText(a.hStart, waitingQueueLabel(runKind))
 			enable(a.hStart, false)
 		}
 		return
 	}
-	if a.currentKind == model.KindImage {
-		setText(a.hStart, "开始压缩")
-	} else {
-		setText(a.hStart, "开始转换")
-	}
+	setText(a.hStart, queueStartLabel(a.currentKind))
 	enable(a.hStart, ready > 0)
 }
 
