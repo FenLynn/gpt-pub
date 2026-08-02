@@ -1,4 +1,4 @@
-name: Release Mediova v4.1.0 once v2
+name: Release Mediova v4.1.0 once v3
 
 on:
   pull_request:
@@ -38,9 +38,12 @@ jobs:
           go-version: '1.23.x'
           cache: false
 
-      - name: Verify formal source and source manifest
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Verify formal source identity
         shell: pwsh
-        working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
           $actual=(git rev-parse HEAD).Trim()
@@ -48,16 +51,61 @@ jobs:
           Write-Host "Release source commit: $actual"
           Write-Host "Release source tree: $((git rev-parse 'HEAD^{tree}').Trim())"
 
-          foreach ($line in Get-Content 'SOURCE_FILES_SHA256.txt') {
-            if ([string]::IsNullOrWhiteSpace($line)) { continue }
-            $match=[regex]::Match($line,'^([0-9a-fA-F]{64})\s{2}(.+)$')
-            if (-not $match.Success) { throw "Invalid source manifest line: $line" }
-            $expected=$match.Groups[1].Value.ToLowerInvariant()
-            $relative=$match.Groups[2].Value.Trim()
-            if (!(Test-Path -LiteralPath $relative -PathType Leaf)) { throw "Manifest file missing: $relative" }
-            $actualHash=(Get-FileHash -LiteralPath $relative -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($actualHash -ne $expected) { throw "Source manifest mismatch: $relative" }
-          }
+      - name: Verify source manifest against Git blob bytes
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          $script=@'
+          import hashlib
+          import os
+          import pathlib
+          import re
+          import subprocess
+          import sys
+
+          source_sha = os.environ["SOURCE_SHA"]
+          prefix = subprocess.check_output(
+              ["git", "rev-parse", "--show-prefix"],
+              text=True,
+              encoding="utf-8",
+          ).strip()
+          manifest = pathlib.Path("SOURCE_FILES_SHA256.txt")
+          pattern = re.compile(r"^([0-9a-fA-F]{64})\s{2}(.+)$")
+          checked = 0
+
+          for raw_line in manifest.read_text(encoding="utf-8-sig").splitlines():
+              if not raw_line.strip():
+                  continue
+              match = pattern.fullmatch(raw_line)
+              if match is None:
+                  raise SystemExit(f"Invalid source manifest line: {raw_line}")
+              expected = match.group(1).lower()
+              relative = match.group(2).strip().replace("\\", "/")
+              if not pathlib.Path(relative).is_file():
+                  raise SystemExit(f"Manifest working-tree file missing: {relative}")
+              repo_path = f"{prefix}{relative}"
+              try:
+                  blob = subprocess.check_output(
+                      ["git", "cat-file", "blob", f"{source_sha}:{repo_path}"]
+                  )
+              except subprocess.CalledProcessError as exc:
+                  raise SystemExit(f"Git blob missing: {repo_path}") from exc
+              actual = hashlib.sha256(blob).hexdigest()
+              if actual != expected:
+                  raise SystemExit(
+                      f"Git blob SHA-256 mismatch: {relative}; expected={expected}; actual={actual}"
+                  )
+              checked += 1
+
+          if checked == 0:
+              raise SystemExit("Source manifest is empty.")
+          print(f"Verified {checked} source entries against exact Git blob bytes.")
+          '@
+          $scriptPath=Join-Path $env:RUNNER_TEMP 'verify_p101_source_manifest.py'
+          Set-Content -LiteralPath $scriptPath -Value $script -Encoding UTF8
+          python $scriptPath
+          if ($LASTEXITCODE -ne 0) { throw 'Git blob source manifest verification failed.' }
 
       - name: Validate source with isolated Data roots
         shell: pwsh
@@ -176,6 +224,7 @@ jobs:
           $record=[ordered]@{
             product='Mediova'; version='4.1.0'; tag=$env:TAG_NAME
             source_commit=$env:SOURCE_SHA
+            source_manifest_mode='git-blob-sha256'
             formal_pr_ci_run='30727129758'
             release_workflow_run=$env:GITHUB_RUN_ID
             native_self_test_checks=$checks.Count
@@ -202,6 +251,7 @@ jobs:
           ## 正式来源与验证
 
           - Source commit: `$env:SOURCE_SHA`
+          - Source manifest: exact Git blob SHA-256
           - Formal PR CI run: `30727129758`
           - Release workflow run: `$env:GITHUB_RUN_ID`
           - Native self-test: `$($checks.Count)/$($checks.Count)`
