@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time workflow. Do not merge.
 
-Reload the exact two-guard workspace protection from latest main.
+Reload literal regex replacement for Windows test paths from latest main.
