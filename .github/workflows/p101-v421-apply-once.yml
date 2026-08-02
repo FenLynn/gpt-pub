@@ -69,18 +69,27 @@ jobs:
           \t}''',
           )
 
-          # Delete the obsolete bottom control by semantic identity. The `main`
-          # variable is a Path, while replace_once() normally handles its I/O.
+          # The prior layout patch already removes the old control creation. Remove
+          # every remaining handle/ID reference so the orphan control cannot return.
           _apply_text = main.read_text(encoding='utf-8')
-          _apply_lines = _apply_text.splitlines(keepends=True)
-          _apply_matches = [
-              i for i, line in enumerate(_apply_lines)
-              if 'a.hApplySelected = createControl' in line and '"应用到选中"' in line
+          _apply_lines = [
+              line for line in _apply_text.splitlines(keepends=True)
+              if 'IDC_APPLY_SELECTED' not in line and 'hApplySelected = createControl' not in line
           ]
-          if len(_apply_matches) != 1:
-              raise SystemExit(f'expected one obsolete bottom apply control, found {len(_apply_matches)}')
-          del _apply_lines[_apply_matches[0]]
-          main.write_text(''.join(_apply_lines), encoding='utf-8', newline='\n')
+          _apply_text = ''.join(_apply_lines)
+          for old in (
+              ', hApplySelected',
+              'hApplySelected, ',
+              ', a.hApplySelected',
+              'a.hApplySelected, ',
+              ', app.hApplySelected',
+              'app.hApplySelected, ',
+          ):
+              _apply_text = _apply_text.replace(old, '')
+          if 'hApplySelected' in _apply_text or 'IDC_APPLY_SELECTED' in _apply_text:
+              _leftovers = [line.strip() for line in _apply_text.splitlines() if 'hApplySelected' in line or 'IDC_APPLY_SELECTED' in line]
+              raise SystemExit('obsolete bottom apply references remain: ' + ' | '.join(_leftovers))
+          main.write_text(_apply_text, encoding='utf-8', newline='\n')
 
           """
           path.write_text(text[:start] + replacement + text[end:], encoding='utf-8', newline='\n')
