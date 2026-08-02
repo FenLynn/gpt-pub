@@ -41,14 +41,36 @@ jobs:
           from pathlib import Path
           path = Path('tooling/.github/scripts/p101_v422_apply.py')
           text = path.read_text(encoding='utf-8')
-          old = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 8 {', "compression custom column")
+
+          old_columns = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 8 {', "compression custom column")
           draw_func = replace_once(draw_func, 'if cd.ISubItem == 8 {', 'if cd.ISubItem == 9 {', "progress custom column")'''
-          new = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 108 {', "compression custom column placeholder")
+          new_columns = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 108 {', "compression custom column placeholder")
           draw_func = replace_once(draw_func, 'if cd.ISubItem == 8 {', 'if cd.ISubItem == 9 {', "progress custom column")
           draw_func = replace_once(draw_func, 'if cd.ISubItem == 108 {', 'if cd.ISubItem == 8 {', "compression custom column")'''
-          if text.count(old) != 1:
-              raise SystemExit(f'column migration patch expected one block, found {text.count(old)}')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          if text.count(old_columns) != 1:
+              raise SystemExit(f'column migration patch expected one block, found {text.count(old_columns)}')
+          text = text.replace(old_columns, new_columns, 1)
+
+          old_guards = '''harden = replace_once(harden, 'if !a.running {\\n\\t\\ta.runMu.Unlock()\\n\\t\\treturn\\n\\t}', 'if !a.running || a.runKind != a.currentKind {\\n\\t\\ta.runMu.Unlock()\\n\\t\\treturn\\n\\t}', "pause belongs to current media")
+          harden = replace_once(harden, 'setText(a.hPause, "继续")', 'setText(a.hPause, queuePauseLabel(a.currentKind, true))', "image pause label")
+          harden = replace_once(harden, 'setText(a.hPause, "暂停")', 'setText(a.hPause, queuePauseLabel(a.currentKind, false))', "image resume label")
+          # Replace the second running guard, belonging to stopQueue.
+          old_guard = 'if !a.running {\\n\\t\\ta.runMu.Unlock()\\n\\t\\treturn\\n\\t}'
+          if harden.count(old_guard) != 1:
+              raise RuntimeError(f"stop guard: expected one remaining match, found {harden.count(old_guard)}")
+          harden = harden.replace(old_guard, 'if !a.running || a.runKind != a.currentKind {\\n\\t\\ta.runMu.Unlock()\\n\\t\\treturn\\n\\t}', 1)'''
+          new_guards = '''old_guard = 'if !a.running {\\n\\t\\ta.runMu.Unlock()\\n\\t\\treturn\\n\\t}'
+          new_guard = 'if !a.running || a.runKind != a.currentKind {\\n\\t\\ta.runMu.Unlock()\\n\\t\\treturn\\n\\t}'
+          if harden.count(old_guard) != 2:
+              raise RuntimeError(f"pause/stop guards: expected exactly two matches, found {harden.count(old_guard)}")
+          harden = harden.replace(old_guard, new_guard, 2)
+          harden = replace_once(harden, 'setText(a.hPause, "继续")', 'setText(a.hPause, queuePauseLabel(a.currentKind, true))', "image pause label")
+          harden = replace_once(harden, 'setText(a.hPause, "暂停")', 'setText(a.hPause, queuePauseLabel(a.currentKind, false))', "image resume label")'''
+          if text.count(old_guards) != 1:
+              raise SystemExit(f'pause/stop patch expected one block, found {text.count(old_guards)}')
+          text = text.replace(old_guards, new_guards, 1)
+
+          path.write_text(text, encoding='utf-8', newline='\n')
           PY
           python -m py_compile tooling/.github/scripts/p101_v422_apply.py
           cd work
