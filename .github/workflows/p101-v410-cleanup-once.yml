@@ -1,0 +1,123 @@
+name: Cleanup Mediova v4.1.0 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.maintenance/p101-v410-cleanup-trigger.txt'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for the formal Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 240); do
+            if gh release view 'p101-v4.1.0' --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo 'Timed out waiting for p101-v4.1.0 Release.' >&2
+          exit 1
+
+      - name: Remove one-time files and finalize records
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git switch -C p101-v410-cleanup origin/main
+          python - <<'PY'
+          from pathlib import Path
+
+          work = Path('projects/1-桌面软件/101-Mediova/工作记录.md')
+          text = work.read_text(encoding='utf-8')
+          replacements = [
+              ('| 当前状态 | v4.1.0 已完成稳定候选、正式主线准入与 Release；正在执行发布后分支回流和临时设施清理 |',
+               '| 当前状态 | v4.1.0 已正式发布，长期分支已回流，临时实施与发布设施已清理 |'),
+              ('| [ ] | 进行中 | 9 | 发布后回流与清理 |',
+               '| [x] | 完成 | 9 | 发布后回流与清理 |'),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'work record marker not found: {old!r}')
+              text = text.replace(old, new, 1)
+          work.write_text(text, encoding='utf-8', newline='\n')
+
+          stage = Path('projects/1-桌面软件/101-Mediova/阶段记录.md')
+          text = stage.read_text(encoding='utf-8')
+          marker = '## 发布后仓库状态'
+          if marker not in text:
+              text = text.rstrip() + '''\n\n## 发布后仓库状态\n\n- `main`、`p101-stable` 与 `p101-exp` 已对齐到最终发布记录提交；\n- v4.1.0 一次性实施、诊断、发布和清理设施已从活动主线删除；\n- P101 临时分支和旧执行 PR 已清理；\n- 后续开发重新从最新 `p101-exp` 开始。\n'''
+          stage.write_text(text, encoding='utf-8', newline='\n')
+          PY
+
+          rm -f .github/workflows/p101-v410-finalize-once.yml
+          rm -f .github/workflows/p101-v410-cleanup-once.yml
+          rm -f .maintenance/p101-v410-finalize-trigger.txt
+          rm -f .maintenance/p101-v410-cleanup-trigger.txt
+          rm -f .maintenance/p101-v410-failure.txt
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- \
+            'projects/1-桌面软件/101-Mediova/工作记录.md' \
+            'projects/1-桌面软件/101-Mediova/阶段记录.md' \
+            '.github/workflows/p101-v410-finalize-once.yml' \
+            '.github/workflows/p101-v410-cleanup-once.yml' \
+            '.maintenance/p101-v410-finalize-trigger.txt' \
+            '.maintenance/p101-v410-cleanup-trigger.txt' \
+            '.maintenance/p101-v410-failure.txt'
+          git commit -m 'P101｜完成 Mediova v4.1.0 发布后收尾'
+          git push origin HEAD:main
+          echo "FINAL_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Align long-term branches and remove temporary branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin "$FINAL_SHA:refs/heads/p101-stable" --force
+          git push origin "$FINAL_SHA:refs/heads/p101-exp" --force
+          branches=(
+            agent/p101-v410-main-runner
+            agent/p101-v410-run-trigger
+            agent/p101-v410-runner-diagnostics
+            agent/p101-v410-run-v2-trigger
+            agent/p101-v410-observable-pr-runner
+            agent/p101-v410-execute-v3
+            agent/p101-v410-fix-escape-test-runner
+            agent/p101-v410-execute-v4
+            agent/p101-v410-prepatch-runner
+            agent/p101-v410-prepatch-v1
+            agent/p101-v410-update-working-runner
+            agent/p101-v410-ci-cleanup
+            agent/p101-v410-finalize-runner
+            agent/p101-v410-finalize-trigger
+            agent/p101-v410-cleanup-runner
+            agent/p101-v410-cleanup-trigger
+          )
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              git push origin --delete "$branch"
+            fi
+          done
+          for number in 56 61; do
+            if gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json state --jq .state 2>/dev/null | grep -q OPEN; then
+              gh pr close "$number" --repo "$GITHUB_REPOSITORY" --comment 'Mediova v4.1.0 已完成正式发布和仓库收尾。'
+            fi
+          done
