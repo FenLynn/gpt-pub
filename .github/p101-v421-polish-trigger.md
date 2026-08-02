@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time patch workflow. Do not merge.
 
-Run the syntax-corrected apply-control contract against the latest audited patch.
+Push the fully tested P101 product files while deferring the CI workflow to a normal PR.
