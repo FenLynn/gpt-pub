@@ -1,0 +1,77 @@
+name: Clean final P101 v4.1.1 refs once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-v411-final-cleanup-once
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.head_ref == 'repo-p101-v411-final-cleanup-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify formal Release and delete exact refs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          source_commit='6b6e38f9d0d6ff71418d12281f41562ea1d6fa8f'
+          tag_commit=$(gh api "repos/${REPOSITORY}/git/ref/tags/p101-v4.1.1" --jq '.object.sha')
+          if [[ "$tag_commit" != "$source_commit" ]]; then
+            tag_commit=$(gh api "repos/${REPOSITORY}/git/tags/${tag_commit}" --jq '.object.sha')
+          fi
+          test "$tag_commit" = "$source_commit"
+          test "$(gh api "repos/${REPOSITORY}/releases/tags/p101-v4.1.1" --jq '.draft')" = 'false'
+          test "$(gh api "repos/${REPOSITORY}/releases/tags/p101-v4.1.1" --jq '.prerelease')" = 'false'
+
+          refs=(
+            p101-v411-release-records
+            p101-v411-ui-visual-fix
+            repo-p101-v411-release-cleanup
+            repo-p101-v411-release-fix1
+            repo-p101-v411-release-once
+            repo-p101-v411-release-trigger
+            repo-p101-v411-ui-apply
+            repo-p101-v411-ui-apply-cleanup
+            repo-p101-v411-ui-apply-fix1
+            repo-p101-v411-ui-apply-pr
+            repo-p101-v411-ui-apply-trigger
+            repo-p101-v411-final-cleanup-runner
+            repo-p101-v411-final-cleanup-trigger
+          )
+
+          for branch in "${refs[@]}"; do
+            case "$branch" in
+              main|p101-exp|p101-stable) echo "Protected branch in deletion list: $branch" >&2; exit 1 ;;
+            esac
+            encoded=${branch//\//%2F}
+            if gh api "repos/${REPOSITORY}/git/ref/heads/${encoded}" >/dev/null 2>&1; then
+              echo "Deleting exact branch: $branch"
+              gh api -X DELETE "repos/${REPOSITORY}/git/refs/heads/${encoded}"
+            else
+              echo "Already absent: $branch"
+            fi
+          done
+
+          for branch in "${refs[@]}"; do
+            encoded=${branch//\//%2F}
+            if gh api "repos/${REPOSITORY}/git/ref/heads/${encoded}" >/dev/null 2>&1; then
+              echo "Branch still exists after deletion: $branch" >&2
+              exit 1
+            fi
+          done
+
+          for protected in main p101-exp p101-stable; do
+            encoded=${protected//\//%2F}
+            gh api "repos/${REPOSITORY}/git/ref/heads/${encoded}" >/dev/null
+          done
