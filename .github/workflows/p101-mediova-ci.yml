@@ -64,7 +64,11 @@ jobs:
         working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           set -euo pipefail
-          sha256sum -c SOURCE_FILES_SHA256.txt
+          if ! sha256sum -c SOURCE_FILES_SHA256.txt; then
+            echo 'Actual hashes for commonly cross-platform text files:'
+            sha256sum go.mod tools_embed_resources.py
+            exit 1
+          fi
           go test -count=1 ./...
           go test -race -count=1 ./internal/config ./internal/media
           go vet -unsafeptr=false ./...
