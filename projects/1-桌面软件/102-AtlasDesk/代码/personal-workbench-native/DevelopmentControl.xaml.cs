@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace PersonalWorkbench;
 
@@ -34,7 +35,8 @@ public partial class DevelopmentControl : UserControl
         // This control is reparented while the development tabs are assembled;
         // visibility transitions during that process must not start background tools.
         // V070ProjectCenterEnhancer explicitly calls EnsureLoadedAsync only after the
-        // user selects the Environment tab.
+        // Environment tab changes, and this control independently verifies that the
+        // change came from an interaction inside the development TabControl.
     }
 
     public void InvalidateEnvironments()
@@ -53,7 +55,49 @@ public partial class DevelopmentControl : UserControl
     {
         if (_loaded || _busy)
             return;
+
+        if (!AuthorizeInteractiveEnvironmentRequest())
+            return;
+
         await RefreshAsync();
+    }
+
+    private bool AuthorizeInteractiveEnvironmentRequest()
+    {
+        var tabs = FindVisualAncestor<TabControl>(this);
+        if (tabs is null)
+            return IsKeyboardFocusWithin;
+
+        var keyboardRequest = tabs.IsKeyboardFocusWithin;
+        var mouseRequest = tabs.IsMouseOver
+                           && Mouse.LeftButton == MouseButtonState.Pressed;
+        if (keyboardRequest || mouseRequest)
+            return true;
+
+        // WPF can transiently select the Environment TabItem when the hidden
+        // DevelopmentView is made visible. That is a layout/selection side effect,
+        // not user intent. Restore the project page and never launch external tools.
+        if (tabs.SelectedItem is TabItem selected
+            && ReferenceEquals(selected.Content, this)
+            && tabs.Items.Count > 0)
+        {
+            tabs.SelectedIndex = 0;
+        }
+
+        App.Log("Ignored non-interactive environment discovery request");
+        return false;
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject child) where T : DependencyObject
+    {
+        DependencyObject? current = child;
+        while (current is not null)
+        {
+            if (current is T match)
+                return match;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
     }
 
     private async Task RefreshAsync()
@@ -135,7 +179,7 @@ public partial class DevelopmentControl : UserControl
             return;
 
         _loaded = false;
-        await EnsureLoadedAsync();
+        await RefreshAsync();
     }
 
     private void OpenPowerShell_Click(object sender, RoutedEventArgs e) =>
