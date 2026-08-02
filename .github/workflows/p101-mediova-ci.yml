@@ -216,14 +216,28 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           Add-Type -AssemblyName System.Drawing
+          Add-Type -AssemblyName System.Windows.Forms
           Add-Type @"
           using System;
           using System.Runtime.InteropServices;
           public static class MediovaCaptureNative {
+              [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
               [DllImport("user32.dll", SetLastError=true)] public static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
+              [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
               [DllImport("user32.dll", SetLastError=true)] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint flags);
           }
           "@
+          $resolutionCommand=Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue
+          if ($resolutionCommand) {
+            try {
+              Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop
+              Start-Sleep -Seconds 2
+            } catch {
+              Write-Warning "Unable to change display resolution: $($_.Exception.Message)"
+            }
+          }
+          $screen=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          Write-Host "Primary screen: $($screen.Width)x$($screen.Height)"
           $runtime=Join-Path $PWD 'build/Runtime'
           $exe=Join-Path $runtime 'Mediova.exe'
           $previewDir=Join-Path $PWD 'build/ui-preview'
@@ -239,14 +253,22 @@ jobs:
             }
             if ($handle -eq [IntPtr]::Zero) { throw 'Mediova main window was not created for UI preview.' }
             function Save-MediovaWindow([int]$width, [int]$height, [string]$path) {
-              if (-not [MediovaCaptureNative]::MoveWindow($handle, 20, 20, $width, $height, $true)) { throw "MoveWindow failed for ${width}x${height}." }
+              if (-not [MediovaCaptureNative]::MoveWindow($handle, 0, 0, $width, $height, $true)) { throw "MoveWindow failed for ${width}x${height}." }
               Start-Sleep -Milliseconds 900
-              $bmp=New-Object System.Drawing.Bitmap($width, $height)
+              $rect=New-Object MediovaCaptureNative+RECT
+              if (-not [MediovaCaptureNative]::GetWindowRect($handle, [ref]$rect)) { throw "GetWindowRect failed for ${width}x${height}." }
+              $actualWidth=$rect.Right-$rect.Left
+              $actualHeight=$rect.Bottom-$rect.Top
+              Write-Host "Requested ${width}x${height}; actual ${actualWidth}x${actualHeight}"
+              if ([math]::Abs($actualWidth-$width) -gt 8 -or [math]::Abs($actualHeight-$height) -gt 8) {
+                throw "Window was clamped: requested ${width}x${height}, actual ${actualWidth}x${actualHeight}."
+              }
+              $bmp=New-Object System.Drawing.Bitmap($actualWidth, $actualHeight)
               $graphics=[System.Drawing.Graphics]::FromImage($bmp)
               try {
                 $hdc=$graphics.GetHdc()
                 try {
-                  if (-not [MediovaCaptureNative]::PrintWindow($handle, $hdc, 2)) { throw "PrintWindow failed for ${width}x${height}." }
+                  if (-not [MediovaCaptureNative]::PrintWindow($handle, $hdc, 2)) { throw "PrintWindow failed for ${actualWidth}x${actualHeight}." }
                 } finally {
                   $graphics.ReleaseHdc($hdc)
                 }
