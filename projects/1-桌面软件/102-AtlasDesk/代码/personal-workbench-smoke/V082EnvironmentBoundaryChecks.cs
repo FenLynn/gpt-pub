@@ -59,6 +59,11 @@ internal static class V083StartupBoundaryChecks
         RequireTokens(
             developmentPath,
             "Environment discovery is deliberately not bound to IsVisibleChanged",
+            "AuthorizeInteractiveEnvironmentRequest",
+            "tabs.IsKeyboardFocusWithin",
+            "tabs.IsMouseOver",
+            "tabs.SelectedIndex = 0",
+            "Ignored non-interactive environment discovery request",
             "public async Task EnsureLoadedAsync()",
             "SetBusyState(true)",
             "SetBusyState(false)");
