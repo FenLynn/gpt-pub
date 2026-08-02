@@ -411,6 +411,9 @@ func Load() model.Settings {
 		} else if old.Output != "" {
 			s.OutputDir = old.Output
 		}
+		if old.ImageOutput != "" {
+			s.ImageOutputDir = old.ImageOutput
+		}
 		if old.LastFolder != "" {
 			s.LastInputDir = old.LastFolder
 			s.LastImageInputDir = old.LastFolder
@@ -562,6 +565,15 @@ func normalize(s *model.Settings) {
 	}
 	if s.ConflictPolicy == "" {
 		s.ConflictPolicy = "自动编号"
+	}
+	if s.ImageOutputDir == "" {
+		s.ImageOutputDir = s.OutputDir
+	}
+	if len(s.RecentImageOutputDirs) == 0 && len(s.RecentOutputDirs) > 0 {
+		s.RecentImageOutputDirs = append([]string(nil), s.RecentOutputDirs...)
+	}
+	if s.LastImageOutputDir == "" {
+		s.LastImageOutputDir = s.ImageOutputDir
 	}
 	if s.ImageFormat == "" {
 		s.ImageFormat = "JPG"
