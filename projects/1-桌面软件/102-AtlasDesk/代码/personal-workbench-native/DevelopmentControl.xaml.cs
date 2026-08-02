@@ -20,8 +20,6 @@ public partial class DevelopmentControl : UserControl
     private bool _busy;
     private PythonDiscoveryResult? _discovery;
     private PythonEnvironmentInfo? _selected;
-    private CancellationTokenSource? _refreshCancellation;
-    private Task? _refreshTask;
 
     public event EventHandler<TerminalOpenRequestEventArgs>? OpenTerminalRequested;
 
@@ -31,74 +29,45 @@ public partial class DevelopmentControl : UserControl
     {
         _settings = settings;
         InitializeComponent();
-        IsVisibleChanged += async (_, _) =>
-        {
-            if (IsVisible)
-                await EnsureLoadedAsync();
-        };
+
+        // Environment discovery is deliberately not bound to IsVisibleChanged.
+        // This control is reparented while the development tabs are assembled;
+        // visibility transitions during that process must not start background tools.
+        // V070ProjectCenterEnhancer explicitly calls EnsureLoadedAsync only after the
+        // user selects the Environment tab.
     }
 
     public void InvalidateEnvironments()
     {
+        if (_busy)
+            return;
+
         _loaded = false;
-        _refreshCancellation?.Cancel();
         EnvironmentList.ItemsSource = null;
         _selected = null;
         UpdateEnvironmentDetails();
+        StatusText.Text = "环境列表已失效，点击“刷新环境”重新检测。";
     }
 
     public async Task EnsureLoadedAsync()
     {
-        if (_loaded)
+        if (_loaded || _busy)
             return;
-
-        var refresh = _refreshTask;
-        if (refresh is null)
-        {
-            refresh = RunRefreshAsync();
-            _refreshTask = refresh;
-        }
-        await refresh;
+        await RefreshAsync();
     }
 
-    private async Task RunRefreshAsync()
-    {
-        using var cancellation = new CancellationTokenSource();
-        _refreshCancellation = cancellation;
-        try
-        {
-            await RefreshAsync(cancellation.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            if (IsVisible)
-                StatusText.Text = "环境检测已重新排队。";
-        }
-        finally
-        {
-            if (ReferenceEquals(_refreshCancellation, cancellation))
-                _refreshCancellation = null;
-            _refreshTask = null;
-        }
-    }
-
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsync()
     {
         if (_busy)
             return;
-
-        var preferredPrefix = _selected?.Prefix;
-        if (string.IsNullOrWhiteSpace(preferredPrefix))
-            preferredPrefix = _settings.SelectedPythonEnvironment;
 
         try
         {
             _busy = true;
             SetBusyState(true);
-            StatusText.Text = "正在检测 Conda、uv、工作区项目环境与系统 Python…";
-            _discovery = await PythonEnvironmentService.DiscoverAsync(_settings, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
+            StatusText.Text = "正在检测 Conda、uv、工作区 venv 与系统 Python…";
 
+            _discovery = await PythonEnvironmentService.DiscoverAsync(_settings);
             EnvironmentList.ItemsSource = _discovery.Environments;
             CondaSummary.Text = string.IsNullOrWhiteSpace(_discovery.CondaExecutable)
                 ? "未检测到 · 可在设置中手动指定"
@@ -107,9 +76,7 @@ public partial class DevelopmentControl : UserControl
                 ? "未检测到 · 可选"
                 : string.IsNullOrWhiteSpace(_discovery.UvVersion) ? "已检测" : _discovery.UvVersion;
             EnvironmentSummary.Text = $"{_discovery.Environments.Count} 个可用环境";
-            StatusText.Text = _discovery.Environments.Count == 0
-                ? "未发现可用 Python 环境。工作台不会自动安装 Python 或修改现有环境。"
-                : $"发现 {_discovery.Environments.Count} 个环境；已包含工作区根目录与一级项目目录。";
+            StatusText.Text = $"发现 {_discovery.Environments.Count} 个环境。工作台未安装或携带任何 Python 包。";
 
             var settingsChanged = false;
             if (string.IsNullOrWhiteSpace(_settings.CondaPath) && !string.IsNullOrWhiteSpace(_discovery.CondaExecutable))
@@ -130,7 +97,10 @@ public partial class DevelopmentControl : UserControl
             {
                 var selected = _discovery.Environments
                     .Select((item, index) => new { item, index })
-                    .FirstOrDefault(pair => string.Equals(pair.item.Prefix, preferredPrefix, StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(pair => string.Equals(
+                        pair.item.Prefix,
+                        _settings.SelectedPythonEnvironment,
+                        StringComparison.OrdinalIgnoreCase));
                 EnvironmentList.SelectedIndex = selected?.index ?? 0;
                 EnvironmentList.ScrollIntoView(EnvironmentList.SelectedItem);
             }
@@ -139,10 +109,6 @@ public partial class DevelopmentControl : UserControl
                 _selected = null;
                 UpdateEnvironmentDetails();
             }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {
@@ -165,22 +131,28 @@ public partial class DevelopmentControl : UserControl
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
+        if (_busy)
+            return;
+
         _loaded = false;
-        var running = _refreshTask;
-        _refreshCancellation?.Cancel();
-        if (running is not null)
-        {
-            try { await running; }
-            catch (OperationCanceledException) { }
-        }
         await EnsureLoadedAsync();
     }
 
     private void OpenPowerShell_Click(object sender, RoutedEventArgs e) =>
-        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs { Shell = "powershell", Title = "PowerShell", WorkingDirectory = _settings.WorkspaceRoot });
+        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs
+        {
+            Shell = "powershell",
+            Title = "PowerShell",
+            WorkingDirectory = _settings.WorkspaceRoot
+        });
 
     private void OpenCmd_Click(object sender, RoutedEventArgs e) =>
-        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs { Shell = "cmd", Title = "CMD", WorkingDirectory = _settings.WorkspaceRoot });
+        OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs
+        {
+            Shell = "cmd",
+            Title = "CMD",
+            WorkingDirectory = _settings.WorkspaceRoot
+        });
 
     private void EnvironmentList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -194,11 +166,15 @@ public partial class DevelopmentControl : UserControl
         {
             DetailName.Text = "选择一个 Python 环境";
             DetailKind.Text = DetailPython.Text = DetailPrefix.Text = DetailSource.Text = string.Empty;
-            OpenIntegratedButton.IsEnabled = SetDefaultButton.IsEnabled = CopyPathButton.IsEnabled = OpenFolderButton.IsEnabled = false;
+            OpenIntegratedButton.IsEnabled = false;
+            SetDefaultButton.IsEnabled = false;
+            CopyPathButton.IsEnabled = false;
+            OpenFolderButton.IsEnabled = false;
             return;
         }
 
-        DetailName.Text = _selected.DisplayName + (string.IsNullOrWhiteSpace(_selected.Version) ? string.Empty : " · Python " + _selected.Version);
+        DetailName.Text = _selected.DisplayName
+            + (string.IsNullOrWhiteSpace(_selected.Version) ? string.Empty : " · Python " + _selected.Version);
         DetailKind.Text = _selected.KindLabel;
         DetailPython.Text = _selected.PythonExecutable;
         DetailPrefix.Text = _selected.Prefix;
@@ -221,12 +197,15 @@ public partial class DevelopmentControl : UserControl
     {
         if (_selected is null)
             return;
+
         OpenTerminalRequested?.Invoke(this, new TerminalOpenRequestEventArgs
         {
             Shell = "cmd",
             Environment = _selected,
             Title = _selected.DisplayName,
-            WorkingDirectory = Directory.Exists(_settings.WorkspaceRoot) ? _settings.WorkspaceRoot : _selected.Prefix
+            WorkingDirectory = Directory.Exists(_settings.WorkspaceRoot)
+                ? _settings.WorkspaceRoot
+                : _selected.Prefix
         });
     }
 
@@ -234,6 +213,7 @@ public partial class DevelopmentControl : UserControl
     {
         if (_selected is null)
             return;
+
         _settings.SelectedPythonEnvironment = _selected.Prefix;
         _settings.Save();
         StatusText.Text = $"默认环境已设为：{_selected.DisplayName}";
@@ -248,6 +228,13 @@ public partial class DevelopmentControl : UserControl
     private void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
         if (_selected is not null && Directory.Exists(_selected.Prefix))
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", _selected.Prefix) { UseShellExecute = true });
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                "explorer.exe",
+                _selected.Prefix)
+            {
+                UseShellExecute = true
+            });
+        }
     }
 }
