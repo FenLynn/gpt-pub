@@ -82,7 +82,8 @@ jobs:
           assert manifest['platform'] == 'Windows x64'
           assert manifest['deployment'] == 'folder-runtime'
           for entry in manifest['files']:
-              path = root / entry['path']
+              relative = entry['path'].replace('\\', '/')
+              path = root.joinpath(*relative.split('/'))
               assert path.is_file(), entry['path']
               data = path.read_bytes()
               assert len(data) == int(entry['size']), entry['path']
