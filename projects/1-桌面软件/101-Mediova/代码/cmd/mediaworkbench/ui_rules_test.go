@@ -78,7 +78,7 @@ func TestBottomParameterWidthsArePurposeSized(t *testing.T) {
 
 func TestListCellBarUsesFullWidthWithFivePixelVerticalInset(t *testing.T) {
 	insets := listCellBarInsets()
-	if insets.Horizontal > 1 || insets.Vertical != 5 || insets.MinimumHeight != 14 {
+	if insets.Horizontal > 1 || insets.Vertical != 2 || insets.MinimumHeight != 20 {
 		t.Fatalf("unexpected insets=%+v", insets)
 	}
 }

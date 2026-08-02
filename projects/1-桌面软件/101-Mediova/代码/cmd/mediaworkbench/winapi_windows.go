@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	WM_NULL                      = 0x0000
 	WM_CREATE                    = 0x0001
 	WM_DESTROY                   = 0x0002
 	WM_SIZE                      = 0x0005
@@ -154,6 +155,7 @@ const (
 	TBM_SETRANGE                 = WM_USER + 6
 	TBM_SETPOS                   = WM_USER + 5
 	TBM_SETTICFREQ               = WM_USER + 20
+	CB_GETCOUNT                  = 0x0146
 	CB_ADDSTRING                 = 0x0143
 	CB_GETCURSEL                 = 0x0147
 	CB_SETCURSEL                 = 0x014E
@@ -291,6 +293,7 @@ var (
 	procGetDpiForWindow               = user32.NewProc("GetDpiForWindow")
 	procCreateMenu                    = user32.NewProc("CreateMenu")
 	procCreatePopupMenu               = user32.NewProc("CreatePopupMenu")
+	procDestroyMenu                   = user32.NewProc("DestroyMenu")
 	procAppendMenuW                   = user32.NewProc("AppendMenuW")
 	procSetMenu                       = user32.NewProc("SetMenu")
 	procDrawMenuBar                   = user32.NewProc("DrawMenuBar")
