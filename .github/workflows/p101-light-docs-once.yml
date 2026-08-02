@@ -18,17 +18,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout latest p101-exp
+      - name: Checkout main tooling
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: tooling
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout latest p101-exp worktree
         uses: actions/checkout@v4
         with:
           ref: p101-exp
           fetch-depth: 0
+          path: work
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Apply exact documentation changes
-        run: python .github/scripts/p101_light_docs.py
+        working-directory: work
+        run: python ../tooling/.github/scripts/p101_light_docs.py
 
       - name: Verify P101-only scope and push
+        working-directory: work
         shell: bash
         run: |
           set -euo pipefail
