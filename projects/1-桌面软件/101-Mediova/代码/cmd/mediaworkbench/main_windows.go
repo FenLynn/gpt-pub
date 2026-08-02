@@ -30,7 +30,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const appVersion = "4.0.0"
+const appVersion = "4.1.0"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -54,6 +54,7 @@ const (
 	IDC_FILTER                = 1022
 	IDC_OUTPUT_EDIT           = 1030
 	IDC_OUTPUT_BROWSE         = 1031
+	IDC_OUTPUT_PICK           = 1032
 	IDC_RESOLUTION            = 1040
 	IDC_CODEC                 = 1041
 	IDC_QUALITY               = 1042
@@ -219,7 +220,7 @@ type application struct {
 	hSearch, hFilter, hList, hToolbarDivider, hHeaderLine                                                                                                                      uintptr
 	hRightTitle, hTaskRes, hTaskCodec, hTaskQuality, hTaskVolume, hTaskRotation, hTaskApply, hTaskDefault, hPreview, hTrimCrop, hSingleOutput, hRetry, hDetails, hDetailsFrame uintptr
 	rightLabels, globalLabels                                                                                                                                                  []uintptr
-	hOutputEdit, hOutputBrowse, hResolution, hCodec, hQuality, hSpeedMode, hVolume, hRotation, hApplySelected, hAllDefault, hSmartPlan                                         uintptr
+	hOutputEdit, hOutputBrowse, hOutputPick, hResolution, hCodec, hQuality, hSpeedMode, hVolume, hRotation, hApplySelected, hAllDefault, hSmartPlan                            uintptr
 	hProgress, hProgressText, hStatusText, hStart, hPause, hStop                                                                                                               uintptr
 	hFFStatus, hGPUStatus, hPotStatus, hConcurrencyStatus, hRightToggle                                                                                                        uintptr
 	hImageList                                                                                                                                                                 uintptr
@@ -247,6 +248,8 @@ type application struct {
 	overallProgress     float64
 	overallText         string
 	overallPaused       bool
+	hoverControl        uintptr
+	runtimeNotice       string
 
 	runMu                 sync.Mutex
 	running, paused       bool
@@ -388,9 +391,9 @@ func main() {
 	uiFont = createUIFont("Microsoft YaHei UI", -16, 400)
 	uiFontBold = createUIFont("Microsoft YaHei UI", -16, 550)
 	uiFontTitle = createUIFont("Microsoft YaHei UI", -18, 600)
-	iconFont = createUIFont("Segoe MDL2 Assets", -24, 400)
-	uiCanvasBrush, _, _ = procCreateSolidBrush.Call(colorRef(248, 250, 252))
-	uiSurfaceBrush, _, _ = procCreateSolidBrush.Call(colorRef(255, 255, 255))
+	iconFont = createUIFont("Segoe MDL2 Assets", -20, 400)
+	uiCanvasBrush, _, _ = procCreateSolidBrush.Call(colorRef(250, 251, 253))
+	uiSurfaceBrush, _, _ = procCreateSolidBrush.Call(colorRef(250, 251, 253))
 	writeStartupStage("fonts_created")
 	defer func() {
 		for _, f := range []uintptr{uiFontSmall, uiFont, uiFontBold, uiFontTitle, iconFont, uiCanvasBrush, uiSurfaceBrush} {
@@ -403,11 +406,13 @@ func main() {
 	procInitCommonControlsEx.Call(uintptr(unsafe.Pointer(&icc)))
 	writeStartupStage("common_controls_initialized")
 	config.MigrateLegacyTransientData()
+	runtimeMigrated, runtimeMigrationErr := config.MigrateLegacyRuntimeComponents()
 	selfTest, selfTestOutput := parseSelfTestArgs(os.Args[1:])
 	uiPreview := parseUIPreviewArgs(os.Args[1:])
 	settings := config.Load()
-	if settings.UILayoutRevision < 394 {
-		settings.UILayoutRevision = 394
+	settings.FFmpegPath = config.NormalizeConfiguredFFmpegPath(settings.FFmpegPath)
+	if settings.UILayoutRevision < 410 {
+		settings.UILayoutRevision = 410
 		settings.RightPanelVisible = true
 		settings.ShowPerformanceStats = false
 		settings.TaskColumnWidths = nil
@@ -425,6 +430,11 @@ func main() {
 		settings.OpenOutputOnDone = false
 	}
 	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
+	if runtimeMigrationErr != nil {
+		app.runtimeNotice = "旧 FFmpeg 组件未能复制到 Runtime，已保留旧位置继续兼容：" + short(runtimeMigrationErr.Error(), 160)
+	} else if runtimeMigrated {
+		app.runtimeNotice = "旧 FFmpeg 组件已安全复制到透明 Runtime；旧组件仍保留。"
+	}
 	app.pauseCond = sync.NewCond(&app.runMu)
 	app.startBackgroundWorkers()
 	app.nextID.Store(time.Now().UnixNano())
@@ -433,7 +443,7 @@ func main() {
 	app.player, app.playerOK, _ = media.DetectPotPlayer(app.settings.PlayerPath)
 	writeStartupStage("components_discovered")
 	hInst, _, _ := procGetModuleHandleW.Call(0)
-	className := p("MediovaDesktop400")
+	className := p("MediovaDesktop410")
 	app.hIcon = loadEmbeddedIcon()
 	if r, _, _ := procRegisterWindowMessageW.Call(uintptr(unsafe.Pointer(p("TaskbarCreated")))); r != 0 {
 		taskbarCreatedMessage = uint32(r)
@@ -623,7 +633,11 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 			// Deliberately do not run FFmpeg encoder/decoder or GPU detection here.
 			// The main window must become usable immediately even when a bundled
 			// FFmpeg build or graphics driver is broken. Detection is manual only.
-			setText(app.hStatusText, fmt.Sprintf("就绪。检测到 %d 个逻辑处理器，并发上限 %d；启动时未运行编码器、解码器或 GPU 测试。", config.LogicalProcessorCount(), config.MaxConcurrency()))
+			readyText := fmt.Sprintf("就绪。检测到 %d 个逻辑处理器，并发上限 %d；启动时未运行编码器、解码器或 GPU 测试。", config.LogicalProcessorCount(), config.MaxConcurrency())
+			if app.runtimeNotice != "" {
+				readyText += " " + app.runtimeNotice
+			}
+			setText(app.hStatusText, readyText)
 			app.updateComponentStatus()
 		}
 		writeStartupStage("wm_create_done")
@@ -656,6 +670,8 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 	case WM_SIZE:
 		app.layout(int32(loWord(lParam)), int32(hiWord(lParam)))
 		return 0
+	case WM_SETCURSOR:
+		app.updateHoverControl(wParam)
 	case WM_COMMAND:
 		app.command(int(loWord(wParam)))
 		return 0
@@ -665,6 +681,11 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		dis := (*drawItemStruct)(unsafe.Pointer(lParam))
 		if app.drawOverallProgress(dis) || app.drawDecoration(dis) || app.drawPrimaryButton(dis) || app.drawToolbarButton(dis) || app.drawSecondaryButton(dis) || app.drawStatusChip(dis) {
 			return 1
+		}
+	case WM_CTLCOLOREDIT:
+		procSetTextColor.Call(wParam, colorRef(45, 55, 69))
+		if uiSurfaceBrush != 0 {
+			return uiSurfaceBrush
 		}
 	case WM_CTLCOLORSTATIC:
 		color := colorRef(55, 65, 81)
@@ -812,6 +833,45 @@ func (a *application) toolbarButtonSpec(hwnd uintptr) (icon, label string, activ
 	}
 }
 
+func (a *application) isHoverableControl(hwnd uintptr) bool {
+	if a == nil || hwnd == 0 {
+		return false
+	}
+	switch hwnd {
+	case a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear,
+		a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir,
+		a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle,
+		a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry,
+		a.hOutputBrowse, a.hOutputPick, a.hApplySelected, a.hAllDefault, a.hSmartPlan,
+		a.hStart, a.hPause, a.hStop:
+		return true
+	default:
+		return false
+	}
+}
+
+func (a *application) updateHoverControl(hwnd uintptr) {
+	next := uintptr(0)
+	if a.isHoverableControl(hwnd) {
+		next = hwnd
+	}
+	if next == a.hoverControl {
+		return
+	}
+	old := a.hoverControl
+	a.hoverControl = next
+	if old != 0 {
+		procInvalidateRect.Call(old, 0, 1)
+	}
+	if next != 0 {
+		procInvalidateRect.Call(next, 0, 1)
+	}
+}
+
+func (a *application) hovered(hwnd uintptr) bool {
+	return a != nil && hwnd != 0 && a.hoverControl == hwnd
+}
+
 func drawCenteredText(hdc uintptr, text string, rc rect, font, color uintptr) {
 	old, _, _ := procSelectObject.Call(hdc, font)
 	procSetBkMode.Call(hdc, TRANSPARENT)
@@ -894,22 +954,31 @@ func (a *application) drawToolbarGlyph(hdc, hwnd uintptr, rc rect, color uintptr
 }
 
 func (a *application) drawPrimaryButton(dis *drawItemStruct) bool {
-	if dis == nil || dis.HwndItem != a.hStart {
+	if dis == nil || (dis.HwndItem != a.hStart && dis.HwndItem != a.hPause && dis.HwndItem != a.hStop) {
 		return false
 	}
 	pressed := dis.ItemState&ODS_SELECTED != 0
 	disabled := dis.ItemState&ODS_DISABLED != 0
-	bg := colorRef(31, 111, 213)
-	border := colorRef(23, 96, 190)
+	hovered := a.hovered(dis.HwndItem)
+	bg, border := colorRef(31, 111, 213), colorRef(23, 96, 190)
+	if dis.HwndItem == a.hPause {
+		bg, border = colorRef(218, 143, 28), colorRef(191, 119, 18)
+	} else if dis.HwndItem == a.hStop {
+		bg, border = colorRef(202, 73, 67), colorRef(176, 57, 52)
+	}
 	textColor := colorRef(255, 255, 255)
-	if pressed {
-		bg = colorRef(23, 91, 181)
+	if hovered && !disabled {
+		bg = mixColor(bg, colorRef(255, 255, 255), .10)
+		border = mixColor(border, colorRef(255, 255, 255), .06)
+	}
+	if pressed && !disabled {
+		bg = mixColor(bg, colorRef(0, 0, 0), .13)
 		border = bg
 	}
 	if disabled {
-		bg = colorRef(241, 244, 248)
-		border = colorRef(222, 227, 234)
-		textColor = colorRef(156, 164, 176)
+		bg = colorRef(232, 235, 240)
+		border = colorRef(218, 223, 230)
+		textColor = colorRef(145, 153, 164)
 	}
 	rc := dis.RcItem
 	brush, _, _ := procCreateSolidBrush.Call(bg)
@@ -922,15 +991,20 @@ func (a *application) drawPrimaryButton(dis *drawItemStruct) bool {
 	procDeleteObject.Call(brush)
 	procDeleteObject.Call(pen)
 
+	glyph := "\uE768"
+	if dis.HwndItem != a.hStart {
+		glyph = secondaryButtonGlyph(dis.HwndItem)
+	}
 	iconRC := rc
-	iconRC.Left += 10
-	iconRC.Right = iconRC.Left + 24
-	drawCenteredText(dis.HDC, "\uE768", iconRC, iconFont, textColor)
+	iconRC.Left += 9
+	iconRC.Right = iconRC.Left + 22
+	drawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
 	textRC := rc
 	textRC.Left += 22
-	drawCenteredText(dis.HDC, getText(a.hStart), textRC, uiFontBold, textColor)
+	drawCenteredText(dis.HDC, getText(dis.HwndItem), textRC, uiFontBold, textColor)
 	return true
 }
+
 func (a *application) drawToolbarButton(dis *drawItemStruct) bool {
 	if dis == nil {
 		return false
@@ -941,58 +1015,57 @@ func (a *application) drawToolbarButton(dis *drawItemStruct) bool {
 	}
 	pressed := dis.ItemState&ODS_SELECTED != 0
 	disabled := dis.ItemState&ODS_DISABLED != 0
+	hovered := a.hovered(dis.HwndItem)
 
-	bg := colorRef(255, 255, 255)
-	iconColor := colorRef(38, 50, 67)
-	textColor := colorRef(42, 52, 66)
-	border := colorRef(223, 228, 235)
+	bg := colorRef(250, 251, 253)
+	iconColor := colorRef(45, 55, 69)
+	textColor := colorRef(48, 58, 72)
+	border := colorRef(231, 235, 240)
+	if hovered && !disabled {
+		bg = colorRef(242, 247, 253)
+		border = colorRef(164, 192, 225)
+	}
 	if active {
+		bg = colorRef(239, 246, 255)
 		iconColor = colorRef(23, 101, 190)
 		textColor = colorRef(19, 91, 177)
-		border = colorRef(105, 157, 222)
+		border = colorRef(118, 164, 220)
 	}
-	if pressed {
-		bg = colorRef(234, 243, 254)
-		border = colorRef(126, 171, 228)
+	if pressed && !disabled {
+		bg = colorRef(229, 240, 253)
+		border = colorRef(105, 151, 208)
 	}
 	if disabled {
-		bg = colorRef(250, 251, 253)
-		border = colorRef(235, 238, 242)
 		iconColor = colorRef(170, 178, 188)
 		textColor = colorRef(155, 163, 174)
+		border = colorRef(239, 241, 244)
 	}
 
 	rc := dis.RcItem
-	fillSolid(dis.HDC, rc, bg)
-	if active || pressed {
-		drawRoundedBorder(dis.HDC, rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}, 6, border)
-	}
+	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	inner := rect{Left: rc.Left + 2, Top: rc.Top + 2, Right: rc.Right - 2, Bottom: rc.Bottom - 2}
+	withRoundedClip(dis.HDC, inner, 6, func() { fillSolid(dis.HDC, inner, bg) })
+	drawRoundedBorder(dis.HDC, inner, 6, border)
 	buttonW := rc.Right - rc.Left
-	if buttonW < 58 {
+	if buttonW < 56 {
 		drawCenteredText(dis.HDC, icon, rc, iconFont, iconColor)
 	} else {
 		iconRC := rc
-		iconRC.Top += 4
-		iconRC.Bottom = iconRC.Top + 27
+		iconRC.Top += 6
+		iconRC.Bottom = iconRC.Top + 22
 		drawCenteredText(dis.HDC, icon, iconRC, iconFont, iconColor)
 		labelRC := rc
-		labelRC.Top += 29
-		labelRC.Bottom -= 2
+		labelRC.Top += 27
+		labelRC.Bottom -= 4
 		drawCenteredText(dis.HDC, label, labelRC, uiFontSmall, textColor)
-	}
-	if active && !disabled {
-		inset := int32(16)
-		if buttonW < 58 {
-			inset = 9
-		}
-		fillSolid(dis.HDC, rect{Left: rc.Left + inset, Top: rc.Bottom - 3, Right: rc.Right - inset, Bottom: rc.Bottom - 1}, colorRef(35, 108, 203))
 	}
 	return true
 }
+
 func (a *application) secondaryButtonKind(hwnd uintptr) (string, bool) {
 	switch hwnd {
 	case a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry,
-		a.hOutputBrowse, a.hApplySelected, a.hAllDefault, a.hSmartPlan, a.hPause, a.hStop, a.hRightToggle:
+		a.hOutputBrowse, a.hOutputPick, a.hApplySelected, a.hAllDefault, a.hSmartPlan, a.hPause, a.hStop, a.hRightToggle:
 		return getText(hwnd), true
 	default:
 		return "", false
@@ -1038,7 +1111,7 @@ func secondaryButtonGlyph(hwnd uintptr) string {
 		return ""
 	}
 	switch hwnd {
-	case app.hOutputBrowse:
+	case app.hOutputBrowse, app.hOutputPick:
 		return "\uE838" // OpenFolder
 	case app.hPause:
 		if strings.Contains(getText(app.hPause), "继续") {
@@ -1066,7 +1139,7 @@ func secondaryButtonGlyph(hwnd uintptr) string {
 }
 
 func (a *application) drawSecondaryButton(dis *drawItemStruct) bool {
-	if dis == nil || dis.HwndItem == a.hStart {
+	if dis == nil || dis.HwndItem == a.hStart || dis.HwndItem == a.hPause || dis.HwndItem == a.hStop {
 		return false
 	}
 	label, ok := a.secondaryButtonKind(dis.HwndItem)
@@ -1075,37 +1148,44 @@ func (a *application) drawSecondaryButton(dis *drawItemStruct) bool {
 	}
 	pressed := dis.ItemState&ODS_SELECTED != 0
 	disabled := dis.ItemState&ODS_DISABLED != 0
-	bg := colorRef(255, 255, 255)
-	border := colorRef(212, 219, 228)
+	hovered := a.hovered(dis.HwndItem)
+	bg := colorRef(250, 251, 253)
+	border := colorRef(222, 227, 234)
 	textColor := colorRef(48, 58, 72)
-	if pressed {
-		bg = colorRef(236, 243, 252)
-		border = colorRef(169, 192, 221)
+	if hovered && !disabled {
+		bg = colorRef(241, 247, 254)
+		border = colorRef(160, 190, 225)
+	}
+	if pressed && !disabled {
+		bg = colorRef(229, 240, 253)
+		border = colorRef(126, 171, 228)
 	}
 	if disabled {
-		bg = colorRef(248, 250, 252)
-		border = colorRef(231, 235, 240)
+		border = colorRef(236, 239, 243)
 		textColor = colorRef(166, 174, 184)
 	}
 	rc := dis.RcItem
-	fillSolid(dis.HDC, rc, bg)
-	drawRoundedBorder(dis.HDC, rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}, 6, border)
+	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	inner := rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}
+	withRoundedClip(dis.HDC, inner, 6, func() { fillSolid(dis.HDC, inner, bg) })
+	drawRoundedBorder(dis.HDC, inner, 6, border)
 	if dis.HwndItem == a.hRightToggle {
 		drawChevron(dis.HDC, rc, !a.rightVisible, textColor)
 		return true
 	}
 	glyph := secondaryButtonGlyph(dis.HwndItem)
 	textRC := rc
-	if glyph != "" {
+	if glyph != "" && rc.Right-rc.Left >= 72 {
 		iconRC := rc
 		iconRC.Left += 7
-		iconRC.Right = iconRC.Left + 24
+		iconRC.Right = iconRC.Left + 21
 		drawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
-		textRC.Left += 21
+		textRC.Left += 20
 	}
 	drawCenteredText(dis.HDC, label, textRC, uiFontSmall, textColor)
 	return true
 }
+
 func colorParts(c uintptr) (uint8, uint8, uint8) {
 	return uint8(c & 0xff), uint8((c >> 8) & 0xff), uint8((c >> 16) & 0xff)
 }
@@ -1176,30 +1256,23 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 		return false
 	}
 	rc := dis.RcItem
-	bar := rect{Left: rc.Left + 1, Top: rc.Top + 2, Right: rc.Right - 1, Bottom: rc.Bottom - 2}
-	fraction := a.overallProgress / 100
-	if fraction < 0 {
-		fraction = 0
-	}
-	if fraction > 1 {
-		fraction = 1
-	}
-	withRoundedClip(dis.HDC, bar, 8, func() {
-		drawHorizontalGradient(dis.HDC, bar, colorRef(247, 249, 252), colorRef(226, 232, 240))
+	bar := rect{Left: rc.Left + 1, Top: rc.Top + 3, Right: rc.Right - 1, Bottom: rc.Bottom - 3}
+	fraction := clamp01(a.overallProgress / 100)
+	withRoundedClip(dis.HDC, bar, 7, func() {
+		fillSolid(dis.HDC, bar, colorRef(243, 246, 250))
 		if fraction > 0 {
 			fill := bar
 			fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
-			if fill.Right < fill.Left+5 {
-				fill.Right = fill.Left + 5
+			if fill.Right < fill.Left+4 {
+				fill.Right = fill.Left + 4
 			}
 			if a.overallPaused {
-				drawHorizontalGradient(dis.HDC, fill, colorRef(255, 218, 147), colorRef(232, 164, 52))
+				drawHorizontalGradient(dis.HDC, fill, colorRef(255, 225, 168), colorRef(226, 156, 40))
 			} else {
-				drawHorizontalGradient(dis.HDC, fill, colorRef(112, 174, 247), colorRef(50, 117, 221))
+				drawHorizontalGradient(dis.HDC, fill, colorRef(142, 190, 245), colorRef(55, 121, 215))
 			}
 		}
 	})
-	drawRoundedBorder(dis.HDC, bar, 8, colorRef(218, 224, 232))
 	drawCenteredText(dis.HDC, a.overallText, bar, uiFontSmall, colorRef(42, 54, 70))
 	return true
 }
@@ -1210,15 +1283,13 @@ func (a *application) drawDecoration(dis *drawItemStruct) bool {
 	}
 	switch dis.HwndItem {
 	case a.hToolbarDivider:
-		fillSolid(dis.HDC, dis.RcItem, colorRef(218, 223, 230))
+		fillSolid(dis.HDC, dis.RcItem, colorRef(235, 238, 242))
 		return true
 	case a.hHeaderLine:
-		fillSolid(dis.HDC, dis.RcItem, colorRef(194, 202, 213))
+		fillSolid(dis.HDC, dis.RcItem, colorRef(226, 230, 236))
 		return true
 	case a.hDetailsFrame:
-		rc := dis.RcItem
-		fillSolid(dis.HDC, rc, colorRef(252, 253, 254))
-		drawRoundedBorder(dis.HDC, rect{Left: rc.Left, Top: rc.Top, Right: rc.Right - 1, Bottom: rc.Bottom - 1}, 7, colorRef(222, 227, 234))
+		fillSolid(dis.HDC, dis.RcItem, colorRef(250, 251, 253))
 		return true
 	}
 	return false
@@ -1302,20 +1373,31 @@ func (a *application) drawStatusChip(dis *drawItemStruct) bool {
 	}
 	rc := dis.RcItem
 	pressed := dis.ItemState&ODS_SELECTED != 0
-	bg := colorRef(255, 255, 255)
+	hovered := a.hovered(dis.HwndItem)
+	bg := colorRef(250, 251, 253)
+	if hovered {
+		bg = colorRef(241, 247, 254)
+	}
 	if pressed {
-		bg = colorRef(236, 244, 254)
+		bg = colorRef(229, 240, 253)
 	}
 	fillSolid(dis.HDC, rc, bg)
-	if pressed || dis.HwndItem == a.hConcurrencyStatus {
-		drawRoundedBorder(dis.HDC, rect{Left: rc.Left, Top: rc.Top, Right: rc.Right - 1, Bottom: rc.Bottom - 1}, 5, colorRef(224, 229, 236))
+	if hovered || pressed {
+		drawRoundedBorder(dis.HDC, rect{Left: rc.Left, Top: rc.Top, Right: rc.Right - 1, Bottom: rc.Bottom - 1}, 5, colorRef(217, 224, 233))
 	}
-	chipW := rc.Right - rc.Left
-	dotRC := rc
-	dotRC.Left += 3
-	dotRC.Right = dotRC.Left + 20
-	drawCenteredText(dis.HDC, "●", dotRC, uiFontTitle, dot)
-	if chipW < 72 {
+	diameter := int32(10)
+	dotLeft := rc.Left + 7
+	dotTop := (rc.Top + rc.Bottom - diameter) / 2
+	brush, _, _ := procCreateSolidBrush.Call(dot)
+	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
+	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, dot)
+	oldPen, _, _ := procSelectObject.Call(dis.HDC, pen)
+	procEllipse.Call(dis.HDC, uintptr(dotLeft), uintptr(dotTop), uintptr(dotLeft+diameter), uintptr(dotTop+diameter))
+	procSelectObject.Call(dis.HDC, oldPen)
+	procSelectObject.Call(dis.HDC, oldBrush)
+	procDeleteObject.Call(pen)
+	procDeleteObject.Call(brush)
+	if rc.Right-rc.Left < 72 {
 		switch dis.HwndItem {
 		case a.hFFStatus:
 			text = "FF"
@@ -1337,6 +1419,7 @@ func (a *application) drawStatusChip(dis *drawItemStruct) bool {
 	}
 	return true
 }
+
 func (a *application) statusTextColor(hwnd uintptr) (uintptr, bool) {
 	ffmpeg, _, hardware, _, playerOK := a.componentSnapshot()
 	switch hwnd {
@@ -1605,7 +1688,7 @@ func (a *application) initControls() {
 	a.hSourceDir = createControl("BUTTON", "源目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 660, 8, 76, 50, a.hwnd, IDC_SOURCE_DIR)
 	a.hOutputDir = createControl("BUTTON", "输出目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 742, 8, 82, 50, a.hwnd, IDC_OUTPUT_DIR)
 
-	a.hSearch = createControlEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_AUTOHSCROLL, 930, 18, 320, 30, a.hwnd, IDC_SEARCH)
+	a.hSearch = createControlEx(0, "EDIT", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL, 930, 18, 320, 30, a.hwnd, IDC_SEARCH)
 	procSetWindowTheme.Call(a.hSearch, uintptr(unsafe.Pointer(p("Explorer"))), 0)
 	send(a.hSearch, EM_SETCUEBANNER, 1, uintptr(unsafe.Pointer(p("搜索文件名、路径或状态"))))
 	a.hFilter = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL, 1260, 17, 126, 220, a.hwnd, IDC_FILTER)
@@ -1682,11 +1765,12 @@ func (a *application) initControls() {
 	send(a.hDetails, EM_SETMARGINS, EC_LEFTMARGIN|EC_RIGHTMARGIN, uintptr(8|(8<<16)))
 
 	// Bottom control strip mirrors v2.8.4: one output row, one progress row, one status row.
-	a.hOutputBrowse = createControl("BUTTON", "输出目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 8, 730, 108, 32, a.hwnd, IDC_OUTPUT_BROWSE)
-	a.hOutputEdit = createControlEx(WS_EX_CLIENTEDGE, "EDIT", a.settings.OutputDir, WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_AUTOHSCROLL, 122, 730, 600, 32, a.hwnd, IDC_OUTPUT_EDIT)
+	a.hOutputBrowse = createControl("BUTTON", "输出母目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 8, 730, 116, 32, a.hwnd, IDC_OUTPUT_BROWSE)
+	a.hOutputEdit = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWN|CBS_AUTOHSCROLL|WS_VSCROLL, 130, 730, 560, 240, a.hwnd, IDC_OUTPUT_EDIT)
+	a.hOutputPick = createControl("BUTTON", "浏览…", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 696, 730, 72, 32, a.hwnd, IDC_OUTPUT_PICK)
 	send(a.hOutputEdit, WM_SETFONT, uiFont, 1)
-	send(a.hOutputEdit, EM_SETMARGINS, EC_LEFTMARGIN|EC_RIGHTMARGIN, uintptr(7|(7<<16)))
 	procSetWindowTheme.Call(a.hOutputEdit, uintptr(unsafe.Pointer(p("Explorer"))), 0)
+	a.refreshOutputHistory()
 	for _, text := range []string{"输出", "格式", "质量", "体积", "旋转"} {
 		h := createControl("STATIC", text, WS_CHILD|WS_VISIBLE|SS_CENTER, 0, 0, 34, 28, a.hwnd, 0)
 		send(h, WM_SETFONT, uiFontSmall, 1)
@@ -1785,7 +1869,7 @@ func (a *application) recreateFontsForDPI() {
 	uiFont = createUIFont("Microsoft YaHei UI", -16, 400)
 	uiFontBold = createUIFont("Microsoft YaHei UI", -16, 550)
 	uiFontTitle = createUIFont("Microsoft YaHei UI", -18, 600)
-	iconFont = createUIFont("Segoe MDL2 Assets", -24, 400)
+	iconFont = createUIFont("Segoe MDL2 Assets", -20, 400)
 	for _, h := range old {
 		if h != 0 {
 			procDeleteObject.Call(h)
@@ -1794,7 +1878,7 @@ func (a *application) recreateFontsForDPI() {
 	if a == nil || !a.controlsReady {
 		return
 	}
-	all := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hSearch, a.hFilter, a.hList, a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle, a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation, a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry, a.hDetails, a.hOutputEdit, a.hOutputBrowse, a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation, a.hApplySelected, a.hAllDefault, a.hSmartPlan, a.hStatusText, a.hStart, a.hPause, a.hStop}
+	all := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hSearch, a.hFilter, a.hList, a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle, a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation, a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry, a.hDetails, a.hOutputEdit, a.hOutputBrowse, a.hOutputPick, a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation, a.hApplySelected, a.hAllDefault, a.hSmartPlan, a.hStatusText, a.hStart, a.hPause, a.hStop}
 	for _, h := range all {
 		if h != 0 {
 			send(h, WM_SETFONT, uiFont, 1)
@@ -1895,10 +1979,11 @@ func (a *application) validateCurrentLayout(clientW, clientH int32) error {
 			return fmt.Errorf("action outside client: %+v", r)
 		}
 	}
-	browse, browseOK := childClientRect(a.hOutputBrowse, a.hwnd)
+	openButton, openOK := childClientRect(a.hOutputBrowse, a.hwnd)
 	edit, editOK := childClientRect(a.hOutputEdit, a.hwnd)
-	if !browseOK || !editOK || rectsOverlap(browse, edit) || browse.Right > edit.Left {
-		return fmt.Errorf("output directory controls overlap: browse=%+v edit=%+v", browse, edit)
+	pickButton, pickOK := childClientRect(a.hOutputPick, a.hwnd)
+	if !openOK || !editOK || !pickOK || rectsOverlap(openButton, edit) || rectsOverlap(edit, pickButton) || openButton.Right > edit.Left || edit.Right > pickButton.Left {
+		return fmt.Errorf("output mother directory controls overlap: open=%+v edit=%+v pick=%+v", openButton, edit, pickButton)
 	}
 	return nil
 }
@@ -1947,11 +2032,11 @@ type topBand struct {
 func topBandForWidth(w int32) topBand {
 	switch {
 	case w >= 1500:
-		return topBand{[]int32{92, 92, 84, 94, 66, 66, 66, 66, 80, 86}, 5, 300, 122, 206, 24}
+		return topBand{[]int32{92, 92, 84, 94, 66, 66, 66, 66, 80, 86}, 7, 290, 122, 206, 24}
 	case w >= 1320:
-		return topBand{[]int32{82, 82, 72, 80, 58, 58, 58, 58, 68, 72}, 4, 220, 104, 184, 24}
+		return topBand{[]int32{82, 82, 72, 80, 58, 58, 58, 58, 68, 72}, 6, 210, 104, 184, 24}
 	case w >= 1120:
-		return topBand{[]int32{66, 66, 56, 60, 48, 48, 48, 48, 54, 56}, 3, 170, 96, 168, 23}
+		return topBand{[]int32{66, 66, 56, 60, 48, 48, 48, 48, 54, 56}, 4, 160, 96, 168, 23}
 	default:
 		return topBand{[]int32{48, 48, 42, 42, 40, 40, 40, 40, 42, 42}, 2, 120, 82, 142, 22}
 	}
@@ -1991,20 +2076,20 @@ func (a *application) layout(w, h int32) {
 	toolHandles := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir}
 	xTool := int32(8)
 	for i, control := range toolHandles {
-		move(control, xTool, 6, band.toolWidths[i], 56)
+		move(control, xTool, 7, band.toolWidths[i], 54)
 		xTool += band.toolWidths[i] + band.toolGap
 		if i == 1 {
-			move(a.hToolbarDivider, xTool, 13, 1, 42)
+			move(a.hToolbarDivider, xTool, 15, 1, 38)
 			xTool += 6
 		}
 	}
 
-	toggleW := int32(32)
+	toggleW := int32(26)
 	if w < 1120 {
-		toggleW = 28
+		toggleW = 24
 	}
 	toggleX := w - 8 - toggleW
-	move(a.hRightToggle, toggleX, 7, toggleW, 53)
+	move(a.hRightToggle, toggleX, 18, toggleW, 30)
 	gridGap := int32(4)
 	gridX := toggleX - 7 - band.statusGridW
 	cellW := (band.statusGridW - gridGap) / 2
@@ -2101,8 +2186,9 @@ func (a *application) layout(w, h int32) {
 	show(a.hSmartPlan, simple)
 
 	if compactBottom {
-		move(a.hOutputBrowse, 8, barY, 110, 32)
-		move(a.hOutputEdit, 126, barY, w-134, 32)
+		move(a.hOutputBrowse, 8, barY, 116, 32)
+		move(a.hOutputEdit, 130, barY, w-216, 32)
+		move(a.hOutputPick, w-78, barY, 70, 32)
 		x := int32(8)
 		row2 := barY + 38
 		if simple {
@@ -2117,7 +2203,7 @@ func (a *application) layout(w, h int32) {
 			pairs := []struct {
 				label, combo uintptr
 				wd           int32
-			}{{a.globalLabels[0], a.hResolution, 88}, {a.globalLabels[1], a.hCodec, 82}, {a.globalLabels[2], a.hQuality, 58}, {a.globalLabels[3], a.hVolume, 112}, {a.globalLabels[4], a.hRotation, 92}}
+			}{{a.globalLabels[0], a.hResolution, 92}, {a.globalLabels[1], a.hCodec, 82}, {a.globalLabels[2], a.hQuality, 68}, {a.globalLabels[3], a.hVolume, 122}, {a.globalLabels[4], a.hRotation, 100}}
 			for _, pair := range pairs {
 				move(pair.label, x, row2+4, 38, 24)
 				x += 38
@@ -2134,17 +2220,18 @@ func (a *application) layout(w, h int32) {
 		move(a.hPause, w-200, barY+107, 88, 38)
 		move(a.hStop, w-104, barY+107, 88, 38)
 	} else {
-		move(a.hOutputBrowse, 8, barY, 110, 32)
-		fixed := int32(38 + 94 + 7 + 34 + 86 + 7 + 34 + 62 + 7 + 34 + 124 + 7 + 34 + 100 + 8 + 122 + 8 + 146)
-		editW := w - 8 - 110 - 8 - fixed - 8
+		move(a.hOutputBrowse, 8, barY, 116, 32)
+		fixed := int32(38 + 92 + 7 + 34 + 82 + 7 + 34 + 68 + 7 + 34 + 132 + 7 + 34 + 104 + 8 + 122 + 8 + 146)
+		editW := w - 8 - 116 - 6 - 72 - 8 - fixed - 8
 		if simple {
-			editW = w - 8 - 110 - 8 - (106 + 7 + 92 + 7 + 122) - 8
+			editW = w - 8 - 116 - 6 - 72 - 8 - (106 + 7 + 92 + 7 + 122) - 8
 		}
-		if editW < 260 {
-			editW = 260
+		if editW < 210 {
+			editW = 210
 		}
-		move(a.hOutputEdit, 126, barY, editW, 32)
-		x := int32(134) + editW
+		move(a.hOutputEdit, 130, barY, editW, 32)
+		move(a.hOutputPick, 136+editW, barY, 72, 32)
+		x := int32(216) + editW
 		if simple {
 			for _, item := range []struct {
 				h  uintptr
@@ -2157,7 +2244,7 @@ func (a *application) layout(w, h int32) {
 			pairs := []struct {
 				label, combo   uintptr
 				labelW, comboW int32
-			}{{a.globalLabels[0], a.hResolution, 38, 94}, {a.globalLabels[1], a.hCodec, 34, 86}, {a.globalLabels[2], a.hQuality, 34, 62}, {a.globalLabels[3], a.hVolume, 34, 124}, {a.globalLabels[4], a.hRotation, 34, 100}}
+			}{{a.globalLabels[0], a.hResolution, 38, 92}, {a.globalLabels[1], a.hCodec, 34, 82}, {a.globalLabels[2], a.hQuality, 34, 68}, {a.globalLabels[3], a.hVolume, 34, 132}, {a.globalLabels[4], a.hRotation, 34, 104}}
 			for _, pair := range pairs {
 				move(pair.label, x, barY+4, pair.labelW, 24)
 				x += pair.labelW
@@ -2220,6 +2307,8 @@ func (a *application) command(id int) {
 	case IDC_OUTPUT_DIR, ID_FILE_OUTPUT, ID_CTX_OPEN_OUTPUT:
 		a.openSelectedDir(true)
 	case IDC_OUTPUT_BROWSE:
+		a.openOutputMotherDir()
+	case IDC_OUTPUT_PICK:
 		a.chooseFolder(false)
 	case IDC_START:
 		a.startQueue()
@@ -2426,7 +2515,7 @@ func (a *application) command(id int) {
 		a.saveSettings()
 	case ID_SET_PORTABLE_MODE:
 		current := config.PortableModeEnabled()
-		prompt := "确定启用便携模式？重启后配置、历史、缓存与 FFmpeg 将保存在 EXE 同目录的 MediovaData 中。"
+		prompt := "确定启用便携模式？重启后配置、历史与缓存将保存在 EXE 同目录的 MediovaData 中；FFmpeg 等运行组件仍位于透明 Runtime。"
 		if current {
 			prompt = "确定关闭便携模式？重启后将恢复使用 AppData 目录。当前便携数据不会删除。"
 		}
@@ -2515,7 +2604,7 @@ func (a *application) command(id int) {
 	case ID_HELP_DIAGNOSTICS:
 		a.writeDiagnostics()
 	case ID_HELP_ABOUT:
-		messageBox(a.hwnd, "关于", fmt.Sprintf("Mediova v%s\r\n\r\n基于 v2.8.4 功能与界面资料重建。\r\n支持视频转正、压缩、裁剪、目标体积、GPU 回退、图片压缩、PotPlayer 对比、历史与任务恢复。\r\n\r\n本机检测到 %d 个逻辑处理器；并行任务上限为 %d。自动模式会结合媒体类型、分辨率、时长、CPU/GPU与任务数量选择实际并发，不会盲目启动上限数量的 FFmpeg 进程。", appVersion, config.LogicalProcessorCount(), config.MaxConcurrency()), MB_OK|MB_ICONINFORMATION)
+		messageBox(a.hwnd, "关于", fmt.Sprintf("Mediova v%s\r\n\r\n采用透明 Runtime 与独立 Data 架构。\r\n支持视频转正、压缩、裁剪、目标体积、GPU 回退、图片压缩、PotPlayer 对比、历史与任务恢复。\r\n\r\n本机检测到 %d 个逻辑处理器；并行任务上限为 %d。自动模式会结合媒体类型、分辨率、时长、CPU/GPU与任务数量选择实际并发，不会盲目启动上限数量的 FFmpeg 进程。", appVersion, config.LogicalProcessorCount(), config.MaxConcurrency()), MB_OK|MB_ICONINFORMATION)
 	case ID_FILE_EXIT:
 		show(a.hwnd, false)
 		if !a.closeHintShown {
@@ -2669,8 +2758,52 @@ func (a *application) saveSettings() {
 	a.syncMenuChecks()
 	a.refreshList()
 }
+func (a *application) refreshOutputHistory() {
+	if a == nil || a.hOutputEdit == 0 {
+		return
+	}
+	current := strings.TrimSpace(getText(a.hOutputEdit))
+	if current == "" {
+		current = strings.TrimSpace(a.settings.OutputDir)
+	}
+	a.settings.RecentOutputDirs = rememberRecentDirectory(current, a.settings.RecentOutputDirs, 10)
+	send(a.hOutputEdit, CB_RESETCONTENT, 0, 0)
+	for _, path := range a.settings.RecentOutputDirs {
+		send(a.hOutputEdit, CB_ADDSTRING, 0, uintptr(unsafe.Pointer(p(path))))
+	}
+	setText(a.hOutputEdit, current)
+}
+
+func (a *application) rememberOutputDirectory(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+	a.settings.OutputDir = path
+	a.settings.LastOutputDir = path
+	a.settings.RecentOutputDirs = rememberRecentDirectory(path, a.settings.RecentOutputDirs, 10)
+}
+
+func (a *application) openOutputMotherDir() {
+	path := strings.TrimSpace(getText(a.hOutputEdit))
+	if path == "" {
+		path = strings.TrimSpace(a.settings.OutputDir)
+	}
+	if path == "" {
+		messageBox(a.hwnd, "输出母目录", "请先选择输出母目录。", MB_OK|MB_ICONINFORMATION)
+		return
+	}
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		messageBox(a.hwnd, "输出母目录", err.Error(), MB_OK|MB_ICONERROR)
+		return
+	}
+	a.rememberOutputDirectory(path)
+	_ = config.Save(a.settings)
+	shellOpen(path)
+}
+
 func (a *application) writeSettingsToUI() {
-	setText(a.hOutputEdit, a.settings.OutputDir)
+	a.refreshOutputHistory()
 	if a.currentKind == model.KindImage {
 		comboFill(a.hResolution, imageSizes(), a.settings.ImageSize)
 		comboFill(a.hCodec, []string{"JPG", "PNG"}, a.settings.ImageFormat)
@@ -2786,11 +2919,11 @@ func drawSelectedCell(hdc uintptr, rc rect, label string, active bool) {
 }
 
 func fullCellBarRect(rc rect) rect {
-	bar := rect{Left: rc.Left + 4, Top: rc.Top + 5, Right: rc.Right - 4, Bottom: rc.Bottom - 5}
-	if bar.Bottom-bar.Top < 18 {
+	bar := rect{Left: rc.Left + 2, Top: rc.Top + 5, Right: rc.Right - 2, Bottom: rc.Bottom - 5}
+	if bar.Bottom-bar.Top < 16 {
 		cy := (rc.Top + rc.Bottom) / 2
-		bar.Top = cy - 10
-		bar.Bottom = cy + 10
+		bar.Top = cy - 8
+		bar.Bottom = cy + 8
 	}
 	return bar
 }
@@ -2800,26 +2933,35 @@ func drawProgressPill(hdc uintptr, rc rect, fraction float64, label string, sele
 		drawSelectedCell(hdc, rc, label, active)
 		return
 	}
-	if fraction < 0 {
-		fraction = 0
-	}
-	if fraction > 1 {
-		fraction = 1
-	}
+	fraction = clamp01(fraction)
 	bar := fullCellBarRect(rc)
 	withRoundedClip(hdc, bar, 5, func() {
-		fillSolid(hdc, bar, colorRef(233, 239, 247))
+		fillSolid(hdc, bar, colorRef(244, 247, 250))
 		if fraction > 0 {
 			fill := bar
 			fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
 			if fill.Right < fill.Left+3 {
 				fill.Right = fill.Left + 3
 			}
-			drawHorizontalGradient(hdc, fill, colorRef(158, 198, 246), colorRef(76, 139, 224))
+			drawHorizontalGradient(hdc, fill, colorRef(165, 202, 244), colorRef(78, 140, 222))
 		}
 	})
-	drawRoundedBorder(hdc, bar, 5, colorRef(220, 227, 236))
 	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(39, 55, 78))
+}
+
+func compressionColorPair(visual compressionVisual) (uintptr, uintptr) {
+	switch visual.Tone {
+	case compressionYellow:
+		return colorRef(255, 239, 184), colorRef(232, 181, 52)
+	case compressionGreen:
+		return mixColor(colorRef(218, 244, 226), colorRef(165, 222, 182), visual.Intensity),
+			mixColor(colorRef(103, 190, 132), colorRef(32, 145, 78), visual.Intensity)
+	case compressionRed:
+		return mixColor(colorRef(255, 226, 222), colorRef(245, 176, 168), visual.Intensity),
+			mixColor(colorRef(224, 91, 82), colorRef(184, 43, 39), visual.Intensity)
+	default:
+		return colorRef(239, 243, 248), colorRef(221, 227, 235)
+	}
 }
 
 func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, selected, active bool) {
@@ -2830,12 +2972,11 @@ func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, s
 	bar := fullCellBarRect(rc)
 	withRoundedClip(hdc, bar, 5, func() {
 		if task == nil || task.InputSize <= 0 || task.OutputSize <= 0 {
-			fillSolid(hdc, bar, colorRef(239, 243, 248))
+			fillSolid(hdc, bar, colorRef(244, 247, 250))
 			return
 		}
-		total := float64(task.InputSize + task.OutputSize)
-		leftFraction := float64(task.InputSize) / total
-		split := bar.Left + int32(float64(bar.Right-bar.Left)*leftFraction)
+		visual := compressionVisualFor(task.InputSize, task.OutputSize)
+		split := bar.Left + int32(float64(bar.Right-bar.Left)*visual.InputFraction)
 		if split <= bar.Left {
 			split = bar.Left + 1
 		}
@@ -2846,19 +2987,13 @@ func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, s
 		left.Right = split
 		right := bar
 		right.Left = split
-		fillSolid(hdc, left, colorRef(232, 237, 244))
-		ratio := float64(task.OutputSize) / float64(task.InputSize)
-		start, finish := colorRef(205, 240, 216), colorRef(79, 177, 113)
-		if ratio > 1.10 {
-			start, finish = colorRef(255, 221, 216), colorRef(224, 89, 80)
-		} else if ratio >= .90 {
-			start, finish = colorRef(236, 239, 244), colorRef(187, 196, 208)
-		}
+		fillSolid(hdc, left, colorRef(238, 242, 247))
+		start, finish := compressionColorPair(visual)
 		drawHorizontalGradient(hdc, right, start, finish)
 	})
-	drawRoundedBorder(hdc, bar, 5, colorRef(220, 227, 236))
 	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(37, 52, 70))
 }
+
 func taskStatusColor(status model.Status) uintptr {
 	switch status {
 	case model.StatusProcessing:
@@ -3157,9 +3292,8 @@ func (a *application) chooseFolder(add bool) {
 		return
 	}
 	if !add {
-		setText(a.hOutputEdit, folder)
-		a.settings.OutputDir = folder
-		a.settings.LastOutputDir = folder
+		a.rememberOutputDirectory(folder)
+		a.refreshOutputHistory()
 		_ = config.Save(a.settings)
 		return
 	}
@@ -3238,7 +3372,7 @@ func (a *application) chooseFFmpegZip() {
 			a.componentMu.Unlock()
 			setText(a.hStatusText, "FFmpeg 组件导入完成。未自动测试编码器或 GPU。")
 			a.updateComponentStatus()
-			messageBox(a.hwnd, "导入 FFmpeg", "组件已安装到软件专用目录。为避免界面卡住，本次未自动运行编码器或 GPU 测试；需要时可从 FFmpeg 菜单手动测速。", MB_OK|MB_ICONINFORMATION)
+			messageBox(a.hwnd, "导入 FFmpeg", "组件已安装到 Mediova Runtime 的 Components\\FFmpeg 目录。为避免界面卡住，本次未自动运行编码器或 GPU 测试；需要时可从 FFmpeg 菜单手动测速。", MB_OK|MB_ICONINFORMATION)
 		})
 	}()
 }
@@ -4748,7 +4882,7 @@ func (a *application) readSettingsFromUI() {
 	a.settings.FFmpegPath = ffmpeg
 	a.settings.PlayerPath = player
 	if a.settings.OutputDir != "" {
-		a.settings.LastOutputDir = a.settings.OutputDir
+		a.rememberOutputDirectory(a.settings.OutputDir)
 	}
 	a.settings.TaskColumnWidths = a.currentTaskColumnWidths()
 	_ = config.Save(a.settings)
@@ -6061,7 +6195,10 @@ func (a *application) showFFmpegStatus() {
 	if ffmpeg != "" {
 		state = "正常"
 	}
-	messageBox(a.hwnd, "FFmpeg 组件", fmt.Sprintf("FFmpeg 组件状态：%s\r\n\r\nFFmpeg：\r\n%s\r\n\r\nFFprobe：\r\n%s\r\n\r\nGPU：%s", state, ffmpeg, ffprobe, hardware.Detail), MB_OK|MB_ICONINFORMATION)
+	runtimeDir, _ := config.RuntimeDir()
+	roamingDir, _ := config.Dir()
+	localDir, _ := config.LocalDir()
+	messageBox(a.hwnd, "FFmpeg 组件", fmt.Sprintf("FFmpeg 组件状态：%s\r\n\r\nRuntime：\r\n%s\r\n\r\nFFmpeg：\r\n%s\r\n\r\nFFprobe：\r\n%s\r\n\r\nRoaming Data：\r\n%s\r\n\r\nLocal Data：\r\n%s\r\n\r\nGPU：%s", state, runtimeDir, ffmpeg, ffprobe, roamingDir, localDir, hardware.Detail), MB_OK|MB_ICONINFORMATION)
 }
 func (a *application) showGPUStatus() {
 	_, _, hardware, _, _ := a.componentSnapshot()
@@ -6432,7 +6569,16 @@ func (a *application) writeDiagnostics() {
 	settingsJSON, _ := json.MarshalIndent(a.settings, "", "  ")
 	tasksJSON, _ := json.MarshalIndent(tasks, "", "  ")
 	ffmpeg, ffprobe, hardware, player, _ := a.componentSnapshot()
-	text := fmt.Sprintf("Mediova诊断报告\r\n生成时间：%s\r\n版本：%s\r\n系统：%s/%s\r\n逻辑处理器：%d\r\n\r\nFFmpeg：%s\r\nFFprobe：%s\r\nGPU：%s\r\nPotPlayer：%s\r\n\r\n配置：\r\n%s\r\n\r\n任务快照：\r\n%s\r\n", time.Now().Format("2006-01-02 15:04:05"), appVersion, runtime.GOOS, runtime.GOARCH, runtime.NumCPU(), ffmpeg, ffprobe, hardware.Detail, player, settingsJSON, tasksJSON)
+	runtimeDir, _ := config.RuntimeDir()
+	roamingDir, _ := config.Dir()
+	localDir, _ := config.LocalDir()
+	manifestState := "未验证"
+	if err := config.ValidateRuntimeManifest(appVersion); err == nil {
+		manifestState = "通过"
+	} else {
+		manifestState = err.Error()
+	}
+	text := fmt.Sprintf("Mediova诊断报告\r\n生成时间：%s\r\n版本：%s\r\n系统：%s/%s\r\n逻辑处理器：%d\r\nRuntime：%s\r\nRoaming Data：%s\r\nLocal Data：%s\r\nRuntime Manifest：%s\r\n\r\nFFmpeg：%s\r\nFFprobe：%s\r\nGPU：%s\r\nPotPlayer：%s\r\n\r\n配置：\r\n%s\r\n\r\n任务快照：\r\n%s\r\n", time.Now().Format("2006-01-02 15:04:05"), appVersion, runtime.GOOS, runtime.GOARCH, runtime.NumCPU(), runtimeDir, roamingDir, localDir, manifestState, ffmpeg, ffprobe, hardware.Detail, player, settingsJSON, tasksJSON)
 	if crashPath, e := config.CrashPath(); e == nil {
 		if b, e := os.ReadFile(crashPath); e == nil {
 			text += "\r\n最近崩溃记录：\r\n" + string(b) + "\r\n"
