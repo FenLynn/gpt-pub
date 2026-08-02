@@ -13,6 +13,7 @@ const (
 	WM_DESTROY                   = 0x0002
 	WM_SIZE                      = 0x0005
 	WM_GETMINMAXINFO             = 0x0024
+	WM_SETCURSOR                 = 0x0020
 	WM_DPICHANGED                = 0x02E0
 	WM_SETFOCUS                  = 0x0007
 	WM_CLOSE                     = 0x0010
@@ -80,7 +81,9 @@ const (
 	ES_AUTOVSCROLL               = 0x0040
 	ES_READONLY                  = 0x0800
 	ES_NUMBER                    = 0x2000
+	CBS_DROPDOWN                 = 2
 	CBS_DROPDOWNLIST             = 3
+	CBS_AUTOHSCROLL              = 0x0040
 	LVS_REPORT                   = 1
 	LVS_SHOWSELALWAYS            = 8
 	LVS_SINGLESEL                = 4

@@ -40,11 +40,14 @@ func InstallFFmpegZip(zipPath string) (ffmpegPath, ffprobePath string, err error
 	if ffmpegEntry == nil || ffprobeEntry == nil {
 		return "", "", errors.New("ZIP 中未同时找到 ffmpeg.exe 和 ffprobe.exe")
 	}
-	componentRoot, err := config.LocalDir()
+	finalDir, err := config.RuntimeFFmpegBinDir()
 	if err != nil {
 		return "", "", err
 	}
-	finalDir := filepath.Join(componentRoot, "ffmpeg", "bin")
+	componentRoot := filepath.Dir(finalDir)
+	if err := os.MkdirAll(componentRoot, 0o755); err != nil {
+		return "", "", fmt.Errorf("无法写入 Runtime 组件目录: %w", err)
+	}
 	stage, err := os.MkdirTemp(componentRoot, ".ffmpeg-import-*")
 	if err != nil {
 		return "", "", err
