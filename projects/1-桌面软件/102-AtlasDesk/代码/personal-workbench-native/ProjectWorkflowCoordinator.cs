@@ -4,13 +4,14 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace PersonalWorkbench;
 
 /// <summary>
 /// Long-term owner for the Project / Environment / Terminal development surface.
-/// Project context is read only after an explicit project selection or refresh;
-/// stale Git and environment results are discarded through generation gating.
+/// Project discovery starts only after explicit Development navigation or Refresh.
+/// Selected-project context is cancellable and stale results are generation gated.
 /// </summary>
 public sealed class ProjectWorkflowCoordinator
 {
@@ -51,8 +52,10 @@ public sealed class ProjectWorkflowCoordinator
         };
 
         _tabs = BuildTabs();
-        _tabs.SelectionChanged += Tabs_SelectionChanged;
+        // Establish the initial Project tab before subscribing. WPF raises
+        // SelectionChanged synchronously, and construction must never start a scan.
         _tabs.SelectedIndex = ProjectTabIndex;
+        _tabs.SelectionChanged += Tabs_SelectionChanged;
 
         Install();
         RemoveLegacyProjectButton();
@@ -296,23 +299,32 @@ public sealed class ProjectWorkflowCoordinator
             var context = await ProjectContextService.ReadAsync(
                 project,
                 _pipeline.Settings,
-                cancellation.Token);
-            if (generation != _contextGeneration || cancellation.IsCancellationRequested)
+                cancellation.Token).ConfigureAwait(false);
+            if (generation != Interlocked.Read(ref _contextGeneration) || cancellation.IsCancellationRequested)
                 return;
-            _projects.ApplyContext(context);
+
+            await _window.Dispatcher.InvokeAsync(() =>
+            {
+                if (generation == Interlocked.Read(ref _contextGeneration)
+                    && !cancellation.IsCancellationRequested)
+                    _projects.ApplyContext(context);
+            }, DispatcherPriority.Background);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             App.Log("Project context read failed: " + ex);
-            if (generation == _contextGeneration)
+            await _window.Dispatcher.InvokeAsync(() =>
             {
-                _projects.ApplyContext(new ProjectWorkflowContext
+                if (generation == Interlocked.Read(ref _contextGeneration))
                 {
-                    ProjectRoot = project.RootPath,
-                    Status = "项目上下文读取失败"
-                });
-            }
+                    _projects.ApplyContext(new ProjectWorkflowContext
+                    {
+                        ProjectRoot = project.RootPath,
+                        Status = "项目上下文读取失败"
+                    });
+                }
+            }, DispatcherPriority.Background);
         }
         finally
         {
@@ -330,7 +342,7 @@ public sealed class ProjectWorkflowCoordinator
         {
             case "workspace":
                 if (_window.FindName("WorkspaceNav") is RadioButton workspaceNav) workspaceNav.IsChecked = true;
-                await _window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                await _window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
                 await _workspace.OpenFromGlobalSearchAsync(e.Project.RootPath);
                 break;
             case "terminal":
