@@ -37,6 +37,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tooling/.github/scripts/p101_v422_apply.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 8 {', "compression custom column")
+          draw_func = replace_once(draw_func, 'if cd.ISubItem == 8 {', 'if cd.ISubItem == 9 {', "progress custom column")'''
+          new = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 108 {', "compression custom column placeholder")
+          draw_func = replace_once(draw_func, 'if cd.ISubItem == 8 {', 'if cd.ISubItem == 9 {', "progress custom column")
+          draw_func = replace_once(draw_func, 'if cd.ISubItem == 108 {', 'if cd.ISubItem == 8 {', "compression custom column")'''
+          if text.count(old) != 1:
+              raise SystemExit(f'column migration patch expected one block, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          PY
           python -m py_compile tooling/.github/scripts/p101_v422_apply.py
           cd work
           python ../tooling/.github/scripts/p101_v422_apply.py
