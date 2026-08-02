@@ -84,16 +84,31 @@ public sealed class ShellResilienceCoordinator : IDisposable
 
     private async void Navigation_Checked(object sender, RoutedEventArgs e)
     {
+        // Some isolated WPF hosts do not install a SynchronizationContext for async
+        // event continuations. Capture route data now, then explicitly marshal every
+        // DependencyObject access back to the owning window Dispatcher after debounce.
+        var selected = sender as RadioButton;
+        var route = selected?.Tag?.ToString();
         var version = Interlocked.Increment(ref _navigationVersion);
-        await Task.Delay(80);
+        await Task.Delay(80).ConfigureAwait(false);
         if (_disposed || version != Interlocked.Read(ref _navigationVersion))
             return;
 
-        StabilizeNavigation(sender as RadioButton);
-        if ((sender as RadioButton)?.Tag?.ToString() == "dashboard")
-            await EnsureDashboardHealthyAsync("Dashboard navigation");
-        else if (_window.FindName("NavigationProgress") is FrameworkElement progress)
-            progress.Visibility = Visibility.Collapsed;
+        Task? dashboardHealthTask = null;
+        await _window.Dispatcher.InvokeAsync(() =>
+        {
+            if (_disposed || version != Interlocked.Read(ref _navigationVersion))
+                return;
+
+            StabilizeNavigation(selected);
+            if (string.Equals(route, "dashboard", StringComparison.OrdinalIgnoreCase))
+                dashboardHealthTask = EnsureDashboardHealthyAsync("Dashboard navigation");
+            else if (_window.FindName("NavigationProgress") is FrameworkElement progress)
+                progress.Visibility = Visibility.Collapsed;
+        }, DispatcherPriority.Background);
+
+        if (dashboardHealthTask is not null)
+            await dashboardHealthTask.ConfigureAwait(false);
     }
 
     private void StabilizeNavigation(RadioButton? selected)
