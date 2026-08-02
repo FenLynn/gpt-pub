@@ -12,6 +12,7 @@ public sealed class WorkbenchFeaturePipeline
                    ?? AppSettings.Load();
         Experience = V061ExperienceEnhancer.Attach(window, Base);
         Stability = V062StabilityEnhancer.Attach(window, Settings);
+        DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
         Projects = V063ProjectEnhancer.Attach(window, this);
         Tasks = V064TaskEnhancer.Attach(window, this);
         Tools = V065ToolsEnhancer.Attach(window, this);
@@ -28,6 +29,7 @@ public sealed class WorkbenchFeaturePipeline
     public WorkbenchEnhancer Base { get; }
     public V061ExperienceEnhancer Experience { get; }
     public V062StabilityEnhancer Stability { get; }
+    public DashboardScriptDiagnostics DashboardDiagnostics { get; }
     public V063ProjectEnhancer Projects { get; }
     public V064TaskEnhancer Tasks { get; }
     public V065ToolsEnhancer Tools { get; }
