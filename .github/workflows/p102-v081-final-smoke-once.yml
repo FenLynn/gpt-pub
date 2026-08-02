@@ -1,0 +1,63 @@
+name: Final smoke P102 AtlasDesk v0.8.1 once
+
+on:
+  pull_request:
+    branches:
+      - p102-exp
+    paths:
+      - '.maintenance/p102-v081-final-smoke-trigger.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p102-v081-final-smoke-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: github.repository == 'FenLynn/gpt-pub' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build native terminal host
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSROOT=%%i"
+          if not defined VSROOT exit /b 1
+          call "%VSROOT%\VC\Auxiliary\Build\vcvars64.bat"
+          if not exist build\terminal-host mkdir build\terminal-host
+          cl /nologo /std:c++20 /O2 /EHsc /MT /DUNICODE /D_UNICODE /Fo"build\terminal-host\\" "projects\1-桌面软件\102-AtlasDesk\代码\personal-workbench-terminal-host\terminal_host.cpp" /link /SUBSYSTEM:WINDOWS /OUT:"build\terminal-host\AtlasDesk.TerminalHost.exe"
+          if errorlevel 1 exit /b %errorlevel%
+          echo PWB_TERMINAL_HOST_PATH=%CD%\build\terminal-host\AtlasDesk.TerminalHost.exe>>"%GITHUB_ENV%"
+
+      - name: Prepare terminal web assets
+        shell: pwsh
+        run: |
+          $temp = Join-Path $env:RUNNER_TEMP 'atlasdesk-xterm-v081-final'
+          npm install --prefix $temp @xterm/xterm@6.0.0 @xterm/addon-fit@0.11.0 --ignore-scripts --no-audit --no-fund
+          $vendor = 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/TerminalAssets/vendor'
+          New-Item -ItemType Directory -Path $vendor -Force | Out-Null
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/lib/xterm.js') (Join-Path $vendor 'xterm.js') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/xterm/css/xterm.css') (Join-Path $vendor 'xterm.css') -Force
+          Copy-Item (Join-Path $temp 'node_modules/@xterm/addon-fit/lib/addon-fit.js') (Join-Path $vendor 'addon-fit.js') -Force
+
+      - name: Run complete smoke suite
+        shell: pwsh
+        run: |
+          dotnet restore projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
+          dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke suite failed.' }
