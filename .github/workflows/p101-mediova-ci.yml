@@ -32,6 +32,13 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
+      - name: Record exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Candidate commit=$(git rev-parse HEAD)"
+          echo "Candidate tree=$(git rev-parse 'HEAD^{tree}')"
+
       - name: Enforce P101 pull-request scope
         if: github.event_name == 'pull_request'
         shell: bash
