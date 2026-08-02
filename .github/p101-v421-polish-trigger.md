@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time patch workflow. Do not merge.
 
-Run the source-contract diagnostic against the latest audited patch.
+Run the corrected apply-control contract against the latest audited patch.
