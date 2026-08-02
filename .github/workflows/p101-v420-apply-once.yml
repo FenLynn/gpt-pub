@@ -1,4 +1,4 @@
-name: Apply P101 Mediova v4.2.0 once
+name: Harden P101 Mediova v4.2.0 once
 
 on:
   pull_request:
@@ -24,17 +24,17 @@ jobs:
           ref: p101-v420-queue-workflow
           fetch-depth: 0
 
-      - name: Apply exact source transform
+      - name: Apply reviewed hardening
         shell: bash
         run: |
           set -euo pipefail
           cd 'projects/1-桌面软件/101-Mediova/代码'
-          python3 tools_v420_transform_fix3.py
-          rm tools_v420_transform.py tools_v420_transform_fix1.py tools_v420_transform_fix2.py tools_v420_transform_fix3.py
+          python3 tools_v420_harden.py
+          rm tools_v420_harden.py
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
-          gofmt -w cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/v420_windows.go cmd/mediaworkbench/v420_context_windows.go internal/model/model.go internal/model/v420_queue_test.go internal/workflow/queue.go internal/workflow/queue_test.go internal/config/config.go
+          gofmt -w cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/v420_windows.go cmd/mediaworkbench/v420_context_windows.go cmd/mediaworkbench/v420_harden_windows.go internal/model/model.go internal/model/v420_queue_test.go internal/workflow/queue.go internal/workflow/queue_test.go internal/config/config.go
 
-      - name: Validate source
+      - name: Validate hardened source
         shell: bash
         run: |
           set -euo pipefail
@@ -60,7 +60,7 @@ jobs:
               *) echo "Out-of-scope path: $path" >&2; exit 1 ;;
             esac
             case "$path" in
-              *tools_v420_transform*.py|*__pycache__*)
+              *tools_v420_*.py|*__pycache__*)
                 if [[ -e "$path" ]]; then
                   echo "Temporary file remains: $path" >&2
                   exit 1
@@ -69,7 +69,7 @@ jobs:
             esac
           done
 
-      - name: Commit validated implementation
+      - name: Commit validated hardening
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -79,5 +79,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- 'projects/1-桌面软件/101-Mediova'
           git diff --cached --quiet && { echo 'No validated changes to commit'; exit 1; }
-          git commit -m 'P101: 接入 v4.2.0 队列工作流基础'
+          git commit -m 'P101: 加固 v4.2.0 队列停止与个体编辑'
           git push origin HEAD:p101-v420-queue-workflow
