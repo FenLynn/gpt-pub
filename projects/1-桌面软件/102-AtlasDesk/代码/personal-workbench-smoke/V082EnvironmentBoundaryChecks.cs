@@ -94,16 +94,29 @@ internal static class V083StartupBoundaryChecks
             "personal-workbench-native\\PersonalWorkbench.csproj");
 
         var smokeRoot = FindProjectSourceRoot("personal-workbench-smoke");
+        var smokeProjectPath = Path.Combine(smokeRoot, "PersonalWorkbench.Smoke.csproj");
         RequireTokens(
-            Path.Combine(smokeRoot, "PersonalWorkbench.Smoke.csproj"),
+            smokeProjectPath,
             "personal-workbench-residency-smoke\\AtlasDesk.ResidencySmoke.csproj",
-            "RunAtlasDeskResidencySmoke",
-            "--no-build --no-restore");
+            "ReferenceOutputAssembly=\"false\"");
+        var smokeProject = File.ReadAllText(smokeProjectPath);
+        Reject(smokeProject, "RunAtlasDeskResidencySmoke",
+            "residency process is still nested inside the legacy smoke MSBuild target");
+        Reject(smokeProject, "<Exec Command=",
+            "residency process execution remains hidden inside MSBuild");
         if (File.Exists(Path.Combine(smokeRoot, "MainWindowStartupProbe.cs")))
         {
             throw new InvalidOperationException(
                 "module-initializer-coupled MainWindowStartupProbe still exists in the legacy smoke project");
         }
+
+        var workflowPath = Path.Combine(FindRepositoryRoot(nativeRoot), ".github", "workflows", "p102-atlasdesk-ci.yml");
+        RequireTokens(
+            workflowPath,
+            "name: Run isolated startup residency",
+            "timeout-minutes: 2",
+            "personal-workbench-residency-smoke/AtlasDesk.ResidencySmoke.csproj",
+            "-c Release --no-restore");
 
         RequireTokens(
             Path.Combine(nativeRoot, "App.xaml.cs"),
@@ -130,6 +143,23 @@ internal static class V083StartupBoundaryChecks
 
         throw new DirectoryNotFoundException(
             "Unable to locate the AtlasDesk source tree for v0.8.3 startup checks.");
+    }
+
+    private static string FindRepositoryRoot(string sourcePath)
+    {
+        var current = new DirectoryInfo(sourcePath);
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, ".github"))
+                && Directory.Exists(Path.Combine(current.FullName, "projects")))
+            {
+                return current.FullName;
+            }
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException(
+            "Unable to locate repository root for AtlasDesk workflow checks.");
     }
 
     private static void RequireTokens(string path, params string[] tokens)
