@@ -61,8 +61,8 @@ internal static class V081SourceBoundaryChecks
         RequireOrder(
             projectCenter,
             "_tabs = BuildTabs();",
-            "_tabs.SelectionChanged += Tabs_SelectionChanged;",
-            "_tabs.SelectedIndex = ProjectTabIndex;");
+            "_tabs.SelectedIndex = ProjectTabIndex;",
+            "_tabs.SelectionChanged += Tabs_SelectionChanged;");
         RejectExactLine(projectCenter, "tabs.SelectedIndex = 0;",
             "project workflow selects a local TabControl before the _tabs field is assigned");
 
