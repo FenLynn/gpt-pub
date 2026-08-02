@@ -60,7 +60,12 @@ jobs:
               *) echo "Out-of-scope path: $path" >&2; exit 1 ;;
             esac
             case "$path" in
-              *tools_v420_transform*.py|*__pycache__*) echo "Temporary file remains: $path" >&2; exit 1 ;;
+              *tools_v420_transform*.py|*__pycache__*)
+                if [[ -e "$path" ]]; then
+                  echo "Temporary file remains: $path" >&2
+                  exit 1
+                fi
+                ;;
             esac
           done
 
