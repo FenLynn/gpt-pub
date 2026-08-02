@@ -1,3 +1,17 @@
+AtlasDesk v0.9.1
+
+This patch fixes maximized-window and short-height layout clipping discovered on Windows taskbar work areas.
+
+Window bounds
+- The main window now handles WM_GETMINMAXINFO and uses the active monitor work area rather than the full monitor bounds.
+- Maximizing on primary or secondary monitors preserves space for taskbars on any screen edge.
+- Native pixel bounds are used directly so the correction remains valid under mixed-DPI scaling.
+- Restoring and resizing keep the existing WPF window behavior.
+
+Tools layout
+- The Tools page now reduces only its vertical outer inset when the available height is constrained.
+- The three-column layout, result area and bottom action buttons remain visible without changing the normal full-height design.
+
 AtlasDesk v0.9.0
 
 This feature release connects projects, workspace, terminal, Git status, environment markers and recent files into one explicit project-driven workflow.
