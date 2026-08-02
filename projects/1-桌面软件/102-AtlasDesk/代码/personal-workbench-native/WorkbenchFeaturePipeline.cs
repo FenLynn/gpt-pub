@@ -25,8 +25,9 @@ public sealed class WorkbenchFeaturePipeline
         Tasks = V064TaskEnhancer.Attach(window, this);
         Tools = V065ToolsEnhancer.Attach(window, this);
         Backup = V066BackupEnhancer.Attach(window);
-        Hotfix = V068HotfixEnhancer.Attach(window, this);
+        FeatureHosts = FeatureHostTerminalCoordinator.Attach(window, this);
         UiFixes = V069UiFixEnhancer.Attach(window, this);
+        LegacyConvergence = LegacyEnhancerConvergenceCoordinator.Attach(window, UiFixes);
         TerminalPresentation = V0610TerminalPresentationEnhancer.Attach(this);
         Corrective = V0611CorrectiveEnhancer.Attach(this);
         ExperiencePolish = V0612ExperienceEnhancer.Attach(window, this);
@@ -44,8 +45,9 @@ public sealed class WorkbenchFeaturePipeline
     public V064TaskEnhancer Tasks { get; }
     public V065ToolsEnhancer Tools { get; }
     public V066BackupEnhancer Backup { get; }
-    public V068HotfixEnhancer Hotfix { get; }
+    public FeatureHostTerminalCoordinator FeatureHosts { get; }
     public V069UiFixEnhancer UiFixes { get; }
+    public LegacyEnhancerConvergenceCoordinator LegacyConvergence { get; }
     public V0610TerminalPresentationEnhancer TerminalPresentation { get; }
     public V0611CorrectiveEnhancer Corrective { get; }
     public V0612ExperienceEnhancer ExperiencePolish { get; }

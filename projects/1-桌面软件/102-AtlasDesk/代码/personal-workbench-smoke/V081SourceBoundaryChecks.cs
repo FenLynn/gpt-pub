@@ -22,13 +22,18 @@ internal static class V081SourceBoundaryChecks
             "OpenExternalUri",
             "DashboardNavigationPolicy.Classify");
 
-        var hotfix = File.ReadAllText(Path.Combine(nativeRoot, "V068HotfixEnhancer.cs"));
-        Reject(hotfix, "_development.Visibility = Visibility.Collapsed",
+        var featureHosts = File.ReadAllText(Path.Combine(nativeRoot, "FeatureHostTerminalCoordinator.cs"));
+        Reject(featureHosts, "_development.Visibility = Visibility.Collapsed",
             "legacy environment hiding path remains");
+        RequireTokens(
+            Path.Combine(nativeRoot, "FeatureHostTerminalCoordinator.cs"),
+            "NormalizeFeatureHosts",
+            "DockTerminalBottom",
+            "TerminalHostMode.Bottom");
 
         RequireTokens(
-            Path.Combine(nativeRoot, "V069UiFixEnhancer.cs"),
-            "WM_GETMINMAXINFO",
+            Path.Combine(nativeRoot, "ShellResilienceCoordinator.cs"),
+            "WmGetMinMaxInfo",
             "MonitorFromWindow",
             "GetMonitorInfo");
 
