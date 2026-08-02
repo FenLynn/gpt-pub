@@ -859,7 +859,7 @@ func (a *application) isHoverableControl(hwnd uintptr) bool {
 		a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir,
 		a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle,
 		a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry,
-		a.hOutputBrowse, a.hOutputPick, a.a.hAllDefault, a.hSmartPlan,
+		a.hOutputBrowse, a.hOutputPick, a.hAllDefault, a.hSmartPlan,
 		a.hStart, a.hPause, a.hStop:
 		return true
 	default:
@@ -1096,7 +1096,7 @@ func (a *application) drawToolbarButton(dis *drawItemStruct) bool {
 func (a *application) secondaryButtonKind(hwnd uintptr) (string, bool) {
 	switch hwnd {
 	case a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry,
-		a.hOutputBrowse, a.hOutputPick, a.a.hAllDefault, a.hSmartPlan, a.hPause, a.hStop, a.hRightToggle:
+		a.hOutputBrowse, a.hOutputPick, a.hAllDefault, a.hSmartPlan, a.hPause, a.hStop, a.hRightToggle:
 		return getText(hwnd), true
 	default:
 		return "", false
@@ -1921,7 +1921,7 @@ func (a *application) recreateFontsForDPI() {
 	if a == nil || !a.controlsReady {
 		return
 	}
-	all := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hSearch, a.hFilter, a.hList, a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle, a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation, a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry, a.hDetails, a.hOutputEdit, a.hOutputBrowse, a.hOutputPick, a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation, a.a.hAllDefault, a.hSmartPlan, a.hStatusText, a.hStart, a.hPause, a.hStop}
+	all := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hSearch, a.hFilter, a.hList, a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle, a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation, a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry, a.hDetails, a.hOutputEdit, a.hOutputBrowse, a.hOutputPick, a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation, a.hAllDefault, a.hSmartPlan, a.hStatusText, a.hStart, a.hPause, a.hStop}
 	for _, h := range all {
 		if h != 0 {
 			send(h, WM_SETFONT, uiFont, 1)
