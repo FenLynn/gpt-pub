@@ -99,4 +99,23 @@ if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
         path_file.write(str(ffmpeg.parent) + "\n")
     print(f"Prepared BtbN FFmpeg tools from {url}: {ffmpeg.parent}")
 
+    # The GitHub App token may push ordinary P101 files but cannot modify
+    # workflow YAML. Remove workflow changes from the index in the pre-commit
+    # hook; the long-term CI update is published later through a connector PR.
+    hook = Path(".git/hooks/pre-commit")
+    hook.write_text(
+        "#!/bin/sh\n"
+        "git restore --staged --source=HEAD -- "
+        ".github/workflows/p101-mediova-ci.yml "
+        ".github/workflows/p101-v410-apply-once.yml || exit 1\n"
+        "exit 0\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    try:
+        hook.chmod(0o755)
+    except OSError:
+        pass
+    print("Installed pre-commit guard to exclude workflow changes from the product commit.")
+
 print("Applied Mediova v4.1.0 post transformation corrections.")
