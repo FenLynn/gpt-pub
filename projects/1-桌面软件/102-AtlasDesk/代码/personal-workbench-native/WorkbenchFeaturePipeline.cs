@@ -18,6 +18,7 @@ public sealed class WorkbenchFeaturePipeline
 
         Experience = V061ExperienceEnhancer.Attach(window, Base);
         Stability = V062StabilityEnhancer.Attach(window, Settings);
+        ShellResilience = ShellResilienceCoordinator.Attach(window);
         DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
         DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings);
         Projects = V063ProjectEnhancer.Attach(window, this);
@@ -36,6 +37,7 @@ public sealed class WorkbenchFeaturePipeline
     public WorkbenchEnhancer Base { get; }
     public V061ExperienceEnhancer Experience { get; }
     public V062StabilityEnhancer Stability { get; }
+    public ShellResilienceCoordinator ShellResilience { get; }
     public DashboardScriptDiagnostics DashboardDiagnostics { get; }
     public DashboardInteractionCoordinator DashboardInteraction { get; }
     public V063ProjectEnhancer Projects { get; }
