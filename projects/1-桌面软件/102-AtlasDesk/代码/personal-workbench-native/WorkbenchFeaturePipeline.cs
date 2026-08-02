@@ -10,6 +10,12 @@ public sealed class WorkbenchFeaturePipeline
         Base = WorkbenchEnhancer.Attach(window);
         Settings = Base.GetType().GetField("_settings", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(Base) as AppSettings
                    ?? AppSettings.Load();
+
+        // The V070 three-tab development surface owns environment discovery.
+        // Disable MainWindow's retained pre-project-center discovery path so one
+        // navigation can never start two independent Conda/Python scans.
+        DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window);
+
         Experience = V061ExperienceEnhancer.Attach(window, Base);
         Stability = V062StabilityEnhancer.Attach(window, Settings);
         DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
