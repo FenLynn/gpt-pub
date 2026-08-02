@@ -38,6 +38,40 @@ jobs:
         run: |
           set -euo pipefail
           cat tooling/.github/scripts/p101_v421_patch.part* | base64 -d | gzip -d > /tmp/p101_v421_patch.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('/tmp/p101_v421_patch.py')
+          text = path.read_text(encoding='utf-8')
+          start_marker = '# Preserve the directory tree after the output file has been committed and file times restored.\n'
+          end_marker = '# 8. Versioned build entry and CI identity.\n'
+          if text.count(start_marker) != 1 or text.count(end_marker) != 1:
+              raise SystemExit('timestamp patch markers are not unique')
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          replacement = r'''# Preserve the directory tree after the output file has been committed and file times restored.
+          replace_once(
+              main,
+              '''\tif settings.PreserveTimes {
+          \t\t_ = media.PreserveTimes(input, out)
+          \t}''',
+              '''\tif settings.PreserveTimes {
+          \t\tif err := media.PreserveTimes(input, out); err != nil {
+          \t\t\ta.postUI(func() { setText(a.hStatusText, "输出已完成，但文件时间戳恢复失败："+short(err.Error(), 180)) })
+          \t\t}
+          \t\toutputRoot := settings.OutputDirFor(kind)
+          \t\tif taskSnapshot.Queue != nil && strings.TrimSpace(taskSnapshot.Queue.OutputRoot) != "" {
+          \t\t\toutputRoot = taskSnapshot.Queue.OutputRoot
+          \t\t}
+          \t\tif err := media.PreserveOutputTreeTimes(input, root, outputRoot); err != nil {
+          \t\t\ta.postUI(func() { setText(a.hStatusText, "输出已完成，但目录时间戳恢复失败："+short(err.Error(), 180)) })
+          \t\t}
+          \t}''',
+          )
+
+          '''
+          path.write_text(text[:start] + replacement + text[end:], encoding='utf-8', newline='\n')
+          PY
           python -m py_compile /tmp/p101_v421_patch.py
           cd work
           python /tmp/p101_v421_patch.py
