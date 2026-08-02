@@ -105,6 +105,7 @@ type Preset struct {
 
 type Settings struct {
 	OutputDir              string           `json:"output_dir"`
+	RecentOutputDirs       []string         `json:"recent_output_dirs,omitempty"`
 	Resolution             string           `json:"resolution"`
 	Codec                  string           `json:"codec"`
 	Quality                string           `json:"quality"`
@@ -176,7 +177,7 @@ func DefaultSettings() Settings {
 		InterfaceMode:          "完整",
 		ShowPerformanceStats:   false,
 		RightPanelVisible:      true,
-		UILayoutRevision:       394,
+		UILayoutRevision:       410,
 		AutoBenchmark:          false,
 		AutoDetectPlayer:       true,
 		UseGPU:                 true,

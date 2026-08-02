@@ -40,7 +40,10 @@ func TestResolveOutputPathAvoidingConcurrent(t *testing.T) {
 }
 
 func TestConcurrentHistoryAppend(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	root := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", root)
+	t.Setenv("APPDATA", root)
+	t.Setenv("LOCALAPPDATA", root)
 	var wg sync.WaitGroup
 	for i := 0; i < 40; i++ {
 		wg.Add(1)
@@ -125,8 +128,14 @@ func TestInstallFFmpegZip(t *testing.T) {
 		t.Fatalf("not installed: %s %s", ff, fp)
 	}
 	cleanRoot := strings.ToLower(filepath.Clean(dataRoot))
-	if !strings.HasPrefix(strings.ToLower(filepath.Clean(ff)), cleanRoot) || !strings.HasPrefix(strings.ToLower(filepath.Clean(fp)), cleanRoot) {
-		t.Fatalf("test escaped isolated data root: ffmpeg=%s ffprobe=%s root=%s", ff, fp, dataRoot)
+	runtimeSuffix := strings.ToLower(filepath.Clean(filepath.Join("Components", "FFmpeg", "bin")))
+	cleanFF := strings.ToLower(filepath.Clean(ff))
+	cleanFP := strings.ToLower(filepath.Clean(fp))
+	if !strings.Contains(cleanFF, runtimeSuffix) || !strings.Contains(cleanFP, runtimeSuffix) {
+		t.Fatalf("components were not installed into Runtime: ffmpeg=%s ffprobe=%s", ff, fp)
+	}
+	if strings.HasPrefix(cleanFF, cleanRoot) || strings.HasPrefix(cleanFP, cleanRoot) {
+		t.Fatalf("Runtime component leaked into Data: ffmpeg=%s ffprobe=%s root=%s", ff, fp, dataRoot)
 	}
 }
 
