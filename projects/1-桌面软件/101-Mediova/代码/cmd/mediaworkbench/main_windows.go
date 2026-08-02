@@ -30,7 +30,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const appVersion = "4.1.1"
+const appVersion = "4.2.0"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -189,6 +189,8 @@ const (
 	ID_CTX_COPY_TRIM_CROP     = 2223
 	ID_CTX_MOVE_TOP           = 2224
 	ID_CTX_MOVE_BOTTOM        = 2225
+	ID_CTX_HOLD_EDIT          = 2226
+	ID_CTX_REMOVE_SAFE        = 2227
 	ID_CTX_RES_4K             = 2300
 	ID_CTX_RES_1080           = 2301
 	ID_CTX_RES_720            = 2302
@@ -250,6 +252,16 @@ type application struct {
 	overallPaused       bool
 	hoverControl        uintptr
 	runtimeNotice       string
+	queueWake           chan struct{}
+	queueSequence       atomic.Int64
+	taskCancels         map[int64]context.CancelFunc
+	holdRequests        map[int64]bool
+	removeRequests      map[int64]bool
+	immediateRestarts   map[int64]bool
+	heldEditTaskID      int64
+	rightDraftFields    map[int]bool
+	rightUpdating       bool
+	rightSelectionKey   string
 
 	runMu                 sync.Mutex
 	running, paused       bool
@@ -280,6 +292,7 @@ type application struct {
 	selfTestOutput        string
 	outputIntegrityHook   func(string)
 	uiPreview             bool
+	uiPreviewMode         string
 }
 
 var app *application
@@ -408,11 +421,11 @@ func main() {
 	config.MigrateLegacyTransientData()
 	runtimeMigrated, runtimeMigrationErr := config.MigrateLegacyRuntimeComponents()
 	selfTest, selfTestOutput := parseSelfTestArgs(os.Args[1:])
-	uiPreview := parseUIPreviewArgs(os.Args[1:])
+	uiPreview, uiPreviewMode := parseUIPreviewArgs(os.Args[1:])
 	settings := config.Load()
 	settings.FFmpegPath = config.NormalizeConfiguredFFmpegPath(settings.FFmpegPath)
-	if settings.UILayoutRevision < 411 {
-		settings.UILayoutRevision = 411
+	if settings.UILayoutRevision < 420 {
+		settings.UILayoutRevision = 420
 		settings.RightPanelVisible = true
 		settings.ShowPerformanceStats = false
 		settings.TaskColumnWidths = nil
@@ -429,7 +442,7 @@ func main() {
 		settings.NotifyOnDone = false
 		settings.OpenOutputOnDone = false
 	}
-	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
+	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, uiPreviewMode: uiPreviewMode, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), queueWake: make(chan struct{}, 64), taskCancels: make(map[int64]context.CancelFunc), holdRequests: make(map[int64]bool), removeRequests: make(map[int64]bool), immediateRestarts: make(map[int64]bool), rightDraftFields: make(map[int]bool), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
 	if runtimeMigrationErr != nil {
 		app.runtimeNotice = "旧 FFmpeg 组件未能复制到 Runtime，已保留旧位置继续兼容：" + short(runtimeMigrationErr.Error(), 160)
 	} else if runtimeMigrated {
@@ -443,7 +456,7 @@ func main() {
 	app.player, app.playerOK, _ = media.DetectPotPlayer(app.settings.PlayerPath)
 	writeStartupStage("components_discovered")
 	hInst, _, _ := procGetModuleHandleW.Call(0)
-	className := p("MediovaDesktop411")
+	className := p("MediovaDesktop420")
 	app.hIcon = loadEmbeddedIcon()
 	if r, _, _ := procRegisterWindowMessageW.Call(uintptr(unsafe.Pointer(p("TaskbarCreated")))); r != 0 {
 		taskbarCreatedMessage = uint32(r)
@@ -673,7 +686,12 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 	case WM_SETCURSOR:
 		app.updateHoverControl(wParam)
 	case WM_COMMAND:
-		app.command(int(loWord(wParam)))
+		id := int(loWord(wParam))
+		code := int(hiWord(wParam))
+		if app.v420HandleControlNotification(id, code) {
+			return 0
+		}
+		app.command(id)
 		return 0
 	case WM_NOTIFY:
 		return app.notify((*nmhdr)(unsafe.Pointer(lParam)))
@@ -1279,7 +1297,7 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 		return false
 	}
 	rc := dis.RcItem
-	bar := rect{Left: rc.Left + 1, Top: rc.Top + 4, Right: rc.Right - 1, Bottom: rc.Bottom - 4}
+	bar := rect{Left: rc.Left + 1, Top: rc.Top + 2, Right: rc.Right - 1, Bottom: rc.Bottom - 2}
 	fraction := clamp01(a.overallProgress / 100)
 	withRoundedClip(dis.HDC, bar, 4, func() {
 		fillSolid(dis.HDC, bar, colorRef(248, 250, 252))
@@ -1409,12 +1427,13 @@ func (a *application) drawStatusChip(dis *drawItemStruct) bool {
 		withRoundedClip(dis.HDC, inner, 4, func() { fillSolid(dis.HDC, inner, bg) })
 		drawRoundedBorder(dis.HDC, inner, 4, border)
 	}
-	diameter := int32(11)
+	diameter := int32(14)
 	dotLeft := rc.Left + 6
 	dotTop := (rc.Top + rc.Bottom - diameter) / 2
 	brush, _, _ := procCreateSolidBrush.Call(dot)
 	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
-	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, dot)
+	outline := mixColor(dot, colorRef(0, 0, 0), .24)
+	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, outline)
 	oldPen, _, _ := procSelectObject.Call(dis.HDC, pen)
 	procEllipse.Call(dis.HDC, uintptr(dotLeft), uintptr(dotTop), uintptr(dotLeft+diameter), uintptr(dotTop+diameter))
 	procSelectObject.Call(dis.HDC, oldPen)
@@ -1777,8 +1796,8 @@ func (a *application) initControls() {
 	comboFill(a.hTaskQuality, []string{"高", "中", "低"}, "高")
 	comboFill(a.hTaskVolume, volumeModes(), "质量优先")
 	comboFill(a.hTaskRotation, rotations(), "自动")
-	a.hTaskApply = createControl("BUTTON", "应用", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1400, 302, 120, 30, a.hwnd, IDC_TASK_APPLY)
-	a.hTaskDefault = createControl("BUTTON", "跟随默认", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1528, 302, 121, 30, a.hwnd, IDC_TASK_DEFAULT)
+	a.hTaskApply = createControl("BUTTON", "应用到选中", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1400, 302, 120, 30, a.hwnd, IDC_TASK_APPLY)
+	a.hTaskDefault = createControl("BUTTON", "恢复选中默认", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1528, 302, 121, 30, a.hwnd, IDC_TASK_DEFAULT)
 	a.hPreview = createControl("BUTTON", "预览", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1400, 338, 120, 30, a.hwnd, IDC_PREVIEW)
 	a.hTrimCrop = createControl("BUTTON", "时长 / 画面", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1528, 338, 121, 30, a.hwnd, IDC_TRIM_CROP)
 	a.hSingleOutput = createControl("BUTTON", "单独输出", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1400, 374, 120, 30, a.hwnd, IDC_SINGLE_OUTPUT)
@@ -1817,7 +1836,7 @@ func (a *application) initControls() {
 	comboFill(a.hVolume, volumeModes(), a.settings.VolumeMode)
 	comboFill(a.hRotation, rotations(), a.settings.Rotation)
 	a.hApplySelected = createControl("BUTTON", "应用到选中", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1286, 730, 132, 32, a.hwnd, IDC_APPLY_SELECTED)
-	a.hAllDefault = createControl("BUTTON", "全部跟随默认", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1424, 730, 156, 32, a.hwnd, IDC_ALL_DEFAULT)
+	a.hAllDefault = createControl("BUTTON", "全部恢复默认", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1424, 730, 156, 32, a.hwnd, IDC_ALL_DEFAULT)
 	a.hSmartPlan = createControl("BUTTON", "智能方案", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 1286, 730, 132, 32, a.hwnd, IDC_SMART_PLAN)
 
 	a.hProgress = createControl("STATIC", "", WS_CHILD|WS_VISIBLE|SS_OWNERDRAW, 8, 770, 1572, 22, a.hwnd, 0)
@@ -2201,7 +2220,7 @@ func (a *application) layout(w, h int32) {
 
 	barY := top + listH + 7
 	simple := a.settings.InterfaceMode == "简洁"
-	for _, control := range []uintptr{a.hCodec, a.hQuality, a.hVolume, a.hRotation, a.hApplySelected, a.hAllDefault} {
+	for _, control := range []uintptr{a.hCodec, a.hQuality, a.hVolume, a.hRotation, a.hAllDefault} {
 		show(control, !simple)
 	}
 	for _, label := range a.globalLabels {
@@ -2235,8 +2254,6 @@ func (a *application) layout(w, h int32) {
 				move(pair.combo, x, row2, pair.wd, 31)
 				x += pair.wd + 6
 			}
-			move(a.hApplySelected, x, row2, 116, 31)
-			x += 123
 			move(a.hAllDefault, x, row2, w-x-8, 31)
 		}
 		move(a.hProgress, 8, barY+76, w-16, 24)
@@ -2246,7 +2263,7 @@ func (a *application) layout(w, h int32) {
 		move(a.hStop, w-104, barY+107, 88, 38)
 	} else {
 		move(a.hOutputBrowse, 8, barY, 116, 32)
-		fixed := int32(38 + bottomWidths.Resolution + 7 + 34 + bottomWidths.Codec + 7 + 34 + bottomWidths.Quality + 7 + 34 + bottomWidths.Volume + 7 + 34 + bottomWidths.Rotation + 8 + 122 + 8 + 146)
+		fixed := int32(38 + bottomWidths.Resolution + 7 + 34 + bottomWidths.Codec + 7 + 34 + bottomWidths.Quality + 7 + 34 + bottomWidths.Volume + 7 + 34 + bottomWidths.Rotation + 8 + 146)
 		editW := w - 8 - 116 - 6 - 72 - 8 - fixed - 8
 		if simple {
 			editW = w - 8 - 116 - 6 - 72 - 8 - (106 + 7 + 92 + 7 + 122) - 8
@@ -2276,8 +2293,6 @@ func (a *application) layout(w, h int32) {
 				move(pair.combo, x, barY, pair.comboW, 32)
 				x += pair.comboW + 7
 			}
-			move(a.hApplySelected, x, barY, 122, 32)
-			x += 130
 			move(a.hAllDefault, x, barY, 146, 32)
 		}
 		move(a.hProgress, 8, barY+40, w-16, 24)
@@ -2319,8 +2334,8 @@ func (a *application) command(id int) {
 		a.chooseFolder(true)
 	case IDC_IMPORT_CLOSE:
 		a.hideImportToast()
-	case IDC_REMOVE, ID_FILE_REMOVE, ID_CTX_REMOVE:
-		a.removeSelected()
+	case IDC_REMOVE, ID_FILE_REMOVE, ID_CTX_REMOVE, ID_CTX_REMOVE_SAFE:
+		a.v420RemoveSelectedSafely()
 	case IDC_CLEAR, ID_FILE_CLEAR:
 		a.clearCurrent()
 	case IDC_SELECT_ALL, ID_EDIT_SELECT_ALL:
@@ -2343,10 +2358,14 @@ func (a *application) command(id int) {
 		a.stopQueue()
 	case IDC_SMART_PLAN:
 		a.applySmartPlan()
-	case IDC_TASK_APPLY, IDC_APPLY_SELECTED:
+	case IDC_TASK_APPLY:
 		a.applyTaskOptions(false)
-	case IDC_TASK_DEFAULT, IDC_ALL_DEFAULT, ID_EDIT_RESET:
+	case IDC_TASK_DEFAULT, ID_EDIT_RESET:
 		a.applyTaskOptions(true)
+	case IDC_ALL_DEFAULT:
+		a.v420ResetReadyDefaults()
+	case ID_CTX_HOLD_EDIT:
+		a.v420BeginHoldSelected()
 	case ID_EDIT_RETRY_FAILED:
 		a.retryRecoverableWorkspace()
 	case ID_EDIT_CLEAN_DONE:
@@ -2784,36 +2803,15 @@ func (a *application) saveSettings() {
 	a.refreshList()
 }
 func (a *application) refreshOutputHistory() {
-	if a == nil || a.hOutputEdit == 0 {
-		return
-	}
-	current := strings.TrimSpace(getText(a.hOutputEdit))
-	if current == "" {
-		current = strings.TrimSpace(a.settings.OutputDir)
-	}
-	a.settings.RecentOutputDirs = rememberRecentDirectory(current, a.settings.RecentOutputDirs, 10)
-	send(a.hOutputEdit, CB_RESETCONTENT, 0, 0)
-	for _, path := range a.settings.RecentOutputDirs {
-		send(a.hOutputEdit, CB_ADDSTRING, 0, uintptr(unsafe.Pointer(p(path))))
-	}
-	setText(a.hOutputEdit, current)
+	a.v420RefreshOutputHistory()
 }
 
 func (a *application) rememberOutputDirectory(path string) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return
-	}
-	a.settings.OutputDir = path
-	a.settings.LastOutputDir = path
-	a.settings.RecentOutputDirs = rememberRecentDirectory(path, a.settings.RecentOutputDirs, 10)
+	a.v420SetOutputDir(a.currentKind, path)
 }
 
 func (a *application) openOutputMotherDir() {
-	path := strings.TrimSpace(getText(a.hOutputEdit))
-	if path == "" {
-		path = strings.TrimSpace(a.settings.OutputDir)
-	}
+	path := a.v420OutputDir(a.currentKind)
 	if path == "" {
 		messageBox(a.hwnd, "输出母目录", "请先选择输出母目录。", MB_OK|MB_ICONINFORMATION)
 		return
@@ -2822,19 +2820,29 @@ func (a *application) openOutputMotherDir() {
 		messageBox(a.hwnd, "输出母目录", err.Error(), MB_OK|MB_ICONERROR)
 		return
 	}
-	a.rememberOutputDirectory(path)
-	_ = config.Save(a.settings)
 	shellOpen(path)
 }
 
 func (a *application) writeSettingsToUI() {
-	a.refreshOutputHistory()
+	a.rightUpdating = true
+	defer func() { a.rightUpdating = false }()
+	a.v420RefreshOutputHistory()
 	if a.currentKind == model.KindImage {
+		labels := []string{"尺寸", "格式", "质量", "大小", "旋转"}
+		for i, label := range labels {
+			setText(a.globalLabels[i], label)
+			setText(a.rightLabels[i], label)
+		}
 		comboFill(a.hResolution, imageSizes(), a.settings.ImageSize)
 		comboFill(a.hCodec, []string{"JPG", "PNG"}, a.settings.ImageFormat)
 		comboFill(a.hQuality, []string{"高", "中", "低"}, a.settings.ImageQuality)
 		comboFill(a.hVolume, []string{"不限", "约 500KB", "约 1MB", "约 2MB", "约 5MB"}, a.settings.ImageLimit)
 	} else {
+		labels := []string{"输出", "格式", "质量", "体积", "旋转"}
+		for i, label := range labels {
+			setText(a.globalLabels[i], label)
+			setText(a.rightLabels[i], label)
+		}
 		comboFill(a.hResolution, videoResolutions(), a.settings.Resolution)
 		comboFill(a.hCodec, []string{"H.265", "H.264"}, a.settings.Codec)
 		comboFill(a.hQuality, []string{"高", "中", "低"}, a.settings.Quality)
@@ -2846,14 +2854,10 @@ func (a *application) writeSettingsToUI() {
 
 func (a *application) switchKind(kind model.Kind) {
 	a.currentKind = kind
-	if kind == model.KindVideo {
-		setText(a.hStart, "开始转换")
-	} else {
-		setText(a.hStart, "开始压缩")
-	}
 	a.writeSettingsToUI()
 	a.refreshList()
 	a.updateRightPanel()
+	a.v420UpdateStartAction()
 	for _, h := range []uintptr{a.hVideo, a.hImage} {
 		procInvalidateRect.Call(h, 0, 1)
 	}
@@ -2956,13 +2960,19 @@ func fullCellBarRect(rc rect) rect {
 
 func drawProgressPill(hdc uintptr, rc rect, fraction float64, label string, selected, active bool) {
 	if selected {
-		drawSelectedCell(hdc, rc, label, active)
-		return
+		if active {
+			brush, _, _ := procGetSysColorBrush.Call(COLOR_HIGHLIGHT)
+			procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), brush)
+		} else {
+			fillSolid(hdc, rc, colorRef(240, 244, 249))
+		}
+	} else {
+		fillSolid(hdc, rc, colorRef(255, 255, 255))
 	}
 	fraction = clamp01(fraction)
 	bar := fullCellBarRect(rc)
 	withRoundedClip(hdc, bar, 3, func() {
-		fillSolid(hdc, bar, colorRef(250, 251, 253))
+		fillSolid(hdc, bar, colorRef(247, 249, 252))
 		if fraction > 0 {
 			fill := bar
 			fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
@@ -2972,7 +2982,7 @@ func drawProgressPill(hdc uintptr, rc rect, fraction float64, label string, sele
 			drawHorizontalGradient(hdc, fill, colorRef(169, 204, 243), colorRef(76, 138, 220))
 		}
 	})
-	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(39, 55, 78))
+	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(35, 51, 74))
 }
 
 func compressionColorPair(visual compressionVisual) (uintptr, uintptr) {
@@ -2992,13 +3002,19 @@ func compressionColorPair(visual compressionVisual) (uintptr, uintptr) {
 
 func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, selected, active bool) {
 	if selected {
-		drawSelectedCell(hdc, rc, label, active)
-		return
+		if active {
+			brush, _, _ := procGetSysColorBrush.Call(COLOR_HIGHLIGHT)
+			procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), brush)
+		} else {
+			fillSolid(hdc, rc, colorRef(240, 244, 249))
+		}
+	} else {
+		fillSolid(hdc, rc, colorRef(255, 255, 255))
 	}
 	bar := fullCellBarRect(rc)
 	withRoundedClip(hdc, bar, 3, func() {
 		if task == nil || task.InputSize <= 0 || task.OutputSize <= 0 {
-			fillSolid(hdc, bar, colorRef(250, 251, 253))
+			fillSolid(hdc, bar, colorRef(247, 249, 252))
 			return
 		}
 		visual := compressionVisualFor(task.InputSize, task.OutputSize)
@@ -3017,7 +3033,7 @@ func drawCompressionPill(hdc uintptr, rc rect, task *model.Task, label string, s
 		start, finish := compressionColorPair(visual)
 		drawHorizontalGradient(hdc, right, start, finish)
 	})
-	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(37, 52, 70))
+	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(35, 51, 70))
 }
 
 func taskStatusColor(status model.Status) uintptr {
@@ -3030,6 +3046,8 @@ func taskStatusColor(status model.Status) uintptr {
 		return colorRef(76, 96, 120)
 	case model.StatusPaused:
 		return colorRef(197, 126, 16)
+	case model.StatusHeld:
+		return colorRef(172, 102, 31)
 	case model.StatusDone:
 		return colorRef(35, 143, 79)
 	case model.StatusFailed:
@@ -3148,7 +3166,12 @@ func (a *application) showContextMenu() {
 	appendMenu(m, MF_POPUP, rotation, "修改旋转处理")
 	appendMenu(m, MF_STRING, ID_CTX_COPY_TASK, "以第一项为来源，复制全部参数")
 	appendMenu(m, MF_STRING, ID_CTX_COPY_TRIM_CROP, "仅复制第一项的时长 / 画面裁剪")
-	appendMenu(m, MF_STRING, ID_CTX_READY, "选中项跟随默认 / 退回准备中")
+	temporary, _, _ := procCreatePopupMenu.Call()
+	editFlags, removeFlags := a.v420ContextMenuFlags()
+	appendMenu(temporary, editFlags, ID_CTX_HOLD_EDIT, "搁置并修改参数")
+	appendMenu(temporary, removeFlags, ID_CTX_REMOVE_SAFE, "从任务列表移除")
+	appendMenu(m, MF_POPUP, temporary, "临时操作")
+	appendMenu(m, MF_STRING, ID_CTX_READY, "恢复选中准备任务默认参数")
 	appendMenu(m, MF_SEPARATOR, 0, "")
 	appendMenu(m, MF_STRING, ID_CTX_ROTATION_PREVIEW, "预览选中的方向")
 	appendMenu(m, MF_STRING, ID_CTX_TRIM, "编辑时长与画面裁剪...")
@@ -3171,7 +3194,7 @@ func (a *application) showContextMenu() {
 	appendMenu(m, MF_STRING, ID_CTX_OPEN_OUTPUT_FILE, "直接打开输出文件")
 	appendMenu(m, MF_STRING, ID_CTX_COPY_SOURCE, "复制源文件路径")
 	appendMenu(m, MF_STRING, ID_CTX_COPY_OUTPUT, "复制输出文件路径")
-	appendMenu(m, MF_STRING, ID_CTX_REMOVE, "移除选中")
+	appendMenu(m, MF_STRING, ID_CTX_REMOVE_SAFE, "从任务列表移除")
 	var pt point
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
 	procSetForegroundWindow.Call(a.hwnd)
@@ -3305,22 +3328,23 @@ func chooseExplorerFolder(owner uintptr, title, initial string) string {
 
 func (a *application) chooseFolder(add bool) {
 	title := "选择输出母目录"
-	initial := a.settings.LastOutputDir
-	if initial == "" {
-		initial = a.settings.OutputDir
-	}
+	initial := a.v420OutputDir(a.currentKind)
 	if add {
 		title = "选择包含媒体文件的文件夹"
 		initial = a.settings.LastInputDir
+	} else if a.v420OutputLocked(a.currentKind) {
+		setText(a.hStatusText, "当前活动队列已锁定输出母目录；停止队列后才能更换。")
+		return
 	}
 	folder := chooseExplorerFolder(a.hwnd, title, initial)
 	if folder == "" {
 		return
 	}
 	if !add {
-		a.rememberOutputDirectory(folder)
-		a.refreshOutputHistory()
-		_ = config.Save(a.settings)
+		if a.v420SetOutputDir(a.currentKind, folder) {
+			a.v420RefreshOutputHistory()
+			setText(a.hStatusText, "输出母目录已更换；准备中任务将使用新目录，已入队任务保持原快照。")
+		}
 		return
 	}
 	a.settings.LastInputDir = folder
@@ -3599,7 +3623,7 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 			}
 			continue
 		}
-		t := &model.Task{ID: a.nextID.Add(1), Input: path, Root: root, Kind: kind, Status: model.StatusReady, InputSize: media.FileSize(path), Options: model.TaskOptions{FollowDefaults: true}, ThumbnailIndex: -1}
+		t := &model.Task{ID: a.nextID.Add(1), Input: path, Root: root, Kind: kind, Status: model.StatusReady, InputSize: media.FileSize(path), Options: a.settings.DefaultOptions(kind), ThumbnailIndex: -1}
 		a.tasks = append(a.tasks, t)
 		existing[key] = t
 		highlightIDs[t.ID] = true
@@ -3834,6 +3858,8 @@ func (a *application) refreshAll() {
 	a.refreshTotal()
 	a.updateRightPanel()
 	a.updateComponentStatus()
+	a.v420RefreshOutputHistory()
+	a.v420UpdateStartAction()
 }
 func taskStatusRank(status model.Status) int {
 	switch status {
@@ -3843,6 +3869,8 @@ func taskStatusRank(status model.Status) int {
 		return 1
 	case model.StatusQueued:
 		return 2
+	case model.StatusHeld:
+		return 3
 	case model.StatusReady:
 		return 3
 	case model.StatusFailed:
@@ -4254,56 +4282,7 @@ func (a *application) selectedTask() (*model.Task, int) {
 	return a.tasks[idxs[0]], idxs[0]
 }
 func (a *application) updateRightPanel() {
-	t, _ := a.selectedTask()
-	if t == nil {
-		setText(a.hRightTitle, "转换参数")
-		setText(a.hDetails, "选择一个或多个任务后，可在这里查看源信息、输出设置和警告，并只修改选中项。\r\n\r\n支持 Ctrl/Shift 多选、右键菜单和双击预览。")
-		return
-	}
-	opts := a.settings.EffectiveOptions(t)
-	setText(a.hRightTitle, "转换参数")
-	if t.Kind == model.KindImage {
-		comboFill(a.hTaskRes, imageSizes(), opts.ImageSize)
-		comboFill(a.hTaskCodec, []string{"JPG", "PNG"}, opts.ImageFormat)
-		comboFill(a.hTaskVolume, []string{"不限", "约 500KB", "约 1MB", "约 2MB", "约 5MB"}, opts.ImageLimit)
-	} else {
-		comboFill(a.hTaskRes, videoResolutions(), opts.Resolution)
-		comboFill(a.hTaskCodec, []string{"H.265", "H.264"}, opts.Codec)
-		comboFill(a.hTaskVolume, volumeModes(), optionsVolumeDisplay(opts))
-	}
-	comboFill(a.hTaskQuality, []string{"高", "中", "低"}, opts.Quality)
-	comboFill(a.hTaskRotation, rotations(), opts.Rotation)
-	source := fmt.Sprintf("源文件：%s\r\n\r\n源信息：%d×%d · %.2f FPS · %d kb/s · %s\r\n视频：%s · %s\r\n音频：%s（%d 轨，%d kb/s） · 字幕 %d 轨\r\n\r\n时长：%s\r\n\r\n片段与画面：%s\r\n\r\n方向标签：%d°\r\n\r\n参数来源：%s\r\n\r\n输出设置：%s · %s · %s · %s\r\n音频策略：%s · 字幕策略：%s\r\n\r\n编码引擎：%s", t.Input, t.Width, t.Height, t.FPS, t.BitrateKbps, media.FormatBytes(t.InputSize), emptyDash(t.VideoCodec), emptyDash(t.HDRInfo), emptyDash(t.AudioCodec), t.AudioStreams, t.AudioBitrateKbps, t.SubtitleStreams, formatSecondsClock(t.Duration), trimCropSummary(t), t.Rotation, func() string {
-		if t.Options.FollowDefaults {
-			return "跟随默认"
-		}
-		return "单独设置"
-	}(), opts.Resolution, opts.Codec, opts.Quality, optionsVolumeDisplay(opts), a.settings.AudioMode, a.settings.SubtitleMode, func() string {
-		if t.Engine != "" {
-			return t.Engine
-		}
-		if a.settings.SmartStreamCopy {
-			return "符合条件时智能复制；否则按常规编码"
-		}
-		if a.settings.UseGPU {
-			return "GPU 优先，失败回退 CPU"
-		}
-		return "CPU 高质量"
-	}())
-	if t.OutputSize > 0 && t.InputSize > 0 {
-		ratio := float64(t.OutputSize) / float64(t.InputSize) * 100
-		source += "\r\n\r\n体积对比：" + compressionBar(ratio) + fmt.Sprintf(" %.1f%%（%s → %s）", ratio, media.FormatBytes(t.InputSize), media.FormatBytes(t.OutputSize))
-	}
-	if t.Error != "" {
-		if t.FailureCategory != "" {
-			source += "\r\n\r\n失败分类：" + t.FailureCategory
-		}
-		source += "\r\n\r\n错误：" + t.Error
-	}
-	if t.ValidationWarning != "" {
-		source += "\r\n\r\n输出校验警告：" + t.ValidationWarning
-	}
-	setText(a.hDetails, source)
+	a.v420UpdateRightPanel()
 }
 func emptyDash(s string) string {
 	if strings.TrimSpace(s) == "" {
@@ -4342,52 +4321,7 @@ func trimCropSummary(t *model.Task) string {
 }
 
 func (a *application) applyTaskOptions(defaults bool) {
-	idxs := a.selectedTaskIndices()
-	if len(idxs) == 0 {
-		return
-	}
-	a.readSettingsFromUI()
-	a.mu.Lock()
-	for _, idx := range idxs {
-		if idx < 0 || idx >= len(a.tasks) {
-			continue
-		}
-		t := a.tasks[idx]
-		if t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
-			continue
-		}
-		if defaults {
-			t.Options = model.TaskOptions{FollowDefaults: true}
-			continue
-		}
-		o := a.settings.EffectiveOptions(t)
-		o.FollowDefaults = false
-		o.Quality = comboText(a.hTaskQuality)
-		o.Rotation = comboText(a.hTaskRotation)
-		if t.Kind == model.KindImage {
-			o.ImageSize = comboText(a.hTaskRes)
-			o.ImageFormat = comboText(a.hTaskCodec)
-			o.ImageLimit = comboText(a.hTaskVolume)
-		} else {
-			o.Resolution = comboText(a.hTaskRes)
-			o.Codec = comboText(a.hTaskCodec)
-			parseVolume(&o, comboText(a.hTaskVolume))
-		}
-		t.Options = o
-		if t.Status == model.StatusDone || t.Status == model.StatusFailed || t.Status == model.StatusSkipped || t.Status == model.StatusCancelled {
-			t.Status = model.StatusReady
-			t.Progress = 0
-			t.OutputPath = ""
-			t.OutputSize = 0
-			t.Error = ""
-			t.FailureCategory = ""
-			t.ValidationWarning = ""
-		}
-	}
-	a.mu.Unlock()
-	a.saveSession()
-	a.refreshList()
-	a.updateRightPanel()
+	a.v420ApplyTaskOptions(defaults)
 }
 func scaleCropValue(value, sourceSize, targetSize int) int {
 	if sourceSize <= 0 || targetSize <= 0 {
@@ -4475,7 +4409,7 @@ func copyTrimCropToTargets(settings model.Settings, tasks []*model.Task, idxs []
 			continue
 		}
 		target := tasks[idx]
-		if target.Status == model.StatusQueued || target.Status == model.StatusProcessing || target.Status == model.StatusPaused {
+		if target.IsLocked() {
 			continue
 		}
 		targetOpts := settings.EffectiveOptions(target)
@@ -4521,7 +4455,7 @@ func (a *application) copyTaskOptions() {
 			continue
 		}
 		t := a.tasks[i]
-		if t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
+		if t.IsLocked() {
 			continue
 		}
 		t.Options = src
@@ -4549,7 +4483,7 @@ func (a *application) setSelectedQuickOption(id int) {
 			continue
 		}
 		t := a.tasks[i]
-		if t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
+		if t.IsLocked() {
 			continue
 		}
 		o := a.settings.EffectiveOptions(t)
@@ -4880,7 +4814,10 @@ func optionsVolumeDisplay(o model.TaskOptions) string {
 }
 
 func (a *application) readSettingsFromUI() {
-	a.settings.OutputDir = strings.TrimSpace(getText(a.hOutputEdit))
+	path := strings.TrimSpace(getText(a.hOutputEdit))
+	if path != "" && !a.v420OutputLocked(a.currentKind) {
+		a.v420SetOutputDir(a.currentKind, path)
+	}
 	if a.currentKind == model.KindImage {
 		a.settings.ImageSize = comboText(a.hResolution)
 		a.settings.ImageFormat = comboText(a.hCodec)
@@ -4890,28 +4827,14 @@ func (a *application) readSettingsFromUI() {
 		a.settings.Resolution = comboText(a.hResolution)
 		a.settings.Codec = comboText(a.hCodec)
 		a.settings.Quality = comboText(a.hQuality)
-		o := model.TaskOptions{}
+		o := a.settings.DefaultOptions(model.KindVideo)
 		parseVolume(&o, comboText(a.hVolume))
 		a.settings.VolumeMode = o.VolumeMode
-		if o.TargetSizeMB > 0 {
-			a.settings.TargetSizeMB = o.TargetSizeMB
-		}
-		if o.BitrateMbps > 0 {
-			a.settings.BitrateMbps = o.BitrateMbps
-		}
+		a.settings.TargetSizeMB = o.TargetSizeMB
+		a.settings.BitrateMbps = o.BitrateMbps
 	}
 	a.settings.Rotation = comboText(a.hRotation)
-	if v := comboText(a.hSpeedMode); v != "" {
-		a.settings.SpeedMode = v
-	}
-	ffmpeg, _, _, player, _ := a.componentSnapshot()
-	a.settings.FFmpegPath = ffmpeg
-	a.settings.PlayerPath = player
-	if a.settings.OutputDir != "" {
-		a.rememberOutputDirectory(a.settings.OutputDir)
-	}
-	a.settings.TaskColumnWidths = a.currentTaskColumnWidths()
-	_ = config.Save(a.settings)
+	a.settings.SpeedMode = comboText(a.hSpeedMode)
 }
 
 func cleanupMatches(status model.Status, mode string) bool {
@@ -5139,117 +5062,7 @@ func (a *application) estimateRunBytes(runIDs map[int64]bool) int64 {
 func (a *application) startQueue() { a.startQueueFiltered(nil) }
 
 func (a *application) startQueueFiltered(only map[int64]bool) {
-	a.runMu.Lock()
-	if a.running {
-		wasPaused := a.paused
-		a.runMu.Unlock()
-		if wasPaused {
-			a.togglePause()
-		}
-		return
-	}
-	a.runMu.Unlock()
-	a.readSettingsFromUI()
-	if a.settings.OutputDir == "" {
-		messageBox(a.hwnd, "输出目录", "请先选择输出母目录。", MB_OK|MB_ICONINFORMATION)
-		return
-	}
-	ff, fp, ok := media.FindFFmpeg(a.ffmpeg)
-	if !ok {
-		messageBox(a.hwnd, "缺少 FFmpeg", "请通过 FFmpeg 菜单选择组件目录；同目录必须有 ffmpeg.exe 与 ffprobe.exe。", MB_OK|MB_ICONERROR)
-		return
-	}
-	a.ffmpeg, a.ffprobe = ff, fp
-	runKind := a.currentKind
-	runIDs := make(map[int64]bool)
-	a.mu.Lock()
-	for _, t := range a.tasks {
-		selected := only == nil || only[t.ID]
-		eligible := t.Status == model.StatusReady || t.Status == model.StatusFailed || t.Status == model.StatusCancelled
-		if only != nil {
-			eligible = eligible || t.Status == model.StatusDone || t.Status == model.StatusSkipped
-		}
-		if selected && t.Kind == runKind && eligible {
-			media.PrepareTaskForRun(t)
-			runIDs[t.ID] = true
-		}
-	}
-	a.mu.Unlock()
-	if len(runIDs) == 0 {
-		messageBox(a.hwnd, "任务队列", "当前工作区没有准备中的任务。", MB_OK|MB_ICONINFORMATION)
-		return
-	}
-	if a.settings.EstimateDiskSpace {
-		_ = os.MkdirAll(a.settings.OutputDir, 0o755)
-		need := a.estimateRunBytes(runIDs)
-		if free, err := media.AvailableDiskBytes(a.settings.OutputDir); err == nil && need > 0 {
-			required := uint64(float64(need)*1.15) + 256*1024*1024
-			if free < required {
-				msg := fmt.Sprintf("预计本次输出约 %s，建议至少保留 %s；当前可用空间 %s。\r\n\r\n继续转换可能因磁盘空间不足而失败，是否仍要继续？", media.FormatBytes(need), media.FormatBytes(int64(required)), media.FormatBytes(int64(free)))
-				if messageBox(a.hwnd, "磁盘空间预检", msg, MB_YESNO|MB_ICONWARNING) != IDYES {
-					a.mu.Lock()
-					for _, t := range a.tasks {
-						if runIDs[t.ID] && t.Status == model.StatusQueued {
-							t.Status = model.StatusReady
-						}
-					}
-					a.mu.Unlock()
-					a.refreshAll()
-					return
-				}
-			}
-		}
-	}
-	controller := media.NewProcessController()
-	baseCtx := context.Background()
-	ctx, cancel := context.WithCancel(media.WithProcessController(baseCtx, controller))
-	a.runMu.Lock()
-	a.running = true
-	a.paused = false
-	a.runKind = runKind
-	a.runStart = time.Now()
-	a.timeEnd = time.Time{}
-	a.ctx, a.cancel = ctx, cancel
-	a.controller = controller
-	a.gpuDisabledForRun = false
-	a.runOnly = only
-	a.runTaskIDs = runIDs
-	a.reservedOutputs = make(map[string]int64)
-	workers := a.recommendedWorkers(runKind, runIDs)
-	if workers < 1 {
-		workers = 1
-	}
-	if workers > config.MaxConcurrency() {
-		workers = config.MaxConcurrency()
-	}
-	a.runMu.Unlock()
-	enable(a.hPause, true)
-	enable(a.hStop, true)
-	enable(a.hStart, false)
-	setText(a.hPause, "暂停")
-	mode := "手动"
-	if a.settings.AutoConcurrency {
-		mode = "自动"
-	}
-	setText(a.hStatusText, fmt.Sprintf("开始处理 %d 个任务 · 实际并发 %d（%s；%d 逻辑处理器，上限 %d）。", len(runIDs), workers, mode, config.LogicalProcessorCount(), config.MaxConcurrency()))
-	procSetTimer.Call(a.hwnd, TIMER_MAIN_CLOCK, 1000, 0)
-	a.updateFloatingBar(0, floatingProgressText(0, 0, len(runIDs), 0, 0, "—", 0, "准备中", false), true)
-	a.saveSession()
-	for i := 0; i < workers; i++ {
-		a.workers.Add(1)
-		go a.worker()
-	}
-	go func() {
-		a.workers.Wait()
-		// The interactive application finalizes through WM_APP_DONE. The
-		// self-test waits for the same workers synchronously and owns a
-		// dedicated shutdown path, so posting a second completion message
-		// would race with its exit message.
-		if a.selfTest {
-			return
-		}
-		procPostMessageW.Call(a.hwnd, WM_APP_DONE, 0, 0)
-	}()
+	a.v420StartQueueFiltered(only)
 }
 
 func (a *application) worker() {
@@ -5276,45 +5089,19 @@ func (a *application) worker() {
 				}
 			}()
 			a.convertOne(id, t, settings)
+			for {
+				next, nextSettings, restart := a.v420WaitReservedRestart(id)
+				if !restart {
+					break
+				}
+				a.convertOne(id, next, nextSettings)
+			}
 		}()
 	}
 }
 
 func (a *application) takeNext() (int64, *model.Task, model.Settings, bool) {
-	a.runMu.Lock()
-	for a.running && a.paused {
-		a.pauseCond.Wait()
-	}
-	running := a.running
-	ctx := a.ctx
-	runKind := a.runKind
-	runOnly := a.runOnly
-	a.runMu.Unlock()
-	if !running || ctx == nil || ctx.Err() != nil {
-		return 0, nil, model.Settings{}, false
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for _, pinnedOnly := range []bool{true, false} {
-		for _, t := range a.tasks {
-			if t.Pinned != pinnedOnly {
-				continue
-			}
-			allowed := runOnly == nil || runOnly[t.ID]
-			if allowed && t.Kind == runKind && t.Status == model.StatusQueued {
-				t.Status = model.StatusProcessing
-				t.StartedAt = time.Now()
-				t.FinishedAt = time.Time{}
-				t.Progress = 0
-				t.Engine = "准备编码"
-				snapshot := *t
-				settings := a.settings
-				a.postTaskRow(t.ID)
-				return t.ID, &snapshot, settings, true
-			}
-		}
-	}
-	return 0, nil, model.Settings{}, false
+	return a.v420TakeNext()
 }
 
 func (a *application) outputUnavailable(path string) bool {
@@ -5427,9 +5214,16 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 	input, root, kind := t.Input, t.Root, t.Kind
 	a.mu.Unlock()
 
-	out, skip, err := media.ResolveAndReserveOutput(input, root, settings.OutputDir, kind, opts, settings, a.outputUnavailable, func(path string) bool {
-		return a.reserveOutput(path, id)
-	})
+	out := strings.TrimSpace(taskSnapshot.OutputPath)
+	skip := false
+	var err error
+	if out == "" {
+		outputRoot := settings.OutputDirFor(kind)
+		if taskSnapshot.Queue != nil && taskSnapshot.Queue.OutputRoot != "" {
+			outputRoot = taskSnapshot.Queue.OutputRoot
+		}
+		out, skip, err = media.ResolveAndReserveOutput(input, root, outputRoot, kind, opts, settings, a.outputUnavailable, func(path string) bool { return a.reserveOutput(path, id) })
+	}
 	if err != nil {
 		a.failTask(id, "输出路径失败: "+err.Error())
 		return
@@ -5459,8 +5253,11 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 
 	a.runMu.Lock()
 	gpuDisabled := a.gpuDisabledForRun
-	ctx := a.ctx
+	parentCtx := a.ctx
 	a.runMu.Unlock()
+	ctx, taskCancel := context.WithCancel(parentCtx)
+	a.v420RegisterTaskCancel(id, taskCancel)
+	defer func() { taskCancel(); a.v420UnregisterTaskCancel(id) }()
 	if gpuDisabled {
 		settings.UseGPU = false
 	}
@@ -5502,6 +5299,9 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 	}
 	if err != nil {
 		_ = os.Remove(out)
+		if a.v420CompleteInterruption(id) {
+			return
+		}
 		if ctx != nil && ctx.Err() != nil {
 			a.cancelTask(id, "任务已停止", opts)
 		} else {
@@ -5623,97 +5423,11 @@ func (a *application) cancelTask(id int64, msg string, opts model.TaskOptions) {
 }
 
 func (a *application) togglePause() {
-	a.runMu.Lock()
-	if !a.running {
-		a.runMu.Unlock()
-		return
-	}
-	a.paused = !a.paused
-	paused := a.paused
-	controller := a.controller
-	if !paused {
-		a.pauseCond.Broadcast()
-	}
-	a.runMu.Unlock()
-	var controlErr error
-	if paused {
-		controlErr = controller.Pause()
-	} else {
-		controlErr = controller.Resume()
-	}
-	a.mu.Lock()
-	for _, t := range a.tasks {
-		if !a.runTaskIDs[t.ID] {
-			continue
-		}
-		if paused && t.Status == model.StatusProcessing {
-			t.Status = model.StatusPaused
-		} else if !paused && t.Status == model.StatusPaused {
-			t.Status = model.StatusProcessing
-		}
-	}
-	a.mu.Unlock()
-	if paused {
-		setText(a.hPause, "继续")
-		msg := "队列与正在运行的 FFmpeg 进程均已暂停。"
-		if controlErr != nil {
-			msg = "队列已暂停，但个别 FFmpeg 进程暂停失败：" + short(controlErr.Error(), 180)
-		}
-		setText(a.hStatusText, msg)
-	} else {
-		setText(a.hPause, "暂停")
-		msg := "队列与 FFmpeg 进程已继续。"
-		if controlErr != nil {
-			msg = "队列已继续，但个别 FFmpeg 进程恢复失败：" + short(controlErr.Error(), 180)
-		}
-		setText(a.hStatusText, msg)
-	}
-	procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
+	a.v420TogglePause()
 }
 
 func (a *application) stopQueue() {
-	a.runMu.Lock()
-	if !a.running {
-		a.runMu.Unlock()
-		return
-	}
-	a.running = false
-	a.paused = false
-	controller := a.controller
-	if a.cancel != nil {
-		a.cancel()
-	}
-	a.pauseCond.Broadcast()
-	runIDs := a.runTaskIDs
-	a.runMu.Unlock()
-	if controller != nil {
-		_ = controller.Resume() // a suspended process must be resumed before cancellation can terminate it.
-	}
-	type stoppedTask struct {
-		task *model.Task
-		opts model.TaskOptions
-	}
-	var stopped []stoppedTask
-	a.mu.Lock()
-	for _, t := range a.tasks {
-		if runIDs == nil || !runIDs[t.ID] {
-			continue
-		}
-		if t.Status == model.StatusReady || t.Status == model.StatusQueued || t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
-			t.Status = model.StatusCancelled
-			t.Error = "已停止"
-			t.Engine = "已停止"
-			t.FinishedAt = time.Now()
-			stopped = append(stopped, stoppedTask{task: t, opts: a.settings.EffectiveOptions(t)})
-		}
-	}
-	a.mu.Unlock()
-	for _, item := range stopped {
-		a.appendTaskHistory(item.task, item.opts, "已停止")
-	}
-	setText(a.hStatusText, "正在停止所有转换进程…")
-	a.saveSession()
-	procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
+	a.v420StopQueue()
 }
 
 func (a *application) finishRun() {
@@ -5729,6 +5443,7 @@ func (a *application) finishRun() {
 	a.runOnly = nil
 	a.runTaskIDs = nil
 	a.reservedOutputs = make(map[string]int64)
+	a.v420ResetRunMaps()
 	runStarted := a.runStart
 	runEnded := a.timeEnd
 	a.runMu.Unlock()
@@ -5800,8 +5515,8 @@ func (a *application) finishRun() {
 		}
 		a.showCompletionToast(title, body)
 	}
-	if a.settings.OpenOutputOnDone && a.settings.OutputDir != "" {
-		shellOpen(a.settings.OutputDir)
+	if outputDir := a.settings.OutputDirFor(runKind); a.settings.OpenOutputOnDone && outputDir != "" {
+		shellOpen(outputDir)
 	}
 }
 
@@ -5811,7 +5526,7 @@ func (a *application) refreshTotal() {
 	paused := a.paused
 	start := a.runStart
 	kind := a.currentKind
-	runIDs := a.runTaskIDs
+	runIDs := copyTaskIDSet(a.runTaskIDs)
 	if running {
 		kind = a.runKind
 	}
@@ -5909,7 +5624,7 @@ func (a *application) refreshTotal() {
 }
 
 func prepareTaskForRetry(t *model.Task) bool {
-	if t == nil || t.Status == model.StatusQueued || t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
+	if t == nil || t.IsLocked() {
 		return false
 	}
 	t.Status = model.StatusReady
@@ -6416,7 +6131,7 @@ func (a *application) saveSession() {
 	items := make([]*model.Task, 0, len(a.tasks))
 	for _, t := range a.tasks {
 		cp := *t
-		if cp.Status == model.StatusProcessing || cp.Status == model.StatusQueued {
+		if cp.Status == model.StatusProcessing || cp.Status == model.StatusQueued || cp.Status == model.StatusPaused || cp.Status == model.StatusHeld {
 			cp.Status = model.StatusReady
 			cp.Progress = 0
 		}
@@ -6447,7 +6162,7 @@ func (a *application) loadSession() {
 			t.FailureCategory = "源文件缺失"
 			t.Progress = 0
 		}
-		if !missing && (t.Status == model.StatusProcessing || t.Status == model.StatusQueued || t.Status == model.StatusCancelled) {
+		if !missing && (t.Status == model.StatusProcessing || t.Status == model.StatusQueued || t.Status == model.StatusPaused || t.Status == model.StatusHeld || t.Status == model.StatusCancelled) {
 			t.Status = model.StatusReady
 			t.Progress = 0
 		}
@@ -6619,27 +6334,12 @@ func (a *application) writeDiagnostics() {
 	messageBox(a.hwnd, "诊断报告", "诊断报告已生成并打开，文件路径已复制到剪贴板。", MB_OK|MB_ICONINFORMATION)
 }
 
-func parseUIPreviewArgs(args []string) bool {
-	for _, arg := range args {
-		if strings.TrimSpace(arg) == "--ui-preview" {
-			return true
-		}
-	}
-	return false
+func parseUIPreviewArgs(args []string) (bool, string) {
+	return parseV420UIPreviewArgs(args)
 }
 
 func (a *application) populateUIPreviewTasks() {
-	now := time.Now()
-	preview := []*model.Task{
-		{ID: a.nextID.Add(1), Input: `C:\Media\Phone\2026-07-28_Baby_Video.MOV`, Kind: model.KindVideo, Width: 3840, Height: 2160, Rotation: 90, Duration: 74.2, FPS: 29.97, BitrateKbps: 48200, VideoCodec: "HEVC", AudioCodec: "AAC", AudioStreams: 1, InputSize: 428 * 1024 * 1024, Status: model.StatusReady, Progress: 0, ThumbnailIndex: -1, Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `C:\Media\Camera\Travel\IMG_3187.MP4`, Kind: model.KindVideo, Width: 3840, Height: 2160, Duration: 182.6, FPS: 59.94, BitrateKbps: 72100, VideoCodec: "H.264", AudioCodec: "AAC", AudioStreams: 1, InputSize: 1538 * 1024 * 1024, Status: model.StatusProcessing, Progress: 63.4, Engine: "CPU · H.265", ThumbnailIndex: -1, StartedAt: now.Add(-2 * time.Minute), Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `D:\Archive\Family\Birthday_001.mp4`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 96.4, FPS: 25, BitrateKbps: 16800, VideoCodec: "H.264", AudioCodec: "AAC", AudioStreams: 1, InputSize: 206 * 1024 * 1024, OutputPath: `D:\Output\Birthday_001.mp4`, OutputSize: 71 * 1024 * 1024, Status: model.StatusDone, Progress: 100, Engine: "NVIDIA NVENC", ThumbnailIndex: -1, FinishedAt: now.Add(-4 * time.Minute), Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `D:\Archive\OldPhone\VID_0042.3gp`, Kind: model.KindVideo, Width: 1280, Height: 720, Duration: 48.7, FPS: 30, BitrateKbps: 5100, VideoCodec: "H.264", AudioCodec: "AAC", AudioStreams: 1, InputSize: 31 * 1024 * 1024, Status: model.StatusFailed, Progress: 18.2, Error: "输入文件尾部损坏，解码器无法继续读取。", FailureCategory: "源文件损坏", ThumbnailIndex: -1, Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `C:\Media\Phone\Screenshot_20260730.png`, Kind: model.KindImage, Width: 1440, Height: 3200, InputSize: 7 * 1024 * 1024, Status: model.StatusReady, ThumbnailIndex: -1, Options: model.TaskOptions{FollowDefaults: true}},
-	}
-	a.mu.Lock()
-	a.tasks = preview
-	a.mu.Unlock()
+	a.v420PopulateUIPreviewTasks()
 }
 func parseSelfTestArgs(args []string) (bool, string) {
 	enabled := false
@@ -6726,7 +6426,13 @@ func (a *application) resetSelfTestRunState() {
 	a.runOnly = nil
 	a.runTaskIDs = nil
 	a.reservedOutputs = make(map[string]int64)
+	a.v420ResetRunMaps()
 	a.runMu.Unlock()
+	a.mu.Lock()
+	a.heldEditTaskID = 0
+	a.rightDraftFields = make(map[int]bool)
+	a.rightSelectionKey = ""
+	a.mu.Unlock()
 	procKillTimer.Call(a.hwnd, TIMER_MAIN_CLOCK)
 }
 
@@ -7583,6 +7289,7 @@ func (a *application) runSelfTest() {
 		}
 	}
 
+	a.runV420DynamicQueueSelfTest(&report, root, videoPath, ffprobe)
 	a.showImportToast("自检导入：视频 2 个，图片 1 个")
 	a.hideImportToast()
 	report.Checks["import_toast"] = true
@@ -7766,7 +7473,7 @@ func (a *application) applySmartPlan() {
 		if len(selected) > 0 && !selected[i] {
 			continue
 		}
-		if t.Status == model.StatusProcessing || t.Status == model.StatusQueued {
+		if t.IsLocked() {
 			continue
 		}
 		opts := a.settings.EffectiveOptions(t)
