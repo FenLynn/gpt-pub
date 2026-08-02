@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -11,8 +12,11 @@ namespace PersonalWorkbench;
 public partial class ZoteroLibraryControl : UserControl
 {
     private readonly AppSettings _settings;
+    private readonly SemaphoreSlim _databaseGate = new(1, 1);
     private bool _loaded;
     private bool _busy;
+    private long _listRequestVersion;
+    private long _detailRequestVersion;
     private ZoteroCollectionNode? _scope;
     private ZoteroRecord? _selectedRecord;
     private ZoteroItemDetails? _selectedDetails;
@@ -26,15 +30,17 @@ public partial class ZoteroLibraryControl : UserControl
         _settings = settings;
         InitializeComponent();
         UpdateModeBadge();
-        IsVisibleChanged += async (_, _) =>
-        {
-            if (IsVisible)
-                await EnsureLoadedAsync();
-        };
+
+        // Database access is deliberately not bound to IsVisibleChanged. The control
+        // is reparented while the feature pipeline is assembled, and visibility changes
+        // must never start SQLite work. WorkbenchEnhancer explicitly loads the library
+        // only after the user selects the Library navigation item.
     }
 
     public void InvalidateLibrary()
     {
+        Interlocked.Increment(ref _listRequestVersion);
+        Interlocked.Increment(ref _detailRequestVersion);
         _loaded = false;
         ItemsList.ItemsSource = null;
         CollectionTree.ItemsSource = null;
@@ -59,29 +65,42 @@ public partial class ZoteroLibraryControl : UserControl
 
     private async Task LoadSnapshotAndSearchAsync()
     {
-        if (_busy) return;
+        if (_busy)
+            return;
+
+        var requestVersion = Interlocked.Increment(ref _listRequestVersion);
         try
         {
             _busy = true;
             FirstRunOverlay.Visibility = Visibility.Collapsed;
             ConnectionText.Text = "正在读取…";
-            ResultStatus.Text = "正在读取 Zotero 分类与元信息…";
+            ResultStatus.Text = "正在后台读取 Zotero 分类与元信息…";
 
-            var snapshot = await ZoteroLibrary.ReadSnapshotAsync(_settings.ZoteroDbPath);
+            var databasePath = _settings.ZoteroDbPath;
+            var snapshot = await RunDatabaseReadAsync(
+                () => ZoteroLibrary.ReadSnapshotAsync(databasePath),
+                CancellationToken.None);
+            if (!IsCurrentListRequest(requestVersion))
+                return;
+
             CollectionTree.ItemsSource = snapshot.Roots;
             ConnectionText.Text = $"已连接 · {snapshot.ItemCount:N0} 条";
             if (!string.IsNullOrWhiteSpace(snapshot.SchemaVersion))
                 ConnectionBadge.ToolTip = "数据库版本：" + snapshot.SchemaVersion;
 
             _scope = snapshot.Roots.FirstOrDefault();
-            await SearchAsync();
+            var results = await QueryRecordsAsync(CancellationToken.None);
+            if (!IsCurrentListRequest(requestVersion))
+                return;
+
+            ApplySearchResults(results);
             _loaded = true;
         }
         catch (Exception ex)
         {
             App.Log("Zotero library load failed: " + ex);
             ConnectionText.Text = "读取失败";
-            ResultStatus.Text = ex.Message;
+            ResultStatus.Text = "读取失败：" + ex.Message;
             FirstRunOverlay.Visibility = Visibility.Visible;
         }
         finally
@@ -92,76 +111,124 @@ public partial class ZoteroLibraryControl : UserControl
 
     private async Task SearchAsync()
     {
-        if (!File.Exists(_settings.ZoteroDbPath) || _busy && !_loaded)
+        if (!File.Exists(_settings.ZoteroDbPath) || !_loaded || _busy)
             return;
+
+        var requestVersion = Interlocked.Increment(ref _listRequestVersion);
         try
         {
-            ResultStatus.Text = "正在检索…";
-            var typeTag = (ItemTypeFilter.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
-            var sortTag = (SortFilter.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "modified";
-            var sortMode = sortTag switch
-            {
-                "added" => ZoteroSortMode.AddedDescending,
-                "year" => ZoteroSortMode.YearDescending,
-                "title" => ZoteroSortMode.TitleAscending,
-                _ => ZoteroSortMode.ModifiedDescending
-            };
-
-            ZoteroSearchRequest CreateRequest(long? collectionId, int limit) => new()
-            {
-                Query = SearchBox.Text,
-                Scope = _scope?.Scope ?? ZoteroScopeKind.All,
-                CollectionId = collectionId,
-                ItemType = typeTag,
-                PdfOnly = PdfOnlyFilter.IsChecked == true,
-                Sort = sortMode,
-                Limit = limit
-            };
-
-            IReadOnlyList<ZoteroRecord> results;
-            var collectionIds = _scope?.Scope == ZoteroScopeKind.Collection
-                ? EnumerateCollectionIds(_scope).Distinct().ToArray()
-                : Array.Empty<long>();
-
-            if (collectionIds.Length > 0)
-            {
-                var perCollectionLimit = _settings.ZoteroLoadFullLibrary
-                    ? 0
-                    : Math.Max(_settings.EffectiveZoteroLimit, 250);
-                var batches = await Task.WhenAll(collectionIds.Select(id =>
-                    ZoteroLibrary.SearchAsync(_settings.ZoteroDbPath, CreateRequest(id, perCollectionLimit))));
-                var merged = batches
-                    .SelectMany(batch => batch)
-                    .GroupBy(record => record.ItemId)
-                    .Select(group => group.First());
-                results = SortRecords(merged, sortMode)
-                    .Take(_settings.ZoteroLoadFullLibrary ? int.MaxValue : _settings.EffectiveZoteroLimit)
-                    .ToArray();
-            }
-            else
-            {
-                results = await ZoteroLibrary.SearchAsync(
-                    _settings.ZoteroDbPath,
-                    CreateRequest(_scope?.CollectionId, _settings.EffectiveZoteroLimit));
-            }
-
-            ItemsList.ItemsSource = results;
-            CurrentScopeText.Text = _scope?.Scope == ZoteroScopeKind.Collection && _scope.Children.Count > 0
-                ? (_scope.Name + " · 含子分类")
-                : (_scope?.Name ?? "全部文献");
-            ResultStatus.Text = _settings.ZoteroLoadFullLibrary
-                ? $"已载入 {results.Count:N0} 条 · 全量模式"
-                : $"已载入 {results.Count:N0} 条 · 校准上限 {_settings.EffectiveZoteroLimit:N0}";
-            if (results.Count > 0)
-                ItemsList.SelectedIndex = 0;
-            else
-                ClearDetails();
+            _busy = true;
+            ResultStatus.Text = "正在后台检索…";
+            var results = await QueryRecordsAsync(CancellationToken.None);
+            if (!IsCurrentListRequest(requestVersion))
+                return;
+            ApplySearchResults(results);
         }
         catch (Exception ex)
         {
             App.Log("Zotero search failed: " + ex);
             ResultStatus.Text = "检索失败：" + ex.Message;
         }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<IReadOnlyList<ZoteroRecord>> QueryRecordsAsync(CancellationToken cancellationToken)
+    {
+        var databasePath = _settings.ZoteroDbPath;
+        var query = SearchBox.Text;
+        var scope = _scope;
+        var typeTag = (ItemTypeFilter.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+        var sortTag = (SortFilter.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "modified";
+        var sortMode = sortTag switch
+        {
+            "added" => ZoteroSortMode.AddedDescending,
+            "year" => ZoteroSortMode.YearDescending,
+            "title" => ZoteroSortMode.TitleAscending,
+            _ => ZoteroSortMode.ModifiedDescending
+        };
+        var pdfOnly = PdfOnlyFilter.IsChecked == true;
+        var loadFullLibrary = _settings.ZoteroLoadFullLibrary;
+        var effectiveLimit = _settings.EffectiveZoteroLimit;
+        var collectionIds = scope?.Scope == ZoteroScopeKind.Collection
+            ? EnumerateCollectionIds(scope).Distinct().ToArray()
+            : Array.Empty<long>();
+
+        ZoteroSearchRequest CreateRequest(long? collectionId, int limit) => new()
+        {
+            Query = query,
+            Scope = scope?.Scope ?? ZoteroScopeKind.All,
+            CollectionId = collectionId,
+            ItemType = typeTag,
+            PdfOnly = pdfOnly,
+            Sort = sortMode,
+            Limit = limit
+        };
+
+        return await RunDatabaseReadAsync(async () =>
+        {
+            if (collectionIds.Length == 0)
+            {
+                return await ZoteroLibrary.SearchAsync(
+                    databasePath,
+                    CreateRequest(scope?.CollectionId, effectiveLimit)).ConfigureAwait(false);
+            }
+
+            // Keep one read connection active at a time. Zotero may have the live
+            // database open, and parallel descendant-collection queries only increase
+            // lock pressure and CPU cost without improving perceived responsiveness.
+            var perCollectionLimit = loadFullLibrary ? 0 : Math.Max(effectiveLimit, 250);
+            var merged = new Dictionary<long, ZoteroRecord>();
+            foreach (var collectionId in collectionIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var batch = await ZoteroLibrary.SearchAsync(
+                    databasePath,
+                    CreateRequest(collectionId, perCollectionLimit)).ConfigureAwait(false);
+                foreach (var record in batch)
+                    merged.TryAdd(record.ItemId, record);
+            }
+
+            return SortRecords(merged.Values, sortMode)
+                .Take(loadFullLibrary ? int.MaxValue : effectiveLimit)
+                .ToArray();
+        }, cancellationToken);
+    }
+
+    private async Task<T> RunDatabaseReadAsync<T>(
+        Func<Task<T>> readOperation,
+        CancellationToken cancellationToken)
+    {
+        await _databaseGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await ZoteroReadScheduler.RunAsync(readOperation, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _databaseGate.Release();
+        }
+    }
+
+    private bool IsCurrentListRequest(long requestVersion) =>
+        requestVersion == Volatile.Read(ref _listRequestVersion);
+
+    private void ApplySearchResults(IReadOnlyList<ZoteroRecord> results)
+    {
+        ItemsList.ItemsSource = results;
+        CurrentScopeText.Text = _scope?.Scope == ZoteroScopeKind.Collection && _scope.Children.Count > 0
+            ? (_scope.Name + " · 含子分类")
+            : (_scope?.Name ?? "全部文献");
+        ResultStatus.Text = _settings.ZoteroLoadFullLibrary
+            ? $"已载入 {results.Count:N0} 条 · 全量模式"
+            : $"已载入 {results.Count:N0} 条 · 校准上限 {_settings.EffectiveZoteroLimit:N0}";
+        if (results.Count > 0)
+            ItemsList.SelectedIndex = 0;
+        else
+            ClearDetails();
     }
 
     private static IEnumerable<long> EnumerateCollectionIds(ZoteroCollectionNode node)
@@ -173,23 +240,37 @@ public partial class ZoteroLibraryControl : UserControl
             yield return id;
     }
 
-    private static IEnumerable<ZoteroRecord> SortRecords(IEnumerable<ZoteroRecord> records, ZoteroSortMode mode)
+    private static IEnumerable<ZoteroRecord> SortRecords(
+        IEnumerable<ZoteroRecord> records,
+        ZoteroSortMode mode)
         => mode switch
         {
-            ZoteroSortMode.AddedDescending => records.OrderByDescending(record => record.DateAdded, StringComparer.OrdinalIgnoreCase),
-            ZoteroSortMode.YearDescending => records.OrderByDescending(record => record.Year, StringComparer.OrdinalIgnoreCase)
+            ZoteroSortMode.AddedDescending => records.OrderByDescending(
+                record => record.DateAdded,
+                StringComparer.OrdinalIgnoreCase),
+            ZoteroSortMode.YearDescending => records.OrderByDescending(
+                    record => record.Year,
+                    StringComparer.OrdinalIgnoreCase)
                 .ThenByDescending(record => record.DateModified, StringComparer.OrdinalIgnoreCase),
-            ZoteroSortMode.TitleAscending => records.OrderBy(record => record.DisplayTitle, StringComparer.CurrentCultureIgnoreCase),
-            _ => records.OrderByDescending(record => record.DateModified, StringComparer.OrdinalIgnoreCase)
+            ZoteroSortMode.TitleAscending => records.OrderBy(
+                record => record.DisplayTitle,
+                StringComparer.CurrentCultureIgnoreCase),
+            _ => records.OrderByDescending(
+                record => record.DateModified,
+                StringComparer.OrdinalIgnoreCase)
         };
 
     private async Task LoadDetailsAsync(ZoteroRecord record)
     {
+        var requestVersion = Interlocked.Increment(ref _detailRequestVersion);
         try
         {
             DetailTitle.Text = record.DisplayTitle;
             DetailAuthors.Text = record.Authors;
-            DetailMeta.Text = string.Join(" · ", new[] { record.ItemTypeLabel, record.Publication, record.Year }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            DetailMeta.Text = string.Join(
+                " · ",
+                new[] { record.ItemTypeLabel, record.Publication, record.Year }
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
             AbstractText.Text = string.IsNullOrWhiteSpace(record.Abstract) ? "暂无摘要" : record.Abstract;
             OpenPrimaryPdfButton.IsEnabled = record.HasPdf;
             CopyDoiButton.IsEnabled = !string.IsNullOrWhiteSpace(record.Doi);
@@ -201,18 +282,34 @@ public partial class ZoteroLibraryControl : UserControl
             CollectionsList.ItemsSource = null;
             TagsPanel.Children.Clear();
 
-            _selectedDetails = await ZoteroLibrary.ReadItemDetailsAsync(_settings.ZoteroDbPath, record);
-            CreatorsList.ItemsSource = _selectedDetails.Creators;
-            InfoFields.ItemsSource = BuildInformationRows(_selectedDetails);
-            AttachmentsList.ItemsSource = _selectedDetails.Attachments;
-            NotesList.ItemsSource = _selectedDetails.Notes;
-            CollectionsList.ItemsSource = _selectedDetails.Collections;
-            RenderTags(_selectedDetails.Tags);
+            var databasePath = _settings.ZoteroDbPath;
+            var details = await RunDatabaseReadAsync(
+                () => ZoteroLibrary.ReadItemDetailsAsync(databasePath, record),
+                CancellationToken.None);
+            if (requestVersion != Volatile.Read(ref _detailRequestVersion)
+                || !ReferenceEquals(_selectedRecord, record))
+            {
+                return;
+            }
+
+            _selectedDetails = details;
+            CreatorsList.ItemsSource = details.Creators;
+            InfoFields.ItemsSource = BuildInformationRows(details);
+            AttachmentsList.ItemsSource = details.Attachments;
+            NotesList.ItemsSource = details.Notes;
+            CollectionsList.ItemsSource = details.Collections;
+            RenderTags(details.Tags);
         }
         catch (Exception ex)
         {
             App.Log("Zotero details failed: " + ex);
-            InfoFields.ItemsSource = new[] { new ZoteroFieldInfo { Label = "读取失败", Value = ex.Message } };
+            if (requestVersion == Volatile.Read(ref _detailRequestVersion))
+            {
+                InfoFields.ItemsSource = new[]
+                {
+                    new ZoteroFieldInfo { Label = "读取失败", Value = ex.Message }
+                };
+            }
         }
     }
 
@@ -238,7 +335,9 @@ public partial class ZoteroLibraryControl : UserControl
         {
             var border = new Border
             {
-                Background = tag.IsAutomatic ? new SolidColorBrush(Color.FromRgb(242, 244, 248)) : new SolidColorBrush(Color.FromRgb(234, 242, 255)),
+                Background = tag.IsAutomatic
+                    ? new SolidColorBrush(Color.FromRgb(242, 244, 248))
+                    : new SolidColorBrush(Color.FromRgb(234, 242, 255)),
                 CornerRadius = new CornerRadius(7),
                 Padding = new Thickness(8, 4, 8, 4),
                 Margin = new Thickness(0, 0, 6, 6)
@@ -247,16 +346,26 @@ public partial class ZoteroLibraryControl : UserControl
             {
                 Text = tag.Name,
                 FontSize = 11.2,
-                Foreground = tag.IsAutomatic ? new SolidColorBrush(Color.FromRgb(112, 124, 141)) : new SolidColorBrush(Color.FromRgb(52, 101, 174))
+                Foreground = tag.IsAutomatic
+                    ? new SolidColorBrush(Color.FromRgb(112, 124, 141))
+                    : new SolidColorBrush(Color.FromRgb(52, 101, 174))
             };
             TagsPanel.Children.Add(border);
         }
         if (TagsPanel.Children.Count == 0)
-            TagsPanel.Children.Add(new TextBlock { Text = "暂无标签", FontSize = 11.5, Foreground = Brushes.Gray });
+        {
+            TagsPanel.Children.Add(new TextBlock
+            {
+                Text = "暂无标签",
+                FontSize = 11.5,
+                Foreground = Brushes.Gray
+            });
+        }
     }
 
     private void ClearDetails()
     {
+        Interlocked.Increment(ref _detailRequestVersion);
         _selectedRecord = null;
         _selectedDetails = null;
         DetailTitle.Text = "选择一篇文献";
@@ -283,10 +392,16 @@ public partial class ZoteroLibraryControl : UserControl
 
     private async void AutoDetect_Click(object sender, RoutedEventArgs e)
     {
-        var candidates = ZoteroLibrary.DetectDatabaseCandidates();
+        var candidates = await ZoteroReadScheduler.RunAsync(
+            () => Task.FromResult(ZoteroLibrary.DetectDatabaseCandidates()),
+            CancellationToken.None);
         if (candidates.Count == 0)
         {
-            MessageBox.Show("未自动找到 zotero.sqlite，请使用手动选择。", "Zotero", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "未自动找到 zotero.sqlite，请使用手动选择。",
+                "Zotero",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
         _settings.ZoteroDbPath = candidates[0];
@@ -304,7 +419,8 @@ public partial class ZoteroLibraryControl : UserControl
             CheckFileExists = true,
             Multiselect = false
         };
-        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+            return;
         _settings.ZoteroDbPath = dialog.FileName;
         _settings.Save();
         InvalidateLibrary();
@@ -317,25 +433,32 @@ public partial class ZoteroLibraryControl : UserControl
         await EnsureLoadedAsync();
     }
 
-    private void OpenSettings_Click(object sender, RoutedEventArgs e) => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+    private void OpenSettings_Click(object sender, RoutedEventArgs e) =>
+        OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync();
 
     private async void SearchBox_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter) return;
+        if (e.Key != Key.Enter)
+            return;
         e.Handled = true;
         await SearchAsync();
     }
 
     private async void Filter_Changed(object sender, RoutedEventArgs e)
     {
-        if (!IsLoaded || !_loaded) return;
+        if (!IsLoaded || !_loaded)
+            return;
         await SearchAsync();
     }
 
-    private async void CollectionTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    private async void CollectionTree_SelectedItemChanged(
+        object sender,
+        RoutedPropertyChangedEventArgs<object> e)
     {
-        if (e.NewValue is not ZoteroCollectionNode node) return;
+        if (e.NewValue is not ZoteroCollectionNode node)
+            return;
         _scope = node;
         await SearchAsync();
     }
@@ -371,7 +494,8 @@ public partial class ZoteroLibraryControl : UserControl
 
     private void OpenPdf(string path)
     {
-        if (!File.Exists(path)) return;
+        if (!File.Exists(path))
+            return;
         try
         {
             if (!_settings.UseSystemPdfReader && File.Exists(_settings.PdfReaderPath))
@@ -388,7 +512,11 @@ public partial class ZoteroLibraryControl : UserControl
         catch (Exception ex)
         {
             App.Log("Open PDF failed: " + ex);
-            MessageBox.Show("无法打开 PDF：\n" + ex.Message, "AtlasDesk", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(
+                "无法打开 PDF：\n" + ex.Message,
+                "AtlasDesk",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 

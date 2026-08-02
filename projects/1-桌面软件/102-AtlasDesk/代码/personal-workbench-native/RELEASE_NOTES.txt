@@ -1,21 +1,15 @@
-AtlasDesk v0.8.3
+AtlasDesk v0.8.4
 
-This emergency maintenance release removes the v0.8.2 startup regression reported on a real Windows installation.
+This maintenance release prevents a large or busy Zotero database from blocking the AtlasDesk WPF interface.
 
-Startup and development lifecycle
-- Environment discovery is no longer connected to DevelopmentControl visibility changes. Reparenting the control while the three development tabs are assembled cannot start Conda or Python tools during application startup.
-- The retained legacy MainWindow Python page is explicitly disabled after the current project/environment/terminal development surface attaches, leaving one environment-discovery owner.
-- A real-window residency test reproduced the hidden trigger: opening the Development project page could produce a transient internal Environment-tab selection and start discovery even though the user did not choose Environment.
-- DevelopmentControl now validates the source of every load request. Environment tools may start only when focus or mouse interaction is inside the development TabControl. Non-interactive Environment selections are rejected and the Project tab is restored.
-- Environment discovery returns to the proven serial and bounded v0.8.1 sequence. The v0.8.2 parallel interpreter probing, project-directory scanning and refresh cancellation chain have been removed.
-- Environment detection starts only after an explicit Environment-tab interaction or the user presses Refresh.
+Zotero responsiveness
+- Zotero database reads are no longer connected to ZoteroLibraryControl visibility changes. Reparenting, layout and page visibility transitions cannot start SQLite work.
+- The current library surface loads only after the user explicitly selects the Library navigation item or requests refresh/search.
+- Microsoft.Data.Sqlite exposes async-shaped methods while SQLite still performs the database work synchronously. AtlasDesk now enters all snapshot, search and item-detail reads through a dedicated Task.Run scheduler so the WPF Dispatcher remains responsive.
+- A single SemaphoreSlim gate serializes AtlasDesk Zotero reads. Descendant collection searches no longer open a Task.WhenAll batch of read connections against the live Zotero database.
+- Slow snapshot, search and detail work now keeps the interface interactive and shows background-reading status instead of making the main window appear hung.
+- Stale list and item-detail results are discarded when the selection or library configuration changes.
 
-Python Launcher
-- py.exe remains optional. AtlasDesk resolves it through PATH before execution and silently skips the Launcher when it is not installed.
-- Launcher output parsing and interpreter-path de-duplication remain covered by smoke tests.
-
-Diagnostics and verification
-- The log now records the WPF Application Exit event, CLR ProcessExit event, and MainWindow Closing/Closed events so a future native or external termination can be distinguished from a normal close.
-- A separate Windows STA process now creates the real App and MainWindow, attaches the complete feature pipeline, holds the window for ten seconds, opens Development on the Project tab, verifies that environment discovery remains idle, and then closes normally.
-- The isolated residency test is a dedicated GitHub Actions step with its own timeout and complete phase output; it is no longer hidden inside an MSBuild target or module initializer.
-- No Runtime/Data, WebView2 profile, terminal, vault or security boundary changes were made.
+Regression protection
+- Smoke tests verify that Zotero reads execute on a worker thread, visibility-triggered loading is absent, collection reads remain serial, and Library navigation is the explicit owner of initial loading.
+- Existing v0.8.3 startup residency, development lifecycle, Dashboard, terminal, Runtime/Data and security boundaries remain unchanged.
