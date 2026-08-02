@@ -1,22 +1,21 @@
-AtlasDesk v0.8.2
+AtlasDesk v0.8.3
 
-This maintenance release stabilizes Python environment discovery in the Development workspace after the v0.8.1 terminal and Dashboard repairs.
+This emergency maintenance release removes the v0.8.2 startup regression reported on a real Windows installation.
 
-Python environment discovery
-- The optional Windows Python Launcher is now located before execution. Systems without py.exe no longer produce a Win32Exception stack trace during normal discovery.
-- PATH Python, Python Launcher, Conda and workspace environments are de-duplicated by their resolved interpreter path.
-- The workspace root and each immediate project directory are checked for .venv, venv and .python environments.
-- Generated and dependency directories such as node_modules, bin, obj, build and caches are excluded from project environment scanning.
-- Interpreter version checks use bounded parallelism so a machine with many Conda environments does not make the page unnecessarily slow.
+Startup and development lifecycle
+- Environment discovery is no longer connected to DevelopmentControl visibility changes. Reparenting the control while the three development tabs are assembled cannot start Conda or Python tools during application startup.
+- The retained legacy MainWindow Python page is explicitly disabled after the current project/environment/terminal development surface attaches, leaving one environment-discovery owner.
+- A real-window residency test reproduced the hidden trigger: opening the Development project page could produce a transient internal Environment-tab selection and start discovery even though the user did not choose Environment.
+- DevelopmentControl now validates the source of every load request. Environment tools may start only when focus or mouse interaction is inside the development TabControl. Non-interactive Environment selections are rejected and the Project tab is restored.
+- Environment discovery returns to the proven serial and bounded v0.8.1 sequence. The v0.8.2 parallel interpreter probing, project-directory scanning and refresh cancellation chain have been removed.
+- Environment detection starts only after an explicit Environment-tab interaction or the user presses Refresh.
 
-Refresh behavior
-- Environment discovery is cancellable and a repeated refresh cancels the previous pass before starting a new one.
-- The Refresh button and environment list are temporarily locked while detection is active.
-- A compact indeterminate progress indicator shows that discovery is running.
-- The previously selected environment is preserved after refresh when it is still available.
-- Settings are saved only when newly discovered Conda or uv paths actually change the configuration.
+Python Launcher
+- py.exe remains optional. AtlasDesk resolves it through PATH before execution and silently skips the Launcher when it is not installed.
+- Launcher output parsing and interpreter-path de-duplication remain covered by smoke tests.
 
-Verification
-- Added executable smoke coverage for Python Launcher output parsing, duplicate removal, root and immediate-project virtual environments, and generated-directory exclusion.
-- Added source-boundary checks preventing a return to direct optional py.exe execution.
-- No Runtime/Data or security boundary changes were made.
+Diagnostics and verification
+- The log now records the WPF Application Exit event, CLR ProcessExit event, and MainWindow Closing/Closed events so a future native or external termination can be distinguished from a normal close.
+- A separate Windows STA process now creates the real App and MainWindow, attaches the complete feature pipeline, holds the window for ten seconds, opens Development on the Project tab, verifies that environment discovery remains idle, and then closes normally.
+- The isolated residency test is a dedicated GitHub Actions step with its own timeout and complete phase output; it is no longer hidden inside an MSBuild target or module initializer.
+- No Runtime/Data, WebView2 profile, terminal, vault or security boundary changes were made.
