@@ -1,4 +1,4 @@
-name: Publish P101 Mediova v4.2.0 light package once
+name: Apply P101 Mediova lightweight delivery docs once
 
 on:
   pull_request:
@@ -9,131 +9,199 @@ permissions:
   contents: write
 
 concurrency:
-  group: p101-v420-light-release-once
+  group: p101-lightweight-docs-once
   cancel-in-progress: false
 
 jobs:
-  publish:
-    if: github.head_ref == 'repo-p101-v420-light-release-trigger2'
+  apply:
+    if: github.head_ref == 'repo-p101-light-docs-trigger'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Verify formal release
+      - name: Checkout latest p101-exp
+        uses: actions/checkout@v4
+        with:
+          ref: p101-exp
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply exact P101 documentation replacements
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          test "$(gh release view p101-v4.2.0 --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = 'false'
-          test "$(gh release view p101-v4.2.0 --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)" = 'false'
-          ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/p101-v4.2.0")"
-          object_type="$(jq -r '.object.type' <<<"$ref_json")"
-          object_sha="$(jq -r '.object.sha' <<<"$ref_json")"
-          while [[ "$object_type" == 'tag' ]]; do
-            tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}")"
-            object_type="$(jq -r '.object.type' <<<"$tag_json")"
-            object_sha="$(jq -r '.object.sha' <<<"$tag_json")"
-          done
-          test "$object_type" = 'commit'
-          test "$object_sha" = 'c8ea2b904a59aa9416763c3397088fd803d24e15'
-
-      - name: Build lightweight package without FFmpeg
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh release download p101-v4.2.0 \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern 'Mediova-v4.2.0-Runtime.zip' \
-            --dir source
-          mkdir -p full light
-          unzip -q source/Mediova-v4.2.0-Runtime.zip -d full
-          test "$(sha256sum full/Mediova.exe | awk '{print $1}')" = '1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f'
-          cp full/Mediova.exe light/Mediova.exe
-          cat > light/README.txt <<'EOF'
-          Mediova v4.2.0 轻量包（不含 FFmpeg）
-
-          直接运行 Mediova.exe。
-
-          本包不包含 ffmpeg.exe 和 ffprobe.exe。使用媒体转换功能前，请任选一种方式提供 FFmpeg：
-          1. 若原 Mediova 目录已有 Components\FFmpeg\bin，请保留该目录，仅覆盖本轻量包中的文件；
-          2. 在软件中选择已有的 FFmpeg/FFprobe 路径；
-          3. 自行将 ffmpeg.exe 与 ffprobe.exe 放入 Components\FFmpeg\bin。
-
-          配置、历史和缓存仍保存在 AppData（便携模式除外）。轻量更新不得覆盖或删除用户 Data。
-          EOF
-          cat > light/THIRD_PARTY_NOTICES.md <<'EOF'
-          # Third-party notices
-
-          This lightweight Mediova package does not bundle FFmpeg or FFprobe.
-          Mediova can use user-provided FFmpeg/FFprobe components or an existing `Components\FFmpeg\bin` directory.
-
-          - Project: FFmpeg
-          - Homepage: https://ffmpeg.org/
-          - Source and license information: https://ffmpeg.org/legal.html
-
-          The Runtime/Data boundary remains unchanged:
-
-          - Runtime: Mediova.exe, optional Components, notices and manifest.
-          - Roaming Data: configuration, history, session and backups.
-          - Local Data: cache, temporary files, thumbnails, logs, state and crash reports.
-
-          Runtime updates must never contain user Data.
-          EOF
           python - <<'PY'
-          import hashlib, json, os
-          root = 'light'
-          def digest(path):
-              h = hashlib.sha256()
-              with open(path, 'rb') as handle:
-                  for chunk in iter(lambda: handle.read(1024 * 1024), b''):
-                      h.update(chunk)
-              return h.hexdigest()
-          files = []
-          for name in ('Mediova.exe', 'README.txt', 'THIRD_PARTY_NOTICES.md'):
-              path = os.path.join(root, name)
-              files.append({'path': name, 'size': os.path.getsize(path), 'sha256': digest(path)})
-          manifest = {
-              'product': 'Mediova',
-              'version': '4.2.0',
-              'platform': 'Windows x64',
-              'deployment': 'folder-runtime',
-              'files': files,
-              'external_components': [{
-                  'name': 'FFmpeg/FFprobe',
-                  'required_for': 'media conversion',
-                  'bundled': False,
-                  'expected_default_path': 'Components\\FFmpeg\\bin'
-              }]
-          }
-          with open(os.path.join(root, 'runtime-manifest.json'), 'w', encoding='utf-8', newline='\n') as handle:
-              json.dump(manifest, handle, ensure_ascii=False, indent=2)
-              handle.write('\n')
-          PY
-          (
-            cd light
-            zip -X -9 ../Mediova-v4.2.0-Light.zip Mediova.exe README.txt runtime-manifest.json THIRD_PARTY_NOTICES.md
-          )
-          test "$(unzip -Z1 Mediova-v4.2.0-Light.zip | grep -Eic '(^|/)(ffmpeg|ffprobe)(\.exe)?$' || true)" = '0'
-          test "$(stat -c %s Mediova-v4.2.0-Light.zip)" -lt 10000000
-          {
-            sha256sum Mediova-v4.2.0-Light.zip
-            sha256sum light/Mediova.exe | sed 's#  light/#  #'
-          } > Mediova-v4.2.0-Light-SHA256.txt
-          cat Mediova-v4.2.0-Light-SHA256.txt
-          unzip -l Mediova-v4.2.0-Light.zip
+          from pathlib import Path
 
-      - name: Upload light package to formal release
+          root = Path('projects/1-桌面软件/101-Mediova')
+
+          def replace_once(relative, old, new):
+              path = root / relative
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{relative}: expected exactly one match, found {count}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          replace_once(
+              'README.md',
+              '''v4.2.0 完整 Runtime 构建入口：
+
+```powershell
+cd projects/1-桌面软件/101-Mediova/代码
+./build_v4.2.0.ps1 -FFmpegBin "C:\\path\\to\\ffmpeg\\bin"
+```
+
+首次部署请使用 Release 中的完整 `Mediova-v4.2.0-Runtime.zip`，不要只复制 `Mediova.exe`。''',
+              '''v4.2.0 内部完整 Runtime 验证构建入口：
+
+```powershell
+cd projects/1-桌面软件/101-Mediova/代码
+./build_v4.2.0.ps1 -FFmpegBin "C:\\path\\to\\ffmpeg\\bin"
+```
+
+用户下载默认使用 Release 中的 [`Mediova-v4.2.0-Light.zip`](https://github.com/FenLynn/gpt-pub/releases/download/p101-v4.2.0/Mediova-v4.2.0-Light.zip)。该轻量包不包含 FFmpeg/FFprobe；覆盖已有安装时应保留原 `Components\\FFmpeg\\bin`，首次使用时可在软件中选择已有 FFmpeg 路径或自行补入该目录。'''
+          )
+
+          replace_once(
+              '开发约束.md',
+              '''- 正式主程序在 Runtime 中命名为 `Mediova.exe`；完整包命名为 `Mediova-v<版本>-Runtime.zip`。
+- 部署形态变化必须交付完整 Runtime ZIP；单文件增量更新必须保留 Runtime 原相对路径并附完整性信息。
+- Release 只提供标签提交生成并通过正式准入的产物，不上传调试文件或私人 Data。
+- 正式发布必须记录标签、源提交、CI、原生自检、实机状态、Runtime ZIP 与主 EXE 大小和 SHA-256、清单结论及签名状态。''',
+              '''- 正式主程序在 Runtime 中命名为 `Mediova.exe`。
+- 面向用户的默认且常规交付包命名为 `Mediova-v<版本>-Light.zip`，必须排除 `ffmpeg.exe`、`ffprobe.exe` 及 `Components/FFmpeg/`；除非用户明确要求，不得再提供或推荐携带 FFmpeg 的大体积压缩包。
+- 轻量包至少包含 `Mediova.exe`、轻量安装说明、与包内容一致的 `runtime-manifest.json` 和第三方说明，并单独提供包与主 EXE 的 SHA-256。
+- 覆盖已有安装时不得删除用户现有 `Components/FFmpeg/`；首次部署由用户选择已有 FFmpeg/FFprobe 路径，或自行放入 `Components/FFmpeg/bin/`。
+- 完整 FFmpeg Runtime 仍可在 CI 中构建，用于真实组件、manifest、完整性和原生自检，但只作为内部验证 Artifact，不作为日常用户下载交付。
+- Release 只提供标签提交生成并通过正式准入的用户产物，不上传调试文件或私人 Data。
+- 正式发布必须记录标签、源提交、CI、原生自检、实机状态、轻量 ZIP 与主 EXE 大小和 SHA-256、清单结论及签名状态；内部完整 Runtime 的验证证据可另行记录。'''
+          )
+
+          replace_once(
+              'Mediova_v4.2.0_版本说明.md',
+              '''## 安装方式
+
+请从 `p101-v4.2.0` Release 下载并完整解压：
+
+```text
+Mediova-v4.2.0-Runtime.zip
+```
+
+不要只复制 `Mediova.exe`。完整 Runtime 还包含 FFmpeg/FFprobe、相关 DLL、第三方说明和完整性清单。
+
+## 正式资产
+
+```text
+标签与 Release：p101-v4.2.0
+正式源提交：c8ea2b904a59aa9416763c3397088fd803d24e15
+正式 CI：30740707877
+Release 运行：30740967788
+
+Mediova.exe
+SHA-256：1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f
+
+Mediova-v4.2.0-Runtime.zip
+SHA-256：daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc
+```
+
+Release 同时保存 `SHA256.txt`、`runtime-manifest.json`、`ci_self_test.json` 和四套 UI 截图，作为正式产物的可追溯证据。''',
+              '''## 安装方式
+
+用户默认下载并完整解压：
+
+[`Mediova-v4.2.0-Light.zip`](https://github.com/FenLynn/gpt-pub/releases/download/p101-v4.2.0/Mediova-v4.2.0-Light.zip)
+
+该包不包含 `ffmpeg.exe` 和 `ffprobe.exe`。若原 Mediova 目录已有 `Components\\FFmpeg\\bin`，更新时保留该目录并覆盖轻量包文件即可；首次使用时，可在软件中选择已有 FFmpeg/FFprobe 路径，或自行将二者放入该目录。
+
+## 正式资产
+
+```text
+标签与 Release：p101-v4.2.0
+正式源提交：c8ea2b904a59aa9416763c3397088fd803d24e15
+正式 CI：30740707877
+Release 运行：30740967788
+轻量包补充运行：30744062665
+
+Mediova.exe
+SHA-256：1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f
+
+Mediova-v4.2.0-Light.zip
+大小：1,692,644 bytes
+SHA-256：e96447dee95510acf2e7a059f9c6f5f128c47660af0e561b67021181f81d8224
+```
+
+完整 FFmpeg Runtime 已在正式 CI 中构建并验证，其历史 SHA-256 为 `daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc`；它只作为内部完整性与真实组件验证证据，不再作为默认用户下载包。Release 的轻量包同时提供 `Mediova-v4.2.0-Light-SHA256.txt`。'''
+          )
+
+          replace_once(
+              '阶段记录.md',
+              '''正式资产：
+
+```text
+Mediova.exe
+SHA-256：1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f
+
+Mediova-v4.2.0-Runtime.zip
+SHA-256：daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc
+```
+
+- Runtime manifest：通过''',
+              '''正式用户资产：
+
+```text
+Mediova.exe
+SHA-256：1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f
+
+Mediova-v4.2.0-Light.zip
+大小：1,692,644 bytes
+SHA-256：e96447dee95510acf2e7a059f9c6f5f128c47660af0e561b67021181f81d8224
+轻量包补充运行：30744062665
+```
+
+内部完整 Runtime 在正式 CI 中完成真实 FFmpeg 与完整性验证，历史 SHA-256 为 `daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc`，但不再作为默认用户交付。
+
+- Runtime manifest：通过'''
+          )
+
+          replace_once(
+              '阶段记录.md',
+              '- 首次部署必须使用完整 `Mediova-v4.2.0-Runtime.zip`，不能只复制 `Mediova.exe`。',
+              '- 用户默认使用不含 FFmpeg 的 `Mediova-v4.2.0-Light.zip`；已有安装保留 `Components/FFmpeg/bin/`，首次使用需自行选择或补入 FFmpeg/FFprobe。'
+          )
+
+          replace_once(
+              '软件开发总结.md',
+              '''v4.2.0 正式 CI `30740707877` 通过 Linux 与 Windows 原生全测、全量竞态、`go vet`、真实 FFmpeg Runtime、四套 UI 截图和 61/61 原生自检。测试覆盖输出相对目录树、动态追加队列、同名并发、复杂轨道、VFR 和完整性故障注入。正式标签为 `p101-v4.2.0`，Release 运行编号为 `30740967788`。
+
+自动化并不等于完全取消真实 Windows 观察。''',
+              '''v4.2.0 正式 CI `30740707877` 通过 Linux 与 Windows 原生全测、全量竞态、`go vet`、真实 FFmpeg Runtime、四套 UI 截图和 61/61 原生自检。测试覆盖输出相对目录树、动态追加队列、同名并发、复杂轨道、VFR 和完整性故障注入。正式标签为 `p101-v4.2.0`，Release 运行编号为 `30740967788`。
+
+用户交付策略随后收敛为“不重复分发 FFmpeg”：完整 Runtime 继续在 CI 内部构建，用于真实组件和完整性验证；面向用户的常规下载只提供 `Mediova-v<版本>-Light.zip`，包含主程序、轻量说明、匹配包内容的 manifest 与第三方说明，不包含 FFmpeg/FFprobe。覆盖升级时保留已有 `Components/FFmpeg/`，首次部署由用户选择已有组件路径或自行补入。v4.2.0 轻量包由运行 `30744062665` 生成并上传。
+
+自动化并不等于完全取消真实 Windows 观察。'''
+          )
+
+          replace_once(
+              '工作记录.md',
+              '''- `Mediova.exe` SHA-256：`1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f`
+- `Mediova-v4.2.0-Runtime.zip` SHA-256：`daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc`''',
+              '''- `Mediova.exe` SHA-256：`1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f`
+- 用户轻量包：`Mediova-v4.2.0-Light.zip`，大小 `1,692,644 bytes`，SHA-256 `e96447dee95510acf2e7a059f9c6f5f128c47660af0e561b67021181f81d8224`
+- 轻量包补充运行：`30744062665`
+- 内部完整 Runtime 验证 SHA-256：`daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc`'''
+          )
+          PY
+
+      - name: Verify scope and commit to p101-exp
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload p101-v4.2.0 \
-            Mediova-v4.2.0-Light.zip \
-            Mediova-v4.2.0-Light-SHA256.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
-          gh release view p101-v4.2.0 --repo "$GITHUB_REPOSITORY" --json assets \
-            --jq '.assets[] | select(.name == "Mediova-v4.2.0-Light.zip" or .name == "Mediova-v4.2.0-Light-SHA256.txt") | [.name, .size, .url] | @tsv'
+          expected=$'projects/1-桌面软件/101-Mediova/Mediova_v4.2.0_版本说明.md\nprojects/1-桌面软件/101-Mediova/README.md\nprojects/1-桌面软件/101-Mediova/工作记录.md\nprojects/1-桌面软件/101-Mediova/开发约束.md\nprojects/1-桌面软件/101-Mediova/软件开发总结.md\nprojects/1-桌面软件/101-Mediova/阶段记录.md'
+          actual="$(git diff --name-only | sort)"
+          test "$actual" = "$expected"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- projects/1-桌面软件/101-Mediova
+          git commit -m 'P101: 固化轻量包交付规则与 v4.2.0 下载记录'
+          git push origin HEAD:p101-exp
