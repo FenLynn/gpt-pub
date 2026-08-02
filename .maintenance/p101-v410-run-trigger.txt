@@ -1,5 +1,0 @@
-project=P101
-product=Mediova
-version=4.1.0
-source_branch=p101-exp
-purpose=run-verified-ui-runtime-transformation
