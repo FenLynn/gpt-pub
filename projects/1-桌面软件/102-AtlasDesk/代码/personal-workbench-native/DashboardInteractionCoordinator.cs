@@ -32,6 +32,7 @@ public sealed class DashboardInteractionCoordinator : IDisposable
     private readonly MainWindow _window;
     private readonly AppSettings _settings;
     private readonly HashSet<CoreWebView2> _configuredCores = new();
+    private readonly HashSet<ulong> _externallyRedirectedNavigationIds = new();
     private FullscreenExitHandleWindow? _exitHandle;
     private Window? _exitHandleOwner;
     private bool _synchronizing;
@@ -82,10 +83,15 @@ public sealed class DashboardInteractionCoordinator : IDisposable
 
         foreach (var core in _configuredCores)
         {
-            try { core.NavigationStarting -= Core_NavigationStarting; }
+            try
+            {
+                core.NavigationStarting -= Core_NavigationStarting;
+                core.NavigationCompleted -= Core_NavigationCompleted;
+            }
             catch { }
         }
         _configuredCores.Clear();
+        _externallyRedirectedNavigationIds.Clear();
         CloseExitHandle();
     }
 
@@ -128,6 +134,7 @@ public sealed class DashboardInteractionCoordinator : IDisposable
             return;
 
         core.NavigationStarting += Core_NavigationStarting;
+        core.NavigationCompleted += Core_NavigationCompleted;
         App.Log("Dashboard top-level navigation guard attached");
     }
 
@@ -138,6 +145,7 @@ public sealed class DashboardInteractionCoordinator : IDisposable
             if (!ShouldOpenExternally(args.Uri, _settings.DashboardUrl))
                 return;
 
+            _externallyRedirectedNavigationIds.Add(args.NavigationId);
             args.Cancel = true;
             var target = args.Uri;
             App.Log("Dashboard top-level external navigation redirected to default browser: " + target);
@@ -147,6 +155,25 @@ public sealed class DashboardInteractionCoordinator : IDisposable
         {
             App.Log("Dashboard top-level navigation guard failed: " + ex);
         }
+    }
+
+    private void Core_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
+    {
+        if (!_externallyRedirectedNavigationIds.Remove(args.NavigationId))
+            return;
+
+        // MainWindow's original completion handler treats every unsuccessful
+        // navigation as a page failure. A navigation intentionally cancelled by
+        // the mixed-mode guard is not an error and must not cover the Dashboard.
+        _window.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_window.FindName("DashboardError") is FrameworkElement error)
+                error.Visibility = Visibility.Collapsed;
+            if (_window.FindName("DashboardHost") is FrameworkElement host)
+                host.Visibility = Visibility.Visible;
+            if (_window.FindName("NavigationProgress") is FrameworkElement progress)
+                progress.Visibility = Visibility.Collapsed;
+        }));
     }
 
     private static void OpenExternalUri(string? target)
