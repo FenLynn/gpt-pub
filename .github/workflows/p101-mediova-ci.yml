@@ -31,14 +31,12 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-
       - name: Record exact candidate identity
         shell: bash
         run: |
           set -euo pipefail
           echo "Candidate commit=$(git rev-parse HEAD)"
           echo "Candidate tree=$(git rev-parse 'HEAD^{tree}')"
-
       - name: Enforce P101 pull-request scope
         if: github.event_name == 'pull_request'
         shell: bash
@@ -56,7 +54,7 @@ jobs:
   linux:
     needs: scope
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v4
@@ -69,11 +67,12 @@ jobs:
           cache: false
       - name: Validate source and cross-build
         working-directory: projects/1-桌面软件/101-Mediova/代码
+        shell: bash
         run: |
           set -euo pipefail
           if ! sha256sum -c SOURCE_FILES_SHA256.txt; then
-            echo 'Actual hashes for v4.2.1 entry points:'
-            sha256sum build_v4.2.1.ps1 cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/ui_rules.go cmd/mediaworkbench/ui_rules_test.go go.mod tools_embed_resources.py
+            echo 'Actual hashes for v4.2.2 entry points:'
+            sha256sum build_v4.2.2.ps1 cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/ui_rules.go cmd/mediaworkbench/ui_rules_test.go cmd/mediaworkbench/v422_windows.go cmd/mediaworkbench/v422_source_contract_test.go go.mod tools_embed_resources.py
             exit 1
           fi
           go test -count=1 ./...
@@ -88,7 +87,7 @@ jobs:
     needs: scope
     if: github.base_ref == 'p101-stable' || github.base_ref == 'main' || github.ref == 'refs/heads/p101-stable'
     runs-on: windows-latest
-    timeout-minutes: 110
+    timeout-minutes: 115
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v4
@@ -145,7 +144,7 @@ jobs:
           $downloaded=$false
           for ($attempt=1; $attempt -le 3; $attempt++) {
             try {
-              Invoke-WebRequest -Uri $uri -OutFile $archive -Headers @{'User-Agent'='Mediova-v4.2.1-CI'}
+              Invoke-WebRequest -Uri $uri -OutFile $archive -Headers @{'User-Agent'='Mediova-v4.2.2-CI'}
               $downloaded=$true
               break
             } catch {
@@ -166,22 +165,25 @@ jobs:
           if ($ffmpegExit -ne 0) { throw 'Downloaded FFmpeg is not runnable.' }
           "FFMPEG_BIN=$($ffmpeg.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Build complete v4.2.1 Runtime
+      - name: Build complete v4.2.2 Runtime
         shell: pwsh
         working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
-          ./build_v4.2.1.ps1 -FFmpegBin $env:FFMPEG_BIN -SkipTests
-          if ($LASTEXITCODE -ne 0) { throw 'Mediova v4.2.1 Runtime build failed' }
+          ./build_v4.2.2.ps1 -FFmpegBin $env:FFMPEG_BIN -SkipTests
+          if ($LASTEXITCODE -ne 0) { throw 'Mediova v4.2.2 Runtime build failed' }
           $build=Join-Path $PWD 'build'
           $runtime=Join-Path $build 'Runtime'
           $exe=Join-Path $runtime 'Mediova.exe'
-          $zip=Join-Path $build 'Mediova-v4.2.1-Runtime.zip'
+          $zip=Join-Path $build 'Mediova-v4.2.2-Runtime.zip'
           if (!(Test-Path $exe) -or !(Test-Path $zip)) { throw 'Runtime EXE or ZIP is missing.' }
           $info=(Get-Item $exe).VersionInfo
-          if (($info.FileVersion -notlike '4.2.1*') -or ($info.ProductVersion -notlike '4.2.1*') -or ($info.ProductName -notlike '*Mediova*')) {
+          Write-Host "FileVersion=$($info.FileVersion) ProductVersion=$($info.ProductVersion) ProductName=$($info.ProductName)"
+          if (($info.FileVersion -notlike '4.2.2*') -or ($info.ProductVersion -notlike '4.2.2*') -or ($info.ProductName -notlike '*Mediova*')) {
             throw 'Version resource mismatch.'
           }
+          Write-Host "Mediova.exe SHA-256: $((Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant())"
+          Write-Host "Runtime ZIP SHA-256: $((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant())"
 
       - name: Verify Runtime boundary and manifest
         shell: pwsh
@@ -191,7 +193,7 @@ jobs:
           $runtime=Join-Path $PWD 'build/Runtime'
           $manifestPath=Join-Path $runtime 'runtime-manifest.json'
           $manifest=Get-Content $manifestPath -Raw | ConvertFrom-Json
-          if ($manifest.product -ne 'Mediova' -or $manifest.version -ne '4.2.1' -or $manifest.platform -ne 'Windows x64' -or $manifest.deployment -ne 'folder-runtime') {
+          if ($manifest.product -ne 'Mediova' -or $manifest.version -ne '4.2.2' -or $manifest.platform -ne 'Windows x64' -or $manifest.deployment -ne 'folder-runtime') {
             throw 'Runtime manifest identity mismatch.'
           }
           foreach ($entry in $manifest.files) {
@@ -230,15 +232,9 @@ jobs:
           "@
           $resolutionCommand=Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue
           if ($resolutionCommand) {
-            try {
-              Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop
-              Start-Sleep -Seconds 2
-            } catch {
-              Write-Warning "Unable to raise display resolution: $($_.Exception.Message)"
-            }
+            try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Start-Sleep -Seconds 2 }
+            catch { Write-Warning "Unable to raise display resolution: $($_.Exception.Message)" }
           }
-          $screen=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          Write-Host "Primary screen: $($screen.Width)x$($screen.Height)"
           $previewDir=Join-Path $PWD 'build/ui-preview'
           New-Item $previewDir -ItemType Directory -Force | Out-Null
           function Save-MediovaMode([string]$mode, [int]$width, [int]$height, [string]$name) {
@@ -286,10 +282,10 @@ jobs:
               if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
             }
           }
-          Save-MediovaMode 'video' 1650 930 'Mediova-v4.2.1-video-wide-1650x930.png'
-          Save-MediovaMode 'video' 1120 720 'Mediova-v4.2.1-video-compact-1120x720.png'
-          Save-MediovaMode 'image' 1450 820 'Mediova-v4.2.1-image-1450x820.png'
-          Save-MediovaMode 'held' 1450 820 'Mediova-v4.2.1-held-1450x820.png'
+          Save-MediovaMode 'video' 1650 930 'Mediova-v4.2.2-video-wide-1650x930.png'
+          Save-MediovaMode 'video' 1120 720 'Mediova-v4.2.2-video-compact-1120x720.png'
+          Save-MediovaMode 'image' 1450 820 'Mediova-v4.2.2-image-1450x820.png'
+          Save-MediovaMode 'held' 1450 820 'Mediova-v4.2.2-held-1450x820.png'
 
       - name: Run native self-test
         shell: pwsh
@@ -311,15 +307,15 @@ jobs:
           $failed=@($checks | Where-Object {-not [bool]$_.Value})
           Write-Host "Native checks: total=$($checks.Count), failed=$($failed.Count), passed=$($json.passed), version=$($json.version)"
           foreach ($item in $failed) { Write-Host "FAILED CHECK: $($item.Name)" }
-          if ($json.version -ne '4.2.1' -or $checks.Count -lt 57) { throw 'Native self-test identity or check-count mismatch' }
+          if ($json.version -ne '4.2.2' -or $checks.Count -lt 62) { throw 'Native self-test identity or check-count mismatch' }
           if (-not $json.passed -or $failed.Count -gt 0) { throw 'Native self-test contains failed checks' }
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: P101-Mediova-v4.2.1-CI
+          name: P101-Mediova-v4.2.2-CI
           path: |
-            projects/1-桌面软件/101-Mediova/代码/build/Mediova-v4.2.1-Runtime.zip
+            projects/1-桌面软件/101-Mediova/代码/build/Mediova-v4.2.2-Runtime.zip
             projects/1-桌面软件/101-Mediova/代码/build/SHA256.txt
             projects/1-桌面软件/101-Mediova/代码/build/ci_self_test.json
             projects/1-桌面软件/101-Mediova/代码/build/ui-preview/*.png
