@@ -30,7 +30,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const appVersion = "4.2.2"
+const appVersion = "4.2.3"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -995,32 +995,51 @@ func (a *application) drawPrimaryButton(dis *drawItemStruct) bool {
 		border = bg
 	}
 	if disabled {
-		bg = colorRef(232, 235, 240)
-		border = colorRef(218, 223, 230)
-		textColor = colorRef(145, 153, 164)
+		bg = colorRef(235, 238, 243)
+		border = colorRef(196, 203, 213)
+		textColor = colorRef(126, 136, 149)
 	}
 	rc := dis.RcItem
+	// Clear the complete owner-draw surface first. Without this, a disabled
+	// button can retain pixels from an earlier state and appear vertically offset.
+	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	inner := rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}
 	brush, _, _ := procCreateSolidBrush.Call(bg)
 	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, border)
 	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
 	oldPen, _, _ := procSelectObject.Call(dis.HDC, pen)
-	procRoundRect.Call(dis.HDC, uintptr(rc.Left+1), uintptr(rc.Top+1), uintptr(rc.Right-1), uintptr(rc.Bottom-1), 7, 7)
+	procRoundRect.Call(dis.HDC, uintptr(inner.Left), uintptr(inner.Top), uintptr(inner.Right), uintptr(inner.Bottom), 7, 7)
 	procSelectObject.Call(dis.HDC, oldBrush)
 	procSelectObject.Call(dis.HDC, oldPen)
 	procDeleteObject.Call(brush)
 	procDeleteObject.Call(pen)
 
-	glyph := "\uE768"
+	glyph := "\\uE768"
 	if dis.HwndItem != a.hStart {
 		glyph = secondaryButtonGlyph(dis.HwndItem)
 	}
-	iconRC := rc
-	iconRC.Left += 9
-	iconRC.Right = iconRC.Left + 22
+	label := getText(dis.HwndItem)
+	font := uiFontBold
+	if len([]rune(label)) > 5 {
+		font = uiFontSmall
+	}
+	labelWidth := measureSingleLineWidth(dis.HDC, label, font)
+	iconWidth := int32(18)
+	gap := int32(4)
+	available := inner.Right - inner.Left - 12
+	total := iconWidth + gap + labelWidth
+	if total > available {
+		labelWidth = available - iconWidth - gap
+		if labelWidth < 24 {
+			labelWidth = 24
+		}
+		total = iconWidth + gap + labelWidth
+	}
+	left := inner.Left + (inner.Right-inner.Left-total)/2
+	iconRC := rect{Left: left, Top: inner.Top, Right: left + iconWidth, Bottom: inner.Bottom}
+	textRC := rect{Left: iconRC.Right + gap, Top: inner.Top, Right: iconRC.Right + gap + labelWidth, Bottom: inner.Bottom}
 	drawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
-	textRC := rc
-	textRC.Left += 22
-	drawCenteredText(dis.HDC, getText(dis.HwndItem), textRC, uiFontBold, textColor)
+	drawCenteredText(dis.HDC, label, textRC, font, textColor)
 	return true
 }
 
@@ -2257,11 +2276,6 @@ func (a *application) layout(w, h int32) {
 			}
 			move(a.hAllDefault, x, row2, minInt32(124, w-x-8), 31)
 		}
-		move(a.hProgress, 8, barY+76, w-16, 24)
-		move(a.hStatusText, 8, barY+110, w-332, 34)
-		move(a.hStart, w-324, barY+107, 116, 38)
-		move(a.hPause, w-200, barY+107, 88, 38)
-		move(a.hStop, w-104, barY+107, 88, 38)
 	} else {
 		move(a.hOutputBrowse, 8, barY, 116, 32)
 		fixed := int32(38 + bottomWidths.Resolution + 7 + 34 + bottomWidths.Codec + 7 + 34 + bottomWidths.Quality + 7 + 34 + bottomWidths.Volume + 7 + 34 + bottomWidths.Rotation + 8 + 124)
@@ -2296,12 +2310,14 @@ func (a *application) layout(w, h int32) {
 			}
 			move(a.hAllDefault, x, barY, 124, 32)
 		}
-		move(a.hProgress, 8, barY+40, w-16, 24)
-		move(a.hStatusText, 8, barY+72, w-356, 34)
-		move(a.hStart, w-348, barY+69, 116, 38)
-		move(a.hPause, w-224, barY+69, 88, 38)
-		move(a.hStop, w-128, barY+69, 88, 38)
 	}
+
+	footer := footerGeometryFor(w, barY, compactBottom)
+	move(a.hProgress, footer.Progress.X, footer.Progress.Y, footer.Progress.W, footer.Progress.H)
+	move(a.hStatusText, footer.Status.X, footer.Status.Y, footer.Status.W, footer.Status.H)
+	move(a.hStart, footer.Start.X, footer.Start.Y, footer.Start.W, footer.Start.H)
+	move(a.hPause, footer.Pause.X, footer.Pause.Y, footer.Pause.W, footer.Pause.H)
+	move(a.hStop, footer.Stop.X, footer.Stop.Y, footer.Stop.W, footer.Stop.H)
 }
 func (a *application) command(id int) {
 	if workers, ok := a.concurrencyCommands[id]; ok {
