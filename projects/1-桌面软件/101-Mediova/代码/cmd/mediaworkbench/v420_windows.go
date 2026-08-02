@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unsafe"
 
 	"mediaworkbench/internal/config"
 	"mediaworkbench/internal/media"
@@ -725,7 +726,10 @@ func (a *application) v420RemoveSelectedSafely() {
 	if len(idxs) == 0 {
 		return
 	}
-	type selected struct{ id int64; status model.Status }
+	type selected struct {
+		id     int64
+		status model.Status
+	}
 	var items []selected
 	a.mu.Lock()
 	for _, idx := range idxs {

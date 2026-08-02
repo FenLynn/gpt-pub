@@ -61,49 +61,49 @@ type QueueSnapshot struct {
 }
 
 type HoldState struct {
-	FromStatus   Status      `json:"from_status"`
-	Original     TaskOptions `json:"original_options"`
+	FromStatus   Status         `json:"from_status"`
+	Original     TaskOptions    `json:"original_options"`
 	Queue        *QueueSnapshot `json:"queue_snapshot,omitempty"`
-	ReservedSlot bool        `json:"reserved_slot"`
-	HeldAt       time.Time   `json:"held_at"`
+	ReservedSlot bool           `json:"reserved_slot"`
+	HeldAt       time.Time      `json:"held_at"`
 }
 
 type Task struct {
-	ID                    int64       `json:"id"`
-	Input                 string      `json:"input"`
-	Root                  string      `json:"root"`
-	Kind                  Kind        `json:"kind"`
-	Width                 int         `json:"width"`
-	Height                int         `json:"height"`
-	Rotation              int         `json:"rotation_tag"`
-	Duration              float64     `json:"duration"`
-	FPS                   float64     `json:"fps"`
-	BitrateKbps           int         `json:"bitrate_kbps"`
-	VideoCodec            string      `json:"video_codec,omitempty"`
-	AudioCodec            string      `json:"audio_codec,omitempty"`
-	AudioStreams          int         `json:"audio_streams,omitempty"`
-	AudioBitrateKbps      int         `json:"audio_bitrate_kbps,omitempty"`
-	SubtitleStreams       int         `json:"subtitle_streams,omitempty"`
-	TextSubtitleStreams   int         `json:"text_subtitle_streams,omitempty"`
-	BitmapSubtitleStreams int         `json:"bitmap_subtitle_streams,omitempty"`
-	VariableFrameRate     bool        `json:"variable_frame_rate,omitempty"`
-	HDRInfo               string      `json:"hdr_info,omitempty"`
-	InputSize             int64       `json:"input_size"`
-	OutputPath            string      `json:"output_path"`
-	OutputSize            int64       `json:"output_size"`
-	Status                Status      `json:"status"`
-	Progress              float64     `json:"progress"`
-	Error                 string      `json:"error"`
-	FailureCategory       string      `json:"failure_category,omitempty"`
-	ValidationWarning     string      `json:"validation_warning,omitempty"`
-	Engine                string      `json:"engine"`
-	Pinned                bool        `json:"pinned"`
-	ThumbnailIndex        int         `json:"-"`
-	Options               TaskOptions `json:"options"`
+	ID                    int64          `json:"id"`
+	Input                 string         `json:"input"`
+	Root                  string         `json:"root"`
+	Kind                  Kind           `json:"kind"`
+	Width                 int            `json:"width"`
+	Height                int            `json:"height"`
+	Rotation              int            `json:"rotation_tag"`
+	Duration              float64        `json:"duration"`
+	FPS                   float64        `json:"fps"`
+	BitrateKbps           int            `json:"bitrate_kbps"`
+	VideoCodec            string         `json:"video_codec,omitempty"`
+	AudioCodec            string         `json:"audio_codec,omitempty"`
+	AudioStreams          int            `json:"audio_streams,omitempty"`
+	AudioBitrateKbps      int            `json:"audio_bitrate_kbps,omitempty"`
+	SubtitleStreams       int            `json:"subtitle_streams,omitempty"`
+	TextSubtitleStreams   int            `json:"text_subtitle_streams,omitempty"`
+	BitmapSubtitleStreams int            `json:"bitmap_subtitle_streams,omitempty"`
+	VariableFrameRate     bool           `json:"variable_frame_rate,omitempty"`
+	HDRInfo               string         `json:"hdr_info,omitempty"`
+	InputSize             int64          `json:"input_size"`
+	OutputPath            string         `json:"output_path"`
+	OutputSize            int64          `json:"output_size"`
+	Status                Status         `json:"status"`
+	Progress              float64        `json:"progress"`
+	Error                 string         `json:"error"`
+	FailureCategory       string         `json:"failure_category,omitempty"`
+	ValidationWarning     string         `json:"validation_warning,omitempty"`
+	Engine                string         `json:"engine"`
+	Pinned                bool           `json:"pinned"`
+	ThumbnailIndex        int            `json:"-"`
+	Options               TaskOptions    `json:"options"`
 	Queue                 *QueueSnapshot `json:"queue_snapshot,omitempty"`
 	Hold                  *HoldState     `json:"hold_state,omitempty"`
-	StartedAt             time.Time   `json:"started_at"`
-	FinishedAt            time.Time   `json:"finished_at"`
+	StartedAt             time.Time      `json:"started_at"`
+	FinishedAt            time.Time      `json:"finished_at"`
 }
 
 func (t *Task) IsReadyEditable() bool {

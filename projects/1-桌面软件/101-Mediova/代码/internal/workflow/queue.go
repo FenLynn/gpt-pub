@@ -19,11 +19,11 @@ const (
 )
 
 var (
-	ErrTaskNotReady      = errors.New("task is not ready")
-	ErrTaskNotLockable   = errors.New("task cannot enter hold state")
-	ErrTaskNotHeld       = errors.New("task is not held")
-	ErrBulkEditLocked    = errors.New("locked tasks can only be edited one at a time")
-	ErrMixedMediaQueue   = errors.New("active queue only accepts the same media kind")
+	ErrTaskNotReady    = errors.New("task is not ready")
+	ErrTaskNotLockable = errors.New("task cannot enter hold state")
+	ErrTaskNotHeld     = errors.New("task is not held")
+	ErrBulkEditLocked  = errors.New("locked tasks can only be edited one at a time")
+	ErrMixedMediaQueue = errors.New("active queue only accepts the same media kind")
 )
 
 func MaterializeReadyOptions(task *model.Task, settings model.Settings) bool {
@@ -143,11 +143,11 @@ func HoldForEdit(task *model.Task, now time.Time) error {
 		queueCopy = &copy
 	}
 	task.Hold = &model.HoldState{
-		FromStatus:    from,
-		Original:      task.Options,
-		Queue:         queueCopy,
-		ReservedSlot:  reserve,
-		HeldAt:        now,
+		FromStatus:   from,
+		Original:     task.Options,
+		Queue:        queueCopy,
+		ReservedSlot: reserve,
+		HeldAt:       now,
 	}
 	task.Status = model.StatusHeld
 	task.Engine = "搁置 · 等待修改"
