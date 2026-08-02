@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time patch workflow. Do not merge.
 
-Reload corrected exact-match script from latest main.
+Reload exact patch whose four Git blobs have been verified.
