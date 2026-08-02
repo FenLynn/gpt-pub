@@ -151,8 +151,9 @@ public sealed class V070ProjectCenterEnhancer
 
     private void WireTerminalPage()
     {
-        // WorkbenchEnhancer still owns session creation and optional bottom docking.
-        // This layer only owns the explicit full-height terminal page.
+        // FeatureHostTerminalCoordinator owns bottom docking and
+        // WorkspaceTerminalCoordinator owns session creation. This layer only owns
+        // the explicit full-height terminal page.
         _development.OpenTerminalRequested += (_, _) => ShowTerminalPage();
         _terminal.EmbedDevelopmentRequested += (_, _) => ShowTerminalPage();
         _terminal.DockBottomRequested += (_, _) =>
@@ -188,7 +189,10 @@ public sealed class V070ProjectCenterEnhancer
                 var openNew = args.Key == Key.T
                               && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
                               && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-                if (openExisting || openNew)
+                var reopenLast = args.Key == Key.R
+                                 && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+                                 && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+                if (openExisting || openNew || reopenLast)
                     ShowTerminalPage();
             }),
             handledEventsToo: true);
@@ -289,8 +293,7 @@ public sealed class V070ProjectCenterEnhancer
                 break;
             case "terminal":
                 ShowTerminalPage();
-                await _terminal.OpenAsync(WorkspaceTerminalFactory.Create(
-                    _pipeline.Settings, _pipeline.Settings.DefaultShell, e.Project.RootPath, e.Project.Name));
+                await _pipeline.WorkspaceTerminal.OpenProjectTerminalAsync(e.Project.RootPath, e.Project.Name);
                 break;
             case "explorer":
                 try { Process.Start(new ProcessStartInfo("explorer.exe", e.Project.RootPath) { UseShellExecute = true }); }
