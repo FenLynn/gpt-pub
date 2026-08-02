@@ -36,7 +36,7 @@ func TestScanDroppedPathsRoutesFilesAndDirectories(t *testing.T) {
 	if nonRecursive.Groups[0].Root != "" || len(nonRecursive.Groups[0].Paths) != 1 || nonRecursive.Groups[0].Paths[0] != direct {
 		t.Fatalf("unexpected direct group: %+v", nonRecursive.Groups[0])
 	}
-	if nonRecursive.Groups[1].Root != root || len(nonRecursive.Groups[1].Paths) != 2 {
+	if nonRecursive.Groups[1].Root != filepath.Dir(root) || len(nonRecursive.Groups[1].Paths) != 2 {
 		t.Fatalf("unexpected directory group: %+v", nonRecursive.Groups[1])
 	}
 	if nonRecursive.Unsupported != 2 || nonRecursive.Unreadable != 1 || nonRecursive.ScanErrors != 0 {

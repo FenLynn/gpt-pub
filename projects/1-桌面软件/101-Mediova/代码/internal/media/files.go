@@ -31,6 +31,21 @@ func DetectKind(path string) (model.Kind, bool) {
 	return "", false
 }
 
+// ImportTreeRoot returns the parent of a selected folder. Using this value as
+// Task.Root keeps the selected top-level folder itself in the output tree:
+// importing A/sub/file produces <output>/A/sub/file rather than <output>/sub/file.
+func ImportTreeRoot(selectedFolder string) string {
+	selectedFolder = filepath.Clean(strings.TrimSpace(selectedFolder))
+	if selectedFolder == "." || selectedFolder == "" {
+		return ""
+	}
+	parent := filepath.Dir(selectedFolder)
+	if parent == selectedFolder {
+		return selectedFolder
+	}
+	return parent
+}
+
 // ScanResult contains every supported media file discovered during one folder
 // traversal. Video and image files are deliberately collected together so the
 // desktop application can route them to their respective workspaces without
@@ -213,6 +228,32 @@ func ResolveAndReserveOutput(
 }
 
 func PreserveTimes(src, dst string) error { return preserveTimesPlatform(src, dst) }
+
+// PreserveOutputTreeTimes restores all recreated source directories below root.
+// It walks deepest-first so setting a child directory cannot dirty an already
+// restored parent directory. Root itself is excluded because it is the parent
+// of the user-selected top-level folder.
+func PreserveOutputTreeTimes(input, root, outputRoot string) error {
+	if strings.TrimSpace(root) == "" || strings.TrimSpace(outputRoot) == "" {
+		return nil
+	}
+	sourceDir := filepath.Dir(input)
+	rel, err := filepath.Rel(root, sourceDir)
+	if err != nil || rel == "." || rel == "" || strings.HasPrefix(rel, "..") {
+		return err
+	}
+	parts := strings.FieldsFunc(filepath.Clean(rel), func(r rune) bool { return r == '/' || r == '\\' })
+	var first error
+	for i := len(parts); i >= 1; i-- {
+		relDir := filepath.Join(parts[:i]...)
+		src := filepath.Join(root, relDir)
+		dst := filepath.Join(outputRoot, relDir)
+		if err := preserveTimesPlatform(src, dst); err != nil && first == nil {
+			first = err
+		}
+	}
+	return first
+}
 
 func FileSize(path string) int64 {
 	if st, err := os.Stat(path); err == nil {

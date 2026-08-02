@@ -198,6 +198,19 @@ func comboValuesWithMixed(values []string, mixed bool) []string {
 	return out
 }
 
+func comboFillStable(hwnd uintptr, values []string, selected string, preserveDraft bool) {
+	if hwnd == 0 || preserveDraft {
+		return
+	}
+	if comboText(hwnd) == selected {
+		count := int(send(hwnd, CB_GETCOUNT, 0, 0))
+		if count == len(values) {
+			return
+		}
+	}
+	comboFill(hwnd, values, selected)
+}
+
 func rightSelectionKey(tasks []*model.Task, heldID int64) string {
 	if heldID != 0 {
 		return fmt.Sprintf("held:%d", heldID)
@@ -260,10 +273,12 @@ func (a *application) v420UpdateRightPanel() {
 		}
 		return 0
 	}())
-	if key != a.rightSelectionKey {
+	selectionChanged := key != a.rightSelectionKey
+	if selectionChanged {
 		a.rightSelectionKey = key
 		a.rightDraftFields = make(map[int]bool)
 	}
+	preserveDraft := !selectionChanged && len(a.rightDraftFields) > 0
 	if len(selected) == 0 {
 		setText(a.hRightTitle, "转换参数")
 		setText(a.hDetails, "选择一个或多个准备中任务后，可在这里编辑个体参数。已入队任务需通过右键“临时操作”安全搁置后才能修改。")
@@ -300,16 +315,16 @@ func (a *application) v420UpdateRightPanel() {
 	v3, m3 := sharedOptionValue(values, 3)
 	v4, m4 := sharedOptionValue(values, 4)
 	if kind == model.KindImage {
-		comboFill(a.hTaskRes, comboValuesWithMixed(imageSizes(), m0), v0)
-		comboFill(a.hTaskCodec, comboValuesWithMixed([]string{"JPG", "PNG"}, m1), v1)
-		comboFill(a.hTaskVolume, comboValuesWithMixed([]string{"不限", "约 500KB", "约 1MB", "约 2MB", "约 5MB"}, m3), v3)
+		comboFillStable(a.hTaskRes, comboValuesWithMixed(imageSizes(), m0), v0, preserveDraft)
+		comboFillStable(a.hTaskCodec, comboValuesWithMixed([]string{"JPG", "PNG"}, m1), v1, preserveDraft)
+		comboFillStable(a.hTaskVolume, comboValuesWithMixed([]string{"不限", "约 500KB", "约 1MB", "约 2MB", "约 5MB"}, m3), v3, preserveDraft)
 	} else {
-		comboFill(a.hTaskRes, comboValuesWithMixed(videoResolutions(), m0), v0)
-		comboFill(a.hTaskCodec, comboValuesWithMixed([]string{"H.265", "H.264"}, m1), v1)
-		comboFill(a.hTaskVolume, comboValuesWithMixed(volumeModes(), m3), v3)
+		comboFillStable(a.hTaskRes, comboValuesWithMixed(videoResolutions(), m0), v0, preserveDraft)
+		comboFillStable(a.hTaskCodec, comboValuesWithMixed([]string{"H.265", "H.264"}, m1), v1, preserveDraft)
+		comboFillStable(a.hTaskVolume, comboValuesWithMixed(volumeModes(), m3), v3, preserveDraft)
 	}
-	comboFill(a.hTaskQuality, comboValuesWithMixed([]string{"高", "中", "低"}, m2), v2)
-	comboFill(a.hTaskRotation, comboValuesWithMixed(rotations(), m4), v4)
+	comboFillStable(a.hTaskQuality, comboValuesWithMixed([]string{"高", "中", "低"}, m2), v2, preserveDraft)
+	comboFillStable(a.hTaskRotation, comboValuesWithMixed(rotations(), m4), v4, preserveDraft)
 	for _, h := range []uintptr{a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation} {
 		enable(h, canEdit)
 	}
