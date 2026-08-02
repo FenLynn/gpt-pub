@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,7 +9,6 @@ namespace PersonalWorkbench.Smoke;
 
 internal static class MainWindowStartupProbe
 {
-    [ModuleInitializer]
     internal static void Verify()
     {
         Exception? failure = null;
