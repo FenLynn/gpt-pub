@@ -74,12 +74,12 @@ internal static class V090ProjectWorkflowChecks
             "ProjectWorkflow = ProjectWorkflowCoordinator.Attach(window, this)",
             "public ProjectWorkflowCoordinator ProjectWorkflow { get; }");
 
-        VerifyLocalContextAsync().GetAwaiter().GetResult();
+        VerifyLocalContext();
         Console.WriteLine(
             "PASS AtlasDesk v0.9.0 explicit project selection drives bounded context, workspace and terminal workflow");
     }
 
-    private static async Task VerifyLocalContextAsync()
+    private static void VerifyLocalContext()
     {
         var root = Path.Combine(Path.GetTempPath(), "atlasdesk-project-context-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -91,7 +91,11 @@ internal static class V090ProjectWorkflowChecks
             var descriptor = ProjectCatalogService.Detect(root, root)
                              ?? throw new InvalidOperationException("Project descriptor smoke detection failed.");
             var settings = new AppSettings { RecentWorkspaceFiles = new List<string> { recent } };
-            var context = await ProjectContextService.ReadAsync(descriptor, settings, CancellationToken.None);
+            var context = ProjectContextService
+                .ReadAsync(descriptor, settings, CancellationToken.None)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
             if (!context.EnvironmentSummary.Contains("Python", StringComparison.Ordinal)
                 || !context.RecentFilesSummary.Contains("1", StringComparison.Ordinal))
             {
