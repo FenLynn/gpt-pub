@@ -40,7 +40,21 @@ internal static class V081SourceBoundaryChecks
             "content.Effect = null",
             "sidebar.Effect = null");
 
-        Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development and Dashboard source boundaries");
+        var projectCenter = File.ReadAllText(Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"));
+        RequireTokens(
+            Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"),
+            "Tabs_SelectionChanged",
+            "_tabs.SelectionChanged += Tabs_SelectionChanged",
+            "_tabs.SelectedIndex = 0");
+        RequireOrder(
+            projectCenter,
+            "_tabs = BuildTabs();",
+            "_tabs.SelectionChanged += Tabs_SelectionChanged;",
+            "_tabs.SelectedIndex = 0;");
+        RejectExactLine(projectCenter, "tabs.SelectedIndex = 0;",
+            "project center selects a local TabControl before the _tabs field is assigned");
+
+        Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development, Dashboard and startup-order source boundaries");
     }
 
     private static string FindNativeSourceRoot()
@@ -77,6 +91,26 @@ internal static class V081SourceBoundaryChecks
             if (!source.Contains(token, StringComparison.Ordinal))
                 throw new InvalidOperationException($"Missing required AtlasDesk boundary token '{token}' in {path}.");
         }
+    }
+
+    private static void RequireOrder(string source, params string[] tokens)
+    {
+        var previous = -1;
+        foreach (var token in tokens)
+        {
+            var current = source.IndexOf(token, previous + 1, StringComparison.Ordinal);
+            if (current < 0)
+                throw new InvalidOperationException("Missing startup-order token: " + token);
+            if (current <= previous)
+                throw new InvalidOperationException("Invalid startup initialization order near: " + token);
+            previous = current;
+        }
+    }
+
+    private static void RejectExactLine(string source, string line, string message)
+    {
+        if (source.Split('\n').Any(candidate => string.Equals(candidate.Trim(), line, StringComparison.Ordinal)))
+            throw new InvalidOperationException(message + ": " + line);
     }
 
     private static void Reject(string source, string token, string message)
