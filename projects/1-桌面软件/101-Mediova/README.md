@@ -22,14 +22,14 @@ Mediova 是面向 Windows 10/11 x64 的本地媒体处理与创作工作站，�
 - 日常分支：`p101-exp`
 - 稳定分支：`p101-stable`
 
-当前正式构建入口仍为 v4.1.1：
+v4.2.0 候选完整 Runtime 构建入口：
 
 ```powershell
 cd projects/1-桌面软件/101-Mediova/代码
-./build_v4.1.1.ps1 -FFmpegBin "C:\path\to\ffmpeg\bin"
+./build_v4.2.0.ps1 -FFmpegBin "C:\path\to\ffmpeg\bin"
 ```
 
-v4.2.0 构建入口只有在版本实现、资源和完整 Runtime 验证完成后才切换，不提前伪装成正式版本。
+当前正式版本仍为 v4.1.1；上述入口用于 v4.2.0 候选构建，只有完成稳定候选、正式主线准入、标签和 Release 后才成为正式入口。
 
 ## 架构摘要
 

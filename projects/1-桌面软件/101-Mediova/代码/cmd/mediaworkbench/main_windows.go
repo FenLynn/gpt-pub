@@ -30,7 +30,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const appVersion = "4.1.1"
+const appVersion = "4.2.0"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -292,6 +292,7 @@ type application struct {
 	selfTestOutput        string
 	outputIntegrityHook   func(string)
 	uiPreview             bool
+	uiPreviewMode         string
 }
 
 var app *application
@@ -420,11 +421,11 @@ func main() {
 	config.MigrateLegacyTransientData()
 	runtimeMigrated, runtimeMigrationErr := config.MigrateLegacyRuntimeComponents()
 	selfTest, selfTestOutput := parseSelfTestArgs(os.Args[1:])
-	uiPreview := parseUIPreviewArgs(os.Args[1:])
+	uiPreview, uiPreviewMode := parseUIPreviewArgs(os.Args[1:])
 	settings := config.Load()
 	settings.FFmpegPath = config.NormalizeConfiguredFFmpegPath(settings.FFmpegPath)
-	if settings.UILayoutRevision < 411 {
-		settings.UILayoutRevision = 411
+	if settings.UILayoutRevision < 420 {
+		settings.UILayoutRevision = 420
 		settings.RightPanelVisible = true
 		settings.ShowPerformanceStats = false
 		settings.TaskColumnWidths = nil
@@ -441,7 +442,7 @@ func main() {
 		settings.NotifyOnDone = false
 		settings.OpenOutputOnDone = false
 	}
-	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), queueWake: make(chan struct{}, 64), taskCancels: make(map[int64]context.CancelFunc), holdRequests: make(map[int64]bool), removeRequests: make(map[int64]bool), immediateRestarts: make(map[int64]bool), rightDraftFields: make(map[int]bool), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
+	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, uiPreviewMode: uiPreviewMode, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), queueWake: make(chan struct{}, 64), taskCancels: make(map[int64]context.CancelFunc), holdRequests: make(map[int64]bool), removeRequests: make(map[int64]bool), immediateRestarts: make(map[int64]bool), rightDraftFields: make(map[int]bool), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
 	if runtimeMigrationErr != nil {
 		app.runtimeNotice = "旧 FFmpeg 组件未能复制到 Runtime，已保留旧位置继续兼容：" + short(runtimeMigrationErr.Error(), 160)
 	} else if runtimeMigrated {
@@ -455,7 +456,7 @@ func main() {
 	app.player, app.playerOK, _ = media.DetectPotPlayer(app.settings.PlayerPath)
 	writeStartupStage("components_discovered")
 	hInst, _, _ := procGetModuleHandleW.Call(0)
-	className := p("MediovaDesktop411")
+	className := p("MediovaDesktop420")
 	app.hIcon = loadEmbeddedIcon()
 	if r, _, _ := procRegisterWindowMessageW.Call(uintptr(unsafe.Pointer(p("TaskbarCreated")))); r != 0 {
 		taskbarCreatedMessage = uint32(r)
@@ -6333,27 +6334,12 @@ func (a *application) writeDiagnostics() {
 	messageBox(a.hwnd, "诊断报告", "诊断报告已生成并打开，文件路径已复制到剪贴板。", MB_OK|MB_ICONINFORMATION)
 }
 
-func parseUIPreviewArgs(args []string) bool {
-	for _, arg := range args {
-		if strings.TrimSpace(arg) == "--ui-preview" {
-			return true
-		}
-	}
-	return false
+func parseUIPreviewArgs(args []string) (bool, string) {
+	return parseV420UIPreviewArgs(args)
 }
 
 func (a *application) populateUIPreviewTasks() {
-	now := time.Now()
-	preview := []*model.Task{
-		{ID: a.nextID.Add(1), Input: `C:\Media\Phone\2026-07-28_Baby_Video.MOV`, Kind: model.KindVideo, Width: 3840, Height: 2160, Rotation: 90, Duration: 74.2, FPS: 29.97, BitrateKbps: 48200, VideoCodec: "HEVC", AudioCodec: "AAC", AudioStreams: 1, InputSize: 428 * 1024 * 1024, Status: model.StatusReady, Progress: 0, ThumbnailIndex: -1, Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `C:\Media\Camera\Travel\IMG_3187.MP4`, Kind: model.KindVideo, Width: 3840, Height: 2160, Duration: 182.6, FPS: 59.94, BitrateKbps: 72100, VideoCodec: "H.264", AudioCodec: "AAC", AudioStreams: 1, InputSize: 1538 * 1024 * 1024, Status: model.StatusProcessing, Progress: 63.4, Engine: "CPU · H.265", ThumbnailIndex: -1, StartedAt: now.Add(-2 * time.Minute), Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `D:\Archive\Family\Birthday_001.mp4`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 96.4, FPS: 25, BitrateKbps: 16800, VideoCodec: "H.264", AudioCodec: "AAC", AudioStreams: 1, InputSize: 206 * 1024 * 1024, OutputPath: `D:\Output\Birthday_001.mp4`, OutputSize: 71 * 1024 * 1024, Status: model.StatusDone, Progress: 100, Engine: "NVIDIA NVENC", ThumbnailIndex: -1, FinishedAt: now.Add(-4 * time.Minute), Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `D:\Archive\OldPhone\VID_0042.3gp`, Kind: model.KindVideo, Width: 1280, Height: 720, Duration: 48.7, FPS: 30, BitrateKbps: 5100, VideoCodec: "H.264", AudioCodec: "AAC", AudioStreams: 1, InputSize: 31 * 1024 * 1024, Status: model.StatusFailed, Progress: 18.2, Error: "输入文件尾部损坏，解码器无法继续读取。", FailureCategory: "源文件损坏", ThumbnailIndex: -1, Options: model.TaskOptions{FollowDefaults: true}},
-		{ID: a.nextID.Add(1), Input: `C:\Media\Phone\Screenshot_20260730.png`, Kind: model.KindImage, Width: 1440, Height: 3200, InputSize: 7 * 1024 * 1024, Status: model.StatusReady, ThumbnailIndex: -1, Options: model.TaskOptions{FollowDefaults: true}},
-	}
-	a.mu.Lock()
-	a.tasks = preview
-	a.mu.Unlock()
+	a.v420PopulateUIPreviewTasks()
 }
 func parseSelfTestArgs(args []string) (bool, string) {
 	enabled := false
@@ -6440,7 +6426,13 @@ func (a *application) resetSelfTestRunState() {
 	a.runOnly = nil
 	a.runTaskIDs = nil
 	a.reservedOutputs = make(map[string]int64)
+	a.v420ResetRunMaps()
 	a.runMu.Unlock()
+	a.mu.Lock()
+	a.heldEditTaskID = 0
+	a.rightDraftFields = make(map[int]bool)
+	a.rightSelectionKey = ""
+	a.mu.Unlock()
 	procKillTimer.Call(a.hwnd, TIMER_MAIN_CLOCK)
 }
 
@@ -7297,6 +7289,7 @@ func (a *application) runSelfTest() {
 		}
 	}
 
+	a.runV420DynamicQueueSelfTest(&report, root, videoPath, ffprobe)
 	a.showImportToast("自检导入：视频 2 个，图片 1 个")
 	a.hideImportToast()
 	report.Checks["import_toast"] = true
@@ -7480,7 +7473,7 @@ func (a *application) applySmartPlan() {
 		if len(selected) > 0 && !selected[i] {
 			continue
 		}
-		if t.Status == model.StatusProcessing || t.Status == model.StatusQueued {
+		if t.IsLocked() {
 			continue
 		}
 		opts := a.settings.EffectiveOptions(t)
