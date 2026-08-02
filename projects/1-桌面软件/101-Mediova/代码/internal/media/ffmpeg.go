@@ -47,6 +47,11 @@ func FindFFmpeg(configured string) (ffmpeg, ffprobe string, ok bool) {
 	if configured != "" {
 		candidates = append(candidates, configured)
 	}
+	if runtimeBin, err := config.RuntimeFFmpegBinDir(); err == nil {
+		candidates = append(candidates, filepath.Join(runtimeBin, executableName("ffmpeg")))
+	}
+	// Legacy AppData remains a read-only compatibility fallback for one full
+	// release cycle. New imports are always written into the transparent Runtime.
 	if local, err := config.LocalDir(); err == nil {
 		candidates = append(candidates,
 			filepath.Join(local, "ffmpeg", "bin", executableName("ffmpeg")),

@@ -1,0 +1,157 @@
+package main
+
+import "strings"
+
+type compressionTone int
+
+const (
+	compressionNeutral compressionTone = iota
+	compressionYellow
+	compressionGreen
+	compressionRed
+)
+
+type compressionVisual struct {
+	InputFraction float64
+	Tone          compressionTone
+	Intensity     float64
+}
+
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+func compressionVisualFor(inputSize, outputSize int64) compressionVisual {
+	if inputSize <= 0 || outputSize <= 0 {
+		return compressionVisual{InputFraction: .5, Tone: compressionNeutral}
+	}
+	total := float64(inputSize + outputSize)
+	ratio := float64(outputSize) / float64(inputSize)
+	visual := compressionVisual{InputFraction: float64(inputSize) / total}
+
+	// Yellow has the highest priority: near 1:1 results are informational rather
+	// than warnings, and a small final file is acceptable even when it grew.
+	if (ratio >= .90 && ratio <= 1.10) || (outputSize > inputSize && outputSize < 15*1024*1024) {
+		visual.Tone = compressionYellow
+		visual.Intensity = clamp01(absFloat(ratio-1) / .10)
+		return visual
+	}
+	if ratio < .90 {
+		visual.Tone = compressionGreen
+		visual.Intensity = clamp01((.90 - ratio) / .75)
+		return visual
+	}
+	visual.Tone = compressionRed
+	visual.Intensity = clamp01((ratio - 1.10) / 1.50)
+	return visual
+}
+
+func absFloat(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func normalizeDirectoryKey(path string) string {
+	path = strings.TrimSpace(path)
+	path = strings.TrimRight(path, "\\/")
+	return strings.ToLower(path)
+}
+
+func rememberRecentDirectory(current string, previous []string, limit int) []string {
+	current = strings.TrimSpace(current)
+	if limit <= 0 {
+		limit = 10
+	}
+	result := make([]string, 0, limit)
+	seen := make(map[string]bool, limit)
+	appendOne := func(path string) {
+		path = strings.TrimSpace(path)
+		key := normalizeDirectoryKey(path)
+		if key == "" || seen[key] || len(result) >= limit {
+			return
+		}
+		seen[key] = true
+		result = append(result, path)
+	}
+	appendOne(current)
+	for _, path := range previous {
+		appendOne(path)
+	}
+	return result
+}
+
+type controlVisualState struct {
+	Active   bool
+	Hovered  bool
+	Pressed  bool
+	Disabled bool
+}
+
+type surfaceTreatment struct {
+	Fill     bool
+	Border   bool
+	Accent   bool
+	Strength int
+}
+
+// Default toolbar controls are transparent and separated only by a very faint
+// line. The surface becomes visible on hover/press, while the selected mode
+// keeps a restrained accent. This prevents the toolbar becoming a row of cards.
+func toolbarSurfaceTreatment(state controlVisualState) surfaceTreatment {
+	if state.Disabled {
+		return surfaceTreatment{Border: true}
+	}
+	if state.Pressed {
+		return surfaceTreatment{Fill: true, Border: true, Accent: state.Active, Strength: 3}
+	}
+	if state.Active {
+		return surfaceTreatment{Fill: true, Border: true, Accent: true, Strength: 2}
+	}
+	if state.Hovered {
+		return surfaceTreatment{Fill: true, Border: true, Strength: 2}
+	}
+	return surfaceTreatment{Border: true, Strength: 1}
+}
+
+func secondarySurfaceTreatment(state controlVisualState) surfaceTreatment {
+	if state.Disabled {
+		return surfaceTreatment{Border: true}
+	}
+	if state.Pressed {
+		return surfaceTreatment{Fill: true, Border: true, Strength: 3}
+	}
+	if state.Hovered {
+		return surfaceTreatment{Fill: true, Border: true, Strength: 2}
+	}
+	return surfaceTreatment{Border: true, Strength: 1}
+}
+
+type parameterWidthSet struct {
+	Resolution int32
+	Codec      int32
+	Quality    int32
+	Volume     int32
+	Rotation   int32
+}
+
+func bottomParameterWidths() parameterWidthSet {
+	return parameterWidthSet{Resolution: 84, Codec: 78, Quality: 72, Volume: 126, Rotation: 98}
+}
+
+type cellBarInsetSet struct {
+	Horizontal    int32
+	Vertical      int32
+	MinimumHeight int32
+}
+
+func listCellBarInsets() cellBarInsetSet {
+	return cellBarInsetSet{Horizontal: 1, Vertical: 5, MinimumHeight: 14}
+}
