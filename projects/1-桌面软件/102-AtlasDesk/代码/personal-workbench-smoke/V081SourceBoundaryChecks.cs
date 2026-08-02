@@ -51,7 +51,7 @@ internal static class V081SourceBoundaryChecks
             "_tabs = BuildTabs();",
             "_tabs.SelectionChanged += Tabs_SelectionChanged;",
             "_tabs.SelectedIndex = 0;");
-        Reject(projectCenter, "tabs.SelectedIndex = 0;",
+        RejectExactLine(projectCenter, "tabs.SelectedIndex = 0;",
             "project center selects a local TabControl before the _tabs field is assigned");
 
         Console.WriteLine("PASS AtlasDesk v0.8.1 shell, WorkArea, development, Dashboard and startup-order source boundaries");
@@ -105,6 +105,12 @@ internal static class V081SourceBoundaryChecks
                 throw new InvalidOperationException("Invalid startup initialization order near: " + token);
             previous = current;
         }
+    }
+
+    private static void RejectExactLine(string source, string line, string message)
+    {
+        if (source.Split('\n').Any(candidate => string.Equals(candidate.Trim(), line, StringComparison.Ordinal)))
+            throw new InvalidOperationException(message + ": " + line);
     }
 
     private static void Reject(string source, string token, string message)
