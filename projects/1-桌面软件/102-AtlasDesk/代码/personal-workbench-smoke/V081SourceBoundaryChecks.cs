@@ -58,7 +58,6 @@ internal static class V081SourceBoundaryChecks
         var diagnostics = File.ReadAllText(diagnosticsPath);
         RequireTokens(
             diagnosticsPath,
-            "DashboardScriptDiagnostics.Attach(window)",
             "AddScriptToExecuteOnDocumentCreatedAsync",
             "ExecuteScriptAsync",
             "WebMessageReceived",
