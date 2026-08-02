@@ -29,7 +29,18 @@ new = '''\tcleanRoot := strings.ToLower(filepath.Clean(dataRoot))
 '''
 if old not in text:
     raise SystemExit("legacy FFmpeg assertion not found")
-test.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
+text = text.replace(old, new, 1)
+old_env = '''\tt.Setenv("XDG_CONFIG_HOME", t.TempDir())
+'''
+new_env = '''\troot := t.TempDir()
+\tt.Setenv("XDG_CONFIG_HOME", root)
+\tt.Setenv("APPDATA", root)
+\tt.Setenv("LOCALAPPDATA", root)
+'''
+if old_env not in text:
+    raise SystemExit("history test isolation marker not found")
+text = text.replace(old_env, new_env, 1)
+test.write_text(text, encoding="utf-8", newline="\n")
 
 ui_test = Path("projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/ui_rules_test.go")
 text = ui_test.read_text(encoding="utf-8")
