@@ -1,0 +1,7 @@
+project=P101
+product=Mediova
+version=4.1.0
+source_commit=27435598978ec8e16944742ce0de7c56f489dded
+formal_pr_ci_run=30727129758
+tag=p101-v4.1.0
+mode=build-verify-tag-release
