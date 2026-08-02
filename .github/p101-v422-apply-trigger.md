@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time workflow. Do not merge.
 
-Reload the unambiguous column-index migration from latest main.
+Reload the exact two-guard workspace protection from latest main.
