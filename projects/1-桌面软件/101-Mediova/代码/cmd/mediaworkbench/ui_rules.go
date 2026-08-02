@@ -17,6 +17,13 @@ type compressionVisual struct {
 	Intensity     float64
 }
 
+func minInt32(a, b int32) int32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func clamp01(v float64) float64 {
 	if v < 0 {
 		return 0
@@ -153,5 +160,5 @@ type cellBarInsetSet struct {
 }
 
 func listCellBarInsets() cellBarInsetSet {
-	return cellBarInsetSet{Horizontal: 1, Vertical: 5, MinimumHeight: 14}
+	return cellBarInsetSet{Horizontal: 1, Vertical: 2, MinimumHeight: 20}
 }

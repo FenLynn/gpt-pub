@@ -4,18 +4,20 @@ package media
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 	"unsafe"
 )
 
 const (
-	genericRead         = 0x80000000
-	genericWrite        = 0x40000000
-	fileShareRead       = 0x1
-	fileShareWrite      = 0x2
-	fileShareDelete     = 0x4
-	openExisting        = 3
-	fileAttributeNormal = 0x80
+	genericRead             = 0x80000000
+	genericWrite            = 0x40000000
+	fileShareRead           = 0x1
+	fileShareWrite          = 0x2
+	fileShareDelete         = 0x4
+	openExisting            = 3
+	fileAttributeNormal     = 0x80
+	fileFlagBackupSemantics = 0x02000000
 )
 
 type filetime struct{ LowDateTime, HighDateTime uint32 }
@@ -31,7 +33,11 @@ func openTimeHandle(path string, access uintptr) (uintptr, error) {
 	if err != nil {
 		return 0, err
 	}
-	h, _, e := procCreateFileWTimes.Call(uintptr(unsafe.Pointer(p)), access, fileShareRead|fileShareWrite|fileShareDelete, 0, openExisting, fileAttributeNormal, 0)
+	flags := uintptr(fileAttributeNormal)
+	if info, statErr := os.Stat(path); statErr == nil && info.IsDir() {
+		flags |= fileFlagBackupSemantics
+	}
+	h, _, e := procCreateFileWTimes.Call(uintptr(unsafe.Pointer(p)), access, fileShareRead|fileShareWrite|fileShareDelete, 0, openExisting, flags, 0)
 	if h == 0 || h == ^uintptr(0) {
 		return 0, fmt.Errorf("CreateFileW: %v", e)
 	}
