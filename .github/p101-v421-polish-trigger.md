@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time patch workflow. Do not merge.
 
-Reload exact patch whose four Git blobs have been verified.
+Reload the uniquely anchored, four-blob-verified patch.
