@@ -304,6 +304,8 @@ public sealed class WorkbenchEnhancer
 
         if (_window.FindName("WorkspaceNav") is RadioButton workspaceNav)
             workspaceNav.Checked += async (_, _) => await ShowWorkspaceAsync();
+        if (_window.FindName("LibraryNav") is RadioButton libraryNav)
+            libraryNav.Checked += async (_, _) => await ShowZoteroAsync();
         if (_window.FindName("ToolsNav") is RadioButton toolsNav)
             toolsNav.Checked += (_, _) => ShowModulePlaceholder("工具", "后续用于组合本地软件、批处理脚本和常用转换动作。工作区与终端稳定后再逐项接入，避免堆出不可用入口。");
         if (_window.FindName("TasksNav") is RadioButton tasksNav)
@@ -315,6 +317,11 @@ public sealed class WorkbenchEnhancer
         if (_modulePlaceholder is not null) _modulePlaceholder.Visibility = Visibility.Collapsed;
         _workspace.Visibility = Visibility.Visible;
         await _workspace.EnsureLoadedAsync();
+    }
+
+    private async Task ShowZoteroAsync()
+    {
+        await _zotero.EnsureLoadedAsync();
     }
 
     private void ShowModulePlaceholder(string title, string description)
