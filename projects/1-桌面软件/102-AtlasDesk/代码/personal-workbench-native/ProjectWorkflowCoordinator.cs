@@ -4,10 +4,16 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace PersonalWorkbench;
 
-public sealed class V070ProjectCenterEnhancer
+/// <summary>
+/// Long-term owner for the Project / Environment / Terminal development surface.
+/// Project discovery starts only after explicit Development navigation or Refresh.
+/// Selected-project context is cancellable and stale results are generation gated.
+/// </summary>
+public sealed class ProjectWorkflowCoordinator
 {
     private const int ProjectTabIndex = 0;
     private const int EnvironmentTabIndex = 1;
@@ -21,9 +27,11 @@ public sealed class V070ProjectCenterEnhancer
     private readonly ProjectCenterControl _projects;
     private readonly ContentControl _terminalHost;
     private readonly TabControl _tabs;
+    private CancellationTokenSource? _contextCancellation;
+    private long _contextGeneration;
     private bool _movingTerminal;
 
-    private V070ProjectCenterEnhancer(MainWindow window, WorkbenchFeaturePipeline pipeline)
+    private ProjectWorkflowCoordinator(MainWindow window, WorkbenchFeaturePipeline pipeline)
     {
         _window = window;
         _pipeline = pipeline;
@@ -35,6 +43,7 @@ public sealed class V070ProjectCenterEnhancer
                        ?? throw new InvalidOperationException("Development environment module is unavailable.");
         _projects = new ProjectCenterControl(pipeline.Settings);
         _projects.ActionRequested += ProjectActionRequested;
+        _projects.ProjectSelectionChanged += ProjectSelectionChanged;
         _terminalHost = new ContentControl
         {
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -42,20 +51,20 @@ public sealed class V070ProjectCenterEnhancer
             Background = new SolidColorBrush(Color.FromRgb(13, 19, 32))
         };
 
-        // Assign the field before selecting the first tab. Setting SelectedIndex raises
-        // SelectionChanged synchronously, and the handler reads _tabs.
         _tabs = BuildTabs();
-        _tabs.SelectionChanged += Tabs_SelectionChanged;
+        // Establish the initial Project tab before subscribing. WPF raises
+        // SelectionChanged synchronously, and construction must never start a scan.
         _tabs.SelectedIndex = ProjectTabIndex;
+        _tabs.SelectionChanged += Tabs_SelectionChanged;
 
         Install();
         RemoveLegacyProjectButton();
         WireNavigation();
         WireTerminalPage();
-        _window.Closed += (_, _) => _projects.Dispose();
+        _window.Closed += (_, _) => Dispose();
     }
 
-    public static V070ProjectCenterEnhancer Attach(MainWindow window, WorkbenchFeaturePipeline pipeline)
+    public static ProjectWorkflowCoordinator Attach(MainWindow window, WorkbenchFeaturePipeline pipeline)
         => new(window, pipeline);
 
     private static T? ReadField<T>(object instance, string name) where T : class
@@ -83,14 +92,13 @@ public sealed class V070ProjectCenterEnhancer
     {
         if (!ReferenceEquals(args.Source, _tabs))
             return;
-
         try
         {
             await RefreshSelectedTabAsync();
         }
         catch (Exception ex)
         {
-            App.Log("Refresh project center tab failed: " + ex);
+            App.Log("Refresh project workflow tab failed: " + ex);
         }
     }
 
@@ -151,9 +159,6 @@ public sealed class V070ProjectCenterEnhancer
 
     private void WireTerminalPage()
     {
-        // FeatureHostTerminalCoordinator owns bottom docking and
-        // WorkspaceTerminalCoordinator owns session creation. This layer only owns
-        // the explicit full-height terminal page.
         _development.OpenTerminalRequested += (_, _) => ShowTerminalPage();
         _terminal.EmbedDevelopmentRequested += (_, _) => ShowTerminalPage();
         _terminal.DockBottomRequested += (_, _) =>
@@ -178,7 +183,7 @@ public sealed class V070ProjectCenterEnhancer
                     args.Handled = true;
                 }
             };
-            terminalButton.ToolTip = "打开开发终端（Ctrl+`）";
+            terminalButton.ToolTip = "打开开发终端（Ctrl+`） · 新建 Ctrl+Shift+T · 重开最近 Ctrl+Shift+R";
         }
 
         _window.AddHandler(
@@ -217,12 +222,8 @@ public sealed class V070ProjectCenterEnhancer
             _movingTerminal = true;
             if (_window.FindName("DevelopmentNav") is RadioButton developmentNav
                 && developmentNav.IsChecked != true)
-            {
                 developmentNav.IsChecked = true;
-            }
 
-            // Collapse any previously requested bottom drawer before reparenting the
-            // same live terminal control into the dedicated development tab.
             try
             {
                 _pipeline.Base.GetType()
@@ -242,7 +243,6 @@ public sealed class V070ProjectCenterEnhancer
             _terminal.SetHostMode(TerminalHostMode.Development);
             if (_tabs.SelectedIndex != TerminalTabIndex)
                 _tabs.SelectedIndex = TerminalTabIndex;
-
             _terminal.Dispatcher.BeginInvoke(new Action(ApplyTerminalButtonContrast));
         }
         catch (Exception ex)
@@ -282,13 +282,67 @@ public sealed class V070ProjectCenterEnhancer
         }
     }
 
+    private async void ProjectSelectionChanged(object? sender, ProjectSelectionChangedEventArgs e)
+    {
+        CancelContextRead();
+        if (e.Project is null)
+            return;
+
+        var project = e.Project;
+        var cancellation = new CancellationTokenSource();
+        _contextCancellation = cancellation;
+        var generation = Interlocked.Increment(ref _contextGeneration);
+        _projects.ShowContextLoading(project);
+
+        try
+        {
+            var context = await ProjectContextService.ReadAsync(
+                project,
+                _pipeline.Settings,
+                cancellation.Token).ConfigureAwait(false);
+            if (generation != Interlocked.Read(ref _contextGeneration) || cancellation.IsCancellationRequested)
+                return;
+
+            await _window.Dispatcher.InvokeAsync(() =>
+            {
+                if (generation == Interlocked.Read(ref _contextGeneration)
+                    && !cancellation.IsCancellationRequested)
+                    _projects.ApplyContext(context);
+            }, DispatcherPriority.Background);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            App.Log("Project context read failed: " + ex);
+            await _window.Dispatcher.InvokeAsync(() =>
+            {
+                if (generation == Interlocked.Read(ref _contextGeneration))
+                {
+                    _projects.ApplyContext(new ProjectWorkflowContext
+                    {
+                        ProjectRoot = project.RootPath,
+                        Status = "项目上下文读取失败"
+                    });
+                }
+            }, DispatcherPriority.Background);
+        }
+        finally
+        {
+            if (ReferenceEquals(_contextCancellation, cancellation))
+            {
+                _contextCancellation = null;
+                cancellation.Dispose();
+            }
+        }
+    }
+
     private async void ProjectActionRequested(object? sender, ProjectActionEventArgs e)
     {
         switch (e.Action)
         {
             case "workspace":
                 if (_window.FindName("WorkspaceNav") is RadioButton workspaceNav) workspaceNav.IsChecked = true;
-                await _window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                await _window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
                 await _workspace.OpenFromGlobalSearchAsync(e.Project.RootPath);
                 break;
             case "terminal":
@@ -297,9 +351,23 @@ public sealed class V070ProjectCenterEnhancer
                 break;
             case "explorer":
                 try { Process.Start(new ProcessStartInfo("explorer.exe", e.Project.RootPath) { UseShellExecute = true }); }
-                catch (Exception ex) { App.Log("Open integrated project explorer failed: " + ex.Message); }
+                catch (Exception ex) { App.Log("Open project explorer failed: " + ex.Message); }
                 break;
         }
+    }
+
+    private void CancelContextRead()
+    {
+        Interlocked.Increment(ref _contextGeneration);
+        _contextCancellation?.Cancel();
+        _contextCancellation?.Dispose();
+        _contextCancellation = null;
+    }
+
+    private void Dispose()
+    {
+        CancelContextRead();
+        _projects.Dispose();
     }
 
     private static void RemoveFromParent(FrameworkElement element)

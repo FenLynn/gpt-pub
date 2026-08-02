@@ -80,9 +80,10 @@ internal static class V083StartupBoundaryChecks
             Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs"),
             "DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window)");
         RequireTokens(
-            Path.Combine(nativeRoot, "V070ProjectCenterEnhancer.cs"),
+            Path.Combine(nativeRoot, "ProjectWorkflowCoordinator.cs"),
             "case EnvironmentTabIndex:",
-            "await _development.EnsureLoadedAsync()");
+            "await _development.EnsureLoadedAsync()",
+            "_tabs.SelectedIndex = ProjectTabIndex");
 
         var residencyRoot = FindProjectSourceRoot("personal-workbench-residency-smoke");
         RequireTokens(
