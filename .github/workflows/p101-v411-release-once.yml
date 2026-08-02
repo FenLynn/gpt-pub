@@ -1,0 +1,175 @@
+name: Release P101 Mediova v4.1.1 once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: p101-v411-release-once
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.head_ref == 'repo-p101-v411-release-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_COMMIT: 6b6e38f9d0d6ff71418d12281f41562ea1d6fa8f
+      SOURCE_TREE: 9f98a2e1fe92fb30f70a055a6014ab24248a7bf0
+      CI_HEAD: d0fe473c78c26e51f2f34381f4894ee406ef9265
+      CI_RUN_ID: '30732509526'
+      ARTIFACT_NAME: P101-Mediova-v4.1.1-CI
+      TAG_NAME: p101-v4.1.1
+      EXE_SHA256: c03d5f40ccb6fa408044d27c3334fe9dd8027907cb64dfd78109f7c8140899f2
+      ZIP_SHA256: a13e24669e5e4c4db73a4d52abda11438b1015e81fa719a5a8f441f8ee231ca9
+    steps:
+      - name: Checkout exact formal source
+        uses: actions/checkout@v4
+        with:
+          ref: 6b6e38f9d0d6ff71418d12281f41562ea1d6fa8f
+          fetch-depth: 0
+
+      - name: Verify formal source and CI tree identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$SOURCE_TREE"
+          git fetch origin "$CI_HEAD" --depth=1
+          test "$(git rev-parse "$CI_HEAD^{tree}")" = "$SOURCE_TREE"
+          run_head=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}" --jq .head_sha)
+          test "$run_head" = "$CI_HEAD"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download fixed formal CI Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: P101-Mediova-v4.1.1-CI
+          path: release-input
+          repository: FenLynn/gpt-pub
+          run-id: 30732509526
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-verify Runtime, self-test and UI screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release-input/Mediova-v4.1.1-Runtime.zip
+          test -f release-input/SHA256.txt
+          test -f release-input/ci_self_test.json
+          test -f release-input/Runtime/runtime-manifest.json
+          test -f release-input/ui-preview/Mediova-v4.1.1-wide-1650x930.png
+          test -f release-input/ui-preview/Mediova-v4.1.1-compact-1120x720.png
+          echo "$ZIP_SHA256  release-input/Mediova-v4.1.1-Runtime.zip" | sha256sum -c -
+          rm -rf runtime-check release-assets
+          mkdir -p runtime-check release-assets
+          unzip -q release-input/Mediova-v4.1.1-Runtime.zip -d runtime-check
+          echo "$EXE_SHA256  runtime-check/Mediova.exe" | sha256sum -c -
+          python3 - <<'PY'
+          import hashlib, json, struct
+          from pathlib import Path
+
+          root = Path('runtime-check')
+          manifest = json.loads((root / 'runtime-manifest.json').read_text(encoding='utf-8-sig'))
+          assert manifest['product'] == 'Mediova'
+          assert manifest['version'] == '4.1.1'
+          assert manifest['platform'] == 'Windows x64'
+          assert manifest['deployment'] == 'folder-runtime'
+          for entry in manifest['files']:
+              path = root / entry['path']
+              assert path.is_file(), entry['path']
+              data = path.read_bytes()
+              assert len(data) == int(entry['size']), entry['path']
+              assert hashlib.sha256(data).hexdigest() == entry['sha256'], entry['path']
+          for private in ('config.json','history.json','session.json','crash.log','settings.json','task-history.json','security.json','vault.bin'):
+              assert not list(root.rglob(private)), private
+
+          report = json.loads(Path('release-input/ci_self_test.json').read_text(encoding='utf-8-sig'))
+          assert report['version'] == '4.1.1'
+          assert report['passed'] is True
+          checks = report['checks']
+          assert len(checks) >= 57
+          assert all(checks.values())
+
+          def png_size(path: Path):
+              data = path.read_bytes()[:24]
+              assert data[:8] == b'\x89PNG\r\n\x1a\n'
+              return struct.unpack('>II', data[16:24])
+          assert png_size(Path('release-input/ui-preview/Mediova-v4.1.1-wide-1650x930.png')) == (1650, 930)
+          assert png_size(Path('release-input/ui-preview/Mediova-v4.1.1-compact-1120x720.png')) == (1120, 720)
+
+          sha_lines = Path('release-input/SHA256.txt').read_text(encoding='ascii').splitlines()
+          assert f"{'c03d5f40ccb6fa408044d27c3334fe9dd8027907cb64dfd78109f7c8140899f2'}  Runtime/Mediova.exe" in sha_lines
+          assert f"{'a13e24669e5e4c4db73a4d52abda11438b1015e81fa719a5a8f441f8ee231ca9'}  Mediova-v4.1.1-Runtime.zip" in sha_lines
+          PY
+          cp runtime-check/Mediova.exe release-assets/Mediova.exe
+          cp release-input/Mediova-v4.1.1-Runtime.zip release-assets/
+          cp release-input/SHA256.txt release-assets/
+          cp release-input/ci_self_test.json release-assets/
+          cp release-input/Runtime/runtime-manifest.json release-assets/
+          cp release-input/ui-preview/Mediova-v4.1.1-wide-1650x930.png release-assets/
+          cp release-input/ui-preview/Mediova-v4.1.1-compact-1120x720.png release-assets/
+
+      - name: Create immutable tag and GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'P101 Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
+            tagged=$(git rev-list -n 1 "$TAG_NAME")
+            test "$tagged" = "$SOURCE_COMMIT"
+          else
+            git tag -a "$TAG_NAME" "$SOURCE_COMMIT" -m 'Mediova v4.1.1'
+            git push origin "refs/tags/$TAG_NAME"
+          fi
+          cat > release-assets/RELEASE_NOTES.md <<'EOF'
+          # Mediova v4.1.1
+
+          v4.1.1 专注完成 v4.1.0 未充分落实的界面视觉修复：工具栏和普通按钮默认透明，悬停/按下/选中状态分离，图标与折叠按钮缩小，状态灯放大，输出母目录和下拉框扁平化，进度/体积条减弱内嵌感，底部参数宽度重新优化。
+
+          本版本保持 v4.1.0 的 Runtime/Data 架构、FFmpeg 组件迁移、输出母目录功能和真实压缩比例逻辑不变。
+
+          ## 安装
+
+          请下载并完整解压 `Mediova-v4.1.1-Runtime.zip`，然后运行其中的 `Mediova.exe`。不要只单独复制 EXE。
+
+          ## 正式验证
+
+          - 正式源提交：`6b6e38f9d0d6ff71418d12281f41562ea1d6fa8f`
+          - 正式源文件树：`9f98a2e1fe92fb30f70a055a6014ab24248a7bf0`
+          - 正式主线 CI：`30732509526`
+          - 原生自检：57/57
+          - Runtime manifest：通过
+          - 私人 Data 扫描：通过
+          - 1650×930 与 1120×720 真实窗口截图：通过尺寸校验与人工复核
+          - Authenticode：未签名
+
+          125%～175% DPI、多显示器和不同 Windows 主题仍保留为真实桌面观察项。
+          EOF
+          assets=(
+            release-assets/Mediova-v4.1.1-Runtime.zip
+            release-assets/Mediova.exe
+            release-assets/SHA256.txt
+            release-assets/ci_self_test.json
+            release-assets/runtime-manifest.json
+            release-assets/Mediova-v4.1.1-wide-1650x930.png
+            release-assets/Mediova-v4.1.1-compact-1120x720.png
+          )
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "${assets[@]}" --clobber
+            gh release edit "$TAG_NAME" --title 'Mediova v4.1.1' --notes-file release-assets/RELEASE_NOTES.md --draft=false --prerelease=false
+          else
+            gh release create "$TAG_NAME" "${assets[@]}" --verify-tag --title 'Mediova v4.1.1' --notes-file release-assets/RELEASE_NOTES.md --latest
+          fi
+          test "$(gh release view "$TAG_NAME" --json isDraft --jq .isDraft)" = 'false'
+          test "$(gh release view "$TAG_NAME" --json isPrerelease --jq .isPrerelease)" = 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
