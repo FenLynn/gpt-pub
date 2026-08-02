@@ -261,6 +261,7 @@ type application struct {
 	heldEditTaskID      int64
 	rightDraftFields    map[int]bool
 	rightUpdating       bool
+	rightSelectionKey   string
 
 	runMu                 sync.Mutex
 	running, paused       bool
@@ -4280,70 +4281,7 @@ func (a *application) selectedTask() (*model.Task, int) {
 	return a.tasks[idxs[0]], idxs[0]
 }
 func (a *application) updateRightPanel() {
-	a.rightUpdating = true
-	defer func() { a.rightUpdating = false }()
-	t, _ := a.selectedTask()
-	if t == nil {
-		setText(a.hRightTitle, "转换参数")
-		setText(a.hDetails, "选择一个或多个任务后，可在这里查看源信息、输出设置和警告，并只修改选中项。\r\n\r\n支持 Ctrl/Shift 多选、右键菜单和双击预览。")
-		return
-	}
-	opts := a.settings.EffectiveOptions(t)
-	if t.Status == model.StatusHeld {
-		setText(a.hRightTitle, "临时修改："+filepath.Base(t.Input))
-		if t.Hold != nil && t.Hold.ReservedSlot {
-			setText(a.hTaskApply, "应用并立即重启")
-		} else {
-			setText(a.hTaskApply, "应用并归队")
-		}
-		setText(a.hTaskDefault, "取消修改")
-	} else {
-		setText(a.hRightTitle, "转换参数")
-		setText(a.hTaskApply, "应用到选中")
-		setText(a.hTaskDefault, "恢复选中默认")
-	}
-	if t.Kind == model.KindImage {
-		comboFill(a.hTaskRes, imageSizes(), opts.ImageSize)
-		comboFill(a.hTaskCodec, []string{"JPG", "PNG"}, opts.ImageFormat)
-		comboFill(a.hTaskVolume, []string{"不限", "约 500KB", "约 1MB", "约 2MB", "约 5MB"}, opts.ImageLimit)
-	} else {
-		comboFill(a.hTaskRes, videoResolutions(), opts.Resolution)
-		comboFill(a.hTaskCodec, []string{"H.265", "H.264"}, opts.Codec)
-		comboFill(a.hTaskVolume, volumeModes(), optionsVolumeDisplay(opts))
-	}
-	comboFill(a.hTaskQuality, []string{"高", "中", "低"}, opts.Quality)
-	comboFill(a.hTaskRotation, rotations(), opts.Rotation)
-	source := fmt.Sprintf("源文件：%s\r\n\r\n源信息：%d×%d · %.2f FPS · %d kb/s · %s\r\n视频：%s · %s\r\n音频：%s（%d 轨，%d kb/s） · 字幕 %d 轨\r\n\r\n时长：%s\r\n\r\n片段与画面：%s\r\n\r\n方向标签：%d°\r\n\r\n参数来源：%s\r\n\r\n输出设置：%s · %s · %s · %s\r\n音频策略：%s · 字幕策略：%s\r\n\r\n编码引擎：%s", t.Input, t.Width, t.Height, t.FPS, t.BitrateKbps, media.FormatBytes(t.InputSize), emptyDash(t.VideoCodec), emptyDash(t.HDRInfo), emptyDash(t.AudioCodec), t.AudioStreams, t.AudioBitrateKbps, t.SubtitleStreams, formatSecondsClock(t.Duration), trimCropSummary(t), t.Rotation, func() string {
-		if t.Options.FollowDefaults {
-			return "跟随默认"
-		}
-		return "单独设置"
-	}(), opts.Resolution, opts.Codec, opts.Quality, optionsVolumeDisplay(opts), a.settings.AudioMode, a.settings.SubtitleMode, func() string {
-		if t.Engine != "" {
-			return t.Engine
-		}
-		if a.settings.SmartStreamCopy {
-			return "符合条件时智能复制；否则按常规编码"
-		}
-		if a.settings.UseGPU {
-			return "GPU 优先，失败回退 CPU"
-		}
-		return "CPU 高质量"
-	}())
-	if t.OutputSize > 0 && t.InputSize > 0 {
-		ratio := float64(t.OutputSize) / float64(t.InputSize) * 100
-		source += "\r\n\r\n体积对比：" + compressionBar(ratio) + fmt.Sprintf(" %.1f%%（%s → %s）", ratio, media.FormatBytes(t.InputSize), media.FormatBytes(t.OutputSize))
-	}
-	if t.Error != "" {
-		if t.FailureCategory != "" {
-			source += "\r\n\r\n失败分类：" + t.FailureCategory
-		}
-		source += "\r\n\r\n错误：" + t.Error
-	}
-	if t.ValidationWarning != "" {
-		source += "\r\n\r\n输出校验警告：" + t.ValidationWarning
-	}
-	setText(a.hDetails, source)
+	a.v420UpdateRightPanel()
 }
 func emptyDash(s string) string {
 	if strings.TrimSpace(s) == "" {
@@ -4470,7 +4408,7 @@ func copyTrimCropToTargets(settings model.Settings, tasks []*model.Task, idxs []
 			continue
 		}
 		target := tasks[idx]
-		if target.Status == model.StatusQueued || target.Status == model.StatusProcessing || target.Status == model.StatusPaused {
+		if target.IsLocked() {
 			continue
 		}
 		targetOpts := settings.EffectiveOptions(target)
@@ -4516,7 +4454,7 @@ func (a *application) copyTaskOptions() {
 			continue
 		}
 		t := a.tasks[i]
-		if t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
+		if t.IsLocked() {
 			continue
 		}
 		t.Options = src
@@ -4544,7 +4482,7 @@ func (a *application) setSelectedQuickOption(id int) {
 			continue
 		}
 		t := a.tasks[i]
-		if t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
+		if t.IsLocked() {
 			continue
 		}
 		o := a.settings.EffectiveOptions(t)
@@ -5484,97 +5422,11 @@ func (a *application) cancelTask(id int64, msg string, opts model.TaskOptions) {
 }
 
 func (a *application) togglePause() {
-	a.runMu.Lock()
-	if !a.running {
-		a.runMu.Unlock()
-		return
-	}
-	a.paused = !a.paused
-	paused := a.paused
-	controller := a.controller
-	if !paused {
-		a.pauseCond.Broadcast()
-	}
-	a.runMu.Unlock()
-	var controlErr error
-	if paused {
-		controlErr = controller.Pause()
-	} else {
-		controlErr = controller.Resume()
-	}
-	a.mu.Lock()
-	for _, t := range a.tasks {
-		if !a.runTaskIDs[t.ID] {
-			continue
-		}
-		if paused && t.Status == model.StatusProcessing {
-			t.Status = model.StatusPaused
-		} else if !paused && t.Status == model.StatusPaused {
-			t.Status = model.StatusProcessing
-		}
-	}
-	a.mu.Unlock()
-	if paused {
-		setText(a.hPause, "继续")
-		msg := "队列与正在运行的 FFmpeg 进程均已暂停。"
-		if controlErr != nil {
-			msg = "队列已暂停，但个别 FFmpeg 进程暂停失败：" + short(controlErr.Error(), 180)
-		}
-		setText(a.hStatusText, msg)
-	} else {
-		setText(a.hPause, "暂停")
-		msg := "队列与 FFmpeg 进程已继续。"
-		if controlErr != nil {
-			msg = "队列已继续，但个别 FFmpeg 进程恢复失败：" + short(controlErr.Error(), 180)
-		}
-		setText(a.hStatusText, msg)
-	}
-	procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
+	a.v420TogglePause()
 }
 
 func (a *application) stopQueue() {
-	a.runMu.Lock()
-	if !a.running {
-		a.runMu.Unlock()
-		return
-	}
-	a.running = false
-	a.paused = false
-	controller := a.controller
-	if a.cancel != nil {
-		a.cancel()
-	}
-	a.pauseCond.Broadcast()
-	runIDs := a.runTaskIDs
-	a.runMu.Unlock()
-	if controller != nil {
-		_ = controller.Resume() // a suspended process must be resumed before cancellation can terminate it.
-	}
-	type stoppedTask struct {
-		task *model.Task
-		opts model.TaskOptions
-	}
-	var stopped []stoppedTask
-	a.mu.Lock()
-	for _, t := range a.tasks {
-		if runIDs == nil || !runIDs[t.ID] {
-			continue
-		}
-		if t.Status == model.StatusReady || t.Status == model.StatusQueued || t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
-			t.Status = model.StatusCancelled
-			t.Error = "已停止"
-			t.Engine = "已停止"
-			t.FinishedAt = time.Now()
-			stopped = append(stopped, stoppedTask{task: t, opts: a.settings.EffectiveOptions(t)})
-		}
-	}
-	a.mu.Unlock()
-	for _, item := range stopped {
-		a.appendTaskHistory(item.task, item.opts, "已停止")
-	}
-	setText(a.hStatusText, "正在停止所有转换进程…")
-	a.saveSession()
-	procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
+	a.v420StopQueue()
 }
 
 func (a *application) finishRun() {
@@ -5590,6 +5442,7 @@ func (a *application) finishRun() {
 	a.runOnly = nil
 	a.runTaskIDs = nil
 	a.reservedOutputs = make(map[string]int64)
+	a.v420ResetRunMaps()
 	runStarted := a.runStart
 	runEnded := a.timeEnd
 	a.runMu.Unlock()
@@ -5661,8 +5514,8 @@ func (a *application) finishRun() {
 		}
 		a.showCompletionToast(title, body)
 	}
-	if a.settings.OpenOutputOnDone && a.settings.OutputDir != "" {
-		shellOpen(a.settings.OutputDir)
+	if outputDir := a.settings.OutputDirFor(runKind); a.settings.OpenOutputOnDone && outputDir != "" {
+		shellOpen(outputDir)
 	}
 }
 
@@ -5672,7 +5525,7 @@ func (a *application) refreshTotal() {
 	paused := a.paused
 	start := a.runStart
 	kind := a.currentKind
-	runIDs := a.runTaskIDs
+	runIDs := copyTaskIDSet(a.runTaskIDs)
 	if running {
 		kind = a.runKind
 	}
@@ -5770,7 +5623,7 @@ func (a *application) refreshTotal() {
 }
 
 func prepareTaskForRetry(t *model.Task) bool {
-	if t == nil || t.Status == model.StatusQueued || t.Status == model.StatusProcessing || t.Status == model.StatusPaused {
+	if t == nil || t.IsLocked() {
 		return false
 	}
 	t.Status = model.StatusReady

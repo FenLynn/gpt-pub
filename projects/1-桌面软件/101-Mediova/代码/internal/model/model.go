@@ -123,7 +123,7 @@ func (t *Task) IsLocked() bool {
 }
 
 func (t *Task) CanHoldForEdit() bool {
-	return t != nil && (t.Status == StatusQueued || t.Status == StatusProcessing)
+	return t != nil && (t.Status == StatusQueued || t.Status == StatusProcessing || t.Status == StatusPaused)
 }
 
 func (t *Task) CanRemoveSafely() bool {

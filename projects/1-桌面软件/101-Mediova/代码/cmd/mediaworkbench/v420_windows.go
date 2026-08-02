@@ -270,21 +270,30 @@ func (a *application) v420PrepareReadyBatch(kind model.Kind, only map[int64]bool
 }
 
 func (a *application) v420RollbackQueued(ids map[int64]bool) {
+	var releases []struct {
+		path string
+		id   int64
+	}
 	a.mu.Lock()
 	for _, task := range a.tasks {
 		if task == nil || !ids[task.ID] || task.Status != model.StatusQueued {
 			continue
 		}
-		path := task.OutputPath
+		if task.OutputPath != "" {
+			releases = append(releases, struct {
+				path string
+				id   int64
+			}{task.OutputPath, task.ID})
+		}
 		task.Status = model.StatusReady
 		task.Queue = nil
 		task.OutputPath = ""
 		task.Progress = 0
-		if path != "" {
-			go a.releaseOutput(path, task.ID)
-		}
 	}
 	a.mu.Unlock()
+	for _, item := range releases {
+		a.releaseOutput(item.path, item.id)
+	}
 }
 
 func (a *application) v420AppendReadyToRun(only map[int64]bool) {
@@ -310,6 +319,12 @@ func (a *application) v420AppendReadyToRun(only map[int64]bool) {
 		}
 		setText(a.hStatusText, msg)
 		a.refreshAll()
+		return
+	}
+	if !a.v420ConfirmDiskSpace(a.v420OutputDir(runKind), ids, "新增任务磁盘空间预检") {
+		a.v420RollbackQueued(ids)
+		a.refreshAll()
+		setText(a.hStatusText, "已取消加入队列；准备中任务保持可编辑。")
 		return
 	}
 	a.runMu.Lock()
@@ -705,13 +720,17 @@ func (a *application) v420RemoveTaskByID(id int64) {
 			a.heldEditTaskID = 0
 		}
 		a.mu.Unlock()
+		// Conversion interruption removes its partial output before this method.
+		// Generic list removal must never delete a completed output or an existing
+		// collision target; it only releases the in-memory reservation.
 		if path != "" {
-			_ = os.Remove(path)
 			a.releaseOutput(path, id)
 		}
 		a.runMu.Lock()
 		delete(a.runTaskIDs, id)
 		delete(a.immediateRestarts, id)
+		delete(a.holdRequests, id)
+		delete(a.removeRequests, id)
 		a.runMu.Unlock()
 		a.saveSession()
 		a.refreshAll()
@@ -767,78 +786,95 @@ func (a *application) v420RemoveSelectedSafely() {
 }
 
 func (a *application) v420OptionsFromRight(base model.TaskOptions, kind model.Kind, dirty map[int]bool) model.TaskOptions {
+	value := func(control uintptr) (string, bool) {
+		text := comboText(control)
+		return text, text != "" && text != "混合"
+	}
 	if dirty[IDC_TASK_RES] {
-		if kind == model.KindImage {
-			base.ImageSize = comboText(a.hTaskRes)
-		} else {
-			base.Resolution = comboText(a.hTaskRes)
+		if text, ok := value(a.hTaskRes); ok {
+			if kind == model.KindImage {
+				base.ImageSize = text
+			} else {
+				base.Resolution = text
+			}
 		}
 	}
 	if dirty[IDC_TASK_CODEC] {
-		if kind == model.KindImage {
-			base.ImageFormat = comboText(a.hTaskCodec)
-		} else {
-			base.Codec = comboText(a.hTaskCodec)
+		if text, ok := value(a.hTaskCodec); ok {
+			if kind == model.KindImage {
+				base.ImageFormat = text
+			} else {
+				base.Codec = text
+			}
 		}
 	}
 	if dirty[IDC_TASK_QUALITY] {
-		base.Quality = comboText(a.hTaskQuality)
+		if text, ok := value(a.hTaskQuality); ok {
+			base.Quality = text
+		}
 	}
 	if dirty[IDC_TASK_VOLUME] {
-		if kind == model.KindImage {
-			base.ImageLimit = comboText(a.hTaskVolume)
-		} else {
-			parseVolume(&base, comboText(a.hTaskVolume))
+		if text, ok := value(a.hTaskVolume); ok {
+			if kind == model.KindImage {
+				base.ImageLimit = text
+			} else {
+				parseVolume(&base, text)
+			}
 		}
 	}
 	if dirty[IDC_TASK_ROTATION] {
-		base.Rotation = comboText(a.hTaskRotation)
+		if text, ok := value(a.hTaskRotation); ok {
+			base.Rotation = text
+		}
 	}
 	base.FollowDefaults = false
 	return base
 }
 
 func (a *application) v420ApplyTaskOptions(defaults bool) {
-	idxs := a.selectedTaskIndices()
-	if len(idxs) == 0 {
-		return
-	}
-	a.mu.Lock()
-	if len(idxs) == 1 && idxs[0] >= 0 && idxs[0] < len(a.tasks) {
-		task := a.tasks[idxs[0]]
+	// A held edit session is independent from list selection. The user may browse
+	// other rows without losing the pending transaction.
+	heldID := a.heldEditTaskID
+	if heldID != 0 {
+		a.mu.Lock()
+		task, _ := a.findTaskByIDLocked(heldID)
 		if task != nil && task.Status == model.StatusHeld {
-			id := task.ID
+			immediate := false
 			if defaults {
-				immediate, err := workflow.CancelHeldEdit(task, time.Now())
-				if err == nil && immediate {
-					a.runMu.Lock()
-					a.immediateRestarts[id] = true
-					a.runMu.Unlock()
-				}
+				immediate, _ = workflow.CancelHeldEdit(task, time.Now())
 			} else {
 				dirty := a.rightDraftFields
 				if len(dirty) == 0 {
 					dirty = map[int]bool{IDC_TASK_RES: true, IDC_TASK_CODEC: true, IDC_TASK_QUALITY: true, IDC_TASK_VOLUME: true, IDC_TASK_ROTATION: true}
 				}
 				updated := a.v420OptionsFromRight(task.Options, task.Kind, dirty)
-				immediate, err := workflow.ApplyHeldOptions(task, updated, time.Now())
-				if err == nil && immediate {
-					a.runMu.Lock()
-					a.immediateRestarts[id] = true
-					a.runMu.Unlock()
-				}
+				immediate, _ = workflow.ApplyHeldOptions(task, updated, time.Now())
 			}
 			a.heldEditTaskID = 0
 			a.rightDraftFields = make(map[int]bool)
+			a.rightSelectionKey = ""
 			a.mu.Unlock()
+			if immediate {
+				a.runMu.Lock()
+				a.immediateRestarts[heldID] = true
+				a.runMu.Unlock()
+			}
 			a.v420SignalQueue()
 			a.saveSession()
 			a.refreshAll()
 			return
 		}
+		a.heldEditTaskID = 0
+		a.mu.Unlock()
+	}
+
+	idxs := a.selectedTaskIndices()
+	if len(idxs) == 0 {
+		return
 	}
 	dirty := a.rightDraftFields
 	changed, skipped := 0, 0
+	a.mu.Lock()
 	for _, idx := range idxs {
 		if idx < 0 || idx >= len(a.tasks) || a.tasks[idx] == nil {
 			continue
