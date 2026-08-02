@@ -131,7 +131,7 @@ jobs:
           cd work
           python /tmp/p101_v421_patch.py
 
-      - name: Verify P101-only scope and push
+      - name: Verify P101-only scope and push product files
         working-directory: work
         shell: bash
         run: |
@@ -145,8 +145,16 @@ jobs:
             exit 1
           fi
           git diff --check
+          echo 'Deferred P101 CI workflow diff (to be merged by a normal PR):'
+          git --no-pager diff -- .github/workflows/p101-mediova-ci.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- projects/1-桌面软件/101-Mediova .github/workflows/p101-mediova-ci.yml
+          git add -- projects/1-桌面软件/101-Mediova
+          staged="$(git -c core.quotePath=false diff --cached --name-only)"
+          test -n "$staged"
+          if printf '%s\n' "$staged" | grep -q '^\.github/workflows/'; then
+            echo 'A workflow file was accidentally staged.'
+            exit 1
+          fi
           git commit -m 'P101: 修复 v4.2.1 桌面交互与完整目录树'
           git push origin HEAD:p101-exp
