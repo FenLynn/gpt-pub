@@ -1,26 +1,30 @@
-AtlasDesk v0.8.7
+AtlasDesk v0.9.0
 
-This maintenance release creates one explicit terminal-session owner for workspace, development and project workflows while preserving the existing terminal UI and ConPTY implementation.
+This feature release connects projects, workspace, terminal, Git status, environment markers and recent files into one explicit project-driven workflow.
 
-Single session owner
-- WorkspaceTerminalCoordinator is the only component that creates sessions requested by WorkspaceControl and DevelopmentControl.
-- Project-center terminal actions now use the same coordinator instead of opening TerminalDrawerControl directly.
-- WorkbenchEnhancer retains only terminal container show/hide behavior; it no longer creates workspace, environment or shortcut sessions.
+Project workflow
+- ProjectWorkflowCoordinator replaces and retires the version-named V070 project-center enhancer.
+- The existing Project / Environment / Terminal surface remains intact; no duplicate project UI was added.
+- Selecting a project creates a bounded project context and updates the existing selection summary.
+- Workspace actions open the selected project in WorkspaceControl.
+- Terminal actions use WorkspaceTerminalCoordinator and enter the selected project directory.
 
-Continuity
-- AtlasDesk remembers only the last terminal shell, valid working directory and display title.
-- Ctrl+Shift+T explicitly creates a new default terminal using the current workspace context.
-- Ctrl+Shift+R explicitly reopens the last terminal context.
-- No terminal process is restored during startup, page load or visibility changes.
-- Existing sessions remain alive when the workspace or main page changes.
+Context
+- Environment summaries use project marker files already identified by ProjectCatalogService; Python, Node, .NET, LaTeX, Rust and Go runtimes are not launched.
+- Recent-file summaries filter the existing recent-file list and do not recursively scan project contents.
+- Git status runs only for the selected Git project, excludes untracked-file enumeration, and has a three-second timeout.
+- Missing Git, invalid paths, non-Git projects and timeouts degrade to explicit status text instead of blocking the shell.
+- Rapid project changes cancel the previous read and generation-gate stale results.
 
-Privacy and safety
-- Commands, output and shell history are not persisted by this feature.
-- An invalid remembered directory is discarded during settings normalization.
+Lifecycle
+- Project scanning remains explicit through the Project page or Refresh action.
+- No project, Git or environment scan runs during AtlasDesk startup or from visibility changes.
+- V070ProjectCenterEnhancer and V070RuntimeVerifier are removed; responsibility-named workflow and runtime-verifier components replace them.
 
 Regression protection
-- New smoke gates require workspace, development and project paths to use WorkspaceTerminalCoordinator and prohibit direct creation in the base shell.
-- Existing ConPTY, terminal frontend recovery, development lazy loading, window residency, Runtime/Data and security checks remain active.
+- New smoke tests exercise a real temporary Python-marker project and recent-file context.
+- Source gates require cancellation, Git timeout, stale-result rejection, workspace integration and terminal integration.
+- Existing startup residency, Dashboard resilience, terminal continuity, ConPTY, Runtime/Data and security checks remain active.
 
 Known limitation
 - Close Zotero before opening the AtlasDesk library where the live database cannot be shared safely.
