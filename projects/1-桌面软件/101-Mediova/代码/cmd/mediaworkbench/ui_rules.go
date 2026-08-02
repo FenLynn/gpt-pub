@@ -87,3 +87,71 @@ func rememberRecentDirectory(current string, previous []string, limit int) []str
 	}
 	return result
 }
+
+type controlVisualState struct {
+	Active   bool
+	Hovered  bool
+	Pressed  bool
+	Disabled bool
+}
+
+type surfaceTreatment struct {
+	Fill     bool
+	Border   bool
+	Accent   bool
+	Strength int
+}
+
+// Default toolbar controls are transparent and separated only by a very faint
+// line. The surface becomes visible on hover/press, while the selected mode
+// keeps a restrained accent. This prevents the toolbar becoming a row of cards.
+func toolbarSurfaceTreatment(state controlVisualState) surfaceTreatment {
+	if state.Disabled {
+		return surfaceTreatment{Border: true}
+	}
+	if state.Pressed {
+		return surfaceTreatment{Fill: true, Border: true, Accent: state.Active, Strength: 3}
+	}
+	if state.Active {
+		return surfaceTreatment{Fill: true, Border: true, Accent: true, Strength: 2}
+	}
+	if state.Hovered {
+		return surfaceTreatment{Fill: true, Border: true, Strength: 2}
+	}
+	return surfaceTreatment{Border: true, Strength: 1}
+}
+
+func secondarySurfaceTreatment(state controlVisualState) surfaceTreatment {
+	if state.Disabled {
+		return surfaceTreatment{Border: true}
+	}
+	if state.Pressed {
+		return surfaceTreatment{Fill: true, Border: true, Strength: 3}
+	}
+	if state.Hovered {
+		return surfaceTreatment{Fill: true, Border: true, Strength: 2}
+	}
+	return surfaceTreatment{Border: true, Strength: 1}
+}
+
+type parameterWidthSet struct {
+	Resolution int32
+	Codec      int32
+	Quality    int32
+	Volume     int32
+	Rotation   int32
+}
+
+func bottomParameterWidths() parameterWidthSet {
+	return parameterWidthSet{Resolution: 84, Codec: 78, Quality: 72, Volume: 126, Rotation: 98}
+}
+
+type cellBarInsetSet struct {
+	Horizontal    int32
+	Vertical      int32
+	MinimumHeight int32
+}
+
+func listCellBarInsets() cellBarInsetSet {
+	return cellBarInsetSet{Horizontal: 1, Vertical: 5, MinimumHeight: 14}
+}
