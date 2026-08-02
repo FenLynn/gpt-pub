@@ -36,7 +36,7 @@ internal static class V083StartupBoundaryChecks
 
     private static void VerifySourceBoundaries()
     {
-        var nativeRoot = FindNativeSourceRoot();
+        var nativeRoot = FindProjectSourceRoot("personal-workbench-native");
 
         var servicePath = Path.Combine(nativeRoot, "PythonEnvironmentService.cs");
         var service = File.ReadAllText(servicePath);
@@ -52,7 +52,7 @@ internal static class V083StartupBoundaryChecks
         Reject(service, "CreateLinkedTokenSource",
             "cancellable process-tree probing was reintroduced into the recovery build");
         Reject(service, "EnumerateWorkspaceEnvironmentCandidates",
-            "unbounded project environment scanning was reintroduced into the recovery build");
+            "project-directory environment scanning was reintroduced into the recovery build");
 
         var developmentPath = Path.Combine(nativeRoot, "DevelopmentControl.xaml.cs");
         var development = File.ReadAllText(developmentPath);
@@ -79,13 +79,20 @@ internal static class V083StartupBoundaryChecks
             "case EnvironmentTabIndex:",
             "await _development.EnsureLoadedAsync()");
 
-        var probeRoot = FindSmokeSourceRoot();
+        var probeRoot = FindProjectSourceRoot("personal-workbench-smoke");
+        var probePath = Path.Combine(probeRoot, "MainWindowStartupProbe.cs");
         RequireTokens(
-            Path.Combine(probeRoot, "MainWindowStartupProbe.cs"),
+            probePath,
             "window.Show()",
-            "PumpDispatcher(TimeSpan.FromSeconds(8))",
-            "tabs.SelectedIndex = 1",
-            "Main window closed while the Environment tab was active");
+            "PumpDispatcher(TimeSpan.FromSeconds(10))",
+            "AssertEnvironmentIdle",
+            "opening the Development project tab started environment discovery",
+            "Last phase: " + "\" + phase");
+        var probe = File.ReadAllText(probePath);
+        Reject(probe, "tabs.SelectedIndex = 1",
+            "startup residency probe starts real environment tools instead of testing lazy startup");
+        Reject(probe, "PumpDispatcher(TimeSpan.FromSeconds(8))",
+            "obsolete environment-page wait remains in the startup probe");
 
         RequireTokens(
             Path.Combine(nativeRoot, "App.xaml.cs"),
@@ -93,12 +100,6 @@ internal static class V083StartupBoundaryChecks
             "CLR ProcessExit event",
             "Main window Closing event");
     }
-
-    private static string FindNativeSourceRoot() =>
-        FindProjectSourceRoot("personal-workbench-native");
-
-    private static string FindSmokeSourceRoot() =>
-        FindProjectSourceRoot("personal-workbench-smoke");
 
     private static string FindProjectSourceRoot(string projectDirectory)
     {
