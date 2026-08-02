@@ -10,7 +10,7 @@ internal static class V083StartupBoundaryChecks
         VerifyPythonLauncherParsing();
         VerifySourceBoundaries();
         Console.WriteLine(
-            "PASS AtlasDesk v0.8.3 lazy environment discovery, single discovery owner and startup residency boundaries");
+            "PASS AtlasDesk v0.8.3 lazy environment discovery, single discovery owner and isolated residency boundaries");
     }
 
     private static void VerifyPythonLauncherParsing()
@@ -79,20 +79,31 @@ internal static class V083StartupBoundaryChecks
             "case EnvironmentTabIndex:",
             "await _development.EnsureLoadedAsync()");
 
-        var probeRoot = FindProjectSourceRoot("personal-workbench-smoke");
-        var probePath = Path.Combine(probeRoot, "MainWindowStartupProbe.cs");
+        var residencyRoot = FindProjectSourceRoot("personal-workbench-residency-smoke");
         RequireTokens(
-            probePath,
-            "window.Show()",
+            Path.Combine(residencyRoot, "Program.cs"),
+            "[STAThread]",
+            "ShutdownMode.OnExplicitShutdown",
             "PumpDispatcher(TimeSpan.FromSeconds(10))",
             "AssertEnvironmentIdle",
-            "opening the Development project tab started environment discovery",
-            "Last phase: ");
-        var probe = File.ReadAllText(probePath);
-        Reject(probe, "tabs.SelectedIndex = 1",
-            "startup residency probe starts real environment tools instead of testing lazy startup");
-        Reject(probe, "PumpDispatcher(TimeSpan.FromSeconds(8))",
-            "obsolete environment-page wait remains in the startup probe");
+            "opening Development project tab started environment discovery",
+            "PASS AtlasDesk isolated process remained alive");
+        RequireTokens(
+            Path.Combine(residencyRoot, "AtlasDesk.ResidencySmoke.csproj"),
+            "<UseWPF>true</UseWPF>",
+            "personal-workbench-native\\PersonalWorkbench.csproj");
+
+        var smokeRoot = FindProjectSourceRoot("personal-workbench-smoke");
+        RequireTokens(
+            Path.Combine(smokeRoot, "PersonalWorkbench.Smoke.csproj"),
+            "personal-workbench-residency-smoke\\AtlasDesk.ResidencySmoke.csproj",
+            "RunAtlasDeskResidencySmoke",
+            "--no-build --no-restore");
+        if (File.Exists(Path.Combine(smokeRoot, "MainWindowStartupProbe.cs")))
+        {
+            throw new InvalidOperationException(
+                "module-initializer-coupled MainWindowStartupProbe still exists in the legacy smoke project");
+        }
 
         RequireTokens(
             Path.Combine(nativeRoot, "App.xaml.cs"),
