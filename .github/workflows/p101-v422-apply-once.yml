@@ -1,0 +1,62 @@
+name: Apply P101 Mediova v4.2.2 once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-v422-apply-once
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.head_ref == 'repo-p101-v422-apply-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout registered tooling
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: tooling
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout latest P101 experiment branch
+        uses: actions/checkout@v4
+        with:
+          ref: p101-exp
+          fetch-depth: 0
+          path: work
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply and validate v4.2.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tooling/.github/scripts/p101_v422_apply.py
+          cd work
+          python ../tooling/.github/scripts/p101_v422_apply.py
+
+      - name: Verify P101-only scope and push
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git -c core.quotePath=false diff --name-only)"
+          test -n "$changed"
+          bad="$(printf '%s\n' "$changed" | grep -Ev '^projects/1-桌面软件/101-Mediova/' || true)"
+          if [[ -n "$bad" ]]; then
+            echo 'Out-of-scope changes:'
+            echo "$bad"
+            exit 1
+          fi
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- projects/1-桌面软件/101-Mediova
+          git commit -m 'P101: 完成 Mediova v4.2.2 UI 与双工作区修复'
+          git push origin HEAD:p101-exp
