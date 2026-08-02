@@ -96,12 +96,26 @@ jobs:
           test_call = 'subprocess.run(["go", "test", "-count=1", "./..."], cwd=CODE, check=True)'
           if new_text.count(test_call) != 1:
               raise SystemExit('go test footer is not unique')
-          diagnostics = r'''print("=== V421 SOURCE CONTRACT TEST ===")
-          _diag_test = CODE / "cmd" / "mediaworkbench" / "v421_source_contract_test.go"
-          if _diag_test.exists():
-              print(_diag_test.read_text(encoding="utf-8"))
-          else:
-              print("<missing v421_source_contract_test.go>")
+          diagnostics = r'''_diag_test = CODE / "cmd" / "mediaworkbench" / "v421_source_contract_test.go"
+          if not _diag_test.exists():
+              raise SystemExit("missing v421_source_contract_test.go")
+          _contract_text = _diag_test.read_text(encoding="utf-8")
+          _old_contract = '''\tif strings.Contains(main, `createControl("BUTTON", "应用到选中"`) {
+          \t\tt.Fatal("orphan bottom 应用到选中 control returned")
+          \t}
+          '''
+          _new_contract = '''\tif strings.Contains(main, "hApplySelected") || strings.Contains(main, "IDC_APPLY_SELECTED") {
+          \t\tt.Fatal("orphan bottom 应用到选中 control returned")
+          \t}
+          \tif !strings.Contains(main, `a.hTaskApply = createControl("BUTTON", "应用到选中"`) {
+          \t\tt.Fatal("right-panel 应用到选中 control missing")
+          \t}
+          '''
+          if _contract_text.count(_old_contract) != 1:
+              raise SystemExit("old v4.2.1 apply-control contract is not unique")
+          _diag_test.write_text(_contract_text.replace(_old_contract, _new_contract, 1), encoding="utf-8", newline="\n")
+          print("=== V421 SOURCE CONTRACT TEST ===")
+          print(_diag_test.read_text(encoding="utf-8"))
           print("=== APPLY-SELECTED SOURCE REFERENCES ===")
           for _diag_file in sorted((CODE / "cmd" / "mediaworkbench").glob("*.go")):
               _diag_source = _diag_file.read_text(encoding="utf-8")
