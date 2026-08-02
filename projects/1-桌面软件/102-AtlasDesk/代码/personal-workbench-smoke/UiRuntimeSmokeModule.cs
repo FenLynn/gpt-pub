@@ -18,7 +18,7 @@ internal static class UiRuntimeSmokeModule
                     app.InitializeComponent();
                 }
                 UiRuntimeVerifier.VerifyCorrectiveVisuals();
-                V070RuntimeVerifier.Verify();
+                ProjectWorkflowRuntimeVerifier.Verify();
                 V071RuntimeVerifier.Verify();
                 V072RuntimeVerifier.Verify();
                 V073RuntimeVerifier.Verify();
