@@ -48,7 +48,7 @@ func (a *application) v420ConfirmDiskSpace(outputRoot string, ids map[int64]bool
 
 func (a *application) v420TogglePause() {
 	a.runMu.Lock()
-	if !a.running {
+	if !a.running || a.runKind != a.currentKind {
 		a.runMu.Unlock()
 		return
 	}
@@ -82,14 +82,14 @@ func (a *application) v420TogglePause() {
 	}
 	a.mu.Unlock()
 	if paused {
-		setText(a.hPause, "继续")
+		setText(a.hPause, queuePauseLabel(a.currentKind, true))
 		msg := "队列与正在运行的 FFmpeg 进程均已暂停；搁置任务仍可编辑。"
 		if controlErr != nil {
 			msg = "队列已暂停，但个别 FFmpeg 进程暂停失败：" + short(controlErr.Error(), 180)
 		}
 		setText(a.hStatusText, msg)
 	} else {
-		setText(a.hPause, "暂停")
+		setText(a.hPause, queuePauseLabel(a.currentKind, false))
 		msg := "队列与 FFmpeg 进程已继续。"
 		if controlErr != nil {
 			msg = "队列已继续，但个别 FFmpeg 进程恢复失败：" + short(controlErr.Error(), 180)
@@ -102,7 +102,7 @@ func (a *application) v420TogglePause() {
 
 func (a *application) v420StopQueue() {
 	a.runMu.Lock()
-	if !a.running {
+	if !a.running || a.runKind != a.currentKind {
 		a.runMu.Unlock()
 		return
 	}

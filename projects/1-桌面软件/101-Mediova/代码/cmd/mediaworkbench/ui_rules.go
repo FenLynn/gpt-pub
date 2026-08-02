@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"mediaworkbench/internal/model"
+)
 
 type compressionTone int
 
@@ -149,7 +153,12 @@ type parameterWidthSet struct {
 	Rotation   int32
 }
 
-func bottomParameterWidths() parameterWidthSet {
+func bottomParameterWidths(kind model.Kind) parameterWidthSet {
+	if kind == model.KindImage {
+		// Image size labels are the longest. Format, quality and target-size
+		// choices are deliberately compact so “最大边 1000px” is never clipped.
+		return parameterWidthSet{Resolution: 122, Codec: 60, Quality: 58, Volume: 82, Rotation: 88}
+	}
 	return parameterWidthSet{Resolution: 84, Codec: 78, Quality: 72, Volume: 126, Rotation: 98}
 }
 
