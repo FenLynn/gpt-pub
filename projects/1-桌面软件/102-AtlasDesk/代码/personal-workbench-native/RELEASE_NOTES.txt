@@ -1,20 +1,26 @@
-AtlasDesk v0.8.6
+AtlasDesk v0.8.7
 
-This maintenance release begins the controlled retirement of historical version-named corrective layers while preserving the current interface and data model.
+This maintenance release creates one explicit terminal-session owner for workspace, development and project workflows while preserving the existing terminal UI and ConPTY implementation.
 
-Feature host ownership
-- V068HotfixEnhancer has been removed from the repository and feature pipeline.
-- Library and Development host normalization, terminal bottom docking, and page-transition terminal behavior now belong to FeatureHostTerminalCoordinator.
-- The new component has a long-term responsibility-based name and retains the tested terminal session model.
+Single session owner
+- WorkspaceTerminalCoordinator is the only component that creates sessions requested by WorkspaceControl and DevelopmentControl.
+- Project-center terminal actions now use the same coordinator instead of opening TerminalDrawerControl directly.
+- WorkbenchEnhancer retains only terminal container show/hide behavior; it no longer creates workspace, environment or shortcut sessions.
 
-Display ownership convergence
-- ShellResilienceCoordinator remains the exclusive owner of monitor WorkArea, DPI and display-topology handling.
-- V069 still supplies the current title bar, tree templates, Zotero presentation and terminal launch reliability.
-- LegacyEnhancerConvergenceCoordinator removes V069's obsolete WorkArea hook after SourceInitialized and Loaded, preventing two window hooks from controlling maximize bounds.
+Continuity
+- AtlasDesk remembers only the last terminal shell, valid working directory and display title.
+- Ctrl+Shift+T explicitly creates a new default terminal using the current workspace context.
+- Ctrl+Shift+R explicitly reopens the last terminal context.
+- No terminal process is restored during startup, page load or visibility changes.
+- Existing sessions remain alive when the workspace or main page changes.
+
+Privacy and safety
+- Commands, output and shell history are not persisted by this feature.
+- An invalid remembered directory is discarded during settings normalization.
 
 Regression protection
-- New smoke checks require V068 to be absent, require named feature-host ownership, and require legacy WorkArea neutralization.
-- Existing startup residency, development lazy loading, Dashboard recovery, ConPTY, Runtime/Data and security boundaries remain active.
+- New smoke gates require workspace, development and project paths to use WorkspaceTerminalCoordinator and prohibit direct creation in the base shell.
+- Existing ConPTY, terminal frontend recovery, development lazy loading, window residency, Runtime/Data and security checks remain active.
 
 Known limitation
-- Close Zotero before opening the AtlasDesk library on installations where the live database cannot be shared safely.
+- Close Zotero before opening the AtlasDesk library where the live database cannot be shared safely.

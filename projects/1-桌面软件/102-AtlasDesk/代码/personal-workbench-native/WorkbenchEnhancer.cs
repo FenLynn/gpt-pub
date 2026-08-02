@@ -173,7 +173,6 @@ public sealed class WorkbenchEnhancer
         actions.Children.Insert(Math.Max(0, actions.Children.Count - 1), button);
     }
 
-
     private void InstallTopLockButton()
     {
         if (_window.FindName("PopoutButton") is not Button popout || popout.Parent is not StackPanel actions)
@@ -281,21 +280,7 @@ public sealed class WorkbenchEnhancer
     private void WireEvents()
     {
         _workspace.OpenSettingsRequested += (_, _) => NavigateToSettings();
-        _workspace.OpenTerminalRequested += async (_, args) =>
-        {
-            ShowTerminal();
-            var directory = string.IsNullOrWhiteSpace(args.WorkingDirectory) ? _settings.WorkspaceRoot : args.WorkingDirectory;
-            await _terminal.OpenAsync(WorkspaceTerminalFactory.Create(_settings, args.Shell, directory, args.Title));
-        };
         _zotero.OpenSettingsRequested += (_, _) => NavigateToSettings();
-        _development.OpenTerminalRequested += async (_, args) =>
-        {
-            ShowTerminal();
-            if (args.Environment is null && !string.IsNullOrWhiteSpace(args.WorkingDirectory))
-                await _terminal.OpenAsync(WorkspaceTerminalFactory.Create(_settings, args.Shell, args.WorkingDirectory, args.Title));
-            else
-                await _terminal.OpenShellAsync(args.Shell, args.Environment, args.Title);
-        };
         _settingsControl.SettingsSaved += (_, args) => OnSettingsSaved(args);
         _settingsControl.ClearAccessRequested += (_, _) => InvokeLegacy("ClearSession_Click", _window, new RoutedEventArgs());
         _terminal.CollapseRequested += (_, _) => HideTerminal();
@@ -382,17 +367,11 @@ public sealed class WorkbenchEnhancer
             settingsNav.IsChecked = true;
     }
 
-    private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Oem3 && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             ToggleTerminal();
-            e.Handled = true;
-        }
-        else if (e.Key == Key.T && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
-        {
-            ShowTerminal();
-            await _terminal.OpenShellAsync(_settings.DefaultShell);
             e.Handled = true;
         }
     }

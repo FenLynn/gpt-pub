@@ -26,6 +26,7 @@ public sealed class WorkbenchFeaturePipeline
         Tools = V065ToolsEnhancer.Attach(window, this);
         Backup = V066BackupEnhancer.Attach(window);
         FeatureHosts = FeatureHostTerminalCoordinator.Attach(window, this);
+        WorkspaceTerminal = WorkspaceTerminalCoordinator.Attach(window, this);
         UiFixes = V069UiFixEnhancer.Attach(window, this);
         LegacyConvergence = LegacyEnhancerConvergenceCoordinator.Attach(window, UiFixes);
         TerminalPresentation = V0610TerminalPresentationEnhancer.Attach(this);
@@ -46,6 +47,7 @@ public sealed class WorkbenchFeaturePipeline
     public V065ToolsEnhancer Tools { get; }
     public V066BackupEnhancer Backup { get; }
     public FeatureHostTerminalCoordinator FeatureHosts { get; }
+    public WorkspaceTerminalCoordinator WorkspaceTerminal { get; }
     public V069UiFixEnhancer UiFixes { get; }
     public LegacyEnhancerConvergenceCoordinator LegacyConvergence { get; }
     public V0610TerminalPresentationEnhancer TerminalPresentation { get; }
