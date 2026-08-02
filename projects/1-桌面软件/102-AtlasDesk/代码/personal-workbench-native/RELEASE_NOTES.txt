@@ -1,23 +1,24 @@
-AtlasDesk v0.8.0
+AtlasDesk v0.8.1
 
-This release changes AtlasDesk from a self-extracting launcher into a transparent folder runtime.
+This maintenance release repairs the shell, Windows maximize behavior, the development environment page and Dashboard external-link handling discovered during real Windows use of v0.8.0.
 
-Runtime and Data
-- AtlasDesk.exe is now the real WPF application. It runs directly from the user-created AtlasDesk folder.
-- AtlasDesk.TerminalHost.exe and terminal web assets remain beside the main program in the same public Runtime folder.
-- No executable, DLL or terminal asset is written to AppData.
-- %APPDATA%\AtlasDesk contains only small, important private settings and encrypted data.
-- %LOCALAPPDATA%\AtlasDesk contains machine-local WebView2 state, terminal profile, logs, cache and startup state.
-- Automatic legacy migration was removed from product code. A one-time external migration script is provided separately.
+Interface and window behavior
+- Replaced the two large outer cards with one continuous application surface and a single divider between navigation and content.
+- Removed redundant outer shadows, borders and background layers while retaining local cards only where they express real information groups.
+- Added monitor WorkArea handling for the custom title bar so maximized windows no longer extend behind the taskbar.
+- Aligned title text and caption buttons within a consistent 36-pixel title bar.
 
-Security and privacy
-- Added an optional local encrypted vault protected by a 20-character-or-longer master password and Google Authenticator compatible TOTP.
-- Added local QR setup, Argon2id password derivation and AES-256-GCM encrypted vault storage.
-- Added a generic encrypted key/value editor for passwords, tokens and private notes.
-- Added an optional four-digit temporary UI lock. It is manual, can be disabled, and never participates in encryption.
-- Runtime remains fully public and contains no user paths, cookies, logs, tokens or account data.
+Development workspace
+- Removed the legacy path that automatically embedded the terminal over the development environment page.
+- Project and environment tabs remain independent, and the environment tab actively refreshes Conda, uv, venv and system Python discovery.
+- Terminal sessions remain in the global bottom drawer or their explicit window instead of replacing the environment page.
 
-Interface and reliability
-- Fixed the sidebar to an opaque neutral background so Dashboard login rendering cannot tint it yellow.
-- Added direct access to the roaming configuration directory and the machine-local data directory.
-- The encrypted vault key is cleared when AtlasDesk exits or when the user locks the vault.
+Dashboard reliability
+- Dashboard same-origin routes remain inside AtlasDesk.
+- Cloudflare Access and supported identity-provider login windows remain in the shared WebView2 profile.
+- All other cross-origin links open in the Windows default browser.
+- Added automatic WebView2 reconstruction after render-process failure or unresponsiveness.
+
+Architecture
+- No Runtime/Data boundary changes were made.
+- No new version-named Enhancer layer was added; the existing controlling paths were consolidated.

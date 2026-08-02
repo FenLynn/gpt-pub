@@ -109,7 +109,7 @@ public sealed class V0612ExperienceEnhancer
     {
         if (_window.Content is not Grid shell || !Equals(shell.Tag, "v069-window-content") || shell.Children.Count < 2)
             return;
-        shell.RowDefinitions[0].Height = new GridLength(32);
+        shell.RowDefinitions[0].Height = new GridLength(36);
         var titleBar = shell.Children.OfType<Border>().FirstOrDefault(item => Grid.GetRow(item) == 0);
         if (titleBar?.Child is not Grid titleGrid)
             return;
@@ -122,7 +122,7 @@ public sealed class V0612ExperienceEnhancer
             .FirstOrDefault(panel => Grid.GetColumn(panel) == 1 && panel.Orientation == Orientation.Horizontal);
         if (actions is not null)
         {
-            actions.Height = 32;
+            actions.Height = 36;
             var buttons = actions.Children.OfType<Button>().Take(3).ToArray();
             if (buttons.Length == 3)
             {
@@ -154,8 +154,8 @@ public sealed class V0612ExperienceEnhancer
 
     private static void ConfigureCaptionButton(Button button, CaptionGlyph glyph)
     {
-        button.Width = 44;
-        button.Height = 31;
+        button.Width = 46;
+        button.Height = 35;
         button.Padding = new Thickness(0);
         button.Margin = new Thickness(0);
         button.HorizontalContentAlignment = HorizontalAlignment.Center;
@@ -170,7 +170,7 @@ public sealed class V0612ExperienceEnhancer
             _ => "关闭"
         };
 
-        var path = new Path
+        var path = new System.Windows.Shapes.Path
         {
             Data = Geometry.Parse(glyph switch
             {
@@ -234,7 +234,7 @@ public sealed class V0612ExperienceEnhancer
         {
             Width = 16,
             Height = 16,
-            Child = new Path
+            Child = new System.Windows.Shapes.Path
             {
                 Data = Geometry.Parse(geometry),
                 Stroke = new SolidColorBrush(Color.FromRgb(91, 110, 136)),

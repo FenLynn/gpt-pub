@@ -20,7 +20,17 @@ void CheckThrows<T>(Action action, string name) where T : Exception
 }
 
 var now = new DateTimeOffset(2026, 7, 31, 1, 0, 0, TimeSpan.Zero);
-Check(WorkbenchVersion.Current == "0.6.6", "assembly version matches Version.props");
+Check(WorkbenchVersion.Current == "0.8.1", "assembly version matches Version.props");
+Check(DashboardNavigationPolicy.Classify("https://660415.xyz/#reading", "https://660415.xyz") == DashboardNavigationTarget.MainDashboard,
+    "dashboard same-origin route stays internal");
+Check(DashboardNavigationPolicy.Classify("https://660415.xyz/cdn-cgi/access/login", "https://660415.xyz") == DashboardNavigationTarget.AuthenticationPopup,
+    "Cloudflare Access route stays in authentication popup");
+Check(DashboardNavigationPolicy.Classify("https://github.com/login/oauth/authorize", "https://660415.xyz") == DashboardNavigationTarget.AuthenticationPopup,
+    "GitHub login stays in authentication popup");
+Check(DashboardNavigationPolicy.Classify("https://aistudio.google.com/prompts/new_chat", "https://660415.xyz") == DashboardNavigationTarget.ExternalBrowser,
+    "cross-origin application opens externally");
+Check(DashboardNavigationPolicy.Classify("not-a-url", "https://660415.xyz") == DashboardNavigationTarget.ExternalBrowser,
+    "invalid new-window target is rejected from internal WebView");
 
 var firstStart = StartupGuard.CreateNext(null, WorkbenchVersion.Current, now);
 var uncleanStart = StartupGuard.CreateNext(new StartupGuardState

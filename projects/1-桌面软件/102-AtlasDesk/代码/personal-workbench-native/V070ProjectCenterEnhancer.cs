@@ -44,6 +44,7 @@ public sealed class V070ProjectCenterEnhancer
     {
         if (_development.Parent is Panel parent) parent.Children.Remove(_development);
         else if (_development.Parent is ContentControl content) content.Content = null;
+        _development.Visibility = Visibility.Visible;
 
         var tabs = new TabControl
         {
@@ -54,12 +55,25 @@ public sealed class V070ProjectCenterEnhancer
         };
         tabs.Items.Add(new TabItem { Header = "项目", Content = _projects });
         tabs.Items.Add(new TabItem { Header = "环境", Content = _development });
-        tabs.SelectionChanged += async (_, _) =>
+        tabs.SelectionChanged += async (_, args) =>
         {
-            if (tabs.SelectedIndex == 0) await _projects.RefreshIfNeededAsync();
+            if (ReferenceEquals(args.Source, tabs))
+                await RefreshSelectedTabAsync();
         };
         tabs.SelectedIndex = 0;
         return tabs;
+    }
+
+    private async Task RefreshSelectedTabAsync()
+    {
+        if (_tabs.SelectedIndex == 0)
+        {
+            await _projects.RefreshIfNeededAsync();
+            return;
+        }
+
+        _development.Visibility = Visibility.Visible;
+        await _development.EnsureLoadedAsync();
     }
 
     private void Install()
@@ -68,6 +82,7 @@ public sealed class V070ProjectCenterEnhancer
             throw new InvalidOperationException("Development host view is unavailable.");
         host.Children.Clear();
         host.Margin = new Thickness(0);
+        _development.Visibility = Visibility.Visible;
         host.Children.Add(_tabs);
     }
 
@@ -82,10 +97,7 @@ public sealed class V070ProjectCenterEnhancer
     {
         if (_window.FindName("DevelopmentNav") is RadioButton developmentNav)
         {
-            developmentNav.Checked += async (_, _) =>
-            {
-                if (_tabs.SelectedIndex == 0) await _projects.RefreshIfNeededAsync();
-            };
+            developmentNav.Checked += async (_, _) => await RefreshSelectedTabAsync();
         }
     }
 

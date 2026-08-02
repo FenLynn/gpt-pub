@@ -1,9 +1,11 @@
 using System.Collections;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Shell;
@@ -25,6 +27,8 @@ public sealed class V069UiFixEnhancer
     private readonly HashSet<Button> _reliableCmdButtons = new();
     private readonly List<FrameworkElement> _libraryChrome = new();
     private bool _defaultCmdRecoveryAttempted;
+    private HwndSource? _windowSource;
+    private bool _windowHookInstalled;
 
     private V069UiFixEnhancer(MainWindow window, WorkbenchFeaturePipeline pipeline)
     {
@@ -38,6 +42,9 @@ public sealed class V069UiFixEnhancer
                     ?? throw new InvalidOperationException("Terminal module is unavailable.");
 
         InstallNeutralWindowChrome();
+        _window.SourceInitialized += (_, _) => InstallWindowWorkAreaHook();
+        _window.Closed += (_, _) => RemoveWindowWorkAreaHook();
+        InstallWindowWorkAreaHook();
         RemoveNavigationFocusFlash();
         RepairWorkspaceTree();
         RepairZoteroTree();
@@ -60,6 +67,7 @@ public sealed class V069UiFixEnhancer
 
     private void FinalizeLoadedVisuals()
     {
+        InstallWindowWorkAreaHook();
         RemoveNavigationFocusFlash();
         InstallReliableCmdButtons();
         UpdateLibraryChromeVisibility();
@@ -355,7 +363,7 @@ public sealed class V069UiFixEnhancer
         });
 
         var shell = new Grid { Tag = "v069-window-content", Background = new SolidColorBrush(Color.FromRgb(246, 248, 251)) };
-        shell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(34) });
+        shell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(36) });
         shell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         var titleBar = new Border
@@ -434,9 +442,9 @@ public sealed class V069UiFixEnhancer
         _window.StateChanged += (_, _) =>
         {
             maximize.Content = _window.WindowState == WindowState.Maximized ? "❐" : "□";
-            original.Margin = _window.WindowState == WindowState.Maximized ? new Thickness(0) : new Thickness(8);
         };
 
+        original.Margin = new Thickness(0);
         _window.Content = null;
         Grid.SetRow(titleBar, 0);
         Grid.SetRow(original, 1);
@@ -445,12 +453,106 @@ public sealed class V069UiFixEnhancer
         _window.Content = shell;
     }
 
+    private void InstallWindowWorkAreaHook()
+    {
+        if (_windowHookInstalled)
+            return;
+
+        var handle = new WindowInteropHelper(_window).Handle;
+        if (handle == IntPtr.Zero)
+            return;
+
+        _windowSource = HwndSource.FromHwnd(handle);
+        if (_windowSource is null)
+            return;
+
+        _windowSource.AddHook(WindowMessageHook);
+        _windowHookInstalled = true;
+    }
+
+    private void RemoveWindowWorkAreaHook()
+    {
+        if (!_windowHookInstalled || _windowSource is null)
+            return;
+        _windowSource.RemoveHook(WindowMessageHook);
+        _windowSource = null;
+        _windowHookInstalled = false;
+    }
+
+    private IntPtr WindowMessageHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WM_GETMINMAXINFO = 0x0024;
+        if (message != WM_GETMINMAXINFO)
+            return IntPtr.Zero;
+
+        var monitor = MonitorFromWindow(hwnd, 0x00000002);
+        if (monitor == IntPtr.Zero)
+            return IntPtr.Zero;
+
+        var monitorInfo = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref monitorInfo))
+            return IntPtr.Zero;
+
+        var info = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        var work = monitorInfo.WorkArea;
+        var bounds = monitorInfo.MonitorArea;
+        info.MaxPosition.X = work.Left - bounds.Left;
+        info.MaxPosition.Y = work.Top - bounds.Top;
+        info.MaxSize.X = work.Right - work.Left;
+        info.MaxSize.Y = work.Bottom - work.Top;
+        info.MaxTrackSize = info.MaxSize;
+        Marshal.StructureToPtr(info, lParam, false);
+        handled = true;
+        return IntPtr.Zero;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public NativeRect MonitorArea;
+        public NativeRect WorkArea;
+        public uint Flags;
+    }
+
     private static Button CreateCaptionButton(string glyph, bool close)
     {
         var button = new Button
         {
             Width = 46,
-            Height = 33,
+            Height = 35,
             Content = glyph,
             FontFamily = new FontFamily("Segoe UI Symbol"),
             FontSize = close ? 16 : 13,
