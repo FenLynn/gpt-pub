@@ -1,0 +1,43 @@
+name: Apply P101 lightweight delivery docs v2
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-light-docs-v2-once
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.head_ref == 'repo-p101-light-docs-v2-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout latest p101-exp
+        uses: actions/checkout@v4
+        with:
+          ref: p101-exp
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply exact documentation changes
+        run: python .github/scripts/p101_light_docs.py
+
+      - name: Verify P101-only scope and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=$'projects/1-桌面软件/101-Mediova/Mediova_v4.2.0_版本说明.md\nprojects/1-桌面软件/101-Mediova/README.md\nprojects/1-桌面软件/101-Mediova/工作记录.md\nprojects/1-桌面软件/101-Mediova/开发约束.md\nprojects/1-桌面软件/101-Mediova/软件开发总结.md\nprojects/1-桌面软件/101-Mediova/阶段记录.md'
+          actual="$(git diff --name-only | sort)"
+          test "$actual" = "$expected"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- projects/1-桌面软件/101-Mediova
+          git commit -m 'P101: 固化轻量包交付规则与 v4.2.0 下载记录'
+          git push origin HEAD:p101-exp
