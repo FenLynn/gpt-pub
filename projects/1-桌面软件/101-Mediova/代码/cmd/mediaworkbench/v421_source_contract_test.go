@@ -18,6 +18,9 @@ func sourceFile(t *testing.T, rel string) string {
 
 func TestV421DesktopSourceContracts(t *testing.T) {
 	main := sourceFile(t, "main_windows.go")
+	if strings.Contains(main, "a.a.") {
+		t.Fatal("invalid duplicated application receiver returned")
+	}
 	if strings.Contains(main, "hApplySelected") || strings.Contains(main, "IDC_APPLY_SELECTED") {
 		t.Fatal("orphan bottom 应用到选中 control returned")
 	}
