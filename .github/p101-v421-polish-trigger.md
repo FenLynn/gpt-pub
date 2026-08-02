@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time patch workflow. Do not merge.
 
-Reload the uniquely anchored, four-blob-verified patch.
+Reload the timestamp-injection-corrected patch from latest main.
