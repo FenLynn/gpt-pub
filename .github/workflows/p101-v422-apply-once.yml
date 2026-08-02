@@ -42,6 +42,12 @@ jobs:
           path = Path('tooling/.github/scripts/p101_v422_apply.py')
           text = path.read_text(encoding='utf-8')
 
+          old_regex = 'updated, count = re.subn(pattern, replacement, text, count=1, flags=flags)'
+          new_regex = 'updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)'
+          if text.count(old_regex) != 1:
+              raise SystemExit(f'regex replacement helper expected once, found {text.count(old_regex)}')
+          text = text.replace(old_regex, new_regex, 1)
+
           old_columns = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 8 {', "compression custom column")
           draw_func = replace_once(draw_func, 'if cd.ISubItem == 8 {', 'if cd.ISubItem == 9 {', "progress custom column")'''
           new_columns = '''draw_func = replace_once(draw_func, 'if cd.ISubItem == 7 {', 'if cd.ISubItem == 108 {', "compression custom column placeholder")
