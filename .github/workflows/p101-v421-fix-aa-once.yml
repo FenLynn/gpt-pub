@@ -1,0 +1,119 @@
+name: Fix P101 Mediova v4.2.1 cross-build typo once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-v421-aa-fix-once
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    if: github.head_ref == 'repo-p101-v421-aa-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact P101 candidate branch
+        uses: actions/checkout@v4
+        with:
+          ref: repo-p101-v421-ci-identity
+          fetch-depth: 0
+          path: work
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Repair exact typo and refresh contracts
+        working-directory: work/projects/1-桌面软件/101-Mediova/代码
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import re
+
+          root = Path('.')
+          main = root / 'cmd/mediaworkbench/main_windows.go'
+          test = root / 'cmd/mediaworkbench/v421_source_contract_test.go'
+          hashes = root / 'SOURCE_FILES_SHA256.txt'
+
+          source = main.read_text(encoding='utf-8')
+          if source.count('a.a.hAllDefault') != 3:
+              raise SystemExit(f'expected exactly three a.a.hAllDefault residues, found {source.count("a.a.hAllDefault")}')
+          source = source.replace('a.a.hAllDefault', 'a.hAllDefault')
+          if 'a.a.' in source:
+              raise SystemExit('unexpected a.a. residue remains in main_windows.go')
+          main.write_text(source, encoding='utf-8', newline='\n')
+
+          contract = test.read_text(encoding='utf-8')
+          marker = '\tmain := sourceFile(t, "main_windows.go")\n'
+          addition = marker + '\tif strings.Contains(main, "a.a.") {\n\t\tt.Fatal("invalid duplicated application receiver returned")\n\t}\n'
+          if contract.count(marker) != 1:
+              raise SystemExit('main source contract marker is not unique')
+          if 'invalid duplicated application receiver returned' not in contract:
+              contract = contract.replace(marker, addition, 1)
+          test.write_text(contract, encoding='utf-8', newline='\n')
+
+          text = hashes.read_text(encoding='utf-8')
+          for rel in ('cmd/mediaworkbench/main_windows.go', 'cmd/mediaworkbench/v421_source_contract_test.go'):
+              digest = hashlib.sha256((root / rel).read_bytes()).hexdigest()
+              pattern = rf'^[0-9a-f]{{64}}  {re.escape(rel)}$'
+              text, count = re.subn(pattern, f'{digest}  {rel}', text, count=1, flags=re.MULTILINE)
+              if count != 1:
+                  raise SystemExit(f'hash entry not unique: {rel}')
+          hashes.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          gofmt -w cmd/mediaworkbench/main_windows.go cmd/mediaworkbench/v421_source_contract_test.go
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import re
+          root = Path('.')
+          hashes = root / 'SOURCE_FILES_SHA256.txt'
+          text = hashes.read_text(encoding='utf-8')
+          for rel in ('cmd/mediaworkbench/main_windows.go', 'cmd/mediaworkbench/v421_source_contract_test.go'):
+              digest = hashlib.sha256((root / rel).read_bytes()).hexdigest()
+              pattern = rf'^[0-9a-f]{{64}}  {re.escape(rel)}$'
+              text, count = re.subn(pattern, f'{digest}  {rel}', text, count=1, flags=re.MULTILINE)
+              if count != 1:
+                  raise SystemExit(f'post-gofmt hash entry not unique: {rel}')
+          hashes.write_text(text, encoding='utf-8', newline='\n')
+          PY
+
+      - name: Run full candidate gates
+        working-directory: work/projects/1-桌面软件/101-Mediova/代码
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c SOURCE_FILES_SHA256.txt
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet -unsafeptr=false ./...
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go test -c ./cmd/mediaworkbench -o /tmp/Mediova_tests.exe
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags='-H=windowsgui -s -w' -o /tmp/Mediova.exe ./cmd/mediaworkbench
+          test -s /tmp/Mediova_tests.exe
+          test -s /tmp/Mediova.exe
+
+      - name: Verify P101-only scope and push candidate
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git -c core.quotePath=false diff --name-only)"
+          test -n "$changed"
+          bad="$(printf '%s\n' "$changed" | grep -Ev '^projects/1-桌面软件/101-Mediova/' || true)"
+          if [[ -n "$bad" ]]; then
+            echo 'Out-of-scope changes:'
+            echo "$bad"
+            exit 1
+          fi
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/main_windows.go projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v421_source_contract_test.go projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt
+          git commit -m 'P101: 修复 v4.2.1 Windows 交叉编译残留'
+          git push origin HEAD:repo-p101-v421-ci-identity
