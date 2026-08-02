@@ -136,6 +136,10 @@ jobs:
       - name: Run complete smoke suite
         run: dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
 
+      - name: Run isolated startup residency
+        timeout-minutes: 2
+        run: dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-residency-smoke/AtlasDesk.ResidencySmoke.csproj -c Release --no-restore
+
       - name: Verify Runtime/Data and security boundary
         shell: pwsh
         run: |
