@@ -1,4 +1,5 @@
 using PersonalWorkbench;
+using PersonalWorkbench.Smoke;
 using System.Runtime.CompilerServices;
 using System.Windows;
 
