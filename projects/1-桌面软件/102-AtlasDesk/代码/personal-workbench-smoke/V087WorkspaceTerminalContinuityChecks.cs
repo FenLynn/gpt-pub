@@ -31,7 +31,7 @@ internal static class V087WorkspaceTerminalContinuityChecks
             "ModifierKeys.Shift",
             "Key.R",
             "LastTerminalWorkingDirectory",
-            "never restores a process automatically");
+            "process automatically; reopening always requires an explicit user action");
         Reject(coordinator, "IsVisibleChanged", "terminal continuity is bound to visibility");
         Reject(coordinator, "Loaded += async", "terminal continuity auto-opens on control load");
 
