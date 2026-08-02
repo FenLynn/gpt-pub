@@ -96,7 +96,7 @@ jobs:
           test_call = 'subprocess.run(["go", "test", "-count=1", "./..."], cwd=CODE, check=True)'
           if new_text.count(test_call) != 1:
               raise SystemExit('go test footer is not unique')
-          diagnostics = r'''_diag_test = CODE / "cmd" / "mediaworkbench" / "v421_source_contract_test.go"
+          diagnostics = r"""_diag_test = CODE / "cmd" / "mediaworkbench" / "v421_source_contract_test.go"
           if not _diag_test.exists():
               raise SystemExit("missing v421_source_contract_test.go")
           _contract_text = _diag_test.read_text(encoding="utf-8")
@@ -123,7 +123,7 @@ jobs:
                   if any(_token in _diag_line for _token in ("应用到选中", "hApplySelected", "IDC_APPLY_SELECTED", "1286, 730")):
                       print(f"{_diag_file.name}:{_diag_no}:{_diag_line}")
           print("=== END V421 DIAGNOSTICS ===")
-          '''
+          """
           new_text = new_text.replace(test_call, diagnostics + '\n' + test_call, 1)
           path.write_text(new_text, encoding='utf-8', newline='\n')
           PY
