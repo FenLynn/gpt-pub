@@ -16,7 +16,7 @@ jobs:
   apply:
     if: github.head_ref == 'repo-p101-v422-contrast-trigger'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout latest P101 experiment branch
         uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fix filled-region text clipping and validate
+      - name: Replace unreliable clipping with per-glyph contrast and validate
         shell: bash
         run: |
           set -euo pipefail
@@ -37,23 +37,103 @@ jobs:
           code = Path('projects/1-桌面软件/101-Mediova/代码')
           helper = code / 'cmd/mediaworkbench/v422_windows.go'
           contract = code / 'cmd/mediaworkbench/v422_source_contract_test.go'
+          winapi = code / 'cmd/mediaworkbench/winapi_windows.go'
           hashes = code / 'SOURCE_FILES_SHA256.txt'
 
           helper_text = helper.read_text(encoding='utf-8')
-          old = 'withRoundedClip(hdc, fill, 1, func() {'
-          new = 'withRoundedClip(hdc, fill, 4, func() {'
-          if helper_text.count(old) != 1:
-              raise SystemExit(f'expected one 1px contrast clip, found {helper_text.count(old)}')
-          helper.write_text(helper_text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          old_helper = '''// drawContrastCenteredText paints dark text over the unfilled track and then
+          // repaints only the filled part in white. A percentage straddling the fill
+          // boundary therefore remains readable on both sides, matching the original UI.
+          func drawContrastCenteredText(hdc uintptr, text string, bar, fill rect, font uintptr) {
+          \tdrawCenteredText(hdc, text, bar, font, colorRef(35, 51, 74))
+          \tif fill.Right <= fill.Left || fill.Bottom <= fill.Top {
+          \t\treturn
+          \t}
+          \tif fill.Left < bar.Left {
+          \t\tfill.Left = bar.Left
+          \t}
+          \tif fill.Right > bar.Right {
+          \t\tfill.Right = bar.Right
+          \t}
+          \twithRoundedClip(hdc, fill, 4, func() {
+          \t\tdrawCenteredText(hdc, text, bar, font, colorRef(255, 255, 255))
+          \t})
+          }
+          '''
+          new_helper = '''// drawContrastCenteredText measures the complete label, keeps it centered, and
+          // paints each glyph according to the background under its centre. This avoids
+          // ListView/PrintWindow clipping inconsistencies while preserving white text on
+          // blue fill and dark text on the light remainder of partially filled bars.
+          func drawContrastCenteredText(hdc uintptr, text string, bar, fill rect, font uintptr) {
+          \tif text == "" {
+          \t\treturn
+          \t}
+          \toldFont, _, _ := procSelectObject.Call(hdc, font)
+          \tdefer func() {
+          \t\tif oldFont != 0 {
+          \t\t\tprocSelectObject.Call(hdc, oldFont)
+          \t\t}
+          \t}()
+          \tprocSetBkMode.Call(hdc, TRANSPARENT)
+
+          \tunits := []rune(text)
+          \twidths := make([]int32, len(units))
+          \tvar total int32
+          \tfor i, unit := range units {
+          \t\tmeasure := rect{Right: 32767, Bottom: bar.Bottom - bar.Top}
+          \t\tunitText := string(unit)
+          \t\tprocDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(unitText))), ^uintptr(0), uintptr(unsafe.Pointer(&measure)), DT_LEFT|DT_SINGLELINE|DT_CALCRECT)
+          \t\twidth := measure.Right - measure.Left
+          \t\tif width <= 0 {
+          \t\t\twidth = scaleDPI(8)
+          \t\t}
+          \t\twidths[i] = width
+          \t\ttotal += width
+          \t}
+
+          \tx := bar.Left + (bar.Right-bar.Left-total)/2
+          \tdark := colorRef(35, 51, 74)
+          \tlight := colorRef(255, 255, 255)
+          \tfor i, unit := range units {
+          \t\twidth := widths[i]
+          \t\tcolor := dark
+          \t\tcentre := x + width/2
+          \t\tif fill.Right > fill.Left && centre >= fill.Left && centre <= fill.Right {
+          \t\t\tcolor = light
+          \t\t}
+          \t\tprocSetTextColor.Call(hdc, color)
+          \t\tunitRC := rect{Left: x, Top: bar.Top, Right: x + width + 1, Bottom: bar.Bottom}
+          \t\tunitText := string(unit)
+          \t\tprocDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(unitText))), ^uintptr(0), uintptr(unsafe.Pointer(&unitRC)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+          \t\tx += width
+          \t}
+          }
+          '''
+          if helper_text.count(old_helper) != 1:
+              raise SystemExit(f'expected one clipping-based contrast function, found {helper_text.count(old_helper)}')
+          helper.write_text(helper_text.replace(old_helper, new_helper, 1), encoding='utf-8', newline='\n')
+
+          winapi_text = winapi.read_text(encoding='utf-8')
+          old_constant = '\tDT_SINGLELINE                = 0x00000020\n'
+          new_constant = old_constant + '\tDT_CALCRECT                  = 0x00000400\n'
+          if winapi_text.count(old_constant) != 1 or 'DT_CALCRECT' in winapi_text:
+              raise SystemExit('DT_CALCRECT constant insertion is not unique')
+          winapi.write_text(winapi_text.replace(old_constant, new_constant, 1), encoding='utf-8', newline='\n')
 
           contract_text = contract.read_text(encoding='utf-8')
-          old_contract = '`withRoundedClip(hdc, fill, 1`'
-          new_contract = '`withRoundedClip(hdc, fill, 4`'
+          old_contract = '`withRoundedClip(hdc, fill, 4`'
+          new_contract = '`for i, unit := range units`, `DT_LEFT|DT_SINGLELINE|DT_CALCRECT`, `centre >= fill.Left && centre <= fill.Right`'
           if contract_text.count(old_contract) != 1:
-              raise SystemExit(f'expected one old contrast contract, found {contract_text.count(old_contract)}')
-          contract.write_text(contract_text.replace(old_contract, new_contract, 1), encoding='utf-8', newline='\n')
+              raise SystemExit(f'expected one clipping contract, found {contract_text.count(old_contract)}')
+          contract_text = contract_text.replace(old_contract, new_contract, 1)
+          contract_text = contract_text.replace(
+              'if !strings.Contains(rules, `kind == model.KindImage`)',
+              'if strings.Contains(helper, "withRoundedClip(hdc, fill") {\n\t\tt.Fatal("progress text returned to unreliable clipping")\n\t}\n\tif !strings.Contains(rules, `kind == model.KindImage`)',
+              1,
+          )
+          contract.write_text(contract_text, encoding='utf-8', newline='\n')
 
-          subprocess.run(['gofmt', '-w', str(helper), str(contract)], check=True)
+          subprocess.run(['gofmt', '-w', str(helper), str(contract), str(winapi)], check=True)
           paths = []
           for line in hashes.read_text(encoding='utf-8').splitlines():
               parts = line.strip().split(maxsplit=1)
@@ -80,7 +160,7 @@ jobs:
         run: |
           set -euo pipefail
           changed="$(git -c core.quotePath=false diff --name-only)"
-          expected=$'projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt\nprojects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_source_contract_test.go\nprojects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_windows.go'
+          expected=$'projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt\nprojects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_source_contract_test.go\nprojects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_windows.go\nprojects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/winapi_windows.go'
           if [[ "$changed" != "$expected" ]]; then
             echo 'Unexpected changes:'
             printf '%s\n' "$changed"
@@ -89,6 +169,6 @@ jobs:
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_source_contract_test.go projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_windows.go
-          git commit -m 'P101: 修复 v4.2.2 蓝底白字真实绘制'
+          git add -- projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_source_contract_test.go projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_windows.go projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/winapi_windows.go
+          git commit -m 'P101: 以逐字符配色修复 v4.2.2 进度文字'
           git push origin HEAD:p101-exp
