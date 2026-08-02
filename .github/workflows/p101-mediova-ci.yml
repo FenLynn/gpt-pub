@@ -195,7 +195,7 @@ jobs:
             throw 'Runtime manifest identity mismatch.'
           }
           foreach ($entry in $manifest.files) {
-            $path=Join-Path $runtime ($entry.path -replace '/', '\')
+            $path=Join-Path $runtime ($entry.path -replace '/', '\\')
             if (!(Test-Path $path -PathType Leaf)) { throw "Manifest file missing: $($entry.path)" }
             $actual=(Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($actual -ne $entry.sha256) { throw "Manifest hash mismatch: $($entry.path)" }
@@ -209,6 +209,7 @@ jobs:
               throw "Private Data leaked into Runtime: $private"
             }
           }
+
       - name: Capture real Windows UI previews
         shell: pwsh
         working-directory: projects/1-桌面软件/101-Mediova/代码
@@ -267,7 +268,6 @@ jobs:
           Save-MediovaMode 'video' 1120 720 'Mediova-v4.2.0-video-compact-1120x720.png'
           Save-MediovaMode 'image' 1450 820 'Mediova-v4.2.0-image-1450x820.png'
           Save-MediovaMode 'held' 1450 820 'Mediova-v4.2.0-held-1450x820.png'
-
 
       - name: Run native self-test
         shell: pwsh
