@@ -1,26 +1,20 @@
-AtlasDesk v0.8.5
+AtlasDesk v0.8.6
 
-This maintenance release hardens the main shell, Dashboard recovery and Windows display adaptation without adding a new feature module.
+This maintenance release begins the controlled retirement of historical version-named corrective layers while preserving the current interface and data model.
 
-Dashboard resilience
-- A shell-owned watchdog checks Dashboard health only while the Dashboard page is active.
-- Missing or failed WebView2 instances enter the existing rebuild path instead of leaving a dead page behind.
-- Automatic rebuilds are serialized, rate-limited and capped at three attempts in a 30-second burst so a damaged renderer cannot make the AtlasDesk window unresponsive.
-- After the cap is reached AtlasDesk keeps the shell alive, stops the loop and exposes the existing reload action.
+Feature host ownership
+- V068HotfixEnhancer has been removed from the repository and feature pipeline.
+- Library and Development host normalization, terminal bottom docking, and page-transition terminal behavior now belong to FeatureHostTerminalCoordinator.
+- The new component has a long-term responsibility-based name and retains the tested terminal session model.
 
-Windows display adaptation
-- WM_GETMINMAXINFO uses the active monitor work area, so maximized AtlasDesk no longer extends behind that monitor's taskbar.
-- DPI and display topology changes schedule a safe layout refresh and clamp a normal window back into the nearest monitor work area.
-- Layout rounding and device-pixel snapping remain enabled across display changes.
-
-Navigation lifecycle
-- Rapid navigation changes use a monotonic request version. Only the final selected page performs shell stabilization.
-- Stale Dashboard progress is collapsed after leaving the page, and Dashboard-only controls are normalized to the final route.
-- The coordinator is cross-cutting infrastructure rather than another version-named visual enhancer.
-
-Known limitation
-- Direct reads from the live Zotero database may still be incompatible with running Zotero on some installations. This remains a non-blocking known limitation; close Zotero before using the AtlasDesk library.
+Display ownership convergence
+- ShellResilienceCoordinator remains the exclusive owner of monitor WorkArea, DPI and display-topology handling.
+- V069 still supplies the current title bar, tree templates, Zotero presentation and terminal launch reliability.
+- LegacyEnhancerConvergenceCoordinator removes V069's obsolete WorkArea hook after SourceInitialized and Loaded, preventing two window hooks from controlling maximize bounds.
 
 Regression protection
-- New smoke gates require monitor work-area handling, bounded Dashboard recovery and final-route navigation stabilization.
-- Existing startup residency, Development, terminal, Zotero background-read, Runtime/Data and security boundaries remain unchanged.
+- New smoke checks require V068 to be absent, require named feature-host ownership, and require legacy WorkArea neutralization.
+- Existing startup residency, development lazy loading, Dashboard recovery, ConPTY, Runtime/Data and security boundaries remain active.
+
+Known limitation
+- Close Zotero before opening the AtlasDesk library on installations where the live database cannot be shared safely.
