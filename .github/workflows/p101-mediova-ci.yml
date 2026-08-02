@@ -17,12 +17,52 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: p101-mediova-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Record exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Candidate commit=$(git rev-parse HEAD)"
+          echo "Candidate tree=$(git rev-parse 'HEAD^{tree}')"
+
+      - name: Enforce P101 pull-request scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          bad=$(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+            | grep -Ev '^(projects/1-桌面软件/101-Mediova/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p101-mediova-ci\.yml$)' || true)
+          if [[ -n "$bad" ]]; then
+            echo 'Out-of-scope P101 changes:'
+            echo "$bad"
+            exit 1
+          fi
+
   linux:
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23.x'
@@ -31,7 +71,11 @@ jobs:
         working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           set -euo pipefail
-          sha256sum -c SOURCE_FILES_SHA256.txt
+          if ! sha256sum -c SOURCE_FILES_SHA256.txt; then
+            echo 'Actual hashes for commonly cross-platform text files:'
+            sha256sum go.mod tools_embed_resources.py
+            exit 1
+          fi
           go test -count=1 ./...
           go test -race -count=1 ./internal/config ./internal/media
           go vet -unsafeptr=false ./...
@@ -41,11 +85,16 @@ jobs:
           test -s /tmp/Mediova.exe
 
   windows-native:
+    needs: scope
     if: github.base_ref == 'p101-stable' || github.base_ref == 'main' || github.ref == 'refs/heads/p101-stable'
     runs-on: windows-latest
     timeout-minutes: 100
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23.x'
@@ -111,8 +160,10 @@ jobs:
           if (-not $ffmpeg -or -not $ffprobe -or $ffmpeg.Directory.FullName -ne $ffprobe.Directory.FullName) {
             throw 'Downloaded package does not contain a colocated FFmpeg/FFprobe pair.'
           }
-          & $ffmpeg.FullName -version | Select-Object -First 1
-          if ($LASTEXITCODE -ne 0) { throw 'Downloaded FFmpeg is not runnable.' }
+          $versionOutput=@(& $ffmpeg.FullName -version 2>&1)
+          $ffmpegExit=$LASTEXITCODE
+          $versionOutput | Select-Object -First 1
+          if ($ffmpegExit -ne 0) { throw 'Downloaded FFmpeg is not runnable.' }
           "FFMPEG_BIN=$($ffmpeg.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build complete v4.1.0 Runtime
