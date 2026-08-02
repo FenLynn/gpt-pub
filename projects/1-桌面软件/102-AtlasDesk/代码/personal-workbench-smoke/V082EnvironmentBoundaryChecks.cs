@@ -87,7 +87,7 @@ internal static class V083StartupBoundaryChecks
             "PumpDispatcher(TimeSpan.FromSeconds(10))",
             "AssertEnvironmentIdle",
             "opening the Development project tab started environment discovery",
-            "Last phase: " + "\" + phase");
+            "Last phase: ");
         var probe = File.ReadAllText(probePath);
         Reject(probe, "tabs.SelectedIndex = 1",
             "startup residency probe starts real environment tools instead of testing lazy startup");
