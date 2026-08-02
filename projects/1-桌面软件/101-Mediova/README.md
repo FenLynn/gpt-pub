@@ -4,11 +4,12 @@ Mediova 是面向 Windows 10/11 x64 的本地媒体处理与创作工作站，�
 
 ## 当前入口
 
-- 当前正式基线：[阶段记录](阶段记录.md)（Mediova v4.2.0，标签与 Release `p101-v4.2.0`）
+- 当前正式基线：[阶段记录](阶段记录.md)（Mediova v4.2.1，标签与 Release `p101-v4.2.1`）
 - 当前工作与真实环境观察项：[工作记录](工作记录.md)
 - 项目长期规则：[开发约束](开发约束.md)
 - 设计与演进：[软件开发总结](软件开发总结.md)
-- v4.2.0 用户可见变化：[正式版本说明](Mediova_v4.2.0_版本说明.md)
+- v4.2.1 用户可见变化：[正式版本说明](Mediova_v4.2.1_版本说明.md)
+- v4.2.0 历史版本说明：[Mediova_v4.2.0_版本说明.md](Mediova_v4.2.0_版本说明.md)
 - v4.1.1 历史版本说明：[Mediova_v4.1.1_版本说明.md](Mediova_v4.1.1_版本说明.md)
 - v4.0.0 公开迁移证据：[迁移校验清单](迁移校验清单.md)
 
@@ -22,18 +23,20 @@ Mediova 是面向 Windows 10/11 x64 的本地媒体处理与创作工作站，�
 - 日常分支：`p101-exp`
 - 稳定分支：`p101-stable`
 
-v4.2.0 内部完整 Runtime 验证构建入口：
+v4.2.1 内部完整 Runtime 验证构建入口：
 
 ```powershell
 cd projects/1-桌面软件/101-Mediova/代码
-./build_v4.2.0.ps1 -FFmpegBin "C:\path\to\ffmpeg\bin"
+./build_v4.2.1.ps1 -FFmpegBin "C:\path\to\ffmpeg\bin"
 ```
 
-用户下载默认使用 Release 中的 [`Mediova-v4.2.0-Light.zip`](https://github.com/FenLynn/gpt-pub/releases/download/p101-v4.2.0/Mediova-v4.2.0-Light.zip)。该轻量包不包含 FFmpeg/FFprobe；覆盖已有安装时应保留原 `Components\FFmpeg\bin`，首次使用时可在软件中选择已有 FFmpeg 路径或自行补入该目录。
+用户下载默认使用 Release 中的 [`Mediova-v4.2.1-Light.zip`](https://github.com/FenLynn/gpt-pub/releases/download/p101-v4.2.1/Mediova-v4.2.1-Light.zip)。该轻量包不包含 FFmpeg/FFprobe；从 v4.2.0 覆盖更新时应保留原 `Components\FFmpeg\bin`，首次使用时可在软件中选择已有 FFmpeg 路径或自行补入该目录。
 
-## 架构摘要
+## 当前正式能力
 
-Mediova 保留一个直接启动的 `Mediova.exe`，公开运行依赖位于透明 Runtime，配置、历史、缓存和日志位于独立 Data。v4.2.0 重构任务状态模型：准备中任务接受全局默认或个体编辑，入队时冻结参数与输出快照，活动队列允许动态追加，同一时间只运行一种媒体，锁定任务通过独立搁置会话安全修改或移除。
+Mediova 保留一个直接启动的 `Mediova.exe`，公开运行依赖位于透明 Runtime，配置、历史、缓存和日志位于独立 Data。
+
+v4.2.0 建立了视频/图片双参数体系、入队冻结、动态追加、单媒体活动队列、独立搁置编辑与安全移除。v4.2.1 在不改变该状态模型的前提下，修复首次布局、DPI 状态灯、底部旧控件、右键菜单、搁置切换响应、完整顶层目录树与目录时间戳，并使压缩/进度条在真实 Windows 窗口和 CI 截图中稳定可见。
 
 完整边界、设计原因和验证证据分别以 `开发约束.md`、`软件开发总结.md`、`阶段记录.md` 与 `工作记录.md` 为准。
 
@@ -49,7 +52,7 @@ Mediova 保留一个直接启动的 `Mediova.exe`，公开运行依赖位于透�
 → main 回流 p101-stable / p101-exp
 ```
 
-正式标签和 Release 只能从 `main` 建立。P101 不得修改 AtlasDesk 的产品、CI、分支或发布记录。
+正式标签和 Release 只能从 `main` 建立。版本专用实施、诊断、触发和发布工作流完成后必须从主线删除。P101 不得修改 AtlasDesk 的产品、CI、分支或发布记录。
 
 ## 版权
 
