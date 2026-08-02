@@ -36,7 +36,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import hashlib, subprocess
-          root = Path('.')
           paths = subprocess.check_output(['git','ls-files','--','.'], text=True).splitlines()
           include = []
           for raw in paths:
@@ -66,12 +65,11 @@ jobs:
           mkdir -p build/check
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o build/check/Mediova-v4.2.0-check.exe ./cmd/mediaworkbench
           test -s build/check/Mediova-v4.2.0-check.exe
-          cd ../../../../..
+          cd ../../../..
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/p101-mediova-ci.yml')"
           python3 - <<'PY'
           from pathlib import Path
-          import yaml
           path=Path('.github/workflows/p101-mediova-ci.yml')
-          yaml.safe_load(path.read_text(encoding='utf-8'))
           text=path.read_text(encoding='utf-8')
           required=['build_v4.2.0.ps1','Mediova-v4.2.0-Runtime.zip','Mediova-v4.2.0-image-1450x820.png','Mediova-v4.2.0-held-1450x820.png','P101-Mediova-v4.2.0-CI']
           missing=[x for x in required if x not in text]
