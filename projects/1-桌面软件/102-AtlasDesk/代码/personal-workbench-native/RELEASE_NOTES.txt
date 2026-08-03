@@ -1,106 +1,50 @@
-AtlasDesk v0.9.4
+AtlasDesk v0.9.5
 
-This stabilization release connects file-integrity tools to the existing task center instead of maintaining two independent execution systems.
+This stabilization release removes duplicate lifecycle ownership from the task and tools surfaces without adding product features.
 
-Shared task flow
-- Manifest generation, manifest verification and two-file comparison create records in the same task collection used by the task page.
-- Tool and task pages display the same queued, running, completed, failed or cancelled state.
-- Cancellation from either page reaches the same operation.
-- Shared records preserve target paths, progress, result summaries and bounded history.
-- The existing task concurrency limit remains in place; no resident background service or scheduler was introduced.
-
-Exit and recovery
-- Closing AtlasDesk with active work shows an explicit confirmation instead of silently interrupting tasks.
-- Confirmed exit cancels active work and persists its interrupted state.
-- History remains limited to the latest 100 records.
-- Records left queued or running by an abnormal previous exit are loaded as failed with a clear interruption message.
+Lifecycle convergence
+- Task and tools pages are installed and switched by one responsibility-named TaskToolCoordinator.
+- The coordinator owns task/tool navigation visibility, active-task exit confirmation, control disposal and shared task-hub shutdown.
+- V064TaskEnhancer and V065ToolsEnhancer are retired and removed.
+- The temporary standalone task-tool alias file is removed.
+- WorkbenchFeaturePipeline now exposes one TaskTools owner rather than two version-named enhancers.
 
 Regression protection
-- New v0.9.4 smoke checks execute a real shared task record and verify common collection membership and serialization.
-- Existing file-integrity atomic-write, path-safety, cancellation, Runtime/Data and privacy checks remain active.
+- New v0.9.5 checks require the retired files to stay absent.
+- The pipeline must attach TaskToolCoordinator.
+- Exactly one native component may call WorkbenchTaskHub.Shutdown.
+- Existing task/tool sharing, cancellation, exit recovery, Runtime/Data and privacy checks remain active.
+
+AtlasDesk v0.9.4
+
+- File-integrity manifest generation, verification and file comparison share the task-center collection.
+- Tool and task pages share status, cancellation, results and bounded history.
+- Active work is confirmed before application exit.
+- History remains limited to 100 records and interrupted work is recovered explicitly.
 
 AtlasDesk v0.9.3
 
-This stabilization release makes the project center useful as a persistent daily entry point without turning AtlasDesk into an IDE.
-
-Project usage
 - Projects can be pinned and filtered as favorites.
-- Workspace, terminal and Explorer actions record a bounded recent-project list.
-- Pinned and recent paths are stored in ordinary roaming settings; no commands, terminal output or repository contents are saved.
-- Pinned projects appear before recent and ordinary projects after an explicit scan.
-
-Missing paths
-- Saved project paths that no longer exist remain visible as unavailable entries instead of silently disappearing.
-- Missing entries cannot open workspace, terminal or Explorer actions.
-- Relocation is explicit: the user selects a replacement folder, AtlasDesk verifies project markers, then replaces the saved path.
-- AtlasDesk does not recursively search disks or guess moved project locations.
-
-Regression protection
-- New v0.9.3 smoke checks exercise an active temporary project and a missing pinned project.
-- Existing project scan cancellation, context timeout, stale-result guard and recent-file project filtering remain active.
+- Workspace, terminal and Explorer actions maintain a bounded recent-project list.
+- Missing saved paths stay visible and require explicit user relocation.
+- AtlasDesk does not search disks or guess moved project locations.
 
 AtlasDesk v0.9.2
 
-This stabilization release rebuilds the Zotero item pane around read-only research actions and continues layout hardening.
-
-Zotero item pane
-- The right pane follows Zotero's compact item-detail structure without exposing editing controls.
-- Title, authors, source, year, Citation Key and DOI are visible without opening a secondary tab.
-- Citation Key detection supports Zotero's native citationKey field and legacy Better BibTeX values stored in Extra.
-- Quick-copy actions cover title, DOI, Citation Key, the current reference preview, LaTeX cite syntax and Pandoc cite syntax.
-- GB/T 7714 and APA previews are explicitly labeled as quick references; formal submissions should still use Zotero/CSL output.
-- Open PDF and Show File are first-class actions. Show File selects the PDF in Windows Explorer so the original file can be copied directly.
-- Abstract, metadata, attachments, notes, tags and collections remain available in a lower read-only detail area.
-
-Read-only boundary
-- Zotero access remains SQLite read-only with PRAGMA query_only enabled.
-- No citation, metadata, file or collection action writes to zotero.sqlite.
-- Existing serialized database reads, request-version guards and explicit navigation loading remain unchanged.
-
-Regression protection
-- New v0.9.2 smoke checks validate native and legacy citation keys, LaTeX/Pandoc output, DOI preservation, file-location actions and invalid XAML control characters.
+- Zotero uses a compact read-only item pane modeled on the native information structure.
+- Title, authors, source, year, Citation Key, DOI and quick citation actions are immediately available.
+- PDF files can be opened or selected in Windows Explorer.
+- Zotero SQLite access remains read-only with query_only enabled.
 
 AtlasDesk v0.9.1
 
-This patch fixes maximized-window and short-height layout clipping discovered on Windows taskbar work areas.
-
-Window bounds
-- The main window now handles WM_GETMINMAXINFO and uses the active monitor work area rather than the full monitor bounds.
-- Maximizing on primary or secondary monitors preserves space for taskbars on any screen edge.
-- Native pixel bounds are used directly so the correction remains valid under mixed-DPI scaling.
-- Restoring and resizing keep the existing WPF window behavior.
-
-Tools layout
-- The Tools page now reduces only its vertical outer inset when the available height is constrained.
-- The three-column layout, result area and bottom action buttons remain visible without changing the normal full-height design.
+- Maximized windows use the active monitor work area and avoid taskbars on any edge.
+- The tools page adapts its vertical inset when height is constrained.
 
 AtlasDesk v0.9.0
 
-This feature release connects projects, workspace, terminal, Git status, environment markers and recent files into one explicit project-driven workflow.
-
-Project workflow
-- ProjectWorkflowCoordinator replaces and retires the version-named V070 project-center enhancer.
-- The existing Project / Environment / Terminal surface remains intact; no duplicate project UI was added.
-- Selecting a project creates a bounded project context and updates the existing selection summary.
-- Workspace actions open the selected project in WorkspaceControl.
-- Terminal actions use WorkspaceTerminalCoordinator and enter the selected project directory.
-
-Context
-- Environment summaries use project marker files already identified by ProjectCatalogService; Python, Node, .NET, LaTeX, Rust and Go runtimes are not launched.
-- Recent-file summaries filter the existing recent-file list and do not recursively scan project contents.
-- Git status runs only for the selected Git project, excludes untracked-file enumeration, and has a three-second timeout.
-- Missing Git, invalid paths, non-Git projects and timeouts degrade to explicit status text instead of blocking the shell.
-- Rapid project changes cancel the previous read and generation-gate stale results.
-
-Lifecycle
-- Project scanning remains explicit through the Project page or Refresh action.
-- No project, Git or environment scan runs during AtlasDesk startup or from visibility changes.
-- V070ProjectCenterEnhancer and V070RuntimeVerifier are removed; responsibility-named workflow and runtime-verifier components replace them.
-
-Regression protection
-- New smoke tests exercise a real temporary Python-marker project and recent-file context.
-- Source gates require cancellation, Git timeout, stale-result rejection, workspace integration and terminal integration.
-- Existing startup residency, Dashboard resilience, terminal continuity, ConPTY, Runtime/Data and security checks remain active.
+- Projects, workspace, terminal, Git status, environment markers and recent files form one explicit user-driven workflow.
+- Project context is cancellable, bounded and never starts from application startup or visibility changes.
 
 Known limitation
 - Close Zotero before opening the AtlasDesk library where the live database cannot be shared safely.
