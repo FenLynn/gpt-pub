@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-const statusDiagnosticSummaryManifestSHA256 = "3e34e21e24f911f262669848ffa5714317bf3e12e7b8e31b25417eb420be37a2"
+const statusDiagnosticSummaryManifestSHA256 = "AUTO"
 
 func TestStatusDiagnosticSummaryFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
@@ -20,12 +21,12 @@ func TestStatusDiagnosticSummaryFixedSourceManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifestSum := sha256.Sum256(data)
-	if got := hex.EncodeToString(manifestSum[:]); got != statusDiagnosticSummaryManifestSHA256 {
-		t.Fatalf("status diagnostic manifest hash mismatch: %s", got)
-	}
+	manifestHash := hex.EncodeToString(manifestSum[:])
 
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
 	entries := 0
+	auto := statusDiagnosticSummaryManifestSHA256 == "AUTO"
+	var actual []string
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -41,13 +42,23 @@ func TestStatusDiagnosticSummaryFixedSourceManifest(t *testing.T) {
 			t.Fatalf("%s: %v", path, err)
 		}
 		got := sha256.Sum256(content)
-		if gotHash := hex.EncodeToString(got[:]); gotHash != want {
+		gotHash := hex.EncodeToString(got[:])
+		actual = append(actual, fmt.Sprintf("%s  %s", gotHash, path))
+		if want == "AUTO" {
+			auto = true
+		} else if gotHash != want {
 			t.Fatalf("%s hash mismatch: %s", path, gotHash)
 		}
 		entries++
 	}
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
+	}
+	if auto {
+		t.Fatalf("replace AUTO values:\nmanifest_sha256=%s\n%s", manifestHash, strings.Join(actual, "\n"))
+	}
+	if manifestHash != statusDiagnosticSummaryManifestSHA256 {
+		t.Fatalf("status diagnostic manifest hash mismatch: %s", manifestHash)
 	}
 	if entries != 4 {
 		t.Fatalf("manifest entries=%d want 4", entries)
