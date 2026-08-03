@@ -39,11 +39,17 @@ internal static class V105FinalQualityChecks
         var pipeline = File.ReadAllText(pipelinePath);
         var diagnostics = File.ReadAllText(diagnosticsPath);
         var project = File.ReadAllText(projectPath);
-        var version = File.ReadAllText(versionPath);
+        var versionSource = File.ReadAllText(versionPath);
         var v069 = File.ReadAllText(v069Path);
         var residency = File.ReadAllText(residencyPath);
 
-        RequireContains(version, "<WorkbenchVersion>1.0.5</WorkbenchVersion>");
+        var versionText = XDocument.Parse(versionSource)
+            .Descendants("WorkbenchVersion")
+            .Select(node => node.Value.Trim())
+            .FirstOrDefault();
+        if (!Version.TryParse(versionText, out var currentVersion) || currentVersion < new Version(1, 0, 5))
+            throw new InvalidOperationException("AtlasDesk version moved below the v1.0.5 final-quality baseline.");
+
         RequireContains(project,
             "<Nullable>enable</Nullable>",
             "<WarningsAsErrors>nullable</WarningsAsErrors>",
@@ -151,7 +157,7 @@ internal static class V105FinalQualityChecks
             "CriticalLayoutClips > 0");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.0.5 restores keyboard focus after legacy layers, freezes audited compatibility owners, promotes nullable warnings and gates structured UI quality");
+            $"PASS AtlasDesk {currentVersion} preserves the v1.0.5 keyboard, nullable, legacy-owner and structured UI quality baseline");
     }
 
     private static void RequireContains(string source, params string[] tokens)
