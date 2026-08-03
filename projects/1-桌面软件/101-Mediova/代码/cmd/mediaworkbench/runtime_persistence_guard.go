@@ -109,7 +109,19 @@ func runtimeSettingsFingerprint(settings model.Settings) string {
 }
 
 func runtimeTasksFingerprint(tasks []*model.Task) string {
-	return hashPersistenceValue(tasks)
+	stable := make([]*model.Task, 0, len(tasks))
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		copy := *task
+		// Progress is intentionally volatile and not useful for restart recovery.
+		// Ignoring it prevents the guard from rewriting session.json every timer
+		// tick while a conversion is running.
+		copy.Progress = 0
+		stable = append(stable, &copy)
+	}
+	return hashPersistenceValue(stable)
 }
 
 func terminalTaskSignature(task *model.Task) string {
