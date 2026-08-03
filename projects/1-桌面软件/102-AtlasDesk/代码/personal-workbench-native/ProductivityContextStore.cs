@@ -98,12 +98,10 @@ public static class ProductivityContextStore
             try
             {
                 Normalize(state);
-                Directory.CreateDirectory(App.AppDataDirectory);
-                var temporary = StatePath + ".tmp";
-                File.WriteAllText(temporary, JsonSerializer.Serialize(state, JsonOptions));
-                if (File.Exists(StatePath))
-                    File.Copy(StatePath, BackupPath, overwrite: true);
-                File.Move(temporary, StatePath, overwrite: true);
+                AtomicFileStore.WriteAllText(
+                    StatePath,
+                    JsonSerializer.Serialize(state, JsonOptions),
+                    BackupPath);
             }
             catch (Exception ex)
             {
@@ -282,8 +280,16 @@ public static class ProductivityContextStore
     {
         if (!File.Exists(path))
             return null;
-        var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<ProductivityContextState>(json, JsonOptions);
+        try
+        {
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<ProductivityContextState>(json, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            App.Log("Load productivity context file failed: " + Path.GetFileName(path) + " · " + ex.Message);
+            return null;
+        }
     }
 
     private static void Normalize(ProductivityContextState state)
