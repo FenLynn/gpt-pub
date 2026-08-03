@@ -77,7 +77,10 @@ internal static class V113ProductivityContextChecks
             "启动与命令",
             "关联文献",
             "Zotero 数据库继续严格只读",
-            "每行：名称 | 命令 | 可选工作目录",
+            "名称 :: 命令 :: 可选工作目录",
+            "line.Split(new[] { \"::\" }, 3",
+            "AccessibilityCoordinator.PrepareWindow(this)",
+            "AutomationProperties.SetName(control, label)",
             "ProductivityContextStore.Save");
         RequireContains(searchWindow,
             "CommandCenterCatalog.SearchAsync",
