@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -91,6 +92,7 @@ public sealed class UiConvergenceCoordinator
     private readonly MainWindow _window;
     private readonly ResourceDictionary _theme;
     private readonly HashSet<DependencyObject> _polished = new(ReferenceEqualityComparer.Instance);
+    private readonly RoutedEventHandler _loadedHandler;
     private readonly Grid? _rootGrid;
     private readonly ColumnDefinition? _sidebarColumn;
     private readonly Border? _sidebar;
@@ -109,6 +111,7 @@ public sealed class UiConvergenceCoordinator
     private UiConvergenceCoordinator(MainWindow window)
     {
         _window = window;
+        _loadedHandler = OnElementLoaded;
         _theme = new ResourceDictionary
         {
             Source = new Uri("/AtlasDesk;component/UiConvergenceResources.xaml", UriKind.RelativeOrAbsolute)
@@ -130,7 +133,7 @@ public sealed class UiConvergenceCoordinator
             .OfType<Border>()
             .FirstOrDefault(border => Grid.GetColumn(border) == 2);
 
-        _window.AddHandler(FrameworkElement.LoadedEvent, new RoutedEventHandler(OnElementLoaded), true);
+        _window.AddHandler(FrameworkElement.LoadedEvent, _loadedHandler, true);
         _window.SizeChanged += Window_SizeChanged;
         _window.Closed += Window_Closed;
         _window.Dispatcher.BeginInvoke(new Action(() =>
@@ -153,7 +156,7 @@ public sealed class UiConvergenceCoordinator
 
     private void Window_Closed(object? sender, EventArgs e)
     {
-        _window.RemoveHandler(FrameworkElement.LoadedEvent, new RoutedEventHandler(OnElementLoaded));
+        _window.RemoveHandler(FrameworkElement.LoadedEvent, _loadedHandler);
         _window.SizeChanged -= Window_SizeChanged;
         _window.Closed -= Window_Closed;
     }
@@ -295,8 +298,11 @@ public sealed class UiConvergenceCoordinator
                 var heroLayout = decorationRoot.Children.OfType<Grid>().LastOrDefault();
                 if (heroLayout is not null)
                 {
-                    heroLayout.Margin = dense ? new Thickness(16, 14) : new Thickness(21, 17);
-                    var context = heroLayout.Children.OfType<Border>().FirstOrDefault(border => Grid.GetColumn(border) == 2 || Grid.GetRow(border) == 2);
+                    heroLayout.Margin = dense
+                        ? new Thickness(16, 14, 16, 14)
+                        : new Thickness(21, 17, 21, 17);
+                    var context = heroLayout.Children.OfType<Border>()
+                        .FirstOrDefault(border => Grid.GetColumn(border) == 2 || Grid.GetRow(border) == 2);
                     if (dense)
                     {
                         heroLayout.ColumnDefinitions.Clear();
@@ -339,7 +345,11 @@ public sealed class UiConvergenceCoordinator
             {
                 if (metrics.Children[index] is not Border card) continue;
                 var lastInRow = (index + 1) % columns == 0;
-                card.Margin = new Thickness(0, 0, lastInRow ? 0 : 9, compact && index < metrics.Children.Count - columns ? 9 : 0);
+                card.Margin = new Thickness(
+                    0,
+                    0,
+                    lastInRow ? 0 : 9,
+                    compact && index < metrics.Children.Count - columns ? 9 : 0);
                 card.MinHeight = compact ? 80 : 86;
             }
         }
@@ -420,8 +430,13 @@ public sealed class UiConvergenceCoordinator
             if (actions is not null)
             {
                 actions.Orientation = dense ? Orientation.Vertical : Orientation.Horizontal;
-                foreach (var button in actions.Children.OfType<Button>())
-                    button.Margin = dense ? new Thickness(0, 0, 0, 6) : new Thickness(button == actions.Children[0] ? 0 : 8, 0, 0, 0);
+                for (var index = 0; index < actions.Children.Count; index++)
+                {
+                    if (actions.Children[index] is not Button button) continue;
+                    button.Margin = dense
+                        ? new Thickness(0, 0, 0, 6)
+                        : new Thickness(index == 0 ? 0 : 8, 0, 0, 0);
+                }
             }
         }
     }
