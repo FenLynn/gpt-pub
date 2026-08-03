@@ -79,7 +79,7 @@ internal static class V113ProductivityContextChecks
             "CommandCenterCatalog.SearchAsync",
             "ProductivityContextStore.BuildSearchResults",
             "Task.WhenAll(catalogTask, contextTask)",
-            "contextTask.Result.Concat(catalogTask.Result)");
+            ".Concat(catalogTask.Result)");
         RequireContains(experience,
             "ProductivityContextCoordinator.TryExecuteAsync",
             "搜索页面、项目、文件、任务、文献、上下文和命令");
