@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-const installConfigManifestSHA256 = "32b529875179572818d8ad58120d5072dd99ec960864ec42b723c0aca7f596ca"
+const configResilienceManifestSHA256 = "2b1522748a096313e324eff1f87389f363a3f8cc34b73bfec4621f9567461da6"
 
-func TestInstallConfigFixedSourceManifest(t *testing.T) {
+func TestConfigResilienceFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	manifestPath := filepath.Join(root, "INSTALL_CONFIG_FILES_SHA256.txt")
+	manifestPath := filepath.Join(root, "CONFIG_RESILIENCE_FILES_SHA256.txt")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	sum := sha256.Sum256(data)
-	if hex.EncodeToString(sum[:]) != installConfigManifestSHA256 {
-		t.Fatalf("install config manifest hash mismatch: %x", sum)
+	if hex.EncodeToString(sum[:]) != configResilienceManifestSHA256 {
+		t.Fatalf("config resilience manifest hash mismatch: %x", sum)
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
@@ -49,7 +49,7 @@ func TestInstallConfigFixedSourceManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 3 {
-		t.Fatalf("manifest entries=%d want 3", entries)
+	if entries != 6 {
+		t.Fatalf("manifest entries=%d want 6", entries)
 	}
 }
