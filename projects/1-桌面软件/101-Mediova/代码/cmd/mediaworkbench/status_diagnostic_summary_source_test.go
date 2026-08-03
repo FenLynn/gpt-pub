@@ -15,6 +15,8 @@ func TestStatusDiagnosticSummaryWindowsSourceContract(t *testing.T) {
 	for _, required := range []string{
 		"SetWindowLongPtrW",
 		"statusDiagnosticWMSetText",
+		"statusDiagnosticUTF16PtrToString",
+		"utf16.Decode(unsafe.Slice(pointer, length))",
 		"diagnosticStatusSummary(full, statusDiagnosticControlWidth(hwnd))",
 		"WM_LBUTTONUP",
 		"WM_CONTEXTMENU",
@@ -31,6 +33,7 @@ func TestStatusDiagnosticSummaryWindowsSourceContract(t *testing.T) {
 		"go func",
 		"time.NewTicker",
 		"setText(a.hStatusText, a.runtimeNotice)",
+		"syscall.UTF16PtrToString",
 	} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("status diagnostic summary contains forbidden pattern %q", forbidden)
