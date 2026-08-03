@@ -1,3 +1,50 @@
+AtlasDesk v1.0.5 final quality candidate
+
+This candidate closes the v1.0 stabilization phase without adding a new product workflow. It restores keyboard and accessibility behavior after the retained compatibility layers, converts UI quality into a real Windows regression gate, hardens the workspace/library UI-thread boundary and promotes nullable warnings to build errors. The next development phase may add new functions, but must start separately and use responsibility-named components.
+
+Keyboard and accessibility
+- AccessibilityCoordinator attaches after every retained presentation layer and restores the focus behavior removed by historical corrective code.
+- The eight main navigation entries are keyboard-focusable, expose one current Tab entry and support arrow, Home and End movement.
+- Buttons, text inputs, navigation, tabs and list items share a visible system-highlight focus visual.
+- Icon-only actions receive automation names and help text from their existing labels and tooltips.
+- The local-workbench status exposes a polite live-region name without publishing private user data.
+- Windows high-contrast mode temporarily uses system brushes for interactive controls and restores the original local values when high contrast is disabled.
+
+Structured UI quality audit
+- The audit counts keyboard-reachable controls, navigation focus state, unnamed icon actions, targets below 24 px and meaningful layout clips.
+- Layout clips are evaluated against the element's desired content bounds; unmeasured transition controls and extra arranged whitespace are not misreported as clipped content.
+- The audit records only control structure, counts, density state and generic control names. It does not read paths, URLs, commands, file names, terminal output or document content.
+- Diagnostics shows keyboard/accessibility status and the retained compatibility-layer audit.
+- Real Windows residency switches through Home, Workspace, Library, Development, Tools, Tasks and Settings and rejects missing names, undersized actions or content clipping.
+
+Reliability boundaries
+- Workspace and Zotero navigation return the complete asynchronous entry to the WPF Dispatcher when invoked without UI-thread ownership.
+- Workspace failure rendering has its own Dispatcher boundary, preventing an exception path from updating WPF controls from a worker thread.
+- The Zotero search box uses the converged 32 px input height and remains inside its existing 42 px toolbar row.
+- The home page remains free from Zotero reads, Git calls and project scans; no background workflow was added.
+
+Legacy and compile-time boundaries
+- Eight version-named compatibility components remain because they still own concrete project, backup, terminal, tree or presentation responsibilities.
+- LegacyComponentAudit freezes this allowlist and rejects any new version-named production component.
+- New feature work after v1.0.5 must use responsibility-named owners rather than adding another V-numbered layer.
+- Nullable warnings are promoted to project build errors.
+- Zotero item-type labeling now accepts nullable input explicitly and always returns a non-null string.
+
+Verification evidence
+- Exact product head: 658a06c2aff3a84ff88deaf037f886f80a646a0f.
+- Full Windows CI: 30818016390, success.
+- Runtime Artifact: 8857673199, AtlasDesk-v1.0.5-Runtime.
+- Artifact digest: sha256:9b83cf1de9af23d88cfbcdc2f5b79858b7f86ca4a972e136fd6645ea0b70c4e4.
+- Extracted Runtime ZIP SHA-256: c0822e78bad04159691e09b6e65bb9db74a6c322788adc967058a0e6b5cafd9a.
+- Runtime ZIP contains 13 entries and passed a complete archive test.
+- All earlier smoke, real CMD/ConPTY, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
+
+Candidate boundary
+- v1.0.5 remains outside main until combined user verification.
+- main stays at the formal v1.0.0 baseline.
+- No formal tag or GitHub Release is created for this candidate.
+- The v1.0 stabilization phase stops after this candidate; the next phase begins with explicitly scoped new features.
+
 AtlasDesk v1.0.4 UI convergence candidate
 
 This bounded maintenance candidate converges the visual hierarchy, adds adaptive-layout diagnostics and fixes the real home-surface host without adding a new product workflow. It remains outside main until user verification.

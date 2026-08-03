@@ -33,6 +33,12 @@ public sealed class WorkbenchFeaturePipeline
         Corrective = V0611CorrectiveEnhancer.Attach(this);
         ExperiencePolish = V0612ExperienceEnhancer.Attach(window, this);
         ProjectWorkflow = ProjectWorkflowCoordinator.Attach(window, this);
+
+        // Attach last. Historical presentation layers may still remove focus visuals
+        // or Tab stops while applying compatibility fixes; AccessibilityCoordinator
+        // is the exclusive final owner of keyboard focus, automation names, high
+        // contrast overrides and structured UI quality auditing.
+        Accessibility = AccessibilityCoordinator.Attach(window);
     }
 
     public V067VisualFixes VisualFixes { get; }
@@ -54,6 +60,7 @@ public sealed class WorkbenchFeaturePipeline
     public V0611CorrectiveEnhancer Corrective { get; }
     public V0612ExperienceEnhancer ExperiencePolish { get; }
     public ProjectWorkflowCoordinator ProjectWorkflow { get; }
+    public AccessibilityCoordinator Accessibility { get; }
     public AppSettings Settings { get; }
 
     public static WorkbenchFeaturePipeline Attach(MainWindow window) => new(window);

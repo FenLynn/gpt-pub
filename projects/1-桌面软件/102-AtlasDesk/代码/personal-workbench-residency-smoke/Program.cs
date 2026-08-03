@@ -2,6 +2,7 @@ using PersonalWorkbench;
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -9,6 +10,12 @@ using System.Windows.Threading;
 
 internal static class Program
 {
+    private static readonly string[] NavigationNames =
+    {
+        "HomeNav", "WorkspaceNav", "LibraryNav", "DevelopmentNav",
+        "ToolsNav", "DashboardNav", "TasksNav", "SettingsNav"
+    };
+
     private static string _phase = "not started";
 
     [STAThread]
@@ -59,6 +66,12 @@ internal static class Program
             SetPhase("verifying physical compact adaptive layout");
             AssertPhysicalCompactLayout(window, pipeline.Experience.Home);
 
+            SetPhase("verifying keyboard accessibility");
+            AssertKeyboardAccessibility(window, pipeline);
+
+            SetPhase("verifying structured core-page quality");
+            AssertCorePageQuality(window, pipeline);
+
             SetPhase("verifying detached standard adaptive layout");
             AssertDetachedHomeLayout(pipeline.Settings, 1320, 780, UiDensityMode.Standard, 4);
 
@@ -70,6 +83,7 @@ internal static class Program
             diagnostics.Show();
             PumpDispatcher(TimeSpan.FromMilliseconds(700));
             AssertWindowAlive(diagnostics, "after opening converged diagnostics");
+            AssertStandaloneAccessibility(diagnostics, "diagnostics");
             diagnostics.Close();
             PumpDispatcher(TimeSpan.FromMilliseconds(150));
 
@@ -101,7 +115,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk isolated process remained alive, compact top-level and detached wide layouts converged, and environment discovery stayed lazy");
+                "PASS AtlasDesk isolated process remained alive, compact and detached wide layouts converged, core pages passed keyboard/structure audits, and environment discovery stayed lazy");
             return 0;
         }
         catch (Exception ex)
@@ -165,6 +179,88 @@ internal static class Program
         }
         if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
             throw new InvalidOperationException("Physical compact audit published invalid geometry or DPI.");
+    }
+
+    private static void AssertKeyboardAccessibility(
+        MainWindow window,
+        WorkbenchFeaturePipeline pipeline)
+    {
+        var navigation = NavigationNames
+            .Select(name => window.FindName(name) as RadioButton
+                            ?? throw new InvalidOperationException("Navigation is unavailable: " + name))
+            .ToArray();
+
+        if (navigation.Any(item => !item.Focusable))
+            throw new InvalidOperationException("One or more navigation entries cannot receive keyboard focus.");
+        if (navigation.Count(item => item.IsTabStop) != 1)
+            throw new InvalidOperationException("NavigationTabStops != 1");
+        if (navigation.Any(item => item.FocusVisualStyle is null))
+            throw new InvalidOperationException("One or more navigation entries have no keyboard focus visual.");
+        if (navigation.Any(item => string.IsNullOrWhiteSpace(AutomationProperties.GetName(item))))
+            throw new InvalidOperationException("One or more navigation entries have no automation name.");
+
+        var snapshot = pipeline.Accessibility.AuditNow();
+        if (!snapshot.Healthy)
+            throw new InvalidOperationException("Initial accessibility audit failed: " + Describe(snapshot));
+    }
+
+    private static void AssertCorePageQuality(
+        MainWindow window,
+        WorkbenchFeaturePipeline pipeline)
+    {
+        foreach (var name in new[]
+                 {
+                     "HomeNav", "WorkspaceNav", "LibraryNav", "DevelopmentNav",
+                     "ToolsNav", "TasksNav", "SettingsNav"
+                 })
+        {
+            if (window.FindName(name) is not RadioButton navigation)
+                throw new InvalidOperationException("Core page navigation is unavailable: " + name);
+            navigation.IsChecked = true;
+            PumpDispatcher(TimeSpan.FromMilliseconds(420));
+            window.UpdateLayout();
+            PumpDispatcher(TimeSpan.FromMilliseconds(80));
+
+            var snapshot = pipeline.Accessibility.AuditNow();
+            if (snapshot.NavigationTabStops != 1
+                || snapshot.NavigationFocusableControls != NavigationNames.Length
+                || snapshot.MissingAutomationNames > 0
+                || snapshot.TinyTargets > 0
+                || snapshot.CriticalLayoutClips > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Core page quality audit failed for {name}: {Describe(snapshot)}");
+            }
+        }
+    }
+
+    private static void AssertStandaloneAccessibility(Window window, string label)
+    {
+        AccessibilityCoordinator.PrepareWindow(window);
+        window.UpdateLayout();
+        foreach (var button in Descendants<ButtonBase>(window))
+        {
+            if (!button.IsVisible || !button.IsEnabled || !IsIconOnly(button)) continue;
+            if (button.Focusable && button.FocusVisualStyle is null)
+                throw new InvalidOperationException(label + " icon button has no focus visual.");
+            if (string.IsNullOrWhiteSpace(AutomationProperties.GetName(button)))
+                throw new InvalidOperationException(label + " icon button has no automation name.");
+        }
+    }
+
+    private static string Describe(UiQualityAuditSnapshot snapshot)
+        => $"interactive={snapshot.InteractiveControls}; keyboard={snapshot.KeyboardFocusableControls}; "
+           + $"navFocusable={snapshot.NavigationFocusableControls}; navTabStops={snapshot.NavigationTabStops}; "
+           + $"unnamed={snapshot.MissingAutomationNames}; tiny={snapshot.TinyTargets}; "
+           + $"clips={snapshot.CriticalLayoutClips}; highContrast={snapshot.HighContrast}";
+
+    private static bool IsIconOnly(ButtonBase button)
+    {
+        if (button.Content is string text)
+            return string.IsNullOrWhiteSpace(text);
+        if (button.Content is TextBlock textBlock)
+            return string.IsNullOrWhiteSpace(textBlock.Text);
+        return button.Content is not null;
     }
 
     private static void AssertDetachedHomeLayout(
@@ -249,16 +345,18 @@ internal static class Program
     }
 
     private static T? FindVisualChild<T>(DependencyObject root) where T : DependencyObject
+        => Descendants<T>(root).FirstOrDefault();
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
     {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        int count;
+        try { count = VisualTreeHelper.GetChildrenCount(root); }
+        catch { yield break; }
+        for (var index = 0; index < count; index++)
         {
             var child = VisualTreeHelper.GetChild(root, index);
-            if (child is T match)
-                return match;
-            var nested = FindVisualChild<T>(child);
-            if (nested is not null)
-                return nested;
+            if (child is T match) yield return match;
+            foreach (var nested in Descendants<T>(child)) yield return nested;
         }
-        return null;
     }
 }
