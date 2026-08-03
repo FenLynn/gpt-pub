@@ -1,0 +1,92 @@
+name: P101 Mediova terminal recovery apply
+
+on:
+  pull_request:
+    branches: [p101-exp]
+    types: [opened]
+    paths:
+      - 'projects/1-桌面软件/101-Mediova/代码/internal/workflow/recovery.go'
+      - 'projects/1-桌面软件/101-Mediova/代码/internal/workflow/recovery_terminal_test.go'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-recovery-terminal-apply
+  cancel-in-progress: false
+
+jobs:
+  validate-and-refresh:
+    if: github.head_ref == 'p101-recovery-terminal-preservation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: p101-recovery-terminal-preservation
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+
+      - name: Refresh complete fixed source manifest
+        shell: bash
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          set -euo pipefail
+          gofmt -w internal/workflow/recovery.go internal/workflow/recovery_terminal_test.go
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          root = Path.cwd()
+          manifest = root / 'SOURCE_FILES_SHA256.txt'
+          paths = {'internal/workflow/recovery_terminal_test.go'}
+          for line in manifest.read_text(encoding='utf-8').splitlines():
+              parts = line.strip().split(maxsplit=1)
+              if len(parts) == 2:
+                  paths.add(parts[1])
+          rows = []
+          for rel in sorted(paths):
+              path = root / rel
+              if not path.is_file():
+                  raise SystemExit(f'missing manifest source: {rel}')
+              rows.append(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {rel}')
+          manifest.write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          PY
+
+      - name: Validate recovery repair
+        shell: bash
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          set -euo pipefail
+          sha256sum -c SOURCE_FILES_SHA256.txt
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet -unsafeptr=false ./...
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go test -c ./cmd/mediaworkbench -o "$RUNNER_TEMP/Mediova_tests.exe"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags='-H=windowsgui -s -w' -o "$RUNNER_TEMP/Mediova.exe" ./cmd/mediaworkbench
+          test -s "$RUNNER_TEMP/Mediova_tests.exe"
+          test -s "$RUNNER_TEMP/Mediova.exe"
+
+      - name: Commit refreshed manifest only
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=$(git -c core.quotePath=false diff --name-only)
+          printf '%s\n' "$changed"
+          bad=$(printf '%s\n' "$changed" | grep -Ev '^projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256\.txt$' || true)
+          if [[ -n "$bad" ]]; then
+            echo "Unexpected generated paths:"
+            echo "$bad"
+            exit 1
+          fi
+          test -n "$changed"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt'
+          git commit -m 'Mediova｜刷新终态恢复修复源码哈希'
+          git push origin HEAD:p101-recovery-terminal-preservation
