@@ -3,9 +3,23 @@
 package main
 
 import (
-	"time"
+	"runtime"
+	"syscall"
 
 	"mediaworkbench/internal/config"
+)
+
+const startupNoticeWHGetMessage = 3
+
+var (
+	startupNoticeUser32             = syscall.NewLazyDLL("user32.dll")
+	startupNoticeSetWindowsHookExW  = startupNoticeUser32.NewProc("SetWindowsHookExW")
+	startupNoticeCallNextHookEx     = startupNoticeUser32.NewProc("CallNextHookEx")
+	startupNoticeUnhookWindowsHook  = startupNoticeUser32.NewProc("UnhookWindowsHookEx")
+	startupNoticeGetCurrentThreadID = syscall.NewLazyDLL("kernel32.dll").NewProc("GetCurrentThreadId")
+	startupNoticeHook               uintptr
+	startupNoticeHookCallback       uintptr
+	startupNoticeText               string
 )
 
 func init() {
@@ -13,40 +27,40 @@ func init() {
 	if notice == "" {
 		return
 	}
-	go func() {
-		deadline := time.Now().Add(20 * time.Second)
-		for time.Now().Before(deadline) {
-			current := app
-			if current != nil && current.hStatusText != 0 {
-				current.postUI(func() {
-					current.runtimeNotice = notice
-				})
-				for attempt := 0; attempt < 32; attempt++ {
-					result := make(chan bool, 1)
-					current.postUI(func() {
-						if current.hStatusText == 0 {
-							result <- false
-							return
-						}
-						if startupStatusAllowsConfigNotice(getText(current.hStatusText)) {
-							setText(current.hStatusText, notice)
-							result <- true
-							return
-						}
-						result <- false
-					})
-					select {
-					case displayed := <-result:
-						if displayed {
-							return
-						}
-					case <-time.After(600 * time.Millisecond):
-					}
-					time.Sleep(250 * time.Millisecond)
-				}
-				return
+
+	// Package init and main run on the main goroutine. Locking here ensures the
+	// thread-specific WH_GETMESSAGE hook is installed on the same UI thread that
+	// main later uses for Win32 window creation and the message loop.
+	runtime.LockOSThread()
+	startupNoticeText = notice
+	startupNoticeHookCallback = syscall.NewCallback(startupNoticeGetMessageProc)
+	threadID, _, _ := startupNoticeGetCurrentThreadID.Call()
+	hook, _, _ := startupNoticeSetWindowsHookExW.Call(
+		startupNoticeWHGetMessage,
+		startupNoticeHookCallback,
+		0,
+		threadID,
+	)
+	startupNoticeHook = hook
+}
+
+func startupNoticeGetMessageProc(code int, wParam, lParam uintptr) uintptr {
+	hook := startupNoticeHook
+	if code >= 0 && startupNoticeText != "" {
+		current := app
+		if current != nil && current.controlsReady && current.hStatusText != 0 {
+			notice := startupNoticeText
+			current.runtimeNotice = mergeStartupRuntimeNotice(current.runtimeNotice, notice)
+			if !current.selfTest && !current.uiPreview && startupStatusAllowsConfigNotice(getText(current.hStatusText)) {
+				setText(current.hStatusText, notice)
 			}
-			time.Sleep(50 * time.Millisecond)
+			startupNoticeText = ""
+			if hook != 0 {
+				startupNoticeUnhookWindowsHook.Call(hook)
+				startupNoticeHook = 0
+			}
 		}
-	}()
+	}
+	next, _, _ := startupNoticeCallNextHookEx.Call(hook, uintptr(code), wParam, lParam)
+	return next
 }
