@@ -3,7 +3,8 @@ package media
 import "os"
 
 // DroppedImportGroup preserves the source root for files discovered from a
-// dropped directory. Directly dropped files use an empty root.
+// dropped directory. Root is the parent of the imported top folder so the
+// top folder itself is recreated under the output root. Direct files use an empty root.
 type DroppedImportGroup struct {
 	Root  string
 	Paths []string
@@ -39,7 +40,7 @@ func ScanDroppedPaths(paths []string, recursive bool) DroppedScanResult {
 			}
 			files := append(append([]string{}, scan.Videos...), scan.Images...)
 			if len(files) > 0 {
-				result.Groups = append(result.Groups, DroppedImportGroup{Root: path, Paths: files})
+				result.Groups = append(result.Groups, DroppedImportGroup{Root: ImportTreeRoot(path), Paths: files})
 			}
 			result.Unsupported += scan.Unsupported
 			result.Unreadable += scan.Unreadable

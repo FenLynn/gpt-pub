@@ -70,13 +70,11 @@ v4.2.0 是一次任务状态机与批处理工作流升级。它延续 v4.1.1 �
 
 ## 安装方式
 
-请从 `p101-v4.2.0` Release 下载并完整解压：
+用户默认下载并完整解压：
 
-```text
-Mediova-v4.2.0-Runtime.zip
-```
+[`Mediova-v4.2.0-Light.zip`](https://github.com/FenLynn/gpt-pub/releases/download/p101-v4.2.0/Mediova-v4.2.0-Light.zip)
 
-不要只复制 `Mediova.exe`。完整 Runtime 还包含 FFmpeg/FFprobe、相关 DLL、第三方说明和完整性清单。
+该包不包含 `ffmpeg.exe` 和 `ffprobe.exe`。若原 Mediova 目录已有 `Components\FFmpeg\bin`，更新时保留该目录并覆盖轻量包文件即可；首次使用时，可在软件中选择已有 FFmpeg/FFprobe 路径，或自行将二者放入该目录。
 
 ## 正式资产
 
@@ -85,12 +83,14 @@ Mediova-v4.2.0-Runtime.zip
 正式源提交：c8ea2b904a59aa9416763c3397088fd803d24e15
 正式 CI：30740707877
 Release 运行：30740967788
+轻量包补充运行：30744062665
 
 Mediova.exe
 SHA-256：1261c158d35d5fd3ae97ebfd36a25e72094d2f5d65f8cc091a331c1955d2a72f
 
-Mediova-v4.2.0-Runtime.zip
-SHA-256：daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc
+Mediova-v4.2.0-Light.zip
+大小：1,692,644 bytes
+SHA-256：e96447dee95510acf2e7a059f9c6f5f128c47660af0e561b67021181f81d8224
 ```
 
-Release 同时保存 `SHA256.txt`、`runtime-manifest.json`、`ci_self_test.json` 和四套 UI 截图，作为正式产物的可追溯证据。
+完整 FFmpeg Runtime 已在正式 CI 中构建并验证，其历史 SHA-256 为 `daf2f9e9f527530c170281fe1bc64e16a23b0d6fbb0bf8a1686f7c32a696bacc`；它只作为内部完整性与真实组件验证证据，不再作为默认用户下载包。Release 的轻量包同时提供 `Mediova-v4.2.0-Light-SHA256.txt`。

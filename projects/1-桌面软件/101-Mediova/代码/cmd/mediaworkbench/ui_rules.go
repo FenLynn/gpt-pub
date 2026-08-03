@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"mediaworkbench/internal/model"
+)
 
 type compressionTone int
 
@@ -15,6 +19,13 @@ type compressionVisual struct {
 	InputFraction float64
 	Tone          compressionTone
 	Intensity     float64
+}
+
+func minInt32(a, b int32) int32 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func clamp01(v float64) float64 {
@@ -142,7 +153,12 @@ type parameterWidthSet struct {
 	Rotation   int32
 }
 
-func bottomParameterWidths() parameterWidthSet {
+func bottomParameterWidths(kind model.Kind) parameterWidthSet {
+	if kind == model.KindImage {
+		// Image size labels are the longest. Format, quality and target-size
+		// choices are deliberately compact so “最大边 1000px” is never clipped.
+		return parameterWidthSet{Resolution: 122, Codec: 60, Quality: 58, Volume: 82, Rotation: 88}
+	}
 	return parameterWidthSet{Resolution: 84, Codec: 78, Quality: 72, Volume: 126, Rotation: 98}
 }
 
@@ -153,5 +169,5 @@ type cellBarInsetSet struct {
 }
 
 func listCellBarInsets() cellBarInsetSet {
-	return cellBarInsetSet{Horizontal: 1, Vertical: 5, MinimumHeight: 14}
+	return cellBarInsetSet{Horizontal: 1, Vertical: 2, MinimumHeight: 20}
 }
