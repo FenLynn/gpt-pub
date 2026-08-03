@@ -29,6 +29,10 @@ public sealed class AppSettings
     public string LastWorkspaceFile { get; set; } = string.Empty;
     public List<string> RecentWorkspaceFiles { get; set; } = new();
 
+    public int ProjectRecentLimit { get; set; } = 12;
+    public List<string> PinnedProjectPaths { get; set; } = new();
+    public List<string> RecentProjectPaths { get; set; } = new();
+
     public string ZoteroDbPath { get; set; } = string.Empty;
     public bool ZoteroLoadFullLibrary { get; set; }
     public int ZoteroCalibrationLimit { get; set; } = 250;
@@ -90,11 +94,13 @@ public sealed class AppSettings
         value.WorkspaceEditorFontSize = Math.Clamp(value.WorkspaceEditorFontSize <= 0 ? 14 : value.WorkspaceEditorFontSize, 11, 24);
         value.WorkspaceRecentLimit = Math.Clamp(value.WorkspaceRecentLimit <= 0 ? 12 : value.WorkspaceRecentLimit, 4, 50);
         value.RecentWorkspaceFiles ??= new List<string>();
-        value.RecentWorkspaceFiles = value.RecentWorkspaceFiles
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(value.WorkspaceRecentLimit)
-            .ToList();
+        value.RecentWorkspaceFiles = NormalizePaths(value.RecentWorkspaceFiles, value.WorkspaceRecentLimit);
+
+        value.ProjectRecentLimit = Math.Clamp(value.ProjectRecentLimit <= 0 ? 12 : value.ProjectRecentLimit, 4, 40);
+        value.PinnedProjectPaths ??= new List<string>();
+        value.RecentProjectPaths ??= new List<string>();
+        value.PinnedProjectPaths = NormalizePaths(value.PinnedProjectPaths, 100);
+        value.RecentProjectPaths = NormalizePaths(value.RecentProjectPaths, value.ProjectRecentLimit);
 
         value.ZoteroVisibleColumns ??= DefaultZoteroColumns.ToList();
         value.ZoteroVisibleColumns = value.ZoteroVisibleColumns
@@ -117,6 +123,26 @@ public sealed class AppSettings
             value.LastTerminalWorkingDirectory = string.Empty;
         value.LastTerminalTitle = (value.LastTerminalTitle ?? string.Empty).Trim();
         return value;
+    }
+
+    private static List<string> NormalizePaths(IEnumerable<string> paths, int limit)
+    {
+        var result = new List<string>();
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+            try
+            {
+                var full = Path.GetFullPath(path.Trim());
+                if (!result.Contains(full, StringComparer.OrdinalIgnoreCase))
+                    result.Add(full);
+            }
+            catch { }
+            if (result.Count >= limit)
+                break;
+        }
+        return result;
     }
 
     private static JsonSerializerOptions JsonOptions() => new()

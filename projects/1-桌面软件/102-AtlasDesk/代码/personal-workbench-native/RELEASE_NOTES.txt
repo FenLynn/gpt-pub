@@ -1,3 +1,23 @@
+AtlasDesk v0.9.3
+
+This stabilization release makes the project center useful as a persistent daily entry point without turning AtlasDesk into an IDE.
+
+Project usage
+- Projects can be pinned and filtered as favorites.
+- Workspace, terminal and Explorer actions record a bounded recent-project list.
+- Pinned and recent paths are stored in ordinary roaming settings; no commands, terminal output or repository contents are saved.
+- Pinned projects appear before recent and ordinary projects after an explicit scan.
+
+Missing paths
+- Saved project paths that no longer exist remain visible as unavailable entries instead of silently disappearing.
+- Missing entries cannot open workspace, terminal or Explorer actions.
+- Relocation is explicit: the user selects a replacement folder, AtlasDesk verifies project markers, then replaces the saved path.
+- AtlasDesk does not recursively search disks or guess moved project locations.
+
+Regression protection
+- New v0.9.3 smoke checks exercise an active temporary project and a missing pinned project.
+- Existing project scan cancellation, context timeout, stale-result guard and recent-file project filtering remain active.
+
 AtlasDesk v0.9.2
 
 This stabilization release rebuilds the Zotero item pane around read-only research actions and continues layout hardening.
