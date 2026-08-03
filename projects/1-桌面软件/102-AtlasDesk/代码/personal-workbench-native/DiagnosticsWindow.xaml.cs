@@ -15,6 +15,7 @@ public partial class DiagnosticsWindow : Window
     {
         _settings = settings;
         InitializeComponent();
+        AccessibilityCoordinator.PrepareWindow(this);
         VersionText.Text = "v" + WorkbenchVersion.Current;
         Loaded += async (_, _) => await RefreshAsync();
         Closed += (_, _) => CancelOperation();
@@ -29,6 +30,8 @@ public partial class DiagnosticsWindow : Window
         try
         {
             var checks = (await DiagnosticsService.RunAsync(_settings, operation.Token)).ToList();
+            checks.Insert(0, LegacyComponentAudit.CreateDiagnosticCheck());
+            checks.Insert(0, UiQualityAuditService.CreateDiagnosticCheck());
             checks.Insert(0, UiAdaptiveAuditService.CreateDiagnosticCheck());
             if (!IsCurrent(operation)) return;
             _checks = checks;
