@@ -32,8 +32,8 @@ jobs:
           from pathlib import Path
           import re
 
-          path = Path('projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py')
-          text = path.read_text(encoding='utf-8')
+          script = Path('projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py')
+          text = script.read_text(encoding='utf-8')
           text, count = re.subn(
               r'\n    round2 = CMD / "v452_round2_windows.go".*?round2.write_text\(round_text, encoding=\x27utf-8\x27, newline=\x27\\n\x27\)\n',
               '\n',
@@ -43,7 +43,54 @@ jobs:
           )
           if count != 1:
               raise SystemExit(f'unable to remove obsolete helper-signature patch block: {count}')
-          path.write_text(text, encoding='utf-8', newline='\n')
+
+          old_cases = """    replace_once(main_file, 'case 8:\\n', 'case taskColOutputSize:\\n')
+    replace_once(main_file, 'case 9:\\n', 'case taskColProgress:\\n')
+    replace_once(main_file, 'case 10:\\n', 'case taskColStatus:\\n')
+"""
+          new_cases = """    replace_once(main_file, 'if cd.ISubItem == 8 {', 'if cd.ISubItem == taskColOutputSize {')
+    replace_once(main_file, 'if cd.ISubItem == 9 {', 'if cd.ISubItem == taskColProgress {')
+    replace_once(main_file, 'if cd.ISubItem == 10 {', 'if cd.ISubItem == taskColStatus {')
+"""
+          if text.count(old_cases) != 1:
+              raise SystemExit(f'unable to replace legacy custom-draw cases: {text.count(old_cases)}')
+          script.write_text(text.replace(old_cases, new_cases, 1), encoding='utf-8', newline='\n')
+
+          main = Path('projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/main_windows.go')
+          source = main.read_text(encoding='utf-8')
+          old_widths = '''\tif delta > 0 {
+\t\tfirst := delta * 65 / 100
+\t\tcompression := delta * 15 / 100
+\t\tstatus := delta - first - compression
+\t\twidths[0] += first
+\t\twidths[8] += compression
+\t\twidths[10] += status
+\t} else if delta < 0 {
+\t\tneed := -delta
+\t\tfor _, spec := range []struct{ idx, min int }{{0, 190}, {10, 88}, {8, 112}, {9, 86}, {4, 92}, {1, 84}, {2, 68}} {
+'''
+          new_widths = '''\tif delta > 0 {
+\t\tfirst := delta * 65 / 100
+\t\tcompression := delta * 15 / 100
+\t\tstatus := delta - first - compression
+\t\twidths[taskColFile] += first
+\t\twidths[taskColOutputSize] += compression
+\t\twidths[taskColStatus] += status
+\t} else if delta < 0 {
+\t\tneed := -delta
+\t\tfor _, spec := range []struct{ idx, min int }{
+\t\t\t{taskColFile, 190},
+\t\t\t{taskColStatus, 88},
+\t\t\t{taskColOutputSize, 112},
+\t\t\t{taskColProgress, 86},
+\t\t\t{taskColOutputResolution, 92},
+\t\t\t{taskColResolution, 84},
+\t\t\t{taskColDuration, 68},
+\t\t} {
+'''
+          if source.count(old_widths) != 1:
+              raise SystemExit(f'unable to migrate default column distribution: {source.count(old_widths)}')
+          main.write_text(source.replace(old_widths, new_widths, 1), encoding='utf-8', newline='\n')
           PY
           python projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py
           cd projects/1-桌面软件/101-Mediova/代码
