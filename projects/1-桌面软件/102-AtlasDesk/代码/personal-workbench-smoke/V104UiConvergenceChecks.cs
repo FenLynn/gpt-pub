@@ -108,8 +108,9 @@ internal static class V104UiConvergenceChecks
             "AssertPhysicalCompactLayout(window, pipeline.Experience.Home)",
             "AssertDetachedHomeLayout(pipeline.Settings, 1320, 780, UiDensityMode.Standard, 4)",
             "AssertDetachedHomeLayout(pipeline.Settings, 1500, 860, UiDensityMode.Spacious, 4)",
-            "GetMethod(\"ResolveMode\"",
-            "GetMethod(\"ApplyHome\"",
+            "\"ResolveMode\"",
+            "\"ApplyHome\"",
+            "BindingFlags.Static | BindingFlags.NonPublic",
             "new DiagnosticsWindow(pipeline.Settings)");
 
         Console.WriteLine("PASS AtlasDesk v1.0.4 converges visual hierarchy, supports ScrollViewer home hosting and verifies compact physical plus detached wide layouts without collecting user content");
