@@ -24,9 +24,11 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         ProductIdentity.EnsureDataDirectories();
+        LogMaintenance.Prepare(LogPath);
         ApplyPendingRestoreBeforeStartup();
         StartupGuard.Begin(WorkbenchVersion.Current);
         IsSafeMode = StartupGuard.SafeModeRecommended;
+        PerformanceBaselineService.Begin(WorkbenchVersion.Current, IsSafeMode);
 
         Exit += (_, args) =>
         {
@@ -95,10 +97,17 @@ public partial class App : Application
         if (_pipeline is not null || MainWindow is not MainWindow window)
             return;
 
+        PerformanceBaselineService.MarkMainWindowLoaded();
         try
         {
             _pipeline = WorkbenchFeaturePipeline.Attach(window);
             AttachWindowLifetimeLogging(window);
+            var sample = PerformanceBaselineService.MarkPipelineAttached();
+            if (sample is not null)
+            {
+                Log($"Startup baseline: window={sample.MainWindowLoadedMs}ms; "
+                    + $"pipeline={sample.PipelineAttachedMs}ms; workingSet={sample.WorkingSetBytes / 1024d / 1024d:0.0}MB");
+            }
             Log("AtlasDesk " + WorkbenchVersion.Current + " modules attached");
             ShowSafeModeNotice(window);
         }
