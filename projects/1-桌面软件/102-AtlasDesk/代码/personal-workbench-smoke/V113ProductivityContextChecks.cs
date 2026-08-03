@@ -27,6 +27,9 @@ internal static class V113ProductivityContextChecks
         var zoteroSearchPath = RequireFile(nativeRoot, "ZoteroLibraryControl.Search.cs");
         var zoteroReferencePath = RequireFile(nativeRoot, "ZoteroLibraryControl.ReferencePane.cs");
         var releaseNotesPath = RequireFile(nativeRoot, "RELEASE_NOTES.txt");
+        var designPath = Path.GetFullPath(Path.Combine(nativeRoot, "..", "..", "设计与演进.md"));
+        if (!File.Exists(designPath))
+            throw new InvalidOperationException("Missing v1.1.3 project-context design decision.");
 
         var store = File.ReadAllText(storePath);
         var coordinator = File.ReadAllText(coordinatorPath);
@@ -38,6 +41,7 @@ internal static class V113ProductivityContextChecks
         var zoteroSearch = File.ReadAllText(zoteroSearchPath);
         var zoteroReference = File.ReadAllText(zoteroReferencePath);
         var releaseNotes = File.ReadAllText(releaseNotesPath);
+        var design = File.ReadAllText(designPath);
 
         RequireContains(store,
             "productivity-context.json",
@@ -107,6 +111,12 @@ internal static class V113ProductivityContextChecks
             "v1.1.3 - Project and Zotero bridge",
             "%APPDATA%\\AtlasDesk\\productivity-context.json",
             "main remains the formal v1.0.0 baseline");
+        RequireContains(design,
+            "AD-D11｜项目上下文是显式索引，不是后台自动化",
+            "Command Center 是统一入口，不增加第二套快捷中心",
+            "不自动执行、恢复或重放用户命令",
+            "不通过“关联项目”功能获得任何 Zotero 写权限",
+            "统一工作流不等于后台接管");
 
         RequireContains(pipeline,
             "ProductivityContext = ProductivityContextCoordinator.Attach(window, this)",
