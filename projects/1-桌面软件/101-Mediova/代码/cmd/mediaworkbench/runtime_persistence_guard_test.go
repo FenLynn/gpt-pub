@@ -66,6 +66,10 @@ func TestRuntimePersistenceFingerprintsChangeOnlyWithContent(t *testing.T) {
 	if first == "" || first != second {
 		t.Fatalf("task fingerprint unstable: %q %q", first, second)
 	}
+	task.Progress = 42
+	if volatile := runtimeTasksFingerprint(tasks); volatile != first {
+		t.Fatal("volatile progress changed session fingerprint")
+	}
 	task.Status = model.StatusDone
 	task.FinishedAt = time.Now()
 	if changed := runtimeTasksFingerprint(tasks); changed == first {
