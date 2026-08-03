@@ -16,6 +16,7 @@ public sealed class WorkbenchFeaturePipeline
         // never start two independent Conda/Python scans.
         DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window);
 
+        UiConvergence = UiConvergenceCoordinator.Attach(window);
         Experience = V061ExperienceEnhancer.Attach(window, Base);
         Diagnostics = DiagnosticsCoordinator.Attach(window, Settings);
         ShellResilience = ShellResilienceCoordinator.Attach(window);
@@ -36,6 +37,7 @@ public sealed class WorkbenchFeaturePipeline
 
     public V067VisualFixes VisualFixes { get; }
     public WorkbenchEnhancer Base { get; }
+    public UiConvergenceCoordinator UiConvergence { get; }
     public V061ExperienceEnhancer Experience { get; }
     public DiagnosticsCoordinator Diagnostics { get; }
     public ShellResilienceCoordinator ShellResilience { get; }
