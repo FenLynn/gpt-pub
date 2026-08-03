@@ -30,7 +30,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const appVersion = "4.3.0"
+const appVersion = "4.4.0"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96

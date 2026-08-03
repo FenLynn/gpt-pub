@@ -87,7 +87,10 @@ func showTrimCropDialog(owner *application, task *model.Task, opts model.TaskOpt
 		return opts, false, false
 	}
 	frameW, frameH := effectiveFrameSize(task, opts.Rotation)
-	if opts.TrimEnd <= 0 || opts.TrimEnd > task.Duration {
+	if task.Kind == model.KindImage {
+		opts.TrimStart = 0
+		opts.TrimEnd = 0
+	} else if opts.TrimEnd <= 0 || opts.TrimEnd > task.Duration {
 		opts.TrimEnd = task.Duration
 	}
 	if opts.Crop.Width <= 0 || opts.Crop.Height <= 0 || opts.Crop.X+opts.Crop.Width > frameW || opts.Crop.Y+opts.Crop.Height > frameH {
@@ -105,6 +108,9 @@ func showTrimCropDialog(owner *application, task *model.Task, opts model.TaskOpt
 	}
 	hInst, _, _ := procGetModuleHandleW.Call(0)
 	title := "时长与画面裁剪 · " + filepath.Base(task.Input)
+	if task.Kind == model.KindImage {
+		title = "图片画面裁剪 · " + filepath.Base(task.Input)
+	}
 	h, _, _ := procCreateWindowExW.Call(WS_EX_DLGMODALFRAME|WS_EX_TOOLWINDOW, uintptr(unsafe.Pointer(p("MWTrimCropDialog"))), uintptr(unsafe.Pointer(p(title))), WS_OVERLAPPEDWINDOW|WS_VISIBLE|WS_CLIPCHILDREN, 120, 70, 1120, 800, owner.hwnd, 0, hInst, 0)
 	if h == 0 {
 		activeTrim = nil
@@ -259,6 +265,11 @@ func (d *trimDialog) init() {
 	send(d.hTrack, TBM_SETRANGE, 1, uintptr(uint32(10000)<<16))
 	send(d.hTrack, TBM_SETTICFREQ, 1000, 0)
 	d.setTimelineFromTime()
+	if d.task.Kind == model.KindImage {
+		for _, h := range []uintptr{d.hNow, d.hTrack} {
+			enable(h, false)
+		}
+	}
 	createControl("BUTTON", "−1 秒", WS_CHILD|WS_VISIBLE|WS_TABSTOP, 210, 660, 90, 32, d.hwnd, IDC_SEEK_MINUS_SEC)
 	createControl("BUTTON", "−1 帧", WS_CHILD|WS_VISIBLE|WS_TABSTOP, 308, 660, 90, 32, d.hwnd, IDC_SEEK_MINUS_FRAME)
 	createControl("BUTTON", "+1 帧", WS_CHILD|WS_VISIBLE|WS_TABSTOP, 406, 660, 90, 32, d.hwnd, IDC_SEEK_PLUS_FRAME)
@@ -272,6 +283,12 @@ func (d *trimDialog) init() {
 	createControl("BUTTON", "设为当前", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+222, 20, 110, 30, d.hwnd, IDC_TRIM_START+100)
 	createControl("BUTTON", "设为当前", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+222, 58, 110, 30, d.hwnd, IDC_TRIM_END+100)
 	createControl("BUTTON", "恢复完整时长", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x, 98, 332, 32, d.hwnd, IDC_FULL_TIME)
+	if d.task.Kind == model.KindImage {
+		enable(d.hStart, false)
+		enable(d.hEnd, false)
+		setText(d.hStart, "图片")
+		setText(d.hEnd, "无时间轴")
+	}
 
 	d.hCrop = createControl("BUTTON", "启用画面裁剪", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_AUTOCHECKBOX, x, 146, 150, 30, d.hwnd, IDC_CROP_ON)
 	if d.opts.Crop.Enabled {
@@ -471,12 +488,26 @@ func (d *trimDialog) setTimelineFromTime() {
 }
 
 func (d *trimDialog) read() bool {
+	start, end := 0.0, 0.0
+	if d.task.Kind == model.KindImage {
+		d.cropFromControls(true)
+		if d.opts.Crop.Enabled {
+			c := d.opts.Crop
+			if c.Width < 2 || c.Height < 2 || c.X < 0 || c.Y < 0 || c.X+c.Width > d.frameW || c.Y+c.Height > d.frameH {
+				messageBox(d.hwnd, "裁剪区域", "裁剪区域必须位于图片范围内，且宽高至少为 2 像素。", MB_OK|MB_ICONERROR)
+				return false
+			}
+		}
+		d.opts.TrimStart = 0
+		d.opts.TrimEnd = 0
+		return true
+	}
 	start, err := parseTimeValue(getText(d.hStart))
 	if err != nil {
 		messageBox(d.hwnd, "开始时间", "无法识别开始时间。", MB_OK|MB_ICONERROR)
 		return false
 	}
-	end, err := parseTimeValue(getText(d.hEnd))
+	end, err = parseTimeValue(getText(d.hEnd))
 	if err != nil {
 		messageBox(d.hwnd, "结束时间", "无法识别结束时间。", MB_OK|MB_ICONERROR)
 		return false
@@ -563,8 +594,11 @@ func (d *trimDialog) cropToControls() {
 }
 
 func (d *trimDialog) updateInfo() {
-	start, _ := parseTimeValue(getText(d.hStart))
-	end, _ := parseTimeValue(getText(d.hEnd))
+	start, end := 0.0, 0.0
+	if d.task.Kind != model.KindImage {
+		start, _ = parseTimeValue(getText(d.hStart))
+		end, _ = parseTimeValue(getText(d.hEnd))
+	}
 	d.cropFromControls(false)
 	c := d.opts.Crop
 	area := d.frameW * d.frameH
@@ -576,6 +610,10 @@ func (d *trimDialog) updateInfo() {
 	crop := fmt.Sprintf("全画面 %d×%d", d.frameW, d.frameH)
 	if c.Enabled {
 		crop = fmt.Sprintf("%d×%d @ (%d,%d)\r\n保留画面面积 %.1f%%", c.Width, c.Height, c.X, c.Y, pct)
+	}
+	if d.task.Kind == model.KindImage {
+		setText(d.hInfo, fmt.Sprintf("图片输入：%s\r\n保留区域：%s\r\n处理顺序：转正 → 裁剪 → 缩放 → 编码\r\n拍摄时间与文件时间按全局设置保留。", filepath.Ext(d.task.Input), crop))
+		return
 	}
 	setText(d.hInfo, fmt.Sprintf("保留片段：%s → %s\r\n输出时长：%s\r\n\r\n保留区域：%s\r\n编码顺序：转正 → 裁剪 → 缩放", formatSecondsClock(start), formatSecondsClock(end), formatSecondsClock(end-start), crop))
 }
@@ -624,7 +662,7 @@ func (d *trimDialog) openHighQualityPreview() {
 	d.cropFromControls(true)
 	dir, _ := config.TempDir()
 	out := filepath.Join(dir, fmt.Sprintf("crop_preview_%d.jpg", time.Now().UnixNano()))
-	req := media.ConvertRequest{Input: d.task.Input, Output: out, Kind: model.KindVideo, Probe: media.ProbeInfo{Width: d.task.Width, Height: d.task.Height, Rotation: d.task.Rotation, Duration: d.task.Duration, FPS: d.task.FPS}, Options: d.opts, Settings: d.owner.settings}
+	req := media.ConvertRequest{Input: d.task.Input, Output: out, Kind: d.task.Kind, Probe: media.ProbeInfo{Width: d.task.Width, Height: d.task.Height, Rotation: d.task.Rotation, Duration: d.task.Duration, FPS: d.task.FPS}, Options: d.opts, Settings: d.owner.settings}
 	at := d.currentAt
 	setText(d.hInfo, "正在生成高清处理后预览，请稍候…")
 	go func() {
