@@ -185,11 +185,14 @@ func runCore(root string, r *report) error {
 	}
 	aclBefore, _ := os.ReadFile(path)
 	aclSaveErr := config.Save(settingsWithOutput("acl-change"))
-	aclAfter, aclReadErr := os.ReadFile(path)
+	// Restore access before reading the file for comparison. Reading while
+	// the explicit deny ACE is active only proves that the ACL is effective;
+	// it does not prove that the primary file was removed or changed.
 	restoreOut, restoreErr := exec.Command("icacls", dataDir, "/remove:d", identity).CombinedOutput()
 	if restoreErr != nil {
 		return fmt.Errorf("icacls restore failed: %v: %s", restoreErr, strings.TrimSpace(string(restoreOut)))
 	}
+	aclAfter, aclReadErr := os.ReadFile(path)
 	r.Checks["ntfs_acl_denial_returns_error"] = aclSaveErr != nil
 	r.Checks["ntfs_acl_denial_preserves_primary"] = aclReadErr == nil && bytes.Equal(aclBefore, aclAfter)
 	if aclSaveErr == nil || aclReadErr != nil || !bytes.Equal(aclBefore, aclAfter) {
