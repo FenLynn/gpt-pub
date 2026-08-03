@@ -193,6 +193,7 @@ const (
 	ID_CTX_MOVE_BOTTOM        = 2225
 	ID_CTX_HOLD_EDIT          = 2226
 	ID_CTX_REMOVE_SAFE        = 2227
+	ID_CTX_EXIT_QUEUE         = 2228
 	ID_CTX_RES_4K             = 2300
 	ID_CTX_RES_1080           = 2301
 	ID_CTX_RES_720            = 2302
@@ -807,6 +808,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 			procDestroyWindow.Call(app.hToast)
 		}
 		if app != nil && app.hImageList != 0 {
+			v452ReleaseAllThumbnails(app)
 			procImageListDestroy.Call(app.hImageList)
 			app.hImageList = 0
 		}
@@ -1354,7 +1356,7 @@ func (a *application) drawDecoration(dis *drawItemStruct) bool {
 		fillSolid(dis.HDC, dis.RcItem, colorRef(235, 238, 242))
 		return true
 	case a.hHeaderLine:
-		fillSolid(dis.HDC, dis.RcItem, colorRef(226, 230, 236))
+		fillSolid(dis.HDC, dis.RcItem, colorRef(214, 220, 228))
 		return true
 	case a.hDetailsFrame:
 		fillSolid(dis.HDC, dis.RcItem, colorRef(250, 251, 253))
@@ -1681,36 +1683,10 @@ func (a *application) syncMenuChecks() {
 	setCheck(a.menuView, ID_VIEW_PERFORMANCE, a.settings.ShowPerformanceStats)
 }
 
-var taskListColumns = []struct {
-	name  string
-	width int
-}{
-	// “时长” is a video-only value; image rows display an em dash so both
-	// workspaces retain one stable column model and saved widths remain portable.
-	{"文件 / 预览", 280}, {"分辨率", 100}, {"时长", 76}, {"方向", 70}, {"输出分辨率", 116}, {"质量", 58},
-	{"旋转", 90}, {"体积", 92}, {"压缩后", 140}, {"进度", 105}, {"状态", 124},
-}
+var taskListColumns = v452TaskListColumns
 
 func normalizedTaskColumnWidths(widths []int) []int {
-	// v4.2.1 stored ten widths. Insert the new duration width after resolution
-	// before validating values, otherwise every later saved width shifts columns.
-	source := widths
-	if len(widths) == 10 {
-		migrated := make([]int, 0, len(taskListColumns))
-		migrated = append(migrated, widths[:2]...)
-		migrated = append(migrated, taskListColumns[2].width)
-		migrated = append(migrated, widths[2:]...)
-		source = migrated
-	}
-	result := make([]int, len(taskListColumns))
-	for i, column := range taskListColumns {
-		width := column.width
-		if i < len(source) && source[i] >= 45 && source[i] <= 900 {
-			width = source[i]
-		}
-		result[i] = width
-	}
-	return result
+	return v452NormalizedColumnWidths(widths)
 }
 
 func (a *application) currentTaskColumnWidths() []int {
@@ -1720,7 +1696,11 @@ func (a *application) currentTaskColumnWidths() []int {
 	widths := make([]int, len(taskListColumns))
 	for i := range widths {
 		w := int(send(a.hList, LVM_GETCOLUMNWIDTH, uintptr(i), 0))
-		if w < 45 || w > 900 {
+		minimum := 45
+		if i == taskColNumber {
+			minimum = 32
+		}
+		if w < minimum || w > 900 {
 			w = taskListColumns[i].width
 		}
 		widths[i] = w
@@ -1772,7 +1752,7 @@ func (a *application) initControls() {
 	// Task list deliberately keeps one clear border and no grid-line style.
 	a.hList = createControlEx(WS_EX_CLIENTEDGE, "SysListView32", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|LVS_REPORT|LVS_SHOWSELALWAYS, 8, 68, 1380, 650, a.hwnd, IDC_LIST)
 	send(a.hList, WM_SETFONT, uiFontSmall, 1)
-	send(a.hList, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT|LVS_EX_DOUBLEBUFFER|LVS_EX_INFOTIP)
+	send(a.hList, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT|LVS_EX_DOUBLEBUFFER|LVS_EX_INFOTIP|0x00000002)
 	procSetWindowTheme.Call(a.hList, uintptr(unsafe.Pointer(p(""))), uintptr(unsafe.Pointer(p(""))))
 	header := send(a.hList, LVM_GETHEADER, 0, 0)
 	if header != 0 {
@@ -2386,7 +2366,15 @@ func (a *application) command(id int) {
 	case IDC_ALL_DEFAULT:
 		a.v420ResetReadyDefaults()
 	case ID_CTX_HOLD_EDIT:
-		a.v420BeginHoldSelected()
+		handled, activated := a.v452ActivateHeldSelected()
+		if activated {
+			a.refreshAll()
+			setText(a.hStatusText, "已进入搁置任务修改状态；应用后重新归队。")
+		} else if !handled {
+			a.v420BeginHoldSelected()
+		}
+	case ID_CTX_EXIT_QUEUE:
+		a.v452ExitSelectedQueue()
 	case ID_EDIT_RETRY_FAILED:
 		a.retryRecoverableWorkspace()
 	case ID_EDIT_CLEAN_DONE:
@@ -3117,7 +3105,7 @@ func (a *application) drawTaskListCell(cd *nmListViewCustomDraw) uintptr {
 	case CDDS_ITEMPREPAINT:
 		return CDRF_NOTIFYSUBITEMDRAW
 	case CDDS_ITEMPREPAINT | CDDS_SUBITEM:
-		if cd.ISubItem != 8 && cd.ISubItem != 9 && cd.ISubItem != 10 {
+		if cd.ISubItem != taskColOutputSize && cd.ISubItem != taskColProgress && cd.ISubItem != taskColStatus {
 			return CDRF_DODEFAULT
 		}
 		task, ok := a.visibleTaskSnapshot(int(cd.NMCD.ItemSpec))
@@ -3134,19 +3122,19 @@ func (a *application) drawTaskListCell(cd *nmListViewCustomDraw) uintptr {
 		selected := listItemSelected(a.hList, int(cd.NMCD.ItemSpec))
 		focus, _, _ := procGetFocus.Call()
 		activeSelection := selected && focus == a.hList
-		if cd.ISubItem == 8 {
+		if cd.ISubItem == taskColOutputSize {
 			listCompressionDrawCount.Add(1)
 			_, label, _ := compressionCellMetrics(&task)
 			drawCompressionPill(cd.NMCD.HDC, cell, &task, label, selected, activeSelection)
 			return CDRF_SKIPDEFAULT
 		}
-		if cd.ISubItem == 9 {
+		if cd.ISubItem == taskColProgress {
 			listProgressDrawCount.Add(1)
 			fraction, label := progressCellMetrics(&task)
 			drawProgressPill(cd.NMCD.HDC, cell, fraction, label, selected, activeSelection)
 			return CDRF_SKIPDEFAULT
 		}
-		label := a.taskTexts(&task)[10]
+		label := a.taskTexts(&task)[taskColStatus-1]
 		if selected {
 			drawSelectedCell(cd.NMCD.HDC, cell, label, activeSelection)
 		} else {
@@ -3210,6 +3198,7 @@ func (a *application) showContextMenu() {
 	appendMenu(m, MF_STRING, ID_CTX_COPY_TRIM_CROP, "仅复制第一项的时长 / 画面裁剪")
 	temporary, _, _ := procCreatePopupMenu.Call()
 	editFlags, removeFlags := a.v420ContextMenuFlags()
+	appendMenu(temporary, a.v452ExitQueueFlags(), ID_CTX_EXIT_QUEUE, "退出队列")
 	appendMenu(temporary, editFlags, ID_CTX_HOLD_EDIT, "搁置并修改参数")
 	appendMenu(temporary, removeFlags, ID_CTX_REMOVE_SAFE, "从任务列表移除")
 	appendMenu(m, MF_POPUP, temporary, "临时操作")
@@ -3708,9 +3697,10 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 }
 
 type thumbnailJob struct {
-	id    int64
-	input string
-	probe media.ProbeInfo
+	id         int64
+	input      string
+	probe      media.ProbeInfo
+	generation uint64
 }
 
 const (
@@ -3753,7 +3743,7 @@ func (a *application) startBackgroundWorkers() {
 							writeCrashContext(fmt.Sprintf("thumbnail worker %d task %d", worker, job.id), r)
 						}
 					}()
-					a.generateThumbnail(job.id, job.input, job.probe)
+					a.generateThumbnail(job.id, job.input, job.probe, job.generation)
 				}()
 			}
 		}(i + 1)
@@ -3778,7 +3768,7 @@ func (a *application) queueThumbnail(id int64, input string, pinfo media.ProbeIn
 		return false
 	}
 	select {
-	case a.thumbnailQueue <- thumbnailJob{id: id, input: input, probe: pinfo}:
+	case a.thumbnailQueue <- thumbnailJob{id: id, input: input, probe: pinfo, generation: v452NextThumbnailGeneration(a, id)}:
 		return true
 	default:
 		// Thumbnails are optional. Saturation must never create one waiting
@@ -3835,14 +3825,14 @@ func (a *application) probeTask(id int64) {
 	}
 }
 
-func (a *application) generateThumbnail(id int64, input string, pinfo media.ProbeInfo) {
+func (a *application) generateThumbnail(id int64, input string, pinfo media.ProbeInfo, generation uint64) {
 	defer func() {
 		if r := recover(); r != nil {
 			writeCrashContext(fmt.Sprintf("thumbnail task %d", id), r)
 		}
 	}()
 	ffmpeg, _, _, _, _ := a.componentSnapshot()
-	if a.hImageList == 0 || ffmpeg == "" {
+	if a.hImageList == 0 || ffmpeg == "" || !v452ThumbnailCurrent(a, id, generation) {
 		return
 	}
 	at := 0.0
@@ -3870,6 +3860,12 @@ func (a *application) generateThumbnail(id int64, input string, pinfo media.Prob
 		}
 		return
 	}
+	if !v452ThumbnailCurrent(a, id, generation) {
+		if !cached || v452ThumbnailStateFor(a).ownership.RefCount(out) == 0 {
+			_ = os.Remove(out)
+		}
+		return
+	}
 	a.postUI(func() {
 		if !cached {
 			defer os.Remove(out)
@@ -3886,12 +3882,11 @@ func (a *application) generateThumbnail(id int64, input string, pinfo media.Prob
 		if int32(idx) < 0 {
 			return
 		}
-		a.mu.Lock()
-		t, _ := a.findTaskByIDLocked(id)
-		if t != nil && t.Input == input {
-			t.ThumbnailIndex = int(int32(idx))
+		imageIndex := int(int32(idx))
+		if !v452InstallThumbnailAsset(a, id, generation, input, out, cached, imageIndex) {
+			procImageListRemoveV452.Call(a.hImageList, uintptr(imageIndex))
+			return
 		}
-		a.mu.Unlock()
 		a.updateTaskRowByID(id)
 	})
 }
@@ -3959,30 +3954,32 @@ func compareTaskColumn(left, right *model.Task, column int) int {
 		return 0
 	}
 	switch column {
-	case 0:
+	case taskColNumber:
+		return cmpInt64(left.ID, right.ID)
+	case taskColFile:
 		return cmpString(filepath.Base(left.Input), filepath.Base(right.Input))
-	case 1:
+	case taskColResolution:
 		if left.Width != right.Width {
 			return cmpInt64(int64(left.Width), int64(right.Width))
 		}
 		return cmpInt64(int64(left.Height), int64(right.Height))
-	case 2:
+	case taskColDuration:
 		return cmpFloat(left.Duration, right.Duration)
-	case 3:
+	case taskColDirection:
 		return cmpInt64(int64(left.Rotation), int64(right.Rotation))
-	case 4:
+	case taskColOutputResolution:
 		return cmpString(left.Options.Resolution+left.Options.ImageSize, right.Options.Resolution+right.Options.ImageSize)
-	case 5:
+	case taskColQuality:
 		return cmpString(left.Options.Quality, right.Options.Quality)
-	case 6:
+	case taskColRotation:
 		return cmpString(left.Options.Rotation, right.Options.Rotation)
-	case 7:
+	case taskColInputSize:
 		return cmpInt64(left.InputSize, right.InputSize)
-	case 8:
+	case taskColOutputSize:
 		return cmpInt64(left.OutputSize, right.OutputSize)
-	case 9:
+	case taskColProgress:
 		return cmpFloat(left.Progress, right.Progress)
-	case 10:
+	case taskColStatus:
 		return cmpInt64(int64(taskStatusRank(left.Status)), int64(taskStatusRank(right.Status)))
 	default:
 		return cmpInt64(left.ID, right.ID)
@@ -3990,7 +3987,7 @@ func compareTaskColumn(left, right *model.Task, column int) int {
 }
 
 func taskSortLabel(column int) string {
-	labels := []string{"文件名", "分辨率", "时长", "方向", "输出分辨率", "质量", "旋转", "源体积", "输出体积", "进度", "状态"}
+	labels := []string{"编号", "文件名", "分辨率", "时长", "方向", "输出分辨率", "质量", "旋转", "源体积", "输出体积", "进度", "状态"}
 	if column >= 0 && column < len(labels) {
 		return labels[column]
 	}
@@ -4147,12 +4144,18 @@ func (a *application) refreshList() {
 	a.restoreTaskSelection(rowTasks, selectedIDs)
 }
 func (a *application) insertRow(row int, t *model.Task) {
-	texts := a.taskTexts(t)
-	q := p(texts[0])
-	item := lvItem{Mask: LVIF_TEXT | LVIF_IMAGE, IItem: int32(row), PszText: q, IImage: int32(t.ThumbnailIndex)}
+	base := a.taskTexts(t)
+	texts := append([]string{fmt.Sprintf("%d", row+1)}, base...)
+	q := p(texts[taskColNumber])
+	item := lvItem{Mask: LVIF_TEXT, IItem: int32(row), PszText: q}
 	send(a.hList, LVM_INSERTITEMW, 0, uintptr(unsafe.Pointer(&item)))
 	for col := 1; col < len(texts); col++ {
 		q = p(texts[col])
+		if col == taskColFile {
+			it := lvItem{Mask: LVIF_TEXT | LVIF_IMAGE, IItem: int32(row), ISubItem: int32(col), PszText: q, IImage: int32(t.ThumbnailIndex)}
+			send(a.hList, LVM_SETITEMW, 0, uintptr(unsafe.Pointer(&it)))
+			continue
+		}
 		it := lvItem{ISubItem: int32(col), PszText: q}
 		send(a.hList, LVM_SETITEMTEXTW, uintptr(row), uintptr(unsafe.Pointer(&it)))
 	}
@@ -4277,12 +4280,17 @@ func (a *application) updateTaskRowByID(taskID int64) {
 	taskSnapshot := *task
 	a.mu.Unlock()
 
-	texts := a.taskTexts(&taskSnapshot)
-	q := p(texts[0])
-	first := lvItem{Mask: LVIF_TEXT | LVIF_IMAGE, IItem: int32(row), ISubItem: 0, PszText: q, IImage: int32(taskSnapshot.ThumbnailIndex)}
+	texts := append([]string{fmt.Sprintf("%d", row+1)}, a.taskTexts(&taskSnapshot)...)
+	q := p(texts[taskColNumber])
+	first := lvItem{Mask: LVIF_TEXT, IItem: int32(row), ISubItem: taskColNumber, PszText: q}
 	send(a.hList, LVM_SETITEMW, 0, uintptr(unsafe.Pointer(&first)))
 	for col := 1; col < len(texts); col++ {
 		q = p(texts[col])
+		if col == taskColFile {
+			it := lvItem{Mask: LVIF_TEXT | LVIF_IMAGE, IItem: int32(row), ISubItem: int32(col), PszText: q, IImage: int32(taskSnapshot.ThumbnailIndex)}
+			send(a.hList, LVM_SETITEMW, 0, uintptr(unsafe.Pointer(&it)))
+			continue
+		}
 		it := lvItem{ISubItem: int32(col), PszText: q}
 		send(a.hList, LVM_SETITEMTEXTW, uintptr(row), uintptr(unsafe.Pointer(&it)))
 	}
@@ -4921,9 +4929,11 @@ func cleanupModeLabel(mode string) string {
 func (a *application) cleanupCurrentWorkspace(mode string) {
 	a.mu.Lock()
 	count := 0
+	removedIDs := make([]int64, 0)
 	for _, task := range a.tasks {
 		if task != nil && task.Kind == a.currentKind && cleanupMatches(task.Status, mode) {
 			count++
+			removedIDs = append(removedIDs, task.ID)
 		}
 	}
 	a.mu.Unlock()
@@ -4938,6 +4948,7 @@ func (a *application) cleanupCurrentWorkspace(mode string) {
 	a.mu.Lock()
 	a.tasks, count = cleanupTaskList(a.tasks, a.currentKind, mode)
 	a.mu.Unlock()
+	v452ReleaseTaskThumbnails(a, removedIDs)
 	a.saveSession()
 	a.refreshAll()
 	setText(a.hStatusText, fmt.Sprintf("已从当前工作区移除 %d 个%s任务；媒体文件未删除。", count, label))
@@ -4967,13 +4978,17 @@ func (a *application) removeSelected() {
 func (a *application) clearCurrent() {
 	a.mu.Lock()
 	var keep []*model.Task
+	removedIDs := make([]int64, 0)
 	for _, t := range a.tasks {
 		if t.Kind != a.currentKind || t.Status == model.StatusProcessing {
 			keep = append(keep, t)
+		} else {
+			removedIDs = append(removedIDs, t.ID)
 		}
 	}
 	a.tasks = keep
 	a.mu.Unlock()
+	v452ReleaseTaskThumbnails(a, removedIDs)
 	a.saveSession()
 	a.refreshAll()
 }
@@ -5073,22 +5088,7 @@ func (a *application) openSelectedOutputFile() {
 }
 
 func (a *application) openSelectedDir(output bool) {
-	t, _ := a.selectedTask()
-	path := ""
-	if t != nil {
-		if output && t.OutputPath != "" {
-			path = filepath.Dir(t.OutputPath)
-		} else if !output {
-			path = filepath.Dir(t.Input)
-		}
-	}
-	if path == "" && output {
-		path = strings.TrimSpace(getText(a.hOutputEdit))
-	}
-	if path != "" {
-		_ = os.MkdirAll(path, 0o755)
-		shellOpen(path)
-	}
+	a.v452OpenTaskDirectory(output)
 }
 
 func (a *application) estimateRunBytes(runIDs map[int64]bool) int64 {
