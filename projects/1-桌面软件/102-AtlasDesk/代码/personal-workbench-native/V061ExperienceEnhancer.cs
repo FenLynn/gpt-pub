@@ -90,7 +90,7 @@ public sealed class V061ExperienceEnhancer
     private void InstallSearchEntry()
     {
         if (_window.FindName("CommandButton") is not Button commandButton) return;
-        commandButton.ToolTip = "AtlasDesk Command Center · 搜索页面、项目、文件、任务、文献和命令";
+        commandButton.ToolTip = "AtlasDesk Command Center · 搜索页面、项目、文件、任务、文献、上下文和命令";
         commandButton.PreviewMouseLeftButtonDown += (_, args) =>
         {
             args.Handled = true;
@@ -137,6 +137,9 @@ public sealed class V061ExperienceEnhancer
 
     private async Task ExecuteSearchResultAsync(GlobalSearchResult result)
     {
+        if (await ProductivityContextCoordinator.TryExecuteAsync(_window, result))
+            return;
+
         switch (result.Action)
         {
             case "navigate":
