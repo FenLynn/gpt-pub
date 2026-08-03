@@ -16,9 +16,11 @@ import (
 
 var portableModeManagedFiles = []string{
 	"config.json",
+	"config.json.bak",
 	"config.json.lastgood",
 	"config.json.legacy",
 	"session.json",
+	"session.json.tmp",
 	"session.json.bak",
 	"history.json",
 	"history.json.lastgood",
