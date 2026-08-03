@@ -135,7 +135,8 @@ public partial class SettingsControl : UserControl
         }
 
         var valid = Uri.TryCreate(value, UriKind.Absolute, out var uri)
-                    && uri.Scheme is Uri.UriSchemeHttp or Uri.UriSchemeHttps;
+                    && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
         DashboardUrlBox.BorderBrush = valid ? ValidPathBrush : MissingPathBrush;
         DashboardUrlBox.ToolTip = valid
             ? "地址格式有效；保存后才会应用。"
