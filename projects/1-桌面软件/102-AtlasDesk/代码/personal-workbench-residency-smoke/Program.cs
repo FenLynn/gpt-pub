@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -47,6 +48,23 @@ internal static class Program
             AssertEnvironmentIdle(development, busyField,
                 "environment discovery started during normal startup");
 
+            SetPhase("verifying compact adaptive layout");
+            AssertAdaptiveLayout(window, 1100, 700, UiDensityMode.Compact, 2);
+
+            SetPhase("verifying standard adaptive layout");
+            AssertAdaptiveLayout(window, 1320, 780, UiDensityMode.Standard, 4);
+
+            SetPhase("verifying spacious adaptive layout");
+            AssertAdaptiveLayout(window, 1500, 860, UiDensityMode.Spacious, 4);
+
+            SetPhase("opening converged diagnostics window");
+            var diagnostics = new DiagnosticsWindow(pipeline.Settings) { Owner = window };
+            diagnostics.Show();
+            PumpDispatcher(TimeSpan.FromMilliseconds(700));
+            AssertWindowAlive(diagnostics, "after opening converged diagnostics");
+            diagnostics.Close();
+            PumpDispatcher(TimeSpan.FromMilliseconds(150));
+
             SetPhase("opening Development project tab");
             if (window.FindName("DevelopmentNav") is not RadioButton developmentNav)
                 throw new InvalidOperationException("Development navigation button is unavailable.");
@@ -75,7 +93,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk isolated process remained alive and environment discovery stayed lazy");
+                "PASS AtlasDesk isolated process remained alive, adaptive modes converged and environment discovery stayed lazy");
             return 0;
         }
         catch (Exception ex)
@@ -114,6 +132,42 @@ internal static class Program
                ?? throw new InvalidOperationException("DevelopmentControl is unavailable.");
     }
 
+    private static void AssertAdaptiveLayout(
+        MainWindow window,
+        double width,
+        double height,
+        UiDensityMode expectedMode,
+        int expectedMetricColumns)
+    {
+        window.WindowState = WindowState.Normal;
+        window.Width = width;
+        window.Height = height;
+        PumpDispatcher(TimeSpan.FromMilliseconds(450));
+        window.UpdateLayout();
+        PumpDispatcher(TimeSpan.FromMilliseconds(180));
+        AssertWindowAlive(window, $"after resizing to {width:0}x{height:0}");
+
+        var snapshot = UiAdaptiveAuditService.Current
+            ?? throw new InvalidOperationException("UI adaptive audit did not publish a snapshot.");
+        if (snapshot.Mode != expectedMode)
+        {
+            throw new InvalidOperationException(
+                $"Adaptive mode mismatch at {width:0}x{height:0}: expected {expectedMode}, got {snapshot.Mode}.");
+        }
+        if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
+            throw new InvalidOperationException("UI adaptive audit published invalid geometry or DPI.");
+
+        var home = FindVisualChild<HomeDashboardControl>(window)
+            ?? throw new InvalidOperationException("Home dashboard is unavailable during adaptive residency.");
+        var metrics = FindVisualChild<UniformGrid>(home)
+            ?? throw new InvalidOperationException("Home metric grid is unavailable during adaptive residency.");
+        if (metrics.Columns != expectedMetricColumns)
+        {
+            throw new InvalidOperationException(
+                $"Home metric columns mismatch in {expectedMode}: expected {expectedMetricColumns}, got {metrics.Columns}.");
+        }
+    }
+
     private static void AssertEnvironmentIdle(
         DevelopmentControl development,
         FieldInfo busyField,
@@ -126,7 +180,7 @@ internal static class Program
     private static void AssertWindowAlive(Window window, string phase)
     {
         if (!window.IsLoaded || !window.IsVisible)
-            throw new InvalidOperationException("AtlasDesk main window closed " + phase + ".");
+            throw new InvalidOperationException("AtlasDesk window closed " + phase + ".");
     }
 
     private static void SetPhase(string value)
