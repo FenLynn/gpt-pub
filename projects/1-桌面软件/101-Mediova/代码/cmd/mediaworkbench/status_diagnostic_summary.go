@@ -109,9 +109,9 @@ func diagnosticStatusSummary(value string, width int32) string {
 	switch {
 	case budget <= 14:
 		if len(categories) > 1 {
-			summary = fmt.Sprintf("%d项%s · 详情", len(categories), label)
+			summary = fmt.Sprintf("%d项·详情", len(categories))
 		} else {
-			summary = label + " · 详情"
+			summary = label + "·详情"
 		}
 	case budget <= 26:
 		if len(categories) > 1 {
