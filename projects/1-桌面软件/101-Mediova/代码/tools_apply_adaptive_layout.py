@@ -39,33 +39,22 @@ def refresh_hashes(extra: list[str]) -> None:
     HASHES.write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
 
 
-old = '''\tdetailsY := actionY + 114
-\tdetailsH := maxInt32(90, top+listH-detailsY)
-\tmove(a.hRightFrame, rightX, top, rightW, listH)
-\tmove(a.hRightHint, rightX+10, top+8, rightW-20, 24)
-\tmove(a.hSelectedList, rightX+8, rowY, rightW-16, 190)
-\tmove(a.hApplySelected, rightX+8, actionY, rightW-16, 34)
-\tmove(a.hHoldSelected, rightX+8, actionY+40, (rightW-24)/2, 34)
-\tmove(a.hClearSelected, rightX+16+(rightW-24)/2, actionY+40, (rightW-24)/2, 34)
-\tmove(a.hRemoveSelected, rightX+8, actionY+80, rightW-16, 34)
-\tmove(a.hRightDetailsFrame, rightX+6, detailsY, rightW-12, detailsH)
-\tmove(a.hDetails, rightX+12, detailsY+8, rightW-24, detailsH-16)
+old = '''\t\tdetailsY := actionY + 114
+\t\tdetailsH := top + listH - detailsY
+\t\tif detailsH < 90 {
+\t\t\tdetailsH = 90
+\t\t}
+\t\tmove(a.hDetailsFrame, rightX+2, detailsY, rightW-14, detailsH)
+\t\tmove(a.hDetails, rightX+10, detailsY+8, rightW-30, detailsH-16)
 '''
-new = '''\tdetailsY := actionY + 114
-\tdetailsH, detailsVisible := rightDetailsHeightFor(top+listH, detailsY)
-\tmove(a.hRightFrame, rightX, top, rightW, listH)
-\tmove(a.hRightHint, rightX+10, top+8, rightW-20, 24)
-\tmove(a.hSelectedList, rightX+8, rowY, rightW-16, 190)
-\tmove(a.hApplySelected, rightX+8, actionY, rightW-16, 34)
-\tmove(a.hHoldSelected, rightX+8, actionY+40, (rightW-24)/2, 34)
-\tmove(a.hClearSelected, rightX+16+(rightW-24)/2, actionY+40, (rightW-24)/2, 34)
-\tmove(a.hRemoveSelected, rightX+8, actionY+80, rightW-16, 34)
-\tshow(a.hRightDetailsFrame, a.rightVisible && detailsVisible)
-\tshow(a.hDetails, a.rightVisible && detailsVisible)
-\tif detailsVisible {
-\t\tmove(a.hRightDetailsFrame, rightX+6, detailsY, rightW-12, detailsH)
-\t\tmove(a.hDetails, rightX+12, detailsY+8, rightW-24, detailsH-16)
-\t}
+new = '''\t\tdetailsY := actionY + 114
+\t\tdetailsH, detailsVisible := rightDetailsHeightFor(top+listH, detailsY)
+\t\tshow(a.hDetailsFrame, detailsVisible)
+\t\tshow(a.hDetails, detailsVisible)
+\t\tif detailsVisible {
+\t\t\tmove(a.hDetailsFrame, rightX+2, detailsY, rightW-14, detailsH)
+\t\t\tmove(a.hDetails, rightX+10, detailsY+8, rightW-30, detailsH-16)
+\t\t}
 '''
 replace_once(MAIN, old, new)
 
@@ -133,7 +122,7 @@ func TestRightDetailsHeightContinuousHeightMatrix(t *testing.T) {
 \t\t\tif listH < 260 {
 \t\t\t\tlistH = 260
 \t\t\t}
-\t\t\tdetailsY := top + 40 + 190 + 6 + 114
+\t\t\tdetailsY := top + 40 + 5*38 + 6 + 114
 \t\t\tlistBottom := top + listH
 \t\t\theight, shown := rightDetailsHeightFor(listBottom, detailsY)
 \t\t\tavailable := listBottom - detailsY
@@ -156,7 +145,11 @@ write(
 
 package main
 
-import "testing"
+import (
+\t"testing"
+
+\t"mediaworkbench/internal/model"
+)
 
 func TestAdaptiveTopBandContinuousWidthBudget(t *testing.T) {
 \tfor width := int32(900); width <= 1920; width++ {
@@ -190,7 +183,7 @@ func TestAdaptiveRightPanelContinuousWidthBudget(t *testing.T) {
 \t\tif listW < 520 {
 \t\t\tlistW = 520
 \t\t}
-\t\trightX := 8 + listW + 6
+\t\trightX := int32(16) + listW
 \t\tif rightX < 0 || rightX+rightW > width-8 {
 \t\t\tt.Fatalf("width=%d right panel outside client: x=%d w=%d", width, rightX, rightW)
 \t\t}
@@ -199,23 +192,23 @@ func TestAdaptiveRightPanelContinuousWidthBudget(t *testing.T) {
 
 func TestAdaptiveBottomParameterContinuousWidthBudget(t *testing.T) {
 \tfor width := int32(900); width <= 1920; width++ {
-\t\tfor _, imageMode := range []bool{false, true} {
-\t\t\tresW, codecW, qualityW, volumeW, rotationW := bottomParameterWidths(imageMode)
+\t\tfor _, kind := range []model.Kind{model.KindVideo, model.KindImage} {
+\t\t\twidths := bottomParameterWidths(kind)
 \t\t\tif width < 1320 {
 \t\t\t\tx := int32(8)
-\t\t\t\tfor _, fieldW := range []int32{resW, codecW, qualityW, volumeW, rotationW} {
+\t\t\t\tfor _, fieldW := range []int32{widths.Resolution, widths.Codec, widths.Quality, widths.Volume, widths.Rotation} {
 \t\t\t\t\tx += 38 + fieldW + 6
 \t\t\t\t}
 \t\t\t\tremaining := width - x - 8
 \t\t\t\tif remaining < 124 {
-\t\t\t\t\tt.Fatalf("width=%d image=%v compact parameter row remaining=%d", width, imageMode, remaining)
+\t\t\t\t\tt.Fatalf("width=%d kind=%v compact parameter row remaining=%d", width, kind, remaining)
 \t\t\t\t}
 \t\t\t\tcontinue
 \t\t\t}
-\t\t\tfixedBottomW := int32(38) + resW + 7 + 34 + codecW + 7 + 34 + qualityW + 7 + 34 + volumeW + 7 + 34 + rotationW + 8 + 124
+\t\t\tfixedBottomW := int32(38) + widths.Resolution + 7 + 34 + widths.Codec + 7 + 34 + widths.Quality + 7 + 34 + widths.Volume + 7 + 34 + widths.Rotation + 8 + 124
 \t\t\teditW := width - 8 - 116 - 6 - 60 - 8 - fixedBottomW - 8
 \t\t\tif editW < 210 {
-\t\t\t\tt.Fatalf("width=%d image=%v output edit width=%d", width, imageMode, editW)
+\t\t\t\tt.Fatalf("width=%d kind=%v output edit width=%d", width, kind, editW)
 \t\t\t}
 \t\t}
 \t}
