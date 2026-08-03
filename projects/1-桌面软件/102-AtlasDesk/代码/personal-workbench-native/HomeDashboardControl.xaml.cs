@@ -34,6 +34,8 @@ public partial class HomeDashboardControl : UserControl
     {
         _settings = settings;
         InitializeComponent();
+        ConfigureMetricCard(PythonValue, "PROJECTS", "P");
+        ConfigureMetricCard(WorkspaceValue, "TASKS", "T");
         IsVisibleChanged += (_, _) =>
         {
             if (IsVisible)
@@ -105,6 +107,23 @@ public partial class HomeDashboardControl : UserControl
                 cancellation.Dispose();
             }
         }
+    }
+
+    private static void ConfigureMetricCard(TextBlock valueText, string label, string glyph)
+    {
+        if (valueText.Parent is not StackPanel textStack)
+            return;
+        var labelText = textStack.Children.OfType<TextBlock>().FirstOrDefault();
+        if (labelText is not null)
+            labelText.Text = label;
+        if (textStack.Parent is not Grid grid)
+            return;
+        var iconText = grid.Children.OfType<Border>()
+            .Select(border => border.Child)
+            .OfType<TextBlock>()
+            .FirstOrDefault();
+        if (iconText is not null)
+            iconText.Text = glyph;
     }
 
     private void CancelRefresh()
