@@ -24,15 +24,15 @@ jobs:
           go-version: '1.24.x'
           cache: false
 
-      - name: Relax the unique start-glyph matcher and apply
+      - name: Apply the unique glyph match and true-circle contract
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round1.py')
-          lines = path.read_text(encoding='utf-8').splitlines()
+          script = Path('projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round1.py')
+          lines = script.read_text(encoding='utf-8').splitlines()
           replacement = '''        r'\\tglyph := "[^"]*E768"\\n\\tif dis\\.HwndItem != a\\.hStart \\{\\n\\t\\tglyph = secondaryButtonGlyph\\(dis\\.HwndItem\\)\\n\\t\\}\\n\\tlabel := getText\\(dis\\.HwndItem\\)\\n','''
           matches = 0
           for i, line in enumerate(lines):
@@ -41,12 +41,47 @@ jobs:
                   matches += 1
           if matches != 1:
               raise SystemExit(f'expected one start-glyph matcher line, found {matches}')
-          path.write_text('\n'.join(lines) + '\n', encoding='utf-8', newline='\n')
+          script.write_text('\n'.join(lines) + '\n', encoding='utf-8', newline='\n')
+
+          contract = Path('projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_source_contract_test.go')
+          text = contract.read_text(encoding='utf-8')
+          old = 'for _, want := range []string{`drawCenteredText(hdc, "●"`, `for i, unit := range units`'
+          new = 'for _, want := range []string{`v452DrawTrueStatusLamp(hdc, rc, color)`, `for i, unit := range units`'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one legacy lamp contract, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+          guard = '''\tif strings.Contains(helper, `drawCenteredText(hdc, "●"`) {
+\t\tt.Fatal("font-rendered status lamp returned")
+\t}
+'''
+          anchor = '''\tif strings.Contains(helper, "withRoundedClip(hdc, fill") {
+'''
+          if text.count(anchor) != 1:
+              raise SystemExit('unable to insert status-lamp regression guard')
+          contract.write_text(text.replace(anchor, guard + anchor, 1), encoding='utf-8', newline='\n')
           PY
 
           python projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round1.py
-          rm -f .github/workflows/p101-v452-round1-retry.yml
+          rm -f \
+            .github/workflows/p101-v452-round1-retry.yml \
+            .github/workflows/p101-v452-round1-retry-contract.yml
+          gofmt -w projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_source_contract_test.go
           cd projects/1-桌面软件/101-Mediova/代码
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          manifest = Path('SOURCE_FILES_SHA256.txt')
+          paths = []
+          for line in manifest.read_text(encoding='utf-8').splitlines():
+              parts = line.strip().split(maxsplit=1)
+              if len(parts) == 2:
+                  paths.append(parts[1])
+          manifest.write_text('\n'.join(
+              f'{hashlib.sha256(Path(rel).read_bytes()).hexdigest()}  {rel}'
+              for rel in sorted(set(paths))
+          ) + '\n', encoding='utf-8', newline='\n')
+          PY
           go test -count=1 ./...
           cd ../../../..
           git config user.name 'github-actions[bot]'
