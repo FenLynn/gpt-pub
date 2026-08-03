@@ -12,6 +12,9 @@ public partial class ZoteroLibraryControl
     private ZoteroItemDetails? _referenceDetails;
     private string _citationKey = string.Empty;
 
+    public ZoteroRecord? SelectedRecord => _selectedRecord;
+    public string CurrentCitationKey => _citationKey;
+
     private async void ItemsList_SelectionChanged_Reference(object sender, SelectionChangedEventArgs e)
     {
         _selectedRecord = ItemsList.SelectedItem as ZoteroRecord;
