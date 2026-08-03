@@ -3,7 +3,7 @@ name: P101 Mediova adaptive layout apply
 on:
   pull_request:
     branches: [p101-exp]
-    types: [opened]
+    types: [opened, synchronize]
     paths:
       - '.github/triggers/p101-adaptive-layout.txt'
 
