@@ -16,8 +16,8 @@ public sealed class WorkbenchFeaturePipeline
         // never start two independent Conda/Python scans.
         DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window);
 
-        UiConvergence = UiConvergenceCoordinator.Attach(window);
         Experience = V061ExperienceEnhancer.Attach(window, Base);
+        UiConvergence = UiConvergenceCoordinator.Attach(window, Experience.Home, Experience.SettingsPage);
         Diagnostics = DiagnosticsCoordinator.Attach(window, Settings);
         ShellResilience = ShellResilienceCoordinator.Attach(window);
         DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
