@@ -42,7 +42,8 @@ internal static class V101DailyPolishChecks
         RequireContains(workRecord,
             "v1.0.1",
             "不因显示主页而扫描工作区",
-            "未经用户验证，不合入 `main`");
+            "用户后续与 v1.0.0 集中实机比较",
+            "不合入 `main`");
 
         Console.WriteLine("PASS AtlasDesk v1.0.1 daily polish keeps settings explicit and Zotero three-column layout responsive");
     }
