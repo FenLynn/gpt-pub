@@ -7,18 +7,25 @@ import (
 )
 
 type processControllerKey struct{}
+type processSignalFunc func(int) error
 
 // ProcessController tracks FFmpeg child processes belonging to one conversion run.
-// It allows the desktop app to pause/resume the actual encoders instead of merely
-// delaying the next queued task.
+// State changes and operating-system signals are serialized under one lock so a
+// concurrent Pause/Resume cannot leave the real process state behind the UI state.
 type ProcessController struct {
 	mu        sync.Mutex
 	processes map[int]*os.Process
 	paused    bool
+	suspend   processSignalFunc
+	resume    processSignalFunc
 }
 
 func NewProcessController() *ProcessController {
-	return &ProcessController{processes: make(map[int]*os.Process)}
+	return &ProcessController{
+		processes: make(map[int]*os.Process),
+		suspend:   suspendProcess,
+		resume:    resumeProcess,
+	}
 }
 
 func WithProcessController(ctx context.Context, c *ProcessController) context.Context {
@@ -36,16 +43,32 @@ func processControllerFromContext(ctx context.Context) *ProcessController {
 	return c
 }
 
+func (c *ProcessController) suspendPID(pid int) error {
+	if c.suspend == nil {
+		return suspendProcess(pid)
+	}
+	return c.suspend(pid)
+}
+
+func (c *ProcessController) resumePID(pid int) error {
+	if c.resume == nil {
+		return resumeProcess(pid)
+	}
+	return c.resume(pid)
+}
+
 func (c *ProcessController) register(p *os.Process) {
 	if c == nil || p == nil {
 		return
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.processes == nil {
+		c.processes = make(map[int]*os.Process)
+	}
 	c.processes[p.Pid] = p
-	paused := c.paused
-	c.mu.Unlock()
-	if paused {
-		_ = suspendProcess(p.Pid)
+	if c.paused {
+		_ = c.suspendPID(p.Pid)
 	}
 }
 
@@ -63,15 +86,11 @@ func (c *ProcessController) Pause() error {
 		return nil
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.paused = true
-	pids := make([]int, 0, len(c.processes))
-	for pid := range c.processes {
-		pids = append(pids, pid)
-	}
-	c.mu.Unlock()
 	var first error
-	for _, pid := range pids {
-		if err := suspendProcess(pid); err != nil && first == nil {
+	for pid := range c.processes {
+		if err := c.suspendPID(pid); err != nil && first == nil {
 			first = err
 		}
 	}
@@ -83,15 +102,11 @@ func (c *ProcessController) Resume() error {
 		return nil
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.paused = false
-	pids := make([]int, 0, len(c.processes))
-	for pid := range c.processes {
-		pids = append(pids, pid)
-	}
-	c.mu.Unlock()
 	var first error
-	for _, pid := range pids {
-		if err := resumeProcess(pid); err != nil && first == nil {
+	for pid := range c.processes {
+		if err := c.resumePID(pid); err != nil && first == nil {
 			first = err
 		}
 	}
