@@ -86,17 +86,19 @@ func TestPreparePortableModeSwitchRemovesStaleManagedFilesMissingFromSource(t *t
 	if err := os.MkdirAll(standard, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writePortableFixture(t, filepath.Join(portable, "config.json.bak"), `{"output_dir":"stale-backup"}`)
 	writePortableFixture(t, filepath.Join(portable, "session.json"), `{"schema":2,"tasks":[{"id":1}]}`)
+	writePortableFixture(t, filepath.Join(portable, "session.json.tmp"), `{"schema":2,"tasks":[{"id":2}]}`)
 	writePortableFixture(t, filepath.Join(portable, "history.json"), `[{"result":"stale"}]`)
 
 	result, err := PreparePortableModeSwitch(true, model.DefaultSettings(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.RemovedFiles < 2 || result.BackupDir == "" {
+	if result.RemovedFiles < 4 || result.BackupDir == "" {
 		t.Fatalf("stale target files were not removed safely: %+v", result)
 	}
-	for _, name := range []string{"session.json", "history.json"} {
+	for _, name := range []string{"config.json.bak", "session.json", "session.json.tmp", "history.json"} {
 		if _, err := os.Stat(filepath.Join(portable, name)); !os.IsNotExist(err) {
 			t.Fatalf("stale %s remained: %v", name, err)
 		}
