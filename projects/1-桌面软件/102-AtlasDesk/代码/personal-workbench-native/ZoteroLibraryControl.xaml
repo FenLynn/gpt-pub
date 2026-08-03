@@ -9,85 +9,46 @@
         <HierarchicalDataTemplate DataType="{x:Type local:ZoteroCollectionNode}" ItemsSource="{Binding Children}">
             <Grid Margin="0,1">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="19"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Viewbox Width="13" Height="13" VerticalAlignment="Center">
-                    <Path Data="M3,6 H9 L11,8 H21 V19 H3 Z" Stroke="#5D7897" StrokeThickness="1.65"
-                          Fill="Transparent" StrokeLineJoin="Round"/>
-                </Viewbox>
-                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="11.9" Foreground="#405269"
-                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                <Viewbox Width="13" Height="13"><Path Data="M3,6 H9 L11,8 H21 V19 H3 Z" Stroke="#5D7897" StrokeThickness="1.65" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox>
+                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="11.9" Foreground="#405269" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
             </Grid>
         </HierarchicalDataTemplate>
 
         <Style x:Key="ZoteroTreeItemStyle" TargetType="TreeViewItem">
-            <Setter Property="Padding" Value="2"/>
-            <Setter Property="Margin" Value="0,1"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TreeViewItem">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <ToggleButton x:Name="Expander" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
-                                          ClickMode="Press" Background="Transparent" BorderThickness="0" Width="18" Height="26">
-                                <Path x:Name="Chevron" Data="M6,4 L10,8 L6,12" Stroke="#8190A3" StrokeThickness="1.5"
-                                      Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                            </ToggleButton>
-                            <Border x:Name="Row" Grid.Column="1" Background="Transparent" CornerRadius="6" Padding="5,3">
-                                <ContentPresenter ContentSource="Header"/>
-                            </Border>
-                            <ItemsPresenter x:Name="ItemsHost" Grid.Column="1" Margin="13,27,0,0" Visibility="Collapsed"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="HasItems" Value="False"><Setter TargetName="Expander" Property="Visibility" Value="Hidden"/></Trigger>
-                            <Trigger Property="IsExpanded" Value="True">
-                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="Chevron" Property="RenderTransform"><Setter.Value><RotateTransform Angle="90" CenterX="8" CenterY="8"/></Setter.Value></Setter>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Row" Property="Background" Value="#F1F5FA"/></Trigger>
-                            <Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="#E5EEFC"/></Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Padding" Value="2"/><Setter Property="Margin" Value="0,1"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TreeViewItem">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <ToggleButton x:Name="Expander" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="Transparent" BorderThickness="0" Width="18" Height="26">
+                        <Path x:Name="Chevron" Data="M6,4 L10,8 L6,12" Stroke="#8190A3" StrokeThickness="1.5" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </ToggleButton>
+                    <Border x:Name="Row" Grid.Column="1" Background="Transparent" CornerRadius="6" Padding="5,3"><ContentPresenter ContentSource="Header"/></Border>
+                    <ItemsPresenter x:Name="ItemsHost" Grid.Column="1" Margin="13,27,0,0" Visibility="Collapsed"/>
+                </Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="HasItems" Value="False"><Setter TargetName="Expander" Property="Visibility" Value="Hidden"/></Trigger>
+                    <Trigger Property="IsExpanded" Value="True"><Setter TargetName="ItemsHost" Property="Visibility" Value="Visible"/><Setter TargetName="Chevron" Property="RenderTransform"><Setter.Value><RotateTransform Angle="90" CenterX="8" CenterY="8"/></Setter.Value></Setter></Trigger>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Row" Property="Background" Value="#F1F5FA"/></Trigger>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="#E5EEFC"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
         </Style>
 
         <DataTemplate x:Key="FieldRowTemplate">
-            <Grid Margin="0,3">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Grid Margin="0,3"><Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding Label}" FontSize="10.9" Foreground="#8290A3" VerticalAlignment="Top"/>
                 <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="11.8" Foreground="#3F5067" TextWrapping="Wrap"/>
             </Grid>
         </DataTemplate>
 
-        <DataTemplate x:Key="TypeIconTemplate">
-            <Viewbox Width="15" Height="15" ToolTip="{Binding ItemTypeLabel}">
-                <Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,12 H17 M9,16 H16"
-                      Stroke="#55749A" StrokeThickness="1.65" Fill="Transparent" StrokeLineJoin="Round"
-                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-            </Viewbox>
-        </DataTemplate>
-
-        <DataTemplate x:Key="PdfIconTemplate">
-            <Viewbox Width="16" Height="16" Visibility="{Binding HasPdf, Converter={StaticResource BoolVisibility}}" ToolTip="本地 PDF 可用">
-                <Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,13 H17 M9,17 H15"
-                      Stroke="#C94E59" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"
-                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-            </Viewbox>
-        </DataTemplate>
+        <DataTemplate x:Key="TypeIconTemplate"><Viewbox Width="15" Height="15" ToolTip="{Binding ItemTypeLabel}"><Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,12 H17 M9,16 H16" Stroke="#55749A" StrokeThickness="1.65" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox></DataTemplate>
+        <DataTemplate x:Key="PdfIconTemplate"><Viewbox Width="16" Height="16" Visibility="{Binding HasPdf, Converter={StaticResource BoolVisibility}}" ToolTip="本地 PDF 可用"><Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,13 H17 M9,17 H15" Stroke="#C94E59" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox></DataTemplate>
 
         <DataTemplate x:Key="AttachmentTemplate">
             <Border BorderBrush="#E7EBF1" BorderThickness="0,0,0,1" Padding="0,8">
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="{Binding DisplayTitle}" FontSize="11.9" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding Status}" FontSize="10.3" Foreground="#7B899C" Margin="0,2,0,0"/>
-                        <TextBlock Text="{Binding ResolvedPath}" FontSize="10.1" Foreground="#9AA5B4" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                    </StackPanel>
-                    <Button Grid.Column="1" Style="{StaticResource IconButton}" ToolTip="打开附件"
-                            Tag="{Binding}" IsEnabled="{Binding Exists}" Click="OpenAttachment_Click">
-                        <Viewbox Width="15" Height="15"><Path Style="{StaticResource ButtonIconPath}" Data="M8,5 H5 V20 H19 V17 M12,4 H20 V12 M20,4 L11,13"/></Viewbox>
-                    </Button>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Text="{Binding DisplayTitle}" FontSize="11.9" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Status}" FontSize="10.3" Foreground="#7B899C" Margin="0,2,0,0"/><TextBlock Text="{Binding ResolvedPath}" FontSize="10.1" Foreground="#9AA5B4" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource IconButton}" ToolTip="打开附件" Tag="{Binding}" IsEnabled="{Binding Exists}" Click="OpenAttachment_Click"><Viewbox Width="15" Height="15"><Path Style="{StaticResource ButtonIconPath}" Data="M8,5 H5 V20 H19 V17 M12,4 H20 V12 M20,4 L11,13"/></Viewbox></Button>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -95,231 +56,83 @@
 
     <Grid Margin="10">
         <Grid.RowDefinitions><RowDefinition Height="39"/><RowDefinition Height="6"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-
         <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="Zotero 文献库" Style="{StaticResource PageHeading}"/>
-                <Border x:Name="ConnectionBadge" Background="#EAF8F2" CornerRadius="7" Padding="8,3" Margin="10,0,0,0">
-                    <TextBlock x:Name="ConnectionText" Text="等待连接" FontSize="10.4" Foreground="#2F7E60"/>
-                </Border>
-                <Border x:Name="LoadModeBadge" Background="#EEF3FA" CornerRadius="7" Padding="8,3" Margin="6,0,0,0">
-                    <TextBlock x:Name="LoadModeText" Text="校准模式 · 250" FontSize="10.4" Foreground="#60758F"/>
-                </Border>
+                <Border x:Name="ConnectionBadge" Background="#EAF8F2" CornerRadius="7" Padding="8,3" Margin="10,0,0,0"><TextBlock x:Name="ConnectionText" Text="等待连接" FontSize="10.4" Foreground="#2F7E60"/></Border>
+                <Border x:Name="LoadModeBadge" Background="#EEF3FA" CornerRadius="7" Padding="8,3" Margin="6,0,0,0"><TextBlock x:Name="LoadModeText" Text="校准模式 · 250" FontSize="10.4" Foreground="#60758F"/></Border>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Style="{StaticResource IconButton}" ToolTip="刷新文献库" Click="Refresh_Click">
-                    <Viewbox Width="16" Height="16"><Path Style="{StaticResource ButtonIconPath}" Data="M19,8 A7,7 0 1 0 19,16 M19,8 V3 M19,8 H14"/></Viewbox>
-                </Button>
-                <Button Style="{StaticResource IconButton}" ToolTip="Zotero 与 PDF 阅读器设置" Margin="3,0,0,0" Click="OpenSettings_Click">
-                    <Viewbox Width="16" Height="16"><Path Style="{StaticResource ButtonIconPath}" Data="M12,8 A4,4 0 1 0 12,16 A4,4 0 1 0 12,8 M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21 M5.6,5.6 L7.7,7.7 M16.3,16.3 L18.4,18.4 M18.4,5.6 L16.3,7.7 M7.7,16.3 L5.6,18.4"/></Viewbox>
-                </Button>
+                <Button Style="{StaticResource IconButton}" ToolTip="刷新文献库" Click="Refresh_Click"><Viewbox Width="16" Height="16"><Path Style="{StaticResource ButtonIconPath}" Data="M19,8 A7,7 0 1 0 19,16 M19,8 V3 M19,8 H14"/></Viewbox></Button>
+                <Button Style="{StaticResource IconButton}" ToolTip="Zotero 与 PDF 阅读器设置" Margin="3,0,0,0" Click="OpenSettings_Click"><Viewbox Width="16" Height="16"><Path Style="{StaticResource ButtonIconPath}" Data="M12,8 A4,4 0 1 0 12,16 A4,4 0 1 0 12,8 M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21 M5.6,5.6 L7.7,7.7 M16.3,16.3 L18.4,18.4 M18.4,5.6 L16.3,7.7 M7.7,16.3 L5.6,18.4"/></Viewbox></Button>
             </StackPanel>
         </Grid>
 
         <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220"/><ColumnDefinition Width="7"/>
-                <ColumnDefinition Width="*"/><ColumnDefinition Width="7"/>
-                <ColumnDefinition Width="410"/>
-            </Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="7"/><ColumnDefinition Width="*"/><ColumnDefinition Width="7"/><ColumnDefinition Width="410"/></Grid.ColumnDefinitions>
 
             <Border Style="{StaticResource SurfaceCard}" Padding="0">
-                <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="39"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <Grid Margin="11,0,8,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Viewbox Width="14" Height="14"><Path Data="M3,6 H9 L11,8 H21 V19 H3 Z" Stroke="#58708E" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox>
-                            <TextBlock Text="分类" Style="{StaticResource SectionHeading}" Margin="7,0,0,0"/>
-                        </StackPanel>
-                        <TextBlock Grid.Column="1" Text="含子分类" FontSize="9.8" Foreground="#8290A3" VerticalAlignment="Center" ToolTip="选择父分类时递归包含全部子分类文献"/>
-                    </Grid>
+                <Grid><Grid.RowDefinitions><RowDefinition Height="39"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid Margin="11,0,8,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="分类" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="含子分类" FontSize="9.8" Foreground="#8290A3" VerticalAlignment="Center" ToolTip="选择父分类时递归包含全部子分类文献"/></Grid>
                     <Border Grid.Row="1" Background="#E7EDF4"/>
-                    <TreeView x:Name="CollectionTree" Grid.Row="2" BorderThickness="0" Background="Transparent" Padding="5"
-                              ItemContainerStyle="{StaticResource ZoteroTreeItemStyle}"
-                              SelectedItemChanged="CollectionTree_SelectedItemChanged"
-                              VirtualizingStackPanel.IsVirtualizing="True"
-                              VirtualizingStackPanel.VirtualizationMode="Recycling"/>
+                    <TreeView x:Name="CollectionTree" Grid.Row="2" BorderThickness="0" Background="Transparent" Padding="5" ItemContainerStyle="{StaticResource ZoteroTreeItemStyle}" SelectedItemChanged="CollectionTree_SelectedItemChanged" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"/>
                 </Grid>
             </Border>
 
             <Border Grid.Column="2" Style="{StaticResource SurfaceCard}" Padding="0">
-                <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="27"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <Grid Margin="9,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/><ColumnDefinition Width="6"/>
-                            <ColumnDefinition Width="48"/><ColumnDefinition Width="6"/>
-                            <ColumnDefinition Width="112"/><ColumnDefinition Width="5"/>
-                            <ColumnDefinition Width="28"/><ColumnDefinition Width="4"/><ColumnDefinition Width="28"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="SearchBox" Height="29" Padding="9,4" FontSize="11.8"
-                                 ToolTip="搜索标题、作者、期刊、DOI、摘要和标签；范围包含当前分类全部子分类"
-                                 KeyDown="SearchBox_KeyDown"/>
-                        <ComboBox x:Name="ItemTypeFilter" Grid.Column="2" Height="29" Padding="4,2" ToolTip="文献类型" SelectionChanged="Filter_Changed">
-                            <ComboBoxItem Tag="" IsSelected="True" ToolTip="全部类型"><TextBlock Text="全部" FontSize="10.5"/></ComboBoxItem>
-                            <ComboBoxItem Tag="journalArticle" Content="期刊"/>
-                            <ComboBoxItem Tag="conferencePaper" Content="会议"/>
-                            <ComboBoxItem Tag="thesis" Content="学位"/>
-                            <ComboBoxItem Tag="book,bookSection" Content="图书"/>
-                            <ComboBoxItem Tag="patent" Content="专利"/>
-                            <ComboBoxItem Tag="report,preprint" Content="报告"/>
-                        </ComboBox>
-                        <ComboBox x:Name="SortFilter" Grid.Column="4" Height="29" Padding="6,2" FontSize="10.8" SelectionChanged="Filter_Changed">
-                            <ComboBoxItem Content="最近修改" Tag="modified" IsSelected="True"/>
-                            <ComboBoxItem Content="最近添加" Tag="added"/>
-                            <ComboBoxItem Content="年份倒序" Tag="year"/>
-                            <ComboBoxItem Content="标题排序" Tag="title"/>
-                        </ComboBox>
-                        <CheckBox x:Name="PdfOnlyFilter" Grid.Column="6" Width="28" Height="28" HorizontalContentAlignment="Center"
-                                  ToolTip="仅显示有本地 PDF 的文献" Checked="Filter_Changed" Unchecked="Filter_Changed">
-                            <Viewbox Width="16" Height="16"><Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,13 H17 M9,17 H14" Stroke="#C84C58" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox>
-                        </CheckBox>
-                        <Button Grid.Column="8" Style="{StaticResource IconButton}" Width="28" Height="28" ToolTip="执行搜索" Click="Search_Click">
-                            <Viewbox Width="15" Height="15"><Path Style="{StaticResource ButtonIconPath}" Data="M10.5,4 A6.5,6.5 0 1 0 10.5,17 A6.5,6.5 0 1 0 10.5,4 M15.2,15.2 L21,21"/></Viewbox>
-                        </Button>
+                <Grid><Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="27"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid Margin="9,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="58"/><ColumnDefinition Width="6"/><ColumnDefinition Width="112"/><ColumnDefinition Width="5"/><ColumnDefinition Width="28"/><ColumnDefinition Width="4"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
+                        <TextBox x:Name="SearchBox" Height="29" Padding="9,4" FontSize="11.8" ToolTip="搜索标题、作者、期刊、DOI、摘要和标签；范围包含当前分类全部子分类" KeyDown="SearchBox_KeyDown"/>
+                        <ComboBox x:Name="ItemTypeFilter" Grid.Column="2" Height="29" Padding="4,2" FontSize="10.5" ToolTip="文献类型" SelectionChanged="Filter_Changed"><ComboBoxItem Tag="" Content="全部" IsSelected="True"/><ComboBoxItem Tag="journalArticle" Content="期刊"/><ComboBoxItem Tag="conferencePaper" Content="会议"/><ComboBoxItem Tag="thesis" Content="学位"/><ComboBoxItem Tag="book" Content="图书"/><ComboBoxItem Tag="patent" Content="专利"/><ComboBoxItem Tag="report" Content="报告"/></ComboBox>
+                        <ComboBox x:Name="SortFilter" Grid.Column="4" Height="29" Padding="6,2" FontSize="10.8" SelectionChanged="Filter_Changed"><ComboBoxItem Content="最近修改" Tag="modified" IsSelected="True"/><ComboBoxItem Content="最近添加" Tag="added"/><ComboBoxItem Content="年份倒序" Tag="year"/><ComboBoxItem Content="标题排序" Tag="title"/></ComboBox>
+                        <CheckBox x:Name="PdfOnlyFilter" Grid.Column="6" Width="28" Height="28" HorizontalContentAlignment="Center" ToolTip="仅显示有本地 PDF 的文献" Checked="Filter_Changed" Unchecked="Filter_Changed"><Viewbox Width="16" Height="16"><Path Data="M6,3 H15 L20,8 V21 H6 Z M15,3 V8 H20 M9,13 H17 M9,17 H14" Stroke="#C84C58" StrokeThickness="1.7" Fill="Transparent" StrokeLineJoin="Round"/></Viewbox></CheckBox>
+                        <Button Grid.Column="8" Style="{StaticResource IconButton}" Width="28" Height="28" ToolTip="执行搜索" Click="Search_Click"><Viewbox Width="15" Height="15"><Path Style="{StaticResource ButtonIconPath}" Data="M10.5,4 A6.5,6.5 0 1 0 10.5,17 A6.5,6.5 0 1 0 10.5,4 M15.2,15.2 L21,21"/></Viewbox></Button>
                     </Grid>
-                    <Grid Grid.Row="1" Margin="12,0,10,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="ResultStatus" Text="等待读取文献库" FontSize="10.7" Foreground="#748296" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="CurrentScopeText" Grid.Column="1" FontSize="10.7" Foreground="#8B97A7" VerticalAlignment="Center"/>
-                    </Grid>
+                    <Grid Grid.Row="1" Margin="12,0,10,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="ResultStatus" Text="等待读取文献库" FontSize="10.7" Foreground="#748296" VerticalAlignment="Center"/><TextBlock x:Name="CurrentScopeText" Grid.Column="1" FontSize="10.7" Foreground="#8B97A7" VerticalAlignment="Center"/></Grid>
                     <Border Grid.Row="2" Background="#E7EDF4"/>
-                    <ListView x:Name="ItemsList" Grid.Row="3" BorderThickness="0" Background="Transparent"
-                              SelectionChanged="ItemsList_SelectionChanged_Reference" MouseDoubleClick="ItemsList_MouseDoubleClick"
-                              VirtualizingStackPanel.IsVirtualizing="True"
-                              VirtualizingStackPanel.VirtualizationMode="Recycling"
-                              ScrollViewer.IsDeferredScrollingEnabled="True">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Width="34" CellTemplate="{StaticResource TypeIconTemplate}"/>
-                                <GridViewColumn Header="标题" Width="385" DisplayMemberBinding="{Binding DisplayTitle}"/>
-                                <GridViewColumn Header="作者" Width="150" DisplayMemberBinding="{Binding Authors}"/>
-                                <GridViewColumn Header="年份" Width="52" DisplayMemberBinding="{Binding Year}"/>
-                                <GridViewColumn Header="来源" Width="170" DisplayMemberBinding="{Binding Publication}"/>
-                                <GridViewColumn Width="38" CellTemplate="{StaticResource PdfIconTemplate}"/>
-                            </GridView>
-                        </ListView.View>
+                    <ListView x:Name="ItemsList" Grid.Row="3" BorderThickness="0" Background="Transparent" SelectionChanged="ItemsList_SelectionChanged_Reference" MouseDoubleClick="ItemsList_MouseDoubleClick" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling" ScrollViewer.IsDeferredScrollingEnabled="True">
+                        <ListView.View><GridView><GridViewColumn Width="34" CellTemplate="{StaticResource TypeIconTemplate}"/><GridViewColumn Header="标题" Width="385" DisplayMemberBinding="{Binding DisplayTitle}"/><GridViewColumn Header="作者" Width="150" DisplayMemberBinding="{Binding Authors}"/><GridViewColumn Header="年份" Width="52" DisplayMemberBinding="{Binding Year}"/><GridViewColumn Header="来源" Width="170" DisplayMemberBinding="{Binding Publication}"/><GridViewColumn Width="38" CellTemplate="{StaticResource PdfIconTemplate}"/></GridView></ListView.View>
                     </ListView>
                 </Grid>
             </Border>
 
             <Border Grid.Column="4" Style="{StaticResource SurfaceCard}" Padding="0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/><RowDefinition Height="1"/>
-                        <RowDefinition Height="Auto"/><RowDefinition Height="1"/>
-                        <RowDefinition Height="*"/><RowDefinition Height="31"/>
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Margin="15,13,15,11">
-                        <TextBlock x:Name="DetailTitle" Text="选择一篇文献" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="DetailAuthors" FontSize="11.6" Foreground="#52657D" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="DetailMeta" FontSize="10.8" Foreground="#7A8798" Margin="0,3,0,0" TextWrapping="Wrap"/>
-                    </StackPanel>
+                <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="1"/><RowDefinition Height="Auto"/><RowDefinition Height="1"/><RowDefinition Height="*"/><RowDefinition Height="31"/></Grid.RowDefinitions>
+                    <StackPanel Margin="15,13,15,11"><TextBlock x:Name="DetailTitle" Text="选择一篇文献" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="DetailAuthors" FontSize="11.6" Foreground="#52657D" Margin="0,5,0,0" TextWrapping="Wrap"/><TextBlock x:Name="DetailMeta" FontSize="10.8" Foreground="#7A8798" Margin="0,3,0,0" TextWrapping="Wrap"/></StackPanel>
                     <Border Grid.Row="1" Background="#E7EDF4"/>
-
-                    <WrapPanel Grid.Row="2" Margin="11,7" VerticalAlignment="Center">
-                        <Button x:Name="OpenPrimaryPdfButton" Content="打开 PDF" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="76" Padding="10,0" IsEnabled="False" Click="OpenPrimaryPdf_Click"/>
-                        <Button x:Name="ShowPdfFolderButton" Content="显示文件" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="76" Padding="10,0" Margin="6,0,0,0" IsEnabled="False" Click="ShowPdfFolder_Click"/>
-                        <Button x:Name="CopyTitleButton" Content="标题" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="54" Padding="9,0" Margin="6,0,0,0" IsEnabled="False" ToolTip="复制标题" Click="CopyTitle_Click"/>
-                        <Button x:Name="CopyDoiButton" Content="DOI" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="48" Padding="9,0" Margin="6,0,0,0" IsEnabled="False" ToolTip="复制 DOI" Click="CopyDoi_Click"/>
-                    </WrapPanel>
+                    <WrapPanel Grid.Row="2" Margin="11,7"><Button x:Name="OpenPrimaryPdfButton" Content="打开 PDF" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="76" Padding="10,0" IsEnabled="False" Click="OpenPrimaryPdf_Click"/><Button x:Name="ShowPdfFolderButton" Content="显示文件" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="76" Padding="10,0" Margin="6,0,0,0" IsEnabled="False" Click="ShowPdfFolder_Click"/><Button x:Name="CopyTitleButton" Content="标题" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="54" Padding="9,0" Margin="6,0,0,0" IsEnabled="False" ToolTip="复制标题" Click="CopyTitle_Click"/><Button x:Name="CopyDoiButton" Content="DOI" Style="{StaticResource SecondaryButton}" Height="29" MinWidth="48" Padding="9,0" Margin="6,0,0,0" IsEnabled="False" ToolTip="复制 DOI" Click="CopyDoi_Click"/></WrapPanel>
                     <Border Grid.Row="3" Background="#E7EDF4"/>
 
                     <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="15,12,15,14">
                             <TextBlock Text="引用信息" FontSize="11.2" FontWeight="SemiBold" Foreground="#53657B"/>
-
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="82"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="Citation Key" FontSize="10.7" Foreground="#8290A3" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="CitationKeyText" Grid.Column="1" Text="未选择文献" FontFamily="Cascadia Mono, Consolas" FontSize="11.8" Foreground="#334A68" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                <Button x:Name="CopyCitationKeyButton" Grid.Column="2" Style="{StaticResource IconButton}" Width="28" Height="26" IsEnabled="False" ToolTip="复制 Citation Key" Click="CopyCitationKey_Click">
-                                    <Viewbox Width="14" Height="14"><Path Style="{StaticResource ButtonIconPath}" Data="M8,8 H20 V20 H8 Z M4,4 H16 V8 M4,4 V16 H8"/></Viewbox>
-                                </Button>
-                            </Grid>
-                            <Grid Margin="0,5,0,0">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="82"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="DOI" FontSize="10.7" Foreground="#8290A3" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="DoiValueText" Grid.Column="1" Text="未选择文献" FontSize="11.6" Foreground="#334A68" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                <Button Grid.Column="2" Style="{StaticResource IconButton}" Width="28" Height="26" IsEnabled="{Binding IsEnabled, ElementName=CopyDoiButton}" ToolTip="复制 DOI" Click="CopyDoi_Click">
-                                    <Viewbox Width="14" Height="14"><Path Style="{StaticResource ButtonIconPath}" Data="M9,8 H6 A4,4 0 0 0 6,16 H9 M15,8 H18 A4,4 0 0 1 18,16 H15 M8,12 H16"/></Viewbox>
-                                </Button>
-                            </Grid>
+                            <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="82"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions><TextBlock Text="Citation Key" FontSize="10.7" Foreground="#8290A3" VerticalAlignment="Center"/><TextBlock x:Name="CitationKeyText" Grid.Column="1" Text="未选择文献" FontFamily="Cascadia Mono, Consolas" FontSize="11.8" Foreground="#334A68" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/><Button x:Name="CopyCitationKeyButton" Grid.Column="2" Style="{StaticResource IconButton}" Width="28" Height="26" IsEnabled="False" ToolTip="复制 Citation Key" Click="CopyCitationKey_Click"><Viewbox Width="14" Height="14"><Path Style="{StaticResource ButtonIconPath}" Data="M8,8 H20 V20 H8 Z M4,4 H16 V8 M4,4 V16 H8"/></Viewbox></Button></Grid>
+                            <Grid Margin="0,5,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="82"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions><TextBlock Text="DOI" FontSize="10.7" Foreground="#8290A3" VerticalAlignment="Center"/><TextBlock x:Name="DoiValueText" Grid.Column="1" Text="未选择文献" FontSize="11.6" Foreground="#334A68" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/><Button Grid.Column="2" Style="{StaticResource IconButton}" Width="28" Height="26" IsEnabled="{Binding IsEnabled, ElementName=CopyDoiButton}" ToolTip="复制 DOI" Click="CopyDoi_Click"><Viewbox Width="14" Height="14"><Path Style="{StaticResource ButtonIconPath}" Data="M9,8 H6 A4,4 0 0 0 6,16 H9 M15,8 H18 A4,4 0 0 1 18,16 H15 M8,12 H16"/></Viewbox></Button></Grid>
 
                             <Border Height="1" Background="#E8EDF3" Margin="0,11,0,10"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="116"/><ColumnDefinition Width="35"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="引用预览" FontSize="11.2" FontWeight="SemiBold" Foreground="#53657B" VerticalAlignment="Center"/>
-                                <ComboBox x:Name="CitationFormatBox" Grid.Column="1" Height="27" FontSize="10.5" SelectionChanged="CitationFormat_Changed">
-                                    <ComboBoxItem Content="GB/T 7714 · 快速" Tag="gbt" IsSelected="True"/>
-                                    <ComboBoxItem Content="APA · 快速" Tag="apa"/>
-                                    <ComboBoxItem Content="紧凑文本" Tag="compact"/>
-                                </ComboBox>
-                                <Button x:Name="CopyCitationButton" Grid.Column="2" Style="{StaticResource IconButton}" Width="29" Height="27" Margin="5,0,0,0" IsEnabled="False" ToolTip="复制当前引用文本" Click="CopyCitation_Click">
-                                    <Viewbox Width="14" Height="14"><Path Style="{StaticResource ButtonIconPath}" Data="M8,8 H20 V20 H8 Z M4,4 H16 V8 M4,4 V16 H8"/></Viewbox>
-                                </Button>
-                            </Grid>
-                            <TextBox x:Name="CitationPreviewText" IsReadOnly="True" MinHeight="72" MaxHeight="130" Margin="0,7,0,0"
-                                     Padding="9" BorderBrush="#E0E6EE" Background="#F8FAFC" FontSize="11.5" Foreground="#40536A"
-                                     TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
-                            <WrapPanel Margin="0,7,0,0">
-                                <Button x:Name="CopyLatexButton" Content="复制 cite{}" Style="{StaticResource SecondaryButton}" Height="28" MinWidth="86" Padding="9,0" IsEnabled="False" Click="CopyLatexCitation_Click"/>
-                                <Button x:Name="CopyPandocButton" Content="复制 [@key]" Style="{StaticResource SecondaryButton}" Height="28" MinWidth="88" Padding="9,0" Margin="6,0,0,0" IsEnabled="False" Click="CopyPandocCitation_Click"/>
-                            </WrapPanel>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="116"/><ColumnDefinition Width="35"/></Grid.ColumnDefinitions><TextBlock Text="引用预览" FontSize="11.2" FontWeight="SemiBold" Foreground="#53657B" VerticalAlignment="Center"/><ComboBox x:Name="CitationFormatBox" Grid.Column="1" Height="27" FontSize="10.5" SelectionChanged="CitationFormat_Changed"><ComboBoxItem Content="GB/T 7714 · 快速" Tag="gbt" IsSelected="True"/><ComboBoxItem Content="APA · 快速" Tag="apa"/><ComboBoxItem Content="紧凑文本" Tag="compact"/></ComboBox><Button x:Name="CopyCitationButton" Grid.Column="2" Style="{StaticResource IconButton}" Width="29" Height="27" Margin="5,0,0,0" IsEnabled="False" ToolTip="复制当前引用文本" Click="CopyCitation_Click"><Viewbox Width="14" Height="14"><Path Style="{StaticResource ButtonIconPath}" Data="M8,8 H20 V20 H8 Z M4,4 H16 V8 M4,4 V16 H8"/></Viewbox></Button></Grid>
+                            <TextBox x:Name="CitationPreviewText" IsReadOnly="True" MinHeight="72" MaxHeight="130" Margin="0,7,0,0" Padding="9" BorderBrush="#E0E6EE" Background="#F8FAFC" FontSize="11.5" Foreground="#40536A" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+                            <WrapPanel Margin="0,7,0,0"><Button x:Name="CopyLatexButton" Content="复制 LaTeX" Style="{StaticResource SecondaryButton}" Height="28" MinWidth="86" Padding="9,0" IsEnabled="False" Click="CopyLatexCitation_Click"/><Button x:Name="CopyPandocButton" Content="复制 [@key]" Style="{StaticResource SecondaryButton}" Height="28" MinWidth="88" Padding="9,0" Margin="6,0,0,0" IsEnabled="False" Click="CopyPandocCitation_Click"/></WrapPanel>
                             <TextBlock Text="快速引用用于便捷复制；正式投稿仍以 Zotero/CSL 输出为准。" FontSize="9.8" Foreground="#8B97A7" Margin="0,6,0,0" TextWrapping="Wrap"/>
 
                             <Border Height="1" Background="#E8EDF3" Margin="0,12,0,8"/>
                             <TabControl x:Name="DetailTabs" Background="Transparent" BorderBrush="#E2E8F0" FontSize="11.5">
-                                <TabItem Header="摘要">
-                                    <TextBox x:Name="AbstractText" IsReadOnly="True" BorderThickness="0" Background="Transparent" MinHeight="120" MaxHeight="260"
-                                             FontSize="11.7" Foreground="#4E6076" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Padding="4,8"/>
-                                </TabItem>
-                                <TabItem Header="详情">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="3,8">
-                                        <StackPanel>
-                                            <TextBlock Text="作者与角色" FontSize="11" FontWeight="SemiBold" Foreground="#586A81" Margin="0,0,0,5"/>
-                                            <ItemsControl x:Name="CreatorsList"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" FontSize="11.5" Foreground="#465971" Margin="0,2" TextWrapping="Wrap"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                                            <Border Height="1" Background="#E8EDF3" Margin="0,9"/>
-                                            <ItemsControl x:Name="InfoFields" ItemTemplate="{StaticResource FieldRowTemplate}"/>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </TabItem>
+                                <TabItem Header="摘要"><TextBox x:Name="AbstractText" IsReadOnly="True" BorderThickness="0" Background="Transparent" MinHeight="120" MaxHeight="260" FontSize="11.7" Foreground="#4E6076" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Padding="4,8"/></TabItem>
+                                <TabItem Header="详情"><ScrollViewer VerticalScrollBarVisibility="Auto" Padding="3,8"><StackPanel><TextBlock Text="作者与角色" FontSize="11" FontWeight="SemiBold" Foreground="#586A81" Margin="0,0,0,5"/><ItemsControl x:Name="CreatorsList"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" FontSize="11.5" Foreground="#465971" Margin="0,2" TextWrapping="Wrap"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl><Border Height="1" Background="#E8EDF3" Margin="0,9"/><ItemsControl x:Name="InfoFields" ItemTemplate="{StaticResource FieldRowTemplate}"/></StackPanel></ScrollViewer></TabItem>
                                 <TabItem Header="附件"><ListBox x:Name="AttachmentsList" BorderThickness="0" Background="Transparent" Padding="2,3" ItemTemplate="{StaticResource AttachmentTemplate}" MaxHeight="230"/></TabItem>
                                 <TabItem Header="笔记"><ListBox x:Name="NotesList" BorderThickness="0" Background="Transparent" Padding="2,7" MaxHeight="230"><ListBox.ItemTemplate><DataTemplate><Border BorderBrush="#E6EBF2" BorderThickness="0,0,0,1" Padding="0,7"><StackPanel><TextBlock Text="{Binding Text}" FontSize="11.6" Foreground="#4F6076" TextWrapping="Wrap"/><TextBlock Text="{Binding DateModified}" FontSize="10.2" Foreground="#929DAC" Margin="0,4,0,0"/></StackPanel></Border></DataTemplate></ListBox.ItemTemplate></ListBox></TabItem>
-                                <TabItem Header="组织">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="3,8" MaxHeight="230">
-                                        <StackPanel>
-                                            <TextBlock Text="标签" FontSize="11" FontWeight="SemiBold" Foreground="#586A81"/>
-                                            <WrapPanel x:Name="TagsPanel" Margin="0,6,0,0"/>
-                                            <Border Height="1" Background="#E8EDF3" Margin="0,10"/>
-                                            <TextBlock Text="所属分类" FontSize="11" FontWeight="SemiBold" Foreground="#586A81"/>
-                                            <ItemsControl x:Name="CollectionsList" Margin="0,5,0,0"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" FontSize="11.5" Foreground="#465971" Margin="0,2"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </TabItem>
+                                <TabItem Header="组织"><ScrollViewer VerticalScrollBarVisibility="Auto" Padding="3,8" MaxHeight="230"><StackPanel><TextBlock Text="标签" FontSize="11" FontWeight="SemiBold" Foreground="#586A81"/><WrapPanel x:Name="TagsPanel" Margin="0,6,0,0"/><Border Height="1" Background="#E8EDF3" Margin="0,10"/><TextBlock Text="所属分类" FontSize="11" FontWeight="SemiBold" Foreground="#586A81"/><ItemsControl x:Name="CollectionsList" Margin="0,5,0,0"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" FontSize="11.5" Foreground="#465971" Margin="0,2"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></ScrollViewer></TabItem>
                             </TabControl>
                         </StackPanel>
                     </ScrollViewer>
-
-                    <Border Grid.Row="5" BorderBrush="#E7EDF4" BorderThickness="0,1,0,0" Background="#FAFBFD">
-                        <TextBlock x:Name="ReferenceStatusText" Text="选择文献后可复制引用与文件位置" FontSize="10.1" Foreground="#7C899A" Margin="12,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                    </Border>
+                    <Border Grid.Row="5" BorderBrush="#E7EDF4" BorderThickness="0,1,0,0" Background="#FAFBFD"><TextBlock x:Name="ReferenceStatusText" Text="选择文献后可复制引用与文件位置" FontSize="10.1" Foreground="#7C899A" Margin="12,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/></Border>
                 </Grid>
             </Border>
         </Grid>
 
         <Border x:Name="FirstRunOverlay" Grid.RowSpan="3" Background="#F7F9FCF5" Visibility="Collapsed">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
-                <TextBlock Text="连接 Zotero 本地文献库" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                <TextBlock Text="AtlasDesk 只读访问 zotero.sqlite，不启动 Zotero，也不会修改数据库。" FontSize="12.7" Foreground="#6B7A90" TextAlignment="Center" TextWrapping="Wrap" Margin="0,9,0,0"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
-                    <Button Content="自动检测" Style="{StaticResource PrimaryButton}" Click="AutoDetect_Click"/>
-                    <Button Content="手动选择" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="ManualSelect_Click"/>
-                </StackPanel>
-            </StackPanel>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="460"><TextBlock Text="连接 Zotero 本地文献库" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock Text="AtlasDesk 只读访问 zotero.sqlite，不启动 Zotero，也不会修改数据库。" FontSize="12.7" Foreground="#6B7A90" TextAlignment="Center" TextWrapping="Wrap" Margin="0,9,0,0"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0"><Button Content="自动检测" Style="{StaticResource PrimaryButton}" Click="AutoDetect_Click"/><Button Content="手动选择" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="ManualSelect_Click"/></StackPanel></StackPanel>
         </Border>
     </Grid>
 </UserControl>
