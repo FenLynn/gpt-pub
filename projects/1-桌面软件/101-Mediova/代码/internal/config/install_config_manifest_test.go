@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const installConfigManifestSHA256 = "1c43b51ca11d0c5a6534fcab353310267963a860e429cea33f8ad2f6d3bc589e"
+const installConfigManifestSHA256 = "32b529875179572818d8ad58120d5072dd99ec960864ec42b723c0aca7f596ca"
 
 func TestInstallConfigFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
