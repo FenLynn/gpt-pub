@@ -178,12 +178,15 @@ func runCore(root string, r *report) error {
 	if identity == "" {
 		return errors.New("USERNAME is empty")
 	}
+	aclBefore, aclBeforeErr := os.ReadFile(path)
+	if aclBeforeErr != nil {
+		return fmt.Errorf("read ACL baseline: %w", aclBeforeErr)
+	}
 	denyArg := identity + ":(OI)(CI)(W,M)"
 	denyOut, denyErr := exec.Command("icacls", dataDir, "/deny", denyArg).CombinedOutput()
 	if denyErr != nil {
 		return fmt.Errorf("icacls deny failed: %v: %s", denyErr, strings.TrimSpace(string(denyOut)))
 	}
-	aclBefore, _ := os.ReadFile(path)
 	aclSaveErr := config.Save(settingsWithOutput("acl-change"))
 	// Restore access before reading the file for comparison. Reading while
 	// the explicit deny ACE is active only proves that the ACL is effective;
