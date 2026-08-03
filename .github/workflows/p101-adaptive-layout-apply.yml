@@ -1,0 +1,110 @@
+name: P101 Mediova adaptive layout apply
+
+on:
+  push:
+    branches: [p101-exp]
+    paths:
+      - '.github/workflows/p101-adaptive-layout-apply.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p101-adaptive-layout-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact experimental branch
+        uses: actions/checkout@v4
+        with:
+          ref: p101-exp
+          fetch-depth: 0
+
+      - name: Confirm branch identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "p101-exp"
+          echo "candidate=$(git rev-parse HEAD)"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+
+      - name: Apply audited adaptive layout patch
+        shell: bash
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          set -euo pipefail
+          python tools_apply_adaptive_layout.py
+          gofmt -w \
+            cmd/mediaworkbench/main_windows.go \
+            cmd/mediaworkbench/adaptive_layout.go \
+            cmd/mediaworkbench/adaptive_layout_test.go \
+            cmd/mediaworkbench/adaptive_layout_audit_windows_test.go
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          root = Path.cwd()
+          manifest = root / "SOURCE_FILES_SHA256.txt"
+          rows = []
+          for line in manifest.read_text(encoding="utf-8").splitlines():
+              parts = line.strip().split(maxsplit=1)
+              if len(parts) != 2:
+                  continue
+              rel = parts[1]
+              path = root / rel
+              if not path.is_file():
+                  raise SystemExit(f"missing manifest source: {rel}")
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {rel}")
+          manifest.write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+          PY
+
+      - name: Validate complete source and Windows cross-build
+        shell: bash
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          set -euo pipefail
+          sha256sum -c SOURCE_FILES_SHA256.txt
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet -unsafeptr=false ./...
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go test -c ./cmd/mediaworkbench -o "$RUNNER_TEMP/Mediova_tests.exe"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags='-H=windowsgui -s -w' -o "$RUNNER_TEMP/Mediova.exe" ./cmd/mediaworkbench
+          test -s "$RUNNER_TEMP/Mediova_tests.exe"
+          test -s "$RUNNER_TEMP/Mediova.exe"
+
+      - name: Enforce generated change scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=$(git -c core.quotePath=false diff --name-only)
+          printf '%s\n' "$changed"
+          bad=$(printf '%s\n' "$changed" | grep -Ev '^projects/1-桌面软件/101-Mediova/代码/(SOURCE_FILES_SHA256\.txt|cmd/mediaworkbench/main_windows\.go|cmd/mediaworkbench/adaptive_layout(_audit_windows_test|_test)?\.go)$' || true)
+          if [[ -n "$bad" ]]; then
+            echo "Unexpected generated paths:"
+            echo "$bad"
+            exit 1
+          fi
+          test -n "$changed"
+
+      - name: Commit validated implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            'projects/1-桌面软件/101-Mediova/代码/SOURCE_FILES_SHA256.txt' \
+            'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/main_windows.go' \
+            'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/adaptive_layout.go' \
+            'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/adaptive_layout_test.go' \
+            'projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/adaptive_layout_audit_windows_test.go'
+          git commit -m 'Mediova｜增加低高度自适应与连续布局门禁'
+          git push origin HEAD:p101-exp
