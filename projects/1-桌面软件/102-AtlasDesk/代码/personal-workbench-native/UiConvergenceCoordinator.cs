@@ -90,6 +90,8 @@ public sealed class UiConvergenceCoordinator
     };
 
     private readonly MainWindow _window;
+    private readonly HomeDashboardControl _home;
+    private readonly SettingsControl _settingsPage;
     private readonly ResourceDictionary _theme;
     private readonly HashSet<DependencyObject> _polished = new(ReferenceEqualityComparer.Instance);
     private readonly RoutedEventHandler _loadedHandler;
@@ -108,9 +110,14 @@ public sealed class UiConvergenceCoordinator
     private bool _layoutQueued;
     private bool? _lastAuditHealthy;
 
-    private UiConvergenceCoordinator(MainWindow window)
+    private UiConvergenceCoordinator(
+        MainWindow window,
+        HomeDashboardControl home,
+        SettingsControl settingsPage)
     {
         _window = window;
+        _home = home;
+        _settingsPage = settingsPage;
         _loadedHandler = OnElementLoaded;
         _theme = new ResourceDictionary
         {
@@ -143,7 +150,11 @@ public sealed class UiConvergenceCoordinator
         }), DispatcherPriority.Loaded);
     }
 
-    public static UiConvergenceCoordinator Attach(MainWindow window) => new(window);
+    public static UiConvergenceCoordinator Attach(
+        MainWindow window,
+        HomeDashboardControl home,
+        SettingsControl settingsPage)
+        => new(window, home, settingsPage);
 
     private void OnElementLoaded(object sender, RoutedEventArgs e)
     {
@@ -253,22 +264,16 @@ public sealed class UiConvergenceCoordinator
 
     private void ApplyPageLayouts(UiDensityMode mode)
     {
+        if (_home.IsLoaded)
+            ApplyHome(_home, mode);
+        if (_settingsPage.IsLoaded)
+            ApplySettings(_settingsPage, mode);
+
         foreach (var control in FindDescendants<UserControl>(_window))
         {
-            if (!control.IsLoaded) continue;
-            switch (control)
-            {
-                case HomeDashboardControl home:
-                    ApplyHome(home, mode);
-                    break;
-                case SettingsControl settings:
-                    ApplySettings(settings, mode);
-                    break;
-                default:
-                    if (GenericPageNames.Contains(control.GetType().Name))
-                        ApplyGenericPage(control, mode);
-                    break;
-            }
+            if (!control.IsLoaded || !GenericPageNames.Contains(control.GetType().Name))
+                continue;
+            ApplyGenericPage(control, mode);
         }
     }
 
