@@ -104,27 +104,27 @@ func (a *application) v452ExitSelectedQueue() {
 	setText(a.hStatusText, msg)
 }
 
-func (a *application) v452ActivateHeldSelected() bool {
+func (a *application) v452ActivateHeldSelected() (handled bool, activated bool) {
 	idxs := a.selectedTaskIndices()
 	if len(idxs) != 1 {
-		return false
+		return false, false
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	idx := idxs[0]
 	if idx < 0 || idx >= len(a.tasks) || a.tasks[idx] == nil {
-		return false
+		return false, false
 	}
 	task := a.tasks[idx]
 	if task.Status != model.StatusHeld || task.Hold == nil {
-		return false
+		return false, false
 	}
 	if a.heldEditTaskID != 0 && a.heldEditTaskID != task.ID {
 		setText(a.hStatusText, "请先应用、取消或移除当前正在修改的搁置任务。")
-		return true
+		return true, false
 	}
 	a.heldEditTaskID = task.ID
 	a.rightDraftFields = make(map[int]bool)
 	a.rightSelectionKey = ""
-	return true
+	return true, true
 }
