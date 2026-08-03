@@ -32,6 +32,9 @@ func startupStatusAllowsConfigNotice(current string) bool {
 	if current == "" {
 		return true
 	}
+	if strings.HasPrefix(current, "就绪。") || strings.HasPrefix(current, "就绪 ") {
+		return true
+	}
 	for _, passive := range []string{
 		"就绪",
 		"准备就绪",
@@ -45,4 +48,17 @@ func startupStatusAllowsConfigNotice(current string) bool {
 		}
 	}
 	return false
+}
+
+func mergeStartupRuntimeNotice(existing, notice string) string {
+	existing = strings.Join(strings.Fields(strings.TrimSpace(existing)), " ")
+	notice = strings.Join(strings.Fields(strings.TrimSpace(notice)), " ")
+	switch {
+	case existing == "":
+		return notice
+	case notice == "" || strings.Contains(existing, notice):
+		return existing
+	default:
+		return existing + " " + notice
+	}
 }
