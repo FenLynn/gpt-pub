@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.IO;
 using System.Windows;
 
 namespace PersonalWorkbench;
@@ -8,6 +7,7 @@ public partial class App : Application
 {
     private WorkbenchFeaturePipeline? _pipeline;
     private bool _windowLifetimeLoggingAttached;
+    private bool _safeModeNoticeShown;
 
     public static string RuntimeDirectory => ProductIdentity.RuntimeDirectory;
     public static string AppDataDirectory => ProductIdentity.RoamingDataDirectory;
@@ -19,12 +19,14 @@ public partial class App : Application
     public static string StateDirectory => ProductIdentity.StateDirectory;
     public static string CrashDirectory => ProductIdentity.CrashDirectory;
     public static string LogPath { get; } = Path.Combine(LogDirectory, "atlasdesk.log");
+    public static bool IsSafeMode { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
         ProductIdentity.EnsureDataDirectories();
         ApplyPendingRestoreBeforeStartup();
         StartupGuard.Begin(WorkbenchVersion.Current);
+        IsSafeMode = StartupGuard.SafeModeRecommended;
 
         Exit += (_, args) =>
         {
@@ -40,6 +42,7 @@ public partial class App : Application
         Log("Runtime=" + RuntimeDirectory);
         Log("RoamingData=" + AppDataDirectory);
         Log("LocalData=" + LocalDataDirectory);
+        Log("SafeMode=" + IsSafeMode);
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -97,6 +100,7 @@ public partial class App : Application
             _pipeline = WorkbenchFeaturePipeline.Attach(window);
             AttachWindowLifetimeLogging(window);
             Log("AtlasDesk " + WorkbenchVersion.Current + " modules attached");
+            ShowSafeModeNotice(window);
         }
         catch (Exception ex)
         {
@@ -107,6 +111,24 @@ public partial class App : Application
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    private void ShowSafeModeNotice(MainWindow window)
+    {
+        if (!IsSafeMode || _safeModeNoticeShown)
+            return;
+
+        _safeModeNoticeShown = true;
+        window.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            MessageBox.Show(
+                "AtlasDesk 检测到连续异常退出，已进入安全启动。\n\n"
+                + "本次不会自动打开 Dashboard，也不会修改你原来的自动打开设置。\n"
+                + "可先在诊断中心检查配置、WebView2、终端和日志，再手动进入各页面。",
+                "AtlasDesk 安全启动",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }));
     }
 
     private void AttachWindowLifetimeLogging(MainWindow window)

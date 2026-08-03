@@ -1,3 +1,37 @@
+AtlasDesk v1.0.2 candidate
+
+This reliability candidate protects startup and local configuration without changing the v1.0.1 user data model or entering the formal main branch.
+
+Settings protection
+- settings.json is written through a same-directory temporary file, flushed to disk and atomically replaced.
+- The previous valid settings file is retained as settings.json.bak.
+- A damaged primary file is quarantined instead of overwritten, then the latest valid backup is restored.
+- If neither copy is valid, AtlasDesk starts from normalized defaults and records the recovery source for diagnostics.
+- Safe-start runtime overrides never rewrite the user's saved Dashboard auto-open preference.
+
+Safe startup
+- StartupGuard keeps an atomic state file and backup.
+- One unclean session produces a warning; two consecutive unclean starts enter safe mode.
+- Safe mode suppresses Dashboard auto-open only for the current process and leaves all saved settings unchanged.
+- The user receives a clear safe-start explanation and can open the diagnostics center before entering feature pages.
+
+Diagnostics
+- Diagnostics now reports settings source/backup state, safe mode, WebView2, Runtime/Data boundaries, terminal host, CMD, PowerShell, Git, configured Conda/uv, Zotero read access and logs.
+- Dashboard reachability uses a cancellable four-second headers-only request and does not launch a browser or external tool.
+- Tool discovery checks saved paths and PATH without starting the programs.
+- Repeated diagnostic runs and support-bundle exports cancel the previous operation and reject stale results.
+- Support bundles include a sanitized settings snapshot and settings-load summary without exposing project or recent-file paths.
+
+Regression protection
+- Real temporary files verify atomic replacement, backup retention and quarantine.
+- Pure startup-policy tests verify the warning-to-safe-mode threshold and clean-exit reset.
+- Source gates prohibit process launching from diagnostics and preserve cancellation/generation boundaries.
+- All prior smoke, real window residency, ConPTY, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
+
+Verification status
+- v1.0.2 is an intermediate candidate on the route to v1.0.3.
+- It must not enter main or receive a formal tag/Release before combined user verification.
+
 AtlasDesk v1.0.1 candidate
 
 This maintenance candidate improves daily-use clarity without changing the v1.0.0 data model or adding a large product feature.

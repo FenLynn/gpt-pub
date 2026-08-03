@@ -1,10 +1,29 @@
-using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace PersonalWorkbench;
 
+public enum SettingsLoadSource
+{
+    Primary,
+    Backup,
+    Defaults
+}
+
+public sealed record SettingsLoadReport(
+    SettingsLoadSource Source,
+    string Detail,
+    string? QuarantinedPath = null)
+{
+    public bool Recovered => Source == SettingsLoadSource.Backup;
+}
+
 public sealed class AppSettings
 {
+    private const int CurrentSchemaVersion = 2;
+    private static readonly object FileGate = new();
+    private static SettingsLoadReport _lastLoadReport = new(SettingsLoadSource.Defaults, "尚未读取配置");
+
     private static readonly string[] DefaultZoteroColumns =
     {
         "type", "title", "authors", "year", "publication", "dateAdded", "pdf"
@@ -16,6 +35,7 @@ public sealed class AppSettings
         "tags", "notes", "attachments", "pdf"
     };
 
+    public int SettingsSchemaVersion { get; set; } = CurrentSchemaVersion;
     public string UserName { get; set; } = "Fenlynn";
     public string DashboardName { get; set; } = "Cloudflare Dashboard";
     public string DashboardUrl { get; set; } = string.Empty;
@@ -58,38 +78,139 @@ public sealed class AppSettings
     public bool SidebarCollapsed { get; set; }
     public bool DashboardAutoOpen { get; set; } = true;
 
+    [JsonIgnore]
+    private bool RuntimeDashboardAutoOpenSuppressed { get; set; }
+
+    [JsonIgnore]
+    private bool RuntimeDashboardAutoOpenOriginal { get; set; }
+
     public int EffectiveZoteroLimit => ZoteroLoadFullLibrary
         ? 0
         : Math.Clamp(ZoteroCalibrationLimit <= 0 ? 250 : ZoteroCalibrationLimit, 50, 5000);
 
     public static string SettingsPath => Path.Combine(App.AppDataDirectory, "settings.json");
+    public static string BackupPath => SettingsPath + ".bak";
+    public static SettingsLoadReport LastLoadReport => _lastLoadReport;
 
     public static AppSettings Load()
     {
-        try
+        lock (FileGate)
         {
-            if (!File.Exists(SettingsPath))
-                return Normalize(new AppSettings());
+            if (TryRead(SettingsPath, out var primary, out var primaryError))
+            {
+                _lastLoadReport = new SettingsLoadReport(SettingsLoadSource.Primary, "已读取主配置");
+                return ApplyRuntimeOverrides(Normalize(primary!));
+            }
 
-            var json = File.ReadAllText(SettingsPath);
-            return Normalize(JsonSerializer.Deserialize<AppSettings>(json, JsonOptions()) ?? new AppSettings());
-        }
-        catch (Exception ex)
-        {
-            App.Log("Settings load failed: " + ex);
-            return Normalize(new AppSettings());
+            string? quarantined = null;
+            if (File.Exists(SettingsPath))
+            {
+                quarantined = AtomicFileStore.Quarantine(SettingsPath, "corrupt");
+                App.Log("Settings primary load failed: " + primaryError);
+            }
+
+            if (TryRead(BackupPath, out var backup, out var backupError))
+            {
+                var recovered = Normalize(backup!);
+                try
+                {
+                    AtomicFileStore.WriteAllText(SettingsPath, SerializePersistent(recovered));
+                }
+                catch (Exception ex)
+                {
+                    App.Log("Settings primary reconstruction failed: " + ex);
+                }
+
+                _lastLoadReport = new SettingsLoadReport(
+                    SettingsLoadSource.Backup,
+                    "主配置不可用，已从最近有效备份恢复",
+                    quarantined);
+                return ApplyRuntimeOverrides(recovered);
+            }
+
+            if (File.Exists(BackupPath))
+            {
+                var backupQuarantine = AtomicFileStore.Quarantine(BackupPath, "corrupt-backup");
+                quarantined ??= backupQuarantine;
+                App.Log("Settings backup load failed: " + backupError);
+            }
+
+            _lastLoadReport = new SettingsLoadReport(
+                SettingsLoadSource.Defaults,
+                File.Exists(SettingsPath) || File.Exists(BackupPath)
+                    ? "主配置和备份均不可用，已使用安全默认值"
+                    : "首次启动，使用默认配置",
+                quarantined);
+            return ApplyRuntimeOverrides(Normalize(new AppSettings()));
         }
     }
 
     public void Save()
     {
-        Normalize(this);
-        Directory.CreateDirectory(App.AppDataDirectory);
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this, JsonOptions()));
+        lock (FileGate)
+        {
+            Normalize(this);
+            SettingsSchemaVersion = CurrentSchemaVersion;
+            AtomicFileStore.WriteAllText(SettingsPath, SerializePersistent(this), BackupPath);
+            _lastLoadReport = new SettingsLoadReport(SettingsLoadSource.Primary, "配置已原子保存并保留最近有效备份");
+        }
+    }
+
+    private static bool TryRead(string path, out AppSettings? value, out string error)
+    {
+        value = null;
+        error = string.Empty;
+        try
+        {
+            if (!File.Exists(path))
+            {
+                error = "文件不存在";
+                return false;
+            }
+
+            var json = File.ReadAllText(path);
+            value = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions());
+            if (value is null)
+            {
+                error = "反序列化结果为空";
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
+    }
+
+    private static AppSettings ApplyRuntimeOverrides(AppSettings value)
+    {
+        if (!App.IsSafeMode) return value;
+        value.RuntimeDashboardAutoOpenOriginal = value.DashboardAutoOpen;
+        value.RuntimeDashboardAutoOpenSuppressed = true;
+        value.DashboardAutoOpen = false;
+        return value;
+    }
+
+    private static string SerializePersistent(AppSettings value)
+    {
+        var current = value.DashboardAutoOpen;
+        try
+        {
+            if (value.RuntimeDashboardAutoOpenSuppressed)
+                value.DashboardAutoOpen = value.RuntimeDashboardAutoOpenOriginal;
+            return JsonSerializer.Serialize(value, JsonOptions());
+        }
+        finally
+        {
+            value.DashboardAutoOpen = current;
+        }
     }
 
     private static AppSettings Normalize(AppSettings value)
     {
+        value.SettingsSchemaVersion = CurrentSchemaVersion;
         value.ZoteroCalibrationLimit = Math.Clamp(value.ZoteroCalibrationLimit <= 0 ? 250 : value.ZoteroCalibrationLimit, 50, 5000);
         value.WorkspaceEditorFontSize = Math.Clamp(value.WorkspaceEditorFontSize <= 0 ? 14 : value.WorkspaceEditorFontSize, 11, 24);
         value.WorkspaceRecentLimit = Math.Clamp(value.WorkspaceRecentLimit <= 0 ? 12 : value.WorkspaceRecentLimit, 4, 50);

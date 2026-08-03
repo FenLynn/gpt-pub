@@ -8,6 +8,8 @@ public partial class DiagnosticsWindow : Window
 {
     private readonly AppSettings _settings;
     private IReadOnlyList<DiagnosticCheck> _checks = Array.Empty<DiagnosticCheck>();
+    private CancellationTokenSource? _operationCancellation;
+    private long _operationGeneration;
 
     public DiagnosticsWindow(AppSettings settings)
     {
@@ -15,30 +17,43 @@ public partial class DiagnosticsWindow : Window
         InitializeComponent();
         VersionText.Text = "v" + WorkbenchVersion.Current;
         Loaded += async (_, _) => await RefreshAsync();
+        Closed += (_, _) => CancelOperation();
     }
 
     private async Task RefreshAsync()
     {
+        var operation = BeginOperation();
         LoadingPanel.Visibility = Visibility.Visible;
         ChecksList.Visibility = Visibility.Collapsed;
         StatusText.Text = "正在检查…";
         try
         {
-            _checks = await DiagnosticsService.RunAsync(_settings);
+            var checks = await DiagnosticsService.RunAsync(_settings, operation.Token);
+            if (!IsCurrent(operation)) return;
+            _checks = checks;
             ChecksList.ItemsSource = _checks;
             var errors = _checks.Count(item => item.Severity == DiagnosticSeverity.Error);
             var warnings = _checks.Count(item => item.Severity == DiagnosticSeverity.Warning);
-            StatusText.Text = errors > 0 ? $"发现 {errors} 个异常、{warnings} 个注意项" : warnings > 0 ? $"检查完成 · {warnings} 个注意项" : "检查完成 · 未发现异常";
+            StatusText.Text = errors > 0
+                ? $"发现 {errors} 个异常、{warnings} 个注意项"
+                : warnings > 0
+                    ? $"检查完成 · {warnings} 个注意项"
+                    : "检查完成 · 未发现异常";
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             App.Log("Diagnostics refresh failed: " + ex);
-            StatusText.Text = "检查失败：" + ex.Message;
+            if (IsCurrent(operation)) StatusText.Text = "检查失败：" + ex.Message;
         }
         finally
         {
-            LoadingPanel.Visibility = Visibility.Collapsed;
-            ChecksList.Visibility = Visibility.Visible;
+            if (IsCurrent(operation))
+            {
+                LoadingPanel.Visibility = Visibility.Collapsed;
+                ChecksList.Visibility = Visibility.Visible;
+                CompleteOperation(operation);
+            }
         }
     }
 
@@ -75,16 +90,66 @@ public partial class DiagnosticsWindow : Window
             DefaultExt = ".zip"
         };
         if (dialog.ShowDialog(this) != true) return;
+
+        var operation = BeginOperation();
         try
         {
+            LoadingPanel.Visibility = Visibility.Visible;
             StatusText.Text = "正在生成支持包…";
-            await DiagnosticsService.ExportSupportBundleAsync(_settings, dialog.FileName);
-            StatusText.Text = "支持包已导出 · " + dialog.FileName;
+            await DiagnosticsService.ExportSupportBundleAsync(_settings, dialog.FileName, operation.Token);
+            if (IsCurrent(operation)) StatusText.Text = "支持包已导出 · " + dialog.FileName;
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             App.Log("Support bundle export failed: " + ex);
-            MessageBox.Show(this, "导出失败：\n" + ex.Message, "诊断中心", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (IsCurrent(operation))
+                MessageBox.Show(this, "导出失败：\n" + ex.Message, "诊断中心", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            if (IsCurrent(operation))
+            {
+                LoadingPanel.Visibility = Visibility.Collapsed;
+                CompleteOperation(operation);
+            }
         }
     }
+
+    private OperationToken BeginOperation()
+    {
+        CancelOperation();
+        var cancellation = new CancellationTokenSource();
+        _operationCancellation = cancellation;
+        return new OperationToken(
+            Interlocked.Increment(ref _operationGeneration),
+            cancellation,
+            cancellation.Token);
+    }
+
+    private bool IsCurrent(OperationToken operation)
+        => operation.Generation == _operationGeneration
+           && ReferenceEquals(_operationCancellation, operation.Cancellation)
+           && !operation.Token.IsCancellationRequested;
+
+    private void CompleteOperation(OperationToken operation)
+    {
+        if (!ReferenceEquals(_operationCancellation, operation.Cancellation)) return;
+        _operationCancellation = null;
+        operation.Cancellation.Dispose();
+    }
+
+    private void CancelOperation()
+    {
+        Interlocked.Increment(ref _operationGeneration);
+        var cancellation = Interlocked.Exchange(ref _operationCancellation, null);
+        if (cancellation is null) return;
+        try { cancellation.Cancel(); } catch { }
+        cancellation.Dispose();
+    }
+
+    private readonly record struct OperationToken(
+        long Generation,
+        CancellationTokenSource Cancellation,
+        CancellationToken Token);
 }
