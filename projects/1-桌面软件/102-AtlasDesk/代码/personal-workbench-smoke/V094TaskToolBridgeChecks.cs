@@ -27,7 +27,7 @@ internal static class V094TaskToolBridgeChecks
             "WorkbenchTaskHub.Service",
             "FileIntegrityTaskBridge.Cancel");
         RequireTokens(
-            Path.Combine(nativeRoot, "V064TaskEnhancer.cs"),
+            Path.Combine(nativeRoot, "TaskToolCoordinator.cs"),
             "Window_Closing",
             "仍有 {active} 个任务",
             "WorkbenchTaskHub.Shutdown");
