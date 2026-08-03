@@ -121,7 +121,10 @@ public partial class DiagnosticsWindow : Window
         CancelOperation();
         var cancellation = new CancellationTokenSource();
         _operationCancellation = cancellation;
-        return new OperationToken(Interlocked.Increment(ref _operationGeneration), cancellation);
+        return new OperationToken(
+            Interlocked.Increment(ref _operationGeneration),
+            cancellation,
+            cancellation.Token);
     }
 
     private bool IsCurrent(OperationToken operation)
@@ -145,8 +148,8 @@ public partial class DiagnosticsWindow : Window
         cancellation.Dispose();
     }
 
-    private readonly record struct OperationToken(long Generation, CancellationTokenSource Cancellation)
-    {
-        public CancellationToken Token => Cancellation.Token;
-    }
+    private readonly record struct OperationToken(
+        long Generation,
+        CancellationTokenSource Cancellation,
+        CancellationToken Token);
 }
