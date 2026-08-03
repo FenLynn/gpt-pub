@@ -182,6 +182,21 @@ func RecoverTasks(tasks []*model.Task, exists func(string) bool) RecoverySummary
 		}
 		summary.Total++
 		task.ThumbnailIndex = -1
+
+		// Terminal results are historical evidence. Preserve them even if the
+		// source media was moved or deleted after processing completed.
+		switch task.Status {
+		case model.StatusDone:
+			summary.Completed++
+			continue
+		case model.StatusSkipped:
+			summary.Skipped++
+			continue
+		case model.StatusFailed:
+			summary.Failed++
+			continue
+		}
+
 		if !exists(task.Input) {
 			task.Status = model.StatusFailed
 			task.Progress = 0
@@ -212,12 +227,6 @@ func RecoverTasks(tasks []*model.Task, exists func(string) bool) RecoverySummary
 				summary.Frozen++
 			}
 			summary.Ready++
-		case model.StatusDone:
-			summary.Completed++
-		case model.StatusSkipped:
-			summary.Skipped++
-		case model.StatusFailed:
-			summary.Failed++
 		default:
 			task.Status = model.StatusReady
 			task.Progress = 0
