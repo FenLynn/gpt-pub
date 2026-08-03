@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time workflow. Do not merge.
 
-Reload the real edit-function boundary from latest main.
+Reload the index-based edit-function replacement from latest main.
