@@ -44,9 +44,9 @@ func init() {
 	startupNoticeHook = hook
 }
 
-func startupNoticeGetMessageProc(code int, wParam, lParam uintptr) uintptr {
+func startupNoticeGetMessageProc(code, wParam, lParam uintptr) uintptr {
 	hook := startupNoticeHook
-	if code >= 0 && startupNoticeText != "" {
+	if int32(code) >= 0 && startupNoticeText != "" {
 		current := app
 		if current != nil && current.controlsReady && current.hStatusText != 0 {
 			notice := startupNoticeText
@@ -61,6 +61,6 @@ func startupNoticeGetMessageProc(code int, wParam, lParam uintptr) uintptr {
 			}
 		}
 	}
-	next, _, _ := startupNoticeCallNextHookEx.Call(hook, uintptr(code), wParam, lParam)
+	next, _, _ := startupNoticeCallNextHookEx.Call(hook, code, wParam, lParam)
 	return next
 }
