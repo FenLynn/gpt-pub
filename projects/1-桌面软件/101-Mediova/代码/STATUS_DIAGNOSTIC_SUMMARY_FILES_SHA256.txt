@@ -1,0 +1,4 @@
+AUTO  cmd/mediaworkbench/status_diagnostic_summary.go
+AUTO  cmd/mediaworkbench/status_diagnostic_summary_test.go
+AUTO  cmd/mediaworkbench/status_diagnostic_summary_windows.go
+AUTO  cmd/mediaworkbench/status_diagnostic_summary_source_test.go
