@@ -19,6 +19,7 @@ internal static class V114DashboardStabilityChecks
         var lifecycle = File.ReadAllText(RequireFile(nativeRoot, "DashboardLifecycleCoordinator.cs"));
         var pipeline = File.ReadAllText(RequireFile(nativeRoot, "WorkbenchFeaturePipeline.cs"));
         var mainWindow = File.ReadAllText(RequireFile(nativeRoot, "MainWindow.xaml.cs"));
+        var releaseNotes = File.ReadAllText(RequireFile(nativeRoot, "RELEASE_NOTES.txt"));
 
         RequireContains(lifecycle,
             "public sealed class DashboardLifecycleCoordinator",
@@ -40,6 +41,12 @@ internal static class V114DashboardStabilityChecks
             "ShellResilience = ShellResilienceCoordinator.Attach(window)",
             "DashboardLifecycle = DashboardLifecycleCoordinator.Attach(window, ShellResilience)",
             "public DashboardLifecycleCoordinator DashboardLifecycle { get; }");
+
+        RequireContains(releaseNotes,
+            "AtlasDesk v1.1.4 Dashboard stability hotfix",
+            "E_ABORT (0x80004004)",
+            "Refresh, retry, Dashboard home, back and forward",
+            "main remains the formal v1.0.0 baseline");
 
         var shellIndex = pipeline.IndexOf(
             "ShellResilience = ShellResilienceCoordinator.Attach(window)",
