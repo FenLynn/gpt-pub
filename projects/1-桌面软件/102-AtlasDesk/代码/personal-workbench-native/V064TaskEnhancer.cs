@@ -20,7 +20,11 @@ public sealed class V064TaskEnhancer
         _tasks = new TaskCenterControl(pipeline.Settings) { Visibility = Visibility.Collapsed };
         Install();
         WireNavigation();
-        _window.Closed += (_, _) => _tasks.Dispose();
+        _window.Closed += (_, _) =>
+        {
+            _tasks.Dispose();
+            WorkbenchTaskHub.Shutdown();
+        };
     }
 
     public static V064TaskEnhancer Attach(MainWindow window, WorkbenchFeaturePipeline pipeline) => new(window, pipeline);
