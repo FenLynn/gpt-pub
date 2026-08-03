@@ -22,8 +22,7 @@ public sealed class WorkbenchFeaturePipeline
         DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
         DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings);
         Projects = V063ProjectEnhancer.Attach(window, this);
-        Tasks = V064TaskEnhancer.Attach(window, this);
-        Tools = V065ToolsEnhancer.Attach(window, this);
+        TaskTools = TaskToolCoordinator.Attach(window, this);
         Backup = V066BackupEnhancer.Attach(window);
         FeatureHosts = FeatureHostTerminalCoordinator.Attach(window, this);
         WorkspaceTerminal = WorkspaceTerminalCoordinator.Attach(window, this);
@@ -43,8 +42,7 @@ public sealed class WorkbenchFeaturePipeline
     public DashboardScriptDiagnostics DashboardDiagnostics { get; }
     public DashboardInteractionCoordinator DashboardInteraction { get; }
     public V063ProjectEnhancer Projects { get; }
-    public V064TaskEnhancer Tasks { get; }
-    public V065ToolsEnhancer Tools { get; }
+    public TaskToolCoordinator TaskTools { get; }
     public V066BackupEnhancer Backup { get; }
     public FeatureHostTerminalCoordinator FeatureHosts { get; }
     public WorkspaceTerminalCoordinator WorkspaceTerminal { get; }
