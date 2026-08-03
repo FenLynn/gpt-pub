@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const portableModeAuthorityManifestSHA256 = "93241a077a961704c45112565d80e644007b2bed8c6612caa509ab4e571b4437"
+const portableModeAuthorityManifestSHA256 = "4f2309246645200f34a99164a15159958f00356dd38c0d85874ae5caf9867538"
 
 func TestPortableModeAuthorityFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
