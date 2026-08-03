@@ -112,14 +112,14 @@ jobs:
           $letter=@('R','S','T','U','V','W','X','Y','Z') | Where-Object {$used -notcontains $_} | Select-Object -First 1
           if (-not $letter) { throw 'No free drive letter is available for disk-full probe' }
           $diskpart=Join-Path $env:RUNNER_TEMP ('Mediova-Diskpart-' + [guid]::NewGuid().ToString('N') + '.txt')
-          @"
-          create vdisk file="$vhd" maximum=64 type=fixed
-          select vdisk file="$vhd"
-          attach vdisk
-          create partition primary
-          format fs=ntfs quick label=MEDIOVAFULL
-          assign letter=$letter
-          "@ | Set-Content $diskpart -Encoding Ascii
+          @(
+            "create vdisk file=`"$vhd`" maximum=64 type=fixed",
+            "select vdisk file=`"$vhd`"",
+            'attach vdisk',
+            'create partition primary',
+            'format fs=ntfs quick label=MEDIOVAFULL',
+            "assign letter=$letter"
+          ) | Set-Content $diskpart -Encoding Ascii
           try {
             diskpart /s $diskpart | Write-Host
             if ($LASTEXITCODE -ne 0 -or !(Test-Path "$letter`:\")) { throw 'Unable to create the disk-full VHD' }
@@ -155,10 +155,10 @@ jobs:
               throw 'Disk-full report did not confirm failure and primary preservation'
             }
           } finally {
-            @"
-            select vdisk file="$vhd"
-            detach vdisk
-            "@ | Set-Content $diskpart -Encoding Ascii
+            @(
+              "select vdisk file=`"$vhd`"",
+              'detach vdisk'
+            ) | Set-Content $diskpart -Encoding Ascii
             diskpart /s $diskpart | Out-Null
             Remove-Item $diskpart -Force -ErrorAction SilentlyContinue
             Remove-Item $vhd -Force -ErrorAction SilentlyContinue
