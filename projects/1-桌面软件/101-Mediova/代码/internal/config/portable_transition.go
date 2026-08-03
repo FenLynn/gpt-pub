@@ -99,12 +99,59 @@ func portableSwitchRegularFile(path string) (os.FileInfo, bool, error) {
 	return info, true, nil
 }
 
+func writePortableSwitchData(path string, data []byte, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".mediova-switch-write-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	ok := false
+	defer func() {
+		_ = tmp.Close()
+		if !ok {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if err := tmp.Chmod(mode.Perm()); err != nil {
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	old := path + ".mode-switch-old"
+	_ = os.Remove(old)
+	if _, err := os.Stat(path); err == nil {
+		if err := os.Rename(path, old); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Rename(old, path)
+		return err
+	}
+	_ = os.Remove(old)
+	ok = true
+	return nil
+}
+
 func copyPortableSwitchFile(src, dst string, mode os.FileMode) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	return atomicWrite(dst, data, mode.Perm())
+	return writePortableSwitchData(dst, data, mode)
 }
 
 func backupPortableManagedFiles(target, backup string) (int, error) {
@@ -137,7 +184,7 @@ func stagePortableManagedFiles(stage, source string, settings model.Settings) er
 	}
 	configData = append(configData, '\n')
 	for _, name := range []string{"config.json", "config.json.lastgood"} {
-		if err := atomicWrite(filepath.Join(stage, name), configData, 0o644); err != nil {
+		if err := writePortableSwitchData(filepath.Join(stage, name), configData, 0o644); err != nil {
 			return err
 		}
 	}
