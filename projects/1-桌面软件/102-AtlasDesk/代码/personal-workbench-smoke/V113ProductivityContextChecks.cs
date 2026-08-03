@@ -26,6 +26,7 @@ internal static class V113ProductivityContextChecks
         var projectWorkflowPath = RequireFile(nativeRoot, "ProjectWorkflowCoordinator.cs");
         var zoteroSearchPath = RequireFile(nativeRoot, "ZoteroLibraryControl.Search.cs");
         var zoteroReferencePath = RequireFile(nativeRoot, "ZoteroLibraryControl.ReferencePane.cs");
+        var releaseNotesPath = RequireFile(nativeRoot, "RELEASE_NOTES.txt");
 
         var store = File.ReadAllText(storePath);
         var coordinator = File.ReadAllText(coordinatorPath);
@@ -36,6 +37,7 @@ internal static class V113ProductivityContextChecks
         var projectWorkflow = File.ReadAllText(projectWorkflowPath);
         var zoteroSearch = File.ReadAllText(zoteroSearchPath);
         var zoteroReference = File.ReadAllText(zoteroReferencePath);
+        var releaseNotes = File.ReadAllText(releaseNotesPath);
 
         RequireContains(store,
             "productivity-context.json",
@@ -97,6 +99,14 @@ internal static class V113ProductivityContextChecks
         RequireContains(zoteroReference,
             "public ZoteroRecord? SelectedRecord",
             "public string CurrentCitationKey");
+        RequireContains(releaseNotes,
+            "AtlasDesk v1.1.3 productivity-context candidate",
+            "v1.1.0 - Command Center context",
+            "v1.1.1 - Project context profiles",
+            "v1.1.2 - Safe session continuation",
+            "v1.1.3 - Project and Zotero bridge",
+            "%APPDATA%\\AtlasDesk\\productivity-context.json",
+            "main remains the formal v1.0.0 baseline");
 
         RequireContains(pipeline,
             "ProductivityContext = ProductivityContextCoordinator.Attach(window, this)",
