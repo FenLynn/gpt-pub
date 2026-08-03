@@ -48,14 +48,22 @@ internal static class Program
             AssertEnvironmentIdle(development, busyField,
                 "environment discovery started during normal startup");
 
+            SetPhase("opening explicit home surface");
+            if (window.FindName("HomeNav") is not RadioButton homeNav)
+                throw new InvalidOperationException("Home navigation button is unavailable.");
+            homeNav.IsChecked = true;
+            PumpDispatcher(TimeSpan.FromMilliseconds(350));
+            if (!pipeline.Experience.Home.IsLoaded)
+                throw new InvalidOperationException("Explicit home surface did not load.");
+
             SetPhase("verifying compact adaptive layout");
-            AssertAdaptiveLayout(window, 1100, 700, UiDensityMode.Compact, 2);
+            AssertAdaptiveLayout(window, pipeline.Experience.Home, 1100, 700, UiDensityMode.Compact, 2);
 
             SetPhase("verifying standard adaptive layout");
-            AssertAdaptiveLayout(window, 1320, 780, UiDensityMode.Standard, 4);
+            AssertAdaptiveLayout(window, pipeline.Experience.Home, 1320, 780, UiDensityMode.Standard, 4);
 
             SetPhase("verifying spacious adaptive layout");
-            AssertAdaptiveLayout(window, 1500, 860, UiDensityMode.Spacious, 4);
+            AssertAdaptiveLayout(window, pipeline.Experience.Home, 1500, 860, UiDensityMode.Spacious, 4);
 
             SetPhase("opening converged diagnostics window");
             var diagnostics = new DiagnosticsWindow(pipeline.Settings) { Owner = window };
@@ -134,6 +142,7 @@ internal static class Program
 
     private static void AssertAdaptiveLayout(
         MainWindow window,
+        HomeDashboardControl home,
         double width,
         double height,
         UiDensityMode expectedMode,
@@ -157,8 +166,6 @@ internal static class Program
         if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
             throw new InvalidOperationException("UI adaptive audit published invalid geometry or DPI.");
 
-        var home = FindVisualChild<HomeDashboardControl>(window)
-            ?? throw new InvalidOperationException("Home dashboard is unavailable during adaptive residency.");
         var metrics = FindVisualChild<UniformGrid>(home)
             ?? throw new InvalidOperationException("Home metric grid is unavailable during adaptive residency.");
         if (metrics.Columns != expectedMetricColumns)
