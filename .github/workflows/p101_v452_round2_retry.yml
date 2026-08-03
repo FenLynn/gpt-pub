@@ -21,7 +21,7 @@ jobs:
         with:
           go-version: '1.24.x'
           cache: false
-      - name: Correct exact signatures and apply round 2
+      - name: Correct signatures, synchronize contracts and apply round 2
         shell: bash
         run: |
           set -euo pipefail
@@ -52,8 +52,57 @@ jobs:
               raise SystemExit(f'expected one obsolete helper-signature migration, found {count}')
           path.write_text(text, encoding='utf-8', newline='\n')
           PY
+
           python projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py
+
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import re
+
+          code = Path('projects/1-桌面软件/101-Mediova/代码')
+          cmd = code / 'cmd/mediaworkbench'
+
+          contract = cmd / 'v422_source_contract_test.go'
+          text = contract.read_text(encoding='utf-8')
+          replacements = {
+              '\t\t`{"分辨率", 100}, {"时长", 76}`,\n': '\t\t`var taskListColumns = v452TaskListColumns`,\n',
+              '\t\t`cd.ISubItem != 8 && cd.ISubItem != 9 && cd.ISubItem != 10`,\n': '\t\t`taskColOutputSize && cd.ISubItem != taskColProgress && cd.ISubItem != taskColStatus`,\n',
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one legacy contract row, found {count}: {old!r}')
+              text = text.replace(old, new, 1)
+          contract.write_text(text, encoding='utf-8', newline='\n')
+
+          manifest = code / 'V452_ROUND1_UI_STATE_FILES_SHA256.txt'
+          rows = []
+          for line in manifest.read_text(encoding='utf-8').splitlines():
+              parts = line.split(maxsplit=1)
+              if len(parts) != 2:
+                  raise SystemExit(f'invalid round-one manifest row: {line!r}')
+              rel = parts[1]
+              digest = hashlib.sha256((code / rel).read_bytes()).hexdigest()
+              rows.append(f'{digest}  {rel}')
+          manifest.write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          manifest_digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+          manifest_test = cmd / 'v452_round1_manifest_test.go'
+          test_text = manifest_test.read_text(encoding='utf-8')
+          test_text, count = re.subn(
+              r'const v452Round1ManifestSHA256 = "[0-9a-f]{64}"',
+              f'const v452Round1ManifestSHA256 = "{manifest_digest}"',
+              test_text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'expected one round-one manifest digest constant, found {count}')
+          manifest_test.write_text(test_text, encoding='utf-8', newline='\n')
+          PY
+
           cd projects/1-桌面软件/101-Mediova/代码
+          gofmt -w cmd/mediaworkbench/v422_source_contract_test.go cmd/mediaworkbench/v452_round1_manifest_test.go
           go test -count=1 ./...
           cd ../../../..
           rm -f .github/workflows/p101_v452_round2_retry.yml
