@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf16"
 	"unsafe"
 
 	"mediaworkbench/internal/config"
@@ -132,6 +133,27 @@ func statusDiagnosticControlWidth(hwnd uintptr) int32 {
 	return width
 }
 
+func statusDiagnosticUTF16PtrToString(pointer *uint16) string {
+	if pointer == nil {
+		return ""
+	}
+	const maximumUnits = 32768
+	base := uintptr(unsafe.Pointer(pointer))
+	unitSize := unsafe.Sizeof(*pointer)
+	length := 0
+	for length < maximumUnits {
+		value := *(*uint16)(unsafe.Pointer(base + uintptr(length)*unitSize))
+		if value == 0 {
+			break
+		}
+		length++
+	}
+	if length == 0 {
+		return ""
+	}
+	return string(utf16.Decode(unsafe.Slice(pointer, length)))
+}
+
 func statusDiagnosticFullDetail() string {
 	latest := normalizeDiagnosticStatusText(statusDiagnosticLatest)
 	if current := app; current != nil {
@@ -144,7 +166,7 @@ func statusDiagnosticFullDetail() string {
 
 func statusDiagnosticStatusWndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 	if message == statusDiagnosticWMSetText && lParam != 0 {
-		full := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(lParam)))
+		full := statusDiagnosticUTF16PtrToString((*uint16)(unsafe.Pointer(lParam)))
 		if isDiagnosticStatusText(full) {
 			statusDiagnosticLatest = normalizeDiagnosticStatusText(full)
 			statusDiagnosticVisible = true
