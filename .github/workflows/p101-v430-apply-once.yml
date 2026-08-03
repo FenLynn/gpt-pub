@@ -35,9 +35,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m py_compile tooling/.github/scripts/p101_v430_apply.py
+          python -m py_compile tooling/.github/scripts/p101_v430_apply.py tooling/.github/scripts/p101_v430_apply_fix1.py
           cd work
-          python ../tooling/.github/scripts/p101_v430_apply.py
+          python ../tooling/.github/scripts/p101_v430_apply_fix1.py
       - name: Verify P101-only scope and push
         working-directory: work
         shell: bash
