@@ -1,3 +1,24 @@
+AtlasDesk v0.9.4
+
+This stabilization release connects file-integrity tools to the existing task center instead of maintaining two independent execution systems.
+
+Shared task flow
+- Manifest generation, manifest verification and two-file comparison create records in the same task collection used by the task page.
+- Tool and task pages display the same queued, running, completed, failed or cancelled state.
+- Cancellation from either page reaches the same operation.
+- Shared records preserve target paths, progress, result summaries and bounded history.
+- The existing task concurrency limit remains in place; no resident background service or scheduler was introduced.
+
+Exit and recovery
+- Closing AtlasDesk with active work shows an explicit confirmation instead of silently interrupting tasks.
+- Confirmed exit cancels active work and persists its interrupted state.
+- History remains limited to the latest 100 records.
+- Records left queued or running by an abnormal previous exit are loaded as failed with a clear interruption message.
+
+Regression protection
+- New v0.9.4 smoke checks execute a real shared task record and verify common collection membership and serialization.
+- Existing file-integrity atomic-write, path-safety, cancellation, Runtime/Data and privacy checks remain active.
+
 AtlasDesk v0.9.3
 
 This stabilization release makes the project center useful as a persistent daily entry point without turning AtlasDesk into an IDE.
