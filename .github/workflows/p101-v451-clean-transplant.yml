@@ -1,0 +1,39 @@
+name: P101 v4.5.1 Clean Transplant
+
+on:
+  push:
+    branches: [p101-v451-stable-candidate]
+    paths:
+      - '.github/workflows/p101-v451-clean-transplant.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  transplant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p101-v451-stable-candidate
+          fetch-depth: 0
+      - name: Transplant exact validated Mediova tree and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit='c41823394b2b74c2a9de5da6745815f2d946122f'
+          project='projects/1-桌面软件/101-Mediova'
+          git fetch origin "$source_commit" --depth=1
+          git checkout "$source_commit" -- "$project"
+          rm .github/workflows/p101-v451-clean-transplant.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$project" .github/workflows/p101-v451-clean-transplant.yml
+          git diff --cached --check
+          if git diff --cached --name-only | grep -Ev '^projects/1-桌面软件/101-Mediova/' | grep -q .; then
+            echo 'Unexpected out-of-scope change in clean transplant'
+            git diff --cached --name-only
+            exit 1
+          fi
+          git commit -m 'Mediova｜移植已验证 v4.5.1 稳定候选目录树'
+          git push origin HEAD:p101-v451-stable-candidate
