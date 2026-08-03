@@ -1,4 +1,5 @@
 using PersonalWorkbench;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -151,28 +152,36 @@ internal static class Program
         window.WindowState = WindowState.Normal;
         window.Width = width;
         window.Height = height;
-        PumpDispatcher(TimeSpan.FromMilliseconds(450));
-        window.UpdateLayout();
-        PumpDispatcher(TimeSpan.FromMilliseconds(180));
+
+        var timer = Stopwatch.StartNew();
+        UiAdaptiveAuditSnapshot? snapshot = null;
+        UniformGrid? metrics = null;
+        while (timer.Elapsed < TimeSpan.FromSeconds(3))
+        {
+            PumpDispatcher(TimeSpan.FromMilliseconds(100));
+            window.UpdateLayout();
+            snapshot = UiAdaptiveAuditService.Current;
+            metrics = FindVisualChild<UniformGrid>(home);
+            if (snapshot is not null
+                && Math.Abs(snapshot.WindowWidth - window.ActualWidth) < 2
+                && Math.Abs(snapshot.WindowHeight - window.ActualHeight) < 2
+                && snapshot.Mode == expectedMode
+                && metrics?.Columns == expectedMetricColumns)
+            {
+                AssertWindowAlive(window, $"after resizing to {width:0}x{height:0}");
+                if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
+                    throw new InvalidOperationException("UI adaptive audit published invalid geometry or DPI.");
+                return;
+            }
+        }
+
         AssertWindowAlive(window, $"after resizing to {width:0}x{height:0}");
-
-        var snapshot = UiAdaptiveAuditService.Current
-            ?? throw new InvalidOperationException("UI adaptive audit did not publish a snapshot.");
-        if (snapshot.Mode != expectedMode)
-        {
-            throw new InvalidOperationException(
-                $"Adaptive mode mismatch at {width:0}x{height:0}: expected {expectedMode}, got {snapshot.Mode}.");
-        }
-        if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
-            throw new InvalidOperationException("UI adaptive audit published invalid geometry or DPI.");
-
-        var metrics = FindVisualChild<UniformGrid>(home)
-            ?? throw new InvalidOperationException("Home metric grid is unavailable during adaptive residency.");
-        if (metrics.Columns != expectedMetricColumns)
-        {
-            throw new InvalidOperationException(
-                $"Home metric columns mismatch in {expectedMode}: expected {expectedMetricColumns}, got {metrics.Columns}.");
-        }
+        throw new InvalidOperationException(
+            $"Adaptive layout did not settle for requested {width:0}x{height:0}. "
+            + $"Actual window={window.ActualWidth:0}x{window.ActualHeight:0}; "
+            + $"snapshot={(snapshot is null ? "missing" : $"{snapshot.WindowWidth:0}x{snapshot.WindowHeight:0}/{snapshot.Mode}")}; "
+            + $"metricColumns={(metrics is null ? "missing" : metrics.Columns)}; "
+            + $"expected={expectedMode}/{expectedMetricColumns}.");
     }
 
     private static void AssertEnvironmentIdle(
