@@ -1,3 +1,28 @@
+AtlasDesk v1.1.4 Dashboard stability hotfix
+
+This hotfix addresses frequent AtlasDesk exits and WebView2 E_ABORT failures when Dashboard startup, window activation, retry and refresh overlapped. It contains no new product workflow and keeps the v1.1.3 project-context behavior unchanged.
+
+Dashboard lifecycle fix
+- Dashboard controller creation is no longer treated as a failed controller merely because the window becomes active.
+- The older ShellResilience activation, periodic watchdog and Dashboard-navigation recovery hooks are retired at runtime.
+- Actual WebView2 ProcessFailed recovery remains owned by MainWindow.
+- Refresh, retry, Dashboard home, back and forward are detached from the retained direct XAML handlers and replaced with one guarded command path.
+- Dashboard commands are serialized; repeated clicks are ignored while another command is active.
+- Commands wait for initialization or recovery to finish before touching CoreWebView2.
+- COM, disposed-controller and invalid-state failures are contained inside the Dashboard surface instead of escaping into the WPF dispatcher or terminating the process.
+- The command semaphore is intentionally not disposed during shutdown while an async continuation may still release it.
+
+Observed root cause
+- AtlasDesk 1.1.3 could start MainWindow.EnsureDashboardAsync and then immediately run ShellResilienceCoordinator recovery on window activation.
+- Shell recovery disposed or replaced the WebView2 instance while CreateCoreWebView2ControllerAsync was still running.
+- The resulting COM error was E_ABORT (0x80004004).
+- The retained refresh handler also called WebView2.Reload directly without checking initialization, recovery or disposal state.
+
+Candidate boundary
+- v1.1.4 is a focused crash hotfix for user verification.
+- Project context, Zotero read-only behavior, Runtime/Data separation and the external-browser policy are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.3 productivity-context candidate
 
 AtlasDesk v1.1 connects the existing Command Center, project center, workspace, terminal and read-only Zotero library into one recoverable project workflow. It does not add a plugin system, cloud account, background service or second browser. The formal main branch remains at v1.0.0 until combined user verification.
