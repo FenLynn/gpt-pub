@@ -1,5 +1,11 @@
 namespace PersonalWorkbench;
 
+public sealed class WorkbenchTaskHandle
+{
+    public required WorkbenchTaskRecord Record { get; init; }
+    public required Task<WorkbenchTaskRecord> Completion { get; init; }
+}
+
 public static class WorkbenchTaskHub
 {
     private static readonly object Gate = new();
@@ -31,7 +37,7 @@ public static class FileIntegrityTaskBridge
     private static readonly Dictionary<Guid, CancellationTokenSource> Cancellations = new();
     private static readonly object Gate = new();
 
-    public static async Task<WorkbenchTaskRecord> RunAsync(
+    public static WorkbenchTaskHandle Start(
         string title,
         string targetPath,
         Func<IProgress<double>, CancellationToken, Task<string>> operation)
@@ -53,7 +59,19 @@ public static class FileIntegrityTaskBridge
         lock (Gate) Cancellations[record.Id] = cancellation;
         service.Tasks.Insert(0, record);
         Persist(service);
+        return new WorkbenchTaskHandle
+        {
+            Record = record,
+            Completion = ExecuteAsync(service, record, cancellation, operation)
+        };
+    }
 
+    private static async Task<WorkbenchTaskRecord> ExecuteAsync(
+        WorkbenchTaskService service,
+        WorkbenchTaskRecord record,
+        CancellationTokenSource cancellation,
+        Func<IProgress<double>, CancellationToken, Task<string>> operation)
+    {
         var entered = false;
         try
         {
