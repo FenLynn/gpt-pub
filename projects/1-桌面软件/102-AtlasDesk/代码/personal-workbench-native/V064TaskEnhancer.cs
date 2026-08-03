@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,13 +21,32 @@ public sealed class V064TaskEnhancer
         _tasks = new TaskCenterControl(pipeline.Settings) { Visibility = Visibility.Collapsed };
         Install();
         WireNavigation();
-        _window.Closed += (_, _) => _tasks.Dispose();
+        _window.Closing += Window_Closing;
+        _window.Closed += (_, _) =>
+        {
+            _tasks.Dispose();
+            WorkbenchTaskHub.Shutdown();
+        };
     }
 
     public static V064TaskEnhancer Attach(MainWindow window, WorkbenchFeaturePipeline pipeline) => new(window, pipeline);
 
     private static T? ReadField<T>(object instance, string name) where T : class
         => instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance) as T;
+
+    private void Window_Closing(object? sender, CancelEventArgs e)
+    {
+        var active = WorkbenchTaskHub.Service.Tasks.Count(task => task.CanCancel);
+        if (active == 0) return;
+        var result = MessageBox.Show(
+            _window,
+            $"仍有 {active} 个任务正在排队或运行。\n\n退出将取消这些任务，并在历史中记录中断状态。是否继续退出？",
+            "AtlasDesk 任务仍在运行",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes)
+            e.Cancel = true;
+    }
 
     private void Install()
     {
