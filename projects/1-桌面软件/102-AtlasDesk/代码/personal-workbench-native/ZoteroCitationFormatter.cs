@@ -2,14 +2,14 @@ using System.Text.RegularExpressions;
 
 namespace PersonalWorkbench;
 
-internal enum ZoteroCitationFormat
+public enum ZoteroCitationFormat
 {
     Gbt7714Quick,
     ApaQuick,
     Compact
 }
 
-internal static class ZoteroCitationFormatter
+public static class ZoteroCitationFormatter
 {
     private static readonly Regex ExtraCitationKeyPattern = new(
         @"(?im)^\s*(?:citation\s*key|citation-key|citekey|tex\.citationkey|bibtex\.citationkey)\s*[:=]\s*(?<key>[^\r\n]+?)\s*$",
@@ -18,14 +18,11 @@ internal static class ZoteroCitationFormatter
     public static string ResolveCitationKey(ZoteroItemDetails details)
     {
         ArgumentNullException.ThrowIfNull(details);
-
-        var native = details.Fields.FirstOrDefault(field =>
-            field.Name.Equals("citationKey", StringComparison.OrdinalIgnoreCase));
+        var native = details.Fields.FirstOrDefault(field => field.Name.Equals("citationKey", StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(native?.Value))
             return native.Value.Trim();
 
-        var extra = details.Fields.FirstOrDefault(field =>
-            field.Name.Equals("extra", StringComparison.OrdinalIgnoreCase));
+        var extra = details.Fields.FirstOrDefault(field => field.Name.Equals("extra", StringComparison.OrdinalIgnoreCase));
         if (string.IsNullOrWhiteSpace(extra?.Value))
             return string.Empty;
 
@@ -73,13 +70,7 @@ internal static class ZoteroCitationFormatter
         return string.Join(", ", authors.Take(3)) + ", et al.";
     }
 
-    private static string BuildGbt(
-        string authors,
-        string year,
-        string title,
-        string source,
-        string doi,
-        string itemType)
+    private static string BuildGbt(string authors, string year, string title, string source, string doi, string itemType)
     {
         var marker = itemType switch
         {
@@ -125,11 +116,10 @@ internal static class ZoteroCitationFormatter
         var doi = Clean(value);
         foreach (var prefix in new[] { "https://doi.org/", "http://doi.org/", "doi:" })
         {
-            if (doi.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                doi = doi[prefix.Length..].Trim();
-                break;
-            }
+            if (!doi.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+            doi = doi[prefix.Length..].Trim();
+            break;
         }
         return doi;
     }
