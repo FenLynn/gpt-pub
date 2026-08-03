@@ -1,0 +1,55 @@
+name: P101 Retry v4.5.2 Round 2
+
+on:
+  pull_request:
+    branches: [p101-stable]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  retry:
+    if: github.event.pull_request.head.ref == 'p101-v452-round2-list-lifecycle'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p101-v452-round2-list-lifecycle
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Correct exact custom-draw signatures and apply round 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              "    replace_once(main_file, 'case 8:\\n', 'case taskColOutputSize:\\n')\n": "    replace_once(main_file, 'if cd.ISubItem == 8 {', 'if cd.ISubItem == taskColOutputSize {')\n",
+              "    replace_once(main_file, 'case 9:\\n', 'case taskColProgress:\\n')\n": "    replace_once(main_file, 'if cd.ISubItem == 9 {', 'if cd.ISubItem == taskColProgress {')\n",
+              "    replace_once(main_file, 'case 10:\\n', 'case taskColStatus:\\n')\n": "    replace_once(main_file, 'label := a.taskTexts(&task)[10]', 'label := a.taskTexts(&task)[taskColStatus-1]')\n",
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one script correction, found {count}: {old!r}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          python projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py
+          cd projects/1-桌面软件/101-Mediova/代码
+          go test -count=1 ./...
+          cd ../../../..
+          rm -f .github/workflows/p101_v452_round2_retry.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Mediova｜完成 v4.5.2 第二轮列表与生命周期接线'
+          git push origin HEAD:p101-v452-round2-list-lifecycle
