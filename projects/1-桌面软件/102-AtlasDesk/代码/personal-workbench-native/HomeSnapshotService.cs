@@ -71,7 +71,7 @@ public static class HomeSnapshotService
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count(path => !Directory.Exists(path));
 
-            var tasks = taskSnapshot ?? WorkbenchTaskStore.Load(WorkbenchTaskService.HistoryPath)
+            HomeTaskDescriptor[] tasks = taskSnapshot ?? WorkbenchTaskStore.Load(WorkbenchTaskService.HistoryPath)
                 .Select(item => new HomeTaskDescriptor(item.State, item.Title, item.CreatedAt))
                 .ToArray();
             var activeTasks = tasks.Count(item => item.State is WorkbenchTaskState.Queued or WorkbenchTaskState.Running);
@@ -99,7 +99,7 @@ public static class HomeSnapshotService
                 RecentProjectCount = recentAvailable,
                 MissingProjectCount = missingProjects,
                 ActiveTaskCount = activeTasks,
-                TaskHistoryCount = tasks.Count,
+                TaskHistoryCount = tasks.Length,
                 ProblemTaskCount = problemTasks,
                 LatestTaskLabel = latestTask is null
                     ? "尚无任务记录"
