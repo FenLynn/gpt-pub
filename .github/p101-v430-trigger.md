@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time workflow. Do not merge.
 
-Reload the raw-replacement-safe implementation from latest main.
+Reload the real edit-function boundary from latest main.
