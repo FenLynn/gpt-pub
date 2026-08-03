@@ -2,14 +2,6 @@ package media
 
 import "os"
 
-// DroppedImportGroup preserves the source root for files discovered from a
-// dropped directory. Root is the parent of the imported top folder so the
-// top folder itself is recreated under the output root. Direct files use an empty root.
-type DroppedImportGroup struct {
-	Root  string
-	Paths []string
-}
-
 // DroppedScanResult is the complete, explicit outcome of decoding dropped
 // filesystem paths. Every dropped path is either represented in Groups or
 // counted as unsupported, unreadable, or a failed directory scan.
@@ -54,7 +46,8 @@ func ScanDroppedPaths(paths []string, recursive bool) DroppedScanResult {
 	}
 
 	if len(direct) > 0 {
-		result.Groups = append([]DroppedImportGroup{{Paths: direct}}, result.Groups...)
+		directGroups := GroupDirectMediaFiles(direct)
+		result.Groups = append(directGroups, result.Groups...)
 	}
 	return result
 }
