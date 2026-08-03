@@ -53,7 +53,12 @@ internal static class V105FinalQualityChecks
             "Dispatcher.InvokeAsync(ShowWorkspaceAsync).Task.Unwrap()",
             "ShowWorkspaceCoreAsync",
             "ShowZoteroCoreAsync",
-            "ShowWorkspaceFailureCore");
+            "ShowWorkspaceFailureCore",
+            "Width=\\&quot;32\\&quot; Height=\\&quot;32\\&quot; ToolTip=\\&quot;' + $tip + '\\&quot;",
+            "选择工作区目录",
+            "新建笔记",
+            "在当前目录打开终端",
+            "刷新资源树");
 
         var document = XDocument.Parse(theme);
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
