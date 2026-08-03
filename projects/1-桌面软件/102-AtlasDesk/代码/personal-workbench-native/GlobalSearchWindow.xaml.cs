@@ -116,16 +116,29 @@ public partial class GlobalSearchWindow : Window
         if (generation == 0) generation = Interlocked.Increment(ref _searchGeneration);
         var text = query.Trim();
         StatusText.Text = string.IsNullOrWhiteSpace(text) ? "正在读取快速入口…" : "正在搜索…";
-        var results = await CommandCenterCatalog.SearchAsync(_settings, text, cancellationToken);
+
+        var catalogTask = CommandCenterCatalog.SearchAsync(_settings, text, cancellationToken);
+        var contextTask = Task.Run(
+            () => ProductivityContextStore.BuildSearchResults(_settings, text),
+            cancellationToken);
+        await Task.WhenAll(catalogTask, contextTask);
         cancellationToken.ThrowIfCancellationRequested();
         if (generation != _searchGeneration) return;
 
+        var results = contextTask.Result
+            .Concat(catalogTask.Result)
+            .GroupBy(item => item.Kind + "|" + item.Action + "|" + item.Target + "|" + item.Title,
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Take(CommandCenterCatalog.MaxTotalResults)
+            .ToArray();
+
         ResultsList.ItemsSource = results;
-        EmptyState.Visibility = results.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = results.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         StatusText.Text = string.IsNullOrWhiteSpace(text)
-            ? $"AtlasDesk 快速入口 · {results.Count} 项"
-            : $"搜索“{text}” · {results.Count} 项";
-        if (results.Count > 0) ResultsList.SelectedIndex = 0;
+            ? $"AtlasDesk 快速入口 · {results.Length} 项"
+            : $"搜索“{text}” · {results.Length} 项";
+        if (results.Length > 0) ResultsList.SelectedIndex = 0;
     }
 
     private void ExecuteSelected()
