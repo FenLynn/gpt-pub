@@ -59,7 +59,11 @@ internal static class V104UiConvergenceChecks
 
         RequireContains(experience,
             "public HomeDashboardControl Home => _home",
-            "public SettingsControl SettingsPage => _settingsControl");
+            "public SettingsControl SettingsPage => _settingsControl",
+            "case Panel panel:",
+            "case ContentControl content:",
+            "content.Content = _home",
+            "HomeView must be a Panel or ContentControl");
 
         RequireContains(coordinator,
             "UiAdaptiveAuditService",
@@ -106,7 +110,7 @@ internal static class V104UiConvergenceChecks
             "AssertAdaptiveLayout(window, pipeline.Experience.Home, 1500, 860, UiDensityMode.Spacious, 4)",
             "new DiagnosticsWindow(pipeline.Settings)");
 
-        Console.WriteLine("PASS AtlasDesk v1.0.4 converges visual hierarchy, uses explicit page ownership and audits three adaptive modes without collecting user content");
+        Console.WriteLine("PASS AtlasDesk v1.0.4 converges visual hierarchy, supports ScrollViewer home hosting and audits three adaptive modes without collecting user content");
     }
 
     private static void RequireContains(string source, params string[] tokens)
