@@ -48,7 +48,12 @@ internal static class V105FinalQualityChecks
             "<Nullable>enable</Nullable>",
             "<WarningsAsErrors>nullable</WarningsAsErrors>",
             "GetItemTypeLabel(string? itemType)",
-            "itemType ?? string.Empty");
+            "itemType ?? string.Empty",
+            "Dispatcher.CheckAccess()",
+            "Dispatcher.InvokeAsync(ShowWorkspaceAsync).Task.Unwrap()",
+            "ShowWorkspaceCoreAsync",
+            "ShowZoteroCoreAsync",
+            "ShowWorkspaceFailureCore");
 
         var document = XDocument.Parse(theme);
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
