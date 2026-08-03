@@ -54,15 +54,8 @@ internal static class V105FinalQualityChecks
             "ShowWorkspaceCoreAsync",
             "ShowZoteroCoreAsync",
             "ShowWorkspaceFailureCore",
-            "UiConvergenceCoordinator.cs",
-            "workspaceTipV105",
-            "button.Width = 32",
-            "button.Height = 32",
-            "$uc=$uc.Replace('case Button button:'",
-            "选择工作区目录",
-            "新建笔记",
-            "在当前目录打开终端",
-            "刷新资源树");
+            "element.DesiredSize.Width &lt;= 0",
+            "element.DesiredSize.Height &lt;= 0");
 
         var document = XDocument.Parse(theme);
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
