@@ -28,9 +28,10 @@ import (
 	"mediaworkbench/internal/config"
 	"mediaworkbench/internal/media"
 	"mediaworkbench/internal/model"
+	"mediaworkbench/internal/workflow"
 )
 
-const appVersion = "4.4.0"
+const appVersion = "4.5.0"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -790,7 +791,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		app.stopQueue()
 		app.readSettingsFromUI()
 		_ = config.Save(app.settings)
-		app.saveSession()
+		app.saveSessionClean()
 		app.removeTray()
 		procDestroyWindow.Call(hwnd)
 		return 0
@@ -6138,6 +6139,14 @@ func (a *application) viewHistory() {
 	shellOpen(path)
 }
 func (a *application) saveSession() {
+	a.saveSessionEnvelope(false, "autosave")
+}
+
+func (a *application) saveSessionClean() {
+	a.saveSessionEnvelope(true, "clean_exit")
+}
+
+func (a *application) saveSessionEnvelope(clean bool, reason string) {
 	if !a.settings.RestoreSession {
 		return
 	}
@@ -6146,18 +6155,13 @@ func (a *application) saveSession() {
 		return
 	}
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	items := make([]*model.Task, 0, len(a.tasks))
-	for _, t := range a.tasks {
-		cp := *t
-		if cp.Status == model.StatusProcessing || cp.Status == model.StatusQueued || cp.Status == model.StatusPaused || cp.Status == model.StatusHeld {
-			cp.Status = model.StatusReady
-			cp.Progress = 0
-		}
-		items = append(items, &cp)
+	envelope := workflow.NewSessionEnvelope(a.tasks, appVersion, clean, reason, time.Now())
+	a.mu.Unlock()
+	if err := workflow.SaveSessionAtomic(path, envelope); err != nil {
+		a.runtimeNotice = "会话快照保存失败：" + short(err.Error(), 160)
 	}
-	_ = config.SaveJSON(path, items)
 }
+
 func (a *application) loadSession() {
 	if !a.settings.RestoreSession {
 		return
@@ -6166,36 +6170,55 @@ func (a *application) loadSession() {
 	if err != nil {
 		return
 	}
-	var items []*model.Task
-	if config.LoadJSON(path, &items) != nil {
+	data, err := os.ReadFile(path)
+	backupUsed := false
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		data, err = os.ReadFile(path + ".bak")
+		backupUsed = err == nil
+	}
+	if err != nil {
+		a.runtimeNotice = "会话快照读取失败：" + short(err.Error(), 160)
 		return
 	}
-	var loadedIDs []int64
+	envelope, legacy, decodeErr := workflow.DecodeSession(data)
+	if decodeErr != nil && !backupUsed {
+		if backup, backupErr := os.ReadFile(path + ".bak"); backupErr == nil {
+			if decoded, oldFormat, err := workflow.DecodeSession(backup); err == nil {
+				envelope, legacy, decodeErr, backupUsed = decoded, oldFormat, nil, true
+			}
+		}
+	}
+	if decodeErr != nil {
+		a.runtimeNotice = "会话快照损坏且无法恢复：" + short(decodeErr.Error(), 160)
+		return
+	}
+	summary := workflow.RecoverTasks(envelope.Tasks, func(path string) bool {
+		_, err := os.Stat(path)
+		return err == nil
+	})
+	summary.Legacy = legacy
+	summary.BackupUsed = backupUsed
+	loadedIDs := make([]int64, 0, len(envelope.Tasks))
 	a.mu.Lock()
-	for _, t := range items {
-		missing := false
-		if _, err := os.Stat(t.Input); err != nil {
-			missing = true
-			t.Status = model.StatusFailed
-			t.Error = "源文件不存在或已移动: " + t.Input
-			t.FailureCategory = "源文件缺失"
-			t.Progress = 0
+	for _, task := range envelope.Tasks {
+		if task == nil {
+			continue
 		}
-		if !missing && (t.Status == model.StatusProcessing || t.Status == model.StatusQueued || t.Status == model.StatusPaused || t.Status == model.StatusHeld || t.Status == model.StatusCancelled) {
-			t.Status = model.StatusReady
-			t.Progress = 0
+		if task.ID == 0 {
+			task.ID = a.nextID.Add(1)
 		}
-		t.ThumbnailIndex = -1
-		if t.ID == 0 {
-			t.ID = a.nextID.Add(1)
-		}
-		a.tasks = append(a.tasks, t)
-		if !missing {
-			loadedIDs = append(loadedIDs, t.ID)
+		a.tasks = append(a.tasks, task)
+		if task.Status != model.StatusFailed {
+			loadedIDs = append(loadedIDs, task.ID)
 		}
 	}
 	a.mu.Unlock()
-	if a.ffprobe != "" {
+	a.runtimeNotice = workflow.RecoveryNotice(summary, envelope)
+	_, ffprobe, _, _, _ := a.componentSnapshot()
+	if ffprobe != "" {
 		for _, id := range loadedIDs {
 			a.queueProbe(id)
 		}

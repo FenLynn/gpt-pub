@@ -325,7 +325,7 @@ func (s Settings) DefaultOptions(kind Kind) TaskOptions {
 
 func (s Settings) EffectiveOptions(t *Task) TaskOptions {
 	if t != nil {
-		if t.Queue != nil {
+		if t.Queue != nil && t.Status != StatusReady {
 			return t.Queue.Options
 		}
 		if t.Kind == KindImage && t.Options.ImageSize != "" {

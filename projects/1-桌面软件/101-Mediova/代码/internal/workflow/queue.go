@@ -101,13 +101,27 @@ func FreezeForQueue(task *model.Task, settings model.Settings, outputRoot string
 	if task == nil || task.Status != model.StatusReady {
 		return ErrTaskNotReady
 	}
+	recoveredQueue := task.Queue
 	MaterializeReadyOptions(task, settings)
 	task.Options.FollowDefaults = false
+	conflictPolicy := settings.ConflictPolicy
+	outputPath := task.OutputPath
+	if recoveredQueue != nil {
+		if recoveredQueue.OutputRoot != "" {
+			outputRoot = recoveredQueue.OutputRoot
+		}
+		if recoveredQueue.ConflictPolicy != "" {
+			conflictPolicy = recoveredQueue.ConflictPolicy
+		}
+		// A pre-crash output can be partial. Force conflict-safe path resolution
+		// while retaining the frozen root, options and conflict policy.
+		outputPath = ""
+	}
 	task.Queue = &model.QueueSnapshot{
 		Options:        task.Options,
 		OutputRoot:     outputRoot,
-		OutputPath:     task.OutputPath,
-		ConflictPolicy: settings.ConflictPolicy,
+		OutputPath:     outputPath,
+		ConflictPolicy: conflictPolicy,
 		QueuedAt:       now,
 		Sequence:       sequence,
 	}
