@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const statusDiagnosticSummaryManifestSHA256 = "ca79918076f303e4e3fdb48f0f54fdd1f3f3752b21afe3826b693612f2810b3f"
+const statusDiagnosticSummaryManifestSHA256 = "3e34e21e24f911f262669848ffa5714317bf3e12e7b8e31b25417eb420be37a2"
 
 func TestStatusDiagnosticSummaryFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
