@@ -22,7 +22,7 @@ public partial class TaskCenterControl : UserControl, IDisposable
     public TaskCenterControl(AppSettings settings)
     {
         _settings = settings;
-        _service = new WorkbenchTaskService();
+        _service = WorkbenchTaskHub.Service;
         InitializeComponent();
         DataContext = _service;
         HistoryPathText.Text = WorkbenchTaskService.HistoryPath;
@@ -124,7 +124,7 @@ public partial class TaskCenterControl : UserControl, IDisposable
             : !string.IsNullOrWhiteSpace(record.Error)
                 ? "错误" + Environment.NewLine + record.Error
                 : record.State == WorkbenchTaskState.Queued
-                    ? $"等待执行槽位 · 最多并行 {_service.MaxConcurrency} 个任务"
+                    ? $"等待执行槽位 · 常规任务最多并行 {_service.MaxConcurrency} 个"
                     : "任务尚未产生结果。";
         CancelButton.IsEnabled = record.CanCancel;
         CopyResultButton.IsEnabled = !string.IsNullOrWhiteSpace(record.Result) || !string.IsNullOrWhiteSpace(record.Error);
@@ -142,10 +142,7 @@ public partial class TaskCenterControl : UserControl, IDisposable
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
         var record = _service.StartFileHash(dialog.FileName);
-        TaskFilter.SelectedIndex = 0;
-        TaskSearchBox.Clear();
-        _taskView.Refresh();
-        TaskList.SelectedItem = record;
+        SelectNewRecord(record);
     }
 
     private void ScanWorkspace_Click(object sender, RoutedEventArgs e)
@@ -156,6 +153,11 @@ public partial class TaskCenterControl : UserControl, IDisposable
             return;
         }
         var record = _service.StartDirectoryStatistics(_settings.WorkspaceRoot);
+        SelectNewRecord(record);
+    }
+
+    private void SelectNewRecord(WorkbenchTaskRecord record)
+    {
         TaskFilter.SelectedIndex = 0;
         TaskSearchBox.Clear();
         _taskView.Refresh();
@@ -181,7 +183,9 @@ public partial class TaskCenterControl : UserControl, IDisposable
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
-        if (_selected is not null) _service.Cancel(_selected.Id);
+        if (_selected is null) return;
+        _service.Cancel(_selected.Id);
+        FileIntegrityTaskBridge.Cancel(_selected.Id);
     }
 
     private void CopyResult_Click(object sender, RoutedEventArgs e)
@@ -212,6 +216,5 @@ public partial class TaskCenterControl : UserControl, IDisposable
         _disposed = true;
         _service.Tasks.CollectionChanged -= Tasks_CollectionChanged;
         foreach (var record in _service.Tasks) record.PropertyChanged -= Record_PropertyChanged;
-        _service.Dispose();
     }
 }
