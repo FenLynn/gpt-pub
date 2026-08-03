@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time workflow. Do not merge.
 
-Reload the corrected video-end assignment from latest main.
+Reload the direct TRIM assignment replacement from latest main.
