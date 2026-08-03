@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time workflow. Do not merge.
 
-Reload the two-return-aware implementation from latest main.
+Reload the raw-replacement-safe implementation from latest main.
