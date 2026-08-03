@@ -32,7 +32,7 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 		t.Fatal("duplicate list context-menu trigger returned")
 	}
 	for _, want := range []string{
-		`const appVersion = "4.2.2"`,
+		`const appVersion = "4.5.0"`,
 		`{"分辨率", 100}, {"时长", 76}`,
 		`bottomParameterWidths(a.currentKind)`,
 		`drawStatusLamp(dis.HDC, rc, dot)`,

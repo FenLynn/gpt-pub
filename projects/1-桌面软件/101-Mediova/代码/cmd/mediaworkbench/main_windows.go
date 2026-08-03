@@ -28,9 +28,10 @@ import (
 	"mediaworkbench/internal/config"
 	"mediaworkbench/internal/media"
 	"mediaworkbench/internal/model"
+	"mediaworkbench/internal/workflow"
 )
 
-const appVersion = "4.2.2"
+const appVersion = "4.5.0"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -790,7 +791,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		app.stopQueue()
 		app.readSettingsFromUI()
 		_ = config.Save(app.settings)
-		app.saveSession()
+		app.saveSessionClean()
 		app.removeTray()
 		procDestroyWindow.Call(hwnd)
 		return 0
@@ -995,32 +996,51 @@ func (a *application) drawPrimaryButton(dis *drawItemStruct) bool {
 		border = bg
 	}
 	if disabled {
-		bg = colorRef(232, 235, 240)
-		border = colorRef(218, 223, 230)
-		textColor = colorRef(145, 153, 164)
+		bg = colorRef(235, 238, 243)
+		border = colorRef(196, 203, 213)
+		textColor = colorRef(126, 136, 149)
 	}
 	rc := dis.RcItem
+	// Clear the complete owner-draw surface first. Without this, a disabled
+	// button can retain pixels from an earlier state and appear vertically offset.
+	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	inner := rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}
 	brush, _, _ := procCreateSolidBrush.Call(bg)
 	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, border)
 	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
 	oldPen, _, _ := procSelectObject.Call(dis.HDC, pen)
-	procRoundRect.Call(dis.HDC, uintptr(rc.Left+1), uintptr(rc.Top+1), uintptr(rc.Right-1), uintptr(rc.Bottom-1), 7, 7)
+	procRoundRect.Call(dis.HDC, uintptr(inner.Left), uintptr(inner.Top), uintptr(inner.Right), uintptr(inner.Bottom), 7, 7)
 	procSelectObject.Call(dis.HDC, oldBrush)
 	procSelectObject.Call(dis.HDC, oldPen)
 	procDeleteObject.Call(brush)
 	procDeleteObject.Call(pen)
 
-	glyph := "\uE768"
+	glyph := "\\uE768"
 	if dis.HwndItem != a.hStart {
 		glyph = secondaryButtonGlyph(dis.HwndItem)
 	}
-	iconRC := rc
-	iconRC.Left += 9
-	iconRC.Right = iconRC.Left + 22
+	label := getText(dis.HwndItem)
+	font := uiFontBold
+	if len([]rune(label)) > 5 {
+		font = uiFontSmall
+	}
+	labelWidth := measureSingleLineWidth(dis.HDC, label, font)
+	iconWidth := int32(18)
+	gap := int32(4)
+	available := inner.Right - inner.Left - 12
+	total := iconWidth + gap + labelWidth
+	if total > available {
+		labelWidth = available - iconWidth - gap
+		if labelWidth < 24 {
+			labelWidth = 24
+		}
+		total = iconWidth + gap + labelWidth
+	}
+	left := inner.Left + (inner.Right-inner.Left-total)/2
+	iconRC := rect{Left: left, Top: inner.Top, Right: left + iconWidth, Bottom: inner.Bottom}
+	textRC := rect{Left: iconRC.Right + gap, Top: inner.Top, Right: iconRC.Right + gap + labelWidth, Bottom: inner.Bottom}
 	drawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
-	textRC := rc
-	textRC.Left += 22
-	drawCenteredText(dis.HDC, getText(dis.HwndItem), textRC, uiFontBold, textColor)
+	drawCenteredText(dis.HDC, label, textRC, font, textColor)
 	return true
 }
 
@@ -2257,11 +2277,6 @@ func (a *application) layout(w, h int32) {
 			}
 			move(a.hAllDefault, x, row2, minInt32(124, w-x-8), 31)
 		}
-		move(a.hProgress, 8, barY+76, w-16, 24)
-		move(a.hStatusText, 8, barY+110, w-332, 34)
-		move(a.hStart, w-324, barY+107, 116, 38)
-		move(a.hPause, w-200, barY+107, 88, 38)
-		move(a.hStop, w-104, barY+107, 88, 38)
 	} else {
 		move(a.hOutputBrowse, 8, barY, 116, 32)
 		fixed := int32(38 + bottomWidths.Resolution + 7 + 34 + bottomWidths.Codec + 7 + 34 + bottomWidths.Quality + 7 + 34 + bottomWidths.Volume + 7 + 34 + bottomWidths.Rotation + 8 + 124)
@@ -2296,12 +2311,14 @@ func (a *application) layout(w, h int32) {
 			}
 			move(a.hAllDefault, x, barY, 124, 32)
 		}
-		move(a.hProgress, 8, barY+40, w-16, 24)
-		move(a.hStatusText, 8, barY+72, w-356, 34)
-		move(a.hStart, w-348, barY+69, 116, 38)
-		move(a.hPause, w-224, barY+69, 88, 38)
-		move(a.hStop, w-128, barY+69, 88, 38)
 	}
+
+	footer := footerGeometryFor(w, barY, compactBottom)
+	move(a.hProgress, footer.Progress.X, footer.Progress.Y, footer.Progress.W, footer.Progress.H)
+	move(a.hStatusText, footer.Status.X, footer.Status.Y, footer.Status.W, footer.Status.H)
+	move(a.hStart, footer.Start.X, footer.Start.Y, footer.Start.W, footer.Start.H)
+	move(a.hPause, footer.Pause.X, footer.Pause.Y, footer.Pause.W, footer.Pause.H)
+	move(a.hStop, footer.Stop.X, footer.Stop.Y, footer.Stop.W, footer.Stop.H)
 }
 func (a *application) command(id int) {
 	if workers, ok := a.concurrencyCommands[id]; ok {
@@ -5764,22 +5781,56 @@ func (a *application) compareVideo() {
 	}()
 }
 func (a *application) editTrimCrop() {
-	t, idx := a.selectedTask()
-	if t == nil {
+	idxs := a.selectedTaskIndices()
+	if len(idxs) == 0 {
+		messageBox(a.hwnd, "时长与画面", "请先选择一个任务。", MB_OK|MB_ICONINFORMATION)
 		return
 	}
-	opts := a.settings.EffectiveOptions(t)
-	updated, ok := showTrimCropDialog(a, t, opts)
-	if ok {
-		a.mu.Lock()
-		if idx < len(a.tasks) {
-			updated.FollowDefaults = false
-			a.tasks[idx].Options = updated
-		}
+	idx := idxs[0]
+	a.mu.Lock()
+	if idx < 0 || idx >= len(a.tasks) || a.tasks[idx] == nil {
 		a.mu.Unlock()
-		a.refreshAll()
+		return
+	}
+	selected := a.tasks[idx]
+	if selected.IsLocked() {
+		a.mu.Unlock()
+		messageBox(a.hwnd, "任务已锁定", "队列中、转换中或暂停任务需要先通过右键进入搁置编辑。", MB_OK|MB_ICONINFORMATION)
+		return
+	}
+	taskCopy := *selected
+	opts := a.settings.EffectiveOptions(selected)
+	a.mu.Unlock()
+
+	updated, ok, applySelected := showTrimCropDialog(a, &taskCopy, opts)
+	if !ok {
+		return
+	}
+	copied := 0
+	a.mu.Lock()
+	if idx >= 0 && idx < len(a.tasks) && a.tasks[idx] != nil && a.tasks[idx].ID == taskCopy.ID {
+		a.tasks[idx].Options = updated
+		resetTaskAfterOptionChange(a.tasks[idx])
+		if applySelected {
+			ordered := []int{idx}
+			for _, candidate := range idxs {
+				if candidate != idx {
+					ordered = append(ordered, candidate)
+				}
+			}
+			copied = copyTrimCropToTargets(a.settings, a.tasks, ordered)
+		}
+	}
+	a.mu.Unlock()
+	a.saveSession()
+	a.refreshAll()
+	if applySelected {
+		setText(a.hStatusText, fmt.Sprintf("裁剪设置已应用到当前任务，并同步到 %d 个可编辑的已选任务。", copied))
+	} else {
+		setText(a.hStatusText, "裁剪设置已应用到当前任务。")
 	}
 }
+
 func (a *application) showFFmpegCommand() {
 	t, _ := a.selectedTask()
 	if t == nil {
@@ -6088,6 +6139,14 @@ func (a *application) viewHistory() {
 	shellOpen(path)
 }
 func (a *application) saveSession() {
+	a.saveSessionEnvelope(false, "autosave")
+}
+
+func (a *application) saveSessionClean() {
+	a.saveSessionEnvelope(true, "clean_exit")
+}
+
+func (a *application) saveSessionEnvelope(clean bool, reason string) {
 	if !a.settings.RestoreSession {
 		return
 	}
@@ -6096,18 +6155,13 @@ func (a *application) saveSession() {
 		return
 	}
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	items := make([]*model.Task, 0, len(a.tasks))
-	for _, t := range a.tasks {
-		cp := *t
-		if cp.Status == model.StatusProcessing || cp.Status == model.StatusQueued || cp.Status == model.StatusPaused || cp.Status == model.StatusHeld {
-			cp.Status = model.StatusReady
-			cp.Progress = 0
-		}
-		items = append(items, &cp)
+	envelope := workflow.NewSessionEnvelope(a.tasks, appVersion, clean, reason, time.Now())
+	a.mu.Unlock()
+	if err := workflow.SaveSessionAtomic(path, envelope); err != nil {
+		a.runtimeNotice = "会话快照保存失败：" + short(err.Error(), 160)
 	}
-	_ = config.SaveJSON(path, items)
 }
+
 func (a *application) loadSession() {
 	if !a.settings.RestoreSession {
 		return
@@ -6116,36 +6170,55 @@ func (a *application) loadSession() {
 	if err != nil {
 		return
 	}
-	var items []*model.Task
-	if config.LoadJSON(path, &items) != nil {
+	data, err := os.ReadFile(path)
+	backupUsed := false
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		data, err = os.ReadFile(path + ".bak")
+		backupUsed = err == nil
+	}
+	if err != nil {
+		a.runtimeNotice = "会话快照读取失败：" + short(err.Error(), 160)
 		return
 	}
-	var loadedIDs []int64
+	envelope, legacy, decodeErr := workflow.DecodeSession(data)
+	if decodeErr != nil && !backupUsed {
+		if backup, backupErr := os.ReadFile(path + ".bak"); backupErr == nil {
+			if decoded, oldFormat, err := workflow.DecodeSession(backup); err == nil {
+				envelope, legacy, decodeErr, backupUsed = decoded, oldFormat, nil, true
+			}
+		}
+	}
+	if decodeErr != nil {
+		a.runtimeNotice = "会话快照损坏且无法恢复：" + short(decodeErr.Error(), 160)
+		return
+	}
+	summary := workflow.RecoverTasks(envelope.Tasks, func(path string) bool {
+		_, err := os.Stat(path)
+		return err == nil
+	})
+	summary.Legacy = legacy
+	summary.BackupUsed = backupUsed
+	loadedIDs := make([]int64, 0, len(envelope.Tasks))
 	a.mu.Lock()
-	for _, t := range items {
-		missing := false
-		if _, err := os.Stat(t.Input); err != nil {
-			missing = true
-			t.Status = model.StatusFailed
-			t.Error = "源文件不存在或已移动: " + t.Input
-			t.FailureCategory = "源文件缺失"
-			t.Progress = 0
+	for _, task := range envelope.Tasks {
+		if task == nil {
+			continue
 		}
-		if !missing && (t.Status == model.StatusProcessing || t.Status == model.StatusQueued || t.Status == model.StatusPaused || t.Status == model.StatusHeld || t.Status == model.StatusCancelled) {
-			t.Status = model.StatusReady
-			t.Progress = 0
+		if task.ID == 0 {
+			task.ID = a.nextID.Add(1)
 		}
-		t.ThumbnailIndex = -1
-		if t.ID == 0 {
-			t.ID = a.nextID.Add(1)
-		}
-		a.tasks = append(a.tasks, t)
-		if !missing {
-			loadedIDs = append(loadedIDs, t.ID)
+		a.tasks = append(a.tasks, task)
+		if task.Status != model.StatusFailed {
+			loadedIDs = append(loadedIDs, task.ID)
 		}
 	}
 	a.mu.Unlock()
-	if a.ffprobe != "" {
+	a.runtimeNotice = workflow.RecoveryNotice(summary, envelope)
+	_, ffprobe, _, _, _ := a.componentSnapshot()
+	if ffprobe != "" {
 		for _, id := range loadedIDs {
 			a.queueProbe(id)
 		}

@@ -750,7 +750,14 @@ func imageLimitBytes(s string) int64 {
 
 func Convert(ctx context.Context, ffmpeg string, req ConvertRequest, progress ProgressFunc) (engine string, err error) {
 	if req.Kind == model.KindImage {
-		return convertImage(ctx, ffmpeg, req, progress)
+		if err := PreflightModernImage(ctx, ffmpeg, req.Input); err != nil {
+			return "FFmpeg图片解码预检", err
+		}
+		engine, err := convertImage(ctx, ffmpeg, req, progress)
+		if err != nil {
+			err = ExplainModernImageFailure(req.Input, err)
+		}
+		return engine, err
 	}
 	if canSmartStreamCopy(req) {
 		args, engine := buildStreamCopyArgs(req)
