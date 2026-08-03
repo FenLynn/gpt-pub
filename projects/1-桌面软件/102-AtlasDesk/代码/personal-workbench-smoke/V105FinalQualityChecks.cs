@@ -56,6 +56,10 @@ internal static class V105FinalQualityChecks
             "ShowWorkspaceFailureCore",
             "element.DesiredSize.Width &lt;= 0",
             "element.DesiredSize.Height &lt;= 0",
+            "bounds.Left &gt; 1",
+            "bounds.Top &gt; 1",
+            "bounds.Right + 1 &lt; element.DesiredSize.Width",
+            "bounds.Bottom + 1 &lt; element.DesiredSize.Height",
             "ZoteroLibraryControl.xaml",
             "x:Name=\\&quot;SearchBox\\&quot; Height=\\&quot;29\\&quot;",
             "x:Name=\\&quot;SearchBox\\&quot; Height=\\&quot;32\\&quot;");
