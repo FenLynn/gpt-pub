@@ -13,8 +13,8 @@ internal static class V114DashboardStabilityChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 4))
-            throw new InvalidOperationException("AtlasDesk Dashboard stability hotfix must be v1.1.4.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 4))
+            throw new InvalidOperationException("AtlasDesk Dashboard stability baseline must not move below v1.1.4.");
 
         var lifecycle = File.ReadAllText(RequireFile(nativeRoot, "DashboardLifecycleCoordinator.cs"));
         var pipeline = File.ReadAllText(RequireFile(nativeRoot, "WorkbenchFeaturePipeline.cs"));
@@ -27,15 +27,15 @@ internal static class V114DashboardStabilityChecks
             "_window.Activated -= activatedHandler",
             "watchdog.Stop()",
             "dashboardNavigation.Checked -= checkedHandler",
-            "ReplaceBrowserButton(browserControls, \"刷新\", \"Refresh_Click\", Refresh_Click)",
-            "ReplaceClickHandler(retry, \"RetryDashboard_Click\", Retry_Click)",
+            "ReplaceBrowserButton(browserControls, \"刷新\", Refresh_Click)",
+            "ReplaceButtonElement(retry, Retry_Click",
             "SemaphoreSlim _commandGate",
             "WaitForDashboardIdleAsync",
             "Dashboard 正在初始化或恢复，本次操作已取消以避免闪退",
             "ex is COMException or InvalidOperationException or ObjectDisposedException",
             "InvokeMainWindowTaskAsync(\"EnsureDashboardAsync\", true)",
             "RecoverIfControllerMissingAsync",
-            "Do not dispose the semaphore while an async click continuation may still");
+            "Do not dispose the semaphore while an async continuation may still");
 
         RequireContains(pipeline,
             "ShellResilience = ShellResilienceCoordinator.Attach(window)",
@@ -60,16 +60,13 @@ internal static class V114DashboardStabilityChecks
         if (shellIndex < 0 || lifecycleIndex <= shellIndex || diagnosticsIndex <= lifecycleIndex)
             throw new InvalidOperationException("Dashboard lifecycle guard must attach immediately after shell resilience and before WebView diagnostics.");
 
-        // The retained MainWindow handlers remain for XAML compatibility, but the
-        // lifecycle coordinator must detach and replace every command that directly
-        // touches WebView2 before the user can invoke it.
         RequireContains(mainWindow,
             "private void Refresh_Click(object sender, RoutedEventArgs e) => _dashboardWebView?.Reload();",
             "private async void RetryDashboard_Click",
             "private async void DashboardHome_Click");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.4 serializes Dashboard commands and retires shell recovery hooks that raced WebView2 controller creation");
+            "PASS AtlasDesk retains the v1.1.4 serialized Dashboard-command and retired shell-recovery baseline");
     }
 
     private static string RequireFile(string root, string fileName)
