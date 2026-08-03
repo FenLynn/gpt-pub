@@ -14,8 +14,8 @@ import (
 )
 
 // InstallFFmpegZip imports a downloaded Windows FFmpeg ZIP into the application's
-// private component directory. It accepts both "bin/ffmpeg.exe" archives and
-// release archives wrapped in a version-named top-level folder.
+// transparent Runtime component directory. It accepts both "bin/ffmpeg.exe"
+// archives and release archives wrapped in a version-named top-level folder.
 func InstallFFmpegZip(zipPath string) (ffmpegPath, ffprobePath string, err error) {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -39,6 +39,9 @@ func InstallFFmpegZip(zipPath string) (ffmpegPath, ffprobePath string, err error
 	}
 	if ffmpegEntry == nil || ffprobeEntry == nil {
 		return "", "", errors.New("ZIP 中未同时找到 ffmpeg.exe 和 ffprobe.exe")
+	}
+	if err := config.EnsureRuntimeFFmpegWritable(); err != nil {
+		return "", "", err
 	}
 	finalDir, err := config.RuntimeFFmpegBinDir()
 	if err != nil {

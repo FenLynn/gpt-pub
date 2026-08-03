@@ -23,21 +23,31 @@ func footerGeometryFor(clientW, barY int32, compact bool) footerGeometry {
 		progressY = barY + 76
 	}
 	const (
-		margin    int32 = 8
-		gap       int32 = 8
-		statusGap int32 = 12
-		buttonH   int32 = 36
-		startW    int32 = 132
-		pauseW    int32 = 96
-		stopW     int32 = 88
+		margin       int32 = 8
+		gap          int32 = 8
+		statusGap    int32 = 12
+		buttonH      int32 = 36
+		wideStartW   int32 = 132
+		widePauseW   int32 = 96
+		wideStopW    int32 = 88
+		compactStart int32 = 112
+		compactOther int32 = 84
+		minStatusW   int32 = 120
 	)
+	startW, pauseW, stopW := wideStartW, widePauseW, wideStopW
+	if clientW < 1040 {
+		startW, pauseW, stopW = compactStart, compactOther, compactOther
+	}
 	actionY := progressY + 32
 	stopX := clientW - margin - stopW
 	pauseX := stopX - gap - pauseW
 	startX := pauseX - gap - startW
 	statusW := startX - statusGap - margin
-	if statusW < 120 {
-		statusW = 120
+	if statusW < minStatusW {
+		statusW = minStatusW
+		startX = margin + minStatusW + statusGap
+		pauseX = startX + startW + gap
+		stopX = pauseX + pauseW + gap
 	}
 	return footerGeometry{
 		Progress: footerRect{X: margin, Y: progressY, W: clientW - 2*margin, H: 24},

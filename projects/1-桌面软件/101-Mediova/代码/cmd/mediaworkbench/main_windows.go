@@ -2231,12 +2231,13 @@ func (a *application) layout(w, h int32) {
 		move(a.hSingleOutput, rightX+2, actionY+76, buttonW, 31)
 		move(a.hRetry, rightX+buttonW+10, actionY+76, buttonW, 31)
 		detailsY := actionY + 114
-		detailsH := top + listH - detailsY
-		if detailsH < 90 {
-			detailsH = 90
+		detailsH, detailsVisible := rightDetailsHeightFor(top+listH, detailsY)
+		show(a.hDetailsFrame, detailsVisible)
+		show(a.hDetails, detailsVisible)
+		if detailsVisible {
+			move(a.hDetailsFrame, rightX+2, detailsY, rightW-14, detailsH)
+			move(a.hDetails, rightX+10, detailsY+8, rightW-30, detailsH-16)
 		}
-		move(a.hDetailsFrame, rightX+2, detailsY, rightW-14, detailsH)
-		move(a.hDetails, rightX+10, detailsY+8, rightW-30, detailsH-16)
 	}
 
 	barY := top + listH + 7
