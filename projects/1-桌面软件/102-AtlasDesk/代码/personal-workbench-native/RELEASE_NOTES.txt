@@ -1,3 +1,42 @@
+AtlasDesk v1.0.4 UI convergence candidate
+
+This bounded maintenance candidate converges the visual hierarchy, adds adaptive-layout diagnostics and fixes the real home-surface host without adding a new product workflow. It remains outside main until user verification.
+
+Visual convergence
+- A centralized UiConvergenceResources dictionary unifies page headings, cards, navigation, buttons, text inputs, tabs and list density.
+- Converged cards use one fine border and no additional drop-shadow layer.
+- Primary, secondary, text and icon buttons share consistent heights, corner radii and interaction states.
+- The terminal keeps its independent dark presentation and is not recolored by the light convergence layer.
+
+Adaptive layout
+- UiConvergenceCoordinator selects spacious, standard or compact density from the current window width, height and DPI.
+- The shell adapts outer spacing, sidebar width, top-bar height, navigation density and low-priority labels.
+- Home metrics switch between four and two columns; the context card and lower work/shortcut area can stack vertically.
+- Settings cards reduce padding and label widths, and narrow footer actions stack instead of colliding.
+- Development, project, task, tool and workspace pages use a reduced outer hierarchy without changing their business behavior.
+
+Layout audit and diagnostics
+- Diagnostics reports the current adaptive mode, window/content geometry, sidebar width and DPI.
+- The audit contains no project path, URL, user name, file name, command or document content.
+- Layout-health transitions are logged only when state changes, avoiding resize-log flooding.
+- The diagnostics window now uses a two-level result row and wrapping footer actions instead of a fixed three-column hierarchy.
+
+Home ownership correction
+- V061ExperienceEnhancer explicitly owns and exposes the home and settings surfaces.
+- Home installation now supports both Panel and ContentControl hosts.
+- This fixes the real MainWindow HomeView host, which is a ScrollViewer/ContentControl and was not covered by the older Panel-only installer.
+- UiConvergenceCoordinator receives the owned page instances directly and no longer guesses them from the visual tree.
+
+Regression protection
+- Source gates verify the shared styles, TextBox PART_ContentHost, three density modes, privacy boundary and flattened diagnostics layout.
+- Real Windows residency verifies the physical compact top-level window and the converged diagnostics window.
+- Standard 1320x780 and spacious 1500x860 home layouts are measured off-screen using the production ResolveMode and ApplyHome methods because the CI desktop is physically limited to 1080x720.
+- All v1.0.3 and earlier smoke, ConPTY, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
+
+Verification status
+- v1.0.4 is a UI-convergence candidate for user verification.
+- It must not enter main or receive a formal tag/Release before user confirmation.
+
 AtlasDesk v1.0.3 final candidate
 
 This final pre-verification candidate completes the bounded reliability work requested after v1.0.0. It adds no new product workflow and remains outside main until combined user verification.

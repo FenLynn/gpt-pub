@@ -44,14 +44,47 @@ public sealed class V061ExperienceEnhancer
     public static V061ExperienceEnhancer Attach(MainWindow window, WorkbenchEnhancer baseEnhancer)
         => new(window, baseEnhancer);
 
+    public HomeDashboardControl Home => _home;
+    public SettingsControl SettingsPage => _settingsControl;
+
     private static T? ReadField<T>(object instance, string name) where T : class
         => instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance) as T;
 
     private void InstallHome()
     {
-        if (_window.FindName("HomeView") is not Panel homeView) return;
-        homeView.Children.Clear();
-        homeView.Children.Add(_home);
+        var host = _window.FindName("HomeView");
+        if (host is null) return;
+        DetachFromCurrentParent(_home);
+
+        switch (host)
+        {
+            case Panel panel:
+                panel.Children.Clear();
+                panel.Children.Add(_home);
+                break;
+            case ContentControl content:
+                content.Content = _home;
+                break;
+            default:
+                throw new InvalidOperationException(
+                    "HomeView must be a Panel or ContentControl, but was " + host.GetType().Name + ".");
+        }
+    }
+
+    private static void DetachFromCurrentParent(FrameworkElement element)
+    {
+        switch (element.Parent)
+        {
+            case Panel panel:
+                panel.Children.Remove(element);
+                break;
+            case ContentControl content when ReferenceEquals(content.Content, element):
+                content.Content = null;
+                break;
+            case Decorator decorator when ReferenceEquals(decorator.Child, element):
+                decorator.Child = null;
+                break;
+        }
     }
 
     private void InstallSearchEntry()
