@@ -9,20 +9,27 @@ internal static class V104UiConvergenceChecks
     internal static void Verify()
     {
         var nativeRoot = FindProjectSourceRoot("personal-workbench-native");
+        var projectRoot = Directory.GetParent(nativeRoot)?.FullName
+                          ?? throw new DirectoryNotFoundException("AtlasDesk code root is unavailable.");
         var themePath = Path.Combine(nativeRoot, "UiConvergenceResources.xaml");
         var coordinatorPath = Path.Combine(nativeRoot, "UiConvergenceCoordinator.cs");
+        var experiencePath = Path.Combine(nativeRoot, "V061ExperienceEnhancer.cs");
         var pipelinePath = Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs");
         var diagnosticsXamlPath = Path.Combine(nativeRoot, "DiagnosticsWindow.xaml");
         var diagnosticsCodePath = Path.Combine(nativeRoot, "DiagnosticsWindow.xaml.cs");
+        var residencyPath = Path.Combine(projectRoot, "personal-workbench-residency-smoke", "Program.cs");
 
         if (!File.Exists(themePath)) throw new InvalidOperationException("v1.0.4 convergence resource dictionary is missing");
         if (!File.Exists(coordinatorPath)) throw new InvalidOperationException("v1.0.4 convergence coordinator is missing");
+        if (!File.Exists(residencyPath)) throw new InvalidOperationException("v1.0.4 adaptive residency source is missing");
 
         var theme = File.ReadAllText(themePath);
         var coordinator = File.ReadAllText(coordinatorPath);
+        var experience = File.ReadAllText(experiencePath);
         var pipeline = File.ReadAllText(pipelinePath);
         var diagnosticsXaml = File.ReadAllText(diagnosticsXamlPath);
         var diagnosticsCode = File.ReadAllText(diagnosticsCodePath);
+        var residency = File.ReadAllText(residencyPath);
 
         var document = XDocument.Parse(theme);
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
@@ -50,6 +57,10 @@ internal static class V104UiConvergenceChecks
             "ConvergedListViewItem");
         RequireAbsent(theme, "DropShadowEffect");
 
+        RequireContains(experience,
+            "public HomeDashboardControl Home => _home",
+            "public SettingsControl SettingsPage => _settingsControl");
+
         RequireContains(coordinator,
             "UiAdaptiveAuditService",
             "UiDensityMode.Spacious",
@@ -57,8 +68,10 @@ internal static class V104UiConvergenceChecks
             "UiDensityMode.Compact",
             "VisualTreeHelper.GetDpi",
             "contentWidth >= 680",
-            "ApplyHome",
-            "ApplySettings",
+            "private readonly HomeDashboardControl _home",
+            "private readonly SettingsControl _settingsPage",
+            "ApplyHome(_home, mode)",
+            "ApplySettings(_settingsPage, mode)",
             "ApplyGenericPage",
             "metrics.Columns = compact ? 2 : 4",
             "GridLength(164)",
@@ -68,10 +81,12 @@ internal static class V104UiConvergenceChecks
             "Directory.EnumerateFiles",
             "recentWorkspaceFiles",
             "TerminalOutput",
-            "DashboardUrl");
+            "DashboardUrl",
+            "GetField(\"_home\"");
 
         RequireContains(pipeline,
-            "UiConvergence = UiConvergenceCoordinator.Attach(window)",
+            "Experience = V061ExperienceEnhancer.Attach(window, Base)",
+            "UiConvergence = UiConvergenceCoordinator.Attach(window, Experience.Home, Experience.SettingsPage)",
             "public UiConvergenceCoordinator UiConvergence");
 
         RequireContains(diagnosticsXaml,
@@ -85,7 +100,13 @@ internal static class V104UiConvergenceChecks
         RequireContains(diagnosticsCode,
             "checks.Insert(0, UiAdaptiveAuditService.CreateDiagnosticCheck())");
 
-        Console.WriteLine("PASS AtlasDesk v1.0.4 converges visual hierarchy and audits adaptive layout without collecting user content");
+        RequireContains(residency,
+            "AssertAdaptiveLayout(window, pipeline.Experience.Home, 1100, 700, UiDensityMode.Compact, 2)",
+            "AssertAdaptiveLayout(window, pipeline.Experience.Home, 1320, 780, UiDensityMode.Standard, 4)",
+            "AssertAdaptiveLayout(window, pipeline.Experience.Home, 1500, 860, UiDensityMode.Spacious, 4)",
+            "new DiagnosticsWindow(pipeline.Settings)");
+
+        Console.WriteLine("PASS AtlasDesk v1.0.4 converges visual hierarchy, uses explicit page ownership and audits three adaptive modes without collecting user content");
     }
 
     private static void RequireContains(string source, params string[] tokens)
