@@ -22,6 +22,15 @@ public static class WorkbenchTaskHub
         }
     }
 
+    public static WorkbenchTaskService? Current
+    {
+        get
+        {
+            lock (Gate)
+                return _service;
+        }
+    }
+
     public static void Shutdown()
     {
         lock (Gate)
