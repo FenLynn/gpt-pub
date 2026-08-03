@@ -1,0 +1,71 @@
+name: P101 Harden ACL Probe
+
+on:
+  push:
+    branches: [p101-v451-verification]
+    paths:
+      - '.github/workflows/p101-v451-harden-acl-probe.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p101-v451-verification
+          fetch-depth: 0
+      - name: Harden ACL restoration and diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('projects/1-桌面软件/101-Mediova/代码/cmd/nativefaultcheck/main_windows.go')
+          source = path.read_text(encoding='utf-8')
+          old = '''\trestoreOut, restoreErr := exec.Command("icacls", dataDir, "/remove:d", identity).CombinedOutput()
+          \tif restoreErr != nil {
+          \t\treturn fmt.Errorf("icacls restore failed: %v: %s", restoreErr, strings.TrimSpace(string(restoreOut)))
+          \t}
+          \taclAfter, aclReadErr := os.ReadFile(path)
+          \tr.Checks["ntfs_acl_denial_returns_error"] = aclSaveErr != nil
+          \tr.Checks["ntfs_acl_denial_preserves_primary"] = aclReadErr == nil && bytes.Equal(aclBefore, aclAfter)
+          \tif aclSaveErr == nil || aclReadErr != nil || !bytes.Equal(aclBefore, aclAfter) {
+          \t\treturn errors.New("NTFS ACL denial did not preserve the primary config")
+          \t}
+          '''
+          new = '''\trestoreOut, restoreErr := exec.Command("icacls", dataDir, "/remove:d", identity, "/T", "/C").CombinedOutput()
+          \tr.Detail["ntfs_acl_restore_output"] = strings.TrimSpace(string(restoreOut))
+          \tif restoreErr != nil {
+          \t\treturn fmt.Errorf("icacls restore failed: %v: %s", restoreErr, strings.TrimSpace(string(restoreOut)))
+          \t}
+          \taclAfter, aclReadErr := os.ReadFile(path)
+          \tif aclSaveErr != nil {
+          \t\tr.Detail["ntfs_acl_save_error"] = aclSaveErr.Error()
+          \t}
+          \tif aclReadErr != nil {
+          \t\tr.Detail["ntfs_acl_read_after_restore_error"] = aclReadErr.Error()
+          \t}
+          \tr.Detail["ntfs_acl_byte_lengths"] = fmt.Sprintf("before=%d after=%d", len(aclBefore), len(aclAfter))
+          \tr.Checks["ntfs_acl_denial_returns_error"] = aclSaveErr != nil
+          \tr.Checks["ntfs_acl_denial_preserves_primary"] = aclReadErr == nil && bytes.Equal(aclBefore, aclAfter)
+          \tif aclSaveErr == nil || aclReadErr != nil || !bytes.Equal(aclBefore, aclAfter) {
+          \t\treturn errors.New("NTFS ACL denial did not preserve the primary config")
+          \t}
+          '''
+          count = source.count(old)
+          if count != 1:
+              raise SystemExit(f'expected one ACL restoration block, found {count}')
+          path.write_text(source.replace(old, new), encoding='utf-8', newline='\n')
+          PY
+          rm .github/workflows/p101-v451-harden-acl-probe.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add projects/1-桌面软件/101-Mediova/代码/cmd/nativefaultcheck/main_windows.go \
+                  .github/workflows/p101-v451-harden-acl-probe.yml
+          git diff --cached --check
+          git commit -m 'Mediova｜强化 ACL 探针递归恢复与失败诊断'
+          git push origin HEAD:p101-v451-verification
