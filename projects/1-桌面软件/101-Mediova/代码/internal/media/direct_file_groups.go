@@ -31,25 +31,30 @@ func parsePortablePath(value string) portablePath {
 		separator = `\`
 	}
 	normalized := strings.ReplaceAll(value, `\`, "/")
+	parsed := portablePath{separator: separator}
+
+	// path.Clean intentionally collapses multiple leading slashes. Detect UNC
+	// server/share authority before cleaning so distinct network volumes remain
+	// distinct on both Windows and non-Windows test hosts.
+	if strings.HasPrefix(normalized, "//") {
+		uncBody := path.Clean(strings.TrimLeft(normalized, "/"))
+		parts := splitPortableComponents(uncBody)
+		if len(parts) >= 2 {
+			parsed.volume = "//" + parts[0] + "/" + parts[1]
+			parsed.absolute = true
+			parsed.components = append([]string(nil), parts[2:]...)
+			return parsed
+		}
+	}
+
 	cleaned := path.Clean(normalized)
 	if cleaned == "." && normalized != "." {
 		cleaned = normalized
 	}
-
-	parsed := portablePath{separator: separator}
 	if len(cleaned) >= 2 && cleaned[1] == ':' && unicode.IsLetter(rune(cleaned[0])) {
 		parsed.volume = strings.ToUpper(cleaned[:2])
 		cleaned = strings.TrimPrefix(cleaned[2:], "/")
 		parsed.absolute = true
-	} else if strings.HasPrefix(cleaned, "//") {
-		parts := splitPortableComponents(strings.TrimPrefix(cleaned, "//"))
-		if len(parts) >= 2 {
-			parsed.volume = "//" + parts[0] + "/" + parts[1]
-			parts = parts[2:]
-			parsed.absolute = true
-			parsed.components = parts
-			return parsed
-		}
 	} else if strings.HasPrefix(cleaned, "/") {
 		parsed.volume = "/"
 		cleaned = strings.TrimPrefix(cleaned, "/")
