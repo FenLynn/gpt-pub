@@ -21,12 +21,13 @@ jobs:
         with:
           go-version: '1.24.x'
           cache: false
-      - name: Correct exact custom-draw signatures and apply round 2
+      - name: Correct exact signatures and apply round 2
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py')
           text = path.read_text(encoding='utf-8')
@@ -40,6 +41,15 @@ jobs:
               if count != 1:
                   raise SystemExit(f'expected one script correction, found {count}: {old!r}')
               text = text.replace(old, new, 1)
+          text, count = re.subn(
+              r'\n    round2 = CMD / "v452_round2_windows.go".*?round2.write_text\(round_text, encoding=\x27utf-8\x27, newline=\x27\\n\x27\)\n',
+              '\n',
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f'expected one obsolete helper-signature migration, found {count}')
           path.write_text(text, encoding='utf-8', newline='\n')
           PY
           python projects/1-桌面软件/101-Mediova/代码/tools/apply_v452_round2.py
