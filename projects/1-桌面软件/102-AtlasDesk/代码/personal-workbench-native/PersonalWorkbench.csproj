@@ -5,6 +5,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>AtlasDesk</AssemblyName>
