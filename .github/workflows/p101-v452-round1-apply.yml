@@ -1,0 +1,459 @@
+name: P101 Apply v4.5.2 Round 1 UI State
+
+on:
+  push:
+    branches: [p101-v452-round1-ui-state]
+    paths:
+      - '.github/workflows/p101-v452-round1-apply.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p101-v452-round1-ui-state
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+
+      - name: Apply exact v4.5.2 round-one wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import re
+
+          repo = Path.cwd()
+          code = repo / 'projects/1-桌面软件/101-Mediova/代码'
+          cmd = code / 'cmd/mediaworkbench'
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one exact replacement, found {count}: {old[:120]!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          def replace_regex_once(path: Path, pattern: str, replacement: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              updated, count = re.subn(pattern, lambda _m: replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one regex replacement, found {count}: {pattern[:120]!r}')
+              path.write_text(updated, encoding='utf-8', newline='\n')
+
+          main = cmd / 'main_windows.go'
+          v420 = cmd / 'v420_windows.go'
+          harden = cmd / 'v420_harden_windows.go'
+          v422 = cmd / 'v422_windows.go'
+
+          replace_once(
+              main,
+              '''\t\tif r, _, _ := procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc))); r != 0 {
+\t\t\tapp.layout(rc.Right-rc.Left, rc.Bottom-rc.Top)
+\t\t}
+\t\twriteStartupStage("wm_create_layout_complete")
+''',
+              '''\t\tif r, _, _ := procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc))); r != 0 {
+\t\t\tapp.layout(rc.Right-rc.Left, rc.Bottom-rc.Top)
+\t\t}
+\t\tv452FinalizeInitialToolbar(app)
+\t\twriteStartupStage("wm_create_layout_complete")
+''',
+          )
+
+          replace_once(
+              main,
+              '''\tglyph := "\\\\uE768"
+\tif dis.HwndItem != a.hStart {
+\t\tglyph = secondaryButtonGlyph(dis.HwndItem)
+\t}
+\tlabel := getText(dis.HwndItem)
+''',
+              '''\tlabel := getText(dis.HwndItem)
+''',
+          )
+          replace_once(
+              main,
+              '''\tdrawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
+\tdrawCenteredText(dis.HDC, label, textRC, font, textColor)
+''',
+              '''\tv452DrawSolidPrimaryGlyph(dis.HDC, dis.HwndItem, iconRC, textColor)
+\tdrawCenteredText(dis.HDC, label, textRC, font, textColor)
+''',
+          )
+
+          replace_regex_once(
+              main,
+              r'func \(a \*application\) drawOverallProgress\(dis \*drawItemStruct\) bool \{.*?\n\}\n\nfunc \(a \*application\) drawDecoration',
+              '''func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
+\tif dis == nil || dis.HwndItem != a.hProgress {
+\t\treturn false
+\t}
+\trc := dis.RcItem
+\tbar := rect{Left: rc.Left + 1, Top: rc.Top + 2, Right: rc.Right - 1, Bottom: rc.Bottom - 2}
+\tfraction := clamp01(a.overallProgress / 100)
+\tfill := rect{Left: bar.Left, Top: bar.Top, Right: bar.Left, Bottom: bar.Bottom}
+\twithRoundedClip(dis.HDC, bar, 4, func() {
+\t\tfillSolid(dis.HDC, bar, colorRef(248, 250, 252))
+\t\tif fraction > 0 {
+\t\t\tfill = bar
+\t\t\tfill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
+\t\t\tif fill.Right < fill.Left+4 {
+\t\t\t\tfill.Right = fill.Left + 4
+\t\t\t}
+\t\t\tif a.overallPaused {
+\t\t\t\tdrawHorizontalGradient(dis.HDC, fill, colorRef(235, 237, 240), colorRef(194, 199, 207))
+\t\t\t} else {
+\t\t\t\tdrawHorizontalGradient(dis.HDC, fill, colorRef(151, 196, 245), colorRef(58, 122, 214))
+\t\t\t}
+\t\t}
+\t})
+\tdrawRoundedBorder(dis.HDC, bar, 4, colorRef(218, 223, 230))
+\tif a.overallPaused {
+\t\tv452DrawPausedProgressText(dis.HDC, a.overallText, bar)
+\t} else {
+\t\tdrawContrastCenteredText(dis.HDC, a.overallText, bar, fill, uiFontSmall)
+\t}
+\treturn true
+}
+
+func (a *application) drawDecoration''',
+          )
+
+          replace_once(
+              main,
+              '''\tduration := runEnded.Sub(runStarted)
+\tif duration < 0 {
+\t\tduration = 0
+\t}
+''',
+              '''\tduration := v452FinishRunClock(a, runStarted, runEnded)
+''',
+          )
+
+          replace_regex_once(
+              main,
+              r'func \(a \*application\) refreshTotal\(\) \{.*?\n\}\n\nfunc prepareTaskForRetry',
+              '''func (a *application) refreshTotal() {
+\ta.runMu.Lock()
+\trunning := a.running
+\tpaused := a.paused
+\tstart := a.runStart
+\trunKind := a.runKind
+\trunIDs := copyTaskIDSet(a.runTaskIDs)
+\ta.runMu.Unlock()
+
+\tnow := time.Now()
+\tactiveElapsed := time.Duration(0)
+\tif running {
+\t\tactiveElapsed = v452RunElapsed(a, start, now)
+\t}
+\tdisplayKind := a.currentKind
+\tdisplayRunning := running && displayKind == runKind
+\tvar displayIDs map[int64]bool
+\tdisplayElapsed := time.Duration(0)
+\tif displayRunning {
+\t\tdisplayIDs = runIDs
+\t\tdisplayElapsed = activeElapsed
+\t}
+\tdisplay := a.v422SummarizeProgress(displayKind, displayIDs)
+\tpct, text, elapsed, remaining, speed := display.render(displayKind, displayRunning, displayElapsed, displayRunning && paused, a.settings.ShowPerformanceStats)
+\tpausedDisplay := displayRunning && paused
+\tredraw := v452ShouldInvalidateProgress(a.overallProgress, pct, a.overallText, text, a.overallPaused, pausedDisplay)
+\ta.overallProgress = pct
+\ta.overallText = text
+\ta.overallPaused = pausedDisplay
+\tif redraw {
+\t\tprocInvalidateRect.Call(a.hProgress, 0, 0)
+\t}
+
+\tif running {
+\t\trunSummary := display
+\t\tif !displayRunning {
+\t\t\trunSummary = a.v422SummarizeProgress(runKind, runIDs)
+\t\t}
+\t\trunPct, _, runElapsed, runRemaining, runSpeed := runSummary.render(runKind, true, activeElapsed, paused, a.settings.ShowPerformanceStats)
+\t\ta.updateFloatingBar(runPct, floatingProgressText(runPct, runSummary.Completed, runSummary.Total, runElapsed, runRemaining, runSpeed, runSummary.Active, runSummary.Engine, paused), true)
+\t} else {
+\t\ta.updateFloatingBar(pct, floatingProgressText(pct, display.Completed, display.Total, elapsed, remaining, speed, display.Active, display.Engine, false), false)
+\t}
+}
+
+func prepareTaskForRetry''',
+          )
+
+          replace_once(
+              v420,
+              '''\tsetText(a.hOutputEdit, current)
+\tenable(a.hOutputEdit, !a.v420OutputLocked(kind))
+\tenable(a.hOutputPick, !a.v420OutputLocked(kind))
+''',
+              '''\tsetText(a.hOutputEdit, current)
+\tlocked := a.v420OutputLocked(kind)
+\tenable(a.hOutputEdit, !locked)
+\tenable(a.hOutputPick, !locked)
+\tv452ClearComboSelection(a, a.hOutputEdit, locked)
+''',
+          )
+
+          replace_once(
+              v420,
+              '''\ta.runKind = runKind
+\ta.runStart = time.Now()
+\ta.timeEnd = time.Time{}
+''',
+              '''\ta.runKind = runKind
+\trunStartedAt := time.Now()
+\ta.runStart = runStartedAt
+\ta.timeEnd = time.Time{}
+''',
+          )
+          replace_once(
+              v420,
+              '''\ta.runMu.Unlock()
+
+\tids, skipped, problems := a.v420PrepareReadyBatch(runKind, only)
+''',
+              '''\ta.runMu.Unlock()
+\tv452ResetRunClock(a, runStartedAt)
+
+\tids, skipped, problems := a.v420PrepareReadyBatch(runKind, only)
+''',
+          )
+
+          replace_once(
+              harden,
+              '''\ta.runMu.Unlock()
+
+\tvar controlErr error
+''',
+              '''\ta.runMu.Unlock()
+\tv452SetRunPaused(a, paused, time.Now())
+
+\tvar controlErr error
+''',
+          )
+
+          replace_regex_once(
+              v422,
+              r'// drawStatusLamp uses.*?func drawStatusLamp\(hdc uintptr, rc rect, color uintptr\) \{.*?\n\}\n',
+              '''// drawStatusLamp uses an explicitly square GDI ellipse. Its diameter is
+// derived from the status text height and remains circular at every DPI.
+func drawStatusLamp(hdc uintptr, rc rect, color uintptr) {
+\tv452DrawTrueStatusLamp(hdc, rc, color)
+}
+''',
+          )
+
+          replace_regex_once(
+              v422,
+              r'func \(summary v422ProgressSummary\) render\(kind model.Kind, running bool, start time.Time, paused, showStats bool\) \(float64, string, time.Duration, time.Duration, string\) \{.*?\n\}\n$',
+              '''func (summary v422ProgressSummary) render(kind model.Kind, running bool, elapsed time.Duration, paused, showStats bool) (float64, string, time.Duration, time.Duration, string) {
+\tpct := 0.0
+\tif summary.Total > 0 {
+\t\tpct = summary.Sum / float64(summary.Total)
+\t}
+\tpct = clamp01(pct/100) * 100
+\ttext := fmt.Sprintf("已完成 %d/%d · 总进度 %.1f%%", summary.Completed, summary.Total, pct)
+\tvar remaining time.Duration
+\tspeed := "—"
+\tif running {
+\t\tif elapsed < 0 {
+\t\t\telapsed = 0
+\t\t}
+\t\ttext += " · 已用 " + formatDuration(elapsed)
+\t\tif pct > .2 && pct < 100 && elapsed > 0 {
+\t\t\testimate := time.Duration(float64(elapsed) * 100 / pct)
+\t\t\tremaining = estimate - elapsed
+\t\t\tif remaining > 0 {
+\t\t\t\ttext += " · 剩余 " + formatDuration(remaining)
+\t\t\t}
+\t\t}
+\t\tif elapsed.Seconds() > 0 {
+\t\t\tif kind == model.KindVideo {
+\t\t\t\tspeed = fmt.Sprintf("%.2fx", summary.ProcessedVideo/elapsed.Seconds())
+\t\t\t} else if elapsed.Minutes() > 0 {
+\t\t\t\tspeed = fmt.Sprintf("%.0f 张/分", summary.ProcessedImages/elapsed.Minutes())
+\t\t\t}
+\t\t}
+\t\tif showStats {
+\t\t\ttext += " · 速度 " + speed
+\t\t\tif summary.TotalInput > 0 {
+\t\t\t\ttext += " · " + media.FormatBytes(summary.TotalInput) + " → " + media.FormatBytes(summary.TotalOutput)
+\t\t\t}
+\t\t}
+\t\tif paused {
+\t\t\ttext += " · 已暂停"
+\t\t}
+\t}
+\tif summary.Failed > 0 {
+\t\ttext += fmt.Sprintf(" · 失败 %d", summary.Failed)
+\t}
+\treturn pct, text, elapsed, remaining, speed
+}
+''',
+          )
+
+          # Build a round-specific fixed manifest and its self-checking test.
+          round_paths = [
+              'cmd/mediaworkbench/main_windows.go',
+              'cmd/mediaworkbench/v420_windows.go',
+              'cmd/mediaworkbench/v420_harden_windows.go',
+              'cmd/mediaworkbench/v422_windows.go',
+              'cmd/mediaworkbench/v452_runtime_clock.go',
+              'cmd/mediaworkbench/v452_runtime_clock_test.go',
+              'cmd/mediaworkbench/v452_ui_state_windows.go',
+              'cmd/mediaworkbench/v452_ui_state_source_test.go',
+          ]
+          rows = []
+          for rel in round_paths:
+              data = (code / rel).read_bytes()
+              rows.append(f'{hashlib.sha256(data).hexdigest()}  {rel}')
+          manifest_text = '\n'.join(rows) + '\n'
+          manifest = code / 'V452_ROUND1_UI_STATE_FILES_SHA256.txt'
+          manifest.write_text(manifest_text, encoding='utf-8', newline='\n')
+          manifest_hash = hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+          manifest_test = cmd / 'v452_round1_manifest_test.go'
+          manifest_test.write_text(f'''package main
+
+import (
+\t"bufio"
+\t"crypto/sha256"
+\t"encoding/hex"
+\t"os"
+\t"path/filepath"
+\t"strings"
+\t"testing"
+)
+
+const v452Round1ManifestSHA256 = "{manifest_hash}"
+
+func TestV452Round1FixedManifest(t *testing.T) {{
+\tmanifest := filepath.Join("..", "..", "V452_ROUND1_UI_STATE_FILES_SHA256.txt")
+\tdata, err := os.ReadFile(manifest)
+\tif err != nil {{
+\t\tt.Fatal(err)
+\t}}
+\tsum := sha256.Sum256(data)
+\tif got := hex.EncodeToString(sum[:]); got != v452Round1ManifestSHA256 {{
+\t\tt.Fatalf("manifest sha256=%s want=%s", got, v452Round1ManifestSHA256)
+\t}}
+\tscanner := bufio.NewScanner(strings.NewReader(string(data)))
+\tfor scanner.Scan() {{
+\t\tparts := strings.Fields(scanner.Text())
+\t\tif len(parts) != 2 {{
+\t\t\tt.Fatalf("invalid manifest row %q", scanner.Text())
+\t\t}}
+\t\tfileData, err := os.ReadFile(filepath.Join("..", "..", filepath.FromSlash(parts[1])))
+\t\tif err != nil {{
+\t\t\tt.Fatalf("%s: %v", parts[1], err)
+\t\t}}
+\t\tfileSum := sha256.Sum256(fileData)
+\t\tif got := hex.EncodeToString(fileSum[:]); got != parts[0] {{
+\t\t\tt.Fatalf("%s sha256=%s want=%s", parts[1], got, parts[0])
+\t\t}}
+\t}}
+\tif err := scanner.Err(); err != nil {{
+\t\tt.Fatal(err)
+\t}}
+}}
+''', encoding='utf-8', newline='\n')
+
+          # Refresh the long-lived source manifest, preserving all existing
+          # entries and adding the new round-one sources/tests/manifests.
+          source_manifest = code / 'SOURCE_FILES_SHA256.txt'
+          source_paths = set(round_paths)
+          source_paths.add('cmd/mediaworkbench/v452_round1_manifest_test.go')
+          source_paths.add('V452_ROUND1_UI_STATE_FILES_SHA256.txt')
+          for line in source_manifest.read_text(encoding='utf-8').splitlines():
+              parts = line.strip().split(maxsplit=1)
+              if len(parts) == 2:
+                  source_paths.add(parts[1])
+          refreshed = []
+          for rel in sorted(source_paths):
+              path = code / rel
+              if not path.is_file():
+                  raise SystemExit(f'missing source-manifest path: {rel}')
+              refreshed.append(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {rel}')
+          source_manifest.write_text('\n'.join(refreshed) + '\n', encoding='utf-8', newline='\n')
+          PY
+
+          gofmt -w \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v452_runtime_clock.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v452_runtime_clock_test.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v452_ui_state_windows.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v452_ui_state_source_test.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v452_round1_manifest_test.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/main_windows.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v420_windows.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v420_harden_windows.go \
+            projects/1-桌面软件/101-Mediova/代码/cmd/mediaworkbench/v422_windows.go
+
+          # gofmt changes protected bytes, so recalculate both manifests once
+          # more and synchronize the embedded manifest hash.
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import re
+
+          code = Path('projects/1-桌面软件/101-Mediova/代码')
+          round_paths = [
+              'cmd/mediaworkbench/main_windows.go',
+              'cmd/mediaworkbench/v420_windows.go',
+              'cmd/mediaworkbench/v420_harden_windows.go',
+              'cmd/mediaworkbench/v422_windows.go',
+              'cmd/mediaworkbench/v452_runtime_clock.go',
+              'cmd/mediaworkbench/v452_runtime_clock_test.go',
+              'cmd/mediaworkbench/v452_ui_state_windows.go',
+              'cmd/mediaworkbench/v452_ui_state_source_test.go',
+          ]
+          manifest = code / 'V452_ROUND1_UI_STATE_FILES_SHA256.txt'
+          manifest.write_text('\n'.join(
+              f'{hashlib.sha256((code / rel).read_bytes()).hexdigest()}  {rel}'
+              for rel in round_paths
+          ) + '\n', encoding='utf-8', newline='\n')
+          manifest_hash = hashlib.sha256(manifest.read_bytes()).hexdigest()
+          test_path = code / 'cmd/mediaworkbench/v452_round1_manifest_test.go'
+          text = test_path.read_text(encoding='utf-8')
+          text, count = re.subn(
+              r'const v452Round1ManifestSHA256 = "[0-9a-f]+"',
+              f'const v452Round1ManifestSHA256 = "{manifest_hash}"',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit('unable to synchronize round-one manifest hash')
+          test_path.write_text(text, encoding='utf-8', newline='\n')
+
+          source_manifest = code / 'SOURCE_FILES_SHA256.txt'
+          paths = set()
+          for line in source_manifest.read_text(encoding='utf-8').splitlines():
+              parts = line.strip().split(maxsplit=1)
+              if len(parts) == 2:
+                  paths.add(parts[1])
+          rows = []
+          for rel in sorted(paths):
+              path = code / rel
+              if not path.is_file():
+                  raise SystemExit(f'missing source-manifest path: {rel}')
+              rows.append(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {rel}')
+          source_manifest.write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          PY
+
+          rm .github/workflows/p101-v452-round1-apply.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add projects/1-桌面软件/101-Mediova/代码 .github/workflows/p101-v452-round1-apply.yml
+          git diff --cached --check
+          git commit -m 'Mediova｜完成 v4.5.2 第一轮 UI 状态接线'
+          git push origin HEAD:p101-v452-round1-ui-state
