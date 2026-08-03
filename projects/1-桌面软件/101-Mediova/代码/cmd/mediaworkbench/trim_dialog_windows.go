@@ -20,26 +20,29 @@ import (
 )
 
 const (
-	IDC_TRIM_START       = 4001
-	IDC_TRIM_END         = 4002
-	IDC_CROP_ON          = 4003
-	IDC_CROP_X           = 4004
-	IDC_CROP_Y           = 4005
-	IDC_CROP_W           = 4006
-	IDC_CROP_H           = 4007
-	IDC_FRAME_PREVIEW    = 4008
-	IDC_FULL_FRAME       = 4009
-	IDC_FULL_TIME        = 4010
-	IDC_TRIM_OK          = 4011
-	IDC_TRIM_CANCEL      = 4012
-	IDC_PREVIEW_CANVAS   = 4013
-	IDC_TIMELINE         = 4014
-	IDC_CURRENT_TIME     = 4015
-	IDC_JUMP_TIME        = 4016
-	IDC_SEEK_MINUS_SEC   = 4017
-	IDC_SEEK_MINUS_FRAME = 4018
-	IDC_SEEK_PLUS_FRAME  = 4019
-	IDC_SEEK_PLUS_SEC    = 4020
+	IDC_TRIM_START          = 4001
+	IDC_TRIM_END            = 4002
+	IDC_CROP_ON             = 4003
+	IDC_CROP_X              = 4004
+	IDC_CROP_Y              = 4005
+	IDC_CROP_W              = 4006
+	IDC_CROP_H              = 4007
+	IDC_FRAME_PREVIEW       = 4008
+	IDC_FULL_FRAME          = 4009
+	IDC_FULL_TIME           = 4010
+	IDC_TRIM_OK             = 4011
+	IDC_TRIM_CANCEL         = 4012
+	IDC_PREVIEW_CANVAS      = 4013
+	IDC_TIMELINE            = 4014
+	IDC_CURRENT_TIME        = 4015
+	IDC_JUMP_TIME           = 4016
+	IDC_SEEK_MINUS_SEC      = 4017
+	IDC_SEEK_MINUS_FRAME    = 4018
+	IDC_SEEK_PLUS_FRAME     = 4019
+	IDC_SEEK_PLUS_SEC       = 4020
+	IDC_CROP_ASPECT         = 4021
+	IDC_CROP_CENTER         = 4022
+	IDC_CROP_APPLY_SELECTED = 4023
 )
 
 type trimDialog struct {
@@ -62,6 +65,7 @@ type trimDialog struct {
 	hCanvas  uintptr
 	hTrack   uintptr
 	hNow     uintptr
+	hAspect  uintptr
 
 	frameW, frameH int
 	currentAt      float64
@@ -71,15 +75,16 @@ type trimDialog struct {
 	previewSeq     atomic.Int64
 	dragging       bool
 	dragStart      point
+	applySelected  bool
 }
 
 var activeTrim *trimDialog
 var trimClassRegistered bool
 var trimPreviewClassRegistered bool
 
-func showTrimCropDialog(owner *application, task *model.Task, opts model.TaskOptions) (model.TaskOptions, bool) {
+func showTrimCropDialog(owner *application, task *model.Task, opts model.TaskOptions) (model.TaskOptions, bool, bool) {
 	if task == nil {
-		return opts, false
+		return opts, false, false
 	}
 	frameW, frameH := effectiveFrameSize(task, opts.Rotation)
 	if opts.TrimEnd <= 0 || opts.TrimEnd > task.Duration {
@@ -103,7 +108,7 @@ func showTrimCropDialog(owner *application, task *model.Task, opts model.TaskOpt
 	h, _, _ := procCreateWindowExW.Call(WS_EX_DLGMODALFRAME|WS_EX_TOOLWINDOW, uintptr(unsafe.Pointer(p("MWTrimCropDialog"))), uintptr(unsafe.Pointer(p(title))), WS_OVERLAPPEDWINDOW|WS_VISIBLE|WS_CLIPCHILDREN, 120, 70, 1120, 800, owner.hwnd, 0, hInst, 0)
 	if h == 0 {
 		activeTrim = nil
-		return opts, false
+		return opts, false, false
 	}
 	d.hwnd = h
 	enable(owner.hwnd, false)
@@ -122,7 +127,7 @@ func showTrimCropDialog(owner *application, task *model.Task, opts model.TaskOpt
 	enable(owner.hwnd, true)
 	procSetForegroundWindow.Call(owner.hwnd)
 	activeTrim = nil
-	return d.opts, d.accepted
+	return d.opts, d.accepted, d.applySelected
 }
 
 func effectiveFrameSize(task *model.Task, rotation string) (int, int) {
@@ -179,6 +184,10 @@ func trimWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 			d.timelineChanged(int(loWord(wParam)))
 		}
 		return 0
+	case WM_KEYDOWN:
+		if d != nil && d.keyDown(int(wParam)) {
+			return 0
+		}
 	case WM_CLOSE:
 		if d != nil {
 			d.done = true
@@ -279,9 +288,17 @@ func (d *trimDialog) init() {
 	}
 	createControl("STATIC", fmt.Sprintf("转正后画面：%d×%d", d.frameW, d.frameH), WS_CHILD|WS_VISIBLE, x+200, 188, 132, 52, d.hwnd, 0)
 	createControl("BUTTON", "恢复全画面", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+200, 260, 132, 32, d.hwnd, IDC_FULL_FRAME)
+	createControl("STATIC", "裁剪比例", WS_CHILD|WS_VISIBLE, x, 312, 70, 26, d.hwnd, 0)
+	d.hAspect = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, x+72, 306, 120, 200, d.hwnd, IDC_CROP_ASPECT)
+	for _, label := range []string{"自由", "16:9", "9:16", "1:1", "4:3"} {
+		send(d.hAspect, CB_ADDSTRING, 0, uintptr(unsafe.Pointer(p(label))))
+	}
+	send(d.hAspect, CB_SETCURSEL, 0, 0)
+	createControl("BUTTON", "居中适配", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+200, 306, 132, 32, d.hwnd, IDC_CROP_CENTER)
 	d.hInfo = createControlEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD|WS_VISIBLE|ES_MULTILINE|ES_READONLY|WS_VSCROLL, x, 350, 332, 138, d.hwnd, 0)
 	createControl("BUTTON", "生成高清预览", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x, 500, 332, 36, d.hwnd, IDC_FRAME_PREVIEW)
-	createControl("BUTTON", "应用到任务", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_DEFPUSHBUTTON, x, 660, 200, 40, d.hwnd, IDC_TRIM_OK)
+	createControl("BUTTON", "应用到已选任务", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x, 614, 332, 36, d.hwnd, IDC_CROP_APPLY_SELECTED)
+	createControl("BUTTON", "应用到当前任务", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_DEFPUSHBUTTON, x, 660, 200, 40, d.hwnd, IDC_TRIM_OK)
 	createControl("BUTTON", "取消", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+208, 660, 124, 40, d.hwnd, IDC_TRIM_CANCEL)
 	d.updateInfo()
 	d.generatePreviewFrame()
@@ -297,6 +314,10 @@ func (d *trimDialog) command(id int) {
 		d.opts.Crop = model.Crop{Enabled: false, X: 0, Y: 0, Width: evenSize(d.frameW), Height: evenSize(d.frameH)}
 		send(d.hCrop, BM_SETCHECK, 0, 0)
 		d.cropToControls()
+	case IDC_CROP_ASPECT:
+		d.updateInfo()
+	case IDC_CROP_CENTER:
+		d.fitSelectedAspect()
 	case IDC_FRAME_PREVIEW:
 		d.openHighQualityPreview()
 	case IDC_JUMP_TIME:
@@ -319,8 +340,17 @@ func (d *trimDialog) command(id int) {
 	case IDC_TRIM_END + 100:
 		setText(d.hEnd, formatSecondsClock(d.currentAt))
 		d.updateInfo()
+	case IDC_CROP_APPLY_SELECTED:
+		if d.read() {
+			d.applySelected = true
+			d.accepted = true
+			d.done = true
+			d.closed.Store(true)
+			procDestroyWindow.Call(d.hwnd)
+		}
 	case IDC_TRIM_OK:
 		if d.read() {
+			d.applySelected = false
 			d.accepted = true
 			d.done = true
 			d.closed.Store(true)
@@ -336,6 +366,57 @@ func (d *trimDialog) command(id int) {
 		d.updateInfo()
 		procInvalidateRect.Call(d.hCanvas, 0, 0)
 	}
+}
+
+func (d *trimDialog) selectedAspect() (int, int, bool) {
+	if d.hAspect == 0 {
+		return 0, 0, false
+	}
+	return media.CropAspect(comboText(d.hAspect))
+}
+
+func (d *trimDialog) fitSelectedAspect() {
+	ratioW, ratioH, ok := d.selectedAspect()
+	if !ok {
+		return
+	}
+	d.opts.Crop = media.FitAspectCrop(d.frameW, d.frameH, ratioW, ratioH)
+	send(d.hCrop, BM_SETCHECK, BST_CHECKED, 0)
+	d.cropToControls()
+}
+
+func (d *trimDialog) keyDown(key int) bool {
+	shiftState, _, _ := procGetKeyState.Call(0x10)
+	shifted := int16(shiftState&0xffff) < 0
+	switch key {
+	case 0x25: // Left
+		if shifted {
+			d.seek(-1)
+		} else {
+			d.seek(-1 / d.safeFPS())
+		}
+		return true
+	case 0x27: // Right
+		if shifted {
+			d.seek(1)
+		} else {
+			d.seek(1 / d.safeFPS())
+		}
+		return true
+	case 'I':
+		setText(d.hStart, formatSecondsClock(d.currentAt))
+		d.updateInfo()
+		return true
+	case 'O':
+		setText(d.hEnd, formatSecondsClock(d.currentAt))
+		d.updateInfo()
+		return true
+	case 'R':
+		d.opts.Crop = model.Crop{Enabled: false, X: 0, Y: 0, Width: evenSize(d.frameW), Height: evenSize(d.frameH)}
+		d.cropToControls()
+		return true
+	}
+	return false
 }
 
 func (d *trimDialog) timelineChanged(code int) {
@@ -657,29 +738,8 @@ func (d *trimDialog) imagePointClamped(lParam uintptr) (point, bool) {
 }
 
 func (d *trimDialog) setDragCrop(a, b point) {
-	x1, x2 := int(a.X), int(b.X)
-	y1, y2 := int(a.Y), int(b.Y)
-	if x2 < x1 {
-		x1, x2 = x2, x1
-	}
-	if y2 < y1 {
-		y1, y2 = y2, y1
-	}
-	x1, y1 = evenCoord(x1), evenCoord(y1)
-	x2, y2 = evenCoord(x2), evenCoord(y2)
-	if x2 <= x1 {
-		x2 = x1 + 2
-	}
-	if y2 <= y1 {
-		y2 = y1 + 2
-	}
-	if x2 > d.frameW {
-		x2 = evenCoord(d.frameW)
-	}
-	if y2 > d.frameH {
-		y2 = evenCoord(d.frameH)
-	}
-	d.opts.Crop = model.Crop{Enabled: true, X: x1, Y: y1, Width: evenSize(x2 - x1), Height: evenSize(y2 - y1)}
+	ratioW, ratioH, locked := d.selectedAspect()
+	d.opts.Crop = media.DragCropWithAspect(d.frameW, d.frameH, int(a.X), int(a.Y), int(b.X), int(b.Y), ratioW, ratioH, locked)
 	d.cropToControls()
 }
 

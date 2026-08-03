@@ -30,7 +30,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const appVersion = "4.2.3"
+const appVersion = "4.3.0"
 
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
@@ -5780,22 +5780,56 @@ func (a *application) compareVideo() {
 	}()
 }
 func (a *application) editTrimCrop() {
-	t, idx := a.selectedTask()
-	if t == nil {
+	idxs := a.selectedTaskIndices()
+	if len(idxs) == 0 {
+		messageBox(a.hwnd, "时长与画面", "请先选择一个任务。", MB_OK|MB_ICONINFORMATION)
 		return
 	}
-	opts := a.settings.EffectiveOptions(t)
-	updated, ok := showTrimCropDialog(a, t, opts)
-	if ok {
-		a.mu.Lock()
-		if idx < len(a.tasks) {
-			updated.FollowDefaults = false
-			a.tasks[idx].Options = updated
-		}
+	idx := idxs[0]
+	a.mu.Lock()
+	if idx < 0 || idx >= len(a.tasks) || a.tasks[idx] == nil {
 		a.mu.Unlock()
-		a.refreshAll()
+		return
+	}
+	selected := a.tasks[idx]
+	if selected.IsLocked() {
+		a.mu.Unlock()
+		messageBox(a.hwnd, "任务已锁定", "队列中、转换中或暂停任务需要先通过右键进入搁置编辑。", MB_OK|MB_ICONINFORMATION)
+		return
+	}
+	taskCopy := *selected
+	opts := a.settings.EffectiveOptions(selected)
+	a.mu.Unlock()
+
+	updated, ok, applySelected := showTrimCropDialog(a, &taskCopy, opts)
+	if !ok {
+		return
+	}
+	copied := 0
+	a.mu.Lock()
+	if idx >= 0 && idx < len(a.tasks) && a.tasks[idx] != nil && a.tasks[idx].ID == taskCopy.ID {
+		a.tasks[idx].Options = updated
+		resetTaskAfterOptionChange(a.tasks[idx])
+		if applySelected {
+			ordered := []int{idx}
+			for _, candidate := range idxs {
+				if candidate != idx {
+					ordered = append(ordered, candidate)
+				}
+			}
+			copied = copyTrimCropToTargets(a.settings, a.tasks, ordered)
+		}
+	}
+	a.mu.Unlock()
+	a.saveSession()
+	a.refreshAll()
+	if applySelected {
+		setText(a.hStatusText, fmt.Sprintf("裁剪设置已应用到当前任务，并同步到 %d 个可编辑的已选任务。", copied))
+	} else {
+		setText(a.hStatusText, "裁剪设置已应用到当前任务。")
 	}
 }
+
 func (a *application) showFFmpegCommand() {
 	t, _ := a.selectedTask()
 	if t == nil {
