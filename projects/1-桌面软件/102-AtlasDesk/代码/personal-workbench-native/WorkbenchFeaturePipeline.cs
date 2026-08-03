@@ -17,7 +17,7 @@ public sealed class WorkbenchFeaturePipeline
         DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window);
 
         Experience = V061ExperienceEnhancer.Attach(window, Base);
-        Stability = V062StabilityEnhancer.Attach(window, Settings);
+        Diagnostics = DiagnosticsCoordinator.Attach(window, Settings);
         ShellResilience = ShellResilienceCoordinator.Attach(window);
         DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
         DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings);
@@ -37,7 +37,7 @@ public sealed class WorkbenchFeaturePipeline
     public V067VisualFixes VisualFixes { get; }
     public WorkbenchEnhancer Base { get; }
     public V061ExperienceEnhancer Experience { get; }
-    public V062StabilityEnhancer Stability { get; }
+    public DiagnosticsCoordinator Diagnostics { get; }
     public ShellResilienceCoordinator ShellResilience { get; }
     public DashboardScriptDiagnostics DashboardDiagnostics { get; }
     public DashboardInteractionCoordinator DashboardInteraction { get; }
