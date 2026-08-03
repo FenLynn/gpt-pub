@@ -60,7 +60,7 @@ internal static class V104UiConvergenceChecks
             "ApplyHome",
             "ApplySettings",
             "ApplyGenericPage",
-            "MetricGrid",
+            "metrics.Columns = compact ? 2 : 4",
             "GridLength(164)",
             "ReferenceEqualityComparer.Instance");
         RequireAbsent(coordinator,
