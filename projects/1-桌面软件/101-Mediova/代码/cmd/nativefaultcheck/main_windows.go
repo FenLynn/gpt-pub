@@ -292,7 +292,9 @@ func runDiskProbe(root string, r *report) error {
 	if err != nil {
 		return err
 	}
-	saveErr := config.Save(settingsWithOutput("disk-full-change"))
+	largeValue := strings.Repeat("disk-full-change-", 8192)
+	r.Detail["disk_full_payload_bytes"] = fmt.Sprintf("%d", len(largeValue)*2)
+	saveErr := config.Save(settingsWithOutput(largeValue))
 	after, readErr := os.ReadFile(path)
 	r.Checks["disk_full_returns_error"] = saveErr != nil
 	r.Checks["disk_full_preserves_primary"] = readErr == nil && bytes.Equal(before, after)
