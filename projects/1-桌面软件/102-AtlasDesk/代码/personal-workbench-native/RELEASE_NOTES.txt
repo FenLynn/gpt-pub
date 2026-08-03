@@ -1,3 +1,24 @@
+AtlasDesk v0.9.2
+
+This stabilization release rebuilds the Zotero item pane around read-only research actions and continues layout hardening.
+
+Zotero item pane
+- The right pane follows Zotero's compact item-detail structure without exposing editing controls.
+- Title, authors, source, year, Citation Key and DOI are visible without opening a secondary tab.
+- Citation Key detection supports Zotero's native citationKey field and legacy Better BibTeX values stored in Extra.
+- Quick-copy actions cover title, DOI, Citation Key, the current reference preview, LaTeX cite syntax and Pandoc cite syntax.
+- GB/T 7714 and APA previews are explicitly labeled as quick references; formal submissions should still use Zotero/CSL output.
+- Open PDF and Show File are first-class actions. Show File selects the PDF in Windows Explorer so the original file can be copied directly.
+- Abstract, metadata, attachments, notes, tags and collections remain available in a lower read-only detail area.
+
+Read-only boundary
+- Zotero access remains SQLite read-only with PRAGMA query_only enabled.
+- No citation, metadata, file or collection action writes to zotero.sqlite.
+- Existing serialized database reads, request-version guards and explicit navigation loading remain unchanged.
+
+Regression protection
+- New v0.9.2 smoke checks validate native and legacy citation keys, LaTeX/Pandoc output, DOI preservation, file-location actions and invalid XAML control characters.
+
 AtlasDesk v0.9.1
 
 This patch fixes maximized-window and short-height layout clipping discovered on Windows taskbar work areas.
