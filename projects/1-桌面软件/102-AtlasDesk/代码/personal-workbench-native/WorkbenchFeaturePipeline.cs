@@ -33,6 +33,7 @@ public sealed class WorkbenchFeaturePipeline
         Corrective = V0611CorrectiveEnhancer.Attach(this);
         ExperiencePolish = V0612ExperienceEnhancer.Attach(window, this);
         ProjectWorkflow = ProjectWorkflowCoordinator.Attach(window, this);
+        ProductivityContext = ProductivityContextCoordinator.Attach(window, this);
 
         // Attach last. Historical presentation layers may still remove focus visuals
         // or Tab stops while applying compatibility fixes; AccessibilityCoordinator
@@ -60,6 +61,7 @@ public sealed class WorkbenchFeaturePipeline
     public V0611CorrectiveEnhancer Corrective { get; }
     public V0612ExperienceEnhancer ExperiencePolish { get; }
     public ProjectWorkflowCoordinator ProjectWorkflow { get; }
+    public ProductivityContextCoordinator ProductivityContext { get; }
     public AccessibilityCoordinator Accessibility { get; }
     public AppSettings Settings { get; }
 
