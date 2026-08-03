@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,7 +9,8 @@ namespace PersonalWorkbench;
 public partial class ToolsCenterControl : UserControl, IDisposable
 {
     private readonly AppSettings _settings;
-    private CancellationTokenSource? _operationCancellation;
+    private Guid? _activeTaskId;
+    private WorkbenchTaskRecord? _activeRecord;
     private string _currentDetail = string.Empty;
     private string _currentPath = string.Empty;
     private bool _disposed;
@@ -40,28 +42,36 @@ public partial class ToolsCenterControl : UserControl, IDisposable
             AddExtension = true
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
-        await RunOperationAsync("正在生成工作区清单…", async (progress, token) =>
-        {
-            var entries = await FileIntegrityService.CreateManifestAsync(_settings.WorkspaceRoot, dialog.FileName, progress, token);
-            await FileIntegrityService.WriteManifestAtomicAsync(dialog.FileName, entries);
-            VerificationList.ItemsSource = null;
-            EmptyState.Visibility = Visibility.Visible;
-            ResultTitle.Text = "清单已生成";
-            ResultCountText.Text = entries.Count + " 个文件";
-            _currentPath = dialog.FileName;
-            _currentDetail = string.Join(Environment.NewLine, new[]
+
+        IReadOnlyList<FileIntegrityEntry>? entries = null;
+        var record = await RunOperationAsync(
+            "生成工作区 SHA-256 清单",
+            dialog.FileName,
+            async (progress, token) =>
             {
-                "SHA-256 清单已写入：", dialog.FileName, string.Empty,
-                $"根目录：{_settings.WorkspaceRoot}", $"记录数：{entries.Count:N0}",
-                "格式：AtlasDesk SHA256 v1"
+                entries = await FileIntegrityService.CreateManifestAsync(_settings.WorkspaceRoot, dialog.FileName, progress, token);
+                await FileIntegrityService.WriteManifestAtomicAsync(dialog.FileName, entries);
+                return string.Join(Environment.NewLine, new[]
+                {
+                    "SHA-256 清单已写入：", dialog.FileName, string.Empty,
+                    $"根目录：{_settings.WorkspaceRoot}", $"记录数：{entries.Count:N0}",
+                    "格式：AtlasDesk SHA256 v1"
+                });
             });
-            DetailTitle.Text = "生成完成";
-            DetailSubtitle.Text = "清单采用相对路径，不写入本机绝对工作区路径。";
-            SelectedPathText.Text = dialog.FileName;
-            DetailText.Text = _currentDetail;
-            CopyButton.IsEnabled = true;
-            OpenPathButton.IsEnabled = true;
-        });
+        if (record.State != WorkbenchTaskState.Completed || entries is null) return;
+
+        VerificationList.ItemsSource = null;
+        EmptyState.Visibility = Visibility.Visible;
+        ResultTitle.Text = "清单已生成";
+        ResultCountText.Text = entries.Count + " 个文件";
+        _currentPath = dialog.FileName;
+        _currentDetail = record.Result;
+        DetailTitle.Text = "生成完成";
+        DetailSubtitle.Text = "任务已写入统一历史；清单采用相对路径。";
+        SelectedPathText.Text = dialog.FileName;
+        DetailText.Text = _currentDetail;
+        CopyButton.IsEnabled = true;
+        OpenPathButton.IsEnabled = true;
     }
 
     private async void Verify_Click(object sender, RoutedEventArgs e)
@@ -78,33 +88,41 @@ public partial class ToolsCenterControl : UserControl, IDisposable
             ? _settings.WorkspaceRoot
             : Path.GetDirectoryName(dialog.FileName) ?? Environment.CurrentDirectory;
 
-        await RunOperationAsync("正在验证清单…", async (progress, token) =>
-        {
-            var results = await FileIntegrityService.VerifyManifestAsync(dialog.FileName, root, progress, token);
-            VerificationList.ItemsSource = results;
-            EmptyState.Visibility = results.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            var matched = results.Count(item => item.Status == IntegrityVerificationStatus.Match);
-            var missing = results.Count(item => item.Status == IntegrityVerificationStatus.Missing);
-            var changed = results.Count(item => item.Status == IntegrityVerificationStatus.Changed);
-            var unsafeCount = results.Count(item => item.Status == IntegrityVerificationStatus.UnsafePath);
-            var errors = results.Count(item => item.Status == IntegrityVerificationStatus.Error);
-            ResultTitle.Text = "清单验证结果";
-            ResultCountText.Text = $"{matched} 匹配 · {results.Count - matched} 异常";
-            _currentPath = dialog.FileName;
-            _currentDetail = string.Join(Environment.NewLine, new[]
+        IReadOnlyList<IntegrityVerificationItem>? results = null;
+        var record = await RunOperationAsync(
+            "验证 SHA-256 清单",
+            dialog.FileName,
+            async (progress, token) =>
             {
-                $"根目录：{root}", $"清单：{dialog.FileName}", string.Empty,
-                $"匹配：{matched:N0}", $"缺失：{missing:N0}", $"改变：{changed:N0}",
-                $"不安全路径：{unsafeCount:N0}", $"读取错误：{errors:N0}"
+                results = await FileIntegrityService.VerifyManifestAsync(dialog.FileName, root, progress, token);
+                var matched = results.Count(item => item.Status == IntegrityVerificationStatus.Match);
+                var missing = results.Count(item => item.Status == IntegrityVerificationStatus.Missing);
+                var changed = results.Count(item => item.Status == IntegrityVerificationStatus.Changed);
+                var unsafeCount = results.Count(item => item.Status == IntegrityVerificationStatus.UnsafePath);
+                var errors = results.Count(item => item.Status == IntegrityVerificationStatus.Error);
+                return string.Join(Environment.NewLine, new[]
+                {
+                    $"根目录：{root}", $"清单：{dialog.FileName}", string.Empty,
+                    $"匹配：{matched:N0}", $"缺失：{missing:N0}", $"改变：{changed:N0}",
+                    $"不安全路径：{unsafeCount:N0}", $"读取错误：{errors:N0}"
+                });
             });
-            DetailTitle.Text = results.Count == matched ? "全部文件匹配" : "发现完整性差异";
-            DetailSubtitle.Text = "点击左侧记录查看期望值与实际值。";
-            SelectedPathText.Text = dialog.FileName;
-            DetailText.Text = _currentDetail;
-            CopyButton.IsEnabled = true;
-            OpenPathButton.IsEnabled = true;
-            if (results.Count > 0) VerificationList.SelectedIndex = 0;
-        });
+        if (record.State != WorkbenchTaskState.Completed || results is null) return;
+
+        VerificationList.ItemsSource = results;
+        EmptyState.Visibility = results.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var matchedCount = results.Count(item => item.Status == IntegrityVerificationStatus.Match);
+        ResultTitle.Text = "清单验证结果";
+        ResultCountText.Text = $"{matchedCount} 匹配 · {results.Count - matchedCount} 异常";
+        _currentPath = dialog.FileName;
+        _currentDetail = record.Result;
+        DetailTitle.Text = results.Count == matchedCount ? "全部文件匹配" : "发现完整性差异";
+        DetailSubtitle.Text = "结果已写入统一任务历史；点击记录查看详情。";
+        SelectedPathText.Text = dialog.FileName;
+        DetailText.Text = _currentDetail;
+        CopyButton.IsEnabled = true;
+        OpenPathButton.IsEnabled = true;
+        if (results.Count > 0) VerificationList.SelectedIndex = 0;
     }
 
     private async void Compare_Click(object sender, RoutedEventArgs e)
@@ -114,70 +132,86 @@ public partial class ToolsCenterControl : UserControl, IDisposable
         var second = SelectFile("选择第二个文件");
         if (string.IsNullOrWhiteSpace(second)) return;
 
-        await RunOperationAsync("正在比较两个文件…", async (progress, token) =>
-        {
-            var result = await FileIntegrityService.CompareFilesAsync(first, second, progress, token);
-            VerificationList.ItemsSource = null;
-            EmptyState.Visibility = Visibility.Visible;
-            ResultTitle.Text = result.IsIdentical ? "文件完全一致" : "文件不同";
-            ResultCountText.Text = result.IsIdentical ? "SHA-256 与大小均相同" : "存在差异";
-            _currentPath = first;
-            _currentDetail = result.Summary;
-            DetailTitle.Text = result.IsIdentical ? "比较通过" : "比较结果不同";
-            DetailSubtitle.Text = "SHA-256 和文件大小已分别计算。";
-            SelectedPathText.Text = first + Environment.NewLine + second;
-            DetailText.Text = result.Summary;
-            CopyButton.IsEnabled = true;
-            OpenPathButton.IsEnabled = true;
-        });
+        FileComparisonResult? comparison = null;
+        var record = await RunOperationAsync(
+            "比较两个文件的 SHA-256",
+            first,
+            async (progress, token) =>
+            {
+                comparison = await FileIntegrityService.CompareFilesAsync(first, second, progress, token);
+                return comparison.Summary;
+            });
+        if (record.State != WorkbenchTaskState.Completed || comparison is null) return;
+
+        VerificationList.ItemsSource = null;
+        EmptyState.Visibility = Visibility.Visible;
+        ResultTitle.Text = comparison.IsIdentical ? "文件完全一致" : "文件不同";
+        ResultCountText.Text = comparison.IsIdentical ? "SHA-256 与大小均相同" : "存在差异";
+        _currentPath = first;
+        _currentDetail = record.Result;
+        DetailTitle.Text = comparison.IsIdentical ? "比较通过" : "比较结果不同";
+        DetailSubtitle.Text = "结果已写入统一任务历史。";
+        SelectedPathText.Text = first + Environment.NewLine + second;
+        DetailText.Text = comparison.Summary;
+        CopyButton.IsEnabled = true;
+        OpenPathButton.IsEnabled = true;
     }
 
-    private async Task RunOperationAsync(
-        string message,
-        Func<IProgress<double>, CancellationToken, Task> operation)
+    private async Task<WorkbenchTaskRecord> RunOperationAsync(
+        string title,
+        string targetPath,
+        Func<IProgress<double>, CancellationToken, Task<string>> operation)
     {
-        _operationCancellation?.Cancel();
-        _operationCancellation?.Dispose();
-        var cancellation = new CancellationTokenSource();
-        _operationCancellation = cancellation;
-        SetBusy(true, message);
-        var progress = new Progress<double>(value =>
-        {
-            OperationProgress.IsIndeterminate = value < 0;
-            if (value >= 0) OperationProgress.Value = Math.Clamp(value, 0, 100);
-            ProgressText.Text = value < 0 ? "处理中" : Math.Clamp(value, 0, 100).ToString("0") + "%";
-        });
-        try
-        {
-            await operation(progress, cancellation.Token);
-            ProgressText.Text = "完成";
-            OperationProgress.IsIndeterminate = false;
-            OperationProgress.Value = 100;
-        }
-        catch (OperationCanceledException)
+        if (_activeTaskId is Guid active)
+            FileIntegrityTaskBridge.Cancel(active);
+        DetachActiveRecord();
+
+        var handle = FileIntegrityTaskBridge.Start(title, targetPath, operation);
+        _activeTaskId = handle.Record.Id;
+        _activeRecord = handle.Record;
+        _activeRecord.PropertyChanged += ActiveRecord_PropertyChanged;
+        SetBusy(true, title + "…");
+        UpdateProgress(handle.Record);
+
+        var record = await handle.Completion;
+        UpdateProgress(record);
+        if (record.State == WorkbenchTaskState.Cancelled)
         {
             DetailTitle.Text = "操作已取消";
-            DetailSubtitle.Text = "未完成的清单不会替换目标文件。";
-            ProgressText.Text = "已取消";
+            DetailSubtitle.Text = "任务历史已记录取消状态；未完成清单不会替换目标文件。";
         }
-        catch (Exception ex)
+        else if (record.State == WorkbenchTaskState.Failed)
         {
-            App.Log("File integrity operation failed: " + ex);
             DetailTitle.Text = "操作失败";
-            DetailSubtitle.Text = ex.Message;
-            DetailText.Text = ex.ToString();
-            ProgressText.Text = "失败";
-            ShowMessage("操作失败：\n" + ex.Message, MessageBoxImage.Error);
+            DetailSubtitle.Text = record.Error;
+            DetailText.Text = record.Error;
+            ShowMessage("操作失败：\n" + record.Error, MessageBoxImage.Error);
         }
-        finally
-        {
-            if (ReferenceEquals(_operationCancellation, cancellation))
-            {
-                _operationCancellation = null;
-                cancellation.Dispose();
-            }
-            SetBusy(false, string.Empty);
-        }
+
+        DetachActiveRecord();
+        SetBusy(false, string.Empty);
+        return record;
+    }
+
+    private void ActiveRecord_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is WorkbenchTaskRecord record)
+            Dispatcher.BeginInvoke(new Action(() => UpdateProgress(record)));
+    }
+
+    private void UpdateProgress(WorkbenchTaskRecord record)
+    {
+        OperationProgress.IsIndeterminate = record.Progress < 0 && record.State == WorkbenchTaskState.Running;
+        if (record.Progress >= 0) OperationProgress.Value = Math.Clamp(record.Progress, 0, 100);
+        ProgressText.Text = record.StateLabel + " · " + record.ProgressLabel;
+    }
+
+    private void DetachActiveRecord()
+    {
+        if (_activeRecord is not null)
+            _activeRecord.PropertyChanged -= ActiveRecord_PropertyChanged;
+        _activeRecord = null;
+        _activeTaskId = null;
     }
 
     private void SetBusy(bool busy, string message)
@@ -189,10 +223,10 @@ public partial class ToolsCenterControl : UserControl, IDisposable
         if (busy)
         {
             DetailTitle.Text = message;
-            DetailSubtitle.Text = "可随时取消；原文件不会被修改。";
+            DetailSubtitle.Text = "任务同时显示在任务中心，可从任一页面取消。";
             OperationProgress.Value = 0;
             OperationProgress.IsIndeterminate = false;
-            ProgressText.Text = "0%";
+            ProgressText.Text = "等待中 · 排队";
         }
     }
 
@@ -232,7 +266,11 @@ public partial class ToolsCenterControl : UserControl, IDisposable
         OpenPathButton.IsEnabled = File.Exists(item.FullPath) || Directory.Exists(item.FullPath);
     }
 
-    private void Cancel_Click(object sender, RoutedEventArgs e) => _operationCancellation?.Cancel();
+    private void Cancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeTaskId is Guid id)
+            FileIntegrityTaskBridge.Cancel(id);
+    }
 
     private void Copy_Click(object sender, RoutedEventArgs e)
     {
@@ -261,8 +299,7 @@ public partial class ToolsCenterControl : UserControl, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _operationCancellation?.Cancel();
-        _operationCancellation?.Dispose();
-        _operationCancellation = null;
+        if (_activeTaskId is Guid id) FileIntegrityTaskBridge.Cancel(id);
+        DetachActiveRecord();
     }
 }
