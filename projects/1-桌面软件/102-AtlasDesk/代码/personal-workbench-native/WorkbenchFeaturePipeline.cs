@@ -20,6 +20,7 @@ public sealed class WorkbenchFeaturePipeline
         UiConvergence = UiConvergenceCoordinator.Attach(window, Experience.Home, Experience.SettingsPage);
         Diagnostics = DiagnosticsCoordinator.Attach(window, Settings);
         ShellResilience = ShellResilienceCoordinator.Attach(window);
+        DashboardLifecycle = DashboardLifecycleCoordinator.Attach(window, ShellResilience);
         DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
         DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings);
         Projects = V063ProjectEnhancer.Attach(window, this);
@@ -48,6 +49,7 @@ public sealed class WorkbenchFeaturePipeline
     public V061ExperienceEnhancer Experience { get; }
     public DiagnosticsCoordinator Diagnostics { get; }
     public ShellResilienceCoordinator ShellResilience { get; }
+    public DashboardLifecycleCoordinator DashboardLifecycle { get; }
     public DashboardScriptDiagnostics DashboardDiagnostics { get; }
     public DashboardInteractionCoordinator DashboardInteraction { get; }
     public V063ProjectEnhancer Projects { get; }

@@ -14,8 +14,8 @@ internal static class V113ProductivityContextChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 3))
-            throw new InvalidOperationException("AtlasDesk productivity-context candidate must be v1.1.3.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 3))
+            throw new InvalidOperationException("AtlasDesk productivity-context baseline must be v1.1.3 or later.");
 
         var storePath = RequireFile(nativeRoot, "ProductivityContextStore.cs");
         var coordinatorPath = RequireFile(nativeRoot, "ProductivityContextCoordinator.cs");
