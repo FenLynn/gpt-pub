@@ -1,3 +1,36 @@
+AtlasDesk v1.0.1 candidate
+
+This maintenance candidate improves daily-use clarity without changing the v1.0.0 data model or adding a large product feature.
+
+Home dashboard
+- Showing the home page no longer reads the Zotero database or starts project/Git discovery.
+- Home status is assembled from already saved settings, recent files, saved project paths and bounded task history.
+- Repeated refreshes are cancellable and generation-gated so stale snapshots cannot overwrite the current view.
+- The former Python and Workspace metric cards now summarize saved projects and shared task activity.
+- Zotero status shows configuration and read-only mode only; actual database reads remain exclusive to the Library page.
+
+Settings clarity
+- Dashboard URL and known file/directory paths receive immediate existence or format feedback.
+- Validation is informative only: AtlasDesk does not create, search for or guess user-entered workspace, Zotero, Conda, uv or PDF paths.
+- Settings adds direct Runtime and log-directory entries alongside roaming and local data folders.
+- Runtime is identified as replaceable program content, while logs and user data remain private local state.
+
+Library layout
+- Zotero keeps its three-pane structure but now uses bounded responsive widths.
+- At constrained window widths, the collection pane narrows gradually and the read-only detail pane retains at least 320 px.
+- Title, Citation Key, DOI, reference and PDF operations remain in the high-priority upper detail area.
+- No Zotero write capability or new database access path was added.
+
+Regression protection
+- New v1.0.1 checks prohibit Zotero, Git and project scans from returning to home-page visibility refresh.
+- Real temporary paths validate project, task and recent-file snapshot aggregation.
+- Settings path behavior and Zotero responsive-layout boundaries are source-gated.
+- All v1.0.0 smoke, window residency, ConPTY, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
+
+Verification status
+- v1.0.1 remains a candidate for combined user verification.
+- It must not enter main or receive a formal tag/Release before user validation.
+
 AtlasDesk v1.0.0
 
 AtlasDesk 1.0 is the first formal release of the stabilized Windows research and development workbench.

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 
 namespace PersonalWorkbench.Smoke;
 
@@ -8,9 +9,13 @@ internal static class V100ReleaseReadinessChecks
     internal static void Verify()
     {
         var nativeRoot = FindProjectSourceRoot("personal-workbench-native");
-        var version = File.ReadAllText(Path.Combine(nativeRoot, "Version.props"));
-        if (!version.Contains("<WorkbenchVersion>1.0.0</WorkbenchVersion>", StringComparison.Ordinal))
-            throw new InvalidOperationException("AtlasDesk formal release version is not 1.0.0.");
+        var versionPath = Path.Combine(nativeRoot, "Version.props");
+        var versionText = XDocument.Load(versionPath)
+            .Descendants("WorkbenchVersion")
+            .Select(node => node.Value.Trim())
+            .FirstOrDefault();
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 0, 0))
+            throw new InvalidOperationException("AtlasDesk version moved below the formal v1.0.0 baseline.");
 
         RequireFile(nativeRoot, "WindowWorkAreaGuard.cs");
         RequireFile(nativeRoot, "ProjectContextService.cs");
@@ -55,19 +60,19 @@ internal static class V100ReleaseReadinessChecks
             "WmGetMinMaxInfo",
             "WorkArea");
 
-        Console.WriteLine("PASS AtlasDesk v1.0.0 release readiness components and boundaries are present");
+        Console.WriteLine($"PASS AtlasDesk {version} preserves v1.0.0 release-readiness components and boundaries");
     }
 
     private static void RequireFile(string root, string fileName)
     {
         if (!File.Exists(Path.Combine(root, fileName)))
-            throw new InvalidOperationException("Required v1.0.0 component is missing: " + fileName);
+            throw new InvalidOperationException("Required v1.0.0 baseline component is missing: " + fileName);
     }
 
     private static void RejectFile(string root, string fileName)
     {
         if (File.Exists(Path.Combine(root, fileName)))
-            throw new InvalidOperationException("Retired component returned before v1.0.0: " + fileName);
+            throw new InvalidOperationException("Retired component returned after v1.0.0: " + fileName);
     }
 
     private static void RequireTokens(string path, params string[] tokens)
@@ -76,7 +81,7 @@ internal static class V100ReleaseReadinessChecks
         foreach (var token in tokens)
         {
             if (!source.Contains(token, StringComparison.Ordinal))
-                throw new InvalidOperationException($"Missing v1.0.0 token '{token}' in {path}.");
+                throw new InvalidOperationException($"Missing v1.0.0 baseline token '{token}' in {path}.");
         }
     }
 
@@ -92,6 +97,6 @@ internal static class V100ReleaseReadinessChecks
                 current = current.Parent;
             }
         }
-        throw new DirectoryNotFoundException("Unable to locate AtlasDesk v1.0.0 sources.");
+        throw new DirectoryNotFoundException("Unable to locate AtlasDesk v1.x sources.");
     }
 }

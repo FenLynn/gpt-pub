@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace PersonalWorkbench;
 
@@ -17,6 +18,12 @@ public sealed class SettingsSavedEventArgs : EventArgs
 
 public partial class SettingsControl : UserControl
 {
+    private enum PathExpectation { File, Directory }
+
+    private static readonly Brush ValidPathBrush = new SolidColorBrush(Color.FromRgb(88, 163, 124));
+    private static readonly Brush MissingPathBrush = new SolidColorBrush(Color.FromRgb(210, 142, 67));
+    private static readonly Brush NeutralPathBrush = new SolidColorBrush(Color.FromRgb(216, 224, 234));
+
     private readonly AppSettings _settings;
 
     public event EventHandler<SettingsSavedEventArgs>? SettingsSaved;
@@ -28,6 +35,8 @@ public partial class SettingsControl : UserControl
     {
         _settings = settings;
         InitializeComponent();
+        InstallPathValidation();
+        InstallDataBoundaryButtons();
         LoadFromSettings();
     }
 
@@ -59,6 +68,96 @@ public partial class SettingsControl : UserControl
         UpdateLoadModeControls();
         SaveStatus.Text = string.Empty;
         UpdateSecurityStatus();
+        UpdateAllPathValidation();
+    }
+
+    private void InstallPathValidation()
+    {
+        DashboardUrlBox.TextChanged += (_, _) => UpdateDashboardValidation();
+        WorkspaceBox.TextChanged += (_, _) => UpdatePathValidation(WorkspaceBox, PathExpectation.Directory, "工作区目录", optional: true);
+        ZoteroBox.TextChanged += (_, _) => UpdatePathValidation(ZoteroBox, PathExpectation.File, "Zotero 数据库", optional: true);
+        PdfReaderBox.TextChanged += (_, _) => UpdateAllPathValidation();
+        CondaBox.TextChanged += (_, _) => UpdatePathValidation(CondaBox, PathExpectation.File, "Conda", optional: true);
+        UvBox.TextChanged += (_, _) => UpdatePathValidation(UvBox, PathExpectation.File, "uv", optional: true);
+    }
+
+    private void InstallDataBoundaryButtons()
+    {
+        if (Content is not ScrollViewer { Content: Grid root }) return;
+        var footer = root.Children.OfType<Grid>().FirstOrDefault(item => Grid.GetRow(item) == 10);
+        var actions = footer?.Children.OfType<StackPanel>().FirstOrDefault(item => item.Orientation == Orientation.Horizontal);
+        if (actions is null) return;
+
+        actions.Children.Add(CreateFooterButton("打开 Runtime", "查看可整体覆盖升级的程序目录", (_, _) => OpenKnownDirectory(App.RuntimeDirectory, create: false)));
+        actions.Children.Add(CreateFooterButton("打开日志", "查看本机日志目录；日志不会进入 Runtime 包", (_, _) => OpenKnownDirectory(App.LogDirectory, create: true)));
+    }
+
+    private static Button CreateFooterButton(string text, string tooltip, RoutedEventHandler click)
+    {
+        var button = new Button
+        {
+            Content = text,
+            Style = Application.Current.TryFindResource("SecondaryButton") as Style,
+            Height = 34,
+            Margin = new Thickness(8, 0, 0, 0),
+            ToolTip = tooltip
+        };
+        button.Click += click;
+        return button;
+    }
+
+    private void UpdateAllPathValidation()
+    {
+        UpdateDashboardValidation();
+        UpdatePathValidation(WorkspaceBox, PathExpectation.Directory, "工作区目录", optional: true);
+        UpdatePathValidation(ZoteroBox, PathExpectation.File, "Zotero 数据库", optional: true);
+        if (SystemPdfCheck.IsChecked == true)
+        {
+            PdfReaderBox.BorderBrush = NeutralPathBrush;
+            PdfReaderBox.ToolTip = "当前使用系统默认 PDF 程序；自定义路径不会被调用。";
+        }
+        else
+        {
+            UpdatePathValidation(PdfReaderBox, PathExpectation.File, "PDF 阅读器", optional: false);
+        }
+        UpdatePathValidation(CondaBox, PathExpectation.File, "Conda", optional: true);
+        UpdatePathValidation(UvBox, PathExpectation.File, "uv", optional: true);
+    }
+
+    private void UpdateDashboardValidation()
+    {
+        var value = DashboardUrlBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            DashboardUrlBox.BorderBrush = NeutralPathBrush;
+            DashboardUrlBox.ToolTip = "可选；未配置时 Dashboard 页面会显示明确空状态。";
+            return;
+        }
+
+        var valid = Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                    && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+        DashboardUrlBox.BorderBrush = valid ? ValidPathBrush : MissingPathBrush;
+        DashboardUrlBox.ToolTip = valid
+            ? "地址格式有效；保存后才会应用。"
+            : "地址必须以 http:// 或 https:// 开头。";
+    }
+
+    private static void UpdatePathValidation(TextBox box, PathExpectation expectation, string label, bool optional)
+    {
+        var value = box.Text.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            box.BorderBrush = NeutralPathBrush;
+            box.ToolTip = optional ? label + "未配置。" : label + "不能为空。";
+            return;
+        }
+
+        var exists = expectation == PathExpectation.Directory ? Directory.Exists(value) : File.Exists(value);
+        box.BorderBrush = exists ? ValidPathBrush : MissingPathBrush;
+        box.ToolTip = exists
+            ? label + "存在；保存后应用。"
+            : label + "当前不存在。AtlasDesk 不会自动创建、搜索或猜测该路径。";
     }
 
     private static void SelectComboByContent(ComboBox box, string value, int fallbackIndex)
@@ -190,7 +289,12 @@ public partial class SettingsControl : UserControl
         if (dialog.ShowDialog(Window.GetWindow(this)) == true) UvBox.Text = dialog.FileName;
     }
 
-    private void SystemPdfCheck_Changed(object sender, RoutedEventArgs e) => UpdatePdfControls();
+    private void SystemPdfCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        UpdatePdfControls();
+        UpdateAllPathValidation();
+    }
+
     private void LoadMode_Changed(object sender, RoutedEventArgs e) => UpdateLoadModeControls();
 
     private void UpdatePdfControls()
@@ -210,11 +314,7 @@ public partial class SettingsControl : UserControl
 
     private void ClearAccess_Click(object sender, RoutedEventArgs e) => ClearAccessRequested?.Invoke(this, EventArgs.Empty);
 
-    private void OpenConfig_Click(object sender, RoutedEventArgs e)
-    {
-        Directory.CreateDirectory(App.AppDataDirectory);
-        Process.Start(new ProcessStartInfo("explorer.exe", App.AppDataDirectory) { UseShellExecute = true });
-    }
+    private void OpenConfig_Click(object sender, RoutedEventArgs e) => OpenKnownDirectory(App.AppDataDirectory, create: true);
 
     private void OpenSecurity_Click(object sender, RoutedEventArgs e)
     {
@@ -233,10 +333,25 @@ public partial class SettingsControl : UserControl
         new TemporaryLockWindow { Owner = Window.GetWindow(this) }.ShowDialog();
     }
 
-    private void OpenLocalData_Click(object sender, RoutedEventArgs e)
+    private void OpenLocalData_Click(object sender, RoutedEventArgs e) => OpenKnownDirectory(App.LocalDataDirectory, create: true);
+
+    private void OpenKnownDirectory(string path, bool create)
     {
-        Directory.CreateDirectory(App.LocalDataDirectory);
-        Process.Start(new ProcessStartInfo("explorer.exe", App.LocalDataDirectory) { UseShellExecute = true });
+        try
+        {
+            if (create) Directory.CreateDirectory(path);
+            if (!Directory.Exists(path))
+            {
+                MessageBox.Show("目录当前不存在：\n" + path, ProductIdentity.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            App.Log("Open settings directory failed: " + ex);
+            MessageBox.Show("无法打开目录：\n" + ex.Message, ProductIdentity.ProductName, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void UpdateSecurityStatus()
@@ -244,5 +359,4 @@ public partial class SettingsControl : UserControl
         if (SecurityStatusText is not null)
             SecurityStatusText.Text = SecurityService.GetStatusSummary();
     }
-
 }
