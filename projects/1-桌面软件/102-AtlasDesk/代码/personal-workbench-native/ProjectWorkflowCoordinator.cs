@@ -67,6 +67,8 @@ public sealed class ProjectWorkflowCoordinator
     public static ProjectWorkflowCoordinator Attach(MainWindow window, WorkbenchFeaturePipeline pipeline)
         => new(window, pipeline);
 
+    public ProjectDescriptor? SelectedProject => _projects.SelectedProject;
+
     private static T? ReadField<T>(object instance, string name) where T : class
         => instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance) as T;
 
