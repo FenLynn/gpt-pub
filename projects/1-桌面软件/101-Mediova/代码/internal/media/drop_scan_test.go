@@ -18,7 +18,8 @@ func writeDropFixture(t *testing.T, path string) {
 
 func TestScanDroppedPathsRoutesFilesAndDirectories(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "中文素材")
-	direct := filepath.Join(t.TempDir(), "直接视频.mov")
+	directBase := t.TempDir()
+	direct := filepath.Join(directBase, "直接素材", "直接视频.mov")
 	unsupportedDirect := filepath.Join(t.TempDir(), "说明.txt")
 	missing := filepath.Join(t.TempDir(), "不存在.mp4")
 
@@ -33,10 +34,10 @@ func TestScanDroppedPathsRoutesFilesAndDirectories(t *testing.T) {
 	if len(nonRecursive.Groups) != 2 {
 		t.Fatalf("groups=%d, want direct + directory", len(nonRecursive.Groups))
 	}
-	if nonRecursive.Groups[0].Root != "" || len(nonRecursive.Groups[0].Paths) != 1 || nonRecursive.Groups[0].Paths[0] != direct {
+	if nonRecursive.Groups[0].Root != directBase || nonRecursive.Groups[0].OutputPrefix != "" || len(nonRecursive.Groups[0].Paths) != 1 || nonRecursive.Groups[0].Paths[0] != direct {
 		t.Fatalf("unexpected direct group: %+v", nonRecursive.Groups[0])
 	}
-	if nonRecursive.Groups[1].Root != filepath.Dir(root) || len(nonRecursive.Groups[1].Paths) != 2 {
+	if nonRecursive.Groups[1].Root != filepath.Dir(root) || nonRecursive.Groups[1].OutputPrefix != "" || len(nonRecursive.Groups[1].Paths) != 2 {
 		t.Fatalf("unexpected directory group: %+v", nonRecursive.Groups[1])
 	}
 	if nonRecursive.Unsupported != 2 || nonRecursive.Unreadable != 1 || nonRecursive.ScanErrors != 0 {
