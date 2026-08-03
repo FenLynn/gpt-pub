@@ -105,12 +105,14 @@ internal static class V104UiConvergenceChecks
             "checks.Insert(0, UiAdaptiveAuditService.CreateDiagnosticCheck())");
 
         RequireContains(residency,
-            "AssertAdaptiveLayout(window, pipeline.Experience.Home, 1100, 700, UiDensityMode.Compact, 2)",
-            "AssertAdaptiveLayout(window, pipeline.Experience.Home, 1320, 780, UiDensityMode.Standard, 4)",
-            "AssertAdaptiveLayout(window, pipeline.Experience.Home, 1500, 860, UiDensityMode.Spacious, 4)",
+            "AssertPhysicalCompactLayout(window, pipeline.Experience.Home)",
+            "AssertDetachedHomeLayout(pipeline.Settings, 1320, 780, UiDensityMode.Standard, 4)",
+            "AssertDetachedHomeLayout(pipeline.Settings, 1500, 860, UiDensityMode.Spacious, 4)",
+            "GetMethod(\"ResolveMode\"",
+            "GetMethod(\"ApplyHome\"",
             "new DiagnosticsWindow(pipeline.Settings)");
 
-        Console.WriteLine("PASS AtlasDesk v1.0.4 converges visual hierarchy, supports ScrollViewer home hosting and audits three adaptive modes without collecting user content");
+        Console.WriteLine("PASS AtlasDesk v1.0.4 converges visual hierarchy, supports ScrollViewer home hosting and verifies compact physical plus detached wide layouts without collecting user content");
     }
 
     private static void RequireContains(string source, params string[] tokens)
