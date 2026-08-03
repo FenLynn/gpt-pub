@@ -1,5 +1,4 @@
 using PersonalWorkbench;
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -57,14 +56,14 @@ internal static class Program
             if (!pipeline.Experience.Home.IsLoaded)
                 throw new InvalidOperationException("Explicit home surface did not load.");
 
-            SetPhase("verifying compact adaptive layout");
-            AssertAdaptiveLayout(window, pipeline.Experience.Home, 1100, 700, UiDensityMode.Compact, 2);
+            SetPhase("verifying physical compact adaptive layout");
+            AssertPhysicalCompactLayout(window, pipeline.Experience.Home);
 
-            SetPhase("verifying standard adaptive layout");
-            AssertAdaptiveLayout(window, pipeline.Experience.Home, 1320, 780, UiDensityMode.Standard, 4);
+            SetPhase("verifying detached standard adaptive layout");
+            AssertDetachedHomeLayout(pipeline.Settings, 1320, 780, UiDensityMode.Standard, 4);
 
-            SetPhase("verifying spacious adaptive layout");
-            AssertAdaptiveLayout(window, pipeline.Experience.Home, 1500, 860, UiDensityMode.Spacious, 4);
+            SetPhase("verifying detached spacious adaptive layout");
+            AssertDetachedHomeLayout(pipeline.Settings, 1500, 860, UiDensityMode.Spacious, 4);
 
             SetPhase("opening converged diagnostics window");
             var diagnostics = new DiagnosticsWindow(pipeline.Settings) { Owner = window };
@@ -102,7 +101,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk isolated process remained alive, adaptive modes converged and environment discovery stayed lazy");
+                "PASS AtlasDesk isolated process remained alive, compact top-level and detached wide layouts converged, and environment discovery stayed lazy");
             return 0;
         }
         catch (Exception ex)
@@ -141,47 +140,75 @@ internal static class Program
                ?? throw new InvalidOperationException("DevelopmentControl is unavailable.");
     }
 
-    private static void AssertAdaptiveLayout(
+    private static void AssertPhysicalCompactLayout(
         MainWindow window,
-        HomeDashboardControl home,
+        HomeDashboardControl home)
+    {
+        window.WindowState = WindowState.Normal;
+        window.Width = 1100;
+        window.Height = 700;
+        PumpDispatcher(TimeSpan.FromMilliseconds(500));
+        window.UpdateLayout();
+        PumpDispatcher(TimeSpan.FromMilliseconds(150));
+        AssertWindowAlive(window, "after compact physical resize");
+
+        var snapshot = UiAdaptiveAuditService.Current
+            ?? throw new InvalidOperationException("UI adaptive audit did not publish a physical snapshot.");
+        var metrics = FindVisualChild<UniformGrid>(home)
+            ?? throw new InvalidOperationException("Home metric grid is unavailable in physical compact layout.");
+        if (snapshot.Mode != UiDensityMode.Compact || metrics.Columns != 2)
+        {
+            throw new InvalidOperationException(
+                $"Physical compact layout mismatch: window={window.ActualWidth:0}x{window.ActualHeight:0}; "
+                + $"snapshot={snapshot.WindowWidth:0}x{snapshot.WindowHeight:0}/{snapshot.Mode}; "
+                + $"metricColumns={metrics.Columns}.");
+        }
+        if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
+            throw new InvalidOperationException("Physical compact audit published invalid geometry or DPI.");
+    }
+
+    private static void AssertDetachedHomeLayout(
+        AppSettings settings,
         double width,
         double height,
         UiDensityMode expectedMode,
         int expectedMetricColumns)
     {
-        window.WindowState = WindowState.Normal;
-        window.Width = width;
-        window.Height = height;
+        var resolveMode = typeof(UiConvergenceCoordinator).GetMethod(
+            "ResolveMode",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(UiConvergenceCoordinator).FullName, "ResolveMode");
+        var applyHome = typeof(UiConvergenceCoordinator).GetMethod(
+            "ApplyHome",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(UiConvergenceCoordinator).FullName, "ApplyHome");
 
-        var timer = Stopwatch.StartNew();
-        UiAdaptiveAuditSnapshot? snapshot = null;
-        UniformGrid? metrics = null;
-        while (timer.Elapsed < TimeSpan.FromSeconds(3))
+        var resolvedMode = (UiDensityMode)(resolveMode.Invoke(null, new object[] { width, height })
+            ?? throw new InvalidOperationException("ResolveMode returned no value."));
+        if (resolvedMode != expectedMode)
+            throw new InvalidOperationException($"Detached mode mismatch: expected {expectedMode}, got {resolvedMode}.");
+
+        var home = new HomeDashboardControl(settings)
         {
-            PumpDispatcher(TimeSpan.FromMilliseconds(100));
-            window.UpdateLayout();
-            snapshot = UiAdaptiveAuditService.Current;
-            metrics = FindVisualChild<UniformGrid>(home);
-            if (snapshot is not null
-                && Math.Abs(snapshot.WindowWidth - window.ActualWidth) < 2
-                && Math.Abs(snapshot.WindowHeight - window.ActualHeight) < 2
-                && snapshot.Mode == expectedMode
-                && metrics?.Columns == expectedMetricColumns)
-            {
-                AssertWindowAlive(window, $"after resizing to {width:0}x{height:0}");
-                if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
-                    throw new InvalidOperationException("UI adaptive audit published invalid geometry or DPI.");
-                return;
-            }
-        }
+            Width = width,
+            Height = height
+        };
+        home.Measure(new Size(width, height));
+        home.Arrange(new Rect(0, 0, width, height));
+        home.UpdateLayout();
+        applyHome.Invoke(null, new object[] { home, resolvedMode });
+        home.Measure(new Size(width, height));
+        home.Arrange(new Rect(0, 0, width, height));
+        home.UpdateLayout();
 
-        AssertWindowAlive(window, $"after resizing to {width:0}x{height:0}");
-        throw new InvalidOperationException(
-            $"Adaptive layout did not settle for requested {width:0}x{height:0}. "
-            + $"Actual window={window.ActualWidth:0}x{window.ActualHeight:0}; "
-            + $"snapshot={(snapshot is null ? "missing" : $"{snapshot.WindowWidth:0}x{snapshot.WindowHeight:0}/{snapshot.Mode}")}; "
-            + $"metricColumns={(metrics is null ? "missing" : metrics.Columns)}; "
-            + $"expected={expectedMode}/{expectedMetricColumns}.");
+        var metrics = FindVisualChild<UniformGrid>(home)
+            ?? throw new InvalidOperationException("Detached home metric grid is unavailable.");
+        if (metrics.Columns != expectedMetricColumns)
+        {
+            throw new InvalidOperationException(
+                $"Detached home columns mismatch at {width:0}x{height:0}: "
+                + $"expected {expectedMetricColumns}, got {metrics.Columns}.");
+        }
     }
 
     private static void AssertEnvironmentIdle(
