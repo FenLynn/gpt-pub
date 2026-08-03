@@ -1,50 +1,42 @@
-AtlasDesk v0.9.5
+AtlasDesk v1.0.0
 
-This stabilization release removes duplicate lifecycle ownership from the task and tools surfaces without adding product features.
+AtlasDesk 1.0 is the first formal release of the stabilized Windows research and development workbench.
 
-Lifecycle convergence
-- Task and tools pages are installed and switched by one responsibility-named TaskToolCoordinator.
-- The coordinator owns task/tool navigation visibility, active-task exit confirmation, control disposal and shared task-hub shutdown.
-- V064TaskEnhancer and V065ToolsEnhancer are retired and removed.
-- The temporary standalone task-tool alias file is removed.
-- WorkbenchFeaturePipeline now exposes one TaskTools owner rather than two version-named enhancers.
+Core workbench
+- A bounded project workflow connects project selection, workspace, terminal, Git status, environment markers and recent files.
+- Projects can be pinned, reopened from recent history and explicitly relocated when saved paths move.
+- The native ConPTY terminal remains isolated behind AtlasDesk.TerminalHost.exe and does not store commands or output.
 
-Regression protection
-- New v0.9.5 checks require the retired files to stay absent.
-- The pipeline must attach TaskToolCoordinator.
-- Exactly one native component may call WorkbenchTaskHub.Shutdown.
-- Existing task/tool sharing, cancellation, exit recovery, Runtime/Data and privacy checks remain active.
+Zotero research pane
+- The library follows a compact three-pane, read-only information structure.
+- Title, authors, source, year, Citation Key and DOI are immediately visible.
+- Title, DOI, Citation Key, quick reference text, LaTeX citations and Pandoc citations can be copied.
+- PDF attachments can be opened or selected in Windows Explorer for direct file copying.
+- Zotero SQLite access is read-only with query_only enabled.
 
-AtlasDesk v0.9.4
-
-- File-integrity manifest generation, verification and file comparison share the task-center collection.
-- Tool and task pages share status, cancellation, results and bounded history.
+Tasks and tools
+- File-integrity manifest generation, verification and file comparison share one task collection.
+- Task and tool pages share status, progress, cancellation, results and bounded history.
 - Active work is confirmed before application exit.
-- History remains limited to 100 records and interrupted work is recovered explicitly.
+- One TaskToolCoordinator owns task/tool navigation and shutdown lifecycle.
 
-AtlasDesk v0.9.3
+Window and runtime
+- Maximized windows use the active monitor work area and avoid taskbars on every edge.
+- Common window sizes, 100–175% DPI, restore/maximize and Runtime/Data boundaries are protected by regression checks.
+- Runtime remains a transparent replaceable folder; private roaming and local data never enter the package.
 
-- Projects can be pinned and filtered as favorites.
-- Workspace, terminal and Explorer actions maintain a bounded recent-project list.
-- Missing saved paths stay visible and require explicit user relocation.
-- AtlasDesk does not search disks or guess moved project locations.
-
-AtlasDesk v0.9.2
-
-- Zotero uses a compact read-only item pane modeled on the native information structure.
-- Title, authors, source, year, Citation Key, DOI and quick citation actions are immediately available.
-- PDF files can be opened or selected in Windows Explorer.
-- Zotero SQLite access remains read-only with query_only enabled.
-
-AtlasDesk v0.9.1
-
-- Maximized windows use the active monitor work area and avoid taskbars on any edge.
-- The tools page adapts its vertical inset when height is constrained.
-
-AtlasDesk v0.9.0
-
-- Projects, workspace, terminal, Git status, environment markers and recent files form one explicit user-driven workflow.
-- Project context is cancellable, bounded and never starts from application startup or visibility changes.
+Release verification
+- v1.0.0 adds a formal release-readiness gate over the stabilized components and retired compatibility layers.
+- Full smoke, real Windows window residency, real CMD/ConPTY sessions, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
 
 Known limitation
 - Close Zotero before opening the AtlasDesk library where the live database cannot be shared safely.
+- GB/T 7714 and APA previews are quick-copy references; use Zotero/CSL output for formal submission formatting.
+
+Previous stabilization milestones
+- v0.9.5: task/tool lifecycle convergence and removal of V064/V065 enhancers.
+- v0.9.4: unified tool tasks, cancellation and bounded history.
+- v0.9.3: project favorites, recents and explicit path relocation.
+- v0.9.2: read-only Zotero research pane and PDF file-location action.
+- v0.9.1: native work-area maximization and constrained-height layout fix.
+- v0.9.0: explicit project-driven workflow.
