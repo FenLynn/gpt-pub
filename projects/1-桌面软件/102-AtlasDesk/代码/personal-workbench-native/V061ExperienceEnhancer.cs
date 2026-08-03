@@ -44,6 +44,9 @@ public sealed class V061ExperienceEnhancer
     public static V061ExperienceEnhancer Attach(MainWindow window, WorkbenchEnhancer baseEnhancer)
         => new(window, baseEnhancer);
 
+    public HomeDashboardControl Home => _home;
+    public SettingsControl SettingsPage => _settingsControl;
+
     private static T? ReadField<T>(object instance, string name) where T : class
         => instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance) as T;
 
