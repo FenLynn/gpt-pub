@@ -627,6 +627,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		if r, _, _ := procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc))); r != 0 {
 			app.layout(rc.Right-rc.Left, rc.Bottom-rc.Top)
 		}
+		v452FinalizeInitialToolbar(app)
 		writeStartupStage("wm_create_layout_complete")
 		if app.selfTest {
 			procSetTimer.Call(hwnd, TIMER_SELF_TEST, 350, 0)
@@ -1015,10 +1016,6 @@ func (a *application) drawPrimaryButton(dis *drawItemStruct) bool {
 	procDeleteObject.Call(brush)
 	procDeleteObject.Call(pen)
 
-	glyph := "\\uE768"
-	if dis.HwndItem != a.hStart {
-		glyph = secondaryButtonGlyph(dis.HwndItem)
-	}
 	label := getText(dis.HwndItem)
 	font := uiFontBold
 	if len([]rune(label)) > 5 {
@@ -1039,7 +1036,7 @@ func (a *application) drawPrimaryButton(dis *drawItemStruct) bool {
 	left := inner.Left + (inner.Right-inner.Left-total)/2
 	iconRC := rect{Left: left, Top: inner.Top, Right: left + iconWidth, Bottom: inner.Bottom}
 	textRC := rect{Left: iconRC.Right + gap, Top: inner.Top, Right: iconRC.Right + gap + labelWidth, Bottom: inner.Bottom}
-	drawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
+	v452DrawSolidPrimaryGlyph(dis.HDC, dis.HwndItem, iconRC, textColor)
 	drawCenteredText(dis.HDC, label, textRC, font, textColor)
 	return true
 }
@@ -1333,13 +1330,18 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 				fill.Right = fill.Left + 4
 			}
 			if a.overallPaused {
-				drawHorizontalGradient(dis.HDC, fill, colorRef(255, 229, 178), colorRef(225, 157, 43))
+				drawHorizontalGradient(dis.HDC, fill, colorRef(235, 237, 240), colorRef(194, 199, 207))
 			} else {
 				drawHorizontalGradient(dis.HDC, fill, colorRef(151, 196, 245), colorRef(58, 122, 214))
 			}
 		}
 	})
-	drawContrastCenteredText(dis.HDC, a.overallText, bar, fill, uiFontSmall)
+	drawRoundedBorder(dis.HDC, bar, 4, colorRef(218, 223, 230))
+	if a.overallPaused {
+		v452DrawPausedProgressText(dis.HDC, a.overallText, bar)
+	} else {
+		drawContrastCenteredText(dis.HDC, a.overallText, bar, fill, uiFontSmall)
+	}
 	return true
 }
 
@@ -5542,10 +5544,7 @@ func (a *application) finishRun() {
 	// Refresh only after reconciliation so the list and summary expose the same
 	// explicit terminal state for every task in the finished run.
 	a.refreshAll()
-	duration := runEnded.Sub(runStarted)
-	if duration < 0 {
-		duration = 0
-	}
+	duration := v452FinishRunClock(a, runStarted, runEnded)
 	text := fmt.Sprintf("队列处理结束。完成 %d，跳过 %d，失败 %d，停止 %d，总用时 %s。", done, skipped, failed, cancelled, formatDuration(duration))
 	setText(a.hStatusText, text)
 	a.lastSummaryPath = a.writeRunSummary(summaryTasks, duration, totalIn, totalOut, done, failed, skipped, cancelled)
@@ -5585,25 +5584,36 @@ func (a *application) refreshTotal() {
 	runIDs := copyTaskIDSet(a.runTaskIDs)
 	a.runMu.Unlock()
 
+	now := time.Now()
+	activeElapsed := time.Duration(0)
+	if running {
+		activeElapsed = v452RunElapsed(a, start, now)
+	}
 	displayKind := a.currentKind
 	displayRunning := running && displayKind == runKind
 	var displayIDs map[int64]bool
+	displayElapsed := time.Duration(0)
 	if displayRunning {
 		displayIDs = runIDs
+		displayElapsed = activeElapsed
 	}
 	display := a.v422SummarizeProgress(displayKind, displayIDs)
-	pct, text, elapsed, remaining, speed := display.render(displayKind, displayRunning, start, displayRunning && paused, a.settings.ShowPerformanceStats)
+	pct, text, elapsed, remaining, speed := display.render(displayKind, displayRunning, displayElapsed, displayRunning && paused, a.settings.ShowPerformanceStats)
+	pausedDisplay := displayRunning && paused
+	redraw := v452ShouldInvalidateProgress(a.overallProgress, pct, a.overallText, text, a.overallPaused, pausedDisplay)
 	a.overallProgress = pct
 	a.overallText = text
-	a.overallPaused = displayRunning && paused
-	procInvalidateRect.Call(a.hProgress, 0, 1)
+	a.overallPaused = pausedDisplay
+	if redraw {
+		procInvalidateRect.Call(a.hProgress, 0, 0)
+	}
 
 	if running {
 		runSummary := display
 		if !displayRunning {
 			runSummary = a.v422SummarizeProgress(runKind, runIDs)
 		}
-		runPct, _, runElapsed, runRemaining, runSpeed := runSummary.render(runKind, true, start, paused, a.settings.ShowPerformanceStats)
+		runPct, _, runElapsed, runRemaining, runSpeed := runSummary.render(runKind, true, activeElapsed, paused, a.settings.ShowPerformanceStats)
 		a.updateFloatingBar(runPct, floatingProgressText(runPct, runSummary.Completed, runSummary.Total, runElapsed, runRemaining, runSpeed, runSummary.Active, runSummary.Engine, paused), true)
 	} else {
 		a.updateFloatingBar(pct, floatingProgressText(pct, display.Completed, display.Total, elapsed, remaining, speed, display.Active, display.Engine, false), false)

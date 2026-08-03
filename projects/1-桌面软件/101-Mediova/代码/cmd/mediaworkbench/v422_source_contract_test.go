@@ -49,10 +49,13 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 	if strings.Contains(main, "diameter := scaleDPI(14)") {
 		t.Fatal("low-resolution GDI status ellipse returned")
 	}
-	for _, want := range []string{`drawCenteredText(hdc, "●"`, `for i, unit := range units`, `DT_LEFT|DT_SINGLELINE|DT_CALCRECT`, `centre >= fill.Left && centre <= fill.Right`, `func taskDurationText`, `func (a *application) v422SummarizeProgress`} {
+	for _, want := range []string{`v452DrawTrueStatusLamp(hdc, rc, color)`, `for i, unit := range units`, `DT_LEFT|DT_SINGLELINE|DT_CALCRECT`, `centre >= fill.Left && centre <= fill.Right`, `func taskDurationText`, `func (a *application) v422SummarizeProgress`} {
 		if !strings.Contains(helper, want) {
 			t.Fatalf("missing helper contract %q", want)
 		}
+	}
+	if strings.Contains(helper, `drawCenteredText(hdc, "●"`) {
+		t.Fatal("font-rendered status lamp returned")
 	}
 	if !strings.Contains(queue, `enable(a.hPause, ownsRun)`) || !strings.Contains(queue, `waitingQueueLabel(runKind)`) {
 		t.Fatal("bottom queue controls are not workspace-specific")
