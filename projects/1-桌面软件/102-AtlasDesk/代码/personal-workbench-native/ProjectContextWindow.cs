@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace PersonalWorkbench;
@@ -27,11 +29,14 @@ public sealed class ProjectContextWindow : Window
         Height = 660;
         MinWidth = 680;
         MinHeight = 520;
+        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(247, 249, 252));
         FontFamily = new FontFamily("Microsoft YaHei UI");
         Content = BuildContent();
         LoadValues();
+        PreviewKeyDown += Window_PreviewKeyDown;
+        Loaded += (_, _) => AccessibilityCoordinator.PrepareWindow(this);
     }
 
     private UIElement BuildContent()
@@ -66,6 +71,7 @@ public sealed class ProjectContextWindow : Window
             BorderThickness = new Thickness(1),
             Background = Brushes.White
         };
+        AutomationProperties.SetName(tabs, "项目上下文选项");
         tabs.Items.Add(new TabItem { Header = "启动与命令", Content = BuildProfileTab() });
         tabs.Items.Add(new TabItem { Header = "关联文献", Content = BuildResearchTab() });
         Grid.SetRow(tabs, 2);
@@ -78,12 +84,16 @@ public sealed class ProjectContextWindow : Window
         _status.FontSize = 11.2;
         _status.Foreground = new SolidColorBrush(Color.FromRgb(102, 119, 140));
         _status.VerticalAlignment = VerticalAlignment.Center;
+        AutomationProperties.SetName(_status, "项目上下文状态");
+        AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         footer.Children.Add(_status);
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal };
         var cancel = CreateButton("取消", secondary: true);
+        cancel.IsCancel = true;
         cancel.Click += (_, _) => Close();
         var save = CreateButton("保存项目上下文", secondary: false);
+        save.IsDefault = true;
         save.Margin = new Thickness(8, 0, 0, 0);
         save.Click += (_, _) => SaveAndClose();
         actions.Children.Add(cancel);
@@ -126,7 +136,10 @@ public sealed class ProjectContextWindow : Window
         _commandsBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         _commandsBox.Height = 150;
         _commandsBox.TextWrapping = TextWrapping.NoWrap;
-        panel.Children.Add(Field("常用命令", _commandsBox, "每行：名称 | 命令 | 可选工作目录。命令只在你主动执行时写入内置终端。"));
+        panel.Children.Add(Field(
+            "常用命令",
+            _commandsBox,
+            "每行可直接填写命令，或使用：名称 :: 命令 :: 可选工作目录。使用 :: 可避免误切 PowerShell 管道。命令只在你主动执行时写入内置终端。"));
         return scroll;
     }
 
@@ -150,6 +163,7 @@ public sealed class ProjectContextWindow : Window
         _researchList.BorderThickness = new Thickness(1);
         _researchList.BorderBrush = new SolidColorBrush(Color.FromRgb(222, 228, 236));
         _researchList.Background = Brushes.White;
+        AutomationProperties.SetName(_researchList, "项目关联文献");
         var view = new GridView();
         view.Columns.Add(new GridViewColumn { Header = "标题", Width = 390, DisplayMemberBinding = new System.Windows.Data.Binding(nameof(ProjectResearchLink.Title)) });
         view.Columns.Add(new GridViewColumn { Header = "Citation Key", Width = 120, DisplayMemberBinding = new System.Windows.Data.Binding(nameof(ProjectResearchLink.CitationKey)) });
@@ -183,10 +197,19 @@ public sealed class ProjectContextWindow : Window
         _dashboardBox.Text = _profile.DashboardUrl;
         _favoritesBox.Text = string.Join(Environment.NewLine, _profile.FavoriteFiles);
         _commandsBox.Text = string.Join(Environment.NewLine, _profile.Commands.Select(command =>
-            string.Join(" | ", new[] { command.Name, command.Command, command.WorkingDirectory }
+            string.Join(" :: ", new[] { command.Name, command.Command, command.WorkingDirectory }
                 .Take(string.IsNullOrWhiteSpace(command.WorkingDirectory) ? 2 : 3))));
         _shellBox.SelectedIndex = string.Equals(_profile.DefaultShell, "cmd", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         RefreshResearchList();
+    }
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            SaveAndClose();
+            e.Handled = true;
+        }
     }
 
     private void SaveAndClose()
@@ -222,7 +245,7 @@ public sealed class ProjectContextWindow : Window
         var commands = new List<ProjectContextCommand>();
         foreach (var line in SplitLines(text))
         {
-            var parts = line.Split('|', 3, StringSplitOptions.TrimEntries);
+            var parts = line.Split(new[] { "::" }, 3, StringSplitOptions.TrimEntries);
             if (parts.Length == 1)
             {
                 commands.Add(new ProjectContextCommand { Name = parts[0], Command = parts[0] });
@@ -231,7 +254,7 @@ public sealed class ProjectContextWindow : Window
             {
                 commands.Add(new ProjectContextCommand
                 {
-                    Name = parts[0],
+                    Name = string.IsNullOrWhiteSpace(parts[0]) ? parts[1] : parts[0],
                     Command = parts[1],
                     WorkingDirectory = parts.Length > 2 ? parts[2] : string.Empty
                 });
@@ -307,6 +330,8 @@ public sealed class ProjectContextWindow : Window
     {
         control.Margin = new Thickness(0, 5, 0, 0);
         control.MinHeight = 34;
+        AutomationProperties.SetName(control, label);
+        AutomationProperties.SetHelpText(control, help);
         if (control is TextBox textBox)
         {
             textBox.Padding = new Thickness(9, 6, 9, 6);
