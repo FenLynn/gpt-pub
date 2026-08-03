@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const persistenceIsolationManifestSHA256 = "c1ed09fc7e854f6bef0ffbbf241238f4f60de2be4475428b9fd9840609dca75c"
+const persistenceIsolationManifestSHA256 = "8aaf52b2fe0c1ed4d35f40d5afa2d3592618c62bd573192c9de0b0ba7d810b10"
 
 func TestPersistenceIsolationFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
