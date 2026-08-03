@@ -101,6 +101,7 @@ public static class DiagnosticsService
             CheckExecutable("Git", settings.GitPath, "git.exe", "git"),
             CheckConfiguredExecutable("Conda", settings.CondaPath, "conda.exe", "conda.bat", "conda"),
             CheckConfiguredExecutable("uv", settings.UvPath, "uv.exe", "uv"),
+            CheckPerformance(),
             CheckLog()
         };
         return checks;
@@ -118,6 +119,18 @@ public static class DiagnosticsService
         WriteText(archive, "diagnostics.txt", BuildSummary(checks));
         WriteText(archive, "environment.txt", BuildEnvironmentSummary());
         WriteText(archive, "settings-load.txt", BuildSettingsLoadSummary());
+        var performanceHistory = PerformanceBaselineService.ReadHistory();
+        if (performanceHistory.Count > 0)
+        {
+            WriteText(
+                archive,
+                "startup-performance.json",
+                JsonSerializer.Serialize(performanceHistory, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true
+                }));
+        }
         if (File.Exists(AppSettings.SettingsPath))
             WriteText(archive, "settings.sanitized.json", SupportBundleSanitizer.SanitizeSettingsJson(await File.ReadAllTextAsync(AppSettings.SettingsPath, cancellationToken)));
         if (File.Exists(StartupGuard.StatePath))
@@ -338,13 +351,40 @@ public static class DiagnosticsService
         return CheckExecutable(name, configured, candidates);
     }
 
+    private static DiagnosticCheck CheckPerformance()
+    {
+        var summary = PerformanceBaselineService.GetSummary();
+        if (summary.Latest is null)
+            return new DiagnosticCheck { Name = "启动基线", Severity = DiagnosticSeverity.Warning, Detail = "尚无完整启动样本" };
+
+        var latest = summary.Latest;
+        var severity = latest.PipelineAttachedMs > 15_000 || latest.WorkingSetBytes > 1536L * 1024 * 1024
+            ? DiagnosticSeverity.Warning
+            : DiagnosticSeverity.Ok;
+        return new DiagnosticCheck
+        {
+            Name = "启动基线",
+            Severity = severity,
+            Detail = $"最近 {latest.PipelineAttachedMs} ms / {latest.WorkingSetBytes / 1024d / 1024d:0.0} MB · "
+                     + $"{summary.SampleCount} 个样本，中位数 {summary.MedianPipelineAttachedMs} ms / "
+                     + $"{summary.MedianWorkingSetBytes / 1024d / 1024d:0.0} MB"
+        };
+    }
+
     private static DiagnosticCheck CheckLog()
     {
         try
         {
             if (!File.Exists(App.LogPath)) return new DiagnosticCheck { Name = "运行日志", Severity = DiagnosticSeverity.Warning, Detail = "日志文件尚未生成" };
             var info = new FileInfo(App.LogPath);
-            return new DiagnosticCheck { Name = "运行日志", Severity = DiagnosticSeverity.Ok, Detail = $"{info.Length / 1024d:0.0} KB · {info.LastWriteTime:yyyy-MM-dd HH:mm:ss}" };
+            var archives = Enumerable.Range(1, LogMaintenance.DefaultArchiveCount)
+                .Count(index => File.Exists(LogMaintenance.ArchivePath(App.LogPath, index)));
+            return new DiagnosticCheck
+            {
+                Name = "运行日志",
+                Severity = info.Length > LogMaintenance.DefaultMaxBytes ? DiagnosticSeverity.Warning : DiagnosticSeverity.Ok,
+                Detail = $"{info.Length / 1024d:0.0} KB · 轮换归档 {archives}/{LogMaintenance.DefaultArchiveCount}"
+            };
         }
         catch (Exception ex) { return new DiagnosticCheck { Name = "运行日志", Severity = DiagnosticSeverity.Warning, Detail = ex.Message }; }
     }
