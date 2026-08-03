@@ -1,0 +1,83 @@
+name: P101 Verify v4.5.2 Round 3 Logic
+
+on:
+  pull_request:
+    branches: [p101-stable]
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event.pull_request.head.ref == 'p101-v452-round3-import-output-toast'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p101-v452-round3-import-output-toast
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Format, refresh manifest and validate direct-file grouping
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config core.autocrlf false
+          cd projects/1-桌面软件/101-Mediova/代码
+          gofmt -w \
+            internal/media/direct_file_groups.go \
+            internal/media/direct_file_groups_test.go \
+            internal/media/drop_scan.go \
+            internal/media/drop_scan_test.go
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          code = Path('.')
+          manifest = Path('SOURCE_FILES_SHA256.txt')
+          paths = []
+          seen = set()
+          for line in manifest.read_text(encoding='utf-8').splitlines():
+              parts = line.split(maxsplit=1)
+              if len(parts) != 2:
+                  raise SystemExit(f'invalid source manifest row: {line!r}')
+              rel = parts[1]
+              if rel not in seen:
+                  seen.add(rel)
+                  paths.append(rel)
+          for rel in [
+              'internal/media/direct_file_groups.go',
+              'internal/media/direct_file_groups_test.go',
+              'internal/media/drop_scan.go',
+              'internal/media/drop_scan_test.go',
+          ]:
+              if rel not in seen:
+                  seen.add(rel)
+                  paths.append(rel)
+          rows = []
+          for rel in sorted(paths):
+              target = code / rel
+              if not target.is_file():
+                  raise SystemExit(f'missing source manifest target: {target}')
+              rows.append(f'{hashlib.sha256(target.read_bytes()).hexdigest()}  {rel}')
+          manifest.write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          PY
+          sha256sum -c SOURCE_FILES_SHA256.txt
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet -unsafeptr=false ./...
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go test -c ./cmd/mediaworkbench -o /tmp/Mediova_round3_tests.exe
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/Mediova_round3.exe ./cmd/mediaworkbench
+          test -s /tmp/Mediova_round3_tests.exe
+          test -s /tmp/Mediova_round3.exe
+          cd ../../../..
+          rm -f .github/workflows/p101_v452_round3_logic.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Mediova｜完成第三轮直接文件目录分组基础层'
+          git push origin HEAD:p101-v452-round3-import-output-toast
