@@ -8,6 +8,8 @@ on:
 permissions:
   contents: write
 
+# This no-op revision intentionally retriggers the workflow after GitHub has
+# registered it from the preceding pull-request synchronize event.
 jobs:
   apply:
     if: github.event.pull_request.head.ref == 'p101-v452-round1-ui-state'
