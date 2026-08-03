@@ -1,10 +1,11 @@
 name: P101 Mediova adaptive layout apply
 
 on:
-  push:
+  pull_request:
     branches: [p101-exp]
+    types: [opened]
     paths:
-      - '.github/workflows/p101-adaptive-layout-apply.yml'
+      - '.github/triggers/p101-adaptive-layout.txt'
 
 permissions:
   contents: write
