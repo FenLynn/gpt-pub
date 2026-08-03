@@ -55,7 +55,10 @@ internal static class V105FinalQualityChecks
             "ShowZoteroCoreAsync",
             "ShowWorkspaceFailureCore",
             "element.DesiredSize.Width &lt;= 0",
-            "element.DesiredSize.Height &lt;= 0");
+            "element.DesiredSize.Height &lt;= 0",
+            "ZoteroLibraryControl.xaml",
+            "x:Name=\\&quot;SearchBox\\&quot; Height=\\&quot;29\\&quot;",
+            "x:Name=\\&quot;SearchBox\\&quot; Height=\\&quot;32\\&quot;");
 
         var document = XDocument.Parse(theme);
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
