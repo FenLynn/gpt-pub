@@ -24,7 +24,13 @@ func TestNormalizeStartupConfigNotice(t *testing.T) {
 }
 
 func TestStartupStatusAllowsConfigNotice(t *testing.T) {
-	for _, current := range []string{"", "就绪", " 准备就绪 ", "请选择文件或文件夹"} {
+	for _, current := range []string{
+		"",
+		"就绪",
+		" 准备就绪 ",
+		"请选择文件或文件夹",
+		"就绪。检测到 16 个逻辑处理器，并发上限 8；启动时未运行编码器测试。",
+	} {
 		if !startupStatusAllowsConfigNotice(current) {
 			t.Fatalf("passive status rejected: %q", current)
 		}
@@ -38,6 +44,24 @@ func TestStartupStatusAllowsConfigNotice(t *testing.T) {
 	} {
 		if startupStatusAllowsConfigNotice(current) {
 			t.Fatalf("active status replaced: %q", current)
+		}
+	}
+}
+
+func TestMergeStartupRuntimeNotice(t *testing.T) {
+	cases := []struct {
+		existing string
+		notice   string
+		want     string
+	}{
+		{"", "配置状态：已继承配置。", "配置状态：已继承配置。"},
+		{"Runtime 可用。", "", "Runtime 可用。"},
+		{"Runtime 可用。", "配置状态：已继承配置。", "Runtime 可用。 配置状态：已继承配置。"},
+		{"Runtime 可用。 配置状态：已继承配置。", "配置状态：已继承配置。", "Runtime 可用。 配置状态：已继承配置。"},
+	}
+	for _, tc := range cases {
+		if got := mergeStartupRuntimeNotice(tc.existing, tc.notice); got != tc.want {
+			t.Fatalf("merge(%q,%q)=%q want %q", tc.existing, tc.notice, got, tc.want)
 		}
 	}
 }
