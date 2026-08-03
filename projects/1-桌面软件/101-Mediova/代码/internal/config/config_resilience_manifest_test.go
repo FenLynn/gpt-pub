@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const configResilienceManifestSHA256 = "eb86349b11785485b1c02d98801c48de8294a3670c3e2a15b019aaa854217a6d"
+const configResilienceManifestSHA256 = "9758d416509ddce4a388888d2674eb401eb40131b85823a82e9f43f006181397"
 
 func TestConfigResilienceFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
