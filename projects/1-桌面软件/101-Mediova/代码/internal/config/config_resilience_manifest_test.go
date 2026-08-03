@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const configResilienceManifestSHA256 = "5b07e4400ed60bf7b06262fe77f35c6037f15c2eb932c1bfaea604220b7de601"
+const configResilienceManifestSHA256 = "2b1522748a096313e324eff1f87389f363a3f8cc34b73bfec4621f9567461da6"
 
 func TestConfigResilienceFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
@@ -49,7 +49,7 @@ func TestConfigResilienceFixedSourceManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 3 {
-		t.Fatalf("manifest entries=%d want 3", entries)
+	if entries != 6 {
+		t.Fatalf("manifest entries=%d want 6", entries)
 	}
 }
