@@ -28,7 +28,8 @@ public partial class DiagnosticsWindow : Window
         StatusText.Text = "正在检查…";
         try
         {
-            var checks = await DiagnosticsService.RunAsync(_settings, operation.Token);
+            var checks = (await DiagnosticsService.RunAsync(_settings, operation.Token)).ToList();
+            checks.Insert(0, UiAdaptiveAuditService.CreateDiagnosticCheck());
             if (!IsCurrent(operation)) return;
             _checks = checks;
             ChecksList.ItemsSource = _checks;

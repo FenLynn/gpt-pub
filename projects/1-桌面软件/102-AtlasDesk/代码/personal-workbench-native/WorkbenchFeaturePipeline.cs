@@ -17,6 +17,7 @@ public sealed class WorkbenchFeaturePipeline
         DevelopmentLifecycleGuard.SuppressLegacyEnvironmentDiscovery(window);
 
         Experience = V061ExperienceEnhancer.Attach(window, Base);
+        UiConvergence = UiConvergenceCoordinator.Attach(window, Experience.Home, Experience.SettingsPage);
         Diagnostics = DiagnosticsCoordinator.Attach(window, Settings);
         ShellResilience = ShellResilienceCoordinator.Attach(window);
         DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
@@ -36,6 +37,7 @@ public sealed class WorkbenchFeaturePipeline
 
     public V067VisualFixes VisualFixes { get; }
     public WorkbenchEnhancer Base { get; }
+    public UiConvergenceCoordinator UiConvergence { get; }
     public V061ExperienceEnhancer Experience { get; }
     public DiagnosticsCoordinator Diagnostics { get; }
     public ShellResilienceCoordinator ShellResilience { get; }
