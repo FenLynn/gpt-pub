@@ -24,8 +24,12 @@ var (
 	v452ShowScrollBar     = user32.NewProc("ShowScrollBar")
 	v452SetWindowTheme    = syscall.NewLazyDLL("uxtheme.dll").NewProc("SetWindowTheme")
 	v452ListApps          sync.Map // map[uintptr]*application
-	v452ListSubclassCB    = syscall.NewCallback(v452ListSubclassProc)
+	v452ListSubclassCB    uintptr
 )
+
+func init() {
+	v452ListSubclassCB = syscall.NewCallback(v452ListSubclassProc)
+}
 
 func v452InstallListVisuals(a *application) {
 	if a == nil || a.hList == 0 {
