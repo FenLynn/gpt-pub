@@ -1,2 +1,3 @@
 P101 Mediova adaptive layout validation trigger.
 This branch exists only to open the audited one-time PR and must not be merged.
+Revision 2: use the current details panel structure and real media-kind width API.
