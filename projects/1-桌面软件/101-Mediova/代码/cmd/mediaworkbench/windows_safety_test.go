@@ -264,22 +264,22 @@ func TestPrepareTaskForRetrySafety(t *testing.T) {
 func TestCompareTaskColumn(t *testing.T) {
 	a := &model.Task{Input: `C:\x\b.mp4`, InputSize: 20, OutputSize: 4, Progress: 80, Status: model.StatusDone, Width: 1920, Height: 1080, Duration: 90}
 	b := &model.Task{Input: `C:\x\a.mp4`, InputSize: 10, OutputSize: 8, Progress: 10, Status: model.StatusFailed, Width: 1280, Height: 720, Duration: 30}
-	if compareTaskColumn(a, b, 0) <= 0 {
+	if compareTaskColumn(a, b, taskColFile) <= 0 {
 		t.Fatal("filename sort failed")
 	}
-	if compareTaskColumn(a, b, 2) <= 0 {
+	if compareTaskColumn(a, b, taskColDuration) <= 0 {
 		t.Fatal("duration sort failed")
 	}
-	if compareTaskColumn(a, b, 7) <= 0 {
+	if compareTaskColumn(a, b, taskColInputSize) <= 0 {
 		t.Fatal("input-size sort failed")
 	}
-	if compareTaskColumn(a, b, 9) <= 0 {
+	if compareTaskColumn(a, b, taskColProgress) <= 0 {
 		t.Fatal("progress sort failed")
 	}
-	if compareTaskColumn(a, b, 10) <= 0 {
+	if compareTaskColumn(a, b, taskColStatus) <= 0 {
 		t.Fatal("status rank sort failed")
 	}
-	if taskSortLabel(8) != "输出体积" {
+	if taskSortLabel(taskColOutputSize) != "输出体积" {
 		t.Fatal("sort label mismatch")
 	}
 }
@@ -296,8 +296,8 @@ func TestSelectionRowsPreserveIDsAfterSort(t *testing.T) {
 }
 
 func TestNormalizedTaskColumnWidths(t *testing.T) {
-	got := normalizedTaskColumnWidths([]int{400, 10, 901, 160})
-	want := []int{400, 100, 76, 160, 116, 58, 90, 92, 140, 105, 124}
+	got := normalizedTaskColumnWidths([]int{40, 400, 10, 901, 160})
+	want := []int{40, 400, 100, 76, 160, 116, 58, 90, 92, 140, 105, 124}
 	if len(got) != len(want) {
 		t.Fatalf("column widths len=%d want=%d", len(got), len(want))
 	}
@@ -307,8 +307,14 @@ func TestNormalizedTaskColumnWidths(t *testing.T) {
 		}
 	}
 	legacy := normalizedTaskColumnWidths([]int{290, 105, 74, 120, 60, 94, 96, 140, 105, 124})
-	if len(legacy) != 11 || legacy[0] != 290 || legacy[1] != 105 || legacy[2] != 76 || legacy[3] != 74 || legacy[10] != 124 {
-		t.Fatalf("legacy column migration failed: %#v", legacy)
+	wantLegacy := []int{48, 290, 105, 76, 74, 120, 60, 94, 96, 140, 105, 124}
+	if len(legacy) != len(wantLegacy) {
+		t.Fatalf("legacy column widths len=%d want=%d: %#v", len(legacy), len(wantLegacy), legacy)
+	}
+	for i := range wantLegacy {
+		if legacy[i] != wantLegacy[i] {
+			t.Fatalf("legacy column width[%d]=%d want=%d: %#v", i, legacy[i], wantLegacy[i], legacy)
+		}
 	}
 }
 
