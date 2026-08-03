@@ -1,3 +1,36 @@
+AtlasDesk v1.0.3 final candidate
+
+This final pre-verification candidate completes the bounded reliability work requested after v1.0.0. It adds no new product workflow and remains outside main until combined user verification.
+
+Performance baseline
+- AtlasDesk records main-window readiness, feature-pipeline attachment time and process working set after a complete startup.
+- Startup history is limited to the newest 20 samples.
+- Samples contain only version, UTC time, safe-mode state, two elapsed durations and working-set bytes.
+- No project path, URL, user name, terminal command, file name or document content enters the performance file.
+- Diagnostics shows the latest and median startup baseline and includes the privacy-safe history in support bundles.
+
+Log maintenance
+- atlasdesk.log rotates before startup when it exceeds 4 MiB.
+- At most two previous log generations are retained.
+- Rotation failure never prevents application startup and never recursively writes to the log being rotated.
+- Real-file smoke tests cover first and multi-generation rotation.
+
+Diagnostics lifecycle
+- The version-numbered V062StabilityEnhancer has been removed.
+- DiagnosticsCoordinator now owns the diagnostics button, single-window activation and close lifecycle.
+- Closing the main window closes and releases the diagnostics window.
+- The diagnostics coordinator preserves safe-mode and unclean-start indicators without adding background checks.
+
+Regression protection
+- Real temporary histories verify the 20-sample boundary and summary calculation.
+- Source and serialized-payload gates prohibit paths, URLs, users, commands and terminal content from the performance baseline.
+- The old V062 component is rejected and the responsibility-named coordinator is required.
+- All v1.0.2 and earlier smoke, real window residency, ConPTY, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
+
+Verification status
+- v1.0.3 is the final candidate for combined user verification with v1.0.0-v1.0.2.
+- Development stops at v1.0.3; it must not enter main or receive a formal tag/Release before user confirmation.
+
 AtlasDesk v1.0.2 candidate
 
 This reliability candidate protects startup and local configuration without changing the v1.0.1 user data model or entering the formal main branch.
