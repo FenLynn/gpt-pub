@@ -674,20 +674,17 @@ func atomicWrite(path string, data []byte, perm os.FileMode) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	// Windows cannot atomically replace an existing file with os.Rename. Keep a
-	// short-lived backup so a power loss never leaves a half-written JSON file.
-	bak := path + ".bak"
-	_ = os.Remove(bak)
-	if _, err := os.Stat(path); err == nil {
-		if err := os.Rename(path, bak); err != nil {
-			return err
-		}
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		_ = os.Rename(bak, path)
+	// Install the fully written temporary file without first moving the
+	// current primary out of place. On Windows, ReplaceFileW keeps the
+	// destination intact when permissions, disk state or security software
+	// reject the replacement. On Unix-like systems os.Rename provides the
+	// corresponding atomic replacement semantics.
+	if err := replaceAtomicFile(path, tmpName); err != nil {
 		return err
 	}
-	_ = os.Remove(bak)
+	// A stale recovery backup from an earlier interrupted save is no longer
+	// authoritative after a successful atomic replacement.
+	_ = os.Remove(path + ".bak")
 	ok = true
 	return nil
 }
