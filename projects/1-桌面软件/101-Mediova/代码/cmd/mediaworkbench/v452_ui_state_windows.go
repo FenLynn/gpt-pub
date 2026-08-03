@@ -91,6 +91,7 @@ func v452FinalizeInitialToolbar(a *application) {
 		procShowWindow.Call(hwnd, SW_SHOW)
 		procInvalidateRect.Call(hwnd, 0, 1)
 	}
+	v452InstallListVisuals(a)
 	procRedrawWindow.Call(a.hwnd, 0, 0, RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN|RDW_UPDATENOW)
 }
 

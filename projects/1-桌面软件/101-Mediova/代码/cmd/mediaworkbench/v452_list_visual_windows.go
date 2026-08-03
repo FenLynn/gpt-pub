@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	v452SBBoth       = 3
+	v452SBBoth        = 3
 	v452ListFadeTimer = 0x4522
 	v452FadeDelayMS   = 1500
 	v452WMMouseWheel  = 0x020A

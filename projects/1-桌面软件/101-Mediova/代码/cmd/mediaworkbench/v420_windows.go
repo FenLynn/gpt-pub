@@ -725,6 +725,7 @@ func (a *application) v420RemoveTaskByID(id int64) {
 			a.heldEditTaskID = 0
 		}
 		a.mu.Unlock()
+		v452ReleaseTaskThumbnails(a, []int64{id})
 		// Conversion interruption removes its partial output before this method.
 		// Generic list removal must never delete a completed output or an existing
 		// collision target; it only releases the in-memory reservation.

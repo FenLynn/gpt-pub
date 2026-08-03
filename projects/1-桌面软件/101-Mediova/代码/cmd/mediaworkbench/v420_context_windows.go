@@ -22,7 +22,7 @@ func (a *application) v420ContextMenuFlags() (editFlags, removeFlags uintptr) {
 		if task.IsLocked() {
 			locked++
 		}
-		if task.CanHoldForEdit() {
+		if task.CanHoldForEdit() || (task.Status == model.StatusHeld && task.Hold != nil) {
 			editableLocked++
 		}
 		if task.CanRemoveSafely() {

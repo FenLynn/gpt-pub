@@ -33,12 +33,12 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 	}
 	for _, want := range []string{
 		`const appVersion = "4.5.0"`,
-		`{"分辨率", 100}, {"时长", 76}`,
+		`var taskListColumns = v452TaskListColumns`,
 		`bottomParameterWidths(a.currentKind)`,
 		`drawStatusLamp(dis.HDC, rc, dot)`,
 		`drawCompactResetGlyph(dis.HDC, rc, textColor)`,
 		`drawContrastCenteredText(hdc, label, bar, fill, uiFontSmall)`,
-		`cd.ISubItem != 8 && cd.ISubItem != 9 && cd.ISubItem != 10`,
+		`taskColOutputSize && cd.ISubItem != taskColProgress && cd.ISubItem != taskColStatus`,
 		`taskDurationText(t)`,
 		`a.refreshTotal()`,
 	} {

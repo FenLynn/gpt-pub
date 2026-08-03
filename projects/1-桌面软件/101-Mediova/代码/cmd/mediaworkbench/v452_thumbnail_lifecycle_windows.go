@@ -23,7 +23,7 @@ type v452ThumbnailState struct {
 
 var v452ThumbnailStates sync.Map // map[*application]*v452ThumbnailState
 
-var procImageListRemoveV452 = modComctl32.NewProc("ImageList_Remove")
+var procImageListRemoveV452 = comctl32.NewProc("ImageList_Remove")
 
 func v452ThumbnailStateFor(a *application) *v452ThumbnailState {
 	if a == nil {
@@ -58,7 +58,7 @@ func v452ThumbnailCurrent(a *application, taskID int64, generation uint64) bool 
 func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, input, path string, cached bool, index int) bool {
 	state := v452ThumbnailStateFor(a)
 	if state == nil || index <= 0 || !state.ownership.Current(taskID, generation) {
-		if cached && path != "" {
+		if cached && path != "" && state != nil && state.ownership.RefCount(path) == 0 {
 			_ = os.Remove(path)
 		}
 		return false
