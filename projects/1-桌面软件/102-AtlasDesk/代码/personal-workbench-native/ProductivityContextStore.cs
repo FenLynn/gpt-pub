@@ -150,6 +150,7 @@ public static class ProductivityContextStore
     {
         var state = Load();
         var text = query?.Trim() ?? string.Empty;
+        var hasQuery = text.Length > 0;
         var results = new List<GlobalSearchResult>();
         var currentRoot = ResolveCurrentProjectRoot(state, settings);
         var currentProfile = FindProfile(state, currentRoot);
@@ -181,9 +182,16 @@ public static class ProductivityContextStore
             AddIfMatch(results, Command(
                 "在当前项目打开终端",
                 currentProfile.DefaultShell + " · " + currentProfile.ProjectRoot,
-                "context-open-terminal",
+                "context-run-command",
                 currentProfile.ProjectRoot,
-                currentProfile), text);
+                new ProjectContextCommandInvocation(
+                    currentProfile,
+                    new ProjectContextCommand
+                    {
+                        Name = currentProfile.EffectiveName,
+                        Command = "cd .",
+                        WorkingDirectory = currentProfile.ProjectRoot
+                    })), text);
             if (Uri.TryCreate(currentProfile.DashboardUrl, UriKind.Absolute, out _))
             {
                 AddIfMatch(results, Command(
@@ -195,11 +203,20 @@ public static class ProductivityContextStore
             }
         }
 
-        foreach (var profile in state.Projects
-                     .Where(item => Directory.Exists(item.ProjectRoot))
-                     .OrderByDescending(item => PathsEqual(item.ProjectRoot, currentRoot))
-                     .ThenByDescending(item => item.UpdatedUtc)
-                     .Take(20))
+        var validProfiles = state.Projects
+            .Where(item => Directory.Exists(item.ProjectRoot))
+            .OrderByDescending(item => PathsEqual(item.ProjectRoot, currentRoot))
+            .ThenByDescending(item => item.UpdatedUtc);
+        var visibleProfiles = hasQuery
+            ? validProfiles.Take(20)
+            : currentProfile is not null
+                ? validProfiles.Where(item => PathsEqual(item.ProjectRoot, currentProfile.ProjectRoot)).Take(1)
+                : validProfiles.Take(4);
+        var commandLimit = hasQuery ? 12 : 5;
+        var favoriteLimit = hasQuery ? 12 : 5;
+        var researchLimit = hasQuery ? 20 : 5;
+
+        foreach (var profile in visibleProfiles)
         {
             AddIfMatch(results, Project(
                 profile.EffectiveName,
@@ -208,7 +225,9 @@ public static class ProductivityContextStore
                 profile.ProjectRoot,
                 profile), text);
 
-            foreach (var command in profile.Commands.Where(item => !string.IsNullOrWhiteSpace(item.Command)).Take(12))
+            foreach (var command in profile.Commands
+                         .Where(item => !string.IsNullOrWhiteSpace(item.Command))
+                         .Take(commandLimit))
             {
                 AddIfMatch(results, Command(
                     command.Name.Length > 0 ? command.Name : command.Command,
@@ -220,7 +239,7 @@ public static class ProductivityContextStore
 
             foreach (var favorite in profile.FavoriteFiles
                          .Where(path => File.Exists(path) || Directory.Exists(path))
-                         .Take(12))
+                         .Take(favoriteLimit))
             {
                 AddIfMatch(results, new GlobalSearchResult
                 {
@@ -235,7 +254,7 @@ public static class ProductivityContextStore
                 }, text);
             }
 
-            foreach (var link in profile.ResearchLinks.Take(20))
+            foreach (var link in profile.ResearchLinks.Take(researchLimit))
             {
                 AddIfMatch(results, new GlobalSearchResult
                 {
