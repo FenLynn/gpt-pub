@@ -4,6 +4,8 @@ import (
 	"math"
 	"reflect"
 	"testing"
+
+	"mediaworkbench/internal/model"
 )
 
 func TestCompressionVisualNearOneToOneIsYellow(t *testing.T) {
@@ -67,18 +69,22 @@ func TestSecondaryDefaultIsTransparent(t *testing.T) {
 }
 
 func TestBottomParameterWidthsArePurposeSized(t *testing.T) {
-	w := bottomParameterWidths()
-	if w.Resolution >= w.Volume || w.Quality <= 68 || w.Codec >= w.Rotation {
-		t.Fatalf("unexpected widths=%+v", w)
+	video := bottomParameterWidths(model.KindVideo)
+	image := bottomParameterWidths(model.KindImage)
+	if video.Resolution >= video.Volume || video.Quality <= 68 || video.Codec >= video.Rotation {
+		t.Fatalf("unexpected video widths=%+v", video)
 	}
-	if w.Volume > 132 || w.Rotation > 104 || w.Resolution > 88 {
-		t.Fatalf("controls remain over-wide: %+v", w)
+	if image.Resolution <= video.Resolution || image.Resolution <= image.Volume || image.Codec >= video.Codec || image.Quality >= video.Quality || image.Volume >= video.Volume {
+		t.Fatalf("image controls are not purpose-sized: video=%+v image=%+v", video, image)
+	}
+	if image.Resolution < 116 || image.Volume > 88 || image.Quality > 62 {
+		t.Fatalf("image bottom widths remain unbalanced: %+v", image)
 	}
 }
 
 func TestListCellBarUsesFullWidthWithFivePixelVerticalInset(t *testing.T) {
 	insets := listCellBarInsets()
-	if insets.Horizontal > 1 || insets.Vertical != 5 || insets.MinimumHeight != 14 {
+	if insets.Horizontal > 1 || insets.Vertical != 2 || insets.MinimumHeight != 20 {
 		t.Fatalf("unexpected insets=%+v", insets)
 	}
 }

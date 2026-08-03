@@ -262,21 +262,24 @@ func TestPrepareTaskForRetrySafety(t *testing.T) {
 }
 
 func TestCompareTaskColumn(t *testing.T) {
-	a := &model.Task{Input: `C:\x\b.mp4`, InputSize: 20, OutputSize: 4, Progress: 80, Status: model.StatusDone, Width: 1920, Height: 1080}
-	b := &model.Task{Input: `C:\x\a.mp4`, InputSize: 10, OutputSize: 8, Progress: 10, Status: model.StatusFailed, Width: 1280, Height: 720}
+	a := &model.Task{Input: `C:\x\b.mp4`, InputSize: 20, OutputSize: 4, Progress: 80, Status: model.StatusDone, Width: 1920, Height: 1080, Duration: 90}
+	b := &model.Task{Input: `C:\x\a.mp4`, InputSize: 10, OutputSize: 8, Progress: 10, Status: model.StatusFailed, Width: 1280, Height: 720, Duration: 30}
 	if compareTaskColumn(a, b, 0) <= 0 {
 		t.Fatal("filename sort failed")
 	}
-	if compareTaskColumn(a, b, 6) <= 0 {
+	if compareTaskColumn(a, b, 2) <= 0 {
+		t.Fatal("duration sort failed")
+	}
+	if compareTaskColumn(a, b, 7) <= 0 {
 		t.Fatal("input-size sort failed")
 	}
-	if compareTaskColumn(a, b, 8) <= 0 {
+	if compareTaskColumn(a, b, 9) <= 0 {
 		t.Fatal("progress sort failed")
 	}
-	if compareTaskColumn(a, b, 9) <= 0 {
+	if compareTaskColumn(a, b, 10) <= 0 {
 		t.Fatal("status rank sort failed")
 	}
-	if taskSortLabel(7) != "输出体积" {
+	if taskSortLabel(8) != "输出体积" {
 		t.Fatal("sort label mismatch")
 	}
 }
@@ -294,7 +297,7 @@ func TestSelectionRowsPreserveIDsAfterSort(t *testing.T) {
 
 func TestNormalizedTaskColumnWidths(t *testing.T) {
 	got := normalizedTaskColumnWidths([]int{400, 10, 901, 160})
-	want := []int{400, 105, 74, 160, 60, 94, 96, 140, 105, 124}
+	want := []int{400, 100, 76, 160, 116, 58, 90, 92, 140, 105, 124}
 	if len(got) != len(want) {
 		t.Fatalf("column widths len=%d want=%d", len(got), len(want))
 	}
@@ -302,6 +305,10 @@ func TestNormalizedTaskColumnWidths(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("column width[%d]=%d want=%d", i, got[i], want[i])
 		}
+	}
+	legacy := normalizedTaskColumnWidths([]int{290, 105, 74, 120, 60, 94, 96, 140, 105, 124})
+	if len(legacy) != 11 || legacy[0] != 290 || legacy[1] != 105 || legacy[2] != 76 || legacy[3] != 74 || legacy[10] != 124 {
+		t.Fatalf("legacy column migration failed: %#v", legacy)
 	}
 }
 
@@ -381,11 +388,35 @@ func TestTopToolbarResponsiveBandsKeepSearchGap(t *testing.T) {
 }
 
 func TestFullCellBarsUseRowHeightAndCompressionRatio(t *testing.T) {
-	row := rect{Left: 800, Top: 100, Right: 940, Bottom: 150}
-	bar := fullCellBarRect(row)
-	if bar.Top != 105 || bar.Bottom != 145 || bar.Bottom-bar.Top != 40 {
-		t.Fatalf("bar rect=%+v, want full-height inset", bar)
+	checkCentered := func(name string, row rect) {
+		t.Helper()
+		bar := fullCellBarRect(row)
+		insets := listCellBarInsets()
+		wantLeft := row.Left + scaleDPI(insets.Horizontal)
+		wantRight := row.Right - scaleDPI(insets.Horizontal)
+		available := row.Bottom - row.Top - 2*scaleDPI(insets.Vertical)
+		wantHeight := scaleDPI(24)
+		if wantHeight > available {
+			wantHeight = available
+		}
+		if minimum := scaleDPI(insets.MinimumHeight); wantHeight < minimum && available >= minimum {
+			wantHeight = minimum
+		}
+		if wantHeight < 1 {
+			wantHeight = 1
+		}
+		topGap := bar.Top - row.Top
+		bottomGap := row.Bottom - bar.Bottom
+		gapDelta := topGap - bottomGap
+		if gapDelta < 0 {
+			gapDelta = -gapDelta
+		}
+		if bar.Left != wantLeft || bar.Right != wantRight || bar.Bottom-bar.Top != wantHeight || gapDelta > 1 {
+			t.Fatalf("%s bar=%+v row=%+v gaps=%d/%d, want horizontal inset, height %d and vertical centring", name, bar, row, topGap, bottomGap, wantHeight)
+		}
 	}
+	checkCentered("synthetic-50px-row", rect{Left: 800, Top: 100, Right: 940, Bottom: 150})
+	checkCentered("realistic-30px-row", rect{Left: 800, Top: 100, Right: 940, Bottom: 130})
 	task := &model.Task{InputSize: 100, OutputSize: 50}
 	fraction, label, active := compressionCellMetrics(task)
 	if !active || fraction != .5 || label != "50 B (50.0%)" {
