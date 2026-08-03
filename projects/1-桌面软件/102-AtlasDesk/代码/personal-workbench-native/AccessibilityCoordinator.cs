@@ -90,7 +90,6 @@ public sealed class AccessibilityCoordinator : IDisposable
 
     private readonly MainWindow _window;
     private readonly RoutedEventHandler _loadedHandler;
-    private readonly HashSet<DependencyObject> _processed = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<Control, Dictionary<DependencyProperty, object>> _highContrastOriginals =
         new(ReferenceEqualityComparer.Instance);
     private readonly List<RadioButton> _navigation = new();
@@ -126,7 +125,7 @@ public sealed class AccessibilityCoordinator : IDisposable
     {
         EnsureTheme(window);
         var focusStyle = FindFocusStyle(window);
-        ApplySubtree(window, focusStyle, SystemParameters.HighContrast, null, null);
+        ApplySubtree(window, focusStyle, SystemParameters.HighContrast, null);
         KeyboardNavigation.SetTabNavigation(window, KeyboardNavigationMode.Continue);
         KeyboardNavigation.SetControlTabNavigation(window, KeyboardNavigationMode.Continue);
     }
@@ -142,9 +141,9 @@ public sealed class AccessibilityCoordinator : IDisposable
 
         var interactive = 0;
         var keyboardFocusable = 0;
-        var missingNames = 0;
-        var tinyTargets = 0;
-        var clips = 0;
+        var missingNameDetails = new List<string>();
+        var tinyTargetDetails = new List<string>();
+        var clipDetails = new List<string>();
 
         foreach (var element in Descendants<FrameworkElement>(_window).Prepend(_window))
         {
@@ -158,35 +157,35 @@ public sealed class AccessibilityCoordinator : IDisposable
             if (element is ButtonBase button && IsIconOnly(button))
             {
                 if (string.IsNullOrWhiteSpace(AutomationProperties.GetName(button)))
-                    missingNames++;
+                    missingNameDetails.Add(DescribeElement(button));
                 if (button.ActualWidth > 0 && button.ActualHeight > 0
                     && (button.ActualWidth < 24 || button.ActualHeight < 24))
-                    tinyTargets++;
+                    tinyTargetDetails.Add(DescribeElement(button));
             }
 
             if (IsCriticalLayoutElement(element) && IsMeaningfullyClipped(element))
-                clips++;
+                clipDetails.Add(DescribeElement(element));
         }
 
         var navigationFocusable = _navigation.Count(item => item.Focusable);
         var navigationTabStops = _navigation.Count(item => item.IsTabStop);
         var healthy = navigationFocusable == NavigationNames.Length
                       && navigationTabStops == 1
-                      && missingNames == 0
-                      && tinyTargets == 0
-                      && clips == 0;
+                      && missingNameDetails.Count == 0
+                      && tinyTargetDetails.Count == 0
+                      && clipDetails.Count == 0;
         var detail = healthy
             ? "焦点、辅助名称与关键布局边界正常"
-            : "存在需要关注的焦点、辅助名称或布局边界";
+            : BuildIssueDetail(missingNameDetails, tinyTargetDetails, clipDetails);
 
         var snapshot = new UiQualityAuditSnapshot(
             interactive,
             keyboardFocusable,
             navigationFocusable,
             navigationTabStops,
-            missingNames,
-            tinyTargets,
-            clips,
+            missingNameDetails.Count,
+            tinyTargetDetails.Count,
+            clipDetails.Count,
             SystemParameters.HighContrast,
             healthy,
             detail);
@@ -293,23 +292,15 @@ public sealed class AccessibilityCoordinator : IDisposable
     private void ApplyTree(DependencyObject root)
     {
         var focusStyle = FindFocusStyle(_window);
-        ApplySubtree(root, focusStyle, SystemParameters.HighContrast, _processed, _highContrastOriginals);
+        ApplySubtree(root, focusStyle, SystemParameters.HighContrast, _highContrastOriginals);
     }
 
     private static void ApplySubtree(
         DependencyObject root,
         Style? focusStyle,
         bool highContrast,
-        HashSet<DependencyObject>? processed,
         Dictionary<Control, Dictionary<DependencyProperty, object>>? highContrastOriginals)
     {
-        if (processed is not null && !processed.Add(root))
-        {
-            if (root is Control existingControl)
-                ApplyHighContrast(existingControl, highContrast, highContrastOriginals);
-            return;
-        }
-
         if (root is FrameworkElement element)
         {
             if (element is Control control)
@@ -325,7 +316,7 @@ public sealed class AccessibilityCoordinator : IDisposable
         try { count = VisualTreeHelper.GetChildrenCount(root); }
         catch { return; }
         for (var index = 0; index < count; index++)
-            ApplySubtree(VisualTreeHelper.GetChild(root, index), focusStyle, highContrast, processed, highContrastOriginals);
+            ApplySubtree(VisualTreeHelper.GetChild(root, index), focusStyle, highContrast, highContrastOriginals);
     }
 
     private static void ApplyAccessibleName(FrameworkElement element)
@@ -419,6 +410,39 @@ public sealed class AccessibilityCoordinator : IDisposable
         return bounds.Width + 1 < element.ActualWidth || bounds.Height + 1 < element.ActualHeight;
     }
 
+    private static string BuildIssueDetail(
+        IReadOnlyList<string> missingNames,
+        IReadOnlyList<string> tinyTargets,
+        IReadOnlyList<string> clips)
+    {
+        var parts = new List<string>();
+        if (missingNames.Count > 0)
+            parts.Add("未命名：" + string.Join("、", missingNames.Distinct(StringComparer.Ordinal).Take(8)));
+        if (tinyTargets.Count > 0)
+            parts.Add("小目标：" + string.Join("、", tinyTargets.Distinct(StringComparer.Ordinal).Take(8)));
+        if (clips.Count > 0)
+            parts.Add("裁切：" + string.Join("、", clips.Distinct(StringComparer.Ordinal).Take(8)));
+        return parts.Count == 0 ? "存在需要关注的焦点或布局边界" : string.Join("；", parts);
+    }
+
+    private static string DescribeElement(FrameworkElement element)
+    {
+        if (!string.IsNullOrWhiteSpace(element.Name)) return element.Name;
+        var automationName = AutomationProperties.GetName(element);
+        if (!string.IsNullOrWhiteSpace(automationName)) return automationName;
+        var owner = FindAncestor<UserControl>(element)?.GetType().Name
+                    ?? FindAncestor<Window>(element)?.GetType().Name
+                    ?? "界面";
+        return owner + "/" + element.GetType().Name;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject source) where T : DependencyObject
+    {
+        for (var current = VisualTreeHelper.GetParent(source); current is not null; current = VisualTreeHelper.GetParent(current))
+            if (current is T match) return match;
+        return null;
+    }
+
     private static void ApplyHighContrast(
         Control control,
         bool enabled,
@@ -510,7 +534,6 @@ public sealed class AccessibilityCoordinator : IDisposable
         foreach (var control in _highContrastOriginals.Keys.ToArray())
             ApplyHighContrast(control, false, _highContrastOriginals);
         _highContrastOriginals.Clear();
-        _processed.Clear();
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
