@@ -1,3 +1,5 @@
+global using FileIntegrityEntry = PersonalWorkbench.IntegrityManifestEntry;
+
 namespace PersonalWorkbench;
 
 public sealed class WorkbenchTaskHandle
