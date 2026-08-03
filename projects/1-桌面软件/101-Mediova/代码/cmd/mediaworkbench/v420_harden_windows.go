@@ -60,6 +60,7 @@ func (a *application) v420TogglePause() {
 		a.pauseCond.Broadcast()
 	}
 	a.runMu.Unlock()
+	v452SetRunPaused(a, paused, time.Now())
 
 	var controlErr error
 	if controller != nil {

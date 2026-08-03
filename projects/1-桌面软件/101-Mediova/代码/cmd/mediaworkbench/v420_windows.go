@@ -56,8 +56,10 @@ func (a *application) v420RefreshOutputHistory() {
 		send(a.hOutputEdit, CB_ADDSTRING, 0, uintptr(unsafeStringPointer(path)))
 	}
 	setText(a.hOutputEdit, current)
-	enable(a.hOutputEdit, !a.v420OutputLocked(kind))
-	enable(a.hOutputPick, !a.v420OutputLocked(kind))
+	locked := a.v420OutputLocked(kind)
+	enable(a.hOutputEdit, !locked)
+	enable(a.hOutputPick, !locked)
+	v452ClearComboSelection(a, a.hOutputEdit, locked)
 }
 
 // unsafeStringPointer centralises the short-lived UTF-16 pointer used by
@@ -381,7 +383,8 @@ func (a *application) v420StartQueueFiltered(only map[int64]bool) {
 	a.running = true
 	a.paused = false
 	a.runKind = runKind
-	a.runStart = time.Now()
+	runStartedAt := time.Now()
+	a.runStart = runStartedAt
 	a.timeEnd = time.Time{}
 	a.ctx, a.cancel = ctx, cancel
 	a.controller = controller
@@ -394,6 +397,7 @@ func (a *application) v420StartQueueFiltered(only map[int64]bool) {
 	a.removeRequests = make(map[int64]bool)
 	a.immediateRestarts = make(map[int64]bool)
 	a.runMu.Unlock()
+	v452ResetRunClock(a, runStartedAt)
 
 	ids, skipped, problems := a.v420PrepareReadyBatch(runKind, only)
 	if len(ids) == 0 {
