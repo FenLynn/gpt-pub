@@ -2,4 +2,4 @@
 
 This branch only triggers the audited one-time workflow. Do not merge.
 
-Reload the corrected build-template assertion from latest main.
+Reload the Go-rune-safe recovery implementation from latest main.
