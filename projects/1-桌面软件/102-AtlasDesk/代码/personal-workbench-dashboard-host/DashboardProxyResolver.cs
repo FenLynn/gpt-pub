@@ -102,9 +102,9 @@ internal sealed record DashboardProxyConfiguration(
 
         var normalized = value.Trim();
         if (normalized.Length > 2048
-            || normalized.Contains('"', StringComparison.Ordinal)
-            || normalized.Contains('\r', StringComparison.Ordinal)
-            || normalized.Contains('\n', StringComparison.Ordinal))
+            || normalized.Contains('"')
+            || normalized.Contains('\r')
+            || normalized.Contains('\n'))
         {
             return string.Empty;
         }
