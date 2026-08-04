@@ -35,15 +35,17 @@ internal static class V1111SidebarTerminalPolishChecks
             "Accessibility = AccessibilityCoordinator.Attach(window)");
 
         RequireContains(coordinator,
-            "Tag, \"productivity-context\"",
+            "Equals(button.Tag, \"productivity-context\")",
             "Grid.SetRow(contextButton, Grid.GetRow(commandButton))",
             "contextButton.HorizontalAlignment = HorizontalAlignment.Right",
             "contextButton.ToolTip = \"项目上下文\"",
             "commandButton.Margin = new Thickness(0, 2, 38, 2)",
             "CreateProjectContextIcon",
+            "new ShapePath",
             "_terminal.Loaded += Terminal_Loaded",
             "DispatcherPriority.ContextIdle",
             "_terminalHost.Background = Brushes.Black",
+            "Color.FromRgb(13, 19, 32)",
             "ApplyTerminalButton(button)",
             "TerminalButtonText");
 
@@ -92,7 +94,7 @@ internal static class V1111SidebarTerminalPolishChecks
         RequireContains(notes,
             "AtlasDesk v1.1.11 sidebar and terminal visual polish",
             "project-context shortcut",
-            "pure-black CMD theme",
+            "pure-black CMD terminal theme",
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
