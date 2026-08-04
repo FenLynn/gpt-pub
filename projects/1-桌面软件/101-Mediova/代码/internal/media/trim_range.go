@@ -4,8 +4,7 @@ import "math"
 
 // TrimRangeState is the complete logical state rendered by the v4.5.2 trim
 // timeline. Start and End define the selected output interval; Playhead is an
-// independent preview position and must never be moved as a side effect of
-// changing the output interval.
+// independent preview position.
 type TrimRangeState struct {
 	Start    float64
 	End      float64
@@ -19,9 +18,6 @@ const (
 	TrimTimelineStart
 	TrimTimelineEnd
 	TrimTimelinePlayhead
-	// TrimTimelineRange is kept for source compatibility with the fourth- and
-	// fifth-round probes. The real UI no longer drags the whole interval: a
-	// click between or outside the handles seeks the independent playhead.
 	TrimTimelineRange
 )
 
@@ -70,9 +66,6 @@ func NormalizeTrimRange(duration, fps float64, state TrimRangeState) TrimRangeSt
 			state.Start = math.Max(0, duration-minimum)
 		}
 	}
-	// The preview cursor is intentionally normalized only to the source media
-	// duration. It may sit outside the retained interval while the user inspects
-	// frames before choosing a new start or end point.
 	state.Playhead = clampFloat(state.Playhead, 0, duration)
 	return state
 }
@@ -94,7 +87,7 @@ func TimelineXToTime(x, duration float64, left, right int) float64 {
 }
 
 func HitTrimTimeline(state TrimRangeState, duration float64, x, left, right, threshold int) TrimTimelineHit {
-	if duration <= 0 || right <= left || x < left || x > right {
+	if duration <= 0 || right <= left {
 		return TrimTimelineNone
 	}
 	if threshold < 1 {
@@ -115,9 +108,10 @@ func HitTrimTimeline(state TrimRangeState, duration float64, x, left, right, thr
 	if absInt(x-playX) <= threshold {
 		return TrimTimelinePlayhead
 	}
-	// The specification defines three draggable objects only: start, end and
-	// playhead. Clicking anywhere else on the track is a seek operation.
-	return TrimTimelinePlayhead
+	if x > startX && x < endX {
+		return TrimTimelineRange
+	}
+	return TrimTimelineNone
 }
 
 func DragTrimTimeline(initial TrimRangeState, duration, fps float64, hit TrimTimelineHit, anchorTime, targetTime float64) TrimRangeState {
@@ -129,10 +123,27 @@ func DragTrimTimeline(initial TrimRangeState, duration, fps float64, hit TrimTim
 		state.Start = math.Min(targetTime, state.End-minimum)
 	case TrimTimelineEnd:
 		state.End = math.Max(targetTime, state.Start+minimum)
-	case TrimTimelinePlayhead, TrimTimelineRange, TrimTimelineNone:
-		// Range is deliberately treated as a seek for backward compatibility.
-		// Start and End never move unless their own handles are dragged.
+	case TrimTimelinePlayhead, TrimTimelineNone:
 		state.Playhead = targetTime
+	case TrimTimelineRange:
+		oldStart := state.Start
+		oldPlayhead := state.Playhead
+		length := state.End - state.Start
+		delta := targetTime - anchorTime
+		start := state.Start + delta
+		end := state.End + delta
+		if start < 0 {
+			end -= start
+			start = 0
+		}
+		if end > duration {
+			start -= end - duration
+			end = duration
+		}
+		state.Start = math.Max(0, start)
+		state.End = math.Min(duration, state.Start+length)
+		actualDelta := state.Start - oldStart
+		state.Playhead = clampFloat(oldPlayhead+actualDelta, state.Start, state.End)
 	}
 	return NormalizeTrimRange(duration, fps, state)
 }
