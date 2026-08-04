@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"mediaworkbench/internal/media"
 	"mediaworkbench/internal/model"
 )
 
@@ -106,7 +107,7 @@ func v452ResolveTaskDirectory(tasks []*model.Task, selectedIDs map[int64]bool, k
 					return filepath.Dir(path)
 				}
 				if root := strings.TrimSpace(chosen.Queue.OutputRoot); root != "" {
-					return filepath.Clean(root)
+					return filepath.Clean(media.OutputRootForContext(root, chosen.Root))
 				}
 			}
 		} else if path := strings.TrimSpace(chosen.Input); path != "" {
@@ -117,12 +118,18 @@ func v452ResolveTaskDirectory(tasks []*model.Task, selectedIDs map[int64]bool, k
 		if kind == model.KindImage {
 			for _, value := range []string{fallback.LastImageOutputDir, fallback.ImageOutputDir, fallback.LastOutputDir, fallback.OutputDir} {
 				if value = strings.TrimSpace(value); value != "" {
+					if chosen != nil {
+						value = media.OutputRootForContext(value, chosen.Root)
+					}
 					return filepath.Clean(value)
 				}
 			}
 		} else {
 			for _, value := range []string{fallback.LastOutputDir, fallback.OutputDir} {
 				if value = strings.TrimSpace(value); value != "" {
+					if chosen != nil {
+						value = media.OutputRootForContext(value, chosen.Root)
+					}
 					return filepath.Clean(value)
 				}
 			}
