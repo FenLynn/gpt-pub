@@ -23,17 +23,15 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // The isolated Dashboard uses a second AtlasDesk.exe process. It must bypass
-        // StartupGuard, global shortcuts, the feature pipeline and MainWindow so a
-        // native WebView2 failure can never be counted as a primary-app crash.
-        if (DashboardHostLaunchOptions.TryParse(e.Args, out var dashboardHostOptions))
+        // WPF does not accept StartupUri=null. Helper mode therefore redirects the
+        // non-null XAML startup route to a hidden bootstrap window before base startup.
+        // The bootstrap replaces itself with DashboardHostWindow and never constructs
+        // MainWindow, StartupGuard, global shortcuts or the primary feature pipeline.
+        if (DashboardHostLaunchOptions.TryParse(e.Args, out _))
         {
-            StartupUri = null;
-            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            StartupUri = new Uri("DashboardHostBootstrapWindow.xaml", UriKind.Relative);
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
             base.OnStartup(e);
-            var host = new DashboardHostWindow(dashboardHostOptions);
-            MainWindow = host;
-            host.Show();
             return;
         }
 
