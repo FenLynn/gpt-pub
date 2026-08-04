@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace PersonalWorkbench;
 
@@ -20,6 +21,13 @@ public sealed class DashboardProcessSurface : HwndHost
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpFrameChanged = 0x0020;
     private const int SwShow = 5;
+    private const int WmSetFocus = 0x0007;
+    private const int WmParentNotify = 0x0210;
+    private const int WmLButtonDown = 0x0201;
+    private const int WmRButtonDown = 0x0204;
+    private const int WmMButtonDown = 0x0207;
+    private const int WmXButtonDown = 0x020B;
+    private const uint GaRoot = 2;
 
     private IntPtr _hostHandle;
     private IntPtr _dashboardHandle;
@@ -28,11 +36,8 @@ public sealed class DashboardProcessSurface : HwndHost
     {
         Focusable = true;
         SizeChanged += (_, _) => ResizeDashboardWindow();
-        GotKeyboardFocus += (_, _) =>
-        {
-            if (_dashboardHandle != IntPtr.Zero && IsWindow(_dashboardHandle))
-                _ = SetFocus(_dashboardHandle);
-        };
+        GotKeyboardFocus += (_, _) => _ = ActivateDashboardInput();
+        PreviewMouseDown += (_, _) => _ = ActivateDashboardInput();
     }
 
     public IntPtr HostHandle => _hostHandle;
@@ -63,11 +68,57 @@ public sealed class DashboardProcessSurface : HwndHost
             SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
         _ = ShowWindow(dashboardHandle, SwShow);
         ResizeDashboardWindow();
+
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            new Action(() => _ = ActivateDashboardInput()));
     }
 
     public void DetachDashboardWindow()
     {
         _dashboardHandle = IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// SetParent does not merge the WPF and DashboardHost input queues. Temporarily
+    /// attach both UI threads while transferring focus, then detach immediately.
+    /// This keeps process isolation while allowing WebView2 text fields to receive
+    /// real keyboard input.
+    /// </summary>
+    public bool ActivateDashboardInput()
+    {
+        if (_hostHandle == IntPtr.Zero
+            || _dashboardHandle == IntPtr.Zero
+            || !IsWindow(_dashboardHandle))
+        {
+            return false;
+        }
+
+        var currentThread = GetCurrentThreadId();
+        var dashboardThread = GetWindowThreadProcessId(_dashboardHandle, out _);
+        var attached = false;
+        try
+        {
+            if (dashboardThread != 0 && dashboardThread != currentThread)
+                attached = AttachThreadInput(currentThread, dashboardThread, true);
+
+            var root = GetAncestor(_hostHandle, GaRoot);
+            if (root != IntPtr.Zero)
+            {
+                _ = SetForegroundWindow(root);
+                _ = SetActiveWindow(root);
+            }
+
+            _ = SetFocus(_dashboardHandle);
+            var focused = GetFocus();
+            return focused == _dashboardHandle
+                   || (focused != IntPtr.Zero && IsChild(_dashboardHandle, focused));
+        }
+        finally
+        {
+            if (attached)
+                _ = AttachThreadInput(currentThread, dashboardThread, false);
+        }
     }
 
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
@@ -92,6 +143,24 @@ public sealed class DashboardProcessSurface : HwndHost
         return new HandleRef(this, _hostHandle);
     }
 
+    protected override IntPtr WndProc(
+        IntPtr hwnd,
+        int msg,
+        IntPtr wParam,
+        IntPtr lParam,
+        ref bool handled)
+    {
+        if (msg == WmSetFocus
+            || (msg == WmParentNotify && IsMouseButtonMessage(LowWord(wParam))))
+        {
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Input,
+                new Action(() => _ = ActivateDashboardInput()));
+        }
+
+        return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
+    }
+
     protected override void DestroyWindowCore(HandleRef hwnd)
     {
         _dashboardHandle = IntPtr.Zero;
@@ -113,6 +182,12 @@ public sealed class DashboardProcessSurface : HwndHost
             Math.Max(1, (int)Math.Round(ActualHeight)),
             true);
     }
+
+    private static int LowWord(IntPtr value)
+        => unchecked((short)(long)value) & 0xFFFF;
+
+    private static bool IsMouseButtonMessage(int message)
+        => message is WmLButtonDown or WmRButtonDown or WmMButtonDown or WmXButtonDown;
 
     private static long GetWindowStyle(IntPtr hwnd)
         => IntPtr.Size == 8
@@ -191,5 +266,32 @@ public sealed class DashboardProcessSurface : HwndHost
     private static extern bool IsWindow(IntPtr hwnd);
 
     [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsChild(IntPtr parent, IntPtr child);
+
+    [DllImport("user32.dll")]
     private static extern IntPtr SetFocus(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetFocus();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetActiveWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
 }

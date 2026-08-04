@@ -1,3 +1,28 @@
+AtlasDesk v1.1.7 Dashboard input-focus hotfix
+
+This hotfix keeps the v1.1.6 process boundary and repairs the interaction boundary exposed by the first real-machine test. The dedicated DashboardHost rendered correctly, but SetParent alone did not transfer keyboard focus between the WPF and WinForms UI threads. Cloudflare Access could also navigate the main embedded Dashboard directly to GitHub sign-in, leaving AtlasDesk navigation visible beside a login page that could not receive input.
+
+Cross-process input bridge
+- DashboardProcessSurface temporarily joins the AtlasDesk and DashboardHost input queues with AttachThreadInput only while focus is transferred.
+- WM_PARENTNOTIFY mouse activation, WPF keyboard focus and Tab navigation all call the same bounded ActivateDashboardInput path.
+- The dedicated WinForms host handles WM_MOUSEACTIVATE and WM_SETFOCUS, then moves focus from its child Form into the actual WebView2 control.
+- A focus command remains available through the existing standard-input channel for integration verification and recovery.
+- The input queues are detached immediately after every transfer; WebView2 remains in AtlasDesk.DashboardHost.exe and process isolation is unchanged.
+
+Authentication window
+- Authentication navigation from the main Dashboard is cancelled before GitHub, Cloudflare Access, Google, Microsoft or Apple sign-in replaces the embedded Dashboard page.
+- Sign-in opens in a standalone authentication window using the same isolated WebView2 profile, so cookies and Access state remain shared with DashboardHost.
+- The login window is a real top-level resizable window with normal keyboard focus, taskbar behavior and close controls.
+- Returning to the configured Dashboard origin marks authentication complete, closes the login window and reloads Dashboard.
+- A manual close does not immediately reopen the login window or force a reload loop.
+- Ordinary GitHub repository links are no longer treated as authentication merely because their host is github.com.
+
+Candidate boundary
+- v1.1.7 is a focused interaction hotfix on top of the v1.1.6 crash-containment architecture.
+- No WebView2 control returns to the AtlasDesk primary process.
+- Project context, Zotero read-only behavior, Runtime/Data separation and terminal behavior are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.6 Dashboard process-isolation hotfix
 
 This hotfix changes the failure boundary instead of adding another in-process recovery layer. User logs showed that clicking a normal Dashboard page item could terminate AtlasDesk before .NET, WPF, CoreWebView2.ProcessFailed, BrowserProcessExited or MainWindow closing handlers could run. An operating-system process boundary is therefore the final protection mechanism.

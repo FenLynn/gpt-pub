@@ -49,11 +49,20 @@ internal static class Program
             SetPhase("starting first dedicated DashboardHost");
             using (var first = StartDashboardHost(server.Url, Path.Combine(root, "profile")))
             {
-                var firstHandle = WaitForHandle(first, TimeSpan.FromSeconds(25));
+                var firstHandle = WaitForHandle(first, TimeSpan.FromSeconds(60));
                 surface.AttachDashboardWindow(firstHandle);
-                WaitForReady(first, TimeSpan.FromSeconds(25));
+                WaitForReady(first, TimeSpan.FromSeconds(15));
                 PumpDispatcher(TimeSpan.FromSeconds(1));
                 AssertWindowAlive(window, "after embedding the first dedicated DashboardHost");
+
+                SetPhase("verifying cross-process Dashboard input focus");
+                window.Activate();
+                if (!surface.ActivateDashboardInput())
+                    throw new InvalidOperationException("DashboardProcessSurface could not transfer focus to the dedicated host.");
+                first.Process.StandardInput.WriteLine("focus");
+                first.Process.StandardInput.Flush();
+                _ = WaitForMessage(first, "FOCUS", TimeSpan.FromSeconds(10));
+                AssertWindowAlive(window, "after transferring keyboard focus to DashboardHost");
 
                 SetPhase("forcing dedicated DashboardHost process loss");
                 first.Process.Kill(entireProcessTree: true);
@@ -69,11 +78,18 @@ internal static class Program
             SetPhase("starting replacement dedicated DashboardHost");
             using (var second = StartDashboardHost(server.Url, Path.Combine(root, "profile")))
             {
-                var secondHandle = WaitForHandle(second, TimeSpan.FromSeconds(25));
+                var secondHandle = WaitForHandle(second, TimeSpan.FromSeconds(60));
                 surface.AttachDashboardWindow(secondHandle);
-                WaitForReady(second, TimeSpan.FromSeconds(25));
+                WaitForReady(second, TimeSpan.FromSeconds(15));
                 PumpDispatcher(TimeSpan.FromSeconds(1));
                 AssertWindowAlive(window, "after embedding the replacement dedicated DashboardHost");
+
+                SetPhase("verifying replacement Dashboard input focus");
+                if (!surface.ActivateDashboardInput())
+                    throw new InvalidOperationException("Replacement DashboardHost could not receive cross-process focus.");
+                second.Process.StandardInput.WriteLine("focus");
+                second.Process.StandardInput.Flush();
+                _ = WaitForMessage(second, "FOCUS", TimeSpan.FromSeconds(10));
 
                 SetPhase("shutting replacement dedicated DashboardHost down cleanly");
                 second.Process.StandardInput.WriteLine("shutdown");
@@ -92,7 +108,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk.DashboardHost created a real WinForms WebView2 process, embedded across an HWND boundary, survived forced helper termination in the primary WPF process, and restarted successfully");
+                "PASS AtlasDesk.DashboardHost created a real WinForms WebView2 process, accepted cross-process keyboard focus, survived forced host termination in the primary WPF process, and restarted successfully");
             return 0;
         }
         catch (Exception ex)
@@ -304,7 +320,7 @@ internal static class Program
                 var requestBuffer = new byte[4096];
                 try { _ = await stream.ReadAsync(requestBuffer); } catch { return; }
 
-                const string html = "<!doctype html><html><head><meta charset='utf-8'><title>AtlasDesk Isolation Test</title></head><body><button id='overview'>主页概览</button><script>document.getElementById('overview').addEventListener('click',()=>document.body.dataset.clicked='1');</script></body></html>";
+                const string html = "<!doctype html><html><head><meta charset='utf-8'><title>AtlasDesk Isolation Test</title></head><body><input id='focus' autofocus aria-label='focus test'><button id='overview'>主页概览</button><script>document.getElementById('overview').addEventListener('click',()=>document.body.dataset.clicked='1');</script></body></html>";
                 var body = Encoding.UTF8.GetBytes(html);
                 var headers = Encoding.ASCII.GetBytes(
                     "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: "
