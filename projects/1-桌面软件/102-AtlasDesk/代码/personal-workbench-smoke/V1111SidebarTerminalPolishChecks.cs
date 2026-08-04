@@ -98,7 +98,6 @@ internal static class V1111SidebarTerminalPolishChecks
             "AtlasDesk v1.1.11 sidebar and terminal visual polish",
             "project-context shortcut",
             "pure-black CMD terminal theme",
-            "SidebarTerminalVisualCoordinator",
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
