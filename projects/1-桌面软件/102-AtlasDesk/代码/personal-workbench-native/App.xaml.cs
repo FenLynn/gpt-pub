@@ -23,6 +23,20 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // The isolated Dashboard uses a second AtlasDesk.exe process. It must bypass
+        // StartupGuard, global shortcuts, the feature pipeline and MainWindow so a
+        // native WebView2 failure can never be counted as a primary-app crash.
+        if (DashboardHostLaunchOptions.TryParse(e.Args, out var dashboardHostOptions))
+        {
+            StartupUri = null;
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            base.OnStartup(e);
+            var host = new DashboardHostWindow(dashboardHostOptions);
+            MainWindow = host;
+            host.Show();
+            return;
+        }
+
         ProductIdentity.EnsureDataDirectories();
         LogMaintenance.Prepare(LogPath);
         ApplyPendingRestoreBeforeStartup();
