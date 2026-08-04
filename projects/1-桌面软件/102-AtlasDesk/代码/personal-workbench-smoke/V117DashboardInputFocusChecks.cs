@@ -27,7 +27,8 @@ internal static class V117DashboardInputFocusChecks
             "AttachThreadInput(currentThread, dashboardThread, false)",
             "WmParentNotify",
             "IsMouseButtonMessage",
-            "protected override bool TabInto",
+            "GotKeyboardFocus +=",
+            "PreviewMouseDown +=",
             "SetFocus(_dashboardHandle)",
             "DispatcherPriority.Input");
 
