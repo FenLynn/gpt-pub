@@ -67,11 +67,11 @@ internal static class V120ProjectCockpitChecks
             "IsVisibleChanged");
 
         RequireContains(store,
-            "%APPDATA%",
+            "App.AppDataDirectory",
             "productivity-context.json",
             "AtomicFileStore.WriteAllText");
         RequireContains(coordinator,
-            "Zotero SQLite access stays read-only",
+            "read-only Zotero project links",
             "context-run-command",
             "context-open-research");
 
