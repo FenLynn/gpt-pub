@@ -4,6 +4,7 @@ package main
 
 import (
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"mediaworkbench/internal/media"
@@ -24,6 +25,8 @@ var (
 	v452Round6TimelineInputHook    uintptr
 	v452Round6TimelineInputs       sync.Map // map[uintptr]*v452Round6TimelineInputState
 	v452Round6TimelineInstalled    sync.Map // map[uintptr]bool
+	v452Round6SeekEvents           atomic.Int32
+	v452Round6IndependentSeeks     atomic.Int32
 )
 
 func init() {
@@ -41,18 +44,23 @@ func init() {
 }
 
 func v452Round6TimelineInputEventProc(hook, event, hwnd, idObject, idChild, eventThread, eventTime uintptr) uintptr {
-	d := activeTrim
+	v452Round6InstallTimelineInput(activeTrim)
+	return 0
+}
+
+func v452Round6InstallTimelineInput(d *trimDialog) {
 	if d == nil || d.hTrack == 0 {
-		return 0
+		return
 	}
 	// Ensure the visual layer is present first, then place this input layer at
 	// the front of the subclass chain. The older fourth-round range-drag code
 	// therefore never receives timeline mouse-down messages.
 	v452Round6InstallTrimDialog(d)
 	if _, loaded := v452Round6TimelineInstalled.LoadOrStore(d.hTrack, true); !loaded {
-		v452SetWindowSubclass.Call(d.hTrack, v452Round6TimelineInputCB, v452Round6TimelineInputSubclassID, 0)
+		if ok, _, _ := v452SetWindowSubclass.Call(d.hTrack, v452Round6TimelineInputCB, v452Round6TimelineInputSubclassID, 0); ok == 0 {
+			v452Round6TimelineInstalled.Delete(d.hTrack)
+		}
 	}
-	return 0
 }
 
 func v452Round6TimelineInputStateFor(hwnd uintptr) *v452Round6TimelineInputState {
@@ -166,6 +174,12 @@ func v452Round6ApplyTimelineInput(d *trimDialog, drag *v452Round6TimelineInputSt
 	next = media.NormalizeTrimRange(d.task.Duration, d.safeFPS(), next)
 	generate := final && drag.hit == media.TrimTimelinePlayhead
 	v452WriteTrimRange(d, next, generate)
+	if final && drag.hit == media.TrimTimelinePlayhead {
+		v452Round6SeekEvents.Add(1)
+		if next.Start == drag.initial.Start && next.End == drag.initial.End && next.Playhead != drag.initial.Playhead {
+			v452Round6IndependentSeeks.Add(1)
+		}
+	}
 }
 
 func v452Round6AbsInt(value int) int {
