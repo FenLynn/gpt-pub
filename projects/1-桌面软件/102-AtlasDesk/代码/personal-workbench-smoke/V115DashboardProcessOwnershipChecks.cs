@@ -13,41 +13,11 @@ internal static class V115DashboardProcessOwnershipChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 5))
-            throw new InvalidOperationException("AtlasDesk Dashboard process-ownership hotfix must be v1.1.5.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 5))
+            throw new InvalidOperationException("AtlasDesk must not move below the v1.1.5 Dashboard process-ownership baseline.");
 
         var lifecycle = File.ReadAllText(RequireFile(nativeRoot, "DashboardLifecycleCoordinator.cs"));
         var releaseNotes = File.ReadAllText(RequireFile(nativeRoot, "RELEASE_NOTES.txt"));
-
-        RequireContains(lifecycle,
-            "using Microsoft.Web.WebView2.Core",
-            "ReplaceButtonElement",
-            "parent.Children.RemoveAt(index)",
-            "parent.Children.Insert(index, replacement)",
-            "DashboardClickGuardScript",
-            "now - lastAt < 900",
-            "atlasdesk-click|",
-            "Core_WebMessageReceived",
-            "Core_ProcessFailed",
-            "WebView2 process failure classified",
-            "WriteMainWindowField(\"_dashboardRecoveryInProgress\", true)",
-            "CoreWebView2ProcessFailedKind.GpuProcessExited",
-            "CoreWebView2ProcessFailedKind.UtilityProcessExited",
-            "CoreWebView2ProcessFailedKind.RenderProcessUnresponsive",
-            "CoreWebView2ProcessFailedKind.RenderProcessExited",
-            "CoreWebView2ProcessFailedKind.BrowserProcessExited",
-            "destructive rebuild skipped",
-            "RecoverRendererWithBoundedReloadAsync",
-            "10-second cooldown",
-            "Environment_BrowserProcessExited",
-            "FailureReportFolderPath",
-            "Dashboard command started",
-            "Dashboard command completed",
-            "controlled Dashboard recreation");
-
-        RequireAbsent(lifecycle,
-            "ReplaceClickHandler",
-            "button.Click -= legacyHandler");
 
         RequireContains(releaseNotes,
             "AtlasDesk v1.1.5 WebView2 process-ownership hotfix",
@@ -58,15 +28,40 @@ internal static class V115DashboardProcessOwnershipChecks
             "900 ms",
             "main remains the formal v1.0.0 baseline");
 
+        if (version == new Version(1, 1, 5))
+        {
+            RequireContains(lifecycle,
+                "DashboardClickGuardScript",
+                "Core_ProcessFailed",
+                "CoreWebView2ProcessFailedKind.GpuProcessExited",
+                "CoreWebView2ProcessFailedKind.RenderProcessUnresponsive",
+                "CoreWebView2ProcessFailedKind.BrowserProcessExited");
+        }
+        else
+        {
+            // v1.1.6 supersedes same-process failure handling with a dedicated
+            // WinForms executable. The v1.1.5 findings remain documented, but DOM
+            // injection and WebView2 ownership must not return to AtlasDesk.exe.
+            RequireContains(lifecycle,
+                "WebView2 moved to dedicated AtlasDesk.DashboardHost.exe process",
+                "DashboardProcessSurface",
+                "AtlasDesk.DashboardHost.exe");
+            RequireAbsent(lifecycle,
+                "DashboardClickGuardScript",
+                "AddScriptToExecuteOnDocumentCreatedAsync",
+                "Core_WebMessageReceived",
+                "--dashboard-host");
+        }
+
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.5 physically replaces legacy Dashboard buttons, classifies WebView2 failures and suppresses rapid web clicks");
+            "PASS AtlasDesk retains the v1.1.5 process-failure history while v1.1.6 moves active WebView2 ownership into AtlasDesk.DashboardHost.exe");
     }
 
     private static string RequireFile(string root, string fileName)
     {
         var path = Path.Combine(root, fileName);
         if (!File.Exists(path))
-            throw new InvalidOperationException("Missing v1.1.5 Dashboard process-ownership source: " + fileName);
+            throw new InvalidOperationException("Missing Dashboard process-ownership source: " + fileName);
         return path;
     }
 
@@ -75,7 +70,7 @@ internal static class V115DashboardProcessOwnershipChecks
         foreach (var token in tokens)
         {
             if (!source.Contains(token, StringComparison.Ordinal))
-                throw new InvalidOperationException("Missing v1.1.5 Dashboard process-ownership token: " + token);
+                throw new InvalidOperationException("Missing Dashboard process-ownership token: " + token);
         }
     }
 
@@ -84,7 +79,7 @@ internal static class V115DashboardProcessOwnershipChecks
         foreach (var token in tokens)
         {
             if (source.Contains(token, StringComparison.Ordinal))
-                throw new InvalidOperationException("Forbidden v1.1.5 Dashboard process-ownership token returned: " + token);
+                throw new InvalidOperationException("Forbidden in-process Dashboard token returned: " + token);
         }
     }
 
@@ -107,6 +102,6 @@ internal static class V115DashboardProcessOwnershipChecks
                 current = current.Parent;
             }
         }
-        throw new DirectoryNotFoundException("Unable to locate AtlasDesk v1.1.5 sources.");
+        throw new DirectoryNotFoundException("Unable to locate AtlasDesk sources.");
     }
 }
