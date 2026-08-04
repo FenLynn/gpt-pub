@@ -2,7 +2,6 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using System.Diagnostics;
 using System.Reflection;
-using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -12,14 +11,14 @@ using System.Windows.Threading;
 namespace PersonalWorkbench;
 
 /// <summary>
-/// Keeps all Dashboard WebView2 and page code in a second AtlasDesk.exe process.
+/// Keeps all Dashboard WebView2 and page code in AtlasDesk.DashboardHost.exe.
 /// The primary process owns only a native child-window surface, command pipe and
 /// restart UI, so a native browser/control crash cannot terminate AtlasDesk.
 /// </summary>
 public sealed class DashboardLifecycleCoordinator : IDisposable
 {
     private static readonly BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
-    private static readonly TimeSpan HostReadyTimeout = TimeSpan.FromSeconds(18);
+    private static readonly TimeSpan HostReadyTimeout = TimeSpan.FromSeconds(25);
     private const string IsolatedProfileFolderName = "WebView2-Isolated";
 
     private readonly MainWindow _window;
@@ -53,7 +52,7 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         _window.LayoutUpdated += Window_LayoutUpdated;
         _window.Closed += Window_Closed;
 
-        App.Log("Dashboard lifecycle coordinator v1.1.6 attached; WebView2 moved to isolated AtlasDesk process");
+        App.Log("Dashboard lifecycle coordinator v1.1.6 attached; WebView2 moved to dedicated AtlasDesk.DashboardHost.exe process");
     }
 
     public static DashboardLifecycleCoordinator Attach(MainWindow window, ShellResilienceCoordinator shell)
@@ -182,8 +181,6 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
             ReplaceBrowserButton(browserControls, "Dashboard 首页", Home_Click);
         }
 
-        // The historical pop-out path creates another in-process WebView2. Hide it
-        // while the isolated host owns Dashboard rendering.
         if (_window.FindName("PopoutButton") is FrameworkElement popout)
             popout.Visibility = Visibility.Collapsed;
     }
@@ -284,11 +281,11 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         {
             await process.StandardInput.WriteLineAsync(command);
             await process.StandardInput.FlushAsync();
-            App.Log("Isolated Dashboard command sent: " + command);
+            App.Log("Dedicated DashboardHost command sent: " + command);
         }
         catch (Exception ex)
         {
-            App.Log("Isolated Dashboard command channel failed: " + ex);
+            App.Log("Dedicated DashboardHost command channel failed: " + ex);
             ShowStatus("Dashboard 独立进程通信失败。AtlasDesk 主窗口仍正常。", allowRestart: true);
         }
     }
@@ -326,11 +323,14 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
 
         try
         {
-            var executable = Environment.ProcessPath;
-            if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable))
-                executable = Path.Combine(App.RuntimeDirectory, "AtlasDesk.exe");
+            var hostDirectory = Path.Combine(App.RuntimeDirectory, "DashboardHost");
+            var executable = Path.Combine(hostDirectory, "AtlasDesk.DashboardHost.exe");
             if (!File.Exists(executable))
-                throw new FileNotFoundException("AtlasDesk.exe 不存在，无法启动独立 Dashboard。", executable);
+            {
+                throw new FileNotFoundException(
+                    "AtlasDesk.DashboardHost.exe 不存在，无法启动独立 Dashboard。",
+                    executable);
+            }
 
             var profile = Path.Combine(App.LocalDataDirectory, IsolatedProfileFolderName);
             Directory.CreateDirectory(profile);
@@ -342,9 +342,8 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
-                WorkingDirectory = App.RuntimeDirectory
+                WorkingDirectory = hostDirectory
             };
-            startInfo.ArgumentList.Add("--dashboard-host");
             startInfo.ArgumentList.Add("--dashboard-url");
             startInfo.ArgumentList.Add(dashboardUrl);
             startInfo.ArgumentList.Add("--dashboard-profile");
@@ -366,13 +365,13 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
             _lastStartUtc = DateTimeOffset.UtcNow;
             _stopping = false;
             if (!process.Start())
-                throw new InvalidOperationException("DashboardHost 进程未能启动。");
+                throw new InvalidOperationException("AtlasDesk.DashboardHost 进程未能启动。");
 
             _process = process;
             process.StandardInput.AutoFlush = true;
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            App.Log($"Isolated DashboardHost started: pid={process.Id}; profile={profile}; url={dashboardUrl}");
+            App.Log($"Dedicated DashboardHost started: pid={process.Id}; profile={profile}; url={dashboardUrl}");
 
             var dashboardHandle = await _windowHandleSource.Task.WaitAsync(HostReadyTimeout);
             var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
@@ -384,12 +383,12 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
             _surface.AttachDashboardWindow(dashboardHandle);
             HideStatus();
             SetProgressVisible(false);
-            App.Log($"Isolated DashboardHost embedded: pid={process.Id}; hwnd={dashboardHandle}");
+            App.Log($"Dedicated DashboardHost embedded: pid={process.Id}; hwnd={dashboardHandle}");
             return true;
         }
         catch (Exception ex)
         {
-            App.Log("Starting isolated DashboardHost failed: " + ex);
+            App.Log("Starting dedicated DashboardHost failed: " + ex);
             StopHost(graceful: false);
             ShowStatus("独立 Dashboard 启动失败，但 AtlasDesk 主窗口仍正常。\n\n" + ex.Message, allowRestart: true);
             SetProgressVisible(false);
@@ -399,7 +398,7 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
 
     private async Task RestartHostAsync(string reason)
     {
-        App.Log("Restarting isolated DashboardHost: " + reason);
+        App.Log("Restarting dedicated DashboardHost: " + reason);
         StopHost(graceful: true);
         await Task.Delay(250);
         await EnsureHostRunningAsync();
@@ -411,7 +410,8 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
             return;
         var line = e.Data;
         var parts = line.Split('|', 3);
-        if (parts.Length != 3 || !string.Equals(parts[0], DashboardHostWindow.ProtocolPrefix, StringComparison.Ordinal))
+        if (parts.Length != 3
+            || !string.Equals(parts[0], DashboardHostProtocol.Prefix, StringComparison.Ordinal))
         {
             App.Log("DashboardHost output: " + line);
             return;
@@ -426,15 +426,15 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
                     _windowHandleSource?.TrySetResult(new IntPtr(rawHandle));
                 break;
             case "READY":
-                App.Log("Isolated DashboardHost reported ready");
+                App.Log("Dedicated DashboardHost reported ready");
                 break;
             case "LOG":
-                App.Log("DashboardHost: " + Decode(payload));
+                App.Log("DashboardHost: " + DashboardHostProtocol.Decode(payload));
                 break;
             case "ERROR":
             case "COMMANDERROR":
             case "PROCESSFAILED":
-                App.Log("DashboardHost " + kind + ": " + Decode(payload));
+                App.Log("DashboardHost " + kind + ": " + DashboardHostProtocol.Decode(payload));
                 break;
             case "NAVSTART":
                 _window.Dispatcher.BeginInvoke(new Action(() => SetProgressVisible(true)));
@@ -443,7 +443,7 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
                 _window.Dispatcher.BeginInvoke(new Action(() => SetProgressVisible(false)));
                 break;
             case "TITLE":
-                var title = Decode(payload);
+                var title = DashboardHostProtocol.Decode(payload);
                 _window.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (_window.FindName("PageTitle") is TextBlock pageTitle && !string.IsNullOrWhiteSpace(title))
@@ -451,7 +451,7 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
                 }));
                 break;
             case "SOURCE":
-                var source = Decode(payload);
+                var source = DashboardHostProtocol.Decode(payload);
                 _window.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (_window.FindName("PageSubtitle") is TextBlock subtitle
@@ -484,14 +484,15 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
 
             _surface.DetachDashboardWindow();
             _process = null;
-            _windowHandleSource?.TrySetException(new InvalidOperationException("DashboardHost exited before supplying a window handle."));
+            _windowHandleSource?.TrySetException(
+                new InvalidOperationException("DashboardHost exited before supplying a window handle."));
             _windowHandleSource = null;
             SetProgressVisible(false);
 
             if (_disposed || _stopping)
                 return;
 
-            App.Log($"Isolated DashboardHost exited unexpectedly: code={exitCode}; runtimeMs={runtime.TotalMilliseconds:0}");
+            App.Log($"Dedicated DashboardHost exited unexpectedly: code={exitCode}; runtimeMs={runtime.TotalMilliseconds:0}");
             ShowStatus(
                 "Dashboard 独立进程已退出，AtlasDesk 主窗口和其他页面未受影响。\n\n退出码：" + exitCode,
                 allowRestart: true);
@@ -505,7 +506,7 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
                 && _window.FindName("DashboardView") is FrameworkElement dashboardView
                 && dashboardView.IsVisible)
             {
-                App.Log("Attempting one automatic isolated DashboardHost restart");
+                App.Log("Attempting one automatic dedicated DashboardHost restart");
                 await Task.Delay(900);
                 await EnsureHostRunningAsync();
             }
@@ -540,7 +541,7 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         }
         catch (Exception ex)
         {
-            App.Log("Stopping isolated DashboardHost failed: " + ex.Message);
+            App.Log("Stopping dedicated DashboardHost failed: " + ex.Message);
         }
         finally
         {
@@ -593,12 +594,6 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
     {
         try { return process.ExitCode; }
         catch { return int.MinValue; }
-    }
-
-    private static string Decode(string payload)
-    {
-        try { return Encoding.UTF8.GetString(Convert.FromBase64String(payload)); }
-        catch { return payload; }
     }
 
     private T? ReadMainWindowField<T>(string fieldName)
