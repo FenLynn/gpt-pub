@@ -29,6 +29,7 @@ func TestV452Round4TrimEditorSourceContracts(t *testing.T) {
 		"v452TrimPreviewMouseDown",
 		"v452ReleaseTrimState",
 		"v452RemoveSubclass.Call",
+		"WM_CTLCOLORSTATIC",
 	)
 	for _, forbidden := range []string{"time.NewTicker", "go func(", "for {"} {
 		if strings.Contains(hook, forbidden) {
@@ -43,7 +44,6 @@ func TestV452Round4TrimEditorSourceContracts(t *testing.T) {
 		"media.ResizeCrop",
 		"media.DragCropWithAspect",
 		"v452PaintCropHandles",
-		"WM_CTLCOLORSTATIC",
 	)
 
 	v452RequireRound4Source(t, "../../internal/media/crop_interaction.go",
