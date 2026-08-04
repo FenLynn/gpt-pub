@@ -9,6 +9,12 @@
 
     <Message Importance="high" Text="Publishing dedicated AtlasDesk DashboardHost to $(DashboardHostPublishDirectory)" />
     <Exec Command="dotnet publish &quot;$(DashboardHostProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false -o &quot;$(DashboardHostPublishDirectory)&quot;" />
+
+    <ItemGroup>
+      <DashboardHostDocumentationXml Include="$(DashboardHostPublishDirectory)**\*.xml" />
+    </ItemGroup>
+    <Delete Files="@(DashboardHostDocumentationXml)" />
+
     <Error Condition="!Exists('$(DashboardHostPublishDirectory)AtlasDesk.DashboardHost.exe')"
            Text="Dedicated DashboardHost publish output is missing: $(DashboardHostPublishDirectory)AtlasDesk.DashboardHost.exe" />
   </Target>
