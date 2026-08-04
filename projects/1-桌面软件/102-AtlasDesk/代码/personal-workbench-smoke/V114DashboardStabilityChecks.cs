@@ -43,14 +43,15 @@ internal static class V114DashboardStabilityChecks
         }
         else
         {
-            // v1.1.6 keeps the v1.1.4 lessons—no shell activation/watchdog race
-            // and no direct primary-process refresh—but moves the command and retry
-            // boundary into a separate DashboardHost process.
+            // v1.1.6 retains the v1.1.4 lessons—no shell activation/watchdog race
+            // and no direct primary-process refresh—but moves commands and restart
+            // into the dedicated WinForms DashboardHost process.
             RequireContains(lifecycle,
                 "ReplaceBrowserButton(browserControls, \"刷新\", Refresh_Click)",
                 "SendCommandAsync(\"reload\")",
                 "重新启动 Dashboard",
-                "WebView2 moved to isolated AtlasDesk process");
+                "WebView2 moved to dedicated AtlasDesk.DashboardHost.exe process",
+                "AtlasDesk.DashboardHost.exe");
         }
 
         RequireContains(pipeline,
@@ -82,7 +83,7 @@ internal static class V114DashboardStabilityChecks
             "private async void DashboardHome_Click");
 
         Console.WriteLine(
-            "PASS AtlasDesk retains the v1.1.4 retired-shell-recovery baseline while allowing v1.1.6 to move Dashboard commands across a process boundary");
+            "PASS AtlasDesk retains the v1.1.4 retired-shell-recovery baseline while v1.1.6 moves Dashboard commands into a dedicated WinForms process");
     }
 
     private static string RequireFile(string root, string fileName)
