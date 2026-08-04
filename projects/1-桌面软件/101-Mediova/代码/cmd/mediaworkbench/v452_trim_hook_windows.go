@@ -27,18 +27,23 @@ type v452TrimInstallState struct {
 }
 
 var (
-	v452SetWinEventHook       = user32.NewProc("SetWinEventHook")
-	v452GetDC                 = user32.NewProc("GetDC")
-	v452ReleaseDC             = user32.NewProc("ReleaseDC")
-	v452TrimWinEventCB        = syscall.NewCallback(v452TrimWinEventProc)
-	v452TrimDialogSubclassCB  = syscall.NewCallback(v452TrimDialogSubclassProc)
-	v452TrimTrackSubclassCB   = syscall.NewCallback(v452TrimTrackSubclassProc)
-	v452TrimPreviewSubclassCB = syscall.NewCallback(v452TrimPreviewSubclassProc)
+	v452SetWinEventHook = user32.NewProc("SetWinEventHook")
+	v452GetDC           = user32.NewProc("GetDC")
+	v452ReleaseDC       = user32.NewProc("ReleaseDC")
+
+	v452TrimWinEventCB        uintptr
+	v452TrimDialogSubclassCB  uintptr
+	v452TrimTrackSubclassCB   uintptr
+	v452TrimPreviewSubclassCB uintptr
 	v452TrimWinEventHook      uintptr
 	v452TrimInstallStates     sync.Map // map[*trimDialog]*v452TrimInstallState
 )
 
 func init() {
+	v452TrimWinEventCB = syscall.NewCallback(v452TrimWinEventProc)
+	v452TrimDialogSubclassCB = syscall.NewCallback(v452TrimDialogSubclassProc)
+	v452TrimTrackSubclassCB = syscall.NewCallback(v452TrimTrackSubclassProc)
+	v452TrimPreviewSubclassCB = syscall.NewCallback(v452TrimPreviewSubclassProc)
 	v452TrimWinEventHook, _, _ = v452SetWinEventHook.Call(
 		v452EventObjectCreate,
 		v452EventObjectShow,
