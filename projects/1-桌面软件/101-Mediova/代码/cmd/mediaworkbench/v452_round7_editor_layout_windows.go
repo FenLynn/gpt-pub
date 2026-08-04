@@ -7,13 +7,14 @@ import (
 	"sync"
 	"syscall"
 	"unsafe"
+
+	"mediaworkbench/internal/model"
 )
 
 var (
 	round7LayoutEventCB   uintptr
 	round7LayoutHook      uintptr
 	round7LayoutApplied   sync.Map // map[uintptr]bool
-	round7LayoutUnhook    = user32.NewProc("UnhookWinEvent")
 )
 
 func init() {
