@@ -6,7 +6,7 @@
             <Setter Property="Height" Value="30"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Margin" Value="0,0,7,0"/>
+            <Setter Property="Margin" Value="0,0,7,6"/>
             <Setter Property="FontSize" Value="11.4"/>
         </Style>
         <Style x:Key="HomeStatusCell" TargetType="Border">
@@ -32,104 +32,111 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <Grid Margin="18,14,18,18" MinWidth="680">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="10"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="10"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="20"/>
-                    <ColumnDefinition Width="300"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock x:Name="GreetingText" Text="早上好，Fenlynn" FontSize="18" FontWeight="SemiBold" Foreground="#1D2B3E"/>
-                    <TextBlock x:Name="DateText" Text="今天" FontSize="10.5" Foreground="#7A8798" Margin="0,3,0,0"/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="当前工作区" FontSize="9.8" Foreground="#8A96A6"/>
-                    <TextBlock x:Name="WorkspaceNameText" Text="尚未配置" FontSize="13" FontWeight="SemiBold" Foreground="#304157" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock x:Name="WorkspacePathText" Text="在设置中选择目录" FontSize="9.8" Foreground="#7E8B9C" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                </StackPanel>
-            </Grid>
-
-            <Border Grid.Row="2" Background="#F7F9FC" BorderBrush="#E5EAF1" BorderThickness="1" CornerRadius="10" Padding="10,8">
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="工作区" Style="{StaticResource HomeActionButton}" Click="OpenWorkspace_Click"/>
-                    <Button Content="Dashboard" Style="{StaticResource HomeActionButton}" Click="OpenDashboard_Click"/>
-                    <Button Content="资料库" Style="{StaticResource HomeActionButton}" Click="OpenLibrary_Click"/>
-                    <Button Content="开发" Style="{StaticResource HomeActionButton}" Click="OpenDevelopment_Click"/>
-                    <Button Content="终端" Style="{StaticResource HomeActionButton}" Click="OpenTerminal_Click"/>
-                    <Button Content="全局搜索" Style="{StaticResource HomeActionButton}" Click="GlobalSearch_Click"/>
-                </StackPanel>
-            </Border>
-
-            <Grid Grid.Row="4">
+        <Border x:Name="HomeLayoutFrame" Background="Transparent">
+            <Grid x:Name="HomeLayoutRoot" Margin="18,14,18,18" MinWidth="0">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <UniformGrid Columns="4">
-                    <Border Style="{StaticResource HomeStatusCell}">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="24" Height="24" CornerRadius="7" Background="#EEF3FA"><TextBlock Text="D" Foreground="#4A6F9E" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <StackPanel Grid.Column="1"><TextBlock Text="DASHBOARD" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="DashboardValue" Text="未配置" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock x:Name="DashboardDetail" Text="Cloudflare Pages" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource HomeStatusCell}">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="24" Height="24" CornerRadius="7" Background="#F1EFF8"><TextBlock Text="Z" Foreground="#6E61A7" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <StackPanel Grid.Column="1"><TextBlock Text="ZOTERO" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="ZoteroValue" Text="未连接" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock x:Name="ZoteroDetail" Text="只读文献库" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource HomeStatusCell}">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="24" Height="24" CornerRadius="7" Background="#EDF5F2"><TextBlock Text="P" Foreground="#397E69" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <StackPanel Grid.Column="1"><TextBlock Text="PROJECTS" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="PythonValue" Text="尚无常用项目" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="PythonDetail" Text="项目状态" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource HomeStatusCell}" Margin="0">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="24" Height="24" CornerRadius="7" Background="#F7F1EA"><TextBlock Text="T" Foreground="#9A6A3A" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <StackPanel Grid.Column="1"><TextBlock Text="TASKS" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="WorkspaceValue" Text="尚无任务" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="WorkspaceDetail" Text="工具与任务共用历史" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
-                        </Grid>
-                    </Border>
-                </UniformGrid>
+                <Grid x:Name="HomeHeaderGrid" Grid.Row="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition x:Name="HeaderVerticalSpacer" Height="0"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition x:Name="HeaderHorizontalSpacer" Width="20"/>
+                        <ColumnDefinition x:Name="WorkspaceSummaryColumn" Width="300"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="GreetingText" Text="早上好，Fenlynn" FontSize="18" FontWeight="SemiBold" Foreground="#1D2B3E"/>
+                        <TextBlock x:Name="DateText" Text="今天" FontSize="10.5" Foreground="#7A8798" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <StackPanel x:Name="WorkspaceSummary" Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="当前工作区" FontSize="9.8" Foreground="#8A96A6"/>
+                        <TextBlock x:Name="WorkspaceNameText" Text="尚未配置" FontSize="13" FontWeight="SemiBold" Foreground="#304157" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="WorkspacePathText" Text="在设置中选择目录" FontSize="9.8" Foreground="#7E8B9C" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </StackPanel>
+                </Grid>
 
-                <Border Grid.Row="2" Background="White" BorderBrush="#E4E9F0" BorderThickness="1" CornerRadius="10" Padding="12,10" MinHeight="150">
-                    <Grid>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <Grid>
-                            <TextBlock Text="最近工作" FontSize="12.8" FontWeight="SemiBold" Foreground="#304157"/>
-                            <Button Content="查看工作区" Style="{StaticResource TextButton}" HorizontalAlignment="Right" Click="OpenWorkspace_Click"/>
-                        </Grid>
-                        <ItemsControl x:Name="RecentFilesList" Grid.Row="1" Margin="0,7,0,0">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource HomeRecentRow}" Cursor="Hand" MouseLeftButtonUp="RecentFile_Click" ToolTip="{Binding FullPath}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="27"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <Border Width="21" Height="21" CornerRadius="6" Background="#F0F3F7"><TextBlock Text="•" FontSize="14" Foreground="#627A99" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                                            <StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" FontSize="11.3" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding DirectoryName}" FontSize="9.3" Foreground="#8A97A7" TextTrimming="CharacterEllipsis"/></StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
+                <Border Grid.Row="2" Background="#F7F9FC" BorderBrush="#E5EAF1" BorderThickness="1" CornerRadius="10" Padding="10,8,3,2">
+                    <WrapPanel x:Name="HomeActionPanel">
+                        <Button Content="工作区" Style="{StaticResource HomeActionButton}" Click="OpenWorkspace_Click"/>
+                        <Button Content="Dashboard" Style="{StaticResource HomeActionButton}" Click="OpenDashboard_Click"/>
+                        <Button Content="资料库" Style="{StaticResource HomeActionButton}" Click="OpenLibrary_Click"/>
+                        <Button Content="开发" Style="{StaticResource HomeActionButton}" Click="OpenDevelopment_Click"/>
+                        <Button Content="终端" Style="{StaticResource HomeActionButton}" Click="OpenTerminal_Click"/>
+                        <Button Content="全局搜索" Style="{StaticResource HomeActionButton}" Click="GlobalSearch_Click"/>
+                    </WrapPanel>
                 </Border>
+
+                <Grid Grid.Row="4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <UniformGrid x:Name="StatusGrid" Columns="4">
+                        <Border Style="{StaticResource HomeStatusCell}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="7" Background="#EEF3FA"><TextBlock Text="D" Foreground="#4A6F9E" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <StackPanel Grid.Column="1"><TextBlock Text="DASHBOARD" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="DashboardValue" Text="未配置" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock x:Name="DashboardDetail" Text="Cloudflare Pages" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource HomeStatusCell}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="7" Background="#F1EFF8"><TextBlock Text="Z" Foreground="#6E61A7" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <StackPanel Grid.Column="1"><TextBlock Text="ZOTERO" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="ZoteroValue" Text="未连接" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock x:Name="ZoteroDetail" Text="只读文献库" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource HomeStatusCell}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="7" Background="#EDF5F2"><TextBlock Text="P" Foreground="#397E69" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <StackPanel Grid.Column="1"><TextBlock Text="PROJECTS" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="PythonValue" Text="尚无常用项目" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="PythonDetail" Text="项目状态" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource HomeStatusCell}" Margin="0">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="31"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="7" Background="#F7F1EA"><TextBlock Text="T" Foreground="#9A6A3A" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <StackPanel Grid.Column="1"><TextBlock Text="TASKS" FontSize="8.9" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="WorkspaceValue" Text="尚无任务" FontSize="12.2" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="WorkspaceDetail" Text="工具与任务共用历史" FontSize="9.2" Foreground="#8995A5" TextTrimming="CharacterEllipsis"/></StackPanel>
+                            </Grid>
+                        </Border>
+                    </UniformGrid>
+
+                    <Border x:Name="RecentWorkCard" Grid.Row="2" Background="White" BorderBrush="#E4E9F0" BorderThickness="1" CornerRadius="10" Padding="12,10" MinHeight="150">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Grid>
+                                <TextBlock Text="最近工作" FontSize="12.8" FontWeight="SemiBold" Foreground="#304157"/>
+                                <Button Content="查看工作区" Style="{StaticResource TextButton}" HorizontalAlignment="Right" Click="OpenWorkspace_Click"/>
+                            </Grid>
+                            <ItemsControl x:Name="RecentFilesList" Grid.Row="1" Margin="0,7,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource HomeRecentRow}" Cursor="Hand" MouseLeftButtonUp="RecentFile_Click" ToolTip="{Binding FullPath}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="27"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <Border Width="21" Height="21" CornerRadius="6" Background="#F0F3F7"><TextBlock Text="•" FontSize="14" Foreground="#627A99" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                                <StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" FontSize="11.3" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding DirectoryName}" FontSize="9.3" Foreground="#8A97A7" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
-        </Grid>
+        </Border>
     </ScrollViewer>
 </UserControl>
