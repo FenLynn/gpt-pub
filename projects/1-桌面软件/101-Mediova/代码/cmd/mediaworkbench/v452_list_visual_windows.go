@@ -38,6 +38,7 @@ func v452InstallListVisuals(a *application) {
 	v452ListApps.Store(a.hList, a)
 	v452SetWindowSubclass.Call(a.hList, v452ListSubclassCB, 1, 0)
 	v452ShowScrollBar.Call(a.hList, v452SBBoth, 0)
+	v452InstallImportFeedback(a)
 	for _, hwnd := range []uintptr{
 		a.hOutputEdit,
 		a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation,

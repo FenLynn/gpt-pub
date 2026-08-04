@@ -156,6 +156,8 @@ func ResolveOutputPathAvoiding(input, root, outputDir string, kind model.Kind, o
 			base += "_" + sanitizeSuffix(opts.ImageSize)
 		}
 	}
+	root, outputPrefix := ResolveRootContext(input, root, settings.LastInputDir)
+	outputDir = OutputRootWithPrefix(outputDir, outputPrefix)
 	dir := outputDir
 	if root != "" {
 		rel, e := filepath.Rel(root, filepath.Dir(input))
@@ -234,6 +236,8 @@ func PreserveTimes(src, dst string) error { return preserveTimesPlatform(src, ds
 // restored parent directory. Root itself is excluded because it is the parent
 // of the user-selected top-level folder.
 func PreserveOutputTreeTimes(input, root, outputRoot string) error {
+	root, outputPrefix := DecodeRootContext(root)
+	outputRoot = OutputRootWithPrefix(outputRoot, outputPrefix)
 	if strings.TrimSpace(root) == "" || strings.TrimSpace(outputRoot) == "" {
 		return nil
 	}
