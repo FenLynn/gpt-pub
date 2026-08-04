@@ -5,27 +5,29 @@ package main
 import (
 	"path/filepath"
 	"syscall"
-	"unsafe"
+
+	"mediaworkbench/internal/media"
+	"mediaworkbench/internal/model"
 )
 
 const (
-	v452EventObjectCreate   = 0x8000
-	v452EventObjectShow     = 0x8002
-	v452WineventOutofcontext = 0x0000
+	v452EventObjectCreate     = 0x8000
+	v452EventObjectShow       = 0x8002
+	v452WineventOutofcontext  = 0x0000
 	v452TrimDialogSubclassID  = 0x4541
 	v452TrimTrackSubclassID   = 0x4542
 	v452TrimPreviewSubclassID = 0x4543
 )
 
 var (
-	v452SetWinEventHook        = user32.NewProc("SetWinEventHook")
-	v452GetDC                  = user32.NewProc("GetDC")
-	v452ReleaseDC              = user32.NewProc("ReleaseDC")
-	v452TrimWinEventCB         = syscall.NewCallback(v452TrimWinEventProc)
-	v452TrimDialogSubclassCB   = syscall.NewCallback(v452TrimDialogSubclassProc)
-	v452TrimTrackSubclassCB    = syscall.NewCallback(v452TrimTrackSubclassProc)
-	v452TrimPreviewSubclassCB  = syscall.NewCallback(v452TrimPreviewSubclassProc)
-	v452TrimWinEventHook       uintptr
+	v452SetWinEventHook       = user32.NewProc("SetWinEventHook")
+	v452GetDC                 = user32.NewProc("GetDC")
+	v452ReleaseDC             = user32.NewProc("ReleaseDC")
+	v452TrimWinEventCB        = syscall.NewCallback(v452TrimWinEventProc)
+	v452TrimDialogSubclassCB  = syscall.NewCallback(v452TrimDialogSubclassProc)
+	v452TrimTrackSubclassCB   = syscall.NewCallback(v452TrimTrackSubclassProc)
+	v452TrimPreviewSubclassCB = syscall.NewCallback(v452TrimPreviewSubclassProc)
+	v452TrimWinEventHook      uintptr
 )
 
 func init() {
@@ -107,7 +109,7 @@ func v452TrimTrackSubclassProc(hwnd uintptr, message uint32, wParam, lParam, sub
 	case WM_ERASEBKGND:
 		return 1
 	case WM_LBUTTONDOWN:
-		if d.task.Kind == "image" || d.task.Duration <= 0 {
+		if d.task.Kind == model.KindImage || d.task.Duration <= 0 {
 			return 0
 		}
 		_, left, right := v452TrimTimelineGeometry(hwnd)
@@ -188,5 +190,3 @@ func v452TrimPreviewSubclassProc(hwnd uintptr, message uint32, wParam, lParam, s
 	}
 	return result
 }
-
-var _ = unsafe.Pointer(nil)
