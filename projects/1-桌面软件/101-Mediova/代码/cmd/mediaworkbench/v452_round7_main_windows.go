@@ -408,6 +408,7 @@ func round7BuildLampPixels(diameter int, lamp, back uintptr) []byte {
 					if dx*dx+dy*dy <= radius*radius {
 						inside++
 					}
+				}
 			}
 			coverage := float64(inside) / float64(samples*samples)
 			dx := (float64(px) - center) / radius
