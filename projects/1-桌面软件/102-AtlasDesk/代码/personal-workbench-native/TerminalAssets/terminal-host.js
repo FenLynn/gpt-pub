@@ -12,15 +12,15 @@
     allowTransparency: false,
     rightClickSelectsWord: false,
     theme: {
-      background: '#0d1320',
-      foreground: '#dce6f5',
-      cursor: '#7da8ff',
-      cursorAccent: '#0d1320',
-      selectionBackground: '#355a8f99',
-      black: '#1a2230', red: '#ff6b7a', green: '#6fdc8c', yellow: '#ffd166',
-      blue: '#6da8ff', magenta: '#c792ea', cyan: '#5fd7e5', white: '#dce6f5',
-      brightBlack: '#617087', brightRed: '#ff8793', brightGreen: '#8be8a2', brightYellow: '#ffe08a',
-      brightBlue: '#8bbcff', brightMagenta: '#d8a7f3', brightCyan: '#83e4ee', brightWhite: '#ffffff'
+      background: '#000000',
+      foreground: '#f2f2f2',
+      cursor: '#ffffff',
+      cursorAccent: '#000000',
+      selectionBackground: '#66666680',
+      black: '#000000', red: '#800000', green: '#008000', yellow: '#808000',
+      blue: '#000080', magenta: '#800080', cyan: '#008080', white: '#c0c0c0',
+      brightBlack: '#808080', brightRed: '#ff5555', brightGreen: '#55ff55', brightYellow: '#ffff55',
+      brightBlue: '#5555ff', brightMagenta: '#ff55ff', brightCyan: '#55ffff', brightWhite: '#ffffff'
     }
   });
   const fitAddon = new FitAddon.FitAddon();
