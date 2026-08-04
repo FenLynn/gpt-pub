@@ -187,19 +187,6 @@ func UnrotateCropRect(frameW, frameH int, crop model.Crop, degrees int) model.Cr
 	return RotateCropRect(rotatedW, rotatedH, crop, 360-degrees)
 }
 
-func normalizeRotation(degrees int) int {
-	degrees %= 360
-	if degrees < 0 {
-		degrees += 360
-	}
-	switch degrees {
-	case 90, 180, 270:
-		return degrees
-	default:
-		return 0
-	}
-}
-
 func clampInt(value, minimum, maximum int) int {
 	if maximum < minimum {
 		maximum = minimum
