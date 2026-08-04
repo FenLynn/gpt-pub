@@ -14,8 +14,8 @@ internal static class V116DashboardProcessIsolationChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 6))
-            throw new InvalidOperationException("AtlasDesk Dashboard process-isolation candidate must be v1.1.6.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 6))
+            throw new InvalidOperationException("AtlasDesk must not move below the v1.1.6 Dashboard process-isolation baseline.");
 
         var appXaml = File.ReadAllText(RequireFile(nativeRoot, "App.xaml"));
         var app = File.ReadAllText(RequireFile(nativeRoot, "App.xaml.cs"));
@@ -133,7 +133,7 @@ internal static class V116DashboardProcessIsolationChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.6 restores the primary WPF startup, moves WebView2 into a dedicated WinForms executable, initializes it before HWND handoff and keeps the host restartable");
+            "PASS AtlasDesk retains the v1.1.6 dedicated Dashboard process-isolation baseline");
     }
 
     private static string RequireFile(string root, string fileName)
