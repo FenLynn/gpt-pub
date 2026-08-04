@@ -4,6 +4,7 @@ package main
 
 import (
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"mediaworkbench/internal/media"
@@ -19,6 +20,12 @@ const (
 	v452TrimPreviewSubclassID = 0x4543
 )
 
+type v452TrimInstallState struct {
+	dialogInstalled  bool
+	trackInstalled   bool
+	previewInstalled bool
+}
+
 var (
 	v452SetWinEventHook       = user32.NewProc("SetWinEventHook")
 	v452GetDC                 = user32.NewProc("GetDC")
@@ -28,6 +35,7 @@ var (
 	v452TrimTrackSubclassCB   = syscall.NewCallback(v452TrimTrackSubclassProc)
 	v452TrimPreviewSubclassCB = syscall.NewCallback(v452TrimPreviewSubclassProc)
 	v452TrimWinEventHook      uintptr
+	v452TrimInstallStates     sync.Map // map[*trimDialog]*v452TrimInstallState
 )
 
 func init() {
@@ -42,6 +50,15 @@ func init() {
 	)
 }
 
+func v452TrimInstallStateFor(d *trimDialog) *v452TrimInstallState {
+	if value, ok := v452TrimInstallStates.Load(d); ok {
+		return value.(*v452TrimInstallState)
+	}
+	state := &v452TrimInstallState{}
+	actual, _ := v452TrimInstallStates.LoadOrStore(d, state)
+	return actual.(*v452TrimInstallState)
+}
+
 func v452TrimWinEventProc(hook, event, hwnd, idObject, idChild, eventThread, eventTime uintptr) uintptr {
 	if d := activeTrim; d != nil && hwnd != 0 {
 		v452TryInstallTrimEditor(d)
@@ -53,7 +70,7 @@ func v452TryInstallTrimEditor(d *trimDialog) {
 	if d == nil {
 		return
 	}
-	state := v452TrimStateFor(d)
+	state := v452TrimInstallStateFor(d)
 	if d.hwnd != 0 && !state.dialogInstalled {
 		state.dialogInstalled = true
 		setText(d.hwnd, "裁剪 · "+filepath.Base(d.task.Input))
@@ -91,6 +108,7 @@ func v452TrimDialogSubclassProc(hwnd uintptr, message uint32, wParam, lParam, su
 		case v452WMNCDestroy:
 			v452RemoveSubclass.Call(hwnd, v452TrimDialogSubclassCB, subclassID)
 			v452ReleaseTrimState(d)
+			v452TrimInstallStates.Delete(d)
 		}
 	}
 	return result
