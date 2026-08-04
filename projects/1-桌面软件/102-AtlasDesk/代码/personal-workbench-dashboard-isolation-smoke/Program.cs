@@ -165,7 +165,41 @@ internal static class Program
             AssertWindowAlive(window, "while waiting for Dashboard WebView2");
         }
 
-        throw new TimeoutException("Timed out waiting for MainWindow's in-process Dashboard WebView2.");
+        throw new TimeoutException(
+            "Timed out waiting for MainWindow's in-process Dashboard WebView2. "
+            + DescribeDashboardState(window));
+    }
+
+    private static string DescribeDashboardState(MainWindow window)
+    {
+        var type = typeof(MainWindow);
+        object? Read(string name) => type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(window);
+        var settings = Read("_settings") as AppSettings;
+        var errorText = (window.FindName("DashboardErrorText") as TextBlock)?.Text ?? "<missing>";
+        var host = window.FindName("DashboardHost") as UIElement;
+        var empty = window.FindName("DashboardEmpty") as UIElement;
+        var error = window.FindName("DashboardError") as UIElement;
+
+        var logTail = "<no log>";
+        try
+        {
+            if (File.Exists(App.LogPath))
+            {
+                logTail = string.Join(
+                    " || ",
+                    File.ReadLines(App.LogPath).TakeLast(18));
+            }
+        }
+        catch (Exception ex)
+        {
+            logTail = "<log read failed: " + ex.Message + ">";
+        }
+
+        return $"url={settings?.DashboardUrl}; currentView={Read("_currentView")}; "
+               + $"initializing={Read("_isInitializingDashboard")}; recovery={Read("_dashboardRecoveryInProgress")}; "
+               + $"environment={(Read("_webViewEnvironment") is null ? "null" : "ready")}; "
+               + $"host={host?.Visibility}; empty={empty?.Visibility}; error={error?.Visibility}; "
+               + $"errorText={errorText}; logTail={logTail}";
     }
 
     private static void WaitForDocument(WebView2 view, TimeSpan timeout)
