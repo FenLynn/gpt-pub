@@ -83,8 +83,12 @@ func (a *application) v452FinalizeRound5ToastReport() error {
 		config, decodeErr := png.DecodeConfig(file)
 		_ = file.Close()
 		if decodeErr == nil {
-			size := media.FileSize(path)
-			valid = config.Width >= 300 && config.Height >= 60 && size >= 1000
+			info, statErr := os.Stat(path)
+			size := int64(0)
+			if statErr == nil {
+				size = info.Size()
+			}
+			valid = statErr == nil && config.Width >= 300 && config.Height >= 60 && size >= 1000
 			detail = fmt.Sprintf("png=%dx%d bytes=%d", config.Width, config.Height, size)
 		} else {
 			detail = decodeErr.Error()
