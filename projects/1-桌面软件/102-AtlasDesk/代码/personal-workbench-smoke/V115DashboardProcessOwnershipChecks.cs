@@ -39,21 +39,22 @@ internal static class V115DashboardProcessOwnershipChecks
         }
         else
         {
-            // v1.1.6 deliberately supersedes in-process failure handling with a
-            // process boundary. The historical v1.1.5 behavior remains documented,
-            // but its DOM injection and same-process ownership must not survive.
+            // v1.1.6 supersedes same-process failure handling with a dedicated
+            // WinForms executable. The v1.1.5 findings remain documented, but DOM
+            // injection and WebView2 ownership must not return to AtlasDesk.exe.
             RequireContains(lifecycle,
-                "WebView2 moved to isolated AtlasDesk process",
+                "WebView2 moved to dedicated AtlasDesk.DashboardHost.exe process",
                 "DashboardProcessSurface",
-                "--dashboard-host");
+                "AtlasDesk.DashboardHost.exe");
             RequireAbsent(lifecycle,
                 "DashboardClickGuardScript",
                 "AddScriptToExecuteOnDocumentCreatedAsync",
-                "Core_WebMessageReceived");
+                "Core_WebMessageReceived",
+                "--dashboard-host");
         }
 
         Console.WriteLine(
-            "PASS AtlasDesk retains the v1.1.5 process-failure history and permits v1.1.6 process isolation to supersede in-process ownership");
+            "PASS AtlasDesk retains the v1.1.5 process-failure history while v1.1.6 moves active WebView2 ownership into AtlasDesk.DashboardHost.exe");
     }
 
     private static string RequireFile(string root, string fileName)
