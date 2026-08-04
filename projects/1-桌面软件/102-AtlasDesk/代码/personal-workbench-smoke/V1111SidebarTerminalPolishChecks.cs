@@ -56,7 +56,7 @@ internal static class V1111SidebarTerminalPolishChecks
             "Background=\"#000000\"",
             "Background=\"#0A0A0A\"",
             "Background=\"#0D0D0D\"",
-            "Foreground=\"#F5F5F5\"",
+            "<Setter Property=\"Foreground\" Value=\"#F5F5F5\"/>",
             "BorderBrush=\"#4A4A4A\"",
             "Text=\"{TemplateBinding Content}\" Foreground=\"{TemplateBinding Foreground}\"",
             "<UniformGrid Columns=\"2\"",
