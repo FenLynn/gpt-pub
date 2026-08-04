@@ -20,9 +20,12 @@ public sealed class WorkbenchFeaturePipeline
         UiConvergence = UiConvergenceCoordinator.Attach(window, Experience.Home, Experience.SettingsPage);
         Diagnostics = DiagnosticsCoordinator.Attach(window, Settings);
         ShellResilience = ShellResilienceCoordinator.Attach(window);
-        DashboardLifecycle = DashboardLifecycleCoordinator.Attach(window, ShellResilience);
-        DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window);
-        DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings);
+
+        // v1.1.10 restores the original lightweight Dashboard model. MainWindow owns
+        // one in-process WPF WebView2 and the shared login profile. No dedicated host,
+        // HWND embedding, page-script diagnostics or interaction shim is attached.
+        Dashboard = DashboardSimplicityCoordinator.Attach(window, ShellResilience);
+
         Projects = V063ProjectEnhancer.Attach(window, this);
         TaskTools = TaskToolCoordinator.Attach(window, this);
         Backup = V066BackupEnhancer.Attach(window);
@@ -49,9 +52,7 @@ public sealed class WorkbenchFeaturePipeline
     public V061ExperienceEnhancer Experience { get; }
     public DiagnosticsCoordinator Diagnostics { get; }
     public ShellResilienceCoordinator ShellResilience { get; }
-    public DashboardLifecycleCoordinator DashboardLifecycle { get; }
-    public DashboardScriptDiagnostics DashboardDiagnostics { get; }
-    public DashboardInteractionCoordinator DashboardInteraction { get; }
+    public DashboardSimplicityCoordinator Dashboard { get; }
     public V063ProjectEnhancer Projects { get; }
     public TaskToolCoordinator TaskTools { get; }
     public V066BackupEnhancer Backup { get; }
