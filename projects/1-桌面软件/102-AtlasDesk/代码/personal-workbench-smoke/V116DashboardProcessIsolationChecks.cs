@@ -33,8 +33,11 @@ internal static class V116DashboardProcessIsolationChecks
         RequireContains(bootstrap,
             "DashboardHostLaunchOptions.TryParse",
             "new DashboardHostWindow(options)",
-            "Application.Current.MainWindow = host",
-            "ShutdownMode.OnMainWindowClose",
+            "application.MainWindow = host",
+            "application.ShutdownMode = ShutdownMode.OnExplicitShutdown",
+            "host.Loaded += Host_Loaded",
+            "application.ShutdownMode = ShutdownMode.OnMainWindowClose",
+            "DispatcherPriority.ContextIdle",
             "host.Show()",
             "Close()");
 
@@ -68,11 +71,20 @@ internal static class V116DashboardProcessIsolationChecks
             "CoreWebView2ProcessFailedKind.BrowserProcessExited",
             "WatchParentProcessAsync",
             "Console.In.ReadLineAsync",
-            "Environment.ExitCode = 73");
+            "Environment.ExitCode = 73",
+            "Keep the helper top-level and off-screen until its WebView2 controller is",
+            "await _webView.EnsureCoreWebView2Async(_environment)",
+            "Emit(\"HWND\"",
+            "Emit(\"READY\"");
         RequireAbsent(host,
             "AddScriptToExecuteOnDocumentCreatedAsync",
             "WebMessageReceived +=",
             "atlasdesk-click|");
+
+        var ensureIndex = host.IndexOf("await _webView.EnsureCoreWebView2Async(_environment)", StringComparison.Ordinal);
+        var handleIndex = host.IndexOf("Emit(\"HWND\"", StringComparison.Ordinal);
+        if (ensureIndex < 0 || handleIndex <= ensureIndex)
+            throw new InvalidOperationException("DashboardHost must finish WebView2 controller creation before handing its HWND to the parent process.");
 
         RequireContains(lifecycle,
             "WebView2 moved to isolated AtlasDesk process",
@@ -104,7 +116,7 @@ internal static class V116DashboardProcessIsolationChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.6 routes helper startup through a non-null XAML bootstrap and keeps WebView2 in an isolated process with an embedded HWND surface");
+            "PASS AtlasDesk v1.1.6 keeps StartupUri bootstrap alive until Host Loaded, initializes WebView2 before HWND handoff and isolates Dashboard in a restartable process");
     }
 
     private static string RequireFile(string root, string fileName)
