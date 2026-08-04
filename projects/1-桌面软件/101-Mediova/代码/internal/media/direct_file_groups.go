@@ -165,8 +165,8 @@ func volumeOutputPrefix(volume string) string {
 // GroupDirectMediaFiles groups directly selected or dropped media by source
 // volume. Within each volume it chooses the parent of the nearest common
 // directory as Root, so the common top folder itself is retained in output.
-// Multiple volumes receive stable prefixes to prevent equal relative trees
-// from silently merging.
+// Multiple volumes receive stable prefixes encoded into Root so the context
+// survives the existing task/session/queue lifecycle without a schema break.
 func GroupDirectMediaFiles(values []string) []DroppedImportGroup {
 	type volumeGroup struct {
 		key    string
@@ -215,8 +215,9 @@ func GroupDirectMediaFiles(values []string) []DroppedImportGroup {
 		if multiVolume {
 			prefix = volumeOutputPrefix(group.volume)
 		}
+		plainRoot := root.string()
 		result = append(result, DroppedImportGroup{
-			Root:         root.string(),
+			Root:         EncodeRootContext(plainRoot, prefix),
 			OutputPrefix: prefix,
 			Paths:        append([]string(nil), group.paths...),
 		})
