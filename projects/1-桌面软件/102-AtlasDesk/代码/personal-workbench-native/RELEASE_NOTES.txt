@@ -1,3 +1,28 @@
+AtlasDesk v1.1.5 WebView2 process-ownership hotfix
+
+This second Dashboard hotfix addresses abrupt native exits that could still occur after v1.1.4 when users clicked refresh-like controls repeatedly. The v1.1.4 startup E_ABORT race remains fixed; v1.1.5 closes the remaining process-failure and duplicate-handler paths.
+
+Process ownership
+- Dashboard top-bar and retry controls are now physical replacement buttons, not legacy XAML buttons with handlers removed by reflection.
+- The removed legacy button instances cannot receive a second direct Reload, retry, home, back or forward call.
+- DashboardLifecycleCoordinator attaches directly to CoreWebView2.ProcessFailed and CoreWebView2Environment.BrowserProcessExited.
+- GPU and utility process exits are logged and left to WebView2 automatic recovery instead of destroying the control.
+- RenderProcessUnresponsive and RenderProcessExited use a bounded renderer Reload with a 10-second cooldown.
+- BrowserProcessExited is the only normal failure kind that escalates directly to full WebView2 recreation.
+- MainWindow's retained destructive ProcessFailed callback is synchronously suppressed before its queued Dispatcher recovery can run.
+- Failure logs now include kind, reason, exit code, process description, browser process ID and the WebView2 failure-report folder.
+
+Rapid interaction protection
+- AtlasDesk injects a capture-phase guard into the Dashboard document.
+- Repeated clicks on the same button, link or role=button within 900 ms are blocked before the page starts duplicate work.
+- Accepted and blocked page interactions are written immediately to atlasdesk.log.
+- Guarded AtlasDesk commands log start, completion and elapsed time so the last successful action survives even if a native process later exits.
+
+Candidate boundary
+- v1.1.5 remains a focused Dashboard reliability hotfix.
+- Project context, Zotero read-only behavior, Runtime/Data separation and external-browser routing are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.4 Dashboard stability hotfix
 
 This hotfix addresses frequent AtlasDesk exits and WebView2 E_ABORT failures when Dashboard startup, window activation, retry and refresh overlapped. It contains no new product workflow and keeps the v1.1.3 project-context behavior unchanged.
