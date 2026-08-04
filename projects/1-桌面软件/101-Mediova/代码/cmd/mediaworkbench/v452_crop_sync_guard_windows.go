@@ -12,10 +12,11 @@ const (
 	v452CropSyncParentSubclassID = 0x4553
 	v452CropSyncEditSubclassID   = 0x4554
 	v452ENChange                 = 0x0300
+	v452WMSetTextMessage         = 0x000C
 )
 
 type v452CropSyncState struct {
-	depth atomic.Int32
+	pending atomic.Uint32
 }
 
 var (
@@ -68,8 +69,9 @@ func v452CropSyncEventProc(hook, event, hwnd, idObject, idChild, eventThread, ev
 }
 
 func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	if message == WM_COMMAND && int(hiWord(wParam)) == v452ENChange && v452IsCropEditID(int(loWord(wParam))) {
-		if value, ok := v452CropSyncStates.Load(hwnd); ok && value.(*v452CropSyncState).depth.Load() > 0 {
+	if message == WM_COMMAND && int(hiWord(wParam)) == v452ENChange {
+		id := int(loWord(wParam))
+		if value, ok := v452CropSyncStates.Load(hwnd); ok && value.(*v452CropSyncState).consume(id) {
 			return 0
 		}
 	}
@@ -83,14 +85,11 @@ func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 }
 
 func v452CropSyncEditSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	if message == v452WMSetText {
+	if message == v452WMSetTextMessage {
 		parent, _, _ := v452CropSyncGetParent.Call(hwnd)
+		id, _, _ := v452CropSyncGetID.Call(hwnd)
 		if value, ok := v452CropSyncStates.Load(parent); ok {
-			state := value.(*v452CropSyncState)
-			state.depth.Add(1)
-			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-			state.depth.Add(-1)
-			return result
+			value.(*v452CropSyncState).mark(int(id))
 		}
 	}
 	if message == v452WMNCDestroy {
@@ -101,11 +100,50 @@ func v452CropSyncEditSubclassProc(hwnd uintptr, message uint32, wParam, lParam, 
 	return result
 }
 
-func v452IsCropEditID(id int) bool {
-	switch id {
-	case IDC_CROP_X, IDC_CROP_Y, IDC_CROP_W, IDC_CROP_H:
-		return true
-	default:
+func (s *v452CropSyncState) mark(id int) {
+	bit := v452CropSyncBit(id)
+	if bit == 0 {
+		return
+	}
+	for {
+		old := s.pending.Load()
+		if s.pending.CompareAndSwap(old, old|bit) {
+			return
+		}
+	}
+}
+
+func (s *v452CropSyncState) consume(id int) bool {
+	bit := v452CropSyncBit(id)
+	if bit == 0 {
 		return false
 	}
+	for {
+		old := s.pending.Load()
+		if old&bit == 0 {
+			return false
+		}
+		if s.pending.CompareAndSwap(old, old&^bit) {
+			return true
+		}
+	}
+}
+
+func v452CropSyncBit(id int) uint32 {
+	switch id {
+	case IDC_CROP_X:
+		return 1 << 0
+	case IDC_CROP_Y:
+		return 1 << 1
+	case IDC_CROP_W:
+		return 1 << 2
+	case IDC_CROP_H:
+		return 1 << 3
+	default:
+		return 0
+	}
+}
+
+func v452IsCropEditID(id int) bool {
+	return v452CropSyncBit(id) != 0
 }
