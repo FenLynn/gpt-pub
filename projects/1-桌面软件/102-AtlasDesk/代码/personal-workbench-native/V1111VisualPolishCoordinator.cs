@@ -4,8 +4,8 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using System.Windows.Threading;
+using ShapePath = System.Windows.Shapes.Path;
 
 namespace PersonalWorkbench;
 
@@ -98,7 +98,7 @@ public sealed class V1111VisualPolishCoordinator : IDisposable
         {
             Width = 16,
             Height = 16,
-            Child = new Path
+            Child = new ShapePath
             {
                 Data = Geometry.Parse("M4,7 H20 V19 H4 Z M8,7 V5 H16 V7 M4,11 H20"),
                 Stroke = Brush(76, 96, 122),
@@ -141,6 +141,15 @@ public sealed class V1111VisualPolishCoordinator : IDisposable
         _terminal.Background = Brushes.Black;
         if (_terminalHost is not null)
             _terminalHost.Background = Brushes.Black;
+
+        foreach (var panel in FindVisualChildren<Panel>(_terminal))
+        {
+            if (panel.Background is SolidColorBrush brush
+                && brush.Color == Color.FromRgb(13, 19, 32))
+            {
+                panel.Background = Brushes.Black;
+            }
+        }
 
         foreach (var button in FindVisualChildren<Button>(_terminal))
         {
