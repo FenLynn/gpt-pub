@@ -31,6 +31,7 @@ var (
 	v452Round6TimelineCB   uintptr
 	v452Round6EventHook    uintptr
 	v452Round6MainOnce     sync.Once
+	v452Round6InitialOnce  sync.Once
 	v452Round6TrimWindows  sync.Map
 	v452Round6TrackWindows sync.Map
 	v452Round6ThumbQueued  sync.Map
@@ -61,7 +62,10 @@ func v452Round6EventProc(hook, event, hwnd, idObject, idChild, eventThread, even
 		v452Round6MainOnce.Do(func() {
 			v452SetWindowSubclass.Call(app.hwnd, v452Round6MainCB, v452Round6MainSubclassID, 0)
 		})
-		setText(app.hwnd, "Mediova v4.5.2")
+		v452Round6InitialOnce.Do(func() {
+			setText(app.hwnd, "Mediova v4.5.2")
+			v452Round6ClearOutputSelection(app)
+		})
 		procPostMessageW.Call(app.hwnd, v452Round6RepairMessage, 0, 0)
 	}
 	if d := activeTrim; d != nil && d.hwnd != 0 {
@@ -86,6 +90,9 @@ func v452Round6MainSubclassProc(hwnd uintptr, message uint32, wParam, lParam, su
 		case WM_COMMAND:
 			id := int(loWord(wParam))
 			if id == IDC_TAB_VIDEO || id == IDC_TAB_IMAGE {
+				// Mode switches are the only recurring operation that is allowed to
+				// clear the output directory edit selection. Ordinary refreshes must
+				// never steal focus while the user is editing or copying the path.
 				v452Round6ClearOutputSelection(app)
 			}
 			procPostMessageW.Call(hwnd, v452Round6RepairMessage, 0, 0)
@@ -103,7 +110,6 @@ func v452Round6RepairMainWindow(a *application) {
 		return
 	}
 	setText(a.hwnd, "Mediova v4.5.2")
-	v452Round6ClearOutputSelection(a)
 	v452Round6RepairListRows(a)
 }
 
@@ -157,17 +163,17 @@ func v452Round6RepairListRows(a *application) {
 		first := lvItem{Mask: LVIF_TEXT, IItem: int32(item.row), ISubItem: int32(taskColNumber), PszText: number}
 		send(a.hList, LVM_SETITEMW, 0, uintptr(unsafe.Pointer(&first)))
 
+		key := fmt.Sprintf("%d|%s", item.task.ID, item.task.Input)
 		imageIndex := item.task.ThumbnailIndex
 		imageItem := lvItem{Mask: LVIF_IMAGE, IItem: int32(item.row), ISubItem: int32(taskColFile), IImage: int32(imageIndex)}
 		send(a.hList, LVM_SETITEMW, 0, uintptr(unsafe.Pointer(&imageItem)))
 		if imageIndex > 0 {
-			v452Round6ThumbQueued.Delete(item.task.ID)
+			v452Round6ThumbQueued.Delete(key)
 			continue
 		}
 		if ffmpeg == "" || item.task.Width <= 0 || item.task.Height <= 0 {
 			continue
 		}
-		key := fmt.Sprintf("%d|%s", item.task.ID, item.task.Input)
 		if _, loaded := v452Round6ThumbQueued.LoadOrStore(key, true); loaded {
 			continue
 		}
