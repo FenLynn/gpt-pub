@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text;
 using System.Windows;
 
 namespace PersonalWorkbench;
@@ -26,16 +27,30 @@ public partial class App : Application
         // App.xaml deliberately has no StartupUri. The process mode is selected here
         // before any Window is constructed, so helper startup cannot enter the primary
         // MainWindow lifetime and primary startup cannot accidentally create WebView2.
+        var helperRequested = e.Args.Any(value =>
+            string.Equals(value, "--dashboard-host", StringComparison.Ordinal));
+        if (helperRequested)
+            EmitDashboardProbe("app-onstartup");
+
         if (DashboardHostLaunchOptions.TryParse(e.Args, out var dashboardHostOptions))
         {
+            EmitDashboardProbe("helper-arguments-accepted");
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             base.OnStartup(e);
+            EmitDashboardProbe("helper-base-onstartup-completed");
 
             var dashboardHost = new DashboardHostWindow(dashboardHostOptions);
+            EmitDashboardProbe("helper-window-constructed");
+            dashboardHost.SourceInitialized += (_, _) => EmitDashboardProbe("helper-window-sourceinitialized");
+            dashboardHost.Loaded += (_, _) => EmitDashboardProbe("helper-window-loaded");
             MainWindow = dashboardHost;
             dashboardHost.Show();
+            EmitDashboardProbe("helper-window-show-returned");
             return;
         }
+
+        if (helperRequested)
+            EmitDashboardProbe("helper-arguments-rejected");
 
         ProductIdentity.EnsureDataDirectories();
         LogMaintenance.Prepare(LogPath);
@@ -179,6 +194,20 @@ public partial class App : Application
         else
         {
             Log("Main window Closing event");
+        }
+    }
+
+    private static void EmitDashboardProbe(string message)
+    {
+        try
+        {
+            var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("startup-probe:" + message));
+            Console.Out.WriteLine(DashboardHostWindow.ProtocolPrefix + "|LOG|" + payload);
+            Console.Out.Flush();
+        }
+        catch
+        {
+            // Helper startup diagnostics must never change process behavior.
         }
     }
 
