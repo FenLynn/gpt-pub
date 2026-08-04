@@ -76,7 +76,6 @@ type trimDialog struct {
 	dragging       bool
 	dragStart      point
 	applySelected  bool
-	cropSyncDepth  int
 }
 
 var activeTrim *trimDialog
@@ -323,12 +322,6 @@ func (d *trimDialog) init() {
 }
 
 func (d *trimDialog) command(id int) {
-	if d.cropSyncDepth > 0 {
-		switch id {
-		case IDC_CROP_X, IDC_CROP_Y, IDC_CROP_W, IDC_CROP_H:
-			return
-		}
-	}
 	switch id {
 	case IDC_FULL_TIME:
 		setText(d.hStart, "00:00:00.000")
@@ -587,8 +580,6 @@ func (d *trimDialog) cropFromControls(normalize bool) {
 }
 
 func (d *trimDialog) cropToControls() {
-	d.cropSyncDepth++
-	defer func() { d.cropSyncDepth-- }()
 	setText(d.hX, strconv.Itoa(d.opts.Crop.X))
 	setText(d.hY, strconv.Itoa(d.opts.Crop.Y))
 	setText(d.hW, strconv.Itoa(d.opts.Crop.Width))
