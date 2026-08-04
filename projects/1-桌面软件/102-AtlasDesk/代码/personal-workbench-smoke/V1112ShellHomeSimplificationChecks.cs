@@ -13,8 +13,8 @@ internal static class V1112ShellHomeSimplificationChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 12))
-            throw new InvalidOperationException("AtlasDesk shell/home simplification candidate must be v1.1.12.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 12))
+            throw new InvalidOperationException("AtlasDesk must not move below the v1.1.12 shell/home simplification baseline.");
 
         var app = File.ReadAllText(RequireFile(nativeRoot, "App.xaml"));
         var coordinator = File.ReadAllText(RequireFile(nativeRoot, "SidebarTerminalVisualCoordinator.cs"));
@@ -79,7 +79,7 @@ internal static class V1112ShellHomeSimplificationChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.12 uses a narrow icon rail, compact navigation, clean command entry, clear settings glyph and self-responsive three-layer home");
+            "PASS AtlasDesk retains the v1.1.12 narrow icon rail, compact navigation, clean command entry, clear settings glyph and self-responsive three-layer home");
     }
 
     private static string RequireFile(string root, params string[] parts)

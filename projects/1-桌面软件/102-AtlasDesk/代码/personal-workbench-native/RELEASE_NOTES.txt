@@ -1,3 +1,27 @@
+AtlasDesk v1.2.0 project cockpit
+
+This release turns Development → Project from a project list with detached footer actions into a daily-use selected-project cockpit. It reuses the existing workspace, terminal, project-context and read-only Zotero owners instead of adding a second execution chain.
+
+Selected-project overview
+- The project list remains the explicit discovery entry and gains a persistent right-side overview for the currently selected valid project.
+- The overview presents bounded Git status, detected environment markers, saved recent-file context and the explicit AtlasDesk project-profile summary.
+- Project discovery still starts only after the user opens Development → Project or requests Refresh; no startup scan, full-disk indexer, timer or background service is introduced.
+- Existing cancellation, generation gating and the three-second Git timeout remain the only selected-project context reader.
+
+Daily actions
+- Workspace, project terminal, Dashboard, Explorer, copy-path and edit-context actions are available directly from the selected project.
+- Explicit favorite files can be opened in the existing workspace owner or copied as paths.
+- Explicit project commands are sent to the existing project terminal only after the user selects Run; commands are never replayed automatically.
+- AtlasDesk-side literature links can copy the Citation Key, open an existing local PDF or locate the record in the existing read-only Zotero surface.
+- Context editing continues to use the existing ProjectContextWindow and atomic productivity-context store.
+
+Data and safety boundary
+- Project profiles remain in private Roaming Data at %APPDATA%\AtlasDesk\productivity-context.json with the existing atomic backup path.
+- No Data schema change is required, and the cockpit never creates a profile merely by selecting a project.
+- Zotero SQLite access remains strictly read-only; associations remain AtlasDesk-side snapshots.
+- Dashboard ownership, ConPTY processes, tasks, tools, security, Runtime/Data separation and the v1.1.12 compact shell remain unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.12 shell and home simplification
 
 This release is a focused density and hierarchy correction after the v1.1.11 terminal visual pass. It does not change Dashboard ownership, ConPTY sessions, project context, Zotero access, tasks, tools, security or Runtime/Data separation.
