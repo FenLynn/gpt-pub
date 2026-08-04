@@ -38,8 +38,8 @@ internal static class V116DashboardProcessIsolationChecks
             "host.Loaded += Host_Loaded",
             "application.ShutdownMode = ShutdownMode.OnMainWindowClose",
             "DispatcherPriority.ContextIdle",
-            "host.Show()",
-            "Close()");
+            "new Action(Close)",
+            "host.Show()");
 
         var hostBranch = app.IndexOf("DashboardHostLaunchOptions.TryParse", StringComparison.Ordinal);
         var startupGuard = app.IndexOf("StartupGuard.Begin", StringComparison.Ordinal);
