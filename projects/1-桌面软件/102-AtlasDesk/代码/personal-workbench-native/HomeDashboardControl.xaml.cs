@@ -19,6 +19,9 @@ public sealed class RecentFileRequestedEventArgs : EventArgs
 
 public partial class HomeDashboardControl : UserControl
 {
+    private const double CompactWidth = 930;
+    private const double DenseWidth = 720;
+
     private readonly AppSettings _settings;
     private CancellationTokenSource? _refreshCancellation;
     private long _refreshGeneration;
@@ -36,12 +39,19 @@ public partial class HomeDashboardControl : UserControl
         InitializeComponent();
         ConfigureMetricCard(PythonValue, "PROJECTS", "P");
         ConfigureMetricCard(WorkspaceValue, "TASKS", "T");
+        Loaded += HomeDashboard_Loaded;
+        SizeChanged += HomeDashboard_SizeChanged;
         IsVisibleChanged += (_, _) =>
         {
             if (IsVisible)
+            {
+                ApplyResponsiveLayout();
                 _ = RefreshAsync();
+            }
             else
+            {
                 CancelRefresh();
+            }
         };
         Unloaded += (_, _) => CancelRefresh();
     }
@@ -107,6 +117,67 @@ public partial class HomeDashboardControl : UserControl
                 cancellation.Dispose();
             }
         }
+    }
+
+    private void HomeDashboard_Loaded(object sender, RoutedEventArgs e) => ApplyResponsiveLayout();
+
+    private void HomeDashboard_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) >= 1)
+            ApplyResponsiveLayout();
+    }
+
+    private void ApplyResponsiveLayout()
+    {
+        var width = ActualWidth;
+        if (width <= 0 && Parent is FrameworkElement parent)
+            width = parent.ActualWidth;
+        if (width <= 0)
+            return;
+
+        var compact = width < CompactWidth;
+        var dense = width < DenseWidth;
+
+        HomeLayoutRoot.Margin = dense
+            ? new Thickness(10, 9, 10, 14)
+            : compact ? new Thickness(13, 11, 13, 16) : new Thickness(18, 14, 18, 18);
+
+        StatusGrid.Columns = compact ? 2 : 4;
+        var columns = StatusGrid.Columns;
+        for (var index = 0; index < StatusGrid.Children.Count; index++)
+        {
+            if (StatusGrid.Children[index] is not Border cell)
+                continue;
+
+            var lastInRow = (index + 1) % columns == 0;
+            var hasFollowingRow = index < StatusGrid.Children.Count - columns;
+            cell.Margin = new Thickness(
+                0,
+                0,
+                lastInRow ? 0 : 8,
+                hasFollowingRow ? 8 : 0);
+            cell.MinHeight = compact ? 60 : 62;
+        }
+
+        if (dense)
+        {
+            HeaderHorizontalSpacer.Width = new GridLength(0);
+            WorkspaceSummaryColumn.Width = new GridLength(1, GridUnitType.Star);
+            HeaderVerticalSpacer.Height = new GridLength(8);
+            Grid.SetColumn(WorkspaceSummary, 0);
+            Grid.SetRow(WorkspaceSummary, 2);
+        }
+        else
+        {
+            HeaderHorizontalSpacer.Width = new GridLength(compact ? 12 : 20);
+            WorkspaceSummaryColumn.Width = new GridLength(compact ? 240 : 300);
+            HeaderVerticalSpacer.Height = new GridLength(0);
+            Grid.SetRow(WorkspaceSummary, 0);
+            Grid.SetColumn(WorkspaceSummary, 2);
+        }
+
+        HomeActionPanel.ItemHeight = 30;
+        RecentWorkCard.MinHeight = compact ? 138 : 150;
     }
 
     private static void ConfigureMetricCard(TextBlock valueText, string label, string glyph)
