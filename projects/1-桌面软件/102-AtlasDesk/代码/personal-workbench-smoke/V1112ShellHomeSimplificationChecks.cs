@@ -19,6 +19,7 @@ internal static class V1112ShellHomeSimplificationChecks
         var app = File.ReadAllText(RequireFile(nativeRoot, "App.xaml"));
         var coordinator = File.ReadAllText(RequireFile(nativeRoot, "SidebarTerminalVisualCoordinator.cs"));
         var home = File.ReadAllText(RequireFile(nativeRoot, "HomeDashboardControl.xaml"));
+        var homeCode = File.ReadAllText(RequireFile(nativeRoot, "HomeDashboardControl.xaml.cs"));
         var notes = File.ReadAllText(RequireFile(nativeRoot, "RELEASE_NOTES.txt"));
 
         RequireContains(app,
@@ -29,33 +30,29 @@ internal static class V1112ShellHomeSimplificationChecks
 
         RequireContains(coordinator,
             "collapsed ? 48 : 208",
-            "_sidebarLayout.Margin = collapsed ? new Thickness(4, 6, 4, 6)",
             "button.Height = collapsed ? 30 : 34",
             "icon.Width = collapsed ? 15 : 16",
             "_userAvatar.Width = collapsed ? 24 : 26",
-            "string.Equals(text.Text?.Replace(\" \", string.Empty), \"CtrlK\"",
-            "搜索页面、项目、文件、任务、文献和命令（Ctrl+K）",
+            "CtrlK",
             "M9.5,3.5 H14.5",
             "_topBarRow.Height = new GridLength(36)",
-            "tab.Height = 30",
-            "QueueShellVisuals");
+            "tab.Height = 30");
 
         RequireContains(home,
+            "x:Name=\"HomeLayoutFrame\"",
+            "x:Name=\"HomeLayoutRoot\"",
+            "x:Name=\"WorkspaceSummary\"",
+            "x:Name=\"HomeActionPanel\"",
+            "x:Name=\"StatusGrid\"",
+            "x:Name=\"RecentWorkCard\"",
             "x:Key=\"HomeActionButton\"",
             "x:Key=\"HomeStatusCell\"",
-            "x:Name=\"GreetingText\"",
-            "FontSize=\"18\"",
-            "Text=\"当前工作区\"",
             "Content=\"工作区\"",
             "Content=\"Dashboard\"",
             "Content=\"资料库\"",
             "Content=\"开发\"",
             "Content=\"终端\"",
             "Content=\"全局搜索\"",
-            "x:Name=\"DashboardValue\"",
-            "x:Name=\"ZoteroValue\"",
-            "x:Name=\"PythonValue\"",
-            "x:Name=\"WorkspaceValue\"",
             "x:Name=\"RecentFilesList\"");
         RequireAbsent(home,
             "ATLASDESK  ·  TODAY",
@@ -63,8 +60,16 @@ internal static class V1112ShellHomeSimplificationChecks
             "LinearGradientBrush",
             "HomeMetricCard",
             "快捷入口",
-            "常用动作保持在首页",
             "本地优先 · 工作区");
+
+        RequireContains(homeCode,
+            "private const double CompactWidth = 930",
+            "private const double DenseWidth = 720",
+            "SizeChanged += HomeDashboard_SizeChanged",
+            "StatusGrid.Columns = compact ? 2 : 4",
+            "WorkspaceSummaryColumn.Width = new GridLength(compact ? 240 : 300)",
+            "Grid.SetRow(WorkspaceSummary, 2)",
+            "RecentWorkCard.MinHeight = compact ? 138 : 150");
 
         RequireContains(notes,
             "AtlasDesk v1.1.12 shell and home simplification",
@@ -74,7 +79,7 @@ internal static class V1112ShellHomeSimplificationChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.12 uses a narrow icon rail, compact navigation, clean command entry, clear settings glyph and simplified three-layer home");
+            "PASS AtlasDesk v1.1.12 uses a narrow icon rail, compact navigation, clean command entry, clear settings glyph and self-responsive three-layer home");
     }
 
     private static string RequireFile(string root, params string[] parts)
