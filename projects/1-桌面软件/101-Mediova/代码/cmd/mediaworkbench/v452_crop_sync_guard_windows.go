@@ -24,7 +24,7 @@ const (
 )
 
 type v452CropSyncState struct {
-	pending      atomic.Uint32
+	writing      atomic.Uint32
 	initializing atomic.Bool
 }
 
@@ -290,11 +290,7 @@ func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 		id := int(loWord(wParam))
 		if value, ok := v452CropSyncStates.Load(hwnd); ok {
 			state := value.(*v452CropSyncState)
-			if state.initializing.Load() && v452IsCropEditID(id) {
-				v452CropSyncIntercepted.Add(1)
-				return 0
-			}
-			if int(hiWord(wParam)) == v452ENChange && state.consume(id) {
+			if state.initializing.Load() && v452IsCropEditID(id) || state.isWriting(id) {
 				v452CropSyncIntercepted.Add(1)
 				return 0
 			}
@@ -316,7 +312,11 @@ func v452CropSyncEditSubclassProc(hwnd uintptr, message uint32, wParam, lParam, 
 		parent, _, _ := v452CropSyncGetParent.Call(hwnd)
 		id, _, _ := v452CropSyncGetID.Call(hwnd)
 		if value, ok := v452CropSyncStates.Load(parent); ok {
-			value.(*v452CropSyncState).mark(int(id))
+			state := value.(*v452CropSyncState)
+			state.beginWriting(int(id))
+			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+			state.endWriting(int(id))
+			return result
 		}
 	}
 	if message == v452WMNCDestroy {
@@ -369,33 +369,35 @@ func v452CropMouseDiagnostics() string {
 	return strings.Join(v452CropDiagLines, " | ")
 }
 
-func (s *v452CropSyncState) mark(id int) {
+func (s *v452CropSyncState) beginWriting(id int) {
 	bit := v452CropSyncBit(id)
 	if bit == 0 {
 		return
 	}
 	for {
-		old := s.pending.Load()
-		if s.pending.CompareAndSwap(old, old|bit) {
+		old := s.writing.Load()
+		if s.writing.CompareAndSwap(old, old|bit) {
 			return
 		}
-}
+	}
 }
 
-func (s *v452CropSyncState) consume(id int) bool {
+func (s *v452CropSyncState) endWriting(id int) {
 	bit := v452CropSyncBit(id)
 	if bit == 0 {
-		return false
+		return
 	}
 	for {
-		old := s.pending.Load()
-		if old&bit == 0 {
-			return false
-		}
-		if s.pending.CompareAndSwap(old, old&^bit) {
-			return true
+		old := s.writing.Load()
+		if s.writing.CompareAndSwap(old, old&^bit) {
+			return
 		}
 	}
+}
+
+func (s *v452CropSyncState) isWriting(id int) bool {
+	bit := v452CropSyncBit(id)
+	return bit != 0 && s.writing.Load()&bit != 0
 }
 
 func v452CropSyncBit(id int) uint32 {
