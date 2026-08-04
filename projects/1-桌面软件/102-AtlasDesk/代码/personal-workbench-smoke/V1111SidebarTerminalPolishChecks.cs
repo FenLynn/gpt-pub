@@ -97,7 +97,7 @@ internal static class V1111SidebarTerminalPolishChecks
         RequireContains(notes,
             "AtlasDesk v1.1.11 sidebar and terminal visual polish",
             "project-context shortcut",
-            "pure-black CMD terminal theme",
+            "Pure-black CMD terminal theme",
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
