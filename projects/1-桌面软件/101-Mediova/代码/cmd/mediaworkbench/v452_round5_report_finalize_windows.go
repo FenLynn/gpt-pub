@@ -102,6 +102,7 @@ func (a *application) v452FinalizeRound5ToastReport() error {
 	tries := v452CropSyncInstallTries.Load()
 	parents := v452CropSyncParentsOK.Load()
 	edits := v452CropSyncEditsOK.Load()
+	editorUI := v452CropSyncEditorUIOK.Load()
 	intercepted := v452CropSyncIntercepted.Load()
 	cbtCallbacks := v452CropSyncCBTCallbacks.Load()
 	activations := v452CropSyncActivations.Load()
@@ -112,7 +113,8 @@ func (a *application) v452FinalizeRound5ToastReport() error {
 	report.Checks["round5_crop_sync_guard_installed"] = parents >= 2 && edits >= 8
 	report.Checks["round5_crop_sync_guard_intercepted"] = intercepted > 0
 	report.Checks["round5_crop_initial_state_repaired"] = snapshots >= 2 && repairs >= 2
-	report.Details["round5_crop_sync_guard"] = fmt.Sprintf("cbt_hook=%d cbt_callbacks=%d activations=%d tries=%d parents=%d edits=%d intercepted=%d snapshots=%d repairs=%d", v452CropSyncCBTHook.Load(), cbtCallbacks, activations, tries, parents, edits, intercepted, snapshots, repairs)
+	report.Details["round5_crop_sync_guard"] = fmt.Sprintf("cbt_hook=%d cbt_callbacks=%d activations=%d tries=%d parents=%d edits=%d editor_ui=%d intercepted=%d snapshots=%d repairs=%d", v452CropSyncCBTHook.Load(), cbtCallbacks, activations, tries, parents, edits, editorUI, intercepted, snapshots, repairs)
+	report.Details["round5_crop_mouse_diagnostics"] = v452CropMouseDiagnostics()
 
 	report.Passed = len(report.Checks) > 0
 	for _, ok := range report.Checks {
