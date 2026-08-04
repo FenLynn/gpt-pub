@@ -25,86 +25,64 @@ internal static class Program
         {
             SetPhase("starting local Dashboard page");
             using var server = LocalDashboardServer.Start();
+            ConfigureIsolatedSettings(server.Url, workspace);
 
-            SetPhase("creating isolated WPF application");
+            SetPhase("creating real AtlasDesk WPF application");
             var app = new App();
             app.InitializeComponent();
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            SetPhase("constructing AtlasDesk MainWindow");
-            var window = new MainWindow();
-            app.MainWindow = window;
-            ConfigureIsolatedSettings(window, server.Url, workspace);
-
-            SetPhase("showing MainWindow");
-            window.Show();
-            PumpDispatcher(TimeSpan.FromMilliseconds(700));
-            AssertWindowAlive(window, "after startup");
-
-            SetPhase("attaching complete feature pipeline");
-            var pipeline = WorkbenchFeaturePipeline.Attach(window);
-            PumpDispatcher(TimeSpan.FromMilliseconds(250));
-
-            SetPhase("opening Dashboard through MainWindow view owner");
-            _ = window.FindName("DashboardNav") as RadioButton
-                ?? throw new InvalidOperationException("Dashboard navigation is unavailable.");
-            InvokeShowView(window, "dashboard", TimeSpan.FromSeconds(45));
-
-            var view = WaitForDashboardView(window, TimeSpan.FromSeconds(10));
-            WaitForDocument(view, TimeSpan.FromSeconds(20));
-            AssertWindowAlive(window, "after in-process WebView2 initialization");
-
-            SetPhase("verifying Dashboard stays inside MainWindow visual tree");
-            var host = window.FindName("DashboardHost") as Panel
-                ?? throw new InvalidOperationException("DashboardHost panel is unavailable.");
-            if (!host.Children.Contains(view))
-                throw new InvalidOperationException("The active Dashboard WebView2 is not a child of MainWindow DashboardHost.");
-            if (host.Children.Cast<UIElement>().Any(child =>
-                    string.Equals(child.GetType().Name, "DashboardProcessSurface", StringComparison.Ordinal)))
+            Exception? failure = null;
+            var completed = false;
+            var scheduled = false;
+            var watchdog = new DispatcherTimer(DispatcherPriority.Send)
             {
-                throw new InvalidOperationException("A retired DashboardProcessSurface returned to the visual tree.");
-            }
-
-            SetPhase("verifying native WPF keyboard focus ownership");
-            window.Activate();
-            view.Focus();
-            _ = Keyboard.Focus(view);
-            PumpDispatcher(TimeSpan.FromMilliseconds(300));
-            if (!view.IsKeyboardFocusWithin && !ReferenceEquals(Keyboard.FocusedElement, view))
-                throw new InvalidOperationException("The in-process Dashboard WebView2 did not receive WPF keyboard focus.");
-
-            SetPhase("verifying page input focus in the same WebView2");
-            var activeElement = AwaitWithDispatcher(
-                view.CoreWebView2.ExecuteScriptAsync(
-                    "document.getElementById('atlasdesk-input').focus(); document.activeElement.id;"),
-                TimeSpan.FromSeconds(10));
-            if (!string.Equals(activeElement, "\"atlasdesk-input\"", StringComparison.Ordinal))
-                throw new InvalidOperationException("Dashboard document input did not become the active element: " + activeElement);
-
-            var textRoundTrip = AwaitWithDispatcher(
-                view.CoreWebView2.ExecuteScriptAsync(
-                    "document.activeElement.value='AtlasDesk input ready'; document.activeElement.value;"),
-                TimeSpan.FromSeconds(10));
-            if (!string.Equals(textRoundTrip, "\"AtlasDesk input ready\"", StringComparison.Ordinal))
-                throw new InvalidOperationException("Dashboard input value round-trip failed: " + textRoundTrip);
-
-            SetPhase("verifying no dedicated Dashboard process is required");
-            if (pipeline.Dashboard is null)
-                throw new InvalidOperationException("Dashboard simplicity coordinator is unavailable.");
-            if (File.Exists(Path.Combine(App.RuntimeDirectory, "DashboardHost", "AtlasDesk.DashboardHost.exe")))
+                Interval = TimeSpan.FromSeconds(90)
+            };
+            watchdog.Tick += (_, _) =>
             {
-                Console.WriteLine("NOTE an older Runtime folder may still contain DashboardHost, but v1.1.10 does not start or publish it.");
-            }
+                watchdog.Stop();
+                failure ??= new TimeoutException("The real AtlasDesk Dashboard verification exceeded 90 seconds during: " + _phase);
+                app.Shutdown(1);
+            };
 
-            SetPhase("closing normally");
-            window.Close();
-            PumpDispatcher(TimeSpan.FromMilliseconds(250));
-            app.Shutdown(0);
-            GC.KeepAlive(pipeline);
+            app.Activated += (_, _) =>
+            {
+                if (scheduled)
+                    return;
+                scheduled = true;
+                watchdog.Start();
+                _ = app.Dispatcher.BeginInvoke(
+                    DispatcherPriority.ApplicationIdle,
+                    new Action(async () =>
+                    {
+                        try
+                        {
+                            await VerifyDashboardAsync(app);
+                            completed = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            failure = ex;
+                        }
+                        finally
+                        {
+                            watchdog.Stop();
+                            app.Shutdown(failure is null ? 0 : 1);
+                        }
+                    }));
+            };
+
+            SetPhase("starting real WPF Application.Run event loop");
+            var exitCode = app.Run();
+            if (failure is not null)
+                throw new InvalidOperationException("Real AtlasDesk Dashboard verification failed.", failure);
+            if (!completed || exitCode != 0)
+                throw new InvalidOperationException($"Real AtlasDesk Dashboard verification ended incompletely; completed={completed}; exitCode={exitCode}.");
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk in-process Dashboard created one WPF WebView2 inside MainWindow, retained native keyboard focus and activated a real document input without HWND embedding or a dedicated host process");
+                "PASS AtlasDesk in-process Dashboard created one WPF WebView2 inside the real MainWindow event loop, retained native keyboard focus and activated a real document input without HWND embedding or a dedicated host process");
             return 0;
         }
         catch (Exception ex)
@@ -119,26 +97,108 @@ internal static class Program
         }
     }
 
-    private static void ConfigureIsolatedSettings(
-        MainWindow window,
-        string dashboardUrl,
-        string workspace)
+    private static void ConfigureIsolatedSettings(string dashboardUrl, string workspace)
     {
-        var settingsField = typeof(MainWindow)
-            .GetField("_settings", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new MissingFieldException(typeof(MainWindow).FullName, "_settings");
-        var settings = settingsField.GetValue(window) as AppSettings
-            ?? throw new InvalidOperationException("MainWindow settings are unavailable.");
-
+        var settings = AppSettings.Load();
         settings.DashboardAutoOpen = false;
         settings.DashboardName = "AtlasDesk in-process smoke";
         settings.DashboardUrl = dashboardUrl;
         settings.WorkspaceRoot = workspace;
         settings.CondaPath = string.Empty;
         settings.UvPath = string.Empty;
+        settings.Save();
     }
 
-    private static void InvokeShowView(MainWindow window, string viewName, TimeSpan timeout)
+    private static async Task VerifyDashboardAsync(App app)
+    {
+        SetPhase("waiting for StartupUri MainWindow");
+        var window = await WaitForMainWindowAsync(app, TimeSpan.FromSeconds(15));
+        AssertWindowAlive(window, "after StartupUri startup");
+
+        SetPhase("waiting for the complete production feature pipeline");
+        var pipeline = await WaitForPipelineAsync(app, TimeSpan.FromSeconds(15));
+        if (pipeline.Dashboard is null)
+            throw new InvalidOperationException("Dashboard simplicity coordinator is unavailable.");
+
+        SetPhase("opening Dashboard through MainWindow view owner");
+        _ = window.FindName("DashboardNav") as RadioButton
+            ?? throw new InvalidOperationException("Dashboard navigation is unavailable.");
+        await InvokeShowViewAsync(window, "dashboard");
+
+        var view = await WaitForDashboardViewAsync(window, TimeSpan.FromSeconds(45));
+        await WaitForDocumentAsync(view, TimeSpan.FromSeconds(20));
+        AssertWindowAlive(window, "after in-process WebView2 initialization");
+
+        SetPhase("verifying Dashboard stays inside MainWindow visual tree");
+        var host = window.FindName("DashboardHost") as Panel
+            ?? throw new InvalidOperationException("DashboardHost panel is unavailable.");
+        if (!host.Children.Contains(view))
+            throw new InvalidOperationException("The active Dashboard WebView2 is not a child of MainWindow DashboardHost.");
+        if (host.Children.Cast<UIElement>().Any(child =>
+                string.Equals(child.GetType().Name, "DashboardProcessSurface", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("A retired DashboardProcessSurface returned to the visual tree.");
+        }
+
+        SetPhase("verifying native WPF keyboard focus ownership");
+        window.Activate();
+        view.Focus();
+        _ = Keyboard.Focus(view);
+        await Dispatcher.Yield(DispatcherPriority.Input);
+        await Task.Delay(250);
+        if (!view.IsKeyboardFocusWithin && !ReferenceEquals(Keyboard.FocusedElement, view))
+            throw new InvalidOperationException("The in-process Dashboard WebView2 did not receive WPF keyboard focus.");
+
+        SetPhase("verifying page input focus in the same WebView2");
+        var activeElement = await view.CoreWebView2.ExecuteScriptAsync(
+            "document.getElementById('atlasdesk-input').focus(); document.activeElement.id;");
+        if (!string.Equals(activeElement, "\"atlasdesk-input\"", StringComparison.Ordinal))
+            throw new InvalidOperationException("Dashboard document input did not become the active element: " + activeElement);
+
+        var textRoundTrip = await view.CoreWebView2.ExecuteScriptAsync(
+            "document.activeElement.value='AtlasDesk input ready'; document.activeElement.value;");
+        if (!string.Equals(textRoundTrip, "\"AtlasDesk input ready\"", StringComparison.Ordinal))
+            throw new InvalidOperationException("Dashboard input value round-trip failed: " + textRoundTrip);
+
+        SetPhase("verifying no dedicated Dashboard process is required");
+        if (File.Exists(Path.Combine(App.RuntimeDirectory, "DashboardHost", "AtlasDesk.DashboardHost.exe")))
+        {
+            Console.WriteLine("NOTE an older local Runtime may still contain DashboardHost, but v1.1.10 does not start or publish it.");
+        }
+
+        SetPhase("closing real MainWindow normally");
+        window.Close();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        GC.KeepAlive(pipeline);
+    }
+
+    private static async Task<MainWindow> WaitForMainWindowAsync(App app, TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (app.MainWindow is MainWindow window && window.IsLoaded && window.IsVisible)
+                return window;
+            await Task.Delay(50);
+        }
+        throw new TimeoutException("Timed out waiting for the real StartupUri MainWindow.");
+    }
+
+    private static async Task<WorkbenchFeaturePipeline> WaitForPipelineAsync(App app, TimeSpan timeout)
+    {
+        var field = typeof(App).GetField("_pipeline", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(typeof(App).FullName, "_pipeline");
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (field.GetValue(app) is WorkbenchFeaturePipeline pipeline)
+                return pipeline;
+            await Task.Delay(50);
+        }
+        throw new TimeoutException("Timed out waiting for the production WorkbenchFeaturePipeline.");
+    }
+
+    private static async Task InvokeShowViewAsync(MainWindow window, string viewName)
     {
         var method = typeof(MainWindow).GetMethod(
             "ShowViewAsync",
@@ -146,10 +206,10 @@ internal static class Program
             ?? throw new MissingMethodException(typeof(MainWindow).FullName, "ShowViewAsync");
         var task = method.Invoke(window, new object[] { viewName }) as Task
             ?? throw new InvalidOperationException("MainWindow.ShowViewAsync did not return a Task.");
-        AwaitWithDispatcher(task, timeout);
+        await task;
     }
 
-    private static WebView2 WaitForDashboardView(MainWindow window, TimeSpan timeout)
+    private static async Task<WebView2> WaitForDashboardViewAsync(MainWindow window, TimeSpan timeout)
     {
         var field = typeof(MainWindow).GetField(
             "_dashboardWebView",
@@ -159,10 +219,10 @@ internal static class Program
         var deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
-            PumpDispatcher(TimeSpan.FromMilliseconds(80));
             if (field.GetValue(window) is WebView2 view && view.CoreWebView2 is not null)
                 return view;
             AssertWindowAlive(window, "while waiting for Dashboard WebView2");
+            await Task.Delay(80);
         }
 
         throw new TimeoutException(
@@ -176,33 +236,12 @@ internal static class Program
         object? Read(string name) => type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(window);
         var settings = Read("_settings") as AppSettings;
         var errorText = (window.FindName("DashboardErrorText") as TextBlock)?.Text ?? "<missing>";
-        var host = window.FindName("DashboardHost") as UIElement;
-        var empty = window.FindName("DashboardEmpty") as UIElement;
-        var error = window.FindName("DashboardError") as UIElement;
-
-        var logTail = "<no log>";
-        try
-        {
-            if (File.Exists(App.LogPath))
-            {
-                logTail = string.Join(
-                    " || ",
-                    File.ReadLines(App.LogPath).TakeLast(18));
-            }
-        }
-        catch (Exception ex)
-        {
-            logTail = "<log read failed: " + ex.Message + ">";
-        }
-
         return $"url={settings?.DashboardUrl}; currentView={Read("_currentView")}; "
                + $"initializing={Read("_isInitializingDashboard")}; recovery={Read("_dashboardRecoveryInProgress")}; "
-               + $"environment={(Read("_webViewEnvironment") is null ? "null" : "ready")}; "
-               + $"host={host?.Visibility}; empty={empty?.Visibility}; error={error?.Visibility}; "
-               + $"errorText={errorText}; logTail={logTail}";
+               + $"environment={(Read("_webViewEnvironment") is null ? "null" : "ready")}; errorText={errorText}";
     }
 
-    private static void WaitForDocument(WebView2 view, TimeSpan timeout)
+    private static async Task WaitForDocumentAsync(WebView2 view, TimeSpan timeout)
     {
         var deadline = DateTimeOffset.UtcNow + timeout;
         Exception? last = null;
@@ -210,9 +249,7 @@ internal static class Program
         {
             try
             {
-                var state = AwaitWithDispatcher(
-                    view.CoreWebView2.ExecuteScriptAsync("document.readyState"),
-                    TimeSpan.FromSeconds(2));
+                var state = await view.CoreWebView2.ExecuteScriptAsync("document.readyState");
                 if (string.Equals(state, "\"complete\"", StringComparison.Ordinal)
                     || string.Equals(state, "\"interactive\"", StringComparison.Ordinal))
                 {
@@ -223,30 +260,9 @@ internal static class Program
             {
                 last = ex;
             }
-            PumpDispatcher(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(100);
         }
-
         throw new TimeoutException("Dashboard document did not become ready.", last);
-    }
-
-    private static void AwaitWithDispatcher(Task task, TimeSpan timeout)
-    {
-        var deadline = DateTimeOffset.UtcNow + timeout;
-        while (!task.IsCompleted && DateTimeOffset.UtcNow < deadline)
-            PumpDispatcher(TimeSpan.FromMilliseconds(25));
-        if (!task.IsCompleted)
-            throw new TimeoutException("Timed out while awaiting a Dashboard WPF operation.");
-        task.GetAwaiter().GetResult();
-    }
-
-    private static T AwaitWithDispatcher<T>(Task<T> task, TimeSpan timeout)
-    {
-        var deadline = DateTimeOffset.UtcNow + timeout;
-        while (!task.IsCompleted && DateTimeOffset.UtcNow < deadline)
-            PumpDispatcher(TimeSpan.FromMilliseconds(25));
-        if (!task.IsCompleted)
-            throw new TimeoutException("Timed out while awaiting a Dashboard WebView2 operation.");
-        return task.GetAwaiter().GetResult();
     }
 
     private static void AssertWindowAlive(Window window, string phase)
@@ -259,22 +275,6 @@ internal static class Program
     {
         _phase = value;
         Console.WriteLine("DASHBOARD-INPROCESS " + value);
-    }
-
-    private static void PumpDispatcher(TimeSpan duration)
-    {
-        var frame = new DispatcherFrame();
-        var timer = new DispatcherTimer(DispatcherPriority.Background)
-        {
-            Interval = duration
-        };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            frame.Continue = false;
-        };
-        timer.Start();
-        Dispatcher.PushFrame(frame);
     }
 
     private sealed class LocalDashboardServer : IDisposable
