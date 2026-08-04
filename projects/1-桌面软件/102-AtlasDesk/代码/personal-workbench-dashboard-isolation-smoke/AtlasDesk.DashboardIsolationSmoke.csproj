@@ -10,6 +10,7 @@
     <AssemblyName>AtlasDesk.DashboardIsolationSmoke</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="System.IO" />
     <ProjectReference Include="..\personal-workbench-native\PersonalWorkbench.csproj" />
   </ItemGroup>
 </Project>
