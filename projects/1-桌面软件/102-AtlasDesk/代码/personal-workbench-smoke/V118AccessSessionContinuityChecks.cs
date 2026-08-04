@@ -14,8 +14,8 @@ internal static class V118AccessSessionContinuityChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 8))
-            throw new InvalidOperationException("AtlasDesk Access session-continuity candidate must be v1.1.8.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 8))
+            throw new InvalidOperationException("AtlasDesk must not move below the v1.1.8 Access session-continuity baseline.");
 
         var host = File.ReadAllText(RequireFile(hostRoot, "DashboardHostForm.cs"));
         var proxy = File.ReadAllText(RequireFile(hostRoot, "DashboardProxyResolver.cs"));
@@ -64,7 +64,7 @@ internal static class V118AccessSessionContinuityChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.8 keeps Cloudflare Access in one WebView2 instance, verifies the application cookie, detaches the same window for login and resolves DashboardHost proxy routing independently of Chrome");
+            "PASS AtlasDesk retains the v1.1.8 single-WebView Access session, application-cookie verification and DashboardHost proxy-routing baseline");
     }
 
     private static string RequireFile(string root, string fileName)

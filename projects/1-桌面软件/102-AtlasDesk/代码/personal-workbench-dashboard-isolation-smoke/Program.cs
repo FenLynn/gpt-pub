@@ -72,8 +72,11 @@ internal static class Program
                 _ = WaitForMessage(first, "AUTHWINDOW", TimeSpan.FromSeconds(15));
                 var authComplete = WaitForMessage(first, "AUTHMODE", TimeSpan.FromSeconds(15));
                 RequirePayloadEquals(authComplete, "success");
+
+                SetPhase("verifying automatic Dashboard input focus after authentication re-embed");
+                _ = WaitForMessage(first, "FOCUS", TimeSpan.FromSeconds(10));
                 PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after the same WebView completed Access cookie round-trip and re-embedded");
+                AssertWindowAlive(window, "after the same WebView completed Access cookie round-trip, re-embedded and automatically regained input focus");
                 if (surface.DashboardHandle != firstHandle)
                     throw new InvalidOperationException("Authentication replaced the DashboardHost HWND instead of reusing the same window.");
 
@@ -121,7 +124,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk.DashboardHost used one real WebView2 for a CF_Authorization cookie round-trip, detached and re-embedded the same HWND, accepted cross-process keyboard focus, survived forced host termination in the primary WPF process, and restarted successfully");
+                "PASS AtlasDesk.DashboardHost used one real WebView2 for a CF_Authorization cookie round-trip, detached and re-embedded the same HWND, automatically regained cross-process input focus after authentication, survived forced host termination in the primary WPF process, and restarted successfully");
             return 0;
         }
         catch (Exception ex)
