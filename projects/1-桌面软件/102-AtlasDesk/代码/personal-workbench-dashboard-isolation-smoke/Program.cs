@@ -47,7 +47,8 @@ internal static class Program
             watchdog.Tick += (_, _) =>
             {
                 watchdog.Stop();
-                failure ??= new TimeoutException("The real AtlasDesk Dashboard verification exceeded 90 seconds during: " + _phase);
+                failure ??= new TimeoutException(
+                    "The real AtlasDesk Dashboard verification exceeded 90 seconds during: " + _phase);
                 app.Shutdown(1);
             };
 
@@ -83,7 +84,10 @@ internal static class Program
             if (failure is not null)
                 throw new InvalidOperationException("Real AtlasDesk Dashboard verification failed.", failure);
             if (!completed || exitCode != 0)
-                throw new InvalidOperationException($"Real AtlasDesk Dashboard verification ended incompletely; completed={completed}; exitCode={exitCode}.");
+            {
+                throw new InvalidOperationException(
+                    $"Real AtlasDesk Dashboard verification ended incompletely; completed={completed}; exitCode={exitCode}.");
+            }
 
             SetPhase("completed");
             Console.WriteLine(
@@ -151,7 +155,7 @@ internal static class Program
         view.Focus();
         _ = Keyboard.Focus(view);
         await Dispatcher.Yield(DispatcherPriority.Input);
-        await Task.Delay(200);
+        await Task.Delay(250);
 
         var activeElement = await view.CoreWebView2.ExecuteScriptAsync(
             "const input=document.getElementById('atlasdesk-input'); input.value=''; input.focus(); document.activeElement.id;");
@@ -161,7 +165,7 @@ internal static class Program
         SetPhase("sending real Unicode keyboard input to WebView2");
         const string expectedInput = "AtlasDesk physical input";
         SendUnicodeText(expectedInput);
-        await Task.Delay(350);
+        await Task.Delay(400);
         var physicalInput = await view.CoreWebView2.ExecuteScriptAsync("document.activeElement.value;");
         if (!string.Equals(physicalInput, "\"" + expectedInput + "\"", StringComparison.Ordinal))
             throw new InvalidOperationException("Dashboard did not receive real keyboard input: " + physicalInput);
@@ -169,7 +173,8 @@ internal static class Program
         SetPhase("verifying no dedicated Dashboard process is required");
         if (File.Exists(Path.Combine(App.RuntimeDirectory, "DashboardHost", "AtlasDesk.DashboardHost.exe")))
         {
-            Console.WriteLine("NOTE an older local Runtime may still contain DashboardHost, but v1.1.10 does not start or publish it.");
+            Console.WriteLine(
+                "NOTE an older local Runtime may still contain DashboardHost, but v1.1.10 does not start or publish it.");
         }
 
         SetPhase("closing real MainWindow normally");
@@ -187,11 +192,16 @@ internal static class Program
             inputs.Add(CreateUnicodeInput(character, keyUp: true));
         }
 
-        var sent = SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<NativeInput>());
-        if (sent != inputs.Count)
+        var nativeInputs = inputs.ToArray();
+        var inputSize = Marshal.SizeOf<NativeInput>();
+        if (Environment.Is64BitProcess && inputSize != 40)
+            throw new InvalidOperationException("Unexpected x64 INPUT size: " + inputSize);
+
+        var sent = SendInput((uint)nativeInputs.Length, nativeInputs, inputSize);
+        if (sent != (uint)nativeInputs.Length)
         {
             throw new InvalidOperationException(
-                $"SendInput delivered {sent} of {inputs.Count} keyboard events; Win32={Marshal.GetLastWin32Error()}.");
+                $"SendInput delivered {sent} of {nativeInputs.Length} keyboard events; size={inputSize}; Win32={Marshal.GetLastWin32Error()}.");
         }
     }
 
@@ -328,7 +338,24 @@ internal static class Program
     private struct InputUnion
     {
         [FieldOffset(0)]
+        public MouseInput Mouse;
+
+        [FieldOffset(0)]
         public KeyboardInput Keyboard;
+
+        [FieldOffset(0)]
+        public HardwareInput Hardware;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -339,6 +366,14 @@ internal static class Program
         public uint Flags;
         public uint Time;
         public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HardwareInput
+    {
+        public uint Message;
+        public ushort ParameterLow;
+        public ushort ParameterHigh;
     }
 
     [DllImport("user32.dll", SetLastError = true)]
