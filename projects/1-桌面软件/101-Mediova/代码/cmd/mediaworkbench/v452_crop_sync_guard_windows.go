@@ -21,7 +21,8 @@ const (
 )
 
 type v452CropSyncState struct {
-	pending atomic.Uint32
+	pending      atomic.Uint32
+	initializing atomic.Bool
 }
 
 var (
@@ -47,6 +48,7 @@ var (
 	v452CropSyncGetThreadID  = kernel32.NewProc("GetCurrentThreadId")
 	v452CropSyncInstallTries atomic.Int32
 	v452CropSyncParentsOK    atomic.Int32
+	v452CropSyncEarlyOK      atomic.Int32
 	v452CropSyncEditsOK      atomic.Int32
 	v452CropSyncIntercepted  atomic.Int32
 	v452CropSyncCBTCallbacks atomic.Int32
@@ -116,6 +118,7 @@ func v452CropSyncCBTProc(code int32, wParam, lParam uintptr) uintptr {
 				v452CropSyncSnapshots.Add(1)
 			}
 			v452CropSyncSnapshotMu.Unlock()
+			v452InstallCropSyncParentEarly(wParam, d)
 		}
 	}
 	if code == v452HCBTActivate {
@@ -129,6 +132,28 @@ func v452CropSyncCBTProc(code int32, wParam, lParam uintptr) uintptr {
 	}
 	result, _, _ := v452CropSyncNextHook.Call(v452CropSyncCBTHook.Load(), uintptr(code), wParam, lParam)
 	return result
+}
+
+func v452InstallCropSyncParentEarly(parent uintptr, d *trimDialog) {
+	if parent == 0 || d == nil {
+		return
+	}
+	if _, installed := v452CropSyncParents.Load(parent); installed {
+		return
+	}
+	v452CropSyncInstallTries.Add(1)
+	state := &v452CropSyncState{}
+	state.initializing.Store(true)
+	v452CropSyncStates.Store(parent, state)
+	ok, _, _ := v452SetWindowSubclass.Call(parent, v452CropSyncParentCB, v452CropSyncParentSubclassID, 0)
+	if ok == 0 {
+		v452CropSyncStates.Delete(parent)
+		return
+	}
+	v452CropSyncParents.Store(parent, true)
+	v452CropSyncInitial.Store(parent, d.opts.Crop)
+	v452CropSyncParentsOK.Add(1)
+	v452CropSyncEarlyOK.Add(1)
 }
 
 func v452InstallCropSyncGuard(d *trimDialog) {
@@ -215,11 +240,30 @@ func v452RestoreInitialCropState(d *trimDialog) {
 }
 
 func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	if message == WM_COMMAND && int(hiWord(wParam)) == v452ENChange {
+	if message == WM_CREATE {
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		if d := activeTrim; d != nil && d.hwnd == hwnd {
+			v452BindPendingCropSnapshot(d)
+			v452InstallCropSyncHandles(hwnd, []uintptr{d.hX, d.hY, d.hW, d.hH})
+			v452RestoreInitialCropState(d)
+		}
+		if value, ok := v452CropSyncStates.Load(hwnd); ok {
+			value.(*v452CropSyncState).initializing.Store(false)
+		}
+		return result
+	}
+	if message == WM_COMMAND {
 		id := int(loWord(wParam))
-		if value, ok := v452CropSyncStates.Load(hwnd); ok && value.(*v452CropSyncState).consume(id) {
-			v452CropSyncIntercepted.Add(1)
-			return 0
+		if value, ok := v452CropSyncStates.Load(hwnd); ok {
+			state := value.(*v452CropSyncState)
+			if state.initializing.Load() && v452IsCropEditID(id) {
+				v452CropSyncIntercepted.Add(1)
+				return 0
+			}
+			if int(hiWord(wParam)) == v452ENChange && state.consume(id) {
+				v452CropSyncIntercepted.Add(1)
+				return 0
+			}
 		}
 	}
 	if message == v452WMNCDestroy {
