@@ -15,6 +15,8 @@ const (
 	v452CropSyncEditSubclassID   = 0x4554
 	v452ENChange                 = 0x0300
 	v452WMSetTextMessage         = 0x000C
+	v452WHCBT                    = 5
+	v452HCBTCreateWnd            = 3
 )
 
 type v452CropSyncState struct {
@@ -25,18 +27,28 @@ var (
 	v452CropSyncEventCB      uintptr
 	v452CropSyncParentCB     uintptr
 	v452CropSyncEditCB       uintptr
+	v452CropSyncCBTCB        uintptr
 	v452CropSyncHook         uintptr
+	v452CropSyncCBTHook      atomic.Uintptr
 	v452CropSyncStates       sync.Map // map[dialog HWND]*v452CropSyncState
 	v452CropSyncParents      sync.Map // map[dialog HWND]bool, only after successful subclassing
 	v452CropSyncEdits        sync.Map // map[edit HWND]bool, only after successful subclassing
-	v452CropSyncInitial      sync.Map // map[dialog HWND]model.Crop, captured before edit creation mutates the model
+	v452CropSyncInitial      sync.Map // map[dialog HWND]model.Crop, captured before WM_CREATE
 	v452CropSyncRepaired     sync.Map // map[dialog HWND]bool, after the captured crop is restored
+	v452CropSyncSnapshotMu   sync.Mutex
+	v452CropSyncPending      *trimDialog
+	v452CropSyncPendingValue model.Crop
 	v452CropSyncGetParent    = user32.NewProc("GetParent")
 	v452CropSyncGetID        = user32.NewProc("GetDlgCtrlID")
+	v452CropSyncSetHook      = user32.NewProc("SetWindowsHookExW")
+	v452CropSyncNextHook     = user32.NewProc("CallNextHookEx")
+	v452CropSyncUnhook       = user32.NewProc("UnhookWindowsHookEx")
+	v452CropSyncGetThreadID  = kernel32.NewProc("GetCurrentThreadId")
 	v452CropSyncInstallTries atomic.Int32
 	v452CropSyncParentsOK    atomic.Int32
 	v452CropSyncEditsOK      atomic.Int32
 	v452CropSyncIntercepted  atomic.Int32
+	v452CropSyncCBTCallbacks atomic.Int32
 	v452CropSyncSnapshots    atomic.Int32
 	v452CropSyncRepairs      atomic.Int32
 )
@@ -45,6 +57,7 @@ func init() {
 	v452CropSyncEventCB = syscall.NewCallback(v452CropSyncEventProc)
 	v452CropSyncParentCB = syscall.NewCallback(v452CropSyncParentSubclassProc)
 	v452CropSyncEditCB = syscall.NewCallback(v452CropSyncEditSubclassProc)
+	v452CropSyncCBTCB = syscall.NewCallback(v452CropSyncCBTProc)
 	v452CropSyncHook, _, _ = v452SetWinEventHook.Call(
 		v452EventObjectCreate,
 		v452EventObjectShow,
@@ -57,6 +70,7 @@ func init() {
 }
 
 func v452CropSyncEventProc(hook, event, hwnd, idObject, idChild, eventThread, eventTime uintptr) uintptr {
+	v452EnsureCropSyncCBTHook()
 	v452InstallCropSyncGuard(activeTrim)
 	if hwnd == 0 {
 		return 0
@@ -71,22 +85,65 @@ func v452CropSyncEventProc(hook, event, hwnd, idObject, idChild, eventThread, ev
 	return 0
 }
 
+func v452EnsureCropSyncCBTHook() {
+	if v452CropSyncCBTHook.Load() != 0 || app == nil || app.hwnd == 0 {
+		return
+	}
+	threadID, _, _ := v452CropSyncGetThreadID.Call()
+	if threadID == 0 {
+		return
+	}
+	hook, _, _ := v452CropSyncSetHook.Call(v452WHCBT, v452CropSyncCBTCB, 0, threadID)
+	if hook == 0 {
+		return
+	}
+	if !v452CropSyncCBTHook.CompareAndSwap(0, hook) {
+		v452CropSyncUnhook.Call(hook)
+	}
+}
+
+func v452CropSyncCBTProc(code int32, wParam, lParam uintptr) uintptr {
+	if code == v452HCBTCreateWnd {
+		v452CropSyncCBTCallbacks.Add(1)
+		d := activeTrim
+		if d != nil && d.hwnd == 0 && d.opts.Crop.Width >= 2 && d.opts.Crop.Height >= 2 {
+			v452CropSyncSnapshotMu.Lock()
+			if v452CropSyncPending != d {
+				v452CropSyncPending = d
+				v452CropSyncPendingValue = d.opts.Crop
+				v452CropSyncSnapshots.Add(1)
+			}
+			v452CropSyncSnapshotMu.Unlock()
+		}
+	}
+	result, _, _ := v452CropSyncNextHook.Call(v452CropSyncCBTHook.Load(), uintptr(code), wParam, lParam)
+	return result
+}
+
 func v452InstallCropSyncGuard(d *trimDialog) {
 	if d == nil || d.hwnd == 0 {
 		return
 	}
-	v452CaptureInitialCropState(d)
+	v452BindPendingCropSnapshot(d)
 	v452InstallCropSyncHandles(d.hwnd, []uintptr{d.hX, d.hY, d.hW, d.hH})
 	v452RestoreInitialCropState(d)
 }
 
-func v452CaptureInitialCropState(d *trimDialog) {
-	if d == nil || d.hwnd == 0 || d.opts.Crop.Width < 2 || d.opts.Crop.Height < 2 {
+func v452BindPendingCropSnapshot(d *trimDialog) {
+	if d == nil || d.hwnd == 0 {
 		return
 	}
-	if _, loaded := v452CropSyncInitial.LoadOrStore(d.hwnd, d.opts.Crop); !loaded {
-		v452CropSyncSnapshots.Add(1)
+	if _, exists := v452CropSyncInitial.Load(d.hwnd); exists {
+		return
 	}
+	v452CropSyncSnapshotMu.Lock()
+	defer v452CropSyncSnapshotMu.Unlock()
+	if v452CropSyncPending != d {
+		return
+	}
+	v452CropSyncInitial.Store(d.hwnd, v452CropSyncPendingValue)
+	v452CropSyncPending = nil
+	v452CropSyncPendingValue = model.Crop{}
 }
 
 func v452InstallCropSyncHandles(parent uintptr, edits []uintptr) {
