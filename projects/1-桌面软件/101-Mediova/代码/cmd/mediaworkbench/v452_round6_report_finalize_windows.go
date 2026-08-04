@@ -83,13 +83,14 @@ func (a *application) v452FinalizeRound6Report() error {
 	report.Details["round6_timeline_seek_independent"] = fmt.Sprintf("seek_events=%d independent=%d", seekEvents, independent)
 
 	numberDraws := v452Round6NumberDraws.Load()
+	previewAttempts := v452Round6PreviewAttempts.Load()
 	previewDraws := v452Round6PreviewDraws.Load()
 	report.Checks["round6_list_numbers_drawn"] = numberDraws > 0
 	report.Details["round6_list_numbers_drawn"] = fmt.Sprintf("draws=%d", numberDraws)
 	// Preview images depend on the generated thumbnail ImageList. Keep the
 	// result explicit rather than treating the file name alone as a preview.
 	report.Checks["round6_list_previews_drawn"] = previewDraws > 0
-	report.Details["round6_list_previews_drawn"] = fmt.Sprintf("draws=%d", previewDraws)
+	report.Details["round6_list_previews_drawn"] = fmt.Sprintf("attempts=%d draws=%d", previewAttempts, previewDraws)
 
 	report.Passed = len(report.Checks) > 0
 	for _, ok := range report.Checks {
