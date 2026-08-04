@@ -15,11 +15,12 @@ func TestGroupDirectMediaFilesKeepsCommonTopFolder(t *testing.T) {
 		t.Fatalf("groups=%d want=1: %#v", len(groups), groups)
 	}
 	group := groups[0]
-	if group.Root != base {
-		t.Fatalf("root=%q want=%q", group.Root, base)
+	root, prefix := DecodeRootContext(group.Root)
+	if root != base {
+		t.Fatalf("root=%q want=%q", root, base)
 	}
-	if group.OutputPrefix != "" {
-		t.Fatalf("single-volume prefix=%q want empty", group.OutputPrefix)
+	if prefix != "" || group.OutputPrefix != "" {
+		t.Fatalf("single-volume prefixes root=%q group=%q", prefix, group.OutputPrefix)
 	}
 	if len(group.Paths) != 2 || group.Paths[0] != first || group.Paths[1] != second {
 		t.Fatalf("paths were not retained in input order: %#v", group.Paths)
@@ -33,8 +34,9 @@ func TestGroupDirectMediaFilesSingleFileRetainsParentFolder(t *testing.T) {
 	if len(groups) != 1 {
 		t.Fatalf("groups=%d want=1", len(groups))
 	}
-	if groups[0].Root != base {
-		t.Fatalf("root=%q want=%q", groups[0].Root, base)
+	root, prefix := DecodeRootContext(groups[0].Root)
+	if root != base || prefix != "" {
+		t.Fatalf("root=%q prefix=%q want root=%q", root, prefix, base)
 	}
 }
 
@@ -48,11 +50,13 @@ func TestGroupDirectMediaFilesSeparatesWindowsVolumes(t *testing.T) {
 	if len(groups) != 2 {
 		t.Fatalf("groups=%d want=2: %#v", len(groups), groups)
 	}
-	if groups[0].Root != `C:\用户\素材` || groups[0].OutputPrefix != "C盘" || len(groups[0].Paths) != 2 {
-		t.Fatalf("unexpected C group: %#v", groups[0])
+	cRoot, cPrefix := DecodeRootContext(groups[0].Root)
+	dRoot, dPrefix := DecodeRootContext(groups[1].Root)
+	if cRoot != `C:\用户\素材` || cPrefix != "C盘" || groups[0].OutputPrefix != "C盘" || len(groups[0].Paths) != 2 {
+		t.Fatalf("unexpected C group: %#v decoded=%q/%q", groups[0], cRoot, cPrefix)
 	}
-	if groups[1].Root != `D:\归档` || groups[1].OutputPrefix != "D盘" || len(groups[1].Paths) != 1 {
-		t.Fatalf("unexpected D group: %#v", groups[1])
+	if dRoot != `D:\归档` || dPrefix != "D盘" || groups[1].OutputPrefix != "D盘" || len(groups[1].Paths) != 1 {
+		t.Fatalf("unexpected D group: %#v decoded=%q/%q", groups[1], dRoot, dPrefix)
 	}
 }
 
@@ -65,8 +69,11 @@ func TestGroupDirectMediaFilesSeparatesUNCShares(t *testing.T) {
 	if len(groups) != 2 {
 		t.Fatalf("groups=%d want=2: %#v", len(groups), groups)
 	}
-	if groups[0].OutputPrefix != "server-a_media" || groups[1].OutputPrefix != "server-b_media" {
-		t.Fatalf("unexpected UNC prefixes: %#v", groups)
+	_, firstPrefix := DecodeRootContext(groups[0].Root)
+	_, secondPrefix := DecodeRootContext(groups[1].Root)
+	if groups[0].OutputPrefix != "server-a_media" || groups[1].OutputPrefix != "server-b_media" ||
+		firstPrefix != "server-a_media" || secondPrefix != "server-b_media" {
+		t.Fatalf("unexpected UNC prefixes: %#v decoded=%q/%q", groups, firstPrefix, secondPrefix)
 	}
 }
 
