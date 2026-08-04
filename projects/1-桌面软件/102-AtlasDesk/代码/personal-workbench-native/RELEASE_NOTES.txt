@@ -1,3 +1,35 @@
+AtlasDesk v1.1.6 Dashboard process-isolation hotfix
+
+This third Dashboard hotfix changes the failure boundary instead of adding another in-process recovery layer. User logs showed that a normal page click could terminate AtlasDesk before .NET, WPF, CoreWebView2.ProcessFailed, BrowserProcessExited or window-closing handlers could run. The reliable boundary is therefore an operating-system process boundary.
+
+Process isolation
+- Dashboard WebView2 and all Dashboard page code now run in a second AtlasDesk.exe process.
+- It is the same executable, separate operating-system process, started with --dashboard-host.
+- The primary AtlasDesk process contains no Dashboard WebView2 control and no Dashboard DOM injection.
+- A lightweight HwndHost surface embeds the child process window into the existing Dashboard page, preserving the integrated layout.
+- Back, forward, refresh and Dashboard home are sent through redirected standard input instead of calling WebView2 from the primary process.
+- Title, source, navigation state, process failures and helper diagnostics return through redirected standard output.
+- The historical in-process pop-out path is disabled because it would reintroduce WebView2 into the primary process.
+
+Crash containment
+- If WebView2, the WPF WebView2 native control, a page script or a graphics component terminates DashboardHost, the failure does not terminate the primary AtlasDesk process.
+- AtlasDesk records the DashboardHost exit code, keeps workspace, Zotero, project, terminal, task and tool pages alive, and shows a restart control inside Dashboard.
+- One automatic restart is attempted after a rapid first exit; repeated rapid exits stop the loop and wait for an explicit restart.
+- The child process monitors the primary process and closes itself when AtlasDesk exits.
+- The child process bypasses StartupGuard, global shortcuts and the AtlasDesk feature pipeline, so a DashboardHost failure is not counted as a primary-app crash.
+
+Reduced variables
+- The isolated host uses a new Local Data profile at %LOCALAPPDATA%\AtlasDesk\WebView2-Isolated.
+- The first v1.1.6 launch can therefore require signing in to Cloudflare Access again.
+- Hardware GPU acceleration is disabled only in DashboardHost with --disable-gpu; the primary AtlasDesk UI and other modules keep their normal rendering path.
+- v1.1.5 capture-phase click injection and Dashboard WebMessageReceived diagnostics are removed from the active Dashboard path.
+- Microsoft WebView2 process events remain handled inside DashboardHost for renderer reload and browser-process exit, but they are no longer the final protection boundary.
+
+Candidate boundary
+- v1.1.6 is a focused crash-containment and architecture hotfix.
+- Project context, Zotero read-only behavior, Runtime/Data separation and external-browser routing are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.5 WebView2 process-ownership hotfix
 
 This second Dashboard hotfix addresses abrupt native exits that could still occur after v1.1.4 when users clicked refresh-like controls repeatedly. The v1.1.4 startup E_ABORT race remains fixed; v1.1.5 closes the remaining process-failure and duplicate-handler paths.
