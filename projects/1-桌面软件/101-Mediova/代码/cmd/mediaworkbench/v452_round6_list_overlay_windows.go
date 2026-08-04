@@ -14,6 +14,7 @@ const (
 	v452Round6ListOverlaySubclassID = 0x4568
 	v452Round6WMPrint               = 0x0317
 	v452Round6WMPrintClient         = 0x0318
+	v452Round6LVMGetColumnWidth     = 0x101D
 )
 
 var (
@@ -83,16 +84,24 @@ func v452Round6DrawListOverlay(a *application, hdc uintptr) {
 	var client rect
 	procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client)))
 	count := int(send(a.hList, LVM_GETITEMCOUNT, 0, 0))
+	numberWidth := int32(send(a.hList, v452Round6LVMGetColumnWidth, uintptr(taskColNumber), 0))
+	if numberWidth <= 0 {
+		numberWidth = int32(scaleDPI(48))
+	}
 	imageCount := 0
 	if a.hImageList != 0 {
 		raw, _, _ := v452Round6ImageListCount.Call(a.hImageList)
 		imageCount = int(raw)
 	}
 	for row := 0; row < count; row++ {
-		numberCell, ok := listSubItemBounds(a.hList, row, taskColNumber)
-		if !ok || numberCell.Bottom < client.Top || numberCell.Top > client.Bottom {
+		fileCell, ok := listSubItemBounds(a.hList, row, taskColFile)
+		if !ok || fileCell.Bottom < client.Top || fileCell.Top > client.Bottom {
 			continue
 		}
+		// Win32 does not return a real subitem rectangle for column zero. Derive
+		// it from the first ordinary subitem and the actual # column width so the
+		// number cannot drift into later columns.
+		numberCell := rect{Left: fileCell.Left - numberWidth, Top: fileCell.Top, Right: fileCell.Left, Bottom: fileCell.Bottom}
 		task, ok := a.visibleTaskSnapshot(row)
 		if !ok {
 			continue
@@ -111,22 +120,20 @@ func v452Round6DrawListOverlay(a *application, hdc uintptr) {
 			}
 		}
 
-		fillSolid(hdc, numberCell, background)
-		old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
-		procSetBkMode.Call(hdc, TRANSPARENT)
-		procSetTextColor.Call(hdc, textColor)
-		label := strconv.Itoa(row + 1)
-		procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&numberCell)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
-		if old != 0 {
-			procSelectObject.Call(hdc, old)
+		if numberCell.Right > client.Left && numberCell.Left < client.Right {
+			fillSolid(hdc, numberCell, background)
+			old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
+			procSetBkMode.Call(hdc, TRANSPARENT)
+			procSetTextColor.Call(hdc, textColor)
+			label := strconv.Itoa(row + 1)
+			procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&numberCell)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+			if old != 0 {
+				procSelectObject.Call(hdc, old)
+			}
+			v452Round6NumberDraws.Add(1)
 		}
-		v452Round6NumberDraws.Add(1)
 
 		if task.ThumbnailIndex < 0 || task.ThumbnailIndex >= imageCount || a.hImageList == 0 {
-			continue
-		}
-		fileCell, ok := listSubItemBounds(a.hList, row, taskColFile)
-		if !ok {
 			continue
 		}
 		fillSolid(hdc, fileCell, background)
@@ -141,10 +148,10 @@ func v452Round6DrawListOverlay(a *application, hdc uintptr) {
 		textRect := fileCell
 		textRect.Left += scaleDPI(98)
 		textRect.Right -= scaleDPI(6)
-		old, _, _ = procSelectObject.Call(hdc, uiFontSmall)
+		old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
 		procSetBkMode.Call(hdc, TRANSPARENT)
 		procSetTextColor.Call(hdc, textColor)
-		label = filepath.Base(task.Input)
+		label := filepath.Base(task.Input)
 		procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&textRect)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
 		if old != 0 {
 			procSelectObject.Call(hdc, old)
