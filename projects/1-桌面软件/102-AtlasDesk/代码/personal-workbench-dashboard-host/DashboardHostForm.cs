@@ -10,7 +10,27 @@ internal sealed class DashboardHostForm : Form
 {
     private const int WmSetFocus = 0x0007;
     private const int WmMouseActivate = 0x0021;
+    private const int WmSysCommand = 0x0112;
+    private const int ScClose = 0xF060;
     private const int MaActivate = 1;
+    private const int GwlStyle = -16;
+    private const int GwlExStyle = -20;
+
+    private const long WsChild = 0x40000000L;
+    private const long WsVisible = 0x10000000L;
+    private const long WsPopup = unchecked((long)0x80000000);
+    private const long WsCaption = 0x00C00000L;
+    private const long WsThickFrame = 0x00040000L;
+    private const long WsSysMenu = 0x00080000L;
+    private const long WsMinimizeBox = 0x00020000L;
+    private const long WsMaximizeBox = 0x00010000L;
+    private const long WsExAppWindow = 0x00040000L;
+    private const long WsExToolWindow = 0x00000080L;
+
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpFrameChanged = 0x0020;
+    private const uint SwpShowWindow = 0x0040;
+    private const int SwShow = 5;
 
     private readonly DashboardHostOptions _options;
     private readonly WebView2 _webView;
@@ -21,10 +41,12 @@ internal sealed class DashboardHostForm : Form
     private readonly SemaphoreSlim _commandGate = new(1, 1);
 
     private CoreWebView2Environment? _environment;
-    private Form? _authenticationForm;
-    private WebView2? _authenticationView;
     private DateTimeOffset _lastRendererReload = DateTimeOffset.MinValue;
-    private bool _authenticationSucceeded;
+    private IntPtr _embeddedParent;
+    private long _embeddedStyle;
+    private long _embeddedExStyle;
+    private bool _authenticationActive;
+    private bool _authenticationDetached;
     private bool _closing;
 
     public DashboardHostForm(DashboardHostOptions options)
@@ -70,7 +92,7 @@ internal sealed class DashboardHostForm : Form
         Controls.Add(_errorPanel);
         _errorPanel.BringToFront();
 
-        _parentTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        _parentTimer = new System.Windows.Forms.Timer { Interval = 500 };
         _parentTimer.Tick += ParentTimer_Tick;
 
         Shown += Form_Shown;
@@ -81,6 +103,16 @@ internal sealed class DashboardHostForm : Form
 
     protected override void WndProc(ref Message m)
     {
+        if (m.Msg == WmSysCommand
+            && ((int)m.WParam.ToInt64() & 0xFFF0) == ScClose
+            && _authenticationActive
+            && !_closing)
+        {
+            CancelAuthentication("window-close");
+            m.Result = IntPtr.Zero;
+            return;
+        }
+
         if (m.Msg == WmMouseActivate)
         {
             base.WndProc(ref m);
@@ -109,6 +141,13 @@ internal sealed class DashboardHostForm : Form
 
     private void Form_FormClosing(object? sender, FormClosingEventArgs e)
     {
+        if (!_closing && _authenticationActive && e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+            CancelAuthentication("form-closing");
+            return;
+        }
+
         _closing = true;
         _parentTimer.Stop();
         _lifetime.Cancel();
@@ -116,8 +155,6 @@ internal sealed class DashboardHostForm : Form
 
     private void Form_FormClosed(object? sender, FormClosedEventArgs e)
     {
-        try { _authenticationForm?.Close(); } catch { }
-        try { _authenticationView?.Dispose(); } catch { }
         try { _webView.Dispose(); } catch { }
         _parentTimer.Dispose();
         DashboardHostProtocol.Emit(
@@ -130,19 +167,21 @@ internal sealed class DashboardHostForm : Form
         try
         {
             Directory.CreateDirectory(_options.ProfileDirectory);
+            var proxy = DashboardProxyConfiguration.Resolve();
             var environmentOptions = new CoreWebView2EnvironmentOptions
             {
-                AdditionalBrowserArguments = "--disable-gpu"
+                AdditionalBrowserArguments = proxy.BrowserArguments
             };
 
             DashboardHostProtocol.Log(
                 "Creating dedicated WinForms WebView2 environment at " + _options.ProfileDirectory);
+            DashboardHostProtocol.Log("DashboardHost network route: " + proxy.Description);
             _environment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: null,
                 userDataFolder: _options.ProfileDirectory,
                 options: environmentOptions);
             await _webView.EnsureCoreWebView2Async(_environment);
-            ConfigureCore(_webView.CoreWebView2, isMainDashboard: true);
+            ConfigureCore(_webView.CoreWebView2);
             _webView.CoreWebView2.Navigate(_options.DashboardUrl);
 
             DashboardHostProtocol.Emit(
@@ -150,7 +189,7 @@ internal sealed class DashboardHostForm : Form
                 Handle.ToInt64().ToString(System.Globalization.CultureInfo.InvariantCulture));
             DashboardHostProtocol.Emit("READY");
             DashboardHostProtocol.Log(
-                "Dedicated WinForms DashboardHost ready before HWND handoff; GPU disabled; DOM injection disabled");
+                "Dedicated WinForms DashboardHost ready before HWND handoff; one WebView owns Dashboard and Access authentication");
             BeginInvoke(new Action(() => FocusBrowserInput("initial-ready")));
         }
         catch (Exception ex)
@@ -160,7 +199,7 @@ internal sealed class DashboardHostForm : Form
         }
     }
 
-    private void ConfigureCore(CoreWebView2 core, bool isMainDashboard)
+    private void ConfigureCore(CoreWebView2 core)
     {
         core.Settings.AreDefaultScriptDialogsEnabled = true;
         core.Settings.AreDefaultContextMenusEnabled = true;
@@ -169,21 +208,13 @@ internal sealed class DashboardHostForm : Form
         core.Settings.IsZoomControlEnabled = true;
         core.Settings.AreBrowserAcceleratorKeysEnabled = true;
 
-        core.NavigationStarting += async (_, args) =>
+        core.NavigationStarting += (_, args) =>
         {
-            if (isMainDashboard
-                && IsAuthenticationUri(args.Uri)
-                && !IsSameDashboardOrigin(args.Uri))
+            if (IsAuthenticationFlowUri(args.Uri))
             {
-                args.Cancel = true;
-                DashboardHostProtocol.Emit(
-                    "AUTHOPEN",
-                    DashboardHostProtocol.Encode(args.Uri ?? string.Empty));
-                _ = await EnsureAuthenticationWindowAsync(args.Uri);
-                return;
+                EnterAuthenticationMode(args.Uri);
             }
-
-            if (ShouldOpenExternally(args.Uri))
+            else if (ShouldOpenExternally(args.Uri))
             {
                 args.Cancel = true;
                 OpenExternalUri(args.Uri);
@@ -197,20 +228,24 @@ internal sealed class DashboardHostForm : Form
                 DashboardHostProtocol.Encode(args.Uri ?? string.Empty));
         };
 
-        core.NavigationCompleted += (_, args) =>
+        core.NavigationCompleted += async (_, args) =>
         {
             DashboardHostProtocol.Emit(
                 "NAVEND",
                 args.IsSuccess ? "success" : "failure:" + args.WebErrorStatus);
-            if (args.IsSuccess)
+            if (!args.IsSuccess)
             {
-                _errorPanel.Visible = false;
-                if (!isMainDashboard && IsSameDashboardOrigin(core.Source))
-                    CompleteAuthentication(core.Source);
+                if (!_authenticationActive)
+                    ShowError("Dashboard 页面载入失败：" + args.WebErrorStatus);
+                return;
             }
-            else if (isMainDashboard)
+
+            _errorPanel.Visible = false;
+            if (_authenticationActive
+                && IsDashboardApplicationUri(core.Source)
+                && await HasApplicationAccessCookieAsync(core))
             {
-                ShowError("Dashboard 页面载入失败：" + args.WebErrorStatus);
+                CompleteAuthentication(core.Source);
             }
         };
 
@@ -220,17 +255,193 @@ internal sealed class DashboardHostForm : Form
         core.DocumentTitleChanged += (_, _) => DashboardHostProtocol.Emit(
             "TITLE",
             DashboardHostProtocol.Encode(core.DocumentTitle ?? string.Empty));
-        core.NewWindowRequested += async (_, args) =>
-            await HandleNewWindowRequestedAsync(core, args, isMainDashboard);
-        core.ProcessFailed += (_, args) =>
-            HandleProcessFailed(args, isMainDashboard);
+        core.NewWindowRequested += (_, args) => HandleNewWindowRequested(core, args);
+        core.ProcessFailed += (_, args) => HandleProcessFailed(args);
     }
 
-    private void HandleProcessFailed(CoreWebView2ProcessFailedEventArgs args, bool isMainDashboard)
+    private void HandleNewWindowRequested(CoreWebView2 core, CoreWebView2NewWindowRequestedEventArgs args)
+    {
+        try
+        {
+            if (IsAuthenticationFlowUri(args.Uri) || IsSameDashboardOrigin(args.Uri))
+            {
+                args.Handled = true;
+                if (IsAuthenticationFlowUri(args.Uri))
+                    EnterAuthenticationMode(args.Uri);
+                core.Navigate(args.Uri);
+                DashboardHostProtocol.Log(
+                    "New-window authentication kept in the existing Dashboard WebView: " + args.Uri);
+                return;
+            }
+
+            args.Handled = true;
+            OpenExternalUri(args.Uri);
+        }
+        catch (Exception ex)
+        {
+            DashboardHostProtocol.Log("Dedicated Dashboard new-window handling failed: " + ex);
+            args.Handled = true;
+        }
+    }
+
+    private void EnterAuthenticationMode(string? target)
+    {
+        if (_closing)
+            return;
+
+        if (!_authenticationActive)
+        {
+            _authenticationActive = true;
+            DashboardHostProtocol.Emit(
+                "AUTHMODE",
+                "start|" + DashboardHostProtocol.Encode(target ?? string.Empty));
+            DashboardHostProtocol.Log(
+                "Access authentication started in the existing Dashboard WebView: " + target);
+        }
+
+        _errorPanel.Visible = false;
+        TryDetachForAuthentication();
+    }
+
+    private void TryDetachForAuthentication()
+    {
+        if (!_authenticationActive || _authenticationDetached || Handle == IntPtr.Zero)
+            return;
+
+        var parent = GetParent(Handle);
+        if (parent == IntPtr.Zero || !IsWindow(parent))
+            return;
+
+        try
+        {
+            _embeddedParent = parent;
+            _embeddedStyle = GetWindowStyle(Handle);
+            _embeddedExStyle = GetWindowExStyle(Handle);
+
+            _ = SetParent(Handle, IntPtr.Zero);
+            var style = _embeddedStyle;
+            style &= ~WsChild;
+            style |= WsPopup | WsVisible | WsCaption | WsThickFrame | WsSysMenu | WsMinimizeBox | WsMaximizeBox;
+            SetWindowStyle(Handle, style);
+
+            var exStyle = _embeddedExStyle;
+            exStyle &= ~WsExToolWindow;
+            exStyle |= WsExAppWindow;
+            SetWindowExStyle(Handle, exStyle);
+
+            Text = "AtlasDesk · Cloudflare Access 登录";
+            var workingArea = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1280, 800);
+            var width = Math.Min(1120, Math.Max(760, workingArea.Width - 120));
+            var height = Math.Min(820, Math.Max(560, workingArea.Height - 100));
+            var x = workingArea.Left + Math.Max(0, (workingArea.Width - width) / 2);
+            var y = workingArea.Top + Math.Max(0, (workingArea.Height - height) / 2);
+            _ = SetWindowPos(
+                Handle,
+                IntPtr.Zero,
+                x,
+                y,
+                width,
+                height,
+                SwpFrameChanged | SwpShowWindow);
+            _ = ShowWindow(Handle, SwShow);
+            _ = SetForegroundWindow(Handle);
+            _authenticationDetached = true;
+            DashboardHostProtocol.Emit("AUTHWINDOW", "detached");
+            BeginInvoke(new Action(() => FocusBrowserInput("authentication-detached")));
+        }
+        catch (Exception ex)
+        {
+            DashboardHostProtocol.Log("Unable to detach DashboardHost for authentication: " + ex);
+        }
+    }
+
+    private async Task<bool> HasApplicationAccessCookieAsync(CoreWebView2 core)
+    {
+        try
+        {
+            var cookies = await core.CookieManager.GetCookiesAsync(_options.DashboardUrl);
+            var found = cookies.Any(cookie =>
+                string.Equals(cookie.Name, "CF_Authorization", StringComparison.OrdinalIgnoreCase));
+            DashboardHostProtocol.Log(
+                found
+                    ? "Cloudflare application authorization cookie confirmed in the same WebView profile"
+                    : "Dashboard origin returned without CF_Authorization; authentication window remains open");
+            return found;
+        }
+        catch (Exception ex)
+        {
+            DashboardHostProtocol.Log("Unable to verify Cloudflare application cookie: " + ex.Message);
+            return false;
+        }
+    }
+
+    private void CompleteAuthentication(string? callbackUri)
+    {
+        if (!_authenticationActive)
+            return;
+
+        DashboardHostProtocol.Log(
+            "Access authentication completed in the same Dashboard WebView: " + callbackUri);
+        RestoreEmbeddedMode("success");
+    }
+
+    private void CancelAuthentication(string reason)
+    {
+        if (!_authenticationActive || _closing)
+            return;
+
+        try { _webView.CoreWebView2?.Stop(); } catch { }
+        DashboardHostProtocol.Log("Access authentication cancelled: " + reason);
+        RestoreEmbeddedMode("cancelled");
+        ShowError("Cloudflare Access 登录已取消。\r\n\r\n点击 Dashboard 顶部刷新或首页按钮可重新开始登录。\r\n认证必须从开始到回调始终使用同一个 Dashboard 浏览器，不能中途切换到 Chrome。");
+    }
+
+    private void RestoreEmbeddedMode(string result)
+    {
+        var parent = _embeddedParent;
+        try
+        {
+            if (_authenticationDetached && parent != IntPtr.Zero && IsWindow(parent))
+            {
+                _ = SetParent(Handle, parent);
+                SetWindowStyle(Handle, _embeddedStyle);
+                SetWindowExStyle(Handle, _embeddedExStyle);
+
+                if (!GetClientRect(parent, out var rect))
+                    rect = new Rect { Right = Math.Max(1, Width), Bottom = Math.Max(1, Height) };
+                _ = SetWindowPos(
+                    Handle,
+                    IntPtr.Zero,
+                    0,
+                    0,
+                    Math.Max(1, rect.Right - rect.Left),
+                    Math.Max(1, rect.Bottom - rect.Top),
+                    SwpNoZOrder | SwpFrameChanged | SwpShowWindow);
+                _ = ShowWindow(Handle, SwShow);
+            }
+        }
+        catch (Exception ex)
+        {
+            DashboardHostProtocol.Log("Unable to re-embed DashboardHost after authentication: " + ex);
+        }
+        finally
+        {
+            Text = "AtlasDesk Dashboard Host";
+            _authenticationActive = false;
+            _authenticationDetached = false;
+            _embeddedParent = IntPtr.Zero;
+            _embeddedStyle = 0;
+            _embeddedExStyle = 0;
+            DashboardHostProtocol.Emit("AUTHMODE", result);
+            BeginInvoke(new Action(() => FocusBrowserInput("authentication-" + result)));
+        }
+    }
+
+    private void HandleProcessFailed(CoreWebView2ProcessFailedEventArgs args)
     {
         var detail = $"kind={args.ProcessFailedKind}; reason={args.Reason}; exitCode={args.ExitCode}; description={args.ProcessDescription}";
         DashboardHostProtocol.Emit("PROCESSFAILED", DashboardHostProtocol.Encode(detail));
-        if (!isMainDashboard || _closing)
+        if (_closing)
             return;
 
         switch (args.ProcessFailedKind)
@@ -255,6 +466,7 @@ internal sealed class DashboardHostForm : Form
                 DashboardHostProtocol.Log(
                     "Dedicated WebView2 browser process exited; terminating only AtlasDesk.DashboardHost");
                 Environment.ExitCode = 73;
+                _closing = true;
                 BeginInvoke(new Action(Close));
                 break;
         }
@@ -283,155 +495,8 @@ internal sealed class DashboardHostForm : Form
             DashboardHostProtocol.Log(
                 "Renderer reload failed; exiting only AtlasDesk.DashboardHost: " + ex);
             Environment.ExitCode = 74;
+            _closing = true;
             Close();
-        }
-    }
-
-    private async Task HandleNewWindowRequestedAsync(
-        CoreWebView2 sourceCore,
-        CoreWebView2NewWindowRequestedEventArgs args,
-        bool isMainDashboard)
-    {
-        var deferral = args.GetDeferral();
-        try
-        {
-            if (IsSameDashboardOrigin(args.Uri))
-            {
-                args.Handled = true;
-                _webView.CoreWebView2?.Navigate(args.Uri);
-                if (!isMainDashboard)
-                    CompleteAuthentication(args.Uri);
-                return;
-            }
-
-            if (IsAuthenticationUri(args.Uri) && _environment is not null)
-            {
-                args.Handled = true;
-                if (!isMainDashboard)
-                {
-                    sourceCore.Navigate(args.Uri);
-                    return;
-                }
-
-                var popupView = await EnsureAuthenticationWindowAsync(initialUri: null);
-                if (popupView?.CoreWebView2 is not null)
-                    args.NewWindow = popupView.CoreWebView2;
-                else
-                    OpenExternalUri(args.Uri);
-                return;
-            }
-
-            args.Handled = true;
-            OpenExternalUri(args.Uri);
-        }
-        catch (Exception ex)
-        {
-            DashboardHostProtocol.Log("Dedicated Dashboard new-window handling failed: " + ex);
-            args.Handled = true;
-            OpenExternalUri(args.Uri);
-        }
-        finally
-        {
-            deferral.Complete();
-        }
-    }
-
-    private async Task<WebView2?> EnsureAuthenticationWindowAsync(string? initialUri)
-    {
-        if (_environment is null || _closing)
-            return null;
-
-        if (_authenticationForm is { IsDisposed: false } existingForm
-            && _authenticationView is { IsDisposed: false } existingView)
-        {
-            if (!existingForm.Visible)
-                existingForm.Show();
-            existingForm.Activate();
-            existingForm.BringToFront();
-            if (!string.IsNullOrWhiteSpace(initialUri) && existingView.CoreWebView2 is not null)
-                existingView.CoreWebView2.Navigate(initialUri);
-            existingView.Focus();
-            return existingView;
-        }
-
-        try { _authenticationForm?.Close(); } catch { }
-        try { _authenticationView?.Dispose(); } catch { }
-
-        var popupView = new WebView2
-        {
-            Dock = DockStyle.Fill,
-            TabStop = true,
-            BackColor = Color.White,
-            DefaultBackgroundColor = Color.White
-        };
-        var popup = new Form
-        {
-            Text = "AtlasDesk 登录验证",
-            Width = 1080,
-            Height = 760,
-            MinimumSize = new Size(720, 520),
-            StartPosition = FormStartPosition.CenterScreen,
-            BackColor = Color.White,
-            ShowInTaskbar = true,
-            FormBorderStyle = FormBorderStyle.Sizable
-        };
-        popup.Controls.Add(popupView);
-
-        _authenticationSucceeded = false;
-        _authenticationForm = popup;
-        _authenticationView = popupView;
-        popup.FormClosed += (_, _) => AuthenticationPopup_FormClosed(popup, popupView);
-        popup.Show();
-
-        try
-        {
-            await popupView.EnsureCoreWebView2Async(_environment);
-            ConfigureCore(popupView.CoreWebView2, isMainDashboard: false);
-            if (!string.IsNullOrWhiteSpace(initialUri))
-                popupView.CoreWebView2.Navigate(initialUri);
-            popup.Activate();
-            popup.BringToFront();
-            popupView.Focus();
-            return popupView;
-        }
-        catch (Exception ex)
-        {
-            DashboardHostProtocol.Log("Authentication popup initialization failed: " + ex);
-            try { popup.Close(); } catch { }
-            return null;
-        }
-    }
-
-    private void CompleteAuthentication(string? callbackUri)
-    {
-        if (_authenticationForm is null || _authenticationForm.IsDisposed)
-            return;
-
-        _authenticationSucceeded = true;
-        DashboardHostProtocol.Log("Authentication returned to Dashboard origin: " + callbackUri);
-        try { _authenticationForm.Close(); } catch { }
-    }
-
-    private void AuthenticationPopup_FormClosed(Form popup, WebView2 popupView)
-    {
-        var succeeded = _authenticationSucceeded;
-        try { popupView.Dispose(); } catch { }
-        if (ReferenceEquals(_authenticationForm, popup)) _authenticationForm = null;
-        if (ReferenceEquals(_authenticationView, popupView)) _authenticationView = null;
-        _authenticationSucceeded = false;
-
-        DashboardHostProtocol.Emit("AUTHCLOSED", succeeded ? "success" : "cancelled");
-        if (!succeeded || _closing)
-            return;
-
-        try
-        {
-            _webView.CoreWebView2?.Navigate(_options.DashboardUrl);
-            BeginInvoke(new Action(() => FocusBrowserInput("authentication-completed")));
-        }
-        catch (Exception ex)
-        {
-            DashboardHostProtocol.Log("Dashboard navigation after authentication failed: " + ex);
         }
     }
 
@@ -465,10 +530,18 @@ internal sealed class DashboardHostForm : Form
             switch (command.Trim().ToLowerInvariant())
             {
                 case "reload":
-                    ExecuteSerialized(() => _webView.CoreWebView2?.Reload());
+                    ExecuteSerialized(() =>
+                    {
+                        _errorPanel.Visible = false;
+                        _webView.CoreWebView2?.Reload();
+                    });
                     break;
                 case "home":
-                    ExecuteSerialized(() => _webView.CoreWebView2?.Navigate(_options.DashboardUrl));
+                    ExecuteSerialized(() =>
+                    {
+                        _errorPanel.Visible = false;
+                        _webView.CoreWebView2?.Navigate(_options.DashboardUrl);
+                    });
                     break;
                 case "back":
                     ExecuteSerialized(() =>
@@ -487,7 +560,16 @@ internal sealed class DashboardHostForm : Form
                 case "focus":
                     FocusBrowserInput("command");
                     break;
+                case "test-auth-flow":
+                    if (Uri.TryCreate(_options.DashboardUrl, UriKind.Absolute, out var testUri)
+                        && testUri.IsLoopback)
+                    {
+                        var target = new Uri(testUri, "/cdn-cgi/access/login");
+                        _webView.CoreWebView2?.Navigate(target.AbsoluteUri);
+                    }
+                    break;
                 case "shutdown":
+                    _closing = true;
                     Close();
                     break;
             }
@@ -546,6 +628,9 @@ internal sealed class DashboardHostForm : Form
 
     private void ParentTimer_Tick(object? sender, EventArgs e)
     {
+        if (_authenticationActive && !_authenticationDetached)
+            TryDetachForAuthentication();
+
         try
         {
             using var parent = Process.GetProcessById(_options.ParentProcessId);
@@ -558,6 +643,7 @@ internal sealed class DashboardHostForm : Form
         }
 
         DashboardHostProtocol.Log("AtlasDesk parent process ended; closing dedicated DashboardHost");
+        _closing = true;
         Close();
     }
 
@@ -567,7 +653,20 @@ internal sealed class DashboardHostForm : Form
             return true;
         if (uri.Scheme is not ("http" or "https"))
             return true;
-        return !IsSameDashboardOrigin(uri.AbsoluteUri) && !IsAuthenticationUri(uri.AbsoluteUri);
+        if (IsSameDashboardOrigin(uri.AbsoluteUri) || IsAuthenticationFlowUri(uri.AbsoluteUri))
+            return false;
+        return true;
+    }
+
+    private bool IsDashboardApplicationUri(string? target)
+    {
+        if (!IsSameDashboardOrigin(target)
+            || !Uri.TryCreate(target, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        return !uri.AbsolutePath.StartsWith("/cdn-cgi/access/", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsSameDashboardOrigin(string? target)
@@ -583,10 +682,13 @@ internal sealed class DashboardHostForm : Form
                && targetUri.Port == dashboardUri.Port;
     }
 
-    private static bool IsAuthenticationUri(string? target)
+    private bool IsAuthenticationFlowUri(string? target)
     {
         if (!Uri.TryCreate(target, UriKind.Absolute, out var uri))
             return false;
+
+        if (uri.AbsolutePath.StartsWith("/cdn-cgi/access/", StringComparison.OrdinalIgnoreCase))
+            return true;
 
         var host = uri.Host;
         if (host.EndsWith(".cloudflareaccess.com", StringComparison.OrdinalIgnoreCase)
@@ -599,6 +701,9 @@ internal sealed class DashboardHostForm : Form
 
         if (!string.Equals(host, "github.com", StringComparison.OrdinalIgnoreCase))
             return false;
+
+        if (_authenticationActive)
+            return true;
 
         var path = uri.AbsolutePath;
         return path.StartsWith("/login", StringComparison.OrdinalIgnoreCase)
@@ -634,6 +739,41 @@ internal sealed class DashboardHostForm : Form
         }
     }
 
+    private static long GetWindowStyle(IntPtr hwnd)
+        => IntPtr.Size == 8
+            ? GetWindowLongPtr(hwnd, GwlStyle).ToInt64()
+            : GetWindowLong(hwnd, GwlStyle);
+
+    private static long GetWindowExStyle(IntPtr hwnd)
+        => IntPtr.Size == 8
+            ? GetWindowLongPtr(hwnd, GwlExStyle).ToInt64()
+            : GetWindowLong(hwnd, GwlExStyle);
+
+    private static void SetWindowStyle(IntPtr hwnd, long style)
+    {
+        if (IntPtr.Size == 8)
+            _ = SetWindowLongPtr(hwnd, GwlStyle, new IntPtr(style));
+        else
+            _ = SetWindowLong(hwnd, GwlStyle, unchecked((int)style));
+    }
+
+    private static void SetWindowExStyle(IntPtr hwnd, long style)
+    {
+        if (IntPtr.Size == 8)
+            _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(style));
+        else
+            _ = SetWindowLong(hwnd, GwlExStyle, unchecked((int)style));
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
@@ -652,4 +792,49 @@ internal sealed class DashboardHostForm : Form
 
     [DllImport("user32.dll")]
     private static extern IntPtr SetFocus(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr hwnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetParent(IntPtr child, IntPtr newParent);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
+    private static extern int GetWindowLong(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
+    private static extern int SetWindowLong(IntPtr hwnd, int index, int newValue);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr newValue);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr hwnd,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hwnd, int command);
 }

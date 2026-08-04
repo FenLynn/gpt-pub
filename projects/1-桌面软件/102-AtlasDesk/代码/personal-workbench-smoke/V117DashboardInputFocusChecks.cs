@@ -14,8 +14,8 @@ internal static class V117DashboardInputFocusChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 7))
-            throw new InvalidOperationException("AtlasDesk Dashboard input-focus candidate must be v1.1.7.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 7))
+            throw new InvalidOperationException("AtlasDesk Dashboard input-focus baseline must not move below v1.1.7.");
 
         var surface = File.ReadAllText(RequireFile(nativeRoot, "DashboardProcessSurface.cs"));
         var host = File.ReadAllText(RequireFile(hostRoot, "DashboardHostForm.cs"));
@@ -41,29 +41,16 @@ internal static class V117DashboardInputFocusChecks
             "AttachThreadInput(currentThread, foregroundThread, false)",
             "SetFocus(_webView.Handle)",
             "case \"focus\"",
-            "DashboardHostProtocol.Emit(\"FOCUS\"",
-            "EnsureAuthenticationWindowAsync",
-            "AUTHOPEN",
-            "AUTHCLOSED",
-            "popup.Show()",
-            "CompleteAuthentication",
-            "if (!succeeded || _closing)",
-            "path.StartsWith(\"/login\"",
-            "appleid.apple.com");
-        RequireAbsent(host,
-            "popup.Show(this)",
-            "try { _webView.CoreWebView2?.Reload(); } catch { }");
+            "DashboardHostProtocol.Emit(\"FOCUS\"");
 
         RequireContains(releaseNotes,
             "AtlasDesk v1.1.7 Dashboard input-focus hotfix",
             "AttachThreadInput",
             "WM_MOUSEACTIVATE",
-            "standalone authentication window",
-            "manual close does not immediately reopen",
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.7 bridges cross-process keyboard focus and moves Access authentication into a dismissible standalone window");
+            "PASS AtlasDesk retains the v1.1.7 cross-process input-focus bridge while later versions may replace the original authentication-window strategy");
     }
 
     private static string RequireFile(string root, string fileName)
@@ -80,15 +67,6 @@ internal static class V117DashboardInputFocusChecks
         {
             if (!source.Contains(token, StringComparison.Ordinal))
                 throw new InvalidOperationException("Missing v1.1.7 Dashboard input-focus token: " + token);
-        }
-    }
-
-    private static void RequireAbsent(string source, params string[] tokens)
-    {
-        foreach (var token in tokens)
-        {
-            if (source.Contains(token, StringComparison.Ordinal))
-                throw new InvalidOperationException("Forbidden v1.1.7 Dashboard input-focus token returned: " + token);
         }
     }
 

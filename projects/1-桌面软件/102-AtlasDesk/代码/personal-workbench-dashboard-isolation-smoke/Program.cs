@@ -64,6 +64,19 @@ internal static class Program
                 _ = WaitForMessage(first, "FOCUS", TimeSpan.FromSeconds(10));
                 AssertWindowAlive(window, "after transferring keyboard focus to DashboardHost");
 
+                SetPhase("verifying same-WebView Access session continuity");
+                first.Process.StandardInput.WriteLine("test-auth-flow");
+                first.Process.StandardInput.Flush();
+                var authStart = WaitForMessage(first, "AUTHMODE", TimeSpan.FromSeconds(15));
+                RequirePayloadStartsWith(authStart, "start|");
+                _ = WaitForMessage(first, "AUTHWINDOW", TimeSpan.FromSeconds(15));
+                var authComplete = WaitForMessage(first, "AUTHMODE", TimeSpan.FromSeconds(15));
+                RequirePayloadEquals(authComplete, "success");
+                PumpDispatcher(TimeSpan.FromSeconds(1));
+                AssertWindowAlive(window, "after the same WebView completed Access cookie round-trip and re-embedded");
+                if (surface.DashboardHandle != firstHandle)
+                    throw new InvalidOperationException("Authentication replaced the DashboardHost HWND instead of reusing the same window.");
+
                 SetPhase("forcing dedicated DashboardHost process loss");
                 first.Process.Kill(entireProcessTree: true);
                 if (!first.Process.WaitForExit(10000))
@@ -108,7 +121,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk.DashboardHost created a real WinForms WebView2 process, accepted cross-process keyboard focus, survived forced host termination in the primary WPF process, and restarted successfully");
+                "PASS AtlasDesk.DashboardHost used one real WebView2 for a CF_Authorization cookie round-trip, detached and re-embedded the same HWND, accepted cross-process keyboard focus, survived forced host termination in the primary WPF process, and restarted successfully");
             return 0;
         }
         catch (Exception ex)
@@ -147,6 +160,7 @@ internal static class Program
             CreateNoWindow = true,
             WorkingDirectory = Path.GetDirectoryName(assembly) ?? AppContext.BaseDirectory
         };
+        info.Environment["ATLASDESK_DASHBOARD_PROXY"] = "direct";
         info.ArgumentList.Add(assembly);
         info.ArgumentList.Add("--dashboard-url");
         info.ArgumentList.Add(url);
@@ -216,6 +230,20 @@ internal static class Program
         }
 
         throw new TimeoutException("Timed out waiting for DashboardHost protocol message: " + kind);
+    }
+
+    private static void RequirePayloadStartsWith(string line, string expectedPrefix)
+    {
+        var parts = line.Split('|', 3);
+        if (parts.Length != 3 || !parts[2].StartsWith(expectedPrefix, StringComparison.Ordinal))
+            throw new InvalidOperationException("Unexpected protocol payload: " + line);
+    }
+
+    private static void RequirePayloadEquals(string line, string expected)
+    {
+        var parts = line.Split('|', 3);
+        if (parts.Length != 3 || !string.Equals(parts[2], expected, StringComparison.Ordinal))
+            throw new InvalidOperationException("Unexpected protocol payload: " + line);
     }
 
     private static void AssertWindowAlive(Window window, string phase)
@@ -317,8 +345,30 @@ internal static class Program
             using (client)
             await using (var stream = client.GetStream())
             {
-                var requestBuffer = new byte[4096];
-                try { _ = await stream.ReadAsync(requestBuffer); } catch { return; }
+                var requestBuffer = new byte[8192];
+                int read;
+                try { read = await stream.ReadAsync(requestBuffer); } catch { return; }
+                var request = Encoding.ASCII.GetString(requestBuffer, 0, Math.Max(0, read));
+                var firstLine = request.Split(new[] { "\r\n" }, StringSplitOptions.None).FirstOrDefault() ?? string.Empty;
+                var parts = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var path = parts.Length > 1 ? parts[1] : "/";
+
+                if (path.StartsWith("/cdn-cgi/access/login", StringComparison.OrdinalIgnoreCase))
+                {
+                    var redirect = Encoding.ASCII.GetBytes(
+                        "HTTP/1.1 302 Found\r\n"
+                        + "Location: /\r\n"
+                        + "Set-Cookie: CF_Authorization=smoke-session; Path=/; HttpOnly\r\n"
+                        + "Content-Length: 0\r\n"
+                        + "Connection: close\r\n\r\n");
+                    try
+                    {
+                        await stream.WriteAsync(redirect);
+                        await stream.FlushAsync();
+                    }
+                    catch { }
+                    return;
+                }
 
                 const string html = "<!doctype html><html><head><meta charset='utf-8'><title>AtlasDesk Isolation Test</title></head><body><input id='focus' autofocus aria-label='focus test'><button id='overview'>主页概览</button><script>document.getElementById('overview').addEventListener('click',()=>document.body.dataset.clicked='1');</script></body></html>";
                 var body = Encoding.UTF8.GetBytes(html);
