@@ -82,7 +82,9 @@ internal static class V116DashboardProcessIsolationChecks
             "AdditionalBrowserArguments = \"--disable-gpu\"",
             "Creating dedicated WinForms WebView2 environment",
             "await _webView.EnsureCoreWebView2Async(_environment)",
-            "DashboardHostProtocol.Emit(\n                \"HWND\"",
+            "DashboardHostProtocol.Emit(",
+            "\"HWND\"",
+            "Handle.ToInt64()",
             "DashboardHostProtocol.Emit(\"READY\")",
             "CoreWebView2ProcessFailedKind.RenderProcessUnresponsive",
             "CoreWebView2ProcessFailedKind.BrowserProcessExited",
@@ -95,7 +97,7 @@ internal static class V116DashboardProcessIsolationChecks
             "atlasdesk-click|");
 
         var ensureIndex = hostForm.IndexOf("await _webView.EnsureCoreWebView2Async(_environment)", StringComparison.Ordinal);
-        var handleIndex = hostForm.IndexOf("DashboardHostProtocol.Emit(\n                \"HWND\"", StringComparison.Ordinal);
+        var handleIndex = hostForm.IndexOf("\"HWND\"", ensureIndex + 1, StringComparison.Ordinal);
         if (ensureIndex < 0 || handleIndex <= ensureIndex)
             throw new InvalidOperationException("Dedicated DashboardHost must initialize WebView2 before handing its HWND to AtlasDesk.");
 
