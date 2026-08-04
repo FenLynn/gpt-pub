@@ -27,6 +27,7 @@ public sealed class DashboardHostWindow : Window
     private CoreWebView2Environment? _environment;
     private Window? _authenticationWindow;
     private WebView2? _authenticationView;
+    private IntPtr _windowHandle;
     private DateTimeOffset _lastRendererReload = DateTimeOffset.MinValue;
     private bool _closing;
 
@@ -80,8 +81,10 @@ public sealed class DashboardHostWindow : Window
 
     private void Window_SourceInitialized(object? sender, EventArgs e)
     {
-        var handle = new WindowInteropHelper(this).Handle;
-        Emit("HWND", handle.ToInt64().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        // Keep the helper top-level and off-screen until its WebView2 controller is
+        // fully initialized. Reparenting a WPF window before EnsureCoreWebView2Async
+        // completes can deadlock native controller creation.
+        _windowHandle = new WindowInteropHelper(this).Handle;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -122,8 +125,17 @@ public sealed class DashboardHostWindow : Window
             await _webView.EnsureCoreWebView2Async(_environment);
             ConfigureCore(_webView.CoreWebView2, isMainDashboard: true);
             _webView.Source = new Uri(_options.DashboardUrl);
+
+            if (_windowHandle == IntPtr.Zero)
+                _windowHandle = new WindowInteropHelper(this).Handle;
+            if (_windowHandle == IntPtr.Zero)
+                throw new InvalidOperationException("DashboardHost window handle is unavailable after WebView2 initialization.");
+
+            // HWND is deliberately handed to the parent only after WebView2 is ready.
+            // The parent may now call SetParent without blocking controller creation.
+            Emit("HWND", _windowHandle.ToInt64().ToString(System.Globalization.CultureInfo.InvariantCulture));
             Emit("READY", string.Empty);
-            EmitLog("Isolated Dashboard WebView2 initialized; GPU disabled; DOM injection disabled");
+            EmitLog("Isolated Dashboard WebView2 initialized before HWND handoff; GPU disabled; DOM injection disabled");
         }
         catch (Exception ex)
         {
@@ -200,13 +212,13 @@ public sealed class DashboardHostWindow : Window
 
             case CoreWebView2ProcessFailedKind.RenderProcessUnresponsive:
             case CoreWebView2ProcessFailedKind.RenderProcessExited:
-                Dispatcher.BeginInvoke(new Action(() => ReloadRendererWithCooldown(detail)));
+                _ = Dispatcher.BeginInvoke(new Action(() => ReloadRendererWithCooldown(detail)));
                 break;
 
             case CoreWebView2ProcessFailedKind.BrowserProcessExited:
                 EmitLog("Isolated WebView2 browser process exited; terminating only DashboardHost");
                 Environment.ExitCode = 73;
-                Dispatcher.BeginInvoke(new Action(Close));
+                _ = Dispatcher.BeginInvoke(new Action(Close));
                 break;
         }
     }
@@ -402,7 +414,7 @@ public sealed class DashboardHostWindow : Window
         if (!_closing)
         {
             EmitLog("AtlasDesk parent process ended; closing isolated DashboardHost");
-            Dispatcher.BeginInvoke(new Action(Close));
+            _ = Dispatcher.BeginInvoke(new Action(Close));
         }
     }
 
