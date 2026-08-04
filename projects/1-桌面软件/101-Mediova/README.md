@@ -19,11 +19,13 @@ Mediova 是面向 Windows 10/11 x64 的本地媒体处理与创作工作站，�
 
 - 正式版本仍为 v4.5.0；正式标签和 Release 未改变。
 - v4.5.1 是 Windows 原生持久化、权限、磁盘写满、便携模式和 Runtime 门禁验证产物，不创建正式 Release。
-- v4.5.2 五轮用户反馈修复已经完成，PR #341 已具备合并条件；用户实机验证后再决定是否建立正式标签和 Release。
-- 当前分支：`p101-v452-round5-windows-closeout`。
-- 第四轮已通过 PR #332 合并，合并提交：`8eadd2ff96d5211db19d005a5093036e766e2428`。
+- v4.5.2 五轮用户反馈修复已经完成并通过 PR #341 合入 `p101-stable`；用户实机验证后再决定是否建立正式标签和 Release。
+- 第四轮 PR #332 合并提交：`8eadd2ff96d5211db19d005a5093036e766e2428`。
+- 第五轮 PR #341 合并提交：`bfaa0d0839ea447beec6e49b7bfecf7e9666f4b2`。
+- `p101-stable` 已核对与该合并提交完全一致。
 - 第五轮冻结产品候选：`3ba4b43bc94ff38ab02aae910ff698e5ecbd7881`。
 - 最终产品 CI：`P101 Mediova CI #388`，run `30883792882`，范围、Linux、Windows 原生链全部通过。
+- 最终文档头 CI：`P101 Mediova CI #390`，run `30884258441`，全部通过。
 
 本轮不修改 `p101-v4.5.0` 标签与正式 Release。CI 生成的可执行文件属于 **v4.5.2 验证候选**，Windows 文件版本资源仍沿用正式基线 `4.5.0`。
 
@@ -62,7 +64,6 @@ CI Artifact SHA-256: 2d8405ece8b1e2811538519fbc28ae717e55e7abc6ffee4573a772ed99d
 - 源码：`代码/`
 - 活动 CI：`.github/workflows/p101-mediova-ci.yml`
 - 日常长期分支：`p101-exp`
-- 当前 v4.5.2 分支：`p101-v452-round5-windows-closeout`
 - 稳定分支：`p101-stable`
 
 v4.5.0 内部完整 Runtime 验证构建入口：
