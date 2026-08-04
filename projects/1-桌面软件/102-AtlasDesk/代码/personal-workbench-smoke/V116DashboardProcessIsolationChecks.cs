@@ -17,6 +17,7 @@ internal static class V116DashboardProcessIsolationChecks
             throw new InvalidOperationException("AtlasDesk Dashboard process-isolation candidate must be v1.1.6.");
 
         var app = File.ReadAllText(RequireFile(nativeRoot, "App.xaml.cs"));
+        var bootstrap = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostBootstrapWindow.xaml.cs"));
         var options = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostLaunchOptions.cs"));
         var surface = File.ReadAllText(RequireFile(nativeRoot, "DashboardProcessSurface.cs"));
         var host = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostWindow.cs"));
@@ -25,10 +26,18 @@ internal static class V116DashboardProcessIsolationChecks
 
         RequireContains(app,
             "DashboardHostLaunchOptions.TryParse",
-            "StartupUri = null",
-            "ShutdownMode = ShutdownMode.OnMainWindowClose",
-            "new DashboardHostWindow",
+            "StartupUri = new Uri(\"DashboardHostBootstrapWindow.xaml\", UriKind.Relative)",
+            "ShutdownMode = ShutdownMode.OnExplicitShutdown",
             "StartupGuard.Begin");
+        RequireAbsent(app, "StartupUri = null");
+        RequireContains(bootstrap,
+            "DashboardHostLaunchOptions.TryParse",
+            "new DashboardHostWindow(options)",
+            "Application.Current.MainWindow = host",
+            "ShutdownMode.OnMainWindowClose",
+            "host.Show()",
+            "Close()");
+
         var hostBranch = app.IndexOf("DashboardHostLaunchOptions.TryParse", StringComparison.Ordinal);
         var startupGuard = app.IndexOf("StartupGuard.Begin", StringComparison.Ordinal);
         if (hostBranch < 0 || startupGuard <= hostBranch)
@@ -95,7 +104,7 @@ internal static class V116DashboardProcessIsolationChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.6 keeps WebView2 and Dashboard page code in an isolated AtlasDesk.exe process with an embedded cross-process HWND surface");
+            "PASS AtlasDesk v1.1.6 routes helper startup through a non-null XAML bootstrap and keeps WebView2 in an isolated process with an embedded HWND surface");
     }
 
     private static string RequireFile(string root, string fileName)
