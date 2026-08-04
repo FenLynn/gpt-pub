@@ -14,8 +14,8 @@ internal static class V1110DashboardSimplicityChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 10))
-            throw new InvalidOperationException("AtlasDesk Dashboard simplification candidate must be v1.1.10.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 10))
+            throw new InvalidOperationException("AtlasDesk must not move below the v1.1.10 Dashboard simplification baseline.");
 
         var pipeline = File.ReadAllText(RequireFile(nativeRoot, "WorkbenchFeaturePipeline.cs"));
         var coordinator = File.ReadAllText(RequireFile(nativeRoot, "DashboardSimplicityCoordinator.cs"));
@@ -74,7 +74,7 @@ internal static class V1110DashboardSimplicityChecks
             "document.activeElement.id");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.10 restores one in-process WPF WebView2, retires automatic Dashboard recovery and removes the dedicated host from publish and verification paths");
+            "PASS AtlasDesk retains the v1.1.10 in-process WPF WebView2, retired automatic Dashboard recovery and dedicated-host-free publication baseline");
     }
 
     private static string RequireFile(string root, string fileName)

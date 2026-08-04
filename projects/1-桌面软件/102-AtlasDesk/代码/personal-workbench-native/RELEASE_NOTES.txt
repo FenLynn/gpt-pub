@@ -1,3 +1,27 @@
+AtlasDesk v1.1.11 sidebar and terminal visual polish
+
+This release is a focused visual correction on top of the v1.1.10 Dashboard simplicity restoration. It does not change Dashboard ownership, project data, terminal processes, Zotero access, tasks, tools, security or Runtime/Data separation.
+
+Sidebar project context
+- The project-context shortcut was previously appended to the sidebar root Grid without a row assignment, so WPF placed it in row 0 over the AtlasDesk brand/avatar area.
+- The shortcut now occupies the right side of the existing Search or Execute row.
+- The search button reserves explicit space for the shortcut, preventing overlap at all supported sidebar widths.
+- The ambiguous target glyph is replaced by a project briefcase icon with the concise tooltip Project Context.
+- Command configuration, favorite files, session restoration and read-only Zotero links remain available; only placement and presentation changed.
+
+Pure-black CMD terminal theme
+- The integrated terminal canvas, tab host, empty state and selected-session side panel now use a neutral black and dark-gray hierarchy instead of the previous blue-gray mixture.
+- CMD, PowerShell, host controls and right-side actions use explicit light text in their control templates, including disabled and hover states.
+- The right control panel is widened to 236 pixels; four tab actions use a balanced two-column grid and the host-location action occupies a full-width row.
+- The xterm frontend uses a #000000 background, white cursor, neutral selection, neutral scrollbar and a classic CMD-compatible ANSI palette.
+- The detached terminal window uses the same black header, black content surface and light-text controls.
+- V1111VisualPolishCoordinator runs after the project workflow and productivity-context layers, so historical local blue button values cannot reappear when the terminal is rehosted.
+
+Boundary
+- The v1.1.10 in-process Dashboard and its native text-input behavior are unchanged.
+- Project center, workspace, environment discovery, ConPTY sessions, terminal continuity, Zotero read-only behavior, tasks, tools and private Data formats are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.10 Dashboard simplicity restoration
 
 This release deliberately retires the v1.1.6-v1.1.9 cross-process Dashboard embedding chain after repeated real-machine input failures. It does not roll back AtlasDesk as a whole. Project context, workspace, terminal, Zotero, tasks, tools, diagnostics, security, Runtime/Data separation and the current UI remain on the existing branch.
