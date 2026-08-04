@@ -89,8 +89,8 @@ func v452Round6DrawListOverlay(a *application, hdc uintptr) {
 		imageCount = int(raw)
 	}
 	for row := 0; row < count; row++ {
-		itemBounds, ok := listItemBounds(a.hList, row)
-		if !ok || itemBounds.Bottom < client.Top || itemBounds.Top > client.Bottom {
+		numberCell, ok := listSubItemBounds(a.hList, row, taskColNumber)
+		if !ok || numberCell.Bottom < client.Top || numberCell.Top > client.Bottom {
 			continue
 		}
 		task, ok := a.visibleTaskSnapshot(row)
@@ -111,18 +111,16 @@ func v452Round6DrawListOverlay(a *application, hdc uintptr) {
 			}
 		}
 
-		if numberCell, ok := listSubItemBounds(a.hList, row, taskColNumber); ok {
-			fillSolid(hdc, numberCell, background)
-			old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
-			procSetBkMode.Call(hdc, TRANSPARENT)
-			procSetTextColor.Call(hdc, textColor)
-			label := strconv.Itoa(row + 1)
-			procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&numberCell)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
-			if old != 0 {
-				procSelectObject.Call(hdc, old)
-			}
-			v452Round6NumberDraws.Add(1)
+		fillSolid(hdc, numberCell, background)
+		old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
+		procSetBkMode.Call(hdc, TRANSPARENT)
+		procSetTextColor.Call(hdc, textColor)
+		label := strconv.Itoa(row + 1)
+		procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&numberCell)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+		if old != 0 {
+			procSelectObject.Call(hdc, old)
 		}
+		v452Round6NumberDraws.Add(1)
 
 		if task.ThumbnailIndex < 0 || task.ThumbnailIndex >= imageCount || a.hImageList == 0 {
 			continue
@@ -143,10 +141,10 @@ func v452Round6DrawListOverlay(a *application, hdc uintptr) {
 		textRect := fileCell
 		textRect.Left += scaleDPI(98)
 		textRect.Right -= scaleDPI(6)
-		old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
+		old, _, _ = procSelectObject.Call(hdc, uiFontSmall)
 		procSetBkMode.Call(hdc, TRANSPARENT)
 		procSetTextColor.Call(hdc, textColor)
-		label := filepath.Base(task.Input)
+		label = filepath.Base(task.Input)
 		procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&textRect)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
 		if old != 0 {
 			procSelectObject.Call(hdc, old)
