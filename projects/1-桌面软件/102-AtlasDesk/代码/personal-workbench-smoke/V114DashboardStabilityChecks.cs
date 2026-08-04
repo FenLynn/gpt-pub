@@ -26,16 +26,33 @@ internal static class V114DashboardStabilityChecks
             "RetireShellDashboardRecoveryHooks",
             "_window.Activated -= activatedHandler",
             "watchdog.Stop()",
-            "dashboardNavigation.Checked -= checkedHandler",
-            "ReplaceBrowserButton(browserControls, \"刷新\", Refresh_Click)",
-            "ReplaceButtonElement(retry, Retry_Click",
-            "SemaphoreSlim _commandGate",
-            "WaitForDashboardIdleAsync",
-            "Dashboard 正在初始化或恢复，本次操作已取消以避免闪退",
-            "ex is COMException or InvalidOperationException or ObjectDisposedException",
-            "InvokeMainWindowTaskAsync(\"EnsureDashboardAsync\", true)",
-            "RecoverIfControllerMissingAsync",
-            "Do not dispose the semaphore while an async continuation may still");
+            "dashboardNavigation.Checked -= checkedHandler");
+
+        if (version < new Version(1, 1, 6))
+        {
+            RequireContains(lifecycle,
+                "ReplaceBrowserButton(browserControls, \"刷新\", Refresh_Click)",
+                "ReplaceButtonElement(retry, Retry_Click",
+                "SemaphoreSlim _commandGate",
+                "WaitForDashboardIdleAsync",
+                "Dashboard 正在初始化或恢复，本次操作已取消以避免闪退",
+                "ex is COMException or InvalidOperationException or ObjectDisposedException",
+                "InvokeMainWindowTaskAsync(\"EnsureDashboardAsync\", true)",
+                "RecoverIfControllerMissingAsync",
+                "Do not dispose the semaphore while an async continuation may still");
+        }
+        else
+        {
+            // v1.1.6 retains the v1.1.4 lessons—no shell activation/watchdog race
+            // and no direct primary-process refresh—but moves commands and restart
+            // into the dedicated WinForms DashboardHost process.
+            RequireContains(lifecycle,
+                "ReplaceBrowserButton(browserControls, \"刷新\", Refresh_Click)",
+                "SendCommandAsync(\"reload\")",
+                "重新启动 Dashboard",
+                "WebView2 moved to dedicated AtlasDesk.DashboardHost.exe process",
+                "AtlasDesk.DashboardHost.exe");
+        }
 
         RequireContains(pipeline,
             "ShellResilience = ShellResilienceCoordinator.Attach(window)",
@@ -66,7 +83,7 @@ internal static class V114DashboardStabilityChecks
             "private async void DashboardHome_Click");
 
         Console.WriteLine(
-            "PASS AtlasDesk retains the v1.1.4 serialized Dashboard-command and retired shell-recovery baseline");
+            "PASS AtlasDesk retains the v1.1.4 retired-shell-recovery baseline while v1.1.6 moves Dashboard commands into a dedicated WinForms process");
     }
 
     private static string RequireFile(string root, string fileName)
