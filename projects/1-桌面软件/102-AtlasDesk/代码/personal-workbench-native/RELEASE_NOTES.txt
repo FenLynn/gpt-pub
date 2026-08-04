@@ -1,3 +1,34 @@
+AtlasDesk v1.1.8 Access session-continuity hotfix
+
+This hotfix removes the split-browser authentication design introduced in v1.1.7. Cloudflare Access requires the browser instance that starts authentication to also complete the callback and retain the resulting CF_Session and CF_Authorization cookies. Opening GitHub or the callback in Chrome while Dashboard remained in WebView2 created two unrelated browser sessions and produced Invalid session by design.
+
+Single-browser Access flow
+- Dashboard, Cloudflare Access, GitHub OAuth, two-factor authentication and the Access callback now remain in the same WebView2 instance and the same WebView2-Isolated profile.
+- Authentication no longer creates a second WebView2 control and never hands an Access or identity-provider URL to Chrome.
+- New-window authentication requests are converted into navigation of the existing Dashboard WebView instead of assigning another WebView or opening the system browser.
+- Paths under /cdn-cgi/access/, the Cloudflare team domain and supported identity-provider login pages are treated as one continuous authentication chain.
+- Returning to the configured Dashboard application origin does not close authentication merely because navigation succeeded; DashboardHost first confirms the application-domain CF_Authorization cookie.
+- Ordinary non-authentication external links still open in the default browser.
+
+Same-window detachable login
+- When authentication starts, the existing DashboardHost HWND is temporarily detached from AtlasDesk and shown as a normal resizable top-level login window.
+- The detached window contains the original WebView2 control rather than a copied or replacement browser.
+- Successful authentication re-embeds that same HWND into the original Dashboard surface.
+- Closing the login window cancels authentication, re-embeds DashboardHost and shows a bounded retry message instead of terminating AtlasDesk or opening Chrome.
+- The v1.1.6 process boundary remains intact; a native browser failure still cannot terminate the primary AtlasDesk process.
+
+DashboardHost proxy routing
+- DashboardHost resolves network routing independently of Chrome.
+- ATLASDESK_DASHBOARD_PROXY is the explicit override. Values direct or none force direct routing; proxy URLs containing credentials are rejected and never logged.
+- HTTPS_PROXY and HTTP_PROXY are accepted as secondary environment-level overrides.
+- When no environment override exists, DashboardHost reads the Windows current-user ProxyEnable, ProxyServer and AutoConfigURL settings.
+- Windows user proxy and PAC settings are passed only to AtlasDesk.DashboardHost.exe; the primary AtlasDesk process is unchanged.
+- The effective route description is logged without exposing proxy credentials or tokens.
+
+Verification boundary
+- A Windows integration smoke drives a synthetic /cdn-cgi/access/login flow inside the real DashboardHost process, sets a CF_Authorization cookie, returns to the Dashboard origin, verifies authentication start and completion protocol messages, then force-kills the host and confirms the primary WPF window remains alive before restarting a replacement host.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.7 Dashboard input-focus hotfix
 
 This hotfix keeps the v1.1.6 process boundary and repairs the interaction boundary exposed by the first real-machine test. The dedicated DashboardHost rendered correctly, but SetParent alone did not transfer keyboard focus between the WPF and WinForms UI threads. Cloudflare Access could also navigate the main embedded Dashboard directly to GitHub sign-in, leaving AtlasDesk navigation visible beside a login page that could not receive input.
