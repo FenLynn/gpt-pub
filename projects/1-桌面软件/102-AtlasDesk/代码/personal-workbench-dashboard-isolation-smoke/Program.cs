@@ -36,20 +36,21 @@ internal static class Program
             app.MainWindow = window;
             ConfigureIsolatedSettings(window, server.Url, workspace);
 
-            SetPhase("attaching complete feature pipeline");
-            var pipeline = WorkbenchFeaturePipeline.Attach(window);
-
             SetPhase("showing MainWindow");
             window.Show();
             PumpDispatcher(TimeSpan.FromMilliseconds(700));
             AssertWindowAlive(window, "after startup");
 
-            SetPhase("opening Dashboard through normal navigation");
-            var dashboardNavigation = window.FindName("DashboardNav") as RadioButton
-                ?? throw new InvalidOperationException("Dashboard navigation is unavailable.");
-            dashboardNavigation.IsChecked = true;
+            SetPhase("attaching complete feature pipeline");
+            var pipeline = WorkbenchFeaturePipeline.Attach(window);
+            PumpDispatcher(TimeSpan.FromMilliseconds(250));
 
-            var view = WaitForDashboardView(window, TimeSpan.FromSeconds(45));
+            SetPhase("opening Dashboard through MainWindow view owner");
+            _ = window.FindName("DashboardNav") as RadioButton
+                ?? throw new InvalidOperationException("Dashboard navigation is unavailable.");
+            InvokeShowView(window, "dashboard", TimeSpan.FromSeconds(45));
+
+            var view = WaitForDashboardView(window, TimeSpan.FromSeconds(10));
             WaitForDocument(view, TimeSpan.FromSeconds(20));
             AssertWindowAlive(window, "after in-process WebView2 initialization");
 
@@ -137,6 +138,17 @@ internal static class Program
         settings.UvPath = string.Empty;
     }
 
+    private static void InvokeShowView(MainWindow window, string viewName, TimeSpan timeout)
+    {
+        var method = typeof(MainWindow).GetMethod(
+            "ShowViewAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(MainWindow).FullName, "ShowViewAsync");
+        var task = method.Invoke(window, new object[] { viewName }) as Task
+            ?? throw new InvalidOperationException("MainWindow.ShowViewAsync did not return a Task.");
+        AwaitWithDispatcher(task, timeout);
+    }
+
     private static WebView2 WaitForDashboardView(MainWindow window, TimeSpan timeout)
     {
         var field = typeof(MainWindow).GetField(
@@ -181,6 +193,16 @@ internal static class Program
         }
 
         throw new TimeoutException("Dashboard document did not become ready.", last);
+    }
+
+    private static void AwaitWithDispatcher(Task task, TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (!task.IsCompleted && DateTimeOffset.UtcNow < deadline)
+            PumpDispatcher(TimeSpan.FromMilliseconds(25));
+        if (!task.IsCompleted)
+            throw new TimeoutException("Timed out while awaiting a Dashboard WPF operation.");
+        task.GetAwaiter().GetResult();
     }
 
     private static T AwaitWithDispatcher<T>(Task<T> task, TimeSpan timeout)
