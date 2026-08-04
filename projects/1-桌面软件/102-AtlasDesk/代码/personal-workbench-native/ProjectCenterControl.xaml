@@ -2,6 +2,31 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FontFamily="{StaticResource AppFont}">
+    <UserControl.Resources>
+        <Style x:Key="ProjectOverviewStat" TargetType="Border">
+            <Setter Property="Background" Value="#F8FAFD"/>
+            <Setter Property="BorderBrush" Value="#E4E9F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="MinHeight" Value="65"/>
+        </Style>
+        <Style x:Key="ProjectOverviewAction" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="FontSize" Value="10.8"/>
+        </Style>
+        <Style x:Key="ProjectOverviewMinorAction" TargetType="Button" BasedOn="{StaticResource TextButton}">
+            <Setter Property="Height" Value="27"/>
+            <Setter Property="Padding" Value="7,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="FontSize" Value="10.4"/>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/><RowDefinition Height="12"/>
@@ -13,11 +38,11 @@
         <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="项目中心" Style="{StaticResource PageHeading}"/>
-                <TextBlock Text="收藏常用项目，保留最近入口，并统一进入工作区、终端和资源管理器。" Style="{StaticResource PageDescription}"/>
+                <TextBlock Text="项目工作台" Style="{StaticResource PageHeading}"/>
+                <TextBlock Text="选择项目后集中查看状态、文件、命令与关联文献，再进入工作区、终端或 Dashboard。" Style="{StaticResource PageDescription}"/>
             </StackPanel>
-            <Border Grid.Column="1" Background="#EAF2FF" CornerRadius="9" Padding="10,6" VerticalAlignment="Center">
-                <TextBlock x:Name="RootBadgeText" Foreground="#326FD6" FontSize="10.8" FontWeight="SemiBold" MaxWidth="360" TextTrimming="CharacterEllipsis"/>
+            <Border Grid.Column="1" Background="#EAF2FF" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
+                <TextBlock x:Name="RootBadgeText" Foreground="#326FD6" FontSize="10.6" FontWeight="SemiBold" MaxWidth="360" TextTrimming="CharacterEllipsis"/>
             </Border>
         </Grid>
 
@@ -46,30 +71,135 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Style="{StaticResource SurfaceCard}" Padding="8">
-            <Grid>
-                <ListView x:Name="ProjectList" BorderThickness="0" Background="Transparent"
-                          SelectionChanged="ProjectList_SelectionChanged" MouseDoubleClick="ProjectList_MouseDoubleClick"
-                          VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="状态" Width="88" DisplayMemberBinding="{Binding UsageLabel}"/>
-                            <GridViewColumn Header="项目" Width="205" DisplayMemberBinding="{Binding Name}"/>
-                            <GridViewColumn Header="类型" Width="165" DisplayMemberBinding="{Binding KindLabel}"/>
-                            <GridViewColumn Header="分支" Width="120" DisplayMemberBinding="{Binding GitBranch}"/>
-                            <GridViewColumn Header="相对路径" Width="270" DisplayMemberBinding="{Binding RelativePath}"/>
-                            <GridViewColumn Header="最近修改" Width="140" DisplayMemberBinding="{Binding ModifiedLabel}"/>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-                <StackPanel x:Name="EmptyState" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="没有匹配的项目" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="调整搜索、类型或使用状态筛选，也可以重新扫描工作区。" FontSize="11.2" Foreground="#7B899C" Margin="0,6,0,0"/>
-                </StackPanel>
-                <StackPanel x:Name="LoadingPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <ProgressBar IsIndeterminate="True" Width="190" Height="4"/>
-                    <TextBlock Text="正在扫描项目标记…" FontSize="11.2" Foreground="#718198" Margin="0,10,0,0" HorizontalAlignment="Center"/>
-                </StackPanel>
+        <Border Grid.Row="4" Style="{StaticResource SurfaceCard}" Padding="0">
+            <Grid x:Name="ProjectBodyGrid">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.2*"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="0.92*"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0" Margin="8">
+                    <ListView x:Name="ProjectList" BorderThickness="0" Background="Transparent"
+                              SelectionChanged="ProjectList_SelectionChanged" MouseDoubleClick="ProjectList_MouseDoubleClick"
+                              VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="状态" Width="82" DisplayMemberBinding="{Binding UsageLabel}"/>
+                                <GridViewColumn Header="项目" Width="190" DisplayMemberBinding="{Binding Name}"/>
+                                <GridViewColumn Header="类型" Width="145" DisplayMemberBinding="{Binding KindLabel}"/>
+                                <GridViewColumn Header="分支" Width="105" DisplayMemberBinding="{Binding GitBranch}"/>
+                                <GridViewColumn Header="相对路径" Width="230" DisplayMemberBinding="{Binding RelativePath}"/>
+                                <GridViewColumn Header="最近修改" Width="132" DisplayMemberBinding="{Binding ModifiedLabel}"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                    <StackPanel x:Name="EmptyState" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="没有匹配的项目" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        <TextBlock Text="调整搜索、类型或使用状态筛选，也可以重新扫描工作区。" FontSize="11.2" Foreground="#7B899C" Margin="0,6,0,0"/>
+                    </StackPanel>
+                    <StackPanel x:Name="LoadingPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="190" Height="4"/>
+                        <TextBlock Text="正在扫描项目标记…" FontSize="11.2" Foreground="#718198" Margin="0,10,0,0" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Grid.Column="1" Background="#E3E8EF"/>
+
+                <Grid Grid.Column="2" Margin="14,12,12,12">
+                    <StackPanel x:Name="OverviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border Width="42" Height="42" CornerRadius="11" Background="#EEF3F8" HorizontalAlignment="Center">
+                            <TextBlock Text="P" FontSize="16" FontWeight="Bold" Foreground="#58718F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="选择一个项目" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                        <TextBlock Text="这里会显示项目状态、常用文件、命令和关联文献。" FontSize="10.8" Foreground="#7B899C" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="260" Margin="0,5,0,0"/>
+                    </StackPanel>
+
+                    <ScrollViewer x:Name="OverviewScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock x:Name="OverviewTitle" FontSize="16" FontWeight="SemiBold" Foreground="#26384D" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="OverviewPath" FontSize="9.9" Foreground="#7B899C" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                </StackPanel>
+                                <Border Grid.Column="1" Background="#EEF3F8" CornerRadius="7" Padding="8,4" VerticalAlignment="Top" Margin="8,0,0,0">
+                                    <TextBlock x:Name="OverviewKind" FontSize="9.6" FontWeight="SemiBold" Foreground="#526B89" MaxWidth="150" TextTrimming="CharacterEllipsis"/>
+                                </Border>
+                            </Grid>
+
+                            <WrapPanel Margin="0,11,0,4">
+                                <Button x:Name="WorkspaceButton" Content="工作区" Style="{StaticResource ProjectOverviewAction}" IsEnabled="False" Click="Workspace_Click"/>
+                                <Button x:Name="TerminalButton" Content="项目终端" Style="{StaticResource ProjectOverviewAction}" IsEnabled="False" Click="Terminal_Click"/>
+                                <Button x:Name="DashboardButton" Content="Dashboard" Style="{StaticResource ProjectOverviewAction}" IsEnabled="False" Click="Dashboard_Click"/>
+                                <Button x:Name="ExplorerButton" Content="资源管理器" Style="{StaticResource ProjectOverviewAction}" IsEnabled="False" Click="Explorer_Click"/>
+                                <Button x:Name="CopyPathButton" Content="复制路径" Style="{StaticResource ProjectOverviewAction}" IsEnabled="False" Click="CopyPath_Click"/>
+                                <Button x:Name="ContextButton" Content="编辑上下文" Style="{StaticResource ProjectOverviewAction}" IsEnabled="False" Click="Context_Click"/>
+                            </WrapPanel>
+
+                            <UniformGrid Columns="2" Margin="0,2,0,3">
+                                <Border Style="{StaticResource ProjectOverviewStat}">
+                                    <StackPanel><TextBlock Text="GIT" FontSize="8.8" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="GitValueText" Text="等待读取" FontSize="11.8" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock x:Name="GitDetailText" Text="" FontSize="9.2" Foreground="#7F8C9C" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource ProjectOverviewStat}" Margin="0,0,0,8">
+                                    <StackPanel><TextBlock Text="环境" FontSize="8.8" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="EnvironmentValueText" Text="等待读取" FontSize="11.8" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock x:Name="EnvironmentDetailText" Text="按项目标记识别" FontSize="9.2" Foreground="#7F8C9C" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource ProjectOverviewStat}">
+                                    <StackPanel><TextBlock Text="最近文件" FontSize="8.8" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="RecentValueText" Text="等待读取" FontSize="11.8" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock Text="只统计已保存的最近入口" FontSize="9.2" Foreground="#7F8C9C" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource ProjectOverviewStat}" Margin="0">
+                                    <StackPanel><TextBlock Text="项目上下文" FontSize="8.8" FontWeight="SemiBold" Foreground="#8A96A6"/><TextBlock x:Name="ContextValueText" Text="尚未配置" FontSize="11.8" FontWeight="SemiBold" Foreground="#304157" Margin="0,2,0,0"/><TextBlock x:Name="ContextDetailText" Text="私人 Data · 显式索引" FontSize="9.2" Foreground="#7F8C9C" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                </Border>
+                            </UniformGrid>
+
+                            <Grid Margin="0,10,0,5">
+                                <TextBlock Text="常用文件" FontSize="12" FontWeight="SemiBold" Foreground="#304157"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="复制路径" Style="{StaticResource ProjectOverviewMinorAction}" Click="FavoriteCopy_Click"/>
+                                    <Button Content="打开" Style="{StaticResource ProjectOverviewMinorAction}" Click="FavoriteOpen_Click"/>
+                                </StackPanel>
+                            </Grid>
+                            <ListView x:Name="FavoriteList" Height="92" BorderBrush="#E2E7EE" BorderThickness="1" Background="#FBFCFE" MouseDoubleClick="FavoriteList_MouseDoubleClick">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="名称" Width="145" DisplayMemberBinding="{Binding Name}"/>
+                                        <GridViewColumn Header="位置" Width="250" DisplayMemberBinding="{Binding ParentPath}"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+
+                            <Grid Margin="0,11,0,5">
+                                <TextBlock Text="常用命令" FontSize="12" FontWeight="SemiBold" Foreground="#304157"/>
+                                <Button Content="运行选中命令" Style="{StaticResource ProjectOverviewMinorAction}" HorizontalAlignment="Right" Click="CommandRun_Click"/>
+                            </Grid>
+                            <ListView x:Name="CommandList" Height="98" BorderBrush="#E2E7EE" BorderThickness="1" Background="#FBFCFE" MouseDoubleClick="CommandList_MouseDoubleClick">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="名称" Width="135" DisplayMemberBinding="{Binding Name}"/>
+                                        <GridViewColumn Header="命令" Width="270" DisplayMemberBinding="{Binding Command}"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+
+                            <Grid Margin="0,11,0,5">
+                                <TextBlock Text="关联文献" FontSize="12" FontWeight="SemiBold" Foreground="#304157"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="复制引用键" Style="{StaticResource ProjectOverviewMinorAction}" Click="ResearchCopy_Click"/>
+                                    <Button Content="打开 PDF" Style="{StaticResource ProjectOverviewMinorAction}" Click="ResearchPdf_Click"/>
+                                    <Button Content="在 Zotero 定位" Style="{StaticResource ProjectOverviewMinorAction}" Click="ResearchLocate_Click"/>
+                                </StackPanel>
+                            </Grid>
+                            <ListView x:Name="ResearchList" Height="108" BorderBrush="#E2E7EE" BorderThickness="1" Background="#FBFCFE" MouseDoubleClick="ResearchList_MouseDoubleClick">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="标题" Width="280" DisplayMemberBinding="{Binding Title}"/>
+                                        <GridViewColumn Header="Citation Key" Width="120" DisplayMemberBinding="{Binding CitationKey}"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
             </Grid>
         </Border>
 
@@ -82,10 +212,6 @@
             <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
                 <Button x:Name="PinButton" Content="收藏" Style="{StaticResource SecondaryButton}" IsEnabled="False" Click="Pin_Click"/>
                 <Button x:Name="RelocateButton" Content="重新定位" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="Relocate_Click"/>
-                <Button x:Name="CopyPathButton" Content="复制路径" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="CopyPath_Click"/>
-                <Button x:Name="ExplorerButton" Content="资源管理器" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="Explorer_Click"/>
-                <Button x:Name="TerminalButton" Content="项目终端" Style="{StaticResource SecondaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="Terminal_Click"/>
-                <Button x:Name="WorkspaceButton" Content="在工作区打开" Style="{StaticResource PrimaryButton}" IsEnabled="False" Margin="7,0,0,0" Click="Workspace_Click"/>
             </WrapPanel>
         </Grid>
     </Grid>
