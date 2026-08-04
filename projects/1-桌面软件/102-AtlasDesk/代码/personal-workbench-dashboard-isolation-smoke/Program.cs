@@ -16,6 +16,7 @@ internal static class Program
     private const uint InputKeyboard = 1;
     private const uint KeyEventUnicode = 0x0004;
     private const uint KeyEventKeyUp = 0x0002;
+    private const int PhysicalInputAttempts = 6;
     private static string _phase = "not started";
 
     [STAThread]
@@ -149,26 +150,9 @@ internal static class Program
             throw new InvalidOperationException("A retired DashboardProcessSurface returned to the visual tree.");
         }
 
-        SetPhase("activating real WebView2 input target");
-        window.Activate();
-        _ = SetForegroundWindow(new WindowInteropHelper(window).Handle);
-        view.Focus();
-        _ = Keyboard.Focus(view);
-        await Dispatcher.Yield(DispatcherPriority.Input);
-        await Task.Delay(250);
-
-        var activeElement = await view.CoreWebView2.ExecuteScriptAsync(
-            "const input=document.getElementById('atlasdesk-input'); input.value=''; input.focus(); document.activeElement.id;");
-        if (!string.Equals(activeElement, "\"atlasdesk-input\"", StringComparison.Ordinal))
-            throw new InvalidOperationException("Dashboard document input did not become the active element: " + activeElement);
-
-        SetPhase("sending real Unicode keyboard input to WebView2");
+        SetPhase("sending bounded real Unicode keyboard input to WebView2");
         const string expectedInput = "AtlasDesk physical input";
-        SendUnicodeText(expectedInput);
-        await Task.Delay(400);
-        var physicalInput = await view.CoreWebView2.ExecuteScriptAsync("document.activeElement.value;");
-        if (!string.Equals(physicalInput, "\"" + expectedInput + "\"", StringComparison.Ordinal))
-            throw new InvalidOperationException("Dashboard did not receive real keyboard input: " + physicalInput);
+        await VerifyPhysicalInputAsync(window, view, expectedInput);
 
         SetPhase("verifying no dedicated Dashboard process is required");
         if (File.Exists(Path.Combine(App.RuntimeDirectory, "DashboardHost", "AtlasDesk.DashboardHost.exe")))
@@ -181,6 +165,55 @@ internal static class Program
         window.Close();
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         GC.KeepAlive(pipeline);
+    }
+
+    private static async Task VerifyPhysicalInputAsync(
+        MainWindow window,
+        WebView2 view,
+        string expectedInput)
+    {
+        var mainHandle = new WindowInteropHelper(window).Handle;
+        string lastValue = "<not-read>";
+        string lastFocusState = "<not-read>";
+        var lastForegroundResult = false;
+
+        for (var attempt = 1; attempt <= PhysicalInputAttempts; attempt++)
+        {
+            AssertWindowAlive(window, $"before physical input attempt {attempt}");
+
+            _ = window.Activate();
+            lastForegroundResult = SetForegroundWindow(mainHandle);
+            view.Focus();
+            _ = Keyboard.Focus(view);
+            await Dispatcher.Yield(DispatcherPriority.Input);
+            await Task.Delay(200 + attempt * 75);
+
+            lastFocusState = await view.CoreWebView2.ExecuteScriptAsync(
+                "window.focus(); const input=document.getElementById('atlasdesk-input'); input.value=''; input.click(); input.focus(); JSON.stringify({active:document.activeElement.id,focused:document.hasFocus()});");
+            if (!lastFocusState.Contains("atlasdesk-input", StringComparison.Ordinal))
+            {
+                Console.WriteLine(
+                    $"DASHBOARD-INPROCESS physical input attempt {attempt}/{PhysicalInputAttempts} did not activate the HTML input: {lastFocusState}");
+                continue;
+            }
+
+            SendUnicodeText(expectedInput);
+            await Task.Delay(350 + attempt * 75);
+            lastValue = await view.CoreWebView2.ExecuteScriptAsync(
+                "document.getElementById('atlasdesk-input').value;");
+            if (string.Equals(lastValue, "\"" + expectedInput + "\"", StringComparison.Ordinal))
+            {
+                Console.WriteLine(
+                    $"DASHBOARD-INPROCESS real Unicode input accepted on attempt {attempt}/{PhysicalInputAttempts}; foreground={lastForegroundResult}");
+                return;
+            }
+
+            Console.WriteLine(
+                $"DASHBOARD-INPROCESS physical input attempt {attempt}/{PhysicalInputAttempts} missed the WebView2 target; foreground={lastForegroundResult}; value={lastValue}; focus={lastFocusState}");
+        }
+
+        throw new InvalidOperationException(
+            $"Dashboard did not receive real keyboard input after {PhysicalInputAttempts} bounded attempts; foreground={lastForegroundResult}; value={lastValue}; focus={lastFocusState}");
     }
 
     private static void SendUnicodeText(string text)
