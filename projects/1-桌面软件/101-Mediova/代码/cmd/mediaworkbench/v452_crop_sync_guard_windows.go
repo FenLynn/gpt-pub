@@ -3,8 +3,6 @@
 package main
 
 import (
-	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -15,8 +13,6 @@ import (
 const (
 	v452CropSyncParentSubclassID = 0x4553
 	v452CropSyncEditSubclassID   = 0x4554
-	v452CropDiagSubclassID       = 0x4556
-	v452ENChange                 = 0x0300
 	v452WMSetTextMessage         = 0x000C
 	v452WHCBT                    = 5
 	v452HCBTCreateWnd            = 3
@@ -33,7 +29,6 @@ var (
 	v452CropSyncParentCB     uintptr
 	v452CropSyncEditCB       uintptr
 	v452CropSyncCBTCB        uintptr
-	v452CropDiagCB           uintptr
 	v452CropSyncHook         uintptr
 	v452CropSyncCBTHook      atomic.Uintptr
 	v452CropSyncStates       sync.Map // map[dialog HWND]*v452CropSyncState
@@ -44,8 +39,6 @@ var (
 	v452CropSyncSnapshotMu   sync.Mutex
 	v452CropSyncPending      *trimDialog
 	v452CropSyncPendingValue model.Crop
-	v452CropDiagMu           sync.Mutex
-	v452CropDiagLines        []string
 	v452CropSyncGetParent    = user32.NewProc("GetParent")
 	v452CropSyncGetID        = user32.NewProc("GetDlgCtrlID")
 	v452CropSyncSetHook      = user32.NewProc("SetWindowsHookExW")
@@ -69,7 +62,6 @@ func init() {
 	v452CropSyncParentCB = syscall.NewCallback(v452CropSyncParentSubclassProc)
 	v452CropSyncEditCB = syscall.NewCallback(v452CropSyncEditSubclassProc)
 	v452CropSyncCBTCB = syscall.NewCallback(v452CropSyncCBTProc)
-	v452CropDiagCB = syscall.NewCallback(v452CropDiagSubclassProc)
 	v452CropSyncHook, _, _ = v452SetWinEventHook.Call(
 		v452EventObjectCreate,
 		v452EventObjectShow,
@@ -184,7 +176,6 @@ func v452InstallTrimEditorUIThread(d *trimDialog) {
 		if ok != 0 {
 			state.previewInstalled = true
 			v452CropSyncEditorUIOK.Add(1)
-			v452SetWindowSubclass.Call(d.hCanvas, v452CropDiagCB, v452CropDiagSubclassID, 0)
 		}
 	}
 }
@@ -290,7 +281,7 @@ func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 		id := int(loWord(wParam))
 		if value, ok := v452CropSyncStates.Load(hwnd); ok {
 			state := value.(*v452CropSyncState)
-			if state.initializing.Load() && v452IsCropEditID(id) || state.isWriting(id) {
+			if (state.initializing.Load() && v452IsCropEditID(id)) || state.isWriting(id) {
 				v452CropSyncIntercepted.Add(1)
 				return 0
 			}
@@ -325,48 +316,6 @@ func v452CropSyncEditSubclassProc(hwnd uintptr, message uint32, wParam, lParam, 
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 	return result
-}
-
-func v452CropDiagSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	d := activeTrim
-	if d == nil || d.hCanvas != hwnd {
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		return result
-	}
-	if message != WM_LBUTTONDOWN && message != WM_MOUSEMOVE && message != WM_LBUTTONUP {
-		if message == v452WMNCDestroy {
-			v452RemoveSubclass.Call(hwnd, v452CropDiagCB, subclassID)
-		}
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		return result
-	}
-	raw := mousePoint(lParam)
-	mapped, mappedOK := d.imagePoint(lParam)
-	clamped, clampedOK := d.imagePointClamped(lParam)
-	before := d.opts.Crop
-	stateBefore := v452TrimStateFor(d)
-	beforeHandle := stateBefore.cropHandle
-	beforeAnchor := stateBefore.cropAnchor
-	beforeDragging := stateBefore.cropDragging
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-	stateAfter := v452TrimStateFor(d)
-	v452AppendCropDiag(fmt.Sprintf("msg=%#x raw=%d,%d map=%d,%d/%t clamp=%d,%d/%t before=%+v after=%+v handle=%d->%d anchor=%d,%d->%d,%d dragging=%t->%t", message, raw.X, raw.Y, mapped.X, mapped.Y, mappedOK, clamped.X, clamped.Y, clampedOK, before, d.opts.Crop, beforeHandle, stateAfter.cropHandle, beforeAnchor.X, beforeAnchor.Y, stateAfter.cropAnchor.X, stateAfter.cropAnchor.Y, beforeDragging, stateAfter.cropDragging))
-	return result
-}
-
-func v452AppendCropDiag(line string) {
-	v452CropDiagMu.Lock()
-	defer v452CropDiagMu.Unlock()
-	if len(v452CropDiagLines) >= 160 {
-		return
-	}
-	v452CropDiagLines = append(v452CropDiagLines, line)
-}
-
-func v452CropMouseDiagnostics() string {
-	v452CropDiagMu.Lock()
-	defer v452CropDiagMu.Unlock()
-	return strings.Join(v452CropDiagLines, " | ")
 }
 
 func (s *v452CropSyncState) beginWriting(id int) {
