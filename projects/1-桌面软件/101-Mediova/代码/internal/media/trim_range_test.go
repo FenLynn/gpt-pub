@@ -41,7 +41,7 @@ func TestTimelineCoordinatesRoundTrip(t *testing.T) {
 	}
 }
 
-func TestHitTrimTimelineUsesOnlyStartEndAndPlayhead(t *testing.T) {
+func TestHitTrimTimelinePrioritizesEndsAndPlayhead(t *testing.T) {
 	state := TrimRangeState{Start: 2, End: 8, Playhead: 5}
 	if got := HitTrimTimeline(state, 10, 200, 0, 1000, 8); got != TrimTimelineStart {
 		t.Fatalf("start hit=%v", got)
@@ -52,37 +52,39 @@ func TestHitTrimTimelineUsesOnlyStartEndAndPlayhead(t *testing.T) {
 	if got := HitTrimTimeline(state, 10, 500, 0, 1000, 8); got != TrimTimelinePlayhead {
 		t.Fatalf("playhead hit=%v", got)
 	}
-	if got := HitTrimTimeline(state, 10, 600, 0, 1000, 8); got != TrimTimelinePlayhead {
-		t.Fatalf("selected interval must seek playhead, hit=%v", got)
+	if got := HitTrimTimeline(state, 10, 600, 0, 1000, 8); got != TrimTimelineRange {
+		t.Fatalf("range hit=%v", got)
 	}
-	if got := HitTrimTimeline(state, 10, 50, 0, 1000, 8); got != TrimTimelinePlayhead {
-		t.Fatalf("outside retained interval must seek playhead, hit=%v", got)
-	}
-	if got := HitTrimTimeline(state, 10, -1, 0, 1000, 8); got != TrimTimelineNone {
-		t.Fatalf("outside track hit=%v", got)
+	if got := HitTrimTimeline(state, 10, 50, 0, 1000, 8); got != TrimTimelineNone {
+		t.Fatalf("outside hit=%v", got)
 	}
 }
 
-func TestDragTrimTimelineKeepsThreeObjectsIndependent(t *testing.T) {
+func TestDragTrimTimelineClampsEndsAndMovesRange(t *testing.T) {
 	initial := TrimRangeState{Start: 2, End: 6, Playhead: 4}
 
 	start := DragTrimTimeline(initial, 10, 25, TrimTimelineStart, 2, 9)
-	if !almostEqual(start.Start, 5.96) || !almostEqual(start.End, 6) || !almostEqual(start.Playhead, 4) {
+	if !almostEqual(start.Start, 5.96) || !almostEqual(start.End, 6) {
 		t.Fatalf("start drag=%+v", start)
 	}
 
 	end := DragTrimTimeline(initial, 10, 25, TrimTimelineEnd, 6, 1)
-	if !almostEqual(end.Start, 2) || !almostEqual(end.End, 2.04) || !almostEqual(end.Playhead, 4) {
+	if !almostEqual(end.Start, 2) || !almostEqual(end.End, 2.04) {
 		t.Fatalf("end drag=%+v", end)
+	}
+
+	movedRight := DragTrimTimeline(initial, 10, 25, TrimTimelineRange, 3, 20)
+	if !almostEqual(movedRight.Start, 6) || !almostEqual(movedRight.End, 10) || !almostEqual(movedRight.Playhead, 8) {
+		t.Fatalf("range right=%+v", movedRight)
+	}
+
+	movedLeft := DragTrimTimeline(initial, 10, 25, TrimTimelineRange, 5, -10)
+	if !almostEqual(movedLeft.Start, 0) || !almostEqual(movedLeft.End, 4) || !almostEqual(movedLeft.Playhead, 2) {
+		t.Fatalf("range left=%+v", movedLeft)
 	}
 
 	playhead := DragTrimTimeline(initial, 10, 25, TrimTimelinePlayhead, 4, 9.5)
 	if !almostEqual(playhead.Playhead, 9.5) || !almostEqual(playhead.Start, 2) || !almostEqual(playhead.End, 6) {
 		t.Fatalf("playhead=%+v", playhead)
-	}
-
-	legacyRange := DragTrimTimeline(initial, 10, 25, TrimTimelineRange, 3, 8.5)
-	if !almostEqual(legacyRange.Playhead, 8.5) || !almostEqual(legacyRange.Start, 2) || !almostEqual(legacyRange.End, 6) {
-		t.Fatalf("legacy range must seek only=%+v", legacyRange)
 	}
 }
