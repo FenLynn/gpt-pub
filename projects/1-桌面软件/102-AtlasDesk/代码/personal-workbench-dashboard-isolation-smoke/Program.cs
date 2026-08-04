@@ -3,14 +3,19 @@ using PersonalWorkbench;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 internal static class Program
 {
+    private const uint InputKeyboard = 1;
+    private const uint KeyEventUnicode = 0x0004;
+    private const uint KeyEventKeyUp = 0x0002;
     private static string _phase = "not started";
 
     [STAThread]
@@ -82,7 +87,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk in-process Dashboard created one WPF WebView2 inside the real MainWindow event loop, retained native keyboard focus and activated a real document input without HWND embedding or a dedicated host process");
+                "PASS AtlasDesk in-process Dashboard created one WPF WebView2 inside the real MainWindow event loop and accepted real Unicode keyboard input without HWND embedding or a dedicated host process");
             return 0;
         }
         catch (Exception ex)
@@ -140,25 +145,26 @@ internal static class Program
             throw new InvalidOperationException("A retired DashboardProcessSurface returned to the visual tree.");
         }
 
-        SetPhase("verifying native WPF keyboard focus ownership");
+        SetPhase("activating real WebView2 input target");
         window.Activate();
+        _ = SetForegroundWindow(new WindowInteropHelper(window).Handle);
         view.Focus();
         _ = Keyboard.Focus(view);
         await Dispatcher.Yield(DispatcherPriority.Input);
-        await Task.Delay(250);
-        if (!view.IsKeyboardFocusWithin && !ReferenceEquals(Keyboard.FocusedElement, view))
-            throw new InvalidOperationException("The in-process Dashboard WebView2 did not receive WPF keyboard focus.");
+        await Task.Delay(200);
 
-        SetPhase("verifying page input focus in the same WebView2");
         var activeElement = await view.CoreWebView2.ExecuteScriptAsync(
-            "document.getElementById('atlasdesk-input').focus(); document.activeElement.id;");
+            "const input=document.getElementById('atlasdesk-input'); input.value=''; input.focus(); document.activeElement.id;");
         if (!string.Equals(activeElement, "\"atlasdesk-input\"", StringComparison.Ordinal))
             throw new InvalidOperationException("Dashboard document input did not become the active element: " + activeElement);
 
-        var textRoundTrip = await view.CoreWebView2.ExecuteScriptAsync(
-            "document.activeElement.value='AtlasDesk input ready'; document.activeElement.value;");
-        if (!string.Equals(textRoundTrip, "\"AtlasDesk input ready\"", StringComparison.Ordinal))
-            throw new InvalidOperationException("Dashboard input value round-trip failed: " + textRoundTrip);
+        SetPhase("sending real Unicode keyboard input to WebView2");
+        const string expectedInput = "AtlasDesk physical input";
+        SendUnicodeText(expectedInput);
+        await Task.Delay(350);
+        var physicalInput = await view.CoreWebView2.ExecuteScriptAsync("document.activeElement.value;");
+        if (!string.Equals(physicalInput, "\"" + expectedInput + "\"", StringComparison.Ordinal))
+            throw new InvalidOperationException("Dashboard did not receive real keyboard input: " + physicalInput);
 
         SetPhase("verifying no dedicated Dashboard process is required");
         if (File.Exists(Path.Combine(App.RuntimeDirectory, "DashboardHost", "AtlasDesk.DashboardHost.exe")))
@@ -171,6 +177,40 @@ internal static class Program
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         GC.KeepAlive(pipeline);
     }
+
+    private static void SendUnicodeText(string text)
+    {
+        var inputs = new List<NativeInput>(text.Length * 2);
+        foreach (var character in text)
+        {
+            inputs.Add(CreateUnicodeInput(character, keyUp: false));
+            inputs.Add(CreateUnicodeInput(character, keyUp: true));
+        }
+
+        var sent = SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<NativeInput>());
+        if (sent != inputs.Count)
+        {
+            throw new InvalidOperationException(
+                $"SendInput delivered {sent} of {inputs.Count} keyboard events; Win32={Marshal.GetLastWin32Error()}.");
+        }
+    }
+
+    private static NativeInput CreateUnicodeInput(char character, bool keyUp)
+        => new()
+        {
+            Type = InputKeyboard,
+            Data = new InputUnion
+            {
+                Keyboard = new KeyboardInput
+                {
+                    VirtualKey = 0,
+                    ScanCode = character,
+                    Flags = KeyEventUnicode | (keyUp ? KeyEventKeyUp : 0),
+                    Time = 0,
+                    ExtraInfo = UIntPtr.Zero
+                }
+            }
+        };
 
     private static async Task<MainWindow> WaitForMainWindowAsync(App app, TimeSpan timeout)
     {
@@ -276,6 +316,37 @@ internal static class Program
         _phase = value;
         Console.WriteLine("DASHBOARD-INPROCESS " + value);
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput
+    {
+        public uint Type;
+        public InputUnion Data;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct InputUnion
+    {
+        [FieldOffset(0)]
+        public KeyboardInput Keyboard;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInput
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint inputCount, NativeInput[] inputs, int inputSize);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr windowHandle);
 
     private sealed class LocalDashboardServer : IDisposable
     {
