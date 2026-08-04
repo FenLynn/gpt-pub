@@ -9,6 +9,7 @@ internal static class V116DashboardProcessIsolationChecks
     internal static void Verify()
     {
         var nativeRoot = FindProjectSourceRoot("personal-workbench-native");
+        var hostRoot = FindProjectSourceRoot("personal-workbench-dashboard-host");
         var versionText = XDocument.Load(Path.Combine(nativeRoot, "Version.props"))
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
@@ -18,53 +19,32 @@ internal static class V116DashboardProcessIsolationChecks
 
         var appXaml = File.ReadAllText(RequireFile(nativeRoot, "App.xaml"));
         var app = File.ReadAllText(RequireFile(nativeRoot, "App.xaml.cs"));
-        var options = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostLaunchOptions.cs"));
         var surface = File.ReadAllText(RequireFile(nativeRoot, "DashboardProcessSurface.cs"));
-        var host = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostWindow.cs"));
+        var protocol = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostProtocol.cs"));
         var lifecycle = File.ReadAllText(RequireFile(nativeRoot, "DashboardLifecycleCoordinator.cs"));
         var releaseNotes = File.ReadAllText(RequireFile(nativeRoot, "RELEASE_NOTES.txt"));
+        var hostProject = File.ReadAllText(RequireFile(hostRoot, "AtlasDesk.DashboardHost.csproj"));
+        var hostProgram = File.ReadAllText(RequireFile(hostRoot, "Program.cs"));
+        var hostOptions = File.ReadAllText(RequireFile(hostRoot, "DashboardHostOptions.cs"));
+        var hostForm = File.ReadAllText(RequireFile(hostRoot, "DashboardHostForm.cs"));
+        var hostProtocol = File.ReadAllText(RequireFile(hostRoot, "DashboardHostProtocol.cs"));
 
-        RequireAbsent(appXaml, "StartupUri=");
+        RequireContains(appXaml, "StartupUri=\"MainWindow.xaml\"");
         RequireContains(app,
-            "App.xaml deliberately has no StartupUri",
-            "DashboardHostLaunchOptions.TryParse",
-            "var dashboardHost = new DashboardHostWindow(dashboardHostOptions)",
-            "MainWindow = dashboardHost",
-            "dashboardHost.Show()",
             "StartupGuard.Begin",
-            "var mainWindow = new MainWindow()",
-            "MainWindow = mainWindow",
-            "mainWindow.Show()");
+            "Activated += App_Activated",
+            "base.OnStartup(e)");
         RequireAbsent(app,
-            "DashboardHostBootstrapWindow",
-            "StartupUri =",
-            "StartupUri=null");
-
-        var hostBranch = app.IndexOf("DashboardHostLaunchOptions.TryParse", StringComparison.Ordinal);
-        var dashboardWindow = app.IndexOf("new DashboardHostWindow", StringComparison.Ordinal);
-        var startupGuard = app.IndexOf("StartupGuard.Begin", StringComparison.Ordinal);
-        var primaryWindow = app.IndexOf("new MainWindow()", StringComparison.Ordinal);
-        if (hostBranch < 0
-            || dashboardWindow <= hostBranch
-            || startupGuard <= dashboardWindow
-            || primaryWindow <= startupGuard)
-        {
-            throw new InvalidOperationException(
-                "App.OnStartup must select DashboardHost before primary StartupGuard and construct MainWindow only in primary mode.");
-        }
-
-        if (File.Exists(Path.Combine(nativeRoot, "DashboardHostBootstrapWindow.xaml"))
+            "DashboardHostWindow",
+            "DashboardHostLaunchOptions",
+            "--dashboard-host");
+        if (File.Exists(Path.Combine(nativeRoot, "DashboardHostWindow.cs"))
+            || File.Exists(Path.Combine(nativeRoot, "DashboardHostLaunchOptions.cs"))
+            || File.Exists(Path.Combine(nativeRoot, "DashboardHostBootstrapWindow.xaml"))
             || File.Exists(Path.Combine(nativeRoot, "DashboardHostBootstrapWindow.xaml.cs")))
         {
-            throw new InvalidOperationException("Obsolete StartupUri Dashboard bootstrap returned.");
+            throw new InvalidOperationException("An obsolete in-process WPF DashboardHost source returned.");
         }
-
-        RequireContains(options,
-            "--dashboard-host",
-            "--dashboard-url",
-            "--dashboard-profile",
-            "--parent-process",
-            "Path.GetFullPath");
 
         RequireContains(surface,
             "public sealed class DashboardProcessSurface : HwndHost",
@@ -73,47 +53,69 @@ internal static class V116DashboardProcessIsolationChecks
             "AttachDashboardWindow",
             "MoveWindow",
             "DestroyWindowCore");
+        RequireContains(protocol,
+            "ATLASDESK_DASHBOARD",
+            "Convert.FromBase64String");
 
-        RequireContains(host,
-            "public sealed class DashboardHostWindow : Window",
-            "ProtocolPrefix = \"ATLASDESK_DASHBOARD\"",
+        RequireContains(hostProject,
+            "<UseWindowsForms>true</UseWindowsForms>",
+            "<AssemblyName>AtlasDesk.DashboardHost</AssemblyName>",
+            "Microsoft.Web.WebView2",
+            "<OutputType>Exe</OutputType>",
+            "<PublishSingleFile>true</PublishSingleFile>");
+        RequireContains(hostProgram,
+            "Application.Run(form)",
+            "new DashboardHostForm(options)",
+            "startup-probe:dedicated-host-main");
+        RequireContains(hostOptions,
+            "--dashboard-url",
+            "--dashboard-profile",
+            "--parent-process",
+            "Path.GetFullPath");
+        RequireContains(hostProtocol,
+            "public static class DashboardHostMarker",
+            "ATLASDESK_DASHBOARD",
+            "Console.Out.Flush");
+        RequireContains(hostForm,
+            "internal sealed class DashboardHostForm : Form",
+            "Microsoft.Web.WebView2.WinForms",
             "AdditionalBrowserArguments = \"--disable-gpu\"",
-            "Creating isolated WebView2 environment",
-            "DOM injection disabled",
+            "Creating dedicated WinForms WebView2 environment",
+            "await _webView.EnsureCoreWebView2Async(_environment)",
+            "DashboardHostProtocol.Emit(\n                \"HWND\"",
+            "DashboardHostProtocol.Emit(\"READY\")",
             "CoreWebView2ProcessFailedKind.RenderProcessUnresponsive",
             "CoreWebView2ProcessFailedKind.BrowserProcessExited",
-            "WatchParentProcessAsync",
             "Console.In.ReadLineAsync",
             "Environment.ExitCode = 73",
-            "Keep the helper top-level and off-screen until its WebView2 controller is",
-            "await _webView.EnsureCoreWebView2Async(_environment)",
-            "Emit(\"HWND\"",
-            "Emit(\"READY\"");
-        RequireAbsent(host,
+            "ParentTimer_Tick");
+        RequireAbsent(hostForm,
             "AddScriptToExecuteOnDocumentCreatedAsync",
             "WebMessageReceived +=",
             "atlasdesk-click|");
 
-        var ensureIndex = host.IndexOf("await _webView.EnsureCoreWebView2Async(_environment)", StringComparison.Ordinal);
-        var handleIndex = host.IndexOf("Emit(\"HWND\"", StringComparison.Ordinal);
+        var ensureIndex = hostForm.IndexOf("await _webView.EnsureCoreWebView2Async(_environment)", StringComparison.Ordinal);
+        var handleIndex = hostForm.IndexOf("DashboardHostProtocol.Emit(\n                \"HWND\"", StringComparison.Ordinal);
         if (ensureIndex < 0 || handleIndex <= ensureIndex)
-            throw new InvalidOperationException("DashboardHost must finish WebView2 controller creation before handing its HWND to the parent process.");
+            throw new InvalidOperationException("Dedicated DashboardHost must initialize WebView2 before handing its HWND to AtlasDesk.");
 
         RequireContains(lifecycle,
-            "WebView2 moved to isolated AtlasDesk process",
+            "WebView2 moved to dedicated AtlasDesk.DashboardHost.exe process",
             "SuppressInProcessDashboard",
             "WriteMainWindowField(\"_isInitializingDashboard\", true)",
             "DashboardProcessSurface",
-            "Environment.ProcessPath",
+            "Path.Combine(App.RuntimeDirectory, \"DashboardHost\")",
+            "AtlasDesk.DashboardHost.exe",
             "RedirectStandardInput = true",
             "RedirectStandardOutput = true",
-            "--dashboard-host",
             "WebView2-Isolated",
-            "DashboardHost exited unexpectedly",
+            "Dedicated DashboardHost exited unexpectedly",
             "AtlasDesk 主窗口和其他页面未受影响",
-            "Attempting one automatic isolated DashboardHost restart",
+            "Attempting one automatic dedicated DashboardHost restart",
             "PopoutButton");
         RequireAbsent(lifecycle,
+            "Environment.ProcessPath",
+            "--dashboard-host",
             "new WebView2",
             "Core_ProcessFailed",
             "DashboardClickGuardScript",
@@ -121,15 +123,15 @@ internal static class V116DashboardProcessIsolationChecks
 
         RequireContains(releaseNotes,
             "AtlasDesk v1.1.6 Dashboard process-isolation hotfix",
-            "second AtlasDesk.exe process",
-            "same executable, separate operating-system process",
+            "AtlasDesk.DashboardHost.exe",
+            "WinForms WebView2",
             "WebView2-Isolated",
             "--disable-gpu",
             "does not terminate the primary AtlasDesk process",
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.6 removes StartupUri, explicitly selects primary or DashboardHost mode in App.OnStartup, initializes WebView2 before HWND handoff and isolates Dashboard in a restartable process");
+            "PASS AtlasDesk v1.1.6 restores the primary WPF startup, moves WebView2 into a dedicated WinForms executable, initializes it before HWND handoff and keeps the host restartable");
     }
 
     private static string RequireFile(string root, string fileName)
