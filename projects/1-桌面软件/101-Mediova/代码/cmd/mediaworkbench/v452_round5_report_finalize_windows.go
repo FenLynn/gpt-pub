@@ -98,6 +98,15 @@ func (a *application) v452FinalizeRound5ToastReport() error {
 	}
 	report.Checks["round5_import_toast_screenshot"] = valid
 	report.Details["round5_import_toast_screenshot"] = detail
+
+	tries := v452CropSyncInstallTries.Load()
+	parents := v452CropSyncParentsOK.Load()
+	edits := v452CropSyncEditsOK.Load()
+	intercepted := v452CropSyncIntercepted.Load()
+	report.Checks["round5_crop_sync_guard_installed"] = parents >= 2 && edits >= 8
+	report.Checks["round5_crop_sync_guard_intercepted"] = intercepted > 0
+	report.Details["round5_crop_sync_guard"] = fmt.Sprintf("tries=%d parents=%d edits=%d intercepted=%d", tries, parents, edits, intercepted)
+
 	report.Passed = len(report.Checks) > 0
 	for _, ok := range report.Checks {
 		if !ok {
