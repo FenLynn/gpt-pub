@@ -1,3 +1,4 @@
+using AtlasDesk.DashboardHost;
 using PersonalWorkbench;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -9,6 +10,7 @@ using System.Windows.Threading;
 
 internal static class Program
 {
+    private const string ProtocolPrefix = "ATLASDESK_DASHBOARD";
     private static string _phase = "not started";
 
     [STAThread]
@@ -44,43 +46,43 @@ internal static class Program
             if (surface.HostHandle == IntPtr.Zero)
                 throw new InvalidOperationException("DashboardProcessSurface did not create a native host HWND.");
 
-            SetPhase("starting first isolated DashboardHost");
+            SetPhase("starting first dedicated DashboardHost");
             using (var first = StartDashboardHost(server.Url, Path.Combine(root, "profile")))
             {
-                var firstHandle = WaitForHandle(first, TimeSpan.FromSeconds(20));
+                var firstHandle = WaitForHandle(first, TimeSpan.FromSeconds(25));
                 surface.AttachDashboardWindow(firstHandle);
                 WaitForReady(first, TimeSpan.FromSeconds(25));
                 PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after embedding the first DashboardHost");
+                AssertWindowAlive(window, "after embedding the first dedicated DashboardHost");
 
-                SetPhase("forcing DashboardHost native-process loss");
+                SetPhase("forcing dedicated DashboardHost process loss");
                 first.Process.Kill(entireProcessTree: true);
                 if (!first.Process.WaitForExit(10000))
-                    throw new TimeoutException("The first DashboardHost did not terminate after Kill.");
+                    throw new TimeoutException("The first dedicated DashboardHost did not terminate after Kill.");
                 surface.DetachDashboardWindow();
                 PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after forcibly terminating DashboardHost");
+                AssertWindowAlive(window, "after forcibly terminating the dedicated DashboardHost");
                 if (Process.GetCurrentProcess().HasExited)
                     throw new InvalidOperationException("The smoke-test primary process exited with DashboardHost.");
             }
 
-            SetPhase("starting replacement isolated DashboardHost");
+            SetPhase("starting replacement dedicated DashboardHost");
             using (var second = StartDashboardHost(server.Url, Path.Combine(root, "profile")))
             {
-                var secondHandle = WaitForHandle(second, TimeSpan.FromSeconds(20));
+                var secondHandle = WaitForHandle(second, TimeSpan.FromSeconds(25));
                 surface.AttachDashboardWindow(secondHandle);
                 WaitForReady(second, TimeSpan.FromSeconds(25));
                 PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after embedding the replacement DashboardHost");
+                AssertWindowAlive(window, "after embedding the replacement dedicated DashboardHost");
 
-                SetPhase("shutting replacement DashboardHost down cleanly");
+                SetPhase("shutting replacement dedicated DashboardHost down cleanly");
                 second.Process.StandardInput.WriteLine("shutdown");
                 second.Process.StandardInput.Flush();
                 if (!second.Process.WaitForExit(10000))
-                    throw new TimeoutException("The replacement DashboardHost did not shut down cleanly.");
+                    throw new TimeoutException("The replacement dedicated DashboardHost did not shut down cleanly.");
                 surface.DetachDashboardWindow();
                 PumpDispatcher(TimeSpan.FromMilliseconds(500));
-                AssertWindowAlive(window, "after clean DashboardHost shutdown");
+                AssertWindowAlive(window, "after clean dedicated DashboardHost shutdown");
             }
 
             SetPhase("closing smoke window");
@@ -90,7 +92,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk DashboardHost created a real WebView2 helper, embedded across an HWND process boundary, survived forced helper termination in the primary process, and restarted successfully");
+                "PASS AtlasDesk.DashboardHost created a real WinForms WebView2 process, embedded across an HWND boundary, survived forced helper termination in the primary WPF process, and restarted successfully");
             return 0;
         }
         catch (Exception ex)
@@ -108,9 +110,13 @@ internal static class Program
     private static DashboardHostProcess StartDashboardHost(string url, string profile)
     {
         Directory.CreateDirectory(profile);
-        var assembly = typeof(App).Assembly.Location;
+        var assembly = typeof(DashboardHostMarker).Assembly.Location;
         if (string.IsNullOrWhiteSpace(assembly) || !File.Exists(assembly))
-            throw new FileNotFoundException("AtlasDesk managed assembly is unavailable for helper-mode smoke testing.", assembly);
+        {
+            throw new FileNotFoundException(
+                "AtlasDesk.DashboardHost managed assembly is unavailable for process-isolation smoke testing.",
+                assembly);
+        }
 
         var dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
         if (string.IsNullOrWhiteSpace(dotnet))
@@ -123,10 +129,9 @@ internal static class Program
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
-            WorkingDirectory = AppContext.BaseDirectory
+            WorkingDirectory = Path.GetDirectoryName(assembly) ?? AppContext.BaseDirectory
         };
         info.ArgumentList.Add(assembly);
-        info.ArgumentList.Add("--dashboard-host");
         info.ArgumentList.Add("--dashboard-url");
         info.ArgumentList.Add(url);
         info.ArgumentList.Add("--dashboard-profile");
@@ -149,7 +154,7 @@ internal static class Program
         };
 
         if (!process.Start())
-            throw new InvalidOperationException("DashboardHost smoke process did not start.");
+            throw new InvalidOperationException("Dedicated DashboardHost smoke process did not start.");
         process.StandardInput.AutoFlush = true;
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
@@ -179,7 +184,7 @@ internal static class Program
                 Console.WriteLine("DASHBOARD-HOST " + line);
                 var parts = line.Split('|', 3);
                 if (parts.Length == 3
-                    && string.Equals(parts[0], DashboardHostWindow.ProtocolPrefix, StringComparison.Ordinal)
+                    && string.Equals(parts[0], ProtocolPrefix, StringComparison.Ordinal)
                     && string.Equals(parts[1], kind, StringComparison.Ordinal))
                 {
                     return line;
