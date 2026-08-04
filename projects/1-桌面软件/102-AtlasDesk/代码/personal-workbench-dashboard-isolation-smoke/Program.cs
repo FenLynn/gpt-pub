@@ -1,311 +1,387 @@
-using AtlasDesk.DashboardHost;
+using Microsoft.Web.WebView2.Wpf;
 using PersonalWorkbench;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 internal static class Program
 {
-    private const string ProtocolPrefix = "ATLASDESK_DASHBOARD";
+    private const uint InputKeyboard = 1;
+    private const uint KeyEventUnicode = 0x0004;
+    private const uint KeyEventKeyUp = 0x0002;
     private static string _phase = "not started";
 
     [STAThread]
     private static int Main()
     {
-        var root = Path.Combine(
+        var workspace = Path.Combine(
             Path.GetTempPath(),
-            "atlasdesk-dashboard-isolation-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
+            "atlasdesk-dashboard-inprocess-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
 
         try
         {
-            SetPhase("starting local Dashboard server");
+            SetPhase("starting local Dashboard page");
             using var server = LocalDashboardServer.Start();
+            ConfigureIsolatedSettings(server.Url, workspace);
 
-            SetPhase("creating WPF process surface");
-            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-            var surface = new DashboardProcessSurface();
-            var window = new Window
+            SetPhase("creating real AtlasDesk WPF application");
+            var app = new App();
+            app.InitializeComponent();
+            app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            Exception? failure = null;
+            var completed = false;
+            var scheduled = false;
+            var watchdog = new DispatcherTimer(DispatcherPriority.Send)
             {
-                Title = "AtlasDesk Dashboard isolation smoke",
-                Width = 920,
-                Height = 620,
-                MinWidth = 640,
-                MinHeight = 420,
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                Content = surface,
-                ShowInTaskbar = false
+                Interval = TimeSpan.FromSeconds(90)
             };
-            window.Show();
-            PumpDispatcher(TimeSpan.FromMilliseconds(600));
-            AssertWindowAlive(window, "after creating the native surface");
-            if (surface.HostHandle == IntPtr.Zero)
-                throw new InvalidOperationException("DashboardProcessSurface did not create a native host HWND.");
-
-            SetPhase("starting first dedicated DashboardHost");
-            using (var first = StartDashboardHost(server.Url, Path.Combine(root, "profile")))
+            watchdog.Tick += (_, _) =>
             {
-                var firstHandle = WaitForHandle(first, TimeSpan.FromSeconds(60));
-                surface.AttachDashboardWindow(firstHandle);
-                WaitForReady(first, TimeSpan.FromSeconds(15));
-                PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after embedding the first dedicated DashboardHost");
+                watchdog.Stop();
+                failure ??= new TimeoutException(
+                    "The real AtlasDesk Dashboard verification exceeded 90 seconds during: " + _phase);
+                app.Shutdown(1);
+            };
 
-                SetPhase("verifying cross-process Dashboard input focus");
-                window.Activate();
-                if (!surface.ActivateDashboardInput())
-                    throw new InvalidOperationException("DashboardProcessSurface could not transfer focus to the dedicated host.");
-                first.Process.StandardInput.WriteLine("focus");
-                first.Process.StandardInput.Flush();
-                _ = WaitForMessage(first, "FOCUS", TimeSpan.FromSeconds(10));
-                AssertWindowAlive(window, "after transferring keyboard focus to DashboardHost");
-
-                SetPhase("verifying same-WebView Access session continuity");
-                first.Process.StandardInput.WriteLine("test-auth-flow");
-                first.Process.StandardInput.Flush();
-                var authStart = WaitForMessage(first, "AUTHMODE", TimeSpan.FromSeconds(15));
-                RequirePayloadStartsWith(authStart, "start|");
-                _ = WaitForMessage(first, "AUTHWINDOW", TimeSpan.FromSeconds(15));
-                var authComplete = WaitForMessage(first, "AUTHMODE", TimeSpan.FromSeconds(15));
-                RequirePayloadEquals(authComplete, "success");
-
-                SetPhase("verifying automatic Dashboard input focus after authentication re-embed");
-                _ = WaitForMessage(first, "FOCUS", TimeSpan.FromSeconds(10));
-                PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after the same WebView completed Access cookie round-trip, re-embedded and automatically regained input focus");
-                if (surface.DashboardHandle != firstHandle)
-                    throw new InvalidOperationException("Authentication replaced the DashboardHost HWND instead of reusing the same window.");
-
-                SetPhase("forcing dedicated DashboardHost process loss");
-                first.Process.Kill(entireProcessTree: true);
-                if (!first.Process.WaitForExit(10000))
-                    throw new TimeoutException("The first dedicated DashboardHost did not terminate after Kill.");
-                surface.DetachDashboardWindow();
-                PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after forcibly terminating the dedicated DashboardHost");
-                if (Process.GetCurrentProcess().HasExited)
-                    throw new InvalidOperationException("The smoke-test primary process exited with DashboardHost.");
-            }
-
-            SetPhase("starting replacement dedicated DashboardHost");
-            using (var second = StartDashboardHost(server.Url, Path.Combine(root, "profile")))
+            app.Activated += (_, _) =>
             {
-                var secondHandle = WaitForHandle(second, TimeSpan.FromSeconds(60));
-                surface.AttachDashboardWindow(secondHandle);
-                WaitForReady(second, TimeSpan.FromSeconds(15));
-                PumpDispatcher(TimeSpan.FromSeconds(1));
-                AssertWindowAlive(window, "after embedding the replacement dedicated DashboardHost");
+                if (scheduled)
+                    return;
+                scheduled = true;
+                watchdog.Start();
+                _ = app.Dispatcher.BeginInvoke(
+                    DispatcherPriority.ApplicationIdle,
+                    new Action(async () =>
+                    {
+                        try
+                        {
+                            await VerifyDashboardAsync(app);
+                            completed = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            failure = ex;
+                        }
+                        finally
+                        {
+                            watchdog.Stop();
+                            app.Shutdown(failure is null ? 0 : 1);
+                        }
+                    }));
+            };
 
-                SetPhase("verifying replacement Dashboard input focus");
-                if (!surface.ActivateDashboardInput())
-                    throw new InvalidOperationException("Replacement DashboardHost could not receive cross-process focus.");
-                second.Process.StandardInput.WriteLine("focus");
-                second.Process.StandardInput.Flush();
-                _ = WaitForMessage(second, "FOCUS", TimeSpan.FromSeconds(10));
-
-                SetPhase("shutting replacement dedicated DashboardHost down cleanly");
-                second.Process.StandardInput.WriteLine("shutdown");
-                second.Process.StandardInput.Flush();
-                if (!second.Process.WaitForExit(10000))
-                    throw new TimeoutException("The replacement dedicated DashboardHost did not shut down cleanly.");
-                surface.DetachDashboardWindow();
-                PumpDispatcher(TimeSpan.FromMilliseconds(500));
-                AssertWindowAlive(window, "after clean dedicated DashboardHost shutdown");
+            SetPhase("starting real WPF Application.Run event loop");
+            var exitCode = app.Run();
+            if (failure is not null)
+                throw new InvalidOperationException("Real AtlasDesk Dashboard verification failed.", failure);
+            if (!completed || exitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Real AtlasDesk Dashboard verification ended incompletely; completed={completed}; exitCode={exitCode}.");
             }
-
-            SetPhase("closing smoke window");
-            window.Close();
-            PumpDispatcher(TimeSpan.FromMilliseconds(200));
-            app.Shutdown(0);
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk.DashboardHost used one real WebView2 for a CF_Authorization cookie round-trip, detached and re-embedded the same HWND, automatically regained cross-process input focus after authentication, survived forced host termination in the primary WPF process, and restarted successfully");
+                "PASS AtlasDesk in-process Dashboard created one WPF WebView2 inside the real MainWindow event loop and accepted real Unicode keyboard input without HWND embedding or a dedicated host process");
             return 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine("FAIL Dashboard process-isolation smoke during phase: " + _phase);
+            Console.Error.WriteLine("FAIL AtlasDesk in-process Dashboard smoke during phase: " + _phase);
             Console.Error.WriteLine(ex);
             return 1;
         }
         finally
         {
-            try { Directory.Delete(root, true); } catch { }
+            try { Directory.Delete(workspace, true); } catch { }
         }
     }
 
-    private static DashboardHostProcess StartDashboardHost(string url, string profile)
+    private static void ConfigureIsolatedSettings(string dashboardUrl, string workspace)
     {
-        Directory.CreateDirectory(profile);
-        var assembly = typeof(DashboardHostMarker).Assembly.Location;
-        if (string.IsNullOrWhiteSpace(assembly) || !File.Exists(assembly))
+        var settings = AppSettings.Load();
+        settings.DashboardAutoOpen = false;
+        settings.DashboardName = "AtlasDesk in-process smoke";
+        settings.DashboardUrl = dashboardUrl;
+        settings.WorkspaceRoot = workspace;
+        settings.CondaPath = string.Empty;
+        settings.UvPath = string.Empty;
+        settings.Save();
+    }
+
+    private static async Task VerifyDashboardAsync(App app)
+    {
+        SetPhase("waiting for StartupUri MainWindow");
+        var window = await WaitForMainWindowAsync(app, TimeSpan.FromSeconds(15));
+        AssertWindowAlive(window, "after StartupUri startup");
+
+        SetPhase("waiting for the complete production feature pipeline");
+        var pipeline = await WaitForPipelineAsync(app, TimeSpan.FromSeconds(15));
+        if (pipeline.Dashboard is null)
+            throw new InvalidOperationException("Dashboard simplicity coordinator is unavailable.");
+
+        SetPhase("opening Dashboard through MainWindow view owner");
+        _ = window.FindName("DashboardNav") as RadioButton
+            ?? throw new InvalidOperationException("Dashboard navigation is unavailable.");
+        await InvokeShowViewAsync(window, "dashboard");
+
+        var view = await WaitForDashboardViewAsync(window, TimeSpan.FromSeconds(45));
+        await WaitForDocumentAsync(view, TimeSpan.FromSeconds(20));
+        AssertWindowAlive(window, "after in-process WebView2 initialization");
+
+        SetPhase("verifying Dashboard stays inside MainWindow visual tree");
+        var host = window.FindName("DashboardHost") as Panel
+            ?? throw new InvalidOperationException("DashboardHost panel is unavailable.");
+        if (!host.Children.Contains(view))
+            throw new InvalidOperationException("The active Dashboard WebView2 is not a child of MainWindow DashboardHost.");
+        if (host.Children.Cast<UIElement>().Any(child =>
+                string.Equals(child.GetType().Name, "DashboardProcessSurface", StringComparison.Ordinal)))
         {
-            throw new FileNotFoundException(
-                "AtlasDesk.DashboardHost managed assembly is unavailable for process-isolation smoke testing.",
-                assembly);
+            throw new InvalidOperationException("A retired DashboardProcessSurface returned to the visual tree.");
         }
 
-        var dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-        if (string.IsNullOrWhiteSpace(dotnet))
-            dotnet = "dotnet";
+        SetPhase("activating real WebView2 input target");
+        window.Activate();
+        _ = SetForegroundWindow(new WindowInteropHelper(window).Handle);
+        view.Focus();
+        _ = Keyboard.Focus(view);
+        await Dispatcher.Yield(DispatcherPriority.Input);
+        await Task.Delay(250);
 
-        var info = new ProcessStartInfo(dotnet)
-        {
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            WorkingDirectory = Path.GetDirectoryName(assembly) ?? AppContext.BaseDirectory
-        };
-        info.Environment["ATLASDESK_DASHBOARD_PROXY"] = "direct";
-        info.ArgumentList.Add(assembly);
-        info.ArgumentList.Add("--dashboard-url");
-        info.ArgumentList.Add(url);
-        info.ArgumentList.Add("--dashboard-profile");
-        info.ArgumentList.Add(profile);
-        info.ArgumentList.Add("--parent-process");
-        info.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var activeElement = await view.CoreWebView2.ExecuteScriptAsync(
+            "const input=document.getElementById('atlasdesk-input'); input.value=''; input.focus(); document.activeElement.id;");
+        if (!string.Equals(activeElement, "\"atlasdesk-input\"", StringComparison.Ordinal))
+            throw new InvalidOperationException("Dashboard document input did not become the active element: " + activeElement);
 
-        var process = new Process { StartInfo = info, EnableRaisingEvents = true };
-        var messages = new BlockingCollection<string>();
-        var errors = new ConcurrentQueue<string>();
-        process.OutputDataReceived += (_, args) =>
-        {
-            if (!string.IsNullOrWhiteSpace(args.Data))
-                messages.Add(args.Data);
-        };
-        process.ErrorDataReceived += (_, args) =>
-        {
-            if (!string.IsNullOrWhiteSpace(args.Data))
-                errors.Enqueue(args.Data);
-        };
+        SetPhase("sending real Unicode keyboard input to WebView2");
+        const string expectedInput = "AtlasDesk physical input";
+        SendUnicodeText(expectedInput);
+        await Task.Delay(400);
+        var physicalInput = await view.CoreWebView2.ExecuteScriptAsync("document.activeElement.value;");
+        if (!string.Equals(physicalInput, "\"" + expectedInput + "\"", StringComparison.Ordinal))
+            throw new InvalidOperationException("Dashboard did not receive real keyboard input: " + physicalInput);
 
-        if (!process.Start())
-            throw new InvalidOperationException("Dedicated DashboardHost smoke process did not start.");
-        process.StandardInput.AutoFlush = true;
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        return new DashboardHostProcess(process, messages, errors);
+        SetPhase("verifying no dedicated Dashboard process is required");
+        if (File.Exists(Path.Combine(App.RuntimeDirectory, "DashboardHost", "AtlasDesk.DashboardHost.exe")))
+        {
+            Console.WriteLine(
+                "NOTE an older local Runtime may still contain DashboardHost, but v1.1.10 does not start or publish it.");
+        }
+
+        SetPhase("closing real MainWindow normally");
+        window.Close();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        GC.KeepAlive(pipeline);
     }
 
-    private static IntPtr WaitForHandle(DashboardHostProcess host, TimeSpan timeout)
+    private static void SendUnicodeText(string text)
     {
-        var line = WaitForMessage(host, "HWND", timeout);
-        var parts = line.Split('|', 3);
-        if (parts.Length != 3 || !long.TryParse(parts[2], out var raw) || raw == 0)
-            throw new InvalidOperationException("DashboardHost returned an invalid HWND: " + line);
-        return new IntPtr(raw);
+        var inputs = new List<NativeInput>(text.Length * 2);
+        foreach (var character in text)
+        {
+            inputs.Add(CreateUnicodeInput(character, keyUp: false));
+            inputs.Add(CreateUnicodeInput(character, keyUp: true));
+        }
+
+        var nativeInputs = inputs.ToArray();
+        var inputSize = Marshal.SizeOf<NativeInput>();
+        if (Environment.Is64BitProcess && inputSize != 40)
+            throw new InvalidOperationException("Unexpected x64 INPUT size: " + inputSize);
+
+        var sent = SendInput((uint)nativeInputs.Length, nativeInputs, inputSize);
+        if (sent != (uint)nativeInputs.Length)
+        {
+            throw new InvalidOperationException(
+                $"SendInput delivered {sent} of {nativeInputs.Length} keyboard events; size={inputSize}; Win32={Marshal.GetLastWin32Error()}.");
+        }
     }
 
-    private static void WaitForReady(DashboardHostProcess host, TimeSpan timeout)
-        => _ = WaitForMessage(host, "READY", timeout);
+    private static NativeInput CreateUnicodeInput(char character, bool keyUp)
+        => new()
+        {
+            Type = InputKeyboard,
+            Data = new InputUnion
+            {
+                Keyboard = new KeyboardInput
+                {
+                    VirtualKey = 0,
+                    ScanCode = character,
+                    Flags = KeyEventUnicode | (keyUp ? KeyEventKeyUp : 0),
+                    Time = 0,
+                    ExtraInfo = UIntPtr.Zero
+                }
+            }
+        };
 
-    private static string WaitForMessage(DashboardHostProcess host, string kind, TimeSpan timeout)
+    private static async Task<MainWindow> WaitForMainWindowAsync(App app, TimeSpan timeout)
     {
         var deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
-            PumpDispatcher(TimeSpan.FromMilliseconds(40));
-            if (host.Messages.TryTake(out var line, 40))
-            {
-                Console.WriteLine("DASHBOARD-HOST " + line);
-                var parts = line.Split('|', 3);
-                if (parts.Length == 3
-                    && string.Equals(parts[0], ProtocolPrefix, StringComparison.Ordinal)
-                    && string.Equals(parts[1], kind, StringComparison.Ordinal))
-                {
-                    return line;
-                }
-            }
+            if (app.MainWindow is MainWindow window && window.IsLoaded && window.IsVisible)
+                return window;
+            await Task.Delay(50);
+        }
+        throw new TimeoutException("Timed out waiting for the real StartupUri MainWindow.");
+    }
 
-            if (host.Process.HasExited)
-            {
-                var stderr = string.Join(" | ", host.Errors);
-                throw new InvalidOperationException(
-                    $"DashboardHost exited before {kind}; code={host.Process.ExitCode}; stderr={stderr}");
-            }
+    private static async Task<WorkbenchFeaturePipeline> WaitForPipelineAsync(App app, TimeSpan timeout)
+    {
+        var field = typeof(App).GetField("_pipeline", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(typeof(App).FullName, "_pipeline");
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (field.GetValue(app) is WorkbenchFeaturePipeline pipeline)
+                return pipeline;
+            await Task.Delay(50);
+        }
+        throw new TimeoutException("Timed out waiting for the production WorkbenchFeaturePipeline.");
+    }
+
+    private static async Task InvokeShowViewAsync(MainWindow window, string viewName)
+    {
+        var method = typeof(MainWindow).GetMethod(
+            "ShowViewAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(MainWindow).FullName, "ShowViewAsync");
+        var task = method.Invoke(window, new object[] { viewName }) as Task
+            ?? throw new InvalidOperationException("MainWindow.ShowViewAsync did not return a Task.");
+        await task;
+    }
+
+    private static async Task<WebView2> WaitForDashboardViewAsync(MainWindow window, TimeSpan timeout)
+    {
+        var field = typeof(MainWindow).GetField(
+            "_dashboardWebView",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(typeof(MainWindow).FullName, "_dashboardWebView");
+
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (field.GetValue(window) is WebView2 view && view.CoreWebView2 is not null)
+                return view;
+            AssertWindowAlive(window, "while waiting for Dashboard WebView2");
+            await Task.Delay(80);
         }
 
-        throw new TimeoutException("Timed out waiting for DashboardHost protocol message: " + kind);
+        throw new TimeoutException(
+            "Timed out waiting for MainWindow's in-process Dashboard WebView2. "
+            + DescribeDashboardState(window));
     }
 
-    private static void RequirePayloadStartsWith(string line, string expectedPrefix)
+    private static string DescribeDashboardState(MainWindow window)
     {
-        var parts = line.Split('|', 3);
-        if (parts.Length != 3 || !parts[2].StartsWith(expectedPrefix, StringComparison.Ordinal))
-            throw new InvalidOperationException("Unexpected protocol payload: " + line);
+        var type = typeof(MainWindow);
+        object? Read(string name) => type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(window);
+        var settings = Read("_settings") as AppSettings;
+        var errorText = (window.FindName("DashboardErrorText") as TextBlock)?.Text ?? "<missing>";
+        return $"url={settings?.DashboardUrl}; currentView={Read("_currentView")}; "
+               + $"initializing={Read("_isInitializingDashboard")}; recovery={Read("_dashboardRecoveryInProgress")}; "
+               + $"environment={(Read("_webViewEnvironment") is null ? "null" : "ready")}; errorText={errorText}";
     }
 
-    private static void RequirePayloadEquals(string line, string expected)
+    private static async Task WaitForDocumentAsync(WebView2 view, TimeSpan timeout)
     {
-        var parts = line.Split('|', 3);
-        if (parts.Length != 3 || !string.Equals(parts[2], expected, StringComparison.Ordinal))
-            throw new InvalidOperationException("Unexpected protocol payload: " + line);
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        Exception? last = null;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                var state = await view.CoreWebView2.ExecuteScriptAsync("document.readyState");
+                if (string.Equals(state, "\"complete\"", StringComparison.Ordinal)
+                    || string.Equals(state, "\"interactive\"", StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+            await Task.Delay(100);
+        }
+        throw new TimeoutException("Dashboard document did not become ready.", last);
     }
 
     private static void AssertWindowAlive(Window window, string phase)
     {
         if (!window.IsLoaded || !window.IsVisible)
-            throw new InvalidOperationException("Primary WPF window closed " + phase + ".");
+            throw new InvalidOperationException("AtlasDesk MainWindow closed " + phase + ".");
     }
 
     private static void SetPhase(string value)
     {
         _phase = value;
-        Console.WriteLine("DASHBOARD-ISOLATION " + value);
+        Console.WriteLine("DASHBOARD-INPROCESS " + value);
     }
 
-    private static void PumpDispatcher(TimeSpan duration)
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput
     {
-        var frame = new DispatcherFrame();
-        var timer = new DispatcherTimer(DispatcherPriority.Background)
-        {
-            Interval = duration
-        };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            frame.Continue = false;
-        };
-        timer.Start();
-        Dispatcher.PushFrame(frame);
+        public uint Type;
+        public InputUnion Data;
     }
 
-    private sealed class DashboardHostProcess : IDisposable
+    [StructLayout(LayoutKind.Explicit)]
+    private struct InputUnion
     {
-        public DashboardHostProcess(
-            Process process,
-            BlockingCollection<string> messages,
-            ConcurrentQueue<string> errors)
-        {
-            Process = process;
-            Messages = messages;
-            Errors = errors;
-        }
+        [FieldOffset(0)]
+        public MouseInput Mouse;
 
-        public Process Process { get; }
-        public BlockingCollection<string> Messages { get; }
-        public ConcurrentQueue<string> Errors { get; }
+        [FieldOffset(0)]
+        public KeyboardInput Keyboard;
 
-        public void Dispose()
-        {
-            try
-            {
-                if (!Process.HasExited)
-                    Process.Kill(entireProcessTree: true);
-            }
-            catch { }
-            try { Process.WaitForExit(3000); } catch { }
-            Process.Dispose();
-            Messages.Dispose();
-        }
+        [FieldOffset(0)]
+        public HardwareInput Hardware;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInput
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HardwareInput
+    {
+        public uint Message;
+        public ushort ParameterLow;
+        public ushort ParameterHigh;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint inputCount, NativeInput[] inputs, int inputSize);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr windowHandle);
 
     private sealed class LocalDashboardServer : IDisposable
     {
@@ -338,7 +414,6 @@ internal static class Program
                 try { client = await _listener.AcceptTcpClientAsync(_lifetime.Token); }
                 catch (OperationCanceledException) { return; }
                 catch (ObjectDisposedException) { return; }
-
                 _ = Task.Run(() => RespondAsync(client));
             }
         }
@@ -348,32 +423,10 @@ internal static class Program
             using (client)
             await using (var stream = client.GetStream())
             {
-                var requestBuffer = new byte[8192];
-                int read;
-                try { read = await stream.ReadAsync(requestBuffer); } catch { return; }
-                var request = Encoding.ASCII.GetString(requestBuffer, 0, Math.Max(0, read));
-                var firstLine = request.Split(new[] { "\r\n" }, StringSplitOptions.None).FirstOrDefault() ?? string.Empty;
-                var parts = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                var path = parts.Length > 1 ? parts[1] : "/";
+                var buffer = new byte[8192];
+                try { _ = await stream.ReadAsync(buffer); } catch { return; }
 
-                if (path.StartsWith("/cdn-cgi/access/login", StringComparison.OrdinalIgnoreCase))
-                {
-                    var redirect = Encoding.ASCII.GetBytes(
-                        "HTTP/1.1 302 Found\r\n"
-                        + "Location: /\r\n"
-                        + "Set-Cookie: CF_Authorization=smoke-session; Path=/; HttpOnly\r\n"
-                        + "Content-Length: 0\r\n"
-                        + "Connection: close\r\n\r\n");
-                    try
-                    {
-                        await stream.WriteAsync(redirect);
-                        await stream.FlushAsync();
-                    }
-                    catch { }
-                    return;
-                }
-
-                const string html = "<!doctype html><html><head><meta charset='utf-8'><title>AtlasDesk Isolation Test</title></head><body><input id='focus' autofocus aria-label='focus test'><button id='overview'>主页概览</button><script>document.getElementById('overview').addEventListener('click',()=>document.body.dataset.clicked='1');</script></body></html>";
+                const string html = "<!doctype html><html><head><meta charset='utf-8'><title>AtlasDesk In-Process Dashboard</title></head><body><label for='atlasdesk-input'>Input</label><input id='atlasdesk-input' type='text' autofocus><button id='overview'>主页概览</button></body></html>";
                 var body = Encoding.UTF8.GetBytes(html);
                 var headers = Encoding.ASCII.GetBytes(
                     "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: "

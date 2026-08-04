@@ -1,3 +1,32 @@
+AtlasDesk v1.1.10 Dashboard simplicity restoration
+
+This release deliberately retires the v1.1.6-v1.1.9 cross-process Dashboard embedding chain after repeated real-machine input failures. It does not roll back AtlasDesk as a whole. Project context, workspace, terminal, Zotero, tasks, tools, diagnostics, security, Runtime/Data separation and the current UI remain on the existing branch.
+
+Restored lightweight ownership
+- MainWindow again owns one WPF WebView2 directly inside the existing DashboardHost panel.
+- The main Dashboard and its login popup share the same CoreWebView2Environment and the original AtlasDesk Dashboard profile.
+- Keyboard input, IME, clipboard shortcuts, context menus and focus remain in the native WPF/WebView2 path; there is no HWND embedding or cross-process input bridge.
+- Back, forward, reload, Dashboard home, pop-out and full-screen return to the existing MainWindow handlers.
+- Cloudflare Access popups remain within the shared WebView2 environment; ordinary external links still follow the existing navigation policy.
+
+Retired complexity
+- WorkbenchFeaturePipeline no longer attaches DashboardLifecycleCoordinator, DashboardScriptDiagnostics or DashboardInteractionCoordinator.
+- DashboardSimplicityCoordinator only retires the Shell activation/navigation/watchdog recovery hooks and closes the historical automatic WebView destruction/recreation gate.
+- No DashboardProcessSurface, SetParent, AttachThreadInput, standard-input command channel, authentication detach/re-embed loop or page-script click injection participates in the active product path.
+- Directory.Build.targets no longer publishes DashboardHost\AtlasDesk.DashboardHost.exe.
+- The Runtime again contains AtlasDesk.exe, AtlasDesk.TerminalHost.exe and the normal managed/native dependencies only.
+
+Failure behavior
+- WebView2 process failures are logged, but background code no longer destroys and recreates the controller.
+- The existing visible reload/retry controls remain the recovery path.
+- A severe native WebView2 failure can still require restarting AtlasDesk; v1.1.10 prioritizes predictable input and the previously proven simple interaction model over transparent process isolation.
+
+Verification boundary
+- The Windows Dashboard smoke now opens the real MainWindow, attaches the complete current feature pipeline, navigates to a local page, confirms the active WebView2 is a direct MainWindow child, gives it WPF keyboard focus and activates a real HTML input.
+- The source gate rejects dedicated DashboardHost publication, HWND embedding and the retired interaction/recovery coordinators.
+- All non-Dashboard modules and data formats are intentionally unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.9 authentication focus-rebind hotfix
 
 This hotfix addresses the first real-machine result after the v1.1.8 single-WebView authentication correction. An existing valid Cloudflare Access session can make the detachable login window flash briefly and immediately return to Dashboard. The browser session is valid, but the DashboardHost HWND changes from an embedded child to a top-level login window and back. The existing test confirmed that the same HWND returned, but it did not verify that WPF and the re-embedded WinForms/WebView2 thread could still accept text input afterwards.

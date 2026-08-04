@@ -66,6 +66,8 @@ internal static class V081SourceBoundaryChecks
         RejectExactLine(projectCenter, "tabs.SelectedIndex = 0;",
             "project workflow selects a local TabControl before the _tabs field is assigned");
 
+        // Retain the v0.8.1 diagnostic source as historical evidence, while v1.1.10
+        // deliberately removes it from the active pipeline.
         var diagnosticsPath = Path.Combine(nativeRoot, "DashboardScriptDiagnostics.cs");
         var diagnostics = File.ReadAllText(diagnosticsPath);
         RequireTokens(
@@ -100,13 +102,18 @@ internal static class V081SourceBoundaryChecks
             "ToggleFocusMode",
             "TogglePopupFullscreen");
 
+        var pipelinePath = Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs");
+        var pipeline = File.ReadAllText(pipelinePath);
         RequireTokens(
-            Path.Combine(nativeRoot, "WorkbenchFeaturePipeline.cs"),
-            "DashboardDiagnostics = DashboardScriptDiagnostics.Attach(window)",
-            "DashboardInteraction = DashboardInteractionCoordinator.Attach(window, Settings)",
-            "public DashboardInteractionCoordinator DashboardInteraction");
+            pipelinePath,
+            "Dashboard = DashboardSimplicityCoordinator.Attach(window, ShellResilience)",
+            "public DashboardSimplicityCoordinator Dashboard");
+        Reject(pipeline, "DashboardScriptDiagnostics.Attach(window)",
+            "retired Dashboard script diagnostics returned to the active pipeline");
+        Reject(pipeline, "DashboardInteractionCoordinator.Attach(window, Settings)",
+            "retired Dashboard interaction shim returned to the active pipeline");
 
-        Console.WriteLine("PASS AtlasDesk shell, WorkArea, development terminal, Dashboard navigation, project workflow startup-order and script-diagnostic source boundaries");
+        Console.WriteLine("PASS AtlasDesk shell, WorkArea, development terminal, Dashboard navigation history, project workflow startup order and v1.1.10 active simplicity boundary");
     }
 
     private static string FindNativeSourceRoot()
