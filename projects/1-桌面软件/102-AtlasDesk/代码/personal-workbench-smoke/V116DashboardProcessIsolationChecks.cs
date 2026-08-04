@@ -16,35 +16,48 @@ internal static class V116DashboardProcessIsolationChecks
         if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 6))
             throw new InvalidOperationException("AtlasDesk Dashboard process-isolation candidate must be v1.1.6.");
 
+        var appXaml = File.ReadAllText(RequireFile(nativeRoot, "App.xaml"));
         var app = File.ReadAllText(RequireFile(nativeRoot, "App.xaml.cs"));
-        var bootstrap = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostBootstrapWindow.xaml.cs"));
         var options = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostLaunchOptions.cs"));
         var surface = File.ReadAllText(RequireFile(nativeRoot, "DashboardProcessSurface.cs"));
         var host = File.ReadAllText(RequireFile(nativeRoot, "DashboardHostWindow.cs"));
         var lifecycle = File.ReadAllText(RequireFile(nativeRoot, "DashboardLifecycleCoordinator.cs"));
         var releaseNotes = File.ReadAllText(RequireFile(nativeRoot, "RELEASE_NOTES.txt"));
 
+        RequireAbsent(appXaml, "StartupUri=");
         RequireContains(app,
+            "App.xaml deliberately has no StartupUri",
             "DashboardHostLaunchOptions.TryParse",
-            "StartupUri = new Uri(\"DashboardHostBootstrapWindow.xaml\", UriKind.Relative)",
-            "ShutdownMode = ShutdownMode.OnExplicitShutdown",
-            "StartupGuard.Begin");
-        RequireAbsent(app, "StartupUri = null");
-        RequireContains(bootstrap,
-            "DashboardHostLaunchOptions.TryParse",
-            "new DashboardHostWindow(options)",
-            "application.MainWindow = host",
-            "application.ShutdownMode = ShutdownMode.OnExplicitShutdown",
-            "host.Loaded += Host_Loaded",
-            "application.ShutdownMode = ShutdownMode.OnMainWindowClose",
-            "DispatcherPriority.ContextIdle",
-            "new Action(Close)",
-            "host.Show()");
+            "var dashboardHost = new DashboardHostWindow(dashboardHostOptions)",
+            "MainWindow = dashboardHost",
+            "dashboardHost.Show()",
+            "StartupGuard.Begin",
+            "var mainWindow = new MainWindow()",
+            "MainWindow = mainWindow",
+            "mainWindow.Show()");
+        RequireAbsent(app,
+            "DashboardHostBootstrapWindow",
+            "StartupUri =",
+            "StartupUri=null");
 
         var hostBranch = app.IndexOf("DashboardHostLaunchOptions.TryParse", StringComparison.Ordinal);
+        var dashboardWindow = app.IndexOf("new DashboardHostWindow", StringComparison.Ordinal);
         var startupGuard = app.IndexOf("StartupGuard.Begin", StringComparison.Ordinal);
-        if (hostBranch < 0 || startupGuard <= hostBranch)
-            throw new InvalidOperationException("Dashboard helper mode must bypass StartupGuard before primary startup begins.");
+        var primaryWindow = app.IndexOf("new MainWindow()", StringComparison.Ordinal);
+        if (hostBranch < 0
+            || dashboardWindow <= hostBranch
+            || startupGuard <= dashboardWindow
+            || primaryWindow <= startupGuard)
+        {
+            throw new InvalidOperationException(
+                "App.OnStartup must select DashboardHost before primary StartupGuard and construct MainWindow only in primary mode.");
+        }
+
+        if (File.Exists(Path.Combine(nativeRoot, "DashboardHostBootstrapWindow.xaml"))
+            || File.Exists(Path.Combine(nativeRoot, "DashboardHostBootstrapWindow.xaml.cs")))
+        {
+            throw new InvalidOperationException("Obsolete StartupUri Dashboard bootstrap returned.");
+        }
 
         RequireContains(options,
             "--dashboard-host",
@@ -116,7 +129,7 @@ internal static class V116DashboardProcessIsolationChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.6 keeps StartupUri bootstrap alive until Host Loaded, initializes WebView2 before HWND handoff and isolates Dashboard in a restartable process");
+            "PASS AtlasDesk v1.1.6 removes StartupUri, explicitly selects primary or DashboardHost mode in App.OnStartup, initializes WebView2 before HWND handoff and isolates Dashboard in a restartable process");
     }
 
     private static string RequireFile(string root, string fileName)
