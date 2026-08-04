@@ -103,11 +103,12 @@ func (a *application) v452FinalizeRound5ToastReport() error {
 	parents := v452CropSyncParentsOK.Load()
 	edits := v452CropSyncEditsOK.Load()
 	intercepted := v452CropSyncIntercepted.Load()
+	snapshots := v452CropSyncSnapshots.Load()
 	repairs := v452CropSyncRepairs.Load()
 	report.Checks["round5_crop_sync_guard_installed"] = parents >= 2 && edits >= 8
 	report.Checks["round5_crop_sync_guard_intercepted"] = intercepted > 0
-	report.Checks["round5_crop_initial_state_repaired"] = repairs >= 2
-	report.Details["round5_crop_sync_guard"] = fmt.Sprintf("tries=%d parents=%d edits=%d intercepted=%d repairs=%d", tries, parents, edits, intercepted, repairs)
+	report.Checks["round5_crop_initial_state_repaired"] = snapshots >= 2 && repairs >= 2
+	report.Details["round5_crop_sync_guard"] = fmt.Sprintf("tries=%d parents=%d edits=%d intercepted=%d snapshots=%d repairs=%d", tries, parents, edits, intercepted, snapshots, repairs)
 
 	report.Passed = len(report.Checks) > 0
 	for _, ok := range report.Checks {
