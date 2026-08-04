@@ -20,6 +20,7 @@ var (
 	v452Round6ListCellsOnce    sync.Once
 	v452Round6NumberDraws      atomic.Int32
 	v452Round6PreviewDraws     atomic.Int32
+	v452Round6PreviewAttempts  atomic.Int32
 	v452Round6ImageListDraw    = comctl32.NewProc("ImageList_Draw")
 	v452Round6ImageListCount   = comctl32.NewProc("ImageList_GetImageCount")
 )
@@ -50,7 +51,10 @@ func v452Round6ListCellsEventProc(hook, event, hwnd, idObject, idChild, eventThr
 }
 
 func v452Round6ListCellsMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	// Custom-draw notifications must be handled before the original parent
+	// procedure returns to the ListView. Drawing after DefSubclassProc means the
+	// control has already completed the paint stage and the HDC is no longer a
+	// valid custom-draw surface; counters increase but nothing appears on screen.
 	if message == WM_NOTIFY && app != nil && lParam != 0 {
 		hdr := (*nmhdr)(unsafe.Pointer(lParam))
 		if hdr.HwndFrom == app.hList && hdr.Code == NM_CUSTOMDRAW {
@@ -62,6 +66,7 @@ func v452Round6ListCellsMainSubclassProc(hwnd uintptr, message uint32, wParam, l
 	if message == v452WMNCDestroy {
 		v452RemoveSubclass.Call(hwnd, v452Round6ListCellsMainCB, subclassID)
 	}
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 	return result
 }
 
@@ -120,6 +125,7 @@ func v452Round6DrawListCell(a *application, cd *nmListViewCustomDraw) (bool, uin
 	if a.hImageList != 0 && task.ThumbnailIndex >= 0 {
 		count, _, _ := v452Round6ImageListCount.Call(a.hImageList)
 		if task.ThumbnailIndex < int(count) {
+			v452Round6PreviewAttempts.Add(1)
 			x := cell.Left + scaleDPI(5)
 			y := (cell.Top+cell.Bottom-scaleDPI(48))/2
 			drawn, _, _ := v452Round6ImageListDraw.Call(a.hImageList, uintptr(task.ThumbnailIndex), cd.NMCD.HDC, uintptr(x), uintptr(y), 0)
