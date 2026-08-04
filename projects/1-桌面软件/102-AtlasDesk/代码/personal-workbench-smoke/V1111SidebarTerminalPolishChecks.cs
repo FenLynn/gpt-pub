@@ -13,8 +13,8 @@ internal static class V1111SidebarTerminalPolishChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 1, 11))
-            throw new InvalidOperationException("AtlasDesk sidebar/terminal polish candidate must be v1.1.11.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 1, 11))
+            throw new InvalidOperationException("AtlasDesk must not move below the v1.1.11 sidebar/terminal visual baseline.");
 
         var pipeline = File.ReadAllText(RequireFile(nativeRoot, "WorkbenchFeaturePipeline.cs"));
         var coordinator = File.ReadAllText(RequireFile(nativeRoot, "SidebarTerminalVisualCoordinator.cs"));
@@ -101,7 +101,7 @@ internal static class V1111SidebarTerminalPolishChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.11 moves the project-context shortcut out of the brand row and applies a pure-black CMD terminal theme with explicit light button text");
+            "PASS AtlasDesk retains the v1.1.11 project-context placement and pure-black CMD terminal baseline");
     }
 
     private static string RequireFile(string root, params string[] parts)
