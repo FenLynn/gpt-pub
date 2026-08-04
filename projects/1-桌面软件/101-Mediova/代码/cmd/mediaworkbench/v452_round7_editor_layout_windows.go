@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	round7LayoutEventCB   uintptr
-	round7LayoutHook      uintptr
-	round7LayoutApplied   sync.Map // map[uintptr]bool
+	round7LayoutEventCB uintptr
+	round7LayoutHook    uintptr
+	round7LayoutApplied sync.Map // map[*round7Editor]bool
 )
 
 func init() {
@@ -35,7 +35,7 @@ func round7LayoutEventProc(hook, event, hwnd, idObject, idChild, eventThread, ev
 	if e == nil || e.hwnd == 0 || e.dialog == nil || e.dialog.hCanvas == 0 || e.hTimeline == 0 || e.hApplyCurrent == 0 {
 		return 0
 	}
-	if _, loaded := round7LayoutApplied.LoadOrStore(e.hwnd, true); loaded {
+	if _, loaded := round7LayoutApplied.LoadOrStore(e, true); loaded {
 		return 0
 	}
 	round7ApplyCompactEditorLayout(e)
@@ -69,16 +69,17 @@ func round7ApplyCompactEditorLayout(e *round7Editor) {
 	procMoveWindow.Call(e.hSeekPlusFrame, 317, 590, 82, 32, 1)
 	procMoveWindow.Call(e.hSeekPlusSec, 407, 590, 82, 32, 1)
 
-	x := int32(630)
-	procMoveWindow.Call(e.hStartLabel, uintptr(x), 24, 88, 28, 1)
-	procMoveWindow.Call(d.hStart, uintptr(x+90), 20, 120, 30, 1)
-	procMoveWindow.Call(e.hStartCurrent, uintptr(x+216), 20, 68, 30, 1)
-	procMoveWindow.Call(e.hStartInitial, uintptr(x+290), 20, 68, 30, 1)
-	procMoveWindow.Call(e.hEndLabel, uintptr(x), 64, 88, 28, 1)
-	procMoveWindow.Call(d.hEnd, uintptr(x+90), 60, 120, 30, 1)
-	procMoveWindow.Call(e.hEndCurrent, uintptr(x+216), 60, 68, 30, 1)
-	procMoveWindow.Call(e.hEndTerminal, uintptr(x+290), 60, 68, 30, 1)
-	procMoveWindow.Call(e.hSourceRange, uintptr(x), 102, 358, 28, 1)
+	// One-line time rows, exactly matching the approved interaction wording.
+	x := int32(620)
+	procMoveWindow.Call(e.hStartLabel, uintptr(x), 24, 96, 28, 1)
+	procMoveWindow.Call(d.hStart, uintptr(x+98), 20, 120, 30, 1)
+	procMoveWindow.Call(e.hStartCurrent, uintptr(x+224), 20, 70, 30, 1)
+	procMoveWindow.Call(e.hStartInitial, uintptr(x+296), 20, 70, 30, 1)
+	procMoveWindow.Call(e.hEndLabel, uintptr(x), 64, 96, 28, 1)
+	procMoveWindow.Call(d.hEnd, uintptr(x+98), 60, 120, 30, 1)
+	procMoveWindow.Call(e.hEndCurrent, uintptr(x+224), 60, 70, 30, 1)
+	procMoveWindow.Call(e.hEndTerminal, uintptr(x+296), 60, 70, 30, 1)
+	procMoveWindow.Call(e.hSourceRange, uintptr(x), 102, 366, 28, 1)
 
 	procMoveWindow.Call(d.hCrop, uintptr(x), 138, 154, 30, 1)
 	for i := range e.cropLabels {
@@ -89,16 +90,16 @@ func round7ApplyCompactEditorLayout(e *round7Editor) {
 	procMoveWindow.Call(d.hY, uintptr(x+68), 212, 112, 30, 1)
 	procMoveWindow.Call(d.hW, uintptr(x+68), 248, 112, 30, 1)
 	procMoveWindow.Call(d.hH, uintptr(x+68), 284, 112, 30, 1)
-	procMoveWindow.Call(e.hCropFrameLabel, uintptr(x+190), 180, 168, 48, 1)
+	procMoveWindow.Call(e.hCropFrameLabel, uintptr(x+190), 180, 176, 48, 1)
 	procMoveWindow.Call(e.hFullFrame, uintptr(x+190), 244, 130, 32, 1)
 	procMoveWindow.Call(e.hAspectLabel, uintptr(x), 326, 68, 26, 1)
 	procMoveWindow.Call(d.hAspect, uintptr(x+68), 320, 112, 200, 1)
 	procMoveWindow.Call(e.hCenter, uintptr(x+190), 320, 130, 32, 1)
-	procMoveWindow.Call(d.hInfo, uintptr(x), 366, 358, 130, 1)
-	procMoveWindow.Call(e.hPreview, uintptr(x), 506, 358, 36, 1)
-	procMoveWindow.Call(e.hApplySelected, uintptr(x), 594, 358, 36, 1)
-	procMoveWindow.Call(e.hApplyCurrent, uintptr(x), 640, 220, 40, 1)
-	procMoveWindow.Call(e.hCancel, uintptr(x+230), 640, 128, 40, 1)
+	procMoveWindow.Call(d.hInfo, uintptr(x), 366, 366, 130, 1)
+	procMoveWindow.Call(e.hPreview, uintptr(x), 506, 366, 36, 1)
+	procMoveWindow.Call(e.hApplySelected, uintptr(x), 594, 366, 36, 1)
+	procMoveWindow.Call(e.hApplyCurrent, uintptr(x), 640, 226, 40, 1)
+	procMoveWindow.Call(e.hCancel, uintptr(x+236), 640, 130, 40, 1)
 
 	// The stable compatibility hook renames any active trimDialog to “裁剪”
 	// once during child creation. Restore the approved name after all children
