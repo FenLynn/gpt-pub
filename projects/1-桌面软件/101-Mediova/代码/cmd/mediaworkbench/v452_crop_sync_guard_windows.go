@@ -20,15 +20,19 @@ type v452CropSyncState struct {
 }
 
 var (
-	v452CropSyncEventCB   uintptr
-	v452CropSyncParentCB  uintptr
-	v452CropSyncEditCB    uintptr
-	v452CropSyncHook      uintptr
-	v452CropSyncStates    sync.Map // map[dialog HWND]*v452CropSyncState
-	v452CropSyncParents   sync.Map // map[dialog HWND]bool
-	v452CropSyncEdits     sync.Map // map[edit HWND]bool
-	v452CropSyncGetParent = user32.NewProc("GetParent")
-	v452CropSyncGetID     = user32.NewProc("GetDlgCtrlID")
+	v452CropSyncEventCB      uintptr
+	v452CropSyncParentCB     uintptr
+	v452CropSyncEditCB       uintptr
+	v452CropSyncHook         uintptr
+	v452CropSyncStates       sync.Map // map[dialog HWND]*v452CropSyncState
+	v452CropSyncParents      sync.Map // map[dialog HWND]bool, only after successful subclassing
+	v452CropSyncEdits        sync.Map // map[edit HWND]bool, only after successful subclassing
+	v452CropSyncGetParent    = user32.NewProc("GetParent")
+	v452CropSyncGetID        = user32.NewProc("GetDlgCtrlID")
+	v452CropSyncInstallTries atomic.Int32
+	v452CropSyncParentsOK    atomic.Int32
+	v452CropSyncEditsOK      atomic.Int32
+	v452CropSyncIntercepted  atomic.Int32
 )
 
 func init() {
@@ -47,6 +51,7 @@ func init() {
 }
 
 func v452CropSyncEventProc(hook, event, hwnd, idObject, idChild, eventThread, eventTime uintptr) uintptr {
+	v452InstallCropSyncGuard(activeTrim)
 	if hwnd == 0 {
 		return 0
 	}
@@ -55,23 +60,53 @@ func v452CropSyncEventProc(hook, event, hwnd, idObject, idChild, eventThread, ev
 		return 0
 	}
 	parent, _, _ := v452CropSyncGetParent.Call(hwnd)
-	if parent == 0 {
-		return 0
-	}
-	if _, loaded := v452CropSyncParents.LoadOrStore(parent, true); !loaded {
-		v452CropSyncStates.Store(parent, &v452CropSyncState{})
-		v452SetWindowSubclass.Call(parent, v452CropSyncParentCB, v452CropSyncParentSubclassID, 0)
-	}
-	if _, loaded := v452CropSyncEdits.LoadOrStore(hwnd, true); !loaded {
-		v452SetWindowSubclass.Call(hwnd, v452CropSyncEditCB, v452CropSyncEditSubclassID, 0)
-	}
+	v452InstallCropSyncHandles(parent, []uintptr{hwnd})
 	return 0
+}
+
+func v452InstallCropSyncGuard(d *trimDialog) {
+	if d == nil || d.hwnd == 0 {
+		return
+	}
+	v452InstallCropSyncHandles(d.hwnd, []uintptr{d.hX, d.hY, d.hW, d.hH})
+}
+
+func v452InstallCropSyncHandles(parent uintptr, edits []uintptr) {
+	if parent == 0 {
+		return
+	}
+	v452CropSyncInstallTries.Add(1)
+	if _, installed := v452CropSyncParents.Load(parent); !installed {
+		state := &v452CropSyncState{}
+		v452CropSyncStates.Store(parent, state)
+		ok, _, _ := v452SetWindowSubclass.Call(parent, v452CropSyncParentCB, v452CropSyncParentSubclassID, 0)
+		if ok != 0 {
+			v452CropSyncParents.Store(parent, true)
+			v452CropSyncParentsOK.Add(1)
+		} else {
+			v452CropSyncStates.Delete(parent)
+		}
+	}
+	for _, hwnd := range edits {
+		if hwnd == 0 {
+			continue
+		}
+		if _, installed := v452CropSyncEdits.Load(hwnd); installed {
+			continue
+		}
+		ok, _, _ := v452SetWindowSubclass.Call(hwnd, v452CropSyncEditCB, v452CropSyncEditSubclassID, 0)
+		if ok != 0 {
+			v452CropSyncEdits.Store(hwnd, true)
+			v452CropSyncEditsOK.Add(1)
+		}
+	}
 }
 
 func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	if message == WM_COMMAND && int(hiWord(wParam)) == v452ENChange {
 		id := int(loWord(wParam))
 		if value, ok := v452CropSyncStates.Load(hwnd); ok && value.(*v452CropSyncState).consume(id) {
+			v452CropSyncIntercepted.Add(1)
 			return 0
 		}
 	}
