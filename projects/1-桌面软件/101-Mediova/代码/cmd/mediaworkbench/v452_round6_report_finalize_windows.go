@@ -24,6 +24,9 @@ var (
 	v452Round6ReportMainCB  uintptr
 	v452Round6ReportHook    uintptr
 	v452Round6ReportOnce    sync.Once
+	v452Round6PreviewOnce   sync.Once
+	v452Round6PreviewOK     bool
+	v452Round6PreviewDetail string
 )
 
 func init() {
@@ -51,6 +54,14 @@ func v452Round6ReportEventProc(hook, event, hwnd, idObject, idChild, eventThread
 }
 
 func v452Round6ReportSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	if message == WM_APP_SELFTEST && app != nil && app.selfTest {
+		// Run the real preview fixture while the main ListView and ImageList are
+		// still alive. The original self-test tears down parts of the UI before
+		// returning, so running this after DefSubclassProc cannot prove rendering.
+		v452Round6PreviewOnce.Do(func() {
+			v452Round6PreviewOK, v452Round6PreviewDetail = app.v452Round6ExerciseRealListPreview()
+		})
+	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 	if message == WM_APP_SELFTEST && app != nil && app.selfTest {
 		_ = app.v452FinalizeRound6Report()
@@ -89,7 +100,6 @@ func (a *application) v452FinalizeRound6Report() error {
 	report.Checks["round6_timeline_seek_independent"] = seekEvents > 0 && independent > 0
 	report.Details["round6_timeline_seek_independent"] = fmt.Sprintf("seek_events=%d independent=%d", seekEvents, independent)
 
-	previewOK, previewDetail := a.v452Round6ExerciseRealListPreview()
 	numberDraws := v452Round6NumberDraws.Load()
 	previewAttempts := v452Round6PreviewAttempts.Load()
 	previewDraws := v452Round6PreviewDraws.Load()
@@ -99,8 +109,8 @@ func (a *application) v452FinalizeRound6Report() error {
 	// the bitmap enters the same ImageList used by the product, a visible task
 	// receives the actual returned index, and the resulting main window is
 	// painted and captured. A synthetic ThumbnailIndex=0 is not accepted.
-	report.Checks["round6_list_previews_drawn"] = previewOK && previewDraws > 0
-	report.Details["round6_list_previews_drawn"] = fmt.Sprintf("%s attempts=%d draws=%d", previewDetail, previewAttempts, previewDraws)
+	report.Checks["round6_list_previews_drawn"] = v452Round6PreviewOK && previewDraws > 0
+	report.Details["round6_list_previews_drawn"] = fmt.Sprintf("%s attempts=%d draws=%d", v452Round6PreviewDetail, previewAttempts, previewDraws)
 
 	report.Passed = len(report.Checks) > 0
 	for _, ok := range report.Checks {
@@ -118,7 +128,7 @@ func (a *application) v452FinalizeRound6Report() error {
 
 func (a *application) v452Round6ExerciseRealListPreview() (bool, string) {
 	if a == nil || a.hwnd == 0 || a.hList == 0 || a.hImageList == 0 {
-		return false, "list or ImageList unavailable"
+		return false, fmt.Sprintf("UI unavailable hwnd=%d list=%d image_list=%d", a.hwnd, a.hList, a.hImageList)
 	}
 	ffmpeg, _, _, _, _ := a.componentSnapshot()
 	if ffmpeg == "" {
