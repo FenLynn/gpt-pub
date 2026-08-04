@@ -1,3 +1,27 @@
+AtlasDesk v1.1.12 shell and home simplification
+
+This release is a focused density and hierarchy correction after the v1.1.11 terminal visual pass. It does not change Dashboard ownership, ConPTY sessions, project context, Zotero access, tasks, tools, security or Runtime/Data separation.
+
+Compact shell
+- The collapsed sidebar is now a true 48-pixel icon rail instead of a wide mini-sidebar.
+- Collapsed navigation icons, the brand mark, settings entry and local-user avatar are reduced and centered; expanded navigation also uses a shorter 34-pixel row.
+- The visible Ctrl+K badge is removed from the Search or Execute field. The shortcut remains available through the tooltip and keyboard binding without crowding the search label.
+- Settings uses an unambiguous gear glyph instead of the previous sun-like radial icon that resembled a dark-mode toggle.
+- The top page bar is reduced to 36 pixels, icon controls are reduced, and the Project / Environment / Terminal tabs use a compact 30-pixel height.
+- The project-context shortcut remains on the command row and all v1.1.11 pure-black terminal behavior is retained.
+
+Simplified home
+- The large gradient greeting banner, decorative circles, oversized metric cards, duplicated shortcut panel and footer slogan are removed.
+- Home now has three clear layers: greeting plus current workspace, one compact action row, and a concise status/recent-work area.
+- Dashboard, Zotero, projects and tasks remain visible as small status cells rather than independent promotional cards.
+- Workspace, Dashboard, Library, Development, Terminal and Global Search remain one click away without repeating the same actions in multiple regions.
+- Existing snapshot refresh, recent-file opening and navigation events are preserved.
+
+Boundary
+- The v1.1.10 in-process Dashboard and its native text-input behavior are unchanged.
+- Terminal processes, project center, workspace, environment discovery, Zotero read-only behavior, tasks, tools and private Data formats are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.11 sidebar and terminal visual polish
 
 This release is a focused visual correction on top of the v1.1.10 Dashboard simplicity restoration. It does not change Dashboard ownership, project data, terminal processes, Zotero access, tasks, tools, security or Runtime/Data separation.
