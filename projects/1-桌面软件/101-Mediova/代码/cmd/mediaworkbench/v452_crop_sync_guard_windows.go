@@ -3,9 +3,13 @@
 package main
 
 import (
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
+
+	"mediaworkbench/internal/model"
 )
 
 const (
@@ -27,12 +31,14 @@ var (
 	v452CropSyncStates       sync.Map // map[dialog HWND]*v452CropSyncState
 	v452CropSyncParents      sync.Map // map[dialog HWND]bool, only after successful subclassing
 	v452CropSyncEdits        sync.Map // map[edit HWND]bool, only after successful subclassing
+	v452CropSyncRepaired     sync.Map // map[dialog HWND]bool, after complete initial crop state is restored
 	v452CropSyncGetParent    = user32.NewProc("GetParent")
 	v452CropSyncGetID        = user32.NewProc("GetDlgCtrlID")
 	v452CropSyncInstallTries atomic.Int32
 	v452CropSyncParentsOK    atomic.Int32
 	v452CropSyncEditsOK      atomic.Int32
 	v452CropSyncIntercepted  atomic.Int32
+	v452CropSyncRepairs      atomic.Int32
 )
 
 func init() {
@@ -61,6 +67,7 @@ func v452CropSyncEventProc(hook, event, hwnd, idObject, idChild, eventThread, ev
 	}
 	parent, _, _ := v452CropSyncGetParent.Call(hwnd)
 	v452InstallCropSyncHandles(parent, []uintptr{hwnd})
+	v452RepairInitialCropState(activeTrim)
 	return 0
 }
 
@@ -69,6 +76,7 @@ func v452InstallCropSyncGuard(d *trimDialog) {
 		return
 	}
 	v452InstallCropSyncHandles(d.hwnd, []uintptr{d.hX, d.hY, d.hW, d.hH})
+	v452RepairInitialCropState(d)
 }
 
 func v452InstallCropSyncHandles(parent uintptr, edits []uintptr) {
@@ -102,6 +110,35 @@ func v452InstallCropSyncHandles(parent uintptr, edits []uintptr) {
 	}
 }
 
+func v452RepairInitialCropState(d *trimDialog) {
+	if d == nil || d.hwnd == 0 || d.hX == 0 || d.hY == 0 || d.hW == 0 || d.hH == 0 {
+		return
+	}
+	if _, ok := v452CropSyncParents.Load(d.hwnd); !ok {
+		return
+	}
+	for _, hwnd := range []uintptr{d.hX, d.hY, d.hW, d.hH} {
+		if _, ok := v452CropSyncEdits.Load(hwnd); !ok {
+			return
+		}
+	}
+	if _, repaired := v452CropSyncRepaired.Load(d.hwnd); repaired {
+		return
+	}
+	x, xErr := strconv.Atoi(strings.TrimSpace(getText(d.hX)))
+	y, yErr := strconv.Atoi(strings.TrimSpace(getText(d.hY)))
+	width, widthErr := strconv.Atoi(strings.TrimSpace(getText(d.hW)))
+	height, heightErr := strconv.Atoi(strings.TrimSpace(getText(d.hH)))
+	if xErr != nil || yErr != nil || widthErr != nil || heightErr != nil || width < 2 || height < 2 {
+		return
+	}
+	enabled := send(d.hCrop, BM_GETCHECK, 0, 0) == BST_CHECKED
+	d.opts.Crop = model.Crop{Enabled: enabled, X: x, Y: y, Width: width, Height: height}
+	v452CropSyncRepaired.Store(d.hwnd, true)
+	v452CropSyncRepairs.Add(1)
+	procInvalidateRect.Call(d.hCanvas, 0, 1)
+}
+
 func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	if message == WM_COMMAND && int(hiWord(wParam)) == v452ENChange {
 		id := int(loWord(wParam))
@@ -114,6 +151,7 @@ func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 		v452RemoveSubclass.Call(hwnd, v452CropSyncParentCB, subclassID)
 		v452CropSyncStates.Delete(hwnd)
 		v452CropSyncParents.Delete(hwnd)
+		v452CropSyncRepaired.Delete(hwnd)
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 	return result
