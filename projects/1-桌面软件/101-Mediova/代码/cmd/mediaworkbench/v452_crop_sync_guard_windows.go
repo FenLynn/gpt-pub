@@ -50,6 +50,7 @@ var (
 	v452CropSyncParentsOK    atomic.Int32
 	v452CropSyncEarlyOK      atomic.Int32
 	v452CropSyncEditsOK      atomic.Int32
+	v452CropSyncEditorUIOK   atomic.Int32
 	v452CropSyncIntercepted  atomic.Int32
 	v452CropSyncCBTCallbacks atomic.Int32
 	v452CropSyncActivations  atomic.Int32
@@ -126,6 +127,7 @@ func v452CropSyncCBTProc(code int32, wParam, lParam uintptr) uintptr {
 		if d != nil && d.hwnd != 0 && d.hwnd == wParam {
 			v452CropSyncActivations.Add(1)
 			v452BindPendingCropSnapshot(d)
+			v452InstallTrimEditorUIThread(d)
 			v452InstallCropSyncHandles(d.hwnd, []uintptr{d.hX, d.hY, d.hW, d.hH})
 			v452RestoreInitialCropState(d)
 		}
@@ -154,6 +156,29 @@ func v452InstallCropSyncParentEarly(parent uintptr, d *trimDialog) {
 	v452CropSyncInitial.Store(parent, d.opts.Crop)
 	v452CropSyncParentsOK.Add(1)
 	v452CropSyncEarlyOK.Add(1)
+}
+
+func v452InstallTrimEditorUIThread(d *trimDialog) {
+	if d == nil {
+		return
+	}
+	state := v452TrimInstallStateFor(d)
+	if d.hTrack != 0 {
+		move(d.hTrack, 15, 609, 700, 47)
+		ok, _, _ := v452SetWindowSubclass.Call(d.hTrack, v452TrimTrackSubclassCB, v452TrimTrackSubclassID, 0)
+		if ok != 0 {
+			state.trackInstalled = true
+			v452CropSyncEditorUIOK.Add(1)
+			procInvalidateRect.Call(d.hTrack, 0, 1)
+		}
+	}
+	if d.hCanvas != 0 {
+		ok, _, _ := v452SetWindowSubclass.Call(d.hCanvas, v452TrimPreviewSubclassCB, v452TrimPreviewSubclassID, 0)
+		if ok != 0 {
+			state.previewInstalled = true
+			v452CropSyncEditorUIOK.Add(1)
+		}
+	}
 }
 
 func v452InstallCropSyncGuard(d *trimDialog) {
@@ -244,6 +269,7 @@ func v452CropSyncParentSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		if d := activeTrim; d != nil && d.hwnd == hwnd {
 			v452BindPendingCropSnapshot(d)
+			v452InstallTrimEditorUIThread(d)
 			v452InstallCropSyncHandles(hwnd, []uintptr{d.hX, d.hY, d.hW, d.hH})
 			v452RestoreInitialCropState(d)
 		}
