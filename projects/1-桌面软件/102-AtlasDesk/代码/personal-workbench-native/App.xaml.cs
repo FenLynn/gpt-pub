@@ -23,15 +23,17 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // WPF does not accept StartupUri=null. Helper mode therefore redirects the
-        // non-null XAML startup route to a hidden bootstrap window before base startup.
-        // The bootstrap replaces itself with DashboardHostWindow and never constructs
-        // MainWindow, StartupGuard, global shortcuts or the primary feature pipeline.
-        if (DashboardHostLaunchOptions.TryParse(e.Args, out _))
+        // App.xaml deliberately has no StartupUri. The process mode is selected here
+        // before any Window is constructed, so helper startup cannot enter the primary
+        // MainWindow lifetime and primary startup cannot accidentally create WebView2.
+        if (DashboardHostLaunchOptions.TryParse(e.Args, out var dashboardHostOptions))
         {
-            StartupUri = new Uri("DashboardHostBootstrapWindow.xaml", UriKind.Relative);
-            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
             base.OnStartup(e);
+
+            var dashboardHost = new DashboardHostWindow(dashboardHostOptions);
+            MainWindow = dashboardHost;
+            dashboardHost.Show();
             return;
         }
 
@@ -79,7 +81,12 @@ public partial class App : Application
         };
 
         Activated += App_Activated;
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
         base.OnStartup(e);
+
+        var mainWindow = new MainWindow();
+        MainWindow = mainWindow;
+        mainWindow.Show();
     }
 
     private static void ApplyPendingRestoreBeforeStartup()
