@@ -126,6 +126,8 @@ func DragTrimTimeline(initial TrimRangeState, duration, fps float64, hit TrimTim
 	case TrimTimelinePlayhead, TrimTimelineNone:
 		state.Playhead = targetTime
 	case TrimTimelineRange:
+		oldStart := state.Start
+		oldPlayhead := state.Playhead
 		length := state.End - state.Start
 		delta := targetTime - anchorTime
 		start := state.Start + delta
@@ -140,7 +142,8 @@ func DragTrimTimeline(initial TrimRangeState, duration, fps float64, hit TrimTim
 		}
 		state.Start = math.Max(0, start)
 		state.End = math.Min(duration, state.Start+length)
-		state.Playhead = clampFloat(state.Playhead+delta, state.Start, state.End)
+		actualDelta := state.Start - oldStart
+		state.Playhead = clampFloat(oldPlayhead+actualDelta, state.Start, state.End)
 	}
 	return NormalizeTrimRange(duration, fps, state)
 }
