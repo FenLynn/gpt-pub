@@ -17,7 +17,7 @@ internal static class V1111SidebarTerminalPolishChecks
             throw new InvalidOperationException("AtlasDesk sidebar/terminal polish candidate must be v1.1.11.");
 
         var pipeline = File.ReadAllText(RequireFile(nativeRoot, "WorkbenchFeaturePipeline.cs"));
-        var coordinator = File.ReadAllText(RequireFile(nativeRoot, "V1111VisualPolishCoordinator.cs"));
+        var coordinator = File.ReadAllText(RequireFile(nativeRoot, "SidebarTerminalVisualCoordinator.cs"));
         var terminalXaml = File.ReadAllText(RequireFile(nativeRoot, "TerminalDrawerControl.xaml"));
         var terminalHtml = File.ReadAllText(RequireFile(nativeRoot, "TerminalAssets", "terminal.html"));
         var terminalJs = File.ReadAllText(RequireFile(nativeRoot, "TerminalAssets", "terminal-host.js"));
@@ -26,15 +26,17 @@ internal static class V1111SidebarTerminalPolishChecks
 
         RequireContains(pipeline,
             "ProductivityContext = ProductivityContextCoordinator.Attach(window, this)",
-            "VisualPolish = V1111VisualPolishCoordinator.Attach(window, this)",
-            "public V1111VisualPolishCoordinator VisualPolish { get; }");
+            "VisualPolish = SidebarTerminalVisualCoordinator.Attach(window, this)",
+            "public SidebarTerminalVisualCoordinator VisualPolish { get; }");
         RequireOrder(
             pipeline,
             "ProductivityContext = ProductivityContextCoordinator.Attach(window, this)",
-            "VisualPolish = V1111VisualPolishCoordinator.Attach(window, this)",
+            "VisualPolish = SidebarTerminalVisualCoordinator.Attach(window, this)",
             "Accessibility = AccessibilityCoordinator.Attach(window)");
+        RequireAbsent(pipeline, "V1111VisualPolishCoordinator");
 
         RequireContains(coordinator,
+            "public sealed class SidebarTerminalVisualCoordinator",
             "Equals(button.Tag, \"productivity-context\")",
             "Grid.SetRow(contextButton, Grid.GetRow(commandButton))",
             "contextButton.HorizontalAlignment = HorizontalAlignment.Right",
@@ -48,6 +50,7 @@ internal static class V1111SidebarTerminalPolishChecks
             "Color.FromRgb(13, 19, 32)",
             "ApplyTerminalButton(button)",
             "TerminalButtonText");
+        RequireAbsent(coordinator, "V1111VisualPolishCoordinator");
 
         RequireContains(terminalXaml,
             "Background=\"#000000\"",
@@ -95,6 +98,7 @@ internal static class V1111SidebarTerminalPolishChecks
             "AtlasDesk v1.1.11 sidebar and terminal visual polish",
             "project-context shortcut",
             "pure-black CMD terminal theme",
+            "SidebarTerminalVisualCoordinator",
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
