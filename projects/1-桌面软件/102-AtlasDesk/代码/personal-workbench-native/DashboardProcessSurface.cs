@@ -27,17 +27,32 @@ public sealed class DashboardProcessSurface : HwndHost
     private const int WmRButtonDown = 0x0204;
     private const int WmMButtonDown = 0x0207;
     private const int WmXButtonDown = 0x020B;
+    private const int VkLButton = 0x01;
+    private const int VkRButton = 0x02;
+    private const int VkMButton = 0x04;
+    private const int VkXButton1 = 0x05;
+    private const int VkXButton2 = 0x06;
     private const uint GaRoot = 2;
 
+    private readonly DispatcherTimer _inputWatchdog;
     private IntPtr _hostHandle;
     private IntPtr _dashboardHandle;
+    private bool _observedDetached;
+    private bool _mouseWasDown;
+    private int _focusRecoveryAttempts;
 
     public DashboardProcessSurface()
     {
         Focusable = true;
         SizeChanged += (_, _) => ResizeDashboardWindow();
         GotKeyboardFocus += (_, _) => _ = ActivateDashboardInput();
-        PreviewMouseDown += (_, _) => _ = ActivateDashboardInput();
+        PreviewMouseDown += (_, _) => QueueDashboardInputActivation();
+
+        _inputWatchdog = new DispatcherTimer(DispatcherPriority.Input)
+        {
+            Interval = TimeSpan.FromMilliseconds(25)
+        };
+        _inputWatchdog.Tick += InputWatchdog_Tick;
     }
 
     public IntPtr HostHandle => _hostHandle;
@@ -69,14 +84,17 @@ public sealed class DashboardProcessSurface : HwndHost
         _ = ShowWindow(dashboardHandle, SwShow);
         ResizeDashboardWindow();
 
-        Dispatcher.BeginInvoke(
-            DispatcherPriority.Input,
-            new Action(() => _ = ActivateDashboardInput()));
+        _observedDetached = false;
+        _focusRecoveryAttempts = 8;
+        QueueDashboardInputActivation();
     }
 
     public void DetachDashboardWindow()
     {
         _dashboardHandle = IntPtr.Zero;
+        _observedDetached = false;
+        _mouseWasDown = false;
+        _focusRecoveryAttempts = 0;
     }
 
     /// <summary>
@@ -89,7 +107,8 @@ public sealed class DashboardProcessSurface : HwndHost
     {
         if (_hostHandle == IntPtr.Zero
             || _dashboardHandle == IntPtr.Zero
-            || !IsWindow(_dashboardHandle))
+            || !IsWindow(_dashboardHandle)
+            || GetParent(_dashboardHandle) != _hostHandle)
         {
             return false;
         }
@@ -140,6 +159,7 @@ public sealed class DashboardProcessSurface : HwndHost
         if (_hostHandle == IntPtr.Zero)
             throw new InvalidOperationException("Unable to create the isolated Dashboard native host window.");
 
+        _inputWatchdog.Start();
         return new HandleRef(this, _hostHandle);
     }
 
@@ -153,9 +173,7 @@ public sealed class DashboardProcessSurface : HwndHost
         if (msg == WmSetFocus
             || (msg == WmParentNotify && IsMouseButtonMessage(LowWord(wParam))))
         {
-            Dispatcher.BeginInvoke(
-                DispatcherPriority.Input,
-                new Action(() => _ = ActivateDashboardInput()));
+            QueueDashboardInputActivation();
         }
 
         return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
@@ -163,16 +181,94 @@ public sealed class DashboardProcessSurface : HwndHost
 
     protected override void DestroyWindowCore(HandleRef hwnd)
     {
+        _inputWatchdog.Stop();
         _dashboardHandle = IntPtr.Zero;
+        _observedDetached = false;
+        _mouseWasDown = false;
+        _focusRecoveryAttempts = 0;
         if (hwnd.Handle != IntPtr.Zero)
             _ = DestroyWindow(hwnd.Handle);
         _hostHandle = IntPtr.Zero;
     }
 
+    private void InputWatchdog_Tick(object? sender, EventArgs e)
+    {
+        if (_hostHandle == IntPtr.Zero
+            || _dashboardHandle == IntPtr.Zero
+            || !IsWindow(_dashboardHandle))
+        {
+            _mouseWasDown = false;
+            return;
+        }
+
+        var parent = GetParent(_dashboardHandle);
+        if (parent != _hostHandle)
+        {
+            _observedDetached = true;
+            _mouseWasDown = false;
+            _focusRecoveryAttempts = 0;
+            return;
+        }
+
+        if (_observedDetached)
+        {
+            _observedDetached = false;
+            _focusRecoveryAttempts = 12;
+            ResizeDashboardWindow();
+        }
+
+        if (_focusRecoveryAttempts > 0)
+        {
+            _focusRecoveryAttempts--;
+            QueueDashboardInputActivation();
+        }
+
+        var mouseDown = IsAnyMouseButtonDown();
+        if (mouseDown && !_mouseWasDown && IsCursorInsideHost())
+            QueueDashboardInputActivation();
+        _mouseWasDown = mouseDown;
+    }
+
+    private void QueueDashboardInputActivation()
+    {
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            new Action(() => _ = ActivateDashboardInput()));
+    }
+
+    private bool IsCursorInsideHost()
+    {
+        if (_hostHandle == IntPtr.Zero
+            || !GetCursorPos(out var point)
+            || !GetWindowRect(_hostHandle, out var rect))
+        {
+            return false;
+        }
+
+        return point.X >= rect.Left
+               && point.X < rect.Right
+               && point.Y >= rect.Top
+               && point.Y < rect.Bottom;
+    }
+
+    private static bool IsAnyMouseButtonDown()
+        => IsKeyDown(VkLButton)
+           || IsKeyDown(VkRButton)
+           || IsKeyDown(VkMButton)
+           || IsKeyDown(VkXButton1)
+           || IsKeyDown(VkXButton2);
+
+    private static bool IsKeyDown(int key)
+        => (GetAsyncKeyState(key) & 0x8000) != 0;
+
     private void ResizeDashboardWindow()
     {
-        if (_dashboardHandle == IntPtr.Zero || !IsWindow(_dashboardHandle))
+        if (_dashboardHandle == IntPtr.Zero
+            || !IsWindow(_dashboardHandle)
+            || GetParent(_dashboardHandle) != _hostHandle)
+        {
             return;
+        }
 
         _ = MoveWindow(
             _dashboardHandle,
@@ -202,6 +298,22 @@ public sealed class DashboardProcessSurface : HwndHost
             _ = SetWindowLong(hwnd, GwlStyle, unchecked((int)style));
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateWindowEx(
         uint extendedStyle,
@@ -223,6 +335,9 @@ public sealed class DashboardProcessSurface : HwndHost
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SetParent(IntPtr child, IntPtr newParent);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr hwnd);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
     private static extern int GetWindowLong(IntPtr hwnd, int index);
@@ -294,4 +409,15 @@ public sealed class DashboardProcessSurface : HwndHost
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out NativePoint point);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
 }

@@ -1,3 +1,25 @@
+AtlasDesk v1.1.9 authentication focus-rebind hotfix
+
+This hotfix addresses the first real-machine result after the v1.1.8 single-WebView authentication correction. An existing valid Cloudflare Access session can make the detachable login window flash briefly and immediately return to Dashboard. The browser session is valid, but the DashboardHost HWND changes from an embedded child to a top-level login window and back. The existing test confirmed that the same HWND returned, but it did not verify that WPF and the re-embedded WinForms/WebView2 thread could still accept text input afterwards.
+
+Re-embed focus recovery
+- DashboardProcessSurface now watches the real parent of the isolated DashboardHost HWND.
+- While DashboardHost is detached for authentication, input recovery is suspended.
+- When the same HWND becomes a child of the AtlasDesk native Dashboard surface again, AtlasDesk resizes it and performs a bounded sequence of cross-process focus transfers.
+- Every transfer temporarily joins the WPF and DashboardHost input queues with AttachThreadInput, focuses the DashboardHost window and immediately detaches the queues.
+- Recovery is bounded to twelve short attempts after re-embedding and eight attempts after initial attachment; it does not become a permanent focus loop.
+
+Real click recovery
+- Native mouse-button state and the physical Dashboard host rectangle are checked at input priority.
+- A real mouse press inside Dashboard triggers the same bounded cross-process input transfer even when WM_PARENTNOTIFY is swallowed by the WebView2 native child hierarchy.
+- Mouse hover does not transfer focus.
+- Clicks outside the Dashboard rectangle do not transfer focus, so AtlasDesk navigation, workspace, Zotero and other controls remain usable.
+
+Verification boundary
+- v1.1.9 retains the v1.1.8 single-WebView Access flow, CF_Authorization verification, DashboardHost proxy routing and the v1.1.6 process boundary.
+- The Windows suite compiles and runs the native focus watchdog together with the existing real DashboardHost detach/re-embed, process-loss and replacement-host tests.
+- main remains the formal v1.0.0 baseline until user verification.
+
 AtlasDesk v1.1.8 Access session-continuity hotfix
 
 This hotfix removes the split-browser authentication design introduced in v1.1.7. Cloudflare Access requires the browser instance that starts authentication to also complete the callback and retain the resulting CF_Session and CF_Authorization cookies. Opening GitHub or the callback in Chrome while Dashboard remained in WebView2 created two unrelated browser sessions and produced Invalid session by design.
