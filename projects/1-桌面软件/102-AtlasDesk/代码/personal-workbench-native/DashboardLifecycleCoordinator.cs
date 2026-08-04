@@ -1,7 +1,8 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+using System.Diagnostics;
 using System.Reflection;
-using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -11,66 +12,30 @@ using System.Windows.Threading;
 namespace PersonalWorkbench;
 
 /// <summary>
-/// Owns Dashboard commands, WebView2 process classification, browser-process
-/// diagnostics and rapid-click protection. MainWindow still creates the control,
-/// but destructive recovery can only run through this coordinator.
+/// Keeps all Dashboard WebView2 and page code in a second AtlasDesk.exe process.
+/// The primary process owns only a native child-window surface, command pipe and
+/// restart UI, so a native browser/control crash cannot terminate AtlasDesk.
 /// </summary>
 public sealed class DashboardLifecycleCoordinator : IDisposable
 {
     private static readonly BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
-
-    private const string DashboardClickGuardScript = """
-        (() => {
-          if (window.__atlasDeskClickGuardInstalled) return;
-          window.__atlasDeskClickGuardInstalled = true;
-          let lastKey = '';
-          let lastAt = 0;
-          const clean = value => String(value || '')
-            .replace(/[\r\n|]+/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 96);
-          document.addEventListener('click', event => {
-            const origin = event.target instanceof Element ? event.target : event.target?.parentElement;
-            const target = origin?.closest?.('button,[role="button"],a,input[type="button"],input[type="submit"]');
-            if (!target) return;
-            const key = clean(
-              target.getAttribute('aria-label')
-              || target.getAttribute('title')
-              || target.id
-              || target.textContent
-              || target.getAttribute('href')
-              || target.tagName);
-            const now = performance.now();
-            const duplicate = key.length > 0 && key === lastKey && now - lastAt < 900;
-            try {
-              window.chrome?.webview?.postMessage(
-                `atlasdesk-click|${duplicate ? 'blocked' : 'accepted'}|${key || target.tagName}`);
-            } catch {}
-            if (duplicate) {
-              event.preventDefault();
-              event.stopImmediatePropagation();
-              return;
-            }
-            lastKey = key;
-            lastAt = now;
-          }, true);
-        })();
-        """;
+    private static readonly TimeSpan HostReadyTimeout = TimeSpan.FromSeconds(18);
+    private const string IsolatedProfileFolderName = "WebView2-Isolated";
 
     private readonly MainWindow _window;
     private readonly ShellResilienceCoordinator _shell;
-    private readonly SemaphoreSlim _commandGate = new(1, 1);
-    private readonly List<(Button Button, RoutedEventHandler Handler)> _safeHandlers = new();
-    private readonly DispatcherTimer _runtimeHookMonitor;
+    private readonly DashboardProcessSurface _surface;
+    private readonly Border _statusOverlay;
+    private readonly TextBlock _statusText;
+    private readonly Button _restartButton;
+    private readonly List<(Button Button, RoutedEventHandler Handler)> _commandHandlers = new();
 
-    private WebView2? _observedView;
-    private CoreWebView2? _observedCore;
-    private CoreWebView2Environment? _observedEnvironment;
-    private string? _clickGuardScriptId;
-    private DateTimeOffset _lastRendererReloadUtc = DateTimeOffset.MinValue;
-    private long _processFailureSequence;
-    private bool _hookingRuntime;
+    private Process? _process;
+    private TaskCompletionSource<IntPtr>? _windowHandleSource;
+    private string _runningUrl = string.Empty;
+    private DateTimeOffset _lastStartUtc = DateTimeOffset.MinValue;
+    private int _rapidExitCount;
+    private bool _stopping;
     private bool _disposed;
 
     private DashboardLifecycleCoordinator(MainWindow window, ShellResilienceCoordinator shell)
@@ -79,17 +44,16 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         _shell = shell;
 
         RetireShellDashboardRecoveryHooks();
-        InstallSafeDashboardCommands();
+        SuppressInProcessDashboard();
+        (_surface, _statusOverlay, _statusText, _restartButton) = InstallProcessSurface();
+        InstallDashboardCommands();
 
-        _runtimeHookMonitor = new DispatcherTimer(DispatcherPriority.Background, _window.Dispatcher)
-        {
-            Interval = TimeSpan.FromMilliseconds(250)
-        };
-        _runtimeHookMonitor.Tick += RuntimeHookMonitor_Tick;
-        _runtimeHookMonitor.Start();
-
+        if (_window.FindName("DashboardView") is FrameworkElement dashboardView)
+            dashboardView.IsVisibleChanged += DashboardView_IsVisibleChanged;
+        _window.LayoutUpdated += Window_LayoutUpdated;
         _window.Closed += Window_Closed;
-        App.Log("Dashboard lifecycle coordinator v1.1.5 attached; process ownership and rapid-click guard enabled");
+
+        App.Log("Dashboard lifecycle coordinator v1.1.6 attached; WebView2 moved to isolated AtlasDesk process");
     }
 
     public static DashboardLifecycleCoordinator Attach(MainWindow window, ShellResilienceCoordinator shell)
@@ -100,7 +64,6 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         try
         {
             var shellType = typeof(ShellResilienceCoordinator);
-
             if (shellType.GetMethod("Window_Activated", PrivateInstance) is { } activatedMethod
                 && activatedMethod.CreateDelegate(typeof(EventHandler), _shell) is EventHandler activatedHandler)
             {
@@ -130,45 +93,111 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         }
     }
 
-    private void InstallSafeDashboardCommands()
+    private void SuppressInProcessDashboard()
+    {
+        WriteMainWindowField("_isInitializingDashboard", true);
+        WriteMainWindowField("_dashboardRecoveryInProgress", false);
+        WriteMainWindowField("_dashboardHasNavigated", false);
+
+        try
+        {
+            if (ReadMainWindowField<WebView2>("_dashboardWebView") is { } retainedView)
+            {
+                if (_window.FindName("DashboardHost") is Panel host)
+                    host.Children.Remove(retainedView);
+                retainedView.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log("Retained in-process Dashboard cleanup failed: " + ex);
+        }
+
+        WriteMainWindowField<WebView2?>("_dashboardWebView", null);
+        WriteMainWindowField<CoreWebView2Environment?>("_webViewEnvironment", null);
+    }
+
+    private (DashboardProcessSurface Surface, Border Overlay, TextBlock Text, Button RestartButton) InstallProcessSurface()
+    {
+        if (_window.FindName("DashboardHost") is not Grid host)
+            throw new InvalidOperationException("DashboardHost grid is unavailable.");
+
+        host.Children.Clear();
+        var surface = new DashboardProcessSurface
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        host.Children.Add(surface);
+
+        var statusText = new TextBlock
+        {
+            Text = "进入 Dashboard 后将启动独立浏览器进程。",
+            FontSize = 13,
+            Foreground = new SolidColorBrush(Color.FromRgb(88, 104, 126)),
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 560,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        var restart = new Button
+        {
+            Content = "重新启动 Dashboard",
+            Margin = new Thickness(0, 16, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visibility = Visibility.Collapsed
+        };
+        if (_window.TryFindResource("PrimaryButton") is Style style)
+            restart.Style = style;
+        AutomationProperties.SetName(restart, "重新启动独立 Dashboard");
+        restart.Click += RestartButton_Click;
+
+        var panel = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(24)
+        };
+        panel.Children.Add(statusText);
+        panel.Children.Add(restart);
+
+        var overlay = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(246, 247, 249, 252)),
+            Child = panel,
+            Visibility = Visibility.Visible
+        };
+        Panel.SetZIndex(overlay, 10);
+        host.Children.Add(overlay);
+        return (surface, overlay, statusText, restart);
+    }
+
+    private void InstallDashboardCommands()
     {
         if (_window.FindName("BrowserControls") is Panel browserControls)
         {
             ReplaceBrowserButton(browserControls, "后退", Back_Click);
             ReplaceBrowserButton(browserControls, "前进", Forward_Click);
             ReplaceBrowserButton(browserControls, "刷新", Refresh_Click);
-            ReplaceBrowserButton(browserControls, "Dashboard 首页", DashboardHome_Click);
+            ReplaceBrowserButton(browserControls, "Dashboard 首页", Home_Click);
         }
 
-        if (_window.FindName("DashboardError") is DependencyObject errorRoot)
-        {
-            var retry = EnumerateVisualDescendants<Button>(errorRoot)
-                .FirstOrDefault(button => string.Equals(button.Content?.ToString(), "重试", StringComparison.Ordinal));
-            if (retry is not null)
-                ReplaceButtonElement(retry, Retry_Click, "Dashboard 重试");
-        }
+        // The historical pop-out path creates another in-process WebView2. Hide it
+        // while the isolated host owns Dashboard rendering.
+        if (_window.FindName("PopoutButton") is FrameworkElement popout)
+            popout.Visibility = Visibility.Collapsed;
     }
 
-    private void ReplaceBrowserButton(Panel host, string tooltip, RoutedEventHandler safeHandler)
+    private void ReplaceBrowserButton(Panel host, string tooltip, RoutedEventHandler handler)
     {
-        var button = host.Children.OfType<Button>()
+        var legacy = host.Children.OfType<Button>()
             .FirstOrDefault(candidate => string.Equals(candidate.ToolTip?.ToString(), tooltip, StringComparison.Ordinal));
-        if (button is not null)
-            ReplaceButtonElement(button, safeHandler, tooltip);
-    }
+        if (legacy is null)
+            return;
 
-    private void ReplaceButtonElement(Button legacy, RoutedEventHandler safeHandler, string automationName)
-    {
-        if (VisualTreeHelper.GetParent(legacy) is not Panel parent)
-            throw new InvalidOperationException("Dashboard command button is not hosted by a Panel.");
-
-        var index = parent.Children.IndexOf(legacy);
-        if (index < 0)
-            throw new InvalidOperationException("Dashboard command button is not present in its visual parent.");
-
+        var index = host.Children.IndexOf(legacy);
         var content = legacy.Content;
         legacy.Content = null;
-
         var replacement = new Button
         {
             Content = content,
@@ -183,426 +212,393 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
             Height = legacy.Height,
             MinWidth = legacy.MinWidth,
             MinHeight = legacy.MinHeight,
-            MaxWidth = legacy.MaxWidth,
-            MaxHeight = legacy.MaxHeight,
             HorizontalAlignment = legacy.HorizontalAlignment,
             VerticalAlignment = legacy.VerticalAlignment,
             HorizontalContentAlignment = legacy.HorizontalContentAlignment,
             VerticalContentAlignment = legacy.VerticalContentAlignment,
             Cursor = legacy.Cursor
         };
-
-        AutomationProperties.SetName(replacement, automationName);
-        replacement.Click += safeHandler;
-        parent.Children.RemoveAt(index);
-        parent.Children.Insert(index, replacement);
-        _safeHandlers.Add((replacement, safeHandler));
+        AutomationProperties.SetName(replacement, tooltip);
+        replacement.Click += handler;
+        host.Children.RemoveAt(index);
+        host.Children.Insert(index, replacement);
+        _commandHandlers.Add((replacement, handler));
     }
 
-    private async void RuntimeHookMonitor_Tick(object? sender, EventArgs e)
+    private async void DashboardView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (_disposed || _hookingRuntime)
+        if (_disposed || e.NewValue is not true)
             return;
-
-        _hookingRuntime = true;
-        try
-        {
-            await EnsureRuntimeHooksAsync();
-        }
-        catch (Exception ex)
-        {
-            App.Log("Dashboard runtime hook monitor failed: " + ex);
-        }
-        finally
-        {
-            _hookingRuntime = false;
-        }
+        await EnsureHostRunningAsync();
     }
 
-    private async Task EnsureRuntimeHooksAsync()
+    private void Window_LayoutUpdated(object? sender, EventArgs e)
     {
-        var view = ReadMainWindowField<WebView2>("_dashboardWebView");
-        var core = view?.CoreWebView2;
-        if (view is null || core is null)
-            return;
-        if (ReferenceEquals(view, _observedView) && ReferenceEquals(core, _observedCore))
-            return;
-
-        DetachRuntimeHooks();
-
-        _observedView = view;
-        _observedCore = core;
-        _observedEnvironment = ReadMainWindowField<CoreWebView2Environment>("_webViewEnvironment");
-
-        core.ProcessFailed += Core_ProcessFailed;
-        core.WebMessageReceived += Core_WebMessageReceived;
-
-        if (_observedEnvironment is not null)
+        if (_window.FindName("PopoutButton") is FrameworkElement popout
+            && popout.Visibility != Visibility.Collapsed)
         {
-            _observedEnvironment.BrowserProcessExited += Environment_BrowserProcessExited;
-            App.Log("WebView2 failure report folder: " + _observedEnvironment.FailureReportFolderPath);
-        }
-
-        _clickGuardScriptId = await core.AddScriptToExecuteOnDocumentCreatedAsync(DashboardClickGuardScript);
-        await core.ExecuteScriptAsync(DashboardClickGuardScript);
-        App.Log("Dashboard WebView2 process diagnostics and web rapid-click guard attached");
-    }
-
-    private void DetachRuntimeHooks()
-    {
-        if (_observedCore is not null)
-        {
-            try
-            {
-                _observedCore.ProcessFailed -= Core_ProcessFailed;
-                _observedCore.WebMessageReceived -= Core_WebMessageReceived;
-                if (!string.IsNullOrWhiteSpace(_clickGuardScriptId))
-                    _observedCore.RemoveScriptToExecuteOnDocumentCreated(_clickGuardScriptId);
-            }
-            catch (Exception ex)
-            {
-                App.Log("Detach Dashboard CoreWebView2 hooks failed: " + ex.Message);
-            }
-        }
-
-        if (_observedEnvironment is not null)
-        {
-            try
-            {
-                _observedEnvironment.BrowserProcessExited -= Environment_BrowserProcessExited;
-            }
-            catch (Exception ex)
-            {
-                App.Log("Detach BrowserProcessExited hook failed: " + ex.Message);
-            }
-        }
-
-        _observedView = null;
-        _observedCore = null;
-        _observedEnvironment = null;
-        _clickGuardScriptId = null;
-    }
-
-    private void Core_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
-    {
-        try
-        {
-            var message = e.TryGetWebMessageAsString();
-            if (message.StartsWith("atlasdesk-click|", StringComparison.Ordinal))
-                App.Log("Dashboard web interaction: " + message);
-        }
-        catch (Exception ex)
-        {
-            App.Log("Dashboard web interaction message failed: " + ex.Message);
+            popout.Visibility = Visibility.Collapsed;
         }
     }
 
-    private void Core_ProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)
-    {
-        if (_disposed)
-            return;
-
-        var sequence = Interlocked.Increment(ref _processFailureSequence);
-        var snapshot = new ProcessFailureSnapshot(
-            sequence,
-            e.ProcessFailedKind,
-            e.Reason.ToString(),
-            e.ExitCode,
-            e.ProcessDescription ?? string.Empty);
-
-        // MainWindow subscribed first and queues destructive recovery. Set the
-        // retained flag synchronously before its Dispatcher callback can run.
-        WriteMainWindowField("_dashboardRecoveryInProgress", true);
-        App.Log(
-            $"WebView2 process failure classified: sequence={snapshot.Sequence}; " +
-            $"kind={snapshot.Kind}; reason={snapshot.Reason}; " +
-            $"exitCode={snapshot.ExitCode}; description={snapshot.Description}");
-
-        _window.Dispatcher.BeginInvoke(
-            new Action(() => _ = HandleProcessFailureAsync(snapshot)),
-            DispatcherPriority.Background);
-    }
-
-    private void Environment_BrowserProcessExited(
-        object? sender,
-        CoreWebView2BrowserProcessExitedEventArgs e)
-    {
-        App.Log(
-            $"WebView2 browser process exited: kind={e.BrowserProcessExitKind}; " +
-            $"processId={e.BrowserProcessId}");
-    }
-
-    private async Task HandleProcessFailureAsync(ProcessFailureSnapshot failure)
-    {
-        try
-        {
-            // Let the legacy queued callback observe the suppression flag and return.
-            await _window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            if (failure.Sequence != Interlocked.Read(ref _processFailureSequence))
-            {
-                App.Log("Superseded WebView2 process failure skipped: sequence=" + failure.Sequence);
-                return;
-            }
-
-            switch (failure.Kind)
-            {
-                case CoreWebView2ProcessFailedKind.GpuProcessExited:
-                case CoreWebView2ProcessFailedKind.UtilityProcessExited:
-                case CoreWebView2ProcessFailedKind.FrameRenderProcessExited:
-                    App.Log("WebView2 failure is non-fatal or auto-recoverable; destructive rebuild skipped");
-                    break;
-
-                case CoreWebView2ProcessFailedKind.RenderProcessUnresponsive:
-                    await RecoverRendererWithBoundedReloadAsync("renderer unresponsive");
-                    break;
-
-                case CoreWebView2ProcessFailedKind.RenderProcessExited:
-                    await RecoverRendererWithBoundedReloadAsync("renderer exited");
-                    break;
-
-                case CoreWebView2ProcessFailedKind.BrowserProcessExited:
-                    await RecreateDashboardAsync("browser process exited", failure.Sequence);
-                    break;
-
-                default:
-                    App.Log("WebView2 failure kind is not destructive by default; rebuild skipped: " + failure.Kind);
-                    break;
-            }
-        }
-        catch (Exception ex)
-        {
-            App.Log("Classified WebView2 recovery failed: " + ex);
-            ShowNonFatalError("Dashboard 进程恢复失败，但 AtlasDesk 主窗口仍保持运行。\n\n" + ex.Message);
-        }
-        finally
-        {
-            if (failure.Sequence == Interlocked.Read(ref _processFailureSequence))
-                WriteMainWindowField("_dashboardRecoveryInProgress", false);
-        }
-    }
-
-    private async Task RecoverRendererWithBoundedReloadAsync(string reason)
-    {
-        var now = DateTimeOffset.UtcNow;
-        if (now - _lastRendererReloadUtc < TimeSpan.FromSeconds(10))
-        {
-            App.Log("Renderer recovery reload suppressed by 10-second cooldown: " + reason);
-            return;
-        }
-        _lastRendererReloadUtc = now;
-
-        if (!await _commandGate.WaitAsync(TimeSpan.FromSeconds(3)))
-        {
-            App.Log("Renderer recovery skipped because another Dashboard command is active: " + reason);
-            return;
-        }
-
-        try
-        {
-            SetCommandButtonsEnabled(false);
-            SetProgressVisible(true);
-
-            var core = _observedCore;
-            if (core is null)
-            {
-                await RecreateDashboardCoreAsync(reason + "; controller missing", null);
-                return;
-            }
-
-            App.Log("Reloading Dashboard renderer without destroying WebView2: " + reason);
-            core.Reload();
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException or ObjectDisposedException)
-        {
-            App.Log("Renderer reload failed; escalating to controlled recreation: " + ex);
-            await RecreateDashboardCoreAsync(reason + "; reload failed", null);
-        }
-        finally
-        {
-            SetProgressVisible(false);
-            SetCommandButtonsEnabled(true);
-            _commandGate.Release();
-        }
-    }
-
-    private async Task RecreateDashboardAsync(string reason, long? failureSequence)
-    {
-        if (!await _commandGate.WaitAsync(TimeSpan.FromSeconds(5)))
-        {
-            App.Log("Dashboard recreation skipped because another command did not finish: " + reason);
-            return;
-        }
-
-        try
-        {
-            SetCommandButtonsEnabled(false);
-            SetProgressVisible(true);
-            await RecreateDashboardCoreAsync(reason, failureSequence);
-        }
-        finally
-        {
-            SetProgressVisible(false);
-            SetCommandButtonsEnabled(true);
-            _commandGate.Release();
-        }
-    }
-
-    private async Task RecreateDashboardCoreAsync(string reason, long? failureSequence)
-    {
-        App.Log("Starting controlled Dashboard recreation: " + reason);
-        DetachRuntimeHooks();
-
-        if (failureSequence is not null
-            && failureSequence.Value != Interlocked.Read(ref _processFailureSequence))
-        {
-            App.Log("Controlled Dashboard recreation cancelled because a newer failure arrived");
-            return;
-        }
-
-        // The legacy ProcessFailed callback has already drained. Clear the
-        // suppression only for the explicit MainWindow-owned recreation.
-        WriteMainWindowField("_dashboardRecoveryInProgress", false);
-        await InvokeMainWindowTaskAsync("RecoverDashboardAsync", "v1.1.5 controlled recovery: " + reason);
-        await EnsureRuntimeHooksAsync();
-        App.Log("Controlled Dashboard recreation completed: " + reason);
-    }
-
-    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    private async void RestartButton_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        await ExecuteGuardedAsync(sender as Button, "refresh", async () =>
-        {
-            await InvokeMainWindowTaskAsync("EnsureDashboardAsync", true);
-            await RecoverIfControllerMissingAsync("manual refresh");
-        });
-    }
-
-    private async void Retry_Click(object sender, RoutedEventArgs e)
-    {
-        e.Handled = true;
-        await ExecuteGuardedAsync(sender as Button, "retry", async () =>
-        {
-            await InvokeMainWindowTaskAsync("EnsureDashboardAsync", true);
-            await RecoverIfControllerMissingAsync("manual retry");
-        });
-    }
-
-    private async void DashboardHome_Click(object sender, RoutedEventArgs e)
-    {
-        e.Handled = true;
-        await ExecuteGuardedAsync(sender as Button, "home", async () =>
-        {
-            await InvokeMainWindowTaskAsync("EnsureDashboardAsync", false);
-            var view = ReadMainWindowField<WebView2>("_dashboardWebView");
-            var settings = ReadMainWindowField<AppSettings>("_settings") ?? AppSettings.Load();
-            if (view?.CoreWebView2 is null || !Uri.TryCreate(settings.DashboardUrl, UriKind.Absolute, out var uri))
-                throw new InvalidOperationException("Dashboard 控制器或首页地址尚未就绪.");
-            view.CoreWebView2.Navigate(uri.AbsoluteUri);
-        });
+        await RestartHostAsync("manual restart");
     }
 
     private async void Back_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        await ExecuteGuardedAsync(sender as Button, "back", () =>
-        {
-            var core = ReadMainWindowField<WebView2>("_dashboardWebView")?.CoreWebView2;
-            if (core?.CanGoBack == true)
-                core.GoBack();
-            return Task.CompletedTask;
-        });
+        await SendCommandAsync("back");
     }
 
     private async void Forward_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        await ExecuteGuardedAsync(sender as Button, "forward", () =>
-        {
-            var core = ReadMainWindowField<WebView2>("_dashboardWebView")?.CoreWebView2;
-            if (core?.CanGoForward == true)
-                core.GoForward();
-            return Task.CompletedTask;
-        });
+        await SendCommandAsync("forward");
     }
 
-    private async Task ExecuteGuardedAsync(Button? trigger, string operation, Func<Task> action)
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        if (_disposed)
-            return;
-        if (!await _commandGate.WaitAsync(0))
-        {
-            App.Log("Dashboard command ignored while another command is active: " + operation);
-            return;
-        }
+        e.Handled = true;
+        await SendCommandAsync("reload");
+    }
 
-        var started = DateTimeOffset.UtcNow;
-        App.Log("Dashboard command started: " + operation);
+    private async void Home_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await SendCommandAsync("home");
+    }
+
+    private async Task SendCommandAsync(string command)
+    {
+        if (!await EnsureHostRunningAsync())
+            return;
+
+        var process = _process;
+        if (process is null || HasExited(process))
+            return;
 
         try
         {
-            SetCommandButtonsEnabled(false);
-            SetProgressVisible(true);
-
-            if (!await WaitForDashboardIdleAsync(TimeSpan.FromSeconds(12)))
-            {
-                ShowNonFatalError("Dashboard 正在初始化或恢复，本次操作已取消以避免闪退。请稍后再试。");
-                return;
-            }
-
-            await action();
-            App.Log(
-                $"Dashboard command completed: {operation}; " +
-                $"elapsedMs={(DateTimeOffset.UtcNow - started).TotalMilliseconds:0}");
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException or ObjectDisposedException)
-        {
-            App.Log($"Guarded Dashboard command {operation} failed: {ex}");
-            await RecreateDashboardCoreAsync("guarded " + operation + ": " + ex.Message, null);
+            await process.StandardInput.WriteLineAsync(command);
+            await process.StandardInput.FlushAsync();
+            App.Log("Isolated Dashboard command sent: " + command);
         }
         catch (Exception ex)
         {
-            App.Log($"Dashboard command {operation} failed: {ex}");
-            ShowNonFatalError("Dashboard 操作失败，但 AtlasDesk 主窗口已保持运行。\n\n" + ex.Message);
+            App.Log("Isolated Dashboard command channel failed: " + ex);
+            ShowStatus("Dashboard 独立进程通信失败。AtlasDesk 主窗口仍正常。", allowRestart: true);
+        }
+    }
+
+    private async Task<bool> EnsureHostRunningAsync()
+    {
+        if (_disposed)
+            return false;
+
+        var settings = ReadMainWindowField<AppSettings>("_settings") ?? AppSettings.Load();
+        if (!Uri.TryCreate(settings.DashboardUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https"))
+        {
+            ShowStatus("尚未配置有效的 Dashboard 地址。", allowRestart: false);
+            return false;
+        }
+
+        if (_process is { } running
+            && !HasExited(running)
+            && _surface.DashboardHandle != IntPtr.Zero
+            && string.Equals(_runningUrl, uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
+        {
+            HideStatus();
+            return true;
+        }
+
+        return await StartHostAsync(uri.AbsoluteUri);
+    }
+
+    private async Task<bool> StartHostAsync(string dashboardUrl)
+    {
+        StopHost(graceful: false);
+        ShowStatus("正在启动隔离的 Dashboard 进程…", allowRestart: false);
+        SetProgressVisible(true);
+
+        try
+        {
+            var executable = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable))
+                executable = Path.Combine(App.RuntimeDirectory, "AtlasDesk.exe");
+            if (!File.Exists(executable))
+                throw new FileNotFoundException("AtlasDesk.exe 不存在，无法启动独立 Dashboard。", executable);
+
+            var profile = Path.Combine(App.LocalDataDirectory, IsolatedProfileFolderName);
+            Directory.CreateDirectory(profile);
+
+            var startInfo = new ProcessStartInfo(executable)
+            {
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = App.RuntimeDirectory
+            };
+            startInfo.ArgumentList.Add("--dashboard-host");
+            startInfo.ArgumentList.Add("--dashboard-url");
+            startInfo.ArgumentList.Add(dashboardUrl);
+            startInfo.ArgumentList.Add("--dashboard-profile");
+            startInfo.ArgumentList.Add(profile);
+            startInfo.ArgumentList.Add("--parent-process");
+            startInfo.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+            var process = new Process
+            {
+                StartInfo = startInfo,
+                EnableRaisingEvents = true
+            };
+            process.OutputDataReceived += Process_OutputDataReceived;
+            process.ErrorDataReceived += Process_ErrorDataReceived;
+            process.Exited += Process_Exited;
+
+            _windowHandleSource = new TaskCompletionSource<IntPtr>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _runningUrl = dashboardUrl;
+            _lastStartUtc = DateTimeOffset.UtcNow;
+            _stopping = false;
+            if (!process.Start())
+                throw new InvalidOperationException("DashboardHost 进程未能启动。");
+
+            _process = process;
+            process.StandardInput.AutoFlush = true;
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            App.Log($"Isolated DashboardHost started: pid={process.Id}; profile={profile}; url={dashboardUrl}");
+
+            var dashboardHandle = await _windowHandleSource.Task.WaitAsync(HostReadyTimeout);
+            var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+            while (_surface.HostHandle == IntPtr.Zero && DateTimeOffset.UtcNow < deadline)
+                await Task.Delay(50);
+            if (_surface.HostHandle == IntPtr.Zero)
+                throw new InvalidOperationException("Dashboard native parent surface was not created.");
+
+            _surface.AttachDashboardWindow(dashboardHandle);
+            HideStatus();
+            SetProgressVisible(false);
+            App.Log($"Isolated DashboardHost embedded: pid={process.Id}; hwnd={dashboardHandle}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log("Starting isolated DashboardHost failed: " + ex);
+            StopHost(graceful: false);
+            ShowStatus("独立 Dashboard 启动失败，但 AtlasDesk 主窗口仍正常。\n\n" + ex.Message, allowRestart: true);
+            SetProgressVisible(false);
+            return false;
+        }
+    }
+
+    private async Task RestartHostAsync(string reason)
+    {
+        App.Log("Restarting isolated DashboardHost: " + reason);
+        StopHost(graceful: true);
+        await Task.Delay(250);
+        await EnsureHostRunningAsync();
+    }
+
+    private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(e.Data))
+            return;
+        var line = e.Data;
+        var parts = line.Split('|', 3);
+        if (parts.Length != 3 || !string.Equals(parts[0], DashboardHostWindow.ProtocolPrefix, StringComparison.Ordinal))
+        {
+            App.Log("DashboardHost output: " + line);
+            return;
+        }
+
+        var kind = parts[1];
+        var payload = parts[2];
+        switch (kind)
+        {
+            case "HWND":
+                if (long.TryParse(payload, out var rawHandle))
+                    _windowHandleSource?.TrySetResult(new IntPtr(rawHandle));
+                break;
+            case "READY":
+                App.Log("Isolated DashboardHost reported ready");
+                break;
+            case "LOG":
+                App.Log("DashboardHost: " + Decode(payload));
+                break;
+            case "ERROR":
+            case "COMMANDERROR":
+            case "PROCESSFAILED":
+                App.Log("DashboardHost " + kind + ": " + Decode(payload));
+                break;
+            case "NAVSTART":
+                _window.Dispatcher.BeginInvoke(new Action(() => SetProgressVisible(true)));
+                break;
+            case "NAVEND":
+                _window.Dispatcher.BeginInvoke(new Action(() => SetProgressVisible(false)));
+                break;
+            case "TITLE":
+                var title = Decode(payload);
+                _window.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (_window.FindName("PageTitle") is TextBlock pageTitle && !string.IsNullOrWhiteSpace(title))
+                        pageTitle.Text = title.Length > 42 ? title[..42] + "…" : title;
+                }));
+                break;
+            case "SOURCE":
+                var source = Decode(payload);
+                _window.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (_window.FindName("PageSubtitle") is TextBlock subtitle
+                        && Uri.TryCreate(source, UriKind.Absolute, out var sourceUri))
+                    {
+                        subtitle.Text = "  ·  " + sourceUri.Host;
+                    }
+                }));
+                break;
+        }
+    }
+
+    private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(e.Data))
+            App.Log("DashboardHost stderr: " + e.Data);
+    }
+
+    private void Process_Exited(object? sender, EventArgs e)
+    {
+        if (sender is not Process exited)
+            return;
+
+        var exitCode = TryGetExitCode(exited);
+        var runtime = DateTimeOffset.UtcNow - _lastStartUtc;
+        _window.Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            if (!ReferenceEquals(_process, exited))
+                return;
+
+            _surface.DetachDashboardWindow();
+            _process = null;
+            _windowHandleSource?.TrySetException(new InvalidOperationException("DashboardHost exited before supplying a window handle."));
+            _windowHandleSource = null;
+            SetProgressVisible(false);
+
+            if (_disposed || _stopping)
+                return;
+
+            App.Log($"Isolated DashboardHost exited unexpectedly: code={exitCode}; runtimeMs={runtime.TotalMilliseconds:0}");
+            ShowStatus(
+                "Dashboard 独立进程已退出，AtlasDesk 主窗口和其他页面未受影响。\n\n退出码：" + exitCode,
+                allowRestart: true);
+
+            if (runtime < TimeSpan.FromSeconds(25))
+                _rapidExitCount++;
+            else
+                _rapidExitCount = 0;
+
+            if (_rapidExitCount <= 1
+                && _window.FindName("DashboardView") is FrameworkElement dashboardView
+                && dashboardView.IsVisible)
+            {
+                App.Log("Attempting one automatic isolated DashboardHost restart");
+                await Task.Delay(900);
+                await EnsureHostRunningAsync();
+            }
+        }));
+    }
+
+    private void StopHost(bool graceful)
+    {
+        var process = _process;
+        _process = null;
+        _windowHandleSource = null;
+        _surface.DetachDashboardWindow();
+        if (process is null)
+            return;
+
+        _stopping = true;
+        try
+        {
+            if (!HasExited(process) && graceful)
+            {
+                try
+                {
+                    process.StandardInput.WriteLine("shutdown");
+                    process.StandardInput.Flush();
+                    _ = process.WaitForExit(1200);
+                }
+                catch { }
+            }
+
+            if (!HasExited(process))
+                process.Kill(entireProcessTree: true);
+        }
+        catch (Exception ex)
+        {
+            App.Log("Stopping isolated DashboardHost failed: " + ex.Message);
         }
         finally
         {
-            SetProgressVisible(false);
-            SetCommandButtonsEnabled(true);
-            if (trigger is not null)
-                trigger.IsEnabled = true;
-            _commandGate.Release();
+            process.OutputDataReceived -= Process_OutputDataReceived;
+            process.ErrorDataReceived -= Process_ErrorDataReceived;
+            process.Exited -= Process_Exited;
+            process.Dispose();
+            _stopping = false;
         }
     }
 
-    private async Task<bool> WaitForDashboardIdleAsync(TimeSpan timeout)
+    private void ShowStatus(string message, bool allowRestart)
     {
-        var deadline = DateTimeOffset.UtcNow + timeout;
-        while (!_disposed && DateTimeOffset.UtcNow < deadline)
+        if (!_window.Dispatcher.CheckAccess())
         {
-            var initializing = ReadMainWindowField<bool>("_isInitializingDashboard");
-            var recovering = ReadMainWindowField<bool>("_dashboardRecoveryInProgress");
-            if (!initializing && !recovering)
-                return true;
-            await Task.Delay(100);
-        }
-        return false;
-    }
-
-    private async Task RecoverIfControllerMissingAsync(string reason)
-    {
-        var view = ReadMainWindowField<WebView2>("_dashboardWebView");
-        if (view?.CoreWebView2 is not null)
+            _window.Dispatcher.BeginInvoke(new Action(() => ShowStatus(message, allowRestart)));
             return;
-        await RecreateDashboardCoreAsync(reason, null);
+        }
+
+        _statusText.Text = message;
+        _restartButton.Visibility = allowRestart ? Visibility.Visible : Visibility.Collapsed;
+        _statusOverlay.Visibility = Visibility.Visible;
     }
 
-    private async Task InvokeMainWindowTaskAsync(string methodName, params object[] arguments)
+    private void HideStatus()
     {
-        var method = typeof(MainWindow).GetMethod(methodName, PrivateInstance)
-                     ?? throw new MissingMethodException(typeof(MainWindow).FullName, methodName);
-        var result = method.Invoke(_window, arguments);
-        if (result is Task task)
-            await task;
+        if (!_window.Dispatcher.CheckAccess())
+        {
+            _window.Dispatcher.BeginInvoke(new Action(HideStatus));
+            return;
+        }
+
+        _statusOverlay.Visibility = Visibility.Collapsed;
+        _restartButton.Visibility = Visibility.Collapsed;
+    }
+
+    private void SetProgressVisible(bool visible)
+    {
+        if (_window.FindName("NavigationProgress") is FrameworkElement progress)
+            progress.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static bool HasExited(Process process)
+    {
+        try { return process.HasExited; }
+        catch { return true; }
+    }
+
+    private static int TryGetExitCode(Process process)
+    {
+        try { return process.ExitCode; }
+        catch { return int.MinValue; }
+    }
+
+    private static string Decode(string payload)
+    {
+        try { return Encoding.UTF8.GetString(Convert.FromBase64String(payload)); }
+        catch { return payload; }
     }
 
     private T? ReadMainWindowField<T>(string fieldName)
@@ -614,7 +610,7 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         }
         catch (Exception ex)
         {
-            App.Log($"Read Dashboard field {fieldName} failed: {ex.Message}");
+            App.Log($"Read MainWindow field {fieldName} failed: {ex.Message}");
             return default;
         }
     }
@@ -627,44 +623,12 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         }
         catch (Exception ex)
         {
-            App.Log($"Write Dashboard field {fieldName} failed: {ex.Message}");
+            App.Log($"Write MainWindow field {fieldName} failed: {ex.Message}");
         }
     }
 
-    private void SetCommandButtonsEnabled(bool enabled)
-    {
-        foreach (var (button, _) in _safeHandlers)
-            button.IsEnabled = enabled;
-    }
-
-    private void SetProgressVisible(bool visible)
-    {
-        if (_window.FindName("NavigationProgress") is FrameworkElement progress)
-            progress.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void ShowNonFatalError(string message)
-    {
-        if (_window.FindName("DashboardHost") is FrameworkElement host)
-            host.Visibility = Visibility.Visible;
-        if (_window.FindName("DashboardError") is FrameworkElement error)
-            error.Visibility = Visibility.Visible;
-        if (_window.FindName("DashboardErrorText") is TextBlock text)
-            text.Text = message;
-    }
-
-    private static IEnumerable<T> EnumerateVisualDescendants<T>(DependencyObject root) where T : DependencyObject
-    {
-        var count = VisualTreeHelper.GetChildrenCount(root);
-        for (var index = 0; index < count; index++)
-        {
-            var child = VisualTreeHelper.GetChild(root, index);
-            if (child is T typed)
-                yield return typed;
-            foreach (var descendant in EnumerateVisualDescendants<T>(child))
-                yield return descendant;
-        }
-    }
+    private void WriteMainWindowField(string fieldName, bool value)
+        => WriteMainWindowField<bool>(fieldName, value);
 
     private void Window_Closed(object? sender, EventArgs e) => Dispose();
 
@@ -673,23 +637,15 @@ public sealed class DashboardLifecycleCoordinator : IDisposable
         if (_disposed)
             return;
         _disposed = true;
-        _runtimeHookMonitor.Stop();
-        _runtimeHookMonitor.Tick -= RuntimeHookMonitor_Tick;
+
+        if (_window.FindName("DashboardView") is FrameworkElement dashboardView)
+            dashboardView.IsVisibleChanged -= DashboardView_IsVisibleChanged;
+        _window.LayoutUpdated -= Window_LayoutUpdated;
         _window.Closed -= Window_Closed;
-        DetachRuntimeHooks();
-
-        foreach (var (button, handler) in _safeHandlers)
+        _restartButton.Click -= RestartButton_Click;
+        foreach (var (button, handler) in _commandHandlers)
             button.Click -= handler;
-        _safeHandlers.Clear();
-
-        // Do not dispose the semaphore while an async continuation may still
-        // release it during shutdown; it owns no native resource.
+        _commandHandlers.Clear();
+        StopHost(graceful: true);
     }
-
-    private readonly record struct ProcessFailureSnapshot(
-        long Sequence,
-        CoreWebView2ProcessFailedKind Kind,
-        string Reason,
-        int ExitCode,
-        string Description);
 }
