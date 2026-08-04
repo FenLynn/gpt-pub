@@ -17,6 +17,7 @@ const (
 	v452WMSetTextMessage         = 0x000C
 	v452WHCBT                    = 5
 	v452HCBTCreateWnd            = 3
+	v452HCBTActivate             = 5
 )
 
 type v452CropSyncState struct {
@@ -49,6 +50,7 @@ var (
 	v452CropSyncEditsOK      atomic.Int32
 	v452CropSyncIntercepted  atomic.Int32
 	v452CropSyncCBTCallbacks atomic.Int32
+	v452CropSyncActivations  atomic.Int32
 	v452CropSyncSnapshots    atomic.Int32
 	v452CropSyncRepairs      atomic.Int32
 )
@@ -114,6 +116,15 @@ func v452CropSyncCBTProc(code int32, wParam, lParam uintptr) uintptr {
 				v452CropSyncSnapshots.Add(1)
 			}
 			v452CropSyncSnapshotMu.Unlock()
+		}
+	}
+	if code == v452HCBTActivate {
+		d := activeTrim
+		if d != nil && d.hwnd != 0 && d.hwnd == wParam {
+			v452CropSyncActivations.Add(1)
+			v452BindPendingCropSnapshot(d)
+			v452InstallCropSyncHandles(d.hwnd, []uintptr{d.hX, d.hY, d.hW, d.hH})
+			v452RestoreInitialCropState(d)
 		}
 	}
 	result, _, _ := v452CropSyncNextHook.Call(v452CropSyncCBTHook.Load(), uintptr(code), wParam, lParam)
