@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
@@ -121,9 +120,6 @@ public sealed class DashboardProcessSurface : HwndHost
                 _ = AttachThreadInput(currentThread, dashboardThread, false);
         }
     }
-
-    protected override bool TabInto(TraversalRequest request)
-        => ActivateDashboardInput();
 
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
     {
