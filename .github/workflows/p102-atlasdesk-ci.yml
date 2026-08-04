@@ -49,7 +49,7 @@ jobs:
   build:
     needs: scope
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -113,7 +113,10 @@ jobs:
           }
 
       - name: Restore app and smoke tests
-        run: dotnet restore projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj
+        shell: pwsh
+        run: |
+          dotnet restore projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj
+          dotnet restore projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-dashboard-isolation-smoke/AtlasDesk.DashboardIsolationSmoke.csproj
 
       - name: Stamp smoke expected version
         shell: pwsh
@@ -139,6 +142,10 @@ jobs:
       - name: Run isolated startup residency
         timeout-minutes: 2
         run: dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-residency-smoke/AtlasDesk.ResidencySmoke.csproj -c Release --no-restore
+
+      - name: Run real Dashboard process isolation
+        timeout-minutes: 3
+        run: dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-dashboard-isolation-smoke/AtlasDesk.DashboardIsolationSmoke.csproj -c Release --no-restore
 
       - name: Verify Runtime/Data and security boundary
         shell: pwsh
