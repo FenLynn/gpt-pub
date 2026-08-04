@@ -104,13 +104,15 @@ func (a *application) v452FinalizeRound5ToastReport() error {
 	edits := v452CropSyncEditsOK.Load()
 	intercepted := v452CropSyncIntercepted.Load()
 	cbtCallbacks := v452CropSyncCBTCallbacks.Load()
+	activations := v452CropSyncActivations.Load()
 	snapshots := v452CropSyncSnapshots.Load()
 	repairs := v452CropSyncRepairs.Load()
 	report.Checks["round5_crop_cbt_hook_installed"] = v452CropSyncCBTHook.Load() != 0 && cbtCallbacks > 0
+	report.Checks["round5_crop_sync_activation"] = activations >= 2
 	report.Checks["round5_crop_sync_guard_installed"] = parents >= 2 && edits >= 8
 	report.Checks["round5_crop_sync_guard_intercepted"] = intercepted > 0
 	report.Checks["round5_crop_initial_state_repaired"] = snapshots >= 2 && repairs >= 2
-	report.Details["round5_crop_sync_guard"] = fmt.Sprintf("cbt_hook=%d cbt_callbacks=%d tries=%d parents=%d edits=%d intercepted=%d snapshots=%d repairs=%d", v452CropSyncCBTHook.Load(), cbtCallbacks, tries, parents, edits, intercepted, snapshots, repairs)
+	report.Details["round5_crop_sync_guard"] = fmt.Sprintf("cbt_hook=%d cbt_callbacks=%d activations=%d tries=%d parents=%d edits=%d intercepted=%d snapshots=%d repairs=%d", v452CropSyncCBTHook.Load(), cbtCallbacks, activations, tries, parents, edits, intercepted, snapshots, repairs)
 
 	report.Passed = len(report.Checks) > 0
 	for _, ok := range report.Checks {
