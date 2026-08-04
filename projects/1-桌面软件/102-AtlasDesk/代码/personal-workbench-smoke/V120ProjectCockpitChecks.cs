@@ -21,6 +21,7 @@ internal static class V120ProjectCockpitChecks
         var workflow = File.ReadAllText(RequireFile(nativeRoot, "ProjectWorkflowCoordinator.cs"));
         var store = File.ReadAllText(RequireFile(nativeRoot, "ProductivityContextStore.cs"));
         var coordinator = File.ReadAllText(RequireFile(nativeRoot, "ProductivityContextCoordinator.cs"));
+        var notes = File.ReadAllText(RequireFile(nativeRoot, "RELEASE_NOTES.txt"));
 
         RequireContains(xaml,
             "Text=\"项目工作台\"",
@@ -74,6 +75,13 @@ internal static class V120ProjectCockpitChecks
             "read-only Zotero project links",
             "context-run-command",
             "context-open-research");
+        RequireContains(notes,
+            "AtlasDesk v1.2.0 project cockpit",
+            "selected-project cockpit",
+            "commands are never replayed automatically",
+            "Zotero SQLite access remains strictly read-only",
+            "No Data schema change is required",
+            "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
             "PASS AtlasDesk v1.2.0 project cockpit aggregates bounded selected-project status, explicit files, commands and read-only literature actions through existing owners");
