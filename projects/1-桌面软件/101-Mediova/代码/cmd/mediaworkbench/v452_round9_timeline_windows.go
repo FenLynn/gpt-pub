@@ -22,7 +22,7 @@ func round9TimelineGeometry(hwnd uintptr) (left, right, barTop, barBottom int32)
 }
 
 func round9TimelineTimeToX(e *round7Editor, value float64) int32 {
-	left, right, _, _ := round9TimelineGeometry(e.hTimeline)
+	left, right, _ := e.timelineGeometry()
 	duration := e.dialog.task.Duration
 	if duration <= 0 {
 		return left
@@ -37,7 +37,7 @@ func round9TimelineTimeToX(e *round7Editor, value float64) int32 {
 }
 
 func round9TimelineXToTime(e *round7Editor, x int32) float64 {
-	left, right, _, _ := round9TimelineGeometry(e.hTimeline)
+	left, right, _ := e.timelineGeometry()
 	if x < left {
 		x = left
 	}
@@ -110,7 +110,10 @@ func round9PaintTimeline(e *round7Editor, hwnd uintptr) {
 	if e == nil || e.dialog == nil || e.dialog.task == nil || e.dialog.task.Kind == model.KindImage {
 		drawCenteredText(memDC, "图片任务无时间轴", rc, uiFontSmall, colorRef(133, 143, 156))
 	} else {
-		left, right, barTop, barBottom := round9TimelineGeometry(hwnd)
+		left, right, _, _ := round9TimelineGeometry(hwnd)
+		axisLeft, axisRight, _ := e.timelineGeometry()
+		left, right = axisLeft, axisRight
+		_, _, barTop, barBottom := round9TimelineGeometry(hwnd)
 		startX := round9TimelineTimeToX(e, e.dialog.opts.TrimStart)
 		endX := round9TimelineTimeToX(e, e.dialog.opts.TrimEnd)
 		currentX := round9TimelineTimeToX(e, e.dialog.currentAt)
