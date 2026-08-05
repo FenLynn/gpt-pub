@@ -212,9 +212,21 @@ def region_box(image: Image.Image, region: dict[str, Any]) -> tuple[int, int, in
     top = max(0, int(image.height * float(region["y"])))
     width = max(1, int(image.width * float(region["w"])))
     height = max(1, int(image.height * float(region["h"])))
-    right = min(image.width, left + width)
-    bottom = min(image.height, top + height)
-    return left, top, right, bottom
+    return left, top, min(image.width, left + width), min(image.height, top + height)
+
+
+def crop_hash(hwnd: int, region: dict[str, Any], save_path: Path | None = None) -> str:
+    frame = capture_window(hwnd)
+    try:
+        crop = frame.crop(region_box(frame, region))
+        try:
+            if save_path is not None:
+                crop.save(save_path)
+            return hashlib.sha256(crop.tobytes()).hexdigest()
+        finally:
+            crop.close()
+    finally:
+        frame.close()
 
 
 def check_regions(
@@ -239,12 +251,15 @@ def check_regions(
             for region in regions:
                 name = str(region["name"])
                 crop = frame.crop(region_box(frame, region))
-                digest = hashlib.sha256(crop.tobytes()).hexdigest()
-                hashes[name].append(digest)
-                if digest not in seen[name]:
-                    unique_index = len(seen[name]) + 1
-                    seen[name][digest] = frame_index
-                    crop.save(evidence / f"{window_name}-{name}-unique-{unique_index}-frame-{frame_index}.png")
+                try:
+                    digest = hashlib.sha256(crop.tobytes()).hexdigest()
+                    hashes[name].append(digest)
+                    if digest not in seen[name]:
+                        unique_index = len(seen[name]) + 1
+                        seen[name][digest] = frame_index
+                        crop.save(evidence / f"{window_name}-{name}-unique-{unique_index}-frame-{frame_index}.png")
+                finally:
+                    crop.close()
         finally:
             frame.close()
         time.sleep(0.05)
@@ -267,6 +282,75 @@ def check_regions(
     return records
 
 
+def surface_axis(surface: dict[str, Any]) -> str:
+    left, top, right, bottom = surface["rect"]
+    return "vertical" if bottom - top > right - left else "horizontal"
+
+
+def check_surface_hover(
+    hwnd: int,
+    surfaces: list[dict[str, Any]],
+    evidence: Path,
+) -> list[dict[str, Any]]:
+    compact_width, compact_height = 1120, 600
+    if not user32.MoveWindow(hwnd, 0, 0, compact_width, compact_height, True):
+        raise ctypes.WinError(ctypes.get_last_error())
+    user32.SetCursorPos(compact_width // 2, compact_height // 2)
+    time.sleep(1.0)
+
+    list_region = {"name": "list-and-bars", "x": 0.00, "y": 0.13, "w": 0.84, "h": 0.70}
+    baseline = crop_hash(hwnd, list_region, evidence / "hover-baseline-hidden.png")
+    records: list[dict[str, Any]] = []
+
+    current_surfaces = [
+        child
+        for child in enumerate_children(hwnd)
+        if child["class"] == "MWRound11StableScrollSurface" and child["visible"]
+    ]
+    if len(current_surfaces) != 2:
+        raise RuntimeError(f"expected two stable surfaces after compact layout, got {current_surfaces!r}")
+
+    for surface in sorted(current_surfaces, key=surface_axis):
+        axis = surface_axis(surface)
+        left, top, right, bottom = surface["rect"]
+        user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
+        time.sleep(0.30)
+        pending = crop_hash(hwnd, list_region, evidence / f"hover-{axis}-300ms-hidden.png")
+        if pending != baseline:
+            raise RuntimeError(f"{axis} thumb appeared before 500 ms")
+
+        time.sleep(0.30)
+        visible = crop_hash(hwnd, list_region, evidence / f"hover-{axis}-600ms-visible.png")
+        if visible == baseline:
+            raise RuntimeError(f"{axis} thumb did not appear after 500 ms")
+
+        visible_hashes = [visible]
+        for _ in range(19):
+            time.sleep(0.05)
+            visible_hashes.append(crop_hash(hwnd, list_region))
+        unique_visible = list(dict.fromkeys(visible_hashes))
+        if len(unique_visible) != 1:
+            raise RuntimeError(f"{axis} thumb flickered while hovered: {len(unique_visible)} hashes")
+
+        user32.SetCursorPos(compact_width // 2, compact_height // 2)
+        time.sleep(0.30)
+        hidden = crop_hash(hwnd, list_region, evidence / f"hover-{axis}-left-hidden.png")
+        if hidden != baseline:
+            raise RuntimeError(f"{axis} thumb did not hide after leaving")
+
+        records.append(
+            {
+                "axis": axis,
+                "pending_300ms_hidden": pending == baseline,
+                "visible_after_600ms": visible != baseline,
+                "hover_frames": 20,
+                "hover_unique_hashes": len(unique_visible),
+                "hidden_after_leave": hidden == baseline,
+            }
+        )
+    return records
+
+
 def run_window_probe(
     exe: Path,
     args: list[str],
@@ -278,15 +362,18 @@ def run_window_probe(
     regions: list[dict[str, Any]],
     evidence: Path,
     env: dict[str, str],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    test_hover: bool = False,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     process = subprocess.Popen([str(exe), *args], cwd=str(exe.parent), env=env)
     try:
         hwnd = find_window(process.pid, title_prefix, 20.0)
         records = check_regions(hwnd, window_name, width, height, settle_seconds, regions, evidence)
         children = enumerate_children(hwnd)
-        return records, children
+        hover = check_surface_hover(hwnd, children, evidence) if test_hover else []
+        return records, children, hover
     finally:
-        process.kill()
+        if process.poll() is None:
+            process.kill()
         process.wait(timeout=10)
 
 
@@ -317,9 +404,9 @@ def main() -> int:
         {"name": "preview", "x": 0.00, "y": 0.04, "w": 0.62, "h": 0.50},
     ]
 
-    report: dict[str, Any] = {"records": [], "windows": {}}
+    report: dict[str, Any] = {"records": [], "hover": [], "windows": {}}
     try:
-        records, children = run_window_probe(
+        records, children, hover = run_window_probe(
             exe,
             ["--ui-preview=video"],
             "Mediova",
@@ -330,15 +417,17 @@ def main() -> int:
             main_regions,
             evidence,
             env,
+            test_hover=True,
         )
         report["records"].extend(records)
+        report["hover"].extend(hover)
         report["windows"]["main"] = {
             "children": children,
             "listviews": [c for c in children if c["class"] == "SysListView32"],
             "stable_surfaces": [c for c in children if c["class"] == "MWRound11StableScrollSurface"],
         }
 
-        records, children = run_window_probe(
+        records, children, _ = run_window_probe(
             exe,
             ["--round11-editor-preview"],
             "剪裁 · Round11-Flicker-Probe.mp4",
@@ -381,8 +470,10 @@ def main() -> int:
     surfaces = report["windows"]["main"]["stable_surfaces"]
     if len(surfaces) != 2 or not all(surface["visible"] for surface in surfaces):
         raise RuntimeError(f"stable surfaces invalid: {surfaces!r}")
+    if len(report["hover"]) != 2:
+        raise RuntimeError(f"horizontal/vertical hover checks missing: {report['hover']!r}")
 
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))
     return 0
 
 
