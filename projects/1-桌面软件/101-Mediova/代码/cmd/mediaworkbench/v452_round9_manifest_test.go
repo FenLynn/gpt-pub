@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const v452Round9InteractionManifestSHA256 = "37d6dae859ae6c5282484d483aea5ad3f58e86f6e7713fa26b809b880c1a354f"
+const v452Round9InteractionManifestSHA256 = "8bc9bf90badf455798ebf010c29df533c89d9827a437137adb5701123d7d2b7e"
 
 func TestV452Round9InteractionManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND9_REAL_INTERACTION_CLOSEOUT_FILES_SHA256.txt")
