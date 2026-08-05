@@ -40,9 +40,14 @@ func init() {
 					v452RemoveSubclass.Call(a.hList, round7FeedbackListSubclassCB, round7FeedbackListSubclassID)
 					round11MainEventProc(0, 0, 0, 0, 0, 0, 0)
 
-					// Permanent round-11 surfaces are installed after all inherited
-					// initialization. They always cover the native scrollbar lanes;
-					// only the thumb itself changes on delayed edge hover.
+					// Install the style guard synchronously in this same UI transaction.
+					// Native WS_HSCROLL/WS_VSCROLL are removed once and any later
+					// restoration attempt is rejected before Windows can paint it.
+					round8EnsureListStyleGuard(a.hList)
+
+					// Permanent round-11 surfaces are installed only after the native
+					// lanes have been removed. Their white idle surface blends into the
+					// list; only the delayed custom thumb becomes visible on edge hover.
 					round11InstallStableScrollSurfaces(a)
 
 					// The dynamic editor gate is opened from the same UI transaction,
