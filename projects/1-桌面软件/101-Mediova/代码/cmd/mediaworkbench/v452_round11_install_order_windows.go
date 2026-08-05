@@ -39,6 +39,13 @@ func init() {
 					// so there is no frame in which both owners coexist.
 					v452RemoveSubclass.Call(a.hList, round7FeedbackListSubclassCB, round7FeedbackListSubclassID)
 					round11MainEventProc(0, 0, 0, 0, 0, 0, 0)
+
+					// The dynamic editor gate is opened from the same UI transaction,
+					// after final ownership has been established. Normal launches never
+					// enter this branch.
+					if round11EditorPreviewEnabled && round11EditorPreviewStarted.CompareAndSwap(false, true) {
+						round11OpenEditorPreview(a)
+					}
 				})
 				return
 			}
