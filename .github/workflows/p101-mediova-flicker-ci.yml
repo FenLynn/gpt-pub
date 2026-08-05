@@ -1,0 +1,190 @@
+name: P101 Mediova Flicker Gate
+
+on:
+  pull_request:
+    branches: [p101-stable, main]
+    paths:
+      - 'projects/1-桌面软件/101-Mediova/**'
+      - '.github/workflows/p101-mediova-flicker-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p101-mediova-flicker-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  windows-idle-frame-stability:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+
+      - name: Build flicker probe
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item build/flicker-evidence -ItemType Directory -Force | Out-Null
+          go test -count=1 ./cmd/mediaworkbench
+          if ($LASTEXITCODE -ne 0) { throw 'Source tests failed.' }
+          go build -buildvcs=false -trimpath -ldflags='-H=windowsgui -s -w' -o build/flicker-evidence/Mediova.exe ./cmd/mediaworkbench
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path build/flicker-evidence/Mediova.exe)) { throw 'Probe build failed.' }
+
+      - name: Verify idle frames are pixel stable
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName System.Drawing
+          Add-Type @"
+          using System;
+          using System.Drawing;
+          using System.Drawing.Imaging;
+          using System.IO;
+          using System.Runtime.InteropServices;
+          using System.Security.Cryptography;
+          using System.Text;
+
+          public static class MediovaFlickerNative {
+              [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+              public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+              [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+              [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+              [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
+              [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+              [DllImport("user32.dll", SetLastError=true)] public static extern bool MoveWindow(IntPtr hwnd, int x, int y, int width, int height, bool repaint);
+              [DllImport("user32.dll", SetLastError=true)] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+              [DllImport("user32.dll", SetLastError=true)] static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+              [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+
+              public static IntPtr FindWindow(uint processId, string titlePrefix) {
+                  IntPtr result = IntPtr.Zero;
+                  EnumWindows((hwnd, state) => {
+                      uint candidate;
+                      GetWindowThreadProcessId(hwnd, out candidate);
+                      if (candidate != processId || !IsWindowVisible(hwnd)) return true;
+                      var text = new StringBuilder(1024);
+                      GetWindowText(hwnd, text, text.Capacity);
+                      if (text.ToString().StartsWith(titlePrefix, StringComparison.Ordinal)) {
+                          result = hwnd;
+                          return false;
+                      }
+                      return true;
+                  }, IntPtr.Zero);
+                  return result;
+              }
+
+              public static string CaptureHash(IntPtr hwnd, string pngPath) {
+                  RECT rect;
+                  if (!GetWindowRect(hwnd, out rect)) throw new InvalidOperationException("GetWindowRect failed");
+                  int width = rect.Right - rect.Left;
+                  int height = rect.Bottom - rect.Top;
+                  if (width < 100 || height < 100) throw new InvalidOperationException("Invalid capture geometry");
+                  using (var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+                  using (var graphics = Graphics.FromImage(bitmap)) {
+                      IntPtr hdc = graphics.GetHdc();
+                      try {
+                          if (!PrintWindow(hwnd, hdc, 2)) throw new InvalidOperationException("PrintWindow failed");
+                      } finally {
+                          graphics.ReleaseHdc(hdc);
+                      }
+                      if (!String.IsNullOrEmpty(pngPath)) bitmap.Save(pngPath, ImageFormat.Png);
+                      using (var stream = new MemoryStream()) {
+                          bitmap.Save(stream, ImageFormat.Bmp);
+                          using (var sha = SHA256.Create()) {
+                              return BitConverter.ToString(sha.ComputeHash(stream.ToArray())).Replace("-", "").ToLowerInvariant();
+                          }
+                      }
+                  }
+              }
+          }
+          "@
+
+          $evidence=Join-Path $PWD 'build/flicker-evidence'
+          $exe=Join-Path $evidence 'Mediova.exe'
+          $records=@()
+
+          function Wait-Window([System.Diagnostics.Process]$Process, [string]$Prefix, [int]$TimeoutMs) {
+            $deadline=[DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
+            while ([DateTime]::UtcNow -lt $deadline) {
+              $Process.Refresh()
+              if ($Process.HasExited) { throw "Mediova exited while waiting for '$Prefix'." }
+              $handle=[MediovaFlickerNative]::FindWindow([uint32]$Process.Id, $Prefix)
+              if ($handle -ne [IntPtr]::Zero) { return $handle }
+              Start-Sleep -Milliseconds 50
+            }
+            throw "Window '$Prefix' was not created."
+          }
+
+          function Assert-IdleStable([IntPtr]$Handle, [string]$Name, [int]$Width, [int]$Height, [int]$SettleMs) {
+            if (-not [MediovaFlickerNative]::MoveWindow($Handle, 0, 0, $Width, $Height, $true)) { throw "MoveWindow failed for $Name." }
+            [void][MediovaFlickerNative]::SetCursorPos([int]($Width/2), [int]($Height/2))
+            Start-Sleep -Milliseconds $SettleMs
+            $hashes=New-Object System.Collections.Generic.List[string]
+            for ($index=0; $index -lt 40; $index++) {
+              $path=$null
+              if ($index -eq 0) { $path=Join-Path $evidence "$Name-first.png" }
+              if ($index -eq 39) { $path=Join-Path $evidence "$Name-last.png" }
+              $hash=[MediovaFlickerNative]::CaptureHash($Handle, $path)
+              $hashes.Add($hash)
+              Start-Sleep -Milliseconds 50
+            }
+            $unique=@($hashes | Select-Object -Unique)
+            $script:records += [ordered]@{ name=$Name; frames=40; unique_hashes=$unique.Count; first_hash=$hashes[0]; last_hash=$hashes[39] }
+            if ($unique.Count -ne 1) {
+              throw "$Name changed during idle capture: $($unique.Count) distinct frame hashes."
+            }
+          }
+
+          $oldAppData=$env:APPDATA
+          $oldLocal=$env:LOCALAPPDATA
+          $root=Join-Path $env:RUNNER_TEMP ('Mediova-Flicker-' + [guid]::NewGuid().ToString('N'))
+          New-Item $root -ItemType Directory -Force | Out-Null
+          try {
+            $env:APPDATA=$root
+            $env:LOCALAPPDATA=$root
+
+            $main=Start-Process -FilePath $exe -WorkingDirectory $evidence -ArgumentList '--ui-preview=video' -PassThru
+            try {
+              $mainHandle=Wait-Window $main 'Mediova' 15000
+              Assert-IdleStable $mainHandle 'main-idle' 1450 820 2200
+            } finally {
+              if (-not $main.HasExited) { Stop-Process -Id $main.Id -Force -ErrorAction SilentlyContinue }
+            }
+
+            $editor=Start-Process -FilePath $exe -WorkingDirectory $evidence -ArgumentList '--round11-editor-preview' -PassThru
+            try {
+              $editorHandle=Wait-Window $editor '剪裁 · Round11-Flicker-Probe.mp4' 20000
+              Assert-IdleStable $editorHandle 'editor-idle' 1080 760 3200
+            } finally {
+              if (-not $editor.HasExited) { Stop-Process -Id $editor.Id -Force -ErrorAction SilentlyContinue }
+            }
+          } finally {
+            $env:APPDATA=$oldAppData
+            $env:LOCALAPPDATA=$oldLocal
+            Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+            $records | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $evidence 'flicker-report.json') -Encoding UTF8
+          }
+
+      - name: Upload flicker evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: P101-Mediova-Round11-Flicker-Evidence
+          path: |
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*-first.png
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*-last.png
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/flicker-report.json
+          if-no-files-found: error
+          retention-days: 14
