@@ -52,7 +52,7 @@ jobs:
         working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
-          python scripts/round11_flicker_gate.py `
+          python scripts/round11_flicker_gate_runner.py `
             --exe build/flicker-evidence/Mediova.exe `
             --evidence build/flicker-evidence
           if ($LASTEXITCODE -ne 0) { throw 'Round-11 flicker gate failed.' }
@@ -63,7 +63,7 @@ jobs:
         with:
           name: P101-Mediova-Round11-Flicker-Evidence
           path: |
-            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*-unique-*.png
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*.png
             projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/flicker-report.json
           if-no-files-found: error
           retention-days: 14
