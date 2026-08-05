@@ -17,13 +17,22 @@ func round9ReadSource(t *testing.T, name string) string {
 }
 
 func TestV452Round9ScrollContract(t *testing.T) {
-	scroll := round9ReadSource(t, "v452_round7_feedback_scroll_windows.go")
+	logic := round9ReadSource(t, "v452_round9_logic.go")
 	for _, required := range []string{
 		"round9OverlayHidden", "round9OverlayPending", "round9OverlayVisible", "round9OverlayDragging",
-		"round7FeedbackScrollDelay", "round9FeedbackHideDelay", "round9FeedbackInvalidateRect",
+		"func (m *round9OverlayMachine) Move", "func (m *round9OverlayMachine) ShowTimeout",
+	} {
+		if !strings.Contains(logic, required) {
+			t.Fatalf("scroll state-machine contract missing %q", required)
+		}
+	}
+	scroll := round9ReadSource(t, "v452_round7_feedback_scroll_windows.go")
+	for _, required := range []string{
+		"round7FeedbackScroll.machine", "round7FeedbackScrollDelay", "round9FeedbackHideDelay",
+		"round9FeedbackInvalidateRect", "round9FeedbackCursorAxis", "round9FeedbackRememberThumbs",
 	} {
 		if !strings.Contains(scroll, required) {
-			t.Fatalf("scroll contract missing %q", required)
+			t.Fatalf("scroll runtime contract missing %q", required)
 		}
 	}
 	for _, forbidden := range []string{"ShowScrollBar", "procInvalidateRect.Call(hwnd, 0, 0)"} {

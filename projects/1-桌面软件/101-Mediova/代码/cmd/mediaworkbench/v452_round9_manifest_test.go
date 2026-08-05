@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
@@ -10,7 +11,7 @@ import (
 	"testing"
 )
 
-const v452Round9InteractionManifestSHA256 = "224df9bb9f4bedd9e082a62433a729c2a6f9ef49c6aa7918f2d65d8a95cc1871"
+const v452Round9InteractionManifestSHA256 = "b8294b74ac7763ff21536baaa1d97517f0c3fbee33fa0f2d0b4049d1324a2285"
 
 func TestV452Round9InteractionManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND9_REAL_INTERACTION_CLOSEOUT_FILES_SHA256.txt")
@@ -33,6 +34,7 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", parts[1], err)
 		}
+		fileData = bytes.ReplaceAll(fileData, []byte("\r\n"), []byte("\n"))
 		fileSum := sha256.Sum256(fileData)
 		if got := hex.EncodeToString(fileSum[:]); got != parts[0] {
 			t.Fatalf("%s sha256=%s want=%s", parts[1], got, parts[0])
