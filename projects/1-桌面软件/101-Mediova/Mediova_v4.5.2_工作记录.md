@@ -137,6 +137,8 @@ SHA-256：d227054881f95fc8bf342b6e73d1460b3ad5997f93f2d0bdd078a597b3df9d16
 
 记录提交后，PR 准确文档 Head `731705198e1b80b182e17fa5ea871f7350827d43` 在 P101 Mediova CI #452（run `30969408524`）再次通过范围、Linux 和 Windows 原生全链。该提交只增加本工作记录，产品代码与 EXE 未改变；CI #452 生成的 `Mediova.exe` SHA-256 仍为 `2b9beb4c31792a23c402628809f1e1ffdf76ac2c4823f78d027fe8e00b269789`。
 
+最终工作记录头 `f57efcd90e1c98e0a129337473d3e9dcfd56186b` 在 P101 Mediova CI #453（run `30969687235`）继续通过范围、Linux 和 Windows 原生全链；Artifact ID `8916077356`，归档 SHA-256 `72a72cd8e2de3b9cb56af1cd0e47363b164e4dff407af6bb93c1f60ae8767bfc`。最终 EXE SHA-256 仍为 `2b9beb4c31792a23c402628809f1e1ffdf76ac2c4823f78d027fe8e00b269789`；最终完整验证 Runtime ZIP SHA-256 为 `26e60173456301addf76745b0a953bb91522d8a3dcc3829576cd769882406704`。
+
 自动截图人工复核确认：
 
 - 主列表默认不显示横向或纵向滚动条；
