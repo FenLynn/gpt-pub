@@ -23,13 +23,13 @@ type round7NativeResult struct {
 }
 
 var (
-	round7NativeEnabled       = v452Round5SelfTestRequested(os.Args[1:])
-	round7NativeEventCB       uintptr
-	round7NativeSubclassCB    uintptr
-	round7NativeHook          uintptr
-	round7NativeInstallOnce   sync.Once
-	round7NativeRunOnce       sync.Once
-	round7NativeStoredResult  round7NativeResult
+	round7NativeEnabled      = v452Round5SelfTestRequested(os.Args[1:])
+	round7NativeEventCB      uintptr
+	round7NativeSubclassCB   uintptr
+	round7NativeHook         uintptr
+	round7NativeInstallOnce  sync.Once
+	round7NativeRunOnce      sync.Once
+	round7NativeStoredResult round7NativeResult
 )
 
 func init() {
@@ -102,16 +102,9 @@ func (a *application) round7RunNativeCloseout() round7NativeResult {
 	result.checks["round7_video_fixture"] = true
 
 	task := &model.Task{
-		ID:             a.nextID.Add(1),
-		Input:          videoPath,
-		Root:           root,
-		Kind:           model.KindVideo,
-		Width:          1280,
-		Height:         720,
-		Duration:       12,
-		FPS:            30,
-		Status:         model.StatusReady,
-		ThumbnailIndex: -1,
+		ID: a.nextID.Add(1), Input: videoPath, Root: root, Kind: model.KindVideo,
+		Width: 1280, Height: 720, Duration: 12, FPS: 30,
+		Status: model.StatusReady, ThumbnailIndex: -1,
 	}
 	opts := a.settings.DefaultOptions(model.KindVideo)
 	opts.Rotation = "不旋转"
@@ -149,12 +142,12 @@ func (a *application) round7RunNativeCloseout() round7NativeResult {
 			worker.details["round7_editor_normal_screenshot"] = fmt.Sprintf("bytes=%d", media.FileSize(normalPath))
 		}
 
-		worker.checks["round7_editor_labels"] = getText(editor.hStartLabel) == "设定起始时间" &&
-			getText(editor.hStartCurrent) == "设为当前" &&
-			getText(editor.hStartInitial) == "设为初始" &&
-			getText(editor.hEndLabel) == "设定结束时间" &&
-			getText(editor.hEndCurrent) == "设为当前" &&
-			getText(editor.hEndTerminal) == "设为终止"
+		worker.checks["round7_editor_labels"] = getText(editor.hStartLabel) == "起始时间" &&
+			getText(editor.hStartCurrent) == "当前" &&
+			getText(editor.hStartInitial) == "源起点" &&
+			getText(editor.hEndLabel) == "结束时间" &&
+			getText(editor.hEndCurrent) == "当前" &&
+			getText(editor.hEndTerminal) == "源终点"
 		worker.details["round7_editor_labels"] = fmt.Sprintf("start=%q/%q/%q end=%q/%q/%q",
 			getText(editor.hStartLabel), getText(editor.hStartCurrent), getText(editor.hStartInitial),
 			getText(editor.hEndLabel), getText(editor.hEndCurrent), getText(editor.hEndTerminal))
@@ -164,7 +157,6 @@ func (a *application) round7RunNativeCloseout() round7NativeResult {
 		initialCurrent := editor.dialog.currentAt
 		_, _, trackY := editor.timelineGeometry()
 
-		// Move only the current playhead from 2 s to 6 s.
 		v452Round5MouseDrag(editor.hTimeline, int(editor.timeToX(initialCurrent)), int(trackY), int(editor.timeToX(6)), int(trackY))
 		time.Sleep(250 * time.Millisecond)
 		currentOnly := editor.dialog.opts.TrimStart == initialStart && editor.dialog.opts.TrimEnd == initialEnd && editor.dialog.currentAt > 5.8 && editor.dialog.currentAt < 6.2
@@ -172,7 +164,6 @@ func (a *application) round7RunNativeCloseout() round7NativeResult {
 		worker.details["round7_current_independent"] = fmt.Sprintf("start=%.3f current=%.3f end=%.3f", editor.dialog.opts.TrimStart, editor.dialog.currentAt, editor.dialog.opts.TrimEnd)
 
 		currentAfterSeek := editor.dialog.currentAt
-		// Move only trim start from 2 s to 3 s.
 		v452Round5MouseDrag(editor.hTimeline, int(editor.timeToX(editor.dialog.opts.TrimStart)), int(trackY-12), int(editor.timeToX(3)), int(trackY-12))
 		time.Sleep(200 * time.Millisecond)
 		startOnly := editor.dialog.opts.TrimStart > 2.8 && editor.dialog.opts.TrimStart < 3.2 && editor.dialog.opts.TrimEnd == initialEnd && editor.dialog.currentAt == currentAfterSeek
@@ -180,7 +171,6 @@ func (a *application) round7RunNativeCloseout() round7NativeResult {
 		worker.details["round7_trim_start_independent"] = fmt.Sprintf("start=%.3f current=%.3f end=%.3f", editor.dialog.opts.TrimStart, editor.dialog.currentAt, editor.dialog.opts.TrimEnd)
 
 		startAfterDrag := editor.dialog.opts.TrimStart
-		// Move only trim end from 10 s to 9 s.
 		v452Round5MouseDrag(editor.hTimeline, int(editor.timeToX(editor.dialog.opts.TrimEnd)), int(trackY-12), int(editor.timeToX(9)), int(trackY-12))
 		time.Sleep(200 * time.Millisecond)
 		endOnly := editor.dialog.opts.TrimEnd > 8.8 && editor.dialog.opts.TrimEnd < 9.2 && editor.dialog.opts.TrimStart == startAfterDrag && editor.dialog.currentAt == currentAfterSeek
