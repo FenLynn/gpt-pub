@@ -16,7 +16,7 @@ func round9ReadSource(t *testing.T, name string) string {
 	return string(data)
 }
 
-func TestV452Round9ScrollContract(t *testing.T) {
+func TestV452Round11ScrollContract(t *testing.T) {
 	logic := round9ReadSource(t, "v452_round9_logic.go")
 	for _, required := range []string{
 		"round9OverlayHidden", "round9OverlayPending", "round9OverlayVisible", "round9OverlayDragging",
@@ -28,9 +28,8 @@ func TestV452Round9ScrollContract(t *testing.T) {
 	}
 	scroll := round9ReadSource(t, "v452_round7_feedback_scroll_windows.go")
 	for _, required := range []string{
-		"MWRound9ScrollCover", "round9EnsureScrollOverlays", "round9ScrollWndProc",
-		"round7FeedbackScrollDelay", "round9FeedbackHideDelay", "round9OverlayCursorInside",
-		"round9SetScrollFromOverlay", "round9PaintScrollOverlay",
+		"MWRound9ScrollCover", "round9ScrollWndProc", "round7FeedbackScrollDelay",
+		"round9FeedbackHideDelay", "round9OverlayCursorInside", "round9SetScrollFromOverlay",
 	} {
 		if !strings.Contains(scroll, required) {
 			t.Fatalf("scroll surface contract missing %q", required)
@@ -41,21 +40,30 @@ func TestV452Round9ScrollContract(t *testing.T) {
 			t.Fatalf("scroll contract contains unstable list repaint path %q", forbidden)
 		}
 	}
-	cover := round9ReadSource(t, "v452_round10_scroll_cover_windows.go")
+	closeout := round9ReadSource(t, "v452_round11_flicker_closeout_windows.go")
 	for _, required := range []string{
-		"round10CoverNativeScrollAreas", "round9PositionOverlay(horizontal", "round9PositionOverlay(vertical",
-		"WM_PAINT, WM_SIZE, WM_HSCROLL", "CompareAndSwap(false, true)",
+		"round11PositionOverlayStable", "previous == geometry && overlay.visible",
+		"round11EnsureStableScrollGeometry", "round11ListSubclassProc",
+		"v452RemoveSubclass.Call(a.hList, round7FeedbackListSubclassCB",
 	} {
-		if !strings.Contains(cover, required) {
-			t.Fatalf("scroll cover contract missing %q", required)
+		if !strings.Contains(closeout, required) {
+			t.Fatalf("round11 stable scroll contract missing %q", required)
 		}
+	}
+	paintCase := closeout[strings.Index(closeout, "case WM_PAINT:"):]
+	if end := strings.Index(paintCase, "case round7FeedbackWMPrint"); end >= 0 {
+		paintCase = paintCase[:end]
+	}
+	if strings.Contains(paintCase, "round11EnsureStableScrollGeometry") || strings.Contains(paintCase, "round9EnsureScrollOverlays") {
+		t.Fatal("list WM_PAINT still drives scroll-cover geometry")
+	}
+	cover := round9ReadSource(t, "v452_round10_scroll_cover_windows.go")
+	if strings.Contains(cover, "WM_PAINT") || strings.Contains(cover, "MoveWindow") || strings.Contains(cover, "InvalidateRect") {
+		t.Fatal("round10 compatibility layer still owns repaint or geometry")
 	}
 	guard := round9ReadSource(t, "v452_round8_list_style_guard_windows.go")
 	if strings.Contains(guard, "SetWinEventHook") || strings.Contains(guard, "EventObjectCreate") {
 		t.Fatal("list style guard still depends on asynchronous WinEvent installation")
-	}
-	if strings.Count(guard, "round7FeedbackSWPFrameChanged") != 1 {
-		t.Fatalf("list style guard frame-change count=%d want=1", strings.Count(guard, "round7FeedbackSWPFrameChanged"))
 	}
 }
 
@@ -83,18 +91,30 @@ func TestV452Round9PreviewAndOutputContract(t *testing.T) {
 	}
 }
 
-func TestV452Round9EditorContract(t *testing.T) {
-	layout := round9ReadSource(t, "v452_round9_editor_layout_windows.go")
-	for _, required := range []string{
-		"procShowWindow.Call(e.hInstruction, 0)",
-		"procShowWindow.Call(e.hSourceRange, 0)",
-		"procShowWindow.Call(e.hApplySelected, 0)",
-		"标题：", "剪裁预览", "恢复全画面", "setText(e.hApplyCurrent, \"应用\")",
-		"round9EnsureInfoGuard", "round9LayoutPreviewStatus",
-	} {
-		if !strings.Contains(layout, required) {
-			t.Fatalf("editor layout contract missing %q", required)
+func TestV452Round11EditorContract(t *testing.T) {
+	installer := round9ReadSource(t, "v452_round8_editor_install_windows.go")
+	for _, required := range []string{"round11InstallEditor(e)", "not installed", "single-owner chain"} {
+		if !strings.Contains(installer, required) {
+			t.Fatalf("round11 editor installer missing %q", required)
 		}
+	}
+	for _, forbidden := range []string{"round7FeedbackApplyEditorLayout(e)", "round9InstallEditorCloseout(e)"} {
+		if strings.Contains(installer, forbidden) {
+			t.Fatalf("editor installer still enables competing layout %q", forbidden)
+		}
+	}
+	closeout := round9ReadSource(t, "v452_round11_flicker_closeout_windows.go")
+	for _, required := range []string{
+		"round11ApplyEditorLayout", "state.clientWidth == width && state.clientHeight == height",
+		"round11SetTextIfChanged", "round11ApplyMoves", "标题：", "round11CanvasPaintSubclassProc",
+		"v452RemoveSubclass.Call(e.hwnd, round7FeedbackEditorSubclassCB",
+	} {
+		if !strings.Contains(closeout, required) {
+			t.Fatalf("round11 editor contract missing %q", required)
+		}
+	}
+	if strings.Contains(closeout, "procMoveWindow.Call(e.hwnd") {
+		t.Fatal("editor layout still resizes its own window from WM_SIZE")
 	}
 	info := round9ReadSource(t, "v452_round9_info_guard_windows.go")
 	for _, required := range []string{"round9InfoSubclassProc", "预览帧", "round9SetPreviewStatus"} {
