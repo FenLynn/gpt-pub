@@ -4,21 +4,40 @@ package main
 
 import "time"
 
-// WinEvent ordering is not deterministic. Previously round 7 could install its
-// list subclass after round 11 had already removed it, briefly restoring the
-// native scrollbars and sometimes reviving the old repaint path. Coordinate
-// both compatibility and final ownership explicitly on the UI thread.
+// WinEvent ordering is not deterministic. Previously round 11 could install
+// first, then round 7 could re-add its list subclass after the final owner had
+// removed it. Disable the round-11 WinEvent path before controls become ready,
+// then coordinate the entire transition once on the UI thread.
 func init() {
+	go func() {
+		for attempt := 0; attempt < 800; attempt++ {
+			if round11MainHook != 0 {
+				round7FeedbackUnhookWinEvent.Call(round11MainHook)
+				round11MainHook = 0
+				break
+			}
+			time.Sleep(2 * time.Millisecond)
+		}
+	}()
+
 	go func() {
 		for attempt := 0; attempt < 800; attempt++ {
 			a := app
 			if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady {
 				a.postUI(func() {
-					// Complete the inherited initialization first. This sets its
-					// installed marker and unhooks the old WinEvent callback.
+					// Remove any premature final installation before sequencing.
+					v452RemoveSubclass.Call(a.hList, round11ListSubclassCB, round11ListSubclassID)
+					v452RemoveSubclass.Call(a.hwnd, round11MainSubclassCB, round11MainSubclassID)
+					round11MainInstalled.Store(false)
+
+					// Complete inherited initialization first. This sets its marker
+					// and disables the inherited WinEvent hook.
 					round7FeedbackMainEventProc(0, 0, 0, 0, 0, 0, 0)
-					// Final ownership is installed second and removes the inherited
-					// list subclass exactly once.
+
+					// Final ownership is always installed last. Remove the inherited
+					// list subclass explicitly as well as from the finalize message,
+					// so there is no frame in which both owners coexist.
+					v452RemoveSubclass.Call(a.hList, round7FeedbackListSubclassCB, round7FeedbackListSubclassID)
 					round11MainEventProc(0, 0, 0, 0, 0, 0, 0)
 				})
 				return
