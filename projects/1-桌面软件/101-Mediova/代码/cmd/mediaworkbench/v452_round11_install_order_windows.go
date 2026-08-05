@@ -40,6 +40,11 @@ func init() {
 					v452RemoveSubclass.Call(a.hList, round7FeedbackListSubclassCB, round7FeedbackListSubclassID)
 					round11MainEventProc(0, 0, 0, 0, 0, 0, 0)
 
+					// Permanent round-11 surfaces are installed after all inherited
+					// initialization. They always cover the native scrollbar lanes;
+					// only the thumb itself changes on delayed edge hover.
+					round11InstallStableScrollSurfaces(a)
+
 					// The dynamic editor gate is opened from the same UI transaction,
 					// after final ownership has been established. Normal launches never
 					// enter this branch.
