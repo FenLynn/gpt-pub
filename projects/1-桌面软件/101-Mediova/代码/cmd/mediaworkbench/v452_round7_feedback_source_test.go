@@ -34,7 +34,8 @@ func TestRound7FeedbackSourceContracts(t *testing.T) {
 	for _, required := range []string{
 		"round7FeedbackScrollDelay = 500",
 		"GetScrollInfo",
-		"round7FeedbackDrawOverlayScrollbars",
+		"MWRound9ScrollCover",
+		"round9EnsureScrollOverlays",
 		"round7FeedbackColumnProfiles",
 		"ui-column-widths-v452.json",
 		"round7FeedbackApplyingColumns",
