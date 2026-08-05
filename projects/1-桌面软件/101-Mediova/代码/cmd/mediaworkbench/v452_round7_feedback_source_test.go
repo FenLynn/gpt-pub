@@ -18,6 +18,9 @@ func TestRound7FeedbackSourceContracts(t *testing.T) {
 		"v452_round7_feedback_timeline_windows.go",
 		"v452_round7_list_overlay_windows.go",
 		"v452_round7_editor_layout_windows.go",
+		"v452_round8_editor_install_windows.go",
+		"v452_round8_tooltip_windows.go",
+		"v452_round8_list_style_guard_windows.go",
 	} {
 		data, err := os.ReadFile(name)
 		if err != nil {
@@ -55,6 +58,11 @@ func TestRound7FeedbackSourceContracts(t *testing.T) {
 		"BeginDeferWindowPos",
 		"剪裁",
 		"GenerateProcessedFrame",
+		"round8WMInstallEditor",
+		"round8TooltipDelay          = 420",
+		"round8WSExNoActivate",
+		"round8WMStyleChanging",
+		"styles.StyleNew &^= uint32(round7FeedbackWSHScroll",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("missing feedback convergence contract %q", required)
@@ -78,5 +86,14 @@ func TestRound7FeedbackSourceContracts(t *testing.T) {
 	}
 	if strings.Contains(files["v452_round7_list_overlay_windows.go"], "SetWindowSubclass") {
 		t.Fatal("list overlay must be paint-only and use the unified list subclass")
+	}
+	if strings.Contains(files["v452_round8_tooltip_windows.go"], "time.NewTicker") {
+		t.Fatal("tooltip must use one-shot hover timing, not a repeating ticker")
+	}
+	if !strings.Contains(files["v452_round8_editor_install_windows.go"], "v452RemoveSubclass.Call(hwnd, round8EditorInstallerCB") {
+		t.Fatal("temporary editor installer must remove itself after synchronous installation")
+	}
+	if !strings.Contains(files["v452_round8_list_style_guard_windows.go"], "round8WMStyleChanging") {
+		t.Fatal("list style guard must reject native scrollbar restoration at WM_STYLECHANGING")
 	}
 }
