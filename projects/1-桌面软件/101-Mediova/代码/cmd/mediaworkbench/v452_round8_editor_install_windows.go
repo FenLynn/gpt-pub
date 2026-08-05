@@ -3,6 +3,7 @@
 package main
 
 import (
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -27,7 +28,6 @@ func init() {
 				}
 				time.Sleep(25 * time.Millisecond)
 			}
-		}()
 	}
 }
 
@@ -58,6 +58,9 @@ func round8EditorInstallerSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 			// crop interaction. The inherited round-7 layout chain is deliberately
 			// not installed, eliminating the two-layout WM_SIZE loop.
 			round11InstallEditor(e)
+			// The title belongs to the final installer and is written once. It no
+			// longer depends on either inherited layout subclass.
+			round11SetTextIfChanged(e.hwnd, "剪裁 · "+filepath.Base(e.dialog.task.Input))
 			v452RemoveSubclass.Call(hwnd, round8EditorInstallerCB, subclassID)
 			return 0
 		}
