@@ -37,7 +37,7 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 		fileData = bytes.ReplaceAll(fileData, []byte("\r\n"), []byte("\n"))
 		fileSum := sha256.Sum256(fileData)
 		if got := hex.EncodeToString(fileSum[:]); got != parts[0] {
-			t.Fatalf("%s sha256=%s want=%s", parts[1], got, parts[0])
+			t.Errorf("%s sha256=%s want=%s", parts[1], got, parts[0])
 		}
 		entries++
 	}
