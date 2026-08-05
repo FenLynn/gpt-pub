@@ -13,6 +13,12 @@ import (
 
 const v452Round9InteractionManifestSHA256 = "8bc9bf90badf455798ebf010c29df533c89d9827a437137adb5701123d7d2b7e"
 
+var v452Round9SupersededByRound11 = map[string]bool{
+	"cmd/mediaworkbench/v452_round8_editor_install_windows.go": true,
+	"cmd/mediaworkbench/v452_round9_source_test.go":             true,
+	"cmd/mediaworkbench/v452_round10_scroll_cover_windows.go":  true,
+}
+
 func TestV452Round9InteractionManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND9_REAL_INTERACTION_CLOSEOUT_FILES_SHA256.txt")
 	data, err := os.ReadFile(manifest)
@@ -21,10 +27,11 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 	}
 	sum := sha256.Sum256(data)
 	if got := hex.EncodeToString(sum[:]); got != v452Round9InteractionManifestSHA256 {
-		t.Fatalf("round9 manifest sha256=%s want=%s", got, v452Round9InteractionManifestSHA256)
+		t.Fatalf("round9 manifest receipt sha256=%s want=%s", got, v452Round9InteractionManifestSHA256)
 	}
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
 	entries := 0
+	superseded := 0
 	for scanner.Scan() {
 		parts := strings.Fields(scanner.Text())
 		if len(parts) != 2 || len(parts[0]) != 64 {
@@ -36,8 +43,12 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 		}
 		fileData = bytes.ReplaceAll(fileData, []byte("\r\n"), []byte("\n"))
 		fileSum := sha256.Sum256(fileData)
-		if got := hex.EncodeToString(fileSum[:]); got != parts[0] {
-			t.Fatalf("%s sha256=%s want=%s", parts[1], got, parts[0])
+		got := hex.EncodeToString(fileSum[:])
+		if got != parts[0] {
+			if !v452Round9SupersededByRound11[parts[1]] {
+				t.Fatalf("%s sha256=%s want=%s", parts[1], got, parts[0])
+			}
+			superseded++
 		}
 		entries++
 	}
@@ -46,5 +57,8 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 	}
 	if entries != 16 {
 		t.Fatalf("round9 manifest entries=%d want=16", entries)
+	}
+	if superseded != len(v452Round9SupersededByRound11) {
+		t.Fatalf("round9 superseded entries=%d want=%d", superseded, len(v452Round9SupersededByRound11))
 	}
 }
