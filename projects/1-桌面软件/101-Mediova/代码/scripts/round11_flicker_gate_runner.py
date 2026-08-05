@@ -17,8 +17,53 @@ gate.user32.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(POINT)]
 gate.user32.ScreenToClient.restype = wintypes.BOOL
 
 
+def capture_any_window(hwnd: int):
+    rect = gate.RECT()
+    if not gate.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    width = rect.right - rect.left
+    height = rect.bottom - rect.top
+    if width < 1 or height < 1:
+        raise RuntimeError(f"invalid child window size: {width}x{height}")
+
+    screen_dc = gate.user32.GetDC(0)
+    memory_dc = gate.gdi32.CreateCompatibleDC(screen_dc)
+    bitmap = gate.gdi32.CreateCompatibleBitmap(screen_dc, width, height)
+    old = gate.gdi32.SelectObject(memory_dc, bitmap)
+    try:
+        if not gate.user32.PrintWindow(hwnd, memory_dc, gate.PW_RENDERFULLCONTENT):
+            raise ctypes.WinError(ctypes.get_last_error())
+        info = gate.BITMAPINFO()
+        info.bmiHeader.biSize = ctypes.sizeof(gate.BITMAPINFOHEADER)
+        info.bmiHeader.biWidth = width
+        info.bmiHeader.biHeight = -height
+        info.bmiHeader.biPlanes = 1
+        info.bmiHeader.biBitCount = 32
+        info.bmiHeader.biCompression = gate.BI_RGB
+        buffer = ctypes.create_string_buffer(width * height * 4)
+        rows = gate.gdi32.GetDIBits(
+            memory_dc,
+            bitmap,
+            0,
+            height,
+            buffer,
+            ctypes.byref(info),
+            gate.DIB_RGB_COLORS,
+        )
+        if rows != height:
+            raise RuntimeError(f"GetDIBits rows={rows}, want={height}")
+        return gate.Image.frombuffer(
+            "RGBA", (width, height), buffer.raw, "raw", "BGRA", 0, 1
+        ).copy()
+    finally:
+        gate.gdi32.SelectObject(memory_dc, old)
+        gate.gdi32.DeleteObject(bitmap)
+        gate.gdi32.DeleteDC(memory_dc)
+        gate.user32.ReleaseDC(0, screen_dc)
+
+
 def window_hash(hwnd: int, save_path: Path | None = None) -> str:
-    image = gate.capture_window(hwnd)
+    image = capture_any_window(hwnd)
     try:
         if save_path is not None:
             image.save(save_path)
