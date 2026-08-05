@@ -5,6 +5,8 @@ package main
 import (
 	"path/filepath"
 	"unsafe"
+
+	"mediaworkbench/internal/model"
 )
 
 func round7FeedbackTimelineSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
@@ -80,8 +82,6 @@ func round7FeedbackDrawTimelineSurface(e *round7Editor, hdc uintptr, rc rect) {
 	blue := colorRef(42, 108, 197)
 	red := colorRef(215, 62, 55)
 
-	// Source timestamps sit at the two ends instead of occupying a second row
-	// below the track. They never collide with the three movable markers.
 	timeTop := int32(1)
 	round7TimelineText(hdc, formatSecondsClock(0), rect{Left: left, Top: timeTop, Right: left + scaleDPI(132), Bottom: timeTop + scaleDPI(22)}, DT_LEFT, gray)
 	round7TimelineText(hdc, formatSecondsClock(e.dialog.task.Duration), rect{Left: right - scaleDPI(132), Top: timeTop, Right: right, Bottom: timeTop + scaleDPI(22)}, DT_RIGHT, gray)
@@ -90,28 +90,17 @@ func round7FeedbackDrawTimelineSurface(e *round7Editor, hdc uintptr, rc rect) {
 	fillSolid(hdc, track, colorRef(225, 231, 238))
 	round7TimelineLine(hdc, left, trackY, right, trackY, colorRef(149, 160, 174), 1)
 
-	// The retained range is a quiet band above the physical track.
 	bandTop := trackY - scaleDPI(18)
 	bandBottom := trackY - scaleDPI(8)
 	fillSolid(hdc, rect{Left: left, Top: bandTop, Right: right, Bottom: bandBottom}, colorRef(237, 241, 246))
 	fillSolid(hdc, rect{Left: startX, Top: bandTop, Right: endX, Bottom: bandBottom}, colorRef(184, 213, 248))
 
-	// Start is a right-facing flag and end is a left-facing flag. Their shape,
-	// direction and blue colour separate them from the red current playhead.
 	round7TimelineLine(hdc, startX, bandTop-scaleDPI(3), startX, trackY+scaleDPI(8), blue, 2)
-	startFlag := []point{
-		{X: startX, Y: bandTop - scaleDPI(4)},
-		{X: startX + scaleDPI(14), Y: bandTop + scaleDPI(2)},
-		{X: startX, Y: bandTop + scaleDPI(8)},
-	}
+	startFlag := []point{{X: startX, Y: bandTop - scaleDPI(4)}, {X: startX + scaleDPI(14), Y: bandTop + scaleDPI(2)}, {X: startX, Y: bandTop + scaleDPI(8)}}
 	round7FillPolygon(hdc, startFlag, blue)
 
 	round7TimelineLine(hdc, endX, bandTop-scaleDPI(3), endX, trackY+scaleDPI(8), blue, 2)
-	endFlag := []point{
-		{X: endX, Y: bandTop - scaleDPI(4)},
-		{X: endX - scaleDPI(14), Y: bandTop + scaleDPI(2)},
-		{X: endX, Y: bandTop + scaleDPI(8)},
-	}
+	endFlag := []point{{X: endX, Y: bandTop - scaleDPI(4)}, {X: endX - scaleDPI(14), Y: bandTop + scaleDPI(2)}, {X: endX, Y: bandTop + scaleDPI(8)}}
 	round7FillPolygon(hdc, endFlag, blue)
 
 	startLabel := round7FeedbackTimelineLabelRect(startX, rc.Right, trackY-scaleDPI(42), scaleDPI(72))
@@ -123,14 +112,8 @@ func round7FeedbackDrawTimelineSurface(e *round7Editor, hdc uintptr, rc rect) {
 	round7TimelineText(hdc, "剪辑起点", startLabel, DT_CENTER, blue)
 	round7TimelineText(hdc, "剪辑终点", endLabel, DT_CENTER, blue)
 
-	// Current time is exclusively below the track and uses a downward red
-	// triangle; it cannot be mistaken for either trim boundary.
 	round7TimelineLine(hdc, currentX, trackY-scaleDPI(5), currentX, trackY+scaleDPI(18), red, 2)
-	currentFlag := []point{
-		{X: currentX - scaleDPI(6), Y: trackY + scaleDPI(13)},
-		{X: currentX + scaleDPI(6), Y: trackY + scaleDPI(13)},
-		{X: currentX, Y: trackY + scaleDPI(22)},
-	}
+	currentFlag := []point{{X: currentX - scaleDPI(6), Y: trackY + scaleDPI(13)}, {X: currentX + scaleDPI(6), Y: trackY + scaleDPI(13)}, {X: currentX, Y: trackY + scaleDPI(22)}}
 	round7FillPolygon(hdc, currentFlag, red)
 	currentLabel := round7FeedbackTimelineLabelRect(currentX, rc.Right, trackY+scaleDPI(24), scaleDPI(108))
 	round7TimelineText(hdc, "当前  "+formatSecondsClock(e.dialog.currentAt), currentLabel, DT_CENTER, red)
