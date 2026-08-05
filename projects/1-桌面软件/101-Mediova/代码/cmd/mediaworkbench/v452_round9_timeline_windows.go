@@ -52,22 +52,36 @@ func round9TimelineXToTime(e *round7Editor, x int32) float64 {
 
 func round9TimelineHit(e *round7Editor, x, y int32) round7TimelineDrag {
 	_, _, _, barBottom := round9TimelineGeometry(e.hTimeline)
-	if y > barBottom+scaleDPI(2) {
-		return round7DragCurrent
-	}
 	tolerance := scaleDPI(12)
 	startX := round9TimelineTimeToX(e, e.dialog.opts.TrimStart)
 	endX := round9TimelineTimeToX(e, e.dialog.opts.TrimEnd)
+	currentX := round9TimelineTimeToX(e, e.dialog.currentAt)
 	abs := func(v int32) int32 {
 		if v < 0 {
 			return -v
 		}
 		return v
 	}
-	if abs(x-startX) <= tolerance {
+	nearStart := abs(x-startX) <= tolerance
+	nearEnd := abs(x-endX) <= tolerance
+	nearCurrent := abs(x-currentX) <= tolerance
+
+	// When the red current marker coincides with a blue trim boundary, the
+	// vertical layer disambiguates them. Once the current marker has moved
+	// away, a pointer close to either blue line always edits that boundary.
+	if nearCurrent && (nearStart || nearEnd) {
+		if y > barBottom+scaleDPI(2) {
+			return round7DragCurrent
+		}
+		if nearStart {
+			return round7DragTrimStart
+		}
+		return round7DragTrimEnd
+	}
+	if nearStart {
 		return round7DragTrimStart
 	}
-	if abs(x-endX) <= tolerance {
+	if nearEnd {
 		return round7DragTrimEnd
 	}
 	return round7DragCurrent
