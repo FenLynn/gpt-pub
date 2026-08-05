@@ -28,6 +28,7 @@ func init() {
 				}
 				time.Sleep(25 * time.Millisecond)
 			}
+		}()
 	}
 }
 
