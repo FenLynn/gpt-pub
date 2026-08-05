@@ -15,69 +15,80 @@ func round7ReadSource(t *testing.T, name string) string {
 	return string(data)
 }
 
-func TestRound7MainInstallsOnceAndUnhooksEventListener(t *testing.T) {
-	source := round7ReadSource(t, "v452_round7_main_windows.go")
-	for _, required := range []string{
-		"round7MainInstalled.Load()",
-		"round7UnhookWinEvent.Call(round7MainEventHook)",
-		"round7MainEventHook = 0",
-		"case WM_SIZE:",
-	} {
-		if !strings.Contains(source, required) {
-			t.Fatalf("missing one-shot main-window guard: %q", required)
+func TestRound7MainHasNoCompetingWindowHook(t *testing.T) {
+	legacy := round7ReadSource(t, "v452_round7_main_windows.go")
+	for _, forbidden := range []string{"func init()", "SetWinEventHook", "case WM_SIZE:", "round7LayoutFooter"} {
+		if strings.Contains(legacy, forbidden) {
+			t.Fatalf("legacy round7 main still owns window state: %q", forbidden)
 		}
 	}
-	for _, forbidden := range []string{"time.NewTicker", "SetTimer", "WM_TIMER", "for {\n\t\tprocInvalidateRect"} {
-		if strings.Contains(source, forbidden) {
-			t.Fatalf("continuous repaint mechanism is forbidden: %q", forbidden)
-		}
-	}
-	if count := strings.Count(source, "procPostMessageW.Call(app.hwnd, round7WMInit"); count != 1 {
-		t.Fatalf("round7 init message count=%d, want 1", count)
-	}
-}
-
-func TestRound7StatusLampIsSupersampledAndFooterArrowFacesRight(t *testing.T) {
-	source := round7ReadSource(t, "v452_round7_main_windows.go")
+	common := round7ReadSource(t, "v452_round7_feedback_common_windows.go")
 	for _, required := range []string{
-		"const samples = 4",
-		"round7StretchDIBits.Call",
-		"diameter := int(scaleDPI(15))",
-		"Right-facing triangle",
-		"iconCenterX + scaleDPI(6)",
-		"round7LayoutFooter(app)",
+		"round7FeedbackMainInstalled.Load()",
+		"round7FeedbackUnhookWinEvent.Call(round7FeedbackMainHook)",
+		"round7FeedbackWMFinalizeSwitch",
+		"round7FeedbackLayoutFooter(a)",
+		"BeginDeferWindowPos",
 	} {
-		if !strings.Contains(source, required) {
-			t.Fatalf("missing visual contract: %q", required)
+		if !strings.Contains(common, required) {
+			t.Fatalf("missing unified main-window contract: %q", required)
 		}
 	}
 }
 
-func TestRound7EditorUsesRequestedNamesAndFiveMarkers(t *testing.T) {
-	source := round7ReadSource(t, "v452_round7_editor_windows.go")
+func TestRound7VisualsUseSingleSupersampledPath(t *testing.T) {
+	legacy := round7ReadSource(t, "v452_round7_main_windows.go")
+	visual := round7ReadSource(t, "v452_round7_feedback_visual_windows.go")
+	if strings.Count(legacy, "round7FeedbackDrawFlatLamp") != 1 {
+		t.Fatal("legacy lamp compatibility must delegate exactly once")
+	}
 	for _, required := range []string{
-		"剪辑 / 画面",
-		"设定起始时间",
-		"设为当前",
-		"设为初始",
-		"设定结束时间",
-		"设为终止",
-		"源起点",
-		"剪辑起点",
-		"当前",
-		"剪辑终点",
-		"源终点",
-		"round7DragTrimStart",
-		"round7DragCurrent",
-		"round7DragTrimEnd",
+		"const samples = 8",
+		"round7FeedbackDrawFooterButton",
+		"round7FeedbackDrawOverallProgress",
+		"fraction > 0",
+		"cx + scaleDPI(6)",
 	} {
-		if !strings.Contains(source, required) {
-			t.Fatalf("missing editor contract: %q", required)
+		if !strings.Contains(visual, required) {
+			t.Fatalf("missing unified visual contract: %q", required)
 		}
 	}
-	for _, forbidden := range []string{"设为起点", "设为终点", "range drag", "TrimTimelineRange", "time.NewTicker", "WM_TIMER"} {
-		if strings.Contains(source, forbidden) {
-			t.Fatalf("rejected editor behaviour remains: %q", forbidden)
+	if strings.Contains(visual, "minimum := int32(4)") {
+		t.Fatal("overall progress must not draw a fake zero-percent start tick")
+	}
+}
+
+func TestRound7EditorUsesTrimNameAndSeparatedMarkers(t *testing.T) {
+	editor := round7ReadSource(t, "v452_round7_feedback_editor_windows.go")
+	timeline := round7ReadSource(t, "v452_round7_feedback_timeline_windows.go")
+	for _, required := range []string{
+		"剪裁",
+		"setText(decor.timeTitle, \"剪辑\")",
+		"setText(e.hStartLabel, \"起始时间\")",
+		"setText(e.hEndLabel, \"结束时间\")",
+		"setText(e.hSourceRange",
+		"round7FeedbackPaintCanvas",
+		"GenerateProcessedFrame",
+	} {
+		if !strings.Contains(editor, required) {
+			t.Fatalf("missing editor convergence contract: %q", required)
+		}
+	}
+	for _, required := range []string{
+		"formatSecondsClock(0)",
+		"formatSecondsClock(e.dialog.task.Duration)",
+		"startFlag",
+		"endFlag",
+		"currentFlag",
+		"当前  "+"\"+formatSecondsClock",
+	} {
+		if !strings.Contains(timeline, required) {
+			t.Fatalf("missing separated timeline marker contract: %q", required)
+		}
+	}
+	for _, forbidden := range []string{"源起点\", rect", "源终点\", rect", "round7FeedbackCanvasSubclassProc"} {
+		if strings.Contains(timeline, forbidden) {
+			t.Fatalf("old overlapping timeline/canvas path remains: %q", forbidden)
 		}
 	}
 }
@@ -91,7 +102,7 @@ func TestRound7CurrentPreviewIsReleasedNotMouseMoveGenerated(t *testing.T) {
 	}
 	moveBlock := source[moveStart : moveStart+moveEnd]
 	if strings.Contains(moveBlock, "generatePreviewFrame") {
-		t.Fatal("preview generation during WM_MOUSEMOVE would cause flashing")
+		t.Fatal("preview generation during timeline WM_MOUSEMOVE would cause flashing")
 	}
 	upStart := strings.Index(source, "case WM_LBUTTONUP:")
 	upEnd := strings.Index(source[upStart:], "result, _, _ := procDefWindowProcW")
