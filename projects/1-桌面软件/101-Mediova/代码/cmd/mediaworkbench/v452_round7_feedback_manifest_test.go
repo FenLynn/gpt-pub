@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const v452Round7FeedbackManifestSHA256 = "af293011111896eff7e38d834988dc67fb18b318cccae2e73d99ce41c8953fd1"
+const v452Round7FeedbackManifestSHA256 = "06bd1ba5b60ffbbad18dff32ca01958203172e297415fabd83378e8c69b524f2"
 
 func TestV452Round7FeedbackFixedManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND7_FEEDBACK_FILES_SHA256.txt")
