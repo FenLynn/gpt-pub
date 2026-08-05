@@ -5,15 +5,16 @@ package main
 import "unsafe"
 
 const (
-	round7FeedbackSBHorz          = 0
-	round7FeedbackSBVert          = 1
-	round7FeedbackSIFAll          = 0x0017
-	round7FeedbackSIFPos          = 0x0004
-	round7FeedbackSBThumbPosition = 4
-	round7FeedbackSBThumbTrack    = 5
-	round7FeedbackWMVScroll       = 0x0115
-	round7FeedbackWMMouseWheel    = 0x020A
+	round7FeedbackSBHorz           = 0
+	round7FeedbackSBVert           = 1
+	round7FeedbackSIFAll           = 0x0017
+	round7FeedbackSIFPos           = 0x0004
+	round7FeedbackSBThumbTrack     = 5
+	round7FeedbackWMVScroll        = 0x0115
+	round7FeedbackWMMouseWheel     = 0x020A
 	round7FeedbackWMCaptureChanged = 0x0215
+	round9FeedbackHideTimer        = 0x4593
+	round9FeedbackHideDelay        = 220
 )
 
 type round7FeedbackScrollInfo struct {
@@ -27,33 +28,32 @@ type round7FeedbackScrollInfo struct {
 }
 
 type round7FeedbackScrollState struct {
-	wantH, wantV       bool
-	visibleH, visibleV bool
-	timerArmed         bool
-	draggingH, draggingV bool
-	dragOffset         int
+	machine    round9OverlayMachine
+	dragOffset int
+	lastH      rect
+	lastV      rect
+	haveH      bool
+	haveV      bool
 }
 
 var (
-	round7FeedbackScroll             round7FeedbackScrollState
-	round7FeedbackGetScrollInfo      = user32.NewProc("GetScrollInfo")
-	round7FeedbackSetScrollInfo      = user32.NewProc("SetScrollInfo")
+	round7FeedbackScroll         round7FeedbackScrollState
+	round7FeedbackGetScrollInfo  = user32.NewProc("GetScrollInfo")
+	round7FeedbackSetScrollInfo  = user32.NewProc("SetScrollInfo")
+	round9FeedbackGetCursorPos   = user32.NewProc("GetCursorPos")
+	round9FeedbackScreenToClient = user32.NewProc("ScreenToClient")
 )
 
 func round7FeedbackHideScrollbars(hwnd uintptr) {
 	if hwnd == 0 {
 		return
 	}
-	wasVisible := round7FeedbackScroll.visibleH || round7FeedbackScroll.visibleV
-	round7FeedbackScroll.wantH = false
-	round7FeedbackScroll.wantV = false
-	round7FeedbackScroll.visibleH = false
-	round7FeedbackScroll.visibleV = false
-	round7FeedbackScroll.timerArmed = false
+	round9FeedbackInvalidateStoredThumbs(hwnd)
 	procKillTimer.Call(hwnd, round7FeedbackScrollTimer)
-	if wasVisible {
-		procInvalidateRect.Call(hwnd, 0, 0)
-	}
+	procKillTimer.Call(hwnd, round9FeedbackHideTimer)
+	round7FeedbackScroll.machine = round9OverlayMachine{}
+	round7FeedbackScroll.haveH = false
+	round7FeedbackScroll.haveV = false
 }
 
 func round7FeedbackListNeedsVertical(hwnd uintptr) bool {
@@ -107,20 +107,20 @@ func round7FeedbackVerticalThumb(hwnd uintptr) (rect, bool) {
 	}
 	var rc rect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
-	margin := int(scaleDPI(4))
+	margin := int(scaleDPI(5))
 	barW := int(scaleDPI(7))
 	bottomReserve := 0
 	if round7FeedbackListNeedsHorizontal(hwnd) {
-		bottomReserve = int(scaleDPI(11))
+		bottomReserve = int(scaleDPI(12))
 	}
 	trackStart := margin
 	trackLength := int(rc.Bottom-rc.Top) - margin*2 - bottomReserve
 	info, ok := round7FeedbackScrollInfoFor(hwnd, round7FeedbackSBVert)
-	if !ok {
+	if !ok || trackLength <= 0 {
 		return rect{}, false
 	}
 	start, length := round7FeedbackThumbGeometry(trackStart, trackLength, int(info.NMin), int(info.NMax), int(info.NPage), int(info.NPos))
-	right := int(rc.Right) - int(scaleDPI(3))
+	right := int(rc.Right) - int(scaleDPI(4))
 	return rect{Left: int32(right - barW), Top: int32(start), Right: int32(right), Bottom: int32(start + length)}, true
 }
 
@@ -130,20 +130,20 @@ func round7FeedbackHorizontalThumb(hwnd uintptr) (rect, bool) {
 	}
 	var rc rect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
-	margin := int(scaleDPI(4))
+	margin := int(scaleDPI(5))
 	barH := int(scaleDPI(7))
 	rightReserve := 0
 	if round7FeedbackListNeedsVertical(hwnd) {
-		rightReserve = int(scaleDPI(11))
+		rightReserve = int(scaleDPI(12))
 	}
 	trackStart := margin
 	trackLength := int(rc.Right-rc.Left) - margin*2 - rightReserve
 	info, ok := round7FeedbackScrollInfoFor(hwnd, round7FeedbackSBHorz)
-	if !ok {
+	if !ok || trackLength <= 0 {
 		return rect{}, false
 	}
 	start, length := round7FeedbackThumbGeometry(trackStart, trackLength, int(info.NMin), int(info.NMax), int(info.NPage), int(info.NPos))
-	bottom := int(rc.Bottom) - int(scaleDPI(3))
+	bottom := int(rc.Bottom) - int(scaleDPI(4))
 	return rect{Left: int32(start), Top: int32(bottom - barH), Right: int32(start + length), Bottom: int32(bottom)}, true
 }
 
@@ -151,18 +151,43 @@ func round7FeedbackPointInRect(pt point, rc rect) bool {
 	return pt.X >= rc.Left && pt.X < rc.Right && pt.Y >= rc.Top && pt.Y < rc.Bottom
 }
 
-func round7FeedbackArmScrollTimer(hwnd uintptr, wantH, wantV bool) {
-	round7FeedbackScroll.wantH = wantH
-	round7FeedbackScroll.wantV = wantV
-	if !wantH && !wantV {
-		round7FeedbackHideScrollbars(hwnd)
-		return
+func round9FeedbackCursorAxis(hwnd uintptr) uint8 {
+	var pt point
+	if ok, _, _ := round9FeedbackGetCursorPos.Call(uintptr(unsafe.Pointer(&pt))); ok == 0 {
+		return round9AxisNone
 	}
-	if round7FeedbackScroll.visibleH || round7FeedbackScroll.visibleV || round7FeedbackScroll.timerArmed {
-		return
+	if ok, _, _ := round9FeedbackScreenToClient.Call(hwnd, uintptr(unsafe.Pointer(&pt))); ok == 0 {
+		return round9AxisNone
 	}
-	round7FeedbackScroll.timerArmed = true
-	procSetTimer.Call(hwnd, round7FeedbackScrollTimer, round7FeedbackScrollDelay, 0)
+	var rc rect
+	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
+	if pt.X < 0 || pt.Y < 0 || pt.X >= rc.Right || pt.Y >= rc.Bottom {
+		return round9AxisNone
+	}
+	edge := int32(scaleDPI(18))
+	axis := round9AxisNone
+	if round7FeedbackListNeedsHorizontal(hwnd) && pt.Y >= rc.Bottom-edge {
+		axis |= round9AxisHorizontal
+	}
+	if round7FeedbackListNeedsVertical(hwnd) && pt.X >= rc.Right-edge {
+		axis |= round9AxisVertical
+	}
+	return axis
+}
+
+func round9FeedbackApplyAction(hwnd uintptr, action round9OverlayAction) {
+	switch action {
+	case round9OverlayArmShow:
+		procKillTimer.Call(hwnd, round7FeedbackScrollTimer)
+		procSetTimer.Call(hwnd, round7FeedbackScrollTimer, round7FeedbackScrollDelay, 0)
+	case round9OverlayCancelShow:
+		procKillTimer.Call(hwnd, round7FeedbackScrollTimer)
+	case round9OverlayArmHide:
+		procKillTimer.Call(hwnd, round9FeedbackHideTimer)
+		procSetTimer.Call(hwnd, round9FeedbackHideTimer, round9FeedbackHideDelay, 0)
+	case round9OverlayCancelHide:
+		procKillTimer.Call(hwnd, round9FeedbackHideTimer)
+	}
 }
 
 func round7FeedbackListMouse(hwnd uintptr, x, y int) {
@@ -173,19 +198,72 @@ func round7FeedbackListMouse(hwnd uintptr, x, y int) {
 		int(rc.Right-rc.Left), int(rc.Bottom-rc.Top), x, y, edge,
 		round7FeedbackListNeedsHorizontal(hwnd), round7FeedbackListNeedsVertical(hwnd),
 	)
+	axis := round9AxisNone
+	if showH {
+		axis |= round9AxisHorizontal
+	}
+	if showV {
+		axis |= round9AxisVertical
+	}
 	track := round7FeedbackTrackMouseEvent{
-		CbSize: uint32(unsafe.Sizeof(round7FeedbackTrackMouseEvent{})),
-		DwFlags: round7FeedbackTMELeave,
+		CbSize:   uint32(unsafe.Sizeof(round7FeedbackTrackMouseEvent{})),
+		DwFlags:  round7FeedbackTMELeave,
 		HwndTrack: hwnd,
 	}
 	round7FeedbackTrackMouseEventProc.Call(uintptr(unsafe.Pointer(&track)))
-	round7FeedbackArmScrollTimer(hwnd, showH, showV)
+	before := round7FeedbackScroll.machine.Axis
+	action := round7FeedbackScroll.machine.Move(axis)
+	round9FeedbackApplyAction(hwnd, action)
+	if round7FeedbackScroll.machine.Phase == round9OverlayVisible && before != round7FeedbackScroll.machine.Axis {
+		round9FeedbackInvalidateStoredThumbs(hwnd)
+		round9FeedbackRememberThumbs(hwnd)
+	}
+}
+
+func round9FeedbackInvalidateRect(hwnd uintptr, r rect) {
+	if r.Right <= r.Left || r.Bottom <= r.Top {
+		return
+	}
+	r.Left -= scaleDPI(2)
+	r.Top -= scaleDPI(2)
+	r.Right += scaleDPI(2)
+	r.Bottom += scaleDPI(2)
+	procInvalidateRect.Call(hwnd, uintptr(unsafe.Pointer(&r)), 0)
+}
+
+func round9FeedbackInvalidateStoredThumbs(hwnd uintptr) {
+	if round7FeedbackScroll.haveH {
+		round9FeedbackInvalidateRect(hwnd, round7FeedbackScroll.lastH)
+	}
+	if round7FeedbackScroll.haveV {
+		round9FeedbackInvalidateRect(hwnd, round7FeedbackScroll.lastV)
+	}
+}
+
+func round9FeedbackRememberThumbs(hwnd uintptr) {
+	axis := round7FeedbackScroll.machine.Axis
+	round7FeedbackScroll.haveH = false
+	round7FeedbackScroll.haveV = false
+	if axis&round9AxisHorizontal != 0 {
+		if thumb, ok := round7FeedbackHorizontalThumb(hwnd); ok {
+			round7FeedbackScroll.lastH = thumb
+			round7FeedbackScroll.haveH = true
+			round9FeedbackInvalidateRect(hwnd, thumb)
+		}
+	}
+	if axis&round9AxisVertical != 0 {
+		if thumb, ok := round7FeedbackVerticalThumb(hwnd); ok {
+			round7FeedbackScroll.lastV = thumb
+			round7FeedbackScroll.haveV = true
+			round9FeedbackInvalidateRect(hwnd, thumb)
+		}
+	}
 }
 
 func round7FeedbackSetScrollFromMouse(hwnd uintptr, vertical bool, coordinate int) {
 	bar := round7FeedbackSBHorz
 	thumb, ok := round7FeedbackHorizontalThumb(hwnd)
-	trackStart := int(scaleDPI(4))
+	trackStart := int(scaleDPI(5))
 	trackLength := 0
 	if vertical {
 		bar = round7FeedbackSBVert
@@ -203,9 +281,9 @@ func round7FeedbackSetScrollFromMouse(hwnd uintptr, vertical bool, coordinate in
 	if !ok {
 		return
 	}
-	thumbLength := int(thumb.Bottom-thumb.Top)
+	thumbLength := int(thumb.Bottom - thumb.Top)
 	if !vertical {
-		thumbLength = int(thumb.Right-thumb.Left)
+		thumbLength = int(thumb.Right - thumb.Left)
 	}
 	info, ok := round7FeedbackScrollInfoFor(hwnd, bar)
 	if !ok {
@@ -231,38 +309,55 @@ func round7FeedbackSetScrollFromMouse(hwnd uintptr, vertical bool, coordinate in
 		position += relative * (maxPos-int(info.NMin)) / movable
 	}
 	setInfo := round7FeedbackScrollInfo{CbSize: uint32(unsafe.Sizeof(round7FeedbackScrollInfo{})), FMask: round7FeedbackSIFPos, NPos: int32(position)}
-	round7FeedbackSetScrollInfo.Call(hwnd, uintptr(bar), uintptr(unsafe.Pointer(&setInfo)), 1)
-	code := round7FeedbackSBThumbTrack
+	round7FeedbackSetScrollInfo.Call(hwnd, uintptr(bar), uintptr(unsafe.Pointer(&setInfo)), 0)
 	message := uint32(WM_HSCROLL)
 	if vertical {
 		message = round7FeedbackWMVScroll
 	}
-	packed := uintptr(uint16(code)) | uintptr(uint16(position))<<16
+	packed := uintptr(uint16(round7FeedbackSBThumbTrack)) | uintptr(uint16(position))<<16
+	round9FeedbackInvalidateStoredThumbs(hwnd)
 	send(hwnd, message, packed, 0)
-	procInvalidateRect.Call(hwnd, 0, 0)
+	round9FeedbackRememberThumbs(hwnd)
 }
 
 func round7FeedbackDrawOverlayScrollbars(hwnd, hdc uintptr) {
 	if hwnd == 0 || hdc == 0 {
 		return
 	}
-	thumbColor := colorRef(157, 169, 184)
-	if round7FeedbackScroll.draggingH || round7FeedbackScroll.draggingV {
-		thumbColor = colorRef(112, 133, 158)
+	phase := round7FeedbackScroll.machine.Phase
+	if phase != round9OverlayVisible && phase != round9OverlayDragging {
+		return
 	}
-	if round7FeedbackScroll.visibleV {
+	thumbColor := colorRef(160, 171, 184)
+	if phase == round9OverlayDragging {
+		thumbColor = colorRef(110, 132, 158)
+	}
+	axis := round7FeedbackScroll.machine.Axis
+	if axis&round9AxisVertical != 0 {
 		if thumb, ok := round7FeedbackVerticalThumb(hwnd); ok {
 			fillSolid(hdc, thumb, thumbColor)
 		}
 	}
-	if round7FeedbackScroll.visibleH {
+	if axis&round9AxisHorizontal != 0 {
 		if thumb, ok := round7FeedbackHorizontalThumb(hwnd); ok {
 			fillSolid(hdc, thumb, thumbColor)
 		}
 	}
 }
 
+func round9FeedbackDrawListBoundary(hwnd, hdc uintptr) {
+	var rc rect
+	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
+	line := colorRef(207, 214, 223)
+	fillSolid(hdc, rect{Left: rc.Left, Top: rc.Top, Right: rc.Right, Bottom: rc.Top + 1}, line)
+	fillSolid(hdc, rect{Left: rc.Left, Top: rc.Bottom - 1, Right: rc.Right, Bottom: rc.Bottom}, line)
+	fillSolid(hdc, rect{Left: rc.Left, Top: rc.Top, Right: rc.Left + 1, Bottom: rc.Bottom}, line)
+	fillSolid(hdc, rect{Left: rc.Right - 1, Top: rc.Top, Right: rc.Right, Bottom: rc.Bottom}, line)
+}
+
 func round7FeedbackListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	round8EnsureListStyleGuard(hwnd)
+	round9EnsureOutputDisplay()
 	switch message {
 	case WM_PAINT:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
@@ -270,83 +365,112 @@ func round7FeedbackListSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 		if hdc != 0 {
 			round7DrawListOverlay(app, hdc)
 			round7FeedbackDrawOverlayScrollbars(hwnd, hdc)
+			round9FeedbackDrawListBoundary(hwnd, hdc)
 			round7ListReleaseDC.Call(hwnd, hdc)
 		}
+		round9EnsureVisibleThumbnails(app, hwnd)
 		return result
 	case round7FeedbackWMPrint, round7FeedbackWMPrintClient:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		if wParam != 0 {
 			round7DrawListOverlay(app, wParam)
 			round7FeedbackDrawOverlayScrollbars(hwnd, wParam)
+			round9FeedbackDrawListBoundary(hwnd, wParam)
 		}
 		return result
 	case WM_MOUSEMOVE:
 		pt := mousePoint(lParam)
-		if round7FeedbackScroll.draggingV {
-			round7FeedbackSetScrollFromMouse(hwnd, true, int(pt.Y))
-			return 0
-		}
-		if round7FeedbackScroll.draggingH {
-			round7FeedbackSetScrollFromMouse(hwnd, false, int(pt.X))
+		if round7FeedbackScroll.machine.Phase == round9OverlayDragging {
+			if round7FeedbackScroll.machine.Axis == round9AxisVertical {
+				round7FeedbackSetScrollFromMouse(hwnd, true, int(pt.Y))
+			} else {
+				round7FeedbackSetScrollFromMouse(hwnd, false, int(pt.X))
+			}
 			return 0
 		}
 		round7FeedbackListMouse(hwnd, int(pt.X), int(pt.Y))
 	case round7FeedbackWMLButtonDown:
 		pt := mousePoint(lParam)
-		if round7FeedbackScroll.visibleV {
-			if thumb, ok := round7FeedbackVerticalThumb(hwnd); ok && round7FeedbackPointInRect(pt, thumb) {
-				round7FeedbackScroll.draggingV = true
-				round7FeedbackScroll.dragOffset = int(pt.Y - thumb.Top)
-				procSetCapture.Call(hwnd)
-				return 0
+		if round7FeedbackScroll.machine.Phase == round9OverlayVisible {
+			if round7FeedbackScroll.machine.Axis&round9AxisVertical != 0 {
+				if thumb, ok := round7FeedbackVerticalThumb(hwnd); ok && round7FeedbackPointInRect(pt, thumb) {
+					if round7FeedbackScroll.machine.BeginDrag(round9AxisVertical) {
+						round7FeedbackScroll.dragOffset = int(pt.Y - thumb.Top)
+						procKillTimer.Call(hwnd, round9FeedbackHideTimer)
+						procSetCapture.Call(hwnd)
+						return 0
+					}
+				}
 			}
-		}
-		if round7FeedbackScroll.visibleH {
-			if thumb, ok := round7FeedbackHorizontalThumb(hwnd); ok && round7FeedbackPointInRect(pt, thumb) {
-				round7FeedbackScroll.draggingH = true
-				round7FeedbackScroll.dragOffset = int(pt.X - thumb.Left)
-				procSetCapture.Call(hwnd)
-				return 0
+			if round7FeedbackScroll.machine.Axis&round9AxisHorizontal != 0 {
+				if thumb, ok := round7FeedbackHorizontalThumb(hwnd); ok && round7FeedbackPointInRect(pt, thumb) {
+					if round7FeedbackScroll.machine.BeginDrag(round9AxisHorizontal) {
+						round7FeedbackScroll.dragOffset = int(pt.X - thumb.Left)
+						procKillTimer.Call(hwnd, round9FeedbackHideTimer)
+						procSetCapture.Call(hwnd)
+						return 0
+					}
+				}
 			}
 		}
 	case WM_LBUTTONUP:
-		if round7FeedbackScroll.draggingH || round7FeedbackScroll.draggingV {
-			round7FeedbackScroll.draggingH = false
-			round7FeedbackScroll.draggingV = false
+		if round7FeedbackScroll.machine.Phase == round9OverlayDragging {
+			axis := round9FeedbackCursorAxis(hwnd)
+			if axis == round9AxisNone {
+				axis = round7FeedbackScroll.machine.Axis
+			}
+			round7FeedbackScroll.machine.EndDrag(axis)
 			procReleaseCapture.Call()
-			procInvalidateRect.Call(hwnd, 0, 0)
+			round9FeedbackRememberThumbs(hwnd)
 			return 0
 		}
 	case round7FeedbackWMCaptureChanged:
-		round7FeedbackScroll.draggingH = false
-		round7FeedbackScroll.draggingV = false
+		if round7FeedbackScroll.machine.Phase == round9OverlayDragging {
+			round7FeedbackScroll.machine.EndDrag(round7FeedbackScroll.machine.Axis)
+		}
 	case WM_TIMER:
-		if wParam == round7FeedbackScrollTimer {
+		switch wParam {
+		case round7FeedbackScrollTimer:
 			procKillTimer.Call(hwnd, round7FeedbackScrollTimer)
-			round7FeedbackScroll.timerArmed = false
-			round7FeedbackScroll.visibleH = round7FeedbackScroll.wantH && round7FeedbackListNeedsHorizontal(hwnd)
-			round7FeedbackScroll.visibleV = round7FeedbackScroll.wantV && round7FeedbackListNeedsVertical(hwnd)
-			procInvalidateRect.Call(hwnd, 0, 0)
+			axis := round9FeedbackCursorAxis(hwnd)
+			if round7FeedbackScroll.machine.ShowTimeout(axis) {
+				round9FeedbackRememberThumbs(hwnd)
+			}
+			return 0
+		case round9FeedbackHideTimer:
+			procKillTimer.Call(hwnd, round9FeedbackHideTimer)
+			axis := round9FeedbackCursorAxis(hwnd)
+			if round7FeedbackScroll.machine.HideTimeout(axis) {
+				round9FeedbackInvalidateStoredThumbs(hwnd)
+				round7FeedbackScroll.haveH = false
+				round7FeedbackScroll.haveV = false
+			}
 			return 0
 		}
 	case round7FeedbackWMMouseLeave:
-		if !round7FeedbackScroll.draggingH && !round7FeedbackScroll.draggingV {
-			round7FeedbackHideScrollbars(hwnd)
+		if round7FeedbackScroll.machine.Phase == round9OverlayPending {
+			round9FeedbackApplyAction(hwnd, round7FeedbackScroll.machine.Move(round9AxisNone))
+		} else if round7FeedbackScroll.machine.Phase == round9OverlayVisible {
+			round9FeedbackApplyAction(hwnd, round7FeedbackScroll.machine.Move(round9AxisNone))
 		}
 	case round7FeedbackWMMouseWheel, WM_HSCROLL, round7FeedbackWMVScroll:
+		round9FeedbackInvalidateStoredThumbs(hwnd)
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if round7FeedbackScroll.visibleH || round7FeedbackScroll.visibleV {
-			procInvalidateRect.Call(hwnd, 0, 0)
+		if round7FeedbackScroll.machine.Phase == round9OverlayVisible || round7FeedbackScroll.machine.Phase == round9OverlayDragging {
+			round9FeedbackRememberThumbs(hwnd)
 		}
 		return result
 	case WM_SIZE, LVM_INSERTITEMW, LVM_DELETEALLITEMS, LVM_SETCOLUMNWIDTH:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if app != nil {
-			round7FeedbackStripListChrome(app)
+		round9FeedbackInvalidateStoredThumbs(hwnd)
+		if round7FeedbackScroll.machine.Phase == round9OverlayVisible {
+			round9FeedbackRememberThumbs(hwnd)
 		}
-		procInvalidateRect.Call(hwnd, 0, 0)
+		round9EnsureVisibleThumbnails(app, hwnd)
 		return result
 	case v452WMNCDestroy:
+		procKillTimer.Call(hwnd, round7FeedbackScrollTimer)
+		procKillTimer.Call(hwnd, round9FeedbackHideTimer)
 		v452RemoveSubclass.Call(hwnd, round7FeedbackListSubclassCB, subclassID)
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)

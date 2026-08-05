@@ -15,14 +15,9 @@ const (
 var round8EditorInstallerCB uintptr
 
 func init() {
-	// Replace the old timing-sensitive WinEvent callback before any editor hook
-	// is armed. The callback only posts one installer message; all real work is
-	// performed on the editor UI thread after WM_CREATE has finished.
 	round7FeedbackEditorEventCB = syscall.NewCallback(round8EditorInstallEventProc)
 	round8EditorInstallerCB = syscall.NewCallback(round8EditorInstallerSubclassProc)
 
-	// Native self-test opens the editor directly. Arm the same one-shot product
-	// installer once the main UI exists; this branch is never active normally.
 	if round7NativeEnabled {
 		go func() {
 			for attempt := 0; attempt < 400; attempt++ {
@@ -59,16 +54,19 @@ func round8EditorInstallerSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 	if message == round8WMInstallEditor {
 		e := round7ActiveEditor
 		if e != nil && e.hwnd == hwnd && e.dialog != nil && e.hTimeline != 0 && e.dialog.hCanvas != 0 {
+			// Install the inherited compatibility handlers first, then the round-9
+			// closeout handlers last. The closeout layer owns final layout, timeline
+			// input/paint, and crop hit-testing; the older handlers remain only for
+			// established helper behavior such as preview and information updates.
 			v452SetWindowSubclass.Call(hwnd, round7FeedbackEditorSubclassCB, round7FeedbackEditorSubclassID, 0)
 			v452SetWindowSubclass.Call(e.hTimeline, round7FeedbackTimelineCB, round7FeedbackTimelineSubclassID, 0)
 			v452SetWindowSubclass.Call(e.dialog.hCanvas, round7FeedbackCanvasCB, round7FeedbackCanvasSubclassID, 0)
 			round7FeedbackApplyEditorLayout(e)
+			round9InstallEditorCloseout(e)
 			procRedrawWindow.Call(hwnd, 0, 0, RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW)
 			v452RemoveSubclass.Call(hwnd, round8EditorInstallerCB, subclassID)
 			return 0
 		}
-		// Controls are still being created. Requeue once without a timer; the
-		// message cannot run until the current creation call unwinds.
 		procPostMessageW.Call(hwnd, round8WMInstallEditor, 0, 0)
 		return 0
 	}
