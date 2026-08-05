@@ -50,8 +50,12 @@ func round9TimelineXToTime(e *round7Editor, x int32) float64 {
 	return float64(x-left) / float64(right-left) * e.dialog.task.Duration
 }
 
-func round9TimelineHit(e *round7Editor, x int32) round7TimelineDrag {
-	tolerance := scaleDPI(22)
+func round9TimelineHit(e *round7Editor, x, y int32) round7TimelineDrag {
+	_, _, _, barBottom := round9TimelineGeometry(e.hTimeline)
+	if y > barBottom+scaleDPI(2) {
+		return round7DragCurrent
+	}
+	tolerance := scaleDPI(12)
 	startX := round9TimelineTimeToX(e, e.dialog.opts.TrimStart)
 	endX := round9TimelineTimeToX(e, e.dialog.opts.TrimEnd)
 	abs := func(v int32) int32 {
@@ -145,7 +149,7 @@ func round9TimelineSubclassProc(hwnd uintptr, message uint32, wParam, lParam, su
 			return 0
 		}
 		pt := mousePoint(lParam)
-		e.drag = round9TimelineHit(e, pt.X)
+		e.drag = round9TimelineHit(e, pt.X, pt.Y)
 		procSetCapture.Call(hwnd)
 		value := round9TimelineXToTime(e, pt.X)
 		switch e.drag {
