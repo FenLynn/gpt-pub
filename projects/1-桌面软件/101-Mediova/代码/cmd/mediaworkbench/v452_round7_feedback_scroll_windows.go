@@ -4,11 +4,15 @@ package main
 
 import "unsafe"
 
+var round7FeedbackScrollHiding bool
+
 func round7FeedbackHideScrollbars(hwnd uintptr) {
-	if hwnd == 0 {
+	if hwnd == 0 || round7FeedbackScrollHiding {
 		return
 	}
+	round7FeedbackScrollHiding = true
 	round7FeedbackShowScrollBar.Call(hwnd, round7FeedbackSBBoth, 0)
+	round7FeedbackScrollHiding = false
 	round7FeedbackScroll.wantH = false
 	round7FeedbackScroll.wantV = false
 	round7FeedbackScroll.visibleH = false
@@ -96,6 +100,7 @@ func round7FeedbackCursorInsideWindow(hwnd uintptr) bool {
 }
 
 func round7FeedbackListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	postHide := message == WM_SIZE || message == LVM_INSERTITEMW || message == LVM_DELETEALLITEMS || message == LVM_SETCOLUMNWIDTH
 	switch message {
 	case WM_MOUSEMOVE:
 		pt := mousePoint(lParam)
@@ -132,5 +137,8 @@ func round7FeedbackListSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 		v452RemoveSubclass.Call(hwnd, round7FeedbackListSubclassCB, subclassID)
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	if postHide && !round7FeedbackScrollHiding && !round7FeedbackScroll.wantH && !round7FeedbackScroll.wantV && !round7FeedbackScroll.dragging {
+		round7FeedbackHideScrollbars(hwnd)
+	}
 	return result
 }
