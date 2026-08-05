@@ -1,0 +1,88 @@
+name: P101 Mediova Flicker Gate
+
+on:
+  pull_request:
+    branches: [p101-stable, main]
+    paths:
+      - 'projects/1-桌面软件/101-Mediova/**'
+      - '.github/workflows/p101-mediova-flicker-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p101-mediova-flicker-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  windows-idle-frame-stability:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Build probe
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item build/flicker-evidence -ItemType Directory -Force | Out-Null
+          go test -count=1 ./cmd/mediaworkbench
+          if ($LASTEXITCODE -ne 0) { throw 'Source tests failed.' }
+          go build -buildvcs=false -trimpath -ldflags='-H=windowsgui -s -w' -o build/flicker-evidence/Mediova.exe ./cmd/mediaworkbench
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
+      - name: Capture stable regions
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName System.Drawing
+          Add-Type @"
+          using System;
+          using System.Runtime.InteropServices;
+          using System.Text;
+          public static class MFN {
+            [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+            public delegate bool EnumWindowsProc(IntPtr h, IntPtr p);
+            [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr p);
+            [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);
+            [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+            [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+            [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h,int x,int y,int w,int z,bool r);
+            [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
+            [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint f);
+            [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+            public static IntPtr Find(uint pid,string prefix) {
+              IntPtr result=IntPtr.Zero;
+              EnumWindows((h,p)=>{uint q;GetWindowThreadProcessId(h,out q);if(q!=pid||!IsWindowVisible(h))return true;var s=new StringBuilder(1024);GetWindowText(h,s,s.Capacity);if(s.ToString().StartsWith(prefix,StringComparison.Ordinal)){result=h;return false;}return true;},IntPtr.Zero);
+              return result;
+            }
+          }
+          "@
+          $out=Join-Path $PWD 'build/flicker-evidence'
+          $exe=Join-Path $out 'Mediova.exe'
+          $report=Join-Path $out 'flicker-report.json'
+          $records=@(); $failures=@()
+          function WaitWindow($p,[string]$prefix,[int]$ms){$end=[DateTime]::UtcNow.AddMilliseconds($ms);while([DateTime]::UtcNow -lt $end){$p.Refresh();if($p.HasExited){throw "Exited waiting $prefix"};$h=[MFN]::Find([uint32]$p.Id,$prefix);if($h-ne[IntPtr]::Zero){return $h};Start-Sleep -Milliseconds 50};throw "Missing window $prefix"}
+          function Capture([IntPtr]$h){$r=New-Object MFN+RECT;if(-not[MFN]::GetWindowRect($h,[ref]$r)){throw 'GetWindowRect'};$b=New-Object System.Drawing.Bitmap($r.Right-$r.Left,$r.Bottom-$r.Top);$g=[System.Drawing.Graphics]::FromImage($b);try{$dc=$g.GetHdc();try{if(-not[MFN]::PrintWindow($h,$dc,2)){throw 'PrintWindow'}}finally{$g.ReleaseHdc($dc)}}finally{$g.Dispose()};return $b}
+          function Hash($b){$s=New-Object IO.MemoryStream;try{$b.Save($s,[Drawing.Imaging.ImageFormat]::Bmp);$sha=[Security.Cryptography.SHA256]::Create();try{return([BitConverter]::ToString($sha.ComputeHash($s.ToArray()))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}}finally{$s.Dispose()}}
+          function Check([IntPtr]$h,[string]$window,[int]$w,[int]$z,[int]$settle,$regions){[void][MFN]::MoveWindow($h,0,0,$w,$z,$true);[void][MFN]::SetCursorPos([int]($w/2),[int]($z/2));Start-Sleep -Milliseconds $settle;$maps=@{};foreach($r in $regions){$maps[$r.name]=New-Object Collections.Generic.List[string]};for($i=0;$i-lt40;$i++){$b=Capture $h;try{foreach($r in $regions){$x=[int]($b.Width*$r.x);$y=[int]($b.Height*$r.y);$cw=[Math]::Max(1,[Math]::Min($b.Width-$x,[int]($b.Width*$r.w)));$ch=[Math]::Max(1,[Math]::Min($b.Height-$y,[int]($b.Height*$r.h)));$c=$b.Clone((New-Object Drawing.Rectangle($x,$y,$cw,$ch)),$b.PixelFormat);try{$v=Hash $c;$maps[$r.name].Add($v);if($i-eq0){$c.Save((Join-Path $out "$window-$($r.name).png"),[Drawing.Imaging.ImageFormat]::Png)}}finally{$c.Dispose()}}}finally{$b.Dispose()};Start-Sleep -Milliseconds 50};foreach($r in $regions){$u=@($maps[$r.name]|Select-Object -Unique);$records+=[ordered]@{window=$window;region=$r.name;frames=40;unique_hashes=$u.Count;first_hash=$maps[$r.name][0];last_hash=$maps[$r.name][39]};if($u.Count-ne1){$failures+="$window/$($r.name)=$($u.Count)"}}}
+          $root=Join-Path $env:RUNNER_TEMP ('mf-'+[guid]::NewGuid().ToString('N'));New-Item $root -ItemType Directory|Out-Null;$oa=$env:APPDATA;$ol=$env:LOCALAPPDATA
+          try{$env:APPDATA=$root;$env:LOCALAPPDATA=$root;$p=Start-Process $exe -WorkingDirectory $out -ArgumentList '--ui-preview=video' -PassThru;try{$h=WaitWindow $p 'Mediova' 15000;Check $h 'main' 1450 820 2200 @(@{name='list-bars';x=0.0;y=0.13;w=0.84;h=0.70},@{name='output';x=0.0;y=0.84;w=0.74;h=0.06})}finally{if(-not$p.HasExited){Stop-Process $p.Id -Force}};$p=Start-Process $exe -WorkingDirectory $out -ArgumentList '--round11-editor-preview' -PassThru;try{$h=WaitWindow $p '剪裁 · Round11-Flicker-Probe.mp4' 20000;Check $h 'editor' 1080 760 3200 @(@{name='title';x=0.58;y=0.0;w=0.41;h=0.08},@{name='timeline';x=0.0;y=0.54;w=0.62;h=0.27},@{name='preview';x=0.0;y=0.04;w=0.62;h=0.50})}finally{if(-not$p.HasExited){Stop-Process $p.Id -Force}}}finally{$env:APPDATA=$oa;$env:LOCALAPPDATA=$ol;Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue;$records|ConvertTo-Json -Depth 6|Set-Content $report -Encoding UTF8}
+          if($failures.Count){throw('Unstable regions: '+($failures-join'; '))}
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: P101-Mediova-Round11-Flicker-Evidence
+          path: |
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*.png
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/flicker-report.json
+          if-no-files-found: error
+          retention-days: 14
