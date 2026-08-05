@@ -41,7 +41,7 @@ jobs:
           go build -buildvcs=false -trimpath -ldflags='-H=windowsgui -s -w' -o build/flicker-evidence/Mediova.exe ./cmd/mediaworkbench
           if ($LASTEXITCODE -ne 0 -or !(Test-Path build/flicker-evidence/Mediova.exe)) { throw 'Probe build failed.' }
 
-      - name: Verify idle frames are pixel stable
+      - name: Verify critical regions are pixel stable
         shell: pwsh
         working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
@@ -88,6 +88,7 @@ jobs:
           $reportPath=Join-Path $evidence 'flicker-report.json'
           '[]' | Set-Content $reportPath -Encoding UTF8
           $records=@()
+          $failures=New-Object System.Collections.Generic.List[string]
 
           function Wait-Window([System.Diagnostics.Process]$Process, [string]$Prefix, [int]$TimeoutMs) {
             $deadline=[DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
@@ -101,7 +102,7 @@ jobs:
             throw "Window '$Prefix' was not created."
           }
 
-          function Capture-FrameHash([IntPtr]$Handle, [string]$PngPath) {
+          function Capture-WindowBitmap([IntPtr]$Handle) {
             $rect=New-Object MediovaFlickerNative+RECT
             if (-not [MediovaFlickerNative]::GetWindowRect($Handle, [ref]$rect)) { throw 'GetWindowRect failed.' }
             $width=$rect.Right-$rect.Left
@@ -113,44 +114,85 @@ jobs:
               $hdc=$graphics.GetHdc()
               try {
                 if (-not [MediovaFlickerNative]::PrintWindow($Handle, $hdc, 2)) { throw 'PrintWindow failed.' }
-              } finally {
-                $graphics.ReleaseHdc($hdc)
-              }
-              if ($PngPath) { $bitmap.Save($PngPath, [System.Drawing.Imaging.ImageFormat]::Png) }
-              $stream=New-Object System.IO.MemoryStream
-              try {
-                $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Bmp)
-                $sha=[System.Security.Cryptography.SHA256]::Create()
-                try {
-                  return ([BitConverter]::ToString($sha.ComputeHash($stream.ToArray()))).Replace('-', '').ToLowerInvariant()
-                } finally { $sha.Dispose() }
-              } finally { $stream.Dispose() }
-            } finally {
-              $graphics.Dispose()
-              $bitmap.Dispose()
-            }
+              } finally { $graphics.ReleaseHdc($hdc) }
+            } finally { $graphics.Dispose() }
+            return $bitmap
           }
 
-          function Assert-IdleStable([IntPtr]$Handle, [string]$Name, [int]$Width, [int]$Height, [int]$SettleMs) {
+          function Get-BitmapHash([System.Drawing.Bitmap]$Bitmap) {
+            $stream=New-Object System.IO.MemoryStream
+            try {
+              $Bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Bmp)
+              $sha=[System.Security.Cryptography.SHA256]::Create()
+              try {
+                return ([BitConverter]::ToString($sha.ComputeHash($stream.ToArray()))).Replace('-', '').ToLowerInvariant()
+              } finally { $sha.Dispose() }
+            } finally { $stream.Dispose() }
+          }
+
+          function Assert-RegionsStable([IntPtr]$Handle, [string]$Name, [int]$Width, [int]$Height, [int]$SettleMs, [array]$Regions) {
             if (-not [MediovaFlickerNative]::MoveWindow($Handle, 0, 0, $Width, $Height, $true)) { throw "MoveWindow failed for $Name." }
             [void][MediovaFlickerNative]::SetCursorPos([int]($Width/2), [int]($Height/2))
             Start-Sleep -Milliseconds $SettleMs
-            $hashes=New-Object System.Collections.Generic.List[string]
+
+            $regionHashes=@{}
+            $regionSeen=@{}
+            foreach ($region in $Regions) {
+              $regionHashes[$region.name]=New-Object System.Collections.Generic.List[string]
+              $regionSeen[$region.name]=@{}
+            }
+
             for ($index=0; $index -lt 40; $index++) {
-              $path=$null
-              if ($index -eq 0) { $path=Join-Path $evidence "$Name-first.png" }
-              if ($index -eq 39) { $path=Join-Path $evidence "$Name-last.png" }
-              $hash=Capture-FrameHash $Handle $path
-              $hashes.Add($hash)
+              $bitmap=Capture-WindowBitmap $Handle
+              try {
+                foreach ($region in $Regions) {
+                  $x=[Math]::Max(0, [int][Math]::Floor($bitmap.Width * [double]$region.x))
+                  $y=[Math]::Max(0, [int][Math]::Floor($bitmap.Height * [double]$region.y))
+                  $w=[Math]::Min($bitmap.Width-$x, [Math]::Max(1, [int][Math]::Floor($bitmap.Width * [double]$region.w)))
+                  $h=[Math]::Min($bitmap.Height-$y, [Math]::Max(1, [int][Math]::Floor($bitmap.Height * [double]$region.h)))
+                  $crop=$bitmap.Clone((New-Object System.Drawing.Rectangle($x,$y,$w,$h)), $bitmap.PixelFormat)
+                  try {
+                    $hash=Get-BitmapHash $crop
+                    $regionHashes[$region.name].Add($hash)
+                    if (-not $regionSeen[$region.name].ContainsKey($hash)) {
+                      $uniqueIndex=$regionSeen[$region.name].Count+1
+                      $regionSeen[$region.name][$hash]=$index
+                      $crop.Save((Join-Path $evidence "$Name-$($region.name)-unique-$uniqueIndex-frame-$index.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+                    }
+                  } finally { $crop.Dispose() }
+                }
+              } finally { $bitmap.Dispose() }
               Start-Sleep -Milliseconds 50
             }
-            $unique=@($hashes | Select-Object -Unique)
-            $script:records += [ordered]@{ name=$Name; frames=40; unique_hashes=$unique.Count; first_hash=$hashes[0]; last_hash=$hashes[39] }
-            $script:records | ConvertTo-Json -Depth 5 | Set-Content $reportPath -Encoding UTF8
-            if ($unique.Count -ne 1) {
-              throw "$Name changed during idle capture: $($unique.Count) distinct frame hashes."
+
+            foreach ($region in $Regions) {
+              $hashes=$regionHashes[$region.name]
+              $unique=@($hashes | Select-Object -Unique)
+              $script:records += [ordered]@{
+                window=$Name
+                region=$region.name
+                frames=40
+                unique_hashes=$unique.Count
+                first_hash=$hashes[0]
+                last_hash=$hashes[39]
+                representative_frames=$regionSeen[$region.name]
+              }
+              if ($unique.Count -ne 1) {
+                $script:failures.Add("$Name/$($region.name): $($unique.Count) distinct hashes")
+              }
             }
+            $script:records | ConvertTo-Json -Depth 8 | Set-Content $reportPath -Encoding UTF8
           }
+
+          $mainRegions=@(
+            @{ name='list-and-bars'; x=0.00; y=0.13; w=0.84; h=0.70 },
+            @{ name='output-path'; x=0.00; y=0.84; w=0.74; h=0.06 }
+          )
+          $editorRegions=@(
+            @{ name='file-title'; x=0.58; y=0.00; w=0.41; h=0.08 },
+            @{ name='timeline'; x=0.00; y=0.54; w=0.62; h=0.27 },
+            @{ name='preview'; x=0.00; y=0.04; w=0.62; h=0.50 }
+          )
 
           $oldAppData=$env:APPDATA
           $oldLocal=$env:LOCALAPPDATA
@@ -163,7 +205,7 @@ jobs:
             $main=Start-Process -FilePath $exe -WorkingDirectory $evidence -ArgumentList '--ui-preview=video' -PassThru
             try {
               $mainHandle=Wait-Window $main 'Mediova' 15000
-              Assert-IdleStable $mainHandle 'main-idle' 1450 820 2200
+              Assert-RegionsStable $mainHandle 'main-idle' 1450 820 2200 $mainRegions
             } finally {
               if (-not $main.HasExited) { Stop-Process -Id $main.Id -Force -ErrorAction SilentlyContinue }
             }
@@ -171,7 +213,7 @@ jobs:
             $editor=Start-Process -FilePath $exe -WorkingDirectory $evidence -ArgumentList '--round11-editor-preview' -PassThru
             try {
               $editorHandle=Wait-Window $editor '剪裁 · Round11-Flicker-Probe.mp4' 20000
-              Assert-IdleStable $editorHandle 'editor-idle' 1080 760 3200
+              Assert-RegionsStable $editorHandle 'editor-idle' 1080 760 3200 $editorRegions
             } finally {
               if (-not $editor.HasExited) { Stop-Process -Id $editor.Id -Force -ErrorAction SilentlyContinue }
             }
@@ -179,7 +221,11 @@ jobs:
             $env:APPDATA=$oldAppData
             $env:LOCALAPPDATA=$oldLocal
             Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
-            $records | ConvertTo-Json -Depth 5 | Set-Content $reportPath -Encoding UTF8
+            $records | ConvertTo-Json -Depth 8 | Set-Content $reportPath -Encoding UTF8
+          }
+
+          if ($failures.Count -gt 0) {
+            throw ('Idle pixel stability failed: ' + ($failures -join '; '))
           }
 
       - name: Upload flicker evidence
@@ -188,8 +234,7 @@ jobs:
         with:
           name: P101-Mediova-Round11-Flicker-Evidence
           path: |
-            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*-first.png
-            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*-last.png
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*-unique-*.png
             projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/flicker-report.json
           if-no-files-found: error
           retention-days: 14
