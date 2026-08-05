@@ -101,17 +101,16 @@
 
 ## 第七轮七项反馈验证
 
-最终产品候选：
+产品实现候选：
 
 ```text
-Head：6c5af56d7c5072aef9493ff3486d9ec4d2e6e634
-PR：#354（Draft）
-CI：P101 Mediova CI #451
+产品 Head：6c5af56d7c5072aef9493ff3486d9ec4d2e6e634
+产品 CI：P101 Mediova CI #451
 Run ID：30969148603
 Artifact ID：8915891433
 ```
 
-CI #451 已通过：
+产品 CI #451 已通过：
 
 - P101 范围门禁；
 - Linux 固定源码清单、Go 全测、全量竞态、`go vet`、Windows 交叉测试与构建；
@@ -123,18 +122,20 @@ CI #451 已通过：
 - 126/126 项原生自检通过，失败 0；
 - 七项反馈独立固定文件清单与源码契约测试。
 
-最终候选产物：
+产品候选产物：
 
 ```text
 Mediova.exe
 SHA-256：2b9beb4c31792a23c402628809f1e1ffdf76ac2c4823f78d027fe8e00b269789
 
-完整验证 Runtime ZIP
+产品 CI #451 完整验证 Runtime ZIP
 SHA-256：5baeeac0023333a6a2dcd2a44524af52ade63c52ec10d9c02355259c5e4ae68b
 
-CI Artifact 归档
+产品 CI #451 Artifact 归档
 SHA-256：d227054881f95fc8bf342b6e73d1460b3ad5997f93f2d0bdd078a597b3df9d16
 ```
+
+记录提交后，PR 准确文档 Head `731705198e1b80b182e17fa5ea871f7350827d43` 在 P101 Mediova CI #452（run `30969408524`）再次通过范围、Linux 和 Windows 原生全链。该提交只增加本工作记录，产品代码与 EXE 未改变；CI #452 生成的 `Mediova.exe` SHA-256 仍为 `2b9beb4c31792a23c402628809f1e1ffdf76ac2c4823f78d027fe8e00b269789`。
 
 自动截图人工复核确认：
 
