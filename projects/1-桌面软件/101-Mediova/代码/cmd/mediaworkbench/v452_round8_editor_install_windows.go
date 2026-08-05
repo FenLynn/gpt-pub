@@ -54,16 +54,10 @@ func round8EditorInstallerSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 	if message == round8WMInstallEditor {
 		e := round7ActiveEditor
 		if e != nil && e.hwnd == hwnd && e.dialog != nil && e.hTimeline != 0 && e.dialog.hCanvas != 0 {
-			// Install the inherited compatibility handlers first, then the round-9
-			// closeout handlers last. The closeout layer owns final layout, timeline
-			// input/paint, and crop hit-testing; the older handlers remain only for
-			// established helper behavior such as preview and information updates.
-			v452SetWindowSubclass.Call(hwnd, round7FeedbackEditorSubclassCB, round7FeedbackEditorSubclassID, 0)
-			v452SetWindowSubclass.Call(e.hTimeline, round7FeedbackTimelineCB, round7FeedbackTimelineSubclassID, 0)
-			v452SetWindowSubclass.Call(e.dialog.hCanvas, round7FeedbackCanvasCB, round7FeedbackCanvasSubclassID, 0)
-			round7FeedbackApplyEditorLayout(e)
-			round9InstallEditorCloseout(e)
-			procRedrawWindow.Call(hwnd, 0, 0, RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW)
+			// Round 11 owns layout, parent painting, timeline input/painting and
+			// crop interaction. The inherited round-7 layout chain is deliberately
+			// not installed, eliminating the two-layout WM_SIZE loop.
+			round11InstallEditor(e)
 			v452RemoveSubclass.Call(hwnd, round8EditorInstallerCB, subclassID)
 			return 0
 		}
