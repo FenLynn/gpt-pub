@@ -45,5 +45,9 @@ func round11OpenEditorPreview(a *application) {
 	opts.TrimStart = 2
 	opts.TrimEnd = 10
 	opts.Crop = model.Crop{Enabled: true, X: 160, Y: 90, Width: 640, Height: 360}
+	// Use the same final-installer hook as the real “剪裁” command. Without
+	// this preparation the synthetic window would remain on the inherited
+	// title/layout and would not exercise the round-11 chain.
+	round7FeedbackArmEditorHook()
 	round7ShowEditor(a, task, opts, []int{0})
 }
