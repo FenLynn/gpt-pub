@@ -23,6 +23,12 @@ func round7FeedbackTimelineSubclassProc(hwnd uintptr, message uint32, wParam, lP
 			round7FeedbackPaintTimeline(e, hwnd)
 			return 0
 		}
+	case WM_MOUSEMOVE, WM_LBUTTONUP:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		if e := round7ActiveEditor; e != nil && e.hTimeline == hwnd {
+			round7FeedbackRefreshInfoCard(e)
+		}
+		return result
 	case WM_ERASEBKGND:
 		return 1
 	case v452WMNCDestroy:
@@ -82,9 +88,10 @@ func round7FeedbackDrawTimelineSurface(e *round7Editor, hdc uintptr, rc rect) {
 	blue := colorRef(42, 108, 197)
 	red := colorRef(215, 62, 55)
 
-	timeTop := int32(1)
-	round7TimelineText(hdc, formatSecondsClock(0), rect{Left: left, Top: timeTop, Right: left + scaleDPI(132), Bottom: timeTop + scaleDPI(22)}, DT_LEFT, gray)
-	round7TimelineText(hdc, formatSecondsClock(e.dialog.task.Duration), rect{Left: right - scaleDPI(132), Top: timeTop, Right: right, Bottom: timeTop + scaleDPI(22)}, DT_RIGHT, gray)
+	// Layer 1: immutable source endpoints, fixed at the two sides.
+	timeTop := int32(0)
+	round7TimelineText(hdc, formatSecondsClock(0), rect{Left: left, Top: timeTop, Right: left + scaleDPI(132), Bottom: timeTop + scaleDPI(20)}, DT_LEFT, gray)
+	round7TimelineText(hdc, formatSecondsClock(e.dialog.task.Duration), rect{Left: right - scaleDPI(132), Top: timeTop, Right: right, Bottom: timeTop + scaleDPI(20)}, DT_RIGHT, gray)
 
 	track := rect{Left: left, Top: trackY - scaleDPI(3), Right: right, Bottom: trackY + scaleDPI(4)}
 	fillSolid(hdc, track, colorRef(225, 231, 238))
@@ -103,11 +110,13 @@ func round7FeedbackDrawTimelineSurface(e *round7Editor, hdc uintptr, rc rect) {
 	endFlag := []point{{X: endX, Y: bandTop - scaleDPI(4)}, {X: endX - scaleDPI(14), Y: bandTop + scaleDPI(2)}, {X: endX, Y: bandTop + scaleDPI(8)}}
 	round7FillPolygon(hdc, endFlag, blue)
 
-	startLabel := round7FeedbackTimelineLabelRect(startX, rc.Right, trackY-scaleDPI(42), scaleDPI(72))
-	endLabel := round7FeedbackTimelineLabelRect(endX, rc.Right, trackY-scaleDPI(42), scaleDPI(72))
+	// Layer 2: movable trim boundaries live below the track. If they are close,
+	// one label drops by a small row rather than overlapping.
+	startLabel := round7FeedbackTimelineLabelRect(startX, rc.Right, trackY+scaleDPI(14), scaleDPI(72))
+	endLabel := round7FeedbackTimelineLabelRect(endX, rc.Right, trackY+scaleDPI(14), scaleDPI(72))
 	if round7FeedbackRectsOverlap(startLabel, endLabel, scaleDPI(6)) {
-		startLabel.Top -= scaleDPI(16)
-		startLabel.Bottom -= scaleDPI(16)
+		endLabel.Top += scaleDPI(15)
+		endLabel.Bottom += scaleDPI(15)
 	}
 	round7TimelineText(hdc, "剪辑起点", startLabel, DT_CENTER, blue)
 	round7TimelineText(hdc, "剪辑终点", endLabel, DT_CENTER, blue)
@@ -115,7 +124,11 @@ func round7FeedbackDrawTimelineSurface(e *round7Editor, hdc uintptr, rc rect) {
 	round7TimelineLine(hdc, currentX, trackY-scaleDPI(5), currentX, trackY+scaleDPI(18), red, 2)
 	currentFlag := []point{{X: currentX - scaleDPI(6), Y: trackY + scaleDPI(13)}, {X: currentX + scaleDPI(6), Y: trackY + scaleDPI(13)}, {X: currentX, Y: trackY + scaleDPI(22)}}
 	round7FillPolygon(hdc, currentFlag, red)
-	currentLabel := round7FeedbackTimelineLabelRect(currentX, rc.Right, trackY+scaleDPI(24), scaleDPI(108))
+
+	// Layer 3: current time always occupies the bottom row and therefore cannot
+	// be mistaken for either blue trim boundary.
+	currentTop := rc.Bottom - scaleDPI(21)
+	currentLabel := round7FeedbackTimelineLabelRect(currentX, rc.Right, currentTop, scaleDPI(118))
 	round7TimelineText(hdc, "当前  "+formatSecondsClock(e.dialog.currentAt), currentLabel, DT_CENTER, red)
 }
 
