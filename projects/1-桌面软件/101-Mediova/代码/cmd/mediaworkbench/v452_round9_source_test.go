@@ -41,6 +41,15 @@ func TestV452Round9ScrollContract(t *testing.T) {
 			t.Fatalf("scroll contract contains unstable list repaint path %q", forbidden)
 		}
 	}
+	cover := round9ReadSource(t, "v452_round10_scroll_cover_windows.go")
+	for _, required := range []string{
+		"round10CoverNativeScrollAreas", "round9PositionOverlay(horizontal", "round9PositionOverlay(vertical",
+		"WM_PAINT, WM_SIZE, WM_HSCROLL", "CompareAndSwap(false, true)",
+	} {
+		if !strings.Contains(cover, required) {
+			t.Fatalf("scroll cover contract missing %q", required)
+		}
+	}
 	guard := round9ReadSource(t, "v452_round8_list_style_guard_windows.go")
 	if strings.Contains(guard, "SetWinEventHook") || strings.Contains(guard, "EventObjectCreate") {
 		t.Fatal("list style guard still depends on asynchronous WinEvent installation")
