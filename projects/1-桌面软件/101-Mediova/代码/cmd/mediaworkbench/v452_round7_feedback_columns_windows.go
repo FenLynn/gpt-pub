@@ -6,9 +6,17 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"mediaworkbench/internal/config"
 	"mediaworkbench/internal/model"
+)
+
+var (
+	round7FeedbackProfilesMu       sync.Mutex
+	round7FeedbackProfiles         round7FeedbackColumnProfiles
+	round7FeedbackProfilesReady    bool
+	round7FeedbackApplyingColumns  bool
 )
 
 func round7FeedbackColumnProfilePath() (string, error) {
@@ -30,24 +38,22 @@ func round7FeedbackLoadColumnProfiles(a *application) {
 	}
 
 	defaults := normalizedTaskColumnWidths(nil)
-	current := normalizedTaskColumnWidths(a.currentTaskColumnWidths())
-	round7FeedbackProfiles = round7FeedbackColumnProfiles{Version: 1}
-	if a.currentKind == model.KindImage {
-		round7FeedbackProfiles.Image = current
-		if len(a.settings.TaskColumnWidths) == len(taskListColumns) {
-			round7FeedbackProfiles.Video = normalizedTaskColumnWidths(a.settings.TaskColumnWidths)
-		} else {
-			round7FeedbackProfiles.Video = defaults
-		}
-	} else {
-		round7FeedbackProfiles.Video = current
-		round7FeedbackProfiles.Image = defaults
+	video := defaults
+	// The legacy single array is migration input only. It is never written
+	// again, so image and video cannot leak widths through Settings.
+	if len(a.settings.TaskColumnWidths) == len(taskListColumns) {
+		video = normalizedTaskColumnWidths(a.settings.TaskColumnWidths)
+	}
+	round7FeedbackProfiles = round7FeedbackColumnProfiles{
+		Version: 2,
+		Video:   round7FeedbackCloneWidths(video),
+		Image:   round7FeedbackCloneWidths(defaults),
 	}
 
 	if path, err := round7FeedbackColumnProfilePath(); err == nil {
 		if data, readErr := os.ReadFile(path); readErr == nil {
 			var stored round7FeedbackColumnProfiles
-			if json.Unmarshal(data, &stored) == nil && stored.Version == 1 {
+			if json.Unmarshal(data, &stored) == nil && (stored.Version == 1 || stored.Version == 2) {
 				if len(stored.Video) == len(taskListColumns) {
 					round7FeedbackProfiles.Video = normalizedTaskColumnWidths(stored.Video)
 				}
@@ -57,44 +63,87 @@ func round7FeedbackLoadColumnProfiles(a *application) {
 			}
 		}
 	}
+	round7FeedbackProfiles.Version = 2
 	round7FeedbackProfilesReady = true
 }
 
-func round7FeedbackCaptureColumnProfile(a *application, kind model.Kind, save bool) {
+func round7FeedbackCurrentWidths(a *application) []int {
 	if a == nil || a.hList == 0 {
+		return nil
+	}
+	return normalizedTaskColumnWidths(a.currentTaskColumnWidths())
+}
+
+func round7FeedbackCaptureColumnProfile(a *application, kind model.Kind, save bool) {
+	if a == nil || a.hList == 0 || round7FeedbackApplyingColumns {
 		return
 	}
 	round7FeedbackLoadColumnProfiles(a)
-	widths := normalizedTaskColumnWidths(a.currentTaskColumnWidths())
+	widths := round7FeedbackCurrentWidths(a)
+	if len(widths) != len(taskListColumns) {
+		return
+	}
 	round7FeedbackProfilesMu.Lock()
-	round7FeedbackProfiles.Set(kind, widths)
+	before := round7FeedbackProfiles.For(kind)
+	if !round7FeedbackEqualWidths(before, widths) {
+		round7FeedbackProfiles.Set(kind, widths)
+	}
+	changed := !round7FeedbackEqualWidths(before, widths)
 	round7FeedbackProfilesMu.Unlock()
-	a.settings.TaskColumnWidths = round7FeedbackCloneWidths(widths)
-	if save {
-		_ = config.Save(a.settings)
+	if save && changed {
 		round7FeedbackSaveColumnProfiles()
 	}
+}
+
+func round7FeedbackProfileFor(a *application, kind model.Kind) []int {
+	round7FeedbackLoadColumnProfiles(a)
+	round7FeedbackProfilesMu.Lock()
+	widths := round7FeedbackProfiles.For(kind)
+	round7FeedbackProfilesMu.Unlock()
+	if len(widths) != len(taskListColumns) {
+		return normalizedTaskColumnWidths(nil)
+	}
+	return normalizedTaskColumnWidths(widths)
 }
 
 func round7FeedbackApplyColumnProfile(a *application, kind model.Kind) {
 	if a == nil || a.hList == 0 {
 		return
 	}
+	widths := round7FeedbackProfileFor(a, kind)
+	if round7FeedbackEqualWidths(round7FeedbackCurrentWidths(a), widths) {
+		return
+	}
+	round7FeedbackApplyingColumns = true
+	a.applyTaskColumnWidths(widths)
+	round7FeedbackApplyingColumns = false
+	procInvalidateRect.Call(a.hList, 0, 0)
+}
+
+func round7FeedbackEnsureColumnProfile(a *application) {
+	if a == nil {
+		return
+	}
+	round7FeedbackApplyColumnProfile(a, a.currentKind)
+}
+
+func round7FeedbackResetColumnProfile(a *application, kind model.Kind) {
+	if a == nil {
+		return
+	}
+	defaults := normalizedTaskColumnWidths(nil)
 	round7FeedbackLoadColumnProfiles(a)
 	round7FeedbackProfilesMu.Lock()
-	widths := round7FeedbackProfiles.For(kind)
+	round7FeedbackProfiles.Set(kind, defaults)
 	round7FeedbackProfilesMu.Unlock()
-	if len(widths) != len(taskListColumns) {
-		widths = normalizedTaskColumnWidths(nil)
-	}
-	a.applyTaskColumnWidths(widths)
-	a.settings.TaskColumnWidths = round7FeedbackCloneWidths(widths)
-	procInvalidateRect.Call(a.hList, 0, 0)
+	round7FeedbackApplyColumnProfile(a, kind)
+	round7FeedbackSaveColumnProfiles()
 }
 
 func round7FeedbackSaveColumnProfiles() {
 	round7FeedbackProfilesMu.Lock()
 	profiles := round7FeedbackProfiles
+	profiles.Version = 2
 	profiles.Video = round7FeedbackCloneWidths(profiles.Video)
 	profiles.Image = round7FeedbackCloneWidths(profiles.Image)
 	round7FeedbackProfilesMu.Unlock()
