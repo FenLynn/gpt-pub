@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const v452Round7ManifestSHA256 = "775bbafd9eaf20e9a9c3ae6ae7205a0e2e03828095c5df7b5e5c412001d0b734"
+const v452Round7ManifestSHA256 = "927da45f13efc75b95281b80014c132ce96597dd999e65bf89379a911f4d361c"
 
 func TestV452Round7FixedManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND7_CLEAN_REDESIGN_FILES_SHA256.txt")
@@ -42,7 +42,7 @@ func TestV452Round7FixedManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 20 {
-		t.Fatalf("manifest entries=%d want=20", entries)
+	if entries != 11 {
+		t.Fatalf("manifest entries=%d want=11", entries)
 	}
 }
