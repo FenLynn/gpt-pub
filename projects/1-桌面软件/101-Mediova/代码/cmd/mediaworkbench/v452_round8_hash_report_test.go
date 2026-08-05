@@ -37,4 +37,5 @@ func TestRound8HashReport(t *testing.T) {
 		sum := sha256.Sum256(data)
 		t.Logf("ROUND8_HASH %s  %s", hex.EncodeToString(sum[:]), name)
 	}
+	t.Fatal("ROUND8_HASH_REPORT_COMPLETE")
 }
