@@ -93,7 +93,7 @@ func TestV452Round9PreviewAndOutputContract(t *testing.T) {
 
 func TestV452Round11EditorContract(t *testing.T) {
 	installer := round9ReadSource(t, "v452_round8_editor_install_windows.go")
-	for _, required := range []string{"round11InstallEditor(e)", "not installed", "single-owner chain"} {
+	for _, required := range []string{"round11InstallEditor(e)", "not installed", "two-layout WM_SIZE loop"} {
 		if !strings.Contains(installer, required) {
 			t.Fatalf("round11 editor installer missing %q", required)
 		}
