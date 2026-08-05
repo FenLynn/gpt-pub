@@ -13,6 +13,7 @@ const (
 	round8TooltipTimer          = 0x4588
 	round8TooltipDelay          = 420
 	round8WMSetCursor           = 0x0020
+	round8WMKillFocus           = 0x0008
 	round8WMNCHitTest           = 0x0084
 	round8HTTransparent         = ^uintptr(0)
 	round8DTRCalcRect           = 0x00000400
@@ -40,6 +41,8 @@ var (
 	round8Tooltip           round8TooltipState
 	round8TooltipUnhook     = user32.NewProc("UnhookWinEvent")
 	round8TooltipIsEnabled  = user32.NewProc("IsWindowEnabled")
+	round8TooltipGetDC      = user32.NewProc("GetDC")
+	round8TooltipReleaseDC  = user32.NewProc("ReleaseDC")
 )
 
 func init() {
@@ -80,12 +83,12 @@ func round8TooltipRegisterClass() {
 	hInst, _, _ := procGetModuleHandleW.Call(0)
 	cursor, _, _ := procLoadCursorW.Call(0, 32512)
 	wc := wndClassEx{
-		CbSize: uint32(unsafe.Sizeof(wndClassEx{})),
-		LpfnWndProc: round8TooltipWndProcCB,
-		HInstance: hInst,
-		HCursor: cursor,
-		HbrBackground: COLOR_WINDOW + 1,
-		LpszClassName: p("MediovaRound8Tooltip"),
+		CbSize:          uint32(unsafe.Sizeof(wndClassEx{})),
+		LpfnWndProc:     round8TooltipWndProcCB,
+		HInstance:       hInst,
+		HCursor:         cursor,
+		HbrBackground:   COLOR_WINDOW + 1,
+		LpszClassName:   p("MediovaRound8Tooltip"),
 	}
 	procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
 	round8TooltipClassReady.Store(true)
@@ -101,7 +104,7 @@ func round8TooltipMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 			round8TooltipShow(hwnd)
 			return 0
 		}
-	case WM_COMMAND, WM_SIZE, WM_KILLFOCUS, WM_CLOSE, WM_DESTROY:
+	case WM_COMMAND, WM_SIZE, round8WMKillFocus, WM_CLOSE, WM_DESTROY:
 		round8TooltipHide(hwnd)
 	case v452WMNCDestroy:
 		round8TooltipHide(hwnd)
@@ -182,11 +185,11 @@ func round8TooltipEnsureWindow(owner uintptr) uintptr {
 }
 
 func round8TooltipMeasure(text string) (int32, int32) {
-	hdc, _, _ := procGetDC.Call(0)
+	hdc, _, _ := round8TooltipGetDC.Call(0)
 	if hdc == 0 {
 		return scaleDPI(220), scaleDPI(48)
 	}
-	defer procReleaseDC.Call(0, hdc)
+	defer round8TooltipReleaseDC.Call(0, hdc)
 	oldFont, _, _ := procSelectObject.Call(hdc, uiFontSmall)
 	rc := rect{Left: 0, Top: 0, Right: scaleDPI(280), Bottom: scaleDPI(240)}
 	procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(text))), ^uintptr(0), uintptr(unsafe.Pointer(&rc)), round8DTRCalcRect|round8DTWordBreak|round8DTNoPrefix)
