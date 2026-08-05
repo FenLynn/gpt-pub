@@ -17,57 +17,31 @@ gate.user32.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(POINT)]
 gate.user32.ScreenToClient.restype = wintypes.BOOL
 
 
-def capture_any_window(hwnd: int):
-    rect = gate.RECT()
-    if not gate.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+def surface_hash(
+    main_hwnd: int,
+    surface: dict[str, object],
+    save_path: Path | None = None,
+) -> str:
+    main_rect = gate.RECT()
+    if not gate.user32.GetWindowRect(main_hwnd, ctypes.byref(main_rect)):
         raise ctypes.WinError(ctypes.get_last_error())
-    width = rect.right - rect.left
-    height = rect.bottom - rect.top
-    if width < 1 or height < 1:
-        raise RuntimeError(f"invalid child window size: {width}x{height}")
-
-    screen_dc = gate.user32.GetDC(0)
-    memory_dc = gate.gdi32.CreateCompatibleDC(screen_dc)
-    bitmap = gate.gdi32.CreateCompatibleBitmap(screen_dc, width, height)
-    old = gate.gdi32.SelectObject(memory_dc, bitmap)
+    left, top, right, bottom = surface["rect"]
+    image = gate.capture_window(main_hwnd)
     try:
-        if not gate.user32.PrintWindow(hwnd, memory_dc, gate.PW_RENDERFULLCONTENT):
-            raise ctypes.WinError(ctypes.get_last_error())
-        info = gate.BITMAPINFO()
-        info.bmiHeader.biSize = ctypes.sizeof(gate.BITMAPINFOHEADER)
-        info.bmiHeader.biWidth = width
-        info.bmiHeader.biHeight = -height
-        info.bmiHeader.biPlanes = 1
-        info.bmiHeader.biBitCount = 32
-        info.bmiHeader.biCompression = gate.BI_RGB
-        buffer = ctypes.create_string_buffer(width * height * 4)
-        rows = gate.gdi32.GetDIBits(
-            memory_dc,
-            bitmap,
-            0,
-            height,
-            buffer,
-            ctypes.byref(info),
-            gate.DIB_RGB_COLORS,
+        crop = image.crop(
+            (
+                max(0, int(left) - main_rect.left),
+                max(0, int(top) - main_rect.top),
+                min(image.width, int(right) - main_rect.left),
+                min(image.height, int(bottom) - main_rect.top),
+            )
         )
-        if rows != height:
-            raise RuntimeError(f"GetDIBits rows={rows}, want={height}")
-        return gate.Image.frombuffer(
-            "RGBA", (width, height), buffer.raw, "raw", "BGRA", 0, 1
-        ).copy()
-    finally:
-        gate.gdi32.SelectObject(memory_dc, old)
-        gate.gdi32.DeleteObject(bitmap)
-        gate.gdi32.DeleteDC(memory_dc)
-        gate.user32.ReleaseDC(0, screen_dc)
-
-
-def window_hash(hwnd: int, save_path: Path | None = None) -> str:
-    image = capture_any_window(hwnd)
-    try:
-        if save_path is not None:
-            image.save(save_path)
-        return gate.hashlib.sha256(image.tobytes()).hexdigest()
+        try:
+            if save_path is not None:
+                crop.save(save_path)
+            return gate.hashlib.sha256(crop.tobytes()).hexdigest()
+        finally:
+            crop.close()
     finally:
         image.close()
 
@@ -107,32 +81,31 @@ def direct_surface_hover(
     records: list[dict[str, object]] = []
     for surface in sorted(surfaces, key=gate.surface_axis):
         axis = gate.surface_axis(surface)
-        surface_hwnd = int(surface["hwnd"])
         left, top, right, bottom = surface["rect"]
-        baseline = window_hash(surface_hwnd, evidence / f"hover-{axis}-baseline-hidden.png")
+        baseline = surface_hash(hwnd, surface, evidence / f"hover-{axis}-baseline-hidden.png")
 
         gate.user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
         time.sleep(0.30)
-        pending = window_hash(surface_hwnd, evidence / f"hover-{axis}-300ms-hidden.png")
+        pending = surface_hash(hwnd, surface, evidence / f"hover-{axis}-300ms-hidden.png")
         if pending != baseline:
             raise RuntimeError(f"{axis} thumb appeared before 500 ms")
 
         time.sleep(0.30)
-        visible = window_hash(surface_hwnd, evidence / f"hover-{axis}-600ms-visible.png")
+        visible = surface_hash(hwnd, surface, evidence / f"hover-{axis}-600ms-visible.png")
         if visible == baseline:
             raise RuntimeError(f"{axis} thumb did not appear after 500 ms")
 
         hovered = [visible]
         for _ in range(19):
             time.sleep(0.05)
-            hovered.append(window_hash(surface_hwnd))
+            hovered.append(surface_hash(hwnd, surface))
         unique_hovered = list(dict.fromkeys(hovered))
         if len(unique_hovered) != 1:
             raise RuntimeError(f"{axis} thumb flickered while hovered: {len(unique_hovered)} hashes")
 
         gate.user32.SetCursorPos(300, 300)
         time.sleep(0.30)
-        hidden = window_hash(surface_hwnd, evidence / f"hover-{axis}-left-hidden.png")
+        hidden = surface_hash(hwnd, surface, evidence / f"hover-{axis}-left-hidden.png")
         if hidden != baseline:
             raise RuntimeError(f"{axis} thumb did not hide after leaving")
 
