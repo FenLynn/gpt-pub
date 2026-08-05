@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const v452Round9InteractionManifestSHA256 = "d2d4dc7c29a41703a66e3631dac09162b0a54ecac624779b1852c17ffa191d73"
+const v452Round9InteractionManifestSHA256 = "3d7853cf944ee1332ec83afef15c82c51af11934230a1ac8db354063007eaaac"
 
 func TestV452Round9InteractionManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND9_REAL_INTERACTION_CLOSEOUT_FILES_SHA256.txt")
@@ -37,7 +37,7 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 		fileData = bytes.ReplaceAll(fileData, []byte("\r\n"), []byte("\n"))
 		fileSum := sha256.Sum256(fileData)
 		if got := hex.EncodeToString(fileSum[:]); got != parts[0] {
-			t.Errorf("%s sha256=%s want=%s", parts[1], got, parts[0])
+			t.Fatalf("%s sha256=%s want=%s", parts[1], got, parts[0])
 		}
 		entries++
 	}
