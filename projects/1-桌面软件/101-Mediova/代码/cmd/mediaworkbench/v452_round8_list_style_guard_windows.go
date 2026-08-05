@@ -38,13 +38,19 @@ func round8EnsureListStyleGuard(hwnd uintptr) {
 		return
 	}
 	round8ListStyleGuardMu.Lock()
-	defer round8ListStyleGuardMu.Unlock()
 	if round8ListStyleGuardHwnd == hwnd {
+		round8ListStyleGuardMu.Unlock()
 		return
 	}
 	if ok, _, _ := v452SetWindowSubclass.Call(hwnd, round8ListStyleGuardCB, round8ListStyleGuardSubclassID, 0); ok == 0 {
+		round8ListStyleGuardMu.Unlock()
 		return
 	}
+	// Publish ownership before changing styles: SetWindowLongPtr synchronously
+	// emits WM_STYLECHANGING, which re-enters the ListView subclass. The early
+	// marker makes that nested call a no-op instead of deadlocking on this mutex.
+	round8ListStyleGuardHwnd = hwnd
+	round8ListStyleGuardMu.Unlock()
 
 	style, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle)
 	newStyle := style &^ uintptr(round7FeedbackWSHScroll|round7FeedbackWSVScroll|round7FeedbackWSBorder)
@@ -63,7 +69,6 @@ func round8EnsureListStyleGuard(hwnd uintptr) {
 		round7FeedbackSetWindowPos.Call(hwnd, 0, 0, 0, 0, 0,
 			round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged)
 	}
-	round8ListStyleGuardHwnd = hwnd
 }
 
 func round8ListStyleGuardSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
