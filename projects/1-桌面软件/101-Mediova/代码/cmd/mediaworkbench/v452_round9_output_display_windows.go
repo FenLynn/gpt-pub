@@ -19,10 +19,14 @@ const (
 )
 
 var (
-	round9OutputSubclassCB    = syscall.NewCallback(round9OutputSubclassProc)
+	round9OutputSubclassCB    uintptr
 	round9OutputMu            sync.Mutex
 	round9OutputInstalledHwnd uintptr
 )
+
+func init() {
+	round9OutputSubclassCB = syscall.NewCallback(round9OutputSubclassProc)
+}
 
 // round9EnsureOutputDisplay turns the ComboBox's internal edit into a visual
 // path display. It keeps the surrounding ComboBox/history behavior, but the

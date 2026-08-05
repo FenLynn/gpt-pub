@@ -19,10 +19,14 @@ type round8StyleStruct struct {
 }
 
 var (
-	round8ListStyleGuardCB   = syscall.NewCallback(round8ListStyleGuardSubclassProc)
+	round8ListStyleGuardCB   uintptr
 	round8ListStyleGuardMu   sync.Mutex
 	round8ListStyleGuardHwnd uintptr
 )
+
+func init() {
+	round8ListStyleGuardCB = syscall.NewCallback(round8ListStyleGuardSubclassProc)
+}
 
 // round8EnsureListStyleGuard is called synchronously from the ListView's own
 // UI-thread subclass. It installs exactly once for the current ListView and
