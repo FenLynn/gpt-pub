@@ -28,16 +28,17 @@ func TestV452Round9ScrollContract(t *testing.T) {
 	}
 	scroll := round9ReadSource(t, "v452_round7_feedback_scroll_windows.go")
 	for _, required := range []string{
-		"round7FeedbackScroll.machine", "round7FeedbackScrollDelay", "round9FeedbackHideDelay",
-		"round9FeedbackInvalidateRect", "round9FeedbackCursorAxis", "round9FeedbackRememberThumbs",
+		"MWRound9ScrollCover", "round9EnsureScrollOverlays", "round9ScrollWndProc",
+		"round7FeedbackScrollDelay", "round9FeedbackHideDelay", "round9OverlayCursorInside",
+		"round9SetScrollFromOverlay", "round9PaintScrollOverlay",
 	} {
 		if !strings.Contains(scroll, required) {
-			t.Fatalf("scroll runtime contract missing %q", required)
+			t.Fatalf("scroll surface contract missing %q", required)
 		}
 	}
-	for _, forbidden := range []string{"ShowScrollBar", "procInvalidateRect.Call(hwnd, 0, 0)"} {
+	for _, forbidden := range []string{"ShowScrollBar", "round7FeedbackDrawOverlayScrollbars", "procInvalidateRect.Call(app.hList, 0, 0)"} {
 		if strings.Contains(scroll, forbidden) {
-			t.Fatalf("scroll contract contains unstable full-window path %q", forbidden)
+			t.Fatalf("scroll contract contains unstable list repaint path %q", forbidden)
 		}
 	}
 	guard := round9ReadSource(t, "v452_round8_list_style_guard_windows.go")
@@ -80,13 +81,20 @@ func TestV452Round9EditorContract(t *testing.T) {
 		"procShowWindow.Call(e.hSourceRange, 0)",
 		"procShowWindow.Call(e.hApplySelected, 0)",
 		"标题：", "剪裁预览", "恢复全画面", "setText(e.hApplyCurrent, \"应用\")",
+		"round9EnsureInfoGuard", "round9LayoutPreviewStatus",
 	} {
 		if !strings.Contains(layout, required) {
 			t.Fatalf("editor layout contract missing %q", required)
 		}
 	}
+	info := round9ReadSource(t, "v452_round9_info_guard_windows.go")
+	for _, required := range []string{"round9InfoSubclassProc", "预览帧", "round9SetPreviewStatus"} {
+		if !strings.Contains(info, required) {
+			t.Fatalf("editor info guard missing %q", required)
+		}
+	}
 	timeline := round9ReadSource(t, "v452_round9_timeline_windows.go")
-	for _, required := range []string{"barBottom = barTop + scaleDPI(12)", "startBlue", "endBlue", "arrowBaseY", "formatSecondsClock(e.dialog.currentAt)"} {
+	for _, required := range []string{"barBottom = barTop + scaleDPI(12)", "startBlue", "endBlue", "arrowBaseY", "formatSecondsClock(e.dialog.currentAt)", "tolerance := scaleDPI(22)"} {
 		if !strings.Contains(timeline, required) {
 			t.Fatalf("timeline contract missing %q", required)
 		}

@@ -51,7 +51,7 @@ func round9TimelineXToTime(e *round7Editor, x int32) float64 {
 }
 
 func round9TimelineHit(e *round7Editor, x int32) round7TimelineDrag {
-	tolerance := scaleDPI(9)
+	tolerance := scaleDPI(22)
 	startX := round9TimelineTimeToX(e, e.dialog.opts.TrimStart)
 	endX := round9TimelineTimeToX(e, e.dialog.opts.TrimEnd)
 	abs := func(v int32) int32 {

@@ -53,6 +53,7 @@ func round9InstallEditorCloseout(e *round7Editor) {
 	v452SetWindowSubclass.Call(e.hwnd, round9EditorSubclassCB, round9EditorSubclassID, 0)
 	v452SetWindowSubclass.Call(e.hTimeline, round9TimelineSubclassCB, round9TimelineSubclassID, 0)
 	v452SetWindowSubclass.Call(e.dialog.hCanvas, round9CanvasSubclassCB, round9CanvasSubclassID, 0)
+	round9EnsureInfoGuard(e)
 	round9ApplyEditorLayout(e)
 }
 
@@ -101,7 +102,7 @@ func round9ApplyEditorLayout(e *round7Editor) {
 	procShowWindow.Call(e.hApplySelected, 0)
 
 	round7FeedbackMove(d.hCanvas, margin, 14, leftW, previewH)
-	currentY := int32(26) + previewH
+	currentY := int32(42) + previewH
 	round7FeedbackMove(e.hCurrentLabel, margin, currentY+4, 68, 28)
 	round7FeedbackMove(d.hNow, margin+70, currentY, 140, 30)
 	round7FeedbackMove(e.hJump, margin+216, currentY, 62, 30)
@@ -186,6 +187,7 @@ func round9ApplyEditorLayout(e *round7Editor) {
 	setText(e.hEndCurrent, "当前")
 	setText(e.hStartInitial, "源起点")
 	setText(e.hEndTerminal, "源终点")
+	round9LayoutPreviewStatus(e)
 	round7FeedbackRefreshInfoCard(e)
 	procInvalidateRect.Call(e.hTimeline, 0, 0)
 	procInvalidateRect.Call(e.hwnd, 0, 0)

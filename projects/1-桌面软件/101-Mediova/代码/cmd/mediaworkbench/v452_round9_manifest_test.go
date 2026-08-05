@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const v452Round9InteractionManifestSHA256 = "484336f71732837b1bf66cf03a618263e6db9db95e1277056f76c2793f723e5f"
+const v452Round9InteractionManifestSHA256 = "529253334b9b1e57864e5ed7d7bbb30058103ba0beda0126ebad75e8bdfd5c62"
 
 func TestV452Round9InteractionManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND9_REAL_INTERACTION_CLOSEOUT_FILES_SHA256.txt")
@@ -44,7 +44,7 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 12 {
-		t.Fatalf("round9 manifest entries=%d want=12", entries)
+	if entries != 13 {
+		t.Fatalf("round9 manifest entries=%d want=13", entries)
 	}
 }
