@@ -2,13 +2,22 @@
 
 package main
 
-import "unsafe"
+import (
+	"path/filepath"
+	"unsafe"
+)
 
 func round7FeedbackTimelineSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
 	case WM_PAINT:
 		e := round7ActiveEditor
 		if e != nil && e.hTimeline == hwnd {
+			if e.dialog != nil && e.dialog.task != nil && e.hFileLabel != 0 {
+				name := filepath.Base(e.dialog.task.Input)
+				if getText(e.hFileLabel) != name {
+					setText(e.hFileLabel, name)
+				}
+			}
 			round7FeedbackPaintTimeline(e, hwnd)
 			return 0
 		}
