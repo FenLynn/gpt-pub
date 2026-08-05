@@ -94,7 +94,7 @@ func TestV452Round9EditorContract(t *testing.T) {
 		}
 	}
 	timeline := round9ReadSource(t, "v452_round9_timeline_windows.go")
-	for _, required := range []string{"barBottom = barTop + scaleDPI(12)", "startBlue", "endBlue", "arrowBaseY", "formatSecondsClock(e.dialog.currentAt)", "barBottom+scaleDPI(2)", "tolerance := scaleDPI(12)"} {
+	for _, required := range []string{"barBottom = barTop + scaleDPI(12)", "startBlue", "endBlue", "arrowBaseY", "formatSecondsClock(e.dialog.currentAt)", "nearCurrent && (nearStart || nearEnd)", "tolerance := scaleDPI(12)"} {
 		if !strings.Contains(timeline, required) {
 			t.Fatalf("timeline contract missing %q", required)
 		}
