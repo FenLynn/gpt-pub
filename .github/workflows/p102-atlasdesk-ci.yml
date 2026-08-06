@@ -209,7 +209,7 @@ jobs:
           if (!(Test-Path build/runtime/AtlasDesk.exe)) { throw 'AtlasDesk.exe missing.' }
           if (!(Test-Path build/runtime/AtlasDesk.TerminalHost.exe)) { throw 'AtlasDesk.TerminalHost.exe missing.' }
 
-          foreach ($required in @('terminal.html','terminal-host.js','vendor/xterm.js','xterm.css','vendor/addon-fit.js')) {
+          foreach ($required in @('terminal.html','terminal-host.js','vendor/xterm.js','vendor/xterm.css','vendor/addon-fit.js')) {
             if (!(Test-Path (Join-Path 'build/runtime/Assets/Terminal' $required))) {
               throw "Runtime asset missing: $required"
             }
