@@ -90,7 +90,7 @@ public sealed class V061ExperienceEnhancer
     private void InstallSearchEntry()
     {
         if (_window.FindName("CommandButton") is not Button commandButton) return;
-        commandButton.ToolTip = "AtlasDesk Command Center · 搜索页面、项目、文件、任务、文献、上下文和命令";
+        commandButton.ToolTip = "Ctrl+K · 搜索页面、当前项目、文件、命令和文献";
         commandButton.PreviewMouseLeftButtonDown += (_, args) =>
         {
             args.Handled = true;
