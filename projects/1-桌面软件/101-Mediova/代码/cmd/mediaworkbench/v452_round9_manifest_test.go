@@ -17,6 +17,10 @@ var v452Round9SupersededByRound11 = map[string]bool{
 	"cmd/mediaworkbench/v452_round8_editor_install_windows.go": true,
 	"cmd/mediaworkbench/v452_round9_source_test.go":             true,
 	"cmd/mediaworkbench/v452_round10_scroll_cover_windows.go":  true,
+	// Round 12 clips the inherited list overlay to the real data viewport so
+	// preview cells can never paint over Header captions. The round-9 digest
+	// remains a historical receipt; the active file is frozen by round 12.
+	"cmd/mediaworkbench/v452_round7_list_overlay_windows.go": true,
 }
 
 func TestV452Round9InteractionManifest(t *testing.T) {
