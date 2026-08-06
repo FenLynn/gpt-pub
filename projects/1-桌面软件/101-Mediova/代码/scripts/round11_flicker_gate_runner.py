@@ -18,6 +18,7 @@ HDM_FIRST = 0x1200
 HDM_GETITEMCOUNT = HDM_FIRST + 0
 SRCCOPY = 0x00CC0020
 ROUND11_SCROLL_PREVIEW_ARG = "--round11-scroll-preview"
+ROUND11_THUMB_COLORS = {(160, 171, 184), (110, 132, 158)}
 
 
 gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
@@ -81,12 +82,21 @@ def capture_screen_rect(rect: list[int]):
         gate.user32.ReleaseDC(0, screen_dc)
 
 
-def surface_hash(surface: dict[str, object], save_path: Path | None = None) -> str:
+def surface_state(
+    surface: dict[str, object],
+    save_path: Path | None = None,
+) -> tuple[str, int]:
     image = capture_screen_rect(surface["rect"])
     try:
         if save_path is not None:
             image.save(save_path)
-        return gate.hashlib.sha256(image.tobytes()).hexdigest()
+        digest = gate.hashlib.sha256(image.tobytes()).hexdigest()
+        rgb = image.convert("RGB")
+        try:
+            thumb_pixels = sum(1 for pixel in rgb.getdata() if pixel in ROUND11_THUMB_COLORS)
+        finally:
+            rgb.close()
+        return digest, thumb_pixels
     finally:
         image.close()
 
@@ -159,42 +169,60 @@ def direct_surface_hover(
     for surface in sorted(surfaces, key=gate.surface_axis):
         axis = gate.surface_axis(surface)
         left, top, right, bottom = [int(value) for value in surface["rect"]]
-        baseline = surface_hash(surface, evidence / f"hover-{axis}-baseline-hidden.png")
+        _baseline_hash, baseline_thumb_pixels = surface_state(
+            surface, evidence / f"hover-{axis}-baseline-hidden.png"
+        )
+        if baseline_thumb_pixels != 0:
+            raise RuntimeError(f"{axis} thumb was visible before hover: {baseline_thumb_pixels} pixels")
 
         gate.user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
         time.sleep(0.30)
-        pending = surface_hash(surface, evidence / f"hover-{axis}-300ms-hidden.png")
-        if pending != baseline:
-            raise RuntimeError(f"{axis} thumb appeared before 500 ms")
+        _pending_hash, pending_thumb_pixels = surface_state(
+            surface, evidence / f"hover-{axis}-300ms-hidden.png"
+        )
+        if pending_thumb_pixels != 0:
+            raise RuntimeError(f"{axis} thumb appeared before 500 ms: {pending_thumb_pixels} pixels")
 
         time.sleep(0.35)
-        visible = surface_hash(surface, evidence / f"hover-{axis}-650ms-visible.png")
-        if visible == baseline:
+        visible_hash, visible_thumb_pixels = surface_state(
+            surface, evidence / f"hover-{axis}-650ms-visible.png"
+        )
+        if visible_thumb_pixels <= 0:
             raise RuntimeError(f"{axis} thumb did not appear after 500 ms")
 
-        hovered = [visible]
+        hovered_hashes = [visible_hash]
+        hovered_counts = [visible_thumb_pixels]
         for _ in range(19):
             time.sleep(0.05)
-            hovered.append(surface_hash(surface))
-        unique_hovered = list(dict.fromkeys(hovered))
+            digest, count = surface_state(surface)
+            hovered_hashes.append(digest)
+            hovered_counts.append(count)
+        unique_hovered = list(dict.fromkeys(hovered_hashes))
         if len(unique_hovered) != 1:
             raise RuntimeError(f"{axis} thumb flickered while hovered: {len(unique_hovered)} hashes")
+        if min(hovered_counts) <= 0:
+            raise RuntimeError(f"{axis} thumb disappeared while hovered: {hovered_counts!r}")
 
         gate.user32.SetCursorPos(900, 40)
         time.sleep(0.35)
-        hidden = surface_hash(surface, evidence / f"hover-{axis}-left-hidden.png")
-        if hidden != baseline:
-            raise RuntimeError(f"{axis} thumb did not hide after leaving")
+        _hidden_hash, hidden_thumb_pixels = surface_state(
+            surface, evidence / f"hover-{axis}-left-hidden.png"
+        )
+        if hidden_thumb_pixels != 0:
+            raise RuntimeError(
+                f"{axis} thumb did not hide after leaving: {hidden_thumb_pixels} pixels"
+            )
 
         records.append(
             {
                 "axis": axis,
                 "overflow": overflow,
-                "pending_300ms_hidden": True,
-                "visible_after_650ms": True,
+                "baseline_thumb_pixels": baseline_thumb_pixels,
+                "pending_300ms_thumb_pixels": pending_thumb_pixels,
+                "visible_650ms_thumb_pixels": visible_thumb_pixels,
                 "hover_frames": 20,
                 "hover_unique_hashes": 1,
-                "hidden_after_leave": True,
+                "hidden_after_leave_thumb_pixels": hidden_thumb_pixels,
             }
         )
     return records
