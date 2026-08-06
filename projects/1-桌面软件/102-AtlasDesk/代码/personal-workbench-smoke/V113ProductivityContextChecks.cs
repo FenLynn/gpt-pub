@@ -95,7 +95,7 @@ internal static class V113ProductivityContextChecks
             ".Concat(catalogTask.Result)");
         RequireContains(experience,
             "ProductivityContextCoordinator.TryExecuteAsync",
-            "搜索页面、项目、文件、任务、文献、上下文和命令");
+            "Ctrl+K · 搜索页面、当前项目、文件、命令和文献");
         RequireContains(projectWorkflow,
             "public ProjectDescriptor? SelectedProject => _projects.SelectedProject");
         RequireContains(zoteroSearch,
@@ -132,7 +132,7 @@ internal static class V113ProductivityContextChecks
             throw new InvalidOperationException("Accessibility must remain the final presentation owner after productivity context attaches.");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.1.3 connects Command Center, project profiles, safe session continuation and read-only Zotero links without adding a versioned enhancer");
+            "PASS AtlasDesk v1.1.3 productivity-context baseline remains connected to the current focused Command Center without adding a second owner");
     }
 
     private static string RequireFile(string root, string fileName)
