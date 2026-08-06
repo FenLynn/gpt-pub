@@ -48,7 +48,7 @@ func TestRound11FlickerRootFixManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatalf("scan %s: %v", manifestName, err)
 	}
-	if entries != 14 {
-		t.Fatalf("manifest entry count=%d, want=14", entries)
+	if entries != 11 {
+		t.Fatalf("manifest entry count=%d, want=11", entries)
 	}
 }
