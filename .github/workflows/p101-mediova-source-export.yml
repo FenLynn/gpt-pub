@@ -1,0 +1,43 @@
+name: P101 Mediova Source Export
+
+on:
+  pull_request:
+    branches:
+      - p101-stable
+    paths:
+      - 'projects/1-桌面软件/101-Mediova/代码/**'
+      - '.github/workflows/p101-mediova-source-export.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p101-mediova-source-export-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  export-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Record exact source identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}" > P101_SOURCE_HEAD.txt
+
+      - name: Upload P101 source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: P101-Mediova-Source-${{ github.event.pull_request.head.sha }}
+          path: |
+            P101_SOURCE_HEAD.txt
+            projects/1-桌面软件/101-Mediova/代码
+          if-no-files-found: error
+          retention-days: 1
