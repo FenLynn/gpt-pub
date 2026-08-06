@@ -19,7 +19,7 @@ SRCCOPY = 0x00CC0020
 
 
 gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-gate.user32.SendMessageW.restype = wintypes.LRESULT
+gate.user32.SendMessageW.restype = ctypes.c_ssize_t
 gate.user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(gate.RECT)]
 gate.user32.GetClientRect.restype = wintypes.BOOL
 gate.gdi32.BitBlt.argtypes = [
