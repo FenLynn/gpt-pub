@@ -157,9 +157,18 @@ def direct_surface_hover(
     gate.user32.SetCursorPos(900, 40)
     time.sleep(1.0)
 
+    children = gate.enumerate_children(hwnd)
+    legacy = [
+        child
+        for child in children
+        if child["class"] == "MWRound9ScrollCover"
+    ]
+    if legacy:
+        raise RuntimeError(f"legacy scroll covers were not retired: {legacy!r}")
+
     surfaces = [
         child
-        for child in gate.enumerate_children(hwnd)
+        for child in children
         if child["class"] == "MWRound11StableScrollSurface" and child["visible"]
     ]
     if len(surfaces) != 2:
@@ -217,6 +226,7 @@ def direct_surface_hover(
             {
                 "axis": axis,
                 "overflow": overflow,
+                "legacy_cover_count": 0,
                 "baseline_thumb_pixels": baseline_thumb_pixels,
                 "pending_300ms_thumb_pixels": pending_thumb_pixels,
                 "visible_650ms_thumb_pixels": visible_thumb_pixels,
