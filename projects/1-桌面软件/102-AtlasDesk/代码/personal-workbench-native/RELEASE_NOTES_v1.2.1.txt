@@ -1,0 +1,11 @@
+AtlasDesk v1.2.1 compact home and project resources
+
+This is a deliberately small follow-up to v1.2.0.
+
+- Home shows one recent-project entry by reusing the existing saved session project and workspace path.
+- Clicking the recent-project entry returns to the existing Development page.
+- The project cockpit adds one shared search box for the already loaded favorite files, explicit commands and read-only literature links.
+- Existing resource sections are shortened to File, Command and Literature without changing their actions or owners.
+- No new Data file, schema, index, timer, background scan, task system, preview center, layout engine or browser workspace is introduced.
+- ConPTY, WebView2 Dashboard, Zotero read-only access, Runtime/Data separation and project-directory cleanliness remain unchanged.
+- main remains the formal v1.0.0 baseline until user verification.

@@ -13,8 +13,8 @@ internal static class V120ProjectCockpitChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 2, 0))
-            throw new InvalidOperationException("AtlasDesk project cockpit candidate must be v1.2.0.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 2, 0))
+            throw new InvalidOperationException("AtlasDesk project cockpit baseline requires v1.2.0 or newer.");
 
         var xaml = File.ReadAllText(RequireFile(nativeRoot, "ProjectCenterControl.xaml"));
         var control = File.ReadAllText(RequireFile(nativeRoot, "ProjectCenterControl.xaml.cs"));
@@ -84,7 +84,7 @@ internal static class V120ProjectCockpitChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.2.0 project cockpit aggregates bounded selected-project status, explicit files, commands and read-only literature actions through existing owners");
+            "PASS AtlasDesk v1.2.0 project cockpit baseline remains intact for current and later candidates");
     }
 
     private static string RequireFile(string root, params string[] parts)
