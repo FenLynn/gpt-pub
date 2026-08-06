@@ -122,8 +122,6 @@ func round11SetStableCoverGeometry(cover *round11StableCover, x, y, width, heigh
 	}
 	geometry := round11OverlayGeometry{x: x, y: y, width: width, height: height, valid: true}
 	if cover.geometry == geometry {
-		// Keep the permanent surface above any inherited child without forcing
-		// a redraw or a geometry recalculation.
 		round7FeedbackSetWindowPos.Call(
 			cover.hwnd, 0, 0, 0, 0, 0,
 			round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoActivate|round9FeedbackSWPShowWindow,
@@ -254,6 +252,13 @@ func round11TrackStableCoverMouse(hwnd uintptr) {
 	round9TrackOverlayMouse(hwnd)
 }
 
+func round11ArmStableCoverHideWatch(cover *round11StableCover) {
+	if cover == nil || cover.hwnd == 0 || cover.phase != round11CoverVisible {
+		return
+	}
+	procSetTimer.Call(cover.hwnd, round11StableCoverHideTimer, round11StableCoverHideDelay, 0)
+}
+
 func round11InvalidateStableCoverThumbs() {
 	for _, cover := range []*round11StableCover{round11StableCoverH, round11StableCoverV} {
 		if cover != nil && cover.hwnd != 0 {
@@ -346,6 +351,8 @@ func round11StableCoverProc(hwnd uintptr, message uint32, wParam, lParam uintptr
 		if cover.phase == round11CoverHidden {
 			cover.phase = round11CoverPending
 			procSetTimer.Call(hwnd, round11StableCoverShowTimer, round11StableCoverShowDelay, 0)
+		} else if cover.phase == round11CoverVisible {
+			round11ArmStableCoverHideWatch(cover)
 		}
 		return 0
 	case round7FeedbackWMLButtonDown:
@@ -353,6 +360,7 @@ func round11StableCoverProc(hwnd uintptr, message uint32, wParam, lParam uintptr
 			pt := mousePoint(lParam)
 			if thumb, ok := round11StableCoverThumb(cover); ok && round7FeedbackPointInRect(pt, thumb) {
 				cover.phase = round11CoverDragging
+				procKillTimer.Call(hwnd, round11StableCoverHideTimer)
 				if cover.axis == round9AxisVertical {
 					cover.dragOffset = int(pt.Y - thumb.Top)
 				} else {
@@ -368,12 +376,14 @@ func round11StableCoverProc(hwnd uintptr, message uint32, wParam, lParam uintptr
 			cover.phase = round11CoverVisible
 			procReleaseCapture.Call()
 			procInvalidateRect.Call(hwnd, 0, 0)
+			round11ArmStableCoverHideWatch(cover)
 		}
 		return 0
 	case round7FeedbackWMCaptureChanged:
 		if cover.phase == round11CoverDragging {
 			cover.phase = round11CoverVisible
 			procInvalidateRect.Call(hwnd, 0, 0)
+			round11ArmStableCoverHideWatch(cover)
 		}
 		return 0
 	case WM_TIMER:
@@ -384,6 +394,7 @@ func round11StableCoverProc(hwnd uintptr, message uint32, wParam, lParam uintptr
 				if round11StableCoverCursorInside(hwnd) {
 					cover.phase = round11CoverVisible
 					procInvalidateRect.Call(hwnd, 0, 0)
+					round11ArmStableCoverHideWatch(cover)
 				} else {
 					cover.phase = round11CoverHidden
 				}
@@ -391,9 +402,13 @@ func round11StableCoverProc(hwnd uintptr, message uint32, wParam, lParam uintptr
 			return 0
 		case round11StableCoverHideTimer:
 			procKillTimer.Call(hwnd, round11StableCoverHideTimer)
-			if cover.phase == round11CoverVisible && !round11StableCoverCursorInside(hwnd) {
-				cover.phase = round11CoverHidden
-				procInvalidateRect.Call(hwnd, 0, 0)
+			if cover.phase == round11CoverVisible {
+				if !round11StableCoverCursorInside(hwnd) {
+					cover.phase = round11CoverHidden
+					procInvalidateRect.Call(hwnd, 0, 0)
+				} else {
+					round11ArmStableCoverHideWatch(cover)
+				}
 			}
 			return 0
 		}
@@ -402,10 +417,12 @@ func round11StableCoverProc(hwnd uintptr, message uint32, wParam, lParam uintptr
 		if cover.phase == round11CoverPending {
 			cover.phase = round11CoverHidden
 		} else if cover.phase == round11CoverVisible {
-			procSetTimer.Call(hwnd, round11StableCoverHideTimer, round11StableCoverHideDelay, 0)
+			round11ArmStableCoverHideWatch(cover)
 		}
 		return 0
 	case v452WMNCDestroy:
+		procKillTimer.Call(hwnd, round11StableCoverShowTimer)
+		procKillTimer.Call(hwnd, round11StableCoverHideTimer)
 		round11StableCoverByHWND.Delete(hwnd)
 	}
 	result, _, _ := procDefWindowProcW.Call(hwnd, uintptr(message), wParam, lParam)
