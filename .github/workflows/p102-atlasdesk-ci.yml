@@ -193,7 +193,14 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item build/terminal-host/AtlasDesk.TerminalHost.exe build/runtime/AtlasDesk.TerminalHost.exe -Force
-          Copy-Item projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native/RELEASE_NOTES.txt build/runtime/README.txt -Force
+          $releaseNotesRoot = 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-native'
+          $versionNotes = Join-Path $releaseNotesRoot "RELEASE_NOTES_v$env:WORKBENCH_VERSION.txt"
+          $releaseNotes = if (Test-Path $versionNotes) { $versionNotes } else { Join-Path $releaseNotesRoot 'RELEASE_NOTES.txt' }
+          Copy-Item $releaseNotes build/runtime/README.txt -Force
+          $readmeFirstLine = Get-Content build/runtime/README.txt -TotalCount 1
+          if ($readmeFirstLine -notmatch [regex]::Escape("v$env:WORKBENCH_VERSION")) {
+            throw "Runtime README version mismatch: $readmeFirstLine"
+          }
 
           # Documentation XML files are build-time reference material, not Runtime dependencies.
           Get-ChildItem build/runtime -File -Filter '*.xml' -ErrorAction SilentlyContinue |
