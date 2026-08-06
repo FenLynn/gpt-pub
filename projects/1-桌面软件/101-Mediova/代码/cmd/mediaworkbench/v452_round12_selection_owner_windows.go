@@ -55,10 +55,8 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 				return CDRF_NOTIFYSUBITEMDRAW
 			case CDDS_ITEMPREPAINT | CDDS_SUBITEM:
 				row := int(cd.NMCD.ItemSpec)
-				if listItemSelected(a.hList, row) {
-					if round12DrawSelectedSubItem(a, cd, row) {
-						return CDRF_SKIPDEFAULT
-					}
+				if listItemSelected(a.hList, row) && round12DrawSelectedSubItem(a, cd, row) {
+					return CDRF_SKIPDEFAULT
 				}
 			}
 		}
@@ -91,10 +89,10 @@ func round12DrawSelectedSubItem(a *application, cd *nmListViewCustomDraw, row in
 	case taskColNumber:
 		drawCenteredText(cd.NMCD.HDC, strconv.Itoa(row+1), cell, uiFontSmall, round12SelectionText)
 	case taskColFile:
-		round12DrawSelectedPreviewAndFile(a, cd.NMCD.HDC, cell, &task)
+		round12DrawSelectedPreviewAndFile(a, cd.NMCD.HDC, cell, row)
 	case taskColOutputSize:
 		_, label, _ := compressionCellMetrics(&task)
-		round12DrawSelectedCompression(cd.NMCD.HDC, cell, &task, label)
+		round12DrawSelectedCompression(cd.NMCD.HDC, cell, task.InputSize, task.OutputSize, label)
 	case taskColProgress:
 		fraction, label := progressCellMetrics(&task)
 		round12DrawSelectedProgress(cd.NMCD.HDC, cell, fraction, label)
@@ -130,19 +128,19 @@ func round12DrawSelectedSubItem(a *application, cd *nmListViewCustomDraw, row in
 			procSelectObject.Call(cd.NMCD.HDC, old)
 		}
 	}
+	fillSolid(cd.NMCD.HDC, rect{Left: cell.Left, Top: cell.Bottom - 1, Right: cell.Right, Bottom: cell.Bottom}, colorRef(217, 232, 247))
 	return true
 }
 
-func round12DrawSelectedPreviewAndFile(a *application, hdc uintptr, cell rect, task *model.Task) {
-	if a == nil || task == nil || hdc == 0 {
+func round12DrawSelectedPreviewAndFile(a *application, hdc uintptr, cell rect, row int) {
+	if a == nil || hdc == 0 {
 		return
 	}
-	preview := rect{
-		Left:   cell.Left + scaleDPI(6),
-		Top:    cell.Top + scaleDPI(4),
-		Right:  cell.Left + scaleDPI(88),
-		Bottom: cell.Bottom - scaleDPI(4),
+	task, ok := a.visibleTaskSnapshot(row)
+	if !ok {
+		return
 	}
+	preview := rect{Left: cell.Left + scaleDPI(6), Top: cell.Top + scaleDPI(4), Right: cell.Left + scaleDPI(88), Bottom: cell.Bottom - scaleDPI(4)}
 	if preview.Bottom-preview.Top > scaleDPI(48) {
 		preview.Top = (cell.Top + cell.Bottom - scaleDPI(48)) / 2
 		preview.Bottom = preview.Top + scaleDPI(48)
@@ -163,7 +161,7 @@ func round12DrawSelectedPreviewAndFile(a *application, hdc uintptr, cell rect, t
 		fillSolid(hdc, rect{Left: preview.Left, Top: preview.Top, Right: preview.Left + 1, Bottom: preview.Bottom}, border)
 		fillSolid(hdc, rect{Left: preview.Right - 1, Top: preview.Top, Right: preview.Right, Bottom: preview.Bottom}, border)
 		kind := "图片"
-		if task.Kind == model.KindVideo {
+		if string(task.Kind) == "video" {
 			kind = "视频"
 		}
 		drawCenteredText(hdc, kind, preview, uiFontSmall, colorRef(132, 144, 158))
@@ -199,12 +197,12 @@ func round12DrawSelectedProgress(hdc uintptr, rc rect, fraction float64, label s
 	drawContrastCenteredText(hdc, label, bar, fill, uiFontSmall)
 }
 
-func round12DrawSelectedCompression(hdc uintptr, rc rect, task *model.Task, label string) {
+func round12DrawSelectedCompression(hdc uintptr, rc rect, inputSize, outputSize int64, label string) {
 	fillSolid(hdc, rc, round12SelectionBackground)
 	bar := fullCellBarRect(rc)
 	fillSolid(hdc, bar, colorRef(239, 243, 248))
-	if task != nil && task.InputSize > 0 && task.OutputSize > 0 {
-		visual := compressionVisualFor(task.InputSize, task.OutputSize)
+	if inputSize > 0 && outputSize > 0 {
+		visual := compressionVisualFor(inputSize, outputSize)
 		split := bar.Left + int32(float64(bar.Right-bar.Left)*visual.InputFraction)
 		if split <= bar.Left {
 			split = bar.Left + 1
