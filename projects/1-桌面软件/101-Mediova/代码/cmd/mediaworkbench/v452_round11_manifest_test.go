@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
@@ -38,6 +39,10 @@ func TestRound11FlickerRootFixManifest(t *testing.T) {
 			t.Errorf("read %s: %v", parts[1], readErr)
 			continue
 		}
+		// Git may materialize text files as CRLF on Windows. The manifest
+		// freezes repository-normalized LF content so both CI platforms verify
+		// the same source bytes rather than checkout-policy side effects.
+		data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 		sum := sha256.Sum256(data)
 		actual := hex.EncodeToString(sum[:])
 		if actual != expected {
