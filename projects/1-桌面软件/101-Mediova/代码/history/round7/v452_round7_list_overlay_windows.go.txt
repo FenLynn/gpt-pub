@@ -17,11 +17,10 @@ const (
 )
 
 var (
-	round7ListGetDC             = user32.NewProc("GetDC")
-	round7ListReleaseDC         = user32.NewProc("ReleaseDC")
-	round7ImageListDraw         = comctl32.NewProc("ImageList_Draw")
-	round7ImageListCount        = comctl32.NewProc("ImageList_GetImageCount")
-	round12ListIntersectClipRect = gdi32.NewProc("IntersectClipRect")
+	round7ListGetDC      = user32.NewProc("GetDC")
+	round7ListReleaseDC  = user32.NewProc("ReleaseDC")
+	round7ImageListDraw  = comctl32.NewProc("ImageList_Draw")
+	round7ImageListCount = comctl32.NewProc("ImageList_GetImageCount")
 )
 
 // round7DrawListOverlay owns the number and preview cells. A preview slot is
@@ -34,23 +33,6 @@ func round7DrawListOverlay(a *application, hdc uintptr) {
 	}
 	var client rect
 	procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client)))
-
-	// The ListView header is a child window but WM_PRINT can hand the overlay a
-	// surface whose origin also contains the header. Clip every overlay path to
-	// the real data viewport. This prevents a preview border or row background
-	// from ever covering column text, including PrintWindow screenshots.
-	clipTop := client.Top
-	if header := send(a.hList, LVM_GETHEADER, 0, 0); header != 0 {
-		if headerRect, ok := childClientRect(header, a.hList); ok && headerRect.Bottom > clipTop {
-			clipTop = headerRect.Bottom
-		}
-	}
-	saved, _, _ := procSaveDC.Call(hdc)
-	if saved != 0 {
-		round12ListIntersectClipRect.Call(hdc, uintptr(client.Left), uintptr(clipTop), uintptr(client.Right), uintptr(client.Bottom))
-		defer procRestoreDC.Call(hdc, saved)
-	}
-
 	count := int(send(a.hList, LVM_GETITEMCOUNT, 0, 0))
 	numberWidth := int32(send(a.hList, round7LVMGetColumnWidth, uintptr(taskColNumber), 0))
 	if numberWidth <= 0 {
@@ -63,7 +45,7 @@ func round7DrawListOverlay(a *application, hdc uintptr) {
 	}
 	for row := 0; row < count; row++ {
 		fileCell, ok := listSubItemBounds(a.hList, row, taskColFile)
-		if !ok || fileCell.Bottom <= clipTop || fileCell.Top > client.Bottom {
+		if !ok || fileCell.Bottom < client.Top || fileCell.Top > client.Bottom {
 			continue
 		}
 		task, ok := a.visibleTaskSnapshot(row)

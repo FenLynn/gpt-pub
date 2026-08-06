@@ -6,6 +6,7 @@ from pathlib import Path
 
 import round11_flicker_gate_runner_base as round11
 import round12_footer_gate
+import round12_header_gate
 
 
 def argument_path(name: str) -> Path | None:
@@ -18,17 +19,21 @@ def argument_path(name: str) -> Path | None:
     return None
 
 
-def merge_footer_evidence() -> None:
+def merge_stage_evidence() -> None:
     evidence = argument_path("--evidence")
     if evidence is None:
         return
-    footer_path = evidence / "footer-report.json"
     final_path = evidence / "flicker-report.json"
-    if not footer_path.is_file() or not final_path.is_file():
+    if not final_path.is_file():
         return
-    footer = json.loads(footer_path.read_text(encoding="utf-8"))
     final = json.loads(final_path.read_text(encoding="utf-8"))
-    final["round12_footer"] = footer
+    for filename, key in (
+        ("footer-report.json", "round12_footer"),
+        ("header-report.json", "round12_header"),
+    ):
+        stage_path = evidence / filename
+        if stage_path.is_file():
+            final[key] = json.loads(stage_path.read_text(encoding="utf-8"))
     final_path.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
@@ -36,10 +41,13 @@ def main() -> int:
     footer_result = int(round12_footer_gate.main())
     if footer_result != 0:
         return footer_result
+    header_result = int(round12_header_gate.main())
+    if header_result != 0:
+        return header_result
     try:
         return int(round11.main())
     finally:
-        merge_footer_evidence()
+        merge_stage_evidence()
 
 
 if __name__ == "__main__":
