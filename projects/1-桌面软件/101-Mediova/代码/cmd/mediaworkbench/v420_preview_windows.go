@@ -47,6 +47,10 @@ func (a *application) v420PopulateUIPreviewTasks() {
 	video4K.Resolution = "4K"
 	videoH264 := videoDefaults
 	videoH264.Codec = "H.264"
+	videoTrimCrop := videoDefaults
+	videoTrimCrop.TrimStart = 10
+	videoTrimCrop.TrimEnd = 120
+	videoTrimCrop.Crop = model.Crop{Enabled: true, X: 0, Y: 0, Width: 1280, Height: 1080}
 	imageDefaults := a.settings.DefaultOptions(model.KindImage)
 	imagePNG := imageDefaults
 	imagePNG.ImageFormat = "PNG"
@@ -60,7 +64,7 @@ func (a *application) v420PopulateUIPreviewTasks() {
 	videoTasks := []*model.Task{
 		{ID: a.nextID.Add(1), Input: `C:\手机备份\2026\宝宝\待处理_4K.MOV`, Root: `C:\手机备份`, Kind: model.KindVideo, Width: 3840, Height: 2160, Rotation: 90, Duration: 74.2, FPS: 29.97, InputSize: 428 * 1024 * 1024, Status: model.StatusReady, Options: video4K, ThumbnailIndex: -1},
 		{ID: a.nextID.Add(1), Input: `C:\手机备份\2026\旅行\等待队列.mp4`, Root: `C:\手机备份`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 86, FPS: 25, InputSize: 180 * 1024 * 1024, OutputPath: filepath.Join(videoOut, `2026\旅行\等待队列.mp4`), Status: model.StatusQueued, Options: videoDefaults, Queue: previewQueue(videoDefaults, videoOut, filepath.Join(videoOut, `2026\旅行\等待队列.mp4`), 2), ThumbnailIndex: -1},
-		{ID: a.nextID.Add(1), Input: `D:\相机\项目A\转换中.mp4`, Root: `D:\相机`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 182.6, FPS: 59.94, InputSize: 1538 * 1024 * 1024, OutputPath: filepath.Join(videoOut, `项目A\转换中.mp4`), OutputSize: 530 * 1024 * 1024, Status: model.StatusProcessing, Progress: 63.4, Engine: "CPU · H.265", Options: videoDefaults, Queue: previewQueue(videoDefaults, videoOut, filepath.Join(videoOut, `项目A\转换中.mp4`), 1), StartedAt: now.Add(-2 * time.Minute), ThumbnailIndex: -1},
+		{ID: a.nextID.Add(1), Input: `D:\相机\项目A\转换中.mp4`, Root: `D:\相机`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 182.6, FPS: 59.94, InputSize: 1538 * 1024 * 1024, OutputPath: filepath.Join(videoOut, `项目A\转换中.mp4`), OutputSize: 530 * 1024 * 1024, Status: model.StatusProcessing, Progress: 63.4, Engine: "CPU · H.265", Options: videoTrimCrop, Queue: previewQueue(videoTrimCrop, videoOut, filepath.Join(videoOut, `项目A\转换中.mp4`), 1), StartedAt: now.Add(-2 * time.Minute), ThumbnailIndex: -1},
 		{ID: a.nextID.Add(1), Input: `D:\相机\项目A\暂停任务.mp4`, Root: `D:\相机`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 96.4, FPS: 25, InputSize: 206 * 1024 * 1024, OutputPath: filepath.Join(videoOut, `项目A\暂停任务.mp4`), OutputSize: 31 * 1024 * 1024, Status: model.StatusPaused, Progress: 34.8, Engine: "已暂停", Options: videoH264, Queue: previewQueue(videoH264, videoOut, filepath.Join(videoOut, `项目A\暂停任务.mp4`), 3), ThumbnailIndex: -1},
 		{ID: a.nextID.Add(1), Input: `E:\归档\临时修改.mp4`, Root: `E:\归档`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 122, FPS: 30, InputSize: 320 * 1024 * 1024, Status: model.StatusHeld, Progress: 0, Engine: "搁置 · 等待修改", Options: videoDefaults, Queue: previewQueue(videoDefaults, videoOut, filepath.Join(videoOut, `临时修改.mp4`), 4), Hold: &model.HoldState{FromStatus: model.StatusProcessing, Original: videoDefaults, Queue: previewQueue(videoDefaults, videoOut, filepath.Join(videoOut, `临时修改.mp4`), 4), ReservedSlot: true, HeldAt: now.Add(-20 * time.Second)}, ThumbnailIndex: -1},
 		{ID: a.nextID.Add(1), Input: `E:\归档\已完成.mp4`, Root: `E:\归档`, Kind: model.KindVideo, Width: 1920, Height: 1080, Duration: 48.7, FPS: 30, InputSize: 56 * 1024 * 1024, OutputPath: filepath.Join(videoOut, `已完成.mp4`), OutputSize: 11 * 1024 * 1024, Status: model.StatusDone, Progress: 100, Engine: "NVIDIA NVENC", Options: videoDefaults, FinishedAt: now.Add(-4 * time.Minute), ThumbnailIndex: -1},
@@ -78,6 +82,7 @@ func (a *application) v420PopulateUIPreviewTasks() {
 		a.mu.Lock()
 		a.tasks = imageTasks
 		a.mu.Unlock()
+		round12InstallPreviewThumbnails(a)
 		a.switchKind(model.KindImage)
 		return
 	}
@@ -89,6 +94,7 @@ func (a *application) v420PopulateUIPreviewTasks() {
 	a.mu.Lock()
 	a.tasks = videoTasks
 	a.mu.Unlock()
+	round12InstallPreviewThumbnails(a)
 	a.switchKind(model.KindVideo)
 }
 

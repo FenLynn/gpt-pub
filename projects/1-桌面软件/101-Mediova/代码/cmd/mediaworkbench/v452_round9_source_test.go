@@ -68,7 +68,7 @@ func TestV452Round11ScrollContract(t *testing.T) {
 }
 
 func TestV452Round9PreviewAndOutputContract(t *testing.T) {
-	preview := round9ReadSource(t, "v452_round7_list_overlay_windows.go")
+	preview := round9ReadSource(t, "v452_round12_selection_owner_windows.go") + round9ReadSource(t, "v452_round12_list_draw_windows.go") + round9ReadSource(t, "v452_round12_preview_windows.go")
 	for _, required := range []string{"ThumbnailIndex", "视频", "图片", "preview"} {
 		if !strings.Contains(preview, required) {
 			t.Fatalf("preview contract missing %q", required)

@@ -70,11 +70,11 @@ func TestFooterGeometryContinuousHorizontalMatrix(t *testing.T) {
 
 func TestFooterGeometryUsesCompactActionWidthsOnlyWhenNeeded(t *testing.T) {
 	narrow := assertFooterSafe(t, 1039, 600, true)
-	if narrow.Start.W != 112 || narrow.Pause.W != 84 || narrow.Stop.W != 84 {
+	if narrow.Start.W != 126 || narrow.Pause.W != 94 || narrow.Stop.W != 94 {
 		t.Fatalf("unexpected narrow action widths: %+v", narrow)
 	}
 	wide := assertFooterSafe(t, 1040, 600, true)
-	if wide.Start.W != 132 || wide.Pause.W != 96 || wide.Stop.W != 88 {
+	if wide.Start.W != 142 || wide.Pause.W != 106 || wide.Stop.W != 100 {
 		t.Fatalf("unexpected wide action widths: %+v", wide)
 	}
 }

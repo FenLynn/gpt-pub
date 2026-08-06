@@ -80,7 +80,7 @@ func TestRound7EditorUsesTrimNameAndSeparatedMarkers(t *testing.T) {
 		"startFlag",
 		"endFlag",
 		"currentFlag",
-		"当前  "+"\"+formatSecondsClock",
+		"当前  " + "\"+formatSecondsClock",
 	} {
 		if !strings.Contains(timeline, required) {
 			t.Fatalf("missing separated timeline marker contract: %q", required)

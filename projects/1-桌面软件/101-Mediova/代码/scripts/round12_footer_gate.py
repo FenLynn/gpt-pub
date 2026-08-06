@@ -69,6 +69,9 @@ def validate_footer(main_hwnd: int, controls: dict[str, int], step: int) -> dict
         raise RuntimeError(f"footer order/gap invalid at step {step}: {rects!r}")
     if overlaps(start, pause) or overlaps(pause, stop) or overlaps(start, stop):
         raise RuntimeError(f"footer overlap at step {step}: {rects!r}")
+    widths = {name: rects[name][2] - rects[name][0] for name in ("start", "pause", "stop")}
+    if widths["start"] < 120 or widths["pause"] < 90 or widths["stop"] < 90:
+        raise RuntimeError(f"footer button too narrow for icon and text at step {step}: {widths!r}")
     for name, rect in rects.items():
         if rect[0] < main[0] or rect[1] < main[1] or rect[2] > main[2] or rect[3] > main[3]:
             raise RuntimeError(f"footer control outside window at step {step}: {name}={rect!r}, main={main!r}")

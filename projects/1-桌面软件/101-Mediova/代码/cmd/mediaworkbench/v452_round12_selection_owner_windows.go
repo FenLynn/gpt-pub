@@ -3,26 +3,65 @@
 package main
 
 import (
-	"fmt"
-	"path/filepath"
-	"strconv"
 	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
 )
 
-const round12SelectionSubclassID = 0x45C2
+const (
+	round12SelectionSubclassID = 0x45C2
+	round12HeaderSubclassID    = 0x45C3
+	round12IDCColumnSettings   = 1072
+	round12ColumnMenuBase      = 2600
+
+	round12LVMDeleteColumn = LVM_FIRST + 28
+	round12LVMSetColumnW   = LVM_FIRST + 96
+	round12HDMGetItemCount = 0x1200
+)
+
+const (
+	round12ColNumber = iota
+	round12ColPreview
+	round12ColFile
+	round12ColResolution
+	round12ColDuration
+	round12ColDirection
+	round12ColOutputResolution
+	round12ColQuality
+	round12ColRotation
+	round12ColInputSize
+	round12ColOutputSize
+	round12ColProgress
+	round12ColStatus
+	round12ColTimeCrop
+	round12ColPictureCrop
+	round12ColumnCount
+)
+
+type round12ColumnDefinition struct {
+	name  string
+	width int
+}
+
+var round12Columns = []round12ColumnDefinition{
+	{"#", 44}, {"预览", 100}, {"文件名", 230}, {"分辨率", 100}, {"时长", 76},
+	{"方向", 66}, {"输出分辨率", 116}, {"质量", 58}, {"旋转", 88}, {"体积", 92},
+	{"压缩后", 140}, {"进度", 105}, {"状态", 124}, {"时间剪裁", 118}, {"画面剪裁", 92},
+}
 
 var (
-	round12SelectionBackground = colorRef(233, 244, 254)
-	round12SelectionText       = colorRef(52, 64, 77)
+	round12SelectionBackground = colorRef(231, 243, 255)
+	round12SelectionText       = colorRef(42, 55, 70)
+	round12CellSeparator       = colorRef(232, 237, 243)
 	round12SelectionInstalled  atomic.Bool
 	round12SelectionCallback   uintptr
+	round12HeaderCallback      uintptr
 )
 
 func init() {
 	round12SelectionCallback = syscall.NewCallback(round12SelectionMainSubclassProc)
+	round12HeaderCallback = syscall.NewCallback(round12HeaderSubclassProc)
 	go func() {
 		for attempt := 0; attempt < 800; attempt++ {
 			a := app
@@ -33,7 +72,10 @@ func init() {
 					}
 					if ok, _, _ := v452SetWindowSubclass.Call(a.hwnd, round12SelectionCallback, round12SelectionSubclassID, 0); ok != 0 {
 						round12SelectionInstalled.Store(true)
-						procInvalidateRect.Call(a.hList, 0, 0)
+						round12EnsureListStructure(a)
+						round12LayoutTopButtons(a)
+						round12InstallPreviewThumbnails(a)
+						procInvalidateRect.Call(a.hList, 0, 1)
 					}
 				})
 				return
@@ -45,24 +87,65 @@ func init() {
 
 func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	a := app
-	if a != nil && hwnd == a.hwnd && message == WM_NOTIFY && lParam != 0 {
-		hdr := (*nmhdr)(unsafe.Pointer(lParam))
-		if hdr.HwndFrom == a.hList && hdr.Code == NM_CUSTOMDRAW {
-			cd := (*nmListViewCustomDraw)(unsafe.Pointer(lParam))
-			switch cd.NMCD.DrawStage {
-			case CDDS_PREPAINT:
-				return CDRF_NOTIFYITEMDRAW
-			case CDDS_ITEMPREPAINT:
-				return CDRF_NOTIFYSUBITEMDRAW
-			case CDDS_ITEMPREPAINT | CDDS_SUBITEM:
-				row := int(cd.NMCD.ItemSpec)
-				if listItemSelected(a.hList, row) && round12DrawSelectedSubItem(a, cd, row) {
-					return CDRF_SKIPDEFAULT
+	if a == nil || hwnd != a.hwnd {
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		return result
+	}
+
+	switch message {
+	case WM_NOTIFY:
+		if lParam != 0 {
+			hdr := (*nmhdr)(unsafe.Pointer(lParam))
+			if hdr.HwndFrom == a.hList {
+				switch hdr.Code {
+				case NM_CUSTOMDRAW:
+					return round12DrawTaskListCell(a, (*nmListViewCustomDraw)(unsafe.Pointer(lParam)))
+				case LVN_COLUMNCLICK:
+					n := (*nmListView)(unsafe.Pointer(lParam))
+					if legacy, ok := round12LegacySortColumn(int(n.IItemSub)); ok {
+						a.toggleTaskSort(legacy)
+					}
+					return 0
 				}
 			}
 		}
-	}
-	if message == v452WMNCDestroy {
+	case WM_COMMAND:
+		id := int(loWord(wParam))
+		if id == round12IDCColumnSettings {
+			round12ShowColumnSettings(a)
+			return 0
+		}
+		if column := id - round12ColumnMenuBase; round12ToggleAllowed(column) {
+			round12ToggleColumn(a, column)
+			return 0
+		}
+		if id == IDC_TAB_VIDEO || id == IDC_TAB_IMAGE {
+			round12CaptureProfile(a, a.currentKind, true)
+			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+			round12EnsureListStructure(a)
+			round12ApplyProfile(a, a.currentKind)
+			round12LayoutTopButtons(a)
+			return result
+		}
+		if id == IDC_RIGHT_TOGGLE {
+			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+			round12LayoutTopButtons(a)
+			return result
+		}
+	case WM_DRAWITEM:
+		if lParam != 0 && round12DrawColumnButton((*drawItemStruct)(unsafe.Pointer(lParam))) {
+			return 1
+		}
+	case WM_SIZE, WM_APP_REFRESH, round7FeedbackWMInit:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		round12EnsureListStructure(a)
+		round12ApplyProfile(a, a.currentKind)
+		round12LayoutTopButtons(a)
+		round12InstallPreviewThumbnails(a)
+		return result
+	case WM_DESTROY:
+		round12CaptureProfile(a, a.currentKind, true)
+	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round12SelectionCallback, subclassID)
 		round12SelectionInstalled.Store(false)
 	}
@@ -70,155 +153,68 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 	return result
 }
 
-func round12DrawSelectedSubItem(a *application, cd *nmListViewCustomDraw, row int) bool {
-	if a == nil || cd == nil || row < 0 {
-		return false
-	}
-	task, ok := a.visibleTaskSnapshot(row)
-	if !ok {
-		return false
-	}
-	column := int(cd.ISubItem)
-	cell := cd.NMCD.Rc
-	if exact, exactOK := listSubItemBounds(a.hList, row, column); exactOK {
-		cell.Left = exact.Left
-		cell.Right = exact.Right
-	}
-	fillSolid(cd.NMCD.HDC, cell, round12SelectionBackground)
-
-	switch column {
-	case taskColNumber:
-		drawCenteredText(cd.NMCD.HDC, strconv.Itoa(row+1), cell, uiFontSmall, round12SelectionText)
-	case taskColFile:
-		round12DrawSelectedPreviewAndFile(a, cd.NMCD.HDC, cell, row)
-	case taskColOutputSize:
-		_, label, _ := compressionCellMetrics(&task)
-		round12DrawSelectedCompression(cd.NMCD.HDC, cell, task.InputSize, task.OutputSize, label)
-	case taskColProgress:
-		fraction, label := progressCellMetrics(&task)
-		round12DrawSelectedProgress(cd.NMCD.HDC, cell, fraction, label)
-	case taskColStatus:
-		texts := a.taskTexts(&task)
-		label := ""
-		if taskColStatus-1 >= 0 && taskColStatus-1 < len(texts) {
-			label = texts[taskColStatus-1]
-		}
-		textRect := cell
-		textRect.Left += scaleDPI(8)
-		old, _, _ := procSelectObject.Call(cd.NMCD.HDC, uiFontSmall)
-		procSetBkMode.Call(cd.NMCD.HDC, TRANSPARENT)
-		procSetTextColor.Call(cd.NMCD.HDC, taskStatusColor(task.Status))
-		procDrawTextW.Call(cd.NMCD.HDC, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&textRect)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
-		if old != 0 {
-			procSelectObject.Call(cd.NMCD.HDC, old)
-		}
+func round12LegacySortColumn(column int) (int, bool) {
+	switch {
+	case column == round12ColNumber:
+		return taskColNumber, true
+	case column == round12ColPreview:
+		return taskColNumber, true
+	case column >= round12ColFile && column <= round12ColStatus:
+		return column - 1, true
 	default:
-		texts := append([]string{fmt.Sprintf("%d", row+1)}, a.taskTexts(&task)...)
-		label := ""
-		if column >= 0 && column < len(texts) {
-			label = texts[column]
-		}
-		textRect := cell
-		textRect.Left += scaleDPI(8)
-		textRect.Right -= scaleDPI(5)
-		old, _, _ := procSelectObject.Call(cd.NMCD.HDC, uiFontSmall)
-		procSetBkMode.Call(cd.NMCD.HDC, TRANSPARENT)
-		procSetTextColor.Call(cd.NMCD.HDC, round12SelectionText)
-		procDrawTextW.Call(cd.NMCD.HDC, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&textRect)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
-		if old != 0 {
-			procSelectObject.Call(cd.NMCD.HDC, old)
-		}
+		return 0, false
 	}
-	fillSolid(cd.NMCD.HDC, rect{Left: cell.Left, Top: cell.Bottom - 1, Right: cell.Right, Bottom: cell.Bottom}, colorRef(217, 232, 247))
-	return true
 }
 
-func round12DrawSelectedPreviewAndFile(a *application, hdc uintptr, cell rect, row int) {
-	if a == nil || hdc == 0 {
+func round12EnsureListStructure(a *application) {
+	if a == nil || a.hList == 0 {
 		return
 	}
-	task, ok := a.visibleTaskSnapshot(row)
-	if !ok {
-		return
+	header := send(a.hList, LVM_GETHEADER, 0, 0)
+	count := 0
+	if header != 0 {
+		count = int(send(header, round12HDMGetItemCount, 0, 0))
 	}
-	preview := rect{Left: cell.Left + scaleDPI(6), Top: cell.Top + scaleDPI(4), Right: cell.Left + scaleDPI(88), Bottom: cell.Bottom - scaleDPI(4)}
-	if preview.Bottom-preview.Top > scaleDPI(48) {
-		preview.Top = (cell.Top + cell.Bottom - scaleDPI(48)) / 2
-		preview.Bottom = preview.Top + scaleDPI(48)
-	}
-	drawn := false
-	if a.hImageList != 0 && task.ThumbnailIndex >= 0 {
-		count, _, _ := round7ImageListCount.Call(a.hImageList)
-		if task.ThumbnailIndex < int(count) {
-			ok, _, _ := round7ImageListDraw.Call(a.hImageList, uintptr(task.ThumbnailIndex), hdc, uintptr(preview.Left), uintptr(preview.Top), 0)
-			drawn = ok != 0
+	if count != round12ColumnCount {
+		for count > 0 {
+			send(a.hList, round12LVMDeleteColumn, 0, 0)
+			count--
+		}
+		for index, definition := range round12Columns {
+			text := p(definition.name)
+			column := lvColumn{Mask: LVCF_TEXT | LVCF_WIDTH | LVCF_FMT, Fmt: LVCFMT_LEFT, Cx: int32(definition.width), PszText: text}
+			send(a.hList, LVM_INSERTCOLUMNW, uintptr(index), uintptr(unsafe.Pointer(&column)))
+		}
+	} else {
+		for index, definition := range round12Columns {
+			text := p(definition.name)
+			column := lvColumn{Mask: LVCF_TEXT, PszText: text}
+			send(a.hList, round12LVMSetColumnW, uintptr(index), uintptr(unsafe.Pointer(&column)))
 		}
 	}
-	if !drawn {
-		fillSolid(hdc, preview, colorRef(241, 244, 248))
-		border := colorRef(211, 218, 227)
-		fillSolid(hdc, rect{Left: preview.Left, Top: preview.Top, Right: preview.Right, Bottom: preview.Top + 1}, border)
-		fillSolid(hdc, rect{Left: preview.Left, Top: preview.Bottom - 1, Right: preview.Right, Bottom: preview.Bottom}, border)
-		fillSolid(hdc, rect{Left: preview.Left, Top: preview.Top, Right: preview.Left + 1, Bottom: preview.Bottom}, border)
-		fillSolid(hdc, rect{Left: preview.Right - 1, Top: preview.Top, Right: preview.Right, Bottom: preview.Bottom}, border)
-		kind := "图片"
-		if string(task.Kind) == "video" {
-			kind = "视频"
-		}
-		drawCenteredText(hdc, kind, preview, uiFontSmall, colorRef(132, 144, 158))
+	if header = send(a.hList, LVM_GETHEADER, 0, 0); header != 0 {
+		v452RemoveSubclass.Call(header, round7FeedbackHeaderSubclassCB, round7FeedbackHeaderSubclassID)
+		v452SetWindowSubclass.Call(header, round12HeaderCallback, round12HeaderSubclassID, 0)
+		send(header, WM_SETFONT, uiFontBold, 1)
+		procInvalidateRect.Call(header, 0, 1)
 	}
-	textRect := cell
-	textRect.Left += scaleDPI(98)
-	textRect.Right -= scaleDPI(6)
-	old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
-	procSetBkMode.Call(hdc, TRANSPARENT)
-	procSetTextColor.Call(hdc, round12SelectionText)
-	label := filepath.Base(task.Input)
-	procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&textRect)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
-	if old != 0 {
-		procSelectObject.Call(hdc, old)
+	if a.hHeaderLine != 0 {
+		show(a.hHeaderLine, false)
 	}
+	round12LoadProfiles()
 }
 
-func round12DrawSelectedProgress(hdc uintptr, rc rect, fraction float64, label string) {
-	fillSolid(hdc, rc, round12SelectionBackground)
-	fraction = clamp01(fraction)
-	bar := fullCellBarRect(rc)
-	fillSolid(hdc, bar, colorRef(239, 243, 248))
-	fill := rect{Left: bar.Left, Top: bar.Top, Right: bar.Left, Bottom: bar.Bottom}
-	if fraction > 0 {
-		fill = bar
-		fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
-		if fill.Right < fill.Left+3 {
-			fill.Right = fill.Left + 3
+func round12HeaderSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	switch message {
+	case WM_LBUTTONUP:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		if app != nil {
+			round12CaptureProfile(app, app.currentKind, true)
 		}
-		drawHorizontalGradient(hdc, fill, colorRef(169, 204, 243), colorRef(76, 138, 220))
+		return result
+	case v452WMNCDestroy:
+		v452RemoveSubclass.Call(hwnd, round12HeaderCallback, subclassID)
 	}
-	drawRoundedBorder(hdc, bar, 3, colorRef(218, 225, 234))
-	drawContrastCenteredText(hdc, label, bar, fill, uiFontSmall)
-}
-
-func round12DrawSelectedCompression(hdc uintptr, rc rect, inputSize, outputSize int64, label string) {
-	fillSolid(hdc, rc, round12SelectionBackground)
-	bar := fullCellBarRect(rc)
-	fillSolid(hdc, bar, colorRef(239, 243, 248))
-	if inputSize > 0 && outputSize > 0 {
-		visual := compressionVisualFor(inputSize, outputSize)
-		split := bar.Left + int32(float64(bar.Right-bar.Left)*visual.InputFraction)
-		if split <= bar.Left {
-			split = bar.Left + 1
-		}
-		if split >= bar.Right {
-			split = bar.Right - 1
-		}
-		left := bar
-		left.Right = split
-		right := bar
-		right.Left = split
-		fillSolid(hdc, left, colorRef(228, 233, 239))
-		start, finish := compressionColorPair(visual)
-		drawHorizontalGradient(hdc, right, start, finish)
-	}
-	drawRoundedBorder(hdc, bar, 3, colorRef(218, 225, 234))
-	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(35, 51, 70))
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	return result
 }
