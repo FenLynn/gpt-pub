@@ -97,6 +97,18 @@ def bottom_hash(hwnd: int, save_path: Path | None = None) -> str:
         frame.close()
 
 
+def merge_report(evidence: Path, footer_report: dict[str, Any]) -> None:
+    report_path = evidence / "flicker-report.json"
+    combined: dict[str, Any] = {}
+    if report_path.is_file():
+        combined = json.loads(report_path.read_text(encoding="utf-8"))
+    combined["round12_footer"] = footer_report
+    report_path.write_text(json.dumps(combined, ensure_ascii=False, indent=2), encoding="utf-8")
+    (evidence / "footer-report.json").write_text(
+        json.dumps(footer_report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", required=True, type=Path)
@@ -158,9 +170,7 @@ def main() -> int:
                 "stable_hash": unique[0],
             }
         )
-        (evidence / "footer-report.json").write_text(
-            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        merge_report(evidence, report)
         print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))
         return 0
     finally:
