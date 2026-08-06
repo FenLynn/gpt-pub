@@ -1,0 +1,12 @@
+AtlasDesk v1.3.0 focused Command Center
+
+This release turns the existing Ctrl+K window into a focused global quick-open surface.
+
+- Ctrl+K and the existing command button open one compact palette for pages, the current project, configured project files, explicit commands, linked literature, recent files and existing local actions.
+- Current-project context from ProductivityContextStore remains the only project-resource source; no second index or command system is introduced.
+- Results are ranked by exact title, prefix, category and existing action priority so the current project and its resources stay near the top.
+- The palette is smaller, flatter and keyboard-first; Ctrl+K is shown in the footer instead of inside the search field.
+- Workspace traversal, project rescanning, task-history loading and direct Zotero database search are removed from Command Center refreshes.
+- No new Data file, schema, background scan, timer, file watcher, browser workspace, plugin system or Agent is introduced.
+- Existing navigation, terminal, Dashboard, workspace and read-only Zotero actions continue through their current owners.
+- Runtime/Data separation and the formal main v1.0.0 baseline remain unchanged pending candidate validation.
