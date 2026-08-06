@@ -37,12 +37,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          bad=$(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD" \
-            | grep -Ev '^(projects/1-桌面软件/102-AtlasDesk/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p102-atlasdesk-ci\.yml$)' || true)
-          if [[ -n "$bad" ]]; then
-            echo 'Out-of-scope P102 changes:'
-            echo "$bad"
+          git fetch origin "${{ github.base_ref }}" main --depth=1
+          bad=()
+          while IFS= read -r path; do
+            if [[ "$path" =~ ^(projects/1-桌面软件/102-AtlasDesk/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p102-atlasdesk-ci\.yml$) ]]; then
+              continue
+            fi
+            if git diff --quiet origin/main -- "$path"; then
+              echo "Inherited unchanged from main: $path"
+              continue
+            fi
+            bad+=("$path")
+          done < <(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if (( ${#bad[@]} > 0 )); then
+            echo 'Out-of-scope P102 changes that differ from main:'
+            printf '%s\n' "${bad[@]}"
             exit 1
           fi
 
