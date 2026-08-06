@@ -26,23 +26,30 @@ IDC_TAB_IMAGE = 1002
 
 
 class HDITEMW(ctypes.Structure):
+    # Win64 commctrl HDITEMW. Pointer fields intentionally use c_void_p so
+    # ctypes preserves the native 8-byte alignment and does not try to marshal
+    # the caller-owned UTF-16 buffer as a Python string value.
     _fields_ = [
-        ("mask", wintypes.UINT),
-        ("cxy", ctypes.c_int),
-        ("pszText", wintypes.LPWSTR),
-        ("hbm", wintypes.HBITMAP),
-        ("cchTextMax", ctypes.c_int),
-        ("fmt", ctypes.c_int),
+        ("mask", ctypes.c_uint32),
+        ("cxy", ctypes.c_int32),
+        ("pszText", ctypes.c_void_p),
+        ("hbm", ctypes.c_void_p),
+        ("cchTextMax", ctypes.c_int32),
+        ("fmt", ctypes.c_int32),
         ("lParam", ctypes.c_ssize_t),
-        ("iImage", ctypes.c_int),
-        ("iOrder", ctypes.c_int),
-        ("type", wintypes.UINT),
+        ("iImage", ctypes.c_int32),
+        ("iOrder", ctypes.c_int32),
+        ("type", ctypes.c_uint32),
         ("pvFilter", ctypes.c_void_p),
-        ("state", wintypes.UINT),
+        ("state", ctypes.c_uint32),
     ]
 
 
-gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+if ctypes.sizeof(ctypes.c_void_p) == 8 and ctypes.sizeof(HDITEMW) != 72:
+    raise RuntimeError(f"unexpected Win64 HDITEMW size: {ctypes.sizeof(HDITEMW)}")
+
+
+gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, ctypes.c_ssize_t]
 gate.user32.SendMessageW.restype = ctypes.c_ssize_t
 
 
@@ -60,10 +67,15 @@ def header_titles(hwnd: int) -> list[str]:
     values: list[str] = []
     for index in range(count):
         buffer = ctypes.create_unicode_buffer(256)
-        item = HDITEMW(mask=HDI_TEXT, pszText=ctypes.cast(buffer, wintypes.LPWSTR), cchTextMax=len(buffer))
+        item = HDITEMW()
+        item.mask = HDI_TEXT
+        item.pszText = ctypes.addressof(buffer)
+        item.cchTextMax = len(buffer)
         result = gate.user32.SendMessageW(hwnd, HDM_GETITEMW, index, ctypes.addressof(item))
         if result == 0:
-            raise RuntimeError(f"HDM_GETITEMW failed for column {index}")
+            raise RuntimeError(
+                f"HDM_GETITEMW failed for column {index}; sizeof(HDITEMW)={ctypes.sizeof(HDITEMW)}"
+            )
         text = buffer.value.strip()
         if not text:
             raise RuntimeError(f"empty header caption at column {index}")
