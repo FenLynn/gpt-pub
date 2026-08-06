@@ -18,10 +18,11 @@ var (
 	round12SelectionBackground = colorRef(233, 244, 254)
 	round12SelectionText       = colorRef(52, 64, 77)
 	round12SelectionInstalled  atomic.Bool
-	round12SelectionCallback   = syscall.NewCallback(round12SelectionMainSubclassProc)
+	round12SelectionCallback   uintptr
 )
 
 func init() {
+	round12SelectionCallback = syscall.NewCallback(round12SelectionMainSubclassProc)
 	go func() {
 		for attempt := 0; attempt < 800; attempt++ {
 			a := app
