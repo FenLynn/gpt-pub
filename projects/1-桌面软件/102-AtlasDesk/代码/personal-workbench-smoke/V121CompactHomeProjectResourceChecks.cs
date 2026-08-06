@@ -13,8 +13,8 @@ internal static class V121CompactHomeProjectResourceChecks
             .Descendants("WorkbenchVersion")
             .Select(node => node.Value.Trim())
             .FirstOrDefault();
-        if (!Version.TryParse(versionText, out var version) || version != new Version(1, 2, 1))
-            throw new InvalidOperationException("AtlasDesk compact home and project-resource candidate must be v1.2.1.");
+        if (!Version.TryParse(versionText, out var version) || version < new Version(1, 2, 1))
+            throw new InvalidOperationException("AtlasDesk compact home and project-resource baseline requires v1.2.1 or newer.");
 
         var source = File.ReadAllText(RequireFile(nativeRoot, "CompactProjectExperience.cs"));
         var notes = File.ReadAllText(RequireFile(nativeRoot, "RELEASE_NOTES_v1.2.1.txt"));
@@ -51,7 +51,7 @@ internal static class V121CompactHomeProjectResourceChecks
             "main remains the formal v1.0.0 baseline");
 
         Console.WriteLine(
-            "PASS AtlasDesk v1.2.1 reuses existing session state and loaded project resources without adding a new subsystem");
+            "PASS AtlasDesk v1.2.1 compact home and project-resource baseline remains intact for current and later candidates");
     }
 
     private static string RequireFile(string root, params string[] parts)
