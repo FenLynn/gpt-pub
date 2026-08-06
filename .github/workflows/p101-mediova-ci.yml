@@ -297,15 +297,30 @@ jobs:
           if ($json.version -ne '4.5.2' -or $checks.Count -lt 126) { throw 'Native self-test identity or check-count mismatch' }
           if (-not $json.passed -or $failed.Count -gt 0) { throw 'Native self-test contains failed checks' }
 
+      - name: Verify round-11 idle and hover stability
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          python -m pip install --disable-pip-version-check --no-input pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw 'Pillow installation failed.' }
+          New-Item build/flicker-evidence -ItemType Directory -Force | Out-Null
+          python scripts/round11_flicker_gate_runner.py `
+            --exe build/Runtime/Mediova.exe `
+            --evidence build/flicker-evidence
+          if ($LASTEXITCODE -ne 0) { throw 'Round-11 flicker gate failed.' }
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: P101-Mediova-v4.5.2-Round7-Verification-CI
+          name: P101-Mediova-v4.5.2-Round11-Verification-CI
           path: |
             projects/1-桌面软件/101-Mediova/代码/build/Mediova-v4.5.2-Verification-Runtime.zip
             projects/1-桌面软件/101-Mediova/代码/build/SHA256.txt
             projects/1-桌面软件/101-Mediova/代码/build/ci_self_test.json
             projects/1-桌面软件/101-Mediova/代码/build/ui-preview/*.png
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/*.png
+            projects/1-桌面软件/101-Mediova/代码/build/flicker-evidence/flicker-report.json
             projects/1-桌面软件/101-Mediova/代码/build/Runtime/Mediova.exe
             projects/1-桌面软件/101-Mediova/代码/build/Runtime/runtime-manifest.json
             projects/1-桌面软件/101-Mediova/代码/build/Runtime/THIRD_PARTY_NOTICES.md
