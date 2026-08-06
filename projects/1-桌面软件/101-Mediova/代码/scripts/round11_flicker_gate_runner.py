@@ -5,6 +5,7 @@ import sys
 import time
 from ctypes import wintypes
 from pathlib import Path
+from typing import Any
 
 import round11_flicker_gate as gate
 
@@ -13,31 +14,10 @@ LVM_FIRST = 0x1000
 LVM_GETITEMCOUNT = LVM_FIRST + 4
 LVM_GETCOLUMNWIDTH = LVM_FIRST + 29
 LVM_GETCOUNTPERPAGE = LVM_FIRST + 40
-LVM_INSERTITEMW = LVM_FIRST + 77
 HDM_FIRST = 0x1200
 HDM_GETITEMCOUNT = HDM_FIRST + 0
-LVIF_TEXT = 0x0001
 SRCCOPY = 0x00CC0020
-
-
-class LVITEMW(ctypes.Structure):
-    _fields_ = [
-        ("mask", wintypes.UINT),
-        ("iItem", ctypes.c_int),
-        ("iSubItem", ctypes.c_int),
-        ("state", wintypes.UINT),
-        ("stateMask", wintypes.UINT),
-        ("pszText", wintypes.LPWSTR),
-        ("cchTextMax", ctypes.c_int),
-        ("iImage", ctypes.c_int),
-        ("lParam", wintypes.LPARAM),
-        ("iIndent", ctypes.c_int),
-        ("iGroupId", ctypes.c_int),
-        ("cColumns", wintypes.UINT),
-        ("puColumns", ctypes.POINTER(wintypes.UINT)),
-        ("piColFmt", ctypes.POINTER(ctypes.c_int)),
-        ("iGroup", ctypes.c_int),
-    ]
+ROUND11_SCROLL_PREVIEW_ARG = "--round11-scroll-preview"
 
 
 gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
@@ -144,45 +124,18 @@ def list_overflow_state(main_hwnd: int) -> dict[str, int | bool]:
     }
 
 
-def inject_vertical_overflow(main_hwnd: int, target_count: int = 28) -> None:
-    list_hwnd, _header_hwnd = list_handles(main_hwnd)
-    current = int(gate.user32.SendMessageW(list_hwnd, LVM_GETITEMCOUNT, 0, 0))
-    for index in range(current, target_count):
-        text = ctypes.create_unicode_buffer(f"Round 11 滚动稳定性验证任务 {index + 1:02d}")
-        item = LVITEMW(
-            mask=LVIF_TEXT,
-            iItem=0x7FFFFFFF,
-            iSubItem=0,
-            pszText=ctypes.cast(text, wintypes.LPWSTR),
-            cchTextMax=len(text),
-            iImage=-1,
-        )
-        result = int(
-            gate.user32.SendMessageW(
-                list_hwnd,
-                LVM_INSERTITEMW,
-                0,
-                ctypes.addressof(item),
-            )
-        )
-        if result < 0:
-            raise RuntimeError(f"LVM_INSERTITEMW failed at row {index}")
-
-
 def establish_real_overflow(main_hwnd: int) -> dict[str, int | bool]:
     if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1120, 520, True):
         raise ctypes.WinError(ctypes.get_last_error())
-    time.sleep(0.8)
-    state = list_overflow_state(main_hwnd)
-    if not bool(state["horizontal"]):
-        raise RuntimeError(f"normal layout did not produce horizontal overflow: {state!r}")
-    if not bool(state["vertical"]):
-        inject_vertical_overflow(main_hwnd)
-        time.sleep(1.0)
+    deadline = time.monotonic() + 10.0
+    state: dict[str, int | bool] = {}
+    while time.monotonic() < deadline:
         state = list_overflow_state(main_hwnd)
-    if not bool(state["vertical"]) or not bool(state["horizontal"]):
-        raise RuntimeError(f"real ListView messages did not produce two-axis overflow: {state!r}")
-    return state
+        if int(state["item_count"]) >= 35 and bool(state["vertical"]) and bool(state["horizontal"]):
+            time.sleep(0.6)
+            return list_overflow_state(main_hwnd)
+        time.sleep(0.10)
+    raise RuntimeError(f"test-only real task mode did not produce two-axis overflow: {state!r}")
 
 
 def direct_surface_hover(
@@ -247,8 +200,43 @@ def direct_surface_hover(
     return records
 
 
+_original_run_window_probe = gate.run_window_probe
+
+
+def run_window_probe_with_real_scroll_tasks(
+    exe: Path,
+    args: list[str],
+    title_prefix: str,
+    window_name: str,
+    width: int,
+    height: int,
+    settle_seconds: float,
+    regions: list[dict[str, Any]],
+    evidence: Path,
+    env: dict[str, str],
+    test_hover: bool = False,
+):
+    launch_args = list(args)
+    if test_hover and ROUND11_SCROLL_PREVIEW_ARG not in launch_args:
+        launch_args.append(ROUND11_SCROLL_PREVIEW_ARG)
+    return _original_run_window_probe(
+        exe,
+        launch_args,
+        title_prefix,
+        window_name,
+        width,
+        height,
+        settle_seconds,
+        regions,
+        evidence,
+        env,
+        test_hover,
+    )
+
+
 def main() -> int:
     gate.check_surface_hover = direct_surface_hover
+    gate.run_window_probe = run_window_probe_with_real_scroll_tasks
     return gate.main()
 
 
