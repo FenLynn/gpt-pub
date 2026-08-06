@@ -17,28 +17,22 @@ const (
 )
 
 var (
-	round7ListGetDC             = user32.NewProc("GetDC")
-	round7ListReleaseDC         = user32.NewProc("ReleaseDC")
-	round7ImageListDraw         = comctl32.NewProc("ImageList_Draw")
-	round7ImageListCount        = comctl32.NewProc("ImageList_GetImageCount")
+	round7ListGetDC              = user32.NewProc("GetDC")
+	round7ListReleaseDC          = user32.NewProc("ReleaseDC")
+	round7ImageListDraw          = comctl32.NewProc("ImageList_Draw")
+	round7ImageListCount         = comctl32.NewProc("ImageList_GetImageCount")
 	round12ListIntersectClipRect = gdi32.NewProc("IntersectClipRect")
 )
 
-// round7DrawListOverlay owns the number and preview cells. A preview slot is
-// always reserved: cached thumbnails are drawn when available; otherwise a
-// calm media placeholder makes the loading/failed state explicit instead of
-// silently collapsing the column back to a plain filename.
+// round7DrawListOverlay owns the number and preview cells for unselected rows.
+// Selected rows are painted by the round-12 single selection owner so every
+// subitem receives exactly the same light-blue surface and dark text.
 func round7DrawListOverlay(a *application, hdc uintptr) {
 	if a == nil || a.hList == 0 || hdc == 0 {
 		return
 	}
 	var client rect
 	procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client)))
-
-	// The ListView header is a child window but WM_PRINT can hand the overlay a
-	// surface whose origin also contains the header. Clip every overlay path to
-	// the real data viewport. This prevents a preview border or row background
-	// from ever covering column text, including PrintWindow screenshots.
 	clipTop := client.Top
 	if header := send(a.hList, LVM_GETHEADER, 0, 0); header != 0 {
 		if headerRect, ok := childClientRect(header, a.hList); ok && headerRect.Bottom > clipTop {
@@ -66,21 +60,18 @@ func round7DrawListOverlay(a *application, hdc uintptr) {
 		if !ok || fileCell.Bottom <= clipTop || fileCell.Top > client.Bottom {
 			continue
 		}
+		// The round-12 custom-draw path has already painted every selected
+		// subitem, including number, preview and filename. Never repaint those
+		// cells with an active/inactive system selection variant.
+		if listItemSelected(a.hList, row) {
+			continue
+		}
 		task, ok := a.visibleTaskSnapshot(row)
 		if !ok {
 			continue
 		}
-		selected := listItemSelected(a.hList, row)
-		focus, _, _ := procGetFocus.Call()
-		activeSelection := selected && focus == a.hList
 		background := colorRef(255, 255, 255)
 		textColor := colorRef(52, 61, 74)
-		if selected {
-			background = colorRef(235, 244, 254)
-			if activeSelection {
-				background = colorRef(221, 237, 255)
-			}
-		}
 
 		numberCell := rect{Left: fileCell.Left - numberWidth, Top: fileCell.Top, Right: fileCell.Left, Bottom: fileCell.Bottom}
 		if numberCell.Right > client.Left && numberCell.Left < client.Right {
@@ -96,12 +87,7 @@ func round7DrawListOverlay(a *application, hdc uintptr) {
 		}
 
 		fillSolid(hdc, fileCell, background)
-		preview := rect{
-			Left:   fileCell.Left + scaleDPI(6),
-			Top:    fileCell.Top + scaleDPI(4),
-			Right:  fileCell.Left + scaleDPI(88),
-			Bottom: fileCell.Bottom - scaleDPI(4),
-		}
+		preview := rect{Left: fileCell.Left + scaleDPI(6), Top: fileCell.Top + scaleDPI(4), Right: fileCell.Left + scaleDPI(88), Bottom: fileCell.Bottom - scaleDPI(4)}
 		if preview.Bottom-preview.Top > scaleDPI(48) {
 			preview.Top = (fileCell.Top + fileCell.Bottom - scaleDPI(48)) / 2
 			preview.Bottom = preview.Top + scaleDPI(48)
