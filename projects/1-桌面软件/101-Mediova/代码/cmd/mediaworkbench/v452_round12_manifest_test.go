@@ -41,10 +41,11 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 22 {
-		t.Fatalf("entries=%d want=22", entries)
+	if entries != 23 {
+		t.Fatalf("entries=%d want=23", entries)
 	}
 	for _, path := range []string{
+		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
 		"cmd/mediaworkbench/v452_round12_selection_owner_windows.go",
 		"cmd/mediaworkbench/v452_round12_activation_bridge_windows.go",
 		"cmd/mediaworkbench/v452_round12_list_draw_windows.go",
