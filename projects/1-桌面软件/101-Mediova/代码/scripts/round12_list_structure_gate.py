@@ -25,7 +25,12 @@ from round12_list_gate_helpers import (
     column_width,
     send_command,
 )
-from round12_list_gate_visual import validate_left_list_image, validate_right_list_image, validate_selected_stability
+from round12_list_gate_visual import (
+    validate_left_list_image,
+    validate_right_list_image,
+    validate_selected_columns,
+    validate_selected_stability,
+)
 from round12_remote_header import EXPECTED_CAPTIONS, RemoteHeaderReader, header_handle
 
 LVM_FIRST = 0x1000
@@ -64,8 +69,10 @@ def read_relative_cells(
     return relative_cells, screen_rows
 
 
-def merge_selected_samples(left: dict[int, list[int]], right: dict[int, list[int]], count: int) -> list[list[int]]:
-    merged = {**left, **right}
+def merge_selected_samples(parts: list[dict[int, list[int]]], count: int) -> list[list[int]]:
+    merged: dict[int, list[int]] = {}
+    for part in parts:
+        merged.update(part)
     missing = [column for column in range(count) if column not in merged]
     if missing:
         raise RuntimeError(f"selected background columns were not all sampled: missing={missing}")
@@ -147,9 +154,22 @@ def main() -> int:
 
         stable_unique_hashes = validate_selected_stability(screen_rows[0], evidence)
 
-        # The list is deliberately wider than its viewport. Validate the right
-        # half after a real ListView horizontal scroll instead of clamping
-        # off-screen coordinates to the screenshot edge.
+        # Column 7 straddles the initial viewport boundary. Scroll a small,
+        # real ListView distance so that the whole cell is visible and verify
+        # it from a separate middle screenshot instead of clipping it.
+        gate.user32.SendMessageW(list_hwnd, LVM_SCROLL, 80, 0)
+        time.sleep(0.30)
+        middle_cells, _ = read_relative_cells(reader, list_hwnd, len(captions), list_info)
+        middle_image = runner.capture_screen_rect(list_info["rect"])
+        try:
+            middle_image.save(evidence / "round12-list-structure-middle.png")
+            middle_samples = validate_selected_columns(middle_image, middle_cells[0], [7])
+        finally:
+            middle_image.close()
+
+        # The list is deliberately wider than its viewport. Move to the real
+        # right edge, re-read all cell rectangles, and validate columns 8-14
+        # including the two trim summary columns.
         gate.user32.SendMessageW(list_hwnd, LVM_SCROLL, 5000, 0)
         time.sleep(0.45)
         right_cells, _ = read_relative_cells(reader, list_hwnd, len(captions), list_info)
@@ -160,8 +180,11 @@ def main() -> int:
             right_image.close()
 
         selected_samples = merge_selected_samples(
-            left_visual["selected_background_samples"],
-            right_visual["selected_background_samples"],
+            [
+                left_visual["selected_background_samples"],
+                middle_samples,
+                right_visual["selected_background_samples"],
+            ],
             len(captions),
         )
         profile = validate_column_profiles(main_hwnd, list_hwnd)
@@ -175,7 +198,7 @@ def main() -> int:
             "preview_unique_colors": left_visual["preview_unique_colors"],
             "time_crop_dark_pixels": right_visual["time_crop_dark_pixels"],
             "picture_crop_dark_pixels": right_visual["picture_crop_dark_pixels"],
-            "horizontal_viewports_validated": 2,
+            "horizontal_viewports_validated": 3,
             "stable_frames": 20,
             "stable_unique_hashes": stable_unique_hashes,
             "column_settings_button_rect": column_button_info["rect"],
