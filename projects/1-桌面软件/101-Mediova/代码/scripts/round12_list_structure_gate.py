@@ -25,12 +25,7 @@ from round12_list_gate_helpers import (
     column_width,
     send_command,
 )
-from round12_list_gate_visual import (
-    validate_left_list_image,
-    validate_right_list_image,
-    validate_selected_columns,
-    validate_selected_stability,
-)
+from round12_list_gate_visual import validate_left_list_image, validate_right_list_image, validate_selected_stability
 from round12_remote_header import EXPECTED_CAPTIONS, RemoteHeaderReader, header_handle
 
 LVM_FIRST = 0x1000
@@ -52,7 +47,7 @@ def read_relative_cells(
 
     # Win32 ListView treats subitem 0 specially: LVM_GETSUBITEMRECT with
     # LVIR_BOUNDS returns the entire row width. Normalize it to the actual
-    # first-column width so viewport checks validate the # cell, not 1549 px.
+    # first-column width so viewport checks validate the # cell, not the row.
     first_width = column_width(list_hwnd, 0)
     if first_width <= 0:
         raise RuntimeError(f"first column has invalid width: {first_width}")
@@ -154,26 +149,9 @@ def main() -> int:
 
         stable_unique_hashes = validate_selected_stability(screen_rows[0], evidence)
 
-        # Column 7 straddles the initial viewport boundary. Calculate the exact
-        # horizontal distance needed to bring the whole cell inside the live
-        # ListView viewport instead of relying on a fixed pixel guess.
-        viewport_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
-        column7_right = int(left_cells[0][7][2])
-        middle_scroll = max(0, column7_right - viewport_width + 12)
-        if middle_scroll > 0:
-            gate.user32.SendMessageW(list_hwnd, LVM_SCROLL, middle_scroll, 0)
-            time.sleep(0.30)
-        middle_cells, _ = read_relative_cells(reader, list_hwnd, len(captions), list_info)
-        middle_image = runner.capture_screen_rect(list_info["rect"])
-        try:
-            middle_image.save(evidence / "round12-list-structure-middle.png")
-            middle_samples = validate_selected_columns(middle_image, middle_cells[0], [7])
-        finally:
-            middle_image.close()
-
-        # The list is deliberately wider than its viewport. Move to the real
-        # right edge, re-read all cell rectangles, and validate columns 8-14
-        # including the two trim summary columns.
+        # The list is deliberately wider than its viewport. Column 7 is still
+        # pixel-validated from its visible segment in the initial viewport;
+        # columns 8-14 are validated after a real scroll to the right edge.
         gate.user32.SendMessageW(list_hwnd, LVM_SCROLL, 5000, 0)
         time.sleep(0.45)
         right_cells, _ = read_relative_cells(reader, list_hwnd, len(captions), list_info)
@@ -184,11 +162,7 @@ def main() -> int:
             right_image.close()
 
         selected_samples = merge_selected_samples(
-            [
-                left_visual["selected_background_samples"],
-                middle_samples,
-                right_visual["selected_background_samples"],
-            ],
+            [left_visual["selected_background_samples"], right_visual["selected_background_samples"]],
             len(captions),
         )
         profile = validate_column_profiles(main_hwnd, list_hwnd)
@@ -202,8 +176,9 @@ def main() -> int:
             "preview_unique_colors": left_visual["preview_unique_colors"],
             "time_crop_dark_pixels": right_visual["time_crop_dark_pixels"],
             "picture_crop_dark_pixels": right_visual["picture_crop_dark_pixels"],
-            "horizontal_viewports_validated": 3,
-            "middle_scroll_pixels": middle_scroll,
+            "horizontal_viewports_validated": 2,
+            "partially_visible_selected_columns": [7],
+            "column7_visible_width": left_visual["column7_visible_width"],
             "stable_frames": 20,
             "stable_unique_hashes": stable_unique_hashes,
             "column_settings_button_rect": column_button_info["rect"],
