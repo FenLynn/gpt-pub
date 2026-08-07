@@ -44,6 +44,16 @@ def read_relative_cells(
 ) -> tuple[list[list[list[int]]], list[list[int]]]:
     row_rects = [reader.list_item_rect(list_hwnd, row) for row in range(3)]
     subitems = [[reader.list_subitem_rect(list_hwnd, row, column) for column in range(column_count)] for row in range(3)]
+
+    # Win32 ListView treats subitem 0 specially: LVM_GETSUBITEMRECT with
+    # LVIR_BOUNDS returns the entire row width. Normalize it to the actual
+    # first-column width so viewport checks validate the # cell, not 1549 px.
+    first_width = column_width(list_hwnd, 0)
+    if first_width <= 0:
+        raise RuntimeError(f"first column has invalid width: {first_width}")
+    for row in subitems:
+        row[0][2] = row[0][0] + first_width
+
     screen_rows = [client_rect_to_screen(list_hwnd, value) for value in row_rects]
     screen_cells = [[client_rect_to_screen(list_hwnd, value) for value in row] for row in subitems]
     origin_x, origin_y = int(list_info["rect"][0]), int(list_info["rect"][1])
