@@ -25,7 +25,12 @@ from round12_list_gate_helpers import (
     column_width,
     send_command,
 )
-from round12_list_gate_visual import validate_left_list_image, validate_right_list_image, validate_selected_stability
+from round12_list_gate_visual import (
+    validate_left_list_image,
+    validate_right_group_image,
+    validate_selected_stability,
+    validate_trim_cells,
+)
 from round12_remote_header import EXPECTED_CAPTIONS, RemoteHeaderReader, header_handle
 
 
@@ -71,6 +76,51 @@ def merge_selected_samples(parts: list[dict[int, list[int]]], count: int) -> lis
     return [merged[column] for column in range(count)]
 
 
+def set_columns_visible(main_hwnd: int, list_hwnd: int, columns: list[int], visible: bool) -> None:
+    for column in columns:
+        is_visible = column_width(list_hwnd, column) > 0
+        if is_visible != visible:
+            send_command(main_hwnd, ROUND12_COLUMN_MENU_BASE + column)
+            time.sleep(0.10)
+        now_visible = column_width(list_hwnd, column) > 0
+        if now_visible != visible:
+            raise RuntimeError(f"column visibility transition failed: column={column} expected={visible} actual={now_visible}")
+
+
+def columns_fully_visible(cells: list[list[list[int]]], image_width: int, columns: list[int]) -> bool:
+    for column in columns:
+        left, top, right, bottom = cells[0][column]
+        if left < 0 or top < 0 or right > image_width or bottom <= top or right <= left:
+            return False
+    return True
+
+
+def prepare_group_view(
+    main_hwnd: int,
+    list_hwnd: int,
+    reader: RemoteHeaderReader,
+    column_count: int,
+    list_info: dict[str, object],
+    visible_group: list[int],
+    hidden_group: list[int],
+) -> list[list[list[int]]]:
+    set_columns_visible(main_hwnd, list_hwnd, [3, 4, 5, 6], False)
+    set_columns_visible(main_hwnd, list_hwnd, hidden_group, False)
+    set_columns_visible(main_hwnd, list_hwnd, visible_group, True)
+    time.sleep(0.30)
+    cells, _ = read_relative_cells(reader, list_hwnd, column_count, list_info)
+    viewport_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
+    if not columns_fully_visible(cells, viewport_width, visible_group):
+        raise RuntimeError(
+            f"column group is not fully visible after real column toggles: group={visible_group} viewport={viewport_width} cells={[cells[0][c] for c in visible_group]}"
+        )
+    return cells
+
+
+def restore_default_columns(main_hwnd: int, list_hwnd: int) -> None:
+    set_columns_visible(main_hwnd, list_hwnd, list(range(3, 15)), True)
+
+
 def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
     video_before = column_width(list_hwnd, TASK_COL_DURATION)
     if video_before <= 0:
@@ -80,10 +130,12 @@ def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
     if video_hidden != 0:
         raise RuntimeError(f"video duration column did not hide: {video_hidden}")
     send_command(main_hwnd, IDC_TAB_IMAGE)
+    time.sleep(0.25)
     image_visible = column_width(list_hwnd, TASK_COL_DURATION)
     if image_visible <= 0:
         raise RuntimeError(f"image column profile leaked hidden video duration: {image_visible}")
     send_command(main_hwnd, IDC_TAB_VIDEO)
+    time.sleep(0.25)
     video_hidden_after_switch = column_width(list_hwnd, TASK_COL_DURATION)
     if video_hidden_after_switch != 0:
         raise RuntimeError(f"video hidden column state was not restored: {video_hidden_after_switch}")
@@ -98,68 +150,6 @@ def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
         "video_hidden_after_switch": video_hidden_after_switch,
         "video_restored": video_restored,
     }
-
-
-def columns_fully_visible(cells: list[list[list[int]]], image_width: int, start: int, end: int) -> bool:
-    for column in range(start, end + 1):
-        left, top, right, bottom = cells[0][column]
-        if left < 0 or top < 0 or right > image_width or bottom <= top or right <= left:
-            return False
-    return True
-
-
-def prepare_full_right_view(
-    main_hwnd: int,
-    list_hwnd: int,
-    reader: RemoteHeaderReader,
-    column_count: int,
-    initial_list_info: dict[str, object],
-) -> tuple[dict[str, object], list[list[list[int]]], list[int], int, int]:
-    initial_width = int(initial_list_info["rect"][2]) - int(initial_list_info["rect"][0])
-
-    # Use the product's real panel-collapse interaction instead of synthetic
-    # ListView scrolling. Round12 explicitly relocates this button below the
-    # column-settings gear, so this also exercises the intended final layout.
-    send_command(main_hwnd, IDC_RIGHT_TOGGLE)
-    time.sleep(0.45)
-    collapsed_info = child_by_handle(main_hwnd, list_hwnd)
-    collapsed_width = int(collapsed_info["rect"][2]) - int(collapsed_info["rect"][0])
-    if collapsed_width <= initial_width:
-        raise RuntimeError(f"right panel collapse did not widen task list: before={initial_width} after={collapsed_width}")
-
-    # Keep the verification window within a normal desktop width. If the full
-    # 15-column table is still wider, temporarily hide only columns already
-    # verified in the left viewport. These are restored before profile tests.
-    if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1840, 930, True):
-        raise ctypes.WinError(ctypes.get_last_error())
-    time.sleep(0.55)
-
-    hidden_for_view: list[int] = []
-    candidate_columns = [3, 4, 5, 6]
-    while True:
-        list_info = child_by_handle(main_hwnd, list_hwnd)
-        cells, _ = read_relative_cells(reader, list_hwnd, column_count, list_info)
-        viewport_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
-        if columns_fully_visible(cells, viewport_width, 7, 14):
-            return list_info, cells, hidden_for_view, initial_width, collapsed_width
-        if not candidate_columns:
-            raise RuntimeError(
-                f"right-side columns 7-14 still do not fit after real panel collapse: viewport={viewport_width} last={cells[0][14]}"
-            )
-        column = candidate_columns.pop(0)
-        if column_width(list_hwnd, column) > 0:
-            send_command(main_hwnd, ROUND12_COLUMN_MENU_BASE + column)
-            hidden_for_view.append(column)
-            time.sleep(0.25)
-
-
-def restore_view_columns(main_hwnd: int, list_hwnd: int, hidden_columns: list[int]) -> None:
-    for column in reversed(hidden_columns):
-        if column_width(list_hwnd, column) == 0:
-            send_command(main_hwnd, ROUND12_COLUMN_MENU_BASE + column)
-    for column in hidden_columns:
-        if column_width(list_hwnd, column) <= 0:
-            raise RuntimeError(f"temporary verification column did not restore: column={column}")
 
 
 def main() -> int:
@@ -208,25 +198,40 @@ def main() -> int:
 
         stable_unique_hashes = validate_selected_stability(screen_rows[0], evidence)
 
-        right_info, right_cells, hidden_for_view, initial_list_width, collapsed_list_width = prepare_full_right_view(
-            main_hwnd,
-            list_hwnd,
-            reader,
-            len(captions),
-            list_info,
-        )
-        right_image = runner.capture_screen_rect(right_info["rect"])
+        # Exercise the actual right-panel collapse interaction. The CI desktop
+        # is intentionally narrow, so complete right-side coverage is then
+        # obtained through two real column-visibility views, not LVM_SCROLL.
+        initial_list_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
+        send_command(main_hwnd, IDC_RIGHT_TOGGLE)
+        time.sleep(0.45)
+        list_info = child_by_handle(main_hwnd, list_hwnd)
+        collapsed_list_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
+        if collapsed_list_width <= initial_list_width:
+            raise RuntimeError(f"right panel collapse did not widen task list: before={initial_list_width} after={collapsed_list_width}")
+
+        group_a = [7, 8, 9, 10]
+        group_b = [11, 12, 13, 14]
+        group_a_cells = prepare_group_view(main_hwnd, list_hwnd, reader, len(captions), list_info, group_a, group_b)
+        group_a_image = runner.capture_screen_rect(list_info["rect"])
         try:
-            right_visual = validate_right_list_image(right_image, right_cells, evidence)
+            group_a_samples = validate_right_group_image(group_a_image, group_a_cells, evidence, group_a, "right-a")
         finally:
-            right_image.close()
+            group_a_image.close()
+
+        group_b_cells = prepare_group_view(main_hwnd, list_hwnd, reader, len(captions), list_info, group_b, group_a)
+        group_b_image = runner.capture_screen_rect(list_info["rect"])
+        try:
+            group_b_samples = validate_right_group_image(group_b_image, group_b_cells, evidence, group_b, "right-b")
+            trim_visual = validate_trim_cells(group_b_image, group_b_cells, evidence)
+        finally:
+            group_b_image.close()
 
         selected_samples = merge_selected_samples(
-            [left_visual["selected_background_samples"], right_visual["selected_background_samples"]],
+            [left_visual["selected_background_samples"], group_a_samples, group_b_samples],
             len(captions),
         )
 
-        restore_view_columns(main_hwnd, list_hwnd, hidden_for_view)
+        restore_default_columns(main_hwnd, list_hwnd)
         profile = validate_column_profiles(main_hwnd, list_hwnd)
         report = {
             "column_count": len(captions),
@@ -236,15 +241,14 @@ def main() -> int:
             "selected_white_text_pixels": left_visual["selected_white_text_pixels"],
             "preview_saturated_pixels": left_visual["preview_saturated_pixels"],
             "preview_unique_colors": left_visual["preview_unique_colors"],
-            "time_crop_dark_pixels": right_visual["time_crop_dark_pixels"],
-            "picture_crop_dark_pixels": right_visual["picture_crop_dark_pixels"],
-            "horizontal_viewports_validated": 2,
+            "time_crop_dark_pixels": trim_visual["time_crop_dark_pixels"],
+            "picture_crop_dark_pixels": trim_visual["picture_crop_dark_pixels"],
+            "horizontal_viewports_validated": 3,
             "all_selected_columns_fully_visible": True,
             "right_panel_collapsed_for_full_view": True,
             "initial_list_width": initial_list_width,
             "collapsed_list_width": collapsed_list_width,
-            "full_view_list_width": int(right_info["rect"][2]) - int(right_info["rect"][0]),
-            "temporarily_hidden_left_columns": hidden_for_view,
+            "right_view_groups": [group_a, group_b],
             "stable_frames": 20,
             "stable_unique_hashes": stable_unique_hashes,
             "column_settings_button_rect": column_button_info["rect"],
