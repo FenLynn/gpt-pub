@@ -90,15 +90,79 @@ def generate_fixture(ffmpeg: Path, destination: Path) -> None:
         raise RuntimeError(f"unable to generate real thumbnail fixture: rc={completed.returncode} stderr={completed.stderr[-1200:]}")
 
 
-def choose_real_file(main_hwnd: int, pid: int, path: Path) -> dict[str, object]:
-    # Trigger the exact production path: IDC_ADD_FILES -> chooseFiles(false) ->
-    # GetOpenFileNameW. PostMessage is required because the main UI thread is
-    # blocked inside the modal common-file dialog until the selection closes.
-    if not gate.user32.PostMessageW(main_hwnd, WM_COMMAND, IDC_ADD_FILES, 0):
-        raise ctypes.WinError(ctypes.get_last_error())
-    dialog = gate.find_window(pid, "添加媒体文件", 15.0)
-    children = gate.enumerate_children(dialog)
+def find_common_file_dialog(pid: int, timeout: float) -> int:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = 0
 
+        @gate.WNDENUMPROC
+        def callback(hwnd: int, _lparam: int) -> bool:
+            nonlocal result
+            candidate = wintypes.DWORD()
+            gate.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(candidate))
+            if candidate.value != pid or not gate.user32.IsWindowVisible(hwnd):
+                return True
+            if gate.class_name(hwnd) != "#32770":
+                return True
+            children = gate.enumerate_children(hwnd)
+            has_visible_edit = any(
+                bool(child["visible"]) and str(child["class"]).lower() == "edit" for child in children
+            )
+            if not has_visible_edit:
+                return True
+            result = int(hwnd)
+            return False
+
+        gate.user32.EnumWindows(callback, 0)
+        if result:
+            return result
+        time.sleep(0.05)
+    return 0
+
+
+def visible_top_windows(pid: int) -> list[tuple[str, str]]:
+    windows: list[tuple[str, str]] = []
+
+    @gate.WNDENUMPROC
+    def callback(hwnd: int, _lparam: int) -> bool:
+        candidate = wintypes.DWORD()
+        gate.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(candidate))
+        if candidate.value == pid and gate.user32.IsWindowVisible(hwnd):
+            windows.append((gate.class_name(hwnd), gate.window_text(hwnd)))
+        return True
+
+    gate.user32.EnumWindows(callback, 0)
+    return windows
+
+
+def choose_real_file(main_hwnd: int, pid: int, path: Path) -> dict[str, object]:
+    # Exercise the production UI path. Prefer a real BM_CLICK on the visible
+    # Add Files button and identify the common dialog by PID + #32770 + a
+    # visible edit control, rather than relying on one localized title.
+    add_button = int(gate.user32.GetDlgItem(main_hwnd, IDC_ADD_FILES))
+    trigger = "button_bm_click"
+    if add_button and gate.user32.IsWindowVisible(add_button):
+        gate.user32.SetForegroundWindow(main_hwnd)
+        if not gate.user32.PostMessageW(add_button, BM_CLICK, 0, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        dialog = find_common_file_dialog(pid, 20.0)
+    else:
+        dialog = 0
+
+    if not dialog:
+        trigger = "main_wm_command_fallback"
+        gate.user32.SetForegroundWindow(main_hwnd)
+        if not gate.user32.PostMessageW(main_hwnd, WM_COMMAND, IDC_ADD_FILES, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        dialog = find_common_file_dialog(pid, 15.0)
+
+    if not dialog:
+        raise RuntimeError(
+            "common file dialog not found after bounded real-button and WM_COMMAND triggers: "
+            f"windows={visible_top_windows(pid)!r}"
+        )
+
+    children = gate.enumerate_children(dialog)
     edit = 0
     edit_id = 0
     for child in children:
@@ -125,7 +189,9 @@ def choose_real_file(main_hwnd: int, pid: int, path: Path) -> dict[str, object]:
     if not open_button:
         candidates = [
             child for child in children
-            if bool(child["visible"]) and str(child["class"]).lower() == "button" and "打开" in str(child["text"])
+            if bool(child["visible"]) and str(child["class"]).lower() == "button" and (
+                "打开" in str(child["text"]) or "open" in str(child["text"]).lower()
+            )
         ]
         if candidates:
             open_button = int(candidates[0]["hwnd"])
@@ -133,11 +199,18 @@ def choose_real_file(main_hwnd: int, pid: int, path: Path) -> dict[str, object]:
         summary = [(child["class"], child["text"], gate.user32.GetDlgCtrlID(int(child["hwnd"]))) for child in children]
         raise RuntimeError(f"Open button not found in common dialog: children={summary!r}")
 
+    open_button_text = gate.window_text(open_button)
     gate.user32.SendMessageW(open_button, BM_CLICK, 0, 0)
     deadline = time.monotonic() + 10.0
     while time.monotonic() < deadline:
         if not gate.user32.IsWindowVisible(dialog):
-            return {"dialog_edit_id": edit_id, "open_button_text": gate.window_text(open_button)}
+            return {
+                "dialog_edit_id": edit_id,
+                "dialog_title": gate.window_text(dialog),
+                "dialog_class": gate.class_name(dialog),
+                "open_button_text": open_button_text,
+                "trigger": trigger,
+            }
         time.sleep(0.05)
     raise RuntimeError("common file dialog did not close after clicking Open")
 
@@ -231,7 +304,7 @@ def main() -> int:
         main_hwnd = gate.find_window(process.pid, "Mediova", 25.0)
         if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1200, 760, True):
             raise ctypes.WinError(ctypes.get_last_error())
-        time.sleep(1.5)
+        time.sleep(2.0)
         list_hwnd = int(gate.user32.GetDlgItem(main_hwnd, IDC_LIST))
         add_button = int(gate.user32.GetDlgItem(main_hwnd, IDC_ADD_FILES))
         if not list_hwnd or not add_button:
