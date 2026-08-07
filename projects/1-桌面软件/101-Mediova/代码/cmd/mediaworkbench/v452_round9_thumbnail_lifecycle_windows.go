@@ -105,5 +105,11 @@ func round9EnsureVisibleThumbnails(a *application, hwnd uintptr) {
 		round9ThumbnailAttempts[candidate.id] = attempt
 		round9ThumbnailMu.Unlock()
 		a.queueThumbnail(candidate.id, candidate.input, candidate.probe)
+		// The normal path prefers the persistent thumbnail cache. Give it a short
+		// head start, but if the task is still missing a preview use the direct
+		// temporary-BMP path proven by the native media tests. Caching is an
+		// optimization and must not leave a visible row permanently on a
+		// placeholder when the cache path fails.
+		round12ScheduleThumbnailFallback(a, candidate.id, candidate.input, candidate.probe)
 	}
 }
