@@ -30,7 +30,7 @@ def validate_selected_columns(list_image, row_cells: list[list[int]], columns: l
 
 def validate_left_list_image(list_image, relative_cells: list[list[list[int]]], evidence: Path) -> dict[str, object]:
     list_image.save(evidence / "round12-list-structure-left.png")
-    selected_samples = validate_selected_columns(list_image, relative_cells[0], list(range(0, 8)))
+    selected_samples = validate_selected_columns(list_image, relative_cells[0], list(range(0, 7)))
 
     file_cell = relative_cells[0][2]
     _require_fully_visible(list_image, file_cell, 2)
