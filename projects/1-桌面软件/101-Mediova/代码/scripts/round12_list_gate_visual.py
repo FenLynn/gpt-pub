@@ -63,10 +63,18 @@ def validate_left_list_image(list_image, relative_cells: list[list[list[int]]], 
     }
 
 
-def validate_right_list_image(list_image, relative_cells: list[list[list[int]]], evidence: Path) -> dict[str, object]:
-    list_image.save(evidence / "round12-list-structure-right.png")
-    selected_samples = validate_selected_columns(list_image, relative_cells[0], list(range(7, 15)))
+def validate_right_group_image(
+    list_image,
+    relative_cells: list[list[list[int]]],
+    evidence: Path,
+    columns: list[int],
+    name: str,
+) -> dict[int, list[int]]:
+    list_image.save(evidence / f"round12-list-structure-{name}.png")
+    return validate_selected_columns(list_image, relative_cells[0], columns)
 
+
+def validate_trim_cells(list_image, relative_cells: list[list[list[int]]], evidence: Path) -> dict[str, object]:
     time_cell = relative_cells[2][13]
     _require_fully_visible(list_image, time_cell, 13)
     time_crop = list_image.crop(tuple(time_cell))
@@ -98,7 +106,6 @@ def validate_right_list_image(list_image, relative_cells: list[list[list[int]]],
         raise RuntimeError(f"picture crop percentage is not visible: dark={picture_dark}")
 
     return {
-        "selected_background_samples": selected_samples,
         "time_crop_dark_pixels": {"top": top_dark, "bottom": bottom_dark},
         "picture_crop_dark_pixels": picture_dark,
     }
