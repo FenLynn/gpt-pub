@@ -16,6 +16,7 @@ import round11_flicker_gate as gate
 import round11_flicker_gate_runner_base as runner
 from round12_list_gate_helpers import IDC_LIST, client_rect_to_screen
 from round12_remote_header import RemoteHeaderReader
+from round12_remote_memory import RemoteMemoryBlock
 
 WM_COMMAND = 0x0111
 WM_SETTEXT = 0x000C
@@ -24,7 +25,11 @@ IDC_ADD_FILES = 1010
 IDOK = 1
 EDT1 = 0x0480
 LVM_FIRST = 0x1000
+LVM_GETIMAGELIST = LVM_FIRST + 2
 LVM_GETITEMCOUNT = LVM_FIRST + 4
+LVM_GETITEMW = LVM_FIRST + 75
+LVSIL_SMALL = 1
+LVIF_IMAGE = 0x0002
 
 
 gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
@@ -33,6 +38,26 @@ gate.user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPAR
 gate.user32.PostMessageW.restype = wintypes.BOOL
 gate.user32.GetDlgCtrlID.argtypes = [wintypes.HWND]
 gate.user32.GetDlgCtrlID.restype = ctypes.c_int
+
+
+class LVITEMW(ctypes.Structure):
+    _fields_ = [
+        ("mask", ctypes.c_uint32),
+        ("iItem", ctypes.c_int32),
+        ("iSubItem", ctypes.c_int32),
+        ("state", ctypes.c_uint32),
+        ("stateMask", ctypes.c_uint32),
+        ("pszText", ctypes.c_void_p),
+        ("cchTextMax", ctypes.c_int32),
+        ("iImage", ctypes.c_int32),
+        ("lParam", ctypes.c_ssize_t),
+        ("iIndent", ctypes.c_int32),
+        ("iGroupId", ctypes.c_int32),
+        ("cColumns", ctypes.c_uint32),
+        ("puColumns", ctypes.c_void_p),
+        ("piColFmt", ctypes.c_void_p),
+        ("iGroup", ctypes.c_int32),
+    ]
 
 
 def child_by_handle(main_hwnd: int, handle: int) -> dict[str, object]:
@@ -117,6 +142,17 @@ def choose_real_file(main_hwnd: int, pid: int, path: Path) -> dict[str, object]:
     raise RuntimeError("common file dialog did not close after clicking Open")
 
 
+def read_subitem_image_index(remote: RemoteMemoryBlock, list_hwnd: int, row: int, subitem: int) -> tuple[int, int]:
+    item = LVITEMW(mask=LVIF_IMAGE, iItem=row, iSubItem=subitem, iImage=-999)
+    remote.write(int(remote.address), item, ctypes.sizeof(item))
+    result = int(gate.user32.SendMessageW(list_hwnd, LVM_GETITEMW, 0, int(remote.address)))
+    returned = LVITEMW()
+    read = remote.read_into(int(remote.address), returned, ctypes.sizeof(returned))
+    if read != ctypes.sizeof(returned):
+        raise RuntimeError(f"short LVITEMW read: {read} != {ctypes.sizeof(returned)}")
+    return int(returned.iImage), result
+
+
 def preview_metrics(image, cell: list[int]) -> dict[str, float | int]:
     left, top, right, bottom = cell
     if left < 0 or top < 0 or right > image.width or bottom > image.height or right <= left or bottom <= top:
@@ -154,6 +190,19 @@ def metrics_are_real(metrics: dict[str, float | int]) -> bool:
     )
 
 
+def save_preview_evidence(image, cell: list[int], evidence: Path, prefix: str) -> None:
+    image.save(evidence / f"{prefix}-list.png")
+    left, top, right, bottom = cell
+    if left < 0 or top < 0 or right > image.width or bottom > image.height or right <= left or bottom <= top:
+        return
+    margin_x = max(3, (right - left - 86) // 2)
+    crop = image.crop((left + margin_x, top + 2, right - margin_x, bottom - 2))
+    try:
+        crop.save(evidence / f"{prefix}-cell.png")
+    finally:
+        crop.close()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", required=True, type=Path)
@@ -177,6 +226,7 @@ def main() -> int:
     env["XDG_CONFIG_HOME"] = str(isolated / "XDG")
     process = subprocess.Popen([str(exe)], cwd=str(exe.parent), env=env)
     reader: RemoteHeaderReader | None = None
+    remote: RemoteMemoryBlock | None = None
     try:
         main_hwnd = gate.find_window(process.pid, "Mediova", 25.0)
         if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1200, 760, True):
@@ -191,6 +241,8 @@ def main() -> int:
 
         dialog_result = choose_real_file(main_hwnd, process.pid, fixture)
         reader = RemoteHeaderReader(process.pid)
+        remote = RemoteMemoryBlock(process.pid, ctypes.sizeof(LVITEMW))
+        image_list_handle = int(gate.user32.SendMessageW(list_hwnd, LVM_GETIMAGELIST, LVSIL_SMALL, 0))
         best: dict[str, float | int] = {
             "unique_colors": 0,
             "quantized_unique": 0,
@@ -198,6 +250,8 @@ def main() -> int:
             "dominant_ratio": 1.0,
             "luma_span": 0,
         }
+        image_indices: list[int] = []
+        getitem_results: list[int] = []
         final_image = None
         final_cell: list[int] | None = None
         item_count = 0
@@ -207,6 +261,12 @@ def main() -> int:
                 raise RuntimeError(f"Mediova exited during real-thumbnail gate: rc={process.returncode}")
             item_count = int(gate.user32.SendMessageW(list_hwnd, LVM_GETITEMCOUNT, 0, 0))
             if item_count > 0:
+                image_index, getitem_result = read_subitem_image_index(remote, list_hwnd, 0, 1)
+                if not image_indices or image_indices[-1] != image_index:
+                    image_indices.append(image_index)
+                if not getitem_results or getitem_results[-1] != getitem_result:
+                    getitem_results.append(getitem_result)
+
                 list_info = child_by_handle(main_hwnd, list_hwnd)
                 raw_cell = reader.list_subitem_rect(list_hwnd, 0, 1)
                 screen_cell = client_rect_to_screen(list_hwnd, raw_cell)
@@ -221,27 +281,13 @@ def main() -> int:
                 metrics = preview_metrics(image, cell)
                 if int(metrics["unique_colors"]) > int(best["unique_colors"]):
                     best = metrics
+                    save_preview_evidence(image, cell, evidence, "round12-real-thumbnail-best")
                 if metrics_are_real(metrics):
                     final_image = image
                     final_cell = cell
                     break
                 image.close()
             time.sleep(0.20)
-
-        if final_image is None or final_cell is None:
-            raise RuntimeError(f"real media thumbnail never appeared in home preview column: items={item_count} best={best} dialog={dialog_result}")
-
-        try:
-            final_image.save(evidence / "round12-real-thumbnail-list.png")
-            left, top, right, bottom = final_cell
-            margin_x = max(3, (right - left - 86) // 2)
-            crop = final_image.crop((left + margin_x, top + 2, right - margin_x, bottom - 2))
-            try:
-                crop.save(evidence / "round12-real-thumbnail-cell.png")
-            finally:
-                crop.close()
-        finally:
-            final_image.close()
 
         report = {
             "normal_runtime": True,
@@ -250,16 +296,31 @@ def main() -> int:
             "file_imported": item_count > 0,
             "item_count": item_count,
             "fixture_size": fixture.stat().st_size,
+            "image_list_handle": image_list_handle,
+            "preview_subitem_image_indices": image_indices,
+            "lvm_getitem_results": getitem_results,
+            "lvitem_size": ctypes.sizeof(LVITEMW),
             "preview_cell": final_cell,
             "metrics": best,
-            "real_thumbnail_visible": metrics_are_real(best),
+            "real_thumbnail_visible": final_image is not None and final_cell is not None and metrics_are_real(best),
         }
         (evidence / "round12-real-thumbnail-report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+
+        if final_image is None or final_cell is None:
+            raise RuntimeError(f"real media thumbnail never appeared in home preview column: {report}")
+
+        try:
+            save_preview_evidence(final_image, final_cell, evidence, "round12-real-thumbnail")
+        finally:
+            final_image.close()
+
         print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))
         return 0
     finally:
+        if remote is not None:
+            remote.close()
         if reader is not None:
             reader.close()
         if process.poll() is None:
