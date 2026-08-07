@@ -130,7 +130,7 @@ def prepare_full_right_view(
     # Keep the verification window within a normal desktop width. If the full
     # 15-column table is still wider, temporarily hide only columns already
     # verified in the left viewport. These are restored before profile tests.
-    if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1800, 930, True):
+    if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1840, 930, True):
         raise ctypes.WinError(ctypes.get_last_error())
     time.sleep(0.55)
 
