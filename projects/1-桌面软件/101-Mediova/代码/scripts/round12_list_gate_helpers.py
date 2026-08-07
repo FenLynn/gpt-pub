@@ -23,12 +23,17 @@ class POINT(ctypes.Structure):
     _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
 
+# Python 3.14 no longer exposes wintypes.LRESULT. Win32 LRESULT is LONG_PTR,
+# i.e. a signed pointer-sized integer. Keep the gate compatible with both old
+# and new CPython without changing the SendMessageW contract.
+LRESULT = getattr(wintypes, "LRESULT", ctypes.c_ssize_t)
+
 gate.user32.GetDlgItem.argtypes = [wintypes.HWND, ctypes.c_int]
 gate.user32.GetDlgItem.restype = wintypes.HWND
 gate.user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(POINT)]
 gate.user32.ClientToScreen.restype = wintypes.BOOL
 gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-gate.user32.SendMessageW.restype = wintypes.LRESULT
+gate.user32.SendMessageW.restype = LRESULT
 
 
 def client_rect_to_screen(hwnd: int, rect: list[int]) -> list[int]:
