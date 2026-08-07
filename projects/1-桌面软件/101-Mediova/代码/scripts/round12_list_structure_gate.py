@@ -154,11 +154,15 @@ def main() -> int:
 
         stable_unique_hashes = validate_selected_stability(screen_rows[0], evidence)
 
-        # Column 7 straddles the initial viewport boundary. Scroll a small,
-        # real ListView distance so that the whole cell is visible and verify
-        # it from a separate middle screenshot instead of clipping it.
-        gate.user32.SendMessageW(list_hwnd, LVM_SCROLL, 80, 0)
-        time.sleep(0.30)
+        # Column 7 straddles the initial viewport boundary. Calculate the exact
+        # horizontal distance needed to bring the whole cell inside the live
+        # ListView viewport instead of relying on a fixed pixel guess.
+        viewport_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
+        column7_right = int(left_cells[0][7][2])
+        middle_scroll = max(0, column7_right - viewport_width + 12)
+        if middle_scroll > 0:
+            gate.user32.SendMessageW(list_hwnd, LVM_SCROLL, middle_scroll, 0)
+            time.sleep(0.30)
         middle_cells, _ = read_relative_cells(reader, list_hwnd, len(captions), list_info)
         middle_image = runner.capture_screen_rect(list_info["rect"])
         try:
@@ -199,6 +203,7 @@ def main() -> int:
             "time_crop_dark_pixels": right_visual["time_crop_dark_pixels"],
             "picture_crop_dark_pixels": right_visual["picture_crop_dark_pixels"],
             "horizontal_viewports_validated": 3,
+            "middle_scroll_pixels": middle_scroll,
             "stable_frames": 20,
             "stable_unique_hashes": stable_unique_hashes,
             "column_settings_button_rect": column_button_info["rect"],
