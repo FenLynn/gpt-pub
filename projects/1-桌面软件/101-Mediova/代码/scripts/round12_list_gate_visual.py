@@ -28,9 +28,47 @@ def validate_selected_columns(list_image, row_cells: list[list[int]], columns: l
     return samples
 
 
+def validate_selected_visible_region(
+    list_image,
+    row_cells: list[list[int]],
+    column: int,
+    evidence: Path,
+    min_visible_width: int = 16,
+) -> tuple[dict[int, list[int]], int]:
+    cell = row_cells[column]
+    visible = [
+        max(0, cell[0]),
+        max(0, cell[1]),
+        min(list_image.width, cell[2]),
+        min(list_image.height, cell[3]),
+    ]
+    visible_width = visible[2] - visible[0]
+    visible_height = visible[3] - visible[1]
+    if visible_width < min_visible_width or visible_height <= 0:
+        raise RuntimeError(
+            f"column={column} has insufficient visible pixels: cell={cell} visible={visible} image={list_image.width}x{list_image.height}"
+        )
+    sample = sample_background(list_image, visible)
+    if not close_color(sample, EXPECTED_SELECTION):
+        raise RuntimeError(f"selected background mismatch column={column}: {sample}")
+    crop = list_image.crop(tuple(visible))
+    try:
+        crop.save(evidence / f"round12-column-{column}-visible.png")
+    finally:
+        crop.close()
+    return {column: list(sample)}, visible_width
+
+
 def validate_left_list_image(list_image, relative_cells: list[list[list[int]]], evidence: Path) -> dict[str, object]:
     list_image.save(evidence / "round12-list-structure-left.png")
     selected_samples = validate_selected_columns(list_image, relative_cells[0], list(range(0, 7)))
+    column7_samples, column7_visible_width = validate_selected_visible_region(
+        list_image,
+        relative_cells[0],
+        7,
+        evidence,
+    )
+    selected_samples.update(column7_samples)
 
     file_cell = relative_cells[0][2]
     _require_fully_visible(list_image, file_cell, 2)
@@ -60,6 +98,7 @@ def validate_left_list_image(list_image, relative_cells: list[list[list[int]]], 
         "selected_white_text_pixels": white_text_pixels,
         "preview_saturated_pixels": preview_saturated,
         "preview_unique_colors": preview_unique,
+        "column7_visible_width": column7_visible_width,
     }
 
 
