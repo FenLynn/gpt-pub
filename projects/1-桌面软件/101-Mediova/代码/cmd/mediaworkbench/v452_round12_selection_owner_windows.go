@@ -5,7 +5,6 @@ package main
 import (
 	"sync/atomic"
 	"syscall"
-	"time"
 	"unsafe"
 )
 
@@ -55,6 +54,7 @@ var (
 	round12SelectionText       = colorRef(42, 55, 70)
 	round12CellSeparator       = colorRef(232, 237, 243)
 	round12SelectionInstalled  atomic.Bool
+	round12HeaderInstalled     atomic.Bool
 	round12SelectionCallback   uintptr
 	round12HeaderCallback      uintptr
 )
@@ -62,27 +62,6 @@ var (
 func init() {
 	round12SelectionCallback = syscall.NewCallback(round12SelectionMainSubclassProc)
 	round12HeaderCallback = syscall.NewCallback(round12HeaderSubclassProc)
-	go func() {
-		for attempt := 0; attempt < 800; attempt++ {
-			a := app
-			if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady && round7FeedbackMainInstalled.Load() {
-				a.postUI(func() {
-					if round12SelectionInstalled.Load() || a.hwnd == 0 || a.hList == 0 {
-						return
-					}
-					if ok, _, _ := v452SetWindowSubclass.Call(a.hwnd, round12SelectionCallback, round12SelectionSubclassID, 0); ok != 0 {
-						round12SelectionInstalled.Store(true)
-						round12EnsureListStructure(a)
-						round12LayoutTopButtons(a)
-						round12InstallPreviewThumbnails(a)
-						procInvalidateRect.Call(a.hList, 0, 1)
-					}
-				})
-				return
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-	}()
 }
 
 func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
@@ -136,11 +115,19 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 		if lParam != 0 && round12DrawColumnButton((*drawItemStruct)(unsafe.Pointer(lParam))) {
 			return 1
 		}
-	case WM_SIZE, WM_APP_REFRESH, round7FeedbackWMInit:
+	case WM_SIZE, round7FeedbackWMInit:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round12EnsureListStructure(a)
 		round12ApplyProfile(a, a.currentKind)
 		round12LayoutTopButtons(a)
+		round12InstallPreviewThumbnails(a)
+		return result
+	case WM_APP_REFRESH:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		if !round12ListStructureReady(a) {
+			round12EnsureListStructure(a)
+			round12ApplyProfile(a, a.currentKind)
+		}
 		round12InstallPreviewThumbnails(a)
 		return result
 	case WM_DESTROY:
@@ -166,6 +153,17 @@ func round12LegacySortColumn(column int) (int, bool) {
 	}
 }
 
+func round12ListStructureReady(a *application) bool {
+	if a == nil || a.hList == 0 {
+		return false
+	}
+	header := send(a.hList, LVM_GETHEADER, 0, 0)
+	if header == 0 {
+		return false
+	}
+	return int(send(header, round12HDMGetItemCount, 0, 0)) == round12ColumnCount
+}
+
 func round12EnsureListStructure(a *application) {
 	if a == nil || a.hList == 0 {
 		return
@@ -175,7 +173,8 @@ func round12EnsureListStructure(a *application) {
 	if header != 0 {
 		count = int(send(header, round12HDMGetItemCount, 0, 0))
 	}
-	if count != round12ColumnCount {
+	structureChanged := count != round12ColumnCount
+	if structureChanged {
 		for count > 0 {
 			send(a.hList, round12LVMDeleteColumn, 0, 0)
 			count--
@@ -185,20 +184,16 @@ func round12EnsureListStructure(a *application) {
 			column := lvColumn{Mask: LVCF_TEXT | LVCF_WIDTH | LVCF_FMT, Fmt: LVCFMT_LEFT, Cx: int32(definition.width), PszText: text}
 			send(a.hList, LVM_INSERTCOLUMNW, uintptr(index), uintptr(unsafe.Pointer(&column)))
 		}
-	} else {
-		for index, definition := range round12Columns {
-			text := p(definition.name)
-			column := lvColumn{Mask: LVCF_TEXT, PszText: text}
-			send(a.hList, round12LVMSetColumnW, uintptr(index), uintptr(unsafe.Pointer(&column)))
-		}
 	}
-	if header = send(a.hList, LVM_GETHEADER, 0, 0); header != 0 {
+	if header = send(a.hList, LVM_GETHEADER, 0, 0); header != 0 && (structureChanged || !round12HeaderInstalled.Load()) {
 		v452RemoveSubclass.Call(header, round7FeedbackHeaderSubclassCB, round7FeedbackHeaderSubclassID)
-		v452SetWindowSubclass.Call(header, round12HeaderCallback, round12HeaderSubclassID, 0)
+		if ok, _, _ := v452SetWindowSubclass.Call(header, round12HeaderCallback, round12HeaderSubclassID, 0); ok != 0 {
+			round12HeaderInstalled.Store(true)
+		}
 		send(header, WM_SETFONT, uiFontBold, 1)
 		procInvalidateRect.Call(header, 0, 1)
 	}
-	if a.hHeaderLine != 0 {
+	if structureChanged && a.hHeaderLine != 0 {
 		show(a.hHeaderLine, false)
 	}
 	round12LoadProfiles()
@@ -214,6 +209,7 @@ func round12HeaderSubclassProc(hwnd uintptr, message uint32, wParam, lParam, sub
 		return result
 	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round12HeaderCallback, subclassID)
+		round12HeaderInstalled.Store(false)
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 	return result
