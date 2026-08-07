@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const v452Round9InteractionManifestSHA256 = "8bc9bf90badf455798ebf010c29df533c89d9827a437137adb5701123d7d2b7e"
+const v452Round9InteractionManifestSHA256 = "9d8a397a6da3db6ffe838eae934962df663597da209a048b7955108acd2b0513"
 
 var v452Round9SupersededByRound11 = map[string]bool{
 	"cmd/mediaworkbench/v452_round8_editor_install_windows.go": true,
