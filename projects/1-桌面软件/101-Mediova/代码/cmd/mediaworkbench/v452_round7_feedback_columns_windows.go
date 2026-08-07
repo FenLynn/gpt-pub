@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	round7FeedbackProfilesMu       sync.Mutex
-	round7FeedbackProfiles         round7FeedbackColumnProfiles
-	round7FeedbackProfilesReady    bool
-	round7FeedbackApplyingColumns  bool
+	round7FeedbackProfilesMu      sync.Mutex
+	round7FeedbackProfiles        round7FeedbackColumnProfiles
+	round7FeedbackProfilesReady   bool
+	round7FeedbackApplyingColumns bool
 )
 
 func round7FeedbackColumnProfilePath() (string, error) {
@@ -74,8 +74,16 @@ func round7FeedbackCurrentWidths(a *application) []int {
 	return normalizedTaskColumnWidths(a.currentTaskColumnWidths())
 }
 
+// Round12 owns the final 15-column model, including per-media visibility and
+// widths. Once it is installed, the round7 13-column profile must become
+// read-only legacy state; otherwise its delayed switch finalizer can overwrite
+// a hidden Round12 column after switching video -> image -> video.
+func round7FeedbackColumnsRetired() bool {
+	return round12SelectionInstalled.Load()
+}
+
 func round7FeedbackCaptureColumnProfile(a *application, kind model.Kind, save bool) {
-	if a == nil || a.hList == 0 || round7FeedbackApplyingColumns {
+	if a == nil || a.hList == 0 || round7FeedbackApplyingColumns || round7FeedbackColumnsRetired() {
 		return
 	}
 	round7FeedbackLoadColumnProfiles(a)
@@ -107,7 +115,7 @@ func round7FeedbackProfileFor(a *application, kind model.Kind) []int {
 }
 
 func round7FeedbackApplyColumnProfile(a *application, kind model.Kind) {
-	if a == nil || a.hList == 0 {
+	if a == nil || a.hList == 0 || round7FeedbackColumnsRetired() {
 		return
 	}
 	widths := round7FeedbackProfileFor(a, kind)
@@ -121,14 +129,14 @@ func round7FeedbackApplyColumnProfile(a *application, kind model.Kind) {
 }
 
 func round7FeedbackEnsureColumnProfile(a *application) {
-	if a == nil {
+	if a == nil || round7FeedbackColumnsRetired() {
 		return
 	}
 	round7FeedbackApplyColumnProfile(a, a.currentKind)
 }
 
 func round7FeedbackResetColumnProfile(a *application, kind model.Kind) {
-	if a == nil {
+	if a == nil || round7FeedbackColumnsRetired() {
 		return
 	}
 	defaults := normalizedTaskColumnWidths(nil)
