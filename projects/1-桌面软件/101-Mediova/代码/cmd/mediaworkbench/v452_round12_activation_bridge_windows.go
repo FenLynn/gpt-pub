@@ -22,27 +22,30 @@ func init() {
 }
 
 // round12BridgeInstallLoop removes the start-order dependency between the
-// round-7 WinEvent hook and the final round-12 list owner. The old installer
-// waited for round7FeedbackMainInstalled, which is not guaranteed to become
-// true before UI-preview/self-test captures the window. Reconcile directly
-// once controls are ready, then keep a short startup guard window so any late
-// legacy layout pass is overwritten by the final 15-column structure.
+// round-7 WinEvent hook and the final round-12 list owner. It retries only
+// until both round-12 subclasses are installed. After that it merely observes
+// the round-7 installation flag and performs at most one final reconcile;
+// there is no periodic repaint/re-layout loop during idle time.
 func round12BridgeInstallLoop() {
 	deadline := time.Now().Add(30 * time.Second)
-	var activeSince time.Time
+	var installedAt time.Time
 	for time.Now().Before(deadline) {
 		a := app
 		if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady && round12SelectionCallback != 0 {
-			round12BridgeScheduleReconcile(a)
-			if round12SelectionInstalled.Load() && round12BridgeInstalled.Load() {
-				if activeSince.IsZero() {
-					activeSince = time.Now()
+			if !round12SelectionInstalled.Load() || !round12BridgeInstalled.Load() {
+				round12BridgeScheduleReconcile(a)
+				installedAt = time.Time{}
+			} else {
+				if installedAt.IsZero() {
+					installedAt = time.Now()
 				}
-				if time.Since(activeSince) >= 5*time.Second {
+				if round7FeedbackMainInstalled.Load() {
+					round12BridgeScheduleReconcile(a)
 					return
 				}
-			} else {
-				activeSince = time.Time{}
+				if time.Since(installedAt) >= 10*time.Second {
+					return
+				}
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -65,9 +68,11 @@ func round12BridgeReconcile(a *application) {
 	if a == nil || a.hwnd == 0 || a.hList == 0 || round12SelectionCallback == 0 {
 		return
 	}
+	firstInstall := false
 	if !round12SelectionInstalled.Load() {
 		if ok, _, _ := v452SetWindowSubclass.Call(a.hwnd, round12SelectionCallback, round12SelectionSubclassID, 0); ok != 0 {
 			round12SelectionInstalled.Store(true)
+			firstInstall = true
 		}
 	}
 	if !round12SelectionInstalled.Load() {
@@ -83,11 +88,12 @@ func round12BridgeReconcile(a *application) {
 	round12ApplyProfile(a, a.currentKind)
 	round12LayoutTopButtons(a)
 	round12InstallPreviewThumbnails(a)
-	procInvalidateRect.Call(a.hList, 0, 1)
+	if firstInstall {
+		procInvalidateRect.Call(a.hList, 0, 1)
+	}
 }
 
-// The bridge stays outside the round-12 owner in the subclass chain. Besides
-// scheduling a final reconcile after legacy layout-sensitive messages, it
+// The bridge stays outside the round-12 owner in the subclass chain and
 // observes the same NM_CUSTOMDRAW notifications used by the native self-test.
 // The actual pixels are still rendered by round12DrawTaskListCell; these
 // counters only prove that the compression/progress subitems reached that path.
@@ -113,13 +119,6 @@ func round12BridgeMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 					}
 				}
 			}
-		}
-	case WM_SIZE, WM_APP_REFRESH:
-		round12BridgeScheduleReconcile(a)
-	case WM_COMMAND:
-		id := int(loWord(wParam))
-		if id == IDC_TAB_VIDEO || id == IDC_TAB_IMAGE || id == IDC_RIGHT_TOGGLE || id == ID_VIEW_RESET_COLUMNS || id == round12IDCColumnSettings || (id >= round12ColumnMenuBase && id < round12ColumnMenuBase+round12ColumnCount) {
-			round12BridgeScheduleReconcile(a)
 		}
 	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round12BridgeCallback, subclassID)
