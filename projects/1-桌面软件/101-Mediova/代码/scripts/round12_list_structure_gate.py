@@ -28,9 +28,6 @@ from round12_list_gate_helpers import (
 from round12_list_gate_visual import validate_left_list_image, validate_right_list_image, validate_selected_stability
 from round12_remote_header import EXPECTED_CAPTIONS, RemoteHeaderReader, header_handle
 
-LVM_FIRST = 0x1000
-LVM_SCROLL = LVM_FIRST + 20
-
 
 def child_by_handle(main_hwnd: int, handle: int) -> dict[str, object]:
     return next(child for child in gate.enumerate_children(main_hwnd) if int(child["hwnd"]) == handle)
@@ -103,6 +100,68 @@ def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
     }
 
 
+def columns_fully_visible(cells: list[list[list[int]]], image_width: int, start: int, end: int) -> bool:
+    for column in range(start, end + 1):
+        left, top, right, bottom = cells[0][column]
+        if left < 0 or top < 0 or right > image_width or bottom <= top or right <= left:
+            return False
+    return True
+
+
+def prepare_full_right_view(
+    main_hwnd: int,
+    list_hwnd: int,
+    reader: RemoteHeaderReader,
+    column_count: int,
+    initial_list_info: dict[str, object],
+) -> tuple[dict[str, object], list[list[list[int]]], list[int], int, int]:
+    initial_width = int(initial_list_info["rect"][2]) - int(initial_list_info["rect"][0])
+
+    # Use the product's real panel-collapse interaction instead of synthetic
+    # ListView scrolling. Round12 explicitly relocates this button below the
+    # column-settings gear, so this also exercises the intended final layout.
+    send_command(main_hwnd, IDC_RIGHT_TOGGLE)
+    time.sleep(0.45)
+    collapsed_info = child_by_handle(main_hwnd, list_hwnd)
+    collapsed_width = int(collapsed_info["rect"][2]) - int(collapsed_info["rect"][0])
+    if collapsed_width <= initial_width:
+        raise RuntimeError(f"right panel collapse did not widen task list: before={initial_width} after={collapsed_width}")
+
+    # Keep the verification window within a normal desktop width. If the full
+    # 15-column table is still wider, temporarily hide only columns already
+    # verified in the left viewport. These are restored before profile tests.
+    if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1800, 930, True):
+        raise ctypes.WinError(ctypes.get_last_error())
+    time.sleep(0.55)
+
+    hidden_for_view: list[int] = []
+    candidate_columns = [3, 4, 5, 6]
+    while True:
+        list_info = child_by_handle(main_hwnd, list_hwnd)
+        cells, _ = read_relative_cells(reader, list_hwnd, column_count, list_info)
+        viewport_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
+        if columns_fully_visible(cells, viewport_width, 7, 14):
+            return list_info, cells, hidden_for_view, initial_width, collapsed_width
+        if not candidate_columns:
+            raise RuntimeError(
+                f"right-side columns 7-14 still do not fit after real panel collapse: viewport={viewport_width} last={cells[0][14]}"
+            )
+        column = candidate_columns.pop(0)
+        if column_width(list_hwnd, column) > 0:
+            send_command(main_hwnd, ROUND12_COLUMN_MENU_BASE + column)
+            hidden_for_view.append(column)
+            time.sleep(0.25)
+
+
+def restore_view_columns(main_hwnd: int, list_hwnd: int, hidden_columns: list[int]) -> None:
+    for column in reversed(hidden_columns):
+        if column_width(list_hwnd, column) == 0:
+            send_command(main_hwnd, ROUND12_COLUMN_MENU_BASE + column)
+    for column in hidden_columns:
+        if column_width(list_hwnd, column) <= 0:
+            raise RuntimeError(f"temporary verification column did not restore: column={column}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", required=True, type=Path)
@@ -149,13 +208,14 @@ def main() -> int:
 
         stable_unique_hashes = validate_selected_stability(screen_rows[0], evidence)
 
-        # The list is deliberately wider than its viewport. Column 7 is still
-        # pixel-validated from its visible segment in the initial viewport;
-        # columns 8-14 are validated after a real scroll to the right edge.
-        gate.user32.SendMessageW(list_hwnd, LVM_SCROLL, 5000, 0)
-        time.sleep(0.45)
-        right_cells, _ = read_relative_cells(reader, list_hwnd, len(captions), list_info)
-        right_image = runner.capture_screen_rect(list_info["rect"])
+        right_info, right_cells, hidden_for_view, initial_list_width, collapsed_list_width = prepare_full_right_view(
+            main_hwnd,
+            list_hwnd,
+            reader,
+            len(captions),
+            list_info,
+        )
+        right_image = runner.capture_screen_rect(right_info["rect"])
         try:
             right_visual = validate_right_list_image(right_image, right_cells, evidence)
         finally:
@@ -165,6 +225,8 @@ def main() -> int:
             [left_visual["selected_background_samples"], right_visual["selected_background_samples"]],
             len(captions),
         )
+
+        restore_view_columns(main_hwnd, list_hwnd, hidden_for_view)
         profile = validate_column_profiles(main_hwnd, list_hwnd)
         report = {
             "column_count": len(captions),
@@ -177,8 +239,12 @@ def main() -> int:
             "time_crop_dark_pixels": right_visual["time_crop_dark_pixels"],
             "picture_crop_dark_pixels": right_visual["picture_crop_dark_pixels"],
             "horizontal_viewports_validated": 2,
-            "partially_visible_selected_columns": [7],
-            "column7_visible_width": left_visual["column7_visible_width"],
+            "all_selected_columns_fully_visible": True,
+            "right_panel_collapsed_for_full_view": True,
+            "initial_list_width": initial_list_width,
+            "collapsed_list_width": collapsed_list_width,
+            "full_view_list_width": int(right_info["rect"][2]) - int(right_info["rect"][0]),
+            "temporarily_hidden_left_columns": hidden_for_view,
             "stable_frames": 20,
             "stable_unique_hashes": stable_unique_hashes,
             "column_settings_button_rect": column_button_info["rect"],
