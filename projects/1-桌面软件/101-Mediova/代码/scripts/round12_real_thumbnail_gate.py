@@ -6,7 +6,6 @@ import ctypes
 import json
 import os
 import shutil
-import struct
 import subprocess
 import tempfile
 import time
@@ -18,24 +17,22 @@ import round11_flicker_gate_runner_base as runner
 from round12_list_gate_helpers import IDC_LIST, client_rect_to_screen
 from round12_remote_header import RemoteHeaderReader
 
-WM_DROPFILES = 0x0233
+WM_COMMAND = 0x0111
+WM_SETTEXT = 0x000C
+BM_CLICK = 0x00F5
+IDC_ADD_FILES = 1010
+IDOK = 1
+EDT1 = 0x0480
 LVM_FIRST = 0x1000
 LVM_GETITEMCOUNT = LVM_FIRST + 4
-GMEM_MOVEABLE = 0x0002
-GMEM_ZEROINIT = 0x0040
 
-kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-kernel32.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
-kernel32.GlobalAlloc.restype = wintypes.HGLOBAL
-kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
-kernel32.GlobalLock.restype = wintypes.LPVOID
-kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
-kernel32.GlobalUnlock.restype = wintypes.BOOL
-kernel32.GlobalFree.argtypes = [wintypes.HGLOBAL]
-kernel32.GlobalFree.restype = wintypes.HGLOBAL
 
 gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
 gate.user32.SendMessageW.restype = ctypes.c_ssize_t
+gate.user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+gate.user32.PostMessageW.restype = wintypes.BOOL
+gate.user32.GetDlgCtrlID.argtypes = [wintypes.HWND]
+gate.user32.GetDlgCtrlID.restype = ctypes.c_int
 
 
 def child_by_handle(main_hwnd: int, handle: int) -> dict[str, object]:
@@ -68,22 +65,56 @@ def generate_fixture(ffmpeg: Path, destination: Path) -> None:
         raise RuntimeError(f"unable to generate real thumbnail fixture: rc={completed.returncode} stderr={completed.stderr[-1200:]}")
 
 
-def send_dropfiles(main_hwnd: int, path: Path) -> None:
-    # DROPFILES is a 20-byte header followed by a double-NUL-terminated UTF-16
-    # path list. Ownership transfers to the receiving window, whose normal
-    # WM_DROPFILES path calls DragFinish/GlobalFree.
-    encoded = str(path.resolve()).encode("utf-16le") + b"\x00\x00\x00\x00"
-    payload = struct.pack("<IiiII", 20, 0, 0, 0, 1) + encoded
-    handle = kernel32.GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, len(payload))
-    if not handle:
+def choose_real_file(main_hwnd: int, pid: int, path: Path) -> dict[str, object]:
+    # Trigger the exact production path: IDC_ADD_FILES -> chooseFiles(false) ->
+    # GetOpenFileNameW. PostMessage is required because the main UI thread is
+    # blocked inside the modal common-file dialog until the selection closes.
+    if not gate.user32.PostMessageW(main_hwnd, WM_COMMAND, IDC_ADD_FILES, 0):
         raise ctypes.WinError(ctypes.get_last_error())
-    pointer = kernel32.GlobalLock(handle)
-    if not pointer:
-        kernel32.GlobalFree(handle)
-        raise ctypes.WinError(ctypes.get_last_error())
-    ctypes.memmove(pointer, payload, len(payload))
-    kernel32.GlobalUnlock(handle)
-    gate.user32.SendMessageW(main_hwnd, WM_DROPFILES, int(handle), 0)
+    dialog = gate.find_window(pid, "添加媒体文件", 15.0)
+    children = gate.enumerate_children(dialog)
+
+    edit = 0
+    edit_id = 0
+    for child in children:
+        hwnd = int(child["hwnd"])
+        control_id = int(gate.user32.GetDlgCtrlID(hwnd))
+        if control_id == EDT1:
+            edit = hwnd
+            edit_id = control_id
+            break
+    if not edit:
+        visible_edits = [child for child in children if bool(child["visible"]) and str(child["class"]).lower() == "edit"]
+        if len(visible_edits) == 1:
+            edit = int(visible_edits[0]["hwnd"])
+            edit_id = int(gate.user32.GetDlgCtrlID(edit))
+    if not edit:
+        summary = [(child["class"], child["text"], gate.user32.GetDlgCtrlID(int(child["hwnd"]))) for child in children]
+        raise RuntimeError(f"file-name edit control not found in common dialog: children={summary!r}")
+
+    value = ctypes.create_unicode_buffer(str(path.resolve()))
+    gate.user32.SendMessageW(edit, WM_SETTEXT, 0, ctypes.addressof(value))
+    time.sleep(0.20)
+
+    open_button = int(gate.user32.GetDlgItem(dialog, IDOK))
+    if not open_button:
+        candidates = [
+            child for child in children
+            if bool(child["visible"]) and str(child["class"]).lower() == "button" and "打开" in str(child["text"])
+        ]
+        if candidates:
+            open_button = int(candidates[0]["hwnd"])
+    if not open_button:
+        summary = [(child["class"], child["text"], gate.user32.GetDlgCtrlID(int(child["hwnd"]))) for child in children]
+        raise RuntimeError(f"Open button not found in common dialog: children={summary!r}")
+
+    gate.user32.SendMessageW(open_button, BM_CLICK, 0, 0)
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        if not gate.user32.IsWindowVisible(dialog):
+            return {"dialog_edit_id": edit_id, "open_button_text": gate.window_text(open_button)}
+        time.sleep(0.05)
+    raise RuntimeError("common file dialog did not close after clicking Open")
 
 
 def preview_metrics(image, cell: list[int]) -> dict[str, float | int]:
@@ -152,10 +183,13 @@ def main() -> int:
             raise ctypes.WinError(ctypes.get_last_error())
         time.sleep(1.5)
         list_hwnd = int(gate.user32.GetDlgItem(main_hwnd, IDC_LIST))
-        if not list_hwnd:
-            raise RuntimeError("task list not found in normal runtime")
+        add_button = int(gate.user32.GetDlgItem(main_hwnd, IDC_ADD_FILES))
+        if not list_hwnd or not add_button:
+            raise RuntimeError("task list or Add Files button not found in normal runtime")
+        if not gate.user32.IsWindowVisible(add_button):
+            raise RuntimeError("Add Files button is not visible in normal runtime")
 
-        send_dropfiles(main_hwnd, fixture)
+        dialog_result = choose_real_file(main_hwnd, process.pid, fixture)
         reader = RemoteHeaderReader(process.pid)
         best: dict[str, float | int] = {
             "unique_colors": 0,
@@ -195,7 +229,7 @@ def main() -> int:
             time.sleep(0.20)
 
         if final_image is None or final_cell is None:
-            raise RuntimeError(f"real media thumbnail never appeared in home preview column: items={item_count} best={best}")
+            raise RuntimeError(f"real media thumbnail never appeared in home preview column: items={item_count} best={best} dialog={dialog_result}")
 
         try:
             final_image.save(evidence / "round12-real-thumbnail-list.png")
@@ -211,7 +245,9 @@ def main() -> int:
 
         report = {
             "normal_runtime": True,
-            "dropfiles_imported": item_count > 0,
+            "real_file_dialog_used": True,
+            "dialog": dialog_result,
+            "file_imported": item_count > 0,
             "item_count": item_count,
             "fixture_size": fixture.stat().st_size,
             "preview_cell": final_cell,
