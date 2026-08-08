@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 import round11_flicker_gate_runner_base as round11
@@ -20,6 +21,48 @@ def argument_path(name: str) -> Path | None:
         if value.startswith(prefix):
             return Path(value[len(prefix):]).resolve()
     return None
+
+
+def install_trim_diagnostics() -> None:
+    original_find_editor = round12_trim_preview_gate.find_editor
+    original_set_current_and_jump = round12_trim_preview_gate.set_current_and_jump
+
+    def find_final_editor(pid: int, timeout: float) -> int:
+        editor = int(original_find_editor(pid, timeout))
+        deadline = time.monotonic() + 8.0
+        last_title = ""
+        while time.monotonic() < deadline:
+            last_title = round12_trim_preview_gate.gate.window_text(editor)
+            if last_title.startswith("剪裁 ·"):
+                return editor
+            time.sleep(0.05)
+        raise RuntimeError(
+            "final Round8/Round11 trim editor installer did not complete before preview validation: "
+            f"title={last_title!r}"
+        )
+
+    def set_current_and_prove_command(editor: int, current_edit: int, jump_button: int, value: str) -> None:
+        # For the endpoint probe, deliberately enter a non-canonical value.
+        # Round7 can only rewrite it to 00:00:02.000 after WM_COMMAND reaches
+        # its real jump handler and setCurrent() has updated currentAt.
+        submitted = "2" if value == "00:00:02.000" else value
+        original_set_current_and_jump(editor, current_edit, jump_button, submitted)
+        if value != "00:00:02.000":
+            return
+        deadline = time.monotonic() + 3.0
+        last_text = ""
+        while time.monotonic() < deadline:
+            last_text = str(round12_trim_preview_gate.child_by_handle(editor, current_edit)["text"])
+            if last_text == value:
+                return
+            time.sleep(0.05)
+        raise RuntimeError(
+            "Round7 endpoint jump command did not canonicalize the requested time; "
+            f"submitted={submitted!r} current_edit={last_text!r} expected={value!r}"
+        )
+
+    round12_trim_preview_gate.find_editor = find_final_editor
+    round12_trim_preview_gate.set_current_and_jump = set_current_and_prove_command
 
 
 def merge_stage_evidence() -> None:
@@ -57,6 +100,7 @@ def main() -> int:
     if thumbnail_result != 0:
         return thumbnail_result
 
+    install_trim_diagnostics()
     trim_preview_passes = 0
     trim_preview_required = 2
     for _attempt in range(trim_preview_required):
@@ -72,6 +116,8 @@ def main() -> int:
             stage = json.loads(stage_path.read_text(encoding="utf-8"))
             stage["fresh_process_passes"] = trim_preview_passes
             stage["fresh_process_required"] = trim_preview_required
+            stage["final_editor_installer_required"] = True
+            stage["endpoint_command_canonicalization_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
