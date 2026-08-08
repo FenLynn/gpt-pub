@@ -1,166 +1,242 @@
 # Mediova v4.5.2 工作记录
 
+本文件只记录 v4.5.2 当前候选、完成标准、最新证据和尚缺内容。更早的实施细节由 Git、PR、CI 与历史提交保存，不在当前工作记录中重复堆叠。
+
 ## 当前状态
 
-- 正式基线：Mediova v4.5.0，标签与 Release `p101-v4.5.0`；
-- v4.5.1：用户验证候选，不转正式版本；
-- v4.5.2：五轮实机反馈修复与 Windows 原生收口全部完成；
-- 唯一执行规格：`Mediova_v4.5.2_实机反馈修复规格.md`；
-- 第四轮 PR #332 已合并，合并提交 `8eadd2ff96d5211db19d005a5093036e766e2428`；
-- 第五轮 PR #341 已合并，合并提交 `bfaa0d0839ea447beec6e49b7bfecf7e9666f4b2`；
-- `p101-stable` 已核对与第五轮合并提交完全一致；
-- 第五轮冻结产品候选：`3ba4b43bc94ff38ab02aae910ff698e5ecbd7881`；
-- 最终产品 CI：`P101 Mediova CI #388` / run `30883792882`，全部通过；
-- 最终文档头 CI：`P101 Mediova CI #390` / run `30884258441`，全部通过；
-- 当前结论：v4.5.2 五轮开发阶段正式结束，等待用户实机验证后再决定是否进入 `main` 并建立正式标签与 Release。
+- 正式版本仍为 **Mediova v4.5.0**，正式标签与 Release 为 `p101-v4.5.0`；
+- v4.5.2 仍是**用户验证候选**，不是正式 Release；
+- 当前活动分支：`p101-v452-round12-list-structure`；
+- 当前 Draft PR：#366，目标分支 `p101-stable`；
+- 用户确认前不得合并到 `p101-stable` / `main`，不得建立标签或正式 Release；
+- 当前最新产品代码候选 Head：`78b4217902743efb58924a90a2284f4ab2922b49`；
+- 当前最新产品验证：P101 Mediova CI **#701** / Run `31242637671`，范围、Linux、Windows-native 全部通过；
+- #701 原生 self-test：**126/126**，失败 0；
+- 本轮 Round12 列表几何专题与剪裁预览稳定性专题均已取得自动化闭环，下一步只保留用户真实桌面验收，不再继续扩大代码范围。
 
-## 版本边界
+## v4.5.2 阶段摘要
 
-- 不修改正式 `p101-v4.5.0` 标签和 Release；
-- 本阶段不创建正式 v4.5.2 标签；
-- CI 产物属于 v4.5.2 验证候选，Windows 文件版本资源仍沿用正式基线 `4.5.0`；
-- 不修改 AtlasDesk 或其他项目；
-- 自动截图和消息级鼠标验证是准入证据，但不替代用户真实桌面的最终视觉与业务验收。
+1. 第一至第五轮：完成顶部工具栏、双工作区状态、导入输出、队列生命周期、剪裁交互与真实 FFmpeg 处理矩阵等基础修复。
+2. 第六轮：持续重绘和界面叠加方案被用户实机否决，未作为后续基线。
+3. 第七轮：从稳定分支重新建立独立剪裁编辑器和主界面视觉基线。
+4. 第八至第十一轮：执行 UI 控制权收口、真实鼠标交互、缩略图生命周期、滚动覆盖与主界面/剪裁编辑器防闪收口。
+5. 第十二轮：完成 15 列任务结构、预览/文件名拆分、浅蓝选中、时间/画面剪裁列、列管理、视频/图片独立列配置、真实主页缩略图，以及本轮列表几何与剪裁预览稳定性专题。
 
-## 第一轮：基础 UI 与暂停语义
+## Round12 列表几何专题
 
-完成顶部工具栏冷启动显示、输出目录焦点清理、实心主按钮图形、有效运行时钟、进度防闪和真圆状态灯。
+用户实机反馈暴露了三项原自动验收未覆盖的问题：
 
-- PR #321；
-- 文档头：`28aee2de8711e6746b5df00893d0c02c834a9ff3`；
-- CI：`30823007412`、`30823432844`；
-- 合并提交：`159ad9ac1a19e91c5ab95c63b5378780565e6ab4`。
+1. `#` 表头存在，但任务编号 `1、2、3…` 不显示；
+2. 首行缩略图可能向上侵入 Header，Header 底线不连续；
+3. 隐藏“画面剪裁”列后仍可能残留孤立 `100%`。
 
-## 第二轮：列表、队列和缩略图
+根因不是单纯视觉样式，而是 ListView 第 0 列特殊几何、数据行纵向边界、Header 绘制所有权和隐藏列绘制条件混杂。最终规则为：
 
-完成 12 列显式模型、`#` 编号列、旧列宽迁移、缩略图所有权与缓存释放、目录回退、多选退出队列及列表视觉收口。
+- 单元格几何只使用真实行/列边界；
+- 第 0 列单独按真实列宽处理；
+- 缩略图严格裁剪在“预览列 ∩ 数据行”内；
+- 实际宽度为 0 的隐藏列禁止进入内容绘制；
+- Header 只有一个 caption owner，并由唯一全宽 bottom separator 收口；
+- 自动门禁必须直接检查编号、Header/首行边界与隐藏列残留，而不是只检查表头文字存在。
 
-- PR #323；
-- 产品候选：`9487cb8e68c5fbe972662057bd3bb84542a8c00d`；
-- CI：`30832646333`；
-- 合并提交：`702e37fa75040ee69491eabb1a52452e5c07633f`。
-
-## 第三轮：导入、输出结构与轻量通知
-
-完成直接文件共同顶层保留、跨卷与 UNC 分组、安全输出前缀、统一导入摘要和无激活右下角通知。
-
-- PR #328；
-- 产品候选：`76af0b8199c0765b0a2327c2bb8cdb55f3877bed`；
-- 产品 CI：`30865931850`；
-- 文档头：`78d6ec2b46da6c63bd067a5387e830c8338d37a4`；
-- 文档 CI：`30866099807`；
-- 合并提交：`1ee487006fa5b07f91c6d4eb3f290d1f80ed7900`。
-
-## 第四轮：裁剪编辑器
-
-完成以下能力：
-
-- 双端时间轴、播放头与整体区间平移；
-- 一帧最小区间与边界归一化；
-- 图片任务禁用时间轴；
-- 裁剪框创建、整体移动和八方向缩放；
-- 自由比例和比例锁定；
-- 八个绿色手柄与方向光标；
-- 0°、90°、180°、270° 旋转坐标映射；
-- “旋转 → 裁剪 → 缩放 → 编码”固定处理顺序；
-- Win32 时间轴与画布子类化；
-- 第四轮固定清单与 133 项全量源码清单。
-
-第四轮证据：
-
-- PR #332；
-- 设计冻结提交：`5b89bda2b2b231d5fbc7e1e18a14f4a95172a46e`；
-- Windows 接线候选：`5d79d97130dee8d9772fae4c292022d411dcd8b5`；
-- Windows 接线 CI：`30867482413`；
-- 冻结产品候选：`650b7ad6d5e4c0e498dae3ada9d9834adfc6e9d1`；
-- 正式全链 CI：`30868312362`；
-- 最终文档头：`d43ee435d43277393c0d9a32c14530c3efc7d954`；
-- 文档 CI：`30868540067`；
-- 合并提交：`8eadd2ff96d5211db19d005a5093036e766e2428`。
-
-## 第五轮：真实 Windows 收口
-
-### 验证范围
-
-第五轮在 GitHub Windows 2025 原生 Runtime 中完成：
-
-- 视频与图片裁剪窗口真实创建；
-- 正常、最大化、还原和交互后截图；
-- 时间轴开始端、结束端、播放头和整体区间消息级拖动；
-- 裁剪框整体移动与八方向手柄拖动；
-- 图片任务时间轴禁用；
-- 导入通知显示、截图、手动关闭和销毁；
-- `0° / 90° / 180° / 270°` 四方向真实 FFmpeg 输出矩阵；
-- Runtime Manifest、私有数据边界和完整 Artifact 上传。
-
-### 暴露的根因
-
-首轮原生探针发现视频和图片共 18 项裁剪鼠标交互失败。消息与坐标诊断证明：鼠标坐标、帧坐标映射、手柄命中和纯几何算法均正确，问题位于 Win32 编辑框程序回填链。
-
-`cropToControls()` 会依次对 X、Y、宽、高编辑框调用 `SetWindowText`。Windows 编辑框在 `WM_SETTEXT` 同步过程中向父窗口发送 `EN_UPDATE` 和 `EN_CHANGE`。旧父窗口过程每收到一次通知就立即从四个编辑框反读完整裁剪状态，导致尚未写完的半成品值覆盖 `model.Crop`，最终造成 Y、宽、高或后续维度丢失。
-
-### 最终修复
-
-第五轮采用独立 Windows 接线，不改写第四轮已冻结文件：
-
-- 通过 UI 线程 `WH_CBT` 在裁剪顶层窗口进入 `WM_CREATE` 前冻结原始 `model.Crop`；
-- 在顶层窗口创建前安装父窗口子类，初始化期间屏蔽裁剪编辑框同步通知；
-- 四个编辑框建立后，在 UI 线程确定安装时间轴和预览画布子类；
-- 对每个编辑框的 `WM_SETTEXT` 建立按控件 ID 的写入位掩码；
-- `WM_SETTEXT` 调用期间，父窗口屏蔽该控件产生的全部 `WM_COMMAND`，同时覆盖 `EN_UPDATE` 与 `EN_CHANGE`；
-- 用户键盘输入不会设置写入位，原有实时编辑行为保持不变；
-- 完整控件建立后一次性恢复初始模型与四个数值框；
-- 窗口销毁时解除子类并清理状态；
-- 临时高容量鼠标诊断在定位完成后删除，不进入冻结候选。
-
-### 最终验证
-
-冻结候选 `3ba4b43bc94ff38ab02aae910ff698e5ecbd7881` 在 CI #388 中通过：
-
-- P101 范围门禁；
-- 140 项全量源码清单；
-- 第五轮独立固定清单；
-- Linux Go 全测、全量竞态和 `go vet`；
-- Windows 交叉测试与交叉构建；
-- Windows Go 全测、全量竞态和 `go vet`；
-- 真实 FFmpeg 下载与运行；
-- 完整 Runtime 构建；
-- Runtime Manifest 与私有数据边界；
-- 既有主窗口截图；
-- 第五轮裁剪窗口与通知截图；
-- 117 项原生自检，117 通过，失败 0；
-- Artifact 上传。
-
-视频与图片均通过：裁剪框整体移动、北、东北、东、东南、南、西南、西、西北八方向缩放、正常窗口截图、最大化截图、还原后继续存活和交互后截图。
-
-四方向 FFmpeg 输出：
+#701 最终动态证据继续通过：
 
 ```text
-0°：crop=320:180:40:30 → 320×180
-90°：transpose=1,crop=180:320:30:40 → 180×320
-180°：hflip,vflip,crop=320:180:40:30 → 320×180
-270°：transpose=2,crop=180:320:30:40 → 180×320
+number_dark_pixels = [12, 19, 14]
+first_row_top = 144
+header_bottom = 144
+header_row_overlap = false
+hidden_picture_crop_residue_dark_pixels = 0
+bottom_separator_continuous = true
+bottom_separator_min_ratio ≈ 0.997389
+selected_background = [231, 243, 255]
+horizontal_viewports_validated = 3
 ```
 
-### 清单、产物与合并证据
+因此编号、Header/缩略图侵入、隐藏列 `100%` 三项已纳入真实像素门禁，不再依赖人工猜测。
 
-- 第五轮固定清单：`代码/V452_ROUND5_WINDOWS_CLOSEOUT_FILES_SHA256.txt`；
-- 固定清单 SHA-256：`a750521c929068443482e853a3709c9c2498a3efe8dde2e79913e7826a133627`；
-- 全量源码清单：140 项；
-- 产品候选：`3ba4b43bc94ff38ab02aae910ff698e5ecbd7881`；
-- 产品 CI：`30883792882`；
-- 最终文档头：`227d58084d1222f9643d60f98b73da5237f096c2`；
-- 文档 CI：`30884258441`；
-- `Mediova.exe` SHA-256：`33ac9c35991cf1a09c21d6af7198bcce805750a70031b3a3654229575f234e29`；
-- Runtime ZIP SHA-256：`05dad60cbb88cb6ce94d6152c143250b08c416142fa1c295ac1812d6d4864dbe`；
-- CI Artifact SHA-256：`2d8405ece8b1e2811538519fbc28ae717e55e7abc6ffee4573a772ed99dbcde5`；
-- Artifact ID：`8882325680`；
-- PR #341 合并提交：`bfaa0d0839ea447beec6e49b7bfecf7e9666f4b2`；
-- `p101-stable` 与该合并提交比较结果：`identical`。
+## Round12 真实主页缩略图
 
-## 后续边界
+旧门禁只能证明占位绘制，不能证明真实媒体帧进入首页。当前门禁使用正常 Runtime 和 Windows 原生文件对话框导入真实 FFmpeg `testsrc2` MP4，再检查首页预览单元格。
 
-- v4.5.2 五轮开发与稳定分支合并阶段已经结束；
-- 当前只交付 v4.5.2 验证候选，不建立正式标签和 Release；
-- 用户需要在真实桌面重点复核裁剪框拖动手感、视觉布局、实际视频输出与预览一致性；
-- 用户验证通过后，再单独决定是否从稳定线进入 `main` 并建立正式 v4.5.2 标签与 Release。
+#701 结果：
+
+```text
+normal_runtime = true
+real_file_dialog_used = true
+file_imported = true
+item_count = 1
+real_thumbnail_visible = true
+unique_colors = 746
+quantized_unique = 111
+saturated_pixels = 3531
+luma_span = 240
+```
+
+因此真实文件导入、probe、主页缩略图生成与可见绘制链仍保持通过。
+
+## Round12 剪裁预览稳定性专题
+
+### 问题
+
+用户实机曾出现“预览帧生成失败”，后续压力门禁又确认：
+
+- 精确跳到视频终点可能没有得到有效新帧；
+- 快速连续跳转时，不同 seek target 可能短暂复用旧视觉帧；
+- 原实现每次 `generatePreviewFrame()` 都启动新的 FFmpeg worker，只用 `previewSeq` 在回调阶段丢弃旧结果，但不会取消旧 FFmpeg 进程。
+
+### 排除的错误路线
+
+曾尝试通过新的 `SetWindowSubclass` 导航 owner 抢占 `WM_COMMAND`、键盘和时间轴消息，并让 Round12 成为最后安装的子类。该方案在部分 CI 可通过，但不同 runner 上仍会出现精确终点不更新。
+
+结论：不能把正确性建立在多个 Win32 subclass 的相对回调顺序上。最终不再让 Round12 拦截导航消息。
+
+### 最终架构
+
+**Round7 保持唯一输入所有者；Round12 只观察真实预览请求序列。**
+
+所有跳转、±1 秒、±1 帧、左右键和时间轴操作仍由 Round7 正常更新 `currentAt` 并触发 `trimDialog.previewSeq`。Round12 watcher 只观察这个单调递增事实：
+
+1. 发现新的 legacy preview sequence；
+2. 立即推进同一个 `previewSeq`，使旧 fast-seek worker 的回调自动失效；
+3. 取消上一条 Round12 robust FFmpeg 请求；
+4. 为当前 `targetAt` 启动唯一 robust 请求；
+5. 最终位图安装必须同时匹配 `generation + ownSeq + targetAt + currentAt`；
+6. 对话框关闭立即取消活动 FFmpeg；
+7. idle 时只在后台观察原子序列，序列不变化时不向 UI 线程持续投递刷新。
+
+精确终点与 fallback 也改为按实际 FPS 工作：
+
+- 一帧步长为 `1 / fps`，限制在合理范围；
+- 请求落到精确终点时收敛到 `duration - 1 frame`；
+- 顺序尝试 fast seek、accurate seek；
+- 仍失败时只向前退 **1 帧** 做准确 seek；
+- 不再使用旧的固定 `0.25 s / 2 帧` 粗回退，避免多个近终点目标被压成同一画面；
+- 每次 FFmpeg 尝试有 10 s 上限。
+
+为避免重新引入子类竞争，本轮建立过的 exclusive owner / finalizer 已退化为无副作用兼容壳：不注册 hook、不拦截导航、不启动 worker，也不参与运行时正确性。
+
+## #701 最终剪裁预览证据
+
+真实 Windows 链：
+
+```text
+正常 Runtime
+→ Windows 原生文件对话框导入真实 MP4
+→ 打开 MWRound7Editor
+→ 首帧稳定
+→ 精确跳转 00:00:02.000
+→ 00:00:00.250
+→ 00:00:01.750
+→ 00:00:00.600
+→ 00:00:01.950
+→ 00:00:01.100
+```
+
+最终报告：
+
+```text
+real_file_imported = true
+editor_class = MWRound7Editor
+minimum_visual_change_ratio = 0.03
+stable_matches_required = 3
+stable_max_drift_ratio = 0.01
+seek_sequence_count = 6
+unique_visual_hashes = 6
+required_distinct_visual_hashes = 6
+failure_texts = []
+exact_end_preview_recovered = true
+continuous_seek_preview_stable = true
+```
+
+精确终点 `00:00:02.000` 相对初始帧实际变化：
+
+```text
+initial visual_hash = ef9f95d7075dccba8a124a592ec5a2db5ed0a3cd694461733a53978bc465193e
+exact-end visual_hash = dd711ed51fd5677cc759c000e47b8aebf4773472d33350d4b1c8bbb71c999f1a
+visual_change_ratio = 0.1740451388888889
+stable_matches = 3
+```
+
+连续 seek 的主要视觉 hash：
+
+```text
+0.250 s → 0a059720405dcdde055842d20301d0b9fd429045635cb003f64c1af4593839c1
+1.750 s → fafd05646440a12c70d8f75665b39d3619d1c295eac14c7e632eb5f87db3bc95
+0.600 s → fbe58e9a6c0cba4740c4877a41f8ce571b5a598c57869b93ae06f600960cc514
+1.950 s → dd711ed51fd5677cc759c000e47b8aebf4773472d33350d4b1c8bbb71c999f1a
+1.100 s → 3894674ad317cbefa6ea2ebf0b2ab134179a1866516ea167df08ca3101b5f144
+```
+
+12 fps 测试视频中 `1.950 s` 与精确终点允许落到同一个最后可解码帧；其余刻意分离的目标全部满足独立视觉门禁。
+
+## #701 完整验证
+
+准确产品代码 Head：
+
+```text
+78b4217902743efb58924a90a2284f4ab2922b49
+```
+
+CI：
+
+```text
+P101 Mediova CI #701
+Run ID：31242637671
+scope：success
+linux：success
+windows-native：success
+```
+
+覆盖：
+
+- P101 PR 路径范围门禁；
+- Round12 33 项固定 SHA-256 清单；
+- Linux Go 全测、全量 race、`go vet`、Windows 交叉测试/构建；
+- Windows 隔离 Data 原生全测与全量 race；
+- 固定来源真实 FFmpeg/FFprobe；
+- v4.5.2 Verification Runtime 构建与 Runtime 清单；
+- 四套 Windows 主界面截图；
+- 原生 self-test **126/126**；
+- 主窗口 180 次几何循环；
+- Header 240 次循环；
+- main/editor idle 40 帧稳定；
+- 横纵悬浮滚动条延迟与隐藏；
+- 15 列三视口、浅蓝选择、时间/画面剪裁列；
+- 视频/图片列配置隔离；
+- 真实文件对话框导入与真实主页缩略图；
+- 真实剪裁首帧、精确终点和连续 seek 稳定性。
+
+## #701 候选产物
+
+```text
+Mediova.exe
+SHA-256：2171663fe8f9b9ab575722fa7d92eaef69e5c0965d034c2dbbe201fb2c36e205
+
+Mediova-v4.5.2-Verification-Runtime.zip
+SHA-256：4ea342d9afaa653213997a041f968370f95def98350dec01104c7833c80df056
+
+CI Artifact ID：9017566341
+Artifact size：120,932,028 bytes
+Artifact archive digest：179a89319451108fc876193091a70632c903076593989d495907df4ed97d1ac9
+```
+
+该 Runtime 仍是内部验证候选，不是正式 Release。
+
+## 当前待用户实机验证
+
+自动化已经覆盖本轮四个重点问题，但真实桌面手感仍不能由 CI 代替。继续确认：
+
+- 实际导入多条视频后编号 `1、2、3…`、Header 底线、首行缩略图边界和隐藏“画面剪裁”后的无残留；
+- 视频和图片分别拖成明显不同列宽，切换、排序、导入、缩放窗口和重启后是否保持；
+- 横纵悬浮滑块边缘命中范围、500 ms 延迟和真实拖动手感；
+- AVI、WMV、MP4、H.264、H.265 与图片的首帧和处理后预览；
+- 连续拖动时间轴、连续点击 ±1 秒/帧、直接输入终点时间时是否始终及时更新且不闪旧帧；
+- 绿色画面选区连续拖动是否仍有肉眼可感知闪烁；
+- 搁置、退出锁定、保存、归队和立即重启的完整任务状态链；
+- 100%、125%、150%、175% DPI、多显示器、真实长文件名；
+- 窗口连续缩放及右侧栏展开/收起时 footer 按钮是否始终稳定。
+
+## 停止条件
+
+当前代码专题到 #701 已满足自动化收口标准，因此不再为“继续优化”主动扩大范围。候选继续保持 Draft；正式版本仍为 v4.5.0。只有用户真实桌面反馈出现新的可复现问题时才继续修复；用户确认后再按 `p101-stable → main → 标签/Release` 流程处理正式发布。

@@ -57,7 +57,7 @@ func v452ThumbnailCurrent(a *application, taskID int64, generation uint64) bool 
 // refuses stale worker results and updates both task and resource ownership.
 func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, input, path string, cached bool, index int) bool {
 	state := v452ThumbnailStateFor(a)
-	if state == nil || index <= 0 || !state.ownership.Current(taskID, generation) {
+	if state == nil || !round12ThumbnailIndexValid(index) || !state.ownership.Current(taskID, generation) {
 		if cached && path != "" && state != nil && state.ownership.RefCount(path) == 0 {
 			_ = os.Remove(path)
 		}
@@ -74,7 +74,7 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 		}
 		return false
 	}
-	old := state.assets[taskID]
+	old, hadOld := state.assets[taskID]
 	stale, orphan := state.ownership.Assign(taskID, generation, path)
 	if stale {
 		a.mu.Unlock()
@@ -87,7 +87,7 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 	task.ThumbnailIndex = index
 	a.mu.Unlock()
 
-	if old.index > 0 && old.index != index {
+	if hadOld && old.index >= 0 && old.index != index {
 		v452RemoveImageListIndex(a, old.index)
 	}
 	if orphan != "" {
@@ -97,7 +97,7 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 }
 
 func v452RemoveImageListIndex(a *application, index int) {
-	if a == nil || a.hImageList == 0 || index <= 0 {
+	if a == nil || a.hImageList == 0 || !round12ThumbnailIndexValid(index) {
 		return
 	}
 	result, _, _ := procImageListRemoveV452.Call(a.hImageList, uintptr(index))
@@ -111,7 +111,7 @@ func v452RemoveImageListIndex(a *application, index int) {
 			continue
 		}
 		if task.ThumbnailIndex == index {
-			task.ThumbnailIndex = 0
+			task.ThumbnailIndex = -1
 		} else if task.ThumbnailIndex > index {
 			task.ThumbnailIndex--
 		}
@@ -133,25 +133,26 @@ func v452ReleaseTaskThumbnails(a *application, taskIDs []int64) {
 	}
 	state := v452ThumbnailStateFor(a)
 	type release struct {
-		id     int64
-		asset  v452ThumbnailAsset
-		orphan string
+		id       int64
+		asset    v452ThumbnailAsset
+		hasAsset bool
+		orphan   string
 	}
 	items := make([]release, 0, len(taskIDs))
 	for _, id := range taskIDs {
-		asset := state.assets[id]
+		asset, hasAsset := state.assets[id]
 		path, orphaned := state.ownership.Release(id)
 		delete(state.assets, id)
 		if !orphaned {
 			path = ""
 		}
-		items = append(items, release{id: id, asset: asset, orphan: path})
+		items = append(items, release{id: id, asset: asset, hasAsset: hasAsset, orphan: path})
 	}
 	// Removing from the highest ImageList index first prevents index shifts from
 	// invalidating the remaining removal plan.
 	sort.Slice(items, func(i, j int) bool { return items[i].asset.index > items[j].asset.index })
 	for _, item := range items {
-		if item.asset.index > 0 {
+		if item.hasAsset && item.asset.index >= 0 {
 			v452RemoveImageListIndex(a, item.asset.index)
 		}
 		if item.orphan != "" {

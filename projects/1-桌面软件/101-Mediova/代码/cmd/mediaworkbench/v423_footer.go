@@ -23,15 +23,15 @@ func footerGeometryFor(clientW, barY int32, compact bool) footerGeometry {
 		progressY = barY + 76
 	}
 	const (
-		margin       int32 = 8
-		gap          int32 = 8
-		statusGap    int32 = 12
-		buttonH      int32 = 36
-		wideStartW   int32 = 132
-		widePauseW   int32 = 96
-		wideStopW    int32 = 88
-		compactStart int32 = 112
-		compactOther int32 = 84
+		margin       int32 = 12
+		gap          int32 = 10
+		statusGap    int32 = 14
+		buttonH      int32 = 34
+		wideStartW   int32 = 142
+		widePauseW   int32 = 106
+		wideStopW    int32 = 100
+		compactStart int32 = 126
+		compactOther int32 = 94
 		minStatusW   int32 = 120
 	)
 	startW, pauseW, stopW := wideStartW, widePauseW, wideStopW
