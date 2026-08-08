@@ -13,6 +13,9 @@ import round12_list_structure_gate
 import round12_real_thumbnail_gate
 import round12_trim_preview_gate
 
+EM_SETSEL = 0x00B1
+WM_CHAR = 0x0102
+
 
 def argument_path(name: str) -> Path | None:
     for index, value in enumerate(sys.argv):
@@ -82,17 +85,19 @@ def install_trim_diagnostics() -> None:
         )
 
     def set_current_and_prove_command(editor: int, current_edit: int, jump_button: int, value: str) -> None:
-        # Use an explicit pointer-sized SendMessageW signature. ctypes defaults
-        # are not safe for pointer-bearing LPARAM values on 64-bit Windows.
+        # Exercise the EDIT control through its normal character-input path
+        # instead of cross-process WM_SETTEXT. WM_SETTEXT is programmatic state
+        # replacement and can legitimately interact differently with synchronous
+        # notification/normalization layers than real typing.
         submitted = "2" if value == "00:00:02.000" else value
-        text = ctypes.create_unicode_buffer(submitted)
-        text_ptr = ctypes.cast(text, ctypes.c_void_p).value or 0
-        send_message(current_edit, round12_trim_preview_gate.WM_SETTEXT, 0, text_ptr)
+        send_message(current_edit, EM_SETSEL, 0, -1)
+        for char in submitted:
+            send_message(current_edit, WM_CHAR, ord(char), 1)
 
         written = round12_trim_preview_gate.gate.window_text(current_edit)
         if written != submitted:
             raise RuntimeError(
-                "current-time edit did not retain WM_SETTEXT before jump command; "
+                "current-time edit did not retain user-like WM_CHAR input before jump command; "
                 f"submitted={submitted!r} current_edit={written!r}"
             )
 
@@ -110,7 +115,7 @@ def install_trim_diagnostics() -> None:
                 return
             time.sleep(0.05)
         raise RuntimeError(
-            "Round7 endpoint jump command did not canonicalize the requested time; "
+            "Round7 endpoint jump command did not canonicalize user-like input; "
             f"submitted={submitted!r} current_edit={last_text!r} expected={value!r}"
         )
 
@@ -171,6 +176,7 @@ def main() -> int:
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
             stage["endpoint_command_canonicalization_required"] = True
+            stage["user_like_character_input_required"] = True
             stage["pointer_sized_sendmessage_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
