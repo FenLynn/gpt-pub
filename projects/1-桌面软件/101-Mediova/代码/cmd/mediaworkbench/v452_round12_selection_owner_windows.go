@@ -83,6 +83,16 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 				switch hdr.Code {
 				case NM_CUSTOMDRAW:
 					return round12DrawTaskListCell(a, (*nmListViewCustomDraw)(unsafe.Pointer(lParam)))
+				case LVN_ITEMCHANGED:
+					n := (*nmListView)(unsafe.Pointer(lParam))
+					if (n.UNewState^n.UOldState)&LVIS_SELECTED != 0 {
+						// ListView may only invalidate subitems whose content changed.
+						// Round12 selection is a whole-row surface, so repaint the
+						// visible list once without background erasure whenever the
+						// selected state moves. Hidden/empty columns therefore cannot
+						// retain the previous row's blue pixels.
+						procInvalidateRect.Call(a.hList, 0, 0)
+					}
 				case LVN_COLUMNCLICK:
 					n := (*nmListView)(unsafe.Pointer(lParam))
 					if legacy, ok := round12LegacySortColumn(int(n.IItemSub)); ok {
