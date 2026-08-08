@@ -8,9 +8,15 @@ import (
 	"unsafe"
 )
 
-const round12HeaderTopSubclassID = 0x45C5
+const (
+	round12HeaderTopSubclassID = 0x45C5
+	round12WMNCPaint            = 0x0085
+)
 
-var round12HeaderTopCallback uintptr
+var (
+	round12HeaderTopCallback uintptr
+	round12HeaderGetWindowDC = user32.NewProc("GetWindowDC")
+)
 
 func init() {
 	round12HeaderTopCallback = syscall.NewCallback(round12HeaderTopSubclassProc)
@@ -42,7 +48,7 @@ func init() {
 
 func round12HeaderTopSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
-	case WM_PAINT, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE:
+	case WM_PAINT, round12WMNCPaint, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round12PaintHeaderTopLine(hwnd)
 		if app != nil {
@@ -60,14 +66,21 @@ func round12PaintHeaderTopLine(hwnd uintptr) {
 	if hwnd == 0 {
 		return
 	}
-	hdc, _, _ := round7ListGetDC.Call(hwnd)
+	// The disappearing edge in the native pressed Header state is the window
+	// top edge, not the Header client origin. Paint through GetWindowDC so the
+	// one-pixel owner survives native non-client/pressed-state repaints.
+	hdc, _, _ := round12HeaderGetWindowDC.Call(hwnd)
 	if hdc == 0 {
 		return
 	}
 	defer round7ListReleaseDC.Call(hwnd, hdc)
-	var rc rect
-	if ok, _, _ := procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc))); ok == 0 || rc.Right <= rc.Left || rc.Bottom <= rc.Top {
+	var wr rect
+	if ok, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&wr))); ok == 0 {
 		return
 	}
-	fillSolid(hdc, rect{Left: rc.Left, Top: rc.Top, Right: rc.Right, Bottom: rc.Top + 1}, round12HeaderBottomSeparator)
+	width := wr.Right - wr.Left
+	if width <= 0 || wr.Bottom <= wr.Top {
+		return
+	}
+	fillSolid(hdc, rect{Left: 0, Top: 0, Right: width, Bottom: 1}, round12HeaderBottomSeparator)
 }
