@@ -21,6 +21,10 @@ var v452Round9SupersededByRound11 = map[string]bool{
 	// preview cells can never paint over Header captions. The round-9 digest
 	// remains a historical receipt; the active file is frozen by round 12.
 	"cmd/mediaworkbench/v452_round7_list_overlay_windows.go": true,
+	// Round 12 only changes the final playhead pixels (stem + arrowhead), while
+	// preserving the Round9 hit-test/drag contract. Keep the Round9 receipt
+	// immutable and freeze the active timeline implementation in Round12.
+	"cmd/mediaworkbench/v452_round9_timeline_windows.go": true,
 }
 
 func TestV452Round9InteractionManifest(t *testing.T) {
