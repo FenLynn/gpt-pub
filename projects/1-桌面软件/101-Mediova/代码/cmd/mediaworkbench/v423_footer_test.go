@@ -20,20 +20,23 @@ func assertFooterSafe(t *testing.T, width, barY int32, compact bool) footerGeome
 	if g.Status.X < 0 || g.Status.W < 120 || g.Status.X+g.Status.W > width {
 		t.Fatalf("width=%d compact=%v invalid status geometry: %+v", width, compact, g.Status)
 	}
-	if g.Progress.X != 8 || g.Progress.W != width-16 || g.Progress.X+g.Progress.W > width {
+	if g.Progress.X != 12 || g.Progress.W != width-24 || g.Progress.X+g.Progress.W > width {
 		t.Fatalf("width=%d compact=%v invalid progress geometry: %+v", width, compact, g.Progress)
 	}
 	if footerRectsOverlap(g.Start, g.Pause) || footerRectsOverlap(g.Pause, g.Stop) || footerRectsOverlap(g.Start, g.Stop) {
 		t.Fatalf("width=%d compact=%v action buttons overlap: %+v", width, compact, g)
 	}
-	if g.Pause.X-(g.Start.X+g.Start.W) != 8 || g.Stop.X-(g.Pause.X+g.Pause.W) != 8 {
+	if g.Pause.X-(g.Start.X+g.Start.W) != 10 || g.Stop.X-(g.Pause.X+g.Pause.W) != 10 {
 		t.Fatalf("width=%d compact=%v action gaps changed: %+v", width, compact, g)
 	}
-	if width-(g.Stop.X+g.Stop.W) != 8 {
-		t.Fatalf("width=%d compact=%v stop button is not right aligned: %+v", width, compact, g.Stop)
+	if width-(g.Stop.X+g.Stop.W) != 12 {
+		t.Fatalf("width=%d compact=%v stop button right safety margin changed: %+v", width, compact, g.Stop)
 	}
 	if g.Progress.Y+g.Progress.H+8 != g.Start.Y {
 		t.Fatalf("width=%d compact=%v progress/action gap changed: progress=%+v start=%+v", width, compact, g.Progress, g.Start)
+	}
+	if g.Start.H != 34 {
+		t.Fatalf("width=%d compact=%v action height changed: %+v", width, compact, g)
 	}
 	return g
 }
