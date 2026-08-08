@@ -61,25 +61,38 @@ func round12DrawVisuallyCenteredText(hdc uintptr, text string, rc rect, font, co
 	}
 }
 
+// round12DrawPolishedButtonContent gives text absolute priority over decoration.
+// The caller has already supplied the desired visual padding in rc; do not add
+// a second hidden padding layer here. If an icon cannot coexist with the full
+// label, first compact the icon/gap and finally drop the icon rather than ever
+// clipping or squeezing the label. This is especially important for the 90 px
+// footer and ±1 second/frame controls.
 func round12DrawPolishedButtonContent(hdc uintptr, label, glyph string, rc rect, font, textColor uintptr) {
-	if glyph == "" {
-		round12DrawVisuallyCenteredText(hdc, label, rc, font, textColor, DT_CENTER)
+	if hdc == 0 || rc.Right <= rc.Left || rc.Bottom <= rc.Top {
 		return
 	}
 	labelWidth := measureSingleLineWidth(hdc, label, font)
-	iconWidth := scaleDPI(17)
-	gap := scaleDPI(5)
-	padding := scaleDPI(10)
-	available := rc.Right - rc.Left - padding*2
-	total := iconWidth + gap + labelWidth
-	if total > available {
-		labelWidth = available - iconWidth - gap
-		if labelWidth < scaleDPI(20) {
-			labelWidth = scaleDPI(20)
-		}
-		total = iconWidth + gap + labelWidth
+	available := rc.Right - rc.Left
+	if glyph == "" || labelWidth <= 0 {
+		round12DrawVisuallyCenteredText(hdc, label, rc, font, textColor, DT_CENTER)
+		return
 	}
-	left := rc.Left + (rc.Right-rc.Left-total)/2
+
+	iconWidth := scaleDPI(15)
+	gap := scaleDPI(4)
+	if iconWidth+gap+labelWidth > available {
+		iconWidth = scaleDPI(13)
+		gap = scaleDPI(2)
+	}
+	if iconWidth+gap+labelWidth > available {
+		// Readability wins. A crisp icon is useful only when it does not steal
+		// pixels from the complete action label.
+		round12DrawVisuallyCenteredText(hdc, label, rc, font, textColor, DT_CENTER)
+		return
+	}
+
+	total := iconWidth + gap + labelWidth
+	left := rc.Left + (available-total)/2
 	iconRC := rect{Left: left, Top: rc.Top, Right: left + iconWidth, Bottom: rc.Bottom}
 	textRC := rect{Left: iconRC.Right + gap, Top: rc.Top, Right: iconRC.Right + gap + labelWidth, Bottom: rc.Bottom}
 	// Segoe MDL2 Assets is a scalable Windows vector-outline font. It is the
