@@ -127,6 +127,12 @@ func round9PaintTimeline(e *round7Editor, hwnd uintptr) {
 		fillSolid(memDC, rect{Left: startX, Top: barTop, Right: endX, Bottom: barBottom}, colorRef(145, 194, 241))
 		round7TimelineLine(memDC, startX, barTop-scaleDPI(5), startX, barBottom+scaleDPI(5), startBlue, 2)
 		round7TimelineLine(memDC, endX, barTop-scaleDPI(5), endX, barBottom+scaleDPI(5), endBlue, 2)
+
+		// The current playhead has one continuous red stem plus an arrowhead.
+		// The previous triangle-only marker looked coarse and was harder to grab.
+		stemTop := barTop - scaleDPI(8)
+		stemBottom := barBottom + scaleDPI(1)
+		round7TimelineLine(memDC, currentX, stemTop, currentX, stemBottom, red, 2)
 		arrowBaseY := barBottom + scaleDPI(11)
 		arrow := []point{{X: currentX, Y: barBottom}, {X: currentX - scaleDPI(6), Y: arrowBaseY}, {X: currentX + scaleDPI(6), Y: arrowBaseY}}
 		round7FillPolygon(memDC, arrow, red)
