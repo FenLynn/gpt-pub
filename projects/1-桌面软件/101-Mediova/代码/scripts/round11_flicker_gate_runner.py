@@ -14,7 +14,7 @@ import round12_real_thumbnail_gate
 import round12_trim_preview_gate
 
 EM_SETSEL = 0x00B1
-WM_CHAR = 0x0102
+EM_REPLACESEL = 0x00C2
 
 
 def argument_path(name: str) -> Path | None:
@@ -85,19 +85,20 @@ def install_trim_diagnostics() -> None:
         )
 
     def set_current_and_prove_command(editor: int, current_edit: int, jump_button: int, value: str) -> None:
-        # Exercise the EDIT control through its normal character-input path
-        # instead of cross-process WM_SETTEXT. WM_SETTEXT is programmatic state
-        # replacement and can legitimately interact differently with synchronous
-        # notification/normalization layers than real typing.
+        # Replace the selected text through the EDIT control's native edit
+        # semantics. Unlike WM_CHAR this path does not depend on keyboard focus,
+        # while still emitting the normal edit notifications that could expose a
+        # real parent/subclass ownership bug.
         submitted = "2" if value == "00:00:02.000" else value
         send_message(current_edit, EM_SETSEL, 0, -1)
-        for char in submitted:
-            send_message(current_edit, WM_CHAR, ord(char), 1)
+        text = ctypes.create_unicode_buffer(submitted)
+        text_ptr = ctypes.cast(text, ctypes.c_void_p).value or 0
+        send_message(current_edit, EM_REPLACESEL, 1, text_ptr)
 
         written = round12_trim_preview_gate.gate.window_text(current_edit)
         if written != submitted:
             raise RuntimeError(
-                "current-time edit did not retain user-like WM_CHAR input before jump command; "
+                "current-time edit did not retain native EM_REPLACESEL input before jump command; "
                 f"submitted={submitted!r} current_edit={written!r}"
             )
 
@@ -115,7 +116,7 @@ def install_trim_diagnostics() -> None:
                 return
             time.sleep(0.05)
         raise RuntimeError(
-            "Round7 endpoint jump command did not canonicalize user-like input; "
+            "Round7 endpoint jump command did not canonicalize native edit input; "
             f"submitted={submitted!r} current_edit={last_text!r} expected={value!r}"
         )
 
@@ -176,7 +177,7 @@ def main() -> int:
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
             stage["endpoint_command_canonicalization_required"] = True
-            stage["user_like_character_input_required"] = True
+            stage["native_edit_replace_required"] = True
             stage["pointer_sized_sendmessage_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
