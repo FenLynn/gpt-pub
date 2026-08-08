@@ -41,8 +41,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 29 {
-		t.Fatalf("entries=%d want=29", entries)
+	if entries != 30 {
+		t.Fatalf("entries=%d want=30", entries)
 	}
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
@@ -52,6 +52,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_round12_list_draw_windows.go",
 		"cmd/mediaworkbench/v452_round12_list_geometry_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_guard_windows.go",
+		"cmd/mediaworkbench/v452_round12_trim_preview_owner_windows.go",
 		"cmd/mediaworkbench/v452_round12_column_profiles_windows.go",
 		"cmd/mediaworkbench/v452_round12_preview_windows.go",
 		"cmd/mediaworkbench/v452_round12_thumbnail_fallback_windows.go",
