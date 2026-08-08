@@ -9,6 +9,7 @@ import round12_footer_gate
 import round12_header_gate
 import round12_list_structure_gate
 import round12_real_thumbnail_gate
+import round12_trim_preview_gate
 
 
 def argument_path(name: str) -> Path | None:
@@ -34,6 +35,7 @@ def merge_stage_evidence() -> None:
         ("header-report.json", "round12_header"),
         ("round12-list-report.json", "round12_list"),
         ("round12-real-thumbnail-report.json", "round12_real_thumbnail"),
+        ("round12-trim-preview-report.json", "round12_trim_preview"),
     ):
         stage_path = evidence / filename
         if stage_path.is_file():
@@ -54,6 +56,9 @@ def main() -> int:
     thumbnail_result = int(round12_real_thumbnail_gate.main())
     if thumbnail_result != 0:
         return thumbnail_result
+    trim_preview_result = int(round12_trim_preview_gate.main())
+    if trim_preview_result != 0:
+        return trim_preview_result
     try:
         return int(round11.main())
     finally:
