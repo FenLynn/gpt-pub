@@ -75,6 +75,10 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 	case WM_NOTIFY:
 		if lParam != 0 {
 			hdr := (*nmhdr)(unsafe.Pointer(lParam))
+			header := send(a.hList, LVM_GETHEADER, 0, 0)
+			if hdr.Code == NM_CUSTOMDRAW && header != 0 && hdr.HwndFrom == header {
+				return round12DrawHeaderItemTop((*nmCustomDraw)(unsafe.Pointer(lParam)))
+			}
 			if hdr.HwndFrom == a.hList {
 				switch hdr.Code {
 				case NM_CUSTOMDRAW:
