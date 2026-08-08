@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -19,63 +20,107 @@ import (
 )
 
 const (
-	round12TrimPreviewEditorSubclassID   = 0x45D1
-	round12TrimPreviewTimelineSubclassID = 0x45D2
-	round12EventObjectCreate             = 0x8000
-	round12EventObjectShow               = 0x8002
-	round12WinEventOutOfContext          = 0x0000
-	round12CreateNoWindow                = 0x08000000
+	round12EventObjectCreate    = 0x8000
+	round12EventObjectShow      = 0x8002
+	round12WinEventOutOfContext = 0x0000
+	round12CreateNoWindow       = 0x08000000
 )
 
 type round12TrimPreviewGuardState struct {
-	mu         sync.Mutex
-	generation int64
-	cancel     context.CancelFunc
+	mu              sync.Mutex
+	stopped         atomic.Bool
+	generation      int64
+	lastSeq         int64
+	originSeq       int64
+	ownSeq          int64
+	attemptedOrigin int64
+	bitmapAtRequest uintptr
+	deadline        time.Time
+	settled         bool
+	cancel          context.CancelFunc
 }
 
 var (
-	round12TrimPreviewEventHook  uintptr
-	round12TrimPreviewHookMu     sync.Mutex
-	round12TrimPreviewStates     sync.Map
-	round12TrimPreviewEventCB    uintptr
-	round12TrimPreviewEditorCB   uintptr
-	round12TrimPreviewTimelineCB uintptr
-	round12SetWinEventHook       = user32.NewProc("SetWinEventHook")
-	round12UnhookWinEvent        = user32.NewProc("UnhookWinEvent")
+	round12TrimPreviewEventHook uintptr
+	round12TrimPreviewHookMu    sync.Mutex
+	round12TrimPreviewStates    sync.Map
+	round12TrimPreviewEventCB   uintptr
+	round12SetWinEventHook      = user32.NewProc("SetWinEventHook")
+	round12UnhookWinEvent       = user32.NewProc("UnhookWinEvent")
 )
 
 func init() {
 	round12TrimPreviewEventCB = syscall.NewCallback(round12TrimPreviewEventProc)
-	round12TrimPreviewEditorCB = syscall.NewCallback(round12TrimPreviewEditorSubclassProc)
-	round12TrimPreviewTimelineCB = syscall.NewCallback(round12TrimPreviewTimelineSubclassProc)
 }
 
 func round12ArmTrimPreviewHook() {
 	round12TrimPreviewHookMu.Lock()
-	defer round12TrimPreviewHookMu.Unlock()
-	if round12TrimPreviewEventHook != 0 {
+	if round12TrimPreviewEventHook == 0 {
+		hook, _, _ := round12SetWinEventHook.Call(
+			round12EventObjectCreate,
+			round12EventObjectShow,
+			0,
+			round12TrimPreviewEventCB,
+			0,
+			0,
+			round12WinEventOutOfContext,
+		)
+		round12TrimPreviewEventHook = hook
+	}
+	round12TrimPreviewHookMu.Unlock()
+
+	// WinEvent delivery is normally immediate, but do not make reliability
+	// depend on callback ordering between the inherited Round7 editor hook and
+	// this Round12 hook. Probe from a helper goroutine while all actual editor
+	// reads/install work remains marshalled onto the UI thread.
+	a := app
+	if a == nil {
 		return
 	}
-	hook, _, _ := round12SetWinEventHook.Call(
-		round12EventObjectCreate,
-		round12EventObjectShow,
-		0,
-		round12TrimPreviewEventCB,
-		0,
-		0,
-		round12WinEventOutOfContext,
-	)
-	round12TrimPreviewEventHook = hook
+	done := &atomic.Bool{}
+	go func() {
+		for attempt := 0; attempt < 240 && !done.Load(); attempt++ {
+			a.postUI(func() {
+				if done.Load() {
+					return
+				}
+				e := round7ActiveEditor
+				if e != nil && e.hwnd != 0 && e.dialog != nil && e.dialog.hCanvas != 0 {
+					round12InstallTrimPreviewWatcher(e)
+					done.Store(true)
+				}
+			})
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
 }
 
 func round12TrimPreviewEventProc(hook, event, hwnd, idObject, idChild, eventThread, eventTime uintptr) uintptr {
 	e := round7ActiveEditor
-	if e == nil || e.hwnd == 0 || e.hTimeline == 0 || e.dialog == nil || e.dialog.hCanvas == 0 {
+	if e == nil || e.hwnd == 0 || e.dialog == nil || e.dialog.hCanvas == 0 {
 		return 0
 	}
-	v452SetWindowSubclass.Call(e.hwnd, round12TrimPreviewEditorCB, round12TrimPreviewEditorSubclassID, 0)
-	v452SetWindowSubclass.Call(e.hTimeline, round12TrimPreviewTimelineCB, round12TrimPreviewTimelineSubclassID, 0)
-	round12ScheduleTrimPreviewWatch(e)
+	round12InstallTrimPreviewWatcher(e)
+	return 0
+}
+
+func round12InstallTrimPreviewWatcher(e *round7Editor) {
+	if e == nil || e.hwnd == 0 || e.owner == nil || e.dialog == nil || e.dialog.task == nil || e.dialog.task.Kind != model.KindVideo {
+		return
+	}
+	d := e.dialog
+	state := &round12TrimPreviewGuardState{
+		lastSeq:         d.previewSeq.Load(),
+		originSeq:       d.previewSeq.Load(),
+		bitmapAtRequest: d.bitmap,
+		deadline:        time.Now().Add(2500 * time.Millisecond),
+		settled:         d.bitmap != 0 && !round12TrimPreviewHasFailure(d),
+	}
+	actual, loaded := round12TrimPreviewStates.LoadOrStore(e.hwnd, state)
+	if loaded {
+		_ = actual
+		return
+	}
 
 	round12TrimPreviewHookMu.Lock()
 	if round12TrimPreviewEventHook != 0 {
@@ -83,118 +128,132 @@ func round12TrimPreviewEventProc(hook, event, hwnd, idObject, idChild, eventThre
 		round12TrimPreviewEventHook = 0
 	}
 	round12TrimPreviewHookMu.Unlock()
-	return 0
-}
 
-func round12TrimPreviewEditorSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	e := round7ActiveEditor
-	switch message {
-	case WM_COMMAND:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if e != nil && e.hwnd == hwnd && round12PreviewCommandChangesFrame(int(loWord(wParam))) {
-			round12ScheduleTrimPreviewWatch(e)
+	go func() {
+		ticker := time.NewTicker(150 * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
+			if state.stopped.Load() {
+				return
+			}
+			e.owner.postUI(func() {
+				round12PollTrimPreview(e, state)
+			})
 		}
-		return result
-	case WM_KEYDOWN:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if e != nil && e.hwnd == hwnd && (int(wParam) == 0x25 || int(wParam) == 0x27) {
-			round12ScheduleTrimPreviewWatch(e)
+	}()
+}
+
+func round12PollTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState) {
+	if e == nil || state == nil || state.stopped.Load() || e.dialog == nil || e.done || e.dialog.closed.Load() || round7ActiveEditor != e {
+		if e != nil {
+			round12StopTrimPreviewWatcher(e.hwnd)
 		}
-		return result
-	case v452WMNCDestroy:
-		round12CancelTrimPreviewGuard(hwnd)
-		v452RemoveSubclass.Call(hwnd, round12TrimPreviewEditorCB, subclassID)
-	}
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-	return result
-}
-
-func round12TrimPreviewTimelineSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	e := round7ActiveEditor
-	if message == WM_LBUTTONUP {
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if e != nil && e.hTimeline == hwnd {
-			round12ScheduleTrimPreviewWatch(e)
-		}
-		return result
-	}
-	if message == v452WMNCDestroy {
-		v452RemoveSubclass.Call(hwnd, round12TrimPreviewTimelineCB, subclassID)
-	}
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-	return result
-}
-
-func round12PreviewCommandChangesFrame(id int) bool {
-	switch id {
-	case IDC_JUMP_TIME, IDC_SEEK_MINUS_SEC, IDC_SEEK_PLUS_SEC, IDC_SEEK_MINUS_FRAME, IDC_SEEK_PLUS_FRAME:
-		return true
-	default:
-		return false
-	}
-}
-
-func round12TrimPreviewState(hwnd uintptr) *round12TrimPreviewGuardState {
-	value, _ := round12TrimPreviewStates.LoadOrStore(hwnd, &round12TrimPreviewGuardState{})
-	return value.(*round12TrimPreviewGuardState)
-}
-
-func round12ScheduleTrimPreviewWatch(e *round7Editor) {
-	if e == nil || e.hwnd == 0 || e.owner == nil || e.dialog == nil || e.dialog.task == nil || e.dialog.task.Kind != model.KindVideo {
 		return
 	}
-	state := round12TrimPreviewState(e.hwnd)
+	d := e.dialog
+	seq := d.previewSeq.Load()
+	now := time.Now()
+
 	state.mu.Lock()
-	state.generation++
-	generation := state.generation
-	if state.cancel != nil {
-		state.cancel()
-		state.cancel = nil
+	if seq != state.lastSeq {
+		if state.ownSeq != 0 && seq == state.ownSeq {
+			state.lastSeq = seq
+		} else {
+			if state.cancel != nil {
+				state.cancel()
+				state.cancel = nil
+			}
+			state.generation++
+			state.lastSeq = seq
+			state.originSeq = seq
+			state.ownSeq = 0
+			state.attemptedOrigin = 0
+			state.bitmapAtRequest = d.bitmap
+			state.deadline = now.Add(2500 * time.Millisecond)
+			state.settled = false
+		}
 	}
+	origin := state.originSeq
+	ownSeq := state.ownSeq
+	attempted := state.attemptedOrigin
+	bitmapAtRequest := state.bitmapAtRequest
+	deadline := state.deadline
+	settled := state.settled
 	state.mu.Unlock()
 
-	time.AfterFunc(2500*time.Millisecond, func() {
-		e.owner.postUI(func() {
-			if round7ActiveEditor != e || e.done || e.dialog == nil || e.dialog.closed.Load() {
-				return
-			}
-			state.mu.Lock()
-			current := state.generation == generation
-			state.mu.Unlock()
-			if !current || !round12TrimPreviewNeedsRecovery(e) {
-				return
-			}
-			round12StartTrimPreviewRecovery(e, state, generation)
-		})
-	})
+	if ownSeq != 0 || settled {
+		return
+	}
+
+	failure := round12TrimPreviewHasFailure(d)
+	// A new bitmap is the strongest success signal. Also clear stale failure
+	// text left by an earlier request; the legacy preview worker does not clear
+	// hInfo when a later frame succeeds.
+	if d.bitmap != 0 && d.bitmap != bitmapAtRequest {
+		state.mu.Lock()
+		if state.originSeq == origin && state.ownSeq == 0 {
+			state.settled = true
+		}
+		state.mu.Unlock()
+		if failure {
+			e.updateInfo()
+			setText(e.hInstruction, "拖动红色游标预览画面；拖动蓝色旗标调整剪辑范围。")
+		}
+		return
+	}
+
+	if attempted == origin {
+		return
+	}
+	if failure || (!deadline.IsZero() && !now.Before(deadline)) {
+		round12StartTrimPreviewRecovery(e, state, origin)
+	}
 }
 
-func round12TrimPreviewNeedsRecovery(e *round7Editor) bool {
-	if e == nil || e.dialog == nil {
+func round12TrimPreviewHasFailure(d *trimDialog) bool {
+	if d == nil {
 		return false
 	}
-	info := getText(e.dialog.hInfo)
-	return e.dialog.bitmap == 0 || strings.Contains(info, "预览帧生成失败") || strings.Contains(info, "预览帧加载失败")
+	info := getText(d.hInfo)
+	return strings.Contains(info, "预览帧生成失败") ||
+		strings.Contains(info, "预览帧加载失败") ||
+		strings.Contains(info, "预览帧自动恢复失败") ||
+		strings.Contains(info, "预览帧自动恢复后加载失败")
 }
 
-func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewGuardState, generation int64) {
+func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewGuardState, origin int64) {
 	d := e.dialog
 	if d == nil || d.owner == nil || d.owner.ffmpeg == "" || d.task == nil {
 		return
 	}
 	state.mu.Lock()
-	if state.generation != generation {
+	if state.stopped.Load() || state.originSeq != origin || state.ownSeq != 0 || state.attemptedOrigin == origin {
 		state.mu.Unlock()
 		return
 	}
+	if state.cancel != nil {
+		state.cancel()
+	}
+	state.generation++
+	generation := state.generation
+	state.attemptedOrigin = origin
 	ctx, cancel := context.WithCancel(context.Background())
 	state.cancel = cancel
+	seq := d.previewSeq.Add(1) // invalidate failed/stale legacy worker result
+	state.ownSeq = seq
+	state.lastSeq = seq
 	state.mu.Unlock()
 
-	seq := d.previewSeq.Add(1)
 	dir, err := config.TempDir()
 	if err != nil {
 		cancel()
+		state.mu.Lock()
+		if state.generation == generation {
+			state.cancel = nil
+			state.ownSeq = 0
+			state.settled = true
+		}
+		state.mu.Unlock()
 		return
 	}
 	out := filepath.Join(dir, fmt.Sprintf("trim_frame_recovery_%d_%d.bmp", d.task.ID, seq))
@@ -212,9 +271,11 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 			defer os.Remove(out)
 			cancel()
 			state.mu.Lock()
-			current := state.generation == generation
+			current := !state.stopped.Load() && state.generation == generation && state.ownSeq == seq
 			if current {
 				state.cancel = nil
+				state.ownSeq = 0
+				state.settled = true
 			}
 			state.mu.Unlock()
 			if !current || round7ActiveEditor != e || d.closed.Load() || d.previewSeq.Load() != seq {
@@ -228,6 +289,7 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 			h, _, _ := procLoadImageW.Call(0, uintptr(unsafe.Pointer(p(out))), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE|LR_CREATEDIBSECTION)
 			if h == 0 {
 				setText(d.hInfo, "预览帧自动恢复后加载失败。")
+				setText(e.hInstruction, "预览取帧失败；移动当前时间后将自动重试。")
 				return
 			}
 			if d.bitmap != 0 {
@@ -244,12 +306,15 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 	}()
 }
 
-func round12CancelTrimPreviewGuard(hwnd uintptr) {
+func round12StopTrimPreviewWatcher(hwnd uintptr) {
 	value, ok := round12TrimPreviewStates.LoadAndDelete(hwnd)
 	if !ok {
 		return
 	}
 	state := value.(*round12TrimPreviewGuardState)
+	if !state.stopped.CompareAndSwap(false, true) {
+		return
+	}
 	state.mu.Lock()
 	if state.cancel != nil {
 		state.cancel()
@@ -336,7 +401,9 @@ func round12RunPreviewAttempt(ctx context.Context, ffmpeg, input, output string,
 	if filters := round12PreviewFilters(rotation); filters != "" {
 		args = append(args, "-vf", filters)
 	}
-	args = append(args, output)
+	// Force a Windows LoadImage-compatible BMP rather than accepting whatever
+	// pixel format the current FFmpeg build chooses for a .bmp extension.
+	args = append(args, "-c:v", "bmp", "-pix_fmt", "bgr24", output)
 	cmd := exec.CommandContext(ctx, ffmpeg, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: round12CreateNoWindow}
 	outputBytes, err := cmd.CombinedOutput()
