@@ -32,6 +32,19 @@ def validate_left_list_image(list_image, relative_cells: list[list[list[int]]], 
     list_image.save(evidence / "round12-list-structure-left.png")
     selected_samples = validate_selected_columns(list_image, relative_cells[0], list(range(0, 7)))
 
+    number_dark_pixels: list[int] = []
+    for row in range(min(3, len(relative_cells))):
+        number_cell = relative_cells[row][0]
+        _require_fully_visible(list_image, number_cell, 0)
+        crop = list_image.crop(tuple(number_cell))
+        try:
+            value = dark_pixels(crop)
+        finally:
+            crop.close()
+        number_dark_pixels.append(value)
+        if value < 3:
+            raise RuntimeError(f"row number is not visibly rendered: row={row} dark_pixels={value}")
+
     file_cell = relative_cells[0][2]
     _require_fully_visible(list_image, file_cell, 2)
     file_crop = list_image.crop(tuple(file_cell))
@@ -57,6 +70,7 @@ def validate_left_list_image(list_image, relative_cells: list[list[list[int]]], 
 
     return {
         "selected_background_samples": selected_samples,
+        "number_dark_pixels": number_dark_pixels,
         "selected_white_text_pixels": white_text_pixels,
         "preview_saturated_pixels": preview_saturated,
         "preview_unique_colors": preview_unique,
