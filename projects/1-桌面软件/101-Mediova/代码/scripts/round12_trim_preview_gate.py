@@ -12,6 +12,8 @@ import time
 from ctypes import wintypes
 from pathlib import Path
 
+from PIL import Image
+
 import round11_flicker_gate as gate
 import round11_flicker_gate_runner_base as runner
 from round12_real_thumbnail_gate import choose_real_file, generate_fixture
@@ -31,6 +33,9 @@ IDC_TRIM_CROP = 1068
 IDC_PREVIEW_CANVAS = 4013
 IDC_CURRENT_TIME = 4015
 IDC_JUMP_TIME = 4016
+VISUAL_W = 64
+VISUAL_H = 36
+MIN_VISUAL_CHANGE_RATIO = 0.03
 
 
 def child_by_handle(parent: int, handle: int) -> dict[str, object]:
@@ -61,6 +66,32 @@ def find_editor(pid: int, timeout: float) -> int:
     return 0
 
 
+def quantized_visual_signature(rgb: Image.Image) -> bytes:
+    small = rgb.resize((VISUAL_W, VISUAL_H), Image.Resampling.BILINEAR)
+    try:
+        raw = small.tobytes()
+    finally:
+        small.close()
+    return bytes((value // 16) * 16 for value in raw)
+
+
+def visual_change_ratio(previous: bytes | None, current: bytes) -> float:
+    if previous is None:
+        return 1.0
+    if len(previous) != len(current) or not current:
+        return 1.0
+    pixels = len(current) // 3
+    changed = 0
+    for offset in range(0, len(current), 3):
+        if current[offset : offset + 3] != previous[offset : offset + 3]:
+            changed += 1
+    return changed / max(1, pixels)
+
+
+def public_snapshot(value: dict[str, object]) -> dict[str, object]:
+    return {key: item for key, item in value.items() if not key.startswith("_")}
+
+
 def canvas_snapshot(editor: int, canvas: int, evidence: Path | None = None) -> dict[str, object]:
     info = child_by_handle(editor, canvas)
     image = runner.capture_screen_rect(info["rect"])
@@ -72,15 +103,18 @@ def canvas_snapshot(editor: int, canvas: int, evidence: Path | None = None) -> d
             saturated = sum(1 for r, g, b in pixels if max(r, g, b) - min(r, g, b) >= 70)
             lumas = [(77 * r + 150 * g + 29 * b) >> 8 for r, g, b in pixels]
             luma_span = max(lumas) - min(lumas) if lumas else 0
+            signature = quantized_visual_signature(rgb)
         finally:
             rgb.close()
         if evidence is not None:
             image.save(evidence)
         return {
             "hash": hashlib.sha256(image.tobytes()).hexdigest(),
+            "visual_hash": hashlib.sha256(signature).hexdigest(),
             "unique_colors": unique,
             "saturated_pixels": saturated,
             "luma_span": luma_span,
+            "_visual_signature": signature,
         }
     finally:
         image.close()
@@ -99,19 +133,50 @@ def preview_failure_texts(editor: int) -> list[str]:
     return failures
 
 
-def wait_for_real_canvas(editor: int, canvas: int, timeout: float, previous_hash: str | None = None) -> dict[str, object]:
+def wait_for_real_canvas(
+    editor: int,
+    canvas: int,
+    timeout: float,
+    previous_signature: bytes | None = None,
+    evidence: Path | None = None,
+    label: str = "preview",
+) -> dict[str, object]:
     deadline = time.monotonic() + timeout
-    best: dict[str, object] = {"hash": "", "unique_colors": 0, "saturated_pixels": 0, "luma_span": 0}
+    best: dict[str, object] = {
+        "hash": "",
+        "visual_hash": "",
+        "unique_colors": 0,
+        "saturated_pixels": 0,
+        "luma_span": 0,
+        "visual_change_ratio": 0.0,
+    }
     while time.monotonic() < deadline:
         current = canvas_snapshot(editor, canvas)
+        signature = current["_visual_signature"]
+        assert isinstance(signature, bytes)
+        change_ratio = visual_change_ratio(previous_signature, signature)
+        current["visual_change_ratio"] = change_ratio
         if int(current["unique_colors"]) > int(best["unique_colors"]):
-            best = current
-        changed = previous_hash is None or str(current["hash"]) != previous_hash
+            best = public_snapshot(current)
+        changed = previous_signature is None or change_ratio >= MIN_VISUAL_CHANGE_RATIO
         if changed and snapshot_is_real(current) and not preview_failure_texts(editor):
+            if evidence is not None:
+                # Capture the accepted state immediately. Then verify that the
+                # saved evidence itself has the same stable visual signature;
+                # this prevents a later redraw from replacing the proof image.
+                accepted = canvas_snapshot(editor, canvas, evidence)
+                accepted_signature = accepted["_visual_signature"]
+                assert isinstance(accepted_signature, bytes)
+                accepted_change = visual_change_ratio(previous_signature, accepted_signature)
+                if snapshot_is_real(accepted) and accepted_change >= (MIN_VISUAL_CHANGE_RATIO if previous_signature is not None else 0.0):
+                    accepted["visual_change_ratio"] = accepted_change
+                    return accepted
+                continue
             return current
         time.sleep(0.15)
     raise RuntimeError(
-        f"trim preview did not reach a new valid frame: previous={previous_hash} best={best} failures={preview_failure_texts(editor)!r}"
+        f"trim preview did not reach a materially new valid frame: label={label} "
+        f"min_change={MIN_VISUAL_CHANGE_RATIO:.3f} best={best} failures={preview_failure_texts(editor)!r}"
     )
 
 
@@ -178,9 +243,6 @@ def main() -> int:
 
         reader = RemoteHeaderReader(process.pid)
         select_first_row(list_hwnd, reader)
-        # The trim editor runs a modal message loop. Post the real owner-draw
-        # button click asynchronously so this test thread can drive that modal
-        # window instead of blocking until the editor closes.
         if not gate.user32.PostMessageW(trim_button, BM_CLICK, 0, 0):
             raise ctypes.WinError(ctypes.get_last_error())
         editor = find_editor(process.pid, 12.0)
@@ -192,37 +254,69 @@ def main() -> int:
         if not canvas or not current_edit or not jump_button:
             raise RuntimeError("trim editor preview/current/jump controls not found")
 
-        initial = wait_for_real_canvas(editor, canvas, 12.0)
-        canvas_snapshot(editor, canvas, evidence / "round12-trim-preview-initial.png")
+        initial = wait_for_real_canvas(
+            editor,
+            canvas,
+            12.0,
+            evidence=evidence / "round12-trim-preview-initial.png",
+            label="initial",
+        )
+        previous_signature = initial["_visual_signature"]
+        assert isinstance(previous_signature, bytes)
 
-        # Exact media end is the known fragile case for fast -ss frame grabs.
         set_current_and_jump(editor, current_edit, jump_button, "00:00:02.000")
-        terminal = wait_for_real_canvas(editor, canvas, 16.0, str(initial["hash"]))
-        canvas_snapshot(editor, canvas, evidence / "round12-trim-preview-terminal.png")
+        terminal = wait_for_real_canvas(
+            editor,
+            canvas,
+            16.0,
+            previous_signature,
+            evidence / "round12-trim-preview-terminal.png",
+            "exact-end-2.000",
+        )
+        previous_signature = terminal["_visual_signature"]
+        assert isinstance(previous_signature, bytes)
 
-        hashes = {str(initial["hash"]), str(terminal["hash"])}
-        previous = str(terminal["hash"])
-        for value in ("00:00:00.250", "00:00:01.750", "00:00:00.600", "00:00:01.950", "00:00:01.100"):
+        snapshots: list[dict[str, object]] = [initial, terminal]
+        seek_values = (
+            ("00:00:00.250", "0250"),
+            ("00:00:01.750", "1750"),
+            ("00:00:00.600", "0600"),
+            ("00:00:01.950", "1950"),
+            ("00:00:01.100", "1100"),
+        )
+        for value, suffix in seek_values:
             set_current_and_jump(editor, current_edit, jump_button, value)
-            current = wait_for_real_canvas(editor, canvas, 10.0, previous)
-            previous = str(current["hash"])
-            hashes.add(previous)
+            current = wait_for_real_canvas(
+                editor,
+                canvas,
+                12.0,
+                previous_signature,
+                evidence / f"round12-trim-preview-seek-{suffix}.png",
+                value,
+            )
+            previous_signature = current["_visual_signature"]
+            assert isinstance(previous_signature, bytes)
+            snapshots.append(current)
 
-        final = canvas_snapshot(editor, canvas, evidence / "round12-trim-preview-final.png")
         failures = preview_failure_texts(editor)
         if failures:
             raise RuntimeError(f"trim preview still exposes failure text after stress sequence: {failures!r}")
-        if len(hashes) < 5:
-            raise RuntimeError(f"trim preview did not visibly update across seek sequence: unique_hashes={len(hashes)}")
+
+        public_snapshots = [public_snapshot(item) for item in snapshots]
+        visual_hashes = [str(item["visual_hash"]) for item in public_snapshots]
+        if len(set(visual_hashes)) != len(visual_hashes):
+            raise RuntimeError(f"trim preview reused a visual frame across distinct seek targets: hashes={visual_hashes}")
 
         report = {
             "real_file_imported": True,
             "editor_class": gate.class_name(editor),
-            "initial": initial,
-            "terminal_exact_end": terminal,
-            "final": final,
-            "seek_sequence_count": 6,
-            "unique_canvas_hashes": len(hashes),
+            "visual_signature": {"width": VISUAL_W, "height": VISUAL_H, "quantization": 16},
+            "minimum_visual_change_ratio": MIN_VISUAL_CHANGE_RATIO,
+            "initial": public_snapshots[0],
+            "terminal_exact_end": public_snapshots[1],
+            "seek_results": public_snapshots[2:],
+            "seek_sequence_count": len(snapshots) - 1,
+            "unique_visual_hashes": len(set(visual_hashes)),
             "failure_texts": failures,
             "exact_end_preview_recovered": True,
             "continuous_seek_preview_stable": True,
