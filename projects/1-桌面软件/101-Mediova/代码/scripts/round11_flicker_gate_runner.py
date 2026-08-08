@@ -14,6 +14,7 @@ import round12_list_structure_gate
 import round12_real_thumbnail_gate
 import round12_trim_preview_gate
 
+WM_COMMAND = 0x0111
 IDC_SEEK_MINUS_SEC = 4017
 IDC_SEEK_MINUS_FRAME = 4018
 IDC_SEEK_PLUS_FRAME = 4019
@@ -91,12 +92,13 @@ def install_trim_diagnostics() -> None:
             f"attempts={attempts} last_title={last_title!r}"
         )
 
-    def set_current_via_seek_buttons(editor: int, current_edit: int, _jump_button: int, value: str) -> None:
-        # The hosted Actions desktop is not a reliable source of synthetic mouse
-        # input. Exercise the real product navigation buttons instead. Each click
-        # goes through Round7 command -> setCurrent(..., true) -> preview request,
-        # so a rapid multi-click sequence is a stronger test of cancellation and
-        # stale-frame rejection than direct edit injection.
+    def set_current_via_seek_commands(editor: int, current_edit: int, _jump_button: int, value: str) -> None:
+        # Hosted Actions desktops are unreliable for cross-process BM_CLICK and
+        # mouse injection. For preview-lifecycle stress, send the pointer-free
+        # WM_COMMAND that a real button click ultimately delivers to the final
+        # Round7 editor. Native self-test separately covers the real timeline
+        # HWND interaction. This keeps the external gate focused on
+        # setCurrent(..., true) -> preview request -> stale-request rejection.
         controls = {
             "minus_sec": int(user32.GetDlgItem(editor, IDC_SEEK_MINUS_SEC)),
             "minus_frame": int(user32.GetDlgItem(editor, IDC_SEEK_MINUS_FRAME)),
@@ -118,21 +120,21 @@ def install_trim_diagnostics() -> None:
         target_frame = max(0, min(int(round(FIXTURE_DURATION * FIXTURE_FPS)), target_frame))
         delta_frames = target_frame - current_frame
 
-        clicks: list[int] = []
+        commands: list[int] = []
         if delta_frames > 0:
             seconds, frames = divmod(delta_frames, int(FIXTURE_FPS))
-            clicks.extend([controls["plus_sec"]] * seconds)
-            clicks.extend([controls["plus_frame"]] * frames)
+            commands.extend([IDC_SEEK_PLUS_SEC] * seconds)
+            commands.extend([IDC_SEEK_PLUS_FRAME] * frames)
         elif delta_frames < 0:
             seconds, frames = divmod(-delta_frames, int(FIXTURE_FPS))
-            clicks.extend([controls["minus_sec"]] * seconds)
-            clicks.extend([controls["minus_frame"]] * frames)
+            commands.extend([IDC_SEEK_MINUS_SEC] * seconds)
+            commands.extend([IDC_SEEK_MINUS_FRAME] * frames)
 
-        for hwnd in clicks:
-            send_message(hwnd, round12_trim_preview_gate.BM_CLICK, 0, 0)
-            # Keep the sequence intentionally rapid so overlapping preview
-            # workers are exercised, while still letting the UI dispatch each
-            # synchronous button command deterministically.
+        for command_id in commands:
+            send_message(editor, WM_COMMAND, command_id, 0)
+            # Keep the sequence intentionally rapid to overlap preview workers
+            # while still synchronously dispatching each command on the UI
+            # thread before the next request arrives.
             time.sleep(0.008)
 
         expected = target_frame / FIXTURE_FPS
@@ -149,13 +151,13 @@ def install_trim_diagnostics() -> None:
                 return
             time.sleep(0.05)
         raise RuntimeError(
-            "seek-button navigation did not update current time: "
+            "seek-command navigation did not update current time: "
             f"from={current:.3f} requested={target:.3f} expected_frame={expected:.3f} "
-            f"current_edit={last_text!r} parsed={last_value:.3f} clicks={len(clicks)}"
+            f"current_edit={last_text!r} parsed={last_value:.3f} commands={len(commands)}"
         )
 
     round12_trim_preview_gate.find_editor = find_ready_editor
-    round12_trim_preview_gate.set_current_and_jump = set_current_via_seek_buttons
+    round12_trim_preview_gate.set_current_and_jump = set_current_via_seek_commands
 
 
 def merge_stage_evidence() -> None:
@@ -210,7 +212,7 @@ def main() -> int:
             stage["fresh_process_passes"] = trim_preview_passes
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
-            stage["seek_button_navigation_required"] = True
+            stage["pointer_free_seek_command_navigation_required"] = True
             stage["native_timeline_drag_selftest_required"] = True
             stage["pointer_sized_win32_abi_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
