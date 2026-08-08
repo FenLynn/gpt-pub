@@ -59,6 +59,10 @@ func round8EditorInstallerSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 			// crop interaction. The inherited round-7 layout chain is deliberately
 			// not installed, eliminating the two-layout WM_SIZE loop.
 			round11InstallEditor(e)
+			// Round 12 owns navigation preview. Install it after the final Round 11
+			// editor/timeline chain so no later inherited subclass can regain
+			// navigation ownership.
+			round12FinalizeExclusiveTrimPreviewOwner(e)
 			// The title belongs to the final installer and is written once. It no
 			// longer depends on either inherited layout subclass.
 			round11SetTextIfChanged(e.hwnd, "剪裁 · "+filepath.Base(e.dialog.task.Input))
