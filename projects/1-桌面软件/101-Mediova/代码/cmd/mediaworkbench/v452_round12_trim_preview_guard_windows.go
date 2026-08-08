@@ -94,11 +94,21 @@ func round12ArmTrimPreviewHook() {
 }
 
 func round12TrimPreviewEventProc(hook, event, hwnd, idObject, idChild, eventThread, eventTime uintptr) uintptr {
-	e := round7ActiveEditor
-	if e == nil || e.hwnd == 0 || e.dialog == nil || e.dialog.hCanvas == 0 {
+	// WinEvent callbacks are out-of-context and can arrive on a worker thread.
+	// Never read mutable dialog state or install preview ownership from that
+	// callback. Marshal discovery back to the application's UI thread so the
+	// watcher observes currentAt/bitmap/previewSeq as one coherent UI state.
+	a := app
+	if a == nil {
 		return 0
 	}
-	round12InstallTrimPreviewWatcher(e)
+	a.postUI(func() {
+		e := round7ActiveEditor
+		if e == nil || e.hwnd == 0 || e.dialog == nil || e.dialog.hCanvas == 0 {
+			return
+		}
+		round12InstallTrimPreviewWatcher(e)
+	})
 	return 0
 }
 
@@ -121,12 +131,14 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 	}
 	round12TrimPreviewHookMu.Unlock()
 
-	// The inherited initial worker may already be running. If no usable bitmap
-	// exists yet, immediately supersede it with the robust request. Otherwise
-	// keep the valid first frame and observe only later previewSeq changes.
-	if d.bitmap == 0 || round12TrimPreviewHasFailure(d) {
-		round12TakeOverTrimPreview(e, state, d.currentAt)
-	}
+	// Always establish Round12 ownership for the current target when the watcher
+	// is first installed. The old conditional could adopt an in-flight legacy
+	// previewSeq as "already seen" while a usable bitmap from the previous target
+	// remained on screen. If that exact-end worker then produced no new frame,
+	// no later sequence change existed for the watcher to notice. One immediate
+	// takeover closes that installation window and invalidates any inherited
+	// worker deterministically.
+	round12TakeOverTrimPreview(e, state, d.currentAt)
 
 	// Poll only the atomic request sequence off the UI thread. A UI callback is
 	// posted solely when the sequence actually changes, so an idle editor has no
