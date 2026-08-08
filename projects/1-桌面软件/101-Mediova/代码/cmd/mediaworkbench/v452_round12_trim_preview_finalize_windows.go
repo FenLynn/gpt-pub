@@ -25,5 +25,8 @@ func round12FinalizeExclusiveTrimPreviewOwner(e *round7Editor) {
 		e.close(false, false)
 		return
 	}
+	// UI polish is installed at the same deterministic final-editor point so
+	// navigation buttons never flash between native and owner-drawn states.
+	round12InstallEditorPolish(e)
 	round12InstallTrimPreviewWatcher(e)
 }
