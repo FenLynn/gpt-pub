@@ -37,6 +37,7 @@ VISUAL_W = 64
 VISUAL_H = 36
 MIN_VISUAL_CHANGE_RATIO = 0.03
 STABLE_MATCHES_REQUIRED = 3
+STABLE_MAX_DRIFT_RATIO = 0.01
 
 
 def child_by_handle(parent: int, handle: int) -> dict[str, object]:
@@ -142,13 +143,12 @@ def wait_for_real_canvas(
     evidence: Path | None = None,
     label: str = "preview",
 ) -> dict[str, object]:
-    """Wait for a materially changed *stable* frame, not the first transient redraw.
+    """Wait for a materially changed frame and then prove it has settled.
 
-    The previous gate returned as soon as any different frame appeared. During a
-    seek, that can accept an old-but-different bitmap while the newest request is
-    still decoding. Requiring the same candidate signature across several spaced
-    samples turns the gate into a request-settlement check instead of a redraw
-    detector.
+    A new seek must differ materially from the last accepted target. Once a
+    candidate appears, three spaced samples may contain small capture/repaint
+    drift, but they must remain within a tight 1% visual envelope. This rejects
+    transient stale frames without requiring byte-identical PrintWindow output.
     """
 
     deadline = time.monotonic() + timeout
@@ -159,10 +159,13 @@ def wait_for_real_canvas(
         "saturated_pixels": 0,
         "luma_span": 0,
         "visual_change_ratio": 0.0,
+        "stable_drift_ratio": 1.0,
         "stable_matches": 0,
     }
     candidate_signature: bytes | None = None
     candidate_matches = 0
+    best_stable_matches = 0
+    lowest_drift = 1.0
 
     while time.monotonic() < deadline:
         current = canvas_snapshot(editor, canvas)
@@ -170,31 +173,42 @@ def wait_for_real_canvas(
         assert isinstance(signature, bytes)
         change_ratio = visual_change_ratio(previous_signature, signature)
         current["visual_change_ratio"] = change_ratio
-        if int(current["unique_colors"]) > int(best["unique_colors"]):
-            best = public_snapshot(current)
 
         changed = previous_signature is None or change_ratio >= MIN_VISUAL_CHANGE_RATIO
         eligible = changed and snapshot_is_real(current) and not preview_failure_texts(editor)
         if eligible:
-            if candidate_signature == signature:
-                candidate_matches += 1
-            else:
+            if candidate_signature is None:
                 candidate_signature = signature
                 candidate_matches = 1
+                drift_ratio = 0.0
+            else:
+                drift_ratio = visual_change_ratio(candidate_signature, signature)
+                lowest_drift = min(lowest_drift, drift_ratio)
+                if drift_ratio <= STABLE_MAX_DRIFT_RATIO:
+                    candidate_matches += 1
+                else:
+                    candidate_signature = signature
+                    candidate_matches = 1
+                    drift_ratio = 0.0
+            current["stable_drift_ratio"] = drift_ratio
             current["stable_matches"] = candidate_matches
+            best_stable_matches = max(best_stable_matches, candidate_matches)
+
             if candidate_matches >= STABLE_MATCHES_REQUIRED:
                 if evidence is not None:
                     accepted = canvas_snapshot(editor, canvas, evidence)
                     accepted_signature = accepted["_visual_signature"]
                     assert isinstance(accepted_signature, bytes)
                     accepted_change = visual_change_ratio(previous_signature, accepted_signature)
+                    accepted_drift = visual_change_ratio(candidate_signature, accepted_signature)
                     if (
                         snapshot_is_real(accepted)
-                        and accepted_signature == candidate_signature
+                        and accepted_drift <= STABLE_MAX_DRIFT_RATIO
                         and accepted_change >= (MIN_VISUAL_CHANGE_RATIO if previous_signature is not None else 0.0)
                         and not preview_failure_texts(editor)
                     ):
                         accepted["visual_change_ratio"] = accepted_change
+                        accepted["stable_drift_ratio"] = accepted_drift
                         accepted["stable_matches"] = candidate_matches
                         return accepted
                     candidate_signature = None
@@ -204,13 +218,21 @@ def wait_for_real_canvas(
         else:
             candidate_signature = None
             candidate_matches = 0
+
+        public_current = public_snapshot(current)
+        if (
+            int(public_current.get("stable_matches", 0)) > int(best.get("stable_matches", 0))
+            or int(current["unique_colors"]) > int(best["unique_colors"])
+        ):
+            best = public_current
         time.sleep(0.15)
 
-    best["stable_matches"] = candidate_matches
+    best["stable_matches"] = max(int(best.get("stable_matches", 0)), best_stable_matches)
+    best["lowest_stable_drift_ratio"] = lowest_drift
     raise RuntimeError(
         f"trim preview did not reach a materially new stable frame: label={label} "
-        f"min_change={MIN_VISUAL_CHANGE_RATIO:.3f} stable_required={STABLE_MATCHES_REQUIRED} "
-        f"best={best} failures={preview_failure_texts(editor)!r}"
+        f"min_change={MIN_VISUAL_CHANGE_RATIO:.3f} max_drift={STABLE_MAX_DRIFT_RATIO:.3f} "
+        f"stable_required={STABLE_MATCHES_REQUIRED} best={best} failures={preview_failure_texts(editor)!r}"
     )
 
 
@@ -356,6 +378,7 @@ def main() -> int:
             "visual_signature": {"width": VISUAL_W, "height": VISUAL_H, "quantization": 16},
             "minimum_visual_change_ratio": MIN_VISUAL_CHANGE_RATIO,
             "stable_matches_required": STABLE_MATCHES_REQUIRED,
+            "stable_max_drift_ratio": STABLE_MAX_DRIFT_RATIO,
             "initial": public_snapshots[0],
             "terminal_exact_end": public_snapshots[1],
             "seek_results": public_snapshots[2:],
