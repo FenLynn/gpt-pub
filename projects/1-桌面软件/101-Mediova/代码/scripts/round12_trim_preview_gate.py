@@ -178,7 +178,11 @@ def main() -> int:
 
         reader = RemoteHeaderReader(process.pid)
         select_first_row(list_hwnd, reader)
-        gate.user32.SendMessageW(trim_button, BM_CLICK, 0, 0)
+        # The trim editor runs a modal message loop. Post the real owner-draw
+        # button click asynchronously so this test thread can drive that modal
+        # window instead of blocking until the editor closes.
+        if not gate.user32.PostMessageW(trim_button, BM_CLICK, 0, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
         editor = find_editor(process.pid, 12.0)
         if not editor:
             raise RuntimeError("Round7 trim editor did not open")
