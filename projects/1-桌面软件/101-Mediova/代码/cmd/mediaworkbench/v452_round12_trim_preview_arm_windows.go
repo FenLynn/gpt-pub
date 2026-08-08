@@ -2,10 +2,9 @@
 
 package main
 
-// Compatibility entry retained for the Round12 selection owner. Navigation is
-// no longer intercepted by an exclusive subclass owner; arming now installs
-// the sequence-driven recovery watcher, leaving Round7 as the single input
-// owner for jump/buttons/keyboard/timeline.
-func round12ArmExclusiveTrimPreviewOwner() {
-	round12ArmTrimPreviewHook()
-}
+// Compatibility entry retained for the Round12 selection owner. Preview
+// ownership is installed synchronously by the final Round8/Round11 editor
+// installer once the Round7 canvas and timeline are fully created. Arming the
+// main-window command no longer starts a second WinEvent/fallback discovery
+// path, eliminating nondeterministic watcher installation timing.
+func round12ArmExclusiveTrimPreviewOwner() {}
