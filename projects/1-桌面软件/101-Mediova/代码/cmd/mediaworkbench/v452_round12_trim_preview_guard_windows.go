@@ -27,17 +27,12 @@ const (
 )
 
 type round12TrimPreviewGuardState struct {
-	mu              sync.Mutex
-	stopped         atomic.Bool
-	generation      int64
-	lastSeq         int64
-	originSeq       int64
-	ownSeq          int64
-	attemptedOrigin int64
-	bitmapAtRequest uintptr
-	deadline        time.Time
-	settled         bool
-	cancel          context.CancelFunc
+	mu         sync.Mutex
+	stopped    atomic.Bool
+	generation int64
+	lastSeq    int64
+	ownSeq     int64
+	cancel     context.CancelFunc
 }
 
 var (
@@ -69,10 +64,8 @@ func round12ArmTrimPreviewHook() {
 	}
 	round12TrimPreviewHookMu.Unlock()
 
-	// WinEvent delivery is normally immediate, but do not make reliability
-	// depend on callback ordering between the inherited Round7 editor hook and
-	// this Round12 hook. Probe from a helper goroutine while all actual editor
-	// reads/install work remains marshalled onto the UI thread.
+	// Keep a bounded fallback install loop because the inherited Round7 editor
+	// also uses a WinEvent hook. All editor inspection remains on the UI thread.
 	a := app
 	if a == nil {
 		return
@@ -109,13 +102,7 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 		return
 	}
 	d := e.dialog
-	state := &round12TrimPreviewGuardState{
-		lastSeq:         d.previewSeq.Load(),
-		originSeq:       d.previewSeq.Load(),
-		bitmapAtRequest: d.bitmap,
-		deadline:        time.Now().Add(2500 * time.Millisecond),
-		settled:         d.bitmap != 0 && !round12TrimPreviewHasFailure(d),
-	}
+	state := &round12TrimPreviewGuardState{lastSeq: d.previewSeq.Load()}
 	actual, loaded := round12TrimPreviewStates.LoadOrStore(e.hwnd, state)
 	if loaded {
 		_ = actual
@@ -129,8 +116,15 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 	}
 	round12TrimPreviewHookMu.Unlock()
 
+	// If installation happens before the inherited initial frame has become a
+	// usable bitmap, take ownership immediately. Otherwise keep the valid first
+	// frame and take over only subsequent previewSeq changes.
+	if d.bitmap == 0 || round12TrimPreviewHasFailure(d) {
+		round12TakeOverTrimPreview(e, state)
+	}
+
 	go func() {
-		ticker := time.NewTicker(150 * time.Millisecond)
+		ticker := time.NewTicker(50 * time.Millisecond)
 		defer ticker.Stop()
 		for range ticker.C {
 			if state.stopped.Load() {
@@ -150,74 +144,22 @@ func round12PollTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState
 		}
 		return
 	}
-	d := e.dialog
-	seq := d.previewSeq.Load()
-	now := time.Now()
+	seq := e.dialog.previewSeq.Load()
 
 	state.mu.Lock()
-	if seq != state.lastSeq {
-		if state.ownSeq != 0 && seq == state.ownSeq {
-			state.lastSeq = seq
-		} else {
-			if state.cancel != nil {
-				state.cancel()
-				state.cancel = nil
-			}
-			state.generation++
-			state.lastSeq = seq
-			state.originSeq = seq
-			state.ownSeq = 0
-			state.attemptedOrigin = 0
-			state.bitmapAtRequest = d.bitmap
-			state.deadline = now.Add(2500 * time.Millisecond)
-			state.settled = false
-		}
-	}
-	origin := state.originSeq
+	lastSeq := state.lastSeq
 	ownSeq := state.ownSeq
-	attempted := state.attemptedOrigin
-	bitmapAtRequest := state.bitmapAtRequest
-	deadline := state.deadline
-	settled := state.settled
 	state.mu.Unlock()
 
-	failure := round12TrimPreviewHasFailure(d)
-	if settled {
-		// The inherited preview worker writes an error into hInfo but does not
-		// clear an older error after a later usable bitmap becomes current.
-		// A settled request with a valid bitmap must therefore reconcile the
-		// visible status back to the normal information card.
-		if failure && d.bitmap != 0 {
-			e.updateInfo()
-			setText(e.hInstruction, "拖动红色游标预览画面；拖动蓝色旗标调整剪辑范围。")
-		}
-		return
-	}
-	if ownSeq != 0 {
+	if seq == lastSeq || (ownSeq != 0 && seq == ownSeq) {
 		return
 	}
 
-	// A new bitmap is the strongest normal-path success signal. Also clear
-	// stale failure text left by an earlier request.
-	if d.bitmap != 0 && d.bitmap != bitmapAtRequest {
-		state.mu.Lock()
-		if state.originSeq == origin && state.ownSeq == 0 {
-			state.settled = true
-		}
-		state.mu.Unlock()
-		if failure {
-			e.updateInfo()
-			setText(e.hInstruction, "拖动红色游标预览画面；拖动蓝色旗标调整剪辑范围。")
-		}
-		return
-	}
-
-	if attempted == origin {
-		return
-	}
-	if failure || (!deadline.IsZero() && !now.Before(deadline)) {
-		round12StartTrimPreviewRecovery(e, state, origin)
-	}
+	// Any external sequence change is a new user preview request. Take ownership
+	// immediately instead of waiting for the inherited fast-seek worker to fail.
+	// Incrementing previewSeq inside takeover invalidates that inherited worker's
+	// callback, so only the robust Round12 frame can become visible.
+	round12TakeOverTrimPreview(e, state)
 }
 
 func round12TrimPreviewHasFailure(d *trimDialog) bool {
@@ -231,89 +173,68 @@ func round12TrimPreviewHasFailure(d *trimDialog) bool {
 		strings.Contains(info, "预览帧自动恢复后加载失败")
 }
 
-func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewGuardState, origin int64) {
-	d := e.dialog
-	if d == nil || d.owner == nil || d.owner.ffmpeg == "" || d.task == nil {
+func round12TakeOverTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState) {
+	if e == nil || state == nil || state.stopped.Load() || e.dialog == nil || e.dialog.owner == nil || e.dialog.owner.ffmpeg == "" || e.dialog.task == nil {
 		return
 	}
+	d := e.dialog
+
 	state.mu.Lock()
-	if state.stopped.Load() || state.originSeq != origin || state.ownSeq != 0 || state.attemptedOrigin == origin {
+	if state.stopped.Load() {
 		state.mu.Unlock()
 		return
 	}
 	if state.cancel != nil {
 		state.cancel()
+		state.cancel = nil
 	}
 	state.generation++
 	generation := state.generation
-	state.attemptedOrigin = origin
 	ctx, cancel := context.WithCancel(context.Background())
 	state.cancel = cancel
-	seq := d.previewSeq.Add(1) // invalidate failed/stale legacy worker result
-	state.ownSeq = seq
-	state.lastSeq = seq
+	// This is the core ownership hand-off: the inherited worker carries the
+	// previous seq, while Round12 owns a fresh one. Its legacy callback will
+	// therefore fail the existing previewSeq equality check and do nothing.
+	ownSeq := d.previewSeq.Add(1)
+	state.lastSeq = ownSeq
+	state.ownSeq = ownSeq
 	state.mu.Unlock()
 
 	dir, err := config.TempDir()
 	if err != nil {
 		cancel()
-		state.mu.Lock()
-		if state.generation == generation && state.ownSeq == seq {
-			state.cancel = nil
-			state.ownSeq = 0
-			state.settled = false
-		}
-		state.mu.Unlock()
+		round12FinishOwnedPreview(state, generation, ownSeq)
 		return
 	}
-	out := filepath.Join(dir, fmt.Sprintf("trim_frame_recovery_%d_%d.bmp", d.task.ID, seq))
+	out := filepath.Join(dir, fmt.Sprintf("trim_frame_round12_%d_%d.bmp", d.task.ID, ownSeq))
 	input := d.task.Input
 	at := d.currentAt
 	duration := d.task.Duration
 	fps := d.safeFPS()
 	rotation := d.opts.Rotation
 	ffmpeg := d.owner.ffmpeg
-	// Replace the stale inherited error immediately with an explicit transient
-	// recovery state. Only a successfully loaded replacement bitmap can mark
-	// this request settled.
-	setText(d.hInfo, "预览帧异常，正在自动恢复…")
-	setText(e.hInstruction, "预览取帧失败，正在自动恢复…")
+	setText(d.hInfo, "正在更新预览帧…")
+	setText(e.hInstruction, "正在更新当前位置预览…")
 
 	go func() {
 		err := round12GenerateRecoveredPreview(ctx, ffmpeg, input, out, at, duration, fps, rotation)
 		e.owner.postUI(func() {
 			defer os.Remove(out)
 			cancel()
-			state.mu.Lock()
-			current := !state.stopped.Load() && state.generation == generation && state.ownSeq == seq
-			if current {
-				state.cancel = nil
-			}
-			state.mu.Unlock()
-			if !current || round7ActiveEditor != e || d.closed.Load() || d.previewSeq.Load() != seq {
+			if !round12OwnedPreviewCurrent(state, generation, ownSeq) || round7ActiveEditor != e || d.closed.Load() || d.previewSeq.Load() != ownSeq {
 				return
 			}
 			if err != nil {
-				state.mu.Lock()
-				if state.generation == generation && state.ownSeq == seq {
-					state.ownSeq = 0
-					state.settled = false
-				}
-				state.mu.Unlock()
-				setText(d.hInfo, "预览帧自动恢复失败："+short(err.Error(), 220))
-				setText(e.hInstruction, "预览取帧失败；移动当前时间后将自动重试。")
+				round12FinishOwnedPreview(state, generation, ownSeq)
+				setText(d.hInfo, "预览帧生成失败："+short(err.Error(), 220))
+				setText(e.hInstruction, "当前位置预览失败；移动时间后将重新取帧。")
 				return
 			}
 			h, _, _ := procLoadImageW.Call(0, uintptr(unsafe.Pointer(p(out))), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE|LR_CREATEDIBSECTION)
 			if h == 0 {
-				state.mu.Lock()
-				if state.generation == generation && state.ownSeq == seq {
-					state.ownSeq = 0
-					state.settled = false
-				}
-				state.mu.Unlock()
-				setText(d.hInfo, "预览帧自动恢复后加载失败。")
-				setText(e.hInstruction, "预览取帧失败；移动当前时间后将自动重试。")
+				round12FinishOwnedPreview(state, generation, ownSeq)
+				setText(d.hInfo, "预览帧加载失败。")
+				setText(e.hInstruction, "当前位置预览失败；移动时间后将重新取帧。")
 				return
 			}
 			if d.bitmap != 0 {
@@ -323,17 +244,35 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 			var bm bitmapInfo
 			procGetObjectW.Call(h, unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm)))
 			d.bitmapW, d.bitmapH = bm.Width, bm.Height
-			state.mu.Lock()
-			if state.generation == generation && state.ownSeq == seq {
-				state.ownSeq = 0
-				state.settled = true
-			}
-			state.mu.Unlock()
+			round12FinishOwnedPreview(state, generation, ownSeq)
 			e.updateInfo()
-			setText(e.hInstruction, "预览已自动恢复；拖动红色游标继续预览画面。")
+			setText(e.hInstruction, "拖动红色游标预览画面；拖动蓝色旗标调整剪辑范围。")
 			procInvalidateRect.Call(d.hCanvas, 0, 1)
 		})
 	}()
+}
+
+func round12OwnedPreviewCurrent(state *round12TrimPreviewGuardState, generation, ownSeq int64) bool {
+	if state == nil || state.stopped.Load() {
+		return false
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	return state.generation == generation && state.ownSeq == ownSeq
+}
+
+func round12FinishOwnedPreview(state *round12TrimPreviewGuardState, generation, ownSeq int64) {
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.generation != generation || state.ownSeq != ownSeq {
+		return
+	}
+	state.cancel = nil
+	state.ownSeq = 0
+	state.lastSeq = ownSeq
 }
 
 func round12StopTrimPreviewWatcher(hwnd uintptr) {
@@ -431,8 +370,6 @@ func round12RunPreviewAttempt(ctx context.Context, ffmpeg, input, output string,
 	if filters := round12PreviewFilters(rotation); filters != "" {
 		args = append(args, "-vf", filters)
 	}
-	// Force a Windows LoadImage-compatible BMP rather than accepting whatever
-	// pixel format the current FFmpeg build chooses for a .bmp extension.
 	args = append(args, "-c:v", "bmp", "-pix_fmt", "bgr24", output)
 	cmd := exec.CommandContext(ctx, ffmpeg, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: round12CreateNoWindow}
