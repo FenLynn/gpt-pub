@@ -17,16 +17,12 @@ func round12DrawTaskListCell(a *application, cd *nmListViewCustomDraw) uintptr {
 	case CDDS_PREPAINT:
 		return CDRF_NOTIFYITEMDRAW
 	case CDDS_ITEMPREPAINT:
-		row := int(cd.NMCD.ItemSpec)
-		background := colorRef(255, 255, 255)
-		if listItemSelected(a.hList, row) {
-			background = round12SelectionBackground
-		}
-		// Paint the complete physical row before any subitem content. ListView
-		// can optimize selection invalidation around text-bearing subitems; that
-		// used to leave the old blue background behind in empty/hidden trailing
-		// columns when selection moved. One row surface makes selection atomic.
-		round12DrawRowBackground(a, cd.NMCD.HDC, row, background)
+		// Do not pre-fill the whole row here. The former whole-row prepaint
+		// briefly erased all text before subitem custom drawing ran, which was
+		// visible as a flash on selection changes and could leave a selected row
+		// blue with missing text if a partial paint ended early. The ListView is
+		// already double-buffered and selection changes invalidate the list, so
+		// each final visible subitem owns its background and content atomically.
 		return CDRF_NOTIFYSUBITEMDRAW
 	case CDDS_ITEMPREPAINT | CDDS_SUBITEM:
 		row := int(cd.NMCD.ItemSpec)
