@@ -73,6 +73,7 @@ func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column
 		legacyIndex := column - 2
 		round12DrawTextCell(hdc, cell, round12LegacyText(legacy, legacyIndex), background, round12SelectionText, true)
 	}
+	round12FillTrailingRowArea(a, hdc, cell, column, background)
 }
 
 func round12LegacyText(values []string, index int) string {
@@ -105,6 +106,27 @@ func round12DrawSeparator(hdc uintptr, cell rect) {
 	if cell.Bottom > cell.Top {
 		fillSolid(hdc, rect{Left: cell.Left, Top: cell.Bottom - 1, Right: cell.Right, Bottom: cell.Bottom}, round12CellSeparator)
 	}
+}
+
+func round12FillTrailingRowArea(a *application, hdc uintptr, cell rect, column int, background uintptr) {
+	if a == nil || a.hList == 0 || hdc == 0 || cell.Bottom <= cell.Top {
+		return
+	}
+	for next := column + 1; next < round12ColumnCount; next++ {
+		if int32(send(a.hList, LVM_GETCOLUMNWIDTH, uintptr(next), 0)) > 0 {
+			return
+		}
+	}
+	var client rect
+	if ok, _, _ := procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client))); ok == 0 {
+		return
+	}
+	if cell.Right >= client.Right {
+		return
+	}
+	tail := rect{Left: cell.Right, Top: cell.Top, Right: client.Right, Bottom: cell.Bottom}
+	fillSolid(hdc, tail, background)
+	round12DrawSeparator(hdc, tail)
 }
 
 func round12DrawPreviewCell(a *application, hdc uintptr, cell rect, task *model.Task, background uintptr) {
@@ -185,7 +207,6 @@ func round12DrawProgressCell(hdc uintptr, cell rect, fraction float64, label str
 		}
 		drawHorizontalGradient(hdc, fill, colorRef(169, 204, 243), colorRef(76, 138, 220))
 	}
-	drawRoundedBorder(hdc, bar, 3, colorRef(218, 225, 234))
 	drawContrastCenteredText(hdc, label, bar, fill, uiFontSmall)
 	round12DrawSeparator(hdc, cell)
 }
@@ -209,7 +230,6 @@ func round12DrawCompressionCell(hdc uintptr, cell rect, task *model.Task, label 
 		start, finish := compressionColorPair(visual)
 		drawHorizontalGradient(hdc, right, start, finish)
 	}
-	drawRoundedBorder(hdc, bar, 3, colorRef(218, 225, 234))
 	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(35, 51, 70))
 	round12DrawSeparator(hdc, cell)
 }
