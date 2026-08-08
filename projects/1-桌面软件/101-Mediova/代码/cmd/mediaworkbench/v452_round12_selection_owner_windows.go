@@ -90,6 +90,12 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 		}
 	case WM_COMMAND:
 		id := int(loWord(wParam))
+		if id == IDC_TRIM_CROP || id == ID_CTX_TRIM {
+			// Arm the preview reliability hook before the inherited Round7 handler
+			// creates the modal editor. The hook installs only on that editor and
+			// unhooks immediately after attachment.
+			round12ArmTrimPreviewHook()
+		}
 		if id == round12IDCColumnSettings {
 			round12ShowColumnSettings(a)
 			return 0
@@ -201,6 +207,12 @@ func round12EnsureListStructure(a *application) {
 
 func round12HeaderSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
+	case WM_PAINT:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		// One owner, one line: draw a deterministic full-width separator after
+		// the native Header has painted captions and vertical dividers.
+		round12PaintHeaderBottomLine(hwnd)
+		return result
 	case WM_LBUTTONUP:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		if app != nil {
