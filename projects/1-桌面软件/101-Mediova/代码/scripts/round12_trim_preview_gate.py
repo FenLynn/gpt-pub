@@ -36,6 +36,7 @@ IDC_JUMP_TIME = 4016
 VISUAL_W = 64
 VISUAL_H = 36
 MIN_VISUAL_CHANGE_RATIO = 0.03
+STABLE_MATCHES_REQUIRED = 3
 
 
 def child_by_handle(parent: int, handle: int) -> dict[str, object]:
@@ -141,6 +142,15 @@ def wait_for_real_canvas(
     evidence: Path | None = None,
     label: str = "preview",
 ) -> dict[str, object]:
+    """Wait for a materially changed *stable* frame, not the first transient redraw.
+
+    The previous gate returned as soon as any different frame appeared. During a
+    seek, that can accept an old-but-different bitmap while the newest request is
+    still decoding. Requiring the same candidate signature across several spaced
+    samples turns the gate into a request-settlement check instead of a redraw
+    detector.
+    """
+
     deadline = time.monotonic() + timeout
     best: dict[str, object] = {
         "hash": "",
@@ -149,7 +159,11 @@ def wait_for_real_canvas(
         "saturated_pixels": 0,
         "luma_span": 0,
         "visual_change_ratio": 0.0,
+        "stable_matches": 0,
     }
+    candidate_signature: bytes | None = None
+    candidate_matches = 0
+
     while time.monotonic() < deadline:
         current = canvas_snapshot(editor, canvas)
         signature = current["_visual_signature"]
@@ -158,25 +172,45 @@ def wait_for_real_canvas(
         current["visual_change_ratio"] = change_ratio
         if int(current["unique_colors"]) > int(best["unique_colors"]):
             best = public_snapshot(current)
+
         changed = previous_signature is None or change_ratio >= MIN_VISUAL_CHANGE_RATIO
-        if changed and snapshot_is_real(current) and not preview_failure_texts(editor):
-            if evidence is not None:
-                # Capture the accepted state immediately. Then verify that the
-                # saved evidence itself has the same stable visual signature;
-                # this prevents a later redraw from replacing the proof image.
-                accepted = canvas_snapshot(editor, canvas, evidence)
-                accepted_signature = accepted["_visual_signature"]
-                assert isinstance(accepted_signature, bytes)
-                accepted_change = visual_change_ratio(previous_signature, accepted_signature)
-                if snapshot_is_real(accepted) and accepted_change >= (MIN_VISUAL_CHANGE_RATIO if previous_signature is not None else 0.0):
-                    accepted["visual_change_ratio"] = accepted_change
-                    return accepted
-                continue
-            return current
+        eligible = changed and snapshot_is_real(current) and not preview_failure_texts(editor)
+        if eligible:
+            if candidate_signature == signature:
+                candidate_matches += 1
+            else:
+                candidate_signature = signature
+                candidate_matches = 1
+            current["stable_matches"] = candidate_matches
+            if candidate_matches >= STABLE_MATCHES_REQUIRED:
+                if evidence is not None:
+                    accepted = canvas_snapshot(editor, canvas, evidence)
+                    accepted_signature = accepted["_visual_signature"]
+                    assert isinstance(accepted_signature, bytes)
+                    accepted_change = visual_change_ratio(previous_signature, accepted_signature)
+                    if (
+                        snapshot_is_real(accepted)
+                        and accepted_signature == candidate_signature
+                        and accepted_change >= (MIN_VISUAL_CHANGE_RATIO if previous_signature is not None else 0.0)
+                        and not preview_failure_texts(editor)
+                    ):
+                        accepted["visual_change_ratio"] = accepted_change
+                        accepted["stable_matches"] = candidate_matches
+                        return accepted
+                    candidate_signature = None
+                    candidate_matches = 0
+                else:
+                    return current
+        else:
+            candidate_signature = None
+            candidate_matches = 0
         time.sleep(0.15)
+
+    best["stable_matches"] = candidate_matches
     raise RuntimeError(
-        f"trim preview did not reach a materially new valid frame: label={label} "
-        f"min_change={MIN_VISUAL_CHANGE_RATIO:.3f} best={best} failures={preview_failure_texts(editor)!r}"
+        f"trim preview did not reach a materially new stable frame: label={label} "
+        f"min_change={MIN_VISUAL_CHANGE_RATIO:.3f} stable_required={STABLE_MATCHES_REQUIRED} "
+        f"best={best} failures={preview_failure_texts(editor)!r}"
     )
 
 
@@ -304,19 +338,31 @@ def main() -> int:
 
         public_snapshots = [public_snapshot(item) for item in snapshots]
         visual_hashes = [str(item["visual_hash"]) for item in public_snapshots]
-        if len(set(visual_hashes)) != len(visual_hashes):
-            raise RuntimeError(f"trim preview reused a visual frame across distinct seek targets: hashes={visual_hashes}")
+
+        # 1.950 s and the exact 2.000 s endpoint can legitimately resolve to
+        # the same final decodable frame in the 12-fps fixture. All other
+        # deliberately separated targets must settle on distinct visuals.
+        required_distinct_indices = (0, 1, 2, 3, 4, 6)
+        required_distinct_hashes = [visual_hashes[index] for index in required_distinct_indices]
+        if len(set(required_distinct_hashes)) != len(required_distinct_hashes):
+            raise RuntimeError(
+                "trim preview settled on a stale/reused frame across separated seek targets: "
+                f"required_hashes={required_distinct_hashes} all_hashes={visual_hashes}"
+            )
 
         report = {
             "real_file_imported": True,
             "editor_class": gate.class_name(editor),
             "visual_signature": {"width": VISUAL_W, "height": VISUAL_H, "quantization": 16},
             "minimum_visual_change_ratio": MIN_VISUAL_CHANGE_RATIO,
+            "stable_matches_required": STABLE_MATCHES_REQUIRED,
             "initial": public_snapshots[0],
             "terminal_exact_end": public_snapshots[1],
             "seek_results": public_snapshots[2:],
             "seek_sequence_count": len(snapshots) - 1,
             "unique_visual_hashes": len(set(visual_hashes)),
+            "required_distinct_visual_hashes": len(set(required_distinct_hashes)),
+            "near_end_alias_allowed": True,
             "failure_texts": failures,
             "exact_end_preview_recovered": True,
             "continuous_seek_preview_stable": True,
