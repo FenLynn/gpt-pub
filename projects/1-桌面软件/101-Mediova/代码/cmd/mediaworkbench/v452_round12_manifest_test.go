@@ -43,13 +43,15 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 35 {
-		t.Errorf("entries=%d want=35", entries)
+	if entries != 39 {
+		t.Errorf("entries=%d want=39", entries)
 	}
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
 		"cmd/mediaworkbench/v452_round8_editor_install_windows.go",
 		"cmd/mediaworkbench/v452_round9_thumbnail_lifecycle_windows.go",
+		"cmd/mediaworkbench/v452_round9_timeline_windows.go",
+		"cmd/mediaworkbench/v452_round9_manifest_test.go",
 		"cmd/mediaworkbench/v452_round12_selection_owner_windows.go",
 		"cmd/mediaworkbench/v452_round12_header_owner_windows.go",
 		"cmd/mediaworkbench/v452_round12_footer_owner_windows.go",
@@ -63,6 +65,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_round12_column_profiles_windows.go",
 		"cmd/mediaworkbench/v452_round12_preview_windows.go",
 		"cmd/mediaworkbench/v452_round12_thumbnail_fallback_windows.go",
+		"cmd/mediaworkbench/v452_round12_ui_polish_windows.go",
+		"cmd/mediaworkbench/v452_round12_manifest_test.go",
 		"cmd/mediaworkbench/v452_thumbnail_lifecycle_windows.go",
 		"scripts/round12_list_structure_gate.py",
 		"scripts/round12_real_thumbnail_gate.py",
