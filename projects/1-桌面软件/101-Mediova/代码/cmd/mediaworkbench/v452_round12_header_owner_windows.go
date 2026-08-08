@@ -2,9 +2,17 @@
 
 package main
 
-import "unsafe"
+import (
+	"syscall"
+	"time"
+	"unsafe"
+)
 
-const round12CDISHot = 0x0040
+const (
+	round12CDISHot                    = 0x0040
+	round12HeaderVisualSubclassID     = 0x45C6
+	round12HeaderVisualInstallRetries = 800
+)
 
 var (
 	round12HeaderTopSeparator   = colorRef(207, 214, 223)
@@ -12,7 +20,57 @@ var (
 	round12HeaderHotBackground  = colorRef(248, 250, 252)
 	round12HeaderDownBackground = colorRef(231, 243, 255)
 	round12HeaderText           = colorRef(28, 39, 52)
+	round12HeaderVisualCallback uintptr
 )
+
+func init() {
+	round12HeaderVisualCallback = syscall.NewCallback(round12HeaderListSubclassProc)
+	go func() {
+		for attempt := 0; attempt < round12HeaderVisualInstallRetries; attempt++ {
+			a := app
+			if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady && round12SelectionInstalled.Load() {
+				a.postUI(func() {
+					if a.hList == 0 {
+						return
+					}
+					v452RemoveSubclass.Call(a.hList, round12HeaderVisualCallback, round12HeaderVisualSubclassID)
+					v452SetWindowSubclass.Call(a.hList, round12HeaderVisualCallback, round12HeaderVisualSubclassID, 0)
+					header := send(a.hList, LVM_GETHEADER, 0, 0)
+					if header != 0 {
+						procInvalidateRect.Call(header, 0, 1)
+					}
+				})
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+}
+
+// Header controls send NM_CUSTOMDRAW to their direct parent, which is the
+// ListView rather than the main window. Own that exact message boundary so the
+// item renderer below is guaranteed to run for native hover/pressed paints.
+func round12HeaderListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	a := app
+	if a == nil || hwnd != a.hList {
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		return result
+	}
+	switch message {
+	case WM_NOTIFY:
+		if lParam != 0 {
+			hdr := (*nmhdr)(unsafe.Pointer(lParam))
+			header := send(a.hList, LVM_GETHEADER, 0, 0)
+			if header != 0 && hdr.HwndFrom == header && hdr.Code == NM_CUSTOMDRAW {
+				return round12DrawHeaderItemTop((*nmCustomDraw)(unsafe.Pointer(lParam)))
+			}
+		}
+	case v452WMNCDestroy:
+		v452RemoveSubclass.Call(hwnd, round12HeaderVisualCallback, subclassID)
+	}
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	return result
+}
 
 // round12DrawHeaderItemTop keeps the native Header in charge of hit testing,
 // column resizing and click/sort notifications, while Round12 owns the final
