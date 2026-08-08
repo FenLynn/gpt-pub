@@ -25,9 +25,12 @@ func round12DrawTaskListCell(a *application, cd *nmListViewCustomDraw) uintptr {
 		if !ok || column < 0 || column >= round12ColumnCount {
 			return CDRF_DODEFAULT
 		}
-		cell := cd.NMCD.Rc
-		if exact, exactOK := listSubItemBounds(a.hList, row, column); exactOK {
-			cell.Left, cell.Right = exact.Left, exact.Right
+		cell, visible := round12VisibleCellBounds(a, row, column)
+		if !visible {
+			// A zero-width/hidden column can still receive NM_CUSTOMDRAW on some
+			// comctl32 versions. Never let stale NMCD.Rc content leak into a
+			// neighbouring visible cell.
+			return CDRF_SKIPDEFAULT
 		}
 		selected := listItemSelected(a.hList, row)
 		background := colorRef(255, 255, 255)
@@ -120,8 +123,13 @@ func round12DrawPreviewCell(a *application, hdc uintptr, cell rect, task *model.
 	if task != nil && a.hImageList != 0 && task.ThumbnailIndex >= 0 {
 		count, _, _ := round7ImageListCount.Call(a.hImageList)
 		if task.ThumbnailIndex < int(count) {
-			result, _, _ := round7ImageListDraw.Call(a.hImageList, uintptr(task.ThumbnailIndex), hdc, uintptr(preview.Left), uintptr(preview.Top), 0)
-			drawn = result != 0
+			// ImageList_Draw always uses the native bitmap size. Clip it to the
+			// physical preview cell so a 48px thumbnail can never paint into the
+			// Header or the adjacent row on a compact ListView.
+			round12WithClip(hdc, preview, func() {
+				result, _, _ := round7ImageListDraw.Call(a.hImageList, uintptr(task.ThumbnailIndex), hdc, uintptr(preview.Left), uintptr(preview.Top), 0)
+				drawn = result != 0
+			})
 		}
 	}
 	if !drawn {
