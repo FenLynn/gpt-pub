@@ -18,14 +18,29 @@ from round12_remote_header import EXPECTED_CAPTIONS, RemoteHeaderReader, header_
 WM_COMMAND = 0x0111
 IDC_TAB_VIDEO = 1001
 IDC_TAB_IMAGE = 1002
+EXPECTED_BOTTOM_SEPARATOR = (194, 203, 214)
 
 
-def capture_header(header: dict[str, object], save: Path | None = None) -> str:
+def _close_color(value: tuple[int, int, int], expected: tuple[int, int, int], tolerance: int = 6) -> bool:
+    return all(abs(int(value[index]) - int(expected[index])) <= tolerance for index in range(3))
+
+
+def capture_header(header: dict[str, object], save: Path | None = None) -> tuple[str, float, int]:
     image = runner.capture_screen_rect(header["rect"])
     try:
         if save is not None:
             image.save(save)
-        return hashlib.sha256(image.tobytes()).hexdigest()
+        rgb = image.convert("RGB")
+        try:
+            ratios: list[tuple[float, int]] = []
+            for y in range(max(0, rgb.height - 3), rgb.height):
+                pixels = [rgb.getpixel((x, y)) for x in range(rgb.width)]
+                matches = sum(1 for pixel in pixels if _close_color(pixel, EXPECTED_BOTTOM_SEPARATOR))
+                ratios.append((matches / max(1, len(pixels)), y))
+            best_ratio, best_y = max(ratios, default=(0.0, -1))
+        finally:
+            rgb.close()
+        return hashlib.sha256(image.tobytes()).hexdigest(), best_ratio, best_y
     finally:
         image.close()
 
@@ -68,9 +83,21 @@ def main() -> int:
 
         time.sleep(0.8)
         hashes: list[str] = []
+        line_ratios: list[float] = []
+        line_rows: list[int] = []
         for frame in range(40):
             current_header = header_handle(main_hwnd)
-            hashes.append(capture_header(current_header, evidence / f"header-stable-{frame:02d}.png" if frame in (0, 39) else None))
+            digest, line_ratio, line_row = capture_header(
+                current_header,
+                evidence / f"header-stable-{frame:02d}.png" if frame in (0, 39) else None,
+            )
+            hashes.append(digest)
+            line_ratios.append(line_ratio)
+            line_rows.append(line_row)
+            if line_ratio < 0.92:
+                raise RuntimeError(
+                    f"header bottom separator is not continuous: frame={frame} ratio={line_ratio:.4f} row={line_row}"
+                )
             if reader.titles(int(current_header["hwnd"])) != baseline:
                 raise RuntimeError(f"header captions changed during stable frame {frame}")
             time.sleep(0.05)
@@ -86,6 +113,10 @@ def main() -> int:
             "stable_frames": 40,
             "stable_unique_hashes": 1,
             "stable_hash": unique[0],
+            "bottom_separator_expected": list(EXPECTED_BOTTOM_SEPARATOR),
+            "bottom_separator_min_ratio": min(line_ratios),
+            "bottom_separator_rows": line_rows,
+            "bottom_separator_continuous": True,
         }
         (evidence / "header-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))
