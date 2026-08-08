@@ -15,6 +15,7 @@ import round12_trim_preview_gate
 
 WM_LBUTTONDOWN = 0x0201
 WM_LBUTTONUP = 0x0202
+WM_MOUSEMOVE = 0x0200
 MK_LBUTTON = 0x0001
 ROUND7_IDC_TIMELINE = 4705
 
@@ -81,9 +82,11 @@ def install_trim_diagnostics() -> None:
         )
 
     def set_current_via_timeline(editor: int, current_edit: int, _jump_button: int, value: str) -> None:
-        # Use the real Round7 timeline user path instead of cross-process EDIT
-        # text injection. A normal timeline click updates currentAt and, on
-        # mouse-up, triggers the same preview request as a desktop user.
+        # Use the real Round9/Round7 timeline drag path. Near a blue trim
+        # boundary the final timeline intentionally gives that boundary priority;
+        # therefore a direct click at exact end edits TrimEnd rather than the red
+        # current marker. A desktop user moves current by grabbing the red marker
+        # (from the lower layer when markers coincide) and dragging it to target.
         timeline = int(user32.GetDlgItem(editor, ROUND7_IDC_TIMELINE))
         if not timeline:
             raise RuntimeError("Round7 timeline control disappeared")
@@ -109,18 +112,37 @@ def install_trim_diagnostics() -> None:
         scale = dpi / 96.0
         left = int(round(26 * scale))
         right = width - int(round(26 * scale))
-        y = min(height - 2, max(2, int(round(42 * scale))))
+        # Round9's blue bar ends at 37 logical px. Grab below it so a red
+        # current marker that coincides with blue start/end is unambiguous.
+        y = min(height - 3, max(3, int(round(52 * scale))))
         if right <= left:
             raise RuntimeError(f"invalid Round7 timeline track bounds: left={left} right={right} width={width}")
 
-        target = parse_clock(value)
         fixture_duration = 2.0
-        target = max(0.0, min(fixture_duration, target))
-        x = int(round(left + (target / fixture_duration) * (right - left)))
-        x = max(left, min(right, x))
-        lparam = ((y & 0xFFFF) << 16) | (x & 0xFFFF)
-        user32.SendMessageW(timeline, WM_LBUTTONDOWN, MK_LBUTTON, lparam)
-        user32.SendMessageW(timeline, WM_LBUTTONUP, 0, lparam)
+        target = max(0.0, min(fixture_duration, parse_clock(value)))
+        current_text = str(round12_trim_preview_gate.child_by_handle(editor, current_edit)["text"])
+        try:
+            current_value = max(0.0, min(fixture_duration, parse_clock(current_text)))
+        except ValueError as exc:
+            raise RuntimeError(f"cannot parse current timeline value before drag: {current_text!r}") from exc
+
+        def time_x(seconds: float) -> int:
+            x = int(round(left + (seconds / fixture_duration) * (right - left)))
+            return max(left, min(right, x))
+
+        def point_lparam(x: int) -> int:
+            return ((y & 0xFFFF) << 16) | (x & 0xFFFF)
+
+        source_x = time_x(current_value)
+        target_x = time_x(target)
+        user32.SendMessageW(timeline, WM_LBUTTONDOWN, MK_LBUTTON, point_lparam(source_x))
+        # Send a few real drag moves so the gate covers capture + continuous
+        # currentAt updates instead of relying on one synthetic endpoint jump.
+        for fraction in (0.25, 0.5, 0.75, 1.0):
+            drag_x = int(round(source_x + (target_x - source_x) * fraction))
+            user32.SendMessageW(timeline, WM_MOUSEMOVE, MK_LBUTTON, point_lparam(drag_x))
+            time.sleep(0.01)
+        user32.SendMessageW(timeline, WM_LBUTTONUP, 0, point_lparam(target_x))
 
         deadline = time.monotonic() + 3.0
         last_text = ""
@@ -135,8 +157,8 @@ def install_trim_diagnostics() -> None:
                 return
             time.sleep(0.05)
         raise RuntimeError(
-            "Round7 timeline click did not update current time: "
-            f"target={target:.3f} current_edit={last_text!r} parsed={last_value:.3f}"
+            "Round7 timeline drag did not update current time: "
+            f"from={current_value:.3f} target={target:.3f} current_edit={last_text!r} parsed={last_value:.3f}"
         )
 
     round12_trim_preview_gate.find_editor = find_ready_editor
@@ -195,7 +217,7 @@ def main() -> int:
             stage["fresh_process_passes"] = trim_preview_passes
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
-            stage["timeline_seek_input_required"] = True
+            stage["timeline_drag_input_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
