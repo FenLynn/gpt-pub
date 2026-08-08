@@ -56,9 +56,24 @@ def main() -> int:
     thumbnail_result = int(round12_real_thumbnail_gate.main())
     if thumbnail_result != 0:
         return thumbnail_result
-    trim_preview_result = int(round12_trim_preview_gate.main())
-    if trim_preview_result != 0:
-        return trim_preview_result
+
+    trim_preview_passes = 0
+    trim_preview_required = 2
+    for _attempt in range(trim_preview_required):
+        trim_preview_result = int(round12_trim_preview_gate.main())
+        if trim_preview_result != 0:
+            return trim_preview_result
+        trim_preview_passes += 1
+
+    evidence = argument_path("--evidence")
+    if evidence is not None:
+        stage_path = evidence / "round12-trim-preview-report.json"
+        if stage_path.is_file():
+            stage = json.loads(stage_path.read_text(encoding="utf-8"))
+            stage["fresh_process_passes"] = trim_preview_passes
+            stage["fresh_process_required"] = trim_preview_required
+            stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
+
     try:
         return int(round11.main())
     finally:
