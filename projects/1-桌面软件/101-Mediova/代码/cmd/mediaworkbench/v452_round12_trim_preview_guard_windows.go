@@ -15,6 +15,7 @@ import (
 	"unsafe"
 
 	"mediaworkbench/internal/config"
+	"mediaworkbench/internal/model"
 )
 
 const (
@@ -33,14 +34,14 @@ type round12TrimPreviewGuardState struct {
 }
 
 var (
-	round12TrimPreviewEventHook uintptr
-	round12TrimPreviewHookMu    sync.Mutex
-	round12TrimPreviewStates    sync.Map
-	round12TrimPreviewEventCB   uintptr
-	round12TrimPreviewEditorCB  uintptr
+	round12TrimPreviewEventHook  uintptr
+	round12TrimPreviewHookMu     sync.Mutex
+	round12TrimPreviewStates     sync.Map
+	round12TrimPreviewEventCB    uintptr
+	round12TrimPreviewEditorCB   uintptr
 	round12TrimPreviewTimelineCB uintptr
-	round12SetWinEventHook      = user32.NewProc("SetWinEventHook")
-	round12UnhookWinEvent       = user32.NewProc("UnhookWinEvent")
+	round12SetWinEventHook       = user32.NewProc("SetWinEventHook")
+	round12UnhookWinEvent        = user32.NewProc("UnhookWinEvent")
 )
 
 func init() {
@@ -139,7 +140,7 @@ func round12TrimPreviewState(hwnd uintptr) *round12TrimPreviewGuardState {
 }
 
 func round12ScheduleTrimPreviewWatch(e *round7Editor) {
-	if e == nil || e.hwnd == 0 || e.owner == nil || e.dialog == nil || e.dialog.task == nil || e.dialog.task.Kind != 0 {
+	if e == nil || e.hwnd == 0 || e.owner == nil || e.dialog == nil || e.dialog.task == nil || e.dialog.task.Kind != model.KindVideo {
 		return
 	}
 	state := round12TrimPreviewState(e.hwnd)
@@ -190,7 +191,7 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 	state.cancel = cancel
 	state.mu.Unlock()
 
-	seq := d.previewSeq.Add(1) // invalidate the failed/stale normal preview
+	seq := d.previewSeq.Add(1)
 	dir, err := config.TempDir()
 	if err != nil {
 		cancel()
@@ -211,10 +212,10 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 			defer os.Remove(out)
 			cancel()
 			state.mu.Lock()
-			if state.cancel == cancel {
+			current := state.generation == generation
+			if current {
 				state.cancel = nil
 			}
-			current := state.generation == generation
 			state.mu.Unlock()
 			if !current || round7ActiveEditor != e || d.closed.Load() || d.previewSeq.Load() != seq {
 				return
@@ -332,8 +333,7 @@ func round12RunPreviewAttempt(ctx context.Context, ffmpeg, input, output string,
 		args = append(args, "-ss", fmt.Sprintf("%.3f", at))
 	}
 	args = append(args, "-frames:v", "1")
-	filters := round12PreviewFilters(rotation)
-	if filters != "" {
+	if filters := round12PreviewFilters(rotation); filters != "" {
 		args = append(args, "-vf", filters)
 	}
 	args = append(args, output)
