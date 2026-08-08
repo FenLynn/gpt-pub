@@ -18,7 +18,13 @@ WM_LBUTTONDOWN = 0x0201
 WM_LBUTTONUP = 0x0202
 WM_MOUSEMOVE = 0x0200
 MK_LBUTTON = 0x0001
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
 ROUND7_IDC_TIMELINE = 4705
+
+
+class POINT(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
 
 def argument_path(name: str) -> Path | None:
@@ -56,7 +62,14 @@ def install_trim_diagnostics() -> None:
     user32.SendMessageW.restype = ctypes.c_ssize_t
     user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
     user32.PostMessageW.restype = wintypes.BOOL
-    send_message = user32.SendMessageW
+    user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(POINT)]
+    user32.ClientToScreen.restype = wintypes.BOOL
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+    user32.SetForegroundWindow.restype = wintypes.BOOL
+    user32.SetCursorPos.argtypes = [ctypes.c_int, ctypes.c_int]
+    user32.SetCursorPos.restype = wintypes.BOOL
+    user32.mouse_event.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, ctypes.c_size_t]
+    user32.mouse_event.restype = None
 
     def find_ready_editor(pid: int, timeout: float) -> int:
         # Real imports can enter the list before FFprobe has populated duration
@@ -97,11 +110,9 @@ def install_trim_diagnostics() -> None:
         )
 
     def set_current_via_timeline(editor: int, current_edit: int, _jump_button: int, value: str) -> None:
-        # Use the real Round9/Round7 timeline drag path. Near a blue trim
-        # boundary the final timeline intentionally gives that boundary priority;
-        # therefore a direct click at exact end edits TrimEnd rather than the red
-        # current marker. A desktop user moves current by grabbing the red marker
-        # (from the lower layer when markers coincide) and dragging it to target.
+        # Exercise the real desktop input path rather than injecting mouse
+        # messages across processes. This drives the target window's hit test,
+        # capture and Round9/Round7 timeline handlers exactly as a user drag.
         timeline = int(user32.GetDlgItem(editor, ROUND7_IDC_TIMELINE))
         if not timeline:
             raise RuntimeError("Round7 timeline control disappeared")
@@ -145,19 +156,31 @@ def install_trim_diagnostics() -> None:
             x = int(round(left + (seconds / fixture_duration) * (right - left)))
             return max(left, min(right, x))
 
-        def point_lparam(x: int) -> int:
-            return ((y & 0xFFFF) << 16) | (x & 0xFFFF)
+        def to_screen(x: int) -> tuple[int, int]:
+            point = POINT(x=x, y=y)
+            if not user32.ClientToScreen(timeline, ctypes.byref(point)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            return int(point.x), int(point.y)
 
         source_x = time_x(current_value)
         target_x = time_x(target)
-        send_message(timeline, WM_LBUTTONDOWN, MK_LBUTTON, point_lparam(source_x))
-        # Send a few real drag moves so the gate covers capture + continuous
-        # currentAt updates instead of relying on one synthetic endpoint jump.
-        for fraction in (0.25, 0.5, 0.75, 1.0):
-            drag_x = int(round(source_x + (target_x - source_x) * fraction))
-            send_message(timeline, WM_MOUSEMOVE, MK_LBUTTON, point_lparam(drag_x))
-            time.sleep(0.01)
-        send_message(timeline, WM_LBUTTONUP, 0, point_lparam(target_x))
+        source_screen = to_screen(source_x)
+        target_screen = to_screen(target_x)
+        user32.SetForegroundWindow(editor)
+        time.sleep(0.05)
+        if not user32.SetCursorPos(source_screen[0], source_screen[1]):
+            raise ctypes.WinError(ctypes.get_last_error())
+        time.sleep(0.04)
+        user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        try:
+            for fraction in (0.25, 0.5, 0.75, 1.0):
+                drag_x = int(round(source_screen[0] + (target_screen[0] - source_screen[0]) * fraction))
+                drag_y = int(round(source_screen[1] + (target_screen[1] - source_screen[1]) * fraction))
+                if not user32.SetCursorPos(drag_x, drag_y):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                time.sleep(0.025)
+        finally:
+            user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
 
         deadline = time.monotonic() + 3.0
         last_text = ""
@@ -172,8 +195,9 @@ def install_trim_diagnostics() -> None:
                 return
             time.sleep(0.05)
         raise RuntimeError(
-            "Round7 timeline drag did not update current time: "
-            f"from={current_value:.3f} target={target:.3f} current_edit={last_text!r} parsed={last_value:.3f}"
+            "real timeline mouse drag did not update current time: "
+            f"from={current_value:.3f} target={target:.3f} current_edit={last_text!r} "
+            f"parsed={last_value:.3f} source_screen={source_screen!r} target_screen={target_screen!r}"
         )
 
     round12_trim_preview_gate.find_editor = find_ready_editor
@@ -232,7 +256,7 @@ def main() -> int:
             stage["fresh_process_passes"] = trim_preview_passes
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
-            stage["timeline_drag_input_required"] = True
+            stage["real_timeline_mouse_drag_required"] = True
             stage["pointer_sized_win32_abi_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
