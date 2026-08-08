@@ -52,6 +52,22 @@ func round12FooterSubclassProc(hwnd uintptr, message uint32, wParam, lParam, sub
 	return result
 }
 
+func round12FooterGlyph(a *application, hwnd uintptr) string {
+	if a == nil {
+		return ""
+	}
+	switch hwnd {
+	case a.hStart:
+		return "\uE768" // Play
+	case a.hPause:
+		return "\uE769" // Pause
+	case a.hStop:
+		return "\uE71A" // Stop
+	default:
+		return ""
+	}
+}
+
 func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
 	if a == nil || dis == nil || (dis.HwndItem != a.hStart && dis.HwndItem != a.hPause && dis.HwndItem != a.hStop) {
 		return false
@@ -94,24 +110,10 @@ func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
 	procDeleteObject.Call(brush)
 	procDeleteObject.Call(pen)
 
+	content := inner
+	content.Left += scaleDPI(7)
+	content.Right -= scaleDPI(7)
 	label := getText(dis.HwndItem)
-	font := uiFontSmall
-	labelWidth := measureSingleLineWidth(dis.HDC, label, font)
-	iconWidth := int32(14)
-	gap := int32(5)
-	available := inner.Right - inner.Left - 20
-	total := iconWidth + gap + labelWidth
-	if total > available {
-		labelWidth = available - iconWidth - gap
-		if labelWidth < 24 {
-			labelWidth = 24
-		}
-		total = iconWidth + gap + labelWidth
-	}
-	left := inner.Left + (inner.Right-inner.Left-total)/2
-	iconRC := rect{Left: left, Top: inner.Top + 1, Right: left + iconWidth, Bottom: inner.Bottom - 1}
-	textRC := rect{Left: iconRC.Right + gap, Top: inner.Top + 1, Right: iconRC.Right + gap + labelWidth, Bottom: inner.Bottom - 1}
-	v452DrawSolidPrimaryGlyph(dis.HDC, dis.HwndItem, iconRC, textColor)
-	drawCenteredText(dis.HDC, label, textRC, font, textColor)
+	round12DrawPolishedButtonContent(dis.HDC, label, round12FooterGlyph(a, dis.HwndItem), content, uiFontSmall, textColor)
 	return true
 }
