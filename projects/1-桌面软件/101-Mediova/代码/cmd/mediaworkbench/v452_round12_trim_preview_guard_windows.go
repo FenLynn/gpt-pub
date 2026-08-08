@@ -181,14 +181,24 @@ func round12PollTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState
 	settled := state.settled
 	state.mu.Unlock()
 
-	if ownSeq != 0 || settled {
+	failure := round12TrimPreviewHasFailure(d)
+	if settled {
+		// The inherited preview worker writes an error into hInfo but does not
+		// clear an older error after a later usable bitmap becomes current.
+		// A settled request with a valid bitmap must therefore reconcile the
+		// visible status back to the normal information card.
+		if failure && d.bitmap != 0 {
+			e.updateInfo()
+			setText(e.hInstruction, "拖动红色游标预览画面；拖动蓝色旗标调整剪辑范围。")
+		}
+		return
+	}
+	if ownSeq != 0 {
 		return
 	}
 
-	failure := round12TrimPreviewHasFailure(d)
-	// A new bitmap is the strongest success signal. Also clear stale failure
-	// text left by an earlier request; the legacy preview worker does not clear
-	// hInfo when a later frame succeeds.
+	// A new bitmap is the strongest normal-path success signal. Also clear
+	// stale failure text left by an earlier request.
 	if d.bitmap != 0 && d.bitmap != bitmapAtRequest {
 		state.mu.Lock()
 		if state.originSeq == origin && state.ownSeq == 0 {
@@ -248,10 +258,10 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 	if err != nil {
 		cancel()
 		state.mu.Lock()
-		if state.generation == generation {
+		if state.generation == generation && state.ownSeq == seq {
 			state.cancel = nil
 			state.ownSeq = 0
-			state.settled = true
+			state.settled = false
 		}
 		state.mu.Unlock()
 		return
@@ -263,6 +273,10 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 	fps := d.safeFPS()
 	rotation := d.opts.Rotation
 	ffmpeg := d.owner.ffmpeg
+	// Replace the stale inherited error immediately with an explicit transient
+	// recovery state. Only a successfully loaded replacement bitmap can mark
+	// this request settled.
+	setText(d.hInfo, "预览帧异常，正在自动恢复…")
 	setText(e.hInstruction, "预览取帧失败，正在自动恢复…")
 
 	go func() {
@@ -274,20 +288,30 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 			current := !state.stopped.Load() && state.generation == generation && state.ownSeq == seq
 			if current {
 				state.cancel = nil
-				state.ownSeq = 0
-				state.settled = true
 			}
 			state.mu.Unlock()
 			if !current || round7ActiveEditor != e || d.closed.Load() || d.previewSeq.Load() != seq {
 				return
 			}
 			if err != nil {
+				state.mu.Lock()
+				if state.generation == generation && state.ownSeq == seq {
+					state.ownSeq = 0
+					state.settled = false
+				}
+				state.mu.Unlock()
 				setText(d.hInfo, "预览帧自动恢复失败："+short(err.Error(), 220))
 				setText(e.hInstruction, "预览取帧失败；移动当前时间后将自动重试。")
 				return
 			}
 			h, _, _ := procLoadImageW.Call(0, uintptr(unsafe.Pointer(p(out))), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE|LR_CREATEDIBSECTION)
 			if h == 0 {
+				state.mu.Lock()
+				if state.generation == generation && state.ownSeq == seq {
+					state.ownSeq = 0
+					state.settled = false
+				}
+				state.mu.Unlock()
 				setText(d.hInfo, "预览帧自动恢复后加载失败。")
 				setText(e.hInstruction, "预览取帧失败；移动当前时间后将自动重试。")
 				return
@@ -299,6 +323,12 @@ func round12StartTrimPreviewRecovery(e *round7Editor, state *round12TrimPreviewG
 			var bm bitmapInfo
 			procGetObjectW.Call(h, unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm)))
 			d.bitmapW, d.bitmapH = bm.Width, bm.Height
+			state.mu.Lock()
+			if state.generation == generation && state.ownSeq == seq {
+				state.ownSeq = 0
+				state.settled = true
+			}
+			state.mu.Unlock()
 			e.updateInfo()
 			setText(e.hInstruction, "预览已自动恢复；拖动红色游标继续预览画面。")
 			procInvalidateRect.Call(d.hCanvas, 0, 1)
