@@ -4,6 +4,7 @@ import ctypes
 import json
 import sys
 import time
+from ctypes import wintypes
 from pathlib import Path
 
 import round11_flicker_gate_runner_base as round11
@@ -42,6 +43,20 @@ def parse_clock(value: str) -> float:
 def install_trim_diagnostics() -> None:
     original_find_editor = round12_trim_preview_gate.find_editor
     user32 = round12_trim_preview_gate.gate.user32
+
+    # ctypes defaults to C int for untyped foreign-function arguments/results.
+    # HWND/WPARAM/LPARAM are pointer-sized on Win64, so an untyped call can
+    # silently truncate the exact control handle we are trying to exercise.
+    # Freeze the ABI once here before any trim-editor discovery or input.
+    user32.GetDlgItem.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetDlgItem.restype = wintypes.HWND
+    user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(round12_trim_preview_gate.gate.RECT)]
+    user32.GetClientRect.restype = wintypes.BOOL
+    user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    user32.SendMessageW.restype = ctypes.c_ssize_t
+    user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    user32.PostMessageW.restype = wintypes.BOOL
+    send_message = user32.SendMessageW
 
     def find_ready_editor(pid: int, timeout: float) -> int:
         # Real imports can enter the list before FFprobe has populated duration
@@ -102,8 +117,8 @@ def install_trim_diagnostics() -> None:
         dpi = 96
         try:
             get_dpi = user32.GetDpiForWindow
-            get_dpi.argtypes = [ctypes.c_void_p]
-            get_dpi.restype = ctypes.c_uint
+            get_dpi.argtypes = [wintypes.HWND]
+            get_dpi.restype = wintypes.UINT
             value_dpi = int(get_dpi(editor))
             if 96 <= value_dpi <= 768:
                 dpi = value_dpi
@@ -135,14 +150,14 @@ def install_trim_diagnostics() -> None:
 
         source_x = time_x(current_value)
         target_x = time_x(target)
-        user32.SendMessageW(timeline, WM_LBUTTONDOWN, MK_LBUTTON, point_lparam(source_x))
+        send_message(timeline, WM_LBUTTONDOWN, MK_LBUTTON, point_lparam(source_x))
         # Send a few real drag moves so the gate covers capture + continuous
         # currentAt updates instead of relying on one synthetic endpoint jump.
         for fraction in (0.25, 0.5, 0.75, 1.0):
             drag_x = int(round(source_x + (target_x - source_x) * fraction))
-            user32.SendMessageW(timeline, WM_MOUSEMOVE, MK_LBUTTON, point_lparam(drag_x))
+            send_message(timeline, WM_MOUSEMOVE, MK_LBUTTON, point_lparam(drag_x))
             time.sleep(0.01)
-        user32.SendMessageW(timeline, WM_LBUTTONUP, 0, point_lparam(target_x))
+        send_message(timeline, WM_LBUTTONUP, 0, point_lparam(target_x))
 
         deadline = time.monotonic() + 3.0
         last_text = ""
@@ -218,6 +233,7 @@ def main() -> int:
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
             stage["timeline_drag_input_required"] = True
+            stage["pointer_sized_win32_abi_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
