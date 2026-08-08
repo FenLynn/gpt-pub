@@ -91,10 +91,10 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 	case WM_COMMAND:
 		id := int(loWord(wParam))
 		if id == IDC_TRIM_CROP || id == ID_CTX_TRIM {
-			// Arm the preview reliability hook before the inherited Round7 handler
-			// creates the modal editor. The hook installs only on that editor and
-			// unhooks immediately after attachment.
-			round12ArmTrimPreviewHook()
+			// Arm only the exclusive preview owner before the inherited handler
+			// creates the modal editor. The retired watcher must never start its
+			// own bounded fallback loop in the current Round12 path.
+			round12ArmExclusiveTrimPreviewOwner()
 		}
 		if id == round12IDCColumnSettings {
 			round12ShowColumnSettings(a)
