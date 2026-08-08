@@ -122,10 +122,10 @@ func round12BridgeMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		}
 	case WM_APP_UI:
 		// Every asynchronous preview worker returns to the UI through WM_APP_UI.
-		// This is a deterministic second installation path for the trim preview
-		// watcher, independent of WinEvent/subclass ordering.
+		// Reconcile the exclusive Round12 preview owner here so an inherited
+		// watcher cannot regain navigation ownership after a worker completes.
 		if e := round7ActiveEditor; e != nil && e.hwnd != 0 && e.dialog != nil && e.dialog.hCanvas != 0 {
-			round12InstallTrimPreviewWatcher(e)
+			round12InstallExclusiveTrimPreviewOwner(e)
 		}
 	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round12BridgeCallback, subclassID)
