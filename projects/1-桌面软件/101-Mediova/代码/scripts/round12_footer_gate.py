@@ -69,9 +69,25 @@ def validate_footer(main_hwnd: int, controls: dict[str, int], step: int) -> dict
         raise RuntimeError(f"footer order/gap invalid at step {step}: {rects!r}")
     if overlaps(start, pause) or overlaps(pause, stop) or overlaps(start, stop):
         raise RuntimeError(f"footer overlap at step {step}: {rects!r}")
+
     widths = {name: rects[name][2] - rects[name][0] for name in ("start", "pause", "stop")}
     if widths["start"] < 120 or widths["pause"] < 90 or widths["stop"] < 90:
         raise RuntimeError(f"footer button too narrow for icon and text at step {step}: {widths!r}")
+    button_height = start[3] - start[1]
+    if button_height < 32:
+        raise RuntimeError(f"footer button height collapsed at step {step}: height={button_height} rects={rects!r}")
+
+    gap_start_pause = pause[0] - start[2]
+    gap_pause_stop = stop[0] - pause[2]
+    right_safe = main[2] - stop[2]
+    if gap_start_pause < 9 or gap_pause_stop < 9:
+        raise RuntimeError(
+            f"footer inter-button safety gap too small at step {step}: "
+            f"start_pause={gap_start_pause} pause_stop={gap_pause_stop}"
+        )
+    if right_safe < 10:
+        raise RuntimeError(f"footer right safety margin too small at step {step}: margin={right_safe} rects={rects!r}")
+
     for name, rect in rects.items():
         if rect[0] < main[0] or rect[1] < main[1] or rect[2] > main[2] or rect[3] > main[3]:
             raise RuntimeError(f"footer control outside window at step {step}: {name}={rect!r}, main={main!r}")
@@ -82,6 +98,10 @@ def validate_footer(main_hwnd: int, controls: dict[str, int], step: int) -> dict
         "step": step,
         "main": list(main),
         "rects": {name: list(rect) for name, rect in rects.items()},
+        "right_safe_margin": right_safe,
+        "start_pause_gap": gap_start_pause,
+        "pause_stop_gap": gap_pause_stop,
+        "button_height": button_height,
     }
 
 
@@ -140,6 +160,7 @@ def main() -> int:
         }
         sizes = [(1650, 930), (1450, 820), (1120, 720), (1380, 760), (1920, 1000), (1000, 680)]
         samples: list[dict[str, Any]] = []
+        all_checks: list[dict[str, Any]] = []
         for step in range(180):
             width, height = sizes[step % len(sizes)]
             if not user32.MoveWindow(hwnd, 0, 0, width, height, True):
@@ -149,6 +170,7 @@ def main() -> int:
             user32.SendMessageW(hwnd, WM_COMMAND, IDC_TAB_IMAGE if step % 3 == 0 else IDC_TAB_VIDEO, 0)
             time.sleep(0.025)
             sample = validate_footer(hwnd, controls, step)
+            all_checks.append(sample)
             if step < 6 or step >= 174:
                 samples.append(sample)
 
@@ -158,7 +180,7 @@ def main() -> int:
             stable_hashes.append(
                 bottom_hash(hwnd, evidence / f"footer-stable-{frame_index:02d}.png" if frame_index in (0, 39) else None)
             )
-            validate_footer(hwnd, controls, 180 + frame_index)
+            all_checks.append(validate_footer(hwnd, controls, 180 + frame_index))
             time.sleep(0.05)
         unique = list(dict.fromkeys(stable_hashes))
         if len(unique) != 1:
@@ -171,6 +193,11 @@ def main() -> int:
                 "stable_frames": 40,
                 "stable_unique_hashes": len(unique),
                 "stable_hash": unique[0],
+                "minimum_right_safe_margin": min(int(item["right_safe_margin"]) for item in all_checks),
+                "minimum_start_pause_gap": min(int(item["start_pause_gap"]) for item in all_checks),
+                "minimum_pause_stop_gap": min(int(item["pause_stop_gap"]) for item in all_checks),
+                "minimum_button_height": min(int(item["button_height"]) for item in all_checks),
+                "compact_typography_owner": True,
             }
         )
         merge_report(evidence, report)
