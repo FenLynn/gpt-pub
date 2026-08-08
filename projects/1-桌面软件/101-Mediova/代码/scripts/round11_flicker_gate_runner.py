@@ -14,17 +14,12 @@ import round12_list_structure_gate
 import round12_real_thumbnail_gate
 import round12_trim_preview_gate
 
-WM_LBUTTONDOWN = 0x0201
-WM_LBUTTONUP = 0x0202
-WM_MOUSEMOVE = 0x0200
-MK_LBUTTON = 0x0001
-MOUSEEVENTF_LEFTDOWN = 0x0002
-MOUSEEVENTF_LEFTUP = 0x0004
-ROUND7_IDC_TIMELINE = 4705
-
-
-class POINT(ctypes.Structure):
-    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+IDC_SEEK_MINUS_SEC = 4017
+IDC_SEEK_MINUS_FRAME = 4018
+IDC_SEEK_PLUS_FRAME = 4019
+IDC_SEEK_PLUS_SEC = 4020
+FIXTURE_FPS = 12.0
+FIXTURE_DURATION = 2.0
 
 
 def argument_path(name: str) -> Path | None:
@@ -50,26 +45,14 @@ def install_trim_diagnostics() -> None:
     original_find_editor = round12_trim_preview_gate.find_editor
     user32 = round12_trim_preview_gate.gate.user32
 
-    # ctypes defaults to C int for untyped foreign-function arguments/results.
-    # HWND/WPARAM/LPARAM are pointer-sized on Win64, so an untyped call can
-    # silently truncate the exact control handle we are trying to exercise.
-    # Freeze the ABI once here before any trim-editor discovery or input.
+    # Keep all cross-process HWND/WPARAM/LPARAM calls pointer-sized on Win64.
     user32.GetDlgItem.argtypes = [wintypes.HWND, ctypes.c_int]
     user32.GetDlgItem.restype = wintypes.HWND
-    user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(round12_trim_preview_gate.gate.RECT)]
-    user32.GetClientRect.restype = wintypes.BOOL
     user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
     user32.SendMessageW.restype = ctypes.c_ssize_t
     user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
     user32.PostMessageW.restype = wintypes.BOOL
-    user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(POINT)]
-    user32.ClientToScreen.restype = wintypes.BOOL
-    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
-    user32.SetForegroundWindow.restype = wintypes.BOOL
-    user32.SetCursorPos.argtypes = [ctypes.c_int, ctypes.c_int]
-    user32.SetCursorPos.restype = wintypes.BOOL
-    user32.mouse_event.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, ctypes.c_size_t]
-    user32.mouse_event.restype = None
+    send_message = user32.SendMessageW
 
     def find_ready_editor(pid: int, timeout: float) -> int:
         # Real imports can enter the list before FFprobe has populated duration
@@ -96,8 +79,7 @@ def install_trim_diagnostics() -> None:
                     time.sleep(0.05)
                 if stable and last_title.startswith("剪裁 ·"):
                     current = int(user32.GetDlgItem(editor, round12_trim_preview_gate.IDC_CURRENT_TIME))
-                    timeline = int(user32.GetDlgItem(editor, ROUND7_IDC_TIMELINE))
-                    if current and timeline:
+                    if current:
                         return editor
 
             user32.PostMessageW(trim_button, round12_trim_preview_gate.BM_CLICK, 0, 0)
@@ -109,79 +91,51 @@ def install_trim_diagnostics() -> None:
             f"attempts={attempts} last_title={last_title!r}"
         )
 
-    def set_current_via_timeline(editor: int, current_edit: int, _jump_button: int, value: str) -> None:
-        # Exercise the real desktop input path rather than injecting mouse
-        # messages across processes. This drives the target window's hit test,
-        # capture and Round9/Round7 timeline handlers exactly as a user drag.
-        timeline = int(user32.GetDlgItem(editor, ROUND7_IDC_TIMELINE))
-        if not timeline:
-            raise RuntimeError("Round7 timeline control disappeared")
+    def set_current_via_seek_buttons(editor: int, current_edit: int, _jump_button: int, value: str) -> None:
+        # The hosted Actions desktop is not a reliable source of synthetic mouse
+        # input. Exercise the real product navigation buttons instead. Each click
+        # goes through Round7 command -> setCurrent(..., true) -> preview request,
+        # so a rapid multi-click sequence is a stronger test of cancellation and
+        # stale-frame rejection than direct edit injection.
+        controls = {
+            "minus_sec": int(user32.GetDlgItem(editor, IDC_SEEK_MINUS_SEC)),
+            "minus_frame": int(user32.GetDlgItem(editor, IDC_SEEK_MINUS_FRAME)),
+            "plus_frame": int(user32.GetDlgItem(editor, IDC_SEEK_PLUS_FRAME)),
+            "plus_sec": int(user32.GetDlgItem(editor, IDC_SEEK_PLUS_SEC)),
+        }
+        if not all(controls.values()):
+            raise RuntimeError(f"trim seek controls disappeared: {controls!r}")
 
-        rc = round12_trim_preview_gate.gate.RECT()
-        if not user32.GetClientRect(timeline, ctypes.byref(rc)):
-            raise ctypes.WinError(ctypes.get_last_error())
-        width = int(rc.right - rc.left)
-        height = int(rc.bottom - rc.top)
-        if width < 80 or height < 30:
-            raise RuntimeError(f"invalid Round7 timeline geometry: {width}x{height}")
-
-        dpi = 96
-        try:
-            get_dpi = user32.GetDpiForWindow
-            get_dpi.argtypes = [wintypes.HWND]
-            get_dpi.restype = wintypes.UINT
-            value_dpi = int(get_dpi(editor))
-            if 96 <= value_dpi <= 768:
-                dpi = value_dpi
-        except AttributeError:
-            pass
-        scale = dpi / 96.0
-        left = int(round(26 * scale))
-        right = width - int(round(26 * scale))
-        # Round9's blue bar ends at 37 logical px. Grab below it so a red
-        # current marker that coincides with blue start/end is unambiguous.
-        y = min(height - 3, max(3, int(round(52 * scale))))
-        if right <= left:
-            raise RuntimeError(f"invalid Round7 timeline track bounds: left={left} right={right} width={width}")
-
-        fixture_duration = 2.0
-        target = max(0.0, min(fixture_duration, parse_clock(value)))
         current_text = str(round12_trim_preview_gate.child_by_handle(editor, current_edit)["text"])
         try:
-            current_value = max(0.0, min(fixture_duration, parse_clock(current_text)))
+            current = max(0.0, min(FIXTURE_DURATION, parse_clock(current_text)))
         except ValueError as exc:
-            raise RuntimeError(f"cannot parse current timeline value before drag: {current_text!r}") from exc
+            raise RuntimeError(f"cannot parse current seek value: {current_text!r}") from exc
 
-        def time_x(seconds: float) -> int:
-            x = int(round(left + (seconds / fixture_duration) * (right - left)))
-            return max(left, min(right, x))
+        target = max(0.0, min(FIXTURE_DURATION, parse_clock(value)))
+        current_frame = int(round(current * FIXTURE_FPS))
+        target_frame = int(round(target * FIXTURE_FPS))
+        target_frame = max(0, min(int(round(FIXTURE_DURATION * FIXTURE_FPS)), target_frame))
+        delta_frames = target_frame - current_frame
 
-        def to_screen(x: int) -> tuple[int, int]:
-            point = POINT(x=x, y=y)
-            if not user32.ClientToScreen(timeline, ctypes.byref(point)):
-                raise ctypes.WinError(ctypes.get_last_error())
-            return int(point.x), int(point.y)
+        clicks: list[int] = []
+        if delta_frames > 0:
+            seconds, frames = divmod(delta_frames, int(FIXTURE_FPS))
+            clicks.extend([controls["plus_sec"]] * seconds)
+            clicks.extend([controls["plus_frame"]] * frames)
+        elif delta_frames < 0:
+            seconds, frames = divmod(-delta_frames, int(FIXTURE_FPS))
+            clicks.extend([controls["minus_sec"]] * seconds)
+            clicks.extend([controls["minus_frame"]] * frames)
 
-        source_x = time_x(current_value)
-        target_x = time_x(target)
-        source_screen = to_screen(source_x)
-        target_screen = to_screen(target_x)
-        user32.SetForegroundWindow(editor)
-        time.sleep(0.05)
-        if not user32.SetCursorPos(source_screen[0], source_screen[1]):
-            raise ctypes.WinError(ctypes.get_last_error())
-        time.sleep(0.04)
-        user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-        try:
-            for fraction in (0.25, 0.5, 0.75, 1.0):
-                drag_x = int(round(source_screen[0] + (target_screen[0] - source_screen[0]) * fraction))
-                drag_y = int(round(source_screen[1] + (target_screen[1] - source_screen[1]) * fraction))
-                if not user32.SetCursorPos(drag_x, drag_y):
-                    raise ctypes.WinError(ctypes.get_last_error())
-                time.sleep(0.025)
-        finally:
-            user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        for hwnd in clicks:
+            send_message(hwnd, round12_trim_preview_gate.BM_CLICK, 0, 0)
+            # Keep the sequence intentionally rapid so overlapping preview
+            # workers are exercised, while still letting the UI dispatch each
+            # synchronous button command deterministically.
+            time.sleep(0.008)
 
+        expected = target_frame / FIXTURE_FPS
         deadline = time.monotonic() + 3.0
         last_text = ""
         last_value = -1.0
@@ -191,17 +145,17 @@ def install_trim_diagnostics() -> None:
                 last_value = parse_clock(last_text)
             except ValueError:
                 last_value = -1.0
-            if abs(last_value - target) <= 0.02:
+            if abs(last_value - expected) <= 0.02:
                 return
             time.sleep(0.05)
         raise RuntimeError(
-            "real timeline mouse drag did not update current time: "
-            f"from={current_value:.3f} target={target:.3f} current_edit={last_text!r} "
-            f"parsed={last_value:.3f} source_screen={source_screen!r} target_screen={target_screen!r}"
+            "seek-button navigation did not update current time: "
+            f"from={current:.3f} requested={target:.3f} expected_frame={expected:.3f} "
+            f"current_edit={last_text!r} parsed={last_value:.3f} clicks={len(clicks)}"
         )
 
     round12_trim_preview_gate.find_editor = find_ready_editor
-    round12_trim_preview_gate.set_current_and_jump = set_current_via_timeline
+    round12_trim_preview_gate.set_current_and_jump = set_current_via_seek_buttons
 
 
 def merge_stage_evidence() -> None:
@@ -256,7 +210,8 @@ def main() -> int:
             stage["fresh_process_passes"] = trim_preview_passes
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
-            stage["real_timeline_mouse_drag_required"] = True
+            stage["seek_button_navigation_required"] = True
+            stage["native_timeline_drag_selftest_required"] = True
             stage["pointer_sized_win32_abi_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
