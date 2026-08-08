@@ -102,6 +102,7 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 		}
 		if column := id - round12ColumnMenuBase; round12ToggleAllowed(column) {
 			round12ToggleColumn(a, column)
+			round12SyncHeaderLine(a)
 			return 0
 		}
 		if id == IDC_TAB_VIDEO || id == IDC_TAB_IMAGE {
@@ -110,16 +111,25 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 			round12EnsureListStructure(a)
 			round12ApplyProfile(a, a.currentKind)
 			round12LayoutTopButtons(a)
+			round12SyncHeaderLine(a)
 			return result
 		}
 		if id == IDC_RIGHT_TOGGLE {
 			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 			round12LayoutTopButtons(a)
+			round12SyncHeaderLine(a)
 			return result
 		}
 	case WM_DRAWITEM:
-		if lParam != 0 && round12DrawColumnButton((*drawItemStruct)(unsafe.Pointer(lParam))) {
-			return 1
+		if lParam != 0 {
+			dis := (*drawItemStruct)(unsafe.Pointer(lParam))
+			if dis.HwndItem == a.hHeaderLine {
+				fillSolid(dis.HDC, dis.RcItem, round12HeaderBottomSeparator)
+				return 1
+			}
+			if round12DrawColumnButton(dis) {
+				return 1
+			}
 		}
 	case WM_SIZE, round7FeedbackWMInit:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
@@ -127,6 +137,7 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 		round12ApplyProfile(a, a.currentKind)
 		round12LayoutTopButtons(a)
 		round12InstallPreviewThumbnails(a)
+		round12SyncHeaderLine(a)
 		return result
 	case WM_APP_REFRESH:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
@@ -135,6 +146,7 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 			round12ApplyProfile(a, a.currentKind)
 		}
 		round12InstallPreviewThumbnails(a)
+		round12SyncHeaderLine(a)
 		return result
 	case WM_DESTROY:
 		round12CaptureProfile(a, a.currentKind, true)
@@ -199,24 +211,49 @@ func round12EnsureListStructure(a *application) {
 		send(header, WM_SETFONT, uiFontBold, 1)
 		procInvalidateRect.Call(header, 0, 1)
 	}
-	if structureChanged && a.hHeaderLine != 0 {
-		show(a.hHeaderLine, false)
-	}
 	round12LoadProfiles()
+	round12SyncHeaderLine(a)
+}
+
+func round12SyncHeaderLine(a *application) {
+	if a == nil || a.hwnd == 0 || a.hList == 0 || a.hHeaderLine == 0 {
+		return
+	}
+	header := send(a.hList, LVM_GETHEADER, 0, 0)
+	if header == 0 {
+		show(a.hHeaderLine, false)
+		return
+	}
+	var wr rect
+	if ok, _, _ := procGetWindowRect.Call(header, uintptr(unsafe.Pointer(&wr))); ok == 0 {
+		return
+	}
+	topLeft := point{X: wr.Left, Y: wr.Top}
+	bottomRight := point{X: wr.Right, Y: wr.Bottom}
+	round9FeedbackScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&topLeft)))
+	round9FeedbackScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&bottomRight)))
+	width := bottomRight.X - topLeft.X
+	if width <= 0 || bottomRight.Y <= topLeft.Y {
+		return
+	}
+	move(a.hHeaderLine, topLeft.X, bottomRight.Y-1, width, 1)
+	show(a.hHeaderLine, true)
+	procInvalidateRect.Call(a.hHeaderLine, 0, 1)
 }
 
 func round12HeaderSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
 	case WM_PAINT:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		// One owner, one line: draw a deterministic full-width separator after
-		// the native Header has painted captions and vertical dividers.
-		round12PaintHeaderBottomLine(hwnd)
+		if app != nil {
+			round12SyncHeaderLine(app)
+		}
 		return result
 	case WM_LBUTTONUP:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		if app != nil {
 			round12CaptureProfile(app, app.currentKind, true)
+			round12SyncHeaderLine(app)
 		}
 		return result
 	case v452WMNCDestroy:
