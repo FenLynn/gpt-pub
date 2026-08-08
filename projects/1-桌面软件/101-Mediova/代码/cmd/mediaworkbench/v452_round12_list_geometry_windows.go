@@ -2,6 +2,8 @@
 
 package main
 
+import "unsafe"
+
 var (
 	round12SaveDC            = gdi32.NewProc("SaveDC")
 	round12RestoreDC         = gdi32.NewProc("RestoreDC")
@@ -29,7 +31,7 @@ func round12VisibleCellBounds(a *application, row, column int) (rect, bool) {
 		return rect{}, false
 	}
 	rowBounds := rect{Left: LVIR_BOUNDS}
-	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafePointer(&rowBounds))) != 0 {
+	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafe.Pointer(&rowBounds))) != 0 {
 		cell.Top = rowBounds.Top
 		cell.Bottom = rowBounds.Bottom
 	}
@@ -41,21 +43,6 @@ func round12VisibleCellBounds(a *application, row, column int) (rect, bool) {
 		return rect{}, false
 	}
 	return cell, true
-}
-
-// unsafePointer keeps the geometry helper self-contained without exporting a
-// second copy of the Win32 rectangle logic.
-func unsafePointer(value any) uintptr {
-	switch v := value.(type) {
-	case *rect:
-		return uintptrPointer(v)
-	default:
-		return 0
-	}
-}
-
-func uintptrPointer(value *rect) uintptr {
-	return uintptr(unsafe.Pointer(value))
 }
 
 func round12WithClip(hdc uintptr, clip rect, draw func()) {
