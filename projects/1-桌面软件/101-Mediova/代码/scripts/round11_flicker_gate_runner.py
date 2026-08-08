@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import sys
 import time
@@ -25,7 +26,10 @@ def argument_path(name: str) -> Path | None:
 
 def install_trim_diagnostics() -> None:
     original_find_editor = round12_trim_preview_gate.find_editor
-    original_set_current_and_jump = round12_trim_preview_gate.set_current_and_jump
+
+    send_message = round12_trim_preview_gate.gate.user32.SendMessageW
+    send_message.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
+    send_message.restype = ctypes.c_ssize_t
 
     def find_final_editor(pid: int, timeout: float) -> int:
         editor = int(original_find_editor(pid, timeout))
@@ -42,13 +46,26 @@ def install_trim_diagnostics() -> None:
         )
 
     def set_current_and_prove_command(editor: int, current_edit: int, jump_button: int, value: str) -> None:
-        # For the endpoint probe, deliberately enter a non-canonical value.
-        # Round7 can only rewrite it to 00:00:02.000 after WM_COMMAND reaches
-        # its real jump handler and setCurrent() has updated currentAt.
+        # Use an explicit pointer-sized SendMessageW signature. ctypes defaults
+        # are not safe for pointer-bearing LPARAM values on 64-bit Windows.
         submitted = "2" if value == "00:00:02.000" else value
-        original_set_current_and_jump(editor, current_edit, jump_button, submitted)
+        text = ctypes.create_unicode_buffer(submitted)
+        text_ptr = ctypes.cast(text, ctypes.c_void_p).value or 0
+        send_message(current_edit, round12_trim_preview_gate.WM_SETTEXT, 0, text_ptr)
+
+        written = round12_trim_preview_gate.gate.window_text(current_edit)
+        if written != submitted:
+            raise RuntimeError(
+                "current-time edit did not retain WM_SETTEXT before jump command; "
+                f"submitted={submitted!r} current_edit={written!r}"
+            )
+
+        send_message(jump_button, round12_trim_preview_gate.BM_CLICK, 0, 0)
         if value != "00:00:02.000":
             return
+
+        # Round7 can only canonicalize the deliberately non-canonical "2" to
+        # 00:00:02.000 after the real IDC_JUMP_TIME command reaches setCurrent.
         deadline = time.monotonic() + 3.0
         last_text = ""
         while time.monotonic() < deadline:
@@ -118,6 +135,7 @@ def main() -> int:
             stage["fresh_process_required"] = trim_preview_required
             stage["final_editor_installer_required"] = True
             stage["endpoint_command_canonicalization_required"] = True
+            stage["pointer_sized_sendmessage_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
