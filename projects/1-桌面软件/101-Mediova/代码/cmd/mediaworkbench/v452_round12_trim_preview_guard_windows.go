@@ -20,10 +20,11 @@ import (
 )
 
 const (
-	round12EventObjectCreate    = 0x8000
-	round12EventObjectShow      = 0x8002
-	round12WinEventOutOfContext = 0x0000
-	round12CreateNoWindow       = 0x08000000
+	round12EventObjectCreate              = 0x8000
+	round12EventObjectShow                = 0x8002
+	round12WinEventOutOfContext           = 0x0000
+	round12CreateNoWindow                 = 0x08000000
+	round12TrimPreviewEditorSubclassID    = 0x45D1
 )
 
 type round12TrimPreviewGuardState struct {
@@ -40,12 +41,14 @@ var (
 	round12TrimPreviewHookMu    sync.Mutex
 	round12TrimPreviewStates    sync.Map
 	round12TrimPreviewEventCB   uintptr
+	round12TrimPreviewEditorCB  uintptr
 	round12SetWinEventHook      = user32.NewProc("SetWinEventHook")
 	round12UnhookWinEvent       = user32.NewProc("UnhookWinEvent")
 )
 
 func init() {
 	round12TrimPreviewEventCB = syscall.NewCallback(round12TrimPreviewEventProc)
+	round12TrimPreviewEditorCB = syscall.NewCallback(round12TrimPreviewEditorSubclassProc)
 }
 
 func round12ArmTrimPreviewHook() {
@@ -102,10 +105,16 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 		return
 	}
 	d := e.dialog
-	state := &round12TrimPreviewGuardState{lastSeq: d.previewSeq.Load()}
-	actual, loaded := round12TrimPreviewStates.LoadOrStore(e.hwnd, state)
+	candidate := &round12TrimPreviewGuardState{lastSeq: d.previewSeq.Load()}
+	actual, loaded := round12TrimPreviewStates.LoadOrStore(e.hwnd, candidate)
+	state := actual.(*round12TrimPreviewGuardState)
+
+	// Directly observe the editor's navigation messages. The inherited handler
+	// runs first and updates currentAt/previewSeq; immediately afterwards Round12
+	// invalidates that fast-seek worker and starts the robust owner request.
+	v452SetWindowSubclass.Call(e.hwnd, round12TrimPreviewEditorCB, round12TrimPreviewEditorSubclassID, 0)
+
 	if loaded {
-		_ = actual
 		return
 	}
 
@@ -118,11 +127,13 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 
 	// If installation happens before the inherited initial frame has become a
 	// usable bitmap, take ownership immediately. Otherwise keep the valid first
-	// frame and take over only subsequent previewSeq changes.
+	// frame and take over only subsequent requests.
 	if d.bitmap == 0 || round12TrimPreviewHasFailure(d) {
 		round12TakeOverTrimPreview(e, state)
 	}
 
+	// Sequence polling remains a fallback for any navigation path that does not
+	// produce a normal editor message (for example a future custom timeline).
 	go func() {
 		ticker := time.NewTicker(50 * time.Millisecond)
 		defer ticker.Stop()
@@ -135,6 +146,59 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 			})
 		}
 	}()
+}
+
+func round12TrimPreviewEditorSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	e := round7ActiveEditor
+	switch message {
+	case WM_COMMAND:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		if e != nil && e.hwnd == hwnd && round12TrimPreviewCommandChangesFrame(int(loWord(wParam))) {
+			round12TakeOverActiveTrimPreview(e)
+		}
+		return result
+	case WM_HSCROLL:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		if e != nil && e.hwnd == hwnd && lParam != 0 && lParam == e.hTimeline {
+			round12TakeOverActiveTrimPreview(e)
+		}
+		return result
+	case WM_KEYDOWN:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		if e != nil && e.hwnd == hwnd && (int(wParam) == 0x25 || int(wParam) == 0x27) {
+			round12TakeOverActiveTrimPreview(e)
+		}
+		return result
+	case v452WMNCDestroy:
+		round12StopTrimPreviewWatcher(hwnd)
+		v452RemoveSubclass.Call(hwnd, round12TrimPreviewEditorCB, subclassID)
+	}
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	return result
+}
+
+func round12TrimPreviewCommandChangesFrame(id int) bool {
+	switch id {
+	case IDC_JUMP_TIME, IDC_SEEK_MINUS_SEC, IDC_SEEK_PLUS_SEC, IDC_SEEK_MINUS_FRAME, IDC_SEEK_PLUS_FRAME:
+		return true
+	default:
+		return false
+	}
+}
+
+func round12TakeOverActiveTrimPreview(e *round7Editor) {
+	if e == nil || e.hwnd == 0 {
+		return
+	}
+	value, ok := round12TrimPreviewStates.Load(e.hwnd)
+	if !ok {
+		round12InstallTrimPreviewWatcher(e)
+		value, ok = round12TrimPreviewStates.Load(e.hwnd)
+	}
+	if !ok {
+		return
+	}
+	round12TakeOverTrimPreview(e, value.(*round12TrimPreviewGuardState))
 }
 
 func round12PollTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState) {
@@ -154,11 +218,6 @@ func round12PollTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState
 	if seq == lastSeq || (ownSeq != 0 && seq == ownSeq) {
 		return
 	}
-
-	// Any external sequence change is a new user preview request. Take ownership
-	// immediately instead of waiting for the inherited fast-seek worker to fail.
-	// Incrementing previewSeq inside takeover invalidates that inherited worker's
-	// callback, so only the robust Round12 frame can become visible.
 	round12TakeOverTrimPreview(e, state)
 }
 
