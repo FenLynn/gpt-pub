@@ -23,6 +23,7 @@ from round12_list_gate_helpers import (
     TASK_COL_DURATION,
     client_rect_to_screen,
     column_width,
+    dark_pixels,
     send_command,
 )
 from round12_list_gate_visual import (
@@ -152,6 +153,43 @@ def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
     }
 
 
+def validate_hidden_picture_crop_has_no_residue(
+    main_hwnd: int,
+    list_hwnd: int,
+    reader: RemoteHeaderReader,
+    column_count: int,
+    list_info: dict[str, object],
+    evidence: Path,
+) -> int:
+    set_columns_visible(main_hwnd, list_hwnd, [14], False)
+    time.sleep(0.30)
+    cells, _ = read_relative_cells(reader, list_hwnd, column_count, list_info)
+    image = runner.capture_screen_rect(list_info["rect"])
+    try:
+        image.save(evidence / "round12-hidden-picture-crop.png")
+        last_right = int(cells[0][13][2])
+        row_top = max(0, int(cells[0][13][1]) + 2)
+        row_bottom = min(image.height, int(cells[2][13][3]) - 2)
+        trail_left = min(image.width, max(0, last_right + 2))
+        trail_right = min(image.width, trail_left + 90)
+        if trail_right - trail_left < 12 or row_bottom <= row_top:
+            raise RuntimeError(
+                f"hidden picture-crop residue viewport invalid: x={trail_left}:{trail_right} y={row_top}:{row_bottom} image={image.width}x{image.height}"
+            )
+        crop = image.crop((trail_left, row_top, trail_right, row_bottom))
+        try:
+            crop.save(evidence / "round12-hidden-picture-crop-tail.png")
+            residue_dark = dark_pixels(crop)
+        finally:
+            crop.close()
+    finally:
+        image.close()
+    if residue_dark > 8:
+        raise RuntimeError(f"hidden picture-crop column still paints visible residue: dark_pixels={residue_dark}")
+    set_columns_visible(main_hwnd, list_hwnd, [14], True)
+    return residue_dark
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", required=True, type=Path)
@@ -190,6 +228,11 @@ def main() -> int:
 
         list_info = child_by_handle(main_hwnd, list_hwnd)
         left_cells, screen_rows = read_relative_cells(reader, list_hwnd, len(captions), list_info)
+        header_bottom = int(header["rect"][3])
+        first_row_top = int(screen_rows[0][1])
+        if first_row_top < header_bottom:
+            raise RuntimeError(f"first data row overlaps Header: row_top={first_row_top} header_bottom={header_bottom}")
+
         left_image = runner.capture_screen_rect(list_info["rect"])
         try:
             left_visual = validate_left_list_image(left_image, left_cells, evidence)
@@ -198,9 +241,6 @@ def main() -> int:
 
         stable_unique_hashes = validate_selected_stability(screen_rows[0], evidence)
 
-        # Exercise the actual right-panel collapse interaction. The CI desktop
-        # is intentionally narrow, so complete right-side coverage is then
-        # obtained through two real column-visibility views, not LVM_SCROLL.
         initial_list_width = int(list_info["rect"][2]) - int(list_info["rect"][0])
         send_command(main_hwnd, IDC_RIGHT_TOGGLE)
         time.sleep(0.45)
@@ -226,6 +266,10 @@ def main() -> int:
         finally:
             group_b_image.close()
 
+        hidden_picture_crop_residue = validate_hidden_picture_crop_has_no_residue(
+            main_hwnd, list_hwnd, reader, len(captions), list_info, evidence
+        )
+
         selected_samples = merge_selected_samples(
             [left_visual["selected_background_samples"], group_a_samples, group_b_samples],
             len(captions),
@@ -238,9 +282,14 @@ def main() -> int:
             "captions": captions,
             "selected_background_expected": list(EXPECTED_SELECTION),
             "selected_background_samples": selected_samples,
+            "number_dark_pixels": left_visual["number_dark_pixels"],
             "selected_white_text_pixels": left_visual["selected_white_text_pixels"],
             "preview_saturated_pixels": left_visual["preview_saturated_pixels"],
             "preview_unique_colors": left_visual["preview_unique_colors"],
+            "first_row_top": first_row_top,
+            "header_bottom": header_bottom,
+            "header_row_overlap": False,
+            "hidden_picture_crop_residue_dark_pixels": hidden_picture_crop_residue,
             "time_crop_dark_pixels": trim_visual["time_crop_dark_pixels"],
             "picture_crop_dark_pixels": trim_visual["picture_crop_dark_pixels"],
             "horizontal_viewports_validated": 3,
