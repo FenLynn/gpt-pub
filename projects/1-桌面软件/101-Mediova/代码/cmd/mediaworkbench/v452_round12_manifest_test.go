@@ -24,16 +24,18 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	for scanner.Scan() {
 		parts := strings.Fields(scanner.Text())
 		if len(parts) != 2 || len(parts[0]) != 64 {
-			t.Fatalf("invalid manifest row %q", scanner.Text())
+			t.Errorf("invalid manifest row %q", scanner.Text())
+			continue
 		}
 		data, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(parts[1])))
 		if readErr != nil {
-			t.Fatal(readErr)
+			t.Errorf("%s read: %v", parts[1], readErr)
+			continue
 		}
 		data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 		sum := sha256.Sum256(data)
 		if got := hex.EncodeToString(sum[:]); got != parts[0] {
-			t.Fatalf("%s sha256=%s want=%s", parts[1], got, parts[0])
+			t.Errorf("%s sha256=%s want=%s", parts[1], got, parts[0])
 		}
 		seen[parts[1]] = true
 		entries++
@@ -42,7 +44,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	if entries != 33 {
-		t.Fatalf("entries=%d want=33", entries)
+		t.Errorf("entries=%d want=33", entries)
 	}
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
@@ -69,7 +71,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"scripts/round12_list_gate_visual.py",
 	} {
 		if !seen[path] {
-			t.Fatalf("missing %s", path)
+			t.Errorf("missing %s", path)
 		}
 	}
 }
