@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from collections import Counter
 from pathlib import Path
 
 import round11_flicker_gate as gate
@@ -22,7 +23,7 @@ WM_LBUTTONUP = 0x0202
 MK_LBUTTON = 0x0001
 IDC_TAB_VIDEO = 1001
 IDC_TAB_IMAGE = 1002
-EXPECTED_SEPARATOR = (194, 203, 214)
+EXPECTED_BOTTOM_SEPARATOR = (194, 203, 214)
 
 
 def _close_color(value: tuple[int, int, int], expected: tuple[int, int, int], tolerance: int = 6) -> bool:
@@ -40,8 +41,26 @@ def _edge_ratio(rgb, rows: range, expected: tuple[int, int, int]) -> tuple[float
     return max(ratios, default=(0.0, -1))
 
 
+def _dominant_top_color(header: dict[str, object]) -> tuple[tuple[int, int, int], float]:
+    image = runner.capture_screen_rect(header["rect"])
+    try:
+        rgb = image.convert("RGB")
+        try:
+            pixels = [rgb.getpixel((x, 0)) for x in range(rgb.width)]
+        finally:
+            rgb.close()
+    finally:
+        image.close()
+    if not pixels:
+        raise RuntimeError("header top edge has no pixels")
+    color, count = Counter(pixels).most_common(1)[0]
+    return tuple(int(value) for value in color), count / len(pixels)
+
+
 def capture_header(
-    header: dict[str, object], save: Path | None = None
+    header: dict[str, object],
+    top_expected: tuple[int, int, int],
+    save: Path | None = None,
 ) -> tuple[str, float, int, float, int]:
     image = runner.capture_screen_rect(header["rect"])
     try:
@@ -50,10 +69,10 @@ def capture_header(
         rgb = image.convert("RGB")
         try:
             bottom_ratio, bottom_y = _edge_ratio(
-                rgb, range(max(0, rgb.height - 3), rgb.height), EXPECTED_SEPARATOR
+                rgb, range(max(0, rgb.height - 3), rgb.height), EXPECTED_BOTTOM_SEPARATOR
             )
             top_ratio, top_y = _edge_ratio(
-                rgb, range(0, min(3, rgb.height)), EXPECTED_SEPARATOR
+                rgb, range(0, min(3, rgb.height)), top_expected
             )
         finally:
             rgb.close()
@@ -69,6 +88,7 @@ def _lparam(x: int, y: int) -> int:
 def validate_pressed_header_items(
     reader: RemoteHeaderReader,
     current_header: dict[str, object],
+    top_expected: tuple[int, int, int],
     evidence: Path,
 ) -> tuple[int, float]:
     hwnd = int(current_header["hwnd"])
@@ -94,16 +114,16 @@ def validate_pressed_header_items(
         time.sleep(0.035)
         _digest, _bottom, _bottom_y, top_ratio, _top_y = capture_header(
             current_header,
+            top_expected,
             evidence / f"header-pressed-col-{index:02d}.png" if order in (0, len(visible) - 1) else None,
         )
         ratios.append(top_ratio)
+        gate.user32.SendMessageW(hwnd, WM_LBUTTONUP, 0, point)
         if top_ratio < 0.98:
-            gate.user32.SendMessageW(hwnd, WM_LBUTTONUP, 0, point)
             raise RuntimeError(
                 f"header top separator disappeared in pressed column state: "
-                f"column={index} ratio={top_ratio:.4f} rect={rect!r}"
+                f"column={index} ratio={top_ratio:.4f} rect={rect!r} expected={top_expected!r}"
             )
-        gate.user32.SendMessageW(hwnd, WM_LBUTTONUP, 0, point)
         time.sleep(0.02)
 
     return len(visible), min(ratios)
@@ -146,6 +166,14 @@ def main() -> int:
                 raise RuntimeError(f"header captions changed at step {step}: {current!r}, baseline={baseline!r}")
 
         time.sleep(0.8)
+        current_header = header_handle(main_hwnd)
+        top_expected, top_dominance = _dominant_top_color(current_header)
+        if top_dominance < 0.98:
+            raise RuntimeError(
+                f"header stable top edge is not a continuous baseline: "
+                f"dominant={top_expected!r} ratio={top_dominance:.4f}"
+            )
+
         hashes: list[str] = []
         bottom_ratios: list[float] = []
         bottom_rows: list[int] = []
@@ -155,6 +183,7 @@ def main() -> int:
             current_header = header_handle(main_hwnd)
             digest, bottom_ratio, bottom_row, top_ratio, top_row = capture_header(
                 current_header,
+                top_expected,
                 evidence / f"header-stable-{frame:02d}.png" if frame in (0, 39) else None,
             )
             hashes.append(digest)
@@ -168,7 +197,8 @@ def main() -> int:
                 )
             if top_ratio < 0.98:
                 raise RuntimeError(
-                    f"header top separator is not continuous: frame={frame} ratio={top_ratio:.4f} row={top_row}"
+                    f"header top separator is not continuous: frame={frame} ratio={top_ratio:.4f} "
+                    f"row={top_row} expected={top_expected!r}"
                 )
             if reader.titles(int(current_header["hwnd"])) != baseline:
                 raise RuntimeError(f"header captions changed during stable frame {frame}")
@@ -178,7 +208,9 @@ def main() -> int:
             raise RuntimeError(f"header pixels are unstable: {len(unique)} unique hashes")
 
         current_header = header_handle(main_hwnd)
-        pressed_count, pressed_min_ratio = validate_pressed_header_items(reader, current_header, evidence)
+        pressed_count, pressed_min_ratio = validate_pressed_header_items(
+            reader, current_header, top_expected, evidence
+        )
 
         report = {
             "iterations": 240,
@@ -188,10 +220,12 @@ def main() -> int:
             "stable_frames": 40,
             "stable_unique_hashes": 1,
             "stable_hash": unique[0],
-            "separator_expected": list(EXPECTED_SEPARATOR),
+            "bottom_separator_expected": list(EXPECTED_BOTTOM_SEPARATOR),
             "bottom_separator_min_ratio": min(bottom_ratios),
             "bottom_separator_rows": bottom_rows,
             "bottom_separator_continuous": True,
+            "top_separator_detected": list(top_expected),
+            "top_separator_baseline_dominance": top_dominance,
             "top_separator_min_ratio": min(top_ratios),
             "top_separator_rows": top_rows,
             "top_separator_continuous": True,
@@ -199,7 +233,9 @@ def main() -> int:
             "pressed_top_separator_min_ratio": pressed_min_ratio,
             "pressed_top_separator_continuous": True,
         }
-        (evidence / "header-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        (evidence / "header-report.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))
         return 0
     finally:
