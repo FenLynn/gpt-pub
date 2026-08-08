@@ -2,13 +2,116 @@
 
 package main
 
-// Round 12 makes application.layout the only owner of the bottom action row.
-// The legacy round-7 footer path derived its geometry from the status control's
-// transitional rectangle after the primary layout had already started. That
-// second pass could move Start/Pause/Stop to a stale row during resize, right
-// panel toggles or video/image switches. Keeping the legacy re-entry guard
-// permanently closed retires that second owner without changing its visual
-// drawing helpers.
+import (
+	"syscall"
+	"time"
+	"unsafe"
+)
+
+const round12FooterSubclassID = 0x45C4
+
+var round12FooterCallback uintptr
+
 func init() {
+	// application.layout is the only geometry owner of the bottom action row.
 	round7FeedbackInLayout = true
+	round12FooterCallback = syscall.NewCallback(round12FooterSubclassProc)
+	go func() {
+		for attempt := 0; attempt < 800; attempt++ {
+			a := app
+			if a != nil && a.hwnd != 0 && a.controlsReady && round12SelectionInstalled.Load() {
+				a.postUI(func() {
+					v452RemoveSubclass.Call(a.hwnd, round12FooterCallback, round12FooterSubclassID)
+					v452SetWindowSubclass.Call(a.hwnd, round12FooterCallback, round12FooterSubclassID, 0)
+					for _, hwnd := range []uintptr{a.hStart, a.hPause, a.hStop} {
+						procInvalidateRect.Call(hwnd, 0, 1)
+					}
+				})
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+}
+
+func round12FooterSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	a := app
+	if a == nil || hwnd != a.hwnd {
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		return result
+	}
+	switch message {
+	case WM_DRAWITEM:
+		if lParam != 0 && round12DrawFooterAction(a, (*drawItemStruct)(unsafe.Pointer(lParam))) {
+			return 1
+		}
+	case v452WMNCDestroy:
+		v452RemoveSubclass.Call(hwnd, round12FooterCallback, subclassID)
+	}
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	return result
+}
+
+func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
+	if a == nil || dis == nil || (dis.HwndItem != a.hStart && dis.HwndItem != a.hPause && dis.HwndItem != a.hStop) {
+		return false
+	}
+	pressed := dis.ItemState&ODS_SELECTED != 0
+	disabled := dis.ItemState&ODS_DISABLED != 0
+	hovered := a.hovered(dis.HwndItem)
+
+	bg, border := colorRef(31, 111, 213), colorRef(23, 96, 190)
+	if dis.HwndItem == a.hPause {
+		bg, border = colorRef(218, 143, 28), colorRef(191, 119, 18)
+	} else if dis.HwndItem == a.hStop {
+		bg, border = colorRef(202, 73, 67), colorRef(176, 57, 52)
+	}
+	textColor := colorRef(255, 255, 255)
+	if hovered && !disabled {
+		bg = mixColor(bg, colorRef(255, 255, 255), .10)
+		border = mixColor(border, colorRef(255, 255, 255), .06)
+	}
+	if pressed && !disabled {
+		bg = mixColor(bg, colorRef(0, 0, 0), .13)
+		border = bg
+	}
+	if disabled {
+		bg = colorRef(235, 238, 243)
+		border = colorRef(196, 203, 213)
+		textColor = colorRef(126, 136, 149)
+	}
+
+	rc := dis.RcItem
+	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	inner := rect{Left: rc.Left + 2, Top: rc.Top + 2, Right: rc.Right - 2, Bottom: rc.Bottom - 2}
+	brush, _, _ := procCreateSolidBrush.Call(bg)
+	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, border)
+	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
+	oldPen, _, _ := procSelectObject.Call(dis.HDC, pen)
+	procRoundRect.Call(dis.HDC, uintptr(inner.Left), uintptr(inner.Top), uintptr(inner.Right), uintptr(inner.Bottom), 6, 6)
+	procSelectObject.Call(dis.HDC, oldBrush)
+	procSelectObject.Call(dis.HDC, oldPen)
+	procDeleteObject.Call(brush)
+	procDeleteObject.Call(pen)
+
+	label := getText(dis.HwndItem)
+	font := uiFontSmall
+	labelWidth := measureSingleLineWidth(dis.HDC, label, font)
+	iconWidth := int32(14)
+	gap := int32(5)
+	available := inner.Right - inner.Left - 20
+	total := iconWidth + gap + labelWidth
+	if total > available {
+		labelWidth = available - iconWidth - gap
+		if labelWidth < 24 {
+			labelWidth = 24
+		}
+		total = iconWidth + gap + labelWidth
+	}
+	left := inner.Left + (inner.Right-inner.Left-total)/2
+	iconRC := rect{Left: left, Top: inner.Top + 1, Right: left + iconWidth, Bottom: inner.Bottom - 1}
+	textRC := rect{Left: iconRC.Right + gap, Top: inner.Top + 1, Right: iconRC.Right + gap + labelWidth, Bottom: inner.Bottom - 1}
+	v452DrawSolidPrimaryGlyph(dis.HDC, dis.HwndItem, iconRC, textColor)
+	drawCenteredText(dis.HDC, label, textRC, font, textColor)
+	return true
 }
