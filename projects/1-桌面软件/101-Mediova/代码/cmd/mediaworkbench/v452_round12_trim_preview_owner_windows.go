@@ -67,6 +67,9 @@ func round12TrimPreviewOwnerEventProc(hook, event, hwnd, idObject, idChild, even
 	if e == nil || e.hwnd == 0 || e.owner == nil || e.dialog == nil || e.dialog.task == nil || e.dialog.task.Kind != model.KindVideo {
 		return 0
 	}
+	if _, installed := round12TrimPreviewOwnerStates.Load(e.hwnd); installed {
+		return 0
+	}
 	round12ScheduleExclusiveTrimPreviewOwner(e)
 	return 0
 }
@@ -76,6 +79,9 @@ func round12ScheduleExclusiveTrimPreviewOwner(e *round7Editor) {
 		return
 	}
 	key := e.hwnd
+	if _, installed := round12TrimPreviewOwnerStates.Load(key); installed {
+		return
+	}
 	if _, loaded := round12TrimPreviewOwnerPending.LoadOrStore(key, struct{}{}); loaded {
 		return
 	}
@@ -92,6 +98,9 @@ func round12ScheduleExclusiveTrimPreviewOwner(e *round7Editor) {
 				round12InstallExclusiveTrimPreviewOwner(e)
 			})
 			time.Sleep(50 * time.Millisecond)
+			if _, installed := round12TrimPreviewOwnerStates.Load(key); installed {
+				return
+			}
 			if e.dialog == nil || e.dialog.closed.Load() {
 				return
 			}
