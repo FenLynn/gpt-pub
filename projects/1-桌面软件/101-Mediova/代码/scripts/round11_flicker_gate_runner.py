@@ -31,18 +31,54 @@ def install_trim_diagnostics() -> None:
     send_message.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
     send_message.restype = ctypes.c_ssize_t
 
-    def find_final_editor(pid: int, timeout: float) -> int:
-        editor = int(original_find_editor(pid, timeout))
-        deadline = time.monotonic() + 8.0
+    def find_ready_editor(pid: int, timeout: float) -> int:
+        # Deliberately allow the first trim click to happen while the imported
+        # task is still probing. Round12 must close that transient zero-duration
+        # editor instead of exposing it. Keep retrying the same real button until
+        # the background probe has populated a stable, usable video editor.
+        deadline = time.monotonic() + timeout
+        main_hwnd = round12_trim_preview_gate.gate.find_window(pid, "Mediova", min(5.0, timeout))
+        trim_button = int(
+            round12_trim_preview_gate.gate.user32.GetDlgItem(
+                main_hwnd, round12_trim_preview_gate.IDC_TRIM_CROP
+            )
+        )
+        if not trim_button:
+            raise RuntimeError("trim button disappeared while waiting for probe readiness")
+
+        attempts = 0
         last_title = ""
         while time.monotonic() < deadline:
-            last_title = round12_trim_preview_gate.gate.window_text(editor)
-            if last_title.startswith("剪裁 ·"):
-                return editor
-            time.sleep(0.05)
+            editor = int(original_find_editor(pid, 0.8))
+            if editor:
+                stable_until = time.monotonic() + 0.35
+                stable = True
+                while time.monotonic() < stable_until:
+                    if not round12_trim_preview_gate.gate.user32.IsWindowVisible(editor):
+                        stable = False
+                        break
+                    last_title = round12_trim_preview_gate.gate.window_text(editor)
+                    time.sleep(0.05)
+                if stable and last_title.startswith("剪裁 ·"):
+                    current = int(
+                        round12_trim_preview_gate.gate.user32.GetDlgItem(
+                            editor, round12_trim_preview_gate.IDC_CURRENT_TIME
+                        )
+                    )
+                    if current:
+                        return editor
+
+            # The metadata-not-ready editor is intentionally closed by product
+            # code. Once the modal call unwinds, retry the real trim button.
+            round12_trim_preview_gate.gate.user32.PostMessageW(
+                trim_button, round12_trim_preview_gate.BM_CLICK, 0, 0
+            )
+            attempts += 1
+            time.sleep(0.25)
+
         raise RuntimeError(
-            "final Round8/Round11 trim editor installer did not complete before preview validation: "
-            f"title={last_title!r}"
+            "trim editor never became metadata-ready after real import: "
+            f"attempts={attempts} last_title={last_title!r}"
         )
 
     def set_current_and_prove_command(editor: int, current_edit: int, jump_button: int, value: str) -> None:
@@ -78,7 +114,7 @@ def install_trim_diagnostics() -> None:
             f"submitted={submitted!r} current_edit={last_text!r} expected={value!r}"
         )
 
-    round12_trim_preview_gate.find_editor = find_final_editor
+    round12_trim_preview_gate.find_editor = find_ready_editor
     round12_trim_preview_gate.set_current_and_jump = set_current_and_prove_command
 
 
@@ -133,7 +169,7 @@ def main() -> int:
             stage = json.loads(stage_path.read_text(encoding="utf-8"))
             stage["fresh_process_passes"] = trim_preview_passes
             stage["fresh_process_required"] = trim_preview_required
-            stage["final_editor_installer_required"] = True
+            stage["metadata_ready_editor_required"] = True
             stage["endpoint_command_canonicalization_required"] = True
             stage["pointer_sized_sendmessage_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
