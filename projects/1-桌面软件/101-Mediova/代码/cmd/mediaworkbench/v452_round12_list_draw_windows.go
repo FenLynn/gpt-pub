@@ -17,6 +17,16 @@ func round12DrawTaskListCell(a *application, cd *nmListViewCustomDraw) uintptr {
 	case CDDS_PREPAINT:
 		return CDRF_NOTIFYITEMDRAW
 	case CDDS_ITEMPREPAINT:
+		row := int(cd.NMCD.ItemSpec)
+		background := colorRef(255, 255, 255)
+		if listItemSelected(a.hList, row) {
+			background = round12SelectionBackground
+		}
+		// Paint the complete physical row before any subitem content. ListView
+		// can optimize selection invalidation around text-bearing subitems; that
+		// used to leave the old blue background behind in empty/hidden trailing
+		// columns when selection moved. One row surface makes selection atomic.
+		round12DrawRowBackground(a, cd.NMCD.HDC, row, background)
 		return CDRF_NOTIFYSUBITEMDRAW
 	case CDDS_ITEMPREPAINT | CDDS_SUBITEM:
 		row := int(cd.NMCD.ItemSpec)
@@ -41,6 +51,24 @@ func round12DrawTaskListCell(a *application, cd *nmListViewCustomDraw) uintptr {
 		return CDRF_SKIPDEFAULT
 	}
 	return CDRF_DODEFAULT
+}
+
+func round12DrawRowBackground(a *application, hdc uintptr, row int, background uintptr) {
+	if a == nil || a.hList == 0 || hdc == 0 || row < 0 {
+		return
+	}
+	rowBounds := rect{Left: LVIR_BOUNDS}
+	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafe.Pointer(&rowBounds))) == 0 || rowBounds.Bottom <= rowBounds.Top {
+		return
+	}
+	var client rect
+	if ok, _, _ := procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client))); ok == 0 || client.Right <= client.Left {
+		return
+	}
+	rowBounds.Left = client.Left
+	rowBounds.Right = client.Right
+	fillSolid(hdc, rowBounds, background)
+	round12DrawSeparator(hdc, rowBounds)
 }
 
 func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column int, task *model.Task, selected bool, background uintptr) {
