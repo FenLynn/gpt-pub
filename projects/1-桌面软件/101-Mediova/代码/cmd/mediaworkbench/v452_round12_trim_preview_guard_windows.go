@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,11 +21,10 @@ import (
 )
 
 const (
-	round12EventObjectCreate              = 0x8000
-	round12EventObjectShow                = 0x8002
-	round12WinEventOutOfContext           = 0x0000
-	round12CreateNoWindow                 = 0x08000000
-	round12TrimPreviewEditorSubclassID    = 0x45D1
+	round12EventObjectCreate    = 0x8000
+	round12EventObjectShow      = 0x8002
+	round12WinEventOutOfContext = 0x0000
+	round12CreateNoWindow       = 0x08000000
 )
 
 type round12TrimPreviewGuardState struct {
@@ -33,6 +33,7 @@ type round12TrimPreviewGuardState struct {
 	generation int64
 	lastSeq    int64
 	ownSeq     int64
+	targetAt   float64
 	cancel     context.CancelFunc
 }
 
@@ -41,16 +42,19 @@ var (
 	round12TrimPreviewHookMu    sync.Mutex
 	round12TrimPreviewStates    sync.Map
 	round12TrimPreviewEventCB   uintptr
-	round12TrimPreviewEditorCB  uintptr
 	round12SetWinEventHook      = user32.NewProc("SetWinEventHook")
 	round12UnhookWinEvent       = user32.NewProc("UnhookWinEvent")
 )
 
 func init() {
 	round12TrimPreviewEventCB = syscall.NewCallback(round12TrimPreviewEventProc)
-	round12TrimPreviewEditorCB = syscall.NewCallback(round12TrimPreviewEditorSubclassProc)
 }
 
+// round12ArmTrimPreviewHook only discovers the final Round7 editor. It never
+// subclasses navigation messages. Round7 remains the single input owner and
+// advances trimDialog.previewSeq for every real preview request; Round12 only
+// observes that monotonic request fact and replaces the inherited fast-seek
+// worker with one cancellable robust request.
 func round12ArmTrimPreviewHook() {
 	round12TrimPreviewHookMu.Lock()
 	if round12TrimPreviewEventHook == 0 {
@@ -67,8 +71,6 @@ func round12ArmTrimPreviewHook() {
 	}
 	round12TrimPreviewHookMu.Unlock()
 
-	// Keep a bounded fallback install loop because the inherited Round7 editor
-	// also uses a WinEvent hook. All editor inspection remains on the UI thread.
 	a := app
 	if a == nil {
 		return
@@ -105,15 +107,9 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 		return
 	}
 	d := e.dialog
-	candidate := &round12TrimPreviewGuardState{lastSeq: d.previewSeq.Load()}
+	candidate := &round12TrimPreviewGuardState{lastSeq: d.previewSeq.Load(), targetAt: d.currentAt}
 	actual, loaded := round12TrimPreviewStates.LoadOrStore(e.hwnd, candidate)
 	state := actual.(*round12TrimPreviewGuardState)
-
-	// Directly observe the editor's navigation messages. The inherited handler
-	// runs first and updates currentAt/previewSeq; immediately afterwards Round12
-	// invalidates that fast-seek worker and starts the robust owner request.
-	v452SetWindowSubclass.Call(e.hwnd, round12TrimPreviewEditorCB, round12TrimPreviewEditorSubclassID, 0)
-
 	if loaded {
 		return
 	}
@@ -125,56 +121,38 @@ func round12InstallTrimPreviewWatcher(e *round7Editor) {
 	}
 	round12TrimPreviewHookMu.Unlock()
 
-	// If installation happens before the inherited initial frame has become a
-	// usable bitmap, take ownership immediately. Otherwise keep the valid first
-	// frame and take over only subsequent requests.
+	// The inherited initial worker may already be running. If no usable bitmap
+	// exists yet, immediately supersede it with the robust request. Otherwise
+	// keep the valid first frame and observe only later previewSeq changes.
 	if d.bitmap == 0 || round12TrimPreviewHasFailure(d) {
-		round12TakeOverTrimPreview(e, state)
+		round12TakeOverTrimPreview(e, state, d.currentAt)
 	}
 
-	// Sequence polling remains a fallback for any navigation path that does not
-	// produce a normal editor message (for example a future custom timeline).
-	go func() {
+	// Poll only the atomic request sequence off the UI thread. A UI callback is
+	// posted solely when the sequence actually changes, so an idle editor has no
+	// 20 Hz UI churn. Closing the dialog cancels the active FFmpeg immediately.
+	go func(hwnd uintptr, dialog *trimDialog) {
 		ticker := time.NewTicker(50 * time.Millisecond)
 		defer ticker.Stop()
 		for range ticker.C {
 			if state.stopped.Load() {
 				return
 			}
-			e.owner.postUI(func() {
-				round12PollTrimPreview(e, state)
-			})
+			if dialog == nil || dialog.closed.Load() {
+				round12StopTrimPreviewWatcher(hwnd)
+				return
+			}
+			seq := dialog.previewSeq.Load()
+			state.mu.Lock()
+			lastSeq := state.lastSeq
+			ownSeq := state.ownSeq
+			state.mu.Unlock()
+			if seq == lastSeq || (ownSeq != 0 && seq == ownSeq) {
+				continue
+			}
+			e.owner.postUI(func() { round12PollTrimPreview(e, state) })
 		}
-	}()
-}
-
-func round12TrimPreviewEditorSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	e := round7ActiveEditor
-	switch message {
-	case WM_COMMAND:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if e != nil && e.hwnd == hwnd && round12TrimPreviewCommandChangesFrame(int(loWord(wParam))) {
-			round12TakeOverActiveTrimPreview(e)
-		}
-		return result
-	case WM_HSCROLL:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if e != nil && e.hwnd == hwnd && lParam != 0 && lParam == e.hTimeline {
-			round12TakeOverActiveTrimPreview(e)
-		}
-		return result
-	case WM_KEYDOWN:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if e != nil && e.hwnd == hwnd && (int(wParam) == 0x25 || int(wParam) == 0x27) {
-			round12TakeOverActiveTrimPreview(e)
-		}
-		return result
-	case v452WMNCDestroy:
-		round12StopTrimPreviewWatcher(hwnd)
-		v452RemoveSubclass.Call(hwnd, round12TrimPreviewEditorCB, subclassID)
-	}
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-	return result
+	}(e.hwnd, d)
 }
 
 func round12TrimPreviewCommandChangesFrame(id int) bool {
@@ -186,21 +164,6 @@ func round12TrimPreviewCommandChangesFrame(id int) bool {
 	}
 }
 
-func round12TakeOverActiveTrimPreview(e *round7Editor) {
-	if e == nil || e.hwnd == 0 {
-		return
-	}
-	value, ok := round12TrimPreviewStates.Load(e.hwnd)
-	if !ok {
-		round12InstallTrimPreviewWatcher(e)
-		value, ok = round12TrimPreviewStates.Load(e.hwnd)
-	}
-	if !ok {
-		return
-	}
-	round12TakeOverTrimPreview(e, value.(*round12TrimPreviewGuardState))
-}
-
 func round12PollTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState) {
 	if e == nil || state == nil || state.stopped.Load() || e.dialog == nil || e.done || e.dialog.closed.Load() || round7ActiveEditor != e {
 		if e != nil {
@@ -208,17 +171,16 @@ func round12PollTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState
 		}
 		return
 	}
-	seq := e.dialog.previewSeq.Load()
-
+	d := e.dialog
+	seq := d.previewSeq.Load()
 	state.mu.Lock()
 	lastSeq := state.lastSeq
 	ownSeq := state.ownSeq
 	state.mu.Unlock()
-
 	if seq == lastSeq || (ownSeq != 0 && seq == ownSeq) {
 		return
 	}
-	round12TakeOverTrimPreview(e, state)
+	round12TakeOverTrimPreview(e, state, d.currentAt)
 }
 
 func round12TrimPreviewHasFailure(d *trimDialog) bool {
@@ -232,11 +194,17 @@ func round12TrimPreviewHasFailure(d *trimDialog) bool {
 		strings.Contains(info, "预览帧自动恢复后加载失败")
 }
 
-func round12TakeOverTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState) {
+func round12TakeOverTrimPreview(e *round7Editor, state *round12TrimPreviewGuardState, targetAt float64) {
 	if e == nil || state == nil || state.stopped.Load() || e.dialog == nil || e.dialog.owner == nil || e.dialog.owner.ffmpeg == "" || e.dialog.task == nil {
 		return
 	}
 	d := e.dialog
+	if targetAt < 0 {
+		targetAt = 0
+	}
+	if d.task.Duration > 0 && targetAt > d.task.Duration {
+		targetAt = d.task.Duration
+	}
 
 	state.mu.Lock()
 	if state.stopped.Load() {
@@ -251,12 +219,13 @@ func round12TakeOverTrimPreview(e *round7Editor, state *round12TrimPreviewGuardS
 	generation := state.generation
 	ctx, cancel := context.WithCancel(context.Background())
 	state.cancel = cancel
-	// This is the core ownership hand-off: the inherited worker carries the
-	// previous seq, while Round12 owns a fresh one. Its legacy callback will
-	// therefore fail the existing previewSeq equality check and do nothing.
+	// Supersede the inherited fast-seek worker by advancing the same sequence
+	// it already checks before installing its bitmap. From this point there is
+	// exactly one accepted request generation for targetAt.
 	ownSeq := d.previewSeq.Add(1)
 	state.lastSeq = ownSeq
 	state.ownSeq = ownSeq
+	state.targetAt = targetAt
 	state.mu.Unlock()
 
 	dir, err := config.TempDir()
@@ -267,33 +236,38 @@ func round12TakeOverTrimPreview(e *round7Editor, state *round12TrimPreviewGuardS
 	}
 	out := filepath.Join(dir, fmt.Sprintf("trim_frame_round12_%d_%d.bmp", d.task.ID, ownSeq))
 	input := d.task.Input
-	at := d.currentAt
 	duration := d.task.Duration
 	fps := d.safeFPS()
 	rotation := d.opts.Rotation
 	ffmpeg := d.owner.ffmpeg
 	setText(d.hInfo, "正在更新预览帧…")
-	setText(e.hInstruction, "正在更新当前位置预览…")
+	if e.hInstruction != 0 {
+		setText(e.hInstruction, "正在更新当前位置预览…")
+	}
 
 	go func() {
-		err := round12GenerateRecoveredPreview(ctx, ffmpeg, input, out, at, duration, fps, rotation)
+		err := round12GenerateRecoveredPreview(ctx, ffmpeg, input, out, targetAt, duration, fps, rotation)
 		e.owner.postUI(func() {
 			defer os.Remove(out)
 			cancel()
-			if !round12OwnedPreviewCurrent(state, generation, ownSeq) || round7ActiveEditor != e || d.closed.Load() || d.previewSeq.Load() != ownSeq {
+			if !round12OwnedPreviewCurrent(state, generation, ownSeq, targetAt) || round7ActiveEditor != e || d.closed.Load() || d.previewSeq.Load() != ownSeq || math.Abs(d.currentAt-targetAt) > 1e-6 {
 				return
 			}
 			if err != nil {
 				round12FinishOwnedPreview(state, generation, ownSeq)
 				setText(d.hInfo, "预览帧生成失败："+short(err.Error(), 220))
-				setText(e.hInstruction, "当前位置预览失败；移动时间后将重新取帧。")
+				if e.hInstruction != 0 {
+					setText(e.hInstruction, "当前位置预览失败；移动时间后将重新取帧。")
+				}
 				return
 			}
 			h, _, _ := procLoadImageW.Call(0, uintptr(unsafe.Pointer(p(out))), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE|LR_CREATEDIBSECTION)
 			if h == 0 {
 				round12FinishOwnedPreview(state, generation, ownSeq)
 				setText(d.hInfo, "预览帧加载失败。")
-				setText(e.hInstruction, "当前位置预览失败；移动时间后将重新取帧。")
+				if e.hInstruction != 0 {
+					setText(e.hInstruction, "当前位置预览失败；移动时间后将重新取帧。")
+				}
 				return
 			}
 			if d.bitmap != 0 {
@@ -305,19 +279,21 @@ func round12TakeOverTrimPreview(e *round7Editor, state *round12TrimPreviewGuardS
 			d.bitmapW, d.bitmapH = bm.Width, bm.Height
 			round12FinishOwnedPreview(state, generation, ownSeq)
 			e.updateInfo()
-			setText(e.hInstruction, "拖动红色游标预览画面；拖动蓝色旗标调整剪辑范围。")
+			if e.hInstruction != 0 {
+				setText(e.hInstruction, "拖动红色游标预览画面；拖动蓝色旗标调整剪辑范围。")
+			}
 			procInvalidateRect.Call(d.hCanvas, 0, 1)
 		})
 	}()
 }
 
-func round12OwnedPreviewCurrent(state *round12TrimPreviewGuardState, generation, ownSeq int64) bool {
+func round12OwnedPreviewCurrent(state *round12TrimPreviewGuardState, generation, ownSeq int64, targetAt float64) bool {
 	if state == nil || state.stopped.Load() {
 		return false
 	}
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	return state.generation == generation && state.ownSeq == ownSeq
+	return state.generation == generation && state.ownSeq == ownSeq && math.Abs(state.targetAt-targetAt) <= 1e-6
 }
 
 func round12FinishOwnedPreview(state *round12TrimPreviewGuardState, generation, ownSeq int64) {
@@ -357,42 +333,46 @@ func round12GenerateRecoveredPreview(parent context.Context, ffmpeg, input, outp
 		fps = 25
 	}
 	step := 1 / fps
-	if step < 0.04 {
-		step = 0.04
+	if step < 1.0/240.0 {
+		step = 1.0 / 240.0
+	}
+	if step > 0.25 {
+		step = 0.25
 	}
 	safeAt := at
 	if safeAt < 0 {
 		safeAt = 0
 	}
-	if duration > 0 && safeAt >= duration-step/2 {
-		safeAt = duration - step
-		if safeAt < 0 {
-			safeAt = 0
+	if duration > 0 {
+		lastFrame := duration - step
+		if lastFrame < 0 {
+			lastFrame = 0
+		}
+		if safeAt > lastFrame {
+			safeAt = lastFrame
 		}
 	}
 
-	attempts := []struct {
+	type previewAttempt struct {
 		at       float64
 		accurate bool
-		fromEnd  bool
-	}{
-		{at: safeAt},
-		{at: safeAt, accurate: true},
-		{at: maxFloat64(0, safeAt-maxFloat64(0.25, step*2))},
 	}
-	if duration > 0 && at >= duration-step*2 {
-		attempts = append(attempts, struct {
-			at       float64
-			accurate bool
-			fromEnd  bool
-		}{fromEnd: true})
+	attempts := []previewAttempt{{at: safeAt}, {at: safeAt, accurate: true}}
+	if safeAt > 0 {
+		back := safeAt - step
+		if back < 0 {
+			back = 0
+		}
+		if math.Abs(back-safeAt) > 1e-9 {
+			attempts = append(attempts, previewAttempt{at: back, accurate: true})
+		}
 	}
 
 	var lastErr error
 	for _, attempt := range attempts {
 		_ = os.Remove(output)
 		ctx, cancel := context.WithTimeout(parent, 10*time.Second)
-		err := round12RunPreviewAttempt(ctx, ffmpeg, input, output, attempt.at, rotation, attempt.accurate, attempt.fromEnd)
+		err := round12RunPreviewAttempt(ctx, ffmpeg, input, output, attempt.at, rotation, attempt.accurate)
 		cancel()
 		if err == nil {
 			if info, statErr := os.Stat(output); statErr == nil && info.Size() > 1024 {
@@ -411,18 +391,16 @@ func round12GenerateRecoveredPreview(parent context.Context, ffmpeg, input, outp
 	return lastErr
 }
 
-func round12RunPreviewAttempt(ctx context.Context, ffmpeg, input, output string, at float64, rotation string, accurate, fromEnd bool) error {
+func round12RunPreviewAttempt(ctx context.Context, ffmpeg, input, output string, at float64, rotation string, accurate bool) error {
 	args := []string{"-hide_banner", "-loglevel", "error", "-y"}
-	if fromEnd {
-		args = append(args, "-sseof", "-0.200")
-	} else if !accurate {
+	if !accurate {
 		args = append(args, "-ss", fmt.Sprintf("%.3f", at))
 	}
 	if rotation != "自动" {
 		args = append(args, "-noautorotate")
 	}
 	args = append(args, "-i", input)
-	if accurate && !fromEnd {
+	if accurate {
 		args = append(args, "-ss", fmt.Sprintf("%.3f", at))
 	}
 	args = append(args, "-frames:v", "1")
@@ -462,11 +440,4 @@ func round12PreviewFilters(rotation string) string {
 	}
 	filters = append(filters, "scale='min(iw,960)':'min(ih,680)':force_original_aspect_ratio=decrease:flags=lanczos")
 	return strings.Join(filters, ",")
-}
-
-func maxFloat64(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	return b
 }
