@@ -37,13 +37,13 @@ func round12VisibleCellBounds(a *application, row, column int) (rect, bool) {
 		cell.Bottom = rowBounds.Bottom
 	}
 	if column == round12ColNumber {
-		// LVM_GETSUBITEMRECT for subitem zero can begin after the native image
-		// inset. The physical first column always begins at the report-view
-		// origin, so derive that edge from LVM_GETORIGIN instead. This keeps the
-		// whole # cell under one custom-draw owner at every horizontal offset.
-		var origin point
-		if send(a.hList, round9FeedbackLVMGetOrigin, 0, uintptr(unsafe.Pointer(&origin))) != 0 {
-			cell.Left = -origin.X
+		// LVM_GETORIGIN is not valid in report view. Derive the physical first
+		// column from the left edge of subitem 1 instead. Both rectangles share
+		// the same report-view horizontal scroll offset, so this remains exact
+		// before and after horizontal scrolling and bypasses the native image
+		// inset that contaminates subitem zero's reported left edge.
+		if next, nextOK := listSubItemBounds(a.hList, row, round12ColPreview); nextOK {
+			cell.Left = next.Left - width
 		} else {
 			cell.Left = 0
 		}
