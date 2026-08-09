@@ -126,7 +126,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	for _, token := range []string{
 		"show_delay_contract_ms",
 		"track_transparent",
-		"validate_localized_thumb",
+		"validate_transparent_track",
+		"outside_thumb_transparency_required",
 		"650ms-visible.png",
 	} {
 		if !bytes.Contains(scrollGate, []byte(token)) {
