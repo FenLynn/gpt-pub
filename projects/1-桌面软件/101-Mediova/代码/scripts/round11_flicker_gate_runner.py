@@ -12,6 +12,7 @@ import round12_footer_gate
 import round12_header_gate
 import round12_list_structure_gate
 import round12_real_thumbnail_gate
+import round12_scroll_overlay_gate
 import round12_selection_transition_gate
 import round12_trim_preview_gate
 
@@ -175,6 +176,7 @@ def merge_stage_evidence() -> None:
         ("round12-list-report.json", "round12_list"),
         ("round12-selection-transition-report.json", "round12_selection_transition"),
         ("round12-real-thumbnail-report.json", "round12_real_thumbnail"),
+        ("round12-scroll-overlay-report.json", "round12_scroll_overlay"),
         ("round12-trim-preview-report.json", "round12_trim_preview"),
     ):
         stage_path = evidence / filename
@@ -199,6 +201,9 @@ def main() -> int:
     thumbnail_result = int(round12_real_thumbnail_gate.main())
     if thumbnail_result != 0:
         return thumbnail_result
+    scroll_overlay_result = int(round12_scroll_overlay_gate.main())
+    if scroll_overlay_result != 0:
+        return scroll_overlay_result
 
     install_trim_diagnostics()
     trim_preview_passes = 0
