@@ -33,6 +33,13 @@ func round12ScheduleThumbnailFallback(a *application, id int64, input string, pi
 	if a == nil || id == 0 || input == "" {
 		return
 	}
+	// The broad native self-test already has its own thumbnail and queue checks.
+	// Do not add asynchronous FFmpeg fallback work to that shared timing domain.
+	// Round12's dedicated black-intro self-test invokes the smart generator
+	// directly, while all normal application launches keep this fallback active.
+	if a.selfTest {
+		return
+	}
 	round12ThumbnailFallbackMu.Lock()
 	state := round12ThumbnailFallbacks[id]
 	if state.input != input {

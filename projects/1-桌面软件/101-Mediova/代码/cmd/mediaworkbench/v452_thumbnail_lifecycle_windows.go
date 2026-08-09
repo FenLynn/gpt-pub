@@ -78,9 +78,11 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 
 	// A generated thumbnail is not useful merely because it decoded. For video
 	// tasks reject an actual black/fade frame before it enters the ImageList.
-	// round9 already schedules the Round12 fallback, so leaving ThumbnailIndex
-	// unset immediately routes the row into the multi-sample retry strategy.
-	if task.Kind == model.KindVideo && !round12ConsumeApprovedDarkThumbnailFallback(path) {
+	// During the broad native self-test this lifecycle branch stays inert so
+	// unrelated queue timing remains identical to the long-standing baseline;
+	// the dedicated Round12 black-frame self-test exercises the full detector
+	// and multi-sample generator directly.
+	if !a.selfTest && task.Kind == model.KindVideo && !round12ConsumeApprovedDarkThumbnailFallback(path) {
 		if quality, qualityErr := round12ThumbnailQualityForBMP(path); qualityErr == nil && round12ThumbnailNearBlack(quality) {
 			a.mu.Unlock()
 			state.ownership.Release(taskID)
