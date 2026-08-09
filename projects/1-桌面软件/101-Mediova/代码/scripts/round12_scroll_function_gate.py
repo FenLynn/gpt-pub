@@ -24,6 +24,14 @@ MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_WHEEL = 0x0800
 WHEEL_DELTA = 120
 
+gate.user32.SendMessageW.argtypes = [
+    wintypes.HWND,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+]
+gate.user32.SendMessageW.restype = ctypes.c_ssize_t
+
 gate.user32.mouse_event.argtypes = [
     wintypes.DWORD,
     wintypes.DWORD,
