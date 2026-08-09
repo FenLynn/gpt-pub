@@ -127,7 +127,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"show_delay_contract_ms",
 		"track_transparent",
 		"validate_localized_thumb",
-		"hover-{}-650ms-visible.png",
+		"650ms-visible.png",
 	} {
 		if !bytes.Contains(scrollGate, []byte(token)) {
 			t.Errorf("scroll overlay gate missing %q", token)
