@@ -8,9 +8,23 @@ import (
 	"unsafe"
 )
 
-const round12FooterSubclassID = 0x45C4
+const (
+	round12FooterSubclassID = 0x45C4
 
-var round12FooterCallback uintptr
+	round12IconPlay = iota + 1
+	round12IconPause
+	round12IconStop
+	round12IconCheck
+	round12IconUndo
+	round12IconCrop
+	round12IconDownload
+	round12IconRetry
+)
+
+var (
+	round12FooterCallback uintptr
+	round12Polygon        = gdi32.NewProc("Polygon")
+)
 
 func init() {
 	// application.layout is the only geometry owner of the bottom action row.
@@ -23,7 +37,10 @@ func init() {
 				a.postUI(func() {
 					v452RemoveSubclass.Call(a.hwnd, round12FooterCallback, round12FooterSubclassID)
 					v452SetWindowSubclass.Call(a.hwnd, round12FooterCallback, round12FooterSubclassID, 0)
-					for _, hwnd := range []uintptr{a.hStart, a.hPause, a.hStop} {
+					for _, hwnd := range []uintptr{
+						a.hStart, a.hPause, a.hStop,
+						a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry,
+					} {
 						procInvalidateRect.Call(hwnd, 0, 1)
 					}
 				})
@@ -42,8 +59,11 @@ func round12FooterSubclassProc(hwnd uintptr, message uint32, wParam, lParam, sub
 	}
 	switch message {
 	case WM_DRAWITEM:
-		if lParam != 0 && round12DrawFooterAction(a, (*drawItemStruct)(unsafe.Pointer(lParam))) {
-			return 1
+		if lParam != 0 {
+			dis := (*drawItemStruct)(unsafe.Pointer(lParam))
+			if round12DrawFooterAction(a, dis) || round12DrawSecondarySolidAction(a, dis) {
+				return 1
+			}
 		}
 	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round12FooterCallback, subclassID)
@@ -52,42 +72,108 @@ func round12FooterSubclassProc(hwnd uintptr, message uint32, wParam, lParam, sub
 	return result
 }
 
-func round12FooterGlyph(a *application, hwnd uintptr) string {
-	if a == nil {
-		return ""
+func round12FillPolygon(hdc uintptr, points []point, color uintptr) {
+	if hdc == 0 || len(points) < 3 {
+		return
 	}
-	switch hwnd {
-	case a.hStart:
-		return "▶"
-	case a.hPause:
-		return "Ⅱ"
-	case a.hStop:
-		return "■"
-	default:
-		return ""
+	brush, _, _ := procCreateSolidBrush.Call(color)
+	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
+	nullPen, _, _ := procGetStockObject.Call(8)
+	oldPen, _, _ := procSelectObject.Call(hdc, nullPen)
+	round12Polygon.Call(hdc, uintptr(unsafe.Pointer(&points[0])), uintptr(len(points)))
+	if oldPen != 0 {
+		procSelectObject.Call(hdc, oldPen)
+	}
+	if oldBrush != 0 {
+		procSelectObject.Call(hdc, oldBrush)
+	}
+	procDeleteObject.Call(brush)
+}
+
+func round12DrawSolidIcon(hdc uintptr, kind int, rc rect, color uintptr) {
+	if hdc == 0 || rc.Right <= rc.Left || rc.Bottom <= rc.Top {
+		return
+	}
+	cx := (rc.Left + rc.Right) / 2
+	cy := (rc.Top + rc.Bottom) / 2
+	u := scaleDPI(1)
+	if u < 1 {
+		u = 1
+	}
+	fill := func(left, top, right, bottom int32) {
+		fillSolid(hdc, rect{Left: left, Top: top, Right: right, Bottom: bottom}, color)
+	}
+
+	switch kind {
+	case round12IconPlay:
+		round12FillPolygon(hdc, []point{
+			{X: cx - 4*u, Y: cy - 6*u},
+			{X: cx - 4*u, Y: cy + 6*u},
+			{X: cx + 6*u, Y: cy},
+		}, color)
+	case round12IconPause:
+		fill(cx-5*u, cy-6*u, cx-1*u, cy+6*u)
+		fill(cx+2*u, cy-6*u, cx+6*u, cy+6*u)
+	case round12IconStop:
+		fill(cx-5*u, cy-5*u, cx+5*u, cy+5*u)
+	case round12IconCheck:
+		round12FillPolygon(hdc, []point{
+			{X: cx - 7*u, Y: cy - 1*u},
+			{X: cx - 4*u, Y: cy - 4*u},
+			{X: cx - 1*u, Y: cy + 1*u},
+			{X: cx + 6*u, Y: cy - 7*u},
+			{X: cx + 8*u, Y: cy - 4*u},
+			{X: cx - 1*u, Y: cy + 6*u},
+		}, color)
+	case round12IconUndo:
+		fill(cx-3*u, cy-3*u, cx+7*u, cy+1*u)
+		fill(cx+4*u, cy-3*u, cx+8*u, cy+6*u)
+		round12FillPolygon(hdc, []point{
+			{X: cx - 8*u, Y: cy - 2*u},
+			{X: cx - 2*u, Y: cy - 7*u},
+			{X: cx - 2*u, Y: cy + 3*u},
+		}, color)
+	case round12IconCrop:
+		fill(cx-7*u, cy-7*u, cx-4*u, cy+4*u)
+		fill(cx-7*u, cy-7*u, cx+4*u, cy-4*u)
+		fill(cx+4*u, cy-4*u, cx+7*u, cy+7*u)
+		fill(cx-4*u, cy+4*u, cx+7*u, cy+7*u)
+	case round12IconDownload:
+		fill(cx-2*u, cy-7*u, cx+2*u, cy+2*u)
+		round12FillPolygon(hdc, []point{
+			{X: cx - 6*u, Y: cy},
+			{X: cx + 6*u, Y: cy},
+			{X: cx, Y: cy + 6*u},
+		}, color)
+		fill(cx-7*u, cy+7*u, cx+7*u, cy+10*u)
+	case round12IconRetry:
+		fill(cx-5*u, cy-6*u, cx+6*u, cy-3*u)
+		fill(cx+3*u, cy-6*u, cx+6*u, cy+4*u)
+		fill(cx-5*u, cy+3*u, cx+5*u, cy+6*u)
+		round12FillPolygon(hdc, []point{
+			{X: cx - 8*u, Y: cy - 5*u},
+			{X: cx - 2*u, Y: cy - 9*u},
+			{X: cx - 2*u, Y: cy - 1*u},
+		}, color)
 	}
 }
 
-// round12DrawSolidFooterContent keeps the Round12 text-priority contract but
-// renders footer actions with filled TrueType symbols instead of MDL2 outline
-// glyphs. The symbols scale through the normal UI font pipeline, so their
-// interiors stay solid and their edges remain anti-aliased at high DPI.
-func round12DrawSolidFooterContent(hdc uintptr, label, glyph string, rc rect, font, textColor uintptr) {
+func round12DrawSolidActionContent(hdc uintptr, label string, iconKind int, rc rect, font, textColor uintptr) {
 	if hdc == 0 || rc.Right <= rc.Left || rc.Bottom <= rc.Top {
 		return
 	}
 	labelWidth := measureSingleLineWidth(hdc, label, font)
 	available := rc.Right - rc.Left
-	if glyph == "" || labelWidth <= 0 {
+	if iconKind == 0 || labelWidth <= 0 {
 		round12DrawVisuallyCenteredText(hdc, label, rc, font, textColor, DT_CENTER)
 		return
 	}
 
-	iconWidth := scaleDPI(15)
-	gap := scaleDPI(4)
+	iconWidth := scaleDPI(16)
+	gap := scaleDPI(5)
 	if iconWidth+gap+labelWidth > available {
-		iconWidth = scaleDPI(13)
-		gap = scaleDPI(2)
+		iconWidth = scaleDPI(14)
+		gap = scaleDPI(3)
 	}
 	if iconWidth+gap+labelWidth > available {
 		round12DrawVisuallyCenteredText(hdc, label, rc, font, textColor, DT_CENTER)
@@ -98,8 +184,46 @@ func round12DrawSolidFooterContent(hdc uintptr, label, glyph string, rc rect, fo
 	left := rc.Left + (available-total)/2
 	iconRC := rect{Left: left, Top: rc.Top, Right: left + iconWidth, Bottom: rc.Bottom}
 	textRC := rect{Left: iconRC.Right + gap, Top: rc.Top, Right: iconRC.Right + gap + labelWidth, Bottom: rc.Bottom}
-	round12DrawVisuallyCenteredText(hdc, glyph, iconRC, uiFontBold, textColor, DT_CENTER)
+	round12DrawSolidIcon(hdc, iconKind, iconRC, textColor)
 	round12DrawVisuallyCenteredText(hdc, label, textRC, font, textColor, DT_CENTER)
+}
+
+func round12FooterIconKind(a *application, hwnd uintptr) int {
+	if a == nil {
+		return 0
+	}
+	switch hwnd {
+	case a.hStart:
+		return round12IconPlay
+	case a.hPause:
+		return round12IconPause
+	case a.hStop:
+		return round12IconStop
+	default:
+		return 0
+	}
+}
+
+func round12SecondaryIconKind(a *application, hwnd uintptr) int {
+	if a == nil {
+		return 0
+	}
+	switch hwnd {
+	case a.hTaskApply:
+		return round12IconCheck
+	case a.hTaskDefault:
+		return round12IconUndo
+	case a.hPreview:
+		return round12IconPlay
+	case a.hTrimCrop:
+		return round12IconCrop
+	case a.hSingleOutput:
+		return round12IconDownload
+	case a.hRetry:
+		return round12IconRetry
+	default:
+		return 0
+	}
 }
 
 func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
@@ -148,6 +272,56 @@ func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
 	content.Left += scaleDPI(7)
 	content.Right -= scaleDPI(7)
 	label := getText(dis.HwndItem)
-	round12DrawSolidFooterContent(dis.HDC, label, round12FooterGlyph(a, dis.HwndItem), content, uiFontSmall, textColor)
+	round12DrawSolidActionContent(dis.HDC, label, round12FooterIconKind(a, dis.HwndItem), content, uiFontSmall, textColor)
+	return true
+}
+
+func round12DrawSecondarySolidAction(a *application, dis *drawItemStruct) bool {
+	if a == nil || dis == nil {
+		return false
+	}
+	iconKind := round12SecondaryIconKind(a, dis.HwndItem)
+	if iconKind == 0 {
+		return false
+	}
+	pressed := dis.ItemState&ODS_SELECTED != 0
+	disabled := dis.ItemState&ODS_DISABLED != 0
+	hovered := a.hovered(dis.HwndItem)
+
+	bg := colorRef(250, 251, 253)
+	border := colorRef(221, 227, 234)
+	textColor := colorRef(45, 59, 77)
+	if hovered && !disabled {
+		bg = colorRef(242, 247, 253)
+		border = colorRef(195, 209, 225)
+	}
+	if pressed && !disabled {
+		bg = colorRef(231, 240, 251)
+		border = colorRef(176, 197, 221)
+	}
+	if disabled {
+		bg = colorRef(247, 248, 250)
+		border = colorRef(229, 233, 238)
+		textColor = colorRef(151, 160, 171)
+	}
+
+	rc := dis.RcItem
+	fillSolid(dis.HDC, rc, colorRef(250, 251, 253))
+	inner := rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}
+	brush, _, _ := procCreateSolidBrush.Call(bg)
+	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, border)
+	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
+	oldPen, _, _ := procSelectObject.Call(dis.HDC, pen)
+	radius := scaleDPI(4)
+	procRoundRect.Call(dis.HDC, uintptr(inner.Left), uintptr(inner.Top), uintptr(inner.Right), uintptr(inner.Bottom), uintptr(radius), uintptr(radius))
+	procSelectObject.Call(dis.HDC, oldBrush)
+	procSelectObject.Call(dis.HDC, oldPen)
+	procDeleteObject.Call(brush)
+	procDeleteObject.Call(pen)
+
+	content := inner
+	content.Left += scaleDPI(5)
+	content.Right -= scaleDPI(5)
+	round12DrawSolidActionContent(dis.HDC, getText(dis.HwndItem), iconKind, content, uiFontSmall, textColor)
 	return true
 }
