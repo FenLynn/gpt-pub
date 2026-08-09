@@ -43,8 +43,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 42 {
-		t.Errorf("entries=%d want=42", entries)
+	if entries != 43 {
+		t.Errorf("entries=%d want=43", entries)
 	}
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
@@ -63,6 +63,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_round12_trim_preview_arm_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_finalize_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_owner_windows.go",
+		"cmd/mediaworkbench/v452_round12_native_preview_selftest_windows.go",
 		"cmd/mediaworkbench/v452_round12_column_profiles_windows.go",
 		"cmd/mediaworkbench/v452_round12_preview_windows.go",
 		"cmd/mediaworkbench/v452_round12_thumbnail_fallback_windows.go",
@@ -139,17 +140,44 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		}
 	}
 
+	nativePreviewSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_native_preview_selftest_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"round12_preview_exact_end_recovered",
+		"round12_preview_sequence_distinct",
+		"round12_preview_cancelled_request_rejected",
+		"round12_preview_stale_generation_rejected",
+		"round12GenerateRecoveredPreview",
+		"round12OwnedPreviewCurrent",
+	} {
+		if !bytes.Contains(nativePreviewSource, []byte(token)) {
+			t.Errorf("native preview self-test missing %q", token)
+		}
+	}
+
 	runnerSource, err := os.ReadFile(filepath.Join(root, "scripts", "round11_flicker_gate_runner.py"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, token := range []string{
-		"set_current_via_resilient_jump",
-		"WM_COMMAND_WITH_SENDER",
-		"resilient_jump_navigation_required",
+		"NATIVE_PREVIEW_CHECKS",
+		"validate_native_preview_evidence",
+		"external_cross_process_trim_injection_required",
+		"round12-native-preview-report.json",
 	} {
 		if !bytes.Contains(runnerSource, []byte(token)) {
-			t.Errorf("round12 trim navigation gate missing %q", token)
+			t.Errorf("round12 native preview gate missing %q", token)
+		}
+	}
+	for _, forbidden := range []string{
+		"set_current_via_resilient_jump",
+		"WM_COMMAND_WITH_SENDER",
+		"round12_trim_preview_gate.main()",
+	} {
+		if bytes.Contains(runnerSource, []byte(forbidden)) {
+			t.Errorf("retired cross-process trim injection remained in runner: %q", forbidden)
 		}
 	}
 }
