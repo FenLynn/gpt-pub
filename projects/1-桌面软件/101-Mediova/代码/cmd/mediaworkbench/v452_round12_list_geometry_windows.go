@@ -13,10 +13,11 @@ var (
 var round12HeaderBottomSeparator = colorRef(194, 203, 214)
 
 // round12VisibleCellBounds is the single geometry source for final task-list
-// painting. Win32 ListView subitem 0 is special: LVM_GETSUBITEMRECT may return
-// the whole row instead of the physical first-column width. Hidden columns can
-// also continue to receive NM_CUSTOMDRAW notifications. Resolve both here so
-// the paint path never guesses from NMCD.Rc.
+// painting. Win32 ListView subitem 0 is special: with a small-image list its
+// reported left edge can begin at the icon/text inset instead of the physical
+// first-column edge. Hidden columns can also continue to receive NM_CUSTOMDRAW
+// notifications. Resolve both here so the paint path never guesses from
+// NMCD.Rc and never leaves a narrow native strip visible inside the # column.
 func round12VisibleCellBounds(a *application, row, column int) (rect, bool) {
 	if a == nil || a.hList == 0 || row < 0 || column < 0 || column >= round12ColumnCount {
 		return rect{}, false
@@ -34,6 +35,18 @@ func round12VisibleCellBounds(a *application, row, column int) (rect, bool) {
 	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafe.Pointer(&rowBounds))) != 0 {
 		cell.Top = rowBounds.Top
 		cell.Bottom = rowBounds.Bottom
+	}
+	if column == round12ColNumber {
+		// LVM_GETSUBITEMRECT for subitem zero can begin after the native image
+		// inset. The physical first column always begins at the report-view
+		// origin, so derive that edge from LVM_GETORIGIN instead. This keeps the
+		// whole # cell under one custom-draw owner at every horizontal offset.
+		var origin point
+		if send(a.hList, round9FeedbackLVMGetOrigin, 0, uintptr(unsafe.Pointer(&origin))) != 0 {
+			cell.Left = -origin.X
+		} else {
+			cell.Left = 0
+		}
 	}
 	// Use the actual current width for every physical column. This is mandatory
 	// for column 0 and also prevents a stale pre-hide rectangle from painting a
