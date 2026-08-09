@@ -43,8 +43,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 40 {
-		t.Errorf("entries=%d want=40", entries)
+	if entries != 41 {
+		t.Errorf("entries=%d want=41", entries)
 	}
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
@@ -58,6 +58,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_round12_activation_bridge_windows.go",
 		"cmd/mediaworkbench/v452_round12_list_draw_windows.go",
 		"cmd/mediaworkbench/v452_round12_list_geometry_windows.go",
+		"cmd/mediaworkbench/v452_round12_scroll_overlay_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_guard_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_arm_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_finalize_windows.go",
@@ -79,6 +80,32 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	} {
 		if !seen[path] {
 			t.Errorf("missing %s", path)
+		}
+	}
+
+	overlaySource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_scroll_overlay_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"round12ScrollWSExLayered",
+		"round12ScrollWSExTransparent",
+		"round12ScrollLWAColorKey",
+		"round12ScrollTransparentKey",
+		"round12ScrollListSubclassProc",
+	} {
+		if !bytes.Contains(overlaySource, []byte(token)) {
+			t.Errorf("transparent scroll overlay source missing %q", token)
+		}
+	}
+
+	footerSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_footer_owner_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{"▶", "Ⅱ", "■", "round12DrawSolidFooterContent"} {
+		if !bytes.Contains(footerSource, []byte(token)) {
+			t.Errorf("solid footer source missing %q", token)
 		}
 	}
 }
