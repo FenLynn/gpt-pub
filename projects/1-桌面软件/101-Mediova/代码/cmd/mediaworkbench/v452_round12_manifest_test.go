@@ -43,8 +43,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 43 {
-		t.Errorf("entries=%d want=43", entries)
+	if entries != 47 {
+		t.Errorf("entries=%d want=47", entries)
 	}
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
@@ -59,11 +59,14 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_round12_list_draw_windows.go",
 		"cmd/mediaworkbench/v452_round12_list_geometry_windows.go",
 		"cmd/mediaworkbench/v452_round12_scroll_overlay_windows.go",
+		"cmd/mediaworkbench/v452_round12_scroll_function_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_guard_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_arm_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_finalize_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_owner_windows.go",
 		"cmd/mediaworkbench/v452_round12_native_preview_selftest_windows.go",
+		"cmd/mediaworkbench/v452_round12_thumbnail_quality_windows.go",
+		"cmd/mediaworkbench/v452_round12_thumbnail_quality_selftest_windows.go",
 		"cmd/mediaworkbench/v452_round12_column_profiles_windows.go",
 		"cmd/mediaworkbench/v452_round12_preview_windows.go",
 		"cmd/mediaworkbench/v452_round12_thumbnail_fallback_windows.go",
@@ -74,6 +77,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"scripts/round12_selection_transition_gate.py",
 		"scripts/round12_real_thumbnail_gate.py",
 		"scripts/round12_scroll_overlay_gate.py",
+		"scripts/round12_scroll_function_gate.py",
 		"scripts/round12_trim_preview_gate.py",
 		"scripts/round12_remote_memory.py",
 		"scripts/round12_remote_header.py",
@@ -97,10 +101,26 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12ShowScrollBar",
 		"round12ScrubNativeListScrollStyles",
 		"round12HideNativeListScrollbars",
-		"round12ScrollListSubclassProc",
 	} {
 		if !bytes.Contains(overlaySource, []byte(token)) {
 			t.Errorf("transparent scroll overlay source missing %q", token)
+		}
+	}
+
+	scrollFunctionSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_scroll_function_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"round7FeedbackLVMScroll",
+		"round12FunctionalSetScrollFromCover",
+		"round12FunctionalHandleMouseWheel",
+		"round12FunctionalCurrentHorizontalOffset",
+		"round12FunctionalSyncScrollInfo",
+		"round12FunctionalListSubclassProc",
+	} {
+		if !bytes.Contains(scrollFunctionSource, []byte(token)) {
+			t.Errorf("functional scroll source missing %q", token)
 		}
 	}
 
@@ -140,6 +160,55 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		}
 	}
 
+	scrollFunctionGate, err := os.ReadFile(filepath.Join(root, "scripts", "round12_scroll_function_gate.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"horizontal_drag_content_moved",
+		"mouse_wheel_vertical_moved",
+		"vertical_drag_content_moved",
+		"direct_listview_scroll_contract",
+		"LVM_GETTOPINDEX",
+		"LVM_GETSUBITEMRECT",
+	} {
+		if !bytes.Contains(scrollFunctionGate, []byte(token)) {
+			t.Errorf("functional scroll gate missing %q", token)
+		}
+	}
+
+	thumbnailQualitySource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_thumbnail_quality_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"round12ThumbnailQualityForBMP",
+		"round12ThumbnailNearBlack",
+		"round12ThumbnailCandidateTimes",
+		"round12GenerateSmartThumbnailBMP",
+		"round12ApprovedDarkThumbnailFallbacks",
+	} {
+		if !bytes.Contains(thumbnailQualitySource, []byte(token)) {
+			t.Errorf("thumbnail quality source missing %q", token)
+		}
+	}
+
+	thumbnailSelfTestSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_thumbnail_quality_selftest_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"round12_thumbnail_black_intro_fixture",
+		"round12_thumbnail_black_sample_detected",
+		"round12_thumbnail_retry_selected_nonblack",
+		"round12_thumbnail_retry_advanced_time",
+		"round12GenerateBlackIntroThumbnailFixture",
+	} {
+		if !bytes.Contains(thumbnailSelfTestSource, []byte(token)) {
+			t.Errorf("thumbnail quality self-test missing %q", token)
+		}
+	}
+
 	nativePreviewSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_native_preview_selftest_windows.go"))
 	if err != nil {
 		t.Fatal(err)
@@ -166,9 +235,11 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"validate_native_preview_evidence",
 		"external_cross_process_trim_injection_required",
 		"round12-native-preview-report.json",
+		"round12_scroll_function_gate.main()",
+		"round12_thumbnail_retry_selected_nonblack",
 	} {
 		if !bytes.Contains(runnerSource, []byte(token)) {
-			t.Errorf("round12 native preview gate missing %q", token)
+			t.Errorf("round12 native/scroll gate missing %q", token)
 		}
 	}
 	for _, forbidden := range []string{

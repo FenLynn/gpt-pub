@@ -27,8 +27,8 @@ var (
 
 // round12ScheduleThumbnailFallback gives the normal cached thumbnail path a
 // short head start. If the visible task still has no image afterwards, fall
-// back to the already-proven direct BMP path. Thumbnail caching is an
-// optimization and must never decide whether the home list has a preview.
+// back to the direct multi-sample BMP path. Thumbnail caching is an optimization
+// and must never decide whether the home list has a preview.
 func round12ScheduleThumbnailFallback(a *application, id int64, input string, pinfo media.ProbeInfo) {
 	if a == nil || id == 0 || input == "" {
 		return
@@ -90,18 +90,14 @@ func round12GenerateThumbnailDirect(a *application, id int64, input string, pinf
 	if generation == 0 || !v452ThumbnailCurrent(a, id, generation) {
 		return
 	}
-	at := 0.0
-	if pinfo.Duration > 1 {
-		at = pinfo.Duration * .05
-	}
 	dir, err := config.TempDir()
 	if err != nil {
 		writeCrashContext(fmt.Sprintf("round12 thumbnail temp task %d", id), err)
 		return
 	}
 	out := filepath.Join(dir, fmt.Sprintf("thumb_round12_%d_%d.bmp", id, time.Now().UnixNano()))
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	err = media.GenerateThumbnailBMP(ctx, ffmpeg, input, out, at, "自动", 86, 48)
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	_, _, err = round12GenerateSmartThumbnailBMP(ctx, ffmpeg, input, out, pinfo, 86, 48)
 	cancel()
 	if err != nil {
 		_ = os.Remove(out)
@@ -110,22 +106,26 @@ func round12GenerateThumbnailDirect(a *application, id int64, input string, pinf
 	}
 	if !v452ThumbnailCurrent(a, id, generation) || !round12ThumbnailStillMissing(a, id, input) {
 		_ = os.Remove(out)
+		round12ConsumeApprovedDarkThumbnailFallback(out)
 		return
 	}
 
 	a.postUI(func() {
 		defer os.Remove(out)
 		if a.hImageList == 0 || !v452ThumbnailCurrent(a, id, generation) || !round12ThumbnailStillMissing(a, id, input) {
+			round12ConsumeApprovedDarkThumbnailFallback(out)
 			return
 		}
 		h, _, _ := procLoadImageW.Call(0, uintptr(unsafe.Pointer(p(out))), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE|LR_CREATEDIBSECTION)
 		if h == 0 {
+			round12ConsumeApprovedDarkThumbnailFallback(out)
 			writeCrashContext(fmt.Sprintf("round12 thumbnail load task %d", id), fmt.Errorf("LoadImageW failed for %s", out))
 			return
 		}
 		idx, _, _ := procImageListAdd.Call(a.hImageList, h, 0)
 		procDeleteObject.Call(h)
 		if int32(idx) < 0 {
+			round12ConsumeApprovedDarkThumbnailFallback(out)
 			writeCrashContext(fmt.Sprintf("round12 thumbnail imagelist task %d", id), fmt.Errorf("ImageList_Add failed for %s", out))
 			return
 		}

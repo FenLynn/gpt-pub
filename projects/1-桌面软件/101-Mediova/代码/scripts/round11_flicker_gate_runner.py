@@ -9,6 +9,7 @@ import round12_footer_gate
 import round12_header_gate
 import round12_list_structure_gate
 import round12_real_thumbnail_gate
+import round12_scroll_function_gate
 import round12_scroll_overlay_gate
 import round12_selection_transition_gate
 
@@ -19,6 +20,10 @@ NATIVE_PREVIEW_CHECKS = (
     "round12_preview_sequence_distinct",
     "round12_preview_cancelled_request_rejected",
     "round12_preview_stale_generation_rejected",
+    "round12_thumbnail_black_intro_fixture",
+    "round12_thumbnail_black_sample_detected",
+    "round12_thumbnail_retry_selected_nonblack",
+    "round12_thumbnail_retry_advanced_time",
 )
 
 
@@ -46,7 +51,7 @@ def validate_native_preview_evidence() -> dict[str, object]:
     failed = [name for name in NATIVE_PREVIEW_CHECKS if checks.get(name) is not True]
     if missing or failed:
         raise RuntimeError(
-            "Round12 native preview coverage is incomplete: "
+            "Round12 native preview/thumbnail coverage is incomplete: "
             f"missing={missing!r} failed={failed!r}"
         )
     return {
@@ -59,6 +64,7 @@ def validate_native_preview_evidence() -> dict[str, object]:
         "external_cross_process_trim_injection_required": False,
         "native_timeline_drag_selftest_required": True,
         "native_preview_generation_selftest_required": True,
+        "black_frame_thumbnail_retry_selftest_required": True,
     }
 
 
@@ -79,6 +85,7 @@ def merge_stage_evidence(native_preview: dict[str, object]) -> None:
         ("round12-selection-transition-report.json", "round12_selection_transition"),
         ("round12-real-thumbnail-report.json", "round12_real_thumbnail"),
         ("round12-scroll-overlay-report.json", "round12_scroll_overlay"),
+        ("round12-scroll-function-report.json", "round12_scroll_function"),
         ("round12-native-preview-report.json", "round12_native_preview"),
     ):
         stage_path = evidence / filename
@@ -108,6 +115,9 @@ def main() -> int:
     scroll_overlay_result = int(round12_scroll_overlay_gate.main())
     if scroll_overlay_result != 0:
         return scroll_overlay_result
+    scroll_function_result = int(round12_scroll_function_gate.main())
+    if scroll_function_result != 0:
+        return scroll_function_result
 
     try:
         return int(round11.main())
