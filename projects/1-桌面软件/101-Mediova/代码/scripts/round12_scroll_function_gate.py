@@ -84,8 +84,10 @@ def list_child(main_hwnd: int, list_hwnd: int) -> dict[str, object]:
 
 
 def park_cursor(main_hwnd: int) -> None:
-    main = gate.window_rect(main_hwnd)
-    gate.user32.SetCursorPos(int(main[0]) + 10, int(main[1]) + 45)
+    main = gate.RECT()
+    if not gate.user32.GetWindowRect(main_hwnd, ctypes.byref(main)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    gate.user32.SetCursorPos(int(main.left) + 10, int(main.top) + 45)
     time.sleep(0.35)
 
 
