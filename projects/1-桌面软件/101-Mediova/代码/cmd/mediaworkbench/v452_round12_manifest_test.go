@@ -43,8 +43,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 41 {
-		t.Errorf("entries=%d want=41", entries)
+	if entries != 42 {
+		t.Errorf("entries=%d want=42", entries)
 	}
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
@@ -72,6 +72,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"scripts/round12_list_structure_gate.py",
 		"scripts/round12_selection_transition_gate.py",
 		"scripts/round12_real_thumbnail_gate.py",
+		"scripts/round12_scroll_overlay_gate.py",
 		"scripts/round12_trim_preview_gate.py",
 		"scripts/round12_remote_memory.py",
 		"scripts/round12_remote_header.py",
@@ -115,6 +116,21 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	} {
 		if !bytes.Contains(footerSource, []byte(token)) {
 			t.Errorf("solid action source missing %q", token)
+		}
+	}
+
+	scrollGate, err := os.ReadFile(filepath.Join(root, "scripts", "round12_scroll_overlay_gate.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"show_delay_contract_ms",
+		"track_transparent",
+		"validate_localized_thumb",
+		"hover-{}-650ms-visible.png",
+	} {
+		if !bytes.Contains(scrollGate, []byte(token)) {
+			t.Errorf("scroll overlay gate missing %q", token)
 		}
 	}
 }
