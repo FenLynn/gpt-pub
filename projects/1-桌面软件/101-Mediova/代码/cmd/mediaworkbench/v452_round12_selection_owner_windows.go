@@ -92,6 +92,15 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 						// selected state moves. Hidden/empty columns therefore cannot
 						// retain the previous row's blue pixels.
 						procInvalidateRect.Call(a.hList, 0, 0)
+						if n.UNewState&LVIS_SELECTED != 0 {
+							// A selection move emits deselect and select notifications in
+							// sequence. Do not synchronously commit the deselected white
+							// intermediate state. Once the new row is actually selected,
+							// finish the pending no-erase repaint before returning so the
+							// screen can never expose a native white subitem between the
+							// state change and Round12's whole-row custom drawing.
+							procUpdateWindow.Call(a.hList)
+						}
 					}
 				case LVN_COLUMNCLICK:
 					n := (*nmListView)(unsafe.Pointer(lParam))
