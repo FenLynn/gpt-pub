@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import json
 import os
 import shutil
 import subprocess
 import tempfile
+import time
+from ctypes import wintypes
 from pathlib import Path
 
 from PIL import Image, ImageChops
@@ -14,6 +17,13 @@ import round11_flicker_gate as gate
 import round11_flicker_gate_runner_base as runner
 
 THUMB_COLORS = {(160, 171, 184), (110, 132, 158)}
+IDC_LIST = 1020
+GWL_STYLE = -16
+WS_HSCROLL = 0x00100000
+WS_VSCROLL = 0x00200000
+NORMAL_COMPACT_WIDTH = 1120
+NORMAL_COMPACT_HEIGHT = 720
+NATIVE_ARROW_DARK_RATIO_LIMIT = 0.08
 
 
 def changed_metrics(before: Image.Image, after: Image.Image) -> dict[str, object]:
@@ -126,6 +136,96 @@ def validate_transparent_track(
     return {"thumb": thumb, "outside_thumb_change": outside}
 
 
+def dark_ratio(image: Image.Image) -> float:
+    rgb = image.convert("RGB")
+    try:
+        pixels = list(rgb.getdata())
+    finally:
+        rgb.close()
+    if not pixels:
+        return 0.0
+    dark = sum(1 for r, g, b in pixels if (77 * r + 150 * g + 29 * b) >> 8 < 150)
+    return dark / len(pixels)
+
+
+def terminate_process(process: subprocess.Popen[bytes] | subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5.0)
+
+
+def validate_normal_compact_surface(exe: Path, env: dict[str, str], evidence: Path) -> dict[str, object]:
+    user32 = gate.user32
+    user32.GetDlgItem.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetDlgItem.restype = wintypes.HWND
+    get_window_long_ptr = user32.GetWindowLongPtrW
+    get_window_long_ptr.argtypes = [wintypes.HWND, ctypes.c_int]
+    get_window_long_ptr.restype = ctypes.c_ssize_t
+
+    process = subprocess.Popen([str(exe), "--ui-preview=video"], cwd=str(exe.parent), env=env)
+    try:
+        main_hwnd = gate.find_window(process.pid, "Mediova", 20.0)
+        if not user32.MoveWindow(main_hwnd, 0, 0, NORMAL_COMPACT_WIDTH, NORMAL_COMPACT_HEIGHT, True):
+            raise ctypes.WinError(ctypes.get_last_error())
+        time.sleep(1.5)
+        list_hwnd = int(user32.GetDlgItem(main_hwnd, IDC_LIST))
+        if not list_hwnd:
+            raise RuntimeError("normal compact task list was not found")
+
+        style = int(get_window_long_ptr(list_hwnd, GWL_STYLE))
+        scroll_style_bits = style & (WS_HSCROLL | WS_VSCROLL)
+        if scroll_style_bits:
+            raise RuntimeError(
+                f"normal compact ListView restored native scrollbar style bits: style=0x{style:x} "
+                f"scroll_bits=0x{scroll_style_bits:x}"
+            )
+
+        list_info = next(
+            child for child in gate.enumerate_children(main_hwnd) if int(child["hwnd"]) == list_hwnd
+        )
+        left, top, right, bottom = [int(value) for value in list_info["rect"]]
+        strip_height = max(12, min(20, bottom - top))
+        strip_rect = [left, bottom - strip_height, right, bottom]
+        strip = runner.capture_screen_rect(strip_rect)
+        try:
+            strip.save(evidence / "normal-compact-list-bottom.png")
+            corner = min(17, strip.width // 3)
+            left_corner = strip.crop((0, 0, corner, strip.height))
+            right_corner = strip.crop((max(0, strip.width - corner), 0, strip.width, strip.height))
+            try:
+                left_dark = dark_ratio(left_corner)
+                right_dark = dark_ratio(right_corner)
+            finally:
+                left_corner.close()
+                right_corner.close()
+        finally:
+            strip.close()
+
+        if left_dark > NATIVE_ARROW_DARK_RATIO_LIMIT or right_dark > NATIVE_ARROW_DARK_RATIO_LIMIT:
+            raise RuntimeError(
+                "normal compact list bottom still resembles a native scrollbar arrow lane: "
+                f"left_dark={left_dark:.4f} right_dark={right_dark:.4f} "
+                f"limit={NATIVE_ARROW_DARK_RATIO_LIMIT:.4f}"
+            )
+        return {
+            "window_size": [NORMAL_COMPACT_WIDTH, NORMAL_COMPACT_HEIGHT],
+            "list_style": style,
+            "native_scroll_style_bits": scroll_style_bits,
+            "bottom_strip_rect": strip_rect,
+            "left_corner_dark_ratio": left_dark,
+            "right_corner_dark_ratio": right_dark,
+            "native_arrow_dark_ratio_limit": NATIVE_ARROW_DARK_RATIO_LIMIT,
+            "normal_compact_native_scrollbars_hidden": True,
+        }
+    finally:
+        terminate_process(process)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", required=True, type=Path)
@@ -140,6 +240,9 @@ def main() -> int:
     env["APPDATA"] = str(isolated)
     env["LOCALAPPDATA"] = str(isolated)
     env["XDG_CONFIG_HOME"] = str(isolated)
+
+    normal_compact = validate_normal_compact_surface(exe, env, evidence)
+
     process = subprocess.Popen(
         [str(exe), "--ui-preview=video", runner.ROUND11_SCROLL_PREVIEW_ARG],
         cwd=str(exe.parent),
@@ -198,6 +301,8 @@ def main() -> int:
             "native_track_absent": True,
             "transparent_track_required": True,
             "outside_thumb_transparency_required": True,
+            "normal_compact_validation": normal_compact,
+            "normal_compact_native_scrollbars_hidden": True,
             "hover_delay_ms": 500,
             "records": report_records,
         }
@@ -207,13 +312,7 @@ def main() -> int:
         print(json.dumps(report, ensure_ascii=False, separators=(",", ":")))
         return 0
     finally:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5.0)
+        terminate_process(process)
         shutil.rmtree(isolated, ignore_errors=True)
 
 

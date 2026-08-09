@@ -94,6 +94,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12ScrollLWAColorKey",
 		"round12ScrollTransparentKey",
 		"round12ShowScrollBar",
+		"round12ScrubNativeListScrollStyles",
 		"round12HideNativeListScrollbars",
 		"round12ScrollListSubclassProc",
 	} {
@@ -128,10 +129,27 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"track_transparent",
 		"validate_transparent_track",
 		"outside_thumb_transparency_required",
+		"validate_normal_compact_surface",
+		"normal_compact_native_scrollbars_hidden",
+		"normal-compact-list-bottom.png",
 		"650ms-visible.png",
 	} {
 		if !bytes.Contains(scrollGate, []byte(token)) {
 			t.Errorf("scroll overlay gate missing %q", token)
+		}
+	}
+
+	runnerSource, err := os.ReadFile(filepath.Join(root, "scripts", "round11_flicker_gate_runner.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{
+		"set_current_via_resilient_jump",
+		"WM_COMMAND_WITH_SENDER",
+		"resilient_jump_navigation_required",
+	} {
+		if !bytes.Contains(runnerSource, []byte(token)) {
+			t.Errorf("round12 trim navigation gate missing %q", token)
 		}
 	}
 }

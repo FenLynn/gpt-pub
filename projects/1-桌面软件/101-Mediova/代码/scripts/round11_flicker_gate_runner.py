@@ -17,12 +17,9 @@ import round12_selection_transition_gate
 import round12_trim_preview_gate
 
 WM_COMMAND = 0x0111
-IDC_SEEK_MINUS_SEC = 4017
-IDC_SEEK_MINUS_FRAME = 4018
-IDC_SEEK_PLUS_FRAME = 4019
-IDC_SEEK_PLUS_SEC = 4020
-FIXTURE_FPS = 12.0
-FIXTURE_DURATION = 2.0
+WM_SETTEXT = 0x000C
+BM_CLICK = 0x00F5
+IDC_JUMP_TIME = 4016
 
 
 def argument_path(name: str) -> Path | None:
@@ -42,6 +39,24 @@ def parse_clock(value: str) -> float:
     if len(parts) == 2:
         return float(parts[0]) * 60.0 + float(parts[1])
     return float(value)
+
+
+def canonical_clock(value: float) -> str:
+    value = max(0.0, value)
+    hours = int(value // 3600.0)
+    value -= hours * 3600.0
+    minutes = int(value // 60.0)
+    seconds = value - minutes * 60.0
+    return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
+
+
+def noncanonical_clock(value: float) -> str:
+    value = max(0.0, value)
+    hours = int(value // 3600.0)
+    value -= hours * 3600.0
+    minutes = int(value // 60.0)
+    seconds = value - minutes * 60.0
+    return f"{hours}:{minutes}:{seconds:.3f}"
 
 
 def install_trim_diagnostics() -> None:
@@ -94,72 +109,49 @@ def install_trim_diagnostics() -> None:
             f"attempts={attempts} last_title={last_title!r}"
         )
 
-    def set_current_via_seek_commands(editor: int, current_edit: int, _jump_button: int, value: str) -> None:
-        # Hosted Actions desktops are unreliable for cross-process BM_CLICK and
-        # mouse injection. For preview-lifecycle stress, send the pointer-free
-        # WM_COMMAND that a real button click ultimately delivers to the final
-        # Round7 editor. Native self-test separately covers the real timeline
-        # HWND interaction. This keeps the external gate focused on
-        # setCurrent(..., true) -> preview request -> stale-request rejection.
-        controls = {
-            "minus_sec": int(user32.GetDlgItem(editor, IDC_SEEK_MINUS_SEC)),
-            "minus_frame": int(user32.GetDlgItem(editor, IDC_SEEK_MINUS_FRAME)),
-            "plus_frame": int(user32.GetDlgItem(editor, IDC_SEEK_PLUS_FRAME)),
-            "plus_sec": int(user32.GetDlgItem(editor, IDC_SEEK_PLUS_SEC)),
-        }
-        if not all(controls.values()):
-            raise RuntimeError(f"trim seek controls disappeared: {controls!r}")
-
-        current_text = str(round12_trim_preview_gate.child_by_handle(editor, current_edit)["text"])
-        try:
-            current = max(0.0, min(FIXTURE_DURATION, parse_clock(current_text)))
-        except ValueError as exc:
-            raise RuntimeError(f"cannot parse current seek value: {current_text!r}") from exc
-
-        target = max(0.0, min(FIXTURE_DURATION, parse_clock(value)))
-        current_frame = int(round(current * FIXTURE_FPS))
-        target_frame = int(round(target * FIXTURE_FPS))
-        target_frame = max(0, min(int(round(FIXTURE_DURATION * FIXTURE_FPS)), target_frame))
-        delta_frames = target_frame - current_frame
-
-        commands: list[int] = []
-        if delta_frames > 0:
-            seconds, frames = divmod(delta_frames, int(FIXTURE_FPS))
-            commands.extend([IDC_SEEK_PLUS_SEC] * seconds)
-            commands.extend([IDC_SEEK_PLUS_FRAME] * frames)
-        elif delta_frames < 0:
-            seconds, frames = divmod(-delta_frames, int(FIXTURE_FPS))
-            commands.extend([IDC_SEEK_MINUS_SEC] * seconds)
-            commands.extend([IDC_SEEK_MINUS_FRAME] * frames)
-
-        for command_id in commands:
-            send_message(editor, WM_COMMAND, command_id, 0)
-            # Keep the sequence intentionally rapid to overlap preview workers
-            # while still synchronously dispatching each command on the UI
-            # thread before the next request arrives.
-            time.sleep(0.008)
-
-        expected = target_frame / FIXTURE_FPS
-        deadline = time.monotonic() + 3.0
+    def set_current_via_resilient_jump(editor: int, current_edit: int, jump_button: int, value: str) -> None:
+        # The old hosted-desktop gate tried to emulate the four seek buttons by
+        # sending WM_COMMAND with no sender HWND. That transport is not faithful
+        # to a real button notification and is intermittent on hosted Windows.
+        # Drive the actual jump control instead. A noncanonical but valid time is
+        # written first; successful product handling rewrites it to the canonical
+        # clock, which gives us an explicit acknowledgement before preview checks.
+        target = parse_clock(value)
+        expected = canonical_clock(target)
+        raw_value = noncanonical_clock(target)
+        transports: list[tuple[str, object]] = [
+            ("BM_CLICK", lambda: send_message(jump_button, BM_CLICK, 0, 0)),
+            (
+                "WM_COMMAND_WITH_SENDER",
+                lambda: send_message(editor, WM_COMMAND, IDC_JUMP_TIME, jump_button),
+            ),
+            (
+                "POST_BM_CLICK",
+                lambda: user32.PostMessageW(jump_button, BM_CLICK, 0, 0),
+            ),
+        ]
+        attempts: list[dict[str, object]] = []
         last_text = ""
-        last_value = -1.0
-        while time.monotonic() < deadline:
-            last_text = str(round12_trim_preview_gate.child_by_handle(editor, current_edit)["text"])
-            try:
-                last_value = parse_clock(last_text)
-            except ValueError:
-                last_value = -1.0
-            if abs(last_value - expected) <= 0.02:
-                return
-            time.sleep(0.05)
+
+        for name, trigger in transports:
+            text = ctypes.create_unicode_buffer(raw_value)
+            send_message(current_edit, WM_SETTEXT, 0, ctypes.addressof(text))
+            trigger()
+            deadline = time.monotonic() + 1.5
+            while time.monotonic() < deadline:
+                last_text = str(round12_trim_preview_gate.child_by_handle(editor, current_edit)["text"])
+                if last_text == expected:
+                    return
+                time.sleep(0.05)
+            attempts.append({"transport": name, "last_text": last_text})
+
         raise RuntimeError(
-            "seek-command navigation did not update current time: "
-            f"from={current:.3f} requested={target:.3f} expected_frame={expected:.3f} "
-            f"current_edit={last_text!r} parsed={last_value:.3f} commands={len(commands)}"
+            "jump navigation was not acknowledged by the editor: "
+            f"requested={value!r} raw={raw_value!r} expected={expected!r} attempts={attempts!r}"
         )
 
     round12_trim_preview_gate.find_editor = find_ready_editor
-    round12_trim_preview_gate.set_current_and_jump = set_current_via_seek_commands
+    round12_trim_preview_gate.set_current_and_jump = set_current_via_resilient_jump
 
 
 def merge_stage_evidence() -> None:
@@ -222,7 +214,8 @@ def main() -> int:
             stage["fresh_process_passes"] = trim_preview_passes
             stage["fresh_process_required"] = trim_preview_required
             stage["metadata_ready_editor_required"] = True
-            stage["pointer_free_seek_command_navigation_required"] = True
+            stage["resilient_jump_navigation_required"] = True
+            stage["jump_transport_order"] = ["BM_CLICK", "WM_COMMAND_WITH_SENDER", "POST_BM_CLICK"]
             stage["native_timeline_drag_selftest_required"] = True
             stage["pointer_sized_win32_abi_required"] = True
             stage_path.write_text(json.dumps(stage, ensure_ascii=False, indent=2), encoding="utf-8")
