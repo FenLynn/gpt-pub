@@ -92,6 +92,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12ScrollWSExTransparent",
 		"round12ScrollLWAColorKey",
 		"round12ScrollTransparentKey",
+		"round12ShowScrollBar",
+		"round12HideNativeListScrollbars",
 		"round12ScrollListSubclassProc",
 	} {
 		if !bytes.Contains(overlaySource, []byte(token)) {
@@ -103,9 +105,16 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, token := range []string{"▶", "Ⅱ", "■", "round12DrawSolidFooterContent"} {
+	for _, token := range []string{
+		"round12FillPolygon",
+		"round12DrawSolidIcon",
+		"round12IconPlay",
+		"round12IconPause",
+		"round12IconStop",
+		"round12DrawSecondarySolidAction",
+	} {
 		if !bytes.Contains(footerSource, []byte(token)) {
-			t.Errorf("solid footer source missing %q", token)
+			t.Errorf("solid action source missing %q", token)
 		}
 	}
 }
