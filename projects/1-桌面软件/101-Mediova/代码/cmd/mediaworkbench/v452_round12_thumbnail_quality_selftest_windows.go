@@ -61,13 +61,16 @@ func round12ThumbnailQualitySelfTestEventProc(hook, event, hwnd, idObject, idChi
 }
 
 func round12ThumbnailQualitySelfTestSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	// Preserve all inherited self-test timing first. In particular, the legacy
+	// dynamic append test owns the conversion workers and must finish before
+	// this Round12 FFmpeg-heavy black-frame fixture starts. Running this check
+	// before DefSubclassProc could steal CPU/encoder time and turn an unrelated
+	// queue completion assertion into a timing failure.
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 	if message == WM_APP_SELFTEST && app != nil && app.selfTest {
 		round12ThumbnailQualitySelfTestRunOnce.Do(func() {
 			round12ThumbnailQualitySelfTestStoredResult = app.round12RunThumbnailQualitySelfTest()
 		})
-	}
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-	if message == WM_APP_SELFTEST && app != nil && app.selfTest {
 		_ = app.round12PatchThumbnailQualitySelfTestReport(round12ThumbnailQualitySelfTestStoredResult)
 	}
 	if message == v452WMNCDestroy {
