@@ -529,7 +529,19 @@ func (a *application) v420TakeNext() (int64, *model.Task, model.Settings, bool) 
 		}
 		a.mu.Unlock()
 		if !pending {
-			return 0, nil, model.Settings{}, false
+			// A dynamic append freezes its task before publishing the new ID into
+			// runTaskIDs. Without a final wake window, a worker can snapshot the
+			// old ID set after the previous task finishes, see no pending work and
+			// exit just before v420AppendReadyToRun publishes the queued task. Keep
+			// the worker alive briefly for the append's queueWake, then resnapshot.
+			select {
+			case <-ctx.Done():
+				return 0, nil, model.Settings{}, false
+			case <-a.queueWake:
+				continue
+			case <-time.After(1 * time.Second):
+				return 0, nil, model.Settings{}, false
+			}
 		}
 		select {
 		case <-ctx.Done():
