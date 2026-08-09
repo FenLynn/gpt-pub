@@ -58,14 +58,48 @@ func round12FooterGlyph(a *application, hwnd uintptr) string {
 	}
 	switch hwnd {
 	case a.hStart:
-		return "\uE768" // Play
+		return "▶"
 	case a.hPause:
-		return "\uE769" // Pause
+		return "Ⅱ"
 	case a.hStop:
-		return "\uE71A" // Stop
+		return "■"
 	default:
 		return ""
 	}
+}
+
+// round12DrawSolidFooterContent keeps the Round12 text-priority contract but
+// renders footer actions with filled TrueType symbols instead of MDL2 outline
+// glyphs. The symbols scale through the normal UI font pipeline, so their
+// interiors stay solid and their edges remain anti-aliased at high DPI.
+func round12DrawSolidFooterContent(hdc uintptr, label, glyph string, rc rect, font, textColor uintptr) {
+	if hdc == 0 || rc.Right <= rc.Left || rc.Bottom <= rc.Top {
+		return
+	}
+	labelWidth := measureSingleLineWidth(hdc, label, font)
+	available := rc.Right - rc.Left
+	if glyph == "" || labelWidth <= 0 {
+		round12DrawVisuallyCenteredText(hdc, label, rc, font, textColor, DT_CENTER)
+		return
+	}
+
+	iconWidth := scaleDPI(15)
+	gap := scaleDPI(4)
+	if iconWidth+gap+labelWidth > available {
+		iconWidth = scaleDPI(13)
+		gap = scaleDPI(2)
+	}
+	if iconWidth+gap+labelWidth > available {
+		round12DrawVisuallyCenteredText(hdc, label, rc, font, textColor, DT_CENTER)
+		return
+	}
+
+	total := iconWidth + gap + labelWidth
+	left := rc.Left + (available-total)/2
+	iconRC := rect{Left: left, Top: rc.Top, Right: left + iconWidth, Bottom: rc.Bottom}
+	textRC := rect{Left: iconRC.Right + gap, Top: rc.Top, Right: iconRC.Right + gap + labelWidth, Bottom: rc.Bottom}
+	round12DrawVisuallyCenteredText(hdc, glyph, iconRC, uiFontBold, textColor, DT_CENTER)
+	round12DrawVisuallyCenteredText(hdc, label, textRC, font, textColor, DT_CENTER)
 }
 
 func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
@@ -114,6 +148,6 @@ func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
 	content.Left += scaleDPI(7)
 	content.Right -= scaleDPI(7)
 	label := getText(dis.HwndItem)
-	round12DrawPolishedButtonContent(dis.HDC, label, round12FooterGlyph(a, dis.HwndItem), content, uiFontSmall, textColor)
+	round12DrawSolidFooterContent(dis.HDC, label, round12FooterGlyph(a, dis.HwndItem), content, uiFontSmall, textColor)
 	return true
 }
