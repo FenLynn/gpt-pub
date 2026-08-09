@@ -14,12 +14,14 @@ const (
 	round12ScrollWSExLayered       = 0x00080000
 	round12ScrollWSExTransparent   = 0x00000020
 	round12ScrollLWAColorKey       = 0x00000001
+	round12ScrollSBBoth            = 3
 )
 
 var (
 	round12ScrollOverlayCallback uintptr
 	round12ScrollListCallback    uintptr
 	round12ScrollSetLayered      = user32.NewProc("SetLayeredWindowAttributes")
+	round12ShowScrollBar         = user32.NewProc("ShowScrollBar")
 	round12ScrollTransparentKey  = colorRef(1, 2, 3)
 )
 
@@ -42,6 +44,18 @@ func init() {
 	}()
 }
 
+func round12HideNativeListScrollbars(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	// The ListView can recreate standard bars after report-column geometry
+	// changes even when WS_HSCROLL/WS_VSCROLL have already been removed. Keep
+	// the style guard, then explicitly hide both standard bars so only the
+	// transparent Round12 overlay thumb remains user-visible.
+	round8EnsureListStyleGuard(hwnd)
+	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
+}
+
 // Round11's cover windows are retained as the hit geometry and timer lifecycle,
 // but Round12 makes their visual track truly transparent. Pointer ownership is
 // moved to the ListView, so the layered cover windows are free to be click-
@@ -50,6 +64,7 @@ func round12InstallTransparentScrollOverlays(a *application) {
 	if a == nil || a.hList == 0 {
 		return
 	}
+	round12HideNativeListScrollbars(a.hList)
 	for _, cover := range []*round11StableCover{round11StableCoverH, round11StableCoverV} {
 		if cover == nil || cover.hwnd == 0 {
 			continue
@@ -77,6 +92,7 @@ func round12InstallTransparentScrollOverlays(a *application) {
 	}
 	v452RemoveSubclass.Call(a.hList, round12ScrollListCallback, round12ScrollListSubclassID)
 	v452SetWindowSubclass.Call(a.hList, round12ScrollListCallback, round12ScrollListSubclassID, 0)
+	round11PositionStableScrollSurfaces(a)
 }
 
 // Paint the full cover in the color-key transparency color and then add only
@@ -242,6 +258,10 @@ func round12FinishScrollDrag(releaseCapture bool) bool {
 
 func round12ScrollListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
+	case WM_PAINT, round7FeedbackWMPrint, round7FeedbackWMPrintClient:
+		// Hide before the lower ListView owner paints so the standard arrows,
+		// rail and corner can never enter the rendered frame.
+		round12HideNativeListScrollbars(hwnd)
 	case WM_MOUSEMOVE:
 		if round12DriveScrollHover() {
 			return 0
@@ -256,6 +276,11 @@ func round12ScrollListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		}
 	case round7FeedbackWMCaptureChanged:
 		round12FinishScrollDrag(false)
+	case WM_SIZE, round9FeedbackWMWindowPosChanged, LVM_SETCOLUMNWIDTH, LVM_INSERTITEMW, LVM_DELETEALLITEMS:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		round12HideNativeListScrollbars(hwnd)
+		round11PositionStableScrollSurfaces(app)
+		return result
 	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round12ScrollListCallback, subclassID)
 	}
