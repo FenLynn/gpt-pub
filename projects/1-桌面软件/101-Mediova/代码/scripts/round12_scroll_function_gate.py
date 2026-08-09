@@ -16,9 +16,10 @@ import round11_flicker_gate_runner_base as runner
 import round12_scroll_overlay_gate as overlay_gate
 
 LVM_FIRST = 0x1000
+LVM_GETHEADER = LVM_FIRST + 31
 LVM_GETTOPINDEX = LVM_FIRST + 39
-LVM_GETSUBITEMRECT = LVM_FIRST + 56
-LVIR_BOUNDS = 0
+HDM_FIRST = 0x1200
+HDM_GETITEMRECT = HDM_FIRST + 7
 MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_WHEEL = 0x0800
@@ -31,6 +32,9 @@ gate.user32.SendMessageW.argtypes = [
     wintypes.LPARAM,
 ]
 gate.user32.SendMessageW.restype = ctypes.c_ssize_t
+
+gate.user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(gate.RECT)]
+gate.user32.GetWindowRect.restype = wintypes.BOOL
 
 gate.user32.mouse_event.argtypes = [
     wintypes.DWORD,
@@ -73,21 +77,30 @@ def get_top_index(list_hwnd: int) -> int:
     return int(gate.user32.SendMessageW(list_hwnd, LVM_GETTOPINDEX, 0, 0))
 
 
-def subitem_left(list_hwnd: int, item: int = 0, subitem: int = 1) -> int:
-    rect = gate.RECT()
-    rect.top = subitem
-    rect.left = LVIR_BOUNDS
+def header_column_screen_left(list_hwnd: int, column: int = 1) -> int:
+    # LVM_GETSUBITEMRECT is not dependable for the owner-drawn report rows used
+    # by this candidate. The native report header is still owned and positioned
+    # by the ListView itself. Combining the Header window screen position with
+    # HDM_GETITEMRECT therefore measures actual horizontally scrolled content,
+    # not the custom thumb's synthetic ScrollInfo.
+    header_hwnd = int(gate.user32.SendMessageW(list_hwnd, LVM_GETHEADER, 0, 0))
+    if not header_hwnd:
+        raise RuntimeError("LVM_GETHEADER returned no native header")
+    window_rect = gate.RECT()
+    if not gate.user32.GetWindowRect(header_hwnd, ctypes.byref(window_rect)):
+        raise RuntimeError("GetWindowRect failed for native ListView header")
+    item_rect = gate.RECT()
     result = int(
         gate.user32.SendMessageW(
-            list_hwnd,
-            LVM_GETSUBITEMRECT,
-            item,
-            ctypes.addressof(rect),
+            header_hwnd,
+            HDM_GETITEMRECT,
+            column,
+            ctypes.addressof(item_rect),
         )
     )
     if result == 0:
-        raise RuntimeError(f"LVM_GETSUBITEMRECT failed for item={item} subitem={subitem}")
-    return int(rect.left)
+        raise RuntimeError(f"HDM_GETITEMRECT failed for column={column}")
+    return int(window_rect.left + item_rect.left)
 
 
 def surface_thumb_screen_rect(surface: dict[str, object], evidence_path: Path) -> list[int]:
@@ -176,19 +189,19 @@ def main() -> int:
         list_hwnd, surfaces = list_and_surfaces(main_hwnd)
 
         capture_list(main_hwnd, list_hwnd, evidence / "scroll-function-before.png")
-        horizontal_before = subitem_left(list_hwnd)
+        horizontal_before = header_column_screen_left(list_hwnd)
         horizontal_thumb = hover_thumb(
             surfaces["horizontal"],
             evidence / "scroll-function-horizontal-thumb-before.png",
         )
         drag_thumb(surfaces["horizontal"], horizontal_thumb, True)
-        horizontal_after = subitem_left(list_hwnd)
+        horizontal_after = header_column_screen_left(list_hwnd)
         capture_list(main_hwnd, list_hwnd, evidence / "scroll-function-horizontal-after.png")
         horizontal_moved = horizontal_after < horizontal_before - 50
         if not horizontal_moved:
             raise RuntimeError(
-                "horizontal thumb moved without ListView content movement: "
-                f"subitem_left before={horizontal_before} after={horizontal_after}"
+                "horizontal thumb moved without native ListView content movement: "
+                f"header column screen-left before={horizontal_before} after={horizontal_after}"
             )
 
         list_child = next(
@@ -229,8 +242,9 @@ def main() -> int:
         report = {
             "overflow": overflow,
             "horizontal_drag_content_moved": horizontal_moved,
-            "horizontal_subitem_left_before": horizontal_before,
-            "horizontal_subitem_left_after": horizontal_after,
+            "horizontal_header_column_screen_left_before": horizontal_before,
+            "horizontal_header_column_screen_left_after": horizontal_after,
+            "horizontal_measurement_contract": "LVM_GETHEADER+HDM_GETITEMRECT+GetWindowRect",
             "mouse_wheel_vertical_moved": wheel_moved,
             "wheel_top_before": wheel_before,
             "wheel_top_after": wheel_after,

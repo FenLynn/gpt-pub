@@ -170,7 +170,9 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"vertical_drag_content_moved",
 		"direct_listview_scroll_contract",
 		"LVM_GETTOPINDEX",
-		"LVM_GETSUBITEMRECT",
+		"LVM_GETHEADER",
+		"HDM_GETITEMRECT",
+		"header_column_screen_left",
 	} {
 		if !bytes.Contains(scrollFunctionGate, []byte(token)) {
 			t.Errorf("functional scroll gate missing %q", token)
