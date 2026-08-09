@@ -12,6 +12,7 @@ import round12_footer_gate
 import round12_header_gate
 import round12_list_structure_gate
 import round12_real_thumbnail_gate
+import round12_selection_transition_gate
 import round12_trim_preview_gate
 
 WM_COMMAND = 0x0111
@@ -172,6 +173,7 @@ def merge_stage_evidence() -> None:
         ("footer-report.json", "round12_footer"),
         ("header-report.json", "round12_header"),
         ("round12-list-report.json", "round12_list"),
+        ("round12-selection-transition-report.json", "round12_selection_transition"),
         ("round12-real-thumbnail-report.json", "round12_real_thumbnail"),
         ("round12-trim-preview-report.json", "round12_trim_preview"),
     ):
@@ -191,6 +193,9 @@ def main() -> int:
     list_result = int(round12_list_structure_gate.main())
     if list_result != 0:
         return list_result
+    selection_result = int(round12_selection_transition_gate.main())
+    if selection_result != 0:
+        return selection_result
     thumbnail_result = int(round12_real_thumbnail_gate.main())
     if thumbnail_result != 0:
         return thumbnail_result
