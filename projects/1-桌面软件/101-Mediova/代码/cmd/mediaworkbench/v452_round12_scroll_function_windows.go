@@ -27,10 +27,8 @@ func init() {
 			if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady &&
 				round11StableCoverH != nil && round11StableCoverV != nil &&
 				round11StableCoverH.hwnd != 0 && round11StableCoverV.hwnd != 0 {
-				// Let the visual installer create and layer the two transparent
-				// surfaces first. Then keep one ListView input owner for all real
-				// scrolling. The custom thumb no longer mirrors state into the
-				// native Win32 scrollbars.
+				// Let the Round11 geometry containers exist first, then immediately
+				// collapse their actual Windows regions to the single-thumb owner.
 				time.Sleep(750 * time.Millisecond)
 				a.postUI(func() {
 					if a.hList == 0 {
@@ -41,7 +39,7 @@ func init() {
 					v452RemoveSubclass.Call(a.hList, round12FunctionalScrollCB, round12FunctionalScrollSubclassID)
 					v452SetWindowSubclass.Call(a.hList, round12FunctionalScrollCB, round12FunctionalScrollSubclassID, 0)
 					round12FunctionalSyncScrollInfo(a.hList)
-					round11InvalidateStableCoverThumbs()
+					round12SyncAllCoverRegions()
 				})
 				return
 			}
@@ -78,7 +76,6 @@ func round12FunctionalCurrentHorizontalOffset(hwnd uintptr) int {
 				if offset >= 0 {
 					return offset
 				}
-			}
 		}
 		logicalLeft += width
 	}
@@ -187,13 +184,9 @@ func round12FunctionalScrollPixels(hwnd uintptr, dx, dy int) {
 		return
 	}
 
-	// LVM_SCROLL can internally recreate WS_VSCROLL/WS_HSCROLL while overflow
-	// exists. If redraw is enabled, that native non-client scrollbar can become
-	// visible for one frame beside the custom overlay. Keep the entire content
-	// move and native-style scrub inside one redraw-suppressed transaction.
-	// Restore redraw only after both native axes have been removed, then request
-	// one non-erasing client repaint. Consecutive mouse-move requests can coalesce
-	// instead of forcing a full ListView repaint for every drag sample.
+	// Keep the content move and native-style scrub inside one redraw-suppressed
+	// transaction. The overlay is no longer a broad layered surface, so this is
+	// now only about preventing a transient native non-client scrollbar.
 	send(hwnd, WM_SETREDRAW, 0, 0)
 	send(hwnd, round7FeedbackLVMScroll, round12FunctionalSignedParam(dx), round12FunctionalSignedParam(dy))
 	round12HideNativeListScrollbars(hwnd)
@@ -201,20 +194,14 @@ func round12FunctionalScrollPixels(hwnd uintptr, dx, dy int) {
 	procRedrawWindow.Call(hwnd, 0, 0, RDW_INVALIDATE)
 }
 
-// Keep this entry point for the Round12 source contract, but do not mirror
-// custom scroll position/range/page back into the Win32 scrollbar state. Doing
-// so can momentarily resurrect a native bar while the transparent custom thumb
-// is being dragged. Native bars are now only scrubbed at install/geometry
-// boundaries.
 func round12FunctionalSyncScrollInfo(hwnd uintptr) {
 	round12HideNativeListScrollbars(hwnd)
 }
 
 func round12FunctionalAfterScroll(hwnd uintptr) {
-	// The atomic LVM_SCROLL transaction owns the single non-erasing client
-	// repaint. Only the overlay thumb and visible-thumbnail lifecycle need work
-	// here; do not invalidate the entire ListView a second time.
-	round11InvalidateStableCoverThumbs()
+	// Only the thumb-shaped window region is updated. No 17 px transparent
+	// surface and no second full-list repaint participates in a drag frame.
+	round12SyncAllCoverRegions()
 	if app != nil {
 		round9EnsureVisibleThumbnails(app, hwnd)
 	}
@@ -291,26 +278,20 @@ func round12FunctionalDriveScrollHover() bool {
 				coordinate = int(pt.Y)
 			}
 			round12FunctionalSetScrollFromCover(cover, coordinate)
+			round12ApplyCoverRegion(cover)
 			dragging = true
 			continue
 		}
 		if inside {
-			if cover.phase == round11CoverHidden || cover.phase == round11CoverPending {
-				procKillTimer.Call(cover.hwnd, round11StableCoverShowTimer)
-				procKillTimer.Call(cover.hwnd, round11StableCoverHideTimer)
+			if cover.phase != round11CoverVisible {
 				cover.phase = round11CoverVisible
-				procInvalidateRect.Call(cover.hwnd, 0, 0)
-				round11ArmStableCoverHideWatch(cover)
-			} else if cover.phase == round11CoverVisible {
-				round11ArmStableCoverHideWatch(cover)
+				round12ApplyCoverRegion(cover)
 			}
 			continue
 		}
-		if cover.phase == round11CoverPending {
-			procKillTimer.Call(cover.hwnd, round11StableCoverShowTimer)
+		if cover.phase == round11CoverVisible || cover.phase == round11CoverPending {
 			cover.phase = round11CoverHidden
-		} else if cover.phase == round11CoverVisible {
-			round11ArmStableCoverHideWatch(cover)
+			round12ApplyCoverRegion(cover)
 		}
 	}
 	return dragging
@@ -350,8 +331,8 @@ func round12FunctionalHandleMouseWheel(hwnd uintptr, wParam uintptr) bool {
 func round12FunctionalListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
 	case WM_PAINT, round7FeedbackWMPrint, round7FeedbackWMPrintClient:
-		// Painting must be side-effect free. Repeated ShowScrollBar/style scrubs
-		// inside WM_PAINT can themselves provoke frame churn while dragging.
+		// ListView paints only its own client. The thumb is an independently
+		// region-clipped child and never requires a broad transparent repaint.
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		return result
 	case WM_MOUSEMOVE:
@@ -379,7 +360,7 @@ func round12FunctionalListSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round11PositionStableScrollSurfaces(app)
 		round12FunctionalSyncScrollInfo(hwnd)
-		round11InvalidateStableCoverThumbs()
+		round12SyncAllCoverRegions()
 		return result
 	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round12FunctionalScrollCB, subclassID)
