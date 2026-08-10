@@ -185,14 +185,12 @@ func round12FunctionalScrollPixels(hwnd uintptr, dx, dy int) {
 		return
 	}
 
-	// Keep the content move and native-style scrub inside one redraw-suppressed
-	// transaction. The overlay is no longer a broad layered surface, so this is
-	// now only about preventing a transient native non-client scrollbar.
-	send(hwnd, WM_SETREDRAW, 0, 0)
+	// LVM_SCROLL already performs the minimal ListView content movement and
+	// invalidates only what is exposed by the scroll. Do not suppress/redraw the
+	// entire list on every mouse-move; that was visible as flashing on real
+	// desktops. Immediately scrub any native scrollbar state before returning.
 	send(hwnd, round7FeedbackLVMScroll, round12FunctionalSignedParam(dx), round12FunctionalSignedParam(dy))
 	round12HideNativeListScrollbars(hwnd)
-	send(hwnd, WM_SETREDRAW, 1, 0)
-	procRedrawWindow.Call(hwnd, 0, 0, RDW_INVALIDATE)
 }
 
 func round12FunctionalSyncScrollInfo(hwnd uintptr) {
@@ -200,8 +198,7 @@ func round12FunctionalSyncScrollInfo(hwnd uintptr) {
 }
 
 func round12FunctionalAfterScroll(hwnd uintptr) {
-	// Only the thumb-shaped window region is updated. No 17 px transparent
-	// surface and no second full-list repaint participates in a drag frame.
+	// Only the single thumb-shaped region follows the new content position.
 	round12SyncAllCoverRegions()
 	if app != nil {
 		round9EnsureVisibleThumbnails(app, hwnd)
@@ -279,7 +276,6 @@ func round12FunctionalDriveScrollHover() bool {
 				coordinate = int(pt.Y)
 			}
 			round12FunctionalSetScrollFromCover(cover, coordinate)
-			round12ApplyCoverRegion(cover)
 			dragging = true
 			continue
 		}
@@ -288,11 +284,11 @@ func round12FunctionalDriveScrollHover() bool {
 				cover.phase = round11CoverVisible
 				round12ApplyCoverRegion(cover)
 			}
+			round12ArmCoverHideWatch(cover)
 			continue
 		}
 		if cover.phase == round11CoverVisible || cover.phase == round11CoverPending {
-			cover.phase = round11CoverHidden
-			round12ApplyCoverRegion(cover)
+			round12HideCoverNow(cover)
 		}
 	}
 	return dragging
