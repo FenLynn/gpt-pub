@@ -65,10 +65,9 @@ func round12HideNativeListScrollbars(hwnd uintptr) {
 	if hwnd == 0 {
 		return
 	}
-	// The report ListView may recreate its standard bar state after column or
-	// viewport work without leaving the style bits permanently clean. Keep the
-	// Round8 style guard, scrub the live style again, and hide both standard bars
-	// before every relevant paint or geometry transition.
+	// Native bars are suppressed only at ownership/geometry boundaries. The
+	// functional Round12 path never mirrors custom position back into Win32
+	// scrollbar state, so dragging does not need per-frame ShowScrollBar calls.
 	round8EnsureListStyleGuard(hwnd)
 	round12ScrubNativeListScrollStyles(hwnd)
 	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
@@ -77,7 +76,7 @@ func round12HideNativeListScrollbars(hwnd uintptr) {
 // Round11's cover windows are retained as the hit geometry and timer lifecycle,
 // but Round12 makes their visual track truly transparent. Pointer ownership is
 // moved to the ListView, so the layered cover windows are free to be click-
-// through and only the delayed thumb itself is composited above list content.
+// through and only the thumb itself is composited above list content.
 func round12InstallTransparentScrollOverlays(a *application) {
 	if a == nil || a.hList == 0 {
 		return
@@ -111,15 +110,11 @@ func round12InstallTransparentScrollOverlays(a *application) {
 	v452RemoveSubclass.Call(a.hList, round12ScrollListCallback, round12ScrollListSubclassID)
 	v452SetWindowSubclass.Call(a.hList, round12ScrollListCallback, round12ScrollListSubclassID, 0)
 	round11PositionStableScrollSurfaces(a)
-	// Positioning the final cover surfaces can trigger one last ListView layout.
-	// Scrub after that transaction as well so normal compact launches cannot
-	// expose a standard arrow or rail before the first user interaction.
 	round12HideNativeListScrollbars(a.hList)
 }
 
 // Paint the full cover in the color-key transparency color and then add only
-// the thumb when its delayed state is visible. No rail, gutter or extra list
-// boundary is drawn here.
+// the thumb when visible. No rail, gutter or extra list boundary is drawn here.
 func round12ScrollOverlaySubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	raw, ok := round11StableCoverByHWND.Load(hwnd)
 	if !ok {
@@ -136,7 +131,7 @@ func round12ScrollOverlaySubclassProc(hwnd uintptr, message uint32, wParam, lPar
 			procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
 			fillSolid(hdc, rc, round12ScrollTransparentKey)
 			if cover.phase == round11CoverVisible || cover.phase == round11CoverDragging {
-				if thumb, thumbOK := round11StableCoverThumb(cover); thumbOK {
+				if thumb, thumbOK := round12FunctionalThumbForCover(cover); thumbOK {
 					color := colorRef(160, 171, 184)
 					if cover.phase == round11CoverDragging {
 						color = colorRef(110, 132, 158)
@@ -172,8 +167,6 @@ func round12ScrollOverlaySubclassProc(hwnd uintptr, message uint32, wParam, lPar
 }
 
 func procGetStockObjectNullPen() uintptr {
-	// NULL_PEN is stock object 8. It produces a clean filled thumb with no
-	// one-pixel outline and scales without introducing a second edge.
 	value, _, _ := procGetStockObject.Call(8)
 	return value
 }
@@ -211,14 +204,13 @@ func round12DriveScrollHover() bool {
 			continue
 		}
 		if inside {
-			if cover.phase == round11CoverHidden {
-				cover.phase = round11CoverPending
+			if cover.phase == round11CoverHidden || cover.phase == round11CoverPending {
 				procKillTimer.Call(cover.hwnd, round11StableCoverShowTimer)
-				procSetTimer.Call(cover.hwnd, round11StableCoverShowTimer, round11StableCoverShowDelay, 0)
+				procKillTimer.Call(cover.hwnd, round11StableCoverHideTimer)
+				cover.phase = round11CoverVisible
+				procInvalidateRect.Call(cover.hwnd, 0, 0)
+				round11ArmStableCoverHideWatch(cover)
 			} else if cover.phase == round11CoverVisible {
-				// Keep a polling hide timer alive even when the pointer leaves the
-				// ListView directly through an outer edge and no later mouse-move
-				// message is delivered to the list.
 				round11ArmStableCoverHideWatch(cover)
 			}
 			continue
@@ -242,7 +234,7 @@ func round12BeginScrollDrag(listHWND uintptr) bool {
 		if !inside {
 			continue
 		}
-		thumb, ok := round11StableCoverThumb(cover)
+		thumb, ok := round12FunctionalThumbForCover(cover)
 		if !ok || !round7FeedbackPointInRect(pt, thumb) {
 			continue
 		}
@@ -281,9 +273,6 @@ func round12FinishScrollDrag(releaseCapture bool) bool {
 func round12ScrollListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
 	case WM_PAINT, round7FeedbackWMPrint, round7FeedbackWMPrintClient:
-		// Standard bars can be recreated by the lower ListView owner while it
-		// processes a paint. Scrub before dispatch and again immediately after
-		// the lower owner returns, rather than relying on a single pre-paint hide.
 		round12HideNativeListScrollbars(hwnd)
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round12HideNativeListScrollbars(hwnd)
