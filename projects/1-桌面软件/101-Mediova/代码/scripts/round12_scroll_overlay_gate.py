@@ -81,8 +81,6 @@ def outside_thumb_change(
     if before.size != after.size:
         raise RuntimeError(f"overlay evidence size changed: before={before.size} after={after.size}")
     left, top, right, bottom = [int(value) for value in thumb_bbox]
-    # One-pixel margin absorbs anti-aliased rounded thumb corners. Anything
-    # farther away belongs to the transparent track/background contract.
     left -= 1
     top -= 1
     right += 1
@@ -124,10 +122,6 @@ def validate_transparent_track(
         raise RuntimeError(f"{axis} thumb geometry was not a compact filled shape: {thumb!r}")
 
     outside = outside_thumb_change(baseline, visible, list(thumb["bbox"]))
-    # The thumb may legitimately cover most of a surface when overflow is only
-    # slight. Track transparency is therefore judged outside the detected thumb,
-    # not by assuming a maximum thumb length. This catches any opaque rail,
-    # gutter, arrows or secondary line regardless of the scroll ratio.
     if float(outside["changed_ratio"]) > 0.02:
         raise RuntimeError(
             f"{axis} overlay changed pixels outside the thumb; track is not transparent: "
@@ -258,36 +252,27 @@ def main() -> int:
         for record in records:
             axis = str(record["axis"])
             baseline_path = evidence / f"hover-{axis}-baseline-hidden.png"
-            pending_path = evidence / f"hover-{axis}-300ms-hidden.png"
-            visible_path = evidence / f"hover-{axis}-650ms-visible.png"
+            visible_path = evidence / f"hover-{axis}-immediate-visible.png"
             hidden_path = evidence / f"hover-{axis}-left-hidden.png"
             with (
                 Image.open(baseline_path) as baseline,
-                Image.open(pending_path) as pending,
                 Image.open(visible_path) as visible,
                 Image.open(hidden_path) as hidden,
             ):
-                pending_metrics = changed_metrics(baseline, pending)
                 visible_metrics = changed_metrics(baseline, visible)
                 hidden_metrics = changed_metrics(baseline, hidden)
                 transparent_metrics = validate_transparent_track(axis, baseline, visible)
 
-            # Before the 500 ms delay and after leaving, the overlay must be
-            # visually equivalent to the underlying ListView. Small compositor
-            # noise is tolerated, but no persistent track/rail is allowed.
-            if float(pending_metrics["changed_ratio"]) > 0.03:
-                raise RuntimeError(f"{axis} overlay became visible before 500 ms: {pending_metrics!r}")
             if float(hidden_metrics["changed_ratio"]) > 0.03:
                 raise RuntimeError(f"{axis} overlay did not return to transparent state: {hidden_metrics!r}")
 
             item = dict(record)
             item.update(
                 {
-                    "pending_change": pending_metrics,
                     "visible_change": visible_metrics,
                     "hidden_after_leave_change": hidden_metrics,
                     "transparent_track_validation": transparent_metrics,
-                    "show_delay_contract_ms": 500,
+                    "show_delay_contract_ms": 0,
                     "thumb_overlay_visible": True,
                     "track_transparent": True,
                     "hidden_state_transparent": True,
@@ -303,7 +288,7 @@ def main() -> int:
             "outside_thumb_transparency_required": True,
             "normal_compact_validation": normal_compact,
             "normal_compact_native_scrollbars_hidden": True,
-            "hover_delay_ms": 500,
+            "hover_delay_ms": 0,
             "records": report_records,
         }
         (evidence / "round12-scroll-overlay-report.json").write_text(
