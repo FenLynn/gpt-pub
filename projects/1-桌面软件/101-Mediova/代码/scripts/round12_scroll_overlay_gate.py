@@ -24,6 +24,11 @@ WS_VSCROLL = 0x00200000
 NORMAL_COMPACT_WIDTH = 1120
 NORMAL_COMPACT_HEIGHT = 720
 NATIVE_ARROW_DARK_RATIO_LIMIT = 0.08
+NULLREGION = 1
+SIMPLEREGION = 2
+COMPLEXREGION = 3
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
 
 
 def changed_metrics(before: Image.Image, after: Image.Image) -> dict[str, object]:
@@ -220,6 +225,164 @@ def validate_normal_compact_surface(exe: Path, env: dict[str, str], evidence: Pa
         terminate_process(process)
 
 
+def configure_region_api() -> tuple[ctypes.WinDLL, ctypes.WinDLL]:
+    user32 = gate.user32
+    gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
+    user32.GetWindowRgn.argtypes = [wintypes.HWND, wintypes.HRGN]
+    user32.GetWindowRgn.restype = ctypes.c_int
+    gdi32.CreateRectRgn.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+    gdi32.CreateRectRgn.restype = wintypes.HRGN
+    gdi32.GetRgnBox.argtypes = [wintypes.HRGN, ctypes.POINTER(wintypes.RECT)]
+    gdi32.GetRgnBox.restype = ctypes.c_int
+    gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+    gdi32.DeleteObject.restype = wintypes.BOOL
+    user32.mouse_event.argtypes = [
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.c_size_t,
+    ]
+    user32.mouse_event.restype = None
+    return user32, gdi32
+
+
+def window_region_metrics(hwnd: int) -> dict[str, object]:
+    user32, gdi32 = configure_region_api()
+    region = gdi32.CreateRectRgn(0, 0, 0, 0)
+    if not region:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        region_type = int(user32.GetWindowRgn(hwnd, region))
+        box = wintypes.RECT()
+        box_type = int(gdi32.GetRgnBox(region, ctypes.byref(box)))
+        bbox = [int(box.left), int(box.top), int(box.right), int(box.bottom)]
+        return {
+            "region_type": region_type,
+            "box_type": box_type,
+            "bbox": bbox,
+            "width": max(0, int(box.right - box.left)),
+            "height": max(0, int(box.bottom - box.top)),
+        }
+    finally:
+        gdi32.DeleteObject(region)
+
+
+def require_hidden_region(axis: str, phase: str, metrics: dict[str, object]) -> None:
+    if int(metrics["region_type"]) != NULLREGION or int(metrics["box_type"]) != NULLREGION:
+        raise RuntimeError(f"{axis} {phase} region was not empty: {metrics!r}")
+    if int(metrics["width"]) != 0 or int(metrics["height"]) != 0:
+        raise RuntimeError(f"{axis} {phase} empty region retained area: {metrics!r}")
+
+
+def require_thumb_only_region(
+    axis: str,
+    phase: str,
+    surface: dict[str, object],
+    metrics: dict[str, object],
+) -> None:
+    if int(metrics["region_type"]) not in (SIMPLEREGION, COMPLEXREGION):
+        raise RuntimeError(f"{axis} {phase} region was not a real thumb region: {metrics!r}")
+    left, top, right, bottom = [int(value) for value in surface["rect"]]
+    full_width = max(1, right - left)
+    full_height = max(1, bottom - top)
+    cross = int(metrics["height"]) if axis == "horizontal" else int(metrics["width"])
+    full_cross = full_height if axis == "horizontal" else full_width
+    if cross <= 0 or cross >= full_cross:
+        raise RuntimeError(
+            f"{axis} {phase} region still spans the broad surface: cross={cross} "
+            f"full_cross={full_cross} metrics={metrics!r}"
+        )
+    if cross > max(10, int(full_cross * 0.65)):
+        raise RuntimeError(
+            f"{axis} {phase} region is too thick for a single thumb: cross={cross} "
+            f"full_cross={full_cross} metrics={metrics!r}"
+        )
+
+
+def validate_window_region_ownership(main_hwnd: int, evidence: Path) -> list[dict[str, object]]:
+    runner.establish_real_overflow(main_hwnd)
+    gate.user32.SetCursorPos(900, 40)
+    time.sleep(0.35)
+    children = gate.enumerate_children(main_hwnd)
+    surfaces = [
+        child
+        for child in children
+        if child["class"] == "MWRound11StableScrollSurface" and child["visible"]
+    ]
+    if len(surfaces) != 2:
+        raise RuntimeError(f"region gate expected two stable surfaces, got {surfaces!r}")
+
+    records: list[dict[str, object]] = []
+    for surface in sorted(surfaces, key=gate.surface_axis):
+        axis = gate.surface_axis(surface)
+        hwnd = int(surface["hwnd"])
+        left, top, right, bottom = [int(value) for value in surface["rect"]]
+
+        hidden_before = window_region_metrics(hwnd)
+        require_hidden_region(axis, "hidden-before", hidden_before)
+
+        gate.user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
+        time.sleep(0.12)
+        visible = window_region_metrics(hwnd)
+        require_thumb_only_region(axis, "hover-visible", surface, visible)
+
+        hover_image = runner.capture_screen_rect(surface["rect"])
+        try:
+            hover_image.save(evidence / f"region-{axis}-hover-visible.png")
+            hover_thumb = thumb_metrics(hover_image)
+        finally:
+            hover_image.close()
+        if int(hover_thumb["pixels"]) <= 0:
+            raise RuntimeError(f"{axis} region was visible but rendered thumb pixels were absent")
+
+        bx1, by1, bx2, by2 = [int(value) for value in visible["bbox"]]
+        start_x = left + (bx1 + bx2) // 2
+        start_y = top + (by1 + by2) // 2
+        if axis == "horizontal":
+            end_x = right - max(8, (bx2 - bx1) // 2 + 3)
+            end_y = start_y
+        else:
+            end_x = start_x
+            end_y = bottom - max(8, (by2 - by1) // 2 + 3)
+
+        gate.user32.SetCursorPos(start_x, start_y)
+        time.sleep(0.05)
+        gate.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        drag_regions: list[dict[str, object]] = []
+        try:
+            for step in range(1, 13):
+                x = start_x + (end_x - start_x) * step // 12
+                y = start_y + (end_y - start_y) * step // 12
+                gate.user32.SetCursorPos(x, y)
+                time.sleep(0.04)
+                metrics = window_region_metrics(hwnd)
+                require_thumb_only_region(axis, f"drag-{step}", surface, metrics)
+                drag_regions.append(metrics)
+        finally:
+            gate.user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+
+        gate.user32.SetCursorPos(900, 40)
+        time.sleep(0.25)
+        hidden_after = window_region_metrics(hwnd)
+        require_hidden_region(axis, "hidden-after-leave", hidden_after)
+
+        records.append(
+            {
+                "axis": axis,
+                "full_surface_rect": [left, top, right, bottom],
+                "hidden_before": hidden_before,
+                "hover_visible": visible,
+                "hover_thumb_pixels": int(hover_thumb["pixels"]),
+                "drag_region_samples": drag_regions,
+                "hidden_after_leave": hidden_after,
+                "single_thumb_region_only": True,
+                "broad_surface_region_never_visible": True,
+            }
+        )
+    return records
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", required=True, type=Path)
@@ -280,16 +443,21 @@ def main() -> int:
             )
             report_records.append(item)
 
+        region_records = validate_window_region_ownership(main_hwnd, evidence)
+
         report = {
             "surface_class": "MWRound11StableScrollSurface",
             "axis_count": len(report_records),
             "native_track_absent": True,
             "transparent_track_required": True,
             "outside_thumb_transparency_required": True,
+            "window_region_ownership_required": True,
+            "broad_surface_region_forbidden": True,
             "normal_compact_validation": normal_compact,
             "normal_compact_native_scrollbars_hidden": True,
             "hover_delay_ms": 0,
             "records": report_records,
+            "window_region_validation": region_records,
         }
         (evidence / "round12-scroll-overlay-report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
