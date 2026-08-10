@@ -19,6 +19,7 @@ HDM_GETITEMCOUNT = HDM_FIRST + 0
 SRCCOPY = 0x00CC0020
 ROUND11_SCROLL_PREVIEW_ARG = "--round11-scroll-preview"
 ROUND11_THUMB_COLORS = {(160, 171, 184), (110, 132, 158)}
+IMMEDIATE_HOVER_SAMPLE_SECONDS = 0.12
 
 
 gate.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
@@ -158,11 +159,7 @@ def direct_surface_hover(
     time.sleep(1.0)
 
     children = gate.enumerate_children(hwnd)
-    legacy = [
-        child
-        for child in children
-        if child["class"] == "MWRound9ScrollCover"
-    ]
+    legacy = [child for child in children if child["class"] == "MWRound9ScrollCover"]
     if legacy:
         raise RuntimeError(f"legacy scroll covers were not retired: {legacy!r}")
 
@@ -185,19 +182,14 @@ def direct_surface_hover(
             raise RuntimeError(f"{axis} thumb was visible before hover: {baseline_thumb_pixels} pixels")
 
         gate.user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
-        time.sleep(0.30)
-        _pending_hash, pending_thumb_pixels = surface_state(
-            surface, evidence / f"hover-{axis}-300ms-hidden.png"
-        )
-        if pending_thumb_pixels != 0:
-            raise RuntimeError(f"{axis} thumb appeared before 500 ms: {pending_thumb_pixels} pixels")
-
-        time.sleep(0.35)
+        time.sleep(IMMEDIATE_HOVER_SAMPLE_SECONDS)
         visible_hash, visible_thumb_pixels = surface_state(
-            surface, evidence / f"hover-{axis}-650ms-visible.png"
+            surface, evidence / f"hover-{axis}-immediate-visible.png"
         )
         if visible_thumb_pixels <= 0:
-            raise RuntimeError(f"{axis} thumb did not appear after 500 ms")
+            raise RuntimeError(
+                f"{axis} thumb did not appear immediately after entering the hit surface"
+            )
 
         hovered_hashes = [visible_hash]
         hovered_counts = [visible_thumb_pixels]
@@ -228,8 +220,8 @@ def direct_surface_hover(
                 "overflow": overflow,
                 "legacy_cover_count": 0,
                 "baseline_thumb_pixels": baseline_thumb_pixels,
-                "pending_300ms_thumb_pixels": pending_thumb_pixels,
-                "visible_650ms_thumb_pixels": visible_thumb_pixels,
+                "visible_immediate_thumb_pixels": visible_thumb_pixels,
+                "visible_after_enter_ms": int(IMMEDIATE_HOVER_SAMPLE_SECONDS * 1000),
                 "hover_frames": 20,
                 "hover_unique_hashes": 1,
                 "hidden_after_leave_thumb_pixels": hidden_thumb_pixels,
