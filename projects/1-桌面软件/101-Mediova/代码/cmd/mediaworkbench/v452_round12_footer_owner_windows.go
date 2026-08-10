@@ -322,6 +322,11 @@ func round12DrawSecondarySolidAction(a *application, dis *drawItemStruct) bool {
 	content := inner
 	content.Left += scaleDPI(5)
 	content.Right -= scaleDPI(5)
-	round12DrawSolidActionContent(dis.HDC, getText(dis.HwndItem), iconKind, content, uiFontSmall, textColor)
+	// The six right-panel actions now use the same scalable Segoe MDL2 vector
+	// glyph path as the crisp top toolbar instead of integer-pixel GDI polygons.
+	// This keeps their icon edges anti-aliased and DPI-stable while preserving
+	// the existing button surfaces and labels.
+	glyph := secondaryButtonGlyph(dis.HwndItem)
+	round12DrawPolishedButtonContent(dis.HDC, getText(dis.HwndItem), glyph, content, uiFontSmall, textColor)
 	return true
 }
