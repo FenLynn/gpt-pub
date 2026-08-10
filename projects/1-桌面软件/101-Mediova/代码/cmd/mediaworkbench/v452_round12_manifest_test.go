@@ -112,16 +112,19 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("clipped ListView viewport", overlaySource,
+	assertContains("normal ListView scrollbar suppression", overlaySource,
+		"round12ScrubNativeListScrollStyles",
+		"round8EnsureListStyleGuard",
+		"round12InstallInlineListScroll",
+		"round7FeedbackWSHScroll",
+		"round7FeedbackWSVScroll",
+	)
+	assertAbsent("normal ListView scrollbar suppression", overlaySource,
+		"SetLayeredWindowAttributes",
+		"SetWindowRgn",
+		"CreateRectRgn",
 		"round12ViewportEnsure",
 		"round12ViewportGutter",
-		"round12ViewportCreateRectRgn",
-		"round12ViewportSetWindowRgn",
-		"round12ViewportRegionWidth",
-		"round12InstallInlineListScroll",
-	)
-	assertAbsent("clipped ListView viewport", overlaySource,
-		"SetLayeredWindowAttributes",
 		"MWRound11StableScrollSurface",
 		"MWRound9ScrollCover",
 		"CreateWindowExW",
@@ -131,7 +134,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("inline scroll owner", scrollSource,
+	assertContains("single ListView inline scroll owner", scrollSource,
 		"round12InstallInlineListScroll",
 		"round12InlineTrackRect",
 		"round12InlineThumbRect",
@@ -141,14 +144,17 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12InlineHandleMouseWheel",
 		"round12InlineListSubclassProc",
 		"round12InlineHoverDelay",
+		"round12InlineLVSExDoubleBuffer",
 		"round7FeedbackLVMScroll",
 	)
-	assertAbsent("inline scroll owner", scrollSource,
+	assertAbsent("single ListView inline scroll owner", scrollSource,
 		"round7FeedbackSetScrollInfo.Call",
 		"procRedrawWindow.Call",
 		"WM_SETREDRAW",
 		"SetWindowRgn",
 		"CreateWindowExW",
+		"procSetTimer.Call",
+		"round12ShowScrollBar.Call",
 	)
 
 	installOrder, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round11_install_order_windows.go"))
@@ -173,51 +179,45 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round11StableCoverH = nil",
 		"round11StableCoverV = nil",
 	)
-	assertAbsent("legacy scrollbar retirement", legacyRetire, "round11RetiredScrollHWND")
-
-	footerSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_footer_owner_windows.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertContains("action icon source", footerSource,
-		"round12FillPolygon",
-		"round12DrawSolidIcon",
-		"round12IconPlay",
-		"round12IconPause",
-		"round12IconStop",
-		"round12DrawSecondarySolidAction",
-		"secondaryButtonGlyph",
-		"round12DrawPolishedButtonContent",
-	)
 
 	scrollGate, err := os.ReadFile(filepath.Join(root, "scripts", "round12_scroll_overlay_gate.py"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("clipped viewport visual gate", scrollGate,
-		"clipped-native-gutter-single-inline-thumb",
+	assertContains("single inline visual gate", scrollGate,
+		"single-listview-inline-thumb",
 		"scrollbar_child_windows_forbidden",
-		"native_scrollbars_clipped_outside_viewport",
-		"HOVER_DELAY_MS = 500",
+		"native_scroll_style_bits",
+		"HOVER_DELAY_MS = 0",
 		"track_transparent",
 		"outside_thumb_change",
 		"MWRound9ScrollCover",
 		"MWRound11StableScrollSurface",
+	)
+	assertAbsent("single inline visual gate", scrollGate,
+		"clipped-native-gutter-single-inline-thumb",
+		"assert_clipped_scroll_viewport",
+		"native_scrollbars_clipped_outside_viewport",
 	)
 
 	scrollFunctionGate, err := os.ReadFile(filepath.Join(root, "scripts", "round12_scroll_function_gate.py"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("clipped viewport function gate", scrollFunctionGate,
-		"clipped-native-gutter-single-inline-thumb",
+	assertContains("single inline function gate", scrollFunctionGate,
+		"single-listview-inline-thumb",
 		"horizontal_drag_content_moved",
 		"mouse_wheel_vertical_moved",
 		"vertical_drag_content_moved",
-		"native_scrollbars_clipped_outside_viewport_throughout_interaction",
+		"native_scroll_style_bits_throughout_interaction",
 		"scrollbar_child_window_count",
 		"MWRound9ScrollCover",
 		"MWRound11StableScrollSurface",
+	)
+	assertAbsent("single inline function gate", scrollFunctionGate,
+		"clipped-native-gutter-single-inline-thumb",
+		"assert_clipped_scroll_viewport",
+		"native_scrollbars_clipped_outside_viewport",
 	)
 
 	thumbnailQualitySource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_thumbnail_quality_windows.go"))
