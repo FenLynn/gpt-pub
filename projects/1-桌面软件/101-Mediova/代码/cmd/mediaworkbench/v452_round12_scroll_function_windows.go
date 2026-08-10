@@ -186,7 +186,19 @@ func round12FunctionalScrollPixels(hwnd uintptr, dx, dy int) {
 	if hwnd == 0 || (dx == 0 && dy == 0) {
 		return
 	}
+
+	// LVM_SCROLL can internally recreate WS_VSCROLL/WS_HSCROLL while overflow
+	// exists. If redraw is enabled, that native non-client scrollbar can become
+	// visible for one frame beside the custom overlay. Keep the entire content
+	// move and native-style scrub inside one redraw-suppressed transaction.
+	// Restore redraw only after both native axes have been removed, then request
+	// one non-erasing client repaint. Consecutive mouse-move requests can coalesce
+	// instead of forcing a full ListView repaint for every drag sample.
+	send(hwnd, WM_SETREDRAW, 0, 0)
 	send(hwnd, round7FeedbackLVMScroll, round12FunctionalSignedParam(dx), round12FunctionalSignedParam(dy))
+	round12HideNativeListScrollbars(hwnd)
+	send(hwnd, WM_SETREDRAW, 1, 0)
+	procRedrawWindow.Call(hwnd, 0, 0, RDW_INVALIDATE)
 }
 
 // Keep this entry point for the Round12 source contract, but do not mirror
@@ -199,9 +211,9 @@ func round12FunctionalSyncScrollInfo(hwnd uintptr) {
 }
 
 func round12FunctionalAfterScroll(hwnd uintptr) {
-	// LVM_SCROLL already moves and invalidates ListView content. Do not force a
-	// second full-list repaint for every mouse-move during a drag; that was the
-	// source of visible flashing on real desktops.
+	// The atomic LVM_SCROLL transaction owns the single non-erasing client
+	// repaint. Only the overlay thumb and visible-thumbnail lifecycle need work
+	// here; do not invalidate the entire ListView a second time.
 	round11InvalidateStableCoverThumbs()
 	if app != nil {
 		round9EnsureVisibleThumbnails(app, hwnd)
