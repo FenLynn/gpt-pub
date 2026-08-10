@@ -112,17 +112,19 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("inline scroll bridge", overlaySource,
-		"round12ScrubNativeListScrollStyles",
-		"round12HideNativeListScrollbars",
+	assertContains("clipped ListView viewport", overlaySource,
+		"round12ViewportEnsure",
+		"round12ViewportGutter",
+		"round12ViewportCreateRectRgn",
+		"round12ViewportSetWindowRgn",
+		"round12ViewportRegionWidth",
 		"round12InstallInlineListScroll",
 	)
-	assertAbsent("inline scroll bridge", overlaySource,
-		"SetWindowRgn",
-		"CreateRectRgn",
+	assertAbsent("clipped ListView viewport", overlaySource,
 		"SetLayeredWindowAttributes",
 		"MWRound11StableScrollSurface",
 		"MWRound9ScrollCover",
+		"CreateWindowExW",
 	)
 
 	scrollSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_scroll_function_windows.go"))
@@ -192,9 +194,10 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("inline scroll visual gate", scrollGate,
-		"single-listview-inline-thumb",
+	assertContains("clipped viewport visual gate", scrollGate,
+		"clipped-native-gutter-single-inline-thumb",
 		"scrollbar_child_windows_forbidden",
+		"native_scrollbars_clipped_outside_viewport",
 		"HOVER_DELAY_MS = 500",
 		"track_transparent",
 		"outside_thumb_change",
@@ -206,12 +209,12 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("inline scroll function gate", scrollFunctionGate,
-		"single-listview-inline-thumb",
+	assertContains("clipped viewport function gate", scrollFunctionGate,
+		"clipped-native-gutter-single-inline-thumb",
 		"horizontal_drag_content_moved",
 		"mouse_wheel_vertical_moved",
 		"vertical_drag_content_moved",
-		"native_scrollbars_absent_throughout_interaction",
+		"native_scrollbars_clipped_outside_viewport_throughout_interaction",
 		"scrollbar_child_window_count",
 		"MWRound9ScrollCover",
 		"MWRound11StableScrollSurface",
