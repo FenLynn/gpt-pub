@@ -101,6 +101,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12ShowScrollBar",
 		"round12ScrubNativeListScrollStyles",
 		"round12HideNativeListScrollbars",
+		"round12FunctionalThumbForCover",
 	} {
 		if !bytes.Contains(overlaySource, []byte(token)) {
 			t.Errorf("transparent scroll overlay source missing %q", token)
@@ -116,11 +117,19 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12FunctionalSetScrollFromCover",
 		"round12FunctionalHandleMouseWheel",
 		"round12FunctionalCurrentHorizontalOffset",
+		"round12FunctionalThumbForCover",
 		"round12FunctionalSyncScrollInfo",
 		"round12FunctionalListSubclassProc",
 	} {
 		if !bytes.Contains(scrollFunctionSource, []byte(token)) {
 			t.Errorf("functional scroll source missing %q", token)
+		}
+	}
+	for _, forbidden := range []string{
+		"round7FeedbackSetScrollInfo.Call",
+	} {
+		if bytes.Contains(scrollFunctionSource, []byte(forbidden)) {
+			t.Errorf("functional scroll source still writes native scrollbar state: %q", forbidden)
 		}
 	}
 
@@ -135,9 +144,11 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12IconPause",
 		"round12IconStop",
 		"round12DrawSecondarySolidAction",
+		"secondaryButtonGlyph",
+		"round12DrawPolishedButtonContent",
 	} {
 		if !bytes.Contains(footerSource, []byte(token)) {
-			t.Errorf("solid action source missing %q", token)
+			t.Errorf("action icon source missing %q", token)
 		}
 	}
 
@@ -153,7 +164,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"validate_normal_compact_surface",
 		"normal_compact_native_scrollbars_hidden",
 		"normal-compact-list-bottom.png",
-		"650ms-visible.png",
+		"immediate-visible.png",
+		"\"hover_delay_ms\": 0",
 	} {
 		if !bytes.Contains(scrollGate, []byte(token)) {
 			t.Errorf("scroll overlay gate missing %q", token)
