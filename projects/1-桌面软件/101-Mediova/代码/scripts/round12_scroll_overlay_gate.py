@@ -15,7 +15,8 @@ import round11_flicker_gate as gate
 import round11_flicker_gate_runner_base as runner
 
 THUMB_COLORS = runner.INLINE_THUMB_COLORS
-HOVER_DELAY_MS = 500
+HOVER_DELAY_MS = 0
+IMMEDIATE_SAMPLE_SECONDS = 0.12
 FORBIDDEN_SCROLL_CLASSES = {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
 
 
@@ -38,6 +39,7 @@ def list_child(main_hwnd: int) -> dict[str, object]:
     forbidden = [child for child in children if child["class"] in FORBIDDEN_SCROLL_CLASSES]
     if forbidden:
         raise RuntimeError(f"scrollbar child windows still exist: {forbidden!r}")
+    runner.normal_list_geometry(main_hwnd)
     return lists[0]
 
 
@@ -115,13 +117,9 @@ def outside_thumb_change(before: Image.Image, after: Image.Image, bbox: list[int
         diff.close()
 
 
-def park_cursor(main_hwnd: int) -> None:
-    runner.park_cursor(main_hwnd)
-
-
 def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object]:
-    runner.assert_clipped_scroll_viewport(main_hwnd)
-    park_cursor(main_hwnd)
+    geometry = runner.normal_list_geometry(main_hwnd)
+    runner.park_cursor(main_hwnd)
     baseline = capture_list(main_hwnd, evidence / f"inline-{axis}-baseline.png")
     try:
         base_metrics = thumb_metrics(baseline)
@@ -130,21 +128,12 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
 
         x, y = runner.inline_hover_point(main_hwnd, axis)
         gate.user32.SetCursorPos(x, y)
-        time.sleep(0.30)
-        pending = capture_list(main_hwnd, evidence / f"inline-{axis}-300ms.png")
-        try:
-            pending_metrics = thumb_metrics(pending)
-            if int(pending_metrics["pixels"]) != 0:
-                raise RuntimeError(f"{axis} thumb appeared before 500 ms: {pending_metrics!r}")
-        finally:
-            pending.close()
-
-        time.sleep(0.35)
-        visible = capture_list(main_hwnd, evidence / f"inline-{axis}-650ms.png")
+        time.sleep(IMMEDIATE_SAMPLE_SECONDS)
+        visible = capture_list(main_hwnd, evidence / f"inline-{axis}-immediate.png")
         try:
             metrics = thumb_metrics(visible, axis)
             if int(metrics["pixels"]) <= 0 or metrics["bbox"] is None:
-                raise RuntimeError(f"{axis} inline thumb not visible after 500 ms: {metrics!r}")
+                raise RuntimeError(f"{axis} inline thumb not visible immediately: {metrics!r}")
             if axis == "horizontal" and int(metrics.get("height", 999)) > 10:
                 raise RuntimeError(f"horizontal thumb became a broad layer: {metrics!r}")
             if axis == "vertical" and int(metrics.get("width", 999)) > 10:
@@ -158,7 +147,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
             for frame in range(20):
                 if frame:
                     time.sleep(0.04)
-                runner.assert_clipped_scroll_viewport(main_hwnd)
+                runner.normal_list_geometry(main_hwnd)
                 sample = capture_list(main_hwnd)
                 try:
                     sample_metrics = thumb_metrics(sample, axis)
@@ -169,7 +158,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
             if len(set(hashes)) != 1 or min(counts) <= 0:
                 raise RuntimeError(f"{axis} inline thumb flickered while stationary")
 
-            park_cursor(main_hwnd)
+            runner.park_cursor(main_hwnd)
             hidden = capture_list(main_hwnd, evidence / f"inline-{axis}-left-hidden.png")
             try:
                 hidden_metrics = thumb_metrics(hidden)
@@ -181,8 +170,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
             return {
                 "axis": axis,
                 "hover_delay_ms": HOVER_DELAY_MS,
-                "pending_300ms_hidden": True,
-                "visible_after_650ms": True,
+                "visible_after_enter_ms": int(IMMEDIATE_SAMPLE_SECONDS * 1000),
                 "thumb": metrics,
                 "track_transparent": True,
                 "outside_thumb_change": track,
@@ -190,7 +178,8 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
                 "hover_unique_frames": 1,
                 "hidden_after_leave": True,
                 "child_scrollbar_windows": 0,
-                "native_scrollbars_clipped_outside_viewport": True,
+                "native_scroll_style_bits": 0,
+                "list_geometry": geometry,
             }
         finally:
             visible.close()
@@ -222,19 +211,18 @@ def main() -> int:
         main_hwnd = gate.find_window(process.pid, "Mediova", 20.0)
         overflow = runner.establish_real_overflow(main_hwnd)
         child = list_child(main_hwnd)
-        geometry = runner.assert_clipped_scroll_viewport(main_hwnd)
+        geometry = runner.normal_list_geometry(main_hwnd)
         records = [
             validate_axis(main_hwnd, "horizontal", evidence),
             validate_axis(main_hwnd, "vertical", evidence),
         ]
         report = {
-            "architecture": "clipped-native-gutter-single-inline-thumb",
+            "architecture": "single-listview-inline-thumb",
             "scrollbar_child_windows_forbidden": True,
             "scrollbar_child_window_count": 0,
-            "native_scrollbars_clipped_outside_viewport": True,
-            "viewport_geometry": geometry,
+            "native_scroll_style_bits": 0,
             "physical_list_rect": child["rect"],
-            "visible_list_rect": geometry["visible_rect"],
+            "list_geometry": geometry,
             "hover_delay_ms": HOVER_DELAY_MS,
             "track_transparent": True,
             "overflow": overflow,
