@@ -11,6 +11,8 @@ import (
 const (
 	round12ScrollOverlaySubclassID = 0x45C9
 	round12ScrollListSubclassID    = 0x45CA
+	round12ScrollHideWatchTimer    = 0x45CB
+	round12ScrollHideWatchDelay    = 60
 
 	// Retired layered/color-key constants are retained for the Round12 source
 	// contract. The final owner no longer relies on layered child transparency.
@@ -77,6 +79,34 @@ func round12HideNativeListScrollbars(hwnd uintptr) {
 	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
 }
 
+func round12StopCoverTimers(cover *round11StableCover) {
+	if cover == nil || cover.hwnd == 0 {
+		return
+	}
+	// Round12 owns the lifecycle completely. Kill both Round11 timers so a
+	// delayed 500 ms show or legacy 220 ms hide can never race the new Region.
+	procKillTimer.Call(cover.hwnd, round11StableCoverShowTimer)
+	procKillTimer.Call(cover.hwnd, round11StableCoverHideTimer)
+	procKillTimer.Call(cover.hwnd, round12ScrollHideWatchTimer)
+}
+
+func round12ArmCoverHideWatch(cover *round11StableCover) {
+	if cover == nil || cover.hwnd == 0 || cover.phase != round11CoverVisible {
+		return
+	}
+	procSetTimer.Call(cover.hwnd, round12ScrollHideWatchTimer, round12ScrollHideWatchDelay, 0)
+}
+
+func round12HideCoverNow(cover *round11StableCover) {
+	if cover == nil || cover.hwnd == 0 {
+		return
+	}
+	procKillTimer.Call(cover.hwnd, round12ScrollHideWatchTimer)
+	cover.phase = round11CoverHidden
+	cover.dragOffset = 0
+	round12ApplyCoverRegion(cover)
+}
+
 // round12ApplyCoverRegion is the final visual ownership rule for task-list
 // scrolling. The old Round11 child HWND keeps its full 17 px bounding geometry
 // only so hit testing and tests can locate the edge strip. Its actual Windows
@@ -112,10 +142,9 @@ func round12ApplyCoverRegion(cover *round11StableCover) {
 		return
 	}
 	// SetWindowRgn takes ownership of region on success. Keep WS_VISIBLE so the
-	// existing HWND discovery remains stable; the empty/rounded region is the
-	// only visual shape that can reach the desktop.
+	// existing full edge-strip geometry remains available for hit calculation;
+	// only the empty/rounded region can ever reach the desktop.
 	procShowWindow.Call(cover.hwnd, SW_SHOWNOACTIVATE)
-	procInvalidateRect.Call(cover.hwnd, 0, 0)
 }
 
 func round12SyncAllCoverRegions() {
@@ -143,6 +172,13 @@ func round12InstallTransparentScrollOverlays(a *application) {
 			continue
 		}
 		hwnd := cover.hwnd
+		round12StopCoverTimers(cover)
+		cover.phase = round11CoverHidden
+		cover.dragOffset = 0
+		// Collapse the visual region before removing WS_EX_LAYERED, so there is
+		// no single startup frame in which the 17 px geometry can become opaque.
+		round12ApplyCoverRegion(cover)
+
 		exStyle, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle)
 		newExStyle := (exStyle &^ uintptr(round12ScrollWSExLayered)) | uintptr(round12ScrollWSExTransparent)
 		if newExStyle != exStyle {
@@ -209,7 +245,34 @@ func round12ScrollOverlaySubclassProc(hwnd uintptr, message uint32, wParam, lPar
 	case WM_NCHITTEST:
 		// Always pass pointer ownership through to the ListView underneath.
 		return ^uintptr(0) // HTTRANSPARENT == -1
+	case WM_TIMER:
+		switch wParam {
+		case round11StableCoverShowTimer, round11StableCoverHideTimer:
+			// Round11 timers are permanently retired once Round12 owns the HWND.
+			procKillTimer.Call(hwnd, wParam)
+			return 0
+		case round12ScrollHideWatchTimer:
+			if cover.phase == round11CoverDragging {
+				return 0
+			}
+			if cover.phase != round11CoverVisible {
+				procKillTimer.Call(hwnd, round12ScrollHideWatchTimer)
+				return 0
+			}
+			_, inside := round12ScrollCursorPoint(cover)
+			if !inside {
+				round12HideCoverNow(cover)
+			}
+			return 0
+		}
+	case round7FeedbackWMMouseLeave:
+		// The overlay itself is HTTRANSPARENT, so MouseLeave is not guaranteed on
+		// every desktop. The 60 ms watch is authoritative and works even when the
+		// pointer leaves the ListView entirely.
+		round12ArmCoverHideWatch(cover)
+		return 0
 	case v452WMNCDestroy:
+		round12StopCoverTimers(cover)
 		v452RemoveSubclass.Call(hwnd, round12ScrollOverlayCallback, subclassID)
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
@@ -253,7 +316,6 @@ func round12DriveScrollHover() bool {
 				coordinate = int(pt.Y)
 			}
 			round12FunctionalSetScrollFromCover(cover, coordinate)
-			round12ApplyCoverRegion(cover)
 			dragging = true
 			continue
 		}
@@ -262,11 +324,11 @@ func round12DriveScrollHover() bool {
 				cover.phase = round11CoverVisible
 				round12ApplyCoverRegion(cover)
 			}
+			round12ArmCoverHideWatch(cover)
 			continue
 		}
 		if cover.phase == round11CoverVisible || cover.phase == round11CoverPending {
-			cover.phase = round11CoverHidden
-			round12ApplyCoverRegion(cover)
+			round12HideCoverNow(cover)
 		}
 	}
 	return dragging
@@ -285,6 +347,7 @@ func round12BeginScrollDrag(listHWND uintptr) bool {
 		if !ok || !round7FeedbackPointInRect(pt, thumb) {
 			continue
 		}
+		procKillTimer.Call(cover.hwnd, round12ScrollHideWatchTimer)
 		cover.phase = round11CoverDragging
 		if cover.axis == round9AxisVertical {
 			cover.dragOffset = int(pt.Y - thumb.Top)
@@ -306,6 +369,7 @@ func round12FinishScrollDrag(releaseCapture bool) bool {
 		}
 		cover.phase = round11CoverVisible
 		round12ApplyCoverRegion(cover)
+		round12ArmCoverHideWatch(cover)
 		finished = true
 	}
 	if finished && releaseCapture {
