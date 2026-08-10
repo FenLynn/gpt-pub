@@ -76,6 +76,7 @@ func round12FunctionalCurrentHorizontalOffset(hwnd uintptr) int {
 				if offset >= 0 {
 					return offset
 				}
+			}
 		}
 		logicalLeft += width
 	}
