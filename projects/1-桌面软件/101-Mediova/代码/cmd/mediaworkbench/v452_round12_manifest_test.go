@@ -44,13 +44,14 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 47 {
-		t.Errorf("entries=%d want=47", entries)
+	if entries != 48 {
+		t.Errorf("entries=%d want=48", entries)
 	}
 
 	for _, path := range []string{
 		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
 		"cmd/mediaworkbench/v452_round8_editor_install_windows.go",
+		"cmd/mediaworkbench/v452_round8_list_style_guard_windows.go",
 		"cmd/mediaworkbench/v452_round9_thumbnail_lifecycle_windows.go",
 		"cmd/mediaworkbench/v452_round9_timeline_windows.go",
 		"cmd/mediaworkbench/v452_round9_manifest_test.go",
