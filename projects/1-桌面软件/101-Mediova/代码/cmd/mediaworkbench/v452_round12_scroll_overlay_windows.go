@@ -14,10 +14,10 @@ const (
 var round12ShowScrollBar = user32.NewProc("ShowScrollBar")
 
 // round12ScrubNativeListScrollStyles is deliberately a light interaction-time
-// scrub. The one-time Round8 style guard already performed the required frame
-// recalculation during installation. Repeating SWP_FRAMECHANGED while dragging
-// makes SysListView32 recalculate overflow and can restore WS_HSCROLL/WS_VSCROLL
-// again, creating the exact native-bar flash this owner is meant to prevent.
+// style scrub. The one-time Round8 style guard already performed the required
+// frame recalculation during installation. Repeating SWP_FRAMECHANGED while
+// dragging makes SysListView32 recalculate overflow and can restore native
+// scroll styles again. This helper therefore changes style bits only.
 func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
 	if hwnd == 0 {
 		return false
@@ -28,16 +28,22 @@ func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
 		return false
 	}
 	round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, cleanStyle)
-	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
 	return true
 }
 
+// Style bits are not a sufficient visual contract for SysListView32. The
+// common control can retain a standard scrollbar in its non-client geometry
+// even after GetWindowLongPtr already reports clean style bits. Always call the
+// canonical hide API at normal installation/paint/guard points so that both
+// standard bars are actually hidden, even when the style scrub is a no-op.
 func round12HideNativeListScrollbars(hwnd uintptr) bool {
 	if hwnd == 0 {
 		return false
 	}
 	round8EnsureListStyleGuard(hwnd)
-	return round12ScrubNativeListScrollStyles(hwnd)
+	changed := round12ScrubNativeListScrollStyles(hwnd)
+	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
+	return changed
 }
 
 // Compatibility bridge for older Round12 callers. No overlay or child HWND is
