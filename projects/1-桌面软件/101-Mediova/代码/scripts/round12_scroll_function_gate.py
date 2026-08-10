@@ -62,16 +62,8 @@ def list_child(main_hwnd: int) -> dict[str, object]:
     forbidden = [child for child in children if child["class"] in FORBIDDEN_SCROLL_CLASSES]
     if forbidden:
         raise RuntimeError(f"retired scrollbar child windows exist: {forbidden!r}")
+    runner.normal_list_geometry(main_hwnd)
     return lists[0]
-
-
-def assert_viewport(main_hwnd: int, phase: str) -> dict[str, object]:
-    try:
-        geometry = runner.assert_clipped_scroll_viewport(main_hwnd)
-    except Exception as exc:
-        raise RuntimeError(f"clipped scrollbar viewport invalid during {phase}: {exc}") from exc
-    list_child(main_hwnd)
-    return geometry
 
 
 def get_top_index(list_hwnd: int) -> int:
@@ -87,7 +79,7 @@ def capture_list(main_hwnd: int, path: Path | None = None) -> Image.Image:
 
 def horizontal_content_change(before: Image.Image, after: Image.Image) -> dict[str, object]:
     if before.size != after.size:
-        raise RuntimeError(f"visible list viewport size changed during horizontal drag: {before.size} -> {after.size}")
+        raise RuntimeError(f"list size changed during horizontal drag: {before.size} -> {after.size}")
     width, height = before.size
     left = min(4, max(0, width - 1))
     top = min(30, max(0, height - 1))
@@ -139,8 +131,8 @@ def hover_thumb(main_hwnd: int, axis: str, evidence_path: Path) -> tuple[list[in
     else:
         x, y = right - 9, top + max(60, (bottom - top) // 2)
     gate.user32.SetCursorPos(x, y)
-    time.sleep(0.62)
-    assert_viewport(main_hwnd, f"{axis} hover")
+    time.sleep(0.12)
+    runner.normal_list_geometry(main_hwnd)
     image = capture_list(main_hwnd, evidence_path)
     try:
         metrics = overlay_gate.thumb_metrics(image, axis)
@@ -148,7 +140,7 @@ def hover_thumb(main_hwnd: int, axis: str, evidence_path: Path) -> tuple[list[in
         image.close()
     bbox = metrics.get("bbox")
     if not bbox or int(metrics.get("pixels", 0)) <= 0:
-        raise RuntimeError(f"{axis} inline thumb not detected: {metrics!r}")
+        raise RuntimeError(f"{axis} inline thumb not detected immediately: {metrics!r}")
     if axis == "horizontal" and int(metrics.get("height", 999)) > 10:
         raise RuntimeError(f"horizontal hover thumb became broad: {metrics!r}")
     if axis == "vertical" and int(metrics.get("width", 999)) > 10:
@@ -163,7 +155,7 @@ def drag_thumb(
     thumb: list[int],
     toward_end: bool,
     evidence: Path,
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+) -> list[dict[str, object]]:
     left, top, right, bottom = runner.visible_list_rect(main_hwnd)
     x1, y1, x2, y2 = thumb
     start_x = (x1 + x2) // 2
@@ -177,11 +169,10 @@ def drag_thumb(
         end_x = start_x
         end_y = bottom - 28 - half if toward_end else top + 38 + half
 
-    viewport_samples: list[dict[str, object]] = []
-    thumb_samples: list[dict[str, object]] = []
-    viewport_samples.append(assert_viewport(main_hwnd, f"{axis} pre-drag"))
+    samples: list[dict[str, object]] = []
+    runner.normal_list_geometry(main_hwnd)
     gate.user32.SetCursorPos(start_x, start_y)
-    time.sleep(0.05)
+    time.sleep(0.04)
     gate.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
     try:
         for step in range(1, 13):
@@ -189,7 +180,7 @@ def drag_thumb(
             y = start_y + (end_y - start_y) * step // 12
             gate.user32.SetCursorPos(x, y)
             time.sleep(0.03)
-            viewport_samples.append(assert_viewport(main_hwnd, f"{axis} drag step {step}/12"))
+            geometry = runner.normal_list_geometry(main_hwnd)
             frame = capture_list(
                 main_hwnd,
                 evidence / f"inline-{axis}-drag-{step:02d}.png" if step in {1, 6, 12} else None,
@@ -204,23 +195,12 @@ def drag_thumb(
                 raise RuntimeError(f"horizontal thumb became a broad layer: {metrics!r}")
             if axis == "vertical" and int(metrics.get("width", 999)) > 10:
                 raise RuntimeError(f"vertical thumb became a broad layer: {metrics!r}")
-            thumb_samples.append(metrics)
+            samples.append({"step": step, "thumb": metrics, "geometry": geometry})
     finally:
         gate.user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-    time.sleep(0.18)
-    viewport_samples.append(assert_viewport(main_hwnd, f"{axis} post-drag"))
-    return viewport_samples, thumb_samples
-
-
-def compact_viewport_sample(sample: dict[str, object]) -> dict[str, object]:
-    return {
-        "physical_size": sample["physical_size"],
-        "region_size": sample["region_size"],
-        "client_size": sample["client_size"],
-        "clipped_gutter_right": sample["clipped_gutter_right"],
-        "clipped_gutter_bottom": sample["clipped_gutter_bottom"],
-        "native_scroll_style_bits": sample["native_scroll_style_bits"],
-    }
+    time.sleep(0.15)
+    runner.normal_list_geometry(main_hwnd)
+    return samples
 
 
 def main() -> int:
@@ -248,7 +228,7 @@ def main() -> int:
         overflow = runner.establish_real_overflow(main_hwnd)
         child = list_child(main_hwnd)
         list_hwnd = int(child["hwnd"])
-        initial_viewport = assert_viewport(main_hwnd, "initial overflow")
+        initial_geometry = runner.normal_list_geometry(main_hwnd)
 
         runner.park_cursor(main_hwnd)
         before = capture_list(main_hwnd, evidence / "inline-function-horizontal-before.png")
@@ -256,7 +236,7 @@ def main() -> int:
             horizontal_thumb, horizontal_hover_metrics = hover_thumb(
                 main_hwnd, "horizontal", evidence / "inline-function-horizontal-thumb.png"
             )
-            horizontal_viewport_samples, horizontal_drag_thumb_samples = drag_thumb(
+            horizontal_drag_samples = drag_thumb(
                 main_hwnd,
                 "horizontal",
                 horizontal_thumb,
@@ -280,7 +260,7 @@ def main() -> int:
         left, top, right, bottom = runner.visible_list_rect(main_hwnd)
         gate.user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
         wheel_before = get_top_index(list_hwnd)
-        pre_wheel_viewport = assert_viewport(main_hwnd, "pre-wheel")
+        runner.normal_list_geometry(main_hwnd)
         gate.user32.mouse_event(
             MOUSEEVENTF_WHEEL,
             0,
@@ -290,7 +270,7 @@ def main() -> int:
         )
         time.sleep(0.25)
         wheel_after = get_top_index(list_hwnd)
-        post_wheel_viewport = assert_viewport(main_hwnd, "post-wheel")
+        wheel_geometry = runner.normal_list_geometry(main_hwnd)
         if wheel_after <= wheel_before:
             raise RuntimeError(f"mouse wheel did not move vertically: before={wheel_before} after={wheel_after}")
 
@@ -298,7 +278,7 @@ def main() -> int:
         vertical_thumb, vertical_hover_metrics = hover_thumb(
             main_hwnd, "vertical", evidence / "inline-function-vertical-thumb.png"
         )
-        vertical_viewport_samples, vertical_drag_thumb_samples = drag_thumb(
+        vertical_drag_samples = drag_thumb(
             main_hwnd,
             "vertical",
             vertical_thumb,
@@ -312,32 +292,30 @@ def main() -> int:
             )
 
         runner.park_cursor(main_hwnd)
-        time.sleep(0.30)
-        final_viewport = assert_viewport(main_hwnd, "final idle")
+        time.sleep(0.20)
+        final_geometry = runner.normal_list_geometry(main_hwnd)
 
         report = {
-            "architecture": "clipped-native-gutter-single-inline-thumb",
+            "architecture": "single-listview-inline-thumb",
             "overflow": overflow,
             "scrollbar_child_window_count": 0,
-            "native_scrollbars_clipped_outside_viewport_throughout_interaction": True,
-            "initial_viewport": compact_viewport_sample(initial_viewport),
+            "native_scroll_style_bits_throughout_interaction": 0,
+            "initial_geometry": initial_geometry,
             "horizontal_drag_content_moved": horizontal_moved,
             "horizontal_visual_change": horizontal_metrics,
             "horizontal_hover_thumb": horizontal_hover_metrics,
-            "horizontal_drag_thumb_samples": horizontal_drag_thumb_samples,
-            "horizontal_viewport_samples": [compact_viewport_sample(item) for item in horizontal_viewport_samples],
+            "horizontal_drag_samples": horizontal_drag_samples,
             "mouse_wheel_vertical_moved": True,
             "wheel_top_before": wheel_before,
             "wheel_top_after": wheel_after,
-            "pre_wheel_viewport": compact_viewport_sample(pre_wheel_viewport),
-            "post_wheel_viewport": compact_viewport_sample(post_wheel_viewport),
+            "wheel_geometry": wheel_geometry,
             "vertical_drag_content_moved": True,
             "vertical_top_before": vertical_before,
             "vertical_top_after": vertical_after,
             "vertical_hover_thumb": vertical_hover_metrics,
-            "vertical_drag_thumb_samples": vertical_drag_thumb_samples,
-            "vertical_viewport_samples": [compact_viewport_sample(item) for item in vertical_viewport_samples],
-            "final_viewport": compact_viewport_sample(final_viewport),
+            "vertical_drag_samples": vertical_drag_samples,
+            "final_geometry": final_geometry,
+            "direct_listview_scroll_contract": "LVM_SCROLL",
         }
         (evidence / "round12-scroll-function-report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
