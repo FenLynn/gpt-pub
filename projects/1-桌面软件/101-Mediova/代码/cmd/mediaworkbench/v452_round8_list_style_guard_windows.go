@@ -31,8 +31,9 @@ func init() {
 // round8EnsureListStyleGuard is called synchronously from the ListView's own
 // UI-thread subclass. It installs exactly once for the current ListView and
 // prevents Windows from restoring native scrollbars or the old 3-D client
-// edge. The one-time frame change is performed only during installation;
-// routine refreshes never toggle styles or recalculate the non-client area.
+// edge. If an older v4.5.2 path removed the subclass without clearing the
+// ownership marker, calling SetWindowSubclass again repairs that stale marker
+// without creating a duplicate subclass entry.
 func round8EnsureListStyleGuard(hwnd uintptr) {
 	if hwnd == 0 {
 		return
@@ -40,6 +41,9 @@ func round8EnsureListStyleGuard(hwnd uintptr) {
 	round8ListStyleGuardMu.Lock()
 	if round8ListStyleGuardHwnd == hwnd {
 		round8ListStyleGuardMu.Unlock()
+		// SetWindowSubclass updates the existing entry when present and restores
+		// it when a retired path removed the callback but left our marker stale.
+		v452SetWindowSubclass.Call(hwnd, round8ListStyleGuardCB, round8ListStyleGuardSubclassID, 0)
 		return
 	}
 	if ok, _, _ := v452SetWindowSubclass.Call(hwnd, round8ListStyleGuardCB, round8ListStyleGuardSubclassID, 0); ok == 0 {
