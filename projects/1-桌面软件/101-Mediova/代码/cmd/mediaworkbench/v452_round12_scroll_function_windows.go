@@ -10,9 +10,6 @@ import (
 
 const (
 	round12FunctionalScrollSubclassID = 0x45CD
-	round12FunctionalSIFRange         = 0x0001
-	round12FunctionalSIFPage          = 0x0002
-	round12FunctionalSIFPos           = 0x0004
 	round12FunctionalWheelDelta       = 120
 	round12FunctionalWheelRows        = 3
 )
@@ -30,9 +27,10 @@ func init() {
 			if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady &&
 				round11StableCoverH != nil && round11StableCoverV != nil &&
 				round11StableCoverH.hwnd != 0 && round11StableCoverV.hwnd != 0 {
-				// The visual Round12 installer is also asynchronous. Let it finish
-				// first, then replace only its ListView input subclass. The overlay
-				// windows and their 500 ms visual lifecycle remain untouched.
+				// Let the visual installer create and layer the two transparent
+				// surfaces first. Then keep one ListView input owner for all real
+				// scrolling. The custom thumb no longer mirrors state into the
+				// native Win32 scrollbars.
 				time.Sleep(750 * time.Millisecond)
 				a.postUI(func() {
 					if a.hList == 0 {
@@ -43,7 +41,6 @@ func init() {
 					v452RemoveSubclass.Call(a.hList, round12FunctionalScrollCB, round12FunctionalScrollSubclassID)
 					v452SetWindowSubclass.Call(a.hList, round12FunctionalScrollCB, round12FunctionalScrollSubclassID, 0)
 					round12FunctionalSyncScrollInfo(a.hList)
-					round12HideNativeListScrollbars(a.hList)
 					round11InvalidateStableCoverThumbs()
 				})
 				return
@@ -129,6 +126,41 @@ func round12FunctionalMetricsFor(hwnd uintptr, axis uint8) (round12FunctionalMet
 	return round12FunctionalMetrics{min: 0, max: total - 1, page: clientWidth, pos: pos}, true
 }
 
+func round12FunctionalThumbForCover(cover *round11StableCover) (rect, bool) {
+	if cover == nil || cover.hwnd == 0 || app == nil || app.hList == 0 {
+		return rect{}, false
+	}
+	metrics, ok := round12FunctionalMetricsFor(app.hList, cover.axis)
+	if !ok {
+		return rect{}, false
+	}
+	var rc rect
+	procGetClientRect.Call(cover.hwnd, uintptr(unsafe.Pointer(&rc)))
+	margin := int(scaleDPI(3))
+	trackLength := int(rc.Right-rc.Left) - margin*2
+	if cover.axis == round9AxisVertical {
+		trackLength = int(rc.Bottom-rc.Top) - margin*2
+	}
+	if trackLength <= 0 {
+		return rect{}, false
+	}
+	start, length := round7FeedbackThumbGeometry(
+		margin,
+		trackLength,
+		metrics.min,
+		metrics.max,
+		metrics.page,
+		metrics.pos,
+	)
+	thickness := scaleDPI(7)
+	if cover.axis == round9AxisVertical {
+		x := (rc.Right - thickness) / 2
+		return rect{Left: x, Top: int32(start), Right: x + thickness, Bottom: int32(start + length)}, true
+	}
+	y := (rc.Bottom - thickness) / 2
+	return rect{Left: int32(start), Top: y, Right: int32(start + length), Bottom: y + thickness}, true
+}
+
 func round12FunctionalRowHeight(hwnd uintptr) int {
 	top := int(send(hwnd, round7FeedbackLVMGetTopIndex, 0, 0))
 	if top < 0 {
@@ -157,39 +189,23 @@ func round12FunctionalScrollPixels(hwnd uintptr, dx, dy int) {
 	send(hwnd, round7FeedbackLVMScroll, round12FunctionalSignedParam(dx), round12FunctionalSignedParam(dy))
 }
 
-func round12FunctionalSyncAxis(hwnd uintptr, axis uint8) {
-	metrics, ok := round12FunctionalMetricsFor(hwnd, axis)
-	if !ok {
-		return
-	}
-	bar := round7FeedbackSBHorz
-	if axis == round9AxisVertical {
-		bar = round7FeedbackSBVert
-	}
-	info := round7FeedbackScrollInfo{
-		CbSize: uint32(unsafe.Sizeof(round7FeedbackScrollInfo{})),
-		FMask:  round12FunctionalSIFRange | round12FunctionalSIFPage | round12FunctionalSIFPos,
-		NMin:   int32(metrics.min),
-		NMax:   int32(metrics.max),
-		NPage:  uint32(metrics.page),
-		NPos:   int32(metrics.pos),
-	}
-	round7FeedbackSetScrollInfo.Call(hwnd, uintptr(bar), uintptr(unsafe.Pointer(&info)), 0)
-}
-
+// Keep this entry point for the Round12 source contract, but do not mirror
+// custom scroll position/range/page back into the Win32 scrollbar state. Doing
+// so can momentarily resurrect a native bar while the transparent custom thumb
+// is being dragged. Native bars are now only scrubbed at install/geometry
+// boundaries.
 func round12FunctionalSyncScrollInfo(hwnd uintptr) {
-	round12FunctionalSyncAxis(hwnd, round9AxisHorizontal)
-	round12FunctionalSyncAxis(hwnd, round9AxisVertical)
 	round12HideNativeListScrollbars(hwnd)
 }
 
 func round12FunctionalAfterScroll(hwnd uintptr) {
-	round12FunctionalSyncScrollInfo(hwnd)
+	// LVM_SCROLL already moves and invalidates ListView content. Do not force a
+	// second full-list repaint for every mouse-move during a drag; that was the
+	// source of visible flashing on real desktops.
 	round11InvalidateStableCoverThumbs()
 	if app != nil {
 		round9EnsureVisibleThumbnails(app, hwnd)
 	}
-	procInvalidateRect.Call(hwnd, 0, 0)
 }
 
 func round12FunctionalSetScrollFromCover(cover *round11StableCover, coordinate int) {
@@ -210,7 +226,7 @@ func round12FunctionalSetScrollFromCover(cover *round11StableCover, coordinate i
 	if trackLength <= 0 {
 		return
 	}
-	start, thumbLength := round7FeedbackThumbGeometry(
+	_, thumbLength := round7FeedbackThumbGeometry(
 		margin,
 		trackLength,
 		metrics.min,
@@ -218,7 +234,6 @@ func round12FunctionalSetScrollFromCover(cover *round11StableCover, coordinate i
 		metrics.page,
 		metrics.pos,
 	)
-	_ = start
 	movable := trackLength - thumbLength
 	if movable <= 0 {
 		return
@@ -268,10 +283,12 @@ func round12FunctionalDriveScrollHover() bool {
 			continue
 		}
 		if inside {
-			if cover.phase == round11CoverHidden {
-				cover.phase = round11CoverPending
+			if cover.phase == round11CoverHidden || cover.phase == round11CoverPending {
 				procKillTimer.Call(cover.hwnd, round11StableCoverShowTimer)
-				procSetTimer.Call(cover.hwnd, round11StableCoverShowTimer, round11StableCoverShowDelay, 0)
+				procKillTimer.Call(cover.hwnd, round11StableCoverHideTimer)
+				cover.phase = round11CoverVisible
+				procInvalidateRect.Call(cover.hwnd, 0, 0)
+				round11ArmStableCoverHideWatch(cover)
 			} else if cover.phase == round11CoverVisible {
 				round11ArmStableCoverHideWatch(cover)
 			}
@@ -321,9 +338,9 @@ func round12FunctionalHandleMouseWheel(hwnd uintptr, wParam uintptr) bool {
 func round12FunctionalListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
 	case WM_PAINT, round7FeedbackWMPrint, round7FeedbackWMPrintClient:
-		round12HideNativeListScrollbars(hwnd)
+		// Painting must be side-effect free. Repeated ShowScrollBar/style scrubs
+		// inside WM_PAINT can themselves provoke frame churn while dragging.
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		round12FunctionalSyncScrollInfo(hwnd)
 		return result
 	case WM_MOUSEMOVE:
 		if round12FunctionalDriveScrollHover() {
@@ -334,7 +351,6 @@ func round12FunctionalListSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 			return 0
 		}
 	case round7FeedbackWMLButtonDown:
-		round12FunctionalSyncScrollInfo(hwnd)
 		if round12BeginScrollDrag(hwnd) {
 			return 0
 		}
