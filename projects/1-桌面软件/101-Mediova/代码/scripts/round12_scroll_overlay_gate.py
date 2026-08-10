@@ -42,8 +42,7 @@ def list_child(main_hwnd: int) -> dict[str, object]:
 
 
 def capture_list(main_hwnd: int, path: Path | None = None) -> Image.Image:
-    child = list_child(main_hwnd)
-    image = runner.capture_screen_rect(child["rect"]).convert("RGB")
+    image = runner.capture_screen_rect(runner.visible_list_rect(main_hwnd)).convert("RGB")
     if path is not None:
         image.save(path)
     return image
@@ -116,19 +115,12 @@ def outside_thumb_change(before: Image.Image, after: Image.Image, bbox: list[int
         diff.close()
 
 
-def hover_point(child: dict[str, object], axis: str) -> tuple[int, int]:
-    left, top, right, bottom = [int(value) for value in child["rect"]]
-    if axis == "horizontal":
-        return (left + right) // 2, bottom - 9
-    return right - 9, top + max(60, (bottom - top) // 2)
-
-
 def park_cursor(main_hwnd: int) -> None:
     runner.park_cursor(main_hwnd)
 
 
 def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object]:
-    child = list_child(main_hwnd)
+    runner.assert_clipped_scroll_viewport(main_hwnd)
     park_cursor(main_hwnd)
     baseline = capture_list(main_hwnd, evidence / f"inline-{axis}-baseline.png")
     try:
@@ -136,7 +128,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
         if int(base_metrics["pixels"]) != 0:
             raise RuntimeError(f"{axis} thumb visible at baseline: {base_metrics!r}")
 
-        x, y = hover_point(child, axis)
+        x, y = runner.inline_hover_point(main_hwnd, axis)
         gate.user32.SetCursorPos(x, y)
         time.sleep(0.30)
         pending = capture_list(main_hwnd, evidence / f"inline-{axis}-300ms.png")
@@ -153,6 +145,10 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
             metrics = thumb_metrics(visible, axis)
             if int(metrics["pixels"]) <= 0 or metrics["bbox"] is None:
                 raise RuntimeError(f"{axis} inline thumb not visible after 500 ms: {metrics!r}")
+            if axis == "horizontal" and int(metrics.get("height", 999)) > 10:
+                raise RuntimeError(f"horizontal thumb became a broad layer: {metrics!r}")
+            if axis == "vertical" and int(metrics.get("width", 999)) > 10:
+                raise RuntimeError(f"vertical thumb became a broad layer: {metrics!r}")
             track = outside_thumb_change(baseline, visible, metrics["bbox"])
             if float(track["changed_ratio"]) > 0.005:
                 raise RuntimeError(f"{axis} transparent track changed outside thumb: {track!r}")
@@ -162,6 +158,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
             for frame in range(20):
                 if frame:
                     time.sleep(0.04)
+                runner.assert_clipped_scroll_viewport(main_hwnd)
                 sample = capture_list(main_hwnd)
                 try:
                     sample_metrics = thumb_metrics(sample, axis)
@@ -193,6 +190,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
                 "hover_unique_frames": 1,
                 "hidden_after_leave": True,
                 "child_scrollbar_windows": 0,
+                "native_scrollbars_clipped_outside_viewport": True,
             }
         finally:
             visible.close()
@@ -224,19 +222,19 @@ def main() -> int:
         main_hwnd = gate.find_window(process.pid, "Mediova", 20.0)
         overflow = runner.establish_real_overflow(main_hwnd)
         child = list_child(main_hwnd)
-        style = int(str(child["style"]), 16)
-        native_bits = style & (gate.WS_HSCROLL | gate.WS_VSCROLL)
-        if native_bits:
-            raise RuntimeError(f"native scrollbar styles visible at rest: 0x{native_bits:x}")
+        geometry = runner.assert_clipped_scroll_viewport(main_hwnd)
         records = [
             validate_axis(main_hwnd, "horizontal", evidence),
             validate_axis(main_hwnd, "vertical", evidence),
         ]
         report = {
-            "architecture": "single-listview-inline-thumb",
+            "architecture": "clipped-native-gutter-single-inline-thumb",
             "scrollbar_child_windows_forbidden": True,
             "scrollbar_child_window_count": 0,
-            "native_scroll_style_bits": native_bits,
+            "native_scrollbars_clipped_outside_viewport": True,
+            "viewport_geometry": geometry,
+            "physical_list_rect": child["rect"],
+            "visible_list_rect": geometry["visible_rect"],
             "hover_delay_ms": HOVER_DELAY_MS,
             "track_transparent": True,
             "overflow": overflow,
