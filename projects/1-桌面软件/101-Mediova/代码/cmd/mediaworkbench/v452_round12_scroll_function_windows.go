@@ -185,12 +185,17 @@ func round12FunctionalScrollPixels(hwnd uintptr, dx, dy int) {
 		return
 	}
 
-	// LVM_SCROLL already performs the minimal ListView content movement and
-	// invalidates only what is exposed by the scroll. Do not suppress/redraw the
-	// entire list on every mouse-move; that was visible as flashing on real
-	// desktops. Immediately scrub any native scrollbar state before returning.
+	// LVM_SCROLL can asynchronously restore a native H/V scrollbar after a
+	// sufficiently large move. Perform the content move while redraw is disabled
+	// so the common control cannot publish that intermediate non-client state.
+	// Unlike the rejected implementation, do not synchronously RedrawWindow the
+	// whole list on every mouse move; resume drawing and enqueue one erase-free
+	// invalidation so consecutive drag frames can be coalesced by Windows.
+	send(hwnd, WM_SETREDRAW, 0, 0)
 	send(hwnd, round7FeedbackLVMScroll, round12FunctionalSignedParam(dx), round12FunctionalSignedParam(dy))
 	round12HideNativeListScrollbars(hwnd)
+	send(hwnd, WM_SETREDRAW, 1, 0)
+	procInvalidateRect.Call(hwnd, 0, 0)
 }
 
 func round12FunctionalSyncScrollInfo(hwnd uintptr) {
