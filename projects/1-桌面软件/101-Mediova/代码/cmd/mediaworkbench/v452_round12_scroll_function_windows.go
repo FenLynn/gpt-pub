@@ -9,14 +9,20 @@ import (
 )
 
 const (
-	round12FunctionalScrollSubclassID = 0x45CD
-	round12FunctionalWheelDelta       = 120
-	round12FunctionalWheelRows        = 3
+	round12FunctionalScrollSubclassID   = 0x45CD
+	round12FunctionalStyleGuardTimer    = 0x45CE
+	round12FunctionalStyleGuardInterval = 10
+	round12FunctionalStyleGuardTail     = 8
+	round12FunctionalWheelDelta         = 120
+	round12FunctionalWheelRows          = 3
+	round12FunctionalWMNCCalcSize       = 0x0083
+	round12FunctionalWMNCPaint          = 0x0085
 )
 
 var (
-	round12FunctionalScrollCB       uintptr
-	round12FunctionalWheelRemainder int
+	round12FunctionalScrollCB            uintptr
+	round12FunctionalWheelRemainder      int
+	round12FunctionalStyleGuardTailTicks int
 )
 
 func init() {
@@ -180,22 +186,68 @@ func round12FunctionalSignedParam(value int) uintptr {
 	return uintptr(int64(value))
 }
 
+// round12FunctionalLightScrubNativeScrollbars deliberately avoids
+// SWP_FRAMECHANGED and any synchronous repaint. It is safe to call from the
+// short-lived drag guard and immediately before painting. Most calls are a
+// no-op; only a genuinely resurrected native H/V style is changed.
+func round12FunctionalLightScrubNativeScrollbars(hwnd uintptr) bool {
+	if hwnd == 0 {
+		return false
+	}
+	style, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle)
+	cleanStyle := style &^ uintptr(round7FeedbackWSHScroll|round7FeedbackWSVScroll)
+	if cleanStyle == style {
+		return false
+	}
+	round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, cleanStyle)
+	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
+	return true
+}
+
+func round12FunctionalArmStyleGuard(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	round12FunctionalStyleGuardTailTicks = round12FunctionalStyleGuardTail
+	procSetTimer.Call(hwnd, round12FunctionalStyleGuardTimer, round12FunctionalStyleGuardInterval, 0)
+}
+
+func round12FunctionalAnyDragging() bool {
+	for _, cover := range []*round11StableCover{round11StableCoverH, round11StableCoverV} {
+		if cover != nil && cover.phase == round11CoverDragging {
+			return true
+		}
+	}
+	return false
+}
+
+func round12FunctionalRunStyleGuard(hwnd uintptr) {
+	round12FunctionalLightScrubNativeScrollbars(hwnd)
+	if round12FunctionalAnyDragging() {
+		round12FunctionalStyleGuardTailTicks = round12FunctionalStyleGuardTail
+		return
+	}
+	if round12FunctionalStyleGuardTailTicks > 0 {
+		round12FunctionalStyleGuardTailTicks--
+	}
+	if round12FunctionalStyleGuardTailTicks <= 0 {
+		procKillTimer.Call(hwnd, round12FunctionalStyleGuardTimer)
+	}
+}
+
 func round12FunctionalScrollPixels(hwnd uintptr, dx, dy int) {
 	if hwnd == 0 || (dx == 0 && dy == 0) {
 		return
 	}
 
-	// LVM_SCROLL can asynchronously restore a native H/V scrollbar after a
-	// sufficiently large move. Perform the content move while redraw is disabled
-	// so the common control cannot publish that intermediate non-client state.
-	// Unlike the rejected implementation, do not synchronously RedrawWindow the
-	// whole list on every mouse move; resume drawing and enqueue one erase-free
-	// invalidation so consecutive drag frames can be coalesced by Windows.
-	send(hwnd, WM_SETREDRAW, 0, 0)
+	// Move only the ListView content. Do not disable/re-enable redraw and do not
+	// force a full-list RedrawWindow for every mouse move. The common control may
+	// restore a native H/V style a few milliseconds later, so a short-lived UI
+	// timer removes that delayed state before it can survive a frame or a gate
+	// sample. WM_PAINT/WM_NCPAINT are guarded as a second synchronous barrier.
 	send(hwnd, round7FeedbackLVMScroll, round12FunctionalSignedParam(dx), round12FunctionalSignedParam(dy))
-	round12HideNativeListScrollbars(hwnd)
-	send(hwnd, WM_SETREDRAW, 1, 0)
-	procInvalidateRect.Call(hwnd, 0, 0)
+	round12FunctionalLightScrubNativeScrollbars(hwnd)
+	round12FunctionalArmStyleGuard(hwnd)
 }
 
 func round12FunctionalSyncScrollInfo(hwnd uintptr) {
@@ -332,11 +384,21 @@ func round12FunctionalHandleMouseWheel(hwnd uintptr, wParam uintptr) bool {
 
 func round12FunctionalListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
-	case WM_PAINT, round7FeedbackWMPrint, round7FeedbackWMPrintClient:
-		// ListView paints only its own client. The thumb is an independently
-		// region-clipped child and never requires a broad transparent repaint.
+	case WM_PAINT, round12FunctionalWMNCPaint, round12FunctionalWMNCCalcSize:
+		// If the common control resurrected a native scrollbar after LVM_SCROLL,
+		// strip it synchronously before any client/non-client painting or layout
+		// can expose it. This does not force a repaint by itself.
+		round12FunctionalLightScrubNativeScrollbars(hwnd)
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		return result
+	case round7FeedbackWMPrint, round7FeedbackWMPrintClient:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		return result
+	case WM_TIMER:
+		if wParam == round12FunctionalStyleGuardTimer {
+			round12FunctionalRunStyleGuard(hwnd)
+			return 0
+		}
 	case WM_MOUSEMOVE:
 		if round12FunctionalDriveScrollHover() {
 			return 0
@@ -347,15 +409,18 @@ func round12FunctionalListSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 		}
 	case round7FeedbackWMLButtonDown:
 		if round12BeginScrollDrag(hwnd) {
+			round12FunctionalArmStyleGuard(hwnd)
 			return 0
 		}
 	case WM_LBUTTONUP:
 		if round12FinishScrollDrag(true) {
+			round12FunctionalArmStyleGuard(hwnd)
 			round12FunctionalAfterScroll(hwnd)
 			return 0
 		}
 	case round7FeedbackWMCaptureChanged:
 		if round12FinishScrollDrag(false) {
+			round12FunctionalArmStyleGuard(hwnd)
 			round12FunctionalAfterScroll(hwnd)
 		}
 	case WM_SIZE, round9FeedbackWMWindowPosChanged, LVM_SETCOLUMNWIDTH, LVM_INSERTITEMW, LVM_DELETEALLITEMS:
@@ -365,6 +430,8 @@ func round12FunctionalListSubclassProc(hwnd uintptr, message uint32, wParam, lPa
 		round12SyncAllCoverRegions()
 		return result
 	case v452WMNCDestroy:
+		procKillTimer.Call(hwnd, round12FunctionalStyleGuardTimer)
+		round12FunctionalStyleGuardTailTicks = 0
 		v452RemoveSubclass.Call(hwnd, round12FunctionalScrollCB, subclassID)
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
