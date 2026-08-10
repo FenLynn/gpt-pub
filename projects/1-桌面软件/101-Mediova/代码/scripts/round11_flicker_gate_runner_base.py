@@ -21,15 +21,14 @@ import round11_flicker_gate as gate
 LVM_FIRST = 0x1000
 LVM_GETITEMCOUNT = LVM_FIRST + 4
 LVM_GETCOLUMNWIDTH = LVM_FIRST + 29
-LVM_GETTOPINDEX = LVM_FIRST + 39
 LVM_GETCOUNTPERPAGE = LVM_FIRST + 40
 HDM_FIRST = 0x1200
 HDM_GETITEMCOUNT = HDM_FIRST + 0
 SRCCOPY = 0x00CC0020
 ROUND11_SCROLL_PREVIEW_ARG = "--round11-scroll-preview"
 INLINE_THUMB_COLORS = {(160, 171, 184), (110, 132, 158)}
-INLINE_HOVER_DELAY_SECONDS = 0.50
-MIN_CLIPPED_SCROLL_GUTTER = 12
+IMMEDIATE_HOVER_SAMPLE_SECONDS = 0.10
+FORBIDDEN_SCROLL_CLASSES = {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
 
 
 gate.user32.SendMessageW.argtypes = [
@@ -41,12 +40,6 @@ gate.user32.SendMessageW.argtypes = [
 gate.user32.SendMessageW.restype = ctypes.c_ssize_t
 gate.user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(gate.RECT)]
 gate.user32.GetClientRect.restype = wintypes.BOOL
-gate.user32.GetWindowRgn.argtypes = [wintypes.HWND, wintypes.HRGN]
-gate.user32.GetWindowRgn.restype = ctypes.c_int
-gate.gdi32.CreateRectRgn.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
-gate.gdi32.CreateRectRgn.restype = wintypes.HRGN
-gate.gdi32.GetRgnBox.argtypes = [wintypes.HRGN, ctypes.POINTER(gate.RECT)]
-gate.gdi32.GetRgnBox.restype = ctypes.c_int
 gate.gdi32.BitBlt.argtypes = [
     wintypes.HDC,
     ctypes.c_int,
@@ -122,85 +115,49 @@ def list_child(main_hwnd: int) -> dict[str, Any]:
     )
 
 
-def viewport_geometry(main_hwnd: int) -> dict[str, Any]:
+def assert_no_scroll_child_windows(main_hwnd: int) -> None:
+    forbidden = [
+        child
+        for child in gate.enumerate_children(main_hwnd)
+        if child["class"] in FORBIDDEN_SCROLL_CLASSES
+    ]
+    if forbidden:
+        raise RuntimeError(f"retired scrollbar child windows still exist: {forbidden!r}")
+
+
+def normal_list_geometry(main_hwnd: int) -> dict[str, Any]:
     child = list_child(main_hwnd)
     list_hwnd = int(child["hwnd"])
-    physical = [int(value) for value in child["rect"]]
-    physical_width = physical[2] - physical[0]
-    physical_height = physical[3] - physical[1]
-
+    rect = [int(value) for value in child["rect"]]
     client = gate.RECT()
     if not gate.user32.GetClientRect(list_hwnd, ctypes.byref(client)):
         raise ctypes.WinError(ctypes.get_last_error())
-    client_width = int(client.right - client.left)
-    client_height = int(client.bottom - client.top)
-
-    region = gate.gdi32.CreateRectRgn(0, 0, 0, 0)
-    if not region:
-        raise ctypes.WinError(ctypes.get_last_error())
-    try:
-        region_type = int(gate.user32.GetWindowRgn(list_hwnd, region))
-        if region_type <= 0:
-            raise RuntimeError(f"ListView viewport region missing: type={region_type}")
-        box = gate.RECT()
-        box_type = int(gate.gdi32.GetRgnBox(region, ctypes.byref(box)))
-        region_box = [int(box.left), int(box.top), int(box.right), int(box.bottom)]
-    finally:
-        gate.gdi32.DeleteObject(region)
-
-    region_width = region_box[2] - region_box[0]
-    region_height = region_box[3] - region_box[1]
-    visible = [
-        physical[0] + region_box[0],
-        physical[1] + region_box[1],
-        physical[0] + region_box[2],
-        physical[1] + region_box[3],
-    ]
-    gutter_right = physical_width - region_width
-    gutter_bottom = physical_height - region_height
     style = int(str(child["style"]), 16)
     exstyle = int(str(child["exstyle"]), 16)
-
+    scroll_bits = style & (gate.WS_HSCROLL | gate.WS_VSCROLL)
+    if scroll_bits:
+        raise RuntimeError(
+            f"native ListView scrollbar styles remain: style=0x{style:08x} bits=0x{scroll_bits:08x}"
+        )
+    if style & gate.WS_BORDER or exstyle & gate.WS_EX_CLIENTEDGE:
+        raise RuntimeError(
+            f"legacy ListView chrome remains: style=0x{style:08x}, exstyle=0x{exstyle:08x}"
+        )
+    assert_no_scroll_child_windows(main_hwnd)
     return {
         "hwnd": list_hwnd,
-        "physical_rect": physical,
-        "visible_rect": visible,
-        "physical_size": [physical_width, physical_height],
-        "client_size": [client_width, client_height],
-        "region_type": region_type,
-        "region_box_type": box_type,
-        "region_box": region_box,
-        "region_size": [region_width, region_height],
-        "clipped_gutter_right": gutter_right,
-        "clipped_gutter_bottom": gutter_bottom,
+        "rect": rect,
+        "size": [rect[2] - rect[0], rect[3] - rect[1]],
+        "client_size": [int(client.right - client.left), int(client.bottom - client.top)],
         "style": style,
         "exstyle": exstyle,
-        "native_scroll_style_bits": style & (gate.WS_HSCROLL | gate.WS_VSCROLL),
+        "native_scroll_style_bits": scroll_bits,
+        "scroll_child_window_count": 0,
     }
 
 
-def assert_clipped_scroll_viewport(main_hwnd: int) -> dict[str, Any]:
-    geometry = viewport_geometry(main_hwnd)
-    if geometry["region_box"][0:2] != [0, 0]:
-        raise RuntimeError(f"ListView viewport region must start at origin: {geometry!r}")
-    if int(geometry["clipped_gutter_right"]) < MIN_CLIPPED_SCROLL_GUTTER:
-        raise RuntimeError(f"native vertical scrollbar gutter is not clipped: {geometry!r}")
-    if int(geometry["clipped_gutter_bottom"]) < MIN_CLIPPED_SCROLL_GUTTER:
-        raise RuntimeError(f"native horizontal scrollbar gutter is not clipped: {geometry!r}")
-    if abs(int(geometry["client_size"][0]) - int(geometry["region_size"][0])) > 2:
-        raise RuntimeError(f"ListView visible width does not match client viewport: {geometry!r}")
-    if abs(int(geometry["client_size"][1]) - int(geometry["region_size"][1])) > 2:
-        raise RuntimeError(f"ListView visible height does not match client viewport: {geometry!r}")
-    required_scroll_bits = gate.WS_HSCROLL | gate.WS_VSCROLL
-    if int(geometry["native_scroll_style_bits"]) != required_scroll_bits:
-        raise RuntimeError(f"native scrollbars are not retained in clipped gutter: {geometry!r}")
-    if int(geometry["style"]) & gate.WS_BORDER or int(geometry["exstyle"]) & gate.WS_EX_CLIENTEDGE:
-        raise RuntimeError(f"legacy ListView border chrome remains: {geometry!r}")
-    return geometry
-
-
 def visible_list_rect(main_hwnd: int) -> list[int]:
-    return list(assert_clipped_scroll_viewport(main_hwnd)["visible_rect"])
+    return list(normal_list_geometry(main_hwnd)["rect"])
 
 
 def list_overflow_state(main_hwnd: int) -> dict[str, int | bool]:
@@ -235,8 +192,8 @@ def establish_real_overflow(main_hwnd: int) -> dict[str, int | bool]:
     while time.monotonic() < deadline:
         state = list_overflow_state(main_hwnd)
         if int(state["item_count"]) >= 35 and bool(state["vertical"]) and bool(state["horizontal"]):
-            time.sleep(0.6)
-            assert_clipped_scroll_viewport(main_hwnd)
+            time.sleep(0.5)
+            normal_list_geometry(main_hwnd)
             return list_overflow_state(main_hwnd)
         time.sleep(0.10)
     raise RuntimeError(f"test-only real task mode did not produce two-axis overflow: {state!r}")
@@ -271,17 +228,6 @@ def list_state(main_hwnd: int, save_path: Path | None = None) -> tuple[str, int,
         image.close()
 
 
-def assert_no_scroll_child_windows(main_hwnd: int) -> None:
-    children = gate.enumerate_children(main_hwnd)
-    forbidden = [
-        child
-        for child in children
-        if child["class"] in {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
-    ]
-    if forbidden:
-        raise RuntimeError(f"retired scrollbar child windows still exist: {forbidden!r}")
-
-
 def inline_hover_point(main_hwnd: int, axis: str) -> tuple[int, int]:
     left, top, right, bottom = visible_list_rect(main_hwnd)
     if axis == "horizontal":
@@ -294,7 +240,7 @@ def park_cursor(main_hwnd: int) -> None:
     if not gate.user32.GetWindowRect(main_hwnd, ctypes.byref(rect)):
         raise ctypes.WinError(ctypes.get_last_error())
     gate.user32.SetCursorPos(int(rect.left) + 12, int(rect.top) + 42)
-    time.sleep(0.25)
+    time.sleep(0.20)
 
 
 def direct_surface_hover(
@@ -303,8 +249,7 @@ def direct_surface_hover(
     evidence: Path,
 ) -> list[dict[str, object]]:
     overflow = establish_real_overflow(hwnd)
-    assert_no_scroll_child_windows(hwnd)
-    geometry = assert_clipped_scroll_viewport(hwnd)
+    geometry = normal_list_geometry(hwnd)
     park_cursor(hwnd)
 
     records: list[dict[str, object]] = []
@@ -317,19 +262,12 @@ def direct_surface_hover(
 
         x, y = inline_hover_point(hwnd, axis)
         gate.user32.SetCursorPos(x, y)
-        time.sleep(0.30)
-        pending_hash, pending_pixels, _ = list_state(
-            hwnd, evidence / f"inline-{axis}-300ms-hidden.png"
-        )
-        if pending_pixels != 0 or pending_hash != baseline_hash:
-            raise RuntimeError(f"{axis} thumb appeared before the 500 ms delay")
-
-        time.sleep(0.30)
+        time.sleep(IMMEDIATE_HOVER_SAMPLE_SECONDS)
         visible_hash, visible_pixels, visible_bbox = list_state(
-            hwnd, evidence / f"inline-{axis}-600ms-visible.png"
+            hwnd, evidence / f"inline-{axis}-immediate-visible.png"
         )
         if visible_pixels <= 0 or visible_hash == baseline_hash or visible_bbox is None:
-            raise RuntimeError(f"{axis} inline thumb did not appear after 500 ms")
+            raise RuntimeError(f"{axis} inline thumb did not appear immediately")
 
         hashes = [visible_hash]
         counts = [visible_pixels]
@@ -353,15 +291,14 @@ def direct_surface_hover(
                 "axis": axis,
                 "overflow": overflow,
                 "scroll_child_window_count": 0,
-                "pending_300ms_hidden": True,
-                "visible_after_600ms": True,
+                "visible_after_enter_ms": int(IMMEDIATE_HOVER_SAMPLE_SECONDS * 1000),
                 "visible_thumb_pixels": visible_pixels,
                 "visible_thumb_bbox": list(visible_bbox),
                 "hover_frames": 20,
                 "hover_unique_hashes": 1,
                 "hidden_after_leave": True,
-                "native_scrollbars_clipped_outside_viewport": True,
-                "viewport_geometry": geometry,
+                "native_scroll_style_bits": 0,
+                "list_geometry": geometry,
             }
         )
     return records
@@ -446,11 +383,7 @@ def main() -> int:
         report["windows"]["main"] = {
             "children": children,
             "listviews": [c for c in children if c["class"] == "SysListView32"],
-            "scroll_child_windows": [
-                c
-                for c in children
-                if c["class"] in {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
-            ],
+            "scroll_child_windows": [c for c in children if c["class"] in FORBIDDEN_SCROLL_CLASSES],
         }
 
         records, children, _ = run_window_probe_with_real_scroll_tasks(
@@ -486,22 +419,16 @@ def main() -> int:
         raise RuntimeError(f"expected exactly one ListView, got {len(listviews)}")
     style = int(listviews[0]["style"], 16)
     exstyle = int(listviews[0]["exstyle"], 16)
-    if style & gate.WS_BORDER or exstyle & gate.WS_EX_CLIENTEDGE:
+    if style & (gate.WS_HSCROLL | gate.WS_VSCROLL | gate.WS_BORDER) or exstyle & gate.WS_EX_CLIENTEDGE:
         raise RuntimeError(
-            f"legacy ListView border chrome remains: style=0x{style:08x}, exstyle=0x{exstyle:08x}"
+            f"native ListView chrome remains: style=0x{style:08x}, exstyle=0x{exstyle:08x}"
         )
-    required_scroll_bits = gate.WS_HSCROLL | gate.WS_VSCROLL
-    if style & required_scroll_bits != required_scroll_bits:
-        raise RuntimeError(f"clipped native scrollbar styles missing: style=0x{style:08x}")
 
     scroll_children = report["windows"]["main"]["scroll_child_windows"]
     if scroll_children:
         raise RuntimeError(f"scrollbar child windows remain: {scroll_children!r}")
     if len(report["hover"]) != 2:
         raise RuntimeError(f"horizontal/vertical inline hover checks missing: {report['hover']!r}")
-    for record in report["hover"]:
-        if record.get("native_scrollbars_clipped_outside_viewport") is not True:
-            raise RuntimeError(f"native scrollbar clipping evidence missing: {record!r}")
 
     print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))
     return 0
