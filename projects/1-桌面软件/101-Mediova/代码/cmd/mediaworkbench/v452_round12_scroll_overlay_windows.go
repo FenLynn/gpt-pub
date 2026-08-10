@@ -13,6 +13,11 @@ const (
 
 var round12ShowScrollBar = user32.NewProc("ShowScrollBar")
 
+// round12ScrubNativeListScrollStyles is deliberately a light interaction-time
+// scrub. The one-time Round8 style guard already performed the required frame
+// recalculation during installation. Repeating SWP_FRAMECHANGED while dragging
+// makes SysListView32 recalculate overflow and can restore WS_HSCROLL/WS_VSCROLL
+// again, creating the exact native-bar flash this owner is meant to prevent.
 func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
 	if hwnd == 0 {
 		return false
@@ -23,11 +28,7 @@ func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
 		return false
 	}
 	round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, cleanStyle)
-	round7FeedbackSetWindowPos.Call(
-		hwnd, 0, 0, 0, 0, 0,
-		round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|
-			round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged,
-	)
+	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
 	return true
 }
 
@@ -36,11 +37,7 @@ func round12HideNativeListScrollbars(hwnd uintptr) bool {
 		return false
 	}
 	round8EnsureListStyleGuard(hwnd)
-	changed := round12ScrubNativeListScrollStyles(hwnd)
-	if changed {
-		round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
-	}
-	return changed
+	return round12ScrubNativeListScrollStyles(hwnd)
 }
 
 // Compatibility bridge for older Round12 callers. No overlay or child HWND is
