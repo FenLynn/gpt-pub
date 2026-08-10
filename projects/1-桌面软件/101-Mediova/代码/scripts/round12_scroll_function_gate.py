@@ -24,6 +24,10 @@ MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_WHEEL = 0x0800
 WHEEL_DELTA = 120
+GWL_STYLE = -16
+WS_HSCROLL = 0x00100000
+WS_VSCROLL = 0x00200000
+NATIVE_SCROLL_STYLE_MASK = WS_HSCROLL | WS_VSCROLL
 
 # Retired native-header measurement markers kept only for the manifest source contract:
 # LVM_GETHEADER HDM_GETITEMRECT header_column_screen_left
@@ -44,6 +48,9 @@ gate.user32.mouse_event.argtypes = [
     ctypes.c_size_t,
 ]
 gate.user32.mouse_event.restype = None
+
+gate.user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+gate.user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
 
 
 def terminate_process(process: subprocess.Popen[bytes] | subprocess.Popen[str]) -> None:
@@ -75,6 +82,24 @@ def list_and_surfaces(main_hwnd: int) -> tuple[int, dict[str, dict[str, object]]
 
 def get_top_index(list_hwnd: int) -> int:
     return int(gate.user32.SendMessageW(list_hwnd, LVM_GETTOPINDEX, 0, 0))
+
+
+def list_style(list_hwnd: int) -> int:
+    return int(gate.user32.GetWindowLongPtrW(list_hwnd, GWL_STYLE))
+
+
+def native_scroll_style_bits(list_hwnd: int) -> int:
+    return list_style(list_hwnd) & NATIVE_SCROLL_STYLE_MASK
+
+
+def assert_native_scrollbars_absent(list_hwnd: int, phase: str) -> int:
+    bits = native_scroll_style_bits(list_hwnd)
+    if bits:
+        raise RuntimeError(
+            f"native ListView scrollbar style resurrected during {phase}: "
+            f"style=0x{list_style(list_hwnd):x} scroll_bits=0x{bits:x}"
+        )
+    return bits
 
 
 def list_child(main_hwnd: int, list_hwnd: int) -> dict[str, object]:
@@ -169,11 +194,16 @@ def surface_thumb_screen_rect(surface: dict[str, object], evidence_path: Path) -
 def hover_thumb(surface: dict[str, object], evidence_path: Path) -> list[int]:
     left, top, right, bottom = [int(value) for value in surface["rect"]]
     gate.user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
-    time.sleep(0.70)
+    time.sleep(0.15)
     return surface_thumb_screen_rect(surface, evidence_path)
 
 
-def drag_thumb(surface: dict[str, object], thumb: list[int], toward_end: bool) -> None:
+def drag_thumb(
+    list_hwnd: int,
+    surface: dict[str, object],
+    thumb: list[int],
+    toward_end: bool,
+) -> list[int]:
     left, top, right, bottom = [int(value) for value in surface["rect"]]
     x1, y1, x2, y2 = thumb
     start_x = (x1 + x2) // 2
@@ -185,6 +215,8 @@ def drag_thumb(surface: dict[str, object], thumb: list[int], toward_end: bool) -
         end_x = start_x
         end_y = bottom - max(8, (y2 - y1) // 2 + 3) if toward_end else top + max(8, (y2 - y1) // 2 + 3)
 
+    style_samples: list[int] = []
+    assert_native_scrollbars_absent(list_hwnd, f"{gate.surface_axis(surface)} pre-drag")
     gate.user32.SetCursorPos(start_x, start_y)
     time.sleep(0.05)
     gate.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
@@ -194,9 +226,18 @@ def drag_thumb(surface: dict[str, object], thumb: list[int], toward_end: bool) -
             y = start_y + (end_y - start_y) * step // 12
             gate.user32.SetCursorPos(x, y)
             time.sleep(0.035)
+            style_samples.append(
+                assert_native_scrollbars_absent(
+                    list_hwnd, f"{gate.surface_axis(surface)} drag step {step}/12"
+                )
+            )
     finally:
         gate.user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-    time.sleep(0.45)
+    time.sleep(0.20)
+    style_samples.append(
+        assert_native_scrollbars_absent(list_hwnd, f"{gate.surface_axis(surface)} post-drag")
+    )
+    return style_samples
 
 
 def direct_horizontal_diagnostic(
@@ -242,6 +283,7 @@ def main() -> int:
         overflow = runner.establish_real_overflow(main_hwnd)
         time.sleep(1.0)
         list_hwnd, surfaces = list_and_surfaces(main_hwnd)
+        initial_native_bits = assert_native_scrollbars_absent(list_hwnd, "initial overflow")
 
         park_cursor(main_hwnd)
         before = capture_list_image(main_hwnd, list_hwnd, evidence / "scroll-function-before.png")
@@ -249,7 +291,9 @@ def main() -> int:
             surfaces["horizontal"],
             evidence / "scroll-function-horizontal-thumb-before.png",
         )
-        drag_thumb(surfaces["horizontal"], horizontal_thumb, True)
+        horizontal_style_samples = drag_thumb(
+            list_hwnd, surfaces["horizontal"], horizontal_thumb, True
+        )
         park_cursor(main_hwnd)
         horizontal_after_image = capture_list_image(
             main_hwnd,
@@ -277,9 +321,11 @@ def main() -> int:
         l, t, r, b = [int(value) for value in child["rect"]]
         gate.user32.SetCursorPos((l + r) // 2, (t + b) // 2)
         wheel_before = get_top_index(list_hwnd)
+        assert_native_scrollbars_absent(list_hwnd, "pre-wheel")
         gate.user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, ctypes.c_uint32(-WHEEL_DELTA).value, 0)
-        time.sleep(0.45)
+        time.sleep(0.30)
         wheel_after = get_top_index(list_hwnd)
+        wheel_native_bits = assert_native_scrollbars_absent(list_hwnd, "post-wheel")
         wheel_moved = wheel_after > wheel_before
         if not wheel_moved:
             direct_before = get_top_index(list_hwnd)
@@ -302,7 +348,9 @@ def main() -> int:
             surfaces["vertical"],
             evidence / "scroll-function-vertical-thumb-before.png",
         )
-        drag_thumb(surfaces["vertical"], vertical_thumb, True)
+        vertical_style_samples = drag_thumb(
+            list_hwnd, surfaces["vertical"], vertical_thumb, True
+        )
         vertical_after = get_top_index(list_hwnd)
         vertical_moved = vertical_after > vertical_before
         if not vertical_moved:
@@ -332,6 +380,12 @@ def main() -> int:
             "vertical_top_before": vertical_before,
             "vertical_top_after": vertical_after,
             "direct_listview_scroll_contract": "LVM_SCROLL",
+            "native_scroll_style_mask": NATIVE_SCROLL_STYLE_MASK,
+            "native_scroll_style_bits_initial": initial_native_bits,
+            "native_scroll_style_bits_during_horizontal_drag": horizontal_style_samples,
+            "native_scroll_style_bits_after_wheel": wheel_native_bits,
+            "native_scroll_style_bits_during_vertical_drag": vertical_style_samples,
+            "native_scrollbars_absent_throughout_interaction": True,
         }
         (evidence / "round12-scroll-function-report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
