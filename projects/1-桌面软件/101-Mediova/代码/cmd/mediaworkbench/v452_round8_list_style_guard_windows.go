@@ -11,6 +11,7 @@ import (
 const (
 	round8ListStyleGuardSubclassID = 0x4590
 	round8WMStyleChanging          = 0x007C
+	round8WMStyleChanged           = 0x007D
 )
 
 type round8StyleStruct struct {
@@ -22,10 +23,41 @@ var (
 	round8ListStyleGuardCB   uintptr
 	round8ListStyleGuardMu   sync.Mutex
 	round8ListStyleGuardHwnd uintptr
+	round8ListStyleRepairing bool
 )
 
 func init() {
 	round8ListStyleGuardCB = syscall.NewCallback(round8ListStyleGuardSubclassProc)
+}
+
+// round8RepairListStyle verifies the style that Windows actually committed.
+// WM_STYLECHANGING remains the first line of defense, but some ListView scroll
+// paths can restore non-client scroll bits after that proposal was filtered.
+// Repairing from WM_STYLECHANGED keeps the correction in the same style-change
+// transaction, before a later non-client paint can expose a second scrollbar.
+func round8RepairListStyle(hwnd uintptr) bool {
+	if hwnd == 0 || round8ListStyleRepairing {
+		return false
+	}
+	style, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle)
+	newStyle := style &^ uintptr(round7FeedbackWSHScroll|round7FeedbackWSVScroll|round7FeedbackWSBorder)
+	exStyle, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle)
+	newExStyle := exStyle &^ uintptr(round7FeedbackWSExClientEdge)
+	if newStyle == style && newExStyle == exStyle {
+		return false
+	}
+
+	round8ListStyleRepairing = true
+	defer func() { round8ListStyleRepairing = false }()
+	if newStyle != style {
+		round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, newStyle)
+	}
+	if newExStyle != exStyle {
+		round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle, newExStyle)
+	}
+	round7FeedbackSetWindowPos.Call(hwnd, 0, 0, 0, 0, 0,
+		round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged)
+	return true
 }
 
 // round8EnsureListStyleGuard is called synchronously from the ListView's own
@@ -44,6 +76,7 @@ func round8EnsureListStyleGuard(hwnd uintptr) {
 		// SetWindowSubclass updates the existing entry when present and restores
 		// it when a retired path removed the callback but left our marker stale.
 		v452SetWindowSubclass.Call(hwnd, round8ListStyleGuardCB, round8ListStyleGuardSubclassID, 0)
+		round8RepairListStyle(hwnd)
 		return
 	}
 	if ok, _, _ := v452SetWindowSubclass.Call(hwnd, round8ListStyleGuardCB, round8ListStyleGuardSubclassID, 0); ok == 0 {
@@ -55,24 +88,7 @@ func round8EnsureListStyleGuard(hwnd uintptr) {
 	// marker makes that nested call a no-op instead of deadlocking on this mutex.
 	round8ListStyleGuardHwnd = hwnd
 	round8ListStyleGuardMu.Unlock()
-
-	style, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle)
-	newStyle := style &^ uintptr(round7FeedbackWSHScroll|round7FeedbackWSVScroll|round7FeedbackWSBorder)
-	exStyle, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle)
-	newExStyle := exStyle &^ uintptr(round7FeedbackWSExClientEdge)
-	changed := false
-	if newStyle != style {
-		round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, newStyle)
-		changed = true
-	}
-	if newExStyle != exStyle {
-		round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle, newExStyle)
-		changed = true
-	}
-	if changed {
-		round7FeedbackSetWindowPos.Call(hwnd, 0, 0, 0, 0, 0,
-			round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged)
-	}
+	round8RepairListStyle(hwnd)
 }
 
 func round8ListStyleGuardSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
@@ -84,6 +100,11 @@ func round8ListStyleGuardSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 		case round7FeedbackGWLExStyle:
 			styles.StyleNew &^= uint32(round7FeedbackWSExClientEdge)
 		}
+	}
+	if message == round8WMStyleChanged {
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		round8RepairListStyle(hwnd)
+		return result
 	}
 	if message == v452WMNCDestroy {
 		round8ListStyleGuardMu.Lock()
