@@ -24,6 +24,7 @@ MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_WHEEL = 0x0800
 WHEEL_DELTA = 120
 FORBIDDEN_SCROLL_CLASSES = {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
+THUMB_LENGTH_TOLERANCE_PX = 2
 
 
 gate.user32.SendMessageW.argtypes = [
@@ -149,10 +150,37 @@ def hover_thumb(main_hwnd: int, axis: str, evidence_path: Path) -> tuple[list[in
     return [left + x1, top + y1, left + x2, top + y2], metrics
 
 
+def assert_drag_thumb_shape(axis: str, step: int, metrics: dict[str, object], reference: dict[str, object]) -> None:
+    if int(metrics.get("pixels", 0)) <= 0 or not metrics.get("bbox"):
+        raise RuntimeError(f"{axis} thumb vanished during drag step {step}: {metrics!r}")
+    if axis == "horizontal":
+        thickness = int(metrics.get("height", 999))
+        length = int(metrics.get("width", 0))
+        reference_thickness = int(reference.get("height", 999))
+        reference_length = int(reference.get("width", 0))
+    else:
+        thickness = int(metrics.get("width", 999))
+        length = int(metrics.get("height", 0))
+        reference_thickness = int(reference.get("width", 999))
+        reference_length = int(reference.get("height", 0))
+    if thickness > 10 or abs(thickness - reference_thickness) > 1:
+        raise RuntimeError(
+            f"{axis} thumb thickness changed during drag step {step}: "
+            f"reference={reference!r} current={metrics!r}"
+        )
+    if abs(length - reference_length) > THUMB_LENGTH_TOLERANCE_PX:
+        raise RuntimeError(
+            f"{axis} thumb length flickered during drag step {step}: "
+            f"reference_length={reference_length} current_length={length} "
+            f"reference={reference!r} current={metrics!r}"
+        )
+
+
 def drag_thumb(
     main_hwnd: int,
     axis: str,
     thumb: list[int],
+    reference_metrics: dict[str, object],
     toward_end: bool,
     evidence: Path,
 ) -> list[dict[str, object]]:
@@ -183,18 +211,13 @@ def drag_thumb(
             geometry = runner.normal_list_geometry(main_hwnd)
             frame = capture_list(
                 main_hwnd,
-                evidence / f"inline-{axis}-drag-{step:02d}.png" if step in {1, 6, 12} else None,
+                evidence / f"inline-{axis}-drag-{step:02d}.png",
             )
             try:
                 metrics = overlay_gate.thumb_metrics(frame, axis)
             finally:
                 frame.close()
-            if int(metrics.get("pixels", 0)) <= 0 or not metrics.get("bbox"):
-                raise RuntimeError(f"{axis} thumb vanished during drag step {step}: {metrics!r}")
-            if axis == "horizontal" and int(metrics.get("height", 999)) > 10:
-                raise RuntimeError(f"horizontal thumb became a broad layer: {metrics!r}")
-            if axis == "vertical" and int(metrics.get("width", 999)) > 10:
-                raise RuntimeError(f"vertical thumb became a broad layer: {metrics!r}")
+            assert_drag_thumb_shape(axis, step, metrics, reference_metrics)
             samples.append({"step": step, "thumb": metrics, "geometry": geometry})
     finally:
         gate.user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
@@ -240,6 +263,7 @@ def main() -> int:
                 main_hwnd,
                 "horizontal",
                 horizontal_thumb,
+                horizontal_hover_metrics,
                 True,
                 evidence,
             )
@@ -282,6 +306,7 @@ def main() -> int:
             main_hwnd,
             "vertical",
             vertical_thumb,
+            vertical_hover_metrics,
             True,
             evidence,
         )
@@ -300,6 +325,7 @@ def main() -> int:
             "overflow": overflow,
             "scrollbar_child_window_count": 0,
             "native_scroll_style_bits_throughout_interaction": 0,
+            "thumb_length_stability_tolerance_px": THUMB_LENGTH_TOLERANCE_PX,
             "initial_geometry": initial_geometry,
             "horizontal_drag_content_moved": horizontal_moved,
             "horizontal_visual_change": horizontal_metrics,
