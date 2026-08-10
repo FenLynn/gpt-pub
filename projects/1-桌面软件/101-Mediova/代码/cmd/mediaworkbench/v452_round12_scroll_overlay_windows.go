@@ -2,52 +2,144 @@
 
 package main
 
-// Round12 no longer creates any scrollbar child window. This file only keeps
-// native ListView scrollbar suppression and compatibility entry points used by
-// the surrounding v4.5.2 code. The visible thumb is painted directly by the
-// ListView subclass in v452_round12_scroll_function_windows.go.
+import "unsafe"
 
-const (
-	round12ScrollSBBoth = 3
+// The rebuilt Round12 scrollbar no longer tries to suppress SysListView32's
+// native scrollbars. The ListView is made physically larger than its intended
+// viewport by one scrollbar gutter on the right and bottom. A window region
+// exposes only the original viewport. Native H/V bars therefore remain outside
+// the visible/hit-test region while the custom thumb is painted inside the
+// visible ListView client.
+
+const round12ScrollSBBoth = 3
+
+var (
+	round12ShowScrollBar            = user32.NewProc("ShowScrollBar")
+	round12ViewportCreateRectRgn   = gdi32.NewProc("CreateRectRgn")
+	round12ViewportSetWindowRgn    = user32.NewProc("SetWindowRgn")
+	round12ViewportWidth           int32
+	round12ViewportHeight          int32
+	round12ViewportRegionWidth     int32
+	round12ViewportRegionHeight    int32
+	round12ViewportApplying        bool
 )
 
-var round12ShowScrollBar = user32.NewProc("ShowScrollBar")
+func round12ViewportGutter() int32 {
+	gutter := scaleDPI(17)
+	if gutter < 17 {
+		gutter = 17
+	}
+	return gutter
+}
 
-// round12ScrubNativeListScrollStyles is deliberately a light interaction-time
-// style scrub. The one-time Round8 style guard already performed the required
-// frame recalculation during installation. Repeating SWP_FRAMECHANGED while
-// dragging makes SysListView32 recalculate overflow and can restore native
-// scroll styles again. This helper therefore changes style bits only.
-func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
-	if hwnd == 0 {
+func round12ViewportReset() {
+	round12ViewportWidth = 0
+	round12ViewportHeight = 0
+	round12ViewportRegionWidth = 0
+	round12ViewportRegionHeight = 0
+	round12ViewportApplying = false
+}
+
+// round12ViewportEnsure makes the native scrollbar geometry unreachable
+// instead of racing its hide/show lifecycle. It is idempotent during paints
+// and scrolling. SetWindowRgn is only repeated when the intended viewport size
+// actually changes.
+func round12ViewportEnsure(hwnd uintptr) bool {
+	if hwnd == 0 || round12ViewportApplying {
 		return false
 	}
+
+	var wr rect
+	if ok, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&wr))); ok == 0 {
+		return false
+	}
+	actualWidth := wr.Right - wr.Left
+	actualHeight := wr.Bottom - wr.Top
+	if actualWidth <= 0 || actualHeight <= 0 {
+		return false
+	}
+
+	gutter := round12ViewportGutter()
+	if round12ViewportWidth <= 0 || round12ViewportHeight <= 0 {
+		round12ViewportWidth = actualWidth
+		round12ViewportHeight = actualHeight
+	} else {
+		expectedWidth := round12ViewportWidth + gutter
+		expectedHeight := round12ViewportHeight + gutter
+		if actualWidth != expectedWidth || actualHeight != expectedHeight {
+			// The normal main-window layout has just supplied a new intended
+			// viewport size. Adopt that size, then move the native scrollbar
+			// gutter back outside the visible region.
+			round12ViewportWidth = actualWidth
+			round12ViewportHeight = actualHeight
+		}
+	}
+
+	viewportWidth := round12ViewportWidth
+	viewportHeight := round12ViewportHeight
+	if viewportWidth <= 0 || viewportHeight <= 0 {
+		return false
+	}
+	targetWidth := viewportWidth + gutter
+	targetHeight := viewportHeight + gutter
+
+	// Round8's style guard belonged to the rejected hide/show architecture.
+	// Remove it permanently for this HWND, then deliberately retain native H/V
+	// scrollbar styles. Their non-client geometry is clipped outside the
+	// viewport and never becomes visible or clickable.
+	v452RemoveSubclass.Call(hwnd, round8ListStyleGuardCB, round8ListStyleGuardSubclassID)
 	style, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle)
-	cleanStyle := style &^ uintptr(round7FeedbackWSHScroll|round7FeedbackWSVScroll)
-	if cleanStyle == style {
-		return false
+	newStyle := (style | uintptr(round7FeedbackWSHScroll|round7FeedbackWSVScroll)) &^ uintptr(round7FeedbackWSBorder)
+	exStyle, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle)
+	newExStyle := exStyle &^ uintptr(round7FeedbackWSExClientEdge)
+	styleChanged := newStyle != style || newExStyle != exStyle
+
+	round12ViewportApplying = true
+	defer func() { round12ViewportApplying = false }()
+
+	if newStyle != style {
+		round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, newStyle)
 	}
-	round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, cleanStyle)
-	return true
+	if newExStyle != exStyle {
+		round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle, newExStyle)
+	}
+
+	resized := actualWidth != targetWidth || actualHeight != targetHeight
+	if styleChanged || resized {
+		flags := uintptr(round7FeedbackSWPNoMove | round7FeedbackSWPNoZOrder | round7FeedbackSWPNoActivate)
+		if styleChanged {
+			flags |= uintptr(round7FeedbackSWPFrameChanged)
+		}
+		round7FeedbackSetWindowPos.Call(hwnd, 0, 0, 0, uintptr(targetWidth), uintptr(targetHeight), flags)
+	}
+
+	regionChanged := round12ViewportRegionWidth != viewportWidth || round12ViewportRegionHeight != viewportHeight
+	if regionChanged {
+		rgn, _, _ := round12ViewportCreateRectRgn.Call(0, 0, uintptr(viewportWidth), uintptr(viewportHeight))
+		if rgn != 0 {
+			ok, _, _ := round12ViewportSetWindowRgn.Call(hwnd, rgn, 0)
+			if ok != 0 {
+				round12ViewportRegionWidth = viewportWidth
+				round12ViewportRegionHeight = viewportHeight
+			} else {
+				procDeleteObject.Call(rgn)
+			}
+		}
+	}
+
+	return styleChanged || resized || regionChanged
 }
 
-// Style bits are not a sufficient visual contract for SysListView32. The
-// common control can retain a standard scrollbar in its non-client geometry
-// even after GetWindowLongPtr already reports clean style bits. Always call the
-// canonical hide API at normal installation/paint/guard points so that both
-// standard bars are actually hidden, even when the style scrub is a no-op.
+// Compatibility names retained for the surrounding v4.5.2 owner. They now
+// establish the clipped viewport; they never hide/show a native scrollbar.
+func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
+	return round12ViewportEnsure(hwnd)
+}
+
 func round12HideNativeListScrollbars(hwnd uintptr) bool {
-	if hwnd == 0 {
-		return false
-	}
-	round8EnsureListStyleGuard(hwnd)
-	changed := round12ScrubNativeListScrollStyles(hwnd)
-	round12ShowScrollBar.Call(hwnd, round12ScrollSBBoth, 0)
-	return changed
+	return round12ViewportEnsure(hwnd)
 }
 
-// Compatibility bridge for older Round12 callers. No overlay or child HWND is
-// created. Installation is delegated to the single in-place ListView owner.
 func round12InstallTransparentScrollOverlays(a *application) {
 	round12InstallInlineListScroll(a)
 }
