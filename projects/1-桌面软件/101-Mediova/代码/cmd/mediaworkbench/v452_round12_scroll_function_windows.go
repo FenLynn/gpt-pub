@@ -9,12 +9,10 @@ import (
 
 const (
 	round12FunctionalScrollSubclassID = 0x45CD
-	round12InlineHoverTimer           = 0x45CE
-	round12InlineNativeGuardTimer     = 0x45CF
-	round12InlineHoverDelay           = 500
-	round12InlineNativeGuardInterval  = 16
-	round12InlineNativeGuardTailTicks = 20
 	round12InlineWMNCPaint            = 0x0085
+	round12InlineHoverDelay           = 0 // immediate by design; retained as a source-contract marker
+	round12InlineLVMSetExtendedStyle  = LVM_FIRST + 54
+	round12InlineLVSExDoubleBuffer    = 0x00010000
 )
 
 type round12InlineScrollState struct {
@@ -23,7 +21,6 @@ type round12InlineScrollState struct {
 	dragAxis       uint8
 	dragOffset     int
 	dragging       bool
-	guardTicks     int
 	wheelRemainder int
 }
 
@@ -52,8 +49,8 @@ func round12InstallInlineListScroll(a *application) {
 		return
 	}
 
-	// Permanently retire both inherited child-window scrollbar implementations.
-	// From this point onward the ListView itself is the only paint and input owner.
+	// Remove every inherited scrollbar child window before the ListView becomes
+	// the sole scroll paint/input owner.
 	round11RetireLegacyOverlayWindows()
 
 	v452RemoveSubclass.Call(a.hList, round12FunctionalScrollCB, round12FunctionalScrollSubclassID)
@@ -63,27 +60,17 @@ func round12InstallInlineListScroll(a *application) {
 		visibleAxis: round9AxisNone,
 		dragAxis:    round9AxisNone,
 	}
+
+	// Double buffering is owned by the ListView itself. No transparent child
+	// HWND, layered surface, window region, or external redraw loop is used.
+	send(
+		a.hList,
+		round12InlineLVMSetExtendedStyle,
+		uintptr(round12InlineLVSExDoubleBuffer),
+		uintptr(round12InlineLVSExDoubleBuffer),
+	)
 	round8EnsureListStyleGuard(a.hList)
-	round12ShowScrollBar.Call(a.hList, round12ScrollSBBoth, 0)
 	round12HideNativeListScrollbars(a.hList)
-	round12InlineArmNativeGuard(a.hList)
-}
-
-func round12InlineArmNativeGuard(hwnd uintptr) {
-	if hwnd == 0 {
-		return
-	}
-	round12InlineState.guardTicks = round12InlineNativeGuardTailTicks
-	procSetTimer.Call(hwnd, round12InlineNativeGuardTimer, round12InlineNativeGuardInterval, 0)
-}
-
-func round12InlineStopTimers(hwnd uintptr) {
-	if hwnd == 0 {
-		return
-	}
-	procKillTimer.Call(hwnd, round12InlineHoverTimer)
-	procKillTimer.Call(hwnd, round12InlineNativeGuardTimer)
-	round12InlineState.guardTicks = 0
 }
 
 func round12InlineTrackMouse(hwnd uintptr) {
@@ -199,6 +186,8 @@ func round12InlineTrackRect(hwnd uintptr, axis uint8) (rect, bool) {
 		return rect{}, false
 	}
 
+	// The hit strip is intentionally wider than the visible thumb. Nothing is
+	// painted for the strip itself, so it remains a transparent overlay area.
 	zone := scaleDPI(17)
 	if zone < 14 {
 		zone = 14
@@ -335,21 +324,13 @@ func round12InlineSetVisibleAxis(hwnd uintptr, axis uint8) {
 func round12InlineUpdateHover(hwnd uintptr, pt point) {
 	round12InlineTrackMouse(hwnd)
 	axis := round12InlineAxisAtPoint(hwnd, pt)
-	if axis == round12InlineState.hoverAxis {
-		if axis == round9AxisNone && round12InlineState.visibleAxis != round9AxisNone {
-			round12InlineSetVisibleAxis(hwnd, round9AxisNone)
-		}
+	round12InlineState.hoverAxis = axis
+	if round12InlineState.dragging {
 		return
 	}
-
-	procKillTimer.Call(hwnd, round12InlineHoverTimer)
-	round12InlineState.hoverAxis = axis
-	if round12InlineState.visibleAxis != round9AxisNone && round12InlineState.visibleAxis != axis {
-		round12InlineSetVisibleAxis(hwnd, round9AxisNone)
-	}
-	if axis != round9AxisNone {
-		procSetTimer.Call(hwnd, round12InlineHoverTimer, round12InlineHoverDelay, 0)
-	}
+	// No timer and no delayed transition. Entering the edge hit strip makes the
+	// single in-place thumb visible in the same mouse-move transaction.
+	round12InlineSetVisibleAxis(hwnd, axis)
 }
 
 func round12InlineDrawThumb(hwnd, hdc uintptr) {
@@ -433,8 +414,9 @@ func round12InlineScrollPixels(hwnd uintptr, dx, dy int) {
 		return
 	}
 	send(hwnd, round7FeedbackLVMScroll, round12InlineSignedParam(dx), round12InlineSignedParam(dy))
+	// LVM_SCROLL is allowed to move content, but native H/V non-client chrome is
+	// never allowed to become a second visual scrollbar.
 	round12HideNativeListScrollbars(hwnd)
-	round12InlineArmNativeGuard(hwnd)
 	if app != nil {
 		round9EnsureVisibleThumbnails(app, hwnd)
 	}
@@ -510,7 +492,6 @@ func round12InlineBeginDrag(hwnd uintptr, pt point) bool {
 	} else {
 		round12InlineState.dragOffset = int(pt.X - thumb.Left)
 	}
-	procKillTimer.Call(hwnd, round12InlineHoverTimer)
 	procSetCapture.Call(hwnd)
 	round12InlineInvalidateAxis(hwnd, axis)
 	return true
@@ -530,11 +511,7 @@ func round12InlineFinishDrag(hwnd uintptr, releaseCapture bool) bool {
 	round12InlineInvalidateAxis(hwnd, axis)
 	current := round12InlineCursorAxis(hwnd)
 	round12InlineState.hoverAxis = current
-	if current == axis {
-		round12InlineSetVisibleAxis(hwnd, axis)
-	} else {
-		round12InlineSetVisibleAxis(hwnd, round9AxisNone)
-	}
+	round12InlineSetVisibleAxis(hwnd, current)
 	return true
 }
 
@@ -548,16 +525,6 @@ func round12InlineHandleDragMove(hwnd uintptr, pt point) bool {
 	}
 	round12InlineSetScrollFromPoint(hwnd, round12InlineState.dragAxis, coordinate)
 	return true
-}
-
-func round12InlineHandleHoverTimer(hwnd uintptr) {
-	procKillTimer.Call(hwnd, round12InlineHoverTimer)
-	if round12InlineState.dragging || round12InlineState.hoverAxis == round9AxisNone {
-		return
-	}
-	if round12InlineCursorAxis(hwnd) == round12InlineState.hoverAxis {
-		round12InlineSetVisibleAxis(hwnd, round12InlineState.hoverAxis)
-	}
 }
 
 func round12InlineHandleMouseWheel(hwnd uintptr, wParam uintptr) bool {
@@ -592,22 +559,9 @@ func round12InlineHandleMouseWheel(hwnd uintptr, wParam uintptr) bool {
 	return true
 }
 
-func round12InlineHandleNativeGuardTimer(hwnd uintptr) {
-	if round12InlineState.guardTicks <= 0 {
-		procKillTimer.Call(hwnd, round12InlineNativeGuardTimer)
-		return
-	}
-	round12HideNativeListScrollbars(hwnd)
-	round12InlineState.guardTicks--
-	if round12InlineState.guardTicks <= 0 {
-		procKillTimer.Call(hwnd, round12InlineNativeGuardTimer)
-	}
-}
-
 func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
 	case WM_PAINT:
-		round12HideNativeListScrollbars(hwnd)
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		hdc, _, _ := round7ListGetDC.Call(hwnd)
 		if hdc != 0 {
@@ -617,7 +571,6 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		return result
 
 	case round7FeedbackWMPrint, round7FeedbackWMPrintClient:
-		round12HideNativeListScrollbars(hwnd)
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		if wParam != 0 {
 			round12InlinePaintAfterDefault(hwnd, message, wParam)
@@ -625,6 +578,8 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		return result
 
 	case round12InlineWMNCPaint:
+		// The style guard is authoritative. This is only a fail-safe check and is
+		// a no-op during normal paints because the forbidden styles are absent.
 		round12HideNativeListScrollbars(hwnd)
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		return result
@@ -652,7 +607,6 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		}
 
 	case round7FeedbackWMMouseLeave:
-		procKillTimer.Call(hwnd, round12InlineHoverTimer)
 		round12InlineState.hoverAxis = round9AxisNone
 		if !round12InlineState.dragging {
 			round12InlineSetVisibleAxis(hwnd, round9AxisNone)
@@ -667,7 +621,6 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 	case WM_HSCROLL, round7FeedbackWMVScroll:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round12HideNativeListScrollbars(hwnd)
-		round12InlineArmNativeGuard(hwnd)
 		if app != nil {
 			round9EnsureVisibleThumbnails(app, hwnd)
 		}
@@ -679,7 +632,6 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 	case WM_SIZE, round9FeedbackWMWindowPosChanged, LVM_SETCOLUMNWIDTH, LVM_INSERTITEMW, LVM_DELETEALLITEMS:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round12HideNativeListScrollbars(hwnd)
-		round12InlineArmNativeGuard(hwnd)
 		if app != nil {
 			round9EnsureVisibleThumbnails(app, hwnd)
 		}
@@ -688,18 +640,7 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		}
 		return result
 
-	case WM_TIMER:
-		switch wParam {
-		case round12InlineHoverTimer:
-			round12InlineHandleHoverTimer(hwnd)
-			return 0
-		case round12InlineNativeGuardTimer:
-			round12InlineHandleNativeGuardTimer(hwnd)
-			return 0
-		}
-
 	case v452WMNCDestroy:
-		round12InlineStopTimers(hwnd)
 		v452RemoveSubclass.Call(hwnd, round12FunctionalScrollCB, subclassID)
 	}
 
