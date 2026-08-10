@@ -92,6 +92,10 @@ func round8EnsureListStyleGuard(hwnd uintptr) {
 }
 
 func round8ListStyleGuardSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	if message == round12WMDeferredScrollScrub {
+		round12PerformDeferredNativeScrollScrub(hwnd)
+		return 0
+	}
 	if message == round8WMStyleChanging && lParam != 0 {
 		styles := (*round8StyleStruct)(unsafe.Pointer(lParam))
 		switch wParam {

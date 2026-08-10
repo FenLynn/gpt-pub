@@ -2,13 +2,20 @@
 
 package main
 
+import "sync/atomic"
+
 // Round12 no longer creates, resizes, clips, layers, or regions any scrollbar
 // window. The task ListView keeps its normal layout rectangle. Native H/V
 // scrollbar styles are rejected by the existing style guard and the only
 // visible scrollbar object is the thumb painted directly into the ListView
 // client area by v452_round12_scroll_function_windows.go.
 
-const round12ScrollSBBoth = 3
+const (
+	round12ScrollSBBoth          = 3
+	round12WMDeferredScrollScrub = WM_APP + 0x5CF
+)
+
+var round12DeferredScrollScrubPending atomic.Bool
 
 // Kept only for compatibility with older source contracts. The rebuilt scroll
 // owner does not call ShowScrollBar because toggling native scrollbar state is
@@ -48,8 +55,28 @@ func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
 	return true
 }
 
+func round12QueueDeferredNativeScrollScrub(hwnd uintptr) {
+	if hwnd == 0 || !round12DeferredScrollScrubPending.CompareAndSwap(false, true) {
+		return
+	}
+	if ok, _, _ := procPostMessageW.Call(hwnd, uintptr(round12WMDeferredScrollScrub), 0, 0); ok == 0 {
+		round12DeferredScrollScrubPending.Store(false)
+	}
+}
+
+func round12PerformDeferredNativeScrollScrub(hwnd uintptr) {
+	round12DeferredScrollScrubPending.Store(false)
+	round12ScrubNativeListScrollStyles(hwnd)
+}
+
 func round12HideNativeListScrollbars(hwnd uintptr) bool {
-	return round12ScrubNativeListScrollStyles(hwnd)
+	changed := round12ScrubNativeListScrollStyles(hwnd)
+	// LVM_SCROLL may queue an internal non-client update that restores native
+	// H/V style bits after the synchronous call returns. Post one coalesced
+	// cleanup behind those already-queued updates. No timer and no extra scroll
+	// owner are involved.
+	round12QueueDeferredNativeScrollScrub(hwnd)
+	return changed
 }
 
 // Compatibility entrypoint retained for callers created during earlier
