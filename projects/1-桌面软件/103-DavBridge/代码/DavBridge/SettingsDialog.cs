@@ -116,6 +116,7 @@ internal sealed class SettingsDialog : Form
         CalibrationAt = x.CalibrationAt,
         CalibrationUploadUsedBytes = x.CalibrationUploadUsedBytes,
         CalibrationDownloadUsedBytes = x.CalibrationDownloadUsedBytes,
+        MigrationEnabled = x.MigrationEnabled,
         AutoStartWithWindows = x.AutoStartWithWindows,
         StartMinimized = x.StartMinimized,
         AutoResume = x.AutoResume,
