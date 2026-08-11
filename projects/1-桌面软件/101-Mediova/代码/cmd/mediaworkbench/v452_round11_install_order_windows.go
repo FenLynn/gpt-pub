@@ -7,7 +7,8 @@ import "time"
 // Install the final task-list ownership chain deterministically on the UI
 // thread. Round7 performs the inherited one-time initialization, then its
 // ListView subclass is removed. Round11's main/list scrollbar owners are never
-// installed. Round12 becomes the only ListView paint/input owner.
+// installed. Round12 keeps one ListView scroll/input owner; the parent bridge only
+// supplies the control-final post-paint notification.
 func init() {
 	go func() {
 		for attempt := 0; attempt < 800; attempt++ {
@@ -30,10 +31,11 @@ func init() {
 					}
 
 					// Destroy every inherited scrollbar child HWND before the new
-					// in-place ListView thumb owner is attached.
+					// in-place ListView thumb owner and its post-paint bridge are attached.
 					round11RetireLegacyOverlayWindows()
 					round8EnsureListStyleGuard(a.hList)
 					round12InstallInlineListScroll(a)
+					round12InstallPostPaintOwner(a)
 
 					if round11EditorPreviewEnabled && round11EditorPreviewStarted.CompareAndSwap(false, true) {
 						round11OpenEditorPreview(a)

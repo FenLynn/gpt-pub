@@ -2,7 +2,11 @@
 
 package main
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"syscall"
+	"unsafe"
+)
 
 // Round12 no longer creates, resizes, clips, layers, or regions any scrollbar
 // window. The task ListView keeps its normal layout rectangle. Native H/V
@@ -11,16 +15,65 @@ import "sync/atomic"
 // client area by v452_round12_scroll_function_windows.go.
 
 const (
-	round12ScrollSBBoth          = 3
-	round12WMDeferredScrollScrub = WM_APP + 0x5CF
+	round12ScrollSBBoth                    = 3
+	round12WMDeferredScrollScrub           = WM_APP + 0x5CF
+	round12PostPaintMainSubclassID         = 0x45CE
+	round12CDDSPostPaint           uint32  = 0x00000002
+	round12CDRFNotifyPostPaint     uintptr = 0x00000010
 )
 
-var round12DeferredScrollScrubPending atomic.Bool
+var (
+	round12DeferredScrollScrubPending atomic.Bool
+	round12PostPaintMainCB            uintptr
+)
+
+func init() {
+	round12PostPaintMainCB = syscall.NewCallback(round12PostPaintMainSubclassProc)
+}
 
 // Kept only for compatibility with older source contracts. The rebuilt scroll
 // owner does not call ShowScrollBar because toggling native scrollbar state is
 // itself a source of non-client relayout and visible flashing.
 var round12ShowScrollBar = user32.NewProc("ShowScrollBar")
+
+func round12InstallPostPaintOwner(a *application) {
+	if a == nil || a.hwnd == 0 || a.hList == 0 {
+		return
+	}
+	v452RemoveSubclass.Call(a.hwnd, round12PostPaintMainCB, round12PostPaintMainSubclassID)
+	v452SetWindowSubclass.Call(a.hwnd, round12PostPaintMainCB, round12PostPaintMainSubclassID, 0)
+}
+
+func round12PostPaintMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
+	if message == WM_NOTIFY && lParam != 0 {
+		a := app
+		if a != nil && a.hList != 0 {
+			hdr := (*nmhdr)(unsafe.Pointer(lParam))
+			if hdr.HwndFrom == a.hList && hdr.Code == NM_CUSTOMDRAW {
+				cd := (*nmListViewCustomDraw)(unsafe.Pointer(lParam))
+				switch cd.NMCD.DrawStage {
+				case CDDS_PREPAINT:
+					result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+					// Keep the existing per-item custom draw contract and ask the
+					// ListView for one final callback after the whole control paint.
+					return result | round12CDRFNotifyPostPaint
+				case round12CDDSPostPaint:
+					// Preserve the existing main-window custom-draw handler first.
+					// The inline thumb is then the final ListView paint layer.
+					result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+					round12InlineDrawThumb(a.hList, cd.NMCD.HDC)
+					return result
+				}
+			}
+		}
+	}
+
+	if message == v452WMNCDestroy {
+		v452RemoveSubclass.Call(hwnd, round12PostPaintMainCB, subclassID)
+	}
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	return result
+}
 
 func round12ScrubNativeListScrollStyles(hwnd uintptr) bool {
 	if hwnd == 0 {
@@ -81,24 +134,18 @@ func round12FinalizeInlineScrollVisual(hwnd uintptr) {
 		return
 	}
 
-	// LVM_SCROLL moves ListView client pixels synchronously. Finish the whole
-	// track repaint in the same call stack, then put the single inline thumb on
-	// top after that repaint. No timer or queued visual owner is allowed here.
+	// LVM_SCROLL can move ListView client pixels before its paint cycle settles.
+	// Invalidate only the transparent edge track and complete that paint now.
+	// The parent post-paint owner draws the thumb after the ListView finishes.
 	round12InlineInvalidateAxis(hwnd, axis)
 	procUpdateWindow.Call(hwnd)
-	hdc, _, _ := round7ListGetDC.Call(hwnd)
-	if hdc != 0 {
-		round12InlineDrawThumb(hwnd, hdc)
-		round7ListReleaseDC.Call(hwnd, hdc)
-	}
 }
 
 func round12HideNativeListScrollbars(hwnd uintptr) bool {
 	changed := round12ScrubNativeListScrollStyles(hwnd)
 
 	// Callers such as round12InlineScrollPixels invoke this immediately after
-	// LVM_SCROLL, so visual finalization stays in that exact synchronous scroll
-	// transaction instead of racing a later posted message.
+	// LVM_SCROLL, so the edge track is repainted in that same scroll transaction.
 	round12FinalizeInlineScrollVisual(hwnd)
 
 	// LVM_SCROLL may still queue a non-client update that restores native H/V
@@ -111,6 +158,7 @@ func round12HideNativeListScrollbars(hwnd uintptr) bool {
 // v4.5.2 rounds. It now installs only the in-place ListView owner.
 func round12InstallTransparentScrollOverlays(a *application) {
 	round12InstallInlineListScroll(a)
+	round12InstallPostPaintOwner(a)
 }
 
 // Retired child-window overlay hooks. They intentionally do nothing.
