@@ -139,7 +139,7 @@ internal sealed class AppHost : IDisposable
     private readonly CredentialStore _credentialStore;
     private readonly StateStore _stateStore;
     private CancellationTokenSource? _activeRun;
-    private bool _manualPaused;
+    private bool _manualPaused = true;
 
     public DavBridgeConfig Config { get; private set; } = new();
     public MigrationState State { get; private set; } = new();
@@ -166,6 +166,9 @@ internal sealed class AppHost : IDisposable
         State = await _stateStore.LoadAsync(cancellationToken).ConfigureAwait(false);
         var secrets = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false);
         IsConfigured = HasConnectionFields(Config) && !string.IsNullOrWhiteSpace(secrets.SourcePassword) && !string.IsNullOrWhiteSpace(secrets.TargetPassword);
+        _manualPaused = !Config.MigrationEnabled;
+        if (!Config.MigrationEnabled && State.EngineState != EngineState.Paused)
+            State.EngineState = EngineState.Paused;
         AutoStartManager.SetEnabled(Config.AutoStartWithWindows);
     }
 
@@ -180,6 +183,7 @@ internal sealed class AppHost : IDisposable
             string.IsNullOrEmpty(targetPassword) ? previous.TargetPassword : targetPassword);
 
         Config = config;
+        _manualPaused = !Config.MigrationEnabled;
         await _configStore.SaveAsync(Config, cancellationToken).ConfigureAwait(false);
         await _credentialStore.SaveAsync(secrets, cancellationToken).ConfigureAwait(false);
         AutoStartManager.SetEnabled(Config.AutoStartWithWindows);
@@ -211,9 +215,33 @@ internal sealed class AppHost : IDisposable
         return await engine.ScanReadinessAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<int> GetVisibleTargetObjectCountAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        var secrets = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var gate = new RequestGate(TimeSpan.FromMilliseconds(Config.TargetMinimumRequestIntervalMs));
+        using var target = new WebDavWriteClient(Config.TargetBaseUrl, Config.TargetUsername, secrets.TargetPassword, gate);
+        var entries = await target.ListDirectoryAsync(Config.TargetRootPath, cancellationToken).ConfigureAwait(false);
+        return entries.Count(x => !x.IsCollection);
+    }
+
+    public async Task SetMigrationEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        Config.MigrationEnabled = enabled;
+        _manualPaused = !enabled;
+        if (!enabled)
+        {
+            _activeRun?.Cancel();
+            State.EngineState = EngineState.Paused;
+            await _stateStore.SaveAsync(State, CancellationToken.None).ConfigureAwait(false);
+        }
+        await _configStore.SaveAsync(Config, cancellationToken).ConfigureAwait(false);
+        StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public async Task RunOnceAsync(CancellationToken cancellationToken = default)
     {
-        if (_manualPaused || IsRunning)
+        if (!Config.MigrationEnabled || _manualPaused || IsRunning)
             return;
         EnsureConfigured();
 
@@ -231,7 +259,7 @@ internal sealed class AppHost : IDisposable
         }
         catch (OperationCanceledException)
         {
-            if (_manualPaused)
+            if (_manualPaused || !Config.MigrationEnabled)
             {
                 State.EngineState = EngineState.Paused;
                 await _stateStore.SaveAsync(State, CancellationToken.None).ConfigureAwait(false);
@@ -249,7 +277,7 @@ internal sealed class AppHost : IDisposable
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (Config.AutoResume && !_manualPaused && IsConfigured)
+            if (Config.AutoResume && Config.MigrationEnabled && !_manualPaused && IsConfigured)
             {
                 try { await RunOnceAsync(cancellationToken).ConfigureAwait(false); }
                 catch { }
@@ -261,23 +289,17 @@ internal sealed class AppHost : IDisposable
         }
     }
 
-    public void Resume()
-    {
-        _manualPaused = false;
-        StateChanged?.Invoke(this, EventArgs.Empty);
-    }
+    public Task ResumeAsync(CancellationToken cancellationToken = default) =>
+        SetMigrationEnabledAsync(true, cancellationToken);
 
-    public void Pause()
-    {
-        _manualPaused = true;
-        _activeRun?.Cancel();
-        State.EngineState = EngineState.Paused;
-        _ = _stateStore.SaveAsync(State, CancellationToken.None);
-        StateChanged?.Invoke(this, EventArgs.Empty);
-    }
+    public Task PauseAsync(CancellationToken cancellationToken = default) =>
+        SetMigrationEnabledAsync(false, cancellationToken);
 
     private TimeSpan GetNextBackgroundDelay()
     {
+        if (!Config.MigrationEnabled)
+            return TimeSpan.FromMinutes(30);
+
         return State.EngineState switch
         {
             EngineState.WaitNetwork => TimeSpan.FromMinutes(10),
@@ -293,9 +315,23 @@ internal sealed class AppHost : IDisposable
     {
         if (Config.NextResetAt == default)
             return TimeSpan.FromHours(6);
-        var remaining = Config.NextResetAt - DateTimeOffset.Now;
+
+        var now = DateTimeOffset.Now;
+        var remaining = Config.NextResetAt - now;
         if (remaining <= TimeSpan.Zero)
             return TimeSpan.FromMinutes(1);
+
+        if (Config.EndOfCycleSprintEnabled)
+        {
+            var sprintStartsAt = Config.NextResetAt - TimeSpan.FromHours(Config.SprintWindowHours);
+            if (now < sprintStartsAt)
+            {
+                var untilSprint = sprintStartsAt - now;
+                if (untilSprint < TimeSpan.FromHours(6))
+                    return untilSprint + TimeSpan.FromMinutes(1);
+            }
+        }
+
         return remaining < TimeSpan.FromHours(6) ? remaining + TimeSpan.FromMinutes(1) : TimeSpan.FromHours(6);
     }
 
