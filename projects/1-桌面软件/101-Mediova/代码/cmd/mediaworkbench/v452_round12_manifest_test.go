@@ -113,14 +113,18 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("normal ListView scrollbar suppression", overlaySource,
+	assertContains("normal ListView scrollbar suppression and thumb-only visual", overlaySource,
 		"round12ScrubNativeListScrollStyles",
 		"round8EnsureListStyleGuard",
 		"round12InstallInlineListScroll",
 		"round7FeedbackWSHScroll",
 		"round7FeedbackWSVScroll",
+		"MWRound12ThumbVisual",
+		"round12SyncThumbVisual",
+		"round12ThumbVisualHTTransparent",
+		"procCreateWindowExW.Call",
 	)
-	assertAbsent("normal ListView scrollbar suppression", overlaySource,
+	assertAbsent("normal ListView scrollbar suppression and thumb-only visual", overlaySource,
 		"SetLayeredWindowAttributes",
 		"SetWindowRgn",
 		"CreateRectRgn",
@@ -128,7 +132,6 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"round12ViewportGutter",
 		"MWRound11StableScrollSurface",
 		"MWRound9ScrollCover",
-		"CreateWindowExW",
 	)
 
 	scrollSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_scroll_function_windows.go"))
