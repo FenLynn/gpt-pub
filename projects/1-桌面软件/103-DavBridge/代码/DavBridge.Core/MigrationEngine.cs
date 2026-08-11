@@ -91,41 +91,44 @@ public sealed class MigrationEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (group.Members.Any(x => (x.ContentLength ?? 0L) > _config.TargetSingleFileLimitBytes))
-            {
-                foreach (var member in group.Members)
-                {
-                    var record = GetOrCreateRecord(member, group.Key);
-                    if ((member.ContentLength ?? 0L) > _config.TargetSingleFileLimitBytes)
-                    {
-                        record.Status = TransferStatus.BlockedOversize;
-                        record.LastError = $"Object exceeds target single-file limit: {member.ContentLength} bytes";
-                    }
-                }
-                await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+            var outstanding = group.Members
+                .Where(member => !_state.Files.TryGetValue(member.RelativePath, out var existingRecord) ||
+                                 !IsRecordCurrentAndVerified(existingRecord, member))
+                .OrderBy(MemberOrder)
+                .ThenBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (outstanding.Length == 0)
                 continue;
+
+            var oversize = outstanding.FirstOrDefault(x => (x.ContentLength ?? 0L) > _config.TargetSingleFileLimitBytes);
+            if (oversize is not null)
+            {
+                var record = GetOrCreateRecord(oversize, group.Key);
+                record.Status = TransferStatus.BlockedOversize;
+                record.LastError = $"Object exceeds target single-file limit: {oversize.ContentLength} bytes";
+                await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+                await SetEngineStateAsync(EngineState.WaitRetry, group.Key, oversize.RelativePath, record.LastError, cancellationToken).ConfigureAwait(false);
+                return;
             }
 
-            if (IsGroupCurrentAndVerified(group))
-                continue;
-
+            var requiredBytes = await GetRequiredUploadBytesAsync(outstanding, cancellationToken).ConfigureAwait(false);
             var quota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
-            if (!QuotaPolicy.CanStart(group.TotalBytes, quota))
+            if (!QuotaPolicy.CanStart(requiredBytes, quota))
             {
                 await SetEngineStateAsync(EngineState.WaitQuota, group.Key, null,
-                    $"Safe upload budget exhausted. Remaining={quota.SafeRemainingBytes} bytes", cancellationToken).ConfigureAwait(false);
+                    $"Safe upload budget exhausted. Group still needs {requiredBytes} bytes; remaining={quota.SafeRemainingBytes} bytes.",
+                    cancellationToken).ConfigureAwait(false);
                 return;
             }
 
             _state.CurrentGroupKey = group.Key;
             await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
 
-            foreach (var member in group.Members.OrderBy(MemberOrder).ThenBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase))
+            foreach (var member in outstanding)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var record = GetOrCreateRecord(member, group.Key);
-                if (IsRecordCurrentAndVerified(record, member))
-                    continue;
 
                 try
                 {
@@ -156,14 +159,48 @@ public sealed class MigrationEngine
                     record.Status = TransferStatus.Failed;
                     record.LastError = ex.Message;
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
-                    OnProgress(EngineState.WaitRetry, group.Key, member.RelativePath, ex.Message);
-                    break;
+                    await SetEngineStateAsync(EngineState.WaitRetry, group.Key, member.RelativePath, ex.Message, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                if (record.Status != TransferStatus.StrongVerified)
+                {
+                    await SetEngineStateAsync(EngineState.WaitRetry, group.Key, member.RelativePath,
+                        record.LastError ?? $"Member stopped in state {record.Status}.", cancellationToken).ConfigureAwait(false);
+                    return;
                 }
             }
         }
 
+        if (!groups.All(IsGroupCurrentAndVerified))
+        {
+            await SetEngineStateAsync(EngineState.WaitRetry, _state.CurrentGroupKey, null,
+                "At least one source object is not strongly verified at the target.", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         _state.CurrentGroupKey = null;
-        await SetEngineStateAsync(EngineState.Complete, null, null, "Current source manifest is strongly verified at target.", cancellationToken).ConfigureAwait(false);
+        await SetEngineStateAsync(EngineState.Complete, null, null,
+            "Current source manifest is strongly verified at target.", cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<long> GetRequiredUploadBytesAsync(IEnumerable<WebDavEntry> members, CancellationToken cancellationToken)
+    {
+        long total = 0;
+        foreach (var member in members)
+        {
+            var length = member.ContentLength;
+            if (!length.HasValue)
+            {
+                var metadata = await _source.GetMetadataAsync(JoinPath(_config.SourceRootPath, member.RelativePath), cancellationToken).ConfigureAwait(false)
+                               ?? throw new WebDavException($"Source object disappeared during quota preflight: {member.RelativePath}");
+                length = metadata.ContentLength;
+            }
+            if (!length.HasValue || length.Value < 0)
+                throw new WebDavException($"Source length is unavailable; refusing to budget an unknown-size object: {member.RelativePath}");
+            checked { total += length.Value; }
+        }
+        return total;
     }
 
     private async Task ProcessMemberAsync(WebDavEntry manifestEntry, TransferRecord record, CancellationToken cancellationToken)
@@ -205,27 +242,40 @@ public sealed class MigrationEngine
             var existing = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
             if (existing is not null)
             {
-                if (string.IsNullOrWhiteSpace(record.TargetSha256))
+                var currentTarget = await _target.DownloadAndHashAsync(targetPath, cancellationToken).ConfigureAwait(false);
+                _state.VerifiedDownloadBytesSinceCalibration += currentTarget.Bytes;
+                await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+
+                var trustedHash = !string.IsNullOrWhiteSpace(record.TargetSha256)
+                    ? record.TargetSha256
+                    : record.LastAttemptedUploadSha256;
+
+                if (string.IsNullOrWhiteSpace(trustedHash))
                 {
                     record.Status = TransferStatus.Conflict;
-                    record.LastError = "Target object already exists but DavBridge has no trusted prior target hash.";
+                    record.LastError = "Target object already exists but has no trusted DavBridge write history.";
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
                     return;
                 }
 
-                var currentTarget = await _target.DownloadAndHashAsync(targetPath, cancellationToken).ConfigureAwait(false);
-                _state.VerifiedDownloadBytesSinceCalibration += currentTarget.Bytes;
-                await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
-                if (!string.Equals(currentTarget.Sha256, record.TargetSha256, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(currentTarget.Sha256, trustedHash, StringComparison.OrdinalIgnoreCase))
                 {
                     record.Status = TransferStatus.Conflict;
-                    record.LastError = "Target object changed outside DavBridge since the last trusted write.";
+                    record.LastError = "Target object differs from the last content DavBridge can prove it wrote.";
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                if (currentTarget.Bytes == sourceDownload.Bytes &&
+                    string.Equals(currentTarget.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    await CompleteStrongVerificationAsync(record, before, sourcePath, existing, sourceDownload, currentTarget, cancellationToken).ConfigureAwait(false);
                     return;
                 }
             }
 
             record.Status = TransferStatus.Uploading;
+            record.LastAttemptedUploadSha256 = sourceDownload.Sha256;
             _state.UploadAttemptBytesSinceCalibration += sourceDownload.Bytes;
             await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
             OnProgress(EngineState.Running, record.GroupKey, record.RelativePath, "Uploading target object.");
@@ -255,28 +305,46 @@ public sealed class MigrationEngine
                 throw new InvalidDataException("Target strong verification failed: byte length or SHA-256 differs from source.");
             }
 
-            var after = await _source.GetMetadataAsync(sourcePath, cancellationToken).ConfigureAwait(false)
-                        ?? throw new WebDavException("Source object disappeared during transfer.");
-            if (MetadataChanged(before, after))
-            {
-                record.Status = TransferStatus.SourceChanged;
-                record.LastError = "Source object changed during transfer; target result is not accepted as current.";
-                await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
-                return;
-            }
-
-            record.TargetSha256 = targetDownload.Sha256;
-            record.TargetETag = confirmed.ETag;
-            record.Status = TransferStatus.StrongVerified;
-            record.VerifiedAt = DateTimeOffset.UtcNow;
-            record.LastError = null;
-            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
-            OnProgress(EngineState.Running, record.GroupKey, record.RelativePath, "Strong verification complete.");
+            await CompleteStrongVerificationAsync(record, before, sourcePath, confirmed, sourceDownload, targetDownload, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
         }
+    }
+
+    private async Task CompleteStrongVerificationAsync(
+        TransferRecord record,
+        WebDavEntry before,
+        string sourcePath,
+        WebDavEntry targetMetadata,
+        DownloadResult sourceDownload,
+        DownloadResult targetDownload,
+        CancellationToken cancellationToken)
+    {
+        var after = await _source.GetMetadataAsync(sourcePath, cancellationToken).ConfigureAwait(false)
+                    ?? throw new WebDavException("Source object disappeared during transfer.");
+        if (MetadataChanged(before, after))
+        {
+            record.Status = TransferStatus.SourceChanged;
+            record.LastError = "Source object changed during transfer; target result is not accepted as current.";
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (targetDownload.Bytes != sourceDownload.Bytes ||
+            !string.Equals(targetDownload.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Strong verification completion received non-identical source and target content.");
+        }
+
+        record.TargetSha256 = targetDownload.Sha256;
+        record.TargetETag = targetMetadata.ETag;
+        record.Status = TransferStatus.StrongVerified;
+        record.VerifiedAt = DateTimeOffset.UtcNow;
+        record.LastError = null;
+        await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+        OnProgress(EngineState.Running, record.GroupKey, record.RelativePath, "Strong verification complete.");
     }
 
     private TransferRecord GetOrCreateRecord(WebDavEntry entry, string groupKey)
