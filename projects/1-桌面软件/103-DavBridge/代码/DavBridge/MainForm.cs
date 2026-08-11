@@ -25,8 +25,8 @@ internal sealed class MainForm : Form
         _launchInBackground = launchInBackground;
         Text = "DavBridge";
         Width = 720;
-        Height = 500;
-        MinimumSize = new Size(620, 420);
+        Height = 510;
+        MinimumSize = new Size(620, 430);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9F);
         BackColor = Color.White;
@@ -34,7 +34,7 @@ internal sealed class MainForm : Form
         var trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("打开 DavBridge", null, (_, _) => ShowWindow());
         trayMenu.Items.Add("继续迁移", null, async (_, _) => await ResumeNowAsync());
-        trayMenu.Items.Add("暂停", null, (_, _) => _host.Pause());
+        trayMenu.Items.Add("暂停", null, async (_, _) => await PauseAsync());
         trayMenu.Items.Add(new ToolStripSeparator());
         trayMenu.Items.Add("退出", null, (_, _) => ExitApplication());
         _trayIcon = new NotifyIcon
@@ -89,8 +89,8 @@ internal sealed class MainForm : Form
         root.Controls.Add(info, 0, 1);
 
         var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true };
-        actions.Controls.Add(ActionButton("继续", async (_, _) => await ResumeNowAsync()));
-        actions.Controls.Add(ActionButton("暂停", (_, _) => _host.Pause()));
+        actions.Controls.Add(ActionButton("开始 / 继续", async (_, _) => await ResumeNowAsync()));
+        actions.Controls.Add(ActionButton("暂停", async (_, _) => await PauseAsync()));
         actions.Controls.Add(ActionButton("迁移就绪扫描", async (_, _) => await ScanAsync()));
         actions.Controls.Add(ActionButton("校准流量", async (_, _) => await CalibrateAsync()));
         actions.Controls.Add(ActionButton("设置", async (_, _) => await EditSettingsAsync()));
@@ -98,7 +98,7 @@ internal sealed class MainForm : Form
 
         root.Controls.Add(new Label
         {
-            Text = "关闭窗口只会缩到托盘。只有托盘菜单“退出”才会停止 DavBridge。",
+            Text = "首次迁移先执行就绪扫描。关闭窗口只缩到托盘，只有托盘菜单“退出”才结束进程。",
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 18, 0, 0)
@@ -128,29 +128,74 @@ internal sealed class MainForm : Form
     private async Task ResumeNowAsync()
     {
         if (!await EnsureConfiguredAsync()) return;
-        _host.Resume();
+
+        if (!_host.Config.MigrationEnabled && _host.State.Files.Count == 0)
+        {
+            var preflight = await ScanCoreAsync(showResult: true);
+            if (preflight is null) return;
+
+            if (preflight.Value.Report.OversizeObjects.Count > 0)
+            {
+                MessageBox.Show(this, "存在超过目标单文件上限的对象，长期迁移不会启用。", "DavBridge", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (preflight.Value.TargetVisibleObjects > 0)
+            {
+                MessageBox.Show(this,
+                    "首次启用要求目标 zotero 目录为空。当前目标目录已存在可见文件，DavBridge 不会自动覆盖这些未知对象。",
+                    "目标目录非空", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(this,
+                "就绪扫描已通过，目标目录当前为空。\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
+                "启用 DavBridge 长期迁移", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (confirm != DialogResult.Yes) return;
+        }
+
+        await _host.ResumeAsync(_appCts.Token);
         try { await _host.RunOnceAsync(_appCts.Token); }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "DavBridge", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        UpdateView();
+    }
+
+    private async Task PauseAsync()
+    {
+        await _host.PauseAsync(_appCts.Token);
         UpdateView();
     }
 
     private async Task ScanAsync()
     {
         if (!await EnsureConfiguredAsync()) return;
+        await ScanCoreAsync(showResult: true);
+    }
+
+    private async Task<(ReadinessReport Report, int TargetVisibleObjects)?> ScanCoreAsync(bool showResult)
+    {
         try
         {
             UseWaitCursor = true;
             var report = await _host.ScanReadinessAsync(_appCts.Token);
-            var oversize = report.OversizeObjects.Count == 0 ? "0" : string.Join(Environment.NewLine, report.OversizeObjects.Take(10));
-            var unpaired = report.UnpairedZoteroObjects.Count == 0 ? "0" : string.Join(Environment.NewLine, report.UnpairedZoteroObjects.Take(10));
-            MessageBox.Show(this,
-                $"对象：{report.ObjectCount:N0}\n逻辑组：{report.GroupCount:N0}\n总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
-                "迁移就绪扫描", MessageBoxButtons.OK,
-                report.OversizeObjects.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            var targetVisible = await _host.GetVisibleTargetObjectCountAsync(_appCts.Token);
+
+            if (showResult)
+            {
+                var oversize = report.OversizeObjects.Count == 0 ? "0" : string.Join(Environment.NewLine, report.OversizeObjects.Take(10));
+                var unpaired = report.UnpairedZoteroObjects.Count == 0 ? "0" : string.Join(Environment.NewLine, report.UnpairedZoteroObjects.Take(10));
+                MessageBox.Show(this,
+                    $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端当前可见文件：{targetVisible:N0}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
+                    "迁移就绪扫描", MessageBoxButtons.OK,
+                    report.OversizeObjects.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            }
+
+            return (report, targetVisible);
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "扫描失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return null;
         }
         finally { UseWaitCursor = false; }
     }
@@ -198,7 +243,9 @@ internal sealed class MainForm : Form
     {
         _sourceValue.Text = string.IsNullOrWhiteSpace(_host.Config.SourceBaseUrl) ? "未配置" : "已配置";
         _targetValue.Text = string.IsNullOrWhiteSpace(_host.Config.TargetBaseUrl) ? "未配置" : "已配置";
-        _stateValue.Text = (progress?.State ?? _host.State.EngineState).ToString();
+        _stateValue.Text = !_host.Config.MigrationEnabled
+            ? "Paused，长期迁移未启用或已暂停"
+            : (progress?.State ?? _host.State.EngineState).ToString();
 
         var quota = progress?.Quota ?? QuotaPolicy.GetSnapshot(_host.Config, _host.State, DateTimeOffset.Now);
         _quotaValue.Text = $"估算已用 {FormatBytes(quota.EstimatedUploadUsedBytes)} / {_host.Config.UploadQuotaBytes / 1_000_000d:0.#} MB，预留 {quota.ReservedBytes / 1_000_000d:0.#} MB{(quota.IsSprint ? "，周期末冲刺" : string.Empty)}";
