@@ -67,6 +67,25 @@ func round12QueueDeferredNativeScrollScrub(hwnd uintptr) {
 func round12PerformDeferredNativeScrollScrub(hwnd uintptr) {
 	round12DeferredScrollScrubPending.Store(false)
 	round12ScrubNativeListScrollStyles(hwnd)
+
+	// LVM_SCROLL can move already-painted client pixels and leave the inline
+	// thumb partially covered by the ListView's later exposed-row repaint. Flush
+	// that pending client paint at the queue tail, then draw the single inline
+	// thumb once more so it is always the final visual owner for its track.
+	axis := round12InlineState.visibleAxis
+	if round12InlineState.dragging {
+		axis = round12InlineState.dragAxis
+	}
+	if axis == round9AxisNone {
+		return
+	}
+	round12InlineInvalidateAxis(hwnd, axis)
+	procUpdateWindow.Call(hwnd)
+	hdc, _, _ := round7ListGetDC.Call(hwnd)
+	if hdc != 0 {
+		round12InlineDrawThumb(hwnd, hdc)
+		round7ListReleaseDC.Call(hwnd, hdc)
+	}
 }
 
 func round12HideNativeListScrollbars(hwnd uintptr) bool {
