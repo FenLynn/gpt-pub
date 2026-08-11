@@ -50,6 +50,7 @@ public sealed class DavBridgeConfig
     public long CalibrationUploadUsedBytes { get; set; }
     public long CalibrationDownloadUsedBytes { get; set; }
 
+    public bool MigrationEnabled { get; set; }
     public bool AutoStartWithWindows { get; set; } = true;
     public bool StartMinimized { get; set; } = true;
     public bool AutoResume { get; set; } = true;
