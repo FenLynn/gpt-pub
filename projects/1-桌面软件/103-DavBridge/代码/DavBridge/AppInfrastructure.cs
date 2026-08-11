@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using DavBridge.Core;
 using Microsoft.Win32;
@@ -16,8 +15,16 @@ internal sealed record AppPaths(
 {
     public static AppPaths Create()
     {
-        var roaming = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DavBridge");
-        var local = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DavBridge");
+        var roamingBase = Environment.GetEnvironmentVariable("APPDATA");
+        if (string.IsNullOrWhiteSpace(roamingBase))
+            roamingBase = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+        var localBase = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+        if (string.IsNullOrWhiteSpace(localBase))
+            localBase = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+        var roaming = Path.Combine(roamingBase, "DavBridge");
+        var local = Path.Combine(localBase, "DavBridge");
         return new AppPaths(
             roaming,
             local,
