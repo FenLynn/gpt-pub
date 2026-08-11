@@ -67,11 +67,12 @@ func round12QueueDeferredNativeScrollScrub(hwnd uintptr) {
 func round12PerformDeferredNativeScrollScrub(hwnd uintptr) {
 	round12DeferredScrollScrubPending.Store(false)
 	round12ScrubNativeListScrollStyles(hwnd)
+}
 
-	// LVM_SCROLL can move already-painted client pixels and leave the inline
-	// thumb partially covered by the ListView's later exposed-row repaint. Flush
-	// that pending client paint at the queue tail, then draw the single inline
-	// thumb once more so it is always the final visual owner for its track.
+func round12FinalizeInlineScrollVisual(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
 	axis := round12InlineState.visibleAxis
 	if round12InlineState.dragging {
 		axis = round12InlineState.dragAxis
@@ -79,6 +80,10 @@ func round12PerformDeferredNativeScrollScrub(hwnd uintptr) {
 	if axis == round9AxisNone {
 		return
 	}
+
+	// LVM_SCROLL moves ListView client pixels synchronously. Finish the whole
+	// track repaint in the same call stack, then put the single inline thumb on
+	// top after that repaint. No timer or queued visual owner is allowed here.
 	round12InlineInvalidateAxis(hwnd, axis)
 	procUpdateWindow.Call(hwnd)
 	hdc, _, _ := round7ListGetDC.Call(hwnd)
@@ -90,10 +95,14 @@ func round12PerformDeferredNativeScrollScrub(hwnd uintptr) {
 
 func round12HideNativeListScrollbars(hwnd uintptr) bool {
 	changed := round12ScrubNativeListScrollStyles(hwnd)
-	// LVM_SCROLL may queue an internal non-client update that restores native
-	// H/V style bits after the synchronous call returns. Post one coalesced
-	// cleanup behind those already-queued updates. No timer and no extra scroll
-	// owner are involved.
+
+	// Callers such as round12InlineScrollPixels invoke this immediately after
+	// LVM_SCROLL, so visual finalization stays in that exact synchronous scroll
+	// transaction instead of racing a later posted message.
+	round12FinalizeInlineScrollVisual(hwnd)
+
+	// LVM_SCROLL may still queue a non-client update that restores native H/V
+	// style bits. The queued path is style cleanup only and never paints.
 	round12QueueDeferredNativeScrollScrub(hwnd)
 	return changed
 }
