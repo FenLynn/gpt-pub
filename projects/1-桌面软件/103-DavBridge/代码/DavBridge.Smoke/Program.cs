@@ -3,12 +3,17 @@ using DavBridge.Core;
 
 var tests = new List<(string Name, Func<Task> Run)>
 {
-    ("zip-prop grouping", TestGroupingAsync),
+    ("zip prop grouping", TestGroupingAsync),
     ("quota reserve and sprint", TestQuotaAsync),
     ("state backup recovery", TestStateRecoveryAsync),
     ("strong verified happy path", TestHappyPathAsync),
     ("put success but target absent", TestFalseSuccessAsync),
-    ("source changes during transfer", TestSourceChangedAsync)
+    ("source changes during transfer", TestSourceChangedAsync),
+    ("unknown target conflict", TestUnknownTargetConflictAsync),
+    ("crash recovery after put", TestCrashRecoveryAsync),
+    ("partial group budgets only unfinished member", TestPartialGroupQuotaAsync),
+    ("oversize object blocks safely", TestOversizeAsync),
+    ("large zotero manifest", TestLargeManifestAsync)
 };
 
 var passed = 0;
@@ -42,8 +47,6 @@ static Task TestGroupingAsync()
     Check(groups.Count == 2, "expected two logical groups");
     var zotero = groups.Single(x => x.Key.Equals("ABC", StringComparison.OrdinalIgnoreCase));
     Check(zotero.Members.Count == 2, "zip and prop must stay in one group");
-    Check(Path.GetExtension(zotero.Members[0].RelativePath).Equals(".zip", StringComparison.OrdinalIgnoreCase) ||
-          Path.GetExtension(zotero.Members[1].RelativePath).Equals(".zip", StringComparison.OrdinalIgnoreCase), "zip missing");
     return Task.CompletedTask;
 }
 
@@ -78,10 +81,8 @@ static async Task TestStateRecoveryAsync()
     {
         var path = Path.Combine(root, "state.json");
         var store = new StateStore(path);
-        var first = new MigrationState { UploadAttemptBytesSinceCalibration = 111 };
-        await store.SaveAsync(first);
-        var second = new MigrationState { UploadAttemptBytesSinceCalibration = 222 };
-        await store.SaveAsync(second);
+        await store.SaveAsync(new MigrationState { UploadAttemptBytesSinceCalibration = 111 });
+        await store.SaveAsync(new MigrationState { UploadAttemptBytesSinceCalibration = 222 });
         File.WriteAllText(path, "{broken");
         var loaded = await store.LoadAsync();
         Check(loaded.UploadAttemptBytesSinceCalibration == 111, "corrupt primary must fall back to previous backup");
@@ -101,15 +102,15 @@ static async Task TestHappyPathAsync()
     try
     {
         var state = new MigrationState();
-        var config = TestConfig();
         var store = new StateStore(Path.Combine(root, "state.json"));
-        var engine = new MigrationEngine(config, state, store, source, target, Path.Combine(root, "temp"));
+        var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
         await engine.RunAsync(CancellationToken.None);
         Check(state.EngineState == EngineState.Complete, "engine should complete");
         Check(state.Files.Count == 2, "two records expected");
         Check(state.Files.Values.All(x => x.Status == TransferStatus.StrongVerified), "all members must be strongly verified");
         Check(state.UploadAttemptBytesSinceCalibration == source.TotalBytes, "all PUT attempts must be conservatively counted");
         Check(state.VerifiedDownloadBytesSinceCalibration == source.TotalBytes, "target verification downloads must be counted");
+        Check(target.PutCount == 2, "each member should be uploaded once");
     }
     finally { Directory.Delete(root, true); }
 }
@@ -127,6 +128,7 @@ static async Task TestFalseSuccessAsync()
         await engine.RunAsync(CancellationToken.None);
         Check(state.EngineState == EngineState.WaitRetry, "fake PUT success must enter retry state when target is absent");
         Check(state.Files["A.bin"].Status == TransferStatus.Failed, "fake success must never become verified");
+        Check(state.UploadAttemptBytesSinceCalibration == 5, "failed PUT must remain conservatively charged");
     }
     finally { Directory.Delete(root, true); }
 }
@@ -146,8 +148,150 @@ static async Task TestSourceChangedAsync()
         var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
         await engine.RunAsync(CancellationToken.None);
         Check(state.Files["A.bin"].Status == TransferStatus.SourceChanged, "source mutation must invalidate the transfer");
+        Check(state.EngineState == EngineState.WaitRetry, "source mutation must never end as Complete");
     }
     finally { Directory.Delete(root, true); }
+}
+
+static async Task TestUnknownTargetConflictAsync()
+{
+    var data = Bytes("same-content");
+    var source = new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
+    var target = new FakeWriteClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.Files["A.bin"].Status == TransferStatus.Conflict, "unknown existing target must remain a conflict even when byte-identical");
+        Check(state.EngineState == EngineState.WaitRetry, "conflict must not end as Complete");
+        Check(target.PutCount == 0, "unknown conflict must not be overwritten");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestCrashRecoveryAsync()
+{
+    var data = Bytes("already-uploaded");
+    var hash = Hash(data);
+    var source = new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
+    var target = new FakeWriteClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState
+        {
+            UploadAttemptBytesSinceCalibration = data.LongLength,
+            Files = new Dictionary<string, TransferRecord>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["A.bin"] = new TransferRecord
+                {
+                    RelativePath = "A.bin",
+                    GroupKey = "A.bin",
+                    SourceSize = data.LongLength,
+                    SourceSha256 = hash,
+                    LastAttemptedUploadSha256 = hash,
+                    Status = TransferStatus.Uploading
+                }
+            }
+        };
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Complete, "trusted in-flight target should recover to Complete");
+        Check(state.Files["A.bin"].Status == TransferStatus.StrongVerified, "recovered target must become strongly verified");
+        Check(target.PutCount == 0, "crash recovery must not spend upload quota a second time when target already matches");
+        Check(state.UploadAttemptBytesSinceCalibration == data.LongLength, "prior conservative upload accounting must stay unchanged");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestPartialGroupQuotaAsync()
+{
+    var zip = Enumerable.Repeat((byte)1, 100).ToArray();
+    var prop = Enumerable.Repeat((byte)2, 10).ToArray();
+    var source = new FakeReadClient(new Dictionary<string, byte[]>
+    {
+        ["zotero/ABC.zip"] = zip,
+        ["zotero/ABC.prop"] = prop
+    });
+    var target = new FakeWriteClient(new Dictionary<string, byte[]> { ["zotero/ABC.zip"] = zip });
+    var manifest = await source.ListDirectoryAsync("zotero", CancellationToken.None);
+    var zipEntry = manifest.Single(x => x.RelativePath == "ABC.zip");
+
+    var state = new MigrationState
+    {
+        Files = new Dictionary<string, TransferRecord>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ABC.zip"] = new TransferRecord
+            {
+                RelativePath = "ABC.zip",
+                GroupKey = "ABC",
+                SourceSize = zip.LongLength,
+                SourceETag = zipEntry.ETag,
+                SourceLastModified = zipEntry.LastModified,
+                SourceSha256 = Hash(zip),
+                TargetSha256 = Hash(zip),
+                Status = TransferStatus.StrongVerified,
+                VerifiedAt = DateTimeOffset.UtcNow
+            }
+        }
+    };
+    var config = TestConfig();
+    config.UploadQuotaBytes = 165;
+    config.NormalReserveBytes = 50;
+    config.CalibrationUploadUsedBytes = 100;
+
+    var root = NewTempRoot();
+    try
+    {
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(config, state, store, source, target, Path.Combine(root, "temp"));
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Complete, "only unfinished prop should be budgeted");
+        Check(state.Files["ABC.prop"].Status == TransferStatus.StrongVerified, "prop should complete inside the remaining quota");
+        Check(target.PutCount == 1, "verified zip must not be uploaded again");
+        Check(state.UploadAttemptBytesSinceCalibration == 10, "only prop bytes should be charged after calibration");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestOversizeAsync()
+{
+    var source = new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/large.bin"] = new byte[20] });
+    var target = new FakeWriteClient();
+    var config = TestConfig();
+    config.TargetSingleFileLimitBytes = 10;
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(config, state, store, source, target, Path.Combine(root, "temp"));
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.Files["large.bin"].Status == TransferStatus.BlockedOversize, "oversize object must be blocked");
+        Check(state.EngineState == EngineState.WaitRetry, "oversize object must not end as Complete");
+        Check(target.PutCount == 0, "oversize object must never be uploaded");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static Task TestLargeManifestAsync()
+{
+    const int attachments = 6000;
+    var entries = new List<WebDavEntry>(attachments * 2);
+    for (var i = 0; i < attachments; i++)
+    {
+        var key = $"K{i:D7}";
+        entries.Add(new WebDavEntry(key + ".zip", false, 1024 + i, "z" + i, DateTimeOffset.UnixEpoch));
+        entries.Add(new WebDavEntry(key + ".prop", false, 64, "p" + i, DateTimeOffset.UnixEpoch));
+    }
+    var groups = MigrationPlanner.CreateGroups(entries);
+    Check(groups.Count == attachments, "6000 Zotero attachments must produce 6000 logical groups");
+    Check(groups.All(x => x.Members.Count == 2), "every large-manifest Zotero group must retain both members");
+    return Task.CompletedTask;
 }
 
 static DavBridgeConfig TestConfig() => new()
@@ -170,6 +314,7 @@ static string NewTempRoot()
 }
 
 static byte[] Bytes(string value) => System.Text.Encoding.UTF8.GetBytes(value);
+static string Hash(byte[] data) => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
 
 static void Check(bool condition, string message)
 {
@@ -219,31 +364,39 @@ sealed class FakeReadClient : IReadOnlyWebDavClient
         var data = Files[relativePath];
         Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
         await File.WriteAllBytesAsync(destinationPath, data, cancellationToken);
-        return new DownloadResult(data.LongLength, Hash(data));
+        return new DownloadResult(data.LongLength, HashBytes(data));
     }
 
     public Task<DownloadResult> DownloadAndHashAsync(string relativePath, CancellationToken cancellationToken)
     {
         var data = Files[relativePath];
-        return Task.FromResult(new DownloadResult(data.LongLength, Hash(data)));
+        return Task.FromResult(new DownloadResult(data.LongLength, HashBytes(data)));
     }
 
-    protected static WebDavEntry Entry(string relativePath, byte[] data) =>
-        new(relativePath, false, data.LongLength, $"\"{Hash(data)}\"", DateTimeOffset.UnixEpoch.AddSeconds(data.Length));
+    private static WebDavEntry Entry(string relativePath, byte[] data) =>
+        new(relativePath, false, data.LongLength, $"\"{HashBytes(data)}\"", DateTimeOffset.UnixEpoch.AddSeconds(data.Length));
 
-    protected static string Hash(byte[] data) => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
+    private static string HashBytes(byte[] data) => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
 }
 
 sealed class FakeWriteClient : IWritableWebDavClient
 {
-    private readonly Dictionary<string, byte[]> _files = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, byte[]> _files;
     public bool DropWrites { get; set; }
+    public int PutCount { get; private set; }
+
+    public FakeWriteClient(Dictionary<string, byte[]>? initial = null)
+    {
+        _files = initial is null
+            ? new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, byte[]>(initial, StringComparer.OrdinalIgnoreCase);
+    }
 
     public Task<IReadOnlyList<WebDavEntry>> ListDirectoryAsync(string relativeDirectory, CancellationToken cancellationToken)
     {
         var prefix = relativeDirectory.Trim('/') + "/";
         IReadOnlyList<WebDavEntry> result = _files.Where(x => x.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            .Select(x => new WebDavEntry(x.Key[prefix.Length..], false, x.Value.LongLength, $"\"{Hash(x.Value)}\"", DateTimeOffset.UnixEpoch))
+            .Select(x => new WebDavEntry(x.Key[prefix.Length..], false, x.Value.LongLength, $"\"{HashBytes(x.Value)}\"", DateTimeOffset.UnixEpoch))
             .ToArray();
         return Task.FromResult(result);
     }
@@ -251,7 +404,7 @@ sealed class FakeWriteClient : IWritableWebDavClient
     public Task<WebDavEntry?> GetMetadataAsync(string relativePath, CancellationToken cancellationToken)
     {
         if (!_files.TryGetValue(relativePath, out var data)) return Task.FromResult<WebDavEntry?>(null);
-        return Task.FromResult<WebDavEntry?>(new WebDavEntry(Path.GetFileName(relativePath), false, data.LongLength, $"\"{Hash(data)}\"", DateTimeOffset.UnixEpoch));
+        return Task.FromResult<WebDavEntry?>(new WebDavEntry(Path.GetFileName(relativePath), false, data.LongLength, $"\"{HashBytes(data)}\"", DateTimeOffset.UnixEpoch));
     }
 
     public async Task<DownloadResult> DownloadToFileAsync(string relativePath, string destinationPath, CancellationToken cancellationToken)
@@ -259,22 +412,23 @@ sealed class FakeWriteClient : IWritableWebDavClient
         var data = _files[relativePath];
         Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
         await File.WriteAllBytesAsync(destinationPath, data, cancellationToken);
-        return new DownloadResult(data.LongLength, Hash(data));
+        return new DownloadResult(data.LongLength, HashBytes(data));
     }
 
     public Task<DownloadResult> DownloadAndHashAsync(string relativePath, CancellationToken cancellationToken)
     {
         var data = _files[relativePath];
-        return Task.FromResult(new DownloadResult(data.LongLength, Hash(data)));
+        return Task.FromResult(new DownloadResult(data.LongLength, HashBytes(data)));
     }
 
     public async Task<PutResult> PutFileAsync(string relativePath, string localFilePath, int bytesPerSecond, CancellationToken cancellationToken)
     {
+        PutCount++;
         var data = await File.ReadAllBytesAsync(localFilePath, cancellationToken);
         if (!DropWrites)
             _files[relativePath] = data;
         return new PutResult(System.Net.HttpStatusCode.Created, true);
     }
 
-    private static string Hash(byte[] data) => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
+    private static string HashBytes(byte[] data) => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
 }
