@@ -75,6 +75,7 @@ public sealed class TransferRecord
     public string? SourceETag { get; set; }
     public DateTimeOffset? SourceLastModified { get; set; }
     public string? SourceSha256 { get; set; }
+    public string? LastAttemptedUploadSha256 { get; set; }
     public string? TargetETag { get; set; }
     public string? TargetSha256 { get; set; }
     public TransferStatus Status { get; set; } = TransferStatus.Pending;
@@ -104,7 +105,6 @@ public static class MigrationPlanner
         var files = entries.Where(x => !x.IsCollection).ToArray();
         var consumed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var groups = new List<AttachmentGroup>();
-
         var byPath = files.ToDictionary(x => x.RelativePath, StringComparer.OrdinalIgnoreCase);
 
         foreach (var entry in files.OrderBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase))
@@ -126,7 +126,6 @@ public static class MigrationPlanner
                     members.Add(zip);
                     consumed.Add(zip.RelativePath);
                 }
-
                 if (byPath.TryGetValue(propPath, out var prop))
                 {
                     members.Add(prop);
