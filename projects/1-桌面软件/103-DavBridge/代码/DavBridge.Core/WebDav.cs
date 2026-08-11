@@ -63,7 +63,7 @@ public sealed class RequestGate
     }
 }
 
-public sealed class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
+public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
 {
     protected readonly HttpClient Http;
     protected readonly Uri BaseUri;
@@ -91,10 +91,9 @@ public sealed class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         if (response.StatusCode != HttpStatusCode.MultiStatus)
             throw new WebDavException($"PROPFIND Depth:1 failed: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
 
-        var all = ParseMultiStatus(body, uri);
-        var requestPath = NormalizeAbsolutePath(uri.AbsolutePath);
-        return all.Where(x => !string.Equals(NormalizeAbsolutePath(BuildUri(x.RelativePath, x.IsCollection).AbsolutePath), requestPath, StringComparison.OrdinalIgnoreCase))
-                  .ToArray();
+        return ParseMultiStatus(body, uri)
+            .Where(x => !string.IsNullOrWhiteSpace(x.RelativePath))
+            .ToArray();
     }
 
     public async Task<WebDavEntry?> GetMetadataAsync(string relativePath, CancellationToken cancellationToken)
@@ -209,7 +208,9 @@ public sealed class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         XNamespace d = "DAV:";
         var doc = XDocument.Parse(xml, LoadOptions.None);
         var result = new List<WebDavEntry>();
-        var requestDirectory = requestUri.AbsolutePath.EndsWith('/') ? requestUri.AbsolutePath : requestUri.AbsolutePath[..(requestUri.AbsolutePath.LastIndexOf('/') + 1)];
+        var requestDirectory = requestUri.AbsolutePath.EndsWith('/')
+            ? requestUri.AbsolutePath
+            : requestUri.AbsolutePath[..(requestUri.AbsolutePath.LastIndexOf('/') + 1)];
 
         foreach (var response in doc.Descendants(d + "response"))
         {
@@ -218,7 +219,9 @@ public sealed class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
                 continue;
 
             Uri hrefUri;
-            if (!Uri.TryCreate(hrefValue, UriKind.Absolute, out hrefUri!))
+            if (Uri.TryCreate(hrefValue, UriKind.Absolute, out var parsedHref) && parsedHref is not null)
+                hrefUri = parsedHref;
+            else
                 hrefUri = new Uri(BaseUri, hrefValue);
 
             var absolutePath = Uri.UnescapeDataString(hrefUri.AbsolutePath);
@@ -245,8 +248,6 @@ public sealed class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         return result;
     }
 
-    private static string NormalizeAbsolutePath(string value) => Uri.UnescapeDataString(value).TrimEnd('/');
-
     public void Dispose() => Http.Dispose();
 }
 
@@ -268,13 +269,12 @@ public sealed class WebDavWriteClient : WebDavReadClient, IWritableWebDavClient
         content.Headers.ContentLength = file.Length;
         using var request = new HttpRequestMessage(HttpMethod.Put, uri) { Content = content };
         using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        var accepted = response.IsSuccessStatusCode;
-        if (!accepted)
+        if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             throw new WebDavException($"PUT failed: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
         }
-        return new PutResult(response.StatusCode, accepted);
+        return new PutResult(response.StatusCode, true);
     }
 }
 
