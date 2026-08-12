@@ -21,14 +21,24 @@
 6. 本项目 `阶段记录.md`
 7. 本项目 `工作记录.md`
 8. 与当前任务有关时读取 `设计与演进.md`
+9. 涉及代码时读取 `代码/README.md`，并以 `代码/DavBridge.sln` 作为统一源码入口
 
 随后必须核对：
 
 - `main`、`p103-stable`、`p103-exp` 的最新提交和相互关系；
-- DavBridge 的开放 PR、最近合并 PR 和准确 head SHA；
+- DavBridge 的开放 PR、最近合并 PR和准确 head SHA；
 - P103 GitHub Actions、测试结果和 Windows Runtime Artifact；
 - 正式标签与 Release 是否真实存在；
 - 哪些能力已自动验证，哪些仍只是假设或待真实 InfiniCLOUD / 坚果云账户验证。
+
+## 源码恢复规则
+
+- P103 当前尚未首次进入 `main` 时，完整源码事实源固定为远端 `p103-exp`。
+- 新对话不得只查默认分支 `main` 后就判断项目不存在。
+- 当前源码统一入口为 `projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln`。
+- `DavBridge.Core`、`DavBridge`、`DavBridge.Smoke` 三个工程缺一不可。
+- 本地 `bin`、`obj`、发布目录、用户配置、状态、凭据和日志不属于源码事实，不得用于替代 GitHub 恢复。
+- 待 P103 首次正式进入 `main` 后，再把转交模板的默认链接切回 `main`。
 
 ## 事实源
 
@@ -67,11 +77,11 @@
 4. 不得夹带 P101 Mediova、P102 AtlasDesk 或其他项目修改；
 5. 候选提升、正式准入、Artifact 和 Release 继续服从 A/B/C 约束。
 
-## 转交模板
+## 当前开发阶段转交模板
 
 ```text
 请接续 DavBridge 项目。请先阅读并严格按照下面的 HANDOFF.md 恢复项目上下文：
-https://github.com/FenLynn/gpt-pub/blob/main/projects/1-%E6%A1%8C%E9%9D%A2%E8%BD%AF%E4%BB%B6/103-DavBridge/HANDOFF.md
+https://github.com/FenLynn/gpt-pub/blob/p103-exp/projects/1-%E6%A1%8C%E9%9D%A2%E8%BD%AF%E4%BB%B6/103-DavBridge/HANDOFF.md
 
 我可能会在本段文字后附上上一轮交接记录；如未附上，请直接从仓库恢复上下文。请先核对并汇报当前正式版本、当前稳定候选或开发版本、main/p103-stable/p103-exp 的真实关系、最近完成事项、未完成或待实机验证事项及准确断点。本轮先不要修改代码、文档、分支、PR、CI、标签或 Release。
 ```
