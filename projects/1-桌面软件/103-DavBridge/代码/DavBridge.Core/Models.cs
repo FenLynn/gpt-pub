@@ -65,6 +65,7 @@ public sealed class MigrationState
     public long VerifiedDownloadBytesSinceCalibration { get; set; }
     public EngineState EngineState { get; set; } = EngineState.Paused;
     public string? CurrentGroupKey { get; set; }
+    public bool ExistingReplicaValidationPassed { get; set; }
     public Dictionary<string, TransferRecord> Files { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
