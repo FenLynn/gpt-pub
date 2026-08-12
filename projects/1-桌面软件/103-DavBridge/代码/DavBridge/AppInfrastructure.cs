@@ -176,6 +176,17 @@ internal sealed class AppHost : IDisposable
         Directory.CreateDirectory(_paths.TempRoot);
         Config = await _configStore.LoadAsync(cancellationToken).ConfigureAwait(false);
         State = await _stateStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+
+        if (Config.NextResetAt != default)
+        {
+            var normalized = ResetSchedulePolicy.NormalizeResetDate(Config.NextResetAt);
+            if (normalized != Config.NextResetAt)
+            {
+                Config.NextResetAt = normalized;
+                await _configStore.SaveAsync(Config, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         var secrets = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false);
         IsConfigured = HasConnectionFields(Config) && !string.IsNullOrWhiteSpace(secrets.SourcePassword) && !string.IsNullOrWhiteSpace(secrets.TargetPassword);
         _manualPaused = !Config.MigrationEnabled;
@@ -200,6 +211,8 @@ internal sealed class AppHost : IDisposable
             MergeSecret(sourcePassword, previous.SourcePassword),
             MergeSecret(targetPassword, previous.TargetPassword));
 
+        if (config.NextResetAt != default)
+            config.NextResetAt = ResetSchedulePolicy.NormalizeResetDate(config.NextResetAt);
         Config = config;
         _manualPaused = !Config.MigrationEnabled;
         await _configStore.SaveAsync(Config, cancellationToken).ConfigureAwait(false);
@@ -282,7 +295,7 @@ internal sealed class AppHost : IDisposable
         Config.CalibrationAt = DateTimeOffset.Now;
         Config.CalibrationUploadUsedBytes = Math.Max(0, officialUploadUsedBytes);
         Config.CalibrationDownloadUsedBytes = Math.Max(0, officialDownloadUsedBytes);
-        Config.NextResetAt = nextResetAt;
+        Config.NextResetAt = ResetSchedulePolicy.NormalizeResetDate(nextResetAt);
         State.UploadAttemptBytesSinceCalibration = 0;
         State.VerifiedDownloadBytesSinceCalibration = 0;
         await _configStore.SaveAsync(Config, cancellationToken).ConfigureAwait(false);
@@ -334,6 +347,69 @@ internal sealed class AppHost : IDisposable
         _activeRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
+            var now = DateTimeOffset.Now;
+            if (ResetSchedulePolicy.IsResetDateReached(Config.NextResetAt, now))
+            {
+                if (!ResetSchedulePolicy.CanStartProbe(Config.NextResetAt, now))
+                {
+                    var probeAt = ResetSchedulePolicy.GetProbeStart(Config.NextResetAt);
+                    State.EngineState = EngineState.WaitQuota;
+                    State.CurrentGroupKey = null;
+                    await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                    PublishProgress(EngineState.WaitQuota, null, null,
+                        $"坚果云只提供重置日期。DavBridge 不会提前清零账本，将等待到 {probeAt:yyyy-MM-dd HH:mm} 后再做真实上传探测。");
+                    return;
+                }
+
+                ResetCycleProbeResult probe;
+                try
+                {
+                    probe = await ResetCycleProbeRunner.ExecuteAsync(this, _activeRun.Token).ConfigureAwait(false);
+                }
+                catch (HttpRequestException ex)
+                {
+                    State.EngineState = EngineState.WaitNetwork;
+                    State.CurrentGroupKey = null;
+                    await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                    PublishProgress(EngineState.WaitNetwork, null, null, $"新周期上传探测遇到网络错误：{ex.Message}");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    State.EngineState = EngineState.WaitRetry;
+                    State.CurrentGroupKey = null;
+                    await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                    PublishProgress(EngineState.WaitRetry, null, null, $"新周期上传探测异常：{ex.Message}");
+                    return;
+                }
+
+                if (!probe.Success)
+                {
+                    State.EngineState = EngineState.WaitQuota;
+                    State.CurrentGroupKey = probe.GroupKey;
+                    await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                    PublishProgress(EngineState.WaitQuota, probe.GroupKey, null,
+                        $"09:00 后新周期上传探测尚未通过。旧周期账本保持不变，约 1 小时后自动重试。{probe.Message}");
+                    return;
+                }
+
+                foreach (var record in probe.Records)
+                    State.Files[record.RelativePath] = record;
+
+                Config.CalibrationAt = now;
+                Config.CalibrationUploadUsedBytes = 0;
+                Config.CalibrationDownloadUsedBytes = 0;
+                State.UploadAttemptBytesSinceCalibration = probe.UploadBytes;
+                State.VerifiedDownloadBytesSinceCalibration = probe.DownloadBytes;
+                Config.NextResetAt = ResetSchedulePolicy.GetNextResetDateAfterConfirmedProbe(Config.NextResetAt, now);
+                State.EngineState = EngineState.Running;
+                State.CurrentGroupKey = null;
+                await _configStore.SaveAsync(Config, _activeRun.Token).ConfigureAwait(false);
+                await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                PublishProgress(EngineState.Running, probe.GroupKey, null,
+                    $"新周期真实上传探测已通过，本次探测上传 {probe.UploadBytes} B。新周期已确认，下一重置日期为 {Config.NextResetAt:yyyy-MM-dd}，继续长期迁移。");
+            }
+
             var secrets = await _credentialStore.LoadAsync(_activeRun.Token).ConfigureAwait(false);
             using var source = new WebDavReadClient(Config.SourceBaseUrl, Config.SourceUsername, secrets.SourcePassword);
             var gate = new RequestGate(TimeSpan.FromMilliseconds(Config.TargetMinimumRequestIntervalMs));
@@ -403,13 +479,17 @@ internal sealed class AppHost : IDisposable
             return TimeSpan.FromHours(6);
 
         var now = DateTimeOffset.Now;
-        var remaining = Config.NextResetAt - now;
+        if (ResetSchedulePolicy.IsResetDateReached(Config.NextResetAt, now))
+            return ResetSchedulePolicy.GetWaitUntilProbe(Config.NextResetAt, now);
+
+        var probeAt = ResetSchedulePolicy.GetProbeStart(Config.NextResetAt);
+        var remaining = probeAt - now;
         if (remaining <= TimeSpan.Zero)
-            return TimeSpan.FromMinutes(1);
+            return TimeSpan.FromHours(1);
 
         if (Config.EndOfCycleSprintEnabled)
         {
-            var sprintStartsAt = Config.NextResetAt - TimeSpan.FromHours(Config.SprintWindowHours);
+            var sprintStartsAt = probeAt - TimeSpan.FromHours(Config.SprintWindowHours);
             if (now < sprintStartsAt)
             {
                 var untilSprint = sprintStartsAt - now;
@@ -418,7 +498,17 @@ internal sealed class AppHost : IDisposable
             }
         }
 
-        return remaining < TimeSpan.FromHours(6) ? remaining + TimeSpan.FromMinutes(1) : TimeSpan.FromHours(6);
+        return remaining < TimeSpan.FromHours(6) ? remaining : TimeSpan.FromHours(6);
+    }
+
+    private void PublishProgress(EngineState state, string? groupKey, string? relativePath, string message)
+    {
+        ProgressChanged?.Invoke(this, new EngineProgress(
+            state,
+            groupKey,
+            relativePath,
+            message,
+            QuotaPolicy.GetSnapshot(Config, State, DateTimeOffset.Now)));
     }
 
     private void EnsureConfigured()
