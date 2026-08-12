@@ -128,7 +128,11 @@ func round12StripScrollVisualFinalizerSubclassProc(
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 
 	if message == LVM_SETITEMSTATE {
+		// The frozen sequence strip is a sibling window. Repainting it may put it
+		// above an already-visible horizontal thumb. Recommit the thumb immediately
+		// so the scrollbar stays visually continuous across the frozen 40 px strip.
 		round12SyncFrozenNumberVisual(hwnd)
+		round12SyncThumbVisual(hwnd)
 	}
 	if message == WM_MOUSEMOVE && (wasDragging || round12InlineState.dragging) {
 		round12FinalizeInlineScrollVisual(hwnd)
