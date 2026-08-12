@@ -263,7 +263,7 @@ internal sealed class MainForm : Form
         }
         if (_host.Config.NextResetAt == default)
         {
-            MessageBox.Show(this, "流量尚未校准。请先点击“校准流量”，录入坚果云网页当前显示的上传已用、下载已用和下一次重置时间。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "流量尚未校准。请先点击“校准流量”，录入坚果云网页当前显示的上传已用、下载已用和下一次重置日期。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         if (FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
@@ -367,7 +367,9 @@ internal sealed class MainForm : Form
         var uploadRatio = _host.Config.UploadQuotaBytes <= 0 ? 0d : (double)quota.EstimatedUploadUsedBytes / _host.Config.UploadQuotaBytes;
         var downloadRatio = _host.Config.DownloadQuotaBytes <= 0 ? 0d : (double)quota.EstimatedDownloadUsedBytes / _host.Config.DownloadQuotaBytes;
         _quotaBar.Value = Math.Clamp((int)Math.Round(Math.Max(uploadRatio, downloadRatio) * 1000), 0, 1000);
-        _resetValue.Text = _host.Config.NextResetAt == default ? "未校准" : _host.Config.NextResetAt.ToString("yyyy-MM-dd HH:mm");
+        _resetValue.Text = _host.Config.NextResetAt == default
+            ? "未校准"
+            : $"{ResetSchedulePolicy.NormalizeResetDate(_host.Config.NextResetAt):yyyy-MM-dd}，当日 09:00 后探测上传";
 
         var verified = _host.State.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified);
         var errors = _host.State.Files.Values.Count(x => x.Status is TransferStatus.Failed or TransferStatus.Conflict or TransferStatus.BlockedOversize);
