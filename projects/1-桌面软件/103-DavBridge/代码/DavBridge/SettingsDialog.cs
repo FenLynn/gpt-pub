@@ -4,6 +4,7 @@ namespace DavBridge;
 
 internal sealed class SettingsDialog : Form
 {
+    private readonly DavBridgeConfig _original;
     private readonly TextBox _sourceUrl = new();
     private readonly TextBox _sourceRoot = new();
     private readonly TextBox _sourceUser = new();
@@ -26,6 +27,7 @@ internal sealed class SettingsDialog : Form
 
     public SettingsDialog(DavBridgeConfig original, string sourcePassword, string targetPassword)
     {
+        _original = CloneConfig(original);
         Config = CloneConfig(original);
         Text = "DavBridge 设置";
         Width = 720;
@@ -86,10 +88,24 @@ internal sealed class SettingsDialog : Form
         AddFull(panel, _autoResume);
         AddFull(panel, _sprint);
 
+        AddFull(panel, new Label
+        {
+            Text = "已有迁移记录后，当前任务的源/目标 URL、根目录和用户名会被视为任务身份。需要迁移到另一套端点时应创建新任务，而不是改写当前任务。密码、限速和配额参数仍可正常调整。",
+            AutoSize = true,
+            MaximumSize = new Size(640, 0),
+            ForeColor = Color.DimGray,
+            Margin = new Padding(0, 10, 0, 4)
+        });
+
         var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill, AutoSize = true };
-        var save = new Button { Text = "保存", DialogResult = DialogResult.OK, AutoSize = true };
+        var save = new Button { Text = "保存", AutoSize = true };
         var cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, AutoSize = true };
-        save.Click += (_, _) => Apply();
+        save.Click += (_, _) =>
+        {
+            if (!Apply()) return;
+            DialogResult = DialogResult.OK;
+            Close();
+        };
         buttons.Controls.Add(save);
         buttons.Controls.Add(cancel);
         AddFull(panel, buttons);
@@ -99,22 +115,65 @@ internal sealed class SettingsDialog : Form
         CancelButton = cancel;
     }
 
-    private void Apply()
+    private bool Apply()
     {
-        Config.SourceBaseUrl = _sourceUrl.Text.Trim();
-        Config.SourceRootPath = _sourceRoot.Text.Trim().Trim('/');
-        Config.SourceUsername = _sourceUser.Text.Trim();
-        Config.TargetBaseUrl = _targetUrl.Text.Trim();
-        Config.TargetRootPath = _targetRoot.Text.Trim().Trim('/');
-        Config.TargetUsername = _targetUser.Text.Trim();
-        Config.UploadLimitBytesPerSecond = (int)_speed.Value * 1000;
-        Config.NormalReserveBytes = (long)_reserve.Value * 1_000_000L;
-        Config.SprintReserveBytes = (long)_sprintReserve.Value * 1_000_000L;
-        Config.AutoStartWithWindows = _autoStart.Checked;
-        Config.StartMinimized = _startMinimized.Checked;
-        Config.AutoResume = _autoResume.Checked;
-        Config.EndOfCycleSprintEnabled = _sprint.Checked;
+        var proposed = CloneConfig(Config);
+        proposed.SourceBaseUrl = _sourceUrl.Text.Trim();
+        proposed.SourceRootPath = _sourceRoot.Text.Trim().Trim('/');
+        proposed.SourceUsername = _sourceUser.Text.Trim();
+        proposed.TargetBaseUrl = _targetUrl.Text.Trim();
+        proposed.TargetRootPath = _targetRoot.Text.Trim().Trim('/');
+        proposed.TargetUsername = _targetUser.Text.Trim();
+        proposed.UploadLimitBytesPerSecond = (int)_speed.Value * 1000;
+        proposed.NormalReserveBytes = (long)_reserve.Value * 1_000_000L;
+        proposed.SprintReserveBytes = (long)_sprintReserve.Value * 1_000_000L;
+        proposed.AutoStartWithWindows = _autoStart.Checked;
+        proposed.StartMinimized = _startMinimized.Checked;
+        proposed.AutoResume = _autoResume.Checked;
+        proposed.EndOfCycleSprintEnabled = _sprint.Checked;
+
+        if (HasExistingTransferRecords() && EndpointIdentityChanged(_original, proposed))
+        {
+            MessageBox.Show(this,
+                "当前任务已经有迁移和强校验记录。为避免把旧任务记录复用到另一套源端或目标端，v0.2 不允许直接修改当前任务的端点身份。\n\n" +
+                "如果以后要从坚果云迁到其他位置，请创建新的 Zotero 迁移任务。当前页面仍可修改密码、上传限速、预留额度和后台运行选项。",
+                "请创建新任务", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return false;
+        }
+
+        Config = proposed;
+        return true;
     }
+
+    private static bool EndpointIdentityChanged(DavBridgeConfig before, DavBridgeConfig after)
+    {
+        return !string.Equals(Normalize(before.SourceBaseUrl), Normalize(after.SourceBaseUrl), StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(NormalizePath(before.SourceRootPath), NormalizePath(after.SourceRootPath), StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(Normalize(before.SourceUsername), Normalize(after.SourceUsername), StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(Normalize(before.TargetBaseUrl), Normalize(after.TargetBaseUrl), StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(NormalizePath(before.TargetRootPath), NormalizePath(after.TargetRootPath), StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(Normalize(before.TargetUsername), Normalize(after.TargetUsername), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasExistingTransferRecords()
+    {
+        try
+        {
+            var paths = AppPaths.Create();
+            if (!File.Exists(paths.StatePath)) return false;
+            var store = new StateStore(paths.StatePath);
+            var state = store.LoadAsync().GetAwaiter().GetResult();
+            return state.Files.Count > 0;
+        }
+        catch
+        {
+            // If state cannot be inspected, prefer safety and treat the legacy task as locked.
+            return true;
+        }
+    }
+
+    private static string Normalize(string? value) => (value ?? string.Empty).Trim();
+    private static string NormalizePath(string? value) => (value ?? string.Empty).Trim().Trim('/');
 
     private static DavBridgeConfig CloneConfig(DavBridgeConfig x) => new()
     {
