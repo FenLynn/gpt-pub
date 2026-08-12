@@ -148,18 +148,20 @@ func round12RepaintReleasedThumbFootprint(
 
 	repaint := false
 	if oldHOK && (!newHOK || !round12ThumbRectEqual(oldH, newH)) {
-		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldH)), 0)
+		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldH)), 1)
 		repaint = true
 	}
 	if oldVOK && (!newVOK || !round12ThumbRectEqual(oldV, newV)) {
-		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldV)), 0)
+		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldV)), 1)
 		repaint = true
 	}
 	if repaint {
-		// The ListView has WS_CLIPSIBLINGS, so its synchronous repaint clears
-		// only the newly exposed old footprint and cannot paint over the thumb
-		// child at its new position. This removes drag trails and hide residue
-		// without introducing a visible rail or a second scrollbar surface.
+		// Force background erasure for the released footprint. The ListView
+		// horizontal thumb lives below the last item row, where a no-erase
+		// invalidation can leave the old sibling pixels intact. WS_CLIPSIBLINGS
+		// keeps the synchronous repaint away from the thumb at its new position.
+		// This removes drag trails and hide residue without introducing a visible
+		// rail or a second scrollbar surface.
 		procUpdateWindow.Call(listHwnd)
 	}
 }
