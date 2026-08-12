@@ -85,6 +85,18 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Read product version
+        id: product-version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $project='projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
+          [xml]$xml=Get-Content $project -Raw
+          $version=@($xml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'DavBridge <Version> is missing' }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "DavBridge product version: $version"
+
       - name: Restore Windows app
         shell: pwsh
         run: dotnet restore 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
@@ -121,6 +133,8 @@ jobs:
 
       - name: Run isolated Windows self-test
         shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ steps.product-version.outputs.value }}
         run: |
           $ErrorActionPreference='Stop'
           $root=Join-Path $env:RUNNER_TEMP ('DavBridge-SelfTest-' + [guid]::NewGuid().ToString('N'))
@@ -138,6 +152,7 @@ jobs:
             if (!(Test-Path $report)) { throw 'DavBridge self-test report missing' }
             $json=Get-Content $report -Raw | ConvertFrom-Json
             if (-not $json.ok -or $json.product -ne 'DavBridge') { throw 'DavBridge self-test report failed' }
+            if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version $($json.version) does not match project version $env:EXPECTED_VERSION" }
             if (!(Test-Path (Join-Path $roaming 'DavBridge'))) { throw 'Roaming Data root was not created under isolated APPDATA' }
             if (!(Test-Path (Join-Path $local 'DavBridge'))) { throw 'Local Data root was not created under isolated LOCALAPPDATA' }
           } finally {
@@ -159,7 +174,7 @@ jobs:
       - name: Upload Windows candidate
         uses: actions/upload-artifact@v4
         with:
-          name: DavBridge-v0.1.7-win-x64
+          name: DavBridge-v${{ steps.product-version.outputs.value }}-win-x64
           path: |
             build/DavBridge/DavBridge.exe
             build/DavBridge/SHA256.txt
@@ -171,10 +186,12 @@ jobs:
         shell: pwsh
         run: |
           @"
-          ## P103 DavBridge v0.1.7
+          ## P103 DavBridge v${{ steps.product-version.outputs.value }}
           - Deployment: .NET 8 framework-dependent single EXE
           - Platform: Windows x64
-          - Safety gates: real PUT group + NO-WRITE existing-replica takeover must both pass before full migration
+          - Stable rollback baseline: v0.1.7 on main
+          - Current candidate: v${{ steps.product-version.outputs.value }} from ${{ github.sha }}
+          - Safety gates: real PUT group + NO-WRITE existing-replica takeover remain required for a task before full migration
           - Monthly reset: date-only, real upload probe begins at local 09:00 before cycle counters are reset
           - EXE bytes: $env:DAVBRIDGE_BYTES
           - EXE SHA-256: $env:DAVBRIDGE_SHA256
