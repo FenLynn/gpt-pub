@@ -141,8 +141,9 @@ internal sealed class MainForm : Form
                 return;
             }
 
+            var visibleLabel = FormatTargetVisibleCount(preflight.Value.TargetVisibleObjects);
             var targetText = preflight.Value.TargetVisibleObjects > 0
-                ? $"目标 zotero 目录当前可见 {preflight.Value.TargetVisibleObjects:N0} 个既有文件。DavBridge 会逐个重新下载并与 InfiniCLOUD 源文件比较 SHA-256。完全一致的文件直接接管，不重复上传；内容不同的文件进入冲突并停止，不会自动覆盖。"
+                ? $"目标 zotero 目录本次可见 {visibleLabel} 个既有文件。DavBridge 会逐个按准确路径重新下载并与 InfiniCLOUD 源文件比较 SHA-256。完全一致的文件直接接管，不重复上传；内容不同的文件进入冲突并停止，不会自动覆盖。"
                 : "目标 zotero 目录当前未发现可见文件。";
 
             var confirm = MessageBox.Show(this,
@@ -211,9 +212,11 @@ internal sealed class MainForm : Form
                 var unpaired = report.UnpairedZoteroObjects.Count == 0 ? "0" : string.Join(Environment.NewLine, report.UnpairedZoteroObjects.Take(10));
                 var targetNote = targetVisible == 0
                     ? "未发现既有目标文件"
-                    : "既有目标文件不会阻止迁移，后续将逐个强校验并安全接管一致文件";
+                    : targetVisible >= 750
+                        ? "本次目录列举已达到 750 项上限，实际目标文件可能更多；迁移本身按准确文件路径逐个确认，不依赖这次列表完整性"
+                        : "既有目标文件不会阻止迁移，后续将逐个强校验并安全接管一致文件";
                 MessageBox.Show(this,
-                    $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端当前可见文件：{targetVisible:N0}\n目标策略：{targetNote}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
+                    $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端本次可见文件：{FormatTargetVisibleCount(targetVisible)}\n目标策略：{targetNote}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
                     "迁移就绪扫描", MessageBoxButtons.OK,
                     report.OversizeObjects.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             }
@@ -240,8 +243,8 @@ internal sealed class MainForm : Form
 
     private async Task EditSettingsAsync()
     {
-        var credentialStatus = await _host.GetCredentialStatusAsync(_appCts.Token);
-        using var dialog = new SettingsDialog(_host.Config, credentialStatus.SourceSaved, credentialStatus.TargetSaved);
+        var secrets = await _host.GetSecretsAsync(_appCts.Token);
+        using var dialog = new SettingsDialog(_host.Config, secrets.SourcePassword, secrets.TargetPassword);
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         await _host.SaveSettingsAsync(dialog.Config, dialog.SourcePassword, dialog.TargetPassword, _appCts.Token);
         UpdateView();
@@ -360,6 +363,8 @@ internal sealed class MainForm : Form
     }
 
     private static string StatusMark(bool ok) => ok ? "✓" : "✗";
+
+    private static string FormatTargetVisibleCount(int count) => count >= 750 ? "750+（单次列举已达上限）" : count.ToString("N0");
 
     private static string FormatBytes(long bytes)
     {
