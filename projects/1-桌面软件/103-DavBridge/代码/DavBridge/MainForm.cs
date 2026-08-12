@@ -23,7 +23,10 @@ internal sealed class MainForm : Form
     {
         _host = host;
         _launchInBackground = launchInBackground;
-        Text = "DavBridge";
+        var appVersion = typeof(MainForm).Assembly.GetName().Version;
+        Text = appVersion is null
+            ? "DavBridge"
+            : $"DavBridge v{appVersion.Major}.{appVersion.Minor}.{appVersion.Build}";
         Width = 800;
         Height = 540;
         MinimumSize = new Size(690, 450);
