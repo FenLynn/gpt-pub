@@ -59,10 +59,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Restore core smoke
-        run: dotnet restore 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj'
+      - name: Restore solution
+        run: dotnet restore 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln'
+      - name: Build solution
+        run: dotnet build 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln' -c Release --no-restore
       - name: Run core smoke
-        run: dotnet run --project 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj' -c Release --no-restore
+        run: dotnet run --project 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj' -c Release --no-build
 
   windows-build:
     needs: [scope, core-smoke]
@@ -148,7 +150,7 @@ jobs:
       - name: Upload Windows candidate
         uses: actions/upload-artifact@v4
         with:
-          name: DavBridge-v0.1.4-win-x64
+          name: DavBridge-v0.1.5-win-x64
           path: |
             build/DavBridge/DavBridge.exe
             build/DavBridge/SHA256.txt
@@ -160,9 +162,10 @@ jobs:
         shell: pwsh
         run: |
           @"
-          ## P103 DavBridge
+          ## P103 DavBridge v0.1.5
           - Deployment: .NET 8 framework-dependent single EXE
           - Platform: Windows x64
+          - Safety gate: one controlled zip + prop group must pass before full migration
           - EXE bytes: $env:DAVBRIDGE_BYTES
           - EXE SHA-256: $env:DAVBRIDGE_SHA256
           - Private Data: %APPDATA%\DavBridge and %LOCALAPPDATA%\DavBridge
