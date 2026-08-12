@@ -24,9 +24,9 @@ internal sealed class MainForm : Form
         _host = host;
         _launchInBackground = launchInBackground;
         Text = "DavBridge";
-        Width = 720;
-        Height = 510;
-        MinimumSize = new Size(620, 430);
+        Width = 750;
+        Height = 520;
+        MinimumSize = new Size(650, 440);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9F);
         BackColor = Color.White;
@@ -91,6 +91,7 @@ internal sealed class MainForm : Form
         var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true };
         actions.Controls.Add(ActionButton("开始 / 继续", async (_, _) => await ResumeNowAsync()));
         actions.Controls.Add(ActionButton("暂停", async (_, _) => await PauseAsync()));
+        actions.Controls.Add(ActionButton("连接诊断", async (_, _) => await DiagnoseConnectionsAsync()));
         actions.Controls.Add(ActionButton("迁移就绪扫描", async (_, _) => await ScanAsync()));
         actions.Controls.Add(ActionButton("校准流量", async (_, _) => await CalibrateAsync()));
         actions.Controls.Add(ActionButton("设置", async (_, _) => await EditSettingsAsync()));
@@ -98,7 +99,7 @@ internal sealed class MainForm : Form
 
         root.Controls.Add(new Label
         {
-            Text = "首次迁移先执行就绪扫描。关闭窗口只缩到托盘，只有托盘菜单“退出”才结束进程。",
+            Text = "首次迁移先做连接诊断和就绪扫描。关闭窗口只缩到托盘，只有托盘菜单“退出”才结束进程。",
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 18, 0, 0)
@@ -162,6 +163,34 @@ internal sealed class MainForm : Form
         UpdateView();
     }
 
+    private async Task DiagnoseConnectionsAsync()
+    {
+        if (!await EnsureConfiguredAsync()) return;
+        try
+        {
+            UseWaitCursor = true;
+            var result = await _host.DiagnoseConnectionsAsync(_appCts.Token);
+            var text =
+                $"InfiniCLOUD\n{StatusMark(result.SourceOk)} {result.SourceMessage}\n\n" +
+                $"坚果云 WebDAV 根目录\n{StatusMark(result.TargetBaseOk)} {result.TargetBaseMessage}\n\n" +
+                $"坚果云 Zotero 目标目录\n{StatusMark(result.TargetRootOk)} {result.TargetRootMessage}";
+
+            if (!result.TargetBaseOk)
+                text += "\n\n若坚果云为 401：请在“设置”中确认用户名为注册邮箱，并重新输入当前有效的第三方应用密码。不要使用坚果云网页登录密码。";
+
+            MessageBox.Show(this, text, "连接诊断",
+                MessageBoxButtons.OK, result.AllOk ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "连接诊断失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            UseWaitCursor = false;
+        }
+    }
+
     private async Task ScanAsync()
     {
         if (!await EnsureConfiguredAsync()) return;
@@ -193,7 +222,9 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "扫描失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this,
+                ex.Message + "\n\n请先点击“连接诊断”，分别确认 InfiniCLOUD、坚果云 WebDAV 根目录和目标 zotero 目录。",
+                "扫描失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return null;
         }
         finally { UseWaitCursor = false; }
@@ -209,7 +240,8 @@ internal sealed class MainForm : Form
 
     private async Task EditSettingsAsync()
     {
-        using var dialog = new SettingsDialog(_host.Config);
+        var credentialStatus = await _host.GetCredentialStatusAsync(_appCts.Token);
+        using var dialog = new SettingsDialog(_host.Config, credentialStatus.SourceSaved, credentialStatus.TargetSaved);
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         await _host.SaveSettingsAsync(dialog.Config, dialog.SourcePassword, dialog.TargetPassword, _appCts.Token);
         UpdateView();
@@ -326,6 +358,8 @@ internal sealed class MainForm : Form
         button.Click += onClick;
         return button;
     }
+
+    private static string StatusMark(bool ok) => ok ? "✓" : "✗";
 
     private static string FormatBytes(long bytes)
     {
