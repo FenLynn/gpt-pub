@@ -93,7 +93,13 @@ func round8EnsureListStyleGuard(hwnd uintptr) {
 
 func round8ListStyleGuardSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	if message == round12WMDeferredScrollScrub {
-		round12PerformDeferredNativeScrollScrub(hwnd)
+		// The immediate scroll path already commits the frozen column and custom
+		// thumb in the same input transaction. This delayed message has one job:
+		// remove any native scrollbar style bits that Windows restores afterward.
+		// It must not resynchronize custom child visuals asynchronously, otherwise
+		// a later child move can leave the previous thumb footprint visible.
+		round12DeferredScrollScrubPending.Store(false)
+		round12ScrubNativeListScrollStyles(hwnd)
 		return 0
 	}
 	if message == round8WMStyleChanging && lParam != 0 {
