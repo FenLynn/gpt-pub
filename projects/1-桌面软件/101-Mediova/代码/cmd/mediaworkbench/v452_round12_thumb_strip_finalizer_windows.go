@@ -37,6 +37,19 @@ func round12StripRectIntersection(left, right rect) (rect, bool) {
 	return intersection, true
 }
 
+func round12RedrawReleasedThumbRect(listHwnd uintptr, released rect) bool {
+	if listHwnd == 0 || released.Right <= released.Left || released.Bottom <= released.Top {
+		return false
+	}
+	procRedrawWindow.Call(
+		listHwnd,
+		uintptr(unsafe.Pointer(&released)),
+		0,
+		RDW_INVALIDATE|RDW_ERASE|RDW_UPDATENOW,
+	)
+	return true
+}
+
 func round12InvalidateReleasedThumbStrips(
 	listHwnd uintptr,
 	oldRect rect,
@@ -48,13 +61,11 @@ func round12InvalidateReleasedThumbStrips(
 		return false
 	}
 	if !newOK {
-		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldRect)), 1)
-		return true
+		return round12RedrawReleasedThumbRect(listHwnd, oldRect)
 	}
 	intersection, overlaps := round12StripRectIntersection(oldRect, newRect)
 	if !overlaps {
-		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldRect)), 1)
-		return true
+		return round12RedrawReleasedThumbRect(listHwnd, oldRect)
 	}
 
 	// Clear only old minus new. The previous full-old erase removed stale pixels,
@@ -72,8 +83,9 @@ func round12InvalidateReleasedThumbStrips(
 		if strip.Right <= strip.Left || strip.Bottom <= strip.Top {
 			continue
 		}
-		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&strip)), 1)
-		repaint = true
+		if round12RedrawReleasedThumbRect(listHwnd, strip) {
+			repaint = true
+		}
 	}
 	return repaint
 }
@@ -91,13 +103,8 @@ func round12StripRepaintReleasedThumbFootprint(
 	newH, newHOK := round12ThumbVisualListRect(listHwnd, round9AxisHorizontal)
 	newV, newVOK := round12ThumbVisualListRect(listHwnd, round9AxisVertical)
 
-	repaint := round12InvalidateReleasedThumbStrips(listHwnd, oldH, oldHOK, newH, newHOK)
-	if round12InvalidateReleasedThumbStrips(listHwnd, oldV, oldVOK, newV, newVOK) {
-		repaint = true
-	}
-	if repaint {
-		procUpdateWindow.Call(listHwnd)
-	}
+	round12InvalidateReleasedThumbStrips(listHwnd, oldH, oldHOK, newH, newHOK)
+	round12InvalidateReleasedThumbStrips(listHwnd, oldV, oldVOK, newV, newVOK)
 }
 
 func round12InstallStripScrollVisualFinalizer(a *application) {
