@@ -10,6 +10,7 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("put success but target absent", TestFalseSuccessAsync),
     ("source changes during transfer", TestSourceChangedAsync),
     ("matching preexisting target is adopted", TestMatchingPreexistingTargetAsync),
+    ("download quota protects preexisting verification", TestDownloadQuotaAsync),
     ("different preexisting target conflicts", TestUnknownTargetConflictAsync),
     ("crash recovery after put", TestCrashRecoveryAsync),
     ("partial group budgets only unfinished member", TestPartialGroupQuotaAsync),
@@ -56,22 +57,26 @@ static Task TestQuotaAsync()
     var config = new DavBridgeConfig
     {
         UploadQuotaBytes = 1_000_000_000,
+        DownloadQuotaBytes = 3_000_000_000,
         NormalReserveBytes = 50_000_000,
         SprintReserveBytes = 5_000_000,
         NextResetAt = DateTimeOffset.Now.AddDays(2),
-        CalibrationUploadUsedBytes = 900_000_000
+        CalibrationUploadUsedBytes = 900_000_000,
+        CalibrationDownloadUsedBytes = 1_000_000_000
     };
     var state = new MigrationState();
     var normal = QuotaPolicy.GetSnapshot(config, state, DateTimeOffset.Now);
     Check(normal.ReservedBytes == 50_000_000, "normal reserve must be 50 MB");
-    Check(normal.SafeRemainingBytes == 50_000_000, "normal remaining mismatch");
+    Check(normal.SafeRemainingBytes == 50_000_000, "normal upload remaining mismatch");
+    Check(normal.SafeDownloadRemainingBytes == 1_950_000_000, "normal download remaining mismatch");
     Check(!normal.IsSprint, "must not sprint two days before reset");
 
     config.NextResetAt = DateTimeOffset.Now.AddHours(1);
     var sprint = QuotaPolicy.GetSnapshot(config, state, DateTimeOffset.Now);
     Check(sprint.IsSprint, "must sprint within 24 hours");
     Check(sprint.ReservedBytes == 5_000_000, "sprint reserve must be 5 MB");
-    Check(sprint.SafeRemainingBytes == 95_000_000, "sprint remaining mismatch");
+    Check(sprint.SafeRemainingBytes == 95_000_000, "sprint upload remaining mismatch");
+    Check(sprint.SafeDownloadRemainingBytes == 1_995_000_000, "sprint download remaining mismatch");
     return Task.CompletedTask;
 }
 
@@ -169,11 +174,33 @@ static async Task TestMatchingPreexistingTargetAsync()
         var store = new StateStore(Path.Combine(root, "state.json"));
         var engine = new MigrationEngine(config, state, store, source, target, Path.Combine(root, "temp"));
         await engine.RunAsync(CancellationToken.None);
-        Check(state.EngineState == EngineState.Complete, "byte-identical preexisting target should be adopted even with no upload budget");
+        Check(state.EngineState == EngineState.Complete, "byte-identical preexisting target should be adopted even with no meaningful upload budget");
         Check(state.Files["A.bin"].Status == TransferStatus.StrongVerified, "adopted target must become strongly verified");
         Check(target.PutCount == 0, "matching preexisting target must not be uploaded again");
         Check(state.UploadAttemptBytesSinceCalibration == 0, "adoption must not consume upload quota");
         Check(state.VerifiedDownloadBytesSinceCalibration == data.LongLength, "adoption must count the target verification download");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestDownloadQuotaAsync()
+{
+    var data = Bytes("0123456789");
+    var source = new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
+    var target = new FakeWriteClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
+    var config = TestConfig();
+    config.DownloadQuotaBytes = 59;
+    config.NormalReserveBytes = 50;
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(config, state, store, source, target, Path.Combine(root, "temp"));
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.WaitQuota, "existing-target verification must wait when safe download budget is insufficient");
+        Check(target.DownloadCount == 0, "download quota guard must stop before target bytes are read");
+        Check(target.PutCount == 0, "download quota guard must never cause a PUT");
     }
     finally { Directory.Delete(root, true); }
 }
@@ -325,6 +352,7 @@ static DavBridgeConfig TestConfig() => new()
     SourceRootPath = "zotero",
     TargetRootPath = "zotero",
     UploadQuotaBytes = 1_000_000_000,
+    DownloadQuotaBytes = 3_000_000_000,
     NormalReserveBytes = 50_000_000,
     SprintReserveBytes = 5_000_000,
     NextResetAt = DateTimeOffset.Now.AddDays(10),
@@ -410,6 +438,7 @@ sealed class FakeWriteClient : IWritableWebDavClient
     private readonly Dictionary<string, byte[]> _files;
     public bool DropWrites { get; set; }
     public int PutCount { get; private set; }
+    public int DownloadCount { get; private set; }
 
     public FakeWriteClient(Dictionary<string, byte[]>? initial = null)
     {
@@ -435,6 +464,7 @@ sealed class FakeWriteClient : IWritableWebDavClient
 
     public async Task<DownloadResult> DownloadToFileAsync(string relativePath, string destinationPath, CancellationToken cancellationToken)
     {
+        DownloadCount++;
         var data = _files[relativePath];
         Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
         await File.WriteAllBytesAsync(destinationPath, data, cancellationToken);
@@ -443,6 +473,7 @@ sealed class FakeWriteClient : IWritableWebDavClient
 
     public Task<DownloadResult> DownloadAndHashAsync(string relativePath, CancellationToken cancellationToken)
     {
+        DownloadCount++;
         var data = _files[relativePath];
         return Task.FromResult(new DownloadResult(data.LongLength, HashBytes(data)));
     }
