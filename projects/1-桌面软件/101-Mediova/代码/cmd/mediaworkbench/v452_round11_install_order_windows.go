@@ -12,7 +12,7 @@ const (
 	round12ScrollVisualFinalizerSubclassID           = 0x45D0
 )
 
-var round12ScrollVisualFinalizerCB = syscall.NewCallback(round12ScrollVisualFinalizerSubclassProc)
+var round12ScrollVisualFinalizerCB uintptr
 
 func round12EnsureListSiblingClipping(hwnd uintptr) {
 	if hwnd == 0 {
@@ -132,6 +132,8 @@ func round12ScrollVisualFinalizerSubclassProc(
 // supplies the control-final post-paint notification and the finalizer commits
 // the thumb after the complete drag transaction.
 func init() {
+	round12ScrollVisualFinalizerCB = syscall.NewCallback(round12ScrollVisualFinalizerSubclassProc)
+
 	go func() {
 		for attempt := 0; attempt < 800; attempt++ {
 			a := app
