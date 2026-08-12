@@ -21,6 +21,9 @@ type round12InlineScrollState struct {
 	dragAxis       uint8
 	dragOffset     int
 	dragging       bool
+	dragGeometry   bool
+	dragTrack      rect
+	dragMetrics    round12InlineMetrics
 	wheelRemainder int
 }
 
@@ -129,6 +132,24 @@ func round12InlineMetricsFor(hwnd uintptr, axis uint8) (round12InlineMetrics, bo
 	if hwnd == 0 {
 		return round12InlineMetrics{}, false
 	}
+	if round12InlineState.dragging &&
+		round12InlineState.dragGeometry &&
+		round12InlineState.dragAxis == axis {
+		metrics := round12InlineState.dragMetrics
+		if axis == round9AxisVertical {
+			metrics.pos = int(send(hwnd, round7FeedbackLVMGetTopIndex, 0, 0))
+		} else {
+			metrics.pos = round12InlineCurrentHorizontalOffset(hwnd)
+		}
+		maxPos := round12InlineMaxPosition(metrics)
+		if metrics.pos < metrics.min {
+			metrics.pos = metrics.min
+		}
+		if metrics.pos > maxPos {
+			metrics.pos = maxPos
+		}
+		return metrics, true
+	}
 	if axis == round9AxisVertical {
 		count := int(send(hwnd, LVM_GETITEMCOUNT, 0, 0))
 		page := int(send(hwnd, round7FeedbackLVMCountPerPage, 0, 0))
@@ -177,6 +198,11 @@ func round12InlineMaxPosition(metrics round12InlineMetrics) int {
 func round12InlineTrackRect(hwnd uintptr, axis uint8) (rect, bool) {
 	if hwnd == 0 {
 		return rect{}, false
+	}
+	if round12InlineState.dragging &&
+		round12InlineState.dragGeometry &&
+		round12InlineState.dragAxis == axis {
+		return round12InlineState.dragTrack, true
 	}
 	var client rect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
@@ -485,8 +511,20 @@ func round12InlineBeginDrag(hwnd uintptr, pt point) bool {
 	if !ok || !round7FeedbackPointInRect(pt, thumb) {
 		return false
 	}
-	round12InlineState.dragging = true
+	track, trackOK := round12InlineTrackRect(hwnd, axis)
+	metrics, metricsOK := round12InlineMetricsFor(hwnd, axis)
+	if !trackOK || !metricsOK {
+		return false
+	}
+
+	// Freeze the physical geometry for the complete drag transaction. LVM_SCROLL
+	// and native-style scrubbing may transiently alter the ListView client page,
+	// but that must never resize the visible thumb under the pointer.
 	round12InlineState.dragAxis = axis
+	round12InlineState.dragTrack = track
+	round12InlineState.dragMetrics = metrics
+	round12InlineState.dragGeometry = true
+	round12InlineState.dragging = true
 	if axis == round9AxisVertical {
 		round12InlineState.dragOffset = int(pt.Y - thumb.Top)
 	} else {
@@ -505,6 +543,9 @@ func round12InlineFinishDrag(hwnd uintptr, releaseCapture bool) bool {
 	round12InlineState.dragging = false
 	round12InlineState.dragAxis = round9AxisNone
 	round12InlineState.dragOffset = 0
+	round12InlineState.dragGeometry = false
+	round12InlineState.dragTrack = rect{}
+	round12InlineState.dragMetrics = round12InlineMetrics{}
 	if releaseCapture {
 		procReleaseCapture.Call()
 	}
