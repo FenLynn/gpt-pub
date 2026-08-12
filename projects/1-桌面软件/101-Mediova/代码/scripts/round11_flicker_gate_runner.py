@@ -27,6 +27,7 @@ NATIVE_PREVIEW_CHECKS = (
     "round12_thumbnail_retry_selected_nonblack",
     "round12_thumbnail_retry_advanced_time",
 )
+ROUND12_HOVER_SETTLE_SECONDS = 0.08
 
 
 def argument_path(name: str) -> Path | None:
@@ -137,17 +138,34 @@ def strict_inline_hover_with_boundary_tolerance(
             x, y = round11.inline_hover_point(hwnd, axis)
             gate.user32.SetCursorPos(x, y)
             time.sleep(round11.IMMEDIATE_HOVER_SAMPLE_SECONDS)
+            immediate = round11.capture_screen_rect(round11.visible_list_rect(hwnd)).convert("RGB")
+            try:
+                immediate.save(evidence / f"inline-{axis}-immediate-visible.png")
+                immediate_thumb_pixels, immediate_bbox = round11.thumb_pixels(immediate)
+                if immediate_thumb_pixels <= 0 or immediate_bbox is None:
+                    raise RuntimeError(f"{axis} inline thumb did not appear immediately")
+            finally:
+                immediate.close()
+
+            # Round12 intentionally animates the 8 px thumb thickness. The legacy
+            # Round11 gate still verifies immediate appearance above, then waits
+            # only for that bounded reveal transition to settle before beginning
+            # its byte-exact stationary-hover test. No tolerance is applied once
+            # the settled reference frame has been captured.
+            time.sleep(ROUND12_HOVER_SETTLE_SECONDS)
+            round11.normal_list_geometry(hwnd)
             visible = round11.capture_screen_rect(round11.visible_list_rect(hwnd)).convert("RGB")
             try:
-                visible.save(evidence / f"inline-{axis}-immediate-visible.png")
+                visible.save(evidence / f"inline-{axis}-settled-visible.png")
                 visible_thumb_pixels, visible_bbox = round11.thumb_pixels(visible)
                 if visible_thumb_pixels <= 0 or visible_bbox is None:
-                    raise RuntimeError(f"{axis} inline thumb did not appear immediately")
+                    raise RuntimeError(f"{axis} inline thumb disappeared before hover settled")
 
                 stable_frames = [visible.tobytes()]
                 stable_counts = [visible_thumb_pixels]
                 for _ in range(19):
                     time.sleep(0.05)
+                    round11.normal_list_geometry(hwnd)
                     sample = round11.capture_screen_rect(round11.visible_list_rect(hwnd)).convert("RGB")
                     try:
                         count, _ = round11.thumb_pixels(sample)
@@ -156,7 +174,7 @@ def strict_inline_hover_with_boundary_tolerance(
                     finally:
                         sample.close()
                 if len(set(stable_frames)) != 1 or min(stable_counts) <= 0:
-                    raise RuntimeError(f"{axis} inline thumb flickered while hovered")
+                    raise RuntimeError(f"{axis} inline thumb flickered after reveal settled")
             finally:
                 visible.close()
 
@@ -186,6 +204,9 @@ def strict_inline_hover_with_boundary_tolerance(
                     "visible_after_enter_ms": int(
                         round11.IMMEDIATE_HOVER_SAMPLE_SECONDS * 1000
                     ),
+                    "reveal_settle_ms": int(ROUND12_HOVER_SETTLE_SECONDS * 1000),
+                    "immediate_thumb_pixels": immediate_thumb_pixels,
+                    "immediate_thumb_bbox": list(immediate_bbox),
                     "visible_thumb_pixels": visible_thumb_pixels,
                     "visible_thumb_bbox": list(visible_bbox),
                     "hover_frames": 20,
