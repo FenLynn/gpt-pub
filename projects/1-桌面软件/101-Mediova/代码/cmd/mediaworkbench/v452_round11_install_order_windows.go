@@ -5,11 +5,12 @@ package main
 import (
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 const (
-	round12ListWSClipSiblings                uintptr = 0x04000000
-	round12ScrollVisualFinalizerSubclassID           = 0x45D0
+	round12ListWSClipSiblings              uintptr = 0x04000000
+	round12ScrollVisualFinalizerSubclassID         = 0x45D0
 )
 
 var round12ScrollVisualFinalizerCB uintptr
@@ -51,7 +52,7 @@ func round12NormalizeThumbVisualPaintOrder(hwnd uintptr) {
 	round7FeedbackSetWindowLongPtr.Call(
 		hwnd,
 		round7FeedbackGWLExStyle,
-		exStyle &^ round12ThumbVisualExTransparent,
+		exStyle&^round12ThumbVisualExTransparent,
 	)
 	round7FeedbackSetWindowPos.Call(
 		hwnd,
@@ -63,6 +64,104 @@ func round12NormalizeThumbVisualPaintOrder(hwnd uintptr) {
 		round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|
 			round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged,
 	)
+}
+
+func round12MessageCanMoveThumbFootprint(message uint32) bool {
+	switch message {
+	case WM_MOUSEMOVE,
+		WM_TIMER,
+		round7FeedbackWMMouseLeave,
+		round7FeedbackWMMouseWheel,
+		round7FeedbackWMLButtonDown,
+		WM_LBUTTONUP,
+		round7FeedbackWMCaptureChanged,
+		WM_HSCROLL,
+		round7FeedbackWMVScroll,
+		WM_SIZE,
+		round9FeedbackWMWindowPosChanged,
+		LVM_SETCOLUMNWIDTH,
+		LVM_INSERTITEMW,
+		LVM_DELETEALLITEMS:
+		return true
+	default:
+		return false
+	}
+}
+
+func round12ThumbVisualListRect(listHwnd uintptr, axis uint8) (rect, bool) {
+	if listHwnd == 0 {
+		return rect{}, false
+	}
+	visual := round12ThumbVisualForAxis(axis)
+	phase := round12ThumbPhaseForAxis(axis)
+	if round12InlineState.dragging && round12InlineState.dragAxis == axis {
+		phase = round12ThumbTransitionSteps
+	}
+	if visual == 0 || phase <= 0 {
+		return rect{}, false
+	}
+
+	var screenRect rect
+	if ok, _, _ := procGetWindowRect.Call(visual, uintptr(unsafe.Pointer(&screenRect))); ok == 0 ||
+		screenRect.Right <= screenRect.Left || screenRect.Bottom <= screenRect.Top {
+		return rect{}, false
+	}
+	points := [2]point{
+		{X: screenRect.Left, Y: screenRect.Top},
+		{X: screenRect.Right, Y: screenRect.Bottom},
+	}
+	for index := range points {
+		if ok, _, _ := round9FeedbackScreenToClient.Call(
+			listHwnd,
+			uintptr(unsafe.Pointer(&points[index])),
+		); ok == 0 {
+			return rect{}, false
+		}
+	}
+	return rect{
+		Left:   points[0].X,
+		Top:    points[0].Y,
+		Right:  points[1].X,
+		Bottom: points[1].Y,
+	}, true
+}
+
+func round12ThumbRectEqual(left, right rect) bool {
+	return left.Left == right.Left &&
+		left.Top == right.Top &&
+		left.Right == right.Right &&
+		left.Bottom == right.Bottom
+}
+
+func round12RepaintReleasedThumbFootprint(
+	listHwnd uintptr,
+	oldH rect,
+	oldHOK bool,
+	oldV rect,
+	oldVOK bool,
+) {
+	if listHwnd == 0 {
+		return
+	}
+	newH, newHOK := round12ThumbVisualListRect(listHwnd, round9AxisHorizontal)
+	newV, newVOK := round12ThumbVisualListRect(listHwnd, round9AxisVertical)
+
+	repaint := false
+	if oldHOK && (!newHOK || !round12ThumbRectEqual(oldH, newH)) {
+		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldH)), 0)
+		repaint = true
+	}
+	if oldVOK && (!newVOK || !round12ThumbRectEqual(oldV, newV)) {
+		procInvalidateRect.Call(listHwnd, uintptr(unsafe.Pointer(&oldV)), 0)
+		repaint = true
+	}
+	if repaint {
+		// The ListView has WS_CLIPSIBLINGS, so its synchronous repaint clears
+		// only the newly exposed old footprint and cannot paint over the thumb
+		// child at its new position. This removes drag trails and hide residue
+		// without introducing a visible rail or a second scrollbar surface.
+		procUpdateWindow.Call(listHwnd)
+	}
 }
 
 // This subclass is intentionally installed last. It lets the functional scroll
@@ -107,6 +206,14 @@ func round12ScrollVisualFinalizerSubclassProc(
 		return result
 	}
 
+	trackFootprint := round12MessageCanMoveThumbFootprint(message)
+	oldH, oldHOK := rect{}, false
+	oldV, oldVOK := rect{}, false
+	if trackFootprint {
+		oldH, oldHOK = round12ThumbVisualListRect(hwnd, round9AxisHorizontal)
+		oldV, oldVOK = round12ThumbVisualListRect(hwnd, round9AxisVertical)
+	}
+
 	wasDragging := round12InlineState.dragging
 	result, _, _ := v452DefSubclassProc.Call(
 		hwnd,
@@ -124,6 +231,9 @@ func round12ScrollVisualFinalizerSubclassProc(
 	}
 	if message == WM_MOUSEMOVE && (wasDragging || round12InlineState.dragging) {
 		round12FinalizeInlineScrollVisual(hwnd)
+	}
+	if trackFootprint {
+		round12RepaintReleasedThumbFootprint(hwnd, oldH, oldHOK, oldV, oldVOK)
 	}
 	return result
 }
