@@ -302,6 +302,10 @@ public sealed class MigrationEngine
                 // since changed. This is the only existing-target case where an overwrite is allowed.
             }
 
+            // A preexisting trusted old version is not counted in group preflight because it first requires
+            // content verification. Recheck the upload budget immediately before every actual PUT.
+            EnsureUploadBudget(sourceDownload.Bytes, $"Uploading {manifestEntry.RelativePath}");
+
             // Never start a new PUT unless there is enough target download budget left to perform the mandatory
             // post-PUT strong verification in the same cycle.
             EnsureDownloadBudget(sourceDownload.Bytes, $"Post-upload verification of {manifestEntry.RelativePath}");
@@ -342,6 +346,17 @@ public sealed class MigrationEngine
         finally
         {
             try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+        }
+    }
+
+    private void EnsureUploadBudget(long expectedBytes, string operation)
+    {
+        var quota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
+        if (!QuotaPolicy.CanStartUpload(expectedBytes, quota))
+        {
+            throw new QuotaExceededException(
+                $"Safe target upload budget exhausted before {operation}. Need about {expectedBytes} bytes; remaining={quota.SafeRemainingBytes} bytes.",
+                isDownloadQuota: false);
         }
     }
 
