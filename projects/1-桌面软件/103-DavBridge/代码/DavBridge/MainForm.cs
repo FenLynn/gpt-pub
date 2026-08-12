@@ -140,16 +140,12 @@ internal sealed class MainForm : Form
                 return;
             }
 
-            if (preflight.Value.TargetVisibleObjects > 0)
-            {
-                MessageBox.Show(this,
-                    "首次启用要求目标 zotero 目录为空。当前目标目录已存在可见文件，DavBridge 不会自动覆盖这些未知对象。",
-                    "目标目录非空", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            var targetText = preflight.Value.TargetVisibleObjects > 0
+                ? $"目标 zotero 目录当前可见 {preflight.Value.TargetVisibleObjects:N0} 个既有文件。DavBridge 会逐个重新下载并与 InfiniCLOUD 源文件比较 SHA-256。完全一致的文件直接接管，不重复上传；内容不同的文件进入冲突并停止，不会自动覆盖。"
+                : "目标 zotero 目录当前未发现可见文件。";
 
             var confirm = MessageBox.Show(this,
-                "就绪扫描已通过，目标目录当前为空。\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
+                $"就绪扫描已通过。\n\n{targetText}\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
                 "启用 DavBridge 长期迁移", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (confirm != DialogResult.Yes) return;
         }
@@ -184,8 +180,11 @@ internal sealed class MainForm : Form
             {
                 var oversize = report.OversizeObjects.Count == 0 ? "0" : string.Join(Environment.NewLine, report.OversizeObjects.Take(10));
                 var unpaired = report.UnpairedZoteroObjects.Count == 0 ? "0" : string.Join(Environment.NewLine, report.UnpairedZoteroObjects.Take(10));
+                var targetNote = targetVisible == 0
+                    ? "未发现既有目标文件"
+                    : "既有目标文件不会阻止迁移，后续将逐个强校验并安全接管一致文件";
                 MessageBox.Show(this,
-                    $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端当前可见文件：{targetVisible:N0}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
+                    $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端当前可见文件：{targetVisible:N0}\n目标策略：{targetNote}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
                     "迁移就绪扫描", MessageBoxButtons.OK,
                     report.OversizeObjects.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             }
@@ -248,9 +247,13 @@ internal sealed class MainForm : Form
             : (progress?.State ?? _host.State.EngineState).ToString();
 
         var quota = progress?.Quota ?? QuotaPolicy.GetSnapshot(_host.Config, _host.State, DateTimeOffset.Now);
-        _quotaValue.Text = $"估算已用 {FormatBytes(quota.EstimatedUploadUsedBytes)} / {_host.Config.UploadQuotaBytes / 1_000_000d:0.#} MB，预留 {quota.ReservedBytes / 1_000_000d:0.#} MB{(quota.IsSprint ? "，周期末冲刺" : string.Empty)}";
-        var ratio = _host.Config.UploadQuotaBytes <= 0 ? 0d : (double)quota.EstimatedUploadUsedBytes / _host.Config.UploadQuotaBytes;
-        _quotaBar.Value = Math.Clamp((int)Math.Round(ratio * 1000), 0, 1000);
+        _quotaValue.Text =
+            $"上传估算 {FormatBytes(quota.EstimatedUploadUsedBytes)} / {FormatBytes(_host.Config.UploadQuotaBytes)}，" +
+            $"下载估算 {FormatBytes(quota.EstimatedDownloadUsedBytes)} / {FormatBytes(_host.Config.DownloadQuotaBytes)}，" +
+            $"安全预留 {FormatBytes(quota.ReservedBytes)}{(quota.IsSprint ? "，周期末冲刺" : string.Empty)}";
+        var uploadRatio = _host.Config.UploadQuotaBytes <= 0 ? 0d : (double)quota.EstimatedUploadUsedBytes / _host.Config.UploadQuotaBytes;
+        var downloadRatio = _host.Config.DownloadQuotaBytes <= 0 ? 0d : (double)quota.EstimatedDownloadUsedBytes / _host.Config.DownloadQuotaBytes;
+        _quotaBar.Value = Math.Clamp((int)Math.Round(Math.Max(uploadRatio, downloadRatio) * 1000), 0, 1000);
         _resetValue.Text = _host.Config.NextResetAt == default ? "未校准" : _host.Config.NextResetAt.ToString("yyyy-MM-dd HH:mm");
 
         var verified = _host.State.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified);
