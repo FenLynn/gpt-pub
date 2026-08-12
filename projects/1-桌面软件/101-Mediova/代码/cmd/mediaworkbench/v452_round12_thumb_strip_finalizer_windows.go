@@ -8,9 +8,26 @@ import (
 	"unsafe"
 )
 
-const round12StripScrollVisualFinalizerSubclassID = 0x45D2
+const (
+	round12StripScrollVisualFinalizerSubclassID = 0x45D2
+	round12FrozenZOrderGuardSubclassID          = 0x45D3
+	round12WMWindowPosChanging                  = 0x0046
+)
 
-var round12StripScrollVisualFinalizerCB uintptr
+var (
+	round12StripScrollVisualFinalizerCB uintptr
+	round12FrozenZOrderGuardCB          uintptr
+)
+
+type round12WindowPos struct {
+	Hwnd            uintptr
+	HwndInsertAfter uintptr
+	X               int32
+	Y               int32
+	CX              int32
+	CY              int32
+	Flags           uint32
+}
 
 func round12RedrawOldThumbRect(listHwnd uintptr, oldRect rect) bool {
 	if listHwnd == 0 || oldRect.Right <= oldRect.Left || oldRect.Bottom <= oldRect.Top {
@@ -78,10 +95,46 @@ func round12RestoreReleasedThumbBackground(
 	round12SyncThumbVisual(listHwnd)
 }
 
+func round12FrozenZOrderGuardSubclassProc(
+	hwnd uintptr,
+	message uint32,
+	wParam, lParam uintptr,
+	subclassID, refData uintptr,
+) uintptr {
+	if message == round12WMWindowPosChanging && lParam != 0 {
+		windowPos := (*round12WindowPos)(unsafe.Pointer(lParam))
+		windowPos.Flags |= uint32(round7FeedbackSWPNoZOrder)
+	}
+	if message == v452WMNCDestroy {
+		v452RemoveSubclass.Call(hwnd, round12FrozenZOrderGuardCB, subclassID)
+	}
+	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+	return result
+}
+
+func round12InstallFrozenZOrderGuard() {
+	if round12FrozenNumberVisual == 0 {
+		return
+	}
+	v452RemoveSubclass.Call(
+		round12FrozenNumberVisual,
+		round12FrozenZOrderGuardCB,
+		round12FrozenZOrderGuardSubclassID,
+	)
+	v452SetWindowSubclass.Call(
+		round12FrozenNumberVisual,
+		round12FrozenZOrderGuardCB,
+		round12FrozenZOrderGuardSubclassID,
+		0,
+	)
+}
+
 func round12InstallStripScrollVisualFinalizer(a *application) {
 	if a == nil || a.hList == 0 {
 		return
 	}
+
+	round12InstallFrozenZOrderGuard()
 
 	// Replace the earlier full-footprint finalizer rather than stacking another
 	// paint owner. The sibling thumb remains the sole pixel owner.
@@ -145,12 +198,13 @@ func round12StripScrollVisualFinalizerSubclassProc(
 
 func init() {
 	round12StripScrollVisualFinalizerCB = syscall.NewCallback(round12StripScrollVisualFinalizerSubclassProc)
+	round12FrozenZOrderGuardCB = syscall.NewCallback(round12FrozenZOrderGuardSubclassProc)
 
 	go func() {
 		for attempt := 0; attempt < 800; attempt++ {
 			a := app
 			if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady &&
-				round12ThumbVisualH != 0 && round12ThumbVisualV != 0 {
+				round12ThumbVisualH != 0 && round12ThumbVisualV != 0 && round12FrozenNumberVisual != 0 {
 				a.postUI(func() {
 					if app == a && a.hList != 0 {
 						round12InstallStripScrollVisualFinalizer(a)
