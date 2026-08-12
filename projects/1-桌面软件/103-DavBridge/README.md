@@ -9,6 +9,8 @@ DavBridge 是面向 Windows 11 的低速、单线程、强校验 WebDAV 迁移�
 - 当前开发目标与实时进度：[工作记录.md](工作记录.md)
 - 当前正式或候选基线：[阶段记录.md](阶段记录.md)
 - 重大架构取舍：[设计与演进.md](设计与演进.md)
+- 完整源码与本地恢复入口：[代码/README.md](代码/README.md)
+- Visual Studio / dotnet 统一解决方案：[代码/DavBridge.sln](代码/DavBridge.sln)
 
 新对话必须先读取 `HANDOFF.md`，再按其中固定流程读取 A｜`/GPT_RULES.md` → `/目录.md` → B｜`../开发约束.md` → C｜本项目 `开发约束.md`、README、阶段记录和工作记录，并核对 `main`、`p103-stable`、`p103-exp`、PR、CI、Artifact、标签与 Release 的真实状态。
 
@@ -41,12 +43,15 @@ InfiniCLOUD /zotero
 
 ```text
 代码/
-├── DavBridge.Core/   # WebDAV、状态、配额、迁移核心
-├── DavBridge/        # WinForms 托盘程序
-└── DavBridge.Smoke/  # 核心回归和故障边界 smoke
+├── DavBridge.sln      # 统一恢复、IDE 和命令行构建入口
+├── README.md          # 源码地图、构建方式与 Data 边界
+├── .gitignore         # 防止本地产物和私人 Data 误入仓库
+├── DavBridge.Core/    # WebDAV、状态、配额、迁移核心
+├── DavBridge/         # WinForms 托盘程序
+└── DavBridge.Smoke/   # 核心回归和故障边界 smoke
 ```
 
-活动 CI 固定为 `.github/workflows/p103-davbridge-ci.yml`。
+活动 CI 固定为 `.github/workflows/p103-davbridge-ci.yml`。远端 `p103-exp` 是当前开发阶段完整源码事实源，任何本地临时构建都不得替代 GitHub 源码和 CI Artifact。
 
 ## 分支与发布
 
@@ -64,4 +69,4 @@ InfiniCLOUD /zotero
 - 正式主线：`main`
 - 正式路径：`projects/1-桌面软件/103-DavBridge/`
 
-正式 Release 只从 `main` 建立，Runtime 和 Artifact 不得包含真实 WebDAV 凭据、真实 Zotero 清单、日志或用户私人数据。
+P103 尚未首次进入 `main` 时，新对话恢复项目必须显式读取 `p103-exp`。正式 Release 只从 `main` 建立，Runtime 和 Artifact 不得包含真实 WebDAV 凭据、真实 Zotero 清单、日志或用户私人数据。
