@@ -115,6 +115,13 @@ func round12ScrollVisualFinalizerSubclassProc(
 		lParam,
 	)
 
+	if message == LVM_SETITEMSTATE {
+		// Selection can change synchronously through keyboard navigation,
+		// bulk actions or tests without waiting for a later paint callback.
+		// Refresh the frozen sequence-number sibling before SendMessage returns
+		// so its selection background never lags the ListView body.
+		round12SyncFrozenNumberVisual(hwnd)
+	}
 	if message == WM_MOUSEMOVE && (wasDragging || round12InlineState.dragging) {
 		round12FinalizeInlineScrollVisual(hwnd)
 	}
