@@ -46,6 +46,7 @@ internal sealed class UiPolish : IDisposable
     private bool _disposed;
     private bool _manifestRefreshStarted;
     private EngineProgress? _lastProgress;
+    private WebDavIoProgress? _lastIoProgress;
     private UiManifestCache _cache = new();
     private readonly string _cachePath;
 
@@ -61,6 +62,7 @@ internal sealed class UiPolish : IDisposable
         _form.Resize += (_, _) => ApplyResponsiveLayout();
         _host.ProgressChanged += OnProgressChanged;
         _host.StateChanged += OnStateChanged;
+        WebDavReadClient.GlobalIoProgress += OnIoProgress;
         _settingsButton.Click += (_, _) => _ = OpenSettingsAsync();
         _primary.Click += (_, _) => _ = PrimaryActionAsync();
         _problemLink.Click += (_, _) => OpenMaintenance("DiagnoseConnectionsAsync");
@@ -286,8 +288,31 @@ internal sealed class UiPolish : IDisposable
 
     private void OnProgressChanged(object? sender, EngineProgress progress)
     {
+        if (!string.Equals(_lastProgress?.RelativePath, progress.RelativePath, StringComparison.OrdinalIgnoreCase))
+            _lastIoProgress = null;
         _lastProgress = progress;
         SafeUi(UpdateDashboard);
+    }
+
+    private void OnIoProgress(object? sender, WebDavIoProgress progress)
+    {
+        if (!MatchesConfiguredEndpoint(progress.BaseAddress)) return;
+        _lastIoProgress = progress;
+    }
+
+    private bool MatchesConfiguredEndpoint(string baseAddress)
+    {
+        return SameEndpoint(baseAddress, _host.Config.SourceBaseUrl) || SameEndpoint(baseAddress, _host.Config.TargetBaseUrl);
+    }
+
+    private static bool SameEndpoint(string left, string right)
+    {
+        if (!Uri.TryCreate(left, UriKind.Absolute, out var a) || !Uri.TryCreate(right, UriKind.Absolute, out var b))
+            return false;
+        return string.Equals(a.Scheme, b.Scheme, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase) &&
+               a.Port == b.Port &&
+               a.AbsolutePath.Trim('/').Equals(b.AbsolutePath.Trim('/'), StringComparison.OrdinalIgnoreCase);
     }
 
     private void OnStateChanged(object? sender, EventArgs e) => SafeUi(UpdateDashboard);
@@ -391,7 +416,7 @@ internal sealed class UiPolish : IDisposable
         if (state == UiEffectiveState.Pausing)
         {
             _currentBar.Pulse = true;
-            _currentBar.BarText = string.IsNullOrWhiteSpace(relative) ? "正在安全暂停" : relative;
+            _currentBar.BarText = string.IsNullOrWhiteSpace(relative) ? "正在安全暂停" : Path.GetFileName(relative);
             _currentPhase.Text = "正在保存当前安全断点";
             return;
         }
@@ -405,17 +430,31 @@ internal sealed class UiPolish : IDisposable
             return;
         }
 
-        _currentBar.Pulse = state == UiEffectiveState.Running && !string.IsNullOrWhiteSpace(relative);
-        _currentBar.Fraction = 0;
-        _currentBar.BarText = string.IsNullOrWhiteSpace(relative)
-            ? state switch
-            {
-                UiEffectiveState.WaitNetwork => "等待网络恢复",
-                UiEffectiveState.WaitQuota => "等待下一周期",
-                UiEffectiveState.WaitRetry => "任务已安全停止",
-                _ => "准备下一个文件"
-            }
-            : relative;
+        var io = _lastIoProgress;
+        var ioMatches = io is not null && !string.IsNullOrWhiteSpace(relative) && RelativeFileMatches(io.RelativePath, relative);
+        var hasTrueProgress = ioMatches && io!.TotalBytes.HasValue && io.TotalBytes.Value > 0;
+        if (hasTrueProgress)
+        {
+            var fraction = Math.Clamp((double)io!.BytesProcessed / io.TotalBytes!.Value, 0, 1);
+            _currentBar.Pulse = false;
+            _currentBar.Fraction = fraction;
+            _currentBar.BarText = $"{Path.GetFileName(relative)}    {fraction:P0}";
+        }
+        else
+        {
+            _currentBar.Pulse = state == UiEffectiveState.Running && !string.IsNullOrWhiteSpace(relative);
+            _currentBar.Fraction = 0;
+            _currentBar.BarText = string.IsNullOrWhiteSpace(relative)
+                ? state switch
+                {
+                    UiEffectiveState.WaitNetwork => "等待网络恢复",
+                    UiEffectiveState.WaitQuota => "等待下一周期",
+                    UiEffectiveState.WaitRetry => "任务已安全停止",
+                    _ => "准备下一个文件"
+                }
+                : Path.GetFileName(relative);
+        }
+
         _currentPhase.Text = phase ?? state switch
         {
             UiEffectiveState.Running => "正在处理",
@@ -424,6 +463,15 @@ internal sealed class UiPolish : IDisposable
             UiEffectiveState.WaitRetry => "请查看需要处理的项目",
             _ => string.Empty
         };
+    }
+
+    private static bool RelativeFileMatches(string ioPath, string progressPath)
+    {
+        var a = ioPath.Replace('\\', '/').Trim('/');
+        var b = progressPath.Replace('\\', '/').Trim('/');
+        return a.EndsWith("/" + b, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(a, b, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(Path.GetFileName(a), Path.GetFileName(b), StringComparison.OrdinalIgnoreCase);
     }
 
     private void UpdateQuota()
@@ -509,6 +557,7 @@ internal sealed class UiPolish : IDisposable
 
         _preparing = true;
         _lastProgress = null;
+        _lastIoProgress = null;
         UpdateDashboard();
         var task = UiCommandBridge.InvokeTask(_form, "ResumeNowAsync");
         if (task is null)
@@ -570,7 +619,6 @@ internal sealed class UiPolish : IDisposable
         }
         catch
         {
-            // UI totals are advisory display metadata only. A failed refresh must never affect migration.
         }
     }
 
@@ -680,6 +728,7 @@ internal sealed class UiPolish : IDisposable
         _timer.Dispose();
         _host.ProgressChanged -= OnProgressChanged;
         _host.StateChanged -= OnStateChanged;
+        WebDavReadClient.GlobalIoProgress -= OnIoProgress;
     }
 
     private sealed class UiManifestCache
