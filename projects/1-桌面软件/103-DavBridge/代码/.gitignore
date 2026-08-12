@@ -1,0 +1,17 @@
+.vs/
+**/bin/
+**/obj/
+TestResults/
+artifacts/
+publish/
+*.user
+*.suo
+*.nupkg
+*.log
+
+# DavBridge private runtime data must never enter source control
+config.json
+state.json
+state.json.bak
+secrets.dat
+DavBridge.log
