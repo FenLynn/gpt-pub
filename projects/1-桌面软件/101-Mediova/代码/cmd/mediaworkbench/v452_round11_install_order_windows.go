@@ -81,7 +81,8 @@ func round12MessageCanMoveThumbFootprint(message uint32) bool {
 		round9FeedbackWMWindowPosChanged,
 		LVM_SETCOLUMNWIDTH,
 		LVM_INSERTITEMW,
-		LVM_DELETEALLITEMS:
+		LVM_DELETEALLITEMS,
+		round12WMDeferredScrollScrub:
 		return true
 	default:
 		return false
