@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 
 namespace DavBridge.Core;
@@ -66,7 +67,12 @@ public sealed class MigrationState
     public EngineState EngineState { get; set; } = EngineState.Paused;
     public string? CurrentGroupKey { get; set; }
     public bool ExistingReplicaValidationPassed { get; set; }
-    public Dictionary<string, TransferRecord> Files { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    // Runtime readers (WinForms status views, tray UI) can enumerate this while the migration
+    // engine is adding/updating records. Keep the public surface dictionary-like for JSON/schema
+    // compatibility, but use ConcurrentDictionary for the live instance.
+    public IDictionary<string, TransferRecord> Files { get; set; } =
+        new ConcurrentDictionary<string, TransferRecord>(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class TransferRecord
