@@ -24,9 +24,9 @@ internal sealed class MainForm : Form
         _host = host;
         _launchInBackground = launchInBackground;
         Text = "DavBridge";
-        Width = 750;
-        Height = 520;
-        MinimumSize = new Size(650, 440);
+        Width = 800;
+        Height = 540;
+        MinimumSize = new Size(690, 450);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9F);
         BackColor = Color.White;
@@ -89,17 +89,18 @@ internal sealed class MainForm : Form
         root.Controls.Add(info, 0, 1);
 
         var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true };
-        actions.Controls.Add(ActionButton("开始 / 继续", async (_, _) => await ResumeNowAsync()));
-        actions.Controls.Add(ActionButton("暂停", async (_, _) => await PauseAsync()));
         actions.Controls.Add(ActionButton("连接诊断", async (_, _) => await DiagnoseConnectionsAsync()));
         actions.Controls.Add(ActionButton("迁移就绪扫描", async (_, _) => await ScanAsync()));
         actions.Controls.Add(ActionButton("校准流量", async (_, _) => await CalibrateAsync()));
+        actions.Controls.Add(ActionButton("首组验证", async (_, _) => await ValidateFirstGroupAsync()));
+        actions.Controls.Add(ActionButton("开始 / 继续", async (_, _) => await ResumeNowAsync()));
+        actions.Controls.Add(ActionButton("暂停", async (_, _) => await PauseAsync()));
         actions.Controls.Add(ActionButton("设置", async (_, _) => await EditSettingsAsync()));
         root.Controls.Add(actions, 0, 2);
 
         root.Controls.Add(new Label
         {
-            Text = "首次迁移先做连接诊断和就绪扫描。关闭窗口只缩到托盘，只有托盘菜单“退出”才结束进程。",
+            Text = "首次迁移顺序：连接诊断 → 就绪扫描 → 校准流量 → 首组验证。首组强校验通过前不会开放整库长期迁移。关闭窗口只缩到托盘。",
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 18, 0, 0)
@@ -130,7 +131,15 @@ internal sealed class MainForm : Form
     {
         if (!await EnsureConfiguredAsync()) return;
 
-        if (!_host.Config.MigrationEnabled && _host.State.Files.Count == 0)
+        if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
+        {
+            MessageBox.Show(this,
+                "整库长期迁移尚未开放。请先完成流量校准和“首组验证”，只有一个完整 zip + prop 逻辑组在真实坚果云端通过强 SHA-256 校验后，才能开始长期迁移。",
+                "DavBridge 安全门", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!_host.Config.MigrationEnabled)
         {
             var preflight = await ScanCoreAsync(showResult: true);
             if (preflight is null) return;
@@ -147,7 +156,7 @@ internal sealed class MainForm : Form
                 : "目标 zotero 目录当前未发现可见文件。";
 
             var confirm = MessageBox.Show(this,
-                $"就绪扫描已通过。\n\n{targetText}\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
+                $"首组真实强校验已经通过，就绪扫描也已完成。\n\n{targetText}\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
                 "启用 DavBridge 长期迁移", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (confirm != DialogResult.Yes) return;
         }
@@ -239,6 +248,72 @@ internal sealed class MainForm : Form
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         await _host.CalibrateAsync(dialog.UploadUsedBytes, dialog.DownloadUsedBytes, dialog.NextResetAt, _appCts.Token);
         UpdateView();
+    }
+
+    private async Task ValidateFirstGroupAsync()
+    {
+        if (!await EnsureConfiguredAsync()) return;
+        if (_host.Config.MigrationEnabled)
+        {
+            MessageBox.Show(this, "请先暂停长期迁移，再执行首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (_host.Config.NextResetAt == default)
+        {
+            MessageBox.Show(this, "流量尚未校准。请先点击“校准流量”，录入坚果云网页当前显示的上传已用、下载已用和下一次重置时间。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
+        {
+            MessageBox.Show(this, "已经存在一个完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        try
+        {
+            UseWaitCursor = true;
+            var plan = await FirstGroupValidationRunner.PrepareAsync(_host, _appCts.Token);
+            var members = string.Join(Environment.NewLine, plan.Members.Select(member => $"  {member.RelativePath}  {FormatBytes(member.ContentLength ?? 0)}"));
+            var confirm = MessageBox.Show(this,
+                $"DavBridge 将只验证下面这一个 Zotero 逻辑组，完成后立即停止，不会启动整库迁移。\n\n" +
+                $"组：{plan.GroupKey}\n{members}\n\n" +
+                $"组总量：{FormatBytes(plan.TotalBytes)}\n" +
+                $"坚果云已存在成员：{plan.ExistingTargetMembers} / {plan.Members.Count}\n" +
+                $"本次最多需要上传：{FormatBytes(plan.MaximumUploadBytes)}\n" +
+                $"预计坚果云强校验下载：约 {FormatBytes(plan.ExpectedTargetVerificationDownloadBytes)}\n\n" +
+                "已有 GoodSync 副本会先下载并比较 SHA-256；只有目标缺失时才会上传。确认开始这个单组真实验证吗？",
+                "首组验证计划", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (confirm != DialogResult.Yes)
+                return;
+
+            var progress = new Progress<EngineProgress>(value => UpdateView(value));
+            var result = await FirstGroupValidationRunner.ExecuteAsync(_host, plan.GroupKey, progress, _appCts.Token);
+            UpdateView();
+
+            var memberStates = string.Join(Environment.NewLine,
+                result.Records.Select(record => $"  {record.RelativePath}: {record.Status}"));
+            var mode = result.UploadBytes == 0
+                ? "本组未发生 PUT，目标已有副本经强校验后直接接管。"
+                : "本组存在目标缺失成员，已完成真实 PUT 和目标重新 GET 强校验。";
+
+            MessageBox.Show(this,
+                $"组：{result.GroupKey}\n结果：{(result.Success ? "通过" : "未通过")}\n\n{memberStates}\n\n" +
+                $"本次计入上传：{FormatBytes(result.UploadBytes)}\n" +
+                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n" +
+                $"{mode}\n{result.Message}\n\n" +
+                (result.Success ? "首组安全门已通过。下一步才可以考虑启用长期迁移。" : "长期迁移仍保持锁定。请先处理本次异常。"),
+                "首组验证结果", MessageBoxButtons.OK,
+                result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "首组验证失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            UseWaitCursor = false;
+            UpdateView();
+        }
     }
 
     private async Task EditSettingsAsync()
