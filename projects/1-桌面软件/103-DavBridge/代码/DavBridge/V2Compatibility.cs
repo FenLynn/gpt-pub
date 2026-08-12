@@ -77,8 +77,7 @@ internal static class LegacySafetyFingerprint
             Normalize(config.SourceUsername),
             Normalize(config.TargetBaseUrl),
             NormalizePath(config.TargetRootPath),
-            Normalize(config.TargetUsername),
-            config.TargetSingleFileLimitBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            Normalize(config.TargetUsername)
         });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
