@@ -28,8 +28,8 @@ internal sealed class SettingsDialog : Form
     {
         Config = CloneConfig(original);
         Text = "DavBridge 设置";
-        Width = 620;
-        Height = 650;
+        Width = 700;
+        Height = 720;
         StartPosition = FormStartPosition.CenterParent;
         Font = new Font("Segoe UI", 9F);
 
@@ -48,16 +48,34 @@ internal sealed class SettingsDialog : Form
         _sprint.Checked = Config.EndOfCycleSprintEnabled;
 
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(18), AutoScroll = true };
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        AddField(panel, "InfiniCLOUD URL", _sourceUrl);
+
+        AddFull(panel, new Label
+        {
+            Text = "InfiniCLOUD 必须填写 My Page → Apps Connection 中显示的 WebDAV Connection URL、Connection ID 和 Apps Password。2026 年网页登录已改用邮箱，但 WebDAV 仍不是邮箱登录密码。",
+            AutoSize = true,
+            MaximumSize = new Size(620, 0),
+            ForeColor = Color.DimGray,
+            Margin = new Padding(0, 0, 0, 8)
+        });
+        AddField(panel, "InfiniCLOUD WebDAV URL", _sourceUrl);
         AddField(panel, "源目录", _sourceRoot);
-        AddField(panel, "源用户名", _sourceUser);
-        AddField(panel, "源应用密码", _sourcePassword);
-        AddField(panel, "坚果云 URL", _targetUrl);
+        AddField(panel, "Connection ID / User ID", _sourceUser);
+        AddField(panel, "Apps Password", _sourcePassword);
+
+        AddFull(panel, new Label
+        {
+            Text = "坚果云请填写 WebDAV 地址、坚果云账号和第三方应用密码。密码留空保存时会继续使用当前已加密保存的密码。",
+            AutoSize = true,
+            MaximumSize = new Size(620, 0),
+            ForeColor = Color.DimGray,
+            Margin = new Padding(0, 12, 0, 8)
+        });
+        AddField(panel, "坚果云 WebDAV URL", _targetUrl);
         AddField(panel, "目标目录", _targetRoot);
-        AddField(panel, "目标用户名", _targetUser);
-        AddField(panel, "目标应用密码", _targetPassword);
+        AddField(panel, "坚果云账号", _targetUser);
+        AddField(panel, "第三方应用密码", _targetPassword);
         AddField(panel, "上传限速 KB/s", _speed);
         AddField(panel, "普通预留 MB", _reserve);
         AddField(panel, "冲刺预留 MB", _sprintReserve);
