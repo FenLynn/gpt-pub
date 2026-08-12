@@ -159,7 +159,7 @@ jobs:
       - name: Upload Windows candidate
         uses: actions/upload-artifact@v4
         with:
-          name: DavBridge-v0.1.6-win-x64
+          name: DavBridge-v0.1.7-win-x64
           path: |
             build/DavBridge/DavBridge.exe
             build/DavBridge/SHA256.txt
@@ -171,10 +171,10 @@ jobs:
         shell: pwsh
         run: |
           @"
-          ## P103 DavBridge v0.1.6
+          ## P103 DavBridge v0.1.7
           - Deployment: .NET 8 framework-dependent single EXE
           - Platform: Windows x64
-          - Safety gate: one controlled zip + prop group must pass before full migration
+          - Safety gates: real PUT group + NO-WRITE existing-replica takeover must both pass before full migration
           - Monthly reset: date-only, real upload probe begins at local 09:00 before cycle counters are reset
           - EXE bytes: $env:DAVBRIDGE_BYTES
           - EXE SHA-256: $env:DAVBRIDGE_SHA256
