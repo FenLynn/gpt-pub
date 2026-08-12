@@ -75,11 +75,31 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
             baseUrl += "/";
         BaseUri = new Uri(baseUrl, UriKind.Absolute);
         Gate = gate;
-        Http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: true);
+
+        if (handler is null)
+        {
+            var httpHandler = new HttpClientHandler
+            {
+                Credentials = new NetworkCredential(username, password),
+                PreAuthenticate = true,
+                AllowAutoRedirect = true,
+                AutomaticDecompression = DecompressionMethods.All
+            };
+            Http = new HttpClient(httpHandler, disposeHandler: true);
+        }
+        else
+        {
+            Http = new HttpClient(handler, disposeHandler: true);
+        }
+
         Http.Timeout = TimeSpan.FromMinutes(30);
+
+        // InfiniCLOUD explicitly supports pre-emptive BASIC authentication. Keep the
+        // header for the first request, while HttpClientHandler.Credentials also lets
+        // .NET answer a fresh BASIC challenge after a benign endpoint redirect.
         var token = Convert.ToBase64String(Encoding.UTF8.GetBytes(username + ":" + password));
         Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
-        Http.DefaultRequestHeaders.UserAgent.ParseAdd("DavBridge/0.1");
+        Http.DefaultRequestHeaders.UserAgent.ParseAdd("DavBridge/0.1.1");
     }
 
     public async Task<IReadOnlyList<WebDavEntry>> ListDirectoryAsync(string relativeDirectory, CancellationToken cancellationToken)
@@ -89,7 +109,7 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.MultiStatus)
-            throw new WebDavException($"PROPFIND Depth:1 failed: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
+            throw BuildFailure("PROPFIND Depth:1", uri, response, body);
 
         return ParseMultiStatus(body, uri)
             .Where(x => !string.IsNullOrWhiteSpace(x.RelativePath))
@@ -106,7 +126,7 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.MultiStatus)
-            throw new WebDavException($"PROPFIND Depth:0 failed: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
+            throw BuildFailure("PROPFIND Depth:0", uri, response, body);
 
         return ParseMultiStatus(body, uri).FirstOrDefault();
     }
@@ -119,7 +139,7 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            throw new WebDavException($"GET failed: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
+            throw BuildFailure("GET", uri, response, body);
         }
 
         var directory = Path.GetDirectoryName(destinationPath);
@@ -152,7 +172,7 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            throw new WebDavException($"GET verify failed: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
+            throw BuildFailure("GET verify", uri, response, body);
         }
 
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -201,6 +221,16 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         request.Headers.TryAddWithoutValidation("Depth", depth);
         request.Content = new StringContent(body, Encoding.UTF8, "application/xml");
         return request;
+    }
+
+    private static WebDavException BuildFailure(string operation, Uri uri, HttpResponseMessage response, string body)
+    {
+        var challenge = string.Join(", ", response.Headers.WwwAuthenticate.Select(x => x.ToString()));
+        var suffix = string.IsNullOrWhiteSpace(challenge) ? string.Empty : $"; WWW-Authenticate={challenge}";
+        return new WebDavException(
+            $"{operation} failed for {uri.GetLeftPart(UriPartial.Path)}: {(int)response.StatusCode} {response.ReasonPhrase}{suffix}",
+            response.StatusCode,
+            body);
     }
 
     private IReadOnlyList<WebDavEntry> ParseMultiStatus(string xml, Uri requestUri)
@@ -272,7 +302,7 @@ public sealed class WebDavWriteClient : WebDavReadClient, IWritableWebDavClient
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            throw new WebDavException($"PUT failed: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
+            throw new WebDavException($"PUT failed for {uri.GetLeftPart(UriPartial.Path)}: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
         }
         return new PutResult(response.StatusCode, true);
     }
