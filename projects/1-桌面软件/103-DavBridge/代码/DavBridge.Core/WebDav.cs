@@ -8,6 +8,13 @@ namespace DavBridge.Core;
 
 public sealed record DownloadResult(long Bytes, string Sha256);
 public sealed record PutResult(HttpStatusCode StatusCode, bool Accepted);
+public enum WebDavIoOperation { Download, Upload }
+public sealed record WebDavIoProgress(
+    string BaseAddress,
+    string RelativePath,
+    WebDavIoOperation Operation,
+    long BytesProcessed,
+    long? TotalBytes);
 
 public sealed class WebDavException : Exception
 {
@@ -69,6 +76,8 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
     protected readonly Uri BaseUri;
     protected readonly RequestGate? Gate;
 
+    public static event EventHandler<WebDavIoProgress>? GlobalIoProgress;
+
     public WebDavReadClient(string baseUrl, string username, string password, RequestGate? gate = null, HttpMessageHandler? handler = null)
     {
         if (!baseUrl.EndsWith('/'))
@@ -94,12 +103,9 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
 
         Http.Timeout = TimeSpan.FromMinutes(30);
 
-        // InfiniCLOUD explicitly supports pre-emptive BASIC authentication. Keep the
-        // header for the first request, while HttpClientHandler.Credentials also lets
-        // .NET answer a fresh BASIC challenge after a benign endpoint redirect.
         var token = Convert.ToBase64String(Encoding.UTF8.GetBytes(username + ":" + password));
         Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
-        Http.DefaultRequestHeaders.UserAgent.ParseAdd("DavBridge/0.1.1");
+        Http.DefaultRequestHeaders.UserAgent.ParseAdd("DavBridge/0.2.2");
     }
 
     public async Task<IReadOnlyList<WebDavEntry>> ListDirectoryAsync(string relativeDirectory, CancellationToken cancellationToken)
@@ -146,6 +152,8 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         if (!string.IsNullOrWhiteSpace(directory))
             Directory.CreateDirectory(directory);
 
+        var expected = response.Content.Headers.ContentLength;
+        ReportIo(relativePath, WebDavIoOperation.Download, 0, expected);
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using var target = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -159,8 +167,10 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
             await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             sha.AppendData(buffer, 0, read);
             total += read;
+            ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         }
         await target.FlushAsync(cancellationToken).ConfigureAwait(false);
+        ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         return new DownloadResult(total, Convert.ToHexString(sha.GetHashAndReset()).ToLowerInvariant());
     }
 
@@ -175,6 +185,8 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
             throw BuildFailure("GET verify", uri, response, body);
         }
 
+        var expected = response.Content.Headers.ContentLength;
+        ReportIo(relativePath, WebDavIoOperation.Download, 0, expected);
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var buffer = new byte[128 * 1024];
@@ -186,7 +198,9 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
                 break;
             sha.AppendData(buffer, 0, read);
             total += read;
+            ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         }
+        ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         return new DownloadResult(total, Convert.ToHexString(sha.GetHashAndReset()).ToLowerInvariant());
     }
 
@@ -209,6 +223,23 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         if (directory && encoded.Length > 0 && !encoded.EndsWith('/'))
             encoded += "/";
         return new Uri(BaseUri, encoded);
+    }
+
+    protected void ReportIo(string relativePath, WebDavIoOperation operation, long bytesProcessed, long? totalBytes)
+    {
+        try
+        {
+            GlobalIoProgress?.Invoke(this, new WebDavIoProgress(
+                BaseUri.ToString(),
+                relativePath.Replace('\\', '/'),
+                operation,
+                Math.Max(0, bytesProcessed),
+                totalBytes.HasValue ? Math.Max(0, totalBytes.Value) : null));
+        }
+        catch
+        {
+            // Telemetry is observational only and must never affect WebDAV behavior.
+        }
     }
 
     private static HttpRequestMessage BuildPropFind(Uri uri, string depth)
@@ -294,7 +325,9 @@ public sealed class WebDavWriteClient : WebDavReadClient, IWritableWebDavClient
         await WaitGateAsync(cancellationToken).ConfigureAwait(false);
         await using var file = new FileStream(localFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 128 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
-        await using var throttled = new ThrottledReadStream(file, bytesPerSecond);
+        ReportIo(relativePath, WebDavIoOperation.Upload, 0, file.Length);
+        await using var throttled = new ThrottledReadStream(file, bytesPerSecond,
+            processed => ReportIo(relativePath, WebDavIoOperation.Upload, processed, file.Length));
         using var content = new StreamContent(throttled, 128 * 1024);
         content.Headers.ContentLength = file.Length;
         using var request = new HttpRequestMessage(HttpMethod.Put, uri) { Content = content };
@@ -304,6 +337,7 @@ public sealed class WebDavWriteClient : WebDavReadClient, IWritableWebDavClient
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             throw new WebDavException($"PUT failed for {uri.GetLeftPart(UriPartial.Path)}: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
         }
+        ReportIo(relativePath, WebDavIoOperation.Upload, file.Length, file.Length);
         return new PutResult(response.StatusCode, true);
     }
 }
@@ -312,20 +346,25 @@ internal sealed class ThrottledReadStream : Stream
 {
     private readonly Stream _inner;
     private readonly int _bytesPerSecond;
+    private readonly Action<long>? _progress;
     private readonly System.Diagnostics.Stopwatch _watch = System.Diagnostics.Stopwatch.StartNew();
     private long _bytesRead;
 
-    public ThrottledReadStream(Stream inner, int bytesPerSecond)
+    public ThrottledReadStream(Stream inner, int bytesPerSecond, Action<long>? progress = null)
     {
         _inner = inner;
         _bytesPerSecond = bytesPerSecond;
+        _progress = progress;
     }
 
     private async ValueTask ThrottleAsync(int justRead, CancellationToken cancellationToken)
     {
-        if (_bytesPerSecond <= 0 || justRead <= 0)
+        if (justRead <= 0)
             return;
         _bytesRead += justRead;
+        _progress?.Invoke(_bytesRead);
+        if (_bytesPerSecond <= 0)
+            return;
         var expected = TimeSpan.FromSeconds((double)_bytesRead / _bytesPerSecond);
         var delay = expected - _watch.Elapsed;
         if (delay > TimeSpan.Zero)
@@ -342,13 +381,17 @@ internal sealed class ThrottledReadStream : Stream
     public override int Read(byte[] buffer, int offset, int count)
     {
         var read = _inner.Read(buffer, offset, count);
-        if (_bytesPerSecond > 0 && read > 0)
+        if (read > 0)
         {
             _bytesRead += read;
-            var expected = TimeSpan.FromSeconds((double)_bytesRead / _bytesPerSecond);
-            var delay = expected - _watch.Elapsed;
-            if (delay > TimeSpan.Zero)
-                Thread.Sleep(delay);
+            _progress?.Invoke(_bytesRead);
+            if (_bytesPerSecond > 0)
+            {
+                var expected = TimeSpan.FromSeconds((double)_bytesRead / _bytesPerSecond);
+                var delay = expected - _watch.Elapsed;
+                if (delay > TimeSpan.Zero)
+                    Thread.Sleep(delay);
+            }
         }
         return read;
     }
