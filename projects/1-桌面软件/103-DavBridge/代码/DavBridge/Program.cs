@@ -17,7 +17,9 @@ internal static class Program
 
         ApplicationConfiguration.Initialize();
         using var host = new AppHost();
-        Application.Run(new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase)));
+        using var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
+        using var uiPolish = UiPolish.Attach(form);
+        Application.Run(form);
     }
 
     private static void RunSelfTest(string reportPath)
