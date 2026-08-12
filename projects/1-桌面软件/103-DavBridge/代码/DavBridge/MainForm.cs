@@ -34,6 +34,8 @@ internal sealed class MainForm : Form
     private bool _exitRequested;
     private bool _advancedVisible;
     private EngineState? _lastNotifiedState;
+    private V2CompatibilityStore? _compatStore;
+    private V2CompatibilityState _compatState = new();
 
     public MainForm(AppHost host, bool launchInBackground)
     {
@@ -249,8 +251,8 @@ internal sealed class MainForm : Form
         if (_shell.ColumnStyles.Count == 0) return;
         _shell.ColumnStyles[0].Width = ClientSize.Width < 760 ? 150 : 220;
         _taskButton.Text = ClientSize.Width < 760
-            ? "Zotero 迁移\r\n当前任务"
-            : "Zotero 附件迁移\r\nInfiniCLOUD → 坚果云";
+            ? $"Zotero 迁移\r\n{GetStateTitle()}"
+            : $"Zotero 附件迁移\r\n{GetStateTitle()}";
     }
 
     private void ToggleAdvanced(bool? visible = null)
@@ -264,6 +266,9 @@ internal sealed class MainForm : Form
         try
         {
             await _host.InitializeAsync(_appCts.Token);
+            _compatStore = new V2CompatibilityStore(_host.Paths.RoamingRoot);
+            _compatState = _compatStore.Load();
+            AdoptCurrentLegacySafetyProfileIfEligible();
             UpdateView();
             ApplyResponsiveLayout();
             if (!_host.IsConfigured)
@@ -278,6 +283,29 @@ internal sealed class MainForm : Form
             MessageBox.Show(this, ex.Message, "DavBridge 启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
+
+    private void AdoptCurrentLegacySafetyProfileIfEligible()
+    {
+        if (_compatStore is null || !string.IsNullOrWhiteSpace(_compatState.LegacySafetyFingerprint)) return;
+        if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State) || !_host.State.ExistingReplicaValidationPassed) return;
+
+        _compatState.LegacySafetyFingerprint = LegacySafetyFingerprint.Compute(_host.Config);
+        _compatStore.Save(_compatState);
+    }
+
+    private bool IsSafetyProfileCurrent()
+    {
+        if (string.IsNullOrWhiteSpace(_compatState.LegacySafetyFingerprint)) return false;
+        return string.Equals(
+            _compatState.LegacySafetyFingerprint,
+            LegacySafetyFingerprint.Compute(_host.Config),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsInitialized() =>
+        FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State) &&
+        _host.State.ExistingReplicaValidationPassed &&
+        IsSafetyProfileCurrent();
 
     private async Task ResumeNowAsync()
     {
@@ -296,14 +324,20 @@ internal sealed class MainForm : Form
         {
             ToggleAdvanced(true);
             MessageBox.Show(this,
-                "当前任务还没有完成既有副本 NO-WRITE 验证。完成这一安全门后，日常继续将直接恢复，不再重复弹出整套确认流程。",
+                "当前任务还没有完成既有副本 NO-WRITE 验证。完成这一安全门后，日常继续将直接恢复。",
                 "需要初始化", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        // Both real-service safety gates have already passed. Daily resume must be direct and quiet.
-        // Re-running readiness scans and repeating the long-term activation confirmation on every resume
-        // creates friction without adding safety for an unchanged task.
+        if (!IsSafetyProfileCurrent())
+        {
+            ToggleAdvanced(true);
+            MessageBox.Show(this,
+                "源端、目标端或关键安全配置自上次验证后发生了变化。旧任务的安全门不会自动沿用到新端点，请重新完成初始化验证。",
+                "任务配置已变化", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         await _host.ResumeAsync(_appCts.Token);
         try
         {
@@ -412,9 +446,9 @@ internal sealed class MainForm : Form
             MessageBox.Show(this, "流量尚未校准。请先录入坚果云网页当前显示的上传已用、下载已用和下一次重置日期。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        if (FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
+        if (FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State) && IsSafetyProfileCurrent())
         {
-            MessageBox.Show(this, "已经存在完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "当前配置已经存在完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -475,9 +509,9 @@ internal sealed class MainForm : Form
             MessageBox.Show(this, "请先完成一次真实首组验证。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        if (_host.State.ExistingReplicaValidationPassed)
+        if (_host.State.ExistingReplicaValidationPassed && IsSafetyProfileCurrent())
         {
-            MessageBox.Show(this, "既有副本 NO-WRITE 接管验证已经通过，无需重复执行。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "当前配置的既有副本 NO-WRITE 接管验证已经通过，无需重复执行。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -499,6 +533,11 @@ internal sealed class MainForm : Form
 
             var progress = new Progress<EngineProgress>(value => UpdateView(value));
             var result = await ExistingReplicaValidationRunner.ExecuteAsync(_host, plan.GroupKey, progress, _appCts.Token);
+            if (result.Success && _compatStore is not null)
+            {
+                _compatState.LegacySafetyFingerprint = LegacySafetyFingerprint.Compute(_host.Config);
+                _compatStore.Save(_compatState);
+            }
             UpdateView();
 
             var memberStates = string.Join(Environment.NewLine,
@@ -523,10 +562,25 @@ internal sealed class MainForm : Form
 
     private async Task EditSettingsAsync()
     {
+        if (_host.Config.MigrationEnabled)
+            await _host.PauseAsync(_appCts.Token);
+
+        var oldFingerprint = LegacySafetyFingerprint.Compute(_host.Config);
         var secrets = await _host.GetSecretsAsync(_appCts.Token);
         using var dialog = new SettingsDialog(_host.Config, secrets.SourcePassword, secrets.TargetPassword);
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         await _host.SaveSettingsAsync(dialog.Config, dialog.SourcePassword, dialog.TargetPassword, _appCts.Token);
+
+        var newFingerprint = LegacySafetyFingerprint.Compute(_host.Config);
+        if (!string.Equals(oldFingerprint, newFingerprint, StringComparison.OrdinalIgnoreCase) && _compatStore is not null)
+        {
+            _compatState.LegacySafetyFingerprint = null;
+            _compatStore.Save(_compatState);
+            ToggleAdvanced(true);
+            MessageBox.Show(this,
+                "关键端点配置已经变化。原任务进度仍完整保留，但旧安全门资格不会沿用；请对新配置重新执行初始化验证。",
+                "需要重新验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
         UpdateView();
     }
 
@@ -568,8 +622,7 @@ internal sealed class MainForm : Form
         _stateDetail.Text = stateDetail;
         _taskStatus.Text = stateTitle;
 
-        var initialized = FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State) &&
-                          _host.State.ExistingReplicaValidationPassed;
+        var initialized = IsInitialized();
         _primaryAction.Text = state == EngineState.Running ? "暂停" : "继续";
         _taskButton.Text = ClientSize.Width < 760
             ? $"Zotero 迁移\r\n{stateTitle}"
@@ -613,6 +666,12 @@ internal sealed class MainForm : Form
         }
 
         _ = projection;
+    }
+
+    private string GetStateTitle()
+    {
+        var state = !_host.Config.MigrationEnabled ? EngineState.Paused : _host.State.EngineState;
+        return DescribeState(state, null).Title;
     }
 
     private static (string Title, string Detail) DescribeState(EngineState state, EngineProgress? progress)
