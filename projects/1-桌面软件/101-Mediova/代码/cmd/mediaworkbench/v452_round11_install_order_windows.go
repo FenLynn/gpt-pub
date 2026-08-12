@@ -2,9 +2,17 @@
 
 package main
 
-import "time"
+import (
+	"syscall"
+	"time"
+)
 
-const round12ListWSClipSiblings uintptr = 0x04000000
+const (
+	round12ListWSClipSiblings                uintptr = 0x04000000
+	round12ScrollVisualFinalizerSubclassID           = 0x45D0
+)
+
+var round12ScrollVisualFinalizerCB = syscall.NewCallback(round12ScrollVisualFinalizerSubclassProc)
 
 func round12EnsureListSiblingClipping(hwnd uintptr) {
 	if hwnd == 0 {
@@ -27,11 +35,102 @@ func round12EnsureListSiblingClipping(hwnd uintptr) {
 	)
 }
 
+// The thumb visual is already hit-transparent through WM_NCHITTEST. Keeping
+// WS_EX_TRANSPARENT as well makes Windows defer its paint behind sibling
+// controls, which can let a ListView scroll repaint temporarily cover the
+// thumb. Remove only that paint-order hint; the visual remains a tiny,
+// non-activating, input-transparent child whose rectangle is the thumb itself.
+func round12NormalizeThumbVisualPaintOrder(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	exStyle, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLExStyle)
+	if exStyle&round12ThumbVisualExTransparent == 0 {
+		return
+	}
+	round7FeedbackSetWindowLongPtr.Call(
+		hwnd,
+		round7FeedbackGWLExStyle,
+		exStyle &^ round12ThumbVisualExTransparent,
+	)
+	round7FeedbackSetWindowPos.Call(
+		hwnd,
+		0,
+		0,
+		0,
+		0,
+		0,
+		round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|
+			round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged,
+	)
+}
+
+// This subclass is intentionally installed last. It lets the functional scroll
+// owner, capture guard, thumbnail refresh and ListView paint complete first,
+// then commits the thumb visual as the last step of the same physical drag
+// transaction. The strict gate therefore observes the same stable thumb after
+// every WM_MOUSEMOVE rather than a transient gap between two repaint owners.
+func round12InstallScrollVisualFinalizer(a *application) {
+	if a == nil || a.hList == 0 {
+		return
+	}
+	round12NormalizeThumbVisualPaintOrder(round12ThumbVisualH)
+	round12NormalizeThumbVisualPaintOrder(round12ThumbVisualV)
+	v452RemoveSubclass.Call(
+		a.hList,
+		round12ScrollVisualFinalizerCB,
+		round12ScrollVisualFinalizerSubclassID,
+	)
+	v452SetWindowSubclass.Call(
+		a.hList,
+		round12ScrollVisualFinalizerCB,
+		round12ScrollVisualFinalizerSubclassID,
+		0,
+	)
+	round12SyncThumbVisual(a.hList)
+}
+
+func round12ScrollVisualFinalizerSubclassProc(
+	hwnd uintptr,
+	message uint32,
+	wParam, lParam uintptr,
+	subclassID, refData uintptr,
+) uintptr {
+	if message == v452WMNCDestroy {
+		v452RemoveSubclass.Call(hwnd, round12ScrollVisualFinalizerCB, subclassID)
+		result, _, _ := v452DefSubclassProc.Call(
+			hwnd,
+			uintptr(message),
+			wParam,
+			lParam,
+		)
+		return result
+	}
+
+	wasDragging := round12InlineState.dragging
+	result, _, _ := v452DefSubclassProc.Call(
+		hwnd,
+		uintptr(message),
+		wParam,
+		lParam,
+	)
+
+	if message == WM_MOUSEMOVE {
+		if wasDragging || round12InlineState.dragging {
+			round12FinalizeInlineScrollVisual(hwnd)
+		} else {
+			round12SyncThumbVisual(hwnd)
+		}
+	}
+	return result
+}
+
 // Install the final task-list ownership chain deterministically on the UI
 // thread. Round7 performs the inherited one-time initialization, then its
 // ListView subclass is removed. Round11's main/list scrollbar owners are never
-// installed. Round12 keeps one ListView scroll/input owner; the parent bridge only
-// supplies the control-final post-paint notification.
+// installed. Round12 keeps one ListView scroll/input owner; the parent bridge
+// supplies the control-final post-paint notification and the finalizer commits
+// the thumb after the complete drag transaction.
 func init() {
 	go func() {
 		for attempt := 0; attempt < 800; attempt++ {
@@ -60,6 +159,7 @@ func init() {
 					round12EnsureListSiblingClipping(a.hList)
 					round12InstallInlineListScroll(a)
 					round12InstallPostPaintOwner(a)
+					round12InstallScrollVisualFinalizer(a)
 
 					if round11EditorPreviewEnabled && round11EditorPreviewStarted.CompareAndSwap(false, true) {
 						round11OpenEditorPreview(a)
