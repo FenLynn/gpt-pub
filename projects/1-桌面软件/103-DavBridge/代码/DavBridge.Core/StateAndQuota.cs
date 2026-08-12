@@ -87,10 +87,23 @@ public sealed class StateStore
 
 public sealed record QuotaSnapshot(
     long EstimatedUploadUsedBytes,
+    long EstimatedDownloadUsedBytes,
     long ReservedBytes,
     long SafeRemainingBytes,
+    long SafeDownloadRemainingBytes,
     bool IsSprint,
     DateTimeOffset NextResetAt);
+
+public sealed class QuotaExceededException : Exception
+{
+    public bool IsDownloadQuota { get; }
+
+    public QuotaExceededException(string message, bool isDownloadQuota)
+        : base(message)
+    {
+        IsDownloadQuota = isDownloadQuota;
+    }
+}
 
 public static class QuotaPolicy
 {
@@ -118,12 +131,28 @@ public static class QuotaPolicy
         var sprint = config.EndOfCycleSprintEnabled && remainingToReset > TimeSpan.Zero &&
                      remainingToReset <= TimeSpan.FromHours(config.SprintWindowHours);
         var reserve = sprint ? config.SprintReserveBytes : config.NormalReserveBytes;
-        var estimatedUsed = Math.Max(0, config.CalibrationUploadUsedBytes) +
-                            Math.Max(0, state.UploadAttemptBytesSinceCalibration);
-        var safeRemaining = Math.Max(0, config.UploadQuotaBytes - reserve - estimatedUsed);
-        return new QuotaSnapshot(estimatedUsed, reserve, safeRemaining, sprint, config.NextResetAt);
+        var estimatedUploadUsed = Math.Max(0, config.CalibrationUploadUsedBytes) +
+                                  Math.Max(0, state.UploadAttemptBytesSinceCalibration);
+        var estimatedDownloadUsed = Math.Max(0, config.CalibrationDownloadUsedBytes) +
+                                    Math.Max(0, state.VerifiedDownloadBytesSinceCalibration);
+        var safeUploadRemaining = Math.Max(0, config.UploadQuotaBytes - reserve - estimatedUploadUsed);
+        var safeDownloadRemaining = Math.Max(0, config.DownloadQuotaBytes - reserve - estimatedDownloadUsed);
+        return new QuotaSnapshot(
+            estimatedUploadUsed,
+            estimatedDownloadUsed,
+            reserve,
+            safeUploadRemaining,
+            safeDownloadRemaining,
+            sprint,
+            config.NextResetAt);
     }
 
     public static bool CanStart(long requiredBytes, QuotaSnapshot snapshot) =>
+        CanStartUpload(requiredBytes, snapshot);
+
+    public static bool CanStartUpload(long requiredBytes, QuotaSnapshot snapshot) =>
         requiredBytes >= 0 && requiredBytes <= snapshot.SafeRemainingBytes;
+
+    public static bool CanStartDownload(long requiredBytes, QuotaSnapshot snapshot) =>
+        requiredBytes >= 0 && requiredBytes <= snapshot.SafeDownloadRemainingBytes;
 }
