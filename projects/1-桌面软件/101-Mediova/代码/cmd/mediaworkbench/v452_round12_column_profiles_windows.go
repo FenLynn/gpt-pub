@@ -13,6 +13,8 @@ import (
 	"mediaworkbench/internal/model"
 )
 
+const round12ColumnProfileVersion = 2
+
 type round12ColumnProfile struct {
 	Widths  []int  `json:"widths"`
 	Visible []bool `json:"visible"`
@@ -40,6 +42,23 @@ func round12DefaultProfile() round12ColumnProfile {
 	return round12ColumnProfile{Widths: widths, Visible: visible}
 }
 
+func round12MinimumColumnWidth(column int) int {
+	// These minima are semantic, not arbitrary layout clamps. In particular,
+	// the preview cell needs enough room for the 86 px thumbnail plus its
+	// physical margins, while the filename column must remain useful instead of
+	// collapsing into a narrow text sliver. Less important columns can still be
+	// hidden explicitly from the Round12 column menu.
+	minimums := [...]int{
+		44, 98, 160, 82, 70,
+		58, 96, 50, 62, 72,
+		96, 88, 84, 100, 82,
+	}
+	if column < 0 || column >= len(minimums) {
+		return 35
+	}
+	return minimums[column]
+}
+
 func round12NormalizeProfile(profile round12ColumnProfile) round12ColumnProfile {
 	defaults := round12DefaultProfile()
 	if len(profile.Widths) != round12ColumnCount {
@@ -53,7 +72,13 @@ func round12NormalizeProfile(profile round12ColumnProfile) round12ColumnProfile 
 		profile.Visible = append([]bool(nil), profile.Visible...)
 	}
 	for index, definition := range round12Columns {
-		if profile.Widths[index] < 35 || profile.Widths[index] > 900 {
+		if index == round12ColNumber {
+			// The number column is also the frozen horizontal-scroll anchor. Keep
+			// its geometry deterministic instead of persisting an accidental drag.
+			profile.Widths[index] = definition.width
+			continue
+		}
+		if profile.Widths[index] < round12MinimumColumnWidth(index) || profile.Widths[index] > 900 {
 			profile.Widths[index] = definition.width
 		}
 	}
@@ -61,6 +86,22 @@ func round12NormalizeProfile(profile round12ColumnProfile) round12ColumnProfile 
 		profile.Visible[fixed] = true
 	}
 	return profile
+}
+
+func round12DecodeStoredProfiles(data []byte) (round12ColumnProfiles, bool, bool) {
+	var stored round12ColumnProfiles
+	if json.Unmarshal(data, &stored) != nil {
+		return round12ColumnProfiles{}, false, false
+	}
+	if stored.Version != 1 && stored.Version != round12ColumnProfileVersion {
+		return round12ColumnProfiles{}, false, false
+	}
+	profiles := round12ColumnProfiles{
+		Version: round12ColumnProfileVersion,
+		Video:   round12NormalizeProfile(stored.Video),
+		Image:   round12NormalizeProfile(stored.Image),
+	}
+	return profiles, true, stored.Version != round12ColumnProfileVersion
 }
 
 func round12ProfilePath() (string, error) {
@@ -73,22 +114,35 @@ func round12ProfilePath() (string, error) {
 
 func round12LoadProfiles() {
 	round12ProfileMu.Lock()
-	defer round12ProfileMu.Unlock()
 	if round12ProfilesReady {
+		round12ProfileMu.Unlock()
 		return
 	}
 	defaults := round12DefaultProfile()
-	round12Profiles = round12ColumnProfiles{Version: 1, Video: defaults, Image: round12DefaultProfile()}
+	round12Profiles = round12ColumnProfiles{
+		Version: round12ColumnProfileVersion,
+		Video:   defaults,
+		Image:   round12DefaultProfile(),
+	}
+	migrated := false
 	if path, err := round12ProfilePath(); err == nil {
 		if data, readErr := os.ReadFile(path); readErr == nil {
-			var stored round12ColumnProfiles
-			if json.Unmarshal(data, &stored) == nil && stored.Version == 1 {
-				round12Profiles.Video = round12NormalizeProfile(stored.Video)
-				round12Profiles.Image = round12NormalizeProfile(stored.Image)
+			if stored, accepted, wasMigrated := round12DecodeStoredProfiles(data); accepted {
+				round12Profiles = stored
+				migrated = wasMigrated
 			}
 		}
 	}
 	round12ProfilesReady = true
+	round12ProfileMu.Unlock()
+
+	// Persist the repaired Version 2 profile immediately. This is what makes a
+	// real user's previously collapsed Version 1 preview/filename widths heal
+	// once and stay healed on the next launch instead of only looking correct in
+	// a clean CI data directory.
+	if migrated {
+		round12SaveProfiles()
+	}
 }
 
 func round12ProfileFor(kind model.Kind) round12ColumnProfile {
@@ -110,12 +164,14 @@ func round12SetProfile(kind model.Kind, profile round12ColumnProfile) {
 	} else {
 		round12Profiles.Video = profile
 	}
+	round12Profiles.Version = round12ColumnProfileVersion
 	round12ProfileMu.Unlock()
 }
 
 func round12SaveProfiles() {
 	round12ProfileMu.Lock()
 	profiles := round12Profiles
+	profiles.Version = round12ColumnProfileVersion
 	profiles.Video = round12NormalizeProfile(profiles.Video)
 	profiles.Image = round12NormalizeProfile(profiles.Image)
 	round12ProfileMu.Unlock()
@@ -140,10 +196,19 @@ func round12CaptureProfile(a *application, kind model.Kind, save bool) {
 	}
 	profile := round12ProfileFor(kind)
 	for column := 0; column < round12ColumnCount; column++ {
-		width := int(send(a.hList, LVM_GETCOLUMNWIDTH, uintptr(column), 0))
-		if profile.Visible[column] && width >= 35 {
-			profile.Widths[column] = width
+		if !profile.Visible[column] {
+			continue
 		}
+		width := int(send(a.hList, LVM_GETCOLUMNWIDTH, uintptr(column), 0))
+		if column == round12ColNumber || width < round12MinimumColumnWidth(column) || width > 900 {
+			repaired := round12Columns[column].width
+			profile.Widths[column] = repaired
+			if width != repaired {
+				send(a.hList, LVM_SETCOLUMNWIDTH, uintptr(column), uintptr(repaired))
+			}
+			continue
+		}
+		profile.Widths[column] = width
 	}
 	round12SetProfile(kind, profile)
 	if save {
