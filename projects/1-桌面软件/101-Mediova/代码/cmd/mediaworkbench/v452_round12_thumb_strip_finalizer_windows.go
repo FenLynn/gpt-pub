@@ -12,85 +12,27 @@ const round12StripScrollVisualFinalizerSubclassID = 0x45D2
 
 var round12StripScrollVisualFinalizerCB uintptr
 
-func round12StripRectIntersection(left, right rect) (rect, bool) {
-	intersection := rect{
-		Left:   left.Left,
-		Top:    left.Top,
-		Right:  left.Right,
-		Bottom: left.Bottom,
-	}
-	if right.Left > intersection.Left {
-		intersection.Left = right.Left
-	}
-	if right.Top > intersection.Top {
-		intersection.Top = right.Top
-	}
-	if right.Right < intersection.Right {
-		intersection.Right = right.Right
-	}
-	if right.Bottom < intersection.Bottom {
-		intersection.Bottom = right.Bottom
-	}
-	if intersection.Right <= intersection.Left || intersection.Bottom <= intersection.Top {
-		return rect{}, false
-	}
-	return intersection, true
-}
-
-func round12RedrawReleasedThumbRect(listHwnd uintptr, released rect) bool {
-	if listHwnd == 0 || released.Right <= released.Left || released.Bottom <= released.Top {
+func round12RedrawOldThumbRect(listHwnd uintptr, oldRect rect) bool {
+	if listHwnd == 0 || oldRect.Right <= oldRect.Left || oldRect.Bottom <= oldRect.Top {
 		return false
 	}
 	procRedrawWindow.Call(
 		listHwnd,
-		uintptr(unsafe.Pointer(&released)),
+		uintptr(unsafe.Pointer(&oldRect)),
 		0,
 		RDW_INVALIDATE|RDW_ERASE|RDW_UPDATENOW,
 	)
 	return true
 }
 
-func round12InvalidateReleasedThumbStrips(
-	listHwnd uintptr,
-	oldRect rect,
-	oldOK bool,
-	newRect rect,
-	newOK bool,
-) bool {
-	if listHwnd == 0 || !oldOK {
+func round12ThumbFootprintMoved(oldRect rect, oldOK bool, newRect rect, newOK bool) bool {
+	if !oldOK {
 		return false
 	}
-	if !newOK {
-		return round12RedrawReleasedThumbRect(listHwnd, oldRect)
-	}
-	intersection, overlaps := round12StripRectIntersection(oldRect, newRect)
-	if !overlaps {
-		return round12RedrawReleasedThumbRect(listHwnd, oldRect)
-	}
-
-	// Clear only old minus new. The previous full-old erase removed stale pixels,
-	// but could also clear a narrow overlap of the thumb at its new position.
-	// These four non-overlapping strips never touch a current thumb pixel.
-	strips := [4]rect{
-		{Left: oldRect.Left, Top: oldRect.Top, Right: oldRect.Right, Bottom: intersection.Top},
-		{Left: oldRect.Left, Top: intersection.Bottom, Right: oldRect.Right, Bottom: oldRect.Bottom},
-		{Left: oldRect.Left, Top: intersection.Top, Right: intersection.Left, Bottom: intersection.Bottom},
-		{Left: intersection.Right, Top: intersection.Top, Right: oldRect.Right, Bottom: intersection.Bottom},
-	}
-	repaint := false
-	for index := range strips {
-		strip := strips[index]
-		if strip.Right <= strip.Left || strip.Bottom <= strip.Top {
-			continue
-		}
-		if round12RedrawReleasedThumbRect(listHwnd, strip) {
-			repaint = true
-		}
-	}
-	return repaint
+	return !newOK || !round12ThumbRectEqual(oldRect, newRect)
 }
 
-func round12StripRepaintReleasedThumbFootprint(
+func round12RestoreReleasedThumbBackground(
 	listHwnd uintptr,
 	oldH rect,
 	oldHOK bool,
@@ -102,9 +44,38 @@ func round12StripRepaintReleasedThumbFootprint(
 	}
 	newH, newHOK := round12ThumbVisualListRect(listHwnd, round9AxisHorizontal)
 	newV, newVOK := round12ThumbVisualListRect(listHwnd, round9AxisVertical)
+	movedH := round12ThumbFootprintMoved(oldH, oldHOK, newH, newHOK)
+	movedV := round12ThumbFootprintMoved(oldV, oldVOK, newV, newVOK)
+	if !movedH && !movedV {
+		return
+	}
 
-	round12InvalidateReleasedThumbStrips(listHwnd, oldH, oldHOK, newH, newHOK)
-	round12InvalidateReleasedThumbStrips(listHwnd, oldV, oldVOK, newV, newVOK)
+	// Restore the complete old footprint while no thumb child is visible. This
+	// is deliberately transactional. Redrawing old-minus-new while the current
+	// sibling remains visible lets the ListView custom-draw post-paint path
+	// re-enter thumb synchronization and can clip either the old or new edge.
+	// Temporarily remove only that post-paint bridge, hide the tiny thumb
+	// siblings, synchronously restore the ListView pixels, then commit the current
+	// thumb geometry once. The UI thread cannot expose an intermediate state.
+	a := app
+	postPaintDetached := false
+	if a != nil && a.hwnd != 0 && a.hList == listHwnd {
+		v452RemoveSubclass.Call(a.hwnd, round12PostPaintMainCB, round12PostPaintMainSubclassID)
+		postPaintDetached = true
+	}
+
+	round12HideThumbVisuals()
+	if movedH {
+		round12RedrawOldThumbRect(listHwnd, oldH)
+	}
+	if movedV {
+		round12RedrawOldThumbRect(listHwnd, oldV)
+	}
+
+	if postPaintDetached && a != nil && a.hwnd != 0 && a.hList == listHwnd {
+		v452SetWindowSubclass.Call(a.hwnd, round12PostPaintMainCB, round12PostPaintMainSubclassID, 0)
+	}
+	round12SyncThumbVisual(listHwnd)
 }
 
 func round12InstallStripScrollVisualFinalizer(a *application) {
@@ -163,7 +134,7 @@ func round12StripScrollVisualFinalizerSubclassProc(
 		round12FinalizeInlineScrollVisual(hwnd)
 	}
 	if trackFootprint {
-		round12StripRepaintReleasedThumbFootprint(hwnd, oldH, oldHOK, oldV, oldVOK)
+		round12RestoreReleasedThumbBackground(hwnd, oldH, oldHOK, oldV, oldVOK)
 	}
 	return result
 }
