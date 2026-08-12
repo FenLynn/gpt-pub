@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DavBridge.Core", "DavBridge.Core\DavBridge.Core.csproj", "{A9D5E630-2C39-4B17-A2F3-7357ACB78B4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DavBridge", "DavBridge\DavBridge.csproj", "{A7984493-D6BE-459F-B0B6-B9304B32D327}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DavBridge.Smoke", "DavBridge.Smoke\DavBridge.Smoke.csproj", "{E572234A-BC0A-4F22-BD7E-EBC4B5B36DA6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A9D5E630-2C39-4B17-A2F3-7357ACB78B4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9D5E630-2C39-4B17-A2F3-7357ACB78B4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9D5E630-2C39-4B17-A2F3-7357ACB78B4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9D5E630-2C39-4B17-A2F3-7357ACB78B4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A7984493-D6BE-459F-B0B6-B9304B32D327}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A7984493-D6BE-459F-B0B6-B9304B32D327}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A7984493-D6BE-459F-B0B6-B9304B32D327}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A7984493-D6BE-459F-B0B6-B9304B32D327}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E572234A-BC0A-4F22-BD7E-EBC4B5B36DA6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E572234A-BC0A-4F22-BD7E-EBC4B5B36DA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E572234A-BC0A-4F22-BD7E-EBC4B5B36DA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E572234A-BC0A-4F22-BD7E-EBC4B5B36DA6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
