@@ -7,11 +7,11 @@ internal sealed class SettingsDialog : Form
     private readonly TextBox _sourceUrl = new();
     private readonly TextBox _sourceRoot = new();
     private readonly TextBox _sourceUser = new();
-    private readonly TextBox _sourcePassword = new() { UseSystemPasswordChar = true };
+    private readonly TextBox _sourcePassword = new() { PasswordChar = '*' };
     private readonly TextBox _targetUrl = new();
     private readonly TextBox _targetRoot = new();
     private readonly TextBox _targetUser = new();
-    private readonly TextBox _targetPassword = new() { UseSystemPasswordChar = true };
+    private readonly TextBox _targetPassword = new() { PasswordChar = '*' };
     private readonly NumericUpDown _speed = new() { Minimum = 10, Maximum = 10_000, Increment = 50 };
     private readonly NumericUpDown _reserve = new() { Minimum = 0, Maximum = 500, Increment = 5 };
     private readonly NumericUpDown _sprintReserve = new() { Minimum = 0, Maximum = 100, Increment = 1 };
@@ -21,14 +21,14 @@ internal sealed class SettingsDialog : Form
     private readonly CheckBox _sprint = new() { Text = "重置前 24 小时启用周期末冲刺" };
 
     public DavBridgeConfig Config { get; private set; }
-    public string? SourcePassword => NormalizeNewSecret(_sourcePassword.Text);
-    public string? TargetPassword => NormalizeNewSecret(_targetPassword.Text);
+    public string SourcePassword => _sourcePassword.Text;
+    public string TargetPassword => _targetPassword.Text;
 
-    public SettingsDialog(DavBridgeConfig original, bool sourcePasswordSaved, bool targetPasswordSaved)
+    public SettingsDialog(DavBridgeConfig original, string sourcePassword, string targetPassword)
     {
         Config = CloneConfig(original);
         Text = "DavBridge 设置";
-        Width = 700;
+        Width = 720;
         Height = 735;
         StartPosition = FormStartPosition.CenterParent;
         Font = new Font("Segoe UI", 9F);
@@ -36,11 +36,11 @@ internal sealed class SettingsDialog : Form
         _sourceUrl.Text = Config.SourceBaseUrl;
         _sourceRoot.Text = Config.SourceRootPath;
         _sourceUser.Text = Config.SourceUsername;
+        _sourcePassword.Text = sourcePassword;
         _targetUrl.Text = Config.TargetBaseUrl;
         _targetRoot.Text = Config.TargetRootPath;
         _targetUser.Text = Config.TargetUsername;
-        _sourcePassword.PlaceholderText = sourcePasswordSaved ? "已保存，留空则沿用原密码" : "请输入 Apps Password";
-        _targetPassword.PlaceholderText = targetPasswordSaved ? "已保存，留空则沿用原密码" : "请输入第三方应用密码";
+        _targetPassword.Text = targetPassword;
         _speed.Value = Math.Clamp(Config.UploadLimitBytesPerSecond / 1000, (int)_speed.Minimum, (int)_speed.Maximum);
         _reserve.Value = Math.Clamp((decimal)Config.NormalReserveBytes / 1_000_000m, _reserve.Minimum, _reserve.Maximum);
         _sprintReserve.Value = Math.Clamp((decimal)Config.SprintReserveBytes / 1_000_000m, _sprintReserve.Minimum, _sprintReserve.Maximum);
@@ -55,31 +55,29 @@ internal sealed class SettingsDialog : Form
 
         AddFull(panel, new Label
         {
-            Text = "InfiniCLOUD 请填写 My Page → Apps Connection 中的 WebDAV Connection URL、Connection ID / User ID 和 Apps Password。密码框留空时沿用已加密保存的旧值，重新输入则覆盖。",
+            Text = "InfiniCLOUD 请填写 My Page → Apps Connection 中的 WebDAV Connection URL、Connection ID / User ID 和 Apps Password。已保存密码会按真实长度显示为 *，右侧眼睛可临时显示明文。",
             AutoSize = true,
-            MaximumSize = new Size(620, 0),
+            MaximumSize = new Size(640, 0),
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 0, 0, 8)
         });
         AddField(panel, "InfiniCLOUD WebDAV URL", _sourceUrl);
         AddField(panel, "源目录", _sourceRoot);
         AddField(panel, "Connection ID / User ID", _sourceUser);
-        AddField(panel, "Apps Password", _sourcePassword);
-        AddPasswordState(panel, "InfiniCLOUD 密码状态", sourcePasswordSaved);
+        AddPasswordField(panel, "Apps Password", _sourcePassword);
 
         AddFull(panel, new Label
         {
-            Text = "坚果云 WebDAV 用户名应填写账号注册邮箱，密码应填写单独生成的第三方应用密码，不是坚果云登录密码。若当前出现 401，建议重新输入或生成一个专用于 DavBridge 的新应用密码覆盖旧值。",
+            Text = "坚果云 WebDAV 用户名填写账号注册邮箱，密码填写单独生成的第三方应用密码，不是网页登录密码。已保存密码同样保留真实长度，便于人工核对。",
             AutoSize = true,
-            MaximumSize = new Size(620, 0),
+            MaximumSize = new Size(640, 0),
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 12, 0, 8)
         });
         AddField(panel, "坚果云 WebDAV URL", _targetUrl);
         AddField(panel, "目标目录", _targetRoot);
         AddField(panel, "坚果云注册邮箱", _targetUser);
-        AddField(panel, "第三方应用密码（非登录密码）", _targetPassword);
-        AddPasswordState(panel, "坚果云密码状态", targetPasswordSaved);
+        AddPasswordField(panel, "第三方应用密码（非登录密码）", _targetPassword);
         AddField(panel, "上传限速 KB/s", _speed);
         AddField(panel, "普通预留 MB", _reserve);
         AddField(panel, "冲刺预留 MB", _sprintReserve);
@@ -116,13 +114,6 @@ internal sealed class SettingsDialog : Form
         Config.StartMinimized = _startMinimized.Checked;
         Config.AutoResume = _autoResume.Checked;
         Config.EndOfCycleSprintEnabled = _sprint.Checked;
-    }
-
-    private static string? NormalizeNewSecret(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-            return null;
-        return text.Trim();
     }
 
     private static DavBridgeConfig CloneConfig(DavBridgeConfig x) => new()
@@ -162,14 +153,38 @@ internal sealed class SettingsDialog : Form
         panel.Controls.Add(control, 1, row);
     }
 
-    private static void AddPasswordState(TableLayoutPanel panel, string label, bool saved)
+    private static void AddPasswordField(TableLayoutPanel panel, string label, TextBox textBox)
     {
-        AddField(panel, label, new Label
+        var row = panel.RowCount++;
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.Controls.Add(new Label { Text = label, AutoSize = true, Margin = new Padding(0, 7, 8, 7) }, 0, row);
+
+        var holder = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, AutoSize = true, Margin = new Padding(0, 2, 0, 2) };
+        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42));
+        textBox.Dock = DockStyle.Top;
+        textBox.Margin = new Padding(0, 2, 6, 2);
+        var eye = new Button
         {
-            Text = saved ? "已加密保存，留空不会清除" : "尚未保存",
-            AutoSize = true,
-            ForeColor = saved ? Color.DarkGreen : Color.DarkRed
-        });
+            Text = "👁",
+            Width = 36,
+            Height = textBox.PreferredHeight + 4,
+            Margin = new Padding(0),
+            AccessibleName = "显示或隐藏密码",
+            TabStop = false
+        };
+        eye.Click += (_, _) =>
+        {
+            var selectionStart = textBox.SelectionStart;
+            var selectionLength = textBox.SelectionLength;
+            textBox.PasswordChar = textBox.PasswordChar == '\0' ? '*' : '\0';
+            eye.Text = textBox.PasswordChar == '\0' ? "◉" : "👁";
+            textBox.Focus();
+            textBox.Select(Math.Min(selectionStart, textBox.TextLength), Math.Min(selectionLength, Math.Max(0, textBox.TextLength - selectionStart)));
+        };
+        holder.Controls.Add(textBox, 0, 0);
+        holder.Controls.Add(eye, 1, 0);
+        panel.Controls.Add(holder, 1, row);
     }
 
     private static void AddFull(TableLayoutPanel panel, Control control)
