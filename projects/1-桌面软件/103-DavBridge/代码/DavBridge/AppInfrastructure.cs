@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 using DavBridge.Core;
@@ -36,6 +37,17 @@ internal sealed record AppPaths(
 }
 
 internal sealed record WebDavSecrets(string SourcePassword, string TargetPassword);
+
+internal sealed record ConnectionDiagnosticResult(
+    bool SourceOk,
+    string SourceMessage,
+    bool TargetBaseOk,
+    string TargetBaseMessage,
+    bool TargetRootOk,
+    string TargetRootMessage)
+{
+    public bool AllOk => SourceOk && TargetBaseOk && TargetRootOk;
+}
 
 internal sealed class ConfigStore
 {
@@ -175,12 +187,18 @@ internal sealed class AppHost : IDisposable
     public async Task<WebDavSecrets> GetSecretsAsync(CancellationToken cancellationToken = default) =>
         await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false);
 
+    public async Task<(bool SourceSaved, bool TargetSaved)> GetCredentialStatusAsync(CancellationToken cancellationToken = default)
+    {
+        var secrets = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+        return (!string.IsNullOrWhiteSpace(secrets.SourcePassword), !string.IsNullOrWhiteSpace(secrets.TargetPassword));
+    }
+
     public async Task SaveSettingsAsync(DavBridgeConfig config, string? sourcePassword, string? targetPassword, CancellationToken cancellationToken = default)
     {
         var previous = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false);
         var secrets = new WebDavSecrets(
-            string.IsNullOrEmpty(sourcePassword) ? previous.SourcePassword : sourcePassword,
-            string.IsNullOrEmpty(targetPassword) ? previous.TargetPassword : targetPassword);
+            MergeSecret(sourcePassword, previous.SourcePassword),
+            MergeSecret(targetPassword, previous.TargetPassword));
 
         Config = config;
         _manualPaused = !Config.MigrationEnabled;
@@ -189,6 +207,74 @@ internal sealed class AppHost : IDisposable
         AutoStartManager.SetEnabled(Config.AutoStartWithWindows);
         IsConfigured = HasConnectionFields(Config) && !string.IsNullOrWhiteSpace(secrets.SourcePassword) && !string.IsNullOrWhiteSpace(secrets.TargetPassword);
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task<ConnectionDiagnosticResult> DiagnoseConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        var secrets = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+
+        var sourceOk = false;
+        var sourceMessage = "尚未测试";
+        try
+        {
+            using var source = new WebDavReadClient(Config.SourceBaseUrl, Config.SourceUsername, secrets.SourcePassword);
+            var entries = await source.ListDirectoryAsync(Config.SourceRootPath, cancellationToken).ConfigureAwait(false);
+            sourceOk = true;
+            sourceMessage = $"连接成功，源目录可访问，本次目录响应包含 {entries.Count:N0} 个可见对象。";
+        }
+        catch (Exception ex)
+        {
+            sourceMessage = DescribeConnectionFailure("InfiniCLOUD", ex);
+        }
+
+        var targetBaseOk = false;
+        var targetRootOk = false;
+        var targetBaseMessage = "尚未测试";
+        var targetRootMessage = "尚未测试";
+        var gate = new RequestGate(TimeSpan.FromMilliseconds(Config.TargetMinimumRequestIntervalMs));
+        try
+        {
+            using var target = new WebDavWriteClient(Config.TargetBaseUrl, Config.TargetUsername, secrets.TargetPassword, gate);
+            try
+            {
+                var rootEntries = await target.ListDirectoryAsync(string.Empty, cancellationToken).ConfigureAwait(false);
+                targetBaseOk = true;
+                targetBaseMessage = $"认证成功，WebDAV 根目录可访问，本次响应包含 {rootEntries.Count:N0} 个可见对象。";
+            }
+            catch (Exception ex)
+            {
+                targetBaseMessage = DescribeConnectionFailure("坚果云", ex);
+            }
+
+            if (targetBaseOk)
+            {
+                try
+                {
+                    var entries = await target.ListDirectoryAsync(Config.TargetRootPath, cancellationToken).ConfigureAwait(false);
+                    targetRootOk = true;
+                    targetRootMessage = $"目标目录 /{Config.TargetRootPath.Trim('/')}/ 可访问，本次响应包含 {entries.Count:N0} 个可见对象。";
+                }
+                catch (Exception ex)
+                {
+                    targetRootMessage = DescribeConnectionFailure("坚果云目标目录", ex);
+                }
+            }
+            else
+            {
+                targetRootMessage = "未测试，因为坚果云 WebDAV 根目录认证尚未通过。";
+            }
+        }
+        catch (Exception ex)
+        {
+            targetBaseMessage = DescribeConnectionFailure("坚果云", ex);
+            targetRootMessage = "未测试，因为坚果云客户端初始化失败。";
+        }
+
+        return new ConnectionDiagnosticResult(
+            sourceOk, sourceMessage,
+            targetBaseOk, targetBaseMessage,
+            targetRootOk, targetRootMessage);
     }
 
     public async Task CalibrateAsync(long officialUploadUsedBytes, long officialDownloadUsedBytes, DateTimeOffset nextResetAt, CancellationToken cancellationToken = default)
@@ -339,6 +425,36 @@ internal sealed class AppHost : IDisposable
     {
         if (!IsConfigured)
             throw new InvalidOperationException("DavBridge is not configured. Set both WebDAV connections and application passwords first.");
+    }
+
+    private static string MergeSecret(string? candidate, string previous)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+            return previous;
+        return candidate.Trim();
+    }
+
+    private static string DescribeConnectionFailure(string side, Exception ex)
+    {
+        if (ex is WebDavException webDav)
+        {
+            if (webDav.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                if (side.StartsWith("坚果云", StringComparison.Ordinal))
+                    return $"已到达坚果云 WebDAV，但认证被拒绝（401）。请确认用户名是坚果云注册邮箱，密码是当前有效的第三方应用密码。详细信息：{webDav.Message}";
+                return $"已到达 {side}，但认证被拒绝（401）。请重新核对该端专用的 WebDAV 用户名和应用密码。详细信息：{webDav.Message}";
+            }
+
+            if (webDav.StatusCode == HttpStatusCode.NotFound)
+                return $"认证请求已到达服务器，但路径不存在或不匹配（404）。详细信息：{webDav.Message}";
+
+            return webDav.Message;
+        }
+
+        if (ex is HttpRequestException)
+            return $"网络连接失败：{ex.Message}";
+
+        return ex.Message;
     }
 
     private static bool HasConnectionFields(DavBridgeConfig config) =>
