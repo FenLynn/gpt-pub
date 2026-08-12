@@ -18,6 +18,7 @@ import round11_flicker_gate_runner_base as runner
 THUMB_COLORS = runner.INLINE_THUMB_COLORS
 HOVER_DELAY_MS = 0
 IMMEDIATE_SAMPLE_SECONDS = 0.12
+HIDE_TRANSITION_SETTLE_SECONDS = 0.14
 FORBIDDEN_SCROLL_CLASSES = {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
 THUMB_VISUAL_CLASS = "MWRound12ThumbVisual"
 GA_ROOT = 2
@@ -195,6 +196,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
                 raise RuntimeError(f"{axis} inline thumb flickered while stationary")
 
             runner.park_cursor(main_hwnd)
+            time.sleep(HIDE_TRANSITION_SETTLE_SECONDS)
             hidden = capture_list(main_hwnd, evidence / f"inline-{axis}-left-hidden.png")
             try:
                 hidden_metrics = thumb_metrics(hidden)
@@ -212,6 +214,7 @@ def validate_axis(main_hwnd: int, axis: str, evidence: Path) -> dict[str, object
                 "outside_thumb_change": track,
                 "hover_frames": 20,
                 "hover_unique_frames": 1,
+                "hide_transition_settle_ms": int(HIDE_TRANSITION_SETTLE_SECONDS * 1000),
                 "hidden_after_leave": True,
                 "child_scrollbar_windows": 0,
                 "native_scroll_style_bits": 0,

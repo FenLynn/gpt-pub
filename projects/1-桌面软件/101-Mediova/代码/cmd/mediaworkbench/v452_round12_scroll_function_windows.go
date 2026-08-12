@@ -64,8 +64,8 @@ func round12InstallInlineListScroll(a *application) {
 		dragAxis:    round9AxisNone,
 	}
 
-	// Double buffering is owned by the ListView itself. No transparent child
-	// HWND, layered surface, window region, or external redraw loop is used.
+	// Double buffering is owned by the ListView itself. The ListView remains
+	// the sole scroll/input owner; thumb-only sibling visuals never own a track.
 	send(
 		a.hList,
 		round12InlineLVMSetExtendedStyle,
@@ -292,7 +292,7 @@ func round12InlineThumbRect(hwnd uintptr, axis uint8) (rect, bool) {
 		metrics.page,
 		metrics.pos,
 	)
-	thickness := scaleDPI(7)
+	thickness := scaleDPI(8)
 	if thickness < 6 {
 		thickness = 6
 	}
@@ -345,6 +345,7 @@ func round12InlineSetVisibleAxis(hwnd uintptr, axis uint8) {
 	round12InlineState.visibleAxis = axis
 	round12InlineInvalidateAxis(hwnd, old)
 	round12InlineInvalidateAxis(hwnd, axis)
+	round12StartThumbTransition(hwnd)
 }
 
 func round12InlineUpdateHover(hwnd uintptr, pt point) {
@@ -354,8 +355,13 @@ func round12InlineUpdateHover(hwnd uintptr, pt point) {
 	if round12InlineState.dragging {
 		return
 	}
-	// No timer and no delayed transition. Entering the edge hit strip makes the
-	// single in-place thumb visible in the same mouse-move transaction.
+	// Entering the edge hit strip changes the interaction owner immediately.
+	// The thumb-only sibling eases its thickness over a few short UI ticks.
+	if axis != round9AxisNone {
+		round12CancelWheelReveal()
+	} else if round12WheelRevealActive() {
+		return
+	}
 	round12InlineSetVisibleAxis(hwnd, axis)
 }
 
@@ -408,7 +414,9 @@ func round12InlinePaintAfterDefault(hwnd uintptr, message uint32, hdc uintptr) {
 		round7DrawListOverlay(app, hdc)
 	}
 	round9FeedbackDrawListBoundary(hwnd, hdc)
-	round12InlineDrawThumb(hwnd, hdc)
+	// The moving thumb is intentionally not painted into the ListView HDC.
+	// A dedicated sibling owns the thumb pixels, so moving/hiding it cannot
+	// leave stale horizontal or vertical fragments in partially invalidated rows.
 	if message == WM_PAINT && app != nil {
 		round9EnsureVisibleThumbnails(app, hwnd)
 	}
@@ -531,6 +539,7 @@ func round12InlineBeginDrag(hwnd uintptr, pt point) bool {
 		round12InlineState.dragOffset = int(pt.X - thumb.Left)
 	}
 	procSetCapture.Call(hwnd)
+	round12ForceThumbVisible(hwnd, axis)
 	round12InlineInvalidateAxis(hwnd, axis)
 	return true
 }
@@ -592,6 +601,7 @@ func round12InlineHandleMouseWheel(hwnd uintptr, wParam uintptr) bool {
 		target = maxPos
 	}
 	if deltaRows := target - metrics.pos; deltaRows != 0 {
+		round12RevealVerticalThumbForWheel(hwnd)
 		round12InlineScrollPixels(hwnd, 0, deltaRows*round12InlineRowHeight(hwnd))
 		if round12InlineState.visibleAxis != round9AxisNone {
 			round12InlineInvalidateAxis(hwnd, round12InlineState.visibleAxis)
@@ -624,6 +634,11 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		round12HideNativeListScrollbars(hwnd)
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		return result
+
+	case WM_TIMER:
+		if round12HandleThumbTimer(hwnd, wParam) {
+			return 0
+		}
 
 	case WM_MOUSEMOVE:
 		pt := mousePoint(lParam)
@@ -682,6 +697,7 @@ func round12InlineListSubclassProc(hwnd uintptr, message uint32, wParam, lParam,
 		return result
 
 	case v452WMNCDestroy:
+		round12StopThumbTimer(hwnd)
 		v452RemoveSubclass.Call(hwnd, round12FunctionalScrollCB, subclassID)
 	}
 

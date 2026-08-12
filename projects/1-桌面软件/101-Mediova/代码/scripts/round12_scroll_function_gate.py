@@ -125,6 +125,35 @@ def horizontal_change_is_scroll(metrics: dict[str, object]) -> bool:
     )
 
 
+def frozen_number_change(before: Image.Image, after: Image.Image) -> dict[str, object]:
+    if before.size != after.size:
+        raise RuntimeError(f"list size changed around frozen column: {before.size} -> {after.size}")
+    width, height = before.size
+    right = min(width, 38)
+    bottom = max(1, height - 28)
+    before_roi = before.crop((0, 0, right, bottom))
+    after_roi = after.crop((0, 0, right, bottom))
+    try:
+        diff = ImageChops.difference(before_roi, after_roi).convert("L")
+        try:
+            mask = diff.point(lambda value: 255 if value >= 10 else 0)
+            try:
+                changed = sum(1 for value in mask.getdata() if value)
+            finally:
+                mask.close()
+        finally:
+            diff.close()
+    finally:
+        before_roi.close()
+        after_roi.close()
+    total = max(1, right * bottom)
+    return {
+        "changed_pixels": changed,
+        "changed_ratio": changed / total,
+        "roi": [0, 0, right, bottom],
+    }
+
+
 def hover_thumb(main_hwnd: int, axis: str, evidence_path: Path) -> tuple[list[int], dict[str, object]]:
     left, top, right, bottom = runner.visible_list_rect(main_hwnd)
     if axis == "horizontal":
@@ -268,11 +297,18 @@ def main() -> int:
                 evidence,
             )
             runner.park_cursor(main_hwnd)
+            time.sleep(0.14)
             horizontal_after = capture_list(
                 main_hwnd, evidence / "inline-function-horizontal-after.png"
             )
             try:
                 horizontal_metrics = horizontal_content_change(before, horizontal_after)
+                frozen_metrics = frozen_number_change(before, horizontal_after)
+                after_thumb = overlay_gate.thumb_metrics(horizontal_after)
+                if int(after_thumb.get("pixels", 0)) != 0:
+                    raise RuntimeError(f"horizontal thumb remained after leave transition: {after_thumb!r}")
+                if float(frozen_metrics["changed_ratio"]) > 0.002:
+                    raise RuntimeError(f"frozen number column moved during horizontal drag: {frozen_metrics!r}")
             finally:
                 horizontal_after.close()
         finally:
@@ -297,6 +333,22 @@ def main() -> int:
         wheel_geometry = runner.normal_list_geometry(main_hwnd)
         if wheel_after <= wheel_before:
             raise RuntimeError(f"mouse wheel did not move vertically: before={wheel_before} after={wheel_after}")
+        wheel_visible_frame = capture_list(main_hwnd, evidence / "inline-function-wheel-visible.png")
+        try:
+            wheel_thumb_metrics = overlay_gate.thumb_metrics(wheel_visible_frame, "vertical")
+            if int(wheel_thumb_metrics.get("pixels", 0)) <= 0:
+                raise RuntimeError(f"wheel did not reveal vertical thumb: {wheel_thumb_metrics!r}")
+        finally:
+            wheel_visible_frame.close()
+
+        time.sleep(0.60)
+        wheel_hidden_frame = capture_list(main_hwnd, evidence / "inline-function-wheel-hidden.png")
+        try:
+            wheel_hidden_metrics = overlay_gate.thumb_metrics(wheel_hidden_frame)
+            if int(wheel_hidden_metrics.get("pixels", 0)) != 0:
+                raise RuntimeError(f"wheel thumb did not auto-hide: {wheel_hidden_metrics!r}")
+        finally:
+            wheel_hidden_frame.close()
 
         vertical_before = get_top_index(list_hwnd)
         vertical_thumb, vertical_hover_metrics = hover_thumb(
@@ -329,12 +381,16 @@ def main() -> int:
             "initial_geometry": initial_geometry,
             "horizontal_drag_content_moved": horizontal_moved,
             "horizontal_visual_change": horizontal_metrics,
+            "frozen_number_column_change": frozen_metrics,
+            "horizontal_hidden_after_leave": True,
             "horizontal_hover_thumb": horizontal_hover_metrics,
             "horizontal_drag_samples": horizontal_drag_samples,
             "mouse_wheel_vertical_moved": True,
             "wheel_top_before": wheel_before,
             "wheel_top_after": wheel_after,
             "wheel_geometry": wheel_geometry,
+            "wheel_vertical_thumb_visible": wheel_thumb_metrics,
+            "wheel_vertical_thumb_auto_hidden": True,
             "vertical_drag_content_moved": True,
             "vertical_top_before": vertical_before,
             "vertical_top_after": vertical_after,
