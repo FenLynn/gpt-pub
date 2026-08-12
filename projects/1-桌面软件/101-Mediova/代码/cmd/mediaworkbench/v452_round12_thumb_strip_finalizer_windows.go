@@ -12,6 +12,7 @@ const (
 	round12StripScrollVisualFinalizerSubclassID = 0x45D2
 	round12FrozenZOrderGuardSubclassID          = 0x45D3
 	round12WMWindowPosChanging                  = 0x0046
+	round12WheelRevealResponsiveTicks            = 26
 )
 
 var (
@@ -179,6 +180,15 @@ func round12StripScrollVisualFinalizerSubclassProc(
 
 	wasDragging := round12InlineState.dragging
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+
+	if message == round7FeedbackWMMouseWheel &&
+		round12WheelRevealTicks > round12WheelRevealResponsiveTicks {
+		// Wheel interaction reveals immediately, then settles for roughly half a
+		// second before the existing four-frame fade. Capping the hold after the
+		// functional owner runs keeps the visual responsive even when Windows
+		// coalesces 16 ms timer messages under CI or a busy desktop.
+		round12WheelRevealTicks = round12WheelRevealResponsiveTicks
+	}
 
 	if message == LVM_SETITEMSTATE {
 		// The frozen sequence strip is a sibling window. Repainting it may put it
