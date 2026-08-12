@@ -96,6 +96,7 @@ internal sealed class MainForm : Form
         actions.Controls.Add(ActionButton("迁移就绪扫描", async (_, _) => await ScanAsync()));
         actions.Controls.Add(ActionButton("校准流量", async (_, _) => await CalibrateAsync()));
         actions.Controls.Add(ActionButton("首组验证", async (_, _) => await ValidateFirstGroupAsync()));
+        actions.Controls.Add(ActionButton("既有副本验证", async (_, _) => await ValidateExistingReplicaAsync()));
         actions.Controls.Add(ActionButton("开始 / 继续", async (_, _) => await ResumeNowAsync()));
         actions.Controls.Add(ActionButton("暂停", async (_, _) => await PauseAsync()));
         actions.Controls.Add(ActionButton("设置", async (_, _) => await EditSettingsAsync()));
@@ -103,7 +104,7 @@ internal sealed class MainForm : Form
 
         root.Controls.Add(new Label
         {
-            Text = "首次迁移顺序：连接诊断 → 就绪扫描 → 校准流量 → 首组验证。首组强校验通过前不会开放整库长期迁移。关闭窗口只缩到托盘。",
+            Text = "首次迁移顺序：连接诊断 → 就绪扫描 → 校准流量 → 首组验证 → 既有副本验证。两个安全门通过前不会开放整库长期迁移。关闭窗口只缩到托盘。",
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 18, 0, 0)
@@ -137,7 +138,15 @@ internal sealed class MainForm : Form
         if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
         {
             MessageBox.Show(this,
-                "整库长期迁移尚未开放。请先完成流量校准和“首组验证”，只有一个完整 zip + prop 逻辑组在真实坚果云端通过强 SHA-256 校验后，才能开始长期迁移。",
+                "整库长期迁移尚未开放。请先完成流量校准和“首组验证”，只有一个完整 zip + prop 逻辑组在真实坚果云端通过强 SHA-256 校验后，才能继续下一安全门。",
+                "DavBridge 安全门", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!_host.State.ExistingReplicaValidationPassed)
+        {
+            MessageBox.Show(this,
+                "整库长期迁移仍未开放。首组真实上传已经通过，但还需要完成一次“既有副本验证”，证明 GoodSync 已有 zip + prop 可以在 NO-WRITE 模式下仅通过 GET + SHA-256 安全接管，且上传增量严格为 0 B。",
                 "DavBridge 安全门", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
@@ -159,7 +168,7 @@ internal sealed class MainForm : Form
                 : "目标 zotero 目录当前未发现可见文件。";
 
             var confirm = MessageBox.Show(this,
-                $"首组真实强校验已经通过，就绪扫描也已完成。\n\n{targetText}\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
+                $"真实上传首组和既有 GoodSync 副本 NO-WRITE 接管都已经通过。\n\n{targetText}\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
                 "启用 DavBridge 长期迁移", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (confirm != DialogResult.Yes) return;
         }
@@ -268,7 +277,7 @@ internal sealed class MainForm : Form
         }
         if (FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
         {
-            MessageBox.Show(this, "已经存在一个完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "已经存在一个完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。下一步请执行“既有副本验证”。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -304,13 +313,75 @@ internal sealed class MainForm : Form
                 $"本次计入上传：{FormatBytes(result.UploadBytes)}\n" +
                 $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n" +
                 $"{mode}\n{result.Message}\n\n" +
-                (result.Success ? "首组安全门已通过。下一步才可以考虑启用长期迁移。" : "长期迁移仍保持锁定。请先处理本次异常。"),
+                (result.Success ? "首组安全门已通过。下一步请执行“既有副本验证”。" : "长期迁移仍保持锁定。请先处理本次异常。"),
                 "首组验证结果", MessageBoxButtons.OK,
                 result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "首组验证失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            UseWaitCursor = false;
+            UpdateView();
+        }
+    }
+
+    private async Task ValidateExistingReplicaAsync()
+    {
+        if (!await EnsureConfiguredAsync()) return;
+        if (_host.Config.MigrationEnabled)
+        {
+            MessageBox.Show(this, "请先暂停长期迁移，再执行既有副本验证。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
+        {
+            MessageBox.Show(this, "请先完成一次真实“首组验证”，再验证 GoodSync 既有副本接管。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (_host.State.ExistingReplicaValidationPassed)
+        {
+            MessageBox.Show(this, "既有副本 NO-WRITE 接管验证已经通过，无需重复执行。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        try
+        {
+            UseWaitCursor = true;
+            var plan = await ExistingReplicaValidationRunner.PrepareAsync(_host, _appCts.Token);
+            var members = string.Join(Environment.NewLine, plan.Members.Select(member => $"  {member.RelativePath}  {FormatBytes(member.ContentLength ?? 0)}"));
+            var confirm = MessageBox.Show(this,
+                $"DavBridge 已从坚果云本次可见列表中选出一个两个成员都已存在的完整 Zotero 组。\n\n" +
+                $"组：{plan.GroupKey}\n{members}\n\n" +
+                $"组总量：{FormatBytes(plan.TotalBytes)}\n" +
+                $"坚果云本次可见文件：{FormatTargetVisibleCount(plan.VisibleTargetObjects)}\n" +
+                $"预计坚果云校验下载：约 {FormatBytes(plan.TotalBytes)}\n" +
+                "本次上传上限：严格 0 B\n\n" +
+                "此测试启用代码级 NO-WRITE 保护，PutFileAsync 被禁止。若目标缺失或内容不一致，只会停止或报冲突，绝不会上传覆盖。确认开始吗？",
+                "既有副本验证计划", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (confirm != DialogResult.Yes)
+                return;
+
+            var progress = new Progress<EngineProgress>(value => UpdateView(value));
+            var result = await ExistingReplicaValidationRunner.ExecuteAsync(_host, plan.GroupKey, progress, _appCts.Token);
+            UpdateView();
+
+            var memberStates = string.Join(Environment.NewLine,
+                result.Records.Select(record => $"  {record.RelativePath}: {record.Status}"));
+            MessageBox.Show(this,
+                $"组：{result.GroupKey}\n结果：{(result.Success ? "通过" : "未通过")}\n\n{memberStates}\n\n" +
+                $"本次计入上传：{FormatBytes(result.UploadBytes)}\n" +
+                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n" +
+                $"{result.Message}\n\n" +
+                (result.Success ? "既有副本安全门已通过。下一步才可以短时启用长期迁移。" : "既有副本安全门未通过，长期迁移继续锁定。"),
+                "既有副本验证结果", MessageBoxButtons.OK,
+                result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "既有副本验证失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
         {
@@ -373,7 +444,8 @@ internal sealed class MainForm : Form
 
         var verified = _host.State.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified);
         var errors = _host.State.Files.Values.Count(x => x.Status is TransferStatus.Failed or TransferStatus.Conflict or TransferStatus.BlockedOversize);
-        _filesValue.Text = $"已强校验 {verified:N0}，异常 {errors:N0}，记录 {_host.State.Files.Count:N0}";
+        var takeover = _host.State.ExistingReplicaValidationPassed ? "已通过" : "待验证";
+        _filesValue.Text = $"已强校验 {verified:N0}，异常 {errors:N0}，记录 {_host.State.Files.Count:N0}，既有副本 {takeover}";
         _currentValue.Text = progress is null
             ? (_host.State.CurrentGroupKey ?? "等待")
             : $"{progress.GroupKey ?? "等待"} / {progress.RelativePath ?? string.Empty}\n{progress.Message}";
