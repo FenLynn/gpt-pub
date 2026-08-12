@@ -455,7 +455,7 @@ func round12PaintFrozenNumberVisual(hwnd, hdc uintptr) {
 		fillSolid(hdc, rect{
 			Left: header.Left, Top: header.Bottom - 1,
 			Right: header.Right, Bottom: header.Bottom,
-		}, round12HeaderTopSeparator)
+		}, colorRef(194, 203, 214))
 		textRect := header
 		textRect.Left += scaleDPI(8)
 		textRect.Right -= scaleDPI(5)
