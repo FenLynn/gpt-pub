@@ -114,7 +114,7 @@ public sealed class MigrationEngine
 
             var requiredBytes = await GetRequiredUploadBytesAsync(outstanding, cancellationToken).ConfigureAwait(false);
             var quota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
-            if (!QuotaPolicy.CanStart(requiredBytes, quota))
+            if (!QuotaPolicy.CanStartUpload(requiredBytes, quota))
             {
                 await SetEngineStateAsync(EngineState.WaitQuota, group.Key, null,
                     $"Safe upload budget exhausted. Group still needs {requiredBytes} bytes; remaining={quota.SafeRemainingBytes} bytes.",
@@ -137,6 +137,14 @@ public sealed class MigrationEngine
                 catch (OperationCanceledException)
                 {
                     throw;
+                }
+                catch (QuotaExceededException ex)
+                {
+                    record.Status = record.SourceSha256 is null ? TransferStatus.Pending : TransferStatus.SourceReady;
+                    record.LastError = ex.Message;
+                    await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+                    await SetEngineStateAsync(EngineState.WaitQuota, group.Key, member.RelativePath, ex.Message, cancellationToken).ConfigureAwait(false);
+                    return;
                 }
                 catch (HttpRequestException ex)
                 {
@@ -252,6 +260,8 @@ public sealed class MigrationEngine
             var existing = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
             if (existing is not null)
             {
+                EnsureDownloadBudget(existing.ContentLength ?? sourceDownload.Bytes,
+                    $"Verifying existing target {manifestEntry.RelativePath}");
                 OnProgress(EngineState.Running, record.GroupKey, record.RelativePath,
                     "Target already exists; downloading it for safe takeover verification.");
                 var currentTarget = await _target.DownloadAndHashAsync(targetPath, cancellationToken).ConfigureAwait(false);
@@ -292,6 +302,10 @@ public sealed class MigrationEngine
                 // since changed. This is the only existing-target case where an overwrite is allowed.
             }
 
+            // Never start a new PUT unless there is enough target download budget left to perform the mandatory
+            // post-PUT strong verification in the same cycle.
+            EnsureDownloadBudget(sourceDownload.Bytes, $"Post-upload verification of {manifestEntry.RelativePath}");
+
             record.Status = TransferStatus.Uploading;
             record.LastAttemptedUploadSha256 = sourceDownload.Sha256;
             _state.UploadAttemptBytesSinceCalibration += sourceDownload.Bytes;
@@ -328,6 +342,17 @@ public sealed class MigrationEngine
         finally
         {
             try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+        }
+    }
+
+    private void EnsureDownloadBudget(long expectedBytes, string operation)
+    {
+        var quota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
+        if (!QuotaPolicy.CanStartDownload(expectedBytes, quota))
+        {
+            throw new QuotaExceededException(
+                $"Safe target download budget exhausted before {operation}. Need about {expectedBytes} bytes; remaining={quota.SafeDownloadRemainingBytes} bytes.",
+                isDownloadQuota: true);
         }
     }
 
