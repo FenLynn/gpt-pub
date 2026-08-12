@@ -8,15 +8,31 @@ internal sealed class MainForm : Form
     private readonly bool _launchInBackground;
     private readonly CancellationTokenSource _appCts = new();
     private readonly NotifyIcon _trayIcon;
-    private readonly Label _sourceValue = new() { AutoSize = true };
-    private readonly Label _targetValue = new() { AutoSize = true };
+
+    private readonly TableLayoutPanel _shell = new();
+    private readonly Panel _advancedPanel = new();
+    private readonly Label _taskStatus = new() { AutoSize = true };
+    private readonly Label _routeValue = new() { AutoSize = true };
     private readonly Label _stateValue = new() { AutoSize = true };
-    private readonly Label _quotaValue = new() { AutoSize = true };
+    private readonly Label _stateDetail = new() { AutoSize = true, MaximumSize = new Size(560, 0) };
+    private readonly Label _quotaValue = new() { AutoSize = true, MaximumSize = new Size(560, 0) };
     private readonly Label _resetValue = new() { AutoSize = true };
-    private readonly Label _filesValue = new() { AutoSize = true };
-    private readonly Label _currentValue = new() { AutoSize = true, MaximumSize = new Size(620, 0) };
-    private readonly ProgressBar _quotaBar = new() { Maximum = 1000, Dock = DockStyle.Top, Height = 12 };
+    private readonly Label _filesValue = new() { AutoSize = true, MaximumSize = new Size(560, 0) };
+    private readonly Label _currentValue = new() { AutoSize = true, MaximumSize = new Size(560, 0) };
+    private readonly ProgressBar _quotaBar = new() { Maximum = 1000, Dock = DockStyle.Top, Height = 10 };
+    private readonly Button _primaryAction = new() { AutoSize = true, MinimumSize = new Size(92, 34) };
+    private readonly Button _taskButton = new()
+    {
+        Text = "Zotero 附件迁移\r\nInfiniCLOUD → 坚果云",
+        TextAlign = ContentAlignment.MiddleLeft,
+        Height = 62,
+        Dock = DockStyle.Top,
+        FlatStyle = FlatStyle.Flat,
+        Margin = new Padding(0, 0, 0, 8)
+    };
+
     private bool _exitRequested;
+    private bool _advancedVisible;
     private EngineState? _lastNotifiedState;
 
     public MainForm(AppHost host, bool launchInBackground)
@@ -27,16 +43,16 @@ internal sealed class MainForm : Form
         Text = appVersion is null
             ? "DavBridge"
             : $"DavBridge v{appVersion.Major}.{appVersion.Minor}.{appVersion.Build}";
-        Width = 800;
-        Height = 540;
-        MinimumSize = new Size(690, 450);
+        Width = 880;
+        Height = 560;
+        MinimumSize = new Size(650, 440);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9F);
         BackColor = Color.White;
 
         var trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("打开 DavBridge", null, (_, _) => ShowWindow());
-        trayMenu.Items.Add("继续迁移", null, async (_, _) => await ResumeNowAsync());
+        trayMenu.Items.Add("继续", null, async (_, _) => await ResumeNowAsync());
         trayMenu.Items.Add("暂停", null, async (_, _) => await PauseAsync());
         trayMenu.Items.Add(new ToolStripSeparator());
         trayMenu.Items.Add("退出", null, (_, _) => ExitApplication());
@@ -50,6 +66,7 @@ internal sealed class MainForm : Form
         _trayIcon.DoubleClick += (_, _) => ShowWindow();
 
         Controls.Add(BuildLayout());
+        Resize += (_, _) => ApplyResponsiveLayout();
         FormClosing += OnFormClosing;
         Shown += OnShownAsync;
         _host.ProgressChanged += OnProgressChanged;
@@ -58,58 +75,188 @@ internal sealed class MainForm : Form
 
     private Control BuildLayout()
     {
-        var root = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 4,
-            Padding = new Padding(24)
-        };
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _shell.Dock = DockStyle.Fill;
+        _shell.ColumnCount = 2;
+        _shell.RowCount = 1;
+        _shell.Padding = new Padding(0);
+        _shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
+        _shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        root.Controls.Add(new Label
+        _shell.Controls.Add(BuildSidebar(), 0, 0);
+        _shell.Controls.Add(BuildTaskView(), 1, 0);
+        return _shell;
+    }
+
+    private Control BuildSidebar()
+    {
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(18, 18, 14, 18), BackColor = Color.FromArgb(247, 247, 247) };
+        var stack = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        stack.Controls.Add(new Label
         {
             Text = "DavBridge",
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 17F),
-            Margin = new Padding(0, 0, 0, 18)
+            Font = new Font("Segoe UI Semibold", 15F),
+            Margin = new Padding(0, 0, 0, 16)
         }, 0, 0);
 
-        var info = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
-        info.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
-        info.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        AddRow(info, "InfiniCLOUD", _sourceValue);
-        AddRow(info, "坚果云", _targetValue);
-        AddRow(info, "状态", _stateValue);
-        AddRow(info, "当前周期", _quotaValue);
-        AddRow(info, string.Empty, _quotaBar);
-        AddRow(info, "流量重置", _resetValue);
-        AddRow(info, "文件状态", _filesValue);
-        AddRow(info, "当前任务", _currentValue);
-        root.Controls.Add(info, 0, 1);
+        _taskButton.FlatAppearance.BorderSize = 1;
+        _taskButton.Click += (_, _) => { };
+        stack.Controls.Add(_taskButton, 0, 1);
 
-        var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true };
-        actions.Controls.Add(ActionButton("连接诊断", async (_, _) => await DiagnoseConnectionsAsync()));
-        actions.Controls.Add(ActionButton("迁移就绪扫描", async (_, _) => await ScanAsync()));
-        actions.Controls.Add(ActionButton("校准流量", async (_, _) => await CalibrateAsync()));
-        actions.Controls.Add(ActionButton("首组验证", async (_, _) => await ValidateFirstGroupAsync()));
-        actions.Controls.Add(ActionButton("既有副本验证", async (_, _) => await ValidateExistingReplicaAsync()));
-        actions.Controls.Add(ActionButton("开始 / 继续", async (_, _) => await ResumeNowAsync()));
-        actions.Controls.Add(ActionButton("暂停", async (_, _) => await PauseAsync()));
+        var taskMeta = new Label
+        {
+            Text = "当前固定任务\r\nv0.2 将支持更多单向迁移、备份与镜像任务",
+            AutoSize = true,
+            ForeColor = Color.DimGray,
+            MaximumSize = new Size(180, 0),
+            Margin = new Padding(2, 10, 0, 0)
+        };
+        stack.Controls.Add(taskMeta, 0, 2);
+
+        var newTask = new Button
+        {
+            Text = "+ 新建任务",
+            Dock = DockStyle.Bottom,
+            Height = 34,
+            Enabled = false
+        };
+        new ToolTip().SetToolTip(newTask, "通用任务模型已经建立，当前候选先保持 v0.1.7 任务兼容，后续开放任务创建。 ");
+        stack.Controls.Add(newTask, 0, 3);
+
+        panel.Controls.Add(stack);
+        return panel;
+    }
+
+    private Control BuildTaskView()
+    {
+        var outer = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(26, 22, 26, 20), BackColor = Color.White };
+        var root = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 8 };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        var header = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var titleStack = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Top };
+        titleStack.Controls.Add(new Label
+        {
+            Text = "Zotero 附件迁移",
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 16F),
+            Margin = new Padding(0)
+        });
+        _routeValue.ForeColor = Color.DimGray;
+        _routeValue.Margin = new Padding(0, 5, 0, 0);
+        titleStack.Controls.Add(_routeValue);
+        header.Controls.Add(titleStack, 0, 0);
+
+        _taskStatus.Font = new Font("Segoe UI Semibold", 10F);
+        _taskStatus.Padding = new Padding(10, 5, 10, 5);
+        _taskStatus.Margin = new Padding(12, 2, 0, 0);
+        header.Controls.Add(_taskStatus, 1, 0);
+        root.Controls.Add(header, 0, 0);
+
+        var stateCard = new Panel { Dock = DockStyle.Top, Height = 86, Margin = new Padding(0, 22, 0, 16), Padding = new Padding(14), BackColor = Color.FromArgb(248, 248, 248) };
+        _stateValue.Font = new Font("Segoe UI Semibold", 12F);
+        _stateValue.Location = new Point(14, 13);
+        _stateDetail.Location = new Point(14, 43);
+        _stateDetail.ForeColor = Color.DimGray;
+        stateCard.Controls.Add(_stateValue);
+        stateCard.Controls.Add(_stateDetail);
+        root.Controls.Add(stateCard, 0, 1);
+
+        var overview = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Margin = new Padding(0, 0, 0, 12) };
+        overview.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
+        overview.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        AddRow(overview, "总体进度", _filesValue);
+        AddRow(overview, "当前周期", _quotaValue);
+        AddRow(overview, string.Empty, _quotaBar);
+        AddRow(overview, "流量重置", _resetValue);
+        AddRow(overview, "当前活动", _currentValue);
+        root.Controls.Add(overview, 0, 2);
+
+        var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(0, 8, 0, 8) };
+        _primaryAction.Padding = new Padding(12, 3, 12, 3);
+        _primaryAction.Click += async (_, _) =>
+        {
+            if (_host.Config.MigrationEnabled && _host.State.EngineState != EngineState.Paused)
+                await PauseAsync();
+            else
+                await ResumeNowAsync();
+        };
+        actions.Controls.Add(_primaryAction);
         actions.Controls.Add(ActionButton("设置", async (_, _) => await EditSettingsAsync()));
-        root.Controls.Add(actions, 0, 2);
+        actions.Controls.Add(ActionButton("初始化与诊断", (_, _) => ToggleAdvanced()));
+        root.Controls.Add(actions, 0, 3);
+
+        _advancedPanel.Dock = DockStyle.Top;
+        _advancedPanel.AutoSize = true;
+        _advancedPanel.Visible = false;
+        _advancedPanel.Margin = new Padding(0, 12, 0, 0);
+        _advancedPanel.Padding = new Padding(14);
+        _advancedPanel.BackColor = Color.FromArgb(248, 248, 248);
+        _advancedPanel.Controls.Add(BuildAdvancedTools());
+        root.Controls.Add(_advancedPanel, 0, 4);
 
         root.Controls.Add(new Label
         {
-            Text = "首次迁移顺序：连接诊断 → 就绪扫描 → 校准流量 → 首组验证 → 既有副本验证。两个安全门通过前不会开放整库长期迁移。关闭窗口只缩到托盘。",
+            Text = "关闭主窗口只会隐藏到托盘。任务初始化完成后，日常暂停和继续不会重复执行整套扫描与确认。",
             AutoSize = true,
             ForeColor = Color.DimGray,
+            MaximumSize = new Size(620, 0),
             Margin = new Padding(0, 18, 0, 0)
-        }, 0, 3);
+        }, 0, 5);
+
+        outer.Controls.Add(root);
+        return outer;
+    }
+
+    private Control BuildAdvancedTools()
+    {
+        var root = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1 };
+        root.Controls.Add(new Label
+        {
+            Text = "初始化与诊断",
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 10F),
+            Margin = new Padding(0, 0, 0, 8)
+        });
+        root.Controls.Add(new Label
+        {
+            Text = "首次任务按顺序完成连接诊断、就绪扫描、流量校准、首组验证和既有副本验证。已通过的任务无需日常重复。",
+            AutoSize = true,
+            ForeColor = Color.DimGray,
+            MaximumSize = new Size(560, 0),
+            Margin = new Padding(0, 0, 0, 10)
+        });
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true };
+        buttons.Controls.Add(ActionButton("连接诊断", async (_, _) => await DiagnoseConnectionsAsync()));
+        buttons.Controls.Add(ActionButton("就绪扫描", async (_, _) => await ScanAsync()));
+        buttons.Controls.Add(ActionButton("校准流量", async (_, _) => await CalibrateAsync()));
+        buttons.Controls.Add(ActionButton("首组验证", async (_, _) => await ValidateFirstGroupAsync()));
+        buttons.Controls.Add(ActionButton("既有副本验证", async (_, _) => await ValidateExistingReplicaAsync()));
+        root.Controls.Add(buttons);
         return root;
+    }
+
+    private void ApplyResponsiveLayout()
+    {
+        if (_shell.ColumnStyles.Count == 0) return;
+        _shell.ColumnStyles[0].Width = ClientSize.Width < 760 ? 150 : 220;
+        _taskButton.Text = ClientSize.Width < 760
+            ? "Zotero 迁移\r\n当前任务"
+            : "Zotero 附件迁移\r\nInfiniCLOUD → 坚果云";
+    }
+
+    private void ToggleAdvanced(bool? visible = null)
+    {
+        _advancedVisible = visible ?? !_advancedVisible;
+        _advancedPanel.Visible = _advancedVisible;
     }
 
     private async void OnShownAsync(object? sender, EventArgs e)
@@ -118,6 +265,7 @@ internal sealed class MainForm : Form
         {
             await _host.InitializeAsync(_appCts.Token);
             UpdateView();
+            ApplyResponsiveLayout();
             if (!_host.IsConfigured)
                 await EditSettingsAsync();
             else if (_launchInBackground || _host.Config.StartMinimized)
@@ -137,45 +285,34 @@ internal sealed class MainForm : Form
 
         if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
         {
+            ToggleAdvanced(true);
             MessageBox.Show(this,
-                "整库长期迁移尚未开放。请先完成流量校准和“首组验证”，只有一个完整 zip + prop 逻辑组在真实坚果云端通过强 SHA-256 校验后，才能继续下一安全门。",
-                "DavBridge 安全门", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "当前任务还没有完成首次真实强校验。请在“初始化与诊断”中完成流量校准和首组验证。",
+                "需要初始化", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         if (!_host.State.ExistingReplicaValidationPassed)
         {
+            ToggleAdvanced(true);
             MessageBox.Show(this,
-                "整库长期迁移仍未开放。首组真实上传已经通过，但还需要完成一次“既有副本验证”，证明 GoodSync 已有 zip + prop 可以在 NO-WRITE 模式下仅通过 GET + SHA-256 安全接管，且上传增量严格为 0 B。",
-                "DavBridge 安全门", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "当前任务还没有完成既有副本 NO-WRITE 验证。完成这一安全门后，日常继续将直接恢复，不再重复弹出整套确认流程。",
+                "需要初始化", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        if (!_host.Config.MigrationEnabled)
-        {
-            var preflight = await ScanCoreAsync(showResult: true);
-            if (preflight is null) return;
-
-            if (preflight.Value.Report.OversizeObjects.Count > 0)
-            {
-                MessageBox.Show(this, "存在超过目标单文件上限的对象，长期迁移不会启用。", "DavBridge", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            var visibleLabel = FormatTargetVisibleCount(preflight.Value.TargetVisibleObjects);
-            var targetText = preflight.Value.TargetVisibleObjects > 0
-                ? $"目标 zotero 目录本次可见 {visibleLabel} 个既有文件。DavBridge 会逐个按准确路径重新下载并与 InfiniCLOUD 源文件比较 SHA-256。完全一致的文件直接接管，不重复上传；内容不同的文件进入冲突并停止，不会自动覆盖。"
-                : "目标 zotero 目录当前未发现可见文件。";
-
-            var confirm = MessageBox.Show(this,
-                $"真实上传首组和既有 GoodSync 副本 NO-WRITE 接管都已经通过。\n\n{targetText}\n\n确认启用长期后台迁移并立即开始吗？\n\n迁移期间 InfiniCLOUD 保持只读，目标文件只有重新 GET 并通过 SHA-256 后才会记为完成。",
-                "启用 DavBridge 长期迁移", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes) return;
-        }
-
+        // Both real-service safety gates have already passed. Daily resume must be direct and quiet.
+        // Re-running readiness scans and repeating the long-term activation confirmation on every resume
+        // creates friction without adding safety for an unchanged task.
         await _host.ResumeAsync(_appCts.Token);
-        try { await _host.RunOnceAsync(_appCts.Token); }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "DavBridge", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        try
+        {
+            await _host.RunOnceAsync(_appCts.Token);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "DavBridge", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
         UpdateView();
     }
 
@@ -198,7 +335,7 @@ internal sealed class MainForm : Form
                 $"坚果云 Zotero 目标目录\n{StatusMark(result.TargetRootOk)} {result.TargetRootMessage}";
 
             if (!result.TargetBaseOk)
-                text += "\n\n若坚果云为 401：请在“设置”中确认用户名为注册邮箱，并重新输入当前有效的第三方应用密码。不要使用坚果云网页登录密码。";
+                text += "\n\n若坚果云为 401，请在设置中确认用户名为注册邮箱，并重新输入当前有效的第三方应用密码。不要使用网页登录密码。";
 
             MessageBox.Show(this, text, "连接诊断",
                 MessageBoxButtons.OK, result.AllOk ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
@@ -234,8 +371,8 @@ internal sealed class MainForm : Form
                 var targetNote = targetVisible == 0
                     ? "未发现既有目标文件"
                     : targetVisible >= 750
-                        ? "本次目录列举已达到 750 项上限，实际目标文件可能更多；迁移本身按准确文件路径逐个确认，不依赖这次列表完整性"
-                        : "既有目标文件不会阻止迁移，后续将逐个强校验并安全接管一致文件";
+                        ? "本次目录列举已达到 750 项上限，实际目标文件可能更多；迁移按准确文件路径逐个确认，不依赖列表完整性"
+                        : "既有目标文件后续将逐个强校验并安全接管一致文件";
                 MessageBox.Show(this,
                     $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端本次可见文件：{FormatTargetVisibleCount(targetVisible)}\n目标策略：{targetNote}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
                     "迁移就绪扫描", MessageBoxButtons.OK,
@@ -247,7 +384,7 @@ internal sealed class MainForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this,
-                ex.Message + "\n\n请先点击“连接诊断”，分别确认 InfiniCLOUD、坚果云 WebDAV 根目录和目标 zotero 目录。",
+                ex.Message + "\n\n请先使用连接诊断分别确认源端、目标 WebDAV 根目录和目标 zotero 目录。",
                 "扫描失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return null;
         }
@@ -267,17 +404,17 @@ internal sealed class MainForm : Form
         if (!await EnsureConfiguredAsync()) return;
         if (_host.Config.MigrationEnabled)
         {
-            MessageBox.Show(this, "请先暂停长期迁移，再执行首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "请先暂停任务，再执行首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         if (_host.Config.NextResetAt == default)
         {
-            MessageBox.Show(this, "流量尚未校准。请先点击“校准流量”，录入坚果云网页当前显示的上传已用、下载已用和下一次重置日期。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "流量尚未校准。请先录入坚果云网页当前显示的上传已用、下载已用和下一次重置日期。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         if (FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
         {
-            MessageBox.Show(this, "已经存在一个完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。下一步请执行“既有副本验证”。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "已经存在完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -287,16 +424,15 @@ internal sealed class MainForm : Form
             var plan = await FirstGroupValidationRunner.PrepareAsync(_host, _appCts.Token);
             var members = string.Join(Environment.NewLine, plan.Members.Select(member => $"  {member.RelativePath}  {FormatBytes(member.ContentLength ?? 0)}"));
             var confirm = MessageBox.Show(this,
-                $"DavBridge 将只验证下面这一个 Zotero 逻辑组，完成后立即停止，不会启动整库迁移。\n\n" +
+                $"DavBridge 将只验证下面这一个 Zotero 逻辑组，完成后立即停止。\n\n" +
                 $"组：{plan.GroupKey}\n{members}\n\n" +
                 $"组总量：{FormatBytes(plan.TotalBytes)}\n" +
                 $"坚果云已存在成员：{plan.ExistingTargetMembers} / {plan.Members.Count}\n" +
                 $"本次最多需要上传：{FormatBytes(plan.MaximumUploadBytes)}\n" +
                 $"预计坚果云强校验下载：约 {FormatBytes(plan.ExpectedTargetVerificationDownloadBytes)}\n\n" +
-                "已有 GoodSync 副本会先下载并比较 SHA-256；只有目标缺失时才会上传。确认开始这个单组真实验证吗？",
+                "已有副本会先下载并比较 SHA-256，只有目标缺失时才会上传。确认开始吗？",
                 "首组验证计划", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
+            if (confirm != DialogResult.Yes) return;
 
             var progress = new Progress<EngineProgress>(value => UpdateView(value));
             var result = await FirstGroupValidationRunner.ExecuteAsync(_host, plan.GroupKey, progress, _appCts.Token);
@@ -311,9 +447,7 @@ internal sealed class MainForm : Form
             MessageBox.Show(this,
                 $"组：{result.GroupKey}\n结果：{(result.Success ? "通过" : "未通过")}\n\n{memberStates}\n\n" +
                 $"本次计入上传：{FormatBytes(result.UploadBytes)}\n" +
-                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n" +
-                $"{mode}\n{result.Message}\n\n" +
-                (result.Success ? "首组安全门已通过。下一步请执行“既有副本验证”。" : "长期迁移仍保持锁定。请先处理本次异常。"),
+                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{mode}\n{result.Message}",
                 "首组验证结果", MessageBoxButtons.OK,
                 result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
@@ -333,12 +467,12 @@ internal sealed class MainForm : Form
         if (!await EnsureConfiguredAsync()) return;
         if (_host.Config.MigrationEnabled)
         {
-            MessageBox.Show(this, "请先暂停长期迁移，再执行既有副本验证。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "请先暂停任务，再执行既有副本验证。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
         {
-            MessageBox.Show(this, "请先完成一次真实“首组验证”，再验证 GoodSync 既有副本接管。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "请先完成一次真实首组验证。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         if (_host.State.ExistingReplicaValidationPassed)
@@ -353,16 +487,15 @@ internal sealed class MainForm : Form
             var plan = await ExistingReplicaValidationRunner.PrepareAsync(_host, _appCts.Token);
             var members = string.Join(Environment.NewLine, plan.Members.Select(member => $"  {member.RelativePath}  {FormatBytes(member.ContentLength ?? 0)}"));
             var confirm = MessageBox.Show(this,
-                $"DavBridge 已从坚果云本次可见列表中选出一个两个成员都已存在的完整 Zotero 组。\n\n" +
+                $"DavBridge 已选出一个两个成员都已存在的完整 Zotero 组。\n\n" +
                 $"组：{plan.GroupKey}\n{members}\n\n" +
                 $"组总量：{FormatBytes(plan.TotalBytes)}\n" +
                 $"坚果云本次可见文件：{FormatTargetVisibleCount(plan.VisibleTargetObjects)}\n" +
                 $"预计坚果云校验下载：约 {FormatBytes(plan.TotalBytes)}\n" +
                 "本次上传上限：严格 0 B\n\n" +
-                "此测试启用代码级 NO-WRITE 保护，PutFileAsync 被禁止。若目标缺失或内容不一致，只会停止或报冲突，绝不会上传覆盖。确认开始吗？",
+                "此测试启用代码级 NO-WRITE 保护。若目标缺失或内容不一致，只会停止或报冲突，绝不会上传覆盖。确认开始吗？",
                 "既有副本验证计划", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
+            if (confirm != DialogResult.Yes) return;
 
             var progress = new Progress<EngineProgress>(value => UpdateView(value));
             var result = await ExistingReplicaValidationRunner.ExecuteAsync(_host, plan.GroupKey, progress, _appCts.Token);
@@ -373,9 +506,7 @@ internal sealed class MainForm : Form
             MessageBox.Show(this,
                 $"组：{result.GroupKey}\n结果：{(result.Success ? "通过" : "未通过")}\n\n{memberStates}\n\n" +
                 $"本次计入上传：{FormatBytes(result.UploadBytes)}\n" +
-                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n" +
-                $"{result.Message}\n\n" +
-                (result.Success ? "既有副本安全门已通过。下一步才可以短时启用长期迁移。" : "既有副本安全门未通过，长期迁移继续锁定。"),
+                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{result.Message}",
                 "既有副本验证结果", MessageBoxButtons.OK,
                 result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
@@ -424,17 +555,31 @@ internal sealed class MainForm : Form
 
     private void UpdateView(EngineProgress? progress = null)
     {
-        _sourceValue.Text = string.IsNullOrWhiteSpace(_host.Config.SourceBaseUrl) ? "未配置" : "已配置";
-        _targetValue.Text = string.IsNullOrWhiteSpace(_host.Config.TargetBaseUrl) ? "未配置" : "已配置";
-        _stateValue.Text = !_host.Config.MigrationEnabled
-            ? "Paused，长期迁移未启用或已暂停"
-            : (progress?.State ?? _host.State.EngineState).ToString();
+        var projection = LegacyV017Adapter.Project(_host.Config);
+        var sourceName = string.IsNullOrWhiteSpace(_host.Config.SourceBaseUrl) ? "源端未配置" : "InfiniCLOUD";
+        var targetName = string.IsNullOrWhiteSpace(_host.Config.TargetBaseUrl) ? "目标端未配置" : "坚果云";
+        _routeValue.Text = $"{sourceName} → {targetName}  ·  Zotero 固定任务";
+
+        var state = !_host.Config.MigrationEnabled
+            ? EngineState.Paused
+            : progress?.State ?? _host.State.EngineState;
+        var (stateTitle, stateDetail) = DescribeState(state, progress);
+        _stateValue.Text = stateTitle;
+        _stateDetail.Text = stateDetail;
+        _taskStatus.Text = stateTitle;
+
+        var initialized = FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State) &&
+                          _host.State.ExistingReplicaValidationPassed;
+        _primaryAction.Text = state == EngineState.Running ? "暂停" : "继续";
+        _taskButton.Text = ClientSize.Width < 760
+            ? $"Zotero 迁移\r\n{stateTitle}"
+            : $"Zotero 附件迁移\r\n{stateTitle}";
 
         var quota = progress?.Quota ?? QuotaPolicy.GetSnapshot(_host.Config, _host.State, DateTimeOffset.Now);
         _quotaValue.Text =
-            $"上传估算 {FormatBytes(quota.EstimatedUploadUsedBytes)} / {FormatBytes(_host.Config.UploadQuotaBytes)}，" +
-            $"下载估算 {FormatBytes(quota.EstimatedDownloadUsedBytes)} / {FormatBytes(_host.Config.DownloadQuotaBytes)}，" +
-            $"安全预留 {FormatBytes(quota.ReservedBytes)}{(quota.IsSprint ? "，周期末冲刺" : string.Empty)}";
+            $"上传 {FormatBytes(quota.EstimatedUploadUsedBytes)} / {FormatBytes(_host.Config.UploadQuotaBytes)}    " +
+            $"下载 {FormatBytes(quota.EstimatedDownloadUsedBytes)} / {FormatBytes(_host.Config.DownloadQuotaBytes)}    " +
+            $"预留 {FormatBytes(quota.ReservedBytes)}{(quota.IsSprint ? "，周期末冲刺" : string.Empty)}";
         var uploadRatio = _host.Config.UploadQuotaBytes <= 0 ? 0d : (double)quota.EstimatedUploadUsedBytes / _host.Config.UploadQuotaBytes;
         var downloadRatio = _host.Config.DownloadQuotaBytes <= 0 ? 0d : (double)quota.EstimatedDownloadUsedBytes / _host.Config.DownloadQuotaBytes;
         _quotaBar.Value = Math.Clamp((int)Math.Round(Math.Max(uploadRatio, downloadRatio) * 1000), 0, 1000);
@@ -444,11 +589,55 @@ internal sealed class MainForm : Form
 
         var verified = _host.State.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified);
         var errors = _host.State.Files.Values.Count(x => x.Status is TransferStatus.Failed or TransferStatus.Conflict or TransferStatus.BlockedOversize);
-        var takeover = _host.State.ExistingReplicaValidationPassed ? "已通过" : "待验证";
-        _filesValue.Text = $"已强校验 {verified:N0}，异常 {errors:N0}，记录 {_host.State.Files.Count:N0}，既有副本 {takeover}";
-        _currentValue.Text = progress is null
-            ? (_host.State.CurrentGroupKey ?? "等待")
-            : $"{progress.GroupKey ?? "等待"} / {progress.RelativePath ?? string.Empty}\n{progress.Message}";
+        var initText = initialized ? "初始化完成" : "需要初始化";
+        _filesValue.Text = $"已强校验 {verified:N0}    异常 {errors:N0}    记录 {_host.State.Files.Count:N0}    {initText}";
+
+        if (progress is not null)
+        {
+            _currentValue.Text = string.IsNullOrWhiteSpace(progress.RelativePath)
+                ? progress.Message
+                : $"{progress.RelativePath}\r\n{HumanizeProgress(progress.Message)}";
+        }
+        else if (state == EngineState.Paused && !string.IsNullOrWhiteSpace(_host.State.CurrentGroupKey))
+        {
+            _currentValue.Text = $"暂停断点：{_host.State.CurrentGroupKey}";
+        }
+        else
+        {
+            _currentValue.Text = state switch
+            {
+                EngineState.Paused => "等待继续",
+                EngineState.Complete => "当前源清单已完成强校验",
+                _ => _host.State.CurrentGroupKey ?? "等待"
+            };
+        }
+
+        _ = projection;
+    }
+
+    private static (string Title, string Detail) DescribeState(EngineState state, EngineProgress? progress)
+    {
+        return state switch
+        {
+            EngineState.Running => ("正在迁移", HumanizeProgress(progress?.Message) ?? "任务正在后台运行"),
+            EngineState.Paused => ("已暂停", "进度和流量账本已保存，点击继续可直接恢复"),
+            EngineState.WaitNetwork => ("等待网络", "网络恢复后可自动继续"),
+            EngineState.WaitQuota => ("等待下一周期", "当前安全额度不足，将按周期规则继续"),
+            EngineState.WaitRetry => ("需要处理", HumanizeProgress(progress?.Message) ?? "任务遇到异常，已安全停止"),
+            EngineState.Complete => ("已完成", "当前源清单已在目标端完成强 SHA-256 校验"),
+            _ => (state.ToString(), HumanizeProgress(progress?.Message) ?? string.Empty)
+        };
+    }
+
+    private static string? HumanizeProgress(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return null;
+        if (message.Contains("Downloading source", StringComparison.OrdinalIgnoreCase)) return "正在读取源文件并计算 SHA-256";
+        if (message.Contains("Target already exists", StringComparison.OrdinalIgnoreCase)) return "正在校验目标端已有副本";
+        if (message.Contains("Uploading target", StringComparison.OrdinalIgnoreCase)) return "正在上传目标文件";
+        if (message.Contains("Re-downloading target", StringComparison.OrdinalIgnoreCase)) return "正在重新读取目标文件并做强校验";
+        if (message.Contains("strongly verified", StringComparison.OrdinalIgnoreCase)) return "目标文件已通过强校验";
+        return message;
     }
 
     private void ShowWindow()
@@ -501,7 +690,13 @@ internal sealed class MainForm : Form
     {
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        panel.Controls.Add(new Label { Text = label, AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(0, 7, 12, 7) }, 0, row);
+        panel.Controls.Add(new Label
+        {
+            Text = label,
+            AutoSize = true,
+            ForeColor = Color.DimGray,
+            Margin = new Padding(0, 7, 12, 7)
+        }, 0, row);
         control.Margin = new Padding(0, 7, 0, 7);
         control.Dock = control is ProgressBar ? DockStyle.Top : DockStyle.Fill;
         panel.Controls.Add(control, 1, row);
@@ -509,14 +704,22 @@ internal sealed class MainForm : Form
 
     private static Button ActionButton(string text, EventHandler onClick)
     {
-        var button = new Button { Text = text, AutoSize = true, Padding = new Padding(10, 4, 10, 4), Margin = new Padding(0, 0, 8, 0) };
+        var button = new Button
+        {
+            Text = text,
+            AutoSize = true,
+            Padding = new Padding(10, 3, 10, 3),
+            Margin = new Padding(0, 0, 8, 6),
+            MinimumSize = new Size(0, 32)
+        };
         button.Click += onClick;
         return button;
     }
 
     private static string StatusMark(bool ok) => ok ? "✓" : "✗";
 
-    private static string FormatTargetVisibleCount(int count) => count >= 750 ? "750+（单次列举已达上限）" : count.ToString("N0");
+    private static string FormatTargetVisibleCount(int count) =>
+        count >= 750 ? "750+（单次列举已达上限）" : count.ToString("N0");
 
     private static string FormatBytes(long bytes)
     {
