@@ -115,12 +115,8 @@ func round12ScrollVisualFinalizerSubclassProc(
 		lParam,
 	)
 
-	if message == WM_MOUSEMOVE {
-		if wasDragging || round12InlineState.dragging {
-			round12FinalizeInlineScrollVisual(hwnd)
-		} else {
-			round12SyncThumbVisual(hwnd)
-		}
+	if message == WM_MOUSEMOVE && (wasDragging || round12InlineState.dragging) {
+		round12FinalizeInlineScrollVisual(hwnd)
 	}
 	return result
 }
