@@ -59,12 +59,21 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Restore solution
-        run: dotnet restore 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln'
-      - name: Build solution
-        run: dotnet build 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln' -c Release --no-restore
+      - name: Verify solution membership
+        shell: bash
+        run: |
+          set -euo pipefail
+          sln='projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln'
+          test -f "$sln"
+          listing=$(dotnet sln "$sln" list)
+          echo "$listing"
+          grep -F 'DavBridge.Core/DavBridge.Core.csproj' <<<"$listing"
+          grep -F 'DavBridge/DavBridge.csproj' <<<"$listing"
+          grep -F 'DavBridge.Smoke/DavBridge.Smoke.csproj' <<<"$listing"
+      - name: Restore core smoke
+        run: dotnet restore 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj'
       - name: Run core smoke
-        run: dotnet run --project 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj' -c Release --no-build
+        run: dotnet run --project 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj' -c Release --no-restore
 
   windows-build:
     needs: [scope, core-smoke]
