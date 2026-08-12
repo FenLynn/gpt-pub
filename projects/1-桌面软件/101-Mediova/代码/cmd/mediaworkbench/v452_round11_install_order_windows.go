@@ -4,6 +4,29 @@ package main
 
 import "time"
 
+const round12ListWSClipSiblings uintptr = 0x04000000
+
+func round12EnsureListSiblingClipping(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	style, _, _ := round7FeedbackGetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle)
+	if style&round12ListWSClipSiblings != 0 {
+		return
+	}
+	round7FeedbackSetWindowLongPtr.Call(hwnd, round7FeedbackGWLStyle, style|round12ListWSClipSiblings)
+	round7FeedbackSetWindowPos.Call(
+		hwnd,
+		0,
+		0,
+		0,
+		0,
+		0,
+		round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|
+			round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged,
+	)
+}
+
 // Install the final task-list ownership chain deterministically on the UI
 // thread. Round7 performs the inherited one-time initialization, then its
 // ListView subclass is removed. Round11's main/list scrollbar owners are never
@@ -34,6 +57,7 @@ func init() {
 					// in-place ListView thumb owner and its post-paint bridge are attached.
 					round11RetireLegacyOverlayWindows()
 					round8EnsureListStyleGuard(a.hList)
+					round12EnsureListSiblingClipping(a.hList)
 					round12InstallInlineListScroll(a)
 					round12InstallPostPaintOwner(a)
 
