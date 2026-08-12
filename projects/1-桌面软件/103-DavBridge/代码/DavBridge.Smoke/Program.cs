@@ -9,7 +9,8 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("strong verified happy path", TestHappyPathAsync),
     ("put success but target absent", TestFalseSuccessAsync),
     ("source changes during transfer", TestSourceChangedAsync),
-    ("unknown target conflict", TestUnknownTargetConflictAsync),
+    ("matching preexisting target is adopted", TestMatchingPreexistingTargetAsync),
+    ("different preexisting target conflicts", TestUnknownTargetConflictAsync),
     ("crash recovery after put", TestCrashRecoveryAsync),
     ("partial group budgets only unfinished member", TestPartialGroupQuotaAsync),
     ("oversize object blocks safely", TestOversizeAsync),
@@ -153,11 +154,36 @@ static async Task TestSourceChangedAsync()
     finally { Directory.Delete(root, true); }
 }
 
-static async Task TestUnknownTargetConflictAsync()
+static async Task TestMatchingPreexistingTargetAsync()
 {
-    var data = Bytes("same-content");
+    var data = Bytes("goodsync-already-copied");
     var source = new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
     var target = new FakeWriteClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = data });
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var config = TestConfig();
+        config.UploadQuotaBytes = 50_000_001;
+        config.NormalReserveBytes = 50_000_000;
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(config, state, store, source, target, Path.Combine(root, "temp"));
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Complete, "byte-identical preexisting target should be adopted even with no upload budget");
+        Check(state.Files["A.bin"].Status == TransferStatus.StrongVerified, "adopted target must become strongly verified");
+        Check(target.PutCount == 0, "matching preexisting target must not be uploaded again");
+        Check(state.UploadAttemptBytesSinceCalibration == 0, "adoption must not consume upload quota");
+        Check(state.VerifiedDownloadBytesSinceCalibration == data.LongLength, "adoption must count the target verification download");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestUnknownTargetConflictAsync()
+{
+    var sourceData = Bytes("source-content");
+    var targetData = Bytes("different-target-content");
+    var source = new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = sourceData });
+    var target = new FakeWriteClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = targetData });
     var root = NewTempRoot();
     try
     {
@@ -165,9 +191,9 @@ static async Task TestUnknownTargetConflictAsync()
         var store = new StateStore(Path.Combine(root, "state.json"));
         var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
         await engine.RunAsync(CancellationToken.None);
-        Check(state.Files["A.bin"].Status == TransferStatus.Conflict, "unknown existing target must remain a conflict even when byte-identical");
+        Check(state.Files["A.bin"].Status == TransferStatus.Conflict, "different untrusted target must remain a conflict");
         Check(state.EngineState == EngineState.WaitRetry, "conflict must not end as Complete");
-        Check(target.PutCount == 0, "unknown conflict must not be overwritten");
+        Check(target.PutCount == 0, "untrusted different target must not be overwritten");
     }
     finally { Directory.Delete(root, true); }
 }
