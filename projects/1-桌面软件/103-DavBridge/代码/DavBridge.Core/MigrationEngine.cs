@@ -189,6 +189,16 @@ public sealed class MigrationEngine
         long total = 0;
         foreach (var member in members)
         {
+            var targetPath = JoinPath(_config.TargetRootPath, member.RelativePath);
+            var existingTarget = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
+            if (existingTarget is not null)
+            {
+                // Existing target objects are never blindly overwritten. They will either be adopted after
+                // source/target SHA-256 equality is proven, or stopped as a conflict. Therefore they need no
+                // upload budget during group preflight.
+                continue;
+            }
+
             var length = member.ContentLength;
             if (!length.HasValue)
             {
@@ -242,9 +252,21 @@ public sealed class MigrationEngine
             var existing = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
             if (existing is not null)
             {
+                OnProgress(EngineState.Running, record.GroupKey, record.RelativePath,
+                    "Target already exists; downloading it for safe takeover verification.");
                 var currentTarget = await _target.DownloadAndHashAsync(targetPath, cancellationToken).ConfigureAwait(false);
                 _state.VerifiedDownloadBytesSinceCalibration += currentTarget.Bytes;
                 await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+
+                // A preexisting object from GoodSync or any other client is safe to adopt if and only if its
+                // actual bytes are identical to the current InfiniCLOUD source. No DavBridge write history is
+                // required in this case, and no upload quota is consumed.
+                if (currentTarget.Bytes == sourceDownload.Bytes &&
+                    string.Equals(currentTarget.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    await CompleteStrongVerificationAsync(record, before, sourcePath, existing, sourceDownload, currentTarget, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
 
                 var trustedHash = !string.IsNullOrWhiteSpace(record.TargetSha256)
                     ? record.TargetSha256
@@ -253,7 +275,7 @@ public sealed class MigrationEngine
                 if (string.IsNullOrWhiteSpace(trustedHash))
                 {
                     record.Status = TransferStatus.Conflict;
-                    record.LastError = "Target object already exists but has no trusted DavBridge write history.";
+                    record.LastError = "Preexisting target object differs from the current source; DavBridge will not overwrite an untrusted object.";
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
                     return;
                 }
@@ -266,12 +288,8 @@ public sealed class MigrationEngine
                     return;
                 }
 
-                if (currentTarget.Bytes == sourceDownload.Bytes &&
-                    string.Equals(currentTarget.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
-                {
-                    await CompleteStrongVerificationAsync(record, before, sourcePath, existing, sourceDownload, currentTarget, cancellationToken).ConfigureAwait(false);
-                    return;
-                }
+                // The target still contains an older version DavBridge can prove it wrote, while the source has
+                // since changed. This is the only existing-target case where an overwrite is allowed.
             }
 
             record.Status = TransferStatus.Uploading;
