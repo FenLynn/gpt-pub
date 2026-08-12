@@ -52,7 +52,7 @@ internal static class ExistingReplicaValidationRunner
         {
             var metadata = await target.GetMetadataAsync(JoinPath(host.Config.TargetRootPath, member.RelativePath), cancellationToken).ConfigureAwait(false);
             if (metadata is null)
-                throw new InvalidOperationException($"准备验证时目标成员已经不可见：{member.RelativePath}。已停止，不会上传。 ");
+                throw new InvalidOperationException($"准备验证时目标成员已经不可见：{member.RelativePath}。已停止，不会上传。");
         }
 
         return new ExistingReplicaValidationPlan(
@@ -112,6 +112,8 @@ internal static class ExistingReplicaValidationRunner
                       records.Length == group.Members.Count &&
                       records.All(record => record.Status == TransferStatus.StrongVerified);
 
+        if (success)
+            host.State.ExistingReplicaValidationPassed = true;
         host.State.EngineState = EngineState.Paused;
         host.State.CurrentGroupKey = null;
         await stateStore.SaveAsync(host.State, CancellationToken.None).ConfigureAwait(false);
