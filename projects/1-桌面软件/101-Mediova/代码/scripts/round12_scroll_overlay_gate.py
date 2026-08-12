@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from ctypes import wintypes
 from pathlib import Path
 
 from PIL import Image, ImageChops
@@ -18,6 +19,16 @@ THUMB_COLORS = runner.INLINE_THUMB_COLORS
 HOVER_DELAY_MS = 0
 IMMEDIATE_SAMPLE_SECONDS = 0.12
 FORBIDDEN_SCROLL_CLASSES = {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
+THUMB_VISUAL_CLASS = "MWRound12ThumbVisual"
+GA_ROOT = 2
+
+
+gate.user32.GetCapture.argtypes = []
+gate.user32.GetCapture.restype = wintypes.HWND
+gate.user32.GetForegroundWindow.argtypes = []
+gate.user32.GetForegroundWindow.restype = wintypes.HWND
+gate.user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+gate.user32.GetAncestor.restype = wintypes.HWND
 
 
 def terminate_process(process: subprocess.Popen[bytes] | subprocess.Popen[str]) -> None:
@@ -50,6 +61,26 @@ def capture_list(main_hwnd: int, path: Path | None = None) -> Image.Image:
     return image
 
 
+def thumb_visual_diagnostics() -> dict[str, object]:
+    capture_hwnd = int(gate.user32.GetCapture() or 0)
+    foreground_hwnd = int(gate.user32.GetForegroundWindow() or 0)
+    anchor = capture_hwnd or foreground_hwnd
+    root_hwnd = int(gate.user32.GetAncestor(anchor, GA_ROOT) or 0) if anchor else 0
+    visuals: list[dict[str, object]] = []
+    if root_hwnd:
+        visuals = [
+            child
+            for child in gate.enumerate_children(root_hwnd)
+            if child["class"] == THUMB_VISUAL_CLASS
+        ]
+    return {
+        "capture_hwnd": capture_hwnd,
+        "foreground_hwnd": foreground_hwnd,
+        "root_hwnd": root_hwnd,
+        "thumb_visuals": visuals,
+    }
+
+
 def thumb_metrics(image: Image.Image, axis: str | None = None) -> dict[str, object]:
     zone = max(24, min(34, min(image.width, image.height) // 8))
     points: list[tuple[int, int]] = []
@@ -67,7 +98,12 @@ def thumb_metrics(image: Image.Image, axis: str | None = None) -> dict[str, obje
             if candidate and image.getpixel((x, y)) in THUMB_COLORS:
                 points.append((x, y))
     if not points:
-        return {"pixels": 0, "bbox": None, "axis": None}
+        return {
+            "pixels": 0,
+            "bbox": None,
+            "axis": None,
+            "visual_diagnostics": thumb_visual_diagnostics(),
+        }
     xs = [point[0] for point in points]
     ys = [point[1] for point in points]
     bbox = (min(xs), min(ys), max(xs) + 1, max(ys) + 1)
