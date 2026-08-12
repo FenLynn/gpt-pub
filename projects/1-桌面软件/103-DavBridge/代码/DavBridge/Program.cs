@@ -19,6 +19,7 @@ internal static class Program
         using var host = new AppHost();
         using var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
         using var uiPolish = UiPolish.Attach(form, host);
+        using var liveProgress = UiLiveProgress.Attach(form, host, uiPolish);
         Application.Run(form);
     }
 
