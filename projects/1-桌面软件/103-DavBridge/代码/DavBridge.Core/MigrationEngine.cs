@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace DavBridge.Core;
 
 public sealed record ReadinessReport(
@@ -55,8 +57,7 @@ public sealed class MigrationEngine
         {
             var zip = group.Members.Any(x => Path.GetExtension(x.RelativePath).Equals(".zip", StringComparison.OrdinalIgnoreCase));
             var prop = group.Members.Any(x => Path.GetExtension(x.RelativePath).Equals(".prop", StringComparison.OrdinalIgnoreCase));
-            if ((zip || prop) && zip != prop)
-                unpaired.Add(group.Key);
+            if ((zip || prop) && zip != prop) unpaired.Add(group.Key);
         }
 
         return new ReadinessReport(
@@ -98,8 +99,7 @@ public sealed class MigrationEngine
                 .ThenBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-            if (outstanding.Length == 0)
-                continue;
+            if (outstanding.Length == 0) continue;
 
             var oversize = outstanding.FirstOrDefault(x => (x.ContentLength ?? 0L) > _config.TargetSingleFileLimitBytes);
             if (oversize is not null)
@@ -129,15 +129,11 @@ public sealed class MigrationEngine
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var record = GetOrCreateRecord(member, group.Key);
-
                 try
                 {
                     await ProcessMemberAsync(member, record, cancellationToken).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
+                catch (OperationCanceledException) { throw; }
                 catch (QuotaExceededException ex)
                 {
                     record.Status = record.SourceSha256 is null ? TransferStatus.Pending : TransferStatus.SourceReady;
@@ -148,7 +144,7 @@ public sealed class MigrationEngine
                 }
                 catch (HttpRequestException ex)
                 {
-                    record.Status = TransferStatus.Failed;
+                    if (record.Status != TransferStatus.WriteUnknown) record.Status = TransferStatus.Failed;
                     record.LastError = ex.Message;
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
                     await SetEngineStateAsync(EngineState.WaitNetwork, group.Key, member.RelativePath, ex.Message, cancellationToken).ConfigureAwait(false);
@@ -156,15 +152,17 @@ public sealed class MigrationEngine
                 }
                 catch (WebDavException ex)
                 {
-                    record.Status = TransferStatus.Failed;
-                    record.LastError = ex.Message;
+                    if (record.Status is not TransferStatus.WriteUnknown and not TransferStatus.Conflict)
+                        record.Status = TransferStatus.Failed;
+                    record.LastError = DescribeWebDavFailure(ex);
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
-                    await SetEngineStateAsync(EngineState.WaitRetry, group.Key, member.RelativePath, ex.Message, cancellationToken).ConfigureAwait(false);
+                    await SetEngineStateAsync(IsTransient(ex.StatusCode) ? EngineState.WaitNetwork : EngineState.WaitRetry,
+                        group.Key, member.RelativePath, record.LastError, cancellationToken).ConfigureAwait(false);
                     return;
                 }
                 catch (Exception ex)
                 {
-                    record.Status = TransferStatus.Failed;
+                    if (record.Status != TransferStatus.WriteUnknown) record.Status = TransferStatus.Failed;
                     record.LastError = ex.Message;
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
                     await SetEngineStateAsync(EngineState.WaitRetry, group.Key, member.RelativePath, ex.Message, cancellationToken).ConfigureAwait(false);
@@ -187,6 +185,29 @@ public sealed class MigrationEngine
             return;
         }
 
+        // A long migration can run while Zotero adds new attachments. Before declaring completion,
+        // take one more low-traffic source manifest snapshot. If anything is new or changed, do not
+        // emit a false Complete; the background loop will immediately continue it on the next pass.
+        IReadOnlyList<WebDavEntry> finalEntries;
+        try
+        {
+            finalEntries = await _source.ListDirectoryAsync(_config.SourceRootPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            await SetEngineStateAsync(EngineState.WaitNetwork, null, null,
+                "Final source manifest refresh failed: " + ex.Message, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        var finalGroups = MigrationPlanner.CreateGroups(finalEntries);
+        if (!finalGroups.All(IsGroupCurrentAndVerified))
+        {
+            await SetEngineStateAsync(EngineState.WaitRetry, null, null,
+                "Source manifest changed while migration was running. New or changed objects will be processed on the next safe pass.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         _state.CurrentGroupKey = null;
         await SetEngineStateAsync(EngineState.Complete, null, null,
             "Current source manifest is strongly verified at target.", cancellationToken).ConfigureAwait(false);
@@ -199,13 +220,7 @@ public sealed class MigrationEngine
         {
             var targetPath = JoinPath(_config.TargetRootPath, member.RelativePath);
             var existingTarget = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
-            if (existingTarget is not null)
-            {
-                // Existing target objects are never blindly overwritten. They will either be adopted after
-                // source/target SHA-256 equality is proven, or stopped as a conflict. Therefore they need no
-                // upload budget during group preflight.
-                continue;
-            }
+            if (existingTarget is not null) continue;
 
             var length = member.ContentLength;
             if (!length.HasValue)
@@ -268,9 +283,6 @@ public sealed class MigrationEngine
                 _state.VerifiedDownloadBytesSinceCalibration += currentTarget.Bytes;
                 await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
 
-                // A preexisting object from GoodSync or any other client is safe to adopt if and only if its
-                // actual bytes are identical to the current InfiniCLOUD source. No DavBridge write history is
-                // required in this case, and no upload quota is consumed.
                 if (currentTarget.Bytes == sourceDownload.Bytes &&
                     string.Equals(currentTarget.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
                 {
@@ -281,7 +293,6 @@ public sealed class MigrationEngine
                 var trustedHash = !string.IsNullOrWhiteSpace(record.TargetSha256)
                     ? record.TargetSha256
                     : record.LastAttemptedUploadSha256;
-
                 if (string.IsNullOrWhiteSpace(trustedHash))
                 {
                     record.Status = TransferStatus.Conflict;
@@ -289,7 +300,6 @@ public sealed class MigrationEngine
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
                     return;
                 }
-
                 if (!string.Equals(currentTarget.Sha256, trustedHash, StringComparison.OrdinalIgnoreCase))
                 {
                     record.Status = TransferStatus.Conflict;
@@ -297,17 +307,9 @@ public sealed class MigrationEngine
                     await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
                     return;
                 }
-
-                // The target still contains an older version DavBridge can prove it wrote, while the source has
-                // since changed. This is the only existing-target case where an overwrite is allowed.
             }
 
-            // A preexisting trusted old version is not counted in group preflight because it first requires
-            // content verification. Recheck the upload budget immediately before every actual PUT.
             EnsureUploadBudget(sourceDownload.Bytes, $"Uploading {manifestEntry.RelativePath}");
-
-            // Never start a new PUT unless there is enough target download budget left to perform the mandatory
-            // post-PUT strong verification in the same cycle.
             EnsureDownloadBudget(sourceDownload.Bytes, $"Post-upload verification of {manifestEntry.RelativePath}");
 
             record.Status = TransferStatus.Uploading;
@@ -316,7 +318,31 @@ public sealed class MigrationEngine
             await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
             OnProgress(EngineState.Running, record.GroupKey, record.RelativePath, "Uploading target object.");
 
-            await _target.PutFileAsync(targetPath, tempPath, _config.UploadLimitBytesPerSecond, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (_target is IConditionalWebDavClient conditional)
+                {
+                    var condition = existing is null
+                        ? new ConditionalPutOptions(CreateOnly: true)
+                        : new ConditionalPutOptions(CreateOnly: false, IfMatchETag: existing.ETag);
+                    await conditional.PutFileConditionallyAsync(targetPath, tempPath, _config.UploadLimitBytesPerSecond, condition, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _target.PutFileAsync(targetPath, tempPath, _config.UploadLimitBytesPerSecond, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (WebDavWriteUncertainException ex)
+            {
+                await ReconcileUnknownWriteAsync(record, before, sourcePath, targetPath, sourceDownload, ex.Message, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            catch (WebDavException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
+            {
+                await ReconcileUnknownWriteAsync(record, before, sourcePath, targetPath, sourceDownload,
+                    "Conditional PUT precondition failed; target changed between preflight and write.", cancellationToken).ConfigureAwait(false);
+                return;
+            }
 
             var confirmed = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
             if (confirmed is null)
@@ -337,9 +363,7 @@ public sealed class MigrationEngine
             await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
             if (targetDownload.Bytes != sourceDownload.Bytes ||
                 !string.Equals(targetDownload.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
-            {
                 throw new InvalidDataException("Target strong verification failed: byte length or SHA-256 differs from source.");
-            }
 
             await CompleteStrongVerificationAsync(record, before, sourcePath, confirmed, sourceDownload, targetDownload, cancellationToken).ConfigureAwait(false);
         }
@@ -349,26 +373,80 @@ public sealed class MigrationEngine
         }
     }
 
+    private async Task ReconcileUnknownWriteAsync(
+        TransferRecord record,
+        WebDavEntry before,
+        string sourcePath,
+        string targetPath,
+        DownloadResult sourceDownload,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        record.Status = TransferStatus.WriteUnknown;
+        record.LastError = reason;
+        await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+        OnProgress(EngineState.Running, record.GroupKey, record.RelativePath,
+            "Re-downloading target to reconcile uncertain PUT outcome.");
+
+        try
+        {
+            var metadata = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
+            if (metadata is null)
+            {
+                record.Status = TransferStatus.SourceReady;
+                record.LastError = "PUT outcome was uncertain, but the target is absent after reconciliation. A later pass may retry safely.";
+                await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            if (metadata.ContentLength.HasValue && metadata.ContentLength.Value != sourceDownload.Bytes)
+            {
+                record.Status = TransferStatus.Conflict;
+                record.LastError = "PUT outcome was uncertain and the target now exists with a different length. DavBridge will not overwrite it.";
+                await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            EnsureDownloadBudget(metadata.ContentLength ?? sourceDownload.Bytes,
+                $"Reconciling uncertain upload {record.RelativePath}");
+            var targetDownload = await _target.DownloadAndHashAsync(targetPath, cancellationToken).ConfigureAwait(false);
+            _state.VerifiedDownloadBytesSinceCalibration += targetDownload.Bytes;
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+
+            if (targetDownload.Bytes == sourceDownload.Bytes &&
+                string.Equals(targetDownload.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                await CompleteStrongVerificationAsync(record, before, sourcePath, metadata, sourceDownload, targetDownload, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            record.Status = TransferStatus.Conflict;
+            record.LastError = "PUT outcome was uncertain and the target bytes do not match the source. DavBridge will not upload again automatically.";
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+        }
+        catch (QuotaExceededException) { throw; }
+        catch (Exception ex)
+        {
+            record.Status = TransferStatus.WriteUnknown;
+            record.LastError = $"PUT outcome remains unknown because reconciliation could not finish: {ex.Message}";
+            await _stateStore.SaveAsync(_state, CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
     private void EnsureUploadBudget(long expectedBytes, string operation)
     {
         var quota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
         if (!QuotaPolicy.CanStartUpload(expectedBytes, quota))
-        {
             throw new QuotaExceededException(
-                $"Safe target upload budget exhausted before {operation}. Need about {expectedBytes} bytes; remaining={quota.SafeRemainingBytes} bytes.",
-                isDownloadQuota: false);
-        }
+                $"Safe target upload budget exhausted before {operation}. Need about {expectedBytes} bytes; remaining={quota.SafeRemainingBytes} bytes.", false);
     }
 
     private void EnsureDownloadBudget(long expectedBytes, string operation)
     {
         var quota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
         if (!QuotaPolicy.CanStartDownload(expectedBytes, quota))
-        {
             throw new QuotaExceededException(
-                $"Safe target download budget exhausted before {operation}. Need about {expectedBytes} bytes; remaining={quota.SafeDownloadRemainingBytes} bytes.",
-                isDownloadQuota: true);
-        }
+                $"Safe target download budget exhausted before {operation}. Need about {expectedBytes} bytes; remaining={quota.SafeDownloadRemainingBytes} bytes.", true);
     }
 
     private async Task CompleteStrongVerificationAsync(
@@ -389,12 +467,9 @@ public sealed class MigrationEngine
             await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
             return;
         }
-
         if (targetDownload.Bytes != sourceDownload.Bytes ||
             !string.Equals(targetDownload.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
-        {
             throw new InvalidDataException("Strong verification completion received non-identical source and target content.");
-        }
 
         record.TargetSha256 = targetDownload.Sha256;
         record.TargetETag = targetMetadata.ETag;
@@ -419,10 +494,7 @@ public sealed class MigrationEngine
             };
             _state.Files[entry.RelativePath] = record;
         }
-        else
-        {
-            record.GroupKey = groupKey;
-        }
+        else record.GroupKey = groupKey;
         return record;
     }
 
@@ -432,28 +504,37 @@ public sealed class MigrationEngine
 
     private static bool IsRecordCurrentAndVerified(TransferRecord record, WebDavEntry entry)
     {
-        if (record.Status != TransferStatus.StrongVerified)
-            return false;
-        if (entry.ContentLength.HasValue && record.SourceSize != entry.ContentLength.Value)
-            return false;
-        if (!string.IsNullOrWhiteSpace(entry.ETag) && !string.Equals(record.SourceETag, entry.ETag, StringComparison.Ordinal))
-            return false;
-        if (entry.LastModified.HasValue && record.SourceLastModified.HasValue && entry.LastModified.Value != record.SourceLastModified.Value)
-            return false;
+        if (record.Status != TransferStatus.StrongVerified) return false;
+        if (entry.ContentLength.HasValue && record.SourceSize != entry.ContentLength.Value) return false;
+        if (!string.IsNullOrWhiteSpace(entry.ETag) && !string.Equals(record.SourceETag, entry.ETag, StringComparison.Ordinal)) return false;
+        if (entry.LastModified.HasValue && record.SourceLastModified.HasValue && entry.LastModified.Value != record.SourceLastModified.Value) return false;
         return true;
     }
 
     private static bool MetadataChanged(WebDavEntry before, WebDavEntry after)
     {
-        if (before.ContentLength != after.ContentLength)
-            return true;
+        if (before.ContentLength != after.ContentLength) return true;
         if (!string.IsNullOrWhiteSpace(before.ETag) && !string.IsNullOrWhiteSpace(after.ETag) &&
-            !string.Equals(before.ETag, after.ETag, StringComparison.Ordinal))
-            return true;
-        if (before.LastModified.HasValue && after.LastModified.HasValue && before.LastModified.Value != after.LastModified.Value)
-            return true;
+            !string.Equals(before.ETag, after.ETag, StringComparison.Ordinal)) return true;
+        if (before.LastModified.HasValue && after.LastModified.HasValue && before.LastModified.Value != after.LastModified.Value) return true;
         return false;
     }
+
+    private static bool IsTransient(HttpStatusCode? status) => status is
+        HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests or
+        HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway or
+        HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
+
+    private static string DescribeWebDavFailure(WebDavException ex) => ex.StatusCode switch
+    {
+        HttpStatusCode.Unauthorized => "Authentication failed; automatic retries are paused until credentials are corrected. " + ex.Message,
+        HttpStatusCode.Forbidden => "Permission denied by the WebDAV server. " + ex.Message,
+        HttpStatusCode.TooManyRequests => "WebDAV server rate limit reached; DavBridge will wait before retrying. " + ex.Message,
+        HttpStatusCode.PreconditionFailed => "Conditional write precondition failed; target state changed and must be reconciled. " + ex.Message,
+        HttpStatusCode.ServiceUnavailable or HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout =>
+            "WebDAV server is temporarily unavailable; DavBridge will retry later. " + ex.Message,
+        _ => ex.Message
+    };
 
     private async Task SetEngineStateAsync(EngineState engineState, string? groupKey, string? relativePath, string message, CancellationToken cancellationToken)
     {
