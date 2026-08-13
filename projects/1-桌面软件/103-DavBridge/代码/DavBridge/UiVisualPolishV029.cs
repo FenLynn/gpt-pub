@@ -311,7 +311,10 @@ internal sealed class UiVisualPolishV029 : IDisposable
             _kind = kind;
             Font = source.Font;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
-            BackColor = Color.Transparent;
+            // This surface paints the parent's background explicitly in OnPaint.
+            // Do not request WinForms transparent BackColor here because plain Control
+            // does not guarantee SupportsTransparentBackColor during construction.
+            BackColor = Color.White;
         }
 
         protected override void OnPaint(PaintEventArgs e)
