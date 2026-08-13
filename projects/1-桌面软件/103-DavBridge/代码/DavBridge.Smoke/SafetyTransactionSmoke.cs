@@ -9,7 +9,18 @@ internal static class SafetyTransactionSmoke
     [ModuleInitializer]
     internal static void Initialize()
     {
-        RunAsync().GetAwaiter().GetResult();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try
+            {
+                RunAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("FAIL v0.2.9 safety transactions: " + ex);
+                Environment.ExitCode = 1;
+            }
+        };
     }
 
     private static async Task RunAsync()
