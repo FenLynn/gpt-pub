@@ -15,7 +15,9 @@ public enum TransferStatus
     SourceChanged,
     Conflict,
     BlockedOversize,
-    Failed
+    Failed,
+    // Appended to preserve every existing numeric value in legacy state.json.
+    WriteUnknown
 }
 
 public enum EngineState
@@ -68,9 +70,6 @@ public sealed class MigrationState
     public string? CurrentGroupKey { get; set; }
     public bool ExistingReplicaValidationPassed { get; set; }
 
-    // Runtime readers (WinForms status views, tray UI) can enumerate this while the migration
-    // engine is adding/updating records. Keep the public surface dictionary-like for JSON/schema
-    // compatibility, but use ConcurrentDictionary for the live instance.
     public IDictionary<string, TransferRecord> Files { get; set; } =
         new ConcurrentDictionary<string, TransferRecord>(StringComparer.OrdinalIgnoreCase);
 }
