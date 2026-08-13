@@ -29,6 +29,7 @@ internal static class Program
             AppBranding.Apply(form);
             using var dashboard = UiDashboardV027.Attach(form, host);
             using var visualPolish = UiVisualPolishV029.Attach(dashboard);
+            using var interactionPolish = UiInteractionPolishV0211.Attach(form, dashboard, host);
             Application.Run(form);
         }
         catch (Exception ex)
@@ -113,6 +114,7 @@ internal static class Program
         AppBranding.Apply(form);
         using var dashboard = UiDashboardV027.Attach(form, host);
         using var visualPolish = UiVisualPolishV029.Attach(dashboard);
+        using var interactionPolish = UiInteractionPolishV0211.Attach(form, dashboard, host);
         _ = form.Handle;
         form.PerformLayout();
     }
