@@ -20,6 +20,7 @@ internal static class Program
         using var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
         AppBranding.Apply(form);
         using var dashboard = UiDashboardV027.Attach(form, host);
+        using var visualPolish = UiVisualPolishV028.Attach(dashboard);
         Application.Run(form);
     }
 
