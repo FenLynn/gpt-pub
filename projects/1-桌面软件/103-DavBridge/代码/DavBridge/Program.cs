@@ -18,8 +18,7 @@ internal static class Program
         ApplicationConfiguration.Initialize();
         using var host = new AppHost();
         using var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
-        using var uiPolish = UiPolish.Attach(form, host);
-        using var liveProgress = UiLiveProgress.Attach(form, host, uiPolish);
+        using var dashboard = UiDashboardV025.Attach(form, host);
         Application.Run(form);
     }
 
