@@ -25,12 +25,20 @@ internal static class Program
         {
             ApplicationConfiguration.Initialize();
             using var host = new AppHost();
-            using var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
-            AppBranding.Apply(form);
-            using var dashboard = UiDashboardV027.Attach(form, host);
-            using var visualPolish = UiVisualPolishV029.Attach(dashboard);
-            using var interactionPolish = UiInteractionPolishV0211.Attach(form, dashboard, host);
-            Application.Run(form);
+            var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
+            try
+            {
+                AppBranding.Apply(form);
+                using var dashboard = UiDashboardV027.Attach(form, host);
+                using var visualPolish = UiVisualPolishV029.Attach(dashboard);
+                using var interactionPolish = UiInteractionPolishV0211.Attach(form, dashboard, host);
+                Application.Run(form);
+            }
+            finally
+            {
+                if (!form.IsDisposed)
+                    form.Dispose();
+            }
         }
         catch (Exception ex)
         {
@@ -41,8 +49,8 @@ internal static class Program
                     ? string.Empty
                     : $"\r\n\r\n诊断日志：{logPath}";
                 MessageBox.Show(
-                    $"DavBridge 无法完成界面启动。\r\n\r\n{ex.Message}{suffix}",
-                    "DavBridge 启动失败",
+                    $"DavBridge 在启动、运行或退出过程中发生异常。\r\n\r\n{ex.Message}{suffix}",
+                    "DavBridge 异常",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
