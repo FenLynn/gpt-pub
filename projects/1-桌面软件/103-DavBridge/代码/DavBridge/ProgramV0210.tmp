@@ -1,0 +1,7 @@
+using System.Text.Json;
+
+namespace DavBridge;
+
+internal static class ProgramV0210Placeholder
+{
+}
