@@ -8,8 +8,8 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>DavBridge</AssemblyName>
     <RootNamespace>DavBridge</RootNamespace>
-    <Version>0.2.5</Version>
-    <FileVersion>0.2.5.0</FileVersion>
+    <Version>0.2.6</Version>
+    <FileVersion>0.2.6.0</FileVersion>
     <Product>DavBridge</Product>
     <Company>FenLynn</Company>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
