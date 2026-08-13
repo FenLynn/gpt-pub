@@ -16,10 +16,10 @@ internal sealed class SettingsDialog : Form
     private readonly NumericUpDown _speed = new() { Minimum = 10, Maximum = 10_000, Increment = 50 };
     private readonly NumericUpDown _reserve = new() { Minimum = 0, Maximum = 500, Increment = 5 };
     private readonly NumericUpDown _sprintReserve = new() { Minimum = 0, Maximum = 100, Increment = 1 };
-    private readonly CheckBox _autoStart = new() { Text = "Windows 登录后自动启动" };
-    private readonly CheckBox _startMinimized = new() { Text = "启动后默认进入托盘" };
-    private readonly CheckBox _autoResume = new() { Text = "网络恢复和新周期后自动继续" };
-    private readonly CheckBox _sprint = new() { Text = "重置前 24 小时启用周期末冲刺" };
+    private readonly CheckBox _autoStart = new() { Text = "Windows 登录后自动启动", AutoSize = true };
+    private readonly CheckBox _startMinimized = new() { Text = "启动后默认进入托盘", AutoSize = true };
+    private readonly CheckBox _autoResume = new() { Text = "网络恢复和新周期后自动继续", AutoSize = true };
+    private readonly CheckBox _sprint = new() { Text = "重置前 24 小时启用周期末冲刺", AutoSize = true };
     private readonly bool _endpointLocked;
 
     public DavBridgeConfig Config { get; private set; }
@@ -33,6 +33,7 @@ internal sealed class SettingsDialog : Form
         _endpointLocked = HasExistingTransferRecords();
 
         Text = "DavBridge 设置";
+        Icon = AppBranding.CreateIcon();
         Width = 840;
         Height = 620;
         MinimumSize = new Size(720, 520);
@@ -65,8 +66,9 @@ internal sealed class SettingsDialog : Form
             }
         }
 
-        var save = new Button { Text = "保存", Width = 88, Height = 34 };
-        var cancel = new Button { Text = "取消", Width = 88, Height = 34, DialogResult = DialogResult.Cancel };
+        var save = CreateFooterButton("保存");
+        var cancel = CreateFooterButton("取消");
+        cancel.DialogResult = DialogResult.Cancel;
         save.Click += (_, _) =>
         {
             if (!Apply()) return;
@@ -77,6 +79,22 @@ internal sealed class SettingsDialog : Form
         Controls.Add(BuildShell(save, cancel));
         AcceptButton = save;
         CancelButton = cancel;
+    }
+
+    private static Button CreateFooterButton(string text)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Width = 88,
+            Height = 34,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.White,
+            TabStop = true
+        };
+        button.FlatAppearance.BorderColor = Color.FromArgb(205, 208, 214);
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(247, 249, 251);
+        return button;
     }
 
     private Control BuildShell(Button save, Button cancel)
@@ -140,8 +158,8 @@ internal sealed class SettingsDialog : Form
             foreach (var button in navButtons)
             {
                 var active = ReferenceEquals(button, selected);
-                button.BackColor = active ? Color.White : Color.FromArgb(247, 248, 250);
-                button.Font = new Font("Segoe UI", 9F, active ? FontStyle.Bold : FontStyle.Regular);
+                button.BackColor = active ? Color.FromArgb(234, 243, 251) : Color.FromArgb(247, 248, 250);
+                button.ForeColor = active ? Color.FromArgb(42, 104, 163) : Color.FromArgb(35, 35, 35);
             }
         }
 
@@ -156,9 +174,13 @@ internal sealed class SettingsDialog : Form
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(10, 0, 0, 0),
                 Margin = new Padding(0, 0, 0, 4),
-                BackColor = Color.FromArgb(247, 248, 250)
+                BackColor = Color.FromArgb(247, 248, 250),
+                UseVisualStyleBackColor = false,
+                TabStop = false
             };
             button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(239, 244, 248);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(229, 238, 247);
             button.Click += (_, _) => SelectCategory(panel, button);
             navButtons.Add(button);
             navStack.Controls.Add(button);
@@ -266,8 +288,12 @@ internal sealed class SettingsDialog : Form
             Width = text.Length > 8 ? 146 : 110,
             Height = 34,
             Enabled = enabled,
-            Margin = new Padding(0, 0, 8, 8)
+            Margin = new Padding(0, 0, 8, 8),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.White,
+            TabStop = false
         };
+        button.FlatAppearance.BorderColor = Color.FromArgb(205, 208, 214);
         button.Click += (_, _) =>
         {
             var main = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
@@ -448,8 +474,11 @@ internal sealed class SettingsDialog : Form
             Height = textBox.PreferredHeight + 4,
             Margin = new Padding(0),
             AccessibleName = "显示或隐藏密码",
-            TabStop = false
+            TabStop = false,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.White
         };
+        eye.FlatAppearance.BorderColor = Color.FromArgb(205, 208, 214);
         eye.Click += (_, _) =>
         {
             var selectionStart = textBox.SelectionStart;
@@ -469,6 +498,12 @@ internal sealed class SettingsDialog : Form
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         control.Margin = control.Margin == Padding.Empty ? new Padding(0, 6, 0, 6) : control.Margin;
+        if (control is CheckBox checkBox)
+        {
+            checkBox.AutoSize = true;
+            checkBox.MaximumSize = new Size(560, 0);
+            checkBox.Dock = DockStyle.Top;
+        }
         panel.Controls.Add(control, 0, row);
         panel.SetColumnSpan(control, 2);
     }
