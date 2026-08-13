@@ -12,6 +12,7 @@ internal sealed class UiInteractionPolishV0211 : IDisposable
     private readonly MainForm _form;
     private readonly UiDashboardV027 _dashboard;
     private readonly AppHost _host;
+    private readonly UiLayoutPolishV0213 _layoutPolish;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 120 };
     private readonly HashSet<IntPtr> _normalizedForms = new();
     private bool _disposed;
@@ -23,6 +24,7 @@ internal sealed class UiInteractionPolishV0211 : IDisposable
         _host = host;
         InstallCalibrationEntry();
         NormalizeButtons(form);
+        _layoutPolish = UiLayoutPolishV0213.Attach(form, dashboard);
         _timer.Tick += (_, _) => PolishOpenForms();
         _timer.Start();
     }
@@ -195,6 +197,7 @@ internal sealed class UiInteractionPolishV0211 : IDisposable
         _disposed = true;
         _timer.Stop();
         _timer.Dispose();
+        _layoutPolish.Dispose();
         _normalizedForms.Clear();
     }
 }
