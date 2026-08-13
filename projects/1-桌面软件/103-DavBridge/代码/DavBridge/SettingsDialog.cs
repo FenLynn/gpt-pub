@@ -20,6 +20,7 @@ internal sealed class SettingsDialog : Form
     private readonly CheckBox _startMinimized = new() { Text = "启动后默认进入托盘" };
     private readonly CheckBox _autoResume = new() { Text = "网络恢复和新周期后自动继续" };
     private readonly CheckBox _sprint = new() { Text = "重置前 24 小时启用周期末冲刺" };
+    private readonly bool _endpointLocked;
 
     public DavBridgeConfig Config { get; private set; }
     public string SourcePassword => _sourcePassword.Text;
@@ -29,11 +30,15 @@ internal sealed class SettingsDialog : Form
     {
         _original = CloneConfig(original);
         Config = CloneConfig(original);
+        _endpointLocked = HasExistingTransferRecords();
+
         Text = "DavBridge 设置";
-        Width = 720;
-        Height = 735;
+        Width = 840;
+        Height = 620;
+        MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterParent;
         Font = new Font("Segoe UI", 9F);
+        BackColor = Color.White;
 
         _sourceUrl.Text = Config.SourceBaseUrl;
         _sourceRoot.Text = Config.SourceRootPath;
@@ -51,68 +56,283 @@ internal sealed class SettingsDialog : Form
         _autoResume.Checked = Config.AutoResume;
         _sprint.Checked = Config.EndOfCycleSprintEnabled;
 
-        var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(18), AutoScroll = true };
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 205));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-
-        AddFull(panel, new Label
+        if (_endpointLocked)
         {
-            Text = "InfiniCLOUD 请填写 My Page → Apps Connection 中的 WebDAV Connection URL、Connection ID / User ID 和 Apps Password。已保存密码会按真实长度显示为 *，右侧眼睛可临时显示明文。",
-            AutoSize = true,
-            MaximumSize = new Size(640, 0),
-            ForeColor = Color.DimGray,
-            Margin = new Padding(0, 0, 0, 8)
-        });
-        AddField(panel, "InfiniCLOUD WebDAV URL", _sourceUrl);
-        AddField(panel, "源目录", _sourceRoot);
-        AddField(panel, "Connection ID / User ID", _sourceUser);
-        AddPasswordField(panel, "Apps Password", _sourcePassword);
+            foreach (var box in new[] { _sourceUrl, _sourceRoot, _sourceUser, _targetUrl, _targetRoot, _targetUser })
+            {
+                box.ReadOnly = true;
+                box.BackColor = Color.FromArgb(247, 248, 250);
+            }
+        }
 
-        AddFull(panel, new Label
-        {
-            Text = "坚果云 WebDAV 用户名填写账号注册邮箱，密码填写单独生成的第三方应用密码，不是网页登录密码。已保存密码同样保留真实长度，便于人工核对。",
-            AutoSize = true,
-            MaximumSize = new Size(640, 0),
-            ForeColor = Color.DimGray,
-            Margin = new Padding(0, 12, 0, 8)
-        });
-        AddField(panel, "坚果云 WebDAV URL", _targetUrl);
-        AddField(panel, "目标目录", _targetRoot);
-        AddField(panel, "坚果云注册邮箱", _targetUser);
-        AddPasswordField(panel, "第三方应用密码（非登录密码）", _targetPassword);
-        AddField(panel, "上传限速 KB/s", _speed);
-        AddField(panel, "普通预留 MB", _reserve);
-        AddField(panel, "冲刺预留 MB", _sprintReserve);
-        AddFull(panel, _autoStart);
-        AddFull(panel, _startMinimized);
-        AddFull(panel, _autoResume);
-        AddFull(panel, _sprint);
-
-        AddFull(panel, new Label
-        {
-            Text = "已有迁移记录后，当前任务的源/目标 URL、根目录和用户名会被视为任务身份。需要迁移到另一套端点时应创建新任务，而不是改写当前任务。密码、限速和配额参数仍可正常调整。",
-            AutoSize = true,
-            MaximumSize = new Size(640, 0),
-            ForeColor = Color.DimGray,
-            Margin = new Padding(0, 10, 0, 4)
-        });
-
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill, AutoSize = true };
-        var save = new Button { Text = "保存", AutoSize = true };
-        var cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, AutoSize = true };
+        var save = new Button { Text = "保存", Width = 88, Height = 34 };
+        var cancel = new Button { Text = "取消", Width = 88, Height = 34, DialogResult = DialogResult.Cancel };
         save.Click += (_, _) =>
         {
             if (!Apply()) return;
             DialogResult = DialogResult.OK;
             Close();
         };
-        buttons.Controls.Add(save);
-        buttons.Controls.Add(cancel);
-        AddFull(panel, buttons);
 
-        Controls.Add(panel);
+        Controls.Add(BuildShell(save, cancel));
         AcceptButton = save;
         CancelButton = cancel;
+    }
+
+    private Control BuildShell(Button save, Button cancel)
+    {
+        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+
+        var nav = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(247, 248, 250),
+            Padding = new Padding(14, 18, 12, 14)
+        };
+        var navStack = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false
+        };
+        navStack.Controls.Add(new Label
+        {
+            Text = "设置",
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 15F),
+            Margin = new Padding(8, 0, 0, 14)
+        });
+        nav.Controls.Add(navStack);
+        shell.Controls.Add(nav, 0, 0);
+        shell.SetRowSpan(nav, 2);
+
+        var hostPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = Color.White,
+            Padding = new Padding(26, 22, 26, 16)
+        };
+        shell.Controls.Add(hostPanel, 1, 0);
+
+        var categories = new[]
+        {
+            ("账户与端点", BuildAccountPanel()),
+            ("流量与限速", BuildQuotaPanel()),
+            ("后台运行", BuildBackgroundPanel()),
+            ("安全与维护", BuildSafetyPanel())
+        };
+
+        var navButtons = new List<Button>();
+        void SelectCategory(Control panel, Button selected)
+        {
+            hostPanel.SuspendLayout();
+            hostPanel.Controls.Clear();
+            hostPanel.Controls.Add(panel);
+            panel.Dock = DockStyle.Top;
+            hostPanel.ResumeLayout(true);
+
+            foreach (var button in navButtons)
+            {
+                var active = ReferenceEquals(button, selected);
+                button.BackColor = active ? Color.White : Color.FromArgb(247, 248, 250);
+                button.Font = new Font("Segoe UI", 9F, active ? FontStyle.Bold : FontStyle.Regular);
+            }
+        }
+
+        foreach (var (name, panel) in categories)
+        {
+            var button = new Button
+            {
+                Text = name,
+                Width = 148,
+                Height = 40,
+                FlatStyle = FlatStyle.Flat,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(10, 0, 0, 0),
+                Margin = new Padding(0, 0, 0, 4),
+                BackColor = Color.FromArgb(247, 248, 250)
+            };
+            button.FlatAppearance.BorderSize = 0;
+            button.Click += (_, _) => SelectCategory(panel, button);
+            navButtons.Add(button);
+            navStack.Controls.Add(button);
+        }
+
+        var footer = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            Padding = new Padding(20, 10, 26, 10)
+        };
+        var footerButtons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Right,
+            AutoSize = true,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false
+        };
+        cancel.Margin = new Padding(8, 0, 0, 0);
+        save.Margin = new Padding(8, 0, 0, 0);
+        footerButtons.Controls.Add(cancel);
+        footerButtons.Controls.Add(save);
+        footer.Controls.Add(footerButtons);
+        shell.Controls.Add(footer, 1, 1);
+
+        SelectCategory(categories[0].Item2, navButtons[0]);
+        return shell;
+    }
+
+    private Control BuildAccountPanel()
+    {
+        var table = CategoryTable("账户与端点");
+        AddHint(table, _endpointLocked
+            ? "当前任务已经有迁移记录，端点身份已锁定。密码仍可更新；若以后迁移到另一套端点，应创建新的迁移任务。"
+            : "配置当前 Zotero 迁移任务的源端与目标端。密码仅保存在本机受保护存储中。");
+
+        AddSubTitle(table, "InfiniCLOUD");
+        AddField(table, "WebDAV URL", _sourceUrl);
+        AddField(table, "源目录", _sourceRoot);
+        AddField(table, "Connection ID / User ID", _sourceUser);
+        AddPasswordField(table, "Apps Password", _sourcePassword);
+
+        AddSubTitle(table, "坚果云");
+        AddField(table, "WebDAV URL", _targetUrl);
+        AddField(table, "目标目录", _targetRoot);
+        AddField(table, "注册邮箱", _targetUser);
+        AddPasswordField(table, "第三方应用密码", _targetPassword);
+        return WrapCategory(table);
+    }
+
+    private Control BuildQuotaPanel()
+    {
+        var table = CategoryTable("流量与限速");
+        AddField(table, "上传限速 KB/s", _speed);
+        AddField(table, "普通预留 MB", _reserve);
+        AddField(table, "冲刺预留 MB", _sprintReserve);
+        AddFull(table, _sprint);
+        AddHint(table, "当前周期已用量与重置日期由主页显示；人工校准入口位于“安全与维护”。");
+        return WrapCategory(table);
+    }
+
+    private Control BuildBackgroundPanel()
+    {
+        var table = CategoryTable("后台运行");
+        AddFull(table, _autoStart);
+        AddFull(table, _startMinimized);
+        AddFull(table, _autoResume);
+        AddHint(table, "主窗口关闭后任务继续在托盘运行；只有托盘菜单“退出”才结束 DavBridge 进程。");
+        return WrapCategory(table);
+    }
+
+    private Control BuildSafetyPanel()
+    {
+        var table = CategoryTable("安全与维护");
+        AddHint(table, "诊断和初始化工具属于低频维护入口。已经通过的安全验证不会要求日常重复执行。");
+        AddSubTitle(table, "维护工具");
+
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            WrapContents = true,
+            Margin = new Padding(0, 4, 0, 0)
+        };
+
+        var main = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
+        var host = main is null ? null : UiCommandBridge.GetHost(main);
+        var firstPassed = host is not null && FirstGroupValidationRunner.HasCompletedZoteroValidation(host.State);
+        var existingPassed = host?.State.ExistingReplicaValidationPassed == true;
+
+        buttons.Controls.Add(MaintenanceButton("连接诊断", "DiagnoseConnectionsAsync", true));
+        buttons.Controls.Add(MaintenanceButton("就绪扫描", "ScanAsync", true));
+        buttons.Controls.Add(MaintenanceButton("校准流量", "CalibrateAsync", true));
+        buttons.Controls.Add(MaintenanceButton(firstPassed ? "首组验证  已通过" : "首组验证", "ValidateFirstGroupAsync", !firstPassed));
+        buttons.Controls.Add(MaintenanceButton(existingPassed ? "既有副本验证  已通过" : "既有副本验证", "ValidateExistingReplicaAsync", !existingPassed));
+        AddFull(table, buttons);
+        return WrapCategory(table);
+    }
+
+    private Button MaintenanceButton(string text, string methodName, bool enabled)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Width = text.Length > 8 ? 146 : 110,
+            Height = 34,
+            Enabled = enabled,
+            Margin = new Padding(0, 0, 8, 8)
+        };
+        button.Click += (_, _) =>
+        {
+            var main = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
+            if (main is null) return;
+            DialogResult = DialogResult.Cancel;
+            Close();
+            main.BeginInvoke(new Action(() =>
+            {
+                var task = UiCommandBridge.InvokeTask(main, methodName);
+                if (task is not null) _ = task;
+            }));
+        };
+        return button;
+    }
+
+    private static TableLayoutPanel CategoryTable(string title)
+    {
+        var table = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        var heading = new Label
+        {
+            Text = title,
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 15F),
+            Margin = new Padding(0, 0, 0, 16)
+        };
+        var row = table.RowCount++;
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        table.Controls.Add(heading, 0, row);
+        table.SetColumnSpan(heading, 2);
+        return table;
+    }
+
+    private static Control WrapCategory(TableLayoutPanel table)
+    {
+        var panel = new Panel { Dock = DockStyle.Top, AutoSize = true, BackColor = Color.White };
+        panel.Controls.Add(table);
+        return panel;
+    }
+
+    private static void AddSubTitle(TableLayoutPanel table, string text)
+    {
+        var label = new Label
+        {
+            Text = text,
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 10.5F),
+            Margin = new Padding(0, 12, 0, 6)
+        };
+        AddFull(table, label);
+    }
+
+    private static void AddHint(TableLayoutPanel table, string text)
+    {
+        var label = new Label
+        {
+            Text = text,
+            AutoSize = true,
+            ForeColor = Color.DimGray,
+            MaximumSize = new Size(560, 0),
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        AddFull(table, label);
     }
 
     private bool Apply()
@@ -135,9 +355,8 @@ internal sealed class SettingsDialog : Form
         if (HasExistingTransferRecords() && EndpointIdentityChanged(_original, proposed))
         {
             MessageBox.Show(this,
-                "当前任务已经有迁移和强校验记录。为避免把旧任务记录复用到另一套源端或目标端，v0.2 不允许直接修改当前任务的端点身份。\n\n" +
-                "如果以后要从坚果云迁到其他位置，请创建新的 Zotero 迁移任务。当前页面仍可修改密码、上传限速、预留额度和后台运行选项。",
-                "请创建新任务", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "当前任务已经有迁移和强校验记录。为避免把旧任务记录复用到另一套源端或目标端，不允许直接修改当前任务的端点身份。",
+                "端点身份已锁定", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return false;
         }
 
@@ -167,7 +386,6 @@ internal sealed class SettingsDialog : Form
         }
         catch
         {
-            // If state cannot be inspected, prefer safety and treat the legacy task as locked.
             return true;
         }
     }
@@ -250,7 +468,7 @@ internal sealed class SettingsDialog : Form
     {
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        control.Margin = new Padding(0, 6, 0, 6);
+        control.Margin = control.Margin == Padding.Empty ? new Padding(0, 6, 0, 6) : control.Margin;
         panel.Controls.Add(control, 0, row);
         panel.SetColumnSpan(control, 2);
     }
