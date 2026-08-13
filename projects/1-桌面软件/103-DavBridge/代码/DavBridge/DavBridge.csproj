@@ -23,7 +23,7 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
   <Target Name="GenerateDavBridgeIcon" BeforeTargets="PrepareForBuild">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;[IO.File]::WriteAllBytes('$(MSBuildProjectDirectory)\DavBridge.ico',[Convert]::FromBase64String((Get-Content -Raw '$(MSBuildProjectDirectory)\Assets\DavBridge.ico.b64')))&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Build\GenerateAppIcon.ps1&quot; -OutputPath &quot;$(MSBuildProjectDirectory)\DavBridge.ico&quot;" />
   </Target>
   <Target Name="CleanGeneratedDavBridgeIcon" AfterTargets="Build;Publish">
     <Delete Files="$(MSBuildProjectDirectory)\DavBridge.ico" />
