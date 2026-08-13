@@ -18,6 +18,7 @@ internal static class Program
         ApplicationConfiguration.Initialize();
         using var host = new AppHost();
         using var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
+        AppBranding.Apply(form);
         using var dashboard = UiDashboardV026.Attach(form, host);
         Application.Run(form);
     }
