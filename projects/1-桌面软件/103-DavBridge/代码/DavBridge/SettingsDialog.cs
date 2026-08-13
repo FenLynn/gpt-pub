@@ -108,7 +108,7 @@ internal sealed class SettingsDialog : Form
         var nav = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(247, 248, 250),
+            BackColor = Color.FromArgb(250, 252, 254),
             Padding = new Padding(14, 18, 12, 14)
         };
         var navStack = new FlowLayoutPanel
@@ -158,7 +158,7 @@ internal sealed class SettingsDialog : Form
             foreach (var button in navButtons)
             {
                 var active = ReferenceEquals(button, selected);
-                button.BackColor = active ? Color.FromArgb(234, 243, 251) : Color.FromArgb(247, 248, 250);
+                button.BackColor = active ? Color.FromArgb(236, 246, 253) : Color.FromArgb(250, 252, 254);
                 button.ForeColor = active ? Color.FromArgb(42, 104, 163) : Color.FromArgb(35, 35, 35);
             }
         }
@@ -174,13 +174,13 @@ internal sealed class SettingsDialog : Form
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(10, 0, 0, 0),
                 Margin = new Padding(0, 0, 0, 4),
-                BackColor = Color.FromArgb(247, 248, 250),
+                BackColor = Color.FromArgb(250, 252, 254),
                 UseVisualStyleBackColor = false,
                 TabStop = false
             };
             button.FlatAppearance.BorderSize = 0;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(239, 244, 248);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(229, 238, 247);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(242, 248, 252);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(232, 242, 250);
             button.Click += (_, _) => SelectCategory(panel, button);
             navButtons.Add(button);
             navStack.Controls.Add(button);
@@ -255,58 +255,105 @@ internal sealed class SettingsDialog : Form
     private Control BuildSafetyPanel()
     {
         var table = CategoryTable("安全与维护");
-        AddHint(table, "诊断和初始化工具属于低频维护入口。已经通过的安全验证不会要求日常重复执行。");
+        AddHint(table, "这里仅保留低频维护与安全检查。已经通过的验证用绿色状态标记，日常迁移不会要求重复执行。");
         AddSubTitle(table, "维护工具");
-
-        var buttons = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            WrapContents = true,
-            Margin = new Padding(0, 4, 0, 0)
-        };
 
         var main = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
         var host = main is null ? null : UiCommandBridge.GetHost(main);
         var firstPassed = host is not null && FirstGroupValidationRunner.HasCompletedZoteroValidation(host.State);
         var existingPassed = host?.State.ExistingReplicaValidationPassed == true;
 
-        buttons.Controls.Add(MaintenanceButton("连接诊断", "DiagnoseConnectionsAsync", true));
-        buttons.Controls.Add(MaintenanceButton("就绪扫描", "ScanAsync", true));
-        buttons.Controls.Add(MaintenanceButton("校准流量", "CalibrateAsync", true));
-        buttons.Controls.Add(MaintenanceButton(firstPassed ? "首组验证  已通过" : "首组验证", "ValidateFirstGroupAsync", !firstPassed));
-        buttons.Controls.Add(MaintenanceButton(existingPassed ? "既有副本验证  已通过" : "既有副本验证", "ValidateExistingReplicaAsync", !existingPassed));
-        AddFull(table, buttons);
+        var list = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 1,
+            Margin = new Padding(0, 4, 0, 0),
+            BackColor = Color.White
+        };
+        list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        list.Controls.Add(MaintenanceRow("连接诊断", "检查源端、坚果云根目录和 Zotero 目标目录是否可访问。", "DiagnoseConnectionsAsync", "可执行", false));
+        list.Controls.Add(MaintenanceRow("迁移就绪扫描", "重新读取源清单并检查文件上限、Zotero 配对和迁移条件。", "ScanAsync", "可执行", false));
+        list.Controls.Add(MaintenanceRow("校准流量", "按坚果云官方页面人工校正本周期上传、下载与重置日期。", "CalibrateAsync", "人工校准", false));
+        list.Controls.Add(MaintenanceRow("首组验证", "真实迁移一个完整 Zotero 组并执行目标回读与 SHA-256 强校验。", "ValidateFirstGroupAsync", firstPassed ? "✓ 已通过" : "未执行", firstPassed));
+        list.Controls.Add(MaintenanceRow("既有副本验证", "确认 GoodSync 等既有副本可在零上传条件下安全接管。", "ValidateExistingReplicaAsync", existingPassed ? "✓ 已通过" : "未执行", existingPassed));
+        AddFull(table, list);
         return WrapCategory(table);
     }
 
-    private Button MaintenanceButton(string text, string methodName, bool enabled)
+    private Control MaintenanceRow(string title, string description, string methodName, string status, bool passed)
     {
-        var button = new Button
+        var row = new TableLayoutPanel
         {
-            Text = text,
-            Width = text.Length > 8 ? 146 : 110,
-            Height = 34,
-            Enabled = enabled,
-            Margin = new Padding(0, 0, 8, 8),
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 3,
+            Margin = new Padding(0, 0, 0, 6),
+            Padding = new Padding(0, 8, 0, 8),
+            BackColor = Color.FromArgb(252, 253, 254)
+        };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78));
+
+        var info = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
+        info.Controls.Add(new Label
+        {
+            Text = title,
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 9.5F),
+            ForeColor = Color.FromArgb(38, 45, 51),
+            Margin = new Padding(10, 0, 0, 2)
+        });
+        info.Controls.Add(new Label
+        {
+            Text = description,
+            AutoSize = true,
+            ForeColor = Color.FromArgb(116, 126, 135),
+            MaximumSize = new Size(390, 0),
+            Margin = new Padding(10, 0, 10, 0)
+        });
+        row.Controls.Add(info, 0, 0);
+
+        var statusLabel = new Label
+        {
+            Text = status,
+            AutoSize = false,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI Semibold", 9F),
+            ForeColor = passed ? Color.FromArgb(38, 145, 87) : Color.FromArgb(91, 124, 151),
+            Margin = Padding.Empty
+        };
+        row.Controls.Add(statusLabel, 1, 0);
+
+        var action = new Button
+        {
+            Text = passed ? "重新验证" : (methodName == "CalibrateAsync" ? "校准" : "执行"),
+            Dock = DockStyle.Fill,
+            Height = 30,
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.White,
+            ForeColor = Color.FromArgb(52, 68, 82),
+            Margin = new Padding(4, 4, 8, 4),
             TabStop = false
         };
-        button.FlatAppearance.BorderColor = Color.FromArgb(205, 208, 214);
-        button.Click += (_, _) =>
+        action.FlatAppearance.BorderColor = Color.FromArgb(208, 215, 221);
+        action.FlatAppearance.MouseOverBackColor = Color.FromArgb(243, 248, 252);
+        action.Click += (_, _) =>
         {
-            var main = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
-            if (main is null) return;
+            var mainForm = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
+            if (mainForm is null) return;
             DialogResult = DialogResult.Cancel;
             Close();
-            main.BeginInvoke(new Action(() =>
+            mainForm.BeginInvoke(new Action(() =>
             {
-                var task = UiCommandBridge.InvokeTask(main, methodName);
+                var task = UiCommandBridge.InvokeTask(mainForm, methodName);
                 if (task is not null) _ = task;
             }));
         };
-        return button;
+        row.Controls.Add(action, 2, 0);
+        return row;
     }
 
     private static TableLayoutPanel CategoryTable(string title)
@@ -410,10 +457,7 @@ internal sealed class SettingsDialog : Form
             var state = store.LoadAsync().GetAwaiter().GetResult();
             return state.Files.Count > 0;
         }
-        catch
-        {
-            return true;
-        }
+        catch { return true; }
     }
 
     private static string Normalize(string? value) => (value ?? string.Empty).Trim();
