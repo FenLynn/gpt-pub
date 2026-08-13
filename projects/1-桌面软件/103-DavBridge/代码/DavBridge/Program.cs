@@ -65,6 +65,9 @@ internal static class Program
             Directory.CreateDirectory(paths.RoamingRoot);
             Directory.CreateDirectory(paths.LocalRoot);
             Directory.CreateDirectory(paths.TempRoot);
+
+            ConstructUiForStartupTest();
+
             WriteReport(reportPath, new
             {
                 product = "DavBridge",
@@ -72,6 +75,7 @@ internal static class Program
                 roaming = paths.RoamingRoot,
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
+                uiConstructed = true,
                 ok = true
             });
         }
@@ -86,14 +90,7 @@ internal static class Program
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
-            ApplicationConfiguration.Initialize();
-            using var host = new AppHost();
-            using var form = new MainForm(host, launchInBackground: false);
-            AppBranding.Apply(form);
-            using var dashboard = UiDashboardV027.Attach(form, host);
-            using var visualPolish = UiVisualPolishV029.Attach(dashboard);
-            _ = form.Handle;
-            form.PerformLayout();
+            ConstructUiForStartupTest();
             WriteReport(reportPath, new
             {
                 product = "DavBridge",
@@ -106,6 +103,18 @@ internal static class Program
         {
             TryWriteFailedReport(reportPath, ex);
         }
+    }
+
+    private static void ConstructUiForStartupTest()
+    {
+        ApplicationConfiguration.Initialize();
+        using var host = new AppHost();
+        using var form = new MainForm(host, launchInBackground: false);
+        AppBranding.Apply(form);
+        using var dashboard = UiDashboardV027.Attach(form, host);
+        using var visualPolish = UiVisualPolishV029.Attach(dashboard);
+        _ = form.Handle;
+        form.PerformLayout();
     }
 
     private static void WriteReport(string reportPath, object report) =>
