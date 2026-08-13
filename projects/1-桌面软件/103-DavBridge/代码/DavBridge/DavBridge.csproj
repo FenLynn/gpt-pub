@@ -16,13 +16,16 @@
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <DebugType>embedded</DebugType>
-    <ApplicationIcon>$(IntermediateOutputPath)DavBridge.ico</ApplicationIcon>
+    <ApplicationIcon>DavBridge.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DavBridge.Core\DavBridge.Core.csproj" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
-  <Target Name="GenerateDavBridgeIcon" BeforeTargets="CoreCompile">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;[IO.Directory]::CreateDirectory('$(IntermediateOutputPath)') | Out-Null; [IO.File]::WriteAllBytes('$(IntermediateOutputPath)DavBridge.ico',[Convert]::FromBase64String((Get-Content -Raw '$(MSBuildProjectDirectory)\Assets\DavBridge.ico.b64')))&quot;" />
+  <Target Name="GenerateDavBridgeIcon" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;[IO.File]::WriteAllBytes('$(MSBuildProjectDirectory)\DavBridge.ico',[Convert]::FromBase64String((Get-Content -Raw '$(MSBuildProjectDirectory)\Assets\DavBridge.ico.b64')))&quot;" />
+  </Target>
+  <Target Name="CleanGeneratedDavBridgeIcon" AfterTargets="Build;Publish">
+    <Delete Files="$(MSBuildProjectDirectory)\DavBridge.ico" />
   </Target>
 </Project>
