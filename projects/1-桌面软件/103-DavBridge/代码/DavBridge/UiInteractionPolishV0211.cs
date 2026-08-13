@@ -138,7 +138,7 @@ internal sealed class UiInteractionPolishV0211 : IDisposable
             if (form.IsDisposed || !form.IsHandleCreated) continue;
             NormalizeButtons(form);
             if (form is SettingsDialog)
-                PolishSettingsHints(form);
+                PolishSettings(form);
             _normalizedForms.Add(form.Handle);
         }
     }
@@ -171,12 +171,21 @@ internal sealed class UiInteractionPolishV0211 : IDisposable
         }
     }
 
-    private static void PolishSettingsHints(Form settings)
+    private static void PolishSettings(Form settings)
     {
         foreach (var label in Enumerate(settings).OfType<Label>())
         {
             if (label.Text.Contains("人工校准入口位于“安全与维护”", StringComparison.Ordinal))
                 label.Text = "当前周期已用量与重置日期由主页显示；人工校准入口位于主页“当前周期”。";
+        }
+
+        foreach (var row in Enumerate(settings).OfType<TableLayoutPanel>())
+        {
+            if (row.ColumnCount != 3) continue;
+            var isCalibrationRow = Enumerate(row).OfType<Label>()
+                .Any(label => string.Equals(label.Text, "校准流量", StringComparison.Ordinal));
+            if (isCalibrationRow)
+                row.Visible = false;
         }
     }
 
