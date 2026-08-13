@@ -111,8 +111,6 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
             {
                 Credentials = new NetworkCredential(username, password),
                 PreAuthenticate = true,
-                // DavBridge handles endpoint identity strictly. Automatic redirects can cross
-                // authority boundaries and make credential behavior ambiguous, so reject them.
                 AllowAutoRedirect = false,
                 AutomaticDecompression = DecompressionMethods.All
             };
@@ -136,7 +134,9 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         var dav = response.Headers.TryGetValues("DAV", out var davValues)
             ? davValues.SelectMany(x => x.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
             : Array.Empty<string>();
-        var allow = response.Headers.Allow.Select(x => x.Method).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var allow = response.Headers.TryGetValues("Allow", out var allowValues)
+            ? allowValues.SelectMany(x => x.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            : Array.Empty<string>();
         return new WebDavCapabilities(response.IsSuccessStatusCode, dav, allow, response.Headers.Server.ToString());
     }
 
