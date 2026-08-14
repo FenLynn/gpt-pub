@@ -11,12 +11,14 @@ internal sealed class UiFinalPolishV0217 : IDisposable
     private readonly MainForm _form;
     private readonly UiDashboardV027 _dashboard;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 180 };
+    private System.Windows.Forms.Timer? _dashboardTimer;
     private Label? _uploadValue;
     private Label? _downloadValue;
     private GradientMeterBar? _uploadBar;
     private GradientMeterBar? _downloadBar;
     private GradientMeterBar? _overallBar;
     private GradientMeterBar? _currentBar;
+    private LinkLabel? _problemLink;
     private TransportActionButtonV027? _primarySource;
     private PrimaryActionSurfaceV0217? _primarySurface;
     private bool _disposed;
@@ -28,6 +30,9 @@ internal sealed class UiFinalPolishV0217 : IDisposable
         InstallSidebarDivider();
         InstallCycleLayout();
         InstallPrimaryAction();
+        _problemLink = Field<LinkLabel>("_problemLink");
+        _dashboardTimer = Field<System.Windows.Forms.Timer>("_timer");
+        if (_dashboardTimer is not null) _dashboardTimer.Tick += DashboardTick;
         ApplyNow();
         _timer.Tick += (_, _) => ApplyNow();
         _timer.Start();
@@ -169,15 +174,23 @@ internal sealed class UiFinalPolishV0217 : IDisposable
         parent.Controls.Add(_primarySurface, position.Column, position.Row);
     }
 
+    private void DashboardTick(object? sender, EventArgs e) => NormalizeCountText();
+
     private void ApplyNow()
     {
         if (_disposed || _form.IsDisposed) return;
-        if (_overallBar is not null) _overallBar.BarText = StripThousands(_overallBar.BarText);
-        if (_currentBar is not null) _currentBar.BarText = StripThousands(_currentBar.BarText);
+        NormalizeCountText();
         if (_uploadBar is not null && _uploadValue is not null) _uploadBar.BarText = CompactQuota(_uploadValue.Text);
         if (_downloadBar is not null && _downloadValue is not null) _downloadBar.BarText = CompactQuota(_downloadValue.Text);
         _primarySurface?.SyncFromSource();
         PolishOpenSettings();
+    }
+
+    private void NormalizeCountText()
+    {
+        if (_disposed || _form.IsDisposed) return;
+        if (_overallBar is not null) _overallBar.BarText = StripThousands(_overallBar.BarText);
+        if (_problemLink is not null) _problemLink.Text = StripThousands(_problemLink.Text);
     }
 
     private static string CompactQuota(string text)
@@ -238,6 +251,7 @@ internal sealed class UiFinalPolishV0217 : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        if (_dashboardTimer is not null) _dashboardTimer.Tick -= DashboardTick;
         _timer.Stop();
         _timer.Dispose();
         _primarySurface?.Dispose();

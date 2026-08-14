@@ -20,15 +20,15 @@ internal sealed partial class UiRouteOverallV0215
             var arrowWidth = Math.Clamp(Width * .32f, 184f, 224f);
             var arrow = new RectangleF((Width - arrowWidth) / 2f, 49f, arrowWidth, 36f);
             var tip = Math.Min(17f, arrow.Height * .46f);
-            var inset = Math.Clamp(Width * .025f, 14f, 22f);
+            var inset = Math.Clamp(Width * .055f, 28f, 38f);
             var leftIcon = new RectangleF(inset, cy - icon / 2f, icon, icon);
             var rightIcon = new RectangleF(Width - icon - inset, cy - icon / 2f, icon, icon);
             DrawInfini(e.Graphics, leftIcon);
             DrawAcorn(e.Graphics, rightIcon);
 
             var leftTextLeft = (int)leftIcon.Right + 2;
-            var leftTextRight = (int)arrow.Left - 5;
-            var rightTextLeft = (int)arrow.Right + 5;
+            var leftTextRight = (int)arrow.Left - 4;
+            var rightTextLeft = (int)arrow.Right + 4;
             var rightTextRight = (int)rightIcon.Left - 2;
             TextRenderer.DrawText(e.Graphics, left, nameFont,
                 new Rectangle(leftTextLeft, 54, Math.Max(20, leftTextRight - leftTextLeft), 28),
