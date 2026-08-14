@@ -34,7 +34,6 @@ internal static class Program
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
                 using var dashboard = UiDashboardV027.Attach(form, host);
-                using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
                 using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
                 using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
                 using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
@@ -147,7 +146,6 @@ internal static class Program
         using var form = new MainForm(host, launchInBackground: false);
         AppBranding.Apply(form);
         using var dashboard = UiDashboardV027.Attach(form, host);
-        using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
         using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
         using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
         using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);

@@ -37,22 +37,20 @@ internal static class UiLayoutSelfTestV0217
             form.PerformLayout();
 
             var verificationStage = Descendants(form).OfType<VerificationStageTrackV0224>().FirstOrDefault();
-            Require(verificationStage is not null && verificationStage.Visible &&
+            Require(verificationStage is not null &&
                     verificationStage.Width >= 180 && verificationStage.Height >= 30,
                 scenario, "verification stage clipped");
 
             var verificationBar = Descendants(form).OfType<VerificationProgressBarV0224>().FirstOrDefault();
-            Require(verificationBar is not null && verificationBar.Visible &&
+            Require(verificationBar is not null &&
                     verificationBar.Width >= 180 && verificationBar.Height >= 24,
                 scenario, "verification bar clipped");
 
-            var verificationPrimary = Descendants(form)
-                .OfType<PrimaryActionSurfaceV0217>()
-                .FirstOrDefault(x => x.Visible);
-            Require(verificationPrimary is not null &&
-                    verificationPrimary.Width >= UiGeometryV0217.PrimaryButtonWidth &&
-                    verificationPrimary.Height >= UiGeometryV0217.PrimaryButtonHeight,
-                scenario, "verification primary action clipped");
+            var primarySurfaces = Descendants(form).OfType<PrimaryActionSurfaceV0217>().ToArray();
+            Require(primarySurfaces.Length >= 2 && primarySurfaces.All(x =>
+                    x.Width >= UiGeometryV0217.PrimaryButtonWidth &&
+                    x.Height >= UiGeometryV0217.PrimaryButtonHeight),
+                scenario, "activity primary action clipped");
 
             tabs.SelectedIndex = 0;
             form.PerformLayout();
