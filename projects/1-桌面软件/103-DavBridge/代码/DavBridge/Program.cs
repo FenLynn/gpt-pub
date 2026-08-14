@@ -41,7 +41,7 @@ internal static class Program
                 using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
                 using var waitQuotaMaintenance = WaitQuotaMaintenanceHostV0222.Attach(host);
                 using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
-                using var waitQuotaAction = UiWaitQuotaMaintenanceActionV0222.Attach(form, dashboard, host, waitQuotaMaintenance);
+                using var activityTabs = UiActivityTabsV0223.Attach(form, dashboard, host, waitQuotaMaintenance);
                 using var meterPolish = UiMeterPolishV0219.Attach(dashboard);
                 using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
                 Application.Run(form);
@@ -155,7 +155,7 @@ internal static class Program
         using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
         using var waitQuotaMaintenance = WaitQuotaMaintenanceHostV0222.Attach(host);
         using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
-        using var waitQuotaAction = UiWaitQuotaMaintenanceActionV0222.Attach(form, dashboard, host, waitQuotaMaintenance);
+        using var activityTabs = UiActivityTabsV0223.Attach(form, dashboard, host, waitQuotaMaintenance);
         using var meterPolish = UiMeterPolishV0219.Attach(dashboard);
         using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
 
