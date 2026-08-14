@@ -15,25 +15,71 @@ public static class WaitQuotaReplicaMaintenance
     private const long NormalDownloadBytesPerPass = 100_000_000L;
     private const long SprintDownloadBytesPerPass = 500_000_000L;
 
-    public static async Task<WaitQuotaReplicaMaintenanceSummary> ExecuteAsync(
+    public static Task<WaitQuotaReplicaMaintenanceSummary> ExecuteAsync(
         DavBridgeConfig config,
         MigrationState state,
         StateStore stateStore,
         IReadOnlyWebDavClient source,
         IWritableWebDavClient target,
         Action<EngineProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(
+            config,
+            state,
+            stateStore,
+            source,
+            target,
+            progress,
+            cancellationToken,
+            manual: false);
+
+    /// <summary>
+    /// Explicit user-started NO-WRITE sweep. Unlike the background safety pass, this scans the
+    /// whole eligible candidate set and may consume the entire safe target download budget for
+    /// the current cycle. QuotaPolicy still preserves the configured reserve and this path never PUTs.
+    /// </summary>
+    public static Task<WaitQuotaReplicaMaintenanceSummary> ExecuteManualAsync(
+        DavBridgeConfig config,
+        MigrationState state,
+        StateStore stateStore,
+        IReadOnlyWebDavClient source,
+        IWritableWebDavClient target,
+        Action<EngineProgress>? progress,
+        CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(
+            config,
+            state,
+            stateStore,
+            source,
+            target,
+            progress,
+            cancellationToken,
+            manual: true);
+
+    private static async Task<WaitQuotaReplicaMaintenanceSummary> ExecuteCoreAsync(
+        DavBridgeConfig config,
+        MigrationState state,
+        StateStore stateStore,
+        IReadOnlyWebDavClient source,
+        IWritableWebDavClient target,
+        Action<EngineProgress>? progress,
+        CancellationToken cancellationToken,
+        bool manual)
     {
         var snapshot = QuotaPolicy.GetSnapshot(config, state, DateTimeOffset.Now);
         if (snapshot.SafeDownloadRemainingBytes <= 0)
             return new WaitQuotaReplicaMaintenanceSummary(0, 0, 0, 0, 0,
-                "[维护] 下载安全额度也已不足，本轮不执行既有副本校验。");
+                manual
+                    ? "[维护] 手动校验未启动：下载安全额度已经到达预留线。"
+                    : "[维护] 下载安全额度也已不足，本轮不执行既有副本校验。");
 
         IReadOnlyList<WebDavEntry> sourceEntries;
         try
         {
             Report(progress, config, state, null, null,
-                "[维护] 上传额度不足，正在读取 InfiniCLOUD 源清单并准备直接路径探测，不依赖坚果云 750 项目录窗口。");
+                manual
+                    ? "[维护] 手动校验已启动。正在读取 InfiniCLOUD 源清单，随后将遍历全部未验证 Zotero 组；只读目标，禁止 PUT。"
+                    : "[维护] 上传额度不足，正在读取 InfiniCLOUD 源清单并准备直接路径探测，不依赖坚果云 750 项目录窗口。");
             sourceEntries = await source.ListDirectoryAsync(config.SourceRootPath, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is HttpRequestException or WebDavException)
@@ -54,11 +100,14 @@ public static class WaitQuotaReplicaMaintenance
             return new WaitQuotaReplicaMaintenanceSummary(0, 0, 0, 0, 0,
                 "[维护] 当前源清单中没有可进行 NO-WRITE 接管的完整未验证 zip+prop 组。");
 
-        var maxProbeGroups = snapshot.IsSprint ? SprintProbeGroupsPerPass : NormalProbeGroupsPerPass;
-        var probeCount = Math.Min(maxProbeGroups, candidates.Length);
-        var startIndex = GetRotatingStartIndex(candidates.Length, DateTimeOffset.Now);
-        var passRemaining = Math.Min(snapshot.SafeDownloadRemainingBytes,
-            snapshot.IsSprint ? SprintDownloadBytesPerPass : NormalDownloadBytesPerPass);
+        var probeCount = manual
+            ? candidates.Length
+            : Math.Min(snapshot.IsSprint ? SprintProbeGroupsPerPass : NormalProbeGroupsPerPass, candidates.Length);
+        var startIndex = manual ? 0 : GetRotatingStartIndex(candidates.Length, DateTimeOffset.Now);
+        var passRemaining = manual
+            ? snapshot.SafeDownloadRemainingBytes
+            : Math.Min(snapshot.SafeDownloadRemainingBytes,
+                snapshot.IsSprint ? SprintDownloadBytesPerPass : NormalDownloadBytesPerPass);
 
         var probedGroups = 0;
         var existingGroups = 0;
@@ -73,7 +122,9 @@ public static class WaitQuotaReplicaMaintenance
             probedGroups++;
 
             Report(progress, config, state, group.Key, null,
-                $"[维护] 正在按目标路径探测坚果云既有副本 {probedGroups}/{probeCount}：{Path.GetFileName(group.Key)}。本阶段只读，不会 PUT。");
+                manual
+                    ? $"[维护] 手动校验：正在直接探测坚果云既有副本 {probedGroups}/{probeCount}，{Path.GetFileName(group.Key)}。仅检查路径，不会 PUT。"
+                    : $"[维护] 正在按目标路径探测坚果云既有副本 {probedGroups}/{probeCount}：{Path.GetFileName(group.Key)}。本阶段只读，不会 PUT。");
 
             var targetMetadata = new Dictionary<string, WebDavEntry>(StringComparer.OrdinalIgnoreCase);
             var completeOnTarget = true;
@@ -111,7 +162,9 @@ public static class WaitQuotaReplicaMaintenance
             if (expectedDownload <= 0 || expectedDownload > passRemaining || !QuotaPolicy.CanStartDownload(expectedDownload, currentQuota))
             {
                 Report(progress, config, state, group.Key, null,
-                    $"[维护] 已找到完整既有副本，但本轮安全下载预算不足以校验该组，需要约 {FormatMb(expectedDownload)}，本轮剩余 {FormatMb(passRemaining)}。");
+                    $"[维护] 已找到完整既有副本，但安全下载额度不足以校验该组，需要约 {FormatMb(expectedDownload)}，当前可安全使用 {FormatMb(Math.Min(passRemaining, currentQuota.SafeDownloadRemainingBytes))}。");
+                if (manual && currentQuota.SafeDownloadRemainingBytes <= 0)
+                    break;
                 continue;
             }
 
@@ -134,15 +187,28 @@ public static class WaitQuotaReplicaMaintenance
             if (groupOk && IsGroupCurrentAndVerified(state, group))
                 adoptedGroups++;
 
-            if (passRemaining <= 0)
+            var afterGroupQuota = QuotaPolicy.GetSnapshot(config, state, DateTimeOffset.Now);
+            if (passRemaining <= 0 || afterGroupQuota.SafeDownloadRemainingBytes <= 0)
                 break;
         }
 
-        var summary = adoptedGroups > 0
-            ? $"[维护] 本轮直接路径探测 {probedGroups} 组，找到 {existingGroups} 个完整坚果云既有组，已 NO-WRITE 强校验接管 {adoptedGroups} 组、{adoptedMembers} 个文件，坚果云实际下载 {FormatMb(downloadedBytes)}，上传 0 B。"
-            : existingGroups > 0
-                ? $"[维护] 本轮直接路径探测 {probedGroups} 组，找到 {existingGroups} 个完整坚果云既有组，但没有组满足本轮安全下载预算或强校验条件，上传 0 B。"
-                : $"[维护] 本轮已越过 750 项目录窗口，直接按目标路径探测 {probedGroups} 个未验证组；这些组在坚果云上未形成完整 zip+prop 副本。本轮未下载文件内容，上传 0 B。";
+        string summary;
+        if (manual)
+        {
+            summary = adoptedGroups > 0
+                ? $"[维护] 手动校验结束：共探测 {probedGroups}/{probeCount} 组，找到 {existingGroups} 个完整坚果云既有组，已 NO-WRITE 强校验接管 {adoptedGroups} 组、{adoptedMembers} 个文件，坚果云实际下载 {FormatMb(downloadedBytes)}，上传 0 B。"
+                : existingGroups > 0
+                    ? $"[维护] 手动校验结束：共探测 {probedGroups}/{probeCount} 组，找到 {existingGroups} 个完整坚果云既有组，但未有新组通过当前安全下载预算与强校验条件，上传 0 B。"
+                    : $"[维护] 手动校验结束：已直接探测 {probedGroups}/{probeCount} 个未验证组，没有发现完整的坚果云 zip+prop 既有副本，因此没有下载文件内容，上传 0 B。";
+        }
+        else
+        {
+            summary = adoptedGroups > 0
+                ? $"[维护] 本轮直接路径探测 {probedGroups} 组，找到 {existingGroups} 个完整坚果云既有组，已 NO-WRITE 强校验接管 {adoptedGroups} 组、{adoptedMembers} 个文件，坚果云实际下载 {FormatMb(downloadedBytes)}，上传 0 B。"
+                : existingGroups > 0
+                    ? $"[维护] 本轮直接路径探测 {probedGroups} 组，找到 {existingGroups} 个完整坚果云既有组，但没有组满足本轮安全下载预算或强校验条件，上传 0 B。"
+                    : $"[维护] 本轮已越过 750 项目录窗口，直接按目标路径探测 {probedGroups} 个未验证组；这些组在坚果云上未形成完整 zip+prop 副本。本轮未下载文件内容，上传 0 B。";
+        }
 
         Report(progress, config, state, null, null, summary);
         return new WaitQuotaReplicaMaintenanceSummary(
