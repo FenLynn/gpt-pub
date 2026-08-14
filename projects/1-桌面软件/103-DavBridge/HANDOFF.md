@@ -18,21 +18,21 @@
 
 正式稳定回滚基线：**v0.1.7**
 
-当前实验候选：**v0.2.20**
+当前实验候选：**v0.2.21**
 
-v0.2.20 已完成完整 CI 的准确代码 head：`09a7291ce9400b0e324c177aa678e494e59765b3`
+v0.2.21 已完成完整 CI 的准确代码 head：`cbf98ea410a642fc04016919a551fac6f2645cec`
 
-P103 CI run：`31783815480`
+P103 CI run：`31804480320`
 
-Artifact：`DavBridge-v0.2.20-win-x64`
+Artifact：`DavBridge-v0.2.21-win-x64`
 
-Artifact ZIP SHA256：`1149689116698cab890195dd47e0ea540c477bc8acdb0f44a2f03343b2abf234`
+Artifact ZIP SHA256：`38763a711a26f2d4e03dab8144fdffbdf90f4ef7c517c6ed1d1fa7ef2e44be67`
 
-EXE SHA256：`6d78135e5f3c22a648dd67b651c0239cc3a03214c5495929bf5d306dfa645ac6`
+EXE SHA256：`f40bc2bbc71a63e43ec8a1e67117ec47f74fc686c767feadd8f1738712b44e1e`
 
-当前阶段：Zotero 长周期迁移的无人值守维护、源版本漂移处理、额度利用和最终一致性门控实机验证。
+当前阶段：Zotero 长周期迁移的无人值守维护、额度等待期既有副本只读接管、源版本漂移处理和最终一致性门控实机验证。
 
-`main` 与 `p103-stable` 继续保持 v0.1.7。v0.2.20 未经用户实机确认，不得提升到 stable/main。
+`main` 与 `p103-stable` 继续保持 v0.1.7。v0.2.21 未经用户实机确认，不得提升到 stable 或 main。
 
 ## 固定读取顺序
 
@@ -57,9 +57,9 @@ DavBridge 定位为可靠、低速、可恢复、强校验的单向迁移、备�
 
 当前用户层只收口现有 Zotero 固定任务，近期不开放普通 WebDAV 新任务。
 
-明确不做双向同步、删除传播、双向冲突合并、rename detection、WebDAV LOCK、客户端加密备份、HTTP/2 或 HTTP/3 性能追逐、高流量 Integrity Scrub、定期全量目标 GET 加 SHA256。
+明确不做双向同步、删除传播、双向冲突合并、rename detection、WebDAV LOCK、客户端加密备份、高流量 Integrity Scrub、定期全量目标 GET 加 SHA256。
 
-用户要求默认无人值守，但必须能知道软件当前正在做什么。后台维护动作通过当前状态、当前文件和底部消息栏明确展示，不要求日常人工点击维护工具。
+用户要求默认无人值守，但必须能知道软件当前正在做什么。后台维护动作必须通过当前文件、阶段和底部消息栏明确展示，不要求日常人工点击维护工具。
 
 ## Data 兼容硬规则
 
@@ -73,7 +73,7 @@ DavBridge 定位为可靠、低速、可恢复、强校验的单向迁移、备�
 
 `%APPDATA%/DavBridge/secrets.dat`
 
-v0.2.20 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码继续使用 Windows DPAPI CurrentUser。
+v0.2.21 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码继续使用 Windows DPAPI CurrentUser。
 
 `TransferStatus.WriteUnknown` 仍是追加枚举值，不改变既有状态编号。
 
@@ -83,122 +83,141 @@ v0.2.20 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码
 
 1. 源端只读。
 2. zip 与 prop 按 Zotero 逻辑组处理。
-3. 已有目标副本先 GET 加 SHA256，比对一致才安全接管。
+3. 已有目标副本只有在目标 GET 和 SHA256 与当前源文件完全一致后才安全接管。
 4. 新目标采用条件 PUT，避免竞争覆盖。
 5. PUT 响应未知时进入 WriteUnknown，再 Reconcile，不立即重复上传。
 6. 412 进入协调流程，不盲目覆盖。
 7. 上传成功后目标重新 GET 并做 SHA256 强校验，完成后才记 StrongVerified。
 8. 源端在传输期间变化时标记 SourceChanged，不接受旧结果为当前版本。
 9. HTTPS only，禁止自动跨 authority 重定向。
-10. 高流量 Integrity Scrub 不进入当前路线。
+10. Conflict、WriteUnknown、SourceChanged 不允许被额度等待期维护自动覆盖。
 
-## v0.2.20 无人值守维护事实
+## v0.2.20 实机发现的真实缺陷
 
-### 1. StrongVerified 变为“当前源版本已验证”语义
+用户在实际 WaitQuota 场景截图确认：总体进度 `1526 / 6929`，上传约 `0.95 G / 1 G`，下载约 `2.09 G / 3 G`，界面一直显示等待下一周期，看不到既有副本下载校验。
 
-每次正常后台 pass 都会重新读取低流量源 Manifest。已经 StrongVerified 的记录会比较当前源端 size、ETag、LastModified 与上次强校验时保存的版本信息。
+复核后确认不是单纯 UI 隐藏，而是两个真实问题叠加。
 
-若源版本发生变化：
+第一，v0.2.20 的自动 NO-WRITE 候选发现先调用坚果云目标目录 LIST，再只从该次可见结果中找未验证 zip 和 prop。真实服务单次目录响应约有 750 项可见窗口。当这些可见项恰好已经 StrongVerified 时，程序不会发现窗口之外的 GoodSync 既有副本，因此不会进入真正的文件 GET 和 SHA256 校验。
 
-- 记录自动标记为 `SourceChanged`；
-- 该逻辑组优先于普通 Pending 组处理；
-- 若当前上传额度不足，则保留等待下一可用上传周期；
-- 不把旧 StrongVerified 永久当成完成。
+第二，`UiLiveProgress.UpdateCurrentActivity()` 只在 `EngineState.Running` 时显示当前文件活动。额度等待期维护属于 `WaitQuota`，所以即使维护发生，当前文件区域也会保持等待下一周期。
 
-源端候选真正进入处理时仍会重新读取和计算 SHA256，因此元数据变化不等于盲目上传。
+因此 v0.2.20 不应再被视为已解决大库额度等待期自动接管问题。
 
-### 2. WaitQuota 自动利用剩余下载额度接管既有副本
+## v0.2.21 直接路径维护
 
-上传安全预算不足时，DavBridge 会自动尝试 NO-WRITE 既有副本接管。
+### 1. 不再依赖坚果云目录 LIST 发现候选
 
-只处理：
+新增 `DavBridge.Core/WaitQuotaReplicaMaintenance.cs`。
 
-- 完整 zip + prop Zotero 逻辑组；
-- 目标当前可见且两个成员都存在；
-- 尚未达到当前源版本 StrongVerified；
-- 不属于 SourceChanged、Conflict、WriteUnknown。
+额度不足时，从 InfiniCLOUD 当前源清单筛选尚未达到当前版本 StrongVerified 的完整 Zotero zip 和 prop 组，然后直接对目标精确路径执行 `GetMetadataAsync`。
 
-流程：
+目标目录 `ListDirectoryAsync` 不再是该维护路径的候选发现前提，因此可以越过单次约 750 项的可见窗口。
 
-源端读取并计算 SHA256 → 目标端 GET 并计算 SHA256 → 完全一致 → StrongVerified。
+### 2. 仍然严格 NO-WRITE
 
-该维护路径禁止 PUT。目标副本不同则标记 Conflict，并停止自动接管该组，不覆盖目标。
+找到目标完整 zip 和 prop 后执行：
 
-普通周期每次后台维护最多使用约 100 MB 目标下载预算；冲刺窗口最多约 500 MB。两者始终同时受 `QuotaPolicy.SafeDownloadRemainingBytes` 限制，因此保留既有下载安全预留。
+源文件读取并计算 SHA256，目标已有文件读取并计算 SHA256，完全一致后记录 StrongVerified。
 
-坚果云单次列表达到约 750 项时，只把当前可见结果当作候选集合，不据此判断其余目标文件不存在。
+若目标内容与当前源不同，记录 Conflict，保持目标原样。
 
-### 3. 最终一致性门
+该维护路径没有 PUT。专门回归测试使用一个禁止目标目录 LIST 且任何 PUT 都直接失败的假目标，仍必须成功按精确路径接管完整组。
 
-所有当前源对象都达到 StrongVerified 后，不立即宣布 Complete。
+### 3. 限制探测和下载负载
 
-必须：
+普通周期每次维护最多直接探测 24 个逻辑组，目标文件实际下载内容上限约 100 MB。
 
-1. 再读取第 1 次源 Manifest；
-2. 确认全部仍与当前 StrongVerified 版本一致；
-3. 间隔约 2 秒读取第 2 次源 Manifest；
-4. 两次清单的 path、size、ETag、LastModified 都一致；
-5. 第二次清单也全部属于当前 StrongVerified 版本。
+冲刺窗口每次最多探测 48 个逻辑组，目标文件实际下载内容上限约 500 MB。
 
-任何新增或变化都会拒绝 Complete，并在下一安全 pass 继续处理。
+实际下载还必须满足 `QuotaPolicy.SafeDownloadRemainingBytes`，继续保留下载安全预留。
 
-即使进入 Complete，现有后台循环仍会定期重新运行，因此之后新增或变化的 Zotero 附件仍会被重新发现。
+候选起点按时间轮换，不修改 `state.json` Schema，也不额外保存维护游标。
 
-### 4. 用户可见但无需操作
+目标路径 metadata 探测本身不计入目标文件下载账本。只有真正 GET 文件内容并做 SHA256 时，才增加 `VerifiedDownloadBytesSinceCalibration`。
 
-底部消息栏会直接显示关键维护动作，包括：
+### 4. 与正常迁移串行
 
-- 检测到已迁移附件源版本发生变化，正在优先刷新；
-- 上传额度不足，正在检查坚果云已有副本；
-- 正在进行 NO-WRITE 只读接管；
-- 既有副本强校验通过，未发生上传；
-- 最终一致性确认第 1 次 / 第 2 次源清单；
-- 最终两次源清单一致。
+新增 `WaitQuotaMaintenanceHostV0221`。
 
-普通后台节奏继续沿用现有策略：正常运行约 5 分钟级复查，WaitQuota 根据重置周期调度且单次等待通常不超过约 6 小时，Complete 约每日复查一次。
+只有在正常 `AppHost` 一轮已经结束、`host.IsRunning == false`、状态仍为 WaitQuota 时，才启动直接路径维护。
 
-## v0.2.20 回归验证
+正常后台 pass 完成后约 8 秒进入维护。维护自身不使用独立高频周期，不与正常迁移并行争用 WebDAV。
 
-准确代码 head：`09a7291ce9400b0e324c177aa678e494e59765b3`
+下一次维护由下一轮正常 WaitQuota pass 再次触发，沿用现有 WaitQuota 调度节奏。
 
-P103 CI run：`31783815480`
+### 5. WaitQuota 期间用户可见
 
-已通过：
+`UiLiveProgress` 现在允许显示 WaitQuota 维护活动。
+
+应依次看到类似状态：
+
+`后台只读维护`
+
+`正在按目标路径探测坚果云既有副本 7/24`
+
+找到完整目标组后，当前文件显示具体 zip 或 prop 文件名，并显示：
+
+`正在读取 InfiniCLOUD 源文件并计算 SHA256`
+
+随后：
+
+`正在读取坚果云已有副本并做 SHA256 强校验`
+
+一致后：
+
+`源端与坚果云完全一致，已安全接管，上传 0 B`
+
+底部消息栏直接读取 `WaitQuotaMaintenanceActivity`，不再被普通等待额度提示覆盖。
+
+如果本轮 24 个探测组都没有完整目标副本，也必须明确显示本轮探测数量和结果，使用户能区分“维护没有运行”和“维护已运行但本批没有可下载校验对象”。
+
+## 源版本漂移和最终一致性门
+
+v0.2.20 引入并由 v0.2.21 保留：
+
+1. 每次正常后台 pass 比较已 StrongVerified 记录与当前源 size、ETag、LastModified。
+2. 当前源版本变化时标记 SourceChanged，并优先于普通 Pending 组刷新。
+3. 所有当前对象都 StrongVerified 后，连续读取两次源 Manifest，中间约 2 秒。
+4. 只有两次 path、size、ETag、LastModified 一致，且都对应当前 StrongVerified 版本，才允许 Complete。
+5. Complete 后仍沿用约每日重新检查。
+
+## v0.2.21 自动验证
+
+准确代码 head：`cbf98ea410a642fc04016919a551fac6f2645cec`
+
+P103 CI run：`31804480320`
+
+最终 CI 全绿，包括：
 
 - 原 13 项 Core Smoke；
 - 条件 PUT；
 - WriteUnknown reconciliation；
 - 412 条件竞争安全协调；
-- HTTPS-only；
-- 原最终 Manifest 新对象检测；
-- WaitQuota NO-WRITE 自动接管，明确断言 `PUT=0`；
-- SourceChanged 组优先刷新；
-- 第 2 次最终 Manifest 出现新对象时阻止 Complete；
+- HTTPS only；
+- SourceChanged 优先刷新；
+- 两次最终 Manifest 门；
+- 旧 WaitQuota NO-WRITE 回归；
+- 新直接路径回归，明确输出 `PASS direct-path wait-quota maintenance bypasses target directory window with PUT=0`；
 - Windows framework-dependent single EXE publish；
 - Runtime boundary；
-- Windows UI self-test 与既有窗口/DPI 检查；
+- Windows UI self-test；
 - SHA256 与 Artifact 上传。
 
 ## 当前待实机验证
 
-下一轮先验证 v0.2.20，不扩新功能：
+下一轮首先验证 v0.2.21，不扩新功能。
 
-1. v0.2.19 已修的进度条文字垂直居中、浅蓝按钮背景在 v0.2.20 中保持正常。
-2. 当前处于 WaitQuota 且目标下载额度仍有富余时，底部消息栏应能看到 NO-WRITE 只读接管提示。
-3. NO-WRITE 接管期间下载流量账本允许上升，但上传流量账本不得因该维护动作增加。
-4. 已经 StrongVerified 的源附件若后续发生变化，应显示源版本变化与优先刷新提示。
-5. 不应因 750 项可见列表而把不可见对象判定为不存在。
-6. Conflict、WriteUnknown、SourceChanged 不应被 NO-WRITE 维护自动覆盖。
-7. 升级前后的 state、配额账本、StrongVerified 记录和密码配置必须保持原样。
+1. 退出 v0.2.20 后启动 v0.2.21，原 state、流量账本、StrongVerified 和密码配置保持原样。
+2. 当前仍处于 WaitQuota 时，正常 pass 结束后约 8 秒，当前文件区域应出现后台只读维护或直接路径探测状态。
+3. 应看到 `正在按目标路径探测坚果云既有副本 x/24` 一类提示，而不是始终停在等待下一周期。
+4. 找到完整既有副本时，应显示具体 zip 或 prop 文件名，并依次显示源端 SHA256、坚果云 SHA256 阶段。
+5. 真正读取坚果云文件内容时，下载账本应增加；该维护动作的上传账本必须不增加。
+6. 若本轮没有找到完整既有副本，应明确给出已探测多少组，而不是无提示返回等待。
+7. 目标内容不同必须 Conflict，不得覆盖。
 8. 暂停、托盘退出、重新打开仍无异常。
 
-用户实机确认后，下一阶段优先清理已经退出运行链的历史 UI generations，再考虑提升 `p103-stable` / `main`。不得提前提升。
-
-## 后续代码清理原则
-
-v0.2.20 实机确认之前，不删除 v025、v026、旧 UiPolish、UiLayoutPolishV0213、UiInteractionPolishV0211 等历史 UI 文件，以保留回退能力。
-
-实机确认后，可以逐步删除或归档已经退出运行链的旧 UI generations，并把最终 UI 合并为少数正式类。代码清理不得改变迁移引擎、WebDAV 安全语义或本地 Data。
+用户实机确认后，再决定是否继续提高直接路径覆盖效率，以及是否进入历史 UI generations 清理和 stable 固化。不得提前提升 stable 或 main。
 
 ## 事实源
 
