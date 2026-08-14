@@ -18,17 +18,21 @@
 
 正式稳定回滚基线：**v0.1.7**
 
-当前实验候选：**v0.2.18**
+当前实验候选：**v0.2.20**
 
-v0.2.18 已完成完整 CI 的准确代码 head：`a29d50af04f3b2d57673eff899d1c2024d0c5f27`
+v0.2.20 已完成完整 CI 的准确代码 head：`09a7291ce9400b0e324c177aa678e494e59765b3`
 
-P103 CI run：`31765695661`
+P103 CI run：`31783815480`
 
-Artifact：`DavBridge-v0.2.18-win-x64`
+Artifact：`DavBridge-v0.2.20-win-x64`
 
-当前阶段：现有 Zotero 固定任务的 UI 最终收口、长期无人值守稳健性与实机验证。
+Artifact ZIP SHA256：`1149689116698cab890195dd47e0ea540c477bc8acdb0f44a2f03343b2abf234`
 
-`main` 与 `p103-stable` 继续保持 v0.1.7。v0.2.18 未经用户实机确认，不得提升到 stable/main。
+EXE SHA256：`6d78135e5f3c22a648dd67b651c0239cc3a03214c5495929bf5d306dfa645ac6`
+
+当前阶段：Zotero 长周期迁移的无人值守维护、源版本漂移处理、额度利用和最终一致性门控实机验证。
+
+`main` 与 `p103-stable` 继续保持 v0.1.7。v0.2.20 未经用户实机确认，不得提升到 stable/main。
 
 ## 固定读取顺序
 
@@ -55,7 +59,7 @@ DavBridge 定位为可靠、低速、可恢复、强校验的单向迁移、备�
 
 明确不做双向同步、删除传播、双向冲突合并、rename detection、WebDAV LOCK、客户端加密备份、HTTP/2 或 HTTP/3 性能追逐、高流量 Integrity Scrub、定期全量目标 GET 加 SHA256。
 
-如后续增加完整性巡检，只允许默认使用低流量 Metadata Probe，检查对象存在性、size、ETag、LastModified。只有元数据异常时才升级到已有安全处理流程。
+用户要求默认无人值守，但必须能知道软件当前正在做什么。后台维护动作通过当前状态、当前文件和底部消息栏明确展示，不要求日常人工点击维护工具。
 
 ## Data 兼容硬规则
 
@@ -69,15 +73,13 @@ DavBridge 定位为可靠、低速、可恢复、强校验的单向迁移、备�
 
 `%APPDATA%/DavBridge/secrets.dat`
 
-v0.2.18 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码继续使用 Windows DPAPI CurrentUser。
+v0.2.20 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码继续使用 Windows DPAPI CurrentUser。
 
-`TransferStatus.WriteUnknown` 追加在既有枚举末尾，不改变既有状态编号。
+`TransferStatus.WriteUnknown` 仍是追加枚举值，不改变既有状态编号。
 
-未来若真正改变持久化格式，必须先完成备份、迁移、等价性校验和回滚路径；内建转换不够安全时必须提供独立一次性转换工具或脚本，不得要求用户手工改 JSON。
+未来若真正改变持久化格式，必须先完成备份、迁移、等价性校验和回滚路径，不得要求用户手工改 JSON。
 
-## 当前迁移安全语义
-
-现有安全事务必须保持：
+## 必须保持的迁移安全语义
 
 1. 源端只读。
 2. zip 与 prop 按 Zotero 逻辑组处理。
@@ -86,95 +88,117 @@ v0.2.18 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码
 5. PUT 响应未知时进入 WriteUnknown，再 Reconcile，不立即重复上传。
 6. 412 进入协调流程，不盲目覆盖。
 7. 上传成功后目标重新 GET 并做 SHA256 强校验，完成后才记 StrongVerified。
-8. 完成前重新获取源 Manifest，避免迁移期间新增附件导致 false Complete。
+8. 源端在传输期间变化时标记 SourceChanged，不接受旧结果为当前版本。
 9. HTTPS only，禁止自动跨 authority 重定向。
 10. 高流量 Integrity Scrub 不进入当前路线。
 
-## v0.2.17 UI 与运行事实
+## v0.2.20 无人值守维护事实
 
-v0.2.17 完成了主要 UI 收口：
+### 1. StrongVerified 变为“当前源版本已验证”语义
 
-1. 顶部路线由 `UiRouteOverallV0215` 独占绘制，50 px 端点图标与中央状态通道形成固定布局。
-2. 左侧任务栏与主内容区增加 1 px 低对比度分界线。
-3. 当前周期重排为单行：`上传 [bar 内数值]  下载 [bar 内数值]  校准`。
-4. 主操作按钮改由 `PrimaryActionSurfaceV0217` 独占绘制，播放、暂停和等待状态整体居中。
-5. 底部消息栏小喇叭与文字统一垂直中心，并增加消息优先级。
-6. 新增统一 UI 几何 token `UiGeometryV0217`。
-7. 新增单实例 `SingleInstanceGateV0217`，第二次手工启动唤醒已有窗口。
-8. 普通双击显示主页面，Windows 开机启动继续通过 `--background` 后台运行。
-9. 新增 700×520、880×570、1200×760，以及 125% 和 150% DPI 布局自检。
+每次正常后台 pass 都会重新读取低流量源 Manifest。已经 StrongVerified 的记录会比较当前源端 size、ETag、LastModified 与上次强校验时保存的版本信息。
 
-用户对 v0.2.17 的实机截图确认：淡分界线、当前文件条、周期单行、bar 内流量、校准位置、主按钮和底栏均明显改善；同时发现两个未真正收口点：顶部两端图标仍偏外，总体进度仍可能短暂显示千位逗号 `1,526 / 6,929`。
+若源版本发生变化：
 
-## v0.2.18 精修事实
+- 记录自动标记为 `SourceChanged`；
+- 该逻辑组优先于普通 Pending 组处理；
+- 若当前上传额度不足，则保留等待下一可用上传周期；
+- 不把旧 StrongVerified 永久当成完成。
 
-v0.2.18 只处理上述实机反馈，不扩产品功能：
+源端候选真正进入处理时仍会重新读取和计算 SHA256，因此元数据变化不等于盲目上传。
 
-1. 顶部路线两端图标从原约 14 至 22 px 内缩范围改为约 28 至 38 px，自适应随窗口宽度变化，左右“图标 + 名称”整体进一步向中央收拢。
-2. 名称与状态箭头间距由 5 px 收紧到 4 px，使左右端点视觉组更紧凑。
-3. 总体进度去千位逗号不再依赖独立 180 ms 刷新碰运气。`UiFinalPolishV0217` 直接订阅 Dashboard 自己的 250 ms Timer，并且注册顺序位于 Dashboard `Tick()` 之后，因此每次 Dashboard 写完 `N0` 文本后，同一 UI 消息周期立即规范化，再进入绘制。
-4. 该规范化只处理总体计数和问题计数，不再对当前文件名做数字替换，避免文件名本身若包含类似 `1,234` 的合法字符被误改。
-5. 不修改迁移引擎、WebDAV 行为、quota 账本、StrongVerified、state/config/secrets 或任何持久化 Schema。
+### 2. WaitQuota 自动利用剩余下载额度接管既有副本
 
-## 当前自动验证
+上传安全预算不足时，DavBridge 会自动尝试 NO-WRITE 既有副本接管。
 
-v0.2.18 准确代码 head `a29d50af04f3b2d57673eff899d1c2024d0c5f27` 已通过：
+只处理：
 
-- Core Smoke；
-- 条件 PUT、WriteUnknown、412 reconciliation、最终 Manifest、HTTP 明文拒绝等事务 Smoke；
+- 完整 zip + prop Zotero 逻辑组；
+- 目标当前可见且两个成员都存在；
+- 尚未达到当前源版本 StrongVerified；
+- 不属于 SourceChanged、Conflict、WriteUnknown。
+
+流程：
+
+源端读取并计算 SHA256 → 目标端 GET 并计算 SHA256 → 完全一致 → StrongVerified。
+
+该维护路径禁止 PUT。目标副本不同则标记 Conflict，并停止自动接管该组，不覆盖目标。
+
+普通周期每次后台维护最多使用约 100 MB 目标下载预算；冲刺窗口最多约 500 MB。两者始终同时受 `QuotaPolicy.SafeDownloadRemainingBytes` 限制，因此保留既有下载安全预留。
+
+坚果云单次列表达到约 750 项时，只把当前可见结果当作候选集合，不据此判断其余目标文件不存在。
+
+### 3. 最终一致性门
+
+所有当前源对象都达到 StrongVerified 后，不立即宣布 Complete。
+
+必须：
+
+1. 再读取第 1 次源 Manifest；
+2. 确认全部仍与当前 StrongVerified 版本一致；
+3. 间隔约 2 秒读取第 2 次源 Manifest；
+4. 两次清单的 path、size、ETag、LastModified 都一致；
+5. 第二次清单也全部属于当前 StrongVerified 版本。
+
+任何新增或变化都会拒绝 Complete，并在下一安全 pass 继续处理。
+
+即使进入 Complete，现有后台循环仍会定期重新运行，因此之后新增或变化的 Zotero 附件仍会被重新发现。
+
+### 4. 用户可见但无需操作
+
+底部消息栏会直接显示关键维护动作，包括：
+
+- 检测到已迁移附件源版本发生变化，正在优先刷新；
+- 上传额度不足，正在检查坚果云已有副本；
+- 正在进行 NO-WRITE 只读接管；
+- 既有副本强校验通过，未发生上传；
+- 最终一致性确认第 1 次 / 第 2 次源清单；
+- 最终两次源清单一致。
+
+普通后台节奏继续沿用现有策略：正常运行约 5 分钟级复查，WaitQuota 根据重置周期调度且单次等待通常不超过约 6 小时，Complete 约每日复查一次。
+
+## v0.2.20 回归验证
+
+准确代码 head：`09a7291ce9400b0e324c177aa678e494e59765b3`
+
+P103 CI run：`31783815480`
+
+已通过：
+
+- 原 13 项 Core Smoke；
+- 条件 PUT；
+- WriteUnknown reconciliation；
+- 412 条件竞争安全协调；
+- HTTPS-only；
+- 原最终 Manifest 新对象检测；
+- WaitQuota NO-WRITE 自动接管，明确断言 `PUT=0`；
+- SourceChanged 组优先刷新；
+- 第 2 次最终 Manifest 出现新对象时阻止 Complete；
 - Windows framework-dependent single EXE publish；
 - Runtime boundary；
-- 真实 Windows UI 构造 self-test；
-- 三种窗口尺寸：700×520、880×570、1200×760；
-- 125% 与 150% DPI 缩放布局自检；
-- 设置页保存/取消尺寸与文字裁切检查；
-- SHA256 生成与 Artifact 上传。
-
-P103 CI run：`31765695661`
-
-Artifact 名称：`DavBridge-v0.2.18-win-x64`
-
-Artifact ZIP digest：`sha256:49cee8d9f8d8b72b3615870bc542c7e09feb69fa56086484e2662aad303faf34`
-
-EXE SHA256：`8bb456bee9bca837b10b7b1116676a0db924244e4a08ac5056ff0bf2079fbe9f`
-
-CI 在 self-test 失败时会直接打印 `self-test.json` 的具体场景与原因，避免仅显示 exit code 1。
+- Windows UI self-test 与既有窗口/DPI 检查；
+- SHA256 与 Artifact 上传。
 
 ## 当前待实机验证
 
-下一轮优先检查 v0.2.18，不增加新功能：
+下一轮先验证 v0.2.20，不扩新功能：
 
-1. 顶部 InfiniCLOUD 与坚果云图标是否比 v0.2.17 再向中间收得自然，图标、名称、箭头之间是否已经协调。
-2. 总体进度是否稳定保持 `1526 / 6929` 一类无逗号数字，不再闪回 `1,526 / 6,929`。
-3. 左侧与主区淡分界线继续保持低存在感。
-4. “暂停断点 ...”继续保持视觉上下居中。
-5. 当前周期继续保持一行：上传 bar、下载 bar、最右校准，GB 数值稳定显示在 bar 内。
-6. 主按钮图标与文字继续作为整体居中且不裁字。
-7. 底栏小喇叭和消息文字继续严格垂直居中。
-8. 双击第二个 DavBridge 时不启动第二迁移进程，而是唤醒现有窗口。
-9. 100%、125%、150% Windows 缩放下无明显重叠或裁切。
-10. 暂停、托盘退出、重新打开无异常。
-11. 原有 state、配额账本和 StrongVerified 记录必须保持原样。
+1. v0.2.19 已修的进度条文字垂直居中、浅蓝按钮背景在 v0.2.20 中保持正常。
+2. 当前处于 WaitQuota 且目标下载额度仍有富余时，底部消息栏应能看到 NO-WRITE 只读接管提示。
+3. NO-WRITE 接管期间下载流量账本允许上升，但上传流量账本不得因该维护动作增加。
+4. 已经 StrongVerified 的源附件若后续发生变化，应显示源版本变化与优先刷新提示。
+5. 不应因 750 项可见列表而把不可见对象判定为不存在。
+6. Conflict、WriteUnknown、SourceChanged 不应被 NO-WRITE 维护自动覆盖。
+7. 升级前后的 state、配额账本、StrongVerified 记录和密码配置必须保持原样。
+8. 暂停、托盘退出、重新打开仍无异常。
 
-用户实机确认后，下一步优先做历史 UI 源清理和 stable 固化，不再继续向主页堆功能。
+用户实机确认后，下一阶段优先清理已经退出运行链的历史 UI generations，再考虑提升 `p103-stable` / `main`。不得提前提升。
 
 ## 后续代码清理原则
 
-v0.2.18 实机确认之前，不删除 v025、v026、旧 UiPolish、UiLayoutPolishV0213、UiInteractionPolishV0211 等历史 UI 文件，以保留回退能力。
+v0.2.20 实机确认之前，不删除 v025、v026、旧 UiPolish、UiLayoutPolishV0213、UiInteractionPolishV0211 等历史 UI 文件，以保留回退能力。
 
 实机确认后，可以逐步删除或归档已经退出运行链的旧 UI generations，并把最终 UI 合并为少数正式类。代码清理不得改变迁移引擎、WebDAV 安全语义或本地 Data。
-
-## 后续低风险内核候选
-
-这些不阻塞 v0.2.18 实机验证：
-
-Capability Probe 接入连接诊断并缓存；
-
-WaitNetwork 与 WaitRetry 自适应退避和 jitter；
-
-Config、State、Compat 统一 AtomicFileStore；
-
-低流量 Metadata Probe，仅元数据异常时升级处理。
 
 ## 事实源
 
