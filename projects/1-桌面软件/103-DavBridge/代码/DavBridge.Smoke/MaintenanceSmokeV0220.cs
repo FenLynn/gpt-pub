@@ -5,9 +5,20 @@ using DavBridge.Core;
 internal static class MaintenanceSmokeV0220
 {
     [ModuleInitializer]
-    public static void Run()
+    public static void Initialize()
     {
-        RunAsync().GetAwaiter().GetResult();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try
+            {
+                RunAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("FAIL v0.2.20 maintenance behavior: " + ex);
+                Environment.ExitCode = 1;
+            }
+        };
     }
 
     private static async Task RunAsync()
