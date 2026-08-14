@@ -181,15 +181,33 @@ internal sealed class UiLiveProgress : IDisposable
     {
         if (_currentBar is null || _currentPhase is null)
             return;
-        if (!_host.Config.MigrationEnabled || _host.State.EngineState != EngineState.Running)
+
+        var maintenance = _host.State.EngineState == EngineState.WaitQuota
+            ? WaitQuotaMaintenanceActivity.Current
+            : null;
+        var maintenanceVisible = maintenance is not null &&
+                                 (maintenance.IsActive || DateTimeOffset.Now - maintenance.UpdatedAt < TimeSpan.FromHours(5));
+        if (!_host.Config.MigrationEnabled ||
+            (_host.State.EngineState != EngineState.Running && !maintenanceVisible))
             return;
 
-        var relative = _progress?.RelativePath;
+        var progress = maintenanceVisible ? maintenance!.Progress : _progress;
+        var relative = progress?.RelativePath;
+        var message = progress?.Message ?? string.Empty;
+
         if (string.IsNullOrWhiteSpace(relative))
+        {
+            if (maintenanceVisible)
+            {
+                _currentBar.Fraction = 0;
+                _currentBar.Pulse = maintenance!.IsActive;
+                _currentBar.BarText = maintenance.IsActive ? "后台只读维护" : "本轮维护完成";
+                _currentPhase.Text = HumanizeStage(message, null);
+            }
             return;
+        }
 
         var fileName = Path.GetFileName(relative);
-        var message = _progress?.Message ?? string.Empty;
         var io = _io;
         var ioMatches = io is not null && RelativeFileMatches(io.RelativePath, relative);
         var hasTotal = ioMatches && io!.TotalBytes.HasValue && io.TotalBytes.Value > 0;
@@ -208,7 +226,8 @@ internal sealed class UiLiveProgress : IDisposable
 
         // If an HTTP operation is taking noticeably longer after the last visible update,
         // keep the bar alive and say what is happening instead of appearing frozen.
-        if (DateTimeOffset.Now - _progressAt > TimeSpan.FromSeconds(8) &&
+        var progressAt = maintenanceVisible ? maintenance!.UpdatedAt : _progressAt;
+        if (DateTimeOffset.Now - progressAt > TimeSpan.FromSeconds(8) &&
             (!ioMatches || DateTimeOffset.Now - _ioAt > TimeSpan.FromSeconds(8)))
         {
             _currentBar.Pulse = true;
@@ -234,10 +253,21 @@ internal sealed class UiLiveProgress : IDisposable
     }
 
     private static bool IsSourceReadStage(string message) =>
-        message.Contains("Downloading source", StringComparison.OrdinalIgnoreCase);
+        message.Contains("Downloading source", StringComparison.OrdinalIgnoreCase) ||
+        message.Contains("读取 InfiniCLOUD", StringComparison.OrdinalIgnoreCase);
 
     private static string HumanizeStage(string message, WebDavIoOperation? operation)
     {
+        if (message.Contains("正在按目标路径探测", StringComparison.Ordinal))
+            return StripMaintenancePrefix(message);
+        if (message.Contains("读取 InfiniCLOUD", StringComparison.OrdinalIgnoreCase))
+            return "正在读取 InfiniCLOUD 源文件并计算 SHA-256";
+        if (message.Contains("读取坚果云已有副本", StringComparison.Ordinal))
+            return "正在读取坚果云已有副本并做 SHA-256 强校验";
+        if (message.Contains("SHA-256 完全一致", StringComparison.OrdinalIgnoreCase))
+            return "源端与坚果云完全一致，已安全接管，上传 0 B";
+        if (message.StartsWith("[维护]", StringComparison.Ordinal))
+            return StripMaintenancePrefix(message);
         if (message.Contains("Downloading source", StringComparison.OrdinalIgnoreCase))
             return "正在读取源文件并计算 SHA-256";
         if (message.Contains("Target already exists", StringComparison.OrdinalIgnoreCase))
@@ -255,6 +285,9 @@ internal sealed class UiLiveProgress : IDisposable
             _ => "正在处理当前文件"
         };
     }
+
+    private static string StripMaintenancePrefix(string message) =>
+        message.StartsWith("[维护] ", StringComparison.Ordinal) ? message[5..] : message;
 
     private void LoadManifestCache()
     {
