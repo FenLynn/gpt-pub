@@ -38,30 +38,44 @@ internal sealed class WaitQuotaMaintenanceHostV0221 : IDisposable
     private readonly AppHost _host;
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _loop;
-    private DateTimeOffset _nextAllowedAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _nextAllowedAt = DateTimeOffset.Now.AddSeconds(10);
+    private bool _maintenanceRunning;
     private bool _disposed;
 
     private WaitQuotaMaintenanceHostV0221(AppHost host)
     {
         _host = host;
+        _host.StateChanged += OnHostStateChanged;
         _loop = Task.Run(() => LoopAsync(_cts.Token));
     }
 
     public static WaitQuotaMaintenanceHostV0221 Attach(AppHost host) => new(host);
 
+    private void OnHostStateChanged(object? sender, EventArgs e)
+    {
+        if (_disposed) return;
+        if (_host.State.EngineState == EngineState.WaitQuota && !_host.IsRunning)
+        {
+            // The normal AppHost pass has finished and owns no active WebDAV run now.
+            // Schedule direct-path maintenance a few seconds later instead of running concurrently.
+            _nextAllowedAt = DateTimeOffset.Now.AddSeconds(8);
+        }
+        else if (_host.State.EngineState != EngineState.WaitQuota)
+        {
+            WaitQuotaMaintenanceActivity.Clear();
+        }
+    }
+
     private async Task LoopAsync(CancellationToken cancellationToken)
     {
         try
         {
-            // Give AppHost's normal startup pass first chance to settle into WaitQuota.
-            await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken).ConfigureAwait(false);
-
             while (!cancellationToken.IsCancellationRequested)
             {
                 if (CanRunNow())
                     await RunMaintenanceAsync(cancellationToken).ConfigureAwait(false);
 
-                await Task.Delay(TimeSpan.FromSeconds(20), cancellationToken).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -75,7 +89,7 @@ internal sealed class WaitQuotaMaintenanceHostV0221 : IDisposable
 
     private bool CanRunNow()
     {
-        if (_disposed || !_host.IsConfigured || !_host.Config.MigrationEnabled || !_host.Config.AutoResume)
+        if (_disposed || _maintenanceRunning || !_host.IsConfigured || !_host.Config.MigrationEnabled || !_host.Config.AutoResume)
             return false;
         if (_host.IsRunning || _host.State.EngineState != EngineState.WaitQuota)
             return false;
@@ -84,7 +98,10 @@ internal sealed class WaitQuotaMaintenanceHostV0221 : IDisposable
 
     private async Task RunMaintenanceAsync(CancellationToken cancellationToken)
     {
-        _nextAllowedAt = DateTimeOffset.Now.AddHours(5);
+        _maintenanceRunning = true;
+        // Do not schedule by an independent periodic clock. The next run is armed only after
+        // AppHost finishes its next normal WaitQuota pass, which avoids overlapping WebDAV work.
+        _nextAllowedAt = DateTimeOffset.MaxValue;
         try
         {
             var secrets = await _host.GetSecretsAsync(cancellationToken).ConfigureAwait(false);
@@ -145,12 +162,17 @@ internal sealed class WaitQuotaMaintenanceHostV0221 : IDisposable
                 QuotaPolicy.GetSnapshot(_host.Config, _host.State, DateTimeOffset.Now));
             WaitQuotaMaintenanceActivity.Publish(progress, active: false);
         }
+        finally
+        {
+            _maintenanceRunning = false;
+        }
     }
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        _host.StateChanged -= OnHostStateChanged;
         _cts.Cancel();
         try { _loop.Wait(TimeSpan.FromSeconds(1)); } catch { }
         _cts.Dispose();
