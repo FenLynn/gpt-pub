@@ -16,7 +16,7 @@ internal sealed class PrimaryActionSurfaceV0217 : Control
         Width = UiGeometryV0217.PrimaryButtonWidth;
         Height = UiGeometryV0217.PrimaryButtonHeight;
         BackColor = Color.White;
-        Font = source.Font;
+        Font = new Font("Microsoft YaHei UI", 9F);
         TabStop = false;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
         SyncFromSource();
@@ -55,24 +55,39 @@ internal sealed class PrimaryActionSurfaceV0217 : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
         var rect = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
-        var fill = !Enabled ? Color.FromArgb(249, 250, 251) : _pressed ? Color.FromArgb(237, 244, 249) : _hover ? Color.FromArgb(245, 249, 252) : Color.White;
+        var fill = !Enabled
+            ? Color.FromArgb(247, 249, 250)
+            : _pressed
+                ? Color.FromArgb(205, 229, 244)
+                : _hover
+                    ? Color.FromArgb(219, 238, 249)
+                    : Color.FromArgb(232, 244, 252);
         using var bg = new SolidBrush(fill);
-        using var border = new Pen(Color.FromArgb(199, 210, 219));
+        using var border = new Pen(Color.FromArgb(150, 190, 216));
         e.Graphics.FillRectangle(bg, rect);
         e.Graphics.DrawRectangle(border, rect);
 
-        var ink = Enabled ? Color.FromArgb(46, 67, 82) : Color.FromArgb(150, 157, 163);
-        var measured = TextRenderer.MeasureText(e.Graphics, _label, Font, new Size(int.MaxValue, Height), TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+        var ink = Enabled ? Color.FromArgb(36, 76, 101) : Color.FromArgb(145, 153, 159);
+        var measured = e.Graphics.MeasureString(_label, Font, int.MaxValue, StringFormat.GenericTypographic);
         const int iconWidth = 16;
         const int gap = 7;
-        var groupWidth = iconWidth + gap + measured.Width;
+        var groupWidth = iconWidth + gap + (int)Math.Ceiling(measured.Width);
         var startX = Math.Max(10, (Width - groupWidth) / 2);
         var iconCenter = new Point(startX + iconWidth / 2, Height / 2);
         DrawIcon(e.Graphics, iconCenter, ink);
-        var textRect = new Rectangle(startX + iconWidth + gap, 0, Math.Max(1, Width - startX - iconWidth - gap - 8), Height);
-        TextRenderer.DrawText(e.Graphics, _label, Font, textRect, ink,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+
+        var textRect = new RectangleF(startX + iconWidth + gap, 0, Math.Max(1, Width - startX - iconWidth - gap - 8), Height);
+        using var brush = new SolidBrush(ink);
+        using var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            Alignment = StringAlignment.Near,
+            LineAlignment = StringAlignment.Center,
+            FormatFlags = StringFormatFlags.NoWrap,
+            Trimming = StringTrimming.EllipsisCharacter
+        };
+        e.Graphics.DrawString(_label, Font, brush, textRect, format);
     }
 
     private void DrawIcon(Graphics g, Point c, Color ink)
