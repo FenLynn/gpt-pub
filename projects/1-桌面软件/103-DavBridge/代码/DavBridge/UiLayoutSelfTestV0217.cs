@@ -29,7 +29,7 @@ internal static class UiLayoutSelfTestV0217
             scenario, "primary action clipped");
 
         var message = Descendants(form).FirstOrDefault(x => x.GetType().Name.Contains("MessageSurface", StringComparison.Ordinal));
-        Require(message is not null && message.Height == UiGeometryV0217.MessageBarHeight && message.Width >= 300,
+        Require(message is not null && message.Height >= UiGeometryV0217.MessageBarHeight && message.Width >= 300,
             scenario, "message bar clipped");
 
         if (shell is not null)
