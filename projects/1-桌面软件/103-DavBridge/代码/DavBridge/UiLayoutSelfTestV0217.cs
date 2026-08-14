@@ -21,12 +21,23 @@ internal static class UiLayoutSelfTestV0217
         Require(flow is not null && flow.Width >= 300 && flow.Height >= 80, scenario, "route flow clipped");
         Require(overall is not null && overall.Width >= 180 && overall.Height >= 20, scenario, "overall bar clipped");
         Require(current is not null && current.Width >= 180 && current.Height >= 24, scenario, "current bar clipped");
-        Require(upload is not null && upload.Width >= 90 && upload.Height >= 20, scenario, "upload bar clipped");
-        Require(download is not null && download.Width >= 90 && download.Height >= 20, scenario, "download bar clipped");
+        Require(upload is not null && upload.Width >= 90 && upload.Height >= 16, scenario, "upload bar clipped");
+        Require(download is not null && download.Width >= 90 && download.Height >= 16, scenario, "download bar clipped");
 
         var primary = Descendants(form).OfType<PrimaryActionSurfaceV0217>().FirstOrDefault();
         Require(primary is not null && primary.Width >= UiGeometryV0217.PrimaryButtonWidth && primary.Height >= UiGeometryV0217.PrimaryButtonHeight,
             scenario, "primary action clipped");
+
+        var tabs = Descendants(form).OfType<ActivityTabStripV0224>().FirstOrDefault();
+        Require(tabs is not null && tabs.Width >= 120 && tabs.Height >= 28, scenario, "activity tabs clipped");
+
+        var verificationStage = Descendants(form).OfType<VerificationStageTrackV0224>().FirstOrDefault();
+        Require(verificationStage is not null && verificationStage.Width >= 180 && verificationStage.Height >= 30,
+            scenario, "verification stage clipped");
+
+        var verificationBar = Descendants(form).OfType<VerificationProgressBarV0224>().FirstOrDefault();
+        Require(verificationBar is not null && verificationBar.Width >= 180 && verificationBar.Height >= 24,
+            scenario, "verification bar clipped");
 
         var message = Descendants(form).FirstOrDefault(x => x.GetType().Name.Contains("MessageSurface", StringComparison.Ordinal));
         Require(message is not null && message.Height >= UiGeometryV0217.MessageBarHeight && message.Width >= 300,

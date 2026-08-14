@@ -2,13 +2,11 @@ namespace DavBridge;
 
 internal sealed class UiButtonPolishV0219 : IDisposable
 {
-    private readonly UiDashboardV027 _dashboard;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 250 };
     private bool _disposed;
 
     private UiButtonPolishV0219(UiDashboardV027 dashboard)
     {
-        _dashboard = dashboard;
         Apply();
         _timer.Tick += (_, _) => Apply();
         _timer.Start();
@@ -37,15 +35,31 @@ internal sealed class UiButtonPolishV0219 : IDisposable
 
     private static void Polish(Button button)
     {
+        var text = button.Text.Trim();
+        var primary = text is "保存" or "确定" or "执行";
+
         button.UseVisualStyleBackColor = false;
         button.FlatStyle = FlatStyle.Flat;
-        button.BackColor = Color.FromArgb(238, 247, 253);
-        button.ForeColor = Color.FromArgb(42, 75, 99);
-        button.FlatAppearance.BorderColor = Color.FromArgb(165, 196, 216);
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(225, 240, 250);
-        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(210, 231, 245);
         button.Padding = Padding.Empty;
         button.TextAlign = ContentAlignment.MiddleCenter;
+        button.Font = new Font("Microsoft YaHei UI", 8.8F);
+
+        if (primary)
+        {
+            button.BackColor = Color.FromArgb(234, 243, 247);
+            button.ForeColor = Color.FromArgb(53, 91, 112);
+            button.FlatAppearance.BorderColor = Color.FromArgb(177, 199, 211);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(224, 237, 243);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(214, 230, 238);
+        }
+        else
+        {
+            button.BackColor = Color.FromArgb(247, 249, 250);
+            button.ForeColor = Color.FromArgb(77, 90, 99);
+            button.FlatAppearance.BorderColor = Color.FromArgb(207, 216, 222);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(239, 244, 247);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(231, 238, 242);
+        }
     }
 
     private static IEnumerable<Control> Descendants(Control root)

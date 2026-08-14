@@ -34,16 +34,15 @@ internal static class Program
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
                 using var dashboard = UiDashboardV027.Attach(form, host);
-                using var visualPolish = UiVisualPolishV029.Attach(dashboard);
                 using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
                 using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
                 using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
                 using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
                 using var waitQuotaMaintenance = WaitQuotaMaintenanceHostV0222.Attach(host);
                 using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
-                using var activityTabs = UiActivityTabsV0223.Attach(form, dashboard, host, waitQuotaMaintenance);
-                using var meterPolish = UiMeterPolishV0219.Attach(dashboard);
+                using var activityTabs = UiActivityTabsV0224.Attach(form, dashboard, host, waitQuotaMaintenance);
                 using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
+                using var refinement = UiRefinementV0224.Attach(form, dashboard);
                 Application.Run(form);
             }
             finally
@@ -148,16 +147,15 @@ internal static class Program
         using var form = new MainForm(host, launchInBackground: false);
         AppBranding.Apply(form);
         using var dashboard = UiDashboardV027.Attach(form, host);
-        using var visualPolish = UiVisualPolishV029.Attach(dashboard);
         using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
         using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
         using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
         using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
         using var waitQuotaMaintenance = WaitQuotaMaintenanceHostV0222.Attach(host);
         using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
-        using var activityTabs = UiActivityTabsV0223.Attach(form, dashboard, host, waitQuotaMaintenance);
-        using var meterPolish = UiMeterPolishV0219.Attach(dashboard);
+        using var activityTabs = UiActivityTabsV0224.Attach(form, dashboard, host, waitQuotaMaintenance);
         using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
+        using var refinement = UiRefinementV0224.Attach(form, dashboard);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
