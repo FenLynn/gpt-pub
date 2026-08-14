@@ -6,8 +6,11 @@ internal sealed partial class UiMessageBarV0216
     {
         if (_disposed || _form.IsDisposed) return;
         var countdown = ResetCountdown();
-        var state = _lastProgress?.State ?? _host.State.EngineState;
-        var text = BuildMessage(countdown, state);
+        var maintenance = _host.State.EngineState == EngineState.WaitQuota
+            ? WaitQuotaMaintenanceActivity.Current
+            : null;
+        var state = maintenance?.Progress.State ?? _lastProgress?.State ?? _host.State.EngineState;
+        var text = maintenance?.Progress.Message ?? BuildMessage(countdown, state);
         var level = LevelFor(state);
         var priority = PriorityFor(state);
         var now = DateTimeOffset.Now;
@@ -85,7 +88,8 @@ internal sealed partial class UiMessageBarV0216
     private static bool IsMaintenanceProgress(string message)
     {
         if (string.IsNullOrWhiteSpace(message)) return false;
-        return message.Contains("NO-WRITE", StringComparison.OrdinalIgnoreCase) ||
+        return message.StartsWith("[维护]", StringComparison.Ordinal) ||
+               message.Contains("NO-WRITE", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("源版本发生变化", StringComparison.Ordinal) ||
                message.Contains("优先刷新", StringComparison.Ordinal) ||
                message.Contains("最终一致性确认", StringComparison.Ordinal) ||
@@ -96,9 +100,7 @@ internal sealed partial class UiMessageBarV0216
     private string BuildQuotaMessage(string countdown)
     {
         var message = _lastProgress?.Message ?? string.Empty;
-        if (message.Contains("已利用剩余下载额度", StringComparison.Ordinal) ||
-            message.Contains("只读接管", StringComparison.Ordinal) ||
-            message.Contains("NO-WRITE", StringComparison.OrdinalIgnoreCase))
+        if (IsMaintenanceProgress(message))
             return message;
 
         if (TryParseBudget(message, out var need, out var remaining))
