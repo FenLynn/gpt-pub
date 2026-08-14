@@ -8,7 +8,7 @@ internal sealed partial class UiInteractionCleanV0215 : IDisposable
     private readonly UiDashboardV027 _dashboard;
     private readonly AppHost _host;
     private readonly UiStartupBehaviorV0214 _startup;
-    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 180 };
+    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 50 };
     private bool _disposed;
 
     private UiInteractionCleanV0215(MainForm form, UiDashboardV027 dashboard, AppHost host)
@@ -35,11 +35,11 @@ internal sealed partial class UiInteractionCleanV0215 : IDisposable
     {
         if (Field<TransportActionButtonV027>("_primary") is { } primary && primary.Parent is TableLayoutPanel bottom)
         {
-            primary.Width = 112;
+            primary.Width = 128;
             primary.Height = 40;
             primary.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
-            bottom.Margin = new Padding(0, 26, 0, 6);
-            bottom.MinimumSize = new Size(0, 54);
+            bottom.Margin = new Padding(0,22,0,6);
+            bottom.MinimumSize = new Size(0,54);
         }
     }
 

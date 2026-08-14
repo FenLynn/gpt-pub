@@ -34,6 +34,8 @@ internal static class Program
                 using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
                 using var currentPulse = UiCurrentPulsePolishV0214.Attach(dashboard);
                 using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
+                using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
+                using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
                 Application.Run(form);
             }
             finally
@@ -76,9 +78,7 @@ internal static class Program
             Directory.CreateDirectory(paths.RoamingRoot);
             Directory.CreateDirectory(paths.LocalRoot);
             Directory.CreateDirectory(paths.TempRoot);
-
             ConstructUiForStartupTest();
-
             WriteReport(reportPath, new
             {
                 product = "DavBridge",
@@ -127,6 +127,8 @@ internal static class Program
         using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
         using var currentPulse = UiCurrentPulsePolishV0214.Attach(dashboard);
         using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
+        using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
+        using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
         _ = form.Handle;
         form.PerformLayout();
     }
