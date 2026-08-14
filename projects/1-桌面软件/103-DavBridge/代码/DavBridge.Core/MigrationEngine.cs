@@ -88,7 +88,17 @@ public sealed class MigrationEngine
         }
 
         var groups = MigrationPlanner.CreateGroups(entries);
-        foreach (var group in groups)
+        var changedGroups = await MarkSourceDriftAsync(groups, cancellationToken).ConfigureAwait(false);
+        if (changedGroups > 0)
+            OnProgress(EngineState.Running, null, null,
+                $"检测到 {changedGroups} 个已迁移附件组的源版本发生变化，将优先刷新目标副本。");
+
+        var orderedGroups = groups
+            .OrderByDescending(GroupHasSourceDrift)
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        foreach (var group in orderedGroups)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -116,8 +126,16 @@ public sealed class MigrationEngine
             var quota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
             if (!QuotaPolicy.CanStartUpload(requiredBytes, quota))
             {
+                var adoption = await TryAdoptExistingReplicaGroupsAsync(groups, cancellationToken).ConfigureAwait(false);
+                var driftWaiting = CountSourceDriftGroups(groups);
+                var extra = adoption.AdoptedGroups > 0
+                    ? $" 已利用剩余下载额度只读接管 {adoption.AdoptedGroups} 组、{adoption.AdoptedMembers} 个文件，未发生 PUT。"
+                    : adoption.Message;
+                if (driftWaiting > 0)
+                    extra += $" 另有 {driftWaiting} 个源端变更组等待下个可用上传周期优先刷新。";
+
                 await SetEngineStateAsync(EngineState.WaitQuota, group.Key, null,
-                    $"Safe upload budget exhausted. Group still needs {requiredBytes} bytes; remaining={quota.SafeRemainingBytes} bytes.",
+                    $"Safe upload budget exhausted. Group still needs {requiredBytes} bytes; remaining={quota.SafeRemainingBytes} bytes.{extra}",
                     cancellationToken).ConfigureAwait(false);
                 return;
             }
@@ -185,12 +203,13 @@ public sealed class MigrationEngine
             return;
         }
 
-        // A long migration can run while Zotero adds new attachments. Before declaring completion,
-        // take one more low-traffic source manifest snapshot. If anything is new or changed, do not
-        // emit a false Complete; the background loop will immediately continue it on the next pass.
+        // Finalization gate: two consecutive low-traffic source manifests must both still match the
+        // strongly verified state. This prevents a long-running migration from declaring completion
+        // while Zotero is still adding or changing attachments.
         IReadOnlyList<WebDavEntry> finalEntries;
         try
         {
+            OnProgress(EngineState.Running, null, null, "正在进行最终一致性确认：读取第 1 次源清单。");
             finalEntries = await _source.ListDirectoryAsync(_config.SourceRootPath, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
@@ -208,9 +227,246 @@ public sealed class MigrationEngine
             return;
         }
 
+        IReadOnlyList<WebDavEntry> stableEntries;
+        try
+        {
+            OnProgress(EngineState.Running, null, null, "第 1 次源清单稳定，正在进行第 2 次最终一致性确认。");
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+            stableEntries = await _source.ListDirectoryAsync(_config.SourceRootPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            await SetEngineStateAsync(EngineState.WaitNetwork, null, null,
+                "Second final source manifest refresh failed: " + ex.Message, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var stableGroups = MigrationPlanner.CreateGroups(stableEntries);
+        if (!stableGroups.All(IsGroupCurrentAndVerified) || !ManifestEquivalent(finalEntries, stableEntries))
+        {
+            await SetEngineStateAsync(EngineState.WaitRetry, null, null,
+                "最终一致性确认发现源端仍在变化。DavBridge 不会宣告完成，将在下一安全轮次继续处理。",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         _state.CurrentGroupKey = null;
         await SetEngineStateAsync(EngineState.Complete, null, null,
-            "Current source manifest is strongly verified at target.", cancellationToken).ConfigureAwait(false);
+            "最终两次源清单一致，当前源版本已在目标端完成强 SHA-256 校验。",
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<int> MarkSourceDriftAsync(IReadOnlyList<AttachmentGroup> groups, CancellationToken cancellationToken)
+    {
+        var changedGroups = 0;
+        var changedAny = false;
+        foreach (var group in groups)
+        {
+            var groupChanged = false;
+            foreach (var member in group.Members)
+            {
+                if (!_state.Files.TryGetValue(member.RelativePath, out var record) ||
+                    record.Status != TransferStatus.StrongVerified ||
+                    IsRecordCurrentAndVerified(record, member))
+                    continue;
+
+                record.Status = TransferStatus.SourceChanged;
+                record.LastError = "源端附件在上次强校验后发生变化，将优先刷新坚果云副本。";
+                groupChanged = true;
+                changedAny = true;
+            }
+            if (groupChanged) changedGroups++;
+        }
+
+        if (changedAny)
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+        return changedGroups;
+    }
+
+    private bool GroupHasSourceDrift(AttachmentGroup group) =>
+        group.Members.Any(member =>
+            _state.Files.TryGetValue(member.RelativePath, out var record) && record.Status == TransferStatus.SourceChanged);
+
+    private int CountSourceDriftGroups(IEnumerable<AttachmentGroup> groups) => groups.Count(GroupHasSourceDrift);
+
+    private async Task<ExistingReplicaAdoptionSummary> TryAdoptExistingReplicaGroupsAsync(
+        IReadOnlyList<AttachmentGroup> groups,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
+        if (snapshot.SafeDownloadRemainingBytes <= 0)
+            return new ExistingReplicaAdoptionSummary(0, 0, 0, " 下载安全额度也已不足，等待下一周期。");
+
+        IReadOnlyList<WebDavEntry> targetEntries;
+        try
+        {
+            OnProgress(EngineState.WaitQuota, null, null,
+                "上传额度不足，正在检查坚果云当前可见的既有副本，尝试用剩余下载额度进行 NO-WRITE 接管。");
+            targetEntries = await _target.ListDirectoryAsync(_config.TargetRootPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or WebDavException)
+        {
+            return new ExistingReplicaAdoptionSummary(0, 0, 0,
+                $" 既有副本只读接管暂未执行：{ex.Message}");
+        }
+
+        var visibleTargets = targetEntries
+            .Where(entry => !entry.IsCollection)
+            .ToDictionary(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase);
+
+        var perPassLimit = snapshot.IsSprint ? 500_000_000L : 100_000_000L;
+        var passRemaining = Math.Min(snapshot.SafeDownloadRemainingBytes, perPassLimit);
+        var adoptedGroups = 0;
+        var adoptedMembers = 0;
+        long downloadedBytes = 0;
+
+        var candidates = groups
+            .Where(IsCompleteZoteroGroup)
+            .Where(group => !IsGroupCurrentAndVerified(group))
+            .Where(group => !GroupHasSourceDrift(group))
+            .Where(group => !GroupHasUnsafeMaintenanceState(group))
+            .Where(group => group.Members.All(member => visibleTargets.ContainsKey(member.RelativePath)))
+            .OrderBy(group => group.TotalBytes)
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        foreach (var group in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var outstanding = group.Members
+                .Where(member => !_state.Files.TryGetValue(member.RelativePath, out var record) ||
+                                 !IsRecordCurrentAndVerified(record, member))
+                .OrderBy(MemberOrder)
+                .ToArray();
+            if (outstanding.Length == 0) continue;
+
+            var expectedDownload = outstanding.Sum(member =>
+                Math.Max(0, visibleTargets[member.RelativePath].ContentLength ?? member.ContentLength ?? 0L));
+            var currentQuota = QuotaPolicy.GetSnapshot(_config, _state, DateTimeOffset.Now);
+            if (expectedDownload <= 0 || expectedDownload > passRemaining || !QuotaPolicy.CanStartDownload(expectedDownload, currentQuota))
+                continue;
+
+            var groupOk = true;
+            foreach (var member in outstanding)
+            {
+                var targetEntry = visibleTargets[member.RelativePath];
+                var result = await TryAdoptExistingMemberAsync(group.Key, member, targetEntry, cancellationToken).ConfigureAwait(false);
+                downloadedBytes += result.DownloadedBytes;
+                passRemaining = Math.Max(0, passRemaining - result.DownloadedBytes);
+                if (result.Success) adoptedMembers++;
+                else
+                {
+                    groupOk = false;
+                    break;
+                }
+            }
+
+            if (groupOk && IsGroupCurrentAndVerified(group)) adoptedGroups++;
+            if (passRemaining <= 0) break;
+        }
+
+        if (adoptedGroups == 0)
+        {
+            var visibleNote = visibleTargets.Count >= 750
+                ? " 当前坚果云单次可见列表已达到 750 项，不据此判断其余文件不存在。"
+                : string.Empty;
+            return new ExistingReplicaAdoptionSummary(0, 0, downloadedBytes,
+                " 当前可见目标中没有可安全自动接管的完整未验证副本。" + visibleNote);
+        }
+
+        return new ExistingReplicaAdoptionSummary(adoptedGroups, adoptedMembers, downloadedBytes, string.Empty);
+    }
+
+    private async Task<AdoptionMemberResult> TryAdoptExistingMemberAsync(
+        string groupKey,
+        WebDavEntry sourceManifest,
+        WebDavEntry targetManifest,
+        CancellationToken cancellationToken)
+    {
+        var record = GetOrCreateRecord(sourceManifest, groupKey);
+        var sourcePath = JoinPath(_config.SourceRootPath, sourceManifest.RelativePath);
+        var targetPath = JoinPath(_config.TargetRootPath, sourceManifest.RelativePath);
+        var before = await _source.GetMetadataAsync(sourcePath, cancellationToken).ConfigureAwait(false);
+        if (before is null)
+        {
+            record.Status = TransferStatus.SourceChanged;
+            record.LastError = "后台只读接管时源文件已经消失，未修改坚果云。";
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+            return new AdoptionMemberResult(false, 0);
+        }
+
+        var targetMetadata = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
+        if (targetMetadata is null)
+        {
+            record.LastError = "后台只读接管发现目标文件已缺失，已跳过且不会 PUT。";
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+            return new AdoptionMemberResult(false, 0);
+        }
+
+        var expectedTargetBytes = Math.Max(0, targetMetadata.ContentLength ?? targetManifest.ContentLength ?? before.ContentLength ?? 0L);
+        EnsureDownloadBudget(expectedTargetBytes, $"NO-WRITE adoption of {sourceManifest.RelativePath}");
+
+        record.AttemptCount++;
+        record.SourceSize = before.ContentLength ?? sourceManifest.ContentLength ?? 0L;
+        record.SourceETag = before.ETag;
+        record.SourceLastModified = before.LastModified;
+        record.LastError = null;
+        await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+        OnProgress(EngineState.WaitQuota, groupKey, sourceManifest.RelativePath,
+            "上传额度不足，正在只读读取源文件并核验坚果云已有副本；本步骤禁止 PUT。");
+
+        var sourceDownload = await _source.DownloadAndHashAsync(sourcePath, cancellationToken).ConfigureAwait(false);
+        var after = await _source.GetMetadataAsync(sourcePath, cancellationToken).ConfigureAwait(false);
+        if (after is null || MetadataChanged(before, after))
+        {
+            record.Status = TransferStatus.SourceChanged;
+            record.LastError = "源文件在后台只读核验期间发生变化，结果未接管。";
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+            return new AdoptionMemberResult(false, 0);
+        }
+
+        var targetDownload = await _target.DownloadAndHashAsync(targetPath, cancellationToken).ConfigureAwait(false);
+        _state.VerifiedDownloadBytesSinceCalibration += targetDownload.Bytes;
+        await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+
+        record.SourceSize = sourceDownload.Bytes;
+        record.SourceSha256 = sourceDownload.Sha256;
+        record.SourceETag = before.ETag;
+        record.SourceLastModified = before.LastModified;
+
+        if (targetDownload.Bytes != sourceDownload.Bytes ||
+            !string.Equals(targetDownload.Sha256, sourceDownload.Sha256, StringComparison.OrdinalIgnoreCase))
+        {
+            record.Status = TransferStatus.Conflict;
+            record.LastError = "坚果云既有副本与当前源文件不同。后台 NO-WRITE 模式不会覆盖，已停止自动接管此组。";
+            await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+            OnProgress(EngineState.WaitQuota, groupKey, sourceManifest.RelativePath,
+                "既有副本与当前源文件不同，已安全跳过并保持 NO-WRITE。需要后续处理冲突。");
+            return new AdoptionMemberResult(false, targetDownload.Bytes);
+        }
+
+        record.TargetSha256 = targetDownload.Sha256;
+        record.TargetETag = targetMetadata.ETag;
+        record.Status = TransferStatus.StrongVerified;
+        record.VerifiedAt = DateTimeOffset.UtcNow;
+        record.LastError = null;
+        await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+        OnProgress(EngineState.WaitQuota, groupKey, sourceManifest.RelativePath,
+            "既有副本已通过 NO-WRITE SHA-256 强校验并安全接管，未发生上传。");
+        return new AdoptionMemberResult(true, targetDownload.Bytes);
+    }
+
+    private bool GroupHasUnsafeMaintenanceState(AttachmentGroup group) =>
+        group.Members.Any(member =>
+            _state.Files.TryGetValue(member.RelativePath, out var record) &&
+            record.Status is TransferStatus.Conflict or TransferStatus.WriteUnknown or TransferStatus.SourceChanged);
+
+    private static bool IsCompleteZoteroGroup(AttachmentGroup group)
+    {
+        if (group.Members.Count != 2) return false;
+        var zip = group.Members.Any(member => Path.GetExtension(member.RelativePath).Equals(".zip", StringComparison.OrdinalIgnoreCase));
+        var prop = group.Members.Any(member => Path.GetExtension(member.RelativePath).Equals(".prop", StringComparison.OrdinalIgnoreCase));
+        return zip && prop;
     }
 
     private async Task<long> GetRequiredUploadBytesAsync(IEnumerable<WebDavEntry> members, CancellationToken cancellationToken)
@@ -218,6 +474,21 @@ public sealed class MigrationEngine
         long total = 0;
         foreach (var member in members)
         {
+            if (_state.Files.TryGetValue(member.RelativePath, out var record) && record.Status == TransferStatus.SourceChanged)
+            {
+                var changedLength = member.ContentLength;
+                if (!changedLength.HasValue)
+                {
+                    var changedMetadata = await _source.GetMetadataAsync(JoinPath(_config.SourceRootPath, member.RelativePath), cancellationToken).ConfigureAwait(false)
+                                          ?? throw new WebDavException($"Changed source object disappeared during quota preflight: {member.RelativePath}");
+                    changedLength = changedMetadata.ContentLength;
+                }
+                if (!changedLength.HasValue || changedLength.Value < 0)
+                    throw new WebDavException($"Changed source length is unavailable; refusing to budget an unknown-size object: {member.RelativePath}");
+                checked { total += changedLength.Value; }
+                continue;
+            }
+
             var targetPath = JoinPath(_config.TargetRootPath, member.RelativePath);
             var existingTarget = await _target.GetMetadataAsync(targetPath, cancellationToken).ConfigureAwait(false);
             if (existingTarget is not null) continue;
@@ -520,6 +791,23 @@ public sealed class MigrationEngine
         return false;
     }
 
+    private static bool ManifestEquivalent(IEnumerable<WebDavEntry> left, IEnumerable<WebDavEntry> right)
+    {
+        var leftFiles = left.Where(entry => !entry.IsCollection)
+            .OrderBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var rightFiles = right.Where(entry => !entry.IsCollection)
+            .OrderBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (leftFiles.Length != rightFiles.Length) return false;
+        for (var i = 0; i < leftFiles.Length; i++)
+        {
+            if (!string.Equals(leftFiles[i].RelativePath, rightFiles[i].RelativePath, StringComparison.OrdinalIgnoreCase)) return false;
+            if (MetadataChanged(leftFiles[i], rightFiles[i])) return false;
+        }
+        return true;
+    }
+
     private static bool IsTransient(HttpStatusCode? status) => status is
         HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests or
         HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway or
@@ -557,4 +845,7 @@ public sealed class MigrationEngine
 
     private static string JoinPath(string root, string relative) =>
         string.Join('/', new[] { root, relative }.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim('/')));
+
+    private sealed record ExistingReplicaAdoptionSummary(int AdoptedGroups, int AdoptedMembers, long DownloadedBytes, string Message);
+    private sealed record AdoptionMemberResult(bool Success, long DownloadedBytes);
 }
