@@ -148,10 +148,21 @@ jobs:
             $env:APPDATA=$roaming
             $env:LOCALAPPDATA=$local
             $proc=Start-Process -FilePath (Resolve-Path 'build/DavBridge/DavBridge.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
-            if ($proc.ExitCode -ne 0) { throw "DavBridge self-test exit code $($proc.ExitCode)" }
+            if ($proc.ExitCode -ne 0) {
+              if (Test-Path $report) {
+                Write-Host 'DavBridge self-test failure report:'
+                Get-Content $report -Raw | Write-Host
+              }
+              throw "DavBridge self-test exit code $($proc.ExitCode)"
+            }
             if (!(Test-Path $report)) { throw 'DavBridge self-test report missing' }
-            $json=Get-Content $report -Raw | ConvertFrom-Json
-            if (-not $json.ok -or $json.product -ne 'DavBridge') { throw 'DavBridge self-test report failed' }
+            $raw=Get-Content $report -Raw
+            $json=$raw | ConvertFrom-Json
+            if (-not $json.ok -or $json.product -ne 'DavBridge') {
+              Write-Host 'DavBridge self-test failure report:'
+              Write-Host $raw
+              throw 'DavBridge self-test report failed'
+            }
             if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version $($json.version) does not match project version $env:EXPECTED_VERSION" }
             if (!(Test-Path (Join-Path $roaming 'DavBridge'))) { throw 'Roaming Data root was not created under isolated APPDATA' }
             if (!(Test-Path (Join-Path $local 'DavBridge'))) { throw 'Local Data root was not created under isolated LOCALAPPDATA' }
