@@ -36,11 +36,12 @@ internal static class Program
                 using var dashboard = UiDashboardV027.Attach(form, host);
                 using var visualPolish = UiVisualPolishV029.Attach(dashboard);
                 using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
-                using var currentPulse = UiCurrentPulsePolishV0214.Attach(dashboard);
                 using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
                 using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
                 using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
                 using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
+                using var meterPolish = UiMeterPolishV0219.Attach(dashboard);
+                using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
                 Application.Run(form);
             }
             finally
@@ -147,11 +148,12 @@ internal static class Program
         using var dashboard = UiDashboardV027.Attach(form, host);
         using var visualPolish = UiVisualPolishV029.Attach(dashboard);
         using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
-        using var currentPulse = UiCurrentPulsePolishV0214.Attach(dashboard);
         using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
         using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
         using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
         using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
+        using var meterPolish = UiMeterPolishV0219.Attach(dashboard);
+        using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
