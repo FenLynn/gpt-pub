@@ -31,13 +31,32 @@ internal static class UiLayoutSelfTestV0217
         var tabs = Descendants(form).OfType<ActivityTabStripV0224>().FirstOrDefault();
         Require(tabs is not null && tabs.Width >= 120 && tabs.Height >= 28, scenario, "activity tabs clipped");
 
-        var verificationStage = Descendants(form).OfType<VerificationStageTrackV0224>().FirstOrDefault();
-        Require(verificationStage is not null && verificationStage.Width >= 180 && verificationStage.Height >= 30,
-            scenario, "verification stage clipped");
+        if (tabs is not null)
+        {
+            tabs.SelectedIndex = 1;
+            form.PerformLayout();
 
-        var verificationBar = Descendants(form).OfType<VerificationProgressBarV0224>().FirstOrDefault();
-        Require(verificationBar is not null && verificationBar.Width >= 180 && verificationBar.Height >= 24,
-            scenario, "verification bar clipped");
+            var verificationStage = Descendants(form).OfType<VerificationStageTrackV0224>().FirstOrDefault();
+            Require(verificationStage is not null && verificationStage.Visible &&
+                    verificationStage.Width >= 180 && verificationStage.Height >= 30,
+                scenario, "verification stage clipped");
+
+            var verificationBar = Descendants(form).OfType<VerificationProgressBarV0224>().FirstOrDefault();
+            Require(verificationBar is not null && verificationBar.Visible &&
+                    verificationBar.Width >= 180 && verificationBar.Height >= 24,
+                scenario, "verification bar clipped");
+
+            var verificationPrimary = Descendants(form)
+                .OfType<PrimaryActionSurfaceV0217>()
+                .FirstOrDefault(x => x.Visible);
+            Require(verificationPrimary is not null &&
+                    verificationPrimary.Width >= UiGeometryV0217.PrimaryButtonWidth &&
+                    verificationPrimary.Height >= UiGeometryV0217.PrimaryButtonHeight,
+                scenario, "verification primary action clipped");
+
+            tabs.SelectedIndex = 0;
+            form.PerformLayout();
+        }
 
         var message = Descendants(form).FirstOrDefault(x => x.GetType().Name.Contains("MessageSurface", StringComparison.Ordinal));
         Require(message is not null && message.Height >= UiGeometryV0217.MessageBarHeight && message.Width >= 300,
