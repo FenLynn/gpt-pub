@@ -18,15 +18,17 @@
 
 正式稳定回滚基线：**v0.1.7**
 
-当前实验候选：**v0.2.16**
+当前实验候选：**v0.2.17**
 
-v0.2.16 已完成完整 CI 的准确代码 head：`bddcb6c86e6c55ca96b83e806fbceee740668acf`
+v0.2.17 已完成完整 CI 的准确代码 head：`58273ff3600d1f0ecced1c1297fc00edc22fe6e0`
 
-P103 CI run：`31759063745`
+P103 CI run：`31762783781`
 
-当前阶段：现有 Zotero 固定任务的 UI 收口与长期无人值守稳健性验证。
+Artifact：`DavBridge-v0.2.17-win-x64`
 
-`main` 与 `p103-stable` 继续保持 v0.1.7。v0.2.16 未经用户实机确认，不得提升到 stable/main。
+当前阶段：现有 Zotero 固定任务的 UI 最终收口、长期无人值守稳健性与实机验证。
+
+`main` 与 `p103-stable` 继续保持 v0.1.7。v0.2.17 未经用户实机确认，不得提升到 stable/main。
 
 ## 固定读取顺序
 
@@ -67,7 +69,7 @@ DavBridge 定位为可靠、低速、可恢复、强校验的单向迁移、备�
 
 `%APPDATA%/DavBridge/secrets.dat`
 
-v0.2.16 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码继续使用 Windows DPAPI CurrentUser。
+v0.2.17 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码继续使用 Windows DPAPI CurrentUser。
 
 `TransferStatus.WriteUnknown` 追加在既有枚举末尾，不改变既有状态编号。
 
@@ -88,61 +90,70 @@ v0.2.16 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码
 9. HTTPS only，禁止自动跨 authority 重定向。
 10. 高流量 Integrity Scrub 不进入当前路线。
 
-## v0.2.16 UI 事实
+## v0.2.17 UI 与运行事实
 
-v0.2.16 是当前 UI 收口候选，核心变化如下。
+v0.2.17 是当前 UI 收口候选，在 v0.2.16 基础上完成：
 
-1. 顶部路线由 `UiRouteOverallV0215` 独占绘制，旧多层箭头覆盖链已退出运行路径。
-2. 中央状态通道改为分段式右向箭头，两端均具有右向尖角语义。
-3. InfiniCLOUD 与坚果云图标放大到约 50 px，名称放在图标与箭头之间并向箭头内收。
-4. 总体进度使用灰紫渐变，当前文件继续使用蓝色渐变，正常状态使用绿色，额度风险继续使用绿黄红语义。
-5. 当前文件移动高光使用两端渐隐，不允许重新出现硬竖线拖尾。
-6. `UiInteractionCleanV0215` 不再修改文件阶段，防止把拉取 100% 强制改回拉取。Dashboard 仍是文件阶段真值。
-7. 主页面校准入口保留在当前周期区域，主按钮宽度扩大，避免“等待新周期”被截断。
-8. 新增底部消息栏 `UiMessageBarV0216`，使用小喇叭图标集中显示重要运行消息。
-9. WaitQuota 会在消息栏解释安全上传预算不足，能够从 EngineProgress 中提取当前组仍需字节与剩余预算并转为 MB 显示。
-10. 新增 `UiResetCountdownV0216`，周期区域显示重置日期、剩余天数和当日 09:00 后自动探测提示。
-11. 设置页保存与取消按钮上移并统一垂直居中。
-12. 设置页旧“校准流量”入口在运行时隐藏，说明改为人工校准位于主页当前周期。
-13. 普通手工启动显示主页面；Windows 开机启动仍使用 `--background` 进入后台。
+1. 顶部路线继续由 `UiRouteOverallV0215` 独占绘制，两端 50 px 图标进一步向中间收，文字更靠近中央状态箭头。
+2. 左侧任务栏与主内容区增加 1 px 低对比度分界线。
+3. 总体进度数字去除千位逗号，例如 `1526 / 6929`。
+4. 当前文件条数字同样去除千位逗号，并使用更适合中文的字体处理垂直视觉居中。
+5. 当前周期重排为单行：`上传 [bar 内数值]  下载 [bar 内数值]  校准`，上传和下载条加宽，值统一压缩为 GB，例如 `0.95 G / 1 G`。
+6. 重置日期和剩余天数继续放在周期条下方，不与主行抢空间。
+7. 主操作按钮改由 `PrimaryActionSurfaceV0217` 独占绘制，播放、暂停、等待状态的图标与文字作为一个整体严格水平和垂直居中。
+8. 底部消息栏小喇叭与文字使用统一垂直中心，消息增加优先级，错误、额度等待、网络等待不会立即被低优先级普通状态覆盖。
+9. 新增统一 UI 几何 token `UiGeometryV0217`，集中约束 section 宽度、bar 高度、主按钮和消息栏尺寸。
+10. 新增单实例 `SingleInstanceGateV0217`。第二次手工启动不再创建第二个迁移进程，而是唤醒已有主窗口。
+11. 普通双击仍显示主页面；Windows 开机启动继续通过 `--background` 后台运行。
+12. 设置页所有按钮继续强制垂直居中，保存/取消保持上移后的 footer 布局。
 
 ## 当前自动验证
 
-v0.2.16 准确代码 head `bddcb6c86e6c55ca96b83e806fbceee740668acf` 已通过：
+v0.2.17 准确代码 head `58273ff3600d1f0ecced1c1297fc00edc22fe6e0` 已通过：
 
-Core Smoke；
+- Core Smoke；
+- 条件 PUT、WriteUnknown、412 reconciliation、最终 Manifest、HTTP 明文拒绝等事务 Smoke；
+- Windows framework-dependent single EXE publish；
+- Runtime boundary；
+- 真实 Windows UI 构造 self-test；
+- 三种窗口尺寸：700×520、880×570、1200×760；
+- 125% 与 150% DPI 缩放布局自检；
+- 设置页保存/取消尺寸与文字裁切检查；
+- SHA256 生成与 Artifact 上传。
 
-条件 PUT、WriteUnknown、412 reconciliation、最终 Manifest、HTTP 明文拒绝等事务 Smoke；
+P103 CI run：`31762783781`
 
-Windows framework dependent single EXE publish；
+Artifact 名称：`DavBridge-v0.2.17-win-x64`
 
-Runtime boundary；
-
-真实 Windows UI 构造 self test；
-
-SHA256 生成与 Artifact 上传。
-
-Artifact 名称：`DavBridge-v0.2.16-win-x64`
+CI 现在在 self-test 失败时会直接打印 `self-test.json` 的具体场景与原因，避免仅显示 exit code 1。
 
 ## 当前待实机验证
 
-下一轮不要先加功能，先检查 v0.2.16 实机表现：
+下一轮不要先加功能，优先检查 v0.2.17 实机表现：
 
-1. 顶部双尖状态箭头是否协调，左右图标大小与文字间距是否合适。
-2. 底部消息栏是否真正占独立一行，不遮挡左下设置和右下主按钮。
-3. WaitQuota 时是否显示中文安全预算说明与距新周期剩余天数。
-4. 当前周期下方是否稳定显示剩余天数，不闪回旧重置文案。
-5. “等待新周期”主按钮是否完整显示。
-6. 设置页旧校准入口是否消失，保存与取消是否上移且文字垂直居中。
-7. 拉取达到 100% 后是否继续进入核验或等待响应，不再被旧交互层改回拉取。
-8. 暂停、托盘退出、重新打开是否无异常。
-9. 原有 state、配额账本和 StrongVerified 记录是否保持原样。
+1. 顶部两端图标是否向中间收得自然，名称与箭头距离是否协调。
+2. 左侧与主区淡分界线是否足够轻，不抢视觉。
+3. 总进度是否显示 `1526 / 6929` 一类无逗号数字。
+4. “暂停断点 ...”是否在当前文件条内视觉上下居中。
+5. 当前周期是否成为一行：上传 bar、下载 bar、最右校准；GB 数值是否稳定显示在 bar 内。
+6. 主按钮的图标与“继续 / 暂停 / 等待新周期”是否作为整体居中且不裁字。
+7. 底栏小喇叭和消息文字是否严格垂直居中，重要消息是否不会被普通状态迅速覆盖。
+8. 双击第二个 DavBridge 时是否不启动第二迁移进程，而是唤醒现有窗口。
+9. 100%、125%、150% Windows 缩放下是否均无明显重叠或裁切。
+10. 暂停、托盘退出、重新打开是否无异常。
+11. 原有 state、配额账本和 StrongVerified 记录必须保持原样。
 
-用户实机确认上述项目后，再决定继续微调 UI 或进入 exp 到 stable 的固化流程。
+用户实机确认后，下一步优先做历史 UI 源清理和 stable 固化，不再继续向主页堆功能。
+
+## 后续代码清理原则
+
+v0.2.17 实机确认之前，不删除 v025、v026、旧 UiPolish、UiLayoutPolishV0213、UiInteractionPolishV0211 等历史 UI 文件，以保留回退能力。
+
+实机确认后，可以逐步删除或归档已经退出运行链的旧 UI generations，并把最终 UI 合并为少数正式类。代码清理不得改变迁移引擎、WebDAV 安全语义或本地 Data。
 
 ## 后续低风险内核候选
 
-这些不阻塞 v0.2.16 实机验证：
+这些不阻塞 v0.2.17 实机验证：
 
 Capability Probe 接入连接诊断并缓存；
 
