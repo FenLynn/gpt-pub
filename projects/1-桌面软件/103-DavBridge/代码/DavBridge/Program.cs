@@ -21,6 +21,9 @@ internal static class Program
             return;
         }
 
+        using var singleInstance = SingleInstanceGateV0217.Acquire();
+        if (!singleInstance.IsPrimary) return;
+
         try
         {
             ApplicationConfiguration.Initialize();
@@ -29,6 +32,7 @@ internal static class Program
             try
             {
                 AppBranding.Apply(form);
+                singleInstance.Attach(form);
                 using var dashboard = UiDashboardV027.Attach(form, host);
                 using var visualPolish = UiVisualPolishV029.Attach(dashboard);
                 using var routeOverall = UiRouteOverallV0215.Attach(dashboard);
@@ -36,6 +40,7 @@ internal static class Program
                 using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
                 using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
                 using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
+                using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
                 Application.Run(form);
             }
             finally
@@ -87,6 +92,7 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
+                layoutScenarios = 5,
                 ok = true
             });
         }
@@ -107,6 +113,7 @@ internal static class Program
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
+                layoutScenarios = 5,
                 ok = true
             });
         }
@@ -119,6 +126,21 @@ internal static class Program
     private static void ConstructUiForStartupTest()
     {
         ApplicationConfiguration.Initialize();
+        var scenarios = new (string Name, int Width, int Height, float Scale)[]
+        {
+            ("compact-100", 700, 520, 1.00f),
+            ("default-100", 880, 570, 1.00f),
+            ("large-100", 1200, 760, 1.00f),
+            ("default-125", 880, 570, 1.25f),
+            ("default-150", 880, 570, 1.50f)
+        };
+
+        foreach (var scenario in scenarios)
+            ConstructUiScenario(scenario.Name, scenario.Width, scenario.Height, scenario.Scale);
+    }
+
+    private static void ConstructUiScenario(string name, int width, int height, float scale)
+    {
         using var host = new AppHost();
         using var form = new MainForm(host, launchInBackground: false);
         AppBranding.Apply(form);
@@ -129,8 +151,22 @@ internal static class Program
         using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
         using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
         using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
+        using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
+
         _ = form.Handle;
+        if (Math.Abs(scale - 1f) > 0.001f)
+            form.Scale(new SizeF(scale, scale));
+        form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
         form.PerformLayout();
+        UiLayoutSelfTestV0217.Validate(form, dashboard, name);
+
+        using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
+        _ = settings.Handle;
+        if (Math.Abs(scale - 1f) > 0.001f)
+            settings.Scale(new SizeF(scale, scale));
+        settings.ClientSize = new Size((int)Math.Round(800 * scale), (int)Math.Round(580 * scale));
+        settings.PerformLayout();
+        UiLayoutSelfTestV0217.ValidateSettings(settings, name);
     }
 
     private static void WriteReport(string reportPath, object report) =>

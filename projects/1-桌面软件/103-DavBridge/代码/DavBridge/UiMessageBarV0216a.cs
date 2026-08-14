@@ -9,8 +9,11 @@ internal sealed partial class UiMessageBarV0216 : IDisposable
     private readonly UiDashboardV027 _dashboard;
     private readonly AppHost _host;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 500 };
-    private readonly MessageSurface _surface = new() { Dock = DockStyle.Bottom, Height = 32 };
+    private readonly MessageSurface _surface = new() { Dock = DockStyle.Bottom, Height = UiGeometryV0217.MessageBarHeight };
     private EngineProgress? _lastProgress;
+    private EngineState? _messageState;
+    private int _activePriority = int.MinValue;
+    private DateTimeOffset _priorityUntil = DateTimeOffset.MinValue;
     private bool _disposed;
 
     private UiMessageBarV0216(MainForm form, UiDashboardV027 dashboard, AppHost host)
@@ -19,7 +22,7 @@ internal sealed partial class UiMessageBarV0216 : IDisposable
         _dashboard = dashboard;
         _host = host;
         if (Field<TableLayoutPanel>("_shell") is { } shell)
-            shell.Padding = new Padding(shell.Padding.Left, shell.Padding.Top, shell.Padding.Right, 32);
+            shell.Padding = new Padding(shell.Padding.Left, shell.Padding.Top, shell.Padding.Right, UiGeometryV0217.MessageBarHeight);
         if (Field<Panel>("_dashboard") is { } root)
         {
             root.Controls.Add(_surface);

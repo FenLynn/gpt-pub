@@ -6,16 +6,23 @@ internal sealed partial class UiMessageBarV0216
     {
         if (_disposed || _form.IsDisposed) return;
         var countdown = ResetCountdown();
-        _surface.Message = BuildMessage(countdown);
-        _surface.Level = _host.State.EngineState switch
+        var state = _host.State.EngineState;
+        var text = BuildMessage(countdown);
+        var level = LevelFor(state);
+        var priority = PriorityFor(state);
+        var now = DateTimeOffset.Now;
+
+        var stateChanged = _messageState != state;
+        var sameMessage = string.Equals(_surface.Message, text, StringComparison.Ordinal);
+        if (stateChanged || sameMessage || now >= _priorityUntil || priority >= _activePriority)
         {
-            EngineState.WaitQuota => MessageLevel.Warning,
-            EngineState.WaitNetwork => MessageLevel.Warning,
-            EngineState.WaitRetry => MessageLevel.Error,
-            EngineState.Complete => MessageLevel.Success,
-            _ => MessageLevel.Normal
-        };
-        _surface.Invalidate();
+            _surface.Message = text;
+            _surface.Level = level;
+            _messageState = state;
+            _activePriority = priority;
+            _priorityUntil = now + HoldFor(state);
+            _surface.Invalidate();
+        }
 
         if (Field<Label>("_resetValue") is { } reset && _host.Config.NextResetAt != default)
         {
@@ -29,6 +36,33 @@ internal sealed partial class UiMessageBarV0216
             reset.Text = $"{_host.Config.NextResetAt:yyyy-MM-dd} 重置 · {shortCountdown} · 09:00 后探测";
         }
     }
+
+    private static MessageLevel LevelFor(EngineState state) => state switch
+    {
+        EngineState.WaitQuota or EngineState.WaitNetwork => MessageLevel.Warning,
+        EngineState.WaitRetry => MessageLevel.Error,
+        EngineState.Complete => MessageLevel.Success,
+        _ => MessageLevel.Normal
+    };
+
+    private static int PriorityFor(EngineState state) => state switch
+    {
+        EngineState.WaitRetry => 500,
+        EngineState.WaitQuota => 400,
+        EngineState.WaitNetwork => 350,
+        EngineState.Paused => 250,
+        EngineState.Complete => 220,
+        EngineState.Running => 150,
+        _ => 100
+    };
+
+    private static TimeSpan HoldFor(EngineState state) => state switch
+    {
+        EngineState.WaitRetry => TimeSpan.FromSeconds(8),
+        EngineState.WaitQuota or EngineState.WaitNetwork => TimeSpan.FromSeconds(6),
+        EngineState.Paused or EngineState.Complete => TimeSpan.FromSeconds(4),
+        _ => TimeSpan.FromSeconds(2)
+    };
 
     private string BuildMessage(string countdown)
     {
