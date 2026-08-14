@@ -6,8 +6,8 @@ internal sealed partial class UiMessageBarV0216
     {
         if (_disposed || _form.IsDisposed) return;
         var countdown = ResetCountdown();
-        var state = _host.State.EngineState;
-        var text = BuildMessage(countdown);
+        var state = _lastProgress?.State ?? _host.State.EngineState;
+        var text = BuildMessage(countdown, state);
         var level = LevelFor(state);
         var priority = PriorityFor(state);
         var now = DateTimeOffset.Now;
@@ -64,9 +64,13 @@ internal sealed partial class UiMessageBarV0216
         _ => TimeSpan.FromSeconds(2)
     };
 
-    private string BuildMessage(string countdown)
+    private string BuildMessage(string countdown, EngineState state)
     {
-        return _host.State.EngineState switch
+        var progress = _lastProgress?.Message ?? string.Empty;
+        if (IsMaintenanceProgress(progress))
+            return progress;
+
+        return state switch
         {
             EngineState.WaitQuota => BuildQuotaMessage(countdown),
             EngineState.WaitNetwork => "网络暂不可用，DavBridge 将保持断点并在网络恢复后自动继续。",
@@ -78,9 +82,25 @@ internal sealed partial class UiMessageBarV0216
         };
     }
 
+    private static bool IsMaintenanceProgress(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        return message.Contains("NO-WRITE", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("源版本发生变化", StringComparison.Ordinal) ||
+               message.Contains("优先刷新", StringComparison.Ordinal) ||
+               message.Contains("最终一致性确认", StringComparison.Ordinal) ||
+               message.Contains("最终两次源清单一致", StringComparison.Ordinal) ||
+               message.Contains("只读接管", StringComparison.Ordinal);
+    }
+
     private string BuildQuotaMessage(string countdown)
     {
         var message = _lastProgress?.Message ?? string.Empty;
+        if (message.Contains("已利用剩余下载额度", StringComparison.Ordinal) ||
+            message.Contains("只读接管", StringComparison.Ordinal) ||
+            message.Contains("NO-WRITE", StringComparison.OrdinalIgnoreCase))
+            return message;
+
         if (TryParseBudget(message, out var need, out var remaining))
             return $"本周期安全上传预算不足：当前组还需 {FormatMb(need)}，可用 {FormatMb(remaining)}，已等待新周期。{countdown}。";
         return $"本周期安全上传预算不足，当前组已安全保留到下一周期继续。{countdown}。";
