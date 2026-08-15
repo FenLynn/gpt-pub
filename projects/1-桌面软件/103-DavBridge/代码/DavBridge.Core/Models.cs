@@ -27,7 +27,9 @@ public enum EngineState
     WaitNetwork,
     WaitQuota,
     WaitRetry,
-    Complete
+    Complete,
+    // Appended to preserve every existing numeric value in legacy state.json.
+    WaitUser
 }
 
 public sealed class DavBridgeConfig
