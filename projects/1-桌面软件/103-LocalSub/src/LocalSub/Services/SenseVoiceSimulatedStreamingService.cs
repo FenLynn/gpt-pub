@@ -9,15 +9,25 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
     const int SampleRate = 16000;
     const int VadWindowSize = 512;
     const int IdleKeepWindows = 10;
-    const int InterimIntervalMs = 450;
+    const int InterimIntervalMs = 650;
+    const float EnergyStartRms = 0.008f;
+    const float EnergyKeepRms = 0.0035f;
+    const int EnergyStartWindows = 4;
+    const int EnergySilenceMs = 550;
+    const int MaxUtteranceMs = 6500;
 
     OfflineRecognizer? _recognizer;
     VoiceActivityDetector? _vad;
     readonly List<float> _buffer = [];
     int _vadOffset;
     bool _speechStarted;
+    DateTime _speechStartedAt;
+    DateTime _lastVoiceAt;
     DateTime _nextInterimAt;
     string _lastPartial = "";
+    int _energyHotWindows;
+    int _emptyDecodeCount;
+    bool _startedByEnergyFallback;
 
     public event Action<string>? PartialResult;
     public event Action<string>? FinalResult;
@@ -48,7 +58,6 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
         var senseVoice = modelConfig.SenseVoice;
         senseVoice.Model = modelPath;
         senseVoice.Language = "auto";
-        // Match sherpa-onnx's current simulated-streaming SenseVoice example.
         senseVoice.UseInverseTextNormalization = 0;
         modelConfig.SenseVoice = senseVoice;
         recognizerConfig.ModelConfig = modelConfig;
@@ -84,22 +93,36 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
 
         _buffer.AddRange(samples);
 
-        // sherpa-onnx's simulated-streaming example feeds Silero VAD in fixed 512-sample windows.
         while (_vadOffset + VadWindowSize <= _buffer.Count)
         {
             var window = _buffer.GetRange(_vadOffset, VadWindowSize).ToArray();
             vad.AcceptWaveform(window);
             _vadOffset += VadWindowSize;
 
-            if (!_speechStarted && vad.IsSpeechDetected())
+            var now = DateTime.UtcNow;
+            var vadDetected = vad.IsSpeechDetected();
+            var rms = ComputeRms(window);
+
+            if (!_speechStarted)
             {
-                _speechStarted = true;
-                _nextInterimAt = DateTime.UtcNow.AddMilliseconds(InterimIntervalMs);
-                StatusChanged?.Invoke("SenseVoice 检测到语音，正在识别");
+                if (vadDetected)
+                {
+                    BeginSpeech(now, false);
+                }
+                else
+                {
+                    if (rms >= EnergyStartRms) _energyHotWindows++;
+                    else _energyHotWindows = Math.Max(0, _energyHotWindows - 1);
+
+                    if (_energyHotWindows >= EnergyStartWindows)
+                        BeginSpeech(now, true);
+                }
             }
+
+            if (_speechStarted && (vadDetected || rms >= EnergyKeepRms))
+                _lastVoiceAt = now;
         }
 
-        // Keep only a short pre-roll while waiting for speech, like the official example.
         if (!_speechStarted && _buffer.Count > IdleKeepWindows * VadWindowSize)
         {
             var trim = _buffer.Count - IdleKeepWindows * VadWindowSize;
@@ -107,19 +130,40 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
             _vadOffset = Math.Max(0, _vadOffset - trim);
         }
 
-        // Provide visible simulated-streaming feedback while the utterance is still in progress.
-        if (_speechStarted && DateTime.UtcNow >= _nextInterimAt && _buffer.Count >= 3200)
+        DrainCompletedSegments();
+        if (!_speechStarted) return;
+
+        var utcNow = DateTime.UtcNow;
+        if (utcNow >= _nextInterimAt && _buffer.Count >= 8000)
         {
             var text = Decode(_buffer.ToArray());
-            if (!string.IsNullOrWhiteSpace(text) && !string.Equals(text, _lastPartial, StringComparison.Ordinal))
-            {
-                _lastPartial = text;
-                PartialResult?.Invoke(text);
-            }
-            _nextInterimAt = DateTime.UtcNow.AddMilliseconds(InterimIntervalMs);
+            PublishDecodeResult(text, false);
+            _nextInterimAt = utcNow.AddMilliseconds(InterimIntervalMs);
         }
 
-        DrainCompletedSegments();
+        var energyTimedOut = _lastVoiceAt != DateTime.MinValue &&
+            (utcNow - _lastVoiceAt).TotalMilliseconds >= EnergySilenceMs;
+        var reachedMaxDuration = _speechStartedAt != DateTime.MinValue &&
+            (utcNow - _speechStartedAt).TotalMilliseconds >= MaxUtteranceMs;
+
+        // System loopback often contains music/effects that make Silero less stable than a microphone.
+        // When VAD does not emit a completed segment, an RMS-based boundary prevents live subtitles
+        // from getting stuck forever while still leaving Silero as the preferred segmenter.
+        if (energyTimedOut || reachedMaxDuration)
+            FinalizeFallbackUtterance(energyTimedOut ? "停顿" : "最长分段");
+    }
+
+    void BeginSpeech(DateTime now, bool byEnergyFallback)
+    {
+        _speechStarted = true;
+        _speechStartedAt = now;
+        _lastVoiceAt = now;
+        _nextInterimAt = now.AddMilliseconds(InterimIntervalMs);
+        _startedByEnergyFallback = byEnergyFallback;
+        _emptyDecodeCount = 0;
+        StatusChanged?.Invoke(byEnergyFallback
+            ? "SenseVoice 音量检测到语音，正在识别（VAD fallback）"
+            : "SenseVoice VAD 检测到语音，正在识别");
     }
 
     void DrainCompletedSegments()
@@ -132,14 +176,52 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
             var segment = vad.Front();
             vad.Pop();
 
+            string text = string.Empty;
             if (segment.Samples.Length >= 1600)
-            {
-                var text = Decode(segment.Samples);
-                if (!string.IsNullOrWhiteSpace(text)) FinalResult?.Invoke(text);
-            }
+                text = Decode(segment.Samples);
 
+            // If the VAD segment is unexpectedly empty, retry the accumulated utterance once.
+            if (string.IsNullOrWhiteSpace(text) && _buffer.Count >= 3200)
+                text = Decode(_buffer.ToArray());
+
+            PublishDecodeResult(text, true);
             ResetStreamingState();
             StatusChanged?.Invoke("SenseVoice 已完成一句，等待语音");
+        }
+    }
+
+    void FinalizeFallbackUtterance(string reason)
+    {
+        if (!_speechStarted) return;
+        var text = _buffer.Count >= 3200 ? Decode(_buffer.ToArray()) : string.Empty;
+        PublishDecodeResult(text, true);
+        var wasFallback = _startedByEnergyFallback;
+        ResetStreamingState();
+        StatusChanged?.Invoke(wasFallback
+            ? $"SenseVoice fallback 已按{reason}分段，等待下一句"
+            : $"SenseVoice 已按{reason}分段，等待下一句");
+    }
+
+    void PublishDecodeResult(string text, bool final)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _emptyDecodeCount++;
+            if (_emptyDecodeCount == 1 || _emptyDecodeCount % 3 == 0)
+                StatusChanged?.Invoke($"SenseVoice 已执行解码但返回空文本（第 {_emptyDecodeCount} 次），继续监听");
+            return;
+        }
+
+        _emptyDecodeCount = 0;
+        if (final)
+        {
+            FinalResult?.Invoke(text);
+            _lastPartial = "";
+        }
+        else if (!string.Equals(text, _lastPartial, StringComparison.Ordinal))
+        {
+            _lastPartial = text;
+            PartialResult?.Invoke(text);
         }
     }
 
@@ -154,6 +236,14 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
         return CleanupSenseVoiceText(stream.Result.Text);
     }
 
+    static float ComputeRms(float[] samples)
+    {
+        if (samples.Length == 0) return 0;
+        double sum = 0;
+        foreach (var x in samples) sum += x * x;
+        return (float)Math.Sqrt(sum / samples.Length);
+    }
+
     static string CleanupSenseVoiceText(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return string.Empty;
@@ -166,8 +256,13 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
         _buffer.Clear();
         _vadOffset = 0;
         _speechStarted = false;
+        _speechStartedAt = DateTime.MinValue;
+        _lastVoiceAt = DateTime.MinValue;
         _lastPartial = "";
         _nextInterimAt = DateTime.MinValue;
+        _energyHotWindows = 0;
+        _emptyDecodeCount = 0;
+        _startedByEnergyFallback = false;
     }
 
     public void Stop()
