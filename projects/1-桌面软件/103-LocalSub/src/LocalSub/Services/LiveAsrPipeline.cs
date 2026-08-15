@@ -7,11 +7,13 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
 {
     readonly AllAudioCaptureService _allAudio = new();
     readonly ProcessLoopbackCaptureService _processAudio = new();
-    readonly StreamingParaformerService _recognizer = new();
+    readonly StreamingParaformerService _streaming = new();
+    readonly SenseVoiceSimulatedStreamingService _senseVoice = new();
     Channel<float[]>? _queue;
     CancellationTokenSource? _cts;
     Task? _worker;
     bool _running;
+    bool _useSenseVoice;
 
     public event Action<float>? LevelChanged;
     public event Action<string>? PartialResult;
@@ -24,8 +26,9 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _allAudio.SamplesAvailable += OnSamples;
         _processAudio.LevelChanged += v => LevelChanged?.Invoke(v);
         _processAudio.SamplesAvailable += OnSamples;
-        _recognizer.PartialResult += text => PartialResult?.Invoke(text);
-        _recognizer.FinalResult += text => FinalResult?.Invoke(text);
+        _streaming.PartialResult += text => PartialResult?.Invoke(text);
+        _streaming.FinalResult += text => FinalResult?.Invoke(text);
+        _senseVoice.FinalResult += text => FinalResult?.Invoke(text);
     }
 
     public Task StartAllAudioAsync(AppSettings settings, ModelDescriptor model, ModelManager models, IProgress<ModelOperationProgress>? runtimeProgress = null, CancellationToken ct = default)
@@ -38,21 +41,43 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     {
         await StopAsync();
 
-        // Do this before downloading/loading sherpa so an unsupported Windows build fails immediately
-        // with a useful message instead of a COM E_NOINTERFACE error.
         if (processId.HasValue) ProcessLoopbackCaptureService.EnsureSupported();
 
         if (!models.IsInstalled(model))
-            throw new InvalidOperationException($"实时模型“{model.Name}”尚未安装，请先在“模型”页面下载。 ");
-        if (!model.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase))
-            throw new NotSupportedException("实时字幕当前请使用 Streaming Paraformer。SenseVoice 保留用于后台与后续模拟流式。 ");
+            throw new InvalidOperationException($"实时模型“{model.Name}”尚未安装，请先在“模型”页面下载。");
+
+        var isStreaming = model.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase);
+        var isSenseVoice = string.Equals(model.Id, "sensevoice-small-int8", StringComparison.OrdinalIgnoreCase);
+        if (!isStreaming && !isSenseVoice)
+            throw new NotSupportedException("当前实时字幕支持 Streaming Paraformer 与 SenseVoice Small INT8（模拟流式）。");
 
         StatusChanged?.Invoke("检查 ASR 运行库");
         var runtime = new AsrRuntimeManager(settings);
         await runtime.EnsureAsync(runtimeProgress, ct);
 
-        StatusChanged?.Invoke("加载实时模型");
-        _recognizer.Start(model, models.GetModelFolder(model), runtime.RuntimeRoot);
+        if (isSenseVoice)
+        {
+            var vadDescriptor = new ModelCatalogService().Load()
+                .FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException("模型 catalog 中缺少 Silero VAD。");
+
+            if (!models.IsInstalled(vadDescriptor))
+            {
+                StatusChanged?.Invoke("SenseVoice 需要 Silero VAD，正在自动下载约 2 MB 组件");
+                await models.DownloadAsync(vadDescriptor, runtimeProgress, ct);
+            }
+
+            var vadPath = Path.Combine(models.GetModelFolder(vadDescriptor), "silero_vad.onnx");
+            StatusChanged?.Invoke("加载 SenseVoice 与 Silero VAD");
+            _senseVoice.Start(model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot);
+            _useSenseVoice = true;
+        }
+        else
+        {
+            StatusChanged?.Invoke("加载 Streaming Paraformer");
+            _streaming.Start(model, models.GetModelFolder(model), runtime.RuntimeRoot);
+            _useSenseVoice = false;
+        }
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _queue = Channel.CreateBounded<float[]>(new BoundedChannelOptions(64)
@@ -75,8 +100,11 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                 StatusChanged?.Invoke("启动所有 Windows 输出音频捕获");
                 _allAudio.Start();
             }
+
             _running = true;
-            StatusChanged?.Invoke("实时识别中");
+            StatusChanged?.Invoke(_useSenseVoice
+                ? "SenseVoice 模拟流式识别中，检测到停顿后出句"
+                : "Streaming Paraformer 实时识别中");
         }
         catch
         {
@@ -101,7 +129,8 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                 while (reader.TryRead(out var samples))
                 {
                     ct.ThrowIfCancellationRequested();
-                    _recognizer.AcceptSamples(samples);
+                    if (_useSenseVoice) _senseVoice.AcceptSamples(samples);
+                    else _streaming.AcceptSamples(samples);
                 }
             }
         }
@@ -130,7 +159,9 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _queue = null;
         _cts?.Dispose();
         _cts = null;
-        _recognizer.Stop();
+        _streaming.Stop();
+        _senseVoice.Stop();
+        _useSenseVoice = false;
         LevelChanged?.Invoke(0);
     }
 
@@ -139,6 +170,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         await StopAsync();
         _allAudio.Dispose();
         _processAudio.Dispose();
-        _recognizer.Dispose();
+        _streaming.Dispose();
+        _senseVoice.Dispose();
     }
 }
