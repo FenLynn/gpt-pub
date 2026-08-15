@@ -133,7 +133,7 @@ public sealed class MainForm : Form
             MaximumSize = new Size(760, 0),
             ForeColor = Color.DimGray,
             Margin = new Padding(3, 18, 3, 3),
-            Text = "实时字幕使用 Streaming Paraformer。首次启动会把约 8 MB 的 sherpa native runtime 下载到 ASR\\_runtime，后续版本不会重复携带。"
+            Text = "Streaming Paraformer 为真流式；SenseVoice Small INT8 为 VAD 停顿后出句的模拟流式。字幕最多保留两行，3 秒无新结果自动清空。首次启动会把 sherpa native runtime 下载到 ASR\\_runtime。"
         });
         liveStart.Click += LiveStart_Click;
         t.Controls.Add(p);
@@ -156,7 +156,7 @@ public sealed class MainForm : Form
             _models = new ModelManager(_settings);
 
             if (liveModelBox.SelectedItem is not ModelDescriptor model)
-                throw new InvalidOperationException("没有可用的实时模型。请先在“模型”页面下载 Streaming Paraformer。 ");
+                throw new InvalidOperationException("没有可用的实时模型。请先在“模型”页面安装 Streaming Paraformer 或 SenseVoice Small INT8。");
             if (!_models.IsInstalled(model))
             {
                 liveStatus.Text = $"实时模型“{model.Name}”未安装。请到“模型”页面下载后再开始。";
@@ -182,7 +182,7 @@ public sealed class MainForm : Form
             if (sourceBox.SelectedIndex == 0)
             {
                 var potPlayer = PotPlayerWatcher.FindRunning();
-                if (potPlayer == null) throw new InvalidOperationException("未检测到正在运行的 PotPlayer。 ");
+                if (potPlayer == null) throw new InvalidOperationException("未检测到正在运行的 PotPlayer。");
                 await _liveAsr.StartPotPlayerAsync(_settings, model, _models, (uint)potPlayer.Id, runtimeProgress);
             }
             else
@@ -540,7 +540,9 @@ public sealed class MainForm : Form
 
     void FillLiveModels()
     {
-        var list = _catalog.Where(x => x.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase)).ToList();
+        var list = _catalog
+            .Where(x => x.LiveCapable && !string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
+            .ToList();
         liveModelBox.DataSource = list;
         liveModelBox.DisplayMember = "Name";
         liveModelBox.ValueMember = "Id";
