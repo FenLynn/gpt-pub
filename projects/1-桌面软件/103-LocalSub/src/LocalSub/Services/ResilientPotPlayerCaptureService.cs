@@ -51,11 +51,10 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
         {
             while (!ct.IsCancellationRequested)
             {
-                var running = ResolvePotPlayerProcess();
-                if (running != null && (uint)running.Id != _processId)
+                if (TryResolvePotPlayer(out var resolvedPid, out var resolvedTitle) && resolvedPid != _processId)
                 {
-                    _processId = (uint)running.Id;
-                    _lastTitle = SafeTitle(running);
+                    _processId = resolvedPid;
+                    _lastTitle = resolvedTitle;
                     StatusChanged?.Invoke($"检测到 PotPlayer 进程变化，自动重新绑定 PID {_processId}");
                 }
 
@@ -103,7 +102,7 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
                         capture.LevelChanged -= ForwardLevel;
                         capture.SamplesAvailable -= ForwardSamples;
                         try { await capture.StopAsync().ConfigureAwait(false); } catch { }
-                        capture.Dispose();
+                        try { capture.Dispose(); } catch { }
                     }
                     lock (_gate)
                     {
@@ -139,22 +138,31 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
         {
             await Task.Delay(300, ct).ConfigureAwait(false);
 
-            Process? current = null;
-            try { current = Process.GetProcessById((int)_processId); } catch { }
-            if (current == null || current.HasExited)
+            bool currentAlive;
+            string title;
+            try
             {
-                var replacement = ResolvePotPlayerProcess();
-                if (replacement != null)
+                using var current = Process.GetProcessById((int)_processId);
+                currentAlive = !current.HasExited;
+                title = currentAlive ? SafeTitle(current) : "";
+            }
+            catch
+            {
+                currentAlive = false;
+                title = "";
+            }
+
+            if (!currentAlive)
+            {
+                if (TryResolvePotPlayer(out var replacementPid, out var replacementTitle))
                 {
-                    _processId = (uint)replacement.Id;
-                    _lastTitle = SafeTitle(replacement);
+                    _processId = replacementPid;
+                    _lastTitle = replacementTitle;
                     return $"PotPlayer 进程已切换，自动绑定 PID {_processId}";
                 }
                 return "PotPlayer 进程暂时不可用，等待自动恢复";
             }
 
-            current.Refresh();
-            var title = SafeTitle(current);
             if (!string.IsNullOrWhiteSpace(title) &&
                 !string.IsNullOrWhiteSpace(_lastTitle) &&
                 !string.Equals(title, _lastTitle, StringComparison.Ordinal))
@@ -188,15 +196,33 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
         SamplesAvailable?.Invoke(samples);
     }
 
-    Process? ResolvePotPlayerProcess()
+    bool TryResolvePotPlayer(out uint pid, out string title)
     {
+        pid = 0;
+        title = "";
         try
         {
-            var current = Process.GetProcessById((int)_processId);
-            if (!current.HasExited) return current;
+            using var current = Process.GetProcessById((int)_processId);
+            if (!current.HasExited)
+            {
+                pid = (uint)current.Id;
+                title = SafeTitle(current);
+                return true;
+            }
         }
         catch { }
-        return PotPlayerWatcher.FindRunning();
+
+        Process? replacement = null;
+        try
+        {
+            replacement = PotPlayerWatcher.FindRunning();
+            if (replacement == null || replacement.HasExited) return false;
+            pid = (uint)replacement.Id;
+            title = SafeTitle(replacement);
+            return true;
+        }
+        catch { return false; }
+        finally { replacement?.Dispose(); }
     }
 
     static string ReadTitle(uint processId)
