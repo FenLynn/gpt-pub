@@ -166,11 +166,25 @@ jobs:
             if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version $($json.version) does not match project version $env:EXPECTED_VERSION" }
             if (!(Test-Path (Join-Path $roaming 'DavBridge'))) { throw 'Roaming Data root was not created under isolated APPDATA' }
             if (!(Test-Path (Join-Path $local 'DavBridge'))) { throw 'Local Data root was not created under isolated LOCALAPPDATA' }
+            $snapshots=Join-Path $root 'ui-snapshots'
+            if (!(Test-Path $snapshots -PathType Container)) { throw 'UI snapshot directory missing' }
+            $pngs=Get-ChildItem $snapshots -Filter '*.png' -File
+            if ($pngs.Count -ne 3) { throw "Expected 3 UI snapshots, found $($pngs.Count)" }
+            New-Item 'build/UiSnapshots' -ItemType Directory -Force | Out-Null
+            Copy-Item (Join-Path $snapshots '*.png') 'build/UiSnapshots/' -Force
           } finally {
             $env:APPDATA=$oldAppData
             $env:LOCALAPPDATA=$oldLocal
             Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
           }
+
+      - name: Upload UI visual snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: DavBridge-v${{ steps.product-version.outputs.value }}-ui-snapshots
+          path: build/UiSnapshots/*.png
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Generate SHA-256
         shell: pwsh
@@ -204,6 +218,7 @@ jobs:
           - Current candidate: v${{ steps.product-version.outputs.value }} from ${{ github.sha }}
           - Safety gates: real PUT group + NO-WRITE existing-replica takeover remain required for a task before full migration
           - Monthly reset: date-only, real upload probe begins at local 09:00 before cycle counters are reset
+          - UI visual snapshots: uploaded as a separate CI artifact for manual inspection
           - EXE bytes: $env:DAVBRIDGE_BYTES
           - EXE SHA-256: $env:DAVBRIDGE_SHA256
           - Private Data: %APPDATA%\DavBridge and %LOCALAPPDATA%\DavBridge

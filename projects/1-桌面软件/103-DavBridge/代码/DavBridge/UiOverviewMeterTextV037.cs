@@ -1,3 +1,4 @@
+using System.Drawing.Imaging;
 using System.Reflection;
 
 namespace DavBridge;
@@ -17,15 +18,15 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
     private UiOverviewMeterTextV037(UiShellV032 shell)
     {
         _shell = shell;
-        Bind("_coverageText", "_coverageMeter", ContentAlignment.MiddleCenter, 0.44F, suppressPulse: false, sampleText: "1,526 / 6,933 已核准");
-        Bind("_currentText", "_currentMeter", ContentAlignment.MiddleLeft, 0.44F, suppressPulse: true, sampleText: "等待坚果云下一额度周期");
-        Bind("_uploadText", "_uploadMeter", ContentAlignment.MiddleCenter, 0.48F, suppressPulse: false, sampleText: "946.6 MB / 1.00 GB");
-        Bind("_downloadText", "_downloadMeter", ContentAlignment.MiddleCenter, 0.48F, suppressPulse: false, sampleText: "2.09 GB / 3.00 GB");
+        Bind("_coverageText", "_coverageMeter", ContentAlignment.MiddleCenter, 0.44F, suppressPulse: false, sampleText: "1,526 / 6,933 已核准", sampleFraction: 0.22);
+        Bind("_currentText", "_currentMeter", ContentAlignment.MiddleLeft, 0.44F, suppressPulse: true, sampleText: "等待坚果云下一额度周期", sampleFraction: 0.00);
+        Bind("_uploadText", "_uploadMeter", ContentAlignment.MiddleCenter, 0.48F, suppressPulse: false, sampleText: "946.6 MB / 1.00 GB", sampleFraction: 0.9466);
+        Bind("_downloadText", "_downloadMeter", ContentAlignment.MiddleCenter, 0.48F, suppressPulse: false, sampleText: "2.09 GB / 3.00 GB", sampleFraction: 0.6967);
     }
 
     public static UiOverviewMeterTextV037 Attach(UiShellV032 shell) => new(shell);
 
-    private void Bind(string labelField, string meterField, ContentAlignment alignment, float heightRatio, bool suppressPulse, string sampleText)
+    private void Bind(string labelField, string meterField, ContentAlignment alignment, float heightRatio, bool suppressPulse, string sampleText, double sampleFraction)
     {
         var label = Field<Label>(labelField);
         var meter = Field<MeterV030>(meterField);
@@ -37,7 +38,7 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
         if (labelCell.Column != meterCell.Column || labelCell.Row < 0 || meterCell.Row != labelCell.Row + 1)
             throw new InvalidOperationException($"meter text found unexpected source layout for {labelField}/{meterField}");
 
-        var binding = new Binding(label, meter, table, labelCell, meterCell, sampleText);
+        var binding = new Binding(label, meter, table, labelCell, meterCell, sampleText, sampleFraction);
         _bindings.Add(binding);
 
         label.Visible = false;
@@ -88,16 +89,48 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
                     throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: no rendered text pixels for {binding.SampleText}");
                 if (ink.Top < 1 || ink.Bottom >= bitmap.Height - 1)
                     throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: rendered text touches meter edge ({ink.Top}..{ink.Bottom} of {bitmap.Height})");
-                var inkCenter = (ink.Top + ink.Bottom) / 2d;
+                var inkCenter = (ink.Top + ink.Bottom - 1) / 2d;
                 var meterCenter = (bitmap.Height - 1) / 2d;
-                if (Math.Abs(inkCenter - meterCenter) > 3.0)
-                    throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: rendered text is not vertically centered (ink={inkCenter:0.0}, meter={meterCenter:0.0})");
+                if (Math.Abs(inkCenter - meterCenter) > 1.0)
+                    throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: visible glyph pixels are not vertically centered (ink={inkCenter:0.0}, meter={meterCenter:0.0})");
             }
             finally
             {
                 binding.Meter.DisplayTextProvider = previousProvider;
                 binding.Meter.Fraction = previousFraction;
                 binding.Meter.Pulse = previousPulse;
+            }
+        }
+    }
+
+    internal void CaptureSampleSnapshot(Form form, string outputPath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        var states = _bindings.Select(binding => new SnapshotState(binding, binding.Meter.DisplayTextProvider, binding.Meter.Fraction, binding.Meter.Pulse)).ToArray();
+        try
+        {
+            foreach (var state in states)
+            {
+                var binding = state.Binding;
+                binding.Meter.DisplayTextProvider = () => binding.SampleText;
+                binding.Meter.Fraction = binding.SampleFraction;
+                binding.Meter.Pulse = false;
+                binding.Meter.Invalidate();
+            }
+
+            form.PerformLayout();
+            using var bitmap = new Bitmap(Math.Max(1, form.ClientSize.Width), Math.Max(1, form.ClientSize.Height), PixelFormat.Format32bppArgb);
+            form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+            bitmap.Save(outputPath, ImageFormat.Png);
+        }
+        finally
+        {
+            foreach (var state in states)
+            {
+                state.Binding.Meter.DisplayTextProvider = state.Provider;
+                state.Binding.Meter.Fraction = state.Fraction;
+                state.Binding.Meter.Pulse = state.Pulse;
+                state.Binding.Meter.Invalidate();
             }
         }
     }
@@ -142,5 +175,8 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
         TableLayoutPanel Table,
         TableLayoutPanelCellPosition LabelCell,
         TableLayoutPanelCellPosition MeterCell,
-        string SampleText);
+        string SampleText,
+        double SampleFraction);
+
+    private sealed record SnapshotState(Binding Binding, Func<string>? Provider, double Fraction, bool Pulse);
 }

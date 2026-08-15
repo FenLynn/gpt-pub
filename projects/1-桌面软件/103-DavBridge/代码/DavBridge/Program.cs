@@ -80,7 +80,8 @@ internal static class Program
             Directory.CreateDirectory(paths.RoamingRoot);
             Directory.CreateDirectory(paths.LocalRoot);
             Directory.CreateDirectory(paths.TempRoot);
-            ConstructUiForStartupTest();
+            var snapshotDirectory = Path.Combine(Path.GetDirectoryName(reportPath)!, "ui-snapshots");
+            ConstructUiForStartupTest(snapshotDirectory);
             WriteReport(reportPath, new
             {
                 product = "DavBridge",
@@ -89,13 +90,14 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
-                uiGeneration = "v0.3.8-pixel-meter-text-home-activation",
+                uiGeneration = "v0.3.9-visible-glyph-meter-text-home-activation",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
                 overviewNativeMeterTextExpected = true,
-                meterRasterCenterValidationExpected = true,
+                meterVisibleGlyphCenterExpected = true,
+                uiSnapshotsExpected = true,
                 explicitActivationReturnsOverview = true,
                 layoutReparentExpected = false,
                 ok = true
@@ -112,19 +114,21 @@ internal static class Program
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
-            ConstructUiForStartupTest();
+            var snapshotDirectory = Path.Combine(Path.GetDirectoryName(reportPath)!, "ui-snapshots");
+            ConstructUiForStartupTest(snapshotDirectory);
             WriteReport(reportPath, new
             {
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
-                uiGeneration = "v0.3.8-pixel-meter-text-home-activation",
+                uiGeneration = "v0.3.9-visible-glyph-meter-text-home-activation",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
                 overviewNativeMeterTextExpected = true,
-                meterRasterCenterValidationExpected = true,
+                meterVisibleGlyphCenterExpected = true,
+                uiSnapshotsExpected = true,
                 explicitActivationReturnsOverview = true,
                 layoutReparentExpected = false,
                 ok = true
@@ -136,7 +140,7 @@ internal static class Program
         }
     }
 
-    private static void ConstructUiForStartupTest()
+    private static void ConstructUiForStartupTest(string snapshotDirectory)
     {
         ApplicationConfiguration.Initialize();
         var scenarios = new (string Name, int Width, int Height, float Scale)[]
@@ -149,10 +153,10 @@ internal static class Program
         };
 
         foreach (var scenario in scenarios)
-            ConstructUiScenario(scenario.Name, scenario.Width, scenario.Height, scenario.Scale);
+            ConstructUiScenario(scenario.Name, scenario.Width, scenario.Height, scenario.Scale, snapshotDirectory);
     }
 
-    private static void ConstructUiScenario(string name, int width, int height, float scale)
+    private static void ConstructUiScenario(string name, int width, int height, float scale, string snapshotDirectory)
     {
         using var host = new AppHost();
         using var form = new MainForm(host, launchInBackground: false);
@@ -171,6 +175,9 @@ internal static class Program
             shell.ValidateLayout(name);
         meterText.ValidateLayout(name);
         homeController.Validate(name);
+
+        if (name is "default-100" or "default-125" or "default-150")
+            meterText.CaptureSampleSnapshot(form, Path.Combine(snapshotDirectory, name + ".png"));
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
