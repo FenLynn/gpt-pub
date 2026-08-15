@@ -27,11 +27,18 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/103-LocalSub
         run: |
+          # org.k2fsa.sherpa.onnx is used only for its tiny managed C# wrapper.
+          # NuGet also brings a win-x64 native runtime transitively; LocalSub deliberately
+          # keeps that runtime outside the app and downloads it once into ASR\_runtime.
+          Remove-Item publish/onnxruntime*.dll -Force -ErrorAction SilentlyContinue
+          Remove-Item publish/sherpa-onnx-c-api.dll -Force -ErrorAction SilentlyContinue
+
           New-Item -ItemType Directory -Force publish/ASR | Out-Null
           Copy-Item src/LocalSub/ASR-README.txt publish/ASR/README.txt
           if (Get-ChildItem publish/ASR -Filter *.onnx -Recurse -ErrorAction SilentlyContinue) { throw 'Model files must not be bundled' }
           if (Test-Path publish/hostfxr.dll) { throw '.NET runtime must not be bundled' }
-          if (Test-Path publish/onnxruntime.dll) { throw 'ASR runtime must not be bundled' }
+          if (Get-ChildItem publish -Filter 'onnxruntime*.dll' -File -ErrorAction SilentlyContinue) { throw 'ONNX Runtime must not be bundled' }
+          if (Test-Path publish/sherpa-onnx-c-api.dll) { throw 'sherpa native runtime must not be bundled' }
       - name: Smoke test LocalSub startup
         shell: pwsh
         working-directory: projects/1-桌面软件/103-LocalSub
@@ -89,6 +96,8 @@ jobs:
         run: |
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           if (Get-ChildItem publish/ASR -Include *.dll,*.onnx -Recurse -ErrorAction SilentlyContinue) { throw 'ASR runtime or model files must not be bundled' }
+          if (Get-ChildItem publish -Filter 'onnxruntime*.dll' -File -ErrorAction SilentlyContinue) { throw 'ONNX Runtime leaked into portable package' }
+          if (Test-Path publish/sherpa-onnx-c-api.dll) { throw 'sherpa native runtime leaked into portable package' }
           Compress-Archive -Path publish/* -DestinationPath LocalSub-v0.1.0-dev-win-x64-net8.zip -Force
       - uses: actions/upload-artifact@v4
         with:
