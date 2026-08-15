@@ -59,8 +59,15 @@ public static class ReconciliationPolicy
     public static string? DeriveCurrentCycleId(DateTimeOffset nextResetAt)
     {
         if (nextResetAt == default) return null;
-        var nextResetDate = ResetSchedulePolicy.NormalizeResetDate(nextResetAt);
-        return FormatCycleId(nextResetDate.AddMonths(-1));
+        // Cycle identity follows the configured reset calendar date itself. Do not convert through
+        // the runner or machine local timezone, because that can move an offset date across midnight.
+        var nextCalendarDate = new DateTimeOffset(
+            nextResetAt.Year,
+            nextResetAt.Month,
+            nextResetAt.Day,
+            0, 0, 0,
+            nextResetAt.Offset);
+        return FormatCycleId(nextCalendarDate.AddMonths(-1));
     }
 
     public static RecycleDisposition GetDisposition(ReconciliationGroupState group, string? currentCycleId)
