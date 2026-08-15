@@ -14,6 +14,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     Task? _worker;
     bool _running;
     bool _useSenseVoice;
+    string _streamingLabel = "Streaming ASR";
 
     public event Action<float>? LevelChanged;
     public event Action<string>? PartialResult;
@@ -48,10 +49,12 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         if (!models.IsInstalled(model))
             throw new InvalidOperationException($"实时模型“{model.Name}”尚未安装，请先在“模型”页面下载。");
 
-        var isStreaming = model.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase);
+        var isParaformer = model.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase);
+        var isZipformer = string.Equals(model.Id, "streaming-zipformer-zh-large-int8", StringComparison.OrdinalIgnoreCase);
+        var isStreaming = isParaformer || isZipformer;
         var isSenseVoice = string.Equals(model.Id, "sensevoice-small-int8", StringComparison.OrdinalIgnoreCase);
         if (!isStreaming && !isSenseVoice)
-            throw new NotSupportedException("当前实时字幕支持 Streaming Paraformer 与 SenseVoice Small INT8（模拟流式）。");
+            throw new NotSupportedException("当前实时字幕支持 Streaming Paraformer、Streaming Zipformer Large 与 SenseVoice Small INT8（模拟流式）。");
 
         StatusChanged?.Invoke("检查 ASR 运行库");
         var runtime = new AsrRuntimeManager(settings);
@@ -73,10 +76,12 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
             StatusChanged?.Invoke("加载 SenseVoice 与 Silero VAD");
             _senseVoice.Start(model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot);
             _useSenseVoice = true;
+            _streamingLabel = "SenseVoice";
         }
         else
         {
-            StatusChanged?.Invoke("加载 Streaming Paraformer");
+            _streamingLabel = isZipformer ? "Streaming Zipformer Large" : "Streaming Paraformer";
+            StatusChanged?.Invoke($"加载 {_streamingLabel}");
             _streaming.Start(model, models.GetModelFolder(model), runtime.RuntimeRoot);
             _useSenseVoice = false;
         }
@@ -105,8 +110,8 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
 
             _running = true;
             StatusChanged?.Invoke(_useSenseVoice
-                ? "SenseVoice 模拟流式识别中，讲话时会显示中间结果，停顿后定稿"
-                : "Streaming Paraformer 实时识别中");
+                ? "SenseVoice 模拟流式识别中，VAD 与音量 fallback 会共同检测语音"
+                : $"{_streamingLabel} 实时识别中");
         }
         catch
         {
@@ -164,6 +169,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _streaming.Stop();
         _senseVoice.Stop();
         _useSenseVoice = false;
+        _streamingLabel = "Streaming ASR";
         LevelChanged?.Invoke(0);
     }
 
