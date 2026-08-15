@@ -28,7 +28,9 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _processAudio.SamplesAvailable += OnSamples;
         _streaming.PartialResult += text => PartialResult?.Invoke(text);
         _streaming.FinalResult += text => FinalResult?.Invoke(text);
+        _senseVoice.PartialResult += text => PartialResult?.Invoke(text);
         _senseVoice.FinalResult += text => FinalResult?.Invoke(text);
+        _senseVoice.StatusChanged += text => StatusChanged?.Invoke(text);
     }
 
     public Task StartAllAudioAsync(AppSettings settings, ModelDescriptor model, ModelManager models, IProgress<ModelOperationProgress>? runtimeProgress = null, CancellationToken ct = default)
@@ -103,7 +105,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
 
             _running = true;
             StatusChanged?.Invoke(_useSenseVoice
-                ? "SenseVoice 模拟流式识别中，检测到停顿后出句"
+                ? "SenseVoice 模拟流式识别中，讲话时会显示中间结果，停顿后定稿"
                 : "Streaming Paraformer 实时识别中");
         }
         catch
