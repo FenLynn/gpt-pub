@@ -32,6 +32,25 @@ jobs:
           if (Get-ChildItem publish/ASR -Filter *.onnx -Recurse -ErrorAction SilentlyContinue) { throw 'Model files must not be bundled' }
           if (Test-Path publish/hostfxr.dll) { throw '.NET runtime must not be bundled' }
           if (Test-Path publish/onnxruntime.dll) { throw 'ASR runtime must not be bundled' }
+      - name: Smoke test LocalSub startup
+        shell: pwsh
+        working-directory: projects/1-桌面软件/103-LocalSub
+        run: |
+          $env:LOCALSUB_SMOKE_TEST = '1'
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru
+          Start-Sleep -Seconds 4
+          $p.Refresh()
+          if ($p.HasExited) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            throw "LocalSub exited during startup smoke test. ExitCode=$($p.ExitCode)"
+          }
+          Stop-Process -Id $p.Id -Force
+      - name: Package portable ZIP
+        shell: pwsh
+        working-directory: projects/1-桌面软件/103-LocalSub
+        run: |
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           Compress-Archive -Path publish/* -DestinationPath LocalSub-v0.1.0-dev-win-x64-net8.zip -Force
       - uses: actions/upload-artifact@v4
         with:
