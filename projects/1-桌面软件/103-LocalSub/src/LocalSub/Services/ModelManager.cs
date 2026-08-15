@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Headers;
 using LocalSub.Models;
 using SharpCompress.Archives;
 using SharpCompress.Common;
@@ -78,31 +80,108 @@ public sealed class ModelManager
 
     async Task DownloadFileAsync(string url, string target, IProgress<int>? progress, CancellationToken ct)
     {
-        using var client = DownloadClientFactory.Create(_settings);
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-        var total = response.Content.Headers.ContentLength;
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         var temp = target + ".part";
+        Exception? lastError = null;
 
-        await using var input = await response.Content.ReadAsStreamAsync(ct);
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            await using var output = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 128, true);
-            var buffer = new byte[1024 * 128];
-            long readTotal = 0;
-            while (true)
+            ct.ThrowIfCancellationRequested();
+            try
             {
-                var n = await input.ReadAsync(buffer, ct);
-                if (n == 0) break;
-                await output.WriteAsync(buffer.AsMemory(0, n), ct);
-                readTotal += n;
-                if (total > 0) progress?.Report((int)Math.Clamp(readTotal * 100 / total.Value, 0, 100));
+                var existing = File.Exists(temp) ? new FileInfo(temp).Length : 0L;
+                using var client = DownloadClientFactory.Create(_settings);
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                if (existing > 0)
+                    request.Headers.Range = new RangeHeaderValue(existing, null);
+
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+
+                if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
+                {
+                    try { File.Delete(temp); } catch { }
+                    existing = 0;
+                    if (attempt < 3) continue;
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                var resumed = existing > 0 && response.StatusCode == HttpStatusCode.PartialContent;
+                if (existing > 0 && !resumed)
+                {
+                    try { File.Delete(temp); } catch { }
+                    existing = 0;
+                }
+
+                var contentLength = response.Content.Headers.ContentLength;
+                var total = contentLength.HasValue ? existing + contentLength.Value : (long?)null;
+                var finalUri = response.RequestMessage?.RequestUri;
+
+                await using var input = await response.Content.ReadAsStreamAsync(ct);
+                await using (var output = new FileStream(
+                    temp,
+                    resumed ? FileMode.Append : FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.Read,
+                    1024 * 256,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan))
+                {
+                    var buffer = new byte[1024 * 256];
+                    var readTotal = existing;
+                    while (true)
+                    {
+                        var n = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
+                        if (n == 0) break;
+                        await output.WriteAsync(buffer.AsMemory(0, n), ct);
+                        readTotal += n;
+                        if (total > 0)
+                            progress?.Report((int)Math.Clamp(readTotal * 100 / total.Value, 0, 100));
+                    }
+                    await output.FlushAsync(ct);
+                }
+
+                if (total.HasValue && new FileInfo(temp).Length < total.Value)
+                    throw new IOException($"模型文件下载不完整：{new FileInfo(temp).Length} / {total.Value} bytes");
+
+                if (File.Exists(target)) File.Delete(target);
+                File.Move(temp, target);
+                progress?.Report(100);
+                return;
             }
-            await output.FlushAsync(ct);
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                lastError = new TimeoutException(BuildNetworkHint("连接模型服务器超时", url), ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                lastError = new HttpRequestException(BuildNetworkHint("模型服务器连接失败", url) + $"\n\n{ex.Message}", ex);
+            }
+            catch (IOException ex)
+            {
+                lastError = new IOException($"模型下载中断，第 {attempt}/3 次尝试失败。已保留 .part 文件用于断点续传。\n\n{ex.Message}", ex);
+            }
+
+            if (attempt < 3)
+                await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct);
         }
 
-        if (File.Exists(target)) File.Delete(target);
-        File.Move(temp, target);
-        progress?.Report(100);
+        throw lastError ?? new IOException("模型下载失败。");
+    }
+
+    string BuildNetworkHint(string title, string url)
+    {
+        var proxy = _settings.ProxyMode switch
+        {
+            ProxyMode.Socks5 => $"SOCKS5：{_settings.Socks5Url}",
+            ProxyMode.Direct => "直连",
+            _ => "系统代理"
+        };
+
+        return $"{title}。\n当前模式：{proxy}\n下载源：{new Uri(url).Host}\nGitHub Release 会继续跳转到 release-assets.githubusercontent.com。若当前网络访问 GitHub 大文件受限，请在“设置 → 下载代理”选择 SOCKS5，并填写例如 socks5://127.0.0.1:7890 后保存。";
     }
 
     public void Delete(ModelDescriptor model)
