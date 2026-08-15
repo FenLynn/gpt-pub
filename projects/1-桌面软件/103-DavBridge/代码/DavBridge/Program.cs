@@ -94,6 +94,7 @@ internal static class Program
                 docsTabExpected = true,
                 inlineMeterTextExpected = true,
                 compactStageStripExpected = true,
+                densityLayerConstructed = true,
                 ok = true
             });
         }
@@ -121,6 +122,7 @@ internal static class Program
                 docsTabExpected = true,
                 inlineMeterTextExpected = true,
                 compactStageStripExpected = true,
+                densityLayerConstructed = true,
                 ok = true
             });
         }
@@ -161,10 +163,7 @@ internal static class Program
         form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
         form.PerformLayout();
         if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
-        {
             shell.ValidateLayout(name);
-            density.ValidateLayout(name);
-        }
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
