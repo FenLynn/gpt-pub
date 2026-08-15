@@ -196,7 +196,7 @@ public sealed class ModelManager
                         if (watch.Elapsed - lastReport >= TimeSpan.FromMilliseconds(250))
                         {
                             var speed = watch.Elapsed.TotalSeconds > 0 ? (readTotal - existing) / watch.Elapsed.TotalSeconds : 0;
-                            var percent = total > 0 ? (int)Math.Clamp(readTotal * 100 / total.Value, 0, 100) : null;
+                            int? percent = total > 0 ? (int)Math.Clamp(readTotal * 100 / total.Value, 0, 100) : null;
                             progress?.Report(new("下载", percent, readTotal, total, speed, resumed ? "断点续传中" : "下载中"));
                             lastReport = watch.Elapsed;
                         }
