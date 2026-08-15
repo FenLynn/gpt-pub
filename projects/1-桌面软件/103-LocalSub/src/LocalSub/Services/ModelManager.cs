@@ -45,6 +45,31 @@ public sealed class ModelManager
         Directory.CreateDirectory(cache);
         progress?.Report(new("准备", 0, Detail: $"准备 {model.Name}"));
 
+        if (model.Files.Length > 0)
+        {
+            var finalDir = GetModelFolder(model);
+            Directory.CreateDirectory(finalDir);
+            for (var i = 0; i < model.Files.Length; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var file = model.Files[i];
+                if (string.IsNullOrWhiteSpace(file.FileName) || string.IsNullOrWhiteSpace(file.Url))
+                    throw new InvalidDataException($"模型 {model.Name} 的第 {i + 1} 个下载文件配置无效。");
+
+                progress?.Report(new("下载", i * 100 / model.Files.Length, Detail: $"文件 {i + 1}/{model.Files.Length}：{file.FileName}"));
+                var target = Path.Combine(finalDir, file.FileName.Replace('/', Path.DirectorySeparatorChar));
+                var parent = Path.GetDirectoryName(target);
+                if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+                var fileProgress = progress == null ? null : new AggregateFileProgress(progress, i, model.Files.Length, file.FileName);
+                await DownloadFileAsync(file.Url, target, fileProgress, ct);
+            }
+
+            progress?.Report(new("校验", 100, Detail: "检查模型关键文件"));
+            if (!IsInstalled(model)) throw new InvalidDataException("模型下载完成，但关键文件不完整。");
+            progress?.Report(new("完成", 100, Detail: $"已安装到 {finalDir}"));
+            return;
+        }
+
         if (model.Url.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase))
         {
             var finalDir = GetModelFolder(model);
@@ -56,6 +81,9 @@ public sealed class ModelManager
             progress?.Report(new("完成", 100, Detail: $"已安装到 {finalDir}"));
             return;
         }
+
+        if (string.IsNullOrWhiteSpace(model.Url))
+            throw new InvalidDataException($"模型 {model.Name} 没有可用下载地址。");
 
         var archiveName = Path.GetFileName(new Uri(model.Url).LocalPath);
         var archivePath = Path.Combine(cache, archiveName);
@@ -267,22 +295,19 @@ public sealed class ModelManager
             _ => "系统代理"
         };
 
-        return $"{title}。\n当前模式：{proxy}\n下载源：{new Uri(url).Host}\nGitHub Release 会继续跳转到 release-assets.githubusercontent.com。若当前网络访问 GitHub 大文件受限，请在“设置 → 下载代理”选择 SOCKS5。";
+        return $"{title}。\n当前模式：{proxy}\n下载源：{new Uri(url).Host}\n若当前网络访问该模型源受限，请在“设置 → 下载代理”选择 SOCKS5 后重试。";
     }
 
     public void Delete(ModelDescriptor model)
     {
         TryDeleteDirectory(GetModelFolder(model));
 
-        var archiveName = Path.GetFileName(new Uri(model.Url).LocalPath);
-        var cache = Path.Combine(_settings.ResolvedAsrRoot, "._cache");
-        TryDeleteFile(Path.Combine(cache, archiveName));
-        TryDeleteFile(Path.Combine(cache, archiveName + ".part"));
-
-        if (model.Url.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(model.Url))
         {
-            var directTarget = Path.Combine(GetModelFolder(model), archiveName);
-            TryDeleteFile(directTarget + ".part");
+            var archiveName = Path.GetFileName(new Uri(model.Url).LocalPath);
+            var cache = Path.Combine(_settings.ResolvedAsrRoot, "._cache");
+            TryDeleteFile(Path.Combine(cache, archiveName));
+            TryDeleteFile(Path.Combine(cache, archiveName + ".part"));
         }
 
         var stagingRoot = Path.Combine(_settings.ResolvedAsrRoot, "._staging");
@@ -290,6 +315,31 @@ public sealed class ModelManager
         {
             foreach (var dir in Directory.GetDirectories(stagingRoot, model.Id + "-*"))
                 TryDeleteDirectory(dir);
+        }
+    }
+
+    sealed class AggregateFileProgress : IProgress<ModelOperationProgress>
+    {
+        readonly IProgress<ModelOperationProgress> _outer;
+        readonly int _index;
+        readonly int _count;
+        readonly string _fileName;
+
+        public AggregateFileProgress(IProgress<ModelOperationProgress> outer, int index, int count, string fileName)
+        {
+            _outer = outer;
+            _index = index;
+            _count = Math.Max(1, count);
+            _fileName = fileName;
+        }
+
+        public void Report(ModelOperationProgress value)
+        {
+            int? overall = value.Percent.HasValue
+                ? Math.Clamp((_index * 100 + value.Percent.Value) / _count, 0, 100)
+                : null;
+            var detail = string.IsNullOrWhiteSpace(value.Detail) ? _fileName : $"{_fileName}：{value.Detail}";
+            _outer.Report(value with { Percent = overall, Detail = detail });
         }
     }
 
