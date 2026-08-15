@@ -10,17 +10,20 @@ public static class DownloadClientFactory
         var handler = new SocketsHttpHandler
         {
             AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 10,
             AutomaticDecompression = DecompressionMethods.All,
-            ConnectTimeout = TimeSpan.FromSeconds(20),
+            ConnectTimeout = TimeSpan.FromSeconds(60),
             PooledConnectionLifetime = TimeSpan.FromMinutes(5)
         };
+
         switch (settings.ProxyMode)
         {
             case ProxyMode.Direct:
                 handler.UseProxy = false;
                 break;
             case ProxyMode.Socks5:
-                if (!Uri.TryCreate(settings.Socks5Url, UriKind.Absolute, out var proxyUri) || !proxyUri.Scheme.Equals("socks5", StringComparison.OrdinalIgnoreCase))
+                if (!Uri.TryCreate(settings.Socks5Url, UriKind.Absolute, out var proxyUri) ||
+                    !proxyUri.Scheme.Equals("socks5", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("SOCKS5 地址格式应类似 socks5://127.0.0.1:7890");
                 handler.UseProxy = true;
                 handler.Proxy = new WebProxy(proxyUri);
@@ -29,6 +32,9 @@ public static class DownloadClientFactory
                 handler.UseProxy = true;
                 break;
         }
-        return new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+
+        var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("LocalSub/0.1.0");
+        return client;
     }
 }
