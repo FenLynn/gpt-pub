@@ -72,12 +72,12 @@ public static class ReconciliationPolicy
 
     public static RecycleDisposition GetDisposition(ReconciliationGroupState group, string? currentCycleId)
     {
-        if (group.RemovedAt.HasValue) return RecycleDisposition.Removed;
         if (!string.IsNullOrWhiteSpace(currentCycleId) &&
             string.Equals(group.LastDeferredCycleId, currentCycleId, StringComparison.OrdinalIgnoreCase) &&
             (!string.IsNullOrWhiteSpace(group.FirstMissingCycleId) || IsBlocked(group)))
             return RecycleDisposition.DeferredThisCycle;
         if (IsBlocked(group)) return RecycleDisposition.Blocked;
+        if (group.RemovedAt.HasValue) return RecycleDisposition.Removed;
         if (string.IsNullOrWhiteSpace(group.FirstMissingCycleId)) return RecycleDisposition.Active;
         if (string.IsNullOrWhiteSpace(currentCycleId) ||
             string.Equals(group.FirstMissingCycleId, currentCycleId, StringComparison.OrdinalIgnoreCase))
