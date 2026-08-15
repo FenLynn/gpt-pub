@@ -62,10 +62,18 @@ internal sealed class WebDavDeleteClientV030 : WebDavReadClient
 
 internal static class ReconciliationRemovalV030
 {
-    public static async Task<IReadOnlyList<RemovalActionResultV030>> DeleteGroupsAsync(
+    public static Task<IReadOnlyList<RemovalActionResultV030>> DeleteGroupsAsync(
         this ReconciliationRuntimeV030 runtime,
         IEnumerable<string> groupKeys,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        runtime.ExecuteExclusiveAsync(
+            () => DeleteGroupsCoreAsync(runtime, groupKeys, cancellationToken),
+            cancellationToken);
+
+    private static async Task<IReadOnlyList<RemovalActionResultV030>> DeleteGroupsCoreAsync(
+        ReconciliationRuntimeV030 runtime,
+        IEnumerable<string> groupKeys,
+        CancellationToken cancellationToken)
     {
         var host = runtime.Host;
         var currentCycle = runtime.CurrentCycleId;
@@ -105,8 +113,6 @@ internal static class ReconciliationRemovalV030
         if (recycle is null)
             return new RemovalActionResultV030(groupKey, false, false, true, "回收站中已经找不到该附件组。已停止删除。");
 
-        // A delete transaction is legal only while the current cycle still exposes the group as
-        // an actionable review item. This is a core safety gate, not merely a UI convention.
         var disposition = ReconciliationPolicy.GetDisposition(recycle, runtime.CurrentCycleId);
         if (disposition is not RecycleDisposition.ReviewRequired and not RecycleDisposition.Blocked)
             return new RemovalActionResultV030(groupKey, false, false, true, "该附件组当前不处于可人工审查状态。已停止删除。");
@@ -121,9 +127,6 @@ internal static class ReconciliationRemovalV030
             return new RemovalActionResultV030(groupKey, false, false, true, recycle.LastIssue);
         }
 
-        // Recheck every exact source member immediately before any destructive target action.
-        // A full recovery cancels deletion. A partial zip/prop recovery is an anomaly and must never
-        // be simplified into either "still deleted" or "fully restored".
         var sourceNow = new Dictionary<string, WebDavEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var record in trusted)
         {
@@ -233,6 +236,11 @@ internal static class ReconciliationRemovalV030
         recycle.LastIssue = null;
         recycle.LastDeferredCycleId = null;
         recycle.LastDeferredAt = null;
+        foreach (var record in trusted)
+        {
+            record.Status = TransferStatus.SourceChanged;
+            record.LastError = "坚果云目标已按人工确认删除。若 InfiniCLOUD 后续重新出现该对象，将优先恢复并重新强校验。";
+        }
         return new RemovalActionResultV030(groupKey, true, false, false, "坚果云目标附件组已经按人工确认删除，并完成准确路径不存在复核。");
     }
 
