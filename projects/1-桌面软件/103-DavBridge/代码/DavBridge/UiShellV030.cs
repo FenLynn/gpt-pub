@@ -1066,7 +1066,7 @@ internal sealed class MeterV030 : Control
     public Func<string>? DisplayTextProvider { get; set; }
     public ContentAlignment DisplayTextAlignment { get; set; } = ContentAlignment.MiddleCenter;
     public Color DisplayTextColor { get; set; } = Color.FromArgb(42, 54, 62);
-    public float DisplayTextFontSize { get; set; } = 8.2F;
+    public float DisplayTextHeightRatio { get; set; } = 0.44F;
     public bool SuppressPulseWhenText { get; set; }
 
     public double Fraction
@@ -1143,9 +1143,18 @@ internal sealed class MeterV030 : Control
 
     private void DrawDisplayText(Graphics graphics, string text)
     {
-        using var font = new Font("Segoe UI Semibold", DisplayTextFontSize, FontStyle.Regular, GraphicsUnit.Point);
-        var bounds = new Rectangle(7, 0, Math.Max(1, Width - 14), Math.Max(1, Height));
-        var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
+        var availableWidth = Math.Max(1, Width - 14);
+        var availableHeight = Math.Max(5, Height - 4);
+        var targetPixels = Math.Clamp(Height * DisplayTextHeightRatio, 7F, Math.Max(7F, Height - 4F));
+        using var font = CreateFittingPixelFont(graphics, text, availableWidth, availableHeight, targetPixels);
+        var measureFlags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
+        var measured = TextRenderer.MeasureText(graphics, text, font, new Size(availableWidth, int.MaxValue), measureFlags);
+        var drawHeight = Math.Max(1, Math.Min(availableHeight, measured.Height + 2));
+        var y = Math.Max(1, (Height - drawHeight) / 2 - 1);
+        if (y + drawHeight >= Height)
+            y = Math.Max(1, Height - drawHeight - 1);
+        var bounds = new Rectangle(7, y, availableWidth, drawHeight);
+        var flags = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
         flags |= DisplayTextAlignment switch
         {
             ContentAlignment.MiddleLeft => TextFormatFlags.Left,
@@ -1153,6 +1162,26 @@ internal sealed class MeterV030 : Control
             _ => TextFormatFlags.HorizontalCenter
         };
         TextRenderer.DrawText(graphics, text, font, bounds, DisplayTextColor, flags);
+    }
+
+    private static Font CreateFittingPixelFont(Graphics graphics, string text, int availableWidth, int availableHeight, float targetPixels)
+    {
+        var size = targetPixels;
+        while (size > 5F)
+        {
+            var candidate = new Font("Segoe UI Semibold", size, FontStyle.Regular, GraphicsUnit.Pixel);
+            var measured = TextRenderer.MeasureText(
+                graphics,
+                text,
+                candidate,
+                new Size(availableWidth, int.MaxValue),
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+            if (measured.Height <= availableHeight)
+                return candidate;
+            candidate.Dispose();
+            size -= 0.5F;
+        }
+        return new Font("Segoe UI Semibold", 5F, FontStyle.Regular, GraphicsUnit.Pixel);
     }
 
     private static System.Drawing.Drawing2D.GraphicsPath Rounded(Rectangle rect, int radius)
