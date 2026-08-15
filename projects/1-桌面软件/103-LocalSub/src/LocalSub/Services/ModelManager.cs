@@ -50,7 +50,7 @@ public sealed class ModelManager
         Directory.CreateDirectory(staging);
         try
         {
-            using var archive = ArchiveFactory.Open(archivePath);
+            using var archive = ArchiveFactory.OpenArchive(archivePath);
             foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
             {
                 ct.ThrowIfCancellationRequested();
