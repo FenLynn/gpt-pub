@@ -18,23 +18,23 @@
 
 正式稳定回滚基线：**v0.1.7**
 
-当前实验候选：**v0.2.25**
+当前实验候选：**v0.3.0**
 
-v0.2.25 完成完整 CI 的准确代码 head：`ec4ba2fb650be9cc46a431b2f38abb4347d5b467`
+v0.3.0 完成完整 CI 的准确代码 head：`22d321f9811bb047f2ddd96c5a7463225fed51f1`
 
-P103 CI run：`31853244339`
+P103 CI run：`31869299097`
 
 CI 结论：**success**
 
-Artifact：`DavBridge-v0.2.25-win-x64`
+Artifact：`DavBridge-v0.3.0-win-x64`
 
-Artifact ZIP SHA256：`476c34a34e7ed796962e2484e513c12cd348088f7ab47275f326ad07dd4a9291`
+Artifact ZIP SHA256：`597232938985882583b808d86db29a473807d6ece4162ac8d1283c2f4ee175de`
 
-EXE SHA256：`9330b87881ab2c94e4c89b4b8e8e77db71f48893c8bcd883622944b4d9b9e6f9`
+EXE SHA256：`37f78cba17fd2eb5a4864b788596371f6858e8e6de42a263f5919a5515c749c3`
 
-本 HANDOFF 之后可能存在 `[skip ci]` 纯文档提交。不得把文档 head 当成已构建代码 head。
+本 HANDOFF 之后存在 `[skip ci]` 纯文档提交时，不得把文档 head 当成已构建代码 head。
 
-`main` 与 `p103-stable` 继续保持 v0.1.7。v0.2.25 未经用户实机确认，不得提升到 stable 或 main。
+`main` 与 `p103-stable` 继续保持 v0.1.7。v0.3.0 未经用户实机确认，不得提升到 stable 或 main。
 
 ## 固定读取顺序
 
@@ -53,152 +53,202 @@ EXE SHA256：`9330b87881ab2c94e4c89b4b8e8e77db71f48893c8bcd883622944b4d9b9e6f9`
 
 接续后必须重新核对 `main`、`p103-stable`、`p103-exp`、最新 P103 CI 和 Artifact。
 
-## 产品边界
+## v0.3 产品定位
 
-DavBridge 当前定位为可靠、低速、可恢复、强校验的单向迁移、备份和镜像任务管理器。
+当前正式开发目标不再是一次性搬运器，而是维护：
 
-当前用户层只收口 Zotero 固定任务。近期不开放普通 WebDAV 新任务，不进入双向同步，不传播删除，不自动合并双向冲突，不做高流量 Integrity Scrub。
+> `InfiniCLOUD` 作为唯一 authoritative source，坚果云保存经过 SHA256 核准的单向镜像子集。
 
-正常长期迁移要求无人值守。上传额度等待期额外利用剩余下载额度检查 GoodSync 等历史副本时，必须由用户主动启动。
+源端始终只读。普通后台任务不得自动传播删除。
 
-## 核心 Data 与安全语义
+### StrongVerified 核准基线
 
-核心用户 Data 保持：
+每个 `StrongVerified` 对象已经保存：
+
+- Source SHA256；
+- Target SHA256；
+- Source size / ETag / LastModified；
+- Target ETag；
+- VerifiedAt。
+
+无论目标最初由 DavBridge、GoodSync 还是人工复制写入，只要已经完成双端强校验，就把这组记录作为历史可信基线。
+
+## Cycle 规则
+
+Cycle ID 使用启动当前坚果云额度周期的真实重置日期，格式固定为 `yyMMdd`。
+
+例如：2026-09-07 的真实重置启动新周期，则 Cycle ID 为 `260907`。
+
+`Config.NextResetAt` 保存下一次重置日期，因此当前 Cycle 从该日期按日历向前一个月推导。不得先转换为运行机器或 CI 的本地时区，否则可能跨午夜换日。
+
+只有真实重置探测通过后，才推进下一重置日期并进入新 Cycle。
+
+## 每周期自动对账
+
+普通 backlog 前自动执行：
+
+```text
+确认真实新周期
+→ 读取 InfiniCLOUD manifest
+→ 与历史 StrongVerified 账本比较
+→ 识别源变化、源缺失和新增对象
+→ 必要时进入人工回收站门
+→ 普通迁移
+```
+
+### 源 metadata 未变化
+
+不下载文件内容。
+
+### 源 metadata 变化
+
+只重新 GET InfiniCLOUD 并计算 SHA256。
+
+- SHA 与历史 Source SHA256 相同：只更新源 metadata；
+- SHA 不同：进入 `SourceChanged`，优先于普通 backlog 修复目标；
+- 源 SHA 改变时，不提前覆盖历史 StrongVerified metadata，直到新目标再次 StrongVerified 后建立新基线。
+
+### 新增对象
+
+只加入普通 backlog，不提高优先级。
+
+## 逻辑回收站
+
+第一次发现一个完整历史 StrongVerified Group 从 InfiniCLOUD 完全消失：
+
+- 只写入 `FirstMissingCycleId`；
+- 坚果云不移动、不改名、不删除；
+- 当前 Cycle 只能观察。
+
+后续已确认 Cycle 仍完全不存在，才进入人工审查。
+
+人工可以：
+
+- 删除所选；
+- 本周期继续保留。
+
+保留只解除当前 Cycle 的阻塞。下一个 Cycle 如果仍缺失，会再次进入人工审查，因此对象可以跨很多周期继续留在回收站。
+
+### 删除硬规则
+
+DELETE 永远不能由后台自动执行。
+
+用户确认删除后仍必须：
+
+1. 再查 InfiniCLOUD 每个准确成员路径；
+2. 完整恢复则自动取消删除；
+3. 只恢复 zip 或 prop 等部分成员时禁止删除并人工保留；
+4. 再核对坚果云目标大小和 ETag；
+5. ETag 无法证明身份时，在下载安全额度允许的前提下重新 GET 目标并比对历史 Target SHA256；
+6. DELETE 后再次查询准确目标路径；
+7. 网络或超时导致结果不确定时先 reconciliation，绝不盲目重复 DELETE。
+
+成功人工删除后，历史 SHA 证据继续保留，TransferRecord 置为 `SourceChanged`。因此源端以后重新出现时会优先恢复目标并重新 StrongVerified。
+
+## 人工操作门
+
+新增 `EngineState.WaitUser`，只追加枚举值，不改变旧数值。
+
+正常对账、源变化识别、新增登记、普通迁移全部自动化。
+
+只有成熟回收站、删除安全异常、Conflict、认证等真正需要人的问题才停止普通迁移，并在总览显示醒目操作入口。
+
+## v0.3 UI
+
+运行时只启用新的 `UiShellV030`，不再挂载 v0.2.x dashboard / activity / refinement / route patch 叠层。
+
+一级入口：
+
+```text
+总览 | 转移 | 回收站                     ⚙
+```
+
+没有常驻宽左栏。
+
+总览保留：
+
+- `InfiniCLOUD ⇒⇒ 坚果云` 双箭头；
+- Cycle；
+- 本周期对账 / 修复 / 普通迁移状态；
+- 镜像覆盖；
+- 当前任务；
+- 上传和下载额度；
+- 必要时的人工介入横幅。
+
+转移页只区分：
+
+- 优先修复；
+- 普通任务。
+
+回收站：
+
+- 待观察；
+- 待审查；
+- 已处理。
+
+审查表默认零选择，且不会被 250 ms 动画刷新反复重建，避免误选和选择丢失。
+
+## Data 兼容
+
+核心用户 Data 继续保持：
 
 - `%APPDATA%/DavBridge/config.json`
 - `%APPDATA%/DavBridge/state.json`
 - `%APPDATA%/DavBridge/state.json.bak`
 - `%APPDATA%/DavBridge/secrets.dat`
 
-v0.2.25 不迁移这些文件，`MigrationState.SchemaVersion` 仍为 1。密码继续使用 Windows DPAPI CurrentUser。
+`MigrationState.SchemaVersion` 仍为 1。
 
-必须保持：
+v0.3 新增独立旁路：
 
-1. InfiniCLOUD 源端只读。
-2. `.zip + .prop` 按 Zotero 逻辑组处理。
-3. 既有目标只有在目标 GET 和 SHA256 与当前源文件完全一致后才允许安全接管。
-4. 新目标采用条件 PUT。
-5. PUT 响应未知进入 `WriteUnknown` 后 Reconcile，不立即重复上传。
-6. 412 进入协调流程，不盲目覆盖。
-7. 上传后重新 GET 目标并计算 SHA256，通过后才记 `StrongVerified`。
-8. 源端传输期间变化时进入 `SourceChanged`。
-9. HTTPS only，禁止自动跨 authority 重定向。
-10. `Conflict`、`WriteUnknown`、`SourceChanged` 不允许被历史副本校核流程自动覆盖。
+- `%APPDATA%/DavBridge/reconcile.json`
+- `%APPDATA%/DavBridge/reconcile.json.bak`
 
-## WaitQuota 手动既有副本校核
+它只保存 Cycle、首次缺失、人工保留、删除历史和对账摘要，不保存密码，不替代 StrongVerified 或流量账本。
 
-v0.2.22 起，额外全库既有副本检查改成用户主动启动的 NO-WRITE 任务。
+sidecar 丢失的安全方向只能是重新开始删除观察期，不能让任何对象更容易被删除。
 
-手动校核：
+## v0.3.0 自动验证
 
-- 从当前未验证完整 Zotero 组出发；
-- 对坚果云准确目标路径做 metadata 探测，不依赖约 750 项目录列举窗口；
-- 不再受原 24 或 48 组单轮上限约束；
-- 只受安全下载额度和下载预留约束；
-- 只有找到完整 `zip + prop` 既有副本后才读取内容并做 SHA256；
-- 主动上传始终为 0 B；
-- 完成的 `StrongVerified` 与下载记账即时保存。
+准确代码 head：`22d321f9811bb047f2ddd96c5a7463225fed51f1`
 
-安全链：
+P103 CI run：`31869299097`
 
-`InfiniCLOUD 当前源 SHA256 → 坚果云已有副本 SHA256 → 完全一致 → StrongVerified`
-
-手动校核运行时会临时阻止正常后台迁移循环并发进入另一轮 WebDAV pass，结束后恢复原 AutoResume 内存值。
-
-### 校核流量的准确语义
-
-路径探测阶段主要执行 metadata 请求，因此不会按文件大小增加 DavBridge 的坚果云下载账本。
-
-只有找到完整目标 `zip + prop` 组并实际读取坚果云文件内容做 SHA256 时，才把该目标文件实际下载字节加入 `VerifiedDownloadBytesSinceCalibration`。InfiniCLOUD 源文件读取不计入坚果云下载额度。
-
-v0.2.24 实机发现周期下载 bar 在手动校核期间可能不变化。根因不是校核没有记账，而是 `UiDashboardV027.UpdateQuota()` 优先使用 `_lastProgress.Quota`，该快照可能停留在正常迁移进入 WaitQuota 时的旧值。v0.2.25 用 `UiRouteQuotaPatchV0225` 在不改变账本语义的前提下，把该缓存 quota 同步为当前 `Config + State` 的实时 `QuotaPolicy` 快照。目标文件下载并完成记账后，周期下载 bar 应自动更新。
-
-## 重置日与周期 bar
-
-不得把“到达重置日期”直接等同于“服务端额度已经重置”。坚果云只提供重置日期，没有可靠的精确重置时刻。
-
-当前安全流程保持：
-
-1. 到达 `NextResetAt` 日期后先保留旧周期账本，不在 00:00 盲目清零。
-2. 当天 09:00 之后执行真实新周期上传探测。
-3. 探测失败时保留旧账本，约 1 小时后继续重试。
-4. 只有真实探测确认新周期后，才把旧周期 calibration 基线和旧周期计数清零，并推进 `NextResetAt`。
-5. 成功探测本身产生的 `probe.UploadBytes` 与 `probe.DownloadBytes` 立即计入新周期，因此 UI 通常回到接近 0 的新周期值，但不承诺数学意义上的绝对 0 B。
-
-这套逻辑避免服务端实际重置时刻晚于本地日期判断时错误恢复大额上传。
-
-## v0.2.23 实机结论
-
-v0.2.23 已在用户真实 WaitQuota 环境运行。用户确认：
-
-- `转移 | 校核` 双视图结构成立；
-- 校核进度稳定显示，例如 `382 / 2703`；
-- v0.2.22 中“等待下一周期”与校核进度争抢同一进度条的闪烁问题已经解决；
-- 功能逻辑继续正常运行。
-
-用户随后要求全面精修 UI，尤其认为颜色仍不够协调，并要求转移页同步调整，同时检查是否存在值得补齐的日常功能。
-
-## v0.2.24 UI 全面精修
-
-v0.2.24 重点是视觉收口和信息补全，不改变迁移核心状态机。
-
-运行时使用 `UiRefinementV0224` 统一路由、阶段条、总体进度、当前进度和周期流量条，减少旧绘制层重复覆盖。
-
-颜色体系统一为低饱和 steel blue、muted teal、sage、amber、coral 与 neutral gray。转移阶段改为连续节点流程，校核页使用独立阶段和进度，路径扫描显示 `x / N · %`，并保留本轮校核摘要和不可启动原因。
-
-手动校核扫描游标仍不持久化，不加入高流量全库 Integrity Scrub，不开放普通 WebDAV 多任务。
-
-## v0.2.25 路由与流量显示修正
-
-用户实机评审 v0.2.24 后提出两点：顶部路由更偏好之前的双右箭头视觉，同时发现手动校核时周期下载 bar 看起来没有变化。
-
-v0.2.25 新增 `UiRouteQuotaPatchV0225`，只处理这两个收口问题：
-
-1. 顶部 InfiniCLOUD 到坚果云的方向图形改回双右箭头语义，继续沿用 v0.2.24 的低饱和颜色，不恢复高饱和旧配色。
-2. 周期流量 UI 不再长期停留在旧 `EngineProgress.Quota`。当校核完成一个真实坚果云目标文件读取并已写入 state 后，bar 使用当前账本快照更新。
-
-没有修改 `WaitQuotaReplicaMaintenance`、`QuotaPolicy`、`ResetCycleProbeRunner`、WebDAV 安全链或持久化结构。
-
-## v0.2.25 自动验证
-
-准确代码 head：`ec4ba2fb650be9cc46a431b2f38abb4347d5b467`
-
-P103 CI run：`31853244339`
-
-CI 结论：**success**。
+CI：**success**。
 
 通过：
 
-- P103 Core Smoke；
-- WaitQuota 手动全扫描和 PUT 0 回归；
-- 条件 PUT、WriteUnknown、412 reconciliation；
-- HTTPS only 与最终 Manifest 门；
-- Windows x64 framework-dependent single EXE publish；
+- scope；
+- Core Smoke；
+- Cycle `yyMMdd` 与时区不换日测试；
+- 首次缺失 / 跨周期人工审查 / 本周期保留回归；
+- 原条件 PUT、WriteUnknown、412 reconciliation；
+- WaitQuota NO-WRITE 回归；
+- Windows x64 framework-dependent 单 EXE publish；
 - Runtime boundary；
-- Windows 隔离 self-test；
-- 现有多窗口与 DPI UI self-test；
-- Artifact 与 SHA256 生成。
+- v0.3 新 shell 五组窗口 / DPI 隔离 self-test；
+- SHA256；
+- Artifact upload。
 
-Artifact：`DavBridge-v0.2.25-win-x64`
+Artifact：`DavBridge-v0.3.0-win-x64`
 
-Artifact ZIP SHA256：`476c34a34e7ed796962e2484e513c12cd348088f7ab47275f326ad07dd4a9291`
+Artifact ZIP SHA256：`597232938985882583b808d86db29a473807d6ece4162ac8d1283c2f4ee175de`
 
-EXE SHA256：`9330b87881ab2c94e4c89b4b8e8e77db71f48893c8bcd883622944b4d9b9e6f9`
+EXE SHA256：`37f78cba17fd2eb5a4864b788596371f6858e8e6de42a263f5919a5515c749c3`
 
-## 下一准确断点
+## 当前实机断点
 
-首先实机验证 v0.2.25，不扩核心功能。
+下一步只做 v0.3.0 实机验收，不提升 stable：
 
-重点检查：
+1. 新的 `总览 / 转移 / 回收站` 三页布局是否自然；
+2. 顶部无宽左栏，双右箭头和 Cycle 显示是否满意；
+3. 当前历史 state 首次建立 `reconcile.json` 时不会触发任何 DELETE；
+4. 周期源端对账运行后，普通迁移和额度记账保持正常；
+5. 当前没有成熟回收站对象时，回收站只显示观察或空状态；
+6. 将来真实跨周期出现成熟删除候选时，再专门实机验证人工删除事务；
+7. 托盘、暂停、继续、设置、重启保持正常。
 
-1. 顶部双右箭头是否比 v0.2.24 的单一长箭头更自然。
-2. 在校核仅做路径探测时，周期下载 bar 可保持不变。
-3. 一旦找到完整目标组并实际执行坚果云目标文件 SHA256 读取，目标文件完成后周期下载用量应自动增加。
-4. 手动校核上传账本继续保持不因校核而增加。
-5. 重置日未确认新周期前旧 bar 不提前清零，真实探测确认后自动进入接近 0 的新周期值。
-6. 转移、校核、托盘、退出和重新打开继续正常。
-
-实机确认后，再决定是否清理旧 UI generation，并评估 v0.2.x 是否具备进入 `p103-stable` 的条件。
+真实 DELETE 行为在用户实际出现合法跨周期候选以前，只能由 Mock / CI 证明代码逻辑，不能声称已经真实账户验证。
 
 ## 事实源
 
