@@ -78,6 +78,12 @@ internal sealed class SingleInstanceGateV0217 : IDisposable
             form.BeginInvoke(new Action(() =>
             {
                 if (form.IsDisposed) return;
+                if (form.Tag is IHomeWindowControllerV037 controller)
+                {
+                    controller.ShowHomeAndRestore();
+                    return;
+                }
+
                 if (form.WindowState == FormWindowState.Minimized)
                     form.WindowState = FormWindowState.Normal;
                 if (!form.Visible) form.Show();
