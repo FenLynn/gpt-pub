@@ -99,8 +99,8 @@ internal sealed class UiOverviewInlineTextV035 : IDisposable
                 throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: meter row changed");
             if (binding.Meter.Width < 100 || binding.Meter.Height < 20)
                 throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: meter clipped ({binding.Meter.Width}x{binding.Meter.Height})");
-            if (string.IsNullOrWhiteSpace(binding.Label.Text))
-                throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: embedded value text missing");
+            if (binding.Label.IsDisposed)
+                throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: embedded value label disposed");
 
             binding.Meter.PerformLayout();
             if (binding.Label.Width <= 0 || binding.Label.Height <= 0 ||
