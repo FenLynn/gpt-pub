@@ -42,6 +42,7 @@ internal static class Program
                 using var activityTabs = UiActivityTabsV0224.Attach(form, dashboard, host, waitQuotaMaintenance);
                 using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
                 using var refinement = UiRefinementV0224.Attach(form, dashboard);
+                using var routeQuotaPatch = UiRouteQuotaPatchV0225.Attach(dashboard, host);
                 Application.Run(form);
             }
             finally
@@ -154,6 +155,7 @@ internal static class Program
         using var activityTabs = UiActivityTabsV0224.Attach(form, dashboard, host, waitQuotaMaintenance);
         using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
         using var refinement = UiRefinementV0224.Attach(form, dashboard);
+        using var routeQuotaPatch = UiRouteQuotaPatchV0225.Attach(dashboard, host);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
