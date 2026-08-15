@@ -1,0 +1,62 @@
+[
+  {
+    "Id": "sensevoice-small-int8",
+    "Name": "SenseVoice Small INT8",
+    "Purpose": "推荐：中英日韩粤，后台与模拟流式",
+    "SizeText": "约 230 MB",
+    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+    "FolderName": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+    "RequiredFiles": ["model.int8.onnx", "tokens.txt"],
+    "Recommended": true,
+    "LiveCapable": true,
+    "BatchCapable": true
+  },
+  {
+    "Id": "streaming-paraformer-zh-en",
+    "Name": "Streaming Paraformer 中英 INT8",
+    "Purpose": "极速实时：普通话/英语",
+    "SizeText": "约 230 MB（INT8 核心）",
+    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2",
+    "FolderName": "sherpa-onnx-streaming-paraformer-bilingual-zh-en",
+    "RequiredFiles": ["encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"],
+    "Recommended": false,
+    "LiveCapable": true,
+    "BatchCapable": false
+  },
+  {
+    "Id": "streaming-paraformer-zh-yue-en",
+    "Name": "Streaming Paraformer 中英粤 INT8",
+    "Purpose": "实时：普通话/粤语/英语",
+    "SizeText": "独立下载",
+    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en.tar.bz2",
+    "FolderName": "sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en",
+    "RequiredFiles": ["encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"],
+    "Recommended": false,
+    "LiveCapable": true,
+    "BatchCapable": false
+  },
+  {
+    "Id": "funasr-nano-int8",
+    "Name": "Fun-ASR-Nano INT8",
+    "Purpose": "高质量后台：中文/英语/日语、方言与口音",
+    "SizeText": "约 0.9 GB",
+    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2",
+    "FolderName": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+    "RequiredFiles": ["encoder_adaptor.int8.onnx", "llm.int8.onnx", "embedding.int8.onnx", "Qwen3-0.6B"],
+    "Recommended": false,
+    "LiveCapable": false,
+    "BatchCapable": true
+  },
+  {
+    "Id": "silero-vad",
+    "Name": "Silero VAD",
+    "Purpose": "通用语音段检测组件",
+    "SizeText": "约 2 MB",
+    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+    "FolderName": "silero-vad",
+    "RequiredFiles": ["silero_vad.onnx"],
+    "Recommended": true,
+    "LiveCapable": true,
+    "BatchCapable": true
+  }
+]
