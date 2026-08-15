@@ -16,23 +16,23 @@
 
 正式稳定回滚基线：**v0.1.7**。
 
-当前实验候选：**v0.3.3**。
+当前实验候选：**v0.3.4**。
 
-v0.3.3 完成完整 CI 的准确代码 head：`e088d8c7a918cc1cfba178df47c0da688ddd17a1`
+v0.3.4 完成完整 CI 的准确代码 head：`0ff1a9329f1fb34601cdf033167c4d85a7fab5fc`
 
-P103 CI run：`31883251539`
+P103 CI run：`31884396260`
 
 CI：**success**。
 
-Artifact：`DavBridge-v0.3.3-win-x64`
+Artifact：`DavBridge-v0.3.4-win-x64`
 
-Artifact ZIP SHA256：`872b1338cce717b5b2f6b0ee5b00a75f4bae7ce9ad11e1d3821698dcd061aa28`
+Artifact ZIP SHA256：`dce49eab9343ff1bd2ee6a7a8cfbcbbd5a96f9a7eb93e02ae07500a7fff31afc`
 
-EXE SHA256：`620206137f34668f47f11b498c2c8a3cb9ba04dcab862f4d53de5803c950ddb1`
+EXE SHA256：`7de38ae725020b8d98138378f1d85a8b837e16d6423c1af87930d85347452b75`
 
 本 HANDOFF 之后若存在 `[skip ci]` 纯文档提交，不得把文档 head 当成已构建代码 head。
 
-`main` 与 `p103-stable` 继续保持 v0.1.7。v0.3.3 未经用户实机确认不得提升。
+`main` 与 `p103-stable` 继续保持 v0.1.7。v0.3.4 未经用户实机确认不得提升。
 
 ## 固定读取顺序
 
@@ -123,47 +123,79 @@ v0.3 新增：
 
 不得重新在主页、转移页、回收站堆大量灰色小字说明。
 
-## v0.3.3 信息密度收口
+## v0.3.3 UI 事故与 v0.3.4 紧急回退
 
-v0.3.2 实机截图继续显示同一信息被标题、数字、说明文字和 bar 重复表达。用户明确要求能放入进度条或状态条的信息尽量直接内嵌。
+v0.3.3 为了把文字直接塞入进度条，引入了 `UiDensityV033` 运行时显示层。该层会在程序启动后：
 
-v0.3.3 只改变 UI 表达，不改变迁移、对账、额度或删除安全逻辑。
+- 给既有 `MeterV030` 叠加新的 overlay 控件；
+- 隐藏原控件和若干文字控件；
+- 动态修改既有 `TableLayoutPanel.RowStyles`；
+- 隐藏转移页卡片、表格列和多个标题说明；
+- 替换原阶段区域。
 
-本轮原则：**bar 本身就是信息载体。**
+用户实机证明这套做法破坏了四个一级页面的布局。CI 的无头 WinForms 构造测试没有能力替代真实窗口可见状态，因此此前 CI success 不能作为该视觉结构正确的依据。
 
-- 镜像覆盖数直接显示在覆盖 bar 内，不再额外占一行数值。
-- 当前文件名、等待原因或当前动作直接显示在当前任务 bar 内。
-- 上传和下载的 `已用 / 总额` 直接显示在各自额度 bar 内。
-- 转移页当前任务直接显示在任务 bar 内。
-- 转移页整体镜像覆盖数直接显示在覆盖 bar 内。
-- “本周期”的对账、修复、迁移三项改为一条紧凑阶段带，不再使用“本周期 + 三段分散文字”。
-- 转移页重复的“当前状态”说明卡移除。
-- 转移任务池表格删除常驻“处理顺序”长句列，只保留任务池与数量，处理规则进入悬浮说明和文档。
-- 转移、回收站、文档页标题下方的重复副标题不再常驻。
-- 重置日期常驻缩短为紧凑日期，完整“09:00 后真实探测”等解释进入悬浮说明。
+**v0.3.3 判定为失败 UI 候选，不得继续沿用。**
 
-v0.3.3 使用 `UiShellV032 + UiDensityV033`。Density 层只负责显示压缩，不拥有业务状态机。
+v0.3.4 的处理不是继续给 Density 层打补丁，而是完整撤销：
 
-## 自动验证
+- `Program.cs` 恢复只挂载 `UiShellV032`；
+- `UiDensityV033.cs` 从当前分支删除；
+- v0.3.4 运行时代码重新与 v0.3.2 已构建 shell 对齐；
+- 相对 v0.3.2 准确构建 head `8a800bb1a8cc51cbef9979dbf6f71e2a4e6d8ec5`，代码目录除产品版本号外无运行逻辑差异。
 
-准确构建 head：`e088d8c7a918cc1cfba178df47c0da688ddd17a1`
+### 后续 UI 修改硬约束
 
-CI run：`31883251539`，结果 **success**。
+今后若继续减少文字或把信息放入 bar：
 
-继续通过：scope、Core Smoke、原 Cycle / StrongVerified / SourceChanged / WaitQuota / WriteUnknown / 412 / 回收站 / DELETE 安全回归、Windows x64 单 EXE publish、Runtime boundary、Windows 隔离 self-test、v0.3.2 原有 900×620 / 大窗口 / DPI / 无默认滚动条 / 四 Tab / Logo 路由布局门，以及 v0.3.3 Density 构造。
+- 禁止再通过独立运行时 overlay 层批量接管既有页面；
+- 禁止为了压缩信息在运行时批量改 `RowStyles`、隐藏父级卡片或跨页修改布局；
+- 应直接在 `UiShellV032` 或其后继单一 shell 的布局源头设计；
+- 每次只改一个页面或一类控件，小步实机确认后再继续；
+- 总览、转移、回收站、文档四页必须逐页实机截图验收；
+- CI 只证明构造、编译和自动安全回归通过，不能声称视觉验收通过。
+
+## v0.3.4 自动验证
+
+准确构建 head：`0ff1a9329f1fb34601cdf033167c4d85a7fab5fc`
+
+CI run：`31884396260`，结果 **success**。
+
+通过：
+
+- scope；
+- Core Smoke；
+- 原 Cycle / StrongVerified / SourceChanged / WaitQuota / WriteUnknown / 412 / 回收站 / DELETE 安全回归；
+- Windows x64 framework-dependent 单 EXE publish；
+- Runtime boundary；
+- Windows 隔离 self-test；
+- v0.3.2 单一 `UiShellV032` 构造；
+- 900×620、大窗口、125% 与 150% DPI 原布局门；
+- 默认无内容区滚动条；
+- 四个一级 Tab；
+- Logo 路由；
+- SHA256；
+- Artifact upload。
+
+Artifact：`DavBridge-v0.3.4-win-x64`
+
+Artifact ZIP SHA256：`dce49eab9343ff1bd2ee6a7a8cfbcbbd5a96f9a7eb93e02ae07500a7fff31afc`
+
+EXE SHA256：`7de38ae725020b8d98138378f1d85a8b837e16d6423c1af87930d85347452b75`
 
 CI 是自动验证，不替代用户实机视觉验收和真实 WebDAV DELETE 验证。
 
 ## 当前实机断点
 
-下一步只验收 v0.3.3 UI，不提升 stable：
+下一步只验收 v0.3.4 是否完整恢复 v0.3.2 shell，不提升 stable：
 
-1. 首页覆盖、当前任务、上传、下载文字是否自然进入 bar，并明显减少重复文字。
-2. 三阶段紧凑带是否比旧“本周期 + 三列文字”更自然。
-3. 转移页是否只保留必要的任务池、数量、当前任务和覆盖信息。
-4. 回收站与文档页是否继续简洁，不重新出现说明文字堆叠。
-5. 悬浮提示能否承担被移除的解释。
-6. 暂停、继续、设置、托盘、重启和当前迁移行为保持正常。
+1. 总览布局是否恢复，不再出现 v0.3.3 的挤压、错位和异常留白。
+2. 转移页任务池、当前状态、当前任务、覆盖区域是否恢复 v0.3.2 结构。
+3. 回收站三个筛选器、表格和底部操作区是否恢复。
+4. 文档左侧导航与正文区是否恢复。
+5. 设置、暂停、继续、托盘、重启和当前迁移行为保持正常。
+
+确认 v0.3.4 恢复稳定后，再讨论下一轮 UI 精简。下一轮不能直接重做 v0.3.3 的 overlay 方案。
 
 真实 DELETE 仍需等合法跨周期候选出现后再做真实账户验证。
 
