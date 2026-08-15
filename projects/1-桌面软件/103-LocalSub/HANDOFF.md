@@ -18,6 +18,7 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - 字幕使用 WebView2 + HTML/CSS。
 - 自有可下载组件尽量位于 EXE 目录树，不主动散落到 Program Files / AppData。
 - CI 不只验证编译，必须做 EXE 启动、Windows Process Loopback 真激活和 sherpa native DLL 加载门禁。
+- 当前用户核心语言限定为中文、英文；多语言优化与翻译延后，不进入当前阶段。
 
 ## 当前开发分支与版本
 
@@ -27,9 +28,10 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 ## 当前已实机确认
 
 - `所有音频 + Streaming Paraformer 中英 INT8` 可以真实出字幕，因此模型、sherpa runtime、全局 loopback、16 kHz 音频链和 HTML 输出主链已经真实跑通。
-- 用户反馈 Streaming Paraformer 整体识别效果一般，准确率不足，因此后续将其定位为“低延迟/极速实时档”，不作为高准确率默认档。
-- PotPlayer 普通窗口和全屏的外部字幕覆盖已经实机确认可见。此前全屏字幕被遮挡的问题已通过持续 `SetWindowPos(HWND_TOPMOST, ..., SWP_NOACTIVATE)` 修复。该链现阶段冻结，非回归不再改动。
-- SenseVoice Small INT8 仍未通过用户实机验证。上一版只能看到“正在启动实时识别”，随后没有字幕，因此必须继续收口 SenseVoice 检测/解码链。
+- 用户反馈 Streaming Paraformer 整体识别效果一般，准确率不足，因此定位为“低延迟/极速实时档”。
+- `Streaming Zipformer Large 中文 INT8` 用户实机反馈“好一点，还是可以的”，当前作为中文实时推荐候选。
+- PotPlayer 普通窗口和全屏的外部字幕覆盖已经实机确认可见。全屏字幕链冻结，非回归不再改动。
+- SenseVoice Small INT8 仍未通过用户实机验证，继续作为模拟流式/后台候选而非当前默认实时档。
 
 ## 当前已实现
 
@@ -46,39 +48,22 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 - `Streaming Paraformer 中英 INT8`：低延迟实时，普通话/英语，当前实机可用但准确率一般。
 - `Streaming Paraformer 中英粤 INT8`：低延迟实时，普通话/粤语/英语。
-- `Streaming Zipformer Large 中文 INT8`：新增中文准确率取向的真流式候选，模型 catalog 中独立下载，约 160 MB，使用 `encoder.int8.onnx + decoder.onnx + joiner.int8.onnx + tokens.txt`。
-- `SenseVoice Small INT8`：中英日韩粤，作为较高准确率的 VAD/能量分段模拟流式及后台模型。
-- `Fun-ASR-Nano INT8`：高质量后台模型，不进入第一阶段实时默认档。
+- `Streaming Zipformer Large 中文 INT8`：中文准确率取向真流式模型，已实机验证比 Paraformer 更好一些。
+- `SenseVoice Small INT8`：中英日韩粤，作为 VAD/能量分段模拟流式及后台模型，继续修复。
+- `Fun-ASR-Nano INT8`：高质量后台模型。
 
 ### SenseVoice 当前修复
 
-- 原始模拟流式方案使用 Silero VAD，16 kHz 音频按 512 samples 固定窗口送入 VAD，并周期性 interim decode。
-- 用户实机仍无字幕后，当前实现增加“VAD 优先 + RMS 音量 fallback”。电影/视频系统音频中音乐和音效可能导致 VAD 不稳定，fallback 不再让 VAD 成为唯一语音起始/结束闸门。
+- VAD 优先 + RMS 音量 fallback。
 - 当前参数：能量起始 RMS 0.008、维持 RMS 0.0035、连续 4 个 512-sample 窗口触发、550 ms 低能量判为停顿、最长单段 6.5 s。
 - 语音进行时约每 650 ms 做一次 SenseVoice interim decode；停顿或达到最长分段时执行 final decode。
-- 若 VAD 已产生 segment 但解码为空，会用累计 buffer 再解码一次。
-- 状态区现在可区分：
-  - `SenseVoice VAD 检测到语音，正在识别`
-  - `SenseVoice 音量检测到语音，正在识别（VAD fallback）`
-  - `SenseVoice 已执行解码但返回空文本（第 N 次），继续监听`
-  - VAD/fallback 分段完成状态
-- 因此下一轮用户实机若仍无字幕，只需截图实时状态即可判断是检测失败还是识别器返回空文本。
-
-### Streaming Zipformer Large
-
-- 新增模型 ID：`streaming-zipformer-zh-large-int8`。
-- catalog 名称：`Streaming Zipformer Large 中文 INT8`。
-- 使用 sherpa 在线 Transducer 路径，配置 `encoder.int8.onnx`、`decoder.onnx`、`joiner.int8.onnx`、`tokens.txt`。
-- 与 Paraformer 共用现有 sherpa 1.13.4 native runtime，不增加程序包 runtime。
-- 作为中文准确率取向实时候选，是否优于当前 Paraformer 以用户同片段实机 A/B 为准，不预先承诺。
+- 状态区区分 VAD 检测、RMS fallback、解码空文本等状态。
 
 ### PotPlayer Process Loopback
 
-- 旧版 NAudio 2 COM RCW 强转曾触发 `0x80004002 E_NOINTERFACE`，已改 raw COM。
 - 当前链：`ActivateAudioInterfaceAsync -> IAudioClient -> IAudioCaptureClient -> event-driven capture -> mono/16 kHz`。
-- Windows 10 build 19045 不再按 20348 门槛提前阻断，19041+ 实际尝试，真实失败才返回 HRESULT。
+- Windows 10 build 19045 允许实际尝试，不再被错误门槛阻断。
 - CI 已真实执行 Process Loopback 激活、Initialize、GetService、Start、Stop。
-- 用户 19045 上 PotPlayer 专用有声捕获是否完全稳定仍需继续实机确认。
 
 ### 字幕显示与跟随
 
@@ -86,52 +71,40 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - 60 ms 跟随 PotPlayer 最大可见顶层窗口。
 - 每次跟随和每次新字幕写入均重新断言 `HWND_TOPMOST`，不抢 PotPlayer 焦点。
 - 用户已确认全屏有字幕，本问题当前视为解决。
-- 字幕只保留当前句 + 上一句，最多两个条目。
-- 最后一次识别更新后 3 秒自动清空，空条目在 HTML 中 `display:none`，不留空黑框。
+- 字幕只保留当前句 + 上一句，最后一次识别更新后 3 秒自动清空。
+- 当前默认 CSS 仍偏测试版：当前句 34 px、font-weight 600、黑色半透明块底纹。用户已明确要求下一轮调整并开放位置、字号、尺寸、底纹等设置。
 
-### 后台方向
+## 2026-08-16 下一阶段用户裁决
+
+用户明确同意进入第二阶段，要求：
+
+1. **字幕样式正式可调**。默认应比当前更小、更轻，优先采用无整块底纹、黑色描边/阴影的播放器原生风格。设置至少包含字号/自动字号、底部偏移、最大宽度、底纹模式和透明度、显示时长，并提供实时预览。
+2. **模型表格扩展**。把当前讨论过且对中文/英文有实际意义的模型都加入 catalog，并在模型表格显示体积、实时性评分、准确率评分、综合性价比。评分属于 LocalSub 面向 CPU 本地字幕场景的相对工程评分，后续可根据用户实机 A/B 调整，不伪装成官方基准。
+3. **实时模型继续扩展**。除现有 Zipformer Large 外，加入 Zipformer XLarge Transducer、Zipformer CTC Large、Zipformer CTC XLarge 等中文流式候选；保留 Paraformer 中英作为英文/低延迟档。用户目前只关心中文、英文，多语言和翻译暂缓。
+4. **后台视频解析正式开始**。不再只保留拖放占位。第一步闭环为：拖入视频 -> 解析媒体/音频轨 -> 解码音频 -> 生成声音波形/幅度轨 -> 显示媒体时长、音频信息与解析进度。随后在该时间轴上接 VAD、离线 ASR、关键词事件。
+5. 媒体解析组件仍遵循绿色规则。若采用 FFmpeg，不塞进每次程序补丁，应下载/放置在 EXE 目录树下独立复用，不污染 Program Files/AppData。
+
+## 后台方向
 
 - 已有文件拖放队列、关键词数据结构和 TXT exporter 骨架。
-- FFmpeg/媒体解码、波形、VAD、离线 ASR、关键词时间轴尚未进入可用闭环。
+- 下一准确实现断点：接媒体探测与音频解码、声音波形时间轴，然后接 VAD 和离线 ASR。
 
 ## 关键故障记录
 
 - 模型页复杂 SplitContainer 曾导致启动秒退，已改安全 TableLayoutPanel，并固化 EXE startup smoke test。
 - `.tar.bz2` 曾下载成功但 ArchiveFactory 解压失败，已改 ReaderFactory。
 - 旧 Process Loopback NAudio 2 RCW 强转触发 E_NOINTERFACE，已改 raw COM。
-- Windows 19045 曾因错误的 20348 门槛被阻断，已改 19041+ 实际尝试。
+- Windows 19045 曾因错误的 20348 门槛被阻断，已改实际尝试。
 - sherpa managed wrapper 曾把 `onnxruntime.dll` 传递带回 publish，CI 已拦截并在 publish 阶段剥离。
-- SenseVoice 第一轮直接喂任意块给 VAD，无字幕；改 512-sample 官方同型流程后用户仍无字幕，现进一步加入 RMS fallback 与明确诊断状态。
-- PotPlayer 全屏 overlay 曾不可见，已增加持续 TopMost Z-order 维护，用户已经实机确认全屏有字幕。
+- PotPlayer 全屏 overlay 曾不可见，已增加持续 TopMost Z-order 维护，用户已实机确认解决。
 
 ## 最新构建验证
 
 - 最新代码验证 head：`3df59dc943577347c621e93f894bc3a23299b003`。
 - Windows CI run：`31894237657`，结论 success。
-- `dotnet publish`：success。
-- `Prepare portable layout`：success，native ASR runtime 仍被剥离。
-- `Smoke test LocalSub startup`：success。
-- `Smoke test Windows process loopback`：success。
-- `Verify sherpa win-x64 runtime package`：success。
-- `Package portable ZIP`：success，发布包仍无模型、无 ONNX Runtime、无 sherpa native runtime。
-- 最新 catalog head：`36f3ce45b007861411b506cfae2619bc53a29181`，仅新增/调整 `model-catalog.json`，无代码变化。
-
-## 用户下一步实机验证
-
-1. 覆盖最新增量包，只替换 `LocalSub.exe` 与 `Assets/model-catalog.json`，不删除现有 ASR、SenseVoice、Paraformer、Silero VAD 或 `ASR\_runtime`。
-2. `所有音频 + SenseVoice Small INT8`：观察状态是 VAD 检测、RMS fallback，还是“解码返回空文本”。如果仍无字幕，直接截图状态行即可继续定位。
-3. 在模型页下载 `Streaming Zipformer Large 中文 INT8`，使用与 Paraformer 相同的中文视频片段做 A/B，比较准确率、延迟和 CPU 占用。
-4. 全屏字幕已经验证通过，不再作为本轮重点。
-5. PotPlayer 专用音源若仍有异常，单独记录状态/HRESULT，不要与模型准确率问题混在一起。
-
-## 当前真实未完成项
-
-- SenseVoice 最新 VAD + RMS fallback 路径的用户实机验证。
-- Streaming Zipformer Large 的用户实机准确率/性能验证。
-- Windows 19045 上 PotPlayer Process Loopback 有声实机稳定性确认。
-- 实时字幕字号、偏移、显示时长等可配置项尚未收口，目前显示时长固定 3 秒。
-- 后台 FFmpeg/媒体解码、波形、VAD、离线 ASR 流水线尚未接入。
+- `dotnet publish`、EXE startup、Process Loopback、sherpa native runtime、轻量打包均 success。
+- 最新 catalog head 在此后继续更新模型列表。
 
 ## 下一准确断点
 
-先收口实时识别质量。若 SenseVoice 状态显示“检测到语音”但反复“解码返回空文本”，直接检查 OfflineRecognizer 配置、模型/runtime ABI 和音频 buffer，而不再调整 VAD；若 SenseVoice 能出字，则比较其延迟/准确率与 Zipformer Large。Zipformer Large 与 Paraformer 用同一片段实机 A/B 后，再决定默认实时模型。全屏 overlay 已验证，除非回归不再修改。
+优先一次性推进三项：字幕样式设置、完整模型评分表、后台媒体解析与声音波形。实时主链和全屏 overlay 已有可用基线，除非回归不再重构。后台解析第一版先做到“视频拖入后很快看见媒体信息和声音波形”，再把离线 ASR 接到同一时间轴。
