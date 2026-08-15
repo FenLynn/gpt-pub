@@ -9,10 +9,34 @@ namespace DavBridge;
 /// </summary>
 internal static class MeterTextSpriteV039
 {
-    internal static Bitmap? Render(string text, int maxWidth, int maxHeight, float targetPixels, Color color)
+    private const int MaxCacheEntries = 96;
+    private static readonly object CacheGate = new();
+    private static readonly Dictionary<SpriteKey, Bitmap> Cache = new();
+    private static readonly Queue<SpriteKey> CacheOrder = new();
+
+    internal static Bitmap? Get(string text, int maxWidth, int maxHeight, float targetPixels, Color color)
     {
         if (string.IsNullOrWhiteSpace(text) || maxWidth <= 0 || maxHeight <= 0) return null;
+        var key = new SpriteKey(text, maxWidth, maxHeight, (int)Math.Round(targetPixels * 10F), color.ToArgb());
+        lock (CacheGate)
+        {
+            if (Cache.TryGetValue(key, out var cached)) return cached;
+            var rendered = Render(text, maxWidth, maxHeight, targetPixels, color);
+            if (rendered is null) return null;
+            Cache[key] = rendered;
+            CacheOrder.Enqueue(key);
+            while (Cache.Count > MaxCacheEntries && CacheOrder.Count > 0)
+            {
+                var oldest = CacheOrder.Dequeue();
+                if (!Cache.Remove(oldest, out var bitmap)) continue;
+                bitmap.Dispose();
+            }
+            return rendered;
+        }
+    }
 
+    private static Bitmap? Render(string text, int maxWidth, int maxHeight, float targetPixels, Color color)
+    {
         var startPixels = Math.Clamp(targetPixels, 6F, Math.Max(6F, maxHeight));
         for (var pixels = startPixels; pixels >= 5F; pixels -= 0.5F)
         {
@@ -93,4 +117,6 @@ internal static class MeterTextSpriteV039
         }
         return sprite;
     }
+
+    private readonly record struct SpriteKey(string Text, int Width, int Height, int TargetTenths, int Argb);
 }
