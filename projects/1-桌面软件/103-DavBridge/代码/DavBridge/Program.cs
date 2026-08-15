@@ -35,6 +35,7 @@ internal static class Program
                 singleInstance.Attach(form);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
                 using var shell = UiShellV032.Attach(form, host, reconciliation);
+                using var inlineText = UiOverviewInlineTextV035.Attach(shell);
                 Application.Run(form);
             }
             finally
@@ -86,11 +87,12 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
-                uiGeneration = "v0.3.2-consolidated-shell",
+                uiGeneration = "v0.3.5-native-overview-inline-text",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
+                overviewInlineTextExpected = true,
                 ok = true
             });
         }
@@ -111,11 +113,12 @@ internal static class Program
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
-                uiGeneration = "v0.3.2-consolidated-shell",
+                uiGeneration = "v0.3.5-native-overview-inline-text",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
+                overviewInlineTextExpected = true,
                 ok = true
             });
         }
@@ -148,6 +151,7 @@ internal static class Program
         AppBranding.Apply(form);
         using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
         using var shell = UiShellV032.Attach(form, host, reconciliation);
+        using var inlineText = UiOverviewInlineTextV035.Attach(shell);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
@@ -156,6 +160,7 @@ internal static class Program
         form.PerformLayout();
         if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
             shell.ValidateLayout(name);
+        inlineText.ValidateLayout(name);
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
