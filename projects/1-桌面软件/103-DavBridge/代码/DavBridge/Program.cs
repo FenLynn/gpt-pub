@@ -28,14 +28,16 @@ internal static class Program
         {
             ApplicationConfiguration.Initialize();
             using var host = new AppHost();
-            var form = new MainForm(host, args.Contains("--background", StringComparer.OrdinalIgnoreCase));
+            var launchInBackground = args.Contains("--background", StringComparer.OrdinalIgnoreCase);
+            var form = new MainForm(host, launchInBackground);
             try
             {
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
                 using var shell = UiShellV032.Attach(form, host, reconciliation);
-                using var meterText = UiOverviewMeterTextV036.Attach(shell);
+                using var meterText = UiOverviewMeterTextV037.Attach(shell);
+                using var homeController = WindowHomeControllerV037.Attach(form, host, shell, launchInBackground);
                 Application.Run(form);
             }
             finally
@@ -87,12 +89,14 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
-                uiGeneration = "v0.3.6-native-meter-text",
+                uiGeneration = "v0.3.7-meter-fit-home-activation",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
                 overviewNativeMeterTextExpected = true,
+                meterTextFitExpected = true,
+                explicitActivationReturnsOverview = true,
                 layoutReparentExpected = false,
                 ok = true
             });
@@ -114,12 +118,14 @@ internal static class Program
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
-                uiGeneration = "v0.3.6-native-meter-text",
+                uiGeneration = "v0.3.7-meter-fit-home-activation",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
                 overviewNativeMeterTextExpected = true,
+                meterTextFitExpected = true,
+                explicitActivationReturnsOverview = true,
                 layoutReparentExpected = false,
                 ok = true
             });
@@ -153,7 +159,8 @@ internal static class Program
         AppBranding.Apply(form);
         using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
         using var shell = UiShellV032.Attach(form, host, reconciliation);
-        using var meterText = UiOverviewMeterTextV036.Attach(shell);
+        using var meterText = UiOverviewMeterTextV037.Attach(shell);
+        using var homeController = WindowHomeControllerV037.Attach(form, host, shell, launchInBackground: false);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
@@ -163,6 +170,7 @@ internal static class Program
         if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
             shell.ValidateLayout(name);
         meterText.ValidateLayout(name);
+        homeController.Validate(name);
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
