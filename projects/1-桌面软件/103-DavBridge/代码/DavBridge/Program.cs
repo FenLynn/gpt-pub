@@ -33,16 +33,8 @@ internal static class Program
             {
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
-                using var dashboard = UiDashboardV027.Attach(form, host);
-                using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
-                using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
-                using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
-                using var waitQuotaMaintenance = WaitQuotaMaintenanceHostV0222.Attach(host);
-                using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
-                using var activityTabs = UiActivityTabsV0224.Attach(form, dashboard, host, waitQuotaMaintenance);
-                using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
-                using var refinement = UiRefinementV0224.Attach(form, dashboard);
-                using var routeQuotaPatch = UiRouteQuotaPatchV0225.Attach(dashboard, host);
+                using var reconciliation = ReconciliationRuntimeV030.Attach(host);
+                using var shell = UiShellV030.Attach(form, host, reconciliation);
                 Application.Run(form);
             }
             finally
@@ -94,6 +86,7 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
+                uiGeneration = "v0.3.0-shell",
                 layoutScenarios = 5,
                 ok = true
             });
@@ -115,6 +108,7 @@ internal static class Program
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
+                uiGeneration = "v0.3.0-shell",
                 layoutScenarios = 5,
                 ok = true
             });
@@ -131,10 +125,10 @@ internal static class Program
         var scenarios = new (string Name, int Width, int Height, float Scale)[]
         {
             ("compact-100", 700, 520, 1.00f),
-            ("default-100", 880, 570, 1.00f),
+            ("default-100", 900, 620, 1.00f),
             ("large-100", 1200, 760, 1.00f),
-            ("default-125", 880, 570, 1.25f),
-            ("default-150", 880, 570, 1.50f)
+            ("default-125", 900, 620, 1.25f),
+            ("default-150", 900, 620, 1.50f)
         };
 
         foreach (var scenario in scenarios)
@@ -146,23 +140,15 @@ internal static class Program
         using var host = new AppHost();
         using var form = new MainForm(host, launchInBackground: false);
         AppBranding.Apply(form);
-        using var dashboard = UiDashboardV027.Attach(form, host);
-        using var interactionPolish = UiInteractionCleanV0215.Attach(form, dashboard, host);
-        using var resetCountdown = UiResetCountdownV0216.Attach(dashboard, host);
-        using var messageBar = UiMessageBarV0216.Attach(form, dashboard, host);
-        using var waitQuotaMaintenance = WaitQuotaMaintenanceHostV0222.Attach(host);
-        using var finalPolish = UiFinalPolishV0217.Attach(form, dashboard);
-        using var activityTabs = UiActivityTabsV0224.Attach(form, dashboard, host, waitQuotaMaintenance);
-        using var buttonPolish = UiButtonPolishV0219.Attach(dashboard);
-        using var refinement = UiRefinementV0224.Attach(form, dashboard);
-        using var routeQuotaPatch = UiRouteQuotaPatchV0225.Attach(dashboard, host);
+        using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
+        using var shell = UiShellV030.Attach(form, host, reconciliation);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
             form.Scale(new SizeF(scale, scale));
         form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
         form.PerformLayout();
-        UiLayoutSelfTestV0217.Validate(form, dashboard, name);
+        shell.ValidateLayout(name);
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
