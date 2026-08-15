@@ -16,23 +16,23 @@
 
 正式稳定回滚基线：**v0.1.7**。
 
-当前实验候选：**v0.3.6**。
+当前实验候选：**v0.3.7**。
 
-v0.3.6 完成完整 CI 的准确代码 head：`5d3f408dfc1a6ca4f814dfaa81bc1b045b3450e5`
+v0.3.7 完成完整 CI 的准确代码 head：`3e9e049b4c4c9791db8ce8149b537b732471af91`
 
-P103 CI run：`31888280415`
+P103 CI run：`31890467083`
 
 CI：**success**。
 
-Artifact：`DavBridge-v0.3.6-win-x64`
+Artifact：`DavBridge-v0.3.7-win-x64`
 
-Artifact ZIP SHA256：`3ecdefdaaa1582be2c4575720869a6c580498e292d905f0f177ab77e2c782759`
+Artifact ZIP SHA256：`8ab1fc6faad3480429b44ee647edbc3aa5f3cb29db25e705faaf855375ab14fb`
 
-EXE SHA256：`b472cb4ff0914b17fb13387eb17bf5d2ccb97ea4201c4e924a32d8d17d419c91`
+EXE SHA256：`be5a615cc6788827593e17690c35f8961f076a8e4dfc3f68c4bfb47625f60725`
 
-本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得被当成已构建代码 head。**准确已构建代码 head 始终是上面的 `5d3f408...`。**
+本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得被当成已构建代码 head。准确已构建代码 head 始终是上面的 `3e9e049...`。
 
-`main` 与 `p103-stable` 未在本轮修改。v0.3.6 未经用户实机视觉确认不得提升。
+`main` 与 `p103-stable` 未在本轮修改。v0.3.7 未经用户实机视觉确认不得提升。
 
 ## 固定读取顺序
 
@@ -123,56 +123,55 @@ v0.3 新增：
 
 不得重新在主页、转移页、回收站堆大量灰色小字说明。
 
-## v0.3.3、v0.3.5 UI 事故与 v0.3.6 修正
+## UI 事故与当前正确实现
 
 ### v0.3.3
 
-v0.3.3 为了压缩信息，引入 `UiDensityV033` 运行时显示层，批量叠 overlay、隐藏原控件并修改 `TableLayoutPanel.RowStyles`。用户实机证明它同时破坏总览、转移、回收站和文档页面。该方案已经永久否决。
+`UiDensityV033` 通过 overlay、隐藏控件和运行时修改 `RowStyles` 压缩信息，实机破坏多个一级页面。该方案永久否决。
 
 ### v0.3.4
 
-v0.3.4 完整撤销 v0.3.3，恢复 v0.3.2 的单一稳定 `UiShellV032`。v0.3.4 是后续几何布局基线。
+完整恢复 v0.3.2 的单一稳定 `UiShellV032`，并作为后续几何布局基线。
 
 ### v0.3.5
 
-v0.3.5 再次尝试把数值放入 bar，但错误地把原 Label 从既有 `TableLayoutPanel` 中 reparent 到 `MeterV030`，同时重新分配局部行高。虽然 CI 可以通过构造检查，用户实机仍清楚显示：
-
-- 卡片和 bar 被无谓加厚；
-- 上传、下载文字视觉基线不正确；
-- 当前任务 Pulse 形成误导性的蓝色块；
-- 四条 bar 的视觉重量和文字规则不一致。
-
-因此 **v0.3.5 判定为失败 UI 候选，不得继续沿用其 reparent 方案。**
+把原 Label reparent 到 Meter 并修改局部行高，实机出现 bar 过厚、文字位置错误和当前任务 Pulse 误导。该方案永久否决。
 
 ### v0.3.6
 
-v0.3.6 完整删除 `UiOverviewInlineTextV035.cs`，改用原生绘制：
+改为 `MeterV030.OnPaint()` 原生绘制动态文字，不再 reparent、不改 RowStyles。结构正确，但用户实机证明 14 px 的上传、下载额度条中 7.4 pt 字体仍会贴底并发生视觉裁切。
 
-- `MeterV030.OnPaint()` 最后直接绘制可选 `DisplayTextProvider` 文本；
-- 不创建替代 Meter，不创建 overlay；
-- 原 Label 和 Meter 的父级不变；
-- 原 TableLayoutPanel cell 不变；
-- 不修改 `RowStyles`；
-- Meter 内没有子控件；
-- 当前任务 bar 在存在文字时抑制 Pulse，避免把等待或准备状态画成误导性的进度块；
-- `UiOverviewMeterTextV036` 只把原 Label 的动态文本作为 Meter 的绘制数据源，并隐藏原 Label，不接管布局。
+### v0.3.7
 
-自动 UI 自检明确检查父级、cell、Meter 子控件数、native text provider、尺寸和 DrawToBitmap。它用于证明结构没有再次被 reparent 或挤坏，**仍不能替代用户实机视觉验收**。
+只修复 v0.3.6 暴露的两个问题，不调整页面几何：
+
+- `UiOverviewMeterTextV037` 保持原 Label 和 Meter 的父级、TableLayoutPanel cell 与尺寸完全不变；
+- 覆盖、当前任务使用 8.0 pt；上传、下载的 14 px bar 使用 6.2 pt；
+- 自动自检使用与真实示例相近的字符串测量文本像素高度，要求文字高度小于 Meter 实际高度并保留边界；
+- 当前任务存在文本时继续抑制 Pulse；
+- 不创建 overlay，不创建替代 Meter，不 reparent，不改 RowStyles。
+
+显式打开行为同时统一：
+
+- Windows 登录自启动仍通过 `--background`，允许进入托盘；
+- 用户手工双击 EXE 时，即使设置中保留“启动后默认进入托盘”，也应恢复主窗口并显示总览；
+- 已运行时再次双击 EXE，通过单实例事件恢复主窗口并强制回到总览；
+- 托盘双击或“打开 DavBridge”在窗口重新可见时同样回到总览。
 
 ### 后续 UI 修改硬约束
 
-- 禁止通过运行时 overlay 批量接管页面。
+- 禁止运行时 overlay 批量接管页面。
 - 禁止 reparent 原有 Label 到 Meter。
 - 禁止为了文字进 bar 修改既有 `RowStyles`。
 - 简单显示需求优先在原控件自身 Paint 层实现。
 - v0.3.4 的页面几何结构是当前基线，除非用户明确要求重构，不得顺手调整尺寸和层级。
-- CI 只证明构造、编译和自动安全回归，不能声称视觉效果已经实机验收。
+- CI 只证明构造、编译、安全回归与自动边界，不能声称真实视觉效果已验收。
 
-## v0.3.6 自动验证
+## v0.3.7 自动验证
 
-准确构建 head：`5d3f408dfc1a6ca4f814dfaa81bc1b045b3450e5`
+准确构建 head：`3e9e049b4c4c9791db8ce8149b537b732471af91`
 
-CI run：`31888280415`，结果 **success**。
+CI run：`31890467083`，结果 **success**。
 
 通过：
 
@@ -183,29 +182,32 @@ CI run：`31888280415`，结果 **success**。
 - Runtime boundary；
 - Windows 隔离 self-test；
 - 700×520、900×620、1200×760、125% 与 150% DPI 构造；
-- v0.3.2/v0.3.4 shell 原布局门；
-- native Meter 文字绘制 DrawToBitmap；
-- Label/Meter 父级与 TableLayoutPanel cell 保持不变；
+- v0.3.4 shell 原布局门；
+- native Meter 文字绘制；
+- quota 示例文字高度与 14 px bar 适配检查；
+- Label/Meter 父级、TableLayoutPanel cell 保持不变；
 - Meter 不拥有被搬入的 Label 子控件；
+- 显式激活会把 shell 返回 Overview 的自检；
 - SHA256；
 - Artifact upload。
 
-Artifact：`DavBridge-v0.3.6-win-x64`
+Artifact：`DavBridge-v0.3.7-win-x64`
 
-Artifact ZIP SHA256：`3ecdefdaaa1582be2c4575720869a6c580498e292d905f0f177ab77e2c782759`
+Artifact ZIP SHA256：`8ab1fc6faad3480429b44ee647edbc3aa5f3cb29db25e705faaf855375ab14fb`
 
-EXE SHA256：`b472cb4ff0914b17fb13387eb17bf5d2ccb97ea4201c4e924a32d8d17d419c91`
+EXE SHA256：`be5a615cc6788827593e17690c35f8961f076a8e4dfc3f68c4bfb47625f60725`
 
 ## 当前实机断点
 
-下一步只验收 v0.3.6 总览显示，不提升 stable：
+下一步只验收 v0.3.7，不提升 stable：
 
-1. 页面几何、Logo、四个 Tab、阶段区、按钮位置应与 v0.3.4 相同。
-2. 镜像覆盖数字应直接绘制在原覆盖 bar 内，bar 本身不应变厚。
-3. 当前任务文字应在原任务 bar 内，等待或准备时不应再出现误导性的移动蓝块。
-4. 上传、下载数值应在原额度 bar 内真正垂直居中。
-5. 转移、回收站、文档三页本轮没有视觉结构改造，应保持 v0.3.4 观感。
-6. 只有用户实机截图确认后，才能把本轮视觉效果记为通过。
+1. 上传、下载额度文字必须完整处于原 14 px bar 内，不再贴底或被裁切。
+2. 镜像覆盖和当前任务继续保持 v0.3.4 原几何，文字在 bar 内自然可读。
+3. 手工双击 EXE 应显示主窗口总览，不因 `StartMinimized` 直接留在托盘。
+4. 已运行时切到“转移 / 回收站 / 文档”任意页后，再双击 EXE，应恢复或激活窗口并切回“总览”。
+5. Windows 登录自启动的 `--background` 路径仍允许后台进入托盘。
+6. 转移、回收站、文档三页没有结构改造，应保持原观感。
+7. 只有用户实机截图确认后，才能把视觉与真实激活行为记为通过。
 
 真实 DELETE 仍需等合法跨周期候选出现后再做真实账户验证。
 
