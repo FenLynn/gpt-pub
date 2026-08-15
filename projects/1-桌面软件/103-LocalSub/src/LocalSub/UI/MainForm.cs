@@ -10,13 +10,17 @@ public sealed class MainForm : Form
     IReadOnlyList<ModelDescriptor> _catalog = [];
     ModelManager? _models;
     readonly TranscriptService _transcript = new();
-    readonly AllAudioCaptureService _allAudio = new();
+    readonly LiveAsrPipeline _liveAsr = new();
+    readonly System.Windows.Forms.Timer _overlayFollowTimer = new() { Interval = 60 };
     SubtitleOverlayForm? _overlay;
+    bool _liveRunning;
+    string _lastFinalText = "";
+    string _previousFinalText = "";
 
     readonly TabControl tabs = new() { Dock = DockStyle.Fill };
     readonly ComboBox sourceBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
     readonly ComboBox liveModelBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 360 };
-    readonly Label liveStatus = new() { AutoSize = true, Text = "未启动" };
+    readonly Label liveStatus = new() { AutoSize = true, MaximumSize = new Size(760, 0), Text = "未启动" };
     readonly ProgressBar audioLevel = new() { Width = 360, Maximum = 1000 };
     readonly Button liveStart = new() { Text = "开始", Width = 100 };
 
@@ -62,23 +66,32 @@ public sealed class MainForm : Form
         BuildBatchTab();
         BuildModelsTab();
         BuildSettingsTab();
+
         Load += (_, _) => ReloadAll();
-        FormClosed += (_, _) =>
+        FormClosed += async (_, _) =>
         {
+            _overlayFollowTimer.Stop();
             _modelDownloadCts?.Cancel();
             _modelDownloadCts?.Dispose();
-            _allAudio.Dispose();
+            await _liveAsr.DisposeAsync();
             _overlay?.Close();
         };
-        _allAudio.LevelChanged += v =>
+
+        _overlayFollowTimer.Tick += (_, _) => FollowOverlayToPotPlayer();
+        _liveAsr.LevelChanged += v => SafeUi(() => audioLevel.Value = (int)(Math.Clamp(v, 0, 1) * 1000));
+        _liveAsr.StatusChanged += text => SafeUi(() => liveStatus.Text = text);
+        _liveAsr.PartialResult += text => SafeUi(async () => await ShowRecognitionAsync(text, false));
+        _liveAsr.FinalResult += text => SafeUi(async () => await ShowRecognitionAsync(text, true));
+    }
+
+    void SafeUi(Action action)
+    {
+        try
         {
-            try
-            {
-                if (!IsDisposed && IsHandleCreated)
-                    BeginInvoke(() => audioLevel.Value = (int)(Math.Clamp(v, 0, 1) * 1000));
-            }
-            catch (InvalidOperationException) { }
-        };
+            if (IsDisposed || !IsHandleCreated) return;
+            BeginInvoke(action);
+        }
+        catch (InvalidOperationException) { }
     }
 
     void ReloadAll()
@@ -114,15 +127,14 @@ public sealed class MainForm : Form
         p.Controls.Add(audioLevel);
         p.Controls.Add(liveStart);
         p.Controls.Add(liveStatus);
-
-        var demo = new Button { Text = "显示 HTML 字幕层", Width = 180, Margin = new Padding(3, 14, 3, 3) };
-        demo.Click += async (_, _) =>
+        p.Controls.Add(new Label
         {
-            EnsureOverlay();
-            _overlay!.Show();
-            await _overlay.SetTextAsync("这是 LocalSub 的 HTML 字幕层", "上一句字幕", ParseKeywords());
-        };
-        p.Controls.Add(demo);
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            ForeColor = Color.DimGray,
+            Margin = new Padding(3, 18, 3, 3),
+            Text = "实时字幕使用 Streaming Paraformer。首次启动会把约 8 MB 的 sherpa native runtime 下载到 ASR\\_runtime，后续版本不会重复携带。"
+        });
         liveStart.Click += LiveStart_Click;
         t.Controls.Add(p);
         tabs.TabPages.Add(t);
@@ -130,44 +142,111 @@ public sealed class MainForm : Form
 
     async void LiveStart_Click(object? sender, EventArgs e)
     {
-        if (liveStart.Text == "停止")
+        if (_liveRunning)
         {
-            _allAudio.Stop();
-            liveStart.Text = "开始";
-            liveStatus.Text = "已停止";
+            await StopLiveAsync();
             return;
         }
 
-        if (sourceBox.SelectedIndex == 0)
+        liveStart.Enabled = false;
+        try
         {
-            var p = PotPlayerWatcher.FindRunning();
-            if (p == null)
+            ApplySettingsFromUi();
+            _settings.Save();
+            _models = new ModelManager(_settings);
+
+            if (liveModelBox.SelectedItem is not ModelDescriptor model)
+                throw new InvalidOperationException("没有可用的实时模型。请先在“模型”页面下载 Streaming Paraformer。 ");
+            if (!_models.IsInstalled(model))
             {
-                liveStatus.Text = "未检测到 PotPlayer";
+                liveStatus.Text = $"实时模型“{model.Name}”未安装。请到“模型”页面下载后再开始。";
+                tabs.SelectedIndex = 2;
+                SelectModelRow(model.Id);
                 return;
             }
 
-            liveStatus.Text = $"已检测到 PotPlayer PID {p.Id}。专用 Process Loopback 正在接入，不会回退为全系统音频。";
+            _lastFinalText = "";
+            _previousFinalText = "";
             EnsureOverlay();
+            FollowOverlayToPotPlayer();
             _overlay!.Show();
-            await _overlay.SetTextAsync("已连接 PotPlayer，等待专用音频捕获模块", "LocalSub");
+            await _overlay.SetTextAsync("正在启动实时识别…", "", ParseKeywords());
+
+            var runtimeProgress = new Progress<ModelOperationProgress>(p =>
+            {
+                var detail = p.Percent.HasValue ? $"{p.Stage} {p.Percent}%" : p.Stage;
+                if (!string.IsNullOrWhiteSpace(p.Detail)) detail += "  " + p.Detail;
+                liveStatus.Text = detail;
+            });
+
+            if (sourceBox.SelectedIndex == 0)
+            {
+                var potPlayer = PotPlayerWatcher.FindRunning();
+                if (potPlayer == null) throw new InvalidOperationException("未检测到正在运行的 PotPlayer。 ");
+                await _liveAsr.StartPotPlayerAsync(_settings, model, _models, (uint)potPlayer.Id, runtimeProgress);
+            }
+            else
+            {
+                await _liveAsr.StartAllAudioAsync(_settings, model, _models, runtimeProgress);
+            }
+
+            _liveRunning = true;
+            liveStart.Text = "停止";
+            sourceBox.Enabled = false;
+            liveModelBox.Enabled = false;
+            _overlayFollowTimer.Start();
+            FollowOverlayToPotPlayer();
         }
-        else
+        catch (Exception ex)
         {
-            try
+            await _liveAsr.StopAsync();
+            _liveRunning = false;
+            _overlayFollowTimer.Stop();
+            _overlay?.Hide();
+            liveStatus.Text = "启动失败：" + ex.Message;
+        }
+        finally
+        {
+            liveStart.Enabled = true;
+        }
+    }
+
+    async Task StopLiveAsync()
+    {
+        liveStart.Enabled = false;
+        try
+        {
+            _overlayFollowTimer.Stop();
+            await _liveAsr.StopAsync();
+            _liveRunning = false;
+            liveStart.Text = "开始";
+            sourceBox.Enabled = true;
+            liveModelBox.Enabled = true;
+            liveStatus.Text = "已停止";
+            audioLevel.Value = 0;
+            _overlay?.Hide();
+        }
+        finally
+        {
+            liveStart.Enabled = true;
+        }
+    }
+
+    async Task ShowRecognitionAsync(string text, bool isFinal)
+    {
+        if (!_liveRunning || string.IsNullOrWhiteSpace(text)) return;
+        if (isFinal)
+        {
+            if (!string.Equals(text, _lastFinalText, StringComparison.Ordinal))
             {
-                _allAudio.Start();
-                liveStart.Text = "停止";
-                liveStatus.Text = "正在监听所有 Windows 输出音频，目前显示输入电平";
-                EnsureOverlay();
-                _overlay!.Show();
-                await _overlay.SetTextAsync("音频捕获已启动，ASR 接口待模型引擎接入", "LocalSub");
-            }
-            catch (Exception ex)
-            {
-                liveStatus.Text = "音频捕获启动失败：" + ex.Message;
+                _previousFinalText = _lastFinalText;
+                _lastFinalText = text;
             }
         }
+
+        EnsureOverlay();
+        if (!_overlay!.Visible) _overlay.Show();
+        await _overlay.SetTextAsync(text, isFinal ? _previousFinalText : _lastFinalText, ParseKeywords());
     }
 
     void EnsureOverlay()
@@ -180,12 +259,32 @@ public sealed class MainForm : Form
         }
     }
 
+    void FollowOverlayToPotPlayer()
+    {
+        if (_overlay == null || _overlay.IsDisposed) return;
+        var process = PotPlayerWatcher.FindRunning();
+        if (process != null && PotPlayerWatcher.TryGetWindowState(process, out var bounds, out var minimized))
+        {
+            if (minimized)
+            {
+                _overlay.Hide();
+                return;
+            }
+            _overlay.FollowPlayer(bounds);
+            if (_liveRunning && !_overlay.Visible) _overlay.Show();
+            return;
+        }
+
+        if (_liveRunning && sourceBox.SelectedIndex == 0)
+            _overlay.Hide();
+    }
+
     void BuildBatchTab()
     {
         var t = new TabPage("后台转写") { AllowDrop = true };
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 390 };
         split.Panel1.Controls.Add(batchFiles);
-        split.Panel1.Controls.Add(new Label { Dock = DockStyle.Top, Height = 62, Text = "把视频拖到这里。v0.1 已建立队列、关键词与导出数据骨架；高速媒体解码与 ASR 流水线在下一实现步接入。", Padding = new Padding(12) });
+        split.Panel1.Controls.Add(new Label { Dock = DockStyle.Top, Height = 62, Text = "把视频拖到这里。当前已建立队列、关键词与导出数据骨架；高速媒体解码与离线 ASR 流水线随后接入。", Padding = new Padding(12) });
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), FlowDirection = FlowDirection.TopDown, AutoScroll = true };
         bottom.Controls.Add(new Label { Text = "关键词（逗号、分号或换行分隔）", AutoSize = true });
         bottom.Controls.Add(keywords);
@@ -277,19 +376,21 @@ public sealed class MainForm : Form
             Status = _models.IsInstalled(m) ? "已安装" : "未安装"
         }).ToList();
 
-        if (!string.IsNullOrWhiteSpace(selectedId))
+        if (!string.IsNullOrWhiteSpace(selectedId)) SelectModelRow(selectedId);
+        FillLiveModels();
+    }
+
+    void SelectModelRow(string modelId)
+    {
+        foreach (DataGridViewRow row in modelGrid.Rows)
         {
-            foreach (DataGridViewRow row in modelGrid.Rows)
+            if (GetBoundModel(row)?.Id == modelId)
             {
-                if (GetBoundModel(row)?.Id == selectedId)
-                {
-                    row.Selected = true;
-                    if (row.Cells.Count > 0) modelGrid.CurrentCell = row.Cells[0];
-                    break;
-                }
+                row.Selected = true;
+                if (row.Cells.Count > 0) modelGrid.CurrentCell = row.Cells[0];
+                break;
             }
         }
-        FillLiveModels();
     }
 
     ModelDescriptor? SelectedModel() => modelGrid.CurrentRow == null ? null : GetBoundModel(modelGrid.CurrentRow);
@@ -380,7 +481,7 @@ public sealed class MainForm : Form
         SetModelRowStatus(_activeModel.Id, p.Percent.HasValue && p.Stage == "下载" ? $"下载 {p.Percent}%" : p.Stage);
 
         var bucket = p.Percent.HasValue ? p.Percent.Value / 10 : -1;
-        if (!string.Equals(_lastLoggedStage, p.Stage, StringComparison.Ordinal) || bucket != _lastLoggedBucket || p.Stage is "完成" or "重试" or "缓存无效")
+        if (!string.Equals(_lastLoggedStage, p.Stage, StringComparison.Ordinal) || bucket != _lastLoggedBucket || p.Stage is "完成" or "重试")
         {
             AppendModelLog(modelStatusDetail.Text, true);
             _lastLoggedStage = p.Stage;
@@ -439,12 +540,13 @@ public sealed class MainForm : Form
 
     void FillLiveModels()
     {
-        var list = _catalog.Where(x => x.LiveCapable && x.Id != "silero-vad").ToList();
+        var list = _catalog.Where(x => x.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase)).ToList();
         liveModelBox.DataSource = list;
         liveModelBox.DisplayMember = "Name";
         liveModelBox.ValueMember = "Id";
         var idx = list.FindIndex(x => x.Id == _settings.LiveModelId);
         if (idx >= 0) liveModelBox.SelectedIndex = idx;
+        else if (list.Count > 0) liveModelBox.SelectedIndex = 0;
     }
 
     void BuildSettingsTab()
