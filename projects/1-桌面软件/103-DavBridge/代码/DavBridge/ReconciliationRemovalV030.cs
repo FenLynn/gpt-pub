@@ -33,6 +33,14 @@ internal sealed class WebDavDeleteClientV030 : WebDavReadClient
                 $"DELETE connection failed and the target still exists: {uri.GetLeftPart(UriPartial.Path)}",
                 null, null, ex);
         }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            var afterTimeout = await GetMetadataAsync(relativePath, cancellationToken).ConfigureAwait(false);
+            if (afterTimeout is null) return;
+            throw new WebDavException(
+                $"DELETE timed out and the target still exists: {uri.GetLeftPart(UriPartial.Path)}",
+                null, null, ex);
+        }
 
         using (response)
         {
@@ -113,24 +121,43 @@ internal static class ReconciliationRemovalV030
             return new RemovalActionResultV030(groupKey, false, false, true, recycle.LastIssue);
         }
 
+        // Recheck every exact source member immediately before any destructive target action.
+        // A full recovery cancels deletion. A partial zip/prop recovery is an anomaly and must never
+        // be simplified into either "still deleted" or "fully restored".
+        var sourceNow = new Dictionary<string, WebDavEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var record in trusted)
         {
             var sourcePath = JoinPath(host.Config.SourceRootPath, record.RelativePath);
             var sourceMetadata = await source.GetMetadataAsync(sourcePath, cancellationToken).ConfigureAwait(false);
-            if (sourceMetadata is null) continue;
+            if (sourceMetadata is not null)
+                sourceNow[record.RelativePath] = sourceMetadata;
+        }
 
+        if (sourceNow.Count > 0)
+        {
             recycle.FirstMissingCycleId = null;
             recycle.FirstMissingAt = null;
             recycle.LastDeferredCycleId = null;
             recycle.LastDeferredAt = null;
             recycle.LastSeenCycleId = runtime.CurrentCycleId;
-            recycle.LastIssue = null;
-            if (!ReconciliationPolicy.IsMetadataCurrent(record, sourceMetadata))
+
+            if (sourceNow.Count != trusted.Length)
             {
-                record.Status = TransferStatus.SourceChanged;
-                record.LastError = "删除审查时发现源端对象已经恢复且版本发生变化，将重新进入迁移校验。";
+                recycle.LastIssue = "BLOCKED: 删除审查前 InfiniCLOUD 只恢复了该 Zotero 附件组的部分成员。DavBridge 已禁止删除，请本周期保留并等待源端恢复或再次确认。";
+                return new RemovalActionResultV030(groupKey, false, false, true, recycle.LastIssue);
             }
-            return new RemovalActionResultV030(groupKey, false, true, false, "InfiniCLOUD 中已经重新出现该附件组，删除已自动取消。");
+
+            recycle.LastIssue = null;
+            foreach (var record in trusted)
+            {
+                var sourceMetadata = sourceNow[record.RelativePath];
+                if (!ReconciliationPolicy.IsMetadataCurrent(record, sourceMetadata))
+                {
+                    record.Status = TransferStatus.SourceChanged;
+                    record.LastError = "删除审查时发现源端对象已经恢复且版本发生变化，将重新进入迁移校验。";
+                }
+            }
+            return new RemovalActionResultV030(groupKey, false, true, false, "InfiniCLOUD 中已经完整恢复该附件组，删除已自动取消。");
         }
 
         var presentTargets = new List<TransferRecord>();
