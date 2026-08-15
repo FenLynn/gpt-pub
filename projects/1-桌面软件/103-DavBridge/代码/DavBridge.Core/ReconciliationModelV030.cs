@@ -73,19 +73,24 @@ public static class ReconciliationPolicy
     public static RecycleDisposition GetDisposition(ReconciliationGroupState group, string? currentCycleId)
     {
         if (group.RemovedAt.HasValue) return RecycleDisposition.Removed;
-        if (!string.IsNullOrWhiteSpace(group.LastIssue) && group.LastIssue.StartsWith("BLOCKED:", StringComparison.Ordinal))
-            return RecycleDisposition.Blocked;
+        if (!string.IsNullOrWhiteSpace(currentCycleId) &&
+            string.Equals(group.LastDeferredCycleId, currentCycleId, StringComparison.OrdinalIgnoreCase) &&
+            (!string.IsNullOrWhiteSpace(group.FirstMissingCycleId) || IsBlocked(group)))
+            return RecycleDisposition.DeferredThisCycle;
+        if (IsBlocked(group)) return RecycleDisposition.Blocked;
         if (string.IsNullOrWhiteSpace(group.FirstMissingCycleId)) return RecycleDisposition.Active;
         if (string.IsNullOrWhiteSpace(currentCycleId) ||
             string.Equals(group.FirstMissingCycleId, currentCycleId, StringComparison.OrdinalIgnoreCase))
             return RecycleDisposition.Observing;
-        if (string.Equals(group.LastDeferredCycleId, currentCycleId, StringComparison.OrdinalIgnoreCase))
-            return RecycleDisposition.DeferredThisCycle;
         return RecycleDisposition.ReviewRequired;
     }
 
     public static bool RequiresReview(ReconciliationGroupState group, string? currentCycleId) =>
-        GetDisposition(group, currentCycleId) == RecycleDisposition.ReviewRequired;
+        GetDisposition(group, currentCycleId) is RecycleDisposition.ReviewRequired or RecycleDisposition.Blocked;
+
+    public static bool IsBlocked(ReconciliationGroupState group) =>
+        !string.IsNullOrWhiteSpace(group.LastIssue) &&
+        group.LastIssue.StartsWith("BLOCKED:", StringComparison.Ordinal);
 
     public static bool IsHistoricallyVerified(TransferRecord record) =>
         record.VerifiedAt.HasValue &&
