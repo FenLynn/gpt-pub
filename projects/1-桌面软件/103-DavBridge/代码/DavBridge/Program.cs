@@ -36,6 +36,7 @@ internal static class Program
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
                 using var shell = UiShellV030.Attach(form, host, reconciliation);
                 using var polish = UiPolishV031.Attach(form, host, reconciliation, shell);
+                UiLayoutRepairV031.Apply(polish);
                 Application.Run(form);
             }
             finally
@@ -148,13 +149,13 @@ internal static class Program
         using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
         using var shell = UiShellV030.Attach(form, host, reconciliation);
         using var polish = UiPolishV031.Attach(form, host, reconciliation, shell);
+        UiLayoutRepairV031.Apply(polish);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
             form.Scale(new SizeF(scale, scale));
         form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
         form.PerformLayout();
-        shell.ValidateLayout(name);
         if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
             polish.ValidateLayout(name);
 
