@@ -134,10 +134,12 @@ public sealed class MainForm : Form
         var t = new TabPage("设置"); var p = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), FlowDirection = FlowDirection.TopDown, AutoScroll = true, WrapContents = false };
         p.Controls.Add(new Label { Text = "ASR 模型根目录（默认 EXE 同级 ASR）", AutoSize = true }); var row = new FlowLayoutPanel { Width = 760, Height = 42 }; row.Controls.Add(asrPath); var browse = new Button { Text = "浏览", Width = 80 }; row.Controls.Add(browse); p.Controls.Add(row);
         p.Controls.Add(new Label { Text = "下载代理", AutoSize = true, Margin = new Padding(3,18,3,3) }); p.Controls.Add(proxyMode); p.Controls.Add(new Label { Text = "SOCKS5 地址", AutoSize = true }); p.Controls.Add(socksUrl);
-        p.Controls.Add(new Label { Text = "示例：socks5://127.0.0.1:7890；也可使用 socks5://user:pass@host:port", AutoSize = true, ForeColor = Color.DimGray });
-        var test = new Button { Text = "测试下载连接", Width = 140 }; var save = new Button { Text = "保存设置", Width = 120 }; p.Controls.Add(test); p.Controls.Add(save);
+        p.Controls.Add(new Label { Text = "可直接接入 Clash / V2RayN 等本机 SOCKS5。示例：socks5://127.0.0.1:7891 或 socks5://127.0.0.1:10808", AutoSize = true, ForeColor = Color.DimGray });
+        var proxyButtons = new FlowLayoutPanel { Width = 620, Height = 42, WrapContents = false };
+        var detect = new Button { Text = "自动检测本机 SOCKS5", Width = 170 }; var test = new Button { Text = "测试模型下载链", Width = 150 }; var save = new Button { Text = "保存设置", Width = 120 };
+        proxyButtons.Controls.AddRange([detect, test, save]); p.Controls.Add(proxyButtons);
         browse.Click += (_, _) => { using var f = new FolderBrowserDialog { SelectedPath = _settings.ResolvedAsrRoot }; if (f.ShowDialog() == DialogResult.OK) asrPath.Text = f.SelectedPath; };
-        save.Click += (_, _) => SaveSettings(); test.Click += async (_, _) => await TestConnection(); t.Controls.Add(p); tabs.TabPages.Add(t);
+        save.Click += (_, _) => SaveSettings(); test.Click += async (_, _) => await TestConnection(); detect.Click += async (_, _) => await DetectLocalSocks5(); t.Controls.Add(p); tabs.TabPages.Add(t);
     }
 
     void SaveSettings()
@@ -149,8 +151,56 @@ public sealed class MainForm : Form
 
     async Task TestConnection()
     {
-        try { SaveSettingsSilent(); using var c = DownloadClientFactory.Create(_settings); using var req = new HttpRequestMessage(HttpMethod.Head, _catalog.First().Url); using var r = await c.SendAsync(req, HttpCompletionOption.ResponseHeadersRead); MessageBox.Show($"连接成功：HTTP {(int)r.StatusCode}", "LocalSub"); }
+        try
+        {
+            SaveSettingsSilent();
+            if (_catalog.Count == 0) throw new InvalidOperationException("模型 catalog 为空。");
+            using var c = DownloadClientFactory.Create(_settings, TimeSpan.FromSeconds(15));
+            using var req = new HttpRequestMessage(HttpMethod.Get, _catalog.First().Url);
+            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
+            using var r = await c.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+            r.EnsureSuccessStatusCode();
+            var finalHost = r.RequestMessage?.RequestUri?.Host ?? "未知";
+            MessageBox.Show($"模型下载链可用。\nHTTP {(int)r.StatusCode}\n最终主机：{finalHost}", "LocalSub");
+        }
         catch (Exception ex) { MessageBox.Show(ex.Message, "连接测试失败"); }
+    }
+
+    async Task DetectLocalSocks5()
+    {
+        if (_catalog.Count == 0) { MessageBox.Show("模型 catalog 为空。", "LocalSub"); return; }
+
+        var current = socksUrl.Text.Trim();
+        var candidates = new[]
+        {
+            current,
+            "socks5://127.0.0.1:7890",
+            "socks5://127.0.0.1:7891",
+            "socks5://127.0.0.1:10808",
+            "socks5://127.0.0.1:1080"
+        }.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var probe = new AppSettings { ProxyMode = ProxyMode.Socks5, Socks5Url = candidate };
+                using var c = DownloadClientFactory.Create(probe, TimeSpan.FromSeconds(4));
+                using var req = new HttpRequestMessage(HttpMethod.Get, _catalog.First().Url);
+                req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
+                using var r = await c.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+                if (!r.IsSuccessStatusCode) continue;
+
+                proxyMode.SelectedIndex = 2;
+                socksUrl.Text = candidate;
+                SaveSettingsSilent();
+                MessageBox.Show($"已检测到可用 SOCKS5：\n{candidate}\n\n已自动切换并保存，模型下载将使用该代理。", "LocalSub");
+                return;
+            }
+            catch { }
+        }
+
+        MessageBox.Show("未检测到可用的本机 SOCKS5。\n\n请确认 Clash / V2RayN 等代理程序已运行，然后在 SOCKS5 地址中填写它实际监听的端口。常见端口：7890、7891、10808、1080。", "LocalSub");
     }
 
     void SaveSettingsSilent() { _settings.AsrRoot = string.IsNullOrWhiteSpace(asrPath.Text) ? "ASR" : asrPath.Text.Trim(); _settings.ProxyMode = proxyMode.SelectedIndex switch { 1 => ProxyMode.Direct, 2 => ProxyMode.Socks5, _ => ProxyMode.System }; _settings.Socks5Url = socksUrl.Text.Trim(); _settings.Keywords = keywords.Text; _settings.Save(); }
