@@ -37,14 +37,21 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - 后台文件拖放队列、关键词数据结构、TXT exporter 骨架。
 - Windows x64 self-contained 绿色包 CI，且 CI 检查 `publish/ASR` 不得含 ONNX 模型。
 
+## 首次真实构建验证
+
+- CI workflow 已通过独立 PR #383 合入 main，项目源码仍只在 `p103-localsub-exp`。
+- Windows run #6（run id `31883721431`）已完整成功：restore、publish、portable layout、artifact upload 均通过。
+- 产物：`LocalSub-v0.1.0-dev-win-x64.zip`。
+- CI artifact SHA-256：`64359cb15e8ce85d2797fd7d77da75d5563d06fbc7b1d3398a5fe68836e25c4d`（GitHub artifact 外层）。
+- 提取出的实际绿色 ZIP 已再次扫描，`ASR` 中模型文件数量为 0。
+
 ## 当前真实未完成项
 
 - PotPlayer process-specific loopback 尚未接入，当前只检测 PID，不会错误回退到全局音频。
 - sherpa-onnx 真实流式 ASR 尚未接入音频链路。
 - 后台 FFmpeg/媒体解码、波形、VAD、离线 ASR 流水线尚未接入。
 - 字幕 overlay 尚未自动跟随 PotPlayer 窗口位置与全屏状态。
-- 首个 Windows 绿色构建正在通过 CI 做真实编译验证。
 
-## CI 说明
+## 下一准确断点
 
-P103 构建 workflow 已通过独立 PR #383 合入 main，项目源码仍只在 `p103-localsub-exp`。后续该分支对 P103 路径的提交会触发 Windows 构建。
+优先实现 `PotPlayer Process Loopback -> 16 kHz mono -> streaming recognizer -> HTML overlay` 的完整实时闭环；随后接 `File Decode -> Waveform/VAD -> offline recognizer -> keywords/TXT` 后台闭环。
