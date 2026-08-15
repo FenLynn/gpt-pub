@@ -205,6 +205,20 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
 
     internal AppHost Host => _host;
 
+    internal async Task<T> ExecuteExclusiveAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
+    {
+        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            return await operation().ConfigureAwait(false);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
     private async Task<ReconciliationSummary> AuditCoreAsync(CancellationToken cancellationToken)
     {
         var secrets = await _host.GetSecretsAsync(cancellationToken).ConfigureAwait(false);
