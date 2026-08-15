@@ -106,22 +106,44 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
     internal void CaptureSampleSnapshot(Form form, string outputPath)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        form.PerformLayout();
         var states = _bindings.Select(binding => new SnapshotState(binding, binding.Meter.DisplayTextProvider, binding.Meter.Fraction, binding.Meter.Pulse)).ToArray();
         try
         {
-            foreach (var state in states)
+            var meterWidth = Math.Max(240, _bindings.Max(binding => binding.Meter.Width));
+            const int left = 24;
+            const int top = 24;
+            const int labelHeight = 24;
+            const int gap = 22;
+            var rowHeights = _bindings.Select(binding => labelHeight + binding.Meter.Height + gap).ToArray();
+            var sheetHeight = top * 2 + rowHeights.Sum();
+            using var sheet = new Bitmap(meterWidth + left * 2, sheetHeight, PixelFormat.Format32bppArgb);
+            using var graphics = Graphics.FromImage(sheet);
+            graphics.Clear(Color.White);
+            using var captionFont = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            using var captionBrush = new SolidBrush(Color.FromArgb(70, 82, 91));
+
+            var y = top;
+            for (var index = 0; index < states.Length; index++)
             {
+                var state = states[index];
                 var binding = state.Binding;
                 binding.Meter.DisplayTextProvider = () => binding.SampleText;
                 binding.Meter.Fraction = binding.SampleFraction;
                 binding.Meter.Pulse = false;
                 binding.Meter.Invalidate();
+
+                var name = index switch { 0 => "coverage", 1 => "current", 2 => "upload", _ => "download" };
+                graphics.DrawString($"{name}   {binding.Meter.Width}×{binding.Meter.Height}px", captionFont, captionBrush, left, y);
+                y += labelHeight;
+
+                using var meterBitmap = new Bitmap(Math.Max(1, binding.Meter.Width), Math.Max(1, binding.Meter.Height), PixelFormat.Format32bppArgb);
+                binding.Meter.DrawToBitmap(meterBitmap, new Rectangle(Point.Empty, meterBitmap.Size));
+                graphics.DrawImageUnscaled(meterBitmap, left, y);
+                y += binding.Meter.Height + gap;
             }
 
-            form.PerformLayout();
-            using var bitmap = new Bitmap(Math.Max(1, form.ClientSize.Width), Math.Max(1, form.ClientSize.Height), PixelFormat.Format32bppArgb);
-            form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
-            bitmap.Save(outputPath, ImageFormat.Png);
+            sheet.Save(outputPath, ImageFormat.Png);
         }
         finally
         {
