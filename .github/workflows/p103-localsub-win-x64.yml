@@ -1,0 +1,37 @@
+name: LocalSub win-x64 portable
+on:
+  workflow_dispatch:
+  push:
+    branches: [ p103-localsub-exp ]
+    paths:
+      - 'projects/1-桌面软件/103-LocalSub/**'
+      - '.github/workflows/p103-localsub-win-x64.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish portable app
+        shell: pwsh
+        working-directory: projects/1-桌面软件/103-LocalSub/src/LocalSub
+        run: |
+          dotnet restore
+          dotnet publish -c Release -r win-x64 --self-contained true -o ../../publish
+      - name: Prepare portable layout
+        shell: pwsh
+        working-directory: projects/1-桌面软件/103-LocalSub
+        run: |
+          New-Item -ItemType Directory -Force publish/ASR | Out-Null
+          Copy-Item src/LocalSub/ASR-README.txt publish/ASR/README.txt
+          if (Test-Path publish/ASR/*.onnx) { throw 'Model files must not be bundled' }
+          Compress-Archive -Path publish/* -DestinationPath LocalSub-v0.1.0-dev-win-x64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LocalSub-v0.1.0-dev-win-x64
+          path: projects/1-桌面软件/103-LocalSub/LocalSub-v0.1.0-dev-win-x64.zip
