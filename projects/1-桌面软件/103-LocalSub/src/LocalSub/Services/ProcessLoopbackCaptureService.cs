@@ -6,7 +6,7 @@ namespace LocalSub.Services;
 public sealed class ProcessLoopbackCaptureService : IDisposable
 {
     const string VirtualAudioDeviceProcessLoopback = "VAD\\Process_Loopback";
-    const int MinimumSupportedBuild = 20348;
+    const int MinimumSupportedBuild = 19041;
 
     const uint AudclntStreamflagsLoopback = 0x00020000;
     const uint AudclntStreamflagsEventCallback = 0x00040000;
@@ -38,7 +38,7 @@ public sealed class ProcessLoopbackCaptureService : IDisposable
         if (build < MinimumSupportedBuild)
         {
             throw new PlatformNotSupportedException(
-                $"当前 Windows build {build} 不支持 PotPlayer 专用进程音频捕获。微软 Application Loopback 要求 build {MinimumSupportedBuild} 或更高。当前系统请使用“所有音频”模式；LocalSub 不会静默回退为全系统音频。");
+                $"当前 Windows build {build} 低于 Process Loopback 的最低尝试版本 {MinimumSupportedBuild}。当前系统请使用“所有音频”模式；LocalSub 不会静默回退为全系统音频。");
         }
     }
 
@@ -71,6 +71,13 @@ public sealed class ProcessLoopbackCaptureService : IDisposable
             _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             _worker = Task.Run(() => CaptureLoopAsync(_cts.Token), _cts.Token);
         }
+        catch (COMException ex)
+        {
+            await StopAsync().ConfigureAwait(false);
+            throw new COMException(
+                $"PotPlayer 专用音频捕获启动失败。Windows build {WindowsBuild}，HRESULT 0x{ex.HResult:X8}。{ex.Message}",
+                ex.HResult);
+        }
         catch
         {
             await StopAsync().ConfigureAwait(false);
@@ -88,7 +95,6 @@ public sealed class ProcessLoopbackCaptureService : IDisposable
                 var signal = _sampleReady;
                 if (signal == null) break;
 
-                // Event-driven like the Microsoft sample, with a short timeout so cancellation remains responsive.
                 signal.WaitOne(100);
                 ct.ThrowIfCancellationRequested();
 
@@ -158,7 +164,7 @@ public sealed class ProcessLoopbackCaptureService : IDisposable
             Marshal.StructureToPtr(activationParams, paramsPtr, false);
             var prop = new PropVariantBlobHeader
             {
-                Vt = 65, // VT_BLOB
+                Vt = 65,
                 BlobSize = (uint)paramsSize,
                 BlobData = paramsPtr
             };
@@ -174,7 +180,6 @@ public sealed class ProcessLoopbackCaptureService : IDisposable
                 out operation);
             ThrowIfFailed(hr, "启动 Windows Process Loopback");
 
-            // Keep activation parameters and the async operation alive until Windows calls ActivateCompleted.
             var clientPtr = await handler.Task.ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             GC.KeepAlive(operation);
@@ -250,7 +255,7 @@ public sealed class ProcessLoopbackCaptureService : IDisposable
                 }
                 else
                 {
-                    client = IntPtr.Zero; // ownership transferred to RawAudioClient
+                    client = IntPtr.Zero;
                 }
             }
             catch (Exception ex)
