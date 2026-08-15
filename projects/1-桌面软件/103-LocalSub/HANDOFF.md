@@ -7,6 +7,8 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 ## 已确认硬约束
 
 - 绿色 ZIP，解压即用，不需要安装器。
+- 后续日常测试默认交付“增量覆盖 ZIP”：只包含相对于用户上一版基线实际发生变化的运行文件，ZIP 内路径直接以 LocalSub 根目录为基准，用户解压到现有程序根目录并覆盖即可。
+- 只有首次安装、运行依赖/目录结构发生变化、无法安全增量覆盖或用户明确要求时，才交付完整绿色包。
 - 基础程序发布方式与 AtlasDesk / DavBridge 对齐：`.NET 8`、`SelfContained=false`、`PublishSingleFile=true`。
 - 不再要求或下载 `.NET 10 Desktop Runtime`；复用用户电脑已有的 `.NET 8 Desktop Runtime`。
 - 模型绝不随程序包分发。
@@ -51,7 +53,8 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - 2026-08-15 已对照 AtlasDesk 与 DavBridge，将 LocalSub 从 `net10.0-windows` 改为 `net8.0-windows10.0.19041.0`，并启用 framework-dependent 单文件发布。
 - Windows CI run `31884989845` 已成功完成 .NET 8 单文件构建。
 - SOCKS5 下载增强版本 Windows CI run `31885669915` 已成功完成 restore、publish、portable layout 与 artifact upload。
-- 最新实际绿色 ZIP：`LocalSub-v0.1.0-dev-win-x64-net8-socks5-green.zip`，SHA-256 `af89bca91531de96914a97a88616e65a68f334fb2ee99c2ca6d500f97c40cc6f`。
+- 最新完整绿色 ZIP：`LocalSub-v0.1.0-dev-win-x64-net8-socks5-green.zip`，SHA-256 `af89bca91531de96914a97a88616e65a68f334fb2ee99c2ca6d500f97c40cc6f`。
+- 本次相对上一版 .NET 8 测试包，实际运行文件仅 `LocalSub.exe` 变化，因此已生成只含 `LocalSub.exe` 的根目录增量覆盖包。
 - 绿色包继续保持无 ASR 模型、无 ONNX Runtime、无 .NET runtime。
 
 ## 当前真实未完成项
