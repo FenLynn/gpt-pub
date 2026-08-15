@@ -11,6 +11,7 @@ internal static class ReconciliationSmokeV030
         CycleIdUsesConfirmedResetDate();
         RecycleRequiresLaterCycle();
         DeferralOnlyCoversCurrentCycle();
+        BlockedDeferralOnlyCoversCurrentCycle();
         HistoricalGroupMustBeComplete();
         WaitUserWasAppended();
     }
@@ -49,6 +50,22 @@ internal static class ReconciliationSmokeV030
             "A human keep decision must unblock only the reviewed cycle.");
         Require(ReconciliationPolicy.GetDisposition(group, "261007") == RecycleDisposition.ReviewRequired,
             "A deferred group must return to review in the next confirmed cycle if still missing.");
+    }
+
+    private static void BlockedDeferralOnlyCoversCurrentCycle()
+    {
+        var group = new ReconciliationGroupState
+        {
+            GroupKey = "C",
+            LastIssue = "BLOCKED: partial source group",
+            LastDeferredCycleId = "260907"
+        };
+        Require(ReconciliationPolicy.GetDisposition(group, "260907") == RecycleDisposition.DeferredThisCycle,
+            "A manually deferred safety anomaly must not keep the current cycle blocked.");
+        Require(ReconciliationPolicy.GetDisposition(group, "261007") == RecycleDisposition.Blocked,
+            "A deferred safety anomaly must surface again in the next cycle if it still exists.");
+        Require(!ReconciliationPolicy.RequiresReview(group, "260907") && ReconciliationPolicy.RequiresReview(group, "261007"),
+            "Blocked review gating must follow the current-cycle deferral decision.");
     }
 
     private static void HistoricalGroupMustBeComplete()
