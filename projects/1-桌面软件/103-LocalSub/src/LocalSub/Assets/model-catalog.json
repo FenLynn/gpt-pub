@@ -2,7 +2,7 @@
   {
     "Id": "sensevoice-small-int8",
     "Name": "SenseVoice Small INT8",
-    "Purpose": "推荐：中英日韩粤，后台与模拟流式",
+    "Purpose": "推荐：中英日韩粤，后台与高准确模拟流式",
     "SizeText": "约 230 MB",
     "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
     "FolderName": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
@@ -12,9 +12,21 @@
     "BatchCapable": true
   },
   {
+    "Id": "streaming-zipformer-zh-large-int8",
+    "Name": "Streaming Zipformer Large 中文 INT8",
+    "Purpose": "准确实时：中文，2025 Large 模型",
+    "SizeText": "约 160 MB",
+    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2",
+    "FolderName": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+    "RequiredFiles": ["encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"],
+    "Recommended": true,
+    "LiveCapable": true,
+    "BatchCapable": false
+  },
+  {
     "Id": "streaming-paraformer-zh-en",
     "Name": "Streaming Paraformer 中英 INT8",
-    "Purpose": "极速实时：普通话/英语",
+    "Purpose": "极速实时：普通话/英语，延迟优先",
     "SizeText": "约 237 MB",
     "Url": "",
     "Files": [
