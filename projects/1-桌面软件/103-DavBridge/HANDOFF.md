@@ -16,25 +16,25 @@
 
 正式稳定回滚基线：**v0.1.7**。
 
-当前实验候选：**v0.3.9**。
+当前实验候选：**v0.3.10**。
 
-v0.3.9 完成完整 CI 和 Windows 视觉检查图的准确代码 head：`35eaf9c8b14760ed27829159f81c7a0fb020be10`
+v0.3.10 完成完整 CI 和 Windows attached Meter 视觉检查的准确代码 head：`8ca0ddd6a0e3b6586a86242766671fd41939e14d`
 
-P103 CI run：`31895694912`
+P103 CI run：`31915216732`
 
 CI：**success**。
 
-Windows Artifact：`DavBridge-v0.3.9-win-x64`
+Windows Artifact：`DavBridge-v0.3.10-win-x64`
 
-Artifact ZIP SHA256：`107d65c4e8cdadf6b31149366a8e09bc18879b7014fc8d6f1ccfd1b2389b6f7c`
+Artifact ZIP SHA256：`44f41145bdfab07571ef13156e4046876425713b426bde46e02b5c03a181619f`
 
-EXE SHA256：`6c84f89730ca9be822055f4c5f0487b72b3add9f1c86ca8ae860f68ec4711e42`
+EXE SHA256：`d6e7a0558627e144cb07dd92168e32c3f7856d414b1b39386be6891eed590355`
 
-视觉检查 Artifact：`DavBridge-v0.3.9-ui-snapshots`
+视觉检查 Artifact：`DavBridge-v0.3.10-ui-snapshots`
 
-本 HANDOFF 及其后的 `[skip ci]` 文档提交不得当成已构建代码 head。准确构建代码 head 始终是上面的 `35eaf9c8...`。
+本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得当成已构建代码 head。准确已构建代码 head 始终是上面的 `8ca0ddd6...`。
 
-`main` 与 `p103-stable` 未修改。v0.3.9 仍需用户实机截图确认后才能考虑提升。
+`main` 与 `p103-stable` 未修改。v0.3.10 仍需用户实机截图确认后才能考虑提升。
 
 ## 固定读取顺序
 
@@ -53,22 +53,23 @@ EXE SHA256：`6c84f89730ca9be822055f4c5f0487b72b3add9f1c86ca8ae860f68ec4711e42`
 
 接续后必须重新核对 `main`、`p103-stable`、`p103-exp`、最新 P103 CI 和 Artifact。
 
-## 产品核心
+## 产品核心与安全语义
 
 DavBridge 长期维护 Zotero 附件从 InfiniCLOUD 到坚果云的强校验单向镜像。
 
 - InfiniCLOUD 是唯一 authoritative source，并始终只读。
 - 坚果云保存 StrongVerified 镜像子集。
 - Zotero `.zip + .prop` 按逻辑 Group 处理。
-- 不做双向同步，不反写源端。
+- 不做双向同步，不反写源端，不传播源端删除。
 - `StrongVerified` 只有在源端完整 GET + SHA256 与目标重新 GET + SHA256 完全一致后成立。
 - 历史 GoodSync 副本可以通过相同双端强校验接管。
 - PUT 结果未知进入 reconciliation，不盲目重试。
 - HTTP 412 先协调，不覆盖未知目标。
+- Conflict、WriteUnknown、SourceChanged 等安全状态不得被历史副本维护覆盖。
 
 ## Cycle 与每周期自动对账
 
-Cycle ID 使用真实坚果云额度周期的重置日期，格式 `yyMMdd`，例如 2026-09-07 为 `260907`。
+Cycle ID 使用真实坚果云额度周期的重置日期，格式 `yyMMdd`。
 
 真实确认的新 Cycle 在普通 backlog 前自动执行：
 
@@ -81,6 +82,8 @@ Cycle ID 使用真实坚果云额度周期的重置日期，格式 `yyMMdd`，�
 ```
 
 源 metadata 未变化时不读取内容。metadata 变化时重新读取 InfiniCLOUD 并计算 SHA256。SHA 未变只更新 metadata；SHA 真变化进入 `SourceChanged`，优先于普通任务。新增对象只加入普通 backlog，不插队。
+
+额度重置不是午夜盲重置。到达配置的重置日后，09:00 以后通过真实探测确认新服务周期，成功后才重置账本并进入新 Cycle。
 
 ## 回收站与 DELETE
 
@@ -111,11 +114,9 @@ DELETE 永远不能后台自动执行。人工确认后仍必须再次检查源�
 总览 | 转移 | 回收站 | 文档                     ⚙
 ```
 
-没有宽左侧栏。总览是运行控制中心，不做说明页。InfiniCLOUD 云形 Logo、双右箭头和坚果云橡果 Logo 保留。
+没有宽左侧栏。总览是运行控制中心。InfiniCLOUD 云形 Logo、双右箭头和坚果云橡果 Logo 保留。
 
 解释采用三级层次：主界面只显示必须状态、数字和动作；概念解释优先 ToolTip；完整规则进入“文档”Tab 和 `用户手册.md`。
-
-不得重新在主页、转移页、回收站堆大量灰色小字说明。
 
 ### UI 修改硬约束
 
@@ -123,87 +124,90 @@ DELETE 永远不能后台自动执行。人工确认后仍必须再次检查源�
 - 禁止运行时 overlay 批量接管页面。
 - 禁止 reparent 原 Label 到 Meter。
 - 禁止为了文字进 bar 修改既有 `RowStyles`。
-- 简单显示需求优先在原控件自身 Paint 层完成。
-- 自动测试不得只检查理论字号或字体行框，必须检查最终可见像素。
+- 简单显示需求优先在原控件自身 Paint 或局部 presentation binding 层完成。
+- 自动测试必须检查最终 attached 控件的实际 Bounds 和最终栅格像素，不能只测试独立 reference 控件。
 - CI 不能代替用户实机视觉验收。
 
-## UI 事故与 v0.3.9 根因确认
-
-### v0.3.3 至 v0.3.5
-
-v0.3.3 使用 overlay 和运行时 RowStyles 压缩，破坏多个页面，永久否决。v0.3.4 完整恢复 v0.3.2 shell，并成为几何基线。v0.3.5 将 Label reparent 到 Meter 并改局部行高，实机观感错误，永久否决。
+## 额度条 UI 事故复盘
 
 ### v0.3.6 至 v0.3.8
 
-v0.3.6 改为 `MeterV030.OnPaint()` 原生绘制文字，结构方向正确，但额度文字仍贴底。v0.3.7 尝试缩小 point 字体仍失败。v0.3.8 改为 pixel 字体并手工按 `TextRenderer.MeasureText()` 行框计算 Y，CI 栅格测试通过，但用户实机截图仍显示上传、下载数字明显压在 bar 下沿。
+v0.3.6 开始把文字改为 `MeterV030.OnPaint()` 原生绘制。v0.3.7 缩小 point 字体。v0.3.8 改为 pixel 字体和手工 Y。方向都没有解决实机上传、下载文字贴底问题。
 
-三轮独立复核后确认：
+### v0.3.9
 
-1. 实机截图中页面几何、bar 本身、中文覆盖和当前任务文字都正常，异常集中在纯 Latin/数字额度字符串，说明不是整体布局或 bar 高度故障。
-2. v0.3.6 的 `VerticalCenter` 和 v0.3.8 的手工 Y 都仍基于字体 line box / baseline，最终可见 glyph ink 并不一定以 line box 中心为视觉中心。CJK 与 Latin/digit 的可见 glyph 占位差异解释了实机现象。
-3. 旧 125%/150% CI 只是 `form.Scale(...)` 的尺寸缩放，不等于真实显示设备 DPI；因此旧 headless 测试不能作为用户屏幕文字位置的充分证据。
+v0.3.9 新增 `MeterTextSpriteV039`，先离屏渲染，再裁掉字体 line box 空白，仅保留真实 glyph 像素，最后按 glyph 像素框居中。这个方法本身解决了字体 baseline 差异，但仍没有解决用户实机问题。
 
-## v0.3.9 正确修复
+用户实机 v0.3.9 截图最终证明：上传、下载文字仍被额度条底部遮挡。该版本视觉验收明确判定失败，不得再记为通过。
 
-产品 UI 几何和业务逻辑不变。只替换 Meter 文字最终定位方法。
+随后重新打开 v0.3.9 的 Windows attached Meter 检查图，发现真正根因：
 
-新增 `MeterTextSpriteV039`：
+```text
+coverage attached: 373×26 px
+current attached:  373×26 px
+upload attached:   369×50 px
+ download attached: 369×50 px
+```
 
-1. 先在足够高的离屏缓冲区中渲染文字。
-2. 扫描真实可见 glyph 像素。
-3. 裁掉字体 line box 上下空白，仅保留实际字形像素。
-4. 转为透明 glyph sprite。
-5. `MeterV030` 最终使用 `DrawImageUnscaled`，按 sprite 的实际高度在 Meter 内精确居中。
+而 `UiShellV032.BuildQuotaCell()` 明确把额度 Meter 所在第三行设计为 16 个逻辑像素。由于上传、下载 Meter 使用 `Dock=Fill`，TableLayoutPanel 的剩余高度被额度 Meter 吞掉，实际控件高度扩大到 50 px。`MeterV030` 因此是在 50 px 内正确居中文字，而主页面外层只显示额度区域的一部分，最终产生实机底部裁切。
 
-因此最终垂直定位不再依赖 Latin、数字、中文各自不同的 baseline / line-box 占位。
+v0.3.9 后期加入的 standalone 16/27 px reference Meter 虽然视觉通过，但它们不是主页面 attached Meter，因而没有复现这个 Bounds 错误。后续禁止把 standalone reference 控件通过当成 attached UI 通过。
 
-sprite 按文本、宽高、目标像素和颜色缓存，避免 250 ms UI 刷新重复做像素扫描。
+## v0.3.10 修复
 
-## v0.3.9 自动与视觉验证
+v0.3.10 不改页面 RowStyles、不移动额度区、不改业务逻辑，也不再调字体 Y。
 
-最终代码 head：`35eaf9c8b14760ed27829159f81c7a0fb020be10`
+新增 `UiQuotaMeterBoundsV0310`，只约束 `_uploadMeter` 和 `_downloadMeter`：
 
-CI run：`31895694912`，结果 **success**。
+```text
+Dock = Top
+Height = 16 logical px
+```
 
-通过原有 scope、Core Smoke、Cycle、StrongVerified、SourceChanged、WaitQuota、WriteUnknown、412、回收站、DELETE、安全回归、Windows x64 单 EXE、Runtime boundary、窗口显式激活回 Overview 等全部既有检查。
+16 px 来自既有 `BuildQuotaCell()` 的额度 Meter 设计行高，不是针对某台机器的经验偏移。因为约束发生在正常 WinForms 控件树中，Windows DPI/缩放仍会正常缩放该逻辑高度。
 
-本轮新增真实 Meter 视觉 Artifact。第一次尝试截取整个未 Show 的 Form，PNG 只有空白窗体，因此明确判定该视觉证据无效，没有据此交付。随后改为直接调用真实 `MeterV030.DrawToBitmap`，生成可见检查表。
+v0.3.9 的 glyph sprite 居中继续保留。现在文字是在真实额度 Meter 本体中居中，不再是在一个被父层裁切的 50/76 px 大控件里居中。
 
-最终检查表覆盖：
+## v0.3.10 验证
 
-- 当前布局中的 coverage、current、upload、download Meter；
-- 固定 16 px 上传额度条；
-- 固定 27 px 上传额度条；
-- 固定 16 px 下载额度条；
-- 固定 27 px 下载额度条。
+准确代码 head：`8ca0ddd6a0e3b6586a86242766671fd41939e14d`
 
-其中 27 px 与用户实机截图中的额度条物理高度接近。人工打开 Windows CI PNG 后，四个固定额度测试均完整显示、无上下裁切、视觉居中。像素复核中，27 px 上传字形中心和下载字形中心都落在 bar 中心附近，误差不超过约 1 px。
+CI run：`31915216732`，结果 **success**。
 
-注意：这些检查证明 Windows CI 绘制路径和明确复刻的 16/27 px 场景已通过，但用户真实机器仍是最终视觉事实源。
+原有 scope、Core Smoke、Cycle、StrongVerified、SourceChanged、WaitQuota、WriteUnknown、412、回收站、DELETE、安全回归、Windows x64 单 EXE、Runtime boundary、显式打开回 Overview 等检查全部继续通过。
+
+新增 quota Meter Bounds 硬门，并重新生成真实 attached Meter 视觉图。
+
+最终 Windows 检查图中：
+
+```text
+100%: upload/download attached = 369×16 px
+150%: upload/download attached = 555×24 px
+```
+
+文字在这两个真实 attached Meter 内完整显示并居中。与 v0.3.9 的 `369×50 px` / 更高 DPI 下继续膨胀的控件相比，根因已经从 Bounds 层消除。
+
+视觉 Artifact 仍只是 Windows CI 证据，用户真实机器是最终事实源。
 
 ## 显式打开行为
 
-v0.3.7 引入并继续保留：
-
-- Windows 登录自启动通过 `--background`，允许后台进入托盘；
-- 用户手工双击 EXE 恢复主窗口并显示总览；
-- 已运行时再次双击 EXE，通过单实例事件恢复窗口并强制回总览；
+- Windows 登录自启动通过 `--background`，允许后台进入托盘。
+- 用户手工双击 EXE 恢复主窗口并显示总览。
+- 已运行时再次双击 EXE，通过单实例事件恢复窗口并强制回总览。
 - 托盘双击或“打开 DavBridge”同样恢复窗口并回总览。
 
 ## 当前实机断点
 
-下一步只验收 v0.3.9，不提升 stable：
+下一步只验收 **v0.3.10**，不提升 stable：
 
-1. 用户实机上传、下载数字必须完整居中于 bar，不贴底、不被裁切。
-2. 镜像覆盖和当前任务继续保持 v0.3.4 原几何。
-3. 页面整体结构、Logo、四个 Tab、阶段区、按钮位置不得变化。
+1. 上传、下载额度文字必须完整处于 bar 内并垂直居中，不贴底、不裁切。
+2. 上传、下载 bar 的整体位置不得改变，只修内部 Bounds 与文字显示。
+3. 镜像覆盖、当前任务、Logo、四个 Tab、阶段区和按钮位置不得变化。
 4. 手工双击 EXE 应显示主窗口总览。
-5. 已运行时切到其他 Tab 后再次双击 EXE，应恢复或激活并回总览。
-6. Windows 登录自启动 `--background` 仍允许后台托盘。
-7. 用户实机确认后，才可记录 v0.3.9 视觉通过并考虑后续收口。
+5. 用户实机确认后，才可把本次额度条问题记为关闭。
 
 真实 DELETE 仍需等合法跨周期候选出现后再做真实账户验证。
 
 ## 事实源
 
-实现事实以源码为准，验证事实以测试、CI 与生成的视觉检查 Artifact 为准，正式稳定事实以 `main` 与 `p103-stable` 为准，当前实验事实以 `p103-exp` 为准，真实 WebDAV 行为与最终视觉效果以用户实机为准。
+实现事实以源码为准，验证事实以测试、CI 与真实 attached 控件视觉 Artifact 为准，正式稳定事实以 `main` 与 `p103-stable` 为准，当前实验事实以 `p103-exp` 为准，真实 WebDAV 行为与最终视觉效果以用户实机为准。
