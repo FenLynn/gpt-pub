@@ -12,6 +12,7 @@ public sealed class SubtitleOverlayForm : Form
     const int WS_EX_NOACTIVATE = 0x08000000;
 
     readonly WebView2 _web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.Transparent };
+    readonly System.Windows.Forms.Timer _clearTimer = new() { Interval = 3000 };
     Task? _initializeTask;
 
     public SubtitleOverlayForm()
@@ -25,6 +26,12 @@ public sealed class SubtitleOverlayForm : Form
         Height = 160;
         Controls.Add(_web);
         Shown += async (_, _) => await EnsureInitializedAsync();
+        _clearTimer.Tick += async (_, _) =>
+        {
+            _clearTimer.Stop();
+            await ClearTextAsync();
+        };
+        FormClosed += (_, _) => _clearTimer.Dispose();
     }
 
     public void FollowPlayer(Rectangle playerBounds)
@@ -71,6 +78,17 @@ public sealed class SubtitleOverlayForm : Form
     {
         await EnsureInitializedAsync();
         var payload = JsonSerializer.Serialize(new { current, previous, keywords = keywords?.ToArray() ?? [] });
+        await _web.CoreWebView2.ExecuteScriptAsync($"window.LocalSub.setSubtitle({payload});");
+
+        _clearTimer.Stop();
+        if (!string.IsNullOrWhiteSpace(current) || !string.IsNullOrWhiteSpace(previous))
+            _clearTimer.Start();
+    }
+
+    async Task ClearTextAsync()
+    {
+        if (_web.CoreWebView2 == null) return;
+        var payload = JsonSerializer.Serialize(new { current = "", previous = "", keywords = Array.Empty<string>() });
         await _web.CoreWebView2.ExecuteScriptAsync($"window.LocalSub.setSubtitle({payload});");
     }
 
