@@ -47,13 +47,30 @@ internal sealed class UiDensityV033 : IDisposable
 
     internal void ValidateLayout(string scenario)
     {
-        foreach (var binding in _bindings)
-        {
-            if (binding.Overlay.Width < 80 || binding.Overlay.Height < 14)
-                throw new InvalidOperationException($"UI density self-test failed [{scenario}]: inline meter clipped ({binding.Overlay.Width}x{binding.Overlay.Height})");
-        }
+        var form = Field<MainForm>("_form");
+        ValidateVisibleMeters(scenario, "overview", 4);
         if (_stageStrip.Width < 360 || _stageStrip.Height < 24)
             throw new InvalidOperationException($"UI density self-test failed [{scenario}]: stage strip clipped");
+
+        var transferTab = Field<Button>("_tabTransfer");
+        var overviewTab = Field<Button>("_tabOverview");
+        transferTab.PerformClick();
+        form.PerformLayout();
+        ValidateVisibleMeters(scenario, "transfer", 2);
+        overviewTab.PerformClick();
+        form.PerformLayout();
+    }
+
+    private void ValidateVisibleMeters(string scenario, string page, int minimumCount)
+    {
+        var visible = _bindings.Where(binding => binding.Overlay.Visible).ToArray();
+        if (visible.Length < minimumCount)
+            throw new InvalidOperationException($"UI density self-test failed [{scenario}]: {page} inline meters missing ({visible.Length})");
+        foreach (var binding in visible)
+        {
+            if (binding.Overlay.Width < 80 || binding.Overlay.Height < 14)
+                throw new InvalidOperationException($"UI density self-test failed [{scenario}]: {page} inline meter clipped ({binding.Overlay.Width}x{binding.Overlay.Height})");
+        }
     }
 
     private T Field<T>(string name) where T : class
