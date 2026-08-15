@@ -21,5 +21,7 @@
   <ItemGroup>
     <Content Include="Assets\subtitle.html"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
     <Content Include="Assets\model-catalog.json"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="Portable\Start-LocalSub.cmd"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><TargetPath>Start-LocalSub.cmd</TargetPath></Content>
+    <Content Include="Portable\Ensure-LocalRuntime.ps1"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><TargetPath>Ensure-LocalRuntime.ps1</TargetPath></Content>
   </ItemGroup>
 </Project>
