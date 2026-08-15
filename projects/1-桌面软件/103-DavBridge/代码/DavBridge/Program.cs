@@ -35,6 +35,7 @@ internal static class Program
                 singleInstance.Attach(form);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
                 using var shell = UiShellV030.Attach(form, host, reconciliation);
+                using var polish = UiPolishV031.Attach(form, host, reconciliation, shell);
                 Application.Run(form);
             }
             finally
@@ -86,8 +87,10 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
-                uiGeneration = "v0.3.0-shell",
+                uiGeneration = "v0.3.1-polished-shell",
                 layoutScenarios = 5,
+                defaultScrollbarExpected = false,
+                routeLogosExpected = true,
                 ok = true
             });
         }
@@ -108,8 +111,10 @@ internal static class Program
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
-                uiGeneration = "v0.3.0-shell",
+                uiGeneration = "v0.3.1-polished-shell",
                 layoutScenarios = 5,
+                defaultScrollbarExpected = false,
+                routeLogosExpected = true,
                 ok = true
             });
         }
@@ -142,6 +147,7 @@ internal static class Program
         AppBranding.Apply(form);
         using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
         using var shell = UiShellV030.Attach(form, host, reconciliation);
+        using var polish = UiPolishV031.Attach(form, host, reconciliation, shell);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
@@ -149,6 +155,7 @@ internal static class Program
         form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
         form.PerformLayout();
         shell.ValidateLayout(name);
+        polish.ValidateLayout(name);
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
