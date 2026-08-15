@@ -97,9 +97,10 @@ internal static class ReconciliationRemovalV030
         if (recycle is null)
             return new RemovalActionResultV030(groupKey, false, false, true, "回收站中已经找不到该附件组。已停止删除。");
 
+        // A delete transaction is legal only while the current cycle still exposes the group as
+        // an actionable review item. This is a core safety gate, not merely a UI convention.
         var disposition = ReconciliationPolicy.GetDisposition(recycle, runtime.CurrentCycleId);
-        var blocked = !string.IsNullOrWhiteSpace(recycle.LastIssue) && recycle.LastIssue.StartsWith("BLOCKED:", StringComparison.Ordinal);
-        if (disposition != RecycleDisposition.ReviewRequired && !blocked)
+        if (disposition is not RecycleDisposition.ReviewRequired and not RecycleDisposition.Blocked)
             return new RemovalActionResultV030(groupKey, false, false, true, "该附件组当前不处于可人工审查状态。已停止删除。");
 
         var records = host.State.Files.Values
