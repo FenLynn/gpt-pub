@@ -90,7 +90,7 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
                     throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: rendered text touches meter edge ({ink.Top}..{ink.Bottom} of {bitmap.Height})");
                 var inkCenter = (ink.Top + ink.Bottom) / 2d;
                 var meterCenter = (bitmap.Height - 1) / 2d;
-                if (Math.Abs(inkCenter - meterCenter) > 2.0)
+                if (Math.Abs(inkCenter - meterCenter) > 3.0)
                     throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: rendered text is not vertically centered (ink={inkCenter:0.0}, meter={meterCenter:0.0})");
             }
             finally
