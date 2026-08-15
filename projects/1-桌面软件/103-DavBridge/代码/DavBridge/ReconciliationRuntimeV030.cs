@@ -247,17 +247,17 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
             }
 
             recycle.LastSeenCycleId = State.CurrentCycleId;
+            var hadRemovedState = recycle.RemovedAt.HasValue;
+            var hadMissingState = !string.IsNullOrWhiteSpace(recycle.FirstMissingCycleId);
             var sourceMembers = currentGroup.Members.ToDictionary(member => member.RelativePath, StringComparer.OrdinalIgnoreCase);
             var isHistoricalZoteroPair = trustedRecords.Any(record => IsZoteroMember(record.RelativePath));
             if (isHistoricalZoteroPair && !trustedRecords.All(record => sourceMembers.ContainsKey(record.RelativePath)))
             {
-                ClearMissingAndRemoved(recycle);
+                ClearMissingObservation(recycle);
                 recycle.LastIssue = "BLOCKED: InfiniCLOUD 当前只显示历史 Zotero 附件组的部分成员。DavBridge 不会按单个 zip 或 prop 推断删除，请人工保留并等待源端恢复或确认。";
                 continue;
             }
 
-            var hadRemovedState = recycle.RemovedAt.HasValue;
-            var hadMissingState = !string.IsNullOrWhiteSpace(recycle.FirstMissingCycleId);
             if (hadMissingState || hadRemovedState)
                 ClearMissingAndRemoved(recycle);
             if (ReconciliationPolicy.IsBlocked(recycle))
@@ -413,12 +413,17 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
         return false;
     }
 
-    private static void ClearMissingAndRemoved(ReconciliationGroupState recycle)
+    private static void ClearMissingObservation(ReconciliationGroupState recycle)
     {
         recycle.FirstMissingCycleId = null;
         recycle.FirstMissingAt = null;
         recycle.LastDeferredCycleId = null;
         recycle.LastDeferredAt = null;
+    }
+
+    private static void ClearMissingAndRemoved(ReconciliationGroupState recycle)
+    {
+        ClearMissingObservation(recycle);
         recycle.RemovedCycleId = null;
         recycle.RemovedAt = null;
     }
