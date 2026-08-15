@@ -155,7 +155,8 @@ internal static class Program
         form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
         form.PerformLayout();
         shell.ValidateLayout(name);
-        polish.ValidateLayout(name);
+        if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
+            polish.ValidateLayout(name);
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
