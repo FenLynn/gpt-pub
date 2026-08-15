@@ -36,6 +36,7 @@ internal static class Program
                 singleInstance.Attach(form);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
                 using var shell = UiShellV032.Attach(form, host, reconciliation);
+                using var quotaMeterBounds = UiQuotaMeterBoundsV0310.Attach(shell);
                 using var meterText = UiOverviewMeterTextV037.Attach(shell);
                 using var homeController = WindowHomeControllerV037.Attach(form, host, shell, launchInBackground);
                 Application.Run(form);
@@ -90,13 +91,14 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
-                uiGeneration = "v0.3.9-visible-glyph-meter-text-home-activation",
+                uiGeneration = "v0.3.10-quota-meter-row-height-visible-glyph-text",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
                 overviewNativeMeterTextExpected = true,
                 meterVisibleGlyphCenterExpected = true,
+                quotaMeterLogicalRowHeightExpected = true,
                 uiSnapshotsExpected = true,
                 explicitActivationReturnsOverview = true,
                 layoutReparentExpected = false,
@@ -121,13 +123,14 @@ internal static class Program
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
-                uiGeneration = "v0.3.9-visible-glyph-meter-text-home-activation",
+                uiGeneration = "v0.3.10-quota-meter-row-height-visible-glyph-text",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
                 docsTabExpected = true,
                 overviewNativeMeterTextExpected = true,
                 meterVisibleGlyphCenterExpected = true,
+                quotaMeterLogicalRowHeightExpected = true,
                 uiSnapshotsExpected = true,
                 explicitActivationReturnsOverview = true,
                 layoutReparentExpected = false,
@@ -163,6 +166,7 @@ internal static class Program
         AppBranding.Apply(form);
         using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
         using var shell = UiShellV032.Attach(form, host, reconciliation);
+        using var quotaMeterBounds = UiQuotaMeterBoundsV0310.Attach(shell);
         using var meterText = UiOverviewMeterTextV037.Attach(shell);
         using var homeController = WindowHomeControllerV037.Attach(form, host, shell, launchInBackground: false);
 
@@ -173,6 +177,7 @@ internal static class Program
         form.PerformLayout();
         if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
             shell.ValidateLayout(name);
+        quotaMeterBounds.Validate(name);
         meterText.ValidateLayout(name);
         homeController.Validate(name);
 
