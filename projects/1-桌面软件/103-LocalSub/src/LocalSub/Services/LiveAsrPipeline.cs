@@ -43,18 +43,14 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     async Task StartAsync(AppSettings settings, ModelDescriptor model, ModelManager models, uint? processId, IProgress<ModelOperationProgress>? runtimeProgress, CancellationToken ct)
     {
         await StopAsync();
-
         if (processId.HasValue) ProcessLoopbackCaptureService.EnsureSupported();
-
-        if (!models.IsInstalled(model))
-            throw new InvalidOperationException($"实时模型“{model.Name}”尚未安装，请先在“模型”页面下载。");
+        if (!models.IsInstalled(model)) throw new InvalidOperationException($"实时模型“{model.Name}”尚未安装，请先在“模型”页面下载。");
 
         var isParaformer = model.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase);
-        var isZipformer = string.Equals(model.Id, "streaming-zipformer-zh-large-int8", StringComparison.OrdinalIgnoreCase);
+        var isZipformer = model.Id.StartsWith("streaming-zipformer-", StringComparison.OrdinalIgnoreCase);
         var isStreaming = isParaformer || isZipformer;
         var isSenseVoice = string.Equals(model.Id, "sensevoice-small-int8", StringComparison.OrdinalIgnoreCase);
-        if (!isStreaming && !isSenseVoice)
-            throw new NotSupportedException("当前实时字幕支持 Streaming Paraformer、Streaming Zipformer Large 与 SenseVoice Small INT8（模拟流式）。");
+        if (!isStreaming && !isSenseVoice) throw new NotSupportedException("当前实时字幕支持 Streaming Paraformer、Streaming Zipformer 与 SenseVoice Small INT8（模拟流式）。");
 
         StatusChanged?.Invoke("检查 ASR 运行库");
         var runtime = new AsrRuntimeManager(settings);
@@ -62,16 +58,13 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
 
         if (isSenseVoice)
         {
-            var vadDescriptor = new ModelCatalogService().Load()
-                .FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
+            var vadDescriptor = new ModelCatalogService().Load().FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException("模型 catalog 中缺少 Silero VAD。");
-
             if (!models.IsInstalled(vadDescriptor))
             {
                 StatusChanged?.Invoke("SenseVoice 需要 Silero VAD，正在自动下载约 2 MB 组件");
                 await models.DownloadAsync(vadDescriptor, runtimeProgress, ct);
             }
-
             var vadPath = Path.Combine(models.GetModelFolder(vadDescriptor), "silero_vad.onnx");
             StatusChanged?.Invoke("加载 SenseVoice 与 Silero VAD");
             _senseVoice.Start(model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot);
@@ -80,21 +73,15 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         }
         else
         {
-            _streamingLabel = isZipformer ? "Streaming Zipformer Large" : "Streaming Paraformer";
+            _streamingLabel = model.Name.Replace(" INT8", "");
             StatusChanged?.Invoke($"加载 {_streamingLabel}");
             _streaming.Start(model, models.GetModelFolder(model), runtime.RuntimeRoot);
             _useSenseVoice = false;
         }
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _queue = Channel.CreateBounded<float[]>(new BoundedChannelOptions(64)
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            FullMode = BoundedChannelFullMode.DropOldest
-        });
+        _queue = Channel.CreateBounded<float[]>(new BoundedChannelOptions(64) { SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.DropOldest });
         _worker = Task.Run(() => DecodeLoopAsync(_cts.Token), _cts.Token);
-
         try
         {
             if (processId.HasValue)
@@ -107,11 +94,8 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                 StatusChanged?.Invoke("启动所有 Windows 输出音频捕获");
                 _allAudio.Start();
             }
-
             _running = true;
-            StatusChanged?.Invoke(_useSenseVoice
-                ? "SenseVoice 模拟流式识别中，VAD 与音量 fallback 会共同检测语音"
-                : $"{_streamingLabel} 实时识别中");
+            StatusChanged?.Invoke(_useSenseVoice ? "SenseVoice 模拟流式识别中，VAD 与音量 fallback 会共同检测语音" : $"{_streamingLabel} 实时识别中");
         }
         catch
         {
@@ -142,10 +126,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
-        catch (Exception ex)
-        {
-            StatusChanged?.Invoke("识别失败：" + ex.Message);
-        }
+        catch (Exception ex) { StatusChanged?.Invoke("识别失败：" + ex.Message); }
     }
 
     public async Task StopAsync()
@@ -154,18 +135,9 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _allAudio.Stop();
         await _processAudio.StopAsync();
         if (_queue != null) _queue.Writer.TryComplete();
-        if (_cts != null)
-        {
-            try { _cts.Cancel(); } catch { }
-        }
-        if (_worker != null)
-        {
-            try { await _worker; } catch (OperationCanceledException) { }
-        }
-        _worker = null;
-        _queue = null;
-        _cts?.Dispose();
-        _cts = null;
+        if (_cts != null) { try { _cts.Cancel(); } catch { } }
+        if (_worker != null) { try { await _worker; } catch (OperationCanceledException) { } }
+        _worker = null; _queue = null; _cts?.Dispose(); _cts = null;
         _streaming.Stop();
         _senseVoice.Stop();
         _useSenseVoice = false;

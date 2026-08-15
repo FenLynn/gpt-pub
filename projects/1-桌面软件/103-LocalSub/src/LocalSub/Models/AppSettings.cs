@@ -6,6 +6,7 @@ namespace LocalSub.Models;
 
 public enum ProxyMode { System, Direct, Socks5 }
 public enum AudioSourceMode { PotPlayer, AllAudio }
+public enum SubtitleBackgroundMode { None, Light, Dark }
 
 public sealed class AppSettings
 {
@@ -15,9 +16,18 @@ public sealed class AppSettings
     public string Socks5Url { get; set; } = "socks5://127.0.0.1:7890";
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AudioSourceMode AudioSource { get; set; } = AudioSourceMode.PotPlayer;
-    public string LiveModelId { get; set; } = "streaming-paraformer-zh-en";
+    public string LiveModelId { get; set; } = "streaming-zipformer-zh-large-int8";
     public string BatchModelId { get; set; } = "sensevoice-small-int8";
     public string Keywords { get; set; } = "";
+
+    public bool SubtitleAutoSize { get; set; } = true;
+    public int SubtitleFontSize { get; set; } = 28;
+    public int SubtitleBottomOffset { get; set; } = 24;
+    public int SubtitleMaxWidthPercent { get; set; } = 90;
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public SubtitleBackgroundMode SubtitleBackground { get; set; } = SubtitleBackgroundMode.None;
+    public int SubtitleBackgroundOpacity { get; set; } = 24;
+    public double SubtitleDisplaySeconds { get; set; } = 3.0;
 
     [JsonIgnore]
     public string ResolvedAsrRoot => PortablePaths.ResolvePortablePath(AsrRoot);

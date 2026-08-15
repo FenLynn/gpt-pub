@@ -11,6 +11,7 @@ public sealed class MainForm : Form
     ModelManager? _models;
     readonly TranscriptService _transcript = new();
     readonly LiveAsrPipeline _liveAsr = new();
+    readonly MediaAnalysisService _mediaAnalysis = new();
     readonly System.Windows.Forms.Timer _overlayFollowTimer = new() { Interval = 60 };
     SubtitleOverlayForm? _overlay;
     bool _liveRunning;
@@ -19,9 +20,9 @@ public sealed class MainForm : Form
 
     readonly TabControl tabs = new() { Dock = DockStyle.Fill };
     readonly ComboBox sourceBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
-    readonly ComboBox liveModelBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 360 };
-    readonly Label liveStatus = new() { AutoSize = true, MaximumSize = new Size(760, 0), Text = "未启动" };
-    readonly ProgressBar audioLevel = new() { Width = 360, Maximum = 1000 };
+    readonly ComboBox liveModelBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 390 };
+    readonly Label liveStatus = new() { AutoSize = true, MaximumSize = new Size(800, 0), Text = "未启动" };
+    readonly ProgressBar audioLevel = new() { Width = 390, Maximum = 1000 };
     readonly Button liveStart = new() { Text = "开始", Width = 100 };
 
     readonly DataGridView modelGrid = new()
@@ -32,7 +33,8 @@ public sealed class MainForm : Form
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         MultiSelect = false,
         AllowUserToAddRows = false,
-        AllowUserToDeleteRows = false
+        AllowUserToDeleteRows = false,
+        RowHeadersVisible = false
     };
     readonly ProgressBar downloadProgress = new() { Dock = DockStyle.Fill, Height = 18 };
     readonly Label modelStatusTitle = new() { Dock = DockStyle.Fill, Text = "就绪", TextAlign = ContentAlignment.MiddleLeft };
@@ -51,16 +53,31 @@ public sealed class MainForm : Form
     readonly TextBox asrPath = new() { Width = 520 };
     readonly ComboBox proxyMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
     readonly TextBox socksUrl = new() { Width = 360 };
-    readonly TextBox keywords = new() { Multiline = true, Width = 520, Height = 90 };
+    readonly TextBox keywords = new() { Multiline = true, Width = 520, Height = 72 };
+
+    readonly CheckBox subtitleAutoSize = new() { Text = "自动字号（随播放器高度）", AutoSize = true };
+    readonly NumericUpDown subtitleFontSize = new() { Minimum = 20, Maximum = 52, Value = 28, Width = 80 };
+    readonly NumericUpDown subtitleBottomOffset = new() { Minimum = 0, Maximum = 160, Value = 24, Width = 80 };
+    readonly NumericUpDown subtitleMaxWidth = new() { Minimum = 50, Maximum = 100, Value = 90, Width = 80 };
+    readonly ComboBox subtitleBackground = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140 };
+    readonly NumericUpDown subtitleBackgroundOpacity = new() { Minimum = 0, Maximum = 70, Value = 24, Width = 80 };
+    readonly NumericUpDown subtitleDuration = new() { Minimum = 1, Maximum = 10, DecimalPlaces = 1, Increment = 0.5M, Value = 3, Width = 80 };
+
     readonly ListBox batchFiles = new() { Dock = DockStyle.Fill };
+    readonly Label batchMediaTitle = new() { Dock = DockStyle.Fill, Text = "尚未选择媒体", Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) };
+    readonly Label batchMediaInfo = new() { Dock = DockStyle.Fill, Text = "拖入视频后自动解析音轨并生成声音波形。", ForeColor = Color.DimGray };
+    readonly Label batchStatus = new() { Dock = DockStyle.Fill, Text = "等待媒体文件", AutoEllipsis = true };
+    readonly ProgressBar batchProgress = new() { Dock = DockStyle.Fill, Maximum = 100 };
+    readonly WaveformView batchWaveform = new() { Dock = DockStyle.Fill };
+    CancellationTokenSource? _batchAnalyzeCts;
 
     public MainForm()
     {
         Text = "LocalSub 0.1.0 dev";
-        Width = 980;
-        Height = 690;
+        Width = 1120;
+        Height = 760;
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(840, 600);
+        MinimumSize = new Size(920, 650);
         Controls.Add(tabs);
         BuildLiveTab();
         BuildBatchTab();
@@ -73,6 +90,8 @@ public sealed class MainForm : Form
             _overlayFollowTimer.Stop();
             _modelDownloadCts?.Cancel();
             _modelDownloadCts?.Dispose();
+            _batchAnalyzeCts?.Cancel();
+            _batchAnalyzeCts?.Dispose();
             await _liveAsr.DisposeAsync();
             _overlay?.Close();
         };
@@ -113,6 +132,23 @@ public sealed class MainForm : Form
         proxyMode.SelectedIndex = _settings.ProxyMode switch { ProxyMode.Direct => 1, ProxyMode.Socks5 => 2, _ => 0 };
         socksUrl.Text = _settings.Socks5Url;
         keywords.Text = _settings.Keywords;
+
+        subtitleBackground.Items.Clear();
+        subtitleBackground.Items.AddRange(["无底纹", "轻底纹", "深底纹"]);
+        subtitleAutoSize.Checked = _settings.SubtitleAutoSize;
+        subtitleFontSize.Value = Math.Clamp(_settings.SubtitleFontSize, 20, 52);
+        subtitleBottomOffset.Value = Math.Clamp(_settings.SubtitleBottomOffset, 0, 160);
+        subtitleMaxWidth.Value = Math.Clamp(_settings.SubtitleMaxWidthPercent, 50, 100);
+        subtitleBackground.SelectedIndex = _settings.SubtitleBackground switch
+        {
+            SubtitleBackgroundMode.Light => 1,
+            SubtitleBackgroundMode.Dark => 2,
+            _ => 0
+        };
+        subtitleBackgroundOpacity.Value = Math.Clamp(_settings.SubtitleBackgroundOpacity, 0, 70);
+        subtitleDuration.Value = (decimal)Math.Clamp(_settings.SubtitleDisplaySeconds, 1.0, 10.0);
+        subtitleFontSize.Enabled = !subtitleAutoSize.Checked;
+        _overlay?.ApplySettings(_settings);
     }
 
     void BuildLiveTab()
@@ -130,10 +166,10 @@ public sealed class MainForm : Form
         p.Controls.Add(new Label
         {
             AutoSize = true,
-            MaximumSize = new Size(760, 0),
+            MaximumSize = new Size(820, 0),
             ForeColor = Color.DimGray,
             Margin = new Padding(3, 18, 3, 3),
-            Text = "Streaming Paraformer 为真流式；SenseVoice Small INT8 为 VAD 停顿后出句的模拟流式。字幕最多保留两行，3 秒无新结果自动清空。首次启动会把 sherpa native runtime 下载到 ASR\\_runtime。"
+            Text = "中文推荐 Zipformer Large/CTC Large；Paraformer 为低延迟中英档。字幕最多两行，样式、位置和显示时长可在“设置”中调整。"
         });
         liveStart.Click += LiveStart_Click;
         t.Controls.Add(p);
@@ -156,10 +192,10 @@ public sealed class MainForm : Form
             _models = new ModelManager(_settings);
 
             if (liveModelBox.SelectedItem is not ModelDescriptor model)
-                throw new InvalidOperationException("没有可用的实时模型。请先在“模型”页面安装 Streaming Paraformer 或 SenseVoice Small INT8。");
+                throw new InvalidOperationException("没有可用的实时模型，请先在“模型”页面安装实时模型。");
             if (!_models.IsInstalled(model))
             {
-                liveStatus.Text = $"实时模型“{model.Name}”未安装。请到“模型”页面下载后再开始。";
+                liveStatus.Text = $"实时模型“{model.Name}”未安装，请到“模型”页面下载。";
                 tabs.SelectedIndex = 2;
                 SelectModelRow(model.Id);
                 return;
@@ -168,8 +204,9 @@ public sealed class MainForm : Form
             _lastFinalText = "";
             _previousFinalText = "";
             EnsureOverlay();
+            _overlay!.ApplySettings(_settings);
             FollowOverlayToPotPlayer();
-            _overlay!.Show();
+            _overlay.Show();
             await _overlay.SetTextAsync("正在启动实时识别…", "", ParseKeywords());
 
             var runtimeProgress = new Progress<ModelOperationProgress>(p =>
@@ -235,33 +272,31 @@ public sealed class MainForm : Form
     async Task ShowRecognitionAsync(string text, bool isFinal)
     {
         if (!_liveRunning || string.IsNullOrWhiteSpace(text)) return;
-        if (isFinal)
+        if (isFinal && !string.Equals(text, _lastFinalText, StringComparison.Ordinal))
         {
-            if (!string.Equals(text, _lastFinalText, StringComparison.Ordinal))
-            {
-                _previousFinalText = _lastFinalText;
-                _lastFinalText = text;
-            }
+            _previousFinalText = _lastFinalText;
+            _lastFinalText = text;
         }
 
         EnsureOverlay();
-        if (!_overlay!.Visible) _overlay.Show();
+        _overlay!.ApplySettings(_settings);
+        if (!_overlay.Visible) _overlay.Show();
         await _overlay.SetTextAsync(text, isFinal ? _previousFinalText : _lastFinalText, ParseKeywords());
     }
 
     void EnsureOverlay()
     {
-        if (_overlay == null || _overlay.IsDisposed)
-        {
-            _overlay = new SubtitleOverlayForm();
-            var area = Screen.PrimaryScreen!.WorkingArea;
-            _overlay.Location = new Point(area.Left + (area.Width - _overlay.Width) / 2, area.Bottom - _overlay.Height - 60);
-        }
+        if (_overlay != null && !_overlay.IsDisposed) return;
+        _overlay = new SubtitleOverlayForm();
+        _overlay.ApplySettings(_settings);
+        var area = Screen.PrimaryScreen!.WorkingArea;
+        _overlay.Location = new Point(area.Left + (area.Width - _overlay.Width) / 2, area.Bottom - _overlay.Height - 40);
     }
 
     void FollowOverlayToPotPlayer()
     {
         if (_overlay == null || _overlay.IsDisposed) return;
+        _overlay.ApplySettings(_settings);
         var process = PotPlayerWatcher.FindRunning();
         if (process != null && PotPlayerWatcher.TryGetWindowState(process, out var bounds, out var minimized))
         {
@@ -275,33 +310,106 @@ public sealed class MainForm : Form
             return;
         }
 
-        if (_liveRunning && sourceBox.SelectedIndex == 0)
-            _overlay.Hide();
+        if (_liveRunning && sourceBox.SelectedIndex == 0) _overlay.Hide();
     }
 
     void BuildBatchTab()
     {
         var t = new TabPage("后台转写") { AllowDrop = true };
-        var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 390 };
-        split.Panel1.Controls.Add(batchFiles);
-        split.Panel1.Controls.Add(new Label { Dock = DockStyle.Top, Height = 62, Text = "把视频拖到这里。当前已建立队列、关键词与导出数据骨架；高速媒体解码与离线 ASR 流水线随后接入。", Padding = new Padding(12) });
-        var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), FlowDirection = FlowDirection.TopDown, AutoScroll = true };
-        bottom.Controls.Add(new Label { Text = "关键词（逗号、分号或换行分隔）", AutoSize = true });
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10), ColumnCount = 1, RowCount = 6 };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 125));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 120));
+
+        var queuePanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+        queuePanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        queuePanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        queuePanel.Controls.Add(new Label { Dock = DockStyle.Fill, Text = "把视频拖到这里。选中后立即解析音轨并生成声音波形。", Padding = new Padding(4, 8, 4, 4) }, 0, 0);
+        queuePanel.Controls.Add(batchFiles, 0, 1);
+
+        var info = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+        info.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        info.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        info.Controls.Add(batchMediaTitle, 0, 0);
+        info.Controls.Add(batchMediaInfo, 0, 1);
+
+        var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0), FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+        bottom.Controls.Add(new Label { Text = "关键词", AutoSize = true, Margin = new Padding(0, 8, 8, 0) });
+        keywords.Width = 500;
+        keywords.Height = 72;
         bottom.Controls.Add(keywords);
-        var export = new Button { Text = "导出 TXT", Width = 120 };
+        var export = new Button { Text = "导出 TXT", Width = 110, Height = 30, Margin = new Padding(10, 4, 0, 0) };
         export.Click += (_, _) => ExportTxt();
         bottom.Controls.Add(export);
-        split.Panel2.Controls.Add(bottom);
-        t.Controls.Add(split);
+
+        layout.Controls.Add(queuePanel, 0, 0);
+        layout.Controls.Add(info, 0, 1);
+        layout.Controls.Add(batchWaveform, 0, 2);
+        layout.Controls.Add(batchStatus, 0, 3);
+        layout.Controls.Add(batchProgress, 0, 4);
+        layout.Controls.Add(bottom, 0, 5);
+        t.Controls.Add(layout);
+
+        batchFiles.SelectedIndexChanged += async (_, _) =>
+        {
+            if (batchFiles.SelectedItem is string path && File.Exists(path)) await AnalyzeBatchFileAsync(path);
+        };
         t.DragEnter += (_, e) => { if (e.Data?.GetDataPresent(DataFormats.FileDrop) == true) e.Effect = DragDropEffects.Copy; };
         t.DragDrop += (_, e) =>
         {
-            if (e.Data?.GetData(DataFormats.FileDrop) is string[] fs)
-                foreach (var f in fs)
-                    if (!batchFiles.Items.Contains(f)) batchFiles.Items.Add(f);
+            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] fs) return;
+            string? first = null;
+            foreach (var f in fs.Where(File.Exists))
+            {
+                if (!batchFiles.Items.Contains(f)) batchFiles.Items.Add(f);
+                first ??= f;
+            }
+            if (first != null) batchFiles.SelectedItem = first;
         };
         tabs.TabPages.Add(t);
     }
+
+    async Task AnalyzeBatchFileAsync(string path)
+    {
+        _batchAnalyzeCts?.Cancel();
+        _batchAnalyzeCts?.Dispose();
+        _batchAnalyzeCts = new CancellationTokenSource();
+        var ct = _batchAnalyzeCts.Token;
+        batchMediaTitle.Text = Path.GetFileName(path);
+        batchMediaInfo.Text = "正在读取媒体音轨…";
+        batchStatus.Text = "打开媒体";
+        batchProgress.Value = 0;
+        batchWaveform.ClearWaveform();
+
+        try
+        {
+            var progress = new Progress<MediaAnalysisProgress>(p =>
+            {
+                if (ct.IsCancellationRequested) return;
+                batchProgress.Value = Math.Clamp(p.Percent, 0, 100);
+                batchStatus.Text = $"{p.Stage}  {p.Detail}";
+            });
+            var result = await _mediaAnalysis.AnalyzeAsync(path, progress, ct);
+            if (ct.IsCancellationRequested) return;
+            batchWaveform.SetWaveform(result.Waveform, result.Duration);
+            batchMediaInfo.Text = $"时长 {FormatDuration(result.Duration)}   音频 {result.SampleRate} Hz / {result.Channels} 声道   波形 {result.Waveform.Length} 点";
+            batchStatus.Text = "声音轨道已生成。下一步将在此时间轴接入 VAD、离线 ASR 和关键词标记。";
+            batchProgress.Value = 100;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (ct.IsCancellationRequested) return;
+            batchMediaInfo.Text = "解析失败";
+            batchStatus.Text = ex.Message;
+            batchProgress.Value = 0;
+        }
+    }
+
+    static string FormatDuration(TimeSpan t) => t.TotalHours >= 1 ? t.ToString(@"hh\:mm\:ss") : t.ToString(@"mm\:ss");
 
     void ExportTxt()
     {
@@ -312,13 +420,17 @@ public sealed class MainForm : Form
     void BuildModelsTab()
     {
         var t = new TabPage("模型");
-        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "模型", DataPropertyName = "Name", Width = 260 });
-        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "用途", DataPropertyName = "Purpose", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "大小", DataPropertyName = "Size", Width = 120 });
-        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", DataPropertyName = "Status", Width = 110 });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "ModelName", HeaderText = "模型", DataPropertyName = "Name", Width = 235 });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Languages", HeaderText = "语言", DataPropertyName = "Languages", Width = 70 });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Purpose", HeaderText = "用途", DataPropertyName = "Purpose", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Size", HeaderText = "体积", DataPropertyName = "Size", Width = 82 });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Realtime", HeaderText = "实时性", DataPropertyName = "Realtime", Width = 62 });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Accuracy", HeaderText = "准确率", DataPropertyName = "Accuracy", Width = 62 });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Value", HeaderText = "性价比", DataPropertyName = "Value", Width = 66 });
+        modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", HeaderText = "状态", DataPropertyName = "Status", Width = 85 });
 
         modelStatusTitle.Font = new Font(modelStatusTitle.Font, FontStyle.Bold);
-        modelLog.Text = "等待操作。";
+        modelLog.Text = "评分为 LocalSub 面向本地 CPU 字幕场景的相对工程评分（10 分制），会随实机 A/B 调整。";
 
         var status = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10, 6, 10, 6), ColumnCount = 1, RowCount = 4 };
         status.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
@@ -345,18 +457,14 @@ public sealed class MainForm : Form
         modelCancelButton.Click += (_, _) => _modelDownloadCts?.Cancel();
         modelDeleteButton.Click += (_, _) => DeleteSelected();
         modelOpenButton.Click += (_, _) => Process.Start(new ProcessStartInfo("explorer.exe", _settings.ResolvedAsrRoot) { UseShellExecute = true });
-        modelScanButton.Click += (_, _) =>
-        {
-            AppendModelLog("重新扫描 ASR 模型目录。", true);
-            RefreshModels();
-        };
+        modelScanButton.Click += (_, _) => { AppendModelLog("重新扫描 ASR 模型目录。", true); RefreshModels(); };
         modelGrid.SelectionChanged += (_, _) =>
         {
             if (_modelDownloadCts != null) return;
             var m = SelectedModel();
             if (m == null) return;
             modelStatusTitle.Text = m.Name;
-            modelStatusDetail.Text = _models?.IsInstalled(m) == true ? "状态：已安装" : "状态：未安装，点击“下载/修复”开始。";
+            modelStatusDetail.Text = $"{m.Purpose}   实时 {ScoreText(m.RealtimeScore)} / 准确 {ScoreText(m.AccuracyScore)} / 性价比 {ScoreText(m.ValueScore)}";
         };
 
         t.Controls.Add(layout);
@@ -371,25 +479,28 @@ public sealed class MainForm : Form
         {
             Model = m,
             m.Name,
+            m.Languages,
             m.Purpose,
             Size = m.SizeText,
+            Realtime = ScoreText(m.RealtimeScore),
+            Accuracy = ScoreText(m.AccuracyScore),
+            Value = ScoreText(m.ValueScore),
             Status = _models.IsInstalled(m) ? "已安装" : "未安装"
         }).ToList();
-
         if (!string.IsNullOrWhiteSpace(selectedId)) SelectModelRow(selectedId);
         FillLiveModels();
     }
+
+    static string ScoreText(int value) => value > 0 ? $"{value}/10" : "—";
 
     void SelectModelRow(string modelId)
     {
         foreach (DataGridViewRow row in modelGrid.Rows)
         {
-            if (GetBoundModel(row)?.Id == modelId)
-            {
-                row.Selected = true;
-                if (row.Cells.Count > 0) modelGrid.CurrentCell = row.Cells[0];
-                break;
-            }
+            if (GetBoundModel(row)?.Id != modelId) continue;
+            row.Selected = true;
+            if (row.Cells.Count > 0) modelGrid.CurrentCell = row.Cells[0];
+            break;
         }
     }
 
@@ -459,11 +570,7 @@ public sealed class MainForm : Form
     {
         if (_activeModel == null) return;
         modelStatusTitle.Text = $"{_activeModel.Name} · {p.Stage}";
-
-        if (p.IsIndeterminate || !p.Percent.HasValue)
-        {
-            downloadProgress.Style = ProgressBarStyle.Marquee;
-        }
+        if (p.IsIndeterminate || !p.Percent.HasValue) downloadProgress.Style = ProgressBarStyle.Marquee;
         else
         {
             downloadProgress.Style = ProgressBarStyle.Continuous;
@@ -477,7 +584,6 @@ public sealed class MainForm : Form
         if (p.BytesPerSecond > 0) parts.Add(FormatBytes((long)p.BytesPerSecond) + "/s");
         if (!string.IsNullOrWhiteSpace(p.Detail)) parts.Add(p.Detail!);
         modelStatusDetail.Text = parts.Count > 0 ? string.Join("   ", parts) : p.Stage;
-
         SetModelRowStatus(_activeModel.Id, p.Percent.HasValue && p.Stage == "下载" ? $"下载 {p.Percent}%" : p.Stage);
 
         var bucket = p.Percent.HasValue ? p.Percent.Value / 10 : -1;
@@ -502,9 +608,9 @@ public sealed class MainForm : Form
     {
         foreach (DataGridViewRow row in modelGrid.Rows)
         {
-            if (GetBoundModel(row)?.Id == modelId && row.Cells.Count >= 4)
+            if (GetBoundModel(row)?.Id == modelId && modelGrid.Columns.Contains("Status"))
             {
-                row.Cells[3].Value = status;
+                row.Cells["Status"].Value = status;
                 break;
             }
         }
@@ -540,9 +646,7 @@ public sealed class MainForm : Form
 
     void FillLiveModels()
     {
-        var list = _catalog
-            .Where(x => x.LiveCapable && !string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var list = _catalog.Where(x => x.LiveCapable && !string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase)).ToList();
         liveModelBox.DataSource = list;
         liveModelBox.DisplayMember = "Name";
         liveModelBox.ValueMember = "Id";
@@ -555,23 +659,40 @@ public sealed class MainForm : Form
     {
         var t = new TabPage("设置");
         var p = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), FlowDirection = FlowDirection.TopDown, AutoScroll = true, WrapContents = false };
+
         p.Controls.Add(new Label { Text = "ASR 模型根目录（默认 EXE 同级 ASR）", AutoSize = true });
-        var row = new FlowLayoutPanel { Width = 760, Height = 42 };
-        row.Controls.Add(asrPath);
+        var pathRow = new FlowLayoutPanel { Width = 800, Height = 42, WrapContents = false };
+        pathRow.Controls.Add(asrPath);
         var browse = new Button { Text = "浏览", Width = 80 };
-        row.Controls.Add(browse);
-        p.Controls.Add(row);
-        p.Controls.Add(new Label { Text = "下载代理", AutoSize = true, Margin = new Padding(3, 18, 3, 3) });
+        pathRow.Controls.Add(browse);
+        p.Controls.Add(pathRow);
+
+        p.Controls.Add(new Label { Text = "下载代理", AutoSize = true, Margin = new Padding(3, 14, 3, 3) });
         p.Controls.Add(proxyMode);
         p.Controls.Add(new Label { Text = "SOCKS5 地址", AutoSize = true });
         p.Controls.Add(socksUrl);
-        p.Controls.Add(new Label { Text = "可直接接入 Clash / V2RayN 等本机 SOCKS5。示例：socks5://127.0.0.1:7891 或 socks5://127.0.0.1:10808", AutoSize = true, ForeColor = Color.DimGray });
-        var proxyButtons = new FlowLayoutPanel { Width = 620, Height = 42, WrapContents = false };
+        p.Controls.Add(new Label { Text = "可直接接入 Clash / V2RayN 等本机 SOCKS5，例如 socks5://127.0.0.1:7891。", AutoSize = true, ForeColor = Color.DimGray });
+        var proxyButtons = new FlowLayoutPanel { Width = 650, Height = 42, WrapContents = false };
         var detect = new Button { Text = "自动检测本机 SOCKS5", Width = 170 };
         var test = new Button { Text = "测试模型下载链", Width = 150 };
-        var save = new Button { Text = "保存设置", Width = 120 };
-        proxyButtons.Controls.AddRange([detect, test, save]);
+        proxyButtons.Controls.AddRange([detect, test]);
         p.Controls.Add(proxyButtons);
+
+        p.Controls.Add(new Label { Text = "字幕样式", Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold), AutoSize = true, Margin = new Padding(3, 16, 3, 6) });
+        p.Controls.Add(subtitleAutoSize);
+        p.Controls.Add(SettingsRow("固定字号", subtitleFontSize, "px（关闭自动字号时使用）"));
+        p.Controls.Add(SettingsRow("底部偏移", subtitleBottomOffset, "px"));
+        p.Controls.Add(SettingsRow("最大宽度", subtitleMaxWidth, "% 播放器宽度"));
+        p.Controls.Add(SettingsRow("底纹", subtitleBackground, ""));
+        p.Controls.Add(SettingsRow("底纹透明度", subtitleBackgroundOpacity, "%"));
+        p.Controls.Add(SettingsRow("无新字幕后消失", subtitleDuration, "秒"));
+        p.Controls.Add(new Label { Text = "默认采用无整块底纹、白字细黑描边。自动字号会随 PotPlayer 窗口/全屏高度变化。", AutoSize = true, ForeColor = Color.DimGray });
+
+        var actionButtons = new FlowLayoutPanel { Width = 520, Height = 44, WrapContents = false };
+        var preview = new Button { Text = "预览字幕", Width = 110 };
+        var save = new Button { Text = "保存设置", Width = 110 };
+        actionButtons.Controls.AddRange([preview, save]);
+        p.Controls.Add(actionButtons);
 
         browse.Click += (_, _) =>
         {
@@ -581,8 +702,37 @@ public sealed class MainForm : Form
         save.Click += (_, _) => SaveSettings();
         test.Click += async (_, _) => await TestConnection();
         detect.Click += async (_, _) => await DetectLocalSocks5();
+        preview.Click += async (_, _) => await PreviewSubtitleAsync();
+        subtitleAutoSize.CheckedChanged += (_, _) => subtitleFontSize.Enabled = !subtitleAutoSize.Checked;
         t.Controls.Add(p);
         tabs.TabPages.Add(t);
+    }
+
+    static FlowLayoutPanel SettingsRow(string label, Control control, string suffix)
+    {
+        var row = new FlowLayoutPanel { Width = 620, Height = 34, WrapContents = false };
+        row.Controls.Add(new Label { Text = label, Width = 130, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 7, 6, 0) });
+        row.Controls.Add(control);
+        if (!string.IsNullOrWhiteSpace(suffix)) row.Controls.Add(new Label { Text = suffix, AutoSize = true, Margin = new Padding(6, 7, 0, 0) });
+        return row;
+    }
+
+    async Task PreviewSubtitleAsync()
+    {
+        ApplySettingsFromUi();
+        EnsureOverlay();
+        _overlay!.ApplySettings(_settings);
+        var process = PotPlayerWatcher.FindRunning();
+        if (process != null && PotPlayerWatcher.TryGetWindowState(process, out var bounds, out var minimized) && !minimized)
+            _overlay.FollowPlayer(bounds);
+        else
+        {
+            var area = Screen.PrimaryScreen!.WorkingArea;
+            var width = Math.Min(900, area.Width - 40);
+            _overlay.Bounds = new Rectangle(area.Left + (area.Width - width) / 2, area.Bottom - 150, width, 120);
+        }
+        _overlay.Show();
+        await _overlay.PreviewAsync();
     }
 
     void SaveSettings()
@@ -591,8 +741,9 @@ public sealed class MainForm : Form
         {
             ApplySettingsFromUi();
             _settings.Save();
+            _overlay?.ApplySettings(_settings);
             ReloadAll();
-            MessageBox.Show("设置已保存。模型检测已切换到当前 ASR 路径。", "LocalSub");
+            MessageBox.Show("设置已保存。", "LocalSub");
         }
         catch (Exception ex)
         {
@@ -608,6 +759,18 @@ public sealed class MainForm : Form
         _settings.AudioSource = sourceBox.SelectedIndex == 1 ? AudioSourceMode.AllAudio : AudioSourceMode.PotPlayer;
         if (liveModelBox.SelectedItem is ModelDescriptor m) _settings.LiveModelId = m.Id;
         _settings.Keywords = keywords.Text;
+        _settings.SubtitleAutoSize = subtitleAutoSize.Checked;
+        _settings.SubtitleFontSize = (int)subtitleFontSize.Value;
+        _settings.SubtitleBottomOffset = (int)subtitleBottomOffset.Value;
+        _settings.SubtitleMaxWidthPercent = (int)subtitleMaxWidth.Value;
+        _settings.SubtitleBackground = subtitleBackground.SelectedIndex switch
+        {
+            1 => SubtitleBackgroundMode.Light,
+            2 => SubtitleBackgroundMode.Dark,
+            _ => SubtitleBackgroundMode.None
+        };
+        _settings.SubtitleBackgroundOpacity = (int)subtitleBackgroundOpacity.Value;
+        _settings.SubtitleDisplaySeconds = (double)subtitleDuration.Value;
     }
 
     async Task TestConnection()
@@ -615,38 +778,27 @@ public sealed class MainForm : Form
         try
         {
             SaveSettingsSilent();
-            if (_catalog.Count == 0) throw new InvalidOperationException("模型 catalog 为空。");
+            var probeModel = _catalog.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.Url))
+                ?? throw new InvalidOperationException("模型 catalog 没有可测试的下载地址。");
             using var c = DownloadClientFactory.Create(_settings, TimeSpan.FromSeconds(15));
-            using var req = new HttpRequestMessage(HttpMethod.Get, _catalog.First().Url);
+            using var req = new HttpRequestMessage(HttpMethod.Get, probeModel.Url);
             req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
             using var r = await c.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
             r.EnsureSuccessStatusCode();
             var finalHost = r.RequestMessage?.RequestUri?.Host ?? "未知";
             MessageBox.Show($"模型下载链可用。\nHTTP {(int)r.StatusCode}\n最终主机：{finalHost}", "LocalSub");
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show(ex.Message, "连接测试失败");
-        }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "连接测试失败"); }
     }
 
     async Task DetectLocalSocks5()
     {
-        if (_catalog.Count == 0)
-        {
-            MessageBox.Show("模型 catalog 为空。", "LocalSub");
-            return;
-        }
+        var probeModel = _catalog.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.Url));
+        if (probeModel == null) { MessageBox.Show("模型 catalog 没有可测试地址。", "LocalSub"); return; }
 
         var current = socksUrl.Text.Trim();
-        var candidates = new[]
-        {
-            current,
-            "socks5://127.0.0.1:7890",
-            "socks5://127.0.0.1:7891",
-            "socks5://127.0.0.1:10808",
-            "socks5://127.0.0.1:1080"
-        }.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var candidates = new[] { current, "socks5://127.0.0.1:7890", "socks5://127.0.0.1:7891", "socks5://127.0.0.1:10808", "socks5://127.0.0.1:1080" }
+            .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
         foreach (var candidate in candidates)
         {
@@ -654,21 +806,19 @@ public sealed class MainForm : Form
             {
                 var probe = new AppSettings { ProxyMode = ProxyMode.Socks5, Socks5Url = candidate };
                 using var c = DownloadClientFactory.Create(probe, TimeSpan.FromSeconds(4));
-                using var req = new HttpRequestMessage(HttpMethod.Get, _catalog.First().Url);
+                using var req = new HttpRequestMessage(HttpMethod.Get, probeModel.Url);
                 req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
                 using var r = await c.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
                 if (!r.IsSuccessStatusCode) continue;
-
                 proxyMode.SelectedIndex = 2;
                 socksUrl.Text = candidate;
                 SaveSettingsSilent();
-                MessageBox.Show($"已检测到可用 SOCKS5：\n{candidate}\n\n已自动切换并保存，模型下载将使用该代理。", "LocalSub");
+                MessageBox.Show($"已检测到可用 SOCKS5：\n{candidate}\n\n已自动切换并保存。", "LocalSub");
                 return;
             }
             catch { }
         }
-
-        MessageBox.Show("未检测到可用的本机 SOCKS5。\n\n请确认 Clash / V2RayN 等代理程序已运行，然后填写它实际监听的 SOCKS5 端口。常见端口：7890、7891、10808、1080。", "LocalSub");
+        MessageBox.Show("未检测到可用的本机 SOCKS5。请确认 Clash / V2RayN 已运行并填写其 SOCKS5 端口。", "LocalSub");
     }
 
     void SaveSettingsSilent()
