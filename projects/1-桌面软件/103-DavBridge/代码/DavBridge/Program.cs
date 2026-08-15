@@ -34,9 +34,7 @@ internal static class Program
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
-                using var shell = UiShellV030.Attach(form, host, reconciliation);
-                using var polish = UiPolishV031.Attach(form, host, reconciliation, shell);
-                UiLayoutRepairV031.Apply(polish);
+                using var shell = UiShellV032.Attach(form, host, reconciliation);
                 Application.Run(form);
             }
             finally
@@ -88,10 +86,11 @@ internal static class Program
                 local = paths.LocalRoot,
                 temp = paths.TempRoot,
                 uiConstructed = true,
-                uiGeneration = "v0.3.1-polished-shell",
+                uiGeneration = "v0.3.2-consolidated-shell",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
+                docsTabExpected = true,
                 ok = true
             });
         }
@@ -112,10 +111,11 @@ internal static class Program
                 product = "DavBridge",
                 version = typeof(Program).Assembly.GetName().Version?.ToString(),
                 uiConstructed = true,
-                uiGeneration = "v0.3.1-polished-shell",
+                uiGeneration = "v0.3.2-consolidated-shell",
                 layoutScenarios = 5,
                 defaultScrollbarExpected = false,
                 routeLogosExpected = true,
+                docsTabExpected = true,
                 ok = true
             });
         }
@@ -147,9 +147,7 @@ internal static class Program
         using var form = new MainForm(host, launchInBackground: false);
         AppBranding.Apply(form);
         using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
-        using var shell = UiShellV030.Attach(form, host, reconciliation);
-        using var polish = UiPolishV031.Attach(form, host, reconciliation, shell);
-        UiLayoutRepairV031.Apply(polish);
+        using var shell = UiShellV032.Attach(form, host, reconciliation);
 
         _ = form.Handle;
         if (Math.Abs(scale - 1f) > 0.001f)
@@ -157,7 +155,7 @@ internal static class Program
         form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
         form.PerformLayout();
         if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
-            polish.ValidateLayout(name);
+            shell.ValidateLayout(name);
 
         using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
         _ = settings.Handle;
