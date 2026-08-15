@@ -16,23 +16,23 @@
 
 正式稳定回滚基线：**v0.1.7**。
 
-当前实验候选：**v0.3.4**。
+当前实验候选：**v0.3.6**。
 
-v0.3.4 完成完整 CI 的准确代码 head：`0ff1a9329f1fb34601cdf033167c4d85a7fab5fc`
+v0.3.6 完成完整 CI 的准确代码 head：`5d3f408dfc1a6ca4f814dfaa81bc1b045b3450e5`
 
-P103 CI run：`31884396260`
+P103 CI run：`31888280415`
 
 CI：**success**。
 
-Artifact：`DavBridge-v0.3.4-win-x64`
+Artifact：`DavBridge-v0.3.6-win-x64`
 
-Artifact ZIP SHA256：`dce49eab9343ff1bd2ee6a7a8cfbcbbd5a96f9a7eb93e02ae07500a7fff31afc`
+Artifact ZIP SHA256：`3ecdefdaaa1582be2c4575720869a6c580498e292d905f0f177ab77e2c782759`
 
-EXE SHA256：`7de38ae725020b8d98138378f1d85a8b837e16d6423c1af87930d85347452b75`
+EXE SHA256：`b472cb4ff0914b17fb13387eb17bf5d2ccb97ea4201c4e924a32d8d17d419c91`
 
-本 HANDOFF 之后若存在 `[skip ci]` 纯文档提交，不得把文档 head 当成已构建代码 head。
+本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得被当成已构建代码 head。**准确已构建代码 head 始终是上面的 `5d3f408...`。**
 
-`main` 与 `p103-stable` 继续保持 v0.1.7。v0.3.4 未经用户实机确认不得提升。
+`main` 与 `p103-stable` 未在本轮修改。v0.3.6 未经用户实机视觉确认不得提升。
 
 ## 固定读取顺序
 
@@ -123,82 +123,92 @@ v0.3 新增：
 
 不得重新在主页、转移页、回收站堆大量灰色小字说明。
 
-## v0.3.3 UI 事故与 v0.3.4 紧急回退
+## v0.3.3、v0.3.5 UI 事故与 v0.3.6 修正
 
-v0.3.3 为了把文字直接塞入进度条，引入了 `UiDensityV033` 运行时显示层。该层会在程序启动后：
+### v0.3.3
 
-- 给既有 `MeterV030` 叠加新的 overlay 控件；
-- 隐藏原控件和若干文字控件；
-- 动态修改既有 `TableLayoutPanel.RowStyles`；
-- 隐藏转移页卡片、表格列和多个标题说明；
-- 替换原阶段区域。
+v0.3.3 为了压缩信息，引入 `UiDensityV033` 运行时显示层，批量叠 overlay、隐藏原控件并修改 `TableLayoutPanel.RowStyles`。用户实机证明它同时破坏总览、转移、回收站和文档页面。该方案已经永久否决。
 
-用户实机证明这套做法破坏了四个一级页面的布局。CI 的无头 WinForms 构造测试没有能力替代真实窗口可见状态，因此此前 CI success 不能作为该视觉结构正确的依据。
+### v0.3.4
 
-**v0.3.3 判定为失败 UI 候选，不得继续沿用。**
+v0.3.4 完整撤销 v0.3.3，恢复 v0.3.2 的单一稳定 `UiShellV032`。v0.3.4 是后续几何布局基线。
 
-v0.3.4 的处理不是继续给 Density 层打补丁，而是完整撤销：
+### v0.3.5
 
-- `Program.cs` 恢复只挂载 `UiShellV032`；
-- `UiDensityV033.cs` 从当前分支删除；
-- v0.3.4 运行时代码重新与 v0.3.2 已构建 shell 对齐；
-- 相对 v0.3.2 准确构建 head `8a800bb1a8cc51cbef9979dbf6f71e2a4e6d8ec5`，代码目录除产品版本号外无运行逻辑差异。
+v0.3.5 再次尝试把数值放入 bar，但错误地把原 Label 从既有 `TableLayoutPanel` 中 reparent 到 `MeterV030`，同时重新分配局部行高。虽然 CI 可以通过构造检查，用户实机仍清楚显示：
+
+- 卡片和 bar 被无谓加厚；
+- 上传、下载文字视觉基线不正确；
+- 当前任务 Pulse 形成误导性的蓝色块；
+- 四条 bar 的视觉重量和文字规则不一致。
+
+因此 **v0.3.5 判定为失败 UI 候选，不得继续沿用其 reparent 方案。**
+
+### v0.3.6
+
+v0.3.6 完整删除 `UiOverviewInlineTextV035.cs`，改用原生绘制：
+
+- `MeterV030.OnPaint()` 最后直接绘制可选 `DisplayTextProvider` 文本；
+- 不创建替代 Meter，不创建 overlay；
+- 原 Label 和 Meter 的父级不变；
+- 原 TableLayoutPanel cell 不变；
+- 不修改 `RowStyles`；
+- Meter 内没有子控件；
+- 当前任务 bar 在存在文字时抑制 Pulse，避免把等待或准备状态画成误导性的进度块；
+- `UiOverviewMeterTextV036` 只把原 Label 的动态文本作为 Meter 的绘制数据源，并隐藏原 Label，不接管布局。
+
+自动 UI 自检明确检查父级、cell、Meter 子控件数、native text provider、尺寸和 DrawToBitmap。它用于证明结构没有再次被 reparent 或挤坏，**仍不能替代用户实机视觉验收**。
 
 ### 后续 UI 修改硬约束
 
-今后若继续减少文字或把信息放入 bar：
+- 禁止通过运行时 overlay 批量接管页面。
+- 禁止 reparent 原有 Label 到 Meter。
+- 禁止为了文字进 bar 修改既有 `RowStyles`。
+- 简单显示需求优先在原控件自身 Paint 层实现。
+- v0.3.4 的页面几何结构是当前基线，除非用户明确要求重构，不得顺手调整尺寸和层级。
+- CI 只证明构造、编译和自动安全回归，不能声称视觉效果已经实机验收。
 
-- 禁止再通过独立运行时 overlay 层批量接管既有页面；
-- 禁止为了压缩信息在运行时批量改 `RowStyles`、隐藏父级卡片或跨页修改布局；
-- 应直接在 `UiShellV032` 或其后继单一 shell 的布局源头设计；
-- 每次只改一个页面或一类控件，小步实机确认后再继续；
-- 总览、转移、回收站、文档四页必须逐页实机截图验收；
-- CI 只证明构造、编译和自动安全回归通过，不能声称视觉验收通过。
+## v0.3.6 自动验证
 
-## v0.3.4 自动验证
+准确构建 head：`5d3f408dfc1a6ca4f814dfaa81bc1b045b3450e5`
 
-准确构建 head：`0ff1a9329f1fb34601cdf033167c4d85a7fab5fc`
-
-CI run：`31884396260`，结果 **success**。
+CI run：`31888280415`，结果 **success**。
 
 通过：
 
 - scope；
 - Core Smoke；
-- 原 Cycle / StrongVerified / SourceChanged / WaitQuota / WriteUnknown / 412 / 回收站 / DELETE 安全回归；
+- Cycle / StrongVerified / SourceChanged / WaitQuota / WriteUnknown / 412 / 回收站 / DELETE 安全回归；
 - Windows x64 framework-dependent 单 EXE publish；
 - Runtime boundary；
 - Windows 隔离 self-test；
-- v0.3.2 单一 `UiShellV032` 构造；
-- 900×620、大窗口、125% 与 150% DPI 原布局门；
-- 默认无内容区滚动条；
-- 四个一级 Tab；
-- Logo 路由；
+- 700×520、900×620、1200×760、125% 与 150% DPI 构造；
+- v0.3.2/v0.3.4 shell 原布局门；
+- native Meter 文字绘制 DrawToBitmap；
+- Label/Meter 父级与 TableLayoutPanel cell 保持不变；
+- Meter 不拥有被搬入的 Label 子控件；
 - SHA256；
 - Artifact upload。
 
-Artifact：`DavBridge-v0.3.4-win-x64`
+Artifact：`DavBridge-v0.3.6-win-x64`
 
-Artifact ZIP SHA256：`dce49eab9343ff1bd2ee6a7a8cfbcbbd5a96f9a7eb93e02ae07500a7fff31afc`
+Artifact ZIP SHA256：`3ecdefdaaa1582be2c4575720869a6c580498e292d905f0f177ab77e2c782759`
 
-EXE SHA256：`7de38ae725020b8d98138378f1d85a8b837e16d6423c1af87930d85347452b75`
-
-CI 是自动验证，不替代用户实机视觉验收和真实 WebDAV DELETE 验证。
+EXE SHA256：`b472cb4ff0914b17fb13387eb17bf5d2ccb97ea4201c4e924a32d8d17d419c91`
 
 ## 当前实机断点
 
-下一步只验收 v0.3.4 是否完整恢复 v0.3.2 shell，不提升 stable：
+下一步只验收 v0.3.6 总览显示，不提升 stable：
 
-1. 总览布局是否恢复，不再出现 v0.3.3 的挤压、错位和异常留白。
-2. 转移页任务池、当前状态、当前任务、覆盖区域是否恢复 v0.3.2 结构。
-3. 回收站三个筛选器、表格和底部操作区是否恢复。
-4. 文档左侧导航与正文区是否恢复。
-5. 设置、暂停、继续、托盘、重启和当前迁移行为保持正常。
-
-确认 v0.3.4 恢复稳定后，再讨论下一轮 UI 精简。下一轮不能直接重做 v0.3.3 的 overlay 方案。
+1. 页面几何、Logo、四个 Tab、阶段区、按钮位置应与 v0.3.4 相同。
+2. 镜像覆盖数字应直接绘制在原覆盖 bar 内，bar 本身不应变厚。
+3. 当前任务文字应在原任务 bar 内，等待或准备时不应再出现误导性的移动蓝块。
+4. 上传、下载数值应在原额度 bar 内真正垂直居中。
+5. 转移、回收站、文档三页本轮没有视觉结构改造，应保持 v0.3.4 观感。
+6. 只有用户实机截图确认后，才能把本轮视觉效果记为通过。
 
 真实 DELETE 仍需等合法跨周期候选出现后再做真实账户验证。
 
 ## 事实源
 
-实现事实以源码为准，验证事实以测试与 CI 为准，正式稳定事实以 `main` 与 `p103-stable` 为准，当前实验事实以 `p103-exp` 为准，真实 WebDAV 行为以用户账户实测为准。
+实现事实以源码为准，验证事实以测试与 CI 为准，正式稳定事实以 `main` 与 `p103-stable` 为准，当前实验事实以 `p103-exp` 为准，真实 WebDAV 行为与视觉效果以用户实机为准。
