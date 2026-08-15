@@ -15,8 +15,22 @@
     "Id": "streaming-paraformer-zh-en",
     "Name": "Streaming Paraformer 中英 INT8",
     "Purpose": "极速实时：普通话/英语",
-    "SizeText": "约 230 MB（INT8 核心）",
-    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2",
+    "SizeText": "约 237 MB",
+    "Url": "",
+    "Files": [
+      {
+        "FileName": "encoder.int8.onnx",
+        "Url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/main/encoder.int8.onnx?download=true"
+      },
+      {
+        "FileName": "decoder.int8.onnx",
+        "Url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/main/decoder.int8.onnx?download=true"
+      },
+      {
+        "FileName": "tokens.txt",
+        "Url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/main/tokens.txt?download=true"
+      }
+    ],
     "FolderName": "sherpa-onnx-streaming-paraformer-bilingual-zh-en",
     "RequiredFiles": ["encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"],
     "Recommended": false,
@@ -27,8 +41,22 @@
     "Id": "streaming-paraformer-zh-yue-en",
     "Name": "Streaming Paraformer 中英粤 INT8",
     "Purpose": "实时：普通话/粤语/英语",
-    "SizeText": "独立下载",
-    "Url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en.tar.bz2",
+    "SizeText": "约 238 MB",
+    "Url": "",
+    "Files": [
+      {
+        "FileName": "encoder.int8.onnx",
+        "Url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en/resolve/main/encoder.int8.onnx?download=true"
+      },
+      {
+        "FileName": "decoder.int8.onnx",
+        "Url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en/resolve/main/decoder.int8.onnx?download=true"
+      },
+      {
+        "FileName": "tokens.txt",
+        "Url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en/resolve/main/tokens.txt?download=true"
+      }
+    ],
     "FolderName": "sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en",
     "RequiredFiles": ["encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"],
     "Recommended": false,
