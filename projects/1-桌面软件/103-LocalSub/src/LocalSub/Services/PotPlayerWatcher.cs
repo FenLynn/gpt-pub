@@ -36,17 +36,51 @@ public static class PotPlayerWatcher
         try
         {
             if (process.HasExited) return false;
-            process.Refresh();
-            var hwnd = process.MainWindowHandle;
-            if (hwnd == IntPtr.Zero || !IsWindow(hwnd) || !IsWindowVisible(hwnd)) return false;
-            minimized = IsIconic(hwnd);
-            if (!GetWindowRect(hwnd, out var rect)) return false;
-            if (rect.Right <= rect.Left || rect.Bottom <= rect.Top) return false;
-            bounds = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
-            return true;
+            var pid = (uint)process.Id;
+            IntPtr best = IntPtr.Zero;
+            Rectangle bestRect = Rectangle.Empty;
+            long bestArea = 0;
+            bool anyMinimized = false;
+
+            EnumWindows((hwnd, _) =>
+            {
+                if (!IsWindow(hwnd) || !IsWindowVisible(hwnd)) return true;
+                GetWindowThreadProcessId(hwnd, out var windowPid);
+                if (windowPid != pid) return true;
+
+                if (IsIconic(hwnd))
+                {
+                    anyMinimized = true;
+                    return true;
+                }
+
+                if (!GetWindowRect(hwnd, out var rect)) return true;
+                var width = rect.Right - rect.Left;
+                var height = rect.Bottom - rect.Top;
+                if (width < 160 || height < 90) return true;
+                var area = (long)width * height;
+                if (area <= bestArea) return true;
+
+                bestArea = area;
+                best = hwnd;
+                bestRect = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+                return true;
+            }, IntPtr.Zero);
+
+            if (best != IntPtr.Zero)
+            {
+                bounds = bestRect;
+                minimized = false;
+                return true;
+            }
+
+            minimized = anyMinimized;
+            return anyMinimized;
         }
         catch { return false; }
     }
+
+    delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [StructLayout(LayoutKind.Sequential)]
     struct RECT
@@ -57,6 +91,8 @@ public static class PotPlayerWatcher
         public int Bottom;
     }
 
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
