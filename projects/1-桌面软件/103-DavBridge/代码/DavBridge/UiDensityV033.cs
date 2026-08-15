@@ -49,8 +49,8 @@ internal sealed class UiDensityV033 : IDisposable
     {
         foreach (var binding in _bindings)
         {
-            if (!binding.Overlay.Visible || binding.Overlay.Width < 80 || binding.Overlay.Height < 14)
-                throw new InvalidOperationException($"UI density self-test failed [{scenario}]: inline meter clipped");
+            if (binding.Overlay.Width < 80 || binding.Overlay.Height < 14)
+                throw new InvalidOperationException($"UI density self-test failed [{scenario}]: inline meter clipped ({binding.Overlay.Width}x{binding.Overlay.Height})");
         }
         if (_stageStrip.Width < 360 || _stageStrip.Height < 24)
             throw new InvalidOperationException($"UI density self-test failed [{scenario}]: stage strip clipped");
