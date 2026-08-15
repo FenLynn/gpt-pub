@@ -6,6 +6,7 @@ namespace LocalSub;
 internal static class Program
 {
     static string CrashLogPath => Path.Combine(AppContext.BaseDirectory, "LocalSub-crash.log");
+    static bool IsSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_SMOKE_TEST") == "1";
 
     [STAThread]
     static void Main()
@@ -27,6 +28,7 @@ internal static class Program
         catch (Exception ex)
         {
             ReportCrash("Startup exception", ex);
+            Environment.ExitCode = 1;
         }
     }
 
@@ -35,7 +37,7 @@ internal static class Program
         var text = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {stage}{Environment.NewLine}{ex}{Environment.NewLine}{new string('=', 72)}{Environment.NewLine}";
         try { File.AppendAllText(CrashLogPath, text); } catch { }
 
-        if (showDialog)
+        if (showDialog && !IsSmokeTest)
         {
             try
             {
