@@ -7,6 +7,10 @@ namespace LocalSub.UI;
 
 public sealed class SubtitleOverlayForm : Form
 {
+    const int WS_EX_TRANSPARENT = 0x20;
+    const int WS_EX_TOOLWINDOW = 0x80;
+    const int WS_EX_NOACTIVATE = 0x08000000;
+
     readonly WebView2 _web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.Transparent };
     Task? _initializeTask;
 
@@ -21,6 +25,17 @@ public sealed class SubtitleOverlayForm : Form
         Height = 160;
         Controls.Add(_web);
         Shown += async (_, _) => await EnsureInitializedAsync();
+    }
+
+    public void FollowPlayer(Rectangle playerBounds)
+    {
+        if (playerBounds.Width < 200 || playerBounds.Height < 120) return;
+        var width = Math.Clamp(playerBounds.Width - 40, 320, 1100);
+        var height = Math.Min(160, Math.Max(110, playerBounds.Height / 4));
+        var left = playerBounds.Left + (playerBounds.Width - width) / 2;
+        var top = playerBounds.Bottom - height - Math.Clamp(playerBounds.Height / 24, 18, 48);
+        var target = new Rectangle(left, top, width, height);
+        if (Bounds != target) Bounds = target;
     }
 
     async Task EnsureInitializedAsync()
@@ -60,4 +75,14 @@ public sealed class SubtitleOverlayForm : Form
     }
 
     protected override bool ShowWithoutActivation => true;
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+            return cp;
+        }
+    }
 }
