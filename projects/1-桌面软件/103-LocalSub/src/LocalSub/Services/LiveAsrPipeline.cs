@@ -37,6 +37,11 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     async Task StartAsync(AppSettings settings, ModelDescriptor model, ModelManager models, uint? processId, IProgress<ModelOperationProgress>? runtimeProgress, CancellationToken ct)
     {
         await StopAsync();
+
+        // Do this before downloading/loading sherpa so an unsupported Windows build fails immediately
+        // with a useful message instead of a COM E_NOINTERFACE error.
+        if (processId.HasValue) ProcessLoopbackCaptureService.EnsureSupported();
+
         if (!models.IsInstalled(model))
             throw new InvalidOperationException($"实时模型“{model.Name}”尚未安装，请先在“模型”页面下载。 ");
         if (!model.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase))
