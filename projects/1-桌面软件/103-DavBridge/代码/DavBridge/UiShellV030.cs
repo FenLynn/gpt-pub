@@ -822,15 +822,8 @@ internal sealed class UiShellV030 : IDisposable
 
     private void RefreshResponsive()
     {
-        if (_form.ClientSize.Width < 760)
-        {
-            _root.Padding = Padding.Empty;
-            _title.Font = new Font("Segoe UI Semibold", 15F);
-        }
-        else
-        {
-            _title.Font = new Font("Segoe UI Semibold", 17F);
-        }
+        // The v0.3 shell uses fixed typography and width-aware layout with AutoScroll. Do not
+        // allocate new Font instances from the 250 ms refresh loop.
     }
 
     private void UseWaitCursor(bool value)
@@ -911,6 +904,7 @@ internal sealed class UiShellV030 : IDisposable
         FlatStyle = FlatStyle.Flat,
         BackColor = Color.White,
         ForeColor = Color.FromArgb(77, 89, 97),
+        Font = new Font("Segoe UI Semibold", 9.3F),
         Margin = new Padding(0, 0, 4, 0),
         TabStop = false
     };
@@ -937,7 +931,6 @@ internal sealed class UiShellV030 : IDisposable
         button.FlatAppearance.BorderSize = 0;
         button.BackColor = active ? Color.FromArgb(235, 244, 250) : Color.White;
         button.ForeColor = active ? Color.FromArgb(49, 107, 145) : Color.FromArgb(80, 91, 99);
-        button.Font = new Font("Segoe UI Semibold", 9.3F);
     }
 
     private static void StyleFilter(Button button, bool active)
