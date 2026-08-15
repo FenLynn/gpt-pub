@@ -10,7 +10,7 @@ internal sealed record ReconciliationGateV030(
     bool RequiresHumanAction)
 {
     public string Message => RequiresHumanAction
-        ? $"周期对账已完成，{HumanActionGroups} 个长期缺失附件组需要人工审查。普通迁移将在审查后继续。"
+        ? $"周期对账已完成，{HumanActionGroups} 个附件组需要人工审查。普通迁移将在审查后继续。"
         : Summary.Message;
 }
 
@@ -125,7 +125,9 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
     {
         RefreshCycleIdentity();
         return State.Groups.Values
-            .Where(group => !string.IsNullOrWhiteSpace(group.FirstMissingCycleId) || group.RemovedAt.HasValue || IsBlocked(group))
+            .Where(group => !string.IsNullOrWhiteSpace(group.FirstMissingCycleId) ||
+                            group.RemovedAt.HasValue ||
+                            ReconciliationPolicy.IsBlocked(group))
             .OrderBy(group => RecycleOrder(ReconciliationPolicy.GetDisposition(group, State.CurrentCycleId)))
             .ThenBy(group => group.FirstMissingAt ?? DateTimeOffset.MaxValue)
             .ThenBy(group => group.GroupKey, StringComparer.OrdinalIgnoreCase)
@@ -179,7 +181,6 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
                 if (!RequiresHumanAction(group)) continue;
                 group.LastDeferredCycleId = State.CurrentCycleId;
                 group.LastDeferredAt = now;
-                if (IsBlocked(group)) group.LastIssue = null;
             }
             await _store.SaveAsync(State, cancellationToken).ConfigureAwait(false);
             RaiseChanged();
@@ -246,20 +247,26 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
             }
 
             recycle.LastSeenCycleId = State.CurrentCycleId;
+            var sourceMembers = currentGroup.Members.ToDictionary(member => member.RelativePath, StringComparer.OrdinalIgnoreCase);
+            var isHistoricalZoteroPair = trustedRecords.Any(record => IsZoteroMember(record.RelativePath));
+            if (isHistoricalZoteroPair && !trustedRecords.All(record => sourceMembers.ContainsKey(record.RelativePath)))
+            {
+                ClearMissingAndRemoved(recycle);
+                recycle.LastIssue = "BLOCKED: InfiniCLOUD 当前只显示历史 Zotero 附件组的部分成员。DavBridge 不会按单个 zip 或 prop 推断删除，请人工保留并等待源端恢复或确认。";
+                continue;
+            }
+
             var hadRemovedState = recycle.RemovedAt.HasValue;
             var hadMissingState = !string.IsNullOrWhiteSpace(recycle.FirstMissingCycleId);
             if (hadMissingState || hadRemovedState)
+                ClearMissingAndRemoved(recycle);
+            if (ReconciliationPolicy.IsBlocked(recycle))
             {
-                recycle.FirstMissingCycleId = null;
-                recycle.FirstMissingAt = null;
+                recycle.LastIssue = null;
                 recycle.LastDeferredCycleId = null;
                 recycle.LastDeferredAt = null;
-                recycle.RemovedCycleId = null;
-                recycle.RemovedAt = null;
-                recycle.LastIssue = null;
             }
 
-            var sourceMembers = currentGroup.Members.ToDictionary(member => member.RelativePath, StringComparer.OrdinalIgnoreCase);
             var groupChanged = false;
             foreach (var record in trustedRecords)
             {
@@ -334,16 +341,18 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
             return true;
         }
 
-        record.SourceSize = download.Bytes;
-        record.SourceETag = after.ETag;
-        record.SourceLastModified = after.LastModified;
         if (string.Equals(download.Sha256, record.SourceSha256, StringComparison.OrdinalIgnoreCase))
         {
+            record.SourceSize = download.Bytes;
+            record.SourceETag = after.ETag;
+            record.SourceLastModified = after.LastModified;
             record.Status = TransferStatus.StrongVerified;
             record.LastError = null;
             return false;
         }
 
+        // Keep the last StrongVerified source metadata until ordinary migration establishes a new
+        // source and target baseline. This preserves the identity of the still-current target copy.
         record.Status = TransferStatus.SourceChanged;
         record.LastError = "InfiniCLOUD 当前 SHA-256 与历史 StrongVerified 基线不同，将优先刷新坚果云副本。";
         return true;
@@ -383,10 +392,7 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
     }
 
     private bool RequiresHumanAction(ReconciliationGroupState group) =>
-        IsBlocked(group) || ReconciliationPolicy.RequiresReview(group, State.CurrentCycleId);
-
-    private static bool IsBlocked(ReconciliationGroupState group) =>
-        !string.IsNullOrWhiteSpace(group.LastIssue) && group.LastIssue.StartsWith("BLOCKED:", StringComparison.Ordinal);
+        ReconciliationPolicy.RequiresReview(group, State.CurrentCycleId);
 
     private static int RecycleOrder(RecycleDisposition disposition) => disposition switch
     {
@@ -405,6 +411,23 @@ internal sealed class ReconciliationRuntimeV030 : IDisposable
             !string.Equals(before.ETag, after.ETag, StringComparison.Ordinal)) return true;
         if (before.LastModified.HasValue && after.LastModified.HasValue && before.LastModified.Value != after.LastModified.Value) return true;
         return false;
+    }
+
+    private static void ClearMissingAndRemoved(ReconciliationGroupState recycle)
+    {
+        recycle.FirstMissingCycleId = null;
+        recycle.FirstMissingAt = null;
+        recycle.LastDeferredCycleId = null;
+        recycle.LastDeferredAt = null;
+        recycle.RemovedCycleId = null;
+        recycle.RemovedAt = null;
+    }
+
+    private static bool IsZoteroMember(string relativePath)
+    {
+        var extension = Path.GetExtension(relativePath);
+        return extension.Equals(".zip", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".prop", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string JoinPath(string root, string relative) =>
