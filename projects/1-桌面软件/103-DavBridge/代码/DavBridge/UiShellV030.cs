@@ -444,7 +444,7 @@ internal sealed class UiShellV030 : IDisposable
         finally
         {
             _passiveAuditRunning = false;
-            SafeUi(RefreshAll);
+            SafeUi(RefreshAllAndRecycleIfVisible);
         }
     }
 
@@ -455,6 +455,11 @@ internal sealed class UiShellV030 : IDisposable
         RefreshHeader();
         RefreshOverview();
         RefreshTransfer();
+    }
+
+    private void RefreshAllAndRecycleIfVisible()
+    {
+        RefreshAll();
         if (_page == UiPageV030.Recycle) RefreshRecycle();
     }
 
@@ -482,7 +487,7 @@ internal sealed class UiShellV030 : IDisposable
         var review = _reconciliation.GetHumanActionCount();
         _actionBanner.Visible = review > 0;
         if (review > 0)
-            _actionBanner.SetText("需要你的操作", $"{review} 个长期缺失附件组等待回收站审查，普通迁移暂缓。", "审查");
+            _actionBanner.SetText("需要你的操作", $"{review} 个附件组需要人工审查，普通迁移暂缓。", "审查");
 
         var lastCycle = _reconciliation.State.LastReconciledCycleId;
         var currentCycle = _reconciliation.CurrentCycleId;
@@ -650,6 +655,8 @@ internal sealed class UiShellV030 : IDisposable
             if (!string.IsNullOrWhiteSpace(group.LastIssue))
                 _recycleGrid.Rows[rowIndex].Cells[5].ToolTipText = group.LastIssue;
         }
+        _recycleGrid.ClearSelection();
+        _recycleGrid.CurrentCell = null;
 
         _recycleHint.Text = _recycleFilter switch
         {
@@ -811,8 +818,8 @@ internal sealed class UiShellV030 : IDisposable
         SafeUi(RefreshAll);
     }
 
-    private void OnStateChanged(object? sender, EventArgs e) => SafeUi(RefreshAll);
-    private void OnReconciliationChanged(object? sender, EventArgs e) => SafeUi(RefreshAll);
+    private void OnStateChanged(object? sender, EventArgs e) => SafeUi(RefreshAllAndRecycleIfVisible);
+    private void OnReconciliationChanged(object? sender, EventArgs e) => SafeUi(RefreshAllAndRecycleIfVisible);
 
     private void OnIo(object? sender, WebDavIoProgress progress)
     {
