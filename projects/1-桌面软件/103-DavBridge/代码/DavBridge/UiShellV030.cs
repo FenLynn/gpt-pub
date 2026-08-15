@@ -1063,6 +1063,11 @@ internal sealed class MeterV030 : Control
     public bool Pulse { get; set; }
     public Color StartColor { get; set; } = Color.FromArgb(124, 184, 215);
     public Color EndColor { get; set; } = Color.FromArgb(72, 145, 184);
+    public Func<string>? DisplayTextProvider { get; set; }
+    public ContentAlignment DisplayTextAlignment { get; set; } = ContentAlignment.MiddleCenter;
+    public Color DisplayTextColor { get; set; } = Color.FromArgb(42, 54, 62);
+    public float DisplayTextFontSize { get; set; } = 8.2F;
+    public bool SuppressPulseWhenText { get; set; }
 
     public double Fraction
     {
@@ -1112,8 +1117,12 @@ internal sealed class MeterV030 : Control
         using var path = Rounded(rect, Math.Min(7, Height / 2));
         using var track = new SolidBrush(Color.FromArgb(238, 242, 244));
         g.FillPath(track, path);
+
+        var displayText = DisplayTextProvider?.Invoke() ?? string.Empty;
+        var drawPulse = Pulse && !(SuppressPulseWhenText && !string.IsNullOrWhiteSpace(displayText));
+
         g.SetClip(path);
-        if (Pulse)
+        if (drawPulse)
         {
             var w = Math.Max(50, Width / 4);
             var x = (_pulse * (Width + w) / 160) - w;
@@ -1127,6 +1136,23 @@ internal sealed class MeterV030 : Control
             g.FillRectangle(brush, 0, 0, fillWidth, Height);
         }
         g.ResetClip();
+
+        if (!string.IsNullOrWhiteSpace(displayText))
+            DrawDisplayText(g, displayText);
+    }
+
+    private void DrawDisplayText(Graphics graphics, string text)
+    {
+        using var font = new Font("Segoe UI Semibold", DisplayTextFontSize, FontStyle.Regular, GraphicsUnit.Point);
+        var bounds = new Rectangle(7, 0, Math.Max(1, Width - 14), Math.Max(1, Height));
+        var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
+        flags |= DisplayTextAlignment switch
+        {
+            ContentAlignment.MiddleLeft => TextFormatFlags.Left,
+            ContentAlignment.MiddleRight => TextFormatFlags.Right,
+            _ => TextFormatFlags.HorizontalCenter
+        };
+        TextRenderer.DrawText(graphics, text, font, bounds, DisplayTextColor, flags);
     }
 
     private static System.Drawing.Drawing2D.GraphicsPath Rounded(Rectangle rect, int radius)
