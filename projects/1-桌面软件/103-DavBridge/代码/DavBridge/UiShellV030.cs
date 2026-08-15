@@ -1144,44 +1144,19 @@ internal sealed class MeterV030 : Control
     private void DrawDisplayText(Graphics graphics, string text)
     {
         var availableWidth = Math.Max(1, Width - 14);
-        var availableHeight = Math.Max(5, Height - 4);
-        var targetPixels = Math.Clamp(Height * DisplayTextHeightRatio, 7F, Math.Max(7F, Height - 4F));
-        using var font = CreateFittingPixelFont(graphics, text, availableWidth, availableHeight, targetPixels);
-        var measureFlags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
-        var measured = TextRenderer.MeasureText(graphics, text, font, new Size(availableWidth, int.MaxValue), measureFlags);
-        var drawHeight = Math.Max(1, Math.Min(availableHeight, measured.Height + 2));
-        var y = Math.Max(1, (Height - drawHeight) / 2 - 1);
-        if (y + drawHeight >= Height)
-            y = Math.Max(1, Height - drawHeight - 1);
-        var bounds = new Rectangle(7, y, availableWidth, drawHeight);
-        var flags = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
-        flags |= DisplayTextAlignment switch
-        {
-            ContentAlignment.MiddleLeft => TextFormatFlags.Left,
-            ContentAlignment.MiddleRight => TextFormatFlags.Right,
-            _ => TextFormatFlags.HorizontalCenter
-        };
-        TextRenderer.DrawText(graphics, text, font, bounds, DisplayTextColor, flags);
-    }
+        var availableHeight = Math.Max(3, Height - 4);
+        var targetPixels = Math.Clamp(Height * DisplayTextHeightRatio, 6F, Math.Max(6F, availableHeight));
+        var sprite = MeterTextSpriteV039.Get(text, availableWidth, availableHeight, targetPixels, DisplayTextColor);
+        if (sprite is null) return;
 
-    private static Font CreateFittingPixelFont(Graphics graphics, string text, int availableWidth, int availableHeight, float targetPixels)
-    {
-        var size = targetPixels;
-        while (size > 5F)
+        var x = DisplayTextAlignment switch
         {
-            var candidate = new Font("Segoe UI Semibold", size, FontStyle.Regular, GraphicsUnit.Pixel);
-            var measured = TextRenderer.MeasureText(
-                graphics,
-                text,
-                candidate,
-                new Size(availableWidth, int.MaxValue),
-                TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
-            if (measured.Height <= availableHeight)
-                return candidate;
-            candidate.Dispose();
-            size -= 0.5F;
-        }
-        return new Font("Segoe UI Semibold", 5F, FontStyle.Regular, GraphicsUnit.Pixel);
+            ContentAlignment.MiddleLeft => 7,
+            ContentAlignment.MiddleRight => Math.Max(7, Width - 7 - sprite.Width),
+            _ => Math.Max(7, (Width - sprite.Width) / 2)
+        };
+        var y = Math.Max(1, (Height - sprite.Height) / 2);
+        graphics.DrawImageUnscaled(sprite, x, y);
     }
 
     private static System.Drawing.Drawing2D.GraphicsPath Rounded(Rectangle rect, int radius)
