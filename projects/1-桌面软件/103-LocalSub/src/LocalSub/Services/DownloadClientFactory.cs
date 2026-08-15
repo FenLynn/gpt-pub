@@ -5,14 +5,14 @@ namespace LocalSub.Services;
 
 public static class DownloadClientFactory
 {
-    public static HttpClient Create(AppSettings settings)
+    public static HttpClient Create(AppSettings settings, TimeSpan? connectTimeout = null)
     {
         var handler = new SocketsHttpHandler
         {
             AllowAutoRedirect = true,
             MaxAutomaticRedirections = 10,
             AutomaticDecompression = DecompressionMethods.All,
-            ConnectTimeout = TimeSpan.FromSeconds(60),
+            ConnectTimeout = connectTimeout ?? TimeSpan.FromSeconds(60),
             PooledConnectionLifetime = TimeSpan.FromMinutes(5)
         };
 
