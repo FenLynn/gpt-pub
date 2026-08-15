@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using LocalSub.Core;
 using Microsoft.Web.WebView2.Core;
@@ -10,6 +11,12 @@ public sealed class SubtitleOverlayForm : Form
     const int WS_EX_TRANSPARENT = 0x20;
     const int WS_EX_TOOLWINDOW = 0x80;
     const int WS_EX_NOACTIVATE = 0x08000000;
+
+    const uint SWP_NOSIZE = 0x0001;
+    const uint SWP_NOMOVE = 0x0002;
+    const uint SWP_NOACTIVATE = 0x0010;
+    const uint SWP_NOOWNERZORDER = 0x0200;
+    static readonly IntPtr HWND_TOPMOST = new(-1);
 
     readonly WebView2 _web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.Transparent };
     readonly System.Windows.Forms.Timer _clearTimer = new() { Interval = 3000 };
@@ -25,7 +32,11 @@ public sealed class SubtitleOverlayForm : Form
         Width = 900;
         Height = 160;
         Controls.Add(_web);
-        Shown += async (_, _) => await EnsureInitializedAsync();
+        Shown += async (_, _) =>
+        {
+            await EnsureInitializedAsync();
+            ReassertTopmost();
+        };
         _clearTimer.Tick += async (_, _) =>
         {
             _clearTimer.Stop();
@@ -41,8 +52,25 @@ public sealed class SubtitleOverlayForm : Form
         var height = Math.Min(160, Math.Max(110, playerBounds.Height / 4));
         var left = playerBounds.Left + (playerBounds.Width - width) / 2;
         var top = playerBounds.Bottom - height - Math.Clamp(playerBounds.Height / 24, 18, 48);
-        var target = new Rectangle(left, top, width, height);
-        if (Bounds != target) Bounds = target;
+
+        // Do not rely only on Form.TopMost. A player entering fullscreen can move itself
+        // above an already-created topmost window. Reinsert the overlay at the top of the
+        // topmost band on every follow tick without stealing focus.
+        if (IsHandleCreated)
+        {
+            SetWindowPos(Handle, HWND_TOPMOST, left, top, width, height, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+        }
+        else
+        {
+            Bounds = new Rectangle(left, top, width, height);
+        }
+    }
+
+    public void ReassertTopmost()
+    {
+        if (!IsHandleCreated || !Visible) return;
+        SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
     }
 
     async Task EnsureInitializedAsync()
@@ -79,6 +107,7 @@ public sealed class SubtitleOverlayForm : Form
         await EnsureInitializedAsync();
         var payload = JsonSerializer.Serialize(new { current, previous, keywords = keywords?.ToArray() ?? [] });
         await _web.CoreWebView2.ExecuteScriptAsync($"window.LocalSub.setSubtitle({payload});");
+        ReassertTopmost();
 
         _clearTimer.Stop();
         if (!string.IsNullOrWhiteSpace(current) || !string.IsNullOrWhiteSpace(previous))
@@ -103,4 +132,7 @@ public sealed class SubtitleOverlayForm : Form
             return cp;
         }
     }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
 }
