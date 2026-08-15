@@ -29,10 +29,20 @@ public sealed class AppSettings
             if (!File.Exists(PortablePaths.ConfigFile)) return new AppSettings();
             return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(PortablePaths.ConfigFile), JsonOptions()) ?? new AppSettings();
         }
-        catch { return new AppSettings(); }
+        catch
+        {
+            return new AppSettings();
+        }
     }
 
-    public void Save() => File.WriteAllText(PortablePaths.ConfigFile, JsonSerializer.Serialize(this, JsonOptions()));
+    public void Save()
+    {
+        var path = PortablePaths.ConfigFile;
+        var temp = path + ".tmp";
+        var json = JsonSerializer.Serialize(this, JsonOptions());
+        File.WriteAllText(temp, json);
+        File.Move(temp, path, true);
+    }
 
     static JsonSerializerOptions JsonOptions() => new() { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
 }
