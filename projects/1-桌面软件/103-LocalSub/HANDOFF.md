@@ -2,81 +2,109 @@
 
 ## 项目定位
 
-Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer，同时支持捕获所有 Windows 输出音频。基础 ASR 永远本地运行，不依赖云端 LLM/API。
+Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer，同时支持捕获所有 Windows 输出音频。基础 ASR 本地运行，不依赖云端 LLM/API。
 
 ## 已确认硬约束
 
 - 绿色 ZIP，解压即用，不需要安装器。
-- 后续日常测试默认交付“增量覆盖 ZIP”：只包含相对于用户上一版基线实际发生变化的运行文件，ZIP 内路径直接以 LocalSub 根目录为基准，用户解压到现有程序根目录并覆盖即可。
-- 只有首次安装、运行依赖/目录结构发生变化、无法安全增量覆盖或用户明确要求时，才交付完整绿色包。
-- 基础程序发布方式与 AtlasDesk / DavBridge 对齐：`.NET 8`、`SelfContained=false`、`PublishSingleFile=true`。
-- 不再要求或下载 `.NET 10 Desktop Runtime`；复用用户电脑已有的 `.NET 8 Desktop Runtime`。
+- 日常测试默认交付增量覆盖 ZIP，只包含相对用户上一版实际变化的运行文件，ZIP 内路径直接以 LocalSub 根目录为基准。
+- 只有首次安装、依赖/目录结构变化、无法安全增量覆盖或用户明确要求时才交付完整绿色包。
+- 基础程序与 AtlasDesk / DavBridge 对齐：`.NET 8`、`SelfContained=false`、`PublishSingleFile=true`。
+- 不要求 `.NET 10 Desktop Runtime`，复用系统已有 `.NET 8 Desktop Runtime`。
 - 模型绝不随程序包分发。
-- 默认模型根目录为 EXE 同级 `ASR`，设置中可改路径。
-- 模型按 catalog 独立下载、完整性扫描、删除与后续升级。
-- 模型下载正式支持系统代理、直连、SOCKS5 三种通道，SOCKS5 为受限网络下的一等下载通道。
-- SOCKS5 支持手工地址，例如 `socks5://127.0.0.1:7891`，并可自动探测本机常见端口 7890、7891、10808、1080。
-- 模型下载连接超时从 20 秒提高到 60 秒；下载失败自动重试三次并保留 `.part` 文件用于断点续传。
-- “测试模型下载链”使用真实 GET + Range 请求，验证 GitHub Release 到实际大文件资源域名的重定向链。
+- 默认模型根目录为 EXE 同级 `ASR`，设置中可改路径，模型扫描/下载/删除均以当前设置路径为准。
+- 模型按 catalog 独立下载、独立删除，后续独立升级。
+- 模型下载正式支持系统代理、直连、SOCKS5。SOCKS5 支持手工地址并可探测本机常见端口 7890、7891、10808、1080。
+- 下载失败自动重试并保留 `.part` 用于断点续传。
 - 实时音源仅保留 `PotPlayer` 与 `所有音频` 两种模式。
+- PotPlayer 模式不得静默回退成全系统音频。
 - 字幕使用 WebView2 + HTML/CSS 渲染。
-- 后台支持拖入视频，高速转写方向固定为：媒体解码、波形、VAD、离线 ASR、关键词高亮/标记、TXT 导出。
-- 项目自身可下载组件尽量保留在 EXE 所在目录树内，不主动写入 Program Files / AppData 作为依赖目录。
-- CI 不得只验证编译。Windows 构建必须实际启动 `LocalSub.exe` 做 startup smoke test，确认程序未在启动阶段立即退出后方可打包。
+- 后台方向固定为：媒体解码、波形、VAD、离线 ASR、关键词高亮/标记、TXT 导出。
+- 项目自身可下载组件尽量位于 EXE 所在目录树，不主动散落到 Program Files / AppData。
+- CI 不得只验证编译，必须真实启动 EXE 做 startup smoke test。
 
-## 当前开发分支
+## 当前开发分支与版本
 
-`p103-localsub-exp`
-
-## 当前版本
-
-`v0.1.0-dev`
+- 分支：`p103-localsub-exp`
+- 版本：`v0.1.0-dev`
 
 ## 当前已实现
 
-- WinForms / .NET 8 Windows 工程骨架。
-- 便携配置与 EXE 相对路径解析。
-- ASR 目录默认建立在 `<EXE>\ASR`。
-- 模型 catalog：SenseVoice Small INT8、Streaming Paraformer 中英、Streaming Paraformer 中英粤、Fun-ASR-Nano INT8、Silero VAD。
-- ModelManager：扫描、下载、关键文件完整性检测、删除、断点续传、三次自动重试。
-- `.tar.bz2` 模型包已改为 SharpCompress `ReaderFactory` 解压，不再使用 0.50.x 对压缩 TAR 不适合的 `ArchiveFactory` 路径。
-- 完整 `.tar.bz2` 缓存可复用，避免解压失败后重新下载数百 MB；无效 BZip2 缓存会删除后提示重试。
-- 下载传输：系统代理、直连、SOCKS5，本机 SOCKS5 自动探测和真实模型链路测试。
-- PotPlayer 进程检测。
-- 所有音频 WASAPI loopback 输入探针与电平显示。
-- WebView2 HTML 字幕 overlay 骨架。
-- 后台文件拖放队列、关键词数据结构、TXT exporter 骨架。
-- 启动及未处理异常会记录到 EXE 同级 `LocalSub-crash.log`，不再静默秒退。
-- Windows x64 framework-dependent 单文件绿色包 CI，且 CI 检查不得携带模型、.NET runtime 或 ONNX Runtime。
+### 绿色运行与模型管理
 
-## 2026-08-15 启动故障与修复
+- WinForms / .NET 8 Windows 工程。
+- 配置、Logs、Data、ASR 均按 EXE 相对路径管理。
+- 模型 catalog：SenseVoice Small INT8、Streaming Paraformer 中英 INT8、Streaming Paraformer 中英粤 INT8、Fun-ASR-Nano INT8、Silero VAD。
+- ModelManager：扫描、下载、关键文件检查、删除、断点续传、三次自动重试。
+- `.tar.bz2` 使用 SharpCompress `ReaderFactory` 解压，损坏缓存自动清理。
+- 模型页使用安全的 `TableLayoutPanel` 状态区，显示阶段、百分比、已下载量、速度、日志和取消按钮。
+- 删除模型时同时清理该模型缓存、`.part` 和 staging，不删除共享 ASR runtime。
+- Streaming Paraformer 不再下载包含 FP32 的约 1.1 GB 整包，只从官方 Hugging Face 模型仓库下载 `encoder.int8.onnx`、`decoder.int8.onnx`、`tokens.txt` 三个必要文件，约 237/238 MB。
 
-- 用户实机反馈新增模型状态窗口版本双击无反应，程序无法打开。
-- 故障范围已定位到新模型页复杂 `SplitContainer` 布局变更。该版本虽然能编译，但缺少真实启动验证。
-- 已立即回退模型页到上一版已实机可启动的安全布局，保留 SOCKS5 下载增强。
-- `.tar.bz2` 解压修复独立保留在 ModelManager 中。
-- `Program.cs` 新增 EXE 同目录崩溃日志 `LocalSub-crash.log`。
-- CI run `31889033321` 首次新增并通过 `Smoke test LocalSub startup`：真实启动 EXE，等待 4 秒确认进程仍存活，再终止并打包。
-- 因此当前 hotfix 已同时通过编译验证和真实启动 smoke test。
-- 之前计划的模型页“详细状态窗口、速度、阶段日志、取消按钮”暂时回退，下一轮必须用启动安全的布局重新实现，并继续通过 startup smoke test。
+### 下载与代理
 
-## 构建验证
+- 系统代理、直连、SOCKS5 三种下载通道。
+- SOCKS5 自动探测。
+- GitHub Release 大文件链路测试。
+- sherpa win-x64 native runtime 首次实时识别时下载到 `<ASR>\_runtime`，固定版本 `1.13.4`，后续程序补丁不重复携带。
+- runtime 来源为 `org.k2fsa.sherpa.onnx.runtime.win-x64 1.13.4` NuGet 包，只提取 win-x64 native 文件。
 
-- 初始 self-contained 验证包曾约 66 MB，仅用于工程验证，已废弃作为正式发布结构。
-- 当前轻量 framework-dependent 包约 8 MB 压缩体积。
-- 2026-08-15 已对照 AtlasDesk 与 DavBridge，将 LocalSub 改为 `net8.0-windows10.0.19041.0`，framework-dependent 单文件发布。
-- SOCKS5 下载增强版本 Windows CI run `31885669915` 已成功。
-- startup hotfix Windows CI run `31889033321` 已成功，包含真实 EXE 启动 smoke test。
-- 绿色包继续保持无 ASR 模型、无 ONNX Runtime、无 .NET runtime。
+### 真实实时字幕链路
+
+- 已移除“演示字幕即功能”的旧逻辑。
+- `所有音频`：WASAPI endpoint loopback -> 多声道转 mono -> 流式重采样到 16 kHz float -> Streaming Paraformer -> partial/final 文本 -> HTML 字幕。
+- `PotPlayer`：Windows `AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK` + PotPlayer PID -> PCM -> 16 kHz mono -> Streaming Paraformer -> HTML 字幕。
+- PotPlayer process loopback 使用 Windows 官方 Application Loopback 机制，不回退到全系统音频。
+- 实时识别器采用 sherpa-onnx 1.13.4 C API 的在线 Paraformer 路径，P/Invoke 代码内置于 EXE，native DLL 外置于 `ASR\_runtime`。
+- 实时下拉框只列出真正的 Streaming Paraformer，不再把 SenseVoice 冒充真正 streaming 模型。SenseVoice 保留给后台和后续模拟流式模式。
+
+### 字幕跟随
+
+- HTML overlay 初始化改为等待 WebView2 和 HTML 导航完成，不再丢第一句。
+- overlay 为 TopMost、非激活、鼠标穿透。
+- 60 ms 检查 PotPlayer 窗口位置。
+- 不只使用 `MainWindowHandle`，而是枚举 PotPlayer 进程可见顶层窗口并选择面积最大的窗口，以覆盖普通窗口、最大化、全屏和多窗口场景。
+- 播放器移动/缩放时字幕随动；最小化时隐藏。
+
+### 其他
+
+- 后台页已有文件拖放队列、关键词数据结构和 TXT exporter 骨架。
+- 启动及未处理异常记录到 EXE 同级 `LocalSub-crash.log`。
+
+## 2026-08-15 关键故障记录
+
+- 曾有模型页复杂 `SplitContainer` 在 WinForms 构造阶段导致双击秒退。已回退并用 `TableLayoutPanel` 重建。
+- 自该故障起，CI 增加 startup smoke test，真实启动 `LocalSub.exe` 并等待 4 秒，进程提前退出即构建失败。
+- 曾出现 `.tar.bz2` 下载成功但 `ArchiveFactory` 解压失败，已改为 SharpCompress 0.50.x 对应的 `ReaderFactory` 路径。
+- 用户实机确认旧版只显示静态演示字幕、无真实转写且不随 PotPlayer 移动。本轮已将该骨架替换为真实实时 ASR 和窗口跟随链路。
+
+## 最新构建验证
+
+- 最新代码 head：`658a0e5cd1a878e69506e745042047cd68880e5e`。
+- Windows CI run：`31890719217`，结论 success。
+- `dotnet publish` 成功。
+- `Smoke test LocalSub startup` 成功，EXE 启动后持续存活。
+- `Verify sherpa win-x64 runtime package` 成功，runner 实际下载 `org.k2fsa.sherpa.onnx.runtime.win-x64 1.13.4` 并成功加载 `sherpa-onnx-c-api.dll`。
+- 打包前再次检查 ASR 目录，不允许模型、ONNX Runtime 或 sherpa native DLL 混入发布包。
+- 该 CI 不能模拟用户真实 PotPlayer 音频播放，因此 PotPlayer process loopback 的实际有声识别和播放器随动仍需用户 Windows 实机最终验证。
+
+## 用户下一步实机验证
+
+1. 覆盖最新增量包。
+2. 在模型页下载 `Streaming Paraformer 中英 INT8`，约 237 MB。若 Hugging Face 受限，使用已经配置好的 SOCKS5。
+3. 实时页先选 `所有音频` 测试，点击开始。首次会把约 8 MB sherpa native runtime 下载到 `ASR\_runtime`。
+4. 确认真正出现识别文本和 partial 更新。
+5. 再切 `PotPlayer`，确认仅 PotPlayer 音频可识别。
+6. 拖动、缩放、最大化、全屏、最小化 PotPlayer，确认字幕跟随和隐藏行为。
+7. 如启动/运行异常，检查 EXE 同级 `LocalSub-crash.log`；如识别失败，记录实时页状态文本。
 
 ## 当前真实未完成项
 
-- 模型页详细状态窗口需在稳定启动基线上重新实现。
-- PotPlayer process-specific loopback 尚未接入，当前只检测 PID，不会错误回退到全局音频。
-- sherpa-onnx 真实流式 ASR 尚未接入音频链路。
+- SenseVoice 模拟流式尚未接入。
 - 后台 FFmpeg/媒体解码、波形、VAD、离线 ASR 流水线尚未接入。
-- 字幕 overlay 尚未自动跟随 PotPlayer 窗口位置与全屏状态。
+- 实时字幕样式、偏移、字号等用户设置尚未收口。
+- PotPlayer process loopback 虽已按 Windows 官方机制实现并通过编译/启动门禁，但尚未经过用户真实 PotPlayer 播放实机验证。
 
 ## 下一准确断点
 
-先由用户实机验证 startup hotfix 能正常打开，并验证现有模型缓存能通过 ReaderFactory 正确解压。随后在不使用启动阶段危险 SplitContainer 参数的前提下，重新实现模型下载详细状态窗口，并保持 startup smoke test 为硬门禁。之后再推进 `PotPlayer Process Loopback -> 16 kHz mono -> streaming recognizer -> HTML overlay`。
+先以用户实机验证真实实时闭环为硬门禁。若 `所有音频` 有输入电平但无文本，优先检查 Streaming Paraformer 模型完整性、sherpa native ABI 和 PCM->16 kHz 数据链；若 `所有音频` 正常而 `PotPlayer` 无文本，优先检查 process loopback 激活/捕获；若文本正常但字幕位置异常，优先检查 PotPlayer HWND 选择与多屏/DPI 坐标。实时闭环稳定后再推进后台文件转写。
