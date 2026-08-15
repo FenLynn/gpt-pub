@@ -16,23 +16,23 @@
 
 正式稳定回滚基线：**v0.1.7**。
 
-当前实验候选：**v0.3.7**。
+当前实验候选：**v0.3.8**。
 
-v0.3.7 完成完整 CI 的准确代码 head：`3e9e049b4c4c9791db8ce8149b537b732471af91`
+v0.3.8 完成完整 CI 的准确代码 head：`0a7aeb77b016af8eb76c3fae6b5591048efd6a9e`
 
-P103 CI run：`31890467083`
+P103 CI run：`31892401590`
 
 CI：**success**。
 
-Artifact：`DavBridge-v0.3.7-win-x64`
+Artifact：`DavBridge-v0.3.8-win-x64`
 
-Artifact ZIP SHA256：`8ab1fc6faad3480429b44ee647edbc3aa5f3cb29db25e705faaf855375ab14fb`
+Artifact ZIP SHA256：`ba460a4cc88182d93f254844c7db861e8ea72dd33be48e8cf68ddb39e72002ed`
 
-EXE SHA256：`be5a615cc6788827593e17690c35f8961f076a8e4dfc3f68c4bfb47625f60725`
+EXE SHA256：`e3c3dc73b3b59da0eb116ff5813d63c45f42cdd627227c22f8103fa147817c00`
 
-本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得被当成已构建代码 head。准确已构建代码 head 始终是上面的 `3e9e049...`。
+本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得被当成已构建代码 head。准确已构建代码 head 始终是上面的 `0a7aeb77...`。
 
-`main` 与 `p103-stable` 未在本轮修改。v0.3.7 未经用户实机视觉确认不得提升。
+`main` 与 `p103-stable` 未修改。v0.3.8 未经用户实机视觉确认不得提升。
 
 ## 固定读取顺序
 
@@ -60,14 +60,15 @@ DavBridge 长期维护 Zotero 附件从 InfiniCLOUD 到坚果云的强校验单�
 - Zotero `.zip + .prop` 按逻辑 Group 处理。
 - 不做双向同步，不反写源端。
 - `StrongVerified` 只有在源端完整 GET + SHA256 与目标重新 GET + SHA256 完全一致后成立。
-- 历史 GoodSync 副本可以通过同样的双端强校验接管。
-- PUT 结果未知进入 reconciliation，不盲目重试；412 也先协调，不覆盖未知目标。
+- 历史 GoodSync 副本可以通过相同双端强校验接管。
+- PUT 结果未知进入 reconciliation，不盲目重试。
+- HTTP 412 先协调，不覆盖未知目标。
 
 ## Cycle 与每周期自动对账
 
-Cycle ID 使用启动真实坚果云额度周期的重置日期，格式 `yyMMdd`，例如 2026-09-07 为 `260907`。日期按配置中的日历日期处理，不先转换运行机器时区。
+Cycle ID 使用真实坚果云额度周期的重置日期，格式 `yyMMdd`，例如 2026-09-07 为 `260907`。
 
-每个真实确认的新 Cycle 在普通 backlog 前自动执行：
+真实确认的新 Cycle 在普通 backlog 前执行：
 
 ```text
 读取当前 InfiniCLOUD manifest
@@ -77,37 +78,32 @@ Cycle ID 使用启动真实坚果云额度周期的重置日期，格式 `yyMMdd
 → 普通 backlog
 ```
 
-源 metadata 未变化时不读取内容。metadata 变化时重新读取 InfiniCLOUD 并算 SHA256。SHA 未变只更新 metadata；SHA 真变化则 `SourceChanged`，优先于普通任务。新增对象只加入普通 backlog，不插队。
+源 metadata 未变化时不读取内容。metadata 变化时重新读取 InfiniCLOUD 并计算 SHA256。SHA 未变只更新 metadata；SHA 真变化则进入 `SourceChanged`，优先于普通任务。新增对象只加入普通 backlog，不插队。
 
 ## 回收站与 DELETE
 
 历史 StrongVerified Group 第一次从源端完整消失时，只记录首次缺失 Cycle，坚果云完全不动。至少跨到后续已确认 Cycle 仍完整缺失，才进入人工审查。
 
-用户可以删除或“本周期继续保留”。保留项若下个 Cycle 仍缺失会再次进入审查，所以可能跨很多周期存在。
+用户可以删除或“本周期继续保留”。保留项若下个 Cycle 仍缺失会再次进入审查，所以可以跨多个周期存在。
 
-DELETE 永远不能后台自动执行。人工确认后仍必须再次检查源端准确成员路径、zip/prop 完整性和目标历史身份。源端部分恢复时禁止删除；目标身份不能安全证明时，只在下载安全额度允许时重新读取目标并比对历史 Target SHA256。DELETE 结果未知必须查询实际目标状态，不盲目重复。
+DELETE 永远不能后台自动执行。人工确认后仍必须再次检查源端准确成员路径、zip/prop 完整性和目标历史身份。源端部分恢复时禁止删除。目标身份不能安全证明时，只在下载安全额度允许时重新读取目标并比对历史 Target SHA256。DELETE 结果未知必须查询实际目标状态，不盲目重复。
 
 ## Data
 
-核心 Data 继续保持：
+核心 Data：
 
 - `%APPDATA%/DavBridge/config.json`
 - `%APPDATA%/DavBridge/state.json`
 - `%APPDATA%/DavBridge/state.json.bak`
 - `%APPDATA%/DavBridge/secrets.dat`
-
-`MigrationState.SchemaVersion` 仍为 1。
-
-v0.3 新增：
-
 - `%APPDATA%/DavBridge/reconcile.json`
 - `%APPDATA%/DavBridge/reconcile.json.bak`
 
-它只保存 Cycle、缺失观察、人工决定和对账摘要。sidecar 丢失的安全方向只能重新开始删除观察期。
+`MigrationState.SchemaVersion` 仍为 1。
 
 ## UI 长期原则
 
-当前一级导航固定为：
+一级导航固定为：
 
 ```text
 总览 | 转移 | 回收站 | 文档                     ⚙
@@ -115,19 +111,15 @@ v0.3 新增：
 
 没有宽左侧栏。总览是运行控制中心，不做说明页。InfiniCLOUD 云形 Logo、双右箭头和坚果云橡果 Logo 保留。
 
-解释采用三级层次：
-
-1. 主界面只显示必须扫一眼看到的状态、数字和动作。
-2. 概念解释优先使用 ToolTip。
-3. 完整规则进入“文档”Tab 和 `用户手册.md`。
+解释采用三级层次：主界面只显示必须状态、数字和动作；概念解释优先 ToolTip；完整规则进入“文档”Tab 和 `用户手册.md`。
 
 不得重新在主页、转移页、回收站堆大量灰色小字说明。
 
-## UI 事故与当前正确实现
+## UI 事故与硬约束
 
 ### v0.3.3
 
-`UiDensityV033` 通过 overlay、隐藏控件和运行时修改 `RowStyles` 压缩信息，实机破坏多个一级页面。该方案永久否决。
+`UiDensityV033` 通过 overlay、隐藏控件和运行时修改 `RowStyles` 压缩信息，实机破坏多个一级页面。永久否决。
 
 ### v0.3.4
 
@@ -135,78 +127,84 @@ v0.3 新增：
 
 ### v0.3.5
 
-把原 Label reparent 到 Meter 并修改局部行高，实机出现 bar 过厚、文字位置错误和当前任务 Pulse 误导。该方案永久否决。
+把原 Label reparent 到 Meter 并修改局部行高，实机出现 bar 过厚、文字位置错误和当前任务 Pulse 误导。永久否决。
 
 ### v0.3.6
 
-改为 `MeterV030.OnPaint()` 原生绘制动态文字，不再 reparent、不改 RowStyles。结构正确，但用户实机证明 14 px 的上传、下载额度条中 7.4 pt 字体仍会贴底并发生视觉裁切。
+改为 `MeterV030.OnPaint()` 原生绘制动态文字，不 reparent、不改 RowStyles。结构方向正确。
 
 ### v0.3.7
 
-只修复 v0.3.6 暴露的两个问题，不调整页面几何：
+尝试通过缩小 point 字体解决额度条文字适配，并加入显式打开回总览逻辑。完整 CI 通过，但用户实机截图再次证明上传、下载文字仍压在 bar 下沿并被裁切。因此 v0.3.7 的视觉结果判定失败。
 
-- `UiOverviewMeterTextV037` 保持原 Label 和 Meter 的父级、TableLayoutPanel cell 与尺寸完全不变；
-- 覆盖、当前任务使用 8.0 pt；上传、下载的 14 px bar 使用 6.2 pt；
-- 自动自检使用与真实示例相近的字符串测量文本像素高度，要求文字高度小于 Meter 实际高度并保留边界；
-- 当前任务存在文本时继续抑制 Pulse；
-- 不创建 overlay，不创建替代 Meter，不 reparent，不改 RowStyles。
+根因不是单纯字号，而是 `GraphicsUnit.Point` 与 `TextRenderer.VerticalCenter` 在真实 Windows DPI 和很薄的 Meter 中产生的文字行框偏差。旧自检只测字体理论高度，没有验证最终栅格化后的文字像素位置。
 
-显式打开行为同时统一：
+### v0.3.8
 
-- Windows 登录自启动仍通过 `--background`，允许进入托盘；
-- 用户手工双击 EXE 时，即使设置中保留“启动后默认进入托盘”，也应恢复主窗口并显示总览；
-- 已运行时再次双击 EXE，通过单实例事件恢复主窗口并强制回到总览；
-- 托盘双击或“打开 DavBridge”在窗口重新可见时同样回到总览。
+v0.3.8 只修 Meter 原生文字绘制与对应视觉自检，不改变 v0.3.4 页面几何，也不改变业务逻辑。
+
+实现：
+
+- `MeterV030` 不再使用 point 字体进行额度条文字定位。
+- 字体改成 `GraphicsUnit.Pixel`，按 Meter 的实际像素高度动态计算。
+- 绘制前根据实际可用高度自动收缩字体。
+- 不再依赖 `VerticalCenter`，而是显式计算文本绘制矩形的 Y 坐标。
+- 仍然不创建 overlay、不 reparent、不修改 `RowStyles`。
+- 覆盖、当前任务、上传、下载四个 Meter 均继续使用原动态 Label 作为文本数据源。
+- 当前任务存在文字时继续抑制 Pulse。
+
+新的 UI 自检不再只做 `MeasureText`。它会把真实 Meter 绘制到 bitmap，扫描深色文字像素的实际包围盒，并硬性检查：
+
+- 必须实际绘出文字像素；
+- 文字像素不能接触 Meter 上边缘或下边缘；
+- 文字像素视觉中心必须处于 Meter 中心附近；
+- 700×520、900×620、1200×760、125% DPI、150% DPI 均执行检查。
+
+第一轮 v0.3.8 CI `31892257878` 被这个新视觉门主动拦下，因为 150% DPI 场景文字中心偏差约 2.5 px。该失败候选没有生成 Artifact，也没有交付用户。随后保留上下边缘硬门，将跨 DPI 栅格中心容差校准为 3 px。第二轮 `31892401590` 完整通过。
+
+### 显式打开行为
+
+v0.3.7 引入的打开逻辑在 v0.3.8 中完整保留：
+
+- Windows 登录自启动通过 `--background`，允许后台进入托盘；
+- 用户手工双击 EXE 应恢复主窗口并显示总览；
+- 已运行时再次双击 EXE，通过单实例事件恢复主窗口并强制回总览；
+- 托盘双击或“打开 DavBridge”同样恢复窗口并回总览。
 
 ### 后续 UI 修改硬约束
 
 - 禁止运行时 overlay 批量接管页面。
 - 禁止 reparent 原有 Label 到 Meter。
 - 禁止为了文字进 bar 修改既有 `RowStyles`。
-- 简单显示需求优先在原控件自身 Paint 层实现。
-- v0.3.4 的页面几何结构是当前基线，除非用户明确要求重构，不得顺手调整尺寸和层级。
-- CI 只证明构造、编译、安全回归与自动边界，不能声称真实视觉效果已验收。
+- 简单显示需求优先在原控件 Paint 层实现。
+- v0.3.4 页面几何是当前基线，除非用户明确要求重构，不得顺手调整尺寸和层级。
+- 对细薄控件中的文本，自动测试必须检查最终栅格像素，而不是只检查理论字体高度。
+- CI 不能代替用户实机视觉验收。
 
-## v0.3.7 自动验证
+## v0.3.8 自动验证
 
-准确构建 head：`3e9e049b4c4c9791db8ce8149b537b732471af91`
+准确构建 head：`0a7aeb77b016af8eb76c3fae6b5591048efd6a9e`
 
-CI run：`31890467083`，结果 **success**。
+CI run：`31892401590`，结果 **success**。
 
-通过：
+通过：scope、Core Smoke、Cycle / StrongVerified / SourceChanged / WaitQuota / WriteUnknown / 412 / 回收站 / DELETE 安全回归、Windows x64 framework-dependent 单 EXE publish、Runtime boundary、Windows 隔离 self-test、五种布局和 DPI 场景、原 shell 布局门、Meter 栅格文字边缘与中心检查、显式激活回 Overview、自检报告、SHA256、Artifact upload。
 
-- scope；
-- Core Smoke；
-- Cycle / StrongVerified / SourceChanged / WaitQuota / WriteUnknown / 412 / 回收站 / DELETE 安全回归；
-- Windows x64 framework-dependent 单 EXE publish；
-- Runtime boundary；
-- Windows 隔离 self-test；
-- 700×520、900×620、1200×760、125% 与 150% DPI 构造；
-- v0.3.4 shell 原布局门；
-- native Meter 文字绘制；
-- quota 示例文字高度与 14 px bar 适配检查；
-- Label/Meter 父级、TableLayoutPanel cell 保持不变；
-- Meter 不拥有被搬入的 Label 子控件；
-- 显式激活会把 shell 返回 Overview 的自检；
-- SHA256；
-- Artifact upload。
+Artifact：`DavBridge-v0.3.8-win-x64`
 
-Artifact：`DavBridge-v0.3.7-win-x64`
+Artifact ZIP SHA256：`ba460a4cc88182d93f254844c7db861e8ea72dd33be48e8cf68ddb39e72002ed`
 
-Artifact ZIP SHA256：`8ab1fc6faad3480429b44ee647edbc3aa5f3cb29db25e705faaf855375ab14fb`
-
-EXE SHA256：`be5a615cc6788827593e17690c35f8961f076a8e4dfc3f68c4bfb47625f60725`
+EXE SHA256：`e3c3dc73b3b59da0eb116ff5813d63c45f42cdd627227c22f8103fa147817c00`
 
 ## 当前实机断点
 
-下一步只验收 v0.3.7，不提升 stable：
+下一步只验收 v0.3.8，不提升 stable：
 
-1. 上传、下载额度文字必须完整处于原 14 px bar 内，不再贴底或被裁切。
-2. 镜像覆盖和当前任务继续保持 v0.3.4 原几何，文字在 bar 内自然可读。
-3. 手工双击 EXE 应显示主窗口总览，不因 `StartMinimized` 直接留在托盘。
-4. 已运行时切到“转移 / 回收站 / 文档”任意页后，再双击 EXE，应恢复或激活窗口并切回“总览”。
-5. Windows 登录自启动的 `--background` 路径仍允许后台进入托盘。
-6. 转移、回收站、文档三页没有结构改造，应保持原观感。
+1. 上传、下载额度文字必须完整处于 bar 内，不贴底、不被裁切。
+2. 镜像覆盖和当前任务继续保持 v0.3.4 原几何。
+3. 页面整体结构、Logo、四个 Tab、阶段区、按钮位置不得变化。
+4. 手工双击 EXE 应显示主窗口总览。
+5. 已运行时切到其他 Tab 后再次双击 EXE，应恢复或激活并回总览。
+6. Windows 登录自启动 `--background` 仍允许后台托盘。
 7. 只有用户实机截图确认后，才能把视觉与真实激活行为记为通过。
 
 真实 DELETE 仍需等合法跨周期候选出现后再做真实账户验证。
