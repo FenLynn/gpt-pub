@@ -59,14 +59,17 @@ public sealed class MediaAnalysisService
                     {
                         var rms = (float)Math.Sqrt(bucketSquares / Math.Max(1, bucketFrames));
                         points.Add(Math.Clamp(rms * 0.72f + bucketPeak * 0.28f, 0f, 1f));
-                        bucketFrames = 0; bucketSquares = 0; bucketPeak = 0;
+                        bucketFrames = 0;
+                        bucketSquares = 0;
+                        bucketPeak = 0;
                     }
                 }
 
                 var percent = (int)Math.Clamp(framesRead * 100L / totalFrames, 0, 99);
                 if (percent >= lastPercent + 2)
                 {
-                    progress?.Report(new(percent, "解析音轨", $"{TimeSpan.FromSeconds(framesRead / (double)sampleRate):hh\:mm\:ss} / {duration:hh\:mm\:ss}"));
+                    var elapsed = TimeSpan.FromSeconds(framesRead / (double)sampleRate);
+                    progress?.Report(new(percent, "解析音轨", $"{FormatClock(elapsed)} / {FormatClock(duration)}"));
                     lastPercent = percent;
                 }
             }
@@ -89,4 +92,7 @@ public sealed class MediaAnalysisService
             throw new NotSupportedException("无法打开媒体音轨。当前第一版使用 Windows Media Foundation 以避免额外下载大型媒体运行库，后续会为不支持的容器自动接 FFmpeg fallback。", ex);
         }
     }
+
+    static string FormatClock(TimeSpan value)
+        => value.TotalHours >= 1 ? value.ToString(@"hh\:mm\:ss") : value.ToString(@"mm\:ss");
 }
