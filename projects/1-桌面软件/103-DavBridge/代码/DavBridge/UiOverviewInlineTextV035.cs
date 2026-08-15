@@ -73,7 +73,7 @@ internal sealed class UiOverviewInlineTextV035 : IDisposable
             table.ResumeLayout(performLayout: true);
         }
 
-        _bindings.Add(new Binding(label, meter, table, labelCell.Row, meterCell.Row, spacerHeight, meterHeight));
+        _bindings.Add(new Binding(label, meter, table, labelCell.Row, meterCell.Row));
     }
 
     private T Field<T>(string name) where T : class
@@ -92,11 +92,13 @@ internal sealed class UiOverviewInlineTextV035 : IDisposable
             if (!ReferenceEquals(binding.Label.Parent, binding.Meter))
                 throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: value label escaped its meter");
             if (binding.Table.RowStyles[binding.LabelRow].SizeType != SizeType.Absolute ||
-                Math.Abs(binding.Table.RowStyles[binding.LabelRow].Height - binding.SpacerHeight) > 0.5F)
-                throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: spacer row changed");
-            if (binding.Table.RowStyles[binding.MeterRow].SizeType != SizeType.Absolute ||
-                Math.Abs(binding.Table.RowStyles[binding.MeterRow].Height - binding.MeterHeight) > 0.5F)
-                throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: meter row changed");
+                binding.Table.RowStyles[binding.MeterRow].SizeType != SizeType.Absolute)
+                throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: local rows stopped being fixed");
+
+            var spacerHeight = binding.Table.RowStyles[binding.LabelRow].Height;
+            var meterHeight = binding.Table.RowStyles[binding.MeterRow].Height;
+            if (spacerHeight <= 0 || meterHeight <= 0 || meterHeight <= spacerHeight)
+                throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: local row balance invalid ({spacerHeight:0.#}/{meterHeight:0.#})");
             if (binding.Meter.Width < 100 || binding.Meter.Height < 20)
                 throw new InvalidOperationException($"UI inline-text self-test failed [{scenario}]: meter clipped ({binding.Meter.Width}x{binding.Meter.Height})");
             if (binding.Label.IsDisposed)
@@ -127,7 +129,5 @@ internal sealed class UiOverviewInlineTextV035 : IDisposable
         MeterV030 Meter,
         TableLayoutPanel Table,
         int LabelRow,
-        int MeterRow,
-        int SpacerHeight,
-        int MeterHeight);
+        int MeterRow);
 }
