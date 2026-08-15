@@ -74,33 +74,56 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
             if (binding.Meter.Width < 100 || binding.Meter.Height < 12)
                 throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: meter clipped ({binding.Meter.Width}x{binding.Meter.Height})");
 
-            var previousProvider = binding.Meter.DisplayTextProvider;
-            var previousFraction = binding.Meter.Fraction;
-            var previousPulse = binding.Meter.Pulse;
-            try
-            {
-                binding.Meter.DisplayTextProvider = () => binding.SampleText;
-                binding.Meter.Fraction = 0;
-                binding.Meter.Pulse = false;
-                using var bitmap = new Bitmap(Math.Max(1, binding.Meter.Width), Math.Max(1, binding.Meter.Height));
-                binding.Meter.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
-                var ink = FindDarkInk(bitmap);
-                if (ink.IsEmpty)
-                    throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: no rendered text pixels for {binding.SampleText}");
-                if (ink.Top < 1 || ink.Bottom >= bitmap.Height - 1)
-                    throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: rendered text touches meter edge ({ink.Top}..{ink.Bottom} of {bitmap.Height})");
-                var inkCenter = (ink.Top + ink.Bottom - 1) / 2d;
-                var meterCenter = (bitmap.Height - 1) / 2d;
-                if (Math.Abs(inkCenter - meterCenter) > 1.0)
-                    throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: visible glyph pixels are not vertically centered (ink={inkCenter:0.0}, meter={meterCenter:0.0})");
-            }
-            finally
-            {
-                binding.Meter.DisplayTextProvider = previousProvider;
-                binding.Meter.Fraction = previousFraction;
-                binding.Meter.Pulse = previousPulse;
-            }
+            ValidateMeterPixels(binding.Meter, binding.SampleText, scenario);
         }
+
+        ValidateFixedHeightQuotaMeter("upload-16", _bindings[2], 16, scenario);
+        ValidateFixedHeightQuotaMeter("upload-27", _bindings[2], 27, scenario);
+        ValidateFixedHeightQuotaMeter("download-16", _bindings[3], 16, scenario);
+        ValidateFixedHeightQuotaMeter("download-27", _bindings[3], 27, scenario);
+    }
+
+    private static void ValidateMeterPixels(MeterV030 meter, string sampleText, string scenario)
+    {
+        var previousProvider = meter.DisplayTextProvider;
+        var previousFraction = meter.Fraction;
+        var previousPulse = meter.Pulse;
+        try
+        {
+            meter.DisplayTextProvider = () => sampleText;
+            meter.Fraction = 0;
+            meter.Pulse = false;
+            using var bitmap = new Bitmap(Math.Max(1, meter.Width), Math.Max(1, meter.Height));
+            meter.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+            ValidateInk(bitmap, sampleText, scenario);
+        }
+        finally
+        {
+            meter.DisplayTextProvider = previousProvider;
+            meter.Fraction = previousFraction;
+            meter.Pulse = previousPulse;
+        }
+    }
+
+    private static void ValidateFixedHeightQuotaMeter(string name, Binding source, int height, string scenario)
+    {
+        using var meter = CreateReferenceMeter(source, height);
+        using var bitmap = new Bitmap(meter.Width, meter.Height, PixelFormat.Format32bppArgb);
+        meter.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+        ValidateInk(bitmap, name, scenario);
+    }
+
+    private static void ValidateInk(Bitmap bitmap, string label, string scenario)
+    {
+        var ink = FindDarkInk(bitmap);
+        if (ink.IsEmpty)
+            throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: no rendered text pixels for {label}");
+        if (ink.Top < 1 || ink.Bottom >= bitmap.Height - 1)
+            throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: rendered text touches meter edge ({ink.Top}..{ink.Bottom} of {bitmap.Height}) for {label}");
+        var inkCenter = (ink.Top + ink.Bottom - 1) / 2d;
+        var meterCenter = (bitmap.Height - 1) / 2d;
+        if (Math.Abs(inkCenter - meterCenter) > 1.0)
+            throw new InvalidOperationException($"UI meter-text self-test failed [{scenario}]: visible glyph pixels are not vertically centered (ink={inkCenter:0.0}, meter={meterCenter:0.0}) for {label}");
     }
 
     internal void CaptureSampleSnapshot(Form form, string outputPath)
@@ -110,13 +133,21 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
         var states = _bindings.Select(binding => new SnapshotState(binding, binding.Meter.DisplayTextProvider, binding.Meter.Fraction, binding.Meter.Pulse)).ToArray();
         try
         {
-            var meterWidth = Math.Max(240, _bindings.Max(binding => binding.Meter.Width));
+            var meterWidth = Math.Max(420, _bindings.Max(binding => binding.Meter.Width));
             const int left = 24;
             const int top = 24;
-            const int labelHeight = 24;
-            const int gap = 22;
-            var rowHeights = _bindings.Select(binding => labelHeight + binding.Meter.Height + gap).ToArray();
-            var sheetHeight = top * 2 + rowHeights.Sum();
+            const int labelHeight = 22;
+            const int gap = 18;
+            var fixedCases = new (string Name, Binding Binding, int Height)[]
+            {
+                ("upload fixed 16px", _bindings[2], 16),
+                ("upload fixed 27px", _bindings[2], 27),
+                ("download fixed 16px", _bindings[3], 16),
+                ("download fixed 27px", _bindings[3], 27)
+            };
+            var attachedHeight = _bindings.Sum(binding => labelHeight + binding.Meter.Height + gap);
+            var fixedHeight = fixedCases.Sum(item => labelHeight + item.Height + gap);
+            var sheetHeight = top * 2 + attachedHeight + fixedHeight;
             using var sheet = new Bitmap(meterWidth + left * 2, sheetHeight, PixelFormat.Format32bppArgb);
             using var graphics = Graphics.FromImage(sheet);
             graphics.Clear(Color.White);
@@ -133,14 +164,14 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
                 binding.Meter.Pulse = false;
                 binding.Meter.Invalidate();
 
-                var name = index switch { 0 => "coverage", 1 => "current", 2 => "upload", _ => "download" };
-                graphics.DrawString($"{name}   {binding.Meter.Width}×{binding.Meter.Height}px", captionFont, captionBrush, left, y);
-                y += labelHeight;
+                var name = index switch { 0 => "coverage attached", 1 => "current attached", 2 => "upload attached", _ => "download attached" };
+                DrawMeterRow(graphics, captionFont, captionBrush, name, binding.Meter, left, ref y, labelHeight, gap);
+            }
 
-                using var meterBitmap = new Bitmap(Math.Max(1, binding.Meter.Width), Math.Max(1, binding.Meter.Height), PixelFormat.Format32bppArgb);
-                binding.Meter.DrawToBitmap(meterBitmap, new Rectangle(Point.Empty, meterBitmap.Size));
-                graphics.DrawImageUnscaled(meterBitmap, left, y);
-                y += binding.Meter.Height + gap;
+            foreach (var item in fixedCases)
+            {
+                using var meter = CreateReferenceMeter(item.Binding, item.Height);
+                DrawMeterRow(graphics, captionFont, captionBrush, item.Name, meter, left, ref y, labelHeight, gap);
             }
 
             sheet.Save(outputPath, ImageFormat.Png);
@@ -155,6 +186,35 @@ internal sealed class UiOverviewMeterTextV037 : IDisposable
                 state.Binding.Meter.Invalidate();
             }
         }
+    }
+
+    private static MeterV030 CreateReferenceMeter(Binding binding, int height)
+    {
+        var meter = new MeterV030
+        {
+            Width = 420,
+            Height = height,
+            Fraction = binding.SampleFraction,
+            Pulse = false,
+            DisplayTextProvider = () => binding.SampleText,
+            DisplayTextAlignment = binding.Meter.DisplayTextAlignment,
+            DisplayTextHeightRatio = binding.Meter.DisplayTextHeightRatio,
+            DisplayTextColor = binding.Meter.DisplayTextColor,
+            SuppressPulseWhenText = binding.Meter.SuppressPulseWhenText
+        };
+        meter.SetQuotaColors(binding.SampleFraction);
+        _ = meter.Handle;
+        return meter;
+    }
+
+    private static void DrawMeterRow(Graphics graphics, Font captionFont, Brush captionBrush, string name, MeterV030 meter, int left, ref int y, int labelHeight, int gap)
+    {
+        graphics.DrawString($"{name}   {meter.Width}×{meter.Height}px", captionFont, captionBrush, left, y);
+        y += labelHeight;
+        using var meterBitmap = new Bitmap(Math.Max(1, meter.Width), Math.Max(1, meter.Height), PixelFormat.Format32bppArgb);
+        meter.DrawToBitmap(meterBitmap, new Rectangle(Point.Empty, meterBitmap.Size));
+        graphics.DrawImageUnscaled(meterBitmap, left, y);
+        y += meter.Height + gap;
     }
 
     private static Rectangle FindDarkInk(Bitmap bitmap)
