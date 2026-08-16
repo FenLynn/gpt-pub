@@ -48,6 +48,8 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
         SherpaInterop.ConfigureRuntime(runtimeFolder);
 
         var recognizerConfig = new OfflineRecognizerConfig();
+        recognizerConfig.FeatConfig.SampleRate = SampleRate;
+        recognizerConfig.FeatConfig.FeatureDim = 80;
         var modelConfig = new OfflineModelConfig
         {
             Tokens = tokensPath,
@@ -146,9 +148,6 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
         var reachedMaxDuration = _speechStartedAt != DateTime.MinValue &&
             (utcNow - _speechStartedAt).TotalMilliseconds >= MaxUtteranceMs;
 
-        // System loopback often contains music/effects that make Silero less stable than a microphone.
-        // When VAD does not emit a completed segment, an RMS-based boundary prevents live subtitles
-        // from getting stuck forever while still leaving Silero as the preferred segmenter.
         if (energyTimedOut || reachedMaxDuration)
             FinalizeFallbackUtterance(energyTimedOut ? "停顿" : "最长分段");
     }
@@ -180,7 +179,6 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
             if (segment.Samples.Length >= 1600)
                 text = Decode(segment.Samples);
 
-            // If the VAD segment is unexpectedly empty, retry the accumulated utterance once.
             if (string.IsNullOrWhiteSpace(text) && _buffer.Count >= 3200)
                 text = Decode(_buffer.ToArray());
 
@@ -231,9 +229,14 @@ public sealed class SenseVoiceSimulatedStreamingService : IDisposable
         if (recognizer == null || samples.Length == 0) return string.Empty;
 
         using var stream = recognizer.CreateStream();
+        if (stream.Handle == IntPtr.Zero)
+        {
+            StatusChanged?.Invoke("SenseVoice 未能创建离线识别流，继续监听");
+            return string.Empty;
+        }
         stream.AcceptWaveform(SampleRate, samples);
         recognizer.Decode(stream);
-        return CleanupSenseVoiceText(stream.Result.Text);
+        return CleanupSenseVoiceText(SherpaOfflineResultReader.GetText(stream));
     }
 
     static float ComputeRms(float[] samples)
