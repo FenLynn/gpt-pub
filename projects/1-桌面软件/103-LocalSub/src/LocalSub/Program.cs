@@ -32,7 +32,9 @@ internal static class Program
                 return;
             }
 
-            Application.Run(new MainForm());
+            var mainForm = new MainForm();
+            ModelGridVisualStyler.Attach(mainForm);
+            Application.Run(mainForm);
         }
         catch (Exception ex)
         {
