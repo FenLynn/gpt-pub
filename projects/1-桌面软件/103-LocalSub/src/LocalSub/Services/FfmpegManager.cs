@@ -155,7 +155,7 @@ public sealed class FfmpegManager
         return false;
     }
 
-    static IEnumerable<string> NearbyMediovaCandidates()
+    static IReadOnlyList<string> NearbyMediovaCandidates()
     {
         var roots = new List<string>();
         var parent = Directory.GetParent(PortablePaths.BaseDir)?.FullName;
@@ -163,6 +163,7 @@ public sealed class FfmpegManager
         var grand = !string.IsNullOrWhiteSpace(parent) ? Directory.GetParent(parent)?.FullName : null;
         if (!string.IsNullOrWhiteSpace(grand)) roots.Add(grand);
 
+        var found = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var root in roots.Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -172,7 +173,7 @@ public sealed class FfmpegManager
                 Path.Combine(root, "101-Mediova", "Components", "FFmpeg", "bin", "ffmpeg.exe")
             };
             foreach (var candidate in direct)
-                if (seen.Add(candidate)) yield return candidate;
+                if (seen.Add(candidate)) found.Add(candidate);
 
             try
             {
@@ -183,11 +184,12 @@ public sealed class FfmpegManager
                     var name = Path.GetFileName(dir);
                     if (!name.Contains("Mediova", StringComparison.OrdinalIgnoreCase)) continue;
                     var candidate = Path.Combine(dir, "Components", "FFmpeg", "bin", "ffmpeg.exe");
-                    if (seen.Add(candidate)) yield return candidate;
+                    if (seen.Add(candidate)) found.Add(candidate);
                 }
             }
             catch { }
         }
+        return found;
     }
 
     async Task DownloadAsync(string target, IProgress<ComponentDownloadProgress>? progress, CancellationToken ct)
