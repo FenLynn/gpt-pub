@@ -6,15 +6,15 @@ namespace DavBridge;
 /// <summary>
 /// v0.3.11 quota-meter readability repair.
 ///
-/// v0.3.10 correctly stopped the quota meter from expanding to roughly 50px, but forcing the
-/// meter itself down to the shell's old 16px row also shrank the native meter text to an
-/// unreadable size. The shell still reserves a 22px value row even though UiOverviewMeterTextV037
-/// hides that label and paints the value inside the meter.
+/// v0.3.10 proved that the quota meter must not vertically Fill its TableLayoutPanel cell,
+/// otherwise WinForms can stretch the attached control far beyond the declared row height.
+/// Its 16px fixed height removed clipping but made the meter text too small to read comfortably.
 ///
-/// Reuse that already-reserved vertical space instead of changing the outer overview geometry:
-/// heading 22px + hidden value spacer 11px + quota meter 27px = the same 60px internal total.
-/// The 27px meter is the size already exercised by the Windows visual fixture and gives the
-/// glyph sprite enough vertical room for normal readable text while keeping it centered.
+/// The reliable rule is therefore control-level, not row-level: keep each quota meter exactly
+/// 27 logical pixels high and Dock=Top. Reclaim part of the now-hidden value-label row so the
+/// larger meter starts higher without increasing the outer overview strip height. TableLayoutPanel
+/// may still distribute unused space differently in compact scenarios, but it can no longer
+/// change the actual meter height or the text scale.
 /// </summary>
 internal sealed class UiQuotaMeterBoundsV0310 : IDisposable
 {
@@ -23,15 +23,13 @@ internal sealed class UiQuotaMeterBoundsV0310 : IDisposable
 
     private readonly MeterV030 _upload;
     private readonly MeterV030 _download;
-    private readonly TableLayoutPanel _uploadTable;
-    private readonly TableLayoutPanel _downloadTable;
 
     private UiQuotaMeterBoundsV0310(UiShellV032 shell)
     {
         _upload = Field<MeterV030>(shell, "_uploadMeter");
         _download = Field<MeterV030>(shell, "_downloadMeter");
-        _uploadTable = Rebalance(_upload, "upload");
-        _downloadTable = Rebalance(_download, "download");
+        Constrain(_upload, "upload");
+        Constrain(_download, "download");
     }
 
     internal static UiQuotaMeterBoundsV0310 Attach(UiShellV032 shell) => new(shell);
@@ -42,7 +40,7 @@ internal sealed class UiQuotaMeterBoundsV0310 : IDisposable
         return value as T ?? throw new InvalidOperationException($"quota meter bounds could not resolve UiShellV032.{name}");
     }
 
-    private static TableLayoutPanel Rebalance(MeterV030 meter, string name)
+    private static void Constrain(MeterV030 meter, string name)
     {
         if (meter.Parent is not TableLayoutPanel table)
             throw new InvalidOperationException($"quota meter readability expected {name} meter inside a TableLayoutPanel");
@@ -51,16 +49,18 @@ internal sealed class UiQuotaMeterBoundsV0310 : IDisposable
         if (position.Row != 2 || table.RowStyles.Count < 3)
             throw new InvalidOperationException($"quota meter readability found unexpected {name} row geometry");
 
+        // This row contains a Label that UiOverviewMeterTextV037 hides because the Meter paints
+        // the same value itself. Reclaim half of that unused space without changing outer geometry.
         table.RowStyles[1].SizeType = SizeType.Absolute;
         table.RowStyles[1].Height = LogicalHiddenValueHeight;
-        table.RowStyles[2].SizeType = SizeType.Absolute;
-        table.RowStyles[2].Height = LogicalQuotaMeterHeight;
 
-        meter.Dock = DockStyle.Fill;
+        // Do not trust the TableLayoutPanel's final row height. It can absorb surplus space.
+        // Pin the actual visual control instead.
+        meter.Dock = DockStyle.Top;
+        meter.Height = LogicalQuotaMeterHeight;
         meter.Margin = new Padding(meter.Margin.Left, 0, meter.Margin.Right, 0);
         meter.Invalidate();
         table.PerformLayout();
-        return table;
     }
 
     internal void Validate(string scenario)
@@ -71,30 +71,24 @@ internal sealed class UiQuotaMeterBoundsV0310 : IDisposable
                 ? 1.50
                 : 1.00;
 
-        ValidateOne(_upload, _uploadTable, "upload", "946.6 MB / 1.00 GB", scenario, scale);
-        ValidateOne(_download, _downloadTable, "download", "2.09 GB / 3.00 GB", scenario, scale);
+        ValidateOne(_upload, "upload", "946.6 MB / 1.00 GB", scenario, scale);
+        ValidateOne(_download, "download", "2.09 GB / 3.00 GB", scenario, scale);
     }
 
     private static void ValidateOne(
         MeterV030 meter,
-        TableLayoutPanel table,
         string name,
         string sampleText,
         string scenario,
         double scale)
     {
-        if (meter.Dock != DockStyle.Fill)
-            throw new InvalidOperationException($"UI quota-meter self-test failed [{scenario}]: {name} meter is not Dock=Fill");
+        if (meter.Dock != DockStyle.Top)
+            throw new InvalidOperationException($"UI quota-meter self-test failed [{scenario}]: {name} meter is not Dock=Top");
 
         var expected = (int)Math.Round(LogicalQuotaMeterHeight * scale);
         if (Math.Abs(meter.Height - expected) > 2)
             throw new InvalidOperationException(
-                $"UI quota-meter self-test failed [{scenario}]: {name} meter height {meter.Height}px, expected about {expected}px from the 27px logical quota row");
-
-        var rowHeights = table.GetRowHeights();
-        if (rowHeights.Length < 3 || Math.Abs(rowHeights[2] - expected) > 2)
-            throw new InvalidOperationException(
-                $"UI quota-meter self-test failed [{scenario}]: {name} table meter row is {string.Join(',', rowHeights)} instead of about {expected}px");
+                $"UI quota-meter self-test failed [{scenario}]: {name} meter height {meter.Height}px, expected about {expected}px from the 27px logical control height");
 
         ValidateReadableGlyphs(meter, sampleText, name, scenario, scale);
     }
