@@ -2,6 +2,7 @@ using System.Diagnostics;
 using LocalSub.Core;
 using LocalSub.Services;
 using LocalSub.UI;
+using NAudio.Wave;
 
 namespace LocalSub;
 
@@ -12,7 +13,8 @@ internal static class Program
     static bool IsStartupSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_SMOKE_TEST") == "1";
     static bool IsProcessLoopbackSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_PROCESS_LOOPBACK_SMOKE") == "1";
     static bool IsBatchUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_BATCH_UI_SMOKE") == "1";
-    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest;
+    static bool IsOfflineAsrSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_SMOKE") == "1";
+    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest;
 
     [STAThread]
     static void Main()
@@ -34,6 +36,12 @@ internal static class Program
             if (IsProcessLoopbackSmokeTest)
             {
                 RunProcessLoopbackSmokeTest();
+                return;
+            }
+
+            if (IsOfflineAsrSmokeTest)
+            {
+                RunOfflineAsrSmokeTest();
                 return;
             }
 
@@ -72,6 +80,32 @@ internal static class Program
         capture.StartAsync((uint)Environment.ProcessId).GetAwaiter().GetResult();
         Thread.Sleep(300);
         capture.StopAsync().GetAwaiter().GetResult();
+    }
+
+    static void RunOfflineAsrSmokeTest()
+    {
+        var model = Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_MODEL") ?? "";
+        var tokens = Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_TOKENS") ?? "";
+        var wav = Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_WAV") ?? "";
+        var runtime = Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_RUNTIME") ?? "";
+        if (!File.Exists(model) || !File.Exists(tokens) || !File.Exists(wav) || !Directory.Exists(runtime))
+            throw new InvalidOperationException("Offline ASR smoke test paths are incomplete.");
+
+        using var wave = new WaveFileReader(wav);
+        var provider = wave.ToSampleProvider();
+        var samples = new List<float>();
+        var buffer = new float[4096];
+        while (true)
+        {
+            var n = provider.Read(buffer, 0, buffer.Length);
+            if (n <= 0) break;
+            for (var i = 0; i < n; i++) samples.Add(buffer[i]);
+        }
+        if (samples.Count == 0) throw new InvalidDataException("Offline ASR smoke WAV contains no samples.");
+
+        using var recognizer = NativeOfflineRecognizer.CreateTdnnSmoke(model, tokens, runtime);
+        var text = recognizer.Decode(samples.ToArray(), provider.WaveFormat.SampleRate);
+        if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException("Offline ASR smoke decode returned empty text.");
     }
 
     static void LogStartup(Stopwatch sw, string stage, bool final = false)
