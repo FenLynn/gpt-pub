@@ -39,10 +39,10 @@ internal static class Program
             var mainForm = new MainForm();
             LogStartup(startup, "main-form-constructed");
             ModelGridVisualStyler.Attach(mainForm);
-            BatchWorkspaceEnhancer.Attach(mainForm);
+            LazyBatchWorkspaceLoader.Attach(mainForm);
             SettingsFeatureEnhancer.Attach(mainForm);
             TrayController.Attach(mainForm);
-            LogStartup(startup, "enhancers-attached");
+            LogStartup(startup, "lightweight-enhancers-attached");
             mainForm.Shown += (_, _) => LogStartup(startup, "window-shown", final: true);
             Application.Run(mainForm);
         }
