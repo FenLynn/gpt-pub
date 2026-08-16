@@ -89,7 +89,7 @@ public sealed class FfmpegManager
                 }
                 response.EnsureSuccessStatusCode();
 
-                var total = response.Content.Headers.ContentLength.HasValue ? existing + response.Content.Headers.ContentLength.Value : null;
+                long? total = response.Content.Headers.ContentLength.HasValue ? existing + response.Content.Headers.ContentLength.Value : null;
                 await using var src = await response.Content.ReadAsStreamAsync(ct);
                 await using var dst = new FileStream(part, existing > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 128, true);
                 var buffer = new byte[1024 * 128];
