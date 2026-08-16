@@ -156,7 +156,7 @@
   {
     "Id": "funasr-nano-int8",
     "Name": "Fun-ASR-Nano INT8",
-    "Purpose": "高质量后台：中英，口音/复杂内容取向",
+    "Purpose": "高准确模拟流式/后台：中英，停顿后出句，口音/复杂内容取向",
     "Languages": "中/英",
     "SizeText": "约 0.9 GB",
     "RealtimeScore": 3,
@@ -166,7 +166,7 @@
     "FolderName": "sherpa-onnx-funasr-nano-int8-2025-12-30",
     "RequiredFiles": ["encoder_adaptor.int8.onnx", "llm.int8.onnx", "embedding.int8.onnx", "Qwen3-0.6B"],
     "Recommended": false,
-    "LiveCapable": false,
+    "LiveCapable": true,
     "BatchCapable": true
   },
   {
