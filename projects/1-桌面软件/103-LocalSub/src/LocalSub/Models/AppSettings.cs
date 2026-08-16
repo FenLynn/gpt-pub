@@ -20,6 +20,7 @@ public sealed class AppSettings
     public string LiveModelId { get; set; } = "streaming-zipformer-zh-large-int8";
     public string BatchModelId { get; set; } = "sensevoice-small-int8";
     public string Keywords { get; set; } = "";
+    public string FfmpegPath { get; set; } = "";
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public ResourceProfile ResourceProfile { get; set; } = ResourceProfile.Auto;
