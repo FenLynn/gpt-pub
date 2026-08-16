@@ -1,14 +1,20 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace LocalSub.Services;
 
 /// <summary>
-/// Keeps PotPlayer process-loopback capture alive across file changes, audio renderer
-/// recreation and an occasional capture-session failure. The ASR recognizer is not
-/// restarted, so switching videos does not reload the model.
+/// Keeps PotPlayer process-loopback capture alive across media changes, seeks,
+/// renderer recreation and transient Windows activation failures. The ASR model
+/// remains loaded while only the audio session is recovered.
 /// </summary>
 public sealed class ResilientPotPlayerCaptureService : IDisposable
 {
+    const int InitialStartAttempts = 6;
+    static readonly TimeSpan NormalInactivity = TimeSpan.FromSeconds(2.6);
+    static readonly TimeSpan TransitionInactivity = TimeSpan.FromSeconds(1.8);
+    static readonly TimeSpan TransitionWindow = TimeSpan.FromSeconds(5);
+
     readonly object _gate = new();
     ProcessLoopbackCaptureService? _inner;
     CancellationTokenSource? _cts;
@@ -17,12 +23,16 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
     uint _processId;
     string _lastTitle = "";
     DateTime _lastSamplesAtUtc;
+    DateTime _lastMediaTransitionAtUtc;
     bool _hasSeenSamples;
-    int _generation;
+    bool _recovering;
+    int _successfulSessions;
+    int _consecutiveStartFailures;
 
     public event Action<float>? LevelChanged;
     public event Action<float[]>? SamplesAvailable;
     public event Action<string>? StatusChanged;
+    public event Action? SessionDiscontinuity;
 
     public static void EnsureSupported() => ProcessLoopbackCaptureService.EnsureSupported();
 
@@ -34,8 +44,11 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
         _processId = processId;
         _lastTitle = ReadTitle(processId);
         _lastSamplesAtUtc = DateTime.UtcNow;
+        _lastMediaTransitionAtUtc = DateTime.MinValue;
         _hasSeenSamples = false;
-        _generation = 0;
+        _recovering = false;
+        _successfulSessions = 0;
+        _consecutiveStartFailures = 0;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _firstReady = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _supervisor = Task.Run(() => SupervisorLoopAsync(_cts.Token), _cts.Token);
@@ -47,6 +60,7 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
     async Task SupervisorLoopAsync(CancellationToken ct)
     {
         Exception? lastStartError = null;
+        var settleBeforeNextStart = false;
         try
         {
             while (!ct.IsCancellationRequested)
@@ -55,10 +69,21 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
                 {
                     _processId = resolvedPid;
                     _lastTitle = resolvedTitle;
-                    StatusChanged?.Invoke($"检测到 PotPlayer 进程变化，自动重新绑定 PID {_processId}");
+                    _recovering = _successfulSessions > 0;
+                    if (_recovering) SessionDiscontinuity?.Invoke();
+                    StatusChanged?.Invoke($"PotPlayer 进程变化，等待音频稳定后重新绑定 PID {_processId}");
+                    settleBeforeNextStart = true;
+                }
+
+                if (settleBeforeNextStart)
+                {
+                    try { await Task.Delay(420, ct).ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
+                    settleBeforeNextStart = false;
                 }
 
                 ProcessLoopbackCaptureService? capture = null;
+                var sessionWasStarted = false;
                 try
                 {
                     capture = new ProcessLoopbackCaptureService();
@@ -66,24 +91,33 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
                     capture.SamplesAvailable += ForwardSamples;
                     lock (_gate) _inner = capture;
 
-                    _generation++;
-                    StatusChanged?.Invoke(_generation == 1
-                        ? $"连接 PotPlayer 音频，PID {_processId}"
-                        : $"重新连接 PotPlayer 音频，第 {_generation - 1} 次恢复");
+                    if (_successfulSessions == 0 && _consecutiveStartFailures == 0)
+                        StatusChanged?.Invoke($"连接 PotPlayer 音频，PID {_processId}");
+                    else if (_consecutiveStartFailures == 0)
+                        StatusChanged?.Invoke("正在恢复 PotPlayer 音频，不重新加载识别模型");
 
                     await capture.StartAsync(_processId, ct).ConfigureAwait(false);
+                    sessionWasStarted = true;
                     lastStartError = null;
+                    _consecutiveStartFailures = 0;
+                    _successfulSessions++;
                     _firstReady?.TrySetResult(true);
                     _lastSamplesAtUtc = DateTime.UtcNow;
                     _hasSeenSamples = false;
 
                     var sessionTitle = ReadTitle(_processId);
                     if (!string.IsNullOrWhiteSpace(sessionTitle)) _lastTitle = sessionTitle;
-                    StatusChanged?.Invoke("PotPlayer 音频已连接，切换视频会自动续接");
+                    StatusChanged?.Invoke(_recovering
+                        ? "PotPlayer 音频会话已重新建立，等待声音恢复"
+                        : "PotPlayer 音频已连接，快进、快退和换片会自动容错");
 
                     var restartReason = await WatchSessionAsync(ct).ConfigureAwait(false);
                     if (ct.IsCancellationRequested) break;
+
+                    _recovering = true;
+                    SessionDiscontinuity?.Invoke();
                     StatusChanged?.Invoke(restartReason);
+                    settleBeforeNextStart = true;
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -92,8 +126,24 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
                 catch (Exception ex)
                 {
                     lastStartError = ex;
-                    if (_generation == 1) _firstReady?.TrySetException(ex);
-                    StatusChanged?.Invoke("PotPlayer 音频捕获中断，正在自动恢复：" + ex.Message);
+                    _consecutiveStartFailures++;
+                    _recovering = _successfulSessions > 0;
+
+                    if (_successfulSessions == 0 && _consecutiveStartFailures >= InitialStartAttempts)
+                    {
+                        _firstReady?.TrySetException(new InvalidOperationException(
+                            $"PotPlayer 音频暂时无法建立，已自动重试 {_consecutiveStartFailures} 次。最后错误：{ShortError(ex)}", ex));
+                        break;
+                    }
+
+                    var delay = RetryDelay(_consecutiveStartFailures);
+                    var prefix = _successfulSessions > 0
+                        ? "PotPlayer 音频正在恢复"
+                        : "PotPlayer 音频尚未就绪";
+                    StatusChanged?.Invoke($"{prefix}，{delay.TotalSeconds:0.0} 秒后自动重试（{_consecutiveStartFailures}）{ErrorSuffix(ex)}");
+
+                    try { await Task.Delay(delay, ct).ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
                 }
                 finally
                 {
@@ -108,13 +158,7 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
                     {
                         if (ReferenceEquals(_inner, capture)) _inner = null;
                     }
-                    LevelChanged?.Invoke(0);
-                }
-
-                if (!ct.IsCancellationRequested)
-                {
-                    try { await Task.Delay(lastStartError == null ? 120 : 650, ct).ConfigureAwait(false); }
-                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
+                    if (sessionWasStarted && _recovering) LevelChanged?.Invoke(0);
                 }
             }
         }
@@ -130,13 +174,12 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
 
     async Task<string> WatchSessionAsync(CancellationToken ct)
     {
-        // Title changes are the cleanest signal for playlist / next-file transitions.
-        // An inactivity recovery is kept as a second line of defence for a silently
-        // faulted WASAPI session. It triggers only after this session has actually
-        // delivered samples, so a long pause does not cause endless reconnect loops.
+        // A title change no longer tears down process loopback immediately. Process
+        // loopback is PID-scoped, so the existing session is kept while PotPlayer
+        // switches files or seeks. We rebuild only when PCM actually stops arriving.
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(300, ct).ConfigureAwait(false);
+            await Task.Delay(220, ct).ConfigureAwait(false);
 
             bool currentAlive;
             string title;
@@ -158,29 +201,36 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
                 {
                     _processId = replacementPid;
                     _lastTitle = replacementTitle;
-                    return $"PotPlayer 进程已切换，自动绑定 PID {_processId}";
+                    return $"PotPlayer 进程已切换，准备自动绑定 PID {_processId}";
                 }
-                return "PotPlayer 进程暂时不可用，等待自动恢复";
+                return "PotPlayer 暂时不可用，等待播放器恢复";
             }
 
             if (!string.IsNullOrWhiteSpace(title) &&
                 !string.IsNullOrWhiteSpace(_lastTitle) &&
                 !string.Equals(title, _lastTitle, StringComparison.Ordinal))
             {
-                var old = _lastTitle;
                 _lastTitle = title;
-                _hasSeenSamples = false;
-                return $"检测到 PotPlayer 视频切换，自动续接音频：{ShortTitle(old)} → {ShortTitle(title)}";
+                _lastMediaTransitionAtUtc = DateTime.UtcNow;
+                StatusChanged?.Invoke("检测到 PotPlayer 媒体变化，保持当前音频会话并等待声音自然恢复");
             }
-            if (!string.IsNullOrWhiteSpace(title)) _lastTitle = title;
-
-            if (_hasSeenSamples && DateTime.UtcNow - _lastSamplesAtUtc > TimeSpan.FromSeconds(7))
+            else if (!string.IsNullOrWhiteSpace(title))
             {
-                // One recovery attempt for a session that used to be active but then
-                // stopped producing PCM. After restart _hasSeenSamples is false until
-                // audio returns, so a paused player will not churn continuously.
-                _hasSeenSamples = false;
-                return "PotPlayer 音频超过 7 秒无新数据，自动重建捕获会话";
+                _lastTitle = title;
+            }
+
+            if (_hasSeenSamples)
+            {
+                var now = DateTime.UtcNow;
+                var nearTransition = _lastMediaTransitionAtUtc != DateTime.MinValue && now - _lastMediaTransitionAtUtc <= TransitionWindow;
+                var threshold = nearTransition ? TransitionInactivity : NormalInactivity;
+                if (now - _lastSamplesAtUtc > threshold)
+                {
+                    _hasSeenSamples = false;
+                    return nearTransition
+                        ? "换片或跳转后音频暂未恢复，准备重新建立捕获会话"
+                        : "检测到 PotPlayer 音频流中断，准备自动恢复";
+                }
             }
         }
         throw new OperationCanceledException(ct);
@@ -193,6 +243,11 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
         if (samples.Length == 0) return;
         _hasSeenSamples = true;
         _lastSamplesAtUtc = DateTime.UtcNow;
+        if (_recovering)
+        {
+            _recovering = false;
+            StatusChanged?.Invoke("PotPlayer 音频已恢复，继续实时识别");
+        }
         SamplesAvailable?.Invoke(samples);
     }
 
@@ -225,6 +280,28 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
         finally { replacement?.Dispose(); }
     }
 
+    static TimeSpan RetryDelay(int failures) => failures switch
+    {
+        <= 1 => TimeSpan.FromMilliseconds(350),
+        2 => TimeSpan.FromMilliseconds(700),
+        3 => TimeSpan.FromMilliseconds(1200),
+        4 => TimeSpan.FromMilliseconds(2000),
+        _ => TimeSpan.FromMilliseconds(3000)
+    };
+
+    static string ErrorSuffix(Exception ex)
+    {
+        var hr = ex.HResult;
+        return ex is COMException || hr < 0 ? $"，HRESULT 0x{hr:X8}" : "";
+    }
+
+    static string ShortError(Exception ex)
+    {
+        var text = ex.Message.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (text.Length > 150) text = text[..147] + "...";
+        return text;
+    }
+
     static string ReadTitle(uint processId)
     {
         try
@@ -239,12 +316,6 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
     {
         try { p.Refresh(); return p.MainWindowTitle?.Trim() ?? ""; }
         catch { return ""; }
-    }
-
-    static string ShortTitle(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return "未知";
-        return value.Length <= 28 ? value : value[..25] + "...";
     }
 
     public async Task StopAsync()
@@ -273,6 +344,8 @@ public sealed class ResilientPotPlayerCaptureService : IDisposable
         _cts = null;
         lock (_gate) _inner = null;
         _hasSeenSamples = false;
+        _recovering = false;
+        _consecutiveStartFailures = 0;
         LevelChanged?.Invoke(0);
     }
 
