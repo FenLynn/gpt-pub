@@ -1,3 +1,4 @@
+using LocalSub.Core;
 using LocalSub.Models;
 using SherpaOnnx;
 
@@ -28,23 +29,35 @@ public sealed class BatchTranscriptionService
         if (!model.BatchCapable) throw new NotSupportedException($"模型“{model.Name}”未标记为后台转写模型。");
         if (!models.IsInstalled(model)) throw new InvalidOperationException($"后台模型“{model.Name}”尚未安装。");
 
-        progress?.Report(new(0, "准备", "检查 ASR 运行库"));
-        var runtime = new AsrRuntimeManager(settings);
-        await runtime.EnsureAsync(runtimeProgress, ct);
-
-        var vadDescriptor = new ModelCatalogService().Load().FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException("模型 catalog 中缺少 Silero VAD。");
-        if (!models.IsInstalled(vadDescriptor))
+        Log($"START file={Path.GetFileName(filePath)} model={model.Id}");
+        try
         {
-            progress?.Report(new(0, "准备", "下载 Silero VAD"));
-            await models.DownloadAsync(vadDescriptor, runtimeProgress, ct);
-        }
+            progress?.Report(new(0, "准备", "检查 ASR 运行库"));
+            var runtime = new AsrRuntimeManager(settings);
+            await runtime.EnsureAsync(runtimeProgress, ct);
 
-        var vadPath = Path.Combine(models.GetModelFolder(vadDescriptor), "silero_vad.onnx");
-        var keywordArray = keywords.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var ffmpeg = new FfmpegManager(settings);
-        var threads = PerformancePolicy.BatchThreads(settings.ResourceProfile);
-        return await Task.Run(() => TranscribeCore(filePath, model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot, ffmpeg, threads, keywordArray, progress, ct), ct);
+            var vadDescriptor = new ModelCatalogService().Load().FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException("模型 catalog 中缺少 Silero VAD。");
+            if (!models.IsInstalled(vadDescriptor))
+            {
+                progress?.Report(new(0, "准备", "下载 Silero VAD"));
+                await models.DownloadAsync(vadDescriptor, runtimeProgress, ct);
+            }
+
+            var vadPath = Path.Combine(models.GetModelFolder(vadDescriptor), "silero_vad.onnx");
+            var keywordArray = keywords.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var ffmpeg = new FfmpegManager(settings);
+            var threads = PerformancePolicy.BatchThreads(settings.ResourceProfile);
+            progress?.Report(new(1, "加载模型", $"正在加载 {model.Name}，大型模型首次加载可能需要一些时间"));
+            var result = await Task.Run(() => TranscribeCore(filePath, model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot, ffmpeg, threads, keywordArray, progress, ct), ct);
+            Log($"DONE file={Path.GetFileName(filePath)} model={model.Id} segments={result.Items.Count} rtf={result.RealTimeFactor:0.000}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Log($"FAIL file={Path.GetFileName(filePath)} model={model.Id} {ex}");
+            throw;
+        }
     }
 
     static BatchTranscriptionResult TranscribeCore(
@@ -61,7 +74,9 @@ public sealed class BatchTranscriptionService
     {
         var started = DateTime.UtcNow;
         SherpaInterop.ConfigureRuntime(runtimeFolder);
+        progress?.Report(new(1, "加载模型", $"{model.Name}，CPU {threads} 线程"));
         using var recognizer = CreateRecognizer(model, modelFolder, threads);
+        progress?.Report(new(2, "模型就绪", $"{model.Name} 已加载，正在打开音轨"));
         using var vad = CreateVad(vadPath);
         using var source = new MediaAudioSource.Mono16kSource(MediaAudioSource.Open(filePath, ffmpeg));
         var duration = source.Duration;
@@ -74,7 +89,7 @@ public sealed class BatchTranscriptionService
         var lastPercent = -1;
         var segmentCount = 0;
 
-        progress?.Report(new(1, "转写", $"{model.Name} 已加载，{source.DecoderName}，{threads} 线程"));
+        progress?.Report(new(3, "转写", $"{model.Name} 已加载，{source.DecoderName}，{threads} 线程"));
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -94,7 +109,7 @@ public sealed class BatchTranscriptionService
             if (offset > 0) pending.RemoveRange(0, offset);
 
             var elapsed = samplesRead / (double)SampleRate;
-            var percent = (int)Math.Clamp(elapsed * 100 / duration.TotalSeconds, 0, 98);
+            var percent = (int)Math.Clamp(elapsed * 100 / duration.TotalSeconds, 3, 98);
             if (percent >= lastPercent + 1)
             {
                 progress?.Report(new(percent, "转写", $"{FormatClock(TimeSpan.FromSeconds(elapsed))} / {FormatClock(duration)}，已识别 {segmentCount} 段", segmentCount));
@@ -140,7 +155,7 @@ public sealed class BatchTranscriptionService
 
             transcript.Add(new TranscriptItem { Start = start, End = end, Text = text }, keywords);
             segmentCount++;
-            var percent = (int)Math.Clamp(end.TotalSeconds * 100 / Math.Max(0.001, duration.TotalSeconds), 0, 99);
+            var percent = (int)Math.Clamp(end.TotalSeconds * 100 / Math.Max(0.001, duration.TotalSeconds), 3, 99);
             progress?.Report(new(percent, "识别语音段", $"{FormatClock(start)}  {TrimForStatus(text)}", segmentCount));
         }
     }
@@ -206,6 +221,16 @@ public sealed class BatchTranscriptionService
         var s = text.Trim();
         while (s.Contains("  ", StringComparison.Ordinal)) s = s.Replace("  ", " ", StringComparison.Ordinal);
         return s;
+    }
+
+    static void Log(string message)
+    {
+        try
+        {
+            Directory.CreateDirectory(PortablePaths.LogsDir);
+            File.AppendAllText(Path.Combine(PortablePaths.LogsDir, "batch.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}");
+        }
+        catch { }
     }
 
     static string TrimForStatus(string text) => text.Length <= 45 ? text : text[..45] + "…";
