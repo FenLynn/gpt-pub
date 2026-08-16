@@ -10,7 +10,7 @@ public sealed class StreamingParaformerService : IDisposable
     public event Action<string>? PartialResult;
     public event Action<string>? FinalResult;
 
-    public void Start(ModelDescriptor model, string modelFolder, string runtimeFolder)
+    public void Start(ModelDescriptor model, string modelFolder, string runtimeFolder, int? numThreads = null)
     {
         Stop();
         var isParaformer = model.Id.StartsWith("streaming-paraformer-", StringComparison.OrdinalIgnoreCase);
@@ -22,7 +22,7 @@ public sealed class StreamingParaformerService : IDisposable
         SherpaInterop.ConfigureRuntime(runtimeFolder);
         var config = SherpaInterop.OnlineRecognizerConfig.Default;
         var modelConfig = SherpaInterop.OnlineModelConfig.Empty;
-        modelConfig.NumThreads = Math.Clamp(Environment.ProcessorCount / 2, 1, 6);
+        modelConfig.NumThreads = Math.Clamp(numThreads ?? Math.Clamp(Environment.ProcessorCount / 2, 1, 6), 1, 12);
         modelConfig.Provider = "cpu";
 
         if (isParaformer)
