@@ -34,7 +34,8 @@ public sealed class MainForm : Form
         MultiSelect = false,
         AllowUserToAddRows = false,
         AllowUserToDeleteRows = false,
-        RowHeadersVisible = false
+        RowHeadersVisible = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect
     };
     readonly ProgressBar downloadProgress = new() { Dock = DockStyle.Fill, Height = 18 };
     readonly Label modelStatusTitle = new() { Dock = DockStyle.Fill, Text = "就绪", TextAlign = ContentAlignment.MiddleLeft };
@@ -123,7 +124,6 @@ public sealed class MainForm : Form
         sourceBox.Items.AddRange(["PotPlayer", "所有音频"]);
         sourceBox.SelectedIndex = _settings.AudioSource == AudioSourceMode.PotPlayer ? 0 : 1;
 
-        FillLiveModels();
         RefreshModels();
         asrPath.Text = _settings.AsrRoot;
 
@@ -157,7 +157,7 @@ public sealed class MainForm : Form
         var p = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, Padding = new Padding(24), AutoScroll = true, WrapContents = false };
         p.Controls.Add(new Label { Text = "音源", AutoSize = true });
         p.Controls.Add(sourceBox);
-        p.Controls.Add(new Label { Text = "实时模型", AutoSize = true, Margin = new Padding(3, 16, 3, 3) });
+        p.Controls.Add(new Label { Text = "实时模型（仅显示已安装）", AutoSize = true, Margin = new Padding(3, 16, 3, 3) });
         p.Controls.Add(liveModelBox);
         p.Controls.Add(new Label { Text = "输入电平", AutoSize = true, Margin = new Padding(3, 16, 3, 3) });
         p.Controls.Add(audioLevel);
@@ -169,7 +169,7 @@ public sealed class MainForm : Form
             MaximumSize = new Size(820, 0),
             ForeColor = Color.DimGray,
             Margin = new Padding(3, 18, 3, 3),
-            Text = "中文推荐 Zipformer Large/CTC Large；Paraformer 为低延迟中英档。字幕最多两行，样式、位置和显示时长可在“设置”中调整。"
+            Text = "下拉框只列出关键文件校验通过的已安装实时模型。中文推荐 Zipformer Large/CTC Large；Paraformer 为低延迟中英档。"
         });
         liveStart.Click += LiveStart_Click;
         t.Controls.Add(p);
@@ -192,10 +192,16 @@ public sealed class MainForm : Form
             _models = new ModelManager(_settings);
 
             if (liveModelBox.SelectedItem is not ModelDescriptor model)
-                throw new InvalidOperationException("没有可用的实时模型，请先在“模型”页面安装实时模型。");
+            {
+                liveStatus.Text = "没有已安装的实时模型，请先到“模型”页面下载。";
+                tabs.SelectedIndex = 2;
+                return;
+            }
+
             if (!_models.IsInstalled(model))
             {
-                liveStatus.Text = $"实时模型“{model.Name}”未安装，请到“模型”页面下载。";
+                RefreshModels();
+                liveStatus.Text = $"实时模型“{model.Name}”已不可用，请在“模型”页面检查或重新下载。";
                 tabs.SelectedIndex = 2;
                 SelectModelRow(model.Id);
                 return;
@@ -218,7 +224,7 @@ public sealed class MainForm : Form
 
             if (sourceBox.SelectedIndex == 0)
             {
-                var potPlayer = PotPlayerWatcher.FindRunning();
+                using var potPlayer = PotPlayerWatcher.FindRunning();
                 if (potPlayer == null) throw new InvalidOperationException("未检测到正在运行的 PotPlayer。");
                 await _liveAsr.StartPotPlayerAsync(_settings, model, _models, (uint)potPlayer.Id, runtimeProgress);
             }
@@ -244,7 +250,7 @@ public sealed class MainForm : Form
         }
         finally
         {
-            liveStart.Enabled = true;
+            liveStart.Enabled = _liveRunning || liveModelBox.Items.Count > 0;
         }
     }
 
@@ -259,13 +265,13 @@ public sealed class MainForm : Form
             liveStart.Text = "开始";
             sourceBox.Enabled = true;
             liveModelBox.Enabled = true;
-            liveStatus.Text = "已停止";
+            liveStatus.Text = liveModelBox.Items.Count > 0 ? "已停止" : "没有已安装的实时模型，请先到“模型”页面下载。";
             audioLevel.Value = 0;
             _overlay?.Hide();
         }
         finally
         {
-            liveStart.Enabled = true;
+            liveStart.Enabled = liveModelBox.Items.Count > 0;
         }
     }
 
@@ -297,7 +303,7 @@ public sealed class MainForm : Form
     {
         if (_overlay == null || _overlay.IsDisposed) return;
         _overlay.ApplySettings(_settings);
-        var process = PotPlayerWatcher.FindRunning();
+        using var process = PotPlayerWatcher.FindRunning();
         if (process != null && PotPlayerWatcher.TryGetWindowState(process, out var bounds, out var minimized))
         {
             if (minimized)
@@ -428,9 +434,11 @@ public sealed class MainForm : Form
         modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Accuracy", HeaderText = "准确率", DataPropertyName = "Accuracy", Width = 62 });
         modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Value", HeaderText = "性价比", DataPropertyName = "Value", Width = 66 });
         modelGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", HeaderText = "状态", DataPropertyName = "Status", Width = 85 });
+        modelGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 238, 252);
+        modelGrid.DefaultCellStyle.SelectionForeColor = Color.Black;
 
         modelStatusTitle.Font = new Font(modelStatusTitle.Font, FontStyle.Bold);
-        modelLog.Text = "评分为 LocalSub 面向本地 CPU 字幕场景的相对工程评分（10 分制），会随实机 A/B 调整。";
+        modelLog.Text = "黑色 = 已安装且关键文件校验通过；灰色 = 未安装。评分为 LocalSub 面向本地 CPU 字幕场景的相对工程评分。";
 
         var status = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10, 6, 10, 6), ColumnCount = 1, RowCount = 4 };
         status.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
@@ -463,8 +471,9 @@ public sealed class MainForm : Form
             if (_modelDownloadCts != null) return;
             var m = SelectedModel();
             if (m == null) return;
+            var installed = _models?.IsInstalled(m) == true;
             modelStatusTitle.Text = m.Name;
-            modelStatusDetail.Text = $"{m.Purpose}   实时 {ScoreText(m.RealtimeScore)} / 准确 {ScoreText(m.AccuracyScore)} / 性价比 {ScoreText(m.ValueScore)}";
+            modelStatusDetail.Text = $"{(installed ? "已安装" : "未安装")}   {m.Purpose}   实时 {ScoreText(m.RealtimeScore)} / 准确 {ScoreText(m.AccuracyScore)} / 性价比 {ScoreText(m.ValueScore)}";
         };
 
         t.Controls.Add(layout);
@@ -475,20 +484,39 @@ public sealed class MainForm : Form
     {
         if (_models == null) return;
         var selectedId = SelectedModel()?.Id;
-        modelGrid.DataSource = _catalog.Select(m => new
+        modelGrid.DataSource = _catalog.Select(m =>
         {
-            Model = m,
-            m.Name,
-            m.Languages,
-            m.Purpose,
-            Size = m.SizeText,
-            Realtime = ScoreText(m.RealtimeScore),
-            Accuracy = ScoreText(m.AccuracyScore),
-            Value = ScoreText(m.ValueScore),
-            Status = _models.IsInstalled(m) ? "已安装" : "未安装"
+            var installed = _models.IsInstalled(m);
+            return new
+            {
+                Model = m,
+                Installed = installed,
+                m.Name,
+                m.Languages,
+                m.Purpose,
+                Size = m.SizeText,
+                Realtime = ScoreText(m.RealtimeScore),
+                Accuracy = ScoreText(m.AccuracyScore),
+                Value = ScoreText(m.ValueScore),
+                Status = installed ? "已安装" : "未安装"
+            };
         }).ToList();
+
+        ApplyModelRowStyles();
         if (!string.IsNullOrWhiteSpace(selectedId)) SelectModelRow(selectedId);
         FillLiveModels();
+    }
+
+    void ApplyModelRowStyles()
+    {
+        if (_models == null) return;
+        foreach (DataGridViewRow row in modelGrid.Rows)
+        {
+            var model = GetBoundModel(row);
+            var installed = model != null && _models.IsInstalled(model);
+            row.DefaultCellStyle.ForeColor = installed ? Color.Black : SystemColors.GrayText;
+            row.DefaultCellStyle.SelectionForeColor = installed ? Color.Black : Color.DimGray;
+        }
     }
 
     static string ScoreText(int value) => value > 0 ? $"{value}/10" : "—";
@@ -536,7 +564,7 @@ public sealed class MainForm : Form
             await _models.DownloadAsync(m, progress, _modelDownloadCts.Token);
             RefreshModels();
             modelStatusTitle.Text = $"{m.Name} · 已完成";
-            modelStatusDetail.Text = $"模型已安装到：{_models.GetModelFolder(m)}";
+            modelStatusDetail.Text = $"模型已安装到：{_models.GetModelFolder(m)}。已自动加入实时模型下拉框（若该模型支持实时识别）。";
             downloadProgress.Style = ProgressBarStyle.Continuous;
             downloadProgress.Value = 100;
             AppendModelLog("完成，模型已通过关键文件校验。", true);
@@ -646,13 +674,34 @@ public sealed class MainForm : Form
 
     void FillLiveModels()
     {
-        var list = _catalog.Where(x => x.LiveCapable && !string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase)).ToList();
-        liveModelBox.DataSource = list;
+        var selectedBefore = (liveModelBox.SelectedItem as ModelDescriptor)?.Id;
+        var list = _catalog
+            .Where(x => x.LiveCapable &&
+                        !string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase) &&
+                        _models?.IsInstalled(x) == true)
+            .ToList();
+
+        liveModelBox.DataSource = null;
         liveModelBox.DisplayMember = "Name";
         liveModelBox.ValueMember = "Id";
-        var idx = list.FindIndex(x => x.Id == _settings.LiveModelId);
+        liveModelBox.DataSource = list;
+
+        var desiredId = !string.IsNullOrWhiteSpace(selectedBefore) && list.Any(x => x.Id == selectedBefore)
+            ? selectedBefore
+            : _settings.LiveModelId;
+        var idx = list.FindIndex(x => x.Id == desiredId);
         if (idx >= 0) liveModelBox.SelectedIndex = idx;
         else if (list.Count > 0) liveModelBox.SelectedIndex = 0;
+        else liveModelBox.SelectedIndex = -1;
+
+        if (!_liveRunning)
+        {
+            liveStart.Enabled = list.Count > 0;
+            if (list.Count == 0)
+                liveStatus.Text = "没有已安装的实时模型，请先到“模型”页面下载。";
+            else if (liveStatus.Text.StartsWith("没有已安装的实时模型", StringComparison.Ordinal))
+                liveStatus.Text = "未启动";
+        }
     }
 
     void BuildSettingsTab()
@@ -722,7 +771,7 @@ public sealed class MainForm : Form
         ApplySettingsFromUi();
         EnsureOverlay();
         _overlay!.ApplySettings(_settings);
-        var process = PotPlayerWatcher.FindRunning();
+        using var process = PotPlayerWatcher.FindRunning();
         if (process != null && PotPlayerWatcher.TryGetWindowState(process, out var bounds, out var minimized) && !minimized)
             _overlay.FollowPlayer(bounds);
         else
