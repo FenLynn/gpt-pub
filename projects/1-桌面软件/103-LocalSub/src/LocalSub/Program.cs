@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LocalSub.Core;
 using LocalSub.Services;
 using LocalSub.UI;
@@ -7,6 +8,7 @@ namespace LocalSub;
 internal static class Program
 {
     static string CrashLogPath => Path.Combine(AppContext.BaseDirectory, "LocalSub-crash.log");
+    static string StartupLogPath => Path.Combine(AppContext.BaseDirectory, "Logs", "startup.log");
     static bool IsStartupSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_SMOKE_TEST") == "1";
     static bool IsProcessLoopbackSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_PROCESS_LOOPBACK_SMOKE") == "1";
     static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest;
@@ -14,10 +16,12 @@ internal static class Program
     [STAThread]
     static void Main()
     {
+        var startup = Stopwatch.StartNew();
         try
         {
             ApplicationConfiguration.Initialize();
             PortablePaths.EnsureBaseFolders();
+            LogStartup(startup, "runtime-init");
 
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (_, e) => ReportCrash("UI thread exception", e.Exception);
@@ -33,7 +37,11 @@ internal static class Program
             }
 
             var mainForm = new MainForm();
+            LogStartup(startup, "main-form-constructed");
             ModelGridVisualStyler.Attach(mainForm);
+            BatchWorkspaceEnhancer.Attach(mainForm);
+            LogStartup(startup, "enhancers-attached");
+            mainForm.Shown += (_, _) => LogStartup(startup, "window-shown", final: true);
             Application.Run(mainForm);
         }
         catch (Exception ex)
@@ -49,6 +57,18 @@ internal static class Program
         capture.StartAsync((uint)Environment.ProcessId).GetAwaiter().GetResult();
         Thread.Sleep(300);
         capture.StopAsync().GetAwaiter().GetResult();
+    }
+
+    static void LogStartup(Stopwatch sw, string stage, bool final = false)
+    {
+        if (IsAnySmokeTest && !final) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(StartupLogPath)!);
+            var prefix = stage == "runtime-init" ? Environment.NewLine + $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] " : "";
+            File.AppendAllText(StartupLogPath, $"{prefix}{stage}={sw.ElapsedMilliseconds}ms{(final ? Environment.NewLine : " | ")}");
+        }
+        catch { }
     }
 
     static void ReportCrash(string stage, Exception ex, bool showDialog = true)
