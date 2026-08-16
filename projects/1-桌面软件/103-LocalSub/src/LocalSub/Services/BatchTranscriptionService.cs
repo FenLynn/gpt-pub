@@ -32,8 +32,7 @@ public sealed class BatchTranscriptionService
         var runtime = new AsrRuntimeManager(settings);
         await runtime.EnsureAsync(runtimeProgress, ct);
 
-        var vadDescriptor = new ModelCatalogService().Load()
-            .FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
+        var vadDescriptor = new ModelCatalogService().Load().FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("模型 catalog 中缺少 Silero VAD。");
         if (!models.IsInstalled(vadDescriptor))
         {
@@ -44,7 +43,8 @@ public sealed class BatchTranscriptionService
         var vadPath = Path.Combine(models.GetModelFolder(vadDescriptor), "silero_vad.onnx");
         var keywordArray = keywords.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var ffmpeg = new FfmpegManager(settings);
-        return await Task.Run(() => TranscribeCore(filePath, model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot, ffmpeg, keywordArray, progress, ct), ct);
+        var threads = PerformancePolicy.BatchThreads(settings.ResourceProfile);
+        return await Task.Run(() => TranscribeCore(filePath, model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot, ffmpeg, threads, keywordArray, progress, ct), ct);
     }
 
     static BatchTranscriptionResult TranscribeCore(
@@ -54,13 +54,14 @@ public sealed class BatchTranscriptionService
         string vadPath,
         string runtimeFolder,
         FfmpegManager ffmpeg,
+        int threads,
         string[] keywords,
         IProgress<BatchTranscriptionProgress>? progress,
         CancellationToken ct)
     {
         var started = DateTime.UtcNow;
         SherpaInterop.ConfigureRuntime(runtimeFolder);
-        using var recognizer = CreateRecognizer(model, modelFolder);
+        using var recognizer = CreateRecognizer(model, modelFolder, threads);
         using var vad = CreateVad(vadPath);
         using var source = new MediaAudioSource.Mono16kSource(MediaAudioSource.Open(filePath, ffmpeg));
         var duration = source.Duration;
@@ -73,7 +74,7 @@ public sealed class BatchTranscriptionService
         var lastPercent = -1;
         var segmentCount = 0;
 
-        progress?.Report(new(1, "转写", $"{model.Name} 已加载，{source.DecoderName} 正在读取音轨"));
+        progress?.Report(new(1, "转写", $"{model.Name} 已加载，{source.DecoderName}，{threads} 线程"));
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -116,16 +117,8 @@ public sealed class BatchTranscriptionService
         return new BatchTranscriptionResult(filePath, duration, transcript.Items.ToArray(), processing, source.DecoderName);
     }
 
-    static void DrainVad(
-        VoiceActivityDetector vad,
-        OfflineRecognizer recognizer,
-        TranscriptService transcript,
-        string[] keywords,
-        ref int segmentCount,
-        IProgress<BatchTranscriptionProgress>? progress,
-        TimeSpan duration,
-        long samplesRead,
-        CancellationToken ct)
+    static void DrainVad(VoiceActivityDetector vad, OfflineRecognizer recognizer, TranscriptService transcript, string[] keywords, ref int segmentCount,
+        IProgress<BatchTranscriptionProgress>? progress, TimeSpan duration, long samplesRead, CancellationToken ct)
     {
         while (!vad.IsEmpty())
         {
@@ -163,10 +156,10 @@ public sealed class BatchTranscriptionService
         catch { return -1; }
     }
 
-    static OfflineRecognizer CreateRecognizer(ModelDescriptor model, string folder)
+    static OfflineRecognizer CreateRecognizer(ModelDescriptor model, string folder, int threads)
     {
         var cfg = new OfflineRecognizerConfig();
-        cfg.ModelConfig.NumThreads = Math.Clamp(Environment.ProcessorCount / 2, 1, 6);
+        cfg.ModelConfig.NumThreads = Math.Clamp(threads, 1, 12);
         cfg.ModelConfig.Provider = "cpu";
         cfg.ModelConfig.Debug = 0;
         cfg.DecodingMethod = "greedy_search";
