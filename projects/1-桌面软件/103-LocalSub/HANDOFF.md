@@ -26,10 +26,10 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 - 分支：`p103-localsub-exp`
 - 版本：`v0.1.0-dev`
-- 当前功能 head：`b5d497d8efaa616ec386fbc1f1b8718d7a7643ae`
-- Windows CI run：`31927905938`，结论 `success`。
+- 当前功能 head：`a7b951080b963ed296597f7c2fc5baec7e1050fc`
+- Windows CI run：`31928257348`，结论 `success`。
 - 该 run 已通过：publish、绿色包检查、EXE 真启动、后台工作区真切换 smoke、Windows Process Loopback 真激活、sherpa native DLL 真加载、最终打包。
-- CI 不携带用户大模型，因此模型实际准确率、真实长视频转写结果、PotPlayer 连播仍属于实机验收项。
+- CI 不携带用户大模型，因此模型实际准确率、真实长视频转写结果、PotPlayer 连播/快进快退恢复仍属于实机验收项。
 
 ## 已实机确认基线
 
@@ -39,12 +39,17 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - PotPlayer 普通窗口和全屏字幕 overlay 已实机可见，全屏链非回归不再重构。
 - 2026-08-16 用户首次验证后台页：MP4 可由 Media Foundation 正常解析并生成波形；FFmpeg 下载曾出现 `416 Requested Range Not Satisfiable`，已修复并支持直接复用 Mediova FFmpeg。
 - 2026-08-16 用户再次验证后台：4:59 MP4 成功完成 Media Foundation 音轨读取，但 Fun-ASR-Nano 结果显示 `完成：0 段，RTF 0.01`，正文为空。该现象明确定位为后台 Silero VAD 未产生语音段，不是 FFmpeg 解码失败。
+- 2026-08-16 用户实机反馈 PotPlayer 快进/快退后偶发停止字幕，并出现 `HRESULT 0x8000FFFF` 的 Process Loopback 初始化失败。旧 supervisor 会把标题变化直接当作必须重建音频会话，恢复动作过于激进。
 
 ## 实时字幕已实现
 
 - 所有音频：WASAPI endpoint loopback -> mono -> 16 kHz -> ASR -> HTML 字幕。
 - PotPlayer：Windows process loopback 按 PID 捕获，不回退全局音频。
-- `ResilientPotPlayerCaptureService` 自动处理 PotPlayer 换片、PID 变化和捕获会话静默失活。
+- `ResilientPotPlayerCaptureService` 自动处理 PotPlayer PID 变化、媒体切换、跳转和捕获会话静默失活。
+- 标题变化不再立即拆掉 Process Loopback。由于捕获本身按 PID 工作，换片/跳转时优先保留当前会话，只有 PCM 持续中断才重建。
+- PCM 中断恢复采用稳定等待和退避重试：约 0.35 / 0.7 / 1.2 / 2 / 3 秒，单次 `0x8000FFFF` 不再把整个实时字幕判死。
+- 首次启动也允许瞬时 Process Loopback 激活失败后自动重试，连续 6 次仍失败才把启动判为失败。
+- 真正重建音频会话时，实时管线会清理旧的排队音频；Zipformer/Paraformer 当前流式句状态同时 Reset，但模型本身不重新加载。
 - 模型加载与 PotPlayer 音频连接并行，缩短点击开始后的等待。
 - 真流式模型：Streaming Paraformer、Zipformer Transducer、Zipformer CTC。
 - SenseVoice：Silero VAD + RMS fallback 模拟流式。
@@ -151,13 +156,20 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 ## 下一实机验收断点
 
-优先后台：
+优先实时：
 
-1. 覆盖 `b5d497d8...` 对应 EXE 和新 `Assets\subtitle.html`。
-2. 对刚才同一 4:59 MP4 + Fun-ASR-Nano 再次点击“转写选中”。
-3. 正常情况下不应再出现 RTF 0.01 直接完成 0 段；至少会进入 VAD fallback/音量分段并真正调用 Fun-ASR-Nano 解码。
-4. 如果仍无文本，直接读取 `Logs\batch.log`，重点看 `VAD_ZERO / ENERGY_EMPTY / BROAD_EMPTY` 以及 DONE/FAIL。
-5. 同时验证设置页“字幕高级样式”：自动字号倍率、当前颜色、上一条大小/颜色/透明度/字重、描边、阴影。
-6. 当前 MP4 已可用 Media Foundation，因此测试后台 ASR 不依赖 FFmpeg；FFmpeg 只测试复用 Mediova 和 MKV/WebM fallback。
+1. 覆盖 `a7b951080...` 对应 EXE，仍使用 Zipformer Large + PotPlayer。
+2. 连续做多次小幅快进/快退和大幅跳转，确认字幕能自然恢复，不再一次 `0x8000FFFF` 后长期失效。
+3. 快进/换片时允许短暂显示“等待音频恢复 / 自动重试”，但无需重新点击“开始”，也不应重新加载 Zipformer 模型。
+4. 如果出现真正的音频重建，恢复后新字幕不应继续拼接跳转前的旧半句话。
+5. 再做连续换 2-3 个视频，确认同一 PID 下不因为标题变化无条件重建音频。
 
-其他统一验收继续包括 PotPlayer 连播自动续接、不同实时/后台模型效果、MKV/WebM fallback、TXT/JSON、托盘和启动速度。
+后台继续：
+
+1. 对同一 4:59 MP4 + Fun-ASR-Nano 再次点击“转写选中”。
+2. 正常情况下不应再出现 RTF 0.01 直接完成 0 段；至少会进入 VAD fallback/音量分段并真正调用 Fun-ASR-Nano 解码。
+3. 如果仍无文本，直接读取 `Logs\batch.log`，重点看 `VAD_ZERO / ENERGY_EMPTY / BROAD_EMPTY` 以及 DONE/FAIL。
+4. 同时验证设置页字幕高级样式：自动字号倍率、当前颜色、上一条大小/颜色/透明度/字重、描边、阴影。
+5. 当前 MP4 已可用 Media Foundation，因此测试后台 ASR 不依赖 FFmpeg；FFmpeg 只测试复用 Mediova 和 MKV/WebM fallback。
+
+其他统一验收继续包括不同实时/后台模型效果、MKV/WebM fallback、TXT/JSON、托盘和启动速度。
