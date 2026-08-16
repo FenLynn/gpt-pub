@@ -4,151 +4,165 @@
 
 Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer，同时支持捕获所有 Windows 输出音频。基础 ASR 本地运行，不依赖云端 LLM/API。
 
+## 当前用户决策
+
+- Mediova 与 LocalSub 暂不合并。后期如果需要统一入口，只考虑轻量总控/启动器，通过链接或进程启动各独立软件，不进行跨技术栈硬合并。
+- 当前进入连续开发收口阶段。用户暂时不逐版本实机验证，开发可以持续推进到既定范围的完整候选，再统一验收。
+- 当前核心语言限定中文、英文。多语言优化与翻译以后再考虑，本阶段不做。
+
 ## 已确认硬约束
 
 - 绿色 ZIP，解压即用，不需要安装器。
 - 日常测试默认交付增量覆盖 ZIP，只包含相对用户上一版实际变化的运行文件，ZIP 内路径直接以 LocalSub 根目录为基准。
 - 只有首次安装、依赖/目录结构变化、无法安全增量覆盖或用户明确要求时才交付完整绿色包。
-- 基础程序与 AtlasDesk / DavBridge 对齐：`.NET 8`、`SelfContained=false`、`PublishSingleFile=true`。
-- 不要求 `.NET 10 Desktop Runtime`，复用系统已有 `.NET 8 Desktop Runtime`。
+- 基础程序采用 `.NET 8`、`SelfContained=false`、`PublishSingleFile=true`，不要求 `.NET 10`。
 - 模型绝不随程序包分发。默认模型根目录为 EXE 同级 `ASR`，设置可改。
 - 模型独立下载、独立删除、后续独立升级。
-- 下载支持系统代理、直连、SOCKS5，SOCKS5 可探测本机常见端口。
+- 下载支持系统代理、直连、SOCKS5。
 - 实时音源只保留 `PotPlayer` 与 `所有音频`，PotPlayer 模式不得静默回退到全系统音频。
 - 字幕使用 WebView2 + HTML/CSS。
 - 自有可下载组件尽量位于 EXE 目录树，不主动散落到 Program Files / AppData。
-- CI 不只验证编译，必须做 EXE 启动、Windows Process Loopback 真激活和 sherpa native DLL 加载门禁。
-- 当前核心语言限定为中文、英文；多语言优化与翻译延后。
-- 实时模型下拉框只允许出现已经安装且关键文件校验通过的模型。模型页以黑色表示已安装可用，灰色表示未安装，不允许 UI 状态与真实磁盘状态脱节。
+- CI 必须验证编译、EXE 真启动、Windows Process Loopback 真激活、sherpa native DLL 加载。后台工作区增加独立 UI smoke gate。
+- 实时模型下拉框只出现已安装且关键文件校验通过的模型。模型页黑色表示已安装可用，浅灰表示未安装。
 
 ## 当前开发分支与版本
 
 - 分支：`p103-localsub-exp`
 - 版本：`v0.1.0-dev`
-- 当前功能 head：`f45ac2c6625f050aff6c3e177dd64dfe3703b8fc`
+- 当前工作仍留在开发分支，不合并 main，不创建额外临时分支。
 
-## 当前已实机确认
+## 已实机确认基线
 
-- `所有音频 + Streaming Paraformer 中英 INT8` 可以真实出字幕，因此模型、sherpa runtime、全局 loopback、16 kHz 音频链和 HTML 输出主链已经真实跑通。
-- Streaming Paraformer 整体识别效果一般，定位为低延迟/极速实时档。
-- `Streaming Zipformer Large 中文 INT8` 用户实机反馈“好一点，还是可以的”，当前作为中文实时推荐候选。
-- PotPlayer 普通窗口和全屏外部字幕覆盖已经实机确认可见。全屏 overlay 链冻结，非回归不再修改。
-- SenseVoice Small INT8 仍未通过用户实机验证，继续作为模拟流式/后台候选。
+- `所有音频 + Streaming Paraformer 中英 INT8` 可以真实出字幕，因此模型、sherpa runtime、全局 loopback、16 kHz 音频链和 HTML 输出主链已真实跑通。
+- Streaming Paraformer 准确率一般，定位为低延迟档。
+- `Streaming Zipformer Large 中文 INT8` 用户反馈“好一点，还是可以的”，当前中文实时推荐基线。
+- PotPlayer 普通窗口与全屏字幕覆盖已实机可见，全屏 overlay 非回归不再重构。
+- SenseVoice 模拟流式仍未完成用户最终验证。
+- Fun-ASR-Nano 已加入实时模拟流式候选，但用户尚未验证最终效果。
 
 ## 当前已实现
 
-### 绿色运行与模型管理
+### 绿色运行、下载与模型管理
 
-- WinForms / .NET 8 Windows 工程。
-- 配置、Data、ASR 按 EXE 相对路径管理。
-- ModelManager 支持扫描、下载、关键文件检查、删除、断点续传、三次重试、状态/速度/日志/取消。
+- WinForms / .NET 8 Windows 单文件程序。
+- 配置、Logs、Data、ASR、Components 均按 EXE 相对目录管理。
+- ModelManager 支持扫描、关键文件校验、下载、断点续传、三次重试、缓存、删除、状态/速度/日志/取消。
 - `.tar.bz2` 使用 SharpCompress `ReaderFactory`，损坏缓存自动清理。
-- sherpa win-x64 native runtime 固定 1.13.4，首次需要时下载到 `<ASR>\_runtime`，程序包不重复携带。
-- NuGet 传递带入的 ONNX Runtime / sherpa native DLL 在 publish 阶段剥离，继续复用 `ASR\_runtime`。
-- 模型页现在以真实 `IsInstalled()` 校验结果驱动 UI：黑色为已安装且关键文件完整，灰色为未安装；下载完成自动变黑，删除后立即变灰。
-- 实时模型下拉框只列 `LiveCapable + IsInstalled()` 模型。下载完成后自动进入下拉框，删除后立即移出；没有任何已安装实时模型时“开始”按钮禁用并给出明确提示。
+- sherpa win-x64 native runtime 固定 1.13.4，首次需要时下载到 `<ASR>\_runtime`，程序补丁不重复携带。
+- publish 阶段剥离 NuGet 传递带入的 ONNX Runtime / sherpa native DLL。
+- Streaming Paraformer 仅下载 INT8 必要文件，不下载 FP32 大包。
+- 模型页有语言、体积、实时性、准确率、性价比、安装状态。
+- 已安装且校验通过显示黑色，未安装显示浅灰色；实时下拉仅显示已安装实时模型。
 
-### 实时模型与模型评分表
+### 当前模型目录
 
-模型页已经加入语言、体积、实时性、准确率、综合性价比列。评分为 LocalSub 面向本地 CPU 字幕场景的 10 分制相对工程评分，不是官方 benchmark，后续按用户实机 A/B 修正。
+- Zipformer CTC Small 中文 INT8：约 26 MB。
+- Zipformer CTC Large 中文 INT8：约 155 MB。
+- Zipformer Large 中文 INT8：约 160 MB。
+- Streaming Paraformer 中英 INT8：约 237 MB。
+- Streaming Paraformer 中英粤 INT8：约 238 MB。
+- SenseVoice Small INT8：约 230 MB。
+- Offline Zipformer CTC 中文 INT8：约 350 MB。
+- Zipformer CTC XLarge 中文 INT8：约 728 MB。
+- Zipformer XLarge 中文 INT8：约 736 MB。
+- Fun-ASR-Nano INT8：约 0.9 GB。
+- Silero VAD：约 2 MB。
 
-当前 catalog：
+### 实时字幕
 
-- Zipformer CTC Small 中文 INT8：约 26 MB，实时 10，准确 6，性价比 10。
-- Zipformer CTC Large 中文 INT8：约 155 MB，实时 9，准确 8，性价比 9。
-- Zipformer Large 中文 INT8：约 160 MB，实时 8，准确 8，性价比 9，用户已实机验证可用。
-- Streaming Paraformer 中英 INT8：约 237 MB，实时 9，准确 6，性价比 8，用户已实机验证但准确率一般。
-- Streaming Paraformer 中英粤 INT8：约 238 MB，实时 8，准确 6，性价比 7。
-- SenseVoice Small INT8：约 230 MB，实时 6，准确 8，性价比 8，模拟流式仍需收口。
-- Offline Zipformer CTC 中文 INT8：约 350 MB，实时 4，准确 9，性价比 9，作为后台中文候选。
-- Zipformer CTC XLarge 中文 INT8：约 728 MB，实时 6，准确 9，性价比 6。
-- Zipformer XLarge 中文 INT8：约 736 MB，实时 5，准确 9，性价比 5。
-- Fun-ASR-Nano INT8：约 0.9 GB，实时 3，准确 9，性价比 7，作为高质量后台候选。
-- Silero VAD：约 2 MB，通用语音段检测组件，不参与 ASR 评分。
+- `所有音频`：WASAPI endpoint loopback -> mono -> 16 kHz -> ASR -> HTML 字幕。
+- `PotPlayer`：Windows process loopback 按 PID 捕获，不回退全局音频。
+- `ResilientPotPlayerCaptureService` supervisor 自动处理 PotPlayer 换片、PID 变化和捕获会话静默失活。
+- 模型加载与 PotPlayer 捕获并行启动，降低点击开始后的等待。
+- Streaming recognizer 支持 Paraformer、Zipformer Transducer、Zipformer CTC。
+- SenseVoice 使用 Silero VAD + RMS fallback 做模拟流式。
+- Fun-ASR-Nano 使用 Silero VAD 分段，停顿后做高质量整句解码，属于模拟流式。
+- 字幕最多当前句 + 上一句，默认 3 秒无新结果自动隐藏。
+- 默认 28 px 基准、无整块底纹、白字黑描边/轻阴影。
+- 可调自动/固定字号、底部偏移、最大宽度、底纹与透明度、显示时长。
+- overlay 为非激活、鼠标穿透、持续 TopMost，跟随 PotPlayer 普通窗口/最大化/全屏。
 
-Streaming recognizer 已扩展到 Paraformer、Zipformer Transducer Large/XLarge、Zipformer CTC Small/Large/XLarge。
+### 后台转写完整链路，当前开发候选
 
-### SenseVoice 当前修复
+已从早期“拖文件 + 波形占位”推进为实际工作区：
 
-- VAD 优先 + RMS 音量 fallback。
-- 当前参数：能量起始 RMS 0.008、维持 RMS 0.0035、连续 4 个 512-sample 窗口触发、550 ms 低能量判停顿、最长单段 6.5 s。
-- 语音进行时约每 650 ms interim decode；停顿或最长分段时 final decode。
-- 状态区可区分 VAD 检测、RMS fallback、解码空文本。
+`媒体文件 -> Media Foundation / FFmpeg fallback -> 16 kHz mono -> Silero VAD -> Offline ASR -> 时间戳 transcript -> 关键词 -> TXT / JSON`
 
-### PotPlayer Process Loopback 与自动续接
+当前代码已包含：
 
-- 当前底层链：`ActivateAudioInterfaceAsync -> IAudioClient -> IAudioCaptureClient -> event-driven capture -> mono/16 kHz`。
-- Windows 10 build 19045 允许实际尝试，不再被错误版本门槛阻断。
-- CI 已真实执行 Process Loopback 激活、Initialize、GetService、Start、Stop。
-- 新增 `ResilientPotPlayerCaptureService` supervisor。实时识别不再只在点击“开始”时绑定一次音频会话。
-- supervisor 约每 300 ms 检查 PotPlayer 进程与窗口标题；检测到播放文件/标题变化时重建 Process Loopback，会继续复用已经加载的 ASR recognizer，不重新加载大模型。
-- 如果 PotPlayer 进程发生变化，会自动重新寻找并绑定新的 PotPlayer PID。
-- 如果一个已经产生过 PCM 的捕获会话连续约 7 秒没有新样本，会把它视为可能的静默失活并自动重建一次捕获会话；重建后在真正再次收到 PCM 前不会因普通暂停而反复重连。
-- supervisor 的 Process 对象和捕获对象均显式释放，避免长时间看片时产生句柄积累。
-- PotPlayer 模式仍不允许静默回退到“所有音频”。
+- `BatchTranscriptionService`：流式读取媒体，不把整部视频载入内存；VAD 分段后进行离线 ASR。
+- 后台模型支持 SenseVoice、Offline Zipformer CTC、Fun-ASR-Nano。
+- `MediaAudioSource`：优先 Windows Media Foundation，不支持时使用外置 FFmpeg。
+- `FfmpegManager`：FFmpeg 作为独立可选组件下载到 `Components\FFmpeg\bin`，复用系统/直连/SOCKS5 下载设置，不进入基础程序包。
+- `MediaAnalysisService`：同一解码抽象生成 RMS + peak 声音波形。
+- `EnhancedWaveformView`：显示完整声音轨道，叠加识别语音区间和关键词竖向标记。
+- `BatchWorkspaceEnhancer`：媒体队列、添加/移除/清空、拖放、已安装后台模型选择、转写选中、全部转写、取消、TXT 导出、FFmpeg 安装/打开、进度、RTF、富文本结果。
+- 识别结果带开始/结束时间戳；关键词在正文中高亮并同步到波形标记。
+- 每个完成文件自动保存结构化 JSON 到 `Data\Transcripts\<name>.localsub.json`，TXT 可人工导出。
+- 多文件按队列顺序连续转写，单个失败不阻断后续文件，取消时保留已完成结果。
+- 后台工作区采取延迟加载，首次进入“后台转写”才构建重 UI，避免拖慢普通启动。
+- 延迟加载时整个替换早期 prototype Tab，避免旧拖放/分析事件在后台重复执行。
 
-### 实时启动速度优化
+### 性能与后台运行
 
-- 旧流程为：检查 runtime -> 同步加载模型 -> 再连接 PotPlayer 音频，两个主要耗时步骤串行叠加。
-- 当前流程在 runtime 已就绪后，把 sherpa 模型构造放到后台线程，并与 PotPlayer Process Loopback 激活并行执行。
-- 音频队列先建立为有界队列，模型加载期间只保留较新的 PCM，避免无限积压。
-- 因此点击“开始”到真正可识别的等待时间接近“模型加载”和“音频连接”两者中较慢的一项，而不是两项之和，同时 UI 线程不被大模型构造阻塞。
-- 如果用户所说的“启动慢”特指双击 EXE 到主窗口出现，而不是点击“开始”到字幕工作，则需要下一轮单独加入 cold-start 分段计时；当前这一轮优化的是实时识别启动路径。
+- `ResourceProfile` 已加入：节能 / 自动 / 最大性能，默认自动。
+- 真流式识别和后台 ASR 已接中央线程策略；节能限制线程，最大性能提高线程上限。
+- 设置页增加性能与后台区，可配置资源模式、最小化到托盘、开机自动启动。
+- 开机启动只使用当前用户 HKCU Run，不需要管理员权限。
+- 托盘模式默认关闭，启用后最小化/关闭窗口可驻留托盘，托盘菜单支持恢复与真正退出。
+- 双击 EXE 冷启动增加 `Logs\startup.log` 分段计时：runtime-init、main-form-constructed、lightweight-enhancers-attached、window-shown，用于后续实机定位启动慢。
 
-### 字幕样式与跟随
+## CI 门禁
 
-- overlay 为非激活、鼠标穿透窗口，60 ms 跟随 PotPlayer 最大可见顶层窗口。
-- 每次跟随和每次新字幕写入均重新断言 `HWND_TOPMOST`，不抢 PotPlayer 焦点。
-- 用户已确认全屏有字幕。
-- 字幕只保留当前句 + 上一句。
-- 默认视觉已由测试版的 34 px + 整块黑底改为：28 px 基准、font-weight 500、无整块底纹、白字细黑描边/轻阴影。
-- 设置新增：自动字号、固定字号 20-52 px、底部偏移、最大宽度百分比、底纹无/轻/深、底纹透明度、1-10 秒显示时长。
-- 自动字号随播放器高度变化，当前 clamp 22-38 px。
-- 设置页新增“预览字幕”，优先贴到当前 PotPlayer，否则在主屏底部预览。
+基础门禁：
 
-### 后台媒体解析与声音轨道
+1. `dotnet publish`。
+2. 剥离并检查基础包不得包含模型、ONNX Runtime、sherpa native runtime。
+3. `LocalSub.exe` 真启动并存活。
+4. Windows Process Loopback 真激活、Initialize、GetService、Start、Stop。
+5. 下载并实际加载 sherpa 1.13.4 win-x64 `sherpa-onnx-c-api.dll`。
+6. 最终 ZIP 再检查模型、runtime、FFmpeg 均未混入。
 
-- “后台转写”已不再只是拖放占位。
-- 拖入/选择媒体文件后调用 `MediaAnalysisService`，当前第一版使用 Windows Media Foundation / NAudio `MediaFoundationReader` 直接解析媒体音轨，不实际播放视频。
-- 解析时显示进度、已处理时间/总时长。
-- 音频按声道平均得到 mono 波形分析样本，以 RMS + peak 混合包络生成约不超过 2500 个波形点。
-- 新增 `WaveformView`，在后台页显示完整声音波形及首尾时间。
-- 解析完成后显示媒体时长、采样率、声道数、波形点数。
-- 当前优先支持 Windows Media Foundation 可解码的 MP4/MOV/M4A/WMA 等。MKV、特殊编码等若系统无法解码，会明确提示；下一步加入 EXE 目录树内独立复用的 FFmpeg fallback。
-- 当前尚未把离线 ASR、VAD 段、关键词事件真正画到该时间轴上，这是下一准确断点。
+新增门禁：后台工作区独立 smoke test，在 Windows runner 中真实切入“后台转写”Tab，触发延迟构建；若 UI 初始化抛异常或写 crash log，则构建失败。
 
-## 关键故障记录
+## 当前明确不做
 
-- 模型页复杂 SplitContainer 曾导致启动秒退，已改安全 TableLayoutPanel，并固化 EXE startup smoke test。
-- `.tar.bz2` 曾下载成功但 ArchiveFactory 解压失败，已改 ReaderFactory。
-- 旧 Process Loopback NAudio 2 RCW 强转触发 E_NOINTERFACE，已改 raw COM。
-- Windows 19045 曾因错误的 20348 门槛被阻断，已改实际尝试。
-- sherpa managed wrapper 曾把 `onnxruntime.dll` 传递带回 publish，CI 已拦截并在 publish 阶段剥离。
-- PotPlayer 全屏 overlay 曾不可见，已增加持续 TopMost Z-order 维护，用户已实机确认解决。
-- 第二阶段第一轮媒体解析代码出现 C# TimeSpan 格式字符串转义编译错误，run 81 被 CI 拦截；已修复。
-- 模型 UI 一度存在“模型页未安装，但实时下拉框仍可选”的事实不一致；现已改为由 `ModelManager.IsInstalled()` 单一事实源驱动。
-- 本轮模型 UI 修改第一次提交出现重复 `SelectionMode` 初始化，被 run 87 编译门禁拦截；已删除重复项，run 88 全绿。
+- 翻译。
+- 多语言专项优化。
+- 说话人分离。
+- 会议总结。
+- 云端 LLM。
+- 重型字幕编辑器。
+- Mediova 代码合并。
 
-## 最新构建验证
+## 后续统一实机验收清单
 
-- 功能 head：`f45ac2c6625f050aff6c3e177dd64dfe3703b8fc`。
-- Windows CI run：`31916278674`，结论 success。
-- `Publish net8 single-file app`：success。
-- `Prepare portable layout`：success。
-- `Smoke test LocalSub startup`：success。
-- `Smoke test Windows process loopback`：success。
-- `Verify sherpa win-x64 runtime package`：success。
-- `Package portable ZIP`：success。
-- 最终发布包仍无模型、无 ONNX Runtime、无 sherpa native runtime。
+实时：
 
-## 用户下一步实机验证
+1. 所有音频 + Zipformer Large 基线。
+2. PotPlayer 连续切换多个视频后是否持续自动监听。
+3. 普通窗口、最大化、全屏、最小化/恢复。
+4. Zipformer CTC Large / XLarge、Fun-ASR-Nano、SenseVoice 的速度与准确率对比。
+5. 字幕位置、自动字号、固定字号、底纹、持续时间。
+6. 节能/自动/最大性能模式下 CPU、延迟与稳定性。
 
-1. 本轮相对上一用户包只需覆盖新的 `LocalSub.exe`，现有 `Assets`、ASR 模型、`ASR\_runtime` 和 config 不动。
-2. 启动后检查实时模型下拉框，应只出现已经下载且模型关键文件完整的实时模型；模型页已安装项应为黑色，未安装项灰色。
-3. 在 PotPlayer 连续播放列表中开始一次实时字幕，然后直接“下一集/下一视频”，不要手动停止或重新开始。状态区应出现“检测到 PotPlayer 视频切换/自动续接”等信息，短暂重连后输入电平和字幕应恢复。
-4. 感受点击“开始”后的等待时间是否比上一版缩短。如果用户实际指的是双击 EXE 本身启动慢，需要记录这一点，下一轮做 cold-start instrumentation。
-5. 后台页继续验证普通 MP4 的媒体信息、解析进度和声音波形。通过后下一轮接 Silero VAD + Offline Zipformer CTC + 关键词 marker + TXT 实际转写。
+后台：
+
+1. MP4/MOV 等 Media Foundation 可解码文件生成声音轨道。
+2. MKV/WebM/特殊编码在安装 FFmpeg 后自动 fallback。
+3. SenseVoice、Offline Zipformer CTC、Fun-ASR-Nano 分别转写同一片段。
+4. 时间戳、语音段、关键词高亮和波形 marker 是否对齐。
+5. 多文件“全部转写”、单文件失败、取消。
+6. TXT 导出与 `Data\Transcripts` JSON 自动记录。
+7. RTF 是否低于 1，尤其是 Offline Zipformer CTC。
+
+系统：
+
+1. 双击 EXE 冷启动体感，并读取 `Logs\startup.log` 精确定位慢点。
+2. 托盘、真正退出、开机启动。
+3. 模型页黑/浅灰状态与实时/后台下拉框事实一致。
+4. 程序包保持轻量，模型、FFmpeg、ASR runtime 全部外置复用。
 
 ## 下一准确断点
 
-先以实机确认 PotPlayer 换片自动续接和启动体感。若自动续接仍失败，直接根据状态区判断是标题变化未检测、PID 变化、还是重建后的 Process Loopback 无 PCM；不重新加载模型。实时链稳定后继续收口后台闭环：`视频 -> 音轨/波形 -> VAD 语音段 -> Offline ASR -> 时间戳 transcript -> 关键词 marker -> TXT`。翻译、多语言增强、说话人分离继续暂缓。
+等待最新开发 head 的 Windows CI 完整通过并修掉所有编译/启动门禁问题。CI 全绿后制作一次统一增量候选包，不再拆小补丁。之后用户回来时按本文件的统一验收清单集中实机验证。
