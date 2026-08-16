@@ -11,7 +11,8 @@ internal static class Program
     static string StartupLogPath => Path.Combine(AppContext.BaseDirectory, "Logs", "startup.log");
     static bool IsStartupSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_SMOKE_TEST") == "1";
     static bool IsProcessLoopbackSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_PROCESS_LOOPBACK_SMOKE") == "1";
-    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest;
+    static bool IsBatchUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_BATCH_UI_SMOKE") == "1";
+    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest;
 
     [STAThread]
     static void Main()
@@ -43,6 +44,17 @@ internal static class Program
             SettingsFeatureEnhancer.Attach(mainForm);
             TrayController.Attach(mainForm);
             LogStartup(startup, "lightweight-enhancers-attached");
+
+            if (IsBatchUiSmokeTest)
+            {
+                mainForm.Shown += (_, _) =>
+                {
+                    var tabs = mainForm.Controls.OfType<TabControl>().FirstOrDefault();
+                    var batch = tabs?.TabPages.Cast<TabPage>().FirstOrDefault(x => x.Text == "后台转写");
+                    if (tabs != null && batch != null) tabs.SelectedTab = batch;
+                };
+            }
+
             mainForm.Shown += (_, _) => LogStartup(startup, "window-shown", final: true);
             Application.Run(mainForm);
         }
