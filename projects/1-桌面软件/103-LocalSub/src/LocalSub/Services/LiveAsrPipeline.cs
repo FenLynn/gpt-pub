@@ -86,15 +86,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         });
         _useSenseVoice = isSenseVoice;
         _useFunAsrNano = isFunAsrNano;
-        _streamingLabel = isSenseVoice
-            ? "SenseVoice"
-            : isFunAsrNano
-                ? "Fun-ASR-Nano"
-                : model.Name.Replace(" INT8", "");
-
-        // Mark the pipeline active before model loading finishes so the audio source can
-        // buffer the newest PCM while the recognizer is being constructed. The bounded
-        // queue drops old chunks rather than growing without limit.
+        _streamingLabel = isSenseVoice ? "SenseVoice" : isFunAsrNano ? "Fun-ASR-Nano" : model.Name.Replace(" INT8", "");
         _running = true;
 
         try
@@ -104,21 +96,19 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
             {
                 StatusChanged?.Invoke("后台加载 SenseVoice 与 Silero VAD");
                 var localVadPath = vadPath!;
-                modelLoadTask = Task.Run(() =>
-                    _senseVoice.Start(model, models.GetModelFolder(model), localVadPath, runtime.RuntimeRoot), _cts.Token);
+                modelLoadTask = Task.Run(() => _senseVoice.Start(model, models.GetModelFolder(model), localVadPath, runtime.RuntimeRoot), _cts.Token);
             }
             else if (isFunAsrNano)
             {
                 StatusChanged?.Invoke("后台加载 Fun-ASR-Nano 与 Silero VAD；该模型较大，首次加载会更慢");
                 var localVadPath = vadPath!;
-                modelLoadTask = Task.Run(() =>
-                    _funAsrNano.Start(model, models.GetModelFolder(model), localVadPath, runtime.RuntimeRoot), _cts.Token);
+                modelLoadTask = Task.Run(() => _funAsrNano.Start(model, models.GetModelFolder(model), localVadPath, runtime.RuntimeRoot), _cts.Token);
             }
             else
             {
-                StatusChanged?.Invoke($"后台加载 {_streamingLabel}");
-                modelLoadTask = Task.Run(() =>
-                    _streaming.Start(model, models.GetModelFolder(model), runtime.RuntimeRoot), _cts.Token);
+                var threads = PerformancePolicy.RealtimeThreads(settings.ResourceProfile);
+                StatusChanged?.Invoke($"后台加载 {_streamingLabel}，{ProfileName(settings.ResourceProfile)} {threads} 线程");
+                modelLoadTask = Task.Run(() => _streaming.Start(model, models.GetModelFolder(model), runtime.RuntimeRoot, threads), _cts.Token);
             }
 
             Task captureStartTask;
@@ -135,7 +125,6 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
             }
 
             await Task.WhenAll(modelLoadTask, captureStartTask);
-
             _worker = Task.Run(() => DecodeLoopAsync(_cts.Token), _cts.Token);
             StatusChanged?.Invoke(_useSenseVoice
                 ? "SenseVoice 模拟流式识别中，VAD 与音量 fallback 会共同检测语音"
@@ -208,4 +197,11 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _senseVoice.Dispose();
         _funAsrNano.Dispose();
     }
+
+    static string ProfileName(ResourceProfile profile) => profile switch
+    {
+        ResourceProfile.Eco => "节能",
+        ResourceProfile.MaxPerformance => "最大性能",
+        _ => "自动"
+    };
 }
