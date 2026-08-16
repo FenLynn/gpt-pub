@@ -4,9 +4,13 @@ namespace LocalSub.UI;
 
 public sealed class EnhancedWaveformView : Control
 {
+    const float VisualTarget = 0.95f;
+    const double VisualReferencePercentile = 0.995;
+
     float[] _samples = [];
     TimeSpan _duration;
     IReadOnlyList<TranscriptItem> _segments = [];
+    float _visualReference = 1f;
 
     public EnhancedWaveformView()
     {
@@ -21,6 +25,7 @@ public sealed class EnhancedWaveformView : Control
     {
         _samples = samples ?? [];
         _duration = duration;
+        _visualReference = CalculateVisualReference(_samples);
         Invalidate();
     }
 
@@ -35,6 +40,7 @@ public sealed class EnhancedWaveformView : Control
         _samples = [];
         _segments = [];
         _duration = TimeSpan.Zero;
+        _visualReference = 1f;
         Invalidate();
     }
 
@@ -62,6 +68,7 @@ public sealed class EnhancedWaveformView : Control
         var waveBottom = Math.Max(waveTop + 20, r.Height - 42);
         var center = (waveTop + waveBottom) / 2f;
         var half = Math.Max(8f, (waveBottom - waveTop) / 2f - 2);
+        var maxVisualHeight = half * VisualTarget;
 
         using var speechBrush = new SolidBrush(Color.FromArgb(238, 244, 249));
         using var keywordPen = new Pen(Color.FromArgb(190, 145, 40), 2f);
@@ -87,8 +94,13 @@ public sealed class EnhancedWaveformView : Control
             var end = Math.Max(start + 1, (int)((long)(x + 1) * _samples.Length / usableWidth));
             end = Math.Min(end, _samples.Length);
             float peak = 0;
-            for (var i = start; i < end; i++) peak = Math.Max(peak, _samples[i]);
-            var h = Math.Max(1f, peak * half);
+            for (var i = start; i < end; i++) peak = Math.Max(peak, Math.Abs(_samples[i]));
+
+            // Normalize the waveform for display only. The high-percentile reference
+            // prevents one isolated click/pop from compressing the rest of the track.
+            // ASR/VAD continue to use the original, unmodified audio samples.
+            var normalized = _visualReference > 0.000001f ? peak / _visualReference : 0f;
+            var h = Math.Max(1f, Math.Min(maxVisualHeight, normalized * maxVisualHeight));
             var px = x + usableLeft;
             g.DrawLine(pen, px, center - h, px, center + h);
         }
@@ -105,6 +117,27 @@ public sealed class EnhancedWaveformView : Control
                 new Rectangle(usableLeft + 72, r.Height - 22, Math.Max(80, r.Width - 250), 18), SystemColors.GrayText,
                 TextFormatFlags.HorizontalCenter);
         }
+    }
+
+    static float CalculateVisualReference(float[] samples)
+    {
+        if (samples == null || samples.Length == 0) return 1f;
+
+        var values = samples
+            .Select(Math.Abs)
+            .Where(x => float.IsFinite(x) && x > 0.000001f)
+            .OrderBy(x => x)
+            .ToArray();
+        if (values.Length == 0) return 1f;
+
+        var index = (int)Math.Clamp(
+            Math.Round((values.Length - 1) * VisualReferencePercentile),
+            0,
+            values.Length - 1);
+        var reference = values[index];
+
+        // Avoid extreme amplification of digital silence / near-silence.
+        return Math.Max(reference, 0.0001f);
     }
 
     static string FormatClock(TimeSpan t)
