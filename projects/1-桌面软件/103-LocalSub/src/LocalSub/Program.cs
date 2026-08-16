@@ -41,6 +41,7 @@ internal static class Program
             LogStartup(startup, "main-form-constructed");
             ModelGridVisualStyler.Attach(mainForm);
             LazyBatchWorkspaceLoader.Attach(mainForm);
+            BatchQueueVisualFix.Attach(mainForm);
             SettingsFeatureEnhancer.Attach(mainForm);
             TrayController.Attach(mainForm);
             LogStartup(startup, "lightweight-enhancers-attached");
