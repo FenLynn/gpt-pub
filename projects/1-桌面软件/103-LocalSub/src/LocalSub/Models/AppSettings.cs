@@ -7,6 +7,7 @@ namespace LocalSub.Models;
 public enum ProxyMode { System, Direct, Socks5 }
 public enum AudioSourceMode { PotPlayer, AllAudio }
 public enum SubtitleBackgroundMode { None, Light, Dark }
+public enum ResourceProfile { Eco, Auto, MaxPerformance }
 
 public sealed class AppSettings
 {
@@ -19,6 +20,11 @@ public sealed class AppSettings
     public string LiveModelId { get; set; } = "streaming-zipformer-zh-large-int8";
     public string BatchModelId { get; set; } = "sensevoice-small-int8";
     public string Keywords { get; set; } = "";
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public ResourceProfile ResourceProfile { get; set; } = ResourceProfile.Auto;
+    public bool MinimizeToTray { get; set; } = false;
+    public bool StartWithWindows { get; set; } = false;
 
     public bool SubtitleAutoSize { get; set; } = true;
     public int SubtitleFontSize { get; set; } = 28;
