@@ -26,10 +26,10 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 - 分支：`p103-localsub-exp`
 - 版本：`v0.1.0-dev`
-- 当前后台/FFmpeg 修复 head：`1cb9e0c2b6a721a8288af149b1f0e6bdbbcbd12d`
-- Windows CI run：`31926946805`，结论 `success`。
+- 当前功能 head：`b5d497d8efaa616ec386fbc1f1b8718d7a7643ae`
+- Windows CI run：`31927905938`，结论 `success`。
 - 该 run 已通过：publish、绿色包检查、EXE 真启动、后台工作区真切换 smoke、Windows Process Loopback 真激活、sherpa native DLL 真加载、最终打包。
-- CI 不携带用户大模型，因此模型实际准确率、长视频转写速度和真实 PotPlayer 连播仍属于实机验收项。
+- CI 不携带用户大模型，因此模型实际准确率、真实长视频转写结果、PotPlayer 连播仍属于实机验收项。
 
 ## 已实机确认基线
 
@@ -37,7 +37,8 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - Paraformer 准确率一般，定位为低延迟档。
 - `Streaming Zipformer Large 中文 INT8` 用户反馈更好且可用，当前中文实时推荐基线。
 - PotPlayer 普通窗口和全屏字幕 overlay 已实机可见，全屏链非回归不再重构。
-- 2026-08-16 用户首次验证后台页：MP4 可由 Media Foundation 正常解析并生成波形，但用户反馈“后台不行”；同时点击 FFmpeg 下载出现 `416 Requested Range Not Satisfiable`。该 MP4 已显示 `解码 Media Foundation`，因此 FFmpeg 失败不是该文件无法读取的根因。
+- 2026-08-16 用户首次验证后台页：MP4 可由 Media Foundation 正常解析并生成波形；FFmpeg 下载曾出现 `416 Requested Range Not Satisfiable`，已修复并支持直接复用 Mediova FFmpeg。
+- 2026-08-16 用户再次验证后台：4:59 MP4 成功完成 Media Foundation 音轨读取，但 Fun-ASR-Nano 结果显示 `完成：0 段，RTF 0.01`，正文为空。该现象明确定位为后台 Silero VAD 未产生语音段，不是 FFmpeg 解码失败。
 
 ## 实时字幕已实现
 
@@ -50,7 +51,10 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - Fun-ASR-Nano：Silero VAD 分段，停顿后整句解码，准确率优先、延迟较高。
 - 字幕最多当前句 + 上一句，默认 3 秒无新结果后消失。
 - 默认无整块黑底，白字细黑描边/轻阴影，基准 28 px。
-- 可调自动/固定字号、底部偏移、最大宽度、底纹/透明度、显示时长。
+- 基础设置：自动/固定字号、底部偏移、最大宽度、底纹/透明度、显示时长。
+- 高级字幕样式：自动字号倍率 60%~160%、当前字幕颜色/字重、上一条字号比例/颜色/透明度/字重、描边颜色/粗细、阴影强度。
+- 自动字号倍率在播放器自动计算字号后继续做相对放大/缩小，不再出现“开启自动后无法微调大小”。
+- 高级样式修改会立即写入配置并同步当前 MainForm settings，使现有预览/实时 overlay 可以直接使用。
 - overlay 非激活、鼠标穿透、持续 TopMost，跟随普通窗口、最大化、全屏和最小化。
 
 ## 模型与运行库管理
@@ -80,7 +84,7 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 完整链路：
 
-`媒体 -> Media Foundation / FFmpeg fallback -> 16 kHz mono -> Silero VAD -> Offline ASR -> 时间戳 transcript -> 关键词 -> TXT / JSON`
+`媒体 -> Media Foundation / FFmpeg fallback -> 16 kHz mono -> Silero VAD -> 自适应音量 fallback -> Offline ASR -> 时间戳 transcript -> 关键词 -> TXT / JSON`
 
 当前能力：
 
@@ -102,15 +106,18 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 ### 2026-08-16 后台修复
 
-- 修复队列状态显示长期停留“待处理”的 UI 问题。WinForms `ListBox` 会缓存对象的显示字符串，新版改为动态 OwnerDraw，每次重绘直接读取当前 QueueItem 状态。
-- 后台 ASR 在真正构建大型离线模型前明确显示“加载模型”，Fun-ASR-Nano 等大模型不再表现为点击后长时间无反馈。
-- 新增 `Logs\batch.log`，记录后台任务 START / DONE / FAIL；若实机仍失败，可直接用完整异常继续定位。
-- FFmpeg 支持手动指定已有 `ffmpeg.exe`，设置页会验证同目录必须同时存在 `ffprobe.exe`。
+- 队列状态改为动态 OwnerDraw，波形就绪后不再长期显示“待处理”。
+- 后台 ASR 在构建大型离线模型前明确显示“加载模型 / 模型就绪”。
+- 新增 `Logs\batch.log`，记录后台任务 START / DONE / FAIL 以及 VAD fallback 诊断。
+- FFmpeg 支持手动指定已有 `ffmpeg.exe`，设置页验证同目录必须同时存在 `ffprobe.exe`。
 - FFmpeg 自动发现顺序：手动指定 -> LocalSub 自有组件 -> `MEDIOVA_RUNTIME_DIR` -> 附近 Mediova `Components\FFmpeg\bin` -> 系统 PATH。
-- Mediova 当前正式运行结构的 FFmpeg 路径即 `Mediova\Components\FFmpeg\bin`，因此两软件可以共用一套文件，不需要复制或重新下载。
-- 只有前述路径全部不可用时，后台页的下载才作为兜底。
-- 修复 FFmpeg 下载 `416 Requested Range Not Satisfiable`：如果 `.part` 已是完整 ZIP，直接校验并复用；若断点缓存异常则清理后重试，不再把 416 直接作为最终失败。
-- FFmpeg ZIP 下载完成后增加实际 ZIP/ffmpeg/ffprobe 校验，避免损坏缓存被当作成功文件。
+- 只有前述路径全部不可用时，后台页下载才作为兜底。
+- 修复 FFmpeg 下载 416：完整 `.part` 可直接校验复用，异常断点会清理重试。
+- FFmpeg ZIP 下载完成后做实际 ZIP/ffmpeg/ffprobe 校验。
+- 针对实机 `0 段`：Silero VAD 阈值由 0.45 下调到 0.32，并缩短最短语音限制。
+- 如果 Silero VAD 整段扫描后仍为 0 段，自动根据整段音频 RMS 分布计算自适应阈值，第二遍进行音量分段，并将片段送入离线模型。
+- 如果音量分段产生候选但模型仍全为空，继续使用宽松 8 秒音频块做最后兜底，避免“4:59 视频 0.01 RTF 瞬间完成 0 段”。
+- fallback 阶段会显示 `VAD fallback / fallback 识别 / 宽松 fallback`，并在 `batch.log` 中记录 `VAD_ZERO / ENERGY_EMPTY / BROAD_EMPTY`，后续可以精确区分“没切到语音”和“模型返回空文本”。
 
 ## 性能、启动与后台运行
 
@@ -146,11 +153,11 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 优先后台：
 
-1. 覆盖 `1cb9e0c2...` 对应 EXE 后重新拖入同一 1:30 MP4。
-2. 波形生成后，队列状态应变为“波形就绪”，不再一直显示“待处理”。
-3. 选择 Fun-ASR-Nano 后点击“转写选中”，状态应先明确进入“加载模型”，随后进入转写进度。
-4. 若仍不出文字，读取 `Logs\batch.log` 的最新 FAIL/最后阶段，不再依赖截图猜测。
-5. 在“设置”中查看 FFmpeg：若自动发现 Mediova，会显示来源 Mediova；否则手动选择 Mediova `Components\FFmpeg\bin\ffmpeg.exe` 并保存。
-6. 当前 MP4 已可用 Media Foundation，因此即便暂时完全不配置 FFmpeg，也应能执行后台 ASR；FFmpeg 只用于 MF 不支持的格式/编码。
+1. 覆盖 `b5d497d8...` 对应 EXE 和新 `Assets\subtitle.html`。
+2. 对刚才同一 4:59 MP4 + Fun-ASR-Nano 再次点击“转写选中”。
+3. 正常情况下不应再出现 RTF 0.01 直接完成 0 段；至少会进入 VAD fallback/音量分段并真正调用 Fun-ASR-Nano 解码。
+4. 如果仍无文本，直接读取 `Logs\batch.log`，重点看 `VAD_ZERO / ENERGY_EMPTY / BROAD_EMPTY` 以及 DONE/FAIL。
+5. 同时验证设置页“字幕高级样式”：自动字号倍率、当前颜色、上一条大小/颜色/透明度/字重、描边、阴影。
+6. 当前 MP4 已可用 Media Foundation，因此测试后台 ASR 不依赖 FFmpeg；FFmpeg 只测试复用 Mediova 和 MKV/WebM fallback。
 
-其他统一验收继续包括 PotPlayer 连播自动续接、不同实时/后台模型效果、字幕样式、MKV/WebM fallback、TXT/JSON、托盘和启动速度。
+其他统一验收继续包括 PotPlayer 连播自动续接、不同实时/后台模型效果、MKV/WebM fallback、TXT/JSON、托盘和启动速度。
