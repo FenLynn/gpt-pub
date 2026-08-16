@@ -99,6 +99,43 @@ jobs:
           if ($handle -eq [IntPtr]::Zero) { throw 'Unable to load sherpa-onnx-c-api.dll' }
           [System.Runtime.InteropServices.NativeLibrary]::Free($handle)
           Remove-Item $testRoot -Recurse -Force
+      - name: Smoke test native offline ASR
+        shell: pwsh
+        working-directory: projects/1-桌面软件/103-LocalSub
+        run: |
+          $testRoot = Join-Path $env:RUNNER_TEMP 'localsub-offline-asr-smoke'
+          Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $testRoot | Out-Null
+
+          $pkg = Join-Path $testRoot 'runtime.nupkg'
+          $zip = Join-Path $testRoot 'runtime.zip'
+          $expanded = Join-Path $testRoot 'runtime-expanded'
+          $runtimeUrl = 'https://api.nuget.org/v3-flatcontainer/org.k2fsa.sherpa.onnx.runtime.win-x64/1.13.4/org.k2fsa.sherpa.onnx.runtime.win-x64.1.13.4.nupkg'
+          Invoke-WebRequest -Uri $runtimeUrl -OutFile $pkg
+          Copy-Item $pkg $zip
+          Expand-Archive -Path $zip -DestinationPath $expanded -Force
+          $native = Join-Path $expanded 'runtimes/win-x64/native'
+
+          $archive = Join-Path $testRoot 'tdnn.tar.bz2'
+          $modelUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-tdnn-yesno.tar.bz2'
+          Invoke-WebRequest -Uri $modelUrl -OutFile $archive
+          & tar.exe -xf $archive -C $testRoot
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to extract TDNN smoke model.' }
+          $modelRoot = Join-Path $testRoot 'sherpa-onnx-tdnn-yesno'
+
+          $env:LOCALSUB_OFFLINE_ASR_SMOKE = '1'
+          $env:LOCALSUB_OFFLINE_ASR_MODEL = (Resolve-Path (Join-Path $modelRoot 'model-epoch-14-avg-2.onnx'))
+          $env:LOCALSUB_OFFLINE_ASR_TOKENS = (Resolve-Path (Join-Path $modelRoot 'tokens.txt'))
+          $env:LOCALSUB_OFFLINE_ASR_WAV = (Resolve-Path (Join-Path $modelRoot 'test_wavs/0_0_0_1_0_0_0_1.wav'))
+          $env:LOCALSUB_OFFLINE_ASR_RUNTIME = (Resolve-Path $native)
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru -Wait
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            throw "Native offline ASR smoke test failed. ExitCode=$($p.ExitCode)"
+          }
+          if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'Native offline ASR smoke test wrote a crash log.' }
+          Remove-Item $testRoot -Recurse -Force
       - name: Package portable ZIP
         shell: pwsh
         working-directory: projects/1-桌面软件/103-LocalSub
