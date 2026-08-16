@@ -348,16 +348,27 @@ public sealed class BatchTranscriptionService
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        using var stream = recognizer.CreateStream();
-        stream.AcceptWaveform(SampleRate, samples);
-        recognizer.Decode(stream);
-        var text = Cleanup(stream.Result.Text);
-        if (string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            using var stream = recognizer.CreateStream();
+            if (stream.Handle == IntPtr.Zero)
+                throw new InvalidOperationException("sherpa-onnx 未能创建离线识别流。");
 
-        transcript.Add(new TranscriptItem { Start = start, End = end, Text = text }, keywords);
-        segmentCount++;
-        var percent = (int)Math.Clamp(end.TotalSeconds * 100 / Math.Max(0.001, duration.TotalSeconds), 0, 99);
-        progress?.Report(new(percent, stage, $"{FormatClock(start)}  {TrimForStatus(text)}", segmentCount));
+            stream.AcceptWaveform(SampleRate, samples);
+            recognizer.Decode(stream);
+            var text = Cleanup(SherpaOfflineResultReader.GetText(stream));
+            if (string.IsNullOrWhiteSpace(text)) return;
+
+            transcript.Add(new TranscriptItem { Start = start, End = end, Text = text }, keywords);
+            segmentCount++;
+            var percent = (int)Math.Clamp(end.TotalSeconds * 100 / Math.Max(0.001, duration.TotalSeconds), 0, 99);
+            progress?.Report(new(percent, stage, $"{FormatClock(start)}  {TrimForStatus(text)}", segmentCount));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log($"DECODE_FAIL stage={stage} start={start.TotalSeconds:0.000}s samples={samples.Length} type={ex.GetType().Name} {ex}");
+            throw new InvalidOperationException($"{stage}在 {FormatClock(start)} 失败：{ex.Message}", ex);
+        }
     }
 
     static void CollectRmsFrames(float[] samples, int count, List<float> output)
@@ -408,6 +419,8 @@ public sealed class BatchTranscriptionService
     static OfflineRecognizer CreateRecognizer(ModelDescriptor model, string folder, int threads)
     {
         var cfg = new OfflineRecognizerConfig();
+        cfg.FeatConfig.SampleRate = SampleRate;
+        cfg.FeatConfig.FeatureDim = 80;
         cfg.ModelConfig.NumThreads = Math.Clamp(threads, 1, 12);
         cfg.ModelConfig.Provider = "cpu";
         cfg.ModelConfig.Debug = 0;
