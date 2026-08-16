@@ -30,6 +30,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _processAudio.LevelChanged += v => LevelChanged?.Invoke(v);
         _processAudio.SamplesAvailable += OnSamples;
         _processAudio.StatusChanged += text => StatusChanged?.Invoke(text);
+        _processAudio.SessionDiscontinuity += OnProcessAudioDiscontinuity;
         _streaming.PartialResult += text => PartialResult?.Invoke(text);
         _streaming.FinalResult += text => FinalResult?.Invoke(text);
         _senseVoice.PartialResult += text => PartialResult?.Invoke(text);
@@ -80,7 +81,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _queue = Channel.CreateBounded<float[]>(new BoundedChannelOptions(64)
         {
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = false,
             FullMode = BoundedChannelFullMode.DropOldest
         });
@@ -131,7 +132,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                 : _useFunAsrNano
                     ? "Fun-ASR-Nano 模拟流式识别中，停顿后输出整句；准确率优先但延迟较高"
                     : processId.HasValue
-                        ? $"{_streamingLabel} 实时识别中，PotPlayer 换片会自动续接音频"
+                        ? $"{_streamingLabel} 实时识别中，PotPlayer 跳转和换片会自动容错"
                         : $"{_streamingLabel} 实时识别中");
         }
         catch
@@ -145,6 +146,18 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     {
         if (!_running || samples.Length == 0) return;
         _queue?.Writer.TryWrite(samples);
+    }
+
+    void OnProcessAudioDiscontinuity()
+    {
+        if (!_running) return;
+        var queue = _queue;
+        if (queue != null)
+        {
+            while (queue.Reader.TryRead(out _)) { }
+        }
+        if (!_useSenseVoice && !_useFunAsrNano) _streaming.ResetInput();
+        StatusChanged?.Invoke("PotPlayer 音频时间线已变化，已清理旧缓冲并等待新位置声音");
     }
 
     async Task DecodeLoopAsync(CancellationToken ct)
