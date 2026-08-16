@@ -34,8 +34,7 @@ public sealed class MainForm : Form
         MultiSelect = false,
         AllowUserToAddRows = false,
         AllowUserToDeleteRows = false,
-        RowHeadersVisible = false,
-        SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        RowHeadersVisible = false
     };
     readonly ProgressBar downloadProgress = new() { Dock = DockStyle.Fill, Height = 18 };
     readonly Label modelStatusTitle = new() { Dock = DockStyle.Fill, Text = "就绪", TextAlign = ContentAlignment.MiddleLeft };
