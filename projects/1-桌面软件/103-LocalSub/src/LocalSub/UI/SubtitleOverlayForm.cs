@@ -49,13 +49,20 @@ public sealed class SubtitleOverlayForm : Form
     public void FollowPlayer(Rectangle playerBounds)
     {
         if (playerBounds.Width < 200 || playerBounds.Height < 120) return;
-        _effectiveFontSize = _settings.SubtitleAutoSize
-            ? Math.Clamp((int)Math.Round(playerBounds.Height / 27.0), 22, 38)
-            : Math.Clamp(_settings.SubtitleFontSize, 20, 52);
+        if (_settings.SubtitleAutoSize)
+        {
+            var baseSize = Math.Clamp((int)Math.Round(playerBounds.Height / 27.0), 20, 42);
+            _effectiveFontSize = Math.Clamp((int)Math.Round(baseSize * Math.Clamp(_settings.SubtitleAutoScalePercent, 60, 160) / 100.0), 14, 60);
+        }
+        else
+        {
+            _effectiveFontSize = Math.Clamp(_settings.SubtitleFontSize, 20, 52);
+        }
 
         var maxWidthPercent = Math.Clamp(_settings.SubtitleMaxWidthPercent, 50, 100) / 100.0;
         var width = Math.Clamp((int)Math.Round(playerBounds.Width * maxWidthPercent), 320, Math.Max(320, playerBounds.Width - 8));
-        var height = Math.Clamp((int)Math.Round(_effectiveFontSize * 3.15), 92, 170);
+        var previousScale = Math.Clamp(_settings.SubtitlePreviousScalePercent, 40, 100) / 100.0;
+        var height = Math.Clamp((int)Math.Round(_effectiveFontSize * (2.35 + previousScale)), 88, 190);
         var left = playerBounds.Left + (playerBounds.Width - width) / 2;
         var bottomOffset = Math.Clamp(_settings.SubtitleBottomOffset, 0, Math.Max(0, playerBounds.Height / 3));
         var top = playerBounds.Bottom - height - bottomOffset;
@@ -101,7 +108,16 @@ public sealed class SubtitleOverlayForm : Form
         fontSize = _effectiveFontSize,
         maxWidthPercent = Math.Clamp(_settings.SubtitleMaxWidthPercent, 50, 100),
         background = _settings.SubtitleBackground.ToString(),
-        backgroundOpacity = Math.Clamp(_settings.SubtitleBackgroundOpacity, 0, 70)
+        backgroundOpacity = Math.Clamp(_settings.SubtitleBackgroundOpacity, 0, 70),
+        currentColor = NormalizeColor(_settings.SubtitleCurrentColor, "#FFFFFF"),
+        currentWeight = NormalizeWeight(_settings.SubtitleCurrentWeight, 500),
+        previousColor = NormalizeColor(_settings.SubtitlePreviousColor, "#D8D8D8"),
+        previousScalePercent = Math.Clamp(_settings.SubtitlePreviousScalePercent, 40, 100),
+        previousOpacity = Math.Clamp(_settings.SubtitlePreviousOpacity, 0, 100),
+        previousWeight = NormalizeWeight(_settings.SubtitlePreviousWeight, 400),
+        outlineColor = NormalizeColor(_settings.SubtitleOutlineColor, "#000000"),
+        outlineWidth = Math.Clamp(_settings.SubtitleOutlineWidth, 0.0, 4.0),
+        shadowOpacity = Math.Clamp(_settings.SubtitleShadowOpacity, 0, 100)
     };
 
     public async Task SetTextAsync(string current, string previous = "", IEnumerable<string>? keywords = null)
@@ -125,6 +141,17 @@ public sealed class SubtitleOverlayForm : Form
         if (_web.CoreWebView2 == null) return;
         var payload = JsonSerializer.Serialize(new { current = "", previous = "", keywords = Array.Empty<string>(), style = StylePayload() });
         await _web.CoreWebView2.ExecuteScriptAsync($"window.LocalSub.setSubtitle({payload});");
+    }
+
+    static int NormalizeWeight(int value, int fallback)
+        => value is 400 or 500 or 600 or 700 ? value : fallback;
+
+    static string NormalizeColor(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return fallback;
+        var s = value.Trim();
+        if (s.Length == 7 && s[0] == '#' && s.Skip(1).All(Uri.IsHexDigit)) return s.ToUpperInvariant();
+        return fallback;
     }
 
     protected override bool ShowWithoutActivation => true;
