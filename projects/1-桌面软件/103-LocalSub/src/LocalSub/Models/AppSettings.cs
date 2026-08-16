@@ -29,12 +29,23 @@ public sealed class AppSettings
 
     public bool SubtitleAutoSize { get; set; } = true;
     public int SubtitleFontSize { get; set; } = 28;
+    public int SubtitleAutoScalePercent { get; set; } = 100;
     public int SubtitleBottomOffset { get; set; } = 24;
     public int SubtitleMaxWidthPercent { get; set; } = 90;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public SubtitleBackgroundMode SubtitleBackground { get; set; } = SubtitleBackgroundMode.None;
     public int SubtitleBackgroundOpacity { get; set; } = 24;
     public double SubtitleDisplaySeconds { get; set; } = 3.0;
+
+    public string SubtitleCurrentColor { get; set; } = "#FFFFFF";
+    public int SubtitleCurrentWeight { get; set; } = 500;
+    public string SubtitlePreviousColor { get; set; } = "#D8D8D8";
+    public int SubtitlePreviousScalePercent { get; set; } = 66;
+    public int SubtitlePreviousOpacity { get; set; } = 72;
+    public int SubtitlePreviousWeight { get; set; } = 400;
+    public string SubtitleOutlineColor { get; set; } = "#000000";
+    public double SubtitleOutlineWidth { get; set; } = 1.5;
+    public int SubtitleShadowOpacity { get; set; } = 55;
 
     [JsonIgnore]
     public string ResolvedAsrRoot => PortablePaths.ResolvePortablePath(AsrRoot);
