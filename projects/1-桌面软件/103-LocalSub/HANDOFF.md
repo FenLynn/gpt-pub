@@ -19,12 +19,13 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - 自有可下载组件尽量位于 EXE 目录树，不主动散落到 Program Files / AppData。
 - CI 不只验证编译，必须做 EXE 启动、Windows Process Loopback 真激活和 sherpa native DLL 加载门禁。
 - 当前核心语言限定为中文、英文；多语言优化与翻译延后。
+- 实时模型下拉框只允许出现已经安装且关键文件校验通过的模型。模型页以黑色表示已安装可用，灰色表示未安装，不允许 UI 状态与真实磁盘状态脱节。
 
 ## 当前开发分支与版本
 
 - 分支：`p103-localsub-exp`
 - 版本：`v0.1.0-dev`
-- 当前功能 head：`e4cb8026de5050ea865a08dc0298003a4f35c8a2`
+- 当前功能 head：`f45ac2c6625f050aff6c3e177dd64dfe3703b8fc`
 
 ## 当前已实机确认
 
@@ -44,6 +45,8 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - `.tar.bz2` 使用 SharpCompress `ReaderFactory`，损坏缓存自动清理。
 - sherpa win-x64 native runtime 固定 1.13.4，首次需要时下载到 `<ASR>\_runtime`，程序包不重复携带。
 - NuGet 传递带入的 ONNX Runtime / sherpa native DLL 在 publish 阶段剥离，继续复用 `ASR\_runtime`。
+- 模型页现在以真实 `IsInstalled()` 校验结果驱动 UI：黑色为已安装且关键文件完整，灰色为未安装；下载完成自动变黑，删除后立即变灰。
+- 实时模型下拉框只列 `LiveCapable + IsInstalled()` 模型。下载完成后自动进入下拉框，删除后立即移出；没有任何已安装实时模型时“开始”按钮禁用并给出明确提示。
 
 ### 实时模型与模型评分表
 
@@ -72,11 +75,25 @@ Streaming recognizer 已扩展到 Paraformer、Zipformer Transducer Large/XLarge
 - 语音进行时约每 650 ms interim decode；停顿或最长分段时 final decode。
 - 状态区可区分 VAD 检测、RMS fallback、解码空文本。
 
-### PotPlayer Process Loopback
+### PotPlayer Process Loopback 与自动续接
 
-- 当前链：`ActivateAudioInterfaceAsync -> IAudioClient -> IAudioCaptureClient -> event-driven capture -> mono/16 kHz`。
+- 当前底层链：`ActivateAudioInterfaceAsync -> IAudioClient -> IAudioCaptureClient -> event-driven capture -> mono/16 kHz`。
 - Windows 10 build 19045 允许实际尝试，不再被错误版本门槛阻断。
 - CI 已真实执行 Process Loopback 激活、Initialize、GetService、Start、Stop。
+- 新增 `ResilientPotPlayerCaptureService` supervisor。实时识别不再只在点击“开始”时绑定一次音频会话。
+- supervisor 约每 300 ms 检查 PotPlayer 进程与窗口标题；检测到播放文件/标题变化时重建 Process Loopback，会继续复用已经加载的 ASR recognizer，不重新加载大模型。
+- 如果 PotPlayer 进程发生变化，会自动重新寻找并绑定新的 PotPlayer PID。
+- 如果一个已经产生过 PCM 的捕获会话连续约 7 秒没有新样本，会把它视为可能的静默失活并自动重建一次捕获会话；重建后在真正再次收到 PCM 前不会因普通暂停而反复重连。
+- supervisor 的 Process 对象和捕获对象均显式释放，避免长时间看片时产生句柄积累。
+- PotPlayer 模式仍不允许静默回退到“所有音频”。
+
+### 实时启动速度优化
+
+- 旧流程为：检查 runtime -> 同步加载模型 -> 再连接 PotPlayer 音频，两个主要耗时步骤串行叠加。
+- 当前流程在 runtime 已就绪后，把 sherpa 模型构造放到后台线程，并与 PotPlayer Process Loopback 激活并行执行。
+- 音频队列先建立为有界队列，模型加载期间只保留较新的 PCM，避免无限积压。
+- 因此点击“开始”到真正可识别的等待时间接近“模型加载”和“音频连接”两者中较慢的一项，而不是两项之和，同时 UI 线程不被大模型构造阻塞。
+- 如果用户所说的“启动慢”特指双击 EXE 到主窗口出现，而不是点击“开始”到字幕工作，则需要下一轮单独加入 cold-start 分段计时；当前这一轮优化的是实时识别启动路径。
 
 ### 字幕样式与跟随
 
@@ -108,12 +125,14 @@ Streaming recognizer 已扩展到 Paraformer、Zipformer Transducer Large/XLarge
 - Windows 19045 曾因错误的 20348 门槛被阻断，已改实际尝试。
 - sherpa managed wrapper 曾把 `onnxruntime.dll` 传递带回 publish，CI 已拦截并在 publish 阶段剥离。
 - PotPlayer 全屏 overlay 曾不可见，已增加持续 TopMost Z-order 维护，用户已实机确认解决。
-- 第二阶段第一轮媒体解析代码出现 C# TimeSpan 格式字符串转义编译错误，run 81 被 CI 拦截；已改为独立 `FormatClock()`，run 82 全绿。
+- 第二阶段第一轮媒体解析代码出现 C# TimeSpan 格式字符串转义编译错误，run 81 被 CI 拦截；已修复。
+- 模型 UI 一度存在“模型页未安装，但实时下拉框仍可选”的事实不一致；现已改为由 `ModelManager.IsInstalled()` 单一事实源驱动。
+- 本轮模型 UI 修改第一次提交出现重复 `SelectionMode` 初始化，被 run 87 编译门禁拦截；已删除重复项，run 88 全绿。
 
 ## 最新构建验证
 
-- 功能 head：`e4cb8026de5050ea865a08dc0298003a4f35c8a2`。
-- Windows CI run：`31915621606`，结论 success。
+- 功能 head：`f45ac2c6625f050aff6c3e177dd64dfe3703b8fc`。
+- Windows CI run：`31916278674`，结论 success。
 - `Publish net8 single-file app`：success。
 - `Prepare portable layout`：success。
 - `Smoke test LocalSub startup`：success。
@@ -124,13 +143,12 @@ Streaming recognizer 已扩展到 Paraformer、Zipformer Transducer Large/XLarge
 
 ## 用户下一步实机验证
 
-1. 覆盖增量包，只替换 `LocalSub.exe`、`Assets/subtitle.html`、`Assets/model-catalog.json`。
-2. 设置页测试自动/固定字号、底部偏移、最大宽度、底纹、透明度、显示时长及“预览字幕”。
-3. 继续以已验证的 Zipformer Large 作为基线，重点 A/B `Zipformer CTC Large`；CTC Small 用于超轻/极速档，XLarge 用于高准确率/高资源档。
-4. 后台页拖入一个普通 MP4，确认能显示媒体信息、解析进度和声音波形。
-5. 如果 MP4 正常，下一轮直接在同一波形时间轴接 Silero VAD + Offline Zipformer CTC，再加入关键词 marker 与 TXT 实际转写。
-6. 如果某容器 Media Foundation 不支持，记录文件格式/编码，下一轮接 FFmpeg fallback，不污染系统目录。
+1. 本轮相对上一用户包只需覆盖新的 `LocalSub.exe`，现有 `Assets`、ASR 模型、`ASR\_runtime` 和 config 不动。
+2. 启动后检查实时模型下拉框，应只出现已经下载且模型关键文件完整的实时模型；模型页已安装项应为黑色，未安装项灰色。
+3. 在 PotPlayer 连续播放列表中开始一次实时字幕，然后直接“下一集/下一视频”，不要手动停止或重新开始。状态区应出现“检测到 PotPlayer 视频切换/自动续接”等信息，短暂重连后输入电平和字幕应恢复。
+4. 感受点击“开始”后的等待时间是否比上一版缩短。如果用户实际指的是双击 EXE 本身启动慢，需要记录这一点，下一轮做 cold-start instrumentation。
+5. 后台页继续验证普通 MP4 的媒体信息、解析进度和声音波形。通过后下一轮接 Silero VAD + Offline Zipformer CTC + 关键词 marker + TXT 实际转写。
 
 ## 下一准确断点
 
-优先收口后台闭环：`视频 -> 音轨/波形 -> VAD 语音段 -> Offline ASR -> 时间戳 transcript -> 关键词 marker -> TXT`。实时主链和全屏 overlay 已有可用基线，除非回归不再重构。翻译、多语言增强、说话人分离暂缓。
+先以实机确认 PotPlayer 换片自动续接和启动体感。若自动续接仍失败，直接根据状态区判断是标题变化未检测、PID 变化、还是重建后的 Process Loopback 无 PCM；不重新加载模型。实时链稳定后继续收口后台闭环：`视频 -> 音轨/波形 -> VAD 语音段 -> Offline ASR -> 时间戳 transcript -> 关键词 marker -> TXT`。翻译、多语言增强、说话人分离继续暂缓。
