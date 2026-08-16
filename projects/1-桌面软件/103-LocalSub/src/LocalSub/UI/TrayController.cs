@@ -25,7 +25,7 @@ public sealed class TrayController : IDisposable
             Text = "LocalSub 本地字幕",
             Icon = SystemIcons.Application,
             ContextMenuStrip = menu,
-            Visible = true
+            Visible = false
         };
         show.Click += (_, _) => Restore();
         exit.Click += (_, _) =>
@@ -48,6 +48,7 @@ public sealed class TrayController : IDisposable
     {
         if (_form.WindowState != FormWindowState.Minimized) return;
         if (!AppSettings.Load().MinimizeToTray) return;
+        _icon.Visible = true;
         _form.BeginInvoke(() => _form.Hide());
     }
 
@@ -56,6 +57,7 @@ public sealed class TrayController : IDisposable
         if (_explicitExit || e.CloseReason is CloseReason.WindowsShutDown or CloseReason.TaskManagerClosing) return;
         if (!AppSettings.Load().MinimizeToTray) return;
         e.Cancel = true;
+        _icon.Visible = true;
         _form.Hide();
         _icon.ShowBalloonTip(1200, "LocalSub", "LocalSub 已在后台运行，双击托盘图标可恢复窗口。", ToolTipIcon.Info);
     }
@@ -66,6 +68,7 @@ public sealed class TrayController : IDisposable
         _form.Show();
         if (_form.WindowState == FormWindowState.Minimized) _form.WindowState = FormWindowState.Normal;
         _form.Activate();
+        if (!AppSettings.Load().MinimizeToTray) _icon.Visible = false;
     }
 
     public void Dispose()
