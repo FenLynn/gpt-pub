@@ -16,25 +16,25 @@
 
 正式稳定回滚基线：**v0.1.7**。
 
-当前实验候选：**v0.3.10**。
+当前实验候选：**v0.3.11**。
 
-v0.3.10 完成完整 CI 和 Windows attached Meter 视觉检查的准确代码 head：`8ca0ddd6a0e3b6586a86242766671fd41939e14d`
+v0.3.11 完成完整 CI、attached Meter Bounds 与可读字形硬门的准确代码 head：`4a188f0c0512d4dec011bac7552110c2f7e9dfa8`
 
-P103 CI run：`31915216732`
+P103 CI run：`31916419821`
 
 CI：**success**。
 
-Windows Artifact：`DavBridge-v0.3.10-win-x64`
+Windows Artifact：`DavBridge-v0.3.11-win-x64`
 
-Artifact ZIP SHA256：`44f41145bdfab07571ef13156e4046876425713b426bde46e02b5c03a181619f`
+Artifact ZIP SHA256：`5f232ba610ca62f1609cf5de828c177b4f5618a6d336018af317ca4c30306188`
 
-EXE SHA256：`d6e7a0558627e144cb07dd92168e32c3f7856d414b1b39386be6891eed590355`
+EXE SHA256：`f0b973ac55dce6e74cea1a64e70bfdb590db8e17996359a09af541c0b9c92b43`
 
-视觉检查 Artifact：`DavBridge-v0.3.10-ui-snapshots`
+视觉检查 Artifact：`DavBridge-v0.3.11-ui-snapshots`
 
-本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得当成已构建代码 head。准确已构建代码 head 始终是上面的 `8ca0ddd6...`。
+本 HANDOFF 及其后的 `[skip ci]` 纯文档提交不得当成已构建代码 head。准确已构建代码 head 始终是上面的 `4a188f0c...`。
 
-`main` 与 `p103-stable` 未修改。v0.3.10 仍需用户实机截图确认后才能考虑提升。
+`main` 与 `p103-stable` 未修改。v0.3.11 仍需用户实机截图确认后才能考虑提升。
 
 ## 固定读取顺序
 
@@ -123,9 +123,10 @@ DELETE 永远不能后台自动执行。人工确认后仍必须再次检查源�
 - v0.3.4 页面几何是当前稳定基线，除非用户明确要求，不得顺手改尺寸和层级。
 - 禁止运行时 overlay 批量接管页面。
 - 禁止 reparent 原 Label 到 Meter。
-- 禁止为了文字进 bar 修改既有 `RowStyles`。
+- 禁止为了文字定位随意修改 RowStyles。v0.3.11 仅有一个已确认例外：原额度 value Label 已由 `UiOverviewMeterTextV037` 隐藏且不再承载显示，因此可回收该空白行的一部分给真实额度 Meter，外层总览区域高度不增加。
 - 简单显示需求优先在原控件自身 Paint 或局部 presentation binding 层完成。
 - 自动测试必须检查最终 attached 控件的实际 Bounds 和最终栅格像素，不能只测试独立 reference 控件。
+- 自动测试还必须检查实际可见 glyph 的最低可读高度，不能把“未裁切但小到难读”当成通过。
 - CI 不能代替用户实机视觉验收。
 
 ## 额度条 UI 事故复盘
@@ -146,48 +147,63 @@ v0.3.9 新增 `MeterTextSpriteV039`，先离屏渲染，再裁掉字体 line box
 coverage attached: 373×26 px
 current attached:  373×26 px
 upload attached:   369×50 px
- download attached: 369×50 px
+download attached: 369×50 px
 ```
 
 而 `UiShellV032.BuildQuotaCell()` 明确把额度 Meter 所在第三行设计为 16 个逻辑像素。由于上传、下载 Meter 使用 `Dock=Fill`，TableLayoutPanel 的剩余高度被额度 Meter 吞掉，实际控件高度扩大到 50 px。`MeterV030` 因此是在 50 px 内正确居中文字，而主页面外层只显示额度区域的一部分，最终产生实机底部裁切。
 
 v0.3.9 后期加入的 standalone 16/27 px reference Meter 虽然视觉通过，但它们不是主页面 attached Meter，因而没有复现这个 Bounds 错误。后续禁止把 standalone reference 控件通过当成 attached UI 通过。
 
-## v0.3.10 修复
+### v0.3.10
 
-v0.3.10 不改页面 RowStyles、不移动额度区、不改业务逻辑，也不再调字体 Y。
+v0.3.10 新增 `UiQuotaMeterBoundsV0310`，把 `_uploadMeter` 与 `_downloadMeter` 强制为 `Dock=Top`、16 logical px。这个版本成功消除了 50 px 控件被外层裁切的问题，真实 attached Meter 在 Windows CI 中变为 100% 下 369×16 px、150% 下 555×24 px。
 
-新增 `UiQuotaMeterBoundsV0310`，只约束 `_uploadMeter` 和 `_downloadMeter`：
+但是用户实机 v0.3.10 截图明确证明该版本仍失败：文字虽然不再被裁切，却因为 `MeterV030` 的文字大小与 Meter 高度成比例，16 px Meter 把额度数字压缩得明显过小，远低于镜像覆盖和当前任务的正常可读层级。
+
+因此 v0.3.10 的错误不是“居中失败”，而是把“16 px 设计行高”误当成“16 px 合理视觉控件高度”。该判断永久否决。后续不得再把仅满足不裁切和居中作为额度条通过标准。
+
+## v0.3.11 修复
+
+v0.3.11 保留 v0.3.9 的真实 glyph sprite 居中方法，同时修正 v0.3.10 的可读性标准。
+
+目标额度 Meter 高度改为 **27 logical px**。27 px 不是重新猜测的偏移量，而是 v0.3.9/v0.3.10 Windows 视觉 fixture 中已经实际绘制、且额度数字大小与上下留白均正常的 reference 高度。
+
+因为 `UiOverviewMeterTextV037` 已经隐藏原 value Label 并把同一数字交给 Meter 自己绘制，原 value 行已经成为无显示内容的空白空间。v0.3.11 只把这个隐藏 value 行从 22 logical px 收回 11 px，使较高的额度条向上获得空间，不增加总览外层高度。
+
+实际 Meter 本体仍不信任 TableLayoutPanel 的最终分配高度，继续采用控制级硬约束：
 
 ```text
 Dock = Top
-Height = 16 logical px
+Height = 27 logical px
 ```
 
-16 px 来自既有 `BuildQuotaCell()` 的额度 Meter 设计行高，不是针对某台机器的经验偏移。因为约束发生在正常 WinForms 控件树中，Windows DPI/缩放仍会正常缩放该逻辑高度。
+第一次 v0.3.11 尝试曾把 27 px Meter 再次设为 `Dock=Fill`。新的 attached Bounds 硬门立即在 `compact-100` 中发现 WinForms 把实际 Meter 拉到 67 px，CI run `31916294371` 因此主动失败，没有生成可交付候选。随后恢复为控制级固定 27 px，避免重演 v0.3.9。
 
-v0.3.9 的 glyph sprite 居中继续保留。现在文字是在真实额度 Meter 本体中居中，不再是在一个被父层裁切的 50/76 px 大控件里居中。
+## v0.3.11 验证
 
-## v0.3.10 验证
+准确代码 head：`4a188f0c0512d4dec011bac7552110c2f7e9dfa8`
 
-准确代码 head：`8ca0ddd6a0e3b6586a86242766671fd41939e14d`
+CI run：`31916419821`，结果 **success**。
 
-CI run：`31915216732`，结果 **success**。
+原有 scope、Core Smoke、Cycle、StrongVerified、SourceChanged、WaitQuota、WriteUnknown、412、回收站、DELETE、安全回归、Windows x64 单 EXE、Runtime boundary、显式打开回 Overview 等检查继续通过。
 
-原有 scope、Core Smoke、Cycle、StrongVerified、SourceChanged、WaitQuota、WriteUnknown、412、回收站、DELETE、安全回归、Windows x64 单 EXE、Runtime boundary、显式打开回 Overview 等检查全部继续通过。
+新的额度条门同时验证：
 
-新增 quota Meter Bounds 硬门，并重新生成真实 attached Meter 视觉图。
+1. 实际 attached Meter 必须是 `Dock=Top`，不能被 TableLayoutPanel 拉伸。
+2. 100%、125%、150% 下实际 Meter 高度必须约等于 27 logical px 的 DPI 缩放结果。
+3. 实际 Meter 自身栅格必须存在额度文字。
+4. 可见 glyph 不得触碰上下边缘。
+5. 可见 glyph 中心必须落在 Meter 中心附近。
+6. 可见 glyph 高度必须达到最低可读阈值，防止 v0.3.10 那种“小但居中”的假通过。
 
-最终 Windows 检查图中：
+最终 Windows attached Meter 检查图中：
 
 ```text
-100%: upload/download attached = 369×16 px
-150%: upload/download attached = 555×24 px
+100%: upload/download attached = 369×27 px
+150%: upload/download attached = 555×40 px
 ```
 
-文字在这两个真实 attached Meter 内完整显示并居中。与 v0.3.9 的 `369×50 px` / 更高 DPI 下继续膨胀的控件相比，根因已经从 Bounds 层消除。
-
-视觉 Artifact 仍只是 Windows CI 证据，用户真实机器是最终事实源。
+100% 和 150% 检查图中额度数字均完整、明显可读，并保持在 bar 中央。此结果是 Windows CI 的真实 attached 控件绘制证据，不等于用户实机已经通过。
 
 ## 显式打开行为
 
@@ -198,11 +214,11 @@ CI run：`31915216732`，结果 **success**。
 
 ## 当前实机断点
 
-下一步只验收 **v0.3.10**，不提升 stable：
+下一步只验收 **v0.3.11**，不提升 stable：
 
-1. 上传、下载额度文字必须完整处于 bar 内并垂直居中，不贴底、不裁切。
-2. 上传、下载 bar 的整体位置不得改变，只修内部 Bounds 与文字显示。
-3. 镜像覆盖、当前任务、Logo、四个 Tab、阶段区和按钮位置不得变化。
+1. 上传、下载额度条在用户真实机器上应明显高于 v0.3.10，并恢复正常可读数字。
+2. 数字必须完整处于 bar 内并垂直居中，不贴底、不裁切，也不能小到难读。
+3. 镜像覆盖、当前任务、Logo、四个 Tab、阶段区和按钮位置不得出现非预期变化。
 4. 手工双击 EXE 应显示主窗口总览。
 5. 用户实机确认后，才可把本次额度条问题记为关闭。
 
