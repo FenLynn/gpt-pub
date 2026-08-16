@@ -9,11 +9,13 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     readonly ResilientPotPlayerCaptureService _processAudio = new();
     readonly StreamingParaformerService _streaming = new();
     readonly SenseVoiceSimulatedStreamingService _senseVoice = new();
+    readonly FunAsrNanoSimulatedStreamingService _funAsrNano = new();
     Channel<float[]>? _queue;
     CancellationTokenSource? _cts;
     Task? _worker;
     bool _running;
     bool _useSenseVoice;
+    bool _useFunAsrNano;
     string _streamingLabel = "Streaming ASR";
 
     public event Action<float>? LevelChanged;
@@ -33,6 +35,8 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _senseVoice.PartialResult += text => PartialResult?.Invoke(text);
         _senseVoice.FinalResult += text => FinalResult?.Invoke(text);
         _senseVoice.StatusChanged += text => StatusChanged?.Invoke(text);
+        _funAsrNano.FinalResult += text => FinalResult?.Invoke(text);
+        _funAsrNano.StatusChanged += text => StatusChanged?.Invoke(text);
     }
 
     public Task StartAllAudioAsync(AppSettings settings, ModelDescriptor model, ModelManager models, IProgress<ModelOperationProgress>? runtimeProgress = null, CancellationToken ct = default)
@@ -51,21 +55,23 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         var isZipformer = model.Id.StartsWith("streaming-zipformer-", StringComparison.OrdinalIgnoreCase);
         var isStreaming = isParaformer || isZipformer;
         var isSenseVoice = string.Equals(model.Id, "sensevoice-small-int8", StringComparison.OrdinalIgnoreCase);
-        if (!isStreaming && !isSenseVoice) throw new NotSupportedException("当前实时字幕支持 Streaming Paraformer、Streaming Zipformer 与 SenseVoice Small INT8（模拟流式）。");
+        var isFunAsrNano = string.Equals(model.Id, "funasr-nano-int8", StringComparison.OrdinalIgnoreCase);
+        if (!isStreaming && !isSenseVoice && !isFunAsrNano)
+            throw new NotSupportedException("当前实时字幕支持 Streaming Paraformer、Streaming Zipformer、SenseVoice Small INT8 与 Fun-ASR-Nano INT8。后两者为 VAD 分段模拟流式。");
 
         StatusChanged?.Invoke("检查 ASR 运行库");
         var runtime = new AsrRuntimeManager(settings);
         await runtime.EnsureAsync(runtimeProgress, ct);
 
-        ModelDescriptor? vadDescriptor = null;
+        var needsVad = isSenseVoice || isFunAsrNano;
         string? vadPath = null;
-        if (isSenseVoice)
+        if (needsVad)
         {
-            vadDescriptor = new ModelCatalogService().Load().FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
+            var vadDescriptor = new ModelCatalogService().Load().FirstOrDefault(x => string.Equals(x.Id, "silero-vad", StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException("模型 catalog 中缺少 Silero VAD。");
             if (!models.IsInstalled(vadDescriptor))
             {
-                StatusChanged?.Invoke("SenseVoice 需要 Silero VAD，正在自动下载约 2 MB 组件");
+                StatusChanged?.Invoke($"{model.Name} 需要 Silero VAD，正在自动下载约 2 MB 组件");
                 await models.DownloadAsync(vadDescriptor, runtimeProgress, ct);
             }
             vadPath = Path.Combine(models.GetModelFolder(vadDescriptor), "silero_vad.onnx");
@@ -79,7 +85,12 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
             FullMode = BoundedChannelFullMode.DropOldest
         });
         _useSenseVoice = isSenseVoice;
-        _streamingLabel = isSenseVoice ? "SenseVoice" : model.Name.Replace(" INT8", "");
+        _useFunAsrNano = isFunAsrNano;
+        _streamingLabel = isSenseVoice
+            ? "SenseVoice"
+            : isFunAsrNano
+                ? "Fun-ASR-Nano"
+                : model.Name.Replace(" INT8", "");
 
         // Mark the pipeline active before model loading finishes so the audio source can
         // buffer the newest PCM while the recognizer is being constructed. The bounded
@@ -95,6 +106,13 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                 var localVadPath = vadPath!;
                 modelLoadTask = Task.Run(() =>
                     _senseVoice.Start(model, models.GetModelFolder(model), localVadPath, runtime.RuntimeRoot), _cts.Token);
+            }
+            else if (isFunAsrNano)
+            {
+                StatusChanged?.Invoke("后台加载 Fun-ASR-Nano 与 Silero VAD；该模型较大，首次加载会更慢");
+                var localVadPath = vadPath!;
+                modelLoadTask = Task.Run(() =>
+                    _funAsrNano.Start(model, models.GetModelFolder(model), localVadPath, runtime.RuntimeRoot), _cts.Token);
             }
             else
             {
@@ -116,17 +134,16 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                 captureStartTask = Task.CompletedTask;
             }
 
-            // Model initialization is CPU-heavy for Large/XLarge. Run it concurrently
-            // with audio activation so startup time approaches the slower of the two,
-            // instead of adding both delays together, and the UI thread stays responsive.
             await Task.WhenAll(modelLoadTask, captureStartTask);
 
             _worker = Task.Run(() => DecodeLoopAsync(_cts.Token), _cts.Token);
             StatusChanged?.Invoke(_useSenseVoice
                 ? "SenseVoice 模拟流式识别中，VAD 与音量 fallback 会共同检测语音"
-                : processId.HasValue
-                    ? $"{_streamingLabel} 实时识别中，PotPlayer 换片会自动续接音频"
-                    : $"{_streamingLabel} 实时识别中");
+                : _useFunAsrNano
+                    ? "Fun-ASR-Nano 模拟流式识别中，停顿后输出整句；准确率优先但延迟较高"
+                    : processId.HasValue
+                        ? $"{_streamingLabel} 实时识别中，PotPlayer 换片会自动续接音频"
+                        : $"{_streamingLabel} 实时识别中");
         }
         catch
         {
@@ -152,6 +169,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                 {
                     ct.ThrowIfCancellationRequested();
                     if (_useSenseVoice) _senseVoice.AcceptSamples(samples);
+                    else if (_useFunAsrNano) _funAsrNano.AcceptSamples(samples);
                     else _streaming.AcceptSamples(samples);
                 }
             }
@@ -174,7 +192,9 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _cts = null;
         _streaming.Stop();
         _senseVoice.Stop();
+        _funAsrNano.Stop();
         _useSenseVoice = false;
+        _useFunAsrNano = false;
         _streamingLabel = "Streaming ASR";
         LevelChanged?.Invoke(0);
     }
@@ -186,5 +206,6 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _processAudio.Dispose();
         _streaming.Dispose();
         _senseVoice.Dispose();
+        _funAsrNano.Dispose();
     }
 }
