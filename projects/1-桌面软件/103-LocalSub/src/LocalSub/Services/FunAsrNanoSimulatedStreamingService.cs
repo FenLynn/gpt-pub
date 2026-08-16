@@ -42,6 +42,8 @@ public sealed class FunAsrNanoSimulatedStreamingService : IDisposable
         SherpaInterop.ConfigureRuntime(runtimeFolder);
 
         var config = new OfflineRecognizerConfig();
+        config.FeatConfig.SampleRate = SampleRate;
+        config.FeatConfig.FeatureDim = 80;
         config.ModelConfig.FunAsrNano.EncoderAdaptor = encoderAdaptor;
         config.ModelConfig.FunAsrNano.LLM = llm;
         config.ModelConfig.FunAsrNano.Embedding = embedding;
@@ -127,9 +129,14 @@ public sealed class FunAsrNanoSimulatedStreamingService : IDisposable
         if (recognizer == null || samples.Length == 0) return string.Empty;
 
         using var stream = recognizer.CreateStream();
+        if (stream.Handle == IntPtr.Zero)
+        {
+            StatusChanged?.Invoke("Fun-ASR-Nano 未能创建离线识别流，继续监听");
+            return string.Empty;
+        }
         stream.AcceptWaveform(SampleRate, samples);
         recognizer.Decode(stream);
-        return stream.Result.Text?.Trim() ?? string.Empty;
+        return SherpaOfflineResultReader.GetText(stream);
     }
 
     public void Stop()
