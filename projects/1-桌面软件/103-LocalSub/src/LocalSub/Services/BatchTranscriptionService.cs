@@ -1,20 +1,14 @@
 using LocalSub.Models;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 using SherpaOnnx;
 
 namespace LocalSub.Services;
 
 public sealed record BatchTranscriptionProgress(int Percent, string Stage, string Detail, int CompletedSegments = 0);
-public sealed record BatchTranscriptionResult(string FilePath, TimeSpan Duration, IReadOnlyList<TranscriptItem> Items, TimeSpan ProcessingTime)
+public sealed record BatchTranscriptionResult(string FilePath, TimeSpan Duration, IReadOnlyList<TranscriptItem> Items, TimeSpan ProcessingTime, string DecoderName)
 {
     public double RealTimeFactor => Duration.TotalSeconds > 0 ? ProcessingTime.TotalSeconds / Duration.TotalSeconds : 0;
 }
 
-/// <summary>
-/// File transcription pipeline: media -> 16 kHz mono -> Silero VAD -> offline ASR -> timestamped transcript.
-/// It deliberately streams audio instead of loading the whole movie into memory.
-/// </summary>
 public sealed class BatchTranscriptionService
 {
     const int SampleRate = 16000;
@@ -49,7 +43,8 @@ public sealed class BatchTranscriptionService
 
         var vadPath = Path.Combine(models.GetModelFolder(vadDescriptor), "silero_vad.onnx");
         var keywordArray = keywords.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        return await Task.Run(() => TranscribeCore(filePath, model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot, keywordArray, progress, ct), ct);
+        var ffmpeg = new FfmpegManager(settings);
+        return await Task.Run(() => TranscribeCore(filePath, model, models.GetModelFolder(model), vadPath, runtime.RuntimeRoot, ffmpeg, keywordArray, progress, ct), ct);
     }
 
     static BatchTranscriptionResult TranscribeCore(
@@ -58,6 +53,7 @@ public sealed class BatchTranscriptionService
         string modelFolder,
         string vadPath,
         string runtimeFolder,
+        FfmpegManager ffmpeg,
         string[] keywords,
         IProgress<BatchTranscriptionProgress>? progress,
         CancellationToken ct)
@@ -66,14 +62,9 @@ public sealed class BatchTranscriptionService
         SherpaInterop.ConfigureRuntime(runtimeFolder);
         using var recognizer = CreateRecognizer(model, modelFolder);
         using var vad = CreateVad(vadPath);
-        using var reader = new MediaFoundationReader(filePath);
-        var duration = reader.TotalTime;
+        using var source = new MediaAudioSource.Mono16kSource(MediaAudioSource.Open(filePath, ffmpeg));
+        var duration = source.Duration;
         if (duration <= TimeSpan.Zero) throw new InvalidDataException("无法取得媒体时长。");
-
-        ISampleProvider provider = reader.ToSampleProvider();
-        provider = new DownmixToMonoSampleProvider(provider);
-        if (provider.WaveFormat.SampleRate != SampleRate)
-            provider = new WdlResamplingSampleProvider(provider, SampleRate);
 
         var transcript = new TranscriptService();
         var input = new float[8192];
@@ -82,11 +73,11 @@ public sealed class BatchTranscriptionService
         var lastPercent = -1;
         var segmentCount = 0;
 
-        progress?.Report(new(1, "转写", $"{model.Name} 已加载，开始扫描音轨"));
+        progress?.Report(new(1, "转写", $"{model.Name} 已加载，{source.DecoderName} 正在读取音轨"));
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var read = provider.Read(input, 0, input.Length);
+            var read = source.Read(input, 0, input.Length);
             if (read <= 0) break;
             samplesRead += read;
             for (var i = 0; i < read; i++) pending.Add(input[i]);
@@ -115,7 +106,6 @@ public sealed class BatchTranscriptionService
             while (pending.Count < VadWindowSize) pending.Add(0);
             vad.AcceptWaveform(pending.Take(VadWindowSize).ToArray());
         }
-        // Pad silence before flush so an utterance ending exactly at EOF can close naturally.
         var silence = new float[VadWindowSize];
         for (var i = 0; i < 16; i++) vad.AcceptWaveform(silence);
         vad.Flush();
@@ -123,7 +113,7 @@ public sealed class BatchTranscriptionService
 
         var processing = DateTime.UtcNow - started;
         progress?.Report(new(100, "完成", $"识别 {transcript.Items.Count} 段，耗时 {FormatClock(processing)}，RTF {(processing.TotalSeconds / Math.Max(0.001, duration.TotalSeconds)):0.00}", transcript.Items.Count));
-        return new BatchTranscriptionResult(filePath, duration, transcript.Items.ToArray(), processing);
+        return new BatchTranscriptionResult(filePath, duration, transcript.Items.ToArray(), processing, source.DecoderName);
     }
 
     static void DrainVad(
@@ -201,23 +191,13 @@ public sealed class BatchTranscriptionService
             cfg.ModelConfig.FunAsrNano.Embedding = Path.Combine(folder, "embedding.int8.onnx");
             cfg.ModelConfig.FunAsrNano.Tokenizer = Path.Combine(folder, "Qwen3-0.6B");
         }
-        else
-        {
-            throw new NotSupportedException($"当前后台转写尚未配置模型“{model.Name}”。");
-        }
-
+        else throw new NotSupportedException($"当前后台转写尚未配置模型“{model.Name}”。");
         return new OfflineRecognizer(cfg);
     }
 
     static VoiceActivityDetector CreateVad(string modelPath)
     {
-        var cfg = new VadModelConfig
-        {
-            SampleRate = SampleRate,
-            NumThreads = 1,
-            Provider = "cpu",
-            Debug = 0
-        };
+        var cfg = new VadModelConfig { SampleRate = SampleRate, NumThreads = 1, Provider = "cpu", Debug = 0 };
         cfg.SileroVad.Model = modelPath;
         cfg.SileroVad.Threshold = 0.45f;
         cfg.SileroVad.MinSilenceDuration = 0.30f;
@@ -237,36 +217,4 @@ public sealed class BatchTranscriptionService
 
     static string TrimForStatus(string text) => text.Length <= 45 ? text : text[..45] + "…";
     static string FormatClock(TimeSpan t) => t.TotalHours >= 1 ? t.ToString(@"hh\:mm\:ss") : t.ToString(@"mm\:ss");
-
-    sealed class DownmixToMonoSampleProvider : ISampleProvider
-    {
-        readonly ISampleProvider _source;
-        readonly int _channels;
-        float[] _scratch = [];
-
-        public DownmixToMonoSampleProvider(ISampleProvider source)
-        {
-            _source = source;
-            _channels = Math.Max(1, source.WaveFormat.Channels);
-            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(source.WaveFormat.SampleRate, 1);
-        }
-
-        public WaveFormat WaveFormat { get; }
-
-        public int Read(float[] buffer, int offset, int count)
-        {
-            var needed = count * _channels;
-            if (_scratch.Length < needed) _scratch = new float[needed];
-            var read = _source.Read(_scratch, 0, needed);
-            var frames = read / _channels;
-            for (var f = 0; f < frames; f++)
-            {
-                double sum = 0;
-                var b = f * _channels;
-                for (var c = 0; c < _channels; c++) sum += _scratch[b + c];
-                buffer[offset + f] = (float)(sum / _channels);
-            }
-            return frames;
-        }
-    }
 }
