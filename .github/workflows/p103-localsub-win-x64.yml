@@ -4,7 +4,7 @@ on:
   push:
     branches: [ p103-localsub-exp ]
     paths:
-      - 'projects/1-桌面软件/103-LocalSub/**'
+      - 'projects/1-桌面软件/103-LocalSub/src/LocalSub/**'
       - '.github/workflows/p103-localsub-win-x64.yml'
 
 jobs:
