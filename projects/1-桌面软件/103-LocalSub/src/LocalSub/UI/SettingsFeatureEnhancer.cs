@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using LocalSub.Core;
 using LocalSub.Models;
+using LocalSub.Services;
 
 namespace LocalSub.UI;
 
@@ -36,6 +37,70 @@ public static class SettingsFeatureEnhancer
         };
         flow.Controls.Add(Row("资源模式", profile, "实时和后台 ASR 的 CPU 线程策略"));
 
+        var selectedFfmpegPath = settings.FfmpegPath;
+        var ffmpegText = new TextBox { Width = 330, ReadOnly = true };
+        var ffmpegStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(6, 4, 0, 6), MaximumSize = new Size(760, 0) };
+        var chooseFfmpeg = new Button { Text = "选择已有", Width = 88, Height = 27 };
+        var clearFfmpeg = new Button { Text = "自动", Width = 62, Height = 27 };
+        var ffmpegRow = new FlowLayoutPanel { Width = 760, Height = 34, WrapContents = false };
+        ffmpegRow.Controls.Add(new Label { Text = "FFmpeg", Width = 130, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 7, 6, 0) });
+        ffmpegRow.Controls.Add(ffmpegText);
+        ffmpegRow.Controls.Add(chooseFfmpeg);
+        ffmpegRow.Controls.Add(clearFfmpeg);
+        flow.Controls.Add(ffmpegRow);
+        flow.Controls.Add(ffmpegStatus);
+        flow.Controls.Add(new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            ForeColor = Color.DimGray,
+            Text = "留空时自动寻找 LocalSub 自有组件、附近 Mediova\\Components\\FFmpeg\\bin 和系统 PATH。也可以直接指定 Mediova 的 ffmpeg.exe；只有都找不到时才需要在后台页单独下载。"
+        });
+
+        void RefreshFfmpegPreview()
+        {
+            var probeSettings = AppSettings.Load();
+            probeSettings.FfmpegPath = selectedFfmpegPath;
+            var manager = new FfmpegManager(probeSettings);
+            ffmpegText.Text = manager.IsInstalled
+                ? manager.FfmpegPath
+                : string.IsNullOrWhiteSpace(selectedFfmpegPath) ? "自动查找，当前未发现" : selectedFfmpegPath;
+            ffmpegStatus.Text = manager.IsInstalled
+                ? $"FFmpeg 可用，来源：{manager.SourceName}"
+                : "FFmpeg 未找到。MP4 等 Media Foundation 可解析文件仍可直接后台转写。";
+        }
+        RefreshFfmpegPreview();
+
+        chooseFfmpeg.Click += (_, _) =>
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Filter = "ffmpeg.exe|ffmpeg.exe|可执行文件|*.exe",
+                Title = "选择已有 FFmpeg，可直接选择 Mediova 的 ffmpeg.exe"
+            };
+            var currentManager = new FfmpegManager(AppSettings.Load());
+            try
+            {
+                if (currentManager.IsInstalled && File.Exists(currentManager.FfmpegPath))
+                    dlg.InitialDirectory = Path.GetDirectoryName(currentManager.FfmpegPath);
+            }
+            catch { }
+            if (dlg.ShowDialog() != DialogResult.OK) return;
+            if (!FfmpegManager.ValidatePair(dlg.FileName, out var ffmpeg, out _))
+            {
+                MessageBox.Show("所选目录中没有完整的 ffmpeg.exe + ffprobe.exe。请选 Mediova 的 Components\\FFmpeg\\bin\\ffmpeg.exe。", "LocalSub");
+                return;
+            }
+            selectedFfmpegPath = ffmpeg;
+            RefreshFfmpegPreview();
+        };
+
+        clearFfmpeg.Click += (_, _) =>
+        {
+            selectedFfmpegPath = "";
+            RefreshFfmpegPreview();
+        };
+
         var tray = new CheckBox { Text = "最小化到系统托盘", AutoSize = true, Checked = settings.MinimizeToTray };
         var startup = new CheckBox { Text = "开机自动启动 LocalSub", AutoSize = true, Checked = IsStartupRegistered() || settings.StartWithWindows };
         flow.Controls.Add(tray);
@@ -61,11 +126,12 @@ public static class SettingsFeatureEnhancer
                     2 => ResourceProfile.MaxPerformance,
                     _ => ResourceProfile.Auto
                 };
+                s.FfmpegPath = selectedFfmpegPath;
                 s.MinimizeToTray = tray.Checked;
                 s.StartWithWindows = startup.Checked;
                 ApplyStartupRegistration(startup.Checked);
                 s.Save();
-                MessageBox.Show("性能与后台设置已保存。新的资源模式会在下一次启动识别任务时生效。", "LocalSub");
+                MessageBox.Show("性能、FFmpeg 与后台设置已保存。新的资源模式会在下一次启动识别任务时生效。", "LocalSub");
             }
             catch (Exception ex)
             {
