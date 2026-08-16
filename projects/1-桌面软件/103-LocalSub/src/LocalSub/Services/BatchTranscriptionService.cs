@@ -14,6 +14,7 @@ public sealed class BatchTranscriptionService
 {
     const int SampleRate = 16000;
     const int VadWindowSize = 512;
+    const int EnergyFrameSize = 320;
 
     public async Task<BatchTranscriptionResult> TranscribeAsync(
         string filePath,
@@ -78,42 +79,50 @@ public sealed class BatchTranscriptionService
         using var recognizer = CreateRecognizer(model, modelFolder, threads);
         progress?.Report(new(2, "模型就绪", $"{model.Name} 已加载，正在打开音轨"));
         using var vad = CreateVad(vadPath);
-        using var source = new MediaAudioSource.Mono16kSource(MediaAudioSource.Open(filePath, ffmpeg));
-        var duration = source.Duration;
-        if (duration <= TimeSpan.Zero) throw new InvalidDataException("无法取得媒体时长。");
 
         var transcript = new TranscriptService();
         var input = new float[8192];
         var pending = new List<float>(VadWindowSize * 4);
+        var rmsFrames = new List<float>();
         long samplesRead = 0;
         var lastPercent = -1;
         var segmentCount = 0;
+        TimeSpan duration;
+        string decoderName;
 
-        progress?.Report(new(3, "转写", $"{model.Name} 已加载，{source.DecoderName}，{threads} 线程"));
-        while (true)
+        using (var source = new MediaAudioSource.Mono16kSource(MediaAudioSource.Open(filePath, ffmpeg)))
         {
-            ct.ThrowIfCancellationRequested();
-            var read = source.Read(input, 0, input.Length);
-            if (read <= 0) break;
-            samplesRead += read;
-            for (var i = 0; i < read; i++) pending.Add(input[i]);
+            duration = source.Duration;
+            decoderName = source.DecoderName;
+            if (duration <= TimeSpan.Zero) throw new InvalidDataException("无法取得媒体时长。");
 
-            var offset = 0;
-            while (pending.Count - offset >= VadWindowSize)
+            progress?.Report(new(3, "VAD 扫描", $"{model.Name} 已加载，{decoderName}，{threads} 线程"));
+            while (true)
             {
-                var window = pending.GetRange(offset, VadWindowSize).ToArray();
-                vad.AcceptWaveform(window);
-                offset += VadWindowSize;
-                DrainVad(vad, recognizer, transcript, keywords, ref segmentCount, progress, duration, samplesRead, ct);
-            }
-            if (offset > 0) pending.RemoveRange(0, offset);
+                ct.ThrowIfCancellationRequested();
+                var read = source.Read(input, 0, input.Length);
+                if (read <= 0) break;
+                samplesRead += read;
+                CollectRmsFrames(input, read, rmsFrames);
+                for (var i = 0; i < read; i++) pending.Add(input[i]);
 
-            var elapsed = samplesRead / (double)SampleRate;
-            var percent = (int)Math.Clamp(elapsed * 100 / duration.TotalSeconds, 3, 98);
-            if (percent >= lastPercent + 1)
-            {
-                progress?.Report(new(percent, "转写", $"{FormatClock(TimeSpan.FromSeconds(elapsed))} / {FormatClock(duration)}，已识别 {segmentCount} 段", segmentCount));
-                lastPercent = percent;
+                var offset = 0;
+                while (pending.Count - offset >= VadWindowSize)
+                {
+                    var window = pending.GetRange(offset, VadWindowSize).ToArray();
+                    vad.AcceptWaveform(window);
+                    offset += VadWindowSize;
+                    DrainVad(vad, recognizer, transcript, keywords, ref segmentCount, progress, duration, samplesRead, ct);
+                }
+                if (offset > 0) pending.RemoveRange(0, offset);
+
+                var elapsed = samplesRead / (double)SampleRate;
+                var percent = (int)Math.Clamp(elapsed * 100 / duration.TotalSeconds, 3, 96);
+                if (percent >= lastPercent + 2)
+                {
+                    progress?.Report(new(percent, "VAD 扫描", $"{FormatClock(TimeSpan.FromSeconds(elapsed))} / {FormatClock(duration)}，已识别 {segmentCount} 段", segmentCount));
+                    lastPercent = percent;
+                }
             }
         }
 
@@ -123,13 +132,37 @@ public sealed class BatchTranscriptionService
             vad.AcceptWaveform(pending.Take(VadWindowSize).ToArray());
         }
         var silence = new float[VadWindowSize];
-        for (var i = 0; i < 16; i++) vad.AcceptWaveform(silence);
+        for (var i = 0; i < 20; i++) vad.AcceptWaveform(silence);
         vad.Flush();
         DrainVad(vad, recognizer, transcript, keywords, ref segmentCount, progress, duration, samplesRead, ct);
 
+        if (transcript.Items.Count == 0)
+        {
+            var threshold = EstimateEnergyThreshold(rmsFrames);
+            Log($"VAD_ZERO file={Path.GetFileName(filePath)} energy_threshold={threshold:0.000000}");
+            progress?.Report(new(3, "VAD fallback", $"Silero VAD 得到 0 段，自动启用音量分段，RMS 阈值 {threshold:0.0000}"));
+            var candidates = DecodeEnergySegments(filePath, ffmpeg, recognizer, transcript, keywords, duration, threshold, ref segmentCount, progress, ct);
+            decoderName += " + 音量 fallback";
+
+            if (transcript.Items.Count == 0)
+            {
+                Log($"ENERGY_EMPTY file={Path.GetFileName(filePath)} candidates={candidates}");
+                progress?.Report(new(4, "宽松 fallback", candidates > 0
+                    ? $"音量分段已尝试 {candidates} 段但模型返回空文本，继续用宽松 8 秒分块"
+                    : "音量分段仍未找到有效片段，继续用宽松 8 秒分块"));
+                var broad = DecodeBroadChunks(filePath, ffmpeg, recognizer, transcript, keywords, duration, Math.Max(0.0008f, threshold * 0.35f), ref segmentCount, progress, ct);
+                decoderName += " + 宽松分块";
+                if (transcript.Items.Count == 0)
+                {
+                    Log($"BROAD_EMPTY file={Path.GetFileName(filePath)} chunks={broad}");
+                    progress?.Report(new(99, "无识别结果", $"VAD、音量分段和 {broad} 个宽松分块均无文本，请查看 Logs\\batch.log。"));
+                }
+            }
+        }
+
         var processing = DateTime.UtcNow - started;
         progress?.Report(new(100, "完成", $"识别 {transcript.Items.Count} 段，耗时 {FormatClock(processing)}，RTF {(processing.TotalSeconds / Math.Max(0.001, duration.TotalSeconds)):0.00}", transcript.Items.Count));
-        return new BatchTranscriptionResult(filePath, duration, transcript.Items.ToArray(), processing, source.DecoderName);
+        return new BatchTranscriptionResult(filePath, duration, transcript.Items.ToArray(), processing, decoderName);
     }
 
     static void DrainVad(VoiceActivityDetector vad, OfflineRecognizer recognizer, TranscriptService transcript, string[] keywords, ref int segmentCount,
@@ -146,18 +179,219 @@ public sealed class BatchTranscriptionService
             if (startSample < 0) startSample = Math.Max(0, samplesRead - segment.Samples.Length);
             var start = TimeSpan.FromSeconds(startSample / (double)SampleRate);
             var end = start + TimeSpan.FromSeconds(segment.Samples.Length / (double)SampleRate);
-
-            using var stream = recognizer.CreateStream();
-            stream.AcceptWaveform(SampleRate, segment.Samples);
-            recognizer.Decode(stream);
-            var text = Cleanup(stream.Result.Text);
-            if (string.IsNullOrWhiteSpace(text)) continue;
-
-            transcript.Add(new TranscriptItem { Start = start, End = end, Text = text }, keywords);
-            segmentCount++;
-            var percent = (int)Math.Clamp(end.TotalSeconds * 100 / Math.Max(0.001, duration.TotalSeconds), 3, 99);
-            progress?.Report(new(percent, "识别语音段", $"{FormatClock(start)}  {TrimForStatus(text)}", segmentCount));
+            DecodeAndAppend(recognizer, transcript, keywords, segment.Samples, start, end, ref segmentCount, progress, duration, "识别语音段", ct);
         }
+    }
+
+    static int DecodeEnergySegments(
+        string filePath,
+        FfmpegManager ffmpeg,
+        OfflineRecognizer recognizer,
+        TranscriptService transcript,
+        string[] keywords,
+        TimeSpan duration,
+        float threshold,
+        ref int segmentCount,
+        IProgress<BatchTranscriptionProgress>? progress,
+        CancellationToken ct)
+    {
+        const int preRollSamples = SampleRate / 5;
+        const int silenceFramesToClose = 25;
+        const int maxSegmentSamples = SampleRate * 10;
+        var attempts = 0;
+        using var source = new MediaAudioSource.Mono16kSource(MediaAudioSource.Open(filePath, ffmpeg));
+        var input = new float[8192];
+        var pending = new List<float>(8192 + EnergyFrameSize);
+        var preRoll = new List<float>(preRollSamples);
+        var segment = new List<float>(SampleRate * 4);
+        long frameStart = 0;
+        long segmentStart = 0;
+        var active = false;
+        var silenceFrames = 0;
+        var lastPercent = -1;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            var read = source.Read(input, 0, input.Length);
+            if (read <= 0) break;
+            for (var i = 0; i < read; i++) pending.Add(input[i]);
+            var offset = 0;
+            while (pending.Count - offset >= EnergyFrameSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                var frame = pending.GetRange(offset, EnergyFrameSize).ToArray();
+                offset += EnergyFrameSize;
+                var speech = ComputeRms(frame, frame.Length) >= threshold;
+
+                if (!active)
+                {
+                    if (speech)
+                    {
+                        active = true;
+                        segmentStart = Math.Max(0, frameStart - preRoll.Count);
+                        if (preRoll.Count > 0) segment.AddRange(preRoll);
+                        segment.AddRange(frame);
+                        preRoll.Clear();
+                    }
+                    else
+                    {
+                        preRoll.AddRange(frame);
+                        if (preRoll.Count > preRollSamples) preRoll.RemoveRange(0, preRoll.Count - preRollSamples);
+                    }
+                }
+                else
+                {
+                    segment.AddRange(frame);
+                    silenceFrames = speech ? 0 : silenceFrames + 1;
+                    if (silenceFrames >= silenceFramesToClose || segment.Count >= maxSegmentSamples)
+                    {
+                        attempts += DecodeEnergyCandidate(recognizer, transcript, keywords, segment, segmentStart, ref segmentCount, progress, duration, ct);
+                        segment.Clear();
+                        active = false;
+                        silenceFrames = 0;
+                        preRoll.Clear();
+                    }
+                }
+
+                frameStart += EnergyFrameSize;
+                var percent = (int)Math.Clamp(frameStart * 100.0 / Math.Max(1, duration.TotalSeconds * SampleRate), 0, 98);
+                if (percent >= lastPercent + 5)
+                {
+                    progress?.Report(new(percent, "VAD fallback", $"音量分段 {percent}% · 已尝试 {attempts} 段 · 已识别 {segmentCount} 段", segmentCount));
+                    lastPercent = percent;
+                }
+            }
+            if (offset > 0) pending.RemoveRange(0, offset);
+        }
+
+        if (active && segment.Count > 0)
+            attempts += DecodeEnergyCandidate(recognizer, transcript, keywords, segment, segmentStart, ref segmentCount, progress, duration, ct);
+        return attempts;
+    }
+
+    static int DecodeEnergyCandidate(
+        OfflineRecognizer recognizer,
+        TranscriptService transcript,
+        string[] keywords,
+        List<float> segment,
+        long startSample,
+        ref int segmentCount,
+        IProgress<BatchTranscriptionProgress>? progress,
+        TimeSpan duration,
+        CancellationToken ct)
+    {
+        if (segment.Count < SampleRate / 5) return 0;
+        var start = TimeSpan.FromSeconds(startSample / (double)SampleRate);
+        var end = start + TimeSpan.FromSeconds(segment.Count / (double)SampleRate);
+        DecodeAndAppend(recognizer, transcript, keywords, segment.ToArray(), start, end, ref segmentCount, progress, duration, "fallback 识别", ct);
+        return 1;
+    }
+
+    static int DecodeBroadChunks(
+        string filePath,
+        FfmpegManager ffmpeg,
+        OfflineRecognizer recognizer,
+        TranscriptService transcript,
+        string[] keywords,
+        TimeSpan duration,
+        float minRms,
+        ref int segmentCount,
+        IProgress<BatchTranscriptionProgress>? progress,
+        CancellationToken ct)
+    {
+        const int chunkSamples = SampleRate * 8;
+        using var source = new MediaAudioSource.Mono16kSource(MediaAudioSource.Open(filePath, ffmpeg));
+        var buffer = new float[chunkSamples];
+        long startSample = 0;
+        var attempts = 0;
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            var total = 0;
+            while (total < buffer.Length)
+            {
+                var read = source.Read(buffer, total, buffer.Length - total);
+                if (read <= 0) break;
+                total += read;
+            }
+            if (total <= 0) break;
+
+            var rms = ComputeRms(buffer, total);
+            if (rms >= minRms)
+            {
+                attempts++;
+                var samples = buffer.Take(total).ToArray();
+                var start = TimeSpan.FromSeconds(startSample / (double)SampleRate);
+                var end = start + TimeSpan.FromSeconds(total / (double)SampleRate);
+                DecodeAndAppend(recognizer, transcript, keywords, samples, start, end, ref segmentCount, progress, duration, "宽松分块识别", ct);
+            }
+            startSample += total;
+            var percent = (int)Math.Clamp(startSample * 100.0 / Math.Max(1, duration.TotalSeconds * SampleRate), 0, 99);
+            progress?.Report(new(percent, "宽松 fallback", $"{percent}% · 已尝试 {attempts} 块 · 已识别 {segmentCount} 段", segmentCount));
+            if (total < buffer.Length) break;
+        }
+        return attempts;
+    }
+
+    static void DecodeAndAppend(
+        OfflineRecognizer recognizer,
+        TranscriptService transcript,
+        string[] keywords,
+        float[] samples,
+        TimeSpan start,
+        TimeSpan end,
+        ref int segmentCount,
+        IProgress<BatchTranscriptionProgress>? progress,
+        TimeSpan duration,
+        string stage,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var stream = recognizer.CreateStream();
+        stream.AcceptWaveform(SampleRate, samples);
+        recognizer.Decode(stream);
+        var text = Cleanup(stream.Result.Text);
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        transcript.Add(new TranscriptItem { Start = start, End = end, Text = text }, keywords);
+        segmentCount++;
+        var percent = (int)Math.Clamp(end.TotalSeconds * 100 / Math.Max(0.001, duration.TotalSeconds), 0, 99);
+        progress?.Report(new(percent, stage, $"{FormatClock(start)}  {TrimForStatus(text)}", segmentCount));
+    }
+
+    static void CollectRmsFrames(float[] samples, int count, List<float> output)
+    {
+        for (var offset = 0; offset + EnergyFrameSize <= count; offset += EnergyFrameSize)
+            output.Add(ComputeRms(samples.AsSpan(offset, EnergyFrameSize)));
+    }
+
+    static float EstimateEnergyThreshold(List<float> values)
+    {
+        var sorted = values.Where(x => x > 0.00001f && float.IsFinite(x)).OrderBy(x => x).ToArray();
+        if (sorted.Length == 0) return 0.0015f;
+        var p20 = Percentile(sorted, 0.20);
+        var p85 = Percentile(sorted, 0.85);
+        var candidate = Math.Max(0.0015f, Math.Max(p20 * 2.2f, p85 * 0.16f));
+        var cap = Math.Max(0.0020f, p85 * 0.55f);
+        return Math.Clamp(Math.Min(candidate, cap), 0.0010f, 0.08f);
+    }
+
+    static float Percentile(float[] sorted, double fraction)
+    {
+        if (sorted.Length == 0) return 0;
+        var index = (int)Math.Clamp(Math.Round((sorted.Length - 1) * fraction), 0, sorted.Length - 1);
+        return sorted[index];
+    }
+
+    static float ComputeRms(float[] samples, int count) => ComputeRms(samples.AsSpan(0, count));
+
+    static float ComputeRms(ReadOnlySpan<float> samples)
+    {
+        if (samples.Length == 0) return 0;
+        double sum = 0;
+        foreach (var v in samples) sum += v * v;
+        return (float)Math.Sqrt(sum / samples.Length);
     }
 
     static long ReadSegmentStart(object segment)
@@ -207,10 +441,10 @@ public sealed class BatchTranscriptionService
     {
         var cfg = new VadModelConfig { SampleRate = SampleRate, NumThreads = 1, Provider = "cpu", Debug = 0 };
         cfg.SileroVad.Model = modelPath;
-        cfg.SileroVad.Threshold = 0.45f;
-        cfg.SileroVad.MinSilenceDuration = 0.30f;
-        cfg.SileroVad.MinSpeechDuration = 0.20f;
-        cfg.SileroVad.MaxSpeechDuration = 12.0f;
+        cfg.SileroVad.Threshold = 0.32f;
+        cfg.SileroVad.MinSilenceDuration = 0.38f;
+        cfg.SileroVad.MinSpeechDuration = 0.16f;
+        cfg.SileroVad.MaxSpeechDuration = 9.0f;
         cfg.SileroVad.WindowSize = VadWindowSize;
         return new VoiceActivityDetector(cfg, 120.0f);
     }
