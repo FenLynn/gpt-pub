@@ -8,7 +8,8 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 - Mediova 与 LocalSub 暂不合并。未来若需要统一入口，只考虑轻量总控/启动器，不进行源码硬合并。
 - 当前核心语言限定中文、英文。多语言专项优化与翻译延后。
-- 当前阶段采用“连续开发到完整候选，再统一实机验收”的方式，不再每个小改动单独交付。
+- 当前阶段以完整候选为主，后续集中实机验收并按真实问题修复。
+- FFmpeg 不应在 LocalSub 和 Mediova 重复下载。LocalSub 应优先复用用户已有 FFmpeg，独立下载仅作为兜底。
 
 ## 硬约束
 
@@ -25,10 +26,10 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 
 - 分支：`p103-localsub-exp`
 - 版本：`v0.1.0-dev`
-- 完整候选功能 head：`0a361e405089e6c6a7eaed9223fc4b62710963d8`
-- Windows CI run：`31920130744`，结论 `success`。
+- 当前后台/FFmpeg 修复 head：`1cb9e0c2b6a721a8288af149b1f0e6bdbbcbd12d`
+- Windows CI run：`31926946805`，结论 `success`。
 - 该 run 已通过：publish、绿色包检查、EXE 真启动、后台工作区真切换 smoke、Windows Process Loopback 真激活、sherpa native DLL 真加载、最终打包。
-- CI 不携带用户大模型，因此模型实际准确率、长视频转写速度和真实 PotPlayer 连播仍属于统一实机验收项。
+- CI 不携带用户大模型，因此模型实际准确率、长视频转写速度和真实 PotPlayer 连播仍属于实机验收项。
 
 ## 已实机确认基线
 
@@ -36,6 +37,7 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - Paraformer 准确率一般，定位为低延迟档。
 - `Streaming Zipformer Large 中文 INT8` 用户反馈更好且可用，当前中文实时推荐基线。
 - PotPlayer 普通窗口和全屏字幕 overlay 已实机可见，全屏链非回归不再重构。
+- 2026-08-16 用户首次验证后台页：MP4 可由 Media Foundation 正常解析并生成波形，但用户反馈“后台不行”；同时点击 FFmpeg 下载出现 `416 Requested Range Not Satisfiable`。该 MP4 已显示 `解码 Media Foundation`，因此 FFmpeg 失败不是该文件无法读取的根因。
 
 ## 实时字幕已实现
 
@@ -74,18 +76,18 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - Fun-ASR-Nano INT8，约 0.9 GB。
 - Silero VAD，约 2 MB。
 
-## 后台转写已实现
+## 后台转写
 
 完整链路：
 
 `媒体 -> Media Foundation / FFmpeg fallback -> 16 kHz mono -> Silero VAD -> Offline ASR -> 时间戳 transcript -> 关键词 -> TXT / JSON`
 
-能力：
+当前能力：
 
 - 视频/音频拖放和文件队列。
 - 添加、移除、清空、转写选中、全部转写、取消。
 - 优先使用 Windows Media Foundation 读取音轨。
-- Media Foundation 不支持时，可单独下载 FFmpeg Essentials 到 `Components\FFmpeg\bin`，仍复用代理/SOCKS5，不进入基础包。
+- Media Foundation 不支持时再使用 FFmpeg。
 - 流式读取媒体，不把整部视频一次性载入内存。
 - 后台模型支持 SenseVoice、Offline Zipformer CTC、Fun-ASR-Nano。
 - Silero VAD 产生语音段并生成开始/结束时间戳。
@@ -96,17 +98,28 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - 每个完成文件自动保存结构化 JSON 到 `Data\Transcripts`。
 - 显示转写进度、分段数、解码器和 RTF。
 - 多文件顺序连续转写，单个失败不阻断后续，取消时保留已完成结果。
-- 后台工作区延迟加载，首次进入后台 Tab 才构建重 UI，避免拖慢普通启动。
-- 延迟加载会替换并销毁早期 prototype Tab，避免旧拖放/分析事件重复运行。
+- 后台工作区延迟加载，首次进入后台 Tab 才构建重 UI。
+
+### 2026-08-16 后台修复
+
+- 修复队列状态显示长期停留“待处理”的 UI 问题。WinForms `ListBox` 会缓存对象的显示字符串，新版改为动态 OwnerDraw，每次重绘直接读取当前 QueueItem 状态。
+- 后台 ASR 在真正构建大型离线模型前明确显示“加载模型”，Fun-ASR-Nano 等大模型不再表现为点击后长时间无反馈。
+- 新增 `Logs\batch.log`，记录后台任务 START / DONE / FAIL；若实机仍失败，可直接用完整异常继续定位。
+- FFmpeg 支持手动指定已有 `ffmpeg.exe`，设置页会验证同目录必须同时存在 `ffprobe.exe`。
+- FFmpeg 自动发现顺序：手动指定 -> LocalSub 自有组件 -> `MEDIOVA_RUNTIME_DIR` -> 附近 Mediova `Components\FFmpeg\bin` -> 系统 PATH。
+- Mediova 当前正式运行结构的 FFmpeg 路径即 `Mediova\Components\FFmpeg\bin`，因此两软件可以共用一套文件，不需要复制或重新下载。
+- 只有前述路径全部不可用时，后台页的下载才作为兜底。
+- 修复 FFmpeg 下载 `416 Requested Range Not Satisfiable`：如果 `.part` 已是完整 ZIP，直接校验并复用；若断点缓存异常则清理后重试，不再把 416 直接作为最终失败。
+- FFmpeg ZIP 下载完成后增加实际 ZIP/ffmpeg/ffprobe 校验，避免损坏缓存被当作成功文件。
 
 ## 性能、启动与后台运行
 
 - 资源模式：节能 / 自动 / 最大性能，默认自动。
 - 真流式 ASR 和后台 ASR 已接统一线程策略。
-- 设置页可配置资源模式、最小化到托盘、开机自动启动。
+- 设置页可配置资源模式、FFmpeg 路径、最小化到托盘、开机自动启动。
 - 开机启动使用当前用户 HKCU Run，不需要管理员权限。
 - 托盘默认关闭；启用后最小化/关闭窗口可驻留托盘，支持恢复和真正退出。
-- 冷启动写入 `Logs\startup.log`，记录 runtime-init、main-form-constructed、lightweight-enhancers-attached、window-shown，便于实机定位启动慢。
+- 冷启动写入 `Logs\startup.log`，记录 runtime-init、main-form-constructed、lightweight-enhancers-attached、window-shown。
 
 ## CI 门禁
 
@@ -129,34 +142,15 @@ Windows 本地实时字幕与后台视频转写工具。优先服务 PotPlayer�
 - 重型字幕编辑器。
 - Mediova 源码合并。
 
-## 统一实机验收清单
+## 下一实机验收断点
 
-实时：
+优先后台：
 
-1. 所有音频 + Zipformer Large 基线。
-2. PotPlayer 连续切 2-3 个视频，确认自动续接。
-3. 普通窗口、最大化、全屏、最小化/恢复。
-4. Zipformer CTC Large / XLarge、SenseVoice、Fun-ASR-Nano 同片段对比速度与准确率。
-5. 字幕自动/固定字号、位置、底纹、显示时长。
-6. 节能/自动/最大性能模式下 CPU、延迟与稳定性。
+1. 覆盖 `1cb9e0c2...` 对应 EXE 后重新拖入同一 1:30 MP4。
+2. 波形生成后，队列状态应变为“波形就绪”，不再一直显示“待处理”。
+3. 选择 Fun-ASR-Nano 后点击“转写选中”，状态应先明确进入“加载模型”，随后进入转写进度。
+4. 若仍不出文字，读取 `Logs\batch.log` 的最新 FAIL/最后阶段，不再依赖截图猜测。
+5. 在“设置”中查看 FFmpeg：若自动发现 Mediova，会显示来源 Mediova；否则手动选择 Mediova `Components\FFmpeg\bin\ffmpeg.exe` 并保存。
+6. 当前 MP4 已可用 Media Foundation，因此即便暂时完全不配置 FFmpeg，也应能执行后台 ASR；FFmpeg 只用于 MF 不支持的格式/编码。
 
-后台：
-
-1. MP4/MOV 等文件自动生成声音轨道。
-2. MKV/WebM/特殊编码安装 FFmpeg 后 fallback。
-3. SenseVoice、Offline Zipformer CTC、Fun-ASR-Nano 分别转写同一片段。
-4. 时间戳、VAD 语音区间、关键词高亮和波形 marker 对齐。
-5. 多文件全部转写、单文件失败和取消。
-6. TXT 导出、`Data\Transcripts` JSON 自动记录。
-7. 检查 RTF，重点看 Offline Zipformer CTC 是否可稳定低于 1。
-
-系统：
-
-1. 双击 EXE 冷启动体感并检查 `Logs\startup.log`。
-2. 托盘、真正退出、开机启动。
-3. 模型页黑/浅灰与实时/后台下拉框保持事实一致。
-4. 基础包保持轻量，模型、FFmpeg、ASR runtime 均外置复用。
-
-## 下一准确断点
-
-当前既定核心范围已经进入统一候选状态。下一步不是继续无边界增加功能，而是用户回来后按上述清单集中实机验收；发现问题时按“实时 / 后台 / 系统”三类逐项修复。
+其他统一验收继续包括 PotPlayer 连播自动续接、不同实时/后台模型效果、字幕样式、MKV/WebM fallback、TXT/JSON、托盘和启动速度。
