@@ -87,6 +87,19 @@ internal sealed class OfflineRecognizer : IDisposable
                 BatchCapable = true
             };
         }
+        else if (!string.IsNullOrWhiteSpace(config.ModelConfig.FireRedAsrCtc.Model))
+        {
+            var modelPath = Path.GetFullPath(config.ModelConfig.FireRedAsrCtc.Model);
+            folder = Path.GetDirectoryName(modelPath) ?? throw new InvalidDataException("FireRedASR2 CTC 模型路径无效。");
+            descriptor = new ModelDescriptor
+            {
+                Id = "firered-asr2-ctc-zh-en-int8",
+                Name = "FireRedASR2 CTC 中英 INT8",
+                FolderName = Path.GetFileName(folder),
+                RequiredFiles = ["model.int8.onnx", "tokens.txt"],
+                BatchCapable = true
+            };
+        }
         else if (!string.IsNullOrWhiteSpace(config.ModelConfig.FunAsrNano.EncoderAdaptor))
         {
             var modelPath = Path.GetFullPath(config.ModelConfig.FunAsrNano.EncoderAdaptor);
@@ -98,12 +111,12 @@ internal sealed class OfflineRecognizer : IDisposable
                 FolderName = Path.GetFileName(folder),
                 RequiredFiles = ["encoder_adaptor.int8.onnx", "llm.int8.onnx", "embedding.int8.onnx", "Qwen3-0.6B"],
                 BatchCapable = true,
-                LiveCapable = true
+                LiveCapable = false
             };
         }
         else
         {
-            throw new NotSupportedException("LocalSub native 离线桥没有识别到已配置的 SenseVoice、Offline Zipformer CTC 或 Fun-ASR-Nano 模型。");
+            throw new NotSupportedException("LocalSub native 离线桥没有识别到已配置的 SenseVoice、Offline Zipformer CTC、FireRedASR2 CTC 或 Fun-ASR-Nano 模型。");
         }
 
         var asrRoot = Directory.GetParent(folder)?.FullName
