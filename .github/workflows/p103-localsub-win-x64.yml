@@ -7,6 +7,10 @@ on:
       - 'projects/1-桌面软件/103-LocalSub/src/LocalSub/**'
       - '.github/workflows/p103-localsub-win-x64.yml'
 
+concurrency:
+  group: localsub-win-x64-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
