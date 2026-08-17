@@ -61,7 +61,7 @@ public sealed class ModelManager
                 var parent = Path.GetDirectoryName(target);
                 if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
                 var fileProgress = progress == null ? null : new AggregateFileProgress(progress, i, model.Files.Length, file.FileName);
-                await DownloadFileAsync(file.Url, target, fileProgress, ct);
+                await DownloadFileAsync(file.Url, target, fileProgress, ct).ConfigureAwait(false);
             }
 
             progress?.Report(new("校验", 100, Detail: "检查模型关键文件"));
@@ -75,7 +75,7 @@ public sealed class ModelManager
             var finalDir = GetModelFolder(model);
             Directory.CreateDirectory(finalDir);
             var target = Path.Combine(finalDir, Path.GetFileName(new Uri(model.Url).LocalPath));
-            await DownloadFileAsync(model.Url, target, progress, ct);
+            await DownloadFileAsync(model.Url, target, progress, ct).ConfigureAwait(false);
             progress?.Report(new("校验", 100, Detail: "检查模型关键文件"));
             if (!IsInstalled(model)) throw new InvalidDataException("模型下载完成，但关键文件不完整。");
             progress?.Report(new("完成", 100, Detail: $"已安装到 {finalDir}"));
@@ -99,7 +99,7 @@ public sealed class ModelManager
         else
         {
             TryDeleteFile(archivePath);
-            await DownloadFileAsync(model.Url, archivePath, progress, ct);
+            await DownloadFileAsync(model.Url, archivePath, progress, ct).ConfigureAwait(false);
         }
 
         if (archivePath.EndsWith(".bz2", StringComparison.OrdinalIgnoreCase) && !LooksLikeBZip2(archivePath))
@@ -108,6 +108,19 @@ public sealed class ModelManager
             throw new InvalidDataException("模型缓存不是有效的 .tar.bz2，已自动删除，请重新下载。");
         }
 
+        // Archive extraction and large directory replacement are intentionally kept off
+        // the WinForms message thread. This is especially important for Fun-ASR/Qwen
+        // archives that contain many small files.
+        await Task.Run(() => ExtractAndInstallArchive(model, archivePath, archiveName, progress, ct), ct).ConfigureAwait(false);
+    }
+
+    void ExtractAndInstallArchive(
+        ModelDescriptor model,
+        string archivePath,
+        string archiveName,
+        IProgress<ModelOperationProgress>? progress,
+        CancellationToken ct)
+    {
         var stagingRoot = Path.Combine(_settings.ResolvedAsrRoot, "._staging");
         var staging = Path.Combine(stagingRoot, model.Id + "-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(staging);
@@ -126,13 +139,25 @@ public sealed class ModelManager
                     BufferSize = 1024 * 256
                 };
 
+                var reportWatch = Stopwatch.StartNew();
+                var lastReport = TimeSpan.Zero;
+                string? lastEntry = null;
                 while (reader.MoveToNextEntry())
                 {
                     ct.ThrowIfCancellationRequested();
                     if (reader.Entry.IsDirectory) continue;
-                    progress?.Report(new("解压", null, Detail: reader.Entry.Key, IsIndeterminate: true));
+                    lastEntry = reader.Entry.Key;
                     reader.WriteEntryToDirectory(staging, options);
+
+                    // Do not flood the UI queue for archives containing thousands of files.
+                    if (reportWatch.Elapsed - lastReport >= TimeSpan.FromMilliseconds(180))
+                    {
+                        progress?.Report(new("解压", null, Detail: lastEntry, IsIndeterminate: true));
+                        lastReport = reportWatch.Elapsed;
+                    }
                 }
+                if (!string.IsNullOrWhiteSpace(lastEntry))
+                    progress?.Report(new("解压", null, Detail: lastEntry, IsIndeterminate: true));
             }
             catch (OperationCanceledException)
             {
@@ -187,7 +212,7 @@ public sealed class ModelManager
                 using var request = new HttpRequestMessage(HttpMethod.Get, url);
                 if (existing > 0) request.Headers.Range = new RangeHeaderValue(existing, null);
 
-                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
                 {
                     TryDeleteFile(temp);
@@ -211,7 +236,7 @@ public sealed class ModelManager
 
                 var watch = Stopwatch.StartNew();
                 var lastReport = TimeSpan.Zero;
-                await using var input = await response.Content.ReadAsStreamAsync(ct);
+                await using var input = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 await using (var output = new FileStream(
                     temp,
                     resumed ? FileMode.Append : FileMode.Create,
@@ -224,9 +249,9 @@ public sealed class ModelManager
                     var readTotal = existing;
                     while (true)
                     {
-                        var n = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
+                        var n = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false);
                         if (n == 0) break;
-                        await output.WriteAsync(buffer.AsMemory(0, n), ct);
+                        await output.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
                         readTotal += n;
 
                         if (watch.Elapsed - lastReport >= TimeSpan.FromMilliseconds(250))
@@ -237,7 +262,7 @@ public sealed class ModelManager
                             lastReport = watch.Elapsed;
                         }
                     }
-                    await output.FlushAsync(ct);
+                    await output.FlushAsync(ct).ConfigureAwait(false);
                     var finalSpeed = watch.Elapsed.TotalSeconds > 0 ? (readTotal - existing) / watch.Elapsed.TotalSeconds : 0;
                     progress?.Report(new("下载", 100, readTotal, total ?? readTotal, finalSpeed, "下载完成"));
                 }
@@ -268,7 +293,7 @@ public sealed class ModelManager
                 progress?.Report(new("重试", null, Detail: $"下载中断，第 {attempt}/3 次：{ex.Message}", IsIndeterminate: true));
             }
 
-            if (attempt < 3) await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct);
+            if (attempt < 3) await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct).ConfigureAwait(false);
         }
 
         throw lastError ?? new IOException("模型下载失败。");
@@ -300,7 +325,9 @@ public sealed class ModelManager
 
     public void Delete(ModelDescriptor model)
     {
-        TryDeleteDirectory(GetModelFolder(model));
+        // Remove the installed directory from its official path immediately so the UI
+        // can refresh at once, then perform recursive deletion in the background.
+        DetachAndDeleteDirectory(GetModelFolder(model));
 
         if (!string.IsNullOrWhiteSpace(model.Url))
         {
@@ -313,8 +340,34 @@ public sealed class ModelManager
         var stagingRoot = Path.Combine(_settings.ResolvedAsrRoot, "._staging");
         if (Directory.Exists(stagingRoot))
         {
-            foreach (var dir in Directory.GetDirectories(stagingRoot, model.Id + "-*"))
-                TryDeleteDirectory(dir);
+            try
+            {
+                foreach (var dir in Directory.GetDirectories(stagingRoot, model.Id + "-*"))
+                    DetachAndDeleteDirectory(dir);
+            }
+            catch { }
+        }
+    }
+
+    static void DetachAndDeleteDirectory(string path)
+    {
+        if (!Directory.Exists(path)) return;
+        var parent = Path.GetDirectoryName(path);
+        if (string.IsNullOrWhiteSpace(parent))
+        {
+            _ = Task.Run(() => TryDeleteDirectory(path));
+            return;
+        }
+
+        var detached = Path.Combine(parent, ".delete-" + Path.GetFileName(path) + "-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.Move(path, detached);
+            _ = Task.Run(() => TryDeleteDirectory(detached));
+        }
+        catch
+        {
+            _ = Task.Run(() => TryDeleteDirectory(path));
         }
     }
 
