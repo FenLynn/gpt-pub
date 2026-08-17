@@ -183,8 +183,11 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     public async Task StopAsync()
     {
         _running = false;
-        _allAudio.Stop();
-        await _processAudio.StopAsync();
+
+        var allAudioStop = Task.Run(() => _allAudio.Stop());
+        var processStop = _processAudio.StopAsync();
+        await Task.WhenAll(allAudioStop, processStop);
+
         if (_queue != null) _queue.Writer.TryComplete();
         if (_cts != null) { try { _cts.Cancel(); } catch { } }
         if (_worker != null) { try { await _worker; } catch (OperationCanceledException) { } }
@@ -192,9 +195,17 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _queue = null;
         _cts?.Dispose();
         _cts = null;
-        _streaming.Stop();
-        _senseVoice.Stop();
-        _funAsrNano.Stop();
+
+        // Destroying ONNX/sherpa recognizers can take hundreds of milliseconds or
+        // several seconds for larger models. Never perform native teardown on the
+        // WinForms message thread, otherwise Windows reports the app as not responding.
+        await Task.Run(() =>
+        {
+            _streaming.Stop();
+            _senseVoice.Stop();
+            _funAsrNano.Stop();
+        });
+
         _useSenseVoice = false;
         _useFunAsrNano = false;
         _streamingLabel = "Streaming ASR";
