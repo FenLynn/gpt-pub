@@ -84,6 +84,9 @@ public sealed class BatchTranscriptionService
         var input = new float[8192];
         var pending = new List<float>(VadWindowSize * 4);
         var rmsFrames = new List<float>();
+        var funAsrMerger = string.Equals(model.Id, "funasr-nano-int8", StringComparison.OrdinalIgnoreCase)
+            ? new FunAsrSegmentMerger()
+            : null;
         long samplesRead = 0;
         var lastPercent = -1;
         var segmentCount = 0;
@@ -95,8 +98,11 @@ public sealed class BatchTranscriptionService
             duration = source.Duration;
             decoderName = source.DecoderName;
             if (duration <= TimeSpan.Zero) throw new InvalidDataException("无法取得媒体时长。");
+            if (funAsrMerger != null) decoderName += " + Fun-ASR 长段合并";
 
-            progress?.Report(new(3, "VAD 扫描", $"{model.Name} 已加载，{decoderName}，{threads} 线程"));
+            progress?.Report(new(3, "VAD 扫描", funAsrMerger == null
+                ? $"{model.Name} 已加载，{decoderName}，{threads} 线程"
+                : $"{model.Name} 已加载，相邻短句将合并为约 7-11 秒上下文块"));
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
@@ -112,7 +118,7 @@ public sealed class BatchTranscriptionService
                     var window = pending.GetRange(offset, VadWindowSize).ToArray();
                     vad.AcceptWaveform(window);
                     offset += VadWindowSize;
-                    DrainVad(vad, recognizer, transcript, keywords, ref segmentCount, progress, duration, samplesRead, ct);
+                    DrainVad(vad, recognizer, transcript, keywords, funAsrMerger, ref segmentCount, progress, duration, samplesRead, ct);
                 }
                 if (offset > 0) pending.RemoveRange(0, offset);
 
@@ -134,7 +140,8 @@ public sealed class BatchTranscriptionService
         var silence = new float[VadWindowSize];
         for (var i = 0; i < 20; i++) vad.AcceptWaveform(silence);
         vad.Flush();
-        DrainVad(vad, recognizer, transcript, keywords, ref segmentCount, progress, duration, samplesRead, ct);
+        DrainVad(vad, recognizer, transcript, keywords, funAsrMerger, ref segmentCount, progress, duration, samplesRead, ct);
+        funAsrMerger?.Flush(recognizer, transcript, keywords, ref segmentCount, progress, duration, ct);
 
         if (transcript.Items.Count == 0)
         {
@@ -165,8 +172,17 @@ public sealed class BatchTranscriptionService
         return new BatchTranscriptionResult(filePath, duration, transcript.Items.ToArray(), processing, decoderName);
     }
 
-    static void DrainVad(VoiceActivityDetector vad, OfflineRecognizer recognizer, TranscriptService transcript, string[] keywords, ref int segmentCount,
-        IProgress<BatchTranscriptionProgress>? progress, TimeSpan duration, long samplesRead, CancellationToken ct)
+    static void DrainVad(
+        VoiceActivityDetector vad,
+        OfflineRecognizer recognizer,
+        TranscriptService transcript,
+        string[] keywords,
+        FunAsrSegmentMerger? funAsrMerger,
+        ref int segmentCount,
+        IProgress<BatchTranscriptionProgress>? progress,
+        TimeSpan duration,
+        long samplesRead,
+        CancellationToken ct)
     {
         while (!vad.IsEmpty())
         {
@@ -177,6 +193,12 @@ public sealed class BatchTranscriptionService
 
             var startSample = ReadSegmentStart(segment);
             if (startSample < 0) startSample = Math.Max(0, samplesRead - segment.Samples.Length);
+            if (funAsrMerger != null)
+            {
+                funAsrMerger.Push(recognizer, transcript, keywords, segment.Samples, startSample, ref segmentCount, progress, duration, ct);
+                continue;
+            }
+
             var start = TimeSpan.FromSeconds(startSample / (double)SampleRate);
             var end = start + TimeSpan.FromSeconds(segment.Samples.Length / (double)SampleRate);
             DecodeAndAppend(recognizer, transcript, keywords, segment.Samples, start, end, ref segmentCount, progress, duration, "识别语音段", ct);
@@ -438,6 +460,11 @@ public sealed class BatchTranscriptionService
             cfg.ModelConfig.Tokens = Path.Combine(folder, "tokens.txt");
             cfg.ModelConfig.ZipformerCtc.Model = Path.Combine(folder, "model.int8.onnx");
         }
+        else if (string.Equals(model.Id, "firered-asr2-ctc-zh-en-int8", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.ModelConfig.Tokens = Path.Combine(folder, "tokens.txt");
+            cfg.ModelConfig.FireRedAsrCtc.Model = Path.Combine(folder, "model.int8.onnx");
+        }
         else if (string.Equals(model.Id, "funasr-nano-int8", StringComparison.OrdinalIgnoreCase))
         {
             cfg.ModelConfig.Tokens = "";
@@ -482,4 +509,76 @@ public sealed class BatchTranscriptionService
 
     static string TrimForStatus(string text) => text.Length <= 45 ? text : text[..45] + "…";
     static string FormatClock(TimeSpan t) => t.TotalHours >= 1 ? t.ToString(@"hh\:mm\:ss") : t.ToString(@"mm\:ss");
+
+    sealed class FunAsrSegmentMerger
+    {
+        const int TargetSamples = SampleRate * 7;
+        const int MaxSamples = SampleRate * 11;
+        const int MaxGapSamples = (int)(SampleRate * 1.1);
+
+        readonly List<float> _samples = new(TargetSamples + SampleRate);
+        long _startSample = -1;
+        long _endSample = -1;
+
+        public void Push(
+            OfflineRecognizer recognizer,
+            TranscriptService transcript,
+            string[] keywords,
+            float[] samples,
+            long startSample,
+            ref int segmentCount,
+            IProgress<BatchTranscriptionProgress>? progress,
+            TimeSpan duration,
+            CancellationToken ct)
+        {
+            if (samples.Length == 0) return;
+            var endSample = startSample + samples.Length;
+
+            if (_startSample >= 0)
+            {
+                var gap = Math.Max(0, startSample - _endSample);
+                var wouldBe = _samples.Count + (gap <= MaxGapSamples ? (int)gap : 0) + samples.Length;
+                if (gap > MaxGapSamples || wouldBe > MaxSamples)
+                    Flush(recognizer, transcript, keywords, ref segmentCount, progress, duration, ct);
+            }
+
+            if (_startSample < 0)
+            {
+                _startSample = startSample;
+                _endSample = startSample;
+            }
+
+            var currentGap = Math.Max(0, startSample - _endSample);
+            if (currentGap > 0 && currentGap <= MaxGapSamples)
+                _samples.AddRange(new float[(int)currentGap]);
+
+            _samples.AddRange(samples);
+            _endSample = endSample;
+
+            if (_samples.Count >= TargetSamples)
+                Flush(recognizer, transcript, keywords, ref segmentCount, progress, duration, ct);
+        }
+
+        public void Flush(
+            OfflineRecognizer recognizer,
+            TranscriptService transcript,
+            string[] keywords,
+            ref int segmentCount,
+            IProgress<BatchTranscriptionProgress>? progress,
+            TimeSpan duration,
+            CancellationToken ct)
+        {
+            if (_samples.Count >= SampleRate / 5 && _startSample >= 0)
+            {
+                var start = TimeSpan.FromSeconds(_startSample / (double)SampleRate);
+                var end = TimeSpan.FromSeconds(Math.Max(_startSample + _samples.Count, _endSample) / (double)SampleRate);
+                Log($"FUNASR_MERGE start={start.TotalSeconds:0.000}s duration={(end - start).TotalSeconds:0.0}s samples={_samples.Count}");
+                DecodeAndAppend(recognizer, transcript, keywords, _samples.ToArray(), start, end, ref segmentCount, progress, duration, "Fun-ASR 长段识别", ct);
+            }
+
+            _samples.Clear();
+            _startSample = -1;
+            _endSample = -1;
+        }
+    }
 }
