@@ -10,8 +10,8 @@ public static class PerformancePolicy
         return profile switch
         {
             ResourceProfile.Eco => Math.Clamp(cpu / 4, 1, 2),
-            ResourceProfile.MaxPerformance => Math.Clamp(cpu, 2, 8),
-            _ => Math.Clamp(cpu / 2, 1, 6)
+            ResourceProfile.MaxPerformance => Math.Clamp(cpu - 1, 2, 6),
+            _ => Math.Clamp(cpu / 3, 1, 4)
         };
     }
 
@@ -21,8 +21,8 @@ public static class PerformancePolicy
         return profile switch
         {
             ResourceProfile.Eco => Math.Clamp(cpu / 4, 1, 2),
-            ResourceProfile.MaxPerformance => Math.Clamp(cpu, 2, 12),
-            _ => Math.Clamp(cpu / 2, 1, 6)
+            ResourceProfile.MaxPerformance => Math.Clamp(cpu - 1, 2, 8),
+            _ => Math.Clamp(cpu / 3, 1, 4)
         };
     }
 }
