@@ -11,6 +11,7 @@ Windows 本地实时字幕与后台视频转写工具，优先服务 PotPlayer�
 - 当前阶段以完整候选和真实实机问题修复为主，不继续无边界增加功能。
 - FFmpeg 优先复用已有 Mediova/系统 FFmpeg，独立下载只作为兜底。
 - 日常交付默认给相对上一用户版的增量覆盖 ZIP。
+- 2026-08-17 用户再次反馈软件“还是容易未响应”，已启动专门的 UI 响应性治理，不再把卡顿简单归因于模型本身。
 
 ## 硬约束
 
@@ -25,8 +26,8 @@ Windows 本地实时字幕与后台视频转写工具，优先服务 PotPlayer�
 
 - 分支：`p103-localsub-exp`
 - 版本：`v0.1.0-dev`
-- 当前运行功能 head：`117b5b0e2c4f1d82d48fab1e50b982c04f19fa3c`
-- Windows CI run：`31995510384`，结论 `success`。
+- 当前运行功能 head：`7d17e5bd49c46a03279e6ce264965a0c317578cb`
+- Windows CI run：`31997618173`，结论 `success`。
 - 该 run 已通过：publish、绿色包检查、EXE 真启动、后台工作区真切换、Windows Process Loopback 真激活、sherpa native runtime 加载、native 离线 ASR 真解码、最终打包。
 - CI 已增加 `concurrency + cancel-in-progress`，同一开发分支的新 commit 会取消过期 Windows 构建，减少 CI 浪费。
 
@@ -117,11 +118,38 @@ Fun-ASR-Nano 不再按每个很短的 VAD 段立即启动一次 LLM 解码。当
 - compatibility bridge 保持 batch/VAD/fallback 调用结构不变。
 - CI native offline ASR smoke 会临时下载官方小型 TDNN yes/no 模型，实际执行 CreateRecognizer -> CreateStream -> AcceptWaveform -> Decode -> JSON result，并验证非空文字；测试模型和 runtime 不进入发布包。
 
+## 2026-08-17 UI 响应性专项修复
+
+本轮针对“容易未响应”进行了代码级审查并确认多个真实阻塞点：
+
+1. `ModelManager.DownloadAsync()` 在下载结束或直接复用缓存后，会在调用线程同步执行 `.tar.bz2` 解压、目录删除和安装。若由 WinForms UI 调用，这些工作实际占住消息线程。
+2. Fun-ASR/Qwen 类压缩包包含较多文件，旧代码每个文件都 `progress.Report()`，会向 UI 消息队列灌入大量状态刷新。
+3. `AsrRuntimeManager` 与 `FfmpegManager` 也存在下载后同步解压/目录替换。
+4. PotPlayer overlay 跟随逻辑高频调用 `FindRunning()`，旧实现会重复 `Process.GetProcessesByName()`，`TryGetWindowState()` 还会重复 `EnumWindows()`。
+5. 停止或切换实时 ASR 时，native recognizer 销毁可能耗时，旧代码会回到 UI 线程执行。
+6. 默认“自动”资源档此前最多给 realtime/batch ASR 6 个线程，对 GUI 响应性预留不足。
+
+当前修复：
+
+- 模型大包解压和正式目录替换改为 `Task.Run` 后台执行。
+- 模型解压状态刷新节流到约 180 ms，不再逐文件轰炸 UI。
+- 模型删除先快速移出正式目录，再后台递归清理。
+- sherpa runtime 安装改为后台执行，下载进度约 250 ms 节流。
+- FFmpeg 解压/安装改为后台执行，FFmpeg 发现结果增加 5 秒缓存，避免后台页反复扫描目录和 PATH。
+- PotPlayer 进程发现缓存约 1.8 秒，窗口句柄快速路径缓存约 0.9 秒，避免每次跟随 tick 都完整枚举。
+- 实时 ASR 停止时，音频停止和 native recognizer teardown 移到后台任务，避免停止/换模型时卡住 WinForms 消息循环。
+- “自动”档 realtime/batch 默认改为最多 4 个 ASR 线程；“最大性能”仍允许更高并发。
+- 新增 `UiResponsivenessMonitor`：正常时不写日志；若 UI tick 间隔超过约 1.5 秒，恢复后记录到 `Logs\responsiveness.log`，包括卡顿时长和当前 Tab，便于继续定位残余阻塞。
+
+本轮 Windows run `31997618173` 已全绿，但尚未由用户实机确认“未响应”问题已经消失。
+
 ## 性能与系统
 
 - 资源模式：节能 / 自动 / 最大性能，默认自动。
+- 默认“自动”现在优先保留 GUI 响应余量，realtime/batch ASR 最大 4 线程。
 - 可选最小化到托盘和当前用户开机启动。
 - 冷启动耗时写入 `Logs\startup.log`。
+- UI 卡顿超过约 1.5 秒后写入 `Logs\responsiveness.log`。
 - 模型加载与 PotPlayer 捕获可并行启动。
 
 ## 本阶段明确不做
@@ -136,13 +164,19 @@ Fun-ASR-Nano 不再按每个很短的 VAD 段立即启动一次 LLM 解码。当
 
 ## 下一实机验收断点
 
-后台优先：
+响应性优先：
+
+1. 覆盖 run `31997618173` 对应 EXE，仅需替换 `LocalSub.exe`。
+2. 重点观察四个此前容易卡顿的动作：模型下载后解压、后台转写进行中、实时字幕停止/切换模型、PotPlayer 播放/快进时长时间运行。
+3. 若仍出现明显“未响应”，不要仅描述现象，直接提供 `Logs\responsiveness.log` 最后几行，同时说明当时正在做什么；日志会记录卡顿毫秒数和当前页面。
+4. 若 `responsiveness.log` 没有记录但窗口仍显示未响应，则下一轮转向原生调用/Windows 消息泵之外的进程级阻塞调查。
+
+后台继续：
 
 1. 用 SenseVoice 再确认已有后台基线没有回归。
 2. 下载 FireRedASR2 CTC 后用同一中文/中英视频对比 SenseVoice、Offline Zipformer CTC、FireRedASR2 CTC 的准确率、RTF 和 CPU。
 3. Fun-ASR-Nano 仅作为实验后台复测，观察 7~11 秒合并后是否比旧版更有输出，不再把它当主力。
-4. 检查新声音轨道的可读性，确认弱音频展开、网格、语音区间和关键词 marker 都清晰。
-5. MKV/WebM 验证 FFmpeg fallback 和 Mediova FFmpeg 复用。
+4. MKV/WebM 验证 FFmpeg fallback 和 Mediova FFmpeg 复用。
 
 实时继续：
 
