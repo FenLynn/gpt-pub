@@ -10,7 +10,14 @@ public sealed record ComponentDownloadProgress(int Percent, long BytesDone, long
 public sealed class FfmpegManager
 {
     const string DownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+    const int ResolveCacheMs = 5000;
     readonly AppSettings _settings;
+    readonly object _resolveGate = new();
+    string _cachedFfmpeg = "";
+    string _cachedFfprobe = "";
+    string _cachedSource = "未找到";
+    bool _cachedResolved;
+    long _lastResolveTick;
 
     public FfmpegManager(AppSettings settings) => _settings = settings;
 
@@ -35,7 +42,7 @@ public sealed class FfmpegManager
         var archive = Path.Combine(cacheDir, "ffmpeg-release-essentials.zip");
         try
         {
-            await DownloadAsync(archive, progress, ct);
+            await DownloadAsync(archive, progress, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -43,6 +50,12 @@ public sealed class FfmpegManager
             throw;
         }
 
+        await Task.Run(() => InstallArchive(archive, progress, ct), ct).ConfigureAwait(false);
+        InvalidateResolveCache();
+    }
+
+    void InstallArchive(string archive, IProgress<ComponentDownloadProgress>? progress, CancellationToken ct)
+    {
         progress?.Report(new(100, new FileInfo(archive).Length, new FileInfo(archive).Length, 0, "解压 FFmpeg"));
         var staging = Path.Combine(Root, ".staging");
         if (Directory.Exists(staging)) Directory.Delete(staging, true);
@@ -80,7 +93,21 @@ public sealed class FfmpegManager
 
     public void DeleteManaged()
     {
-        if (Directory.Exists(Root)) Directory.Delete(Root, true);
+        InvalidateResolveCache();
+        if (!Directory.Exists(Root)) return;
+        var parent = Path.GetDirectoryName(Root);
+        if (!string.IsNullOrWhiteSpace(parent))
+        {
+            var detached = Path.Combine(parent, ".delete-FFmpeg-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.Move(Root, detached);
+                _ = Task.Run(() => { try { Directory.Delete(detached, true); } catch { } });
+                return;
+            }
+            catch { }
+        }
+        _ = Task.Run(() => { try { Directory.Delete(Root, true); } catch { } });
     }
 
     public static bool ValidatePair(string path, out string ffmpegPath, out string ffprobePath)
@@ -107,6 +134,32 @@ public sealed class FfmpegManager
     }
 
     bool TryResolveActivePair(out string ffmpeg, out string ffprobe, out string source)
+    {
+        var now = Environment.TickCount64;
+        lock (_resolveGate)
+        {
+            if (_cachedResolved && now - _lastResolveTick < ResolveCacheMs)
+            {
+                ffmpeg = _cachedFfmpeg;
+                ffprobe = _cachedFfprobe;
+                source = _cachedSource;
+                return !string.IsNullOrWhiteSpace(ffmpeg) && File.Exists(ffmpeg) && File.Exists(ffprobe);
+            }
+        }
+
+        var found = ResolveActivePair(out ffmpeg, out ffprobe, out source);
+        lock (_resolveGate)
+        {
+            _cachedResolved = true;
+            _lastResolveTick = now;
+            _cachedFfmpeg = found ? ffmpeg : "";
+            _cachedFfprobe = found ? ffprobe : "";
+            _cachedSource = found ? source : "未找到";
+        }
+        return found;
+    }
+
+    bool ResolveActivePair(out string ffmpeg, out string ffprobe, out string source)
     {
         if (ValidatePair(_settings.FfmpegPath, out ffmpeg, out ffprobe))
         {
@@ -153,6 +206,18 @@ public sealed class FfmpegManager
         ffprobe = string.Empty;
         source = "未找到";
         return false;
+    }
+
+    void InvalidateResolveCache()
+    {
+        lock (_resolveGate)
+        {
+            _cachedResolved = false;
+            _lastResolveTick = 0;
+            _cachedFfmpeg = "";
+            _cachedFfprobe = "";
+            _cachedSource = "未找到";
+        }
     }
 
     static IReadOnlyList<string> NearbyMediovaCandidates()
@@ -215,7 +280,7 @@ public sealed class FfmpegManager
                 using var client = DownloadClientFactory.Create(_settings, TimeSpan.FromSeconds(60));
                 using var request = new HttpRequestMessage(HttpMethod.Get, DownloadUrl);
                 if (existing > 0) request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existing, null);
-                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
 
                 if (existing > 0 && response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
                 {
@@ -239,7 +304,7 @@ public sealed class FfmpegManager
                 response.EnsureSuccessStatusCode();
 
                 long? total = response.Content.Headers.ContentLength.HasValue ? existing + response.Content.Headers.ContentLength.Value : null;
-                await using var src = await response.Content.ReadAsStreamAsync(ct);
+                await using var src = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 await using var dst = new FileStream(part, existing > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 128, true);
                 var buffer = new byte[1024 * 128];
                 var done = existing;
@@ -248,9 +313,9 @@ public sealed class FfmpegManager
                 var lastAt = sw.Elapsed;
                 while (true)
                 {
-                    var read = await src.ReadAsync(buffer, ct);
+                    var read = await src.ReadAsync(buffer, ct).ConfigureAwait(false);
                     if (read <= 0) break;
-                    await dst.WriteAsync(buffer.AsMemory(0, read), ct);
+                    await dst.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                     done += read;
                     var now = sw.Elapsed;
                     if ((now - lastAt).TotalMilliseconds >= 350)
@@ -262,7 +327,7 @@ public sealed class FfmpegManager
                         lastAt = now;
                     }
                 }
-                await dst.FlushAsync(ct);
+                await dst.FlushAsync(ct).ConfigureAwait(false);
 
                 if (!IsUsableArchive(part))
                     throw new InvalidDataException("FFmpeg 下载完成但 ZIP 校验失败，将自动重新下载。");
@@ -273,7 +338,7 @@ public sealed class FfmpegManager
             }
             catch when (attempt < 3 && !ct.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct);
+                await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct).ConfigureAwait(false);
             }
         }
     }
