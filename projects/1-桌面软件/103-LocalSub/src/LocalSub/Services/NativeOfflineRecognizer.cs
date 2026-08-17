@@ -83,6 +83,11 @@ internal sealed class NativeOfflineRecognizer : IDisposable
             cfg.ModelConfig.Tokens = RequireFile(folder, "tokens.txt", model.Name);
             cfg.ModelConfig.ZipformerCtc.Model = RequireFile(folder, "model.int8.onnx", model.Name);
         }
+        else if (string.Equals(model.Id, "firered-asr2-ctc-zh-en-int8", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.ModelConfig.Tokens = RequireFile(folder, "tokens.txt", model.Name);
+            cfg.ModelConfig.FireRedAsrCtc.Model = RequireFile(folder, "model.int8.onnx", model.Name);
+        }
         else if (string.Equals(model.Id, "funasr-nano-int8", StringComparison.OrdinalIgnoreCase))
         {
             cfg.ModelConfig.FunAsrNano = new NativeFunAsrNanoConfig
