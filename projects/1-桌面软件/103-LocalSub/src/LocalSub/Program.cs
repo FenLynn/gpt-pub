@@ -52,6 +52,7 @@ internal static class Program
             BatchQueueVisualFix.Attach(mainForm);
             SettingsFeatureEnhancer.Attach(mainForm);
             TrayController.Attach(mainForm);
+            UiResponsivenessMonitor.Attach(mainForm);
             LogStartup(startup, "lightweight-enhancers-attached");
 
             if (IsBatchUiSmokeTest)
