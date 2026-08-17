@@ -25,10 +25,10 @@ Windows 本地实时字幕与后台视频转写工具，优先服务 PotPlayer�
 
 - 分支：`p103-localsub-exp`
 - 版本：`v0.1.0-dev`
-- 当前功能 head：`5fc9ab4d2dbd08e2728656da8c44c9afc3ea697a`
-- Windows CI run：`31945115694`，结论 `success`。
-- 该 run 已通过：publish、绿色包检查、EXE 真启动、后台工作区真切换、Windows Process Loopback 真激活、sherpa native runtime 加载、**native 离线 ASR 真解码**、最终打包。
-- native 离线 ASR smoke 会临时下载 sherpa 官方小型 TDNN yes/no 模型，实际执行 CreateRecognizer -> CreateStream -> AcceptWaveform -> Decode -> JSON result，并验证返回非空文字。测试模型和 runtime 不进入发布包。
+- 当前运行功能 head：`117b5b0e2c4f1d82d48fab1e50b982c04f19fa3c`
+- Windows CI run：`31995510384`，结论 `success`。
+- 该 run 已通过：publish、绿色包检查、EXE 真启动、后台工作区真切换、Windows Process Loopback 真激活、sherpa native runtime 加载、native 离线 ASR 真解码、最终打包。
+- CI 已增加 `concurrency + cancel-in-progress`，同一开发分支的新 commit 会取消过期 Windows 构建，减少 CI 浪费。
 
 ## 已实机确认基线
 
@@ -36,11 +36,9 @@ Windows 本地实时字幕与后台视频转写工具，优先服务 PotPlayer�
 - `Streaming Zipformer Large 中文 INT8` 实机可用，用户反馈明显好一些，当前中文实时推荐基线。
 - PotPlayer 普通窗口和全屏 overlay 已实机可见。
 - PotPlayer 快进/快退曾出现 `HRESULT 0x8000FFFF`，恢复 supervisor 已改为按 PCM 失活判断和退避重试，用户反馈较旧版“好一点”，仍需持续实机验证。
-- 后台 MP4 可由 Media Foundation 正常解析，能够取得时长、采样率、声道并生成波形。
-- 后台第一次真实转写曾出现 `完成 0 段 / RTF 0.01`，已加入 Silero VAD 放宽、自适应 RMS fallback 和宽松 8 秒 fallback。
-- 后台随后暴露 `Object reference not set`，进一步定位到 sherpa 1.13.4 managed `OfflineStream.Result` 对空 native result 不安全。
-- 绕过 Result 后又暴露 `sherpa-onnx 未能创建离线识别流`，进一步确认 managed `OfflineRecognizer` 构造器不会检查 native recognizer 是否为 NULL。
-- 2026-08-16 当前修复已将 LocalSub 的离线 recognizer 创建迁移到直接 sherpa C API，尚待用户用真实 SenseVoice/Fun-ASR-Nano 再次实机验证。
+- 后台 MP4 可由 Media Foundation 正常解析并生成波形。
+- 后台离线 ASR 早期依次暴露 `0 段`、managed Result NullReference、CreateStream=0，现已迁移到直接 sherpa C API，并有 Windows native offline ASR 真烟测。
+- 2026-08-17 用户实机反馈：SenseVoice 后台“还可以”；Fun-ASR-Nano 实际体验很差、像“不干活”。因此模型定位和 Fun-ASR 后台分段策略已重构。
 
 ## 实时字幕
 
@@ -49,22 +47,22 @@ Windows 本地实时字幕与后台视频转写工具，优先服务 PotPlayer�
 - `ResilientPotPlayerCaptureService`：标题变化不再立即拆流，PCM 真失活后才重建；恢复退避约 0.35 / 0.7 / 1.2 / 2 / 3 秒；真正重建时清旧 PCM 和当前流式句状态，但不重新加载模型。
 - WebView2 overlay 非激活、鼠标穿透、持续 TopMost，支持普通窗口、最大化和全屏。
 - 字幕最多当前句 + 上一句，默认 3 秒无更新消失。
-- 字幕设置已支持：自动/固定字号、自动字号倍率 60%~160%、当前字幕颜色/字重、上一条大小比例/颜色/透明度/字重、描边颜色/粗细、阴影强度、底部偏移、最大宽度、底纹和持续时间。
+- 字幕设置支持：自动/固定字号、自动字号倍率 60%~160%、当前字幕颜色/字重、上一条大小比例/颜色/透明度/字重、描边颜色/粗细、阴影强度、底部偏移、最大宽度、底纹和持续时间。
+- Fun-ASR-Nano 已从实时模型 catalog 移除，不再作为实时字幕候选；保留后台实验用途。
 
-## 模型
+## 模型定位
 
-主要 catalog：
-
-- Zipformer CTC Small 中文 INT8，约 26 MB。
-- Zipformer CTC Large 中文 INT8，约 155 MB。
-- Zipformer Large 中文 INT8，约 160 MB。
-- Streaming Paraformer 中英 INT8，约 237 MB。
-- SenseVoice Small INT8，约 230 MB。
-- Offline Zipformer CTC 中文 INT8，约 350 MB。
-- Zipformer CTC XLarge 中文 INT8，约 728 MB。
-- Zipformer XLarge 中文 INT8，约 736 MB。
-- Fun-ASR-Nano INT8，约 0.9 GB。
-- Silero VAD，约 2 MB。
+- Zipformer CTC Small 中文 INT8，约 26 MB：超轻实时。
+- Zipformer CTC Large 中文 INT8，约 155 MB：推荐实时。
+- Zipformer Large 中文 INT8，约 160 MB：推荐实时，已有较好实机反馈。
+- Streaming Paraformer 中英 INT8，约 237 MB：中英低延迟档。
+- SenseVoice Small INT8，约 230 MB：推荐后台/模拟实时，当前实机可用。
+- Offline Zipformer CTC 中文 INT8，约 350 MB：推荐中文后台，高性价比。
+- **FireRedASR2 CTC 中英 INT8，约 740 MB：新增推荐后台候选，中英、CTC 快速解码。**
+- Zipformer CTC XLarge 中文 INT8，约 728 MB：大模型实时候选。
+- Zipformer XLarge 中文 INT8，约 736 MB：最大实时档。
+- Fun-ASR-Nano INT8，约 0.9 GB：**实验后台**，LLM 解码较重，不推荐实时。
+- Silero VAD，约 2 MB：语音段检测组件。
 
 模型页显示语言、体积、实时性、准确率、性价比和安装状态。已安装且关键文件存在显示黑色，未安装显示浅灰色；实时/后台下拉框只显示对应能力且已安装的模型。
 
@@ -76,37 +74,48 @@ Windows 本地实时字幕与后台视频转写工具，优先服务 PotPlayer�
 
 已实现：
 
-- 视频/音频拖放和多文件队列。
-- 添加、移除、清空、转写选中、全部转写、取消。
-- Media Foundation 优先，FFmpeg fallback。
-- FFmpeg 可手动指定已有路径，并自动尝试 LocalSub 自有、`MEDIOVA_RUNTIME_DIR`、附近 Mediova `Components\FFmpeg\bin`、系统 PATH。
-- 修复 FFmpeg 下载 416，下载完成校验 ZIP、ffmpeg、ffprobe。
+- 视频/音频拖放、多文件队列、转写选中/全部、取消。
+- Media Foundation 优先，FFmpeg fallback；FFmpeg 可复用 Mediova/手动路径/系统 PATH。
 - Silero VAD + 自适应 RMS fallback + 宽松 8 秒 fallback。
-- RMS/peak 声音波形、语音区间、关键词 marker。
-- **波形显示已改为视觉归一化**：使用高分位有效峰值作为显示基准，主要峰值拉到轨道约 95%，孤立尖峰软限幅；仅影响绘图，不改变真实 PCM/VAD/ASR。
+- native C API 离线 recognizer 支持 SenseVoice、Offline Zipformer CTC、FireRedASR2 CTC、Fun-ASR-Nano。
 - 转写正文时间戳与关键词高亮。
 - TXT 手工导出，结构化 JSON 自动保存到 `Data\Transcripts`。
 - RTF、进度、分段数、日志 `Logs\batch.log`。
 - 后台工作区延迟加载。
 
-## 2026-08-16 离线 ASR 关键修复
+### Fun-ASR-Nano 专项策略
 
-### 问题链
+Fun-ASR-Nano 不再按每个很短的 VAD 段立即启动一次 LLM 解码。当前后台会：
 
-1. `stream.Result.Text` 在部分空 native result 上抛 NullReference。
-2. 改用 sherpa JSON result C API 后，实机暴露 `CreateStream()` 返回空句柄。
-3. 对照 sherpa-onnx 1.13.4 源码确认 managed `OfflineRecognizer` 构造器只是保存 `SherpaOnnxCreateOfflineRecognizer()` 返回值，不检查 NULL，因此模型配置/加载失败会被延迟表现为 CreateStream=0。
+- 合并相邻语音段；
+- 目标上下文约 7 秒；
+- 最长约 11 秒；
+- 间隔不超过约 1.1 秒的语音段可合并，并用静音保持时间关系；
+- 日志写入 `FUNASR_MERGE`；
+- UI 阶段显示 `Fun-ASR 长段识别`。
 
-### 当前修复
+目标是减少 LLM 重复启动和短片段空结果。Fun-ASR 仍属于实验后台模型，不再作为产品主力。
 
-- 新增 `NativeOfflineRecognizer`，直接 P/Invoke sherpa-onnx 1.13.4 C API。
+## 声音轨道
+
+2026-08-17 已完成第二轮视觉优化：
+
+- 继续使用 99.5% 高分位作为视觉参考，主要有效峰值映射到轨道约 95%，不改变真实 PCM/VAD/ASR 输入。
+- 由黑色竖针改为平滑的上下对称填充包络，并增加细轮廓。
+- 使用浅色轨道背景和弱化中线。
+- 增加 25% / 50% / 75% 时间网格，并显示 0%~100% 五个时间标签。
+- 已识别语音段显示轻量半透明区域。
+- 关键词使用独立竖线和顶部三角 marker。
+- 顶部显示 `声音包络 · 自动增益 95%`，有结果后显示语音段数和关键词命中数。
+
+## 离线 ASR 关键修复
+
+- LocalSub 使用 `NativeOfflineRecognizer` 直接 P/Invoke sherpa-onnx 1.13.4 C API。
 - native config 按官方 C 示例语义零初始化，只填写当前模型家族需要字段，未使用指针保持 NULL。
-- Windows 路径使用 UTF-8 marshaling，不再依赖 managed offline wrapper 的 ANSI `LPStr` 路径。
-- 支持当前后台模型：SenseVoice、Offline Zipformer CTC、Fun-ASR-Nano。
-- 识别结果使用 `SherpaOnnxGetOfflineStreamResultAsJson()`，空指针安全处理。
-- LocalSub 内部 compatibility bridge 保持现有 batch/VAD/fallback 调用结构不变，但离线 recognizer/stream 创建已经切到 native C API。
-- SenseVoice 增加宽松体积完整性预检，明显截断的 `model.int8.onnx` 或 `tokens.txt` 会直接提示重新下载/修复，而不是继续显示成不可解释的流创建失败。
-- CI 新增 native offline ASR 真烟测，run `31945115694` 已成功解码官方小型测试 WAV。
+- Windows 路径使用 UTF-8 marshaling。
+- 结果使用 `SherpaOnnxGetOfflineStreamResultAsJson()`，空指针安全处理。
+- compatibility bridge 保持 batch/VAD/fallback 调用结构不变。
+- CI native offline ASR smoke 会临时下载官方小型 TDNN yes/no 模型，实际执行 CreateRecognizer -> CreateStream -> AcceptWaveform -> Decode -> JSON result，并验证非空文字；测试模型和 runtime 不进入发布包。
 
 ## 性能与系统
 
@@ -129,17 +138,14 @@ Windows 本地实时字幕与后台视频转写工具，优先服务 PotPlayer�
 
 后台优先：
 
-1. 覆盖 run `31945115694` 对应 EXE。
-2. 使用用户此前的 `2:57 MP4 + SenseVoice Small INT8` 再次“转写选中”。
-3. 预期不应再出现 `未能创建离线识别流`。若模型文件明显损坏，应在模型加载阶段直接报告文件体积异常；若模型正常，应开始产生真实转写段。
-4. 同一文件再测试 Fun-ASR-Nano，确认 native bridge 对第二种离线模型同样可用。
-5. 观察归一化后的波形是否明显展开，主要有效峰值应接近轨道 95% 高度。
-6. 若仍失败，读取 `Logs\batch.log`，当前日志会保留模型加载/解码阶段、时间点和完整异常。
+1. 用 SenseVoice 再确认已有后台基线没有回归。
+2. 下载 FireRedASR2 CTC 后用同一中文/中英视频对比 SenseVoice、Offline Zipformer CTC、FireRedASR2 CTC 的准确率、RTF 和 CPU。
+3. Fun-ASR-Nano 仅作为实验后台复测，观察 7~11 秒合并后是否比旧版更有输出，不再把它当主力。
+4. 检查新声音轨道的可读性，确认弱音频展开、网格、语音区间和关键词 marker 都清晰。
+5. MKV/WebM 验证 FFmpeg fallback 和 Mediova FFmpeg 复用。
 
 实时继续：
 
 1. Zipformer Large + PotPlayer 连续小幅/大幅快进快退。
 2. 连续换 2~3 个视频，确认无需重新点击开始即可自动恢复字幕。
 3. 真正重建后不应拼接跳转前旧半句话。
-
-其余统一验收：不同实时/后台模型效果、MKV/WebM FFmpeg fallback、TXT/JSON、托盘和启动速度。
