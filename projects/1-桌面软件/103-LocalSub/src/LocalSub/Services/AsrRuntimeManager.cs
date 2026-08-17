@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using LocalSub.Models;
 
@@ -47,24 +48,32 @@ public sealed class AsrRuntimeManager
             {
                 progress?.Report(new("ASR 运行库", 0, Detail: $"下载 sherpa-onnx {Version}，第 {attempt}/3 次"));
                 using var client = DownloadClientFactory.Create(_settings);
-                using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+                using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 var total = response.Content.Headers.ContentLength;
-                await using var input = await response.Content.ReadAsStreamAsync(ct);
+                await using var input = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 await using (var output = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.Read, 128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
                 {
                     var buffer = new byte[128 * 1024];
                     long done = 0;
+                    var watch = Stopwatch.StartNew();
+                    var lastReport = TimeSpan.Zero;
                     while (true)
                     {
-                        var n = await input.ReadAsync(buffer.AsMemory(), ct);
+                        var n = await input.ReadAsync(buffer.AsMemory(), ct).ConfigureAwait(false);
                         if (n == 0) break;
-                        await output.WriteAsync(buffer.AsMemory(0, n), ct);
+                        await output.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
                         done += n;
-                        int? percent = total > 0 ? (int)Math.Clamp(done * 100 / total.Value, 0, 100) : null;
-                        progress?.Report(new("ASR 运行库", percent, done, total, Detail: "正在下载 native runtime", IsIndeterminate: !percent.HasValue));
+
+                        if (watch.Elapsed - lastReport >= TimeSpan.FromMilliseconds(250))
+                        {
+                            int? percent = total > 0 ? (int)Math.Clamp(done * 100 / total.Value, 0, 100) : null;
+                            progress?.Report(new("ASR 运行库", percent, done, total, Detail: "正在下载 native runtime", IsIndeterminate: !percent.HasValue));
+                            lastReport = watch.Elapsed;
+                        }
                     }
-                    await output.FlushAsync(ct);
+                    await output.FlushAsync(ct).ConfigureAwait(false);
+                    progress?.Report(new("ASR 运行库", 100, done, total ?? done, Detail: "native runtime 下载完成"));
                 }
                 File.Move(temp, package, true);
                 last = null;
@@ -75,11 +84,16 @@ public sealed class AsrRuntimeManager
             {
                 last = ex;
                 try { if (File.Exists(temp)) File.Delete(temp); } catch { }
-                if (attempt < 3) await Task.Delay(attempt * 1500, ct);
+                if (attempt < 3) await Task.Delay(attempt * 1500, ct).ConfigureAwait(false);
             }
         }
         if (last != null) throw new InvalidOperationException("ASR 运行库下载失败。可在设置中启用 SOCKS5 后重试。", last);
 
+        await Task.Run(() => InstallRuntimePackage(package, progress, ct), ct).ConfigureAwait(false);
+    }
+
+    void InstallRuntimePackage(string package, IProgress<ModelOperationProgress>? progress, CancellationToken ct)
+    {
         var staging = RuntimeRoot + ".new";
         try
         {
