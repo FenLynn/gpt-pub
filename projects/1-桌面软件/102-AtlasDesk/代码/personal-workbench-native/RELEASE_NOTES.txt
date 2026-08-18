@@ -1,23 +1,42 @@
-AtlasDesk v0.8.0
+AtlasDesk v1.0.0
 
-This release changes AtlasDesk from a self-extracting launcher into a transparent folder runtime.
+AtlasDesk 1.0 is the first formal release of the stabilized Windows research and development workbench.
 
-Runtime and Data
-- AtlasDesk.exe is now the real WPF application. It runs directly from the user-created AtlasDesk folder.
-- AtlasDesk.TerminalHost.exe and terminal web assets remain beside the main program in the same public Runtime folder.
-- No executable, DLL or terminal asset is written to AppData.
-- %APPDATA%\AtlasDesk contains only small, important private settings and encrypted data.
-- %LOCALAPPDATA%\AtlasDesk contains machine-local WebView2 state, terminal profile, logs, cache and startup state.
-- Automatic legacy migration was removed from product code. A one-time external migration script is provided separately.
+Core workbench
+- A bounded project workflow connects project selection, workspace, terminal, Git status, environment markers and recent files.
+- Projects can be pinned, reopened from recent history and explicitly relocated when saved paths move.
+- The native ConPTY terminal remains isolated behind AtlasDesk.TerminalHost.exe and does not store commands or output.
 
-Security and privacy
-- Added an optional local encrypted vault protected by a 20-character-or-longer master password and Google Authenticator compatible TOTP.
-- Added local QR setup, Argon2id password derivation and AES-256-GCM encrypted vault storage.
-- Added a generic encrypted key/value editor for passwords, tokens and private notes.
-- Added an optional four-digit temporary UI lock. It is manual, can be disabled, and never participates in encryption.
-- Runtime remains fully public and contains no user paths, cookies, logs, tokens or account data.
+Zotero research pane
+- The library follows a compact three-pane, read-only information structure.
+- Title, authors, source, year, Citation Key and DOI are immediately visible.
+- Title, DOI, Citation Key, quick reference text, LaTeX citations and Pandoc citations can be copied.
+- PDF attachments can be opened or selected in Windows Explorer for direct file copying.
+- Zotero SQLite access is read-only with query_only enabled.
 
-Interface and reliability
-- Fixed the sidebar to an opaque neutral background so Dashboard login rendering cannot tint it yellow.
-- Added direct access to the roaming configuration directory and the machine-local data directory.
-- The encrypted vault key is cleared when AtlasDesk exits or when the user locks the vault.
+Tasks and tools
+- File-integrity manifest generation, verification and file comparison share one task collection.
+- Task and tool pages share status, progress, cancellation, results and bounded history.
+- Active work is confirmed before application exit.
+- One TaskToolCoordinator owns task/tool navigation and shutdown lifecycle.
+
+Window and runtime
+- Maximized windows use the active monitor work area and avoid taskbars on every edge.
+- Common window sizes, 100–175% DPI, restore/maximize and Runtime/Data boundaries are protected by regression checks.
+- Runtime remains a transparent replaceable folder; private roaming and local data never enter the package.
+
+Release verification
+- v1.0.0 adds a formal release-readiness gate over the stabilized components and retired compatibility layers.
+- Full smoke, real Windows window residency, real CMD/ConPTY sessions, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
+
+Known limitation
+- Close Zotero before opening the AtlasDesk library where the live database cannot be shared safely.
+- GB/T 7714 and APA previews are quick-copy references; use Zotero/CSL output for formal submission formatting.
+
+Previous stabilization milestones
+- v0.9.5: task/tool lifecycle convergence and removal of V064/V065 enhancers.
+- v0.9.4: unified tool tasks, cancellation and bounded history.
+- v0.9.3: project favorites, recents and explicit path relocation.
+- v0.9.2: read-only Zotero research pane and PDF file-location action.
+- v0.9.1: native work-area maximization and constrained-height layout fix.
+- v0.9.0: explicit project-driven workflow.

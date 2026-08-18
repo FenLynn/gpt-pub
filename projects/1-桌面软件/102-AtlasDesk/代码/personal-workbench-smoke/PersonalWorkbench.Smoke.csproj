@@ -9,5 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\personal-workbench-native\PersonalWorkbench.csproj" />
+    <ProjectReference Include="..\personal-workbench-residency-smoke\AtlasDesk.ResidencySmoke.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

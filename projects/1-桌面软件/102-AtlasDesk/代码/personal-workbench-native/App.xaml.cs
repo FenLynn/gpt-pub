@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 
@@ -6,6 +7,7 @@ namespace PersonalWorkbench;
 public partial class App : Application
 {
     private WorkbenchFeaturePipeline? _pipeline;
+    private bool _windowLifetimeLoggingAttached;
 
     public static string RuntimeDirectory => ProductIdentity.RuntimeDirectory;
     public static string AppDataDirectory => ProductIdentity.RoamingDataDirectory;
@@ -23,11 +25,16 @@ public partial class App : Application
         ProductIdentity.EnsureDataDirectories();
         ApplyPendingRestoreBeforeStartup();
         StartupGuard.Begin(WorkbenchVersion.Current);
-        Exit += (_, _) =>
+
+        Exit += (_, args) =>
         {
+            Log($"Application Exit event. Code={args.ApplicationExitCode}");
             StartupGuard.Complete();
             SecurityService.LockVault();
         };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            Log("CLR ProcessExit event");
+
         GlobalShortcutBootstrap.Initialize();
         Log($"Starting AtlasDesk {WorkbenchVersion.Current}");
         Log("Runtime=" + RuntimeDirectory);
@@ -46,7 +53,7 @@ public partial class App : Application
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-            Log("Unhandled exception: " + args.ExceptionObject);
+            Log($"Unhandled exception. IsTerminating={args.IsTerminating}: {args.ExceptionObject}");
 
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
@@ -84,16 +91,44 @@ public partial class App : Application
     {
         if (_pipeline is not null || MainWindow is not MainWindow window)
             return;
+
         try
         {
             _pipeline = WorkbenchFeaturePipeline.Attach(window);
+            AttachWindowLifetimeLogging(window);
             Log("AtlasDesk " + WorkbenchVersion.Current + " modules attached");
         }
         catch (Exception ex)
         {
             Log("Feature pipeline failed: " + ex);
-            MessageBox.Show("工作台功能模块初始化失败：\n" + ex.Message + "\n\n日志：" + LogPath,
-                ProductIdentity.ProductName, MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(
+                "工作台功能模块初始化失败：\n" + ex.Message + "\n\n日志：" + LogPath,
+                ProductIdentity.ProductName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void AttachWindowLifetimeLogging(MainWindow window)
+    {
+        if (_windowLifetimeLoggingAttached)
+            return;
+
+        _windowLifetimeLoggingAttached = true;
+        window.Closing += MainWindow_Closing;
+        window.Closed += (_, _) => Log("Main window Closed event");
+    }
+
+    private static void MainWindow_Closing(object? sender, CancelEventArgs args)
+    {
+        if (sender is Window window)
+        {
+            Log($"Main window Closing event. Cancel={args.Cancel}; "
+                + $"Visible={window.IsVisible}; Loaded={window.IsLoaded}; State={window.WindowState}");
+        }
+        else
+        {
+            Log("Main window Closing event");
         }
     }
 
@@ -102,7 +137,9 @@ public partial class App : Application
         try
         {
             Directory.CreateDirectory(LogDirectory);
-            File.AppendAllText(LogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}");
+            File.AppendAllText(
+                LogPath,
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}");
         }
         catch
         {

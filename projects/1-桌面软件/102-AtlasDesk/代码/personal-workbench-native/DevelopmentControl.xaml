@@ -13,7 +13,7 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Content="PowerShell" Style="{StaticResource SecondaryButton}" Click="OpenPowerShell_Click"/>
                 <Button Content="CMD" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="OpenCmd_Click"/>
-                <Button Content="刷新环境" Style="{StaticResource PrimaryButton}" Margin="7,0,0,0" Click="Refresh_Click"/>
+                <Button x:Name="RefreshButton" Content="刷新环境" Style="{StaticResource PrimaryButton}" Margin="7,0,0,0" Click="Refresh_Click"/>
             </StackPanel>
         </Grid>
 
@@ -33,7 +33,12 @@
             <Border Background="White" BorderBrush="#E1E8F1" BorderThickness="1" CornerRadius="12" Padding="8">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="7"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <TextBlock x:Name="StatusText" Text="进入页面后自动发现环境。" FontSize="11.4" Foreground="#748296" Margin="4,2"/>
+                    <Grid Margin="4,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="StatusText" Text="进入页面后自动发现环境。" FontSize="11.4" Foreground="#748296" TextTrimming="CharacterEllipsis"/>
+                        <ProgressBar x:Name="DiscoveryProgress" Grid.Column="1" Width="92" Height="3" Margin="12,0,2,0"
+                                     VerticalAlignment="Center" IsIndeterminate="True" Visibility="Collapsed"/>
+                    </Grid>
                     <ListView x:Name="EnvironmentList" Grid.Row="2" BorderThickness="0" Background="Transparent"
                               SelectionChanged="EnvironmentList_SelectionChanged" MouseDoubleClick="EnvironmentList_MouseDoubleClick"
                               VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">

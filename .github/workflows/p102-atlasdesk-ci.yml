@@ -121,13 +121,24 @@ jobs:
           $path = 'projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/Program.cs'
           $content = Get-Content $path -Raw
           $pattern = 'Check\(WorkbenchVersion\.Current == "[^"]+", "assembly version matches Version\.props"\);'
+          if (-not [regex]::IsMatch($content, $pattern)) {
+            throw 'Smoke-test version assertion could not be located.'
+          }
           $replacement = "Check(WorkbenchVersion.Current == `"$env:WORKBENCH_VERSION`", `"assembly version matches Version.props`");"
           $updated = [regex]::Replace($content, $pattern, $replacement, 1)
-          if ($updated -eq $content) { throw 'Smoke-test version assertion could not be stamped.' }
-          Set-Content $path $updated -Encoding UTF8
+          if ($updated -ne $content) {
+            Set-Content $path $updated -Encoding UTF8
+            Write-Host "Stamped smoke expected version: $env:WORKBENCH_VERSION"
+          } else {
+            Write-Host "Smoke expected version already matches: $env:WORKBENCH_VERSION"
+          }
 
       - name: Run complete smoke suite
         run: dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-smoke/PersonalWorkbench.Smoke.csproj -c Release --no-restore
+
+      - name: Run isolated startup residency
+        timeout-minutes: 2
+        run: dotnet run --project projects/1-桌面软件/102-AtlasDesk/代码/personal-workbench-residency-smoke/AtlasDesk.ResidencySmoke.csproj -c Release --no-restore
 
       - name: Verify Runtime/Data and security boundary
         shell: pwsh

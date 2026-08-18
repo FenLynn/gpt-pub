@@ -22,11 +22,16 @@ public sealed class ProjectDescriptor
     public string GitBranch { get; init; } = string.Empty;
     public DateTime LastModified { get; init; }
     public string MarkerSummary { get; init; } = string.Empty;
+    public bool IsPinned { get; set; }
+    public bool IsRecent { get; set; }
+    public int RecentOrder { get; set; } = int.MaxValue;
+    public bool IsMissing { get; init; }
 
     public string KindLabel
     {
         get
         {
+            if (IsMissing) return "路径失效";
             var labels = new List<string>();
             if (Kind.HasFlag(ProjectKind.Git)) labels.Add("Git");
             if (Kind.HasFlag(ProjectKind.Python)) labels.Add("Python");
@@ -41,6 +46,7 @@ public sealed class ProjectDescriptor
 
     public string BranchLabel => string.IsNullOrWhiteSpace(GitBranch) ? string.Empty : "分支 " + GitBranch;
     public string ModifiedLabel => LastModified == default ? string.Empty : LastModified.ToString("yyyy-MM-dd HH:mm");
+    public string UsageLabel => IsMissing ? "需重新定位" : IsPinned ? "★ 收藏" : IsRecent ? "最近" : string.Empty;
 }
 
 public static class ProjectCatalogService

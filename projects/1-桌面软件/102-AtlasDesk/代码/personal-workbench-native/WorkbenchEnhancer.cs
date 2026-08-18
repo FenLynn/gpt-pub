@@ -173,7 +173,6 @@ public sealed class WorkbenchEnhancer
         actions.Children.Insert(Math.Max(0, actions.Children.Count - 1), button);
     }
 
-
     private void InstallTopLockButton()
     {
         if (_window.FindName("PopoutButton") is not Button popout || popout.Parent is not StackPanel actions)
@@ -210,24 +209,57 @@ public sealed class WorkbenchEnhancer
 
     private void ApplyVisualPolish()
     {
-        _window.Background = new LinearGradientBrush(
-            Color.FromRgb(243, 247, 252), Color.FromRgb(239, 244, 251), new Point(0, 0), new Point(1, 1));
-        if (_window.FindName("RootGrid") is Grid root) root.Margin = new Thickness(8);
+        _window.Background = new SolidColorBrush(Color.FromRgb(247, 248, 250));
+        if (_window.FindName("RootGrid") is Grid root)
+        {
+            root.Margin = new Thickness(0);
+            root.Background = new SolidColorBrush(Color.FromRgb(247, 248, 250));
+            if (root.ColumnDefinitions.Count > 1)
+                root.ColumnDefinitions[1].Width = new GridLength(1);
+
+            var divider = root.Children.OfType<Border>()
+                .FirstOrDefault(border => Equals(border.Tag, "shell-divider"));
+            if (divider is null)
+            {
+                divider = new Border
+                {
+                    Tag = "shell-divider",
+                    Background = new SolidColorBrush(Color.FromRgb(226, 229, 234)),
+                    IsHitTestVisible = false
+                };
+                Grid.SetColumn(divider, 1);
+                root.Children.Add(divider);
+            }
+
+            var content = root.Children.OfType<Border>()
+                .FirstOrDefault(border => Grid.GetColumn(border) == 2);
+            if (content is not null)
+            {
+                content.CornerRadius = new CornerRadius(0);
+                content.BorderThickness = new Thickness(0);
+                content.BorderBrush = Brushes.Transparent;
+                content.Background = Brushes.White;
+                content.Effect = null;
+                content.ClipToBounds = true;
+            }
+        }
         if (_window.FindName("Sidebar") is Border sidebar)
         {
-            sidebar.CornerRadius = new CornerRadius(16);
-            sidebar.BorderBrush = new SolidColorBrush(Color.FromRgb(218, 227, 239));
-            sidebar.Background = new SolidColorBrush(Color.FromRgb(250, 252, 255));
+            sidebar.CornerRadius = new CornerRadius(0);
+            sidebar.BorderThickness = new Thickness(0);
+            sidebar.BorderBrush = Brushes.Transparent;
+            sidebar.Background = new SolidColorBrush(Color.FromRgb(248, 249, 251));
+            sidebar.Effect = null;
         }
-        if (_window.FindName("TopBarRow") is RowDefinition topBarRow) topBarRow.Height = new GridLength(40);
+        if (_window.FindName("TopBarRow") is RowDefinition topBarRow) topBarRow.Height = new GridLength(42);
         if (_window.FindName("TopBar") is Grid topBar)
         {
-            topBar.Background = new SolidColorBrush(Color.FromRgb(252, 253, 255));
+            topBar.Background = Brushes.White;
             if (!topBar.Children.OfType<Border>().Any(border => Equals(border.Tag, "polish-divider")))
             {
                 var divider = new Border
                 {
-                    Tag = "polish-divider", Height = 1, Background = new SolidColorBrush(Color.FromRgb(229, 235, 243)),
+                    Tag = "polish-divider", Height = 1, Background = new SolidColorBrush(Color.FromRgb(229, 232, 237)),
                     VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false
                 };
                 Grid.SetColumnSpan(divider, 3);
@@ -238,30 +270,17 @@ public sealed class WorkbenchEnhancer
         if (_window.FindName("PageSubtitle") is TextBlock subtitle) subtitle.FontSize = 11;
         if (_window.FindName("UserCard") is Border userCard)
         {
-            userCard.Background = new SolidColorBrush(Color.FromRgb(244, 247, 251));
-            userCard.BorderBrush = new SolidColorBrush(Color.FromRgb(228, 234, 242));
-            userCard.BorderThickness = new Thickness(1);
+            userCard.Background = Brushes.Transparent;
+            userCard.BorderBrush = Brushes.Transparent;
+            userCard.BorderThickness = new Thickness(0);
+            userCard.CornerRadius = new CornerRadius(0);
         }
     }
 
     private void WireEvents()
     {
         _workspace.OpenSettingsRequested += (_, _) => NavigateToSettings();
-        _workspace.OpenTerminalRequested += async (_, args) =>
-        {
-            ShowTerminal();
-            var directory = string.IsNullOrWhiteSpace(args.WorkingDirectory) ? _settings.WorkspaceRoot : args.WorkingDirectory;
-            await _terminal.OpenAsync(WorkspaceTerminalFactory.Create(_settings, args.Shell, directory, args.Title));
-        };
         _zotero.OpenSettingsRequested += (_, _) => NavigateToSettings();
-        _development.OpenTerminalRequested += async (_, args) =>
-        {
-            ShowTerminal();
-            if (args.Environment is null && !string.IsNullOrWhiteSpace(args.WorkingDirectory))
-                await _terminal.OpenAsync(WorkspaceTerminalFactory.Create(_settings, args.Shell, args.WorkingDirectory, args.Title));
-            else
-                await _terminal.OpenShellAsync(args.Shell, args.Environment, args.Title);
-        };
         _settingsControl.SettingsSaved += (_, args) => OnSettingsSaved(args);
         _settingsControl.ClearAccessRequested += (_, _) => InvokeLegacy("ClearSession_Click", _window, new RoutedEventArgs());
         _terminal.CollapseRequested += (_, _) => HideTerminal();
@@ -270,6 +289,8 @@ public sealed class WorkbenchEnhancer
 
         if (_window.FindName("WorkspaceNav") is RadioButton workspaceNav)
             workspaceNav.Checked += async (_, _) => await ShowWorkspaceAsync();
+        if (_window.FindName("LibraryNav") is RadioButton libraryNav)
+            libraryNav.Checked += async (_, _) => await ShowZoteroAsync();
         if (_window.FindName("ToolsNav") is RadioButton toolsNav)
             toolsNav.Checked += (_, _) => ShowModulePlaceholder("工具", "后续用于组合本地软件、批处理脚本和常用转换动作。工作区与终端稳定后再逐项接入，避免堆出不可用入口。");
         if (_window.FindName("TasksNav") is RadioButton tasksNav)
@@ -281,6 +302,11 @@ public sealed class WorkbenchEnhancer
         if (_modulePlaceholder is not null) _modulePlaceholder.Visibility = Visibility.Collapsed;
         _workspace.Visibility = Visibility.Visible;
         await _workspace.EnsureLoadedAsync();
+    }
+
+    private async Task ShowZoteroAsync()
+    {
+        await _zotero.EnsureLoadedAsync();
     }
 
     private void ShowModulePlaceholder(string title, string description)
@@ -341,17 +367,11 @@ public sealed class WorkbenchEnhancer
             settingsNav.IsChecked = true;
     }
 
-    private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Oem3 && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             ToggleTerminal();
-            e.Handled = true;
-        }
-        else if (e.Key == Key.T && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
-        {
-            ShowTerminal();
-            await _terminal.OpenShellAsync(_settings.DefaultShell);
             e.Handled = true;
         }
     }

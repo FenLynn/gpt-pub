@@ -13,7 +13,10 @@ public sealed class PythonEnvironmentInfo
     public string Version { get; init; } = string.Empty;
     public string Source { get; init; } = string.Empty;
 
-    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Path.GetFileName(Prefix.TrimEnd(Path.DirectorySeparatorChar)) : Name;
+    public string DisplayName => string.IsNullOrWhiteSpace(Name)
+        ? Path.GetFileName(Prefix.TrimEnd(Path.DirectorySeparatorChar))
+        : Name;
+
     public string KindLabel => Kind switch
     {
         "conda" => "Conda",
@@ -36,6 +39,9 @@ public static class PythonEnvironmentService
 {
     public static async Task<PythonDiscoveryResult> DiscoverAsync(AppSettings settings)
     {
+        // Keep discovery deliberately serial and bounded. Environment enumeration is
+        // only started after the user selects the Environment tab; it must never form
+        // part of the main-window startup path.
         var environments = new List<PythonEnvironmentInfo>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -43,7 +49,7 @@ public static class PythonEnvironmentService
         var condaVersion = string.Empty;
         if (!string.IsNullOrWhiteSpace(conda))
         {
-            condaVersion = (await RunToolAsync(conda, "--version", 5000).ConfigureAwait(false)).Output.Trim();
+            condaVersion = PreferredOutput(await RunToolAsync(conda, "--version", 5000).ConfigureAwait(false)).Trim();
             foreach (var prefix in await ReadCondaEnvironmentsAsync(conda).ConfigureAwait(false))
             {
                 var python = Path.Combine(prefix, "python.exe");
@@ -107,7 +113,7 @@ public static class PythonEnvironmentService
         var uv = await FindUvAsync(settings.UvPath).ConfigureAwait(false);
         var uvVersion = string.Empty;
         if (!string.IsNullOrWhiteSpace(uv))
-            uvVersion = (await RunToolAsync(uv, "--version", 5000).ConfigureAwait(false)).Output.Trim();
+            uvVersion = PreferredOutput(await RunToolAsync(uv, "--version", 5000).ConfigureAwait(false)).Trim();
 
         return new PythonDiscoveryResult
         {
@@ -120,6 +126,24 @@ public static class PythonEnvironmentService
                 .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToArray()
         };
+    }
+
+    public static IReadOnlyList<string> ParsePythonLauncherPaths(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+            return Array.Empty<string>();
+
+        var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var match = Regex.Match(
+                line,
+                @"(?<path>(?:[A-Za-z]:\\|\\\\).*?python(?:w)?\.exe)\s*$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (match.Success)
+                results.Add(match.Groups["path"].Value.Trim());
+        }
+        return results.ToArray();
     }
 
     public static void OpenTerminal(PythonEnvironmentInfo environment, string? workspace, string? condaExecutable)
@@ -205,8 +229,11 @@ public static class PythonEnvironmentService
         try
         {
             using var document = JsonDocument.Parse(result.Output);
-            if (!document.RootElement.TryGetProperty("envs", out var envs) || envs.ValueKind != JsonValueKind.Array)
+            if (!document.RootElement.TryGetProperty("envs", out var envs)
+                || envs.ValueKind != JsonValueKind.Array)
+            {
                 return Array.Empty<string>();
+            }
 
             return envs.EnumerateArray()
                 .Select(item => item.GetString())
@@ -217,14 +244,18 @@ public static class PythonEnvironmentService
         }
         catch (Exception ex)
         {
-            App.Log("Conda environment JSON parse failed: " + ex);
+            App.Log("Conda environment JSON parse failed: " + ex.Message);
             return Array.Empty<string>();
         }
     }
 
     private static async Task<string> ReadPythonVersionAsync(string python)
     {
-        var result = await RunToolAsync(python, "-c \"import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')\"", 5000).ConfigureAwait(false);
+        var result = await RunToolAsync(
+            python,
+            "-c \"import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')\"",
+            5000,
+            logFailure: false).ConfigureAwait(false);
         return result.ExitCode == 0 ? result.Output.Trim() : string.Empty;
     }
 
@@ -234,12 +265,17 @@ public static class PythonEnvironmentService
         foreach (var path in await FindOnPathAsync("python.exe").ConfigureAwait(false))
             results.Add(path);
 
-        var output = await RunToolAsync("py.exe", "-0p", 5000).ConfigureAwait(false);
-        foreach (var line in output.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        // Python Launcher is optional. Resolve it first instead of blindly starting
+        // py.exe; absence is a normal state and must not create a Win32Exception log.
+        var launcher = (await FindOnPathAsync("py.exe").ConfigureAwait(false)).FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(launcher))
+            return results.ToArray();
+
+        var output = await RunToolAsync(launcher, "-0p", 5000, logFailure: false).ConfigureAwait(false);
+        foreach (var path in ParsePythonLauncherPaths(output.Output))
         {
-            var match = Regex.Match(line, @"(?<path>[A-Za-z]:\\.*?python\.exe)\s*$", RegexOptions.IgnoreCase);
-            if (match.Success && File.Exists(match.Groups["path"].Value))
-                results.Add(Path.GetFullPath(match.Groups["path"].Value));
+            if (File.Exists(path))
+                results.Add(Path.GetFullPath(path));
         }
 
         return results.ToArray();
@@ -247,9 +283,10 @@ public static class PythonEnvironmentService
 
     private static async Task<IReadOnlyList<string>> FindOnPathAsync(string executable)
     {
-        var result = await RunToolAsync("where.exe", executable, 4000).ConfigureAwait(false);
+        var result = await RunToolAsync("where.exe", executable, 4000, logFailure: false).ConfigureAwait(false);
         if (result.ExitCode != 0)
             return Array.Empty<string>();
+
         return result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(value => value.Trim())
             .Where(File.Exists)
@@ -270,8 +307,11 @@ public static class PythonEnvironmentService
     {
         if (string.IsNullOrWhiteSpace(condaExecutable))
             return string.Empty;
-        if (condaExecutable.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) && File.Exists(condaExecutable))
+        if (condaExecutable.EndsWith(".bat", StringComparison.OrdinalIgnoreCase)
+            && File.Exists(condaExecutable))
+        {
             return condaExecutable;
+        }
 
         try
         {
@@ -288,20 +328,28 @@ public static class PythonEnvironmentService
         }
     }
 
-    private static void AddIfPresent(List<string> candidates, string? value)
+    private static void AddIfPresent(ICollection<string> candidates, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value) && File.Exists(value))
             candidates.Add(Path.GetFullPath(value));
     }
 
-    private static async Task<ToolResult> RunToolAsync(string fileName, string arguments, int timeoutMilliseconds)
+    private static string PreferredOutput(ToolResult result) =>
+        string.IsNullOrWhiteSpace(result.Output) ? result.Error : result.Output;
+
+    private static async Task<ToolResult> RunToolAsync(
+        string fileName,
+        string arguments,
+        int timeoutMilliseconds,
+        bool logFailure = true)
     {
         try
         {
             var actualFile = fileName;
             var actualArguments = arguments;
             var extension = Path.GetExtension(fileName);
-            if (extension.Equals(".bat", StringComparison.OrdinalIgnoreCase) || extension.Equals(".cmd", StringComparison.OrdinalIgnoreCase))
+            if (extension.Equals(".bat", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".cmd", StringComparison.OrdinalIgnoreCase))
             {
                 actualFile = "cmd.exe";
                 actualArguments = $"/d /s /c \"\"{fileName}\" {arguments}\"";
@@ -331,14 +379,19 @@ public static class PythonEnvironmentService
             catch (OperationCanceledException)
             {
                 try { process.Kill(true); } catch { }
+                try { await process.WaitForExitAsync().ConfigureAwait(false); } catch { }
                 return new ToolResult(-1, await outputTask.ConfigureAwait(false), "执行超时");
             }
 
-            return new ToolResult(process.ExitCode, await outputTask.ConfigureAwait(false), await errorTask.ConfigureAwait(false));
+            return new ToolResult(
+                process.ExitCode,
+                await outputTask.ConfigureAwait(false),
+                await errorTask.ConfigureAwait(false));
         }
         catch (Exception ex)
         {
-            App.Log($"Tool execution failed: {fileName} {arguments}: {ex}");
+            if (logFailure)
+                App.Log($"Tool execution failed: {fileName} {arguments}: {ex}");
             return new ToolResult(-1, string.Empty, ex.Message);
         }
     }

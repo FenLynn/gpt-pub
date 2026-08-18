@@ -1,0 +1,182 @@
+name: P103 DavBridge CI
+
+on:
+  push:
+    branches: [p103-exp, p103-stable]
+    paths:
+      - 'projects/1-桌面软件/103-DavBridge/**'
+      - '.github/workflows/p103-davbridge-ci.yml'
+      - '目录.md'
+      - 'projects/1-桌面软件/README.md'
+  pull_request:
+    branches: [p103-exp, p103-stable, main]
+    paths:
+      - 'projects/1-桌面软件/103-DavBridge/**'
+      - '.github/workflows/p103-davbridge-ci.yml'
+      - '目录.md'
+      - 'projects/1-桌面软件/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p103-davbridge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce P103 pull-request scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          bad=$(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+            | grep -Ev '^(projects/1-桌面软件/103-DavBridge/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p103-davbridge-ci\.yml$)' || true)
+          if [[ -n "$bad" ]]; then
+            echo 'Out-of-scope P103 changes:'
+            echo "$bad"
+            exit 1
+          fi
+
+  core-smoke:
+    needs: scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify solution membership
+        shell: bash
+        run: |
+          set -euo pipefail
+          sln='projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln'
+          test -f "$sln"
+          listing=$(dotnet sln "$sln" list)
+          echo "$listing"
+          grep -F 'DavBridge.Core/DavBridge.Core.csproj' <<<"$listing"
+          grep -F 'DavBridge/DavBridge.csproj' <<<"$listing"
+          grep -F 'DavBridge.Smoke/DavBridge.Smoke.csproj' <<<"$listing"
+      - name: Restore core smoke
+        run: dotnet restore 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj'
+      - name: Run core smoke
+        run: dotnet run --project 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj' -c Release --no-restore
+
+  windows-build:
+    needs: [scope, core-smoke]
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Windows app
+        shell: pwsh
+        run: dotnet restore 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
+
+      - name: Publish framework-dependent single EXE
+        shell: pwsh
+        run: >-
+          dotnet publish 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
+          -c Release
+          -r win-x64
+          --self-contained false
+          --no-restore
+          -p:PublishSingleFile=true
+          -p:DebugType=embedded
+          -o build/DavBridge
+
+      - name: Verify Runtime boundary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $exe='build/DavBridge/DavBridge.exe'
+          if (!(Test-Path $exe -PathType Leaf)) { throw 'DavBridge.exe missing' }
+          $unexpected=Get-ChildItem 'build/DavBridge' -File | Where-Object { $_.Name -ne 'DavBridge.exe' }
+          if ($unexpected) {
+            Write-Host 'Unexpected publish files:'
+            $unexpected | Select-Object Name,Length | Format-Table
+            throw 'Default P103 Runtime must remain a single-file delivery.'
+          }
+          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','DavBridge.log')) {
+            if (Get-ChildItem 'build/DavBridge' -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) {
+              throw "Private Data leaked into Runtime: $private"
+            }
+          }
+
+      - name: Run isolated Windows self-test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP ('DavBridge-SelfTest-' + [guid]::NewGuid().ToString('N'))
+          $roaming=Join-Path $root 'Roaming'
+          $local=Join-Path $root 'Local'
+          $report=Join-Path $root 'self-test.json'
+          New-Item $roaming,$local -ItemType Directory -Force | Out-Null
+          $oldAppData=$env:APPDATA
+          $oldLocal=$env:LOCALAPPDATA
+          try {
+            $env:APPDATA=$roaming
+            $env:LOCALAPPDATA=$local
+            $proc=Start-Process -FilePath (Resolve-Path 'build/DavBridge/DavBridge.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
+            if ($proc.ExitCode -ne 0) { throw "DavBridge self-test exit code $($proc.ExitCode)" }
+            if (!(Test-Path $report)) { throw 'DavBridge self-test report missing' }
+            $json=Get-Content $report -Raw | ConvertFrom-Json
+            if (-not $json.ok -or $json.product -ne 'DavBridge') { throw 'DavBridge self-test report failed' }
+            if (!(Test-Path (Join-Path $roaming 'DavBridge'))) { throw 'Roaming Data root was not created under isolated APPDATA' }
+            if (!(Test-Path (Join-Path $local 'DavBridge'))) { throw 'Local Data root was not created under isolated LOCALAPPDATA' }
+          } finally {
+            $env:APPDATA=$oldAppData
+            $env:LOCALAPPDATA=$oldLocal
+            Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Generate SHA-256
+        shell: pwsh
+        run: |
+          $exe='build/DavBridge/DavBridge.exe'
+          $hash=(Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $bytes=(Get-Item $exe).Length
+          "DavBridge.exe  $bytes bytes  sha256=$hash" | Set-Content 'build/DavBridge/SHA256.txt' -Encoding utf8
+          "DAVBRIDGE_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "DAVBRIDGE_BYTES=$bytes" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Windows candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: DavBridge-v0.1.7-win-x64
+          path: |
+            build/DavBridge/DavBridge.exe
+            build/DavBridge/SHA256.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write summary
+        if: always()
+        shell: pwsh
+        run: |
+          @"
+          ## P103 DavBridge v0.1.7
+          - Deployment: .NET 8 framework-dependent single EXE
+          - Platform: Windows x64
+          - Safety gates: real PUT group + NO-WRITE existing-replica takeover must both pass before full migration
+          - Monthly reset: date-only, real upload probe begins at local 09:00 before cycle counters are reset
+          - EXE bytes: $env:DAVBRIDGE_BYTES
+          - EXE SHA-256: $env:DAVBRIDGE_SHA256
+          - Private Data: %APPDATA%\DavBridge and %LOCALAPPDATA%\DavBridge
+          "@ | Add-Content $env:GITHUB_STEP_SUMMARY
