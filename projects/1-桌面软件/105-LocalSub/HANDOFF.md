@@ -67,18 +67,13 @@ IPC v1：Windows Named Pipe + UTF-8 newline-delimited JSON，方法为 `ping / a
 
 后台媒体分析和完整后台转写实现已经从 Shell 编译边界排除，Shell 仅保留 Proxy。**禁止重新引入进程内静默 fallback。**
 
-Core 异常时：当前请求失败，GUI 保持存活；下一次重任务重新启动 Core。Shell 正常退出后 Core 跟随退出。
+v0.1.1-dev 在 Shell client 中增加 connection generation。每个 pending request 绑定自己的 generation；旧 reader loop 退出只能失败旧 generation 的请求，不能影响重连后的新请求。当前 generation 断开后下一请求重新启动 Core。用户取消若 1.5 秒不收敛则回收 worker。Shell 正常退出优先主动 shutdown Core，parent watcher 保留为异常退出兜底。
 
 ## 5. 当前验证事实
 
-Phase 1A 历史候选来源：
+Phase 1A 首次正式准入已经完成 Shell/Core 双 publish、绿色目录、Core Named Pipe `ping/shutdown`、Shell 启动、后台工作区、Process Loopback、sherpa native runtime 加载、native offline ASR 真解码与最终打包。
 
-- 旧 Draft PR：#387
-- 历史功能 head：`88be3779de4777705d4f3ebb552231d381d31a75`
-- 历史 Windows CI：run `32085583218`，run number `168`，结论 `success`
-- 已覆盖 Shell/Core 双 publish、绿色目录、Core Named Pipe `ping/shutdown`、Shell 启动、后台工作区、Process Loopback、sherpa native runtime 加载、native offline ASR 真解码与最终打包。
-
-这些是迁移来源证据，不替代 P105 自己的 CI。P105 正式开发以后只认 P105 分支当前 exact-head CI。
+P105 v0.1.1-dev 当前功能代码提交：`0ff1cd4dc308ce684e882a3e0c7724304da1ecb4`。本版新增 Windows fault injection：Shell client 建立一个仍在 pending 的延迟 ping 后真实结束第一 Core，必须让当前请求失败，并由同一 client 拉起第二 Core，再次 ping 成功。当前 exact-head CI、Artifact 和 digest 以本轮 Draft PR 的 GitHub 实时状态为准。
 
 ## 6. 当前实机待验证
 
@@ -87,17 +82,17 @@ Phase 1A 最重要的用户实机验收仍是“进程边界是否真正保护 G
 1. 后台解析或 SenseVoice 转写时拖动窗口、最大化/恢复、切换页面、滚动。
 2. 任务管理器观察主要 CPU/内存负载应进入 `LocalSub.Core.exe`。
 3. 后台转写时手动结束 `LocalSub.Core.exe`，`LocalSub.exe` 不应退出。
-4. 当前任务应失败，再发起后台任务时应重新拉起 Core。
+4. 当前任务应失败，再发起后台任务时应重新拉起新的 Core。
 5. 关闭 LocalSub 后 Core 不长期残留。
-6. 异常时优先查看 `Logs/core.log`、`Logs/responsiveness.log`。
+6. 异常时优先查看 `Logs/core.log`、`Logs/core-client.log`、`Logs/responsiveness.log`。
 
-用户尚未确认上述完整故障注入验收前，状态保持“待验证”。
+自动 fault injection 能证明 supervisor/IPC 的恢复状态机，但不能证明用户真实媒体、模型和机器负载下的 WinForms 消息循环体验。用户尚未确认上述完整实机验收前，状态保持“待验证”。
 
 ## 7. 下一开发顺序
 
 不要回去继续堆 WinForms 小修补。架构顺序固定为：
 
-1. 完成 Phase 1A 实机响应性与 Core 崩溃边界验收。
+1. 完成 v0.1.1-dev exact-head Windows CI，并交给用户完成 Phase 1A 实机响应性与 Core 崩溃边界验收。
 2. Phase 1B 分批迁移实时 Zipformer/Paraformer/SenseVoice、WASAPI、PotPlayer Process Loopback、模型下载/解压/删除等重任务到 Core。
 3. 每迁一类能力就保持“Core 失败不拖死 GUI”的故障边界，并增加对应 CI/实机验证。
 4. Core API 稳定后才进入 WebView2 + Vue 3 + TypeScript 主界面。
