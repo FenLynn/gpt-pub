@@ -1,4 +1,4 @@
-use crate::codex::{assistant_text, clean_visible_text, hydrate_summary, is_internal_user_text, truncate_chars, user_text};
+use crate::codex::{assistant_text, clean_visible_text, is_internal_user_text, truncate_chars, user_text};
 use crate::types::{ExportRequest, ExportResult, PreflightResult, ProgressEvent, SessionSummary};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -23,10 +23,8 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
     if needle.is_empty() { 0 } else { haystack.match_indices(needle).count() }
 }
 
-pub fn preflight_impl(sessions: &[SessionSummary], app: &AppHandle, cancel: &AtomicBool) -> Result<PreflightResult, String> {
-    cancel.store(false, Ordering::SeqCst);
-    let mut total_bytes = 0u64;
-    let mut hits: BTreeMap<String, usize> = BTreeMap::new();
+fn scan_sensitive_text(text: &str, hits: &mut BTreeMap<String, usize>) {
+    let lower = text.to_ascii_lowercase();
     let patterns = [
         ("API Key", "api_key"),
         ("Access Token", "access_token"),
@@ -36,20 +34,104 @@ pub fn preflight_impl(sessions: &[SessionSummary], app: &AppHandle, cancel: &Ato
         ("Bearer Token", "bearer "),
         ("OpenAI-style Key", "sk-"),
     ];
+    for (label, needle) in patterns {
+        let count = count_occurrences(&lower, needle);
+        if count > 0 { *hits.entry(label.to_string()).or_insert(0) += count; }
+    }
+}
+
+fn line_may_contain_visible_message(line: &str) -> bool {
+    line.contains("user_message")
+        || line.contains("agent_message")
+        || line.contains("UserMessage")
+        || line.contains("AgentMessage")
+        || (line.contains("\"role\"") && (line.contains("\"user\"") || line.contains("\"assistant\"")))
+}
+
+fn visit_compact_turns<F>(session: &SessionSummary, cancel: &AtomicBool, mut visit: F) -> Result<usize, String>
+where
+    F: FnMut(&str, Option<&str>) -> Result<(), String>,
+{
+    let file = fs::File::open(&session.path).map_err(|e| format!("无法读取会话 {}：{}", session.title, e))?;
+    let mut current_user: Option<String> = None;
+    let mut current_assistant: Option<String> = None;
+    let mut turns = 0usize;
+
+    let flush = |user: &mut Option<String>, assistant: &mut Option<String>, visit: &mut F, turns: &mut usize| -> Result<(), String> {
+        if let Some(user_text) = user.take() {
+            visit(&user_text, assistant.as_deref())?;
+            assistant.take();
+            *turns += 1;
+        } else {
+            assistant.take();
+        }
+        Ok(())
+    };
+
+    for line in BufReader::new(file).lines().map_while(Result::ok) {
+        if cancel.load(Ordering::SeqCst) { return Err("export_cancelled".to_string()); }
+        if line.trim().is_empty() || !line_may_contain_visible_message(&line) { continue; }
+        let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+
+        if let Some(text) = user_text(&v) {
+            let text = clean_visible_text(&text);
+            if text.is_empty() || is_internal_user_text(&text) { continue; }
+
+            // The same visible user message can be recorded in more than one Codex event format.
+            // Treat an adjacent duplicate before any assistant reply as the same turn.
+            if current_user.as_deref() == Some(text.as_str()) && current_assistant.is_none() {
+                continue;
+            }
+            flush(&mut current_user, &mut current_assistant, &mut visit, &mut turns)?;
+            current_user = Some(text);
+            continue;
+        }
+
+        if let Some(text) = assistant_text(&v) {
+            if current_user.is_none() { continue; }
+            let text = clean_visible_text(&text);
+            if text.is_empty() { continue; }
+            // Overwrite instead of append. The last visible Codex message in a user turn is
+            // the useful handoff conclusion; intermediate status updates are intentionally dropped.
+            if current_assistant.as_deref() != Some(text.as_str()) {
+                current_assistant = Some(text);
+            }
+        }
+    }
+
+    flush(&mut current_user, &mut current_assistant, &mut visit, &mut turns)?;
+    Ok(turns)
+}
+
+pub fn preflight_impl(sessions: &[SessionSummary], include_details: bool, app: &AppHandle, cancel: &AtomicBool) -> Result<PreflightResult, String> {
+    cancel.store(false, Ordering::SeqCst);
+    let mut total_bytes = 0u64;
+    let mut hits: BTreeMap<String, usize> = BTreeMap::new();
+
     for (i, session) in sessions.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) { return Err("export_cancelled".to_string()); }
         total_bytes = total_bytes.saturating_add(session.size);
-        let file = fs::File::open(&session.path).map_err(|e| format!("预检无法读取 {}：{}", session.title, e))?;
-        for line in BufReader::new(file).lines().map_while(Result::ok) {
-            let lower = line.to_ascii_lowercase();
-            for (label, needle) in patterns {
-                let count = count_occurrences(&lower, needle);
-                if count > 0 { *hits.entry(label.to_string()).or_insert(0) += count; }
+
+        if include_details {
+            // Advanced detailed mode can emit tool payloads, so its preflight intentionally
+            // checks every raw record. Compact mode below checks only text that will be exported.
+            let file = fs::File::open(&session.path).map_err(|e| format!("预检无法读取 {}：{}", session.title, e))?;
+            for line in BufReader::new(file).lines().map_while(Result::ok) {
+                if cancel.load(Ordering::SeqCst) { return Err("export_cancelled".to_string()); }
+                scan_sensitive_text(&line, &mut hits);
             }
+        } else {
+            visit_compact_turns(session, cancel, |user, assistant| {
+                scan_sensitive_text(user, &mut hits);
+                if let Some(assistant) = assistant { scan_sensitive_text(assistant, &mut hits); }
+                Ok(())
+            })?;
         }
+
         let pct = 100.0 * (i + 1) as f64 / sessions.len().max(1) as f64;
         emit_progress(app, "preflight", i + 1, sessions.len(), pct, format!("敏感信息预检 {}/{}：{}", i + 1, sessions.len(), session.title));
     }
+
     let mut warnings = Vec::new();
     if !hits.is_empty() { warnings.push("检测到疑似凭据或认证字段，请确认 Markdown 的保存位置与后续 Git 操作安全。".to_string()); }
     Ok(PreflightResult { session_count: sessions.len(), total_bytes, sensitive_hits: hits, warnings })
@@ -94,19 +176,14 @@ fn create_temp_path(target: &Path) -> Result<PathBuf, String> {
     Err("无法创建唯一临时文件名。".to_string())
 }
 
-fn content_text(content: Option<&Value>) -> Option<String> {
-    let arr = content?.as_array()?;
-    let parts: Vec<&str> = arr.iter().filter_map(|b| {
-        let kind = b.get("type").and_then(Value::as_str).unwrap_or_default();
-        if matches!(kind, "input_text" | "text" | "Text" | "output_text") { b.get("text").and_then(Value::as_str) } else { None }
-    }).filter(|s| !s.trim().is_empty()).collect();
-    if parts.is_empty() { None } else { Some(parts.join("\n")) }
-}
-
 fn write_message<W: Write>(w: &mut W, role: &str, text: &str) -> std::io::Result<()> {
     let text = clean_visible_text(text);
     if text.is_empty() { return Ok(()); }
-    writeln!(w, "### {}", role)?; writeln!(w)?; writeln!(w, "{}", text)?; writeln!(w)?; Ok(())
+    writeln!(w, "### {}", role)?;
+    writeln!(w)?;
+    writeln!(w, "{}", text)?;
+    writeln!(w)?;
+    Ok(())
 }
 
 fn tool_call_from(v: &Value) -> Option<(String, String)> {
@@ -144,15 +221,44 @@ fn tool_result_from(v: &Value) -> Option<String> {
 fn write_tool_call<W: Write>(w: &mut W, name: &str, args: &str, max_chars: usize) -> std::io::Result<()> {
     writeln!(w, "<details>")?;
     writeln!(w, "<summary>工具调用：{}</summary>", name.replace('<', "&lt;").replace('>', "&gt;"))?;
-    writeln!(w)?; writeln!(w, "```json")?; writeln!(w, "{}", truncate_chars(args, max_chars))?; writeln!(w, "```")?; writeln!(w)?; writeln!(w, "</details>")?; writeln!(w)?; Ok(())
+    writeln!(w)?;
+    writeln!(w, "```json")?;
+    writeln!(w, "{}", truncate_chars(args, max_chars))?;
+    writeln!(w, "```")?;
+    writeln!(w)?;
+    writeln!(w, "</details>")?;
+    writeln!(w)?;
+    Ok(())
 }
 
 fn write_tool_result<W: Write>(w: &mut W, result: &str, max_chars: usize) -> std::io::Result<()> {
-    writeln!(w, "<details>")?; writeln!(w, "<summary>工具结果</summary>")?; writeln!(w)?;
-    writeln!(w, "```text")?; writeln!(w, "{}", truncate_chars(result, max_chars))?; writeln!(w, "```")?; writeln!(w)?; writeln!(w, "</details>")?; writeln!(w)?; Ok(())
+    writeln!(w, "<details>")?;
+    writeln!(w, "<summary>工具结果</summary>")?;
+    writeln!(w)?;
+    writeln!(w, "```text")?;
+    writeln!(w, "{}", truncate_chars(result, max_chars))?;
+    writeln!(w, "```")?;
+    writeln!(w)?;
+    writeln!(w, "</details>")?;
+    writeln!(w)?;
+    Ok(())
 }
 
-fn render_session<W: Write>(w: &mut W, session: &SessionSummary, include_tools: bool, max_tool_chars: usize, cancel: &AtomicBool) -> Result<usize, String> {
+fn render_compact_session<W: Write>(w: &mut W, session: &SessionSummary, cancel: &AtomicBool) -> Result<usize, String> {
+    let mut message_count = 0usize;
+    visit_compact_turns(session, cancel, |user, assistant| {
+        write_message(w, "你", user).map_err(|e| e.to_string())?;
+        message_count += 1;
+        if let Some(assistant) = assistant {
+            write_message(w, "Codex", assistant).map_err(|e| e.to_string())?;
+            message_count += 1;
+        }
+        Ok(())
+    })?;
+    Ok(message_count)
+}
+
+fn render_detailed_session<W: Write>(w: &mut W, session: &SessionSummary, max_tool_chars: usize, cancel: &AtomicBool) -> Result<usize, String> {
     let file = fs::File::open(&session.path).map_err(|e| format!("无法读取会话 {}：{}", session.title, e))?;
     let mut message_count = 0usize;
     let mut last_user = String::new();
@@ -164,8 +270,9 @@ fn render_session<W: Write>(w: &mut W, session: &SessionSummary, include_tools: 
         if let Some(text) = user_text(&v) {
             let text = clean_visible_text(&text);
             if !text.is_empty() && !is_internal_user_text(&text) && text != last_user {
-                write_message(w, "User", &text).map_err(|e| e.to_string())?;
-                last_user = text; message_count += 1;
+                write_message(w, "你", &text).map_err(|e| e.to_string())?;
+                last_user = text;
+                message_count += 1;
             }
             continue;
         }
@@ -173,30 +280,28 @@ fn render_session<W: Write>(w: &mut W, session: &SessionSummary, include_tools: 
             let text = clean_visible_text(&text);
             if !text.is_empty() && text != last_assistant {
                 write_message(w, "Codex", &text).map_err(|e| e.to_string())?;
-                last_assistant = text; message_count += 1;
+                last_assistant = text;
+                message_count += 1;
             }
             continue;
         }
-        if include_tools {
-            if let Some((name, args)) = tool_call_from(&v) { write_tool_call(w, &name, &args, max_tool_chars).map_err(|e| e.to_string())?; continue; }
-            if let Some(result) = tool_result_from(&v) { write_tool_result(w, &result, max_tool_chars).map_err(|e| e.to_string())?; continue; }
+        if let Some((name, args)) = tool_call_from(&v) {
+            write_tool_call(w, &name, &args, max_tool_chars).map_err(|e| e.to_string())?;
+            continue;
         }
-        let payload = v.get("payload");
-        if v.get("type").and_then(Value::as_str) == Some("event_msg") && payload.and_then(|p| p.get("type")).and_then(Value::as_str) == Some("item_completed") {
-            if let Some(item) = payload.and_then(|p| p.get("item")) {
-                if item.get("type").and_then(Value::as_str) == Some("AgentMessage") {
-                    if let Some(text) = item.get("text").and_then(Value::as_str).map(str::to_string).or_else(|| content_text(item.get("content"))) {
-                        let text = clean_visible_text(&text);
-                        if !text.is_empty() && text != last_assistant {
-                            write_message(w, "Codex", &text).map_err(|e| e.to_string())?;
-                            last_assistant = text; message_count += 1;
-                        }
-                    }
-                }
-            }
+        if let Some(result) = tool_result_from(&v) {
+            write_tool_result(w, &result, max_tool_chars).map_err(|e| e.to_string())?;
         }
     }
     Ok(message_count)
+}
+
+fn render_session<W: Write>(w: &mut W, session: &SessionSummary, include_details: bool, max_tool_chars: usize, cancel: &AtomicBool) -> Result<usize, String> {
+    if include_details {
+        render_detailed_session(w, session, max_tool_chars, cancel)
+    } else {
+        render_compact_session(w, session, cancel)
+    }
 }
 
 pub fn export_impl(request: &ExportRequest, codex_root: &Path, app: &AppHandle, cancel: &AtomicBool) -> Result<ExportResult, String> {
@@ -210,46 +315,53 @@ pub fn export_impl(request: &ExportRequest, codex_root: &Path, app: &AppHandle, 
     let mut writer = BufWriter::new(file);
 
     let write_result = (|| -> Result<(usize, usize), String> {
-        writeln!(writer, "# Codex Project Handoff").map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
-        writeln!(writer, "> 本文件由 CodexHandoff 以只读方式从 Codex 本地会话生成。历史讨论用于恢复上下文，当前代码与仓库实际状态应作为最终事实依据。").map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
-        writeln!(writer, "## 导出信息").map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
-        writeln!(writer, "- Project: `{}`", request.project_path.replace('`', "'")).map_err(|e| e.to_string())?;
-        writeln!(writer, "- Exported by: CodexHandoff v1.0.0 alpha 1").map_err(|e| e.to_string())?;
-        writeln!(writer, "- Sessions: {}", request.sessions.len()).map_err(|e| e.to_string())?;
-        writeln!(writer, "- Tool details: {}", if request.include_tools { "included" } else { "omitted" }).map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
-        writeln!(writer, "## 对话索引").map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
-        writeln!(writer, "| # | Codex 对话名称 | 最后一条用户输入 | 最后活动 |").map_err(|e| e.to_string())?;
-        writeln!(writer, "|---:|---|---|---|").map_err(|e| e.to_string())?;
-
-        let mut hydrated = Vec::with_capacity(request.sessions.len());
-        for (i, original) in request.sessions.iter().enumerate() {
-            if cancel.load(Ordering::SeqCst) { return Err("export_cancelled".to_string()); }
-            let mut s = original.clone();
-            let _ = hydrate_summary(&mut s, 8 * 1024 * 1024);
-            writeln!(writer, "| {} | {} | {} | {} |", i + 1, escape_table(&safe_title(&s.title)), escape_table(s.last_user_preview.as_deref().unwrap_or("")), s.modified).map_err(|e| e.to_string())?;
-            hydrated.push(s);
+        writeln!(writer, "# Codex Project Handoff").map_err(|e| e.to_string())?;
+        writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer, "> 本文件由 CodexHandoff 以只读方式从 Codex 本地会话生成。历史讨论用于恢复上下文，当前代码与仓库实际状态应作为最终事实依据。").map_err(|e| e.to_string())?;
+        if !request.include_tools {
+            writeln!(writer, "> 本文件采用精简交接模式，只保留你的真实消息和每轮 Codex 最后一条可见回复；过程性状态更新、工具调用与工具结果已省略。").map_err(|e| e.to_string())?;
         }
-        writeln!(writer).map_err(|e| e.to_string())?; writeln!(writer, "---").map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer, "## 导出信息").map_err(|e| e.to_string())?;
+        writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer, "- Project: `{}`", request.project_path.replace('`', "'")).map_err(|e| e.to_string())?;
+        writeln!(writer, "- Exported by: CodexHandoff v1.0.0 alpha 4").map_err(|e| e.to_string())?;
+        writeln!(writer, "- Sessions: {}", request.sessions.len()).map_err(|e| e.to_string())?;
+        writeln!(writer, "- Mode: {}", if request.include_tools { "detailed" } else { "compact handoff" }).map_err(|e| e.to_string())?;
+        writeln!(writer).map_err(|e| e.to_string())?;
+
+        writeln!(writer, "## 对话索引").map_err(|e| e.to_string())?;
+        writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer, "| # | Codex 对话名称 | 状态 |").map_err(|e| e.to_string())?;
+        writeln!(writer, "|---:|---|---|").map_err(|e| e.to_string())?;
+        for (i, session) in request.sessions.iter().enumerate() {
+            let state = if session.archived { "已归档" } else { "活动" };
+            writeln!(writer, "| {} | {} | {} |", i + 1, escape_table(&safe_title(&session.title)), state).map_err(|e| e.to_string())?;
+        }
+        writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer, "---").map_err(|e| e.to_string())?;
+        writeln!(writer).map_err(|e| e.to_string())?;
 
         let mut message_count = 0usize;
-        for (i, session) in hydrated.iter().enumerate() {
+        for (i, session) in request.sessions.iter().enumerate() {
             if cancel.load(Ordering::SeqCst) { return Err("export_cancelled".to_string()); }
-            let pct = 5.0 + 90.0 * (i as f64 / hydrated.len().max(1) as f64);
-            emit_progress(app, "export", i, hydrated.len(), pct, format!("正在导出 {}/{}：{}", i + 1, hydrated.len(), session.title));
-            writeln!(writer, "# Conversation {}", i + 1).map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
-            writeln!(writer, "## {}", safe_title(&session.title)).map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
-            writeln!(writer, "- Thread ID: `{}`", session.id).map_err(|e| e.to_string())?;
-            writeln!(writer, "- Workspace: `{}`", session.cwd.replace('`', "'")).map_err(|e| e.to_string())?;
-            if let Some(created) = &session.created { writeln!(writer, "- Created: {}", created).map_err(|e| e.to_string())?; }
-            writeln!(writer, "- Archived: {}", session.archived).map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
+            let pct = 5.0 + 90.0 * (i as f64 / request.sessions.len().max(1) as f64);
+            emit_progress(app, "export", i, request.sessions.len(), pct, format!("正在导出 {}/{}：{}", i + 1, request.sessions.len(), session.title));
+            writeln!(writer, "# Conversation {} · {}", i + 1, safe_title(&session.title)).map_err(|e| e.to_string())?;
+            writeln!(writer).map_err(|e| e.to_string())?;
+            writeln!(writer, "> 状态：{}", if session.archived { "已归档" } else { "活动" }).map_err(|e| e.to_string())?;
+            writeln!(writer).map_err(|e| e.to_string())?;
             message_count += render_session(&mut writer, session, request.include_tools, request.max_tool_chars, cancel)?;
-            writeln!(writer, "---").map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
+            writeln!(writer, "---").map_err(|e| e.to_string())?;
+            writeln!(writer).map_err(|e| e.to_string())?;
         }
 
-        writeln!(writer, "# Antigravity 接续说明").map_err(|e| e.to_string())?; writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer, "# Antigravity 接续说明").map_err(|e| e.to_string())?;
+        writeln!(writer).map_err(|e| e.to_string())?;
         writeln!(writer, "在 Antigravity CLI 中，将本文件放在项目工作区后，可使用 `@CODEX-HANDOFF.md` 载入。建议先核对当前代码与仓库实际状态，再以本文件恢复历史上下文并继续开发。").map_err(|e| e.to_string())?;
-        writeln!(writer).map_err(|e| e.to_string())?; writeln!(writer, "# End of Codex History").map_err(|e| e.to_string())?;
-        Ok((hydrated.len(), message_count))
+        writeln!(writer).map_err(|e| e.to_string())?;
+        writeln!(writer, "# End of Codex History").map_err(|e| e.to_string())?;
+        Ok((request.sessions.len(), message_count))
     })();
 
     let (_rendered_sessions, message_count) = match write_result {
@@ -264,4 +376,16 @@ pub fn export_impl(request: &ExportRequest, codex_root: &Path, app: &AppHandle, 
     emit_progress(app, "done", request.sessions.len(), request.sessions.len(), 100.0, "导出完成");
     let bytes_written = fs::metadata(&target).map(|m| m.len()).unwrap_or(0);
     Ok(ExportResult { output_path: target.to_string_lossy().to_string(), session_count: request.sessions.len(), message_count, bytes_written, elapsed_ms: started.elapsed().as_millis() })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn visible_line_gate_keeps_message_records() {
+        assert!(line_may_contain_visible_message(r#"{"type":"event_msg","payload":{"type":"user_message"}}"#));
+        assert!(line_may_contain_visible_message(r#"{"payload":{"role":"assistant"}}"#));
+        assert!(!line_may_contain_visible_message(r#"{"payload":{"type":"function_call_output"}}"#));
+    }
 }
