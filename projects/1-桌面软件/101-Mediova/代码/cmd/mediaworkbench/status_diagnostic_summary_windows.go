@@ -20,8 +20,8 @@ import (
 
 const (
 	statusDiagnosticWHGetMessage = 3
-	statusDiagnosticGWLPWndProc   = ^uintptr(3)
-	statusDiagnosticWMSetText     = 0x000C
+	statusDiagnosticGWLPWndProc  = ^uintptr(3)
+	statusDiagnosticWMSetText    = 0x000C
 )
 
 var (

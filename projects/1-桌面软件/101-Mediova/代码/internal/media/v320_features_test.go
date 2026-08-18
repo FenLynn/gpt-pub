@@ -27,7 +27,16 @@ func TestEstimateAndFailureClassification(t *testing.T) {
 
 func TestEnhancedHistoryHTML(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	if err := AppendHistory(HistoryRecord{Input: "a.mov", Output: "a.mp4", InputSize: 1000, OutputSize: 400, Engine: "CPU高质量", Result: "转换完成"}); err != nil {
+	files := t.TempDir()
+	input := filepath.Join(files, "源 文件.mov")
+	output := filepath.Join(files, "输出 文件.mp4")
+	if err := os.WriteFile(input, []byte("input"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(output, []byte("output"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendHistory(HistoryRecord{Input: input, Output: output, InputSize: 1000, OutputSize: 400, Engine: "CPU高质量", Result: "转换完成"}); err != nil {
 		t.Fatal(err)
 	}
 	path, err := WriteHistoryHTML()
@@ -39,7 +48,7 @@ func TestEnhancedHistoryHTML(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(b)
-	for _, want := range []string{"导出当前结果 CSV", "累计节省", "CPU高质量", "function apply()"} {
+	for _, want := range []string{"导出当前结果 CSV", "累计节省", "CPU高质量", "function apply()", `class="file-link"`, "file:///", "%20", "点击打开或播放文件", "打开输入文件夹", "打开输出文件夹", "复制路径"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("history html missing %q", want)
 		}

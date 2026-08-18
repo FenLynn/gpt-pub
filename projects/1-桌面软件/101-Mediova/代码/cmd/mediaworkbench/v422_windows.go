@@ -19,19 +19,9 @@ func drawStatusLamp(hdc uintptr, rc rect, color uintptr) {
 }
 
 func drawCompactResetGlyph(hdc uintptr, rc rect, color uintptr) {
-	cx := rc.Left + scaleDPI(15)
-	cy := (rc.Top + rc.Bottom) / 2
-	radius := scaleDPI(4)
-	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, color)
-	oldPen, _, _ := procSelectObject.Call(hdc, pen)
-	hollow, _, _ := procGetStockObject.Call(NULL_BRUSH)
-	oldBrush, _, _ := procSelectObject.Call(hdc, hollow)
-	procEllipse.Call(hdc, uintptr(cx-radius), uintptr(cy-radius), uintptr(cx+radius), uintptr(cy+radius))
-	drawGDIline(hdc, cx+radius-1, cy-radius, cx+radius+3, cy-radius)
-	drawGDIline(hdc, cx+radius+3, cy-radius, cx+radius+3, cy-radius+4)
-	procSelectObject.Call(hdc, oldBrush)
-	procSelectObject.Call(hdc, oldPen)
-	procDeleteObject.Call(pen)
+	icon := rc
+	icon.Right = icon.Left + scaleDPI(30)
+	drawCenteredText(hdc, "\uE72C", icon, iconFont, color)
 }
 
 // drawContrastCenteredText measures the complete label, keeps it centred, and

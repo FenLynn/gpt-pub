@@ -8,12 +8,13 @@ import shutil
 import subprocess
 import tempfile
 import time
+from ctypes import wintypes
 from pathlib import Path
 
 import round11_flicker_gate as gate
 import round11_flicker_gate_runner_base as runner
 from round12_list_gate_helpers import (
-    EXPECTED_SELECTION,
+    EXPECTED_STATUS_OTHER,
     IDC_COLUMN_SETTINGS,
     IDC_LIST,
     IDC_RIGHT_TOGGLE,
@@ -34,6 +35,27 @@ from round12_list_gate_visual import (
 )
 from round12_remote_header import EXPECTED_CAPTIONS, RemoteHeaderReader, header_handle
 
+LVM_SETCOLUMNWIDTH = 0x1000 + 30
+WM_MOUSEMOVE = 0x0200
+WM_LBUTTONDOWN = 0x0201
+WM_LBUTTONUP = 0x0202
+MK_LBUTTON = 0x0001
+HWND_TOPMOST = -1
+SWP_NOSIZE = 0x0001
+SWP_NOMOVE = 0x0002
+SWP_NOACTIVATE = 0x0010
+
+gate.user32.SetWindowPos.argtypes = [
+    wintypes.HWND,
+    wintypes.HWND,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    wintypes.UINT,
+]
+gate.user32.SetWindowPos.restype = wintypes.BOOL
+
 
 def child_by_handle(main_hwnd: int, handle: int) -> dict[str, object]:
     return next(child for child in gate.enumerate_children(main_hwnd) if int(child["hwnd"]) == handle)
@@ -44,9 +66,10 @@ def read_relative_cells(
     list_hwnd: int,
     column_count: int,
     list_info: dict[str, object],
+    row_count: int = 3,
 ) -> tuple[list[list[list[int]]], list[list[int]]]:
-    row_rects = [reader.list_item_rect(list_hwnd, row) for row in range(3)]
-    subitems = [[reader.list_subitem_rect(list_hwnd, row, column) for column in range(column_count)] for row in range(3)]
+    row_rects = [reader.list_item_rect(list_hwnd, row) for row in range(row_count)]
+    subitems = [[reader.list_subitem_rect(list_hwnd, row, column) for column in range(column_count)] for row in range(row_count)]
 
     # Win32 ListView treats subitem 0 specially: LVM_GETSUBITEMRECT with
     # LVIR_BOUNDS returns the entire row width. Normalize it to the actual
@@ -88,6 +111,48 @@ def set_columns_visible(main_hwnd: int, list_hwnd: int, columns: list[int], visi
             raise RuntimeError(f"column visibility transition failed: column={column} expected={visible} actual={now_visible}")
 
 
+def validate_hidden_columns_reject_width_drift(
+    list_hwnd: int, header_hwnd: int, reader: RemoteHeaderReader
+) -> dict[str, object]:
+    hidden_columns = [13, 14]
+    before = [column_width(list_hwnd, column) for column in hidden_columns]
+    if before != [0, 0]:
+        raise RuntimeError(f"hidden trim columns unexpectedly visible before drift test: {before}")
+    for column, attempted_width in zip(hidden_columns, [118, 92]):
+        gate.user32.SendMessageW(list_hwnd, LVM_SETCOLUMNWIDTH, column, attempted_width)
+    time.sleep(0.15)
+    after = [column_width(list_hwnd, column) for column in hidden_columns]
+    if after != [0, 0]:
+        raise RuntimeError(f"unchecked columns accepted nonzero width drift: before={before} after={after}")
+
+    # Reproduce the actual bug: all hidden zero-width dividers overlap the
+    # right edge of the final visible Status column. Native Header dragging at
+    # that exact edge used to pull Picture Crop out to a visible width while
+    # the menu remained unchecked.
+    rects = reader.rects(header_hwnd)
+    status_right = int(rects[12][2])
+    y = max(4, (int(rects[12][1]) + int(rects[12][3])) // 2)
+
+    def point(x: int) -> int:
+        return ((y & 0xFFFF) << 16) | (x & 0xFFFF)
+
+    gate.user32.SendMessageW(header_hwnd, WM_LBUTTONDOWN, MK_LBUTTON, point(status_right))
+    gate.user32.SendMessageW(header_hwnd, WM_MOUSEMOVE, MK_LBUTTON, point(status_right + 100))
+    gate.user32.SendMessageW(header_hwnd, WM_LBUTTONUP, 0, point(status_right + 100))
+    time.sleep(0.15)
+    after_header_drag = [column_width(list_hwnd, column) for column in hidden_columns]
+    if after_header_drag != [0, 0]:
+        raise RuntimeError(
+            f"real Header drag exposed unchecked columns: before={before} after={after_header_drag}"
+        )
+    return {
+        "columns": hidden_columns,
+        "before": before,
+        "after_external_width_request": after,
+        "after_real_header_drag": after_header_drag,
+    }
+
+
 def columns_fully_visible(cells: list[list[list[int]]], image_width: int, columns: list[int]) -> bool:
     for column in columns:
         left, top, right, bottom = cells[0][column]
@@ -123,6 +188,19 @@ def restore_default_columns(main_hwnd: int, list_hwnd: int) -> None:
 
 
 def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
+    # Both media kinds now start from the compact core set. Establish an
+    # explicit image-only choice before proving that the video profile does
+    # not leak across the kind switch.
+    send_command(main_hwnd, IDC_TAB_IMAGE)
+    time.sleep(0.25)
+    if column_width(list_hwnd, TASK_COL_DURATION) <= 0:
+        send_command(main_hwnd, ROUND12_COLUMN_MENU_BASE + TASK_COL_DURATION)
+    image_before = column_width(list_hwnd, TASK_COL_DURATION)
+    if image_before <= 0:
+        raise RuntimeError(f"image duration column could not be enabled: {image_before}")
+    send_command(main_hwnd, IDC_TAB_VIDEO)
+    time.sleep(0.25)
+
     video_before = column_width(list_hwnd, TASK_COL_DURATION)
     if video_before <= 0:
         raise RuntimeError(f"video duration column unexpectedly hidden before toggle: {video_before}")
@@ -147,6 +225,7 @@ def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
     return {
         "video_before": video_before,
         "video_hidden": video_hidden,
+        "image_before": image_before,
         "image_visible": image_visible,
         "video_hidden_after_switch": video_hidden_after_switch,
         "video_restored": video_restored,
@@ -209,6 +288,10 @@ def main() -> int:
         main_hwnd = gate.find_window(process.pid, "Mediova", 20.0)
         if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1650, 930, True):
             raise ctypes.WinError(ctypes.get_last_error())
+        if not gate.user32.SetWindowPos(
+            main_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
         time.sleep(1.2)
         list_hwnd = int(gate.user32.GetDlgItem(main_hwnd, IDC_LIST))
         column_button = int(gate.user32.GetDlgItem(main_hwnd, IDC_COLUMN_SETTINGS))
@@ -225,9 +308,12 @@ def main() -> int:
         captions = reader.titles(int(header["hwnd"]))
         if captions != EXPECTED_CAPTIONS:
             raise RuntimeError(f"unexpected captions: {captions!r}")
+        hidden_width_authority = validate_hidden_columns_reject_width_drift(
+            list_hwnd, int(header["hwnd"]), reader
+        )
 
         list_info = child_by_handle(main_hwnd, list_hwnd)
-        left_cells, screen_rows = read_relative_cells(reader, list_hwnd, len(captions), list_info)
+        left_cells, screen_rows = read_relative_cells(reader, list_hwnd, len(captions), list_info, row_count=7)
         header_bottom = int(header["rect"][3])
         first_row_top = int(screen_rows[0][1])
         if first_row_top < header_bottom:
@@ -271,7 +357,7 @@ def main() -> int:
         )
 
         selected_samples = merge_selected_samples(
-            [left_visual["selected_background_samples"], group_a_samples, group_b_samples],
+            [left_visual["status_background_samples"], group_a_samples, group_b_samples],
             len(captions),
         )
 
@@ -280,12 +366,17 @@ def main() -> int:
         report = {
             "column_count": len(captions),
             "captions": captions,
-            "selected_background_expected": list(EXPECTED_SELECTION),
-            "selected_background_samples": selected_samples,
+            "selected_row_preserves_status_background": True,
+            "selected_row_background_expected": list(EXPECTED_STATUS_OTHER),
+            "selected_row_background_samples": selected_samples,
+            "status_row_backgrounds": left_visual["status_row_backgrounds"],
+            "status_row_tail_backgrounds": left_visual["status_row_tail_backgrounds"],
             "number_dark_pixels": left_visual["number_dark_pixels"],
-            "selected_white_text_pixels": left_visual["selected_white_text_pixels"],
+            "selected_filename_dark_pixels": left_visual["selected_filename_dark_pixels"],
             "preview_saturated_pixels": left_visual["preview_saturated_pixels"],
             "preview_unique_colors": left_visual["preview_unique_colors"],
+            "status_marker_colors": left_visual["status_marker_colors"],
+            "status_marker_pixels": left_visual["status_marker_pixels"],
             "first_row_top": first_row_top,
             "header_bottom": header_bottom,
             "header_row_overlap": False,
@@ -303,6 +394,7 @@ def main() -> int:
             "column_settings_button_rect": column_button_info["rect"],
             "right_toggle_button_rect": toggle_button_info["rect"],
             "column_profile_isolation": profile,
+            "unchecked_columns_stay_hidden": hidden_width_authority,
         }
         (evidence / "round12-list-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))

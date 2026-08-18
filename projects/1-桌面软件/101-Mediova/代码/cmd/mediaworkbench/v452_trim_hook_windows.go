@@ -78,7 +78,11 @@ func v452TryInstallTrimEditor(d *trimDialog) {
 	state := v452TrimInstallStateFor(d)
 	if d.hwnd != 0 && !state.dialogInstalled {
 		state.dialogInstalled = true
-		setText(d.hwnd, "裁剪 · "+filepath.Base(d.task.Input))
+		title := "裁剪 · " + filepath.Base(d.task.Input)
+		if d.task.Kind == model.KindImage {
+			title = "图片裁剪 · " + filepath.Base(d.task.Input)
+		}
+		setText(d.hwnd, title)
 		v452SetWindowSubclass.Call(d.hwnd, v452TrimDialogSubclassCB, v452TrimDialogSubclassID, 0)
 	}
 	if d.hTrack != 0 && !state.trackInstalled {

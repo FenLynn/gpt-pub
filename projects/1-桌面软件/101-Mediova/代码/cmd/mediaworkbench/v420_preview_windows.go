@@ -25,7 +25,7 @@ func parseV420UIPreviewArgs(args []string) (bool, string) {
 		case strings.HasPrefix(arg, "--ui-preview="):
 			value := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(arg, "--ui-preview=")))
 			switch value {
-			case "image", "held", "video":
+			case "image", "held", "video", "completion":
 				mode = value
 			default:
 				mode = "video"

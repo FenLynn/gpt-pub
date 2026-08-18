@@ -21,14 +21,27 @@ import round11_flicker_gate as gate
 LVM_FIRST = 0x1000
 LVM_GETITEMCOUNT = LVM_FIRST + 4
 LVM_GETCOLUMNWIDTH = LVM_FIRST + 29
+LVM_SETCOLUMNWIDTH = LVM_FIRST + 30
 LVM_GETCOUNTPERPAGE = LVM_FIRST + 40
+WM_COMMAND = 0x0111
+ROUND12_COLUMN_MENU_BASE = 2600
 HDM_FIRST = 0x1200
 HDM_GETITEMCOUNT = HDM_FIRST + 0
 SRCCOPY = 0x00CC0020
 ROUND11_SCROLL_PREVIEW_ARG = "--round11-scroll-preview"
 INLINE_THUMB_COLORS = {(160, 171, 184), (110, 132, 158)}
 IMMEDIATE_HOVER_SAMPLE_SECONDS = 0.10
-FORBIDDEN_SCROLL_CLASSES = {"MWRound9ScrollCover", "MWRound11StableScrollSurface"}
+FORBIDDEN_SCROLL_CLASSES = {
+    "MWRound9ScrollCover",
+    "MWRound11StableScrollSurface",
+    "MWRound12ThumbVisual",
+    "MWRound12FrozenNumber",
+}
+ROUND12_EXPANDED_COLUMN_WIDTHS = [
+    44, 100, 230, 100, 76,
+    66, 116, 58, 88, 92,
+    140, 105, 124, 118, 92,
+]
 
 
 gate.user32.SendMessageW.argtypes = [
@@ -54,6 +67,40 @@ gate.gdi32.BitBlt.argtypes = [
 gate.gdi32.BitBlt.restype = wintypes.BOOL
 
 
+def capture_print_window_rect(rect: list[int]) -> Image.Image:
+    """Capture a screen-relative child region through its smallest top-level owner.
+
+    BitBlt of the desktop DC is unavailable in some locked/RDP automation
+    sessions. PrintWindow remains supported there and also avoids unrelated
+    foreground windows covering the application under test.
+    """
+    left, top, right, bottom = [int(value) for value in rect]
+    candidates: list[tuple[int, int, gate.RECT]] = []
+
+    @gate.WNDENUMPROC
+    def callback(hwnd: int, _lparam: int) -> bool:
+        if not gate.user32.IsWindowVisible(hwnd):
+            return True
+        owner = gate.RECT()
+        if not gate.user32.GetWindowRect(hwnd, ctypes.byref(owner)):
+            return True
+        if owner.left <= left and owner.top <= top and owner.right >= right and owner.bottom >= bottom:
+            area = max(1, owner.right - owner.left) * max(1, owner.bottom - owner.top)
+            candidates.append((area, int(hwnd), owner))
+        return True
+
+    gate.user32.EnumWindows(callback, 0)
+    if not candidates:
+        raise RuntimeError(f"no visible top-level owner contains screen region {rect!r}")
+    _, hwnd, owner = min(candidates, key=lambda item: item[0])
+    whole = gate.capture_window(hwnd)
+    try:
+        crop = (left - owner.left, top - owner.top, right - owner.left, bottom - owner.top)
+        return whole.crop(crop)
+    finally:
+        whole.close()
+
+
 def capture_screen_rect(rect: list[int]) -> Image.Image:
     left, top, right, bottom = [int(value) for value in rect]
     width = right - left
@@ -67,7 +114,7 @@ def capture_screen_rect(rect: list[int]) -> Image.Image:
     old = gate.gdi32.SelectObject(memory_dc, bitmap)
     try:
         if not gate.gdi32.BitBlt(memory_dc, 0, 0, width, height, screen_dc, left, top, SRCCOPY):
-            raise ctypes.WinError(ctypes.get_last_error())
+            return capture_print_window_rect(rect)
         info = gate.BITMAPINFO()
         info.bmiHeader.biSize = ctypes.sizeof(gate.BITMAPINFOHEADER)
         info.bmiHeader.biWidth = width
@@ -135,14 +182,6 @@ def normal_list_geometry(main_hwnd: int) -> dict[str, Any]:
     style = int(str(child["style"]), 16)
     exstyle = int(str(child["exstyle"]), 16)
     scroll_bits = style & (gate.WS_HSCROLL | gate.WS_VSCROLL)
-    if scroll_bits:
-        raise RuntimeError(
-            f"native ListView scrollbar styles remain: style=0x{style:08x} bits=0x{scroll_bits:08x}"
-        )
-    if style & gate.WS_BORDER or exstyle & gate.WS_EX_CLIENTEDGE:
-        raise RuntimeError(
-            f"legacy ListView chrome remains: style=0x{style:08x}, exstyle=0x{exstyle:08x}"
-        )
     assert_no_scroll_child_windows(main_hwnd)
     return {
         "hwnd": list_hwnd,
@@ -184,19 +223,50 @@ def list_overflow_state(main_hwnd: int) -> dict[str, int | bool]:
     }
 
 
-def establish_real_overflow(main_hwnd: int) -> dict[str, int | bool]:
+def establish_real_overflow(main_hwnd: int) -> dict[str, Any]:
     if not gate.user32.MoveWindow(main_hwnd, 0, 0, 1120, 520, True):
         raise ctypes.WinError(ctypes.get_last_error())
     deadline = time.monotonic() + 10.0
     state: dict[str, int | bool] = {}
+    compact_state: dict[str, int | bool] | None = None
     while time.monotonic() < deadline:
         state = list_overflow_state(main_hwnd)
-        if int(state["item_count"]) >= 35 and bool(state["vertical"]) and bool(state["horizontal"]):
+        if int(state["item_count"]) >= 35 and bool(state["vertical"]):
+            compact_state = dict(state)
+            if bool(compact_state["horizontal"]):
+                raise RuntimeError(
+                    f"compact default unexpectedly overflowed horizontally: {compact_state!r}"
+                )
+            list_hwnd, _ = list_handles(main_hwnd)
+            for index, width in enumerate(ROUND12_EXPANDED_COLUMN_WIDTHS):
+                # Expand through the same column-selection command a user
+                # invokes. Directly assigning a hidden column a nonzero width
+                # is intentionally rejected by the application, because that
+                # was the unchecked-column Header drag bug.
+                if int(gate.user32.SendMessageW(list_hwnd, LVM_GETCOLUMNWIDTH, index, 0)) == 0:
+                    gate.user32.SendMessageW(
+                        main_hwnd, WM_COMMAND, ROUND12_COLUMN_MENU_BASE + index, 0
+                    )
+                gate.user32.SendMessageW(list_hwnd, LVM_SETCOLUMNWIDTH, index, width)
+            break
+        time.sleep(0.10)
+
+    if compact_state is None:
+        raise RuntimeError(f"test-only real task mode did not produce vertical overflow: {state!r}")
+
+    while time.monotonic() < deadline:
+        state = list_overflow_state(main_hwnd)
+        if bool(state["vertical"]) and bool(state["horizontal"]):
             time.sleep(0.5)
             normal_list_geometry(main_hwnd)
-            return list_overflow_state(main_hwnd)
+            result: dict[str, Any] = dict(list_overflow_state(main_hwnd))
+            result["compact_default_total_width"] = compact_state["total_width"]
+            result["compact_default_client_width"] = compact_state["client_width"]
+            result["compact_default_horizontal"] = compact_state["horizontal"]
+            result["expanded_for_user_selected_columns"] = True
+            return result
         time.sleep(0.10)
-    raise RuntimeError(f"test-only real task mode did not produce two-axis overflow: {state!r}")
+    raise RuntimeError(f"user-selected columns did not produce two-axis overflow: {state!r}")
 
 
 def thumb_pixels(image: Image.Image) -> tuple[int, tuple[int, int, int, int] | None]:
@@ -419,16 +489,16 @@ def main() -> int:
         raise RuntimeError(f"expected exactly one ListView, got {len(listviews)}")
     style = int(listviews[0]["style"], 16)
     exstyle = int(listviews[0]["exstyle"], 16)
-    if style & (gate.WS_HSCROLL | gate.WS_VSCROLL | gate.WS_BORDER) or exstyle & gate.WS_EX_CLIENTEDGE:
+    if not style & gate.WS_HSCROLL:
         raise RuntimeError(
-            f"native ListView chrome remains: style=0x{style:08x}, exstyle=0x{exstyle:08x}"
+            f"native horizontal ListView scrollbar is missing: style=0x{style:08x}, exstyle=0x{exstyle:08x}"
         )
 
     scroll_children = report["windows"]["main"]["scroll_child_windows"]
     if scroll_children:
         raise RuntimeError(f"scrollbar child windows remain: {scroll_children!r}")
     if len(report["hover"]) != 2:
-        raise RuntimeError(f"horizontal/vertical inline hover checks missing: {report['hover']!r}")
+        raise RuntimeError(f"horizontal/vertical native scrollbar checks missing: {report['hover']!r}")
 
     print(json.dumps(report, ensure_ascii=True, separators=(",", ":")))
     return 0

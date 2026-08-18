@@ -38,6 +38,18 @@ VISUAL_H = 36
 MIN_VISUAL_CHANGE_RATIO = 0.03
 STABLE_MATCHES_REQUIRED = 3
 STABLE_MAX_DRIFT_RATIO = 0.01
+SMTO_ABORTIFHUNG = 0x0002
+
+gate.user32.SendMessageTimeoutW.argtypes = [
+    wintypes.HWND,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+    wintypes.UINT,
+    wintypes.UINT,
+    ctypes.POINTER(ctypes.c_size_t),
+]
+gate.user32.SendMessageTimeoutW.restype = wintypes.LPARAM
 
 
 def child_by_handle(parent: int, handle: int) -> dict[str, object]:
@@ -68,6 +80,50 @@ def find_editor(pid: int, timeout: float) -> int:
     return 0
 
 
+def find_stable_editor_controls(pid: int, timeout: float) -> tuple[int, int, int, int]:
+    deadline = time.monotonic() + timeout
+    previous: tuple[int, int, int, int] | None = None
+    matches = 0
+    observed: list[tuple[int, int, int, int]] = []
+    while time.monotonic() < deadline:
+        editor = find_editor(pid, min(0.25, max(0.05, deadline - time.monotonic())))
+        current = (
+            editor,
+            int(gate.user32.GetDlgItem(editor, IDC_PREVIEW_CANVAS) or 0) if editor else 0,
+            int(gate.user32.GetDlgItem(editor, IDC_CURRENT_TIME) or 0) if editor else 0,
+            int(gate.user32.GetDlgItem(editor, IDC_JUMP_TIME) or 0) if editor else 0,
+        )
+        if current not in observed:
+            observed.append(current)
+        if all(current):
+            matches = matches + 1 if current == previous else 1
+            previous = current
+            if matches >= 4:
+                return current
+        else:
+            matches = 0
+            previous = None
+        time.sleep(0.10)
+    raise RuntimeError(f"stable trim editor controls not found; observed={observed[-12:]!r}")
+
+
+def open_stable_editor(trim_button: int, pid: int, timeout: float) -> tuple[int, int, int, int]:
+    deadline = time.monotonic() + timeout
+    last_error = ""
+    while time.monotonic() < deadline:
+        if not gate.user32.PostMessageW(trim_button, BM_CLICK, 0, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            return find_stable_editor_controls(pid, min(2.5, max(0.5, deadline - time.monotonic())))
+        except RuntimeError as exc:
+            # A task becomes visible before its asynchronous probe necessarily
+            # has duration/dimensions. Mediova intentionally closes that
+            # transient editor; retry the real user action after probe advances.
+            last_error = str(exc)
+            time.sleep(0.35)
+    raise RuntimeError(f"trim editor never became ready after media probe; last={last_error}")
+
+
 def quantized_visual_signature(rgb: Image.Image) -> bytes:
     small = rgb.resize((VISUAL_W, VISUAL_H), Image.Resampling.BILINEAR)
     try:
@@ -95,7 +151,16 @@ def public_snapshot(value: dict[str, object]) -> dict[str, object]:
 
 
 def canvas_snapshot(editor: int, canvas: int, evidence: Path | None = None) -> dict[str, object]:
-    info = child_by_handle(editor, canvas)
+    try:
+        info = child_by_handle(editor, canvas)
+    except StopIteration:
+        # The final Round12 preview owner can replace the inherited canvas once
+        # while the modal editor is settling. Always follow the current control
+        # ID instead of treating the retired handle as a preview failure.
+        canvas = int(gate.user32.GetDlgItem(editor, IDC_PREVIEW_CANVAS) or 0)
+        if not canvas:
+            raise RuntimeError("trim preview canvas disappeared")
+        info = child_by_handle(editor, canvas)
     image = runner.capture_screen_rect(info["rect"])
     try:
         rgb = image.convert("RGB")
@@ -247,11 +312,21 @@ def select_first_row(list_hwnd: int, reader: RemoteHeaderReader) -> None:
     x = max(8, min(int(row[2]) - 8, 180))
     y = max(4, (int(row[1]) + int(row[3])) // 2)
     lparam = (y & 0xFFFF) << 16 | (x & 0xFFFF)
-    gate.user32.SendMessageW(list_hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lparam)
-    gate.user32.SendMessageW(list_hwnd, WM_LBUTTONUP, 0, lparam)
+    # Hardware mouse input is queued. Cross-process SendMessage creates an
+    # artificial nested wait between the gate and the UI thread, so exercise
+    # the real queue semantics and keep every observation time-bounded.
+    if not gate.user32.PostMessageW(list_hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lparam):
+        raise ctypes.WinError(ctypes.get_last_error())
+    if not gate.user32.PostMessageW(list_hwnd, WM_LBUTTONUP, 0, lparam):
+        raise ctypes.WinError(ctypes.get_last_error())
     deadline = time.monotonic() + 3.0
     while time.monotonic() < deadline:
-        state = int(gate.user32.SendMessageW(list_hwnd, LVM_GETITEMSTATE, 0, LVIS_SELECTED))
+        result = ctypes.c_size_t()
+        responsive = gate.user32.SendMessageTimeoutW(
+            list_hwnd, LVM_GETITEMSTATE, 0, LVIS_SELECTED,
+            SMTO_ABORTIFHUNG, 250, ctypes.byref(result),
+        )
+        state = int(result.value) if responsive else 0
         if state & LVIS_SELECTED:
             return
         time.sleep(0.05)
@@ -299,16 +374,7 @@ def main() -> int:
 
         reader = RemoteHeaderReader(process.pid)
         select_first_row(list_hwnd, reader)
-        if not gate.user32.PostMessageW(trim_button, BM_CLICK, 0, 0):
-            raise ctypes.WinError(ctypes.get_last_error())
-        editor = find_editor(process.pid, 12.0)
-        if not editor:
-            raise RuntimeError("Round7 trim editor did not open")
-        canvas = int(gate.user32.GetDlgItem(editor, IDC_PREVIEW_CANVAS))
-        current_edit = int(gate.user32.GetDlgItem(editor, IDC_CURRENT_TIME))
-        jump_button = int(gate.user32.GetDlgItem(editor, IDC_JUMP_TIME))
-        if not canvas or not current_edit or not jump_button:
-            raise RuntimeError("trim editor preview/current/jump controls not found")
+        editor, canvas, current_edit, jump_button = open_stable_editor(trim_button, process.pid, 15.0)
 
         initial = wait_for_real_canvas(
             editor,

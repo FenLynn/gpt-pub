@@ -66,6 +66,24 @@ func TestResizeCropFreeAndLocked(t *testing.T) {
 	}
 }
 
+func TestImageCropMoveAndResizePreserveOddPixels(t *testing.T) {
+	initial := model.Crop{Enabled: true, X: 3, Y: 5, Width: 611, Height: 777}
+	moved := MoveImageCrop(1619, 1600, initial, 2, 4)
+	if moved.X != 5 || moved.Y != 9 || moved.Width != 611 || moved.Height != 777 {
+		t.Fatalf("image move rounded odd pixels: %+v", moved)
+	}
+
+	resized := ResizeImageCrop(1619, 1600, initial, CropHandleEast, 2, 0, 0, 0, false)
+	if resized.X != 3 || resized.Y != 5 || resized.Width != 613 || resized.Height != 777 {
+		t.Fatalf("image resize rounded odd pixels: %+v", resized)
+	}
+
+	locked := ResizeImageCrop(1619, 1600, initial, CropHandleSouthEast, 101, 101, 1, 1, true)
+	if locked.Width != locked.Height || locked.X != 3 || locked.Y != 5 {
+		t.Fatalf("image locked resize lost ratio: %+v", locked)
+	}
+}
+
 func TestRotateCropRectExpectedCoordinates(t *testing.T) {
 	crop := model.Crop{Enabled: true, X: 100, Y: 200, Width: 400, Height: 300}
 	cases := []struct {

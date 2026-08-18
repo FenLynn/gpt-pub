@@ -44,14 +44,18 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 48 {
-		t.Errorf("entries=%d want=48", entries)
+	if entries != 54 {
+		t.Errorf("entries=%d want=54", entries)
 	}
 
 	for _, path := range []string{
-		"cmd/mediaworkbench/v452_round7_feedback_columns_windows.go",
+		"cmd/mediaworkbench/main_windows.go",
+		"cmd/mediaworkbench/winapi_windows.go",
+		"cmd/mediaworkbench/progress_refresh_windows_test.go",
+		"internal/media/ffmpeg.go",
+		"internal/media/stream_compatibility_test.go",
 		"cmd/mediaworkbench/v452_round8_editor_install_windows.go",
-		"cmd/mediaworkbench/v452_round8_list_style_guard_windows.go",
+		"cmd/mediaworkbench/v452_round11_install_order_windows.go",
 		"cmd/mediaworkbench/v452_round9_thumbnail_lifecycle_windows.go",
 		"cmd/mediaworkbench/v452_round9_timeline_windows.go",
 		"cmd/mediaworkbench/v452_round9_manifest_test.go",
@@ -60,9 +64,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_round12_footer_owner_windows.go",
 		"cmd/mediaworkbench/v452_round12_activation_bridge_windows.go",
 		"cmd/mediaworkbench/v452_round12_list_draw_windows.go",
+		"cmd/mediaworkbench/v452_round12_status_glyph_windows.go",
 		"cmd/mediaworkbench/v452_round12_list_geometry_windows.go",
-		"cmd/mediaworkbench/v452_round12_scroll_overlay_windows.go",
-		"cmd/mediaworkbench/v452_round12_scroll_function_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_guard_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_arm_windows.go",
 		"cmd/mediaworkbench/v452_round12_trim_preview_finalize_windows.go",
@@ -71,6 +74,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_round12_thumbnail_quality_windows.go",
 		"cmd/mediaworkbench/v452_round12_thumbnail_quality_selftest_windows.go",
 		"cmd/mediaworkbench/v452_round12_column_profiles_windows.go",
+		"cmd/mediaworkbench/v452_round12_column_profiles_windows_test.go",
 		"cmd/mediaworkbench/v452_round12_preview_windows.go",
 		"cmd/mediaworkbench/v452_round12_thumbnail_fallback_windows.go",
 		"cmd/mediaworkbench/v452_round12_ui_polish_windows.go",
@@ -78,8 +82,10 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		"cmd/mediaworkbench/v452_thumbnail_lifecycle_windows.go",
 		"scripts/round12_list_structure_gate.py",
 		"scripts/round12_selection_transition_gate.py",
+		"scripts/round12_overall_progress_gate.py",
 		"scripts/round12_real_thumbnail_gate.py",
 		"scripts/round12_scroll_overlay_gate.py",
+		"scripts/round11_flicker_gate_runner_base.py",
 		"scripts/round12_scroll_function_gate.py",
 		"scripts/round12_trim_preview_gate.py",
 		"scripts/round12_remote_memory.py",
@@ -109,119 +115,207 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		}
 	}
 
-	overlaySource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_scroll_overlay_windows.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertContains("normal ListView scrollbar suppression and thumb-only visual", overlaySource,
-		"round12ScrubNativeListScrollStyles",
-		"round8EnsureListStyleGuard",
-		"round12InstallInlineListScroll",
-		"round7FeedbackWSHScroll",
-		"round7FeedbackWSVScroll",
-		"MWRound12ThumbVisual",
-		"round12SyncThumbVisual",
-		"round12ThumbVisualHTTransparent",
-		"procCreateWindowExW.Call",
-	)
-	assertAbsent("normal ListView scrollbar suppression and thumb-only visual", overlaySource,
-		"SetLayeredWindowAttributes",
-		"SetWindowRgn",
-		"CreateRectRgn",
-		"round12ViewportEnsure",
-		"round12ViewportGutter",
-		"MWRound11StableScrollSurface",
-		"MWRound9ScrollCover",
-	)
-
-	scrollSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_scroll_function_windows.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertContains("single ListView inline scroll owner", scrollSource,
-		"round12InstallInlineListScroll",
-		"round12InlineTrackRect",
-		"round12InlineThumbRect",
-		"round12InlineDrawThumb",
-		"round12InlineBeginDrag",
-		"round12InlineSetScrollFromPoint",
-		"round12InlineHandleMouseWheel",
-		"round12InlineListSubclassProc",
-		"round12InlineHoverDelay",
-		"round12InlineLVSExDoubleBuffer",
-		"round7FeedbackLVMScroll",
-	)
-	assertAbsent("single ListView inline scroll owner", scrollSource,
-		"round7FeedbackSetScrollInfo.Call",
-		"procRedrawWindow.Call",
-		"WM_SETREDRAW",
-		"SetWindowRgn",
-		"CreateWindowExW",
-		"procSetTimer.Call",
-		"round12ShowScrollBar.Call",
-	)
-
 	installOrder, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round11_install_order_windows.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("scroll install order", installOrder,
+	assertContains("native ListView scroll owner", installOrder,
+		"round12InstallNativeListScroll",
+		"round7FeedbackWSHScroll|round7FeedbackWSVScroll",
+		"LVS_EX_DOUBLEBUFFER",
+	)
+	assertAbsent("native ListView scroll owner", installOrder,
 		"round11RetireLegacyOverlayWindows",
 		"round12InstallInlineListScroll",
+		"round12InstallPostPaintOwner",
+		"round12InstallScrollVisualFinalizer",
 		"round7FeedbackListSubclassCB",
 		"round11ListSubclassCB",
 	)
-	assertAbsent("scroll install order", installOrder, "round11InstallStableScrollSurfaces")
 
-	legacyRetire, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round11_legacy_overlay_retire_windows.go"))
+	for _, retired := range []string{
+		"v452_round7_feedback_scroll_windows.go",
+		"v452_round8_list_style_guard_windows.go",
+		"v452_round10_scroll_cover_windows.go",
+		"v452_round11_legacy_overlay_retire_windows.go",
+		"v452_round11_stable_scroll_surfaces_windows.go",
+		"v452_round12_scroll_function_windows.go",
+		"v452_round12_scroll_overlay_windows.go",
+		"v452_round12_thumb_strip_finalizer_windows.go",
+	} {
+		if _, statErr := os.Stat(filepath.Join(root, "cmd", "mediaworkbench", retired)); !os.IsNotExist(statErr) {
+			t.Errorf("retired scroll source still exists: %s (err=%v)", retired, statErr)
+		}
+	}
+
+	profileSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_column_profiles_windows.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("legacy scrollbar retirement", legacyRetire,
-		"round9DestroyScrollOverlays",
-		"procDestroyWindow.Call",
-		"round11StableCoverH = nil",
-		"round11StableCoverV = nil",
+	assertContains("compact persistent column profiles", profileSource,
+		"round12ColumnProfileVersion = 4",
+		"round12DefaultColumnVisible",
+		"round12MigrateLegacyProfile",
+		"config.LoadJSON",
+		"config.SaveJSON",
+		"round12LoadLegacyWidthProfiles",
+	)
+	assertAbsent("compact persistent column profiles", profileSource,
+		"os.WriteFile(path, data, 0o644)",
+		"round7FeedbackSaveColumnProfiles",
+	)
+
+	selectionSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_selection_owner_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("targeted selection repaint", selectionSource,
+		"case LVN_ITEMCHANGED:",
+		"round12InvalidateTaskSelectionNeighborhood(a, int(n.IItem))",
+		"round12DrawBufferedOverallProgress(a, dis)",
+	)
+	assertAbsent("targeted selection repaint", selectionSource,
+		"procInvalidateRect.Call(a.hList, 0, 0)",
+	)
+	assertAbsent("non-reentrant selection repaint", selectionSource,
+		"procUpdateWindow.Call(a.hList)",
+	)
+	footerSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_footer_owner_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("DPI-stable solid footer glyphs", footerSource,
+		"round12DrawSolidFooterGlyph",
+		"round12DrawAAGlyph(hdc, x, y, size, glyph, foreground, background)",
+		"round12DrawMessageBar",
+		"round12DrawFooterTiming",
+		"round12DrawToolbarAction",
+		"round12DrawSecondaryBadgeContent",
+		"round12PaintUnifiedMenuBoundary",
+	)
+	assertAbsent("DPI-stable solid footer glyphs", footerSource,
+		"round12FooterVectorGlyph",
+	)
+	listVisualSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_list_visual_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("footer-only ordinary feedback", listVisualSource,
+		"round12InstallFooterMessageFeedback(a)",
+	)
+	assertAbsent("footer-only ordinary feedback", listVisualSource,
+		"\n\tv452InstallImportFeedback(a)\n",
+	)
+	overlaySource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "overlay_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("completion-only animated toast", overlaySource,
+		"drawVerticalGradient",
+		"v452ImportToastFrameAt",
+		"beginCompletionToastClose",
+		"app.toastTitle",
+		"app.toastBody",
+		"procSetTimer.Call(hwnd, TIMER_TOAST_CLOSE, 2000, 0)",
+	)
+	listDrawSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_list_draw_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("status backgrounds and grouped selection outline", listDrawSource,
+		"round12TaskBackground(task.Status)",
+		"case CDDS_ITEMPOSTPAINT:",
+		"round12DrawSelectionOutline",
+		"!listItemSelected(a.hList, row-1)",
+		"!listItemSelected(a.hList, row+1)",
+		"round12FillTrailingRowArea(a, cd.NMCD.HDC, row, round12TaskBackground(task.Status))",
+		"round12DrawBufferedOverallProgress",
+		"round7FeedbackBitBlt.Call",
+		"round12VisibleCellBounds",
+	)
+	statusGlyphSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_status_glyph_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("supersampled semantic status glyphs", statusGlyphSource,
+		"const samples = 8",
+		"round12GlyphRing",
+		"round12GlyphQueue",
+		"round12GlyphPlay",
+		"round12GlyphPause",
+		"round12GlyphCircle",
+		"round12GlyphCross",
+		"round12GlyphSquare",
+		"round12DrawAAStatusGlyph",
+	)
+	assertAbsent("row-cached native selection draw", listDrawSource,
+		"cd.NMCD.ItemState&CDIS_SELECTED != 0",
+	)
+
+	mainSource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "main_windows.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("coalesced progress refresh", mainSource,
+		"postProgressRow",
+		"TIMER_PROGRESS_FLUSH",
+		"updateTaskProgressRowByID",
+		"round12ColOutputSize, round12ColProgress, round12ColStatus",
+		"len(a.settings.TaskColumnWidths) == 0 && !round12ListStructureReady(a)",
+		"procPostMessageW.Call(a.hwnd, WM_APP_SELECTION, 0, 0)",
+		"IDC_OVERALL_PROGRESS",
+		"createControl(\"BUTTON\", \"选中转换\"",
+		"return \"\\uE768\" // Play: convert the selected tasks",
+		"uiFontProgress = createUIFont(\"Microsoft YaHei UI\", -13, 400)",
+		"a.hTimeText = createControl",
+		"footerOverallLabel(0, 0, 0)",
+	)
+
+	progressGate, err := os.ReadFile(filepath.Join(root, "scripts", "round12_overall_progress_gate.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains("atomic overall progress visual gate", progressGate,
+		"IDC_OVERALL_PROGRESS",
+		"frames_validated",
+		"buffered_atomic_paint",
+		"text_never_blank",
 	)
 
 	scrollGate, err := os.ReadFile(filepath.Join(root, "scripts", "round12_scroll_overlay_gate.py"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("single inline visual gate", scrollGate,
-		"single-listview-inline-thumb",
-		"scrollbar_child_windows_forbidden",
+	assertContains("native scroll visual gate", scrollGate,
+		"native-listview-scrollbars",
+		"custom_scrollbar_windows_forbidden",
 		"native_scroll_style_bits",
-		"HOVER_DELAY_MS = 0",
-		"track_transparent",
-		"outside_thumb_change",
+		"MWRound12ThumbVisual",
+		"MWRound12FrozenNumber",
 		"MWRound9ScrollCover",
 		"MWRound11StableScrollSurface",
 	)
-	assertAbsent("single inline visual gate", scrollGate,
-		"clipped-native-gutter-single-inline-thumb",
-		"assert_clipped_scroll_viewport",
-		"native_scrollbars_clipped_outside_viewport",
+	assertAbsent("native scroll visual gate", scrollGate,
+		"single-listview-inline-thumb",
+		"outside_thumb_change",
 	)
 
 	scrollFunctionGate, err := os.ReadFile(filepath.Join(root, "scripts", "round12_scroll_function_gate.py"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertContains("single inline function gate", scrollFunctionGate,
-		"single-listview-inline-thumb",
-		"horizontal_drag_content_moved",
+	assertContains("native scroll function gate", scrollFunctionGate,
+		"NATIVE_SCROLL_ARCHITECTURE",
+		"horizontal_native_page_moved",
+		"WM_HSCROLL",
+		"SB_PAGERIGHT",
 		"mouse_wheel_vertical_moved",
-		"vertical_drag_content_moved",
-		"native_scroll_style_bits_throughout_interaction",
-		"scrollbar_child_window_count",
-		"MWRound9ScrollCover",
-		"MWRound11StableScrollSurface",
+		"WM_MOUSEWHEEL",
+		"custom_scrollbar_window_count",
 	)
-	assertAbsent("single inline function gate", scrollFunctionGate,
-		"clipped-native-gutter-single-inline-thumb",
-		"assert_clipped_scroll_viewport",
-		"native_scrollbars_clipped_outside_viewport",
+	assertAbsent("native scroll function gate", scrollFunctionGate,
+		"single-listview-inline-thumb",
+		"round12InlineSetScrollFromPoint",
 	)
 
 	thumbnailQualitySource, err := os.ReadFile(filepath.Join(root, "cmd", "mediaworkbench", "v452_round12_thumbnail_quality_windows.go"))

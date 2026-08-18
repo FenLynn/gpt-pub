@@ -5,23 +5,14 @@ package main
 import (
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
 
 const (
-	round11MainSubclassID        = 0x45B1
-	round11ListSubclassID        = 0x45B2
 	round11EditorSubclassID      = 0x45B3
 	round11CanvasPaintSubclassID = 0x45B4
-	round11WMFinalizeInstall     = WM_APP + 0x5B1
 )
-
-type round11OverlayGeometry struct {
-	x, y, width, height int32
-	valid               bool
-}
 
 type round11EditorLayoutState struct {
 	clientWidth, clientHeight int32
@@ -30,197 +21,19 @@ type round11EditorLayoutState struct {
 }
 
 type round11MoveSpec struct {
-	hwnd             uintptr
+	hwnd                uintptr
 	x, y, width, height int32
 }
 
 var (
-	round11MainEventCB        uintptr
-	round11MainSubclassCB     uintptr
-	round11ListSubclassCB     uintptr
-	round11EditorSubclassCB   uintptr
-	round11CanvasPaintCB      uintptr
-	round11MainHook           uintptr
-	round11MainInstalled      atomic.Bool
-	round11OverlayGeometryMap sync.Map
-	round11EditorStateMap     sync.Map
+	round11EditorSubclassCB uintptr
+	round11CanvasPaintCB    uintptr
+	round11EditorStateMap   sync.Map
 )
 
 func init() {
-	round11MainEventCB = syscall.NewCallback(round11MainEventProc)
-	round11MainSubclassCB = syscall.NewCallback(round11MainSubclassProc)
-	round11ListSubclassCB = syscall.NewCallback(round11ListSubclassProc)
 	round11EditorSubclassCB = syscall.NewCallback(round11EditorSubclassProc)
 	round11CanvasPaintCB = syscall.NewCallback(round11CanvasPaintSubclassProc)
-	round11MainHook, _, _ = v452SetWinEventHook.Call(
-		v452EventObjectCreate,
-		v452EventObjectShow,
-		0,
-		round11MainEventCB,
-		0,
-		0,
-		v452WineventOutofcontext,
-	)
-}
-
-func round11MainEventProc(hook, event, hwnd, idObject, idChild, eventThread, eventTime uintptr) uintptr {
-	a := app
-	if a == nil || a.hwnd == 0 || a.hList == 0 || !a.controlsReady {
-		return 0
-	}
-	if !round11MainInstalled.CompareAndSwap(false, true) {
-		return 0
-	}
-	if ok, _, _ := v452SetWindowSubclass.Call(a.hwnd, round11MainSubclassCB, round11MainSubclassID, 0); ok == 0 {
-		round11MainInstalled.Store(false)
-		return 0
-	}
-	procPostMessageW.Call(a.hwnd, round11WMFinalizeInstall, 0, 0)
-	return 0
-}
-
-func round11FinalizeMainInstall(a *application) {
-	if a == nil || a.hwnd == 0 || a.hList == 0 {
-		return
-	}
-	// The round-7 list subclass positioned scroll overlays from WM_PAINT.
-	// Remove it before installing the single stable list owner.
-	v452RemoveSubclass.Call(a.hList, round7FeedbackListSubclassCB, round7FeedbackListSubclassID)
-	v452SetWindowSubclass.Call(a.hList, round11ListSubclassCB, round11ListSubclassID, 0)
-	round11EnsureStableScrollGeometry(a)
-	if round11MainHook != 0 {
-		round7FeedbackUnhookWinEvent.Call(round11MainHook)
-		round11MainHook = 0
-	}
-}
-
-func round11MainSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	switch message {
-	case round11WMFinalizeInstall:
-		round11FinalizeMainInstall(app)
-		return 0
-	case WM_SIZE:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		round11EnsureStableScrollGeometry(app)
-		return result
-	case v452WMNCDestroy:
-		v452RemoveSubclass.Call(hwnd, round11MainSubclassCB, subclassID)
-	}
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-	return result
-}
-
-func round11ListSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
-	round8EnsureListStyleGuard(hwnd)
-	round9EnsureOutputDisplay()
-	switch message {
-	case WM_PAINT:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		hdc, _, _ := round7ListGetDC.Call(hwnd)
-		if hdc != 0 {
-			round7DrawListOverlay(app, hdc)
-			round9FeedbackDrawListBoundary(hwnd, hdc)
-			round7ListReleaseDC.Call(hwnd, hdc)
-		}
-		round9EnsureVisibleThumbnails(app, hwnd)
-		return result
-	case round7FeedbackWMPrint, round7FeedbackWMPrintClient:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if wParam != 0 {
-			round7DrawListOverlay(app, wParam)
-			round9FeedbackDrawListBoundary(hwnd, wParam)
-		}
-		return result
-	case round7FeedbackWMMouseWheel, WM_HSCROLL, round7FeedbackWMVScroll:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		round9InvalidateScrollOverlays()
-		return result
-	case WM_SIZE, round9FeedbackWMWindowPosChanged, LVM_SETCOLUMNWIDTH:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		round11EnsureStableScrollGeometry(app)
-		round9EnsureVisibleThumbnails(app, hwnd)
-		return result
-	case LVM_INSERTITEMW, LVM_DELETEALLITEMS:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		round9EnsureVisibleThumbnails(app, hwnd)
-		round9InvalidateScrollOverlays()
-		return result
-	case v452WMNCDestroy:
-		round9DestroyScrollOverlays()
-		round11OverlayGeometryMap = sync.Map{}
-		v452RemoveSubclass.Call(hwnd, round11ListSubclassCB, subclassID)
-	}
-	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-	return result
-}
-
-func round11EnsureOverlayInstances(a *application) (*round9ScrollOverlay, *round9ScrollOverlay) {
-	if a == nil || a.hwnd == 0 {
-		return nil, nil
-	}
-	round9ScrollMu.Lock()
-	defer round9ScrollMu.Unlock()
-	if round9ScrollH == nil || round9ScrollH.hwnd == 0 {
-		round9ScrollH = round9CreateScrollOverlay(a.hwnd, round9AxisHorizontal)
-	}
-	if round9ScrollV == nil || round9ScrollV.hwnd == 0 {
-		round9ScrollV = round9CreateScrollOverlay(a.hwnd, round9AxisVertical)
-	}
-	return round9ScrollH, round9ScrollV
-}
-
-func round11PositionOverlayStable(overlay *round9ScrollOverlay, x, y, width, height int32) {
-	if overlay == nil || overlay.hwnd == 0 || width <= 0 || height <= 0 {
-		return
-	}
-	geometry := round11OverlayGeometry{x: x, y: y, width: width, height: height, valid: true}
-	if raw, ok := round11OverlayGeometryMap.Load(overlay.hwnd); ok {
-		previous := raw.(round11OverlayGeometry)
-		if previous == geometry && overlay.visible {
-			return
-		}
-	}
-	round11OverlayGeometryMap.Store(overlay.hwnd, geometry)
-	round7FeedbackSetWindowPos.Call(
-		overlay.hwnd,
-		0,
-		uintptr(x), uintptr(y), uintptr(width), uintptr(height),
-		round7FeedbackSWPNoActivate|round9FeedbackSWPShowWindow,
-	)
-	overlay.visible = true
-}
-
-func round11EnsureStableScrollGeometry(a *application) {
-	if a == nil || a.hwnd == 0 || a.hList == 0 {
-		return
-	}
-	horizontal, vertical := round11EnsureOverlayInstances(a)
-	if horizontal == nil || vertical == nil {
-		return
-	}
-	var wr rect
-	if ok, _, _ := procGetWindowRect.Call(a.hList, uintptr(unsafe.Pointer(&wr))); ok == 0 {
-		return
-	}
-	topLeft := point{X: wr.Left, Y: wr.Top}
-	bottomRight := point{X: wr.Right, Y: wr.Bottom}
-	round9FeedbackScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&topLeft)))
-	round9FeedbackScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&bottomRight)))
-	width := bottomRight.X - topLeft.X
-	height := bottomRight.Y - topLeft.Y
-	if width <= 0 || height <= 0 {
-		return
-	}
-	thickness := scaleDPI(17)
-	if thickness < 14 {
-		thickness = 14
-	}
-	round11PositionOverlayStable(horizontal, topLeft.X+1, bottomRight.Y-thickness, width-1, thickness)
-	verticalHeight := height - thickness - 1
-	if verticalHeight < 1 {
-		verticalHeight = 1
-	}
-	round11PositionOverlayStable(vertical, bottomRight.X-thickness, topLeft.Y+1, thickness, verticalHeight)
 }
 
 func round11InstallEditor(e *round7Editor) {
@@ -333,13 +146,13 @@ func round11ApplyEditorLayout(e *round7Editor, force bool) {
 		previewH = 330
 	}
 
-	procShowWindow.Call(e.hInstruction, round9FeedbackSWHide)
-	procShowWindow.Call(e.hSourceRange, round9FeedbackSWHide)
-	procShowWindow.Call(e.hApplySelected, round9FeedbackSWHide)
+	procShowWindow.Call(e.hInstruction, SW_HIDE)
+	procShowWindow.Call(e.hSourceRange, SW_HIDE)
+	procShowWindow.Call(e.hApplySelected, SW_HIDE)
 
 	decor := round7FeedbackEnsureDecor(e)
-	procShowWindow.Call(decor.timeLine, round9FeedbackSWHide)
-	procShowWindow.Call(decor.cropLine, round9FeedbackSWHide)
+	procShowWindow.Call(decor.timeLine, SW_HIDE)
+	procShowWindow.Call(decor.cropLine, SW_HIDE)
 	r9decor := round9EnsureEditorDecor(e)
 
 	currentY := int32(42) + previewH
@@ -366,8 +179,8 @@ func round11ApplyEditorLayout(e *round7Editor, force bool) {
 		{e.hTimeline, margin, timelineY, leftW, 86},
 		{e.hSeekMinusSec, seekX, seekY, buttonW, 30},
 		{e.hSeekMinusFrame, seekX + buttonW + 8, seekY, buttonW, 30},
-		{e.hSeekPlusFrame, seekX + (buttonW + 8) * 2, seekY, buttonW, 30},
-		{e.hSeekPlusSec, seekX + (buttonW + 8) * 3, seekY, buttonW, 30},
+		{e.hSeekPlusFrame, seekX + (buttonW+8)*2, seekY, buttonW, 30},
+		{e.hSeekPlusSec, seekX + (buttonW+8)*3, seekY, buttonW, 30},
 		{e.hFileLabel, rightX, 14, rightW, 26},
 		{decor.timeTitle, rightX + 12, clipTop - 11, 64, 24},
 		{e.hStartLabel, rightX + 14, clipTop + 22, 64, 28},

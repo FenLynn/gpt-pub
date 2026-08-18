@@ -1,5 +1,8 @@
 param(
     [string]$FFmpegBin = "",
+    [string]$ExifToolRoot = "",
+    [string]$OutputDirectory = "build",
+    [switch]$PackageZip,
     [switch]$SkipTests
 )
 
@@ -7,10 +10,27 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $version = "4.5.2"
-$buildRoot = Join-Path $PSScriptRoot "build"
+if ($OutputDirectory -notmatch '^build(?:-[A-Za-z0-9._-]+)?$') {
+    throw "OutputDirectory must be 'build' or a safe build-* directory name."
+}
+$buildRoot = Join-Path $PSScriptRoot $OutputDirectory
 $runtimeRoot = Join-Path $buildRoot "Runtime"
 $componentBin = Join-Path $runtimeRoot "Components/FFmpeg/bin"
+$exifToolTarget = Join-Path $runtimeRoot "Components/ExifTool"
 $versionSource = Join-Path $PSScriptRoot "cmd/mediaworkbench/main_windows.go"
+$exifToolRootResolved = ""
+$exifToolExe = $null
+$exifToolFiles = ""
+if (-not [string]::IsNullOrWhiteSpace($ExifToolRoot)) {
+    $exifToolRootResolved = (Resolve-Path -LiteralPath $ExifToolRoot).Path
+    $exifToolExe = Get-ChildItem -LiteralPath $exifToolRootResolved -File | Where-Object {
+        $_.Name -ieq "exiftool.exe" -or $_.Name -ieq "exiftool(-k).exe"
+    } | Select-Object -First 1
+    $exifToolFiles = Join-Path $exifToolRootResolved "exiftool_files"
+    if (-not $exifToolExe -or -not (Test-Path -LiteralPath $exifToolFiles -PathType Container)) {
+        throw "ExifToolRoot must contain exiftool.exe (or exiftool(-k).exe) and exiftool_files: $ExifToolRoot"
+    }
+}
 if (Test-Path $buildRoot) { Remove-Item $buildRoot -Recurse -Force }
 New-Item $runtimeRoot -ItemType Directory -Force | Out-Null
 
@@ -21,22 +41,30 @@ if (-not $SkipTests) {
     $oldAppData = $env:APPDATA
     $oldXdgConfigHome = $env:XDG_CONFIG_HOME
     $oldRuntime = $env:MEDIOVA_RUNTIME_DIR
+    $oldGoCache = $env:GOCACHE
+    $oldExifTool = $env:MEDIOVA_EXIFTOOL_PATH
     try {
         $env:LOCALAPPDATA = $testDataRoot
         $env:APPDATA = $testDataRoot
         $env:XDG_CONFIG_HOME = $testDataRoot
         $env:MEDIOVA_RUNTIME_DIR = (Join-Path $testDataRoot "Runtime")
+        $env:GOCACHE = (Join-Path $testDataRoot "go-cache")
+        if ($exifToolExe) {
+            $env:MEDIOVA_EXIFTOOL_PATH = $exifToolExe.FullName
+        }
         go test -count=1 ./...
         if ($LASTEXITCODE -ne 0) { throw "go test failed" }
+        go vet -unsafeptr=false ./...
+        if ($LASTEXITCODE -ne 0) { throw "go vet failed" }
     } finally {
         $env:LOCALAPPDATA = $oldLocalAppData
         $env:APPDATA = $oldAppData
         $env:XDG_CONFIG_HOME = $oldXdgConfigHome
         $env:MEDIOVA_RUNTIME_DIR = $oldRuntime
+        $env:GOCACHE = $oldGoCache
+        $env:MEDIOVA_EXIFTOOL_PATH = $oldExifTool
         Remove-Item $testDataRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
-    go vet -unsafeptr=false ./...
-    if ($LASTEXITCODE -ne 0) { throw "go vet failed" }
 }
 
 # Keep the official v4.5.0 source baseline byte-for-byte reproducible. Build
@@ -81,6 +109,12 @@ if (-not [string]::IsNullOrWhiteSpace($FFmpegBin)) {
     } | Copy-Item -Destination $componentBin -Force
 }
 
+if (-not [string]::IsNullOrWhiteSpace($ExifToolRoot)) {
+    New-Item $exifToolTarget -ItemType Directory -Force | Out-Null
+    Copy-Item -LiteralPath $exifToolFiles -Destination $exifToolTarget -Recurse -Force
+    Copy-Item -LiteralPath $exifToolExe.FullName -Destination (Join-Path $exifToolTarget "exiftool.exe") -Force
+}
+
 $notice = @"
 # Third-party notices
 
@@ -91,6 +125,13 @@ FFmpeg is a separate project and is not owned by Mediova.
 - Homepage: https://ffmpeg.org/
 - Source and license information: https://ffmpeg.org/legal.html
 - The exact binary version and build configuration can be displayed with `Components\\FFmpeg\\bin\\ffmpeg.exe -version`.
+
+Mediova uses ExifTool to preserve writable EXIF, IPTC, XMP and ICC metadata
+when images are converted between formats.
+
+- Project: ExifTool by Phil Harvey
+- Homepage and license: https://exiftool.org/
+- The bundled executable reports its version with `Components\\ExifTool\\exiftool.exe -ver`.
 
 The Runtime/Data boundary is:
 
@@ -114,7 +155,10 @@ Set-Content (Join-Path $runtimeRoot "README.txt") $runtimeReadme -Encoding UTF8
 
 $files = @()
 Get-ChildItem $runtimeRoot -Recurse -File | Where-Object { $_.Name -ne "runtime-manifest.json" } | Sort-Object FullName | ForEach-Object {
-    $relative = [System.IO.Path]::GetRelativePath($runtimeRoot, $_.FullName).Replace('\\','/')
+    # System.IO.Path.GetRelativePath is unavailable in Windows PowerShell 5.1's
+    # .NET Framework. Every item here is already a descendant of runtimeRoot,
+    # so a prefix trim is both deterministic and compatible with 5.1 and 7+.
+    $relative = $_.FullName.Substring($runtimeRoot.Length).TrimStart([char[]]"\/").Replace('\','/')
     $files += [ordered]@{
         path = $relative
         size = [int64]$_.Length
@@ -131,14 +175,17 @@ $manifest = [ordered]@{
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $runtimeRoot "runtime-manifest.json") -Encoding UTF8
 
-$zip = Join-Path $buildRoot "Mediova-v$version-Verification-Runtime.zip"
-Compress-Archive -Path (Join-Path $runtimeRoot "*") -DestinationPath $zip -CompressionLevel Optimal -Force
 $exeHash = (Get-FileHash (Join-Path $runtimeRoot "Mediova.exe") -Algorithm SHA256).Hash.ToLowerInvariant()
-$zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-@(
-    "$exeHash  Runtime/Mediova.exe",
-    "$zipHash  Mediova-v$version-Verification-Runtime.zip"
-) | Set-Content (Join-Path $buildRoot "SHA256.txt") -Encoding Ascii
-Write-Host "Built $zip"
+$hashLines = @("$exeHash  Runtime/Mediova.exe")
+if ($PackageZip) {
+    $zip = Join-Path $buildRoot "Mediova-v$version-Verification-Runtime.zip"
+    Compress-Archive -Path (Join-Path $runtimeRoot "*") -DestinationPath $zip -CompressionLevel Optimal -Force
+    $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    $hashLines += "$zipHash  Mediova-v$version-Verification-Runtime.zip"
+    Write-Host "Built $zip"
+    Write-Host "Runtime ZIP SHA-256: $zipHash"
+} else {
+    Write-Host "Built $runtimeRoot (ZIP skipped for disk-first build; pass -PackageZip when needed)"
+}
+$hashLines | Set-Content (Join-Path $buildRoot "SHA256.txt") -Encoding Ascii
 Write-Host "Mediova.exe SHA-256: $exeHash"
-Write-Host "Runtime ZIP SHA-256: $zipHash"

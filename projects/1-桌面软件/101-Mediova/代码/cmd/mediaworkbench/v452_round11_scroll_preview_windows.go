@@ -76,7 +76,6 @@ func round11PopulateScrollPreview(a *application) {
 	a.refreshList()
 	a.refreshTotal()
 	a.updateRightPanel()
-	round11PositionStableScrollSurfaces(a)
 }
 
 func init() {

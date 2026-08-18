@@ -15,7 +15,7 @@ import (
 
 const (
 	portableAuthorityWHGetMessage = 3
-	portableAuthorityGWLPWndProc   = ^uintptr(3)
+	portableAuthorityGWLPWndProc  = ^uintptr(3)
 )
 
 var (

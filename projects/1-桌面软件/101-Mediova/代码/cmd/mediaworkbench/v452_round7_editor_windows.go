@@ -24,7 +24,7 @@ const (
 	round7IDCTimeline     = 4705
 	round7IDCSourceRange  = 4706
 
-	round7ENKillFocus = 0x0200
+	round7ENKillFocus  = 0x0200
 	round7CBNSelChange = 1
 )
 
@@ -38,35 +38,35 @@ const (
 )
 
 type round7Editor struct {
-	owner       *application
-	dialog      *trimDialog
-	selected    []int
-	hwnd        uintptr
-	hTimeline   uintptr
-	hInstruction uintptr
-	hCurrentLabel uintptr
-	hJump       uintptr
-	hFileLabel  uintptr
-	hStartLabel uintptr
-	hStartCurrent uintptr
-	hStartInitial uintptr
-	hEndLabel   uintptr
-	hEndCurrent uintptr
-	hEndTerminal uintptr
-	hSourceRange uintptr
+	owner           *application
+	dialog          *trimDialog
+	selected        []int
+	hwnd            uintptr
+	hTimeline       uintptr
+	hInstruction    uintptr
+	hCurrentLabel   uintptr
+	hJump           uintptr
+	hFileLabel      uintptr
+	hStartLabel     uintptr
+	hStartCurrent   uintptr
+	hStartInitial   uintptr
+	hEndLabel       uintptr
+	hEndCurrent     uintptr
+	hEndTerminal    uintptr
+	hSourceRange    uintptr
 	hCropFrameLabel uintptr
-	hFullFrame  uintptr
-	hAspectLabel uintptr
-	hCenter     uintptr
-	hPreview    uintptr
-	hApplySelected uintptr
-	hApplyCurrent uintptr
-	hCancel     uintptr
-	hSeekMinusSec uintptr
+	hFullFrame      uintptr
+	hAspectLabel    uintptr
+	hCenter         uintptr
+	hPreview        uintptr
+	hApplySelected  uintptr
+	hApplyCurrent   uintptr
+	hCancel         uintptr
+	hSeekMinusSec   uintptr
 	hSeekMinusFrame uintptr
-	hSeekPlusFrame uintptr
-	hSeekPlusSec uintptr
-	cropLabels  [4]uintptr
+	hSeekPlusFrame  uintptr
+	hSeekPlusSec    uintptr
+	cropLabels      [4]uintptr
 
 	drag          round7TimelineDrag
 	updating      bool
@@ -168,11 +168,11 @@ func round7ShowEditor(owner *application, task *model.Task, opts model.TaskOptio
 	}
 
 	d := &trimDialog{
-		owner: owner,
-		task: task,
-		opts: opts,
-		frameW: frameW,
-		frameH: frameH,
+		owner:     owner,
+		task:      task,
+		opts:      opts,
+		frameW:    frameW,
+		frameH:    frameH,
 		currentAt: opts.TrimStart,
 	}
 	e := &round7Editor{owner: owner, dialog: d, selected: append([]int(nil), selected...)}
@@ -185,21 +185,21 @@ func round7ShowEditor(owner *application, task *model.Task, opts model.TaskOptio
 		hInst, _, _ := procGetModuleHandleW.Call(0)
 		cursor, _, _ := procLoadCursorW.Call(0, 32512)
 		editorClass := wndClassEx{
-			CbSize: uint32(unsafe.Sizeof(wndClassEx{})),
-			LpfnWndProc: round7EditorWndProcCB,
-			HInstance: hInst,
-			HIcon: owner.hIcon,
-			HIconSm: owner.hIcon,
-			HCursor: cursor,
+			CbSize:        uint32(unsafe.Sizeof(wndClassEx{})),
+			LpfnWndProc:   round7EditorWndProcCB,
+			HInstance:     hInst,
+			HIcon:         owner.hIcon,
+			HIconSm:       owner.hIcon,
+			HCursor:       cursor,
 			HbrBackground: COLOR_WINDOW + 1,
 			LpszClassName: p("MWRound7Editor"),
 		}
 		procRegisterClassExW.Call(uintptr(unsafe.Pointer(&editorClass)))
 		timelineClass := wndClassEx{
-			CbSize: uint32(unsafe.Sizeof(wndClassEx{})),
-			LpfnWndProc: round7TimelineWndProcCB,
-			HInstance: hInst,
-			HCursor: cursor,
+			CbSize:        uint32(unsafe.Sizeof(wndClassEx{})),
+			LpfnWndProc:   round7TimelineWndProcCB,
+			HInstance:     hInst,
+			HCursor:       cursor,
 			HbrBackground: COLOR_WINDOW + 1,
 			LpszClassName: p("MWRound7Timeline"),
 		}

@@ -50,3 +50,22 @@ func TestVFRAddsFPSMode(t *testing.T) {
 		t.Fatalf("unexpected args: %v", args)
 	}
 }
+
+func TestTwoPassUsesIdenticalFrameSynchronization(t *testing.T) {
+	req := ConvertRequest{
+		Input: "input.mp4", Output: "output.mp4", Kind: model.KindVideo,
+		Options: model.TaskOptions{Codec: "H.264"},
+	}
+	for _, variable := range []bool{false, true} {
+		req.Probe.VariableFrameRate = variable
+		first := strings.Join(twoPassArgs(req, 1, "passlog"), " ")
+		second := strings.Join(twoPassArgs(req, 2, "passlog"), " ")
+		want := "-fps_mode passthrough"
+		if variable {
+			want = "-fps_mode vfr"
+		}
+		if !strings.Contains(first, want) || !strings.Contains(second, want) {
+			t.Fatalf("variable=%v first=%q second=%q want=%q", variable, first, second, want)
+		}
+	}
+}

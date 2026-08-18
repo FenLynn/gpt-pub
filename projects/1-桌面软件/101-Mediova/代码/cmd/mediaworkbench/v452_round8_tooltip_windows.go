@@ -83,12 +83,12 @@ func round8TooltipRegisterClass() {
 	hInst, _, _ := procGetModuleHandleW.Call(0)
 	cursor, _, _ := procLoadCursorW.Call(0, 32512)
 	wc := wndClassEx{
-		CbSize:          uint32(unsafe.Sizeof(wndClassEx{})),
-		LpfnWndProc:     round8TooltipWndProcCB,
-		HInstance:       hInst,
-		HCursor:         cursor,
-		HbrBackground:   COLOR_WINDOW + 1,
-		LpszClassName:   p("MediovaRound8Tooltip"),
+		CbSize:        uint32(unsafe.Sizeof(wndClassEx{})),
+		LpfnWndProc:   round8TooltipWndProcCB,
+		HInstance:     hInst,
+		HCursor:       cursor,
+		HbrBackground: COLOR_WINDOW + 1,
+		LpszClassName: p("MediovaRound8Tooltip"),
 	}
 	procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
 	round8TooltipClassReady.Store(true)

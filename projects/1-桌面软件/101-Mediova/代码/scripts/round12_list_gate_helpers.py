@@ -16,7 +16,10 @@ LVM_FIRST = 0x1000
 LVM_GETCOLUMNWIDTH = LVM_FIRST + 29
 ROUND12_COLUMN_MENU_BASE = 2600
 TASK_COL_DURATION = 4
-EXPECTED_SELECTION = (231, 243, 255)
+EXPECTED_STATUS_DONE = (238, 249, 242)
+EXPECTED_STATUS_PROCESSING = (247, 241, 252)
+EXPECTED_STATUS_QUEUED = (240, 247, 255)
+EXPECTED_STATUS_OTHER = (255, 255, 255)
 
 
 class POINT(ctypes.Structure):
@@ -46,7 +49,9 @@ def client_rect_to_screen(hwnd: int, rect: list[int]) -> list[int]:
     return [int(first.x), int(first.y), int(second.x), int(second.y)]
 
 
-def sample_background(image, rect: list[int]) -> tuple[int, int, int]:
+def sample_background(
+    image, rect: list[int], expected: tuple[int, int, int] = EXPECTED_STATUS_OTHER
+) -> tuple[int, int, int]:
     left, top, right, bottom = rect
     candidates = [(left + 3, top + 3), (right - 4, top + 3), (left + 3, bottom - 4), (right - 4, bottom - 4)]
     values: list[tuple[int, int, int]] = []
@@ -55,7 +60,7 @@ def sample_background(image, rect: list[int]) -> tuple[int, int, int]:
         y = min(max(y, 0), image.height - 1)
         pixel = image.getpixel((x, y))
         values.append(tuple(int(value) for value in pixel[:3]))
-    values.sort(key=lambda value: sum(abs(value[index] - EXPECTED_SELECTION[index]) for index in range(3)))
+    values.sort(key=lambda value: sum(abs(value[index] - expected[index]) for index in range(3)))
     return values[0]
 
 

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	v452WMSetText                  = 0x000C
+	v452WMSetText                 = 0x000C
 	v452ImportFeedbackDebounce    = 80 * time.Millisecond
 	v452ImportToastAnimationTime  = 180 * time.Millisecond
 	v452ImportToastVisibleTime    = 5 * time.Second
@@ -29,11 +29,11 @@ type v452ImportFeedbackState struct {
 }
 
 type v452ImportToastState struct {
-	app               *application
-	text, close       uintptr
+	app                *application
+	text, close        uintptr
 	targetX, targetY   int32
 	shownAt, closingAt time.Time
-	closing           bool
+	closing            bool
 }
 
 var (

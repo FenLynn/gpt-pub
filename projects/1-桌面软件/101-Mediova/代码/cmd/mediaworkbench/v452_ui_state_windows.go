@@ -119,48 +119,26 @@ func v452DrawTrueStatusLamp(hdc uintptr, rc rect, color uintptr) {
 	diameter := v452StatusLampDiameter(rowHeight, scaleDPI(12))
 	left := rc.Left + scaleDPI(5)
 	top := rc.Top + (rowHeight-diameter)/2
-	lamp := rect{Left: left, Top: top, Right: left + diameter, Bottom: top + diameter}
-	brush, _, _ := procCreateSolidBrush.Call(color)
-	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, color)
-	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
-	oldPen, _, _ := procSelectObject.Call(hdc, pen)
-	procEllipse.Call(hdc, uintptr(lamp.Left), uintptr(lamp.Top), uintptr(lamp.Right), uintptr(lamp.Bottom))
-	procSelectObject.Call(hdc, oldPen)
-	procSelectObject.Call(hdc, oldBrush)
-	procDeleteObject.Call(pen)
-	procDeleteObject.Call(brush)
+	// The compatibility status-lamp path now uses the same 8x8 supersampled
+	// rasterizer as the active right-top component indicators. Direct GDI
+	// Ellipse at 11-14 px visibly stair-stepped on 100% and 125% DPI screens.
+	round7FeedbackDrawFlatLamp(
+		hdc, int(left), int(top), int(diameter), color, colorRef(250, 251, 253),
+	)
 }
 
 func v452DrawSolidPrimaryGlyph(hdc, hwnd uintptr, rc rect, color uintptr) {
 	if app == nil || hwnd == 0 {
 		return
 	}
-	cx := (rc.Left + rc.Right) / 2
-	cy := (rc.Top + rc.Bottom) / 2
+	glyph := "\uE768" // Play
 	if hwnd == app.hPause && !strings.Contains(getText(app.hPause), "继续") {
-		barW := scaleDPI(4)
-		barH := scaleDPI(14)
-		gap := scaleDPI(3)
-		fillSolid(hdc, rect{Left: cx - gap - barW, Top: cy - barH/2, Right: cx - gap, Bottom: cy + barH/2}, color)
-		fillSolid(hdc, rect{Left: cx + gap, Top: cy - barH/2, Right: cx + gap + barW, Bottom: cy + barH/2}, color)
-		return
+		glyph = "\uE769" // Pause
 	}
 	if hwnd == app.hStop {
-		size := scaleDPI(13)
-		fillSolid(hdc, rect{Left: cx - size/2, Top: cy - size/2, Right: cx + size/2, Bottom: cy + size/2}, color)
-		return
+		glyph = "\uE71A" // Stop
 	}
-
-	// Start and resume use a filled right-facing triangle. Drawing one-pixel
-	// vertical strips avoids font-dependent outline glyphs and keeps the fill
-	// colour exactly synchronized with the button foreground state.
-	width := scaleDPI(13)
-	height := scaleDPI(15)
-	left := cx - width/2
-	for x := int32(0); x < width; x++ {
-		half := (x * height) / (2 * width)
-		fillSolid(hdc, rect{Left: left + x, Top: cy - half, Right: left + x + 1, Bottom: cy + half + 1}, color)
-	}
+	drawCenteredText(hdc, glyph, rc, iconFont, color)
 }
 
 func v452DrawPausedProgressText(hdc uintptr, text string, bar rect) {

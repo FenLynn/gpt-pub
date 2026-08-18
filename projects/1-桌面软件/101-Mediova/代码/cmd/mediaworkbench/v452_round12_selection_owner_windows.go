@@ -50,13 +50,13 @@ var round12Columns = []round12ColumnDefinition{
 }
 
 var (
-	round12SelectionBackground = colorRef(231, 243, 255)
-	round12SelectionText       = colorRef(42, 55, 70)
-	round12CellSeparator       = colorRef(232, 237, 243)
-	round12SelectionInstalled  atomic.Bool
-	round12HeaderInstalled     atomic.Bool
-	round12SelectionCallback   uintptr
-	round12HeaderCallback      uintptr
+	round12SelectionBorder    = colorRef(50, 118, 205)
+	round12SelectionText      = colorRef(42, 55, 70)
+	round12CellSeparator      = colorRef(232, 237, 243)
+	round12SelectionInstalled atomic.Bool
+	round12HeaderInstalled    atomic.Bool
+	round12SelectionCallback  uintptr
+	round12HeaderCallback     uintptr
 )
 
 func init() {
@@ -85,22 +85,11 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 					return round12DrawTaskListCell(a, (*nmListViewCustomDraw)(unsafe.Pointer(lParam)))
 				case LVN_ITEMCHANGED:
 					n := (*nmListView)(unsafe.Pointer(lParam))
-					if (n.UNewState^n.UOldState)&LVIS_SELECTED != 0 {
-						// ListView may only invalidate subitems whose content changed.
-						// Round12 selection is a whole-row surface, so repaint the
-						// visible list once without background erasure whenever the
-						// selected state moves. Hidden/empty columns therefore cannot
-						// retain the previous row's blue pixels.
-						procInvalidateRect.Call(a.hList, 0, 0)
-						if n.UNewState&LVIS_SELECTED != 0 {
-							// A selection move emits deselect and select notifications in
-							// sequence. Do not synchronously commit the deselected white
-							// intermediate state. Once the new row is actually selected,
-							// finish the pending no-erase repaint before returning so the
-							// screen can never expose a native white subitem between the
-							// state change and Round12's whole-row custom drawing.
-							procUpdateWindow.Call(a.hList)
-						}
+					if n.IItem >= 0 && (n.UNewState^n.UOldState)&LVIS_SELECTED != 0 {
+						// The selection owns only its outline. Repaint the changed row and
+						// its neighbours because joining or splitting a contiguous group
+						// changes the group's top and bottom boundary.
+						round12InvalidateTaskSelectionNeighborhood(a, int(n.IItem))
 					}
 				case LVN_COLUMNCLICK:
 					n := (*nmListView)(unsafe.Pointer(lParam))
@@ -123,12 +112,21 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 			round12ShowColumnSettings(a)
 			return 0
 		}
+		if id == ID_VIEW_RESET_COLUMNS {
+			round12SetProfile(a.currentKind, round12DefaultProfileFor(a.currentKind))
+			round12ApplyProfile(a, a.currentKind)
+			round12PersistProfiles(a)
+			round12SyncHeaderLine(a)
+			return 0
+		}
 		if column := id - round12ColumnMenuBase; round12ToggleAllowed(column) {
 			round12ToggleColumn(a, column)
 			round12SyncHeaderLine(a)
 			return 0
 		}
 		if id == IDC_TAB_VIDEO || id == IDC_TAB_IMAGE {
+			a.beginAtomicUIRefresh()
+			defer a.endAtomicUIRefresh()
 			round12CaptureProfile(a, a.currentKind, true)
 			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 			round12EnsureListStructure(a)
@@ -146,6 +144,9 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 	case WM_DRAWITEM:
 		if lParam != 0 {
 			dis := (*drawItemStruct)(unsafe.Pointer(lParam))
+			if round12DrawBufferedOverallProgress(a, dis) {
+				return 1
+			}
 			if dis.HwndItem == a.hHeaderLine {
 				fillSolid(dis.HDC, dis.RcItem, round12HeaderBottomSeparator)
 				return 1
@@ -154,10 +155,20 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 				return 1
 			}
 		}
-	case WM_SIZE, round7FeedbackWMInit:
+	case round7FeedbackWMInit:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round12EnsureListStructure(a)
 		round12ApplyProfile(a, a.currentKind)
+		round12LayoutTopButtons(a)
+		round12InstallPreviewThumbnails(a)
+		round12SyncHeaderLine(a)
+		return result
+	case WM_SIZE:
+		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
+		// Resizing the window does not change the user's column profile. Reapplying
+		// all 15 widths here caused 15 synchronous ListView geometry transactions
+		// for every size message and made native scroll recalculation visibly lag.
+		round12EnsureListStructure(a)
 		round12LayoutTopButtons(a)
 		round12InstallPreviewThumbnails(a)
 		round12SyncHeaderLine(a)
@@ -253,8 +264,8 @@ func round12SyncHeaderLine(a *application) {
 	}
 	topLeft := point{X: wr.Left, Y: wr.Top}
 	bottomRight := point{X: wr.Right, Y: wr.Bottom}
-	round9FeedbackScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&topLeft)))
-	round9FeedbackScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&bottomRight)))
+	procScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&topLeft)))
+	procScreenToClient.Call(a.hwnd, uintptr(unsafe.Pointer(&bottomRight)))
 	width := bottomRight.X - topLeft.X
 	if width <= 0 || bottomRight.Y <= topLeft.Y {
 		return

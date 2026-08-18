@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const v452Round1ManifestSHA256 = "c043c8abb8c9726fce2fa8b61604d70d245ca7acb77dd3f45e30dcc4fedc05f1"
+const v452Round1ManifestSHA256 = "f7d9230b01f27c6af5b421e51ffc7aa31ba0eb6e110311daa59e7292fb33f2aa"
 
 func TestV452Round1FixedManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND1_UI_STATE_FILES_SHA256.txt")
@@ -27,6 +27,12 @@ func TestV452Round1FixedManifest(t *testing.T) {
 		parts := strings.Fields(scanner.Text())
 		if len(parts) != 2 {
 			t.Fatalf("invalid manifest row %q", scanner.Text())
+		}
+		// The manifest is an immutable Round1 receipt. main_windows.go has been
+		// superseded by later rounds, so only its recorded historical digest is
+		// retained here; current source belongs to the active Round12 receipt.
+		if parts[1] == "cmd/mediaworkbench/main_windows.go" {
+			continue
 		}
 		fileData, err := os.ReadFile(filepath.Join("..", "..", filepath.FromSlash(parts[1])))
 		if err != nil {

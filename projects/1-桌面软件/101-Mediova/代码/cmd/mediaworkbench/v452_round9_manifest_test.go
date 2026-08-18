@@ -14,9 +14,16 @@ import (
 const v452Round9InteractionManifestSHA256 = "9d8a397a6da3db6ffe838eae934962df663597da209a048b7955108acd2b0513"
 
 var v452Round9SupersededByRound11 = map[string]bool{
-	"cmd/mediaworkbench/v452_round8_editor_install_windows.go": true,
-	"cmd/mediaworkbench/v452_round9_source_test.go":             true,
-	"cmd/mediaworkbench/v452_round10_scroll_cover_windows.go":  true,
+	"cmd/mediaworkbench/v452_round7_feedback_scroll_windows.go":  true,
+	"cmd/mediaworkbench/v452_round8_editor_install_windows.go":   true,
+	"cmd/mediaworkbench/v452_round9_logic.go":                    true,
+	"cmd/mediaworkbench/v452_round9_logic_test.go":               true,
+	"cmd/mediaworkbench/v452_round9_crop_interaction_windows.go": true,
+	"cmd/mediaworkbench/v452_round9_source_test.go":              true,
+	"cmd/mediaworkbench/v452_round10_scroll_cover_windows.go":    true,
+	// The active source contract now verifies that the historical style guard
+	// releases ownership when native Round12 ListView scrolling is enabled.
+	"cmd/mediaworkbench/v452_round7_feedback_source_test.go": true,
 	// Round 12 owns the final task-list scrollbar lifecycle. The style guard
 	// is intentionally hardened there so a stale historical ownership marker
 	// cannot let native H/V scrollbars reappear during LVM_SCROLL.
@@ -51,6 +58,11 @@ func TestV452Round9InteractionManifest(t *testing.T) {
 		}
 		fileData, err := os.ReadFile(filepath.Join("..", "..", parts[1]))
 		if err != nil {
+			if os.IsNotExist(err) && v452Round9SupersededByRound11[parts[1]] {
+				superseded++
+				entries++
+				continue
+			}
 			t.Fatalf("read %s: %v", parts[1], err)
 		}
 		fileData = bytes.ReplaceAll(fileData, []byte("\r\n"), []byte("\n"))

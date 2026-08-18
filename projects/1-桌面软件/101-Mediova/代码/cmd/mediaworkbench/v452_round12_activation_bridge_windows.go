@@ -5,7 +5,6 @@ package main
 import (
 	"sync/atomic"
 	"syscall"
-	"time"
 	"unsafe"
 )
 
@@ -18,50 +17,6 @@ var (
 
 func init() {
 	round12BridgeCallback = syscall.NewCallback(round12BridgeMainSubclassProc)
-	go round12BridgeInstallLoop()
-}
-
-// round12BridgeInstallLoop removes the start-order dependency between the
-// round-7 WinEvent hook and the final round-12 list owner. It retries only
-// until both round-12 subclasses are installed. After that it merely observes
-// the round-7 installation flag and performs at most one final reconcile;
-// there is no periodic repaint/re-layout loop during idle time.
-func round12BridgeInstallLoop() {
-	deadline := time.Now().Add(30 * time.Second)
-	var installedAt time.Time
-	for time.Now().Before(deadline) {
-		a := app
-		if a != nil && a.hwnd != 0 && a.hList != 0 && a.controlsReady && round12SelectionCallback != 0 {
-			if !round12SelectionInstalled.Load() || !round12BridgeInstalled.Load() {
-				round12BridgeScheduleReconcile(a)
-				installedAt = time.Time{}
-			} else {
-				if installedAt.IsZero() {
-					installedAt = time.Now()
-				}
-				if round7FeedbackMainInstalled.Load() {
-					round12BridgeScheduleReconcile(a)
-					return
-				}
-				if time.Since(installedAt) >= 10*time.Second {
-					return
-				}
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-}
-
-func round12BridgeScheduleReconcile(a *application) {
-	if a == nil || a.hwnd == 0 {
-		return
-	}
-	a.postUI(func() {
-		if app != a || a.hwnd == 0 || a.hList == 0 || !a.controlsReady {
-			return
-		}
-		round12BridgeReconcile(a)
-	})
 }
 
 func round12BridgeReconcile(a *application) {

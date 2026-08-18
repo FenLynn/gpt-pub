@@ -3,11 +3,8 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"unsafe"
-
-	"mediaworkbench/internal/config"
 )
 
 func round7FeedbackDrawFlatToolbarButton(a *application, dis *drawItemStruct) bool {
@@ -152,7 +149,7 @@ func round7FeedbackDrawStatusChip(a *application, dis *drawItemStruct) bool {
 			lamp = colorRef(76, 104, 210)
 		}
 	case a.hConcurrencyStatus:
-		text = fmt.Sprintf("自动≤%d", config.NormalizeConcurrency(a.settings.Concurrency))
+		text = a.concurrencyChipText()
 		lamp = colorRef(54, 113, 205)
 	}
 	if disabled {

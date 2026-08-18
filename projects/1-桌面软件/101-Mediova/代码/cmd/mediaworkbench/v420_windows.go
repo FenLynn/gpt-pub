@@ -26,7 +26,7 @@ func (a *application) v420OutputDir(kind model.Kind) string {
 func (a *application) v420OutputLocked(kind model.Kind) bool {
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
-	return a.running && a.runKind == kind
+	return a.running && a.activeRuns[kind] != nil
 }
 
 func (a *application) v420SetOutputDir(kind model.Kind, path string) bool {
@@ -171,10 +171,15 @@ func (a *application) v420UpdateStartAction() {
 		return
 	}
 	a.runMu.Lock()
-	running, runKind, paused := a.running, a.runKind, a.paused
+	running := a.running
+	queue := a.activeRuns[a.currentKind]
+	paused := queue != nil && queue.paused
 	a.runMu.Unlock()
 	ready := a.v420ReadyCount(a.currentKind)
-	ownsRun := running && a.currentKind == runKind
+	if !running {
+		queue = nil
+	}
+	ownsRun := queue != nil
 	enable(a.hPause, ownsRun)
 	enable(a.hStop, ownsRun)
 	setText(a.hPause, queuePauseLabel(a.currentKind, ownsRun && paused))
@@ -184,13 +189,69 @@ func (a *application) v420UpdateStartAction() {
 			setText(a.hStart, "加入队列")
 			enable(a.hStart, ready > 0)
 		} else {
-			setText(a.hStart, waitingQueueLabel(runKind))
-			enable(a.hStart, false)
+			// The other workspace may be active, but this one is independently
+			// startable and will consume the next globally free worker slot.
+			setText(a.hStart, queueStartLabel(a.currentKind))
+			enable(a.hStart, ready > 0)
 		}
 		return
 	}
 	setText(a.hStart, queueStartLabel(a.currentKind))
 	enable(a.hStart, ready > 0)
+}
+
+func (a *application) v420WorkerCapacity() int {
+	if a == nil {
+		return 1
+	}
+	if !a.settings.AutoConcurrency {
+		return int(maxInt32(int32(config.NormalizeConcurrency(a.settings.Concurrency)), 1))
+	}
+	// Auto mode has always exposed MaxConcurrency as the machine-wide ceiling.
+	// Keep every slot available: idle workers are cheap, and this is what lets a
+	// just-started image queue use capacity while a conservative video batch is
+	// still running.
+	return int(maxInt32(int32(config.MaxConcurrency()), 1))
+}
+
+// v420ImageTaskLimitLocked protects the application from launching too many
+// full-resolution image encoders at once. Workers remain globally shared, so
+// an image queue immediately consumes every otherwise idle slot up to this
+// memory-safe ceiling; video work continues to use the remaining slots.
+// Caller must hold a.mu.
+func (a *application) v420ImageTaskLimitLocked(runIDs map[int64]bool) int {
+	limit := config.MaxConcurrency()
+	if !a.settings.AutoConcurrency {
+		return limit
+	}
+	if limit > 8 {
+		limit = 8
+	}
+	for _, task := range a.tasks {
+		if task == nil || task.Kind != model.KindImage || !runIDs[task.ID] {
+			continue
+		}
+		if task.Width >= 3000 || task.Height >= 3000 {
+			highResolutionLimit := (config.LogicalProcessorCount() + 2) / 3
+			if highResolutionLimit < 2 {
+				highResolutionLimit = 2
+			}
+			if limit > highResolutionLimit {
+				limit = highResolutionLimit
+			}
+			break
+		}
+	}
+	if limit < 1 {
+		return 1
+	}
+	return limit
+}
+
+func (a *application) v420ActiveRun(kind model.Kind) *activeQueueRun {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	return a.activeRuns[kind]
 }
 
 func (a *application) v420SignalQueue() {
@@ -305,10 +366,13 @@ func (a *application) v420AppendReadyToRun(only map[int64]bool) {
 		a.runMu.Unlock()
 		return
 	}
-	runKind := a.runKind
+	runKind := a.currentKind
+	queue := a.activeRuns[runKind]
 	a.runMu.Unlock()
-	if err := workflow.CanAppendToActiveQueue(runKind, a.currentKind); err != nil {
-		setText(a.hStatusText, "当前只运行一种媒体；可继续准备另一模式，待当前队列完成后再开始。")
+	if queue == nil {
+		// A different kind is already running. Starting this kind must create its
+		// own controller rather than append into that controller.
+		a.v420StartQueueFiltered(only)
 		return
 	}
 	ids, skipped, problems := a.v420PrepareReadyBatch(runKind, only)
@@ -359,8 +423,9 @@ func (a *application) v420AppendReadyToRun(only map[int64]bool) {
 func (a *application) v420StartQueueFiltered(only map[int64]bool) {
 	a.runMu.Lock()
 	running := a.running
+	activeCurrent := a.activeRuns[a.currentKind] != nil
 	a.runMu.Unlock()
-	if running {
+	if running && activeCurrent {
 		a.v420AppendReadyToRun(only)
 		return
 	}
@@ -377,38 +442,53 @@ func (a *application) v420StartQueueFiltered(only map[int64]bool) {
 		return
 	}
 	a.ffmpeg, a.ffprobe = ff, fp
+	var rootCtx context.Context
+	var rootCancel context.CancelFunc
 	controller := media.NewProcessController()
-	ctx, cancel := context.WithCancel(media.WithProcessController(context.Background(), controller))
 	a.runMu.Lock()
-	a.running = true
-	a.paused = false
-	a.runKind = runKind
 	runStartedAt := time.Now()
-	a.runStart = runStartedAt
-	a.timeEnd = time.Time{}
-	a.ctx, a.cancel = ctx, cancel
-	a.controller = controller
-	a.gpuDisabledForRun = false
-	a.runOnly = nil
-	a.runTaskIDs = make(map[int64]bool)
-	a.reservedOutputs = make(map[string]int64)
-	a.taskCancels = make(map[int64]context.CancelFunc)
-	a.holdRequests = make(map[int64]bool)
-	a.removeRequests = make(map[int64]bool)
-	a.immediateRestarts = make(map[int64]bool)
+	if !running {
+		rootCtx, rootCancel = context.WithCancel(context.Background())
+		a.running = true
+		a.paused = false
+		a.runKind = runKind // legacy primary-kind field; scheduling is map-owned.
+		a.runStart = runStartedAt
+		a.timeEnd = time.Time{}
+		a.ctx, a.cancel = rootCtx, rootCancel
+		a.gpuDisabledForRun = false
+		a.runOnly = nil
+		a.runTaskIDs = make(map[int64]bool)
+		a.activeRuns = make(map[model.Kind]*activeQueueRun)
+		a.reservedOutputs = make(map[string]int64)
+		a.v420ResetRunMaps()
+	} else {
+		rootCtx = a.ctx
+	}
+	if rootCtx == nil {
+		rootCtx = context.Background()
+	}
+	if a.activeRuns == nil {
+		a.activeRuns = make(map[model.Kind]*activeQueueRun)
+	}
+	queueCtx, queueCancel := context.WithCancel(media.WithProcessController(rootCtx, controller))
+	a.activeRuns[runKind] = &activeQueueRun{kind: runKind, ctx: queueCtx, cancel: queueCancel, controller: controller, startedAt: runStartedAt}
 	a.runMu.Unlock()
-	v452ResetRunClock(a, runStartedAt)
+	if !running {
+		v452ResetRunClock(a, runStartedAt)
+	}
 
 	ids, skipped, problems := a.v420PrepareReadyBatch(runKind, only)
 	if len(ids) == 0 {
-		cancel()
+		queueCancel()
 		a.runMu.Lock()
-		a.running = false
-		a.ctx = nil
-		a.cancel = nil
-		a.controller = nil
-		a.runTaskIDs = nil
-		a.reservedOutputs = make(map[string]int64)
+		delete(a.activeRuns, runKind)
+		if !running {
+			a.running = false
+			a.ctx = nil
+			a.cancel = nil
+			a.runTaskIDs = nil
+			a.reservedOutputs = make(map[string]int64)
+		}
 		a.runMu.Unlock()
 		msg := "当前工作区没有准备中的任务。"
 		if skipped > 0 {
@@ -436,13 +516,15 @@ func (a *application) v420StartQueueFiltered(only map[int64]bool) {
 				msg := fmt.Sprintf("预计本次输出约 %s，建议至少保留 %s；当前可用空间 %s。\r\n\r\n是否继续？", media.FormatBytes(need), media.FormatBytes(int64(required)), media.FormatBytes(int64(free)))
 				if messageBox(a.hwnd, "磁盘空间预检", msg, MB_YESNO|MB_ICONWARNING) != IDYES {
 					a.v420RollbackQueued(ids)
-					cancel()
+					queueCancel()
 					a.runMu.Lock()
-					a.running = false
-					a.ctx = nil
-					a.cancel = nil
-					a.controller = nil
-					a.runTaskIDs = nil
+					delete(a.activeRuns, runKind)
+					if !running {
+						a.running = false
+						a.ctx = nil
+						a.cancel = nil
+						a.runTaskIDs = nil
+					}
 					a.runMu.Unlock()
 					a.refreshAll()
 					return
@@ -451,29 +533,31 @@ func (a *application) v420StartQueueFiltered(only map[int64]bool) {
 		}
 	}
 
-	workers := a.recommendedWorkers(runKind, ids)
-	if workers < 1 {
-		workers = 1
-	}
-	if workers > config.MaxConcurrency() {
-		workers = config.MaxConcurrency()
+	workers := 0
+	if !running {
+		workers = int(a.v420WorkerCapacity())
 	}
 	enable(a.hPause, true)
 	enable(a.hStop, true)
 	setText(a.hPause, "暂停")
 	procSetTimer.Call(a.hwnd, TIMER_MAIN_CLOCK, 1000, 0)
 	a.saveSession()
-	for i := 0; i < workers; i++ {
-		a.workers.Add(1)
-		go a.worker()
-	}
-	go func() {
-		a.workers.Wait()
-		if !a.selfTest {
-			procPostMessageW.Call(a.hwnd, WM_APP_DONE, 0, 0)
+	if workers > 0 {
+		for i := 0; i < workers; i++ {
+			a.workers.Add(1)
+			go a.worker()
 		}
-	}()
-	msg := fmt.Sprintf("开始处理 %d 个任务 · 实际并发 %d。转换期间可继续添加并加入同类型任务。", len(ids), workers)
+		go func() {
+			a.workers.Wait()
+			if !a.selfTest {
+				procPostMessageW.Call(a.hwnd, WM_APP_DONE, 0, 0)
+			}
+		}()
+	}
+	for range ids {
+		a.v420SignalQueue()
+	}
+	msg := fmt.Sprintf("已启动 %d 个%s任务；共享并发容量 %d，空闲槽会自动分配给已启动的另一工作区。", len(ids), map[model.Kind]string{model.KindVideo: "视频", model.KindImage: "图片"}[runKind], a.v420WorkerCapacity())
 	if skipped > 0 {
 		msg += fmt.Sprintf(" 已跳过已有输出 %d 个。", skipped)
 	}
@@ -487,13 +571,18 @@ func (a *application) v420StartQueueFiltered(only map[int64]bool) {
 func (a *application) v420TakeNext() (int64, *model.Task, model.Settings, bool) {
 	for {
 		a.runMu.Lock()
-		for a.running && a.paused {
-			a.pauseCond.Wait()
-		}
-		running, ctx, runKind := a.running, a.ctx, a.runKind
+		running, ctx := a.running, a.ctx
 		runIDs := make(map[int64]bool, len(a.runTaskIDs))
 		for id := range a.runTaskIDs {
 			runIDs[id] = true
+		}
+		activeKinds := make(map[model.Kind]bool, len(a.activeRuns))
+		pausedKinds := make(map[model.Kind]bool, len(a.activeRuns))
+		for kind, queue := range a.activeRuns {
+			if queue != nil {
+				activeKinds[kind] = true
+				pausedKinds[kind] = queue.paused
+			}
 		}
 		a.runMu.Unlock()
 		if !running || ctx == nil || ctx.Err() != nil {
@@ -501,13 +590,21 @@ func (a *application) v420TakeNext() (int64, *model.Task, model.Settings, bool) 
 		}
 		pending := false
 		a.mu.Lock()
+		activeByKind := make(map[model.Kind]int)
+		for _, task := range a.tasks {
+			if task != nil && runIDs[task.ID] && activeKinds[task.Kind] && task.Status == model.StatusProcessing {
+				activeByKind[task.Kind]++
+			}
+		}
+		imageLimit := a.v420ImageTaskLimitLocked(runIDs)
 		for _, pinnedOnly := range []bool{true, false} {
 			for _, task := range a.tasks {
-				if task == nil || !runIDs[task.ID] || task.Kind != runKind || task.Pinned != pinnedOnly {
+				if task == nil || !runIDs[task.ID] || !activeKinds[task.Kind] || task.Pinned != pinnedOnly {
 					continue
 				}
-				if task.Status == model.StatusQueued {
+				if task.Status == model.StatusQueued && !pausedKinds[task.Kind] && (task.Kind != model.KindImage || activeByKind[model.KindImage] < imageLimit) {
 					task.Status = model.StatusProcessing
+					activeByKind[task.Kind]++
 					task.StartedAt = time.Now()
 					task.FinishedAt = time.Time{}
 					task.Progress = 0
@@ -523,7 +620,13 @@ func (a *application) v420TakeNext() (int64, *model.Task, model.Settings, bool) 
 				}
 				switch task.Status {
 				case model.StatusProcessing, model.StatusPaused, model.StatusHeld:
-					pending = true
+					if activeKinds[task.Kind] {
+						pending = true
+					}
+				case model.StatusQueued:
+					if activeKinds[task.Kind] {
+						pending = true
+					}
 				}
 			}
 		}
@@ -634,9 +737,23 @@ func (a *application) v420CompleteInterruption(id int64) bool {
 }
 
 func (a *application) v420WaitReservedRestart(id int64) (*model.Task, model.Settings, bool) {
+	a.mu.Lock()
+	task, _ := a.findTaskByIDLocked(id)
+	if task == nil {
+		a.mu.Unlock()
+		return nil, model.Settings{}, false
+	}
+	kind := task.Kind
+	a.mu.Unlock()
 	for {
 		a.runMu.Lock()
-		running, paused, ctx := a.running, a.paused, a.ctx
+		running := a.running
+		queue := a.activeRuns[kind]
+		paused := queue != nil && queue.paused
+		var ctx context.Context
+		if queue != nil {
+			ctx = queue.ctx
+		}
 		immediate := a.immediateRestarts[id]
 		a.runMu.Unlock()
 		if !running || ctx == nil || ctx.Err() != nil {

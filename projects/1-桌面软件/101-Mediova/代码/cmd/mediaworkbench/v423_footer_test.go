@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func assertFooterSafe(t *testing.T, width, barY int32, compact bool) footerGeometry {
 	t.Helper()
@@ -13,12 +16,18 @@ func assertFooterSafe(t *testing.T, width, barY int32, compact bool) footerGeome
 		if button.X < 0 || button.W <= 0 || button.X+button.W > width {
 			t.Fatalf("width=%d compact=%v button %d outside client: %+v", width, compact, i, button)
 		}
-		if footerRectsOverlap(g.Progress, button) || footerRectsOverlap(g.Status, button) {
+		if footerRectsOverlap(g.Progress, button) || footerRectsOverlap(g.Status, button) || footerRectsOverlap(g.Timing, button) {
 			t.Fatalf("width=%d compact=%v button %d overlaps footer content: %+v", width, compact, i, button)
 		}
 	}
 	if g.Status.X < 0 || g.Status.W < 120 || g.Status.X+g.Status.W > width {
 		t.Fatalf("width=%d compact=%v invalid status geometry: %+v", width, compact, g.Status)
+	}
+	if g.Timing.X < 0 || g.Timing.W < 220 || g.Timing.X+g.Timing.W > width {
+		t.Fatalf("width=%d compact=%v invalid timing geometry: %+v", width, compact, g.Timing)
+	}
+	if footerRectsOverlap(g.Status, g.Timing) || !(g.Status.X+g.Status.W < g.Timing.X && g.Timing.X+g.Timing.W < g.Start.X) {
+		t.Fatalf("width=%d compact=%v footer content order/overlap invalid: %+v", width, compact, g)
 	}
 	if g.Progress.X != 12 || g.Progress.W != width-24 || g.Progress.X+g.Progress.W > width {
 		t.Fatalf("width=%d compact=%v invalid progress geometry: %+v", width, compact, g.Progress)
@@ -39,6 +48,32 @@ func assertFooterSafe(t *testing.T, width, barY int32, compact bool) footerGeome
 		t.Fatalf("width=%d compact=%v action height changed: %+v", width, compact, g)
 	}
 	return g
+}
+
+func TestFooterMinuteText(t *testing.T) {
+	tests := []struct {
+		duration time.Duration
+		roundUp  bool
+		want     string
+	}{
+		{0, false, "—"},
+		{20 * time.Second, false, "<1m"},
+		{89 * time.Second, false, "1m"},
+		{89 * time.Second, true, "2m"},
+		{65*time.Minute + 2*time.Second, false, "1h 05m"},
+		{65*time.Minute + 2*time.Second, true, "1h 06m"},
+	}
+	for _, tc := range tests {
+		if got := footerMinuteText(tc.duration, tc.roundUp); got != tc.want {
+			t.Fatalf("footerMinuteText(%v, %v)=%q want %q", tc.duration, tc.roundUp, got, tc.want)
+		}
+	}
+}
+
+func TestFooterOverallLabelContainsOnlyCompletionAndPercent(t *testing.T) {
+	if got, want := footerOverallLabel(3, 7, 77.2), "已完成 3/7      77.2%"; got != want {
+		t.Fatalf("footerOverallLabel=%q want %q", got, want)
+	}
 }
 
 func TestFooterGeometryKeepsActionButtonsAligned(t *testing.T) {

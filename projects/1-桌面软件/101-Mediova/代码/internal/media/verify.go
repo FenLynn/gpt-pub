@@ -34,6 +34,8 @@ func ClassifyFailure(err error) string {
 		return "磁盘空间不足"
 	case strings.Contains(s, "unknown encoder"), strings.Contains(s, "cannot load"), strings.Contains(s, "device setup failed"), strings.Contains(s, "no capable devices"):
 		return "编码器不可用"
+	case strings.Contains(s, "windows heif"), strings.Contains(s, "heic 图像扩展"), strings.Contains(s, "heif 图像扩展"):
+		return "HEIC/HEIF 解码不可用"
 	case strings.Contains(s, "invalid data"), strings.Contains(s, "moov atom not found"), strings.Contains(s, "could not find codec parameters"), strings.Contains(s, "检测失败"):
 		return "输入媒体损坏或不支持"
 	case strings.Contains(s, "目标体积"):

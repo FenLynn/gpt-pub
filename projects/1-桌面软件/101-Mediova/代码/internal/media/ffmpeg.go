@@ -27,7 +27,10 @@ type Hardware struct {
 }
 
 type ConvertRequest struct {
-	Input            string
+	Input string
+	// MetadataInput remains the original source when a modern image is decoded
+	// by WIC into a temporary PNG for FFmpeg.
+	MetadataInput    string
 	Output           string
 	Kind             model.Kind
 	Probe            ProbeInfo
@@ -38,6 +41,9 @@ type ConvertRequest struct {
 	PreviewDur       float64
 	VideoBitrateKbps int
 	ExtraScale       float64
+	// InputOrientation is an EXIF orientation value applied only after a WIC
+	// HEIC decode. FFmpeg cannot see that metadata once the input is a PNG.
+	InputOrientation int
 }
 
 type ProgressFunc func(percent float64, stage string)
@@ -330,6 +336,9 @@ func scaleFilter(res string, allowUpscale bool) string {
 
 func BuildFilters(req ConvertRequest) string {
 	var filters []string
+	if of := imageOrientationFilter(req.InputOrientation); of != "" {
+		filters = append(filters, of)
+	}
 	if rf := rotationFilter(req.Options.Rotation); rf != "" {
 		filters = append(filters, rf)
 	}
@@ -350,6 +359,27 @@ func BuildFilters(req ConvertRequest) string {
 		filters = append(filters, "setsar=1")
 	}
 	return strings.Join(filters, ",")
+}
+
+func imageOrientationFilter(orientation int) string {
+	switch orientation {
+	case 2:
+		return "hflip"
+	case 3:
+		return "hflip,vflip"
+	case 4:
+		return "vflip"
+	case 5:
+		return "transpose=0"
+	case 6:
+		return "transpose=1"
+	case 7:
+		return "transpose=3"
+	case 8:
+		return "transpose=2"
+	default:
+		return ""
+	}
 }
 
 func commonInputArgs(req ConvertRequest) []string {
@@ -686,6 +716,15 @@ func twoPassArgs(req ConvertRequest, pass int, passlog string) []string {
 		codec = "libx264"
 	}
 	args = append(args, "-c:v", codec, "-preset", cpuPresetForCodec(req.Options.Codec, req.Settings.SpeedMode), "-b:v", fmt.Sprintf("%dk", kbps), "-pass", strconv.Itoa(pass), "-passlogfile", passlog)
+	// Both passes must use the same video synchronization policy. With audio in
+	// pass 2, FFmpeg's default CFR muxing can synthesize one trailing frame that
+	// pass 1 never analyzed. Older Windows libx264 builds then crash with
+	// 0xc0000005. Passthrough forbids that synthesis; real VFR stays explicit.
+	if req.Probe.VariableFrameRate {
+		args = append(args, "-fps_mode", "vfr")
+	} else {
+		args = append(args, "-fps_mode", "passthrough")
+	}
 	if pass == 1 {
 		args = append(args, "-an", "-sn", "-f", "null", nullDevice())
 	} else {
@@ -694,7 +733,6 @@ func twoPassArgs(req ConvertRequest, pass int, passlog string) []string {
 		if codec == "libx265" {
 			args = append(args, "-tag:v", "hvc1")
 		}
-		args = appendFrameRateMode(args, req)
 		args = append(args, "-metadata:s:v:0", "rotate=0", "-movflags", "+faststart+use_metadata_tags", "-progress", "pipe:1", "-nostats", req.Output)
 	}
 	return args
@@ -750,14 +788,41 @@ func imageLimitBytes(s string) int64 {
 
 func Convert(ctx context.Context, ffmpeg string, req ConvertRequest, progress ProgressFunc) (engine string, err error) {
 	if req.Kind == model.KindImage {
+		metadataInput := req.Input
+		if strings.TrimSpace(req.MetadataInput) != "" {
+			metadataInput = req.MetadataInput
+		}
 		if err := PreflightModernImage(ctx, ffmpeg, req.Input); err != nil {
-			return "FFmpeg图片解码预检", err
+			return "Windows HEIF 解码预检", err
+		}
+		if IsModernImageInput(req.Input) {
+			if progress != nil {
+				progress(1, "正在读取 HEIC")
+			}
+			temporary, orientation, decodeErr := DecodeModernImageForFFmpeg(ctx, ffmpeg, req.Input, req.Output)
+			if decodeErr != nil {
+				return "Windows HEIF 图片解码", decodeErr
+			}
+			defer os.Remove(temporary)
+			req.Input = temporary
+			req.MetadataInput = metadataInput
+			req.InputOrientation = orientation
 		}
 		engine, err := convertImage(ctx, ffmpeg, req, progress)
 		if err != nil {
-			err = ExplainModernImageFailure(req.Input, err)
+			return engine, err
 		}
-		return engine, err
+		if !req.Settings.ClearMetadata {
+			if progress != nil {
+				progress(99, "正在保留图片元数据")
+			}
+			metadataEngine, metadataErr := PreserveImageMetadata(ctx, ffmpeg, metadataInput, req.Output)
+			if metadataErr != nil {
+				return engine + " · " + metadataEngine, metadataErr
+			}
+			engine += " · " + metadataEngine
+		}
+		return engine, nil
 	}
 	if canSmartStreamCopy(req) {
 		args, engine := buildStreamCopyArgs(req)
@@ -804,9 +869,6 @@ func convertImage(ctx context.Context, ffmpeg string, req ConvertRequest, progre
 				progress(v, "图片处理中")
 			}
 		})
-		if err == nil && !req.Settings.ClearMetadata && strings.EqualFold(filepath.Ext(req.Input), ".jpg") && strings.EqualFold(filepath.Ext(req.Output), ".jpg") {
-			_ = CopyJPEGExif(req.Input, req.Output)
-		}
 		return "FFmpeg图片", err
 	}
 
@@ -901,9 +963,6 @@ func convertImage(ctx context.Context, ffmpeg string, req ConvertRequest, progre
 			if err := replaceFile(candidate, req.Output); err != nil {
 				return "FFmpeg图片目标体积", err
 			}
-			if !req.Settings.ClearMetadata && strings.EqualFold(filepath.Ext(req.Input), ".jpg") && strings.EqualFold(filepath.Ext(req.Output), ".jpg") {
-				_ = CopyJPEGExif(req.Input, req.Output)
-			}
 			if progress != nil {
 				progress(100, "完成")
 			}
@@ -913,9 +972,6 @@ func convertImage(ctx context.Context, ffmpeg string, req ConvertRequest, progre
 	if FileSize(fallback) > 0 {
 		if err := replaceFile(fallback, req.Output); err != nil {
 			return "FFmpeg图片目标体积", err
-		}
-		if !req.Settings.ClearMetadata && strings.EqualFold(filepath.Ext(req.Input), ".jpg") && strings.EqualFold(filepath.Ext(req.Output), ".jpg") {
-			_ = CopyJPEGExif(req.Input, req.Output)
 		}
 		if progress != nil {
 			progress(100, "已尽量压缩")
@@ -1187,10 +1243,48 @@ func comparisonLabel(prefix, path string) string {
 	return drawtextEscape(prefix + " · " + filepath.Base(path) + " · " + FormatBytes(FileSize(path)))
 }
 
+func comparisonFontFile() string {
+	var candidates []string
+	if windowsDir := strings.TrimSpace(os.Getenv("WINDIR")); windowsDir != "" {
+		candidates = append(candidates,
+			filepath.Join(windowsDir, "Fonts", "msyh.ttc"),
+			filepath.Join(windowsDir, "Fonts", "segoeui.ttf"),
+			filepath.Join(windowsDir, "Fonts", "arial.ttf"),
+		)
+	}
+	candidates = append(candidates,
+		"/System/Library/Fonts/Supplemental/Arial.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+		"/usr/share/fonts/dejavu/DejaVuSans.ttf",
+	)
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func comparisonTextFilter(label string, fontSize int) string {
+	font := comparisonFontFile()
+	if font == "" {
+		// Text is decoration. A missing system font must never block generation
+		// of the actual visual comparison.
+		return ""
+	}
+	// fontfile is parsed as a filter option, not as drawtext text. In particular
+	// a Windows drive colon needs exactly one escaping backslash; the text
+	// escaper intentionally emits two and would make FFmpeg fall back to
+	// Fontconfig instead of opening the explicit file.
+	font = strings.ReplaceAll(filepath.ToSlash(font), "'", `\'`)
+	font = strings.ReplaceAll(font, ":", `\:`)
+	return fmt.Sprintf(",drawtext=fontfile='%s':text='%s':x=20:y=20:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.55", font, label, fontSize)
+}
+
 func GenerateComparisonImage(ctx context.Context, ffmpeg, source, converted, output string, at float64) error {
 	leftLabel := comparisonLabel("源文件", source)
 	rightLabel := comparisonLabel("转换后", converted)
-	filter := fmt.Sprintf("[0:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black,drawtext=text='%s':x=20:y=20:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.55[left];[1:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black,drawtext=text='%s':x=20:y=20:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.55[right];[left][right]hstack=inputs=2", leftLabel, rightLabel)
+	filter := fmt.Sprintf("[0:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black%s[left];[1:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black%s[right];[left][right]hstack=inputs=2", comparisonTextFilter(leftLabel, 26), comparisonTextFilter(rightLabel, 26))
 	args := []string{"-hide_banner", "-y", "-ss", formatSeconds(at), "-i", source, "-ss", formatSeconds(at), "-i", converted, "-filter_complex", filter, "-frames:v", "1", output}
 	return Run(ctx, ffmpeg, args, 0, nil)
 }
@@ -1201,7 +1295,7 @@ func GenerateComparisonVideo(ctx context.Context, ffmpeg, source, converted, out
 	}
 	leftLabel := comparisonLabel("源文件", source)
 	rightLabel := comparisonLabel("转换后", converted)
-	filter := fmt.Sprintf("[0:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black,drawtext=text='%s':x=20:y=20:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.55[left];[1:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black,drawtext=text='%s':x=20:y=20:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.55[right];[left][right]hstack=inputs=2,setsar=1[v]", leftLabel, rightLabel)
+	filter := fmt.Sprintf("[0:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black%s[left];[1:v]scale=960:540:force_original_aspect_ratio=decrease:flags=lanczos,pad=960:540:(ow-iw)/2:(oh-ih)/2:black%s[right];[left][right]hstack=inputs=2,setsar=1[v]", comparisonTextFilter(leftLabel, 26), comparisonTextFilter(rightLabel, 26))
 	args := []string{"-hide_banner", "-y", "-i", source, "-i", converted, "-t", formatSeconds(seconds), "-filter_complex", filter, "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-crf", "20", "-preset", "fast", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", output}
 	return Run(ctx, ffmpeg, args, seconds, func(v float64) {
 		if progress != nil {
@@ -1248,9 +1342,11 @@ func GenerateFivePointComparisonImage(ctx context.Context, ffmpeg, source, conve
 	var parts []string
 	for i := 0; i < 5; i++ {
 		left, right := i*2, i*2+1
+		leftText := comparisonTextFilter(fmt.Sprintf("%s · %d/5", leftBase, i+1), 24)
+		rightText := comparisonTextFilter(fmt.Sprintf("%s · %d/5", rightBase, i+1), 24)
 		parts = append(parts,
-			fmt.Sprintf("[%d:v]scale=720:406:force_original_aspect_ratio=decrease:flags=lanczos,pad=720:406:(ow-iw)/2:(oh-ih)/2:black,drawtext=text='%s · %d/5':x=20:y=20:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.55[l%d]", left, leftBase, i+1, i),
-			fmt.Sprintf("[%d:v]scale=720:406:force_original_aspect_ratio=decrease:flags=lanczos,pad=720:406:(ow-iw)/2:(oh-ih)/2:black,drawtext=text='%s · %d/5':x=20:y=20:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.55[r%d]", right, rightBase, i+1, i),
+			fmt.Sprintf("[%d:v]scale=720:406:force_original_aspect_ratio=decrease:flags=lanczos,pad=720:406:(ow-iw)/2:(oh-ih)/2:black%s[l%d]", left, leftText, i),
+			fmt.Sprintf("[%d:v]scale=720:406:force_original_aspect_ratio=decrease:flags=lanczos,pad=720:406:(ow-iw)/2:(oh-ih)/2:black%s[r%d]", right, rightText, i),
 			fmt.Sprintf("[l%d][r%d]hstack=inputs=2[row%d]", i, i, i))
 	}
 	parts = append(parts, "[row0][row1][row2][row3][row4]vstack=inputs=5[out]")
@@ -1301,5 +1397,29 @@ func GenerateThumbnailBMP(ctx context.Context, ffmpeg, input, output string, at 
 	}
 	filters = append(filters, fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black", width, height, width, height))
 	args = append(args, "-vf", strings.Join(filters, ","), output)
+	return Run(ctx, ffmpeg, args, 0, nil)
+}
+
+// GenerateThumbnailJPEG creates a compact, durable preview for history pages.
+// Unlike the BMP variant used by the Win32 ImageList, this is intentionally
+// small on disk and is not part of the disposable task-list thumbnail cache.
+func GenerateThumbnailJPEG(ctx context.Context, ffmpeg, input, output string, at float64, rotation string, width, height int) error {
+	if width < 32 {
+		width = 160
+	}
+	if height < 24 {
+		height = 90
+	}
+	args := []string{"-hide_banner", "-y", "-ss", formatSeconds(at)}
+	if rotation != "自动" {
+		args = append(args, "-noautorotate")
+	}
+	args = append(args, "-i", input, "-frames:v", "1")
+	var filters []string
+	if f := rotationFilter(rotation); f != "" {
+		filters = append(filters, f)
+	}
+	filters = append(filters, fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=0xf4f7fa", width, height, width, height))
+	args = append(args, "-vf", strings.Join(filters, ","), "-q:v", "5", output)
 	return Run(ctx, ffmpeg, args, 0, nil)
 }

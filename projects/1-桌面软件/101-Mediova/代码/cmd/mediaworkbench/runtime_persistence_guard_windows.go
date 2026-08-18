@@ -19,7 +19,7 @@ import (
 
 const (
 	runtimePersistenceWHGetMessage = 3
-	runtimePersistenceIntervalMS    = 1500
+	runtimePersistenceIntervalMS   = 1500
 )
 
 var (

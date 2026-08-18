@@ -12,10 +12,10 @@ func TestRound12FooterGeometryIsStableAndNonOverlapping(t *testing.T) {
 				t.Fatalf("footer geometry is not deterministic: width=%d compact=%v first=%+v second=%+v", width, compact, first, second)
 			}
 			buttons := []footerRect{first.Start, first.Pause, first.Stop}
-			if first.Status.Y != first.Start.Y || first.Start.Y != first.Pause.Y || first.Pause.Y != first.Stop.Y {
+			if first.Status.Y != first.Timing.Y || first.Timing.Y != first.Start.Y || first.Start.Y != first.Pause.Y || first.Pause.Y != first.Stop.Y {
 				t.Fatalf("footer controls are not on one row: width=%d compact=%v geometry=%+v", width, compact, first)
 			}
-			if first.Status.H != first.Start.H || first.Start.H != first.Pause.H || first.Pause.H != first.Stop.H {
+			if first.Status.H != first.Timing.H || first.Timing.H != first.Start.H || first.Start.H != first.Pause.H || first.Pause.H != first.Stop.H {
 				t.Fatalf("footer controls have different heights: width=%d compact=%v geometry=%+v", width, compact, first)
 			}
 			if first.Status.X < 0 || first.Status.W < 120 || first.Status.X+first.Status.W > width {
@@ -32,10 +32,10 @@ func TestRound12FooterGeometryIsStableAndNonOverlapping(t *testing.T) {
 					t.Fatalf("button %d outside client: width=%d compact=%v rect=%+v", i, width, compact, r)
 				}
 			}
-			if footerRectsOverlap(first.Status, first.Start) || footerRectsOverlap(first.Start, first.Pause) || footerRectsOverlap(first.Pause, first.Stop) {
+			if footerRectsOverlap(first.Status, first.Timing) || footerRectsOverlap(first.Timing, first.Start) || footerRectsOverlap(first.Start, first.Pause) || footerRectsOverlap(first.Pause, first.Stop) {
 				t.Fatalf("footer controls overlap: width=%d compact=%v geometry=%+v", width, compact, first)
 			}
-			if !(first.Status.X+first.Status.W < first.Start.X && first.Start.X+first.Start.W < first.Pause.X && first.Pause.X+first.Pause.W < first.Stop.X) {
+			if !(first.Status.X+first.Status.W < first.Timing.X && first.Timing.X+first.Timing.W < first.Start.X && first.Start.X+first.Start.W < first.Pause.X && first.Pause.X+first.Pause.W < first.Stop.X) {
 				t.Fatalf("footer control order is unstable: width=%d compact=%v geometry=%+v", width, compact, first)
 			}
 		}

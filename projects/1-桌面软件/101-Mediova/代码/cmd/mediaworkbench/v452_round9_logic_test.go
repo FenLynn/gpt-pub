@@ -2,42 +2,6 @@ package main
 
 import "testing"
 
-func TestRound9OverlayStateMachine(t *testing.T) {
-	var m round9OverlayMachine
-	if got := m.Move(round9AxisNone); got != round9OverlayNoop || m.Phase != round9OverlayHidden {
-		t.Fatalf("central hover changed hidden state: action=%v phase=%v", got, m.Phase)
-	}
-	if got := m.Move(round9AxisVertical); got != round9OverlayArmShow || m.Phase != round9OverlayPending {
-		t.Fatalf("edge did not arm show: action=%v phase=%v", got, m.Phase)
-	}
-	if m.ShowTimeout(round9AxisNone) {
-		t.Fatal("show timeout accepted a cursor outside the edge")
-	}
-	if !m.ShowTimeout(round9AxisVertical) || m.Phase != round9OverlayVisible {
-		t.Fatalf("show timeout did not make the thumb visible: phase=%v", m.Phase)
-	}
-	if got := m.Move(round9AxisNone); got != round9OverlayArmHide || m.Phase != round9OverlayVisible {
-		t.Fatalf("leaving edge hid immediately: action=%v phase=%v", got, m.Phase)
-	}
-	if got := m.Move(round9AxisVertical); got != round9OverlayCancelHide || m.Phase != round9OverlayVisible {
-		t.Fatalf("returning to edge did not keep the thumb stable: action=%v phase=%v", got, m.Phase)
-	}
-	if !m.BeginDrag(round9AxisVertical) || m.Phase != round9OverlayDragging {
-		t.Fatalf("visible thumb did not enter dragging: phase=%v", m.Phase)
-	}
-	if got := m.Move(round9AxisNone); got != round9OverlayNoop || m.Phase != round9OverlayDragging {
-		t.Fatalf("dragging thumb reacted to hover leave: action=%v phase=%v", got, m.Phase)
-	}
-	m.EndDrag(round9AxisVertical)
-	if m.Phase != round9OverlayVisible {
-		t.Fatalf("drag did not end visible: phase=%v", m.Phase)
-	}
-	m.Move(round9AxisNone)
-	if !m.HideTimeout(round9AxisNone) || m.Phase != round9OverlayHidden {
-		t.Fatalf("hide timeout did not hide after leaving edge: phase=%v", m.Phase)
-	}
-}
-
 func TestRound9CropMoveAndResize(t *testing.T) {
 	original := round9CropBox{X: 100, Y: 80, Width: 320, Height: 180}
 	moved := round9MoveCropBox(original, 40, 30, 640, 360)

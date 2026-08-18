@@ -151,6 +151,90 @@ func ResizeCrop(frameW, frameH int, crop model.Crop, handle CropHandle, dx, dy, 
 	return ClampCrop(frameW, frameH, model.Crop{Enabled: true, X: x1, Y: y1, Width: x2 - x1, Height: y2 - y1})
 }
 
+func MoveImageCrop(frameW, frameH int, crop model.Crop, dx, dy int) model.Crop {
+	enabled := crop.Enabled
+	crop = ClampImageCrop(frameW, frameH, crop)
+	crop.Enabled = enabled || crop.Width > 0
+	crop.X = clampInt(crop.X+dx, 0, frameW-crop.Width)
+	crop.Y = clampInt(crop.Y+dy, 0, frameH-crop.Height)
+	return crop
+}
+
+func ResizeImageCrop(frameW, frameH int, crop model.Crop, handle CropHandle, dx, dy, ratioW, ratioH int, locked bool) model.Crop {
+	crop = ClampImageCrop(frameW, frameH, crop)
+	x1, y1 := crop.X, crop.Y
+	x2, y2 := crop.X+crop.Width, crop.Y+crop.Height
+	if handle == CropHandleMove {
+		return MoveImageCrop(frameW, frameH, crop, dx, dy)
+	}
+	if locked && ratioW > 0 && ratioH > 0 {
+		switch handle {
+		case CropHandleNorthWest:
+			return DragImageCropWithAspect(frameW, frameH, x2, y2, x1+dx, y1+dy, ratioW, ratioH, true)
+		case CropHandleNorthEast:
+			return DragImageCropWithAspect(frameW, frameH, x1, y2, x2+dx, y1+dy, ratioW, ratioH, true)
+		case CropHandleSouthEast:
+			return DragImageCropWithAspect(frameW, frameH, x1, y1, x2+dx, y2+dy, ratioW, ratioH, true)
+		case CropHandleSouthWest:
+			return DragImageCropWithAspect(frameW, frameH, x2, y1, x1+dx, y2+dy, ratioW, ratioH, true)
+		case CropHandleEast, CropHandleWest:
+			width := crop.Width
+			if handle == CropHandleEast {
+				width += dx
+			} else {
+				width -= dx
+			}
+			width = maxInt(width, 1)
+			height := maxInt(int(math.Round(float64(width)*float64(ratioH)/float64(ratioW))), 1)
+			x := crop.X
+			if handle == CropHandleWest {
+				x = x2 - width
+			}
+			return ClampImageCrop(frameW, frameH, model.Crop{Enabled: true, X: x, Y: crop.Y + crop.Height/2 - height/2, Width: width, Height: height})
+		case CropHandleNorth, CropHandleSouth:
+			height := crop.Height
+			if handle == CropHandleSouth {
+				height += dy
+			} else {
+				height -= dy
+			}
+			height = maxInt(height, 1)
+			width := maxInt(int(math.Round(float64(height)*float64(ratioW)/float64(ratioH))), 1)
+			y := crop.Y
+			if handle == CropHandleNorth {
+				y = y2 - height
+			}
+			return ClampImageCrop(frameW, frameH, model.Crop{Enabled: true, X: crop.X + crop.Width/2 - width/2, Y: y, Width: width, Height: height})
+		}
+	}
+
+	switch handle {
+	case CropHandleNorthWest:
+		x1 = minInt(x1+dx, x2-1)
+		y1 = minInt(y1+dy, y2-1)
+	case CropHandleNorth:
+		y1 = minInt(y1+dy, y2-1)
+	case CropHandleNorthEast:
+		x2 = maxInt(x2+dx, x1+1)
+		y1 = minInt(y1+dy, y2-1)
+	case CropHandleEast:
+		x2 = maxInt(x2+dx, x1+1)
+	case CropHandleSouthEast:
+		x2 = maxInt(x2+dx, x1+1)
+		y2 = maxInt(y2+dy, y1+1)
+	case CropHandleSouth:
+		y2 = maxInt(y2+dy, y1+1)
+	case CropHandleSouthWest:
+		x1 = minInt(x1+dx, x2-1)
+		y2 = maxInt(y2+dy, y1+1)
+	case CropHandleWest:
+		x1 = minInt(x1+dx, x2-1)
+	default:
+		return crop
+	}
+	return ClampImageCrop(frameW, frameH, model.Crop{Enabled: true, X: x1, Y: y1, Width: x2 - x1, Height: y2 - y1})
+}
+
 func RotatedFrameSize(frameW, frameH, degrees int) (int, int) {
 	degrees = normalizeRotation(degrees)
 	if degrees == 90 || degrees == 270 {

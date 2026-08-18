@@ -198,6 +198,10 @@ type Settings struct {
 	RestoreSession         bool             `json:"restore_session"`
 	NotifyOnDone           bool             `json:"notify_on_done"`
 	ShowFloatingBar        bool             `json:"show_floating_bar"`
+	FloatingTopmost        bool             `json:"floating_topmost"`
+	FloatingPositionSet    bool             `json:"floating_position_set"`
+	FloatingX              int              `json:"floating_x"`
+	FloatingY              int              `json:"floating_y"`
 	CompletionToastSeconds int              `json:"completion_toast_seconds"`
 	VerifyOutput           bool             `json:"verify_output"`
 	ThumbnailCache         bool             `json:"thumbnail_cache"`
@@ -247,7 +251,7 @@ func DefaultSettings() Settings {
 		ConflictPolicy:         "自动编号",
 		SaveHistory:            true,
 		RestoreSession:         true,
-		NotifyOnDone:           true,
+		NotifyOnDone:           false,
 		ShowFloatingBar:        true,
 		CompletionToastSeconds: 30,
 		VerifyOutput:           true,

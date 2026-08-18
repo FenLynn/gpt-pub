@@ -21,3 +21,11 @@ func TestRound12CropSummaries(t *testing.T) {
 		t.Fatalf("picture crop=%q", got)
 	}
 }
+
+func TestRound12ImageCropSummaryUsesRetainedArea(t *testing.T) {
+	task := &model.Task{Kind: model.KindImage, Width: 1619, Height: 1600}
+	opts := model.TaskOptions{Crop: model.Crop{Enabled: true, Width: 611, Height: 777}}
+	if got := round12PictureCropText(task, opts); got != "18.3%" {
+		t.Fatalf("image crop area=%q want=18.3%%", got)
+	}
+}

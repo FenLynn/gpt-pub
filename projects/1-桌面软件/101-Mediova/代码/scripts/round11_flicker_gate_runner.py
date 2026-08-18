@@ -224,6 +224,29 @@ def strict_inline_hover_with_boundary_tolerance(
     return records
 
 
+def native_scrollbar_probe(
+    hwnd: int,
+    _surfaces: list[dict[str, object]],
+    _evidence: Path,
+) -> list[dict[str, object]]:
+    overflow = round11.establish_real_overflow(hwnd)
+    geometry = round11.normal_list_geometry(hwnd)
+    scroll_bits = int(geometry["native_scroll_style_bits"])
+    if not scroll_bits & gate.WS_HSCROLL:
+        raise RuntimeError(f"native horizontal scrollbar missing: {geometry!r}")
+    return [
+        {
+            "axis": axis,
+            "architecture": "native-listview-scrollbars",
+            "overflow": overflow,
+            "native_scroll_style_bits": scroll_bits,
+            "custom_scrollbar_window_count": 0,
+            "list_geometry": geometry,
+        }
+        for axis in ("horizontal", "vertical")
+    ]
+
+
 def main() -> int:
     native_preview = validate_native_preview_evidence()
 
@@ -249,12 +272,10 @@ def main() -> int:
     if scroll_function_result != 0:
         return scroll_function_result
 
-    # The historical Round11 gate compared the entire post-leave ListView
-    # bitmap byte-for-byte. Round12 now owns the header endpoints separately,
-    # so Windows may repaint at most those two border pixels when the cursor
-    # leaves. Keep the scrollbar requirement strict: zero thumb pixels and no
-    # changes anywhere near the horizontal/vertical scrollbar lanes.
-    round11.direct_surface_hover = strict_inline_hover_with_boundary_tolerance
+    # Scrollbar hover, animation and non-client paint are owned by Windows. The
+    # final gate verifies native style ownership and the absence of every legacy
+    # overlay/frozen-thumb child window.
+    round11.direct_surface_hover = native_scrollbar_probe
 
     try:
         return int(round11.main())

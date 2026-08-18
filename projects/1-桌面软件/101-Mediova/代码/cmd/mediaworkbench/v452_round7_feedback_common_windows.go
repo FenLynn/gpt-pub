@@ -7,13 +7,10 @@ import (
 	"sync/atomic"
 	"syscall"
 	"unsafe"
-
-	"mediaworkbench/internal/model"
 )
 
 const (
 	round7FeedbackMainSubclassID     = 0x4581
-	round7FeedbackListSubclassID     = 0x4582
 	round7FeedbackHeaderSubclassID   = 0x4583
 	round7FeedbackEditorSubclassID   = 0x4584
 	round7FeedbackTimelineSubclassID = 0x4585
@@ -24,23 +21,15 @@ const (
 	round7FeedbackWMEditorInit     = WM_APP + 0x583
 	round7FeedbackWMFinalizeSwitch = WM_APP + 0x584
 
-	round7FeedbackScrollTimer = 0x4582
-	round7FeedbackScrollDelay = 500
-
-	round7FeedbackWMMouseLeave  = 0x02A3
-	round7FeedbackWMPrint       = 0x0317
-	round7FeedbackWMPrintClient = 0x0318
-	round7FeedbackTMELeave      = 0x00000002
 	round7FeedbackLVMCountPerPage = LVM_FIRST + 40
 	round7FeedbackLVMGetTopIndex  = LVM_FIRST + 39
-	round7FeedbackLVMScroll       = LVM_FIRST + 20
 	round7FeedbackSSEtchedHorz    = 0x00000010
 
-	round7FeedbackGWLStyle   = ^uintptr(15) // -16
-	round7FeedbackGWLExStyle = ^uintptr(19) // -20
-	round7FeedbackWSHScroll  = 0x00100000
-	round7FeedbackWSVScroll  = 0x00200000
-	round7FeedbackWSBorder   = 0x00800000
+	round7FeedbackGWLStyle       = ^uintptr(15) // -16
+	round7FeedbackGWLExStyle     = ^uintptr(19) // -20
+	round7FeedbackWSHScroll      = 0x00100000
+	round7FeedbackWSVScroll      = 0x00200000
+	round7FeedbackWSBorder       = 0x00800000
 	round7FeedbackWSExClientEdge = 0x00000200
 
 	round7FeedbackSWPNoSize       = 0x0001
@@ -54,13 +43,6 @@ const (
 	round7FeedbackWMLButtonDown   = 0x0201
 	round7FeedbackEMSetSel        = 0x00B1
 )
-
-type round7FeedbackTrackMouseEvent struct {
-	CbSize      uint32
-	DwFlags     uint32
-	HwndTrack   uintptr
-	DwHoverTime uint32
-}
 
 type round7FeedbackComboBoxInfo struct {
 	CbSize      uint32
@@ -88,7 +70,6 @@ type round7FeedbackLampKey struct {
 var (
 	round7FeedbackMainEventCB      uintptr
 	round7FeedbackMainSubclassCB   uintptr
-	round7FeedbackListSubclassCB   uintptr
 	round7FeedbackHeaderSubclassCB uintptr
 	round7FeedbackOutputSubclassCB uintptr
 	round7FeedbackEditorEventCB    uintptr
@@ -103,13 +84,11 @@ var (
 	round7FeedbackDecor         sync.Map
 	round7FeedbackLampCache     sync.Map
 
-	round7FeedbackHeaderWidths []int
-	round7FeedbackSwitchFocus  uintptr
+	round7FeedbackSwitchFocus   uintptr
 	round7FeedbackSwitchPending int
-	round7FeedbackInLayout     bool
+	round7FeedbackInLayout      bool
 
 	round7FeedbackUnhookWinEvent      = user32.NewProc("UnhookWinEvent")
-	round7FeedbackTrackMouseEventProc = user32.NewProc("TrackMouseEvent")
 	round7FeedbackCreateCompatibleBmp = gdi32.NewProc("CreateCompatibleBitmap")
 	round7FeedbackBitBlt              = gdi32.NewProc("BitBlt")
 	round7FeedbackGetWindowLongPtr    = user32.NewProc("GetWindowLongPtrW")
@@ -126,7 +105,6 @@ var (
 func init() {
 	round7FeedbackMainEventCB = syscall.NewCallback(round7FeedbackMainEventProc)
 	round7FeedbackMainSubclassCB = syscall.NewCallback(round7FeedbackMainSubclassProc)
-	round7FeedbackListSubclassCB = syscall.NewCallback(round7FeedbackListSubclassProc)
 	round7FeedbackHeaderSubclassCB = syscall.NewCallback(round7FeedbackHeaderSubclassProc)
 	round7FeedbackOutputSubclassCB = syscall.NewCallback(round7FeedbackOutputSubclassProc)
 	round7FeedbackEditorEventCB = syscall.NewCallback(round7FeedbackEditorEventProc)
@@ -152,7 +130,6 @@ func round7FeedbackMainEventProc(hook, event, hwnd, idObject, idChild, eventThre
 	if ok, _, _ := v452SetWindowSubclass.Call(app.hwnd, round7FeedbackMainSubclassCB, round7FeedbackMainSubclassID, 0); ok == 0 {
 		return 0
 	}
-	v452SetWindowSubclass.Call(app.hList, round7FeedbackListSubclassCB, round7FeedbackListSubclassID, 0)
 	if header := send(app.hList, LVM_GETHEADER, 0, 0); header != 0 {
 		v452SetWindowSubclass.Call(header, round7FeedbackHeaderSubclassCB, round7FeedbackHeaderSubclassID, 0)
 		send(header, WM_SETFONT, uiFontBold, 1)
@@ -180,8 +157,6 @@ func round7FeedbackMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 	switch message {
 	case round7FeedbackWMInit:
 		setText(a.hTrimCrop, "剪裁")
-		round7FeedbackLoadColumnProfiles(a)
-		round7FeedbackEnsureColumnProfile(a)
 		round7FeedbackStripListChrome(a)
 		round7FeedbackLayoutFooter(a)
 		for _, control := range []uintptr{
@@ -197,7 +172,6 @@ func round7FeedbackMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 		return 0
 
 	case round7FeedbackWMFinalizeSwitch:
-		round7FeedbackEnsureColumnProfile(a)
 		round7FeedbackFinalizeOutputFocus(a)
 		return 0
 
@@ -208,24 +182,15 @@ func round7FeedbackMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 			return 0
 		}
 		if id == IDC_TAB_VIDEO || id == IDC_TAB_IMAGE {
-			target := model.KindVideo
 			round7FeedbackSwitchFocus = a.hVideo
 			if id == IDC_TAB_IMAGE {
-				target = model.KindImage
 				round7FeedbackSwitchFocus = a.hImage
 			}
 			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-			round7FeedbackApplyColumnProfile(a, target)
 			round7FeedbackSwitchPending = 3
 			procPostMessageW.Call(hwnd, round7FeedbackWMFinalizeSwitch, 0, 0)
 			return result
 		}
-		if id == ID_VIEW_RESET_COLUMNS {
-			result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-			round7FeedbackResetColumnProfile(a, a.currentKind)
-			return result
-		}
-
 	case round7FeedbackWMInitMenuPopup:
 		if wParam != 0 {
 			round7FeedbackModifyMenu.Call(wParam, ID_CTX_TRIM, 0, ID_CTX_TRIM, uintptr(unsafe.Pointer(p("剪裁..."))))
@@ -246,7 +211,6 @@ func round7FeedbackMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 
 	case WM_APP_REFRESH:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		round7FeedbackEnsureColumnProfile(a)
 		round7FeedbackStripListChrome(a)
 		if round7FeedbackSwitchPending > 0 {
 			procPostMessageW.Call(hwnd, round7FeedbackWMFinalizeSwitch, 0, 0)
@@ -256,12 +220,8 @@ func round7FeedbackMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 	case WM_SIZE:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		round7FeedbackStripListChrome(a)
-		round7FeedbackEnsureColumnProfile(a)
 		round7FeedbackLayoutFooter(a)
 		return result
-
-	case WM_DESTROY:
-		round7FeedbackSaveColumnProfiles()
 
 	case v452WMNCDestroy:
 		v452RemoveSubclass.Call(hwnd, round7FeedbackMainSubclassCB, subclassID)
@@ -273,20 +233,6 @@ func round7FeedbackMainSubclassProc(hwnd uintptr, message uint32, wParam, lParam
 
 func round7FeedbackHeaderSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subclassID, refData uintptr) uintptr {
 	switch message {
-	case round7FeedbackWMLButtonDown:
-		if app != nil {
-			round7FeedbackHeaderWidths = round7FeedbackCurrentWidths(app)
-		}
-	case WM_LBUTTONUP:
-		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
-		if app != nil && !round7FeedbackApplyingColumns {
-			after := round7FeedbackCurrentWidths(app)
-			if !round7FeedbackEqualWidths(round7FeedbackHeaderWidths, after) {
-				round7FeedbackCaptureColumnProfile(app, app.currentKind, true)
-			}
-		}
-		round7FeedbackHeaderWidths = nil
-		return result
 	case WM_PAINT:
 		result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 		hdc, _, _ := round7ListGetDC.Call(hwnd)
@@ -352,23 +298,6 @@ func round7FeedbackStripListChrome(a *application) {
 	if a == nil || a.hList == 0 {
 		return
 	}
-	style, _, _ := round7FeedbackGetWindowLongPtr.Call(a.hList, round7FeedbackGWLStyle)
-	newStyle := style &^ uintptr(round7FeedbackWSHScroll|round7FeedbackWSVScroll|round7FeedbackWSBorder)
-	exStyle, _, _ := round7FeedbackGetWindowLongPtr.Call(a.hList, round7FeedbackGWLExStyle)
-	newExStyle := exStyle &^ uintptr(round7FeedbackWSExClientEdge)
-	changed := false
-	if newStyle != style {
-		round7FeedbackSetWindowLongPtr.Call(a.hList, round7FeedbackGWLStyle, newStyle)
-		changed = true
-	}
-	if newExStyle != exStyle {
-		round7FeedbackSetWindowLongPtr.Call(a.hList, round7FeedbackGWLExStyle, newExStyle)
-		changed = true
-	}
-	if changed {
-		round7FeedbackSetWindowPos.Call(a.hList, 0, 0, 0, 0, 0,
-			round7FeedbackSWPNoMove|round7FeedbackSWPNoSize|round7FeedbackSWPNoZOrder|round7FeedbackSWPNoActivate|round7FeedbackSWPFrameChanged)
-	}
 	send(a.hList, LVM_FIRST+1, 0, colorRef(255, 255, 255))
 	send(a.hList, LVM_FIRST+36, 0, colorRef(50, 60, 74))
 	send(a.hList, LVM_FIRST+38, 0, colorRef(255, 255, 255))
@@ -419,7 +348,7 @@ func round7FeedbackLayoutFooter(a *application) {
 	}
 	flags := uintptr(round7FeedbackSWPNoZOrder | round7FeedbackSWPNoActivate)
 	for _, item := range []struct {
-		h       uintptr
+		h            uintptr
 		x, y, w, hgt int32
 	}{
 		{a.hStatusText, margin, y, statusW, rowH},

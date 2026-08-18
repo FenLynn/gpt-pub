@@ -274,13 +274,24 @@ func v452TrimPreviewMouseMove(d *trimDialog, lParam uintptr) bool {
 		dx := int(pt.X - state.cropAnchor.X)
 		dy := int(pt.Y - state.cropAnchor.Y)
 		ratioW, ratioH, locked := d.selectedAspect()
-		switch state.cropHandle {
-		case media.CropHandleCreate:
-			d.opts.Crop = media.DragCropWithAspect(d.frameW, d.frameH, int(state.cropAnchor.X), int(state.cropAnchor.Y), int(pt.X), int(pt.Y), ratioW, ratioH, locked)
-		case media.CropHandleMove:
-			d.opts.Crop = media.MoveCrop(d.frameW, d.frameH, state.cropInitial, dx, dy)
-		default:
-			d.opts.Crop = media.ResizeCrop(d.frameW, d.frameH, state.cropInitial, state.cropHandle, dx, dy, ratioW, ratioH, locked)
+		if d.task.Kind == model.KindImage {
+			switch state.cropHandle {
+			case media.CropHandleCreate:
+				d.opts.Crop = media.DragImageCropWithAspect(d.frameW, d.frameH, int(state.cropAnchor.X), int(state.cropAnchor.Y), int(pt.X), int(pt.Y), ratioW, ratioH, locked)
+			case media.CropHandleMove:
+				d.opts.Crop = media.MoveImageCrop(d.frameW, d.frameH, state.cropInitial, dx, dy)
+			default:
+				d.opts.Crop = media.ResizeImageCrop(d.frameW, d.frameH, state.cropInitial, state.cropHandle, dx, dy, ratioW, ratioH, locked)
+			}
+		} else {
+			switch state.cropHandle {
+			case media.CropHandleCreate:
+				d.opts.Crop = media.DragCropWithAspect(d.frameW, d.frameH, int(state.cropAnchor.X), int(state.cropAnchor.Y), int(pt.X), int(pt.Y), ratioW, ratioH, locked)
+			case media.CropHandleMove:
+				d.opts.Crop = media.MoveCrop(d.frameW, d.frameH, state.cropInitial, dx, dy)
+			default:
+				d.opts.Crop = media.ResizeCrop(d.frameW, d.frameH, state.cropInitial, state.cropHandle, dx, dy, ratioW, ratioH, locked)
+			}
 		}
 		d.cropToControls()
 		return true

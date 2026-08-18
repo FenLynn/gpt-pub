@@ -23,7 +23,16 @@ func round12DrawTaskListCell(a *application, cd *nmListViewCustomDraw) uintptr {
 		// blue with missing text if a partial paint ended early. The ListView is
 		// already double-buffered and selection changes invalidate the list, so
 		// each final visible subitem owns its background and content atomically.
-		return CDRF_NOTIFYSUBITEMDRAW
+		return CDRF_NOTIFYSUBITEMDRAW | CDRF_NOTIFYPOSTPAINT
+	case CDDS_ITEMPOSTPAINT:
+		row := int(cd.NMCD.ItemSpec)
+		if task, ok := a.visibleTaskSnapshot(row); ok {
+			round12FillTrailingRowArea(a, cd.NMCD.HDC, row, round12TaskBackground(task.Status))
+		}
+		if listItemSelected(a.hList, row) {
+			round12DrawSelectionOutline(a, cd.NMCD.HDC, row)
+		}
+		return CDRF_DODEFAULT
 	case CDDS_ITEMPREPAINT | CDDS_SUBITEM:
 		row := int(cd.NMCD.ItemSpec)
 		column := int(cd.ISubItem)
@@ -38,15 +47,24 @@ func round12DrawTaskListCell(a *application, cd *nmListViewCustomDraw) uintptr {
 			// neighbouring visible cell.
 			return CDRF_SKIPDEFAULT
 		}
-		selected := listItemSelected(a.hList, row)
-		background := colorRef(255, 255, 255)
-		if selected {
-			background = round12SelectionBackground
-		}
-		round12DrawPhysicalCell(a, cd.NMCD.HDC, cell, row, column, &task, selected, background)
+		background := round12TaskBackground(task.Status)
+		round12DrawPhysicalCell(a, cd.NMCD.HDC, cell, row, column, &task, background)
 		return CDRF_SKIPDEFAULT
 	}
 	return CDRF_DODEFAULT
+}
+
+func round12TaskBackground(status model.Status) uintptr {
+	switch status {
+	case model.StatusDone:
+		return colorRef(238, 249, 242)
+	case model.StatusProcessing:
+		return colorRef(247, 241, 252)
+	case model.StatusQueued:
+		return colorRef(240, 247, 255)
+	default:
+		return colorRef(255, 255, 255)
+	}
 }
 
 func round12DrawRowBackground(a *application, hdc uintptr, row int, background uintptr) {
@@ -67,7 +85,7 @@ func round12DrawRowBackground(a *application, hdc uintptr, row int, background u
 	round12DrawSeparator(hdc, rowBounds)
 }
 
-func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column int, task *model.Task, selected bool, background uintptr) {
+func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column int, task *model.Task, background uintptr) {
 	legacy := a.taskTexts(task)
 	switch column {
 	case round12ColNumber:
@@ -83,11 +101,7 @@ func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column
 		fraction, label := progressCellMetrics(task)
 		round12DrawProgressCell(hdc, cell, fraction, label, background)
 	case round12ColStatus:
-		color := round12SelectionText
-		if !selected {
-			color = taskStatusColor(task.Status)
-		}
-		round12DrawTextCell(hdc, cell, round12LegacyText(legacy, 10), background, color, false)
+		round12DrawStatusCell(hdc, cell, round12LegacyText(legacy, 10), task.Status, background)
 	case round12ColTimeCrop:
 		round12DrawTimeCropCell(a, hdc, cell, task, background)
 	case round12ColPictureCrop:
@@ -97,7 +111,54 @@ func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column
 		legacyIndex := column - 2
 		round12DrawTextCell(hdc, cell, round12LegacyText(legacy, legacyIndex), background, round12SelectionText, true)
 	}
-	round12FillTrailingRowArea(a, hdc, cell, column, background)
+}
+
+func round12DrawSelectionOutline(a *application, hdc uintptr, row int) {
+	if a == nil || a.hList == 0 || hdc == 0 || row < 0 {
+		return
+	}
+	rowBounds := rect{Left: LVIR_BOUNDS}
+	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafe.Pointer(&rowBounds))) == 0 || rowBounds.Bottom <= rowBounds.Top {
+		return
+	}
+	var client rect
+	if ok, _, _ := procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client))); ok == 0 || client.Right <= client.Left {
+		return
+	}
+	rowBounds.Left = client.Left
+	rowBounds.Right = client.Right
+	// Keep the row content/background untouched, but make the selection frame
+	// unmistakable against both white rows and the pale status tints.
+	thickness := scaleDPI(3)
+	if thickness < 3 {
+		thickness = 3
+	}
+	border := colorRef(28, 91, 183)
+	fillSolid(hdc, rect{Left: rowBounds.Left, Top: rowBounds.Top, Right: rowBounds.Left + thickness, Bottom: rowBounds.Bottom}, border)
+	fillSolid(hdc, rect{Left: rowBounds.Right - thickness, Top: rowBounds.Top, Right: rowBounds.Right, Bottom: rowBounds.Bottom}, border)
+	if row == 0 || !listItemSelected(a.hList, row-1) {
+		fillSolid(hdc, rect{Left: rowBounds.Left, Top: rowBounds.Top, Right: rowBounds.Right, Bottom: rowBounds.Top + thickness}, border)
+	}
+	if !listItemSelected(a.hList, row+1) {
+		fillSolid(hdc, rect{Left: rowBounds.Left, Top: rowBounds.Bottom - thickness, Right: rowBounds.Right, Bottom: rowBounds.Bottom}, border)
+	}
+}
+
+func round12DrawStatusCell(hdc uintptr, cell rect, label string, status model.Status, background uintptr) {
+	fillSolid(hdc, cell, background)
+	markerColor := taskStatusColor(status)
+	round12DrawAAStatusGlyph(hdc, cell, status, markerColor, background)
+	textRect := cell
+	textRect.Left += scaleDPI(25)
+	textRect.Right -= scaleDPI(5)
+	old, _, _ := procSelectObject.Call(hdc, uiFontSmall)
+	procSetBkMode.Call(hdc, TRANSPARENT)
+	procSetTextColor.Call(hdc, markerColor)
+	procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&textRect)), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	if old != 0 {
+		procSelectObject.Call(hdc, old)
+	}
+	round12DrawSeparator(hdc, cell)
 }
 
 func round12LegacyText(values []string, index int) string {
@@ -127,28 +188,45 @@ func round12DrawTextCell(hdc uintptr, cell rect, label string, background, textC
 }
 
 func round12DrawSeparator(hdc uintptr, cell rect) {
-	if cell.Bottom > cell.Top {
-		fillSolid(hdc, rect{Left: cell.Left, Top: cell.Bottom - 1, Right: cell.Right, Bottom: cell.Bottom}, round12CellSeparator)
-	}
+	// Dense per-cell rules made a normal queue look like a spreadsheet and also
+	// amplified partial-paint artifacts during scrolling. Selection/background
+	// contrast now separates rows; the header keeps one dedicated bottom rule.
+	_ = hdc
+	_ = cell
 }
 
-func round12FillTrailingRowArea(a *application, hdc uintptr, cell rect, column int, background uintptr) {
-	if a == nil || a.hList == 0 || hdc == 0 || cell.Bottom <= cell.Top {
+func round12FillTrailingRowArea(a *application, hdc uintptr, row int, background uintptr) {
+	if a == nil || a.hList == 0 || hdc == 0 || row < 0 {
 		return
 	}
-	for next := column + 1; next < round12ColumnCount; next++ {
-		if int32(send(a.hList, LVM_GETCOLUMNWIDTH, uintptr(next), 0)) > 0 {
-			return
+	rowBounds := rect{Left: LVIR_BOUNDS}
+	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafe.Pointer(&rowBounds))) == 0 || rowBounds.Bottom <= rowBounds.Top {
+		return
+	}
+	lastRight := int32(0)
+	for column := 0; column < round12ColumnCount; column++ {
+		if send(a.hList, LVM_GETCOLUMNWIDTH, uintptr(column), 0) <= 0 {
+			continue
+		}
+		cell, visible := round12VisibleCellBounds(a, row, column)
+		if visible && cell.Right > lastRight {
+			lastRight = cell.Right
 		}
 	}
 	var client rect
 	if ok, _, _ := procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client))); ok == 0 {
 		return
 	}
-	if cell.Right >= client.Right {
+	if lastRight < client.Left {
+		lastRight = client.Left
+	}
+	if lastRight >= client.Right {
 		return
 	}
-	tail := rect{Left: cell.Right, Top: cell.Top, Right: client.Right, Bottom: cell.Bottom}
+	// NM_CUSTOMDRAW clips subitem painting to the physical cell. Filling the
+	// tail from a status-cell callback therefore left stale blocks to its right.
+	// ITEMPOSTPAINT owns the uncropped row tail and paints it exactly once.
+	tail := rect{Left: lastRight, Top: rowBounds.Top, Right: client.Right, Bottom: rowBounds.Bottom}
 	fillSolid(hdc, tail, background)
 	round12DrawSeparator(hdc, tail)
 }
@@ -220,6 +298,11 @@ func round12DrawTimeCropCell(a *application, hdc uintptr, cell rect, task *model
 func round12DrawProgressCell(hdc uintptr, cell rect, fraction float64, label string, background uintptr) {
 	fillSolid(hdc, cell, background)
 	fraction = clamp01(fraction)
+	if fraction <= 0 {
+		drawCenteredText(hdc, label, cell, uiFontSmall, round12SelectionText)
+		round12DrawSeparator(hdc, cell)
+		return
+	}
 	bar := fullCellBarRect(cell)
 	fillSolid(hdc, bar, colorRef(239, 243, 248))
 	fill := rect{Left: bar.Left, Top: bar.Top, Right: bar.Left, Bottom: bar.Bottom}
@@ -237,23 +320,79 @@ func round12DrawProgressCell(hdc uintptr, cell rect, fraction float64, label str
 
 func round12DrawCompressionCell(hdc uintptr, cell rect, task *model.Task, label string, background uintptr) {
 	fillSolid(hdc, cell, background)
+	if task == nil || task.InputSize <= 0 || task.OutputSize <= 0 {
+		drawCenteredText(hdc, label, cell, uiFontSmall, round12SelectionText)
+		round12DrawSeparator(hdc, cell)
+		return
+	}
 	bar := fullCellBarRect(cell)
 	fillSolid(hdc, bar, colorRef(239, 243, 248))
-	if task != nil && task.InputSize > 0 && task.OutputSize > 0 {
-		visual := compressionVisualFor(task.InputSize, task.OutputSize)
-		split := bar.Left + int32(float64(bar.Right-bar.Left)*visual.InputFraction)
-		if split <= bar.Left {
-			split = bar.Left + 1
-		}
-		if split >= bar.Right {
-			split = bar.Right - 1
-		}
-		left, right := bar, bar
-		left.Right, right.Left = split, split
-		fillSolid(hdc, left, colorRef(228, 233, 239))
-		start, finish := compressionColorPair(visual)
-		drawHorizontalGradient(hdc, right, start, finish)
+	visual := compressionVisualFor(task.InputSize, task.OutputSize)
+	split := bar.Left + int32(float64(bar.Right-bar.Left)*visual.InputFraction)
+	if split <= bar.Left {
+		split = bar.Left + 1
 	}
+	if split >= bar.Right {
+		split = bar.Right - 1
+	}
+	left, right := bar, bar
+	left.Right, right.Left = split, split
+	fillSolid(hdc, left, colorRef(228, 233, 239))
+	start, finish := compressionColorPair(visual)
+	drawHorizontalGradient(hdc, right, start, finish)
 	drawCenteredText(hdc, label, bar, uiFontSmall, colorRef(35, 51, 70))
 	round12DrawSeparator(hdc, cell)
+}
+
+// round12DrawBufferedOverallProgress renders the bar and its complete label in
+// memory, then publishes one bitmap. The prior direct owner-draw path exposed
+// the interval between painting the moving gradient and painting dozens of
+// individual text glyphs, which appeared as a repeatedly shrinking/flashing
+// total-progress label during active conversion.
+func round12DrawBufferedOverallProgress(a *application, dis *drawItemStruct) bool {
+	if a == nil || dis == nil || dis.HwndItem != a.hProgress || dis.HDC == 0 {
+		return false
+	}
+	width := dis.RcItem.Right - dis.RcItem.Left
+	height := dis.RcItem.Bottom - dis.RcItem.Top
+	if width <= 0 || height <= 0 {
+		return false
+	}
+	memoryDC, _, _ := procCreateCompatibleDC.Call(dis.HDC)
+	if memoryDC == 0 {
+		return false
+	}
+	defer procDeleteDC.Call(memoryDC)
+	bitmap, _, _ := round7FeedbackCreateCompatibleBmp.Call(dis.HDC, uintptr(width), uintptr(height))
+	if bitmap == 0 {
+		return false
+	}
+	oldBitmap, _, _ := procSelectObject.Call(memoryDC, bitmap)
+	defer func() {
+		if oldBitmap != 0 {
+			procSelectObject.Call(memoryDC, oldBitmap)
+		}
+		procDeleteObject.Call(bitmap)
+	}()
+
+	local := rect{Right: width, Bottom: height}
+	fillSolid(memoryDC, local, colorRef(255, 255, 255))
+	buffered := *dis
+	buffered.HDC = memoryDC
+	buffered.RcItem = local
+	if !a.drawOverallProgress(&buffered) {
+		return false
+	}
+	round7FeedbackBitBlt.Call(
+		dis.HDC,
+		uintptr(dis.RcItem.Left),
+		uintptr(dis.RcItem.Top),
+		uintptr(width),
+		uintptr(height),
+		memoryDC,
+		0,
+		0,
+		SRCCOPY,
+	)
+	return true
 }

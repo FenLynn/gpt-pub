@@ -24,7 +24,7 @@ type round7FeedbackCanvasState struct {
 
 var (
 	round7FeedbackCanvasStates sync.Map
-	round7FeedbackInfoBrush uintptr
+	round7FeedbackInfoBrush    uintptr
 )
 
 func round7FeedbackEditSelected(a *application) {
@@ -373,9 +373,9 @@ func round7FeedbackEnsureDecor(e *round7Editor) *round7FeedbackEditorDecor {
 	}
 	decor := &round7FeedbackEditorDecor{
 		timeTitle: createControl("STATIC", "剪辑", WS_CHILD|WS_VISIBLE, 0, 0, 10, 10, e.hwnd, 0),
-		timeLine: createControl("STATIC", "", WS_CHILD|WS_VISIBLE, 0, 0, 10, 1, e.hwnd, 0),
+		timeLine:  createControl("STATIC", "", WS_CHILD|WS_VISIBLE, 0, 0, 10, 1, e.hwnd, 0),
 		cropTitle: createControl("STATIC", "画面", WS_CHILD|WS_VISIBLE, 0, 0, 10, 10, e.hwnd, 0),
-		cropLine: createControl("STATIC", "", WS_CHILD|WS_VISIBLE, 0, 0, 10, 1, e.hwnd, 0),
+		cropLine:  createControl("STATIC", "", WS_CHILD|WS_VISIBLE, 0, 0, 10, 1, e.hwnd, 0),
 	}
 	send(decor.timeTitle, WM_SETFONT, uiFontBold, 1)
 	send(decor.cropTitle, WM_SETFONT, uiFontBold, 1)
@@ -552,8 +552,8 @@ func round7FeedbackDrawCropOverlay(d *trimDialog, hdc uintptr, dr rect) {
 	procSelectObject.Call(hdc, oldPen)
 	procDeleteObject.Call(pen)
 	handle := scaleDPI(5)
-	for _, pt := range []point{{X: r.Left, Y: r.Top}, {X: r.Right, Y: r.Top}, {X: r.Left, Y: r.Bottom}, {X: r.Right, Y: r.Bottom}, {X: (r.Left+r.Right)/2, Y: r.Top}, {X: (r.Left+r.Right)/2, Y: r.Bottom}, {X: r.Left, Y: (r.Top+r.Bottom)/2}, {X: r.Right, Y: (r.Top+r.Bottom)/2}} {
-		fillSolid(hdc, rect{Left: pt.X-handle, Top: pt.Y-handle, Right: pt.X+handle+1, Bottom: pt.Y+handle+1}, green)
+	for _, pt := range []point{{X: r.Left, Y: r.Top}, {X: r.Right, Y: r.Top}, {X: r.Left, Y: r.Bottom}, {X: r.Right, Y: r.Bottom}, {X: (r.Left + r.Right) / 2, Y: r.Top}, {X: (r.Left + r.Right) / 2, Y: r.Bottom}, {X: r.Left, Y: (r.Top + r.Bottom) / 2}, {X: r.Right, Y: (r.Top + r.Bottom) / 2}} {
+		fillSolid(hdc, rect{Left: pt.X - handle, Top: pt.Y - handle, Right: pt.X + handle + 1, Bottom: pt.Y + handle + 1}, green)
 	}
 }
 

@@ -53,19 +53,24 @@ type trimDialog struct {
 	done   bool
 	closed atomic.Bool
 
-	accepted bool
-	hStart   uintptr
-	hEnd     uintptr
-	hCrop    uintptr
-	hX       uintptr
-	hY       uintptr
-	hW       uintptr
-	hH       uintptr
-	hInfo    uintptr
-	hCanvas  uintptr
-	hTrack   uintptr
-	hNow     uintptr
-	hAspect  uintptr
+	accepted                                                     bool
+	hStart                                                       uintptr
+	hEnd                                                         uintptr
+	hCrop                                                        uintptr
+	hX                                                           uintptr
+	hY                                                           uintptr
+	hW                                                           uintptr
+	hH                                                           uintptr
+	hInfo                                                        uintptr
+	hCanvas                                                      uintptr
+	hTrack                                                       uintptr
+	hNow                                                         uintptr
+	hAspect                                                      uintptr
+	hVideoHint, hCurrentLabel, hJump, hFileInfo                  uintptr
+	hSeekMinusSec, hSeekMinusFrame, hSeekPlusFrame, hSeekPlusSec uintptr
+	hStartLabel, hEndLabel, hStartNow, hEndNow, hFullTime        uintptr
+	hFrameInfo, hFullFrame, hAspectLabel, hCenter, hFramePreview uintptr
+	hApplySelected, hOK, hCancel                                 uintptr
 
 	frameW, frameH int
 	currentAt      float64
@@ -254,6 +259,10 @@ func trimPreviewWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 }
 
 func (d *trimDialog) init() {
+	if d.task.Kind == model.KindImage {
+		d.initImageCrop()
+		return
+	}
 	// Large integrated preview, matching the original v2.8.4 workflow.
 	d.hCanvas = createControlEx(WS_EX_CLIENTEDGE, "MWTrimPreviewCanvas", "", WS_CHILD|WS_VISIBLE, 15, 20, 700, 520, d.hwnd, IDC_PREVIEW_CANVAS)
 	createControl("STATIC", "拖动时间轴快速预览；在画面中拖动鼠标可框选保留区域。", WS_CHILD|WS_VISIBLE, 15, 548, 700, 24, d.hwnd, 0)
@@ -268,6 +277,13 @@ func (d *trimDialog) init() {
 	if d.task.Kind == model.KindImage {
 		for _, h := range []uintptr{d.hNow, d.hTrack} {
 			enable(h, false)
+		}
+		// Images have no timeline. Hide the video-only controls completely so
+		// the dialog presents a focused crop workflow instead of disabled video
+		// editing controls.
+		for _, id := range []int{IDC_CURRENT_TIME, IDC_JUMP_TIME, IDC_TIMELINE, IDC_SEEK_MINUS_SEC, IDC_SEEK_MINUS_FRAME, IDC_SEEK_PLUS_FRAME, IDC_SEEK_PLUS_SEC, IDC_TRIM_START, IDC_TRIM_END, IDC_FULL_TIME} {
+			h, _, _ := procGetDlgItem.Call(d.hwnd, uintptr(id))
+			show(h, false)
 		}
 	}
 	createControl("BUTTON", "−1 秒", WS_CHILD|WS_VISIBLE|WS_TABSTOP, 210, 660, 90, 32, d.hwnd, IDC_SEEK_MINUS_SEC)
@@ -321,6 +337,46 @@ func (d *trimDialog) init() {
 	d.generatePreviewFrame()
 }
 
+func (d *trimDialog) initImageCrop() {
+	// Still images use a dedicated pixel crop editor: no timeline, frame seek,
+	// in/out points, duration language or video-only even-pixel rounding.
+	d.hCanvas = createControlEx(WS_EX_CLIENTEDGE, "MWTrimPreviewCanvas", "", WS_CHILD|WS_VISIBLE, 15, 20, 700, 620, d.hwnd, IDC_PREVIEW_CANVAS)
+	createControl("STATIC", "拖动鼠标框选保留区域；图片按原始像素精确裁剪。", WS_CHILD|WS_VISIBLE, 15, 650, 700, 28, d.hwnd, 0)
+
+	x := int32(735)
+	heading := createControl("STATIC", "图片裁剪", WS_CHILD|WS_VISIBLE, x, 24, 332, 30, d.hwnd, 0)
+	send(heading, WM_SETFONT, uiFontBold, 1)
+	d.hCrop = createControl("BUTTON", "启用图片裁剪", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_AUTOCHECKBOX, x, 58, 180, 30, d.hwnd, IDC_CROP_ON)
+	if d.opts.Crop.Enabled {
+		send(d.hCrop, BM_SETCHECK, BST_CHECKED, 0)
+	}
+	labels := []string{"左侧 X", "顶部 Y", "宽度", "高度"}
+	vals := []int{d.opts.Crop.X, d.opts.Crop.Y, d.opts.Crop.Width, d.opts.Crop.Height}
+	ids := []int{IDC_CROP_X, IDC_CROP_Y, IDC_CROP_W, IDC_CROP_H}
+	handles := []*uintptr{&d.hX, &d.hY, &d.hW, &d.hH}
+	for i := range labels {
+		y := int32(100 + i*42)
+		createControl("STATIC", labels[i], WS_CHILD|WS_VISIBLE, x, y+4, 72, 28, d.hwnd, 0)
+		*handles[i] = createControlEx(WS_EX_CLIENTEDGE, "EDIT", strconv.Itoa(vals[i]), WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_AUTOHSCROLL|ES_NUMBER, x+76, y, 116, 32, d.hwnd, ids[i])
+	}
+	createControl("STATIC", fmt.Sprintf("原始像素：%d×%d", d.frameW, d.frameH), WS_CHILD|WS_VISIBLE, x+204, 104, 128, 48, d.hwnd, 0)
+	createControl("BUTTON", "恢复整张图片", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+204, 226, 128, 34, d.hwnd, IDC_FULL_FRAME)
+	createControl("STATIC", "裁剪比例", WS_CHILD|WS_VISIBLE, x, 282, 72, 28, d.hwnd, 0)
+	d.hAspect = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST, x+76, 276, 116, 200, d.hwnd, IDC_CROP_ASPECT)
+	for _, label := range []string{"自由", "16:9", "9:16", "1:1", "4:3"} {
+		send(d.hAspect, CB_ADDSTRING, 0, uintptr(unsafe.Pointer(p(label))))
+	}
+	send(d.hAspect, CB_SETCURSEL, 0, 0)
+	createControl("BUTTON", "居中适配", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+204, 276, 128, 34, d.hwnd, IDC_CROP_CENTER)
+	d.hInfo = createControlEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD|WS_VISIBLE|ES_MULTILINE|ES_READONLY|WS_VSCROLL, x, 328, 332, 154, d.hwnd, 0)
+	createControl("BUTTON", "查看裁剪后预览", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x, 494, 332, 38, d.hwnd, IDC_FRAME_PREVIEW)
+	createControl("BUTTON", "应用到已选图片", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x, 614, 332, 36, d.hwnd, IDC_CROP_APPLY_SELECTED)
+	createControl("BUTTON", "应用到当前图片", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_DEFPUSHBUTTON, x, 660, 200, 40, d.hwnd, IDC_TRIM_OK)
+	createControl("BUTTON", "取消", WS_CHILD|WS_VISIBLE|WS_TABSTOP, x+208, 660, 124, 40, d.hwnd, IDC_TRIM_CANCEL)
+	d.updateInfo()
+	d.generatePreviewFrame()
+}
+
 func (d *trimDialog) command(id int) {
 	switch id {
 	case IDC_FULL_TIME:
@@ -328,7 +384,11 @@ func (d *trimDialog) command(id int) {
 		setText(d.hEnd, formatSecondsClock(d.task.Duration))
 		d.updateInfo()
 	case IDC_FULL_FRAME:
-		d.opts.Crop = model.Crop{Enabled: false, X: 0, Y: 0, Width: evenSize(d.frameW), Height: evenSize(d.frameH)}
+		width, height := evenSize(d.frameW), evenSize(d.frameH)
+		if d.task.Kind == model.KindImage {
+			width, height = d.frameW, d.frameH
+		}
+		d.opts.Crop = model.Crop{Enabled: false, X: 0, Y: 0, Width: width, Height: height}
 		send(d.hCrop, BM_SETCHECK, 0, 0)
 		d.cropToControls()
 	case IDC_CROP_ASPECT:
@@ -397,12 +457,24 @@ func (d *trimDialog) fitSelectedAspect() {
 	if !ok {
 		return
 	}
-	d.opts.Crop = media.FitAspectCrop(d.frameW, d.frameH, ratioW, ratioH)
+	if d.task.Kind == model.KindImage {
+		d.opts.Crop = media.FitImageAspectCrop(d.frameW, d.frameH, ratioW, ratioH)
+	} else {
+		d.opts.Crop = media.FitAspectCrop(d.frameW, d.frameH, ratioW, ratioH)
+	}
 	send(d.hCrop, BM_SETCHECK, BST_CHECKED, 0)
 	d.cropToControls()
 }
 
 func (d *trimDialog) keyDown(key int) bool {
+	if d.task.Kind == model.KindImage {
+		if key == 'R' {
+			d.opts.Crop = model.Crop{Enabled: false, X: 0, Y: 0, Width: d.frameW, Height: d.frameH}
+			d.cropToControls()
+			return true
+		}
+		return false
+	}
 	shiftState, _, _ := procGetKeyState.Call(0x10)
 	shifted := int16(shiftState&0xffff) < 0
 	switch key {
@@ -493,8 +565,8 @@ func (d *trimDialog) read() bool {
 		d.cropFromControls(true)
 		if d.opts.Crop.Enabled {
 			c := d.opts.Crop
-			if c.Width < 2 || c.Height < 2 || c.X < 0 || c.Y < 0 || c.X+c.Width > d.frameW || c.Y+c.Height > d.frameH {
-				messageBox(d.hwnd, "裁剪区域", "裁剪区域必须位于图片范围内，且宽高至少为 2 像素。", MB_OK|MB_ICONERROR)
+			if c.Width < 1 || c.Height < 1 || c.X < 0 || c.Y < 0 || c.X+c.Width > d.frameW || c.Y+c.Height > d.frameH {
+				messageBox(d.hwnd, "裁剪区域", "裁剪区域必须位于图片范围内，且宽高至少为 1 像素。", MB_OK|MB_ICONERROR)
 				return false
 			}
 		}
@@ -549,7 +621,10 @@ func (d *trimDialog) cropFromControls(normalize bool) {
 	w, _ := strconv.Atoi(strings.TrimSpace(getText(d.hW)))
 	h, _ := strconv.Atoi(strings.TrimSpace(getText(d.hH)))
 	enabled := send(d.hCrop, BM_GETCHECK, 0, 0) == BST_CHECKED
-	if normalize && enabled {
+	if normalize && enabled && d.task.Kind == model.KindImage {
+		crop := media.ClampImageCrop(d.frameW, d.frameH, model.Crop{Enabled: true, X: x, Y: y, Width: w, Height: h})
+		x, y, w, h = crop.X, crop.Y, crop.Width, crop.Height
+	} else if normalize && enabled {
 		if x < 0 {
 			x = 0
 		}
@@ -777,7 +852,11 @@ func (d *trimDialog) imagePointClamped(lParam uintptr) (point, bool) {
 
 func (d *trimDialog) setDragCrop(a, b point) {
 	ratioW, ratioH, locked := d.selectedAspect()
-	d.opts.Crop = media.DragCropWithAspect(d.frameW, d.frameH, int(a.X), int(a.Y), int(b.X), int(b.Y), ratioW, ratioH, locked)
+	if d.task.Kind == model.KindImage {
+		d.opts.Crop = media.DragImageCropWithAspect(d.frameW, d.frameH, int(a.X), int(a.Y), int(b.X), int(b.Y), ratioW, ratioH, locked)
+	} else {
+		d.opts.Crop = media.DragCropWithAspect(d.frameW, d.frameH, int(a.X), int(a.Y), int(b.X), int(b.Y), ratioW, ratioH, locked)
+	}
 	d.cropToControls()
 }
 

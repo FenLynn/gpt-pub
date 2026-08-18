@@ -16,54 +16,34 @@ func round9ReadSource(t *testing.T, name string) string {
 	return string(data)
 }
 
-func TestV452Round11ScrollContract(t *testing.T) {
-	logic := round9ReadSource(t, "v452_round9_logic.go")
+func TestV452NativeListScrollContract(t *testing.T) {
+	install := round9ReadSource(t, "v452_round11_install_order_windows.go")
 	for _, required := range []string{
-		"round9OverlayHidden", "round9OverlayPending", "round9OverlayVisible", "round9OverlayDragging",
-		"func (m *round9OverlayMachine) Move", "func (m *round9OverlayMachine) ShowTimeout",
+		"round12InstallNativeListScroll",
+		"round7FeedbackWSHScroll|round7FeedbackWSVScroll",
+		"LVS_EX_DOUBLEBUFFER",
+		"round12InstallFinalUIOwners",
 	} {
-		if !strings.Contains(logic, required) {
-			t.Fatalf("scroll state-machine contract missing %q", required)
+		if !strings.Contains(install, required) {
+			t.Fatalf("native ListView scroll contract missing %q", required)
 		}
 	}
-	scroll := round9ReadSource(t, "v452_round7_feedback_scroll_windows.go")
-	for _, required := range []string{
-		"MWRound9ScrollCover", "round9ScrollWndProc", "round7FeedbackScrollDelay",
-		"round9FeedbackHideDelay", "round9OverlayCursorInside", "round9SetScrollFromOverlay",
+
+	common := round9ReadSource(t, "v452_round7_feedback_common_windows.go")
+	combined := install + common + round9ReadSource(t, "v452_round11_flicker_closeout_windows.go")
+	for _, retired := range []string{
+		"MWRound9ScrollCover",
+		"MWRound11StableScrollSurface",
+		"MWRound12ThumbVisual",
+		"MWRound12FrozenNumber",
+		"round9OverlayMachine",
+		"round7FeedbackListSubclassProc",
+		"round8EnsureListStyleGuard",
+		"round12InlineListSubclassProc",
 	} {
-		if !strings.Contains(scroll, required) {
-			t.Fatalf("scroll surface contract missing %q", required)
+		if strings.Contains(combined, retired) {
+			t.Fatalf("retired custom scroll owner remains: %q", retired)
 		}
-	}
-	for _, forbidden := range []string{"ShowScrollBar", "round7FeedbackDrawOverlayScrollbars", "procInvalidateRect.Call(app.hList, 0, 0)"} {
-		if strings.Contains(scroll, forbidden) {
-			t.Fatalf("scroll contract contains unstable list repaint path %q", forbidden)
-		}
-	}
-	closeout := round9ReadSource(t, "v452_round11_flicker_closeout_windows.go")
-	for _, required := range []string{
-		"round11PositionOverlayStable", "previous == geometry && overlay.visible",
-		"round11EnsureStableScrollGeometry", "round11ListSubclassProc",
-		"v452RemoveSubclass.Call(a.hList, round7FeedbackListSubclassCB",
-	} {
-		if !strings.Contains(closeout, required) {
-			t.Fatalf("round11 stable scroll contract missing %q", required)
-		}
-	}
-	paintCase := closeout[strings.Index(closeout, "case WM_PAINT:"):]
-	if end := strings.Index(paintCase, "case round7FeedbackWMPrint"); end >= 0 {
-		paintCase = paintCase[:end]
-	}
-	if strings.Contains(paintCase, "round11EnsureStableScrollGeometry") || strings.Contains(paintCase, "round9EnsureScrollOverlays") {
-		t.Fatal("list WM_PAINT still drives scroll-cover geometry")
-	}
-	cover := round9ReadSource(t, "v452_round10_scroll_cover_windows.go")
-	if strings.Contains(cover, "WM_PAINT") || strings.Contains(cover, "MoveWindow") || strings.Contains(cover, "InvalidateRect") {
-		t.Fatal("round10 compatibility layer still owns repaint or geometry")
-	}
-	guard := round9ReadSource(t, "v452_round8_list_style_guard_windows.go")
-	if strings.Contains(guard, "SetWinEventHook") || strings.Contains(guard, "EventObjectCreate") {
-		t.Fatal("list style guard still depends on asynchronous WinEvent installation")
 	}
 }
 
@@ -80,6 +60,16 @@ func TestV452Round9PreviewAndOutputContract(t *testing.T) {
 			t.Fatalf("thumbnail lifecycle missing %q", required)
 		}
 	}
+	installer := round9ReadSource(t, "v452_round11_install_order_windows.go")
+	headerOwner := round9ReadSource(t, "v452_round12_header_owner_windows.go")
+	if !strings.Contains(installer, "round9EnsureVisibleThumbnails") || !strings.Contains(headerOwner, "round9EnsureVisibleThumbnails") {
+		t.Fatal("visible thumbnail recovery is not wired into startup and native ListView observation")
+	}
+	for _, required := range []string{"round12WMThumbnailScan", "procPostMessageW.Call", "round12ThumbnailScanPosted.CompareAndSwap"} {
+		if !strings.Contains(headerOwner, required) {
+			t.Fatalf("thumbnail observer must defer and coalesce work outside native ListView messages; missing %q", required)
+		}
+	}
 	output := round9ReadSource(t, "v452_round9_output_display_windows.go")
 	for _, required := range []string{"round9EMSetReadOnly", "round9PaintOutputDisplay", "round9WMSetFocus"} {
 		if !strings.Contains(output, required) {
@@ -88,6 +78,9 @@ func TestV452Round9PreviewAndOutputContract(t *testing.T) {
 	}
 	if strings.Contains(output, "EM_SETSEL") || strings.Contains(output, "round7FeedbackEMSetSel") {
 		t.Fatal("output display regressed to post-hoc selection clearing")
+	}
+	if !strings.Contains(installer, "round9EnsureOutputDisplay") {
+		t.Fatal("output display is not installed by the deterministic final owner chain")
 	}
 }
 

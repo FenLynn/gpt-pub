@@ -195,9 +195,39 @@ func terminalTaskHistoryRecord(settings model.Settings, task *model.Task) media.
 		return media.HistoryRecord{}
 	}
 	options := settings.EffectiveOptions(task)
-	resolution, codec := options.Resolution, options.Codec
+	return historyRecordFromTask(settings, task, options, terminalTaskResult(task))
+}
+
+func historyOutputResolution(task *model.Task, options model.TaskOptions) string {
+	if task == nil {
+		return ""
+	}
 	if task.Kind == model.KindImage {
-		resolution, codec = options.ImageSize, options.ImageFormat
+		if options.ImageSize == "" {
+			return "保持原尺寸"
+		}
+		return options.ImageSize
+	}
+	if options.Resolution == "原尺寸" && task.Width > 0 && task.Height > 0 {
+		return fmt.Sprintf("%d×%d", task.Width, task.Height)
+	}
+	return options.Resolution
+}
+
+func historyCropSummary(options model.TaskOptions) string {
+	trim := "完整"
+	if options.TrimStart > 0 || options.TrimEnd > 0 {
+		trim = fmt.Sprintf("%.3fs → %.3fs", options.TrimStart, options.TrimEnd)
+	}
+	if !options.Crop.Enabled {
+		return trim + " · 全画面"
+	}
+	return fmt.Sprintf("%s · 裁剪 %d×%d @ (%d,%d)", trim, options.Crop.Width, options.Crop.Height, options.Crop.X, options.Crop.Y)
+}
+
+func historyRecordFromTask(settings model.Settings, task *model.Task, options model.TaskOptions, result string) media.HistoryRecord {
+	if task == nil {
+		return media.HistoryRecord{}
 	}
 	completedAt := task.FinishedAt
 	if completedAt.IsZero() {
@@ -211,18 +241,49 @@ func terminalTaskHistoryRecord(settings model.Settings, task *model.Task) media.
 		}
 	}
 	return media.HistoryRecord{
-		CompletedAt:  completedAt,
-		Input:        task.Input,
-		Output:       task.OutputPath,
-		InputSize:    task.InputSize,
-		OutputSize:   task.OutputSize,
-		Resolution:   resolution,
-		Codec:        codec,
-		Quality:      options.Quality,
-		Rotation:     options.Rotation,
-		Engine:       task.Engine,
-		DurationSecs: duration,
-		Result:       terminalTaskResult(task),
+		ID:                media.NewHistoryRecordID(),
+		Kind:              task.Kind,
+		Status:            task.Status,
+		CompletedAt:       completedAt,
+		Input:             task.Input,
+		Output:            task.OutputPath,
+		InputSize:         task.InputSize,
+		OutputSize:        task.OutputSize,
+		SourceWidth:       task.Width,
+		SourceHeight:      task.Height,
+		SourceDurationSec: task.Duration,
+		SourceFPS:         task.FPS,
+		SourceRotation:    task.Rotation,
+		SourceVideoCodec:  task.VideoCodec,
+		SourceAudioCodec:  task.AudioCodec,
+		AudioStreams:      task.AudioStreams,
+		SubtitleStreams:   task.SubtitleStreams,
+		Resolution:        historyOutputResolution(task, options),
+		OutputResolution:  historyOutputResolution(task, options),
+		Codec: func() string {
+			if task.Kind == model.KindImage {
+				return options.ImageFormat
+			}
+			return options.Codec
+		}(),
+		Quality: func() string {
+			if task.Kind == model.KindImage {
+				return settings.ImageQuality
+			}
+			return options.Quality
+		}(),
+		Rotation:          options.Rotation,
+		VolumeMode:        options.VolumeMode,
+		AudioMode:         settings.AudioMode,
+		SubtitleMode:      settings.SubtitleMode,
+		CropSummary:       historyCropSummary(options),
+		Progress:          task.Progress,
+		Engine:            task.Engine,
+		FailureCategory:   task.FailureCategory,
+		Error:             task.Error,
+		ValidationWarning: task.ValidationWarning,
+		DurationSecs:      duration,
+		Result:            result,
 	}
 }
 

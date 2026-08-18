@@ -37,7 +37,7 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 		`bottomParameterWidths(a.currentKind)`,
 		`drawStatusLamp(dis.HDC, rc, dot)`,
 		`drawCompactResetGlyph(dis.HDC, rc, textColor)`,
-		`drawContrastCenteredText(hdc, label, bar, fill, uiFontSmall)`,
+		`drawContrastCenteredText(dis.HDC, a.overallText, bar, fill, uiFontProgress)`,
 		`taskColOutputSize && cd.ISubItem != taskColProgress && cd.ISubItem != taskColStatus`,
 		`taskDurationText(t)`,
 		`a.refreshTotal()`,
@@ -57,11 +57,11 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 	if strings.Contains(helper, `drawCenteredText(hdc, "●"`) {
 		t.Fatal("font-rendered status lamp returned")
 	}
-	if !strings.Contains(queue, `enable(a.hPause, ownsRun)`) || !strings.Contains(queue, `waitingQueueLabel(runKind)`) {
+	if !strings.Contains(queue, `enable(a.hPause, ownsRun)`) || !strings.Contains(queue, `a.activeRuns[a.currentKind]`) {
 		t.Fatal("bottom queue controls are not workspace-specific")
 	}
-	if strings.Count(harden, `a.runKind != a.currentKind`) < 2 {
-		t.Fatal("pause/stop can still control the other media workspace")
+	if !strings.Contains(harden, `a.activeRuns[a.currentKind]`) || !strings.Contains(harden, `task.Kind != kind`) {
+		t.Fatal("pause/stop are not isolated to the selected media workspace")
 	}
 	if strings.Contains(helper, "withRoundedClip(hdc, fill") {
 		t.Fatal("progress text returned to unreliable clipping")

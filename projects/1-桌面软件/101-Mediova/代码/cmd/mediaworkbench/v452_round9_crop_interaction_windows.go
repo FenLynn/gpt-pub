@@ -199,8 +199,8 @@ func round9CanvasSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subc
 		}
 	case round9WMSetCursor:
 		var pt point
-		if ok, _, _ := round9FeedbackGetCursorPos.Call(uintptr(unsafe.Pointer(&pt))); ok != 0 {
-			round9FeedbackScreenToClient.Call(hwnd, uintptr(unsafe.Pointer(&pt)))
+		if ok, _, _ := procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt))); ok != 0 {
+			procScreenToClient.Call(hwnd, uintptr(unsafe.Pointer(&pt)))
 			round9SetCanvasCursor(round9CropHitTest(d, pt))
 			return 1
 		}

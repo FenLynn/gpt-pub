@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const runtimePersistenceGuardManifestSHA256 = "68eccf0e8b1a16478552a71cd4975cc65b8db33bd34f6616afa0c71d003ff354"
+const runtimePersistenceGuardManifestSHA256 = "8434583f277633504f7845d8be9c02c234d38530b248dcb0f087779871cd3fab"
 
 func TestRuntimePersistenceGuardFixedSourceManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))

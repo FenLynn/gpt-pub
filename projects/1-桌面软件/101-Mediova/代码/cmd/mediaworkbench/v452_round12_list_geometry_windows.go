@@ -37,25 +37,40 @@ func round12VisibleCellBounds(a *application, row, column int) (rect, bool) {
 		cell.Bottom = rowBounds.Bottom
 	}
 	if column == round12ColNumber {
-		// LVM_GETORIGIN is not valid in report view. Derive the physical first
-		// column from the left edge of subitem 1 instead. Both rectangles share
-		// the same report-view horizontal scroll offset, so this remains exact
-		// before and after horizontal scrolling and bypasses the native image
-		// inset that contaminates subitem zero's reported left edge.
 		if next, nextOK := listSubItemBounds(a.hList, row, round12ColPreview); nextOK {
 			cell.Left = next.Left - width
 		} else {
 			cell.Left = 0
 		}
 	}
-	// Use the actual current width for every physical column. This is mandatory
-	// for column 0 and also prevents a stale pre-hide rectangle from painting a
-	// zero-width column into its neighbour.
 	cell.Right = cell.Left + width
 	if cell.Right <= cell.Left || cell.Bottom <= cell.Top {
 		return rect{}, false
 	}
 	return cell, true
+}
+
+func round12InvalidateTaskRow(a *application, row int) {
+	if a == nil || a.hList == 0 || row < 0 {
+		return
+	}
+	rowBounds := rect{Left: LVIR_BOUNDS}
+	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafe.Pointer(&rowBounds))) == 0 || rowBounds.Bottom <= rowBounds.Top {
+		return
+	}
+	var client rect
+	if ok, _, _ := procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client))); ok == 0 {
+		return
+	}
+	rowBounds.Left = client.Left
+	rowBounds.Right = client.Right
+	procInvalidateRect.Call(a.hList, uintptr(unsafe.Pointer(&rowBounds)), 0)
+}
+
+func round12InvalidateTaskSelectionNeighborhood(a *application, row int) {
+	for candidate := row - 1; candidate <= row+1; candidate++ {
+		round12InvalidateTaskRow(a, candidate)
+	}
 }
 
 func round12WithClip(hdc uintptr, clip rect, draw func()) {

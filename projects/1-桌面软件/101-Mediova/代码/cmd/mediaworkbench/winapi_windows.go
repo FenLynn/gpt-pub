@@ -23,6 +23,7 @@ const (
 	WM_TIMER                     = 0x0113
 	WM_NCHITTEST                 = 0x0084
 	WM_HSCROLL                   = 0x0114
+	WM_VSCROLL                   = 0x0115
 	WM_NOTIFY                    = 0x004E
 	WM_SETFONT                   = 0x0030
 	WM_SETREDRAW                 = 0x000B
@@ -40,9 +41,13 @@ const (
 	WM_APP_STATUS                = WM_APP + 6
 	WM_APP_UI                    = WM_APP + 7
 	WM_APP_SELFTEST              = WM_APP + 8
+	WM_APP_PROGRESS              = WM_APP + 9
+	WM_APP_SELECTION             = WM_APP + 10
 	WM_LBUTTONDOWN               = 0x0201
 	WM_LBUTTONUP                 = 0x0202
+	WM_MOUSEWHEEL                = 0x020A
 	WM_MOUSEMOVE                 = 0x0200
+	WM_EXITSIZEMOVE              = 0x0232
 	WM_PAINT                     = 0x000F
 	WM_ERASEBKGND                = 0x0014
 	WM_DRAWITEM                  = 0x002B
@@ -133,10 +138,13 @@ const (
 	NM_RCLICK                    = ^uint32(4) - 0
 	NM_CUSTOMDRAW                = ^uint32(11) - 0
 	CDDS_PREPAINT                = 0x00000001
+	CDDS_POSTPAINT               = 0x00000002
 	CDDS_ITEMPREPAINT            = 0x00010001
+	CDDS_ITEMPOSTPAINT           = 0x00010002
 	CDDS_SUBITEM                 = 0x00020000
 	CDRF_DODEFAULT               = 0x00000000
 	CDRF_SKIPDEFAULT             = 0x00000004
+	CDRF_NOTIFYPOSTPAINT         = 0x00000010
 	CDRF_NOTIFYITEMDRAW          = 0x00000020
 	CDRF_NOTIFYSUBITEMDRAW       = 0x00000020
 	CDIS_SELECTED                = 0x0001
@@ -243,16 +251,19 @@ const (
 	ICON_SMALL                   = 0
 	ICON_BIG                     = 1
 	HTCAPTION                    = 2
+	HTCLIENT                     = 1
 	SPI_GETWORKAREA              = 0x0030
 	SWP_NOSIZE                   = 0x0001
 	SWP_NOMOVE                   = 0x0002
 	SWP_NOZORDER                 = 0x0004
 	SWP_NOACTIVATE               = 0x0010
+	SWP_HIDEWINDOW               = 0x0080
 	RDW_INVALIDATE               = 0x0001
 	RDW_ERASE                    = 0x0004
 	RDW_ALLCHILDREN              = 0x0080
 	RDW_UPDATENOW                = 0x0100
 	HWND_TOPMOST                 = ^uintptr(0)
+	HWND_NOTOPMOST               = ^uintptr(1)
 )
 
 const (
@@ -270,6 +281,7 @@ var (
 	uxtheme                           = syscall.NewLazyDLL("uxtheme.dll")
 	procRegisterClassExW              = user32.NewProc("RegisterClassExW")
 	procCreateWindowExW               = user32.NewProc("CreateWindowExW")
+	procGetDlgItem                    = user32.NewProc("GetDlgItem")
 	procDefWindowProcW                = user32.NewProc("DefWindowProcW")
 	procShowWindow                    = user32.NewProc("ShowWindow")
 	procUpdateWindow                  = user32.NewProc("UpdateWindow")
@@ -301,7 +313,10 @@ var (
 	procTrackPopupMenu                = user32.NewProc("TrackPopupMenu")
 	procGetCursorPos                  = user32.NewProc("GetCursorPos")
 	procSetForegroundWindow           = user32.NewProc("SetForegroundWindow")
+	procFindWindowW                   = user32.NewProc("FindWindowW")
+	procBringWindowToTop              = user32.NewProc("BringWindowToTop")
 	procSetWindowPos                  = user32.NewProc("SetWindowPos")
+	procSetWindowRgn                  = user32.NewProc("SetWindowRgn")
 	procDrawTextW                     = user32.NewProc("DrawTextW")
 	procFrameRect                     = user32.NewProc("FrameRect")
 	procGetSysColorBrush              = user32.NewProc("GetSysColorBrush")
@@ -318,6 +333,7 @@ var (
 	procFillRect                      = user32.NewProc("FillRect")
 	procGetClientRect                 = user32.NewProc("GetClientRect")
 	procGetWindowRect                 = user32.NewProc("GetWindowRect")
+	procScreenToClient                = user32.NewProc("ScreenToClient")
 	procMapWindowPoints               = user32.NewProc("MapWindowPoints")
 	procSetFocus                      = user32.NewProc("SetFocus")
 	procGetFocus                      = user32.NewProc("GetFocus")
@@ -330,6 +346,8 @@ var (
 	procSetClipboardData              = user32.NewProc("SetClipboardData")
 	procCloseClipboard                = user32.NewProc("CloseClipboard")
 	procGetModuleHandleW              = kernel32.NewProc("GetModuleHandleW")
+	procCreateMutexW                  = kernel32.NewProc("CreateMutexW")
+	procCloseHandle                   = kernel32.NewProc("CloseHandle")
 	procGlobalAlloc                   = kernel32.NewProc("GlobalAlloc")
 	procGlobalLock                    = kernel32.NewProc("GlobalLock")
 	procGlobalUnlock                  = kernel32.NewProc("GlobalUnlock")
@@ -551,7 +569,7 @@ type notifyIconData struct {
 	HBalloonIcon         uintptr
 }
 
-var uiFontSmall, uiFont, uiFontBold, uiFontTitle, iconFont, uiCanvasBrush, uiSurfaceBrush uintptr
+var uiFontProgress, uiFontSmall, uiFont, uiFontBold, uiFontTitle, iconFont, uiCanvasBrush, uiSurfaceBrush uintptr
 
 func p(s string) *uint16 {
 	v, _ := syscall.UTF16PtrFromString(s)
