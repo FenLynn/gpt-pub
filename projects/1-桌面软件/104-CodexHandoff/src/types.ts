@@ -2,6 +2,9 @@ export interface ProjectInfo {
   key: string
   displayPath: string
   sessionCount: number
+  activeCount: number
+  archivedCount: number
+  missingBodyCount: number
   lastModified: number
 }
 
@@ -15,6 +18,9 @@ export interface SessionSummary {
   size: number
   archived: boolean
   internal: boolean
+  hasUserEvent: boolean
+  bodyExists: boolean
+  source: string
   lastUserPreview?: string | null
 }
 
@@ -38,8 +44,12 @@ export interface ScanResult {
   totalSessions: number
   activeSessions: number
   archivedSessions: number
+  rawThreads: number
   internalSessions: number
+  nonUserSessions: number
   namedSessions: number
+  missingBodySessions: number
+  orphanSessions: number
   elapsedMs: number
   logs: string[]
 }
