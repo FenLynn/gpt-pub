@@ -38,7 +38,7 @@ const pageIndex = ref(0)
 const search = ref('')
 const filter = ref('all')
 const includeInternal = ref(false)
-const includeArchived = ref(false)
+const includeArchived = ref(true)
 const selected = reactive(new Map<string, SessionSummary>())
 const selectionMode = ref<'project' | 'custom'>('project')
 const current = ref<SessionSummary | null>(null)
@@ -154,10 +154,10 @@ async function confirmScan() {
   try {
     const result = await scanCatalog(root.value.trim(), mergeGitRoots.value)
     projects.value = result.projects
-    status.value = `扫描完成，共 ${result.totalSessions} 个会话，${result.projects.length} 个项目`
+    status.value = `扫描完成，有效用户对话 ${result.totalSessions} 个（活动 ${result.activeSessions} / 归档 ${result.archivedSessions}），${result.projects.length} 个项目`
     progress.value = 100
     result.logs.forEach(line => appendLog(line))
-    appendLog(`扫描总耗时 ${result.elapsedMs} ms；活动 ${result.activeSessions}，归档 ${result.archivedSessions}，内部 ${result.internalSessions}，命名 ${result.namedSessions}`)
+    appendLog(`扫描总耗时 ${result.elapsedMs} ms；原始 thread ${result.rawThreads}；有效 ${result.totalSessions}；活动 ${result.activeSessions}；归档 ${result.archivedSessions}；内部 ${result.internalSessions}；无用户事件 ${result.nonUserSessions}；正文缺失 ${result.missingBodySessions}；JSONL 兜底 ${result.orphanSessions}`)
     if (projects.value.length) projectKey.value = projects.value[0].key
   } catch (err) {
     errorText.value = String(err)
@@ -230,6 +230,10 @@ watch(search, () => {
 async function selectSession(s: SessionSummary) {
   current.value = s
   preview.value = null
+  if (!s.bodyExists) {
+    appendLog(`正文文件缺失，仅保留 Codex state 索引：${s.title}`)
+    return
+  }
   previewBusy.value = true
   try {
     preview.value = await sessionPreview(s.path)
@@ -242,13 +246,13 @@ async function selectSession(s: SessionSummary) {
 
 function toggleSession(s: SessionSummary, checked: boolean) {
   selectionMode.value = 'custom'
-  if (checked) selected.set(s.id, s)
+  if (checked && s.bodyExists) selected.set(s.id, s)
   else selected.delete(s.id)
 }
 
 function selectVisible() {
   selectionMode.value = 'custom'
-  for (const s of sessions.value) selected.set(s.id, s)
+  for (const s of sessions.value) if (s.bodyExists) selected.set(s.id, s)
 }
 
 function clearSelection() {
@@ -259,7 +263,7 @@ function clearSelection() {
 function selectWholeProject() {
   selectionMode.value = 'project'
   selected.clear()
-  for (const s of sessions.value) selected.set(s.id, s)
+  for (const s of sessions.value) if (s.bodyExists) selected.set(s.id, s)
 }
 
 async function changePage(next: number) {
@@ -283,7 +287,7 @@ async function resolveExportSessions() {
       includeArchived: includeArchived.value,
     })
   }
-  return Array.from(selected.values())
+  return Array.from(selected.values()).filter(s => s.bodyExists)
 }
 
 async function requestExportPlan() {
@@ -303,7 +307,7 @@ async function requestExportPlan() {
     return
   }
   if (!pendingExportSessions.value.length) {
-    errorText.value = '当前没有可导出的会话。'
+    errorText.value = '当前没有可导出的会话正文。'
     return
   }
   preflight.value = null
@@ -377,7 +381,7 @@ async function copyAgyPrompt() {
         <div class="brand-mark">CH</div>
         <div>
           <div class="brand-name">CodexHandoff</div>
-          <div class="brand-version">v1.0.0 alpha 1</div>
+          <div class="brand-version">v1.0.0 alpha 2</div>
         </div>
       </div>
       <nav class="nav">
@@ -391,7 +395,7 @@ async function copyAgyPrompt() {
     <main class="main">
       <template v-if="page === 'export'">
         <header class="page-header">
-          <div><h1>对话导出</h1><p>按 Codex 原生会话边界读取，将项目历史整理为 Antigravity 可接续开发的 Markdown</p></div>
+          <div><h1>对话导出</h1><p>以 Codex state thread 为主索引，活动与归档会话统一整理为 Antigravity 可接续开发的 Markdown</p></div>
           <div class="route-brand"><div class="agent-badge"><span class="agent-icon codex-icon">C</span>Codex</div><span class="route-arrow">→</span><div class="agent-badge"><span class="agent-icon agy-icon">A</span>Antigravity</div></div>
         </header>
 
@@ -406,7 +410,7 @@ async function copyAgyPrompt() {
           <label>项目</label>
           <select v-model="projectKey" class="select-input" :disabled="!projects.length || scanBusy">
             <option value="">请选择项目</option>
-            <option v-for="p in projects" :key="p.key" :value="p.key">{{ p.displayPath }}（{{ p.sessionCount }} 个会话）</option>
+            <option v-for="p in projects" :key="p.key" :value="p.key">{{ p.displayPath }}（{{ p.sessionCount }} 个：活动 {{ p.activeCount }} / 归档 {{ p.archivedCount }}）</option>
           </select>
         </section>
 
@@ -418,9 +422,9 @@ async function copyAgyPrompt() {
             </div>
             <div class="toolbar">
               <div class="search-box"><span>⌕</span><input v-model="search" placeholder="搜索对话标题" /></div>
-              <select v-model="filter" class="compact-select"><option value="all">全部时间</option><option value="7d">最近 7 天</option><option value="30d">最近 30 天</option><option value="archived">仅已归档</option></select>
+              <select v-model="filter" class="compact-select"><option value="all">全部</option><option value="active">仅活动</option><option value="archived">仅归档</option><option value="7d">最近 7 天</option><option value="30d">最近 30 天</option></select>
               <label class="mini-check"><input v-model="includeArchived" type="checkbox" />包含归档</label>
-              <label class="mini-check"><input v-model="includeInternal" type="checkbox" />内部会话</label>
+              <label class="mini-check"><input v-model="includeInternal" type="checkbox" />内部/非用户线程</label>
             </div>
             <div class="session-table-wrap">
               <table class="session-table">
@@ -429,9 +433,9 @@ async function copyAgyPrompt() {
                   <tr v-if="listBusy"><td colspan="4" class="empty-cell">正在读取当前页…</td></tr>
                   <tr v-else-if="!sessions.length"><td colspan="4" class="empty-cell">{{ projects.length ? '当前筛选没有会话' : '请先手动扫描 Codex 数据' }}</td></tr>
                   <tr v-for="s in sessions" v-else :key="s.id" :class="{ current: current?.id === s.id }" @click="selectSession(s)">
-                    <td class="check-col" @click.stop><input type="checkbox" :checked="selectionMode === 'project' || selected.has(s.id)" @change="toggleSession(s, ($event.target as HTMLInputElement).checked)" /></td>
-                    <td><div class="session-title">{{ s.title }}</div><div class="session-flags"><span v-if="s.archived" class="pill">归档</span><span v-if="s.internal" class="pill warning">内部</span></div></td>
-                    <td class="preview-col"><span class="ellipsis">{{ s.lastUserPreview || '点击读取预览' }}</span></td>
+                    <td class="check-col" @click.stop><input type="checkbox" :disabled="!s.bodyExists" :checked="s.bodyExists && (selectionMode === 'project' || selected.has(s.id))" @change="toggleSession(s, ($event.target as HTMLInputElement).checked)" /></td>
+                    <td><div class="session-title">{{ s.title }}</div><div class="session-flags"><span v-if="s.archived" class="pill">归档</span><span v-if="s.internal || !s.hasUserEvent" class="pill warning">内部/非用户</span><span v-if="!s.bodyExists" class="pill warning">正文缺失</span></div></td>
+                    <td class="preview-col"><span class="ellipsis">{{ s.bodyExists ? (s.lastUserPreview || '点击读取预览') : '仅有索引，正文文件缺失' }}</span></td>
                     <td class="date-col">{{ formatTime(s.modified) }}</td>
                   </tr>
                 </tbody>
@@ -448,7 +452,7 @@ async function copyAgyPrompt() {
               <template v-else>
                 <div class="detail-title">{{ current.title }}</div>
                 <dl class="meta-list"><div><dt>项目</dt><dd>{{ current.cwd }}</dd></div><div><dt>时间</dt><dd>{{ preview?.created || formatTime(current.modified) }}</dd></div><div><dt>大小</dt><dd>{{ humanBytes(current.size) }}</dd></div></dl>
-                <div class="last-user-label">最后用户输入</div><div class="last-user-text">{{ preview?.lastUser || current.lastUserPreview || '未找到可见用户输入' }}</div>
+                <div class="last-user-label">最后用户输入</div><div class="last-user-text">{{ current.bodyExists ? (preview?.lastUser || current.lastUserPreview || '未找到可见用户输入') : 'Codex state 中存在该 thread，但 rollout 正文文件没有找到。' }}</div>
               </template>
             </div>
             <div class="export-options">
@@ -482,7 +486,7 @@ async function copyAgyPrompt() {
 
       <template v-else>
         <header class="page-header simple"><div><h1>关于</h1><p>CodexHandoff 是一个本地、只读、面向 AI 编程工具迁移的项目交接工具。</p></div></header>
-        <div class="about-card"><div class="about-logo">CH</div><div><h2>CodexHandoff</h2><p class="about-version">v1.0.0 alpha 1</p><p>第一阶段专注于 Codex → Antigravity。会话扫描遵循 Codex 原生 rollout / session_meta 边界，标题优先读取 session_index.jsonl，列表分页并按需深解析。</p><p>架构：Tauri 2 + Rust + Vue 3。Windows 运行依赖系统 WebView2，不依赖 .NET、Python 或 Node。</p></div></div>
+        <div class="about-card"><div class="about-logo">CH</div><div><h2>CodexHandoff</h2><p class="about-version">v1.0.0 alpha 2</p><p>第一阶段专注于 Codex → Antigravity。会话发现以最新 state_N.sqlite 的 Codex thread 为主索引，同时扫描 sessions 与 archived_sessions 的 rollout JSONL 作为正文源和兜底，并按 thread ID 去重。</p><p>架构：Tauri 2 + Rust + Vue 3。Windows 运行依赖系统 WebView2，不依赖 .NET、Python 或 Node。</p></div></div>
       </template>
     </main>
 
@@ -490,7 +494,7 @@ async function copyAgyPrompt() {
       <div class="modal-card">
         <template v-if="modal === 'scan-plan'">
           <h2>扫描执行计划</h2><p class="modal-lead">确认前不会读取 Codex 会话文件。</p>
-          <div class="plan-box"><div><b>来源</b><span>{{ root }}</span></div><div><b>将读取</b><span>sessions、archived_sessions、session_index.jsonl；存在时以只读模式读取最新 state_N.sqlite 的会话标记</span></div><div><b>扫描方式</b><span>先枚举 JSONL，仅读取首行 session_meta 建立索引；正文只在当前页预览或导出时读取</span></div><div><b>项目归并</b><span>{{ mergeGitRoots ? '启用 Git 根目录归并' : '按 Codex cwd 原样归组' }}</span></div><div><b>不会执行</b><span>不修改、不删除、不移动、不重命名、不归档、不写入 .codex</span></div></div>
+          <div class="plan-box"><div><b>来源</b><span>{{ root }}</span></div><div><b>将读取</b><span>最新 state_N.sqlite（只读主索引）、sessions、archived_sessions、session_index.jsonl</span></div><div><b>扫描方式</b><span>先读取 Codex thread 索引，再用活动与归档 rollout 定位正文，最后按 thread ID 去重并用孤立 JSONL 补漏；正文只在当前页预览或导出时深读取</span></div><div><b>项目归并</b><span>{{ mergeGitRoots ? '启用 Git 根目录归并' : '按 Codex cwd 原样归组' }}</span></div><div><b>不会执行</b><span>不修改、不删除、不移动、不重命名、不归档、不写入 .codex</span></div></div>
           <div class="modal-actions"><button class="ghost-button" @click="modal = null">取消</button><button class="primary-button" @click="confirmScan">确认并开始扫描</button></div>
         </template>
         <template v-else-if="modal === 'export-plan'">
