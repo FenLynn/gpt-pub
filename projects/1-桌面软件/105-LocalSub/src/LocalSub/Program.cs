@@ -14,7 +14,8 @@ internal static class Program
     static bool IsProcessLoopbackSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_PROCESS_LOOPBACK_SMOKE") == "1";
     static bool IsBatchUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_BATCH_UI_SMOKE") == "1";
     static bool IsOfflineAsrSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_SMOKE") == "1";
-    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest;
+    static bool IsCoreRecoverySmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_CORE_RECOVERY_SMOKE") == "1";
+    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest || IsCoreRecoverySmokeTest;
 
     [STAThread]
     static void Main()
@@ -45,6 +46,12 @@ internal static class Program
                 return;
             }
 
+            if (IsCoreRecoverySmokeTest)
+            {
+                RunCoreRecoverySmokeTestAsync().GetAwaiter().GetResult();
+                return;
+            }
+
             var mainForm = new MainForm();
             LogStartup(startup, "main-form-constructed");
             ModelGridVisualStyler.Attach(mainForm);
@@ -72,6 +79,10 @@ internal static class Program
         {
             ReportCrash("Startup exception", ex);
             Environment.ExitCode = 1;
+        }
+        finally
+        {
+            try { CoreWorkerBroker.ShutdownAsync().AsTask().GetAwaiter().GetResult(); } catch { }
         }
     }
 
@@ -107,6 +118,47 @@ internal static class Program
         using var recognizer = NativeOfflineRecognizer.CreateTdnnSmoke(model, tokens, runtime);
         var text = recognizer.Decode(samples.ToArray(), provider.WaveFormat.SampleRate);
         if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException("Offline ASR smoke decode returned empty text.");
+    }
+
+    static async Task RunCoreRecoverySmokeTestAsync()
+    {
+        await using var client = new CoreWorkerClient();
+        await client.PingAsync();
+        var firstPid = client.WorkerProcessId ?? throw new InvalidOperationException("Core recovery smoke test could not resolve the first worker PID.");
+
+        var delayedPing = client.PingWithDelayAsync(5000);
+        var waitPending = Stopwatch.StartNew();
+        while (client.PendingRequestCount == 0 && waitPending.Elapsed < TimeSpan.FromSeconds(2))
+            await Task.Delay(10);
+        if (client.PendingRequestCount == 0)
+            throw new InvalidOperationException("Core recovery smoke test did not observe an in-flight request.");
+
+        await Task.Delay(150);
+        using (var worker = Process.GetProcessById(firstPid))
+        {
+            worker.Kill(true);
+            await worker.WaitForExitAsync();
+        }
+
+        var failureObserved = false;
+        try
+        {
+            await delayedPing.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or OperationCanceledException)
+        {
+            failureObserved = true;
+        }
+        if (!failureObserved)
+            throw new InvalidOperationException("Core recovery smoke test expected the in-flight request to fail after worker termination.");
+
+        using var restartTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        await client.PingAsync(restartTimeout.Token);
+        var secondPid = client.WorkerProcessId ?? throw new InvalidOperationException("Core recovery smoke test could not resolve the restarted worker PID.");
+        if (secondPid == firstPid)
+            throw new InvalidOperationException("Core recovery smoke test did not start a new worker process.");
+        if (client.PendingRequestCount != 0)
+            throw new InvalidOperationException("Core recovery smoke test left pending requests after reconnection.");
     }
 
     static void LogStartup(Stopwatch sw, string stage, bool final = false)
