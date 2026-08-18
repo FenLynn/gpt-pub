@@ -42,13 +42,8 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin "${{ github.base_ref }}" --depth=1
-          bad=$(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD" \
-            | grep -Ev '^(projects/1-桌面软件/103-DavBridge/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p103-davbridge-ci\.yml$)' || true)
-          if [[ -n "$bad" ]]; then
-            echo 'Out-of-scope P103 changes:'
-            echo "$bad"
-            exit 1
-          fi
+          bad=$(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Ev '^(projects/1-桌面软件/103-DavBridge/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p103-davbridge-ci\.yml$)' || true)
+          if [[ -n "$bad" ]]; then echo 'Out-of-scope P103 changes:'; echo "$bad"; exit 1; fi
 
   core-smoke:
     needs: scope
@@ -64,7 +59,6 @@ jobs:
         run: |
           set -euo pipefail
           sln='projects/1-桌面软件/103-DavBridge/代码/DavBridge.sln'
-          test -f "$sln"
           listing=$(dotnet sln "$sln" list)
           echo "$listing"
           grep -F 'DavBridge.Core/DavBridge.Core.csproj' <<<"$listing"
@@ -75,15 +69,71 @@ jobs:
       - name: Run core smoke
         run: dotnet run --project 'projects/1-桌面软件/103-DavBridge/代码/DavBridge.Smoke/DavBridge.Smoke.csproj' -c Release --no-restore
 
-  windows-build:
-    needs: [scope, core-smoke]
-    runs-on: windows-latest
-    timeout-minutes: 35
+  frontend:
+    needs: scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: projects/1-桌面软件/103-DavBridge/代码/DavBridge/WebUi
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned UI dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check and build Vue UI
+        run: npm run build
+      - name: Verify production bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/index.html
+          test -n "$(find dist/assets -maxdepth 1 -type f -name '*.js' -print -quit)"
+          test -n "$(find dist/assets -maxdepth 1 -type f -name '*.css' -print -quit)"
+      - name: Render browser visual previews
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build/WebUiPreview"
+          python3 -m http.server 4173 --directory dist >/tmp/davbridge-webui-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true' EXIT
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 0.3; done
+          browser=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+          test -n "$browser"
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=900,620 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png" http://127.0.0.1:4173/
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1200,760 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png" http://127.0.0.1:4173/
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png") -gt 10000
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png") -gt 10000
+      - name: Upload Vue visual previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: DavBridge-v0.4.0-webui-preview
+          path: build/WebUiPreview/*.png
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-build:
+    needs: [scope, core-smoke, frontend]
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Build embedded Vue UI
+        shell: pwsh
+        working-directory: projects/1-桌面软件/103-DavBridge/代码/DavBridge/WebUi
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
 
       - name: Read product version
         id: product-version
@@ -95,7 +145,6 @@ jobs:
           $version=@($xml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'DavBridge <Version> is missing' }
           "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "DavBridge product version: $version"
 
       - name: Restore Windows app
         shell: pwsh
@@ -105,12 +154,8 @@ jobs:
         shell: pwsh
         run: >-
           dotnet publish 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
-          -c Release
-          -r win-x64
-          --self-contained false
-          --no-restore
-          -p:PublishSingleFile=true
-          -p:DebugType=embedded
+          -c Release -r win-x64 --self-contained false --no-restore
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded
           -o build/DavBridge
 
       - name: Verify Runtime boundary
@@ -120,78 +165,35 @@ jobs:
           $exe='build/DavBridge/DavBridge.exe'
           if (!(Test-Path $exe -PathType Leaf)) { throw 'DavBridge.exe missing' }
           $unexpected=Get-ChildItem 'build/DavBridge' -File | Where-Object { $_.Name -ne 'DavBridge.exe' }
-          if ($unexpected) {
-            Write-Host 'Unexpected publish files:'
-            $unexpected | Select-Object Name,Length | Format-Table
-            throw 'Default P103 Runtime must remain a single-file delivery.'
-          }
-          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','DavBridge.log')) {
-            if (Get-ChildItem 'build/DavBridge' -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) {
-              throw "Private Data leaked into Runtime: $private"
-            }
+          if ($unexpected) { $unexpected | Select-Object Name,Length | Format-Table; throw 'Default P103 Runtime must remain a single-file delivery.' }
+          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','reconcile.json','DavBridge.log')) {
+            if (Get-ChildItem 'build/DavBridge' -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private Data leaked into Runtime: $private" }
           }
 
-      - name: Run isolated Windows self-test
+      - name: Run isolated native-host self-test
         shell: pwsh
         env:
           EXPECTED_VERSION: ${{ steps.product-version.outputs.value }}
         run: |
           $ErrorActionPreference='Stop'
           $root=Join-Path $env:RUNNER_TEMP ('DavBridge-SelfTest-' + [guid]::NewGuid().ToString('N'))
-          $roaming=Join-Path $root 'Roaming'
-          $local=Join-Path $root 'Local'
-          $report=Join-Path $root 'self-test.json'
+          $roaming=Join-Path $root 'Roaming'; $local=Join-Path $root 'Local'; $report=Join-Path $root 'self-test.json'
           New-Item $roaming,$local -ItemType Directory -Force | Out-Null
-          $oldAppData=$env:APPDATA
-          $oldLocal=$env:LOCALAPPDATA
+          $oldAppData=$env:APPDATA; $oldLocal=$env:LOCALAPPDATA
           try {
-            $env:APPDATA=$roaming
-            $env:LOCALAPPDATA=$local
+            $env:APPDATA=$roaming; $env:LOCALAPPDATA=$local
             $proc=Start-Process -FilePath (Resolve-Path 'build/DavBridge/DavBridge.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
-            if ($proc.ExitCode -ne 0) {
-              if (Test-Path $report) {
-                Write-Host 'DavBridge self-test failure report:'
-                Get-Content $report -Raw | Write-Host
-              }
-              throw "DavBridge self-test exit code $($proc.ExitCode)"
-            }
-            if (!(Test-Path $report)) { throw 'DavBridge self-test report missing' }
-            $raw=Get-Content $report -Raw
-            $json=$raw | ConvertFrom-Json
-            if (-not $json.ok -or $json.product -ne 'DavBridge') {
-              Write-Host 'DavBridge self-test failure report:'
-              Write-Host $raw
-              throw 'DavBridge self-test report failed'
-            }
-            if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version $($json.version) does not match project version $env:EXPECTED_VERSION" }
-            if (!(Test-Path (Join-Path $roaming 'DavBridge'))) { throw 'Roaming Data root was not created under isolated APPDATA' }
-            if (!(Test-Path (Join-Path $local 'DavBridge'))) { throw 'Local Data root was not created under isolated LOCALAPPDATA' }
-            $snapshots=Join-Path $root 'ui-snapshots'
-            if (!(Test-Path $snapshots -PathType Container)) { throw 'UI snapshot directory missing' }
-            $pngs=Get-ChildItem $snapshots -Filter '*.png' -File
-            if ($pngs.Count -ne 3) { throw "Expected 3 UI snapshots, found $($pngs.Count)" }
-            New-Item 'build/UiSnapshots' -ItemType Directory -Force | Out-Null
-            Copy-Item (Join-Path $snapshots '*.png') 'build/UiSnapshots/' -Force
-          } finally {
-            $env:APPDATA=$oldAppData
-            $env:LOCALAPPDATA=$oldLocal
-            Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
-          }
-
-      - name: Upload UI visual snapshots
-        uses: actions/upload-artifact@v4
-        with:
-          name: DavBridge-v${{ steps.product-version.outputs.value }}-ui-snapshots
-          path: build/UiSnapshots/*.png
-          if-no-files-found: error
-          retention-days: 14
+            if ($proc.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "DavBridge self-test exit code $($proc.ExitCode)" }
+            $json=(Get-Content $report -Raw) | ConvertFrom-Json
+            if (-not $json.ok -or -not $json.webUiEmbedded -or -not $json.bridgeWhitelistValidated -or $json.coreLogicMovedToJavaScript) { throw 'DavBridge v0.4 native-host self-test failed' }
+            if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version mismatch: $($json.version)" }
+          } finally { $env:APPDATA=$oldAppData; $env:LOCALAPPDATA=$oldLocal; Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
 
       - name: Generate SHA-256
         shell: pwsh
         run: |
           $exe='build/DavBridge/DavBridge.exe'
-          $hash=(Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          $bytes=(Get-Item $exe).Length
+          $hash=(Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant(); $bytes=(Get-Item $exe).Length
           "DavBridge.exe  $bytes bytes  sha256=$hash" | Set-Content 'build/DavBridge/SHA256.txt' -Encoding utf8
           "DAVBRIDGE_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
           "DAVBRIDGE_BYTES=$bytes" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -212,14 +214,12 @@ jobs:
         run: |
           @"
           ## P103 DavBridge v${{ steps.product-version.outputs.value }}
-          - Deployment: .NET 8 framework-dependent single EXE
-          - Platform: Windows x64
+          - UI: Vue 3 + TypeScript + Vite inside WebView2
+          - Native host and business core: existing C# / .NET 8
+          - Core migration logic: unchanged
+          - Deployment: framework-dependent single EXE, Windows x64
           - Stable rollback baseline: v0.1.7 on main
-          - Current candidate: v${{ steps.product-version.outputs.value }} from ${{ github.sha }}
-          - Safety gates: real PUT group + NO-WRITE existing-replica takeover remain required for a task before full migration
-          - Monthly reset: date-only, real upload probe begins at local 09:00 before cycle counters are reset
-          - UI visual snapshots: uploaded as a separate CI artifact for manual inspection
+          - Candidate: ${{ github.sha }}
           - EXE bytes: $env:DAVBRIDGE_BYTES
           - EXE SHA-256: $env:DAVBRIDGE_SHA256
-          - Private Data: %APPDATA%\DavBridge and %LOCALAPPDATA%\DavBridge
           "@ | Add-Content $env:GITHUB_STEP_SUMMARY

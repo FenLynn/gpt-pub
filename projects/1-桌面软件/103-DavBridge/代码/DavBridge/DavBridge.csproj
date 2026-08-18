@@ -8,20 +8,29 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>DavBridge</AssemblyName>
     <RootNamespace>DavBridge</RootNamespace>
-    <Version>0.3.11</Version>
-    <FileVersion>0.3.11.0</FileVersion>
+    <Version>0.4.0</Version>
+    <FileVersion>0.4.0.0</FileVersion>
     <Product>DavBridge</Product>
     <Company>FenLynn</Company>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>embedded</DebugType>
     <ApplicationIcon>DavBridge.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DavBridge.Core\DavBridge.Core.csproj" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\WebUi\dist\index.html')">
+    <EmbeddedResource Include="WebUi\dist\index.html" LogicalName="DavBridge.WebUi.index.html" />
+    <EmbeddedResource Include="WebUi\dist\assets\*" LogicalName="DavBridge.WebUi.assets.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="RequireDavBridgeWebUi" BeforeTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\WebUi\dist\index.html')" Text="DavBridge WebUi dist is missing. Run npm install and npm run build in WebUi before building the desktop host." />
+  </Target>
   <Target Name="GenerateDavBridgeIcon" BeforeTargets="PrepareForBuild">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Build\GenerateAppIcon.ps1&quot; -OutputPath &quot;$(MSBuildProjectDirectory)\DavBridge.ico&quot;" />
   </Target>

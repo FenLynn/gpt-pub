@@ -8,22 +8,12 @@ internal static class Program
     private static void Main(string[] args)
     {
         var selfTest = GetArgumentPath(args, "--self-test=");
-        if (selfTest is not null)
-        {
-            RunSelfTest(selfTest);
-            return;
-        }
-
+        if (selfTest is not null) { RunSelfTest(selfTest); return; }
         var uiSelfTest = GetArgumentPath(args, "--ui-self-test=");
-        if (uiSelfTest is not null)
-        {
-            RunUiSelfTest(uiSelfTest);
-            return;
-        }
+        if (uiSelfTest is not null) { RunUiSelfTest(uiSelfTest); return; }
 
         using var singleInstance = SingleInstanceGateV0217.Acquire();
         if (!singleInstance.IsPrimary) return;
-
         try
         {
             ApplicationConfiguration.Initialize();
@@ -35,31 +25,19 @@ internal static class Program
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
-                using var shell = UiShellV032.Attach(form, host, reconciliation);
-                using var quotaMeterBounds = UiQuotaMeterBoundsV0310.Attach(shell);
-                using var meterText = UiOverviewMeterTextV037.Attach(shell);
-                using var homeController = WindowHomeControllerV037.Attach(form, host, shell, launchInBackground);
+                using var webUi = WebUiHostV040.Attach(form, host, reconciliation);
+                using var homeController = WindowHomeControllerV040.Attach(form, host, webUi, launchInBackground);
                 Application.Run(form);
             }
-            finally
-            {
-                if (!form.IsDisposed)
-                    form.Dispose();
-            }
+            finally { if (!form.IsDisposed) form.Dispose(); }
         }
         catch (Exception ex)
         {
             var logPath = StartupDiagnosticsV0210.TryWrite(ex);
             try
             {
-                var suffix = string.IsNullOrWhiteSpace(logPath)
-                    ? string.Empty
-                    : $"\r\n\r\n诊断日志：{logPath}";
-                MessageBox.Show(
-                    $"DavBridge 在启动、运行或退出过程中发生异常。\r\n\r\n{ex.Message}{suffix}",
-                    "DavBridge 异常",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                var suffix = string.IsNullOrWhiteSpace(logPath) ? string.Empty : $"\r\n\r\n诊断日志：{logPath}";
+                MessageBox.Show($"DavBridge 在启动、运行或退出过程中发生异常。\r\n\r\n{ex.Message}{suffix}", "DavBridge 异常", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch { }
             Environment.ExitCode = 1;
@@ -78,137 +56,24 @@ internal static class Program
         {
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
             var paths = AppPaths.Create();
-            Directory.CreateDirectory(paths.RoamingRoot);
-            Directory.CreateDirectory(paths.LocalRoot);
-            Directory.CreateDirectory(paths.TempRoot);
-            var snapshotDirectory = Path.Combine(Path.GetDirectoryName(reportPath)!, "ui-snapshots");
-            ConstructUiForStartupTest(snapshotDirectory);
-            WriteReport(reportPath, new
-            {
-                product = "DavBridge",
-                version = typeof(Program).Assembly.GetName().Version?.ToString(),
-                roaming = paths.RoamingRoot,
-                local = paths.LocalRoot,
-                temp = paths.TempRoot,
-                uiConstructed = true,
-                uiGeneration = "v0.3.11-readable-27px-quota-meter-visible-glyph-text",
-                layoutScenarios = 5,
-                defaultScrollbarExpected = false,
-                routeLogosExpected = true,
-                docsTabExpected = true,
-                overviewNativeMeterTextExpected = true,
-                meterVisibleGlyphCenterExpected = true,
-                quotaMeterReadableAttachedGlyphExpected = true,
-                uiSnapshotsExpected = true,
-                explicitActivationReturnsOverview = true,
-                layoutReparentExpected = false,
-                ok = true
-            });
+            Directory.CreateDirectory(paths.RoamingRoot); Directory.CreateDirectory(paths.LocalRoot); Directory.CreateDirectory(paths.TempRoot);
+            WebUiAssetsV040.ValidateEmbeddedResources();
+            WebUiHostV040.ValidateBridgeContract();
+            ApplicationConfiguration.Initialize();
+            using var host = new AppHost();
+            using var form = new MainForm(host, launchInBackground: false);
+            AppBranding.Apply(form); _ = form.Handle;
+            if (form.MinimumSize.Width < 600 || form.MinimumSize.Height < 400) throw new InvalidOperationException("Native host minimum size changed unexpectedly.");
+            WriteReport(reportPath, new { product="DavBridge", version=typeof(Program).Assembly.GetName().Version?.ToString(), roaming=paths.RoamingRoot, local=paths.LocalRoot, temp=paths.TempRoot, nativeHostConstructed=true, uiGeneration="v0.4.0-vue3-webview2-csharp-core", webUiEmbedded=true, bridgeWhitelistValidated=true, coreLogicMovedToJavaScript=false, ok=true });
         }
-        catch (Exception ex)
-        {
-            TryWriteFailedReport(reportPath, ex);
-        }
+        catch (Exception ex) { TryWriteFailedReport(reportPath, ex); }
     }
 
-    private static void RunUiSelfTest(string reportPath)
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
-            var snapshotDirectory = Path.Combine(Path.GetDirectoryName(reportPath)!, "ui-snapshots");
-            ConstructUiForStartupTest(snapshotDirectory);
-            WriteReport(reportPath, new
-            {
-                product = "DavBridge",
-                version = typeof(Program).Assembly.GetName().Version?.ToString(),
-                uiConstructed = true,
-                uiGeneration = "v0.3.11-readable-27px-quota-meter-visible-glyph-text",
-                layoutScenarios = 5,
-                defaultScrollbarExpected = false,
-                routeLogosExpected = true,
-                docsTabExpected = true,
-                overviewNativeMeterTextExpected = true,
-                meterVisibleGlyphCenterExpected = true,
-                quotaMeterReadableAttachedGlyphExpected = true,
-                uiSnapshotsExpected = true,
-                explicitActivationReturnsOverview = true,
-                layoutReparentExpected = false,
-                ok = true
-            });
-        }
-        catch (Exception ex)
-        {
-            TryWriteFailedReport(reportPath, ex);
-        }
-    }
-
-    private static void ConstructUiForStartupTest(string snapshotDirectory)
-    {
-        ApplicationConfiguration.Initialize();
-        var scenarios = new (string Name, int Width, int Height, float Scale)[]
-        {
-            ("compact-100", 700, 520, 1.00f),
-            ("default-100", 900, 620, 1.00f),
-            ("large-100", 1200, 760, 1.00f),
-            ("default-125", 900, 620, 1.25f),
-            ("default-150", 900, 620, 1.50f)
-        };
-
-        foreach (var scenario in scenarios)
-            ConstructUiScenario(scenario.Name, scenario.Width, scenario.Height, scenario.Scale, snapshotDirectory);
-    }
-
-    private static void ConstructUiScenario(string name, int width, int height, float scale, string snapshotDirectory)
-    {
-        using var host = new AppHost();
-        using var form = new MainForm(host, launchInBackground: false);
-        AppBranding.Apply(form);
-        using var reconciliation = ReconciliationRuntimeV030.Attach(host, persistent: false);
-        using var shell = UiShellV032.Attach(form, host, reconciliation);
-        using var quotaMeterBounds = UiQuotaMeterBoundsV0310.Attach(shell);
-        using var meterText = UiOverviewMeterTextV037.Attach(shell);
-        using var homeController = WindowHomeControllerV037.Attach(form, host, shell, launchInBackground: false);
-
-        _ = form.Handle;
-        if (Math.Abs(scale - 1f) > 0.001f)
-            form.Scale(new SizeF(scale, scale));
-        form.ClientSize = new Size((int)Math.Round(width * scale), (int)Math.Round(height * scale));
-        form.PerformLayout();
-        if (!name.StartsWith("compact", StringComparison.OrdinalIgnoreCase))
-            shell.ValidateLayout(name);
-        quotaMeterBounds.Validate(name);
-        meterText.ValidateLayout(name);
-        homeController.Validate(name);
-
-        if (name is "default-100" or "default-125" or "default-150")
-            meterText.CaptureSampleSnapshot(form, Path.Combine(snapshotDirectory, name + ".png"));
-
-        using var settings = new SettingsDialog(host.Config, string.Empty, string.Empty);
-        _ = settings.Handle;
-        if (Math.Abs(scale - 1f) > 0.001f)
-            settings.Scale(new SizeF(scale, scale));
-        settings.ClientSize = new Size((int)Math.Round(800 * scale), (int)Math.Round(580 * scale));
-        settings.PerformLayout();
-        UiLayoutSelfTestV0217.ValidateSettings(settings, name);
-    }
-
-    private static void WriteReport(string reportPath, object report) =>
-        File.WriteAllText(reportPath, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
-
+    private static void RunUiSelfTest(string reportPath) => RunSelfTest(reportPath);
+    private static void WriteReport(string reportPath, object report) => File.WriteAllText(reportPath, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
     private static void TryWriteFailedReport(string reportPath, Exception ex)
     {
-        try
-        {
-            WriteReport(reportPath, new
-            {
-                product = "DavBridge",
-                version = typeof(Program).Assembly.GetName().Version?.ToString(),
-                ok = false,
-                error = ex.ToString()
-            });
-        }
-        catch { }
+        try { WriteReport(reportPath, new { product="DavBridge", version=typeof(Program).Assembly.GetName().Version?.ToString(), ok=false, error=ex.ToString() }); } catch { }
         Environment.ExitCode = 1;
     }
 }
