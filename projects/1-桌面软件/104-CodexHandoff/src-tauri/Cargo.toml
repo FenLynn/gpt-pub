@@ -1,6 +1,6 @@
 [package]
 name = "codex-handoff"
-version = "1.0.0-alpha.1"
+version = "1.0.0-alpha.2"
 description = "Read-only Codex project handoff exporter"
 authors = ["FenLynn"]
 edition = "2021"
