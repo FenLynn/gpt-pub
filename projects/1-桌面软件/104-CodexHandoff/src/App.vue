@@ -44,7 +44,7 @@ const selectionMode = ref<'project' | 'custom'>('project')
 const current = ref<SessionSummary | null>(null)
 const preview = ref<SessionPreview | null>(null)
 const outputPath = ref('')
-const includeTools = ref(true)
+const includeTools = ref(false)
 const scanBusy = ref(false)
 const listBusy = ref(false)
 const previewBusy = ref(false)
@@ -339,7 +339,7 @@ async function runPreflight() {
   progress.value = 0
   appendLog(`开始导出预检：${pendingExportSessions.value.length} 个会话。`)
   try {
-    preflight.value = await preflightExport(pendingExportSessions.value)
+    preflight.value = await preflightExport(pendingExportSessions.value, includeTools.value)
     modal.value = 'sensitive'
     appendLog(`预检完成：${humanBytes(preflight.value.totalBytes)}。`)
   } catch (err) {
@@ -370,7 +370,7 @@ async function confirmExport() {
     resultOpen.value = true
     progress.value = 100
     status.value = '导出完成'
-    appendLog(`导出完成：${result.outputPath}，${result.sessionCount} 个会话，${result.messageCount} 条可见消息，${humanBytes(result.bytesWritten)}，耗时 ${result.elapsedMs} ms。`)
+    appendLog(`导出完成：${result.outputPath}，${result.sessionCount} 个会话，${result.messageCount} 条交接消息，${humanBytes(result.bytesWritten)}，耗时 ${result.elapsedMs} ms。`)
   } catch (err) {
     errorText.value = String(err)
     status.value = String(err).includes('cancel') ? '已取消导出' : '导出失败'
@@ -400,7 +400,7 @@ async function copyAgyPrompt() {
         <div class="brand-mark">CH</div>
         <div class="brand-copy">
           <div class="brand-name">CodexHandoff</div>
-          <div class="brand-version">v1.0.0 alpha 3</div>
+          <div class="brand-version">v1.0.0 alpha 4</div>
         </div>
       </div>
 
@@ -418,7 +418,7 @@ async function copyAgyPrompt() {
         <header class="page-header compact-header">
           <div>
             <h1>对话导出</h1>
-            <p>选择项目和历史对话，生成可直接交给 Antigravity 的项目交接 Markdown</p>
+            <p>选择项目和历史对话，生成可直接交给 Antigravity 的精简项目交接 Markdown</p>
           </div>
           <div class="route-brand" aria-label="Codex to Antigravity">
             <div class="agent-badge"><span class="agent-icon codex-icon">C</span><span>Codex</span></div>
@@ -527,7 +527,7 @@ async function copyAgyPrompt() {
             </div>
 
             <div class="handoff-options">
-              <label class="option-row"><input v-model="includeTools" type="checkbox" /><span><strong>包含关键工具调用与结果</strong><small>单条结果最多 32 KB</small></span></label>
+              <label class="option-row"><input v-model="includeTools" type="checkbox" /><span><strong>包含过程细节（高级）</strong><small>默认关闭；开启后保留中间 Codex 回复、工具调用与结果</small></span></label>
 
               <label class="field-caption">输出文件</label>
               <div class="output-field"><input v-model="outputPath" class="text-input" spellcheck="false" /><button @click="chooseOutput">选择</button></div>
@@ -560,14 +560,14 @@ async function copyAgyPrompt() {
           <article class="info-card"><span class="info-icon">0</span><h3>启动零扫描</h3><p>程序启动只初始化界面。只有你查看并确认扫描计划后，才读取指定的 Codex 数据目录。</p></article>
           <article class="info-card"><span class="info-icon">↗</span><h3>禁止写回源目录</h3><p>任何导出目标只要位于 .codex 或 .gemini 目录内都会被拒绝。</p></article>
           <article class="info-card"><span class="info-icon">K</span><h3>不读取认证文件</h3><p>扫描器不会读取 auth.json、OAuth Token、Cookie 或其他登录凭据文件。</p></article>
-          <article class="info-card"><span class="info-icon">!</span><h3>敏感信息预检</h3><p>正式写入 Markdown 前检查疑似 API Key、Bearer Token、access_token、refresh_token 与 password 字段，并由你确认。</p></article>
+          <article class="info-card"><span class="info-icon">!</span><h3>敏感信息预检</h3><p>默认只检查最终会写入精简交接 Markdown 的文本；开启过程细节后会扩大到完整导出内容。</p></article>
           <article class="info-card"><span class="info-icon">✓</span><h3>原子导出</h3><p>先写独立临时文件，完整成功后才重命名为最终 Markdown，已有目标文件默认不覆盖。</p></article>
         </div>
       </template>
 
       <template v-else>
         <header class="page-header simple"><div><h1>关于</h1><p>轻量、只读、面向 AI 编程工具迁移的项目交接工具。</p></div></header>
-        <div class="about-card"><div class="about-logo">CH</div><div><h2>CodexHandoff</h2><p class="about-version">v1.0.0 alpha 3</p><p>当前阶段专注 Codex → Antigravity。会话发现以 Codex state thread 与 rollout JSONL 双源校验，活动与归档统一纳入，并按 thread ID 去重。</p><p>架构：Tauri 2 + Rust + Vue 3。Windows 运行使用系统 WebView2，不依赖 .NET、Python 或 Node。</p></div></div>
+        <div class="about-card"><div class="about-logo">CH</div><div><h2>CodexHandoff</h2><p class="about-version">v1.0.0 alpha 4</p><p>当前阶段专注 Codex → Antigravity。默认导出精简交接内容，只保留用户真实输入与每轮 Codex 最终可见回复。</p><p>架构：Tauri 2 + Rust + Vue 3。Windows 运行使用系统 WebView2，不依赖 .NET、Python 或 Node。</p></div></div>
       </template>
     </main>
 
@@ -580,7 +580,7 @@ async function copyAgyPrompt() {
         </template>
         <template v-else-if="modal === 'export-plan'">
           <div class="modal-icon">↗</div><h2>导出执行计划</h2><p class="modal-lead">先做只读预检，预检完成后仍需再次确认才会创建文件。</p>
-          <div class="plan-box"><div><b>项目</b><span>{{ project?.displayPath }}</span></div><div><b>会话</b><span>{{ pendingExportSessions.length }} 个</span></div><div><b>输出</b><span>{{ outputPath }}</span></div><div><b>内容</b><span>用户消息、Codex 可见回复{{ includeTools ? '、关键工具调用与结果' : '' }}、对话索引、Antigravity 接续说明</span></div><div><b>保护</b><span>敏感信息预检；临时文件 + 原子改名；已有文件不覆盖</span></div></div>
+          <div class="plan-box"><div><b>项目</b><span>{{ project?.displayPath }}</span></div><div><b>会话</b><span>{{ pendingExportSessions.length }} 个</span></div><div><b>输出</b><span>{{ outputPath }}</span></div><div><b>内容</b><span>{{ includeTools ? '你的消息、所有 Codex 可见回复、工具调用与结果、对话索引、Antigravity 接续说明' : '你的消息、每轮 Codex 最终可见回复、对话索引、Antigravity 接续说明' }}</span></div><div><b>模式</b><span>{{ includeTools ? '高级详细模式' : '精简交接模式（推荐）' }}</span></div><div><b>保护</b><span>敏感信息预检；临时文件 + 原子改名；已有文件不覆盖</span></div></div>
           <div class="modal-actions"><button class="secondary-button" @click="modal = null">取消</button><button class="primary-button" :disabled="exportBusy" @click="runPreflight">开始只读预检</button></div>
         </template>
         <template v-else-if="modal === 'sensitive'">
@@ -591,6 +591,6 @@ async function copyAgyPrompt() {
       </div>
     </div>
 
-    <div v-if="resultOpen && exportResult" class="result-toast"><button class="close-result" @click="resultOpen = false">×</button><div class="result-check">✓</div><div class="result-body"><strong>导出完成</strong><span>{{ exportResult.sessionCount }} 个对话，{{ exportResult.messageCount }} 条可见消息，{{ humanBytes(exportResult.bytesWritten) }}</span><code>{{ exportResult.outputPath }}</code><div class="result-actions"><button @click="openPath(exportResult.outputPath, false)">打开文件</button><button @click="openPath(exportResult.outputPath, true)">打开文件夹</button><button class="primary-button" @click="copyAgyPrompt">复制 Antigravity 接续提示</button></div></div></div>
+    <div v-if="resultOpen && exportResult" class="result-toast"><button class="close-result" @click="resultOpen = false">×</button><div class="result-check">✓</div><div class="result-body"><strong>导出完成</strong><span>{{ exportResult.sessionCount }} 个对话，{{ exportResult.messageCount }} 条交接消息，{{ humanBytes(exportResult.bytesWritten) }}</span><code>{{ exportResult.outputPath }}</code><div class="result-actions"><button @click="openPath(exportResult.outputPath, false)">打开文件</button><button @click="openPath(exportResult.outputPath, true)">打开文件夹</button><button class="primary-button" @click="copyAgyPrompt">复制 Antigravity 接续提示</button></div></div></div>
   </div>
 </template>
