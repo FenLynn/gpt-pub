@@ -40,6 +40,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Report temporary CI run id
+        if: github.event_name == 'push' && github.ref == 'refs/heads/p104-exp'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 392,
+              body: `P104_TEMP_CI_RUN=${context.runId}\nHEAD=${context.sha}`
+            })
+
       - name: Scope gate
         if: github.event_name == 'pull_request'
         working-directory: .
@@ -105,15 +117,3 @@ jobs:
             projects/1-桌面软件/104-CodexHandoff/CodexHandoff.sha256.json
           if-no-files-found: error
           retention-days: 7
-
-      - name: Report temporary CI run id
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/p104-exp'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: 392,
-              body: `P104_TEMP_CI_RUN=${context.runId}\nHEAD=${context.sha}`
-            })
