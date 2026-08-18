@@ -10,10 +10,20 @@ CodexHandoff 是一个面向 AI 编程工具迁移的本地只读项目交接工
 
 ## 当前版本
 
-- 开发版本：`1.0.0-alpha.1`
+- 当前交付编号：`P104-001`
+- 内部开发版本：`1.0.0-alpha.4`
 - 开发分支：`p104-exp`
 - 稳定候选分支：`p104-stable`
 - 正式分支：`main`
+
+## 强制交付编号规则
+
+1. `DELIVERY_VERSION` 是用户可见 EXE 的唯一连续交付编号来源。
+2. 从 `P104-001` 开始，每产生一份新的用户测试 EXE 必须依次递增为 `P104-002`、`P104-003` 等，不得回退、复用或跳号。
+3. 内部 SemVer 可以继续使用 `1.0.0-alpha.N`，但不能替代交付编号。
+4. CI 必须读取 `DELIVERY_VERSION`，生成带编号的 EXE 和校验文件，禁止把通用名 `CodexHandoff.exe` 直接作为用户交付文件。
+5. 每轮给用户的最终回复必须同时报告：交付编号、内部版本、exact head SHA、CI run、SHA-256，并提供这一轮 CI 产出的带编号最新 EXE。
+6. 不得把历史 Artifact、本地旧 EXE 或上一轮文件改名后冒充当前交付。
 
 ## 当前架构
 
@@ -49,6 +59,25 @@ CodexHandoff 是一个面向 AI 编程工具迁移的本地只读项目交接工
 
 必须过滤 `# AGENTS.md instructions`、`<environment_context>`、`<skills_instructions>`、`<system-reminder>` 等内部注入内容。
 
+## 精简交接导出规则
+
+默认导出目标是给 Antigravity 恢复开发上下文，不是生成完整审计日志。
+
+默认正文只保留：
+
+1. 用户真正发送的可见消息；
+2. 每个用户轮次结束时 Codex 最后一条可见回复。
+
+默认不保留：
+
+- 工具调用与工具结果；
+- Shell 命令及大段日志；
+- 同一轮中间的进度回复；
+- system / developer / AGENTS / environment 注入；
+- reasoning、token、模型元数据和其他内部事件。
+
+敏感信息预检必须使用与最终导出相同的精简口径，避免扫描最终不会写入 Markdown 的过程数据。
+
 ## 大批量会话策略
 
 - 扫描阶段只枚举 JSONL 并读取第一行 `session_meta`；
@@ -69,8 +98,8 @@ CodexHandoff 是一个面向 AI 编程工具迁移的本地只读项目交接工
 - 当前会话预览与最后用户输入；
 - 项目全选、本页全选、手工多选；
 - 敏感信息预警；
-- 完整 Markdown；
-- 可选工具调用与结果；
+- 精简交接 Markdown；
+- 可选高级完整细节；
 - 导出进度与取消；
 - 原子导出；
 - 结果页；
@@ -79,15 +108,14 @@ CodexHandoff 是一个面向 AI 编程工具迁移的本地只读项目交接工
 
 ## 当前验证状态
 
-- 前端与 Rust 源码已完成首轮重构；
-- P104 Windows x64 CI 已配置，首轮原生编译与测试结果以当前工作分支 CI 为准；
-- 自动测试覆盖 Codex 用户消息、内部注入过滤、会话重命名事件；
-- Windows 实机 UI 和真实大规模 Codex 数据仍需后续实机验证。
+- `1.0.0-alpha.4` 精简交接导出已通过 Windows CI 的前端构建、Rust 测试、只读守卫与原生 EXE 构建；
+- 下一次用户测试交付以 `P104-001` 编号重新构建，编号和 SHA 必须由 CI Artifact 核对后再发送；
+- Windows 实机 UI 和真实大规模 Codex 数据仍需用户继续验证。
 
 ## 后续顺序
 
-1. 先让 Windows CI 绿灯并产出单 EXE；
-2. 实机验证启动零扫描、手动扫描和大批量会话性能；
-3. 核对项目数量、会话数量和 Codex 左侧标题；
-4. 核验 Markdown 是否适合 Antigravity 接续；
+1. 先以 `P104-001` 重新跑完整 Windows CI，并只发送该 run 的带编号 EXE；
+2. 实机核验精简 Markdown 是否只保留用户消息与每轮最终回复；
+3. 再处理 UI 和性能问题；
+4. 每次新的用户测试 EXE 顺序递增 `DELIVERY_VERSION`；
 5. 稳定后再讨论第二数据源 Antigravity。
