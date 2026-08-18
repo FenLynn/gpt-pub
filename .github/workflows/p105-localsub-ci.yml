@@ -67,12 +67,12 @@ jobs:
             esac
           done < <(git -c core.quotepath=false diff --name-status "$base_sha" "$head_sha")
           [[ "$bad" -eq 0 ]]
-      - name: Reject old P103 LocalSub identifiers in active implementation
+      - name: Reject old P103 LocalSub identifiers in active source
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R -n -E '103-LocalSub|p103-localsub' 'projects/1-桌面软件/105-LocalSub/src' '.github/workflows/p105-localsub-ci.yml'; then
-            echo 'Old P103 LocalSub identifiers remain in active P105 implementation.'
+          if grep -R -n -E '103-LocalSub|p103-localsub' 'projects/1-桌面软件/105-LocalSub/src'; then
+            echo 'Old P103 LocalSub identifiers remain in active P105 source.'
             exit 1
           fi
 
