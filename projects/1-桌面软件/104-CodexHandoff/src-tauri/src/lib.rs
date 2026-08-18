@@ -137,13 +137,14 @@ async fn choose_output_path(suggested: String) -> Result<Option<String>, String>
 #[tauri::command]
 async fn preflight_export(
     sessions: Vec<SessionSummary>,
+    include_details: bool,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<PreflightResult, String> {
     let state = state.inner().clone();
     let app_clone = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        exporter::preflight_impl(&sessions, &app_clone, &state.export_cancel)
+        exporter::preflight_impl(&sessions, include_details, &app_clone, &state.export_cancel)
     })
     .await
     .map_err(|e| format!("预检任务异常结束：{}", e))?
