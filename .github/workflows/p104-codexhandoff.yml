@@ -43,7 +43,7 @@ jobs:
         working-directory: .
         run: |
           git fetch origin "${{ github.base_ref }}" --depth=1
-          $files = git diff --name-only "origin/${{ github.base_ref }}...HEAD"
+          $files = git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD"
           $bad = $files | Where-Object {
             $_ -notlike 'projects/1-桌面软件/104-CodexHandoff/*' -and
             $_ -ne '.github/workflows/p104-codexhandoff.yml' -and
