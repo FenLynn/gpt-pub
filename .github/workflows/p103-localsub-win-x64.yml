@@ -6,9 +6,14 @@ on:
     paths:
       - 'projects/1-桌面软件/103-LocalSub/src/**'
       - '.github/workflows/p103-localsub-win-x64.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'projects/1-桌面软件/103-LocalSub/src/**'
+      - '.github/workflows/p103-localsub-win-x64.yml'
 
 concurrency:
-  group: localsub-win-x64-${{ github.ref }}
+  group: localsub-win-x64-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
