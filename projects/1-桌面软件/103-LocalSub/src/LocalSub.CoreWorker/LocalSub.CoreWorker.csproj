@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>LocalSub.Core</AssemblyName>
+    <RootNamespace>LocalSub</RootNamespace>
+    <Version>0.1.0</Version>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="SharpCompress" Version="0.50.1" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\LocalSub\Core\PortablePaths.cs" Link="Core\PortablePaths.cs" />
+    <Compile Include="..\LocalSub\Models\AppSettings.cs" Link="Models\AppSettings.cs" />
+    <Compile Include="..\LocalSub\Models\ModelDescriptor.cs" Link="Models\ModelDescriptor.cs" />
+    <Compile Include="..\LocalSub\Models\TranscriptItem.cs" Link="Models\TranscriptItem.cs" />
+
+    <Compile Include="..\LocalSub\Services\AsrRuntimeManager.cs" Link="Services\AsrRuntimeManager.cs" />
+    <Compile Include="..\LocalSub\Services\BatchTranscriptionService.cs" Link="Services\BatchTranscriptionService.cs" />
+    <Compile Include="..\LocalSub\Services\DownloadClientFactory.cs" Link="Services\DownloadClientFactory.cs" />
+    <Compile Include="..\LocalSub\Services\FfmpegManager.cs" Link="Services\FfmpegManager.cs" />
+    <Compile Include="..\LocalSub\Services\MediaAnalysisService.cs" Link="Services\MediaAnalysisService.cs" />
+    <Compile Include="..\LocalSub\Services\MediaAudioSource.cs" Link="Services\MediaAudioSource.cs" />
+    <Compile Include="..\LocalSub\Services\ModelCatalogService.cs" Link="Services\ModelCatalogService.cs" />
+    <Compile Include="..\LocalSub\Services\ModelManager.cs" Link="Services\ModelManager.cs" />
+    <Compile Include="..\LocalSub\Services\NativeOfflineRecognizer.cs" Link="Services\NativeOfflineRecognizer.cs" />
+    <Compile Include="..\LocalSub\Services\OfflineRecognizer.cs" Link="Services\OfflineRecognizer.cs" />
+    <Compile Include="..\LocalSub\Services\PerformancePolicy.cs" Link="Services\PerformancePolicy.cs" />
+    <Compile Include="..\LocalSub\Services\SherpaInterop.cs" Link="Services\SherpaInterop.cs" />
+    <Compile Include="..\LocalSub\Services\SherpaOfflineResultReader.cs" Link="Services\SherpaOfflineResultReader.cs" />
+    <Compile Include="..\LocalSub\Services\TranscriptService.cs" Link="Services\TranscriptService.cs" />
+  </ItemGroup>
+</Project>
