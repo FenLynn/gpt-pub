@@ -6,6 +6,9 @@ pub struct ProjectInfo {
     pub key: String,
     pub display_path: String,
     pub session_count: usize,
+    pub active_count: usize,
+    pub archived_count: usize,
+    pub missing_body_count: usize,
     pub last_modified: u64,
 }
 
@@ -21,6 +24,9 @@ pub struct SessionSummary {
     pub size: u64,
     pub archived: bool,
     pub internal: bool,
+    pub has_user_event: bool,
+    pub body_exists: bool,
+    pub source: String,
     pub last_user_preview: Option<String>,
 }
 
@@ -47,11 +53,17 @@ pub struct SessionPreview {
 pub struct ScanResult {
     pub root: String,
     pub projects: Vec<ProjectInfo>,
+    /// Valid user conversations, active + archived, excluding internal threads.
     pub total_sessions: usize,
     pub active_sessions: usize,
     pub archived_sessions: usize,
+    /// Raw discovered thread records before the user-conversation filter.
+    pub raw_threads: usize,
     pub internal_sessions: usize,
+    pub non_user_sessions: usize,
     pub named_sessions: usize,
+    pub missing_body_sessions: usize,
+    pub orphan_sessions: usize,
     pub elapsed_ms: u128,
     pub logs: Vec<String>,
 }
