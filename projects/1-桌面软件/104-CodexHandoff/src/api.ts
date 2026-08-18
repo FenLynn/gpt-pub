@@ -30,8 +30,8 @@ export const sessionPreview = (path: string) =>
 export const chooseOutputPath = (suggested: string) =>
   invoke<string | null>('choose_output_path', { suggested })
 
-export const preflightExport = (sessions: SessionSummary[]) =>
-  invoke<PreflightResult>('preflight_export', { sessions })
+export const preflightExport = (sessions: SessionSummary[], includeDetails: boolean) =>
+  invoke<PreflightResult>('preflight_export', { sessions, includeDetails })
 
 export const exportMarkdown = (payload: {
   sessions: SessionSummary[]
