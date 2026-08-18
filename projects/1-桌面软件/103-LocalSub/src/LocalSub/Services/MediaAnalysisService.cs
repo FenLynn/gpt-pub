@@ -11,7 +11,13 @@ public sealed class MediaAnalysisService
         => AnalyzeAsync(filePath, AppSettings.Load(), progress, ct);
 
     public Task<MediaAnalysisResult> AnalyzeAsync(string filePath, AppSettings settings, IProgress<MediaAnalysisProgress>? progress = null, CancellationToken ct = default)
-        => Task.Run(() => AnalyzeCore(filePath, settings, progress, ct), ct);
+    {
+#if !LOCALSUB_CORE_WORKER
+        if (CoreWorkerBroker.IsAvailable)
+            return CoreWorkerBroker.Shared.AnalyzeAsync(filePath, progress, ct);
+#endif
+        return Task.Run(() => AnalyzeCore(filePath, settings, progress, ct), ct);
+    }
 
     static MediaAnalysisResult AnalyzeCore(string filePath, AppSettings settings, IProgress<MediaAnalysisProgress>? progress, CancellationToken ct)
     {
