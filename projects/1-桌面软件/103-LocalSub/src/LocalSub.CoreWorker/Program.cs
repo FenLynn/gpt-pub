@@ -321,15 +321,19 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         catch { }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        _shutdown.Cancel();
+        try { _shutdown.Cancel(); } catch { }
         CancelActive(null);
-        _reader?.Dispose();
-        if (_writer != null) await _writer.DisposeAsync();
-        _pipe?.Dispose();
-        _writeGate.Dispose();
-        _shutdown.Dispose();
+        try { _writer?.Dispose(); } catch { }
+        try { _reader?.Dispose(); } catch { }
+        try { _pipe?.Dispose(); } catch { }
+        try { _writeGate.Dispose(); } catch { }
+        try { _shutdown.Dispose(); } catch { }
+        _writer = null;
+        _reader = null;
+        _pipe = null;
+        return ValueTask.CompletedTask;
     }
 }
 
