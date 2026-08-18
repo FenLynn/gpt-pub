@@ -25,8 +25,9 @@
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.4" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The full offline batch implementation is compiled only into LocalSub.Core.exe. -->
+    <!-- Heavy background implementations are compiled only into LocalSub.Core.exe. -->
     <Compile Remove="Services\BatchTranscriptionService.cs" />
+    <Compile Remove="Services\MediaAnalysisService.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\subtitle.html"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
