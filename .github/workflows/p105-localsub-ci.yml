@@ -50,16 +50,22 @@ jobs:
           base_sha='${{ github.event.pull_request.base.sha }}'
           head_sha='${{ github.event.pull_request.head.sha }}'
           bad=0
-          while IFS= read -r path; do
+          while IFS=$'\t' read -r status path; do
             case "$path" in
               projects/1-桌面软件/105-LocalSub/*|.github/workflows/p105-localsub-ci.yml|projects/1-桌面软件/README.md|目录.md)
                 ;;
+              .github/workflows/p103-localsub-win-x64.yml)
+                if [[ "$status" != D* ]]; then
+                  echo "Legacy P103 LocalSub workflow is allowed only as a deletion: $status $path"
+                  bad=1
+                fi
+                ;;
               *)
-                echo "Out-of-scope P105 path: $path"
+                echo "Out-of-scope P105 path: $status $path"
                 bad=1
                 ;;
             esac
-          done < <(git diff --name-only "$base_sha" "$head_sha")
+          done < <(git -c core.quotepath=false diff --name-status "$base_sha" "$head_sha")
           [[ "$bad" -eq 0 ]]
       - name: Reject old P103 LocalSub identifiers in active implementation
         shell: bash
