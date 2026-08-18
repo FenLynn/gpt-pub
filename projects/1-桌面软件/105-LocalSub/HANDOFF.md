@@ -73,7 +73,18 @@ v0.1.1-dev 在 Shell client 中增加 connection generation。每个 pending req
 
 Phase 1A 首次正式准入已经完成 Shell/Core 双 publish、绿色目录、Core Named Pipe `ping/shutdown`、Shell 启动、后台工作区、Process Loopback、sherpa native runtime 加载、native offline ASR 真解码与最终打包。
 
-P105 v0.1.1-dev 当前功能代码提交：`0ff1cd4dc308ce684e882a3e0c7724304da1ecb4`。本版新增 Windows fault injection：Shell client 建立一个仍在 pending 的延迟 ping 后真实结束第一 Core，必须让当前请求失败，并由同一 client 拉起第二 Core，再次 ping 成功。当前 exact-head CI、Artifact 和 digest 以本轮 Draft PR 的 GitHub 实时状态为准。
+P105 v0.1.1-dev：
+
+- Draft PR：#395，方向 `p105-exp → p105-stable`
+- 功能代码提交：`0ff1cd4dc308ce684e882a3e0c7724304da1ecb4`
+- 首轮 exact head：`cf7a1e443ba30bc1269b129cab2a317c9a396001`
+- Windows CI：run `32128794091`，run number `11`，`success`
+- Artifact：`9321423073`
+- Artifact digest：`sha256:57a3d886f8e10363ef1895d2888d0f29b73a41f82fef16f6fe867ead59991a53`
+
+本版新增 Windows fault injection 已真实通过：Shell client 建立一个仍在 pending 的延迟 ping 后结束第一 Core，该请求失败；同一 client 随后建立 generation 2，拉起第二 Core，并再次 ping 成功。原有 Process Loopback、sherpa runtime、native offline ASR 与包边界也继续通过。
+
+本 HANDOFF 收口会改变 PR head，因此下一对话不得把 `32128794091` 当成新的 current-head 证据。恢复时必须先读取 #395 当前 head 和最新对应 CI/Artifact。
 
 ## 6. 当前实机待验证
 
@@ -92,11 +103,11 @@ Phase 1A 最重要的用户实机验收仍是“进程边界是否真正保护 G
 
 不要回去继续堆 WinForms 小修补。架构顺序固定为：
 
-1. 完成 v0.1.1-dev exact-head Windows CI，并交给用户完成 Phase 1A 实机响应性与 Core 崩溃边界验收。
-2. Phase 1B 分批迁移实时 Zipformer/Paraformer/SenseVoice、WASAPI、PotPlayer Process Loopback、模型下载/解压/删除等重任务到 Core。
-3. 每迁一类能力就保持“Core 失败不拖死 GUI”的故障边界，并增加对应 CI/实机验证。
-4. Core API 稳定后才进入 WebView2 + Vue 3 + TypeScript 主界面。
-5. 最后再收口旧 WinForms 业务页。
+1. 先确认 #395 文档收口后的 **当前 exact head** Windows CI 全绿，并将该 current-head Artifact 作为 v0.1.1-dev 实机候选。
+2. 用户完成 Phase 1A 实机响应性与 Core 崩溃边界验收。
+3. Phase 1B 分批迁移实时 Zipformer/Paraformer/SenseVoice、WASAPI、PotPlayer Process Loopback、模型下载/解压/删除等重任务到 Core。
+4. 每迁一类能力就保持“Core 失败不拖死 GUI”的故障边界，并增加对应 CI/实机验证。
+5. Core API 稳定后才进入 WebView2 + Vue 3 + TypeScript 主界面，最后再收口旧 WinForms 业务页。
 
 ## 8. 运行与分发硬约束
 
