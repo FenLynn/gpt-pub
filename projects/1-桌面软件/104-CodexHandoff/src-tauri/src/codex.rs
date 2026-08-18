@@ -1,10 +1,13 @@
-use crate::types::{ListSessionsArgs, ProgressEvent, ProjectInfo, ScanResult, SessionPage, SessionPreview, SessionSummary};
+use crate::types::{
+    ListSessionsArgs, ProgressEvent, ProjectInfo, ScanResult, SessionPage, SessionPreview,
+    SessionSummary,
+};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::Value;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -52,19 +55,19 @@ struct FileEntry {
     size: u64,
 }
 
-#[derive(Debug, Clone)]
-struct DbThread {
-    id: String,
-    rollout_path: String,
-    created_at: i64,
-    updated_at: i64,
-    source: String,
-    cwd: String,
-    title: String,
-    has_user_event: bool,
+#[derive(Debug, Clone, Copy, Default)]
+struct ThreadFlags {
     archived: bool,
-    thread_source: String,
-    model: String,
+    internal: bool,
+    has_user_event: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct DbIndex {
+    by_id: HashMap<String, ThreadFlags>,
+    by_path: HashMap<String, ThreadFlags>,
+    ids: HashSet<String>,
+    user_visible_ids: HashSet<String>,
 }
 
 pub fn default_codex_root() -> String {
@@ -82,7 +85,14 @@ fn unix_ms() -> u128 {
         .unwrap_or(0)
 }
 
-fn emit_progress(app: &AppHandle, phase: &str, current: usize, total: usize, percent: f64, message: impl Into<String>) {
+fn emit_progress(
+    app: &AppHandle,
+    phase: &str,
+    current: usize,
+    total: usize,
+    percent: f64,
+    message: impl Into<String>,
+) {
     let _ = app.emit(
         "scan-progress",
         ProgressEvent {
@@ -105,16 +115,6 @@ fn modified_ms(path: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-fn normalize_epoch_ms(v: i64) -> u64 {
-    if v <= 0 {
-        0
-    } else if v < 10_000_000_000 {
-        (v as u64).saturating_mul(1000)
-    } else {
-        v as u64
-    }
-}
-
 fn collect_jsonl(dir: &Path, archived: bool, out: &mut Vec<(PathBuf, bool)>) {
     let Ok(rd) = fs::read_dir(dir) else { return };
     for entry in rd.flatten() {
@@ -132,6 +132,48 @@ fn collect_jsonl(dir: &Path, archived: bool, out: &mut Vec<(PathBuf, bool)>) {
     }
 }
 
+fn strip_windows_extended_prefix(raw: &str) -> String {
+    let mut s = raw.trim().replace('/', "\\");
+    if let Some(rest) = s.strip_prefix("\\\\?\\UNC\\") {
+        s = format!("\\\\{}", rest);
+    } else if let Some(rest) = s.strip_prefix("\\\\?\\") {
+        s = rest.to_string();
+    } else if let Some(rest) = s.strip_prefix("\\??\\") {
+        s = rest.to_string();
+    }
+    while s.len() > 3 && s.ends_with('\\') {
+        s.pop();
+    }
+    s
+}
+
+fn normalize_project_key(raw: &str) -> String {
+    strip_windows_extended_prefix(raw).to_ascii_lowercase()
+}
+
+fn normalize_path_key(path: &Path) -> String {
+    normalize_project_key(&path.to_string_lossy())
+}
+
+fn clean_project_display(raw: &str) -> String {
+    let s = strip_windows_extended_prefix(raw);
+    if s.trim().is_empty() {
+        "(未知目录)".to_string()
+    } else {
+        s
+    }
+}
+
+fn read_bounded_lossy(path: &Path, cap: usize) -> Result<String, String> {
+    let mut file = fs::File::open(path).map_err(|e| format!("读取文件失败：{}", e))?;
+    let mut bytes = Vec::with_capacity(cap.min(1024 * 1024));
+    file.by_ref()
+        .take(cap as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("读取文件失败：{}", e))?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
 fn value_as_text(v: Option<&Value>) -> String {
     match v {
         Some(Value::String(s)) => s.clone(),
@@ -140,14 +182,12 @@ fn value_as_text(v: Option<&Value>) -> String {
     }
 }
 
-/// Modern Codex puts session_meta first. Older or partially rewritten files are
-/// tolerated by looking only through a small bounded prefix instead of rejecting
-/// the whole rollout because byte zero is not session_meta.
 fn read_meta(path: &Path) -> Option<Meta> {
-    let file = fs::File::open(path).ok()?;
-    let reader = BufReader::new(file.take(256 * 1024));
-    for line in reader.lines().map_while(Result::ok) {
-        let v: Value = serde_json::from_str(line.trim()).ok()?;
+    let text = read_bounded_lossy(path, 256 * 1024).ok()?;
+    for line in text.lines() {
+        let Ok(v) = serde_json::from_str::<Value>(line.trim()) else {
+            continue;
+        };
         if v.get("type").and_then(Value::as_str) != Some("session_meta") {
             continue;
         }
@@ -159,18 +199,21 @@ fn read_meta(path: &Path) -> Option<Meta> {
             .trim()
             .to_string();
         if id.is_empty() {
-            return None;
+            continue;
         }
-        let cwd = payload
-            .get("cwd")
-            .and_then(Value::as_str)
-            .unwrap_or("(未知目录)")
-            .trim()
-            .to_string();
+        let cwd = clean_project_display(
+            payload
+                .get("cwd")
+                .and_then(Value::as_str)
+                .unwrap_or("(未知目录)"),
+        );
         return Some(Meta {
             id,
             cwd,
-            created: payload.get("timestamp").and_then(Value::as_str).map(str::to_string),
+            created: payload
+                .get("timestamp")
+                .and_then(Value::as_str)
+                .map(str::to_string),
             source: value_as_text(payload.get("source")),
         });
     }
@@ -178,15 +221,23 @@ fn read_meta(path: &Path) -> Option<Meta> {
 }
 
 fn load_title_index(root: &Path) -> HashMap<String, String> {
+    let path = root.join("session_index.jsonl");
+    let Ok(text) = read_bounded_lossy(&path, usize::MAX / 4) else {
+        return HashMap::new();
+    };
     let mut map = HashMap::new();
-    let Ok(file) = fs::File::open(root.join("session_index.jsonl")) else { return map };
-    for line in BufReader::new(file).lines().map_while(Result::ok) {
-        let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
-        let Some(id) = v.get("id").and_then(Value::as_str) else { continue };
-        let Some(name) = v.get("thread_name").and_then(Value::as_str) else { continue };
+    for line in text.lines() {
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let Some(id) = v.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(name) = v.get("thread_name").and_then(Value::as_str) else {
+            continue;
+        };
         let name = name.trim();
         if !id.trim().is_empty() && !name.is_empty() {
-            // session_index is append-only; the newest name wins.
             map.insert(id.to_string(), name.to_string());
         }
     }
@@ -207,7 +258,7 @@ fn find_state_db(root: &Path) -> Option<PathBuf> {
             }
         }
     }
-    best.map(|(_, path)| path)
+    best.map(|(_, p)| p)
 }
 
 fn table_columns(conn: &Connection, table: &str) -> HashSet<String> {
@@ -231,89 +282,98 @@ fn sql_col(columns: &HashSet<String>, name: &str, fallback: &str) -> String {
     }
 }
 
-fn load_db_threads(root: &Path, logs: &mut Vec<String>) -> Vec<DbThread> {
+fn source_is_internal(source: &str, thread_source: &str, model: &str) -> bool {
+    let source = source.to_ascii_lowercase();
+    let thread_source = thread_source.to_ascii_lowercase();
+    let model = model.to_ascii_lowercase();
+    thread_source == "subagent"
+        || source.contains("subagent")
+        || source.contains("guardian")
+        || model == "codex-auto-review"
+}
+
+fn load_db_index(root: &Path, logs: &mut Vec<String>) -> DbIndex {
     let Some(db) = find_state_db(root) else {
-        logs.push("未发现 state_N.sqlite，将完全使用 rollout JSONL 建立索引。".to_string());
-        return Vec::new();
+        logs.push("未发现 state_N.sqlite，使用 rollout 自身信息。".to_string());
+        return DbIndex::default();
     };
     let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
     let conn = match Connection::open_with_flags(&db, flags) {
         Ok(conn) => conn,
         Err(err) => {
-            logs.push(format!("只读打开 {} 失败：{}，改用 JSONL 兜底。", db.display(), err));
-            return Vec::new();
+            logs.push(format!("只读打开 {} 失败：{}，使用 rollout 兜底。", db.display(), err));
+            return DbIndex::default();
         }
     };
     let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
     let columns = table_columns(&conn, "threads");
     if !columns.contains("id") {
-        logs.push("state 数据库不存在可用 threads.id，改用 JSONL 兜底。".to_string());
-        return Vec::new();
+        logs.push("state 数据库没有可用 threads.id，使用 rollout 兜底。".to_string());
+        return DbIndex::default();
     }
-
     let sql = format!(
-        "SELECT id, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} FROM threads",
+        "SELECT id, {}, {}, {}, {}, {}, {} FROM threads",
         sql_col(&columns, "rollout_path", "''"),
-        sql_col(&columns, "created_at", "0"),
-        sql_col(&columns, "updated_at", "0"),
-        sql_col(&columns, "source", "''"),
-        sql_col(&columns, "cwd", "''"),
-        sql_col(&columns, "title", "''"),
-        sql_col(&columns, "has_user_event", "1"),
         sql_col(&columns, "archived", "0"),
+        sql_col(&columns, "has_user_event", "1"),
+        sql_col(&columns, "source", "''"),
         sql_col(&columns, "thread_source", "''"),
         sql_col(&columns, "model", "''")
     );
-
     let mut stmt = match conn.prepare(&sql) {
         Ok(stmt) => stmt,
         Err(err) => {
-            logs.push(format!("读取 threads 表失败：{}，改用 JSONL 兜底。", err));
-            return Vec::new();
+            logs.push(format!("读取 threads 表失败：{}，使用 rollout 兜底。", err));
+            return DbIndex::default();
         }
     };
     let rows = match stmt.query_map([], |row| {
-        Ok(DbThread {
-            id: row.get::<_, String>(0).unwrap_or_default(),
-            rollout_path: row.get::<_, String>(1).unwrap_or_default(),
-            created_at: row.get::<_, i64>(2).unwrap_or(0),
-            updated_at: row.get::<_, i64>(3).unwrap_or(0),
-            source: row.get::<_, String>(4).unwrap_or_default(),
-            cwd: row.get::<_, String>(5).unwrap_or_default(),
-            title: row.get::<_, String>(6).unwrap_or_default(),
-            has_user_event: row.get::<_, i64>(7).unwrap_or(1) != 0,
-            archived: row.get::<_, i64>(8).unwrap_or(0) != 0,
-            thread_source: row.get::<_, String>(9).unwrap_or_default(),
-            model: row.get::<_, String>(10).unwrap_or_default(),
-        })
+        let id: String = row.get(0).unwrap_or_default();
+        let rollout_path: String = row.get(1).unwrap_or_default();
+        let archived = row.get::<_, i64>(2).unwrap_or(0) != 0;
+        let has_user_event = row.get::<_, i64>(3).unwrap_or(1) != 0;
+        let source: String = row.get(4).unwrap_or_default();
+        let thread_source: String = row.get(5).unwrap_or_default();
+        let model: String = row.get(6).unwrap_or_default();
+        let internal = source_is_internal(&source, &thread_source, &model);
+        Ok((id, rollout_path, ThreadFlags { archived, internal, has_user_event }))
     }) {
         Ok(rows) => rows,
         Err(err) => {
-            logs.push(format!("查询 threads 失败：{}，改用 JSONL 兜底。", err));
-            return Vec::new();
+            logs.push(format!("查询 threads 失败：{}，使用 rollout 兜底。", err));
+            return DbIndex::default();
         }
     };
-    let mut out = Vec::new();
+    let mut index = DbIndex::default();
     for row in rows.flatten() {
-        if !row.id.trim().is_empty() {
-            out.push(row);
+        let (id, path, flags) = row;
+        if id.trim().is_empty() {
+            continue;
+        }
+        if flags.has_user_event && !flags.internal {
+            index.user_visible_ids.insert(id.clone());
+        }
+        index.ids.insert(id.clone());
+        index.by_id.insert(id, flags);
+        if !path.trim().is_empty() {
+            index
+                .by_path
+                .insert(normalize_project_key(&path), flags);
         }
     }
-    logs.push(format!("Codex state 主索引：{} 条 thread。", out.len()));
-    out
+    logs.push(format!(
+        "Codex state：{} 条 thread，其中用户可见候选 {} 条。",
+        index.ids.len(),
+        index.user_visible_ids.len()
+    ));
+    index
 }
 
-fn normalize_path_key(path: &Path) -> String {
-    path.to_string_lossy()
-        .replace('/', "\\")
-        .trim_end_matches('\\')
-        .to_ascii_lowercase()
-}
-
-fn normalize_project_key(path: &str) -> String {
-    path.replace('/', "\\")
-        .trim_end_matches('\\')
-        .to_ascii_lowercase()
+fn flags_for_file(entry: &FileEntry, db: &DbIndex) -> Option<ThreadFlags> {
+    db.by_id
+        .get(&entry.meta.id)
+        .copied()
+        .or_else(|| db.by_path.get(&normalize_path_key(&entry.path)).copied())
 }
 
 fn find_git_root(cwd: &str) -> Option<String> {
@@ -326,7 +386,7 @@ fn find_git_root(cwd: &str) -> Option<String> {
     }
     for _ in 0..18 {
         if current.join(".git").exists() {
-            return Some(current.to_string_lossy().to_string());
+            return Some(clean_project_display(&current.to_string_lossy()));
         }
         if !current.pop() {
             break;
@@ -335,67 +395,81 @@ fn find_git_root(cwd: &str) -> Option<String> {
     None
 }
 
-fn source_is_internal(source: &str, thread_source: &str, model: &str) -> bool {
-    let source = source.to_ascii_lowercase();
-    let thread_source = thread_source.to_ascii_lowercase();
-    let model = model.to_ascii_lowercase();
-    thread_source.contains("subagent")
-        || source.contains("subagent")
-        || source.contains("guardian")
-        || model == "codex-auto-review"
+fn choose_best_file<'a>(items: &'a [&FileEntry], flags: Option<ThreadFlags>) -> Option<&'a FileEntry> {
+    let prefer_archived = flags.map(|f| f.archived);
+    items.iter().copied().max_by_key(|f| {
+        let archive_match = prefer_archived
+            .map(|wanted| wanted == f.archived_path)
+            .unwrap_or(true);
+        (archive_match as u8, f.modified)
+    })
 }
 
-fn resolve_rollout_path(root: &Path, raw: &str) -> PathBuf {
-    let p = PathBuf::from(raw.trim());
-    if p.is_absolute() {
-        p
-    } else if raw.trim().is_empty() {
-        PathBuf::new()
+fn parse_tail_bytes(bytes: &[u8], started_mid_file: bool) -> String {
+    let slice = if started_mid_file {
+        match bytes.iter().position(|b| *b == b'\n') {
+            Some(pos) if pos + 1 < bytes.len() => &bytes[pos + 1..],
+            _ => &[],
+        }
     } else {
-        root.join(p)
-    }
+        bytes
+    };
+    String::from_utf8_lossy(slice).into_owned()
 }
 
-fn choose_file_for_db<'a>(
-    root: &Path,
-    db: &DbThread,
-    files: &'a [FileEntry],
-    by_path: &HashMap<String, usize>,
-    by_id: &HashMap<String, Vec<usize>>,
-) -> Option<&'a FileEntry> {
-    let declared = resolve_rollout_path(root, &db.rollout_path);
-    if !declared.as_os_str().is_empty() {
-        if let Some(idx) = by_path.get(&normalize_path_key(&declared)) {
-            return files.get(*idx);
+fn scan_tail(path: &Path, cap: usize) -> Result<(Option<String>, Option<String>), String> {
+    let mut file = fs::File::open(path).map_err(|e| format!("读取会话失败：{}", e))?;
+    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let start = len.saturating_sub(cap as u64);
+    file.seek(SeekFrom::Start(start))
+        .map_err(|e| format!("读取会话尾部失败：{}", e))?;
+    let mut bytes = Vec::with_capacity((len.saturating_sub(start) as usize).min(cap));
+    file.read_to_end(&mut bytes)
+        .map_err(|e| format!("读取会话尾部失败：{}", e))?;
+    let text = parse_tail_bytes(&bytes, start > 0);
+    let mut latest_name = None;
+    let mut latest_user = None;
+    for line in text.lines() {
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if let Some(name) = thread_name_update(&v) {
+            latest_name = Some(name);
+        }
+        if let Some(user) = user_text(&v) {
+            if !is_internal_user_text(&user) {
+                latest_user = Some(user);
+            }
         }
     }
-    let candidates = by_id.get(&db.id)?;
-    candidates
-        .iter()
-        .filter_map(|idx| files.get(*idx))
-        .max_by_key(|f| ((f.archived_path == db.archived) as u8, f.modified))
+    Ok((latest_name, latest_user))
 }
 
 fn detect_user_event(path: &Path) -> bool {
-    if let Ok(file) = fs::File::open(path) {
-        let reader = BufReader::new(file.take(1024 * 1024));
-        for line in reader.lines().map_while(Result::ok) {
-            if let Ok(v) = serde_json::from_str::<Value>(&line) {
-                if let Some(text) = user_text(&v) {
-                    if !is_internal_user_text(&text) {
-                        return true;
-                    }
+    if let Ok(text) = read_bounded_lossy(path, 1024 * 1024) {
+        for line in text.lines() {
+            let Ok(v) = serde_json::from_str::<Value>(line) else {
+                continue;
+            };
+            if let Some(user) = user_text(&v) {
+                if !is_internal_user_text(&user) {
+                    return true;
                 }
             }
         }
     }
-    if let Ok((_, user)) = scan_tail(path, 1024 * 1024) {
-        return user.is_some();
-    }
-    false
+    scan_tail(path, 1024 * 1024)
+        .ok()
+        .and_then(|(_, user)| user)
+        .is_some()
 }
 
-pub fn scan_catalog_impl(root: PathBuf, merge_git_roots: bool, app: &AppHandle, cancel: &AtomicBool) -> Result<(Catalog, ScanResult), String> {
+pub fn scan_catalog_impl(
+    root: PathBuf,
+    merge_git_roots: bool,
+    app: &AppHandle,
+    cancel: &AtomicBool,
+) -> Result<(Catalog, ScanResult), String> {
     let started = Instant::now();
     cancel.store(false, Ordering::SeqCst);
     if !root.is_dir() {
@@ -407,22 +481,18 @@ pub fn scan_catalog_impl(root: PathBuf, merge_git_roots: bool, app: &AppHandle, 
     }
 
     let mut logs = vec![format!("扫描根目录：{}", root.display())];
-    emit_progress(app, "database", 0, 0, 3.0, "阶段 1/5：读取 Codex state 主索引");
-    let db_threads = load_db_threads(&root, &mut logs);
-    if cancel.load(Ordering::SeqCst) {
-        return Err("scan_cancelled".to_string());
-    }
+    emit_progress(app, "database", 0, 0, 5.0, "阶段 1/4：读取 Codex 状态标记");
+    let db = load_db_index(&root, &mut logs);
 
-    emit_progress(app, "files", 0, 0, 10.0, "阶段 2/5：枚举活动与归档 rollout 文件");
+    emit_progress(app, "files", 0, 0, 12.0, "阶段 2/4：枚举活动与归档 rollout");
     let mut raw_files = Vec::new();
     collect_jsonl(&sessions_dir, false, &mut raw_files);
     collect_jsonl(&root.join("archived_sessions"), true, &mut raw_files);
-    raw_files.sort_by_key(|(p, _)| p.clone());
-    logs.push(format!("磁盘 rollout：{} 个 JSONL，其中 sessions 与 archived_sessions 均纳入。", raw_files.len()));
+    logs.push(format!("磁盘 rollout：{} 个 JSONL，活动与归档均纳入。", raw_files.len()));
 
-    emit_progress(app, "metadata", 0, raw_files.len(), 16.0, "阶段 3/5：仅读取 rollout 小范围头部元数据");
+    emit_progress(app, "metadata", 0, raw_files.len(), 18.0, "阶段 3/4：读取 rollout session_meta");
     let mut files = Vec::new();
-    let mut unreadable_rollouts = 0usize;
+    let mut unreadable = 0usize;
     for (i, (path, archived_path)) in raw_files.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
             return Err("scan_cancelled".to_string());
@@ -436,112 +506,53 @@ pub fn scan_catalog_impl(root: PathBuf, merge_git_roots: bool, app: &AppHandle, 
                 size: fs::metadata(path).map(|m| m.len()).unwrap_or(0),
             });
         } else {
-            unreadable_rollouts += 1;
+            unreadable += 1;
         }
         if i % 100 == 0 || i + 1 == raw_files.len() {
-            let pct = 16.0 + 32.0 * ((i + 1) as f64 / raw_files.len().max(1) as f64);
-            emit_progress(app, "metadata", i + 1, raw_files.len(), pct, format!("读取 rollout 元数据 {}/{}", i + 1, raw_files.len()));
+            let pct = 18.0 + 42.0 * ((i + 1) as f64 / raw_files.len().max(1) as f64);
+            emit_progress(
+                app,
+                "metadata",
+                i + 1,
+                raw_files.len(),
+                pct,
+                format!("读取 rollout 元数据 {}/{}", i + 1, raw_files.len()),
+            );
         }
     }
-    if unreadable_rollouts > 0 {
-        logs.push(format!("有 {} 个 JSONL 在 256 KB 头部范围内未找到 session_meta，已保留为诊断计数。", unreadable_rollouts));
+    if unreadable > 0 {
+        logs.push(format!("{} 个 JSONL 未在有限头部找到 session_meta。", unreadable));
     }
 
     let titles = load_title_index(&root);
-    logs.push(format!("session_index.jsonl：{} 个有效 thread_name。", titles.len()));
+    logs.push(format!("session_index.jsonl：{} 个标题。", titles.len()));
 
-    let mut by_path: HashMap<String, usize> = HashMap::new();
-    let mut by_id: HashMap<String, Vec<usize>> = HashMap::new();
-    for (idx, file) in files.iter().enumerate() {
-        by_path.insert(normalize_path_key(&file.path), idx);
-        by_id.entry(file.meta.id.clone()).or_default().push(idx);
+    let mut files_by_id: HashMap<String, Vec<&FileEntry>> = HashMap::new();
+    for file in &files {
+        files_by_id.entry(file.meta.id.clone()).or_default().push(file);
     }
 
-    emit_progress(app, "merge", 0, db_threads.len().max(files.len()), 52.0, "阶段 4/5：以 thread ID 合并 state 主索引与 JSONL 兜底");
-    let mut sessions_by_id: HashMap<String, SessionRecord> = HashMap::new();
+    emit_progress(app, "catalog", 0, files_by_id.len(), 64.0, "阶段 4/4：按 Codex 会话 ID 去重并整理项目");
+    let mut sessions = Vec::with_capacity(files_by_id.len());
     let mut git_cache: HashMap<String, Option<String>> = HashMap::new();
-    let mut db_body_matches = 0usize;
-    let mut db_missing_bodies = 0usize;
+    let mut orphan_sessions = 0usize;
 
-    for (i, db) in db_threads.iter().enumerate() {
+    for (i, (id, candidates)) in files_by_id.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
             return Err("scan_cancelled".to_string());
         }
-        let file = choose_file_for_db(&root, db, &files, &by_path, &by_id);
-        let declared = resolve_rollout_path(&root, &db.rollout_path);
-        let path = file
-            .map(|f| f.path.clone())
-            .unwrap_or_else(|| if !declared.as_os_str().is_empty() { declared } else { root.join("missing-rollout").join(format!("{}.jsonl", db.id)) });
-        let body_exists = file.is_some() || path.is_file();
-        if body_exists { db_body_matches += 1; } else { db_missing_bodies += 1; }
-
-        let cwd = if !db.cwd.trim().is_empty() {
-            db.cwd.trim().to_string()
-        } else {
-            file.map(|f| f.meta.cwd.clone()).unwrap_or_else(|| "(未知目录)".to_string())
-        };
-        let display_project = if merge_git_roots {
-            let key = normalize_project_key(&cwd);
-            git_cache
-                .entry(key)
-                .or_insert_with(|| find_git_root(&cwd))
-                .clone()
-                .unwrap_or_else(|| cwd.clone())
-        } else {
-            cwd.clone()
-        };
-        let title = titles
-            .get(&db.id)
-            .cloned()
-            .or_else(|| (!db.title.trim().is_empty()).then(|| db.title.trim().to_string()))
-            .unwrap_or_else(|| "(未命名会话)".to_string());
-        let source = if !db.source.trim().is_empty() {
-            db.source.clone()
-        } else {
-            file.map(|f| f.meta.source.clone()).unwrap_or_default()
-        };
-        let archived = db.archived || file.map(|f| f.archived_path).unwrap_or(false);
-        let internal = source_is_internal(&source, &db.thread_source, &db.model);
-        let modified = normalize_epoch_ms(db.updated_at).max(file.map(|f| f.modified).unwrap_or(0));
-        let size = file.map(|f| f.size).or_else(|| fs::metadata(&path).ok().map(|m| m.len())).unwrap_or(0);
-        let created = file
-            .and_then(|f| f.meta.created.clone())
-            .or_else(|| (db.created_at > 0).then(|| normalize_epoch_ms(db.created_at).to_string()));
-
-        sessions_by_id.insert(
-            db.id.clone(),
-            SessionRecord {
-                id: db.id.clone(),
-                path,
-                title,
-                cwd,
-                project_key: normalize_project_key(&display_project),
-                project_display: display_project,
-                created,
-                modified,
-                size,
-                archived,
-                internal,
-                has_user_event: db.has_user_event,
-                body_exists,
-                source,
-            },
-        );
-        if i % 100 == 0 || i + 1 == db_threads.len() {
-            let pct = 52.0 + 20.0 * ((i + 1) as f64 / db_threads.len().max(1) as f64);
-            emit_progress(app, "merge", i + 1, db_threads.len(), pct, format!("合并 state thread {}/{}", i + 1, db_threads.len()));
-        }
-    }
-
-    let mut orphan_sessions = 0usize;
-    let mut seen_orphan_ids = HashSet::new();
-    for file in &files {
-        if sessions_by_id.contains_key(&file.meta.id) || !seen_orphan_ids.insert(file.meta.id.clone()) {
+        let flags = db.by_id.get(id).copied();
+        let Some(file) = choose_best_file(candidates, flags) else {
             continue;
+        };
+        if flags.is_none() {
+            orphan_sessions += 1;
         }
-        orphan_sessions += 1;
-        let cwd = file.meta.cwd.clone();
-        let display_project = if merge_git_roots {
+
+        // Project identity always follows rollout session_meta.cwd. SQLite cwd may
+        // be normalized or updated later and can merge unrelated workspaces.
+        let cwd = clean_project_display(&file.meta.cwd);
+        let project_display = if merge_git_roots {
             let key = normalize_project_key(&cwd);
             git_cache
                 .entry(key)
@@ -551,36 +562,54 @@ pub fn scan_catalog_impl(root: PathBuf, merge_git_roots: bool, app: &AppHandle, 
         } else {
             cwd.clone()
         };
-        let title = titles.get(&file.meta.id).cloned().unwrap_or_else(|| "(未命名会话)".to_string());
-        let source = file.meta.source.clone();
-        let internal = source_is_internal(&source, "", "");
-        let has_user_event = detect_user_event(&file.path);
-        sessions_by_id.insert(
-            file.meta.id.clone(),
-            SessionRecord {
-                id: file.meta.id.clone(),
-                path: file.path.clone(),
-                title,
-                cwd,
-                project_key: normalize_project_key(&display_project),
-                project_display: display_project,
-                created: file.meta.created.clone(),
-                modified: file.modified,
-                size: file.size,
-                archived: file.archived_path,
-                internal,
-                has_user_event,
-                body_exists: true,
-                source,
-            },
-        );
+        let thread_flags = flags.unwrap_or_else(|| ThreadFlags {
+            archived: file.archived_path,
+            internal: source_is_internal(&file.meta.source, "", ""),
+            has_user_event: detect_user_event(&file.path),
+        });
+        let archived = thread_flags.archived || file.archived_path;
+        let title = titles
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| "(未命名会话)".to_string());
+
+        sessions.push(SessionRecord {
+            id: id.clone(),
+            path: file.path.clone(),
+            title,
+            cwd,
+            project_key: normalize_project_key(&project_display),
+            project_display,
+            created: file.meta.created.clone(),
+            modified: file.modified,
+            size: file.size,
+            archived,
+            internal: thread_flags.internal,
+            has_user_event: thread_flags.has_user_event,
+            body_exists: true,
+            source: file.meta.source.clone(),
+        });
+
+        if i % 100 == 0 || i + 1 == files_by_id.len() {
+            let pct = 64.0 + 30.0 * ((i + 1) as f64 / files_by_id.len().max(1) as f64);
+            emit_progress(
+                app,
+                "catalog",
+                i + 1,
+                files_by_id.len(),
+                pct,
+                format!("整理会话 {}/{}", i + 1, files_by_id.len()),
+            );
+        }
     }
 
-    logs.push(format!("state ↔ rollout 正文匹配：{}，state 中正文缺失：{}，JSONL 孤立兜底：{}。", db_body_matches, db_missing_bodies, orphan_sessions));
-
-    emit_progress(app, "projects", sessions_by_id.len(), sessions_by_id.len(), 86.0, "阶段 5/5：按有效用户对话整理项目与归档计数");
-    let mut sessions: Vec<SessionRecord> = sessions_by_id.into_values().collect();
     sessions.sort_by_key(|s| Reverse(s.modified));
+    let session_ids: HashSet<String> = sessions.iter().map(|s| s.id.clone()).collect();
+    let missing_body_sessions = db
+        .user_visible_ids
+        .iter()
+        .filter(|id| !session_ids.contains(*id))
+        .count();
 
     let mut project_map: HashMap<String, ProjectInfo> = HashMap::new();
     for s in &sessions {
@@ -597,8 +626,11 @@ pub fn scan_catalog_impl(root: PathBuf, merge_git_roots: bool, app: &AppHandle, 
             last_modified: 0,
         });
         entry.session_count += 1;
-        if s.archived { entry.archived_count += 1; } else { entry.active_count += 1; }
-        if !s.body_exists { entry.missing_body_count += 1; }
+        if s.archived {
+            entry.archived_count += 1;
+        } else {
+            entry.active_count += 1;
+        }
         entry.last_modified = entry.last_modified.max(s.modified);
     }
     let mut projects: Vec<ProjectInfo> = project_map.into_values().collect();
@@ -611,15 +643,28 @@ pub fn scan_catalog_impl(root: PathBuf, merge_git_roots: bool, app: &AppHandle, 
     let total_sessions = sessions.iter().filter(valid).count();
     let active_sessions = sessions.iter().filter(valid).filter(|s| !s.archived).count();
     let archived_sessions = sessions.iter().filter(valid).filter(|s| s.archived).count();
-    let named_sessions = sessions.iter().filter(valid).filter(|s| s.title != "(未命名会话)").count();
-    let missing_body_sessions = sessions.iter().filter(valid).filter(|s| !s.body_exists).count();
+    let named_sessions = sessions
+        .iter()
+        .filter(valid)
+        .filter(|s| s.title != "(未命名会话)")
+        .count();
 
-    logs.push(format!("统计口径：原始 thread {}；有效用户对话 {}，其中活动 {}、归档 {}；内部 {}；无用户事件 {}。", raw_threads, total_sessions, active_sessions, archived_sessions, internal_sessions, non_user_sessions));
-    logs.push(format!("项目 {} 个；有效对话中正文缺失 {}；命名对话 {}。", projects.len(), missing_body_sessions, named_sessions));
+    logs.push(format!(
+        "会话口径：rollout 去重后 {}；有效用户对话 {}，活动 {}、归档 {}；内部 {}；无用户事件 {}。",
+        raw_threads, total_sessions, active_sessions, archived_sessions, internal_sessions, non_user_sessions
+    ));
+    logs.push(format!(
+        "项目 {} 个；state 中另有 {} 个用户 thread 未找到 rollout 正文；JSONL 无 state 标记 {} 个。",
+        projects.len(), missing_body_sessions, orphan_sessions
+    ));
     emit_progress(app, "done", total_sessions, total_sessions, 100.0, "扫描完成");
 
     let elapsed_ms = started.elapsed().as_millis();
-    let catalog = Catalog { root: root.clone(), sessions, projects: projects.clone() };
+    let catalog = Catalog {
+        root: root.clone(),
+        sessions,
+        projects: projects.clone(),
+    };
     let result = ScanResult {
         root: root.to_string_lossy().to_string(),
         projects,
@@ -645,31 +690,24 @@ fn matches_filter(s: &SessionRecord, args: &ListSessionsArgs, now_ms: u64) -> bo
     if (!s.has_user_event || s.internal) && !args.include_internal {
         return false;
     }
-    if args.filter == "archived" {
-        if !s.archived {
-            return false;
-        }
-    } else if args.filter == "active" {
-        if s.archived {
-            return false;
-        }
-    } else if s.archived && !args.include_archived {
+    match args.filter.as_str() {
+        "archived" if !s.archived => return false,
+        "active" if s.archived => return false,
+        _ => {}
+    }
+    if args.filter != "archived" && s.archived && !args.include_archived {
         return false;
     }
-    let age_limit = match args.filter.as_str() {
-        "7d" => Some(7u64 * 24 * 60 * 60 * 1000),
-        "30d" => Some(30u64 * 24 * 60 * 60 * 1000),
-        _ => None,
-    };
-    if let Some(limit) = age_limit {
-        if now_ms.saturating_sub(s.modified) > limit {
-            return false;
-        }
+    if args.filter == "7d" && now_ms.saturating_sub(s.modified) > 7 * 24 * 60 * 60 * 1000 {
+        return false;
     }
-    let q = args.search.trim().to_ascii_lowercase();
-    if !q.is_empty()
-        && !s.title.to_ascii_lowercase().contains(&q)
-        && !s.cwd.to_ascii_lowercase().contains(&q)
+    if args.filter == "30d" && now_ms.saturating_sub(s.modified) > 30 * 24 * 60 * 60 * 1000 {
+        return false;
+    }
+    let query = args.search.trim().to_ascii_lowercase();
+    if !query.is_empty()
+        && !s.title.to_ascii_lowercase().contains(&query)
+        && !s.cwd.to_ascii_lowercase().contains(&query)
     {
         return false;
     }
@@ -705,7 +743,6 @@ pub fn list_sessions_impl(catalog: &Catalog, args: &ListSessionsArgs) -> Result<
     let mut sessions = Vec::new();
     for s in matched.into_iter().skip(args.offset).take(args.limit) {
         let mut summary = to_summary(s);
-        // Current page remains cheap. Clicking one row uses the larger preview window.
         hydrate_summary(&mut summary, 256 * 1024)?;
         sessions.push(summary);
     }
@@ -784,12 +821,13 @@ pub fn hydrate_summary(summary: &mut SessionSummary, tail_cap: usize) -> Result<
 }
 
 fn scan_head_for_title(path: &Path, cap: usize) -> Result<Option<(String, String)>, String> {
-    let file = fs::File::open(path).map_err(|e| format!("读取会话失败：{}", e))?;
-    let reader = BufReader::new(file.take(cap as u64));
+    let text = read_bounded_lossy(path, cap)?;
     let mut thread_name = String::new();
     let mut first_user = String::new();
-    for line in reader.lines().map_while(Result::ok) {
-        let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+    for line in text.lines() {
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
         if let Some(name) = thread_name_update(&v) {
             thread_name = name;
         }
@@ -811,42 +849,15 @@ fn scan_head_for_title(path: &Path, cap: usize) -> Result<Option<(String, String
     }
 }
 
-fn scan_tail(path: &Path, cap: usize) -> Result<(Option<String>, Option<String>), String> {
-    let mut file = fs::File::open(path).map_err(|e| format!("读取会话失败：{}", e))?;
-    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
-    let start = len.saturating_sub(cap as u64);
-    file.seek(SeekFrom::Start(start))
-        .map_err(|e| format!("读取会话尾部失败：{}", e))?;
-    let mut buf = String::new();
-    file.read_to_string(&mut buf)
-        .map_err(|e| format!("读取会话尾部失败：{}", e))?;
-    if start > 0 {
-        if let Some(pos) = buf.find('\n') {
-            buf.drain(..=pos);
-        }
-    }
-    let mut latest_name = None;
-    let mut latest_user = None;
-    for line in buf.lines() {
-        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
-        if let Some(name) = thread_name_update(&v) {
-            latest_name = Some(name);
-        }
-        if let Some(text) = user_text(&v) {
-            if !is_internal_user_text(&text) {
-                latest_user = Some(text);
-            }
-        }
-    }
-    Ok((latest_name, latest_user))
-}
-
 pub fn user_text(v: &Value) -> Option<String> {
     let t = v.get("type").and_then(Value::as_str).unwrap_or_default();
     let payload = v.get("payload")?;
     let pt = payload.get("type").and_then(Value::as_str).unwrap_or_default();
     match (t, pt) {
-        ("event_msg", "user_message") => payload.get("message").and_then(Value::as_str).map(str::to_string),
+        ("event_msg", "user_message") => payload
+            .get("message")
+            .and_then(Value::as_str)
+            .map(str::to_string),
         ("event_msg", "item_completed")
             if payload
                 .get("item")
@@ -868,7 +879,10 @@ pub fn assistant_text(v: &Value) -> Option<String> {
     let payload = v.get("payload")?;
     let pt = payload.get("type").and_then(Value::as_str).unwrap_or_default();
     match (t, pt) {
-        ("event_msg", "agent_message") => payload.get("message").and_then(Value::as_str).map(str::to_string),
+        ("event_msg", "agent_message") => payload
+            .get("message")
+            .and_then(Value::as_str)
+            .map(str::to_string),
         ("event_msg", "item_completed")
             if payload
                 .get("item")
@@ -884,7 +898,9 @@ pub fn assistant_text(v: &Value) -> Option<String> {
                     .map(str::to_string)
             })
         }
-        ("response_item", "message") if payload.get("role").and_then(Value::as_str) == Some("assistant") => {
+        ("response_item", "message")
+            if payload.get("role").and_then(Value::as_str) == Some("assistant") =>
+        {
             content_text(payload.get("content"))
         }
         _ => None,
@@ -1000,15 +1016,15 @@ mod tests {
     }
 
     #[test]
-    fn normalizes_seconds_and_milliseconds() {
-        assert_eq!(normalize_epoch_ms(1_700_000_000), 1_700_000_000_000);
-        assert_eq!(normalize_epoch_ms(1_700_000_000_000), 1_700_000_000_000);
+    fn normalizes_windows_extended_paths() {
+        assert_eq!(clean_project_display(r"\\?\D:\research\"), r"D:\research");
+        assert_eq!(clean_project_display(r"\\?\UNC\server\share\x"), r"\\server\share\x");
+        assert_eq!(normalize_project_key(r"D:/Research/"), r"d:\research");
     }
 
     #[test]
-    fn flags_known_internal_sources() {
-        assert!(source_is_internal("guardian", "", ""));
-        assert!(source_is_internal("cli", "subagent", ""));
-        assert!(!source_is_internal("cli", "", "gpt-5"));
+    fn tail_decode_tolerates_split_utf8_character() {
+        let bytes = [0xAD, 0xA0, b'\n', b'{', b'}', b'\n'];
+        assert_eq!(parse_tail_bytes(&bytes, true), "{}\n");
     }
 }
