@@ -56,6 +56,16 @@ jobs:
             exit 1
           }
 
+      - name: Read delivery version
+        id: delivery
+        run: |
+          $delivery = (Get-Content DELIVERY_VERSION -Raw).Trim()
+          if ($delivery -notmatch '^P104-[0-9]{3}$') {
+            throw "Invalid DELIVERY_VERSION: $delivery"
+          }
+          "version=$delivery" >> $env:GITHUB_OUTPUT
+          Write-Host "Delivery version: $delivery"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -86,20 +96,37 @@ jobs:
       - name: Build portable Windows EXE
         run: npm run tauri build -- --no-bundle
 
-      - name: Hash portable EXE
+      - name: Number and hash portable EXE
         run: |
-          $exe = 'src-tauri/target/release/CodexHandoff.exe'
-          if (-not (Test-Path $exe)) { throw "Missing $exe" }
-          Get-Item $exe | Format-List Name,Length,FullName
-          Get-FileHash $exe -Algorithm SHA256 | Format-List
-          Get-FileHash $exe -Algorithm SHA256 | Select-Object Hash | ConvertTo-Json | Set-Content CodexHandoff.sha256.json
+          $sourceExe = 'src-tauri/target/release/CodexHandoff.exe'
+          if (-not (Test-Path $sourceExe)) { throw "Missing $sourceExe" }
 
-      - name: Upload portable EXE
+          $delivery = '${{ steps.delivery.outputs.version }}'
+          $numberedExe = "CodexHandoff-$delivery.exe"
+          $hashFile = "CodexHandoff-$delivery.sha256.json"
+          Copy-Item $sourceExe $numberedExe -Force
+
+          $match = Select-String -Path 'src-tauri/Cargo.toml' -Pattern '^version = "([^"]+)"' | Select-Object -First 1
+          if (-not $match) { throw 'Cannot read internal version from Cargo.toml' }
+          $internalVersion = $match.Matches[0].Groups[1].Value
+          $hash = (Get-FileHash $numberedExe -Algorithm SHA256).Hash
+
+          [ordered]@{
+            DeliveryVersion = $delivery
+            InternalVersion = $internalVersion
+            Commit = '${{ github.sha }}'
+            Hash = $hash
+          } | ConvertTo-Json | Set-Content $hashFile
+
+          Get-Item $numberedExe | Format-List Name,Length,FullName
+          Get-Content $hashFile
+
+      - name: Upload numbered portable EXE
         uses: actions/upload-artifact@v4
         with:
-          name: P104-CodexHandoff-windows-x64-${{ github.sha }}
+          name: CodexHandoff-${{ steps.delivery.outputs.version }}-windows-x64-${{ github.sha }}
           path: |
-            projects/1-桌面软件/104-CodexHandoff/src-tauri/target/release/CodexHandoff.exe
-            projects/1-桌面软件/104-CodexHandoff/CodexHandoff.sha256.json
+            projects/1-桌面软件/104-CodexHandoff/CodexHandoff-${{ steps.delivery.outputs.version }}.exe
+            projects/1-桌面软件/104-CodexHandoff/CodexHandoff-${{ steps.delivery.outputs.version }}.sha256.json
           if-no-files-found: error
           retention-days: 7
