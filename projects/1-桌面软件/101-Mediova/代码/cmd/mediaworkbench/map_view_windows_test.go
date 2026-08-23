@@ -41,7 +41,7 @@ func TestMapBoundsExpandSinglePoint(t *testing.T) {
 }
 
 func TestMapViewToolbarLabels(t *testing.T) {
-	for mode, want := range map[string]string{mapViewList: "列表", mapViewSplit: "分屏", mapViewMap: "地图"} {
+	for mode, want := range map[string]string{mapViewList: "列表", mapViewSplit: "分屏", mapViewMap: "地图", mapViewSidebar: "侧栏"} {
 		_, label, _, ok := mapViewToolbarSpec(mode)
 		if !ok || label != want {
 			t.Fatalf("mode=%s label=%q ok=%v", mode, label, ok)

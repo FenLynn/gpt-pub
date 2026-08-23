@@ -65,6 +65,7 @@ const (
 	IDC_VOLUME_FILTER         = 1023
 	IDC_MAP_SURFACE           = 1024
 	IDC_MAP_TEST              = 1025
+	IDC_MAP_SPLITTER          = 1026
 	IDC_OUTPUT_EDIT           = 1030
 	IDC_OUTPUT_BROWSE         = 1031
 	IDC_OUTPUT_PICK           = 1032
@@ -208,6 +209,7 @@ const (
 	ID_CTX_HOLD_EDIT          = 2226
 	ID_CTX_REMOVE_SAFE        = 2227
 	ID_CTX_EXIT_QUEUE         = 2228
+	ID_CTX_SHOW_ON_MAP        = 2229
 	ID_CTX_RES_4K             = 2300
 	ID_CTX_RES_1080           = 2301
 	ID_CTX_RES_720            = 2302
@@ -237,7 +239,7 @@ type application struct {
 	hIcon                                                                                                                                                                      uintptr
 	hVideo, hImage, hAddFiles, hAddFolder, hRemove, hClear, hSelectAll, hInvert, hSourceDir, hOutputDir, hViewMode                                                             uintptr
 	hSearch, hSearchEdit, hFilter, hVolumeFilter, hList, hToolbarDivider, hHeaderLine                                                                                          uintptr
-	hMapSurface, hMapTest                                                                                                                                                      uintptr
+	hMapSurface, hMapTest, hMapSplitter                                                                                                                                        uintptr
 	hRightTitle, hTaskRes, hTaskCodec, hTaskQuality, hTaskVolume, hTaskRotation, hTaskApply, hTaskDefault, hPreview, hTrimCrop, hSingleOutput, hRetry, hDetails, hDetailsFrame uintptr
 	rightLabels, globalLabels                                                                                                                                                  []uintptr
 	hOutputEdit, hOutputBrowse, hOutputPick, hResolution, hCodec, hQuality, hSpeedMode, hVolume, hRotation, hAllDefault, hSmartPlan                                            uintptr
@@ -1980,6 +1982,8 @@ func (a *application) initControls() {
 	a.hHeaderLine = createControl("STATIC", "", WS_CHILD|WS_VISIBLE|SS_OWNERDRAW, 9, 95, 100, 1, a.hwnd, 0)
 	a.hMapSurface = createControl("BUTTON", "", WS_CHILD|BS_OWNERDRAW, 8, 68, 1380, 650, a.hwnd, IDC_MAP_SURFACE)
 	a.hMapTest = createControl("BUTTON", "显示测试点", WS_CHILD|WS_TABSTOP|BS_OWNERDRAW, 0, 0, 104, 30, a.hwnd, IDC_MAP_TEST)
+	a.hMapSplitter = createControl("STATIC", "", WS_CHILD|SS_NOTIFY, 0, 0, 6, 100, a.hwnd, IDC_MAP_SPLITTER)
+	a.installMapSidebarSplitter()
 
 	// Retained only for compatibility; import feedback is routed to the bottom status line.
 	a.hImportToast = createControl("STATIC", "", WS_CHILD, 0, 0, 0, 0, a.hwnd, 0)
@@ -2419,8 +2423,11 @@ func (a *application) layout(w, h int32) {
 	if compactBottom {
 		bottomBar = 164
 	}
+	if a.viewMode != mapViewList {
+		bottomBar = 8
+	}
 	rightW := int32(0)
-	if a.rightVisible {
+	if a.rightVisible && a.viewMode != mapViewSidebar {
 		rightW = 264
 		if w < 1180 {
 			rightW = 238
@@ -2448,22 +2455,34 @@ func (a *application) layout(w, h int32) {
 		show(a.hList, false)
 		show(a.hHeaderLine, false)
 		show(a.hMapSurface, true)
+		show(a.hMapSplitter, false)
+	case mapViewSidebar:
+		sidebarW := a.mapSidebarWidthFor(listW)
+		show(a.hList, true)
+		show(a.hHeaderLine, true)
+		show(a.hMapSurface, true)
+		show(a.hMapSplitter, true)
+		move(a.hList, 8, top, sidebarW, listH)
+		move(a.hHeaderLine, 9, top+28, sidebarW-2, 2)
+		move(a.hMapSplitter, 8+sidebarW, top, 6, listH)
+		move(a.hMapSurface, 14+sidebarW, top, listW-sidebarW-6, listH)
+		move(a.hMapTest, 8+listW-116, top+10, 104, 30)
+		show(a.hMapTest, true)
 	default:
 		show(a.hList, true)
 		show(a.hHeaderLine, true)
 		show(a.hMapSurface, false)
+		show(a.hMapSplitter, false)
 	}
-	if a.viewMode != mapViewMap {
+	if a.viewMode != mapViewMap && a.viewMode != mapViewSidebar {
 		move(a.hList, 8, top, listW, listViewH)
 		move(a.hHeaderLine, 9, top+28, listW-2, 2)
 	}
-	if a.viewMode != mapViewList {
+	if a.viewMode != mapViewList && a.viewMode != mapViewSidebar {
 		move(a.hMapSurface, 8, mapY, listW, mapH)
 		move(a.hMapTest, 8+listW-116, mapY+10, 104, 30)
-		show(a.hMapTest, true)
-	} else {
-		show(a.hMapTest, false)
 	}
+	show(a.hMapTest, a.viewMode != mapViewList)
 	// The legacy 14-column layout used to redistribute widths on every fresh
 	// startup. Once Round12 owns the 15-column structure that would immediately
 	// make hidden optional columns visible again, defeating the compact default.
@@ -2475,9 +2494,9 @@ func (a *application) layout(w, h int32) {
 	rightX := 16 + listW
 	rightControls := append([]uintptr{a.hRightTitle, a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation, a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry, a.hDetailsFrame, a.hDetails}, a.rightLabels...)
 	for _, control := range rightControls {
-		show(control, a.rightVisible)
+		show(control, a.rightVisible && a.viewMode != mapViewSidebar)
 	}
-	if a.rightVisible {
+	if a.rightVisible && a.viewMode != mapViewSidebar {
 		move(a.hRightTitle, rightX+2, top+4, rightW-14, 29)
 		rowY := top + 40
 		rowStep := int32(38)
@@ -2597,6 +2616,7 @@ func (a *application) layout(w, h int32) {
 	move(a.hStart, footer.Start.X, footer.Start.Y, footer.Start.W, footer.Start.H)
 	move(a.hPause, footer.Pause.X, footer.Pause.Y, footer.Pause.W, footer.Pause.H)
 	move(a.hStop, footer.Stop.X, footer.Stop.Y, footer.Stop.W, footer.Stop.H)
+	a.setMapBottomControlsVisible(a.viewMode == mapViewList)
 }
 func (a *application) command(id int) {
 	if workers, ok := a.concurrencyCommands[id]; ok {
@@ -2618,6 +2638,8 @@ func (a *application) command(id int) {
 		a.activateMapPointAtCursor()
 	case IDC_MAP_TEST:
 		a.toggleMapDemo()
+	case ID_CTX_SHOW_ON_MAP:
+		a.showSelectedTaskOnMap()
 	case ID_CONCURRENCY_STATUS:
 		a.showConcurrencyMenu()
 	case IDC_RIGHT_TOGGLE:
@@ -3587,6 +3609,10 @@ func (a *application) showContextMenu() {
 	appendMenu(m, MF_STRING, ID_CTX_MOVE_BOTTOM, "移到当前工作区最后")
 	appendMenu(m, MF_STRING, ID_CTX_JUMP_RUNNING, "跳转到正在运行的任务")
 	appendMenu(m, MF_SEPARATOR, 0, "")
+	if a.selectedTaskHasMapLocation() {
+		appendMenu(m, MF_STRING, ID_CTX_SHOW_ON_MAP, "在地图上显示")
+		appendMenu(m, MF_SEPARATOR, 0, "")
+	}
 	appendMenu(m, MF_STRING, ID_CTX_OPEN_SOURCE, "打开源文件所在文件夹")
 	appendMenu(m, MF_STRING, ID_CTX_OPEN_OUTPUT, "打开输出文件夹")
 	appendMenu(m, MF_STRING, ID_CTX_OPEN_OUTPUT_FILE, "直接打开输出文件")

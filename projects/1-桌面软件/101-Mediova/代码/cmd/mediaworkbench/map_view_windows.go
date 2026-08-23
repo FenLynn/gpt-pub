@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	mapViewList  = "list"
-	mapViewSplit = "split"
-	mapViewMap   = "map"
+	mapViewList    = "list"
+	mapViewSplit   = "split"
+	mapViewMap     = "map"
+	mapViewSidebar = "sidebar"
 )
 
 type mapMediaPoint struct {
@@ -49,6 +50,8 @@ func mapViewToolbarSpec(mode string) (icon, label string, active bool, ok bool) 
 		return "\uECA5", "分屏", true, true
 	case mapViewMap:
 		return "\uE707", "地图", true, true
+	case mapViewSidebar:
+		return "\uE8A9", "侧栏", true, true
 	default:
 		return "\uE8FD", "列表", false, true
 	}
@@ -332,6 +335,7 @@ func (a *application) relayoutForMapMode() {
 	if ok, _, _ := procGetClientRect.Call(a.hwnd, uintptr(unsafe.Pointer(&rc))); ok != 0 {
 		a.layout(rc.Right-rc.Left, rc.Bottom-rc.Top)
 	}
+	a.applyMapSidebarColumns()
 	procInvalidateRect.Call(a.hViewMode, 0, 1)
 	a.resizeMapRuntime()
 }
@@ -341,6 +345,8 @@ func (a *application) cycleMapViewMode() {
 	case mapViewSplit:
 		a.viewMode = mapViewMap
 	case mapViewMap:
+		a.viewMode = mapViewSidebar
+	case mapViewSidebar:
 		a.viewMode = mapViewList
 	default:
 		a.viewMode = mapViewSplit
@@ -350,7 +356,7 @@ func (a *application) cycleMapViewMode() {
 		a.ensureMapRuntime()
 	}
 	a.relayoutForMapMode()
-	setText(a.hStatusText, "视图已切换为"+mapViewLabel(a.viewMode)+"；顶部按钮按“列表 → 分屏 → 地图”循环。")
+	setText(a.hStatusText, "视图已切换为"+mapViewLabel(a.viewMode)+"；顶部按钮按“列表 → 分屏 → 地图 → 侧栏”循环。")
 }
 
 func mapViewLabel(mode string) string {
@@ -359,6 +365,8 @@ func mapViewLabel(mode string) string {
 		return "分屏"
 	case mapViewMap:
 		return "地图"
+	case mapViewSidebar:
+		return "侧栏"
 	default:
 		return "列表"
 	}

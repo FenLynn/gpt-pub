@@ -251,17 +251,20 @@ func (m *mapCacheManager) state() (bool, uint64) {
 }
 
 type mapRuntime struct {
-	app        *application
-	cache      *mapCacheManager
-	browser    *edge.Chromium
-	server     *http.Server
-	listener   net.Listener
-	baseURL    string
-	prefix     string
-	profileDir string
-	client     *http.Client
-	mu         sync.Mutex
-	closed     bool
+	app            *application
+	cache          *mapCacheManager
+	browser        *edge.Chromium
+	server         *http.Server
+	listener       net.Listener
+	baseURL        string
+	prefix         string
+	profileDir     string
+	client         *http.Client
+	mu             sync.Mutex
+	closed         bool
+	hasFocus       bool
+	focusLongitude float64
+	focusLatitude  float64
 }
 
 func randomMapToken() string {
@@ -458,8 +461,9 @@ html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Sego
 </style></head><body><div id="map"></div><div class="toolbar"><div class="brand">媒体位置</div><div class="tools"><button id="online" class="active">在线 · OpenFreeMap</button><button id="offline">离线地图</button><span id="cache" class="cache">缓存 0 MB / 1 GB</span><button id="clear">清除离线地图</button></div></div><div id="notice" class="notice">在线模式仅缓存实际查看过的区域</div><script src="` + r.baseURL + `/maplibre.js"></script><script>
 const BASE=` + string(base) + `;let mode='online',points=[];const post=o=>window.chrome.webview.postMessage(JSON.stringify(o));
 const map=new maplibregl.Map({container:'map',style:BASE+'/ofm/styles/liberty',center:[105,35],zoom:3,attributionControl:true});map.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
-function install(){if(map.getSource('media'))return;map.addSource('media',{type:'geojson',data:{type:'FeatureCollection',features:points},cluster:true,clusterMaxZoom:14,clusterRadius:36});map.addLayer({id:'clusters',type:'circle',source:'media',filter:['has','point_count'],paint:{'circle-color':'#167fba','circle-radius':['step',['get','point_count'],15,10,19,50,23],'circle-stroke-color':'#fff','circle-stroke-width':2}});map.addLayer({id:'cluster-count',type:'symbol',source:'media',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':12},paint:{'text-color':'#fff'}});map.addLayer({id:'point',type:'circle',source:'media',filter:['!',['has','point_count']],paint:{'circle-color':['case',['get','selected'],'#ff8b24',['get','demo'],'#d6862e','#159783'],'circle-radius':['case',['get','selected'],9,7],'circle-stroke-color':'#fff','circle-stroke-width':2}});map.on('click','clusters',async e=>{const f=e.features[0],leaves=await map.getSource('media').getClusterLeaves(f.properties.cluster_id,1000,0);post({type:'select',ids:leaves.map(x=>x.properties.taskID).filter(Boolean),demo:leaves.find(x=>x.properties.demo)?.properties.label||''})});map.on('click','point',e=>post({type:'select',ids:e.features.map(x=>x.properties.taskID).filter(Boolean),demo:e.features[0].properties.demo?e.features[0].properties.label:''}));for(const id of ['clusters','point']){map.on('mouseenter',id,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',id,()=>map.getCanvas().style.cursor='')}}
+function install(){if(map.getSource('media'))return;map.addSource('media',{type:'geojson',data:{type:'FeatureCollection',features:points},cluster:true,clusterMaxZoom:14,clusterRadius:36,clusterProperties:{selected_count:['+',['case',['get','selected'],1,0]]}});const selected=['>', ['get','selected_count'],0];map.addLayer({id:'clusters',type:'circle',source:'media',filter:['has','point_count'],paint:{'circle-color':['case',selected,'#fff4e8','#167fba'],'circle-radius':['step',['get','point_count'],15,10,19,50,23],'circle-stroke-color':['case',selected,'#f07a18','#fff'],'circle-stroke-width':['case',selected,3,2]}});map.addLayer({id:'cluster-count',type:'symbol',source:'media',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':12},paint:{'text-color':['case',selected,'#e86f00','#fff']}});map.addLayer({id:'point',type:'circle',source:'media',filter:['!',['has','point_count']],paint:{'circle-color':['case',['get','selected'],'#ff8b24',['get','demo'],'#d6862e','#159783'],'circle-radius':['case',['get','selected'],9,7],'circle-stroke-color':'#fff','circle-stroke-width':2}});map.on('click','clusters',async e=>{const f=e.features[0],leaves=await map.getSource('media').getClusterLeaves(f.properties.cluster_id,1000,0);post({type:'select',ids:leaves.map(x=>x.properties.taskID).filter(Boolean),demo:leaves.find(x=>x.properties.demo)?.properties.label||''})});map.on('click','point',e=>post({type:'select',ids:e.features.map(x=>x.properties.taskID).filter(Boolean),demo:e.features[0].properties.demo?e.features[0].properties.label:''}));for(const id of ['clusters','point']){map.on('mouseenter',id,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',id,()=>map.getCanvas().style.cursor='')}}
 map.on('style.load',install);window.mediovaSetPoints=function(data,fit){points=data.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.longitude,p.latitude]},properties:p}));if(map.isStyleLoaded()){const s=map.getSource('media');if(s)s.setData({type:'FeatureCollection',features:points});else install()}if(fit&&points.length){const b=new maplibregl.LngLatBounds();points.forEach(p=>b.extend(p.geometry.coordinates));map.fitBounds(b,{padding:70,maxZoom:14,duration:0})}};
+window.mediovaFocus=function(lon,lat){map.easeTo({center:[lon,lat],zoom:Math.max(map.getZoom(),15),duration:420})};
 window.mediovaCache=function(bytes){document.getElementById('cache').textContent='缓存 '+(bytes<1048576?'<1 MB':(bytes/1048576).toFixed(0)+' MB')+' / 1 GB'};
 window.mediovaMode=function(next){mode=next;document.getElementById('online').classList.toggle('active',next==='online');document.getElementById('offline').classList.toggle('active',next==='offline');document.getElementById('notice').textContent=next==='online'?'在线模式仅缓存实际查看过的区域':'离线模式：未缓存区域不会联网';map.setStyle(BASE+'/ofm/styles/liberty?mode='+next+'&t='+Date.now())};
 setInterval(()=>fetch(BASE+'/cache-status',{cache:'no-store'}).then(r=>r.json()).then(v=>window.mediovaCache(v.bytes)).catch(()=>{}),2000);document.getElementById('online').onclick=()=>post({type:'mode',mode:'online'});document.getElementById('offline').onclick=()=>post({type:'mode',mode:'offline'});document.getElementById('clear').onclick=()=>{if(confirm('清除全部离线地图缓存？照片、GPS、历史记录和设置不会受影响。'))post({type:'clear'})};post({type:'ready'});
@@ -482,6 +486,7 @@ func (r *mapRuntime) onMessage(raw string) {
 		switch msg.Type {
 		case "ready":
 			r.pushPoints(true)
+			r.pushPendingFocus()
 			r.pushCacheSize()
 			online, _ := r.cache.state()
 			mode := "offline"
@@ -616,6 +621,7 @@ func mapRuntimeSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subcla
 	}
 	result, _, _ := v452DefSubclassProc.Call(hwnd, uintptr(message), wParam, lParam)
 	if message == WM_SIZE && a != nil {
+		a.applyMapSidebarColumns()
 		if runtime := mapRuntimeFor(a); runtime != nil {
 			runtime.resize()
 		}
