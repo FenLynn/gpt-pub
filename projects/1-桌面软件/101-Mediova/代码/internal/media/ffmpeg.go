@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"mediaworkbench/internal/config"
@@ -558,9 +559,7 @@ func bitrateKbps(req ConvertRequest) int {
 func baseVideoArgs(req ConvertRequest) []string {
 	args := commonInputArgs(req)
 	args = append(args, "-map", "0:v:0")
-	if req.Probe.HasAudio && req.Settings.AudioMode != "静音" {
-		args = append(args, "-map", "0:a?")
-	}
+	args = append(args, audioMapArgs(req)...)
 	args = append(args, subtitleMapArgs(req)...)
 	if f := BuildFilters(req); f != "" {
 		args = append(args, "-vf", f)
@@ -570,13 +569,73 @@ func baseVideoArgs(req ConvertRequest) []string {
 }
 
 func audioCodecArgs(req ConvertRequest) []string {
-	if !req.Probe.HasAudio || req.Settings.AudioMode == "静音" {
+	if expectedAudioStreams(req) == 0 {
 		return []string{"-an"}
 	}
 	if req.Settings.AudioMode == "复制音频" {
 		return []string{"-c:a", "copy"}
 	}
 	return []string{"-c:a", "aac", "-b:a", "192k"}
+}
+
+// audioMapArgs deliberately maps individual compatible streams rather than
+// 0:a?. Some Apple recordings contain both an ordinary AAC fallback track and
+// an Apple Positional Audio Codec (apple_apac) track. FFmpeg can identify that
+// codec but the bundled build cannot decode it; mapping every audio stream then
+// makes an otherwise playable video fail before progress starts.
+func audioMapArgs(req ConvertRequest) []string {
+	if !req.Probe.HasAudio || req.Settings.AudioMode == "静音" {
+		return nil
+	}
+	if len(req.Probe.AudioDetails) == 0 {
+		// Legacy/synthetic ProbeInfo values do not carry global stream indexes.
+		// Real conversions with audio are re-probed immediately before execution.
+		return []string{"-map", "0:a?"}
+	}
+	var args []string
+	for _, stream := range req.Probe.AudioDetails {
+		if !isCompatibleAudioStream(stream) {
+			continue
+		}
+		args = append(args, "-map", fmt.Sprintf("0:%d?", stream.Index))
+	}
+	return args
+}
+
+func isCompatibleAudioStream(stream StreamInfo) bool {
+	switch strings.ToLower(strings.TrimSpace(stream.Codec)) {
+	case "apple_apac":
+		return false
+	default:
+		return true
+	}
+}
+
+func expectedAudioStreams(req ConvertRequest) int {
+	if !req.Probe.HasAudio || req.Settings.AudioMode == "静音" {
+		return 0
+	}
+	if len(req.Probe.AudioDetails) == 0 {
+		return req.Probe.AudioStreams
+	}
+	count := 0
+	for _, stream := range req.Probe.AudioDetails {
+		if isCompatibleAudioStream(stream) {
+			count++
+		}
+	}
+	return count
+}
+
+func skippedAudioStreams(req ConvertRequest) int {
+	if len(req.Probe.AudioDetails) == 0 || req.Settings.AudioMode == "静音" {
+		return 0
+	}
+	skipped := req.Probe.AudioStreams - expectedAudioStreams(req)
+	if skipped < 0 {
+		return 0
+	}
+	return skipped
 }
 
 func subtitleMapArgs(req ConvertRequest) []string {
@@ -624,8 +683,11 @@ func appendFrameRateMode(args []string, req ConvertRequest) []string {
 
 func streamCompatibilityLabel(req ConvertRequest) string {
 	parts := []string{}
-	if req.Probe.AudioStreams > 1 && req.Settings.AudioMode != "静音" {
-		parts = append(parts, fmt.Sprintf("%d音轨", req.Probe.AudioStreams))
+	if expected := expectedAudioStreams(req); expected > 1 {
+		parts = append(parts, fmt.Sprintf("%d音轨", expected))
+	}
+	if skipped := skippedAudioStreams(req); skipped > 0 {
+		parts = append(parts, fmt.Sprintf("跳过%d条不兼容音轨", skipped))
 	}
 	if req.Settings.SubtitleMode == "保留文本字幕" && req.Probe.SubtitleStreams > 0 {
 		parts = append(parts, fmt.Sprintf("文本字幕%d/总%d", req.Probe.TextSubtitles, req.Probe.SubtitleStreams))
@@ -670,9 +732,7 @@ func canSmartStreamCopy(req ConvertRequest) bool {
 func buildStreamCopyArgs(req ConvertRequest) ([]string, string) {
 	args := commonInputArgs(req)
 	args = append(args, "-map", "0:v:0")
-	if req.Probe.HasAudio && req.Settings.AudioMode != "静音" {
-		args = append(args, "-map", "0:a?")
-	}
+	args = append(args, audioMapArgs(req)...)
 	args = append(args, subtitleMapArgs(req)...)
 	args = append(args, metadataArgs(req.Settings.ClearMetadata)...)
 	args = append(args, "-c:v", "copy")
@@ -1173,6 +1233,61 @@ func cleanupPasslog(prefix string) {
 	}
 }
 
+var ffmpegFailureLogMu sync.Mutex
+
+const ffmpegFailureLogLimit = 4 << 20
+
+// appendFFmpegFailureLog keeps one bounded rolling diagnostic file. It
+// preserves the command, exit error and stderr without creating one large file
+// per failed task or allowing diagnostics to grow without limit.
+func appendFFmpegFailureLog(ffmpeg string, args []string, runErr error, stderrText string) string {
+	dir, err := config.LocalDir()
+	if err != nil {
+		return ""
+	}
+	dir = filepath.Join(dir, "logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return ""
+	}
+	path := filepath.Join(dir, "ffmpeg-failures.log")
+	quote := func(value string) string {
+		if strings.ContainsAny(value, " \t\r\n\"") {
+			return strconv.Quote(value)
+		}
+		return value
+	}
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, quote(ffmpeg))
+	for _, arg := range args {
+		parts = append(parts, quote(arg))
+	}
+	entry := fmt.Sprintf("\r\n===== %s =====\r\nCommand: %s\r\nExit: %v\r\nStderr:\r\n%s\r\n", time.Now().Format(time.RFC3339), strings.Join(parts, " "), runErr, stderrText)
+
+	ffmpegFailureLogMu.Lock()
+	defer ffmpegFailureLogMu.Unlock()
+	existing, _ := os.ReadFile(path)
+	maxExisting := ffmpegFailureLogLimit - len(entry)
+	if maxExisting < 0 {
+		entry = entry[len(entry)-ffmpegFailureLogLimit:]
+		existing = nil
+	} else if len(existing) > maxExisting {
+		existing = existing[len(existing)-maxExisting:]
+	}
+	payload := append(existing, []byte(entry)...)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, payload, 0o644); err != nil {
+		return ""
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(path)
+		if err = os.Rename(tmp, path); err != nil {
+			_ = os.Remove(tmp)
+			return ""
+		}
+	}
+	return path
+}
+
 func Run(ctx context.Context, ffmpeg string, args []string, duration float64, progress func(float64)) error {
 	cmd := exec.CommandContext(ctx, ffmpeg, args...)
 	configureCommand(cmd)
@@ -1221,17 +1336,23 @@ func Run(ctx context.Context, ffmpeg string, args []string, duration float64, pr
 	err = cmd.Wait()
 	<-doneErr
 	if err != nil {
-		msg := strings.TrimSpace(stderrText.String())
+		fullMessage := strings.TrimSpace(stderrText.String())
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return context.Canceled
 		}
+		logPath := appendFFmpegFailureLog(ffmpeg, args, err, fullMessage)
+		msg := fullMessage
 		if len(msg) > 1800 {
 			msg = msg[len(msg)-1800:]
 		}
-		if msg != "" {
-			return fmt.Errorf("%w: %s", err, msg)
+		prefix := "FFmpeg 执行失败"
+		if logPath != "" {
+			prefix += "（完整诊断: " + logPath + "）"
 		}
-		return err
+		if msg != "" {
+			return fmt.Errorf("%s: %w: %s", prefix, err, msg)
+		}
+		return fmt.Errorf("%s: %w", prefix, err)
 	}
 	if progress != nil {
 		progress(100)

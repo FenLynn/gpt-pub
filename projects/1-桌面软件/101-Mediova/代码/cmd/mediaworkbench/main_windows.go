@@ -5799,6 +5799,9 @@ func (p *progressThrottler) accept(value float64, stage, output string, now time
 func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings model.Settings) {
 	pinfo, reused := probeInfoFromTask(taskSnapshot)
 	modernImage := taskSnapshot.Kind == model.KindImage && media.IsModernImageInput(taskSnapshot.Input)
+	if taskSnapshot.Kind == model.KindVideo && taskSnapshot.AudioStreams > 0 {
+		reused = false // detailed audio codecs/indexes are required for safe stream selection
+	}
 	if settings.SubtitleMode == "保留文本字幕" && taskSnapshot.SubtitleStreams > 0 {
 		reused = false // detailed subtitle indexes/codecs are required to skip bitmap tracks safely
 	}
