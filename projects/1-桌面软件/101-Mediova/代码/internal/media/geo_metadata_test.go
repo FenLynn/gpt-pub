@@ -43,3 +43,20 @@ func TestLocationFromQuickTimeTagsKeepsAccuracyAndCaptureTime(t *testing.T) {
 		t.Fatalf("capture time=%q", capture)
 	}
 }
+
+func TestPlaceSummaryDistinguishesDescriptionFromCoordinates(t *testing.T) {
+	got := placeSummary("五四广场", "青岛市", "山东省", "中国", "青岛市", "36.0671, 120.3826")
+	if got != "五四广场 · 青岛市 · 山东省 · 中国" {
+		t.Fatalf("place summary=%q", got)
+	}
+}
+
+func TestLocationFromQuickTimeTagsKeepsPlaceName(t *testing.T) {
+	location, _ := locationFromTags(map[string]string{
+		"com.apple.quicktime.location.iso6709": "+36.0671+120.3826/",
+		"com.apple.quicktime.location.name":    "五四广场",
+	})
+	if location == nil || location.Place != "五四广场" {
+		t.Fatalf("place metadata was not retained: %+v", location)
+	}
+}

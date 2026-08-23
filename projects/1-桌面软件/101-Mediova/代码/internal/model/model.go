@@ -34,14 +34,16 @@ type Crop struct {
 // GeoLocation keeps the original WGS84 media coordinates. Display providers
 // may derive another coordinate system, but must never overwrite these values.
 type GeoLocation struct {
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
-	Altitude    float64 `json:"altitude,omitempty"`
-	HasAltitude bool    `json:"has_altitude,omitempty"`
-	Accuracy    float64 `json:"accuracy,omitempty"`
-	Timestamp   string  `json:"timestamp,omitempty"`
-	Source      string  `json:"source,omitempty"`
-	Raw         string  `json:"raw,omitempty"`
+	Latitude     float64 `json:"latitude"`
+	Longitude    float64 `json:"longitude"`
+	Altitude     float64 `json:"altitude,omitempty"`
+	HasAltitude  bool    `json:"has_altitude,omitempty"`
+	Accuracy     float64 `json:"accuracy,omitempty"`
+	Timestamp    string  `json:"timestamp,omitempty"`
+	Source       string  `json:"source,omitempty"`
+	Raw          string  `json:"raw,omitempty"`
+	Place        string  `json:"place,omitempty"`
+	PlaceChecked bool    `json:"place_checked,omitempty"`
 }
 
 func (g *GeoLocation) Valid() bool {

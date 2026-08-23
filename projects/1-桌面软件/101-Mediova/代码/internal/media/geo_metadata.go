@@ -95,6 +95,11 @@ func locationFromTags(tags map[string]string) (*model.GeoLocation, string) {
 		}
 	}
 	if location != nil {
+		location.Place = placeSummary(
+			normalized["com.apple.quicktime.location.name"],
+			normalized["com.apple.quicktime.location.body"],
+			normalized["com.apple.quicktime.location.note"],
+		)
 		for _, key := range []string{
 			"com.apple.quicktime.location.accuracy.horizontal",
 			"gpshpositioningerror",
@@ -120,6 +125,27 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func placeSummary(values ...string) string {
+	seen := map[string]bool{}
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, coordinate := parseCoordinateText(value); coordinate {
+			continue
+		}
+		key := strings.ToLower(value)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		parts = append(parts, value)
+	}
+	return strings.Join(parts, " · ")
 }
 
 func recordValue(record map[string]any, names ...string) any {
@@ -177,6 +203,10 @@ func ProbeMediaMetadata(ctx context.Context, ffmpeg, input string) (MediaMetadat
 		"-j", "-n", "-m", "-q", "-api", "QuickTimeUTC=1",
 		"-GPSLatitude", "-GPSLongitude", "-GPSAltitude",
 		"-GPSHPositioningError", "-GPSCoordinates",
+		"-GPSAreaInformation", "-Location", "-Sub-location",
+		"-City", "-State", "-Country",
+		"-LocationShownSublocation", "-LocationShownCity",
+		"-LocationShownProvinceState", "-LocationShownCountryName",
 		"-DateTimeOriginal", "-CreateDate", "-MediaCreateDate",
 		input,
 	}
@@ -221,6 +251,15 @@ func ProbeMediaMetadata(ctx context.Context, ffmpeg, input string) (MediaMetadat
 		}
 	}
 	if result.Location != nil {
+		result.Location.PlaceChecked = true
+		result.Location.Place = placeSummary(
+			valueText(recordValue(record, "GPSAreaInformation")),
+			valueText(recordValue(record, "Sub-location", "LocationShownSublocation")),
+			valueText(recordValue(record, "Location")),
+			valueText(recordValue(record, "City", "LocationShownCity")),
+			valueText(recordValue(record, "State", "LocationShownProvinceState")),
+			valueText(recordValue(record, "Country", "LocationShownCountryName")),
+		)
 		if altitude, ok := valueFloat(recordValue(record, "GPSAltitude")); ok {
 			result.Location.Altitude = altitude
 			result.Location.HasAltitude = true

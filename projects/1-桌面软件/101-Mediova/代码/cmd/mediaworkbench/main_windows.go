@@ -4273,7 +4273,7 @@ func (a *application) probeMediaMetadataTask(id int64) {
 		return
 	}
 	path := task.Input
-	alreadyComplete := task.Location.Valid() && strings.TrimSpace(task.CaptureTime) != ""
+	alreadyComplete := task.Location.Valid() && task.Location.PlaceChecked && strings.TrimSpace(task.CaptureTime) != ""
 	a.mu.Unlock()
 	if alreadyComplete {
 		return

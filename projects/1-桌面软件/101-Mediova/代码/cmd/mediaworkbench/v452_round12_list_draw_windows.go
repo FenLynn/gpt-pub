@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"unsafe"
 
 	"mediaworkbench/internal/model"
@@ -94,7 +95,20 @@ func round12LocationText(task *model.Task) string {
 	if task == nil || !task.Location.Valid() {
 		return "—"
 	}
-	return fmt.Sprintf("📍 %.4f, %.4f", task.Location.Latitude, task.Location.Longitude)
+	if place := strings.TrimSpace(task.Location.Place); place != "" {
+		return "地点 · " + place
+	}
+	return fmt.Sprintf("GPS · %.4f, %.4f", task.Location.Latitude, task.Location.Longitude)
+}
+
+func round12LocationColor(task *model.Task) uintptr {
+	if task == nil || !task.Location.Valid() {
+		return colorRef(142, 151, 162)
+	}
+	if strings.TrimSpace(task.Location.Place) != "" {
+		return colorRef(25, 126, 101)
+	}
+	return colorRef(45, 112, 178)
 }
 
 func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column int, task *model.Task, background uintptr) {
@@ -107,10 +121,10 @@ func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column
 	case round12ColFile:
 		round12DrawTextCell(hdc, cell, round12LegacyText(legacy, 0), background, round12SelectionText, false)
 	case round12ColOutputSize:
-	case round12ColLocation:
-		round12DrawTextCell(hdc, cell, round12LocationText(task), background, round12SelectionText, false)
 		_, label, _ := compressionCellMetrics(task)
 		round12DrawCompressionCell(hdc, cell, task, label, background)
+	case round12ColLocation:
+		round12DrawTextCell(hdc, cell, round12LocationText(task), background, round12LocationColor(task), false)
 	case round12ColProgress:
 		fraction, label := progressCellMetrics(task)
 		round12DrawProgressCell(hdc, cell, fraction, label, background)
