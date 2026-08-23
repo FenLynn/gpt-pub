@@ -19,12 +19,12 @@ const (
 )
 
 type mapMediaPoint struct {
-	TaskID    int64
-	Latitude  float64
-	Longitude float64
-	Label     string
-	Demo      bool
-	Selected  bool
+	TaskID    int64   `json:"taskID"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Label     string  `json:"label"`
+	Demo      bool    `json:"demo"`
+	Selected  bool    `json:"selected"`
 }
 
 type mapPointScreen struct {
@@ -333,7 +333,7 @@ func (a *application) relayoutForMapMode() {
 		a.layout(rc.Right-rc.Left, rc.Bottom-rc.Top)
 	}
 	procInvalidateRect.Call(a.hViewMode, 0, 1)
-	procInvalidateRect.Call(a.hMapSurface, 0, 1)
+	a.resizeMapRuntime()
 }
 
 func (a *application) cycleMapViewMode() {
@@ -346,6 +346,9 @@ func (a *application) cycleMapViewMode() {
 		a.viewMode = mapViewSplit
 	}
 	setText(a.hViewMode, mapViewLabel(a.viewMode))
+	if a.viewMode != mapViewList {
+		a.ensureMapRuntime()
+	}
 	a.relayoutForMapMode()
 	setText(a.hStatusText, "视图已切换为"+mapViewLabel(a.viewMode)+"；顶部按钮按“列表 → 分屏 → 地图”循环。")
 }
@@ -371,8 +374,10 @@ func (a *application) toggleMapDemo() {
 		setText(a.hMapTest, "显示测试点")
 		setText(a.hStatusText, "已隐藏地图内置测试点。")
 	}
-	procInvalidateRect.Call(a.hMapSurface, 0, 1)
 	procInvalidateRect.Call(a.hMapTest, 0, 1)
+	if runtime := mapRuntimeFor(a); runtime != nil {
+		runtime.pushPoints(true)
+	}
 }
 
 func (a *application) mapClusterAtCursor() (mapCluster, bool) {
@@ -462,6 +467,8 @@ func (a *application) activateMapPointAtCursor() {
 
 func (a *application) invalidateMapView() {
 	if a != nil && a.hMapSurface != 0 && a.viewMode != mapViewList {
-		procInvalidateRect.Call(a.hMapSurface, 0, 0)
+		if runtime := mapRuntimeFor(a); runtime != nil {
+			runtime.pushPoints(false)
+		}
 	}
 }
