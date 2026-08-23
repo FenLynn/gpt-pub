@@ -49,6 +49,7 @@ const (
 	WM_APP_KIND_SYNC             = WM_APP + 11
 	WM_LBUTTONDOWN               = 0x0201
 	WM_LBUTTONUP                 = 0x0202
+	WM_LBUTTONDBLCLK             = 0x0203
 	WM_MOUSEWHEEL                = 0x020A
 	WM_MOUSEMOVE                 = 0x0200
 	WM_EXITSIZEMOVE              = 0x0232
@@ -61,6 +62,7 @@ const (
 	SW_HIDE                      = 0
 	SW_RESTORE                   = 9
 	SW_SHOWNOACTIVATE            = 4
+	CS_DBLCLKS                   = 0x0008
 	WS_OVERLAPPEDWINDOW          = 0x00CF0000
 	WS_POPUP                     = 0x80000000
 	WS_VISIBLE                   = 0x10000000

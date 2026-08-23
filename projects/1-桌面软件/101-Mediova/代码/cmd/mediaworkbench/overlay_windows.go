@@ -32,7 +32,7 @@ var (
 func registerAuxWindowClasses(hInst uintptr, hIcon uintptr) bool {
 	cursor, _, _ := procLoadCursorW.Call(0, 32512)
 	classes := []wndClassEx{
-		{CbSize: uint32(unsafe.Sizeof(wndClassEx{})), LpfnWndProc: syscall.NewCallback(floatingWndProc), HInstance: hInst, HIcon: hIcon, HIconSm: hIcon, HCursor: cursor, HbrBackground: 0, LpszClassName: floatingClassName},
+		{CbSize: uint32(unsafe.Sizeof(wndClassEx{})), Style: CS_DBLCLKS, LpfnWndProc: syscall.NewCallback(floatingWndProc), HInstance: hInst, HIcon: hIcon, HIconSm: hIcon, HCursor: cursor, HbrBackground: 0, LpszClassName: floatingClassName},
 		{CbSize: uint32(unsafe.Sizeof(wndClassEx{})), LpfnWndProc: syscall.NewCallback(toastWndProc), HInstance: hInst, HIcon: hIcon, HIconSm: hIcon, HCursor: cursor, HbrBackground: COLOR_WINDOW + 1, LpszClassName: toastClassName},
 	}
 	for i := range classes {
@@ -48,6 +48,11 @@ var (
 	floatingHoverRight bool
 	floatingTracking   bool
 )
+
+func floatingProgressDoubleClickHit(x, width int32) bool {
+	edge := scaleDPI(26)
+	return width > edge*2 && x >= edge && x < width-edge
+}
 
 //go:nocheckptr
 func floatingWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
@@ -94,6 +99,16 @@ func floatingWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintp
 			floatingHoverRight = false
 			if app != nil {
 				app.renderFloatingLayer()
+			}
+		}
+		return 0
+	case WM_LBUTTONDBLCLK:
+		if app != nil {
+			x := int32(int16(loWord(lParam)))
+			var rc rect
+			procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
+			if floatingProgressDoubleClickHit(x, rc.Right-rc.Left) {
+				app.restoreMainWindow()
 			}
 		}
 		return 0

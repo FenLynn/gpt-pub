@@ -91,3 +91,22 @@ func TestFloatingApplyAlphaLegacyCompatibility(t *testing.T) {
 		}
 	}
 }
+func TestFloatingProgressDoubleClickHitZone(t *testing.T) {
+	edge := scaleDPI(26)
+	width := edge*2 + scaleDPI(120)
+	cases := []struct {
+		x    int32
+		want bool
+	}{
+		{edge - 1, false},
+		{edge, true},
+		{width / 2, true},
+		{width - edge - 1, true},
+		{width - edge, false},
+	}
+	for _, tc := range cases {
+		if got := floatingProgressDoubleClickHit(tc.x, width); got != tc.want {
+			t.Fatalf("x=%d width=%d hit=%v want=%v", tc.x, width, got, tc.want)
+		}
+	}
+}

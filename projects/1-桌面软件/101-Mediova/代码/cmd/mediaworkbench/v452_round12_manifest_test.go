@@ -44,8 +44,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 58 {
-		t.Errorf("entries=%d want=58", entries)
+	if entries != 60 {
+		t.Errorf("entries=%d want=60", entries)
 	}
 
 	for _, path := range []string{

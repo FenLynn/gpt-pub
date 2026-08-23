@@ -6975,6 +6975,7 @@ func (a *application) notifyBalloon(title, text string) {
 func (a *application) restoreMainWindow() {
 	show(a.hwnd, true)
 	procShowWindow.Call(a.hwnd, SW_RESTORE)
+	procBringWindowToTop.Call(a.hwnd)
 	procSetForegroundWindow.Call(a.hwnd)
 }
 func (a *application) trayEvent(lParam uintptr) {
