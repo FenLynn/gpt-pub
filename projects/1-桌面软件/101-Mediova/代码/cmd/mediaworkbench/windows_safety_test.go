@@ -398,7 +398,7 @@ func TestCleanupTaskListCurrentWorkspaceOnly(t *testing.T) {
 func TestTopToolbarResponsiveBandsKeepSearchGap(t *testing.T) {
 	for _, width := range []int32{980, 1050, 1119, 1120, 1200, 1280, 1319, 1320, 1499, 1500, 1640, 1920} {
 		band := topBandForWidth(width)
-		if len(band.toolWidths) != 10 {
+		if len(band.toolWidths) != 11 {
 			t.Fatalf("width=%d toolbar buttons=%d", width, len(band.toolWidths))
 		}
 		toggleW := int32(32)

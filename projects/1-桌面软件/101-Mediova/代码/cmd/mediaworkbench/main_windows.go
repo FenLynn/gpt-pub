@@ -58,10 +58,13 @@ const (
 	IDC_INVERT                = 1015
 	IDC_SOURCE_DIR            = 1016
 	IDC_OUTPUT_DIR            = 1017
+	IDC_VIEW_MODE             = 1018
 	IDC_LIST                  = 1020
 	IDC_SEARCH                = 1021
 	IDC_FILTER                = 1022
 	IDC_VOLUME_FILTER         = 1023
+	IDC_MAP_SURFACE           = 1024
+	IDC_MAP_TEST              = 1025
 	IDC_OUTPUT_EDIT           = 1030
 	IDC_OUTPUT_BROWSE         = 1031
 	IDC_OUTPUT_PICK           = 1032
@@ -232,8 +235,9 @@ type application struct {
 	hwnd                                                                                                                                                                       uintptr
 	menuMain, menuSettings, menuView, menuConcurrency                                                                                                                          uintptr
 	hIcon                                                                                                                                                                      uintptr
-	hVideo, hImage, hAddFiles, hAddFolder, hRemove, hClear, hSelectAll, hInvert, hSourceDir, hOutputDir                                                                        uintptr
+	hVideo, hImage, hAddFiles, hAddFolder, hRemove, hClear, hSelectAll, hInvert, hSourceDir, hOutputDir, hViewMode                                                             uintptr
 	hSearch, hSearchEdit, hFilter, hVolumeFilter, hList, hToolbarDivider, hHeaderLine                                                                                          uintptr
+	hMapSurface, hMapTest                                                                                                                                                      uintptr
 	hRightTitle, hTaskRes, hTaskCodec, hTaskQuality, hTaskVolume, hTaskRotation, hTaskApply, hTaskDefault, hPreview, hTrimCrop, hSingleOutput, hRetry, hDetails, hDetailsFrame uintptr
 	rightLabels, globalLabels                                                                                                                                                  []uintptr
 	hOutputEdit, hOutputBrowse, hOutputPick, hResolution, hCodec, hQuality, hSpeedMode, hVolume, hRotation, hAllDefault, hSmartPlan                                            uintptr
@@ -332,6 +336,9 @@ type application struct {
 	outputIntegrityHook    func(string)
 	uiPreview              bool
 	uiPreviewMode          string
+	viewMode               string
+	mapDemo                bool
+	mapSelectedDemo        string
 }
 
 // activeQueueRun is deliberately scoped to one media kind. The workers are
@@ -835,7 +842,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		return app.notify((*nmhdr)(unsafe.Pointer(lParam)))
 	case WM_DRAWITEM:
 		dis := (*drawItemStruct)(unsafe.Pointer(lParam))
-		if app.drawOverallProgress(dis) || app.drawDecoration(dis) || app.drawPrimaryButton(dis) || app.drawToolbarButton(dis) || app.drawSecondaryButton(dis) || app.drawStatusChip(dis) {
+		if app.drawMapSurface(dis) || app.drawOverallProgress(dis) || app.drawDecoration(dis) || app.drawPrimaryButton(dis) || app.drawToolbarButton(dis) || app.drawSecondaryButton(dis) || app.drawStatusChip(dis) {
 			return 1
 		}
 	case WM_CTLCOLOREDIT:
@@ -897,6 +904,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		return 0
 	case WM_APP_SELECTION:
 		app.updateRightPanel()
+		app.invalidateMapView()
 		return 0
 	case WM_APP_KIND_SYNC:
 		// A ComboBox may finish closing after the tab click that initiated the
@@ -914,6 +922,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 	case WM_APP_PROBE:
 		app.updateTaskRowByID(int64(wParam))
 		app.updateRightPanel()
+		app.invalidateMapView()
 		return 0
 	case WM_APP_STATUS:
 		app.updateComponentStatus()
@@ -1009,6 +1018,8 @@ func (a *application) toolbarButtonSpec(hwnd uintptr) (icon, label string, activ
 		return "\uE74A", "源目录", false, true // Up
 	case a.hOutputDir:
 		return "\uE74B", "输出目录", false, true // Down
+	case a.hViewMode:
+		return mapViewToolbarSpec(a.viewMode)
 	default:
 		return "", "", false, false
 	}
@@ -1020,7 +1031,7 @@ func (a *application) isHoverableControl(hwnd uintptr) bool {
 	}
 	switch hwnd {
 	case a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear,
-		a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir,
+		a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hViewMode,
 		a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle,
 		a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry,
 		a.hOutputBrowse, a.hOutputPick, a.hAllDefault, a.hSmartPlan,
@@ -1916,6 +1927,8 @@ func (a *application) initControls() {
 	a.hInvert = createControl("BUTTON", "反选", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 588, 5, 66, 58, a.hwnd, IDC_INVERT)
 	a.hSourceDir = createControl("BUTTON", "源目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 660, 5, 76, 58, a.hwnd, IDC_SOURCE_DIR)
 	a.hOutputDir = createControl("BUTTON", "输出目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 742, 5, 82, 58, a.hwnd, IDC_OUTPUT_DIR)
+	a.viewMode = mapViewList
+	a.hViewMode = createControl("BUTTON", "列表", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 830, 5, 78, 58, a.hwnd, IDC_VIEW_MODE)
 
 	a.hSearch = createControlEx(0, "COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_BORDER|CBS_DROPDOWN|CBS_AUTOHSCROLL|WS_VSCROLL, 930, 5, 320, searchHistoryDropHeight, a.hwnd, IDC_SEARCH)
 	procSetWindowTheme.Call(a.hSearch, uintptr(unsafe.Pointer(p("CFD"))), 0)
@@ -1965,6 +1978,8 @@ func (a *application) initControls() {
 		send(a.hList, LVM_INSERTCOLUMNW, uintptr(i), uintptr(unsafe.Pointer(&col)))
 	}
 	a.hHeaderLine = createControl("STATIC", "", WS_CHILD|WS_VISIBLE|SS_OWNERDRAW, 9, 95, 100, 1, a.hwnd, 0)
+	a.hMapSurface = createControl("BUTTON", "", WS_CHILD|BS_OWNERDRAW, 8, 68, 1380, 650, a.hwnd, IDC_MAP_SURFACE)
+	a.hMapTest = createControl("BUTTON", "显示测试点", WS_CHILD|WS_TABSTOP|BS_OWNERDRAW, 0, 0, 104, 30, a.hwnd, IDC_MAP_TEST)
 
 	// Retained only for compatibility; import feedback is routed to the bottom status line.
 	a.hImportToast = createControl("STATIC", "", WS_CHILD, 0, 0, 0, 0, a.hwnd, 0)
@@ -2123,7 +2138,7 @@ func (a *application) recreateFontsForDPI() {
 	if a == nil || !a.controlsReady {
 		return
 	}
-	all := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hSearch, a.hFilter, a.hVolumeFilter, a.hList, a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle, a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation, a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry, a.hDetails, a.hOutputEdit, a.hOutputBrowse, a.hOutputPick, a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation, a.hAllDefault, a.hSmartPlan, a.hStatusText, a.hTimeText, a.hStart, a.hPause, a.hStop}
+	all := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hViewMode, a.hSearch, a.hFilter, a.hVolumeFilter, a.hList, a.hMapSurface, a.hMapTest, a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle, a.hTaskRes, a.hTaskCodec, a.hTaskQuality, a.hTaskVolume, a.hTaskRotation, a.hTaskApply, a.hTaskDefault, a.hPreview, a.hTrimCrop, a.hSingleOutput, a.hRetry, a.hDetails, a.hOutputEdit, a.hOutputBrowse, a.hOutputPick, a.hResolution, a.hCodec, a.hQuality, a.hSpeedMode, a.hVolume, a.hRotation, a.hAllDefault, a.hSmartPlan, a.hStatusText, a.hTimeText, a.hStart, a.hPause, a.hStop}
 	for _, h := range all {
 		if h != 0 {
 			send(h, WM_SETFONT, uiFont, 1)
@@ -2167,7 +2182,7 @@ func rectsOverlap(a, b rect) bool {
 }
 
 func (a *application) validateCurrentLayout(clientW, clientH int32) error {
-	toolbar := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir}
+	toolbar := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hViewMode}
 	controls := append(append([]uintptr{}, toolbar...), a.hSearch, a.hFilter, a.hVolumeFilter, a.hFFStatus, a.hGPUStatus, a.hPotStatus, a.hConcurrencyStatus, a.hRightToggle)
 	rects := make(map[uintptr]rect, len(controls))
 	for i, h := range controls {
@@ -2185,8 +2200,8 @@ func (a *application) validateCurrentLayout(clientW, clientH int32) error {
 			return fmt.Errorf("toolbar buttons overlap: %d %+v %+v", i, rects[toolbar[i-1]], rects[toolbar[i]])
 		}
 	}
-	if rects[a.hOutputDir].Right > rects[a.hSearch].Left {
-		return fmt.Errorf("toolbar enters search area: toolbar=%+v search=%+v", rects[a.hOutputDir], rects[a.hSearch])
+	if rects[a.hViewMode].Right > rects[a.hSearch].Left {
+		return fmt.Errorf("toolbar enters search area: toolbar=%+v search=%+v", rects[a.hViewMode], rects[a.hSearch])
 	}
 	if rectsOverlap(rects[a.hSearch], rects[a.hFilter]) || rectsOverlap(rects[a.hSearch], rects[a.hVolumeFilter]) || rectsOverlap(rects[a.hFilter], rects[a.hVolumeFilter]) {
 		return fmt.Errorf("search/filter controls overlap: search=%+v status=%+v volume=%+v", rects[a.hSearch], rects[a.hFilter], rects[a.hVolumeFilter])
@@ -2277,13 +2292,13 @@ type topBand struct {
 func topBandForWidth(w int32) topBand {
 	switch {
 	case w >= 1500:
-		return topBand{[]int32{104, 104, 84, 94, 66, 66, 66, 66, 80, 86}, 8, 126, 174, 206, 24}
+		return topBand{[]int32{104, 104, 84, 94, 66, 66, 66, 66, 80, 86, 88}, 8, 126, 174, 206, 24}
 	case w >= 1320:
-		return topBand{[]int32{92, 92, 72, 80, 58, 58, 58, 58, 68, 72}, 7, 120, 168, 184, 24}
+		return topBand{[]int32{92, 92, 72, 80, 58, 58, 58, 58, 68, 72, 78}, 7, 120, 168, 184, 24}
 	case w >= 1120:
-		return topBand{[]int32{74, 74, 56, 60, 48, 48, 48, 48, 54, 56}, 5, 112, 156, 168, 23}
+		return topBand{[]int32{74, 74, 56, 60, 48, 48, 48, 48, 54, 56, 62}, 5, 112, 156, 168, 23}
 	default:
-		return topBand{[]int32{54, 54, 42, 42, 40, 40, 40, 40, 42, 42}, 3, 100, 142, 142, 22}
+		return topBand{[]int32{54, 54, 42, 42, 40, 40, 40, 40, 42, 42, 46}, 3, 100, 142, 142, 22}
 	}
 }
 
@@ -2345,7 +2360,7 @@ func (a *application) layout(w, h int32) {
 	top := int32(68)
 	band := topBandForWidth(w)
 
-	toolHandles := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir}
+	toolHandles := []uintptr{a.hVideo, a.hImage, a.hAddFiles, a.hAddFolder, a.hRemove, a.hClear, a.hSelectAll, a.hInvert, a.hSourceDir, a.hOutputDir, a.hViewMode}
 	xTool := int32(8)
 	for i, control := range toolHandles {
 		move(control, xTool, 5, band.toolWidths[i], 58)
@@ -2419,8 +2434,36 @@ func (a *application) layout(w, h int32) {
 	if listH < 260 {
 		listH = 260
 	}
-	move(a.hList, 8, top, listW, listH)
-	move(a.hHeaderLine, 9, top+28, listW-2, 2)
+	mapY, mapH := top, listH
+	listViewH := listH
+	switch a.viewMode {
+	case mapViewSplit:
+		listViewH = listH * 58 / 100
+		mapY = top + listViewH + 6
+		mapH = listH - listViewH - 6
+		show(a.hList, true)
+		show(a.hHeaderLine, true)
+		show(a.hMapSurface, true)
+	case mapViewMap:
+		show(a.hList, false)
+		show(a.hHeaderLine, false)
+		show(a.hMapSurface, true)
+	default:
+		show(a.hList, true)
+		show(a.hHeaderLine, true)
+		show(a.hMapSurface, false)
+	}
+	if a.viewMode != mapViewMap {
+		move(a.hList, 8, top, listW, listViewH)
+		move(a.hHeaderLine, 9, top+28, listW-2, 2)
+	}
+	if a.viewMode != mapViewList {
+		move(a.hMapSurface, 8, mapY, listW, mapH)
+		move(a.hMapTest, 8+listW-116, mapY+10, 104, 30)
+		show(a.hMapTest, true)
+	} else {
+		show(a.hMapTest, false)
+	}
 	// The legacy 14-column layout used to redistribute widths on every fresh
 	// startup. Once Round12 owns the 15-column structure that would immediately
 	// make hidden optional columns visible again, defeating the compact default.
@@ -2569,6 +2612,12 @@ func (a *application) command(id int) {
 		a.switchKind(model.KindVideo)
 	case IDC_TAB_IMAGE:
 		a.switchKind(model.KindImage)
+	case IDC_VIEW_MODE:
+		a.cycleMapViewMode()
+	case IDC_MAP_SURFACE:
+		a.activateMapPointAtCursor()
+	case IDC_MAP_TEST:
+		a.toggleMapDemo()
 	case ID_CONCURRENCY_STATUS:
 		a.showConcurrencyMenu()
 	case IDC_RIGHT_TOGGLE:
