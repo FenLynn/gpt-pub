@@ -233,6 +233,10 @@ func round8TooltipShow(owner uintptr) {
 			y = work.Top
 		}
 	}
+	rgn, _, _ := procCreateRoundRectRgn.Call(0, 0, uintptr(width), uintptr(height), 8, 8)
+	if rgn != 0 {
+		procSetWindowRgn.Call(hwnd, rgn, 1)
+	}
 	round7FeedbackSetWindowPos.Call(hwnd, ^uintptr(0), uintptr(x), uintptr(y), uintptr(width), uintptr(height), round7FeedbackSWPNoActivate|round8SWPShowWindow)
 	procInvalidateRect.Call(hwnd, 0, 0)
 }
@@ -255,8 +259,7 @@ func round8TooltipWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) 
 		if hdc != 0 {
 			var rc rect
 			procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
-			withRoundedClip(hdc, rc, 6, func() { fillSolid(hdc, rc, colorRef(250, 251, 253)) })
-			drawRoundedBorder(hdc, rc, 6, colorRef(198, 207, 218))
+			fillSolid(hdc, rc, colorRef(255, 255, 255))
 			textRC := rc
 			textRC.Left += scaleDPI(12)
 			textRC.Top += scaleDPI(8)

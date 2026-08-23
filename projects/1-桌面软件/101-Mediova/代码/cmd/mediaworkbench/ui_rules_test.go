@@ -42,6 +42,15 @@ func TestRememberRecentDirectory(t *testing.T) {
 	}
 }
 
+func TestRememberRecentSearch(t *testing.T) {
+	previous := []string{"片名", "  路径  ", "片名", "失败", "完成"}
+	got := rememberRecentSearch("  路径  ", previous, 3)
+	want := []string{"路径", "片名", "失败"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("rememberRecentSearch()=%v, want %v", got, want)
+	}
+}
+
 func TestToolbarDefaultIsTransparentAndHoverIsVisible(t *testing.T) {
 	base := toolbarSurfaceTreatment(controlVisualState{})
 	if base.Fill || !base.Border || base.Strength != 1 {

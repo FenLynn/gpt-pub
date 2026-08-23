@@ -132,8 +132,13 @@ func v452DrawSolidPrimaryGlyph(hdc, hwnd uintptr, rc rect, color uintptr) {
 		return
 	}
 	glyph := "\uE768" // Play
-	if hwnd == app.hPause && !strings.Contains(getText(app.hPause), "继续") {
-		glyph = "\uE769" // Pause
+	if hwnd == app.hPause {
+		label := getText(app.hPause)
+		if strings.Contains(label, "继续") || strings.Contains(label, "恢复") {
+			glyph = "\uE768" // Play icon when paused (ready to continue)
+		} else {
+			glyph = "\uE769" // Pause double bars during active running
+		}
 	}
 	if hwnd == app.hStop {
 		glyph = "\uE71A" // Stop

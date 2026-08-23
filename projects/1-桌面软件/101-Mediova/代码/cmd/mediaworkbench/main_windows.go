@@ -33,6 +33,12 @@ import (
 
 const appVersion = "4.5.0"
 
+const (
+	bottomParameterDropHeight = 220
+	outputHistoryDropHeight   = 240
+	searchHistoryDropHeight   = 220
+)
+
 var taskbarCreatedMessage uint32
 var uiDPI uint32 = 96
 var listCompressionDrawCount atomic.Int64
@@ -54,6 +60,7 @@ const (
 	IDC_OUTPUT_DIR            = 1017
 	IDC_LIST                  = 1020
 	IDC_SEARCH                = 1021
+	IDC_SEARCH_CLEAR          = 1024
 	IDC_FILTER                = 1022
 	IDC_VOLUME_FILTER         = 1023
 	IDC_OUTPUT_EDIT           = 1030
@@ -227,7 +234,7 @@ type application struct {
 	menuMain, menuSettings, menuView, menuConcurrency                                                                                                                          uintptr
 	hIcon                                                                                                                                                                      uintptr
 	hVideo, hImage, hAddFiles, hAddFolder, hRemove, hClear, hSelectAll, hInvert, hSourceDir, hOutputDir                                                                        uintptr
-	hSearch, hFilter, hVolumeFilter, hList, hToolbarDivider, hHeaderLine                                                                                                       uintptr
+	hSearch, hSearchEdit, hSearchClear, hFilter, hVolumeFilter, hList, hToolbarDivider, hHeaderLine                                                                            uintptr
 	hRightTitle, hTaskRes, hTaskCodec, hTaskQuality, hTaskVolume, hTaskRotation, hTaskApply, hTaskDefault, hPreview, hTrimCrop, hSingleOutput, hRetry, hDetails, hDetailsFrame uintptr
 	rightLabels, globalLabels                                                                                                                                                  []uintptr
 	hOutputEdit, hOutputBrowse, hOutputPick, hResolution, hCodec, hQuality, hSpeedMode, hVolume, hRotation, hAllDefault, hSmartPlan                                            uintptr
@@ -281,6 +288,8 @@ type application struct {
 	heldEditTaskID         int64
 	rightDraftFields       map[int]bool
 	rightUpdating          bool
+	kindSwitching          bool
+	kindSwitchGeneration   uintptr
 	rightSelectionKey      string
 	filterOptionsKey       string
 	volumeFilterOptionsKey string
@@ -646,11 +655,15 @@ func (a *application) handleShortcutMessage(m *msg) bool {
 	}
 	focus, _, _ := procGetFocus.Call()
 	listFocused := focus == a.hList
-	searchFocused := focus == a.hSearch
+	searchFocused := focus == a.hSearch || focus == a.hSearchEdit
 	action := shortcutAction(m.WParam, keyDown(VK_CONTROL), keyDown(VK_SHIFT), listFocused, searchFocused)
 	switch action {
 	case -1:
-		procSetFocus.Call(a.hSearch)
+		target := a.hSearchEdit
+		if target == 0 {
+			target = a.hSearch
+		}
+		procSetFocus.Call(target)
 		return true
 	case -2:
 		search := strings.TrimSpace(getText(a.hSearch))
@@ -666,6 +679,10 @@ func (a *application) handleShortcutMessage(m *msg) bool {
 		setText(a.hStatusText, "已清除搜索与状态筛选。")
 		return true
 	case 0:
+		if m.WParam == VK_RETURN && searchFocused {
+			a.commitSearchHistory()
+			return true
+		}
 		return false
 	default:
 		a.command(action)
@@ -799,8 +816,16 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 	case WM_COMMAND:
 		id := int(loWord(wParam))
 		code := int(hiWord(wParam))
+		// Repopulating the shared video/image parameter controls must not be
+		// mistaken for a user edit while a workspace switch is in progress.
+		if app.kindSwitching && id >= IDC_RESOLUTION && id <= IDC_ROTATION {
+			return 0
+		}
 		if app.v420HandleControlNotification(id, code) {
 			return 0
+		}
+		if id == IDC_SEARCH && (code == cbnSelChange || code == 4) { // CBN_KILLFOCUS
+			app.commitSearchHistory()
 		}
 		app.command(id)
 		return 0
@@ -808,7 +833,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		return app.notify((*nmhdr)(unsafe.Pointer(lParam)))
 	case WM_DRAWITEM:
 		dis := (*drawItemStruct)(unsafe.Pointer(lParam))
-		if app.drawOverallProgress(dis) || app.drawDecoration(dis) || app.drawPrimaryButton(dis) || app.drawToolbarButton(dis) || app.drawSecondaryButton(dis) || app.drawStatusChip(dis) {
+		if app.drawOverallProgress(dis) || app.drawSearchClearButton(dis) || app.drawDecoration(dis) || app.drawPrimaryButton(dis) || app.drawToolbarButton(dis) || app.drawSecondaryButton(dis) || app.drawStatusChip(dis) {
 			return 1
 		}
 	case WM_CTLCOLOREDIT:
@@ -870,6 +895,16 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		return 0
 	case WM_APP_SELECTION:
 		app.updateRightPanel()
+		return 0
+	case WM_APP_KIND_SYNC:
+		// A ComboBox may finish closing after the tab click that initiated the
+		// workspace switch. Reapply only the newest workspace generation after
+		// older notifications have drained from the window queue.
+		if wParam == app.kindSwitchGeneration {
+			app.kindSwitching = true
+			app.writeSettingsToUI()
+			app.kindSwitching = false
+		}
 		return 0
 	case WM_APP_DONE:
 		app.finishRun()
@@ -1106,7 +1141,12 @@ func (a *application) drawPrimaryButton(dis *drawItemStruct) bool {
 	hovered := a.hovered(dis.HwndItem)
 	bg, border := colorRef(31, 111, 213), colorRef(23, 96, 190)
 	if dis.HwndItem == a.hPause {
-		bg, border = colorRef(218, 143, 28), colorRef(191, 119, 18)
+		label := getText(dis.HwndItem)
+		if strings.Contains(label, "继续") || strings.Contains(label, "恢复") {
+			bg, border = colorRef(31, 111, 213), colorRef(23, 96, 190)
+		} else {
+			bg, border = colorRef(218, 143, 28), colorRef(191, 119, 18)
+		}
 	} else if dis.HwndItem == a.hStop {
 		bg, border = colorRef(202, 73, 67), colorRef(176, 57, 52)
 	}
@@ -1352,12 +1392,16 @@ func (a *application) drawSecondaryButton(dis *drawItemStruct) bool {
 	if dis.HwndItem == a.hAllDefault {
 		drawCompactResetGlyph(dis.HDC, rc, textColor)
 		textRC.Left += scaleDPI(20)
-	} else if glyph != "" && rc.Right-rc.Left >= 72 {
+	} else if glyph != "" && (rc.Right-rc.Left >= 72 || dis.HwndItem == a.hOutputPick) {
 		iconRC := rc
-		iconRC.Left += 7
+		iconRC.Left += 5
 		iconRC.Right = iconRC.Left + 19
 		drawCenteredText(dis.HDC, glyph, iconRC, iconFont, textColor)
-		textRC.Left += 19
+		if dis.HwndItem == a.hOutputPick {
+			textRC.Left += 17
+		} else {
+			textRC.Left += 19
+		}
 	}
 	drawCenteredText(dis.HDC, label, textRC, uiFontSmall, textColor)
 	return true
@@ -1436,8 +1480,8 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 	bar := rect{Left: rc.Left + 1, Top: rc.Top + 2, Right: rc.Right - 1, Bottom: rc.Bottom - 2}
 	fraction := clamp01(a.overallProgress / 100)
 	fill := rect{Left: bar.Left, Top: bar.Top, Right: bar.Left, Bottom: bar.Bottom}
-	withRoundedClip(dis.HDC, bar, 4, func() {
-		fillSolid(dis.HDC, bar, colorRef(248, 250, 252))
+	withRoundedClip(dis.HDC, bar, 5, func() {
+		fillSolid(dis.HDC, bar, colorRef(245, 247, 250))
 		if fraction > 0 {
 			fill = bar
 			fill.Right = fill.Left + int32(float64(fill.Right-fill.Left)*fraction)
@@ -1445,18 +1489,68 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 				fill.Right = fill.Left + 4
 			}
 			if a.overallPaused {
-				drawHorizontalGradient(dis.HDC, fill, colorRef(235, 237, 240), colorRef(194, 199, 207))
+				drawHorizontalGradient(dis.HDC, fill, colorRef(203, 213, 225), colorRef(148, 163, 184))
+			} else if a.overallProgress >= 100 {
+				drawHorizontalGradient(dis.HDC, fill, colorRef(52, 211, 153), colorRef(5, 150, 105))
 			} else {
-				drawHorizontalGradient(dis.HDC, fill, colorRef(151, 196, 245), colorRef(58, 122, 214))
+				drawHorizontalGradient(dis.HDC, fill, colorRef(96, 165, 250), colorRef(29, 78, 216))
 			}
+			// Subtle 1px top sheen
+			sheen := fill
+			sheen.Bottom = sheen.Top + 1
+			fillSolid(dis.HDC, sheen, colorRef(255, 255, 255))
 		}
 	})
-	drawRoundedBorder(dis.HDC, bar, 4, colorRef(218, 223, 230))
+	drawRoundedBorder(dis.HDC, bar, 5, colorRef(210, 218, 228))
 	if a.overallPaused {
-		drawCenteredText(dis.HDC, a.overallText, bar, uiFontProgress, colorRef(117, 126, 139))
+		drawCenteredText(dis.HDC, a.overallText, bar, uiFontProgress, colorRef(100, 116, 139))
 	} else {
 		drawContrastCenteredText(dis.HDC, a.overallText, bar, fill, uiFontProgress)
 	}
+	return true
+}
+
+func (a *application) drawSearchClearButton(dis *drawItemStruct) bool {
+	if dis == nil || a.hSearchClear == 0 || dis.HwndItem != a.hSearchClear {
+		return false
+	}
+	rc := dis.RcItem
+	cx := (rc.Left + rc.Right) / 2
+	cy := (rc.Top + rc.Bottom) / 2
+	radius := int32(scaleDPI(7))
+	circle := rect{Left: cx - radius, Top: cy - radius, Right: cx + radius, Bottom: cy + radius}
+
+	hovered := a.hovered(dis.HwndItem)
+	circleBg := colorRef(226, 232, 240)
+	crossColor := colorRef(100, 116, 139)
+	if hovered {
+		circleBg = colorRef(203, 213, 225)
+		crossColor = colorRef(51, 65, 85)
+	}
+
+	brush, _, _ := procCreateSolidBrush.Call(circleBg)
+	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
+	nullPen, _, _ := procGetStockObject.Call(NULL_PEN)
+	oldPen, _, _ := procSelectObject.Call(dis.HDC, nullPen)
+	procEllipse.Call(dis.HDC, uintptr(circle.Left), uintptr(circle.Top), uintptr(circle.Right), uintptr(circle.Bottom))
+	if oldBrush != 0 {
+		procSelectObject.Call(dis.HDC, oldBrush)
+	}
+	if oldPen != 0 {
+		procSelectObject.Call(dis.HDC, oldPen)
+	}
+	procDeleteObject.Call(brush)
+
+	// Draw subtle crisp cross
+	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, crossColor)
+	oldPen, _, _ = procSelectObject.Call(dis.HDC, pen)
+	r := int32(scaleDPI(3))
+	drawGDIline(dis.HDC, cx-r, cy-r, cx+r+1, cy+r+1)
+	drawGDIline(dis.HDC, cx+r, cy-r, cx-r-1, cy+r+1)
+	if oldPen != 0 {
+		procSelectObject.Call(dis.HDC, oldPen)
+	}
+	procDeleteObject.Call(pen)
 	return true
 }
 
@@ -1559,16 +1653,28 @@ func (a *application) drawStatusChip(dis *drawItemStruct) bool {
 	hovered := a.hovered(dis.HwndItem)
 	canvas := colorRef(250, 251, 253)
 	fillSolid(dis.HDC, rc, canvas)
+
 	if hovered || pressed {
 		inner := rect{Left: rc.Left + 1, Top: rc.Top + 1, Right: rc.Right - 1, Bottom: rc.Bottom - 1}
-		bg := colorRef(241, 247, 254)
-		border := colorRef(157, 188, 223)
+		bg := colorRef(240, 244, 250)
 		if pressed {
-			bg, border = colorRef(228, 240, 253), colorRef(112, 158, 212)
+			bg = colorRef(226, 235, 248)
 		}
-		withRoundedClip(dis.HDC, inner, 4, func() { fillSolid(dis.HDC, inner, bg) })
-		drawRoundedBorder(dis.HDC, inner, 4, border)
+		// Pure seamless rounded highlight without harsh border or black corners
+		brush, _, _ := procCreateSolidBrush.Call(bg)
+		oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
+		nullPen, _, _ := procGetStockObject.Call(NULL_PEN)
+		oldPen, _, _ := procSelectObject.Call(dis.HDC, nullPen)
+		procRoundRect.Call(dis.HDC, uintptr(inner.Left), uintptr(inner.Top), uintptr(inner.Right), uintptr(inner.Bottom), 8, 8)
+		if oldBrush != 0 {
+			procSelectObject.Call(dis.HDC, oldBrush)
+		}
+		if oldPen != 0 {
+			procSelectObject.Call(dis.HDC, oldPen)
+		}
+		procDeleteObject.Call(brush)
 	}
+
 	drawStatusLamp(dis.HDC, rc, dot)
 	if rc.Right-rc.Left < 72 {
 		switch dis.HwndItem {
@@ -1853,9 +1959,17 @@ func (a *application) initControls() {
 	a.hSourceDir = createControl("BUTTON", "源目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 660, 5, 76, 58, a.hwnd, IDC_SOURCE_DIR)
 	a.hOutputDir = createControl("BUTTON", "输出目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 742, 5, 82, 58, a.hwnd, IDC_OUTPUT_DIR)
 
-	a.hSearch = createControlEx(0, "EDIT", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL, 930, 18, 320, 30, a.hwnd, IDC_SEARCH)
-	procSetWindowTheme.Call(a.hSearch, uintptr(unsafe.Pointer(p("Explorer"))), 0)
-	send(a.hSearch, EM_SETCUEBANNER, 1, uintptr(unsafe.Pointer(p("搜索文件名、路径或状态"))))
+	a.hSearch = createControlEx(0, "COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_BORDER|CBS_DROPDOWN|CBS_AUTOHSCROLL|WS_VSCROLL, 930, 5, 320, searchHistoryDropHeight, a.hwnd, IDC_SEARCH)
+	procSetWindowTheme.Call(a.hSearch, uintptr(unsafe.Pointer(p("CFD"))), 0)
+	a.hSearchEdit = round7FeedbackOutputEdit(a.hSearch)
+	if a.hSearchEdit != 0 {
+		send(a.hSearchEdit, EM_SETCUEBANNER, 1, uintptr(unsafe.Pointer(p("搜索文件名、路径或状态"))))
+		leftMargin := uint32(scaleDPI(6))
+		rightMargin := uint32(scaleDPI(42))
+		send(a.hSearchEdit, EM_SETMARGINS, EC_LEFTMARGIN|EC_RIGHTMARGIN, uintptr(leftMargin|(rightMargin<<16)))
+	}
+	a.populateSearchHistory("")
+	a.hSearchClear = createControl("BUTTON", "", WS_CHILD|BS_OWNERDRAW, 0, 0, 18, 18, a.hwnd, IDC_SEARCH_CLEAR)
 	a.hFilter = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL, 1260, 17, 126, 220, a.hwnd, IDC_FILTER)
 	procSetWindowTheme.Call(a.hFilter, uintptr(unsafe.Pointer(p("CFD"))), 0)
 	a.hVolumeFilter = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL, 1394, 17, 126, 220, a.hwnd, IDC_VOLUME_FILTER)
@@ -1933,7 +2047,7 @@ func (a *application) initControls() {
 	send(a.hDetails, EM_SETMARGINS, EC_LEFTMARGIN|EC_RIGHTMARGIN, uintptr(8|(8<<16)))
 
 	// Bottom control strip mirrors v2.8.4: one output row, one progress row, one status row.
-	a.hOutputBrowse = createControl("BUTTON", "输出母目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 8, 730, 116, 32, a.hwnd, IDC_OUTPUT_BROWSE)
+	a.hOutputBrowse = createControl("BUTTON", "打开主目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 8, 731, 116, 30, a.hwnd, IDC_OUTPUT_BROWSE)
 	a.hOutputEdit = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWN|CBS_AUTOHSCROLL|WS_VSCROLL, 130, 730, 560, 240, a.hwnd, IDC_OUTPUT_EDIT)
 	a.hOutputPick = createControl("BUTTON", "浏览", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 696, 730, 72, 32, a.hwnd, IDC_OUTPUT_PICK)
 	send(a.hOutputEdit, WM_SETFONT, uiFont, 1)
@@ -2196,20 +2310,20 @@ func distributeDefaultTaskColumns(listW int32) []int {
 }
 
 type topBand struct {
-	toolWidths                                               []int32
-	toolGap, searchTarget, filterW, statusGridW, statusCellH int32
+	toolWidths                                                      []int32
+	toolGap, statusFilterW, volumeFilterW, statusGridW, statusCellH int32
 }
 
 func topBandForWidth(w int32) topBand {
 	switch {
 	case w >= 1500:
-		return topBand{[]int32{104, 104, 84, 94, 66, 66, 66, 66, 80, 86}, 8, 282, 150, 206, 24}
+		return topBand{[]int32{104, 104, 84, 94, 66, 66, 66, 66, 80, 86}, 8, 126, 174, 206, 24}
 	case w >= 1320:
-		return topBand{[]int32{92, 92, 72, 80, 58, 58, 58, 58, 68, 72}, 7, 202, 136, 184, 24}
+		return topBand{[]int32{92, 92, 72, 80, 58, 58, 58, 58, 68, 72}, 7, 120, 168, 184, 24}
 	case w >= 1120:
-		return topBand{[]int32{74, 74, 56, 60, 48, 48, 48, 48, 54, 56}, 5, 152, 126, 168, 23}
+		return topBand{[]int32{74, 74, 56, 60, 48, 48, 48, 48, 54, 56}, 5, 112, 156, 168, 23}
 	default:
-		return topBand{[]int32{54, 54, 42, 42, 40, 40, 40, 40, 42, 42}, 3, 112, 116, 142, 22}
+		return topBand{[]int32{54, 54, 42, 42, 40, 40, 40, 40, 42, 42}, 3, 100, 142, 142, 22}
 	}
 }
 
@@ -2229,9 +2343,6 @@ func (a *application) beginAtomicUIRefresh() {
 		return
 	}
 	if a.redrawDepth == 0 {
-		if a.hwnd != 0 {
-			send(a.hwnd, WM_SETREDRAW, 0, 0)
-		}
 		if a.hList != 0 {
 			send(a.hList, WM_SETREDRAW, 0, 0)
 		}
@@ -2251,8 +2362,7 @@ func (a *application) endAtomicUIRefresh() {
 		send(a.hList, WM_SETREDRAW, 1, 0)
 	}
 	if a.hwnd != 0 {
-		send(a.hwnd, WM_SETREDRAW, 1, 0)
-		procRedrawWindow.Call(a.hwnd, 0, 0, RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN|RDW_UPDATENOW)
+		procRedrawWindow.Call(a.hwnd, 0, 0, RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW)
 	}
 }
 
@@ -2302,12 +2412,14 @@ func (a *application) layout(w, h int32) {
 	move(a.hPotStatus, gridX, row2, cellW, band.statusCellH)
 	move(a.hConcurrencyStatus, gridX+cellW+gridGap, row2, cellW, band.statusCellH)
 
-	// Search owns the upper row.  Status and size filters are independent,
-	// equal-width controls directly beneath it, mirroring the history page.
+	// Search owns the upper row. The two filters align exactly beneath it,
+	// but are intentionally unequal: status only needs its longest label,
+	// while the volume-ratio descriptions need more room.
 	searchRight := gridX - 8
 	searchLeft := xTool + 8
 	available := searchRight - searchLeft
-	groupW := band.searchTarget + 7 + band.filterW
+	filterGap := int32(6)
+	groupW := band.statusFilterW + filterGap + band.volumeFilterW
 	if groupW > available {
 		groupW = available
 	}
@@ -2315,14 +2427,19 @@ func (a *application) layout(w, h int32) {
 		groupW = 90
 	}
 	groupLeft := searchRight - groupW
-	move(a.hSearch, groupLeft, 5, groupW, 26)
-	filterGap := int32(6)
-	filterW := (groupW - filterGap) / 2
-	if filterW < 42 {
-		filterW = 42
+	move(a.hSearch, groupLeft, 4, groupW, searchHistoryDropHeight)
+	searchClearW := int32(16)
+	// Keep the X inside the edit field and to the left of the combo arrow.
+	move(a.hSearchClear, groupLeft+groupW-searchClearW-24, 10, searchClearW, searchClearW)
+	statusFilterW := band.statusFilterW
+	if statusFilterW > groupW-filterGap-42 {
+		statusFilterW = groupW - filterGap - 42
 	}
-	move(a.hFilter, groupLeft, 35, filterW, 220)
-	move(a.hVolumeFilter, groupLeft+filterW+filterGap, 35, groupW-filterW-filterGap, 220)
+	if statusFilterW < 42 {
+		statusFilterW = 42
+	}
+	move(a.hFilter, groupLeft, 35, statusFilterW, 220)
+	move(a.hVolumeFilter, groupLeft+statusFilterW+filterGap, 35, groupW-statusFilterW-filterGap, 220)
 
 	compactBottom := w < 1320
 	bottomWidths := bottomParameterWidths(a.currentKind)
@@ -2400,9 +2517,12 @@ func (a *application) layout(w, h int32) {
 	show(a.hSmartPlan, simple)
 
 	if compactBottom {
-		move(a.hOutputBrowse, 8, barY, 116, 32)
-		move(a.hOutputEdit, 130, barY, w-204, 32)
-		move(a.hOutputPick, w-66, barY, 58, 32)
+		move(a.hOutputBrowse, 8, barY+1, 116, 30)
+		// For a ComboBox, MoveWindow's height is the complete drop-list height,
+		// not merely the height of its collapsed selection field.  Keeping this
+		// at 32px makes the arrow react but leaves no visible candidate rows.
+		move(a.hOutputEdit, 130, barY, w-216, outputHistoryDropHeight)
+		move(a.hOutputPick, w-80, barY+1, 72, 30)
 		x := int32(8)
 		row2 := barY + 38
 		if simple {
@@ -2410,7 +2530,11 @@ func (a *application) layout(w, h int32) {
 				h  uintptr
 				wd int32
 			}{{a.hResolution, 104}, {a.hSpeedMode, 92}, {a.hSmartPlan, 118}} {
-				move(item.h, x, row2, item.wd, 31)
+				if item.h == a.hSmartPlan {
+					move(item.h, x, row2, item.wd, 31)
+				} else {
+					move(item.h, x, row2, item.wd, bottomParameterDropHeight)
+				}
 				x += item.wd + 7
 			}
 		} else {
@@ -2421,30 +2545,34 @@ func (a *application) layout(w, h int32) {
 			for _, pair := range pairs {
 				move(pair.label, x, row2+4, 38, 24)
 				x += 38
-				move(pair.combo, x, row2, pair.wd, 31)
+				move(pair.combo, x, row2, pair.wd, bottomParameterDropHeight)
 				x += pair.wd + 6
 			}
 			move(a.hAllDefault, x, row2, minInt32(124, w-x-8), 31)
 		}
 	} else {
-		move(a.hOutputBrowse, 8, barY, 116, 32)
+		move(a.hOutputBrowse, 8, barY+1, 116, 30)
 		fixed := int32(38 + bottomWidths.Resolution + 7 + 34 + bottomWidths.Codec + 7 + 34 + bottomWidths.Quality + 7 + 34 + bottomWidths.Volume + 7 + 34 + bottomWidths.Rotation + 8 + 124)
-		editW := w - 8 - 116 - 6 - 60 - 8 - fixed - 8
+		editW := w - 8 - 116 - 6 - 72 - 8 - fixed - 8
 		if simple {
-			editW = w - 8 - 116 - 6 - 60 - 8 - (106 + 7 + 92 + 7 + 122) - 8
+			editW = w - 8 - 116 - 6 - 72 - 8 - (106 + 7 + 92 + 7 + 122) - 8
 		}
 		if editW < 210 {
 			editW = 210
 		}
-		move(a.hOutputEdit, 130, barY, editW, 32)
-		move(a.hOutputPick, 136+editW, barY, 60, 32)
-		x := int32(204) + editW
+		move(a.hOutputEdit, 130, barY, editW, outputHistoryDropHeight)
+		move(a.hOutputPick, 136+editW, barY+1, 72, 30)
+		x := int32(216) + editW
 		if simple {
 			for _, item := range []struct {
 				h  uintptr
 				wd int32
 			}{{a.hResolution, 106}, {a.hSpeedMode, 92}, {a.hSmartPlan, 122}} {
-				move(item.h, x, barY, item.wd, 32)
+				if item.h == a.hSmartPlan {
+					move(item.h, x, barY, item.wd, 32)
+				} else {
+					move(item.h, x, barY, item.wd, bottomParameterDropHeight)
+				}
 				x += item.wd + 7
 			}
 		} else {
@@ -2455,7 +2583,7 @@ func (a *application) layout(w, h int32) {
 			for _, pair := range pairs {
 				move(pair.label, x, barY+4, pair.labelW, 24)
 				x += pair.labelW
-				move(pair.combo, x, barY, pair.comboW, 32)
+				move(pair.combo, x, barY, pair.comboW, bottomParameterDropHeight)
 				x += pair.comboW + 7
 			}
 			move(a.hAllDefault, x, barY, 124, 32)
@@ -2847,9 +2975,51 @@ func (a *application) command(id int) {
 		messageBox(a.hwnd, "关于", fmt.Sprintf("Mediova v%s\r\n\r\n采用透明 Runtime 与独立 Data 架构。\r\n支持视频转正、压缩、裁剪、目标体积、GPU 回退、图片压缩、PotPlayer 对比、历史与任务恢复。\r\n\r\n本机检测到 %d 个逻辑处理器；并行任务上限为 %d。自动模式会结合媒体类型、分辨率、时长、CPU/GPU与任务数量选择实际并发，不会盲目启动上限数量的 FFmpeg 进程。", appVersion, config.LogicalProcessorCount(), config.MaxConcurrency()), MB_OK|MB_ICONINFORMATION)
 	case ID_FILE_EXIT:
 		show(a.hwnd, false)
-	case IDC_SEARCH, IDC_FILTER, IDC_VOLUME_FILTER:
+	case IDC_SEARCH:
+		query := getText(a.hSearch)
+		show(a.hSearchClear, len(strings.TrimSpace(query)) > 0)
+		a.refreshList()
+	case IDC_SEARCH_CLEAR:
+		setText(a.hSearch, "")
+		show(a.hSearchClear, false)
+		a.refreshList()
+		target := a.hSearchEdit
+		if target == 0 {
+			target = a.hSearch
+		}
+		procSetFocus.Call(target)
+	case IDC_FILTER, IDC_VOLUME_FILTER:
 		a.refreshList()
 	}
+}
+
+func (a *application) populateSearchHistory(current string) {
+	if a == nil || a.hSearch == 0 {
+		return
+	}
+	send(a.hSearch, CB_RESETCONTENT, 0, 0)
+	for _, query := range a.settings.RecentSearches {
+		send(a.hSearch, CB_ADDSTRING, 0, uintptr(unsafeStringPointer(query)))
+	}
+	setText(a.hSearch, current)
+	show(a.hSearchClear, strings.TrimSpace(current) != "")
+}
+
+func (a *application) commitSearchHistory() {
+	if a == nil || a.hSearch == 0 {
+		return
+	}
+	query := strings.TrimSpace(getText(a.hSearch))
+	if query == "" {
+		return
+	}
+	recent := rememberRecentSearch(query, a.settings.RecentSearches, 10)
+	if stringSlicesEqual(recent, a.settings.RecentSearches) {
+		return
+	}
+	a.settings.RecentSearches = recent
+	a.populateSearchHistory(query)
+	a.saveSettings()
 }
 
 func (a *application) currentWorkspaceTaskCopies() []*model.Task {
@@ -3048,8 +3218,18 @@ func (a *application) switchKind(kind model.Kind) {
 	if a == nil {
 		return
 	}
+	if kind != model.KindVideo && kind != model.KindImage {
+		return
+	}
+	a.kindSwitchGeneration++
+	generation := a.kindSwitchGeneration
+	a.kindSwitching = true
 	a.beginAtomicUIRefresh()
-	defer a.endAtomicUIRefresh()
+	defer func() {
+		a.endAtomicUIRefresh()
+		a.kindSwitching = false
+		procPostMessageW.Call(a.hwnd, WM_APP_KIND_SYNC, generation, 0)
+	}()
 	a.currentKind = kind
 	a.writeSettingsToUI()
 	a.refreshList()
@@ -5971,6 +6151,10 @@ func (a *application) finishRun() {
 	setText(a.hStatusText, text)
 	a.lastSummaryPath = a.writeRunSummary(summaryTasks, duration, totalIn, totalOut, done, failed, skipped, cancelled)
 	a.saveSession()
+	if a.settings.ShowFloatingBar && a.hFloating != 0 {
+		a.updateFloatingBar(100, "全部完成 ✓", true, false)
+		procSetTimer.Call(a.hFloating, 0x4503, 1500, 0)
+	}
 	if a.settings.OpenOutputOnDone {
 		for _, kind := range []model.Kind{model.KindVideo, model.KindImage} {
 			if outputDir := a.settings.OutputDirFor(kind); outputDir != "" {
@@ -6152,29 +6336,63 @@ func (a *application) playSelected(output bool) {
 	if t == nil {
 		return
 	}
-	path := t.Input
+	path := strings.TrimSpace(t.Input)
 	if output {
-		path = t.OutputPath
+		path = strings.TrimSpace(t.OutputPath)
 		if path == "" || media.FileSize(path) == 0 {
 			messageBox(a.hwnd, "播放输出", "该任务尚无可播放的输出文件。", MB_OK|MB_ICONINFORMATION)
 			return
 		}
 	}
-	a.launchPlayer(path, true)
+	if path == "" {
+		return
+	}
+	if st, err := os.Stat(path); err != nil || st.IsDir() {
+		messageBox(a.hwnd, "播放视频", "媒体文件不存在或无法访问：\r\n"+path, MB_OK|MB_ICONWARNING)
+		return
+	}
+	a.launchPlayer(path, false)
 }
+
+func potPlayerLaunchArgs(path string, newWindow bool) []string {
+	args := []string{path}
+	if newWindow {
+		// PotPlayer expects the media target first; placing /new before it can
+		// create an empty player window without loading the following file.
+		args = append(args, "/new")
+	}
+	return args
+}
+
 func (a *application) launchPlayer(path string, newWindow bool) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	cleanPath := filepath.Clean(path)
+	if st, err := os.Stat(cleanPath); err != nil || st.IsDir() {
+		messageBox(a.hwnd, "播放视频", "媒体文件不存在：\r\n"+cleanPath, MB_OK|MB_ICONWARNING)
+		return
+	}
 	_, _, _, player, playerOK := a.componentSnapshot()
 	if playerOK && player != "" {
-		args := []string{}
-		if newWindow {
-			args = append(args, "/new")
+		if st, err := os.Stat(player); err == nil && !st.IsDir() {
+			cmd := exec.Command(player, potPlayerLaunchArgs(cleanPath, newWindow)...)
+			// Portable PotPlayer builds resolve filters and adjacent components
+			// relative to their executable directory. Do not inherit Mediova's
+			// unrelated working directory.
+			cmd.Dir = filepath.Dir(player)
+			if err := cmd.Start(); err == nil {
+				_ = cmd.Process.Release()
+				return
+			}
 		}
-		args = append(args, path)
-		cmd := exec.Command(player, args...)
-		_ = cmd.Start()
-	} else {
-		shellOpen(path)
 	}
+	// Fallback to native Windows default shell handler
+	shellOpen(cleanPath)
 }
 func (a *application) dualCompare() {
 	t, _ := a.selectedTask()

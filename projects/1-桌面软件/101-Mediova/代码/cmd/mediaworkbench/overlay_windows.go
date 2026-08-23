@@ -4,6 +4,8 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -20,7 +22,6 @@ const (
 	TIMER_TRAY_RETRY     = 3
 	TIMER_IMPORT_CLOSE   = 4
 	TIMER_PROGRESS_FLUSH = 5
-	TIMER_FLOAT_PIN_HIDE = 7
 )
 
 var (
@@ -31,8 +32,6 @@ var (
 func registerAuxWindowClasses(hInst uintptr, hIcon uintptr) bool {
 	cursor, _, _ := procLoadCursorW.Call(0, 32512)
 	classes := []wndClassEx{
-		// This window is drawn only through UpdateLayeredWindow. A COLOR_WINDOW
-		// class brush can leak square white corners during native repaints.
 		{CbSize: uint32(unsafe.Sizeof(wndClassEx{})), LpfnWndProc: syscall.NewCallback(floatingWndProc), HInstance: hInst, HIcon: hIcon, HIconSm: hIcon, HCursor: cursor, HbrBackground: 0, LpszClassName: floatingClassName},
 		{CbSize: uint32(unsafe.Sizeof(wndClassEx{})), LpfnWndProc: syscall.NewCallback(toastWndProc), HInstance: hInst, HIcon: hIcon, HIconSm: hIcon, HCursor: cursor, HbrBackground: COLOR_WINDOW + 1, LpszClassName: toastClassName},
 	}
@@ -43,6 +42,12 @@ func registerAuxWindowClasses(hInst uintptr, hIcon uintptr) bool {
 	}
 	return true
 }
+
+var (
+	floatingHoverLeft  bool
+	floatingHoverRight bool
+	floatingTracking   bool
+)
 
 //go:nocheckptr
 func floatingWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
@@ -56,36 +61,53 @@ func floatingWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintp
 		show(hwnd, false)
 		return 0
 	case WM_PAINT:
-		// UpdateLayeredWindow owns the visible pixels.  A normal GDI repaint here
-		// would bypass the premultiplied-alpha surface and is the source of faint
-		// remnants on the desktop after hover/click changes.
 		paintFloatingProgress(hwnd)
 		return 0
 	case WM_ERASEBKGND:
 		return 1
 	case WM_MOUSEMOVE:
-		if app != nil && !app.floatingPinVisible {
-			app.floatingPinVisible = true
-			app.renderFloatingLayer()
+		if !floatingTracking {
+			var tme trackMouseEvent
+			tme.CbSize = uint32(unsafe.Sizeof(tme))
+			tme.DwFlags = TME_LEAVE
+			tme.HwndTrack = hwnd
+			procTrackMouseEvent.Call(uintptr(unsafe.Pointer(&tme)))
+			floatingTracking = true
 		}
-		procKillTimer.Call(hwnd, TIMER_FLOAT_PIN_HIDE)
-		procSetTimer.Call(hwnd, TIMER_FLOAT_PIN_HIDE, 1200, 0)
+		x := int32(int16(loWord(lParam)))
+		var rc rect
+		procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
+		newLeft := x < scaleDPI(26)
+		newRight := x >= rc.Right-scaleDPI(26)
+		if newLeft != floatingHoverLeft || newRight != floatingHoverRight {
+			floatingHoverLeft = newLeft
+			floatingHoverRight = newRight
+			if app != nil {
+				app.renderFloatingLayer()
+			}
+		}
 		return 0
-	case WM_TIMER:
-		if wParam == TIMER_FLOAT_PIN_HIDE && app != nil && !app.settings.FloatingTopmost {
-			procKillTimer.Call(hwnd, TIMER_FLOAT_PIN_HIDE)
-			app.floatingPinVisible = false
-			app.renderFloatingLayer()
-			return 0
+	case WM_MOUSELEAVE:
+		floatingTracking = false
+		if floatingHoverLeft || floatingHoverRight {
+			floatingHoverLeft = false
+			floatingHoverRight = false
+			if app != nil {
+				app.renderFloatingLayer()
+			}
 		}
+		return 0
 	case WM_LBUTTONUP:
 		if app != nil {
 			x := int32(int16(loWord(lParam)))
 			var rc rect
 			procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
-			if x >= rc.Right-scaleDPI(32) {
+			if x < scaleDPI(26) {
+				// Click on Left play/pause button
+				app.togglePause()
+			} else if x >= rc.Right-scaleDPI(26) {
+				// Click on Right pin button: toggle topmost
 				app.settings.FloatingTopmost = !app.settings.FloatingTopmost
-				app.floatingPinVisible = app.settings.FloatingTopmost
 				_ = config.Save(app.settings)
 				app.syncMenuChecks()
 				app.applyFloatingTopmost()
@@ -93,11 +115,17 @@ func floatingWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintp
 			}
 		}
 		return 0
+	case WM_TIMER:
+		if wParam == 0x4503 {
+			procKillTimer.Call(hwnd, 0x4503)
+			show(hwnd, false)
+			return 0
+		}
 	case WM_NCHITTEST:
 		var wr rect
 		procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&wr)))
 		x := int32(int16(loWord(lParam)))
-		if x >= wr.Right-scaleDPI(32) {
+		if x < wr.Left+scaleDPI(26) || x >= wr.Right-scaleDPI(26) {
 			return HTCLIENT
 		}
 		return HTCAPTION
@@ -105,15 +133,54 @@ func floatingWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintp
 		if app != nil {
 			var wr rect
 			if ok, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&wr))); ok != 0 {
+				w := wr.Right - wr.Left
+				h := wr.Bottom - wr.Top
+				x := wr.Left
+				y := wr.Top
+
+				// Magnetic edge snapping (snaps within 18px from desktop work area)
+				var mi monitorInfo
+				mi.CbSize = uint32(unsafe.Sizeof(mi))
+				hMon, _, _ := procMonitorFromWindow.Call(hwnd, MONITOR_DEFAULTTONEAREST)
+				if hMon != 0 {
+					if ok, _, _ := procGetMonitorInfoW.Call(hMon, uintptr(unsafe.Pointer(&mi))); ok != 0 {
+						wa := mi.RcWork
+						snapDist := int32(18)
+						if math.Abs(float64(x-wa.Left)) < float64(snapDist) {
+							x = wa.Left + 4
+						} else if math.Abs(float64(wa.Right-x-w)) < float64(snapDist) {
+							x = wa.Right - w - 4
+						}
+						if math.Abs(float64(y-wa.Top)) < float64(snapDist) {
+							y = wa.Top + 4
+						} else if math.Abs(float64(wa.Bottom-y-h)) < float64(snapDist) {
+							y = wa.Bottom - h - 4
+						}
+						// Ensure never outside screen
+						if x < wa.Left {
+							x = wa.Left + 4
+						}
+						if x+w > wa.Right {
+							x = wa.Right - w - 4
+						}
+						if y < wa.Top {
+							y = wa.Top + 4
+						}
+						if y+h > wa.Bottom {
+							y = wa.Bottom - h - 4
+						}
+						procSetWindowPos.Call(hwnd, 0, uintptr(x), uintptr(y), 0, 0, SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE)
+					}
+				}
+
 				app.settings.FloatingPositionSet = true
-				app.settings.FloatingX = int(wr.Left)
-				app.settings.FloatingY = int(wr.Top)
+				app.settings.FloatingX = int(x)
+				app.settings.FloatingY = int(y)
 				_ = config.Save(app.settings)
 			}
 		}
 		return 0
 	case WM_DESTROY:
-		procKillTimer.Call(hwnd, TIMER_FLOAT_PIN_HIDE)
 		if app != nil {
 			app.hFloating = 0
 			app.hFloatingProgress = 0
@@ -133,16 +200,263 @@ func paintFloatingProgress(hwnd uintptr) {
 		return
 	}
 	defer procEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
-	// The layered DIB is already committed by renderFloatingLayer. Begin/EndPaint
-	// merely validates the update region; drawing here would create an opaque
-	// second rendering path.
 }
 
+// ─── floating bar full composition (Glass + HiDPI Text + Vector Icons) ───────
+
+func floatingFullCompose(memDC, screenDC uintptr, w, h int32, raw []byte, pct float64, label string, paused, pinned bool) {
+	// 1. Draw smooth frosted glass background & blue gradient progress bar
+	floatingComposeDIB(raw, w, h, pct, label, paused, pinned)
+
+	// 2. High-precision Text rendering with Exact Alpha Recovery (Smooth subpixel font blending)
+	drawFloatingTextHiDPI(screenDC, w, h, raw, pct, label)
+
+	// 3. High-precision Vector icons (Left Pause/Play + Right Pin) directly in subpixel anti-aliasing
+	drawFloatingIcons(w, h, raw, paused, pinned)
+}
+
+// drawFloatingTextHiDPI renders text onto a black scratch buffer, extracts exact subpixel coverage,
+// and alpha-blends it in deep navy onto the background with no jagged black edges.
+func drawFloatingTextHiDPI(screenDC uintptr, w, h int32, raw []byte, pct float64, label string) {
+	if screenDC == 0 || w <= 0 || h <= 0 {
+		return
+	}
+	textDC, _, _ := procCreateCompatibleDC.Call(screenDC)
+	if textDC == 0 {
+		return
+	}
+	defer procDeleteDC.Call(textDC)
+
+	info := v452Round5BitmapInfo{Header: v452Round5BitmapInfoHeader{
+		Size: uint32(unsafe.Sizeof(v452Round5BitmapInfoHeader{})), Width: w, Height: -h,
+		Planes: 1, BitCount: 32, Compression: 0,
+	}}
+	var bits uintptr
+	hBmp, _, _ := floatingCreateDIBSection.Call(screenDC, uintptr(unsafe.Pointer(&info)), 0, uintptr(unsafe.Pointer(&bits)), 0, 0)
+	if hBmp == 0 || bits == 0 {
+		return
+	}
+	defer procDeleteObject.Call(hBmp)
+	oldBmp, _, _ := procSelectObject.Call(textDC, hBmp)
+	if oldBmp != 0 {
+		defer procSelectObject.Call(textDC, oldBmp)
+	}
+
+	// Clear text bitmap to pure black (0, 0, 0, 0)
+	tRaw := unsafe.Slice((*byte)(unsafe.Pointer(bits)), int(w*h*4))
+	for i := range tRaw {
+		tRaw[i] = 0
+	}
+
+	procSetBkMode.Call(textDC, TRANSPARENT)
+	procSetTextColor.Call(textDC, colorRef(255, 255, 255))
+	oldFont, _, _ := procSelectObject.Call(textDC, uiFontSmall)
+	if oldFont != 0 {
+		defer procSelectObject.Call(textDC, oldFont)
+	}
+
+	if pct >= 100.0 || strings.Contains(label, "完成") {
+		// Render unified "全部完成 ✓" centered across the capsule
+		centerRC := rect{Left: scaleDPI(20), Top: 0, Right: w - scaleDPI(20), Bottom: h}
+		procDrawTextW.Call(textDC, uintptr(unsafe.Pointer(p("全部完成 ✓"))), ^uintptr(0), uintptr(unsafe.Pointer(&centerRC)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+	} else {
+		// Part 1: Quantity on Left part center (e.g. "0 / 4")
+		leftRC := rect{Left: scaleDPI(24), Top: 0, Right: w/2 - scaleDPI(3), Bottom: h}
+		// Part 2: Percentage on Right part center (e.g. "43%")
+		rightRC := rect{Left: w/2 + scaleDPI(3), Top: 0, Right: w - scaleDPI(22), Bottom: h}
+
+		procDrawTextW.Call(textDC, uintptr(unsafe.Pointer(p(label))), ^uintptr(0), uintptr(unsafe.Pointer(&leftRC)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+		procDrawTextW.Call(textDC, uintptr(unsafe.Pointer(p(floatingProgressPercent(pct)))), ^uintptr(0), uintptr(unsafe.Pointer(&rightRC)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+	}
+
+	// A deeper navy remains legible over both the pale track and blue fill.
+	tgtR, tgtG, tgtB := 24.0, 49.0, 78.0
+
+	for i := 0; i+3 < len(raw); i += 4 {
+		// Use green channel for font coverage intensity
+		coverage := float64(tRaw[i+1]) / 255.0
+		if coverage <= 0.005 {
+			continue
+		}
+
+		bgA := float64(raw[i+3])
+		if bgA <= 0.0 {
+			continue
+		}
+		// Unpremultiply current background
+		currB := float64(raw[i+0]) * 255.0 / bgA
+		currG := float64(raw[i+1]) * 255.0 / bgA
+		currR := float64(raw[i+2]) * 255.0 / bgA
+
+		// Blend text color over current background
+		outA := bgA + (255.0-bgA)*coverage
+		outR := currR*(1.0-coverage) + tgtR*coverage
+		outG := currG*(1.0-coverage) + tgtG*coverage
+		outB := currB*(1.0-coverage) + tgtB*coverage
+
+		if outA > 255 {
+			outA = 255
+		}
+
+		// Re-premultiply
+		raw[i+0] = uint8(outB * outA / 255.0)
+		raw[i+1] = uint8(outG * outA / 255.0)
+		raw[i+2] = uint8(outR * outA / 255.0)
+		raw[i+3] = uint8(outA)
+	}
+}
+
+// drawFloatingIcons draws left pause/play glyph and right pin directly via vector math.
+func drawFloatingIcons(w, h int32, raw []byte, paused, pinned bool) {
+	// Target icon colors: Dark Slate #334155 (R:51, G:65, B:85)
+	iconR, iconG, iconB := 51.0, 65.0, 85.0
+
+	// 1. Left Pause/Play Icon (centered at x=scaleDPI(16), y=h/2)
+	cx := float64(scaleDPI(15))
+	cy := float64(h) / 2.0
+
+	for y := int32(0); y < h; y++ {
+		fy := float64(y) + 0.5
+		for x := int32(0); x < w; x++ {
+			fx := float64(x) + 0.5
+			off := int((y*w + x) * 4)
+			if off+3 >= len(raw) {
+				continue
+			}
+
+			// Left Glyph Coverage
+			var glyphCov float64
+			if paused {
+				// Pause double bars (2px width, 2px gap, 9px height)
+				barW := float64(scaleDPI(2))
+				gap := float64(scaleDPI(2))
+				barH := float64(scaleDPI(9))
+
+				inBar1 := (fx >= cx-gap/2-barW && fx <= cx-gap/2 && math.Abs(fy-cy) <= barH/2)
+				inBar2 := (fx >= cx+gap/2 && fx <= cx+gap/2+barW && math.Abs(fy-cy) <= barH/2)
+				if inBar1 || inBar2 {
+					glyphCov = 1.0
+				}
+			} else {
+				// Play triangle (right-pointing, optically centered)
+				triH := float64(scaleDPI(10))
+				triW := float64(scaleDPI(9))
+				xLeft := cx - triW/2 + float64(scaleDPI(1))
+				xRight := xLeft + triW
+				yTop := cy - triH/2
+				yBot := cy + triH/2
+
+				if fx >= xLeft && fx <= xRight && fy >= yTop && fy <= yBot {
+					progress := (fx - xLeft) / triW
+					halfHeightAtX := (triH / 2.0) * (1.0 - progress)
+					distY := math.Abs(fy - cy)
+					if distY <= halfHeightAtX {
+						glyphCov = 1.0
+					} else if distY < halfHeightAtX+0.8 {
+						glyphCov = 1.0 - (distY-halfHeightAtX)/0.8
+					}
+				}
+			}
+
+			// Hover chip glow for left play/pause button
+			if floatingHoverLeft {
+				distLeft := math.Sqrt((fx-cx)*(fx-cx) + (fy-cy)*(fy-cy))
+				chipRadius := float64(scaleDPI(11))
+				if distLeft <= chipRadius {
+					chipAlpha := 0.18 * (1.0 - distLeft/chipRadius*0.2)
+					blendPixelOverRaw(raw, off, 255.0, 255.0, 255.0, chipAlpha)
+				}
+			}
+
+			// Hover chip glow for right pin button
+			pinX := float64(w - scaleDPI(13))
+			pinY := cy
+			if floatingHoverRight {
+				distRight := math.Sqrt((fx-pinX)*(fx-pinX) + (fy-pinY)*(fy-pinY))
+				chipRadius := float64(scaleDPI(11))
+				if distRight <= chipRadius {
+					chipAlpha := 0.18 * (1.0 - distRight/chipRadius*0.2)
+					blendPixelOverRaw(raw, off, 255.0, 255.0, 255.0, chipAlpha)
+				}
+			}
+
+			if glyphCov > 0 {
+				blendPixelOverRaw(raw, off, iconR, iconG, iconB, glyphCov)
+			}
+
+			// 2. Right Pin Icon (centered at px=w-scaleDPI(13), py=h/2)
+			var pinCov float64
+			var pR, pG, pB, pAlpha float64
+			if pinned {
+				// Pinned: Solid Dark Slate #334155 (100% visible, distinct dark grey)
+				pR, pG, pB, pAlpha = iconR, iconG, iconB, 1.0
+			} else {
+				// Unpinned: Almost hidden, subtle slate #64748B with ~0.20 opacity
+				pR, pG, pB, pAlpha = 100.0, 116.0, 139.0, 0.20
+			}
+
+			dx := math.Abs(fx - pinX)
+			dy := fy - pinY
+
+			// Cap: dy in [-5.5, -4], halfW = 3.0
+			if dy >= -float64(scaleDPI(6)) && dy <= -float64(scaleDPI(4)) && dx <= float64(scaleDPI(3)) {
+				pinCov = 1.0
+			}
+			// Body: dy in [-4, -1], halfW from 1.0 to 3.0
+			if dy > -float64(scaleDPI(4)) && dy <= -float64(scaleDPI(1)) {
+				t := (dy + float64(scaleDPI(4))) / float64(scaleDPI(3))
+				bw := float64(scaleDPI(1))*(1.0-t) + float64(scaleDPI(3))*t
+				if dx <= bw {
+					pinCov = 1.0
+				}
+			}
+			// Collar: dy in [-1, 1], halfW = 3.5
+			collarHalfW := float64(scaleDPI(7)) / 2.0
+			if dy > -float64(scaleDPI(1)) && dy <= float64(scaleDPI(1)) && dx <= collarHalfW {
+				pinCov = 1.0
+			}
+			// Needle: dy in [1, 5], dx <= 0.8
+			needleHalfW := math.Max(float64(scaleDPI(1))*0.75, 0.75)
+			if dy > float64(scaleDPI(1)) && dy <= float64(scaleDPI(5)) && dx <= needleHalfW {
+				pinCov = 1.0
+			}
+
+			if pinCov > 0 {
+				blendPixelOverRaw(raw, off, pR, pG, pB, pinCov*pAlpha)
+			}
+		}
+	}
+}
+
+func blendPixelOverRaw(raw []byte, off int, r, g, b, cov float64) {
+	if off+3 >= len(raw) || cov <= 0 {
+		return
+	}
+	bgA := float64(raw[off+3])
+	if bgA <= 0 {
+		return
+	}
+	currB := float64(raw[off+0]) * 255.0 / bgA
+	currG := float64(raw[off+1]) * 255.0 / bgA
+	currR := float64(raw[off+2]) * 255.0 / bgA
+
+	outA := bgA + (255.0-bgA)*cov
+	outR := currR*(1.0-cov) + r*cov
+	outG := currG*(1.0-cov) + g*cov
+	outB := currB*(1.0-cov) + b*cov
+
+	if outA > 255 {
+		outA = 255
+	}
+	raw[off+0] = uint8(outB * outA / 255.0)
+	raw[off+1] = uint8(outG * outA / 255.0)
+	raw[off+2] = uint8(outR * outA / 255.0)
+	raw[off+3] = uint8(outA)
+}
+
+// ─── legacy stub kept for test compatibility ─────────────────────────────────
+
 func drawFloatingProgress(hdc uintptr, rc rect) {
-	// This is intentionally an opaque rectangular strip. Wallpaper transparency
-	// and soft corners made the state indistinct at small progress values.
-	surface := rc
-	fillSolid(hdc, surface, colorRef(211, 231, 248))
 	if app == nil {
 		return
 	}
@@ -153,31 +467,15 @@ func drawFloatingProgress(hdc uintptr, rc rect) {
 	if pct > 100 {
 		pct = 100
 	}
-	// The fill owns the complete left edge: no inset, transparency or seam.
-	fill := surface
-	fill.Right = fill.Left + int32(float64(surface.Right-surface.Left)*pct/100+.5)
+	fillSolid(hdc, rc, colorRef(245, 248, 252))
+	fill := rc
+	fill.Right = fill.Left + int32(float64(rc.Right-rc.Left)*pct/100+.5)
 	if fill.Right > fill.Left {
-		fillSolid(hdc, fill, colorRef(102, 169, 222))
+		fillSolid(hdc, fill, colorRef(90, 160, 245))
 	}
-	iconRC := surface
-	iconRC.Left += scaleDPI(8)
-	iconRC.Right = iconRC.Left + scaleDPI(15)
-	iconRC.Top += scaleDPI(5)
-	iconRC.Bottom -= scaleDPI(5)
-	drawFloatingStateGlyph(hdc, iconRC, app.floatingPaused, colorRef(12, 22, 32))
-	textRC := surface
-	textRC.Left += scaleDPI(32)
-	textRC.Right -= scaleDPI(30)
-	drawCenteredText(hdc, fmt.Sprintf("%s (%s)", app.floatingText, floatingProgressPercent(pct)), textRC, uiFontSmall, colorRef(0, 0, 0))
-	// The true pushpin is always visible: blue when pinned, black otherwise.
-	pinRC := surface
-	pinRC.Left = surface.Right - scaleDPI(24)
-	pinColor := colorRef(0, 0, 0)
-	if app.settings.FloatingTopmost {
-		pinColor = colorRef(16, 79, 155)
-	}
-	drawFloatingPushPin(hdc, pinRC, pinColor)
 }
+
+// ─── toast notification ──────────────────────────────────────────────────────
 
 //go:nocheckptr
 func toastWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
@@ -316,16 +614,15 @@ func (a *application) ensureFloatingBar() {
 	}
 	hInst, _, _ := procGetModuleHandleW.Call(0)
 	rc := workArea()
-	// A short, deliberately taller desktop strip: it reads at least as clearly
-	// as the high-DPI status lamps without returning to a large notification UI.
-	w, h := scaleDPI(228), scaleDPI(26)
-	x, y := rc.Right-w-scaleDPI(56), rc.Top+scaleDPI(86)
+	// Compact modern pill shape: ~2/3 length (196 x 34)
+	w, h := scaleDPI(196), scaleDPI(34)
+	x, y := rc.Right-w-scaleDPI(48), rc.Top+scaleDPI(80)
 	if a.settings.FloatingPositionSet {
 		x, y = int32(a.settings.FloatingX), int32(a.settings.FloatingY)
 	}
 	margin := scaleDPI(8)
 	if x < rc.Left+margin || x+w > rc.Right-margin || y < rc.Top+margin || y+h > rc.Bottom-margin {
-		x, y = rc.Right-w-scaleDPI(56), rc.Top+scaleDPI(86)
+		x, y = rc.Right-w-scaleDPI(48), rc.Top+scaleDPI(80)
 	}
 	exStyle := uintptr(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | v452WSExLayered)
 	if a.settings.FloatingTopmost {
@@ -396,7 +693,7 @@ func (a *application) showCompletionToast(title, body string) {
 	y := rc.Bottom - h - scaleDPI(14)
 	if a.hFloating != 0 {
 		if r, _, _ := procIsWindowVisible.Call(a.hFloating); r != 0 {
-			y -= scaleDPI(78)
+			y -= scaleDPI(84)
 		}
 	}
 	hwnd, _, _ := procCreateWindowExW.Call(WS_EX_TOOLWINDOW|WS_EX_TOPMOST|WS_EX_NOACTIVATE|v452WSExLayered, uintptr(unsafe.Pointer(toastClassName)), uintptr(unsafe.Pointer(p(title))), WS_POPUP|WS_CLIPCHILDREN, uintptr(x), uintptr(y+scaleDPI(16)), uintptr(w), uintptr(h), 0, 0, hInst, 0)
@@ -422,68 +719,11 @@ func (a *application) showCompletionToast(title, body string) {
 }
 
 func floatingProgressText(pct float64, completed, total int, elapsed, remaining time.Duration, speedLabel string, active int, engine string, paused bool) string {
-	return fmt.Sprintf("%d/%d", completed, total)
+	return fmt.Sprintf("%d / %d", completed, total)
 }
 
 func floatingProgressPercent(pct float64) string {
 	return fmt.Sprintf("%.0f%%", pct)
-}
-
-// drawFloatingPushPin draws the recognisable Windows-style pushpin silhouette
-// directly instead of using a tiny font glyph or the old three-line marker.
-func drawFloatingPushPin(hdc uintptr, rc rect, color uintptr) {
-	pen, _, _ := procCreatePen.Call(PS_SOLID, uintptr(maxInt32(scaleDPI(1), 1)), color)
-	if pen == 0 {
-		return
-	}
-	old, _, _ := procSelectObject.Call(hdc, pen)
-	defer func() {
-		if old != 0 {
-			procSelectObject.Call(hdc, old)
-		}
-		procDeleteObject.Call(pen)
-	}()
-	cx := (rc.Left + rc.Right) / 2
-	top := rc.Top + scaleDPI(2)
-	cap := maxInt32(scaleDPI(3), 2)
-	collar := top + scaleDPI(3)
-	body := collar + scaleDPI(2)
-	tip := rc.Bottom - scaleDPI(2)
-
-	// cap -> tapered body -> needle. This reads as a pushpin at 100% DPI and
-	// remains a clean vector at scaled DPI settings.
-	procMoveToEx.Call(hdc, uintptr(cx-cap), uintptr(top), 0)
-	procLineTo.Call(hdc, uintptr(cx+cap), uintptr(top))
-	procMoveToEx.Call(hdc, uintptr(cx-cap), uintptr(top), 0)
-	procLineTo.Call(hdc, uintptr(cx-cap+scaleDPI(1)), uintptr(collar))
-	procMoveToEx.Call(hdc, uintptr(cx+cap), uintptr(top), 0)
-	procLineTo.Call(hdc, uintptr(cx+cap-scaleDPI(1)), uintptr(collar))
-	procMoveToEx.Call(hdc, uintptr(cx-cap), uintptr(collar), 0)
-	procLineTo.Call(hdc, uintptr(cx+cap), uintptr(collar))
-	procMoveToEx.Call(hdc, uintptr(cx-cap), uintptr(collar), 0)
-	procLineTo.Call(hdc, uintptr(cx-scaleDPI(2)), uintptr(body))
-	procMoveToEx.Call(hdc, uintptr(cx+cap), uintptr(collar), 0)
-	procLineTo.Call(hdc, uintptr(cx+scaleDPI(2)), uintptr(body))
-	procMoveToEx.Call(hdc, uintptr(cx-scaleDPI(2)), uintptr(body), 0)
-	procLineTo.Call(hdc, uintptr(cx+scaleDPI(2)), uintptr(body))
-	procMoveToEx.Call(hdc, uintptr(cx), uintptr(body), 0)
-	procLineTo.Call(hdc, uintptr(cx), uintptr(tip))
-}
-
-func drawFloatingStateGlyph(hdc uintptr, rc rect, paused bool, color uintptr) {
-	if hdc == 0 || rc.Right <= rc.Left || rc.Bottom <= rc.Top {
-		return
-	}
-	if paused {
-		width := maxInt32(scaleDPI(2), 1)
-		fillSolid(hdc, rect{Left: rc.Left, Top: rc.Top, Right: rc.Left + width, Bottom: rc.Bottom}, color)
-		fillSolid(hdc, rect{Left: rc.Right - width, Top: rc.Top, Right: rc.Right, Bottom: rc.Bottom}, color)
-		return
-	}
-	mid := (rc.Top + rc.Bottom) / 2
-	// A filled native polygon avoids the jagged one-pixel outline that the
-	// previous miniature play marker produced at normal 100% desktop scaling.
-	round12FillPolygon(hdc, []point{{X: rc.Left, Y: rc.Top}, {X: rc.Right, Y: mid}, {X: rc.Left, Y: rc.Bottom}}, color)
 }
 
 func drawFloatingRectBorder(hdc uintptr, rc rect, color uintptr) {

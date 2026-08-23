@@ -16,6 +16,9 @@ const (
 	WM_GETMINMAXINFO             = 0x0024
 	WM_SETCURSOR                 = 0x0020
 	WM_DPICHANGED                = 0x02E0
+	WM_MOUSELEAVE                = 0x02A3
+	TME_LEAVE                    = 0x00000002
+	MONITOR_DEFAULTTONEAREST     = 2
 	WM_SETFOCUS                  = 0x0007
 	WM_CLOSE                     = 0x0010
 	WM_COMMAND                   = 0x0111
@@ -43,6 +46,7 @@ const (
 	WM_APP_SELFTEST              = WM_APP + 8
 	WM_APP_PROGRESS              = WM_APP + 9
 	WM_APP_SELECTION             = WM_APP + 10
+	WM_APP_KIND_SYNC             = WM_APP + 11
 	WM_LBUTTONDOWN               = 0x0201
 	WM_LBUTTONUP                 = 0x0202
 	WM_MOUSEWHEEL                = 0x020A
@@ -238,6 +242,7 @@ const (
 	COLORONCOLOR                 = 3
 	HALFTONE                     = 4
 	PS_SOLID                     = 0
+	NULL_PEN                     = 8
 	NULL_BRUSH                   = 5
 	TRANSPARENT                  = 1
 	DT_LEFT                      = 0x00000000
@@ -311,6 +316,9 @@ var (
 	procSetMenu                       = user32.NewProc("SetMenu")
 	procDrawMenuBar                   = user32.NewProc("DrawMenuBar")
 	procTrackPopupMenu                = user32.NewProc("TrackPopupMenu")
+	procTrackMouseEvent               = user32.NewProc("TrackMouseEvent")
+	procMonitorFromWindow             = user32.NewProc("MonitorFromWindow")
+	procGetMonitorInfoW               = user32.NewProc("GetMonitorInfoW")
 	procGetCursorPos                  = user32.NewProc("GetCursorPos")
 	procSetForegroundWindow           = user32.NewProc("SetForegroundWindow")
 	procFindWindowW                   = user32.NewProc("FindWindowW")
@@ -448,6 +456,20 @@ type msg struct {
 	Private        uint32
 }
 type rect struct{ Left, Top, Right, Bottom int32 }
+
+type trackMouseEvent struct {
+	CbSize      uint32
+	DwFlags     uint32
+	HwndTrack   uintptr
+	DwHoverTime uint32
+}
+
+type monitorInfo struct {
+	CbSize    uint32
+	RcMonitor rect
+	RcWork    rect
+	DwFlags   uint32
+}
 type wndClassEx struct {
 	CbSize        uint32
 	Style         uint32

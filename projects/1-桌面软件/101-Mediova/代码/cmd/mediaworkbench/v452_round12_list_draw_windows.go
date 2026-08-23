@@ -15,6 +15,10 @@ func round12DrawTaskListCell(a *application, cd *nmListViewCustomDraw) uintptr {
 	}
 	switch cd.NMCD.DrawStage {
 	case CDDS_PREPAINT:
+		count := int(send(a.hList, LVM_GETITEMCOUNT, 0, 0))
+		if count == 0 {
+			round12DrawEmptyStateWatermark(a, cd.NMCD.HDC)
+		}
 		return CDRF_NOTIFYITEMDRAW
 	case CDDS_ITEMPREPAINT:
 		// Do not pre-fill the whole row here. The former whole-row prepaint
@@ -159,6 +163,84 @@ func round12DrawStatusCell(hdc uintptr, cell rect, label string, status model.St
 		procSelectObject.Call(hdc, old)
 	}
 	round12DrawSeparator(hdc, cell)
+}
+
+func statusPillColors(status model.Status) (bg, border, text uintptr) {
+	switch status {
+	case model.StatusProcessing:
+		return colorRef(224, 242, 254), colorRef(186, 230, 253), colorRef(3, 105, 161) // Sky Blue
+	case model.StatusDone:
+		return colorRef(220, 252, 231), colorRef(187, 247, 208), colorRef(21, 128, 61)  // Emerald Green
+	case model.StatusPaused:
+		return colorRef(241, 245, 249), colorRef(226, 232, 240), colorRef(71, 85, 105)  // Slate
+	case model.StatusFailed, model.StatusCancelled:
+		return colorRef(254, 226, 226), colorRef(254, 202, 202), colorRef(185, 28, 28)  // Rose Red
+	case model.StatusQueued:
+		return colorRef(238, 242, 255), colorRef(224, 231, 255), colorRef(79, 70, 229)  // Indigo
+	default:
+		return colorRef(248, 250, 252), colorRef(226, 232, 240), colorRef(51, 65, 85)   // Light Neutral
+	}
+}
+
+func round12DrawEmptyStateWatermark(a *application, hdc uintptr) {
+	if a == nil || a.hList == 0 || hdc == 0 {
+		return
+	}
+	var rc rect
+	if ok, _, _ := procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&rc))); ok == 0 || rc.Right <= rc.Left || rc.Bottom <= rc.Top {
+		return
+	}
+	fillSolid(hdc, rc, colorRef(255, 255, 255))
+
+	cardW := scaleDPI(340)
+	cardH := scaleDPI(130)
+	cx := (rc.Left + rc.Right) / 2
+	cy := (rc.Top + rc.Bottom) / 2
+	if cy < scaleDPI(120) {
+		cy = scaleDPI(120)
+	}
+
+	card := rect{Left: cx - cardW/2, Top: cy - cardH/2, Right: cx + cardW/2, Bottom: cy + cardH/2}
+	// Light frosted border
+	brush, _, _ := procCreateSolidBrush.Call(colorRef(250, 252, 255))
+	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, colorRef(226, 232, 240))
+	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
+	oldPen, _, _ := procSelectObject.Call(hdc, pen)
+	procRoundRect.Call(hdc, uintptr(card.Left), uintptr(card.Top), uintptr(card.Right), uintptr(card.Bottom), 14, 14)
+	procSelectObject.Call(hdc, oldBrush)
+	procSelectObject.Call(hdc, oldPen)
+	procDeleteObject.Call(brush)
+	procDeleteObject.Call(pen)
+
+	procSetBkMode.Call(hdc, TRANSPARENT)
+
+	// Icon
+	iconRC := card
+	iconRC.Top += scaleDPI(16)
+	iconRC.Bottom = iconRC.Top + scaleDPI(26)
+	oldFont, _, _ := procSelectObject.Call(hdc, iconFont)
+	procSetTextColor.Call(hdc, colorRef(59, 130, 246))
+	procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p("\uE896"))), ^uintptr(0), uintptr(unsafe.Pointer(&iconRC)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+
+	// Title
+	titleRC := card
+	titleRC.Top = iconRC.Bottom + scaleDPI(8)
+	titleRC.Bottom = titleRC.Top + scaleDPI(24)
+	procSelectObject.Call(hdc, uiFontBold)
+	procSetTextColor.Call(hdc, colorRef(71, 85, 105))
+	procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p("拖拽视频或图片到此处"))), ^uintptr(0), uintptr(unsafe.Pointer(&titleRC)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+
+	// Subtitle
+	subRC := card
+	subRC.Top = titleRC.Bottom + scaleDPI(2)
+	subRC.Bottom = subRC.Top + scaleDPI(20)
+	procSelectObject.Call(hdc, uiFontSmall)
+	procSetTextColor.Call(hdc, colorRef(148, 163, 184))
+	procDrawTextW.Call(hdc, uintptr(unsafe.Pointer(p("或点击左上方「添加文件 / 文件夹」"))), ^uintptr(0), uintptr(unsafe.Pointer(&subRC)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+
+	if oldFont != 0 {
+		procSelectObject.Call(hdc, oldFont)
+	}
 }
 
 func round12LegacyText(values []string, index int) string {

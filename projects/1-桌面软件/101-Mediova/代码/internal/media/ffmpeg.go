@@ -231,17 +231,42 @@ func DetectPotPlayer(configured string) (string, bool, string) {
 	if configured != "" {
 		candidates = append(candidates, configured)
 	}
-	for _, base := range []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)"), os.Getenv("LOCALAPPDATA")} {
+	// Common executable names
+	exeNames := []string{"PotPlayer64.exe", "PotPlayer.exe", "PotPlayerMini64.exe", "PotPlayerMini.exe"}
+	for _, exe := range exeNames {
+		if p, err := exec.LookPath(exe); err == nil && p != "" {
+			candidates = append(candidates, p)
+		}
+	}
+	var bases []string
+	for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "LOCALAPPDATA", "APPDATA"} {
+		if v := os.Getenv(env); v != "" {
+			bases = append(bases, v)
+		}
+	}
+	// Also check common fixed drive roots
+	for _, drive := range []string{"C:", "D:", "E:", "F:"} {
+		bases = append(bases,
+			filepath.Join(drive, "Program Files"),
+			filepath.Join(drive, "Program Files (x86)"),
+			filepath.Join(drive, "PotPlayer"),
+			filepath.Join(drive, "DAUM", "PotPlayer"),
+			filepath.Join(drive, "Software", "PotPlayer"),
+			filepath.Join(drive, "Tools", "PotPlayer"),
+		)
+	}
+	for _, base := range bases {
 		if base == "" {
 			continue
 		}
-		candidates = append(candidates,
-			filepath.Join(base, "DAUM", "PotPlayer", "PotPlayerMini64.exe"),
-			filepath.Join(base, "DAUM", "PotPlayer", "PotPlayerMini.exe"),
-			filepath.Join(base, "PotPlayer", "PotPlayerMini64.exe"))
-	}
-	if p, err := exec.LookPath("PotPlayerMini64.exe"); err == nil {
-		candidates = append(candidates, p)
+		for _, exe := range exeNames {
+			candidates = append(candidates,
+				filepath.Join(base, exe),
+				filepath.Join(base, "DAUM", "PotPlayer", exe),
+				filepath.Join(base, "PotPlayer", exe),
+				filepath.Join(base, "DAUM", exe),
+			)
+		}
 	}
 	for _, p := range candidates {
 		if p == "" {

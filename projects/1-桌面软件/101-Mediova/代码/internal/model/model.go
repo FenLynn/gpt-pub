@@ -164,6 +164,7 @@ type Settings struct {
 	ImageOutputDir         string           `json:"image_output_dir,omitempty"`
 	RecentOutputDirs       []string         `json:"recent_output_dirs,omitempty"`
 	RecentImageOutputDirs  []string         `json:"recent_image_output_dirs,omitempty"`
+	RecentSearches         []string         `json:"recent_searches,omitempty"`
 	Resolution             string           `json:"resolution"`
 	Codec                  string           `json:"codec"`
 	Quality                string           `json:"quality"`

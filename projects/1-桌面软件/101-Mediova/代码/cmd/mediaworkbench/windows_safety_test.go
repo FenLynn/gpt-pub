@@ -17,6 +17,29 @@ func TestLayoutSafeBeforeControls(t *testing.T) {
 	a.layout(1650, 900)
 }
 
+func TestBottomComboDropHeightsKeepCandidateRowsVisible(t *testing.T) {
+	// Native ComboBox height includes its popup list. A one-row 31/32px layout
+	// makes the arrow clickable but leaves the candidate list effectively empty.
+	if bottomParameterDropHeight < 120 {
+		t.Fatalf("parameter drop height=%d, want room for multiple rows", bottomParameterDropHeight)
+	}
+	if outputHistoryDropHeight < 120 {
+		t.Fatalf("output-history drop height=%d, want room for multiple rows", outputHistoryDropHeight)
+	}
+}
+
+func TestPotPlayerLaunchArgsKeepMediaTargetFirst(t *testing.T) {
+	path := `D:\媒体 文件\示例 视频.mp4`
+	ordinary := potPlayerLaunchArgs(path, false)
+	if len(ordinary) != 1 || ordinary[0] != path {
+		t.Fatalf("ordinary PotPlayer args = %#v", ordinary)
+	}
+	separate := potPlayerLaunchArgs(path, true)
+	if len(separate) != 2 || separate[0] != path || separate[1] != "/new" {
+		t.Fatalf("separate-window PotPlayer args = %#v", separate)
+	}
+}
+
 func TestFileDialogFilterKeepsDoubleNUL(t *testing.T) {
 	filter := "媒体文件\x00*.mp4;*.jpg\x00所有文件\x00*.*\x00\x00"
 	buf := utf16Multi(filter)
@@ -384,10 +407,9 @@ func TestTopToolbarResponsiveBandsKeepSearchGap(t *testing.T) {
 		}
 		toggleX := width - 8 - toggleW
 		gridX := toggleX - 7 - band.statusGridW
-		filterX := gridX - 8 - band.filterW
-		searchRight := filterX - 7
+		groupRight := gridX - 8
 		searchLeft := toolbarRightEdge(band) + 8
-		if available := searchRight - searchLeft; available < 90 {
+		if available := groupRight - searchLeft; available < 90 {
 			t.Fatalf("width=%d leaves only %d px between toolbar and filter", width, available)
 		}
 	}

@@ -94,6 +94,9 @@ func (a *application) v420TogglePause() {
 		}
 		setText(a.hStatusText, msg)
 	}
+	if a.hPause != 0 {
+		procInvalidateRect.Call(a.hPause, 0, 0)
+	}
 	a.v420SignalQueue()
 	procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
 }

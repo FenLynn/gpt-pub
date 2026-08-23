@@ -3,6 +3,7 @@
 package main
 
 import (
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -441,6 +442,10 @@ func round12FooterIconKind(a *application, hwnd uintptr) int {
 	case a.hStart:
 		return round12IconPlay
 	case a.hPause:
+		label := getText(hwnd)
+		if strings.Contains(label, "继续") || strings.Contains(label, "恢复") {
+			return round12IconPlay
+		}
 		return round12IconPause
 	case a.hStop:
 		return round12IconStop
@@ -481,7 +486,14 @@ func round12DrawFooterAction(a *application, dis *drawItemStruct) bool {
 
 	bg, border := colorRef(31, 111, 213), colorRef(23, 96, 190)
 	if dis.HwndItem == a.hPause {
-		bg, border = colorRef(218, 143, 28), colorRef(191, 119, 18)
+		label := getText(dis.HwndItem)
+		if strings.Contains(label, "继续") || strings.Contains(label, "恢复") {
+			// Paused state: show blue background & play icon for 'Continue' action
+			bg, border = colorRef(31, 111, 213), colorRef(23, 96, 190)
+		} else {
+			// Active running state: show amber background for 'Pause' action
+			bg, border = colorRef(218, 143, 28), colorRef(191, 119, 18)
+		}
 	} else if dis.HwndItem == a.hStop {
 		bg, border = colorRef(202, 73, 67), colorRef(176, 57, 52)
 	}
