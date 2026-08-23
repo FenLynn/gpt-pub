@@ -60,7 +60,6 @@ const (
 	IDC_OUTPUT_DIR            = 1017
 	IDC_LIST                  = 1020
 	IDC_SEARCH                = 1021
-	IDC_SEARCH_CLEAR          = 1024
 	IDC_FILTER                = 1022
 	IDC_VOLUME_FILTER         = 1023
 	IDC_OUTPUT_EDIT           = 1030
@@ -234,7 +233,7 @@ type application struct {
 	menuMain, menuSettings, menuView, menuConcurrency                                                                                                                          uintptr
 	hIcon                                                                                                                                                                      uintptr
 	hVideo, hImage, hAddFiles, hAddFolder, hRemove, hClear, hSelectAll, hInvert, hSourceDir, hOutputDir                                                                        uintptr
-	hSearch, hSearchEdit, hSearchClear, hFilter, hVolumeFilter, hList, hToolbarDivider, hHeaderLine                                                                            uintptr
+	hSearch, hSearchEdit, hFilter, hVolumeFilter, hList, hToolbarDivider, hHeaderLine                                                                                          uintptr
 	hRightTitle, hTaskRes, hTaskCodec, hTaskQuality, hTaskVolume, hTaskRotation, hTaskApply, hTaskDefault, hPreview, hTrimCrop, hSingleOutput, hRetry, hDetails, hDetailsFrame uintptr
 	rightLabels, globalLabels                                                                                                                                                  []uintptr
 	hOutputEdit, hOutputBrowse, hOutputPick, hResolution, hCodec, hQuality, hSpeedMode, hVolume, hRotation, hAllDefault, hSmartPlan                                            uintptr
@@ -313,11 +312,13 @@ type application struct {
 	uiQueue                chan func()
 	probeQueue             chan int64
 	thumbnailQueue         chan thumbnailJob
+	metadataQueue          chan int64
 	progressMu             sync.Mutex
 	pendingProgressRows    map[int64]struct{}
 	progressFlushScheduled bool
 	probeQueueDropped      atomic.Int64
 	thumbnailQueueDropped  atomic.Int64
+	metadataQueueDropped   atomic.Int64
 	workers                sync.WaitGroup
 	exiting                bool
 	trayAdded              bool
@@ -550,6 +551,7 @@ func main() {
 		settings.OpenOutputOnDone = false
 	}
 	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, uiPreviewMode: uiPreviewMode, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), queueWake: make(chan struct{}, 64), taskCancels: make(map[int64]context.CancelFunc), holdRequests: make(map[int64]bool), removeRequests: make(map[int64]bool), immediateRestarts: make(map[int64]bool), rightDraftFields: make(map[int]bool), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
+	app.metadataQueue = make(chan int64, 8192)
 	if runtimeMigrationErr != nil {
 		app.runtimeNotice = "旧 FFmpeg 组件未能复制到 Runtime，已保留旧位置继续兼容：" + short(runtimeMigrationErr.Error(), 160)
 	} else if runtimeMigrated {
@@ -833,7 +835,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		return app.notify((*nmhdr)(unsafe.Pointer(lParam)))
 	case WM_DRAWITEM:
 		dis := (*drawItemStruct)(unsafe.Pointer(lParam))
-		if app.drawOverallProgress(dis) || app.drawSearchClearButton(dis) || app.drawDecoration(dis) || app.drawPrimaryButton(dis) || app.drawToolbarButton(dis) || app.drawSecondaryButton(dis) || app.drawStatusChip(dis) {
+		if app.drawOverallProgress(dis) || app.drawDecoration(dis) || app.drawPrimaryButton(dis) || app.drawToolbarButton(dis) || app.drawSecondaryButton(dis) || app.drawStatusChip(dis) {
 			return 1
 		}
 	case WM_CTLCOLOREDIT:
@@ -1510,50 +1512,6 @@ func (a *application) drawOverallProgress(dis *drawItemStruct) bool {
 	return true
 }
 
-func (a *application) drawSearchClearButton(dis *drawItemStruct) bool {
-	if dis == nil || a.hSearchClear == 0 || dis.HwndItem != a.hSearchClear {
-		return false
-	}
-	rc := dis.RcItem
-	cx := (rc.Left + rc.Right) / 2
-	cy := (rc.Top + rc.Bottom) / 2
-	radius := int32(scaleDPI(7))
-	circle := rect{Left: cx - radius, Top: cy - radius, Right: cx + radius, Bottom: cy + radius}
-
-	hovered := a.hovered(dis.HwndItem)
-	circleBg := colorRef(226, 232, 240)
-	crossColor := colorRef(100, 116, 139)
-	if hovered {
-		circleBg = colorRef(203, 213, 225)
-		crossColor = colorRef(51, 65, 85)
-	}
-
-	brush, _, _ := procCreateSolidBrush.Call(circleBg)
-	oldBrush, _, _ := procSelectObject.Call(dis.HDC, brush)
-	nullPen, _, _ := procGetStockObject.Call(NULL_PEN)
-	oldPen, _, _ := procSelectObject.Call(dis.HDC, nullPen)
-	procEllipse.Call(dis.HDC, uintptr(circle.Left), uintptr(circle.Top), uintptr(circle.Right), uintptr(circle.Bottom))
-	if oldBrush != 0 {
-		procSelectObject.Call(dis.HDC, oldBrush)
-	}
-	if oldPen != 0 {
-		procSelectObject.Call(dis.HDC, oldPen)
-	}
-	procDeleteObject.Call(brush)
-
-	// Draw subtle crisp cross
-	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, crossColor)
-	oldPen, _, _ = procSelectObject.Call(dis.HDC, pen)
-	r := int32(scaleDPI(3))
-	drawGDIline(dis.HDC, cx-r, cy-r, cx+r+1, cy+r+1)
-	drawGDIline(dis.HDC, cx+r, cy-r, cx-r-1, cy+r+1)
-	if oldPen != 0 {
-		procSelectObject.Call(dis.HDC, oldPen)
-	}
-	procDeleteObject.Call(pen)
-	return true
-}
-
 func (a *application) drawDecoration(dis *drawItemStruct) bool {
 	if dis == nil {
 		return false
@@ -1965,11 +1923,10 @@ func (a *application) initControls() {
 	if a.hSearchEdit != 0 {
 		send(a.hSearchEdit, EM_SETCUEBANNER, 1, uintptr(unsafe.Pointer(p("搜索文件名、路径或状态"))))
 		leftMargin := uint32(scaleDPI(6))
-		rightMargin := uint32(scaleDPI(42))
+		rightMargin := uint32(scaleDPI(24))
 		send(a.hSearchEdit, EM_SETMARGINS, EC_LEFTMARGIN|EC_RIGHTMARGIN, uintptr(leftMargin|(rightMargin<<16)))
 	}
 	a.populateSearchHistory("")
-	a.hSearchClear = createControl("BUTTON", "", WS_CHILD|BS_OWNERDRAW, 0, 0, 18, 18, a.hwnd, IDC_SEARCH_CLEAR)
 	a.hFilter = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL, 1260, 17, 126, 220, a.hwnd, IDC_FILTER)
 	procSetWindowTheme.Call(a.hFilter, uintptr(unsafe.Pointer(p("CFD"))), 0)
 	a.hVolumeFilter = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL, 1394, 17, 126, 220, a.hwnd, IDC_VOLUME_FILTER)
@@ -2047,11 +2004,14 @@ func (a *application) initControls() {
 	send(a.hDetails, EM_SETMARGINS, EC_LEFTMARGIN|EC_RIGHTMARGIN, uintptr(8|(8<<16)))
 
 	// Bottom control strip mirrors v2.8.4: one output row, one progress row, one status row.
-	a.hOutputBrowse = createControl("BUTTON", "打开主目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 8, 731, 116, 30, a.hwnd, IDC_OUTPUT_BROWSE)
+	a.hOutputBrowse = createControl("BUTTON", "打开主目录", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 8, 730, 116, 32, a.hwnd, IDC_OUTPUT_BROWSE)
 	a.hOutputEdit = createControl("COMBOBOX", "", WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWN|CBS_AUTOHSCROLL|WS_VSCROLL, 130, 730, 560, 240, a.hwnd, IDC_OUTPUT_EDIT)
 	a.hOutputPick = createControl("BUTTON", "浏览", WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW, 696, 730, 72, 32, a.hwnd, IDC_OUTPUT_PICK)
 	send(a.hOutputEdit, WM_SETFONT, uiFont, 1)
 	procSetWindowTheme.Call(a.hOutputEdit, uintptr(unsafe.Pointer(p("CFD"))), 0)
+	// Match the collapsed ComboBox field to the two adjacent 32px buttons.
+	// MoveWindow's height still controls the expanded drop-list height.
+	send(a.hOutputEdit, CB_SETITEMHEIGHT, ^uintptr(0), uintptr(scaleDPI(24)))
 	a.refreshOutputHistory()
 	for _, text := range []string{"输出", "格式", "质量", "体积", "旋转"} {
 		h := createControl("STATIC", text, WS_CHILD|WS_VISIBLE|SS_CENTER, 0, 0, 34, 28, a.hwnd, 0)
@@ -2428,9 +2388,6 @@ func (a *application) layout(w, h int32) {
 	}
 	groupLeft := searchRight - groupW
 	move(a.hSearch, groupLeft, 4, groupW, searchHistoryDropHeight)
-	searchClearW := int32(16)
-	// Keep the X inside the edit field and to the left of the combo arrow.
-	move(a.hSearchClear, groupLeft+groupW-searchClearW-24, 10, searchClearW, searchClearW)
 	statusFilterW := band.statusFilterW
 	if statusFilterW > groupW-filterGap-42 {
 		statusFilterW = groupW - filterGap - 42
@@ -2517,12 +2474,12 @@ func (a *application) layout(w, h int32) {
 	show(a.hSmartPlan, simple)
 
 	if compactBottom {
-		move(a.hOutputBrowse, 8, barY+1, 116, 30)
+		move(a.hOutputBrowse, 8, barY, 116, 32)
 		// For a ComboBox, MoveWindow's height is the complete drop-list height,
 		// not merely the height of its collapsed selection field.  Keeping this
 		// at 32px makes the arrow react but leaves no visible candidate rows.
 		move(a.hOutputEdit, 130, barY, w-216, outputHistoryDropHeight)
-		move(a.hOutputPick, w-80, barY+1, 72, 30)
+		move(a.hOutputPick, w-80, barY, 72, 32)
 		x := int32(8)
 		row2 := barY + 38
 		if simple {
@@ -2551,7 +2508,7 @@ func (a *application) layout(w, h int32) {
 			move(a.hAllDefault, x, row2, minInt32(124, w-x-8), 31)
 		}
 	} else {
-		move(a.hOutputBrowse, 8, barY+1, 116, 30)
+		move(a.hOutputBrowse, 8, barY, 116, 32)
 		fixed := int32(38 + bottomWidths.Resolution + 7 + 34 + bottomWidths.Codec + 7 + 34 + bottomWidths.Quality + 7 + 34 + bottomWidths.Volume + 7 + 34 + bottomWidths.Rotation + 8 + 124)
 		editW := w - 8 - 116 - 6 - 72 - 8 - fixed - 8
 		if simple {
@@ -2561,7 +2518,7 @@ func (a *application) layout(w, h int32) {
 			editW = 210
 		}
 		move(a.hOutputEdit, 130, barY, editW, outputHistoryDropHeight)
-		move(a.hOutputPick, 136+editW, barY+1, 72, 30)
+		move(a.hOutputPick, 136+editW, barY, 72, 32)
 		x := int32(216) + editW
 		if simple {
 			for _, item := range []struct {
@@ -2976,18 +2933,7 @@ func (a *application) command(id int) {
 	case ID_FILE_EXIT:
 		show(a.hwnd, false)
 	case IDC_SEARCH:
-		query := getText(a.hSearch)
-		show(a.hSearchClear, len(strings.TrimSpace(query)) > 0)
 		a.refreshList()
-	case IDC_SEARCH_CLEAR:
-		setText(a.hSearch, "")
-		show(a.hSearchClear, false)
-		a.refreshList()
-		target := a.hSearchEdit
-		if target == 0 {
-			target = a.hSearch
-		}
-		procSetFocus.Call(target)
 	case IDC_FILTER, IDC_VOLUME_FILTER:
 		a.refreshList()
 	}
@@ -3002,7 +2948,6 @@ func (a *application) populateSearchHistory(current string) {
 		send(a.hSearch, CB_ADDSTRING, 0, uintptr(unsafeStringPointer(query)))
 	}
 	setText(a.hSearch, current)
-	show(a.hSearchClear, strings.TrimSpace(current) != "")
 }
 
 func (a *application) commitSearchHistory() {
@@ -4079,10 +4024,11 @@ type thumbnailJob struct {
 const (
 	probeWorkerCount     = 4
 	thumbnailWorkerCount = 2
+	metadataWorkerCount  = 1
 )
 
 func (a *application) startBackgroundWorkers() {
-	if a == nil || a.probeQueue == nil || a.thumbnailQueue == nil {
+	if a == nil || a.probeQueue == nil || a.thumbnailQueue == nil || a.metadataQueue == nil {
 		return
 	}
 	for i := 0; i < probeWorkerCount; i++ {
@@ -4121,6 +4067,20 @@ func (a *application) startBackgroundWorkers() {
 			}
 		}(i + 1)
 	}
+	for i := 0; i < metadataWorkerCount; i++ {
+		go func(worker int) {
+			for id := range a.metadataQueue {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							writeCrashContext(fmt.Sprintf("metadata worker %d task %d", worker, id), r)
+						}
+					}()
+					a.probeMediaMetadataTask(id)
+				}()
+			}
+		}(i + 1)
+	}
 }
 
 func (a *application) queueProbe(id int64) bool {
@@ -4132,6 +4092,21 @@ func (a *application) queueProbe(id int64) bool {
 		return true
 	default:
 		a.probeQueueDropped.Add(1)
+		return false
+	}
+}
+
+func (a *application) queueMediaMetadata(id int64) bool {
+	if a == nil || a.metadataQueue == nil || id == 0 {
+		return false
+	}
+	select {
+	case a.metadataQueue <- id:
+		return true
+	default:
+		// Location is optional and must never stall a large import. The queue is
+		// deliberately bounded; a later manual rescan can fill a rare overflow.
+		a.metadataQueueDropped.Add(1)
 		return false
 	}
 }
@@ -4194,18 +4169,67 @@ func (a *application) probeTask(id int64) {
 			t.BitmapSubtitleStreams = pinfo.BitmapSubtitles
 			t.VariableFrameRate = pinfo.VariableFrameRate
 			t.HDRInfo = pinfo.HDRInfo
+			if pinfo.Location.Valid() {
+				t.Location = pinfo.Location
+			}
+			if strings.TrimSpace(pinfo.CaptureTime) != "" {
+				t.CaptureTime = pinfo.CaptureTime
+			}
 		} else if t.Error == "" {
 			t.Error = "检测失败: " + err.Error()
 		}
 	}
 	a.mu.Unlock()
 	procPostMessageW.Call(a.hwnd, WM_APP_PROBE, uintptr(id), 0)
+	if err == nil {
+		a.queueMediaMetadata(id)
+	}
 	ffmpeg, _, _, _, _ := a.componentSnapshot()
 	if err == nil && ffmpeg != "" && !modernImage {
 		a.queueThumbnail(id, path, pinfo)
 	}
 }
 
+func (a *application) probeMediaMetadataTask(id int64) {
+	a.mu.Lock()
+	task, _ := a.findTaskByIDLocked(id)
+	if task == nil {
+		a.mu.Unlock()
+		return
+	}
+	path := task.Input
+	alreadyComplete := task.Location.Valid() && strings.TrimSpace(task.CaptureTime) != ""
+	a.mu.Unlock()
+	if alreadyComplete {
+		return
+	}
+	ffmpeg, _, _, _, _ := a.componentSnapshot()
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	metadata, err := media.ProbeMediaMetadata(ctx, ffmpeg, path)
+	cancel()
+	if err != nil {
+		// GPS and capture metadata are optional. Their absence must not turn an
+		// otherwise valid conversion task into a detection error.
+		return
+	}
+	changed := false
+	a.mu.Lock()
+	task, _ = a.findTaskByIDLocked(id)
+	if task != nil && task.Input == path {
+		if metadata.Location.Valid() {
+			task.Location = metadata.Location
+			changed = true
+		}
+		if strings.TrimSpace(metadata.CaptureTime) != "" {
+			task.CaptureTime = metadata.CaptureTime
+			changed = true
+		}
+	}
+	a.mu.Unlock()
+	if changed {
+		procPostMessageW.Call(a.hwnd, WM_APP_PROBE, uintptr(id), 0)
+	}
+}
 func (a *application) generateThumbnail(id int64, input string, pinfo media.ProbeInfo, generation uint64) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -4611,7 +4635,10 @@ func (a *application) refreshList() {
 		if t.Kind != a.currentKind {
 			continue
 		}
-		if search != "" && !strings.Contains(strings.ToLower(filepath.Base(t.Input)), search) && !strings.Contains(strings.ToLower(t.Input), search) {
+		if search != "" &&
+			!strings.Contains(strings.ToLower(filepath.Base(t.Input)), search) &&
+			!strings.Contains(strings.ToLower(t.Input), search) &&
+			!strings.Contains(strings.ToLower(string(t.Status)+" "+round12LocationText(t)), search) {
 			continue
 		}
 		if volumeFilter != "" && taskVolumeFilter(t) != volumeFilter {
@@ -7535,6 +7562,7 @@ func (a *application) runSelfTest() {
 	report.Checks["dynamic_concurrency_limit"] = config.MaxConcurrency() >= 1 && config.MaxConcurrency() <= config.HardMaxConcurrency && config.MaxConcurrency() <= config.LogicalProcessorCount()
 	report.Checks["dynamic_concurrency_menu"] = len(a.concurrencyCommands) == len(config.ConcurrencyChoices()) && len(a.concurrencyCommands) > 0
 	report.Checks["background_probe_pool_bounded"] = cap(a.probeQueue) == 16384 && probeWorkerCount == 4
+	report.Checks["background_metadata_pool_bounded"] = cap(a.metadataQueue) == 8192 && metadataWorkerCount == 1
 	report.Checks["background_thumbnail_pool_bounded"] = cap(a.thumbnailQueue) == 8192 && thumbnailWorkerCount == 2
 	beforeGoroutines := runtime.NumGoroutine()
 	enqueued := 0
@@ -7719,8 +7747,8 @@ func (a *application) runSelfTest() {
 	report.Checks["right_panel_default_visible"] = a.rightVisible
 	row := rect{Left: LVIR_BOUNDS}
 	rowOK := send(a.hList, LVM_GETITEMRECT, 0, uintptr(unsafe.Pointer(&row))) != 0
-	compressionCell, compressionOK := listSubItemBounds(a.hList, 0, 8)
-	progressCell, progressOK := listSubItemBounds(a.hList, 0, 9)
+	compressionCell, compressionOK := listSubItemBounds(a.hList, 0, round12ColOutputSize)
+	progressCell, progressOK := listSubItemBounds(a.hList, 0, round12ColProgress)
 	compressionBar := fullCellBarRect(compressionCell)
 	progressBar := fullCellBarRect(progressCell)
 	centeredPreferredBar := func(cell, bar rect) bool {

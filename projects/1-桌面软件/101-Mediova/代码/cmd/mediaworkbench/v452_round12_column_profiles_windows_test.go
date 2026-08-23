@@ -298,22 +298,32 @@ func TestRound12DecodeVersion3PromotesImageCropAreaOnce(t *testing.T) {
 }
 
 func TestRound12DecodeVersion4PreservesHiddenImageCropArea(t *testing.T) {
-	stored := round12ColumnProfiles{
-		Version: round12ColumnProfileVersion,
-		Video:   round12DefaultProfileFor(model.KindVideo),
-		Image:   round12DefaultProfileFor(model.KindImage),
+	dropLocation := func(profile round12ColumnProfile) round12ColumnProfile {
+		profile.Widths = append(append([]int(nil), profile.Widths[:round12ColLocation]...), profile.Widths[round12ColLocation+1:]...)
+		profile.Visible = append(append([]bool(nil), profile.Visible[:round12ColLocation]...), profile.Visible[round12ColLocation+1:]...)
+		return profile
 	}
-	stored.Image.Visible[round12ColPictureCrop] = false
+	video := round12DefaultProfileFor(model.KindVideo)
+	image := round12DefaultProfileFor(model.KindImage)
+	image.Visible[round12ColPictureCrop] = false
+	stored := round12ColumnProfiles{
+		Version: 4,
+		Video:   dropLocation(video),
+		Image:   dropLocation(image),
+	}
 	data, err := json.Marshal(stored)
 	if err != nil {
 		t.Fatal(err)
 	}
 	profiles, accepted, migrated := round12DecodeStoredProfiles(data)
-	if !accepted || migrated {
+	if !accepted || !migrated {
 		t.Fatalf("accepted=%v migrated=%v", accepted, migrated)
 	}
 	if profiles.Image.Visible[round12ColPictureCrop] {
 		t.Fatal("v4 explicit image crop-area hide was not preserved")
+	}
+	if profiles.Video.Visible[round12ColLocation] || profiles.Image.Visible[round12ColLocation] {
+		t.Fatal("new location column must remain hidden after v4 migration")
 	}
 }
 

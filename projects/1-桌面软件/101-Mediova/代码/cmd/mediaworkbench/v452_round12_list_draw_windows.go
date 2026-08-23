@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 	"unsafe"
 
@@ -89,6 +90,13 @@ func round12DrawRowBackground(a *application, hdc uintptr, row int, background u
 	round12DrawSeparator(hdc, rowBounds)
 }
 
+func round12LocationText(task *model.Task) string {
+	if task == nil || !task.Location.Valid() {
+		return "—"
+	}
+	return fmt.Sprintf("📍 %.4f, %.4f", task.Location.Latitude, task.Location.Longitude)
+}
+
 func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column int, task *model.Task, background uintptr) {
 	legacy := a.taskTexts(task)
 	switch column {
@@ -99,6 +107,8 @@ func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column
 	case round12ColFile:
 		round12DrawTextCell(hdc, cell, round12LegacyText(legacy, 0), background, round12SelectionText, false)
 	case round12ColOutputSize:
+	case round12ColLocation:
+		round12DrawTextCell(hdc, cell, round12LocationText(task), background, round12SelectionText, false)
 		_, label, _ := compressionCellMetrics(task)
 		round12DrawCompressionCell(hdc, cell, task, label, background)
 	case round12ColProgress:
@@ -113,6 +123,9 @@ func round12DrawPhysicalCell(a *application, hdc uintptr, cell rect, row, column
 		round12DrawTextCell(hdc, cell, round12PictureCropText(task, opts), background, round12SelectionText, true)
 	default:
 		legacyIndex := column - 2
+		if column > round12ColLocation {
+			legacyIndex--
+		}
 		round12DrawTextCell(hdc, cell, round12LegacyText(legacy, legacyIndex), background, round12SelectionText, true)
 	}
 }
@@ -170,15 +183,15 @@ func statusPillColors(status model.Status) (bg, border, text uintptr) {
 	case model.StatusProcessing:
 		return colorRef(224, 242, 254), colorRef(186, 230, 253), colorRef(3, 105, 161) // Sky Blue
 	case model.StatusDone:
-		return colorRef(220, 252, 231), colorRef(187, 247, 208), colorRef(21, 128, 61)  // Emerald Green
+		return colorRef(220, 252, 231), colorRef(187, 247, 208), colorRef(21, 128, 61) // Emerald Green
 	case model.StatusPaused:
-		return colorRef(241, 245, 249), colorRef(226, 232, 240), colorRef(71, 85, 105)  // Slate
+		return colorRef(241, 245, 249), colorRef(226, 232, 240), colorRef(71, 85, 105) // Slate
 	case model.StatusFailed, model.StatusCancelled:
-		return colorRef(254, 226, 226), colorRef(254, 202, 202), colorRef(185, 28, 28)  // Rose Red
+		return colorRef(254, 226, 226), colorRef(254, 202, 202), colorRef(185, 28, 28) // Rose Red
 	case model.StatusQueued:
-		return colorRef(238, 242, 255), colorRef(224, 231, 255), colorRef(79, 70, 229)  // Indigo
+		return colorRef(238, 242, 255), colorRef(224, 231, 255), colorRef(79, 70, 229) // Indigo
 	default:
-		return colorRef(248, 250, 252), colorRef(226, 232, 240), colorRef(51, 65, 85)   // Light Neutral
+		return colorRef(248, 250, 252), colorRef(226, 232, 240), colorRef(51, 65, 85) // Light Neutral
 	}
 }
 

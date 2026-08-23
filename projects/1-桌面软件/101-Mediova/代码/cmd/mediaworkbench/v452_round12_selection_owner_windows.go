@@ -26,6 +26,7 @@ const (
 	round12ColResolution
 	round12ColDuration
 	round12ColDirection
+	round12ColLocation
 	round12ColOutputResolution
 	round12ColQuality
 	round12ColRotation
@@ -45,8 +46,8 @@ type round12ColumnDefinition struct {
 
 var round12Columns = []round12ColumnDefinition{
 	{"#", 44}, {"预览", 100}, {"文件名", 230}, {"分辨率", 100}, {"时长", 76},
-	{"方向", 66}, {"输出分辨率", 116}, {"质量", 58}, {"旋转", 88}, {"体积", 92},
-	{"压缩后", 140}, {"进度", 105}, {"状态", 124}, {"时间剪裁", 118}, {"画面剪裁", 92},
+	{"方向", 66}, {"位置", 150}, {"输出分辨率", 116}, {"质量", 58}, {"旋转", 88},
+	{"体积", 92}, {"压缩后", 140}, {"进度", 105}, {"状态", 124}, {"时间剪裁", 118}, {"画面剪裁", 92},
 }
 
 var (
@@ -198,8 +199,12 @@ func round12LegacySortColumn(column int) (int, bool) {
 		return taskColNumber, true
 	case column == round12ColPreview:
 		return taskColNumber, true
-	case column >= round12ColFile && column <= round12ColStatus:
+	case column >= round12ColFile && column <= round12ColDirection:
 		return column - 1, true
+	case column == round12ColLocation:
+		return 0, false
+	case column >= round12ColOutputResolution && column <= round12ColStatus:
+		return column - 2, true
 	default:
 		return 0, false
 	}

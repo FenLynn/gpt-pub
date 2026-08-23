@@ -31,6 +31,25 @@ type Crop struct {
 	Height  int  `json:"height"`
 }
 
+// GeoLocation keeps the original WGS84 media coordinates. Display providers
+// may derive another coordinate system, but must never overwrite these values.
+type GeoLocation struct {
+	Latitude    float64 `json:"latitude"`
+	Longitude   float64 `json:"longitude"`
+	Altitude    float64 `json:"altitude,omitempty"`
+	HasAltitude bool    `json:"has_altitude,omitempty"`
+	Accuracy    float64 `json:"accuracy,omitempty"`
+	Timestamp   string  `json:"timestamp,omitempty"`
+	Source      string  `json:"source,omitempty"`
+	Raw         string  `json:"raw,omitempty"`
+}
+
+func (g *GeoLocation) Valid() bool {
+	return g != nil &&
+		g.Latitude >= -90 && g.Latitude <= 90 &&
+		g.Longitude >= -180 && g.Longitude <= 180
+}
+
 type TaskOptions struct {
 	// FollowDefaults is retained for v4.1.x session/config compatibility. v4.2.0
 	// materialises explicit options on every ready task; new queue logic must not
@@ -87,6 +106,8 @@ type Task struct {
 	TextSubtitleStreams   int            `json:"text_subtitle_streams,omitempty"`
 	BitmapSubtitleStreams int            `json:"bitmap_subtitle_streams,omitempty"`
 	VariableFrameRate     bool           `json:"variable_frame_rate,omitempty"`
+	Location              *GeoLocation   `json:"location,omitempty"`
+	CaptureTime           string         `json:"capture_time,omitempty"`
 	HDRInfo               string         `json:"hdr_info,omitempty"`
 	InputSize             int64          `json:"input_size"`
 	OutputPath            string         `json:"output_path"`

@@ -173,6 +173,7 @@ const (
 	CB_SETCURSEL                 = 0x014E
 	CB_GETLBTEXT                 = 0x0148
 	CB_RESETCONTENT              = 0x014B
+	CB_SETITEMHEIGHT             = 0x0153
 	EM_SETCUEBANNER              = 0x1501
 	EM_SETMARGINS                = 0x00D3
 	EC_LEFTMARGIN                = 0x0001

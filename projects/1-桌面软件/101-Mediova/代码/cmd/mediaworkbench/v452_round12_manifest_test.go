@@ -44,8 +44,8 @@ func TestRound12ListStructureManifest(t *testing.T) {
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 54 {
-		t.Errorf("entries=%d want=54", entries)
+	if entries != 58 {
+		t.Errorf("entries=%d want=58", entries)
 	}
 
 	for _, path := range []string{
@@ -153,7 +153,7 @@ func TestRound12ListStructureManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertContains("compact persistent column profiles", profileSource,
-		"round12ColumnProfileVersion = 4",
+		"round12ColumnProfileVersion = 5",
 		"round12DefaultColumnVisible",
 		"round12MigrateLegacyProfile",
 		"config.LoadJSON",

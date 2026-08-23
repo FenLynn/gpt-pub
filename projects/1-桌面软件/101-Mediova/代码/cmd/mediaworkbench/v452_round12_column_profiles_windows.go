@@ -14,7 +14,7 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-const round12ColumnProfileVersion = 4
+const round12ColumnProfileVersion = 5
 
 type round12ColumnProfile struct {
 	Widths  []int  `json:"widths"`
@@ -85,13 +85,32 @@ func round12MinimumColumnWidth(column int) int {
 	// hidden explicitly from the Round12 column menu.
 	minimums := [...]int{
 		44, 98, 160, 82, 70,
-		58, 96, 50, 62, 72,
-		96, 88, 84, 100, 82,
+		58, 110, 96, 50, 62,
+		72, 96, 88, 84, 100, 82,
 	}
 	if column < 0 || column >= len(minimums) {
 		return 35
 	}
 	return minimums[column]
+}
+
+func round12UpgradeLocationProfile(profile round12ColumnProfile) round12ColumnProfile {
+	legacyCount := round12ColumnCount - 1
+	if len(profile.Widths) == legacyCount {
+		widths := make([]int, round12ColumnCount)
+		copy(widths[:round12ColLocation], profile.Widths[:round12ColLocation])
+		widths[round12ColLocation] = round12Columns[round12ColLocation].width
+		copy(widths[round12ColLocation+1:], profile.Widths[round12ColLocation:])
+		profile.Widths = widths
+	}
+	if len(profile.Visible) == legacyCount {
+		visible := make([]bool, round12ColumnCount)
+		copy(visible[:round12ColLocation], profile.Visible[:round12ColLocation])
+		visible[round12ColLocation] = false
+		copy(visible[round12ColLocation+1:], profile.Visible[round12ColLocation:])
+		profile.Visible = visible
+	}
+	return profile
 }
 
 func round12NormalizeProfile(profile round12ColumnProfile) round12ColumnProfile {
@@ -133,7 +152,8 @@ func round12NormalizeProfileFor(kind model.Kind, profile round12ColumnProfile) r
 }
 
 func round12MigrateLegacyProfile(profile round12ColumnProfile) round12ColumnProfile {
-	hadCompleteVisibility := len(profile.Visible) == round12ColumnCount
+	legacyCount := round12ColumnCount - 1
+	hadCompleteVisibility := len(profile.Visible) == legacyCount || len(profile.Visible) == round12ColumnCount
 	allVisible := hadCompleteVisibility
 	if hadCompleteVisibility {
 		for _, visible := range profile.Visible {
@@ -144,7 +164,7 @@ func round12MigrateLegacyProfile(profile round12ColumnProfile) round12ColumnProf
 		}
 	}
 
-	profile = round12NormalizeProfile(profile)
+	profile = round12NormalizeProfile(round12UpgradeLocationProfile(profile))
 	// Versions 1 and 2 shipped with every column visible. Treat that exact
 	// shape as the old default and migrate it to the compact core set. If a
 	// user had hidden even one optional column, their explicit choices win.
@@ -162,8 +182,10 @@ func round12DecodeStoredProfiles(data []byte) (round12ColumnProfiles, bool, bool
 	if stored.Version < 1 || stored.Version > round12ColumnProfileVersion {
 		return round12ColumnProfiles{}, false, false
 	}
-	normalize := round12NormalizeProfile
-	if stored.Version < round12ColumnProfileVersion {
+	normalize := func(profile round12ColumnProfile) round12ColumnProfile {
+		return round12NormalizeProfile(round12UpgradeLocationProfile(profile))
+	}
+	if stored.Version < 4 {
 		normalize = round12MigrateLegacyProfile
 	}
 	profiles := round12ColumnProfiles{
