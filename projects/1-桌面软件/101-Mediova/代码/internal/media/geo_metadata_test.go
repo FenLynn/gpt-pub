@@ -56,7 +56,7 @@ func TestLocationFromQuickTimeTagsKeepsPlaceName(t *testing.T) {
 		"com.apple.quicktime.location.iso6709": "+36.0671+120.3826/",
 		"com.apple.quicktime.location.name":    "五四广场",
 	})
-	if location == nil || location.Place != "五四广场" {
+	if location == nil || location.Place != "五四广场" || location.PlaceSource != "embedded" {
 		t.Fatalf("place metadata was not retained: %+v", location)
 	}
 }

@@ -100,6 +100,9 @@ func locationFromTags(tags map[string]string) (*model.GeoLocation, string) {
 			normalized["com.apple.quicktime.location.body"],
 			normalized["com.apple.quicktime.location.note"],
 		)
+		if location.Place != "" {
+			location.PlaceSource = "embedded"
+		}
 		for _, key := range []string{
 			"com.apple.quicktime.location.accuracy.horizontal",
 			"gpshpositioningerror",
@@ -260,6 +263,9 @@ func ProbeMediaMetadata(ctx context.Context, ffmpeg, input string) (MediaMetadat
 			valueText(recordValue(record, "State", "LocationShownProvinceState")),
 			valueText(recordValue(record, "Country", "LocationShownCountryName")),
 		)
+		if result.Location.Place != "" {
+			result.Location.PlaceSource = "embedded"
+		}
 		if altitude, ok := valueFloat(recordValue(record, "GPSAltitude")); ok {
 			result.Location.Altitude = altitude
 			result.Location.HasAltitude = true

@@ -210,6 +210,7 @@ const (
 	ID_CTX_REMOVE_SAFE        = 2227
 	ID_CTX_EXIT_QUEUE         = 2228
 	ID_CTX_SHOW_ON_MAP        = 2229
+	ID_CTX_REVERSE_GEOCODE    = 2230
 	ID_CTX_RES_4K             = 2300
 	ID_CTX_RES_1080           = 2301
 	ID_CTX_RES_720            = 2302
@@ -966,6 +967,9 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		procDestroyWindow.Call(hwnd)
 		return 0
 	case WM_DESTROY:
+		if app != nil {
+			app.shutdownReverseGeocoder()
+		}
 		procKillTimer.Call(hwnd, TIMER_MAIN_CLOCK)
 		procKillTimer.Call(hwnd, TIMER_TRAY_RETRY)
 		procKillTimer.Call(hwnd, TIMER_IMPORT_CLOSE)
@@ -2640,6 +2644,8 @@ func (a *application) command(id int) {
 		a.toggleMapDemo()
 	case ID_CTX_SHOW_ON_MAP:
 		a.showSelectedTaskOnMap()
+	case ID_CTX_REVERSE_GEOCODE:
+		a.startSelectedReverseGeocode()
 	case ID_CONCURRENCY_STATUS:
 		a.showConcurrencyMenu()
 	case IDC_RIGHT_TOGGLE:
@@ -3611,6 +3617,9 @@ func (a *application) showContextMenu() {
 	appendMenu(m, MF_SEPARATOR, 0, "")
 	if a.selectedTaskHasMapLocation() {
 		appendMenu(m, MF_STRING, ID_CTX_SHOW_ON_MAP, "在地图上显示")
+		if a.selectedTasksNeedReverseGeocode() {
+			appendMenu(m, MF_STRING, ID_CTX_REVERSE_GEOCODE, "补全选中地名")
+		}
 		appendMenu(m, MF_SEPARATOR, 0, "")
 	}
 	appendMenu(m, MF_STRING, ID_CTX_OPEN_SOURCE, "打开源文件所在文件夹")

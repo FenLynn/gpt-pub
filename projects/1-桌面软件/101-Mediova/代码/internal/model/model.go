@@ -43,6 +43,7 @@ type GeoLocation struct {
 	Source       string  `json:"source,omitempty"`
 	Raw          string  `json:"raw,omitempty"`
 	Place        string  `json:"place,omitempty"`
+	PlaceSource  string  `json:"place_source,omitempty"`
 	PlaceChecked bool    `json:"place_checked,omitempty"`
 }
 
