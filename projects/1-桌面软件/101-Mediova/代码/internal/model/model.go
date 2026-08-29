@@ -203,6 +203,10 @@ type Settings struct {
 	SpeedMode              string           `json:"speed_mode"`
 	InterfaceMode          string           `json:"interface_mode"`
 	ShowPerformanceStats   bool             `json:"show_performance_stats"`
+	PerformanceMode        string           `json:"performance_mode,omitempty"`
+	PerfOverrideSet        bool             `json:"performance_override_set,omitempty"`
+	PerfPrevAuto           bool             `json:"performance_previous_auto,omitempty"`
+	PerfPrevConcurrency    int              `json:"performance_previous_concurrency,omitempty"`
 	RightPanelVisible      bool             `json:"right_panel_visible"`
 	UILayoutRevision       int              `json:"ui_layout_revision"`
 	TaskColumnWidths       []int            `json:"task_column_widths,omitempty"`
@@ -270,6 +274,7 @@ func DefaultSettings() Settings {
 		SpeedMode:              "均衡",
 		InterfaceMode:          "完整",
 		ShowPerformanceStats:   false,
+		PerformanceMode:        PerformanceModeStandard,
 		RightPanelVisible:      true,
 		UILayoutRevision:       420,
 		AutoBenchmark:          false,
@@ -297,6 +302,24 @@ func DefaultSettings() Settings {
 		ImageSize:              "保持原尺寸",
 		ImageQuality:           "高",
 		ImageLimit:             "不限",
+	}
+}
+
+const (
+	PerformanceModeStandard   = "标准"
+	PerformanceModeLargeBatch = "大批量"
+	PerformanceModeLowMemory  = "低内存"
+)
+
+// NormalizePerformanceMode keeps settings written by older versions on the
+// conservative, fully featured profile. The value is user-facing on Windows,
+// but lives in model so scheduling and migration tests share one definition.
+func NormalizePerformanceMode(value string) string {
+	switch value {
+	case PerformanceModeLargeBatch, PerformanceModeLowMemory:
+		return value
+	default:
+		return PerformanceModeStandard
 	}
 }
 

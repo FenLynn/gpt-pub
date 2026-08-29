@@ -565,6 +565,7 @@ function showMediaPopup(features,lngLat,total){const items=mediaItems(features);
 function install(){if(map.getSource('media'))return;map.addSource('media',{type:'geojson',data:{type:'FeatureCollection',features:points},cluster:true,clusterMaxZoom:20,clusterRadius:36,clusterProperties:{selected_count:['+',['case',['get','selected'],1,0]]}});const selected=['>', ['get','selected_count'],0];map.addLayer({id:'clusters',type:'circle',source:'media',filter:['has','point_count'],paint:{'circle-color':['case',selected,'#f28a1a','#167fba'],'circle-radius':['step',['get','point_count'],15,10,19,50,23],'circle-stroke-color':['case',selected,'#c8660d','#fff'],'circle-stroke-width':['case',selected,2.5,2]}});map.addLayer({id:'cluster-count',type:'symbol',source:'media',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':12},paint:{'text-color':'#fff'}});map.addLayer({id:'point',type:'circle',source:'media',filter:['all',['!',['has','point_count']],['!=',['get','current'],true]],paint:{'circle-color':['case',['get','selected'],'#f28a1a',['get','demo'],'#d6862e','#159783'],'circle-radius':['case',['get','selected'],9,7],'circle-stroke-color':'#fff','circle-stroke-width':2}});map.addLayer({id:'current-star',type:'symbol',source:'media',filter:['all',['!',['has','point_count']],['==',['get','current'],true]],layout:{'text-field':'★','text-size':24,'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'#f28a1a','text-halo-color':'#fff','text-halo-width':1.1}});for(const id of ['clusters','point','current-star']){map.on('mouseenter',id,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',id,()=>map.getCanvas().style.cursor='')}}
 function fitAll(animate=true){if(!points.length)return;const b=new maplibregl.LngLatBounds();points.forEach(p=>b.extend(p.geometry.coordinates));map.fitBounds(b,{padding:70,maxZoom:14,duration:animate?animationMs():0})}function focusCurrent(){const current=points.find(p=>p.properties&&p.properties.current===true);if(!current){document.getElementById('notice').textContent='当前没有已选中的地图媒体';return}map.easeTo({center:current.geometry.coordinates,zoom:Math.max(map.getZoom(),15),duration:animationMs()})}
 map.on('style.load',install);window.mediovaSetPoints=function(data,fit){points=data.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.longitude,p.latitude]},properties:p}));document.getElementById('map-count').textContent='地图点 '+points.length;if(map.isStyleLoaded()){const s=map.getSource('media');if(s)s.setData({type:'FeatureCollection',features:points});else install()}if(fit)fitAll(false)};
+window.mediovaSelection=function(ids,currentID){const selected=new Set((ids||[]).map(String)),current=String(currentID||'');let changed=false;points.forEach(feature=>{const p=feature.properties||{},id=String(p.taskID||''),nextSelected=id!==''&&selected.has(id),nextCurrent=current!==''&&current!=='0'&&id===current;if(p.selected!==nextSelected||p.current!==nextCurrent){p.selected=nextSelected;p.current=nextCurrent;changed=true}});if(changed){const source=map.getSource('media');if(source)source.setData({type:'FeatureCollection',features:points})}};
 window.mediovaThumbnail=function(rawID){const id=String(rawID),version=(thumbVersions.get(id)||0)+1;thumbVersions.set(id,version);let changed=false;points.forEach(feature=>{if(String(feature.properties.taskID||'')===id){feature.properties.hasThumbnail=true;changed=true}});document.querySelectorAll('img[data-task-id]').forEach(img=>{if(img.dataset.taskId===id){img.style.visibility='visible';img.src=BASE+'/thumb/'+encodeURIComponent(id)+'?v='+version}});if(!changed)return;clearTimeout(thumbTimer);thumbTimer=setTimeout(()=>{const source=map.getSource('media');if(source)source.setData({type:'FeatureCollection',features:points})},160)};
 map.on('click','clusters',async e=>{const feature=e.features&&e.features[0];if(!feature)return;const source=map.getSource('media'),clusterID=feature.properties.cluster_id,current=map.getZoom(),total=Number(feature.properties.point_count)||1;try{const leaves=await source.getClusterLeaves(clusterID,Math.min(Math.max(total,1),5000),0),items=mediaItems(leaves),ids=items.filter(p=>p.taskID).map(p=>String(p.taskID));if(ids.length)post({type:'select',ids:ids});const expansion=await source.getClusterExpansionZoom(clusterID);if(current<13.75&&expansion>current+.1){map.easeTo({center:feature.geometry.coordinates,zoom:Math.min(expansion,15),duration:animationMs()});return}showMediaPopup(leaves,e.lngLat,total)}catch(_){}});
 map.on('click','point',e=>{const features=e.features||[],items=mediaItems(features),ids=items.filter(p=>p.taskID).map(p=>String(p.taskID));post({type:'select',ids:ids,demo:items.length===1&&items[0].demo?items[0].label:''});showMediaPopup(features,e.lngLat,items.length)});map.on('click','current-star',e=>{const items=mediaItems(e.features||[]),ids=items.filter(p=>p.taskID).map(p=>String(p.taskID));post({type:'select',ids:ids});showMediaPopup(e.features||[],e.lngLat,items.length)});map.on('dblclick','point',e=>{e.preventDefault();const items=mediaItems(e.features);if(items.length===1&&items[0].taskID)post({type:'play',ids:[String(items[0].taskID)]})});map.on('dblclick','current-star',e=>{e.preventDefault();const items=mediaItems(e.features);if(items.length===1&&items[0].taskID)post({type:'play',ids:[String(items[0].taskID)]})});
@@ -613,7 +614,7 @@ func (r *mapRuntime) selectTaskIDs(ids []string) int {
 	r.app.selectMapTasks(selected)
 	// Refresh immediately so the selected marker changes to the current-item
 	// star in the same interaction, without waiting for a later list event.
-	r.pushPoints(false)
+	r.pushSelection()
 	return len(selected)
 }
 
@@ -691,6 +692,27 @@ func (r *mapRuntime) onMessage(raw string) {
 			}
 		}
 	})
+}
+
+func (r *mapRuntime) pushSelection() {
+	if r == nil || r.browser == nil || r.app == nil {
+		return
+	}
+	indices := r.app.selectedTaskIndices()
+	ids := make([]int64, 0, len(indices))
+	r.app.mu.Lock()
+	for _, index := range indices {
+		if index < 0 || index >= len(r.app.tasks) || r.app.tasks[index] == nil {
+			continue
+		}
+		ids = append(ids, r.app.tasks[index].ID)
+	}
+	r.app.mu.Unlock()
+	data, err := json.Marshal(ids)
+	if err != nil {
+		return
+	}
+	r.browser.Eval("window.mediovaSelection(" + string(data) + "," + strconv.FormatInt(r.currentTask(), 10) + ")")
 }
 
 func (r *mapRuntime) pushPoints(fit bool) {

@@ -114,3 +114,20 @@ func TestRuntimeDiagnosticsReportsPreviousUncleanRun(t *testing.T) {
 		t.Fatalf("current run was not closed cleanly: %+v", current)
 	}
 }
+
+func TestRuntimePressureReasonCapturesLargeBatchRisk(t *testing.T) {
+	healthy := runtimeHealthSnapshot{MemoryLoadPct: 45, AvailableRAM: 8 << 30, ProcessHandles: 300, GDIHandles: 100, UserHandles: 100}
+	if runtimeSnapshotUnderPressure(healthy) {
+		t.Fatalf("healthy snapshot reported pressure: %s", runtimePressureReason(healthy))
+	}
+	stressed := runtimeHealthSnapshot{
+		MemoryLoadPct: 93, AvailableRAM: 512 << 20, ProcessHandles: 9000,
+		ThumbnailQueued: 8000, HistoryQueued: 2000, Goroutines: 2200,
+	}
+	reason := runtimePressureReason(stressed)
+	for _, want := range []string{"系统内存紧张", "Windows句柄接近安全上限", "后台队列接近容量", "后台协程异常增多"} {
+		if !strings.Contains(reason, want) {
+			t.Fatalf("pressure reason %q missing %q", reason, want)
+		}
+	}
+}

@@ -85,6 +85,13 @@ type runtimeHealthSnapshot struct {
 	ProbeQueued     int            `json:"probe_queued"`
 	ThumbnailQueued int            `json:"thumbnail_queued"`
 	MetadataQueued  int            `json:"metadata_queued"`
+	HistoryQueued   int            `json:"history_thumbnail_queued"`
+	ProbeDropped    int64          `json:"probe_queue_dropped"`
+	ThumbDropped    int64          `json:"thumbnail_queue_dropped"`
+	MetadataDropped int64          `json:"metadata_queue_dropped"`
+	HistoryDropped  int64          `json:"history_thumbnail_dropped"`
+	PerformanceMode string         `json:"performance_mode"`
+	PressureReason  string         `json:"pressure_reason,omitempty"`
 	ActiveVideoRuns int            `json:"active_video_runs"`
 	ActiveImageRuns int            `json:"active_image_runs"`
 }
@@ -171,10 +178,34 @@ func runtimeMemoryWorkerCapForStatus(kind model.Kind, workers int, memory runtim
 
 func runtimeMemoryWorkerCap(kind model.Kind, workers int) int {
 	memory, ok := readRuntimeMemoryStatus()
-	if !ok {
-		return workers
+	if ok {
+		workers = runtimeMemoryWorkerCapForStatus(kind, workers, memory)
 	}
-	return runtimeMemoryWorkerCapForStatus(kind, workers, memory)
+	if app != nil {
+		workers = performanceWorkerCap(app.settings.PerformanceMode, kind, workers)
+	}
+	return workers
+}
+
+func runtimePressureReason(s runtimeHealthSnapshot) string {
+	reasons := make([]string, 0, 4)
+	if s.MemoryLoadPct >= 90 || (s.AvailableRAM > 0 && s.AvailableRAM < 1024*1024*1024) {
+		reasons = append(reasons, "系统内存紧张")
+	}
+	if s.ProcessHandles >= 8000 || s.GDIHandles >= 8000 || s.UserHandles >= 8000 {
+		reasons = append(reasons, "Windows句柄接近安全上限")
+	}
+	if s.ProbeQueued >= 15000 || s.ThumbnailQueued >= 7600 || s.MetadataQueued >= 7600 || s.HistoryQueued >= 1900 {
+		reasons = append(reasons, "后台队列接近容量")
+	}
+	if s.Goroutines >= 2000 {
+		reasons = append(reasons, "后台协程异常增多")
+	}
+	return strings.Join(reasons, "；")
+}
+
+func runtimeSnapshotUnderPressure(s runtimeHealthSnapshot) bool {
+	return runtimePressureReason(s) != ""
 }
 
 func snapshotRuntimeHealth(runID string, started time.Time, clean bool, reason string) runtimeHealthSnapshot {
@@ -199,6 +230,15 @@ func snapshotRuntimeHealth(runID string, started time.Time, clean bool, reason s
 	if app.metadataQueue != nil {
 		s.MetadataQueued = len(app.metadataQueue)
 	}
+	if app.historyThumbnailQueue != nil {
+		s.HistoryQueued = len(app.historyThumbnailQueue)
+	}
+	s.ProbeDropped = app.probeQueueDropped.Load()
+	s.ThumbDropped = app.thumbnailQueueDropped.Load()
+	s.MetadataDropped = app.metadataQueueDropped.Load()
+	s.HistoryDropped = app.historyThumbnailDropped.Load()
+	s.PerformanceMode = model.NormalizePerformanceMode(app.settings.PerformanceMode)
+	s.PressureReason = runtimePressureReason(s)
 	app.runMu.Lock()
 	for kind := range app.activeRuns {
 		switch kind {
@@ -248,11 +288,17 @@ func startRuntimeDiagnostics(disabled bool) func(bool) {
 	go func() {
 		defer close(done)
 		ticker := time.NewTicker(15 * time.Second)
+		var lastPressure time.Time
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				saveRuntimeHealth(snapshotRuntimeHealth(runID, started, false, "running"))
+				snapshot := snapshotRuntimeHealth(runID, started, false, "running")
+				saveRuntimeHealth(snapshot)
+				if runtimeSnapshotUnderPressure(snapshot) && (lastPressure.IsZero() || time.Since(lastPressure) >= 2*time.Minute) {
+					lastPressure = time.Now()
+					writeRuntimeIncident("resource_pressure", snapshot.PressureReason, snapshot, nil)
+				}
 			case <-stop:
 				return
 			}

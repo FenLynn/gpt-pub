@@ -175,6 +175,9 @@ const (
 	ID_VIEW_FLOATING_TOPMOST  = 2095
 	ID_SET_MAP_ENABLED        = 2096
 	ID_SET_MAP_FAST_ZOOM      = 2097
+	ID_SET_PERF_STANDARD      = 2098
+	ID_SET_PERF_BATCH         = 2099
+	ID_SET_PERF_MEMORY        = 2105
 	ID_HISTORY_VIEW           = 2100
 	ID_HISTORY_CLEAR          = 2101
 	ID_HISTORY_LAST_SUMMARY   = 2102
@@ -239,6 +242,7 @@ const (
 type application struct {
 	hwnd                                                                                                                                                                       uintptr
 	menuMain, menuSettings, menuView, menuConcurrency                                                                                                                          uintptr
+	menuPerformance                                                                                                                                                            uintptr
 	hIcon                                                                                                                                                                      uintptr
 	hVideo, hImage, hAddFiles, hAddFolder, hRemove, hClear, hSelectAll, hInvert, hSourceDir, hOutputDir, hViewMode                                                             uintptr
 	hSearch, hSearchEdit, hFilter, hVolumeFilter, hList, hToolbarDivider, hHeaderLine                                                                                          uintptr
@@ -325,6 +329,7 @@ type application struct {
 	probeQueue              chan int64
 	thumbnailQueue          chan thumbnailJob
 	metadataQueue           chan int64
+	historyThumbnailQueue   chan historyThumbnailJob
 	progressMu              sync.Mutex
 	pendingProgressRows     map[int64]struct{}
 	progressFlushScheduled  bool
@@ -338,6 +343,7 @@ type application struct {
 	probeQueueDropped       atomic.Int64
 	thumbnailQueueDropped   atomic.Int64
 	metadataQueueDropped    atomic.Int64
+	historyThumbnailDropped atomic.Int64
 	workers                 sync.WaitGroup
 	exiting                 bool
 	trayAdded               bool
@@ -613,6 +619,7 @@ func main() {
 	config.MigrateLegacyTransientData()
 	runtimeMigrated, runtimeMigrationErr := config.MigrateLegacyRuntimeComponents()
 	settings := config.Load()
+	settings.PerformanceMode = model.NormalizePerformanceMode(settings.PerformanceMode)
 	settings.FFmpegPath = config.NormalizeConfiguredFFmpegPath(settings.FFmpegPath)
 	if settings.UILayoutRevision < 420 {
 		settings.UILayoutRevision = 420
@@ -634,6 +641,7 @@ func main() {
 	}
 	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, uiPreviewMode: uiPreviewMode, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), queueWake: make(chan struct{}, 64), taskCancels: make(map[int64]context.CancelFunc), holdRequests: make(map[int64]bool), removeRequests: make(map[int64]bool), immediateRestarts: make(map[int64]bool), rightDraftFields: make(map[int]bool), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
 	app.metadataQueue = make(chan int64, 8192)
+	app.historyThumbnailQueue = make(chan historyThumbnailJob, 2048)
 	app.mapFeatureEnabled.Store(settings.MapEnabled)
 	if runtimeMigrationErr != nil {
 		app.runtimeNotice = "旧 FFmpeg 组件未能复制到 Runtime，已保留旧位置继续兼容：" + short(runtimeMigrationErr.Error(), 160)
@@ -995,7 +1003,9 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		app.selectionRefreshPending.Store(false)
 		app.updateRightPanel()
 		app.syncSelectedTaskToMap()
-		app.invalidateMapView()
+		if runtime := mapRuntimeFor(app); runtime != nil {
+			runtime.pushSelection()
+		}
 		return 0
 	case WM_APP_KIND_SYNC:
 		// A ComboBox may finish closing after the tab click that initiated the
@@ -1849,6 +1859,12 @@ func (a *application) initMenus() {
 		appendMenu(conc, MF_STRING, uintptr(id), label)
 	}
 	appendMenu(settings, MF_POPUP, conc, "并行任务")
+	performance, _, _ := procCreatePopupMenu.Call()
+	a.menuPerformance = performance
+	appendMenu(performance, MF_STRING|MF_CHECKED, ID_SET_PERF_STANDARD, "标准（完整功能）")
+	appendMenu(performance, MF_STRING, ID_SET_PERF_BATCH, "大批量（减少后台预览）")
+	appendMenu(performance, MF_STRING, ID_SET_PERF_MEMORY, "低内存（限制同时处理）")
+	appendMenu(settings, MF_POPUP, performance, "性能模式")
 	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_GPU, "视频编码优先使用 GPU")
 	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_GPU_FALLBACK, "GPU 失败自动回退 CPU")
 	appendMenu(settings, MF_STRING, ID_SET_CLEAR_META, "清除 GPS 和设备元数据")
@@ -1954,6 +1970,9 @@ func (a *application) syncMenuChecks() {
 	setCheck(a.menuSettings, ID_SET_MAP_ENABLED, a.mapFeaturesEnabled())
 	setCheck(a.menuSettings, ID_SET_MAP_FAST_ZOOM, a.settings.MapFastZoom)
 	setCheck(a.menuSettings, ID_SET_SMART_COPY, a.settings.SmartStreamCopy)
+	setCheck(a.menuPerformance, ID_SET_PERF_STANDARD, model.NormalizePerformanceMode(a.settings.PerformanceMode) == model.PerformanceModeStandard)
+	setCheck(a.menuPerformance, ID_SET_PERF_BATCH, model.NormalizePerformanceMode(a.settings.PerformanceMode) == model.PerformanceModeLargeBatch)
+	setCheck(a.menuPerformance, ID_SET_PERF_MEMORY, model.NormalizePerformanceMode(a.settings.PerformanceMode) == model.PerformanceModeLowMemory)
 	setCheck(a.menuSettings, ID_SET_AUDIO_AAC, a.settings.AudioMode == "AAC 192k")
 	setCheck(a.menuSettings, ID_SET_AUDIO_COPY, a.settings.AudioMode == "复制音频")
 	setCheck(a.menuSettings, ID_SET_AUDIO_MUTE, a.settings.AudioMode == "静音")
@@ -2999,6 +3018,22 @@ func (a *application) command(id int) {
 			mode = "快速"
 		}
 		setText(a.hStatusText, "地图缩放速度已切换为"+mode+"模式。")
+	case ID_SET_PERF_STANDARD, ID_SET_PERF_BATCH, ID_SET_PERF_MEMORY:
+		mode := model.PerformanceModeStandard
+		switch id {
+		case ID_SET_PERF_BATCH:
+			mode = model.PerformanceModeLargeBatch
+		case ID_SET_PERF_MEMORY:
+			mode = model.PerformanceModeLowMemory
+		}
+		a.readSettingsFromUI()
+		a.applyPerformanceMode(mode)
+		_ = config.Save(a.settings)
+		a.syncMenuChecks()
+		setText(a.hStatusText, "性能模式："+performanceModeSummary(mode)+"；后台预览立即生效，转换总槽位从下次启动队列起生效。")
+		if a.hwnd != 0 {
+			procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
+		}
 	case ID_SET_OPEN_DONE:
 		a.settings.OpenOutputOnDone = !a.settings.OpenOutputOnDone
 		a.saveSettings()
@@ -4237,14 +4272,19 @@ type thumbnailJob struct {
 	generation uint64
 }
 
+type historyThumbnailJob struct {
+	record media.HistoryRecord
+}
+
 const (
-	probeWorkerCount     = 4
-	thumbnailWorkerCount = 2
-	metadataWorkerCount  = 1
+	probeWorkerCount            = 4
+	thumbnailWorkerCount        = 2
+	metadataWorkerCount         = 1
+	historyThumbnailWorkerCount = 1
 )
 
 func (a *application) startBackgroundWorkers() {
-	if a == nil || a.probeQueue == nil || a.thumbnailQueue == nil || a.metadataQueue == nil {
+	if a == nil || a.probeQueue == nil || a.thumbnailQueue == nil || a.metadataQueue == nil || a.historyThumbnailQueue == nil {
 		return
 	}
 	for i := 0; i < probeWorkerCount; i++ {
@@ -4302,6 +4342,26 @@ func (a *application) startBackgroundWorkers() {
 			}
 		}(i + 1)
 	}
+	for i := 0; i < historyThumbnailWorkerCount; i++ {
+		go func(worker int) {
+			for job := range a.historyThumbnailQueue {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							writeCrashContext(fmt.Sprintf("history thumbnail worker %d record %s", worker, job.record.ID), r)
+						}
+					}()
+					ffmpeg, _, _, _, _ := a.componentSnapshot()
+					ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+					thumbnail, err := media.StoreHistoryThumbnail(ctx, ffmpeg, job.record.Input, job.record.Output, job.record.ID, job.record.Rotation, job.record.SourceDurationSec)
+					cancel()
+					if err == nil && thumbnail != "" {
+						_ = media.AttachHistoryThumbnail(job.record.ID, thumbnail)
+					}
+				}()
+			}
+		}(i + 1)
+	}
 }
 
 func (a *application) queueProbe(id int64) bool {
@@ -4347,6 +4407,20 @@ func (a *application) queueThumbnail(id int64, input string, pinfo media.ProbeIn
 	}
 }
 
+func (a *application) queueHistoryThumbnail(record media.HistoryRecord) bool {
+	if a == nil || a.historyThumbnailQueue == nil || strings.TrimSpace(record.ID) == "" {
+		return false
+	}
+	select {
+	case a.historyThumbnailQueue <- historyThumbnailJob{record: record}:
+		return true
+	default:
+		// History remains complete even when preview work is saturated. Missing
+		// previews are preferable to blocking conversion workers or growing RAM.
+		a.historyThumbnailDropped.Add(1)
+		return false
+	}
+}
 func (a *application) probeTask(id int64) {
 	a.mu.Lock()
 	t, _ := a.findTaskByIDLocked(id)
@@ -4414,7 +4488,7 @@ func (a *application) probeTask(id int64) {
 		a.queueMediaMetadata(id)
 	}
 	ffmpeg, _, _, _, _ := a.componentSnapshot()
-	if err == nil && ffmpeg != "" && !modernImage {
+	if err == nil && ffmpeg != "" && !modernImage && a.shouldQueueEagerThumbnail(kind) {
 		a.queueThumbnail(id, path, pinfo)
 	}
 }
@@ -5996,9 +6070,55 @@ func (a *application) estimateRunBytes(runIDs map[int64]bool) int64 {
 	return total
 }
 
+func (a *application) preflightReadyTasks(only map[int64]bool) bool {
+	if a == nil {
+		return false
+	}
+	a.readSettingsFromUI()
+	outputRoot := a.v420OutputDir(a.currentKind)
+	if outputRoot != "" {
+		if err := media.PreflightOutputDirectory(outputRoot); err != nil {
+			messageBox(a.hwnd, "输出目录预检失败", err.Error(), MB_OK|MB_ICONERROR)
+			return false
+		}
+	}
+	type candidate struct {
+		id    int64
+		input string
+		opts  model.TaskOptions
+	}
+	items := make([]candidate, 0)
+	a.mu.Lock()
+	for _, task := range a.tasks {
+		if task == nil || task.Kind != a.currentKind || task.Status != model.StatusReady || (only != nil && !only[task.ID]) {
+			continue
+		}
+		items = append(items, candidate{id: task.ID, input: task.Input, opts: a.settings.EffectiveOptions(task)})
+	}
+	a.mu.Unlock()
+	invalid := 0
+	for _, item := range items {
+		if err := media.PreflightInput(item.input); err != nil {
+			invalid++
+			a.failTaskWithOptions(item.id, "转换前预检失败: "+err.Error(), item.opts)
+		}
+	}
+	if invalid == len(items) && invalid > 0 {
+		messageBox(a.hwnd, "转换前预检", fmt.Sprintf("%d 个任务均未通过输入预检；任务已标记失败，可在详情和历史记录中查看原因。", invalid), MB_OK|MB_ICONWARNING)
+		return false
+	}
+	if invalid > 0 {
+		setText(a.hStatusText, fmt.Sprintf("转换前预检已拦截 %d 个不可读任务；其余任务继续入队。", invalid))
+	}
+	return true
+}
+
 func (a *application) startQueue() { a.startQueueFiltered(nil) }
 
 func (a *application) startQueueFiltered(only map[int64]bool) {
+	if !a.preflightReadyTasks(only) {
+		return
+	}
 	a.v420StartQueueFiltered(only)
 }
 
@@ -6059,16 +6179,10 @@ func (a *application) appendTaskHistory(t *model.Task, opts model.TaskOptions, r
 	if err := media.AppendHistory(record); err != nil {
 		return
 	}
-	// Store the history preview separately from the disposable task-list cache.
-	// This runs in the worker that has just finalized the task; StoreHistory-
-	// Thumbnail serializes the tiny JPEG encodes to avoid a second burst of
-	// FFmpeg processes when many images finish together.
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	thumbnail, err := media.StoreHistoryThumbnail(ctx, a.ffmpeg, record.Input, record.Output, record.ID, opts.Rotation, record.SourceDurationSec)
-	if err == nil && thumbnail != "" {
-		_ = media.AttachHistoryThumbnail(record.ID, thumbnail)
-	}
+	// Preview generation is deliberately outside the conversion worker. A
+	// bounded single worker prevents hundreds of completed images from spawning
+	// more FFmpeg processes or holding every shared conversion slot.
+	a.queueHistoryThumbnail(record)
 }
 
 func probeInfoFromTask(t *model.Task) (media.ProbeInfo, bool) {
@@ -6188,6 +6302,9 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 		return
 	}
 	defer a.releaseOutput(out, id)
+	_ = media.CleanupStagedOutputs(filepath.Dir(out), 24*time.Hour)
+	stagedOut := media.StagedOutputPath(out)
+	defer os.Remove(stagedOut)
 	a.mu.Lock()
 	t, _ = a.findTaskByIDLocked(id)
 	if t != nil {
@@ -6215,10 +6332,10 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 		settings.UseGPU = false
 	}
 	ffmpeg, _, hardware, _, _ := a.componentSnapshot()
-	req := media.ConvertRequest{Input: input, Output: out, Kind: kind, Probe: pinfo, Options: opts, Settings: settings, Hardware: hardware}
+	req := media.ConvertRequest{Input: input, Output: stagedOut, Kind: kind, Probe: pinfo, Options: opts, Settings: settings, Hardware: hardware}
 	throttler := &progressThrottler{}
 	progressFn := func(v float64, stage string) {
-		emit, partialSize := throttler.accept(v, stage, out, time.Now())
+		emit, partialSize := throttler.accept(v, stage, stagedOut, time.Now())
 		if !emit {
 			return
 		}
@@ -6236,19 +6353,25 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 		a.mu.Unlock()
 		a.postProgressRow(id)
 	}
-	engine, err := media.Convert(ctx, ffmpeg, req, progressFn)
+	conversionProgress := func(v float64, stage string) {
+		if v > 98 {
+			v = 98
+		}
+		progressFn(v, stage)
+	}
+	engine, err := media.Convert(ctx, ffmpeg, req, conversionProgress)
 	if err != nil && settings.UseGPU && settings.GPUFallback && hardware.Available && !(opts.VolumeMode == "目标体积" && settings.ExactTargetSize) && ctx.Err() == nil {
 		a.runMu.Lock()
 		a.gpuDisabledForRun = true
 		a.runMu.Unlock()
-		_ = os.Remove(out)
+		_ = os.Remove(stagedOut)
 		req.Settings.UseGPU = false
 		engine, err = media.Convert(ctx, ffmpeg, req, func(v float64, stage string) {
-			progressFn(v, "GPU失败，CPU回退 · "+stage)
+			conversionProgress(v, "GPU失败，CPU回退 · "+stage)
 		})
 	}
 	if err != nil {
-		_ = os.Remove(out)
+		_ = os.Remove(stagedOut)
 		if a.v420CompleteInterruption(id) {
 			return
 		}
@@ -6260,12 +6383,12 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 		return
 	}
 	if a.outputIntegrityHook != nil {
-		a.outputIntegrityHook(out)
+		a.outputIntegrityHook(stagedOut)
 	}
 	// This minimum integrity gate cannot be disabled. A successful FFmpeg exit
 	// must never become a false 100% result when no usable output was created.
-	if presenceErr := media.ValidateOutputPresence(out); presenceErr != nil {
-		_ = os.Remove(out)
+	if presenceErr := media.ValidateOutputPresence(stagedOut); presenceErr != nil {
+		_ = os.Remove(stagedOut)
 		a.failTaskWithOptions(id, "输出完整性失败: "+presenceErr.Error(), opts)
 		return
 	}
@@ -6276,7 +6399,7 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 		vr, verifyErr := media.VerifyOutput(ctx, ffmpeg, ffprobe, req)
 		verificationWarning = vr.Warning
 		if verifyErr != nil {
-			_ = os.Remove(out)
+			_ = os.Remove(stagedOut)
 			a.failTaskWithOptions(id, "输出校验失败: "+verifyErr.Error(), opts)
 			return
 		}
@@ -6286,7 +6409,7 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 	// after validation so MP4/MOV output retains the source capture timeline.
 	if kind == model.KindVideo && !settings.ClearMetadata {
 		progressFn(99, "正在保留视频日期信息")
-		if label, err := media.PreserveVideoDateMetadata(ctx, ffmpeg, input, out); err != nil {
+		if label, err := media.PreserveVideoDateMetadata(ctx, ffmpeg, input, stagedOut); err != nil {
 			if verificationWarning != "" {
 				verificationWarning += "；"
 			}
@@ -6295,6 +6418,12 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 			engine += " · " + label
 		}
 	}
+	progressFn(99.5, "正在提交正式输出")
+	if commitErr := media.CommitStagedOutput(stagedOut, out); commitErr != nil {
+		a.failTaskWithOptions(id, "输出提交失败: "+commitErr.Error(), opts)
+		return
+	}
+	req.Output = out
 	if settings.PreserveTimes {
 		if err := media.PreserveTimes(input, out); err != nil {
 			a.postUI(func() {
@@ -7903,6 +8032,7 @@ func (a *application) runSelfTest() {
 	report.Checks["background_probe_pool_bounded"] = cap(a.probeQueue) == 16384 && probeWorkerCount == 4
 	report.Checks["background_metadata_pool_bounded"] = cap(a.metadataQueue) == 8192 && metadataWorkerCount == 1
 	report.Checks["background_thumbnail_pool_bounded"] = cap(a.thumbnailQueue) == 8192 && thumbnailWorkerCount == 2
+	report.Checks["background_history_thumbnail_pool_bounded"] = cap(a.historyThumbnailQueue) == 2048 && historyThumbnailWorkerCount == 1
 	beforeGoroutines := runtime.NumGoroutine()
 	enqueued := 0
 	for i := 0; i < 2000; i++ {
@@ -8553,6 +8683,7 @@ func (a *application) recommendedWorkers(kind model.Kind, runIDs map[int64]bool)
 		workers = limit
 	}
 	workers = runtimeMemoryWorkerCap(kind, workers)
+	workers = performanceWorkerCap(a.settings.PerformanceMode, kind, workers)
 	if workers > count {
 		workers = count
 	}
