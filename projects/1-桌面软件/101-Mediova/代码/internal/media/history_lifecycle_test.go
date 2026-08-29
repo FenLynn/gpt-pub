@@ -174,6 +174,34 @@ func TestHistoryHTMLIncludesIndependentVolumeFilter(t *testing.T) {
 	}
 }
 
+func TestFailureCenterContainsOnlyFailuresAndOverwritesOneReport(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", root)
+	t.Setenv("APPDATA", root)
+	t.Setenv("LOCALAPPDATA", root)
+	if err := AppendHistory(HistoryRecord{ID: "failure-centre-bad", Kind: model.KindImage, Status: model.StatusFailed, CompletedAt: time.Now(), Input: `C:\in\bad.heic`, FailureCategory: "输入编码不受支持", Error: "decoder failed"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendHistory(HistoryRecord{ID: "failure-centre-good", Kind: model.KindVideo, Status: model.StatusDone, CompletedAt: time.Now(), Input: `C:\in\good.mp4`}); err != nil {
+		t.Fatal(err)
+	}
+	path, count, err := WriteFailureCenterHTML()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 || filepath.Base(path) != "failure-center.html" {
+		t.Fatalf("path=%q count=%d", path, count)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "bad.heic") || !strings.Contains(text, "decoder failed") || strings.Contains(text, "good.mp4") {
+		t.Fatalf("unexpected failure report: %s", text)
+	}
+}
+
 func TestStoreHistoryThumbnailFollowsRecordLifecycle(t *testing.T) {
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {

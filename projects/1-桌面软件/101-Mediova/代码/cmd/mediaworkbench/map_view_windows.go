@@ -24,6 +24,10 @@ const (
 type mapMediaPoint struct {
 	TaskID        int64   `json:"-"`
 	TaskKey       string  `json:"taskID,omitempty"`
+	Kind          string  `json:"kind,omitempty"`
+	FolderKey     string  `json:"folderKey,omitempty"`
+	FolderLabel   string  `json:"folderLabel,omitempty"`
+	ListVisible   bool    `json:"listVisible"`
 	Latitude      float64 `json:"latitude"`
 	Longitude     float64 `json:"longitude"`
 	Label         string  `json:"label"`
@@ -34,6 +38,22 @@ type mapMediaPoint struct {
 	Demo          bool    `json:"demo"`
 	Selected      bool    `json:"selected"`
 	Current       bool    `json:"current"`
+}
+
+func mapFolderIdentity(input string) (key, label string) {
+	dir := filepath.Clean(filepath.Dir(strings.TrimSpace(input)))
+	if dir == "." || dir == "" {
+		return "", "未归类目录"
+	}
+	key = strings.ToLower(dir)
+	name := filepath.Base(dir)
+	parent := filepath.Base(filepath.Dir(dir))
+	if parent != "" && parent != "." && parent != string(filepath.Separator) {
+		label = filepath.Join(parent, name)
+	} else {
+		label = name
+	}
+	return key, label
 }
 
 type mapPointScreen struct {
@@ -175,14 +195,15 @@ func (a *application) currentMapPoints() []mapMediaPoint {
 	thumbnailState := v452ThumbnailStateFor(a)
 	selectedTaskIDs := a.selectedTaskIDsSnapshot()
 	a.mu.Lock()
-	visible := append([]int(nil), a.visible...)
-	points := make([]mapMediaPoint, 0, len(visible)+4)
-	for _, index := range visible {
-		if index < 0 || index >= len(a.tasks) {
-			continue
+	visible := make(map[int64]bool, len(a.visible))
+	for _, index := range a.visible {
+		if index >= 0 && index < len(a.tasks) && a.tasks[index] != nil {
+			visible[a.tasks[index].ID] = true
 		}
-		task := a.tasks[index]
-		if task == nil || task.Kind != a.currentKind || !task.Location.Valid() {
+	}
+	points := make([]mapMediaPoint, 0, len(a.tasks)+4)
+	for _, task := range a.tasks {
+		if task == nil || !task.Location.Valid() {
 			continue
 		}
 		label := strings.TrimSpace(round12LocationText(task))
@@ -195,10 +216,13 @@ func (a *application) currentMapPoints() []mapMediaPoint {
 				thumbnailPath = strings.TrimSpace(asset.path)
 			}
 		}
+		folderKey, folderLabel := mapFolderIdentity(task.Input)
 		points = append(points, mapMediaPoint{
 			TaskID: task.ID, TaskKey: strconv.FormatInt(task.ID, 10), Latitude: task.Location.Latitude,
 			Longitude: task.Location.Longitude, Label: label,
-			Name: filepath.Base(task.Input), Status: string(task.Status),
+			Kind: string(task.Kind), FolderKey: folderKey, FolderLabel: folderLabel,
+			ListVisible: visible[task.ID],
+			Name:        filepath.Base(task.Input), Status: string(task.Status),
 			HasThumbnail: thumbnailPath != "", ThumbnailPath: thumbnailPath,
 			Selected: selectedTaskIDs[task.ID], Current: task.ID == currentTaskID,
 		})
@@ -213,6 +237,16 @@ func (a *application) currentMapPoints() []mapMediaPoint {
 		)
 	}
 	return points
+}
+
+func visibleMapPoints(points []mapMediaPoint) []mapMediaPoint {
+	visible := make([]mapMediaPoint, 0, len(points))
+	for _, point := range points {
+		if point.ListVisible || point.Demo {
+			visible = append(visible, point)
+		}
+	}
+	return visible
 }
 
 func drawMapText(hdc uintptr, text string, rc rect, font, color, flags uintptr) {
@@ -275,7 +309,7 @@ func (a *application) drawMapSurface(dis *drawItemStruct) bool {
 	drawMapText(dis.HDC, title, rect{Left: rc.Left + scaleDPI(16), Top: rc.Top + scaleDPI(10), Right: rc.Right - scaleDPI(124), Bottom: rc.Top + scaleDPI(34)}, uiFontBold, colorRef(36, 62, 82), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
 	drawMapText(dis.HDC, summary, rect{Left: rc.Left + scaleDPI(16), Top: rc.Top + scaleDPI(31), Right: rc.Right - scaleDPI(124), Bottom: rc.Top + scaleDPI(50)}, uiFontSmall, colorRef(91, 111, 126), DT_LEFT|DT_VCENTER|DT_SINGLELINE)
 
-	points := a.currentMapPoints()
+	points := visibleMapPoints(a.currentMapPoints())
 	plot := mapPlotRect(rc)
 	if len(points) == 0 {
 		fillSolid(dis.HDC, plot, colorRef(239, 246, 250))
@@ -426,7 +460,7 @@ func (a *application) mapClusterAtCursor() (mapCluster, bool) {
 	if ok, _, _ := procGetClientRect.Call(a.hMapSurface, uintptr(unsafe.Pointer(&rc))); ok == 0 {
 		return mapCluster{}, false
 	}
-	points := a.currentMapPoints()
+	points := visibleMapPoints(a.currentMapPoints())
 	if len(points) == 0 {
 		return mapCluster{}, false
 	}
@@ -478,6 +512,22 @@ func (a *application) centerMapTaskRow(row int) {
 }
 
 func (a *application) selectMapTasks(ids map[int64]bool) {
+	// Folder browsing intentionally spans videos and images. When a map item
+	// belongs to the other workspace, switch the list before resolving rows.
+	// A mixed cluster selects the first task's workspace; a later click can
+	// switch to an item from the other kind without stale row indexes.
+	targetKind := model.Kind("")
+	a.mu.Lock()
+	for _, task := range a.tasks {
+		if task != nil && ids[task.ID] {
+			targetKind = task.Kind
+			break
+		}
+	}
+	a.mu.Unlock()
+	if targetKind != "" && targetKind != a.currentKind {
+		a.switchKind(targetKind)
+	}
 	rows := make([]int, 0, len(ids))
 	a.mu.Lock()
 	for row, index := range a.visible {

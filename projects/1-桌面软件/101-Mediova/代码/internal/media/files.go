@@ -132,10 +132,16 @@ func OutputExtension(kind model.Kind, opts model.TaskOptions) string {
 	if kind == model.KindVideo {
 		return ".mp4"
 	}
-	if strings.EqualFold(opts.ImageFormat, "PNG") {
+	switch strings.ToUpper(strings.TrimSpace(opts.ImageFormat)) {
+	case "PNG":
 		return ".png"
+	case "WEBP":
+		return ".webp"
+	case "AVIF":
+		return ".avif"
+	default:
+		return ".jpg"
 	}
-	return ".jpg"
 }
 
 func ResolveOutputPath(input, root, outputDir string, kind model.Kind, opts model.TaskOptions, settings model.Settings) (path string, skip bool, err error) {

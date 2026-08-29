@@ -53,6 +53,10 @@ func TestMapHTMLProvidesBoundedMediaNavigation(t *testing.T) {
 		"popupPlacement",
 		"String(p.taskID)",
 		"img.dataset.taskId=id",
+		`id="folder"`,
+		"全部文件夹（当前列表）",
+		"folderKey?String(p.folderKey||'')===folderKey",
+		"视频与图片合并显示",
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("map HTML missing %q", required)
@@ -62,6 +66,18 @@ func TestMapHTMLProvidesBoundedMediaNavigation(t *testing.T) {
 		if strings.Contains(html, forbidden) {
 			t.Fatalf("map HTML still performs lossy task ID conversion %q", forbidden)
 		}
+	}
+}
+
+func TestBatchPreviewTriggerIsRiskBased(t *testing.T) {
+	if shouldShowBatchPreview(99, 0, "自动编号") {
+		t.Fatal("small conflict-free queues must stay one click")
+	}
+	if !shouldShowBatchPreview(100, 0, "自动编号") {
+		t.Fatal("large queues need a preview")
+	}
+	if !shouldShowBatchPreview(2, 1, "覆盖已有") || !shouldShowBatchPreview(2, 1, "跳过已有") {
+		t.Fatal("explicit conflict strategies must show existing targets")
 	}
 }
 

@@ -178,13 +178,17 @@ const (
 	ID_SET_PERF_STANDARD      = 2098
 	ID_SET_PERF_BATCH         = 2099
 	ID_SET_PERF_MEMORY        = 2105
+	ID_SET_BATCH_PREVIEW      = 2106
+	ID_SET_METADATA_AUDIT     = 2107
 	ID_HISTORY_VIEW           = 2100
 	ID_HISTORY_CLEAR          = 2101
 	ID_HISTORY_LAST_SUMMARY   = 2102
 	ID_HISTORY_CLEAR_VIDEO    = 2103
 	ID_HISTORY_CLEAR_IMAGE    = 2104
+	ID_HISTORY_FAILURES       = 2108
 	ID_HELP_ABOUT             = 2110
 	ID_HELP_DIAGNOSTICS       = 2111
+	ID_HELP_CAPABILITIES      = 2112
 	ID_CTX_PLAY_SOURCE        = 2200
 	ID_CTX_PLAY_OUTPUT        = 2201
 	ID_CTX_DUAL               = 2202
@@ -225,6 +229,8 @@ const (
 	ID_CTX_CODEC_264          = 2311
 	ID_CTX_CODEC_JPG          = 2312
 	ID_CTX_CODEC_PNG          = 2313
+	ID_CTX_CODEC_WEBP         = 2314
+	ID_CTX_CODEC_AVIF         = 2315
 	ID_CTX_QUALITY_HIGH       = 2320
 	ID_CTX_QUALITY_MEDIUM     = 2321
 	ID_CTX_QUALITY_LOW        = 2322
@@ -1842,7 +1848,47 @@ func (a *application) initMenus() {
 	appendMenu(player, MF_STRING, ID_PLAYER_OPEN, "打开 PotPlayer 所在文件夹")
 	settings, _, _ := procCreatePopupMenu.Call()
 	a.menuSettings = settings
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_RECURSIVE, "添加文件夹时包含子文件夹")
+	general, _, _ := procCreatePopupMenu.Call()
+	appendMenu(general, MF_STRING|MF_CHECKED, ID_SET_RECURSIVE, "添加文件夹时包含子文件夹")
+	appendMenu(general, MF_STRING|MF_CHECKED, ID_SET_SESSION, "启动时恢复未完成任务")
+	appendMenu(general, MF_STRING|MF_CHECKED, ID_SET_HISTORY, "保存最近转换记录")
+	appendMenu(general, MF_STRING|MF_CHECKED, ID_SET_BATCH_PREVIEW, "大量文件或覆盖风险时显示处理预览")
+	appendMenu(settings, MF_POPUP, general, "常规")
+
+	conversion, _, _ := procCreatePopupMenu.Call()
+	appendMenu(conversion, MF_STRING|MF_CHECKED, ID_SET_GPU, "视频编码优先使用 GPU")
+	appendMenu(conversion, MF_STRING|MF_CHECKED, ID_SET_GPU_FALLBACK, "GPU 失败自动回退 CPU")
+	appendMenu(conversion, MF_STRING, ID_SET_UPSCALE, "允许放大小分辨率视频")
+	appendMenu(conversion, MF_STRING, ID_SET_EXACT_SIZE, "目标体积使用两遍精确编码（仅 CPU）")
+	appendMenu(conversion, MF_STRING, ID_SET_SMART_COPY, "原尺寸且无需处理时智能复制视频流")
+	audio, _, _ := procCreatePopupMenu.Call()
+	appendMenu(audio, MF_STRING|MF_CHECKED, ID_SET_AUDIO_AAC, "AAC 192k（默认兼容）")
+	appendMenu(audio, MF_STRING, ID_SET_AUDIO_COPY, "复制原音频流")
+	appendMenu(audio, MF_STRING, ID_SET_AUDIO_MUTE, "静音输出")
+	appendMenu(conversion, MF_POPUP, audio, "音频处理")
+	subtitle, _, _ := procCreatePopupMenu.Call()
+	appendMenu(subtitle, MF_STRING|MF_CHECKED, ID_SET_SUBTITLE_NONE, "不保留字幕")
+	appendMenu(subtitle, MF_STRING, ID_SET_SUBTITLE_TEXT, "保留文本字幕并转为 MP4 字幕")
+	appendMenu(conversion, MF_POPUP, subtitle, "字幕处理")
+	name, _, _ := procCreatePopupMenu.Call()
+	appendMenu(name, MF_STRING|MF_CHECKED, ID_SET_FILENAME_KEEP, "保持原文件名")
+	appendMenu(name, MF_STRING, ID_SET_FILENAME_SUFFIX, "添加规格后缀")
+	appendMenu(conversion, MF_POPUP, name, "输出文件命名")
+	conf, _, _ := procCreatePopupMenu.Call()
+	appendMenu(conf, MF_STRING|MF_CHECKED, ID_SET_CONFLICT_NUMBER, "自动编号（保留现有文件）")
+	appendMenu(conf, MF_STRING, ID_SET_CONFLICT_SKIP, "跳过已有文件")
+	appendMenu(conf, MF_STRING, ID_SET_CONFLICT_OVERWRITE, "成功校验后替换已有文件")
+	appendMenu(conversion, MF_POPUP, conf, "同名文件处理")
+	appendMenu(settings, MF_POPUP, conversion, "转换与输出")
+
+	metadataMenu, _, _ := procCreatePopupMenu.Call()
+	appendMenu(metadataMenu, MF_STRING, ID_SET_CLEAR_META, "清除 GPS 和设备元数据")
+	appendMenu(metadataMenu, MF_STRING|MF_CHECKED, ID_SET_PRESERVE_TIMES, "保留拍摄日期与文件时间")
+	appendMenu(metadataMenu, MF_STRING|MF_CHECKED, ID_SET_METADATA_AUDIT, "转换后核验关键元数据")
+	appendMenu(metadataMenu, MF_STRING|MF_CHECKED, ID_SET_VERIFY_OUTPUT, "转换完成后校验输出可用性")
+	appendMenu(settings, MF_POPUP, metadataMenu, "元数据与文件日期")
+
+	performanceMenu, _, _ := procCreatePopupMenu.Call()
 	conc, _, _ := procCreatePopupMenu.Call()
 	a.menuConcurrency = conc
 	logicalProcessors := config.LogicalProcessorCount()
@@ -1858,49 +1904,27 @@ func (a *application) initMenus() {
 		}
 		appendMenu(conc, MF_STRING, uintptr(id), label)
 	}
-	appendMenu(settings, MF_POPUP, conc, "并行任务")
+	appendMenu(performanceMenu, MF_POPUP, conc, "并行任务")
 	performance, _, _ := procCreatePopupMenu.Call()
 	a.menuPerformance = performance
 	appendMenu(performance, MF_STRING|MF_CHECKED, ID_SET_PERF_STANDARD, "标准（完整功能）")
 	appendMenu(performance, MF_STRING, ID_SET_PERF_BATCH, "大批量（减少后台预览）")
 	appendMenu(performance, MF_STRING, ID_SET_PERF_MEMORY, "低内存（限制同时处理）")
-	appendMenu(settings, MF_POPUP, performance, "性能模式")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_GPU, "视频编码优先使用 GPU")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_GPU_FALLBACK, "GPU 失败自动回退 CPU")
-	appendMenu(settings, MF_STRING, ID_SET_CLEAR_META, "清除 GPS 和设备元数据")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_PRESERVE_TIMES, "保留拍摄日期与文件时间")
-	appendMenu(settings, MF_STRING, ID_SET_UPSCALE, "允许放大小分辨率视频")
-	appendMenu(settings, MF_STRING, ID_SET_EXACT_SIZE, "目标体积使用两遍精确编码（仅 CPU）")
-	appendMenu(settings, MF_STRING, ID_SET_SMART_COPY, "原尺寸且无需处理时智能复制视频流")
-	audio, _, _ := procCreatePopupMenu.Call()
-	appendMenu(audio, MF_STRING|MF_CHECKED, ID_SET_AUDIO_AAC, "AAC 192k（默认兼容）")
-	appendMenu(audio, MF_STRING, ID_SET_AUDIO_COPY, "复制原音频流")
-	appendMenu(audio, MF_STRING, ID_SET_AUDIO_MUTE, "静音输出")
-	appendMenu(settings, MF_POPUP, audio, "音频处理")
-	subtitle, _, _ := procCreatePopupMenu.Call()
-	appendMenu(subtitle, MF_STRING|MF_CHECKED, ID_SET_SUBTITLE_NONE, "不保留字幕")
-	appendMenu(subtitle, MF_STRING, ID_SET_SUBTITLE_TEXT, "保留文本字幕并转为 MP4 字幕")
-	appendMenu(settings, MF_POPUP, subtitle, "字幕处理")
-	name, _, _ := procCreatePopupMenu.Call()
-	appendMenu(name, MF_STRING|MF_CHECKED, ID_SET_FILENAME_KEEP, "保持原文件名")
-	appendMenu(name, MF_STRING, ID_SET_FILENAME_SUFFIX, "添加规格后缀")
-	appendMenu(settings, MF_POPUP, name, "输出文件命名")
-	conf, _, _ := procCreatePopupMenu.Call()
-	appendMenu(conf, MF_STRING|MF_CHECKED, ID_SET_CONFLICT_NUMBER, "自动编号")
-	appendMenu(conf, MF_STRING, ID_SET_CONFLICT_SKIP, "跳过已有")
-	appendMenu(conf, MF_STRING, ID_SET_CONFLICT_OVERWRITE, "覆盖已有")
-	appendMenu(settings, MF_POPUP, conf, "同名文件处理")
-	appendMenu(settings, MF_SEPARATOR, 0, "")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_SESSION, "恢复任务会话")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_HISTORY, "保存最近转换记录")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_VERIFY_OUTPUT, "转换完成后自动校验输出")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_THUMB_CACHE, "启用缩略图磁盘缓存")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_ESTIMATE_SPACE, "转换前估算磁盘空间")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_MAP_ENABLED, "启用地图与位置功能")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_MAP_FAST_ZOOM, "地图快速缩放（推荐）")
-	appendMenu(settings, MF_STRING, ID_SET_OPEN_DONE, "完成后打开输出文件夹")
-	appendMenu(settings, MF_STRING|MF_CHECKED, ID_VIEW_FLOATING, "转换时显示桌面悬浮进度条")
-	appendMenu(settings, MF_STRING, ID_VIEW_FLOATING_TOPMOST, "悬浮进度条置顶")
+	appendMenu(performanceMenu, MF_POPUP, performance, "性能模式")
+	appendMenu(performanceMenu, MF_STRING|MF_CHECKED, ID_SET_THUMB_CACHE, "启用缩略图磁盘缓存")
+	appendMenu(performanceMenu, MF_STRING|MF_CHECKED, ID_SET_ESTIMATE_SPACE, "转换前估算磁盘空间")
+	appendMenu(settings, MF_POPUP, performanceMenu, "性能与大批量任务")
+
+	mapMenu, _, _ := procCreatePopupMenu.Call()
+	appendMenu(mapMenu, MF_STRING|MF_CHECKED, ID_SET_MAP_ENABLED, "启用地图与位置功能")
+	appendMenu(mapMenu, MF_STRING|MF_CHECKED, ID_SET_MAP_FAST_ZOOM, "地图快速缩放（推荐）")
+	appendMenu(settings, MF_POPUP, mapMenu, "地图与离线缓存")
+
+	appearance, _, _ := procCreatePopupMenu.Call()
+	appendMenu(appearance, MF_STRING, ID_SET_OPEN_DONE, "完成后打开输出文件夹")
+	appendMenu(appearance, MF_STRING|MF_CHECKED, ID_VIEW_FLOATING, "转换时显示桌面悬浮进度条")
+	appendMenu(appearance, MF_STRING, ID_VIEW_FLOATING_TOPMOST, "悬浮进度条置顶")
+	appendMenu(settings, MF_POPUP, appearance, "外观与完成提醒")
 	appendMenu(settings, MF_SEPARATOR, 0, "")
 	appendMenu(settings, MF_STRING, ID_SET_PORTABLE_MODE, "切换便携模式（重启生效）")
 	appendMenu(settings, MF_STRING, ID_SET_CONFIG_DIR, "打开配置、会话与历史目录")
@@ -1932,12 +1956,14 @@ func (a *application) initMenus() {
 	appendMenu(view, MF_STRING, ID_VIEW_RESET_COLUMNS, "恢复任务列表默认列宽")
 	history, _, _ := procCreatePopupMenu.Call()
 	appendMenu(history, MF_STRING, ID_HISTORY_VIEW, "查看最近转换记录...")
+	appendMenu(history, MF_STRING, ID_HISTORY_FAILURES, "失败任务中心...")
 	appendMenu(history, MF_STRING, ID_HISTORY_LAST_SUMMARY, "查看上次任务总结...")
 	appendMenu(history, MF_SEPARATOR, 0, "")
 	appendMenu(history, MF_STRING, ID_HISTORY_CLEAR_VIDEO, "清空视频历史与缩略图")
 	appendMenu(history, MF_STRING, ID_HISTORY_CLEAR_IMAGE, "清空图片历史与缩略图")
 	appendMenu(history, MF_STRING, ID_HISTORY_CLEAR, "清空全部转换记录与缩略图")
 	help, _, _ := procCreatePopupMenu.Call()
+	appendMenu(help, MF_STRING, ID_HELP_CAPABILITIES, "转换能力检测...")
 	appendMenu(help, MF_STRING, ID_HELP_DIAGNOSTICS, "生成诊断报告...")
 	appendMenu(help, MF_SEPARATOR, 0, "")
 	appendMenu(help, MF_STRING, ID_HELP_ABOUT, "关于")
@@ -1967,6 +1993,8 @@ func (a *application) syncMenuChecks() {
 	setCheck(a.menuSettings, ID_SET_VERIFY_OUTPUT, a.settings.VerifyOutput)
 	setCheck(a.menuSettings, ID_SET_THUMB_CACHE, a.settings.ThumbnailCache)
 	setCheck(a.menuSettings, ID_SET_ESTIMATE_SPACE, a.settings.EstimateDiskSpace)
+	setCheck(a.menuSettings, ID_SET_BATCH_PREVIEW, a.settings.BatchPreview)
+	setCheck(a.menuSettings, ID_SET_METADATA_AUDIT, a.settings.AuditMetadata)
 	setCheck(a.menuSettings, ID_SET_MAP_ENABLED, a.mapFeaturesEnabled())
 	setCheck(a.menuSettings, ID_SET_MAP_FAST_ZOOM, a.settings.MapFastZoom)
 	setCheck(a.menuSettings, ID_SET_SMART_COPY, a.settings.SmartStreamCopy)
@@ -2875,7 +2903,7 @@ func (a *application) command(id int) {
 	case ID_CTX_OPEN_OUTPUT_FILE:
 		a.openSelectedOutputFile()
 	case ID_CTX_RES_4K, ID_CTX_RES_1080, ID_CTX_RES_720, ID_CTX_RES_480, ID_CTX_RES_ORIGINAL,
-		ID_CTX_CODEC_265, ID_CTX_CODEC_264, ID_CTX_CODEC_JPG, ID_CTX_CODEC_PNG,
+		ID_CTX_CODEC_265, ID_CTX_CODEC_264, ID_CTX_CODEC_JPG, ID_CTX_CODEC_PNG, ID_CTX_CODEC_WEBP, ID_CTX_CODEC_AVIF,
 		ID_CTX_QUALITY_HIGH, ID_CTX_QUALITY_MEDIUM, ID_CTX_QUALITY_LOW,
 		ID_CTX_ROT_AUTO, ID_CTX_ROT_RIGHT, ID_CTX_ROT_LEFT, ID_CTX_ROT_180, ID_CTX_ROT_HFLIP, ID_CTX_ROT_VFLIP:
 		a.setSelectedQuickOption(id)
@@ -3003,6 +3031,12 @@ func (a *application) command(id int) {
 	case ID_SET_ESTIMATE_SPACE:
 		a.settings.EstimateDiskSpace = !a.settings.EstimateDiskSpace
 		a.saveSettings()
+	case ID_SET_BATCH_PREVIEW:
+		a.settings.BatchPreview = !a.settings.BatchPreview
+		a.saveSettings()
+	case ID_SET_METADATA_AUDIT:
+		a.settings.AuditMetadata = !a.settings.AuditMetadata
+		a.saveSettings()
 	case ID_SET_MAP_ENABLED:
 		a.setMapFeaturesEnabled(!a.mapFeaturesEnabled())
 	case ID_SET_MAP_FAST_ZOOM:
@@ -3123,6 +3157,8 @@ func (a *application) command(id int) {
 		a.applyFloatingTopmost()
 	case ID_HISTORY_VIEW:
 		a.viewHistory()
+	case ID_HISTORY_FAILURES:
+		a.viewFailureCenter()
 	case ID_HISTORY_LAST_SUMMARY:
 		if a.lastSummaryPath != "" {
 			shellOpen(a.lastSummaryPath)
@@ -3153,6 +3189,8 @@ func (a *application) command(id int) {
 		}
 	case ID_HELP_DIAGNOSTICS:
 		a.writeDiagnostics()
+	case ID_HELP_CAPABILITIES:
+		a.showCapabilityReport()
 	case ID_HELP_ABOUT:
 		messageBox(a.hwnd, "关于", fmt.Sprintf("Mediova v%s\r\n\r\n采用透明 Runtime 与独立 Data 架构。\r\n支持视频转正、压缩、裁剪、目标体积、GPU 回退、图片压缩、PotPlayer 对比、历史与任务恢复。\r\n\r\n本机检测到 %d 个逻辑处理器；并行任务上限为 %d。自动模式会结合媒体类型、分辨率、时长、CPU/GPU与任务数量选择实际并发，不会盲目启动上限数量的 FFmpeg 进程。", appVersion, config.LogicalProcessorCount(), config.MaxConcurrency()), MB_OK|MB_ICONINFORMATION)
 	case ID_FILE_EXIT:
@@ -3368,7 +3406,7 @@ func (a *application) writeSettingsToUI() {
 			setText(a.rightLabels[i], label)
 		}
 		comboFill(a.hResolution, imageSizes(), a.settings.ImageSize)
-		comboFill(a.hCodec, []string{"JPG", "PNG"}, a.settings.ImageFormat)
+		comboFill(a.hCodec, []string{"JPG", "PNG", "WebP", "AVIF"}, a.settings.ImageFormat)
 		comboFill(a.hQuality, []string{"高", "中", "低"}, a.settings.ImageQuality)
 		comboFill(a.hVolume, []string{"不限", "约 500KB", "约 1MB", "约 2MB", "约 5MB"}, a.settings.ImageLimit)
 	} else {
@@ -3700,14 +3738,64 @@ func (a *application) drawTaskListCell(cd *nmListViewCustomDraw) uintptr {
 }
 
 func (a *application) showContextMenu() {
+	idxs := a.selectedTaskIndices()
+	if len(idxs) == 0 {
+		return
+	}
+	type selectionState struct {
+		hasOutput, hasReady, hasRetry, hasProblem bool
+	}
+	state := selectionState{}
+	a.mu.Lock()
+	for _, idx := range idxs {
+		if idx < 0 || idx >= len(a.tasks) || a.tasks[idx] == nil {
+			continue
+		}
+		task := a.tasks[idx]
+		state.hasOutput = state.hasOutput || (task.OutputPath != "" && media.FileSize(task.OutputPath) > 0)
+		state.hasReady = state.hasReady || task.Status == model.StatusReady
+		state.hasRetry = state.hasRetry || recoverableTaskStatus(task.Status) || task.Status == model.StatusDone
+		state.hasProblem = state.hasProblem || task.Error != "" || task.ValidationWarning != ""
+	}
+	a.mu.Unlock()
+
 	m, _, _ := procCreatePopupMenu.Call()
 	if m == 0 {
 		return
 	}
 	defer procDestroyMenu.Call(m)
-	appendMenu(m, MF_STRING, ID_CTX_PLAY_SOURCE, "播放原视频")
-	appendMenu(m, MF_STRING, ID_CTX_PLAY_OUTPUT, "播放转换后视频")
-	appendMenu(m, MF_STRING, ID_CTX_DUAL, "PotPlayer 双窗口快速对比")
+	if a.currentKind == model.KindImage {
+		appendMenu(m, MF_STRING, ID_CTX_PLAY_SOURCE, "预览原图片")
+		if state.hasOutput {
+			appendMenu(m, MF_STRING, ID_CTX_PLAY_OUTPUT, "预览转换后图片")
+		}
+	} else {
+		appendMenu(m, MF_STRING, ID_CTX_PLAY_SOURCE, "播放原视频")
+		if state.hasOutput {
+			appendMenu(m, MF_STRING, ID_CTX_PLAY_OUTPUT, "播放转换后视频")
+		}
+	}
+	if a.mapFeaturesEnabled() && a.selectedTaskHasMapLocation() {
+		// This is intentionally a top-level command: map navigation is a frequent
+		// operation and must never be buried inside the low-frequency submenu.
+		appendMenu(m, MF_STRING, ID_CTX_SHOW_ON_MAP, "在地图中显示")
+	}
+	if state.hasReady {
+		appendMenu(m, MF_STRING, IDC_SINGLE_OUTPUT, "选中转换")
+	} else if state.hasRetry {
+		appendMenu(m, MF_STRING, ID_CTX_RETRY, "复制为准备任务并重新转换")
+	}
+	if len(idxs) == 1 {
+		label := "编辑时长与画面裁剪..."
+		if a.currentKind == model.KindImage {
+			label = "编辑图片画面裁剪..."
+		}
+		appendMenu(m, MF_STRING, ID_CTX_TRIM, label)
+	}
+	appendMenu(m, MF_STRING, ID_CTX_OPEN_SOURCE, "打开源文件所在文件夹")
+	if state.hasOutput {
+		appendMenu(m, MF_STRING, ID_CTX_OPEN_OUTPUT, "打开输出文件夹")
+	}
 	appendMenu(m, MF_SEPARATOR, 0, "")
 
 	res, _, _ := procCreatePopupMenu.Call()
@@ -3721,16 +3809,18 @@ func (a *application) showContextMenu() {
 	if a.currentKind == model.KindImage {
 		appendMenu(codec, MF_STRING, ID_CTX_CODEC_JPG, "JPG")
 		appendMenu(codec, MF_STRING, ID_CTX_CODEC_PNG, "PNG")
+		appendMenu(codec, MF_STRING, ID_CTX_CODEC_WEBP, "WebP")
+		appendMenu(codec, MF_STRING, ID_CTX_CODEC_AVIF, "AVIF")
 	} else {
 		appendMenu(codec, MF_STRING, ID_CTX_CODEC_265, "H.265 / HEVC")
 		appendMenu(codec, MF_STRING, ID_CTX_CODEC_264, "H.264 / AVC")
 	}
-	appendMenu(m, MF_POPUP, codec, "修改编码 / 格式")
+	appendMenu(res, MF_POPUP, codec, "编码 / 格式")
 	quality, _, _ := procCreatePopupMenu.Call()
 	appendMenu(quality, MF_STRING, ID_CTX_QUALITY_HIGH, "高")
 	appendMenu(quality, MF_STRING, ID_CTX_QUALITY_MEDIUM, "中")
 	appendMenu(quality, MF_STRING, ID_CTX_QUALITY_LOW, "低")
-	appendMenu(m, MF_POPUP, quality, "修改质量")
+	appendMenu(res, MF_POPUP, quality, "质量")
 	rotation, _, _ := procCreatePopupMenu.Call()
 	appendMenu(rotation, MF_STRING, ID_CTX_ROT_AUTO, "自动")
 	appendMenu(rotation, MF_STRING, ID_CTX_ROT_RIGHT, "90°右转")
@@ -3738,46 +3828,62 @@ func (a *application) showContextMenu() {
 	appendMenu(rotation, MF_STRING, ID_CTX_ROT_180, "180°")
 	appendMenu(rotation, MF_STRING, ID_CTX_ROT_HFLIP, "左右翻转")
 	appendMenu(rotation, MF_STRING, ID_CTX_ROT_VFLIP, "上下翻转")
-	appendMenu(m, MF_POPUP, rotation, "修改旋转处理")
-	appendMenu(m, MF_STRING, ID_CTX_COPY_TASK, "以第一项为来源，复制全部参数")
-	appendMenu(m, MF_STRING, ID_CTX_COPY_TRIM_CROP, "仅复制第一项的时长 / 画面裁剪")
+	appendMenu(res, MF_POPUP, rotation, "旋转处理")
+	if len(idxs) > 1 {
+		appendMenu(res, MF_SEPARATOR, 0, "")
+		appendMenu(res, MF_STRING, ID_CTX_COPY_TASK, "以第一项为来源复制全部参数")
+		appendMenu(res, MF_STRING, ID_CTX_COPY_TRIM_CROP, "仅复制时长 / 画面裁剪")
+	}
+	appendMenu(res, MF_STRING, ID_CTX_READY, "恢复准备任务默认参数")
+	appendMenu(m, MF_POPUP, res, "转换参数")
+
+	preview, _, _ := procCreatePopupMenu.Call()
+	appendMenu(preview, MF_STRING, ID_CTX_ROTATION_PREVIEW, "预览选中的方向")
+	if state.hasOutput && a.currentKind == model.KindImage {
+		appendMenu(preview, MF_STRING, ID_CTX_COMPARE_IMAGE, "生成五点画面对比图...")
+	}
+	if state.hasOutput && a.currentKind == model.KindVideo {
+		appendMenu(preview, MF_STRING, ID_CTX_DUAL, "PotPlayer 双窗口快速对比")
+		appendMenu(preview, MF_STRING, ID_CTX_COMPARE_VIDEO, "生成 30 秒同步对比视频...")
+	}
+	if state.hasOutput {
+		appendMenu(preview, MF_STRING, ID_CTX_TECH_REPORT, "生成前后技术参数报告...")
+	}
+	appendMenu(m, MF_POPUP, preview, "预览与对比")
+
+	taskMenu, _, _ := procCreatePopupMenu.Call()
 	temporary, _, _ := procCreatePopupMenu.Call()
 	editFlags, removeFlags := a.v420ContextMenuFlags()
 	appendMenu(temporary, a.v452ExitQueueFlags(), ID_CTX_EXIT_QUEUE, "退出队列")
 	appendMenu(temporary, editFlags, ID_CTX_HOLD_EDIT, "搁置并修改参数")
 	appendMenu(temporary, removeFlags, ID_CTX_REMOVE_SAFE, "从任务列表移除")
-	appendMenu(m, MF_POPUP, temporary, "临时操作")
-	appendMenu(m, MF_STRING, ID_CTX_READY, "恢复选中准备任务默认参数")
-	appendMenu(m, MF_SEPARATOR, 0, "")
-	appendMenu(m, MF_STRING, ID_CTX_ROTATION_PREVIEW, "预览选中的方向")
-	appendMenu(m, MF_STRING, ID_CTX_TRIM, "编辑时长与画面裁剪...")
-	appendMenu(m, MF_STRING, ID_CTX_COMPARE_IMAGE, "生成五点画面对比图...")
-	appendMenu(m, MF_STRING, ID_CTX_COMPARE_VIDEO, "生成 30 秒同步对比视频...")
-	appendMenu(m, MF_STRING, ID_CTX_RETRY, "复制为准备任务并重新转换")
-	appendMenu(m, MF_STRING, ID_CTX_COPY_COMMAND, "查看 / 复制 FFmpeg 命令")
-	appendMenu(m, MF_STRING, ID_CTX_ERROR_DETAILS, "查看错误与任务详情")
-	appendMenu(m, MF_STRING, ID_CTX_TECH_REPORT, "生成前后技术参数报告...")
-	appendMenu(m, MF_SEPARATOR, 0, "")
-	appendMenu(m, MF_STRING, ID_CTX_PIN, "置顶 / 取消置顶")
-	appendMenu(m, MF_STRING, ID_CTX_MOVE_TOP, "移到当前工作区最前")
-	appendMenu(m, MF_STRING, ID_CTX_MOVE_UP, "上移")
-	appendMenu(m, MF_STRING, ID_CTX_MOVE_DOWN, "下移")
-	appendMenu(m, MF_STRING, ID_CTX_MOVE_BOTTOM, "移到当前工作区最后")
-	appendMenu(m, MF_STRING, ID_CTX_JUMP_RUNNING, "跳转到正在运行的任务")
-	appendMenu(m, MF_SEPARATOR, 0, "")
-	if a.mapFeaturesEnabled() && a.selectedTaskHasMapLocation() {
-		appendMenu(m, MF_STRING, ID_CTX_SHOW_ON_MAP, "在地图上显示")
-		if a.selectedTasksNeedReverseGeocode() {
-			appendMenu(m, MF_STRING, ID_CTX_REVERSE_GEOCODE, "补全选中地名")
-		}
-		appendMenu(m, MF_SEPARATOR, 0, "")
+	appendMenu(taskMenu, MF_POPUP, temporary, "临时操作")
+	appendMenu(taskMenu, MF_STRING, ID_CTX_PIN, "置顶 / 取消置顶")
+	appendMenu(taskMenu, MF_STRING, ID_CTX_MOVE_TOP, "移到当前工作区最前")
+	appendMenu(taskMenu, MF_STRING, ID_CTX_MOVE_UP, "上移")
+	appendMenu(taskMenu, MF_STRING, ID_CTX_MOVE_DOWN, "下移")
+	appendMenu(taskMenu, MF_STRING, ID_CTX_MOVE_BOTTOM, "移到当前工作区最后")
+	appendMenu(taskMenu, MF_STRING, ID_CTX_JUMP_RUNNING, "跳转到正在运行的任务")
+	appendMenu(taskMenu, MF_SEPARATOR, 0, "")
+	appendMenu(taskMenu, MF_STRING, ID_CTX_REMOVE_SAFE, "从任务列表移除")
+	appendMenu(m, MF_POPUP, taskMenu, "任务管理")
+
+	more, _, _ := procCreatePopupMenu.Call()
+	appendMenu(more, MF_STRING, ID_CTX_COPY_COMMAND, "查看 / 复制 FFmpeg 命令")
+	appendMenu(more, MF_STRING, ID_CTX_ERROR_DETAILS, "查看任务详情")
+	if state.hasProblem {
+		appendMenu(more, MF_STRING, ID_HISTORY_FAILURES, "打开失败任务中心")
 	}
-	appendMenu(m, MF_STRING, ID_CTX_OPEN_SOURCE, "打开源文件所在文件夹")
-	appendMenu(m, MF_STRING, ID_CTX_OPEN_OUTPUT, "打开输出文件夹")
-	appendMenu(m, MF_STRING, ID_CTX_OPEN_OUTPUT_FILE, "直接打开输出文件")
-	appendMenu(m, MF_STRING, ID_CTX_COPY_SOURCE, "复制源文件路径")
-	appendMenu(m, MF_STRING, ID_CTX_COPY_OUTPUT, "复制输出文件路径")
-	appendMenu(m, MF_STRING, ID_CTX_REMOVE_SAFE, "从任务列表移除")
+	if a.mapFeaturesEnabled() && a.selectedTasksNeedReverseGeocode() {
+		appendMenu(more, MF_STRING, ID_CTX_REVERSE_GEOCODE, "补全选中地名")
+	}
+	appendMenu(more, MF_SEPARATOR, 0, "")
+	appendMenu(more, MF_STRING, ID_CTX_COPY_SOURCE, "复制源文件路径")
+	if state.hasOutput {
+		appendMenu(more, MF_STRING, ID_CTX_COPY_OUTPUT, "复制输出文件路径")
+		appendMenu(more, MF_STRING, ID_CTX_OPEN_OUTPUT_FILE, "使用默认程序打开输出文件")
+	}
+	appendMenu(m, MF_POPUP, more, "更多")
 	var pt point
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
 	procSetForegroundWindow.Call(a.hwnd)
@@ -5546,6 +5652,10 @@ func (a *application) setSelectedQuickOption(id int) {
 			o.ImageFormat = "JPG"
 		case ID_CTX_CODEC_PNG:
 			o.ImageFormat = "PNG"
+		case ID_CTX_CODEC_WEBP:
+			o.ImageFormat = "WebP"
+		case ID_CTX_CODEC_AVIF:
+			o.ImageFormat = "AVIF"
 		case ID_CTX_QUALITY_HIGH:
 			o.Quality = "高"
 		case ID_CTX_QUALITY_MEDIUM:
@@ -6115,8 +6225,65 @@ func (a *application) preflightReadyTasks(only map[int64]bool) bool {
 
 func (a *application) startQueue() { a.startQueueFiltered(nil) }
 
+func shouldShowBatchPreview(taskCount, conflicts int, policy string) bool {
+	return taskCount >= 100 || (conflicts > 0 && strings.TrimSpace(policy) != "自动编号")
+}
+
+func (a *application) confirmBatchPreview(only map[int64]bool) bool {
+	if a == nil || !a.settings.BatchPreview {
+		return true
+	}
+	type previewTask struct {
+		task *model.Task
+		opts model.TaskOptions
+	}
+	items := make([]previewTask, 0)
+	a.mu.Lock()
+	for _, task := range a.tasks {
+		if task == nil || task.Kind != a.currentKind || task.Status != model.StatusReady || (only != nil && !only[task.ID]) {
+			continue
+		}
+		copyTask := *task
+		items = append(items, previewTask{task: &copyTask, opts: a.settings.EffectiveOptions(task)})
+	}
+	a.mu.Unlock()
+	if len(items) == 0 {
+		return true
+	}
+	conflicts, estimated := 0, int64(0)
+	probeSettings := a.settings
+	probeSettings.ConflictPolicy = "覆盖已有" // resolves the unsuffixed target without mutating it
+	outputRoot := a.v420OutputDir(a.currentKind)
+	for _, item := range items {
+		estimated += media.EstimateOutputBytes(item.task, item.opts)
+		candidate, _, err := media.ResolveOutputPath(item.task.Input, item.task.Root, outputRoot, item.task.Kind, item.opts, probeSettings)
+		if err == nil {
+			if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
+				conflicts++
+			}
+		}
+	}
+	if !shouldShowBatchPreview(len(items), conflicts, a.settings.ConflictPolicy) {
+		return true
+	}
+	kind := "视频"
+	if a.currentKind == model.KindImage {
+		kind = "图片"
+	}
+	strategy := map[string]string{"自动编号": "自动编号并保留现有文件", "跳过已有": "跳过已有文件", "覆盖已有": "成功校验后替换已有文件"}[a.settings.ConflictPolicy]
+	if strategy == "" {
+		strategy = a.settings.ConflictPolicy
+	}
+	text := fmt.Sprintf("即将处理 %d 个%s任务。\r\n\r\n输出目录：%s\r\n冲突策略：%s\r\n检测到已有目标：%d 个\r\n预计输出体积：约 %s\r\n\r\n是否开始？", len(items), kind, outputRoot, strategy, conflicts, media.FormatBytes(estimated))
+	return messageBox(a.hwnd, "批量处理预览", text, MB_YESNO|MB_ICONQUESTION) == IDYES
+}
+
 func (a *application) startQueueFiltered(only map[int64]bool) {
 	if !a.preflightReadyTasks(only) {
+		return
+	}
+	if !a.confirmBatchPreview(only) {
+		setText(a.hStatusText, "已取消本次批量处理；任务仍保持准备状态。")
 		return
 	}
 	a.v420StartQueueFiltered(only)
@@ -6416,6 +6583,26 @@ func (a *application) convertOne(id int64, taskSnapshot *model.Task, settings mo
 			verificationWarning += "视频日期元数据未完全保留: " + short(err.Error(), 160)
 		} else {
 			engine += " · " + label
+		}
+	}
+	if settings.AuditMetadata && !settings.ClearMetadata {
+		progressFn(99.2, "正在核验元数据")
+		auditCtx, cancelAudit := context.WithTimeout(ctx, 25*time.Second)
+		audit, auditErr := media.AuditCriticalMetadata(auditCtx, ffmpeg, input, stagedOut, kind)
+		cancelAudit()
+		warning := ""
+		if auditErr != nil {
+			warning = "元数据核验未完成: " + short(auditErr.Error(), 150)
+		} else if audit.Warning() != "" {
+			warning = "元数据差异: " + short(audit.Warning(), 180)
+		} else if audit.Checked > 0 {
+			engine += fmt.Sprintf(" · 元数据核验通过(%d)", audit.Checked)
+		}
+		if warning != "" {
+			if verificationWarning != "" {
+				verificationWarning += "；"
+			}
+			verificationWarning += warning
 		}
 	}
 	progressFn(99.5, "正在提交正式输出")
@@ -7287,6 +7474,33 @@ func (a *application) viewHistory() {
 	}
 	shellOpen(path)
 }
+
+func (a *application) viewFailureCenter() {
+	path, count, err := media.WriteFailureCenterHTML()
+	if err != nil {
+		messageBox(a.hwnd, "失败任务中心", err.Error(), MB_OK|MB_ICONERROR)
+		return
+	}
+	if count == 0 {
+		messageBox(a.hwnd, "失败任务中心", "历史记录中没有失败任务。", MB_OK|MB_ICONINFORMATION)
+		return
+	}
+	shellOpen(path)
+}
+
+func (a *application) showCapabilityReport() {
+	ffmpeg, ffprobe, hardware, player, playerOK := a.componentSnapshot()
+	setText(a.hStatusText, "正在检测本机转换能力；主界面可以继续使用。")
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		report := media.DetectCapabilityReport(ctx, ffmpeg, ffprobe, hardware, player, playerOK)
+		a.postUI(func() {
+			messageBox(a.hwnd, "转换能力检测", report, MB_OK|MB_ICONINFORMATION)
+			setText(a.hStatusText, "本机转换能力检测完成。")
+		})
+	}()
+}
 func (a *application) saveSession() {
 	if a == nil || !a.settings.RestoreSession {
 		return
@@ -7381,6 +7595,23 @@ func (a *application) loadSession() {
 	})
 	summary.Legacy = legacy
 	summary.BackupUsed = backupUsed
+	if !envelope.CleanShutdown && summary.Reset > 0 && !a.selfTest {
+		prompt := fmt.Sprintf("上次运行未正常结束，发现 %d 个可恢复任务。\r\n\r\n选择“是”：把它们恢复为准备任务；\r\n选择“否”：只保留完成、失败、跳过等终态记录。", summary.Reset)
+		if messageBox(a.hwnd, "恢复未完成任务", prompt, MB_YESNO|MB_ICONQUESTION) != IDYES {
+			kept := envelope.Tasks[:0]
+			for _, task := range envelope.Tasks {
+				if task == nil {
+					continue
+				}
+				switch task.Status {
+				case model.StatusDone, model.StatusFailed, model.StatusSkipped:
+					kept = append(kept, task)
+				}
+			}
+			envelope.Tasks = kept
+			a.runtimeNotice = fmt.Sprintf("已放弃恢复 %d 个中断任务，仅保留终态记录。", summary.Reset)
+		}
+	}
 	loadedIDs := make([]int64, 0, len(envelope.Tasks))
 	a.mu.Lock()
 	for _, task := range envelope.Tasks {
@@ -7396,7 +7627,9 @@ func (a *application) loadSession() {
 		}
 	}
 	a.mu.Unlock()
-	a.runtimeNotice = workflow.RecoveryNotice(summary, envelope)
+	if a.runtimeNotice == "" {
+		a.runtimeNotice = workflow.RecoveryNotice(summary, envelope)
+	}
 	_, ffprobe, _, _, _ := a.componentSnapshot()
 	if ffprobe != "" {
 		for _, id := range loadedIDs {

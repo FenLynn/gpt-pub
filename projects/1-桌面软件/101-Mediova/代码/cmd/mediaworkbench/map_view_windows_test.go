@@ -2,7 +2,11 @@
 
 package main
 
-import "testing"
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestMapProjectionAndClustering(t *testing.T) {
 	points := []mapMediaPoint{
@@ -46,5 +50,23 @@ func TestMapViewToolbarLabels(t *testing.T) {
 		if !ok || label != want {
 			t.Fatalf("mode=%s label=%q ok=%v", mode, label, ok)
 		}
+	}
+}
+
+func TestMapFolderIdentityUsesFullPathAndCompactLabel(t *testing.T) {
+	input := filepath.Join(`D:\媒体`, "旅行", "青岛", "clip.mp4")
+	key, label := mapFolderIdentity(input)
+	if key != strings.ToLower(filepath.Join(`D:\媒体`, "旅行", "青岛")) {
+		t.Fatalf("folder key=%q", key)
+	}
+	if label != filepath.Join("旅行", "青岛") {
+		t.Fatalf("folder label=%q", label)
+	}
+}
+
+func TestNativeMapKeepsCurrentListScope(t *testing.T) {
+	points := visibleMapPoints([]mapMediaPoint{{TaskID: 1, ListVisible: true}, {TaskID: 2}, {Demo: true}})
+	if len(points) != 2 || points[0].TaskID != 1 || !points[1].Demo {
+		t.Fatalf("visible points=%+v", points)
 	}
 }

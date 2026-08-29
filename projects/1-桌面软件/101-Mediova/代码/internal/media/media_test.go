@@ -60,6 +60,29 @@ func TestImageArgs(t *testing.T) {
 	}
 }
 
+func TestModernImageOutputArgsAndExtensions(t *testing.T) {
+	s := model.DefaultSettings()
+	o := s.EffectiveOptions(nil)
+	for _, tc := range []struct {
+		format, output, extension string
+		need                      []string
+	}{
+		{format: "WebP", output: "out.webp", extension: ".webp", need: []string{"-c:v libwebp", "-preset photo", "-quality"}},
+		{format: "AVIF", output: "out.avif", extension: ".avif", need: []string{"-c:v libaom-av1", "-still-picture 1", "-crf", "-pix_fmt yuv420p"}},
+	} {
+		o.ImageFormat = tc.format
+		joined := strings.Join(BuildImageArgs(ConvertRequest{Input: "in.png", Output: tc.output, Kind: model.KindImage, Options: o, Settings: s}), " ")
+		for _, want := range tc.need {
+			if !strings.Contains(joined, want) {
+				t.Errorf("%s args missing %q: %s", tc.format, want, joined)
+			}
+		}
+		if got := OutputExtension(model.KindImage, o); got != tc.extension {
+			t.Errorf("%s extension=%q", tc.format, got)
+		}
+	}
+}
+
 func TestVolumeParsingMath(t *testing.T) {
 	s := model.DefaultSettings()
 	o := s.EffectiveOptions(nil)

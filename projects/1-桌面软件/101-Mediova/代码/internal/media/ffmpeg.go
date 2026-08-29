@@ -831,7 +831,18 @@ func nullDevice() string {
 }
 
 func BuildImageArgs(req ConvertRequest) []string {
-	return buildImageArgsQ(req, imageQuality(req.Options.Quality))
+	loss := imageQuality(req.Options.Quality)
+	if strings.EqualFold(req.Options.ImageFormat, "WebP") || strings.EqualFold(req.Options.ImageFormat, "AVIF") {
+		switch req.Options.Quality {
+		case "高":
+			loss = "3"
+		case "低":
+			loss = "12"
+		default:
+			loss = "7"
+		}
+	}
+	return buildImageArgsQ(req, loss)
 }
 
 func buildImageArgsQ(req ConvertRequest, q string) []string {
@@ -845,9 +856,25 @@ func buildImageArgsQ(req ConvertRequest, q string) []string {
 	// the encoded frame so viewers do not rotate the already-correct pixels a
 	// second time. Other embedded metadata remains mapped when requested.
 	args = append(args, "-metadata:s:v:0", "rotate=0")
-	if strings.EqualFold(req.Options.ImageFormat, "PNG") {
+	format := strings.ToUpper(strings.TrimSpace(req.Options.ImageFormat))
+	switch format {
+	case "PNG":
 		args = append(args, "-compression_level", "9")
-	} else {
+	case "WEBP":
+		loss, _ := strconv.Atoi(q)
+		quality := 100 - loss*3
+		if quality < 5 {
+			quality = 5
+		}
+		args = append(args, "-c:v", "libwebp", "-preset", "photo", "-quality", strconv.Itoa(quality))
+	case "AVIF":
+		loss, _ := strconv.Atoi(q)
+		crf := 16 + loss*2
+		if crf > 63 {
+			crf = 63
+		}
+		args = append(args, "-c:v", "libaom-av1", "-still-picture", "1", "-crf", strconv.Itoa(crf), "-cpu-used", "6", "-row-mt", "1", "-pix_fmt", "yuv420p")
+	default:
 		args = append(args, "-q:v", q)
 	}
 	args = append(args, req.Output)

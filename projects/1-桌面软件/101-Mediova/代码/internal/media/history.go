@@ -231,6 +231,49 @@ func LoadHistory() []HistoryRecord {
 	return items
 }
 
+// WriteFailureCenterHTML creates one replace-in-place report. It deliberately
+// reuses history.json instead of introducing another database or thumbnail
+// lifecycle, so the failure centre can never become a second garbage pile.
+func WriteFailureCenterHTML() (string, int, error) {
+	historyMu.Lock()
+	defer historyMu.Unlock()
+	records := loadHistoryUnlocked()
+	failures := make([]HistoryRecord, 0)
+	for _, record := range records {
+		if record.Status == model.StatusFailed {
+			failures = append(failures, record)
+		}
+	}
+	sort.SliceStable(failures, func(i, j int) bool { return failures[i].CompletedAt.After(failures[j].CompletedAt) })
+	dir, err := config.Dir()
+	if err != nil {
+		return "", 0, err
+	}
+	path := filepath.Join(dir, "failure-center.html")
+	var b strings.Builder
+	b.WriteString(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mediova 失败任务中心</title><style>:root{font-family:"Microsoft YaHei UI","Segoe UI",sans-serif;color:#243b53;background:#f6f8fb}*{box-sizing:border-box}body{margin:18px}h1{font-size:21px;margin:0}.sub{font-size:12px;color:#718096;margin:6px 0 15px}.tools{display:flex;gap:8px;margin-bottom:12px}.tools input,.tools select{height:34px;border:1px solid #cbd8e6;border-radius:6px;background:#fff;padding:0 10px;color:#243b53}.tools input{width:min(520px,70vw)}.wrap{overflow:auto;max-height:calc(100vh - 150px);background:#fff;border:1px solid #d9e2ec;border-radius:8px}table{border-collapse:collapse;min-width:1500px;width:100%;font-size:12px}th,td{border-bottom:1px solid #edf1f5;padding:8px;vertical-align:top;text-align:left}th{position:sticky;top:0;background:#f3f7fb;color:#486581;z-index:2}.kind{color:#526d82}.category{color:#b44b3e;font-weight:600}.error{white-space:normal;min-width:280px;max-width:480px;word-break:break-word}.path{white-space:normal;min-width:260px;max-width:420px;word-break:break-all}.file-link{color:#176ac1;text-decoration:none}.path-actions{display:flex;gap:5px;margin-top:5px}.folder-link,.copy-path{height:23px;padding:0 8px;border:1px solid #bfd4e8;border-radius:12px;background:#fff;color:#2571b8;font-size:11px;line-height:21px;text-decoration:none;cursor:pointer}.empty{padding:36px;text-align:center;color:#718096}</style></head><body>`)
+	fmt.Fprintf(&b, `<h1>失败任务中心（%d）</h1><p class="sub">这里只汇总历史中的失败记录，不占用主界面；文件每次打开都会覆盖更新。需要重试时，回到软件使用“任务管理 → 重新准备失败任务”。</p>`, len(failures))
+	b.WriteString(`<div class="tools"><input id="q" type="search" placeholder="搜索文件名、路径、失败分类或错误"><select id="kind"><option value="">全部类型</option><option value="video">视频</option><option value="image">图片</option></select><span id="count"></span></div><div class="wrap">`)
+	if len(failures) == 0 {
+		b.WriteString(`<div class="empty">当前没有失败记录。</div>`)
+	} else {
+		b.WriteString(`<table><thead><tr><th>时间</th><th>类型</th><th>失败分类</th><th>错误详情</th><th>输入文件</th><th>预定输出</th><th>引擎 / 阶段</th></tr></thead><tbody>`)
+		for _, record := range failures {
+			kindLabel := "视频"
+			if record.Kind == model.KindImage {
+				kindLabel = "图片"
+			}
+			fmt.Fprintf(&b, `<tr data-kind="%s"><td>%s</td><td class="kind">%s</td><td class="category">%s</td><td class="error">%s</td><td class="path">%s%s</td><td class="path">%s%s</td><td>%s</td></tr>`, record.Kind, record.CompletedAt.Format("2006-01-02 15:04:05"), kindLabel, html.EscapeString(record.FailureCategory), html.EscapeString(record.Error), historyPathHTML(record.Input), historyFolderActionsHTML(record.Input, "打开输入文件夹"), historyPathHTML(record.Output), historyFolderActionsHTML(record.Output, "打开输出文件夹"), html.EscapeString(record.Engine))
+		}
+		b.WriteString(`</tbody></table>`)
+	}
+	b.WriteString(`</div><script>const q=document.getElementById('q'),kind=document.getElementById('kind'),count=document.getElementById('count');function apply(){let shown=0;document.querySelectorAll('tbody tr').forEach(r=>{const ok=(!kind.value||r.dataset.kind===kind.value)&&(!q.value||r.textContent.toLowerCase().includes(q.value.toLowerCase()));r.hidden=!ok;if(ok)shown++});count.textContent='显示 '+shown+' 条'}q.oninput=apply;kind.onchange=apply;apply();document.querySelectorAll('.copy-path').forEach(button=>button.onclick=()=>navigator.clipboard.writeText(button.dataset.path||''));</script></body></html>`)
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return "", 0, err
+	}
+	return path, len(failures), nil
+}
+
 func historyThumbnailDir() (string, error) {
 	dir, err := config.Dir()
 	if err != nil {

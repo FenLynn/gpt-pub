@@ -64,6 +64,12 @@ func EstimateOutputBytes(t *model.Task, opts model.TaskOptions) int64 {
 			if strings.EqualFold(opts.ImageFormat, "PNG") {
 				return t.InputSize
 			}
+			if strings.EqualFold(opts.ImageFormat, "AVIF") {
+				return int64(float64(t.InputSize) * .45)
+			}
+			if strings.EqualFold(opts.ImageFormat, "WebP") {
+				return int64(float64(t.InputSize) * .60)
+			}
 			return int64(float64(t.InputSize) * .75)
 		}
 		return 4 * 1024 * 1024

@@ -235,6 +235,8 @@ type Settings struct {
 	VerifyOutput           bool             `json:"verify_output"`
 	ThumbnailCache         bool             `json:"thumbnail_cache"`
 	EstimateDiskSpace      bool             `json:"estimate_disk_space"`
+	BatchPreview           bool             `json:"batch_preview"`
+	AuditMetadata          bool             `json:"audit_metadata"`
 	MapEnabled             bool             `json:"map_enabled"`
 	MapFastZoom            bool             `json:"map_fast_zoom"`
 	MapCameraSet           bool             `json:"map_camera_set,omitempty"`
@@ -293,6 +295,8 @@ func DefaultSettings() Settings {
 		VerifyOutput:           true,
 		ThumbnailCache:         true,
 		EstimateDiskSpace:      true,
+		BatchPreview:           true,
+		AuditMetadata:          true,
 		MapEnabled:             true,
 		MapFastZoom:            true,
 		SmartStreamCopy:        false,

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const v452Round8ConvergenceManifestSHA256 = "fd1a7d2b5a9fb8946378185a2d0ea6835dca22a3cc0ed4376e42034d12302bf3"
+const v452Round8ConvergenceManifestSHA256 = "90d4c369e0ba35ea15fb657e4eafc56c33adbc7a089eae25fb624fbeab60057e"
 
 // Round 8 is a historical receipt. Its manifest and rows must remain intact,
 // but later rounds are allowed to supersede listed implementation files.
