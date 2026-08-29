@@ -242,6 +242,10 @@ func (a *application) v420ImageTaskLimitLocked(runIDs map[int64]bool) int {
 			break
 		}
 	}
+	// Re-evaluate before every task claim. If other applications or native
+	// decoders consume memory during a long batch, new image jobs slow down
+	// without interrupting the conversions that are already running.
+	limit = runtimeMemoryWorkerCap(model.KindImage, limit)
 	if limit < 1 {
 		return 1
 	}

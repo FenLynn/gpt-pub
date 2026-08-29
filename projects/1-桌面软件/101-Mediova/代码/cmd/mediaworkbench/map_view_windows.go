@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unsafe"
 
@@ -17,15 +18,22 @@ const (
 	mapViewSplit   = "split"
 	mapViewMap     = "map"
 	mapViewSidebar = "sidebar"
+	mapLVMScroll   = LVM_FIRST + 20
 )
 
 type mapMediaPoint struct {
-	TaskID    int64   `json:"taskID"`
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Label     string  `json:"label"`
-	Demo      bool    `json:"demo"`
-	Selected  bool    `json:"selected"`
+	TaskID        int64   `json:"-"`
+	TaskKey       string  `json:"taskID,omitempty"`
+	Latitude      float64 `json:"latitude"`
+	Longitude     float64 `json:"longitude"`
+	Label         string  `json:"label"`
+	Name          string  `json:"name,omitempty"`
+	Status        string  `json:"status,omitempty"`
+	HasThumbnail  bool    `json:"hasThumbnail,omitempty"`
+	ThumbnailPath string  `json:"-"`
+	Demo          bool    `json:"demo"`
+	Selected      bool    `json:"selected"`
+	Current       bool    `json:"current"`
 }
 
 type mapPointScreen struct {
@@ -160,7 +168,12 @@ func (a *application) currentMapPoints() []mapMediaPoint {
 	if a == nil {
 		return nil
 	}
-	selected := a.selectedTaskIDsSnapshot()
+	currentTaskID := int64(0)
+	if runtime := mapRuntimeFor(a); runtime != nil {
+		currentTaskID = runtime.currentTask()
+	}
+	thumbnailState := v452ThumbnailStateFor(a)
+	selectedTaskIDs := a.selectedTaskIDsSnapshot()
 	a.mu.Lock()
 	visible := append([]int(nil), a.visible...)
 	points := make([]mapMediaPoint, 0, len(visible)+4)
@@ -176,19 +189,27 @@ func (a *application) currentMapPoints() []mapMediaPoint {
 		if label == "" || label == "—" {
 			label = filepath.Base(task.Input)
 		}
+		thumbnailPath := ""
+		if thumbnailState != nil {
+			if asset, ok := thumbnailState.assets[task.ID]; ok {
+				thumbnailPath = strings.TrimSpace(asset.path)
+			}
+		}
 		points = append(points, mapMediaPoint{
-			TaskID: task.ID, Latitude: task.Location.Latitude,
+			TaskID: task.ID, TaskKey: strconv.FormatInt(task.ID, 10), Latitude: task.Location.Latitude,
 			Longitude: task.Location.Longitude, Label: label,
-			Selected: selected[task.ID],
+			Name: filepath.Base(task.Input), Status: string(task.Status),
+			HasThumbnail: thumbnailPath != "", ThumbnailPath: thumbnailPath,
+			Selected: selectedTaskIDs[task.ID], Current: task.ID == currentTaskID,
 		})
 	}
 	a.mu.Unlock()
 	if a.mapDemo {
 		points = append(points,
-			mapMediaPoint{Latitude: 36.1741, Longitude: 120.3865, Label: "青岛 · iPhone GPS 样例", Demo: true, Selected: a.mapSelectedDemo == "青岛 · iPhone GPS 样例"},
-			mapMediaPoint{Latitude: 39.9042, Longitude: 116.4074, Label: "北京 · 测试点", Demo: true, Selected: a.mapSelectedDemo == "北京 · 测试点"},
-			mapMediaPoint{Latitude: 34.3416, Longitude: 108.9398, Label: "西安 · 测试点 A", Demo: true, Selected: a.mapSelectedDemo == "西安 · 测试点 A"},
-			mapMediaPoint{Latitude: 34.3421, Longitude: 108.9402, Label: "西安 · 测试点 B", Demo: true, Selected: a.mapSelectedDemo == "西安 · 测试点 B"},
+			mapMediaPoint{Latitude: 36.1741, Longitude: 120.3865, Label: "青岛 · iPhone GPS 样例", Demo: true, Selected: a.mapSelectedDemo == "青岛 · iPhone GPS 样例", Current: a.mapSelectedDemo == "青岛 · iPhone GPS 样例"},
+			mapMediaPoint{Latitude: 39.9042, Longitude: 116.4074, Label: "北京 · 测试点", Demo: true, Selected: a.mapSelectedDemo == "北京 · 测试点", Current: a.mapSelectedDemo == "北京 · 测试点"},
+			mapMediaPoint{Latitude: 34.3416, Longitude: 108.9398, Label: "西安 · 测试点 A", Demo: true, Selected: a.mapSelectedDemo == "西安 · 测试点 A", Current: a.mapSelectedDemo == "西安 · 测试点 A"},
+			mapMediaPoint{Latitude: 34.3421, Longitude: 108.9402, Label: "西安 · 测试点 B", Demo: true, Selected: a.mapSelectedDemo == "西安 · 测试点 B", Current: a.mapSelectedDemo == "西安 · 测试点 B"},
 		)
 	}
 	return points
@@ -341,6 +362,10 @@ func (a *application) relayoutForMapMode() {
 }
 
 func (a *application) cycleMapViewMode() {
+	if !a.mapFeaturesEnabled() {
+		setText(a.hStatusText, "地图与位置功能已关闭；可在“设置”中重新启用。")
+		return
+	}
 	switch a.viewMode {
 	case mapViewSplit:
 		a.viewMode = mapViewMap
@@ -373,6 +398,9 @@ func mapViewLabel(mode string) string {
 }
 
 func (a *application) toggleMapDemo() {
+	if !a.mapFeaturesEnabled() {
+		return
+	}
 	a.mapDemo = !a.mapDemo
 	a.mapSelectedDemo = ""
 	if a.mapDemo {
@@ -418,31 +446,71 @@ func (a *application) mapClusterAtCursor() (mapCluster, bool) {
 	return clusters[best], true
 }
 
+func mapListCenterDelta(rowTop, rowBottom, clientTop, clientBottom int32) int32 {
+	if rowBottom <= rowTop || clientBottom <= clientTop {
+		return 0
+	}
+	return (rowTop + (rowBottom-rowTop)/2) - (clientTop + (clientBottom-clientTop)/2)
+}
+
+func (a *application) centerMapTaskRow(row int) {
+	if a == nil || a.hList == 0 || row < 0 {
+		return
+	}
+	// First make the item measurable, then scroll its centre to the centre of
+	// the current list viewport. This matches map navigation rather than merely
+	// exposing one pixel of the target row.
+	send(a.hList, LVM_ENSUREVISIBLE, uintptr(row), 0)
+	rowBounds := rect{Left: LVIR_BOUNDS}
+	if send(a.hList, LVM_GETITEMRECT, uintptr(row), uintptr(unsafe.Pointer(&rowBounds))) == 0 {
+		return
+	}
+	var client rect
+	if ok, _, _ := procGetClientRect.Call(a.hList, uintptr(unsafe.Pointer(&client))); ok == 0 {
+		return
+	}
+	delta := mapListCenterDelta(rowBounds.Top, rowBounds.Bottom, client.Top, client.Bottom)
+	rowHeight := rowBounds.Bottom - rowBounds.Top
+	if delta > rowHeight/2 || delta < -rowHeight/2 {
+		send(a.hList, mapLVMScroll, 0, uintptr(int64(delta)))
+	}
+	procInvalidateRect.Call(a.hList, 0, 0)
+}
+
 func (a *application) selectMapTasks(ids map[int64]bool) {
-	clear := lvItem{State: 0, StateMask: LVIS_SELECTED | LVIS_FOCUSED}
-	send(a.hList, LVM_SETITEMSTATE, ^uintptr(0), uintptr(unsafe.Pointer(&clear)))
-	firstRow := -1
+	rows := make([]int, 0, len(ids))
 	a.mu.Lock()
 	for row, index := range a.visible {
 		if index < 0 || index >= len(a.tasks) || a.tasks[index] == nil || !ids[a.tasks[index].ID] {
 			continue
 		}
+		rows = append(rows, row)
+	}
+	a.mu.Unlock()
+
+	// Never send ListView messages while holding a.mu: item-state messages emit
+	// synchronous notifications, and repeated map navigation must not observe a
+	// partially updated selection.
+	clear := lvItem{State: 0, StateMask: LVIS_SELECTED | LVIS_FOCUSED}
+	send(a.hList, LVM_SETITEMSTATE, ^uintptr(0), uintptr(unsafe.Pointer(&clear)))
+	for position, row := range rows {
 		state := uint32(LVIS_SELECTED)
-		if firstRow < 0 {
-			firstRow = row
+		if position == 0 {
 			state |= LVIS_FOCUSED
 		}
 		item := lvItem{State: state, StateMask: LVIS_SELECTED | LVIS_FOCUSED}
 		send(a.hList, LVM_SETITEMSTATE, uintptr(row), uintptr(unsafe.Pointer(&item)))
 	}
-	a.mu.Unlock()
-	if firstRow >= 0 {
-		send(a.hList, LVM_ENSUREVISIBLE, uintptr(firstRow), 0)
+	if len(rows) > 0 {
+		a.centerMapTaskRow(rows[0])
 	}
 	a.updateRightPanel()
 }
 
 func (a *application) activateMapPointAtCursor() {
+	if !a.mapFeaturesEnabled() {
+		return
+	}
 	cluster, ok := a.mapClusterAtCursor()
 	if !ok {
 		return
@@ -459,12 +527,12 @@ func (a *application) activateMapPointAtCursor() {
 	}
 	if len(ids) > 0 {
 		a.mapSelectedDemo = ""
-		a.selectMapTasks(ids)
 		if a.viewMode == mapViewMap {
-			a.viewMode = mapViewSplit
-			setText(a.hViewMode, "分屏")
+			a.viewMode = mapViewSidebar
+			setText(a.hViewMode, "侧栏")
 			a.relayoutForMapMode()
 		}
+		a.selectMapTasks(ids)
 		setText(a.hStatusText, fmt.Sprintf("已从地图定位并选中 %d 个媒体任务。", len(ids)))
 	} else if demoLabel != "" {
 		a.mapSelectedDemo = demoLabel
@@ -474,7 +542,7 @@ func (a *application) activateMapPointAtCursor() {
 }
 
 func (a *application) invalidateMapView() {
-	if a != nil && a.hMapSurface != 0 && a.viewMode != mapViewList {
+	if a != nil && a.mapFeaturesEnabled() && a.hMapSurface != 0 && a.viewMode != mapViewList {
 		if runtime := mapRuntimeFor(a); runtime != nil {
 			runtime.pushPoints(false)
 		}

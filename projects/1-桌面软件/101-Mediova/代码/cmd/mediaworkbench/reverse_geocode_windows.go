@@ -309,6 +309,10 @@ func (a *application) startAllReverseGeocode() {
 }
 
 func (a *application) startReverseGeocode(all bool) {
+	if !a.mapFeaturesEnabled() {
+		setText(a.hStatusText, "地图与位置功能已关闭；未启动地名补全。")
+		return
+	}
 	manager, err := reverseGeocoderFor(a)
 	if err != nil {
 		setText(a.hStatusText, "地名缓存初始化失败："+err.Error())

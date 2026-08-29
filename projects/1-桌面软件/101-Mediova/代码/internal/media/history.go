@@ -27,6 +27,11 @@ var (
 	historyThumbnailMu       sync.Mutex
 	historyThumbnailJPEGSize = 160
 	historyThumbnailJPEGHigh = 90
+	historyCachePath         string
+	historyCache             []HistoryRecord
+	historyCacheLoaded       bool
+	historyDirtyChanges      int
+	historyFlushTimer        *time.Timer
 )
 
 // HistoryRecord is a terminal-task snapshot. New fields deliberately retain
@@ -143,24 +148,87 @@ func loadHistoryUnlocked() []HistoryRecord {
 	if err != nil {
 		return nil
 	}
+	if historyCacheLoaded && historyCachePath == path {
+		return append([]HistoryRecord(nil), historyCache...)
+	}
+	// Tests, portable-mode switches and migrations may change the data root
+	// during one process. Persist the old root before changing cache authority.
+	_ = flushHistoryUnlocked()
 	b, err := os.ReadFile(path)
 	if err != nil {
+		historyCachePath = path
+		historyCache = nil
+		historyCacheLoaded = true
 		return nil
 	}
 	var records []HistoryRecord
 	if json.Unmarshal(b, &records) != nil {
+		historyCachePath = path
+		historyCache = nil
+		historyCacheLoaded = true
 		return nil
 	}
 	for i := range records {
 		records[i] = normalizeHistoryRecord(records[i])
 	}
-	return records
+	historyCachePath = path
+	historyCache = records
+	historyCacheLoaded = true
+	return append([]HistoryRecord(nil), records...)
+}
+
+func flushHistoryUnlocked() error {
+	if !historyCacheLoaded || historyDirtyChanges == 0 || historyCachePath == "" {
+		return nil
+	}
+	if historyFlushTimer != nil {
+		historyFlushTimer.Stop()
+		historyFlushTimer = nil
+	}
+	if err := config.SaveJSON(historyCachePath, historyCache); err != nil {
+		return err
+	}
+	historyDirtyChanges = 0
+	return nil
+}
+
+func setHistoryUnlocked(items []HistoryRecord) {
+	historyCache = append(historyCache[:0], items...)
+	historyCacheLoaded = true
+	historyDirtyChanges++
+}
+
+func scheduleHistoryFlushUnlocked() error {
+	// A bounded count protects history even during a continuously busy queue;
+	// the timer collapses the common burst of many nearly simultaneous finishes.
+	if historyDirtyChanges >= 25 {
+		return flushHistoryUnlocked()
+	}
+	if historyFlushTimer == nil {
+		historyFlushTimer = time.AfterFunc(time.Second, func() {
+			historyMu.Lock()
+			historyFlushTimer = nil
+			_ = flushHistoryUnlocked()
+			historyMu.Unlock()
+		})
+	}
+	return nil
+}
+
+// FlushHistory makes all coalesced terminal records durable. It is called on
+// clean application shutdown and before history is displayed or cleared.
+func FlushHistory() error {
+	historyMu.Lock()
+	defer historyMu.Unlock()
+	return flushHistoryUnlocked()
 }
 
 func LoadHistory() []HistoryRecord {
 	historyMu.Lock()
 	defer historyMu.Unlock()
-	return loadHistoryUnlocked()
+	items := loadHistoryUnlocked()
+	_ = flushHistoryUnlocked()
+	return items
 }
 
 func historyThumbnailDir() (string, error) {
@@ -222,13 +290,12 @@ func AppendHistory(record HistoryRecord) error {
 	if err != nil {
 		return err
 	}
-	if err := config.SaveJSON(path, items); err != nil {
-		return err
-	}
+	historyCachePath = path
+	setHistoryUnlocked(items)
 	for _, item := range removed {
 		removeHistoryThumbnail(item)
 	}
-	return nil
+	return scheduleHistoryFlushUnlocked()
 }
 
 // AttachHistoryThumbnail publishes a completed thumbnail only when its record
@@ -254,7 +321,9 @@ func AttachHistoryThumbnail(recordID, relative string) error {
 	if err != nil {
 		return err
 	}
-	return config.SaveJSON(path, items)
+	historyCachePath = path
+	setHistoryUnlocked(items)
+	return scheduleHistoryFlushUnlocked()
 }
 
 func ClearHistoryKind(kind model.Kind) (int, error) {
@@ -277,7 +346,9 @@ func ClearHistoryKind(kind model.Kind) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := config.SaveJSON(path, kept); err != nil {
+	historyCachePath = path
+	setHistoryUnlocked(kept)
+	if err := flushHistoryUnlocked(); err != nil {
 		return 0, err
 	}
 	for _, record := range removed {
@@ -293,6 +364,14 @@ func ClearHistory() error {
 	if err != nil {
 		return err
 	}
+	if historyFlushTimer != nil {
+		historyFlushTimer.Stop()
+		historyFlushTimer = nil
+	}
+	historyCachePath = path
+	historyCache = nil
+	historyCacheLoaded = true
+	historyDirtyChanges = 0
 	_ = os.Remove(path)
 	htmlPath, _ := config.HistoryHTMLPath()
 	if htmlPath != "" {

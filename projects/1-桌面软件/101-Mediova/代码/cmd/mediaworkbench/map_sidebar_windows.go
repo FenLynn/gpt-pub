@@ -194,6 +194,10 @@ func (a *application) selectedTaskHasMapLocation() bool {
 }
 
 func (a *application) showSelectedTaskOnMap() {
+	if !a.mapFeaturesEnabled() {
+		setText(a.hStatusText, "地图与位置功能已关闭；可在“设置”中重新开启。")
+		return
+	}
 	task, _ := a.selectedTask()
 	if task == nil || !task.Location.Valid() {
 		setText(a.hStatusText, "所选媒体没有可用的 GPS 坐标。")
@@ -205,6 +209,7 @@ func (a *application) showSelectedTaskOnMap() {
 	a.ensureMapRuntime()
 	a.relayoutForMapMode()
 	if runtime := mapRuntimeFor(a); runtime != nil {
+		runtime.setCurrentTask(task.ID)
 		runtime.pushPoints(false)
 		runtime.focus(longitude, latitude)
 	}

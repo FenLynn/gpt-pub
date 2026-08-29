@@ -99,7 +99,7 @@ func round12GenerateThumbnailDirect(a *application, id int64, input string, pinf
 	}
 	dir, err := config.TempDir()
 	if err != nil {
-		writeCrashContext(fmt.Sprintf("round12 thumbnail temp task %d", id), err)
+		writeRuntimeError(fmt.Sprintf("round12 thumbnail temp task %d", id), err)
 		return
 	}
 	out := filepath.Join(dir, fmt.Sprintf("thumb_round12_%d_%d.bmp", id, time.Now().UnixNano()))
@@ -108,7 +108,7 @@ func round12GenerateThumbnailDirect(a *application, id int64, input string, pinf
 	cancel()
 	if err != nil {
 		_ = os.Remove(out)
-		writeCrashContext(fmt.Sprintf("round12 thumbnail direct task %d", id), err)
+		writeRuntimeError(fmt.Sprintf("round12 thumbnail direct task %d", id), err)
 		return
 	}
 	if !v452ThumbnailCurrent(a, id, generation) || !round12ThumbnailStillMissing(a, id, input) {
@@ -118,7 +118,12 @@ func round12GenerateThumbnailDirect(a *application, id int64, input string, pinf
 	}
 
 	a.postUI(func() {
-		defer os.Remove(out)
+		keepThumbnail := false
+		defer func() {
+			if !keepThumbnail {
+				_ = os.Remove(out)
+			}
+		}()
 		if a.hImageList == 0 || !v452ThumbnailCurrent(a, id, generation) || !round12ThumbnailStillMissing(a, id, input) {
 			round12ConsumeApprovedDarkThumbnailFallback(out)
 			return
@@ -126,14 +131,14 @@ func round12GenerateThumbnailDirect(a *application, id int64, input string, pinf
 		h, _, _ := procLoadImageW.Call(0, uintptr(unsafe.Pointer(p(out))), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE|LR_CREATEDIBSECTION)
 		if h == 0 {
 			round12ConsumeApprovedDarkThumbnailFallback(out)
-			writeCrashContext(fmt.Sprintf("round12 thumbnail load task %d", id), fmt.Errorf("LoadImageW failed for %s", out))
+			writeRuntimeError(fmt.Sprintf("round12 thumbnail load task %d", id), fmt.Errorf("LoadImageW failed for %s", out))
 			return
 		}
 		idx, _, _ := procImageListAdd.Call(a.hImageList, h, 0)
 		procDeleteObject.Call(h)
 		if int32(idx) < 0 {
 			round12ConsumeApprovedDarkThumbnailFallback(out)
-			writeCrashContext(fmt.Sprintf("round12 thumbnail imagelist task %d", id), fmt.Errorf("ImageList_Add failed for %s", out))
+			writeRuntimeError(fmt.Sprintf("round12 thumbnail imagelist task %d", id), fmt.Errorf("ImageList_Add failed for %s", out))
 			return
 		}
 		imageIndex := int(int32(idx))
@@ -141,6 +146,7 @@ func round12GenerateThumbnailDirect(a *application, id int64, input string, pinf
 			procImageListRemoveV452.Call(a.hImageList, uintptr(imageIndex))
 			return
 		}
+		keepThumbnail = true
 		a.updateTaskRowByID(id)
 	})
 }

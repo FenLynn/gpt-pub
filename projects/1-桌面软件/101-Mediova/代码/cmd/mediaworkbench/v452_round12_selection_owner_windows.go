@@ -86,7 +86,7 @@ func round12SelectionMainSubclassProc(hwnd uintptr, message uint32, wParam, lPar
 					return round12DrawTaskListCell(a, (*nmListViewCustomDraw)(unsafe.Pointer(lParam)))
 				case LVN_ITEMCHANGED:
 					n := (*nmListView)(unsafe.Pointer(lParam))
-					if n.IItem >= 0 && (n.UNewState^n.UOldState)&LVIS_SELECTED != 0 {
+					if a.redrawDepth == 0 && n.IItem >= 0 && (n.UNewState^n.UOldState)&LVIS_SELECTED != 0 {
 						// The selection owns only its outline. Repaint the changed row and
 						// its neighbours because joining or splitting a contiguous group
 						// changes the group's top and bottom boundary.
@@ -202,7 +202,7 @@ func round12LegacySortColumn(column int) (int, bool) {
 	case column >= round12ColFile && column <= round12ColDirection:
 		return column - 1, true
 	case column == round12ColLocation:
-		return 0, false
+		return taskSortLocation, true
 	case column >= round12ColOutputResolution && column <= round12ColStatus:
 		return column - 2, true
 	default:

@@ -173,6 +173,8 @@ const (
 	ID_VIEW_PERFORMANCE       = 2093
 	ID_VIEW_RESET_COLUMNS     = 2094
 	ID_VIEW_FLOATING_TOPMOST  = 2095
+	ID_SET_MAP_ENABLED        = 2096
+	ID_SET_MAP_FAST_ZOOM      = 2097
 	ID_HISTORY_VIEW           = 2100
 	ID_HISTORY_CLEAR          = 2101
 	ID_HISTORY_LAST_SUMMARY   = 2102
@@ -301,47 +303,58 @@ type application struct {
 	volumeFilterOptionsKey string
 	redrawDepth            int
 
-	runMu                  sync.Mutex
-	running, paused        bool
-	runKind                model.Kind
-	controller             *media.ProcessController
-	gpuDisabledForRun      bool
-	ctx                    context.Context
-	cancel                 context.CancelFunc
-	pauseCond              *sync.Cond
-	runStart, timeEnd      time.Time
-	runOnly                map[int64]bool
-	runTaskIDs             map[int64]bool
-	activeRuns             map[model.Kind]*activeQueueRun
-	pendingRunKind         model.Kind
-	pendingRunOnly         map[int64]bool
-	reservedOutputs        map[string]int64
-	uiQueue                chan func()
-	probeQueue             chan int64
-	thumbnailQueue         chan thumbnailJob
-	metadataQueue          chan int64
-	progressMu             sync.Mutex
-	pendingProgressRows    map[int64]struct{}
-	progressFlushScheduled bool
-	probeQueueDropped      atomic.Int64
-	thumbnailQueueDropped  atomic.Int64
-	metadataQueueDropped   atomic.Int64
-	workers                sync.WaitGroup
-	exiting                bool
-	trayAdded              bool
-	closeHintShown         bool
-	lastSummaryPath        string
-	benchmarkRunning       atomic.Bool
-	controlsReady          bool
-	initializing           bool
-	selfTest               bool
-	selfTestOutput         string
-	outputIntegrityHook    func(string)
-	uiPreview              bool
-	uiPreviewMode          string
-	viewMode               string
-	mapDemo                bool
-	mapSelectedDemo        string
+	runMu                   sync.Mutex
+	running, paused         bool
+	runKind                 model.Kind
+	controller              *media.ProcessController
+	gpuDisabledForRun       bool
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	pauseCond               *sync.Cond
+	runStart, timeEnd       time.Time
+	runOnly                 map[int64]bool
+	runTaskIDs              map[int64]bool
+	activeRuns              map[model.Kind]*activeQueueRun
+	sessionSaveMu           sync.Mutex
+	sessionSaveTimer        *time.Timer
+	sessionSaveClosing      bool
+	pendingRunKind          model.Kind
+	pendingRunOnly          map[int64]bool
+	reservedOutputs         map[string]int64
+	uiQueue                 chan func()
+	probeQueue              chan int64
+	thumbnailQueue          chan thumbnailJob
+	metadataQueue           chan int64
+	progressMu              sync.Mutex
+	pendingProgressRows     map[int64]struct{}
+	progressFlushScheduled  bool
+	probeResultMu           sync.Mutex
+	pendingProbeRows        map[int64]struct{}
+	probeFlushScheduled     bool
+	probeActive             atomic.Int64
+	lastProbeMapRefresh     time.Time
+	selectionRefreshPending atomic.Bool
+	listBuild               *listBuildState
+	probeQueueDropped       atomic.Int64
+	thumbnailQueueDropped   atomic.Int64
+	metadataQueueDropped    atomic.Int64
+	workers                 sync.WaitGroup
+	exiting                 bool
+	trayAdded               bool
+	closeHintShown          bool
+	lastSummaryPath         string
+	benchmarkRunning        atomic.Bool
+	controlsReady           bool
+	initializing            bool
+	selfTest                bool
+	selfTestOutput          string
+	outputIntegrityHook     func(string)
+	uiPreview               bool
+	uiPreviewMode           string
+	viewMode                string
+	mapDemo                 bool
+	mapSelectedDemo         string
+	mapFeatureEnabled       atomic.Bool
 }
 
 // activeQueueRun is deliberately scoped to one media kind. The workers are
@@ -459,6 +472,62 @@ func (a *application) flushProgressRows() {
 	}
 }
 
+func (a *application) postProbeResult(id int64) {
+	if a == nil || a.hwnd == 0 || id == 0 {
+		return
+	}
+	a.probeResultMu.Lock()
+	if a.pendingProbeRows == nil {
+		a.pendingProbeRows = make(map[int64]struct{})
+	}
+	a.pendingProbeRows[id] = struct{}{}
+	post := !a.probeFlushScheduled
+	if post {
+		a.probeFlushScheduled = true
+	}
+	a.probeResultMu.Unlock()
+	if post {
+		procPostMessageW.Call(a.hwnd, WM_APP_PROBE, 0, 0)
+	}
+}
+
+func (a *application) flushProbeResultRows(limit int) bool {
+	if a == nil {
+		return true
+	}
+	a.probeResultMu.Lock()
+	ids := takePendingProbeBatch(a.pendingProbeRows, limit)
+	remainingUI := len(a.pendingProbeRows)
+	if remainingUI == 0 {
+		a.probeFlushScheduled = false
+	}
+	a.probeResultMu.Unlock()
+	for _, id := range ids {
+		a.updateTaskRowByID(id)
+	}
+	queued := 0
+	if a.probeQueue != nil {
+		queued = len(a.probeQueue)
+	}
+	active := int(a.probeActive.Load())
+	complete := remainingUI == 0 && queued == 0 && active == 0
+	now := time.Now()
+	if len(ids) > 0 && a.mapFeaturesEnabled() && (complete || a.lastProbeMapRefresh.IsZero() || now.Sub(a.lastProbeMapRefresh) >= 1500*time.Millisecond) {
+		a.lastProbeMapRefresh = now
+		a.invalidateMapView()
+	}
+	if complete {
+		a.refreshStatusFilterOptions()
+		a.updateRightPanel()
+		if len(ids) > 0 && a.listBuild == nil {
+			setText(a.hStatusText, "媒体基础信息读取完成；缩略图和地理位置仍会按需在后台补充。")
+		}
+	} else if len(ids) > 0 && a.listBuild == nil {
+		setText(a.hStatusText, fmt.Sprintf("正在后台读取媒体信息：待探测 %d，处理中 %d，待刷新 %d。", queued, active, remainingUI))
+	}
+	return remainingUI == 0
+}
+
 func normalizeOutputKey(path string) string {
 	return strings.ToLower(filepath.Clean(path))
 }
@@ -511,6 +580,9 @@ func main() {
 		return
 	}
 	defer releaseSingleInstance()
+	diagnosticsNormalExit := false
+	stopRuntimeDiagnostics := startRuntimeDiagnostics(selfTest || uiPreview)
+	defer func() { stopRuntimeDiagnostics(diagnosticsNormalExit) }()
 	if hr, _, _ := procCoInitializeEx.Call(0, COINIT_APARTMENTTHREADED|COINIT_DISABLE_OLE1DDE); int32(hr) >= 0 {
 		defer procCoUninitialize.Call()
 	}
@@ -562,6 +634,7 @@ func main() {
 	}
 	app = &application{currentKind: model.KindVideo, settings: settings, rightVisible: settings.RightPanelVisible, uiPreview: uiPreview, uiPreviewMode: uiPreviewMode, reservedOutputs: make(map[string]int64), pendingSelection: make(map[int64]bool), concurrencyCommands: make(map[int]int), uiQueue: make(chan func(), 512), queueWake: make(chan struct{}, 64), taskCancels: make(map[int64]context.CancelFunc), holdRequests: make(map[int64]bool), removeRequests: make(map[int64]bool), immediateRestarts: make(map[int64]bool), rightDraftFields: make(map[int]bool), probeQueue: make(chan int64, 16384), thumbnailQueue: make(chan thumbnailJob, 8192), selfTest: selfTest, selfTestOutput: selfTestOutput, hardware: media.Hardware{Detail: "启动时不自动测试 GPU；默认使用 CPU。可在 FFmpeg 菜单中手动测速。"}}
 	app.metadataQueue = make(chan int64, 8192)
+	app.mapFeatureEnabled.Store(settings.MapEnabled)
 	if runtimeMigrationErr != nil {
 		app.runtimeNotice = "旧 FFmpeg 组件未能复制到 Runtime，已保留旧位置继续兼容：" + short(runtimeMigrationErr.Error(), 160)
 	} else if runtimeMigrated {
@@ -627,6 +700,7 @@ func main() {
 		procDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
 	}
 	writeStartupStage("message_loop_end")
+	diagnosticsNormalExit = true
 }
 
 // shortcutAction is intentionally pure so the key mapping can be regression-tested
@@ -688,6 +762,7 @@ func (a *application) handleShortcutMessage(m *msg) bool {
 		send(a.hFilter, CB_SETCURSEL, 0, 0)
 		send(a.hVolumeFilter, CB_SETCURSEL, 0, 0)
 		a.refreshList()
+		a.invalidateMapView()
 		setText(a.hStatusText, "已清除搜索与状态筛选。")
 		return true
 	case 0:
@@ -753,6 +828,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		writeStartupStage("wm_create_controls_validated")
 		app.controlsReady = true
 		app.initializing = false
+		app.applyMapFeatureAvailability()
 		// Every control now exists, so install the final owner chain on the
 		// creating UI thread instead of relying on startup polling deadlines.
 		round12InstallFinalUIOwners(app)
@@ -877,6 +953,16 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 			procKillTimer.Call(hwnd, TIMER_PROGRESS_FLUSH)
 			app.flushProgressRows()
 			return 0
+		case TIMER_PROBE_FLUSH:
+			if app.flushProbeResultRows(48) {
+				procKillTimer.Call(hwnd, TIMER_PROBE_FLUSH)
+			}
+			return 0
+		case TIMER_LIST_BUILD:
+			if app.flushBatchedListBuild(listBuildChunkSize) {
+				procKillTimer.Call(hwnd, TIMER_LIST_BUILD)
+			}
+			return 0
 		case TIMER_MAIN_CLOCK:
 			app.refreshTotal()
 			return 0
@@ -906,7 +992,9 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		}
 		return 0
 	case WM_APP_SELECTION:
+		app.selectionRefreshPending.Store(false)
 		app.updateRightPanel()
+		app.syncSelectedTaskToMap()
 		app.invalidateMapView()
 		return 0
 	case WM_APP_KIND_SYNC:
@@ -923,9 +1011,9 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		app.finishRun()
 		return 0
 	case WM_APP_PROBE:
-		app.updateTaskRowByID(int64(wParam))
-		app.updateRightPanel()
-		app.invalidateMapView()
+		if timer, _, _ := procSetTimer.Call(hwnd, TIMER_PROBE_FLUSH, 60, 0); timer == 0 {
+			app.flushProbeResultRows(0)
+		}
 		return 0
 	case WM_APP_STATUS:
 		app.updateComponentStatus()
@@ -963,6 +1051,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		app.readSettingsFromUI()
 		_ = config.Save(app.settings)
 		app.saveSessionClean()
+		_ = media.FlushHistory()
 		app.removeTray()
 		procDestroyWindow.Call(hwnd)
 		return 0
@@ -974,6 +1063,8 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		procKillTimer.Call(hwnd, TIMER_TRAY_RETRY)
 		procKillTimer.Call(hwnd, TIMER_IMPORT_CLOSE)
 		procKillTimer.Call(hwnd, TIMER_PROGRESS_FLUSH)
+		procKillTimer.Call(hwnd, TIMER_PROBE_FLUSH)
+		procKillTimer.Call(hwnd, TIMER_LIST_BUILD)
 		if app != nil && app.hFloating != 0 {
 			procDestroyWindow.Call(app.hFloating)
 		}
@@ -1789,6 +1880,8 @@ func (a *application) initMenus() {
 	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_VERIFY_OUTPUT, "转换完成后自动校验输出")
 	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_THUMB_CACHE, "启用缩略图磁盘缓存")
 	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_ESTIMATE_SPACE, "转换前估算磁盘空间")
+	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_MAP_ENABLED, "启用地图与位置功能")
+	appendMenu(settings, MF_STRING|MF_CHECKED, ID_SET_MAP_FAST_ZOOM, "地图快速缩放（推荐）")
 	appendMenu(settings, MF_STRING, ID_SET_OPEN_DONE, "完成后打开输出文件夹")
 	appendMenu(settings, MF_STRING|MF_CHECKED, ID_VIEW_FLOATING, "转换时显示桌面悬浮进度条")
 	appendMenu(settings, MF_STRING, ID_VIEW_FLOATING_TOPMOST, "悬浮进度条置顶")
@@ -1858,6 +1951,8 @@ func (a *application) syncMenuChecks() {
 	setCheck(a.menuSettings, ID_SET_VERIFY_OUTPUT, a.settings.VerifyOutput)
 	setCheck(a.menuSettings, ID_SET_THUMB_CACHE, a.settings.ThumbnailCache)
 	setCheck(a.menuSettings, ID_SET_ESTIMATE_SPACE, a.settings.EstimateDiskSpace)
+	setCheck(a.menuSettings, ID_SET_MAP_ENABLED, a.mapFeaturesEnabled())
+	setCheck(a.menuSettings, ID_SET_MAP_FAST_ZOOM, a.settings.MapFastZoom)
 	setCheck(a.menuSettings, ID_SET_SMART_COPY, a.settings.SmartStreamCopy)
 	setCheck(a.menuSettings, ID_SET_AUDIO_AAC, a.settings.AudioMode == "AAC 192k")
 	setCheck(a.menuSettings, ID_SET_AUDIO_COPY, a.settings.AudioMode == "复制音频")
@@ -2889,6 +2984,21 @@ func (a *application) command(id int) {
 	case ID_SET_ESTIMATE_SPACE:
 		a.settings.EstimateDiskSpace = !a.settings.EstimateDiskSpace
 		a.saveSettings()
+	case ID_SET_MAP_ENABLED:
+		a.setMapFeaturesEnabled(!a.mapFeaturesEnabled())
+	case ID_SET_MAP_FAST_ZOOM:
+		a.readSettingsFromUI()
+		a.settings.MapFastZoom = !a.settings.MapFastZoom
+		_ = config.Save(a.settings)
+		a.syncMenuChecks()
+		if runtime := mapRuntimeFor(a); runtime != nil {
+			runtime.applyZoomSpeed()
+		}
+		mode := "标准"
+		if a.settings.MapFastZoom {
+			mode = "快速"
+		}
+		setText(a.hStatusText, "地图缩放速度已切换为"+mode+"模式。")
 	case ID_SET_OPEN_DONE:
 		a.settings.OpenOutputOnDone = !a.settings.OpenOutputOnDone
 		a.saveSettings()
@@ -2912,8 +3022,11 @@ func (a *application) command(id int) {
 	case ID_SET_RESET:
 		if messageBox(a.hwnd, "恢复默认设置", "确定恢复全部默认设置？已导入任务不会删除。", MB_YESNO|MB_ICONQUESTION) == IDYES {
 			a.settings = model.DefaultSettings()
+			a.mapFeatureEnabled.Store(a.settings.MapEnabled)
 			a.writeSettingsToUI()
 			a.saveSettings()
+			a.applyMapFeatureAvailability()
+			a.resumeMapMetadataAnalysis()
 		}
 	case ID_PRESET_1080, ID_PRESET_720, ID_PRESET_ORIGINAL, ID_PRESET_4K:
 		a.applyPreset(id)
@@ -3011,8 +3124,10 @@ func (a *application) command(id int) {
 		show(a.hwnd, false)
 	case IDC_SEARCH:
 		a.refreshList()
+		a.invalidateMapView()
 	case IDC_FILTER, IDC_VOLUME_FILTER:
 		a.refreshList()
+		a.invalidateMapView()
 	}
 }
 
@@ -3274,11 +3389,11 @@ func (a *application) notify(h *nmhdr) uintptr {
 	}
 	switch h.Code {
 	case LVN_ITEMCHANGED:
-		// A ListView mouse-down is still inside the common control while this
-		// notification runs. Re-entering the ListView from updateRightPanel (to
-		// enumerate selected rows) can deadlock that real input message. Defer the
-		// dependent panel update until the notification stack has returned.
-		procPostMessageW.Call(a.hwnd, WM_APP_SELECTION, 0, 0)
+		n := (*nmListView)(unsafe.Pointer(h))
+		// Bulk rebuilds may change thousands of states; post one refresh only.
+		if a.redrawDepth == 0 && n.IItem >= 0 && (n.UNewState^n.UOldState)&LVIS_SELECTED != 0 && a.selectionRefreshPending.CompareAndSwap(false, true) {
+			procPostMessageW.Call(a.hwnd, WM_APP_SELECTION, 0, 0)
+		}
 	case LVN_COLUMNCLICK:
 		n := (*nmListView)(unsafe.Pointer(h))
 		a.toggleTaskSort(int(n.IItemSub))
@@ -3615,7 +3730,7 @@ func (a *application) showContextMenu() {
 	appendMenu(m, MF_STRING, ID_CTX_MOVE_BOTTOM, "移到当前工作区最后")
 	appendMenu(m, MF_STRING, ID_CTX_JUMP_RUNNING, "跳转到正在运行的任务")
 	appendMenu(m, MF_SEPARATOR, 0, "")
-	if a.selectedTaskHasMapLocation() {
+	if a.mapFeaturesEnabled() && a.selectedTaskHasMapLocation() {
 		appendMenu(m, MF_STRING, ID_CTX_SHOW_ON_MAP, "在地图上显示")
 		if a.selectedTasksNeedReverseGeocode() {
 			appendMenu(m, MF_STRING, ID_CTX_REVERSE_GEOCODE, "补全选中地名")
@@ -4031,6 +4146,7 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 		return 0, 0, 0
 	}
 	sort.Strings(paths)
+	_, ffprobe, _, _, _ := a.componentSnapshot()
 	a.mu.Lock()
 	existing := map[string]*model.Task{}
 	for _, t := range a.tasks {
@@ -4040,7 +4156,9 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 	}
 	var probeIDs []int64
 	highlightIDs := make(map[int64]bool)
+	firstHighlightID := int64(0)
 	videoTouched, imageTouched := 0, 0
+	deferFileSizes := len(paths) >= 256 && ffprobe != ""
 	for _, path := range paths {
 		kind, ok := media.DetectKind(path)
 		if !ok {
@@ -4050,6 +4168,9 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 		if old := existing[key]; old != nil {
 			duplicates++
 			highlightIDs[old.ID] = true
+			if firstHighlightID == 0 {
+				firstHighlightID = old.ID
+			}
 			if old.Kind == model.KindVideo {
 				videoTouched++
 			} else {
@@ -4057,10 +4178,17 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 			}
 			continue
 		}
-		t := &model.Task{ID: a.nextID.Add(1), Input: path, Root: root, Kind: kind, Status: model.StatusReady, InputSize: media.FileSize(path), Options: a.settings.DefaultOptions(kind), ThumbnailIndex: -1}
+		inputSize := int64(0)
+		if !deferFileSizes {
+			inputSize = media.FileSize(path)
+		}
+		t := &model.Task{ID: a.nextID.Add(1), Input: path, Root: root, Kind: kind, Status: model.StatusReady, InputSize: inputSize, Options: a.settings.DefaultOptions(kind), ThumbnailIndex: -1}
 		a.tasks = append(a.tasks, t)
 		existing[key] = t
 		highlightIDs[t.ID] = true
+		if firstHighlightID == 0 {
+			firstHighlightID = t.ID
+		}
 		probeIDs = append(probeIDs, t.ID)
 		if kind == model.KindVideo {
 			videoAdded++
@@ -4070,7 +4198,8 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 			imageTouched++
 		}
 	}
-	for id := range highlightIDs {
+	const bulkSelectionLimit = 128
+	for id := range bulkImportSelectionIDs(highlightIDs, firstHighlightID, bulkSelectionLimit) {
 		a.pendingSelection[id] = true
 	}
 	a.mu.Unlock()
@@ -4086,10 +4215,13 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 		}
 		return videoAdded, imageAdded, duplicates
 	}
-	setText(a.hStatusText, fmt.Sprintf("已自动分流：视频 %d 个，图片 %d 个；新增任务已选中。", videoAdded, imageAdded))
+	selectionNotice := "新增任务已选中。"
+	if len(highlightIDs) > bulkSelectionLimit {
+		selectionNotice = "批量导入仅定位第一项，避免千级选择阻塞界面。"
+	}
+	setText(a.hStatusText, fmt.Sprintf("已自动分流：视频 %d 个，图片 %d 个；%s", videoAdded, imageAdded, selectionNotice))
 	a.saveSession()
 	a.refreshAll()
-	_, ffprobe, _, _, _ := a.componentSnapshot()
 	if ffprobe != "" {
 		for _, id := range probeIDs {
 			a.queueProbe(id)
@@ -4119,6 +4251,11 @@ func (a *application) startBackgroundWorkers() {
 		go func(worker int) {
 			for id := range a.probeQueue {
 				func() {
+					a.probeActive.Add(1)
+					defer func() {
+						a.probeActive.Add(-1)
+						a.postProbeResult(id)
+					}()
 					defer func() {
 						if r := recover(); r != nil {
 							writeCrashContext(fmt.Sprintf("probe worker %d task %d", worker, id), r)
@@ -4181,7 +4318,7 @@ func (a *application) queueProbe(id int64) bool {
 }
 
 func (a *application) queueMediaMetadata(id int64) bool {
-	if a == nil || a.metadataQueue == nil || id == 0 {
+	if a == nil || !a.mapFeaturesEnabled() || a.metadataQueue == nil || id == 0 {
 		return false
 	}
 	select {
@@ -4219,7 +4356,16 @@ func (a *application) probeTask(id int64) {
 	}
 	path := t.Input
 	kind := t.Kind
+	inputSize := t.InputSize
 	a.mu.Unlock()
+	if inputSize <= 0 {
+		inputSize = media.FileSize(path)
+		a.mu.Lock()
+		if current, _ := a.findTaskByIDLocked(id); current != nil && current.Input == path && current.InputSize <= 0 {
+			current.InputSize = inputSize
+		}
+		a.mu.Unlock()
+	}
 	_, ffprobe, _, _, _ := a.componentSnapshot()
 	modernImage := kind == model.KindImage && media.IsModernImageInput(path)
 	if ffprobe == "" && !modernImage {
@@ -4264,7 +4410,6 @@ func (a *application) probeTask(id int64) {
 		}
 	}
 	a.mu.Unlock()
-	procPostMessageW.Call(a.hwnd, WM_APP_PROBE, uintptr(id), 0)
 	if err == nil {
 		a.queueMediaMetadata(id)
 	}
@@ -4275,6 +4420,9 @@ func (a *application) probeTask(id int64) {
 }
 
 func (a *application) probeMediaMetadataTask(id int64) {
+	if !a.mapFeaturesEnabled() {
+		return
+	}
 	a.mu.Lock()
 	task, _ := a.findTaskByIDLocked(id)
 	if task == nil {
@@ -4291,7 +4439,7 @@ func (a *application) probeMediaMetadataTask(id int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	metadata, err := media.ProbeMediaMetadata(ctx, ffmpeg, path)
 	cancel()
-	if err != nil {
+	if err != nil || !a.mapFeaturesEnabled() {
 		// GPS and capture metadata are optional. Their absence must not turn an
 		// otherwise valid conversion task into a detection error.
 		return
@@ -4311,7 +4459,7 @@ func (a *application) probeMediaMetadataTask(id int64) {
 	}
 	a.mu.Unlock()
 	if changed {
-		procPostMessageW.Call(a.hwnd, WM_APP_PROBE, uintptr(id), 0)
+		a.postProbeResult(id)
 	}
 }
 func (a *application) generateThumbnail(id int64, input string, pinfo media.ProbeInfo, generation uint64) {
@@ -4356,9 +4504,12 @@ func (a *application) generateThumbnail(id int64, input string, pinfo media.Prob
 		return
 	}
 	a.postUI(func() {
-		if !cached {
-			defer os.Remove(out)
-		}
+		keepThumbnail := cached
+		defer func() {
+			if !keepThumbnail {
+				_ = os.Remove(out)
+			}
+		}()
 		if a.hImageList == 0 {
 			return
 		}
@@ -4376,6 +4527,7 @@ func (a *application) generateThumbnail(id int64, input string, pinfo media.Prob
 			procImageListRemoveV452.Call(a.hImageList, uintptr(imageIndex))
 			return
 		}
+		keepThumbnail = true
 		a.updateTaskThumbnailRowByID(id)
 	})
 }
@@ -4486,12 +4638,30 @@ func compareTaskColumn(left, right *model.Task, column int) int {
 		return cmpFloat(left.Progress, right.Progress)
 	case taskColStatus:
 		return cmpInt64(int64(taskStatusRank(left.Status)), int64(taskStatusRank(right.Status)))
+	case taskSortLocation:
+		leftRank, rightRank := taskLocationSortRank(left), taskLocationSortRank(right)
+		if leftRank != rightRank {
+			return cmpInt64(int64(leftRank), int64(rightRank))
+		}
+		if leftRank == 0 {
+			return cmpString(strings.TrimSpace(left.Location.Place), strings.TrimSpace(right.Location.Place))
+		}
+		if leftRank == 1 {
+			if cmp := cmpFloat(left.Location.Latitude, right.Location.Latitude); cmp != 0 {
+				return cmp
+			}
+			return cmpFloat(left.Location.Longitude, right.Location.Longitude)
+		}
+		return 0
 	default:
 		return cmpInt64(left.ID, right.ID)
 	}
 }
 
 func taskSortLabel(column int) string {
+	if column == taskSortLocation {
+		return "位置"
+	}
 	labels := []string{"编号", "文件名", "分辨率", "时长", "方向", "输出分辨率", "质量", "旋转", "源体积", "输出体积", "进度", "状态"}
 	if column >= 0 && column < len(labels) {
 		return labels[column]
@@ -4500,7 +4670,7 @@ func taskSortLabel(column int) string {
 }
 
 func (a *application) toggleTaskSort(column int) {
-	if column < 0 || column >= len(taskListColumns) {
+	if column < 0 || (column >= len(taskListColumns) && column != taskSortLocation) {
 		return
 	}
 	if a.sortActive && a.sortColumn == column {
@@ -4585,6 +4755,8 @@ func statusFilterBase(value string) string {
 
 const (
 	statusFilterAll       = "\u5168\u90e8\u72b6\u6001"
+	statusFilterLocated   = "有地理位置"
+	statusFilterUnlocated = "无地理位置"
 	volumeFilterAll       = "\u5168\u90e8\u4f53\u79ef"
 	volumeFilterLarger    = "\u4f53\u79ef\u589e\u52a0(>=1.1\u500d)"
 	volumeFilterSmaller   = "\u4f53\u79ef\u7f29\u5c0f(<=0.9\u500d)"
@@ -4613,7 +4785,25 @@ func taskMatchesStatusFilter(task *model.Task, filter string) bool {
 	if volume := taskVolumeFilter(task); volume != "" && filter == volume {
 		return true
 	}
+	if filter == statusFilterLocated {
+		return task != nil && task.Location.Valid()
+	}
+	if filter == statusFilterUnlocated {
+		return task == nil || !task.Location.Valid()
+	}
 	return task != nil && string(task.Status) == filter
+}
+
+const taskSortLocation = taskColumnCount
+
+func taskLocationSortRank(task *model.Task) int {
+	if task == nil || !task.Location.Valid() {
+		return 2
+	}
+	if strings.TrimSpace(task.Location.Place) != "" {
+		return 0
+	}
+	return 1
 }
 
 func (a *application) refreshStatusFilterOptions() {
@@ -4634,6 +4824,8 @@ func (a *application) refreshStatusFilterOptions() {
 		{label: string(model.StatusFailed), status: model.StatusFailed},
 		{label: string(model.StatusSkipped), status: model.StatusSkipped},
 		{label: string(model.StatusCancelled), status: model.StatusCancelled},
+		{label: statusFilterLocated},
+		{label: statusFilterUnlocated},
 	}
 	a.mu.Lock()
 	kind := a.currentKind
@@ -4646,7 +4838,9 @@ func (a *application) refreshStatusFilterOptions() {
 		counts[0]++
 		volumeCounts[volumeFilterAll]++
 		for i := 1; i < len(entries); i++ {
-			if entries[i].status != "" && task.Status == entries[i].status {
+			if (entries[i].status != "" && task.Status == entries[i].status) ||
+				(entries[i].label == statusFilterLocated && task.Location.Valid()) ||
+				(entries[i].label == statusFilterUnlocated && !task.Location.Valid()) {
 				counts[i]++
 			}
 		}
@@ -4666,6 +4860,10 @@ func (a *application) refreshStatusFilterOptions() {
 	}
 	key := strings.Join(values, "\x00") + "\x01" + strings.Join(volumeValues, "\x00")
 	if key == a.filterOptionsKey {
+		return
+	}
+	// Resetting an open ComboBox makes its popup visibly empty until refill ends.
+	if send(a.hFilter, CB_GETDROPPEDSTATE, 0, 0) != 0 || send(a.hVolumeFilter, CB_GETDROPPEDSTATE, 0, 0) != 0 {
 		return
 	}
 	selectedBase := statusFilterBase(comboText(a.hFilter))
@@ -4692,6 +4890,11 @@ func (a *application) refreshStatusFilterOptions() {
 func (a *application) refreshList() {
 	a.refreshStatusFilterOptions()
 	selectedIDs := a.selectedTaskIDsSnapshot()
+	if a.listBuild != nil {
+		for id := range a.listBuild.selectedIDs {
+			selectedIDs[id] = true
+		}
+	}
 	a.mu.Lock()
 	for id := range a.pendingSelection {
 		selectedIDs[id] = true
@@ -4709,10 +4912,6 @@ func (a *application) refreshList() {
 	// a.mu held while rebuilding the control, because the notification path
 	// refreshes the right panel and needs the same mutex. Build immutable row
 	// snapshots first, publish the final visible-index mapping, then touch UI.
-	type listRowSnapshot struct {
-		index int
-		task  model.Task
-	}
 	a.mu.Lock()
 	rows := make([]listRowSnapshot, 0, len(a.tasks))
 	for idx, t := range a.tasks {
@@ -4728,7 +4927,7 @@ func (a *application) refreshList() {
 		if volumeFilter != "" && taskVolumeFilter(t) != volumeFilter {
 			continue
 		}
-		if filter != "" && filter != "全部状态" && string(t.Status) != filter {
+		if !taskMatchesStatusFilter(t, filter) {
 			continue
 		}
 		rows = append(rows, listRowSnapshot{index: idx, task: *t})
@@ -4737,6 +4936,13 @@ func (a *application) refreshList() {
 	a.mu.Unlock()
 	if sortActive {
 		sort.SliceStable(rows, func(i, j int) bool {
+			if sortColumn == taskSortLocation {
+				leftRank, rightRank := taskLocationSortRank(&rows[i].task), taskLocationSortRank(&rows[j].task)
+				if leftRank != rightRank {
+					// Keep missing locations at the bottom in both directions.
+					return leftRank < rightRank
+				}
+			}
 			cmp := compareTaskColumn(&rows[i].task, &rows[j].task, sortColumn)
 			if cmp == 0 {
 				cmp = compareTaskColumn(&rows[i].task, &rows[j].task, 0)
@@ -4755,6 +4961,11 @@ func (a *application) refreshList() {
 	a.visible = visible
 	a.mu.Unlock()
 
+	if shouldBatchTaskListBuild(len(rows), a.controlsReady, a.selfTest) {
+		a.startBatchedListBuild(rows, selectedIDs)
+		return
+	}
+	a.cancelBatchedListBuild()
 	a.beginAtomicUIRefresh()
 	defer func() {
 		a.endAtomicUIRefresh()
@@ -6465,7 +6676,19 @@ func (a *application) playSelected(output bool) {
 		messageBox(a.hwnd, "播放视频", "媒体文件不存在或无法访问：\r\n"+path, MB_OK|MB_ICONWARNING)
 		return
 	}
-	a.launchPlayer(path, false)
+	a.openTaskMedia(path, t.Kind, false)
+}
+
+func taskMediaUsesDefaultShell(kind model.Kind) bool {
+	return kind == model.KindImage
+}
+
+func (a *application) openTaskMedia(path string, kind model.Kind, newWindow bool) {
+	if taskMediaUsesDefaultShell(kind) {
+		shellOpen(filepath.Clean(path))
+		return
+	}
+	a.launchPlayer(path, newWindow)
 }
 
 func potPlayerLaunchArgs(path string, newWindow bool) []string {
@@ -6936,11 +7159,42 @@ func (a *application) viewHistory() {
 	shellOpen(path)
 }
 func (a *application) saveSession() {
-	a.saveSessionEnvelope(false, "autosave")
+	if a == nil || !a.settings.RestoreSession {
+		return
+	}
+	// Large queues can finish many tasks per second. Coalesce those changes
+	// instead of serializing the complete task list for every completed item.
+	a.sessionSaveMu.Lock()
+	if a.sessionSaveClosing {
+		a.sessionSaveMu.Unlock()
+		return
+	}
+	if a.sessionSaveTimer == nil {
+		a.sessionSaveTimer = time.AfterFunc(750*time.Millisecond, func() {
+			a.sessionSaveMu.Lock()
+			defer a.sessionSaveMu.Unlock()
+			if a.sessionSaveClosing {
+				return
+			}
+			a.sessionSaveTimer = nil
+			a.saveSessionEnvelope(false, "autosave_batch")
+		})
+	}
+	a.sessionSaveMu.Unlock()
 }
 
 func (a *application) saveSessionClean() {
+	if a == nil {
+		return
+	}
+	a.sessionSaveMu.Lock()
+	a.sessionSaveClosing = true
+	if a.sessionSaveTimer != nil {
+		a.sessionSaveTimer.Stop()
+		a.sessionSaveTimer = nil
+	}
 	a.saveSessionEnvelope(true, "clean_exit")
+	a.sessionSaveMu.Unlock()
 }
 
 func (a *application) saveSessionEnvelope(clean bool, reason string) {
@@ -8199,12 +8453,7 @@ func writeCrash(err any) {
 }
 
 func writeCrashContext(stage string, err any) {
-	path, e := config.CrashPath()
-	if e != nil {
-		return
-	}
-	text := fmt.Sprintf("time: %s\r\nversion: %s\r\nstage: %s\r\nerror: %v\r\n\r\nstack:\r\n%s", time.Now().Format(time.RFC3339), appVersion, stage, err, debug.Stack())
-	_ = os.WriteFile(path, []byte(text), 0o644)
+	writeRuntimeIncident("panic", stage, err, debug.Stack())
 }
 
 func (a *application) showImportToast(text string) {
@@ -8271,6 +8520,17 @@ func (a *application) recommendedWorkers(kind model.Kind, runIDs map[int64]bool)
 		if workers < 2 {
 			workers = 2
 		}
+		// Full-resolution still images require several decoded pixel buffers.
+		// CPU count alone is unsafe for large camera and HEIC batches.
+		if fourK > 0 {
+			highResolutionLimit := (logical + 2) / 3
+			if highResolutionLimit < 2 {
+				highResolutionLimit = 2
+			}
+			if workers > highResolutionLimit {
+				workers = highResolutionLimit
+			}
+		}
 	} else {
 		workers = (logical + 3) / 4
 		if workers < 1 {
@@ -8292,6 +8552,7 @@ func (a *application) recommendedWorkers(kind model.Kind, runIDs map[int64]bool)
 	if workers > limit {
 		workers = limit
 	}
+	workers = runtimeMemoryWorkerCap(kind, workers)
 	if workers > count {
 		workers = count
 	}

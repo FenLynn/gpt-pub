@@ -231,6 +231,12 @@ type Settings struct {
 	VerifyOutput           bool             `json:"verify_output"`
 	ThumbnailCache         bool             `json:"thumbnail_cache"`
 	EstimateDiskSpace      bool             `json:"estimate_disk_space"`
+	MapEnabled             bool             `json:"map_enabled"`
+	MapFastZoom            bool             `json:"map_fast_zoom"`
+	MapCameraSet           bool             `json:"map_camera_set,omitempty"`
+	MapCenterLatitude      float64          `json:"map_center_latitude,omitempty"`
+	MapCenterLongitude     float64          `json:"map_center_longitude,omitempty"`
+	MapZoom                float64          `json:"map_zoom,omitempty"`
 	SmartStreamCopy        bool             `json:"smart_stream_copy"`
 	AudioMode              string           `json:"audio_mode"`
 	SubtitleMode           string           `json:"subtitle_mode"`
@@ -282,6 +288,8 @@ func DefaultSettings() Settings {
 		VerifyOutput:           true,
 		ThumbnailCache:         true,
 		EstimateDiskSpace:      true,
+		MapEnabled:             true,
+		MapFastZoom:            true,
 		SmartStreamCopy:        false,
 		AudioMode:              "AAC 192k",
 		SubtitleMode:           "不保留字幕",

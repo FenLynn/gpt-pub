@@ -20,6 +20,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/jchv/go-webview2/pkg/edge"
 
@@ -132,14 +133,14 @@ func (m *mapCacheManager) scanAndPruneLocked() error {
 }
 
 func (m *mapCacheManager) get(rawURL string) ([]byte, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Cache files are immutable after their atomic rename. Reads therefore do
+	// not need the manager mutex and can serve multiple visible vector tiles in
+	// parallel while the user pans or zooms. A concurrent clear simply turns a
+	// read into a harmless cache miss.
 	data, err := os.ReadFile(m.cachePath(rawURL))
 	if err != nil {
 		return nil, false
 	}
-	now := time.Now()
-	_ = os.Chtimes(m.cachePath(rawURL), now, now)
 	return data, true
 }
 
@@ -166,9 +167,10 @@ func (m *mapCacheManager) put(rawURL string, data []byte, generation uint64) err
 		return err
 	}
 	tmp := tmpFile.Name()
-	if _, err = tmpFile.Write(data); err == nil {
-		err = tmpFile.Sync()
-	}
+	_, err = tmpFile.Write(data)
+	// The cache is disposable and can always be downloaded again. Closing and
+	// atomically renaming the completed temporary file protects readers without
+	// forcing a physical disk flush for every map tile.
 	if closeErr := tmpFile.Close(); err == nil {
 		err = closeErr
 	}
@@ -261,10 +263,34 @@ type mapRuntime struct {
 	profileDir     string
 	client         *http.Client
 	mu             sync.Mutex
+	thumbnailMu    sync.RWMutex
+	thumbnailPaths map[int64]string
 	closed         bool
 	hasFocus       bool
+	currentTaskID  int64
 	focusLongitude float64
 	focusLatitude  float64
+}
+
+func (r *mapRuntime) setCurrentTask(id int64) bool {
+	if r == nil {
+		return false
+	}
+	r.mu.Lock()
+	changed := r.currentTaskID != id
+	r.currentTaskID = id
+	r.mu.Unlock()
+	return changed
+}
+
+func (r *mapRuntime) currentTask() int64 {
+	if r == nil {
+		return 0
+	}
+	r.mu.Lock()
+	id := r.currentTaskID
+	r.mu.Unlock()
+	return id
 }
 
 func randomMapToken() string {
@@ -285,11 +311,21 @@ func newMapRuntime(a *application) (*mapRuntime, error) {
 		return nil, err
 	}
 	token := randomMapToken()
-	r := &mapRuntime{app: a, cache: cache, listener: listener}
+	r := &mapRuntime{app: a, cache: cache, listener: listener, thumbnailPaths: make(map[int64]string)}
 	r.prefix = "/" + token
 	r.baseURL = "http://" + listener.Addr().String() + "/" + token
 	r.client = &http.Client{
 		Timeout: 20 * time.Second,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          64,
+			MaxIdleConnsPerHost:   24,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: time.Second,
+			ResponseHeaderTimeout: 15 * time.Second,
+		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if req.URL.Host != "tiles.openfreemap.org" && req.URL.Host != "assets.openfreemap.com" {
 				return fmt.Errorf("blocked map redirect to %s", req.URL.Host)
@@ -328,7 +364,6 @@ func newMapRuntime(a *application) (*mapRuntime, error) {
 }
 
 func (r *mapRuntime) serve(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	// The unguessable prefix prevents unrelated local pages from using the
@@ -336,27 +371,62 @@ func (r *mapRuntime) serve(w http.ResponseWriter, req *http.Request) {
 	path := strings.TrimPrefix(req.URL.Path, r.prefix)
 	switch path {
 	case "/map", "/map/":
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = io.WriteString(w, r.mapHTML())
 	case "/maplibre.js":
+		w.Header().Set("Cache-Control", "private, max-age=86400")
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 		_, _ = w.Write(mapLibreJS)
 	case "/maplibre.css":
+		w.Header().Set("Cache-Control", "private, max-age=86400")
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		_, _ = w.Write(mapLibreCSS)
 	case "/maplibre-license.txt":
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write(mapLibreLicense)
 	case "/cache-status":
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_, _ = fmt.Fprintf(w, "{\"bytes\":%d}", r.cache.sizeBytes())
 	default:
+		if strings.HasPrefix(path, "/thumb/") {
+			r.serveMapThumbnail(w, req, strings.TrimPrefix(path, "/thumb/"))
+			return
+		}
 		if strings.HasPrefix(path, "/ofm/") {
 			r.serveOpenFreeMap(w, req, strings.TrimPrefix(path, "/ofm/"))
 			return
 		}
 		http.NotFound(w, req)
 	}
+}
+
+func (r *mapRuntime) serveMapThumbnail(w http.ResponseWriter, req *http.Request, rawID string) {
+	if req.Method != http.MethodGet && req.Method != http.MethodHead {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
+	if err != nil || id <= 0 {
+		http.NotFound(w, req)
+		return
+	}
+	r.thumbnailMu.RLock()
+	path := r.thumbnailPaths[id]
+	r.thumbnailMu.RUnlock()
+	if strings.TrimSpace(path) == "" {
+		http.NotFound(w, req)
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 64 {
+		http.NotFound(w, req)
+		return
+	}
+	w.Header().Set("Content-Type", "image/bmp")
+	w.Header().Set("Cache-Control", "private, max-age=60")
+	http.ServeFile(w, req, path)
 }
 
 func (r *mapRuntime) serveOpenFreeMap(w http.ResponseWriter, req *http.Request, resource string) {
@@ -414,6 +484,11 @@ func (r *mapRuntime) serveOpenFreeMap(w http.ResponseWriter, req *http.Request, 
 	if mapJSONResource(resource) {
 		data = []byte(strings.ReplaceAll(strings.ReplaceAll(string(data), "https://tiles.openfreemap.org/", r.baseURL+"/ofm/"), "https://assets.openfreemap.com/", r.baseURL+"/ofm/assets/"))
 	}
+	if mapJSONResource(resource) {
+		w.Header().Set("Cache-Control", "private, max-age=300")
+	} else {
+		w.Header().Set("Cache-Control", "private, max-age=86400")
+	}
 	w.Header().Set("Content-Type", mapContentType(resource))
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	if req.Method == http.MethodGet {
@@ -454,28 +529,92 @@ func mapContentType(path string) string {
 	}
 }
 
+func validMapCamera(longitude, latitude, zoom float64) bool {
+	return longitude >= -180 && longitude <= 180 && latitude >= -85 && latitude <= 85 && zoom >= 0 && zoom <= 22
+}
+
+func (r *mapRuntime) initialMapCamera() (longitude, latitude, zoom float64, fast bool) {
+	longitude, latitude, zoom, fast = 105, 35, 3, true
+	if r == nil || r.app == nil {
+		return
+	}
+	fast = r.app.settings.MapFastZoom
+	if r.app.settings.MapCameraSet && validMapCamera(r.app.settings.MapCenterLongitude, r.app.settings.MapCenterLatitude, r.app.settings.MapZoom) {
+		longitude = r.app.settings.MapCenterLongitude
+		latitude = r.app.settings.MapCenterLatitude
+		zoom = r.app.settings.MapZoom
+	}
+	return
+}
+
 func (r *mapRuntime) mapHTML() string {
 	base, _ := json.Marshal(r.baseURL)
+	longitude, latitude, zoom, fast := r.initialMapCamera()
 	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="` + r.baseURL + `/maplibre.css"><style>
-html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#eef4f8}.toolbar{position:absolute;z-index:5;top:10px;left:10px;right:10px;display:flex;gap:6px;align-items:center;pointer-events:none}.brand,.tools{pointer-events:auto;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(31,57,76,.18);border-radius:5px;height:34px;display:flex;align-items:center}.brand{padding:0 11px;color:#29465a;font-size:13px}.tools{margin-left:6px;padding:0 5px;gap:3px}.tools button{border:0;background:transparent;color:#355a73;height:26px;padding:0 9px;border-radius:4px;font:12px "Segoe UI","Microsoft YaHei";cursor:pointer}.tools button.active{background:#dcecff;color:#125a9a}.tools button:hover{background:#e8f2fa}.tools button.stop{color:#b8493f}.tools .divider{width:1px;height:18px;background:#dbe5ec;margin:0 2px}.cache{color:#6f8492;font-size:11px;padding:0 5px}.notice{position:absolute;z-index:4;left:12px;bottom:12px;background:rgba(255,255,255,.92);color:#5b7180;padding:6px 9px;border-radius:4px;font-size:11px;box-shadow:0 1px 4px rgba(31,57,76,.13)}
-</style></head><body><div id="map"></div><div class="toolbar"><div class="brand">媒体位置</div><div class="tools"><button id="online" class="active">在线 · OpenFreeMap</button><button id="offline">离线地图</button><span id="cache" class="cache">缓存 0 MB / 1 GB</span><button id="clear">清除离线地图</button><span class="divider"></span><button id="geocode" title="按坐标去重，手动补全当前列表的地名">补全全部地名</button><button id="geocode-stop" class="stop" style="display:none">停止补全</button><button id="geocode-clear" title="只清除在线反查地名，不改变媒体 GPS">清除地名缓存</button></div></div><div id="notice" class="notice">在线模式仅缓存实际查看过的区域</div><script src="` + r.baseURL + `/maplibre.js"></script><script>
-const BASE=` + string(base) + `;let mode='online',points=[],geocoding=false;const post=o=>window.chrome.webview.postMessage(JSON.stringify(o));
-const map=new maplibregl.Map({container:'map',style:BASE+'/ofm/styles/liberty',center:[105,35],zoom:3,attributionControl:true});map.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
-function install(){if(map.getSource('media'))return;map.addSource('media',{type:'geojson',data:{type:'FeatureCollection',features:points},cluster:true,clusterMaxZoom:14,clusterRadius:36,clusterProperties:{selected_count:['+',['case',['get','selected'],1,0]]}});const selected=['>', ['get','selected_count'],0];map.addLayer({id:'clusters',type:'circle',source:'media',filter:['has','point_count'],paint:{'circle-color':['case',selected,'#fff4e8','#167fba'],'circle-radius':['step',['get','point_count'],15,10,19,50,23],'circle-stroke-color':['case',selected,'#f07a18','#fff'],'circle-stroke-width':['case',selected,3,2]}});map.addLayer({id:'cluster-count',type:'symbol',source:'media',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':12},paint:{'text-color':['case',selected,'#e86f00','#fff']}});map.addLayer({id:'point',type:'circle',source:'media',filter:['!',['has','point_count']],paint:{'circle-color':['case',['get','selected'],'#ff8b24',['get','demo'],'#d6862e','#159783'],'circle-radius':['case',['get','selected'],9,7],'circle-stroke-color':'#fff','circle-stroke-width':2}});map.on('click','clusters',async e=>{const f=e.features[0],leaves=await map.getSource('media').getClusterLeaves(f.properties.cluster_id,1000,0);post({type:'select',ids:leaves.map(x=>x.properties.taskID).filter(Boolean),demo:leaves.find(x=>x.properties.demo)?.properties.label||''})});map.on('click','point',e=>post({type:'select',ids:e.features.map(x=>x.properties.taskID).filter(Boolean),demo:e.features[0].properties.demo?e.features[0].properties.label:''}));for(const id of ['clusters','point']){map.on('mouseenter',id,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',id,()=>map.getCanvas().style.cursor='')}}
-map.on('style.load',install);window.mediovaSetPoints=function(data,fit){points=data.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.longitude,p.latitude]},properties:p}));if(map.isStyleLoaded()){const s=map.getSource('media');if(s)s.setData({type:'FeatureCollection',features:points});else install()}if(fit&&points.length){const b=new maplibregl.LngLatBounds();points.forEach(p=>b.extend(p.geometry.coordinates));map.fitBounds(b,{padding:70,maxZoom:14,duration:0})}};
-window.mediovaFocus=function(lon,lat){map.easeTo({center:[lon,lat],zoom:Math.max(map.getZoom(),15),duration:420})};
+html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#eef4f8}.toolbar{position:absolute;z-index:5;top:10px;left:10px;right:10px;display:flex;gap:6px;align-items:center;pointer-events:none}.brand,.tools{pointer-events:auto;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(31,57,76,.18);border-radius:5px;height:34px;display:flex;align-items:center}.brand{padding:0 11px;color:#29465a;font-size:13px}.tools{margin-left:6px;padding:0 5px;gap:3px}.tools button{border:0;background:transparent;color:#355a73;height:26px;padding:0 9px;border-radius:4px;font:12px "Segoe UI","Microsoft YaHei";cursor:pointer}.tools button.active{background:#dcecff;color:#125a9a}.tools button:hover{background:#e8f2fa}.tools button.stop{color:#b8493f}.tools .divider{width:1px;height:18px;background:#dbe5ec;margin:0 2px}.cache{color:#6f8492;font-size:11px;padding:0 5px}.notice{position:absolute;z-index:4;left:12px;bottom:12px;background:rgba(255,255,255,.92);color:#5b7180;padding:6px 9px;border-radius:4px;font-size:11px;box-shadow:0 1px 4px rgba(31,57,76,.13)}.quick{position:absolute;z-index:5;right:10px;bottom:82px;display:flex;flex-direction:column;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(31,57,76,.18);border-radius:4px;overflow:hidden}.quick button{width:46px;height:28px;border:0;border-bottom:1px solid #e4edf3;background:transparent;color:#355a73;font:11px "Segoe UI","Microsoft YaHei";cursor:pointer}.quick button:last-child{border-bottom:0}.quick button:hover{background:#e8f2fa}
+.maplibregl-popup-content{padding:8px;border-radius:6px;box-shadow:0 3px 14px rgba(24,49,67,.24)}.media-popup{width:310px;max-width:calc(100vw - 44px);color:#29465a}.media-summary{font-size:11px;color:#718694;margin:0 0 5px}.media-list{max-height:250px;overflow:auto}.media-row{display:grid;grid-template-columns:44px minmax(0,1fr);gap:7px;width:100%;padding:5px;border:0;border-radius:4px;background:transparent;text-align:left;cursor:pointer;color:#29465a}.media-row:hover{background:#e8f2fa}.media-row img,.media-placeholder{width:44px;height:30px;object-fit:cover;border-radius:2px;background:#edf3f7}.media-name{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.media-meta{font-size:10px;color:#718694;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.media-more{padding:6px 4px 2px;color:#718694;font-size:10px}
+</style></head><body><div id="map"></div><div class="toolbar"><div id="map-count" class="brand">地图点 0</div><div class="tools"><button id="online" class="active">在线 · OpenFreeMap</button><button id="offline">离线地图</button><span id="cache" class="cache">缓存 0 MB / 1 GB</span><button id="clear">清除离线地图</button><span class="divider"></span><button id="geocode" title="按坐标去重，手动补全当前列表的地名">补全全部地名</button><button id="geocode-stop" class="stop" style="display:none">停止补全</button><button id="geocode-clear" title="只清除在线反查地名，不改变媒体 GPS">清除地名缓存</button></div></div><div class="quick"><button id="fit" title="显示全部地图点（Home）">全览</button><button id="current" title="定位当前媒体（F）">当前</button></div><div id="notice" class="notice">在线模式仅缓存实际查看过的区域</div><script src="` + r.baseURL + `/maplibre.js"></script><script>
+const BASE=` + string(base) + `,INITIAL_CENTER=[` + strconv.FormatFloat(longitude, 'f', 7, 64) + `,` + strconv.FormatFloat(latitude, 'f', 7, 64) + `],INITIAL_ZOOM=` + strconv.FormatFloat(zoom, 'f', 3, 64) + `,INITIAL_FAST=` + strconv.FormatBool(fast) + `;let mode='online',points=[],geocoding=false,fastZoom=INITIAL_FAST;const post=o=>window.chrome.webview.postMessage(JSON.stringify(o));
+const map=new maplibregl.Map({container:'map',style:BASE+'/ofm/styles/liberty',center:INITIAL_CENTER,zoom:INITIAL_ZOOM,attributionControl:true,fadeDuration:fastZoom?60:180,refreshExpiredTiles:false,cancelPendingTileRequestsWhileZooming:true,maxTileCacheSize:128});map.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
+function animationMs(){return fastZoom?180:320}function applyZoomSpeed(){map.scrollZoom.setWheelZoomRate(fastZoom?1/240:1/450);map.scrollZoom.setZoomRate(fastZoom?1/70:1/100)}window.mediovaSpeed=function(fast){fastZoom=!!fast;applyZoomSpeed()};applyZoomSpeed();
+let mediaPopup=null,thumbTimer=null;const thumbVersions=new Map();
+const hasThumb=p=>p&&(p.hasThumbnail===true||p.hasThumbnail==='true');
+function mediaItems(features){const found=new Map();for(const feature of features||[]){const p=feature&&feature.properties||{},id=String(p.taskID||''),key=id?'t'+id:'d'+(p.label||'');if(key!=='d'&&!found.has(key))found.set(key,p)}return Array.from(found.values())}
+function mediaThumb(p){const id=String(p.taskID||''),img=document.createElement('img');img.loading='lazy';img.alt='';img.dataset.taskId=id;img.src=BASE+'/thumb/'+encodeURIComponent(id)+'?v='+(thumbVersions.get(id)||0);img.onerror=()=>{img.style.visibility='hidden'};return img}function popupPlacement(lngLat){const p=map.project(lngLat),c=map.getCanvas(),right=p.x<c.clientWidth-360,above=p.y>170;return{anchor:(above?'bottom':'top')+'-'+(right?'left':'right'),offset:[right?14:-14,above?-12:12]}}
+function showMediaPopup(features,lngLat,total){const items=mediaItems(features);if(!items.length)return;if(mediaPopup)mediaPopup.remove();const root=document.createElement('div');root.className='media-popup';const summary=document.createElement('div');summary.className='media-summary';summary.textContent=(total||items.length)>1?'此位置共 '+(total||items.length)+' 项；单击定位，双击打开':'已选中当前媒体；双击打开';root.appendChild(summary);const list=document.createElement('div');list.className='media-list';items.slice(0,80).forEach(p=>{const row=document.createElement('button');row.type='button';row.className='media-row';if(hasThumb(p))row.appendChild(mediaThumb(p));else{const blank=document.createElement('span');blank.className='media-placeholder';row.appendChild(blank)}const text=document.createElement('span');const name=document.createElement('div');name.className='media-name';name.textContent=p.name||p.label||'媒体文件';const meta=document.createElement('div');meta.className='media-meta';meta.textContent=[p.status,p.label].filter(Boolean).join(' · ');text.append(name,meta);row.appendChild(text);row.onclick=ev=>{ev.stopPropagation();post({type:'select',ids:p.taskID?[String(p.taskID)]:[],demo:p.demo?p.label:''})};row.ondblclick=ev=>{ev.stopPropagation();ev.preventDefault();if(p.taskID)post({type:'play',ids:[String(p.taskID)]})};list.appendChild(row)});root.appendChild(list);if((total||items.length)>80){const more=document.createElement('div');more.className='media-more';more.textContent='仅显示前 80 项；继续放大地图可进一步拆分。';root.appendChild(more)}mediaPopup=new maplibregl.Popup(Object.assign({closeButton:true,closeOnClick:true,maxWidth:'350px'},popupPlacement(lngLat))).setLngLat(lngLat).setDOMContent(root).addTo(map)}
+function install(){if(map.getSource('media'))return;map.addSource('media',{type:'geojson',data:{type:'FeatureCollection',features:points},cluster:true,clusterMaxZoom:20,clusterRadius:36,clusterProperties:{selected_count:['+',['case',['get','selected'],1,0]]}});const selected=['>', ['get','selected_count'],0];map.addLayer({id:'clusters',type:'circle',source:'media',filter:['has','point_count'],paint:{'circle-color':['case',selected,'#f28a1a','#167fba'],'circle-radius':['step',['get','point_count'],15,10,19,50,23],'circle-stroke-color':['case',selected,'#c8660d','#fff'],'circle-stroke-width':['case',selected,2.5,2]}});map.addLayer({id:'cluster-count',type:'symbol',source:'media',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':12},paint:{'text-color':'#fff'}});map.addLayer({id:'point',type:'circle',source:'media',filter:['all',['!',['has','point_count']],['!=',['get','current'],true]],paint:{'circle-color':['case',['get','selected'],'#f28a1a',['get','demo'],'#d6862e','#159783'],'circle-radius':['case',['get','selected'],9,7],'circle-stroke-color':'#fff','circle-stroke-width':2}});map.addLayer({id:'current-star',type:'symbol',source:'media',filter:['all',['!',['has','point_count']],['==',['get','current'],true]],layout:{'text-field':'★','text-size':24,'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'#f28a1a','text-halo-color':'#fff','text-halo-width':1.1}});for(const id of ['clusters','point','current-star']){map.on('mouseenter',id,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',id,()=>map.getCanvas().style.cursor='')}}
+function fitAll(animate=true){if(!points.length)return;const b=new maplibregl.LngLatBounds();points.forEach(p=>b.extend(p.geometry.coordinates));map.fitBounds(b,{padding:70,maxZoom:14,duration:animate?animationMs():0})}function focusCurrent(){const current=points.find(p=>p.properties&&p.properties.current===true);if(!current){document.getElementById('notice').textContent='当前没有已选中的地图媒体';return}map.easeTo({center:current.geometry.coordinates,zoom:Math.max(map.getZoom(),15),duration:animationMs()})}
+map.on('style.load',install);window.mediovaSetPoints=function(data,fit){points=data.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.longitude,p.latitude]},properties:p}));document.getElementById('map-count').textContent='地图点 '+points.length;if(map.isStyleLoaded()){const s=map.getSource('media');if(s)s.setData({type:'FeatureCollection',features:points});else install()}if(fit)fitAll(false)};
+window.mediovaThumbnail=function(rawID){const id=String(rawID),version=(thumbVersions.get(id)||0)+1;thumbVersions.set(id,version);let changed=false;points.forEach(feature=>{if(String(feature.properties.taskID||'')===id){feature.properties.hasThumbnail=true;changed=true}});document.querySelectorAll('img[data-task-id]').forEach(img=>{if(img.dataset.taskId===id){img.style.visibility='visible';img.src=BASE+'/thumb/'+encodeURIComponent(id)+'?v='+version}});if(!changed)return;clearTimeout(thumbTimer);thumbTimer=setTimeout(()=>{const source=map.getSource('media');if(source)source.setData({type:'FeatureCollection',features:points})},160)};
+map.on('click','clusters',async e=>{const feature=e.features&&e.features[0];if(!feature)return;const source=map.getSource('media'),clusterID=feature.properties.cluster_id,current=map.getZoom(),total=Number(feature.properties.point_count)||1;try{const leaves=await source.getClusterLeaves(clusterID,Math.min(Math.max(total,1),5000),0),items=mediaItems(leaves),ids=items.filter(p=>p.taskID).map(p=>String(p.taskID));if(ids.length)post({type:'select',ids:ids});const expansion=await source.getClusterExpansionZoom(clusterID);if(current<13.75&&expansion>current+.1){map.easeTo({center:feature.geometry.coordinates,zoom:Math.min(expansion,15),duration:animationMs()});return}showMediaPopup(leaves,e.lngLat,total)}catch(_){}});
+map.on('click','point',e=>{const features=e.features||[],items=mediaItems(features),ids=items.filter(p=>p.taskID).map(p=>String(p.taskID));post({type:'select',ids:ids,demo:items.length===1&&items[0].demo?items[0].label:''});showMediaPopup(features,e.lngLat,items.length)});map.on('click','current-star',e=>{const items=mediaItems(e.features||[]),ids=items.filter(p=>p.taskID).map(p=>String(p.taskID));post({type:'select',ids:ids});showMediaPopup(e.features||[],e.lngLat,items.length)});map.on('dblclick','point',e=>{e.preventDefault();const items=mediaItems(e.features);if(items.length===1&&items[0].taskID)post({type:'play',ids:[String(items[0].taskID)]})});map.on('dblclick','current-star',e=>{e.preventDefault();const items=mediaItems(e.features);if(items.length===1&&items[0].taskID)post({type:'play',ids:[String(items[0].taskID)]})});
+window.mediovaFocus=function(lon,lat){map.easeTo({center:[lon,lat],zoom:Math.max(map.getZoom(),15),duration:animationMs()})};
 window.mediovaCache=function(bytes){document.getElementById('cache').textContent='缓存 '+(bytes<1048576?'<1 MB':(bytes/1048576).toFixed(0)+' MB')+' / 1 GB'};
 window.mediovaGeocode=function(text,running){geocoding=running;document.getElementById('notice').textContent=text;document.getElementById('geocode').style.display=running?'none':'';document.getElementById('geocode-stop').style.display=running?'':'none'};
 window.mediovaMode=function(next){mode=next;document.getElementById('online').classList.toggle('active',next==='online');document.getElementById('offline').classList.toggle('active',next==='offline');if(!geocoding)document.getElementById('notice').textContent=next==='online'?'在线模式仅缓存实际查看过的区域':'离线模式：未缓存区域不会联网';map.setStyle(BASE+'/ofm/styles/liberty?mode='+next+'&t='+Date.now())};
-setInterval(()=>fetch(BASE+'/cache-status',{cache:'no-store'}).then(r=>r.json()).then(v=>window.mediovaCache(v.bytes)).catch(()=>{}),2000);document.getElementById('online').onclick=()=>post({type:'mode',mode:'online'});document.getElementById('offline').onclick=()=>post({type:'mode',mode:'offline'});document.getElementById('clear').onclick=()=>{if(confirm('清除全部离线地图缓存？照片、GPS、历史记录和设置不会受影响。'))post({type:'clear'})};document.getElementById('geocode').onclick=()=>post({type:'geocode-all'});document.getElementById('geocode-stop').onclick=()=>post({type:'geocode-stop'});document.getElementById('geocode-clear').onclick=()=>post({type:'geocode-clear'});post({type:'ready'});
+let cameraTimer=null;map.on('moveend',()=>{clearTimeout(cameraTimer);cameraTimer=setTimeout(()=>{const c=map.getCenter();post({type:'camera',longitude:c.lng,latitude:c.lat,zoom:map.getZoom()})},900)});window.addEventListener('keydown',e=>{if(e.key==='Home'){e.preventDefault();fitAll(true)}else if((e.key==='f'||e.key==='F')&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();focusCurrent()}else if(e.key==='+'||e.key==='='){e.preventDefault();map.zoomIn({duration:animationMs()})}else if(e.key==='-'){e.preventDefault();map.zoomOut({duration:animationMs()})}else if(e.key==='Escape'&&mediaPopup){mediaPopup.remove();mediaPopup=null}});
+setInterval(()=>fetch(BASE+'/cache-status',{cache:'no-store'}).then(r=>r.json()).then(v=>window.mediovaCache(v.bytes)).catch(()=>{}),2000);document.getElementById('fit').onclick=()=>fitAll(true);document.getElementById('current').onclick=focusCurrent;document.getElementById('online').onclick=()=>post({type:'mode',mode:'online'});document.getElementById('offline').onclick=()=>post({type:'mode',mode:'offline'});document.getElementById('clear').onclick=()=>{if(confirm('清除全部离线地图缓存？照片、GPS、历史记录和设置不会受影响。'))post({type:'clear'})};document.getElementById('geocode').onclick=()=>post({type:'geocode-all'});document.getElementById('geocode-stop').onclick=()=>post({type:'geocode-stop'});document.getElementById('geocode-clear').onclick=()=>post({type:'geocode-clear'});post({type:'ready'});
 </script></body></html>`
 }
 
 type mapRuntimeMessage struct {
-	Type string  `json:"type"`
-	Mode string  `json:"mode"`
-	IDs  []int64 `json:"ids"`
-	Demo string  `json:"demo"`
+	Type      string   `json:"type"`
+	Mode      string   `json:"mode"`
+	IDs       []string `json:"ids"`
+	Demo      string   `json:"demo"`
+	Latitude  float64  `json:"latitude"`
+	Longitude float64  `json:"longitude"`
+	Zoom      float64  `json:"zoom"`
+}
+
+func (r *mapRuntime) selectTaskIDs(ids []string) int {
+	selected := make(map[int64]bool, len(ids))
+	for _, rawID := range ids {
+		if id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64); err == nil && id != 0 {
+			selected[id] = true
+		}
+	}
+	if len(selected) == 0 || r == nil || r.app == nil {
+		return 0
+	}
+	r.app.mapSelectedDemo = ""
+	if len(selected) == 1 {
+		for id := range selected {
+			r.setCurrentTask(id)
+		}
+	} else {
+		r.setCurrentTask(0)
+	}
+	if r.app.viewMode == mapViewMap {
+		r.app.viewMode = mapViewSidebar
+		setText(r.app.hViewMode, "侧栏")
+		r.app.relayoutForMapMode()
+	}
+	r.app.selectMapTasks(selected)
+	// Refresh immediately so the selected marker changes to the current-item
+	// star in the same interaction, without waiting for a later list event.
+	r.pushPoints(false)
+	return len(selected)
 }
 
 func (r *mapRuntime) onMessage(raw string) {
@@ -484,9 +623,15 @@ func (r *mapRuntime) onMessage(raw string) {
 		return
 	}
 	r.app.postUI(func() {
+		// The user may disable the map after WebView posts a message but before
+		// this UI callback runs. Never touch a controller that has been closed.
+		if !r.app.mapFeaturesEnabled() || r.browser == nil {
+			return
+		}
 		switch msg.Type {
 		case "ready":
-			r.pushPoints(true)
+			r.pushPoints(!r.app.settings.MapCameraSet)
+			r.applyZoomSpeed()
 			r.pushPendingFocus()
 			r.pushCacheSize()
 			online, _ := r.cache.state()
@@ -495,6 +640,15 @@ func (r *mapRuntime) onMessage(raw string) {
 				mode = "online"
 			}
 			r.browser.Eval("window.mediovaMode(" + strconv.Quote(mode) + ")")
+		case "camera":
+			if validMapCamera(msg.Longitude, msg.Latitude, msg.Zoom) {
+				r.app.readSettingsFromUI()
+				r.app.settings.MapCameraSet = true
+				r.app.settings.MapCenterLongitude = msg.Longitude
+				r.app.settings.MapCenterLatitude = msg.Latitude
+				r.app.settings.MapZoom = msg.Zoom
+				_ = config.Save(r.app.settings)
+			}
 		case "mode":
 			online := msg.Mode != "offline"
 			r.cache.setOnline(online)
@@ -524,19 +678,16 @@ func (r *mapRuntime) onMessage(raw string) {
 			r.browser.Eval("window.mediovaMode('offline')")
 			setText(r.app.hStatusText, "已一键清除全部离线地图缓存；照片、GPS、历史记录和设置均未改变。")
 		case "select":
-			ids := make(map[int64]bool, len(msg.IDs))
-			for _, id := range msg.IDs {
-				if id != 0 {
-					ids[id] = true
-				}
-			}
-			if len(ids) > 0 {
-				r.app.selectMapTasks(ids)
-				setText(r.app.hStatusText, fmt.Sprintf("已从地图定位并选中 %d 个媒体任务。", len(ids)))
+			if count := r.selectTaskIDs(msg.IDs); count > 0 {
+				setText(r.app.hStatusText, fmt.Sprintf("已从地图定位并选中 %d 个媒体任务。", count))
 			} else if msg.Demo != "" {
 				r.app.mapSelectedDemo = msg.Demo
 				setText(r.app.hStatusText, "地图测试点："+msg.Demo+"；该点不会写入任务。")
 				r.pushPoints(false)
+			}
+		case "play":
+			if r.selectTaskIDs(msg.IDs) == 1 {
+				r.app.playSelected(false)
 			}
 		}
 	})
@@ -546,11 +697,40 @@ func (r *mapRuntime) pushPoints(fit bool) {
 	if r == nil || r.browser == nil || r.app == nil {
 		return
 	}
-	data, err := json.Marshal(r.app.currentMapPoints())
+	points := r.app.currentMapPoints()
+	thumbnailPaths := make(map[int64]string)
+	for _, point := range points {
+		if point.TaskID != 0 && point.ThumbnailPath != "" {
+			thumbnailPaths[point.TaskID] = point.ThumbnailPath
+		}
+	}
+	r.thumbnailMu.Lock()
+	r.thumbnailPaths = thumbnailPaths
+	r.thumbnailMu.Unlock()
+	data, err := json.Marshal(points)
 	if err != nil {
 		return
 	}
 	r.browser.Eval("window.mediovaSetPoints(" + string(data) + "," + strconv.FormatBool(fit) + ")")
+}
+func (r *mapRuntime) registerThumbnail(taskID int64, path string) {
+	if r == nil || r.browser == nil || taskID <= 0 || strings.TrimSpace(path) == "" {
+		return
+	}
+	r.thumbnailMu.Lock()
+	if r.thumbnailPaths == nil {
+		r.thumbnailPaths = make(map[int64]string)
+	}
+	r.thumbnailPaths[taskID] = path
+	r.thumbnailMu.Unlock()
+	r.browser.Eval("window.mediovaThumbnail(" + strconv.Quote(strconv.FormatInt(taskID, 10)) + ")")
+}
+
+func (r *mapRuntime) applyZoomSpeed() {
+	if r == nil || r.browser == nil || r.app == nil {
+		return
+	}
+	r.browser.Eval("if(window.mediovaSpeed){window.mediovaSpeed(" + strconv.FormatBool(r.app.settings.MapFastZoom) + ")}")
 }
 
 func (r *mapRuntime) pushCacheSize() {
@@ -566,6 +746,33 @@ func (r *mapRuntime) resize() {
 	}
 }
 
+type mapControllerABI struct {
+	vtable *[26]uintptr
+}
+
+// The upstream wrapper does not expose ICoreWebView2Controller::Close. Calling
+// the documented COM vtable slot releases the controller immediately, so the
+// map can be disabled and later recreated without retaining a hidden WebView.
+func closeMapWebView(browser *edge.Chromium) {
+	if browser == nil {
+		return
+	}
+	browser.MessageCallback = nil
+	browser.WebResourceRequestedCallback = nil
+	browser.NavigationCompletedCallback = nil
+	browser.AcceleratorKeyCallback = nil
+	_ = browser.Hide()
+	controller := browser.GetController()
+	if controller == nil {
+		return
+	}
+	abi := (*mapControllerABI)(unsafe.Pointer(controller))
+	if abi.vtable == nil || abi.vtable[24] == 0 {
+		return
+	}
+	syscall.SyscallN(abi.vtable[24], uintptr(unsafe.Pointer(controller)))
+}
+
 func (r *mapRuntime) close() {
 	if r == nil {
 		return
@@ -576,16 +783,16 @@ func (r *mapRuntime) close() {
 		return
 	}
 	r.closed = true
+	browser := r.browser
+	r.browser = nil
 	r.mu.Unlock()
-	if r.browser != nil {
-		_ = r.browser.Hide()
-	}
 	if r.server != nil {
 		_ = r.server.Close()
 	}
 	if r.listener != nil {
 		_ = r.listener.Close()
 	}
+	closeMapWebView(browser)
 	profile := r.profileDir
 	if profile != "" {
 		go func() {
@@ -638,7 +845,7 @@ func mapRuntimeSubclassProc(hwnd uintptr, message uint32, wParam, lParam, subcla
 }
 
 func (a *application) ensureMapRuntime() {
-	if a == nil || mapRuntimeFor(a) != nil || a.hMapSurface == 0 {
+	if a == nil || !a.mapFeaturesEnabled() || mapRuntimeFor(a) != nil || a.hMapSurface == 0 {
 		return
 	}
 	runtime, err := newMapRuntime(a)

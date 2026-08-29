@@ -2,6 +2,8 @@ package media
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"mediaworkbench/internal/config"
 	"mediaworkbench/internal/model"
 )
 
@@ -86,6 +89,42 @@ func TestHistoryVolumeClassBoundaries(t *testing.T) {
 		if got := historyVolumeClass(record); got != tc.want {
 			t.Fatalf("historyVolumeClass(%d,%d)=%q want %q", tc.input, tc.output, got, tc.want)
 		}
+	}
+}
+
+func TestHistoryBurstIsCoalescedAndFlushable(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", root)
+	t.Setenv("APPDATA", root)
+	t.Setenv("LOCALAPPDATA", root)
+	for i := 0; i < 20; i++ {
+		if err := AppendHistory(HistoryRecord{ID: fmt.Sprintf("burst-%02d", i), Kind: model.KindImage, Status: model.StatusDone, CompletedAt: time.Now()}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	historyMu.Lock()
+	dirty := historyDirtyChanges
+	historyMu.Unlock()
+	if dirty != 20 {
+		t.Fatalf("dirty changes=%d want 20 before explicit flush", dirty)
+	}
+	if err := FlushHistory(); err != nil {
+		t.Fatal(err)
+	}
+	path, err := config.HistoryPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var records []HistoryRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 20 {
+		t.Fatalf("persisted records=%d want 20", len(records))
 	}
 }
 

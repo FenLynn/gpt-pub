@@ -59,7 +59,7 @@ func v452ThumbnailCurrent(a *application, taskID int64, generation uint64) bool 
 func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, input, path string, cached bool, index int) bool {
 	state := v452ThumbnailStateFor(a)
 	if state == nil || !round12ThumbnailIndexValid(index) || !state.ownership.Current(taskID, generation) {
-		if cached && path != "" && state != nil && state.ownership.RefCount(path) == 0 {
+		if path != "" && (!cached || state == nil || state.ownership.RefCount(path) == 0) {
 			_ = os.Remove(path)
 		}
 		return false
@@ -70,7 +70,7 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 	if task == nil || task.Input != input {
 		a.mu.Unlock()
 		state.ownership.Release(taskID)
-		if cached && path != "" {
+		if path != "" && (!cached || state.ownership.RefCount(path) == 0) {
 			_ = os.Remove(path)
 		}
 		return false
@@ -86,7 +86,7 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 		if quality, qualityErr := round12ThumbnailQualityForBMP(path); qualityErr == nil && round12ThumbnailNearBlack(quality) {
 			a.mu.Unlock()
 			state.ownership.Release(taskID)
-			if cached && path != "" && state.ownership.RefCount(path) == 0 {
+			if path != "" && (!cached || state.ownership.RefCount(path) == 0) {
 				_ = os.Remove(path)
 			}
 			return false
@@ -97,7 +97,7 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 	stale, orphan := state.ownership.Assign(taskID, generation, path)
 	if stale {
 		a.mu.Unlock()
-		if cached && path != "" {
+		if path != "" && (!cached || state.ownership.RefCount(path) == 0) {
 			_ = os.Remove(path)
 		}
 		return false
@@ -105,6 +105,11 @@ func v452InstallThumbnailAsset(a *application, taskID int64, generation uint64, 
 	state.assets[taskID] = v452ThumbnailAsset{index: index, path: path, cached: cached}
 	task.ThumbnailIndex = index
 	a.mu.Unlock()
+	if path != "" {
+		if runtime := mapRuntimeFor(a); runtime != nil {
+			runtime.registerThumbnail(taskID, path)
+		}
+	}
 
 	if hadOld && old.index >= 0 && old.index != index {
 		v452RemoveImageListIndex(a, old.index)

@@ -1532,7 +1532,12 @@ func GenerateThumbnailBMP(ctx context.Context, ffmpeg, input, output string, at 
 	if height < 8 {
 		height = 48
 	}
-	args := []string{"-hide_banner", "-y", "-ss", formatSeconds(at)}
+	args := []string{"-hide_banner", "-y"}
+	// FFmpeg 9 may report success but emit no frame when a still image is
+	// explicitly seeked to exactly 0.000. A zero seek is a no-op, so omit it.
+	if at > 0.0005 {
+		args = append(args, "-ss", formatSeconds(at))
+	}
 	if rotation != "自动" {
 		args = append(args, "-noautorotate")
 	}
@@ -1556,7 +1561,10 @@ func GenerateThumbnailJPEG(ctx context.Context, ffmpeg, input, output string, at
 	if height < 24 {
 		height = 90
 	}
-	args := []string{"-hide_banner", "-y", "-ss", formatSeconds(at)}
+	args := []string{"-hide_banner", "-y"}
+	if at > 0.0005 {
+		args = append(args, "-ss", formatSeconds(at))
+	}
 	if rotation != "自动" {
 		args = append(args, "-noautorotate")
 	}

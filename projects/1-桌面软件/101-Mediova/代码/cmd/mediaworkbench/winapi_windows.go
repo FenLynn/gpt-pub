@@ -176,6 +176,7 @@ const (
 	CB_GETLBTEXT                 = 0x0148
 	CB_RESETCONTENT              = 0x014B
 	CB_SETITEMHEIGHT             = 0x0153
+	CB_GETDROPPEDSTATE           = 0x0157
 	EM_SETCUEBANNER              = 0x1501
 	EM_SETMARGINS                = 0x00D3
 	EC_LEFTMARGIN                = 0x0001
