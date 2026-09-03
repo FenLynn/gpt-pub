@@ -227,7 +227,7 @@ def validate_transition_frame(image, target_row: int, cells: list[list[list[int]
                 )
             tail_samples[str(row)] = list(sample)
 
-        pixels = status_text_pixels(image, cells[row][12], ROW_STATUS_TEXT[row])
+        pixels = status_text_pixels(image, cells[row][13], ROW_STATUS_TEXT[row])
         if pixels < 5:
             raise RuntimeError(
                 f"status text colour changed or disappeared: selected={target_row} row={row} "
