@@ -23,6 +23,7 @@ jobs:
   scope:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
@@ -80,6 +81,7 @@ jobs:
     needs: scope
     if: always() && (needs.scope.result == 'success' || needs.scope.result == 'skipped')
     runs-on: windows-latest
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -135,6 +137,7 @@ jobs:
             if ([string]::IsNullOrWhiteSpace($line)) { throw 'Core IPC returned no ping response' }
             $message = $line | ConvertFrom-Json
             if ($message.kind -ne 'response' -or $message.id -ne 'ci-ping' -or -not $message.ok) { throw "Unexpected Core IPC response: $line" }
+            if ($message.payload.version -ne '0.1.1') { throw "Unexpected Core version: $($message.payload.version)" }
             $writer.WriteLine('{"kind":"request","id":"ci-stop","method":"shutdown","payload":{}}')
             $stopLine = $reader.ReadLine()
             if ([string]::IsNullOrWhiteSpace($stopLine)) { throw 'Core IPC returned no shutdown response' }
@@ -147,6 +150,27 @@ jobs:
             try { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } } catch { }
             throw
           }
+
+      - name: Smoke test Shell Core crash recovery
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $env:LOCALSUB_CORE_RECOVERY_SMOKE = '1'
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
+          Remove-Item publish/Logs/core.log -Force -ErrorAction SilentlyContinue
+          Remove-Item publish/Logs/core-client.log -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru -Wait
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            if (Test-Path publish/Logs/core.log) { Get-Content publish/Logs/core.log }
+            if (Test-Path publish/Logs/core-client.log) { Get-Content publish/Logs/core-client.log }
+            throw "Core crash recovery smoke test failed. ExitCode=$($p.ExitCode)"
+          }
+          if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'Core crash recovery smoke test wrote a crash log.' }
+          if (-not (Test-Path publish/Logs/core-client.log)) { throw 'Core crash recovery smoke test did not create core-client.log.' }
+          $clientLog = Get-Content publish/Logs/core-client.log -Raw
+          if ($clientLog -notmatch 'DISCONNECTED generation=1') { throw 'Core crash recovery smoke test did not record generation 1 disconnect.' }
+          if ($clientLog -notmatch 'CONNECTED generation=2') { throw 'Core crash recovery smoke test did not reconnect as generation 2.' }
 
       - name: Smoke test LocalSub startup
         shell: pwsh
@@ -258,14 +282,16 @@ jobs:
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           Remove-Item publish/Logs/startup.log -Force -ErrorAction SilentlyContinue
           Remove-Item publish/Logs/core.log -Force -ErrorAction SilentlyContinue
+          Remove-Item publish/Logs/core-client.log -Force -ErrorAction SilentlyContinue
           if (-not (Test-Path publish/LocalSub.Core.exe)) { throw 'LocalSub.Core.exe missing from portable package' }
           if (Get-ChildItem publish/ASR -Include *.dll,*.onnx -Recurse -ErrorAction SilentlyContinue) { throw 'ASR runtime or model files must not be bundled' }
           if (Get-ChildItem publish -Filter 'onnxruntime*.dll' -File -ErrorAction SilentlyContinue) { throw 'ONNX Runtime leaked into portable package' }
           if (Test-Path publish/sherpa-onnx-c-api.dll) { throw 'sherpa native runtime leaked into portable package' }
           if (Test-Path publish/Components/FFmpeg/bin/ffmpeg.exe) { throw 'FFmpeg must remain an optional downloaded component' }
-          Compress-Archive -Path publish/* -DestinationPath LocalSub-v0.1.0-dev-win-x64-net8.zip -Force
+          Compress-Archive -Path publish/* -DestinationPath LocalSub-v0.1.1-dev-win-x64-net8.zip -Force
 
       - uses: actions/upload-artifact@v4
         with:
-          name: P105-LocalSub-v0.1.0-dev-win-x64-net8
-          path: projects/1-桌面软件/105-LocalSub/LocalSub-v0.1.0-dev-win-x64-net8.zip
+          name: P105-LocalSub-v0.1.1-dev-win-x64-net8
+          path: projects/1-桌面软件/105-LocalSub/LocalSub-v0.1.1-dev-win-x64-net8.zip
+          retention-days: 14
