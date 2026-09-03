@@ -164,7 +164,7 @@ func round12DrawSelectionOutline(a *application, hdc uintptr, row int) {
 	if thickness < 3 {
 		thickness = 3
 	}
-	border := colorRef(28, 91, 183)
+	border := round12SelectionBorder
 	fillSolid(hdc, rect{Left: rowBounds.Left, Top: rowBounds.Top, Right: rowBounds.Left + thickness, Bottom: rowBounds.Bottom}, border)
 	fillSolid(hdc, rect{Left: rowBounds.Right - thickness, Top: rowBounds.Top, Right: rowBounds.Right, Bottom: rowBounds.Bottom}, border)
 	if row == 0 || !listItemSelected(a.hList, row-1) {
