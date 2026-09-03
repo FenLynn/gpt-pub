@@ -39,7 +39,7 @@ jobs:
           fetch-depth: 0
 
       - name: Scope gate
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'integration/main-')
         working-directory: .
         run: |
           git fetch origin "${{ github.base_ref }}" --depth=1

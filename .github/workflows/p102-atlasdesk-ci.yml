@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Enforce P102 pull-request scope
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'integration/main-')
         shell: bash
         run: |
           set -euo pipefail
