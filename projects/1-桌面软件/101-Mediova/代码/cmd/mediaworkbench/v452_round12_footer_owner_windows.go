@@ -161,6 +161,9 @@ func round12MessageSubclassProc(hwnd uintptr, message uint32, wParam, lParam, su
 			messageBox(a.hwnd, "运行状态详情", statusDiagnosticFullDetail(), MB_OK|MB_ICONINFORMATION)
 			return 0
 		}
+		if a.v455ShowStatusCenter() {
+			return 0
+		}
 	case WM_TIMER:
 		if wParam == round12MessageTimer {
 			if a.messageMarqueeSpan <= 0 {

@@ -24,6 +24,7 @@ const (
 	TIMER_PROGRESS_FLUSH = 5
 	TIMER_PROBE_FLUSH    = 7
 	TIMER_LIST_BUILD     = 8
+	TIMER_MAP_PUSH       = 9
 )
 
 var (

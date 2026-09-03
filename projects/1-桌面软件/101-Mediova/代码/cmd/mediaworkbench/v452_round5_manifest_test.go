@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const v452Round5ManifestSHA256 = "0540d6483f0d6b0bb56575b17b83bfa24ea58582b0d4a7c82581c2fdd4223137"
+const v452Round5ManifestSHA256 = "8f8edc52e03d79f29704b1ddbb7f8ab3445caae1305d1b42ad7dfd2d7596561b"
 
 func TestV452Round5FixedManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND5_WINDOWS_CLOSEOUT_FILES_SHA256.txt")

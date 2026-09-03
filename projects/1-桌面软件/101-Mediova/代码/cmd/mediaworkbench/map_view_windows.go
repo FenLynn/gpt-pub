@@ -400,22 +400,21 @@ func (a *application) cycleMapViewMode() {
 		setText(a.hStatusText, "地图与位置功能已关闭；可在“设置”中重新启用。")
 		return
 	}
-	switch a.viewMode {
-	case mapViewSplit:
-		a.viewMode = mapViewMap
-	case mapViewMap:
-		a.viewMode = mapViewSidebar
-	case mapViewSidebar:
+	// Keep the user-facing map workflow intentionally small: the normal list
+	// and the side-by-side sidebar map. The old split/full-map layouts remain
+	// implemented for compatibility, but are no longer reachable from the
+	// toolbar and old in-memory modes normalize to the sidebar.
+	if a.viewMode == mapViewSidebar {
 		a.viewMode = mapViewList
-	default:
-		a.viewMode = mapViewSplit
+	} else {
+		a.viewMode = mapViewSidebar
 	}
 	setText(a.hViewMode, mapViewLabel(a.viewMode))
 	if a.viewMode != mapViewList {
 		a.ensureMapRuntime()
 	}
 	a.relayoutForMapMode()
-	setText(a.hStatusText, "视图已切换为"+mapViewLabel(a.viewMode)+"；顶部按钮按“列表 → 分屏 → 地图 → 侧栏”循环。")
+	setText(a.hStatusText, "视图已切换为"+mapViewLabel(a.viewMode)+"；可在列表和侧栏地图之间切换")
 }
 
 func mapViewLabel(mode string) string {
@@ -581,6 +580,7 @@ func (a *application) activateMapPointAtCursor() {
 			a.viewMode = mapViewSidebar
 			setText(a.hViewMode, "侧栏")
 			a.relayoutForMapMode()
+			setText(a.hStatusText, "视图已切换为"+mapViewLabel(a.viewMode)+"；可在列表和侧栏地图之间切换")
 		}
 		a.selectMapTasks(ids)
 		setText(a.hStatusText, fmt.Sprintf("已从地图定位并选中 %d 个媒体任务。", len(ids)))
@@ -593,8 +593,18 @@ func (a *application) activateMapPointAtCursor() {
 
 func (a *application) invalidateMapView() {
 	if a != nil && a.mapFeaturesEnabled() && a.hMapSurface != 0 && a.viewMode != mapViewList {
-		if runtime := mapRuntimeFor(a); runtime != nil {
-			runtime.pushPoints(false)
+		// Filtering/import/progress events can arrive in bursts. Coalesce them
+		// into one map data push so WebView2 is not fed a full GeoJSON payload for
+		// every individual task update.
+		if a.mapPushPending {
+			return
+		}
+		a.mapPushPending = true
+		if timer, _, _ := procSetTimer.Call(a.hwnd, TIMER_MAP_PUSH, 140, 0); timer == 0 {
+			a.mapPushPending = false
+			if runtime := mapRuntimeFor(a); runtime != nil {
+				runtime.pushPoints(false)
+			}
 		}
 	}
 }

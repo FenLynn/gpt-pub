@@ -1,4 +1,5 @@
 param(
+	[string]$ReleaseVersion = "4.5.4",
     [string]$FFmpegBin = "",
     [string]$ExifToolRoot = "",
     [string]$OutputDirectory = "build",
@@ -9,7 +10,11 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-$version = "4.5.4"
+$version = $ReleaseVersion
+
+if ($version -notmatch '^4\.5\.[0-9]+$') {
+    throw "ReleaseVersion must use the 4.5.x format."
+}
 if ($OutputDirectory -notmatch '^build(?:-[A-Za-z0-9._-]+)?$') {
     throw "OutputDirectory must be 'build' or a safe build-* directory name."
 }
@@ -68,13 +73,13 @@ if (-not $SkipTests) {
 }
 
 # Keep the official v4.5.0 source baseline byte-for-byte reproducible. Build
-# this v4.5.4 stability release with a temporary exact appVersion change,
+# this stability release with a temporary exact appVersion change,
 # then restore the original bytes even if compilation fails.
 $originalSourceBytes = [System.IO.File]::ReadAllBytes($versionSource)
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $originalSourceText = $utf8NoBom.GetString($originalSourceBytes)
 $oldVersionLine = 'const appVersion = "4.5.0"'
-$newVersionLine = 'const appVersion = "4.5.4"'
+$newVersionLine = 'const appVersion = "' + $version + '"'
 if (-not $originalSourceText.Contains($oldVersionLine)) {
     throw "Expected frozen appVersion declaration was not found: $oldVersionLine"
 }
@@ -149,7 +154,7 @@ Mediova v$version Stability Runtime
 Run Mediova.exe directly from this folder.
 Do not move only Mediova.exe away from Components when using the bundled FFmpeg.
 User configuration and history are stored outside Runtime under AppData, unless portable.mode is enabled.
-This is a v4.5.4 stability release; it does not change the official v4.5.0 tag or Release.
+This is a v$version stability release; it does not change the official v4.5.0 tag or Release.
 "@
 Set-Content (Join-Path $runtimeRoot "README.txt") $runtimeReadme -Encoding UTF8
 
@@ -189,4 +194,3 @@ if ($PackageZip) {
 }
 $hashLines | Set-Content (Join-Path $buildRoot "SHA256.txt") -Encoding Ascii
 Write-Host "Mediova.exe SHA-256: $exeHash"
-

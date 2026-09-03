@@ -378,12 +378,12 @@ func (a *application) v420UpdateRightPanel() {
 	task := selected[0]
 	if task.IsLocked() {
 		setText(a.hRightTitle, "参数已锁定")
-		setText(a.hDetails, fmt.Sprintf("任务：%s\r\n状态：%s\r\n\r\n该任务已入队，底部默认和普通个体编辑均不会改变它。请右键选择“临时操作”。", filepath.Base(task.Input), task.Status))
+		setText(a.hDetails, fmt.Sprintf("任务：%s\r\n状态：%s\r\n\r\n该任务已入队，底部默认和普通个体编辑均不会改变它。请右键选择“临时操作”。%s", filepath.Base(task.Input), task.Status, a.v455TaskRecognitionDetails(task)))
 		return
 	}
 	opts := a.settings.EffectiveOptions(task)
 	setText(a.hRightTitle, "转换参数")
-	setText(a.hDetails, fmt.Sprintf("源文件：%s\r\n\r\n源信息：%d×%d · %.2f FPS · %s\r\n状态：%s\r\n输出设置：%s · %s · %s · %s · %s", task.Input, task.Width, task.Height, task.FPS, media.FormatBytes(task.InputSize), task.Status, taskOptionStrings(opts, task.Kind)[0], taskOptionStrings(opts, task.Kind)[1], taskOptionStrings(opts, task.Kind)[2], taskOptionStrings(opts, task.Kind)[3], taskOptionStrings(opts, task.Kind)[4]))
+	setText(a.hDetails, fmt.Sprintf("源文件：%s\r\n\r\n源信息：%d×%d · %.2f FPS · %s\r\n状态：%s\r\n输出设置：%s · %s · %s · %s · %s%s", task.Input, task.Width, task.Height, task.FPS, media.FormatBytes(task.InputSize), task.Status, taskOptionStrings(opts, task.Kind)[0], taskOptionStrings(opts, task.Kind)[1], taskOptionStrings(opts, task.Kind)[2], taskOptionStrings(opts, task.Kind)[3], taskOptionStrings(opts, task.Kind)[4], a.v455TaskRecognitionDetails(task)))
 }
 
 func (a *application) v420ResetRunMaps() {

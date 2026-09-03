@@ -120,6 +120,9 @@ type Task struct {
 	Error                 string         `json:"error"`
 	FailureCategory       string         `json:"failure_category,omitempty"`
 	ValidationWarning     string         `json:"validation_warning,omitempty"`
+	DuplicateOf           string         `json:"duplicate_of,omitempty"`
+	PreviouslyConverted   bool           `json:"previously_converted,omitempty"`
+	PreviousOutput        string         `json:"previous_output,omitempty"`
 	Engine                string         `json:"engine"`
 	Pinned                bool           `json:"pinned"`
 	ThumbnailIndex        int            `json:"-"`

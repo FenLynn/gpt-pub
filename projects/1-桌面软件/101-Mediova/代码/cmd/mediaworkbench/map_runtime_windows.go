@@ -268,6 +268,8 @@ type mapRuntime struct {
 	closed         bool
 	hasFocus       bool
 	currentTaskID  int64
+	folderState    string
+	pointState     string
 	focusLongitude float64
 	focusLatitude  float64
 }
@@ -551,10 +553,10 @@ func (r *mapRuntime) mapHTML() string {
 	base, _ := json.Marshal(r.baseURL)
 	longitude, latitude, zoom, fast := r.initialMapCamera()
 	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="` + r.baseURL + `/maplibre.css"><style>
-html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#eef4f8}.toolbar{position:absolute;z-index:5;top:10px;left:10px;right:10px;display:flex;gap:6px;align-items:center;pointer-events:none}.brand,.tools,.folder-select{pointer-events:auto;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(31,57,76,.18);border-radius:5px;height:34px;display:flex;align-items:center}.brand{padding:0 11px;color:#29465a;font-size:13px}.folder-select{width:220px;border:0;padding:0 28px 0 10px;color:#355a73;font:12px "Segoe UI","Microsoft YaHei";outline:none}.tools{margin-left:0;padding:0 5px;gap:3px}.tools button{border:0;background:transparent;color:#355a73;height:26px;padding:0 9px;border-radius:4px;font:12px "Segoe UI","Microsoft YaHei";cursor:pointer}.tools button.active{background:#dcecff;color:#125a9a}.tools button:hover{background:#e8f2fa}.tools button.stop{color:#b8493f}.tools .divider{width:1px;height:18px;background:#dbe5ec;margin:0 2px}.cache{color:#6f8492;font-size:11px;padding:0 5px}.notice{position:absolute;z-index:4;left:12px;bottom:12px;background:rgba(255,255,255,.92);color:#5b7180;padding:6px 9px;border-radius:4px;font-size:11px;box-shadow:0 1px 4px rgba(31,57,76,.13)}.quick{position:absolute;z-index:5;right:10px;bottom:82px;display:flex;flex-direction:column;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(31,57,76,.18);border-radius:4px;overflow:hidden}.quick button{width:46px;height:28px;border:0;border-bottom:1px solid #e4edf3;background:transparent;color:#355a73;font:11px "Segoe UI","Microsoft YaHei";cursor:pointer}.quick button:last-child{border-bottom:0}.quick button:hover{background:#e8f2fa}
+html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#eef4f8}.toolbar{position:absolute;z-index:5;top:10px;left:10px;right:10px;display:flex;gap:6px;align-items:center;pointer-events:none}.brand,.tools,.folder-select,.folder-scope{pointer-events:auto;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(31,57,76,.18);border-radius:5px;height:34px;display:flex;align-items:center}.brand{padding:0 11px;color:#29465a;font-size:13px}.folder-select{width:270px;border:0;padding:0 28px 0 10px;color:#355a73;font:12px "Segoe UI","Microsoft YaHei";outline:none}.folder-scope{padding:0 8px;color:#526d82;font-size:11px;white-space:nowrap}.folder-scope input{margin:0 5px 0 0}.tools{margin-left:0;padding:0 5px;gap:3px}.tools button{border:0;background:transparent;color:#355a73;height:26px;padding:0 9px;border-radius:4px;font:12px "Segoe UI","Microsoft YaHei";cursor:pointer}.tools button.active{background:#dcecff;color:#125a9a}.tools button:hover{background:#e8f2fa}.tools button.stop{color:#b8493f}.tools .divider{width:1px;height:18px;background:#dbe5ec;margin:0 2px}.cache{color:#6f8492;font-size:11px;padding:0 5px}.notice{position:absolute;z-index:4;left:12px;bottom:12px;background:rgba(255,255,255,.92);color:#5b7180;padding:6px 9px;border-radius:4px;font-size:11px;box-shadow:0 1px 4px rgba(31,57,76,.13)}.quick{position:absolute;z-index:5;right:10px;bottom:82px;display:flex;flex-direction:column;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(31,57,76,.18);border-radius:4px;overflow:hidden}.quick button{width:46px;height:28px;border:0;border-bottom:1px solid #e4edf3;background:transparent;color:#355a73;font:11px "Segoe UI","Microsoft YaHei";cursor:pointer}.quick button:last-child{border-bottom:0}.quick button:hover{background:#e8f2fa}
 .maplibregl-popup-content{padding:8px;border-radius:6px;box-shadow:0 3px 14px rgba(24,49,67,.24)}.media-popup{width:310px;max-width:calc(100vw - 44px);color:#29465a}.media-summary{font-size:11px;color:#718694;margin:0 0 5px}.media-list{max-height:250px;overflow:auto}.media-row{display:grid;grid-template-columns:44px minmax(0,1fr);gap:7px;width:100%;padding:5px;border:0;border-radius:4px;background:transparent;text-align:left;cursor:pointer;color:#29465a}.media-row:hover{background:#e8f2fa}.media-row img,.media-placeholder{width:44px;height:30px;object-fit:cover;border-radius:2px;background:#edf3f7}.media-name{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.media-meta{font-size:10px;color:#718694;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.media-more{padding:6px 4px 2px;color:#718694;font-size:10px}
-</style></head><body><div id="map"></div><div class="toolbar"><div id="map-count" class="brand">地图点 0</div><select id="folder" class="folder-select" title="按导入文件所在目录浏览；选择后同时显示该目录中的视频与图片"><option value="">全部文件夹（当前列表）</option></select><div class="tools"><button id="online" class="active">在线 · OpenFreeMap</button><button id="offline">离线地图</button><span id="cache" class="cache">缓存 0 MB / 1 GB</span><button id="clear">清除离线地图</button><span class="divider"></span><button id="geocode" title="按坐标去重，手动补全当前列表的地名">补全全部地名</button><button id="geocode-stop" class="stop" style="display:none">停止补全</button><button id="geocode-clear" title="只清除在线反查地名，不改变媒体 GPS">清除地名缓存</button></div></div><div class="quick"><button id="fit" title="显示全部地图点（Home）">全览</button><button id="current" title="定位当前媒体（F）">当前</button></div><div id="notice" class="notice">在线模式仅缓存实际查看过的区域</div><script src="` + r.baseURL + `/maplibre.js"></script><script>
-const BASE=` + string(base) + `,INITIAL_CENTER=[` + strconv.FormatFloat(longitude, 'f', 7, 64) + `,` + strconv.FormatFloat(latitude, 'f', 7, 64) + `],INITIAL_ZOOM=` + strconv.FormatFloat(zoom, 'f', 3, 64) + `,INITIAL_FAST=` + strconv.FormatBool(fast) + `;let mode='online',allPoints=[],points=[],folderKey='',geocoding=false,fastZoom=INITIAL_FAST;const post=o=>window.chrome.webview.postMessage(JSON.stringify(o)),folderSelect=document.getElementById('folder');
+</style></head><body><div id="map"></div><div class="toolbar"><div id="map-count" class="brand">地图点 0</div><select id="folder" class="folder-select" title="所有源目录都在这里统计，包括没有 GPS 的视频和图片"><option value="">全部目录</option></select><label class="folder-scope"><input id="folder-children" type="checkbox">含子目录</label><div class="tools"><button id="folder-select-all">选中目录</button><button id="folder-convert">转换目录</button><button id="folder-open">源目录</button><button id="folder-output">输出目录</button><span class="divider"></span><button id="online" class="active">在线 · OpenFreeMap</button><button id="offline">离线地图</button><span id="cache" class="cache">缓存 0 MB / 1 GB</span><button id="clear">清除离线地图</button><span class="divider"></span><button id="geocode" title="按坐标去重，手动补全当前列表的地名">补全全部地名</button><button id="geocode-stop" class="stop" style="display:none">停止补全</button><button id="geocode-clear" title="只清除在线反查地名，不改变媒体 GPS">清除地名缓存</button></div></div><div class="quick"><button id="fit" title="显示全部地图点（Home）">全览</button><button id="current" title="定位当前媒体（F）">当前</button></div><div id="notice" class="notice">在线模式仅缓存实际查看过的区域</div><script src="` + r.baseURL + `/maplibre.js"></script><script>
+const BASE=` + string(base) + `,INITIAL_CENTER=[` + strconv.FormatFloat(longitude, 'f', 7, 64) + `,` + strconv.FormatFloat(latitude, 'f', 7, 64) + `],INITIAL_ZOOM=` + strconv.FormatFloat(zoom, 'f', 3, 64) + `,INITIAL_FAST=` + strconv.FormatBool(fast) + `;let mode='online',allPoints=[],points=[],folderData=[],folderKey='',includeSubfolders=false,geocoding=false,fastZoom=INITIAL_FAST;const post=o=>window.chrome.webview.postMessage(JSON.stringify(o)),folderSelect=document.getElementById('folder'),folderChildren=document.getElementById('folder-children');
 const map=new maplibregl.Map({container:'map',style:BASE+'/ofm/styles/liberty',center:INITIAL_CENTER,zoom:INITIAL_ZOOM,attributionControl:true,fadeDuration:fastZoom?60:180,refreshExpiredTiles:false,cancelPendingTileRequestsWhileZooming:true,maxTileCacheSize:128});map.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
 function animationMs(){return fastZoom?180:320}function applyZoomSpeed(){map.scrollZoom.setWheelZoomRate(fastZoom?1/240:1/450);map.scrollZoom.setZoomRate(fastZoom?1/70:1/100)}window.mediovaSpeed=function(fast){fastZoom=!!fast;applyZoomSpeed()};applyZoomSpeed();
 let mediaPopup=null,thumbTimer=null;const thumbVersions=new Map();
@@ -565,9 +567,10 @@ function showMediaPopup(features,lngLat,total){const items=mediaItems(features);
 function install(){if(map.getSource('media'))return;map.addSource('media',{type:'geojson',data:{type:'FeatureCollection',features:points},cluster:true,clusterMaxZoom:20,clusterRadius:36,clusterProperties:{selected_count:['+',['case',['get','selected'],1,0]]}});const selected=['>', ['get','selected_count'],0];map.addLayer({id:'clusters',type:'circle',source:'media',filter:['has','point_count'],paint:{'circle-color':['case',selected,'#f28a1a','#167fba'],'circle-radius':['step',['get','point_count'],15,10,19,50,23],'circle-stroke-color':['case',selected,'#c8660d','#fff'],'circle-stroke-width':['case',selected,2.5,2]}});map.addLayer({id:'cluster-count',type:'symbol',source:'media',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':12},paint:{'text-color':'#fff'}});map.addLayer({id:'point',type:'circle',source:'media',filter:['all',['!',['has','point_count']],['!=',['get','current'],true]],paint:{'circle-color':['case',['get','selected'],'#f28a1a',['get','demo'],'#d6862e','#159783'],'circle-radius':['case',['get','selected'],9,7],'circle-stroke-color':'#fff','circle-stroke-width':2}});map.addLayer({id:'current-star',type:'symbol',source:'media',filter:['all',['!',['has','point_count']],['==',['get','current'],true]],layout:{'text-field':'★','text-size':24,'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'#f28a1a','text-halo-color':'#fff','text-halo-width':1.1}});for(const id of ['clusters','point','current-star']){map.on('mouseenter',id,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',id,()=>map.getCanvas().style.cursor='')}}
 function fitAll(animate=true){if(!points.length)return;const b=new maplibregl.LngLatBounds();points.forEach(p=>b.extend(p.geometry.coordinates));map.fitBounds(b,{padding:70,maxZoom:14,duration:animate?animationMs():0})}function focusCurrent(){const current=points.find(p=>p.properties&&p.properties.current===true);if(!current){document.getElementById('notice').textContent='当前没有已选中的地图媒体';return}map.easeTo({center:current.geometry.coordinates,zoom:Math.max(map.getZoom(),15),duration:animationMs()})}
 function updateMediaSource(){document.getElementById('map-count').textContent='地图点 '+points.length;if(map.isStyleLoaded()){const s=map.getSource('media');if(s)s.setData({type:'FeatureCollection',features:points});else install()}}
-function rebuildFolders(){const previous=folderKey,groups=new Map();allPoints.forEach(f=>{const p=f.properties||{},key=String(p.folderKey||'');if(!key)return;const g=groups.get(key)||{label:String(p.folderLabel||key),count:0,kinds:new Set()};g.count++;if(p.kind)g.kinds.add(String(p.kind));groups.set(key,g)});folderSelect.replaceChildren();const all=document.createElement('option');all.value='';all.textContent='全部文件夹（当前列表）';folderSelect.appendChild(all);Array.from(groups.entries()).sort((a,b)=>a[1].label.localeCompare(b[1].label,'zh-CN')).forEach(([key,g])=>{const option=document.createElement('option');option.value=key;option.textContent=g.label+'（'+g.count+'）';option.title=key;folderSelect.appendChild(option)});folderKey=groups.has(previous)?previous:'';folderSelect.value=folderKey}
-function applyFolder(fit){points=allPoints.filter(f=>{const p=f.properties||{};return folderKey?String(p.folderKey||'')===folderKey:(p.demo===true||p.demo==='true'||p.listVisible!==false&&p.listVisible!=='false')});updateMediaSource();if(fit)fitAll(false);const selected=folderSelect.selectedOptions[0];if(folderKey&&selected)document.getElementById('notice').textContent='文件夹：'+selected.textContent+'；视频与图片合并显示'}
-map.on('style.load',install);window.mediovaSetPoints=function(data,fit){allPoints=data.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.longitude,p.latitude]},properties:p}));rebuildFolders();applyFolder(fit)};
+function rebuildFolders(){folderSelect.replaceChildren();const all=document.createElement('option');all.value='';all.textContent='全部目录（'+folderData.reduce((n,g)=>n+Number(g.total||0),0)+'）';folderSelect.appendChild(all);folderData.forEach(g=>{const option=document.createElement('option');option.value=String(g.key||'');option.textContent=String(g.label||g.path||'目录')+'（总'+g.total+' · 视'+g.video+' · 图'+g.image+' · GPS'+g.located+'）';option.title=String(g.path||'');folderSelect.appendChild(option)});if(!folderData.some(g=>String(g.key||'')===folderKey))folderKey='';folderSelect.value=folderKey;folderChildren.checked=includeSubfolders}
+function inFolder(p){const key=String(p.folderKey||'').toLowerCase(),base=String(folderKey||'').toLowerCase();return key===base||(includeSubfolders&&key.startsWith(base+'\\'))}
+function applyFolder(fit){points=allPoints.filter(f=>{const p=f.properties||{};return folderKey?inFolder(p):(p.demo===true||p.demo==='true'||p.listVisible!==false&&p.listVisible!=='false')});updateMediaSource();if(fit)fitAll(false);const selected=folderSelect.selectedOptions[0];if(folderKey&&selected)document.getElementById('notice').textContent='目录：'+selected.textContent+'；列表与地图联动，视频和图片合并统计'}
+map.on('style.load',install);window.mediovaSetFolders=function(data,selectedKey,include){folderData=Array.isArray(data)?data:[];folderKey=String(selectedKey||'');includeSubfolders=!!include;rebuildFolders()};window.mediovaSetPoints=function(data,fit){allPoints=data.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.longitude,p.latitude]},properties:p}));applyFolder(fit)};
 window.mediovaSelection=function(ids,currentID){const selected=new Set((ids||[]).map(String)),current=String(currentID||'');let changed=false;allPoints.forEach(feature=>{const p=feature.properties||{},id=String(p.taskID||''),nextSelected=id!==''&&selected.has(id),nextCurrent=current!==''&&current!=='0'&&id===current;if(p.selected!==nextSelected||p.current!==nextCurrent){p.selected=nextSelected;p.current=nextCurrent;changed=true}});if(changed)applyFolder(false)};
 window.mediovaThumbnail=function(rawID){const id=String(rawID),version=(thumbVersions.get(id)||0)+1;thumbVersions.set(id,version);let changed=false;allPoints.forEach(feature=>{if(String(feature.properties.taskID||'')===id){feature.properties.hasThumbnail=true;changed=true}});document.querySelectorAll('img[data-task-id]').forEach(img=>{if(img.dataset.taskId===id){img.style.visibility='visible';img.src=BASE+'/thumb/'+encodeURIComponent(id)+'?v='+version}});if(!changed)return;clearTimeout(thumbTimer);thumbTimer=setTimeout(()=>applyFolder(false),160)};
 map.on('click','clusters',async e=>{const feature=e.features&&e.features[0];if(!feature)return;const source=map.getSource('media'),clusterID=feature.properties.cluster_id,current=map.getZoom(),total=Number(feature.properties.point_count)||1;try{const leaves=await source.getClusterLeaves(clusterID,Math.min(Math.max(total,1),5000),0),items=mediaItems(leaves),ids=items.filter(p=>p.taskID).map(p=>String(p.taskID));if(ids.length)post({type:'select',ids:ids});const expansion=await source.getClusterExpansionZoom(clusterID);if(current<13.75&&expansion>current+.1){map.easeTo({center:feature.geometry.coordinates,zoom:Math.min(expansion,15),duration:animationMs()});return}showMediaPopup(leaves,e.lngLat,total)}catch(_){}});
@@ -577,18 +580,21 @@ window.mediovaCache=function(bytes){document.getElementById('cache').textContent
 window.mediovaGeocode=function(text,running){geocoding=running;document.getElementById('notice').textContent=text;document.getElementById('geocode').style.display=running?'none':'';document.getElementById('geocode-stop').style.display=running?'':'none'};
 window.mediovaMode=function(next){mode=next;document.getElementById('online').classList.toggle('active',next==='online');document.getElementById('offline').classList.toggle('active',next==='offline');if(!geocoding)document.getElementById('notice').textContent=next==='online'?'在线模式仅缓存实际查看过的区域':'离线模式：未缓存区域不会联网';map.setStyle(BASE+'/ofm/styles/liberty?mode='+next+'&t='+Date.now())};
 let cameraTimer=null;map.on('moveend',()=>{clearTimeout(cameraTimer);cameraTimer=setTimeout(()=>{const c=map.getCenter();post({type:'camera',longitude:c.lng,latitude:c.lat,zoom:map.getZoom()})},900)});window.addEventListener('keydown',e=>{if(e.key==='Home'){e.preventDefault();fitAll(true)}else if((e.key==='f'||e.key==='F')&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();focusCurrent()}else if(e.key==='+'||e.key==='='){e.preventDefault();map.zoomIn({duration:animationMs()})}else if(e.key==='-'){e.preventDefault();map.zoomOut({duration:animationMs()})}else if(e.key==='Escape'&&mediaPopup){mediaPopup.remove();mediaPopup=null}});
-setInterval(()=>fetch(BASE+'/cache-status',{cache:'no-store'}).then(r=>r.json()).then(v=>window.mediovaCache(v.bytes)).catch(()=>{}),2000);folderSelect.onchange=()=>{folderKey=folderSelect.value;applyFolder(true)};document.getElementById('fit').onclick=()=>fitAll(true);document.getElementById('current').onclick=focusCurrent;document.getElementById('online').onclick=()=>post({type:'mode',mode:'online'});document.getElementById('offline').onclick=()=>post({type:'mode',mode:'offline'});document.getElementById('clear').onclick=()=>{if(confirm('清除全部离线地图缓存？照片、GPS、历史记录和设置不会受影响。'))post({type:'clear'})};document.getElementById('geocode').onclick=()=>post({type:'geocode-all'});document.getElementById('geocode-stop').onclick=()=>post({type:'geocode-stop'});document.getElementById('geocode-clear').onclick=()=>post({type:'geocode-clear'});post({type:'ready'});
+setInterval(()=>fetch(BASE+'/cache-status',{cache:'no-store'}).then(r=>r.json()).then(v=>window.mediovaCache(v.bytes)).catch(()=>{}),2000);function postFolder(){post({type:'folder',folderKey:folderKey,includeSubfolders:includeSubfolders})}folderSelect.onchange=()=>{folderKey=folderSelect.value;applyFolder(true);postFolder()};folderChildren.onchange=()=>{includeSubfolders=folderChildren.checked;applyFolder(true);postFolder()};document.getElementById('folder-select-all').onclick=()=>post({type:'folder-action',action:'select'});document.getElementById('folder-convert').onclick=()=>post({type:'folder-action',action:'convert'});document.getElementById('folder-open').onclick=()=>post({type:'folder-action',action:'source'});document.getElementById('folder-output').onclick=()=>post({type:'folder-action',action:'output'});document.getElementById('fit').onclick=()=>fitAll(true);document.getElementById('current').onclick=focusCurrent;document.getElementById('online').onclick=()=>post({type:'mode',mode:'online'});document.getElementById('offline').onclick=()=>post({type:'mode',mode:'offline'});document.getElementById('clear').onclick=()=>{if(confirm('清除全部离线地图缓存？照片、GPS、历史记录和设置不会受影响。'))post({type:'clear'})};document.getElementById('geocode').onclick=()=>post({type:'geocode-all'});document.getElementById('geocode-stop').onclick=()=>post({type:'geocode-stop'});document.getElementById('geocode-clear').onclick=()=>post({type:'geocode-clear'});post({type:'ready'});
 </script></body></html>`
 }
 
 type mapRuntimeMessage struct {
-	Type      string   `json:"type"`
-	Mode      string   `json:"mode"`
-	IDs       []string `json:"ids"`
-	Demo      string   `json:"demo"`
-	Latitude  float64  `json:"latitude"`
-	Longitude float64  `json:"longitude"`
-	Zoom      float64  `json:"zoom"`
+	Type              string   `json:"type"`
+	Mode              string   `json:"mode"`
+	FolderKey         string   `json:"folderKey"`
+	Action            string   `json:"action"`
+	IncludeSubfolders bool     `json:"includeSubfolders"`
+	IDs               []string `json:"ids"`
+	Demo              string   `json:"demo"`
+	Latitude          float64  `json:"latitude"`
+	Longitude         float64  `json:"longitude"`
+	Zoom              float64  `json:"zoom"`
 }
 
 func (r *mapRuntime) selectTaskIDs(ids []string) int {
@@ -662,6 +668,11 @@ func (r *mapRuntime) onMessage(raw string) {
 			}
 			r.browser.Eval("window.mediovaMode(" + strconv.Quote(mode) + ")")
 			setText(r.app.hStatusText, map[string]string{"online": "地图已切换为 OpenFreeMap 在线模式；只缓存实际查看区域。", "offline": "地图已切换为离线模式；未缓存区域不会联网。"}[mode])
+		case "folder":
+			r.app.v455SetFolderFilter(msg.FolderKey, msg.IncludeSubfolders)
+			r.pushPoints(true)
+		case "folder-action":
+			r.app.v455FolderAction(msg.Action)
 		case "demo":
 			r.app.toggleMapDemo()
 			r.pushPoints(true)
@@ -736,7 +747,33 @@ func (r *mapRuntime) pushPoints(fit bool) {
 	if err != nil {
 		return
 	}
-	r.browser.Eval("window.mediovaSetPoints(" + string(data) + "," + strconv.FormatBool(fit) + ")")
+	pointSum := sha256.Sum256(data)
+	pointState := hex.EncodeToString(pointSum[:])
+	r.mu.Lock()
+	pointsUnchanged := pointState == r.pointState
+	if !pointsUnchanged || fit {
+		r.pointState = pointState
+	}
+	r.mu.Unlock()
+	folders, folderErr := json.Marshal(r.app.currentMapFolders())
+	if folderErr == nil {
+		r.app.mu.Lock()
+		folderKey, include := r.app.folderFilterKey, r.app.folderIncludeSubdirs
+		r.app.mu.Unlock()
+		folderState := string(folders) + "\x00" + folderKey + "\x00" + strconv.FormatBool(include)
+		r.mu.Lock()
+		changed := folderState != r.folderState
+		if changed {
+			r.folderState = folderState
+		}
+		r.mu.Unlock()
+		if changed {
+			r.browser.Eval("window.mediovaSetFolders(" + string(folders) + "," + strconv.Quote(folderKey) + "," + strconv.FormatBool(include) + ")")
+		}
+	}
+	if !pointsUnchanged || fit {
+		r.browser.Eval("window.mediovaSetPoints(" + string(data) + "," + strconv.FormatBool(fit) + ")")
+	}
 }
 func (r *mapRuntime) registerThumbnail(taskID int64, path string) {
 	if r == nil || r.browser == nil || taskID <= 0 || strings.TrimSpace(path) == "" {

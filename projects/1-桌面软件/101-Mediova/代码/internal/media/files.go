@@ -148,6 +148,54 @@ func ResolveOutputPath(input, root, outputDir string, kind model.Kind, opts mode
 	return ResolveOutputPathAvoiding(input, root, outputDir, kind, opts, settings, nil)
 }
 
+// PlanOutputPath applies the same naming, tree-preservation and conflict rules
+// as the converter without creating any directory. Inspecting a plan therefore
+// never mutates the output tree.
+func PlanOutputPath(input, root, outputDir string, kind model.Kind, opts model.TaskOptions, settings model.Settings) (path string, skip bool, err error) {
+	base := strings.TrimSuffix(filepath.Base(input), filepath.Ext(input))
+	ext := OutputExtension(kind, opts)
+	if settings.FilenameMode == "添加规格后缀" {
+		if kind == model.KindVideo {
+			codec := strings.ReplaceAll(opts.Codec, ".", "")
+			base += "_" + sanitizeSuffix(opts.Resolution) + "_" + sanitizeSuffix(codec)
+		} else {
+			base += "_" + sanitizeSuffix(opts.ImageSize)
+		}
+	}
+	root, outputPrefix := ResolveRootContext(input, root, settings.LastInputDir)
+	outputDir = OutputRootWithPrefix(outputDir, outputPrefix)
+	dir := outputDir
+	if root != "" {
+		rel, relErr := filepath.Rel(root, filepath.Dir(input))
+		if relErr == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			dir = filepath.Join(outputDir, rel)
+		}
+	}
+	candidate := filepath.Join(dir, base+ext)
+	if filepath.Clean(candidate) == filepath.Clean(input) {
+		candidate = filepath.Join(dir, base+"_converted"+ext)
+	}
+	exists := func(candidate string) bool {
+		_, statErr := os.Stat(candidate)
+		return statErr == nil || !os.IsNotExist(statErr)
+	}
+	if !exists(candidate) {
+		return candidate, false, nil
+	}
+	switch settings.ConflictPolicy {
+	case "覆盖已有":
+		return candidate, false, nil
+	case "跳过已有":
+		return candidate, true, nil
+	}
+	for i := 1; ; i++ {
+		next := filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, i, ext))
+		if !exists(next) {
+			return next, false, nil
+		}
+	}
+}
+
 // ResolveOutputPathAvoiding is the concurrency-safe form used by the queue. The
 // unavailable callback marks paths already reserved by another worker, even when
 // the file has not yet been created on disk.

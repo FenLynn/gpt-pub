@@ -270,44 +270,44 @@ type application struct {
 	floatingProgress                                                                                                                                                           float64
 	floatingPinVisible, floatingPaused                                                                                                                                         bool
 
-	mu                     sync.Mutex
-	componentMu            sync.RWMutex
-	tasks                  []*model.Task
-	visible                []int
-	sortActive             bool
-	sortColumn             int
-	sortDescending         bool
-	pendingSelection       map[int64]bool
-	concurrencyCommands    map[int]int
-	nextID                 atomic.Int64
-	currentKind            model.Kind
-	settings               model.Settings
-	ffmpeg, ffprobe        string
-	hardware               media.Hardware
-	player                 string
-	playerOK               bool
-	rightVisible           bool
-	overallProgress        float64
-	overallText            string
-	overallPaused          bool
-	footerElapsedText      string
-	footerRemainingText    string
-	messageMarquee         int32
-	messageMarqueeSpan     int32
-	messageMarqueeHold     int
-	hoverControl           uintptr
-	runtimeNotice          string
-	queueWake              chan struct{}
-	queueSequence          atomic.Int64
-	taskCancels            map[int64]context.CancelFunc
-	holdRequests           map[int64]bool
-	removeRequests         map[int64]bool
-	immediateRestarts      map[int64]bool
-	heldEditTaskID         int64
-	rightDraftFields       map[int]bool
-	rightUpdating          bool
-	kindSwitching          bool
-	kindSwitchGeneration   uintptr
+	mu                   sync.Mutex
+	componentMu          sync.RWMutex
+	tasks                []*model.Task
+	visible              []int
+	sortActive           bool
+	sortColumn           int
+	sortDescending       bool
+	pendingSelection     map[int64]bool
+	concurrencyCommands  map[int]int
+	nextID               atomic.Int64
+	currentKind          model.Kind
+	settings             model.Settings
+	ffmpeg, ffprobe      string
+	hardware             media.Hardware
+	player               string
+	playerOK             bool
+	rightVisible         bool
+	overallProgress      float64
+	overallText          string
+	overallPaused        bool
+	footerElapsedText    string
+	footerRemainingText  string
+	messageMarquee       int32
+	messageMarqueeSpan   int32
+	messageMarqueeHold   int
+	hoverControl         uintptr
+	runtimeNotice        string
+	queueWake            chan struct{}
+	queueSequence        atomic.Int64
+	taskCancels          map[int64]context.CancelFunc
+	holdRequests         map[int64]bool
+	removeRequests       map[int64]bool
+	immediateRestarts    map[int64]bool
+	heldEditTaskID       int64
+	rightDraftFields     map[int]bool
+	rightUpdating        bool
+	kindSwitching        bool
+	kindSwitchGeneration uintptr
 	rightSelectionKey      string
 	filterOptionsKey       string
 	volumeFilterOptionsKey string
@@ -355,6 +355,18 @@ type application struct {
 	trayAdded               bool
 	closeHintShown          bool
 	lastSummaryPath         string
+	lastOutputPlanPath      string
+	lastImportOverview      v455ImportOverview
+	lastRecognition         v455RecognitionStats
+	lastBatchResult         v455BatchResult
+	statusCenterKind        string
+	specialTaskFilter       string
+	specialTaskIDs          map[int64]bool
+	lastBatchTaskIDs        map[int64]bool
+	folderFilterKey         string
+	folderFilterPath        string
+	folderIncludeSubdirs    bool
+	fileSignatureIndex      map[string]string
 	benchmarkRunning        atomic.Bool
 	controlsReady           bool
 	initializing            bool
@@ -367,6 +379,7 @@ type application struct {
 	mapDemo                 bool
 	mapSelectedDemo         string
 	mapFeatureEnabled       atomic.Bool
+	mapPushPending          bool
 }
 
 // activeQueueRun is deliberately scoped to one media kind. The workers are
@@ -977,6 +990,17 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 				procKillTimer.Call(hwnd, TIMER_LIST_BUILD)
 			}
 			return 0
+		case TIMER_MAP_PUSH:
+			procKillTimer.Call(hwnd, TIMER_MAP_PUSH)
+			if app != nil {
+				app.mapPushPending = false
+				if app.mapFeaturesEnabled() && app.viewMode != mapViewList {
+					if runtime := mapRuntimeFor(app); runtime != nil {
+						runtime.pushPoints(false)
+					}
+				}
+			}
+			return 0
 		case TIMER_MAIN_CLOCK:
 			app.refreshTotal()
 			return 0
@@ -1081,6 +1105,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) (result uintp
 		procKillTimer.Call(hwnd, TIMER_PROGRESS_FLUSH)
 		procKillTimer.Call(hwnd, TIMER_PROBE_FLUSH)
 		procKillTimer.Call(hwnd, TIMER_LIST_BUILD)
+		procKillTimer.Call(hwnd, TIMER_MAP_PUSH)
 		if app != nil && app.hFloating != 0 {
 			procDestroyWindow.Call(app.hFloating)
 		}
@@ -1819,6 +1844,7 @@ func (a *application) initMenus() {
 	appendMenu(file, MF_STRING, ID_FILE_EXPORT_TASKS, "导出当前工作区任务清单 CSV")
 	appendMenu(file, MF_STRING, ID_FILE_EXPORT_QUEUE_JSON, "导出当前工作区任务队列 JSON")
 	appendMenu(file, MF_STRING, ID_FILE_IMPORT_QUEUE_JSON, "导入任务队列 JSON...")
+	appendMenu(file, MF_STRING, ID_V455_OUTPUT_PLAN, "查看当前输出计划...")
 	appendMenu(file, MF_SEPARATOR, 0, "")
 	appendMenu(file, MF_STRING, ID_FILE_EXIT, "隐藏到系统托盘")
 	edit, _, _ := procCreatePopupMenu.Call()
@@ -1954,6 +1980,7 @@ func (a *application) initMenus() {
 	appendMenu(view, MF_STRING|MF_CHECKED, ID_VIEW_PERFORMANCE, "显示速度与体积统计")
 	appendMenu(view, MF_SEPARATOR, 0, "")
 	appendMenu(view, MF_STRING, ID_VIEW_RESET_COLUMNS, "恢复任务列表默认列宽")
+	appendMenu(view, MF_STRING, ID_V455_FOLDER_CLEAR, "清除地图目录筛选")
 	history, _, _ := procCreatePopupMenu.Call()
 	appendMenu(history, MF_STRING, ID_HISTORY_VIEW, "查看最近转换记录...")
 	appendMenu(history, MF_STRING, ID_HISTORY_FAILURES, "失败任务中心...")
@@ -2243,6 +2270,7 @@ func comboFill(hwnd uintptr, values []string, selected string) {
 	}
 	send(hwnd, CB_SETCURSEL, uintptr(pick), 0)
 }
+
 func comboText(hwnd uintptr) string {
 	i := int(send(hwnd, CB_GETCURSEL, 0, 0))
 	if i < 0 {
@@ -2765,6 +2793,9 @@ func (a *application) layout(w, h int32) {
 	a.setMapBottomControlsVisible(a.viewMode == mapViewList)
 }
 func (a *application) command(id int) {
+	if a.v455HandleCommand(id) {
+		return
+	}
 	if workers, ok := a.concurrencyCommands[id]; ok {
 		a.settings.AutoConcurrency = false
 		a.settings.Concurrency = config.NormalizeConcurrency(workers)
@@ -3743,7 +3774,7 @@ func (a *application) showContextMenu() {
 		return
 	}
 	type selectionState struct {
-		hasOutput, hasReady, hasRetry, hasProblem bool
+		hasOutput, hasReady, hasRetry, hasProblem, hasRecognized, hasPreviousOutput bool
 	}
 	state := selectionState{}
 	a.mu.Lock()
@@ -3756,6 +3787,8 @@ func (a *application) showContextMenu() {
 		state.hasReady = state.hasReady || task.Status == model.StatusReady
 		state.hasRetry = state.hasRetry || recoverableTaskStatus(task.Status) || task.Status == model.StatusDone
 		state.hasProblem = state.hasProblem || task.Error != "" || task.ValidationWarning != ""
+		state.hasRecognized = state.hasRecognized || task.PreviouslyConverted || task.DuplicateOf != ""
+		state.hasPreviousOutput = state.hasPreviousOutput || media.FileSize(task.PreviousOutput) > 0
 	}
 	a.mu.Unlock()
 
@@ -3795,6 +3828,15 @@ func (a *application) showContextMenu() {
 	appendMenu(m, MF_STRING, ID_CTX_OPEN_SOURCE, "打开源文件所在文件夹")
 	if state.hasOutput {
 		appendMenu(m, MF_STRING, ID_CTX_OPEN_OUTPUT, "打开输出文件夹")
+	}
+	if state.hasRecognized {
+		recognition, _, _ := procCreatePopupMenu.Call()
+		if state.hasPreviousOutput {
+			appendMenu(recognition, MF_STRING, ID_V455_OPEN_PREVIOUS, "打开此前转换输出")
+			appendMenu(recognition, MF_STRING, ID_V455_SKIP_RECOGNIZED, "使用历史输出并跳过转换")
+		}
+		appendMenu(recognition, MF_STRING, ID_V455_RECONVERT, "忽略提示，仍然重新转换")
+		appendMenu(m, MF_POPUP, recognition, "导入识别")
 	}
 	appendMenu(m, MF_SEPARATOR, 0, "")
 
@@ -4050,6 +4092,8 @@ func (a *application) chooseFolder(add bool) {
 			}
 			paths := append(append([]string{}, result.Videos...), result.Images...)
 			videoAdded, imageAdded, duplicate := a.addPaths(paths, media.ImportTreeRoot(folder))
+			recognition := a.v455LastRecognition()
+			a.v455RememberImport(v455ImportOverview{Video: videoAdded, Image: imageAdded, Folders: v455FolderSet(paths), ExactDuplicates: duplicate, Unsupported: result.Unsupported, Unreadable: result.Unreadable}, recognition)
 			msg := fmt.Sprintf("导入完成：视频 %d 个，图片 %d 个", videoAdded, imageAdded)
 			if duplicate > 0 {
 				msg += fmt.Sprintf("，重复 %d 个", duplicate)
@@ -4059,6 +4103,12 @@ func (a *application) chooseFolder(add bool) {
 			}
 			if result.Unreadable > 0 {
 				msg += fmt.Sprintf("，无法读取 %d 项", result.Unreadable)
+			}
+			if recognition.SuspectedDuplicate > 0 {
+				msg += fmt.Sprintf("，疑似重复 %d 个", recognition.SuspectedDuplicate)
+			}
+			if recognition.PreviouslyConverted > 0 {
+				msg += fmt.Sprintf("，此前已转换 %d 个", recognition.PreviouslyConverted)
 			}
 			a.showImportToast(msg)
 		})
@@ -4244,12 +4294,19 @@ func (a *application) processDroppedPaths(files []string, recursive bool) {
 	scan := media.ScanDroppedPaths(files, recursive)
 	a.postUI(func() {
 		totalVideo, totalImage, totalDuplicate := 0, 0, 0
+		totalRecognition := v455RecognitionStats{}
+		allPaths := make([]string, 0)
 		for _, group := range scan.Groups {
 			v, i, d := a.addPaths(group.Paths, group.Root)
 			totalVideo += v
 			totalImage += i
 			totalDuplicate += d
+			recognition := a.v455LastRecognition()
+			totalRecognition.SuspectedDuplicate += recognition.SuspectedDuplicate
+			totalRecognition.PreviouslyConverted += recognition.PreviouslyConverted
+			allPaths = append(allPaths, group.Paths...)
 		}
+		a.v455RememberImport(v455ImportOverview{Video: totalVideo, Image: totalImage, Folders: v455FolderSet(allPaths), ExactDuplicates: totalDuplicate, Unsupported: scan.Unsupported, Unreadable: scan.Unreadable, ScanErrors: scan.ScanErrors}, totalRecognition)
 		msg := fmt.Sprintf("导入完成：视频 %d 个，图片 %d 个", totalVideo, totalImage)
 		if totalDuplicate > 0 {
 			msg += fmt.Sprintf("，重复 %d 个", totalDuplicate)
@@ -4262,6 +4319,12 @@ func (a *application) processDroppedPaths(files []string, recursive bool) {
 		}
 		if scan.ScanErrors > 0 {
 			msg += fmt.Sprintf("，文件夹扫描失败 %d 个", scan.ScanErrors)
+		}
+		if totalRecognition.SuspectedDuplicate > 0 {
+			msg += fmt.Sprintf("，疑似重复 %d 个", totalRecognition.SuspectedDuplicate)
+		}
+		if totalRecognition.PreviouslyConverted > 0 {
+			msg += fmt.Sprintf("，此前已转换 %d 个", totalRecognition.PreviouslyConverted)
 		}
 		if totalVideo+totalImage > 0 {
 			a.showImportToast(msg)
@@ -4287,9 +4350,22 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 		return 0, 0, 0
 	}
 	sort.Strings(paths)
+	historyIndex := v455HistoryIndex()
+	recognition := v455RecognitionStats{}
 	_, ffprobe, _, _, _ := a.componentSnapshot()
 	a.mu.Lock()
 	existing := map[string]*model.Task{}
+	if a.fileSignatureIndex == nil {
+		a.fileSignatureIndex = make(map[string]string)
+		for _, task := range a.tasks {
+			if task != nil {
+				if signature := v455FileSignature(task.Input); signature != "" {
+					a.fileSignatureIndex[signature] = task.Input
+				}
+			}
+		}
+	}
+	signatureOwners := a.fileSignatureIndex
 	for _, t := range a.tasks {
 		if t != nil {
 			existing[strings.ToLower(filepath.Clean(t.Input))] = t
@@ -4319,13 +4395,28 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 			}
 			continue
 		}
+		actualSize := media.FileSize(path)
+		signature := v455FileSignature(path)
+		duplicateOf := ""
+		if owner := signatureOwners[signature]; signature != "" && owner != "" && v455CleanPath(owner) != key && existing[v455CleanPath(owner)] != nil {
+			duplicateOf = owner
+			recognition.SuspectedDuplicate++
+		}
+		previouslyConverted, previousOutput := false, ""
+		if record, ok := historyIndex[key]; ok && v455HistoryMatches(record, path, actualSize) {
+			previouslyConverted, previousOutput = true, record.Output
+			recognition.PreviouslyConverted++
+		}
 		inputSize := int64(0)
 		if !deferFileSizes {
-			inputSize = media.FileSize(path)
+			inputSize = actualSize
 		}
-		t := &model.Task{ID: a.nextID.Add(1), Input: path, Root: root, Kind: kind, Status: model.StatusReady, InputSize: inputSize, Options: a.settings.DefaultOptions(kind), ThumbnailIndex: -1}
+		t := &model.Task{ID: a.nextID.Add(1), Input: path, Root: root, Kind: kind, Status: model.StatusReady, InputSize: inputSize, DuplicateOf: duplicateOf, PreviouslyConverted: previouslyConverted, PreviousOutput: previousOutput, Options: a.settings.DefaultOptions(kind), ThumbnailIndex: -1}
 		a.tasks = append(a.tasks, t)
 		existing[key] = t
+		if signature != "" {
+			signatureOwners[signature] = path
+		}
 		highlightIDs[t.ID] = true
 		if firstHighlightID == 0 {
 			firstHighlightID = t.ID
@@ -4344,6 +4435,7 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 		a.pendingSelection[id] = true
 	}
 	a.mu.Unlock()
+	a.v455RememberImport(v455ImportOverview{Video: videoAdded, Image: imageAdded, Folders: v455FolderSet(paths), ExactDuplicates: duplicates}, recognition)
 
 	a.currentKind = workspaceFocusKind(videoTouched, imageTouched, a.currentKind)
 	added := videoAdded + imageAdded
@@ -4360,7 +4452,14 @@ func (a *application) addPaths(paths []string, root string) (videoAdded, imageAd
 	if len(highlightIDs) > bulkSelectionLimit {
 		selectionNotice = "批量导入仅定位第一项，避免千级选择阻塞界面。"
 	}
-	setText(a.hStatusText, fmt.Sprintf("已自动分流：视频 %d 个，图片 %d 个；%s", videoAdded, imageAdded, selectionNotice))
+	recognitionText := ""
+	if recognition.SuspectedDuplicate > 0 {
+		recognitionText += fmt.Sprintf("，疑似重复 %d 个", recognition.SuspectedDuplicate)
+	}
+	if recognition.PreviouslyConverted > 0 {
+		recognitionText += fmt.Sprintf("，此前已转换 %d 个", recognition.PreviouslyConverted)
+	}
+	setText(a.hStatusText, fmt.Sprintf("已自动分流：视频 %d 个，图片 %d 个%s；%s", videoAdded, imageAdded, recognitionText, selectionNotice))
 	a.saveSession()
 	a.refreshAll()
 	if ffprobe != "" {
@@ -5038,7 +5137,7 @@ func (a *application) refreshStatusFilterOptions() {
 	for i, entry := range volumeEntries {
 		volumeValues[i] = fmt.Sprintf("%s(%d)", entry, volumeCounts[entry])
 	}
-	key := strings.Join(values, "\x00") + "\x01" + strings.Join(volumeValues, "\x00")
+	key := string(kind) + "\x02" + strings.Join(values, "\x00") + "\x01" + strings.Join(volumeValues, "\x00")
 	if key == a.filterOptionsKey {
 		return
 	}
@@ -5068,6 +5167,13 @@ func (a *application) refreshStatusFilterOptions() {
 }
 
 func (a *application) refreshList() {
+	if a == nil {
+		return
+	}
+	// A native ListView/ComboBox notification can re-enter this method while
+	// the current list is being rebuilt.  Finish the active build first, then
+	// perform one coalesced refresh instead of rebuilding the control from a
+	// transient filter selection.
 	a.refreshStatusFilterOptions()
 	selectedIDs := a.selectedTaskIDsSnapshot()
 	if a.listBuild != nil {
@@ -5087,6 +5193,13 @@ func (a *application) refreshList() {
 	if volumeFilter == volumeFilterAll {
 		volumeFilter = ""
 	}
+	a.mu.Lock()
+	folderFilterPath, folderIncludeSubdirs, specialTaskFilter := a.folderFilterPath, a.folderIncludeSubdirs, a.specialTaskFilter
+	var specialTaskIDs map[int64]bool
+	if a.specialTaskIDs != nil {
+		specialTaskIDs = copyTaskIDSet(a.specialTaskIDs)
+	}
+	a.mu.Unlock()
 
 	// ListView SendMessage calls can synchronously emit WM_NOTIFY. Never keep
 	// a.mu held while rebuilding the control, because the notification path
@@ -5108,6 +5221,12 @@ func (a *application) refreshList() {
 			continue
 		}
 		if !taskMatchesStatusFilter(t, filter) {
+			continue
+		}
+		if !v455PathInFolder(t.Input, folderFilterPath, folderIncludeSubdirs) || !v455TaskMatchesSpecialFilter(t, specialTaskFilter) {
+			continue
+		}
+		if specialTaskIDs != nil && !specialTaskIDs[t.ID] {
 			continue
 		}
 		rows = append(rows, listRowSnapshot{index: idx, task: *t})
@@ -5211,6 +5330,12 @@ func (a *application) taskTexts(t *model.Task) []string {
 		status += " · " + short(t.Error, 45)
 	} else if t.ValidationWarning != "" {
 		status += " · 校验警告"
+	}
+	if t.PreviouslyConverted {
+		status += " · 此前已转换"
+	}
+	if t.DuplicateOf != "" {
+		status += " · 疑似重复"
 	}
 	name := filepath.Base(t.Input)
 	if t.Pinned {
@@ -6274,8 +6399,8 @@ func (a *application) confirmBatchPreview(only map[int64]bool) bool {
 	if strategy == "" {
 		strategy = a.settings.ConflictPolicy
 	}
-	text := fmt.Sprintf("即将处理 %d 个%s任务。\r\n\r\n输出目录：%s\r\n冲突策略：%s\r\n检测到已有目标：%d 个\r\n预计输出体积：约 %s\r\n\r\n是否开始？", len(items), kind, outputRoot, strategy, conflicts, media.FormatBytes(estimated))
-	return messageBox(a.hwnd, "批量处理预览", text, MB_YESNO|MB_ICONQUESTION) == IDYES
+	text := fmt.Sprintf("即将处理 %d 个%s任务。\r\n\r\n输出目录：%s\r\n冲突策略：%s\r\n检测到已有目标：%d 个\r\n预计输出体积：约 %s", len(items), kind, outputRoot, strategy, conflicts, media.FormatBytes(estimated))
+	return a.v455ConfirmPlan(only, text)
 }
 
 func (a *application) startQueueFiltered(only map[int64]bool) {
@@ -6777,6 +6902,7 @@ func (a *application) finishRun() {
 		}
 	}
 	a.mu.Unlock()
+	a.v455SetBatchResult(summaryTasks)
 	if len(reconciled) > 0 {
 		writeCrashContext("queue integrity reconciliation", fmt.Errorf("%d tasks lacked terminal results: %v", len(reconciled), reconciled))
 	}

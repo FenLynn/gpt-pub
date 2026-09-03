@@ -54,9 +54,10 @@ func TestMapHTMLProvidesBoundedMediaNavigation(t *testing.T) {
 		"String(p.taskID)",
 		"img.dataset.taskId=id",
 		`id="folder"`,
-		"全部文件夹（当前列表）",
-		"folderKey?String(p.folderKey||'')===folderKey",
-		"视频与图片合并显示",
+		"全部目录",
+		"window.mediovaSetFolders",
+		"includeSubfolders",
+		"列表与地图联动",
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("map HTML missing %q", required)

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const v452Round3ManifestSHA256 = "0a6f5b5ca75a0b6e3627fb71a76817d6fb24160ab31f6475be15e97a785fbbde"
+const v452Round3ManifestSHA256 = "822afb8543e1e1102a731ef0a86dc18b0f238a9b79448be9f43e76d526d1741e"
 
 const v452Round3ListVisualSupersededByRound11 = "cmd/mediaworkbench/v452_list_visual_windows.go"
 

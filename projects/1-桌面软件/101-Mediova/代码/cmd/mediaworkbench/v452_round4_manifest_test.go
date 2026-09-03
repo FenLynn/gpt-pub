@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const v452Round4ManifestSHA256 = "7069e1cb227f8aead44a936c60a96bcccbc6bc939852ae381edf96b45c228f7b"
+const v452Round4ManifestSHA256 = "1e902434889d90d6c7bcc9a353a0bfa42a9ef8b795c5c2cfd0961c2d699af4c3"
 
 func TestV452Round4FixedManifest(t *testing.T) {
 	manifest := filepath.Join("..", "..", "V452_ROUND4_TRIM_EDITOR_FILES_SHA256.txt")
