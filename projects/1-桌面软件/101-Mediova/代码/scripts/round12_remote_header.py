@@ -16,7 +16,7 @@ LVM_GETSUBITEMRECT = LVM_FIRST + 56
 LVIR_BOUNDS = 0
 HDI_TEXT = 0x0002
 
-EXPECTED_CAPTIONS = ["#", "预览", "文件名", "分辨率", "时长", "方向", "输出分辨率", "质量", "旋转", "体积", "压缩后", "进度", "状态", "时间剪裁", "画面剪裁"]
+EXPECTED_CAPTIONS = ["#", "预览", "文件名", "分辨率", "时长", "方向", "位置", "输出分辨率", "质量", "旋转", "体积", "压缩后", "进度", "状态", "时间剪裁", "画面剪裁"]
 
 
 class HDITEMW(ctypes.Structure):
