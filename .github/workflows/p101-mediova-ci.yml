@@ -165,7 +165,7 @@ jobs:
         working-directory: projects/1-桌面软件/101-Mediova/代码
         run: |
           $ErrorActionPreference='Stop'
-          ./build_v4.5.2.ps1 -FFmpegBin $env:FFMPEG_BIN -SkipTests
+          ./build_v4.5.2.ps1 -FFmpegBin $env:FFMPEG_BIN -PackageZip -SkipTests
           if ($LASTEXITCODE -ne 0) { throw 'Mediova v4.5.2 Runtime build failed' }
           $build=Join-Path $PWD 'build'
           $runtime=Join-Path $build 'Runtime'
