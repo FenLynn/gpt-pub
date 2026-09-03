@@ -1,0 +1,55 @@
+name: Repository hygiene
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Reject generated binaries and oversized files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          forbidden=$(git ls-files -z | tr '\0' '\n' | grep -Ei '\.(exe|zip|7z|rar|msi|msix|msixbundle|appx)$' || true)
+          if [[ -n "$forbidden" ]]; then
+            echo 'Generated binaries/archives must be uploaded to a Release, not committed:'
+            echo "$forbidden"
+            exit 1
+          fi
+
+          generated=$(git ls-files -z | tr '\0' '\n' | grep -E '(^|/)(build-v[0-9]|node_modules|obj|bin)/|(^|/)MediovaData/' || true)
+          if [[ -n "$generated" ]]; then
+            echo 'Generated build/data directories must not be tracked:'
+            echo "$generated"
+            exit 1
+          fi
+
+          oversized=''
+          while IFS= read -r -d '' file; do
+            size=$(stat -c '%s' "$file")
+            if (( size > 52428800 )); then
+              oversized+="$file ($size bytes)"$'\n'
+            fi
+          done < <(git ls-files -z)
+          if [[ -n "$oversized" ]]; then
+            echo 'Files over 50 MiB must be stored outside Git:'
+            printf '%s' "$oversized"
+            exit 1
+          fi
+
+          echo 'Repository hygiene checks passed.'
