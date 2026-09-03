@@ -24,21 +24,24 @@ public sealed class TerminalFloatingWindow : Window
         MinWidth = 720;
         MinHeight = 420;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Background = new SolidColorBrush(Color.FromRgb(13, 19, 32));
+        Background = Brushes.Black;
         FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI");
         PreviewKeyDown += Window_PreviewKeyDown;
 
-        var root = new Grid();
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) });
+        var root = new Grid { Background = Brushes.Black };
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var header = new Grid { Background = new SolidColorBrush(Color.FromRgb(17, 26, 41)) };
+        var header = new Grid
+        {
+            Background = new SolidColorBrush(Color.FromRgb(10, 10, 10))
+        };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(new TextBlock
         {
             Text = string.IsNullOrWhiteSpace(title) ? "终端" : title,
-            Foreground = new SolidColorBrush(Color.FromRgb(220, 230, 245)),
+            Foreground = new SolidColorBrush(Color.FromRgb(242, 242, 242)),
             FontSize = 12.5,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(12, 0, 0, 0),
@@ -55,7 +58,7 @@ public sealed class TerminalFloatingWindow : Window
         var topmost = new CheckBox
         {
             Content = "置顶",
-            Foreground = new SolidColorBrush(Color.FromRgb(174, 193, 216)),
+            Foreground = new SolidColorBrush(Color.FromRgb(210, 210, 210)),
             FontSize = 11.2,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 10, 0)
@@ -77,7 +80,9 @@ public sealed class TerminalFloatingWindow : Window
 
         _contentHost = new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(13, 19, 32)),
+            Background = Brushes.Black,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(43, 43, 43)),
+            BorderThickness = new Thickness(0, 1, 0, 0),
             Child = terminalContent
         };
         Grid.SetRow(_contentHost, 1);
@@ -90,13 +95,14 @@ public sealed class TerminalFloatingWindow : Window
         return new Button
         {
             Content = text,
-            Height = 27,
+            Height = 28,
             MinWidth = width,
             Padding = new Thickness(10, 0, 10, 0),
-            Background = new SolidColorBrush(Color.FromRgb(26, 38, 56)),
-            Foreground = new SolidColorBrush(Color.FromRgb(199, 215, 235)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(48, 66, 91)),
+            Background = new SolidColorBrush(Color.FromRgb(26, 26, 26)),
+            Foreground = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(74, 74, 74)),
             BorderThickness = new Thickness(1),
+            FontWeight = FontWeights.SemiBold,
             Cursor = Cursors.Hand
         };
     }

@@ -1,0 +1,7 @@
+<Project>
+  <!--
+    v1.1.10 intentionally has no Dashboard publish target.
+    Dashboard is again owned by the primary WPF process and uses the existing
+    Microsoft.Web.WebView2 dependency already published with AtlasDesk.exe.
+  -->
+</Project>

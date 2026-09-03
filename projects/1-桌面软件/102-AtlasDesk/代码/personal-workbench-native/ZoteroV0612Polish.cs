@@ -8,6 +8,7 @@ namespace PersonalWorkbench;
 public partial class ZoteroLibraryControl
 {
     private bool _v0612DetailsAttached;
+    private Grid? _responsiveLibraryGrid;
 
     internal void EnableV0612DetailPolish()
     {
@@ -30,7 +31,54 @@ public partial class ZoteroLibraryControl
                 separator.Visibility = Visibility.Collapsed;
         }
 
+        AttachResponsiveLibraryLayout();
         ItemsList.SelectionChanged += (_, _) => QueueCompactAuthorRefresh();
+    }
+
+    private void AttachResponsiveLibraryLayout()
+    {
+        if (Content is not Grid root) return;
+        _responsiveLibraryGrid = root.Children
+            .OfType<Grid>()
+            .FirstOrDefault(grid => Grid.GetRow(grid) == 2 && grid.ColumnDefinitions.Count == 5);
+        if (_responsiveLibraryGrid is null) return;
+
+        SizeChanged += (_, _) => ApplyResponsiveLibraryLayout();
+        Loaded += (_, _) => ApplyResponsiveLibraryLayout();
+        ApplyResponsiveLibraryLayout();
+    }
+
+    private void ApplyResponsiveLibraryLayout()
+    {
+        if (_responsiveLibraryGrid is null || _responsiveLibraryGrid.ColumnDefinitions.Count != 5)
+            return;
+
+        var width = ActualWidth;
+        var leftWidth = width switch
+        {
+            < 900 => 156,
+            < 1080 => 178,
+            < 1240 => 196,
+            _ => 220
+        };
+        var rightWidth = width switch
+        {
+            < 900 => 320,
+            < 1080 => 338,
+            < 1240 => 370,
+            _ => 410
+        };
+        var gap = width < 1080 ? 5 : 7;
+
+        _responsiveLibraryGrid.ColumnDefinitions[0].Width = new GridLength(leftWidth);
+        _responsiveLibraryGrid.ColumnDefinitions[1].Width = new GridLength(gap);
+        _responsiveLibraryGrid.ColumnDefinitions[3].Width = new GridLength(gap);
+        _responsiveLibraryGrid.ColumnDefinitions[4].Width = new GridLength(rightWidth);
+
+        var compact = rightWidth <= 338;
+        DetailTitle.FontSize = compact ? 14.5 : 16;
+        if (DetailTitle.Parent is StackPanel header)
+            header.Margin = compact ? new Thickness(12, 10, 12, 9) : new Thickness(15, 13, 15, 11);
     }
 
     private void QueueCompactAuthorRefresh()

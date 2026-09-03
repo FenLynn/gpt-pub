@@ -19,8 +19,12 @@ public sealed class RecentFileRequestedEventArgs : EventArgs
 
 public partial class HomeDashboardControl : UserControl
 {
+    private const double CompactWidth = 930;
+    private const double DenseWidth = 720;
+
     private readonly AppSettings _settings;
-    private bool _loading;
+    private CancellationTokenSource? _refreshCancellation;
+    private long _refreshGeneration;
 
     public event EventHandler<HomeNavigationEventArgs>? NavigateRequested;
     public event EventHandler? GlobalSearchRequested;
@@ -33,63 +37,172 @@ public partial class HomeDashboardControl : UserControl
     {
         _settings = settings;
         InitializeComponent();
-        IsVisibleChanged += async (_, _) => { if (IsVisible) await RefreshAsync(); };
+        ConfigureMetricCard(PythonValue, "PROJECTS", "P");
+        ConfigureMetricCard(WorkspaceValue, "TASKS", "T");
+        Loaded += HomeDashboard_Loaded;
+        SizeChanged += HomeDashboard_SizeChanged;
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible)
+            {
+                ApplyResponsiveLayout();
+                _ = RefreshAsync();
+            }
+            else
+            {
+                CancelRefresh();
+            }
+        };
+        Unloaded += (_, _) => CancelRefresh();
     }
 
     public async Task RefreshAsync()
     {
-        if (_loading) return;
+        CancelRefresh();
+        var cancellation = new CancellationTokenSource();
+        _refreshCancellation = cancellation;
+        var generation = Interlocked.Increment(ref _refreshGeneration);
+
         try
         {
-            _loading = true;
             GreetingText.Text = BuildGreeting();
-            DateText.Text = DateTime.Now.ToString("yyyy 年 M 月 d 日  ·  dddd", System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
-            var root = _settings.WorkspaceRoot;
-            WorkspaceNameText.Text = Directory.Exists(root) ? new DirectoryInfo(root).Name : "尚未配置";
-            WorkspacePathText.Text = Directory.Exists(root) ? root : "在设置中选择目录";
+            DateText.Text = DateTime.Now.ToString(
+                "yyyy 年 M 月 d 日  ·  dddd",
+                System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
 
-            if (Uri.TryCreate(_settings.DashboardUrl, UriKind.Absolute, out var dashboardUri))
-            {
-                DashboardValue.Text = "已连接";
-                DashboardDetail.Text = dashboardUri.Host;
-            }
-            else
-            {
-                DashboardValue.Text = "未配置";
-                DashboardDetail.Text = "Cloudflare Pages";
-            }
+            var liveTasks = WorkbenchTaskHub.Current?.Tasks
+                .Select(item => new HomeTaskDescriptor(item.State, item.Title, item.CreatedAt))
+                .ToArray();
+            var snapshot = await HomeSnapshotService.ReadAsync(_settings, liveTasks, cancellation.Token);
+            if (generation != _refreshGeneration || cancellation.IsCancellationRequested)
+                return;
 
-            if (File.Exists(_settings.ZoteroDbPath))
-            {
-                ZoteroValue.Text = _settings.ZoteroLoadFullLibrary ? "全量模式" : $"校准 {_settings.EffectiveZoteroLimit} 条";
-                ZoteroDetail.Text = "数据库已连接";
-                try
-                {
-                    var snapshot = await ZoteroLibrary.ReadSnapshotAsync(_settings.ZoteroDbPath);
-                    ZoteroDetail.Text = $"文献库 {snapshot.ItemCount:N0} 条";
-                }
-                catch { }
-            }
-            else
-            {
-                ZoteroValue.Text = "未连接";
-                ZoteroDetail.Text = "只读文献库";
-            }
+            WorkspaceNameText.Text = snapshot.WorkspaceName;
+            WorkspacePathText.Text = snapshot.WorkspacePath;
 
-            var python = new List<string>();
-            if (!string.IsNullOrWhiteSpace(_settings.CondaPath) && File.Exists(_settings.CondaPath)) python.Add("Conda");
-            if (!string.IsNullOrWhiteSpace(_settings.UvPath) && File.Exists(_settings.UvPath)) python.Add("uv");
-            PythonValue.Text = python.Count == 0 ? "待检测" : string.Join(" + ", python);
-            PythonDetail.Text = python.Count == 0 ? "Conda / uv" : "环境工具已配置";
+            DashboardValue.Text = snapshot.DashboardConfigured ? "已连接" : "未配置";
+            DashboardDetail.Text = snapshot.DashboardHost;
 
-            _settings.RecentWorkspaceFiles ??= new List<string>();
-            var recent = _settings.RecentWorkspaceFiles.Where(File.Exists).Take(7).Select(path => new RecentWorkspaceItem(path)).ToList();
-            RecentFilesList.ItemsSource = recent;
-            WorkspaceValue.Text = $"{recent.Count:N0} 个最近文件";
-            WorkspaceDetail.Text = Directory.Exists(root) ? "Markdown / 代码 / 图片" : "等待选择目录";
+            ZoteroValue.Text = snapshot.ZoteroMode;
+            ZoteroDetail.Text = snapshot.ZoteroDetail;
+
+            PythonValue.Text = snapshot.PinnedProjectCount == 0 && snapshot.RecentProjectCount == 0
+                ? "尚无常用项目"
+                : $"{snapshot.PinnedProjectCount} 收藏 · {snapshot.RecentProjectCount} 最近";
+            PythonDetail.Text = snapshot.MissingProjectCount > 0
+                ? $"{snapshot.MissingProjectCount} 个保存路径失效"
+                : "项目状态来自已保存入口";
+
+            WorkspaceValue.Text = snapshot.ActiveTaskCount > 0
+                ? $"{snapshot.ActiveTaskCount} 个进行中"
+                : snapshot.TaskHistoryCount > 0 ? "当前空闲" : "尚无任务";
+            WorkspaceDetail.Text = snapshot.TaskHistoryCount == 0
+                ? "工具与任务共用历史"
+                : snapshot.LatestTaskLabel;
+
+            RecentFilesList.ItemsSource = snapshot.RecentWorkspaceFiles
+                .Select(path => new RecentWorkspaceItem(path))
+                .ToArray();
         }
-        catch (Exception ex) { App.Log("Home dashboard refresh failed: " + ex); }
-        finally { _loading = false; }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            App.Log("Home dashboard refresh failed: " + ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_refreshCancellation, cancellation))
+            {
+                _refreshCancellation = null;
+                cancellation.Dispose();
+            }
+        }
+    }
+
+    private void HomeDashboard_Loaded(object sender, RoutedEventArgs e) => ApplyResponsiveLayout();
+
+    private void HomeDashboard_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) >= 1)
+            ApplyResponsiveLayout();
+    }
+
+    private void ApplyResponsiveLayout()
+    {
+        var width = ActualWidth;
+        if (width <= 0 && Parent is FrameworkElement parent)
+            width = parent.ActualWidth;
+        if (width <= 0)
+            return;
+
+        var compact = width < CompactWidth;
+        var dense = width < DenseWidth;
+
+        HomeLayoutRoot.Margin = dense
+            ? new Thickness(10, 9, 10, 14)
+            : compact ? new Thickness(13, 11, 13, 16) : new Thickness(18, 14, 18, 18);
+
+        StatusGrid.Columns = compact ? 2 : 4;
+        var columns = StatusGrid.Columns;
+        for (var index = 0; index < StatusGrid.Children.Count; index++)
+        {
+            if (StatusGrid.Children[index] is not Border cell)
+                continue;
+
+            var lastInRow = (index + 1) % columns == 0;
+            var hasFollowingRow = index < StatusGrid.Children.Count - columns;
+            cell.Margin = new Thickness(
+                0,
+                0,
+                lastInRow ? 0 : 8,
+                hasFollowingRow ? 8 : 0);
+            cell.MinHeight = compact ? 60 : 62;
+        }
+
+        if (dense)
+        {
+            HeaderHorizontalSpacer.Width = new GridLength(0);
+            WorkspaceSummaryColumn.Width = new GridLength(1, GridUnitType.Star);
+            HeaderVerticalSpacer.Height = new GridLength(8);
+            Grid.SetColumn(WorkspaceSummary, 0);
+            Grid.SetRow(WorkspaceSummary, 2);
+        }
+        else
+        {
+            HeaderHorizontalSpacer.Width = new GridLength(compact ? 12 : 20);
+            WorkspaceSummaryColumn.Width = new GridLength(compact ? 240 : 300);
+            HeaderVerticalSpacer.Height = new GridLength(0);
+            Grid.SetRow(WorkspaceSummary, 0);
+            Grid.SetColumn(WorkspaceSummary, 2);
+        }
+
+        HomeActionPanel.ItemHeight = 30;
+        RecentWorkCard.MinHeight = compact ? 138 : 150;
+    }
+
+    private static void ConfigureMetricCard(TextBlock valueText, string label, string glyph)
+    {
+        if (valueText.Parent is not StackPanel textStack)
+            return;
+        var labelText = textStack.Children.OfType<TextBlock>().FirstOrDefault();
+        if (labelText is not null)
+            labelText.Text = label;
+        if (textStack.Parent is not Grid grid)
+            return;
+        var iconText = grid.Children.OfType<Border>()
+            .Select(border => border.Child)
+            .OfType<TextBlock>()
+            .FirstOrDefault();
+        if (iconText is not null)
+            iconText.Text = glyph;
+    }
+
+    private void CancelRefresh()
+    {
+        Interlocked.Increment(ref _refreshGeneration);
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
+        _refreshCancellation = null;
     }
 
     private string BuildGreeting()

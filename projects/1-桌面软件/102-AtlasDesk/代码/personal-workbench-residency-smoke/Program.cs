@@ -2,12 +2,20 @@ using PersonalWorkbench;
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 
 internal static class Program
 {
+    private static readonly string[] NavigationNames =
+    {
+        "HomeNav", "WorkspaceNav", "LibraryNav", "DevelopmentNav",
+        "ToolsNav", "DashboardNav", "TasksNav", "SettingsNav"
+    };
+
     private static string _phase = "not started";
 
     [STAThread]
@@ -47,6 +55,38 @@ internal static class Program
             AssertEnvironmentIdle(development, busyField,
                 "environment discovery started during normal startup");
 
+            SetPhase("opening explicit home surface");
+            if (window.FindName("HomeNav") is not RadioButton homeNav)
+                throw new InvalidOperationException("Home navigation button is unavailable.");
+            homeNav.IsChecked = true;
+            PumpDispatcher(TimeSpan.FromMilliseconds(350));
+            if (!pipeline.Experience.Home.IsLoaded)
+                throw new InvalidOperationException("Explicit home surface did not load.");
+
+            SetPhase("verifying physical compact adaptive layout");
+            AssertPhysicalCompactLayout(window, pipeline.Experience.Home);
+
+            SetPhase("verifying keyboard accessibility");
+            AssertKeyboardAccessibility(window, pipeline);
+
+            SetPhase("verifying structured core-page quality");
+            AssertCorePageQuality(window, pipeline);
+
+            SetPhase("verifying detached standard adaptive layout");
+            AssertDetachedHomeLayout(pipeline.Settings, 1320, 780, UiDensityMode.Standard, 4);
+
+            SetPhase("verifying detached spacious adaptive layout");
+            AssertDetachedHomeLayout(pipeline.Settings, 1500, 860, UiDensityMode.Spacious, 4);
+
+            SetPhase("opening converged diagnostics window");
+            var diagnostics = new DiagnosticsWindow(pipeline.Settings) { Owner = window };
+            diagnostics.Show();
+            PumpDispatcher(TimeSpan.FromMilliseconds(700));
+            AssertWindowAlive(diagnostics, "after opening converged diagnostics");
+            AssertStandaloneAccessibility(diagnostics, "diagnostics");
+            diagnostics.Close();
+            PumpDispatcher(TimeSpan.FromMilliseconds(150));
+
             SetPhase("opening Development project tab");
             if (window.FindName("DevelopmentNav") is not RadioButton developmentNav)
                 throw new InvalidOperationException("Development navigation button is unavailable.");
@@ -75,7 +115,7 @@ internal static class Program
 
             SetPhase("completed");
             Console.WriteLine(
-                "PASS AtlasDesk isolated process remained alive and environment discovery stayed lazy");
+                "PASS AtlasDesk isolated process remained alive, compact and detached wide layouts converged, core pages passed keyboard/structure audits, and environment discovery stayed lazy");
             return 0;
         }
         catch (Exception ex)
@@ -114,6 +154,159 @@ internal static class Program
                ?? throw new InvalidOperationException("DevelopmentControl is unavailable.");
     }
 
+    private static void AssertPhysicalCompactLayout(
+        MainWindow window,
+        HomeDashboardControl home)
+    {
+        window.WindowState = WindowState.Normal;
+        window.Width = 1100;
+        window.Height = 700;
+        PumpDispatcher(TimeSpan.FromMilliseconds(500));
+        window.UpdateLayout();
+        PumpDispatcher(TimeSpan.FromMilliseconds(150));
+        AssertWindowAlive(window, "after compact physical resize");
+
+        var snapshot = UiAdaptiveAuditService.Current
+            ?? throw new InvalidOperationException("UI adaptive audit did not publish a physical snapshot.");
+        var metrics = FindVisualChild<UniformGrid>(home)
+            ?? throw new InvalidOperationException("Home metric grid is unavailable in physical compact layout.");
+        if (snapshot.Mode != UiDensityMode.Compact || metrics.Columns != 2)
+        {
+            throw new InvalidOperationException(
+                $"Physical compact layout mismatch: window={window.ActualWidth:0}x{window.ActualHeight:0}; "
+                + $"snapshot={snapshot.WindowWidth:0}x{snapshot.WindowHeight:0}/{snapshot.Mode}; "
+                + $"metricColumns={metrics.Columns}.");
+        }
+        if (snapshot.ContentWidth <= 0 || snapshot.ContentHeight <= 0 || snapshot.DpiScale <= 0)
+            throw new InvalidOperationException("Physical compact audit published invalid geometry or DPI.");
+    }
+
+    private static void AssertKeyboardAccessibility(
+        MainWindow window,
+        WorkbenchFeaturePipeline pipeline)
+    {
+        var navigation = NavigationNames
+            .Select(name => window.FindName(name) as RadioButton
+                            ?? throw new InvalidOperationException("Navigation is unavailable: " + name))
+            .ToArray();
+
+        if (navigation.Any(item => !item.Focusable))
+            throw new InvalidOperationException("One or more navigation entries cannot receive keyboard focus.");
+        if (navigation.Count(item => item.IsTabStop) != 1)
+            throw new InvalidOperationException("NavigationTabStops != 1");
+        if (navigation.Any(item => item.FocusVisualStyle is null))
+            throw new InvalidOperationException("One or more navigation entries have no keyboard focus visual.");
+        if (navigation.Any(item => string.IsNullOrWhiteSpace(AutomationProperties.GetName(item))))
+            throw new InvalidOperationException("One or more navigation entries have no automation name.");
+
+        var snapshot = pipeline.Accessibility.AuditNow();
+        if (!snapshot.Healthy)
+            throw new InvalidOperationException("Initial accessibility audit failed: " + Describe(snapshot));
+    }
+
+    private static void AssertCorePageQuality(
+        MainWindow window,
+        WorkbenchFeaturePipeline pipeline)
+    {
+        foreach (var name in new[]
+                 {
+                     "HomeNav", "WorkspaceNav", "LibraryNav", "DevelopmentNav",
+                     "ToolsNav", "TasksNav", "SettingsNav"
+                 })
+        {
+            if (window.FindName(name) is not RadioButton navigation)
+                throw new InvalidOperationException("Core page navigation is unavailable: " + name);
+            navigation.IsChecked = true;
+            PumpDispatcher(TimeSpan.FromMilliseconds(420));
+            window.UpdateLayout();
+            PumpDispatcher(TimeSpan.FromMilliseconds(80));
+
+            var snapshot = pipeline.Accessibility.AuditNow();
+            if (snapshot.NavigationTabStops != 1
+                || snapshot.NavigationFocusableControls != NavigationNames.Length
+                || snapshot.MissingAutomationNames > 0
+                || snapshot.TinyTargets > 0
+                || snapshot.CriticalLayoutClips > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Core page quality audit failed for {name}: {Describe(snapshot)}");
+            }
+        }
+    }
+
+    private static void AssertStandaloneAccessibility(Window window, string label)
+    {
+        AccessibilityCoordinator.PrepareWindow(window);
+        window.UpdateLayout();
+        foreach (var button in Descendants<ButtonBase>(window))
+        {
+            if (!button.IsVisible || !button.IsEnabled || !IsIconOnly(button)) continue;
+            if (button.Focusable && button.FocusVisualStyle is null)
+                throw new InvalidOperationException(label + " icon button has no focus visual.");
+            if (string.IsNullOrWhiteSpace(AutomationProperties.GetName(button)))
+                throw new InvalidOperationException(label + " icon button has no automation name.");
+        }
+    }
+
+    private static string Describe(UiQualityAuditSnapshot snapshot)
+        => $"interactive={snapshot.InteractiveControls}; keyboard={snapshot.KeyboardFocusableControls}; "
+           + $"navFocusable={snapshot.NavigationFocusableControls}; navTabStops={snapshot.NavigationTabStops}; "
+           + $"unnamed={snapshot.MissingAutomationNames}; tiny={snapshot.TinyTargets}; "
+           + $"clips={snapshot.CriticalLayoutClips}; highContrast={snapshot.HighContrast}";
+
+    private static bool IsIconOnly(ButtonBase button)
+    {
+        if (button.Content is string text)
+            return string.IsNullOrWhiteSpace(text);
+        if (button.Content is TextBlock textBlock)
+            return string.IsNullOrWhiteSpace(textBlock.Text);
+        return button.Content is not null;
+    }
+
+    private static void AssertDetachedHomeLayout(
+        AppSettings settings,
+        double width,
+        double height,
+        UiDensityMode expectedMode,
+        int expectedMetricColumns)
+    {
+        var resolveMode = typeof(UiConvergenceCoordinator).GetMethod(
+            "ResolveMode",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(UiConvergenceCoordinator).FullName, "ResolveMode");
+        var applyHome = typeof(UiConvergenceCoordinator).GetMethod(
+            "ApplyHome",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(UiConvergenceCoordinator).FullName, "ApplyHome");
+
+        var resolvedMode = (UiDensityMode)(resolveMode.Invoke(null, new object[] { width, height })
+            ?? throw new InvalidOperationException("ResolveMode returned no value."));
+        if (resolvedMode != expectedMode)
+            throw new InvalidOperationException($"Detached mode mismatch: expected {expectedMode}, got {resolvedMode}.");
+
+        var home = new HomeDashboardControl(settings)
+        {
+            Width = width,
+            Height = height
+        };
+        home.Measure(new Size(width, height));
+        home.Arrange(new Rect(0, 0, width, height));
+        home.UpdateLayout();
+        applyHome.Invoke(null, new object[] { home, resolvedMode });
+        home.Measure(new Size(width, height));
+        home.Arrange(new Rect(0, 0, width, height));
+        home.UpdateLayout();
+
+        var metrics = FindVisualChild<UniformGrid>(home)
+            ?? throw new InvalidOperationException("Detached home metric grid is unavailable.");
+        if (metrics.Columns != expectedMetricColumns)
+        {
+            throw new InvalidOperationException(
+                $"Detached home columns mismatch at {width:0}x{height:0}: "
+                + $"expected {expectedMetricColumns}, got {metrics.Columns}.");
+        }
+    }
+
     private static void AssertEnvironmentIdle(
         DevelopmentControl development,
         FieldInfo busyField,
@@ -126,7 +319,7 @@ internal static class Program
     private static void AssertWindowAlive(Window window, string phase)
     {
         if (!window.IsLoaded || !window.IsVisible)
-            throw new InvalidOperationException("AtlasDesk main window closed " + phase + ".");
+            throw new InvalidOperationException("AtlasDesk window closed " + phase + ".");
     }
 
     private static void SetPhase(string value)
@@ -152,16 +345,18 @@ internal static class Program
     }
 
     private static T? FindVisualChild<T>(DependencyObject root) where T : DependencyObject
+        => Descendants<T>(root).FirstOrDefault();
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
     {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        int count;
+        try { count = VisualTreeHelper.GetChildrenCount(root); }
+        catch { yield break; }
+        for (var index = 0; index < count; index++)
         {
             var child = VisualTreeHelper.GetChild(root, index);
-            if (child is T match)
-                return match;
-            var nested = FindVisualChild<T>(child);
-            if (nested is not null)
-                return nested;
+            if (child is T match) yield return match;
+            foreach (var nested in Descendants<T>(child)) yield return nested;
         }
-        return null;
     }
 }

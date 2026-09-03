@@ -1,42 +1,273 @@
-AtlasDesk v1.0.0
+AtlasDesk v1.2.0 project cockpit
 
-AtlasDesk 1.0 is the first formal release of the stabilized Windows research and development workbench.
+This release turns Development → Project from a project list with detached footer actions into a daily-use selected-project cockpit. It reuses the existing workspace, terminal, project-context and read-only Zotero owners instead of adding a second execution chain.
 
-Core workbench
-- A bounded project workflow connects project selection, workspace, terminal, Git status, environment markers and recent files.
-- Projects can be pinned, reopened from recent history and explicitly relocated when saved paths move.
-- The native ConPTY terminal remains isolated behind AtlasDesk.TerminalHost.exe and does not store commands or output.
+Selected-project overview
+- The project list remains the explicit discovery entry and gains a persistent right-side overview for the currently selected valid project.
+- The overview presents bounded Git status, detected environment markers, saved recent-file context and the explicit AtlasDesk project-profile summary.
+- Project discovery still starts only after the user opens Development → Project or requests Refresh; no startup scan, full-disk indexer, timer or background service is introduced.
+- Existing cancellation, generation gating and the three-second Git timeout remain the only selected-project context reader.
 
-Zotero research pane
-- The library follows a compact three-pane, read-only information structure.
-- Title, authors, source, year, Citation Key and DOI are immediately visible.
-- Title, DOI, Citation Key, quick reference text, LaTeX citations and Pandoc citations can be copied.
-- PDF attachments can be opened or selected in Windows Explorer for direct file copying.
-- Zotero SQLite access is read-only with query_only enabled.
+Daily actions
+- Workspace, project terminal, Dashboard, Explorer, copy-path and edit-context actions are available directly from the selected project.
+- Explicit favorite files can be opened in the existing workspace owner or copied as paths.
+- Explicit project commands are sent to the existing project terminal only after the user selects Run; commands are never replayed automatically.
+- AtlasDesk-side literature links can copy the Citation Key, open an existing local PDF or locate the record in the existing read-only Zotero surface.
+- Context editing continues to use the existing ProjectContextWindow and atomic productivity-context store.
 
-Tasks and tools
-- File-integrity manifest generation, verification and file comparison share one task collection.
-- Task and tool pages share status, progress, cancellation, results and bounded history.
-- Active work is confirmed before application exit.
-- One TaskToolCoordinator owns task/tool navigation and shutdown lifecycle.
+Data and safety boundary
+- Project profiles remain in private Roaming Data at %APPDATA%\AtlasDesk\productivity-context.json with the existing atomic backup path.
+- No Data schema change is required, and the cockpit never creates a profile merely by selecting a project.
+- Zotero SQLite access remains strictly read-only; associations remain AtlasDesk-side snapshots.
+- Dashboard ownership, ConPTY processes, tasks, tools, security, Runtime/Data separation and the v1.1.12 compact shell remain unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
 
-Window and runtime
-- Maximized windows use the active monitor work area and avoid taskbars on every edge.
-- Common window sizes, 100–175% DPI, restore/maximize and Runtime/Data boundaries are protected by regression checks.
-- Runtime remains a transparent replaceable folder; private roaming and local data never enter the package.
+AtlasDesk v1.1.12 shell and home simplification
 
-Release verification
-- v1.0.0 adds a formal release-readiness gate over the stabilized components and retired compatibility layers.
-- Full smoke, real Windows window residency, real CMD/ConPTY sessions, Dashboard, Runtime/Data, security, publish, manifest and ZIP checks remain mandatory.
+This release is a focused density and hierarchy correction after the v1.1.11 terminal visual pass. It does not change Dashboard ownership, ConPTY sessions, project context, Zotero access, tasks, tools, security or Runtime/Data separation.
 
-Known limitation
-- Close Zotero before opening the AtlasDesk library where the live database cannot be shared safely.
-- GB/T 7714 and APA previews are quick-copy references; use Zotero/CSL output for formal submission formatting.
+Compact shell
+- The collapsed sidebar is now a true 48-pixel icon rail instead of a wide mini-sidebar.
+- Collapsed navigation icons, the brand mark, settings entry and local-user avatar are reduced and centered; expanded navigation also uses a shorter 34-pixel row.
+- The visible Ctrl+K badge is removed from the Search or Execute field. The shortcut remains available through the tooltip and keyboard binding without crowding the search label.
+- Settings uses an unambiguous gear glyph instead of the previous sun-like radial icon that resembled a dark-mode toggle.
+- The top page bar is reduced to 36 pixels, icon controls are reduced, and the Project / Environment / Terminal tabs use a compact 30-pixel height.
+- The project-context shortcut remains on the command row and all v1.1.11 pure-black terminal behavior is retained.
 
-Previous stabilization milestones
-- v0.9.5: task/tool lifecycle convergence and removal of V064/V065 enhancers.
-- v0.9.4: unified tool tasks, cancellation and bounded history.
-- v0.9.3: project favorites, recents and explicit path relocation.
-- v0.9.2: read-only Zotero research pane and PDF file-location action.
-- v0.9.1: native work-area maximization and constrained-height layout fix.
-- v0.9.0: explicit project-driven workflow.
+Simplified home
+- The large gradient greeting banner, decorative circles, oversized metric cards, duplicated shortcut panel and footer slogan are removed.
+- Home now has three clear layers: greeting plus current workspace, one compact action row, and a concise status/recent-work area.
+- Dashboard, Zotero, projects and tasks remain visible as small status cells rather than independent promotional cards.
+- Workspace, Dashboard, Library, Development, Terminal and Global Search remain one click away without repeating the same actions in multiple regions.
+- Existing snapshot refresh, recent-file opening and navigation events are preserved.
+
+Boundary
+- The v1.1.10 in-process Dashboard and its native text-input behavior are unchanged.
+- Terminal processes, project center, workspace, environment discovery, Zotero read-only behavior, tasks, tools and private Data formats are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.11 sidebar and terminal visual polish
+
+This release is a focused visual correction on top of the v1.1.10 Dashboard simplicity restoration. It does not change Dashboard ownership, project data, terminal processes, Zotero access, tasks, tools, security or Runtime/Data separation.
+
+Sidebar project context
+- The project-context shortcut was previously appended to the sidebar root Grid without a row assignment, so WPF placed it in row 0 over the AtlasDesk brand/avatar area.
+- The shortcut now occupies the right side of the existing Search or Execute row.
+- The search button reserves explicit space for the shortcut, preventing overlap at all supported sidebar widths.
+- The ambiguous target glyph is replaced by a project briefcase icon with the concise tooltip Project Context.
+- Command configuration, favorite files, session restoration and read-only Zotero links remain available; only placement and presentation changed.
+
+Pure-black CMD terminal theme
+- The integrated terminal canvas, tab host, empty state and selected-session side panel now use a neutral black and dark-gray hierarchy instead of the previous blue-gray mixture.
+- CMD, PowerShell, host controls and right-side actions use explicit light text in their control templates, including disabled and hover states.
+- The right control panel is widened to 236 pixels; four tab actions use a balanced two-column grid and the host-location action occupies a full-width row.
+- The xterm frontend uses a #000000 background, white cursor, neutral selection, neutral scrollbar and a classic CMD-compatible ANSI palette.
+- The detached terminal window uses the same black header, black content surface and light-text controls.
+- V1111VisualPolishCoordinator runs after the project workflow and productivity-context layers, so historical local blue button values cannot reappear when the terminal is rehosted.
+
+Boundary
+- The v1.1.10 in-process Dashboard and its native text-input behavior are unchanged.
+- Project center, workspace, environment discovery, ConPTY sessions, terminal continuity, Zotero read-only behavior, tasks, tools and private Data formats are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.10 Dashboard simplicity restoration
+
+This release deliberately retires the v1.1.6-v1.1.9 cross-process Dashboard embedding chain after repeated real-machine input failures. It does not roll back AtlasDesk as a whole. Project context, workspace, terminal, Zotero, tasks, tools, diagnostics, security, Runtime/Data separation and the current UI remain on the existing branch.
+
+Restored lightweight ownership
+- MainWindow again owns one WPF WebView2 directly inside the existing DashboardHost panel.
+- The main Dashboard and its login popup share the same CoreWebView2Environment and the original AtlasDesk Dashboard profile.
+- Keyboard input, IME, clipboard shortcuts, context menus and focus remain in the native WPF/WebView2 path; there is no HWND embedding or cross-process input bridge.
+- Back, forward, reload, Dashboard home, pop-out and full-screen return to the existing MainWindow handlers.
+- Cloudflare Access popups remain within the shared WebView2 environment; ordinary external links still follow the existing navigation policy.
+
+Retired complexity
+- WorkbenchFeaturePipeline no longer attaches DashboardLifecycleCoordinator, DashboardScriptDiagnostics or DashboardInteractionCoordinator.
+- DashboardSimplicityCoordinator only retires the Shell activation/navigation/watchdog recovery hooks and closes the historical automatic WebView destruction/recreation gate.
+- No DashboardProcessSurface, SetParent, AttachThreadInput, standard-input command channel, authentication detach/re-embed loop or page-script click injection participates in the active product path.
+- Directory.Build.targets no longer publishes DashboardHost\AtlasDesk.DashboardHost.exe.
+- The Runtime again contains AtlasDesk.exe, AtlasDesk.TerminalHost.exe and the normal managed/native dependencies only.
+
+Failure behavior
+- WebView2 process failures are logged, but background code no longer destroys and recreates the controller.
+- The existing visible reload/retry controls remain the recovery path.
+- A severe native WebView2 failure can still require restarting AtlasDesk; v1.1.10 prioritizes predictable input and the previously proven simple interaction model over transparent process isolation.
+
+Verification boundary
+- The Windows Dashboard smoke now opens the real MainWindow, attaches the complete current feature pipeline, navigates to a local page, confirms the active WebView2 is a direct MainWindow child, gives it WPF keyboard focus and activates a real HTML input.
+- The source gate rejects dedicated DashboardHost publication, HWND embedding and the retired interaction/recovery coordinators.
+- All non-Dashboard modules and data formats are intentionally unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.9 authentication focus-rebind hotfix
+
+This hotfix addresses the first real-machine result after the v1.1.8 single-WebView authentication correction. An existing valid Cloudflare Access session can make the detachable login window flash briefly and immediately return to Dashboard. The browser session is valid, but the DashboardHost HWND changes from an embedded child to a top-level login window and back. The existing test confirmed that the same HWND returned, but it did not verify that WPF and the re-embedded WinForms/WebView2 thread could still accept text input afterwards.
+
+Re-embed focus recovery
+- DashboardProcessSurface now watches the real parent of the isolated DashboardHost HWND.
+- While DashboardHost is detached for authentication, input recovery is suspended.
+- When the same HWND becomes a child of the AtlasDesk native Dashboard surface again, AtlasDesk resizes it and performs a bounded sequence of cross-process focus transfers.
+- Every transfer temporarily joins the WPF and DashboardHost input queues with AttachThreadInput, focuses the DashboardHost window and immediately detaches the queues.
+- Recovery is bounded to twelve short attempts after re-embedding and eight attempts after initial attachment; it does not become a permanent focus loop.
+
+Real click recovery
+- Native mouse-button state and the physical Dashboard host rectangle are checked at input priority.
+- A real mouse press inside Dashboard triggers the same bounded cross-process input transfer even when WM_PARENTNOTIFY is swallowed by the WebView2 native child hierarchy.
+- Mouse hover does not transfer focus.
+- Clicks outside the Dashboard rectangle do not transfer focus, so AtlasDesk navigation, workspace, Zotero and other controls remain usable.
+
+Verification boundary
+- v1.1.9 retains the v1.1.8 single-WebView Access flow, CF_Authorization verification, DashboardHost proxy routing and the v1.1.6 process boundary.
+- The Windows suite compiles and runs the native focus watchdog together with the existing real DashboardHost detach/re-embed, process-loss and replacement-host tests.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.8 Access session-continuity hotfix
+
+This hotfix removes the split-browser authentication design introduced in v1.1.7. Cloudflare Access requires the browser instance that starts authentication to also complete the callback and retain the resulting CF_Session and CF_Authorization cookies. Opening GitHub or the callback in Chrome while Dashboard remained in WebView2 created two unrelated browser sessions and produced Invalid session by design.
+
+Single-browser Access flow
+- Dashboard, Cloudflare Access, GitHub OAuth, two-factor authentication and the Access callback now remain in the same WebView2 instance and the same WebView2-Isolated profile.
+- Authentication no longer creates a second WebView2 control and never hands an Access or identity-provider URL to Chrome.
+- New-window authentication requests are converted into navigation of the existing Dashboard WebView instead of assigning another WebView or opening the system browser.
+- Paths under /cdn-cgi/access/, the Cloudflare team domain and supported identity-provider login pages are treated as one continuous authentication chain.
+- Returning to the configured Dashboard application origin does not close authentication merely because navigation succeeded; DashboardHost first confirms the application-domain CF_Authorization cookie.
+- Ordinary non-authentication external links still open in the default browser.
+
+Same-window detachable login
+- When authentication starts, the existing DashboardHost HWND is temporarily detached from AtlasDesk and shown as a normal resizable top-level login window.
+- The detached window contains the original WebView2 control rather than a copied or replacement browser.
+- Successful authentication re-embeds that same HWND into the original Dashboard surface.
+- Closing the login window cancels authentication, re-embeds DashboardHost and shows a bounded retry message instead of terminating AtlasDesk or opening Chrome.
+- The v1.1.6 process boundary remains intact; a native browser failure still cannot terminate the primary AtlasDesk process.
+
+DashboardHost proxy routing
+- DashboardHost resolves network routing independently of Chrome.
+- ATLASDESK_DASHBOARD_PROXY is the explicit override. Values direct or none force direct routing; proxy URLs containing credentials are rejected and never logged.
+- HTTPS_PROXY and HTTP_PROXY are accepted as secondary environment-level overrides.
+- When no environment override exists, DashboardHost reads the Windows current-user ProxyEnable, ProxyServer and AutoConfigURL settings.
+- Windows user proxy and PAC settings are passed only to AtlasDesk.DashboardHost.exe; the primary AtlasDesk process is unchanged.
+- The effective route description is logged without exposing proxy credentials or tokens.
+
+Verification boundary
+- A Windows integration smoke drives a synthetic /cdn-cgi/access/login flow inside the real DashboardHost process, sets a CF_Authorization cookie, returns to the Dashboard origin, verifies authentication start and completion protocol messages, then force-kills the host and confirms the primary WPF window remains alive before restarting a replacement host.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.7 Dashboard input-focus hotfix
+
+This hotfix keeps the v1.1.6 process boundary and repairs the interaction boundary exposed by the first real-machine test. The dedicated DashboardHost rendered correctly, but SetParent alone did not transfer keyboard focus between the WPF and WinForms UI threads. Cloudflare Access could also navigate the main embedded Dashboard directly to GitHub sign-in, leaving AtlasDesk navigation visible beside a login page that could not receive input.
+
+Cross-process input bridge
+- DashboardProcessSurface temporarily joins the AtlasDesk and DashboardHost input queues with AttachThreadInput only while focus is transferred.
+- WM_PARENTNOTIFY mouse activation, WPF keyboard focus and Tab navigation all call the same bounded ActivateDashboardInput path.
+- The dedicated WinForms host handles WM_MOUSEACTIVATE and WM_SETFOCUS, then moves focus from its child Form into the actual WebView2 control.
+- A focus command remains available through the existing standard-input channel for integration verification and recovery.
+- The input queues are detached immediately after every transfer; WebView2 remains in AtlasDesk.DashboardHost.exe and process isolation is unchanged.
+
+Authentication window
+- Authentication navigation from the main Dashboard is cancelled before GitHub, Cloudflare Access, Google, Microsoft or Apple sign-in replaces the embedded Dashboard page.
+- Sign-in opens in a standalone authentication window using the same isolated WebView2 profile, so cookies and Access state remain shared with DashboardHost.
+- The login window is a real top-level resizable window with normal keyboard focus, taskbar behavior and close controls.
+- Returning to the configured Dashboard origin marks authentication complete, closes the login window and reloads Dashboard.
+- A manual close does not immediately reopen the login window or force a reload loop.
+- Ordinary GitHub repository links are no longer treated as authentication merely because their host is github.com.
+
+Candidate boundary
+- v1.1.7 is a focused interaction hotfix on top of the v1.1.6 crash-containment architecture.
+- No WebView2 control returns to the AtlasDesk primary process.
+- Project context, Zotero read-only behavior, Runtime/Data separation and terminal behavior are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.6 Dashboard process-isolation hotfix
+
+This hotfix changes the failure boundary instead of adding another in-process recovery layer. User logs showed that clicking a normal Dashboard page item could terminate AtlasDesk before .NET, WPF, CoreWebView2.ProcessFailed, BrowserProcessExited or MainWindow closing handlers could run. An operating-system process boundary is therefore the final protection mechanism.
+
+Dedicated Dashboard process
+- Dashboard WebView2 and all Dashboard page code now run in DashboardHost\AtlasDesk.DashboardHost.exe.
+- AtlasDesk.DashboardHost.exe is a dedicated WinForms WebView2 executable, not a second WPF AtlasDesk application instance.
+- The primary AtlasDesk process retains its original WPF App and MainWindow startup path.
+- The primary process contains no active Dashboard WebView2 control and no Dashboard DOM injection.
+- A lightweight WPF HwndHost surface embeds the dedicated WinForms window into the existing Dashboard page.
+- Back, forward, refresh and Dashboard home are sent through redirected standard input.
+- Title, source, navigation status, process failures and helper diagnostics return through redirected standard output.
+- The historical in-process pop-out path is disabled because it would reintroduce WebView2 into the primary process.
+
+Crash containment
+- A WebView2, page-script, renderer, graphics-driver or native-control failure inside AtlasDesk.DashboardHost.exe does not terminate the primary AtlasDesk process.
+- AtlasDesk records the dedicated host exit code and keeps workspace, Zotero, project, terminal, task and tool pages alive.
+- Dashboard shows a restart control after host loss.
+- One automatic restart is attempted after the first rapid exit; repeated rapid exits stop the loop and wait for an explicit restart.
+- The dedicated host monitors the AtlasDesk parent process and closes when the parent exits.
+- A real Windows integration smoke starts the host, creates WebView2, embeds its HWND, force-kills the host, verifies the primary WPF window remains alive, then starts a replacement host.
+
+Reduced variables
+- The dedicated host uses a new Local Data profile at %LOCALAPPDATA%\AtlasDesk\WebView2-Isolated.
+- The first v1.1.6 launch can therefore require signing in to Cloudflare Access again.
+- Hardware GPU acceleration is disabled only in AtlasDesk.DashboardHost.exe with --disable-gpu.
+- The primary AtlasDesk UI and other modules retain their normal rendering path.
+- v1.1.5 capture-phase click injection and Dashboard WebMessageReceived diagnostics are removed from the active Dashboard path.
+- WebView2 process events remain handled inside the dedicated host for bounded renderer recovery, but they are no longer the final protection boundary.
+
+Runtime layout
+- AtlasDesk.exe remains the only user-facing entry point.
+- AtlasDesk.TerminalHost.exe remains the native terminal helper.
+- DashboardHost\AtlasDesk.DashboardHost.exe and its required files must remain together in the Runtime folder.
+- Update by replacing the complete Runtime folder; do not copy only AtlasDesk.exe.
+- Roaming Data, Local Data, WebView2 profiles, logs and project context remain outside Runtime.
+
+Candidate boundary
+- v1.1.6 is a focused crash-containment and architecture hotfix.
+- Project context, Zotero read-only behavior, Runtime/Data separation and external-browser routing are unchanged.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.5 WebView2 process-ownership hotfix
+
+The v1.1.5 investigation established the following retained facts:
+- Dashboard top-bar and retry controls used physical replacement buttons rather than relying on reflected event removal.
+- GPU and utility process exits were distinguished from browser and renderer failures.
+- RenderProcessUnresponsive and RenderProcessExited used a bounded reload path.
+- BrowserProcessExited was the only normal failure that escalated directly to full recreation.
+- A capture-phase rapid-click guard blocked repeated interactions on the same target within 900 ms.
+- These protections remain historical diagnostics; v1.1.6 supersedes their same-process failure boundary.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.4 Dashboard stability hotfix
+
+The v1.1.4 investigation established the following retained facts:
+- Startup could overlap ShellResilience window-activation recovery and abort WebView2 controller creation.
+- The observed error was E_ABORT (0x80004004).
+- Shell activation, watchdog and Dashboard-navigation recovery hooks were retired.
+- Refresh, retry, Dashboard home, back and forward were moved away from unguarded direct calls.
+- v1.1.6 retains those retired-shell boundaries while moving all active Dashboard commands across a process boundary.
+- main remains the formal v1.0.0 baseline until user verification.
+
+AtlasDesk v1.1.3 productivity-context candidate
+
+v1.1.0 - Command Center context
+- Ctrl+K uses the existing Command Center for pages, projects, files, tasks, tools, project context and read-only Zotero results.
+
+v1.1.1 - Project context profiles
+- Projects can store a display name, default PowerShell or CMD shell, Python note, Dashboard URL, favorite paths and explicit commands.
+- Commands run only after explicit user selection.
+
+v1.1.2 - Safe session continuation
+- AtlasDesk can restore the last page, project root, workspace location and Zotero search.
+- It never stores terminal output or automatically replays commands.
+- Safe mode suppresses automatic restoration.
+
+v1.1.3 - Project and Zotero bridge
+- Selected Zotero records can be associated with AtlasDesk projects.
+- Associations remain AtlasDesk-side snapshots; Zotero SQLite access stays read-only.
+
+Private context data
+- Project context and session metadata are stored in %APPDATA%\AtlasDesk\productivity-context.json.
+- AtomicFileStore and a .bak file protect the context file.
+- Passwords, tokens, cookies, terminal output and vault plaintext are excluded.
+- main remains the formal v1.0.0 baseline until user verification.
+
+Retained v1.0 baseline
+- v1.0.5: keyboard/accessibility convergence, structured real-Windows UI audit, nullable warnings as errors and frozen legacy-component allowlist.
+- v1.0.4: centralized visual resources and responsive density modes.
+- v1.0.3: bounded startup history, log rotation and responsibility-named diagnostics lifecycle.
+- v1.0.2: atomic settings recovery, bounded safe mode and cancellable diagnostics.
+- v1.0.1: lazy home behavior, explicit path validation and responsive read-only Zotero layout.
+- v1.0.0: formal project/workspace/terminal/Zotero/task/tool Runtime baseline.
