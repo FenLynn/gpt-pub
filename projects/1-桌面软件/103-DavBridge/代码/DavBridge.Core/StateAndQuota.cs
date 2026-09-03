@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace DavBridge.Core;
@@ -75,7 +76,12 @@ public sealed class StateStore
         {
             var json = File.ReadAllText(path);
             state = JsonSerializer.Deserialize<MigrationState>(json, JsonOptions) ?? new MigrationState();
-            state.Files = new Dictionary<string, TransferRecord>(state.Files, StringComparer.OrdinalIgnoreCase);
+
+            // Keep the serialized schema unchanged while restoring the runtime-only concurrency
+            // guarantee needed by the migration engine and WinForms readers.
+            state.Files = new ConcurrentDictionary<string, TransferRecord>(
+                state.Files,
+                StringComparer.OrdinalIgnoreCase);
             return true;
         }
         catch

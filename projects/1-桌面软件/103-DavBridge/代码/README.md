@@ -2,122 +2,153 @@
 
 本目录是 P103 DavBridge 的完整可恢复源码入口。任何新对话、开发机或 CI 都应从这里恢复工程，不依赖聊天记录或本地临时文件。
 
-## 目录结构
+## 当前实验候选
+
+`p103-exp`：**v0.3.0**
+
+准确完成 CI 的代码 head：`22d321f9811bb047f2ddd96c5a7463225fed51f1`
+
+CI run：`31869299097`，结果 **success**。
+
+正式稳定基线仍为 `main / p103-stable = v0.1.7`。
+
+## 解决方案
+
+源码入口：
 
 ```text
-代码/
-├── DavBridge.sln
-├── DavBridge.Core/
-│   ├── DavBridge.Core.csproj
-│   ├── Models.cs
-│   ├── WebDav.cs
-│   ├── StateAndQuota.cs
-│   └── MigrationEngine.cs
-├── DavBridge/
-│   ├── DavBridge.csproj
-│   ├── Program.cs
-│   ├── AppInfrastructure.cs
-│   ├── MainForm.cs
-│   ├── SettingsDialog.cs
-│   └── CalibrationDialog.cs
-└── DavBridge.Smoke/
-    ├── DavBridge.Smoke.csproj
-    └── Program.cs
+代码/DavBridge.sln
 ```
 
-## 职责边界
+主要项目：
+
+```text
+DavBridge.Core
+DavBridge
+DavBridge.Smoke
+```
+
+## v0.3 核心文件
 
 ### DavBridge.Core
 
-只放与 UI 无关的迁移核心，包括：
+`Models.cs`
 
-- WebDAV 读写和准确资源确认；
-- InfiniCLOUD 只读客户端；
-- 坚果云目标写入客户端；
-- Zotero `.zip + .prop` 分组；
-- 强校验状态机；
-- GoodSync 既有文件安全接管；
-- 上传与下载配额；
-- 状态持久化模型；
-- 限速和请求节流。
+- 原迁移状态与 TransferRecord；
+- `EngineState.WaitUser` 追加在旧枚举值之后；
+- `MigrationState.SchemaVersion` 仍为 1。
 
-核心层必须能够在没有 WinForms 的环境中独立编译和接受自动测试。
+`ReconciliationModelV030.cs`
+
+- Cycle `yyMMdd`；
+- 回收站 disposition；
+- 历史 StrongVerified 证据判断；
+- metadata current 判断。
+
+`MigrationEngine.cs`
+
+- 原上传、StrongVerified、SourceChanged、Conflict、WriteUnknown 主安全链；
+- SourceChanged 组优先于普通 backlog。
+
+`StateAndQuota.cs`
+
+- `state.json` 原子保存；
+- 配额模型。
+
+`WebDav.cs`
+
+- WebDAV read/write；
+- HTTPS only；
+- GET / PUT IO progress。
 
 ### DavBridge
 
-Windows x64 WinForms 托盘程序，包括：
+`ReconciliationRuntimeV030.cs`
 
-- 程序入口；
-- DPAPI 凭据保存；
-- 配置和状态文件路径；
-- Windows 登录自启动；
-- 主窗口和托盘；
-- 连接诊断；
-- 迁移就绪扫描入口；
-- 流量校准；
-- 设置界面。
+- `%APPDATA%/DavBridge/reconcile.json` sidecar；
+- 每 Cycle 自动源端对账；
+- 源 metadata 变化后的 InfiniCLOUD SHA256 复核；
+- 首次缺失、跨周期审查、人工保留；
+- 对账与人工回收站事务使用同一互斥门。
 
-UI 不得重新实现迁移判定逻辑，迁移事实以 `DavBridge.Core` 为准。
+`ReconciliationRemovalV030.cs`
+
+- 只有人工调用的受控 DELETE；
+- 删除前再次确认全部源成员仍缺失；
+- zip / prop 部分恢复时禁止删除；
+- 目标大小 / ETag / 必要 SHA256 身份确认；
+- DELETE 不确定结果 reconciliation；
+- 删除后目标准确路径复核；
+- 删除成功后保留历史 SHA 证据并把记录置为待恢复语义。
+
+`AppInfrastructure.cs`
+
+- 重置真实探测；
+- 新 Cycle 后先走 `ReconciliationRuntimeV030.BeforeMigrationAsync`；
+- 有人工阻塞时进入 `WaitUser`；
+- 无人工阻塞才进入普通 MigrationEngine。
+
+`UiShellV030.cs`
+
+- 当前唯一运行 UI shell；
+- `总览 | 转移 | 回收站`；
+- 无宽左栏；
+- Cycle、双右箭头、流量、镜像覆盖、人工提示；
+- 回收站审查默认零选择，不在动画 Timer 中重建。
+
+`Program.cs`
+
+- 运行时只挂载 `ReconciliationRuntimeV030 + UiShellV030`；
+- 旧 v0.2 UI generation 仍在源码中作为历史过渡文件，但不再运行挂载。
 
 ### DavBridge.Smoke
 
-核心故障模型和回归入口。至少覆盖：
+`ReconciliationSmokeV030.cs`
 
-- 正常强校验；
-- PUT 假成功；
-- 源端传输期间变化；
-- GoodSync 既有目标一致接管；
-- 既有目标冲突；
-- 上传和下载额度保护；
-- 崩溃恢复；
-- 部分 Group 恢复；
-- 单文件上限；
-- 6000 个 Zotero Group / 12000 个对象基线。
+- Cycle 日历日期不受 CI 时区换日；
+- 首次缺失只能观察；
+- 跨后续 Cycle 才可人工审查；
+- 本周期保留只对当前 Cycle 有效；
+- blocked 人工保留下周期重新出现；
+- zip + prop 历史完整性；
+- WaitUser 枚举追加兼容。
 
-## 本地恢复和构建
+## 关键安全不变量
 
-在本目录执行：
+1. InfiniCLOUD 正式客户端只读。
+2. StrongVerified 只有双端 GET + SHA256 一致才能成立。
+3. 源 SHA 真变化后优先刷新历史镜像。
+4. 新增对象不插队。
+5. 首次源缺失永远不 DELETE。
+6. DELETE 永远要求人工明确确认。
+7. 本周期人工保留后任何代码路径都不得再删除该组。
+8. 源只恢复部分 Zotero 成员时禁止删除。
+9. 删除前目标身份无法证明时禁止删除，或在安全下载预算允许时做目标 SHA256。
+10. DELETE 结果不确定先查询目标，不盲目重复。
+11. `reconcile.json` 丢失只能让删除更保守，不能让删除更容易。
 
-```powershell
-dotnet restore .\DavBridge.sln
-dotnet build .\DavBridge.sln -c Release
+## 本地 Data
+
+核心旧 Data 保持不迁移：
+
+```text
+%APPDATA%/DavBridge/config.json
+%APPDATA%/DavBridge/state.json
+%APPDATA%/DavBridge/state.json.bak
+%APPDATA%/DavBridge/secrets.dat
 ```
 
-运行核心 smoke：
+v0.3 新增：
 
-```powershell
-dotnet run --project .\DavBridge.Smoke\DavBridge.Smoke.csproj -c Release
+```text
+%APPDATA%/DavBridge/reconcile.json
+%APPDATA%/DavBridge/reconcile.json.bak
 ```
 
-生成与 CI 一致的 Windows x64 单 EXE：
+## 构建
 
-```powershell
-dotnet publish .\DavBridge\DavBridge.csproj `
-  -c Release `
-  -r win-x64 `
-  --self-contained false `
-  -p:PublishSingleFile=true `
-  -p:DebugType=embedded
-```
+CI Windows x64 使用 .NET 8 framework-dependent single EXE publish。
 
-正式候选仍以 `.github/workflows/p103-davbridge-ci.yml` 的 Windows Artifact 为准，不以开发机手工构建代替 CI 证据。
+v0.3.0 Artifact：`DavBridge-v0.3.0-win-x64`
 
-## 数据与凭据边界
-
-源码目录不得出现：
-
-- `config.json`；
-- `state.json` 或 `state.json.bak`；
-- `secrets.dat`；
-- 真实 WebDAV 密码、Cookie、Token；
-- 真实 Zotero 文件清单；
-- 用户日志；
-- 本机 `%APPDATA%`、`%LOCALAPPDATA%` 私人数据副本。
-
-正式用户 Data 只能位于 `%APPDATA%\DavBridge` 和 `%LOCALAPPDATA%\DavBridge`。
-
-## Git 分支事实
-
-当前开发期源码事实源是远端 `p103-exp`。`p103-stable` 只接受满足当前候选提升条件的版本，`main` 只保存已经完成正式准入的版本。
-
-在 P103 尚未首次进入 `main` 前，新对话恢复源码时必须显式读取 `p103-exp`，不得因为默认分支是 `main` 而误判项目不存在。
+EXE SHA256：`37f78cba17fd2eb5a4864b788596371f6858e8e6de42a263f5919a5515c749c3`

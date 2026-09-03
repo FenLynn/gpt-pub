@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 
 namespace DavBridge.Core;
@@ -14,7 +15,9 @@ public enum TransferStatus
     SourceChanged,
     Conflict,
     BlockedOversize,
-    Failed
+    Failed,
+    // Appended to preserve every existing numeric value in legacy state.json.
+    WriteUnknown
 }
 
 public enum EngineState
@@ -24,7 +27,9 @@ public enum EngineState
     WaitNetwork,
     WaitQuota,
     WaitRetry,
-    Complete
+    Complete,
+    // Appended to preserve every existing numeric value in legacy state.json.
+    WaitUser
 }
 
 public sealed class DavBridgeConfig
@@ -66,7 +71,9 @@ public sealed class MigrationState
     public EngineState EngineState { get; set; } = EngineState.Paused;
     public string? CurrentGroupKey { get; set; }
     public bool ExistingReplicaValidationPassed { get; set; }
-    public Dictionary<string, TransferRecord> Files { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public IDictionary<string, TransferRecord> Files { get; set; } =
+        new ConcurrentDictionary<string, TransferRecord>(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class TransferRecord
