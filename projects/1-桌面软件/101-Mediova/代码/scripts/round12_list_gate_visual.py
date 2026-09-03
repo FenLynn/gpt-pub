@@ -128,8 +128,8 @@ def validate_left_list_image(list_image, relative_cells: list[list[list[int]]], 
     ]
     status_marker_pixels: list[int] = []
     for row, expected in enumerate(status_marker_colors):
-        status_cell = relative_cells[row][12]
-        _require_fully_visible(list_image, status_cell, 12)
+        status_cell = relative_cells[row][13]
+        _require_fully_visible(list_image, status_cell, 13)
         marker = list_image.crop((status_cell[0], status_cell[1], min(status_cell[2], status_cell[0] + 24), status_cell[3]))
         try:
             marker = marker.convert("RGB")
@@ -171,8 +171,8 @@ def validate_right_group_image(
 
 
 def validate_trim_cells(list_image, relative_cells: list[list[list[int]]], evidence: Path) -> dict[str, object]:
-    time_cell = relative_cells[2][13]
-    _require_fully_visible(list_image, time_cell, 13)
+    time_cell = relative_cells[2][14]
+    _require_fully_visible(list_image, time_cell, 14)
     time_crop = list_image.crop(tuple(time_cell))
     try:
         time_crop.save(evidence / "round12-time-crop-cell.png")
@@ -190,8 +190,8 @@ def validate_trim_cells(list_image, relative_cells: list[list[list[int]]], evide
     if top_dark < 5 or bottom_dark < 5:
         raise RuntimeError(f"time crop is not rendered on two lines: top={top_dark} bottom={bottom_dark}")
 
-    picture_cell = relative_cells[2][14]
-    _require_fully_visible(list_image, picture_cell, 14)
+    picture_cell = relative_cells[2][15]
+    _require_fully_visible(list_image, picture_cell, 15)
     picture_crop = list_image.crop(tuple(picture_cell))
     try:
         picture_crop.save(evidence / "round12-picture-crop-cell.png")

@@ -184,7 +184,7 @@ def prepare_group_view(
 
 
 def restore_default_columns(main_hwnd: int, list_hwnd: int) -> None:
-    set_columns_visible(main_hwnd, list_hwnd, list(range(3, 15)), True)
+    set_columns_visible(main_hwnd, list_hwnd, list(range(3, 16)), True)
 
 
 def validate_column_profiles(main_hwnd: int, list_hwnd: int) -> dict[str, int]:
@@ -240,15 +240,15 @@ def validate_hidden_picture_crop_has_no_residue(
     list_info: dict[str, object],
     evidence: Path,
 ) -> int:
-    set_columns_visible(main_hwnd, list_hwnd, [14], False)
+    set_columns_visible(main_hwnd, list_hwnd, [15], False)
     time.sleep(0.30)
     cells, _ = read_relative_cells(reader, list_hwnd, column_count, list_info)
     image = runner.capture_screen_rect(list_info["rect"])
     try:
         image.save(evidence / "round12-hidden-picture-crop.png")
-        last_right = int(cells[0][13][2])
-        row_top = max(0, int(cells[0][13][1]) + 2)
-        row_bottom = min(image.height, int(cells[2][13][3]) - 2)
+        last_right = int(cells[0][14][2])
+        row_top = max(0, int(cells[0][14][1]) + 2)
+        row_bottom = min(image.height, int(cells[2][14][3]) - 2)
         trail_left = min(image.width, max(0, last_right + 2))
         trail_right = min(image.width, trail_left + 90)
         if trail_right - trail_left < 12 or row_bottom <= row_top:
@@ -265,7 +265,7 @@ def validate_hidden_picture_crop_has_no_residue(
         image.close()
     if residue_dark > 8:
         raise RuntimeError(f"hidden picture-crop column still paints visible residue: dark_pixels={residue_dark}")
-    set_columns_visible(main_hwnd, list_hwnd, [14], True)
+    set_columns_visible(main_hwnd, list_hwnd, [15], True)
     return residue_dark
 
 
@@ -336,7 +336,7 @@ def main() -> int:
             raise RuntimeError(f"right panel collapse did not widen task list: before={initial_list_width} after={collapsed_list_width}")
 
         group_a = [7, 8, 9, 10]
-        group_b = [11, 12, 13, 14]
+        group_b = [11, 12, 13, 14, 15]
         group_a_cells = prepare_group_view(main_hwnd, list_hwnd, reader, len(captions), list_info, group_a, group_b)
         group_a_image = runner.capture_screen_rect(list_info["rect"])
         try:
