@@ -114,7 +114,7 @@ def set_columns_visible(main_hwnd: int, list_hwnd: int, columns: list[int], visi
 def validate_hidden_columns_reject_width_drift(
     list_hwnd: int, header_hwnd: int, reader: RemoteHeaderReader
 ) -> dict[str, object]:
-    hidden_columns = [13, 14]
+    hidden_columns = [14, 15]
     before = [column_width(list_hwnd, column) for column in hidden_columns]
     if before != [0, 0]:
         raise RuntimeError(f"hidden trim columns unexpectedly visible before drift test: {before}")
@@ -130,8 +130,8 @@ def validate_hidden_columns_reject_width_drift(
     # that exact edge used to pull Picture Crop out to a visible width while
     # the menu remained unchecked.
     rects = reader.rects(header_hwnd)
-    status_right = int(rects[12][2])
-    y = max(4, (int(rects[12][1]) + int(rects[12][3])) // 2)
+    status_right = int(rects[13][2])
+    y = max(4, (int(rects[13][1]) + int(rects[13][3])) // 2)
 
     def point(x: int) -> int:
         return ((y & 0xFFFF) << 16) | (x & 0xFFFF)
