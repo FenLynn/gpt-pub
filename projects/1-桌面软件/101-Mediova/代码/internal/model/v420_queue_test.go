@@ -39,6 +39,16 @@ func TestDefaultOptionsAreExplicitPerKind(t *testing.T) {
 	}
 }
 
+func TestImageMetadataAndFilesystemTimesArePreservedByDefault(t *testing.T) {
+	s := DefaultSettings()
+	if s.ClearMetadata {
+		t.Fatal("default settings must not clear embedded metadata")
+	}
+	if !s.PreserveTimes {
+		t.Fatal("default settings must preserve source filesystem times")
+	}
+}
+
 func TestQueueSnapshotOverridesMutableDefaults(t *testing.T) {
 	s := DefaultSettings()
 	task := &Task{

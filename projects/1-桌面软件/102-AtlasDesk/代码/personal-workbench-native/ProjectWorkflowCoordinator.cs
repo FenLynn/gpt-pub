@@ -44,6 +44,7 @@ public sealed class ProjectWorkflowCoordinator
         _projects = new ProjectCenterControl(pipeline.Settings);
         _projects.ActionRequested += ProjectActionRequested;
         _projects.ProjectSelectionChanged += ProjectSelectionChanged;
+        _projects.ContextActionRequested += ProjectContextActionRequested;
         _terminalHost = new ContentControl
         {
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -66,6 +67,8 @@ public sealed class ProjectWorkflowCoordinator
 
     public static ProjectWorkflowCoordinator Attach(MainWindow window, WorkbenchFeaturePipeline pipeline)
         => new(window, pipeline);
+
+    public ProjectDescriptor? SelectedProject => _projects.SelectedProject;
 
     private static T? ReadField<T>(object instance, string name) where T : class
         => instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance) as T;
@@ -353,6 +356,19 @@ public sealed class ProjectWorkflowCoordinator
                 try { Process.Start(new ProcessStartInfo("explorer.exe", e.Project.RootPath) { UseShellExecute = true }); }
                 catch (Exception ex) { App.Log("Open project explorer failed: " + ex.Message); }
                 break;
+        }
+    }
+
+    private async void ProjectContextActionRequested(object? sender, ProjectContextActionEventArgs e)
+    {
+        try
+        {
+            await ProductivityContextCoordinator.TryExecuteAsync(_window, e.Result);
+            _projects.ReloadSelectedOverview();
+        }
+        catch (Exception ex)
+        {
+            App.Log("Project cockpit context action failed: " + ex);
         }
     }
 

@@ -1,0 +1,10 @@
+# Generated executables and distributable archives are never source files.
+# Keep release artifacts outside Git; use the release/artifact store instead.
+*.exe
+*.zip
+*.7z
+*.rar
+*.msi
+*.msix
+*.msixbundle
+*.appx

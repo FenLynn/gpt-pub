@@ -19,9 +19,15 @@ func TestModernImageExtensions(t *testing.T) {
 
 func TestModernImageFailureMessage(t *testing.T) {
 	err := ExplainModernImageFailure("IMG_0001.HEIC", errors.New("decoder missing"))
-	for _, want := range []string{"HEIC", "FFmpeg", "源文件未被修改", "decoder missing"} {
+	for _, want := range []string{"HEIC", "Windows HEIF", "源文件未被修改", "decoder missing"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("missing failure detail %q: %v", want, err)
 		}
+	}
+}
+
+func TestModernImageFailureCategory(t *testing.T) {
+	if got := ClassifyFailure(ExplainModernImageFailure("IMG_0001.HEIC", errors.New("decoder missing"))); got != "HEIC/HEIF 解码不可用" {
+		t.Fatalf("modern image category=%q", got)
 	}
 }

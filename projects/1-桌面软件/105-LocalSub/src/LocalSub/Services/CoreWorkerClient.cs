@@ -22,6 +22,8 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     StreamReader? _reader;
     StreamWriter? _writer;
     Task? _readerTask;
+    int _connectionGeneration;
+    int _brokenGeneration;
     bool _disposed;
 
     static readonly JsonSerializerOptions JsonOptions = new()
@@ -30,8 +32,22 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    internal int? WorkerProcessId
+    {
+        get
+        {
+            try { return _process is { HasExited: false } p ? p.Id : null; }
+            catch { return null; }
+        }
+    }
+
+    internal int PendingRequestCount => _pending.Count;
+
     public async Task PingAsync(CancellationToken ct = default)
         => _ = await SendOperationAsync("ping", new { }, null, ct);
+
+    internal async Task PingWithDelayAsync(int delayMs, CancellationToken ct = default)
+        => _ = await SendOperationAsync("ping", new { delayMs = Math.Clamp(delayMs, 0, 10_000) }, null, ct);
 
     public async Task<MediaAnalysisResult> AnalyzeAsync(
         string filePath,
@@ -114,15 +130,24 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         await _operationGate.WaitAsync(ct);
         try
         {
-            await EnsureConnectedAsync(ct);
+            var generation = await EnsureConnectedAsync(ct);
             var id = Guid.NewGuid().ToString("N");
-            var pending = new PendingRequest(onEvent);
+            var pending = new PendingRequest(generation, onEvent);
             if (!_pending.TryAdd(id, pending)) throw new InvalidOperationException("无法登记 Core 请求。");
-            using var registration = ct.Register(() => _ = SendCancelAsync(id));
             try
             {
-                await WriteMessageAsync(new { kind = "request", id, method, payload }, CancellationToken.None);
-                return await pending.Completion.Task;
+                await WriteMessageAsync(new { kind = "request", id, method, payload }, CancellationToken.None, generation);
+                if (!ct.CanBeCanceled) return await pending.Completion.Task;
+
+                try
+                {
+                    return await pending.Completion.Task.WaitAsync(ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    await HandleCallerCancellationAsync(id, generation, pending);
+                    throw;
+                }
             }
             finally
             {
@@ -135,29 +160,35 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         }
     }
 
-    async Task SendCancelAsync(string requestId)
+    async Task HandleCallerCancellationAsync(string requestId, int generation, PendingRequest pending)
     {
-        try
-        {
-            if (_writer == null) return;
-            await WriteMessageAsync(new
-            {
-                kind = "request",
-                id = "cancel-" + Guid.NewGuid().ToString("N"),
-                method = "cancel",
-                payload = new { requestId }
-            }, CancellationToken.None);
-        }
-        catch { }
+        try { await SendCancelAsync(requestId, generation); } catch { }
+
+        var completed = await Task.WhenAny(pending.Completion.Task, Task.Delay(TimeSpan.FromMilliseconds(1500)));
+        if (completed == pending.Completion.Task) return;
+
+        LogClient($"CANCEL_TIMEOUT generation={generation} request={requestId}; terminating worker for clean recovery");
+        TerminateCurrentWorker(generation, "cancel-timeout");
     }
 
-    async Task EnsureConnectedAsync(CancellationToken ct)
+    async Task SendCancelAsync(string requestId, int generation)
     {
-        if (_pipe?.IsConnected == true && _process is { HasExited: false }) return;
+        await WriteMessageAsync(new
+        {
+            kind = "request",
+            id = "cancel-" + Guid.NewGuid().ToString("N"),
+            method = "cancel",
+            payload = new { requestId }
+        }, CancellationToken.None, generation);
+    }
+
+    async Task<int> EnsureConnectedAsync(CancellationToken ct)
+    {
+        if (IsCurrentConnectionHealthy()) return Volatile.Read(ref _connectionGeneration);
         await _lifecycleGate.WaitAsync(ct);
         try
         {
-            if (_pipe?.IsConnected == true && _process is { HasExited: false }) return;
+            if (IsCurrentConnectionHealthy()) return Volatile.Read(ref _connectionGeneration);
             CleanupConnection();
 
             var exe = Path.Combine(PortablePaths.BaseDir, "LocalSub.Core.exe");
@@ -177,25 +208,45 @@ public sealed class CoreWorkerClient : IAsyncDisposable
             start.ArgumentList.Add(pipeName);
             start.ArgumentList.Add("--parent");
             start.ArgumentList.Add(Environment.ProcessId.ToString());
-            _process = Process.Start(start) ?? throw new InvalidOperationException("无法启动 LocalSub.Core.exe。");
 
-            _pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            var process = Process.Start(start) ?? throw new InvalidOperationException("无法启动 LocalSub.Core.exe。");
+            var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             connectCts.CancelAfter(TimeSpan.FromSeconds(8));
             try
             {
-                await _pipe.ConnectAsync(connectCts.Token);
+                await pipe.ConnectAsync(connectCts.Token);
             }
-            catch
+            catch (Exception ex)
             {
-                try { if (!_process.HasExited) _process.Kill(true); } catch { }
-                CleanupConnection();
-                throw new TimeoutException("LocalSub.Core 启动后 8 秒内没有建立 IPC 连接。");
+                try { if (!process.HasExited) process.Kill(true); } catch { }
+                try { pipe.Dispose(); } catch { }
+                try { process.Dispose(); } catch { }
+                LogClient($"CONNECT_FAIL pid={SafePid(process)} {ex.GetType().Name}: {ex.Message}");
+                if (ct.IsCancellationRequested) throw;
+                throw new TimeoutException("LocalSub.Core 启动后 8 秒内没有建立 IPC 连接。", ex);
             }
 
-            _reader = new StreamReader(_pipe);
-            _writer = new StreamWriter(_pipe) { AutoFlush = true };
-            _readerTask = Task.Run(ReadLoopAsync);
+            var reader = new StreamReader(pipe);
+            var writer = new StreamWriter(pipe) { AutoFlush = true };
+            var generation = Interlocked.Increment(ref _connectionGeneration);
+            Volatile.Write(ref _brokenGeneration, 0);
+
+            _process = process;
+            _pipe = pipe;
+            _reader = reader;
+            _writer = writer;
+
+            process.EnableRaisingEvents = true;
+            process.Exited += (_, _) =>
+            {
+                var exitCode = SafeExitCode(process);
+                MarkConnectionBroken(generation, new IOException($"LocalSub.Core 意外退出，ExitCode={exitCode}。下次任务会自动重启 Core。"));
+            };
+
+            _readerTask = Task.Run(() => ReadLoopAsync(pipe, reader, generation));
+            LogClient($"CONNECTED generation={generation} pid={process.Id}");
+            return generation;
         }
         finally
         {
@@ -203,14 +254,22 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         }
     }
 
-    async Task ReadLoopAsync()
+    bool IsCurrentConnectionHealthy()
+    {
+        var generation = Volatile.Read(ref _connectionGeneration);
+        if (generation <= 0 || Volatile.Read(ref _brokenGeneration) == generation) return false;
+        try { return _pipe?.IsConnected == true && _process is { HasExited: false }; }
+        catch { return false; }
+    }
+
+    async Task ReadLoopAsync(NamedPipeClientStream pipe, StreamReader reader, int generation)
     {
         Exception? failure = null;
         try
         {
-            while (_pipe?.IsConnected == true && !_disposed)
+            while (pipe.IsConnected && !_disposed)
             {
-                var line = await _reader!.ReadLineAsync();
+                var line = await reader.ReadLineAsync();
                 if (line == null) break;
                 using var doc = JsonDocument.Parse(line);
                 var root = doc.RootElement;
@@ -218,7 +277,7 @@ public sealed class CoreWorkerClient : IAsyncDisposable
                 var id = root.TryGetProperty("id", out var idNode) ? idNode.GetString() : null;
                 if (string.IsNullOrWhiteSpace(id)) continue;
 
-                if (kind == "event" && _pending.TryGetValue(id, out var eventPending))
+                if (kind == "event" && _pending.TryGetValue(id, out var eventPending) && eventPending.Generation == generation)
                 {
                     var eventName = root.TryGetProperty("event", out var eventNode) ? eventNode.GetString() ?? "" : "";
                     var payload = root.TryGetProperty("payload", out var payloadNode) ? payloadNode.Clone() : default;
@@ -226,7 +285,7 @@ public sealed class CoreWorkerClient : IAsyncDisposable
                     continue;
                 }
 
-                if (kind == "response" && _pending.TryGetValue(id, out var pending))
+                if (kind == "response" && _pending.TryGetValue(id, out var pending) && pending.Generation == generation)
                 {
                     var ok = root.TryGetProperty("ok", out var okNode) && okNode.GetBoolean();
                     var cancelled = root.TryGetProperty("cancelled", out var cancelNode) && cancelNode.GetBoolean();
@@ -254,20 +313,59 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         finally
         {
             if (!_disposed)
-                FailPending(failure ?? new IOException("LocalSub.Core IPC 已断开。下次任务会自动重启 Core。"));
+            {
+                var reason = failure ?? new IOException("LocalSub.Core IPC 已断开。下次任务会自动重启 Core。");
+                MarkConnectionBroken(generation, reason);
+            }
         }
     }
 
-    async Task WriteMessageAsync(object message, CancellationToken ct)
+    async Task WriteMessageAsync(object message, CancellationToken ct, int expectedGeneration)
     {
+        if (expectedGeneration != Volatile.Read(ref _connectionGeneration) || Volatile.Read(ref _brokenGeneration) == expectedGeneration)
+            throw new IOException("LocalSub.Core IPC 已失效。下次任务会自动重启 Core。");
+
         var writer = _writer ?? throw new IOException("LocalSub.Core IPC 尚未连接。");
         var json = JsonSerializer.Serialize(message, JsonOptions);
         await _writeGate.WaitAsync(ct);
-        try { await writer.WriteLineAsync(json); }
+        try
+        {
+            if (expectedGeneration != Volatile.Read(ref _connectionGeneration) || Volatile.Read(ref _brokenGeneration) == expectedGeneration)
+                throw new IOException("LocalSub.Core IPC 已在写入前失效。");
+            await writer.WriteLineAsync(json);
+        }
+        catch (Exception ex)
+        {
+            MarkConnectionBroken(expectedGeneration, ex);
+            throw new IOException("写入 LocalSub.Core IPC 失败。下次任务会自动重启 Core。", ex);
+        }
         finally { _writeGate.Release(); }
     }
 
-    void FailPending(Exception ex)
+    void MarkConnectionBroken(int generation, Exception ex)
+    {
+        if (_disposed || generation != Volatile.Read(ref _connectionGeneration)) return;
+        if (Volatile.Read(ref _brokenGeneration) == generation) return;
+        Volatile.Write(ref _brokenGeneration, generation);
+        LogClient($"DISCONNECTED generation={generation} pid={WorkerProcessId?.ToString() ?? "n/a"} {ex.GetType().Name}: {ex.Message}");
+        FailPendingForGeneration(generation, ex is IOException ? ex : new IOException("LocalSub.Core 连接异常。下次任务会自动重启 Core。", ex));
+    }
+
+    void TerminateCurrentWorker(int generation, string reason)
+    {
+        if (generation != Volatile.Read(ref _connectionGeneration)) return;
+        var process = _process;
+        MarkConnectionBroken(generation, new IOException($"LocalSub.Core 因 {reason} 被回收，下一次任务会自动重启。"));
+        try { if (process is { HasExited: false }) process.Kill(true); } catch { }
+    }
+
+    void FailPendingForGeneration(int generation, Exception ex)
+    {
+        foreach (var pair in _pending)
+            if (pair.Value.Generation == generation) pair.Value.Completion.TrySetException(ex);
+    }
+
+    void FailAllPending(Exception ex)
     {
         foreach (var pair in _pending) pair.Value.Completion.TrySetException(ex);
     }
@@ -285,6 +383,28 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         _readerTask = null;
     }
 
+    static int SafePid(Process process)
+    {
+        try { return process.Id; } catch { return -1; }
+    }
+
+    static int SafeExitCode(Process process)
+    {
+        try { return process.HasExited ? process.ExitCode : -1; } catch { return -1; }
+    }
+
+    static void LogClient(string text)
+    {
+        try
+        {
+            PortablePaths.EnsureBaseFolders();
+            File.AppendAllText(
+                Path.Combine(PortablePaths.LogsDir, "core-client.log"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {text}{Environment.NewLine}");
+        }
+        catch { }
+    }
+
     void ThrowIfDisposed()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(CoreWorkerClient));
@@ -293,14 +413,15 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
-        _disposed = true;
+        var generation = Volatile.Read(ref _connectionGeneration);
         try
         {
-            if (_writer != null)
-                await WriteMessageAsync(new { kind = "request", id = "shutdown", method = "shutdown", payload = new { } }, CancellationToken.None);
+            if (_writer != null && generation > 0 && Volatile.Read(ref _brokenGeneration) != generation)
+                await WriteMessageAsync(new { kind = "request", id = "shutdown", method = "shutdown", payload = new { } }, CancellationToken.None, generation);
         }
         catch { }
 
+        _disposed = true;
         var process = _process;
         if (process is { HasExited: false })
         {
@@ -314,7 +435,7 @@ public sealed class CoreWorkerClient : IAsyncDisposable
                 try { if (!process.HasExited) process.Kill(true); } catch { }
             }
         }
-        FailPending(new ObjectDisposedException(nameof(CoreWorkerClient)));
+        FailAllPending(new ObjectDisposedException(nameof(CoreWorkerClient)));
         CleanupConnection();
         _lifecycleGate.Dispose();
         _writeGate.Dispose();
@@ -323,9 +444,14 @@ public sealed class CoreWorkerClient : IAsyncDisposable
 
     sealed class PendingRequest
     {
+        public int Generation { get; }
         public TaskCompletionSource<JsonElement> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Action<string, JsonElement>? OnEvent { get; }
-        public PendingRequest(Action<string, JsonElement>? onEvent) => OnEvent = onEvent;
+        public PendingRequest(int generation, Action<string, JsonElement>? onEvent)
+        {
+            Generation = generation;
+            OnEvent = onEvent;
+        }
     }
 
     sealed class AnalysisDto

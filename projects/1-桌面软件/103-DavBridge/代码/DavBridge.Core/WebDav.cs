@@ -8,18 +8,37 @@ namespace DavBridge.Core;
 
 public sealed record DownloadResult(long Bytes, string Sha256);
 public sealed record PutResult(HttpStatusCode StatusCode, bool Accepted);
+public sealed record ConditionalPutOptions(bool CreateOnly, string? IfMatchETag = null);
+public sealed record WebDavCapabilities(
+    bool OptionsSucceeded,
+    IReadOnlyList<string> DavTokens,
+    IReadOnlyList<string> AllowedMethods,
+    string? Server);
+public enum WebDavIoOperation { Download, Upload }
+public sealed record WebDavIoProgress(
+    string BaseAddress,
+    string RelativePath,
+    WebDavIoOperation Operation,
+    long BytesProcessed,
+    long? TotalBytes);
 
-public sealed class WebDavException : Exception
+public class WebDavException : Exception
 {
     public HttpStatusCode? StatusCode { get; }
     public string? ResponseBody { get; }
 
-    public WebDavException(string message, HttpStatusCode? statusCode = null, string? responseBody = null)
-        : base(message)
+    public WebDavException(string message, HttpStatusCode? statusCode = null, string? responseBody = null, Exception? innerException = null)
+        : base(message, innerException)
     {
         StatusCode = statusCode;
         ResponseBody = responseBody;
     }
+}
+
+public sealed class WebDavWriteUncertainException : WebDavException
+{
+    public WebDavWriteUncertainException(string message, Exception innerException)
+        : base(message, null, null, innerException) { }
 }
 
 public interface IReadOnlyWebDavClient
@@ -33,6 +52,16 @@ public interface IReadOnlyWebDavClient
 public interface IWritableWebDavClient : IReadOnlyWebDavClient
 {
     Task<PutResult> PutFileAsync(string relativePath, string localFilePath, int bytesPerSecond, CancellationToken cancellationToken);
+}
+
+public interface IConditionalWebDavClient : IWritableWebDavClient
+{
+    Task<PutResult> PutFileConditionallyAsync(
+        string relativePath,
+        string localFilePath,
+        int bytesPerSecond,
+        ConditionalPutOptions options,
+        CancellationToken cancellationToken);
 }
 
 public sealed class RequestGate
@@ -56,10 +85,7 @@ public sealed class RequestGate
                 await Task.Delay(_nextAllowed - now, cancellationToken).ConfigureAwait(false);
             _nextAllowed = DateTimeOffset.UtcNow + _minimumInterval;
         }
-        finally
-        {
-            _mutex.Release();
-        }
+        finally { _mutex.Release(); }
     }
 }
 
@@ -69,11 +95,14 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
     protected readonly Uri BaseUri;
     protected readonly RequestGate? Gate;
 
+    public static event EventHandler<WebDavIoProgress>? GlobalIoProgress;
+
     public WebDavReadClient(string baseUrl, string username, string password, RequestGate? gate = null, HttpMessageHandler? handler = null)
     {
-        if (!baseUrl.EndsWith('/'))
-            baseUrl += "/";
+        if (!baseUrl.EndsWith('/')) baseUrl += "/";
         BaseUri = new Uri(baseUrl, UriKind.Absolute);
+        if (!string.Equals(BaseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("DavBridge requires HTTPS WebDAV endpoints; plaintext HTTP is not permitted.");
         Gate = gate;
 
         if (handler is null)
@@ -82,7 +111,7 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
             {
                 Credentials = new NetworkCredential(username, password),
                 PreAuthenticate = true,
-                AllowAutoRedirect = true,
+                AllowAutoRedirect = false,
                 AutomaticDecompression = DecompressionMethods.All
             };
             Http = new HttpClient(httpHandler, disposeHandler: true);
@@ -93,13 +122,22 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         }
 
         Http.Timeout = TimeSpan.FromMinutes(30);
-
-        // InfiniCLOUD explicitly supports pre-emptive BASIC authentication. Keep the
-        // header for the first request, while HttpClientHandler.Credentials also lets
-        // .NET answer a fresh BASIC challenge after a benign endpoint redirect.
         var token = Convert.ToBase64String(Encoding.UTF8.GetBytes(username + ":" + password));
         Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
-        Http.DefaultRequestHeaders.UserAgent.ParseAdd("DavBridge/0.1.1");
+        Http.DefaultRequestHeaders.UserAgent.ParseAdd("DavBridge/0.2.9");
+    }
+
+    public async Task<WebDavCapabilities> ProbeCapabilitiesAsync(CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Options, BaseUri);
+        using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        var dav = response.Headers.TryGetValues("DAV", out var davValues)
+            ? davValues.SelectMany(x => x.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            : Array.Empty<string>();
+        var allow = response.Headers.TryGetValues("Allow", out var allowValues)
+            ? allowValues.SelectMany(x => x.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            : Array.Empty<string>();
+        return new WebDavCapabilities(response.IsSuccessStatusCode, dav, allow, response.Headers.Server.ToString());
     }
 
     public async Task<IReadOnlyList<WebDavEntry>> ListDirectoryAsync(string relativeDirectory, CancellationToken cancellationToken)
@@ -121,8 +159,7 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         var uri = BuildUri(relativePath, directory: false);
         using var request = BuildPropFind(uri, depth: "0");
         using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return null;
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.MultiStatus)
@@ -143,9 +180,9 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         }
 
         var directory = Path.GetDirectoryName(destinationPath);
-        if (!string.IsNullOrWhiteSpace(directory))
-            Directory.CreateDirectory(directory);
-
+        if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+        var expected = response.Content.Headers.ContentLength;
+        ReportIo(relativePath, WebDavIoOperation.Download, 0, expected);
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using var target = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -154,13 +191,14 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         while (true)
         {
             var read = await source.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-            if (read == 0)
-                break;
+            if (read == 0) break;
             await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             sha.AppendData(buffer, 0, read);
             total += read;
+            ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         }
         await target.FlushAsync(cancellationToken).ConfigureAwait(false);
+        ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         return new DownloadResult(total, Convert.ToHexString(sha.GetHashAndReset()).ToLowerInvariant());
     }
 
@@ -175,6 +213,8 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
             throw BuildFailure("GET verify", uri, response, body);
         }
 
+        var expected = response.Content.Headers.ContentLength;
+        ReportIo(relativePath, WebDavIoOperation.Download, 0, expected);
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var buffer = new byte[128 * 1024];
@@ -182,11 +222,12 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         while (true)
         {
             var read = await source.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-            if (read == 0)
-                break;
+            if (read == 0) break;
             sha.AppendData(buffer, 0, read);
             total += read;
+            ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         }
+        ReportIo(relativePath, WebDavIoOperation.Download, total, expected ?? total);
         return new DownloadResult(total, Convert.ToHexString(sha.GetHashAndReset()).ToLowerInvariant());
     }
 
@@ -198,17 +239,26 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
 
     protected async Task WaitGateAsync(CancellationToken cancellationToken)
     {
-        if (Gate is not null)
-            await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (Gate is not null) await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     protected Uri BuildUri(string relativePath, bool directory)
     {
         var clean = relativePath.Replace('\\', '/').Trim('/');
         var encoded = string.Join('/', clean.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString));
-        if (directory && encoded.Length > 0 && !encoded.EndsWith('/'))
-            encoded += "/";
+        if (directory && encoded.Length > 0 && !encoded.EndsWith('/')) encoded += "/";
         return new Uri(BaseUri, encoded);
+    }
+
+    protected void ReportIo(string relativePath, WebDavIoOperation operation, long bytesProcessed, long? totalBytes)
+    {
+        try
+        {
+            GlobalIoProgress?.Invoke(this, new WebDavIoProgress(
+                BaseUri.ToString(), relativePath.Replace('\\', '/'), operation,
+                Math.Max(0, bytesProcessed), totalBytes.HasValue ? Math.Max(0, totalBytes.Value) : null));
+        }
+        catch { }
     }
 
     private static HttpRequestMessage BuildPropFind(Uri uri, string depth)
@@ -229,8 +279,7 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         var suffix = string.IsNullOrWhiteSpace(challenge) ? string.Empty : $"; WWW-Authenticate={challenge}";
         return new WebDavException(
             $"{operation} failed for {uri.GetLeftPart(UriPartial.Path)}: {(int)response.StatusCode} {response.ReasonPhrase}{suffix}",
-            response.StatusCode,
-            body);
+            response.StatusCode, body);
     }
 
     private IReadOnlyList<WebDavEntry> ParseMultiStatus(string xml, Uri requestUri)
@@ -245,66 +294,87 @@ public class WebDavReadClient : IReadOnlyWebDavClient, IDisposable
         foreach (var response in doc.Descendants(d + "response"))
         {
             var hrefValue = response.Element(d + "href")?.Value;
-            if (string.IsNullOrWhiteSpace(hrefValue))
-                continue;
+            if (string.IsNullOrWhiteSpace(hrefValue)) continue;
 
             Uri hrefUri;
-            if (Uri.TryCreate(hrefValue, UriKind.Absolute, out var parsedHref) && parsedHref is not null)
-                hrefUri = parsedHref;
-            else
-                hrefUri = new Uri(BaseUri, hrefValue);
+            if (Uri.TryCreate(hrefValue, UriKind.Absolute, out var parsedHref) && parsedHref is not null) hrefUri = parsedHref;
+            else hrefUri = new Uri(BaseUri, hrefValue);
 
             var absolutePath = Uri.UnescapeDataString(hrefUri.AbsolutePath);
             var baseDirectory = Uri.UnescapeDataString(requestDirectory);
             string relative;
-            if (absolutePath.StartsWith(baseDirectory, StringComparison.OrdinalIgnoreCase))
-                relative = absolutePath[baseDirectory.Length..].Trim('/');
-            else
-                relative = absolutePath.Trim('/').Split('/').LastOrDefault() ?? string.Empty;
+            if (absolutePath.StartsWith(baseDirectory, StringComparison.OrdinalIgnoreCase)) relative = absolutePath[baseDirectory.Length..].Trim('/');
+            else relative = absolutePath.Trim('/').Split('/').LastOrDefault() ?? string.Empty;
 
             var prop = response.Descendants(d + "prop").FirstOrDefault();
             var isCollection = prop?.Element(d + "resourcetype")?.Element(d + "collection") is not null;
             long? length = null;
-            if (long.TryParse(prop?.Element(d + "getcontentlength")?.Value, out var parsedLength))
-                length = parsedLength;
+            if (long.TryParse(prop?.Element(d + "getcontentlength")?.Value, out var parsedLength)) length = parsedLength;
             var etag = prop?.Element(d + "getetag")?.Value?.Trim();
             DateTimeOffset? modified = null;
-            if (DateTimeOffset.TryParse(prop?.Element(d + "getlastmodified")?.Value, out var parsedModified))
-                modified = parsedModified;
-
+            if (DateTimeOffset.TryParse(prop?.Element(d + "getlastmodified")?.Value, out var parsedModified)) modified = parsedModified;
             result.Add(new WebDavEntry(relative, isCollection, length, etag, modified));
         }
-
         return result;
     }
 
     public void Dispose() => Http.Dispose();
 }
 
-public sealed class WebDavWriteClient : WebDavReadClient, IWritableWebDavClient
+public sealed class WebDavWriteClient : WebDavReadClient, IConditionalWebDavClient
 {
     public WebDavWriteClient(string baseUrl, string username, string password, RequestGate? gate = null, HttpMessageHandler? handler = null)
-        : base(baseUrl, username, password, gate, handler)
-    {
-    }
+        : base(baseUrl, username, password, gate, handler) { }
 
-    public async Task<PutResult> PutFileAsync(string relativePath, string localFilePath, int bytesPerSecond, CancellationToken cancellationToken)
+    public Task<PutResult> PutFileAsync(string relativePath, string localFilePath, int bytesPerSecond, CancellationToken cancellationToken) =>
+        PutFileConditionallyAsync(relativePath, localFilePath, bytesPerSecond, new ConditionalPutOptions(false), cancellationToken);
+
+    public async Task<PutResult> PutFileConditionallyAsync(
+        string relativePath,
+        string localFilePath,
+        int bytesPerSecond,
+        ConditionalPutOptions options,
+        CancellationToken cancellationToken)
     {
         var uri = BuildUri(relativePath, directory: false);
         await WaitGateAsync(cancellationToken).ConfigureAwait(false);
         await using var file = new FileStream(localFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 128 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
-        await using var throttled = new ThrottledReadStream(file, bytesPerSecond);
+        ReportIo(relativePath, WebDavIoOperation.Upload, 0, file.Length);
+        await using var throttled = new ThrottledReadStream(file, bytesPerSecond,
+            processed => ReportIo(relativePath, WebDavIoOperation.Upload, processed, file.Length));
         using var content = new StreamContent(throttled, 128 * 1024);
         content.Headers.ContentLength = file.Length;
         using var request = new HttpRequestMessage(HttpMethod.Put, uri) { Content = content };
-        using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
+        if (options.CreateOnly)
+            request.Headers.TryAddWithoutValidation("If-None-Match", "*");
+        else if (!string.IsNullOrWhiteSpace(options.IfMatchETag))
+            request.Headers.TryAddWithoutValidation("If-Match", options.IfMatchETag);
+
+        HttpResponseMessage response;
+        try
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            throw new WebDavException($"PUT failed for {uri.GetLeftPart(UriPartial.Path)}: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
+            response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         }
-        return new PutResult(response.StatusCode, true);
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new WebDavWriteUncertainException($"PUT timed out for {uri.GetLeftPart(UriPartial.Path)}; write outcome is unknown and must be reconciled before retry.", new TimeoutException());
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new WebDavWriteUncertainException($"PUT connection failed for {uri.GetLeftPart(UriPartial.Path)}; write outcome is unknown and must be reconciled before retry.", ex);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                throw new WebDavException($"PUT failed for {uri.GetLeftPart(UriPartial.Path)}: {(int)response.StatusCode} {response.ReasonPhrase}", response.StatusCode, body);
+            }
+            ReportIo(relativePath, WebDavIoOperation.Upload, file.Length, file.Length);
+            return new PutResult(response.StatusCode, true);
+        }
     }
 }
 
@@ -312,24 +382,26 @@ internal sealed class ThrottledReadStream : Stream
 {
     private readonly Stream _inner;
     private readonly int _bytesPerSecond;
+    private readonly Action<long>? _progress;
     private readonly System.Diagnostics.Stopwatch _watch = System.Diagnostics.Stopwatch.StartNew();
     private long _bytesRead;
 
-    public ThrottledReadStream(Stream inner, int bytesPerSecond)
+    public ThrottledReadStream(Stream inner, int bytesPerSecond, Action<long>? progress = null)
     {
         _inner = inner;
         _bytesPerSecond = bytesPerSecond;
+        _progress = progress;
     }
 
     private async ValueTask ThrottleAsync(int justRead, CancellationToken cancellationToken)
     {
-        if (_bytesPerSecond <= 0 || justRead <= 0)
-            return;
+        if (justRead <= 0) return;
         _bytesRead += justRead;
+        _progress?.Invoke(_bytesRead);
+        if (_bytesPerSecond <= 0) return;
         var expected = TimeSpan.FromSeconds((double)_bytesRead / _bytesPerSecond);
         var delay = expected - _watch.Elapsed;
-        if (delay > TimeSpan.Zero)
-            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+        if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
     }
 
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
@@ -342,13 +414,16 @@ internal sealed class ThrottledReadStream : Stream
     public override int Read(byte[] buffer, int offset, int count)
     {
         var read = _inner.Read(buffer, offset, count);
-        if (_bytesPerSecond > 0 && read > 0)
+        if (read > 0)
         {
             _bytesRead += read;
-            var expected = TimeSpan.FromSeconds((double)_bytesRead / _bytesPerSecond);
-            var delay = expected - _watch.Elapsed;
-            if (delay > TimeSpan.Zero)
-                Thread.Sleep(delay);
+            _progress?.Invoke(_bytesRead);
+            if (_bytesPerSecond > 0)
+            {
+                var expected = TimeSpan.FromSeconds((double)_bytesRead / _bytesPerSecond);
+                var delay = expected - _watch.Elapsed;
+                if (delay > TimeSpan.Zero) Thread.Sleep(delay);
+            }
         }
         return read;
     }

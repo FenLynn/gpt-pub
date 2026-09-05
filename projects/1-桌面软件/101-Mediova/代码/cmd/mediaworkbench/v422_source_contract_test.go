@@ -33,12 +33,12 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 	}
 	for _, want := range []string{
 		`const appVersion = "4.5.0"`,
-		`{"分辨率", 100}, {"时长", 76}`,
+		`var taskListColumns = v452TaskListColumns`,
 		`bottomParameterWidths(a.currentKind)`,
 		`drawStatusLamp(dis.HDC, rc, dot)`,
 		`drawCompactResetGlyph(dis.HDC, rc, textColor)`,
-		`drawContrastCenteredText(hdc, label, bar, fill, uiFontSmall)`,
-		`cd.ISubItem != 8 && cd.ISubItem != 9 && cd.ISubItem != 10`,
+		`drawContrastCenteredText(dis.HDC, a.overallText, bar, fill, uiFontProgress)`,
+		`taskColOutputSize && cd.ISubItem != taskColProgress && cd.ISubItem != taskColStatus`,
 		`taskDurationText(t)`,
 		`a.refreshTotal()`,
 	} {
@@ -49,16 +49,19 @@ func TestV422DesktopSourceContracts(t *testing.T) {
 	if strings.Contains(main, "diameter := scaleDPI(14)") {
 		t.Fatal("low-resolution GDI status ellipse returned")
 	}
-	for _, want := range []string{`drawCenteredText(hdc, "●"`, `for i, unit := range units`, `DT_LEFT|DT_SINGLELINE|DT_CALCRECT`, `centre >= fill.Left && centre <= fill.Right`, `func taskDurationText`, `func (a *application) v422SummarizeProgress`} {
+	for _, want := range []string{`v452DrawTrueStatusLamp(hdc, rc, color)`, `for i, unit := range units`, `DT_LEFT|DT_SINGLELINE|DT_CALCRECT`, `centre >= fill.Left && centre <= fill.Right`, `func taskDurationText`, `func (a *application) v422SummarizeProgress`} {
 		if !strings.Contains(helper, want) {
 			t.Fatalf("missing helper contract %q", want)
 		}
 	}
-	if !strings.Contains(queue, `enable(a.hPause, ownsRun)`) || !strings.Contains(queue, `waitingQueueLabel(runKind)`) {
+	if strings.Contains(helper, `drawCenteredText(hdc, "●"`) {
+		t.Fatal("font-rendered status lamp returned")
+	}
+	if !strings.Contains(queue, `enable(a.hPause, ownsRun)`) || !strings.Contains(queue, `a.activeRuns[a.currentKind]`) {
 		t.Fatal("bottom queue controls are not workspace-specific")
 	}
-	if strings.Count(harden, `a.runKind != a.currentKind`) < 2 {
-		t.Fatal("pause/stop can still control the other media workspace")
+	if !strings.Contains(harden, `a.activeRuns[a.currentKind]`) || !strings.Contains(harden, `task.Kind != kind`) {
+		t.Fatal("pause/stop are not isolated to the selected media workspace")
 	}
 	if strings.Contains(helper, "withRoundedClip(hdc, fill") {
 		t.Fatal("progress text returned to unreliable clipping")

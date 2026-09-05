@@ -48,17 +48,15 @@ func (a *application) v420ConfirmDiskSpace(outputRoot string, ids map[int64]bool
 
 func (a *application) v420TogglePause() {
 	a.runMu.Lock()
-	if !a.running || a.runKind != a.currentKind {
+	queue := a.activeRuns[a.currentKind]
+	if !a.running || queue == nil {
 		a.runMu.Unlock()
 		return
 	}
-	a.paused = !a.paused
-	paused := a.paused
-	controller := a.controller
+	queue.paused = !queue.paused
+	paused := queue.paused
+	controller := queue.controller
 	runIDs := copyTaskIDSet(a.runTaskIDs)
-	if !paused {
-		a.pauseCond.Broadcast()
-	}
 	a.runMu.Unlock()
 
 	var controlErr error
@@ -71,7 +69,7 @@ func (a *application) v420TogglePause() {
 	}
 	a.mu.Lock()
 	for _, task := range a.tasks {
-		if task == nil || !runIDs[task.ID] {
+		if task == nil || task.Kind != a.currentKind || !runIDs[task.ID] {
 			continue
 		}
 		if paused && task.Status == model.StatusProcessing {
@@ -95,26 +93,33 @@ func (a *application) v420TogglePause() {
 			msg = "队列已继续，但个别 FFmpeg 进程恢复失败：" + short(controlErr.Error(), 180)
 		}
 		setText(a.hStatusText, msg)
-		a.v420SignalQueue()
 	}
+	if a.hPause != 0 {
+		procInvalidateRect.Call(a.hPause, 0, 0)
+	}
+	a.v420SignalQueue()
 	procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
 }
 
 func (a *application) v420StopQueue() {
+	a.v420StopQueueKind(a.currentKind)
+}
+
+func (a *application) v420StopQueueKind(kind model.Kind) {
 	a.runMu.Lock()
-	if !a.running || a.runKind != a.currentKind {
+	queue := a.activeRuns[kind]
+	if !a.running || queue == nil {
 		a.runMu.Unlock()
 		return
 	}
-	a.running = false
-	a.paused = false
-	controller := a.controller
-	cancel := a.cancel
+	queue.paused = false
+	controller := queue.controller
+	cancel := queue.cancel
 	runIDs := copyTaskIDSet(a.runTaskIDs)
+	delete(a.activeRuns, kind)
 	if cancel != nil {
 		cancel()
 	}
-	a.pauseCond.Broadcast()
 	a.runMu.Unlock()
 	if controller != nil {
 		_ = controller.Resume()
@@ -128,7 +133,7 @@ func (a *application) v420StopQueue() {
 	var returnReady []int64
 	a.mu.Lock()
 	for _, task := range a.tasks {
-		if task == nil || !runIDs[task.ID] {
+		if task == nil || task.Kind != kind || !runIDs[task.ID] {
 			continue
 		}
 		if task.Status == model.StatusHeld {
@@ -165,7 +170,22 @@ func (a *application) v420StopQueue() {
 	}
 	setText(a.hStatusText, fmt.Sprintf("正在停止队列；%d 个搁置任务已退回准备中，未提交草稿已丢弃。", len(returnReady)))
 	a.saveSession()
+	a.v420SignalQueue()
 	procPostMessageW.Call(a.hwnd, WM_APP_REFRESH, 0, 0)
+}
+
+// v420StopAllQueues is intentionally only used for process exit.  Normal
+// footer Stop remains scoped to the currently visible media workspace.
+func (a *application) v420StopAllQueues() {
+	a.runMu.Lock()
+	kinds := make([]model.Kind, 0, len(a.activeRuns))
+	for kind := range a.activeRuns {
+		kinds = append(kinds, kind)
+	}
+	a.runMu.Unlock()
+	for _, kind := range kinds {
+		a.v420StopQueueKind(kind)
+	}
 }
 
 func taskOptionStrings(options model.TaskOptions, kind model.Kind) [5]string {
@@ -358,12 +378,12 @@ func (a *application) v420UpdateRightPanel() {
 	task := selected[0]
 	if task.IsLocked() {
 		setText(a.hRightTitle, "参数已锁定")
-		setText(a.hDetails, fmt.Sprintf("任务：%s\r\n状态：%s\r\n\r\n该任务已入队，底部默认和普通个体编辑均不会改变它。请右键选择“临时操作”。", filepath.Base(task.Input), task.Status))
+		setText(a.hDetails, fmt.Sprintf("任务：%s\r\n状态：%s\r\n\r\n该任务已入队，底部默认和普通个体编辑均不会改变它。请右键选择“临时操作”。%s", filepath.Base(task.Input), task.Status, a.v455TaskRecognitionDetails(task)))
 		return
 	}
 	opts := a.settings.EffectiveOptions(task)
 	setText(a.hRightTitle, "转换参数")
-	setText(a.hDetails, fmt.Sprintf("源文件：%s\r\n\r\n源信息：%d×%d · %.2f FPS · %s\r\n状态：%s\r\n输出设置：%s · %s · %s · %s · %s", task.Input, task.Width, task.Height, task.FPS, media.FormatBytes(task.InputSize), task.Status, taskOptionStrings(opts, task.Kind)[0], taskOptionStrings(opts, task.Kind)[1], taskOptionStrings(opts, task.Kind)[2], taskOptionStrings(opts, task.Kind)[3], taskOptionStrings(opts, task.Kind)[4]))
+	setText(a.hDetails, fmt.Sprintf("源文件：%s\r\n\r\n源信息：%d×%d · %.2f FPS · %s\r\n状态：%s\r\n输出设置：%s · %s · %s · %s · %s%s", task.Input, task.Width, task.Height, task.FPS, media.FormatBytes(task.InputSize), task.Status, taskOptionStrings(opts, task.Kind)[0], taskOptionStrings(opts, task.Kind)[1], taskOptionStrings(opts, task.Kind)[2], taskOptionStrings(opts, task.Kind)[3], taskOptionStrings(opts, task.Kind)[4], a.v455TaskRecognitionDetails(task)))
 }
 
 func (a *application) v420ResetRunMaps() {

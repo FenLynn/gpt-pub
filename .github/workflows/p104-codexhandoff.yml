@@ -1,0 +1,132 @@
+name: P104 CodexHandoff Windows
+
+on:
+  push:
+    branches: [p104-exp, p104-stable]
+    paths:
+      - 'projects/1-桌面软件/104-CodexHandoff/**'
+      - '.github/workflows/p104-codexhandoff.yml'
+      - '目录.md'
+      - 'projects/1-桌面软件/README.md'
+  pull_request:
+    branches: [p104-exp, p104-stable, main]
+    paths:
+      - 'projects/1-桌面软件/104-CodexHandoff/**'
+      - '.github/workflows/p104-codexhandoff.yml'
+      - '目录.md'
+      - 'projects/1-桌面软件/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p104-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: projects/1-桌面软件/104-CodexHandoff
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scope gate
+        if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'integration/main-')
+        working-directory: .
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          $files = git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD"
+          $bad = $files | Where-Object {
+            $_ -notlike 'projects/1-桌面软件/104-CodexHandoff/*' -and
+            $_ -ne '.github/workflows/p104-codexhandoff.yml' -and
+            $_ -ne '目录.md' -and
+            $_ -ne 'projects/1-桌面软件/README.md'
+          }
+          if ($bad) {
+            Write-Host 'Out-of-scope files:'
+            $bad | ForEach-Object { Write-Host $_ }
+            exit 1
+          }
+
+      - name: Read delivery version
+        id: delivery
+        run: |
+          $delivery = (Get-Content DELIVERY_VERSION -Raw).Trim()
+          if ($delivery -notmatch '^P104-[0-9]{3}$') {
+            throw "Invalid DELIVERY_VERSION: $delivery"
+          }
+          "version=$delivery" >> $env:GITHUB_OUTPUT
+          Write-Host "Delivery version: $delivery"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Frontend typecheck and build
+        run: npm run build
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Read-only source guard
+        run: |
+          $source = Get-Content src-tauri/src/codex.rs -Raw
+          $forbidden = @('remove_file(', 'rename(', 'OpenOptions::new', 'File::create(', 'write(true)', 'append(true)')
+          foreach ($needle in $forbidden) {
+            if ($source.Contains($needle)) {
+              Write-Error "Source reader contains forbidden write primitive: $needle"
+              exit 1
+            }
+          }
+
+      - name: Build portable Windows EXE
+        run: npm run tauri build -- --no-bundle
+
+      - name: Number and hash portable EXE
+        run: |
+          $sourceExe = 'src-tauri/target/release/CodexHandoff.exe'
+          if (-not (Test-Path $sourceExe)) { throw "Missing $sourceExe" }
+
+          $delivery = '${{ steps.delivery.outputs.version }}'
+          $numberedExe = "CodexHandoff-$delivery.exe"
+          $hashFile = "CodexHandoff-$delivery.sha256.json"
+          Copy-Item $sourceExe $numberedExe -Force
+
+          $match = Select-String -Path 'src-tauri/Cargo.toml' -Pattern '^version = "([^"]+)"' | Select-Object -First 1
+          if (-not $match) { throw 'Cannot read internal version from Cargo.toml' }
+          $internalVersion = $match.Matches[0].Groups[1].Value
+          $hash = (Get-FileHash $numberedExe -Algorithm SHA256).Hash
+
+          [ordered]@{
+            DeliveryVersion = $delivery
+            InternalVersion = $internalVersion
+            Commit = '${{ github.sha }}'
+            Hash = $hash
+          } | ConvertTo-Json | Set-Content $hashFile
+
+          Get-Item $numberedExe | Format-List Name,Length,FullName
+          Get-Content $hashFile
+
+      - name: Upload numbered portable EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexHandoff-${{ steps.delivery.outputs.version }}-windows-x64-${{ github.sha }}
+          path: |
+            projects/1-桌面软件/104-CodexHandoff/CodexHandoff-${{ steps.delivery.outputs.version }}.exe
+            projects/1-桌面软件/104-CodexHandoff/CodexHandoff-${{ steps.delivery.outputs.version }}.sha256.json
+          if-no-files-found: error
+          retention-days: 7

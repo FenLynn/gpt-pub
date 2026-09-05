@@ -1,0 +1,115 @@
+name: P101 Mediova v4.5.5 Release
+
+on:
+  push:
+    tags:
+      - p101-v4.5.5
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout immutable release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Download Runtime dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $ffmpegArchive=Join-Path $env:RUNNER_TEMP 'mediova-ffmpeg.zip'
+          $ffmpegExtracted=Join-Path $env:RUNNER_TEMP 'mediova-ffmpeg'
+          Invoke-WebRequest -Uri 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip' -OutFile $ffmpegArchive -Headers @{'User-Agent'='Mediova-v4.5.5-release'}
+          Expand-Archive -LiteralPath $ffmpegArchive -DestinationPath $ffmpegExtracted -Force
+          $ffmpeg=Get-ChildItem -LiteralPath $ffmpegExtracted -Recurse -Filter ffmpeg.exe -File | Select-Object -First 1
+          $ffprobe=Get-ChildItem -LiteralPath $ffmpegExtracted -Recurse -Filter ffprobe.exe -File | Where-Object { $_.Directory.FullName -eq $ffmpeg.Directory.FullName } | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) { throw 'A colocated FFmpeg/FFprobe pair was not found.' }
+          & $ffmpeg.FullName -version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw 'Bundled FFmpeg is not runnable.' }
+          "FFMPEG_BIN=$($ffmpeg.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          $exifVersion=(Invoke-WebRequest -Uri 'https://exiftool.org/ver.txt' -UseBasicParsing).Content.Trim()
+          if ($exifVersion -notmatch '^\d+\.\d+$') { throw "Unexpected ExifTool version response: $exifVersion" }
+          $exifArchive=Join-Path $env:RUNNER_TEMP 'mediova-exiftool.zip'
+          $exifExtracted=Join-Path $env:RUNNER_TEMP 'mediova-exiftool'
+          Invoke-WebRequest -Uri "https://exiftool.org/exiftool-$($exifVersion)_64.zip" -OutFile $exifArchive -Headers @{'User-Agent'='Mediova-v4.5.5-release'}
+          Expand-Archive -LiteralPath $exifArchive -DestinationPath $exifExtracted -Force
+          $exifExe=Get-ChildItem -LiteralPath $exifExtracted -Recurse -File | Where-Object { $_.Name -ieq 'exiftool.exe' -or $_.Name -ieq 'exiftool(-k).exe' } | Select-Object -First 1
+          if (-not $exifExe -or -not (Test-Path -LiteralPath (Join-Path $exifExe.Directory.FullName 'exiftool_files') -PathType Container)) { throw 'Official ExifTool package is incomplete.' }
+          "EXIFTOOL_ROOT=$($exifExe.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build exact-tag v4.5.5 Runtime
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          ./build_v4.5.5.ps1 -FFmpegBin $env:FFMPEG_BIN -ExifToolRoot $env:EXIFTOOL_ROOT -OutputDirectory build-release -PackageZip
+          if ($LASTEXITCODE -ne 0) { throw 'Mediova v4.5.5 release build failed.' }
+
+      - name: Verify Runtime, archive and privacy boundary
+        shell: pwsh
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $build=Join-Path $PWD 'build-release'
+          $runtime=Join-Path $build 'Runtime'
+          $zip=Join-Path $build 'Mediova-v4.5.5-Stability-Runtime.zip'
+          $manifestPath=Join-Path $runtime 'runtime-manifest.json'
+          $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          if ($manifest.product -ne 'Mediova' -or $manifest.version -ne '4.5.5' -or $manifest.channel -ne 'stability' -or $manifest.platform -ne 'Windows x64' -or $manifest.deployment -ne 'folder-runtime') { throw 'Runtime manifest identity mismatch.' }
+          foreach ($entry in $manifest.files) {
+            $path=Join-Path $runtime ($entry.path -replace '/', '\\')
+            if (!(Test-Path -LiteralPath $path -PathType Leaf)) { throw "Manifest file missing: $($entry.path)" }
+            if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.sha256) { throw "Manifest hash mismatch: $($entry.path)" }
+          }
+          foreach ($required in @('Mediova.exe','Components/FFmpeg/bin/ffmpeg.exe','Components/FFmpeg/bin/ffprobe.exe','Components/ExifTool/exiftool.exe','THIRD_PARTY_NOTICES.md','README.txt')) {
+            if (!(Test-Path -LiteralPath (Join-Path $runtime $required))) { throw "Required Runtime file missing: $required" }
+          }
+          $private=@('config.json','history.json','session.json','session.json.bak','crash.log','settings.json','task-history.json','security.json','vault.bin','startup.log')
+          foreach ($name in $private) {
+            if (Get-ChildItem -LiteralPath $runtime -Recurse -Force -Filter $name -ErrorAction SilentlyContinue) { throw "Private Data leaked into Runtime: $name" }
+          }
+          if (!(Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP is missing.' }
+          $archive=[IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            foreach ($name in $private) {
+              if ($archive.Entries | Where-Object { $_.FullName -match "(^|/)$([regex]::Escape($name))$" }) { throw "Private Data leaked into ZIP: $name" }
+            }
+          } finally { $archive.Dispose() }
+          $zipHash=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "${zipHash}  Mediova-v4.5.5-Stability-Runtime.zip" | Set-Content -LiteralPath (Join-Path $build 'RELEASE_SHA256.txt') -Encoding Ascii
+
+      - name: Publish GitHub Release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: projects/1-桌面软件/101-Mediova/代码
+        run: |
+          $ErrorActionPreference='Stop'
+          $build=Join-Path $PWD 'build-release'
+          $zip=Join-Path $build 'Mediova-v4.5.5-Stability-Runtime.zip'
+          $sha=Join-Path $build 'RELEASE_SHA256.txt'
+          $notes=Join-Path $build 'RELEASE_NOTES.md'
+          @"
+          Mediova v4.5.5 stability Runtime for Windows x64.
+
+          This archive is built from this immutable source tag in GitHub Actions.
+          It includes FFmpeg/FFprobe and ExifTool. User configuration, task history,
+          logs, thumbnails and temporary files are verified absent from the package.
+          "@ | Set-Content -LiteralPath $notes -Encoding UTF8
+          gh release create $env:GITHUB_REF_NAME $zip $sha --title 'Mediova v4.5.5' --notes-file $notes --verify-tag

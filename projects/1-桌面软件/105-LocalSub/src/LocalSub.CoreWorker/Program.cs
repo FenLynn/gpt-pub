@@ -58,6 +58,8 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    static string CurrentVersion => typeof(CoreWorkerHost).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+
     public CoreWorkerHost(string pipeName, int parentPid)
     {
         _pipeName = pipeName;
@@ -115,7 +117,13 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         switch (request.Method.ToLowerInvariant())
         {
             case "ping":
-                await SendResponseAsync(request.Id, true, new { pid = Environment.ProcessId, version = "0.1.0", architecture = "core-worker-v1" }, null);
+                var delayMs = Math.Clamp(GetInt(request.Payload, "delayMs"), 0, 10_000);
+                if (delayMs > 0)
+                {
+                    Log($"PING_DELAY id={request.Id} delayMs={delayMs}");
+                    await Task.Delay(delayMs, _shutdown.Token);
+                }
+                await SendResponseAsync(request.Id, true, new { pid = Environment.ProcessId, version = CurrentVersion, architecture = "core-worker-v1" }, null);
                 break;
             case "cancel":
                 var target = GetString(request.Payload, "requestId");
@@ -304,6 +312,11 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         => payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+
+    static int GetInt(JsonElement payload, string name)
+        => payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty(name, out var value) && value.TryGetInt32(out var result)
+            ? result
+            : 0;
 
     static string[] GetStringArray(JsonElement payload, string name)
     {

@@ -1,6 +1,10 @@
 package media
 
-import "testing"
+import (
+	"testing"
+
+	"mediaworkbench/internal/model"
+)
 
 func TestFitAspectCrop(t *testing.T) {
 	cases := []struct {
@@ -41,5 +45,16 @@ func TestCropAspectNames(t *testing.T) {
 	}
 	if _, _, ok := CropAspect("自由"); ok {
 		t.Fatal("free aspect must not lock")
+	}
+}
+
+func TestImageCropPreservesOddPixels(t *testing.T) {
+	crop := ClampImageCrop(1619, 1600, model.Crop{Enabled: true, X: 3, Y: 5, Width: 611, Height: 777})
+	if crop.X != 3 || crop.Y != 5 || crop.Width != 611 || crop.Height != 777 {
+		t.Fatalf("still-image crop was rounded like video: %+v", crop)
+	}
+	crop = DragImageCropWithAspect(1619, 1600, 3, 5, 614, 782, 0, 0, false)
+	if crop.X != 3 || crop.Y != 5 || crop.Width != 611 || crop.Height != 777 {
+		t.Fatalf("still-image drag lost exact pixels: %+v", crop)
 	}
 }

@@ -1,6 +1,12 @@
 代码/build/
+代码/build*/
 代码/MediovaData/
 代码/testdata/
 代码/**/*.exe
+代码/**/*.zip
+代码/**/*.7z
+代码/**/*.rar
+代码/**/*.msi
+代码/**/*.msix
 代码/portable.mode
 代码/**/*.log

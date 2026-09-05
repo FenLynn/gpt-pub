@@ -31,6 +31,28 @@ type Crop struct {
 	Height  int  `json:"height"`
 }
 
+// GeoLocation keeps the original WGS84 media coordinates. Display providers
+// may derive another coordinate system, but must never overwrite these values.
+type GeoLocation struct {
+	Latitude     float64 `json:"latitude"`
+	Longitude    float64 `json:"longitude"`
+	Altitude     float64 `json:"altitude,omitempty"`
+	HasAltitude  bool    `json:"has_altitude,omitempty"`
+	Accuracy     float64 `json:"accuracy,omitempty"`
+	Timestamp    string  `json:"timestamp,omitempty"`
+	Source       string  `json:"source,omitempty"`
+	Raw          string  `json:"raw,omitempty"`
+	Place        string  `json:"place,omitempty"`
+	PlaceSource  string  `json:"place_source,omitempty"`
+	PlaceChecked bool    `json:"place_checked,omitempty"`
+}
+
+func (g *GeoLocation) Valid() bool {
+	return g != nil &&
+		g.Latitude >= -90 && g.Latitude <= 90 &&
+		g.Longitude >= -180 && g.Longitude <= 180
+}
+
 type TaskOptions struct {
 	// FollowDefaults is retained for v4.1.x session/config compatibility. v4.2.0
 	// materialises explicit options on every ready task; new queue logic must not
@@ -87,6 +109,8 @@ type Task struct {
 	TextSubtitleStreams   int            `json:"text_subtitle_streams,omitempty"`
 	BitmapSubtitleStreams int            `json:"bitmap_subtitle_streams,omitempty"`
 	VariableFrameRate     bool           `json:"variable_frame_rate,omitempty"`
+	Location              *GeoLocation   `json:"location,omitempty"`
+	CaptureTime           string         `json:"capture_time,omitempty"`
 	HDRInfo               string         `json:"hdr_info,omitempty"`
 	InputSize             int64          `json:"input_size"`
 	OutputPath            string         `json:"output_path"`
@@ -96,9 +120,17 @@ type Task struct {
 	Error                 string         `json:"error"`
 	FailureCategory       string         `json:"failure_category,omitempty"`
 	ValidationWarning     string         `json:"validation_warning,omitempty"`
+	DuplicateOf           string         `json:"duplicate_of,omitempty"`
+	PreviouslyConverted   bool           `json:"previously_converted,omitempty"`
+	PreviousOutput        string         `json:"previous_output,omitempty"`
 	Engine                string         `json:"engine"`
 	Pinned                bool           `json:"pinned"`
 	ThumbnailIndex        int            `json:"-"`
+	// StatusText is a UI-only snapshot of the derived status label.  It is
+	// deliberately not persisted: the Win32 owner-draw path must never call
+	// time.Now while painting, or an otherwise idle row can change pixels on
+	// every repaint merely because its ETA text was recalculated.
+	StatusText            string         `json:"-"`
 	Options               TaskOptions    `json:"options"`
 	Queue                 *QueueSnapshot `json:"queue_snapshot,omitempty"`
 	Hold                  *HoldState     `json:"hold_state,omitempty"`
@@ -164,6 +196,7 @@ type Settings struct {
 	ImageOutputDir         string           `json:"image_output_dir,omitempty"`
 	RecentOutputDirs       []string         `json:"recent_output_dirs,omitempty"`
 	RecentImageOutputDirs  []string         `json:"recent_image_output_dirs,omitempty"`
+	RecentSearches         []string         `json:"recent_searches,omitempty"`
 	Resolution             string           `json:"resolution"`
 	Codec                  string           `json:"codec"`
 	Quality                string           `json:"quality"`
@@ -178,6 +211,10 @@ type Settings struct {
 	SpeedMode              string           `json:"speed_mode"`
 	InterfaceMode          string           `json:"interface_mode"`
 	ShowPerformanceStats   bool             `json:"show_performance_stats"`
+	PerformanceMode        string           `json:"performance_mode,omitempty"`
+	PerfOverrideSet        bool             `json:"performance_override_set,omitempty"`
+	PerfPrevAuto           bool             `json:"performance_previous_auto,omitempty"`
+	PerfPrevConcurrency    int              `json:"performance_previous_concurrency,omitempty"`
 	RightPanelVisible      bool             `json:"right_panel_visible"`
 	UILayoutRevision       int              `json:"ui_layout_revision"`
 	TaskColumnWidths       []int            `json:"task_column_widths,omitempty"`
@@ -198,10 +235,22 @@ type Settings struct {
 	RestoreSession         bool             `json:"restore_session"`
 	NotifyOnDone           bool             `json:"notify_on_done"`
 	ShowFloatingBar        bool             `json:"show_floating_bar"`
+	FloatingTopmost        bool             `json:"floating_topmost"`
+	FloatingPositionSet    bool             `json:"floating_position_set"`
+	FloatingX              int              `json:"floating_x"`
+	FloatingY              int              `json:"floating_y"`
 	CompletionToastSeconds int              `json:"completion_toast_seconds"`
 	VerifyOutput           bool             `json:"verify_output"`
 	ThumbnailCache         bool             `json:"thumbnail_cache"`
 	EstimateDiskSpace      bool             `json:"estimate_disk_space"`
+	BatchPreview           bool             `json:"batch_preview"`
+	AuditMetadata          bool             `json:"audit_metadata"`
+	MapEnabled             bool             `json:"map_enabled"`
+	MapFastZoom            bool             `json:"map_fast_zoom"`
+	MapCameraSet           bool             `json:"map_camera_set,omitempty"`
+	MapCenterLatitude      float64          `json:"map_center_latitude,omitempty"`
+	MapCenterLongitude     float64          `json:"map_center_longitude,omitempty"`
+	MapZoom                float64          `json:"map_zoom,omitempty"`
 	SmartStreamCopy        bool             `json:"smart_stream_copy"`
 	AudioMode              string           `json:"audio_mode"`
 	SubtitleMode           string           `json:"subtitle_mode"`
@@ -235,6 +284,7 @@ func DefaultSettings() Settings {
 		SpeedMode:              "均衡",
 		InterfaceMode:          "完整",
 		ShowPerformanceStats:   false,
+		PerformanceMode:        PerformanceModeStandard,
 		RightPanelVisible:      true,
 		UILayoutRevision:       420,
 		AutoBenchmark:          false,
@@ -247,12 +297,16 @@ func DefaultSettings() Settings {
 		ConflictPolicy:         "自动编号",
 		SaveHistory:            true,
 		RestoreSession:         true,
-		NotifyOnDone:           true,
+		NotifyOnDone:           false,
 		ShowFloatingBar:        true,
 		CompletionToastSeconds: 30,
 		VerifyOutput:           true,
 		ThumbnailCache:         true,
 		EstimateDiskSpace:      true,
+		BatchPreview:           true,
+		AuditMetadata:          true,
+		MapEnabled:             true,
+		MapFastZoom:            true,
 		SmartStreamCopy:        false,
 		AudioMode:              "AAC 192k",
 		SubtitleMode:           "不保留字幕",
@@ -260,6 +314,24 @@ func DefaultSettings() Settings {
 		ImageSize:              "保持原尺寸",
 		ImageQuality:           "高",
 		ImageLimit:             "不限",
+	}
+}
+
+const (
+	PerformanceModeStandard   = "标准"
+	PerformanceModeLargeBatch = "大批量"
+	PerformanceModeLowMemory  = "低内存"
+)
+
+// NormalizePerformanceMode keeps settings written by older versions on the
+// conservative, fully featured profile. The value is user-facing on Windows,
+// but lives in model so scheduling and migration tests share one definition.
+func NormalizePerformanceMode(value string) string {
+	switch value {
+	case PerformanceModeLargeBatch, PerformanceModeLowMemory:
+		return value
+	default:
+		return PerformanceModeStandard
 	}
 }
 

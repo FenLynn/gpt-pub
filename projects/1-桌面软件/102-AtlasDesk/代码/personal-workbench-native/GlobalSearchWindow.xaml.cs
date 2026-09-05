@@ -84,18 +84,24 @@ public partial class GlobalSearchWindow : Window
 
     private async void QueryBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        PlaceholderText.Visibility = string.IsNullOrEmpty(QueryBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+        PlaceholderText.Visibility = string.IsNullOrEmpty(QueryBox.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         _searchCancellation?.Cancel();
         _searchCancellation?.Dispose();
         var cancellation = new CancellationTokenSource();
         _searchCancellation = cancellation;
         var generation = Interlocked.Increment(ref _searchGeneration);
+
         try
         {
-            await Task.Delay(120, cancellation.Token);
+            await Task.Delay(70, cancellation.Token);
             await RefreshResultsAsync(QueryBox.Text, cancellation.Token, generation);
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception ex)
         {
             App.Log("Command Center refresh failed: " + ex);
@@ -113,24 +119,88 @@ public partial class GlobalSearchWindow : Window
         CancellationToken cancellationToken = default,
         long generation = 0)
     {
-        if (generation == 0) generation = Interlocked.Increment(ref _searchGeneration);
+        if (generation == 0)
+            generation = Interlocked.Increment(ref _searchGeneration);
+
         var text = query.Trim();
-        StatusText.Text = string.IsNullOrWhiteSpace(text) ? "正在读取快速入口…" : "正在搜索…";
-        var results = await CommandCenterCatalog.SearchAsync(_settings, text, cancellationToken);
+        StatusText.Text = string.IsNullOrWhiteSpace(text) ? "正在读取快捷入口…" : "正在搜索…";
+
+        var catalogTask = CommandCenterCatalog.SearchAsync(_settings, text, cancellationToken);
+        var contextTask = Task.Run(
+            () => ProductivityContextStore.BuildSearchResults(_settings, text),
+            cancellationToken);
+        await Task.WhenAll(catalogTask, contextTask);
         cancellationToken.ThrowIfCancellationRequested();
-        if (generation != _searchGeneration) return;
+        if (generation != _searchGeneration)
+            return;
+
+        var results = contextTask.Result
+            .Concat(catalogTask.Result)
+            .GroupBy(
+                item => item.Kind + "|" + item.Action + "|" + item.Target + "|" + item.Title,
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(item => RankMatch(item, text))
+            .ThenBy(RankDefault)
+            .ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+            .Take(string.IsNullOrWhiteSpace(text) ? 24 : CommandCenterCatalog.MaxTotalResults)
+            .ToArray();
 
         ResultsList.ItemsSource = results;
-        EmptyState.Visibility = results.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = results.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         StatusText.Text = string.IsNullOrWhiteSpace(text)
-            ? $"AtlasDesk 快速入口 · {results.Count} 项"
-            : $"搜索“{text}” · {results.Count} 项";
-        if (results.Count > 0) ResultsList.SelectedIndex = 0;
+            ? $"快速打开 · {results.Length} 项"
+            : $"搜索“{text}” · {results.Length} 项";
+        ResultsList.SelectedIndex = results.Length > 0 ? 0 : -1;
     }
+
+    private static int RankMatch(GlobalSearchResult item, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return 0;
+        if (string.Equals(item.Title, query, StringComparison.CurrentCultureIgnoreCase))
+            return 0;
+        if (item.Title.StartsWith(query, StringComparison.CurrentCultureIgnoreCase))
+            return 1;
+        if (item.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            return 2;
+        if (item.Category.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            return 3;
+        if (item.Subtitle.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            return 4;
+        return 5;
+    }
+
+    private static int RankDefault(GlobalSearchResult item)
+        => item.Action switch
+        {
+            "context-open-project" => 0,
+            "context-open-terminal" => 1,
+            "context-open-dashboard" => 2,
+            "context-open-favorite" => 3,
+            "context-open-research" => 4,
+            "navigate" => 10,
+            "workspace-item" => 20,
+            "new-terminal" => 30,
+            "context-run-command" => 31,
+            "context-edit-current" => 40,
+            "refresh-home" => 50,
+            "open-root" or "open-config" or "open-logs" => 60,
+            _ => item.Kind switch
+            {
+                GlobalSearchResultKind.Project => 5,
+                GlobalSearchResultKind.Navigation => 10,
+                GlobalSearchResultKind.Workspace => 20,
+                GlobalSearchResultKind.Command => 30,
+                GlobalSearchResultKind.Zotero => 40,
+                _ => 70
+            }
+        };
 
     private void ExecuteSelected()
     {
-        if (ResultsList.SelectedItem is not GlobalSearchResult result) return;
+        if (ResultsList.SelectedItem is not GlobalSearchResult result)
+            return;
         ResultInvoked?.Invoke(this, new GlobalSearchInvokedEventArgs(result));
         Close();
     }
@@ -139,14 +209,12 @@ public partial class GlobalSearchWindow : Window
     {
         if (e.Key == Key.Down)
         {
-            ResultsList.SelectedIndex = Math.Min(ResultsList.Items.Count - 1, ResultsList.SelectedIndex + 1);
-            ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+            MoveSelection(1);
             e.Handled = true;
         }
         else if (e.Key == Key.Up)
         {
-            ResultsList.SelectedIndex = Math.Max(0, ResultsList.SelectedIndex - 1);
-            ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+            MoveSelection(-1);
             e.Handled = true;
         }
         else if (e.Key == Key.Enter)
@@ -156,9 +224,19 @@ public partial class GlobalSearchWindow : Window
         }
     }
 
+    private void MoveSelection(int offset)
+    {
+        if (ResultsList.Items.Count == 0)
+            return;
+        var current = ResultsList.SelectedIndex < 0 ? 0 : ResultsList.SelectedIndex;
+        ResultsList.SelectedIndex = Math.Clamp(current + offset, 0, ResultsList.Items.Count - 1);
+        ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+    }
+
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape) Close();
+        if (e.Key == Key.Escape)
+            Close();
     }
 
     private void ResultsList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => ExecuteSelected();

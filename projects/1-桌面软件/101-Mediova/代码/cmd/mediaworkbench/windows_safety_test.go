@@ -4,6 +4,7 @@ package main
 
 import (
 	"testing"
+	"time"
 	"unsafe"
 
 	"mediaworkbench/internal/model"
@@ -15,6 +16,29 @@ func TestLayoutSafeBeforeControls(t *testing.T) {
 	a.layout(1650, 900)
 	a.controlsReady = true
 	a.layout(1650, 900)
+}
+
+func TestBottomComboDropHeightsKeepCandidateRowsVisible(t *testing.T) {
+	// Native ComboBox height includes its popup list. A one-row 31/32px layout
+	// makes the arrow clickable but leaves the candidate list effectively empty.
+	if bottomParameterDropHeight < 120 {
+		t.Fatalf("parameter drop height=%d, want room for multiple rows", bottomParameterDropHeight)
+	}
+	if outputHistoryDropHeight < 120 {
+		t.Fatalf("output-history drop height=%d, want room for multiple rows", outputHistoryDropHeight)
+	}
+}
+
+func TestPotPlayerLaunchArgsKeepMediaTargetFirst(t *testing.T) {
+	path := `D:\媒体 文件\示例 视频.mp4`
+	ordinary := potPlayerLaunchArgs(path, false)
+	if len(ordinary) != 1 || ordinary[0] != path {
+		t.Fatalf("ordinary PotPlayer args = %#v", ordinary)
+	}
+	separate := potPlayerLaunchArgs(path, true)
+	if len(separate) != 2 || separate[0] != path || separate[1] != "/new" {
+		t.Fatalf("separate-window PotPlayer args = %#v", separate)
+	}
 }
 
 func TestFileDialogFilterKeepsDoubleNUL(t *testing.T) {
@@ -81,6 +105,33 @@ func TestTaskCellMetrics(t *testing.T) {
 	progress, progressLabel := progressCellMetrics(task)
 	if progress < 0.605 || progress > 0.607 || progressLabel != "60.6%" {
 		t.Fatalf("progress metrics = %v %q", progress, progressLabel)
+	}
+}
+
+func TestTaskStatusTextIsStableBetweenProgressUpdates(t *testing.T) {
+	started := time.Date(2026, time.September, 5, 8, 0, 0, 0, time.UTC)
+	task := &model.Task{
+		Input:     `C:\media\sample.mp4`,
+		Kind:      model.KindVideo,
+		Status:    model.StatusProcessing,
+		Progress:  50,
+		StartedAt: started,
+	}
+	syncTaskStatusText(task, started.Add(2*time.Minute))
+	if task.StatusText != "剩余 02:00" {
+		t.Fatalf("initial ETA snapshot = %q", task.StatusText)
+	}
+	a := &application{settings: model.DefaultSettings()}
+	first := a.taskTexts(task)[10]
+	// A later paint must reuse the stored status rather than calculate a new
+	// ETA from the wall clock. The next progress update refreshes the snapshot.
+	second := a.taskTexts(task)[10]
+	if first != task.StatusText || second != task.StatusText {
+		t.Fatalf("paint-time status changed: first=%q second=%q snapshot=%q", first, second, task.StatusText)
+	}
+	syncTaskStatusText(task, started.Add(3*time.Minute))
+	if task.StatusText != "剩余 03:00" {
+		t.Fatalf("progress-update ETA snapshot = %q", task.StatusText)
 	}
 }
 
@@ -264,22 +315,22 @@ func TestPrepareTaskForRetrySafety(t *testing.T) {
 func TestCompareTaskColumn(t *testing.T) {
 	a := &model.Task{Input: `C:\x\b.mp4`, InputSize: 20, OutputSize: 4, Progress: 80, Status: model.StatusDone, Width: 1920, Height: 1080, Duration: 90}
 	b := &model.Task{Input: `C:\x\a.mp4`, InputSize: 10, OutputSize: 8, Progress: 10, Status: model.StatusFailed, Width: 1280, Height: 720, Duration: 30}
-	if compareTaskColumn(a, b, 0) <= 0 {
+	if compareTaskColumn(a, b, taskColFile) <= 0 {
 		t.Fatal("filename sort failed")
 	}
-	if compareTaskColumn(a, b, 2) <= 0 {
+	if compareTaskColumn(a, b, taskColDuration) <= 0 {
 		t.Fatal("duration sort failed")
 	}
-	if compareTaskColumn(a, b, 7) <= 0 {
+	if compareTaskColumn(a, b, taskColInputSize) <= 0 {
 		t.Fatal("input-size sort failed")
 	}
-	if compareTaskColumn(a, b, 9) <= 0 {
+	if compareTaskColumn(a, b, taskColProgress) <= 0 {
 		t.Fatal("progress sort failed")
 	}
-	if compareTaskColumn(a, b, 10) <= 0 {
+	if compareTaskColumn(a, b, taskColStatus) <= 0 {
 		t.Fatal("status rank sort failed")
 	}
-	if taskSortLabel(8) != "输出体积" {
+	if taskSortLabel(taskColOutputSize) != "输出体积" {
 		t.Fatal("sort label mismatch")
 	}
 }
@@ -296,8 +347,8 @@ func TestSelectionRowsPreserveIDsAfterSort(t *testing.T) {
 }
 
 func TestNormalizedTaskColumnWidths(t *testing.T) {
-	got := normalizedTaskColumnWidths([]int{400, 10, 901, 160})
-	want := []int{400, 100, 76, 160, 116, 58, 90, 92, 140, 105, 124}
+	got := normalizedTaskColumnWidths([]int{40, 400, 10, 901, 160})
+	want := []int{40, 400, 100, 76, 160, 116, 58, 90, 92, 140, 105, 124}
 	if len(got) != len(want) {
 		t.Fatalf("column widths len=%d want=%d", len(got), len(want))
 	}
@@ -307,8 +358,14 @@ func TestNormalizedTaskColumnWidths(t *testing.T) {
 		}
 	}
 	legacy := normalizedTaskColumnWidths([]int{290, 105, 74, 120, 60, 94, 96, 140, 105, 124})
-	if len(legacy) != 11 || legacy[0] != 290 || legacy[1] != 105 || legacy[2] != 76 || legacy[3] != 74 || legacy[10] != 124 {
-		t.Fatalf("legacy column migration failed: %#v", legacy)
+	wantLegacy := []int{48, 290, 105, 76, 74, 120, 60, 94, 96, 140, 105, 124}
+	if len(legacy) != len(wantLegacy) {
+		t.Fatalf("legacy column widths len=%d want=%d: %#v", len(legacy), len(wantLegacy), legacy)
+	}
+	for i := range wantLegacy {
+		if legacy[i] != wantLegacy[i] {
+			t.Fatalf("legacy column width[%d]=%d want=%d: %#v", i, legacy[i], wantLegacy[i], legacy)
+		}
 	}
 }
 
@@ -369,7 +426,7 @@ func TestCleanupTaskListCurrentWorkspaceOnly(t *testing.T) {
 func TestTopToolbarResponsiveBandsKeepSearchGap(t *testing.T) {
 	for _, width := range []int32{980, 1050, 1119, 1120, 1200, 1280, 1319, 1320, 1499, 1500, 1640, 1920} {
 		band := topBandForWidth(width)
-		if len(band.toolWidths) != 10 {
+		if len(band.toolWidths) != 11 {
 			t.Fatalf("width=%d toolbar buttons=%d", width, len(band.toolWidths))
 		}
 		toggleW := int32(32)
@@ -378,10 +435,9 @@ func TestTopToolbarResponsiveBandsKeepSearchGap(t *testing.T) {
 		}
 		toggleX := width - 8 - toggleW
 		gridX := toggleX - 7 - band.statusGridW
-		filterX := gridX - 8 - band.filterW
-		searchRight := filterX - 7
+		groupRight := gridX - 8
 		searchLeft := toolbarRightEdge(band) + 8
-		if available := searchRight - searchLeft; available < 90 {
+		if available := groupRight - searchLeft; available < 90 {
 			t.Fatalf("width=%d leaves only %d px between toolbar and filter", width, available)
 		}
 	}

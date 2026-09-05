@@ -407,7 +407,38 @@ internal sealed class AppHost : IDisposable
                 await _configStore.SaveAsync(Config, _activeRun.Token).ConfigureAwait(false);
                 await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
                 PublishProgress(EngineState.Running, probe.GroupKey, null,
-                    $"新周期真实上传探测已通过，本次探测上传 {probe.UploadBytes} B。新周期已确认，下一重置日期为 {Config.NextResetAt:yyyy-MM-dd}，继续长期迁移。");
+                    $"新周期真实上传探测已通过，本次探测上传 {probe.UploadBytes} B。新周期已确认，下一重置日期为 {Config.NextResetAt:yyyy-MM-dd}，先执行源端对账。" );
+            }
+
+            ReconciliationGateV030 reconciliation;
+            try
+            {
+                reconciliation = await ReconciliationRuntimeV030.BeforeMigrationAsync(this, _activeRun.Token).ConfigureAwait(false);
+            }
+            catch (HttpRequestException ex)
+            {
+                State.EngineState = EngineState.WaitNetwork;
+                State.CurrentGroupKey = null;
+                await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                PublishProgress(EngineState.WaitNetwork, null, null, $"周期源端对账遇到网络错误：{ex.Message}");
+                return;
+            }
+            catch (Exception ex) when (ex is WebDavException or IOException or InvalidDataException)
+            {
+                State.EngineState = EngineState.WaitRetry;
+                State.CurrentGroupKey = null;
+                await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                PublishProgress(EngineState.WaitRetry, null, null, $"周期源端对账未能安全完成：{ex.Message}");
+                return;
+            }
+
+            if (reconciliation.RequiresHumanAction)
+            {
+                State.EngineState = EngineState.WaitUser;
+                State.CurrentGroupKey = null;
+                await _stateStore.SaveAsync(State, _activeRun.Token).ConfigureAwait(false);
+                PublishProgress(EngineState.WaitUser, null, null, reconciliation.Message);
+                return;
             }
 
             var secrets = await _credentialStore.LoadAsync(_activeRun.Token).ConfigureAwait(false);
@@ -467,6 +498,7 @@ internal sealed class AppHost : IDisposable
             EngineState.WaitNetwork => TimeSpan.FromMinutes(10),
             EngineState.WaitRetry => TimeSpan.FromMinutes(10),
             EngineState.WaitQuota => GetQuotaDelay(),
+            EngineState.WaitUser => TimeSpan.FromHours(6),
             EngineState.Complete => TimeSpan.FromHours(24),
             EngineState.Paused => TimeSpan.FromMinutes(30),
             _ => TimeSpan.FromMinutes(5)

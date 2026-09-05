@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"mediaworkbench/internal/model"
 )
 
 type StreamInfo struct {
@@ -45,6 +47,8 @@ type ProbeInfo struct {
 	ColorTransfer     string
 	ColorPrimaries    string
 	HDRInfo           string
+	Location          *model.GeoLocation
+	CaptureTime       string
 }
 
 type ffprobeResult struct {
@@ -72,8 +76,9 @@ type ffprobeResult struct {
 		} `json:"side_data_list"`
 	} `json:"streams"`
 	Format struct {
-		Duration string `json:"duration"`
-		BitRate  string `json:"bit_rate"`
+		Duration string            `json:"duration"`
+		BitRate  string            `json:"bit_rate"`
+		Tags     map[string]string `json:"tags"`
 	} `json:"format"`
 }
 
@@ -176,6 +181,8 @@ func ProbeContext(ctx context.Context, ffprobePath, input string) (ProbeInfo, er
 	}
 	p.HDRInfo = detectHDR(p.ColorTransfer, p.ColorPrimaries, p.PixelFormat)
 	if p.Width <= 0 || p.Height <= 0 {
+		p.Location, p.CaptureTime = locationFromTags(r.Format.Tags)
+
 		return p, fmt.Errorf("未检测到视频画面")
 	}
 	return p, nil

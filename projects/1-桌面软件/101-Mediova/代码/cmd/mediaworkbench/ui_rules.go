@@ -99,6 +99,41 @@ func rememberRecentDirectory(current string, previous []string, limit int) []str
 	return result
 }
 
+func rememberRecentSearch(current string, previous []string, limit int) []string {
+	current = strings.TrimSpace(current)
+	if limit <= 0 {
+		limit = 10
+	}
+	result := make([]string, 0, limit)
+	seen := make(map[string]bool, limit)
+	appendOne := func(query string) {
+		query = strings.TrimSpace(query)
+		key := strings.ToLower(query)
+		if key == "" || seen[key] || len(result) >= limit {
+			return
+		}
+		seen[key] = true
+		result = append(result, query)
+	}
+	appendOne(current)
+	for _, query := range previous {
+		appendOne(query)
+	}
+	return result
+}
+
+func stringSlicesEqual(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
 type controlVisualState struct {
 	Active   bool
 	Hovered  bool

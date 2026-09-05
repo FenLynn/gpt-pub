@@ -2,6 +2,8 @@ namespace PersonalWorkbench;
 
 public partial class ZoteroLibraryControl
 {
+    public string CurrentSearchQuery => SearchBox.Text?.Trim() ?? string.Empty;
+
     public async Task ApplyExternalSearchAsync(string query)
     {
         await EnsureLoadedAsync();

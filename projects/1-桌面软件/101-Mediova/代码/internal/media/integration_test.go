@@ -66,6 +66,16 @@ func TestRealFFmpegPipeline(t *testing.T) {
 	if e != nil {
 		t.Fatalf("image: %v", e)
 	}
+	for _, format := range []string{"WebP", "AVIF"} {
+		io.ImageFormat = format
+		out := filepath.Join(d, "out"+OutputExtension(model.KindImage, io))
+		if _, e = Convert(context.Background(), ff, ConvertRequest{Input: img, Output: out, Kind: model.KindImage, Options: io, Settings: s}, nil); e != nil {
+			t.Fatalf("%s image: %v", format, e)
+		}
+		if e = ValidateOutputPresence(out); e != nil {
+			t.Fatalf("%s output: %v", format, e)
+		}
+	}
 }
 
 func TestRealPreviewAndComparison(t *testing.T) {

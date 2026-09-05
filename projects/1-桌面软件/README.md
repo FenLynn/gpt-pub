@@ -12,10 +12,11 @@
 
 | 编号 | 项目 | 状态 | 正式路径 |
 |---|---|---|---|
-| P101 | [Mediova](101-Mediova/) | v4.5.0 已正式发布 | `101-Mediova/` |
-| P102 | [AtlasDesk](102-AtlasDesk/) | v0.8.0 已正式发布 | `102-AtlasDesk/` |
-| P103 | [DavBridge](103-DavBridge/) | v0.1.0 核心可靠性开发中 | `103-DavBridge/` |
-| P105 | [LocalSub](105-LocalSub/) | Phase 1A 双进程隔离已建立，实机响应性待验证 | `105-LocalSub/` |
+| P101 | [Mediova](101-Mediova/) | v4.5.5 稳定候选，待实机验收 | `101-Mediova/` |
+| P102 | [AtlasDesk](102-AtlasDesk/) | v1.3.0 候选源码已纳入主线 | `102-AtlasDesk/` |
+| P103 | [DavBridge](103-DavBridge/) | v0.4 候选源码已纳入主线 | `103-DavBridge/` |
+| P104 | [CodexHandoff](104-CodexHandoff/) | v1.0.0-alpha.1 Tauri 重构开发中 | `104-CodexHandoff/` |
+| P105 | [LocalSub](105-LocalSub/) | v0.1.1-dev 候选源码已纳入主线 | `105-LocalSub/` |
 
 ## 分支模型
 
@@ -24,6 +25,7 @@
 | P101 | `p101-exp` | `p101-stable` | `main` |
 | P102 | `p102-exp` | `p102-stable` | `main` |
 | P103 | `p103-exp` | `p103-stable` | `main` |
+| P104 | `p104-exp` | `p104-stable` | `main` |
 | P105 | `p105-exp` | `p105-stable` | `main` |
 
 默认流程：`main → exp → stable → main → 标签与 Release → 回流 exp/stable`。

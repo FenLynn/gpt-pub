@@ -34,6 +34,8 @@ LocalSub.Core.exe
 
 已经迁入 Core 的后台媒体分析和后台转写禁止静默回退到 GUI 进程。Core 异常时当前后台任务可以失败，但 `LocalSub.exe` 应继续存活，下一次后台任务按需重新启动 Core。
 
+v0.1.1-dev 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显式失效、取消超时回收、Shell 正常退出主动 shutdown，以及 Windows CI 中真实强杀 Core 后重连的新故障注入门禁。自动恢复门禁不能替代用户真实高负载下的窗口响应性验收。
+
 详细架构见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
 ## 运行与分发边界
@@ -50,7 +52,7 @@ LocalSub.Core.exe
 
 ## 当前状态
 
-- Phase 1A：代码与 Windows CI 已完成第一版，P105 正式准入后继续做用户实机响应性验收。
+- Phase 1A：正式基线已进入 main；`p105-exp` 正在验证 v0.1.1-dev Core 崩溃恢复加强版，仍等待用户真实 Windows 响应性验收。
 - Phase 1B：计划将实时 Zipformer、SenseVoice、WASAPI、PotPlayer Process Loopback 和模型重任务逐步迁入 Core。
 - Phase 2：Core API 稳定后再引入 WebView2 + Vue 3 + TypeScript 主界面，不进行一次性全量重写。
 

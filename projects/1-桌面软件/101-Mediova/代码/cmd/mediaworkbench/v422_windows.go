@@ -12,33 +12,16 @@ import (
 	"mediaworkbench/internal/model"
 )
 
-// drawStatusLamp uses a font-rendered vector glyph rather than a tiny GDI
-// ellipse. Windows applies font antialiasing at every DPI, so the four status
-// indicators remain round and crisp on 100%-200% displays.
+// drawStatusLamp uses an explicitly square GDI ellipse. Its diameter is
+// derived from the status text height and remains circular at every DPI.
 func drawStatusLamp(hdc uintptr, rc rect, color uintptr) {
-	lamp := rect{
-		Left:   rc.Left + scaleDPI(2),
-		Top:    rc.Top,
-		Right:  rc.Left + scaleDPI(23),
-		Bottom: rc.Bottom,
-	}
-	drawCenteredText(hdc, "●", lamp, uiFontTitle, color)
+	v452DrawTrueStatusLamp(hdc, rc, color)
 }
 
 func drawCompactResetGlyph(hdc uintptr, rc rect, color uintptr) {
-	cx := rc.Left + scaleDPI(15)
-	cy := (rc.Top + rc.Bottom) / 2
-	radius := scaleDPI(4)
-	pen, _, _ := procCreatePen.Call(PS_SOLID, 1, color)
-	oldPen, _, _ := procSelectObject.Call(hdc, pen)
-	hollow, _, _ := procGetStockObject.Call(NULL_BRUSH)
-	oldBrush, _, _ := procSelectObject.Call(hdc, hollow)
-	procEllipse.Call(hdc, uintptr(cx-radius), uintptr(cy-radius), uintptr(cx+radius), uintptr(cy+radius))
-	drawGDIline(hdc, cx+radius-1, cy-radius, cx+radius+3, cy-radius)
-	drawGDIline(hdc, cx+radius+3, cy-radius, cx+radius+3, cy-radius+4)
-	procSelectObject.Call(hdc, oldBrush)
-	procSelectObject.Call(hdc, oldPen)
-	procDeleteObject.Call(pen)
+	icon := rc
+	icon.Right = icon.Left + scaleDPI(30)
+	drawCenteredText(hdc, "\uE72C", icon, iconFont, color)
 }
 
 // drawContrastCenteredText measures the complete label, keeps it centred, and
@@ -187,18 +170,18 @@ func (a *application) v422SummarizeProgress(kind model.Kind, only map[int64]bool
 	return summary
 }
 
-func (summary v422ProgressSummary) render(kind model.Kind, running bool, start time.Time, paused, showStats bool) (float64, string, time.Duration, time.Duration, string) {
+func (summary v422ProgressSummary) render(kind model.Kind, running bool, elapsed time.Duration, paused, showStats bool) (float64, string, time.Duration, time.Duration, string) {
 	pct := 0.0
 	if summary.Total > 0 {
 		pct = summary.Sum / float64(summary.Total)
 	}
 	pct = clamp01(pct/100) * 100
 	text := fmt.Sprintf("已完成 %d/%d · 总进度 %.1f%%", summary.Completed, summary.Total, pct)
-	var elapsed, remaining time.Duration
+	var remaining time.Duration
 	speed := "—"
 	if running {
-		if !start.IsZero() {
-			elapsed = time.Since(start)
+		if elapsed < 0 {
+			elapsed = 0
 		}
 		text += " · 已用 " + formatDuration(elapsed)
 		if pct > .2 && pct < 100 && elapsed > 0 {

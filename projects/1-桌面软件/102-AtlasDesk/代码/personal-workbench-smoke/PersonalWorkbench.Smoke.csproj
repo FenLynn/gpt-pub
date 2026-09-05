@@ -12,4 +12,15 @@
     <ProjectReference Include="..\personal-workbench-residency-smoke\AtlasDesk.ResidencySmoke.csproj"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- v1.1.4-v1.1.9 Dashboard hotfix checks describe the retired recovery/
+         process-embedding architecture. Keep the source files as historical records,
+         but do not execute them against the simplified v1.1.10 product. -->
+    <Compile Remove="V114DashboardStabilityChecks.cs" />
+    <Compile Remove="V115DashboardProcessOwnershipChecks.cs" />
+    <Compile Remove="V116DashboardProcessIsolationChecks.cs" />
+    <Compile Remove="V117DashboardInputFocusChecks.cs" />
+    <Compile Remove="V118AccessSessionContinuityChecks.cs" />
+    <Compile Remove="V119AuthenticationFocusRebindChecks.cs" />
+  </ItemGroup>
 </Project>

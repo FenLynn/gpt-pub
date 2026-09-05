@@ -132,14 +132,68 @@ func OutputExtension(kind model.Kind, opts model.TaskOptions) string {
 	if kind == model.KindVideo {
 		return ".mp4"
 	}
-	if strings.EqualFold(opts.ImageFormat, "PNG") {
+	switch strings.ToUpper(strings.TrimSpace(opts.ImageFormat)) {
+	case "PNG":
 		return ".png"
+	case "WEBP":
+		return ".webp"
+	case "AVIF":
+		return ".avif"
+	default:
+		return ".jpg"
 	}
-	return ".jpg"
 }
 
 func ResolveOutputPath(input, root, outputDir string, kind model.Kind, opts model.TaskOptions, settings model.Settings) (path string, skip bool, err error) {
 	return ResolveOutputPathAvoiding(input, root, outputDir, kind, opts, settings, nil)
+}
+
+// PlanOutputPath applies the same naming, tree-preservation and conflict rules
+// as the converter without creating any directory. Inspecting a plan therefore
+// never mutates the output tree.
+func PlanOutputPath(input, root, outputDir string, kind model.Kind, opts model.TaskOptions, settings model.Settings) (path string, skip bool, err error) {
+	base := strings.TrimSuffix(filepath.Base(input), filepath.Ext(input))
+	ext := OutputExtension(kind, opts)
+	if settings.FilenameMode == "添加规格后缀" {
+		if kind == model.KindVideo {
+			codec := strings.ReplaceAll(opts.Codec, ".", "")
+			base += "_" + sanitizeSuffix(opts.Resolution) + "_" + sanitizeSuffix(codec)
+		} else {
+			base += "_" + sanitizeSuffix(opts.ImageSize)
+		}
+	}
+	root, outputPrefix := ResolveRootContext(input, root, settings.LastInputDir)
+	outputDir = OutputRootWithPrefix(outputDir, outputPrefix)
+	dir := outputDir
+	if root != "" {
+		rel, relErr := filepath.Rel(root, filepath.Dir(input))
+		if relErr == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			dir = filepath.Join(outputDir, rel)
+		}
+	}
+	candidate := filepath.Join(dir, base+ext)
+	if filepath.Clean(candidate) == filepath.Clean(input) {
+		candidate = filepath.Join(dir, base+"_converted"+ext)
+	}
+	exists := func(candidate string) bool {
+		_, statErr := os.Stat(candidate)
+		return statErr == nil || !os.IsNotExist(statErr)
+	}
+	if !exists(candidate) {
+		return candidate, false, nil
+	}
+	switch settings.ConflictPolicy {
+	case "覆盖已有":
+		return candidate, false, nil
+	case "跳过已有":
+		return candidate, true, nil
+	}
+	for i := 1; ; i++ {
+		next := filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, i, ext))
+		if !exists(next) {
+			return next, false, nil
+		}
+	}
 }
 
 // ResolveOutputPathAvoiding is the concurrency-safe form used by the queue. The
@@ -156,6 +210,8 @@ func ResolveOutputPathAvoiding(input, root, outputDir string, kind model.Kind, o
 			base += "_" + sanitizeSuffix(opts.ImageSize)
 		}
 	}
+	root, outputPrefix := ResolveRootContext(input, root, settings.LastInputDir)
+	outputDir = OutputRootWithPrefix(outputDir, outputPrefix)
 	dir := outputDir
 	if root != "" {
 		rel, e := filepath.Rel(root, filepath.Dir(input))
@@ -234,6 +290,8 @@ func PreserveTimes(src, dst string) error { return preserveTimesPlatform(src, ds
 // restored parent directory. Root itself is excluded because it is the parent
 // of the user-selected top-level folder.
 func PreserveOutputTreeTimes(input, root, outputRoot string) error {
+	root, outputPrefix := DecodeRootContext(root)
+	outputRoot = OutputRootWithPrefix(outputRoot, outputPrefix)
 	if strings.TrimSpace(root) == "" || strings.TrimSpace(outputRoot) == "" {
 		return nil
 	}

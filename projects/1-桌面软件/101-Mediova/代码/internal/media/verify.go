@@ -34,6 +34,10 @@ func ClassifyFailure(err error) string {
 		return "磁盘空间不足"
 	case strings.Contains(s, "unknown encoder"), strings.Contains(s, "cannot load"), strings.Contains(s, "device setup failed"), strings.Contains(s, "no capable devices"):
 		return "编码器不可用"
+	case strings.Contains(s, "decoder not found"), strings.Contains(s, "unknown decoder"), strings.Contains(s, "error while opening decoder"), strings.Contains(s, "unsupported codec"), strings.Contains(s, "not currently supported"), strings.Contains(s, "apple_apac"):
+		return "输入编码不受支持"
+	case strings.Contains(s, "windows heif"), strings.Contains(s, "heic 图像扩展"), strings.Contains(s, "heif 图像扩展"):
+		return "HEIC/HEIF 解码不可用"
 	case strings.Contains(s, "invalid data"), strings.Contains(s, "moov atom not found"), strings.Contains(s, "could not find codec parameters"), strings.Contains(s, "检测失败"):
 		return "输入媒体损坏或不支持"
 	case strings.Contains(s, "目标体积"):
@@ -59,6 +63,12 @@ func EstimateOutputBytes(t *model.Task, opts model.TaskOptions) int64 {
 		if t.InputSize > 0 {
 			if strings.EqualFold(opts.ImageFormat, "PNG") {
 				return t.InputSize
+			}
+			if strings.EqualFold(opts.ImageFormat, "AVIF") {
+				return int64(float64(t.InputSize) * .45)
+			}
+			if strings.EqualFold(opts.ImageFormat, "WebP") {
+				return int64(float64(t.InputSize) * .60)
 			}
 			return int64(float64(t.InputSize) * .75)
 		}
@@ -127,8 +137,12 @@ func VerifyOutput(ctx context.Context, ffmpeg, ffprobe string, req ConvertReques
 	if expected > 0 && math.Abs(p.Duration-expected) > tolerance {
 		warnings = append(warnings, fmt.Sprintf("输出时长 %.2fs 与预期 %.2fs 偏差较大", p.Duration, expected))
 	}
-	if req.Probe.AudioStreams > 0 && req.Settings.AudioMode != "静音" && p.AudioStreams != req.Probe.AudioStreams {
-		return VerificationResult{Category: "输出轨道不完整"}, fmt.Errorf("输出音轨数量 %d，与预期 %d 不一致", p.AudioStreams, req.Probe.AudioStreams)
+	expectedAudio := expectedAudioStreams(req)
+	if p.AudioStreams != expectedAudio {
+		return VerificationResult{Category: "输出轨道不完整"}, fmt.Errorf("输出音轨数量 %d，与兼容计划预期 %d 不一致", p.AudioStreams, expectedAudio)
+	}
+	if skipped := skippedAudioStreams(req); skipped > 0 {
+		warnings = append(warnings, fmt.Sprintf("已跳过 %d 条当前 FFmpeg 不支持的音轨", skipped))
 	}
 	expectedSubs := expectedTextSubtitleStreams(req)
 	if p.SubtitleStreams != expectedSubs {
