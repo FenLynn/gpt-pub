@@ -365,13 +365,18 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $marker='projects/1-桌面软件/105-LocalSub/RELEASE.md'
-          $changed=@(git diff --name-only "$env:GITHUB_SHA^1" "$env:GITHUB_SHA")
-          if ($changed -contains $marker) {
+          $PSNativeCommandUseErrorActionPreference=$false
+          git diff --quiet "$env:GITHUB_SHA^1" "$env:GITHUB_SHA" -- "$marker"
+          $diffExit=$LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference=$true
+          if ($diffExit -eq 1) {
             'requested=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
             Write-Host 'P105 RELEASE.md changed in this main commit; formal release requested.'
-          } else {
+          } elseif ($diffExit -eq 0) {
             'requested=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
             Write-Host 'No P105 release marker change; release job will stop without publishing.'
+          } else {
+            throw "git diff failed while checking P105 RELEASE.md. ExitCode=$diffExit"
           }
 
       - name: Resolve and guard release identity
