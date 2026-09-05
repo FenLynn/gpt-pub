@@ -6,6 +6,8 @@ Version: 0.1.1
 
 2026-09-05，用户明确要求将当前稳定 LocalSub 固化为正式版本，并从最新 `main` 创建正式 Release。
 
+首次 exact-main build 已完整通过，但 Release job 因 GitHub Actions 对 skipped 上游 job 的隐式依赖语义而未执行发布步骤。该问题只影响发布 job 调度，不影响已经成功的 build 与 smoke。当前已修正 release job 条件，并重新更新本发布标记，使修复后的 main 合并提交再次显式请求 v0.1.1 正式发布。
+
 ## 发布边界
 
 - 正式标签：`p105-v0.1.1`
