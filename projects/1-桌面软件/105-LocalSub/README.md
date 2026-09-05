@@ -10,7 +10,8 @@ LocalSub 是 Windows 本地实时字幕与后台媒体转写工具，优先服�
 - 稳定候选：`p105-stable`
 - 正式主线：`main`
 - 固定流转：`main → p105-exp → p105-stable → main`
-- 旧 `p103-localsub-*` 仅属于编号错误的迁移历史，不再作为活动开发入口。
+- P105 长期只保留 `p105-exp` 与 `p105-stable` 两条项目分支。
+- 旧 `p103-localsub-*` 仅属于编号错误的历史，不再作为活动开发入口。
 
 ## 当前架构基线
 
@@ -32,9 +33,9 @@ LocalSub.Core.exe
 └─ 后台离线 ASR
 ```
 
-已经迁入 Core 的后台媒体分析和后台转写禁止静默回退到 GUI 进程。Core 异常时当前后台任务可以失败，但 `LocalSub.exe` 应继续存活，下一次后台任务按需重新启动 Core。
+已经迁入 Core 的后台媒体分析和后台转写禁止静默回退到 GUI 进程。Core 异常时当前后台任务明确失败，`LocalSub.exe` 应继续存活，下一次后台任务按需重新启动 Core。
 
-v0.1.1-dev 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显式失效、取消超时回收、Shell 正常退出主动 shutdown，以及 Windows CI 中真实强杀 Core 后重连的新故障注入门禁。自动恢复门禁不能替代用户真实高负载下的窗口响应性验收。
+v0.1.1 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显式失效、取消超时回收、Shell 正常退出主动 shutdown，以及 Windows CI 中真实强杀 Core 后重连的故障注入门禁。
 
 详细架构见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
@@ -52,8 +53,11 @@ v0.1.1-dev 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显
 
 ## 当前状态
 
-- Phase 1A：正式基线已进入 main；`p105-exp` 正在验证 v0.1.1-dev Core 崩溃恢复加强版，仍等待用户真实 Windows 响应性验收。
-- Phase 1B：计划将实时 Zipformer、SenseVoice、WASAPI、PotPlayer Process Loopback 和模型重任务逐步迁入 Core。
+- v0.1.1：源码已存在于 `main`，2026-09-05 用户明确要求将当前稳定状态正式固化并发布；当前正在按 `p105-exp → p105-stable → main` 完成正式发布准入。
+- 正式发布使用 [`RELEASE.md`](RELEASE.md) 显式触发，必须从合入后的准确 `main` SHA 重新构建和验证，再创建 `p105-v0.1.1` Release。
+- Phase 1A 自动门禁已覆盖 Core IPC、Core 强杀与 generation 2 重连、Shell 启动、后台工作区、Process Loopback、sherpa runtime 与 native offline ASR。
+- 用户特定媒体、模型和机器条件下的高负载 GUI 响应性仍属于实机待验证项，正式 Release 不把该项描述成已经验证。
+- Phase 1B：后续逐步将实时 Zipformer、SenseVoice、WASAPI、PotPlayer Process Loopback 和模型重任务迁入 Core。
 - Phase 2：Core API 稳定后再引入 WebView2 + Vue 3 + TypeScript 主界面，不进行一次性全量重写。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
@@ -70,6 +74,6 @@ v0.1.1-dev 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显
 6. [`阶段记录.md`](阶段记录.md)
 7. [`工作记录.md`](工作记录.md)
 8. [`设计与演进.md`](设计与演进.md) 与相关 `docs/`
-9. `p105-exp / p105-stable / main`、PR 与当前 head CI
+9. `p105-exp / p105-stable / main`、PR、当前 head CI、tag 与 Release
 
 跨对话恢复使用 [`HANDOFF.md`](HANDOFF.md)。

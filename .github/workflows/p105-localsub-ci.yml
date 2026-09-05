@@ -3,9 +3,10 @@ name: P105 LocalSub Windows CI
 on:
   workflow_dispatch:
   push:
-    branches: [ p105-exp ]
+    branches: [ p105-exp, main ]
     paths:
       - 'projects/1-桌面软件/105-LocalSub/src/**'
+      - 'projects/1-桌面软件/105-LocalSub/RELEASE.md'
       - '.github/workflows/p105-localsub-ci.yml'
   pull_request:
     branches: [ p105-stable, main ]
@@ -15,17 +16,22 @@ on:
       - 'projects/1-桌面软件/README.md'
       - '目录.md'
 
+permissions:
+  contents: read
+
 concurrency:
   group: p105-localsub-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
 
 jobs:
   scope:
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'integration/main-')
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,12 +61,6 @@ jobs:
             case "$path" in
               projects/1-桌面软件/105-LocalSub/*|.github/workflows/p105-localsub-ci.yml|projects/1-桌面软件/README.md|目录.md)
                 ;;
-              .github/workflows/p103-localsub-win-x64.yml)
-                if [[ "$status" != D* ]]; then
-                  echo "Legacy P103 LocalSub workflow is allowed only as a deletion: $status $path"
-                  bad=1
-                fi
-                ;;
               *)
                 echo "Out-of-scope P105 path: $status $path"
                 bad=1
@@ -81,14 +81,31 @@ jobs:
     needs: scope
     if: always() && (needs.scope.result == 'success' || needs.scope.result == 'skipped')
     runs-on: windows-latest
-    timeout-minutes: 25
-    permissions:
-      contents: read
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Verify release identity inputs
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          [xml]$shell=Get-Content 'src/LocalSub/LocalSub.csproj' -Raw
+          [xml]$core=Get-Content 'src/LocalSub.CoreWorker/LocalSub.CoreWorker.csproj' -Raw
+          $shellVersion=@($shell.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          $coreVersion=@($core.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if ([string]::IsNullOrWhiteSpace($shellVersion) -or $shellVersion -ne $coreVersion) {
+            throw "Shell/Core version mismatch: shell=$shellVersion core=$coreVersion"
+          }
+          if (Test-Path 'RELEASE.md') {
+            $text=Get-Content 'RELEASE.md' -Raw
+            $m=[regex]::Match($text,'(?m)^Version:\s*([^\s]+)\s*$')
+            if (-not $m.Success) { throw 'RELEASE.md must contain Version: x.y.z' }
+            if ($m.Groups[1].Value -ne $shellVersion) { throw "RELEASE.md version does not match source: $($m.Groups[1].Value) vs $shellVersion" }
+          }
 
       - name: Publish net8 shell app
         shell: pwsh
@@ -108,12 +125,13 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           Remove-Item publish/onnxruntime*.dll -Force -ErrorAction SilentlyContinue
           Remove-Item publish/sherpa-onnx-c-api.dll -Force -ErrorAction SilentlyContinue
           if (-not (Test-Path core-publish/LocalSub.Core.exe)) { throw 'LocalSub.Core.exe was not published' }
           Copy-Item core-publish/LocalSub.Core.exe publish/LocalSub.Core.exe -Force
           New-Item -ItemType Directory -Force publish/ASR | Out-Null
-          Copy-Item src/LocalSub/ASR-README.txt publish/ASR/README.txt
+          Copy-Item src/LocalSub/ASR-README.txt publish/ASR/README.txt -Force
           if (Get-ChildItem publish/ASR -Filter *.onnx -Recurse -ErrorAction SilentlyContinue) { throw 'Model files must not be bundled' }
           if (Test-Path publish/hostfxr.dll) { throw '.NET runtime must not be bundled' }
           if (Get-ChildItem publish -Filter 'onnxruntime*.dll' -File -ErrorAction SilentlyContinue) { throw 'ONNX Runtime must not be bundled' }
@@ -123,6 +141,7 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           $pipeName = "LocalSub.Core.CI.$PID.$([guid]::NewGuid().ToString('N'))"
           Remove-Item publish/Logs/core.log -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.Core.exe') -WorkingDirectory (Resolve-Path 'publish') -ArgumentList @('--pipe', $pipeName, '--parent', "$PID") -PassThru
@@ -144,8 +163,7 @@ jobs:
             $writer.Dispose(); $reader.Dispose(); $client.Dispose()
             if (-not $p.WaitForExit(5000)) { throw 'LocalSub.Core did not exit after shutdown' }
             if ($p.ExitCode -ne 0) { throw "LocalSub.Core exited with $($p.ExitCode)" }
-          }
-          catch {
+          } catch {
             if (Test-Path publish/Logs/core.log) { Get-Content publish/Logs/core.log }
             try { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } } catch { }
             throw
@@ -155,6 +173,7 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           $env:LOCALSUB_CORE_RECOVERY_SMOKE = '1'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           Remove-Item publish/Logs/core.log -Force -ErrorAction SilentlyContinue
@@ -176,6 +195,7 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           $env:LOCALSUB_SMOKE_TEST = '1'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru
@@ -192,6 +212,7 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           $env:LOCALSUB_BATCH_UI_SMOKE = '1'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru
@@ -208,6 +229,7 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           $env:LOCALSUB_PROCESS_LOOPBACK_SMOKE = '1'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru -Wait
@@ -221,6 +243,7 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           $testRoot = Join-Path $env:RUNNER_TEMP 'localsub-sherpa-runtime-test'
           Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $testRoot | Out-Null
@@ -244,6 +267,7 @@ jobs:
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           $testRoot = Join-Path $env:RUNNER_TEMP 'localsub-offline-asr-smoke'
           Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $testRoot | Out-Null
@@ -275,23 +299,219 @@ jobs:
           if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'Native offline ASR smoke test wrote a crash log.' }
           Remove-Item $testRoot -Recurse -Force
 
-      - name: Package portable ZIP
+      - name: Package portable candidate and verify manifest
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
+          $ErrorActionPreference='Stop'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
-          Remove-Item publish/Logs/startup.log -Force -ErrorAction SilentlyContinue
-          Remove-Item publish/Logs/core.log -Force -ErrorAction SilentlyContinue
-          Remove-Item publish/Logs/core-client.log -Force -ErrorAction SilentlyContinue
+          Remove-Item publish/Logs -Recurse -Force -ErrorAction SilentlyContinue
+          foreach ($private in @('config.json','state.json','history.json')) {
+            if (Get-ChildItem publish -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private Data leaked into portable package: $private" }
+          }
+          if (-not (Test-Path publish/LocalSub.exe)) { throw 'LocalSub.exe missing from portable package' }
           if (-not (Test-Path publish/LocalSub.Core.exe)) { throw 'LocalSub.Core.exe missing from portable package' }
           if (Get-ChildItem publish/ASR -Include *.dll,*.onnx -Recurse -ErrorAction SilentlyContinue) { throw 'ASR runtime or model files must not be bundled' }
           if (Get-ChildItem publish -Filter 'onnxruntime*.dll' -File -ErrorAction SilentlyContinue) { throw 'ONNX Runtime leaked into portable package' }
           if (Test-Path publish/sherpa-onnx-c-api.dll) { throw 'sherpa native runtime leaked into portable package' }
           if (Test-Path publish/Components/FFmpeg/bin/ffmpeg.exe) { throw 'FFmpeg must remain an optional downloaded component' }
-          Compress-Archive -Path publish/* -DestinationPath LocalSub-v0.1.1-dev-win-x64-net8.zip -Force
+          $root=(Resolve-Path 'publish').Path
+          $manifest=@()
+          foreach ($file in Get-ChildItem publish -File -Recurse | Sort-Object FullName) {
+            $rel=$file.FullName.Substring($root.Length).TrimStart('\','/') -replace '\\','/'
+            $hash=(Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $manifest += "$rel`t$($file.Length)`t$hash"
+          }
+          $manifest | Set-Content publish/MANIFEST-SHA256.txt -Encoding utf8
+          Compress-Archive -Path publish/* -DestinationPath LocalSub-candidate-win-x64-net8.zip -CompressionLevel Optimal -Force
+          $verify=Join-Path $env:RUNNER_TEMP 'localsub-package-verify'
+          Remove-Item $verify -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive LocalSub-candidate-win-x64-net8.zip -DestinationPath $verify -Force
+          foreach ($line in Get-Content (Join-Path $verify 'MANIFEST-SHA256.txt')) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            $parts=$line -split "`t"
+            if ($parts.Count -ne 3) { throw "Invalid manifest line: $line" }
+            $file=Join-Path $verify ($parts[0] -replace '/', [IO.Path]::DirectorySeparatorChar)
+            if (-not (Test-Path $file -PathType Leaf)) { throw "Manifest file missing after re-extract: $($parts[0])" }
+            if ((Get-Item $file).Length -ne [int64]$parts[1]) { throw "Manifest size mismatch: $($parts[0])" }
+            $hash=(Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($hash -ne $parts[2]) { throw "Manifest hash mismatch: $($parts[0])" }
+          }
+          Remove-Item $verify -Recurse -Force
 
       - uses: actions/upload-artifact@v4
         with:
-          name: P105-LocalSub-v0.1.1-dev-win-x64-net8
-          path: projects/1-桌面软件/105-LocalSub/LocalSub-v0.1.1-dev-win-x64-net8.zip
+          name: P105-LocalSub-win-x64-net8-candidate
+          path: projects/1-桌面软件/105-LocalSub/LocalSub-candidate-win-x64-net8.zip
           retention-days: 14
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect explicit P105 release marker change
+        id: request
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $marker='projects/1-桌面软件/105-LocalSub/RELEASE.md'
+          $changed=@(git diff --name-only "$env:GITHUB_SHA^1" "$env:GITHUB_SHA")
+          if ($changed -contains $marker) {
+            'requested=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host 'P105 RELEASE.md changed in this main commit; formal release requested.'
+          } else {
+            'requested=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host 'No P105 release marker change; release job will stop without publishing.'
+          }
+
+      - name: Resolve and guard release identity
+        if: steps.request.outputs.requested == 'true'
+        id: identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          [xml]$shell=Get-Content 'projects/1-桌面软件/105-LocalSub/src/LocalSub/LocalSub.csproj' -Raw
+          [xml]$core=Get-Content 'projects/1-桌面软件/105-LocalSub/src/LocalSub.CoreWorker/LocalSub.CoreWorker.csproj' -Raw
+          $version=@($shell.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          $coreVersion=@($core.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if ($version -ne $coreVersion) { throw "Shell/Core version mismatch: $version vs $coreVersion" }
+          $marker=Get-Content 'projects/1-桌面软件/105-LocalSub/RELEASE.md' -Raw
+          $m=[regex]::Match($marker,'(?m)^Version:\s*([^\s]+)\s*$')
+          if (-not $m.Success -or $m.Groups[1].Value -ne $version) { throw 'RELEASE.md version does not match source version.' }
+          $tag="p105-v$version"
+          $PSNativeCommandUseErrorActionPreference=$false
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; release markers must never be reused." }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - uses: actions/download-artifact@v4
+        if: steps.request.outputs.requested == 'true'
+        with:
+          name: P105-LocalSub-win-x64-net8-candidate
+          path: release-input
+
+      - name: Prepare immutable release assets
+        if: steps.request.outputs.requested == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $version='${{ steps.identity.outputs.version }}'
+          New-Item release,release/incremental,release/runtime -ItemType Directory -Force | Out-Null
+          $candidate=Resolve-Path 'release-input/LocalSub-candidate-win-x64-net8.zip'
+          $full="release/LocalSub-v$version-win-x64-net8.zip"
+          Copy-Item $candidate $full -Force
+          Expand-Archive $candidate -DestinationPath release/runtime -Force
+          foreach ($name in @('LocalSub.exe','LocalSub.Core.exe')) {
+            $src=Join-Path 'release/runtime' $name
+            if (-not (Test-Path $src -PathType Leaf)) { throw "$name missing from release runtime" }
+            Copy-Item $src (Join-Path 'release/incremental' $name) -Force
+          }
+          $shellHash=(Get-FileHash 'release/runtime/LocalSub.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $coreHash=(Get-FileHash 'release/runtime/LocalSub.Core.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            "LocalSub.exe`t$shellHash",
+            "LocalSub.Core.exe`t$coreHash"
+          ) | Set-Content 'release/incremental/SHA256.txt' -Encoding utf8
+          $inc="release/LocalSub-v$version-incremental-two-exe.zip"
+          Compress-Archive -Path release/incremental/* -DestinationPath $inc -CompressionLevel Optimal -Force
+          $fullHash=(Get-FileHash $full -Algorithm SHA256).Hash.ToLowerInvariant()
+          $incHash=(Get-FileHash $inc -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            "LocalSub-v$version-win-x64-net8.zip`t$fullHash",
+            "LocalSub-v$version-incremental-two-exe.zip`t$incHash",
+            "LocalSub.exe`t$shellHash",
+            "LocalSub.Core.exe`t$coreHash"
+          ) | Set-Content "release/LocalSub-v$version-SHA256.txt" -Encoding utf8
+          @"
+          ## LocalSub v$version
+
+          LocalSub v$version is the first formal P105 release of the dual-process Phase 1A architecture.
+
+          Highlights:
+          * `LocalSub.exe` remains the Windows shell and UI host.
+          * `LocalSub.Core.exe` isolates media analysis and background ASR heavy workloads.
+          * Core crash recovery uses connection generations so a dead worker cannot poison a new connection.
+          * Cancellation timeout cleanup and graceful Shell-to-Core shutdown are included.
+          * The tagged main commit is rebuilt on Windows and passes Core IPC, forced Core crash/reconnect, Shell startup, background workspace, Process Loopback, sherpa native runtime loading, and native offline ASR smoke tests before publishing.
+          * Models, ONNX Runtime, sherpa native runtime, FFmpeg and user Data are excluded from the base package.
+
+          Requirements:
+          * Windows x64
+          * .NET 8 Desktop Runtime
+          * Existing ASR models/runtime remain external to the base package.
+
+          Validation note:
+          Automated Windows fault-injection and native smoke tests passed for this tagged source. User-specific high-load GUI responsiveness with real media/models remains a real-machine validation item and is not represented as completed by CI.
+
+          Release commit: $env:GITHUB_SHA
+          "@ | Set-Content 'release/RELEASE_NOTES.md' -Encoding utf8
+
+      - name: Create LocalSub GitHub Release from current main commit
+        if: steps.request.outputs.requested == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $version='${{ steps.identity.outputs.version }}'
+          $tag='${{ steps.identity.outputs.tag }}'
+          gh release create $tag `
+            "release/LocalSub-v$version-win-x64-net8.zip" `
+            "release/LocalSub-v$version-incremental-two-exe.zip" `
+            "release/LocalSub-v$version-SHA256.txt" `
+            --target "$env:GITHUB_SHA" `
+            --title "LocalSub v$version" `
+            --notes-file 'release/RELEASE_NOTES.md'
+
+      - name: Synchronize persistent P105 branches and clean obsolete LocalSub refs
+        if: steps.request.outputs.requested == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $repo=$env:GITHUB_REPOSITORY
+          foreach ($branch in @('p105-stable','p105-exp')) {
+            gh api --method PATCH "repos/$repo/git/refs/heads/$branch" -f sha="$env:GITHUB_SHA" -F force=false | Out-Null
+            Write-Host "Fast-forwarded $branch to $env:GITHUB_SHA"
+          }
+          foreach ($branch in @('p103-localsub-ci-bootstrap','p103-localsub-exp','_should_not_create')) {
+            $PSNativeCommandUseErrorActionPreference=$false
+            $ref=gh api "repos/$repo/git/ref/heads/$branch" 2>$null | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Branch already absent: $branch"
+              continue
+            }
+            $PSNativeCommandUseErrorActionPreference=$true
+            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" --quiet
+            git merge-base --is-ancestor "refs/remotes/origin/$branch" "$env:GITHUB_SHA"
+            if ($LASTEXITCODE -ne 0) { throw "Refusing to delete branch with unique commits: $branch" }
+            gh api --method DELETE "repos/$repo/git/refs/heads/$branch" | Out-Null
+            Write-Host "Deleted obsolete branch: $branch"
+          }
+
+      - name: Verify final P105 branch and Release state
+        if: steps.request.outputs.requested == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $repo=$env:GITHUB_REPOSITORY
+          $tag='${{ steps.identity.outputs.tag }}'
+          gh release view $tag --json tagName,name,isDraft,isPrerelease,url,assets | Write-Host
+          $refs=gh api "repos/$repo/git/matching-refs/heads/p105" | ConvertFrom-Json
+          $names=@($refs | ForEach-Object { $_.ref -replace '^refs/heads/','' } | Sort-Object)
+          $unexpected=@($names | Where-Object { $_ -notin @('p105-exp','p105-stable') })
+          if ($unexpected.Count -gt 0) { throw ('Unexpected P105 branches remain: ' + ($unexpected -join ', ')) }
+          if ($names.Count -ne 2) { throw ('Expected exactly p105-exp and p105-stable, got: ' + ($names -join ', ')) }
+          foreach ($branch in @('p105-exp','p105-stable')) {
+            $sha=(gh api "repos/$repo/git/ref/heads/$branch" | ConvertFrom-Json).object.sha
+            if ($sha -ne $env:GITHUB_SHA) { throw "$branch is not synchronized to release main $env:GITHUB_SHA" }
+          }
+          Write-Host ('P105 branches: ' + ($names -join ', '))
