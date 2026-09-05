@@ -20,7 +20,7 @@ env:
   GH_TOKEN: ${{ github.token }}
 
 jobs:
-  validate-initial-plan:
+  validate-current-state:
     if: github.event_name == 'push' && github.ref == 'refs/heads/repo-p102-branch-hygiene'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -29,95 +29,33 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate exact initial cleanup allowlist
+      - name: Verify post-cleanup P102 branch set
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
 
-          candidates=(
-            'p102-handoff-entry'
-            'p102-handoff-stable-backflow'
-            'p102-reference-projects'
-            'p102-reference-projects-main'
-            'p102-simplify-reference-roadmap'
-            'p102-v081-dashboard-jsdiag'
-            'p102-v081-dashboard-jsdiag-testfix'
-            'p102-v081-implementation'
-            'p102-v081-interaction-repair'
-            'p102-v081-startupfix'
-            'p102-v081-startupfix-test'
-            'p102-v082-environment-stability'
-            'p102-v083-startup-hotfix'
-            'p102-v084-zotero-responsiveness'
-            'p102-v085-shell-resilience'
-            'p102-v086-enhancer-convergence'
-            'p102-v087-workspace-terminal-continuity'
-            'p102-v090-project-workflow'
-            'p102-v092-zotero-readonly'
-            'p102-v093-project-usage'
-            'p102-v094-task-tools'
-            'p102-v095-lifecycle-convergence'
-            'p102-v100-release'
-            'p102-v100-release-record'
-            'p102-v101-candidate-record'
-            'p102-v101-daily-polish'
-            'p102-v102-v103-reliability'
-            'p102-v103-final-record'
-            'p102-v103-final-reliability'
-            'p102-v104-final-record'
-            'p102-v104-ui-convergence'
-            'p102-v105-final-quality'
-            'p102-v105-final-record'
-            'p102-v113-context'
-            'p102-v114-dashboard-stability'
-            'p102-v115-dashboard-process-ownership'
-            'p102-v116-dashboard-process-isolation'
-            'p102-v117-dashboard-input-focus'
-            'p102-v118-access-session-proxy'
-            'p102-v119-auth-focus-rebind'
-            'p102-v120-project-cockpit'
-            'p102-v120-records'
-            'p102-v130-command-palette'
-            'p102-v130-main-baseline-scope'
-            'p102-v130-records'
-            'p102-v130-runtime-verifier-contract'
-            'p102-v130-v113-baseline'
-            'p102-v1110-dashboard-simplification'
-            'p102-v1111-sidebar-terminal-polish'
-            'p102-v1111-work-record-refresh'
-            'p102-v1112-shell-home-simplification'
+          mapfile -t branches < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/p102- | sort -u)
+          expected=(
+            'p102-exp'
+            'p102-stable'
+            'p102-v081-dashboard-dialog-fix'
           )
 
-          failed=0
-          for branch in "${candidates[@]}"; do
-            if ! git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
-              echo "::error::Expected cleanup candidate is missing before approval: $branch"
-              failed=1
-              continue
-            fi
-            if git merge-base --is-ancestor "refs/remotes/origin/${branch}" origin/main; then
-              echo "SAFE $branch"
-            else
-              echo "::error::Candidate has commits not contained in main: $branch"
-              failed=1
-            fi
-          done
-
-          excluded='p102-v081-dashboard-dialog-fix'
-          if ! git show-ref --verify --quiet "refs/remotes/origin/${excluded}"; then
-            echo "::error::Known unique branch unexpectedly missing: $excluded"
-            failed=1
-          elif git merge-base --is-ancestor "refs/remotes/origin/${excluded}" origin/main; then
-            echo "::error::Known unique branch is now merged; refresh the cleanup plan instead of using stale evidence: $excluded"
-            failed=1
-          else
-            echo "KEEP $excluded because it still has unique commits"
+          if [[ "${branches[*]}" != "${expected[*]}" ]]; then
+            echo "::error::Unexpected P102 branch set: ${branches[*]}"
+            exit 1
           fi
 
-          exit "$failed"
+          unique='p102-v081-dashboard-dialog-fix'
+          if git merge-base --is-ancestor "refs/remotes/origin/${unique}" origin/main; then
+            echo "::error::Known unique branch is now contained in main; review it explicitly before changing policy: $unique"
+            exit 1
+          fi
 
-  initial-sweep:
+          echo "P102 branch set is intentionally reduced to: ${branches[*]}"
+
+  cleanup-bootstrap-branch:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
@@ -128,174 +66,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Delete exact audited P102 branch allowlist
+      - name: Delete completed repo bootstrap branch safely
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
 
-          sentinel='p102-handoff-entry'
-          if ! git show-ref --verify --quiet "refs/remotes/origin/${sentinel}"; then
-            echo "Initial P102 cleanup already completed; sentinel branch is absent."
+          branch='repo-p102-branch-hygiene'
+          if ! git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+            echo "Bootstrap branch already absent: $branch"
             exit 0
           fi
 
-          candidates=(
-            'p102-handoff-entry'
-            'p102-handoff-stable-backflow'
-            'p102-reference-projects'
-            'p102-reference-projects-main'
-            'p102-simplify-reference-roadmap'
-            'p102-v081-dashboard-jsdiag'
-            'p102-v081-dashboard-jsdiag-testfix'
-            'p102-v081-implementation'
-            'p102-v081-interaction-repair'
-            'p102-v081-startupfix'
-            'p102-v081-startupfix-test'
-            'p102-v082-environment-stability'
-            'p102-v083-startup-hotfix'
-            'p102-v084-zotero-responsiveness'
-            'p102-v085-shell-resilience'
-            'p102-v086-enhancer-convergence'
-            'p102-v087-workspace-terminal-continuity'
-            'p102-v090-project-workflow'
-            'p102-v092-zotero-readonly'
-            'p102-v093-project-usage'
-            'p102-v094-task-tools'
-            'p102-v095-lifecycle-convergence'
-            'p102-v100-release'
-            'p102-v100-release-record'
-            'p102-v101-candidate-record'
-            'p102-v101-daily-polish'
-            'p102-v102-v103-reliability'
-            'p102-v103-final-record'
-            'p102-v103-final-reliability'
-            'p102-v104-final-record'
-            'p102-v104-ui-convergence'
-            'p102-v105-final-quality'
-            'p102-v105-final-record'
-            'p102-v113-context'
-            'p102-v114-dashboard-stability'
-            'p102-v115-dashboard-process-ownership'
-            'p102-v116-dashboard-process-isolation'
-            'p102-v117-dashboard-input-focus'
-            'p102-v118-access-session-proxy'
-            'p102-v119-auth-focus-rebind'
-            'p102-v120-project-cockpit'
-            'p102-v120-records'
-            'p102-v130-command-palette'
-            'p102-v130-main-baseline-scope'
-            'p102-v130-records'
-            'p102-v130-runtime-verifier-contract'
-            'p102-v130-v113-baseline'
-            'p102-v1110-dashboard-simplification'
-            'p102-v1111-sidebar-terminal-polish'
-            'p102-v1111-work-record-refresh'
-            'p102-v1112-shell-home-simplification'
-          )
-
-          failed=0
-          for branch in "${candidates[@]}"; do
-            if ! git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
-              echo "Already absent: $branch"
-              continue
-            fi
-            if git merge-base --is-ancestor "refs/remotes/origin/${branch}" origin/main; then
-              echo "PRECHECK SAFE $branch"
-            else
-              echo "::error::Refusing cleanup because candidate has commits not contained in main: $branch"
-              failed=1
-            fi
-          done
-          if [[ "$failed" -ne 0 ]]; then
+          if ! git merge-base --is-ancestor "refs/remotes/origin/${branch}" origin/main; then
+            echo "::error::Refusing to delete bootstrap branch with commits outside main: $branch"
             exit 1
           fi
 
-          for branch in "${candidates[@]}"; do
-            if git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
-              echo "Deleting audited fully merged P102 branch: $branch"
-              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" >/dev/null
-            fi
-          done
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" >/dev/null
+          echo "Deleted completed bootstrap branch: $branch"
 
-      - name: Verify protected and excluded P102 refs
+      - name: Report remaining P102 refs
         shell: bash
         run: |
           set -euo pipefail
-          failed=0
-
-          for branch in p102-exp p102-stable p102-v081-dashboard-dialog-fix; do
-            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
-              echo "PRESERVED $branch"
-            else
-              echo "::error::Required preserved branch is missing: $branch"
-              failed=1
-            fi
-          done
-
-          candidates=(
-            'p102-handoff-entry'
-            'p102-handoff-stable-backflow'
-            'p102-reference-projects'
-            'p102-reference-projects-main'
-            'p102-simplify-reference-roadmap'
-            'p102-v081-dashboard-jsdiag'
-            'p102-v081-dashboard-jsdiag-testfix'
-            'p102-v081-implementation'
-            'p102-v081-interaction-repair'
-            'p102-v081-startupfix'
-            'p102-v081-startupfix-test'
-            'p102-v082-environment-stability'
-            'p102-v083-startup-hotfix'
-            'p102-v084-zotero-responsiveness'
-            'p102-v085-shell-resilience'
-            'p102-v086-enhancer-convergence'
-            'p102-v087-workspace-terminal-continuity'
-            'p102-v090-project-workflow'
-            'p102-v092-zotero-readonly'
-            'p102-v093-project-usage'
-            'p102-v094-task-tools'
-            'p102-v095-lifecycle-convergence'
-            'p102-v100-release'
-            'p102-v100-release-record'
-            'p102-v101-candidate-record'
-            'p102-v101-daily-polish'
-            'p102-v102-v103-reliability'
-            'p102-v103-final-record'
-            'p102-v103-final-reliability'
-            'p102-v104-final-record'
-            'p102-v104-ui-convergence'
-            'p102-v105-final-quality'
-            'p102-v105-final-record'
-            'p102-v113-context'
-            'p102-v114-dashboard-stability'
-            'p102-v115-dashboard-process-ownership'
-            'p102-v116-dashboard-process-isolation'
-            'p102-v117-dashboard-input-focus'
-            'p102-v118-access-session-proxy'
-            'p102-v119-auth-focus-rebind'
-            'p102-v120-project-cockpit'
-            'p102-v120-records'
-            'p102-v130-command-palette'
-            'p102-v130-main-baseline-scope'
-            'p102-v130-records'
-            'p102-v130-runtime-verifier-contract'
-            'p102-v130-v113-baseline'
-            'p102-v1110-dashboard-simplification'
-            'p102-v1111-sidebar-terminal-polish'
-            'p102-v1111-work-record-refresh'
-            'p102-v1112-shell-home-simplification'
-          )
-          for branch in "${candidates[@]}"; do
-            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
-              echo "::error::Audited cleanup candidate still exists: $branch"
-              failed=1
-            fi
-          done
-
-          echo "Remaining P102 refs:"
-          gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/p102" --jq '.[].ref' | sed 's#refs/heads/##' | sort
-          exit "$failed"
+          gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/p102-" --jq '.[].ref' | sed 's#refs/heads/##' | sort
 
   delete-merged-head:
     if: >-
