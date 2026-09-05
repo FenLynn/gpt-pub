@@ -47,7 +47,7 @@ jobs:
           [xml]$xml=Get-Content $project -Raw
           $version=@($xml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
           if ($version -ne '0.4.0') { throw "Expected DavBridge version 0.4.0, got $version" }
-          $existing = gh release view p103-v0.4.0 --json tagName 2>$null
+          gh release view p103-v0.4.0 --json tagName *> $null
           if ($LASTEXITCODE -eq 0) {
             'skip=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
             Write-Host 'p103-v0.4.0 Release already exists; build/publish steps will be skipped.'
@@ -177,21 +177,19 @@ jobs:
             'release/DavBridge-v0.4.0-SHA256.txt' `
             --target "$env:GITHUB_SHA" `
             --title 'DavBridge v0.4.0' `
-            --notes-file 'release/RELEASE_NOTES.md' `
-            --verify-tag:$false
+            --notes-file 'release/RELEASE_NOTES.md'
 
       - name: Archive unique LocalSub misnumber history before branch cleanup
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
           $repo=$env:GITHUB_REPOSITORY
-          $archiveRef='refs/tags/archive/localsub-p103-localsub-exp-20260905'
-          $existing=gh api "repos/$repo/git/ref/tags/archive/localsub-p103-localsub-exp-20260905" 2>$null
+          gh api "repos/$repo/git/ref/tags/archive/localsub-p103-localsub-exp-20260905" *> $null
           if ($LASTEXITCODE -ne 0) {
             $branch=gh api "repos/$repo/git/ref/heads/p103-localsub-exp" --jq '.object.sha' 2>$null
             if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($branch)) {
-              gh api --method POST "repos/$repo/git/refs" -f ref="$archiveRef" -f sha="$branch" | Out-Null
-              Write-Host "Archived p103-localsub-exp at $archiveRef"
+              gh api --method POST "repos/$repo/git/refs" -f ref='refs/tags/archive/localsub-p103-localsub-exp-20260905' -f sha="$branch" | Out-Null
+              Write-Host 'Archived unique p103-localsub-exp history before branch deletion.'
             }
           }
 
