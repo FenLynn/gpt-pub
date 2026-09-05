@@ -11,13 +11,15 @@
 - 稳定候选：`p105-stable`
 - 正式主线：`main`
 - 固定流转：`main → p105-exp → p105-stable → main`
-- 活动 CI：`.github/workflows/p105-localsub-ci.yml`
+- P105 长期项目分支只允许 `p105-exp` 与 `p105-stable`。
+- 活动 CI 与正式发布门禁：`.github/workflows/p105-localsub-ci.yml`
+- 显式发布标记：`RELEASE.md`
 
-旧 `p103-localsub-ci-bootstrap`、`p103-localsub-exp`、`103-LocalSub` 与 PR #385/#387 只用于追溯 2026-08 的编号错误及 Phase 1A 来源，不再作为后续维护入口。P103 永久属于 DavBridge。
+旧 `p103-localsub-*`、`103-LocalSub` 与 PR #385/#387/#395 只用于追溯编号错误和 Phase 1A 开发历史，不再作为维护入口。P103 永久属于 DavBridge。
 
 ## 2. 新对话强制读取顺序
 
-每次接续 LocalSub，先只读恢复，不凭聊天记忆直接写：
+每次接续 LocalSub，先只读恢复：
 
 1. `/GPT_RULES.md`
 2. `/目录.md`
@@ -26,26 +28,24 @@
 5. `projects/1-桌面软件/105-LocalSub/README.md`
 6. `projects/1-桌面软件/105-LocalSub/阶段记录.md`
 7. `projects/1-桌面软件/105-LocalSub/工作记录.md`
-8. 与当前任务相关的 `设计与演进.md`、`docs/` 和源码
-9. `main / p105-stable / p105-exp` 的真实关系
-10. P105 当前 open PR、最近 exact-head CI、Artifact，以及存在时的 tag/Release
+8. `projects/1-桌面软件/105-LocalSub/RELEASE.md`
+9. 与当前任务相关的 `设计与演进.md`、`docs/` 和源码
+10. `main / p105-stable / p105-exp` 的真实关系
+11. P105 当前 open PR、当前 exact-head CI、tag 与 Release
 
-第一轮回复必须先说明当前正式基线、稳定候选、开发 head、待验证事项和准确断点。用户只说“接续/恢复”时，不自动修改代码。
+不得只凭聊天记忆继续工作。
 
-## 3. 写入前固定核对
+## 3. 写入规则
 
-任何写操作前必须明确：
+- 日常代码和状态修改只在 `p105-exp`。
+- 不建立普通版本专用 P105 分支。
+- `p105-stable` 只接收 `p105-exp` 的正式提升 PR。
+- `main` 只接收 `p105-stable` 的正式准入 PR。
+- 禁止修改 P103 DavBridge、P104 或其他项目。
+- 所有提升都只认当前准确 head 的成功 CI。
+- 发布完成后 `p105-exp / p105-stable` 必须非强制快进到最新发布 main。
 
-- 当前任务只允许修改 `105-LocalSub/**`、`p105-localsub-ci.yml` 和本项目必要的共享状态行。
-- `103-DavBridge/**`、P104 和其他项目保持不动。
-- 开发从最新 `main` 同步到 `p105-exp`，不把其他长期项目分支直接合入 P105。
-- 不直接写 `main` 或 `p105-stable` 做日常开发。
-- PR 只允许 `p105-exp → p105-stable`、`p105-stable → main`。
-- 合并依据必须是当前 head 成功 CI，不复用过期 run。
-
-## 4. 当前架构断点
-
-Phase 1A 已建立：
+## 4. 当前架构
 
 ```text
 LocalSub.exe
@@ -65,86 +65,88 @@ LocalSub.Core.exe
 
 IPC v1：Windows Named Pipe + UTF-8 newline-delimited JSON，方法为 `ping / analyze / transcribe / cancel / shutdown`。
 
-后台媒体分析和完整后台转写实现已经从 Shell 编译边界排除，Shell 仅保留 Proxy。**禁止重新引入进程内静默 fallback。**
+已迁入 Core 的后台媒体分析和转写不得重新引入 GUI 进程内静默 fallback。
 
-v0.1.1-dev 在 Shell client 中增加 connection generation。每个 pending request 绑定自己的 generation；旧 reader loop 退出只能失败旧 generation 的请求，不能影响重连后的新请求。当前 generation 断开后下一请求重新启动 Core。用户取消若 1.5 秒不收敛则回收 worker。Shell 正常退出优先主动 shutdown Core，parent watcher 保留为异常退出兜底。
+v0.1.1 已加入 connection generation、Core 断开显式失效、下一请求自动重启 Core、cancel 超时回收和 Shell 主动 shutdown Core。
 
-## 5. 当前验证事实
+## 5. v0.1.1 验证历史
 
-Phase 1A 首次正式准入已经完成 Shell/Core 双 publish、绿色目录、Core Named Pipe `ping/shutdown`、Shell 启动、后台工作区、Process Loopback、sherpa native runtime 加载、native offline ASR 真解码与最终打包。
+最终开发候选：
 
-P105 v0.1.1-dev：
+- 历史 Draft PR #395，现已关闭且未合并
+- exact head `b9e7cbaf792cc925bc0d40918ab73ac00e242869`
+- Windows CI run `32129200379`，`success`
+- Artifact `9321563463`
+- Artifact digest `sha256:5531d0ea9202ab06a0b521e61aa5d796904804f903f873dd92dcbdf7865c5e66`
 
-- Draft PR：#395，方向 `p105-exp → p105-stable`
-- 功能代码提交：`0ff1cd4dc308ce684e882a3e0c7724304da1ecb4`
-- 首轮 exact head：`cf7a1e443ba30bc1269b129cab2a317c9a396001`
-- Windows CI：run `32128794091`，run number `11`，`success`
-- Artifact：`9321423073`
-- Artifact digest：`sha256:57a3d886f8e10363ef1895d2888d0f29b73a41f82fef16f6fe867ead59991a53`
+该 run 已验证 Core IPC、真实强杀第一 Core 与 generation 2 重连、Shell 启动、后台工作区、Process Loopback、sherpa native runtime、native offline ASR 和打包边界。
 
-本版新增 Windows fault injection 已真实通过：Shell client 建立一个仍在 pending 的延迟 ping 后结束第一 Core，该请求失败；同一 client 随后建立 generation 2，拉起第二 Core，并再次 ping 成功。原有 Process Loopback、sherpa runtime、native offline ASR 与包边界也继续通过。
+该历史 run 不能代替当前正式发布 head 的验证。
 
-本 HANDOFF 收口会改变 PR head，因此下一对话不得把 `32128794091` 当成新的 current-head 证据。恢复时必须先读取 #395 当前 head 和最新对应 CI/Artifact。
+## 6. 2026-09-05 分支收口事实
 
-## 6. 当前实机待验证
+本轮发布准备开始前：
 
-Phase 1A 最重要的用户实机验收仍是“进程边界是否真正保护 GUI”，不是识别准确率：
+- 最新 main 为 `19e91cb22682ddcbe943199693dc510d9de73b0a`。
+- main 已包含 v0.1.1 最新 LocalSub 源码。
+- `p105-exp` 与 `p105-stable` 均已通过非强制 fast-forward 同步到该 main。
+- `p103-localsub-*` 搜索结果为 0。
+- P105 分支搜索结果只包含 `p105-exp` 与 `p105-stable`。
+- #395 已关闭且未合并。
 
-1. 后台解析或 SenseVoice 转写时拖动窗口、最大化/恢复、切换页面、滚动。
-2. 任务管理器观察主要 CPU/内存负载应进入 `LocalSub.Core.exe`。
-3. 后台转写时手动结束 `LocalSub.Core.exe`，`LocalSub.exe` 不应退出。
-4. 当前任务应失败，再发起后台任务时应重新拉起新的 Core。
-5. 关闭 LocalSub 后 Core 不长期残留。
-6. 异常时优先查看 `Logs/core.log`、`Logs/core-client.log`、`Logs/responsiveness.log`。
+随后才在 `p105-exp` 开始正式发布准备。
 
-自动 fault injection 能证明 supervisor/IPC 的恢复状态机，但不能证明用户真实媒体、模型和机器负载下的 WinForms 消息循环体验。用户尚未确认上述完整实机验收前，状态保持“待验证”。
+## 7. 当前发布断点
 
-## 7. 下一开发顺序
+用户已明确要求把当前稳定 LocalSub 固化并正式发布。
 
-不要回去继续堆 WinForms 小修补。架构顺序固定为：
+当前目标：
 
-1. 先确认 #395 文档收口后的 **当前 exact head** Windows CI 全绿，并将该 current-head Artifact 作为 v0.1.1-dev 实机候选。
-2. 用户完成 Phase 1A 实机响应性与 Core 崩溃边界验收。
-3. Phase 1B 分批迁移实时 Zipformer/Paraformer/SenseVoice、WASAPI、PotPlayer Process Loopback、模型下载/解压/删除等重任务到 Core。
-4. 每迁一类能力就保持“Core 失败不拖死 GUI”的故障边界，并增加对应 CI/实机验证。
-5. Core API 稳定后才进入 WebView2 + Vue 3 + TypeScript 主界面，最后再收口旧 WinForms 业务页。
+- Version：`0.1.1`
+- Tag：`p105-v0.1.1`
+- Release：`LocalSub v0.1.1`
+- 发布标记：`RELEASE.md`
 
-## 8. 运行与分发硬约束
+固定顺序：
 
-- Windows x64。
-- `.NET 8` framework-dependent single-file。
-- `LocalSub.exe` 与 `LocalSub.Core.exe` 同目录。
-- 模型位于 `ASR/`，sherpa runtime 位于 `ASR/_runtime/`。
-- 模型、ONNX Runtime、sherpa native runtime、FFmpeg 不进入基础包。
-- PotPlayer 模式禁止静默回退成全系统音频。
-- FFmpeg 优先复用 Mediova、手动路径或 PATH。
-- 增量覆盖包发生 Core 架构变化时至少同时交付两个 EXE。
+1. `p105-exp → p105-stable`，当前 exact head 完整 P105 CI。
+2. `p105-stable → main`，当前 exact head 再完整 P105 CI。
+3. main 合并提交修改了 `RELEASE.md` 后，P105 workflow 在该准确 main SHA 再构建并运行完整 Windows 门禁。
+4. exact-main build 成功后创建正式 tag 和 Release assets。
+5. workflow 非强制快进 `p105-exp / p105-stable` 到发布 main，并验证只剩这两条 P105 项目分支。
 
-## 9. 每轮结束交接标准
+Release assets：
 
-结束一轮前至少核对并更新：
+- `LocalSub-v0.1.1-win-x64-net8.zip`
+- `LocalSub-v0.1.1-incremental-two-exe.zip`
+- `LocalSub-v0.1.1-SHA256.txt`
 
-- `工作记录.md`：正在做什么、状态、下一步、待用户实机事项。
-- `阶段记录.md`：本轮形成的候选/正式基线、PR、exact-head CI 和 Artifact 证据。
-- `设计与演进.md`：只有架构决策发生变化时才更新。
-- 本 HANDOFF：只有恢复流程、关键断点或长期执行顺序发生变化时才更新。
+## 8. 实机待验证
 
-不得把同一事实复制到多个文件并各自维护不同版本。
+用户特定媒体、模型与机器条件下的高负载 GUI 响应性仍待真实机器确认。自动 fault injection 只证明 supervisor/IPC 恢复状态机。
 
-## 10. 下一对话恢复模板
+正式 v0.1.1 Release Notes 必须明确这一点，不得声称该实机项已完成。
 
-恢复后优先汇报：
+## 9. 后续开发
+
+正式 v0.1.1 收口后，下一功能开发从最新 `p105-exp` 开始。架构顺序保持：
+
+1. Phase 1B 分批迁移实时 Zipformer/Paraformer/SenseVoice、WASAPI、PotPlayer Process Loopback 与模型重任务到 Core。
+2. 每类迁移继续维持 Core 失败不拖死 GUI 的边界。
+3. Core API 稳定后再进入 WebView2 + Vue 3 + TypeScript 主界面。
+4. 最后收口旧 WinForms 业务页。
+
+## 10. 恢复模板
 
 ```text
 P105 LocalSub
-main: <sha / 当前正式状态>
+main: <sha>
 p105-stable: <sha / ahead-behind>
 p105-exp: <sha / ahead-behind>
 open PR: <编号与方向>
 latest exact-head CI: <run / result>
-current phase: <Phase 1A / 1B / 2>
+release tag: <存在/不存在>
+release: <存在/不存在>
 real-machine pending: <待验证事项>
 next action: <唯一明确断点>
 ```
-
-确认事实后再按用户本轮指令决定是否写入。
