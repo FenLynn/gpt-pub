@@ -86,7 +86,7 @@ jobs:
           if (-not $exifVersion) { throw "Unable to determine ExifTool version after 3 attempts: $($versionError.Exception.Message)" }
           $exifArchive=Join-Path $env:RUNNER_TEMP 'mediova-exiftool.zip'
           $exifExtracted=Join-Path $env:RUNNER_TEMP 'mediova-exiftool'
-          Get-ReleaseDependency -Uri "https://exiftool.org/exiftool-$($exifVersion)_64.zip" -OutFile $exifArchive -Label 'official ExifTool package' -MinimumBytes 1000000
+          Get-ReleaseDependency -Uri "https://sourceforge.net/projects/exiftool/files/exiftool-$($exifVersion)_64.zip/download" -OutFile $exifArchive -Label 'official ExifTool Windows package' -MinimumBytes 1000000
           Expand-Archive -LiteralPath $exifArchive -DestinationPath $exifExtracted -Force
           $exifExe=Get-ChildItem -LiteralPath $exifExtracted -Recurse -File | Where-Object { $_.Name -ieq 'exiftool.exe' -or $_.Name -ieq 'exiftool(-k).exe' } | Select-Object -First 1
           if (-not $exifExe -or -not (Test-Path -LiteralPath (Join-Path $exifExe.Directory.FullName 'exiftool_files') -PathType Container)) { throw 'Official ExifTool package is incomplete.' }
