@@ -357,7 +357,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Detect explicit P105 release marker change
         id: request
@@ -378,6 +378,7 @@ jobs:
           } else {
             throw "git diff failed while checking P105 RELEASE.md. ExitCode=$diffExit"
           }
+          exit 0
 
       - name: Resolve and guard release identity
         if: steps.request.outputs.requested == 'true'
@@ -396,9 +397,13 @@ jobs:
           $tag="p105-v$version"
           $PSNativeCommandUseErrorActionPreference=$false
           gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; release markers must never be reused." }
+          $releaseExit=$LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference=$true
+          if ($releaseExit -eq 0) { throw "Release $tag already exists; release markers must never be reused." }
+          if ($releaseExit -ne 1) { throw "Unable to verify whether Release $tag exists. ExitCode=$releaseExit" }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          exit 0
 
       - uses: actions/download-artifact@v4
         if: steps.request.outputs.requested == 'true'
@@ -490,17 +495,19 @@ jobs:
           foreach ($branch in @('p103-localsub-ci-bootstrap','p103-localsub-exp','_should_not_create')) {
             $PSNativeCommandUseErrorActionPreference=$false
             $ref=gh api "repos/$repo/git/ref/heads/$branch" 2>$null | ConvertFrom-Json
-            if ($LASTEXITCODE -ne 0) {
+            $lookupExit=$LASTEXITCODE
+            $PSNativeCommandUseErrorActionPreference=$true
+            if ($lookupExit -ne 0) {
               Write-Host "Branch already absent: $branch"
               continue
             }
-            $PSNativeCommandUseErrorActionPreference=$true
             git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" --quiet
             git merge-base --is-ancestor "refs/remotes/origin/$branch" "$env:GITHUB_SHA"
             if ($LASTEXITCODE -ne 0) { throw "Refusing to delete branch with unique commits: $branch" }
             gh api --method DELETE "repos/$repo/git/refs/heads/$branch" | Out-Null
             Write-Host "Deleted obsolete branch: $branch"
           }
+          exit 0
 
       - name: Verify final P105 branch and Release state
         if: steps.request.outputs.requested == 'true'
