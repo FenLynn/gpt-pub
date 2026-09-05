@@ -8,7 +8,9 @@ Version: 0.1.1
 
 首次 exact-main build 已完整通过，但 Release job 因 GitHub Actions 对 skipped 上游 job 的隐式依赖语义而未执行发布步骤。该问题只影响发布 job 调度，不影响已经成功的 build 与 smoke。随后已为 release job 增加显式 `always()`。
 
-第二次 exact-main build 同样完整通过，release job 已实际启动，但原发布标记检测使用 `git diff --name-only` 后再比较中文路径，受 Git `core.quotepath` 默认转义影响，错误判定 `RELEASE.md` 未变化，导致发布资产、Release 创建与分支同步步骤被跳过。当前已将检测改为直接对目标路径执行 `git diff --quiet ... -- "$marker"`，不再依赖路径文本输出，并再次更新本发布标记，使下一次 main 合并提交明确请求 v0.1.1 正式发布。
+第二次 exact-main build 同样完整通过，release job 已实际启动，但原发布标记检测使用 `git diff --name-only` 后再比较中文路径，受 Git `core.quotepath` 默认转义影响，错误判定 `RELEASE.md` 未变化。随后已改为直接对目标路径执行 `git diff --quiet ... -- "$marker"`。
+
+第三次 exact-main build 再次完整通过，路径检测已经正确输出 `formal release requested`，但 PowerShell 将 `git diff --quiet` 用于表示“文件有变化”的预期退出码 1 保留为整个 step 的最终退出码，导致 Actions 将检测 step 判为失败。当前已对所有预期允许非零返回的发布检查显式归零，并将 Release checkout 改为完整历史，以保证后续对老分支的祖先关系安全校验可靠。本次再次更新发布标记，请求 `p105-v0.1.1` 正式发布。
 
 ## 发布边界
 
