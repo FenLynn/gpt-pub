@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
 
-          mapfile -t branches < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/p102- | sort -u)
+          mapfile -t branches < <(git branch -r --format='%(refname:short)' --list 'origin/p102-*' | sed 's#^origin/##' | sort -u)
           expected=(
             'p102-exp'
             'p102-stable'
@@ -145,7 +145,7 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
-          mapfile -t branches < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/p102- | sort -u)
+          mapfile -t branches < <(git branch -r --format='%(refname:short)' --list 'origin/p102-*' | sed 's#^origin/##' | sort -u)
 
           for branch in "${branches[@]}"; do
             [[ "$branch" == 'p102-exp' || "$branch" == 'p102-stable' ]] && continue
