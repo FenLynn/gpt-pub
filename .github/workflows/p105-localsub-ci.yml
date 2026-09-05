@@ -347,7 +347,7 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
     runs-on: windows-latest
     timeout-minutes: 15
     permissions:
