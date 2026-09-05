@@ -43,16 +43,19 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
+          $PSNativeCommandUseErrorActionPreference=$false
           $project='projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
           [xml]$xml=Get-Content $project -Raw
           $version=@($xml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
           if ($version -ne '0.4.0') { throw "Expected DavBridge version 0.4.0, got $version" }
-          gh release view p103-v0.4.0 --json tagName *> $null
-          if ($LASTEXITCODE -eq 0) {
+          gh release view p103-v0.4.0 --json tagName 2>$null | Out-Null
+          $releaseExit=$LASTEXITCODE
+          if ($releaseExit -eq 0) {
             'skip=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
             Write-Host 'p103-v0.4.0 Release already exists; build/publish steps will be skipped.'
           } else {
             'skip=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host 'p103-v0.4.0 Release is absent; formal release build will run.'
           }
 
       - name: Run frozen core smoke
@@ -183,12 +186,16 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
+          $PSNativeCommandUseErrorActionPreference=$false
           $repo=$env:GITHUB_REPOSITORY
-          gh api "repos/$repo/git/ref/tags/archive/localsub-p103-localsub-exp-20260905" *> $null
-          if ($LASTEXITCODE -ne 0) {
+          gh api "repos/$repo/git/ref/tags/archive/localsub-p103-localsub-exp-20260905" 2>$null | Out-Null
+          $archiveExit=$LASTEXITCODE
+          if ($archiveExit -ne 0) {
             $branch=gh api "repos/$repo/git/ref/heads/p103-localsub-exp" --jq '.object.sha' 2>$null
-            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($branch)) {
+            $branchExit=$LASTEXITCODE
+            if ($branchExit -eq 0 -and -not [string]::IsNullOrWhiteSpace($branch)) {
               gh api --method POST "repos/$repo/git/refs" -f ref='refs/tags/archive/localsub-p103-localsub-exp-20260905' -f sha="$branch" | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw 'Failed to archive p103-localsub-exp before branch deletion.' }
               Write-Host 'Archived unique p103-localsub-exp history before branch deletion.'
             }
           }
@@ -206,6 +213,7 @@ jobs:
       - name: Remove obsolete P103 branches
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference=$false
           $repo=$env:GITHUB_REPOSITORY
           $branches=@(
             'p103-do-not-use',
@@ -213,10 +221,11 @@ jobs:
             'p103-v010-candidate-check',
             'p103-localsub-ci-bootstrap',
             'p103-localsub-exp',
-            'integration/main-p103-v040-release'
+            'integration/main-p103-v040-release',
+            'integration/main-p103-v040-release-fix'
           )
           foreach ($branch in $branches) {
-            gh api --method DELETE "repos/$repo/git/refs/heads/$branch" 2>$null
+            gh api --method DELETE "repos/$repo/git/refs/heads/$branch" 2>$null | Out-Null
             if ($LASTEXITCODE -eq 0) { Write-Host "Deleted $branch" }
             else { Write-Host "Branch already absent or not deletable: $branch" }
           }
