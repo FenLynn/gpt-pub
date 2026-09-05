@@ -482,8 +482,29 @@ jobs:
             --title "LocalSub v$version" `
             --notes-file 'release/RELEASE_NOTES.md'
 
-      - name: Synchronize persistent P105 branches and clean obsolete LocalSub refs
+      - name: Verify published P105 Release state
         if: steps.request.outputs.requested == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $tag='${{ steps.identity.outputs.tag }}'
+          gh release view $tag --json tagName,name,isDraft,isPrerelease,url,assets | Write-Host
+
+  branch_hygiene:
+    needs: build
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Synchronize P105 branches and clean known obsolete refs
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
@@ -501,7 +522,7 @@ jobs:
               Write-Host "Branch already absent: $branch"
               continue
             }
-            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" --quiet
+            git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}" --quiet
             git merge-base --is-ancestor "refs/remotes/origin/$branch" "$env:GITHUB_SHA"
             if ($LASTEXITCODE -ne 0) { throw "Refusing to delete branch with unique commits: $branch" }
             gh api --method DELETE "repos/$repo/git/refs/heads/$branch" | Out-Null
@@ -509,14 +530,11 @@ jobs:
           }
           exit 0
 
-      - name: Verify final P105 branch and Release state
-        if: steps.request.outputs.requested == 'true'
+      - name: Verify final P105 branch hygiene
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
           $repo=$env:GITHUB_REPOSITORY
-          $tag='${{ steps.identity.outputs.tag }}'
-          gh release view $tag --json tagName,name,isDraft,isPrerelease,url,assets | Write-Host
           $refs=gh api "repos/$repo/git/matching-refs/heads/p105" | ConvertFrom-Json
           $names=@($refs | ForEach-Object { $_.ref -replace '^refs/heads/','' } | Sort-Object)
           $unexpected=@($names | Where-Object { $_ -notin @('p105-exp','p105-stable') })
@@ -524,6 +542,15 @@ jobs:
           if ($names.Count -ne 2) { throw ('Expected exactly p105-exp and p105-stable, got: ' + ($names -join ', ')) }
           foreach ($branch in @('p105-exp','p105-stable')) {
             $sha=(gh api "repos/$repo/git/ref/heads/$branch" | ConvertFrom-Json).object.sha
-            if ($sha -ne $env:GITHUB_SHA) { throw "$branch is not synchronized to release main $env:GITHUB_SHA" }
+            if ($sha -ne $env:GITHUB_SHA) { throw "$branch is not synchronized to main $env:GITHUB_SHA" }
           }
-          Write-Host ('P105 branches: ' + ($names -join ', '))
+          foreach ($branch in @('p103-localsub-ci-bootstrap','p103-localsub-exp','_should_not_create')) {
+            $PSNativeCommandUseErrorActionPreference=$false
+            gh api "repos/$repo/git/ref/heads/$branch" *> $null
+            $existsExit=$LASTEXITCODE
+            $PSNativeCommandUseErrorActionPreference=$true
+            if ($existsExit -eq 0) { throw "Obsolete branch still exists: $branch" }
+            if ($existsExit -ne 1) { throw "Unable to verify obsolete branch absence: $branch ExitCode=$existsExit" }
+          }
+          Write-Host ('P105 active branches: ' + ($names -join ', '))
+          exit 0
