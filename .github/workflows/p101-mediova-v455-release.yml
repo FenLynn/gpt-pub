@@ -63,8 +63,10 @@ jobs:
           $ffmpeg=Get-ChildItem -LiteralPath $ffmpegExtracted -Recurse -Filter ffmpeg.exe -File | Select-Object -First 1
           $ffprobe=Get-ChildItem -LiteralPath $ffmpegExtracted -Recurse -Filter ffprobe.exe -File | Where-Object { $_.Directory.FullName -eq $ffmpeg.Directory.FullName } | Select-Object -First 1
           if (-not $ffmpeg -or -not $ffprobe) { throw 'A colocated FFmpeg/FFprobe pair was not found.' }
-          & $ffmpeg.FullName -version | Select-Object -First 1
-          if ($LASTEXITCODE -ne 0) { throw 'Bundled FFmpeg is not runnable.' }
+          $ffmpegVersion = & $ffmpeg.FullName -version
+          $ffmpegExitCode = $LASTEXITCODE
+          $ffmpegVersion | Select-Object -First 1
+          if ($ffmpegExitCode -ne 0) { throw 'Bundled FFmpeg is not runnable.' }
           "FFMPEG_BIN=$($ffmpeg.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
           $exifVersion=$null
