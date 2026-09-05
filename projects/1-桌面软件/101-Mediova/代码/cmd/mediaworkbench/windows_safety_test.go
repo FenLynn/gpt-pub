@@ -4,6 +4,7 @@ package main
 
 import (
 	"testing"
+	"time"
 	"unsafe"
 
 	"mediaworkbench/internal/model"
@@ -104,6 +105,33 @@ func TestTaskCellMetrics(t *testing.T) {
 	progress, progressLabel := progressCellMetrics(task)
 	if progress < 0.605 || progress > 0.607 || progressLabel != "60.6%" {
 		t.Fatalf("progress metrics = %v %q", progress, progressLabel)
+	}
+}
+
+func TestTaskStatusTextIsStableBetweenProgressUpdates(t *testing.T) {
+	started := time.Date(2026, time.September, 5, 8, 0, 0, 0, time.UTC)
+	task := &model.Task{
+		Input:     `C:\media\sample.mp4`,
+		Kind:      model.KindVideo,
+		Status:    model.StatusProcessing,
+		Progress:  50,
+		StartedAt: started,
+	}
+	syncTaskStatusText(task, started.Add(2*time.Minute))
+	if task.StatusText != "剩余 02:00" {
+		t.Fatalf("initial ETA snapshot = %q", task.StatusText)
+	}
+	a := &application{settings: model.DefaultSettings()}
+	first := a.taskTexts(task)[10]
+	// A later paint must reuse the stored status rather than calculate a new
+	// ETA from the wall clock. The next progress update refreshes the snapshot.
+	second := a.taskTexts(task)[10]
+	if first != task.StatusText || second != task.StatusText {
+		t.Fatalf("paint-time status changed: first=%q second=%q snapshot=%q", first, second, task.StatusText)
+	}
+	syncTaskStatusText(task, started.Add(3*time.Minute))
+	if task.StatusText != "剩余 03:00" {
+		t.Fatalf("progress-update ETA snapshot = %q", task.StatusText)
 	}
 }
 

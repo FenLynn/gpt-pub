@@ -5205,12 +5205,17 @@ func (a *application) refreshList() {
 	// a.mu held while rebuilding the control, because the notification path
 	// refreshes the right panel and needs the same mutex. Build immutable row
 	// snapshots first, publish the final visible-index mapping, then touch UI.
+	now := time.Now()
 	a.mu.Lock()
 	rows := make([]listRowSnapshot, 0, len(a.tasks))
 	for idx, t := range a.tasks {
+		if t == nil {
+			continue
+		}
 		if t.Kind != a.currentKind {
 			continue
 		}
+		syncTaskStatusText(t, now)
 		if search != "" &&
 			!strings.Contains(strings.ToLower(filepath.Base(t.Input)), search) &&
 			!strings.Contains(strings.ToLower(t.Input), search) &&
@@ -5315,9 +5320,31 @@ func (a *application) taskTexts(t *model.Task) []string {
 		}
 		compressed = media.FormatBytes(t.OutputSize) + ratio
 	}
+	status := t.StatusText
+	if status == "" {
+		// Callers that build or update a visible row install the snapshot first.
+		// Keeping this fallback makes direct unit-test construction safe without
+		// putting time-dependent work back into the normal paint path.
+		status = taskStatusTextAt(t, time.Now())
+	}
+	name := filepath.Base(t.Input)
+	if t.Pinned {
+		name = "[置顶] " + name
+	}
+	return []string{name, spec, taskDurationText(t), dir, outRes, opts.Quality, opts.Rotation, media.FormatBytes(t.InputSize), compressed, fmt.Sprintf("%.1f%%", t.Progress), status}
+}
+
+// taskStatusTextAt derives the status label at a controlled state-transition
+// point.  It must not be called by an owner-draw callback: GDI can repaint an
+// idle row at any time, and a paint-time ETA creates visible flicker without
+// any corresponding media-progress update.
+func taskStatusTextAt(t *model.Task, now time.Time) string {
+	if t == nil {
+		return ""
+	}
 	status := string(t.Status)
 	if t.Status == model.StatusProcessing && t.Progress > .5 && !t.StartedAt.IsZero() {
-		elapsed := time.Since(t.StartedAt)
+		elapsed := now.Sub(t.StartedAt)
 		remain := time.Duration(float64(elapsed) * (100 - t.Progress) / t.Progress)
 		if remain > 0 && remain < 7*24*time.Hour {
 			status = "剩余 " + formatDuration(remain)
@@ -5337,11 +5364,13 @@ func (a *application) taskTexts(t *model.Task) []string {
 	if t.DuplicateOf != "" {
 		status += " · 疑似重复"
 	}
-	name := filepath.Base(t.Input)
-	if t.Pinned {
-		name = "[置顶] " + name
+	return status
+}
+
+func syncTaskStatusText(t *model.Task, now time.Time) {
+	if t != nil {
+		t.StatusText = taskStatusTextAt(t, now)
 	}
-	return []string{name, spec, taskDurationText(t), dir, outRes, opts.Quality, opts.Rotation, media.FormatBytes(t.InputSize), compressed, fmt.Sprintf("%.1f%%", t.Progress), status}
 }
 func (a *application) outputResolutionText(t *model.Task, opts model.TaskOptions) string {
 	if t == nil {
@@ -5419,6 +5448,7 @@ func (a *application) updateTaskRowByID(taskID int64) {
 		a.mu.Unlock()
 		return
 	}
+	syncTaskStatusText(task, time.Now())
 	taskSnapshot := *task
 	a.mu.Unlock()
 
@@ -5462,6 +5492,7 @@ func (a *application) updateTaskProgressRowByID(taskID int64) {
 		a.mu.Unlock()
 		return
 	}
+	syncTaskStatusText(task, time.Now())
 	a.mu.Unlock()
 	round12InvalidateTaskRow(a, row)
 }

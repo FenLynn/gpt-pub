@@ -126,6 +126,11 @@ type Task struct {
 	Engine                string         `json:"engine"`
 	Pinned                bool           `json:"pinned"`
 	ThumbnailIndex        int            `json:"-"`
+	// StatusText is a UI-only snapshot of the derived status label.  It is
+	// deliberately not persisted: the Win32 owner-draw path must never call
+	// time.Now while painting, or an otherwise idle row can change pixels on
+	// every repaint merely because its ETA text was recalculated.
+	StatusText            string         `json:"-"`
 	Options               TaskOptions    `json:"options"`
 	Queue                 *QueueSnapshot `json:"queue_snapshot,omitempty"`
 	Hold                  *HoldState     `json:"hold_state,omitempty"`
