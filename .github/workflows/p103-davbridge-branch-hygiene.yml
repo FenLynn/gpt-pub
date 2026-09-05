@@ -13,6 +13,11 @@ permissions:
 env:
   GH_TOKEN: ${{ github.token }}
 
+# DavBridge branch policy:
+# - persistent working branches: p103-exp, p103-stable
+# - p103-localsub-* belongs to the historical LocalSub project and is outside DavBridge governance
+# - any other p103-* branch is transient and may be cleaned only when it is fully merged
+
 jobs:
   delete-merged-head:
     if: >-
@@ -20,11 +25,12 @@ jobs:
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'p103-') &&
+      !startsWith(github.event.pull_request.head.ref, 'p103-localsub-') &&
       github.event.pull_request.head.ref != 'p103-exp' &&
       github.event.pull_request.head.ref != 'p103-stable'
     runs-on: ubuntu-latest
     steps:
-      - name: Delete merged transient P103 head branch
+      - name: Delete merged transient DavBridge head branch
         shell: bash
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
@@ -44,22 +50,23 @@ jobs:
         shell: bash
         run: git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
 
-      - name: Delete only P103 branches fully contained in main
+      - name: Delete only fully merged transient DavBridge branches
         shell: bash
         run: |
           set -euo pipefail
           mapfile -t branches < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/p103- | sort -u)
           for branch in "${branches[@]}"; do
             [[ "$branch" == 'p103-exp' || "$branch" == 'p103-stable' ]] && continue
+            [[ "$branch" == p103-localsub-* ]] && { echo "Ignoring LocalSub branch outside DavBridge governance: $branch"; continue; }
             if git merge-base --is-ancestor "refs/remotes/origin/$branch" origin/main; then
-              echo "Deleting fully merged transient branch: $branch"
+              echo "Deleting fully merged transient DavBridge branch: $branch"
               gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" || true
             else
               echo "Keeping branch with unique commits: $branch"
             fi
           done
 
-      - name: Report remaining P103 branches
+      - name: Report remaining DavBridge and LocalSub-prefixed branches
         shell: bash
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/p103" --jq '.[].ref' | sed 's#refs/heads/##' | sort
