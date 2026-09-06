@@ -2,6 +2,20 @@ name: P105 LocalSub Windows CI
 
 on:
   workflow_dispatch:
+    inputs:
+      formal_release:
+        description: 'Create a formal GitHub Release. Use only after explicit user authorization.'
+        required: false
+        type: boolean
+        default: false
+      release_version:
+        description: 'Exact version to release, for example 0.2.0'
+        required: false
+        type: string
+      release_confirm:
+        description: 'Type RELEASE to confirm formal publication'
+        required: false
+        type: string
   push:
     branches: [ p105-exp, main ]
     paths:
@@ -347,7 +361,13 @@ jobs:
 
   release:
     needs: build
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.formal_release == true &&
+      inputs.release_confirm == 'RELEASE' &&
+      needs.build.result == 'success'
     runs-on: windows-latest
     timeout-minutes: 15
     permissions:
@@ -359,38 +379,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect explicit P105 release marker change
-        id: request
+      - name: Verify explicit manual release gate
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
-          $marker='projects/1-桌面软件/105-LocalSub/RELEASE.md'
-          $PSNativeCommandUseErrorActionPreference=$false
-          git diff --quiet "$env:GITHUB_SHA^1" "$env:GITHUB_SHA" -- "$marker"
-          $diffExit=$LASTEXITCODE
-          $PSNativeCommandUseErrorActionPreference=$true
-          if ($diffExit -eq 1) {
-            'requested=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            Write-Host 'P105 RELEASE.md changed in this main commit; formal release requested.'
-          } elseif ($diffExit -eq 0) {
-            'requested=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            Write-Host 'No P105 release marker change; release job will stop without publishing.'
-          } else {
-            throw "git diff failed while checking P105 RELEASE.md. ExitCode=$diffExit"
-          }
-          exit 0
+          $requested='${{ inputs.release_version }}'
+          $confirm='${{ inputs.release_confirm }}'
+          if ([string]::IsNullOrWhiteSpace($requested)) { throw 'release_version is required for a formal Release.' }
+          if ($confirm -ne 'RELEASE') { throw 'release_confirm must equal RELEASE.' }
+          Write-Host "Explicit manual release gate accepted for version $requested on main $env:GITHUB_SHA"
 
       - name: Resolve and guard release identity
-        if: steps.request.outputs.requested == 'true'
         id: identity
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
+          $requested='${{ inputs.release_version }}'
           [xml]$shell=Get-Content 'projects/1-桌面软件/105-LocalSub/src/LocalSub/LocalSub.csproj' -Raw
           [xml]$core=Get-Content 'projects/1-桌面软件/105-LocalSub/src/LocalSub.CoreWorker/LocalSub.CoreWorker.csproj' -Raw
           $version=@($shell.Project.PropertyGroup.Version | Where-Object { $_ })[0]
           $coreVersion=@($core.Project.PropertyGroup.Version | Where-Object { $_ })[0]
           if ($version -ne $coreVersion) { throw "Shell/Core version mismatch: $version vs $coreVersion" }
+          if ($version -ne $requested) { throw "Requested release version does not match source: requested=$requested source=$version" }
           $marker=Get-Content 'projects/1-桌面软件/105-LocalSub/RELEASE.md' -Raw
           $m=[regex]::Match($marker,'(?m)^Version:\s*([^\s]+)\s*$')
           if (-not $m.Success -or $m.Groups[1].Value -ne $version) { throw 'RELEASE.md version does not match source version.' }
@@ -398,21 +408,23 @@ jobs:
           $PSNativeCommandUseErrorActionPreference=$false
           gh release view $tag *> $null
           $releaseExit=$LASTEXITCODE
+          gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" *> $null
+          $tagExit=$LASTEXITCODE
           $PSNativeCommandUseErrorActionPreference=$true
-          if ($releaseExit -eq 0) { throw "Release $tag already exists; release markers must never be reused." }
+          if ($releaseExit -eq 0) { throw "Release $tag already exists; formal releases must never be reused." }
           if ($releaseExit -ne 1) { throw "Unable to verify whether Release $tag exists. ExitCode=$releaseExit" }
+          if ($tagExit -eq 0) { throw "Tag $tag already exists; formal tags must never be reused." }
+          if ($tagExit -ne 1) { throw "Unable to verify whether tag $tag exists. ExitCode=$tagExit" }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           exit 0
 
       - uses: actions/download-artifact@v4
-        if: steps.request.outputs.requested == 'true'
         with:
           name: P105-LocalSub-win-x64-net8-candidate
           path: release-input
 
       - name: Prepare immutable release assets
-        if: steps.request.outputs.requested == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
@@ -446,14 +458,14 @@ jobs:
           @"
           ## LocalSub v$version
 
-          LocalSub v$version is the first formal P105 release of the dual-process Phase 1A architecture.
+          LocalSub v$version is a formal P105 release of the dual-process architecture.
 
           Highlights:
           * `LocalSub.exe` remains the Windows shell and UI host.
           * `LocalSub.Core.exe` isolates media analysis and background ASR heavy workloads.
           * Core crash recovery uses connection generations so a dead worker cannot poison a new connection.
           * Cancellation timeout cleanup and graceful Shell-to-Core shutdown are included.
-          * The tagged main commit is rebuilt on Windows and passes Core IPC, forced Core crash/reconnect, Shell startup, background workspace, Process Loopback, sherpa native runtime loading, and native offline ASR smoke tests before publishing.
+          * The selected main commit is rebuilt on Windows and passes Core IPC, forced Core crash/reconnect, Shell startup, background workspace, Process Loopback, sherpa native runtime loading, and native offline ASR smoke tests before publishing.
           * Models, ONNX Runtime, sherpa native runtime, FFmpeg and user Data are excluded from the base package.
 
           Requirements:
@@ -462,13 +474,12 @@ jobs:
           * Existing ASR models/runtime remain external to the base package.
 
           Validation note:
-          Automated Windows fault-injection and native smoke tests passed for this tagged source. User-specific high-load GUI responsiveness with real media/models remains a real-machine validation item and is not represented as completed by CI.
+          Automated Windows fault-injection and native smoke tests passed for this source. User-specific high-load GUI responsiveness with real media/models remains a real-machine validation item and is not represented as completed by CI.
 
           Release commit: $env:GITHUB_SHA
           "@ | Set-Content 'release/RELEASE_NOTES.md' -Encoding utf8
 
       - name: Create LocalSub GitHub Release from current main commit
-        if: steps.request.outputs.requested == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
@@ -483,7 +494,6 @@ jobs:
             --notes-file 'release/RELEASE_NOTES.md'
 
       - name: Verify published P105 Release state
-        if: steps.request.outputs.requested == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
