@@ -17,6 +17,7 @@ const isNative = hasNativeBridge()
 const coveragePercent = computed(() => Math.round(snapshot.value.coverage * 1000) / 10)
 const uploadFraction = computed(() => Math.min(1, snapshot.value.quota.uploadUsed / Math.max(1, snapshot.value.quota.uploadMax)))
 const downloadFraction = computed(() => Math.min(1, snapshot.value.quota.downloadUsed / Math.max(1, snapshot.value.quota.downloadMax)))
+const configStateText = computed(() => snapshot.value.configured ? '配置已读取' : '需要配置')
 const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => recycleFilter.value === 'observing' ? group.disposition === 'observing' : recycleFilter.value === 'review' ? group.disposition === 'review' || group.disposition === 'blocked' : group.disposition === 'history'))
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
 
@@ -35,88 +36,91 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
 
 <template>
 <main class="app-shell">
-  <header class="topbar">
+  <header class="app-header">
     <div class="brand-block">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
-      <div>
-        <h1>Zotero 镜像维护</h1>
-        <div class="product-sub">DavBridge <span>v{{ snapshot.version }}</span></div>
+      <div class="brand-copy">
+        <h1>DavBridge</h1>
+        <div class="product-sub">Zotero 镜像 · v{{ snapshot.version }}</div>
       </div>
     </div>
+
+    <nav class="tabs" aria-label="主导航">
+      <button :class="{active:tab==='overview'}" @click="tab='overview'">总览</button>
+      <button :class="{active:tab==='transfer'}" @click="tab='transfer'">转移</button>
+      <button :class="{active:tab==='recycle'}" @click="tab='recycle'">回收站<span v-if="snapshot.humanActionCount" class="tab-badge">{{ snapshot.humanActionCount }}</span></button>
+      <button :class="{active:tab==='docs'}" @click="tab='docs'">文档</button>
+    </nav>
+
     <div class="top-actions">
-      <span class="cycle-pill" title="Cycle 使用坚果云真实额度重置日期，格式 yyMMdd">Cycle {{ snapshot.cycleId || '未校准' }}</span>
+      <span class="config-state" :class="{ok:snapshot.configured}" :title="configStateText"><i></i><span>{{ configStateText }}</span></span>
+      <span class="cycle-pill" title="Cycle 使用坚果云真实额度重置日期，格式 yyMMdd">{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : 'Cycle 未校准' }}</span>
       <button class="icon-button" title="设置" aria-label="设置" @click="command('app.openSettings')" :disabled="busy">⚙</button>
     </div>
   </header>
 
-  <nav class="tabs" aria-label="主导航">
-    <button :class="{active:tab==='overview'}" @click="tab='overview'">总览</button>
-    <button :class="{active:tab==='transfer'}" @click="tab='transfer'">转移</button>
-    <button :class="{active:tab==='recycle'}" @click="tab='recycle'">回收站 <span v-if="snapshot.humanActionCount" class="tab-badge">{{ snapshot.humanActionCount }}</span></button>
-    <button :class="{active:tab==='docs'}" @click="tab='docs'">文档</button>
-  </nav>
-
   <section v-if="tab==='overview'" class="page overview-page">
     <div v-if="snapshot.humanActionCount" class="attention-card" @click="tab='recycle'; recycleFilter='review'">
-      <div><strong>需要人工审查</strong><span>{{ snapshot.humanActionCount }} 个附件组等待明确决定，普通迁移已安全暂停。</span></div>
+      <div><strong>需要人工审查</strong><span>{{ snapshot.humanActionCount }} 个附件组等待明确决定</span></div>
       <button>前往审查</button>
     </div>
 
-    <section class="route-card" :class="`route-${snapshot.routeTone}`">
-      <div class="endpoint">
-        <svg class="cloud-logo" viewBox="0 0 48 28" aria-hidden="true"><path d="M15 23h20a9 9 0 0 0 1-17 13 13 0 0 0-23-1A9 9 0 0 0 15 23Z"/></svg>
-        <div><span>InfiniCLOUD</span><small>只读源端</small></div>
-      </div>
-      <div class="route-main">
-        <div class="route-line"><i></i><span>{{ snapshot.routeStatus }}</span></div>
-      </div>
-      <div class="endpoint target-endpoint">
-        <div><span>坚果云</span><small>强校验镜像</small></div>
-        <svg class="nut-logo" viewBox="0 0 30 34" aria-hidden="true"><path d="M18 7c6 1 9 5 8 11-1 8-5 13-11 13S5 26 5 18c0-6 5-10 13-11Z"/><path d="M17 8c1-5 4-7 9-7-1 5-4 7-9 7Z"/></svg>
-      </div>
-    </section>
-
-    <div class="phase-row">
-      <div v-for="phase in snapshot.phases" :key="phase.key" class="phase" :class="phase.state" :title="phase.hint">
-        <span class="phase-dot"></span><span>{{ phase.label }}</span>
-      </div>
-    </div>
-
-    <div class="overview-grid">
-      <article class="metric-card coverage-card">
-        <header><div><span class="card-kicker">镜像覆盖</span><h2>StrongVerified</h2></div><span class="card-state">{{ snapshot.coverageText }}</span></header>
-        <div class="coverage-body"><strong>{{ coveragePercent }}<small>%</small></strong><span>已完成双端 SHA-256 强校验</span></div>
-        <div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div>
-      </article>
-
-      <article class="metric-card task-card">
-        <header><div><span class="card-kicker">当前任务</span><h2>{{ snapshot.currentTitle }}</h2></div><span class="state-chip" :class="`tone-${snapshot.routeTone}`">{{ snapshot.engineState }}</span></header>
-        <p>{{ snapshot.currentDetail }}</p>
-        <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${(snapshot.currentProgress||0)*100}%`}"></i></div><strong>{{ Math.round((snapshot.currentProgress||0)*100) }}%</strong></div>
-      </article>
-    </div>
-
-    <section class="quota-card">
-      <div class="section-heading">
-        <div><span class="card-kicker">流量预算</span><h2>当前周期</h2><p>{{ snapshot.quota.resetText }}</p></div>
-        <span v-if="snapshot.quota.isSprint" class="sprint-badge">周期末冲刺</span>
-      </div>
-      <div class="quota-grid">
-        <div class="quota-item">
-          <div class="quota-head"><div><span>上传</span><strong>{{ snapshot.quota.uploadText }}</strong></div><b>{{ Math.round(uploadFraction*100) }}%</b></div>
-          <div class="quota-track" :class="quotaClass(uploadFraction)"><i :style="{width:`${uploadFraction*100}%`}"></i></div>
+    <div class="overview-stack">
+      <section class="route-strip" :class="`route-${snapshot.routeTone}`">
+        <div class="endpoint">
+          <svg class="cloud-logo" viewBox="0 0 48 28" aria-hidden="true"><path d="M15 23h20a9 9 0 0 0 1-17 13 13 0 0 0-23-1A9 9 0 0 0 15 23Z"/></svg>
+          <div><strong>InfiniCLOUD</strong><small>只读源端</small></div>
         </div>
-        <div class="quota-item">
-          <div class="quota-head"><div><span>下载</span><strong>{{ snapshot.quota.downloadText }}</strong></div><b>{{ Math.round(downloadFraction*100) }}%</b></div>
-          <div class="quota-track" :class="quotaClass(downloadFraction)"><i :style="{width:`${downloadFraction*100}%`}"></i></div>
+        <div class="route-main"><span class="route-line"></span><b>{{ snapshot.routeStatus }}</b></div>
+        <div class="endpoint target-endpoint">
+          <div><strong>坚果云</strong><small>强校验镜像</small></div>
+          <svg class="nut-logo" viewBox="0 0 30 34" aria-hidden="true"><path d="M18 7c6 1 9 5 8 11-1 8-5 13-11 13S5 26 5 18c0-6 5-10 13-11Z"/><path d="M17 8c1-5 4-7 9-7-1 5-4 7-9 7Z"/></svg>
+        </div>
+      </section>
+
+      <div class="phase-row">
+        <div v-for="phase in snapshot.phases" :key="phase.key" class="phase" :class="phase.state" :title="phase.hint">
+          <span class="phase-dot"></span><span>{{ phase.label }}</span>
         </div>
       </div>
-    </section>
 
-    <footer class="overview-actions">
-      <span class="safe-note">源端只读 · 双端 SHA-256 强校验</span>
-      <button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">{{ busy?'处理中…':snapshot.primaryLabel }}</button>
-    </footer>
+      <div class="overview-grid">
+        <article class="metric-card coverage-card">
+          <header><div><span class="card-kicker">镜像覆盖</span><h2>StrongVerified</h2></div><span class="card-state">{{ snapshot.coverageText }}</span></header>
+          <div class="coverage-body"><strong>{{ coveragePercent }}<small>%</small></strong><span>双端 SHA-256 已核准</span></div>
+          <div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div>
+        </article>
+
+        <article class="metric-card task-card">
+          <header><div><span class="card-kicker">当前任务</span><h2>{{ snapshot.currentTitle }}</h2></div><span class="state-chip" :class="`tone-${snapshot.routeTone}`">{{ snapshot.engineState }}</span></header>
+          <p>{{ snapshot.currentDetail }}</p>
+          <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${(snapshot.currentProgress||0)*100}%`}"></i></div><strong>{{ Math.round((snapshot.currentProgress||0)*100) }}%</strong></div>
+        </article>
+      </div>
+
+      <section class="quota-panel">
+        <div class="quota-title">
+          <div><span class="card-kicker">流量预算</span><h2>本 Cycle</h2></div>
+          <p><span>下次重置</span>{{ snapshot.quota.resetText }}</p>
+          <span v-if="snapshot.quota.isSprint" class="sprint-badge">周期末冲刺</span>
+        </div>
+        <div class="quota-grid">
+          <div class="quota-item">
+            <div class="quota-head"><span>上传</span><strong>{{ snapshot.quota.uploadText }}</strong><b>{{ Math.round(uploadFraction*100) }}%</b></div>
+            <div class="quota-track" :class="quotaClass(uploadFraction)"><i :style="{width:`${uploadFraction*100}%`}"></i></div>
+          </div>
+          <div class="quota-item">
+            <div class="quota-head"><span>下载</span><strong>{{ snapshot.quota.downloadText }}</strong><b>{{ Math.round(downloadFraction*100) }}%</b></div>
+            <div class="quota-track" :class="quotaClass(downloadFraction)"><i :style="{width:`${downloadFraction*100}%`}"></i></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="overview-actions">
+        <span class="safe-note">源端只读 · 双端 SHA-256 强校验</span>
+        <button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">{{ busy?'处理中…':snapshot.primaryLabel }}</button>
+      </footer>
+    </div>
   </section>
 
   <section v-else-if="tab==='transfer'" class="page transfer-page">
