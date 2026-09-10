@@ -17,9 +17,14 @@ const isNative = hasNativeBridge()
 const coveragePercent = computed(() => Math.round(snapshot.value.coverage * 1000) / 10)
 const uploadFraction = computed(() => Math.min(1, snapshot.value.quota.uploadUsed / Math.max(1, snapshot.value.quota.uploadMax)))
 const downloadFraction = computed(() => Math.min(1, snapshot.value.quota.downloadUsed / Math.max(1, snapshot.value.quota.downloadMax)))
-const configStateText = computed(() => snapshot.value.configured ? '配置已读取' : '需要配置')
 const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => recycleFilter.value === 'observing' ? group.disposition === 'observing' : recycleFilter.value === 'review' ? group.disposition === 'review' || group.disposition === 'blocked' : group.disposition === 'history'))
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
+const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
+const sideStatusTip = computed(() => `${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
+const resetLabel = computed(() => {
+  const match = snapshot.value.quota.resetText.match(/(\d{4})-(\d{2})-(\d{2}).*?(\d{2}:\d{2})/)
+  return match ? `${match[2]}/${match[3]} ${match[4]} 重置` : snapshot.value.quota.resetText
+})
 
 function notify(message: string) { toast.value = message; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toast.value = '', 2600) }
 async function refresh() { if (!isNative) return; try { snapshot.value = await invoke<DavBridgeSnapshot>('app.getSnapshot') } catch (error) { notify(error instanceof Error ? error.message : '状态读取失败') } }
@@ -39,7 +44,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
   <aside class="sidebar">
     <div class="side-brand">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
-      <div class="brand-copy"><h1>DavBridge</h1><small>Zotero 镜像 · v{{ snapshot.version }}</small></div>
+      <div class="brand-copy"><h1>DavBridge</h1><small>Zotero 镜像</small></div>
     </div>
 
     <nav class="side-nav" aria-label="主导航">
@@ -67,19 +72,17 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
       </button>
     </nav>
 
-    <div class="side-status has-tip" :data-tip="snapshot.routeStatus">
+    <div class="side-status has-tip" :data-tip="sideStatusTip">
       <i :class="`tone-${snapshot.routeTone}`"></i>
-      <div><strong>{{ snapshot.engineState }}</strong><small>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : 'Cycle 未校准' }}</small></div>
+      <strong>{{ snapshot.engineState }}</strong>
     </div>
   </aside>
 
   <section class="workspace">
     <header class="workspace-head">
-      <div class="welcome"><h2>{{ tab==='overview' ? '你好，DavBridge' : tab==='transfer' ? '转移' : tab==='recycle' ? '回收站' : tab==='docs' ? '文档' : '关于 DavBridge' }}</h2><p v-if="tab==='overview'">Zotero 数据镜像，正在持续维护。</p></div>
-      <div class="top-actions">
-        <span class="config-state has-tip" :class="{ok:snapshot.configured}" :data-tip="snapshot.configured ? '当前配置和凭据已从本机安全存储读取' : '需要打开设置补充配置'"><i></i>{{ configStateText }}</span>
-        <span class="cycle-pill has-tip" data-tip="Cycle 使用坚果云真实额度重置日期，格式 yyMMdd">{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : 'Cycle 未校准' }}</span>
-        <button class="icon-button has-tip" data-tip="设置" aria-label="设置" @click="command('app.openSettings')" :disabled="busy">⚙</button>
+      <div class="welcome"><h2>{{ tab==='overview' ? '你好，DavBridge' : tab==='transfer' ? '转移' : tab==='recycle' ? '回收站' : tab==='docs' ? '文档' : '关于 DavBridge' }}</h2></div>
+      <div v-if="!snapshot.configured" class="top-actions">
+        <button class="config-warning has-tip" data-tip="需要打开设置补充配置" @click="command('app.openSettings')" :disabled="busy"><i></i>需要配置</button>
       </div>
     </header>
 
@@ -88,56 +91,48 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
         <strong>需要人工审查</strong><span>{{ snapshot.humanActionCount }} 个附件组</span><button>前往审查</button>
       </div>
 
-      <section class="route-card">
+      <section class="route-card route-card-polished">
         <div class="endpoint source has-tip" data-tip="InfiniCLOUD 是唯一 authoritative source，DavBridge 对源端只读">
           <svg class="cloud-logo" viewBox="0 0 48 28" aria-hidden="true"><path d="M15 23h20a9 9 0 0 0 1-17 13 13 0 0 0-23-1A9 9 0 0 0 15 23Z"/></svg>
           <strong>InfiniCLOUD</strong>
         </div>
-        <div class="route-core">
-          <span class="route-caption">Zotero 数据镜像维护</span>
+        <div class="route-core has-tip" :data-tip="snapshot.routeStatus">
           <div class="route-line"><i></i><b>›</b><i></i></div>
-          <span class="route-state" :class="`tone-${snapshot.routeTone}`">{{ snapshot.routeStatus }}</span>
         </div>
         <div class="endpoint target has-tip" data-tip="坚果云保存经过 StrongVerified 的强校验镜像">
           <strong>坚果云</strong>
           <svg class="nut-logo" viewBox="0 0 30 34" aria-hidden="true"><path d="M18 7c6 1 9 5 8 11-1 8-5 13-11 13S5 26 5 18c0-6 5-10 13-11Z"/><path d="M17 8c1-5 4-7 9-7-1 5-4 7-9 7Z"/></svg>
         </div>
-      </section>
 
-      <div class="phase-row">
-        <div v-for="(phase,index) in snapshot.phases" :key="phase.key" class="phase-wrap">
-          <div class="phase has-tip" :class="phase.state" :data-tip="phase.hint"><span class="phase-icon">{{ phase.state==='done' ? '✓' : index+1 }}</span><strong>{{ phase.label }}</strong><small>{{ phase.state==='done' ? '已完成' : phase.state==='active' ? '进行中' : '等待中' }}</small></div>
-          <span v-if="index<snapshot.phases.length-1" class="phase-arrow">›</span>
+        <div class="phase-row">
+          <div v-for="(phase,index) in snapshot.phases" :key="phase.key" class="phase-wrap">
+            <div class="phase has-tip" :class="phase.state" :data-tip="phase.hint"><span class="phase-icon">{{ phase.state==='done' ? '✓' : index+1 }}</span><strong>{{ phase.label }}</strong></div>
+            <span v-if="index<snapshot.phases.length-1" class="phase-arrow">›</span>
+          </div>
         </div>
-      </div>
+      </section>
 
       <div class="dashboard-grid">
         <article class="dashboard-card coverage-card">
-          <header><div class="card-title"><span class="card-icon shield">✓</span><h3>覆盖率校验</h3><span class="info-dot has-tip" data-tip="StrongVerified 表示源端与目标端均重新读取并完成 SHA-256 一致性验证">i</span></div></header>
-          <strong class="metric-name">StrongVerified</strong>
+          <header><div class="card-title has-tip" data-tip="StrongVerified 表示源端与目标端均重新读取并完成 SHA-256 一致性验证"><span class="card-icon shield">✓</span><h3>镜像覆盖</h3></div></header>
           <div class="metric-line"><b>{{ coveragePercent }}<small>%</small></b><span>{{ snapshot.coverageText }}</span></div>
           <div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div>
         </article>
 
         <article class="dashboard-card task-card">
-          <header><div class="card-title"><span class="card-icon task">▤</span><h3>当前任务</h3><span class="info-dot has-tip" :data-tip="snapshot.currentDetail">i</span></div><span class="state-chip" :class="`tone-${snapshot.routeTone}`">{{ snapshot.engineState }}</span></header>
+          <header><div class="card-title has-tip" :data-tip="snapshot.currentDetail"><span class="card-icon task">▤</span><h3>当前任务</h3></div><span class="state-chip" :class="`tone-${snapshot.routeTone}`">{{ snapshot.engineState }}</span></header>
           <strong class="task-name">{{ snapshot.currentTitle }}</strong>
-          <p class="task-detail">{{ snapshot.currentDetail }}</p>
-          <div class="task-progress"><div class="progress-track"><i :style="{width:`${(snapshot.currentProgress||0)*100}%`}"></i></div><strong>{{ snapshot.currentProgress===null ? '—' : `${Math.round(snapshot.currentProgress*100)}%` }}</strong></div>
+          <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div><strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong></div>
+          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">{{ busy?'处理中…':snapshot.primaryLabel }}</button></div>
         </article>
 
         <article class="dashboard-card quota-card">
-          <header><div class="card-title"><span class="card-icon quota">▥</span><h3>流量预算</h3><span class="info-dot has-tip" data-tip="额度依据当前 Cycle 本地账本保守统计，重置日 09:00 后通过真实探测确认新周期">i</span></div><span class="cycle-mini">本 Cycle</span></header>
+          <header><div class="card-title has-tip" :data-tip="quotaTip"><span class="card-icon quota">▥</span><h3>流量预算</h3></div></header>
           <div class="quota-row"><span class="quota-arrow up">↑</span><div><div class="quota-text"><span>上传</span><strong>{{ snapshot.quota.uploadText }}</strong><b>{{ Math.round(uploadFraction*100) }}%</b></div><div class="quota-track" :class="quotaClass(uploadFraction)"><i :style="{width:`${uploadFraction*100}%`}"></i></div></div></div>
           <div class="quota-row"><span class="quota-arrow down">↓</span><div><div class="quota-text"><span>下载</span><strong>{{ snapshot.quota.downloadText }}</strong><b>{{ Math.round(downloadFraction*100) }}%</b></div><div class="quota-track" :class="quotaClass(downloadFraction)"><i :style="{width:`${downloadFraction*100}%`}"></i></div></div></div>
-          <div class="reset-row has-tip" :data-tip="snapshot.quota.resetText"><span>◷</span><div><small>下次重置</small><strong>{{ snapshot.quota.resetText }}</strong></div></div>
+          <div class="reset-row compact-reset has-tip" :data-tip="snapshot.quota.resetText"><span>◷</span><strong>{{ resetLabel }}</strong></div>
         </article>
       </div>
-
-      <footer class="status-card">
-        <div class="status-summary has-tip" :data-tip="snapshot.currentDetail"><span class="status-doc">▤</span><div><strong>迁移状态</strong><small>{{ snapshot.routeStatus }}</small></div></div>
-        <button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">{{ busy?'处理中…':snapshot.primaryLabel }}</button>
-      </footer>
     </section>
 
     <section v-else-if="tab==='transfer'" class="page transfer-page">
