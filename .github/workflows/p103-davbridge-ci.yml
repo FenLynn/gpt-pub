@@ -104,14 +104,16 @@ jobs:
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 0.3; done
           browser=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
           test -n "$browser"
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=870,525 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-870x525.png" http://127.0.0.1:4173/
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=900,620 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png" http://127.0.0.1:4173/
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1200,760 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png" http://127.0.0.1:4173/
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-870x525.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png") -gt 10000
       - name: Upload Vue visual previews
         uses: actions/upload-artifact@v4
         with:
-          name: DavBridge-v0.4.0-webui-preview
+          name: DavBridge-webui-preview
           path: build/WebUiPreview/*.png
           if-no-files-found: error
           retention-days: 14
@@ -219,7 +221,7 @@ jobs:
           - Native host and business core: existing C# / .NET 8
           - Core migration logic: unchanged
           - Deployment: framework-dependent single EXE, Windows x64
-          - Stable rollback baseline: v0.1.7 on main
+          - Stable rollback baseline: v0.4.0 on main
           - Candidate: ${{ github.sha }}
           - EXE bytes: $env:DAVBRIDGE_BYTES
           - EXE SHA-256: $env:DAVBRIDGE_SHA256
