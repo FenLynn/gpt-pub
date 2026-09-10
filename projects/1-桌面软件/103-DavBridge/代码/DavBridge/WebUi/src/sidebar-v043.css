@@ -1,0 +1,18 @@
+.overview-page{
+  align-content:start;
+  grid-template-rows:auto 78px 54px clamp(156px,30vh,188px) 54px;
+}
+.overview-page:not(:has(.attention-card)){
+  grid-template-rows:78px 54px clamp(156px,30vh,188px) 54px;
+}
+.dashboard-grid{height:100%;min-height:0}
+
+@media(max-width:950px){
+  .coverage-card .metric-line{display:block;margin-top:6px}
+  .coverage-card .metric-line>span{display:block;text-align:left;margin-top:4px;white-space:nowrap;overflow:visible;text-overflow:clip}
+}
+
+@media(max-height:540px){
+  .overview-page{grid-template-rows:auto 68px 48px 156px 49px}
+  .overview-page:not(:has(.attention-card)){grid-template-rows:68px 48px 156px 49px}
+}
