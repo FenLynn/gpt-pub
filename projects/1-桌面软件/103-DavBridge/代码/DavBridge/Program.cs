@@ -64,7 +64,7 @@ internal static class Program
             using var form = new MainForm(host, launchInBackground: false);
             AppBranding.Apply(form); _ = form.Handle;
             if (form.MinimumSize.Width < 600 || form.MinimumSize.Height < 400) throw new InvalidOperationException("Native host minimum size changed unexpectedly.");
-            WriteReport(reportPath, new { product="DavBridge", version=typeof(Program).Assembly.GetName().Version?.ToString(), roaming=paths.RoamingRoot, local=paths.LocalRoot, temp=paths.TempRoot, nativeHostConstructed=true, uiGeneration="v0.4.0-vue3-webview2-csharp-core", webUiEmbedded=true, bridgeWhitelistValidated=true, coreLogicMovedToJavaScript=false, ok=true });
+            WriteReport(reportPath, new { product="DavBridge", version=typeof(Program).Assembly.GetName().Version?.ToString(), roaming=paths.RoamingRoot, local=paths.LocalRoot, temp=paths.TempRoot, nativeHostConstructed=true, uiGeneration="v0.4.1-vue3-webview2-ui-thread-safe-refined-ui", webUiEmbedded=true, bridgeWhitelistValidated=true, coreLogicMovedToJavaScript=false, ok=true });
         }
         catch (Exception ex) { TryWriteFailedReport(reportPath, ex); }
     }
