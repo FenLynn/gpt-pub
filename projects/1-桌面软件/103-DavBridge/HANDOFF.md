@@ -30,9 +30,9 @@ P103 长期不建立其他功能分支作为常驻维护线。
 94aa30fe488235b1a15065d54e6cf3b8c94fef47
 ```
 
-当前研发候选：**v0.4.3**，位于 `p103-exp`。
+当前研发候选位于 `p103-exp`。新对话必须重新读取项目文件中的产品版本，并以当前分支真实 head 和最近完整 CI 为准。
 
-最后完成完整 P103 CI 的代码 head：
+此前最后完成完整 P103 CI 的代码 head 为：
 
 ```text
 0fcdde9fd7167a128d8104e644fe14fa29728ae9
@@ -49,9 +49,7 @@ windows-build  success
 report-status  success
 ```
 
-候选 Artifact：`DavBridge-v0.4.3-win-x64`。
-
-EXE SHA256：
+该候选的 EXE SHA256：
 
 ```text
 03325839fb6bfe9090c14800ebd777375e9b98abe9578a01e2ca2d1e97ffef1c
@@ -63,11 +61,11 @@ Artifact ZIP SHA256：
 8fde4e1c398d420546e02856c21d37de93332397401b7cd3fdd822c5ce12a883
 ```
 
-如果 `p103-exp` 后续存在纯文档提交，必须把上面的 `0fcdde9...` 继续视为最后经过完整 Windows 构建验证的代码 head，除非新的代码提交又有新的完整 CI 证据。
+之后存在文档收口提交，以及一轮新的总览 UI 减法美化提交。**不要把尚未完成完整 CI 的新提交冒充已验证代码基线。**
 
 ## 3. 当前分支关系
 
-在 v0.4.3 最后已验证代码 head 时：
+此前最后已验证代码 head 时：
 
 ```text
 p103-exp relative to then-current main:
@@ -75,7 +73,7 @@ ahead 19
 behind 0
 ```
 
-说明 `p103-exp` 已包含当时最新 `main`，不是从陈旧主线继续开发。
+说明当时 `p103-exp` 已包含最新 `main`，不是从陈旧主线继续开发。
 
 当时 `main`：
 
@@ -126,11 +124,9 @@ C# / .NET 8 极薄 Windows 宿主
 
 核心原则是只换显示与交互层，不重写已经验证的迁移、安全和数据逻辑。不引入 Rust，不使用 Tauri sidecar，不把核心迁移逻辑搬进 JavaScript。
 
-## 6. v0.4.3 已完成内容
+## 6. 当前 UI 方向与最新改动
 
-v0.4.3 已把用户选定的左侧栏方案真正更新到实际 Vue/WebView2 UI，不是概念图。
-
-当前左侧导航：
+总览保持固定左侧导航，一级入口仍为：
 
 ```text
 总览
@@ -143,24 +139,40 @@ v0.4.3 已把用户选定的左侧栏方案真正更新到实际 Vue/WebView2 UI
 运行状态
 ```
 
-总览重新组织为：
+用户对上一版实机总览的总体布局没有大意见，但明确反馈：
+
+- 信息块堆叠过多；
+- 小字号太多；
+- 默认窗口下显得拥挤；
+- 同一状态重复显示；
+- 应更多使用悬浮说明。
+
+最新一轮已经按“减法信息架构”调整总览，重点不是简单缩小或放大字号，而是减少重复层级：
+
+- 顶部不再重复展示正常配置状态、Cycle 和第二个设置入口；仅在需要配置时显示异常提示；
+- 左侧品牌不再重复显示版本号，版本保留在“关于”页和 Windows 标题栏；
+- 左下运行状态只保留一个主状态文字，Cycle 放入悬浮信息；
+- 路径卡内合并三阶段，取消三张独立阶段卡和“已完成/等待中”等重复小字；
+- 路径说明和当前路径状态改为悬浮；
+- 原三张 dashboard card 合并为一块统一摘要面板，以细分隔线区分镜像覆盖、当前任务和流量预算；
+- `StrongVerified` 详细含义从主界面移到“镜像覆盖”标题悬浮；
+- 当前任务详细原因移到标题悬浮；
+- Cycle 规则移到“流量预算”标题悬浮；
+- 当前任务区域直接承担主操作按钮，删除底部重复的“迁移状态”卡；
+- 重置时间压缩为短格式显示，完整文本保留悬浮；
+- 正常状态默认隐退，异常和需要人工操作的状态才主动浮出。
+
+对应最新 UI 代码提交为：
 
 ```text
-迁移路径
-→ 三阶段状态
-→ StrongVerified 覆盖率
-→ 当前任务
-→ 上传 / 下载流量预算
-→ 底部运行控制
+4c67753c2ba7ed775efd5bdfd5f651e8e97039c1
 ```
 
-大量解释性文字已经收掉。StrongVerified、阶段状态、Cycle、端点角色等说明优先通过悬浮提示呈现。
-
-最后一轮 `sidebar-v043.css` 只调整总览布局比例、窄窗口和低高度窗口表现。
+该提交更新 `App.vue`，新增长期名称 `overview.css`，并移除版本耦合的 `sidebar-v043.css`；同时 `main.ts` 改为导入 `overview.css`。该提交尚需完整 CI 和新的 Windows 实机截图确认。
 
 ## 7. 核心冻结
 
-v0.4.3 没有修改 `DavBridge.Core`。以下语义继续完整冻结：
+最新 UI 调整没有修改 `DavBridge.Core`。以下语义继续完整冻结：
 
 - InfiniCLOUD authoritative source 与源端只读；
 - Zotero `.zip + .prop` Group；
@@ -233,21 +245,13 @@ WinForms 不再承担业务页面布局，只保留：
 
 Runtime、Artifact、Release、源码和 CI 不得包含私人凭据、真实 Zotero 文件清单、用户日志或其他私人 Data。
 
-## 11. 当前 CI 与差异边界
+## 11. CI 与差异边界
 
-最后已验证代码 head 的 `main → p103-exp` 有效差异只位于：
+此前最后已验证代码 head 的 `main → p103-exp` 有效差异只位于 P103 CI、Windows 宿主和 Web UI 范围，没有 `DavBridge.Core` 差异。
 
-- `.github/workflows/p103-davbridge-ci.yml`
-- P103 Windows 项目版本与宿主文件
-- `WebUi/src/App.vue`
-- `WebUi/src/main.ts`
-- `WebUi/src/mock.ts`
-- `WebUi/src/styles.css`
-- `WebUi/src/sidebar-v043.css`
+最新总览 UI 减法美化仍只触及 Web UI 文件，不应扩大核心差异范围。新对话必须重新 compare 当前 `main...p103-exp`，确认这一事实。
 
-没有 `DavBridge.Core` 差异。
-
-CI 已验证：
+CI 必须继续验证：
 
 - Core Smoke；
 - Vue typecheck 与 production build；
@@ -268,7 +272,7 @@ CI 已验证：
 .github/workflows/p103-davbridge-branch-hygiene.yml
 ```
 
-这两套说法已经过期。v0.4.0 一次性 Release workflow 完成正式发布后已经退役，P103 专属 branch hygiene 也已经被仓库级统一治理取代。
+这两套说法已经过期。一次性 Release workflow 完成正式发布后已经退役，P103 专属 branch hygiene 也已经被仓库级统一治理取代。
 
 当前分支和发布规则只服从最新 A/B/C 约束。正常流程是：
 
@@ -290,16 +294,12 @@ CI 已验证：
 
 当前不要重新设计 Core，不要回到旧 WinForms 业务 UI，不要从历史垃圾分支恢复，不要因为 CI 绿色就自动提升 stable/main。
 
-**当前唯一正常下一关是用户对 v0.4.3 的 Windows 实机 UI 与交互验收。**
+当前最近一步是总览 UI 的减法美化。正常下一步顺序为：
 
-重点观察：
-
-- 左侧栏比例和视觉密度；
-- 总览默认窗口完整性；
-- 迁移路径、三阶段、覆盖率、当前任务、流量预算和底部控制的层级；
-- 转移、回收站、文档、设置、关于；
-- 暂停、继续、托盘、再次双击 EXE 回主页；
-- 高 DPI 与窗口缩放是否有明显问题。
+1. 等待并核对 `4c67753c...` 对应完整 P103 CI；
+2. 如果 CI 全绿，使用该准确 head 的 Windows candidate；
+3. 用户在真实 Windows 上重点检查默认窗口视觉密度、字号、悬浮提示、三阶段合并后的清晰度、统一摘要面板和主操作按钮位置；
+4. 只有用户确认实机结果后，才决定是否继续微调或进入稳定提升流程。
 
 真实 DELETE 仍需等待未来合法跨周期候选自然出现后再实机验证。
 
