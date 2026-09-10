@@ -16,7 +16,7 @@
 
 P103 长期不建立其他功能分支作为常驻维护线。
 
-## 2. 当前版本事实
+## 2. 当前版本与验证事实
 
 当前正式版本：**v0.4.0**。
 
@@ -30,18 +30,18 @@ P103 长期不建立其他功能分支作为常驻维护线。
 94aa30fe488235b1a15065d54e6cf3b8c94fef47
 ```
 
-当前研发候选位于 `p103-exp`。新对话必须重新读取项目文件中的产品版本，并以当前分支真实 head 和最近完整 CI 为准。
+当前研发候选位于 `p103-exp`，产品版本仍为 **v0.4.3**。
 
-此前最后完成完整 P103 CI 的代码 head 为：
+当前最后完成完整 P103 CI 的 UI 代码 head：
 
 ```text
-0fcdde9fd7167a128d8104e644fe14fa29728ae9
+4930be95d81e679f91784a91dab2c6b94a367c7d
 ```
 
 对应 P103 CI：
 
 ```text
-run 34470894206
+run 34480877831
 scope          success
 core-smoke     success
 frontend       success
@@ -49,45 +49,41 @@ windows-build  success
 report-status  success
 ```
 
-该候选的 EXE SHA256：
+该候选 Windows 单 EXE：
 
 ```text
-03325839fb6bfe9090c14800ebd777375e9b98abe9578a01e2ca2d1e97ffef1c
+DavBridge-v0.4.3-win-x64
+EXE bytes: 2242139
+EXE SHA256: 80a9f58ca78dab722ccc15df15127195725c4834e1f9c9950891e3546ceda6bc
+Artifact ZIP SHA256: f27cd7ba0b4fbb2ce025399193c3a717940a084e1ab8b10f5e4a157b43e1eefa
+Artifact ID: 10153669464
 ```
 
-Artifact ZIP SHA256：
+对应浏览器视觉预览 Artifact：
 
 ```text
-8fde4e1c398d420546e02856c21d37de93332397401b7cd3fdd822c5ce12a883
+DavBridge-webui-preview
+Artifact ID: 10153588666
+Artifact ZIP SHA256: b149644673b9173a72f293378baeda0840545a627024131f487e7058dcd85fab
 ```
 
-之后存在文档收口提交，以及一轮新的总览 UI 减法美化提交。**不要把尚未完成完整 CI 的新提交冒充已验证代码基线。**
+CI 已重新通过 Vue typecheck、production build、视觉预览、Core Smoke、Windows publish、Runtime 私人数据边界、native-host self-test 和 Artifact 生成。
+
+如果 `p103-exp` 在该代码 head 之后只有 HANDOFF 或其他纯文档提交，不得把文档提交 SHA 冒充新的 UI 代码验证 head。新对话仍应重新查询分支、CI 与 Artifact，以仓库实时事实为准。
 
 ## 3. 当前分支关系
 
-此前最后已验证代码 head 时：
+在前一轮已验证代码快照时，`p103-exp` 已完整包含当时最新 `main`，不是从陈旧主线继续开发。随后只继续了 P103 文档和 Web UI 范围修改。
+
+新对话必须重新查询：
 
 ```text
-p103-exp relative to then-current main:
-ahead 19
-behind 0
+main
+p103-stable
+p103-exp
 ```
 
-说明当时 `p103-exp` 已包含最新 `main`，不是从陈旧主线继续开发。
-
-当时 `main`：
-
-```text
-042329ede97b09cd375ebcf7c55d7245fc56b933
-```
-
-当时 `p103-stable`：
-
-```text
-d8d5aed844ca2944c8511c85c0a892dbbd411fc5
-```
-
-新对话必须重新查询三条分支的实时 head 和祖先关系，不得把上述快照当作永久不变事实。
+并重新核对三条分支的实时 head、祖先关系、ahead/behind 与 `main...p103-exp` 有效差异。不得把本文中的历史 SHA 快照当作永久不变事实。
 
 ## 4. 固定读取顺序
 
@@ -107,6 +103,8 @@ d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 14. `设计与演进.md`
 15. `代码/README.md`
 16. 涉及代码时再从 `代码/DavBridge.sln`、`代码/DavBridge/`、`代码/DavBridge/WebUi/` 和 `代码/DavBridge.Core/` 恢复实现事实
+
+README 只是长期稳定入口，不承担动态状态快照职责。版本、SHA、CI、Artifact、分支关系、当前断点和待验证事项统一由 HANDOFF 维护。
 
 ## 5. v0.4 架构决策
 
@@ -139,36 +137,43 @@ C# / .NET 8 极薄 Windows 宿主
 运行状态
 ```
 
-用户对上一版实机总览的总体布局没有大意见，但明确反馈：
+用户对上一版 Windows 实机总览的总体结构没有大意见，但明确指出：信息块堆叠过多，小字号太多，默认窗口显得拥挤，同一状态重复出现，希望进一步美化并更多使用悬浮说明。
 
-- 信息块堆叠过多；
-- 小字号太多；
-- 默认窗口下显得拥挤；
-- 同一状态重复显示；
-- 应更多使用悬浮说明。
+最新一轮没有继续做单纯字号微调，而是按“减法信息架构”重组总览：
 
-最新一轮已经按“减法信息架构”调整总览，重点不是简单缩小或放大字号，而是减少重复层级：
-
-- 顶部不再重复展示正常配置状态、Cycle 和第二个设置入口；仅在需要配置时显示异常提示；
-- 左侧品牌不再重复显示版本号，版本保留在“关于”页和 Windows 标题栏；
-- 左下运行状态只保留一个主状态文字，Cycle 放入悬浮信息；
-- 路径卡内合并三阶段，取消三张独立阶段卡和“已完成/等待中”等重复小字；
-- 路径说明和当前路径状态改为悬浮；
-- 原三张 dashboard card 合并为一块统一摘要面板，以细分隔线区分镜像覆盖、当前任务和流量预算；
-- `StrongVerified` 详细含义从主界面移到“镜像覆盖”标题悬浮；
-- 当前任务详细原因移到标题悬浮；
-- Cycle 规则移到“流量预算”标题悬浮；
+- 顶部不再重复展示正常配置状态、Cycle 和第二个设置入口；正常配置时保持安静，只有需要配置时才显示异常入口；
+- 顶部只保留页面主标题，删除重复的说明副标题；
+- 左侧品牌不再重复显示版本号，版本仍保留在 Windows 标题栏和“关于”页；
+- 左下运行状态只保留一个主状态文字，Cycle 与路径状态进入悬浮；
+- 路径与三阶段合并为一个整体表面，取消三张独立阶段卡；
+- 阶段默认只显示节点与阶段名称，删除“已完成”“等待中”等重复小字，详细阶段含义进入悬浮；
+- 路径说明与当前路径状态不再单独占行，进入路径悬浮；
+- 原三张 dashboard card 合并为一块统一摘要面板，仅用细分隔线区分镜像覆盖、当前任务和流量预算；
+- “StrongVerified”详细解释从主界面移到“镜像覆盖”标题悬浮；
+- 当前任务的长说明移到标题悬浮；
+- Cycle 与额度规则移到“流量预算”标题悬浮；
 - 当前任务区域直接承担主操作按钮，删除底部重复的“迁移状态”卡；
-- 重置时间压缩为短格式显示，完整文本保留悬浮；
-- 正常状态默认隐退，异常和需要人工操作的状态才主动浮出。
+- 重置时间使用短格式显示，完整文本保留悬浮；
+- 可见正文整体提高字号和留白，减少 9 px 级辅助文字；
+- 正常信息默认隐退，异常、等待和需要人工处理的状态才主动浮出。
 
-对应最新 UI 代码提交为：
+当前 UI 代码 head：
 
 ```text
-4c67753c2ba7ed775efd5bdfd5f651e8e97039c1
+4930be95d81e679f91784a91dab2c6b94a367c7d
 ```
 
-该提交更新 `App.vue`，新增长期名称 `overview.css`，并移除版本耦合的 `sidebar-v043.css`；同时 `main.ts` 改为导入 `overview.css`。该提交尚需完整 CI 和新的 Windows 实机截图确认。
+文件变化集中在：
+
+```text
+代码/DavBridge/WebUi/src/App.vue
+代码/DavBridge/WebUi/src/main.ts
+代码/DavBridge/WebUi/src/overview.css
+```
+
+旧的版本耦合样式 `sidebar-v043.css` 已删除，改为长期名称 `overview.css`。这一步未修改 `DavBridge.Core`、WebDAV、宿主安全链或 Data 契约。
+
+CI 浏览器预览已经显示新的结构明显减少卡片堆叠和小字，但 Linux 浏览器预览的中文字形不作为最终视觉事实。下一步仍必须以用户真实 Windows/WebView2 截图为准。
 
 ## 7. 核心冻结
 
@@ -247,19 +252,18 @@ Runtime、Artifact、Release、源码和 CI 不得包含私人凭据、真实 Zo
 
 ## 11. CI 与差异边界
 
-此前最后已验证代码 head 的 `main → p103-exp` 有效差异只位于 P103 CI、Windows 宿主和 Web UI 范围，没有 `DavBridge.Core` 差异。
+当前总览减法美化的完整 CI 已成功。Windows build 日志再次确认：
 
-最新总览 UI 减法美化仍只触及 Web UI 文件，不应扩大核心差异范围。新对话必须重新 compare 当前 `main...p103-exp`，确认这一事实。
+- `DavBridge.Core` 正常构建；
+- Vue UI 正常嵌入单 EXE；
+- Runtime 未泄露私人 Data；
+- native-host self-test 通过；
+- `webUiEmbedded=true`、bridge whitelist 有效、核心逻辑没有搬入 JavaScript；
+- 产品版本仍为 v0.4.3。
 
-CI 必须继续验证：
+构建仍可见既有 WindowsBase/WebView2 WPF reference conflict warning，以及旧 WinForms UI 历史文件的几个编译 warning，但本轮 CI 全部通过，本轮 UI 修改未涉及这些文件。不要为了当前视觉微调顺手扩展到无关清理。
 
-- Core Smoke；
-- Vue typecheck 与 production build；
-- 浏览器视觉预览；
-- Windows x64 framework-dependent single EXE；
-- Runtime 私人数据边界；
-- 隔离 native-host self-test；
-- SHA256 与候选 Artifact。
+新对话仍需重新 compare 当前 `main...p103-exp`，确认 P103 有效差异没有越过 UI、宿主与 P103 CI 范围。
 
 自动视觉预览不是最终视觉验收，最终事实仍以用户真实 Windows 为准。
 
@@ -294,12 +298,20 @@ CI 必须继续验证：
 
 当前不要重新设计 Core，不要回到旧 WinForms 业务 UI，不要从历史垃圾分支恢复，不要因为 CI 绿色就自动提升 stable/main。
 
-当前最近一步是总览 UI 的减法美化。正常下一步顺序为：
+总览“减法美化”代码已经完成完整 CI。**当前唯一正常下一关是用户拿 `4930be95...` 对应 Windows candidate 做真实 WebView2 实机验收。**
 
-1. 等待并核对 `4c67753c...` 对应完整 P103 CI；
-2. 如果 CI 全绿，使用该准确 head 的 Windows candidate；
-3. 用户在真实 Windows 上重点检查默认窗口视觉密度、字号、悬浮提示、三阶段合并后的清晰度、统一摘要面板和主操作按钮位置；
-4. 只有用户确认实机结果后，才决定是否继续微调或进入稳定提升流程。
+重点观察：
+
+- 默认窗口是否明显减少堆叠感；
+- 主文字是否比上一版更容易读，是否仍存在不必要的小字；
+- 路径与三阶段合并后是否简洁但仍一眼可理解；
+- 镜像覆盖、当前任务、流量预算统一摘要面板的层级是否自然；
+- 主操作按钮放入当前任务区是否合理；
+- 悬浮提示是否足够覆盖 StrongVerified、Cycle、路径状态和阶段含义；
+- 870×525 左右默认窗口、高 DPI、窗口缩放下是否出现截断、遮挡或悬浮溢出；
+- 转移、回收站、文档、设置、关于等其他页面功能不受影响。
+
+用户确认新的 Windows 实机截图后，再做下一轮精修。未经实机确认，不提升 `p103-stable` 或 `main`，不创建正式标签或 Release。
 
 真实 DELETE 仍需等待未来合法跨周期候选自然出现后再实机验证。
 
