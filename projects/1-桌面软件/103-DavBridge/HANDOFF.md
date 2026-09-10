@@ -1,19 +1,22 @@
 # DavBridge 对话接续入口
 
-本文件用于恢复 P103 DavBridge 当前事实与准确断点。
+本文件用于恢复 P103 DavBridge 当前事实与准确断点。新对话不得只凭聊天记忆继续，必须按本文与 A/B/C 约束重新核对仓库事实。
 
-## 当前事实
+## 1. 项目身份
 
 仓库：`FenLynn/gpt-pub`
 
 项目：`projects/1-桌面软件/103-DavBridge/`
 
-长期 P103 分支只保留：
+正式主线：`main`
 
-- `p103-exp`
-- `p103-stable`
+日常开发：`p103-exp`
 
-跨项目正式主线：`main`。
+稳定候选：`p103-stable`
+
+P103 长期不建立其他功能分支作为常驻维护线。
+
+## 2. 当前版本事实
 
 当前正式版本：**v0.4.0**。
 
@@ -21,18 +24,24 @@
 
 正式 Release 名：`DavBridge v0.4.0`。
 
-v0.4.0 在进入正式 Release 前已经完成用户真实 Windows 验收：Vue + WebView2 主界面正常加载，中文、路由、阶段、卡片和上传下载额度条实际显示明显优于旧 WinForms 业务 UI。
-
-v0.4.0 UI 迁移的准确已验证代码 head：
+正式 Release commit：
 
 ```text
-0c502b45077d0dfd4482a05ad3ba288f364e1135
+94aa30fe488235b1a15065d54e6cf3b8c94fef47
+```
+
+当前研发候选：**v0.4.3**，位于 `p103-exp`。
+
+最后完成完整 P103 CI 的代码 head：
+
+```text
+0fcdde9fd7167a128d8104e644fe14fa29728ae9
 ```
 
 对应 P103 CI：
 
 ```text
-run 32085930510
+run 34470894206
 scope          success
 core-smoke     success
 frontend       success
@@ -40,69 +49,49 @@ windows-build  success
 report-status  success
 ```
 
-该代码已经进入 `main`。后续主线又包含其他项目的大量提交，因此不得把旧 `p103-exp` 反向合并到当前 `main`。正式 v0.4.0 Release 必须直接从当前 `main` 重新构建。
+候选 Artifact：`DavBridge-v0.4.3-win-x64`。
 
-## 正式发布流程
-
-P103 正式发布工作流：
+EXE SHA256：
 
 ```text
-.github/workflows/p103-davbridge-v040-release.yml
+03325839fb6bfe9090c14800ebd777375e9b98abe9578a01e2ca2d1e97ffef1c
 ```
 
-它只在 `main` 上构建并执行：
+Artifact ZIP SHA256：
 
 ```text
-版本核对
-→ 冻结 Core Smoke
-→ Vue production build
-→ Windows x64 single EXE publish
-→ Runtime 私人数据边界检查
-→ 隔离 native-host self-test
-→ 生成 EXE / ZIP / SHA256
-→ 建立 p103-v0.4.0 tag
-→ 建立 DavBridge v0.4.0 GitHub Release
-→ 同步 p103-stable / p103-exp 到已发布 main
-→ 清理 P103 旧临时分支
+8fde4e1c398d420546e02856c21d37de93332397401b7cd3fdd822c5ce12a883
 ```
 
-Release 资产固定为：
+如果 `p103-exp` 后续存在纯文档提交，必须把上面的 `0fcdde9...` 继续视为最后经过完整 Windows 构建验证的代码 head，除非新的代码提交又有新的完整 CI 证据。
+
+## 3. 当前分支关系
+
+在 v0.4.3 最后已验证代码 head 时：
 
 ```text
-DavBridge-v0.4.0.exe
-DavBridge-v0.4.0-win-x64.zip
-DavBridge-v0.4.0-SHA256.txt
+p103-exp relative to then-current main:
+ahead 19
+behind 0
 ```
 
-旧实验 Artifact 的 SHA 只作为历史证据，不冒充正式 Release 构建。正式 Release SHA 以 GitHub Release 中重新构建的资产为准。
+说明 `p103-exp` 已包含当时最新 `main`，不是从陈旧主线继续开发。
 
-## 分支治理
-
-正常长期只保留：
+当时 `main`：
 
 ```text
-p103-exp
-p103-stable
+042329ede97b09cd375ebcf7c55d7245fc56b933
 ```
 
-正式 Release 后两者都快进到已发布的 `main` 提交，避免长期分支再次落后主线几百或上千提交。
-
-已废弃的 P103 分支在正式发布阶段统一清理。旧 `p103-localsub-exp` 曾包含 LocalSub 编号错误时期的独有历史，因此删除分支前先转存为 archive tag，再移除错误的 P103 branch ref。
-
-以后不启用仓库级 `Automatically delete head branches`，因为这是多项目 monorepo，其他项目有长期 `exp/stable` 分支。P103 自己使用：
+当时 `p103-stable`：
 
 ```text
-.github/workflows/p103-davbridge-branch-hygiene.yml
+d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 ```
 
-治理规则：
+新对话必须重新查询三条分支的实时 head 和祖先关系，不得把上述快照当作永久不变事实。
 
-- 合并完成的临时 `p103-*` PR head 自动删除；
-- `p103-exp` 与 `p103-stable` 永不自动删除；
-- 每周只清理已经完整包含于 `main` 的 P103 临时分支；
-- 有独有提交的分支不会被周任务自动删除，必须先人工确认或归档。
-
-## 固定读取顺序
+## 4. 固定读取顺序
 
 1. `/GPT_RULES.md`
 2. `/目录.md`
@@ -110,16 +99,18 @@ p103-stable
 4. `projects/1-桌面软件/开发约束.md`
 5. 本项目 `开发约束.md`
 6. 本项目 `开发约束-v0.4-补充.md`
-7. 本 HANDOFF
+7. 本 `HANDOFF.md`
 8. `UI架构-v0.4.md`
 9. `README.md`
-10. `用户手册.md`
-11. `数据兼容与升级.md`
-12. 涉及代码时从 `代码/DavBridge.sln` 与 `代码/DavBridge/WebUi/` 恢复
+10. `工作记录.md`
+11. `阶段记录.md`
+12. `用户手册.md`
+13. `数据兼容与升级.md`
+14. `设计与演进.md`
+15. `代码/README.md`
+16. 涉及代码时再从 `代码/DavBridge.sln`、`代码/DavBridge/`、`代码/DavBridge/WebUi/` 和 `代码/DavBridge.Core/` 恢复实现事实
 
-## v0.4 架构决策
-
-用户明确批准：保留已经验证的 C# 逻辑，只更换 UI。
+## 5. v0.4 架构决策
 
 当前运行架构：
 
@@ -133,11 +124,43 @@ C# / .NET 8 极薄 Windows 宿主
 既有 DavBridge.Core 与既有 C# 安全链
 ```
 
-不引入 Rust，不使用 Tauri sidecar，不重写 DavBridge.Core。
+核心原则是只换显示与交互层，不重写已经验证的迁移、安全和数据逻辑。不引入 Rust，不使用 Tauri sidecar，不把核心迁移逻辑搬进 JavaScript。
 
-## 核心冻结
+## 6. v0.4.3 已完成内容
 
-v0.4 UI 迁移不得改变：
+v0.4.3 已把用户选定的左侧栏方案真正更新到实际 Vue/WebView2 UI，不是概念图。
+
+当前左侧导航：
+
+```text
+总览
+转移
+回收站
+文档
+
+设置
+关于
+运行状态
+```
+
+总览重新组织为：
+
+```text
+迁移路径
+→ 三阶段状态
+→ StrongVerified 覆盖率
+→ 当前任务
+→ 上传 / 下载流量预算
+→ 底部运行控制
+```
+
+大量解释性文字已经收掉。StrongVerified、阶段状态、Cycle、端点角色等说明优先通过悬浮提示呈现。
+
+最后一轮 `sidebar-v043.css` 只调整总览布局比例、窄窗口和低高度窗口表现。
+
+## 7. 核心冻结
+
+v0.4.3 没有修改 `DavBridge.Core`。以下语义继续完整冻结：
 
 - InfiniCLOUD authoritative source 与源端只读；
 - Zotero `.zip + .prop` Group；
@@ -154,11 +177,11 @@ v0.4 UI 迁移不得改变：
 - DPAPI 与现有 Data 文件；
 - WebDAV GET / PUT / DELETE 实现。
 
-架构迁移前后 Git diff 已复核。v0.4 UI 迁移没有修改 `DavBridge.Core`、既有 WebDAV 核心、状态模型或核心安全语义。
+如果 UI 需求与这些语义冲突，调整 UI，不降低安全门。
 
-## Web UI 权限边界
+## 8. Web UI 权限边界
 
-当前 C# bridge 白名单只有：
+当前 C# bridge 白名单仍只有：
 
 ```text
 app.getSnapshot
@@ -171,9 +194,18 @@ recycle.delete
 
 Vue 只接收安全 DTO 和发送白名单意图。密码、DPAPI、WebDAV 客户端、state/reconcile 原文件和真正写入逻辑不得进入 JavaScript。
 
-DELETE 仍保留两层人机门：Web UI 表示删除意图，随后必须经过 C# 原生最终确认，再进入原 `ReconciliationRemovalV030` 安全链。
+DELETE 仍保留双门：
 
-## Windows 原生宿主职责
+```text
+Web UI 删除意图
+→ 前端确认
+→ C# 原生最终确认
+→ ReconciliationRemovalV030
+→ 再次核对源端、Zotero Group、目标历史身份
+→ 满足全部条件后才允许 DELETE
+```
+
+## 9. Windows 原生宿主职责
 
 WinForms 不再承担业务页面布局，只保留：
 
@@ -186,9 +218,9 @@ WinForms 不再承担业务页面布局，只保留：
 - 危险操作最终确认；
 - 已有后台运行入口。
 
-## Data
+## 10. Data
 
-核心 Data 继续保持原路径与兼容格式：
+核心 Data 保持既有兼容格式：
 
 ```text
 %APPDATA%\DavBridge\config.json
@@ -199,20 +231,85 @@ WinForms 不再承担业务页面布局，只保留：
 %APPDATA%\DavBridge\reconcile.json.bak
 ```
 
-Release、Artifact、源码和 CI 不得包含私人凭据、私人 Zotero 文件清单、用户日志或其他私人 Data。
+Runtime、Artifact、Release、源码和 CI 不得包含私人凭据、真实 Zotero 文件清单、用户日志或其他私人 Data。
 
-## 当前断点
+## 11. 当前 CI 与差异边界
 
-正式 Release 完成后，下一个开发周期从已经与 `main` 对齐的 `p103-exp` 开始。不得从历史垃圾分支恢复开发，也不得为了 UI 优化重写核心迁移逻辑。
+最后已验证代码 head 的 `main → p103-exp` 有效差异只位于：
+
+- `.github/workflows/p103-davbridge-ci.yml`
+- P103 Windows 项目版本与宿主文件
+- `WebUi/src/App.vue`
+- `WebUi/src/main.ts`
+- `WebUi/src/mock.ts`
+- `WebUi/src/styles.css`
+- `WebUi/src/sidebar-v043.css`
+
+没有 `DavBridge.Core` 差异。
+
+CI 已验证：
+
+- Core Smoke；
+- Vue typecheck 与 production build；
+- 浏览器视觉预览；
+- Windows x64 framework-dependent single EXE；
+- Runtime 私人数据边界；
+- 隔离 native-host self-test；
+- SHA256 与候选 Artifact。
+
+自动视觉预览不是最终视觉验收，最终事实仍以用户真实 Windows 为准。
+
+## 12. 仓库治理更新
+
+历史文档曾描述：
+
+```text
+.github/workflows/p103-davbridge-v040-release.yml
+.github/workflows/p103-davbridge-branch-hygiene.yml
+```
+
+这两套说法已经过期。v0.4.0 一次性 Release workflow 完成正式发布后已经退役，P103 专属 branch hygiene 也已经被仓库级统一治理取代。
+
+当前分支和发布规则只服从最新 A/B/C 约束。正常流程是：
+
+```text
+最新 main
+→ p103-exp
+→ PR: p103-exp → p103-stable
+→ 完整候选验证
+→ 用户真实 Windows 验收
+→ PR: p103-stable → main
+→ 用户在当前会话对明确版本明确授权
+→ 正式标签与 Release
+→ 按最新规则同步长期分支
+```
+
+生成候选 EXE、ZIP 或 Artifact 不等于授权正式 Release。
+
+## 13. 当前准确断点
+
+当前不要重新设计 Core，不要回到旧 WinForms 业务 UI，不要从历史垃圾分支恢复，不要因为 CI 绿色就自动提升 stable/main。
+
+**当前唯一正常下一关是用户对 v0.4.3 的 Windows 实机 UI 与交互验收。**
+
+重点观察：
+
+- 左侧栏比例和视觉密度；
+- 总览默认窗口完整性；
+- 迁移路径、三阶段、覆盖率、当前任务、流量预算和底部控制的层级；
+- 转移、回收站、文档、设置、关于；
+- 暂停、继续、托盘、再次双击 EXE 回主页；
+- 高 DPI 与窗口缩放是否有明显问题。
 
 真实 DELETE 仍需等待未来合法跨周期候选自然出现后再实机验证。
 
-## 事实源
+## 14. 事实源
 
 - 实现事实：源码；
-- 安全逻辑事实：Core Smoke 与既有 C# 测试；
-- 构建事实：准确 CI / Release workflow；
-- 正式发布事实：`main` + `p103-v0.4.0` + GitHub Release；
+- 安全逻辑事实：DavBridge.Core、Core Smoke 与既有 C# 测试；
+- 构建事实：准确代码 head 对应的 CI；
+- 正式发布事实：`main` 上正式标签与 GitHub Release；
 - 日常开发：`p103-exp`；
 - 稳定候选：`p103-stable`；
-- WebDAV 行为和最终 UI：用户真实 Windows。
+- 最终 UI 与真实 WebDAV 行为：用户真实 Windows；
+- 当前治理：最新 `/GPT_RULES.md`、分类 `开发约束.md` 和本项目 `开发约束.md`。

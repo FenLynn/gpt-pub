@@ -2,15 +2,27 @@
 
 本目录是 P103 DavBridge 的完整可恢复源码入口。任何新对话、开发机或 CI 都应从这里恢复工程，不依赖聊天记录或本地临时文件。
 
-## 当前实验候选
+## 当前版本
 
-`p103-exp`：**v0.3.0**
+当前正式版本：**v0.4.0**。
 
-准确完成 CI 的代码 head：`22d321f9811bb047f2ddd96c5a7463225fed51f1`
+当前 `p103-exp` 候选：**v0.4.3**。
 
-CI run：`31869299097`，结果 **success**。
+最后完成完整 CI 的代码 head：
 
-正式稳定基线仍为 `main / p103-stable = v0.1.7`。
+```text
+0fcdde9fd7167a128d8104e644fe14fa29728ae9
+```
+
+CI run：`34470894206`，结果 `success`。
+
+候选 Artifact：`DavBridge-v0.4.3-win-x64`。
+
+EXE SHA256：`03325839fb6bfe9090c14800ebd777375e9b98abe9578a01e2ca2d1e97ffef1c`。
+
+Artifact ZIP SHA256：`8fde4e1c398d420546e02856c21d37de93332397401b7cd3fdd822c5ce12a883`。
+
+如果该 head 之后只有文档提交，仍以 `0fcdde9...` 作为最后经过完整构建验证的代码 head。
 
 ## 解决方案
 
@@ -28,15 +40,32 @@ DavBridge
 DavBridge.Smoke
 ```
 
-## v0.3 核心文件
+## 当前运行架构
 
-### DavBridge.Core
+```text
+DavBridge/WebUi
+Vue 3 + TypeScript + Vite
+        ↓
+WebView2 typed JSON bridge
+        ↓
+DavBridge
+C# / .NET 8 Windows 原生宿主
+        ↓
+DavBridge.Core
+既有迁移与安全链
+```
+
+v0.3 的 WinForms 业务 UI 源码仍保留用于历史追溯和回滚参照，但当前正常运行路径已经使用 `WebUiHostV040` 和嵌入式 Vue UI，不再挂载旧 `UiShellV030/V032` 作为主业务界面。
+
+## DavBridge.Core
+
+核心实现继续包含：
 
 `Models.cs`
 
 - 原迁移状态与 TransferRecord；
-- `EngineState.WaitUser` 追加在旧枚举值之后；
-- `MigrationState.SchemaVersion` 仍为 1。
+- `EngineState.WaitUser` 保持追加兼容；
+- `MigrationState.SchemaVersion` 沿用既有兼容策略。
 
 `ReconciliationModelV030.cs`
 
@@ -47,7 +76,7 @@ DavBridge.Smoke
 
 `MigrationEngine.cs`
 
-- 原上传、StrongVerified、SourceChanged、Conflict、WriteUnknown 主安全链；
+- 上传、StrongVerified、SourceChanged、Conflict、WriteUnknown 主安全链；
 - SourceChanged 组优先于普通 backlog。
 
 `StateAndQuota.cs`
@@ -57,11 +86,31 @@ DavBridge.Smoke
 
 `WebDav.cs`
 
-- WebDAV read/write；
+- WebDAV GET / PUT 等客户端逻辑；
 - HTTPS only；
-- GET / PUT IO progress。
+- IO progress。
 
-### DavBridge
+v0.4.3 UI 精修没有修改 `DavBridge.Core`。
+
+## DavBridge Windows 宿主
+
+当前重点文件：
+
+`Program.cs`
+
+- 单实例和应用启动；
+- 当前运行入口挂载 v0.4 WebView2 UI；
+- 支持显式打开回到总览。
+
+`WebUiHostV040.cs`
+
+- WebView2 生命周期；
+- 嵌入式静态资源；
+- 本地虚拟 host；
+- typed JSON bridge；
+- 前端命令白名单；
+- 导航与 Web 权限边界；
+- 原生设置和危险确认入口。
 
 `ReconciliationRuntimeV030.cs`
 
@@ -78,40 +127,63 @@ DavBridge.Smoke
 - zip / prop 部分恢复时禁止删除；
 - 目标大小 / ETag / 必要 SHA256 身份确认；
 - DELETE 不确定结果 reconciliation；
-- 删除后目标准确路径复核；
-- 删除成功后保留历史 SHA 证据并把记录置为待恢复语义。
+- 删除后目标准确路径复核。
 
-`AppInfrastructure.cs`
+旧 `Ui*V02xx/V03xx.cs` 文件属于历史 UI 演进，不应因为仍在项目中就被重新挂回正常业务路径。
 
-- 重置真实探测；
-- 新 Cycle 后先走 `ReconciliationRuntimeV030.BeforeMigrationAsync`；
-- 有人工阻塞时进入 `WaitUser`；
-- 无人工阻塞才进入普通 MigrationEngine。
+## WebUi
 
-`UiShellV030.cs`
+目录：
 
-- 当前唯一运行 UI shell；
-- `总览 | 转移 | 回收站`；
-- 无宽左栏；
-- Cycle、双右箭头、流量、镜像覆盖、人工提示；
-- 回收站审查默认零选择，不在动画 Timer 中重建。
+```text
+DavBridge/WebUi/
+```
 
-`Program.cs`
+关键文件：
 
-- 运行时只挂载 `ReconciliationRuntimeV030 + UiShellV030`；
-- 旧 v0.2 UI generation 仍在源码中作为历史过渡文件，但不再运行挂载。
+`src/App.vue`
 
-### DavBridge.Smoke
+- 当前总览、转移、回收站、文档、关于页面；
+- 固定左侧导航；
+- 前端白名单命令调用；
+- 回收站人工操作入口。
 
-`ReconciliationSmokeV030.cs`
+`src/bridge.ts`
 
-- Cycle 日历日期不受 CI 时区换日；
-- 首次缺失只能观察；
-- 跨后续 Cycle 才可人工审查；
-- 本周期保留只对当前 Cycle 有效；
-- blocked 人工保留下周期重新出现；
-- zip + prop 历史完整性；
-- WaitUser 枚举追加兼容。
+- typed JSON bridge 客户端；
+- 与 C# 宿主交换安全 DTO 和白名单命令。
+
+`src/styles.css`
+
+- v0.4 主视觉与页面样式。
+
+`src/sidebar-v043.css`
+
+- v0.4.3 左侧栏方案的最后比例调整；
+- 总览网格行高；
+- 窄窗口覆盖卡文本；
+- 低高度窗口兜底。
+
+`src/mock.ts`
+
+- 浏览器视觉预览用安全 mock snapshot；
+- 不属于真实迁移事实源。
+
+## DavBridge.Smoke
+
+Smoke 测试继续覆盖迁移与安全不变量，包括：
+
+- zip/prop Group；
+- StrongVerified；
+- SourceChanged；
+- WriteUnknown 与 412；
+- quota 与 Cycle；
+- 跨周期回收站；
+- WaitUser；
+- DELETE 前再验证；
+- Data 兼容。
+
+UI 迁移后仍必须运行原 Core Smoke，不能只做 Vue 构建。
 
 ## 关键安全不变量
 
@@ -126,29 +198,45 @@ DavBridge.Smoke
 9. 删除前目标身份无法证明时禁止删除，或在安全下载预算允许时做目标 SHA256。
 10. DELETE 结果不确定先查询目标，不盲目重复。
 11. `reconcile.json` 丢失只能让删除更保守，不能让删除更容易。
+12. Vue 不得持有 WebDAV 凭据或直接实现 PUT/DELETE。
 
 ## 本地 Data
 
-核心旧 Data 保持不迁移：
+核心 Data 保持兼容：
 
 ```text
 %APPDATA%/DavBridge/config.json
 %APPDATA%/DavBridge/state.json
 %APPDATA%/DavBridge/state.json.bak
 %APPDATA%/DavBridge/secrets.dat
-```
-
-v0.3 新增：
-
-```text
 %APPDATA%/DavBridge/reconcile.json
 %APPDATA%/DavBridge/reconcile.json.bak
 ```
 
+WebView2 用户数据位于 `%LOCALAPPDATA%/DavBridge/WebView2`，日志、缓存和临时文件继续与 Runtime 分离。
+
 ## 构建
 
-CI Windows x64 使用 .NET 8 framework-dependent single EXE publish。
+前端先执行：
 
-v0.3.0 Artifact：`DavBridge-v0.3.0-win-x64`
+```text
+cd DavBridge/WebUi
+npm install
+npm run build
+```
 
-EXE SHA256：`37f78cba17fd2eb5a4864b788596371f6858e8e6de42a263f5919a5515c749c3`
+随后由 `DavBridge.csproj` 把 `WebUi/dist` 作为 EmbeddedResource 嵌入程序集。
+
+Windows x64 使用 .NET 8 framework-dependent single EXE publish。
+
+活动 CI：
+
+```text
+.github/workflows/p103-davbridge-ci.yml
+```
+
+最后已验证 run `34470894206` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
+
+## 当前开发断点
+
+v0.4.3 目前只等待用户 Windows 实机 UI 与交互验收。未经明确验收，不提升 stable/main，不扩展功能，不重构 Core。
