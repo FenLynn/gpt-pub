@@ -14,6 +14,7 @@ const error = ref<string | null>(null);
 const commandBusy = ref(false);
 const selectedSource = ref<"potplayer" | "allAudio">("potplayer");
 const selectedModelId = ref("");
+let selectionInitialized = false;
 let unsubscribeSnapshot: (() => void) | null = null;
 
 const nav: Array<{ key: PageKey; label: string; glyph: string }> = [
@@ -41,15 +42,23 @@ const liveButtonDisabled = computed(() => {
   if (liveRunning.value) return false;
   return !snapshot.value?.live.canStart || !selectedModelId.value;
 });
+const liveStateLabel = computed(() => {
+  switch (liveState.value) {
+    case "starting": return "启动中";
+    case "running": return "识别中";
+    case "stopping": return "停止中";
+    case "failed": return "失败";
+    default: return "等待开始";
+  }
+});
 
 function applySnapshot(next: LocalSubSnapshot) {
   snapshot.value = next;
 
-  if (!selectedModelId.value || next.live.state !== "idle") {
-    selectedModelId.value = next.live.modelId || next.live.availableModels[0]?.id || "";
-  }
-  if (next.live.state !== "idle" || !selectedSource.value) {
+  if (!selectionInitialized || next.live.state !== "idle") {
     selectedSource.value = next.live.sourceId;
+    selectedModelId.value = next.live.modelId || next.live.availableModels[0]?.id || "";
+    selectionInitialized = true;
   }
 }
 
@@ -202,9 +211,7 @@ onBeforeUnmount(() => {
 
               <div class="state-field">
                 <span>状态</span>
-                <b :class="'state-' + snapshot.live.state">
-                  {{ snapshot.live.state === "idle" ? "等待开始" : snapshot.live.state === "running" ? "识别中" : snapshot.live.state === "failed" ? "失败" : snapshot.live.state }}
-                </b>
+                <b :class="'state-' + snapshot.live.state">{{ liveStateLabel }}</b>
               </div>
             </div>
 
