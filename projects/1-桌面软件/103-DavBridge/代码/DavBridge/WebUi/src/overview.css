@@ -108,7 +108,7 @@
   display:none;
 }
 .page{
-  padding:30px 46px 14px 34px;
+  padding:30px 49px 14px 30px;
 }
 .overview-page{
   align-content:stretch;
@@ -150,11 +150,11 @@
 .route-card-polished{
   height:100%;
   box-sizing:border-box;
-  grid-template-columns:210px minmax(0,1fr) 166px;
+  grid-template-columns:201px minmax(0,1fr) 162px;
   grid-template-rows:116px 41px;
   column-gap:25px;
   row-gap:0;
-  padding:0 0 17px;
+  padding:0 0 17px 13px;
   border:0;
   border-bottom:1px solid rgba(202,217,228,.70);
   border-radius:0;
@@ -176,7 +176,7 @@
   letter-spacing:-.35px;
 }
 .route-card-polished .endpoint.target{
-  justify-content:flex-end;
+  justify-content:flex-start;
   gap:14px;
 }
 .cloud-logo{
@@ -370,7 +370,7 @@
   border-radius:0;
   background:transparent;
   box-shadow:none;
-  padding:0 8px;
+  padding:0 4px;
 }
 .dashboard-card + .dashboard-card{
   border-top:1px solid rgba(202,217,228,.70);
@@ -459,7 +459,7 @@
 /* Mirror coverage */
 .coverage-card{
   display:grid;
-  grid-template-columns:58px 156px minmax(0,1fr) 102px;
+  grid-template-columns:58px 156px minmax(0,1fr) 94px;
   align-items:center;
   gap:29px;
 }
