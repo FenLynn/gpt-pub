@@ -62,7 +62,7 @@ internal static class StartupDiagnosticsV0210
                 result = result.Replace(path, token, StringComparison.OrdinalIgnoreCase);
         }
 
-        result = Regex.Replace(result, @"https?://[^\s\]\)\}\>\"']+", "[URL]", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"https?://[^\s\]\)\}\>""']+", "[URL]", RegexOptions.IgnoreCase);
         return result;
     }
 }
