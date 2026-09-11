@@ -46,11 +46,14 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
     readonly CancellationTokenSource _shutdown = new();
     readonly SemaphoreSlim _writeGate = new(1, 1);
     readonly object _operationGate = new();
+    readonly object _liveGate = new();
     NamedPipeServerStream? _pipe;
     StreamReader? _reader;
     StreamWriter? _writer;
     CancellationTokenSource? _activeOperation;
     string? _activeRequestId;
+    LiveAsrPipeline? _livePipeline;
+    string? _liveSessionId;
 
     static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -105,8 +108,9 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
         finally
         {
-            _shutdown.Cancel();
             CancelActive(null);
+            try { await StopLiveSessionAsync(null, notifyStopped: false); } catch { }
+            _shutdown.Cancel();
             try { await parentWatch; } catch { }
             Log("DISCONNECTED");
         }
@@ -132,8 +136,15 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
                 break;
             case "shutdown":
                 CancelActive(null);
+                await StopLiveSessionAsync(null, notifyStopped: false);
                 await SendResponseAsync(request.Id, true, new { shuttingDown = true }, null);
                 _shutdown.Cancel();
+                break;
+            case "live.start":
+                StartOperation(request, StartLiveAsync);
+                break;
+            case "live.stop":
+                await StopLiveRequestAsync(request);
                 break;
             case "analyze":
                 StartOperation(request, AnalyzeAsync);
@@ -155,6 +166,11 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
             if (_activeOperation != null)
             {
                 _ = SendResponseAsync(request.Id, false, null, $"LocalSub.Core 正在处理 {_activeRequestId}，请稍候或先取消当前任务。");
+                return;
+            }
+            if (HasLiveSession())
+            {
+                _ = SendResponseAsync(request.Id, false, null, "LocalSub.Core 正在运行实时字幕，请先停止实时会话。");
                 return;
             }
             cts = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
@@ -256,6 +272,124 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         };
     }
 
+    async Task<object> StartLiveAsync(WorkerRequest request, CancellationToken ct)
+    {
+        var modelId = RequireString(request.Payload, "modelId");
+        var processId = GetNullableUInt(request.Payload, "processId");
+        var settings = AppSettings.Load();
+        var catalog = new ModelCatalogService().Load();
+        var model = catalog.FirstOrDefault(x => string.Equals(x.Id, modelId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"模型 catalog 中找不到 {modelId}。");
+        var models = new ModelManager(settings);
+        var pipeline = new LiveAsrPipeline();
+        var sessionId = Guid.NewGuid().ToString("N");
+
+        lock (_liveGate)
+        {
+            if (_livePipeline != null)
+                throw new InvalidOperationException("LocalSub.Core 已经存在实时会话，请先停止当前实时字幕。");
+            _livePipeline = pipeline;
+            _liveSessionId = sessionId;
+        }
+
+        var lastLevelSent = 0L;
+        pipeline.LevelChanged += value =>
+        {
+            var now = Environment.TickCount64;
+            var previous = Interlocked.Read(ref lastLevelSent);
+            if (value > 0 && now - previous < 100) return;
+            Interlocked.Exchange(ref lastLevelSent, now);
+            _ = SendEventAsync(sessionId, "live.level", new { value = Math.Clamp(value, 0, 1) });
+        };
+        pipeline.StatusChanged += text =>
+            _ = SendEventAsync(sessionId, "live.status", new { text });
+        pipeline.PartialResult += text =>
+            _ = SendEventAsync(sessionId, "live.partial", new { text });
+        pipeline.FinalResult += text =>
+            _ = SendEventAsync(sessionId, "live.final", new { text });
+
+        var modelProgress = new Progress<ModelOperationProgress>(p =>
+            _ = SendEventAsync(request.Id, "model-progress", p));
+
+        try
+        {
+            Log($"LIVE_START session={sessionId} model={modelId} processId={(processId?.ToString() ?? "all-audio")}");
+            if (processId.HasValue)
+                await pipeline.StartPotPlayerAsync(settings, model, models, processId.Value, modelProgress, ct);
+            else
+                await pipeline.StartAllAudioAsync(settings, model, models, modelProgress, ct);
+
+            await SendEventAsync(sessionId, "live.status", new { text = "实时识别已由 LocalSub.Core 接管" });
+            return new { sessionId, state = "running" };
+        }
+        catch (Exception ex)
+        {
+            lock (_liveGate)
+            {
+                if (ReferenceEquals(_livePipeline, pipeline))
+                {
+                    _livePipeline = null;
+                    _liveSessionId = null;
+                }
+            }
+            try { await pipeline.DisposeAsync(); } catch { }
+            await SendEventAsync(sessionId, "live.failed", new { error = ex.Message });
+            Log($"LIVE_START_FAIL session={sessionId} {ex}");
+            throw;
+        }
+    }
+
+    async Task StopLiveRequestAsync(WorkerRequest request)
+    {
+        var sessionId = GetString(request.Payload, "sessionId");
+        var stopped = await StopLiveSessionAsync(sessionId, notifyStopped: true);
+        await SendResponseAsync(request.Id, true, new { stopped, sessionId }, null);
+    }
+
+    async Task<bool> StopLiveSessionAsync(string? requestedSessionId, bool notifyStopped)
+    {
+        LiveAsrPipeline? pipeline;
+        string? sessionId;
+
+        lock (_liveGate)
+        {
+            if (_livePipeline == null) return false;
+            if (!string.IsNullOrWhiteSpace(requestedSessionId) &&
+                !string.Equals(requestedSessionId, _liveSessionId, StringComparison.Ordinal))
+                return false;
+
+            pipeline = _livePipeline;
+            sessionId = _liveSessionId;
+            _livePipeline = null;
+            _liveSessionId = null;
+        }
+
+        if (pipeline == null) return false;
+        if (notifyStopped && !string.IsNullOrWhiteSpace(sessionId))
+            await SendEventAsync(sessionId, "live.status", new { text = "正在停止实时识别" });
+
+        try
+        {
+            await pipeline.DisposeAsync();
+            Log($"LIVE_STOP session={sessionId}");
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(sessionId))
+            {
+                await SendEventAsync(sessionId, "live.level", new { value = 0f });
+                if (notifyStopped)
+                    await SendEventAsync(sessionId, "live.status", new { text = "实时识别已停止" });
+            }
+        }
+        return true;
+    }
+
+    bool HasLiveSession()
+    {
+        lock (_liveGate) return _livePipeline != null;
+    }
+
     bool CancelActive(string? requestId)
     {
         lock (_operationGate)
@@ -299,8 +433,9 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
             }
             catch { }
             Log("PARENT_EXIT");
-            _shutdown.Cancel();
             CancelActive(null);
+            try { await StopLiveSessionAsync(null, notifyStopped: false); } catch { }
+            _shutdown.Cancel();
             break;
         }
     }
@@ -318,6 +453,15 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
             ? result
             : 0;
 
+    static uint? GetNullableUInt(JsonElement payload, string name)
+    {
+        if (payload.ValueKind != JsonValueKind.Object || !payload.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        if (value.TryGetUInt32(out var result)) return result;
+        if (value.TryGetInt64(out var signed) && signed >= 0 && signed <= uint.MaxValue) return (uint)signed;
+        throw new ArgumentException($"Invalid payload.{name}");
+    }
+
     static string[] GetStringArray(JsonElement payload, string name)
     {
         if (payload.ValueKind != JsonValueKind.Object || !payload.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array) return [];
@@ -334,10 +478,11 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         catch { }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        try { _shutdown.Cancel(); } catch { }
         CancelActive(null);
+        try { await StopLiveSessionAsync(null, notifyStopped: false); } catch { }
+        try { _shutdown.Cancel(); } catch { }
         try { _writer?.Dispose(); } catch { }
         try { _reader?.Dispose(); } catch { }
         try { _pipe?.Dispose(); } catch { }
@@ -346,7 +491,6 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         _writer = null;
         _reader = null;
         _pipe = null;
-        return ValueTask.CompletedTask;
     }
 }
 
