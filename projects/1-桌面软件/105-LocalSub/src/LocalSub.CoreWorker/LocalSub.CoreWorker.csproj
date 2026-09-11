@@ -30,19 +30,27 @@
     <Compile Include="..\LocalSub\Models\ModelDescriptor.cs" Link="Models\ModelDescriptor.cs" />
     <Compile Include="..\LocalSub\Models\TranscriptItem.cs" Link="Models\TranscriptItem.cs" />
 
+    <Compile Include="..\LocalSub\Services\AllAudioCaptureService.cs" Link="Services\AllAudioCaptureService.cs" />
     <Compile Include="..\LocalSub\Services\AsrRuntimeManager.cs" Link="Services\AsrRuntimeManager.cs" />
     <Compile Include="..\LocalSub\Services\BatchTranscriptionService.cs" Link="Services\BatchTranscriptionService.cs" />
     <Compile Include="..\LocalSub\Services\DownloadClientFactory.cs" Link="Services\DownloadClientFactory.cs" />
     <Compile Include="..\LocalSub\Services\FfmpegManager.cs" Link="Services\FfmpegManager.cs" />
     <Compile Include="..\LocalSub\Services\MediaAnalysisService.cs" Link="Services\MediaAnalysisService.cs" />
+    <Compile Include="..\LocalSub\Services\LiveAsrPipeline.cs" Link="Services\LiveAsrPipeline.cs" />
     <Compile Include="..\LocalSub\Services\MediaAudioSource.cs" Link="Services\MediaAudioSource.cs" />
     <Compile Include="..\LocalSub\Services\ModelCatalogService.cs" Link="Services\ModelCatalogService.cs" />
     <Compile Include="..\LocalSub\Services\ModelManager.cs" Link="Services\ModelManager.cs" />
     <Compile Include="..\LocalSub\Services\NativeOfflineRecognizer.cs" Link="Services\NativeOfflineRecognizer.cs" />
     <Compile Include="..\LocalSub\Services\OfflineRecognizer.cs" Link="Services\OfflineRecognizer.cs" />
     <Compile Include="..\LocalSub\Services\PerformancePolicy.cs" Link="Services\PerformancePolicy.cs" />
+    <Compile Include="..\LocalSub\Services\PotPlayerWatcher.cs" Link="Services\PotPlayerWatcher.cs" />
+    <Compile Include="..\LocalSub\Services\ProcessLoopbackCaptureService.cs" Link="Services\ProcessLoopbackCaptureService.cs" />
+    <Compile Include="..\LocalSub\Services\ResilientPotPlayerCaptureService.cs" Link="Services\ResilientPotPlayerCaptureService.cs" />
     <Compile Include="..\LocalSub\Services\SherpaInterop.cs" Link="Services\SherpaInterop.cs" />
+    <Compile Include="..\LocalSub\Services\SenseVoiceSimulatedStreamingService.cs" Link="Services\SenseVoiceSimulatedStreamingService.cs" />
     <Compile Include="..\LocalSub\Services\SherpaOfflineResultReader.cs" Link="Services\SherpaOfflineResultReader.cs" />
+    <Compile Include="..\LocalSub\Services\StreamingParaformerService.cs" Link="Services\StreamingParaformerService.cs" />
+    <Compile Include="..\LocalSub\Services\FunAsrNanoSimulatedStreamingService.cs" Link="Services\FunAsrNanoSimulatedStreamingService.cs" />
     <Compile Include="..\LocalSub\Services\TranscriptService.cs" Link="Services\TranscriptService.cs" />
   </ItemGroup>
 </Project>
