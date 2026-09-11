@@ -183,6 +183,69 @@ jobs:
             throw
           }
 
+      - name: Smoke test realtime IPC state machine
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $pipeName = "LocalSub.Core.LiveCI.$PID.$([guid]::NewGuid().ToString('N'))"
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.Core.exe') -WorkingDirectory (Resolve-Path 'publish') -ArgumentList @('--pipe', $pipeName, '--parent', "$PID") -PassThru
+          try {
+            $client = [System.IO.Pipes.NamedPipeClientStream]::new('.', $pipeName, [System.IO.Pipes.PipeDirection]::InOut, [System.IO.Pipes.PipeOptions]::Asynchronous)
+            $client.Connect(8000)
+            $reader = [System.IO.StreamReader]::new($client)
+            $writer = [System.IO.StreamWriter]::new($client)
+            $writer.AutoFlush = $true
+
+            $writer.WriteLine('{"kind":"request","id":"ci-live-stop-empty","method":"live.stop","payload":{"sessionId":"missing-session"}}')
+            $stopLine = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($stopLine)) { throw 'Realtime IPC returned no idempotent stop response' }
+            $stop = $stopLine | ConvertFrom-Json
+            if ($stop.kind -ne 'response' -or $stop.id -ne 'ci-live-stop-empty' -or -not $stop.ok -or $stop.payload.stopped) {
+              throw "Unexpected empty live.stop response: $stopLine"
+            }
+
+            $writer.WriteLine('{"kind":"request","id":"ci-live-start-1","method":"live.start","payload":{"modelId":"__ci_missing_model__","processId":null}}')
+            $startLine1 = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($startLine1)) { throw 'Realtime IPC returned no failed start response' }
+            $start1 = $startLine1 | ConvertFrom-Json
+            if ($start1.kind -ne 'response' -or $start1.id -ne 'ci-live-start-1' -or $start1.ok) {
+              throw "Invalid model live.start must fail cleanly: $startLine1"
+            }
+            if ([string]::IsNullOrWhiteSpace($start1.error) -or $start1.error -notmatch 'catalog') {
+              throw "Invalid model live.start returned an unclear error: $startLine1"
+            }
+
+            Start-Sleep -Milliseconds 150
+            $writer.WriteLine('{"kind":"request","id":"ci-live-start-2","method":"live.start","payload":{"modelId":"__ci_missing_model__","processId":null}}')
+            $startLine2 = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($startLine2)) { throw 'Realtime IPC returned no second failed start response' }
+            $start2 = $startLine2 | ConvertFrom-Json
+            if ($start2.kind -ne 'response' -or $start2.id -ne 'ci-live-start-2' -or $start2.ok) {
+              throw "Realtime operation slot did not recover after failed start: $startLine2"
+            }
+
+            $writer.WriteLine('{"kind":"request","id":"ci-live-ping","method":"ping","payload":{}}')
+            $pingLine = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($pingLine)) { throw 'Core did not answer ping after realtime failures' }
+            $ping = $pingLine | ConvertFrom-Json
+            if ($ping.kind -ne 'response' -or $ping.id -ne 'ci-live-ping' -or -not $ping.ok) {
+              throw "Core unhealthy after realtime failures: $pingLine"
+            }
+
+            $writer.WriteLine('{"kind":"request","id":"ci-live-shutdown","method":"shutdown","payload":{}}')
+            $shutdownLine = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($shutdownLine)) { throw 'Core returned no shutdown response after realtime smoke' }
+
+            $writer.Dispose(); $reader.Dispose(); $client.Dispose()
+            if (-not $p.WaitForExit(5000)) { throw 'LocalSub.Core did not exit after realtime smoke shutdown' }
+            if ($p.ExitCode -ne 0) { throw "LocalSub.Core realtime smoke exited with $($p.ExitCode)" }
+          } catch {
+            if (Test-Path publish/Logs/core.log) { Get-Content publish/Logs/core.log }
+            try { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } } catch { }
+            throw
+          }
+
       - name: Smoke test Shell Core crash recovery
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
