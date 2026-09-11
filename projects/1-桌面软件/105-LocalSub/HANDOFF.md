@@ -74,24 +74,26 @@ p105-exp
 
 ```text
 LocalSub.exe
-├─ WinForms 主界面
+├─ WinForms 主界面，当前作为验证壳
 ├─ WebView2 字幕 Overlay
-├─ PotPlayer 进程与窗口跟随
-├─ 实时 ASR 与实时音频链，当前仍在 Shell
+├─ PotPlayer 进程发现、PID、窗口 bounds 与最小化状态
+├─ Shell LiveAsrPipeline proxy
 ├─ Core supervisor
 └─ Named Pipe IPC
         ↓
 LocalSub.Core.exe
-├─ 媒体解析
-├─ 波形数据
-├─ 后台离线 ASR
-├─ VAD
-└─ 后台重任务
+├─ realtime All Audio / Process Loopback
+├─ PotPlayer 音频恢复
+├─ Streaming Paraformer / Zipformer
+├─ SenseVoice / Fun-ASR-Nano realtime
+├─ VAD / realtime decode queue
+├─ 媒体解析与波形
+└─ 后台离线 ASR
 ```
 
-Phase 1A 已迁入 Core 的后台媒体分析和后台转写不得重新引入 GUI 进程内静默 fallback。
+已迁入 Core 的后台与 realtime 重实现不得重新引入 GUI 进程内静默 fallback。
 
-现有 Core IPC v1：
+Core IPC 当前包括：
 
 ```text
 ping
@@ -99,9 +101,21 @@ analyze
 transcribe
 cancel
 shutdown
+
+live.start
+live.stop
+
+live.status
+live.level
+live.partial
+live.final
+live.discontinuity
+live.failed
 ```
 
-现有 Shell/Core 已有 connection generation、Core 断开显式失效、下一请求自动重启、cancel 超时回收和正常 shutdown。
+Shell/Core 继续使用 connection generation、Core 断开显式失效、下一请求自动重启、cancel 超时回收和正常 shutdown。
+
+Shell 编译已经排除 realtime 重实现与 `ProcessLoopbackCaptureService`。Process Loopback smoke 也通过 Core 执行。
 
 ## 6. 当前架构决策
 
@@ -169,20 +183,41 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`1B.0` 已建立第一版 Application Contract。
+当前 Phase：`1B.1` 第一版代码闭环完成。
 
-下一代码阶段：`Phase 1B.1`。
+最后一个经过完整自动门禁的代码 head：
 
-只在 `p105-exp`：
+```text
+944cc4674b3fecefae5ef88c1c4bc88f30918013
+```
 
-1. 为 Core 增加 realtime session 状态机。
-2. 增加 `live.start / live.stop`。
-3. 增加 `live.status / live.level / live.partial / live.final / live.discontinuity / live.failed`。
-4. 将 `LiveAsrPipeline` 的音频捕获、实时模型加载、VAD 和解码循环迁入 Core。
-5. `live.level` 对外默认限频约 10 Hz。
-6. Shell 保留 PotPlayer 进程发现、PID、窗口 bounds、最小化判断和 Overlay 跟随。
-7. 先继续使用现有 WinForms 实时页验证新的 Core realtime API。
-8. Phase 1B.1 稳定后开始 Phase 2A Web Shell。
+P105 Windows CI：
+
+```text
+run 34581474053
+success
+```
+
+Artifact：
+
+```text
+ID 10191877739
+P105-LocalSub-win-x64-net8-candidate
+sha256:1758fdcecf8121b093c24bffaba2d15d035debebb1bf4c0683a218a66aad0581
+```
+
+该代码 head 已通过 realtime 编译隔离、Shell/Core publish、Core IPC、realtime IPC 状态机、Core 强杀恢复、Shell startup、后台工作区、Core 内 Process Loopback、sherpa runtime、native offline ASR 与候选包 manifest。
+
+后续文档提交不改变这一已验证源码事实。
+
+下一步：
+
+1. 不提升 stable，不动 main。
+2. 使用当前 candidate 在用户真实 Windows 上验证 PotPlayer + 已安装 realtime 模型。
+3. 验证开始、停止、音量、字幕、seek、换片、全屏/窗口切换和长时间运行。
+4. 在 realtime 运行中强杀 `LocalSub.Core.exe`，确认 Shell 保持存活且错误可诊断。
+5. Core 边界确认后进入 Phase 2A，建立 WebView2 + Vue 3 + TypeScript 主 Shell。
+6. 不直接翻译 `MainForm`，Web UI 只能消费 Application Contract。
 
 ## 9. Web UI 约束
 
