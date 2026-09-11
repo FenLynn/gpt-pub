@@ -53,12 +53,15 @@ v0.1.1 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显式�
 
 ## 当前状态
 
-- v0.1.1：源码已存在于 `main`，2026-09-05 用户明确要求将当前稳定状态正式固化并发布；当前正在按 `p105-exp → p105-stable → main` 完成正式发布准入。
-- 正式发布使用 [`RELEASE.md`](RELEASE.md) 显式触发，必须从合入后的准确 `main` SHA 重新构建和验证，再创建 `p105-v0.1.1` Release。
+- v0.1.1 已正式发布，正式标签与 Release 保持不可变。
+- 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
+- `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
 - Phase 1A 自动门禁已覆盖 Core IPC、Core 强杀与 generation 2 重连、Shell 启动、后台工作区、Process Loopback、sherpa runtime 与 native offline ASR。
-- 用户特定媒体、模型和机器条件下的高负载 GUI 响应性仍属于实机待验证项，正式 Release 不把该项描述成已经验证。
-- Phase 1B：后续逐步将实时 Zipformer、SenseVoice、WASAPI、PotPlayer Process Loopback 和模型重任务迁入 Core。
-- Phase 2：Core API 稳定后再引入 WebView2 + Vue 3 + TypeScript 主界面，不进行一次性全量重写。
+- 用户特定媒体、模型和机器条件下的高负载 GUI 响应性仍属于实机待验证项。
+- 当前进入 Phase 1B.0，先冻结 Shell / Core / Web UI Application Contract。
+- 后续 Phase 1B.1 先将实时 ASR、WASAPI、PotPlayer Process Loopback 和实时解码队列迁入 Core。
+- WebView2 + Vue 3 + TypeScript 主 UI 不再机械等待全部 Phase 1B 完成，而是在稳定契约下与后续 Core 迁移交错推进。
+- 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
 
