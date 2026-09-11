@@ -187,16 +187,6 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         catch (Exception ex) { StatusChanged?.Invoke("识别失败：" + ex.Message); }
     }
 
-    void OnCoreConnectionBroken(string message)
-    {
-        if (!_starting && string.IsNullOrWhiteSpace(_sessionId)) return;
-        _sessionId = null;
-        _starting = false;
-        LevelChanged?.Invoke(0);
-        Failed?.Invoke(message);
-        StatusChanged?.Invoke("实时识别失败：" + message);
-    }
-
     public async Task StopAsync()
     {
         _running = false;
