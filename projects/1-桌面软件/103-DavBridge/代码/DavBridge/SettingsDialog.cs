@@ -407,7 +407,7 @@ internal sealed class SettingsDialog : Form
             BackColor = Color.FromArgb(248, 251, 254),
             Padding = Padding.Empty
         };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 176));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 154));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         var heading = new Label
@@ -548,6 +548,18 @@ internal sealed class SettingsDialog : Form
         EndOfCycleSprintEnabled = x.EndOfCycleSprintEnabled
     };
 
+    private static int PreferredFieldWidth(string label, Control control)
+    {
+        if (control is NumericUpDown) return 176;
+        if (label.Contains("URL", StringComparison.OrdinalIgnoreCase)) return 430;
+        if (label.Contains("目录", StringComparison.OrdinalIgnoreCase)) return 340;
+        if (label.Contains("User", StringComparison.OrdinalIgnoreCase) ||
+            label.Contains("邮箱", StringComparison.OrdinalIgnoreCase)) return 300;
+        if (label.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
+            label.Contains("密码", StringComparison.OrdinalIgnoreCase)) return 300;
+        return 320;
+    }
+
     private static void AddField(TableLayoutPanel panel, string label, Control control)
     {
         var row = panel.RowCount++;
@@ -560,7 +572,10 @@ internal sealed class SettingsDialog : Form
             ForeColor = Color.FromArgb(78, 96, 115),
             Margin = new Padding(0, 9, 12, 9)
         }, 0, row);
-        control.Dock = DockStyle.Top;
+
+        control.Dock = DockStyle.None;
+        control.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        control.Width = PreferredFieldWidth(label, control);
         control.Margin = new Padding(0, 5, 0, 7);
         panel.Controls.Add(control, 1, row);
     }
@@ -578,21 +593,25 @@ internal sealed class SettingsDialog : Form
             Margin = new Padding(0, 9, 12, 9)
         }, 0, row);
 
+        var fieldWidth = PreferredFieldWidth(label, textBox);
         var holder = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
+            Dock = DockStyle.None,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left,
             ColumnCount = 2,
-            AutoSize = true,
+            AutoSize = false,
+            Width = fieldWidth + 42,
+            Height = textBox.PreferredHeight + 8,
             Margin = new Padding(0, 3, 0, 5),
             BackColor = Color.FromArgb(248, 251, 254)
         };
-        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, fieldWidth));
         holder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42));
-        textBox.Dock = DockStyle.Top;
+        textBox.Dock = DockStyle.Fill;
         textBox.Margin = new Padding(0, 2, 6, 2);
         var eye = new Button
         {
-            Text = "👁",
+            Text = "◉",
             Width = 36,
             Height = textBox.PreferredHeight + 4,
             Margin = new Padding(0),
@@ -607,7 +626,7 @@ internal sealed class SettingsDialog : Form
             var selectionStart = textBox.SelectionStart;
             var selectionLength = textBox.SelectionLength;
             textBox.PasswordChar = textBox.PasswordChar == '\0' ? '*' : '\0';
-            eye.Text = textBox.PasswordChar == '\0' ? "◉" : "👁";
+            eye.Text = textBox.PasswordChar == '\0' ? "◎" : "◉";
             textBox.Focus();
             textBox.Select(Math.Min(selectionStart, textBox.TextLength), Math.Min(selectionLength, Math.Max(0, textBox.TextLength - selectionStart)));
         };

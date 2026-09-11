@@ -1062,3 +1062,15 @@
   stroke:#ffd25b;
   opacity:.95;
 }
+
+/* v0.4 compact form proportions and a shorter, rounder Nutstore acorn. */
+.nut-logo{
+  width:54px;
+  height:48px;
+}
+@media(max-width:999px){
+  .nut-logo{
+    width:36px;
+    height:32px;
+  }
+}

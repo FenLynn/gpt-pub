@@ -135,11 +135,11 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
           <div class="route-line"><i></i><b>›</b><i></i></div>
         </div>
         <div class="endpoint target has-tip" data-tip="坚果云保存经过 StrongVerified 的强校验镜像">
-          <svg class="nut-logo" viewBox="0 0 48 56" aria-hidden="true">
-            <path class="nut-body" d="M11 23c0-7.4 5.9-12.4 13-12.4S37 15.6 37 23c0 12.7-6.2 23.1-13 27-6.8-3.9-13-14.3-13-27Z"/>
-            <path class="nut-cap" d="M9.5 21.2C12.3 13.3 17.7 9 24 9s11.7 4.3 14.5 12.2c-8.8 3.9-20.2 3.9-29 0Z"/>
-            <path class="nut-stem" d="M24 9.5C24 5.8 26.2 3.2 29.5 2"/>
-            <path class="nut-leaf" d="M29.2 8.1c2.5-4.6 7.2-6.2 11.5-4.8-1.2 4.8-4.9 7.4-10.8 7.5Z"/>
+          <svg class="nut-logo" viewBox="0 0 56 50" aria-hidden="true">
+            <path class="nut-body" d="M9 22.5C9 14.7 16.5 10 28 10s19 4.7 19 12.5C47 33 39.5 42 28 46 16.5 42 9 33 9 22.5Z"/>
+            <path class="nut-cap" d="M7.5 21.2C12.2 12.4 19 8.2 28 8.2s15.8 4.2 20.5 13c-11.6 4.2-29.4 4.2-41 0Z"/>
+            <path class="nut-stem" d="M28 8.8C28 5.8 29.6 3.5 32.6 2.2"/>
+            <path class="nut-leaf" d="M33.2 7.7c2.7-4.2 7.4-5.7 11.4-4.1-1.1 4.3-4.6 6.6-10.3 6.7Z"/>
           </svg>
           <strong>坚果云</strong>
         </div>
