@@ -71,7 +71,9 @@ internal static class StartupHealthV044
             ProbeDirectory(host.Paths.LocalRoot, "Local Data"),
             CheckJsonFile(host.Paths.ConfigPath, "config.json"),
             CheckJsonFile(host.Paths.StatePath, "state.json"),
-            CheckJsonFile(Path.Combine(host.Paths.RoamingRoot, "reconcile.json"), "reconcile.json")
+            CheckJsonFile(Path.Combine(host.Paths.RoamingRoot, "reconcile.json"), "reconcile.json"),
+            new("product-sidecar", "UI 辅助状态", ProductExperienceV044.SidecarRecoveredFromBackup ? "warning" : "ok",
+                ProductExperienceV044.SidecarRecoveredFromBackup ? "本次已从 .bak 恢复并修复主文件" : "辅助状态可读取")
         };
 
         try
@@ -168,6 +170,7 @@ internal static class ProductExperienceV044
     private static ProductState _state = new();
 
     public static StartupHealthReportV044 Health { get; private set; } = StartupHealthReportV044.NotChecked;
+    public static bool SidecarRecoveredFromBackup { get; private set; }
     public static bool ConnectionDiagnosticPassed { get { lock (Gate) return _state.ConnectionDiagnosticPassedAt.HasValue; } }
     public static bool ReadinessScanPassed { get { lock (Gate) return _state.ReadinessScanPassedAt.HasValue; } }
 
@@ -179,7 +182,10 @@ internal static class ProductExperienceV044
             if (string.Equals(_path, nextPath, StringComparison.OrdinalIgnoreCase)) return;
             _path = nextPath;
             Directory.CreateDirectory(localRoot);
-            _state = Load(nextPath);
+            _state = Load(nextPath, out var recoveredFromBackup);
+            SidecarRecoveredFromBackup = recoveredFromBackup;
+            if (recoveredFromBackup)
+                RepairPrimaryFromBackup(nextPath);
         }
     }
 
@@ -390,14 +396,59 @@ internal static class ProductExperienceV044
         writer.Write(JsonSerializer.Serialize(value, JsonOptions));
     }
 
-    private static ProductState Load(string path)
+    private static ProductState Load(string path, out bool recoveredFromBackup)
+    {
+        recoveredFromBackup = false;
+        if (TryLoad(path, out var state))
+            return state;
+
+        if (TryLoad(path + ".bak", out state))
+        {
+            recoveredFromBackup = true;
+            return state;
+        }
+
+        return new ProductState();
+    }
+
+    private static bool TryLoad(string path, out ProductState state)
+    {
+        state = new ProductState();
+        if (!File.Exists(path)) return false;
+        try
+        {
+            state = JsonSerializer.Deserialize<ProductState>(File.ReadAllText(path), JsonOptions) ?? new ProductState();
+            state.Activities ??= new List<ProductActivityV044>();
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static void RepairPrimaryFromBackup(string path)
     {
         try
         {
-            if (!File.Exists(path)) return new ProductState();
-            return JsonSerializer.Deserialize<ProductState>(File.ReadAllText(path), JsonOptions) ?? new ProductState();
+            var backup = path + ".bak";
+            if (!File.Exists(backup)) return;
+            var temp = path + ".recovering";
+            File.Copy(backup, temp, true);
+            File.Move(temp, path, true);
         }
-        catch { return new ProductState(); }
+        catch { }
+    }
+
+    internal static bool ValidateBackupRecoveryForSelfTest(string root)
+    {
+        var path = Path.Combine(root, "product-experience-selftest.json");
+        var backupState = new ProductState
+        {
+            LastObservedCycleId = "backup-cycle",
+            Activities = new List<ProductActivityV044> { new(DateTimeOffset.UtcNow, "backup", "backup", "info") }
+        };
+        File.WriteAllText(path + ".bak", JsonSerializer.Serialize(backupState, JsonOptions));
+        File.WriteAllText(path, "{broken");
+        var loaded = Load(path, out var recovered);
+        return recovered && loaded.LastObservedCycleId == "backup-cycle" && loaded.Activities.Count == 1;
     }
 
     private static void TrimActivities()

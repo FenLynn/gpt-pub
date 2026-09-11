@@ -150,6 +150,7 @@ internal sealed class AppHost : IDisposable
     private readonly ConfigStore _configStore;
     private readonly CredentialStore _credentialStore;
     private readonly StateStore _stateStore;
+    private readonly SemaphoreSlim _backgroundWake = new(0, 1);
     private CancellationTokenSource? _activeRun;
     private bool _manualPaused = true;
 
@@ -477,9 +478,32 @@ internal sealed class AppHost : IDisposable
             }
 
             var delay = GetNextBackgroundDelay();
-            try { await Task.Delay(delay, cancellationToken).ConfigureAwait(false); }
+            try { await WaitForBackgroundWakeOrDelayAsync(delay, cancellationToken).ConfigureAwait(false); }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    public void RequestBackgroundWake()
+    {
+        try
+        {
+            if (_backgroundWake.CurrentCount == 0)
+                _backgroundWake.Release();
+        }
+        catch (SemaphoreFullException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private async Task WaitForBackgroundWakeOrDelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var delayTask = Task.Delay(delay, linked.Token);
+        var wakeTask = _backgroundWake.WaitAsync(linked.Token);
+        var completed = await Task.WhenAny(delayTask, wakeTask).ConfigureAwait(false);
+        linked.Cancel();
+        try { await completed.ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     public Task ResumeAsync(CancellationToken cancellationToken = default) =>
@@ -591,5 +615,6 @@ internal sealed class AppHost : IDisposable
     {
         _activeRun?.Cancel();
         _activeRun?.Dispose();
+        _backgroundWake.Dispose();
     }
 }

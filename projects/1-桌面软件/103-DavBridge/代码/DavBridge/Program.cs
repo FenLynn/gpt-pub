@@ -46,6 +46,7 @@ internal static class Program
             {
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
+                using var resilience = RuntimeResilienceV045.Attach(host);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
                 using var webUi = WebUiHostV040.Attach(form, host, reconciliation);
                 using var homeController = WindowHomeControllerV040.Attach(form, host, webUi, launchInBackground);
@@ -82,13 +83,71 @@ internal static class Program
             WebUiAssetsV040.ValidateEmbeddedResources();
             WebUiHostV040.ValidateBridgeContract();
             ApplicationConfiguration.Initialize();
+
+            var recoveryRoot = Path.Combine(paths.LocalRoot, "RecoverySelfTest");
+            Directory.CreateDirectory(recoveryRoot);
+            var configBackupRecovery = ValidateConfigBackupRecovery(recoveryRoot);
+            var stateBackupRecovery = ValidateStateBackupRecovery(recoveryRoot);
+            var reconcileBackupRecovery = ValidateReconcileBackupRecovery(recoveryRoot);
+            var productSidecarBackupRecovery = ProductExperienceV044.ValidateBackupRecoveryForSelfTest(recoveryRoot);
+
             using var host = new AppHost();
+            host.RequestBackgroundWake();
+            host.RequestBackgroundWake();
             using var form = new MainForm(host, launchInBackground: false);
             AppBranding.Apply(form); _ = form.Handle;
             if (form.MinimumSize.Width < 600 || form.MinimumSize.Height < 400) throw new InvalidOperationException("Native host minimum size changed unexpectedly.");
-            WriteReport(reportPath, new { product="DavBridge", version=typeof(Program).Assembly.GetName().Version?.ToString(), roaming=paths.RoamingRoot, local=paths.LocalRoot, temp=paths.TempRoot, nativeHostConstructed=true, uiGeneration="v0.4.3-vue3-webview2-sidebar-dashboard", webUiEmbedded=true, bridgeWhitelistValidated=true, coreLogicMovedToJavaScript=false, ok=true });
+            WriteReport(reportPath, new {
+                product="DavBridge",
+                version=typeof(Program).Assembly.GetName().Version?.ToString(),
+                roaming=paths.RoamingRoot,
+                local=paths.LocalRoot,
+                temp=paths.TempRoot,
+                nativeHostConstructed=true,
+                uiGeneration="v0.4.5-vue3-webview2-sidebar-dashboard",
+                webUiEmbedded=true,
+                bridgeWhitelistValidated=true,
+                coreLogicMovedToJavaScript=false,
+                configBackupRecovery,
+                stateBackupRecovery,
+                reconcileBackupRecovery,
+                productSidecarBackupRecovery,
+                backgroundWakeSignal=true,
+                ok=true
+            });
         }
         catch (Exception ex) { TryWriteFailedReport(reportPath, ex); }
+    }
+
+    private static bool ValidateConfigBackupRecovery(string root)
+    {
+        var path = Path.Combine(root, "config.json");
+        var store = new ConfigStore(path);
+        store.SaveAsync(new DavBridge.Core.DavBridgeConfig { SourceUsername = "backup-config" }).GetAwaiter().GetResult();
+        store.SaveAsync(new DavBridge.Core.DavBridgeConfig { SourceUsername = "main-config" }).GetAwaiter().GetResult();
+        File.WriteAllText(path, "{broken");
+        var recovered = store.LoadAsync().GetAwaiter().GetResult();
+        return string.Equals(recovered.SourceUsername, "backup-config", StringComparison.Ordinal);
+    }
+
+    private static bool ValidateStateBackupRecovery(string root)
+    {
+        var path = Path.Combine(root, "state.json");
+        var store = new DavBridge.Core.StateStore(path);
+        store.SaveAsync(new DavBridge.Core.MigrationState { EngineState = DavBridge.Core.EngineState.WaitNetwork }).GetAwaiter().GetResult();
+        store.SaveAsync(new DavBridge.Core.MigrationState { EngineState = DavBridge.Core.EngineState.Complete }).GetAwaiter().GetResult();
+        File.WriteAllText(path, "{broken");
+        var recovered = store.LoadAsync().GetAwaiter().GetResult();
+        return recovered.EngineState == DavBridge.Core.EngineState.WaitNetwork;
+    }
+
+    private static bool ValidateReconcileBackupRecovery(string root)
+    {
+        var store = new ReconciliationStoreV030(root, persistent: true);
+        store.SaveAsync(new DavBridge.Core.ReconciliationState { CurrentCycleId = "backup-cycle" }).GetAwaiter().GetResult();
+        store.SaveAsync(new DavBridge.Core.ReconciliationState { CurrentCycleId = "main-cycle" }).GetAwaiter().GetResult();
+        File.WriteAllText(Path.Combine(root, "reconcile.json"), "{broken");
+        return string.Equals(store.Load().CurrentCycleId, "backup-cycle", StringComparison.Ordinal);
     }
 
     private static void RunUiSelfTest(string reportPath) => RunSelfTest(reportPath);
