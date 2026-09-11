@@ -31,13 +31,13 @@
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-3fdab6f35a49074dcf17a6251a958d44910bc450
+e2db3a5a210093f5e59a30ce02b9eb852e6b056e
 ```
 
 对应 P103 CI：
 
 ```text
-run 34595100738
+run 34601336384
 scope          success
 core-smoke     success
 frontend       success
@@ -47,24 +47,24 @@ report-status  success
 
 Windows candidate：`DavBridge-v0.4.4-win-x64`
 
-Artifact ID：`10261806813`
+Artifact ID：`10264243083`
 
 EXE：
 
 ```text
 2336347 bytes
-SHA256 390fcad1fff5a4ffb8ee7244a27424729a2f80379ce3a791a4188fd1e66fe318
+SHA256 b21ab140cfb413e86f96d00fecd4e3baf43883707f06c85abe68a54f8f911af9
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-7becda0a6ccab00fe6db04a548c710ab90925c7db497fbd6d9e963fad4144c0b
+1f149ef69c53ffdec737b8086995d7488cabcb08e6ec4edc1ecce2ee21dfe6fb
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `3fdab6f3...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `e2db3a5a...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
 
 ## 4. 当前分支快照
 
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-3fdab6f35a49074dcf17a6251a958d44910bc450
+e2db3a5a210093f5e59a30ce02b9eb852e6b056e
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -112,7 +112,7 @@ recycle.delete
 
 ## 6. 最新总览 UI 状态
 
-用户已确认总览页视觉质量良好。`3fdab6f3...` 在 UI 与交互冻结轮基础上继续压缩内嵌设置页：四个分类的说明直接挂在顶部分类标签悬浮，不再单独占一整行；安全与维护各项说明直接挂在项目名称本身，取消独立 `ⓘ` 图标；移除重复的“维护工具”小标题；同时收紧顶部分类区、内容区、字段行距、输入框高度和底部按钮区，使设置页在不牺牲可读性的情况下明显减少纵向堆叠。该 head 已通过完整 P103 CI。
+用户已确认总览页视觉质量良好。`e2db3a5a...` 在 UI 与交互冻结轮基础上继续压缩内嵌设置页：四个分类的说明直接挂在顶部分类标签悬浮，不再单独占一整行；安全与维护各项说明直接挂在项目名称本身，取消独立 `ⓘ` 图标；移除重复的“维护工具”小标题；同时收紧顶部分类区、内容区、字段行距、输入框高度和底部按钮区，使设置页在不牺牲可读性的情况下明显减少纵向堆叠。该 head 已通过完整 P103 CI。
 
 第一，默认窗口由 880×560 调整为 1100×620，使真实 WinForms/WebView2 窗口与已确认参考图保持近似 16:9 的同一比例；原生标题改为简洁 `DavBridge`。Overview 的主要尺寸按该默认窗口逐项标定，较小窗口继续走响应式压缩。悬浮提示保持白色底纹、深色文字、浅边框和柔和阴影。
 
@@ -142,6 +142,8 @@ recycle.delete
 ### v0.4.4 产品化补充
 
 最新候选新增启动环境自检、最近活动、脱敏诊断导出、首次初始化状态条、构建身份显示和更明确的转移队列语义。
+
+最新视觉修正进一步解决阶段行的真实布局冲突。旧 `styles.css` 中 `.phase strong { align-self:end; }` 在新 flex 阶段布局中仍然生效，导致“源端对账 / 变化修复 / 等待周期”文字整体落在圆形图标下方。`e2db3a5a...` 明确覆盖为垂直居中，并移除此前 1 px translate 补偿。CI 的 1100×620 预览测量中，三组圆形图标中心均为 y=166.5 px，三组文字像素中心也均为 y=166.5 px。
 
 总览已经在 CI 的 1100×620 精确预览上做像素测量。InfiniCLOUD 云图形中心约 y=85.5 px，文字视觉中心约 y=85.0 px；目标坚果主体约 y=86.0 px，目标文字约 y=87.0 px。端点图标和文字的光学偏差控制在约 0.5 至 1 px，中央路线与阶段文字也做了对应校正。
 
@@ -202,7 +204,7 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步需要在真实 Windows 上运行 `3fdab6f3...` 对应的 v0.4.4 candidate，重点检查：
+用户下一步需要在真实 Windows 上运行 `e2db3a5a...` 对应的 v0.4.4 candidate，重点检查：
 
 1. 100%、125%、150% Windows 缩放下，总览、转移、回收站、文档、设置、关于的字号、留白与交互是否仍统一。
 2. 普通成功与提示是否只在 DavBridge 内显示右上角轻量 notice，不再出现老式信息 MessageBox；高风险确认仍应保持原生确认框。
