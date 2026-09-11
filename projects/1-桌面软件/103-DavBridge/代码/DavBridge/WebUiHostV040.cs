@@ -102,7 +102,6 @@ internal sealed class WebUiHostV040 : IDisposable
             {
                 if(dialog.DialogResult==DialogResult.OK) await _form.ApplySettingsAsync(dialog.Config,dialog.SourcePassword,dialog.TargetPassword).ConfigureAwait(true);
                 _settingsLayer.Controls.Clear(); _settingsLayer.Visible=false; _settingsDialog=null; _settingsCompletion=null;
-                if(_webReady&&_webView.CoreWebView2 is not null) PostEventOnUiThread(_webView.CoreWebView2,"navigate","overview");
                 completion.TrySetResult(new { snapshot=BuildSnapshot() });
             }
             catch(Exception ex){ _settingsLayer.Controls.Clear(); _settingsLayer.Visible=false; _settingsDialog=null; _settingsCompletion=null; completion.TrySetException(ex); }
