@@ -15,27 +15,29 @@ LocalSub 是 Windows 本地实时字幕与后台媒体转写工具，优先服�
 
 ## 当前架构基线
 
-Phase 1A 已建立双进程边界：
+Phase 1A 与 Phase 1B.1 第一闭环已经形成：
 
 ```text
 LocalSub.exe
-├─ WinForms 主界面
+├─ WinForms 主界面，当前作为验证壳
 ├─ 托盘
-├─ 字幕 Overlay
-├─ 实时 PotPlayer 链，暂时保留
+├─ WebView2 字幕 Overlay
+├─ PotPlayer 进程发现与窗口跟随
+├─ realtime Shell proxy
 └─ Named Pipe IPC
         ↓
 LocalSub.Core.exe
-├─ 媒体解析
-├─ Media Foundation / FFmpeg
-├─ 波形数据生成
-├─ Silero VAD
+├─ WASAPI / PotPlayer Process Loopback
+├─ realtime Streaming ASR
+├─ SenseVoice / Fun-ASR-Nano realtime
+├─ VAD / realtime decode queue
+├─ 媒体解析与波形
 └─ 后台离线 ASR
 ```
 
-已经迁入 Core 的后台媒体分析和后台转写禁止静默回退到 GUI 进程。Core 异常时当前后台任务明确失败，`LocalSub.exe` 应继续存活，下一次后台任务按需重新启动 Core。
+已经迁入 Core 的后台和 realtime 重实现禁止静默回退到 GUI 进程。Core 异常时当前任务明确失败，`LocalSub.exe` 应继续存活，后续操作按 supervisor 规则恢复。
 
-v0.1.1 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显式失效、取消超时回收、Shell 正常退出主动 shutdown，以及 Windows CI 中真实强杀 Core 后重连的故障注入门禁。
+Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的进程发现、窗口位置、最小化状态与字幕 Overlay 仍属于 Shell。
 
 详细架构见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
@@ -58,9 +60,10 @@ v0.1.1 在 Phase 1A 基础上增加连接代际隔离、Core 异常退出显式�
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
 - Phase 1A 自动门禁已覆盖 Core IPC、Core 强杀与 generation 2 重连、Shell 启动、后台工作区、Process Loopback、sherpa runtime 与 native offline ASR。
 - 用户特定媒体、模型和机器条件下的高负载 GUI 响应性仍属于实机待验证项。
-- 当前进入 Phase 1B.0，先冻结 Shell / Core / Web UI Application Contract。
-- 后续 Phase 1B.1 先将实时 ASR、WASAPI、PotPlayer Process Loopback 和实时解码队列迁入 Core。
-- WebView2 + Vue 3 + TypeScript 主 UI 不再机械等待全部 Phase 1B 完成，而是在稳定契约下与后续 Core 迁移交错推进。
+- Phase 1B.0 Application Contract 已完成第一版。
+- Phase 1B.1 realtime Core 迁移第一闭环已完成，最后完整验证代码 head 为 `944cc4674b3fecefae5ef88c1c4bc88f30918013`，CI run `34581474053` success。
+- 当前开始 Phase 2A，建立 WebView2 + Vue 3 + TypeScript 主 Shell，同时保留旧 WinForms 作为验证与回退界面。
+- Phase 1B.2 模型重任务迁 Core 可在稳定契约下与 Web UI 后续交错推进。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
