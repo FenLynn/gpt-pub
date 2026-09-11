@@ -1,8 +1,13 @@
-using System.Threading.Channels;
 using LocalSub.Models;
+#if LOCALSUB_CORE_WORKER
+using System.Threading.Channels;
+#else
+using System.Text.Json;
+#endif
 
 namespace LocalSub.Services;
 
+#if LOCALSUB_CORE_WORKER
 public sealed class LiveAsrPipeline : IAsyncDisposable
 {
     readonly AllAudioCaptureService _allAudio = new();
@@ -229,3 +234,152 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _ => "自动"
     };
 }
+
+#else
+/// <summary>
+/// Shell-side realtime ASR proxy. The actual audio capture, native model loading,
+/// VAD and decoding run inside LocalSub.Core.exe.
+/// </summary>
+public sealed class LiveAsrPipeline : IAsyncDisposable
+{
+    readonly CoreWorkerClient _core = new();
+    string? _sessionId;
+    bool _starting;
+    bool _disposed;
+
+    public event Action<float>? LevelChanged;
+    public event Action<string>? PartialResult;
+    public event Action<string>? FinalResult;
+    public event Action<string>? StatusChanged;
+
+    public LiveAsrPipeline()
+    {
+        _core.LiveEventReceived += OnLiveEvent;
+    }
+
+    public Task StartAllAudioAsync(
+        AppSettings settings,
+        ModelDescriptor model,
+        ModelManager models,
+        IProgress<ModelOperationProgress>? runtimeProgress = null,
+        CancellationToken ct = default)
+        => StartAsync(model, null, runtimeProgress, ct);
+
+    public Task StartPotPlayerAsync(
+        AppSettings settings,
+        ModelDescriptor model,
+        ModelManager models,
+        uint processId,
+        IProgress<ModelOperationProgress>? runtimeProgress = null,
+        CancellationToken ct = default)
+        => StartAsync(model, processId, runtimeProgress, ct);
+
+    async Task StartAsync(
+        ModelDescriptor model,
+        uint? processId,
+        IProgress<ModelOperationProgress>? runtimeProgress,
+        CancellationToken ct)
+    {
+        ThrowIfDisposed();
+        await StopAsync();
+        _starting = true;
+        try
+        {
+            StatusChanged?.Invoke("正在连接 LocalSub.Core 实时识别服务");
+            _sessionId = await _core.StartLiveAsync(model.Id, processId, runtimeProgress, ct);
+        }
+        finally
+        {
+            _starting = false;
+        }
+    }
+
+    void OnLiveEvent(string sessionId, string eventName, JsonElement payload)
+    {
+        if (!_starting && !string.Equals(_sessionId, sessionId, StringComparison.Ordinal)) return;
+
+        try
+        {
+            switch (eventName)
+            {
+                case "live.status":
+                    if (payload.TryGetProperty("text", out var statusNode))
+                    {
+                        var text = statusNode.GetString();
+                        if (!string.IsNullOrWhiteSpace(text)) StatusChanged?.Invoke(text);
+                    }
+                    break;
+
+                case "live.level":
+                    if (payload.TryGetProperty("value", out var levelNode) && levelNode.TryGetSingle(out var level))
+                        LevelChanged?.Invoke(Math.Clamp(level, 0, 1));
+                    break;
+
+                case "live.partial":
+                    if (payload.TryGetProperty("text", out var partialNode))
+                    {
+                        var text = partialNode.GetString();
+                        if (!string.IsNullOrWhiteSpace(text)) PartialResult?.Invoke(text);
+                    }
+                    break;
+
+                case "live.final":
+                    if (payload.TryGetProperty("text", out var finalNode))
+                    {
+                        var text = finalNode.GetString();
+                        if (!string.IsNullOrWhiteSpace(text)) FinalResult?.Invoke(text);
+                    }
+                    break;
+
+                case "live.discontinuity":
+                    StatusChanged?.Invoke("PotPlayer 音频时间线已变化，Core 正在清理旧缓冲并恢复实时识别");
+                    break;
+
+                case "live.failed":
+                    if (payload.TryGetProperty("error", out var errorNode))
+                    {
+                        var error = errorNode.GetString();
+                        if (!string.IsNullOrWhiteSpace(error)) StatusChanged?.Invoke("实时识别失败：" + error);
+                    }
+                    break;
+            }
+        }
+        catch
+        {
+            // A malformed status event must not break the Shell reader loop.
+        }
+    }
+
+    public async Task StopAsync()
+    {
+        if (_disposed) return;
+        var sessionId = _sessionId;
+        _sessionId = null;
+        _starting = false;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(sessionId))
+                await _core.StopLiveAsync(sessionId);
+        }
+        finally
+        {
+            LevelChanged?.Invoke(0);
+        }
+    }
+
+    void ThrowIfDisposed()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(LiveAsrPipeline));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        await StopAsync();
+        _core.LiveEventReceived -= OnLiveEvent;
+        _disposed = true;
+        await _core.DisposeAsync();
+    }
+}
+#endif
