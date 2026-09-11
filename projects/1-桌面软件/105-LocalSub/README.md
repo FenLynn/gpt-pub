@@ -64,6 +64,8 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - Phase 1B.1 realtime Core 迁移第一闭环已完成，最后完整验证代码 head 为 `944cc4674b3fecefae5ef88c1c4bc88f30918013`，CI run `34581474053` success。
 - Phase 2A Web Shell 第一闭环已完成，Vue 3 + TypeScript + Vite production bundle 已嵌入 `LocalSub.exe`，真实 WebView2 bridge smoke 已通过；默认启动仍保留旧 WinForms。
 - Phase 2A 最后完整验证代码 head 为 `3c31bd4951304ba637eee2fc8ed60d5f66fa6bc5`，CI run `34583489679` success。
+- Phase 2B 实时字幕页第一闭环已完成，Web bridge 已接入 `live.start / live.stop`，并通过独立 `LiveSessionController` 复用现有 Core realtime session，没有把旧 `MainForm` 业务逻辑复制到 Vue。
+- 当前最新完整验证代码 head 为 `29c8d72419e28441afee2fb7d171b5e760b075ca`，P105 Windows CI run `34588657762` success；candidate Artifact `10194772256`，WebUi preview Artifact `10194773158`。
 - Phase 1B.2 模型重任务迁 Core 可在稳定契约下与 Web UI 后续交错推进。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 

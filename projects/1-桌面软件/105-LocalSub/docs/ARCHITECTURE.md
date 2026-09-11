@@ -175,17 +175,21 @@ Shell 只保留 PotPlayer 进程发现、PID、窗口位置、最小化状态和
 
 ### Phase 2A：Web Shell
 
-状态：**当前开始实施。**
+状态：**第一闭环完成。**
 
-建立 WebView2 + Vue 3 + TypeScript 主 Shell，先完成：
+已建立 WebView2 + Vue 3 + TypeScript 主 Shell：
 
-- 左侧导航
+- 左侧一级导航
 - Core 状态
-- 设置
-- 关于
+- 设置与文档骨架
 - 实时页面骨架
+- `app.getSnapshot / app.navigate` 首批 bridge
+- Vue typecheck、Vite build、多尺寸预览与真实 WebView2 host smoke
 
-Phase 2A 可以与 1B 后续交错推进，但只能消费已经冻结的 DTO 与白名单命令。
+最后完整验证代码 head：`3c31bd4951304ba637eee2fc8ed60d5f66fa6bc5`，P105 Windows CI run `34583489679` success。
+
+Phase 2A 继续遵守冻结 DTO 与白名单边界，默认启动仍保留旧 WinForms。
+
 
 ### Phase 1B.2：模型重任务迁入 Core
 
@@ -200,14 +204,21 @@ Phase 2A 可以与 1B 后续交错推进，但只能消费已经冻结的 DTO �
 
 ### Phase 2B：逐页切换
 
+状态：**实时字幕页第一闭环完成，其他页面待迁移。**
+
 推荐顺序：
 
-1. 实时字幕
+1. 实时字幕，第一闭环已完成
 2. 模型
 3. 后台转写与 waveform
 4. 设置细节
 
-每一页切换后继续复用同一个 Application Contract。
+实时页当前通过 `WebShellForm → LiveSessionController → LiveAsrPipeline proxy → CoreWorkerClient` 接入同一个 Core realtime session。Vue 不复制旧 `MainForm` 业务核心。
+
+当前 realtime Web 页最后完整验证代码 head：`29c8d72419e28441afee2fb7d171b5e760b075ca`，P105 Windows CI run `34588657762` success。
+
+每一页切换后继续复用同一个 Application Contract。模型页接管时先做查看与选择，模型下载、解压、校验和大目录替换等重任务继续按 Phase 1B.2 收口到 Core。
+
 
 ### Phase 3：轻量 Shell 收口
 

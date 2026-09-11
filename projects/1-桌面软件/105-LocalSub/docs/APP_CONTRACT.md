@@ -167,20 +167,23 @@ LocalSubSnapshot
 
 ### live
 
-至少包含：
+当前 Web UI snapshot 至少包含：
 
 - state: idle / starting / running / stopping / failed
-- sessionId
+- sourceId
 - source
-- processId
 - modelId
 - modelName
+- availableModels
 - level
-- partialText
-- finalText
-- previousFinalText
 - status
+- currentText
+- previousText
 - lastError
+- canStart
+
+Core realtime 的 `sessionId` 与 PotPlayer `processId` 由 Shell 应用层持有，不作为当前 Vue 页面必须管理的状态。只有未来出现明确 UI 需求时才扩展 snapshot，避免让 Web UI 直接承担 Core session 生命周期。
+
 
 ### batch
 
@@ -211,15 +214,18 @@ LocalSubSnapshot
 
 ## 7. Shell 到 Web UI 命令白名单
 
-第一版主界面优先收敛为：
+当前已经实现并进入 Phase 2B 第一闭环的命令：
 
 ```text
 app.getSnapshot
 app.navigate
-
 live.start
 live.stop
+```
 
+后续按页面迁移逐步加入：
+
+```text
 batch.pickFiles
 batch.analyze
 batch.transcribe
@@ -237,7 +243,7 @@ settings.save
 overlay.preview
 ```
 
-实际实现可以分批加入，但不得使用任意方法名转发或反射式调用代替白名单。
+实际实现必须继续使用显式白名单，不得使用任意方法名转发或反射式调用。Vue 只发送用户意图，realtime 的 session ID、PotPlayer PID、Core generation 与 Windows 句柄继续由 Shell 持有。
 
 ## 8. Core IPC 演进
 

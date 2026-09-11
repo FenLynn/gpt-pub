@@ -184,18 +184,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`2A` 第一版 Web Shell 代码闭环完成。
+当前 Phase：`2B` 实时字幕页第一闭环完成。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-3c31bd4951304ba637eee2fc8ed60d5f66fa6bc5
+29c8d72419e28441afee2fb7d171b5e760b075ca
 ```
 
 P105 Windows CI：
 
 ```text
-run 34583489679
+run 34588657762
 success
 ```
 
@@ -203,26 +203,33 @@ Artifacts：
 
 ```text
 candidate
-ID 10192663341
-sha256:43b49a76775f3356fd45588dddf1689d8d46c1ed2363c6d96851f8e0abf5fd15
+ID 10194772256
+sha256:73553afd535f3c6fa35140752025b1eb3464e9e0c11d7cf08d56ce4903173180
 
 WebUi preview
-ID 10192664092
-sha256:4d58234254cecc0c213c6df02c4d82c8f06c10ee0861081d93aaa1f02914d204
+ID 10194773158
+sha256:e1a038f058c2a9ba45b11e4ac30a1bb1af3d695913202d0ebdc6f166c73bb9d3
 ```
 
-该代码 head 已通过 Vue typecheck、Vite build、bundle 检查、1280×800 与 1600×1000 Edge 预览、Shell/Core publish、真实 WebView2 host、真实 `app.getSnapshot` bridge 往返，以及原有全部 P105 回归门。
+从 `bad29572451de0618058146ffd87faf14e009de2` 到该 head 的 7 个提交已经完成：
 
-默认启动路径尚未切换，正常运行仍进入旧 WinForms。当前 Web Shell 只作为显式预览和 CI host，避免在用户确认视觉方向前破坏现有入口。
+- 新增 Shell 应用层 `LiveSessionController`，统一协调 PotPlayer 发现、Overlay 与现有 Core realtime session。
+- Web bridge 已正式白名单接入 `live.start / live.stop`，Vue 不直接连接 Named Pipe。
+- realtime 页已经显示音源、已安装实时模型、状态、输入电平、partial/final 字幕和错误。
+- 状态覆盖 `idle / starting / running / stopping / failed`，启动和停止期间锁定易冲突控件。
+- Core 异常仍由 Shell proxy 与现有 generation 恢复链处理，未复制 `MainForm` 业务核心。
+- CI 已覆盖真实 WebView2 bridge 的 `app.getSnapshot / live.stop / live.start` 路径，其中 `live.start` 使用缺失模型验证明确失败，不下载真实模型。
+- 1280×800 与 1600×1000 自动预览保持现有统一视觉语言，无明显溢出或响应式塌陷。
 
-下一步：
+默认启动路径仍未切换，正常运行继续进入旧 WinForms。Web Shell 继续作为显式预览与逐页迁移入口。
+
+下一步固定为：
 
 1. 不提升 stable，不动 main。
-2. 用户先审看当前 Web Shell 视觉方向。
-3. 继续完成真实 PotPlayer + 已安装 realtime 模型实机验证。
-4. 下一代码阶段优先接通 Web realtime 页的 Shell 白名单命令，复用现有 Core realtime session，不复制旧 `MainForm` 逻辑。
-5. 之后再迁模型、后台转写和设置编辑。
-6. Web UI 始终只能消费 Application Contract。
+2. 优先用当前 candidate 在真实 Windows 上验证 PotPlayer + 已安装 realtime 模型，包括开始、停止、输入电平、字幕、seek、换片、窗口/全屏切换、长时间运行与运行中强杀 Core。
+3. 实机 realtime 没有阻断问题后，进入模型页接管，先做查看与选择，再推进 Phase 1B.2 的模型下载、解压、校验和大目录替换迁 Core。
+4. 后续依次迁后台转写与设置编辑。
+5. 实时、模型、后台、设置均完成必要验证前，不切换默认主界面。
 
 ## 9. Web UI 约束
 
