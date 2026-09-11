@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { disposeBridge, invoke, type LocalSubSnapshot, type PageKey } from "./bridge";
+import {
+  disposeBridge,
+  invoke,
+  subscribeSnapshot,
+  type LocalSubSnapshot,
+  type PageKey
+} from "./bridge";
 
 const snapshot = ref<LocalSubSnapshot | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const commandBusy = ref(false);
+const selectedSource = ref<"potplayer" | "allAudio">("potplayer");
+const selectedModelId = ref("");
+let unsubscribeSnapshot: (() => void) | null = null;
 
 const nav: Array<{ key: PageKey; label: string; glyph: string }> = [
   { key: "live", label: "实时字幕", glyph: "字" },
@@ -16,11 +26,37 @@ const nav: Array<{ key: PageKey; label: string; glyph: string }> = [
 
 const activePage = computed(() => snapshot.value?.app.activePage ?? "live");
 const pageTitle = computed(() => nav.find(item => item.key === activePage.value)?.label ?? "LocalSub");
+const liveState = computed(() => snapshot.value?.live.state ?? "idle");
+const liveRunning = computed(() => liveState.value === "running");
+const liveTransitioning = computed(() => liveState.value === "starting" || liveState.value === "stopping");
+const liveControlsLocked = computed(() => liveRunning.value || liveTransitioning.value || commandBusy.value);
+const liveButtonText = computed(() => {
+  if (liveState.value === "starting") return "正在启动";
+  if (liveState.value === "stopping") return "正在停止";
+  if (liveRunning.value) return "停止实时字幕";
+  return "开始实时字幕";
+});
+const liveButtonDisabled = computed(() => {
+  if (liveTransitioning.value || commandBusy.value) return true;
+  if (liveRunning.value) return false;
+  return !snapshot.value?.live.canStart || !selectedModelId.value;
+});
+
+function applySnapshot(next: LocalSubSnapshot) {
+  snapshot.value = next;
+
+  if (!selectedModelId.value || next.live.state !== "idle") {
+    selectedModelId.value = next.live.modelId || next.live.availableModels[0]?.id || "";
+  }
+  if (next.live.state !== "idle" || !selectedSource.value) {
+    selectedSource.value = next.live.sourceId;
+  }
+}
 
 async function refresh() {
   try {
     error.value = null;
-    snapshot.value = await invoke<LocalSubSnapshot>("app.getSnapshot");
+    applySnapshot(await invoke<LocalSubSnapshot>("app.getSnapshot"));
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -31,14 +67,51 @@ async function refresh() {
 async function navigate(page: PageKey) {
   try {
     error.value = null;
-    snapshot.value = await invoke<LocalSubSnapshot>("app.navigate", { page });
+    applySnapshot(await invoke<LocalSubSnapshot>("app.navigate", { page }));
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   }
 }
 
-onMounted(refresh);
-onBeforeUnmount(disposeBridge);
+async function toggleLive() {
+  if (!snapshot.value) return;
+  commandBusy.value = true;
+  error.value = null;
+
+  try {
+    if (liveRunning.value) {
+      applySnapshot(await invoke<LocalSubSnapshot>("live.stop"));
+    } else {
+      applySnapshot(await invoke<LocalSubSnapshot>("live.start", {
+        source: selectedSource.value,
+        modelId: selectedModelId.value
+      }));
+    }
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+    try { await refresh(); } catch { }
+  } finally {
+    commandBusy.value = false;
+  }
+}
+
+onMounted(async () => {
+  unsubscribeSnapshot = subscribeSnapshot(applySnapshot);
+  await refresh();
+
+  if (new URLSearchParams(window.location.search).get("smoke") === "1") {
+    try {
+      applySnapshot(await invoke<LocalSubSnapshot>("live.stop"));
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : String(e);
+    }
+  }
+});
+
+onBeforeUnmount(() => {
+  unsubscribeSnapshot?.();
+  disposeBridge();
+});
 </script>
 
 <template>
@@ -83,7 +156,7 @@ onBeforeUnmount(disposeBridge);
       </header>
 
       <section v-if="error" class="notice error">
-        <b>界面桥接失败</b>
+        <b>操作失败</b>
         <span>{{ error }}</span>
       </section>
 
@@ -106,18 +179,32 @@ onBeforeUnmount(disposeBridge);
               </div>
             </div>
 
-            <div class="live-summary">
-              <div class="summary-item">
+            <div class="control-grid">
+              <label class="control-field">
                 <span>音源</span>
-                <b>{{ snapshot.live.source }}</b>
-              </div>
-              <div class="summary-item">
+                <select v-model="selectedSource" :disabled="liveControlsLocked">
+                  <option value="potplayer">PotPlayer</option>
+                  <option value="allAudio">所有音频</option>
+                </select>
+              </label>
+
+              <label class="control-field">
                 <span>模型</span>
-                <b>{{ snapshot.live.modelName }}</b>
-              </div>
-              <div class="summary-item">
+                <select v-model="selectedModelId" :disabled="liveControlsLocked || snapshot.live.availableModels.length === 0">
+                  <option
+                    v-for="model in snapshot.live.availableModels"
+                    :key="model.id"
+                    :value="model.id"
+                  >{{ model.name }}</option>
+                  <option v-if="snapshot.live.availableModels.length === 0" value="">未安装实时模型</option>
+                </select>
+              </label>
+
+              <div class="state-field">
                 <span>状态</span>
-                <b>{{ snapshot.live.state === "idle" ? "等待开始" : snapshot.live.state }}</b>
+                <b :class="'state-' + snapshot.live.state">
+                  {{ snapshot.live.state === "idle" ? "等待开始" : snapshot.live.state === "running" ? "识别中" : snapshot.live.state === "failed" ? "失败" : snapshot.live.state }}
+                </b>
               </div>
             </div>
 
@@ -131,11 +218,29 @@ onBeforeUnmount(disposeBridge);
               </div>
             </div>
 
+            <div
+              v-if="snapshot.live.currentText || snapshot.live.previousText"
+              class="transcript-preview"
+            >
+              <span v-if="snapshot.live.previousText">{{ snapshot.live.previousText }}</span>
+              <b>{{ snapshot.live.currentText }}</b>
+            </div>
+
+            <div v-if="snapshot.live.lastError" class="inline-error">
+              {{ snapshot.live.lastError }}
+            </div>
+
             <div class="hero-actions">
-              <button class="primary-button" type="button" disabled>开始实时字幕</button>
+              <button
+                class="primary-button"
+                :class="{ stop: liveRunning }"
+                type="button"
+                :disabled="liveButtonDisabled"
+                @click="toggleLive"
+              >{{ liveButtonText }}</button>
               <span
                 class="hint-dot"
-                data-tip="当前 Phase 2A 只验证新主界面与 bridge。实时开始和停止将在下一阶段接入现有 Core session。"
+                data-tip="开始后音源和模型会锁定。停止后恢复选择。实时识别逻辑仍由现有 Core session 执行。"
               >i</span>
             </div>
           </article>
@@ -143,15 +248,16 @@ onBeforeUnmount(disposeBridge);
           <aside class="stack">
             <article class="mini-card">
               <div class="mini-title">
-                <span class="status-pulse"></span>
+                <span class="status-pulse" :class="{ off: snapshot.core.state !== 'ready' }"></span>
                 <span>Core</span>
                 <span
                   class="hint-dot"
                   data-tip="实时识别、音频捕获和后台转写的重任务均运行在独立 Core 进程。"
                 >i</span>
               </div>
-              <strong>{{ snapshot.core.state === "ready" ? "运行正常" : "等待连接" }}</strong>
+              <strong>{{ snapshot.core.state === "ready" ? "运行正常" : "需要检查" }}</strong>
             </article>
+
             <article class="mini-card accent">
               <div class="mini-title">
                 <span>字幕 Overlay</span>
@@ -160,7 +266,7 @@ onBeforeUnmount(disposeBridge);
                   data-tip="PotPlayer 窗口位置、TopMost、点击穿透和全屏跟随继续由 Windows Shell 管理。"
                 >i</span>
               </div>
-              <strong>窗口跟随已保留</strong>
+              <strong>{{ liveRunning ? "正在跟随" : "待命" }}</strong>
             </article>
           </aside>
         </section>
@@ -169,10 +275,7 @@ onBeforeUnmount(disposeBridge);
           <article class="wide-card">
             <div class="section-title">
               <h2>后台转写</h2>
-              <span
-                class="hint-dot"
-                data-tip="媒体分析、波形、VAD 和离线 ASR 均由 LocalSub.Core 执行。"
-              >i</span>
+              <span class="hint-dot" data-tip="媒体分析、波形、VAD 和离线 ASR 均由 LocalSub.Core 执行。">i</span>
             </div>
             <div class="drop-zone">
               <div class="drop-icon">＋</div>
@@ -192,10 +295,7 @@ onBeforeUnmount(disposeBridge);
           <article class="wide-card">
             <div class="section-title">
               <h2>本地模型</h2>
-              <span
-                class="hint-dot"
-                data-tip="模型不进入基础绿色包。下载、校验、解压和目录替换等重 IO 将继续收口到 Core。"
-              >i</span>
+              <span class="hint-dot" data-tip="模型不进入基础绿色包。下载、校验、解压和目录替换等重 IO 将继续收口到 Core。">i</span>
             </div>
             <div class="metric-row">
               <div><span>Catalog</span><b>{{ snapshot.models.catalogCount }}</b></div>
@@ -262,7 +362,7 @@ onBeforeUnmount(disposeBridge);
               <h3>当前迁移</h3>
               <ul>
                 <li>实时识别链已经迁入独立 Core。</li>
-                <li>Vue + WebView2 主 Shell 已完成第一版验证。</li>
+                <li>Web 实时页已经接入同一个 Core session。</li>
                 <li>旧 WinForms 仍是默认入口，方便验证与回退。</li>
               </ul>
             </article>

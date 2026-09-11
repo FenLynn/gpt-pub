@@ -187,6 +187,16 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         catch (Exception ex) { StatusChanged?.Invoke("识别失败：" + ex.Message); }
     }
 
+    void OnCoreConnectionBroken(string message)
+    {
+        if (!_starting && string.IsNullOrWhiteSpace(_sessionId)) return;
+        _sessionId = null;
+        _starting = false;
+        LevelChanged?.Invoke(0);
+        Failed?.Invoke(message);
+        StatusChanged?.Invoke("实时识别失败：" + message);
+    }
+
     public async Task StopAsync()
     {
         _running = false;
@@ -244,7 +254,8 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
 /// </summary>
 public sealed class LiveAsrPipeline : IAsyncDisposable
 {
-    readonly CoreWorkerClient _core = new();
+    readonly CoreWorkerClient _core;
+    readonly bool _ownsCore;
     string? _sessionId;
     bool _starting;
     bool _disposed;
@@ -253,10 +264,24 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     public event Action<string>? PartialResult;
     public event Action<string>? FinalResult;
     public event Action<string>? StatusChanged;
+    public event Action<string>? Failed;
 
     public LiveAsrPipeline()
+        : this(new CoreWorkerClient(), true)
     {
+    }
+
+    internal LiveAsrPipeline(CoreWorkerClient core)
+        : this(core, false)
+    {
+    }
+
+    LiveAsrPipeline(CoreWorkerClient core, bool ownsCore)
+    {
+        _core = core;
+        _ownsCore = ownsCore;
         _core.LiveEventReceived += OnLiveEvent;
+        _core.ConnectionBroken += OnCoreConnectionBroken;
     }
 
     public Task StartAllAudioAsync(
@@ -341,7 +366,13 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
                     if (payload.TryGetProperty("error", out var errorNode))
                     {
                         var error = errorNode.GetString();
-                        if (!string.IsNullOrWhiteSpace(error)) StatusChanged?.Invoke("实时识别失败：" + error);
+                        if (!string.IsNullOrWhiteSpace(error))
+                        {
+                            _sessionId = null;
+                            _starting = false;
+                            Failed?.Invoke(error);
+                            StatusChanged?.Invoke("实时识别失败：" + error);
+                        }
                     }
                     break;
             }
@@ -380,8 +411,9 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         if (_disposed) return;
         await StopAsync();
         _core.LiveEventReceived -= OnLiveEvent;
+        _core.ConnectionBroken -= OnCoreConnectionBroken;
         _disposed = true;
-        await _core.DisposeAsync();
+        if (_ownsCore) await _core.DisposeAsync();
     }
 }
 #endif

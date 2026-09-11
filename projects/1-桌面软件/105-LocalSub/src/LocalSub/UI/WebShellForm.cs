@@ -58,7 +58,9 @@ public sealed class WebShellForm : Form
     static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal)
     {
         "app.getSnapshot",
-        "app.navigate"
+        "app.navigate",
+        "live.start",
+        "live.stop"
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
     {
@@ -75,14 +77,29 @@ public sealed class WebShellForm : Form
         Font = new Font("Segoe UI", 10F)
     };
     readonly CoreWorkerClient _core = new();
+    readonly LiveSessionController _live;
+    readonly AppSettings _settings;
+    readonly int _catalogCount;
+    readonly int _installedModelCount;
     readonly bool _smoke;
+    readonly HashSet<string> _smokeMethods = new(StringComparer.Ordinal);
+
     string _activePage = "live";
-    bool _bridgeRoundTripObserved;
+    string _coreState = "stopped";
+    string? _coreError;
+    int _snapshotPushPending;
     bool _disposed;
 
     public WebShellForm(bool smoke = false)
     {
         _smoke = smoke;
+        _settings = AppSettings.Load();
+        var catalog = new ModelCatalogService().Load();
+        var models = new ModelManager(_settings);
+        _catalogCount = catalog.Count;
+        _installedModelCount = catalog.Count(models.IsInstalled);
+        _live = new LiveSessionController(_core);
+
         Text = "LocalSub";
         Width = 1180;
         Height = 760;
@@ -92,13 +109,16 @@ public sealed class WebShellForm : Form
         Controls.Add(_loading);
         Controls.Add(_web);
         _web.Visible = false;
+
+        _live.Changed += OnLiveChanged;
+        _core.ConnectionBroken += OnCoreConnectionBroken;
         Shown += async (_, _) => await InitializeAsync();
-        FormClosed += (_, _) => DisposeOwnedResources();
+        FormClosed += async (_, _) => await DisposeOwnedResourcesAsync();
     }
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "live.start", "live.stop" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -135,7 +155,8 @@ public sealed class WebShellForm : Form
                 _web.Visible = true;
                 _web.BringToFront();
             };
-            core.Navigate(Origin + "/index.html");
+
+            core.Navigate(_smoke ? Origin + "/index.html?smoke=1" : Origin + "/index.html");
         }
         catch (Exception ex)
         {
@@ -156,22 +177,27 @@ public sealed class WebShellForm : Form
             if (!AllowedMethods.Contains(request.Method))
                 throw new InvalidOperationException("不允许的界面命令。");
 
-            object result = request.Method switch
+            object result;
+            switch (request.Method)
             {
-                "app.getSnapshot" => await BuildSnapshotAsync(),
-                "app.navigate" => await NavigateAsync(request.Params),
-                _ => throw new InvalidOperationException("不允许的界面命令。")
-            };
-            Reply(request.Id, true, result, null);
-
-            if (_smoke && request.Method == "app.getSnapshot" && !_bridgeRoundTripObserved)
-            {
-                _bridgeRoundTripObserved = true;
-                Directory.CreateDirectory(PortablePaths.LogsDir);
-                File.WriteAllText(
-                    Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-                    $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}");
+                case "app.getSnapshot":
+                    result = await BuildSnapshotAsync(probeCore: true);
+                    break;
+                case "app.navigate":
+                    result = await NavigateAsync(request.Params);
+                    break;
+                case "live.start":
+                    result = await StartLiveAsync(request.Params);
+                    break;
+                case "live.stop":
+                    result = await StopLiveAsync();
+                    break;
+                default:
+                    throw new InvalidOperationException("不允许的界面命令。");
             }
+
+            Reply(request.Id, true, result, null);
+            RecordSmokeMethod(request.Method);
         }
         catch (Exception ex)
         {
@@ -181,38 +207,46 @@ public sealed class WebShellForm : Form
 
     async Task<object> NavigateAsync(JsonElement? parameters)
     {
-        if (!parameters.HasValue ||
-            parameters.Value.ValueKind != JsonValueKind.Object ||
-            !parameters.Value.TryGetProperty("page", out var pageNode) ||
-            pageNode.ValueKind != JsonValueKind.String)
+        if (!TryReadString(parameters, "page", out var page))
             throw new InvalidOperationException("Missing app.navigate page.");
+        if (!AllowedPages.Contains(page))
+            throw new InvalidOperationException("不允许的页面。");
 
-        var page = pageNode.GetString() ?? "";
-        if (!AllowedPages.Contains(page)) throw new InvalidOperationException("不允许的页面。");
         _activePage = page;
-        return await BuildSnapshotAsync();
+        if (page == "live") _live.RefreshConfiguration();
+        return await BuildSnapshotAsync(probeCore: false);
     }
 
-    async Task<object> BuildSnapshotAsync()
+    async Task<object> StartLiveAsync(JsonElement? parameters)
     {
-        string coreState;
-        string? coreError = null;
-        try
-        {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            await _core.PingAsync(timeout.Token);
-            coreState = "ready";
-        }
-        catch (Exception ex)
-        {
-            coreState = "failed";
-            coreError = ex.Message;
-        }
+        if (!TryReadString(parameters, "source", out var source))
+            throw new InvalidOperationException("请选择实时音源。");
+        if (!TryReadString(parameters, "modelId", out var modelId))
+            throw new InvalidOperationException("请选择实时识别模型。");
 
-        var settings = AppSettings.Load();
-        var catalog = new ModelCatalogService().Load();
-        var models = new ModelManager(settings);
-        var installedCount = catalog.Count(models.IsInstalled);
+        await _live.StartAsync(source, modelId);
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
+    async Task<object> StopLiveAsync()
+    {
+        await _live.StopAsync();
+        return BuildSnapshot();
+    }
+
+    async Task<object> BuildSnapshotAsync(bool probeCore)
+    {
+        if (probeCore) await ProbeCoreAsync();
+        return BuildSnapshot();
+    }
+
+    object BuildSnapshot()
+    {
+        var live = _live.Snapshot;
+        var busy = live.State is "starting" or "stopping";
+        var operation = live.State is "starting" or "running" or "stopping" ? "realtime" : null;
 
         return new
         {
@@ -220,25 +254,18 @@ public sealed class WebShellForm : Form
             {
                 productVersion = typeof(WebShellForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.1",
                 activePage = _activePage,
-                busy = false,
-                lastError = (string?)null
+                busy,
+                lastError = live.LastError
             },
             core = new
             {
-                state = coreState,
+                state = _coreState,
                 pid = _core.WorkerProcessId,
                 generation = _core.ConnectionGeneration,
-                currentOperation = (string?)null,
-                lastError = coreError
+                currentOperation = operation,
+                lastError = _coreError
             },
-            live = new
-            {
-                state = "idle",
-                source = settings.AudioSource == AudioSourceMode.PotPlayer ? "PotPlayer" : "所有音频",
-                modelName = "由现有实时页选择",
-                level = 0.0,
-                status = "实时链已迁入 LocalSub.Core，Web 控制将在 Phase 2B 接入"
-            },
+            live,
             batch = new
             {
                 queued = 0,
@@ -247,37 +274,140 @@ public sealed class WebShellForm : Form
             },
             models = new
             {
-                catalogCount = catalog.Count,
-                installedCount,
-                status = $"{installedCount} 个本地模型可用"
+                catalogCount = _catalogCount,
+                installedCount = _installedModelCount,
+                status = $"{_installedModelCount} 个本地模型可用"
             },
             settings = new
             {
-                audioSource = settings.AudioSource.ToString(),
-                resourceProfile = settings.ResourceProfile.ToString(),
-                subtitleAutoSize = settings.SubtitleAutoSize,
-                subtitleFontSize = settings.SubtitleFontSize
+                audioSource = live.Source,
+                resourceProfile = _settings.ResourceProfile.ToString(),
+                subtitleAutoSize = _settings.SubtitleAutoSize,
+                subtitleFontSize = _settings.SubtitleFontSize
             }
         };
+    }
+
+    async Task ProbeCoreAsync()
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await _core.PingAsync(timeout.Token);
+            _coreState = "ready";
+            _coreError = null;
+        }
+        catch (Exception ex)
+        {
+            _coreState = "failed";
+            _coreError = ex.Message;
+        }
+    }
+
+    void OnLiveChanged()
+    {
+        var live = _live.Snapshot;
+        if (_core.WorkerProcessId.HasValue && live.State is "starting" or "running" or "stopping")
+        {
+            _coreState = "ready";
+            _coreError = null;
+        }
+        else if (live.State == "failed" && !_core.WorkerProcessId.HasValue)
+        {
+            _coreState = "failed";
+            _coreError = live.LastError;
+        }
+
+        ScheduleSnapshotPush();
+    }
+
+    void OnCoreConnectionBroken(string message)
+    {
+        _coreState = "failed";
+        _coreError = message;
+        ScheduleSnapshotPush();
+    }
+
+    void ScheduleSnapshotPush()
+    {
+        if (_disposed || _web.CoreWebView2 == null) return;
+        if (Interlocked.Exchange(ref _snapshotPushPending, 1) != 0) return;
+
+        try
+        {
+            BeginInvoke(() =>
+            {
+                try
+                {
+                    if (!_disposed && _web.CoreWebView2 != null)
+                        PostEvent("app.snapshot", BuildSnapshot());
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _snapshotPushPending, 0);
+                }
+            });
+        }
+        catch
+        {
+            Interlocked.Exchange(ref _snapshotPushPending, 0);
+        }
+    }
+
+    void PostEvent(string eventName, object payload)
+    {
+        if (_web.CoreWebView2 == null) return;
+        var json = JsonSerializer.Serialize(new { kind = "event", @event = eventName, payload }, JsonOptions);
+        _web.CoreWebView2.PostWebMessageAsJson(json);
     }
 
     void Reply(string id, bool ok, object? result, string? error)
     {
         if (string.IsNullOrWhiteSpace(id) || _web.CoreWebView2 == null) return;
-        var json = JsonSerializer.Serialize(new { id, ok, result, error }, JsonOptions);
+        var json = JsonSerializer.Serialize(new { kind = "response", id, ok, result, error }, JsonOptions);
         _web.CoreWebView2.PostWebMessageAsJson(json);
     }
 
-    void DisposeOwnedResources()
+    void RecordSmokeMethod(string method)
+    {
+        if (!_smoke) return;
+        _smokeMethods.Add(method);
+        if (!_smokeMethods.Contains("app.getSnapshot") || !_smokeMethods.Contains("live.stop")) return;
+
+        Directory.CreateDirectory(PortablePaths.LogsDir);
+        File.WriteAllText(
+            Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}");
+    }
+
+    static bool TryReadString(JsonElement? parameters, string propertyName, out string value)
+    {
+        value = "";
+        if (!parameters.HasValue ||
+            parameters.Value.ValueKind != JsonValueKind.Object ||
+            !parameters.Value.TryGetProperty(propertyName, out var node) ||
+            node.ValueKind != JsonValueKind.String)
+            return false;
+
+        value = node.GetString()?.Trim() ?? "";
+        return value.Length > 0;
+    }
+
+    async Task DisposeOwnedResourcesAsync()
     {
         if (_disposed) return;
         _disposed = true;
+
+        _live.Changed -= OnLiveChanged;
+        _core.ConnectionBroken -= OnCoreConnectionBroken;
+        try { await _live.DisposeAsync(); } catch { }
+        try { await _core.DisposeAsync(); } catch { }
+
         try
         {
             if (_web.CoreWebView2 != null) _web.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
         }
         catch { }
-        try { _core.DisposeAsync().AsTask().GetAwaiter().GetResult(); } catch { }
         try { _web.Dispose(); } catch { }
     }
 

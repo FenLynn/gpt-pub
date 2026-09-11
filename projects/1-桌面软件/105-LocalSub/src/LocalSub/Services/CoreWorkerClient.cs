@@ -27,6 +27,7 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     bool _disposed;
 
     internal event Action<string, string, JsonElement>? LiveEventReceived;
+    internal event Action<string>? ConnectionBroken;
 
     static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -393,7 +394,9 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         if (Volatile.Read(ref _brokenGeneration) == generation) return;
         Volatile.Write(ref _brokenGeneration, generation);
         LogClient($"DISCONNECTED generation={generation} pid={WorkerProcessId?.ToString() ?? "n/a"} {ex.GetType().Name}: {ex.Message}");
-        FailPendingForGeneration(generation, ex is IOException ? ex : new IOException("LocalSub.Core 连接异常。下次任务会自动重启 Core。", ex));
+        var failure = ex is IOException ? ex : new IOException("LocalSub.Core 连接异常。下次任务会自动重启 Core。", ex);
+        FailPendingForGeneration(generation, failure);
+        try { ConnectionBroken?.Invoke(failure.Message); } catch { }
     }
 
     void TerminateCurrentWorker(int generation, string reason)

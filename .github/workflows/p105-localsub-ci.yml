@@ -383,7 +383,7 @@ jobs:
             throw 'WebUi host did not complete a real app.getSnapshot bridge round trip.'
           }
           $ready = Get-Content publish/Logs/webui-smoke-ready.txt -Raw
-          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'webview2=ready') {
+          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'bridge=live.stop' -or $ready -notmatch 'webview2=ready') {
             throw "Unexpected WebUi smoke marker: $ready"
           }
           if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'WebUi host wrote a crash log.' }
