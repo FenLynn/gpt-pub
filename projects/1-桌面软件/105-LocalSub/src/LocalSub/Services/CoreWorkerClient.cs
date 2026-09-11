@@ -26,6 +26,8 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     int _brokenGeneration;
     bool _disposed;
 
+    internal event Action<string, string, JsonElement>? LiveEventReceived;
+
     static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -75,6 +77,36 @@ public sealed class CoreWorkerClient : IAsyncDisposable
             dto.Waveform ?? [],
             dto.SecondsPerPoint,
             dto.DecoderName ?? "LocalSub.Core");
+    }
+
+    public async Task<string> StartLiveAsync(
+        string modelId,
+        uint? processId,
+        IProgress<ModelOperationProgress>? modelProgress = null,
+        CancellationToken ct = default)
+    {
+        var payload = await SendOperationAsync(
+            "live.start",
+            new { modelId, processId },
+            (eventName, value) =>
+            {
+                if (eventName != "model-progress" || modelProgress == null) return;
+                var progress = value.Deserialize<ModelOperationProgress>(JsonOptions);
+                if (progress != null) modelProgress.Report(progress);
+            },
+            ct);
+
+        var dto = payload.Deserialize<LiveStartDto>(JsonOptions)
+            ?? throw new InvalidDataException("LocalSub.Core 返回了无效的实时会话结果。");
+        if (string.IsNullOrWhiteSpace(dto.SessionId))
+            throw new InvalidDataException("LocalSub.Core 没有返回实时会话 ID。");
+        return dto.SessionId;
+    }
+
+    public async Task StopLiveAsync(string sessionId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) return;
+        _ = await SendOperationAsync("live.stop", new { sessionId }, null, ct);
     }
 
     public async Task<BatchTranscriptionResult> TranscribeAsync(
@@ -277,11 +309,20 @@ public sealed class CoreWorkerClient : IAsyncDisposable
                 var id = root.TryGetProperty("id", out var idNode) ? idNode.GetString() : null;
                 if (string.IsNullOrWhiteSpace(id)) continue;
 
-                if (kind == "event" && _pending.TryGetValue(id, out var eventPending) && eventPending.Generation == generation)
+                if (kind == "event")
                 {
                     var eventName = root.TryGetProperty("event", out var eventNode) ? eventNode.GetString() ?? "" : "";
                     var payload = root.TryGetProperty("payload", out var payloadNode) ? payloadNode.Clone() : default;
-                    try { eventPending.OnEvent?.Invoke(eventName, payload); } catch { }
+
+                    if (_pending.TryGetValue(id, out var eventPending) && eventPending.Generation == generation)
+                    {
+                        try { eventPending.OnEvent?.Invoke(eventName, payload); } catch { }
+                    }
+
+                    if (eventName.StartsWith("live.", StringComparison.Ordinal))
+                    {
+                        try { LiveEventReceived?.Invoke(id, eventName, payload); } catch { }
+                    }
                     continue;
                 }
 
@@ -452,6 +493,12 @@ public sealed class CoreWorkerClient : IAsyncDisposable
             Generation = generation;
             OnEvent = onEvent;
         }
+    }
+
+    sealed class LiveStartDto
+    {
+        public string SessionId { get; set; } = "";
+        public string State { get; set; } = "";
     }
 
     sealed class AnalysisDto
