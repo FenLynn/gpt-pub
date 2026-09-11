@@ -111,6 +111,15 @@ onMounted(async () => {
   if (new URLSearchParams(window.location.search).get("smoke") === "1") {
     try {
       applySnapshot(await invoke<LocalSubSnapshot>("live.stop"));
+      try {
+        await invoke<LocalSubSnapshot>("live.start", {
+          source: "allAudio",
+          modelId: "__ci_missing_model__"
+        });
+      } catch {
+        // Expected: CI intentionally uses a missing model to exercise the
+        // real WebView2 -> Shell live.start failure path without downloading models.
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
     }

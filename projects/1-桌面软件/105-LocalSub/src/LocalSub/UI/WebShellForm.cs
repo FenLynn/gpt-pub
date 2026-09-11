@@ -201,6 +201,8 @@ public sealed class WebShellForm : Form
         }
         catch (Exception ex)
         {
+            if (_smoke && request?.Method == "live.start")
+                RecordSmokeMethod("live.start");
             Reply(request?.Id ?? string.Empty, false, null, ex.Message);
         }
     }
@@ -372,12 +374,14 @@ public sealed class WebShellForm : Form
     {
         if (!_smoke) return;
         _smokeMethods.Add(method);
-        if (!_smokeMethods.Contains("app.getSnapshot") || !_smokeMethods.Contains("live.stop")) return;
+        if (!_smokeMethods.Contains("app.getSnapshot") ||
+            !_smokeMethods.Contains("live.stop") ||
+            !_smokeMethods.Contains("live.start")) return;
 
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}");
     }
 
     static bool TryReadString(JsonElement? parameters, string propertyName, out string value)
