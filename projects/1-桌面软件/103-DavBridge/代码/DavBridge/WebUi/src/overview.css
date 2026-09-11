@@ -740,3 +740,315 @@
   .task-action-row .primary-button{min-width:96px;min-height:38px;border-radius:12px;font-size:12px;gap:8px}
   .primary-glyph{font-size:14px}
 }
+
+
+/* v0.4 UI completion: secondary pages share the approved overview language. */
+.workspace-head{
+  padding:21px 49px 12px 30px;
+  background:rgba(250,253,255,.70);
+  border-bottom:1px solid rgba(211,224,234,.72);
+}
+.welcome h2{
+  font-size:24px;
+  line-height:1.05;
+  font-weight:720;
+  letter-spacing:-.55px;
+  color:#111d38;
+}
+.side-nav svg{
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.85;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.side-nav button:first-child svg{
+  fill:currentColor;
+  stroke:none;
+}
+.action-icon{
+  width:19px;
+  height:19px;
+  fill:currentColor;
+  stroke:currentColor;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  flex:none;
+}
+.action-icon-play{stroke:none}
+.primary-glyph{display:none}
+
+/* Transfer */
+.transfer-page{
+  display:grid;
+  grid-template-rows:170px 104px minmax(44px,1fr);
+  gap:18px;
+  overflow:auto;
+  scrollbar-width:none;
+}
+.transfer-page::-webkit-scrollbar{width:0}
+.pool-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+}
+.pool-card{
+  min-height:0;
+  border:1px solid rgba(212,224,233,.72);
+  border-radius:21px;
+  padding:24px 26px;
+  background:linear-gradient(145deg,rgba(242,249,255,.96),rgba(250,253,255,.96));
+  box-shadow:0 12px 32px rgba(43,78,108,.045);
+}
+.pool-card.priority{
+  background:linear-gradient(145deg,rgba(255,249,236,.95),rgba(255,253,247,.98));
+  border-color:rgba(235,219,180,.75);
+}
+.pool-card>span{
+  font-size:13px;
+  font-weight:650;
+  color:#60768f;
+}
+.pool-card strong{
+  margin:13px 0 8px;
+  font-size:42px;
+  line-height:1;
+  font-weight:720;
+  letter-spacing:-1.2px;
+  color:#1487e5;
+}
+.pool-card.priority strong{color:#d69b22}
+.pool-card small{
+  font-size:11.5px;
+  line-height:1.45;
+  color:#8797a7;
+}
+.work-card{
+  border:1px solid rgba(212,224,233,.72);
+  border-radius:18px;
+  padding:18px 21px;
+  grid-template-columns:46px minmax(0,1fr) auto;
+  gap:16px;
+  background:rgba(255,255,255,.76);
+  box-shadow:0 8px 24px rgba(43,78,108,.035);
+}
+.work-icon{
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  background:linear-gradient(145deg,#eaf7ff,#dcefff);
+}
+.work-icon span{
+  width:15px;
+  height:15px;
+  border:2px solid #1688e8;
+  border-right-color:transparent;
+}
+.work-copy>span{
+  font-size:10.5px;
+  color:#8c9aaa;
+}
+.work-copy strong{
+  margin:3px 0;
+  font-size:14px;
+  color:#14223d;
+}
+.work-copy small{
+  font-size:11px;
+  color:#71859a;
+}
+.work-state{
+  font-size:12px;
+  font-weight:650;
+  color:#4c6e8b;
+}
+.coverage-footer{
+  align-self:start;
+  padding:6px 2px 0;
+  grid-template-columns:110px minmax(0,1fr) auto;
+  gap:16px;
+  font-size:11.5px;
+  color:#6d8094;
+}
+.coverage-footer strong{
+  color:#425c75;
+  font-size:11.5px;
+}
+
+/* Recycle */
+.recycle-page{
+  grid-template-rows:48px minmax(0,1fr) auto;
+  gap:14px;
+  overflow:hidden;
+}
+.recycle-tabs{
+  gap:6px;
+  border-bottom:0;
+  padding:0;
+}
+.recycle-tabs button{
+  min-width:104px;
+  border:0;
+  border-radius:12px;
+  padding:10px 14px;
+  background:transparent;
+  color:#647891;
+  font-size:12.5px;
+  font-weight:600;
+}
+.recycle-tabs button:hover{background:#eef5fa}
+.recycle-tabs button.active{
+  color:#107fcf;
+  background:#e8f4fc;
+  font-weight:680;
+}
+.recycle-tabs button.active:after{display:none}
+.recycle-tabs button span{
+  margin-left:6px;
+  color:#8a9baa;
+  font-size:10px;
+}
+.recycle-table-wrap{
+  border:1px solid rgba(211,223,232,.78);
+  border-radius:18px;
+  background:rgba(255,255,255,.78);
+  box-shadow:0 10px 30px rgba(44,75,101,.035);
+  overflow:auto;
+}
+.recycle-table{
+  font-size:11.5px;
+}
+.recycle-table th{
+  background:rgba(246,249,251,.96);
+  color:#708296;
+  font-weight:650;
+  padding:13px 14px;
+  border-bottom:1px solid #e5edf3;
+}
+.recycle-table td{
+  padding:13px 14px;
+  border-bottom:1px solid #edf2f6;
+  color:#52677d;
+}
+.recycle-table td strong{
+  color:#20334a;
+  font-weight:650;
+}
+.recycle-table tbody tr:hover{background:#f6fafc}
+.recycle-table tbody tr.selected{background:#eef8ff}
+.state-pill{
+  border-radius:999px;
+  padding:5px 9px;
+  background:#eef2f5;
+  color:#61758a;
+  font-size:10.5px;
+}
+.state-pill.review{background:#fff5dd;color:#956718}
+.state-pill.blocked{background:#fff0ef;color:#a34e48}
+.recycle-actions{
+  min-height:46px;
+}
+.recycle-actions>span{
+  font-size:11px;
+  color:#728499;
+}
+.secondary-button,.danger-button{
+  min-height:38px;
+  border-radius:11px;
+  padding:8px 15px;
+  font-size:11.5px;
+}
+.secondary-button{
+  border-color:#d8e4ec;
+  background:#f9fcfe;
+}
+.danger-button{
+  border-color:#ebcbc8;
+  background:#fffafa;
+}
+
+/* Documents */
+.docs-page{
+  grid-template-columns:182px minmax(0,1fr);
+  gap:28px;
+  overflow:hidden;
+}
+.doc-nav{
+  border-right:1px solid #dfe8ef;
+  padding:2px 20px 0 0;
+  gap:5px;
+}
+.doc-nav a{
+  border-radius:11px;
+  padding:10px 12px;
+  color:#63778e;
+  font-size:12px;
+  font-weight:560;
+}
+.doc-nav a:hover{
+  background:#edf6fb;
+  color:#207bb1;
+}
+.doc-content{
+  padding:0 14px 24px 2px;
+}
+.doc-content section{
+  padding:0 0 24px;
+}
+.doc-content h2{
+  margin:0 0 10px;
+  font-size:19px;
+  line-height:1.25;
+  font-weight:720;
+  color:#17243e;
+  letter-spacing:-.25px;
+}
+.doc-content p{
+  max-width:720px;
+  margin:0;
+  color:#60758a;
+  font-size:12.5px;
+  line-height:1.82;
+}
+.doc-content code{
+  border-radius:6px;
+  padding:2px 5px;
+  background:#edf3f7;
+  color:#40586e;
+  font-size:11px;
+}
+.doc-content details{
+  max-width:720px;
+  border:1px solid #dfe8ee;
+  border-radius:13px;
+  margin:9px 0;
+  padding:11px 13px;
+  background:rgba(255,255,255,.72);
+}
+.doc-content summary{
+  color:#344b61;
+  font-size:12px;
+  font-weight:650;
+}
+
+/* About */
+.about-card{
+  width:min(500px,90%);
+  padding:34px;
+  border:1px solid rgba(211,223,232,.75);
+  border-radius:22px;
+  background:rgba(255,255,255,.78);
+  box-shadow:0 14px 38px rgba(44,75,101,.045);
+}
+.about-card h2{font-size:24px;color:#16243d}
+.about-card>p{font-size:12px}
+
+/* Settings overlay is native but aligns with the same workspace width. */
+@media(max-width:999px){
+  .workspace-head{padding-left:24px;padding-right:24px}
+  .transfer-page{grid-template-rows:150px 98px minmax(42px,1fr);gap:14px}
+  .pool-card{padding:20px}.pool-card strong{font-size:34px}
+  .docs-page{grid-template-columns:150px minmax(0,1fr);gap:20px}
+  .doc-nav{padding-right:14px}
+}

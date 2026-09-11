@@ -1,4 +1,4 @@
-export type PrimaryAction = 'pause' | 'resume' | 'review' | 'none'
+export type PrimaryAction = 'pause' | 'resume' | 'retry' | 'review' | 'settings' | 'none'
 export type RecycleKind = 'observing' | 'review' | 'history'
 
 export interface PhaseStep {

@@ -4,7 +4,7 @@ import { hasNativeBridge, invoke, onSnapshot } from './bridge'
 import { mockSnapshot } from './mock'
 import type { DavBridgeSnapshot, RecycleGroup, RecycleKind } from './types'
 
-type Tab = 'overview' | 'transfer' | 'recycle' | 'docs' | 'about'
+type Tab = 'overview' | 'transfer' | 'recycle' | 'docs' | 'settings' | 'about'
 const tab = ref<Tab>('overview')
 const recycleFilter = ref<RecycleKind>('observing')
 const snapshot = ref<DavBridgeSnapshot>(mockSnapshot)
@@ -34,12 +34,39 @@ const downloadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.dow
 function notify(message: string) { toast.value = message; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toast.value = '', 2600) }
 async function refresh() { if (!isNative) return; try { snapshot.value = await invoke<DavBridgeSnapshot>('app.getSnapshot') } catch (error) { notify(error instanceof Error ? error.message : '状态读取失败') } }
 async function command(method: string, params?: unknown) { if (!isNative || busy.value) return; busy.value = true; try { const result = await invoke<{ snapshot?: DavBridgeSnapshot; message?: string }>(method, params); if (result?.snapshot) snapshot.value = result.snapshot; if (result?.message) notify(result.message); await refresh() } catch (error) { notify(error instanceof Error ? error.message : '操作失败') } finally { busy.value = false } }
-async function primaryAction() { if (snapshot.value.primaryAction === 'review') { tab.value='recycle'; recycleFilter.value='review'; return } if (snapshot.value.primaryAction === 'pause') await command('migration.pause'); if (snapshot.value.primaryAction === 'resume') await command('migration.resume') }
+async function primaryAction() {
+  if (snapshot.value.primaryAction === 'review') { tab.value='recycle'; recycleFilter.value='review'; return }
+  if (snapshot.value.primaryAction === 'settings') { await openSettings(); return }
+  if (snapshot.value.primaryAction === 'pause') await command('migration.pause')
+  if (snapshot.value.primaryAction === 'resume') await command('migration.resume')
+  if (snapshot.value.primaryAction === 'retry') await command('migration.retry')
+}
 function selectGroup(group: RecycleGroup) { const next = new Set(selected.value); next.has(group.groupKey) ? next.delete(group.groupKey) : next.add(group.groupKey); selected.value = next }
 async function deferSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); await command('recycle.defer',{groupKeys:keys}); selected.value=new Set() }
 async function deleteSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); if (!window.confirm(`准备审查删除 ${keys.length} 个附件组。DavBridge 还会显示一次原生最终确认，并在删除前重新核对源端与目标身份。继续吗？`)) return; await command('recycle.delete',{groupKeys:keys}); selected.value=new Set() }
 function quotaClass(value:number){ return value>=.9?'danger':value>=.6?'warn':'safe' }
-function goOverview(){ tab.value='overview' }
+async function openSettings(){
+  if(tab.value==='settings') return
+  tab.value='settings'
+  if(!isNative) return
+  try {
+    const result=await invoke<{ snapshot?: DavBridgeSnapshot }>('app.openSettings')
+    if(result?.snapshot) snapshot.value=result.snapshot
+  } catch(error) {
+    notify(error instanceof Error ? error.message : '设置页打开失败')
+  } finally {
+    if(tab.value==='settings') tab.value='overview'
+  }
+}
+async function navigate(next:Tab){
+  if(tab.value==='settings'&&next!=='settings'&&isNative){
+    tab.value=next
+    try { await invoke('app.closeSettings') } catch(error) { notify(error instanceof Error ? error.message : '设置页关闭失败') }
+    return
+  }
+  tab.value=next
+}
+function goOverview(){ if(tab.value==='settings'&&isNative) void invoke('app.closeSettings').catch(()=>{}); tab.value='overview' }
 onMounted(async()=>{ detachSnapshot=onSnapshot(value=>snapshot.value=value); window.addEventListener('davbridge:navigate-overview',goOverview); await refresh() })
 onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:navigate-overview',goOverview); if(toastTimer) window.clearTimeout(toastTimer) })
 </script>
@@ -53,26 +80,26 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
     </div>
 
     <nav class="side-nav" aria-label="主导航">
-      <button :class="{active:tab==='overview'}" @click="tab='overview'">
-        <svg viewBox="0 0 24 24"><path d="M3 11.2 12 4l9 7.2v8.3a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5Z"/></svg><span>总览</span>
+      <button :class="{active:tab==='overview'}" @click="navigate('overview')">
+        <svg viewBox="0 0 24 24"><path d="M3.5 10.7 12 4l8.5 6.7v8.1c0 .9-.7 1.7-1.7 1.7h-4.6v-6h-4.4v6H5.2c-.9 0-1.7-.7-1.7-1.7Z"/></svg><span>总览</span>
       </button>
-      <button :class="{active:tab==='transfer'}" @click="tab='transfer'">
-        <svg viewBox="0 0 24 24"><path d="M4 8h13m0 0-3.5-3.5M17 8l-3.5 3.5M20 16H7m0 0 3.5-3.5M7 16l3.5 3.5"/></svg><span>转移</span>
+      <button :class="{active:tab==='transfer'}" @click="navigate('transfer')">
+        <svg viewBox="0 0 24 24"><path d="M4 7.5h13"/><path d="m14 4.5 3 3-3 3"/><path d="M20 16.5H7"/><path d="m10 13.5-3 3 3 3"/></svg><span>转移</span>
       </button>
-      <button :class="{active:tab==='recycle'}" @click="tab='recycle'">
-        <svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg><span>回收站</span><b v-if="snapshot.humanActionCount">{{ snapshot.humanActionCount }}</b>
+      <button :class="{active:tab==='recycle'}" @click="navigate('recycle')">
+        <svg viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9 7V4.5h6V7"/><path d="m6.7 7 .8 12c.1.9.8 1.5 1.7 1.5h5.6c.9 0 1.6-.7 1.7-1.5l.8-12"/><path d="M10 10.5v6.5M14 10.5v6.5"/></svg><span>回收站</span><b v-if="snapshot.humanActionCount">{{ snapshot.humanActionCount }}</b>
       </button>
-      <button :class="{active:tab==='docs'}" @click="tab='docs'">
-        <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a3 3 0 0 1 3 3v15a3 3 0 0 0-3-3H6.5A2.5 2.5 0 0 0 4 20.5Zm16 0A2.5 2.5 0 0 0 17.5 3H14v18a3 3 0 0 1 3-3h.5a2.5 2.5 0 0 1 2.5 2.5Z"/></svg><span>文档</span>
+      <button :class="{active:tab==='docs'}" @click="navigate('docs')">
+        <svg viewBox="0 0 24 24"><path d="M3.5 5.5c2.8-.8 5.6-.3 8.5 1.4v13c-2.9-1.7-5.7-2.2-8.5-1.4Z"/><path d="M20.5 5.5c-2.8-.8-5.6-.3-8.5 1.4v13c2.9-1.7 5.7-2.2 8.5-1.4Z"/></svg><span>文档</span>
       </button>
     </nav>
 
     <div class="side-spacer"></div>
     <nav class="side-nav side-secondary">
-      <button @click="command('app.openSettings')" :disabled="busy">
-        <svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5 1.1 2.1 2.3.6 2-1.1 1.5 1.5-1.1 2 .6 2.3 2.1 1.1v2l-2.1 1.1-.6 2.3 1.1 2-1.5 1.5-2-1.1-2.3.6L12 20.5h-2l-1.1-2.1-2.3-.6-2 1.1-1.5-1.5 1.1-2-.6-2.3L1.5 12v-2l2.1-1.1.6-2.3-1.1-2 1.5-1.5 2 1.1 2.3-.6L10 1.5h2Z"/></svg><span>设置</span>
+      <button :class="{active:tab==='settings'}" @click="openSettings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2m0 12.6v2.2M3.5 12h2.2m12.6 0h2.2M6 6l1.6 1.6m8.8 8.8L18 18M18 6l-1.6 1.6m-8.8 8.8L6 18"/><circle cx="12" cy="12" r="7.2"/></svg><span>设置</span>
       </button>
-      <button :class="{active:tab==='about'}" @click="tab='about'">
+      <button :class="{active:tab==='about'}" @click="navigate('about')">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 10v6m0-9v.2"/></svg><span>关于</span>
       </button>
     </nav>
@@ -85,9 +112,9 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
 
   <section class="workspace">
     <header class="workspace-head">
-      <div class="welcome"><h2>{{ tab==='overview' ? '你好，DavBridge' : tab==='transfer' ? '转移' : tab==='recycle' ? '回收站' : tab==='docs' ? '文档' : '关于 DavBridge' }}</h2></div>
+      <div class="welcome"><h2>{{ tab==='overview' ? '你好，DavBridge' : tab==='transfer' ? '转移' : tab==='recycle' ? '回收站' : tab==='docs' ? '文档' : tab==='settings' ? '设置' : '关于 DavBridge' }}</h2></div>
       <div v-if="!snapshot.configured" class="top-actions">
-        <button class="config-warning has-tip" data-tip="需要打开设置补充配置" @click="command('app.openSettings')" :disabled="busy"><i></i>需要配置</button>
+        <button class="config-warning has-tip" data-tip="需要打开设置补充配置" @click="openSettings" :disabled="busy"><i></i>需要配置</button>
       </div>
     </header>
 
@@ -108,11 +135,11 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
           <div class="route-line"><i></i><b>›</b><i></i></div>
         </div>
         <div class="endpoint target has-tip" data-tip="坚果云保存经过 StrongVerified 的强校验镜像">
-          <svg class="nut-logo" viewBox="0 0 42 48" aria-hidden="true">
-            <path class="nut-body" d="M8.7 22.6c3.7-8.7 14.9-13 22.2-7.9 7.1 5 5 18.2-1.1 25.2-4.8 5.4-12 6.7-17 1.9-5.7-5.4-7.5-11.1-4.1-19.2Z"/>
-            <path class="nut-cap" d="M7.7 21.1c4.7-9.2 18.7-14.3 27-6.8 1.2 1.1 1.2 3-.2 3.8-7.9 4.4-17.1 6.3-25.9 5.4-1.4-.1-1.7-1.3-.9-2.4Z"/>
-            <path class="nut-stem" d="M21.7 10.4c-.1-4.1 1.4-6.9 4.5-8.3"/>
-            <path class="nut-leaf" d="M27.2 7.6C30 2.2 35.1.8 39.2 1.6c-.7 5.1-4.4 8.1-10.7 8.4Z"/>
+          <svg class="nut-logo" viewBox="0 0 48 56" aria-hidden="true">
+            <path class="nut-body" d="M11 23c0-7.4 5.9-12.4 13-12.4S37 15.6 37 23c0 12.7-6.2 23.1-13 27-6.8-3.9-13-14.3-13-27Z"/>
+            <path class="nut-cap" d="M9.5 21.2C12.3 13.3 17.7 9 24 9s11.7 4.3 14.5 12.2c-8.8 3.9-20.2 3.9-29 0Z"/>
+            <path class="nut-stem" d="M24 9.5C24 5.8 26.2 3.2 29.5 2"/>
+            <path class="nut-leaf" d="M29.2 8.1c2.5-4.6 7.2-6.2 11.5-4.8-1.2 4.8-4.9 7.4-10.8 7.5Z"/>
           </svg>
           <strong>坚果云</strong>
         </div>
@@ -171,7 +198,14 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
             <strong class="task-name">{{ snapshot.currentTitle }}</strong>
             <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div><strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong></div>
           </div>
-          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy"><span class="primary-glyph" aria-hidden="true">{{ snapshot.primaryAction==='pause' ? 'Ⅱ' : snapshot.primaryAction==='resume' ? '▶' : '' }}</span>{{ busy?'处理中…':snapshot.primaryLabel }}</button></div>
+          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">
+            <svg v-if="snapshot.primaryAction==='pause'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg>
+            <svg v-else-if="snapshot.primaryAction==='resume'" class="action-icon action-icon-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.8 15 10l-8.5 5.2Z"/></svg>
+            <svg v-else-if="snapshot.primaryAction==='retry'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7.4A6 6 0 1 0 16 12" fill="none"/><path d="m12.8 4.5 3.1 2.8-3.6 2" fill="none"/></svg>
+            <svg v-else-if="snapshot.primaryAction==='review'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5h10v11H5Z" fill="none"/><path d="M7.5 8h5M7.5 11h5" fill="none"/></svg>
+            <svg v-else-if="snapshot.primaryAction==='settings'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.5" fill="none"/><circle cx="10" cy="10" r="6" fill="none"/></svg>
+            {{ busy?'处理中…':snapshot.primaryLabel }}
+          </button></div>
         </article>
       </div>
     </section>

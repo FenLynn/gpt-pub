@@ -10,5 +10,5 @@ export const mockSnapshot: DavBridgeSnapshot = {
   verified: 2090, total: 6949, coverage: 0.301, coverageText: '2090 / 6949 已校准',
   currentTitle: '等待下一周期', currentDetail: '坚果云当前安全额度不足，账本与断点保持不变。', currentProgress: null,
   quota: { uploadUsed: 794100000, uploadMax: 1000000000, uploadText: '794.1 MB / 1.0 GB', downloadUsed: 781100000, downloadMax: 3000000000, downloadText: '781.1 MB / 3.0 GB', resetText: '2026-10-07 · 09:00 后探测', isSprint: false },
-  priorityCount: 0, normalCount: 2704, humanActionCount: 0, primaryAction: 'pause', primaryLabel: '暂停', recycle: []
+  priorityCount: 0, normalCount: 2704, humanActionCount: 0, primaryAction: 'none', primaryLabel: '', recycle: []
 }

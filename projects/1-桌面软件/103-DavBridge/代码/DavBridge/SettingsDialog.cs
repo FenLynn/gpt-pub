@@ -21,16 +21,18 @@ internal sealed class SettingsDialog : Form
     private readonly CheckBox _autoResume = new() { Text = "网络恢复和新周期后自动继续", AutoSize = true };
     private readonly CheckBox _sprint = new() { Text = "重置前 24 小时启用周期末冲刺", AutoSize = true };
     private readonly bool _endpointLocked;
+    private readonly bool _embedded;
 
     public DavBridgeConfig Config { get; private set; }
     public string SourcePassword => _sourcePassword.Text;
     public string TargetPassword => _targetPassword.Text;
 
-    public SettingsDialog(DavBridgeConfig original, string sourcePassword, string targetPassword)
+    public SettingsDialog(DavBridgeConfig original, string sourcePassword, string targetPassword, bool embedded = false)
     {
         _original = CloneConfig(original);
         Config = CloneConfig(original);
         _endpointLocked = HasExistingTransferRecords();
+        _embedded = embedded;
 
         Text = "DavBridge 设置";
         Icon = AppBranding.CreateIcon();
@@ -39,7 +41,8 @@ internal sealed class SettingsDialog : Form
         MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterParent;
         Font = new Font("Segoe UI", 9F);
-        BackColor = Color.White;
+        BackColor = embedded ? Color.FromArgb(248, 251, 254) : Color.White;
+        if (embedded) FormBorderStyle = FormBorderStyle.None;
 
         _sourceUrl.Text = Config.SourceBaseUrl;
         _sourceRoot.Text = Config.SourceRootPath;
@@ -69,6 +72,7 @@ internal sealed class SettingsDialog : Form
         var save = CreateFooterButton("保存");
         var cancel = CreateFooterButton("取消");
         cancel.DialogResult = DialogResult.Cancel;
+        if (_embedded) cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         save.Click += (_, _) =>
         {
             if (!Apply()) return;
@@ -100,7 +104,7 @@ internal sealed class SettingsDialog : Form
     private Control BuildShell(Button save, Button cancel)
     {
         var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
-        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, _embedded ? 168 : 180));
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
@@ -108,8 +112,8 @@ internal sealed class SettingsDialog : Form
         var nav = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(250, 252, 254),
-            Padding = new Padding(14, 18, 12, 14)
+            BackColor = Color.FromArgb(247, 250, 253),
+            Padding = new Padding(14, 26, 12, 14)
         };
         var navStack = new FlowLayoutPanel
         {
@@ -120,10 +124,11 @@ internal sealed class SettingsDialog : Form
         };
         navStack.Controls.Add(new Label
         {
-            Text = "设置",
+            Text = _embedded ? "偏好设置" : "设置",
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 15F),
-            Margin = new Padding(8, 0, 0, 14)
+            Font = new Font("Segoe UI Semibold", _embedded ? 16F : 15F),
+            ForeColor = Color.FromArgb(24, 35, 55),
+            Margin = new Padding(8, 0, 0, 18)
         });
         nav.Controls.Add(navStack);
         shell.Controls.Add(nav, 0, 0);
@@ -133,8 +138,8 @@ internal sealed class SettingsDialog : Form
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
-            BackColor = Color.White,
-            Padding = new Padding(26, 22, 26, 16)
+            BackColor = Color.FromArgb(250, 252, 254),
+            Padding = new Padding(34, 28, 34, 18)
         };
         shell.Controls.Add(hostPanel, 1, 0);
 
@@ -189,8 +194,8 @@ internal sealed class SettingsDialog : Form
         var footer = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.White,
-            Padding = new Padding(20, 10, 26, 10)
+            BackColor = Color.FromArgb(250, 252, 254),
+            Padding = new Padding(20, 10, 34, 10)
         };
         var footerButtons = new FlowLayoutPanel
         {

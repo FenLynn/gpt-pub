@@ -562,11 +562,16 @@ internal sealed class MainForm : Form
         if (_host.Config.MigrationEnabled)
             await _host.PauseAsync(_appCts.Token);
 
-        var oldFingerprint = LegacySafetyFingerprint.Compute(_host.Config);
         var secrets = await _host.GetSecretsAsync(_appCts.Token);
         using var dialog = new SettingsDialog(_host.Config, secrets.SourcePassword, secrets.TargetPassword);
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        await _host.SaveSettingsAsync(dialog.Config, dialog.SourcePassword, dialog.TargetPassword, _appCts.Token);
+        await ApplySettingsAsync(dialog.Config, dialog.SourcePassword, dialog.TargetPassword);
+    }
+
+    internal async Task ApplySettingsAsync(DavBridgeConfig config, string sourcePassword, string targetPassword)
+    {
+        var oldFingerprint = LegacySafetyFingerprint.Compute(_host.Config);
+        await _host.SaveSettingsAsync(config, sourcePassword, targetPassword, _appCts.Token);
 
         var newFingerprint = LegacySafetyFingerprint.Compute(_host.Config);
         if (!string.Equals(oldFingerprint, newFingerprint, StringComparison.OrdinalIgnoreCase) && _compatStore is not null)

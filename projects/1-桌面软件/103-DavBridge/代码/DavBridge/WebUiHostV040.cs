@@ -41,19 +41,23 @@ internal sealed class WebUiHostV040 : IDisposable
 {
     private const string Origin = "https://davbridge.local";
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-    private static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal) { "app.getSnapshot", "app.openSettings", "migration.pause", "migration.resume", "recycle.defer", "recycle.delete" };
+    private static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal) { "app.getSnapshot", "app.openSettings", "app.closeSettings", "migration.pause", "migration.resume", "migration.retry", "recycle.defer", "recycle.delete" };
     private readonly MainForm _form; private readonly AppHost _host; private readonly ReconciliationRuntimeV030 _reconciliation;
     private readonly Panel _surface = new() { Dock = DockStyle.Fill, BackColor = Color.White };
+    private readonly Panel _settingsLayer = new() { BackColor = Color.FromArgb(248,251,254), Visible = false };
     private readonly Label _loading = new() { Dock = DockStyle.Fill, Text = "DavBridge 正在加载界面…", TextAlign = ContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(102,116,124), Font = new Font("Segoe UI",10F) };
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill, BackColor = Color.White };
     private readonly System.Windows.Forms.Timer _pushTimer = new() { Interval = 500 };
     private readonly CancellationTokenSource _cts = new();
     private EngineProgress? _lastProgress; private WebDavIoProgress? _lastIo; private bool _webReady; private bool _disposed;
+    private SettingsDialog? _settingsDialog; private TaskCompletionSource<object>? _settingsCompletion;
     private WebUiHostV040(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) { _form=form; _host=host; _reconciliation=reconciliation; Mount(); Wire(); _=InitializeWebViewAsync(); }
     internal static WebUiHostV040 Attach(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) => new(form,host,reconciliation);
-    internal static void ValidateBridgeContract() { var expected=new[]{"app.getSnapshot","app.openSettings","migration.pause","migration.resume","recycle.defer","recycle.delete"}; if(!expected.All(AllowedMethods.Contains)||AllowedMethods.Count!=expected.Length) throw new InvalidOperationException("DavBridge Web UI command whitelist changed unexpectedly."); }
-    private void Mount() { _ = _form.Handle; foreach(Control control in _form.Controls) control.Visible=false; _surface.Controls.Add(_loading); _surface.Controls.Add(_webView); _webView.Visible=false; _form.Controls.Add(_surface); _surface.BringToFront(); }
-    private void Wire() { _host.ProgressChanged+=OnProgress; _host.StateChanged+=OnStateChanged; _reconciliation.Changed+=OnReconciliationChanged; WebDavReadClient.GlobalIoProgress+=OnIo; _pushTimer.Tick+=(_,_)=>PushSnapshot(); _pushTimer.Start(); }
+    internal static void ValidateBridgeContract() { var expected=new[]{"app.getSnapshot","app.openSettings","app.closeSettings","migration.pause","migration.resume","migration.retry","recycle.defer","recycle.delete"}; if(!expected.All(AllowedMethods.Contains)||AllowedMethods.Count!=expected.Length) throw new InvalidOperationException("DavBridge Web UI command whitelist changed unexpectedly."); }
+    private void Mount() { _ = _form.Handle; foreach(Control control in _form.Controls) control.Visible=false; _surface.Controls.Add(_loading); _surface.Controls.Add(_webView); _webView.Visible=false; _form.Controls.Add(_surface); _form.Controls.Add(_settingsLayer); _surface.BringToFront(); LayoutSettingsLayer(); }
+    private void Wire() { _host.ProgressChanged+=OnProgress; _host.StateChanged+=OnStateChanged; _reconciliation.Changed+=OnReconciliationChanged; WebDavReadClient.GlobalIoProgress+=OnIo; _form.SizeChanged+=OnHostSizeChanged; _pushTimer.Tick+=(_,_)=>PushSnapshot(); _pushTimer.Start(); }
+    private void OnHostSizeChanged(object? sender,EventArgs e)=>LayoutSettingsLayer();
+    private void LayoutSettingsLayer(){ var sidebar=_form.ClientSize.Width>=1000?225:174; _settingsLayer.Bounds=new Rectangle(sidebar,0,Math.Max(0,_form.ClientSize.Width-sidebar),_form.ClientSize.Height); }
     private async Task InitializeWebViewAsync()
     {
         try
@@ -67,19 +71,52 @@ internal sealed class WebUiHostV040 : IDisposable
         }
         catch(Exception ex){ SafeUi(()=>{ _loading.Text="DavBridge 新界面无法启动\r\n\r\n"+ex.Message+"\r\n\r\n请确认 Microsoft Edge WebView2 Runtime 已安装。"; _loading.ForeColor=Color.FromArgb(151,67,62); }); }
     }
-    internal void ShowOverview(){ SafeUi(()=>{ if(_disposed||!_webReady||_webView.IsDisposed)return; var core=_webView.CoreWebView2; if(core is null)return; PostEventOnUiThread(core,"navigate","overview"); }); }
+    internal void ShowOverview(){ SafeUi(()=>{ if(_settingsDialog is not null&&!_settingsDialog.IsDisposed){ _settingsDialog.DialogResult=DialogResult.Cancel; _settingsDialog.Close(); } if(_disposed||!_webReady||_webView.IsDisposed)return; var core=_webView.CoreWebView2; if(core is null)return; PostEventOnUiThread(core,"navigate","overview"); }); }
     private async void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)
     {
         BridgeRequest? request=null;
         try
         {
             request=JsonSerializer.Deserialize<BridgeRequest>(args.WebMessageAsJson,JsonOptions); if(request is null||string.IsNullOrWhiteSpace(request.Id)||!AllowedMethods.Contains(request.Method??string.Empty)) throw new InvalidOperationException("不允许的界面命令。");
-            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync","已暂停"), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交继续请求"), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
+            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync","已暂停"), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交继续请求"), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交重试请求"), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
             Reply(request.Id,true,result,null);
         }
         catch(Exception ex){ Reply(request?.Id??string.Empty,false,null,ex is TargetInvocationException tie?tie.InnerException?.Message??tie.Message:ex.Message); }
     }
-    private async Task<object> OpenSettingsAsync(){ await InvokeMainFormTaskAsync("EditSettingsAsync"); return new { snapshot=BuildSnapshot() }; }
+    private async Task<object> OpenSettingsAsync()
+    {
+        if(_settingsDialog is not null&&!_settingsDialog.IsDisposed&&_settingsCompletion is not null) return await _settingsCompletion.Task.ConfigureAwait(true);
+        if(_host.Config.MigrationEnabled) await _host.PauseAsync(_cts.Token).ConfigureAwait(true);
+        var secrets=await _host.GetSecretsAsync(_cts.Token).ConfigureAwait(true);
+        var dialog=new SettingsDialog(_host.Config,secrets.SourcePassword,secrets.TargetPassword,true)
+        {
+            TopLevel=false,
+            FormBorderStyle=FormBorderStyle.None,
+            Dock=DockStyle.Fill,
+            ShowInTaskbar=false
+        };
+        var completion=new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _settingsDialog=dialog; _settingsCompletion=completion;
+        dialog.FormClosed+=async(_,_)=>{
+            try
+            {
+                if(dialog.DialogResult==DialogResult.OK) await _form.ApplySettingsAsync(dialog.Config,dialog.SourcePassword,dialog.TargetPassword).ConfigureAwait(true);
+                _settingsLayer.Controls.Clear(); _settingsLayer.Visible=false; _settingsDialog=null; _settingsCompletion=null;
+                if(_webReady&&_webView.CoreWebView2 is not null) PostEventOnUiThread(_webView.CoreWebView2,"navigate","overview");
+                completion.TrySetResult(new { snapshot=BuildSnapshot() });
+            }
+            catch(Exception ex){ _settingsLayer.Controls.Clear(); _settingsLayer.Visible=false; _settingsDialog=null; _settingsCompletion=null; completion.TrySetException(ex); }
+        };
+        LayoutSettingsLayer(); _settingsLayer.Controls.Clear(); _settingsLayer.Controls.Add(dialog); _settingsLayer.Visible=true; _settingsLayer.BringToFront(); dialog.Show(); dialog.BringToFront();
+        return await completion.Task.ConfigureAwait(true);
+    }
+    private async Task<object> CloseSettingsAsync()
+    {
+        var completion=_settingsCompletion;
+        if(_settingsDialog is not null&&!_settingsDialog.IsDisposed){ _settingsDialog.DialogResult=DialogResult.Cancel; _settingsDialog.Close(); }
+        if(completion is not null) return await completion.Task.ConfigureAwait(true);
+        _settingsLayer.Visible=false; return new { snapshot=BuildSnapshot() };
+    }
     private async Task<object> InvokeMainTaskAsync(string method,string message){ await InvokeMainFormTaskAsync(method); return new { message,snapshot=BuildSnapshot() }; }
     private async Task InvokeMainFormTaskAsync(string methodName){ var method=typeof(MainForm).GetMethod(methodName,BindingFlags.Instance|BindingFlags.NonPublic)??throw new InvalidOperationException($"DavBridge native host could not resolve {methodName}."); if(method.Invoke(_form,null) is Task task) await task.ConfigureAwait(true); }
     private async Task<object> DeferAsync(IReadOnlyList<string> keys){ if(keys.Count==0) throw new InvalidOperationException("请先选择待审查附件组。"); await _reconciliation.DeferGroupsAsync(keys,_cts.Token).ConfigureAwait(true); await ContinueAfterReviewAsync().ConfigureAwait(true); return new { message=$"本周期继续保留 {keys.Count} 个附件组。",snapshot=BuildSnapshot() }; }
@@ -97,7 +134,7 @@ internal sealed class WebUiHostV040 : IDisposable
     {
         var cycle=_reconciliation.CurrentCycleId??string.Empty; var review=_reconciliation.GetHumanActionCount(); var priority=PriorityGroupCount(); var verified=_host.State.Files.Values.Count(r=>r.Status==TransferStatus.StrongVerified); var total=Math.Max(_reconciliation.State.LastManifestObjectCount,_host.State.Files.Count); var coverage=total<=0?0:Math.Clamp((double)verified/total,0,1); var state=!_host.Config.MigrationEnabled?EngineState.Paused:_host.State.EngineState; var quota=QuotaPolicy.GetSnapshot(_host.Config,_host.State,DateTimeOffset.Now); var current=CurrentTask(state); var auditDone=!string.IsNullOrWhiteSpace(cycle)&&string.Equals(_reconciliation.State.LastReconciledCycleId,cycle,StringComparison.OrdinalIgnoreCase);
         var phases=new[]{ new PhaseDto("audit",_reconciliation.IsAuditing?"源端对账中":auditDone?"源端对账":"等待对账",_reconciliation.IsAuditing?"active":auditDone?"done":"waiting","新 Cycle 先核对 InfiniCLOUD 当前清单与历史账本。"), new PhaseDto("repair",priority>0?$"变化修复 {priority:N0}":"变化修复",priority>0?"active":"done","确认发生内容变化的历史 StrongVerified 组优先修复。"), new PhaseDto("migration",review>0?$"待审查 {review:N0}":state==EngineState.WaitQuota?"等待周期":"普通迁移",review>0?"warning":state==EngineState.Running?"active":"waiting","新增对象与既有 backlog 同级进入普通稳定池。") };
-        var(routeStatus,tone)=DescribeRoute(state,review); var(primary,primaryLabel)=DescribePrimary(state,review); var resetText=_host.Config.NextResetAt==default?"流量尚未校准":$"{ResetSchedulePolicy.NormalizeResetDate(_host.Config.NextResetAt):yyyy-MM-dd} · 09:00 后探测";
+        var(routeStatus,tone)=DescribeRoute(state,review); var(primary,primaryLabel)=!_host.IsConfigured?("settings","完成设置"):DescribePrimary(state,review); var resetText=_host.Config.NextResetAt==default?"流量尚未校准":$"{ResetSchedulePolicy.NormalizeResetDate(_host.Config.NextResetAt):yyyy-MM-dd} · 09:00 后探测";
         return new WebSnapshot(Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0.4.1",cycle,_host.IsConfigured,StateText(state),routeStatus,tone,phases,verified,total,coverage,total>0?$"{verified:N0} / {total:N0} 已核准":$"{verified:N0} 已核准",current.Title,current.Detail,current.Progress,new QuotaDto(quota.EstimatedUploadUsedBytes,Math.Max(1,_host.Config.UploadQuotaBytes),$"{FormatBytes(quota.EstimatedUploadUsedBytes)} / {FormatBytes(Math.Max(1,_host.Config.UploadQuotaBytes))}",quota.EstimatedDownloadUsedBytes,Math.Max(1,_host.Config.DownloadQuotaBytes),$"{FormatBytes(quota.EstimatedDownloadUsedBytes)} / {FormatBytes(Math.Max(1,_host.Config.DownloadQuotaBytes))}",resetText,quota.IsSprint),priority,NormalBacklogCount(),review,primary,primaryLabel,BuildRecycleGroups());
     }
     private (string Title,string Detail,double? Progress) CurrentTask(EngineState state){ var relative=_lastProgress?.RelativePath; if(!string.IsNullOrWhiteSpace(relative)){ double? fraction=null; if(_lastIo is not null&&PathMatches(_lastIo.RelativePath,relative)&&_lastIo.TotalBytes is >0) fraction=Math.Clamp((double)_lastIo.BytesProcessed/_lastIo.TotalBytes.Value,0,1); return(Path.GetFileName(relative),HumanizeProgress(_lastProgress?.Message),fraction); } if(_reconciliation.IsAuditing)return("源端对账","正在读取 InfiniCLOUD manifest 并核对历史 StrongVerified 账本",null); return state switch{ EngineState.WaitUser=>("等待人工审查","回收站存在需要明确决定的附件组",null),EngineState.WaitQuota=>("等待下一周期","坚果云当前安全额度不足，账本与断点已经保存",null),EngineState.WaitNetwork=>("等待网络","连接条件恢复后任务可以继续",null),EngineState.WaitRetry=>("需要处理",_lastProgress?.Message??"任务已经安全停止，请检查具体原因",null),EngineState.Complete=>("当前清单完成","当前源清单已经完成强校验",null),EngineState.Paused=>("已暂停","进度和流量账本已经保存",null),EngineState.Running=>("准备任务",_lastProgress?.Message??"正在调度下一安全任务",null),_=>("准备中","正在初始化 DavBridge",null)}; }
@@ -105,7 +142,21 @@ internal sealed class WebUiHostV040 : IDisposable
     private int PriorityGroupCount()=>_host.State.Files.Values.Where(r=>r.Status==TransferStatus.SourceChanged).Select(r=>r.GroupKey).Where(k=>!string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
     private int NormalBacklogCount(){ var stateGroups=_host.State.Files.Values.GroupBy(r=>r.GroupKey,StringComparer.OrdinalIgnoreCase).Count(g=>!string.IsNullOrWhiteSpace(g.Key)&&g.Any(r=>r.Status!=TransferStatus.StrongVerified&&r.Status!=TransferStatus.SourceChanged)); return Math.Max(0,stateGroups+_reconciliation.State.LastNewGroupCount); }
     private static (string Status,string Tone) DescribeRoute(EngineState state,int review)=>review>0?("等待人工审查","warning"):state switch{EngineState.WaitQuota=>("等待下一周期","wait"),EngineState.WaitNetwork=>("等待网络","wait"),EngineState.WaitRetry=>("需要处理","warning"),EngineState.Complete=>("当前清单完成","complete"),EngineState.Running=>("普通迁移中","active"),EngineState.Paused=>("已暂停","idle"),_=>("准备中","idle")};
-    private static (string Action,string Label) DescribePrimary(EngineState state,int review){ if(review>0)return("review","审查回收站"); if(state==EngineState.Complete)return("none","已完成"); if(state==EngineState.Paused)return("resume","继续"); return("pause","暂停"); }
+    private static (string Action,string Label) DescribePrimary(EngineState state,int review)
+    {
+        if(review>0)return("review","前往审查");
+        return state switch
+        {
+            EngineState.Running => ("pause","暂停"),
+            EngineState.Paused => ("resume","继续"),
+            EngineState.WaitRetry => ("retry","重试"),
+            EngineState.WaitQuota => ("none",string.Empty),
+            EngineState.WaitNetwork => ("none",string.Empty),
+            EngineState.WaitUser => ("none",string.Empty),
+            EngineState.Complete => ("none",string.Empty),
+            _ => ("none",string.Empty)
+        };
+    }
     private static string StateText(EngineState state)=>state switch{EngineState.Running=>"运行中",EngineState.Paused=>"已暂停",EngineState.WaitNetwork=>"等待网络",EngineState.WaitQuota=>"等待额度",EngineState.WaitRetry=>"需要处理",EngineState.WaitUser=>"等待人工",EngineState.Complete=>"已完成",_=>"准备中"};
     private static string HumanizeProgress(string? message){ if(string.IsNullOrWhiteSpace(message))return"正在处理"; if(message.Contains("Downloading source",StringComparison.OrdinalIgnoreCase))return"正在读取源文件并计算 SHA-256"; if(message.Contains("Target already exists",StringComparison.OrdinalIgnoreCase))return"正在校验目标端已有副本"; if(message.Contains("Uploading target",StringComparison.OrdinalIgnoreCase))return"正在上传目标文件"; if(message.Contains("Re-downloading target",StringComparison.OrdinalIgnoreCase))return"正在重新读取目标文件并做强校验"; if(message.Contains("strongly verified",StringComparison.OrdinalIgnoreCase))return"目标文件已通过强校验"; return message; }
     private static bool EndpointMatches(string left,string right){ if(!Uri.TryCreate(left,UriKind.Absolute,out var a)||!Uri.TryCreate(right,UriKind.Absolute,out var b))return false; return string.Equals(a.Scheme,b.Scheme,StringComparison.OrdinalIgnoreCase)&&string.Equals(a.Host,b.Host,StringComparison.OrdinalIgnoreCase)&&a.Port==b.Port; }
@@ -117,7 +168,7 @@ internal sealed class WebUiHostV040 : IDisposable
     private static void PostEventOnUiThread(CoreWebView2 core,string eventName,object payload){ core.PostWebMessageAsJson(JsonSerializer.Serialize(new{@event=eventName,payload},JsonOptions)); }
     private void Reply(string id,bool ok,object? result,string? error){ if(string.IsNullOrWhiteSpace(id))return; SafeUi(()=>{ if(_disposed||!_webReady||_webView.IsDisposed)return; var core=_webView.CoreWebView2; if(core is null)return; core.PostWebMessageAsJson(JsonSerializer.Serialize(new{id,ok,result,error},JsonOptions)); }); }
     private void SafeUi(Action action){ if(_disposed||_form.IsDisposed)return; try{if(_form.InvokeRequired)_form.BeginInvoke(action);else action();}catch{} }
-    public void Dispose(){ if(_disposed)return; if(!_form.IsDisposed&&_form.InvokeRequired){try{_form.Invoke(new Action(Dispose));}catch{} return;} _disposed=true;_pushTimer.Stop();_host.ProgressChanged-=OnProgress;_host.StateChanged-=OnStateChanged;_reconciliation.Changed-=OnReconciliationChanged;WebDavReadClient.GlobalIoProgress-=OnIo;if(!_webView.IsDisposed&&_webView.CoreWebView2 is not null)_webView.CoreWebView2.WebMessageReceived-=OnWebMessageReceived;_cts.Cancel();_cts.Dispose();_pushTimer.Dispose();_webView.Dispose();_surface.Dispose(); }
+    public void Dispose(){ if(_disposed)return; if(!_form.IsDisposed&&_form.InvokeRequired){try{_form.Invoke(new Action(Dispose));}catch{} return;} _disposed=true;_pushTimer.Stop();_host.ProgressChanged-=OnProgress;_host.StateChanged-=OnStateChanged;_reconciliation.Changed-=OnReconciliationChanged;WebDavReadClient.GlobalIoProgress-=OnIo;_form.SizeChanged-=OnHostSizeChanged;if(_settingsDialog is not null&&!_settingsDialog.IsDisposed)_settingsDialog.Close();if(!_webView.IsDisposed&&_webView.CoreWebView2 is not null)_webView.CoreWebView2.WebMessageReceived-=OnWebMessageReceived;_cts.Cancel();_cts.Dispose();_pushTimer.Dispose();_webView.Dispose();_settingsLayer.Dispose();_surface.Dispose(); }
     private sealed record BridgeRequest(string Id,string? Method,JsonElement? Params); private sealed record PhaseDto(string Key,string Label,string State,string Hint); private sealed record QuotaDto(long UploadUsed,long UploadMax,string UploadText,long DownloadUsed,long DownloadMax,string DownloadText,string ResetText,bool IsSprint); private sealed record RecycleDto(string GroupKey,string Name,string FirstMissing,string LastDecision,string SizeText,string VerifiedText,string State,string Disposition,string? Issue); private sealed record WebSnapshot(string Version,string CycleId,bool Configured,string EngineState,string RouteStatus,string RouteTone,IReadOnlyList<PhaseDto> Phases,int Verified,int Total,double Coverage,string CoverageText,string CurrentTitle,string CurrentDetail,double? CurrentProgress,QuotaDto Quota,int PriorityCount,int NormalCount,int HumanActionCount,string PrimaryAction,string PrimaryLabel,IReadOnlyList<RecycleDto> Recycle);
 }
 
