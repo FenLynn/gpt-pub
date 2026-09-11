@@ -24,20 +24,20 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前实验候选的产品版本为 v0.4.4，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前实验候选的产品版本为 v0.4.5，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
 
 ## 3. 最新完整验证代码基线
 
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-e2db3a5a210093f5e59a30ce02b9eb852e6b056e
+4c61206047285772bec98df0748e0a6576977112
 ```
 
 对应 P103 CI：
 
 ```text
-run 34601336384
+run 34604400008
 scope          success
 core-smoke     success
 frontend       success
@@ -45,26 +45,26 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.4-win-x64`
+Windows candidate：`DavBridge-v0.4.5-win-x64`
 
-Artifact ID：`10264243083`
+Artifact ID：`10264724460`
 
 EXE：
 
 ```text
-2336347 bytes
-SHA256 b21ab140cfb413e86f96d00fecd4e3baf43883707f06c85abe68a54f8f911af9
+2348635 bytes
+SHA256 10efd7bad3e033b6f3a904682076dac625a1694f1b6ab11833e1a7bc24333ea7
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-1f149ef69c53ffdec737b8086995d7488cabcb08e6ec4edc1ecce2ee21dfe6fb
+f75753544121653ab0bbd7e26d04dd1f17e292dfda7ed345d966d58e5b87f350
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `e2db3a5a...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `4c612060...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
 
 ## 4. 当前分支快照
 
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-e2db3a5a210093f5e59a30ce02b9eb852e6b056e
+4c61206047285772bec98df0748e0a6576977112
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -112,7 +112,7 @@ recycle.delete
 
 ## 6. 最新总览 UI 状态
 
-用户已确认总览页视觉质量良好。`e2db3a5a...` 在 UI 与交互冻结轮基础上继续压缩内嵌设置页：四个分类的说明直接挂在顶部分类标签悬浮，不再单独占一整行；安全与维护各项说明直接挂在项目名称本身，取消独立 `ⓘ` 图标；移除重复的“维护工具”小标题；同时收紧顶部分类区、内容区、字段行距、输入框高度和底部按钮区，使设置页在不牺牲可读性的情况下明显减少纵向堆叠。该 head 已通过完整 P103 CI。
+用户已确认总览页视觉质量良好。`4c612060...` 在 UI 与交互冻结轮基础上继续压缩内嵌设置页：四个分类的说明直接挂在顶部分类标签悬浮，不再单独占一整行；安全与维护各项说明直接挂在项目名称本身，取消独立 `ⓘ` 图标；移除重复的“维护工具”小标题；同时收紧顶部分类区、内容区、字段行距、输入框高度和底部按钮区，使设置页在不牺牲可读性的情况下明显减少纵向堆叠。该 head 已通过完整 P103 CI。
 
 第一，默认窗口由 880×560 调整为 1100×620，使真实 WinForms/WebView2 窗口与已确认参考图保持近似 16:9 的同一比例；原生标题改为简洁 `DavBridge`。Overview 的主要尺寸按该默认窗口逐项标定，较小窗口继续走响应式压缩。悬浮提示保持白色底纹、深色文字、浅边框和柔和阴影。
 
@@ -143,7 +143,7 @@ recycle.delete
 
 最新候选新增启动环境自检、最近活动、脱敏诊断导出、首次初始化状态条、构建身份显示和更明确的转移队列语义。
 
-最新视觉修正进一步解决阶段行的真实布局冲突。旧 `styles.css` 中 `.phase strong { align-self:end; }` 在新 flex 阶段布局中仍然生效，导致“源端对账 / 变化修复 / 等待周期”文字整体落在圆形图标下方。`e2db3a5a...` 明确覆盖为垂直居中，并移除此前 1 px translate 补偿。CI 的 1100×620 预览测量中，三组圆形图标中心均为 y=166.5 px，三组文字像素中心也均为 y=166.5 px。
+最新视觉修正进一步解决阶段行的真实布局冲突。旧 `styles.css` 中 `.phase strong { align-self:end; }` 在新 flex 阶段布局中仍然生效，导致“源端对账 / 变化修复 / 等待周期”文字整体落在圆形图标下方。`4c612060...` 明确覆盖为垂直居中，并移除此前 1 px translate 补偿。CI 的 1100×620 预览测量中，三组圆形图标中心均为 y=166.5 px，三组文字像素中心也均为 y=166.5 px。
 
 总览已经在 CI 的 1100×620 精确预览上做像素测量。InfiniCLOUD 云图形中心约 y=85.5 px，文字视觉中心约 y=85.0 px；目标坚果主体约 y=86.0 px，目标文字约 y=87.0 px。端点图标和文字的光学偏差控制在约 0.5 至 1 px，中央路线与阶段文字也做了对应校正。
 
@@ -154,6 +154,20 @@ recycle.delete
 “设置 → 安全与维护”新增运行环境自检和脱敏诊断导出。诊断 ZIP 只包含版本、短 commit、构建时间、Windows/.NET/WebView2、EngineState、Cycle、额度、自检、备份存在性、初始化步骤和通用活动，不包含凭据、真实文件名、私人目录或本机私人路径。
 
 About 页新增 v0.4.4、构建短 SHA、构建时间、运行环境摘要和初始化完成度。CI 额外生成 `overview-1100x620.png` 与 `transfer-1100x620.png` 用于默认窗口精确视觉检查。
+
+### v0.4.5 稳定性硬化
+
+第一，后台循环新增可合并的 wake signal。原有定时轮询仍是基础机制，但系统恢复事件可以提前唤醒既有 `RunOnceAsync`。唤醒只改变重新检查的时间，不跳过 quota、Cycle、Reconciliation、人工审查或 StrongVerified 安全门。
+
+第二，新增 `RuntimeResilienceV045`。Windows 从睡眠恢复后约 4 秒请求一次后台重新检查；如果恢复时仍有活动任务，还会安排一次延迟检查。网络恢复且当前为 `WaitNetwork` 时，约 2 秒后提前唤醒后台循环，不再必须等待原来的最长约 10 分钟轮询。
+
+第三，`product-experience.json` 现在支持 `.bak` 回退。若主 sidecar 损坏而备份有效，会从备份恢复并修复主文件。该文件仍然只影响 UI 辅助状态，不参与迁移安全判定。
+
+第四，`startup-error.log` 改为脱敏本地日志。URL、用户目录、APPDATA 与 LOCALAPPDATA 不再原样写入，而且该日志明确不会进入脱敏诊断 ZIP。
+
+第五，Windows native self-test 新增四类备份恢复测试：`config.json`、`state.json`、`reconcile.json` 与 `product-experience.json`。CI 会先生成有效主文件和备份，再故意损坏主文件，确认各自可以从备份恢复。同时验证后台 wake signal 可以安全合并。
+
+第六，Runtime 私人数据边界新增 `startup-error.log`，避免本机异常日志误进入发布 Artifact。
 
 
 ## 7. 核心冻结安全语义
@@ -198,21 +212,19 @@ Web UI 删除意图
 
 窗口外观状态另外保存在 `%LOCALAPPDATA%\\DavBridge\\window.json`，仅包含窗口 X/Y、宽高和最大化状态，不包含账户、文件清单或凭据。
 
-v0.4.4 的 UI 辅助状态保存在 `%LOCALAPPDATA%\\DavBridge\\product-experience.json(.bak)`，只保存通用初始化/活动状态，不保存核心迁移数据或私人文件信息。
+v0.4.5 的 UI 辅助状态保存在 `%LOCALAPPDATA%\\DavBridge\\product-experience.json(.bak)`，只保存通用初始化/活动状态，不保存核心迁移数据或私人文件信息。
 
 Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、私人 Zotero 文件清单、用户日志或其他私人 Data。
 
 ## 9. 当前准确断点
 
-用户下一步需要在真实 Windows 上运行 `e2db3a5a...` 对应的 v0.4.4 candidate，重点检查：
+用户下一步需要在真实 Windows 上运行 `4c612060...` 对应的 v0.4.5 candidate，重点检查：
 
-1. 100%、125%、150% Windows 缩放下，总览、转移、回收站、文档、设置、关于的字号、留白与交互是否仍统一。
-2. 普通成功与提示是否只在 DavBridge 内显示右上角轻量 notice，不再出现老式信息 MessageBox；高风险确认仍应保持原生确认框。
-3. Running / Paused / WaitRetry / WaitQuota / WaitNetwork / WaitUser / Complete 下首页按钮与托盘继续/暂停是否一致且无无意义操作。
-4. 调整窗口尺寸、位置或最大化后关闭到托盘并正式退出，再启动时是否正确恢复；更换显示器后不应恢复到屏幕外。
-5. 已有实例运行时手动双击另一个 EXE，是否明确提示“当前文件没有启动为第二实例”；后台重复自启动不应唤醒窗口。
-6. InfiniCLOUD 黄色云标、坚果云图标、阶段淡灰圆与绿色 `✓`、流量和镜像百分数继续保持此前确认的视觉。
-7. 桌面右下角继续不出现额度不足或其他 BalloonTip。
+1. 正常运行时让电脑进入睡眠再唤醒，最近活动应出现“系统已唤醒”，程序不应重复启动，也不应丢失迁移状态。
+2. 在 `WaitNetwork` 状态恢复网络时，应明显早于旧版最长约 10 分钟轮询重新检查；如果暂时没有真实网络故障条件，至少检查活动记录与后台稳定性。
+3. 不要直接破坏真实账户 Data 做恢复实验。CI 已自动验证 config、state、reconcile 与 product sidecar 的 `.bak` fallback。
+4. 抽查“导出诊断信息”ZIP 与本机 `startup-error.log`，确认诊断 ZIP 不含密码、真实 Zotero 文件名、远端目录或私人绝对路径。
+5. v0.4.4 已冻结的总览像素对齐、转移页语义、设置页紧凑布局、单实例提示、窗口位置恢复和无桌面 BalloonTip 行为不得回退。
 
 用户实机确认之前，不提升 `p103-stable`，不修改 `main`，不创建正式标签或 Release。
 
