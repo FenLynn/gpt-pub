@@ -41,8 +41,8 @@ LocalSub 已积累并实机验证大量 Windows/C# 技术资产，包括 Process
 
 - Shell / Core：C# .NET 8
 - IPC：Windows Named Pipe，newline-delimited JSON
-- 当前主 UI：WinForms
-- 目标主 UI：WebView2 + Vue 3 + TypeScript
+- 当前业务 UI：WinForms，暂时作为验证壳
+- Phase 2A 主 UI：WebView2 + Vue 3 + TypeScript，开始建立
 - 字幕 Overlay：透明 TopMost WebView2
 - Rust：当前不引入
 
@@ -95,9 +95,23 @@ Shell 按需启动 Core。IPC 断开时当前请求失败，但 GUI 保持可用
 {"kind":"response","id":"...","ok":true,"cancelled":false,"payload":{},"error":null}
 ```
 
-v1 方法：`ping`、`analyze`、`transcribe`、`cancel`、`shutdown`。
+基础方法：`ping`、`analyze`、`transcribe`、`cancel`、`shutdown`。
 
-同一个 Core v1 同时只执行一个重任务，Shell 对后台请求串行化。取消命令仍可在任务执行期间通过 Pipe 发送。
+realtime 第一版增加：
+
+```text
+live.start
+live.stop
+
+live.status
+live.level
+live.partial
+live.final
+live.discontinuity
+live.failed
+```
+
+`live.start` 成功后返回 session ID，长期事件不依赖原 start request 保持 pending。`live.level` 对外默认约 10 Hz。当前版本 realtime session 存在时明确拒绝其他重任务并发，避免原生资源隐式竞争。
 
 ## 迁移阶段
 
@@ -120,15 +134,14 @@ v1 方法：`ping`、`analyze`、`transcribe`、`cancel`、`shutdown`。
 - WinForms 主界面
 - 波形绘制控件与结果展示
 - 模型页 UI
-- 实时 ASR
-- PotPlayer 实时音频链
+- PotPlayer 进程发现与窗口跟随
 - Overlay
 
-Shell 工程对后台媒体分析与后台转写完整实现采用编译期排除，只保留 Proxy，禁止 Core 故障时自动进程内 fallback。
+Shell 工程对后台媒体分析、后台转写和已经迁移的 realtime 重实现采用编译期排除，只保留 Proxy，禁止 Core 故障时自动进程内 fallback。
 
 ### Phase 1B.0：Application Contract
 
-状态：**当前阶段。**
+状态：**第一版已完成。**
 
 先固定：
 
@@ -143,19 +156,26 @@ Shell 工程对后台媒体分析与后台转写完整实现采用编译期排�
 
 ### Phase 1B.1：实时链迁入 Core
 
-迁移：
+状态：**第一版自动化闭环已完成，真实 PotPlayer + 已安装模型仍待用户实机验证。**
+
+已迁入 Core：
 
 - Streaming Zipformer / Paraformer
 - SenseVoice / Fun-ASR-Nano 实时链
-- WASAPI
+- All Audio / WASAPI
 - PotPlayer Process Loopback
+- PotPlayer 音频恢复
 - audio queue
 - realtime model load
 - realtime decode loop
 
-Shell 长期只保留 PotPlayer 进程发现、PID、窗口位置和 Overlay 跟随。
+Shell 只保留 PotPlayer 进程发现、PID、窗口位置、最小化状态和 Overlay 跟随。
+
+最后完整验证代码 head：`944cc4674b3fecefae5ef88c1c4bc88f30918013`，P105 Windows CI run `34581474053` success。
 
 ### Phase 2A：Web Shell
+
+状态：**当前开始实施。**
 
 建立 WebView2 + Vue 3 + TypeScript 主 Shell，先完成：
 
