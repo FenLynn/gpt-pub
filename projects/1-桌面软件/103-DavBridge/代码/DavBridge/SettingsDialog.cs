@@ -119,8 +119,8 @@ internal sealed class SettingsDialog : Form
         var button = new Button
         {
             Text = text,
-            Width = 96,
-            Height = 38,
+            Width = 88,
+            Height = 30,
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(245, 250, 253),
             ForeColor = Color.FromArgb(45, 68, 88),
@@ -146,20 +146,22 @@ internal sealed class SettingsDialog : Form
             ColumnCount = 1,
             RowCount = 4,
             BackColor = background,
-            Padding = new Padding(_embedded ? 34 : 28, _embedded ? 24 : 20, _embedded ? 38 : 28, 0)
+            Padding = new Padding(_embedded ? 30 : 26, _embedded ? 14 : 16, _embedded ? 34 : 26, 0)
         };
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 8));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 2));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
 
         var categories = new[]
         {
-            ("账户与端点", BuildAccountPanel()),
-            ("流量与限速", BuildQuotaPanel()),
-            ("后台运行", BuildBackgroundPanel()),
-            ("安全与维护", BuildSafetyPanel())
+            ("账户与端点", BuildAccountPanel(), _endpointLocked
+                ? "当前任务已有迁移记录，端点身份已锁定。密码仍可更新；若以后迁移到另一套端点，应创建新的迁移任务。"
+                : "配置当前 Zotero 迁移任务的源端与目标端。密码仅保存在本机受保护存储中。"),
+            ("流量与限速", BuildQuotaPanel(), "当前周期已用量与重置日期由主页显示；人工校准入口位于安全与维护。"),
+            ("后台运行", BuildBackgroundPanel(), "主窗口关闭后任务继续在托盘运行；只有托盘菜单“退出”才结束 DavBridge 进程。"),
+            ("安全与维护", BuildSafetyPanel(), "这里仅保留低频维护与安全检查。已经通过的验证会标记为绿色状态，日常迁移不会重复要求。")
         };
 
         var tabs = new FlowLayoutPanel
@@ -170,7 +172,7 @@ internal sealed class SettingsDialog : Form
             AutoScroll = false,
             BackColor = background,
             Margin = Padding.Empty,
-            Padding = new Padding(0, 2, 0, 8)
+            Padding = new Padding(0, 0, 0, 6)
         };
 
         var hostPanel = new Panel
@@ -178,7 +180,7 @@ internal sealed class SettingsDialog : Form
             Dock = DockStyle.Fill,
             AutoScroll = true,
             BackColor = background,
-            Padding = new Padding(2, 22, 8, 12),
+            Padding = new Padding(2, 10, 8, 6),
             Margin = Padding.Empty
         };
         shell.Controls.Add(tabs, 0, 1);
@@ -202,17 +204,17 @@ internal sealed class SettingsDialog : Form
             }
         }
 
-        foreach (var (name, panel) in categories)
+        foreach (var (name, panel, hint) in categories)
         {
             var button = new Button
             {
                 Text = name,
                 AutoSize = false,
-                Width = name == "安全与维护" ? 118 : 112,
-                Height = 38,
+                Width = name == "安全与维护" ? 110 : 102,
+                Height = 34,
                 FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Margin = new Padding(0, 0, 8, 0),
+                Margin = new Padding(0, 0, 6, 0),
                 BackColor = background,
                 ForeColor = Color.FromArgb(91, 111, 132),
                 UseVisualStyleBackColor = false,
@@ -223,6 +225,7 @@ internal sealed class SettingsDialog : Form
             button.FlatAppearance.MouseOverBackColor = Color.FromArgb(235, 246, 253);
             button.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 240, 251);
             button.Click += (_, _) => SelectCategory(panel, button);
+            _tips.SetToolTip(button, hint);
             navButtons.Add(button);
             tabs.Controls.Add(button);
         }
@@ -231,7 +234,7 @@ internal sealed class SettingsDialog : Form
         {
             Dock = DockStyle.Fill,
             BackColor = background,
-            Padding = new Padding(0, 10, 0, 10),
+            Padding = new Padding(0, 8, 0, 8),
             Margin = Padding.Empty
         };
         var footerButtons = new FlowLayoutPanel
@@ -256,9 +259,6 @@ internal sealed class SettingsDialog : Form
     private Control BuildAccountPanel()
     {
         var table = CategoryTable("账户与端点");
-        AddHint(table, _endpointLocked
-            ? "当前任务已经有迁移记录，端点身份已锁定。密码仍可更新；若以后迁移到另一套端点，应创建新的迁移任务。"
-            : "配置当前 Zotero 迁移任务的源端与目标端。密码仅保存在本机受保护存储中。");
 
         AddSubTitle(table, "InfiniCLOUD");
         AddField(table, "WebDAV URL", _sourceUrl);
@@ -281,7 +281,6 @@ internal sealed class SettingsDialog : Form
         AddField(table, "普通预留 MB", _reserve);
         AddField(table, "冲刺预留 MB", _sprintReserve);
         AddFull(table, _sprint);
-        AddHint(table, "当前周期已用量与重置日期由主页显示；人工校准入口位于“安全与维护”。");
         return WrapCategory(table);
     }
 
@@ -291,15 +290,12 @@ internal sealed class SettingsDialog : Form
         AddFull(table, _autoStart);
         AddFull(table, _startMinimized);
         AddFull(table, _autoResume);
-        AddHint(table, "主窗口关闭后任务继续在托盘运行；只有托盘菜单“退出”才结束 DavBridge 进程。");
         return WrapCategory(table);
     }
 
     private Control BuildSafetyPanel()
     {
         var table = CategoryTable("安全与维护");
-        AddHint(table, "这里仅保留低频维护与安全检查。已经通过的验证用绿色状态标记，日常迁移不会要求重复执行。");
-        AddSubTitle(table, "维护工具");
 
         var main = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
         var host = main is null ? null : UiCommandBridge.GetHost(main);
@@ -311,8 +307,8 @@ internal sealed class SettingsDialog : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 1,
-            Margin = new Padding(0, 4, 0, 0),
-            BackColor = Color.FromArgb(245, 250, 253)
+            Margin = Padding.Empty,
+            BackColor = Color.FromArgb(248, 251, 254)
         };
         list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         list.Controls.Add(MaintenanceRow("连接诊断", "检查源端、坚果云根目录和 Zotero 目标目录是否可访问。", "DiagnoseConnectionsAsync", "可执行", false));
@@ -331,45 +327,27 @@ internal sealed class SettingsDialog : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 3,
-            Margin = new Padding(0, 0, 0, 4),
-            Padding = new Padding(0, 7, 0, 7),
+            Margin = new Padding(0, 0, 0, 2),
+            Padding = new Padding(0, 3, 0, 3),
             BackColor = Color.FromArgb(248, 251, 254)
         };
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84));
 
-        var titleLine = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            Margin = Padding.Empty,
-            BackColor = Color.FromArgb(248, 251, 254)
-        };
         var titleLabel = new Label
         {
             Text = title,
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 10F),
+            AutoSize = false,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Segoe UI Semibold", 9.5F),
             ForeColor = Color.FromArgb(38, 55, 72),
-            Margin = new Padding(10, 7, 6, 0)
-        };
-        var info = new Label
-        {
-            Text = "ⓘ",
-            AutoSize = true,
-            Font = new Font("Segoe UI Symbol", 9F),
-            ForeColor = Color.FromArgb(139, 156, 171),
             Cursor = Cursors.Help,
-            Margin = new Padding(0, 7, 0, 0)
+            Margin = new Padding(10, 0, 0, 0)
         };
-        _tips.SetToolTip(info, description);
         _tips.SetToolTip(titleLabel, description);
-        titleLine.Controls.Add(titleLabel);
-        titleLine.Controls.Add(info);
-        row.Controls.Add(titleLine, 0, 0);
+        row.Controls.Add(titleLabel, 0, 0);
 
         var statusLabel = new Label
         {
@@ -392,7 +370,7 @@ internal sealed class SettingsDialog : Form
             BackColor = Color.FromArgb(235, 246, 253),
             ForeColor = Color.FromArgb(36, 101, 148),
             Font = new Font("Segoe UI Semibold", 9F),
-            Margin = new Padding(5, 3, 4, 3),
+            Margin = new Padding(5, 2, 4, 2),
             TabStop = false
         };
         action.FlatAppearance.BorderSize = 0;
@@ -450,24 +428,9 @@ internal sealed class SettingsDialog : Form
             AutoSize = true,
             Font = new Font("Segoe UI Semibold", 11.5F),
             ForeColor = Color.FromArgb(36, 55, 75),
-            Margin = new Padding(0, 16, 0, 8)
+            Margin = new Padding(0, 8, 0, 4)
         };
         AddFull(table, label);
-    }
-
-    private void AddHint(TableLayoutPanel table, string text)
-    {
-        var info = new Label
-        {
-            Text = "ⓘ",
-            AutoSize = true,
-            Font = new Font("Segoe UI Symbol", 10F),
-            ForeColor = Color.FromArgb(138, 155, 170),
-            Cursor = Cursors.Help,
-            Margin = new Padding(0, 0, 0, 10)
-        };
-        _tips.SetToolTip(info, text);
-        AddFull(table, info);
     }
 
     private bool Apply()
@@ -570,7 +533,7 @@ internal sealed class SettingsDialog : Form
         AutoSize = true,
         Font = new Font("Segoe UI", 9.5F),
         ForeColor = Color.FromArgb(78, 96, 115),
-        Margin = new Padding(0, 10, 12, 8)
+        Margin = new Padding(0, 7, 10, 5)
     };
 
     private static void PrepareFieldControl(Control control)
@@ -590,9 +553,9 @@ internal sealed class SettingsDialog : Form
     private static SoftFieldPanel CreateFieldSurface(Control control, int width)
     {
         PrepareFieldControl(control);
-        var surface = new SoftFieldPanel(width, 35)
+        var surface = new SoftFieldPanel(width, 32)
         {
-            Margin = new Padding(0, 4, 0, 7)
+            Margin = new Padding(0, 2, 0, 4)
         };
         control.Dock = DockStyle.Fill;
         control.Margin = Padding.Empty;
@@ -616,9 +579,9 @@ internal sealed class SettingsDialog : Form
 
         var width = PreferredFieldWidth(label, textBox);
         PrepareFieldControl(textBox);
-        var surface = new SoftFieldPanel(width, 35)
+        var surface = new SoftFieldPanel(width, 32)
         {
-            Margin = new Padding(0, 4, 0, 7)
+            Margin = new Padding(0, 2, 0, 4)
         };
         var holder = new TableLayoutPanel
         {
@@ -673,7 +636,7 @@ internal sealed class SettingsDialog : Form
             MinimumSize = new Size(width, height);
             MaximumSize = new Size(width, height);
             BackColor = Color.FromArgb(243, 248, 251);
-            Padding = new Padding(10, 7, 8, 5);
+            Padding = new Padding(9, 6, 7, 4);
             DoubleBuffered = true;
             ResizeRedraw = true;
         }
@@ -711,12 +674,13 @@ internal sealed class SettingsDialog : Form
     {
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        control.Margin = control.Margin == Padding.Empty ? new Padding(0, 6, 0, 6) : control.Margin;
+        control.Margin = control.Margin == Padding.Empty ? new Padding(0, 3, 0, 3) : control.Margin;
         if (control is CheckBox checkBox)
         {
             checkBox.AutoSize = true;
             checkBox.MaximumSize = new Size(560, 0);
             checkBox.Dock = DockStyle.Top;
+            checkBox.Padding = new Padding(0, 1, 0, 1);
         }
         panel.Controls.Add(control, 0, row);
         panel.SetColumnSpan(control, 2);
