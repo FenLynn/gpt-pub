@@ -79,7 +79,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
 
     <div class="side-status has-tip" :data-tip="sideStatusTip">
       <i :class="`tone-${snapshot.routeTone}`"></i>
-      <strong>{{ snapshot.engineState }}</strong>
+      <div><strong>{{ snapshot.engineState }}</strong><small>{{ snapshot.routeStatus }}</small></div>
     </div>
   </aside>
 
@@ -171,7 +171,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
             <strong class="task-name">{{ snapshot.currentTitle }}</strong>
             <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div><strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong></div>
           </div>
-          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">{{ busy?'处理中…':snapshot.primaryLabel }}</button></div>
+          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy"><span class="primary-glyph" aria-hidden="true">{{ snapshot.primaryAction==='pause' ? 'Ⅱ' : snapshot.primaryAction==='resume' ? '▶' : '' }}</span>{{ busy?'处理中…':snapshot.primaryLabel }}</button></div>
         </article>
       </div>
     </section>

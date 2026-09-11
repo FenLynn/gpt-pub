@@ -41,13 +41,10 @@ internal sealed class MainForm : Form
     {
         _host = host;
         _launchInBackground = launchInBackground;
-        var appVersion = typeof(MainForm).Assembly.GetName().Version;
-        Text = appVersion is null
-            ? "DavBridge"
-            : $"DavBridge v{appVersion.Major}.{appVersion.Minor}.{appVersion.Build}";
-        Width = 880;
-        Height = 560;
-        MinimumSize = new Size(650, 440);
+        Text = "DavBridge";
+        Width = 1100;
+        Height = 620;
+        MinimumSize = new Size(880, 540);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9F);
         BackColor = Color.White;
