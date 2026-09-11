@@ -106,10 +106,14 @@ jobs:
           test -n "$browser"
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=870,525 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-870x525.png" http://127.0.0.1:4173/
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=900,620 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png" http://127.0.0.1:4173/
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,620 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-1100x620.png" http://127.0.0.1:4173/
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1200,760 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png" http://127.0.0.1:4173/
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,620 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/transfer-1100x620.png" 'http://127.0.0.1:4173/?tab=transfer'
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-870x525.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png") -gt 10000
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-1100x620.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png") -gt 10000
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/transfer-1100x620.png") -gt 10000
       - name: Upload Vue visual previews
         uses: actions/upload-artifact@v4
         with:
@@ -155,11 +159,9 @@ jobs:
 
       - name: Publish framework-dependent single EXE
         shell: pwsh
-        run: >-
-          dotnet publish 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
-          -c Release -r win-x64 --self-contained false --no-restore
-          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded
-          -o build/DavBridge
+        run: |
+          $buildUtc=(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+          dotnet publish 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'             -c Release -r win-x64 --self-contained false --no-restore             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded             "-p:DavBridgeCommit=$env:GITHUB_SHA" "-p:DavBridgeBuildUtc=$buildUtc"             -o build/DavBridge
 
       - name: Verify Runtime boundary
         shell: pwsh
@@ -169,7 +171,7 @@ jobs:
           if (!(Test-Path $exe -PathType Leaf)) { throw 'DavBridge.exe missing' }
           $unexpected=Get-ChildItem 'build/DavBridge' -File | Where-Object { $_.Name -ne 'DavBridge.exe' }
           if ($unexpected) { $unexpected | Select-Object Name,Length | Format-Table; throw 'Default P103 Runtime must remain a single-file delivery.' }
-          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','reconcile.json','DavBridge.log')) {
+          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','reconcile.json','product-experience.json','product-experience.json.bak','DavBridge.log')) {
             if (Get-ChildItem 'build/DavBridge' -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private Data leaked into Runtime: $private" }
           }
 

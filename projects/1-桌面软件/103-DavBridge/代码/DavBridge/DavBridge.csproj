@@ -8,10 +8,14 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>DavBridge</AssemblyName>
     <RootNamespace>DavBridge</RootNamespace>
-    <Version>0.4.3</Version>
-    <FileVersion>0.4.3.0</FileVersion>
+    <Version>0.4.4</Version>
+    <FileVersion>0.4.4.0</FileVersion>
     <Product>DavBridge</Product>
     <Company>FenLynn</Company>
+    <Description>Verified one-way Zotero WebDAV mirror</Description>
+    <Copyright>Copyright © 2026 FenLynn</Copyright>
+    <DavBridgeCommit Condition="'$(DavBridgeCommit)' == ''">local</DavBridgeCommit>
+    <DavBridgeBuildUtc Condition="'$(DavBridgeBuildUtc)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))</DavBridgeBuildUtc>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
@@ -19,6 +23,10 @@
     <DebugType>embedded</DebugType>
     <ApplicationIcon>DavBridge.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="DavBridgeCommit" Value="$(DavBridgeCommit)" />
+    <AssemblyMetadata Include="DavBridgeBuildUtc" Value="$(DavBridgeBuildUtc)" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DavBridge.Core\DavBridge.Core.csproj" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
