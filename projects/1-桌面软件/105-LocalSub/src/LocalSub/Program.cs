@@ -36,7 +36,7 @@ internal static class Program
 
             if (IsProcessLoopbackSmokeTest)
             {
-                RunProcessLoopbackSmokeTest();
+                RunProcessLoopbackSmokeTestAsync().GetAwaiter().GetResult();
                 return;
             }
 
@@ -86,12 +86,10 @@ internal static class Program
         }
     }
 
-    static void RunProcessLoopbackSmokeTest()
+    static async Task RunProcessLoopbackSmokeTestAsync()
     {
-        using var capture = new ProcessLoopbackCaptureService();
-        capture.StartAsync((uint)Environment.ProcessId).GetAwaiter().GetResult();
-        Thread.Sleep(300);
-        capture.StopAsync().GetAwaiter().GetResult();
+        await using var client = new CoreWorkerClient();
+        await client.RunProcessLoopbackSmokeAsync((uint)Environment.ProcessId);
     }
 
     static void RunOfflineAsrSmokeTest()
