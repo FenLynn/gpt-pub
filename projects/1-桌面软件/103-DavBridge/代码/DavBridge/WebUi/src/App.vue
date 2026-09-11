@@ -5,12 +5,15 @@ import { mockSnapshot } from './mock'
 import type { DavBridgeSnapshot, RecycleGroup, RecycleKind } from './types'
 
 type Tab = 'overview' | 'transfer' | 'recycle' | 'docs' | 'settings' | 'about'
-const tab = ref<Tab>('overview')
+const previewTab = new URLSearchParams(window.location.search).get('tab')
+const initialTab:Tab = previewTab==='transfer'||previewTab==='recycle'||previewTab==='docs'||previewTab==='about' ? previewTab : 'overview'
+const tab = ref<Tab>(initialTab)
 const recycleFilter = ref<RecycleKind>('observing')
 const snapshot = ref<DavBridgeSnapshot>(mockSnapshot)
 const busy = ref(false)
 const toast = ref('')
 const notice = ref<{ title: string; message: string; tone: string } | null>(null)
+const showActivity = ref(false)
 const selected = ref(new Set<string>())
 let detachSnapshot: (() => void) | undefined
 let detachNotice: (() => void) | undefined
@@ -23,7 +26,7 @@ const downloadFraction = computed(() => Math.min(1, snapshot.value.quota.downloa
 const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => recycleFilter.value === 'observing' ? group.disposition === 'observing' : recycleFilter.value === 'review' ? group.disposition === 'review' || group.disposition === 'blocked' : group.disposition === 'history'))
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
-const sideStatusTip = computed(() => `${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
+const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
 const resetLabel = computed(() => {
   const match = snapshot.value.quota.resetText.match(/(\d{4})-(\d{2})-(\d{2}).*?(\d{2}:\d{2})/)
   return match ? `${match[2]}/${match[3]} ${match[4]} 重置` : snapshot.value.quota.resetText
@@ -33,6 +36,18 @@ function formatQuotaBytes(bytes:number){
 }
 const uploadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.uploadUsed)} / ${formatQuotaBytes(snapshot.value.quota.uploadMax)}`)
 const downloadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.downloadUsed)} / ${formatQuotaBytes(snapshot.value.quota.downloadMax)}`)
+const automaticQueueCount = computed(() => snapshot.value.priorityCount + snapshot.value.normalCount)
+const queueHeadline = computed(() => snapshot.value.humanActionCount > 0
+  ? `${snapshot.value.humanActionCount} 组等待人工决定`
+  : automaticQueueCount.value > 0
+    ? `${automaticQueueCount.value} 组等待自动处理`
+    : '当前队列已清空')
+const initializedCount = computed(() => snapshot.value.initialization.filter(step=>step.done).length)
+const buildDateLabel = computed(() => {
+  if(!snapshot.value.buildDate) return '本地构建'
+  const date=new Date(snapshot.value.buildDate)
+  return Number.isNaN(date.getTime()) ? snapshot.value.buildDate : date.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
+})
 
 function notify(message: string) { toast.value = message; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toast.value = '', 2600) }
 function showNotice(value:{ title:string; message:string; tone:string }) {
@@ -112,10 +127,10 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
       </button>
     </nav>
 
-    <div class="side-status has-tip" :data-tip="sideStatusTip">
+    <button type="button" class="side-status has-tip" :data-tip="sideStatusTip" @click="showActivity=true">
       <i :class="`tone-${snapshot.routeTone}`"></i>
       <div><strong>{{ snapshot.engineState }}</strong><small>{{ snapshot.routeStatus }}</small></div>
-    </div>
+    </button>
   </aside>
 
   <section class="workspace">
@@ -218,25 +233,43 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     </section>
 
     <section v-else-if="tab==='transfer'" class="page transfer-page">
-      <div class="pool-grid">
-        <article class="pool-card priority">
-          <div class="pool-title-row"><span>优先修复</span><span class="info-dot has-tip" data-tip="源端真实变化的历史 StrongVerified 组">i</span></div>
-          <strong>{{ snapshot.priorityCount.toLocaleString() }}</strong>
+      <section class="queue-summary">
+        <div class="queue-summary-copy">
+          <span>当前调度</span>
+          <strong>{{ queueHeadline }}</strong>
+          <small>{{ snapshot.routeStatus }}<template v-if="snapshot.cycleId"> · Cycle {{ snapshot.cycleId }}</template></small>
+        </div>
+        <span class="queue-rule has-tip" data-tip="变化修复始终优先于普通迁移；需要人工审查时，DavBridge 会安全停在审查门前。">调度规则 <b>i</b></span>
+      </section>
+
+      <section class="queue-list" aria-label="迁移队列">
+        <article class="queue-row priority">
+          <div class="queue-glyph">↻</div>
+          <div class="queue-row-main"><strong>变化修复</strong><span class="has-tip" data-tip="历史 StrongVerified 附件组在源端发生真实内容变化，必须优先恢复镜像一致性。">历史镜像变化</span></div>
+          <div class="queue-count"><b>{{ snapshot.priorityCount }}</b><small>最高优先</small></div>
         </article>
-        <article class="pool-card normal">
-          <div class="pool-title-row"><span>普通任务</span><span class="info-dot has-tip" data-tip="既有 backlog 与本周期新增对象">i</span></div>
-          <strong>{{ snapshot.normalCount.toLocaleString() }}</strong>
+        <article class="queue-row normal">
+          <div class="queue-glyph">⇢</div>
+          <div class="queue-row-main"><strong>普通迁移</strong><span class="has-tip" data-tip="尚未迁移的既有 backlog 与本周期新增附件组进入同一个稳定队列。">自动队列</span></div>
+          <div class="queue-count"><b>{{ snapshot.normalCount }}</b><small>按序处理</small></div>
         </article>
-      </div>
+        <article class="queue-row review" :class="{attention:snapshot.humanActionCount>0}">
+          <div class="queue-glyph">✓</div>
+          <div class="queue-row-main"><strong>人工审查</strong><span class="has-tip" data-tip="跨周期仍从源端缺失的历史 StrongVerified 组，需要你明确选择保留或删除。">回收站安全门</span></div>
+          <div class="queue-count"><b>{{ snapshot.humanActionCount }}</b><small>{{ snapshot.humanActionCount ? '需要决定' : '无需处理' }}</small></div>
+        </article>
+      </section>
+
       <article class="work-card">
         <div class="work-icon"><span></span></div>
         <div class="work-copy">
-          <div class="work-label-row"><span>当前任务</span><span class="info-dot has-tip" :data-tip="snapshot.currentDetail">i</span></div>
+          <div class="work-label-row"><span>当前执行</span><span class="info-dot has-tip" :data-tip="snapshot.currentDetail">i</span></div>
           <strong>{{ snapshot.currentTitle }}</strong>
         </div>
         <div class="work-state">{{ snapshot.currentProgress===null?snapshot.routeStatus:`${Math.round(snapshot.currentProgress*100)}%` }}</div>
       </article>
-      <div class="coverage-footer"><span>总体镜像覆盖</span><div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div><strong>{{ snapshot.coverageText }}</strong></div>
+
+      <div class="coverage-footer"><span>总体镜像覆盖</span><div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div><strong>{{ snapshot.verified }} / {{ snapshot.total }} · {{ coveragePercent }}%</strong></div>
     </section>
 
     <section v-else-if="tab==='recycle'" class="page recycle-page">
@@ -263,9 +296,31 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     </section>
 
     <section v-else class="page about-page">
-      <article class="about-card"><div class="about-logo"><span></span><span></span></div><h2>DavBridge</h2><p>安全、持续地维护 Zotero 单向强校验镜像。</p><dl><div><dt>版本</dt><dd>v{{ snapshot.version }}</dd></div><div><dt>引擎</dt><dd>.NET 8 + WebView2</dd></div><div><dt>界面</dt><dd>Vue 3</dd></div></dl></article>
+      <article class="about-card">
+        <div class="about-logo"><span></span><span></span></div>
+        <h2>DavBridge</h2>
+        <p>安全、持续地维护 Zotero 单向强校验镜像。</p>
+        <dl>
+          <div><dt>版本</dt><dd>v{{ snapshot.version }}</dd></div>
+          <div><dt>构建</dt><dd>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</dd></div>
+          <div><dt>运行环境</dt><dd :class="`health-text ${snapshot.health.status}`">{{ snapshot.health.summary }}</dd></div>
+          <div><dt>初始化</dt><dd>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</dd></div>
+          <div><dt>引擎</dt><dd>.NET 8 + WebView2</dd></div>
+          <div><dt>界面</dt><dd>Vue 3</dd></div>
+        </dl>
+      </article>
     </section>
   </section>
+
+  <aside v-if="showActivity" class="activity-drawer" aria-label="最近活动">
+    <header><div><span>最近活动</span><small>只记录状态事件，不记录文件名与凭据</small></div><button aria-label="关闭最近活动" @click="showActivity=false">×</button></header>
+    <div class="activity-list">
+      <article v-for="item in snapshot.activities" :key="item.time+item.title" :class="`tone-${item.tone}`">
+        <time>{{ item.time }}</time><div><strong>{{ item.title }}</strong><span>{{ item.detail }}</span></div>
+      </article>
+      <p v-if="!snapshot.activities.length" class="activity-empty">暂时没有活动记录</p>
+    </div>
+  </aside>
 
   <div v-if="notice" class="notice-banner" :class="`tone-${notice.tone}`" role="status">
     <span class="notice-mark" aria-hidden="true">{{ notice.tone==='success' ? '✓' : notice.tone==='warning' ? '!' : 'i' }}</span>
