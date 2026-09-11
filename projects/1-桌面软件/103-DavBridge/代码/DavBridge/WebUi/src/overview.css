@@ -1052,3 +1052,13 @@
   .docs-page{grid-template-columns:150px minmax(0,1fr);gap:20px}
   .doc-nav{padding-right:14px}
 }
+
+/* InfiniCLOUD visual identity uses the warm yellow cloud mark. */
+.cloud-logo .cloud-fill{
+  fill:#fff8dc;
+  stroke:#e7a900;
+}
+.cloud-logo .cloud-highlight{
+  stroke:#ffd25b;
+  opacity:.95;
+}

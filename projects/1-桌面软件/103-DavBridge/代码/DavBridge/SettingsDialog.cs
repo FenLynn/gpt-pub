@@ -40,9 +40,30 @@ internal sealed class SettingsDialog : Form
         Height = 620;
         MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterParent;
-        Font = new Font("Segoe UI", 9F);
-        BackColor = embedded ? Color.FromArgb(248, 251, 254) : Color.White;
+        Font = new Font("Segoe UI", 10F);
+        BackColor = Color.FromArgb(248, 251, 254);
         if (embedded) FormBorderStyle = FormBorderStyle.None;
+
+        foreach (var box in new[] { _sourceUrl, _sourceRoot, _sourceUser, _sourcePassword, _targetUrl, _targetRoot, _targetUser, _targetPassword })
+        {
+            box.Font = new Font("Segoe UI", 10F);
+            box.BorderStyle = BorderStyle.FixedSingle;
+            box.BackColor = Color.FromArgb(249, 252, 254);
+            box.ForeColor = Color.FromArgb(31, 47, 67);
+        }
+        foreach (var number in new[] { _speed, _reserve, _sprintReserve })
+        {
+            number.Font = new Font("Segoe UI", 10F);
+            number.BorderStyle = BorderStyle.FixedSingle;
+            number.BackColor = Color.FromArgb(249, 252, 254);
+            number.ForeColor = Color.FromArgb(31, 47, 67);
+        }
+        foreach (var check in new[] { _autoStart, _startMinimized, _autoResume, _sprint })
+        {
+            check.Font = new Font("Segoe UI", 10F);
+            check.ForeColor = Color.FromArgb(50, 70, 90);
+            check.BackColor = Color.Transparent;
+        }
 
         _sourceUrl.Text = Config.SourceBaseUrl;
         _sourceRoot.Text = Config.SourceRootPath;
@@ -65,7 +86,7 @@ internal sealed class SettingsDialog : Form
             foreach (var box in new[] { _sourceUrl, _sourceRoot, _sourceUser, _targetUrl, _targetRoot, _targetUser })
             {
                 box.ReadOnly = true;
-                box.BackColor = Color.FromArgb(247, 248, 250);
+                box.BackColor = Color.FromArgb(241, 246, 249);
             }
         }
 
@@ -90,58 +111,45 @@ internal sealed class SettingsDialog : Form
         var button = new Button
         {
             Text = text,
-            Width = 88,
-            Height = 34,
+            Width = 96,
+            Height = 38,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.White,
+            BackColor = Color.FromArgb(245, 250, 253),
+            ForeColor = Color.FromArgb(45, 68, 88),
+            Font = new Font("Segoe UI Semibold", 9.5F),
             TabStop = true
         };
-        button.FlatAppearance.BorderColor = Color.FromArgb(205, 208, 214);
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(247, 249, 251);
+        button.FlatAppearance.BorderColor = Color.FromArgb(205, 220, 231);
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(235, 246, 253);
         return button;
     }
 
     private Control BuildShell(Button save, Button cancel)
     {
-        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
-        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, _embedded ? 168 : 180));
+        var background = Color.FromArgb(248, 251, 254);
+        var shell = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            BackColor = background,
+            Padding = new Padding(_embedded ? 34 : 28, _embedded ? 24 : 20, _embedded ? 38 : 28, 0)
+        };
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
 
-        var nav = new Panel
+        var heading = new Label
         {
-            Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(247, 250, 253),
-            Padding = new Padding(14, 26, 12, 14)
-        };
-        var navStack = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Top,
+            Text = _embedded ? "设置" : "DavBridge 设置",
             AutoSize = true,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false
+            Font = new Font("Segoe UI Semibold", 18F),
+            ForeColor = Color.FromArgb(20, 34, 54),
+            Margin = new Padding(2, 4, 0, 0)
         };
-        navStack.Controls.Add(new Label
-        {
-            Text = _embedded ? "偏好设置" : "设置",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", _embedded ? 16F : 15F),
-            ForeColor = Color.FromArgb(24, 35, 55),
-            Margin = new Padding(8, 0, 0, 18)
-        });
-        nav.Controls.Add(navStack);
-        shell.Controls.Add(nav, 0, 0);
-        shell.SetRowSpan(nav, 2);
-
-        var hostPanel = new Panel
-        {
-            Dock = DockStyle.Fill,
-            AutoScroll = true,
-            BackColor = Color.FromArgb(250, 252, 254),
-            Padding = new Padding(34, 28, 34, 18)
-        };
-        shell.Controls.Add(hostPanel, 1, 0);
+        shell.Controls.Add(heading, 0, 0);
 
         var categories = new[]
         {
@@ -150,6 +158,28 @@ internal sealed class SettingsDialog : Form
             ("后台运行", BuildBackgroundPanel()),
             ("安全与维护", BuildSafetyPanel())
         };
+
+        var tabs = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoScroll = false,
+            BackColor = background,
+            Margin = Padding.Empty,
+            Padding = new Padding(0, 2, 0, 8)
+        };
+
+        var hostPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = background,
+            Padding = new Padding(2, 22, 8, 12),
+            Margin = Padding.Empty
+        };
+        shell.Controls.Add(tabs, 0, 1);
+        shell.Controls.Add(hostPanel, 0, 2);
 
         var navButtons = new List<Button>();
         void SelectCategory(Control panel, Button selected)
@@ -163,8 +193,9 @@ internal sealed class SettingsDialog : Form
             foreach (var button in navButtons)
             {
                 var active = ReferenceEquals(button, selected);
-                button.BackColor = active ? Color.FromArgb(236, 246, 253) : Color.FromArgb(250, 252, 254);
-                button.ForeColor = active ? Color.FromArgb(42, 104, 163) : Color.FromArgb(35, 35, 35);
+                button.BackColor = active ? Color.FromArgb(225, 241, 252) : background;
+                button.ForeColor = active ? Color.FromArgb(20, 124, 199) : Color.FromArgb(91, 111, 132);
+                button.Font = new Font("Segoe UI Semibold", active ? 10F : 9.5F);
             }
         }
 
@@ -173,43 +204,47 @@ internal sealed class SettingsDialog : Form
             var button = new Button
             {
                 Text = name,
-                Width = 148,
-                Height = 40,
+                AutoSize = false,
+                Width = name == "安全与维护" ? 118 : 112,
+                Height = 38,
                 FlatStyle = FlatStyle.Flat,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10, 0, 0, 0),
-                Margin = new Padding(0, 0, 0, 4),
-                BackColor = Color.FromArgb(250, 252, 254),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Margin = new Padding(0, 0, 8, 0),
+                BackColor = background,
+                ForeColor = Color.FromArgb(91, 111, 132),
                 UseVisualStyleBackColor = false,
-                TabStop = false
+                TabStop = false,
+                Font = new Font("Segoe UI Semibold", 9.5F)
             };
             button.FlatAppearance.BorderSize = 0;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(242, 248, 252);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(232, 242, 250);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(235, 246, 253);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 240, 251);
             button.Click += (_, _) => SelectCategory(panel, button);
             navButtons.Add(button);
-            navStack.Controls.Add(button);
+            tabs.Controls.Add(button);
         }
 
         var footer = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(250, 252, 254),
-            Padding = new Padding(20, 10, 34, 10)
+            BackColor = background,
+            Padding = new Padding(0, 10, 0, 10),
+            Margin = Padding.Empty
         };
         var footerButtons = new FlowLayoutPanel
         {
             Dock = DockStyle.Right,
             AutoSize = true,
             FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false
+            WrapContents = false,
+            BackColor = background
         };
         cancel.Margin = new Padding(8, 0, 0, 0);
         save.Margin = new Padding(8, 0, 0, 0);
         footerButtons.Controls.Add(cancel);
         footerButtons.Controls.Add(save);
         footer.Controls.Add(footerButtons);
-        shell.Controls.Add(footer, 1, 1);
+        shell.Controls.Add(footer, 0, 3);
 
         SelectCategory(categories[0].Item2, navButtons[0]);
         return shell;
@@ -274,7 +309,7 @@ internal sealed class SettingsDialog : Form
             AutoSize = true,
             ColumnCount = 1,
             Margin = new Padding(0, 4, 0, 0),
-            BackColor = Color.White
+            BackColor = Color.FromArgb(245, 250, 253)
         };
         list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         list.Controls.Add(MaintenanceRow("连接诊断", "检查源端、坚果云根目录和 Zotero 目标目录是否可访问。", "DiagnoseConnectionsAsync", "可执行", false));
@@ -295,7 +330,7 @@ internal sealed class SettingsDialog : Form
             ColumnCount = 3,
             Margin = new Padding(0, 0, 0, 6),
             Padding = new Padding(0, 8, 0, 8),
-            BackColor = Color.FromArgb(252, 253, 254)
+            BackColor = Color.FromArgb(248, 251, 254)
         };
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
@@ -306,16 +341,17 @@ internal sealed class SettingsDialog : Form
         {
             Text = title,
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 9.5F),
-            ForeColor = Color.FromArgb(38, 45, 51),
+            Font = new Font("Segoe UI Semibold", 10F),
+            ForeColor = Color.FromArgb(38, 55, 72),
             Margin = new Padding(10, 0, 0, 2)
         });
         info.Controls.Add(new Label
         {
             Text = description,
             AutoSize = true,
-            ForeColor = Color.FromArgb(116, 126, 135),
-            MaximumSize = new Size(390, 0),
+            Font = new Font("Segoe UI", 9F),
+            ForeColor = Color.FromArgb(112, 132, 149),
+            MaximumSize = new Size(470, 0),
             Margin = new Padding(10, 0, 10, 0)
         });
         row.Controls.Add(info, 0, 0);
@@ -336,14 +372,14 @@ internal sealed class SettingsDialog : Form
         {
             Text = passed ? "重新验证" : (methodName == "CalibrateAsync" ? "校准" : "执行"),
             Dock = DockStyle.Fill,
-            Height = 30,
+            Height = 34,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.White,
+            BackColor = Color.FromArgb(245, 250, 253),
             ForeColor = Color.FromArgb(52, 68, 82),
             Margin = new Padding(4, 4, 8, 4),
             TabStop = false
         };
-        action.FlatAppearance.BorderColor = Color.FromArgb(208, 215, 221);
+        action.FlatAppearance.BorderColor = Color.FromArgb(205, 220, 231);
         action.FlatAppearance.MouseOverBackColor = Color.FromArgb(243, 248, 252);
         action.Click += (_, _) =>
         {
@@ -363,16 +399,24 @@ internal sealed class SettingsDialog : Form
 
     private static TableLayoutPanel CategoryTable(string title)
     {
-        var table = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+        var table = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 2,
+            BackColor = Color.FromArgb(248, 251, 254),
+            Padding = Padding.Empty
+        };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 176));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         var heading = new Label
         {
             Text = title,
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 15F),
-            Margin = new Padding(0, 0, 0, 16)
+            Font = new Font("Segoe UI Semibold", 15.5F),
+            ForeColor = Color.FromArgb(24, 38, 58),
+            Margin = new Padding(0, 0, 0, 15)
         };
         var row = table.RowCount++;
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -383,7 +427,14 @@ internal sealed class SettingsDialog : Form
 
     private static Control WrapCategory(TableLayoutPanel table)
     {
-        var panel = new Panel { Dock = DockStyle.Top, AutoSize = true, BackColor = Color.White };
+        var panel = new Panel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            BackColor = Color.FromArgb(248, 251, 254),
+            Padding = Padding.Empty,
+            Margin = Padding.Empty
+        };
         panel.Controls.Add(table);
         return panel;
     }
@@ -394,8 +445,9 @@ internal sealed class SettingsDialog : Form
         {
             Text = text,
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 10.5F),
-            Margin = new Padding(0, 12, 0, 6)
+            Font = new Font("Segoe UI Semibold", 11.5F),
+            ForeColor = Color.FromArgb(36, 55, 75),
+            Margin = new Padding(0, 16, 0, 8)
         };
         AddFull(table, label);
     }
@@ -406,9 +458,10 @@ internal sealed class SettingsDialog : Form
         {
             Text = text,
             AutoSize = true,
-            ForeColor = Color.DimGray,
-            MaximumSize = new Size(560, 0),
-            Margin = new Padding(0, 0, 0, 10)
+            ForeColor = Color.FromArgb(105, 125, 145),
+            Font = new Font("Segoe UI", 9.5F),
+            MaximumSize = new Size(690, 0),
+            Margin = new Padding(0, 0, 0, 14)
         };
         AddFull(table, label);
     }
@@ -499,9 +552,16 @@ internal sealed class SettingsDialog : Form
     {
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        panel.Controls.Add(new Label { Text = label, AutoSize = true, Margin = new Padding(0, 7, 8, 7) }, 0, row);
+        panel.Controls.Add(new Label
+        {
+            Text = label,
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
+            ForeColor = Color.FromArgb(78, 96, 115),
+            Margin = new Padding(0, 9, 12, 9)
+        }, 0, row);
         control.Dock = DockStyle.Top;
-        control.Margin = new Padding(0, 4, 0, 4);
+        control.Margin = new Padding(0, 5, 0, 7);
         panel.Controls.Add(control, 1, row);
     }
 
@@ -509,9 +569,23 @@ internal sealed class SettingsDialog : Form
     {
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        panel.Controls.Add(new Label { Text = label, AutoSize = true, Margin = new Padding(0, 7, 8, 7) }, 0, row);
+        panel.Controls.Add(new Label
+        {
+            Text = label,
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9.5F),
+            ForeColor = Color.FromArgb(78, 96, 115),
+            Margin = new Padding(0, 9, 12, 9)
+        }, 0, row);
 
-        var holder = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, AutoSize = true, Margin = new Padding(0, 2, 0, 2) };
+        var holder = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = 2,
+            AutoSize = true,
+            Margin = new Padding(0, 3, 0, 5),
+            BackColor = Color.FromArgb(248, 251, 254)
+        };
         holder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         holder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42));
         textBox.Dock = DockStyle.Top;
@@ -525,7 +599,7 @@ internal sealed class SettingsDialog : Form
             AccessibleName = "显示或隐藏密码",
             TabStop = false,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.White
+            BackColor = Color.FromArgb(248, 251, 254)
         };
         eye.FlatAppearance.BorderColor = Color.FromArgb(205, 208, 214);
         eye.Click += (_, _) =>
