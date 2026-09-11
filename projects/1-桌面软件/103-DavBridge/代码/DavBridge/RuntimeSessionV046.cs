@@ -36,6 +36,7 @@ internal sealed class RuntimeSessionV046 : IDisposable
     private static RuntimeSessionV046? _current;
 
     private readonly AppHost _host;
+    private readonly object _markerGate = new();
     private readonly string _markerPath;
     private readonly string _sessionId = Guid.NewGuid().ToString("N");
     private readonly DateTimeOffset _startedAt = DateTimeOffset.Now;
@@ -127,11 +128,23 @@ internal sealed class RuntimeSessionV046 : IDisposable
 
     private void Heartbeat()
     {
-        if (_disposed) return;
-        try { WriteMarker(cleanExitAt: null); } catch { }
+        lock (_markerGate)
+        {
+            if (_disposed) return;
+            try { WriteMarkerCore(cleanExitAt: null); } catch { }
+        }
     }
 
     private void WriteMarker(DateTimeOffset? cleanExitAt)
+    {
+        lock (_markerGate)
+        {
+            if (_disposed && cleanExitAt is null) return;
+            WriteMarkerCore(cleanExitAt);
+        }
+    }
+
+    private void WriteMarkerCore(DateTimeOffset? cleanExitAt)
     {
         var marker = new SessionMarker
         {
@@ -248,14 +261,19 @@ internal sealed class RuntimeSessionV046 : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
         _host.StateChanged -= OnHostStateChanged;
-        _heartbeat.Dispose();
+        try { _heartbeat.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan); } catch { }
 
         var endedAt = DateTimeOffset.Now;
-        try { WriteMarker(endedAt); } catch { }
-        try { File.Delete(_markerPath); } catch { }
+        lock (_markerGate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            try { WriteMarkerCore(endedAt); } catch { }
+            try { File.Delete(_markerPath); } catch { }
+        }
+
+        _heartbeat.Dispose();
         ProductExperienceV044.EndRuntimeSession(_startedAt, endedAt);
 
         lock (CurrentGate)
