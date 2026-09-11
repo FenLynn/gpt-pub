@@ -307,6 +307,8 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
             _ = SendEventAsync(sessionId, "live.partial", new { text });
         pipeline.FinalResult += text =>
             _ = SendEventAsync(sessionId, "live.final", new { text });
+        pipeline.SessionDiscontinuity += () =>
+            _ = SendEventAsync(sessionId, "live.discontinuity", new { });
 
         var modelProgress = new Progress<ModelOperationProgress>(p =>
             _ = SendEventAsync(request.Id, "model-progress", p));
