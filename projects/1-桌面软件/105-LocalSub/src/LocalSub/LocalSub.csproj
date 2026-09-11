@@ -25,9 +25,14 @@
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.4" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Heavy background implementations are compiled only into LocalSub.Core.exe. -->
+    <!-- Heavy background and realtime implementations are compiled only into LocalSub.Core.exe. -->
     <Compile Remove="Services\BatchTranscriptionService.cs" />
     <Compile Remove="Services\MediaAnalysisService.cs" />
+    <Compile Remove="Services\AllAudioCaptureService.cs" />
+    <Compile Remove="Services\ResilientPotPlayerCaptureService.cs" />
+    <Compile Remove="Services\StreamingParaformerService.cs" />
+    <Compile Remove="Services\SenseVoiceSimulatedStreamingService.cs" />
+    <Compile Remove="Services\FunAsrNanoSimulatedStreamingService.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\subtitle.html"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
