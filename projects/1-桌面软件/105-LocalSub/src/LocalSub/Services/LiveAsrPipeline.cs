@@ -27,6 +27,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     public event Action<string>? PartialResult;
     public event Action<string>? FinalResult;
     public event Action<string>? StatusChanged;
+    public event Action? SessionDiscontinuity;
 
     public LiveAsrPipeline()
     {
@@ -162,6 +163,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
             while (queue.Reader.TryRead(out _)) { }
         }
         if (!_useSenseVoice && !_useFunAsrNano) _streaming.ResetInput();
+        SessionDiscontinuity?.Invoke();
         StatusChanged?.Invoke("PotPlayer 音频时间线已变化，已清理旧缓冲并等待新位置声音");
     }
 
