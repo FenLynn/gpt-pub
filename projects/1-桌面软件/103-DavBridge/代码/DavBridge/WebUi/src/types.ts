@@ -25,6 +25,13 @@ export interface HealthInfo {
   checkedAt: string
 }
 
+export interface RuntimeInfo {
+  uptimeText: string
+  previousExitText: string
+  uncleanExitCount: number
+  cleanupText: string
+}
+
 export interface InitializationStep {
   key: string
   label: string
@@ -75,6 +82,7 @@ export interface DavBridgeSnapshot {
   primaryAction: PrimaryAction
   primaryLabel: string
   health: HealthInfo
+  runtime: RuntimeInfo
   initialization: InitializationStep[]
   activities: ActivityItem[]
   recycle: RecycleGroup[]

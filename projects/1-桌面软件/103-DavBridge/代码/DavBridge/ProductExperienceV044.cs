@@ -37,7 +37,7 @@ internal static class BuildInfoV044
         .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
         .ToDictionary(group => group.Key, group => group.Last().Value ?? string.Empty, StringComparer.OrdinalIgnoreCase);
 
-    public static string Version => Assembly.GetName().Version?.ToString(3) ?? "0.4.4";
+    public static string Version => Assembly.GetName().Version?.ToString(3) ?? "0.4.6";
     public static string Commit => Metadata.TryGetValue("DavBridgeCommit", out var value) && !string.IsNullOrWhiteSpace(value) ? value : "local";
     public static string ShortCommit => Commit.Length >= 8 ? Commit[..8] : Commit;
     public static string BuildUtc => Metadata.TryGetValue("DavBridgeBuildUtc", out var value) ? value : string.Empty;
@@ -69,6 +69,8 @@ internal static class StartupHealthV044
             CheckWebView2(),
             ProbeDirectory(host.Paths.RoamingRoot, "Roaming Data"),
             ProbeDirectory(host.Paths.LocalRoot, "Local Data"),
+            ProbeDirectory(host.Paths.TempRoot, "Temp Data"),
+            CheckRuntimeSession(),
             CheckJsonFile(host.Paths.ConfigPath, "config.json"),
             CheckJsonFile(host.Paths.StatePath, "state.json"),
             CheckJsonFile(Path.Combine(host.Paths.RoamingRoot, "reconcile.json"), "reconcile.json"),
@@ -88,6 +90,18 @@ internal static class StartupHealthV044
         }
 
         return new StartupHealthReportV044(DateTimeOffset.Now, items);
+    }
+
+    private static StartupHealthItemV044 CheckRuntimeSession()
+    {
+        var snapshot = RuntimeSessionV046.GetSnapshot();
+        if (!snapshot.IsActive)
+            return new("runtime-session", "运行会话", "warning", "会话监控尚未启动");
+
+        if (snapshot.PreviousExitUnclean)
+            return new("runtime-session", "运行会话", "warning", $"已恢复，上次会话为异常中断，累计 {snapshot.UncleanExitCount} 次");
+
+        return new("runtime-session", "运行会话", "ok", snapshot.PreviousExitText);
     }
 
     private static StartupHealthItemV044 CheckWebView2()
@@ -161,6 +175,14 @@ internal static class ProductExperienceV044
         public DateTimeOffset? ReadinessScanPassedAt { get; set; }
         public string? LastObservedCycleId { get; set; }
         public string? LastEngineState { get; set; }
+        public int UncleanExitCount { get; set; }
+        public DateTimeOffset? LastCleanExitAt { get; set; }
+        public DateTimeOffset? LastUncleanDetectedAt { get; set; }
+        public DateTimeOffset? LastSessionStartedAt { get; set; }
+        public long LastSessionDurationSeconds { get; set; }
+        public DateTimeOffset? LastTempCleanupAt { get; set; }
+        public int LastTempCleanupFiles { get; set; }
+        public long LastTempCleanupBytes { get; set; }
         public List<ProductActivityV044> Activities { get; set; } = new();
     }
 
@@ -173,6 +195,11 @@ internal static class ProductExperienceV044
     public static bool SidecarRecoveredFromBackup { get; private set; }
     public static bool ConnectionDiagnosticPassed { get { lock (Gate) return _state.ConnectionDiagnosticPassedAt.HasValue; } }
     public static bool ReadinessScanPassed { get { lock (Gate) return _state.ReadinessScanPassedAt.HasValue; } }
+    public static int UncleanExitCount { get { lock (Gate) return _state.UncleanExitCount; } }
+    public static DateTimeOffset? LastCleanExitAt { get { lock (Gate) return _state.LastCleanExitAt; } }
+    public static DateTimeOffset? LastTempCleanupAt { get { lock (Gate) return _state.LastTempCleanupAt; } }
+    public static int LastTempCleanupFiles { get { lock (Gate) return _state.LastTempCleanupFiles; } }
+    public static long LastTempCleanupBytes { get { lock (Gate) return _state.LastTempCleanupBytes; } }
 
     public static void Initialize(string localRoot)
     {
@@ -265,6 +292,59 @@ internal static class ProductExperienceV044
         }
     }
 
+    public static void BeginRuntimeSession(
+        DateTimeOffset startedAt,
+        bool previousUnclean,
+        DateTimeOffset? previousStartedAt,
+        DateTimeOffset? previousHeartbeatAt,
+        string? previousEngineState,
+        int cleanedTempFiles,
+        long cleanedTempBytes)
+    {
+        lock (Gate)
+        {
+            _state.LastSessionStartedAt = startedAt;
+            if (previousUnclean)
+            {
+                _state.UncleanExitCount++;
+                _state.LastUncleanDetectedAt = startedAt;
+                var heartbeat = previousHeartbeatAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "未知";
+                var state = string.IsNullOrWhiteSpace(previousEngineState) ? "未知状态" : previousEngineState;
+                _state.Activities.Add(new ProductActivityV044(
+                    startedAt,
+                    "检测到上次异常中断",
+                    $"上次会话最后心跳 {heartbeat}，状态 {state}。本次将继续使用已持久化的安全账本恢复。",
+                    "warning"));
+            }
+
+            if (cleanedTempFiles > 0)
+            {
+                _state.LastTempCleanupAt = startedAt;
+                _state.LastTempCleanupFiles = cleanedTempFiles;
+                _state.LastTempCleanupBytes = Math.Max(0, cleanedTempBytes);
+                _state.Activities.Add(new ProductActivityV044(
+                    startedAt,
+                    "已清理中断残留",
+                    $"启动前清理 {cleanedTempFiles} 个未完成临时文件，共 {FormatBytesCompact(cleanedTempBytes)}。迁移进度仍由持久化账本决定。",
+                    "info"));
+            }
+
+            TrimActivities();
+            SaveLocked();
+        }
+    }
+
+    public static void EndRuntimeSession(DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
+        lock (Gate)
+        {
+            _state.LastSessionStartedAt = startedAt;
+            _state.LastCleanExitAt = endedAt;
+            _state.LastSessionDurationSeconds = Math.Max(0, (long)(endedAt - startedAt).TotalSeconds);
+            SaveLocked();
+        }
+    }
+
     public static void ResetInitializationChecks()
     {
         lock (Gate)
@@ -310,6 +390,7 @@ internal static class ProductExperienceV044
 
         var quota = QuotaPolicy.GetSnapshot(host.Config, host.State, DateTimeOffset.Now);
         var reconcile = LoadReconciliation(host.Paths.RoamingRoot);
+        var runtimeSession = RuntimeSessionV046.GetSnapshot();
         var report = new
         {
             product = "DavBridge",
@@ -323,6 +404,17 @@ internal static class ProductExperienceV044
                 dotnet = Environment.Version.ToString(),
                 process64Bit = Environment.Is64BitProcess,
                 webView2 = health.Items.FirstOrDefault(item => item.Key == "webview2")?.Detail ?? "unknown"
+            },
+            runtimeSession = new
+            {
+                startedAt = runtimeSession.StartedAt,
+                uptimeSeconds = runtimeSession.UptimeSeconds,
+                previousExit = runtimeSession.PreviousExitText,
+                previousExitUnclean = runtimeSession.PreviousExitUnclean,
+                uncleanExitCount = runtimeSession.UncleanExitCount,
+                lastHeartbeatAt = runtimeSession.LastHeartbeatAt,
+                tempCleanupFiles = runtimeSession.CleanedTempFiles,
+                tempCleanupBytes = runtimeSession.CleanedTempBytes
             },
             state = new
             {
@@ -471,6 +563,15 @@ internal static class ProductExperienceV044
             File.Move(temp, _path, true);
         }
         catch { }
+    }
+
+    private static string FormatBytesCompact(long bytes)
+    {
+        var value = Math.Max(0, bytes);
+        if (value >= 1_000_000_000L) return $"{value / 1_000_000_000d:0.0} GB";
+        if (value >= 1_000_000L) return $"{value / 1_000_000d:0.0} MB";
+        if (value >= 1_000L) return $"{value / 1_000d:0.0} KB";
+        return $"{value} B";
     }
 
     private static string Clip(string value, int max) => value.Length <= max ? value : value[..max];

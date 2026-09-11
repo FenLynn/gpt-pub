@@ -175,6 +175,12 @@ internal sealed class WebUiHostV040 : IDisposable
         var activities = ProductExperienceV044.RecentActivities()
             .Select(item => new ActivityDto(item.At.ToLocalTime().ToString("MM-dd HH:mm"), item.Title, item.Detail, item.Tone))
             .ToArray();
+        var runtime = RuntimeSessionV046.GetSnapshot();
+        var runtimeDto = new RuntimeDto(
+            runtime.UptimeText,
+            runtime.PreviousExitText,
+            runtime.UncleanExitCount,
+            runtime.CleanupText);
 
         return new WebSnapshot(
             BuildInfoV044.Version,
@@ -208,6 +214,7 @@ internal sealed class WebUiHostV040 : IDisposable
             primary,
             primaryLabel,
             healthDto,
+            runtimeDto,
             initialization,
             activities,
             BuildRecycleGroups());
@@ -260,6 +267,7 @@ internal sealed class WebUiHostV040 : IDisposable
     private sealed record PhaseDto(string Key,string Label,string State,string Hint);
     private sealed record QuotaDto(long UploadUsed,long UploadMax,string UploadText,long DownloadUsed,long DownloadMax,string DownloadText,string ResetText,bool IsSprint);
     private sealed record HealthDto(string Status,string Summary,string CheckedAt);
+    private sealed record RuntimeDto(string UptimeText,string PreviousExitText,int UncleanExitCount,string CleanupText);
     private sealed record InitializationDto(string Key,string Label,bool Done,string Hint);
     private sealed record ActivityDto(string Time,string Title,string Detail,string Tone);
     private sealed record RecycleDto(string GroupKey,string Name,string FirstMissing,string LastDecision,string SizeText,string VerifiedText,string State,string Disposition,string? Issue);
@@ -287,6 +295,7 @@ internal sealed class WebUiHostV040 : IDisposable
         string PrimaryAction,
         string PrimaryLabel,
         HealthDto Health,
+        RuntimeDto Runtime,
         IReadOnlyList<InitializationDto> Initialization,
         IReadOnlyList<ActivityDto> Activities,
         IReadOnlyList<RecycleDto> Recycle);

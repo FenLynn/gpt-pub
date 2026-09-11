@@ -304,6 +304,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
           <div><dt>版本</dt><dd>v{{ snapshot.version }}</dd></div>
           <div><dt>构建</dt><dd>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</dd></div>
           <div><dt>运行环境</dt><dd :class="`health-text ${snapshot.health.status}`">{{ snapshot.health.summary }}</dd></div>
+          <div><dt>运行会话</dt><dd>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</dd></div>
           <div><dt>初始化</dt><dd>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</dd></div>
           <div><dt>引擎</dt><dd>.NET 8 + WebView2</dd></div>
           <div><dt>界面</dt><dd>Vue 3</dd></div>

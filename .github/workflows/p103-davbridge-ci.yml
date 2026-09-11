@@ -171,7 +171,7 @@ jobs:
           if (!(Test-Path $exe -PathType Leaf)) { throw 'DavBridge.exe missing' }
           $unexpected=Get-ChildItem 'build/DavBridge' -File | Where-Object { $_.Name -ne 'DavBridge.exe' }
           if ($unexpected) { $unexpected | Select-Object Name,Length | Format-Table; throw 'Default P103 Runtime must remain a single-file delivery.' }
-          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','reconcile.json','product-experience.json','product-experience.json.bak','startup-error.log','DavBridge.log')) {
+          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','reconcile.json','product-experience.json','product-experience.json.bak','runtime-session.json','startup-error.log','DavBridge.log')) {
             if (Get-ChildItem 'build/DavBridge' -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private Data leaked into Runtime: $private" }
           }
 
@@ -191,7 +191,7 @@ jobs:
             if ($proc.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "DavBridge self-test exit code $($proc.ExitCode)" }
             $json=(Get-Content $report -Raw) | ConvertFrom-Json
             if (-not $json.ok -or -not $json.webUiEmbedded -or -not $json.bridgeWhitelistValidated -or $json.coreLogicMovedToJavaScript) { throw 'DavBridge v0.4 native-host self-test failed' }
-            if (-not $json.configBackupRecovery -or -not $json.stateBackupRecovery -or -not $json.reconcileBackupRecovery -or -not $json.productSidecarBackupRecovery -or -not $json.backgroundWakeSignal) { throw 'DavBridge v0.4.5 recovery self-test failed' }
+            if (-not $json.configBackupRecovery -or -not $json.stateBackupRecovery -or -not $json.reconcileBackupRecovery -or -not $json.productSidecarBackupRecovery -or -not $json.runtimeSessionSelfTest -or -not $json.backgroundWakeSignal) { throw 'DavBridge v0.4.6 recovery self-test failed' }
             if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version mismatch: $($json.version)" }
           } finally { $env:APPDATA=$oldAppData; $env:LOCALAPPDATA=$oldLocal; Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
 

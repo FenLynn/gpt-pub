@@ -46,6 +46,7 @@ internal static class Program
             {
                 AppBranding.Apply(form);
                 singleInstance.Attach(form);
+                using var runtimeSession = RuntimeSessionV046.Attach(host);
                 using var resilience = RuntimeResilienceV045.Attach(host);
                 using var reconciliation = ReconciliationRuntimeV030.Attach(host);
                 using var webUi = WebUiHostV040.Attach(form, host, reconciliation);
@@ -90,6 +91,7 @@ internal static class Program
             var stateBackupRecovery = ValidateStateBackupRecovery(recoveryRoot);
             var reconcileBackupRecovery = ValidateReconcileBackupRecovery(recoveryRoot);
             var productSidecarBackupRecovery = ProductExperienceV044.ValidateBackupRecoveryForSelfTest(recoveryRoot);
+            var runtimeSessionSelfTest = RuntimeSessionV046.ValidateForSelfTest(paths.LocalRoot, paths.TempRoot);
 
             using var host = new AppHost();
             host.RequestBackgroundWake();
@@ -104,7 +106,7 @@ internal static class Program
                 local=paths.LocalRoot,
                 temp=paths.TempRoot,
                 nativeHostConstructed=true,
-                uiGeneration="v0.4.5-vue3-webview2-sidebar-dashboard",
+                uiGeneration="v0.4.6-vue3-webview2-sidebar-dashboard",
                 webUiEmbedded=true,
                 bridgeWhitelistValidated=true,
                 coreLogicMovedToJavaScript=false,
@@ -112,6 +114,7 @@ internal static class Program
                 stateBackupRecovery,
                 reconcileBackupRecovery,
                 productSidecarBackupRecovery,
+                runtimeSessionSelfTest,
                 backgroundWakeSignal=true,
                 ok=true
             });
