@@ -25,6 +25,11 @@ const resetLabel = computed(() => {
   const match = snapshot.value.quota.resetText.match(/(\d{4})-(\d{2})-(\d{2}).*?(\d{2}:\d{2})/)
   return match ? `${match[2]}/${match[3]} ${match[4]} 重置` : snapshot.value.quota.resetText
 })
+function formatQuotaBytes(bytes:number){
+  return bytes >= 1_000_000_000 ? `${(bytes/1_000_000_000).toFixed(1)} GB` : `${(bytes/1_000_000).toFixed(1)} MB`
+}
+const uploadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.uploadUsed)} / ${formatQuotaBytes(snapshot.value.quota.uploadMax)}`)
+const downloadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.downloadUsed)} / ${formatQuotaBytes(snapshot.value.quota.downloadMax)}`)
 
 function notify(message: string) { toast.value = message; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toast.value = '', 2600) }
 async function refresh() { if (!isNative) return; try { snapshot.value = await invoke<DavBridgeSnapshot>('app.getSnapshot') } catch (error) { notify(error instanceof Error ? error.message : '状态读取失败') } }
@@ -93,44 +98,80 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
 
       <section class="route-card route-card-polished">
         <div class="endpoint source has-tip" data-tip="InfiniCLOUD 是唯一 authoritative source，DavBridge 对源端只读">
-          <svg class="cloud-logo" viewBox="0 0 48 28" aria-hidden="true"><path d="M15 23h20a9 9 0 0 0 1-17 13 13 0 0 0-23-1A9 9 0 0 0 15 23Z"/></svg>
+          <svg class="cloud-logo" viewBox="0 0 56 38" aria-hidden="true">
+            <path class="cloud-fill" d="M16.5 31.5h25.2c7.3 0 11.8-4.2 11.8-10.2 0-5.8-4.1-9.6-9.8-10.1C40.9 4.9 35.7 2 29.7 2 22 2 15.8 7.2 14.6 14.5 7.6 15 3 18.8 3 24.1c0 4.4 3.9 7.4 13.5 7.4Z"/>
+            <path class="cloud-highlight" d="M15.8 26.5h27.4"/>
+          </svg>
           <strong>InfiniCLOUD</strong>
         </div>
         <div class="route-core has-tip" :data-tip="snapshot.routeStatus">
           <div class="route-line"><i></i><b>›</b><i></i></div>
         </div>
         <div class="endpoint target has-tip" data-tip="坚果云保存经过 StrongVerified 的强校验镜像">
+          <svg class="nut-logo" viewBox="0 0 42 48" aria-hidden="true">
+            <path class="nut-body" d="M8.7 22.6c3.7-8.7 14.9-13 22.2-7.9 7.1 5 5 18.2-1.1 25.2-4.8 5.4-12 6.7-17 1.9-5.7-5.4-7.5-11.1-4.1-19.2Z"/>
+            <path class="nut-cap" d="M7.7 21.1c4.7-9.2 18.7-14.3 27-6.8 1.2 1.1 1.2 3-.2 3.8-7.9 4.4-17.1 6.3-25.9 5.4-1.4-.1-1.7-1.3-.9-2.4Z"/>
+            <path class="nut-stem" d="M21.7 10.4c-.1-4.1 1.4-6.9 4.5-8.3"/>
+            <path class="nut-leaf" d="M27.2 7.6C30 2.2 35.1.8 39.2 1.6c-.7 5.1-4.4 8.1-10.7 8.4Z"/>
+          </svg>
           <strong>坚果云</strong>
-          <svg class="nut-logo" viewBox="0 0 30 34" aria-hidden="true"><path d="M18 7c6 1 9 5 8 11-1 8-5 13-11 13S5 26 5 18c0-6 5-10 13-11Z"/><path d="M17 8c1-5 4-7 9-7-1 5-4 7-9 7Z"/></svg>
         </div>
 
         <div class="phase-row">
           <div v-for="(phase,index) in snapshot.phases" :key="phase.key" class="phase-wrap">
-            <div class="phase has-tip" :class="phase.state" :data-tip="phase.hint"><span class="phase-icon">{{ phase.state==='done' ? '✓' : index+1 }}</span><strong>{{ phase.label }}</strong></div>
-            <span v-if="index<snapshot.phases.length-1" class="phase-arrow">›</span>
+            <div class="phase has-tip" :class="phase.state" :data-tip="phase.hint"><span class="phase-icon">{{ phase.state==='done' ? '✓' : '' }}</span><strong>{{ phase.label }}</strong></div>
+            <span v-if="index<snapshot.phases.length-1" class="phase-connector"></span>
           </div>
         </div>
       </section>
 
       <div class="dashboard-grid">
         <article class="dashboard-card coverage-card">
-          <header><div class="card-title has-tip" data-tip="StrongVerified 表示源端与目标端均重新读取并完成 SHA-256 一致性验证"><span class="card-icon shield">✓</span><h3>镜像覆盖</h3></div></header>
-          <div class="metric-line"><b>{{ coveragePercent }}<small>%</small></b><span>{{ snapshot.coverageText }}</span></div>
-          <div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div>
-        </article>
-
-        <article class="dashboard-card task-card">
-          <header><div class="card-title has-tip" :data-tip="snapshot.currentDetail"><span class="card-icon task">▤</span><h3>当前任务</h3></div><span class="state-chip" :class="`tone-${snapshot.routeTone}`">{{ snapshot.engineState }}</span></header>
-          <strong class="task-name">{{ snapshot.currentTitle }}</strong>
-          <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div><strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong></div>
-          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">{{ busy?'处理中…':snapshot.primaryLabel }}</button></div>
+          <div class="feature-icon coverage-feature" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="coverage-copy">
+            <div class="card-title"><h3>镜像覆盖</h3><span class="info-dot has-tip" data-tip="StrongVerified 表示源端与目标端均重新读取并完成 SHA-256 一致性验证">i</span></div>
+            <span class="coverage-count">{{ snapshot.verified }} / {{ snapshot.total }} 已校准</span>
+          </div>
+          <div class="progress-track coverage-progress"><i :style="{width:`${coveragePercent}%`}"></i></div>
+          <b class="coverage-percent">{{ coveragePercent }}<small>%</small></b>
         </article>
 
         <article class="dashboard-card quota-card">
-          <header><div class="card-title has-tip" :data-tip="quotaTip"><span class="card-icon quota">▥</span><h3>流量预算</h3></div></header>
-          <div class="quota-row"><span class="quota-arrow up">↑</span><div><div class="quota-text"><span>上传</span><strong>{{ snapshot.quota.uploadText }}</strong><b>{{ Math.round(uploadFraction*100) }}%</b></div><div class="quota-track" :class="quotaClass(uploadFraction)"><i :style="{width:`${uploadFraction*100}%`}"></i></div></div></div>
-          <div class="quota-row"><span class="quota-arrow down">↓</span><div><div class="quota-text"><span>下载</span><strong>{{ snapshot.quota.downloadText }}</strong><b>{{ Math.round(downloadFraction*100) }}%</b></div><div class="quota-track" :class="quotaClass(downloadFraction)"><i :style="{width:`${downloadFraction*100}%`}"></i></div></div></div>
-          <div class="reset-row compact-reset has-tip" :data-tip="snapshot.quota.resetText"><span>◷</span><strong>{{ resetLabel }}</strong></div>
+          <div class="feature-icon quota-feature" aria-hidden="true"><span>↑</span><span>↓</span></div>
+          <div class="quota-content">
+            <div class="quota-head">
+              <div class="card-title"><h3>流量预算</h3><span class="info-dot has-tip" :data-tip="quotaTip">i</span></div>
+              <span class="quota-reset has-tip" :data-tip="snapshot.quota.resetText">{{ resetLabel }}</span>
+            </div>
+            <div class="quota-columns">
+              <div class="quota-item">
+                <span class="quota-arrow up">↑</span>
+                <div class="quota-main">
+                  <div class="quota-text"><span>上传</span><strong>{{ uploadText }}</strong></div>
+                  <div class="quota-track" :class="quotaClass(uploadFraction)"><i :style="{width:`${uploadFraction*100}%`}"></i></div>
+                </div>
+                <b class="quota-percent" :class="quotaClass(uploadFraction)">{{ Math.round(uploadFraction*100) }}<small>%</small></b>
+              </div>
+              <div class="quota-item">
+                <span class="quota-arrow down">↓</span>
+                <div class="quota-main">
+                  <div class="quota-text"><span>下载</span><strong>{{ downloadText }}</strong></div>
+                  <div class="quota-track" :class="quotaClass(downloadFraction)"><i :style="{width:`${downloadFraction*100}%`}"></i></div>
+                </div>
+                <b class="quota-percent" :class="quotaClass(downloadFraction)">{{ Math.round(downloadFraction*100) }}<small>%</small></b>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="dashboard-card task-card">
+          <div class="feature-icon task-feature" aria-hidden="true"><span>▤</span></div>
+          <div class="task-copy">
+            <div class="card-title"><h3>当前任务</h3><span class="info-dot has-tip" :data-tip="snapshot.currentDetail">i</span></div>
+            <strong class="task-name">{{ snapshot.currentTitle }}</strong>
+            <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div><strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong></div>
+          </div>
+          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">{{ busy?'处理中…':snapshot.primaryLabel }}</button></div>
         </article>
       </div>
     </section>
