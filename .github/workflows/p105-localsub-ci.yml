@@ -133,7 +133,7 @@ jobs:
           $edge = $edgeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $edge) { throw 'Microsoft Edge was not found for WebUi visual preview.' }
           New-Item -ItemType Directory -Force preview | Out-Null
-          $uri = ([Uri](Resolve-Path 'dist/index.html')).AbsoluteUri
+          $uri = [Uri]::new((Resolve-Path 'dist/index.html').Path).AbsoluteUri
           foreach ($spec in @(
             @{ Name='1280x800'; Size='1280,800' },
             @{ Name='1600x1000'; Size='1600,1000' }
