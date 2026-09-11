@@ -405,13 +405,13 @@ internal sealed class LiveSessionController : IAsyncDisposable
         if (SynchronizationContext.Current == _uiContext)
             return action();
 
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _uiContext.Post(async _ =>
         {
             try
             {
                 await action();
-                completion.TrySetResult();
+                completion.TrySetResult(true);
             }
             catch (Exception ex)
             {
