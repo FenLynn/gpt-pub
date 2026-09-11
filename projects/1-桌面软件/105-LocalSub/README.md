@@ -62,7 +62,8 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - 用户特定媒体、模型和机器条件下的高负载 GUI 响应性仍属于实机待验证项。
 - Phase 1B.0 Application Contract 已完成第一版。
 - Phase 1B.1 realtime Core 迁移第一闭环已完成，最后完整验证代码 head 为 `944cc4674b3fecefae5ef88c1c4bc88f30918013`，CI run `34581474053` success。
-- 当前开始 Phase 2A，建立 WebView2 + Vue 3 + TypeScript 主 Shell，同时保留旧 WinForms 作为验证与回退界面。
+- Phase 2A Web Shell 第一闭环已完成，Vue 3 + TypeScript + Vite production bundle 已嵌入 `LocalSub.exe`，真实 WebView2 bridge smoke 已通过；默认启动仍保留旧 WinForms。
+- Phase 2A 最后完整验证代码 head 为 `3c31bd4951304ba637eee2fc8ed60d5f66fa6bc5`，CI run `34583489679` success。
 - Phase 1B.2 模型重任务迁 Core 可在稳定契约下与 Web UI 后续交错推进。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
