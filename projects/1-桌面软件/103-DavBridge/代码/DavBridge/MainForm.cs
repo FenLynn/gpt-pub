@@ -36,6 +36,7 @@ internal sealed class MainForm : Form
     private bool _exitRequested;
     private bool _advancedVisible;
     private EngineState? _lastNotifiedState;
+    private EngineState? _lastActivityState;
     private V2CompatibilityStore? _compatStore;
     private V2CompatibilityState _compatState = new();
 
@@ -43,6 +44,7 @@ internal sealed class MainForm : Form
     {
         _host = host;
         _launchInBackground = launchInBackground;
+        ProductExperienceV044.Initialize(_host.Paths.LocalRoot);
         Text = "DavBridge";
         Width = 1100;
         Height = 620;
@@ -272,6 +274,9 @@ internal sealed class MainForm : Form
             _compatStore = new V2CompatibilityStore(_host.Paths.RoamingRoot);
             _compatState = _compatStore.Load();
             AdoptCurrentLegacySafetyProfileIfEligible();
+            ProductExperienceV044.Record("应用启动", "本机配置、账本与运行状态已载入。", "info");
+            ProductExperienceV044.RecordEngineState(_host.State.EngineState);
+            await RunStartupHealthCheckAsync(publishNotice: false);
             UpdateView();
             ApplyResponsiveLayout();
             if (!_host.IsConfigured)
@@ -336,6 +341,7 @@ internal sealed class MainForm : Form
         }
 
         await _host.ResumeAsync(_appCts.Token);
+        ProductExperienceV044.Record("迁移已继续", "自动调度已恢复，DavBridge 将继续执行当前安全队列。", "info");
         try
         {
             await _host.RunOnceAsync(_appCts.Token);
@@ -350,6 +356,7 @@ internal sealed class MainForm : Form
     private async Task PauseAsync()
     {
         await _host.PauseAsync(_appCts.Token);
+        ProductExperienceV044.Record("迁移已暂停", "当前进度与流量账本已经保存。", "info");
         UpdateView();
     }
 
@@ -368,10 +375,17 @@ internal sealed class MainForm : Form
             if (!result.TargetBaseOk)
                 text += "\n\n若坚果云为 401，请在设置中确认用户名为注册邮箱，并重新输入当前有效的第三方应用密码。不要使用网页登录密码。";
 
+            ProductExperienceV044.MarkConnectionDiagnostic(result.AllOk);
             if (result.AllOk)
+            {
+                ProductExperienceV044.Record("连接诊断通过", "源端与目标 WebDAV 均可访问。", "success");
                 UiFeedbackBusV044.Publish("连接诊断通过", "InfiniCLOUD 与坚果云 WebDAV 均可访问。", "success");
+            }
             else
+            {
+                ProductExperienceV044.Record("连接诊断需处理", "至少一个 WebDAV 端点未通过连接检查。", "warning");
                 MessageBox.Show(this, text, "连接诊断", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
         catch (Exception ex)
         {
@@ -406,12 +420,20 @@ internal sealed class MainForm : Form
                     : targetVisible >= 750
                         ? "本次目录列举已达到 750 项上限，实际目标文件可能更多；迁移按准确文件路径逐个确认，不依赖列表完整性"
                         : "既有目标文件后续将逐个强校验并安全接管一致文件";
-                if (report.OversizeObjects.Count == 0 && report.UnpairedZoteroObjects.Count == 0)
+                var readinessOk = report.OversizeObjects.Count == 0 && report.UnpairedZoteroObjects.Count == 0;
+                ProductExperienceV044.MarkReadinessScan(readinessOk);
+                if (readinessOk)
+                {
+                    ProductExperienceV044.Record("就绪扫描完成", $"已检查 {report.GroupCount:N0} 个 Zotero 逻辑组，未发现阻塞项。", "success");
                     UiFeedbackBusV044.Publish("就绪扫描完成", $"源端 {report.ObjectCount:N0} 个对象，{report.GroupCount:N0} 个 Zotero 逻辑组，当前未发现阻塞项。", "success");
+                }
                 else
+                {
+                    ProductExperienceV044.Record("就绪扫描需处理", "扫描发现超限文件或不完整 Zotero 配对。", "warning");
                     MessageBox.Show(this,
                         $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端本次可见文件：{FormatTargetVisibleCount(targetVisible)}\n目标策略：{targetNote}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
                         "迁移就绪扫描", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
 
             return (report, targetVisible);
@@ -431,6 +453,7 @@ internal sealed class MainForm : Form
         using var dialog = new CalibrationDialog(_host.Config);
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         await _host.CalibrateAsync(dialog.UploadUsedBytes, dialog.DownloadUsedBytes, dialog.NextResetAt, _appCts.Token);
+        ProductExperienceV044.Record("流量已校准", "已更新本周期上传、下载账本与下一次重置日期。", "success");
         UpdateView();
     }
 
@@ -480,7 +503,10 @@ internal sealed class MainForm : Form
                 : "本组存在目标缺失成员，已完成真实 PUT 和目标重新 GET 强校验。";
 
             if (result.Success)
+            {
+                ProductExperienceV044.Record("首组验证通过", "一个完整 Zotero 逻辑组已经完成真实双端 StrongVerified。", "success");
                 UiFeedbackBusV044.Publish("首组验证通过", $"逻辑组 {result.GroupKey} 已完成真实双端强校验。上传 {FormatBytes(result.UploadBytes)}，校验下载 {FormatBytes(result.DownloadBytes)}。", "success");
+            }
             else
                 MessageBox.Show(this,
                     $"组：{result.GroupKey}\n结果：未通过\n\n{memberStates}\n\n本次计入上传：{FormatBytes(result.UploadBytes)}\n本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{mode}\n{result.Message}",
@@ -544,7 +570,10 @@ internal sealed class MainForm : Form
             var memberStates = string.Join(Environment.NewLine,
                 result.Records.Select(record => $"  {record.RelativePath}: {record.Status}"));
             if (result.Success)
+            {
+                ProductExperienceV044.Record("既有副本验证通过", "既有目标副本已经在零上传条件下完成 NO-WRITE 接管验证。", "success");
                 UiFeedbackBusV044.Publish("既有副本验证通过", $"逻辑组 {result.GroupKey} 已在 0 B 上传条件下完成 NO-WRITE 接管验证。", "success");
+            }
             else
                 MessageBox.Show(this,
                     $"组：{result.GroupKey}\n结果：未通过\n\n{memberStates}\n\n本次计入上传：{FormatBytes(result.UploadBytes)}\n本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{result.Message}",
@@ -582,9 +611,12 @@ internal sealed class MainForm : Form
         {
             _compatState.LegacySafetyFingerprint = null;
             _compatStore.Save(_compatState);
+            ProductExperienceV044.ResetInitializationChecks();
+            ProductExperienceV044.Record("端点配置已变化", "初始化检查状态已经重置，旧安全门不会沿用到新端点。", "warning");
             ToggleAdvanced(true);
             UiFeedbackBusV044.Publish("需要重新验证", "关键端点配置已经变化。原任务进度仍完整保留，但旧安全门资格不会沿用，请对新配置重新执行初始化验证。", "warning");
         }
+        ProductExperienceV044.Record("设置已保存", "DavBridge 设置已更新。", "info");
         UpdateView();
     }
 
@@ -600,6 +632,11 @@ internal sealed class MainForm : Form
         SafeUi(() =>
         {
             UpdateView(progress);
+            if (_lastActivityState != progress.State)
+            {
+                ProductExperienceV044.RecordEngineState(progress.State);
+                _lastActivityState = progress.State;
+            }
             var important = progress.State is EngineState.WaitQuota or EngineState.WaitRetry or EngineState.Complete;
             if (important && _lastNotifiedState != progress.State)
             {
@@ -712,6 +749,34 @@ internal sealed class MainForm : Form
         if (message.Contains("Re-downloading target", StringComparison.OrdinalIgnoreCase)) return "正在重新读取目标文件并做强校验";
         if (message.Contains("strongly verified", StringComparison.OrdinalIgnoreCase)) return "目标文件已通过强校验";
         return message;
+    }
+
+    private async Task RunStartupHealthCheckAsync() => await RunStartupHealthCheckAsync(publishNotice: true);
+
+    private async Task RunStartupHealthCheckAsync(bool publishNotice)
+    {
+        var report = await StartupHealthV044.CheckAsync(_host, _appCts.Token);
+        ProductExperienceV044.SetHealth(report);
+        ProductExperienceV044.Record(
+            "运行环境自检",
+            report.Status == "ok" ? "运行依赖与本机 Data 状态正常。" : "运行环境存在需要注意的检查项。",
+            report.Status == "ok" ? "success" : "warning");
+
+        if (publishNotice)
+            UiFeedbackBusV044.Publish(
+                report.Status == "ok" ? "运行环境正常" : "运行环境需要检查",
+                report.Summary,
+                report.Status == "ok" ? "success" : "warning");
+    }
+
+    private async Task ExportDiagnosticsAsync()
+    {
+        var exported = await ProductExperienceV044.ExportDiagnosticsAsync(this, _host, _appCts.Token);
+        if (!string.IsNullOrWhiteSpace(exported))
+        {
+            ProductExperienceV044.Record("诊断信息已导出", "已生成不含凭据、文件名和私人目录的脱敏诊断包。", "success");
+            UiFeedbackBusV044.Publish("诊断信息已导出", $"已生成 {Path.GetFileName(exported)}。", "success");
+        }
     }
 
     private void ShowWindow()

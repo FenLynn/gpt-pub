@@ -31,6 +31,13 @@ internal static class Program
             return;
         }
 
+        var fatalPreflight = StartupHealthV044.GetFatalPreflightIssue();
+        if (!string.IsNullOrWhiteSpace(fatalPreflight))
+        {
+            MessageBox.Show(fatalPreflight, "DavBridge 无法启动", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
         try
         {
             using var host = new AppHost();

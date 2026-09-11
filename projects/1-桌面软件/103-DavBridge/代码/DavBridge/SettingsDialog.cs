@@ -301,7 +301,11 @@ internal sealed class SettingsDialog : Form
         var host = main is null ? null : UiCommandBridge.GetHost(main);
         var firstPassed = host is not null && FirstGroupValidationRunner.HasCompletedZoteroValidation(host.State);
         var existingPassed = host?.State.ExistingReplicaValidationPassed == true;
+        var steps = ProductExperienceV044.BuildInitializationSteps(host);
+        if (steps.Any(step => !step.Done))
+            AddFull(table, BuildInitializationRail(steps));
 
+        var health = ProductExperienceV044.Health;
         var list = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -311,16 +315,49 @@ internal sealed class SettingsDialog : Form
             BackColor = Color.FromArgb(248, 251, 254)
         };
         list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        list.Controls.Add(MaintenanceRow("连接诊断", "检查源端、坚果云根目录和 Zotero 目标目录是否可访问。", "DiagnoseConnectionsAsync", "可执行", false));
-        list.Controls.Add(MaintenanceRow("迁移就绪扫描", "重新读取源清单并检查文件上限、Zotero 配对和迁移条件。", "ScanAsync", "可执行", false));
-        list.Controls.Add(MaintenanceRow("校准流量", "按坚果云官方页面人工校正本周期上传、下载与重置日期。", "CalibrateAsync", "人工校准", false));
+        list.Controls.Add(MaintenanceRow("运行环境自检", "检查 .NET 8、WebView2、Data 目录读写以及 config/state/reconcile 的可恢复性。", "RunStartupHealthCheckAsync", health.Status == "not_checked" ? "待检查" : health.Status == "ok" ? "✓ 正常" : "需注意", health.Status == "ok", "检查"));
+        list.Controls.Add(MaintenanceRow("连接诊断", "检查源端、坚果云根目录和 Zotero 目标目录是否可访问。", "DiagnoseConnectionsAsync", ProductExperienceV044.ConnectionDiagnosticPassed ? "✓ 已通过" : "可执行", ProductExperienceV044.ConnectionDiagnosticPassed));
+        list.Controls.Add(MaintenanceRow("迁移就绪扫描", "重新读取源清单并检查文件上限、Zotero 配对和迁移条件。", "ScanAsync", ProductExperienceV044.ReadinessScanPassed ? "✓ 已通过" : "可执行", ProductExperienceV044.ReadinessScanPassed));
+        list.Controls.Add(MaintenanceRow("校准流量", "按坚果云官方页面人工校正本周期上传、下载与重置日期。", "CalibrateAsync", host?.Config.NextResetAt != default ? "✓ 已校准" : "人工校准", host?.Config.NextResetAt != default, "校准"));
         list.Controls.Add(MaintenanceRow("首组验证", "真实迁移一个完整 Zotero 组并执行目标回读与 SHA-256 强校验。", "ValidateFirstGroupAsync", firstPassed ? "✓ 已通过" : "未执行", firstPassed));
         list.Controls.Add(MaintenanceRow("既有副本验证", "确认 GoodSync 等既有副本可在零上传条件下安全接管。", "ValidateExistingReplicaAsync", existingPassed ? "✓ 已通过" : "未执行", existingPassed));
+        list.Controls.Add(MaintenanceRow("导出诊断信息", "生成脱敏 ZIP，仅包含版本、运行环境、状态、额度、自检和最近活动，不包含密码、WebDAV 凭据、真实文件名或私人目录。", "ExportDiagnosticsAsync", "脱敏 ZIP", false, "导出"));
         AddFull(table, list);
         return WrapCategory(table);
     }
 
-    private Control MaintenanceRow(string title, string description, string methodName, string status, bool passed)
+    private Control BuildInitializationRail(IReadOnlyList<InitializationStepV044> steps)
+    {
+        var rail = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0, 0, 0, 8),
+            Padding = new Padding(0, 1, 0, 2),
+            BackColor = Color.FromArgb(248, 251, 254)
+        };
+        foreach (var step in steps)
+        {
+            var label = new Label
+            {
+                Text = (step.Done ? "✓ " : "○ ") + step.Label,
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 9F),
+                ForeColor = step.Done ? Color.FromArgb(38, 145, 87) : Color.FromArgb(104, 123, 141),
+                BackColor = step.Done ? Color.FromArgb(235, 248, 241) : Color.FromArgb(240, 245, 248),
+                Padding = new Padding(8, 5, 8, 5),
+                Margin = new Padding(0, 0, 6, 0),
+                Cursor = Cursors.Help
+            };
+            _tips.SetToolTip(label, step.Hint);
+            rail.Controls.Add(label);
+        }
+        return rail;
+    }
+
+    private Control MaintenanceRow(string title, string description, string methodName, string status, bool passed, string? actionText = null)
     {
         var row = new TableLayoutPanel
         {
@@ -363,7 +400,7 @@ internal sealed class SettingsDialog : Form
 
         var action = new Button
         {
-            Text = passed ? "重新验证" : (methodName == "CalibrateAsync" ? "校准" : "执行"),
+            Text = actionText ?? (passed ? "重新验证" : (methodName == "CalibrateAsync" ? "校准" : "执行")),
             Dock = DockStyle.Fill,
             Height = 34,
             FlatStyle = FlatStyle.Flat,
