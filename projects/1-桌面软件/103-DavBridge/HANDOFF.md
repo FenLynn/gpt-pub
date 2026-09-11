@@ -31,13 +31,13 @@
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-10af57a195fb33d66d4ada4b32c2dc4203d0d616
+dd4e3cb9eb5b7064bd03b79e8857f5bec4d8be6c
 ```
 
 对应 P103 CI：
 
 ```text
-run 34586790063
+run 34590388651
 scope          success
 core-smoke     success
 frontend       success
@@ -47,24 +47,24 @@ report-status  success
 
 Windows candidate：`DavBridge-v0.4.3-win-x64`
 
-Artifact ID：`10194009673`
+Artifact ID：`10195444710`
 
 EXE：
 
 ```text
 2279003 bytes
-SHA256 1ae093ff4d1d2c859580eda78cdb1b9cec65478c70d67eb7110106988fce71f1
+SHA256 f9472f8fca8b0e2251499f6c61e98ff22a1743abe20ecf599b1661204ae59d32
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-9defce9a72552593a8ec83aaafbf586639756e1e51fe318a6a1e2114348cc1c8
+7c5ee9b4d63c14aadcfbe8e25bd12f2665190ca837951a0753a75afb728037e5
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `10af57a1...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `dd4e3cb9...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
 
 ## 4. 当前分支快照
 
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-10af57a195fb33d66d4ada4b32c2dc4203d0d616
+dd4e3cb9eb5b7064bd03b79e8857f5bec4d8be6c
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -112,7 +112,7 @@ recycle.delete
 
 ## 6. 最新总览 UI 状态
 
-用户已确认总览页视觉质量良好。`10af57a1...` 完成 UI 与交互冻结轮：普通页面继续维持轻量 Apple / Google 风格；前端按钮增加一致的 hover、active、focus-visible 与 disabled 行为；MainForm、SettingsDialog 使用 DPI 自动缩放；普通初始化提示、配置变化、连接诊断成功、就绪扫描成功与安全验证成功不再弹传统 MessageBox，而是经 `UiFeedbackBusV044` 进入 Web UI 右上角轻量 notice。高风险确认、异常详情和失败详情继续保留原生确认框。托盘继续/暂停与主状态机保持一致。该 head 已通过完整 P103 CI。
+用户已确认总览页视觉质量良好。`dd4e3cb9...` 在 UI 与交互冻结轮基础上继续压缩内嵌设置页：四个分类的说明直接挂在顶部分类标签悬浮，不再单独占一整行；安全与维护各项说明直接挂在项目名称本身，取消独立 `ⓘ` 图标；移除重复的“维护工具”小标题；同时收紧顶部分类区、内容区、字段行距、输入框高度和底部按钮区，使设置页在不牺牲可读性的情况下明显减少纵向堆叠。该 head 已通过完整 P103 CI。
 
 第一，默认窗口由 880×560 调整为 1100×620，使真实 WinForms/WebView2 窗口与已确认参考图保持近似 16:9 的同一比例；原生标题改为简洁 `DavBridge`。Overview 的主要尺寸按该默认窗口逐项标定，较小窗口继续走响应式压缩。悬浮提示保持白色底纹、深色文字、浅边框和柔和阴影。
 
@@ -130,7 +130,7 @@ recycle.delete
 
 第八，首页主操作按钮按 EngineState 重新定义：Running 显示真正 SVG 双竖线“暂停”；Paused 显示“继续”；WaitRetry 显示“重试”；WaitQuota、WaitNetwork、WaitUser 与 Complete 默认不显示无意义操作；有人工审查时显示“前往审查”；未配置时显示“完成设置”。托盘菜单的继续/暂停也改为同一状态映射，Running 只允许暂停，Paused/WaitRetry 允许继续或重试，其余等待状态不再给出无意义操作。新增 `migration.retry` 白名单命令，但仍复用现有 C# 安全恢复路径。
 
-第九，设置页已从独立 SettingsDialog 弹窗改为主窗口右侧内嵌原生设置面板。实现方式继续保留 C# 原生敏感控件与 DPAPI 边界。二级分类位于顶部横向切换；重复的“设置”和分类大标题已移除。说明性提示与维护项说明不再常驻，改为 `ⓘ` 悬浮。TextBox 与 NumericUpDown 不再使用传统 FixedSingle 样式，而是放入自绘的浅色圆角 field surface；字段仍保持 URL、目录、用户、密码与数值的不同适中宽度。新增 `app.closeSettings` 用于从设置页直接切换其他导航；密码与凭据仍不进入 JavaScript。新增 `SilentNotifyIcon.cs`，继续保留 Windows 托盘图标、双击恢复、右键菜单、暂停、继续和退出功能，但所有 `ShowBalloonTip` 调用均成为 no op。额度不足、完成、重试等待等状态不再推送 Windows 右下角桌面气泡。状态仍在 DavBridge 自身 UI 内显示。
+第九，设置页已从独立 SettingsDialog 弹窗改为主窗口右侧内嵌原生设置面板。实现方式继续保留 C# 原生敏感控件与 DPAPI 边界。二级分类位于顶部横向切换；重复的“设置”和分类大标题已移除。分类级说明直接挂在顶部分类标签悬浮，不再在内容区占独立提示行；安全与维护各项说明直接挂在项目名称本身，不再显示独立 `ⓘ`。TextBox 与 NumericUpDown 使用自绘浅色圆角 field surface，字段按类型维持适中固定宽度；顶部、字段、分组与页脚垂直间距进一步压缩。新增 `app.closeSettings` 用于从设置页直接切换其他导航；密码与凭据仍不进入 JavaScript。新增 `SilentNotifyIcon.cs`，继续保留 Windows 托盘图标、双击恢复、右键菜单、暂停、继续和退出功能，但所有 `ShowBalloonTip` 调用均成为 no op。额度不足、完成、重试等待等状态不再推送 Windows 右下角桌面气泡。状态仍在 DavBridge 自身 UI 内显示。
 
 第十，新增交互反馈总线 `UiFeedbackBusV044`。普通成功、提示与可恢复警告在主 UI 右上角显示自动消失且可手动关闭的轻量 notice；安全相关 Yes/No 确认、DELETE 最终门、异常详情和失败详情仍保留原生 MessageBox，不降低安全门。
 
@@ -186,7 +186,7 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步需要在真实 Windows 上运行 `10af57a1...` 对应的 candidate，重点检查：
+用户下一步需要在真实 Windows 上运行 `dd4e3cb9...` 对应的 candidate，重点检查：
 
 1. 100%、125%、150% Windows 缩放下，总览、转移、回收站、文档、设置、关于的字号、留白与交互是否仍统一。
 2. 普通成功与提示是否只在 DavBridge 内显示右上角轻量 notice，不再出现老式信息 MessageBox；高风险确认仍应保持原生确认框。
