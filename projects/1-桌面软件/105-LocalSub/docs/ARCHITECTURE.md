@@ -101,9 +101,11 @@ v1 方法：`ping`、`analyze`、`transcribe`、`cancel`、`shutdown`。
 
 ## 迁移阶段
 
+迁移遵守 [Application Contract](APP_CONTRACT.md)，不再等待 Phase 1B 全部完成后才开始 Web UI。
+
 ### Phase 1A：后台进程隔离
 
-状态：**第一版已实现并通过历史 Windows CI，P105 正式 CI 需重新验证，用户实机响应性待验证。**
+状态：**自动化基线已建立，用户特定高负载 GUI 响应性仍待实机验证。**
 
 已迁移到 Core：
 
@@ -119,25 +121,73 @@ v1 方法：`ping`、`analyze`、`transcribe`、`cancel`、`shutdown`。
 - 波形绘制控件与结果展示
 - 模型页 UI
 - 实时 ASR
-- PotPlayer 捕获
+- PotPlayer 实时音频链
 - Overlay
 
 Shell 工程对后台媒体分析与后台转写完整实现采用编译期排除，只保留 Proxy，禁止 Core 故障时自动进程内 fallback。
 
-### Phase 1B：实时与模型核心迁移
+### Phase 1B.0：Application Contract
 
-仅在 1A 实机边界确认后分项推进：
+状态：**当前阶段。**
 
-- Streaming Zipformer / Paraformer / SenseVoice 实时识别迁入 Core
-- WASAPI 与 PotPlayer Process Loopback 迁入 Core
-- 模型下载、解压、删除和版本状态逐步迁入 Core
-- Shell 只接收 level、partial、final、status 等事件
+先固定：
 
-目标是即使 native ASR 或音频链异常，主窗口仍保持响应。
+- Shell / Core / Web UI 所有权
+- Snapshot DTO
+- Web UI command whitelist
+- Core event contract
+- realtime session 状态机
+- 回退基线
 
-### Phase 2：Vue 3 主界面
+本阶段不改变用户功能。
 
-在 Core API 稳定后新增 WebView2 主 UI：Vue 3、TypeScript、Vite 与 Canvas/SVG waveform。先并存，不一次删除 WinForms，逐页迁移后台、模型、设置和实时页面。
+### Phase 1B.1：实时链迁入 Core
+
+迁移：
+
+- Streaming Zipformer / Paraformer
+- SenseVoice / Fun-ASR-Nano 实时链
+- WASAPI
+- PotPlayer Process Loopback
+- audio queue
+- realtime model load
+- realtime decode loop
+
+Shell 长期只保留 PotPlayer 进程发现、PID、窗口位置和 Overlay 跟随。
+
+### Phase 2A：Web Shell
+
+建立 WebView2 + Vue 3 + TypeScript 主 Shell，先完成：
+
+- 左侧导航
+- Core 状态
+- 设置
+- 关于
+- 实时页面骨架
+
+Phase 2A 可以与 1B 后续交错推进，但只能消费已经冻结的 DTO 与白名单命令。
+
+### Phase 1B.2：模型重任务迁入 Core
+
+迁移：
+
+- 模型下载
+- 断点续传
+- 解压
+- 校验
+- 大目录替换
+- 重型删除
+
+### Phase 2B：逐页切换
+
+推荐顺序：
+
+1. 实时字幕
+2. 模型
+3. 后台转写与 waveform
+4. 设置细节
+
+每一页切换后继续复用同一个 Application Contract。
 
 ### Phase 3：轻量 Shell 收口
 
