@@ -22,6 +22,13 @@ internal sealed class SettingsDialog : Form
     private readonly CheckBox _sprint = new() { Text = "重置前 24 小时启用周期末冲刺", AutoSize = true };
     private readonly bool _endpointLocked;
     private readonly bool _embedded;
+    private readonly ToolTip _tips = new()
+    {
+        AutoPopDelay = 12000,
+        InitialDelay = 350,
+        ReshowDelay = 100,
+        ShowAlways = true
+    };
 
     public DavBridgeConfig Config { get; private set; }
     public string SourcePassword => _sourcePassword.Text;
@@ -47,15 +54,15 @@ internal sealed class SettingsDialog : Form
         foreach (var box in new[] { _sourceUrl, _sourceRoot, _sourceUser, _sourcePassword, _targetUrl, _targetRoot, _targetUser, _targetPassword })
         {
             box.Font = new Font("Segoe UI", 10F);
-            box.BorderStyle = BorderStyle.FixedSingle;
-            box.BackColor = Color.FromArgb(249, 252, 254);
+            box.BorderStyle = BorderStyle.None;
+            box.BackColor = Color.FromArgb(243, 248, 251);
             box.ForeColor = Color.FromArgb(31, 47, 67);
         }
         foreach (var number in new[] { _speed, _reserve, _sprintReserve })
         {
             number.Font = new Font("Segoe UI", 10F);
-            number.BorderStyle = BorderStyle.FixedSingle;
-            number.BackColor = Color.FromArgb(249, 252, 254);
+            number.BorderStyle = BorderStyle.None;
+            number.BackColor = Color.FromArgb(243, 248, 251);
             number.ForeColor = Color.FromArgb(31, 47, 67);
         }
         foreach (var check in new[] { _autoStart, _startMinimized, _autoResume, _sprint })
@@ -86,7 +93,7 @@ internal sealed class SettingsDialog : Form
             foreach (var box in new[] { _sourceUrl, _sourceRoot, _sourceUser, _targetUrl, _targetRoot, _targetUser })
             {
                 box.ReadOnly = true;
-                box.BackColor = Color.FromArgb(241, 246, 249);
+                box.ForeColor = Color.FromArgb(103, 120, 137);
             }
         }
 
@@ -119,8 +126,13 @@ internal sealed class SettingsDialog : Form
             Font = new Font("Segoe UI Semibold", 9.5F),
             TabStop = true
         };
-        button.FlatAppearance.BorderColor = Color.FromArgb(205, 220, 231);
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(235, 246, 253);
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(228, 242, 251);
+        if (text == "保存")
+        {
+            button.BackColor = Color.FromArgb(225, 241, 252);
+            button.ForeColor = Color.FromArgb(24, 118, 185);
+        }
         return button;
     }
 
@@ -136,20 +148,10 @@ internal sealed class SettingsDialog : Form
             Padding = new Padding(_embedded ? 34 : 28, _embedded ? 24 : 20, _embedded ? 38 : 28, 0)
         };
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 8));
         shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
-
-        var heading = new Label
-        {
-            Text = _embedded ? "设置" : "DavBridge 设置",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 18F),
-            ForeColor = Color.FromArgb(20, 34, 54),
-            Margin = new Padding(2, 4, 0, 0)
-        };
-        shell.Controls.Add(heading, 0, 0);
 
         var categories = new[]
         {
@@ -328,33 +330,45 @@ internal sealed class SettingsDialog : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 3,
-            Margin = new Padding(0, 0, 0, 6),
-            Padding = new Padding(0, 8, 0, 8),
+            Margin = new Padding(0, 0, 0, 4),
+            Padding = new Padding(0, 7, 0, 7),
             BackColor = Color.FromArgb(248, 251, 254)
         };
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84));
 
-        var info = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
-        info.Controls.Add(new Label
+        var titleLine = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = Padding.Empty,
+            BackColor = Color.FromArgb(248, 251, 254)
+        };
+        var titleLabel = new Label
         {
             Text = title,
             AutoSize = true,
             Font = new Font("Segoe UI Semibold", 10F),
             ForeColor = Color.FromArgb(38, 55, 72),
-            Margin = new Padding(10, 0, 0, 2)
-        });
-        info.Controls.Add(new Label
+            Margin = new Padding(10, 7, 6, 0)
+        };
+        var info = new Label
         {
-            Text = description,
+            Text = "ⓘ",
             AutoSize = true,
-            Font = new Font("Segoe UI", 9F),
-            ForeColor = Color.FromArgb(112, 132, 149),
-            MaximumSize = new Size(470, 0),
-            Margin = new Padding(10, 0, 10, 0)
-        });
-        row.Controls.Add(info, 0, 0);
+            Font = new Font("Segoe UI Symbol", 9F),
+            ForeColor = Color.FromArgb(139, 156, 171),
+            Cursor = Cursors.Help,
+            Margin = new Padding(0, 7, 0, 0)
+        };
+        _tips.SetToolTip(info, description);
+        _tips.SetToolTip(titleLabel, description);
+        titleLine.Controls.Add(titleLabel);
+        titleLine.Controls.Add(info);
+        row.Controls.Add(titleLine, 0, 0);
 
         var statusLabel = new Label
         {
@@ -374,13 +388,14 @@ internal sealed class SettingsDialog : Form
             Dock = DockStyle.Fill,
             Height = 34,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(245, 250, 253),
-            ForeColor = Color.FromArgb(52, 68, 82),
-            Margin = new Padding(4, 4, 8, 4),
+            BackColor = Color.FromArgb(235, 246, 253),
+            ForeColor = Color.FromArgb(36, 101, 148),
+            Font = new Font("Segoe UI Semibold", 9F),
+            Margin = new Padding(5, 3, 4, 3),
             TabStop = false
         };
-        action.FlatAppearance.BorderColor = Color.FromArgb(205, 220, 231);
-        action.FlatAppearance.MouseOverBackColor = Color.FromArgb(243, 248, 252);
+        action.FlatAppearance.BorderSize = 0;
+        action.FlatAppearance.MouseOverBackColor = Color.FromArgb(222, 239, 250);
         action.Click += (_, _) =>
         {
             var mainForm = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
@@ -409,19 +424,6 @@ internal sealed class SettingsDialog : Form
         };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 154));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-
-        var heading = new Label
-        {
-            Text = title,
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 15.5F),
-            ForeColor = Color.FromArgb(24, 38, 58),
-            Margin = new Padding(0, 0, 0, 15)
-        };
-        var row = table.RowCount++;
-        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        table.Controls.Add(heading, 0, row);
-        table.SetColumnSpan(heading, 2);
         return table;
     }
 
@@ -452,18 +454,19 @@ internal sealed class SettingsDialog : Form
         AddFull(table, label);
     }
 
-    private static void AddHint(TableLayoutPanel table, string text)
+    private void AddHint(TableLayoutPanel table, string text)
     {
-        var label = new Label
+        var info = new Label
         {
-            Text = text,
+            Text = "ⓘ",
             AutoSize = true,
-            ForeColor = Color.FromArgb(105, 125, 145),
-            Font = new Font("Segoe UI", 9.5F),
-            MaximumSize = new Size(690, 0),
-            Margin = new Padding(0, 0, 0, 14)
+            Font = new Font("Segoe UI Symbol", 10F),
+            ForeColor = Color.FromArgb(138, 155, 170),
+            Cursor = Cursors.Help,
+            Margin = new Padding(0, 0, 0, 10)
         };
-        AddFull(table, label);
+        _tips.SetToolTip(info, text);
+        AddFull(table, info);
     }
 
     private bool Apply()
@@ -560,67 +563,89 @@ internal sealed class SettingsDialog : Form
         return 320;
     }
 
+    private static Label FieldLabel(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        Font = new Font("Segoe UI", 9.5F),
+        ForeColor = Color.FromArgb(78, 96, 115),
+        Margin = new Padding(0, 10, 12, 8)
+    };
+
+    private static void PrepareFieldControl(Control control)
+    {
+        if (control is TextBox textBox)
+        {
+            textBox.BorderStyle = BorderStyle.None;
+            textBox.BackColor = Color.FromArgb(243, 248, 251);
+        }
+        else if (control is NumericUpDown number)
+        {
+            number.BorderStyle = BorderStyle.None;
+            number.BackColor = Color.FromArgb(243, 248, 251);
+        }
+    }
+
+    private static SoftFieldPanel CreateFieldSurface(Control control, int width)
+    {
+        PrepareFieldControl(control);
+        var surface = new SoftFieldPanel(width, 35)
+        {
+            Margin = new Padding(0, 4, 0, 7)
+        };
+        control.Dock = DockStyle.Fill;
+        control.Margin = Padding.Empty;
+        surface.Controls.Add(control);
+        return surface;
+    }
+
     private static void AddField(TableLayoutPanel panel, string label, Control control)
     {
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        panel.Controls.Add(new Label
-        {
-            Text = label,
-            AutoSize = true,
-            Font = new Font("Segoe UI", 9.5F),
-            ForeColor = Color.FromArgb(78, 96, 115),
-            Margin = new Padding(0, 9, 12, 9)
-        }, 0, row);
-
-        control.Dock = DockStyle.None;
-        control.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        control.Width = PreferredFieldWidth(label, control);
-        control.Margin = new Padding(0, 5, 0, 7);
-        panel.Controls.Add(control, 1, row);
+        panel.Controls.Add(FieldLabel(label), 0, row);
+        panel.Controls.Add(CreateFieldSurface(control, PreferredFieldWidth(label, control)), 1, row);
     }
 
     private static void AddPasswordField(TableLayoutPanel panel, string label, TextBox textBox)
     {
         var row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        panel.Controls.Add(new Label
-        {
-            Text = label,
-            AutoSize = true,
-            Font = new Font("Segoe UI", 9.5F),
-            ForeColor = Color.FromArgb(78, 96, 115),
-            Margin = new Padding(0, 9, 12, 9)
-        }, 0, row);
+        panel.Controls.Add(FieldLabel(label), 0, row);
 
-        var fieldWidth = PreferredFieldWidth(label, textBox);
+        var width = PreferredFieldWidth(label, textBox);
+        PrepareFieldControl(textBox);
+        var surface = new SoftFieldPanel(width, 35)
+        {
+            Margin = new Padding(0, 4, 0, 7)
+        };
         var holder = new TableLayoutPanel
         {
-            Dock = DockStyle.None,
-            Anchor = AnchorStyles.Top | AnchorStyles.Left,
+            Dock = DockStyle.Fill,
             ColumnCount = 2,
-            AutoSize = false,
-            Width = fieldWidth + 42,
-            Height = textBox.PreferredHeight + 8,
-            Margin = new Padding(0, 3, 0, 5),
-            BackColor = Color.FromArgb(248, 251, 254)
+            RowCount = 1,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            BackColor = Color.FromArgb(243, 248, 251)
         };
-        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, fieldWidth));
-        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42));
+        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        holder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 34));
         textBox.Dock = DockStyle.Fill;
-        textBox.Margin = new Padding(0, 2, 6, 2);
+        textBox.Margin = Padding.Empty;
         var eye = new Button
         {
             Text = "◉",
-            Width = 36,
-            Height = textBox.PreferredHeight + 4,
-            Margin = new Padding(0),
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
             AccessibleName = "显示或隐藏密码",
             TabStop = false,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(248, 251, 254)
+            BackColor = Color.FromArgb(243, 248, 251),
+            ForeColor = Color.FromArgb(101, 120, 138),
+            Font = new Font("Segoe UI Symbol", 9F)
         };
-        eye.FlatAppearance.BorderColor = Color.FromArgb(205, 208, 214);
+        eye.FlatAppearance.BorderSize = 0;
+        eye.FlatAppearance.MouseOverBackColor = Color.FromArgb(232, 242, 248);
         eye.Click += (_, _) =>
         {
             var selectionStart = textBox.SelectionStart;
@@ -632,7 +657,53 @@ internal sealed class SettingsDialog : Form
         };
         holder.Controls.Add(textBox, 0, 0);
         holder.Controls.Add(eye, 1, 0);
-        panel.Controls.Add(holder, 1, row);
+        surface.Controls.Add(holder);
+        panel.Controls.Add(surface, 1, row);
+    }
+
+    private sealed class SoftFieldPanel : Panel
+    {
+        private const int Radius = 10;
+
+        public SoftFieldPanel(int width, int height)
+        {
+            Width = width;
+            Height = height;
+            MinimumSize = new Size(width, height);
+            MaximumSize = new Size(width, height);
+            BackColor = Color.FromArgb(243, 248, 251);
+            Padding = new Padding(10, 7, 8, 5);
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            using var path = RoundedRect(rect, Radius);
+            using var fill = new SolidBrush(Color.FromArgb(243, 248, 251));
+            using var border = new Pen(Color.FromArgb(221, 232, 239), 1F);
+            e.Graphics.FillPath(fill, path);
+            e.Graphics.DrawPath(border, path);
+            base.OnPaint(e);
+        }
+
+        private static System.Drawing.Drawing2D.GraphicsPath RoundedRect(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            var diameter = radius * 2;
+            var arc = new Rectangle(rect.X, rect.Y, diameter, diameter);
+            path.AddArc(arc, 180, 90);
+            arc.X = rect.Right - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = rect.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = rect.Left;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
     }
 
     private static void AddFull(TableLayoutPanel panel, Control control)

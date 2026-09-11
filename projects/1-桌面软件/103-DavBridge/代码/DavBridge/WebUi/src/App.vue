@@ -111,9 +111,8 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
   </aside>
 
   <section class="workspace">
-    <header class="workspace-head">
-      <div class="welcome"><h2>{{ tab==='overview' ? '你好，DavBridge' : tab==='transfer' ? '转移' : tab==='recycle' ? '回收站' : tab==='docs' ? '文档' : tab==='settings' ? '设置' : '关于 DavBridge' }}</h2></div>
-      <div v-if="!snapshot.configured" class="top-actions">
+    <header v-if="!snapshot.configured" class="workspace-head config-only-head">
+      <div class="top-actions">
         <button class="config-warning has-tip" data-tip="需要打开设置补充配置" @click="openSettings" :disabled="busy"><i></i>需要配置</button>
       </div>
     </header>
@@ -211,8 +210,24 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
     </section>
 
     <section v-else-if="tab==='transfer'" class="page transfer-page">
-      <div class="pool-grid"><article class="pool-card priority"><span>优先修复</span><strong>{{ snapshot.priorityCount.toLocaleString() }}</strong><small>源端真实变化的历史 StrongVerified 组</small></article><article class="pool-card normal"><span>普通任务</span><strong>{{ snapshot.normalCount.toLocaleString() }}</strong><small>既有 backlog 与本周期新增对象</small></article></div>
-      <article class="work-card"><div class="work-icon"><span></span></div><div class="work-copy"><span>当前任务</span><strong>{{ snapshot.currentTitle }}</strong><small>{{ snapshot.currentDetail }}</small></div><div class="work-state">{{ snapshot.currentProgress===null?snapshot.routeStatus:`${Math.round(snapshot.currentProgress*100)}%` }}</div></article>
+      <div class="pool-grid">
+        <article class="pool-card priority">
+          <div class="pool-title-row"><span>优先修复</span><span class="info-dot has-tip" data-tip="源端真实变化的历史 StrongVerified 组">i</span></div>
+          <strong>{{ snapshot.priorityCount.toLocaleString() }}</strong>
+        </article>
+        <article class="pool-card normal">
+          <div class="pool-title-row"><span>普通任务</span><span class="info-dot has-tip" data-tip="既有 backlog 与本周期新增对象">i</span></div>
+          <strong>{{ snapshot.normalCount.toLocaleString() }}</strong>
+        </article>
+      </div>
+      <article class="work-card">
+        <div class="work-icon"><span></span></div>
+        <div class="work-copy">
+          <div class="work-label-row"><span>当前任务</span><span class="info-dot has-tip" :data-tip="snapshot.currentDetail">i</span></div>
+          <strong>{{ snapshot.currentTitle }}</strong>
+        </div>
+        <div class="work-state">{{ snapshot.currentProgress===null?snapshot.routeStatus:`${Math.round(snapshot.currentProgress*100)}%` }}</div>
+      </article>
       <div class="coverage-footer"><span>总体镜像覆盖</span><div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div><strong>{{ snapshot.coverageText }}</strong></div>
     </section>
 
