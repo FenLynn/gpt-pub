@@ -22,7 +22,7 @@ internal sealed class SingleInstanceGateV0217 : IDisposable
 
     public bool IsPrimary { get; }
 
-    public static SingleInstanceGateV0217 Acquire()
+    public static SingleInstanceGateV0217 Acquire(bool signalExisting = true)
     {
         EventWaitHandle? showEvent = null;
         Mutex? mutex = null;
@@ -32,7 +32,7 @@ internal sealed class SingleInstanceGateV0217 : IDisposable
             mutex = new Mutex(false, MutexName, out var createdNew);
             if (!createdNew)
             {
-                showEvent.Set();
+                if (signalExisting) showEvent.Set();
                 mutex.Dispose();
                 showEvent.Dispose();
                 return new SingleInstanceGateV0217(null, null, false, false);
@@ -41,7 +41,7 @@ internal sealed class SingleInstanceGateV0217 : IDisposable
             var owns = mutex.WaitOne(0);
             if (!owns)
             {
-                showEvent.Set();
+                if (signalExisting) showEvent.Set();
                 mutex.Dispose();
                 showEvent.Dispose();
                 return new SingleInstanceGateV0217(null, null, false, false);

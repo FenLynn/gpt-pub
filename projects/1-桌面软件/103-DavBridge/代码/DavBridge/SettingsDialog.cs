@@ -47,6 +47,7 @@ internal sealed class SettingsDialog : Form
         Height = 620;
         MinimumSize = new Size(720, 520);
         StartPosition = FormStartPosition.CenterParent;
+        AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 10F);
         BackColor = Color.FromArgb(248, 251, 254);
         if (embedded) FormBorderStyle = FormBorderStyle.None;

@@ -8,6 +8,8 @@ internal sealed class MainForm : Form
     private readonly bool _launchInBackground;
     private readonly CancellationTokenSource _appCts = new();
     private readonly NotifyIcon _trayIcon;
+    private readonly ToolStripMenuItem _trayResume = new("继续");
+    private readonly ToolStripMenuItem _trayPause = new("暂停");
 
     private readonly TableLayoutPanel _shell = new();
     private readonly Panel _advancedPanel = new();
@@ -46,13 +48,17 @@ internal sealed class MainForm : Form
         Height = 620;
         MinimumSize = new Size(880, 540);
         StartPosition = FormStartPosition.CenterScreen;
+        AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9F);
         BackColor = Color.White;
+        WindowPlacementV044.Restore(this);
 
         var trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("打开 DavBridge", null, (_, _) => ShowWindow());
-        trayMenu.Items.Add("继续", null, async (_, _) => await ResumeNowAsync());
-        trayMenu.Items.Add("暂停", null, async (_, _) => await PauseAsync());
+        _trayResume.Click += async (_, _) => await ResumeNowAsync();
+        _trayPause.Click += async (_, _) => await PauseAsync();
+        trayMenu.Items.Add(_trayResume);
+        trayMenu.Items.Add(_trayPause);
         trayMenu.Items.Add(new ToolStripSeparator());
         trayMenu.Items.Add("退出", null, (_, _) => ExitApplication());
         _trayIcon = new NotifyIcon
@@ -311,27 +317,21 @@ internal sealed class MainForm : Form
         if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
         {
             ToggleAdvanced(true);
-            MessageBox.Show(this,
-                "当前任务还没有完成首次真实强校验。请在“初始化与诊断”中完成流量校准和首组验证。",
-                "需要初始化", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("需要初始化", "当前任务还没有完成首次真实强校验。请在“安全与维护”中完成流量校准和首组验证。", "warning");
             return;
         }
 
         if (!_host.State.ExistingReplicaValidationPassed)
         {
             ToggleAdvanced(true);
-            MessageBox.Show(this,
-                "当前任务还没有完成既有副本 NO-WRITE 验证。完成这一安全门后，日常继续将直接恢复。",
-                "需要初始化", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("需要初始化", "当前任务还没有完成既有副本 NO-WRITE 验证。完成这一安全门后，日常继续将直接恢复。", "warning");
             return;
         }
 
         if (!IsSafetyProfileCurrent())
         {
             ToggleAdvanced(true);
-            MessageBox.Show(this,
-                "源端、目标端或关键安全配置自上次验证后发生了变化。旧任务的安全门不会自动沿用到新端点，请重新完成初始化验证。",
-                "任务配置已变化", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("任务配置已变化", "源端、目标端或关键安全配置自上次验证后发生了变化。旧任务的安全门不会自动沿用，请重新完成初始化验证。", "warning");
             return;
         }
 
@@ -342,7 +342,7 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "DavBridge", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UiFeedbackBusV044.Publish("任务未继续", ex.Message, "warning");
         }
         UpdateView();
     }
@@ -368,8 +368,10 @@ internal sealed class MainForm : Form
             if (!result.TargetBaseOk)
                 text += "\n\n若坚果云为 401，请在设置中确认用户名为注册邮箱，并重新输入当前有效的第三方应用密码。不要使用网页登录密码。";
 
-            MessageBox.Show(this, text, "连接诊断",
-                MessageBoxButtons.OK, result.AllOk ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            if (result.AllOk)
+                UiFeedbackBusV044.Publish("连接诊断通过", "InfiniCLOUD 与坚果云 WebDAV 均可访问。", "success");
+            else
+                MessageBox.Show(this, text, "连接诊断", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
@@ -404,10 +406,12 @@ internal sealed class MainForm : Form
                     : targetVisible >= 750
                         ? "本次目录列举已达到 750 项上限，实际目标文件可能更多；迁移按准确文件路径逐个确认，不依赖列表完整性"
                         : "既有目标文件后续将逐个强校验并安全接管一致文件";
-                MessageBox.Show(this,
-                    $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端本次可见文件：{FormatTargetVisibleCount(targetVisible)}\n目标策略：{targetNote}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
-                    "迁移就绪扫描", MessageBoxButtons.OK,
-                    report.OversizeObjects.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                if (report.OversizeObjects.Count == 0 && report.UnpairedZoteroObjects.Count == 0)
+                    UiFeedbackBusV044.Publish("就绪扫描完成", $"源端 {report.ObjectCount:N0} 个对象，{report.GroupCount:N0} 个 Zotero 逻辑组，当前未发现阻塞项。", "success");
+                else
+                    MessageBox.Show(this,
+                        $"源端对象：{report.ObjectCount:N0}\nZotero 逻辑组：{report.GroupCount:N0}\n源端总量：{FormatBytes(report.TotalBytes)}\n最大文件：{FormatBytes(report.LargestFileBytes)}\n目标端本次可见文件：{FormatTargetVisibleCount(targetVisible)}\n目标策略：{targetNote}\n\n超过单文件上限：{oversize}\n\n未配对 zip/prop：{unpaired}",
+                        "迁移就绪扫描", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
             return (report, targetVisible);
@@ -435,17 +439,17 @@ internal sealed class MainForm : Form
         if (!await EnsureConfiguredAsync()) return;
         if (_host.Config.MigrationEnabled)
         {
-            MessageBox.Show(this, "请先暂停任务，再执行首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("首组验证", "请先暂停任务，再执行首组验证。", "info");
             return;
         }
         if (_host.Config.NextResetAt == default)
         {
-            MessageBox.Show(this, "流量尚未校准。请先录入坚果云网页当前显示的上传已用、下载已用和下一次重置日期。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("首组验证", "流量尚未校准。请先录入坚果云网页当前显示的上传已用、下载已用和下一次重置日期。", "warning");
             return;
         }
         if (FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State) && IsSafetyProfileCurrent())
         {
-            MessageBox.Show(this, "当前配置已经存在完整 zip + prop 逻辑组的真实强校验记录，无需重复首组验证。", "首组验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("首组验证", "当前配置已经存在完整 zip + prop 逻辑组的真实强校验记录，无需重复执行。", "success");
             return;
         }
 
@@ -475,12 +479,12 @@ internal sealed class MainForm : Form
                 ? "本组未发生 PUT，目标已有副本经强校验后直接接管。"
                 : "本组存在目标缺失成员，已完成真实 PUT 和目标重新 GET 强校验。";
 
-            MessageBox.Show(this,
-                $"组：{result.GroupKey}\n结果：{(result.Success ? "通过" : "未通过")}\n\n{memberStates}\n\n" +
-                $"本次计入上传：{FormatBytes(result.UploadBytes)}\n" +
-                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{mode}\n{result.Message}",
-                "首组验证结果", MessageBoxButtons.OK,
-                result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            if (result.Success)
+                UiFeedbackBusV044.Publish("首组验证通过", $"逻辑组 {result.GroupKey} 已完成真实双端强校验。上传 {FormatBytes(result.UploadBytes)}，校验下载 {FormatBytes(result.DownloadBytes)}。", "success");
+            else
+                MessageBox.Show(this,
+                    $"组：{result.GroupKey}\n结果：未通过\n\n{memberStates}\n\n本次计入上传：{FormatBytes(result.UploadBytes)}\n本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{mode}\n{result.Message}",
+                    "首组验证结果", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
@@ -498,17 +502,17 @@ internal sealed class MainForm : Form
         if (!await EnsureConfiguredAsync()) return;
         if (_host.Config.MigrationEnabled)
         {
-            MessageBox.Show(this, "请先暂停任务，再执行既有副本验证。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("既有副本验证", "请先暂停任务，再执行既有副本验证。", "info");
             return;
         }
         if (!FirstGroupValidationRunner.HasCompletedZoteroValidation(_host.State))
         {
-            MessageBox.Show(this, "请先完成一次真实首组验证。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("既有副本验证", "请先完成一次真实首组验证。", "warning");
             return;
         }
         if (_host.State.ExistingReplicaValidationPassed && IsSafetyProfileCurrent())
         {
-            MessageBox.Show(this, "当前配置的既有副本 NO-WRITE 接管验证已经通过，无需重复执行。", "既有副本验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("既有副本验证", "当前配置的既有副本 NO-WRITE 接管验证已经通过，无需重复执行。", "success");
             return;
         }
 
@@ -539,12 +543,12 @@ internal sealed class MainForm : Form
 
             var memberStates = string.Join(Environment.NewLine,
                 result.Records.Select(record => $"  {record.RelativePath}: {record.Status}"));
-            MessageBox.Show(this,
-                $"组：{result.GroupKey}\n结果：{(result.Success ? "通过" : "未通过")}\n\n{memberStates}\n\n" +
-                $"本次计入上传：{FormatBytes(result.UploadBytes)}\n" +
-                $"本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{result.Message}",
-                "既有副本验证结果", MessageBoxButtons.OK,
-                result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            if (result.Success)
+                UiFeedbackBusV044.Publish("既有副本验证通过", $"逻辑组 {result.GroupKey} 已在 0 B 上传条件下完成 NO-WRITE 接管验证。", "success");
+            else
+                MessageBox.Show(this,
+                    $"组：{result.GroupKey}\n结果：未通过\n\n{memberStates}\n\n本次计入上传：{FormatBytes(result.UploadBytes)}\n本次计入坚果云校验下载：{FormatBytes(result.DownloadBytes)}\n\n{result.Message}",
+                    "既有副本验证结果", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
@@ -579,9 +583,7 @@ internal sealed class MainForm : Form
             _compatState.LegacySafetyFingerprint = null;
             _compatStore.Save(_compatState);
             ToggleAdvanced(true);
-            MessageBox.Show(this,
-                "关键端点配置已经变化。原任务进度仍完整保留，但旧安全门资格不会沿用；请对新配置重新执行初始化验证。",
-                "需要重新验证", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UiFeedbackBusV044.Publish("需要重新验证", "关键端点配置已经变化。原任务进度仍完整保留，但旧安全门资格不会沿用，请对新配置重新执行初始化验证。", "warning");
         }
         UpdateView();
     }
@@ -625,7 +627,7 @@ internal sealed class MainForm : Form
         _taskStatus.Text = stateTitle;
 
         var initialized = IsInitialized();
-        _primaryAction.Text = state == EngineState.Running ? "暂停" : "继续";
+        ApplyActionAvailability(state);
         _taskButton.Text = ClientSize.Width < 760
             ? $"Zotero 迁移\r\n{stateTitle}"
             : $"Zotero 附件迁移\r\n{stateTitle}";
@@ -670,6 +672,17 @@ internal sealed class MainForm : Form
         _ = projection;
     }
 
+    private void ApplyActionAvailability(EngineState state)
+    {
+        var canPause = state == EngineState.Running;
+        var canResume = state is EngineState.Paused or EngineState.WaitRetry;
+        _trayPause.Enabled = canPause;
+        _trayResume.Enabled = canResume;
+        _primaryAction.Visible = canPause || canResume;
+        _primaryAction.Enabled = canPause || canResume;
+        _primaryAction.Text = canPause ? "暂停" : canResume ? (state == EngineState.WaitRetry ? "重试" : "继续") : string.Empty;
+    }
+
     private string GetStateTitle()
     {
         var state = !_host.Config.MigrationEnabled ? EngineState.Paused : _host.State.EngineState;
@@ -704,8 +717,9 @@ internal sealed class MainForm : Form
     private void ShowWindow()
     {
         ShowInTaskbar = true;
-        Show();
-        WindowState = FormWindowState.Normal;
+        if (!Visible) Show();
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        BringToFront();
         Activate();
     }
 
@@ -717,13 +731,15 @@ internal sealed class MainForm : Form
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
-        if (_exitRequested) return;
+        WindowPlacementV044.Save(this);
+        if (_exitRequested || e.CloseReason is CloseReason.WindowsShutDown or CloseReason.TaskManagerClosing) return;
         e.Cancel = true;
         HideToTray();
     }
 
     private void ExitApplication()
     {
+        WindowPlacementV044.Save(this);
         _exitRequested = true;
         _trayIcon.Visible = false;
         _appCts.Cancel();

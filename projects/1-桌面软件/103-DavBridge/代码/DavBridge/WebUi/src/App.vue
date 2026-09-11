@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { hasNativeBridge, invoke, onSnapshot } from './bridge'
+import { hasNativeBridge, invoke, onNotice, onSnapshot } from './bridge'
 import { mockSnapshot } from './mock'
 import type { DavBridgeSnapshot, RecycleGroup, RecycleKind } from './types'
 
@@ -10,9 +10,12 @@ const recycleFilter = ref<RecycleKind>('observing')
 const snapshot = ref<DavBridgeSnapshot>(mockSnapshot)
 const busy = ref(false)
 const toast = ref('')
+const notice = ref<{ title: string; message: string; tone: string } | null>(null)
 const selected = ref(new Set<string>())
 let detachSnapshot: (() => void) | undefined
+let detachNotice: (() => void) | undefined
 let toastTimer: number | undefined
+let noticeTimer: number | undefined
 const isNative = hasNativeBridge()
 const coveragePercent = computed(() => Math.round(snapshot.value.coverage * 1000) / 10)
 const uploadFraction = computed(() => Math.min(1, snapshot.value.quota.uploadUsed / Math.max(1, snapshot.value.quota.uploadMax)))
@@ -32,6 +35,11 @@ const uploadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.uploa
 const downloadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.downloadUsed)} / ${formatQuotaBytes(snapshot.value.quota.downloadMax)}`)
 
 function notify(message: string) { toast.value = message; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toast.value = '', 2600) }
+function showNotice(value:{ title:string; message:string; tone:string }) {
+  notice.value=value
+  if(noticeTimer) window.clearTimeout(noticeTimer)
+  noticeTimer=window.setTimeout(()=>notice.value=null, value.tone==='warning' ? 9000 : 6500)
+}
 async function refresh() { if (!isNative) return; try { snapshot.value = await invoke<DavBridgeSnapshot>('app.getSnapshot') } catch (error) { notify(error instanceof Error ? error.message : '状态读取失败') } }
 async function command(method: string, params?: unknown) { if (!isNative || busy.value) return; busy.value = true; try { const result = await invoke<{ snapshot?: DavBridgeSnapshot; message?: string }>(method, params); if (result?.snapshot) snapshot.value = result.snapshot; if (result?.message) notify(result.message); await refresh() } catch (error) { notify(error instanceof Error ? error.message : '操作失败') } finally { busy.value = false } }
 async function primaryAction() {
@@ -67,8 +75,8 @@ async function navigate(next:Tab){
   tab.value=next
 }
 function goOverview(){ if(tab.value==='settings'&&isNative) void invoke('app.closeSettings').catch(()=>{}); tab.value='overview' }
-onMounted(async()=>{ detachSnapshot=onSnapshot(value=>snapshot.value=value); window.addEventListener('davbridge:navigate-overview',goOverview); await refresh() })
-onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:navigate-overview',goOverview); if(toastTimer) window.clearTimeout(toastTimer) })
+onMounted(async()=>{ detachSnapshot=onSnapshot(value=>snapshot.value=value); detachNotice=onNotice(showNotice); window.addEventListener('davbridge:navigate-overview',goOverview); await refresh() })
+onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventListener('davbridge:navigate-overview',goOverview); if(toastTimer) window.clearTimeout(toastTimer); if(noticeTimer) window.clearTimeout(noticeTimer) })
 </script>
 
 <template>
@@ -259,6 +267,11 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); window.removeEventListener('davbridge:
     </section>
   </section>
 
+  <div v-if="notice" class="notice-banner" :class="`tone-${notice.tone}`" role="status">
+    <span class="notice-mark" aria-hidden="true">{{ notice.tone==='success' ? '✓' : notice.tone==='warning' ? '!' : 'i' }}</span>
+    <div><strong>{{ notice.title }}</strong><span>{{ notice.message }}</span></div>
+    <button aria-label="关闭提示" @click="notice=null">×</button>
+  </div>
   <div v-if="toast" class="toast" role="status">{{ toast }}</div>
 </main>
 </template>

@@ -55,7 +55,7 @@ internal sealed class WebUiHostV040 : IDisposable
     internal static WebUiHostV040 Attach(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) => new(form,host,reconciliation);
     internal static void ValidateBridgeContract() { var expected=new[]{"app.getSnapshot","app.openSettings","app.closeSettings","migration.pause","migration.resume","migration.retry","recycle.defer","recycle.delete"}; if(!expected.All(AllowedMethods.Contains)||AllowedMethods.Count!=expected.Length) throw new InvalidOperationException("DavBridge Web UI command whitelist changed unexpectedly."); }
     private void Mount() { _ = _form.Handle; foreach(Control control in _form.Controls) control.Visible=false; _surface.Controls.Add(_loading); _surface.Controls.Add(_webView); _webView.Visible=false; _form.Controls.Add(_surface); _form.Controls.Add(_settingsLayer); _surface.BringToFront(); LayoutSettingsLayer(); }
-    private void Wire() { _host.ProgressChanged+=OnProgress; _host.StateChanged+=OnStateChanged; _reconciliation.Changed+=OnReconciliationChanged; WebDavReadClient.GlobalIoProgress+=OnIo; _form.SizeChanged+=OnHostSizeChanged; _pushTimer.Tick+=(_,_)=>PushSnapshot(); _pushTimer.Start(); }
+    private void Wire() { _host.ProgressChanged+=OnProgress; _host.StateChanged+=OnStateChanged; _reconciliation.Changed+=OnReconciliationChanged; WebDavReadClient.GlobalIoProgress+=OnIo; UiFeedbackBusV044.Published+=OnNotice; _form.SizeChanged+=OnHostSizeChanged; _pushTimer.Tick+=(_,_)=>PushSnapshot(); _pushTimer.Start(); }
     private void OnHostSizeChanged(object? sender,EventArgs e)=>LayoutSettingsLayer();
     private void LayoutSettingsLayer(){ var sidebar=_form.ClientSize.Width>=1000?225:174; _settingsLayer.Bounds=new Rectangle(sidebar,0,Math.Max(0,_form.ClientSize.Width-sidebar),_form.ClientSize.Height); }
     private async Task InitializeWebViewAsync()
@@ -161,13 +161,24 @@ internal sealed class WebUiHostV040 : IDisposable
     private static bool EndpointMatches(string left,string right){ if(!Uri.TryCreate(left,UriKind.Absolute,out var a)||!Uri.TryCreate(right,UriKind.Absolute,out var b))return false; return string.Equals(a.Scheme,b.Scheme,StringComparison.OrdinalIgnoreCase)&&string.Equals(a.Host,b.Host,StringComparison.OrdinalIgnoreCase)&&a.Port==b.Port; }
     private static bool PathMatches(string ioPath,string relative)=>ioPath.Replace('\\','/').Trim('/').EndsWith(relative.Replace('\\','/').Trim('/'),StringComparison.OrdinalIgnoreCase);
     private static string FormatBytes(long bytes){ var value=Math.Max(0,bytes); if(value>=1_000_000_000L)return$"{value/1_000_000_000d:0.00} GB"; if(value>=1_000_000L)return$"{value/1_000_000d:0.0} MB"; if(value>=1_000L)return$"{value/1_000d:0.0} KB"; return$"{value} B"; }
+    private void OnNotice(object? sender, UiNoticeV044 notice)
+    {
+        SafeUi(() =>
+        {
+            if (_disposed || !_webReady || _webView.IsDisposed) return;
+            var core = _webView.CoreWebView2;
+            if (core is null) return;
+            PostEventOnUiThread(core, "notice", notice);
+        });
+    }
+
     private void OnProgress(object? sender,EngineProgress progress){_lastProgress=progress;_lastIo=null;PushSnapshot();} private void OnStateChanged(object? sender,EventArgs e)=>PushSnapshot(); private void OnReconciliationChanged(object? sender,EventArgs e)=>PushSnapshot();
     private void OnIo(object? sender,WebDavIoProgress progress){ if(!EndpointMatches(progress.BaseAddress,_host.Config.SourceBaseUrl)&&!EndpointMatches(progress.BaseAddress,_host.Config.TargetBaseUrl))return; _lastIo=progress; }
     private void PushSnapshot(){ SafeUi(()=>{ if(_disposed||!_webReady||_webView.IsDisposed)return; var core=_webView.CoreWebView2; if(core is null)return; PostEventOnUiThread(core,"snapshot",BuildSnapshot()); }); }
     private static void PostEventOnUiThread(CoreWebView2 core,string eventName,object payload){ core.PostWebMessageAsJson(JsonSerializer.Serialize(new{@event=eventName,payload},JsonOptions)); }
     private void Reply(string id,bool ok,object? result,string? error){ if(string.IsNullOrWhiteSpace(id))return; SafeUi(()=>{ if(_disposed||!_webReady||_webView.IsDisposed)return; var core=_webView.CoreWebView2; if(core is null)return; core.PostWebMessageAsJson(JsonSerializer.Serialize(new{id,ok,result,error},JsonOptions)); }); }
     private void SafeUi(Action action){ if(_disposed||_form.IsDisposed)return; try{if(_form.InvokeRequired)_form.BeginInvoke(action);else action();}catch{} }
-    public void Dispose(){ if(_disposed)return; if(!_form.IsDisposed&&_form.InvokeRequired){try{_form.Invoke(new Action(Dispose));}catch{} return;} _disposed=true;_pushTimer.Stop();_host.ProgressChanged-=OnProgress;_host.StateChanged-=OnStateChanged;_reconciliation.Changed-=OnReconciliationChanged;WebDavReadClient.GlobalIoProgress-=OnIo;_form.SizeChanged-=OnHostSizeChanged;if(_settingsDialog is not null&&!_settingsDialog.IsDisposed)_settingsDialog.Close();if(!_webView.IsDisposed&&_webView.CoreWebView2 is not null)_webView.CoreWebView2.WebMessageReceived-=OnWebMessageReceived;_cts.Cancel();_cts.Dispose();_pushTimer.Dispose();_webView.Dispose();_settingsLayer.Dispose();_surface.Dispose(); }
+    public void Dispose(){ if(_disposed)return; if(!_form.IsDisposed&&_form.InvokeRequired){try{_form.Invoke(new Action(Dispose));}catch{} return;} _disposed=true;_pushTimer.Stop();_host.ProgressChanged-=OnProgress;_host.StateChanged-=OnStateChanged;_reconciliation.Changed-=OnReconciliationChanged;WebDavReadClient.GlobalIoProgress-=OnIo;UiFeedbackBusV044.Published-=OnNotice;_form.SizeChanged-=OnHostSizeChanged;if(_settingsDialog is not null&&!_settingsDialog.IsDisposed)_settingsDialog.Close();if(!_webView.IsDisposed&&_webView.CoreWebView2 is not null)_webView.CoreWebView2.WebMessageReceived-=OnWebMessageReceived;_cts.Cancel();_cts.Dispose();_pushTimer.Dispose();_webView.Dispose();_settingsLayer.Dispose();_surface.Dispose(); }
     private sealed record BridgeRequest(string Id,string? Method,JsonElement? Params); private sealed record PhaseDto(string Key,string Label,string State,string Hint); private sealed record QuotaDto(long UploadUsed,long UploadMax,string UploadText,long DownloadUsed,long DownloadMax,string DownloadText,string ResetText,bool IsSprint); private sealed record RecycleDto(string GroupKey,string Name,string FirstMissing,string LastDecision,string SizeText,string VerifiedText,string State,string Disposition,string? Issue); private sealed record WebSnapshot(string Version,string CycleId,bool Configured,string EngineState,string RouteStatus,string RouteTone,IReadOnlyList<PhaseDto> Phases,int Verified,int Total,double Coverage,string CoverageText,string CurrentTitle,string CurrentDetail,double? CurrentProgress,QuotaDto Quota,int PriorityCount,int NormalCount,int HumanActionCount,string PrimaryAction,string PrimaryLabel,IReadOnlyList<RecycleDto> Recycle);
 }
 

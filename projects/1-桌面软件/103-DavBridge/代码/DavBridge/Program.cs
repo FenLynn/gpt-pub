@@ -12,13 +12,28 @@ internal static class Program
         var uiSelfTest = GetArgumentPath(args, "--ui-self-test=");
         if (uiSelfTest is not null) { RunUiSelfTest(uiSelfTest); return; }
 
-        using var singleInstance = SingleInstanceGateV0217.Acquire();
-        if (!singleInstance.IsPrimary) return;
+        var launchInBackground = args.Contains("--background", StringComparer.OrdinalIgnoreCase);
+        ApplicationConfiguration.Initialize();
+
+        using var singleInstance = SingleInstanceGateV0217.Acquire(signalExisting: !launchInBackground);
+        if (!singleInstance.IsPrimary)
+        {
+            if (!launchInBackground)
+            {
+                var version = typeof(Program).Assembly.GetName().Version;
+                var versionText = version is null ? "当前文件" : $"当前文件 v{version.Major}.{version.Minor}.{version.Build}";
+                MessageBox.Show(
+                    $"DavBridge 已经在后台运行。\r\n\r\n{versionText} 没有启动为第二个实例，正在运行的 DavBridge 已被唤醒。\r\n\r\n如果你刚刚换用了新的 EXE，请先从系统托盘右键 DavBridge → 退出，再重新启动这个文件。",
+                    "DavBridge 已在运行",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            return;
+        }
+
         try
         {
-            ApplicationConfiguration.Initialize();
             using var host = new AppHost();
-            var launchInBackground = args.Contains("--background", StringComparer.OrdinalIgnoreCase);
             var form = new MainForm(host, launchInBackground);
             try
             {

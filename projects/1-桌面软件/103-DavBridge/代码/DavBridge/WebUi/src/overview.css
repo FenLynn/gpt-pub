@@ -1301,3 +1301,26 @@
 .about-card dl div{
   border-bottom-color:rgba(220,230,237,.72);
 }
+
+
+/* v0.4 interaction freeze */
+button:not(:disabled){cursor:pointer}
+button:disabled{cursor:default;opacity:.52}
+button:focus-visible,a:focus-visible{outline:2px solid rgba(34,139,214,.38);outline-offset:2px}
+.side-nav button,.recycle-tabs button,.primary-button,.secondary-button,.danger-button{transition:background-color .15s ease,color .15s ease,box-shadow .15s ease,transform .08s ease}
+.side-nav button:active,.recycle-tabs button:active,.primary-button:active,.secondary-button:active,.danger-button:active{transform:translateY(1px)}
+.notice-banner{
+  position:fixed;top:22px;right:28px;z-index:500;width:min(390px,calc(100vw - 250px));min-height:58px;
+  display:grid;grid-template-columns:30px minmax(0,1fr) 24px;align-items:start;gap:10px;padding:13px 12px 13px 13px;
+  border:1px solid rgba(199,216,228,.72);border-radius:16px;background:rgba(251,253,255,.97);
+  box-shadow:0 16px 42px rgba(35,67,94,.13),0 3px 10px rgba(35,67,94,.05);backdrop-filter:blur(14px)
+}
+.notice-mark{width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:#e8f4fc;color:#1685d3;font-size:13px;font-weight:800}
+.notice-banner.tone-success .notice-mark{background:#e7f6ef;color:#169865}
+.notice-banner.tone-warning .notice-mark{background:#fff3d9;color:#b17a17}
+.notice-banner>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.notice-banner strong{color:#1b2b42;font-size:12.5px;font-weight:700}
+.notice-banner div span{color:#65798e;font-size:11px;line-height:1.5}
+.notice-banner button{width:22px;height:22px;padding:0;border:0;border-radius:8px;background:transparent;color:#8a9aaa;font-size:17px;line-height:1}
+.notice-banner button:hover{background:#eef4f8;color:#566d82}
+@media(max-width:999px){.notice-banner{right:18px;width:min(350px,calc(100vw - 205px))}}
