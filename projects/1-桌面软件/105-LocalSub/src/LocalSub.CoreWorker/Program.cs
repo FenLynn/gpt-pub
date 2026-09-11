@@ -140,6 +140,9 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
                 await SendResponseAsync(request.Id, true, new { shuttingDown = true }, null);
                 _shutdown.Cancel();
                 break;
+            case "diagnostics.processloopback":
+                StartOperation(request, ProcessLoopbackSmokeAsync);
+                break;
             case "live.start":
                 StartOperation(request, StartLiveAsync);
                 break;
@@ -270,6 +273,27 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
                 keywords = x.Keywords.ToArray()
             }).ToArray()
         };
+    }
+
+    async Task<object> ProcessLoopbackSmokeAsync(WorkerRequest request, CancellationToken ct)
+    {
+        if (!string.Equals(Environment.GetEnvironmentVariable("LOCALSUB_PROCESS_LOOPBACK_SMOKE"), "1", StringComparison.Ordinal))
+            throw new InvalidOperationException("Process Loopback diagnostics are disabled outside the explicit smoke-test environment.");
+
+        var processId = GetNullableUInt(request.Payload, "processId")
+            ?? throw new ArgumentException("Missing payload.processId");
+
+        using var capture = new ProcessLoopbackCaptureService();
+        await capture.StartAsync(processId, ct);
+        try
+        {
+            await Task.Delay(300, ct);
+        }
+        finally
+        {
+            await capture.StopAsync();
+        }
+        return new { processId, ok = true };
     }
 
     async Task<object> StartLiveAsync(WorkerRequest request, CancellationToken ct)
