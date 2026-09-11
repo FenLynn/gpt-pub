@@ -74,7 +74,8 @@ p105-exp
 
 ```text
 LocalSub.exe
-├─ WinForms 主界面，当前作为验证壳
+├─ WinForms 主界面，当前仍为默认入口与验证壳
+├─ Phase 2A Vue/WebView2 主 Shell，当前为显式预览入口
 ├─ WebView2 字幕 Overlay
 ├─ PotPlayer 进程发现、PID、窗口 bounds 与最小化状态
 ├─ Shell LiveAsrPipeline proxy
@@ -183,41 +184,45 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`1B.1` 第一版代码闭环完成。
+当前 Phase：`2A` 第一版 Web Shell 代码闭环完成。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-944cc4674b3fecefae5ef88c1c4bc88f30918013
+3c31bd4951304ba637eee2fc8ed60d5f66fa6bc5
 ```
 
 P105 Windows CI：
 
 ```text
-run 34581474053
+run 34583489679
 success
 ```
 
-Artifact：
+Artifacts：
 
 ```text
-ID 10191877739
-P105-LocalSub-win-x64-net8-candidate
-sha256:1758fdcecf8121b093c24bffaba2d15d035debebb1bf4c0683a218a66aad0581
+candidate
+ID 10192663341
+sha256:43b49a76775f3356fd45588dddf1689d8d46c1ed2363c6d96851f8e0abf5fd15
+
+WebUi preview
+ID 10192664092
+sha256:4d58234254cecc0c213c6df02c4d82c8f06c10ee0861081d93aaa1f02914d204
 ```
 
-该代码 head 已通过 realtime 编译隔离、Shell/Core publish、Core IPC、realtime IPC 状态机、Core 强杀恢复、Shell startup、后台工作区、Core 内 Process Loopback、sherpa runtime、native offline ASR 与候选包 manifest。
+该代码 head 已通过 Vue typecheck、Vite build、bundle 检查、1280×800 与 1600×1000 Edge 预览、Shell/Core publish、真实 WebView2 host、真实 `app.getSnapshot` bridge 往返，以及原有全部 P105 回归门。
 
-后续文档提交不改变这一已验证源码事实。
+默认启动路径尚未切换，正常运行仍进入旧 WinForms。当前 Web Shell 只作为显式预览和 CI host，避免在用户确认视觉方向前破坏现有入口。
 
 下一步：
 
 1. 不提升 stable，不动 main。
-2. 使用当前 candidate 在用户真实 Windows 上验证 PotPlayer + 已安装 realtime 模型。
-3. 验证开始、停止、音量、字幕、seek、换片、全屏/窗口切换和长时间运行。
-4. 在 realtime 运行中强杀 `LocalSub.Core.exe`，确认 Shell 保持存活且错误可诊断。
-5. Core 边界确认后进入 Phase 2A，建立 WebView2 + Vue 3 + TypeScript 主 Shell。
-6. 不直接翻译 `MainForm`，Web UI 只能消费 Application Contract。
+2. 用户先审看当前 Web Shell 视觉方向。
+3. 继续完成真实 PotPlayer + 已安装 realtime 模型实机验证。
+4. 下一代码阶段优先接通 Web realtime 页的 Shell 白名单命令，复用现有 Core realtime session，不复制旧 `MainForm` 逻辑。
+5. 之后再迁模型、后台转写和设置编辑。
+6. Web UI 始终只能消费 Application Contract。
 
 ## 9. Web UI 约束
 
