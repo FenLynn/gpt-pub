@@ -101,6 +101,59 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Typecheck and build Vue WebUi
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub/src/LocalSub/WebUi
+        run: |
+          $ErrorActionPreference='Stop'
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+          foreach ($file in @('dist/index.html','dist/assets/app.js','dist/assets/app.css')) {
+            if (-not (Test-Path $file -PathType Leaf)) { throw "WebUi bundle missing $file" }
+          }
+          $index = Get-Content dist/index.html -Raw
+          if ($index -notmatch './assets/app\.js' -or $index -notmatch './assets/app\.css') {
+            throw 'WebUi index.html does not reference deterministic production assets.'
+          }
+
+      - name: Capture WebUi browser previews
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub/src/LocalSub/WebUi
+        run: |
+          $ErrorActionPreference='Stop'
+          $edgeCandidates = @(
+            "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
+            "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          )
+          $edge = $edgeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $edge) { throw 'Microsoft Edge was not found for WebUi visual preview.' }
+          New-Item -ItemType Directory -Force preview | Out-Null
+          $uri = ([Uri](Resolve-Path 'dist/index.html')).AbsoluteUri
+          foreach ($spec in @(
+            @{ Name='1280x800'; Size='1280,800' },
+            @{ Name='1600x1000'; Size='1600,1000' }
+          )) {
+            $shot = (Resolve-Path 'preview').Path + "\localsub-$($spec.Name).png"
+            $args = @(
+              '--headless',
+              '--disable-gpu',
+              '--hide-scrollbars',
+              '--no-first-run',
+              '--allow-file-access-from-files',
+              "--window-size=$($spec.Size)",
+              "--screenshot=$shot",
+              $uri
+            )
+            $p = Start-Process -FilePath $edge -ArgumentList $args -PassThru -Wait
+            if ($p.ExitCode -ne 0 -or -not (Test-Path $shot) -or (Get-Item $shot).Length -lt 10000) {
+              throw "WebUi preview failed for $($spec.Name)"
+            }
+          }
 
       - name: Verify release identity inputs
         shell: pwsh
@@ -303,6 +356,38 @@ jobs:
           if ($clientLog -notmatch 'DISCONNECTED generation=1') { throw 'Core crash recovery smoke test did not record generation 1 disconnect.' }
           if ($clientLog -notmatch 'CONNECTED generation=2') { throw 'Core crash recovery smoke test did not reconnect as generation 2.' }
 
+      - name: Smoke test WebView2 Vue host and bridge
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $env:LOCALSUB_WEBUI_SMOKE = '1'
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
+          Remove-Item publish/Logs/webui-smoke-ready.txt -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru
+          $deadline = [DateTime]::UtcNow.AddSeconds(15)
+          while ([DateTime]::UtcNow -lt $deadline) {
+            Start-Sleep -Milliseconds 250
+            $p.Refresh()
+            if ($p.HasExited) { break }
+            if (Test-Path publish/Logs/webui-smoke-ready.txt) { break }
+          }
+          $p.Refresh()
+          if ($p.HasExited) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            throw "WebUi host exited before ready. ExitCode=$($p.ExitCode)"
+          }
+          if (-not (Test-Path publish/Logs/webui-smoke-ready.txt)) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            throw 'WebUi host did not complete a real app.getSnapshot bridge round trip.'
+          }
+          $ready = Get-Content publish/Logs/webui-smoke-ready.txt -Raw
+          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'webview2=ready') {
+            throw "Unexpected WebUi smoke marker: $ready"
+          }
+          if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'WebUi host wrote a crash log.' }
+          Stop-Process -Id $p.Id -Force
+
       - name: Smoke test LocalSub startup
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
@@ -455,6 +540,12 @@ jobs:
         with:
           name: P105-LocalSub-win-x64-net8-candidate
           path: projects/1-桌面软件/105-LocalSub/LocalSub-candidate-win-x64-net8.zip
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: P105-LocalSub-WebUi-preview
+          path: projects/1-桌面软件/105-LocalSub/src/LocalSub/WebUi/preview/*.png
           retention-days: 14
 
   release:

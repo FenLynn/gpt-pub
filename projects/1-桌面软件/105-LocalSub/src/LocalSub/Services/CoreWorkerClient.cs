@@ -44,6 +44,7 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     }
 
     internal int PendingRequestCount => _pending.Count;
+    internal int ConnectionGeneration => Volatile.Read(ref _connectionGeneration);
 
     public async Task PingAsync(CancellationToken ct = default)
         => _ = await SendOperationAsync("ping", new { }, null, ct);

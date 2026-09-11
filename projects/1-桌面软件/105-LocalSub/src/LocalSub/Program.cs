@@ -15,7 +15,9 @@ internal static class Program
     static bool IsBatchUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_BATCH_UI_SMOKE") == "1";
     static bool IsOfflineAsrSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_SMOKE") == "1";
     static bool IsCoreRecoverySmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_CORE_RECOVERY_SMOKE") == "1";
-    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest || IsCoreRecoverySmokeTest;
+    static bool IsWebUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_WEBUI_SMOKE") == "1";
+    static bool IsWebUiPreview => Environment.GetEnvironmentVariable("LOCALSUB_WEBUI_PREVIEW") == "1";
+    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest || IsCoreRecoverySmokeTest || IsWebUiSmokeTest;
 
     [STAThread]
     static void Main()
@@ -49,6 +51,14 @@ internal static class Program
             if (IsCoreRecoverySmokeTest)
             {
                 RunCoreRecoverySmokeTestAsync().GetAwaiter().GetResult();
+                return;
+            }
+
+            if (IsWebUiSmokeTest || IsWebUiPreview)
+            {
+                WebUiAssets.ValidateEmbeddedResources();
+                using var webShell = new WebShellForm(IsWebUiSmokeTest);
+                Application.Run(webShell);
                 return;
             }
 
