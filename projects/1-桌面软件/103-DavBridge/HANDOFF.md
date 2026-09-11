@@ -31,13 +31,13 @@
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-adde1adaab6d3f4c9e9d0600b674d7e613c26408
+fc9b2e6e5bca0a0bce402b273b210370d01647db
 ```
 
 对应 P103 CI：
 
 ```text
-run 34547772628
+run 34563940712
 scope          success
 core-smoke     success
 frontend       success
@@ -47,24 +47,24 @@ report-status  success
 
 Windows candidate：`DavBridge-v0.4.3-win-x64`
 
-Artifact ID：`10179717875`
+Artifact ID：`10185357260`
 
 EXE：
 
 ```text
 2246235 bytes
-SHA256 27363e5546b4b757832090aa5703d410b4d00e4be07a6b4c16178ba34c1c98a0
+SHA256 bef8cfd1dff817789b3c07842e5532120a1dbaab81d6223512275103575b678d
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-a1db20e24c5706d3bc4c846b4998d299754fe89d2d20427213f27205fc2df09a
+c07e5ef375c9baaab1e7fd7def4c0d9b6a6726e2f19ea19de8d9f22e37686d7c
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `daa2f105...` 识别为最后完整验证的代码基线，而不是把纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `fc9b2e6e...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
 
 ## 4. 当前分支快照
 
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-adde1adaab6d3f4c9e9d0600b674d7e613c26408
+fc9b2e6e5bca0a0bce402b273b210370d01647db
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -110,17 +110,17 @@ recycle.delete
 
 ## 6. 最新总览 UI 状态
 
-用户已经确认整体方向基本可接受，最新一轮继续做轻量化收敛。`adde1ada...` 已完成并通过完整 P103 CI。
+用户已经确认新的 Apple / Google 风格总览设计稿，`fc9b2e6e...` 已按该设计稿落地并通过完整 P103 CI。
 
 第一，悬浮提示统一改为白色底纹、深色文字、浅边框和柔和阴影，并提高层级，Overview 相关容器允许 tooltip 正常溢出显示。
 
 第二，迁移路径不再使用中间圆形箭头。现在是一条连续横向路径线，箭头头部位于右端，指向坚果云。
 
-第三，迁移阶段仍位于路径卡下方，但状态标记进一步弱化。已完成阶段只显示普通绿色 `✓`，不再使用绿色圆形图标。未完成阶段不再显示圆形数字。
+第三，迁移阶段位于路径下方并改成轻量 stage rail。`源端对账` 与 `变化修复` 在 done 状态时都显示淡灰圆底内的绿色 `✓`；未完成阶段显示淡灰空心圆，不再显示数字；阶段之间使用细灰连接线。
 
-第四，“镜像覆盖、当前任务、流量预算”继续保持三行信息结构，但已经移除右侧大白色外框、圆角底板和阴影。三行直接融入 workspace 背景，只保留轻量水平分隔线；三类左侧图标底块、流量箭头底块和重置图标底块也进一步弱化为无底色视觉。
+第四，三行顺序已经固定为 `镜像覆盖 → 流量预算 → 当前任务`，整体直接融入 workspace 背景，只保留轻量水平分隔线。每行左侧使用柔和功能图标块；覆盖率百分比移动到最右侧，覆盖计数直接使用无千位分隔符的 `verified / total 已校准`。流量预算的上传和下载数值统一显示 1 位小数，百分数放大，重置日期与时间移动到流量预算标题后。当前任务放在最下方，任务详情不再常驻显示，只通过更淡的 info 圆圈悬浮提示。
 
-第五，左上角 DavBridge 下方的 `Zotero 镜像` 已隐藏。总览页顶部 `你好，DavBridge` 整个 header 已移除。其他页面仍保留各自页面标题。
+第五，源端与目标端图标按已确认设计稿重新绘制：InfiniCLOUD 使用蓝色卡通云图标，坚果云使用卡通坚果图标，不再显示源端或目标端括号说明。左上角 DavBridge 下方的 `Zotero 镜像` 继续隐藏，总览页顶部 `你好，DavBridge` 不恢复。
 
 第六，桌面 BalloonTip 通知已经永久关闭。新增 `SilentNotifyIcon.cs`，继续保留 Windows 托盘图标、双击恢复、右键菜单、暂停、继续和退出功能，但所有 `ShowBalloonTip` 调用均成为 no op。额度不足、完成、重试等待等状态不再推送 Windows 右下角桌面气泡。状态仍在 DavBridge 自身 UI 内显示。
 
@@ -170,14 +170,15 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步需要在真实 Windows 上运行 `adde1ada...` 对应的 candidate，重点检查：
+用户下一步需要在真实 Windows 上运行 `fc9b2e6e...` 对应的 candidate，重点检查：
 
-1. 总览顶部被移除后，主体起始位置是否自然。
-2. 白色 tooltip 是否能稳定显示且不被卡片裁切。
-3. 右端箭头是否比原中间圆形箭头自然。
-4. 右侧大白框移除后，三行内容是否自然融入背景，水平分隔线是否足够而不过度。
-5. 三阶段普通绿色勾是否足够轻，不再抢视觉。
-6. 桌面右下角不再出现额度不足或其他 BalloonTip。
+1. 总览是否与已确认设计稿一致，尤其是三行顺序、对齐、留白和整体轻量感。
+2. InfiniCLOUD 蓝色云图标与坚果云卡通坚果图标在真实 WebView2 中是否自然。
+3. `源端对账` 与 `变化修复` 的淡灰圆底绿色 `✓` 是否清晰但不抢视觉。
+4. 镜像覆盖的 `verified / total` 无千位分隔符、最右侧大百分数和进度条是否协调。
+5. 流量预算是否稳定显示 1 位小数，重置日期时间是否位于标题后，上传和下载的大百分数是否合适。
+6. 当前任务详情是否只通过淡色 info 圆圈悬浮出现，底部不再常驻说明句；操作按钮仍可正常点击。
+7. 桌面右下角继续不出现额度不足或其他 BalloonTip。
 
 用户实机确认之前，不提升 `p103-stable`，不修改 `main`，不创建正式标签或 Release。
 
