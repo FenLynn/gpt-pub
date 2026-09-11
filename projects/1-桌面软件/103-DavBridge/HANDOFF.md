@@ -31,13 +31,13 @@
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-ee1123594c7d65169af1ad08dab9a4359fd43d7a
+4b6b105ad06a87538510eead89c2f4e06b7381df
 ```
 
 对应 P103 CI：
 
 ```text
-run 34575058046
+run 34579593536
 scope          success
 core-smoke     success
 frontend       success
@@ -47,24 +47,24 @@ report-status  success
 
 Windows candidate：`DavBridge-v0.4.3-win-x64`
 
-Artifact ID：`10189349808`
+Artifact ID：`10191130906`
 
 EXE：
 
 ```text
 2266715 bytes
-SHA256 524490bba357c6567f552b31f4e26b85653e127d2763d15a65d67ecf5d49c485
+SHA256 7934962d1e571f703fc988be92170dd032ba712a4eced4d3eb0314e4585cfede
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-38c6ffc85e7bad6060d0a82c52c5eb32023741576f910be955d787b16a01772a
+7f3f227585969f68877da39a4805705a100b7b3237b130e58356793dc318e04c
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `ee112359...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `4b6b105a...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
 
 ## 4. 当前分支快照
 
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-ee1123594c7d65169af1ad08dab9a4359fd43d7a
+4b6b105ad06a87538510eead89c2f4e06b7381df
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -112,7 +112,7 @@ recycle.delete
 
 ## 6. 最新总览 UI 状态
 
-用户已确认总览页视觉质量良好。`ee112359...` 在此前 v0.4 UI completion 基础上继续收口：InfiniCLOUD 云标改为黄色系；内嵌设置页彻底取消左侧二级栏，改成顶部横向四分类切换；设置内容区、页脚和维护区去掉大片白色底板，统一为与主 workspace 一致的自然浅色背景；输入框、数字框、标签、按钮和提示文字的字号与尺寸重新校准。该 head 已通过完整 P103 CI。
+用户已确认总览页视觉质量良好。`4b6b105a...` 在此前 v0.4 UI completion 基础上继续收口：InfiniCLOUD 云标保持黄色系；内嵌设置页使用顶部横向四分类；设置表单不再让输入框横向铺满，按 URL、目录、用户、密码与数值字段分别采用适中的固定宽度，整体更接近桌面软件比例；密码显示按钮也改成更轻量的符号。坚果云图标重新绘制为更短、更宽、更圆润的坚果轮廓，减少此前瘦长感。该 head 已通过完整 P103 CI。
 
 第一，默认窗口由 880×560 调整为 1100×620，使真实 WinForms/WebView2 窗口与已确认参考图保持近似 16:9 的同一比例；原生标题改为简洁 `DavBridge`。Overview 的主要尺寸按该默认窗口逐项标定，较小窗口继续走响应式压缩。悬浮提示保持白色底纹、深色文字、浅边框和柔和阴影。
 
@@ -178,7 +178,7 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步需要在真实 Windows 上运行 `ee112359...` 对应的 candidate，重点检查：
+用户下一步需要在真实 Windows 上运行 `4b6b105a...` 对应的 candidate，重点检查：
 
 1. 总览是否与已确认设计稿一致，尤其是三行顺序、对齐、留白和整体轻量感。
 2. InfiniCLOUD 黄色云图标与坚果云卡通坚果图标在真实 WebView2 中是否自然。
