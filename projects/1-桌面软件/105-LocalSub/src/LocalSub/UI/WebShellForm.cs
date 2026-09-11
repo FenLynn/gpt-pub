@@ -62,7 +62,7 @@ public sealed class WebShellForm : Form
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
     {
-        "live", "batch", "models", "settings", "about"
+        "live", "batch", "models", "settings", "docs"
     };
 
     readonly WebView2 _web = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(243, 246, 249) };

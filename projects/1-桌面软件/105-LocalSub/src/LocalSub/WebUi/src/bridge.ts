@@ -1,4 +1,4 @@
-export type PageKey = "live" | "batch" | "models" | "settings" | "about";
+export type PageKey = "live" | "batch" | "models" | "settings" | "docs";
 
 export interface LocalSubSnapshot {
   app: {
@@ -61,7 +61,8 @@ const fallback: LocalSubSnapshot = {
   settings: { audioSource: "PotPlayer", resourceProfile: "Auto", subtitleAutoSize: true, subtitleFontSize: 28 }
 };
 
-let fallbackPage: PageKey = "live";
+const previewPage = new URLSearchParams(window.location.search).get("page");
+let fallbackPage: PageKey = previewPage === "docs" ? "docs" : "live";
 let sequence = 0;
 const pending = new Map<string, { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }>();
 

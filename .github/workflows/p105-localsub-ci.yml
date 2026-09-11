@@ -135,8 +135,9 @@ jobs:
           New-Item -ItemType Directory -Force preview | Out-Null
           $uri = [Uri]::new((Resolve-Path 'dist/index.html').Path).AbsoluteUri
           foreach ($spec in @(
-            @{ Name='1280x800'; Size='1280,800' },
-            @{ Name='1600x1000'; Size='1600,1000' }
+            @{ Name='live-1280x800'; Size='1280,800'; Page='live' },
+            @{ Name='live-1600x1000'; Size='1600,1000'; Page='live' },
+            @{ Name='docs-1280x800'; Size='1280,800'; Page='docs' }
           )) {
             $shot = (Resolve-Path 'preview').Path + "\localsub-$($spec.Name).png"
             $args = @(
@@ -147,7 +148,7 @@ jobs:
               '--allow-file-access-from-files',
               "--window-size=$($spec.Size)",
               "--screenshot=$shot",
-              $uri
+              ($uri + '?page=' + $spec.Page)
             )
             $p = Start-Process -FilePath $edge -ArgumentList $args -PassThru -Wait
             if ($p.ExitCode -ne 0 -or -not (Test-Path $shot) -or (Get-Item $shot).Length -lt 10000) {
