@@ -51,6 +51,9 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     internal async Task PingWithDelayAsync(int delayMs, CancellationToken ct = default)
         => _ = await SendOperationAsync("ping", new { delayMs = Math.Clamp(delayMs, 0, 10_000) }, null, ct);
 
+    internal async Task RunProcessLoopbackSmokeAsync(uint processId, CancellationToken ct = default)
+        => _ = await SendOperationAsync("diagnostics.processloopback", new { processId }, null, ct);
+
     public async Task<MediaAnalysisResult> AnalyzeAsync(
         string filePath,
         IProgress<MediaAnalysisProgress>? progress = null,
