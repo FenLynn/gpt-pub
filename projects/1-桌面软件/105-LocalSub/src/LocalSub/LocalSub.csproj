@@ -30,6 +30,7 @@
     <Compile Remove="Services\MediaAnalysisService.cs" />
     <Compile Remove="Services\AllAudioCaptureService.cs" />
     <Compile Remove="Services\ResilientPotPlayerCaptureService.cs" />
+    <Compile Remove="Services\ProcessLoopbackCaptureService.cs" />
     <Compile Remove="Services\StreamingParaformerService.cs" />
     <Compile Remove="Services\SenseVoiceSimulatedStreamingService.cs" />
     <Compile Remove="Services\FunAsrNanoSimulatedStreamingService.cs" />
