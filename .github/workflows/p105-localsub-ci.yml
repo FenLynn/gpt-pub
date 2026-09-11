@@ -121,6 +121,40 @@ jobs:
             if ($m.Groups[1].Value -ne $shellVersion) { throw "RELEASE.md version does not match source: $($m.Groups[1].Value) vs $shellVersion" }
           }
 
+      - name: Verify realtime compile-time isolation
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $shellText = Get-Content 'src/LocalSub/LocalSub.csproj' -Raw
+          $coreText = Get-Content 'src/LocalSub.CoreWorker/LocalSub.CoreWorker.csproj' -Raw
+          $heavy = @(
+            'AllAudioCaptureService',
+            'ResilientPotPlayerCaptureService',
+            'StreamingParaformerService',
+            'SenseVoiceSimulatedStreamingService',
+            'FunAsrNanoSimulatedStreamingService'
+          )
+          foreach ($name in $heavy) {
+            $remove = "Compile Remove=\"Services\\$name.cs\""
+            if ($shellText -notmatch [regex]::Escape($remove)) {
+              throw "$name is not excluded from LocalSub.exe compilation"
+            }
+            $include = "LocalSub\\Services\\$name.cs"
+            if ($coreText -notmatch [regex]::Escape($include)) {
+              throw "$name is not compiled into LocalSub.Core.exe"
+            }
+          }
+          foreach ($name in @('LiveAsrPipeline','ProcessLoopbackCaptureService')) {
+            $include = "LocalSub\\Services\\$name.cs"
+            if ($coreText -notmatch [regex]::Escape($include)) {
+              throw "$name is missing from LocalSub.Core.exe compilation"
+            }
+          }
+          if ($coreText -notmatch 'LOCALSUB_CORE_WORKER') {
+            throw 'LocalSub.CoreWorker must define LOCALSUB_CORE_WORKER'
+          }
+
       - name: Publish net8 shell app
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub/src/LocalSub
