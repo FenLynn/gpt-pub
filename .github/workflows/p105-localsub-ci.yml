@@ -131,6 +131,7 @@ jobs:
           $heavy = @(
             'AllAudioCaptureService',
             'ResilientPotPlayerCaptureService',
+            'ProcessLoopbackCaptureService',
             'StreamingParaformerService',
             'SenseVoiceSimulatedStreamingService',
             'FunAsrNanoSimulatedStreamingService'
