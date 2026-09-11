@@ -14,6 +14,8 @@ const error = ref<string | null>(null);
 const commandBusy = ref(false);
 const selectedSource = ref<"potplayer" | "allAudio">("potplayer");
 const selectedModelId = ref("");
+const modelFilter = ref<"all" | "installed" | "live" | "batch">("all");
+const selectedCatalogModelId = ref("");
 let selectionInitialized = false;
 let unsubscribeSnapshot: (() => void) | null = null;
 
@@ -52,6 +54,25 @@ const liveStateLabel = computed(() => {
   }
 });
 
+const modelFilters = [
+  { key: "all", label: "全部" },
+  { key: "installed", label: "已安装" },
+  { key: "live", label: "实时" },
+  { key: "batch", label: "后台" }
+] as const;
+const filteredCatalogModels = computed(() => {
+  const catalog = snapshot.value?.models.catalog ?? [];
+  switch (modelFilter.value) {
+    case "installed": return catalog.filter(x => x.installed);
+    case "live": return catalog.filter(x => x.liveCapable);
+    case "batch": return catalog.filter(x => x.batchCapable);
+    default: return catalog;
+  }
+});
+const selectedCatalogModel = computed(() =>
+  snapshot.value?.models.catalog.find(x => x.id === selectedCatalogModelId.value) ?? null
+);
+
 function applySnapshot(next: LocalSubSnapshot) {
   snapshot.value = next;
 
@@ -59,6 +80,15 @@ function applySnapshot(next: LocalSubSnapshot) {
     selectedSource.value = next.live.sourceId;
     selectedModelId.value = next.live.modelId || next.live.availableModels[0]?.id || "";
     selectionInitialized = true;
+  }
+
+  if (!next.models.catalog.some(x => x.id === selectedCatalogModelId.value)) {
+    selectedCatalogModelId.value =
+      next.models.catalog.find(x => x.liveSelected)?.id ??
+      next.models.catalog.find(x => x.batchSelected)?.id ??
+      next.models.catalog.find(x => x.installed && x.recommended && !x.isComponent)?.id ??
+      next.models.catalog[0]?.id ??
+      "";
   }
 }
 
@@ -79,6 +109,37 @@ async function navigate(page: PageKey) {
     applySnapshot(await invoke<LocalSubSnapshot>("app.navigate", { page }));
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
+async function refreshModels() {
+  commandBusy.value = true;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("model.list"));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    commandBusy.value = false;
+  }
+}
+
+async function setDefaultModel(target: "live" | "batch") {
+  const model = selectedCatalogModel.value;
+  if (!model) return;
+
+  commandBusy.value = true;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("model.select", {
+      target,
+      modelId: model.id
+    }));
+    if (target === "live") selectedModelId.value = model.id;
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    commandBusy.value = false;
   }
 }
 
@@ -119,6 +180,15 @@ onMounted(async () => {
       } catch {
         // Expected: CI intentionally uses a missing model to exercise the
         // real WebView2 -> Shell live.start failure path without downloading models.
+      }
+      applySnapshot(await invoke<LocalSubSnapshot>("model.list"));
+      try {
+        await invoke<LocalSubSnapshot>("model.select", {
+          target: "live",
+          modelId: "__ci_missing_model__"
+        });
+      } catch {
+        // Expected: model selection must reject unknown catalog entries cleanly.
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
@@ -307,24 +377,132 @@ onBeforeUnmount(() => {
           </aside>
         </section>
 
-        <section v-else-if="activePage === 'models'" class="page-grid">
-          <article class="wide-card">
-            <div class="section-title">
-              <h2>本地模型</h2>
-              <span class="hint-dot" data-tip="模型不进入基础绿色包。下载、校验、解压和目录替换等重 IO 将继续收口到 Core。">i</span>
+        <section v-else-if="activePage === 'models'" class="page-grid models-grid">
+          <article class="wide-card model-catalog-card">
+            <div class="model-page-head">
+              <div class="section-title">
+                <h2>本地模型</h2>
+                <span
+                  class="hint-dot"
+                  data-tip="本页只读取模型目录状态和保存默认选择。下载、校验、解压和大目录替换等重任务将在下一阶段迁入 LocalSub.Core。"
+                >i</span>
+              </div>
+              <button class="compact-button" type="button" :disabled="commandBusy" @click="refreshModels">
+                重新扫描
+              </button>
             </div>
-            <div class="metric-row">
-              <div><span>Catalog</span><b>{{ snapshot.models.catalogCount }}</b></div>
-              <div><span>已安装</span><b>{{ snapshot.models.installedCount }}</b></div>
-              <div><span>状态</span><b>{{ snapshot.models.status }}</b></div>
+
+            <div class="model-summary-strip">
+              <div><b>{{ snapshot.models.installedCount }}</b><span>已安装</span></div>
+              <div><b>{{ snapshot.models.catalogCount }}</b><span>Catalog</span></div>
+              <div><b>{{ snapshot.models.catalog.filter(x => x.liveCapable && x.installed).length }}</b><span>实时可用</span></div>
+              <div><b>{{ snapshot.models.catalog.filter(x => x.batchCapable && x.installed).length }}</b><span>后台可用</span></div>
+            </div>
+
+            <div class="model-filter-bar">
+              <button
+                v-for="item in modelFilters"
+                :key="item.key"
+                type="button"
+                :class="{ active: modelFilter === item.key }"
+                @click="modelFilter = item.key"
+              >{{ item.label }}</button>
+              <span>{{ snapshot.models.status }}</span>
+            </div>
+
+            <div class="model-list">
+              <button
+                v-for="model in filteredCatalogModels"
+                :key="model.id"
+                class="model-row"
+                :class="{
+                  selected: selectedCatalogModelId === model.id,
+                  unavailable: !model.installed
+                }"
+                type="button"
+                @click="selectedCatalogModelId = model.id"
+              >
+                <div class="model-row-main">
+                  <div class="model-name-line">
+                    <b>{{ model.name }}</b>
+                    <span v-if="model.recommended" class="model-badge recommended">推荐</span>
+                    <span class="model-badge" :class="{ installed: model.installed }">
+                      {{ model.installed ? "已安装" : "未安装" }}
+                    </span>
+                  </div>
+                  <p>{{ model.purpose }}</p>
+                  <div class="model-meta">
+                    <span>{{ model.languages }}</span>
+                    <span>{{ model.sizeText }}</span>
+                    <span v-if="model.isComponent">组件</span>
+                    <span v-else-if="model.liveCapable && model.batchCapable">实时 / 后台</span>
+                    <span v-else-if="model.liveCapable">实时</span>
+                    <span v-else-if="model.batchCapable">后台</span>
+                  </div>
+                </div>
+                <div class="model-score-grid">
+                  <span><small>实时</small><b>{{ model.realtimeScore || "·" }}</b></span>
+                  <span><small>准确</small><b>{{ model.accuracyScore || "·" }}</b></span>
+                  <span><small>性价比</small><b>{{ model.valueScore || "·" }}</b></span>
+                </div>
+              </button>
+
+              <div v-if="filteredCatalogModels.length === 0" class="model-empty">
+                当前筛选条件下没有模型。
+              </div>
             </div>
           </article>
-          <aside class="mini-card accent">
-            <div class="mini-title">
-              <span>模型目录</span>
-              <span class="hint-dot" data-tip="Vue 不直接读写模型目录，文件操作必须经过 Shell/Core 白名单接口。">i</span>
-            </div>
-            <strong>本地管理</strong>
+
+          <aside class="model-detail-stack">
+            <article class="mini-card accent model-default-card">
+              <div class="mini-title">
+                <span>默认模型</span>
+                <span class="hint-dot" data-tip="默认选择由 Shell 写入 AppSettings，旧 WinForms 与未来 Web 页面继续共用同一份配置。">i</span>
+              </div>
+              <div class="default-model-line">
+                <span>实时字幕</span>
+                <b>{{ snapshot.models.liveModelName }}</b>
+              </div>
+              <div class="default-model-line">
+                <span>后台转写</span>
+                <b>{{ snapshot.models.batchModelName }}</b>
+              </div>
+            </article>
+
+            <article v-if="selectedCatalogModel" class="mini-card model-selection-card">
+              <div class="mini-title">
+                <span>当前选择</span>
+                <span
+                  class="model-state-dot"
+                  :class="{ installed: selectedCatalogModel.installed }"
+                ></span>
+              </div>
+              <strong>{{ selectedCatalogModel.name }}</strong>
+              <p class="model-detail-purpose">{{ selectedCatalogModel.purpose }}</p>
+              <div class="model-actions">
+                <button
+                  class="primary-button model-action"
+                  type="button"
+                  :disabled="commandBusy || !selectedCatalogModel.installed || !selectedCatalogModel.liveCapable || selectedCatalogModel.liveSelected"
+                  @click="setDefaultModel('live')"
+                >{{ selectedCatalogModel.liveSelected ? "实时默认" : "设为实时默认" }}</button>
+                <button
+                  class="outline-button model-action"
+                  type="button"
+                  :disabled="commandBusy || !selectedCatalogModel.installed || !selectedCatalogModel.batchCapable || selectedCatalogModel.batchSelected"
+                  @click="setDefaultModel('batch')"
+                >{{ selectedCatalogModel.batchSelected ? "后台默认" : "设为后台默认" }}</button>
+              </div>
+            </article>
+
+            <article class="mini-card model-next-card">
+              <div class="mini-title">
+                <span>下一阶段</span>
+                <span class="hint-dot" data-tip="模型下载、断点续传、解压、校验、修复和大目录删除都属于重任务，不在 Web UI 或轻量 Shell 中执行。">i</span>
+              </div>
+              <strong>重任务迁入 Core</strong>
+              <p>当前先接管查看与默认选择，下载、修复和删除随后统一迁移。</p>
+            </article>
           </aside>
         </section>
 

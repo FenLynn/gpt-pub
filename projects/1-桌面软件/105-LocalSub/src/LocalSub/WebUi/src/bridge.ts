@@ -5,6 +5,24 @@ export interface LiveModelOption {
   name: string;
 }
 
+export interface ModelCatalogItem {
+  id: string;
+  name: string;
+  purpose: string;
+  languages: string;
+  sizeText: string;
+  realtimeScore: number;
+  accuracyScore: number;
+  valueScore: number;
+  recommended: boolean;
+  liveCapable: boolean;
+  batchCapable: boolean;
+  isComponent: boolean;
+  installed: boolean;
+  liveSelected: boolean;
+  batchSelected: boolean;
+}
+
 export interface LocalSubSnapshot {
   app: {
     productVersion: string;
@@ -39,8 +57,13 @@ export interface LocalSubSnapshot {
     status: string;
   };
   models: {
+    catalog: ModelCatalogItem[];
     catalogCount: number;
     installedCount: number;
+    liveModelId: string;
+    liveModelName: string;
+    batchModelId: string;
+    batchModelName: string;
     status: string;
   };
   settings: {
@@ -65,6 +88,77 @@ type BridgeEvent<T> = {
   payload: T;
 };
 
+const fallbackCatalog: ModelCatalogItem[] = [
+  {
+    id: "streaming-zipformer-zh-large-int8",
+    name: "Zipformer Large 中文 INT8",
+    purpose: "推荐实时：中文，实机效果较 Paraformer 更好",
+    languages: "中",
+    sizeText: "约 160 MB",
+    realtimeScore: 8,
+    accuracyScore: 8,
+    valueScore: 9,
+    recommended: true,
+    liveCapable: true,
+    batchCapable: false,
+    isComponent: false,
+    installed: true,
+    liveSelected: true,
+    batchSelected: false
+  },
+  {
+    id: "sensevoice-small-int8",
+    name: "SenseVoice Small INT8",
+    purpose: "推荐后台/模拟实时：中英，轻量、稳定",
+    languages: "中/英",
+    sizeText: "约 230 MB",
+    realtimeScore: 6,
+    accuracyScore: 8,
+    valueScore: 9,
+    recommended: true,
+    liveCapable: true,
+    batchCapable: true,
+    isComponent: false,
+    installed: true,
+    liveSelected: false,
+    batchSelected: true
+  },
+  {
+    id: "offline-zipformer-ctc-zh-int8",
+    name: "Zipformer CTC Offline 中文 INT8",
+    purpose: "推荐后台：中文，高准确、高性价比",
+    languages: "中",
+    sizeText: "约 350 MB",
+    realtimeScore: 4,
+    accuracyScore: 9,
+    valueScore: 9,
+    recommended: true,
+    liveCapable: false,
+    batchCapable: true,
+    isComponent: false,
+    installed: false,
+    liveSelected: false,
+    batchSelected: false
+  },
+  {
+    id: "silero-vad",
+    name: "Silero VAD",
+    purpose: "语音段检测组件，不是 ASR 模型",
+    languages: "通用",
+    sizeText: "约 2 MB",
+    realtimeScore: 0,
+    accuracyScore: 0,
+    valueScore: 0,
+    recommended: true,
+    liveCapable: false,
+    batchCapable: false,
+    isComponent: true,
+    installed: true,
+    liveSelected: false,
+    batchSelected: false
+  }
+];
+
 const fallback: LocalSubSnapshot = {
   app: { productVersion: "0.1.1", activePage: "live", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
@@ -86,13 +180,26 @@ const fallback: LocalSubSnapshot = {
     canStart: true
   },
   batch: { queued: 0, state: "idle", status: "拖入媒体后开始后台转写" },
-  models: { catalogCount: 12, installedCount: 4, status: "模型目录可用" },
+  models: {
+    catalog: fallbackCatalog,
+    catalogCount: fallbackCatalog.length,
+    installedCount: fallbackCatalog.filter(x => x.installed).length,
+    liveModelId: "streaming-zipformer-zh-large-int8",
+    liveModelName: "Zipformer Large 中文 INT8",
+    batchModelId: "sensevoice-small-int8",
+    batchModelName: "SenseVoice Small INT8",
+    status: "3 / 4 已安装"
+  },
   settings: { audioSource: "PotPlayer", resourceProfile: "Auto", subtitleAutoSize: true, subtitleFontSize: 28 }
 };
 
 const previewPage = new URLSearchParams(window.location.search).get("page");
-let fallbackPage: PageKey = previewPage === "docs" ? "docs" : "live";
+let fallbackPage: PageKey =
+  previewPage === "batch" || previewPage === "models" || previewPage === "settings" || previewPage === "docs"
+    ? previewPage
+    : "live";
 let fallbackLive = { ...fallback.live };
+let fallbackModels = { ...fallback.models, catalog: fallback.models.catalog.map(x => ({ ...x })) };
 let sequence = 0;
 const pending = new Map<string, { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }>();
 const snapshotSubscribers = new Set<(snapshot: LocalSubSnapshot) => void>();
@@ -133,7 +240,8 @@ function fallbackSnapshot(): LocalSubSnapshot {
   return {
     ...fallback,
     app: { ...fallback.app, activePage: fallbackPage, busy: fallbackLive.state === "starting" || fallbackLive.state === "stopping" },
-    live: { ...fallbackLive }
+    live: { ...fallbackLive },
+    models: { ...fallbackModels, catalog: fallbackModels.catalog.map(x => ({ ...x })) }
   };
 }
 
@@ -169,7 +277,44 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         lastError: null
       };
     }
-    if (method === "app.getSnapshot" || method === "app.navigate" || method === "live.start" || method === "live.stop") {
+    if (method === "model.select") {
+      const target = params.target === "batch" ? "batch" : params.target === "live" ? "live" : "";
+      const modelId = typeof params.modelId === "string" ? params.modelId : "";
+      const model = fallbackModels.catalog.find(x => x.id === modelId);
+      if (!target) throw new Error("不支持的模型默认用途。");
+      if (!model) throw new Error("模型 catalog 中不存在该模型。");
+      if (!model.installed) throw new Error("该模型尚未安装。");
+      if (target === "live" && !model.liveCapable) throw new Error("该模型不支持实时字幕。");
+      if (target === "batch" && !model.batchCapable) throw new Error("该模型不支持后台转写。");
+
+      fallbackModels = {
+        ...fallbackModels,
+        liveModelId: target === "live" ? model.id : fallbackModels.liveModelId,
+        liveModelName: target === "live" ? model.name : fallbackModels.liveModelName,
+        batchModelId: target === "batch" ? model.id : fallbackModels.batchModelId,
+        batchModelName: target === "batch" ? model.name : fallbackModels.batchModelName,
+        catalog: fallbackModels.catalog.map(x => ({
+          ...x,
+          liveSelected: target === "live" ? x.id === model.id : x.liveSelected,
+          batchSelected: target === "batch" ? x.id === model.id : x.batchSelected
+        }))
+      };
+      if (target === "live") {
+        fallbackLive = {
+          ...fallbackLive,
+          modelId: model.id,
+          modelName: model.name
+        };
+      }
+    }
+    if (
+      method === "app.getSnapshot" ||
+      method === "app.navigate" ||
+      method === "live.start" ||
+      method === "live.stop" ||
+      method === "model.list" ||
+      method === "model.select"
+    ) {
       const snapshot = fallbackSnapshot();
       emitSnapshot(snapshot);
       return snapshot as T;

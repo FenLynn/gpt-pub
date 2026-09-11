@@ -60,7 +60,9 @@ public sealed class WebShellForm : Form
         "app.getSnapshot",
         "app.navigate",
         "live.start",
-        "live.stop"
+        "live.stop",
+        "model.list",
+        "model.select"
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
     {
@@ -78,9 +80,8 @@ public sealed class WebShellForm : Form
     };
     readonly CoreWorkerClient _core = new();
     readonly LiveSessionController _live;
+    readonly ModelCatalogController _models;
     readonly AppSettings _settings;
-    readonly int _catalogCount;
-    readonly int _installedModelCount;
     readonly bool _smoke;
     readonly HashSet<string> _smokeMethods = new(StringComparer.Ordinal);
 
@@ -94,10 +95,7 @@ public sealed class WebShellForm : Form
     {
         _smoke = smoke;
         _settings = AppSettings.Load();
-        var catalog = new ModelCatalogService().Load();
-        var models = new ModelManager(_settings);
-        _catalogCount = catalog.Count;
-        _installedModelCount = catalog.Count(models.IsInstalled);
+        _models = new ModelCatalogController();
         _live = new LiveSessionController(_core);
 
         Text = "LocalSub";
@@ -118,7 +116,7 @@ public sealed class WebShellForm : Form
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate", "live.start", "live.stop" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "live.start", "live.stop", "model.list", "model.select" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -192,6 +190,12 @@ public sealed class WebShellForm : Form
                 case "live.stop":
                     result = await StopLiveAsync();
                     break;
+                case "model.list":
+                    result = ListModels();
+                    break;
+                case "model.select":
+                    result = SelectModel(request.Params);
+                    break;
                 default:
                     throw new InvalidOperationException("不允许的界面命令。");
             }
@@ -201,8 +205,8 @@ public sealed class WebShellForm : Form
         }
         catch (Exception ex)
         {
-            if (_smoke && request?.Method == "live.start")
-                RecordSmokeMethod("live.start");
+            if (_smoke && request?.Method is "live.start" or "model.select")
+                RecordSmokeMethod(request.Method);
             Reply(request?.Id ?? string.Empty, false, null, ex.Message);
         }
     }
@@ -216,6 +220,7 @@ public sealed class WebShellForm : Form
 
         _activePage = page;
         if (page == "live") _live.RefreshConfiguration();
+        if (page == "models") _models.Refresh();
         return await BuildSnapshotAsync(probeCore: false);
     }
 
@@ -235,6 +240,24 @@ public sealed class WebShellForm : Form
     async Task<object> StopLiveAsync()
     {
         await _live.StopAsync();
+        return BuildSnapshot();
+    }
+
+    object ListModels()
+    {
+        _models.Refresh();
+        return BuildSnapshot();
+    }
+
+    object SelectModel(JsonElement? parameters)
+    {
+        if (!TryReadString(parameters, "target", out var target))
+            throw new InvalidOperationException("请选择模型默认用途。");
+        if (!TryReadString(parameters, "modelId", out var modelId))
+            throw new InvalidOperationException("请选择模型。");
+
+        _models.SelectDefault(target, modelId);
+        if (target == "live") _live.RefreshConfiguration();
         return BuildSnapshot();
     }
 
@@ -274,12 +297,7 @@ public sealed class WebShellForm : Form
                 state = "idle",
                 status = "现有后台转写继续由 Core 执行"
             },
-            models = new
-            {
-                catalogCount = _catalogCount,
-                installedCount = _installedModelCount,
-                status = $"{_installedModelCount} 个本地模型可用"
-            },
+            models = _models.Snapshot,
             settings = new
             {
                 audioSource = live.Source,
@@ -376,12 +394,14 @@ public sealed class WebShellForm : Form
         _smokeMethods.Add(method);
         if (!_smokeMethods.Contains("app.getSnapshot") ||
             !_smokeMethods.Contains("live.stop") ||
-            !_smokeMethods.Contains("live.start")) return;
+            !_smokeMethods.Contains("live.start") ||
+            !_smokeMethods.Contains("model.list") ||
+            !_smokeMethods.Contains("model.select")) return;
 
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}");
     }
 
     static bool TryReadString(JsonElement? parameters, string propertyName, out string value)

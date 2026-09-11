@@ -200,13 +200,16 @@ Core realtime 的 `sessionId` 与 PotPlayer `processId` 由 Shell 应用层持�
 
 ### models
 
-至少包含：
+当前查看与选择阶段至少包含：
 
-- catalog
-- installed
-- activeOperation
-- progress
-- lastError
+- catalog：模型名、用途、语言、体积、实时/准确/性价比评分、推荐标记、实时/后台能力、组件标记和安装状态
+- catalogCount
+- installedCount
+- liveModelId / liveModelName
+- batchModelId / batchModelName
+- status
+
+模型页只允许轻量扫描与默认选择。下载、断点续传、解压、校验、修复和大目录删除进入 Phase 1B.2 后才通过 Core 长任务接口暴露 progress / lastError。
 
 ### settings
 
@@ -214,14 +217,18 @@ Core realtime 的 `sessionId` 与 PotPlayer `processId` 由 Shell 应用层持�
 
 ## 7. Shell 到 Web UI 命令白名单
 
-当前已经实现并进入 Phase 2B 第一闭环的命令：
+当前已经实现的命令：
 
 ```text
 app.getSnapshot
 app.navigate
 live.start
 live.stop
+model.list
+model.select
 ```
+
+`model.select` 只保存已安装且能力匹配的实时或后台默认模型，不执行下载或删除。
 
 后续按页面迁移逐步加入：
 
@@ -231,7 +238,6 @@ batch.analyze
 batch.transcribe
 batch.cancel
 
-model.list
 model.download
 model.cancel
 model.delete
