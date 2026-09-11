@@ -335,7 +335,7 @@ public sealed class WebShellForm : Form
 
         try
         {
-            BeginInvoke(() =>
+            BeginInvoke(new Action(() =>
             {
                 try
                 {
@@ -346,7 +346,7 @@ public sealed class WebShellForm : Form
                 {
                     Interlocked.Exchange(ref _snapshotPushPending, 0);
                 }
-            });
+            }));
         }
         catch
         {
