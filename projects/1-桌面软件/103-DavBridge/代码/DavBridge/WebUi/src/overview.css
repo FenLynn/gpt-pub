@@ -301,7 +301,13 @@
   cursor:help;
 }
 .route-card-polished .phase strong{
+  align-self:center;
+  display:inline-flex;
+  align-items:center;
+  height:34px;
+  margin:0;
   font-size:15px;
+  line-height:1;
   font-weight:630;
   white-space:nowrap;
 }
@@ -708,7 +714,7 @@
   .route-card-polished .phase-wrap{grid-template-columns:1fr 48px}
   .route-card-polished .phase-wrap:last-child{grid-template-columns:1fr}
   .route-card-polished .phase{height:34px;gap:8px}
-  .route-card-polished .phase strong{font-size:11.5px}
+  .route-card-polished .phase strong{height:27px;font-size:11.5px}
   .route-card-polished .phase-icon,
   .route-card-polished .phase.done .phase-icon{width:27px;height:27px;font-size:16px}
   .phase-connector{width:48px}
@@ -1335,7 +1341,7 @@ button:focus-visible,a:focus-visible{outline:2px solid rgba(34,139,214,.38);outl
   transform:translateY(-1px);
 }
 .route-card-polished .endpoint.source .cloud-logo{transform:translateY(1px)}
-.route-card-polished .phase strong{transform:translateY(-1px)}
+.route-card-polished .phase strong{transform:none}
 
 button.side-status{
   width:calc(100% - 14px);
