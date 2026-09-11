@@ -136,17 +136,17 @@ jobs:
             'FunAsrNanoSimulatedStreamingService'
           )
           foreach ($name in $heavy) {
-            $remove = "Compile Remove=\"Services\\$name.cs\""
+            $remove = 'Compile Remove="Services\{0}.cs"' -f $name
             if ($shellText -notmatch [regex]::Escape($remove)) {
               throw "$name is not excluded from LocalSub.exe compilation"
             }
-            $include = "LocalSub\\Services\\$name.cs"
+            $include = '..\LocalSub\Services\{0}.cs' -f $name
             if ($coreText -notmatch [regex]::Escape($include)) {
               throw "$name is not compiled into LocalSub.Core.exe"
             }
           }
           foreach ($name in @('LiveAsrPipeline','ProcessLoopbackCaptureService')) {
-            $include = "LocalSub\\Services\\$name.cs"
+            $include = '..\LocalSub\Services\{0}.cs' -f $name
             if ($coreText -notmatch [regex]::Escape($include)) {
               throw "$name is missing from LocalSub.Core.exe compilation"
             }
