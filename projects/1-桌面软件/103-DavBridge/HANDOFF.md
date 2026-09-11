@@ -31,13 +31,13 @@
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-daa2f105bdea37b41725f3d8f2152b1f8faa7c28
+adde1adaab6d3f4c9e9d0600b674d7e613c26408
 ```
 
 对应 P103 CI：
 
 ```text
-run 34486122426
+run 34547772628
 scope          success
 core-smoke     success
 frontend       success
@@ -47,19 +47,19 @@ report-status  success
 
 Windows candidate：`DavBridge-v0.4.3-win-x64`
 
-Artifact ID：`10155806521`
+Artifact ID：`10179717875`
 
 EXE：
 
 ```text
-2242139 bytes
-SHA256 93c736966e044e79bdd33eda8d7c7ed8719b7bf67a621bd5175355047df3e38b
+2246235 bytes
+SHA256 27363e5546b4b757832090aa5703d410b4d00e4be07a6b4c16178ba34c1c98a0
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-e2ae39cc32204be3768bf2df5601ac7eb34df365bbcbb8b42ef082bb6dcbf442
+a1db20e24c5706d3bc4c846b4998d299754fe89d2d20427213f27205fc2df09a
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
@@ -74,10 +74,10 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-daa2f105bdea37b41725f3d8f2152b1f8faa7c28
+adde1adaab6d3f4c9e9d0600b674d7e613c26408
 ```
 
-`main...daa2f105` 为 ahead 25、behind 0，说明实验线包含当前 main，未从陈旧主线分叉。
+本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
 
 新对话必须重新查询三条分支实时 head 和祖先关系，不得把上述快照视为永久事实。
 
@@ -110,7 +110,7 @@ recycle.delete
 
 ## 6. 最新总览 UI 状态
 
-用户已经确认上一轮整体方向基本可接受，最新一轮继续做细节收敛。`daa2f105...` 已完成以下修改。
+用户已经确认整体方向基本可接受，最新一轮继续做轻量化收敛。`adde1ada...` 已完成并通过完整 P103 CI。
 
 第一，悬浮提示统一改为白色底纹、深色文字、浅边框和柔和阴影，并提高层级，Overview 相关容器允许 tooltip 正常溢出显示。
 
@@ -118,7 +118,7 @@ recycle.delete
 
 第三，迁移阶段仍位于路径卡下方，但状态标记进一步弱化。已完成阶段只显示普通绿色 `✓`，不再使用绿色圆形图标。未完成阶段不再显示圆形数字。
 
-第四，原本并排的“镜像覆盖、当前任务、流量预算”三列已经改成一个统一面板内的三行。每行内部横向组织信息，三行之间只使用轻量水平分隔线。
+第四，“镜像覆盖、当前任务、流量预算”继续保持三行信息结构，但已经移除右侧大白色外框、圆角底板和阴影。三行直接融入 workspace 背景，只保留轻量水平分隔线；三类左侧图标底块、流量箭头底块和重置图标底块也进一步弱化为无底色视觉。
 
 第五，左上角 DavBridge 下方的 `Zotero 镜像` 已隐藏。总览页顶部 `你好，DavBridge` 整个 header 已移除。其他页面仍保留各自页面标题。
 
@@ -170,12 +170,12 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步需要在真实 Windows 上运行 `daa2f105...` 对应的 candidate，重点检查：
+用户下一步需要在真实 Windows 上运行 `adde1ada...` 对应的 candidate，重点检查：
 
 1. 总览顶部被移除后，主体起始位置是否自然。
 2. 白色 tooltip 是否能稳定显示且不被卡片裁切。
 3. 右端箭头是否比原中间圆形箭头自然。
-4. 三列改为三行后，默认窗口的信息密度和视觉比例是否合适。
+4. 右侧大白框移除后，三行内容是否自然融入背景，水平分隔线是否足够而不过度。
 5. 三阶段普通绿色勾是否足够轻，不再抢视觉。
 6. 桌面右下角不再出现额度不足或其他 BalloonTip。
 
