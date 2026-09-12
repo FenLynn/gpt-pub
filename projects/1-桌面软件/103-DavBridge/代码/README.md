@@ -6,23 +6,23 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.12**。
+当前 `p103-exp` 候选：**v0.4.13**。
 
 最后完成完整 CI 的代码 head：
 
 ```text
-c00ad702ff9ed1303cc9ce439b61154ed09ae282
+09aa5495bf1c914bf3a18cc8800be17076a1e21f
 ```
 
-CI run：`34705490320`，结果 `success`。
+CI run：`34707132029`，结果 `success`。
 
-候选 Artifact：`DavBridge-v0.4.12-win-x64`，Artifact ID `10301765459`。
+候选 Artifact：`DavBridge-v0.4.13-win-x64`，Artifact ID `10302216592`。
 
-EXE SHA256：`bf71b1ec031b2e3f1751b76d16b45de8e0df8d7285137e7b79a4ae5fca0584ae`。
+EXE SHA256：`dbda27fe28d79b64309de3c3f5dafaaa28ad51d2dc587c6546cb3bf38710ddd8`。
 
-Artifact ZIP SHA256：`d805250dd0f8519aff268d75ce0c960f88a57b1cd222b2a165ac2f755a101bdd`。
+Artifact ZIP SHA256：`ad6879dc4221decd2fe4eb1addaae4056d27b1f6301be051742973e855e505b8`。
 
-如果该 head 之后只有文档提交，仍以 `e94758c5...` 作为最后经过完整构建验证的代码 head。
+如果该 head 之后只有文档提交，仍以 `09aa5495...` 作为最后经过完整构建验证的代码 head。
 
 ## 解决方案
 
@@ -90,7 +90,7 @@ v0.3 的 WinForms 业务 UI 源码仍保留用于历史追溯和回滚参照，�
 - HTTPS only；
 - IO progress。
 
-v0.4.12 UI 收束没有修改 `DavBridge.Core`。
+v0.4.13 对 `DavBridge.Core/MigrationEngine.cs` 只增加人工暂停的安全 member 边界检查；WebDAV PUT/GET、StrongVerified、WriteUnknown、quota/Cycle、Reconciliation 与 DELETE 语义未改变。
 
 ## DavBridge Windows 宿主
 
@@ -181,7 +181,8 @@ Smoke 测试继续覆盖迁移与安全不变量，包括：
 - 跨周期回收站；
 - WaitUser；
 - DELETE 前再验证；
-- Data 兼容。
+- Data 兼容；
+- 人工安全暂停：当前 member 安全完成后停止，下一 member 不得启动。
 
 UI 迁移后仍必须运行原 Core Smoke，不能只做 Vue 构建。
 
@@ -235,8 +236,8 @@ Windows x64 使用 .NET 8 framework-dependent single EXE publish。
 .github/workflows/p103-davbridge-ci.yml
 ```
 
-最后已验证 run `34705490320` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
+最后已验证 run `34707132029` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
 
 ## 当前开发断点
 
-v0.4.12 目前只等待用户 Windows 实机 UI 与交互验收。重点检查整体箭头、阶段对勾与呼吸灯、模块图标居中、流量风险颜色和绿色运行/继续语义。未经明确验收，不提升 stable/main，不扩展功能，不重构 Core。
+v0.4.13 等待用户 Windows 实机验证两阶段安全暂停。点击暂停必须立即显示“正在暂停”，当前 member 完成安全收尾后必须在下一 member 前真正停止并显示“已暂停 / 继续”。未经明确验收，不提升 stable/main，不创建正式 Release。
