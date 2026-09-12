@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   disposeBridge,
   invoke,
@@ -24,7 +24,9 @@ const settingsTab = ref<"subtitle" | "startup" | "runtime">(
 );
 const deleteConfirmId = ref("");
 const settingsSaveState = ref("");
-const levelHistory = ref<number[]>(Array.from({ length: 120 }, () => 0));
+const levelHistory = ref<number[]>(Array.from({ length: 300 }, () => 0));
+const transcriptHistory = ref<string[]>([]);
+const transcriptScroll = ref<HTMLElement | null>(null);
 const hoverTip = ref<{ text: string; left: number; top: number; above: boolean } | null>(null);
 let activeTipTarget: HTMLElement | null = null;
 let selectionInitialized = false;
@@ -86,6 +88,36 @@ const homeButtonDisabled = computed(() => {
   if (liveRunning.value) return commandBusy.value || liveTransitioning.value;
   return commandBusy.value || liveTransitioning.value || !liveModelReady.value || !inputReady.value;
 });
+const sideStatusKind = computed(() => {
+  if (liveState.value === "running") return "run";
+  if (liveTransitioning.value || snapshot.value?.system.autoStartPending) return "wait";
+  if (liveState.value === "failed" || snapshot.value?.core.state === "failed") return "warning";
+  if (allReady.value) return "complete";
+  return "idle";
+});
+const sideStatusTitle = computed(() => {
+  if (liveState.value === "running") return "实时字幕运行中";
+  if (liveState.value === "starting") return "实时字幕启动中";
+  if (liveState.value === "stopping") return "实时字幕停止中";
+  if (snapshot.value?.system.autoStartPending) return snapshot.value.system.autoStartStatus || "等待自动启动";
+  if (liveState.value === "failed" || snapshot.value?.core.state === "failed") return "需要处理";
+  return allReady.value ? "LocalSub 已就绪" : "等待配置";
+});
+const sideStatusSecondary = computed(() => {
+  if (liveState.value === "running")
+    return snapshot.value?.live.source ?? "实时识别";
+  if (snapshot.value?.system.autoStartPending)
+    return snapshot.value.system.autoStartStatus || "自动启动";
+  if (!liveModelReady.value) return "实时模型未就绪";
+  if (!inputReady.value) return "等待音源";
+  return "v" + (snapshot.value?.app.productVersion ?? "0.1.7");
+});
+const sideStatusTip = computed(() => {
+  const core = coreReady.value ? "Core 就绪" : "Core 未就绪";
+  const model = liveModelReady.value ? "实时模型可用" : "实时模型需要安装";
+  const input = inputReady.value ? "音源可用" : "音源等待中";
+  return [sideStatusTitle.value, core, model, input].join(" · ");
+});
 
 const waveformPoints = computed(() => {
   const values = levelHistory.value;
@@ -131,7 +163,23 @@ const modelOperationBusy = computed(() => snapshot.value?.models.operation.state
 const modelHeavyBlocked = computed(() => liveState.value !== "idle" || modelOperationBusy.value || commandBusy.value);
 
 function applySnapshot(next: LocalSubSnapshot) {
-  const previousLevel = snapshot.value?.live.level ?? 0;
+  const previous = snapshot.value;
+  const previousLevel = previous?.live.level ?? 0;
+  const startingNewSession = previous?.live.state !== "starting" && next.live.state === "starting";
+  const transcriptChanged =
+    next.live.currentText !== (previous?.live.currentText ?? "") ||
+    next.live.previousText !== (previous?.live.previousText ?? "");
+
+  if (startingNewSession) {
+    transcriptHistory.value = [];
+    levelHistory.value = Array.from({ length: 300 }, () => 0);
+  }
+
+  const finalized = next.live.previousText.trim();
+  if (finalized && transcriptHistory.value.at(-1) !== finalized) {
+    transcriptHistory.value = [...transcriptHistory.value.slice(-79), finalized];
+  }
+
   snapshot.value = next;
 
   if (!selectionInitialized || next.live.state === "idle" || next.live.state === "failed") {
@@ -140,9 +188,16 @@ function applySnapshot(next: LocalSubSnapshot) {
     selectionInitialized = true;
   }
 
-  if (next.settings.showLiveLevelHistory) {
+  if (next.settings.showLiveLevelHistory && next.live.state === "running") {
     const value = Number.isFinite(next.live.level) ? next.live.level : previousLevel;
-    levelHistory.value = [...levelHistory.value.slice(-119), Math.max(0, Math.min(1, value))];
+    levelHistory.value = [...levelHistory.value.slice(-299), Math.max(0, Math.min(1, value))];
+  }
+
+  if (transcriptChanged) {
+    void nextTick(() => {
+      const target = transcriptScroll.value;
+      if (target) target.scrollTop = target.scrollHeight;
+    });
   }
 }
 
@@ -421,21 +476,15 @@ onBeforeUnmount(() => {
         </button>
       </nav>
 
-      <div class="side-status"
-        :data-tip="snapshot?.system.autoStartPending
-          ? snapshot.system.autoStartStatus
-          : snapshot?.core.pid
-            ? 'LocalSub.Core 进程 ' + snapshot.core.pid + '，generation ' + snapshot.core.generation
-            : 'Core 会在需要识别、分析或模型重任务时启动。'">
-        <span class="side-status-icon" :class="snapshot?.core.state ?? 'starting'" aria-hidden="true">
-          <svg v-if="snapshot?.core.state === 'ready' || snapshot?.core.state === 'busy'" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg>
-          <svg v-else-if="snapshot?.core.state === 'failed'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
-          <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+      <div class="side-status" :class="'state-' + sideStatusKind" :data-tip="sideStatusTip">
+        <span class="side-status-icon" :class="'state-' + sideStatusKind" aria-hidden="true">
+          <svg v-if="sideStatusKind === 'run'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+          <svg v-else-if="sideStatusKind === 'wait'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+          <svg v-else-if="sideStatusKind === 'warning'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
+          <svg v-else-if="sideStatusKind === 'complete'" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg>
+          <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
         </span>
-        <div>
-          <strong>{{ snapshot?.system.autoStartPending ? snapshot.system.autoStartStatus : coreReady ? "Core 就绪" : "Core 待命" }}</strong>
-          <small>v{{ snapshot?.app.productVersion ?? "0.1.6" }}</small>
-        </div>
+        <div><strong>{{ sideStatusTitle }}</strong><small>{{ sideStatusSecondary }}</small></div>
       </div>
     </aside>
 
@@ -448,65 +497,75 @@ onBeforeUnmount(() => {
 
       <template v-else-if="snapshot">
         <section v-if="activePage === 'home'" class="page home-page">
-          <header class="home-head">
-            <div class="home-mark" :class="{ ready: allReady || liveRunning }">
-              <svg viewBox="0 0 48 48">
-                <path v-if="allReady || liveRunning" d="m12 25 8 8 17-18"></path>
-                <path v-else d="M8 25h8l4-12 8 25 6-16 5 5"></path>
-              </svg>
+          <header class="home-toolbar">
+            <div class="home-title">
+              <span class="compact-feature" :class="{ ready: allReady || liveRunning }">
+                <svg viewBox="0 0 24 24">
+                  <path v-if="allReady || liveRunning" d="m5.5 12.5 4.2 4.2 8.8-9.4"></path>
+                  <path v-else d="M3 12h3l2-6 4 12 3-9 2 3h4"></path>
+                </svg>
+              </span>
+              <div><h2>{{ homeStateText }}</h2><span>LocalSub</span></div>
             </div>
-            <div>
-              <span class="section-kicker">LOCALSUB</span>
-              <h2>{{ homeStateText }}</h2>
-              <p>{{ liveRunning ? "字幕识别和 Overlay 正在工作。" : "日常使用只需要从这里开始。" }}</p>
-            </div>
-          </header>
-
-          <button class="home-primary" type="button" :class="{ stop: liveRunning }"
-            :disabled="homeButtonDisabled" @click="toggleHomeLive">
-            <span class="home-primary-icon">
+            <button class="home-action-button" type="button" :class="{ stop: liveRunning }"
+              :disabled="homeButtonDisabled" @click="toggleHomeLive">
               <svg v-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
               <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
-            </span>
-            <span><strong>{{ liveRunning ? "停止实时字幕" : "开始实时字幕" }}</strong><small>{{ snapshot.live.source }} · {{ snapshot.live.modelName || "未选择模型" }}</small></span>
-          </button>
+              {{ liveRunning ? "停止实时字幕" : "开始实时字幕" }}
+            </button>
+          </header>
 
-          <section class="check-list">
-            <div class="check-row">
-              <span class="check-icon" :class="{ ok: coreReady }"><svg viewBox="0 0 24 24"><path d="M5 12h14 M12 5v14"></path></svg></span>
-              <div><strong>识别核心</strong><span>{{ coreReady ? "Core 已就绪" : "需要时自动启动" }}</span></div>
-              <b :class="{ ok: coreReady }">{{ coreReady ? "正常" : "待命" }}</b>
+          <section class="home-status-list">
+            <div class="home-status-row" :data-tip="coreReady ? 'LocalSub.Core 已可接受识别、媒体分析和模型任务。' : 'Core 会在需要时自动启动；若启动失败会在这里显示异常。'">
+              <span class="status-mark" :class="{ ok: coreReady }"><i></i><svg v-if="coreReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
+              <strong>识别核心</strong><span>{{ coreReady ? "Core 已就绪" : "按需启动" }}</span><b :class="{ ok: coreReady }">{{ coreReady ? "正常" : "待命" }}</b>
             </div>
-            <div class="check-row">
-              <span class="check-icon" :class="{ ok: liveModelReady }"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="3"></ellipse><path d="M5 6.5V12c0 1.7 3.1 3 7 3s7-1.3 7-3V6.5 M5 12v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V12"></path></svg></span>
-              <div><strong>实时模型</strong><span>{{ snapshot.models.liveModelName }}</span></div>
-              <b :class="{ ok: liveModelReady }">{{ liveModelReady ? "可用" : "需安装" }}</b>
+            <div class="home-status-row" :data-tip="'当前实时默认模型：' + snapshot.models.liveModelName">
+              <span class="status-mark" :class="{ ok: liveModelReady }"><i></i><svg v-if="liveModelReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
+              <strong>实时模型</strong><span>{{ snapshot.models.liveModelName }}</span><b :class="{ ok: liveModelReady }">{{ liveModelReady ? "可用" : "需安装" }}</b>
             </div>
-            <div class="check-row">
-              <span class="check-icon" :class="{ ok: inputReady }"><svg viewBox="0 0 24 24"><path d="M5 9h4l4-4v14l-4-4H5z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10"></path></svg></span>
-              <div><strong>音源</strong><span>{{ snapshot.settings.audioSource }}{{ snapshot.settings.audioSourceId === "potplayer" ? (snapshot.system.potPlayerDetected ? " · 已检测" : " · 等待 PotPlayer") : "" }}</span></div>
-              <b :class="{ ok: inputReady }">{{ inputReady ? "正常" : "等待" }}</b>
+            <div class="home-status-row" :data-tip="snapshot.settings.audioSourceId === 'potplayer' ? 'PotPlayer 模式使用进程专用音频捕获，不会静默回退到所有音频。' : '所有音频模式监听系统输出混音。'">
+              <span class="status-mark" :class="{ ok: inputReady }"><i></i><svg v-if="inputReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
+              <strong>音源</strong><span>{{ snapshot.settings.audioSource }}</span><b :class="{ ok: inputReady }">{{ inputReady ? "正常" : "等待" }}</b>
             </div>
-            <div class="check-row">
-              <span class="check-icon" :class="{ ok: batchModelReady }"><svg viewBox="0 0 24 24"><path d="M6 4h8l4 4v12H6z M14 4v5h4 M9 13h6 M9 16h6"></path></svg></span>
-              <div><strong>后台模型</strong><span>{{ snapshot.models.batchModelName }}</span></div>
-              <b :class="{ ok: batchModelReady }">{{ batchModelReady ? "可用" : "需安装" }}</b>
+            <div class="home-status-row" data-tip="Overlay 由 Windows Shell 管理，实时字幕运行时自动显示并跟随播放器窗口。">
+              <span class="status-mark ok"><i></i><svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
+              <strong>字幕 Overlay</strong><span>{{ liveRunning ? "正在显示" : "随实时字幕启动" }}</span><b class="ok">{{ liveRunning ? "运行" : "就绪" }}</b>
+            </div>
+            <div class="home-status-row" :data-tip="'当前后台默认模型：' + snapshot.models.batchModelName">
+              <span class="status-mark" :class="{ ok: batchModelReady }"><i></i><svg v-if="batchModelReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
+              <strong>后台模型</strong><span>{{ snapshot.models.batchModelName }}</span><b :class="{ ok: batchModelReady }">{{ batchModelReady ? "可用" : "需安装" }}</b>
             </div>
           </section>
 
-          <footer class="home-foot">
-            <span v-if="snapshot.settings.startWithWindows">开机启动{{ snapshot.settings.silentStartup ? " · 静默托盘" : "" }}{{ snapshot.settings.autoStartLive ? " · 自动实时" : "" }}</span>
-            <button type="button" @click="navigate('settings')">调整启动方式</button>
+          <footer class="home-startup-row" data-tip="可在设置中组合开机启动、静默进入托盘和启动后自动开启实时字幕。">
+            <span class="startup-row-icon"><svg viewBox="0 0 24 24"><path d="M12 3v8 M8.5 5.5A8 8 0 1 0 15.5 5.5"></path></svg></span>
+            <strong>启动方式</strong>
+            <span>{{ snapshot.settings.startWithWindows ? "开机启动" : "手动启动" }}{{ snapshot.settings.silentStartup ? " · 静默托盘" : "" }}{{ snapshot.settings.autoStartLive ? " · 自动实时" : "" }}</span>
+            <button type="button" @click="navigate('settings')">调整</button>
           </footer>
         </section>
 
         <section v-else-if="activePage === 'live'" class="page live-page">
-          <header class="page-head simple-head">
-            <div class="page-feature live-feature"><svg viewBox="0 0 48 48"><path d="M7 25h7l4-11 8 23 6-17 4 5h5"></path></svg></div>
-            <div class="page-title"><div class="title-line"><h2>实时字幕</h2><span class="info-dot" data-tip="实时音频、VAD、Process Loopback 与 ASR 运行在 LocalSub.Core，Overlay 和 PotPlayer 窗口跟随由 Shell 管理。">i</span></div><span>{{ liveStateLabel }}</span></div>
+          <header class="live-topbar">
+            <div class="live-title">
+              <span class="compact-feature live"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg></span>
+              <h2>实时字幕</h2>
+              <span class="info-dot" data-tip="实时音频、VAD、Process Loopback 与 ASR 运行在 LocalSub.Core；Overlay 和 PotPlayer 窗口跟随由 Shell 管理。">i</span>
+            </div>
+            <div class="instant-level" data-tip="当前输入电平，来自 Core 限频后的归一化音频幅度。">
+              <span>输入</span><div><i :style="{ width: Math.max(2, snapshot.live.level * 100) + '%' }"></i></div><b>{{ Math.round(snapshot.live.level * 100) }}%</b>
+            </div>
+            <div class="live-head-actions">
+              <label class="header-monitor" data-tip="显示或隐藏最近约 30 秒的输入电平历史。">
+                <svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg>
+                <span class="switch small-switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></span>
+              </label>
+              <span class="live-state" :class="'state-' + liveState"><i></i>{{ liveStateLabel }}</span>
+            </div>
           </header>
 
-          <section class="option-list">
+          <section class="option-list live-options">
             <label class="option-row">
               <span class="option-name"><span class="row-icon audio"><svg viewBox="0 0 24 24"><path d="M5 9h4l4-4v14l-4-4H5z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10"></path></svg></span><strong>音源</strong></span>
               <select v-model="selectedSource" :disabled="liveControlsLocked"><option value="potplayer">PotPlayer</option><option value="allAudio">所有音频</option></select>
@@ -515,23 +574,25 @@ onBeforeUnmount(() => {
               <span class="option-name"><span class="row-icon model"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="3"></ellipse><path d="M5 6.5V12c0 1.7 3.1 3 7 3s7-1.3 7-3V6.5 M5 12v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V12"></path></svg></span><strong>识别模型</strong></span>
               <select v-model="selectedModelId" :disabled="liveControlsLocked || snapshot.live.availableModels.length === 0"><option v-for="model in snapshot.live.availableModels" :key="model.id" :value="model.id">{{ model.name }}</option><option v-if="snapshot.live.availableModels.length === 0" value="">未安装实时模型</option></select>
             </label>
-            <div class="option-row">
-              <span class="option-name"><span class="row-icon monitor"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg></span><strong>输入监视</strong><span class="info-dot small" data-tip="只保存最近几秒的归一化电平值用于绘图，不把原始音频暴露给 Web UI。">i</span></span>
-              <label class="switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></label>
-            </div>
           </section>
 
           <section v-if="snapshot.settings.showLiveLevelHistory" class="waveform-section">
-            <div class="wave-head"><span><strong>输入电平</strong><small>{{ snapshot.live.status }}</small></span><b>{{ Math.round(snapshot.live.level * 100) }}%</b></div>
-            <svg class="level-wave" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="实时输入电平历史">
+            <div class="wave-head"><strong>输入电平历史</strong><span>最近约 30 秒</span></div>
+            <svg class="level-wave" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="最近约 30 秒输入电平历史">
               <line x1="0" y1="21" x2="100" y2="21"></line>
               <polyline :points="waveformPoints"></polyline>
               <polyline class="mirror" :points="waveformMirrorPoints"></polyline>
             </svg>
+            <div class="wave-axis"><span>30 s</span><span>15 s</span><span>现在</span></div>
           </section>
 
-          <section v-if="snapshot.live.currentText || snapshot.live.previousText" class="transcript-preview">
-            <span v-if="snapshot.live.previousText">{{ snapshot.live.previousText }}</span><strong>{{ snapshot.live.currentText }}</strong>
+          <section class="transcript-section">
+            <div class="transcript-head"><strong>字幕</strong><span>{{ snapshot.live.status }}</span></div>
+            <div ref="transcriptScroll" class="transcript-scroll">
+              <p v-for="(line,index) in transcriptHistory" :key="index">{{ line }}</p>
+              <p v-if="snapshot.live.currentText" class="current">{{ snapshot.live.currentText }}</p>
+              <p v-else-if="transcriptHistory.length === 0" class="empty">实时识别结果会显示在这里。</p>
+            </div>
           </section>
 
           <footer class="live-actions">

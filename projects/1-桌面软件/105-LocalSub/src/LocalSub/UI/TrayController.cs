@@ -31,7 +31,7 @@ public sealed class TrayController : IDisposable
             Text = "LocalSub 本地字幕",
             Icon = SystemIcons.Application,
             ContextMenuStrip = menu,
-            Visible = false
+            Visible = true
         };
 
         show.Click += (_, _) => Restore();
@@ -119,7 +119,7 @@ public sealed class TrayController : IDisposable
         _form.Show();
         if (_form.WindowState == FormWindowState.Minimized) _form.WindowState = FormWindowState.Normal;
         _form.Activate();
-        if (!AppSettings.Load().MinimizeToTray) _icon.Visible = false;
+        _icon.Visible = true;
     }
 
     public void Dispose()

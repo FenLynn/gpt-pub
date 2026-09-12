@@ -74,7 +74,12 @@ public sealed class WebShellForm : Form
         "home", "live", "batch", "models", "settings", "docs"
     };
 
-    readonly WebView2 _web = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(243, 246, 249) };
+    readonly WebView2 _web = new()
+    {
+        Dock = DockStyle.Fill,
+        BackColor = Color.FromArgb(244, 248, 251),
+        DefaultBackgroundColor = Color.FromArgb(244, 248, 251)
+    };
     readonly Label _loading = new()
     {
         Dock = DockStyle.Fill,
