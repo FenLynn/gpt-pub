@@ -57,7 +57,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- 当前开发候选版本为 v0.1.4；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.5；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
@@ -73,9 +73,11 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - 旧 WinForms realtime、后台与模型任务已统一到 shared Core broker，模型删除进入破坏性阶段后不可由用户取消。
 - v0.1.3 起普通双击 `LocalSub.exe` 默认进入 Web UI。旧 WinForms 不再默认出现，仅通过 `LocalSub.exe --legacy-ui` 或 `LOCALSUB_LEGACY_UI=1` 作为迁移期备用入口。
 - WebShell 已挂接既有托盘控制器与 UI 响应监控，默认入口切换不牺牲这两项 Shell 能力。
-- v0.1.4 完成 Web UI 视觉基线重构：一级导航改为顶部横向 Tab，页面主内容统一单栏，模型详情移到列表下方，设置与文档改为纵向信息流，图标改为线性 SVG，整体采用浅色低饱和配色并提高文字可读性。
-- v0.1.4 的实时、后台、模型、设置、文档五页 1280×800 预览及实时页 1600×1000 预览已逐张人工检查，无明显横向溢出、布局塌陷或 Tab 拥挤。
-- 当前最新完整验证代码 head 为 `183a32816fedf0b4bcc4b9eb5d5f628e3408cb16`，P105 Windows CI run `34698144349` success；candidate Artifact `10299706108`，WebUi preview Artifact `10299516539`。
+- v0.1.5 根据用户实机反馈纠正视觉方向：恢复 DavBridge 风格左侧一级导航，右侧工作区保持严格单栏；默认窗口改为 1100×825 的 4:3，最小窗口为 900×675。
+- 页面说明文字大幅收缩，辅助原理与边界说明改为浅色全局 Tooltip；Tooltip 使用 Vue Teleport 挂到 body，z-index 提升到全局最高层，避免旧黑底样式和被卡片遮挡。
+- 左侧导航、页面标题、表单、模型条目和设置项重新放大；页面及设置使用更大的线性 SVG 图标，配色对齐最新版 DavBridge 的浅色蓝白基线。
+- v0.1.5 的实时、后台、模型、设置、文档五页 1100×825 预览和实时页 900×675 预览已人工检查，右侧无页面级二次分栏，缩小窗口也无明显横向溢出。
+- 当前最新完整验证代码 head 为 `5b575d45a3f09f9c20e0e0377a88283466548139`，P105 Windows CI run `34701810199` success；candidate Artifact `10300570629`，WebUi preview Artifact `10299584948`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。

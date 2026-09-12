@@ -63,7 +63,7 @@ Mediova / system FFmpeg
 .github/workflows/p105-localsub-ci.yml
 ```
 
-CI 负责 P105 路径 scope gate、Shell/Core publish、Core Named Pipe 真连接、Shell/后台页/Process Loopback 烟测、sherpa native runtime 加载、native offline ASR 真解码和最终包边界检查。
+CI 负责 P105 路径 scope gate、Shell/Core publish、Core Named Pipe 真连接、Shell/后台页/Process Loopback 烟测、sherpa native runtime 加载、native offline ASR 真解码和最终包边界检查。v0.1.5 起还固定检查左侧一级导航、1100×825 默认外窗、body 级全局 Tooltip，并生成五页 1100×825 与实时页 900×675 预览。
 
 旧 `.github/workflows/p103-localsub-win-x64.yml` 属于编号错误历史，不再使用。
 
@@ -75,7 +75,7 @@ v0.1.3 起普通双击或直接运行：
 .\LocalSub.exe
 ```
 
-默认进入 Web UI。迁移期如需旧 WinForms 备用界面：
+默认进入 Web UI。v0.1.5 默认窗口为 1100×825 的 4:3。迁移期如需旧 WinForms 备用界面：
 
 ```powershell
 .\LocalSub.exe --legacy-ui
