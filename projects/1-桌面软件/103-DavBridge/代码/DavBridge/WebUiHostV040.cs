@@ -116,7 +116,7 @@ internal sealed class WebUiHostV040 : IDisposable
         if(completion is not null) return await completion.Task.ConfigureAwait(true);
         _settingsLayer.Visible=false; return new { snapshot=BuildSnapshot() };
     }
-    private async Task<object> InvokeMainTaskAsync(string method,string message){ await InvokeMainFormTaskAsync(method); return string.IsNullOrWhiteSpace(message) ? new { snapshot=BuildSnapshot() } : new { message,snapshot=BuildSnapshot() }; }
+    private async Task<object> InvokeMainTaskAsync(string method,string message){ await InvokeMainFormTaskAsync(method); return new { message=string.IsNullOrWhiteSpace(message)?null:message,snapshot=BuildSnapshot() }; }
     private async Task InvokeMainFormTaskAsync(string methodName){ var method=typeof(MainForm).GetMethod(methodName,BindingFlags.Instance|BindingFlags.NonPublic)??throw new InvalidOperationException($"DavBridge native host could not resolve {methodName}."); if(method.Invoke(_form,null) is Task task) await task.ConfigureAwait(true); }
     private async Task<object> DeferAsync(IReadOnlyList<string> keys){ if(keys.Count==0) throw new InvalidOperationException("请先选择待审查附件组。"); await _reconciliation.DeferGroupsAsync(keys,_cts.Token).ConfigureAwait(true); await ContinueAfterReviewAsync().ConfigureAwait(true); return new { message=$"本周期继续保留 {keys.Count} 个附件组。",snapshot=BuildSnapshot() }; }
     private async Task<object> DeleteAsync(IReadOnlyList<string> keys)
