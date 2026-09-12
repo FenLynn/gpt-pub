@@ -1,5 +1,5 @@
 /* DavBridge overview visual baseline
-   Target: approved Apple / Google inspired reference at a 1100 x 825 default window.
+   Target: approved Apple / Google inspired reference at a true 4:3 client-area default window.
    This file loads after styles.css and intentionally overrides the older dashboard skin. */
 
 .app-shell{
@@ -503,14 +503,14 @@
   grid-template-columns:58px minmax(0,1fr);
   align-items:start;
   gap:29px;
-  padding-top:25px;
+  padding-top:16px;
   box-sizing:border-box;
 }
 .quota-content{
   min-width:0;
   display:grid;
-  grid-template-rows:auto 1fr;
-  gap:20px;
+  grid-template-rows:auto auto;
+  gap:9px;
 }
 .quota-head{
   display:flex;
@@ -694,7 +694,7 @@
   padding-right:3px;
 }
 
-/* Desktop default is 1100 x 825. Smaller windows preserve the same responsive behavior. */
+/* Desktop default keeps the outer width at 1100 and computes height for a 4:3 client area. */
 @media(max-width:999px){
   .app-shell{grid-template-columns:174px minmax(0,1fr)}
   .sidebar{padding:22px 12px 14px}
@@ -1438,32 +1438,42 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
 }
 
 
-/* v0.4.7 taller 16:12 default window: use the extra height instead of leaving a large dead zone. */
+/* v0.4.8 4:3 default window: keep modules compact; extra height belongs between sections, not inside them. */
 @media (min-width:1000px) and (min-height:740px){
-  .page{padding-top:38px;padding-bottom:24px}
-  .overview-page:not(:has(.attention-card)){grid-template-rows:205px minmax(0,1fr)}
-  .overview-page{grid-template-rows:auto 205px minmax(0,1fr)}
-  .route-card-polished{
-    grid-template-rows:140px 48px;
-    padding-bottom:17px;
+  .page{padding-top:34px;padding-bottom:28px}
+  .overview-page,
+  .overview-page:not(:has(.attention-card)){
+    align-content:start;
   }
-  .route-card-polished .phase{height:48px}
-  .route-card-polished .phase strong{height:34px}
+  .overview-page:not(:has(.attention-card)){grid-template-rows:184px auto}
+  .overview-page{grid-template-rows:auto 184px auto}
+  .route-card-polished{
+    grid-template-rows:126px 41px;
+    padding-bottom:16px;
+  }
+  .route-card-polished .phase{height:41px}
   .dashboard-grid{
-    grid-template-rows:minmax(132px,1fr) minmax(174px,1.25fr) minmax(138px,1fr);
+    height:auto;
+    min-height:0;
+    grid-template-rows:116px 148px 126px;
+    align-content:start;
   }
   .coverage-card{align-items:center}
-  .quota-card{align-items:center;padding-top:0}
-  .task-card{align-items:center;padding-top:0}
-  .quota-content{gap:24px}
-  .transfer-page{padding-top:38px;min-height:100%}
-  .transfer-page .queue-summary{min-height:104px;padding-bottom:22px}
-  .transfer-page .queue-list{padding:16px 0 12px}
-  .transfer-page .queue-row{min-height:82px}
-  .transfer-page .work-card{min-height:94px;margin-top:20px}
+  .quota-card{align-items:start;padding-top:16px}
+  .quota-content{grid-template-rows:auto auto;gap:8px}
+  .quota-columns{align-items:center}
+  .task-card{align-items:start;padding-top:22px}
+  .transfer-page{
+    padding-top:34px;
+    min-height:0;
+  }
+  .transfer-page .queue-summary{min-height:82px;padding-bottom:18px}
+  .transfer-page .queue-list{padding:10px 0 8px}
+  .transfer-page .queue-row{min-height:68px}
+  .transfer-page .work-card{min-height:80px;margin-top:12px}
   .transfer-page .coverage-footer{
-    margin-top:auto;
-    padding:20px 4px 6px;
+    margin-top:16px;
+    padding:12px 4px 4px;
     border-top:1px solid rgba(202,217,228,.70);
   }
 }

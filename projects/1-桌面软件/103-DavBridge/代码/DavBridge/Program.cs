@@ -99,6 +99,7 @@ internal static class Program
             using var form = new MainForm(host, launchInBackground: false);
             AppBranding.Apply(form); _ = form.Handle;
             if (form.MinimumSize.Width < 600 || form.MinimumSize.Height < 400) throw new InvalidOperationException("Native host minimum size changed unexpectedly.");
+            var windowFourThreeMigration = WindowPlacementV044.ValidateFourThreeForSelfTest(form);
             WriteReport(reportPath, new {
                 product="DavBridge",
                 version=typeof(Program).Assembly.GetName().Version?.ToString(),
@@ -106,7 +107,7 @@ internal static class Program
                 local=paths.LocalRoot,
                 temp=paths.TempRoot,
                 nativeHostConstructed=true,
-                uiGeneration="v0.4.6-vue3-webview2-sidebar-dashboard",
+                uiGeneration="v0.4.8-vue3-webview2-sidebar-dashboard",
                 webUiEmbedded=true,
                 bridgeWhitelistValidated=true,
                 coreLogicMovedToJavaScript=false,
@@ -115,6 +116,7 @@ internal static class Program
                 reconcileBackupRecovery,
                 productSidecarBackupRecovery,
                 runtimeSessionSelfTest,
+                windowFourThreeMigration,
                 backgroundWakeSignal=true,
                 ok=true
             });

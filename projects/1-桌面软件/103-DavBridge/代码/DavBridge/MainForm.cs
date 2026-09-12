@@ -46,13 +46,12 @@ internal sealed class MainForm : Form
         _launchInBackground = launchInBackground;
         ProductExperienceV044.Initialize(_host.Paths.LocalRoot);
         Text = "DavBridge";
-        Width = 1100;
-        Height = 825;
         MinimumSize = new Size(880, 540);
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9F);
         BackColor = Color.White;
+        WindowPlacementV044.ApplyDefaultFourThree(this);
         WindowPlacementV044.Restore(this);
 
         var trayMenu = new ContextMenuStrip();
