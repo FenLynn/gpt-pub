@@ -144,7 +144,12 @@ internal sealed class WebUiHostV040 : IDisposable
         var total = Math.Max(_reconciliation.State.LastManifestObjectCount, _host.State.Files.Count);
         var coverage = total <= 0 ? 0 : Math.Clamp((double)verified / total, 0, 1);
         var pausePending = _host.IsPausePending;
-        var state = !_host.Config.MigrationEnabled && !pausePending ? EngineState.Paused : _host.State.EngineState;
+        var activeRun = _host.IsRunning && _host.Config.MigrationEnabled && !pausePending;
+        var state = !_host.Config.MigrationEnabled && !pausePending
+            ? EngineState.Paused
+            : activeRun && _host.State.EngineState == EngineState.Paused
+                ? EngineState.Running
+                : _host.State.EngineState;
         var quota = QuotaPolicy.GetSnapshot(_host.Config, _host.State, DateTimeOffset.Now);
         var current = CurrentTask(state);
         if (pausePending)
@@ -168,7 +173,11 @@ internal sealed class WebUiHostV040 : IDisposable
         var (routeStatus, tone) = pausePending ? ("正在安全暂停", "wait") : DescribeRoute(state, review);
         var (primary, primaryLabel) = !_host.IsConfigured
             ? ("settings", "完成设置")
-            : pausePending ? ("none", string.Empty) : DescribePrimary(state, review);
+            : pausePending
+                ? ("none", string.Empty)
+                : activeRun
+                    ? ("pause", "暂停")
+                    : DescribePrimary(state, review);
         var resetText = _host.Config.NextResetAt == default
             ? "流量尚未校准"
             : $"{ResetSchedulePolicy.NormalizeResetDate(_host.Config.NextResetAt):yyyy-MM-dd} · 09:00 后探测";
