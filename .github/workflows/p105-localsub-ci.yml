@@ -135,12 +135,15 @@ jobs:
           New-Item -ItemType Directory -Force preview | Out-Null
           $uri = [Uri]::new((Resolve-Path 'dist/index.html').Path).AbsoluteUri
           foreach ($spec in @(
-            @{ Name='live-1100x825'; Size='1100,825'; Page='live' },
-            @{ Name='batch-1100x825'; Size='1100,825'; Page='batch' },
-            @{ Name='models-1100x825'; Size='1100,825'; Page='models' },
-            @{ Name='settings-1100x825'; Size='1100,825'; Page='settings' },
-            @{ Name='docs-1100x825'; Size='1100,825'; Page='docs' },
-            @{ Name='live-900x675'; Size='900,675'; Page='live' }
+            @{ Name='home-1100x825'; Size='1100,825'; Page='home'; Query='' },
+            @{ Name='live-1100x825'; Size='1100,825'; Page='live'; Query='' },
+            @{ Name='batch-1100x825'; Size='1100,825'; Page='batch'; Query='' },
+            @{ Name='models-config-1100x825'; Size='1100,825'; Page='models'; Query='' },
+            @{ Name='models-library-1100x825'; Size='1100,825'; Page='models'; Query='&modelTab=library' },
+            @{ Name='settings-subtitle-1100x825'; Size='1100,825'; Page='settings'; Query='' },
+            @{ Name='settings-startup-1100x825'; Size='1100,825'; Page='settings'; Query='&settingsTab=startup' },
+            @{ Name='docs-1100x825'; Size='1100,825'; Page='docs'; Query='' },
+            @{ Name='live-900x675'; Size='900,675'; Page='live'; Query='' }
           )) {
             $shot = (Resolve-Path 'preview').Path + "\localsub-$($spec.Name).png"
             $args = @(
@@ -151,7 +154,7 @@ jobs:
               '--allow-file-access-from-files',
               "--window-size=$($spec.Size)",
               "--screenshot=$shot",
-              ($uri + '?page=' + $spec.Page)
+              ($uri + '?page=' + $spec.Page + $spec.Query)
             )
             $p = Start-Process -FilePath $edge -ArgumentList $args -PassThru -Wait
             if ($p.ExitCode -ne 0 -or -not (Test-Path $shot) -or (Get-Item $shot).Length -lt 10000) {
@@ -194,7 +197,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.5 visual layout contract
+      - name: Verify v0.1.6 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -206,20 +209,26 @@ jobs:
           foreach ($required in @(
             'class="sidebar"',
             'class="side-nav"',
+            "activePage === 'home'",
+            'class="level-wave"',
+            'class="model-table-shell"',
+            'settings.update',
             '<Teleport to="body">',
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.5 Web UI contract missing: $required"
+              throw "v0.1.6 Web UI contract missing: $required"
             }
           }
 
           foreach ($required in @(
             'grid-template-columns:225px minmax(0,1fr)',
+            '.workspace{min-width:0;min-height:0;position:relative;overflow:hidden}',
+            'scrollbar-color:transparent transparent',
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.5 style contract missing: $required"
+              throw "v0.1.6 style contract missing: $required"
             }
           }
 
@@ -228,7 +237,7 @@ jobs:
             'Height = 825;'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.5 4:3 host contract missing: $required"
+              throw "v0.1.6 4:3 host contract missing: $required"
             }
           }
 
@@ -247,6 +256,7 @@ jobs:
             'IsBatchUiSmokeTest || IsLegacyUiRequested',
             '--legacy-ui',
             'LOCALSUB_LEGACY_UI',
+            '--startup-silent',
             'TrayController.Attach(webShell)'
           )) {
             if ($program -notmatch [regex]::Escape($required)) {
@@ -554,6 +564,23 @@ jobs:
             throw "LocalSub exited during startup smoke test. ExitCode=$($p.ExitCode)"
           }
           if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'Startup smoke test wrote a crash log.' }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Smoke test silent tray startup
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          Remove-Item Env:LOCALSUB_SMOKE_TEST -ErrorAction SilentlyContinue
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -ArgumentList '--startup-silent' -PassThru
+          Start-Sleep -Seconds 4
+          $p.Refresh()
+          if ($p.HasExited) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            throw "Silent startup exited unexpectedly. ExitCode=$($p.ExitCode)"
+          }
+          if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'Silent startup wrote a crash log.' }
           Stop-Process -Id $p.Id -Force
 
       - name: Smoke test legacy WinForms backup

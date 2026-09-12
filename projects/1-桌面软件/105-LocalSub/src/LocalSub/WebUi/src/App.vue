@@ -15,9 +15,13 @@ const error = ref<string | null>(null);
 const commandBusy = ref(false);
 const selectedSource = ref<"potplayer" | "allAudio">("potplayer");
 const selectedModelId = ref("");
+const previewParams = new URLSearchParams(window.location.search);
 const modelFilter = ref<"all" | "installed" | "live" | "batch">("all");
-const modelTab = ref<"config" | "library">("config");
-const settingsTab = ref<"subtitle" | "startup" | "runtime">("subtitle");
+const modelTab = ref<"config" | "library">(previewParams.get("modelTab") === "library" ? "library" : "config");
+const settingsTab = ref<"subtitle" | "startup" | "runtime">(
+  previewParams.get("settingsTab") === "startup" ? "startup" :
+  previewParams.get("settingsTab") === "runtime" ? "runtime" : "subtitle"
+);
 const deleteConfirmId = ref("");
 const settingsSaveState = ref("");
 const levelHistory = ref<number[]>(Array.from({ length: 120 }, () => 0));
