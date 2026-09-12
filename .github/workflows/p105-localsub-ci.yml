@@ -276,7 +276,9 @@ jobs:
             if ([string]::IsNullOrWhiteSpace($line)) { throw 'Core IPC returned no ping response' }
             $message = $line | ConvertFrom-Json
             if ($message.kind -ne 'response' -or $message.id -ne 'ci-ping' -or -not $message.ok) { throw "Unexpected Core IPC response: $line" }
-            if ($message.payload.version -ne '0.1.1') { throw "Unexpected Core version: $($message.payload.version)" }
+            [xml]$coreProject = Get-Content 'src/LocalSub.CoreWorker/LocalSub.CoreWorker.csproj' -Raw
+            $expectedVersion = @($coreProject.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+            if ($message.payload.version -ne $expectedVersion) { throw "Unexpected Core version: $($message.payload.version), expected $expectedVersion" }
             $writer.WriteLine('{"kind":"request","id":"ci-stop","method":"shutdown","payload":{}}')
             $stopLine = $reader.ReadLine()
             if ([string]::IsNullOrWhiteSpace($stopLine)) { throw 'Core IPC returned no shutdown response' }
