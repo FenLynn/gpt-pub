@@ -102,11 +102,11 @@ public sealed class WebShellForm : Form
         _live = new LiveSessionController(_core);
 
         Text = "LocalSub";
-        Width = 1180;
-        Height = 760;
-        MinimumSize = new Size(900, 640);
+        Width = 1100;
+        Height = 825;
+        MinimumSize = new Size(900, 675);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(243, 246, 249);
+        BackColor = Color.FromArgb(244, 248, 251);
         Controls.Add(_loading);
         Controls.Add(_web);
         _web.Visible = false;

@@ -135,12 +135,12 @@ jobs:
           New-Item -ItemType Directory -Force preview | Out-Null
           $uri = [Uri]::new((Resolve-Path 'dist/index.html').Path).AbsoluteUri
           foreach ($spec in @(
-            @{ Name='live-1280x800'; Size='1280,800'; Page='live' },
-            @{ Name='live-1600x1000'; Size='1600,1000'; Page='live' },
-            @{ Name='batch-1280x800'; Size='1280,800'; Page='batch' },
-            @{ Name='models-1280x800'; Size='1280,800'; Page='models' },
-            @{ Name='settings-1280x800'; Size='1280,800'; Page='settings' },
-            @{ Name='docs-1280x800'; Size='1280,800'; Page='docs' }
+            @{ Name='live-1100x825'; Size='1100,825'; Page='live' },
+            @{ Name='batch-1100x825'; Size='1100,825'; Page='batch' },
+            @{ Name='models-1100x825'; Size='1100,825'; Page='models' },
+            @{ Name='settings-1100x825'; Size='1100,825'; Page='settings' },
+            @{ Name='docs-1100x825'; Size='1100,825'; Page='docs' },
+            @{ Name='live-900x675'; Size='900,675'; Page='live' }
           )) {
             $shot = (Resolve-Path 'preview').Path + "\localsub-$($spec.Name).png"
             $args = @(
