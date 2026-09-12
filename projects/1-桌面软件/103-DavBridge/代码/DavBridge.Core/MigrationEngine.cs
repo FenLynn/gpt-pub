@@ -25,6 +25,7 @@ public sealed class MigrationEngine
     private readonly IReadOnlyWebDavClient _source;
     private readonly IWritableWebDavClient _target;
     private readonly string _tempRoot;
+    private readonly Func<bool> _pauseRequested;
 
     public event EventHandler<EngineProgress>? ProgressChanged;
 
@@ -34,7 +35,8 @@ public sealed class MigrationEngine
         StateStore stateStore,
         IReadOnlyWebDavClient source,
         IWritableWebDavClient target,
-        string tempRoot)
+        string tempRoot,
+        Func<bool>? pauseRequested = null)
     {
         _config = config;
         _state = state;
@@ -42,6 +44,7 @@ public sealed class MigrationEngine
         _source = source;
         _target = target;
         _tempRoot = tempRoot;
+        _pauseRequested = pauseRequested ?? (() => false);
     }
 
     public async Task<ReadinessReport> ScanReadinessAsync(CancellationToken cancellationToken)
@@ -71,6 +74,7 @@ public sealed class MigrationEngine
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        if (await PauseAtSafeBoundaryAsync(cancellationToken).ConfigureAwait(false)) return;
         Directory.CreateDirectory(_tempRoot);
         QuotaPolicy.AdvanceCycleIfNeeded(_config, _state, DateTimeOffset.Now);
         _state.EngineState = EngineState.Running;
@@ -87,6 +91,8 @@ public sealed class MigrationEngine
             return;
         }
 
+        if (await PauseAtSafeBoundaryAsync(cancellationToken).ConfigureAwait(false)) return;
+
         var groups = MigrationPlanner.CreateGroups(entries);
         var changedGroups = await MarkSourceDriftAsync(groups, cancellationToken).ConfigureAwait(false);
         if (changedGroups > 0)
@@ -101,6 +107,7 @@ public sealed class MigrationEngine
         foreach (var group in orderedGroups)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (await PauseAtSafeBoundaryAsync(cancellationToken).ConfigureAwait(false)) return;
 
             var outstanding = group.Members
                 .Where(member => !_state.Files.TryGetValue(member.RelativePath, out var existingRecord) ||
@@ -146,6 +153,7 @@ public sealed class MigrationEngine
             foreach (var member in outstanding)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (await PauseAtSafeBoundaryAsync(cancellationToken).ConfigureAwait(false)) return;
                 var record = GetOrCreateRecord(member, group.Key);
                 try
                 {
@@ -193,8 +201,12 @@ public sealed class MigrationEngine
                         record.LastError ?? $"Member stopped in state {record.Status}.", cancellationToken).ConfigureAwait(false);
                     return;
                 }
+
+                if (await PauseAtSafeBoundaryAsync(cancellationToken).ConfigureAwait(false)) return;
             }
         }
+
+        if (await PauseAtSafeBoundaryAsync(cancellationToken).ConfigureAwait(false)) return;
 
         if (!groups.All(IsGroupCurrentAndVerified))
         {
@@ -254,6 +266,17 @@ public sealed class MigrationEngine
         await SetEngineStateAsync(EngineState.Complete, null, null,
             "最终两次源清单一致，当前源版本已在目标端完成强 SHA-256 校验。",
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> PauseAtSafeBoundaryAsync(CancellationToken cancellationToken)
+    {
+        if (!_pauseRequested()) return false;
+        _state.EngineState = EngineState.Paused;
+        _state.CurrentGroupKey = null;
+        await _stateStore.SaveAsync(_state, cancellationToken).ConfigureAwait(false);
+        OnProgress(EngineState.Paused, null, null,
+            "Safe pause complete; no new file will start until migration is resumed.");
+        return true;
     }
 
     private async Task<int> MarkSourceDriftAsync(IReadOnlyList<AttachmentGroup> groups, CancellationToken cancellationToken)
