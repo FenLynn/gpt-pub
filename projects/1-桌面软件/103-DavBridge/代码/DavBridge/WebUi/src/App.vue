@@ -31,6 +31,8 @@ const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
 const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
 const sideStatusKind = computed(() => {
+  if (pendingPrimaryAction.value === 'pause') return 'pause'
+  if (pendingPrimaryAction.value === 'resume' || pendingPrimaryAction.value === 'retry') return 'run'
   const text = `${snapshot.value.engineState} ${snapshot.value.routeStatus}`
   if (/暂停/.test(text)) return 'pause'
   if (/运行|迁移中/.test(text)) return 'run'
@@ -40,7 +42,15 @@ const sideStatusKind = computed(() => {
   if (/完成/.test(text)) return 'complete'
   return 'idle'
 })
+const sideStatusText = computed(() => {
+  if (pendingPrimaryAction.value === 'pause') return '正在暂停'
+  if (pendingPrimaryAction.value === 'resume') return '正在继续'
+  if (pendingPrimaryAction.value === 'retry') return '正在重试'
+  return snapshot.value.engineState
+})
 const sideStatusSecondary = computed(() => {
+  if (pendingPrimaryAction.value === 'pause') return '当前文件安全收尾后停止'
+  if (pendingPrimaryAction.value === 'resume' || pendingPrimaryAction.value === 'retry') return snapshot.value.routeStatus || '正在恢复调度'
   if (snapshot.value.routeStatus && snapshot.value.routeStatus !== snapshot.value.engineState) return snapshot.value.routeStatus
   return snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : '查看最近活动'
 })
@@ -235,7 +245,7 @@ onBeforeUnmount(()=>{
         <svg v-else-if="sideStatusKind==='complete'" viewBox="0 0 24 24"><path d="m6.5 12.5 3.3 3.3 7.8-8"/></svg>
         <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>
       </span>
-      <div><strong>{{ snapshot.engineState }}</strong><small>{{ sideStatusSecondary }}</small></div>
+      <div><strong>{{ sideStatusText }}</strong><small>{{ sideStatusSecondary }}</small></div>
     </button>
   </aside>
 
