@@ -5,7 +5,7 @@ export const mockSnapshot: DavBridgeSnapshot = {
   phases: [
     { key: 'audit', label: '源端对账', state: 'done', hint: '本周期源端清单已经完成核对' },
     { key: 'repair', label: '变化修复', state: 'done', hint: '历史 StrongVerified 变化项已经处理' },
-    { key: 'migration', label: '等待周期', state: 'waiting', hint: '当前安全额度不足，等待下一周期继续' }
+    { key: 'migration', label: '普通迁移', state: 'active', hint: '普通稳定队列正在处理' }
   ],
   verified: 2090, total: 6949, coverage: 0.301, coverageText: '2090 / 6949 已校准',
   currentTitle: 'BZR4PLGF.zip', currentDetail: '当前正在处理普通迁移任务。', currentProgress: 0.63,
