@@ -355,7 +355,10 @@ internal sealed class MainForm : Form
     private async Task PauseAsync()
     {
         await _host.PauseAsync(_appCts.Token);
-        ProductExperienceV044.Record("迁移已暂停", "当前进度与流量账本已经保存。", "info");
+        if (_host.IsPausePending)
+            ProductExperienceV044.Record("正在安全暂停", "已收到暂停请求。当前文件会完成必要的安全收尾，随后在下一文件开始前停止。", "info");
+        else
+            ProductExperienceV044.Record("迁移已暂停", "当前进度与流量账本已经保存。", "info");
         UpdateView();
     }
 
@@ -622,8 +625,11 @@ internal sealed class MainForm : Form
 
     private async Task EditSettingsAsync()
     {
-        if (_host.Config.MigrationEnabled)
+        if (_host.Config.MigrationEnabled || _host.IsRunning)
+        {
             await _host.PauseAsync(_appCts.Token);
+            await _host.WaitUntilIdleAsync(_appCts.Token);
+        }
 
         var secrets = await _host.GetSecretsAsync(_appCts.Token);
         using var dialog = new SettingsDialog(_host.Config, secrets.SourcePassword, secrets.TargetPassword);
