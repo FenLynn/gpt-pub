@@ -20,7 +20,7 @@ WinForms 仍作为 Windows 原生宿主技术存在，但不再负责总览、�
 
 ## 冻结边界
 
-以下已经验证的逻辑不属于 UI，v0.4 架构迁移不得重写、复制到 JavaScript 或改变语义：
+以下已经验证的安全逻辑不属于 UI，v0.4 架构迁移不得复制到 JavaScript 或改变语义。v0.4.13 仅在 C# 内增加人工暂停的安全边界协调，不改变下列不变量：
 
 - InfiniCLOUD authoritative source 与源端只读；
 - Zotero `.zip + .prop` Group；
@@ -107,7 +107,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
-## v0.4.12 当前界面结构
+## v0.4.13 当前界面结构
 
 当前候选采用固定左侧导航：
 
@@ -142,6 +142,7 @@ v0.4.9 同时规定：
 左下角状态 → SVG 图标 + 主状态 + 非重复副状态
 当前任务 → 对象在左，真实状态和进度在中，动作在右
 悬浮提示 → Teleport 到 body 的全局最高层
+人工暂停 → UI 立即反馈“正在暂停”，Core 在安全 member 边界落到 Paused
 ```
 
 UI 文字策略：
@@ -192,6 +193,8 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 ## 当前阶段
 
-v0.4.12 位于 `p103-exp`，最后完成完整 CI 的代码 head 为 `c00ad702ff9ed1303cc9ce439b61154ed09ae282`，对应 run `34705490320`。它尚未提升到 `p103-stable` 或 `main`。
+v0.4.13 位于 `p103-exp`，最后完成完整 CI 的代码 head 为 `09aa5495bf1c914bf3a18cc8800be17076a1e21f`，对应 run `34707132029`。它尚未提升到 `p103-stable` 或 `main`。
 
-下一关是用户 Windows 实机验收，重点检查整体路线箭头、阶段对勾与呼吸灯、模块图标居中、80% 红色流量阈值和绿色运行/继续语义。
+本轮为解决实机暂停失效感，窄范围修改了 AppHost 与 MigrationEngine：人工暂停不再中断当前 PUT，而是立即进入“正在暂停”，当前 member 安全完成后在下一 member 前停止。Core Smoke 已验证暂停后不会启动第二个 member。
+
+下一关是用户 Windows 实机验证：鼠标手型、立即“正在暂停”反馈、当前文件安全收尾、最终“已暂停”、以及之后“继续”恢复。
