@@ -24,20 +24,20 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前实验候选的产品版本为 v0.4.12，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前实验候选的产品版本为 v0.4.13，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
 
 ## 3. 最新完整验证代码基线
 
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-c00ad702ff9ed1303cc9ce439b61154ed09ae282
+09aa5495bf1c914bf3a18cc8800be17076a1e21f
 ```
 
 对应 P103 CI：
 
 ```text
-run 34705490320
+run 34707132029
 scope          success
 core-smoke     success
 frontend       success
@@ -45,26 +45,26 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.12-win-x64`
+Windows candidate：`DavBridge-v0.4.13-win-x64`
 
-Artifact ID：`10301765459`
+Artifact ID：`10302216592`
 
 EXE：
 
 ```text
-2430557 bytes
-SHA256 bf71b1ec031b2e3f1751b76d16b45de8e0df8d7285137e7b79a4ae5fca0584ae
+2434653 bytes
+SHA256 dbda27fe28d79b64309de3c3f5dafaaa28ad51d2dc587c6546cb3bf38710ddd8
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-d805250dd0f8519aff268d75ce0c960f88a57b1cd222b2a165ac2f755a101bdd
+ad6879dc4221decd2fe4eb1addaae4056d27b1f6301be051742973e855e505b8
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `c00ad702...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `09aa5495...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
 
 ## 4. 当前分支快照
 
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-c00ad702ff9ed1303cc9ce439b61154ed09ae282
+09aa5495bf1c914bf3a18cc8800be17076a1e21f
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -95,7 +95,7 @@ C# / .NET 8 Windows native host
 DavBridge.Core 与既有 C# 安全链
 ```
 
-v0.4 系列只替换显示与交互层，不重写已经验证的迁移逻辑。不引入 Rust，不使用 Tauri sidecar，不把 WebDAV、凭据、DPAPI、原始 state 或 reconcile 数据搬进 JavaScript。
+v0.4 系列以显示与交互层改造为主。v0.4.13 仅为修复人工暂停语义，对 AppHost 与 MigrationEngine 增加了窄范围的安全暂停协调：不改 WebDAV PUT / GET 算法、不改 StrongVerified 判定、不改 quota、Cycle、Reconciliation 或 DELETE 安全链。不引入 Rust，不使用 Tauri sidecar，不把 WebDAV、凭据、DPAPI、原始 state 或 reconcile 数据搬进 JavaScript。
 
 Web UI bridge 白名单仍只有：
 
@@ -295,6 +295,23 @@ v0.4.7 的实现存在两个明确问题，已在 v0.4.8 纠正。
 第八，本轮仍未修改 DavBridge.Core、WebDAV 传输算法、StrongVerified、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
 
 
+### v0.4.13 安全暂停修正
+
+第一，修复首页“暂停”按钮缺少动作感的问题。可点击时鼠标指针明确变为手型，按下时有轻微按压反馈；命令已发出但正在等待安全停止时使用 progress 指针。
+
+第二，人工暂停从“硬取消当前 run 并立刻宣告 Paused”改为两阶段安全暂停。点击瞬间 Vue 会立即显示“正在暂停”，左下角同步显示“当前文件安全收尾后停止”；按钮不再让用户误以为没有响应。
+
+第三，暂停的真正生效点移动到安全边界。若当前正在处理一个文件，DavBridge 允许该文件完成必要的源端读取、目标上传、目标确认与 StrongVerified 强校验，然后在下一个文件开始前停止。这样不会为了追求瞬时停止而在 PUT 中途制造未知远端写入状态。
+
+第四，AppHost 不再因为人工 Pause 直接取消活动 run token。应用退出、进程取消等生命周期仍可使用 linked CancellationToken 进行硬取消；人工暂停只设置 MigrationEnabled=false / manual pause request，由 MigrationEngine 在安全成员边界检查并落到 EngineState.Paused。
+
+第五，新增 Core Smoke：`safe pause stops before next member`。测试在第一个文件 PUT 后提出暂停请求，要求第一个文件必须最终 StrongVerified，同时第二个文件不得开始 PUT，最终 EngineState 必须为 Paused。该测试已随 run 34707132029 通过。
+
+第六，设置页和需要独占状态的原生操作若触发暂停，会等待 host 真正进入 idle 后再继续，避免“界面写已暂停但后台文件仍在收尾”的竞态。
+
+第七，本轮虽然修改了 `DavBridge.Core/MigrationEngine.cs`，但修改范围只限安全暂停边界判断，不改变 WebDAV 传输、条件 PUT、WriteUnknown reconciliation、StrongVerified、源端只读、quota/Cycle 或删除安全语义。
+
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -343,15 +360,15 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步只需在真实 Windows 上运行 v0.4.12 candidate，重点确认：
+用户下一步应实机验证 v0.4.13 candidate，重点只看暂停链路：
 
-1. 顶部整体箭头是否自然、连贯，左侧直线与箭头头部必须真正连上，整体呼吸空间是否舒服。
-2. 已完成阶段是否只有粗绿色对勾，普通迁移 active 时是否显示绿色呼吸灯，不再出现多余白底圆。
-3. 镜像覆盖与流量预算图标是否真正居中。
-4. 上传下载方向箭头是否统一蓝色；进度条和百分比是否统一按绿色、黄色、红色风险等级显示，80% 起进入红色。
-5. 正常运行和“继续”动作是否使用明确绿色语义，暂停状态是否保持中性。
-6. 当前任务真实进度继续沿用 WebDAV 字节进度，不应为了视觉效果伪造渐进过程。
-7. 其余 tooltip、设置账号编辑、回收站、文档、流量校准、单实例、睡眠网络恢复与 DELETE 安全链不得回退。
+1. 鼠标移到“暂停 / 继续 / 重试”等可执行按钮上必须显示手型。
+2. 点击“暂停”后，不等待 C# 完成才反馈，首页中央状态与左下角必须立即变为“正在暂停”。
+3. 若当前文件尚未完成，允许它完成必要的安全收尾；这段时间属于“暂停已请求，尚未安全停住”，不是按钮失效。
+4. 当前文件达到 StrongVerified 或其他安全成员边界后，DavBridge 必须在下一个文件开始前真正停住并显示“已暂停 / 继续”。
+5. 暂停期间不得再启动第二个文件。Core Smoke 已覆盖这一不变量，但仍需用户真实 WebDAV 实机确认。
+6. 恢复“继续”后应从持久化账本继续正常调度，不重复已 StrongVerified 的文件。
+7. v0.4.12 的整体箭头、阶段呼吸灯、流量颜色、账号编辑、tooltip、回收站、文档等不得回退。
 
 用户实机确认之前，不提升 `p103-stable`，不修改 `main`，不创建正式标签或 Release。
 
