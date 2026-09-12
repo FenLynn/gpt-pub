@@ -143,7 +143,8 @@ LocalSubSnapshot
 ├─ live
 ├─ batch
 ├─ models
-└─ settings
+├─ settings
+└─ system
 ```
 
 ### app
@@ -218,7 +219,13 @@ Core realtime 的 `sessionId` 与 PotPlayer `processId` 由 Shell 应用层持�
 
 ### settings
 
-只向 UI 提供允许编辑的设置 DTO，不暴露内部文件位置和不必要的实现细节。
+只向 UI 提供允许编辑的设置 DTO，不暴露内部文件位置和不必要的实现细节。v0.1.6 已进入 snapshot 的主要设置包括音源、资源策略、托盘/开机/静默/自动实时、输入波形开关，以及字幕字号、位置、宽度、背景、颜色、透明度与停留时间等。
+
+Vue 只能通过 `settings.update` 提交白名单字段。Shell 负责范围校验、AppSettings 持久化、HKCU 启动注册和 Overlay 更新。`settings.previewSubtitle` 只请求 Shell 显示当前字幕样式预览。
+
+### system
+
+v0.1.6 当前至少包含 `potPlayerDetected`、`autoStartPending` 和 `autoStartStatus`。PotPlayer PID、HWND、Core session ID 和注册表路径不暴露给 Vue。
 
 ## 7. Shell 到 Web UI 命令白名单
 
@@ -227,6 +234,8 @@ Core realtime 的 `sessionId` 与 PotPlayer `processId` 由 Shell 应用层持�
 ```text
 app.getSnapshot
 app.navigate
+settings.update
+settings.previewSubtitle
 live.start
 live.stop
 model.list
@@ -248,10 +257,7 @@ batch.cancel
 
 model.openFolder
 
-settings.get
-settings.save
-
-overlay.preview
+后续新增设置字段必须继续扩展现有 `settings.update` 白名单，不建立任意 key/value 配置通道。
 ```
 
 实际实现必须继续使用显式白名单，不得使用任意方法名转发或反射式调用。Vue 只发送用户意图，realtime 的 session ID、PotPlayer PID、Core generation 与 Windows 句柄继续由 Shell 持有。
@@ -377,13 +383,15 @@ Shell 找到 PID
 
 ### 默认主界面与迁移期回退
 
-自 v0.1.3 起，普通启动 `LocalSub.exe` 直接进入 WebView2/Vue 主界面。旧 WinForms 不再默认出现，只作为尚未完成后台与设置迁移期间的显式备用入口：
+自 v0.1.3 起，普通启动 `LocalSub.exe` 直接进入 WebView2/Vue 主界面。v0.1.6 起默认页面为主页。旧 WinForms 不再默认出现，只作为后台 Web 工作区尚未完成迁移期间的显式备用入口：
 
 ```text
 LocalSub.exe --legacy-ui
 ```
 
 也可使用 `LOCALSUB_LEGACY_UI=1`。该备用入口不改变三层所有权，不允许 WebShell 在 Core 故障时退回 WinForms 执行重任务。Phase 3 删除旧 WinForms 后同时删除该备用入口。
+
+v0.1.6 新增 `--startup-silent` 作为 Windows 自动启动时的显式生命周期参数。它只让主窗口进入托盘，不改变普通双击行为。若同时启用 AutoStartLive，Shell 根据保存的音源和模型启动实时字幕；PotPlayer 音源缺少目标进程时保持等待，不允许回退 All Audio。
 
 ## 12. 新阶段顺序
 

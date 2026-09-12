@@ -57,7 +57,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- 当前开发候选版本为 v0.1.5；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.6；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
@@ -77,7 +77,12 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - 页面说明文字大幅收缩，辅助原理与边界说明改为浅色全局 Tooltip；Tooltip 使用 Vue Teleport 挂到 body，z-index 提升到全局最高层，避免旧黑底样式和被卡片遮挡。
 - 左侧导航、页面标题、表单、模型条目和设置项重新放大；页面及设置使用更大的线性 SVG 图标，配色对齐最新版 DavBridge 的浅色蓝白基线。
 - v0.1.5 的实时、后台、模型、设置、文档五页 1100×825 预览和实时页 900×675 预览已人工检查，右侧无页面级二次分栏，缩小窗口也无明显横向溢出。
-- 当前最新完整验证代码 head 为 `5b575d45a3f09f9c20e0e0377a88283466548139`，P105 Windows CI run `34701810199` success；candidate Artifact `10300570629`，WebUi preview Artifact `10299584948`。
+- v0.1.6 新增主页作为默认页，集中显示 Core、实时模型、音源/PotPlayer、后台模型自检，并提供一个主按钮启动或停止实时字幕。
+- 实时字幕页改为自然单栏设置行，新增可开关的实时输入电平历史波形。Vue 仅累计 Core 已节流的归一化 `live.level`，不接触原始音频。
+- 模型页改为“配置 / 模型库”两个页内 Tab。默认只显示实时模型、后台模型和 VAD 配置，模型库使用表格呈现语言、体积、实时、准确、性价比、状态与操作。外层工作区禁止滚动，模型库和设置页仅在内部需要时滚动，滚动条默认隐藏并在悬浮时出现。
+- 设置页已接入真实 `settings.update` 白名单命令，可编辑字幕、启动与运行设置，并支持字幕即时预览。Windows 启动项由 Shell 写入当前用户 HKCU，不需要管理员权限。
+- 生命周期新增 `--startup-silent`、静默托盘启动、托盘开始/停止实时字幕、启动后自动实时字幕。PotPlayer 模式在播放器未出现时保持“等待 PotPlayer”，不得静默回退为所有音频。
+- 当前最新完整验证代码 head 为 `f016e7cb161b770f6a3229cdb37debf3548b8b94`，P105 Windows CI run `34705240310` success；candidate Artifact `10300893415`，WebUi preview Artifact `10300958225`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。

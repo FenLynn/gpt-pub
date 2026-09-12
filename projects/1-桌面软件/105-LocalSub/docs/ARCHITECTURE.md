@@ -214,7 +214,7 @@ Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重�
 
 ### Phase 2B：逐页切换
 
-状态：**实时字幕页与模型页第一闭环完成，WebShell 已成为默认入口，v0.1.5 DavBridge 风格视觉基线完成，后台与设置编辑待迁移。**
+状态：**v0.1.6 已完成主页、实时字幕、模型配置/模型库、设置编辑与启动生命周期第一闭环；WebShell 为默认入口，Web 后台转写工作区仍待迁移。**
 
 推荐顺序：
 
@@ -227,9 +227,9 @@ Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重�
 
 当前 realtime Web 页第一闭环保留。模型页已经通过 `WebShellForm → ModelCatalogController → CoreWorkerClient → LocalSub.Core.exe` 接入同一 Application Contract，支持查看、默认选择、下载/修复、取消和删除。
 
-当前模型页与 Phase 1B.2 已完成既有闭环。v0.1.5 恢复左侧一级导航，并继续保持右侧单栏；默认外窗改为 1100×825，Tooltip 改为 Teleport 到 body 的浅色全局层。该视觉基线完整验证代码 head 为 `5b575d45a3f09f9c20e0e0377a88283466548139`，P105 Windows CI run `34701810199` success。
+当前模型页与 Phase 1B.2 已完成既有闭环。v0.1.6 在 v0.1.5 视觉基线上增加默认主页、自检与单一主按钮；实时页只使用节流后的 `live.level` 绘制 Web 波形；模型页拆为“配置 / 模型库”；设置页通过白名单 `settings.update / settings.previewSubtitle` 写入 Shell AppSettings 并控制 Overlay；Shell 生命周期增加 HKCU 开机启动、`--startup-silent`、托盘实时开关和 PotPlayer 等待式 AutoStartLive。完整验证代码 head 为 `f016e7cb161b770f6a3229cdb37debf3548b8b94`，P105 Windows CI run `34705240310` success。
 
-每一页切换后继续复用同一个 Application Contract。下一页为后台转写工作区，必须复用现有 Core 分析与转写链，不复制旧 WinForms 业务核心。旧 WinForms 在该迁移阶段仅作为显式备用入口。
+下一页仍为后台转写工作区，必须复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。设置页和启动生命周期已进入 Web 第一闭环，旧 WinForms 现主要保留后台工作区回退与迁移对照。
 
 
 ### Phase 3：轻量 Shell 收口
