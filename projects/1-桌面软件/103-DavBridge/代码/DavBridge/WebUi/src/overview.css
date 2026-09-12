@@ -1456,5 +1456,14 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
   .quota-card{align-items:center;padding-top:0}
   .task-card{align-items:center;padding-top:0}
   .quota-content{gap:24px}
-  .transfer-page{padding-top:38px}
+  .transfer-page{padding-top:38px;min-height:100%}
+  .transfer-page .queue-summary{min-height:104px;padding-bottom:22px}
+  .transfer-page .queue-list{padding:16px 0 12px}
+  .transfer-page .queue-row{min-height:82px}
+  .transfer-page .work-card{min-height:94px;margin-top:20px}
+  .transfer-page .coverage-footer{
+    margin-top:auto;
+    padding:20px 4px 6px;
+    border-top:1px solid rgba(202,217,228,.70);
+  }
 }
