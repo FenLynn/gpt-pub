@@ -1980,3 +1980,8 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
   .quota-card{align-items:center}
   .transfer-page{padding-top:34px}
 }
+
+/* v0.4.10 final visual nudge after 1100x825 preview. */
+.global-tooltip{z-index:2147483000}
+.route-card-polished .route-line:before{right:-8px}
+.route-card-polished .route-line:after{right:-25px}

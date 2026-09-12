@@ -407,7 +407,7 @@ onBeforeUnmount(()=>{
     <div><strong>{{ notice.title }}</strong><span>{{ notice.message }}</span></div>
     <button aria-label="关闭提示" @click="notice=null">×</button>
   </div>
-  <div v-if="hoverTip" class="global-tooltip" :class="{above:hoverTip.above}" :style="{left:`${hoverTip.left}px`,top:`${hoverTip.top}px`}">{{ hoverTip.text }}</div>
+  <Teleport to="body"><div v-if="hoverTip" class="global-tooltip" :class="{above:hoverTip.above}" :style="{left:`${hoverTip.left}px`,top:`${hoverTip.top}px`}">{{ hoverTip.text }}</div></Teleport>
   <div v-if="toast" class="toast" role="status">{{ toast }}</div>
 </main>
 </template>
