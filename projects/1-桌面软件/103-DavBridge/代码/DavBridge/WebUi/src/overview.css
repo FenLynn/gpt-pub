@@ -2325,3 +2325,19 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
   border-color:#c8deed;
   background:linear-gradient(180deg,#f7fbfe,#edf5fa);
 }
+
+
+/* v0.4.13 action affordance and pause-request feedback. */
+.task-action-row .primary-button:not(:disabled){
+  cursor:pointer!important;
+}
+.task-action-row .primary-button:disabled{
+  cursor:progress!important;
+}
+.task-action-row .primary-button{
+  transition:background .16s ease,border-color .16s ease,color .16s ease,opacity .16s ease,transform .12s ease;
+}
+.task-action-row .primary-button:not(:disabled):active{
+  transform:scale(.985);
+}
+.side-status{cursor:pointer}
