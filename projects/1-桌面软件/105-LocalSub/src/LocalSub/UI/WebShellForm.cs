@@ -378,6 +378,7 @@ public sealed class WebShellForm : Form
         if (!parameters.HasValue || parameters.Value.ValueKind != JsonValueKind.Object)
             throw new InvalidOperationException("设置参数无效。");
 
+        var wasAutoStartPending = _autoStartPending;
         var p = parameters.Value;
 
         if (TryReadOptionalString(p, "audioSource", out var source))
@@ -438,17 +439,17 @@ public sealed class WebShellForm : Form
         _models.Refresh();
         await _live.ApplySettingsAsync(preview: false);
 
-        if (_settings.AutoStartLive && _live.Snapshot.State is "idle" or "failed")
-        {
-            _autoStartPending = true;
-            _autoStartStatus = _live.Snapshot.SourceId == "potplayer" && !IsPotPlayerDetected() ? "等待 PotPlayer" : "等待自动启动";
-            _autoStartTimer.Start();
-        }
-        else if (!_settings.AutoStartLive)
+        if (!_settings.AutoStartLive)
         {
             _autoStartPending = false;
             _autoStartStatus = "";
             _autoStartTimer.Stop();
+        }
+        else if (wasAutoStartPending)
+        {
+            _autoStartPending = true;
+            _autoStartStatus = _live.Snapshot.SourceId == "potplayer" && !IsPotPlayerDetected() ? "等待 PotPlayer" : "等待自动启动";
+            _autoStartTimer.Start();
         }
 
         TrayStateChanged?.Invoke();

@@ -283,7 +283,6 @@ internal sealed class LiveSessionController : IAsyncDisposable
         lock (_stateGate)
         {
             _availableModels = available;
-            _sourceId = _settings.AudioSource == AudioSourceMode.PotPlayer ? "potplayer" : "allAudio";
 
             var selected = available.FirstOrDefault(x =>
                 string.Equals(x.Id, _settings.LiveModelId, StringComparison.OrdinalIgnoreCase))
@@ -291,6 +290,7 @@ internal sealed class LiveSessionController : IAsyncDisposable
 
             if (_state is "idle" or "failed")
             {
+                _sourceId = _settings.AudioSource == AudioSourceMode.PotPlayer ? "potplayer" : "allAudio";
                 _modelId = selected?.Id ?? "";
                 _modelName = selected?.Name ?? "未安装实时模型";
                 if (_state == "idle")
