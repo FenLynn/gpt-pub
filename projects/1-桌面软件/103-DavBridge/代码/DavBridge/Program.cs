@@ -99,7 +99,8 @@ internal static class Program
             using var form = new MainForm(host, launchInBackground: false);
             AppBranding.Apply(form); _ = form.Handle;
             if (form.MinimumSize.Width < 600 || form.MinimumSize.Height < 400) throw new InvalidOperationException("Native host minimum size changed unexpectedly.");
-            var windowFourThreeMigration = WindowPlacementV044.ValidateFourThreeForSelfTest(form);
+            var windowPlacementSelfTest = WindowPlacementV044.ValidateFourThreeForSelfTest(form);
+            var windowFourThreeMigration = windowPlacementSelfTest.Ok;
             WriteReport(reportPath, new {
                 product="DavBridge",
                 version=typeof(Program).Assembly.GetName().Version?.ToString(),
@@ -117,6 +118,7 @@ internal static class Program
                 productSidecarBackupRecovery,
                 runtimeSessionSelfTest,
                 windowFourThreeMigration,
+                windowPlacementSelfTest,
                 backgroundWakeSignal=true,
                 ok=true
             });

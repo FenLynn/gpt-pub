@@ -79,13 +79,15 @@ internal static class WindowPlacementV044
         catch { }
     }
 
-    internal static bool ValidateFourThreeForSelfTest(Form form)
+    internal static WindowPlacementSelfTestV048 ValidateFourThreeForSelfTest(Form form)
     {
         ApplyDefaultFourThree(form);
+        var defaultWidth = form.Width;
+        var defaultHeight = form.Height;
         var defaultRatioOk =
-            form.Width == DefaultWidth &&
-            form.Height == DefaultHeight &&
-            Math.Abs((double)form.Width / form.Height - 4d / 3d) < 0.0001;
+            defaultWidth == DefaultWidth &&
+            defaultHeight == DefaultHeight &&
+            Math.Abs((double)defaultWidth / defaultHeight - 4d / 3d) < 0.0001;
 
         var legacy = new Rectangle(120, 90, 1100, 620);
         var working = new Rectangle(0, 0, 1920, 1040);
@@ -102,7 +104,16 @@ internal static class WindowPlacementV044
             customMigrated.Height == 750 &&
             Math.Abs((double)customMigrated.Width / customMigrated.Height - 4d / 3d) < 0.0001;
 
-        return defaultRatioOk && migratedRatioOk && customRatioOk;
+        return new WindowPlacementSelfTestV048(
+            defaultRatioOk && migratedRatioOk && customRatioOk,
+            defaultWidth,
+            defaultHeight,
+            migrated.Width,
+            migrated.Height,
+            customMigrated.Width,
+            customMigrated.Height,
+            form.MinimumSize.Width,
+            form.MinimumSize.Height);
     }
 
     private static Rectangle LegacyFourThreeBounds(Rectangle saved, Rectangle working, Size minimum)
@@ -169,3 +180,15 @@ internal static class WindowPlacementV044
         public bool Maximized { get; set; }
     }
 }
+
+
+internal sealed record WindowPlacementSelfTestV048(
+    bool Ok,
+    int DefaultWidth,
+    int DefaultHeight,
+    int LegacyWidth,
+    int LegacyHeight,
+    int CustomWidth,
+    int CustomHeight,
+    int MinimumWidth,
+    int MinimumHeight);
