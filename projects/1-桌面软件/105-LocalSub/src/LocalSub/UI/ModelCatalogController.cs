@@ -93,7 +93,7 @@ internal sealed class ModelCatalogController : IDisposable
     {
         lock (_gate)
         {
-            if (_operationCts == null || _operation.State != "running") return false;
+            if (_operationCts == null || _operation.State != "running" || !_operation.CanCancel) return false;
             _operation = _operation with { Stage = "取消中", Detail = "正在请求 LocalSub.Core 停止当前模型任务", CanCancel = false };
             try { _operationCts.Cancel(); } catch { }
             RefreshLocked();
@@ -126,7 +126,7 @@ internal sealed class ModelCatalogController : IDisposable
                 kind == "delete" ? "正在启动 Core 删除任务" : "正在启动 Core 下载任务",
                 false,
                 null,
-                true);
+                kind == "download");
             RefreshLocked();
         }
         RaiseChanged();

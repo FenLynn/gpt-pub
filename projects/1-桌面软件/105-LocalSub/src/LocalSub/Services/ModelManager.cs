@@ -334,6 +334,9 @@ public sealed class ModelManager
         ct.ThrowIfCancellationRequested();
         progress?.Report(new("删除", null, Detail: $"准备删除 {model.Name}", IsIndeterminate: true));
 
+        // Cancellation is accepted only before destructive detachment begins.
+        // Once a model directory is renamed out of its official location, finish
+        // cleanup deterministically instead of leaving .delete-* directories behind.
         var detached = new List<string>();
         var modelPath = DetachDirectory(GetModelFolder(model));
         if (!string.IsNullOrWhiteSpace(modelPath)) detached.Add(modelPath);
@@ -351,7 +354,6 @@ public sealed class ModelManager
         {
             foreach (var dir in Directory.GetDirectories(stagingRoot, model.Id + "-*"))
             {
-                ct.ThrowIfCancellationRequested();
                 var stagingPath = DetachDirectory(dir);
                 if (!string.IsNullOrWhiteSpace(stagingPath)) detached.Add(stagingPath);
             }
@@ -359,7 +361,6 @@ public sealed class ModelManager
 
         for (var i = 0; i < detached.Count; i++)
         {
-            ct.ThrowIfCancellationRequested();
             progress?.Report(new(
                 "删除",
                 detached.Count == 0 ? 100 : i * 100 / detached.Count,

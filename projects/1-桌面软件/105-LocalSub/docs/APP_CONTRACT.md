@@ -236,7 +236,7 @@ model.cancel
 model.delete
 ```
 
-`model.select` 只保存已安装且能力匹配的实时或后台默认模型。`model.download`、`model.delete` 通过 Shell 应用控制器进入 Core 长任务，`model.cancel` 只取消当前模型任务，不暴露 Core request ID。
+`model.select` 只保存已安装且能力匹配的实时或后台默认模型。`model.download`、`model.delete` 通过 Shell 应用控制器进入 Core 长任务。`model.cancel` 只用于可安全中断的下载任务，不暴露 Core request ID；删除一旦进入目录脱离与递归清理阶段即完成收尾，不允许用户中途取消。
 
 后续按页面迁移逐步加入：
 

@@ -10,7 +10,7 @@ public sealed class MainForm : Form
     IReadOnlyList<ModelDescriptor> _catalog = [];
     ModelManager? _models;
     readonly TranscriptService _transcript = new();
-    readonly LiveAsrPipeline _liveAsr = new();
+    readonly LiveAsrPipeline _liveAsr = new(CoreWorkerBroker.Shared);
     readonly MediaAnalysisService _mediaAnalysis = new();
     readonly System.Windows.Forms.Timer _overlayFollowTimer = new() { Interval = 60 };
     SubtitleOverlayForm? _overlay;
@@ -677,6 +677,7 @@ public sealed class MainForm : Form
         modelStatusDetail.Text = "删除任务正在 LocalSub.Core 中执行";
         AppendModelLog($"开始删除 {m.Name}。", true);
         SetModelBusy(true);
+        modelCancelButton.Enabled = false;
         SetModelRowStatus(m.Id, "删除中");
 
         try

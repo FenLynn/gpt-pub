@@ -183,6 +183,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $shellText = Get-Content 'src/LocalSub/LocalSub.csproj' -Raw
           $coreText = Get-Content 'src/LocalSub.CoreWorker/LocalSub.CoreWorker.csproj' -Raw
+          $mainFormText = Get-Content 'src/LocalSub/UI/MainForm.cs' -Raw
           $heavy = @(
             'AllAudioCaptureService',
             'ResilientPotPlayerCaptureService',
@@ -221,6 +222,9 @@ jobs:
           }
           if (-not (Test-Path 'src/LocalSub/Services/ModelManager.Proxy.cs')) {
             throw 'Shell-side ModelManager proxy is missing'
+          }
+          if ($mainFormText -notmatch [regex]::Escape('readonly LiveAsrPipeline _liveAsr = new(CoreWorkerBroker.Shared);')) {
+            throw 'Legacy WinForms realtime must share CoreWorkerBroker with batch and model operations'
           }
 
       - name: Publish net8 shell app
