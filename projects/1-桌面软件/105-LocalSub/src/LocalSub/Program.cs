@@ -17,6 +17,9 @@ internal static class Program
     static bool IsCoreRecoverySmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_CORE_RECOVERY_SMOKE") == "1";
     static bool IsWebUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_WEBUI_SMOKE") == "1";
     static bool IsWebUiPreview => Environment.GetEnvironmentVariable("LOCALSUB_WEBUI_PREVIEW") == "1";
+    static bool IsLegacyUiRequested =>
+        Environment.GetEnvironmentVariable("LOCALSUB_LEGACY_UI") == "1" ||
+        Environment.GetCommandLineArgs().Skip(1).Any(x => string.Equals(x, "--legacy-ui", StringComparison.OrdinalIgnoreCase));
     static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest || IsCoreRecoverySmokeTest || IsWebUiSmokeTest;
 
     [STAThread]
@@ -54,36 +57,13 @@ internal static class Program
                 return;
             }
 
-            if (IsWebUiSmokeTest || IsWebUiPreview)
+            if (IsBatchUiSmokeTest || IsLegacyUiRequested)
             {
-                WebUiAssets.ValidateEmbeddedResources();
-                using var webShell = new WebShellForm(IsWebUiSmokeTest);
-                Application.Run(webShell);
+                RunLegacyWinForms(startup);
                 return;
             }
 
-            var mainForm = new MainForm();
-            LogStartup(startup, "main-form-constructed");
-            ModelGridVisualStyler.Attach(mainForm);
-            LazyBatchWorkspaceLoader.Attach(mainForm);
-            BatchQueueVisualFix.Attach(mainForm);
-            SettingsFeatureEnhancer.Attach(mainForm);
-            TrayController.Attach(mainForm);
-            UiResponsivenessMonitor.Attach(mainForm);
-            LogStartup(startup, "lightweight-enhancers-attached");
-
-            if (IsBatchUiSmokeTest)
-            {
-                mainForm.Shown += (_, _) =>
-                {
-                    var tabs = mainForm.Controls.OfType<TabControl>().FirstOrDefault();
-                    var batch = tabs?.TabPages.Cast<TabPage>().FirstOrDefault(x => x.Text == "后台转写");
-                    if (tabs != null && batch != null) tabs.SelectedTab = batch;
-                };
-            }
-
-            mainForm.Shown += (_, _) => LogStartup(startup, "window-shown", final: true);
-            Application.Run(mainForm);
+            RunWebShell(startup);
         }
         catch (Exception ex)
         {
@@ -94,6 +74,48 @@ internal static class Program
         {
             try { CoreWorkerBroker.ShutdownAsync().AsTask().GetAwaiter().GetResult(); } catch { }
         }
+    }
+
+    static void RunWebShell(Stopwatch startup)
+    {
+        WebUiAssets.ValidateEmbeddedResources();
+        using var webShell = new WebShellForm(IsWebUiSmokeTest);
+        LogStartup(startup, IsWebUiPreview ? "web-shell-preview-constructed" : "web-shell-constructed");
+
+        if (!IsWebUiSmokeTest)
+        {
+            TrayController.Attach(webShell);
+            UiResponsivenessMonitor.Attach(webShell);
+        }
+
+        webShell.Shown += (_, _) => LogStartup(startup, "window-shown", final: true);
+        Application.Run(webShell);
+    }
+
+    static void RunLegacyWinForms(Stopwatch startup)
+    {
+        var mainForm = new MainForm();
+        LogStartup(startup, "legacy-main-form-constructed");
+        ModelGridVisualStyler.Attach(mainForm);
+        LazyBatchWorkspaceLoader.Attach(mainForm);
+        BatchQueueVisualFix.Attach(mainForm);
+        SettingsFeatureEnhancer.Attach(mainForm);
+        TrayController.Attach(mainForm);
+        UiResponsivenessMonitor.Attach(mainForm);
+        LogStartup(startup, "legacy-enhancers-attached");
+
+        if (IsBatchUiSmokeTest)
+        {
+            mainForm.Shown += (_, _) =>
+            {
+                var tabs = mainForm.Controls.OfType<TabControl>().FirstOrDefault();
+                var batch = tabs?.TabPages.Cast<TabPage>().FirstOrDefault(x => x.Text == "后台转写");
+                if (tabs != null && batch != null) tabs.SelectedTab = batch;
+            };
+        }
+
+        mainForm.Shown += (_, _) => LogStartup(startup, "window-shown", final: true);
+        Application.Run(mainForm);
     }
 
     static async Task RunProcessLoopbackSmokeTestAsync()

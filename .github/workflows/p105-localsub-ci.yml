@@ -192,6 +192,27 @@ jobs:
             }
           }
 
+      - name: Verify default WebUi and legacy backup startup policy
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $program = Get-Content 'src/LocalSub/Program.cs' -Raw
+          foreach ($required in @(
+            'RunWebShell(startup);',
+            'IsBatchUiSmokeTest || IsLegacyUiRequested',
+            '--legacy-ui',
+            'LOCALSUB_LEGACY_UI',
+            'TrayController.Attach(webShell)'
+          )) {
+            if ($program -notmatch [regex]::Escape($required)) {
+              throw "Default WebUi startup policy is missing: $required"
+            }
+          }
+          if ($program -match 'if \(IsWebUiSmokeTest \|\| IsWebUiPreview\)') {
+            throw 'WebUi must no longer require preview or smoke mode to become the primary startup path.'
+          }
+
       - name: Verify realtime compile-time isolation
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
@@ -491,6 +512,23 @@ jobs:
           if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'Startup smoke test wrote a crash log.' }
           Stop-Process -Id $p.Id -Force
 
+      - name: Smoke test legacy WinForms backup
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          Remove-Item Env:LOCALSUB_SMOKE_TEST -ErrorAction SilentlyContinue
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -ArgumentList '--legacy-ui' -PassThru
+          Start-Sleep -Seconds 4
+          $p.Refresh()
+          if ($p.HasExited) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            throw "Legacy WinForms backup exited during startup smoke test. ExitCode=$($p.ExitCode)"
+          }
+          if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'Legacy WinForms backup wrote a crash log.' }
+          Stop-Process -Id $p.Id -Force
+
       - name: Smoke test background workspace
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
@@ -498,7 +536,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $env:LOCALSUB_BATCH_UI_SMOKE = '1'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
-          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -ArgumentList '--legacy-ui' -PassThru
           Start-Sleep -Seconds 4
           $p.Refresh()
           if ($p.HasExited) {
