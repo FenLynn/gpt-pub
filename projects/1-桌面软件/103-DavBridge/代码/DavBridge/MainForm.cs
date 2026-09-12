@@ -365,7 +365,7 @@ internal sealed class MainForm : Form
         }
         finally
         {
-            SafeUi(UpdateView);
+            SafeUi(() => UpdateView());
         }
     }
 
