@@ -24,20 +24,20 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前实验候选的产品版本为 v0.4.9，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前实验候选的产品版本为 v0.4.10，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
 
 ## 3. 最新完整验证代码基线
 
 最新完成完整 P103 CI 的代码 head：
 
 ```text
-e94758c5c1097b24efed97defdc1bec765f0ee4a
+9bd983c248b30c6908ccb89786766f4f6321fe1f
 ```
 
 对应 P103 CI：
 
 ```text
-run 34697665710
+run 34700404112
 scope          success
 core-smoke     success
 frontend       success
@@ -45,26 +45,26 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.9-win-x64`
+Windows candidate：`DavBridge-v0.4.10-win-x64`
 
-Artifact ID：`10299073260`
+Artifact ID：`10299967686`
 
 EXE：
 
 ```text
-2410075 bytes
-SHA256 652e74bc3722101132cba292133985aff00a875945dbce895ad0e1108805ecf0
+2422365 bytes
+SHA256 19c5529124ec95d052e418e79b282dbd003ff9352331fe05c1741cb834ca33d5
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-33aa10e17628b68fc0396f5ffbfccd410c8f650d4c674d342d15d7f22997e8da
+1a637b19339d826c53e6a2e0cec24ced7c1834001d969fef08b22d4f34bc2e2e
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `f10ca58b...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `9bd983c2...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
 
 ## 4. 当前分支快照
 
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-f10ca58b1aa2fd14a44ab00b76193f7cc004552e
+9bd983c248b30c6908ccb89786766f4f6321fe1f
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -240,6 +240,25 @@ v0.4.7 的实现存在两个明确问题，已在 v0.4.8 纠正。
 第九，本轮修改仅涉及 Web UI、SettingsDialog 展示布局和版本号，没有修改 DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、Reconciliation 或 DELETE 安全链。
 
 
+### v0.4.10 二次 UI 收束
+
+第一，首页蓝色迁移路线继续向目标端延伸，箭头头部与坚果云视觉上连成完整连续路线。三阶段布局改为统一 flex 节奏，阶段内容与连接线使用同一间距规则，普通迁移不再出现与前两项不同的左侧空白。
+
+第二，镜像覆盖模块重新绘制左侧统计图标，并强化蓝色渐变进度条。流量预算左侧紫色上下行箭头改为正式 SVG，线宽加粗；标题与上传下载数据的垂直间距进一步收紧。
+
+第三，设置入口使用更明确的齿轮 SVG。左下角运行状态不再使用字符符号，暂停、运行、等待、网络、审查和完成均改为正式 SVG；暂停状态是纯双竖线，不再出现上下横线。
+
+第四，转移页再次按首页语言重构。三个队列改为无边框分隔行，只常驻图标、标题和数量，解释进入 info tooltip；底部只保留当前动作与总体镜像覆盖，删除大段常驻说明和卡片化结构。
+
+第五，所有 Web UI tooltip 改为全局浮层并 Teleport 到 body，使用最高层级显示，不再依赖局部伪元素，因此不会被首页卡片、overflow 或 stacking context 裁切遮挡。
+
+第六，设置页“账户与端点”字段不再因为已有迁移记录而直接设为 ReadOnly，用户可以正常点击、选择和编辑。安全语义仍保持：若已有迁移记录，保存阶段继续阻止 URL、目录或 User ID 改成另一套端点，应用密码仍可正常更新。也就是说，交互层不再假死，但既有端点身份保护没有降低。
+
+第七，CI 的 1100×825 总览和转移预览已人工复核。转移页已经与首页同样采用轻量分隔行；路线、阶段间距、齿轮图标、覆盖图标和流量图标均进入新视觉。浏览器预览环境缺少完整中文字体，但不影响几何和布局检查，最终字体仍以 Windows 实机为准。
+
+第八，本轮仍未修改 DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
+
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -288,15 +307,15 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步需要在真实 Windows 上运行 `e94758c5...` 对应的 v0.4.9 candidate，重点检查：
+用户下一步只需要实机运行 v0.4.10 candidate，重点确认：
 
-1. 总览“流量预算”的标题行与上传下载数据上下留白是否真正对称，上传绿色渐变和下载蓝色渐变是否自然。
-2. 转移页是否比 v0.4.8 更直接，三类队列和“恢复后或当前动作”是否一眼可懂，不再出现无意义的“当前执行 C”式表达。
-3. 回收站在真实数据存在时，表头、行文字、状态标签和操作按钮是否足够清楚。
-4. 文档页左侧目录应消失，正文变为单列阅读；滚动条平时不应常驻可见，标题和正文比例应更协调。
-5. 设置“账户与端点”中的 User ID 应单行显示，URL、目录、用户名和密码字段横向空间应明显更合理。
-6. 左下角状态块不应重复两次“已暂停”。若主状态和路线状态相同，第二行应显示 Cycle；点击后最近活动抽屉字号应明显增大。
-7. 总览阶段中线、InfiniCLOUD/坚果云路线、校准安全暂停、单实例、睡眠与网络恢复、无桌面 BalloonTip 行为不得回退。
+1. 蓝色迁移路线右端是否已经自然连到坚果云，三阶段之间的连接线和圆圈间距是否一致。
+2. 镜像覆盖的新图标与蓝色渐变进度条、流量预算的新紫色 SVG 和更紧凑标题间距是否自然。
+3. 设置和左下角状态图标是否清楚，Paused 必须显示纯双竖线。
+4. 转移页是否已足够接近首页的信息密度，只保留三类队列标题、数量和必要动作，其余解释通过悬浮提示读取。
+5. 首页与转移页所有 tooltip 是否始终显示在最高层，不再被卡片或页面裁切。
+6. “设置 → 账户与端点”字段是否能够正常点击和编辑。已有迁移账本时，如果保存会改变 URL、目录或 User ID，仍必须由安全门阻止；密码修改应继续允许保存。
+7. 回收站、文档、流量校准、单实例、睡眠与网络恢复、托盘和 DELETE 安全链不得回退。
 
 用户实机确认之前，不提升 `p103-stable`，不修改 `main`，不创建正式标签或 Release。
 
