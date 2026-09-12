@@ -59,6 +59,8 @@ public sealed class WebShellForm : Form
     {
         "app.getSnapshot",
         "app.navigate",
+        "settings.update",
+        "settings.previewSubtitle",
         "live.start",
         "live.stop",
         "model.list",
@@ -69,7 +71,7 @@ public sealed class WebShellForm : Form
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
     {
-        "live", "batch", "models", "settings", "docs"
+        "home", "live", "batch", "models", "settings", "docs"
     };
 
     readonly WebView2 _web = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(243, 246, 249) };
@@ -87,12 +89,35 @@ public sealed class WebShellForm : Form
     readonly AppSettings _settings;
     readonly bool _smoke;
     readonly HashSet<string> _smokeMethods = new(StringComparer.Ordinal);
+    readonly System.Windows.Forms.Timer _autoStartTimer = new() { Interval = 1500 };
 
-    string _activePage = "live";
+    string _activePage = "home";
     string _coreState = "stopped";
     string? _coreError;
     int _snapshotPushPending;
+    bool _autoStartPending;
+    bool _autoStartBusy;
+    string _autoStartStatus = "";
     bool _disposed;
+
+    internal event Action? TrayStateChanged;
+    internal bool IsLiveRunning => _live.Snapshot.State == "running";
+    internal string TrayStatusText
+    {
+        get
+        {
+            var live = _live.Snapshot;
+            if (_autoStartPending && !string.IsNullOrWhiteSpace(_autoStartStatus)) return _autoStartStatus;
+            return live.State switch
+            {
+                "running" => "实时字幕运行中",
+                "starting" => "实时字幕启动中",
+                "stopping" => "实时字幕停止中",
+                "failed" => "实时字幕异常",
+                _ => "待命"
+            };
+        }
+    }
 
     public WebShellForm(bool smoke = false)
     {
@@ -114,13 +139,15 @@ public sealed class WebShellForm : Form
         _live.Changed += OnLiveChanged;
         _models.Changed += OnModelsChanged;
         _core.ConnectionBroken += OnCoreConnectionBroken;
+        _autoStartTimer.Tick += async (_, _) => await TryAutoStartLiveAsync();
+        _autoStartPending = !_smoke && _settings.AutoStartLive;
         Shown += async (_, _) => await InitializeAsync();
         FormClosed += async (_, _) => await DisposeOwnedResourcesAsync();
     }
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -159,6 +186,11 @@ public sealed class WebShellForm : Form
             };
 
             core.Navigate(_smoke ? Origin + "/index.html?smoke=1" : Origin + "/index.html");
+            if (_autoStartPending)
+            {
+                _autoStartTimer.Start();
+                _ = TryAutoStartLiveAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -187,6 +219,12 @@ public sealed class WebShellForm : Form
                     break;
                 case "app.navigate":
                     result = await NavigateAsync(request.Params);
+                    break;
+                case "settings.update":
+                    result = await UpdateSettingsAsync(request.Params);
+                    break;
+                case "settings.previewSubtitle":
+                    result = await PreviewSubtitleAsync();
                     break;
                 case "live.start":
                     result = await StartLiveAsync(request.Params);
@@ -237,6 +275,189 @@ public sealed class WebShellForm : Form
         return await BuildSnapshotAsync(probeCore: false);
     }
 
+    internal async Task ToggleLiveFromTrayAsync()
+    {
+        _autoStartPending = false;
+        _autoStartTimer.Stop();
+        var live = _live.Snapshot;
+        if (live.State == "running")
+        {
+            await _live.StopAsync();
+            TrayStateChanged?.Invoke();
+            return;
+        }
+
+        if (live.State is "starting" or "stopping")
+            throw new InvalidOperationException("实时字幕正在切换状态，请稍候。");
+        if (string.IsNullOrWhiteSpace(live.ModelId))
+            throw new InvalidOperationException("没有可用的实时识别模型。");
+
+        await _live.StartAsync(live.SourceId, live.ModelId);
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        TrayStateChanged?.Invoke();
+    }
+
+    async Task TryAutoStartLiveAsync()
+    {
+        if (_disposed || !_autoStartPending || _autoStartBusy) return;
+        _autoStartBusy = true;
+        try
+        {
+            var current = AppSettings.Load();
+            if (!current.AutoStartLive)
+            {
+                _autoStartPending = false;
+                _autoStartTimer.Stop();
+                _autoStartStatus = "";
+                return;
+            }
+
+            _live.RefreshConfiguration();
+            var live = _live.Snapshot;
+            if (live.State == "running")
+            {
+                _autoStartPending = false;
+                _autoStartTimer.Stop();
+                _autoStartStatus = "";
+                return;
+            }
+            if (live.State is "starting" or "stopping") return;
+
+            if (live.SourceId == "potplayer" && !IsPotPlayerDetected())
+            {
+                _autoStartStatus = "等待 PotPlayer";
+                TrayStateChanged?.Invoke();
+                ScheduleSnapshotPush();
+                return;
+            }
+
+            if (!live.CanStart || string.IsNullOrWhiteSpace(live.ModelId))
+            {
+                _autoStartStatus = "等待实时模型";
+                TrayStateChanged?.Invoke();
+                ScheduleSnapshotPush();
+                return;
+            }
+
+            _autoStartStatus = "自动启动中";
+            TrayStateChanged?.Invoke();
+            ScheduleSnapshotPush();
+            await _live.StartAsync(live.SourceId, live.ModelId);
+            _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+            _coreError = null;
+            _autoStartPending = false;
+            _autoStartStatus = "";
+            _autoStartTimer.Stop();
+            TrayStateChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            _coreError = ex.Message;
+            if (_live.Snapshot.SourceId == "potplayer" && !IsPotPlayerDetected())
+            {
+                _autoStartStatus = "等待 PotPlayer";
+            }
+            else
+            {
+                _autoStartPending = false;
+                _autoStartTimer.Stop();
+                _autoStartStatus = "自动启动失败";
+            }
+            TrayStateChanged?.Invoke();
+            ScheduleSnapshotPush();
+        }
+        finally
+        {
+            _autoStartBusy = false;
+        }
+    }
+
+    async Task<object> UpdateSettingsAsync(JsonElement? parameters)
+    {
+        if (!parameters.HasValue || parameters.Value.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("设置参数无效。");
+
+        var p = parameters.Value;
+
+        if (TryReadOptionalString(p, "audioSource", out var source))
+            _settings.AudioSource = source switch
+            {
+                "potplayer" => AudioSourceMode.PotPlayer,
+                "allAudio" => AudioSourceMode.AllAudio,
+                _ => throw new InvalidOperationException("不支持的默认音源。")
+            };
+
+        if (TryReadOptionalString(p, "resourceProfile", out var profile))
+            _settings.ResourceProfile = profile switch
+            {
+                "Eco" => ResourceProfile.Eco,
+                "MaxPerformance" => ResourceProfile.MaxPerformance,
+                "Auto" => ResourceProfile.Auto,
+                _ => throw new InvalidOperationException("不支持的资源策略。")
+            };
+
+        if (TryReadOptionalBool(p, "minimizeToTray", out var minimizeToTray)) _settings.MinimizeToTray = minimizeToTray;
+        if (TryReadOptionalBool(p, "startWithWindows", out var startWithWindows)) _settings.StartWithWindows = startWithWindows;
+        if (TryReadOptionalBool(p, "silentStartup", out var silentStartup)) _settings.SilentStartup = silentStartup;
+        if (TryReadOptionalBool(p, "autoStartLive", out var autoStartLive)) _settings.AutoStartLive = autoStartLive;
+        if (TryReadOptionalBool(p, "showLiveLevelHistory", out var showHistory)) _settings.ShowLiveLevelHistory = showHistory;
+        if (TryReadOptionalBool(p, "subtitleAutoSize", out var autoSize)) _settings.SubtitleAutoSize = autoSize;
+
+        if (TryReadOptionalInt(p, "subtitleFontSize", out var fontSize)) _settings.SubtitleFontSize = Math.Clamp(fontSize, 20, 52);
+        if (TryReadOptionalInt(p, "subtitleAutoScalePercent", out var autoScale)) _settings.SubtitleAutoScalePercent = Math.Clamp(autoScale, 60, 160);
+        if (TryReadOptionalInt(p, "subtitleBottomOffset", out var bottomOffset)) _settings.SubtitleBottomOffset = Math.Clamp(bottomOffset, 0, 300);
+        if (TryReadOptionalInt(p, "subtitleMaxWidthPercent", out var maxWidth)) _settings.SubtitleMaxWidthPercent = Math.Clamp(maxWidth, 50, 100);
+        if (TryReadOptionalInt(p, "subtitleBackgroundOpacity", out var backgroundOpacity)) _settings.SubtitleBackgroundOpacity = Math.Clamp(backgroundOpacity, 0, 70);
+        if (TryReadOptionalInt(p, "subtitlePreviousScalePercent", out var previousScale)) _settings.SubtitlePreviousScalePercent = Math.Clamp(previousScale, 40, 100);
+        if (TryReadOptionalInt(p, "subtitlePreviousOpacity", out var previousOpacity)) _settings.SubtitlePreviousOpacity = Math.Clamp(previousOpacity, 0, 100);
+        if (TryReadOptionalInt(p, "subtitleShadowOpacity", out var shadowOpacity)) _settings.SubtitleShadowOpacity = Math.Clamp(shadowOpacity, 0, 100);
+
+        if (TryReadOptionalDouble(p, "subtitleDisplaySeconds", out var seconds)) _settings.SubtitleDisplaySeconds = Math.Clamp(seconds, 1.0, 10.0);
+        if (TryReadOptionalDouble(p, "subtitleOutlineWidth", out var outlineWidth)) _settings.SubtitleOutlineWidth = Math.Clamp(outlineWidth, 0.0, 4.0);
+
+        if (TryReadOptionalString(p, "subtitleBackground", out var background))
+            _settings.SubtitleBackground = background switch
+            {
+                "Light" => SubtitleBackgroundMode.Light,
+                "Dark" => SubtitleBackgroundMode.Dark,
+                "None" => SubtitleBackgroundMode.None,
+                _ => throw new InvalidOperationException("不支持的字幕背景。")
+            };
+
+        if (TryReadOptionalString(p, "subtitleCurrentColor", out var currentColor)) _settings.SubtitleCurrentColor = currentColor;
+        if (TryReadOptionalString(p, "subtitlePreviousColor", out var previousColor)) _settings.SubtitlePreviousColor = previousColor;
+        if (TryReadOptionalString(p, "subtitleOutlineColor", out var outlineColor)) _settings.SubtitleOutlineColor = outlineColor;
+
+        _settings.Save();
+        StartupRegistrationService.Apply(_settings);
+        _live.RefreshConfiguration();
+        _models.Refresh();
+        await _live.ApplySettingsAsync(preview: false);
+
+        if (_settings.AutoStartLive && _live.Snapshot.State is "idle" or "failed")
+        {
+            _autoStartPending = true;
+            _autoStartStatus = _live.Snapshot.SourceId == "potplayer" && !IsPotPlayerDetected() ? "等待 PotPlayer" : "等待自动启动";
+            _autoStartTimer.Start();
+        }
+        else if (!_settings.AutoStartLive)
+        {
+            _autoStartPending = false;
+            _autoStartStatus = "";
+            _autoStartTimer.Stop();
+        }
+
+        TrayStateChanged?.Invoke();
+        return BuildSnapshot();
+    }
+
+    async Task<object> PreviewSubtitleAsync()
+    {
+        await _live.ApplySettingsAsync(preview: true);
+        return BuildSnapshot();
+    }
+
     async Task<object> StartLiveAsync(JsonElement? parameters)
     {
         if (!TryReadString(parameters, "source", out var source))
@@ -244,6 +465,8 @@ public sealed class WebShellForm : Form
         if (!TryReadString(parameters, "modelId", out var modelId))
             throw new InvalidOperationException("请选择实时识别模型。");
 
+        _autoStartPending = false;
+        _autoStartTimer.Stop();
         await _live.StartAsync(source, modelId);
         _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
         _coreError = null;
@@ -252,7 +475,10 @@ public sealed class WebShellForm : Form
 
     async Task<object> StopLiveAsync()
     {
+        _autoStartPending = false;
+        _autoStartTimer.Stop();
         await _live.StopAsync();
+        TrayStateChanged?.Invoke();
         return BuildSnapshot();
     }
 
@@ -351,9 +577,35 @@ public sealed class WebShellForm : Form
             settings = new
             {
                 audioSource = live.Source,
+                audioSourceId = _settings.AudioSource == AudioSourceMode.PotPlayer ? "potplayer" : "allAudio",
                 resourceProfile = _settings.ResourceProfile.ToString(),
+                minimizeToTray = _settings.MinimizeToTray,
+                startWithWindows = _settings.StartWithWindows,
+                startupRegistered = StartupRegistrationService.IsRegistered(),
+                silentStartup = _settings.SilentStartup,
+                autoStartLive = _settings.AutoStartLive,
+                showLiveLevelHistory = _settings.ShowLiveLevelHistory,
                 subtitleAutoSize = _settings.SubtitleAutoSize,
-                subtitleFontSize = _settings.SubtitleFontSize
+                subtitleFontSize = _settings.SubtitleFontSize,
+                subtitleAutoScalePercent = _settings.SubtitleAutoScalePercent,
+                subtitleBottomOffset = _settings.SubtitleBottomOffset,
+                subtitleMaxWidthPercent = _settings.SubtitleMaxWidthPercent,
+                subtitleBackground = _settings.SubtitleBackground.ToString(),
+                subtitleBackgroundOpacity = _settings.SubtitleBackgroundOpacity,
+                subtitleDisplaySeconds = _settings.SubtitleDisplaySeconds,
+                subtitleCurrentColor = _settings.SubtitleCurrentColor,
+                subtitlePreviousColor = _settings.SubtitlePreviousColor,
+                subtitlePreviousScalePercent = _settings.SubtitlePreviousScalePercent,
+                subtitlePreviousOpacity = _settings.SubtitlePreviousOpacity,
+                subtitleOutlineColor = _settings.SubtitleOutlineColor,
+                subtitleOutlineWidth = _settings.SubtitleOutlineWidth,
+                subtitleShadowOpacity = _settings.SubtitleShadowOpacity
+            },
+            system = new
+            {
+                potPlayerDetected = IsPotPlayerDetected(),
+                autoStartPending = _autoStartPending,
+                autoStartStatus = _autoStartStatus
             }
         };
     }
@@ -395,6 +647,7 @@ public sealed class WebShellForm : Form
             _coreError = live.LastError;
         }
 
+        TrayStateChanged?.Invoke();
         ScheduleSnapshotPush();
     }
 
@@ -455,6 +708,7 @@ public sealed class WebShellForm : Form
         if (!_smoke) return;
         _smokeMethods.Add(method);
         if (!_smokeMethods.Contains("app.getSnapshot") ||
+            !_smokeMethods.Contains("settings.update") ||
             !_smokeMethods.Contains("live.stop") ||
             !_smokeMethods.Contains("live.start") ||
             !_smokeMethods.Contains("model.list") ||
@@ -466,7 +720,58 @@ public sealed class WebShellForm : Form
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}");
+    }
+
+    static bool IsPotPlayerDetected()
+    {
+        try
+        {
+            using var process = PotPlayerWatcher.FindRunning();
+            return process != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static bool TryReadOptionalString(JsonElement parameters, string propertyName, out string value)
+    {
+        value = "";
+        if (!parameters.TryGetProperty(propertyName, out var node)) return false;
+        if (node.ValueKind != JsonValueKind.String)
+            throw new InvalidOperationException($"设置 {propertyName} 必须是字符串。");
+        value = node.GetString()?.Trim() ?? "";
+        return true;
+    }
+
+    static bool TryReadOptionalBool(JsonElement parameters, string propertyName, out bool value)
+    {
+        value = false;
+        if (!parameters.TryGetProperty(propertyName, out var node)) return false;
+        if (node.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+            throw new InvalidOperationException($"设置 {propertyName} 必须是布尔值。");
+        value = node.GetBoolean();
+        return true;
+    }
+
+    static bool TryReadOptionalInt(JsonElement parameters, string propertyName, out int value)
+    {
+        value = 0;
+        if (!parameters.TryGetProperty(propertyName, out var node)) return false;
+        if (node.ValueKind != JsonValueKind.Number || !node.TryGetInt32(out value))
+            throw new InvalidOperationException($"设置 {propertyName} 必须是整数。");
+        return true;
+    }
+
+    static bool TryReadOptionalDouble(JsonElement parameters, string propertyName, out double value)
+    {
+        value = 0;
+        if (!parameters.TryGetProperty(propertyName, out var node)) return false;
+        if (node.ValueKind != JsonValueKind.Number || !node.TryGetDouble(out value))
+            throw new InvalidOperationException($"设置 {propertyName} 必须是数字。");
+        return true;
     }
 
     static bool TryReadString(JsonElement? parameters, string propertyName, out string value)
@@ -490,6 +795,8 @@ public sealed class WebShellForm : Form
         _live.Changed -= OnLiveChanged;
         _models.Changed -= OnModelsChanged;
         _core.ConnectionBroken -= OnCoreConnectionBroken;
+        _autoStartTimer.Stop();
+        _autoStartTimer.Dispose();
         try { _models.Dispose(); } catch { }
         try { await _live.DisposeAsync(); } catch { }
         try { await _core.DisposeAsync(); } catch { }
