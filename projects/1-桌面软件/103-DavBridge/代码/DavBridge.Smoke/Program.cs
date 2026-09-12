@@ -15,6 +15,7 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("crash recovery after put", TestCrashRecoveryAsync),
     ("partial group budgets only unfinished member", TestPartialGroupQuotaAsync),
     ("oversize object blocks safely", TestOversizeAsync),
+    ("safe pause stops before next member", TestSafePauseAsync),
     ("large zotero manifest", TestLargeManifestAsync)
 };
 
@@ -331,6 +332,36 @@ static async Task TestOversizeAsync()
     finally { Directory.Delete(root, true); }
 }
 
+static async Task TestSafePauseAsync()
+{
+    var source = new FakeReadClient(new Dictionary<string, byte[]>
+    {
+        ["zotero/A.bin"] = Bytes("first-file"),
+        ["zotero/B.bin"] = Bytes("second-file")
+    });
+    var pauseRequested = false;
+    var target = new FakeWriteClient
+    {
+        AfterPut = count => { if (count == 1) pauseRequested = true; }
+    };
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"),
+            pauseRequested: () => pauseRequested);
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Paused, "safe pause must end in Paused");
+        Check(target.PutCount == 1, "safe pause must not start the next member");
+        Check(state.Files.TryGetValue("A.bin", out var first) && first.Status == TransferStatus.StrongVerified,
+            "the in-flight member must finish strong verification before pause");
+        Check(!state.Files.TryGetValue("B.bin", out var second) || second.Status != TransferStatus.StrongVerified,
+            "the next member must remain unprocessed");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
 static Task TestLargeManifestAsync()
 {
     const int attachments = 6000;
@@ -437,6 +468,7 @@ sealed class FakeWriteClient : IWritableWebDavClient
 {
     private readonly Dictionary<string, byte[]> _files;
     public bool DropWrites { get; set; }
+    public Action<int>? AfterPut { get; init; }
     public int PutCount { get; private set; }
     public int DownloadCount { get; private set; }
 
@@ -482,6 +514,7 @@ sealed class FakeWriteClient : IWritableWebDavClient
     {
         PutCount++;
         var data = await File.ReadAllBytesAsync(localFilePath, cancellationToken);
+        AfterPut?.Invoke(PutCount);
         if (!DropWrites)
             _files[relativePath] = data;
         return new PutResult(System.Net.HttpStatusCode.Created, true);
