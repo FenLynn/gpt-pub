@@ -5,7 +5,8 @@ namespace DavBridge;
 internal static class WindowPlacementV044
 {
     private const int CurrentSchemaVersion = 2;
-    private const int DefaultOuterWidth = 1100;
+    private const int DefaultWidth = 1100;
+    private const int DefaultHeight = 825;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -14,8 +15,7 @@ internal static class WindowPlacementV044
 
     public static void ApplyDefaultFourThree(Form form)
     {
-        form.Width = DefaultOuterWidth;
-        form.Height = FourThreeOuterHeight(form, DefaultOuterWidth);
+        form.Size = new Size(DefaultWidth, DefaultHeight);
     }
 
     public static void Restore(Form form)
@@ -32,7 +32,7 @@ internal static class WindowPlacementV044
 
             var migrated = state.SchemaVersion < CurrentSchemaVersion && !state.Maximized;
             var target = migrated
-                ? LegacyFourThreeBounds(form, requested, screen.WorkingArea)
+                ? LegacyFourThreeBounds(requested, screen.WorkingArea, form.MinimumSize)
                 : ClampToWorkingArea(requested, screen.WorkingArea);
 
             if (target.Width < form.MinimumSize.Width || target.Height < form.MinimumSize.Height) return;
@@ -81,63 +81,58 @@ internal static class WindowPlacementV044
 
     internal static bool ValidateFourThreeForSelfTest(Form form)
     {
-        var original = form.Bounds;
-        try
-        {
-            ApplyDefaultFourThree(form);
-            var ratio = form.ClientSize.Height <= 0 ? 0 : (double)form.ClientSize.Width / form.ClientSize.Height;
-            if (Math.Abs(ratio - 4d / 3d) > 0.015) return false;
+        ApplyDefaultFourThree(form);
+        var defaultRatioOk =
+            form.Width == DefaultWidth &&
+            form.Height == DefaultHeight &&
+            Math.Abs((double)form.Width / form.Height - 4d / 3d) < 0.0001;
 
-            var legacy = new Rectangle(120, 90, 1100, 620);
-            var working = new Rectangle(0, 0, 1920, 1040);
-            var migrated = LegacyFourThreeBounds(form, legacy, working);
-            var nonClientWidth = Math.Max(0, form.Width - form.ClientSize.Width);
-            var nonClientHeight = Math.Max(0, form.Height - form.ClientSize.Height);
-            var clientWidth = Math.Max(1, migrated.Width - nonClientWidth);
-            var clientHeight = Math.Max(1, migrated.Height - nonClientHeight);
-            var migratedRatio = (double)clientWidth / clientHeight;
-            return migrated.Width == legacy.Width &&
-                   migrated.Height > legacy.Height &&
-                   Math.Abs(migratedRatio - 4d / 3d) <= 0.015;
-        }
-        finally
-        {
-            form.Bounds = original;
-        }
+        var legacy = new Rectangle(120, 90, 1100, 620);
+        var working = new Rectangle(0, 0, 1920, 1040);
+        var migrated = LegacyFourThreeBounds(legacy, working, form.MinimumSize);
+        var migratedRatioOk =
+            migrated.Width == 1100 &&
+            migrated.Height == 825 &&
+            Math.Abs((double)migrated.Width / migrated.Height - 4d / 3d) < 0.0001;
+
+        var customLegacy = new Rectangle(200, 120, 1000, 610);
+        var customMigrated = LegacyFourThreeBounds(customLegacy, working, form.MinimumSize);
+        var customRatioOk =
+            customMigrated.Width == 1000 &&
+            customMigrated.Height == 750 &&
+            Math.Abs((double)customMigrated.Width / customMigrated.Height - 4d / 3d) < 0.0001;
+
+        return defaultRatioOk && migratedRatioOk && customRatioOk;
     }
 
-    private static Rectangle LegacyFourThreeBounds(Form form, Rectangle saved, Rectangle working)
+    private static Rectangle LegacyFourThreeBounds(Rectangle saved, Rectangle working, Size minimum)
     {
-        var targetWidth = Math.Max(form.MinimumSize.Width, saved.Width);
-        var targetHeight = FourThreeOuterHeight(form, targetWidth);
+        var targetWidth = Math.Max(minimum.Width, saved.Width);
+        var targetHeight = (int)Math.Round(targetWidth * 3d / 4d);
 
         if (targetWidth > working.Width || targetHeight > working.Height)
         {
-            var nonClientWidth = Math.Max(0, form.Width - form.ClientSize.Width);
-            var nonClientHeight = Math.Max(0, form.Height - form.ClientSize.Height);
-            var maxClientWidth = Math.Max(1, working.Width - nonClientWidth);
-            var maxClientHeight = Math.Max(1, working.Height - nonClientHeight);
-            var clientWidth = Math.Min(maxClientWidth, (int)Math.Floor(maxClientHeight * 4d / 3d));
-            targetWidth = Math.Max(form.MinimumSize.Width, clientWidth + nonClientWidth);
-            targetHeight = FourThreeOuterHeight(form, targetWidth);
-            if (targetHeight > working.Height)
-                targetHeight = working.Height;
+            var scale = Math.Min(
+                (double)working.Width / targetWidth,
+                (double)working.Height / targetHeight);
+            targetWidth = Math.Max(minimum.Width, (int)Math.Floor(targetWidth * scale));
+            targetHeight = (int)Math.Round(targetWidth * 3d / 4d);
         }
+
+        if (targetHeight < minimum.Height)
+        {
+            targetHeight = minimum.Height;
+            targetWidth = Math.Max(minimum.Width, (int)Math.Round(targetHeight * 4d / 3d));
+        }
+
+        if (targetWidth > working.Width || targetHeight > working.Height)
+            return ClampToWorkingArea(saved, working);
 
         var centerX = saved.Left + saved.Width / 2;
         var centerY = saved.Top + saved.Height / 2;
         var x = centerX - targetWidth / 2;
         var y = centerY - targetHeight / 2;
         return ClampToWorkingArea(new Rectangle(x, y, targetWidth, targetHeight), working);
-    }
-
-    private static int FourThreeOuterHeight(Form form, int outerWidth)
-    {
-        var nonClientWidth = Math.Max(0, form.Width - form.ClientSize.Width);
-        var nonClientHeight = Math.Max(0, form.Height - form.ClientSize.Height);
-        var clientWidth = Math.Max(1, outerWidth - nonClientWidth);
-        var clientHeight = (int)Math.Round(clientWidth * 3d / 4d);
-        return Math.Max(form.MinimumSize.Height, clientHeight + nonClientHeight);
     }
 
     private static Screen? BestScreen(Rectangle requested) =>

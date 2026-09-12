@@ -1,5 +1,5 @@
 /* DavBridge overview visual baseline
-   Target: approved Apple / Google inspired reference at a true 4:3 client-area default window.
+   Target: approved Apple / Google inspired reference at a 1100 x 825 (16:12 / 4:3) default window.
    This file loads after styles.css and intentionally overrides the older dashboard skin. */
 
 .app-shell{
@@ -694,7 +694,7 @@
   padding-right:3px;
 }
 
-/* Desktop default keeps the outer width at 1100 and computes height for a 4:3 client area. */
+/* Desktop default is 1100 x 825. Legacy unschemed placements migrate once to the same 4:3 outer-window ratio. */
 @media(max-width:999px){
   .app-shell{grid-template-columns:174px minmax(0,1fr)}
   .sidebar{padding:22px 12px 14px}
