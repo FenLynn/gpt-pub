@@ -179,7 +179,8 @@ Shell 只保留 PotPlayer 进程发现、PID、窗口位置、最小化状态和
 
 已建立 WebView2 + Vue 3 + TypeScript 主 Shell：
 
-- 左侧一级导航
+- 顶部横向一级 Tab，v0.1.4 起作为固定视觉基线
+- 单栏主内容区，避免页面级左右分栏
 - Core 状态
 - 设置与文档骨架
 - 实时页面骨架
@@ -211,7 +212,7 @@ Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重�
 
 ### Phase 2B：逐页切换
 
-状态：**实时字幕页与模型页第一闭环完成，WebShell 已成为默认入口，后台与设置待迁移。**
+状态：**实时字幕页与模型页第一闭环完成，WebShell 已成为默认入口，v0.1.4 视觉基线完成，后台与设置编辑待迁移。**
 
 推荐顺序：
 
@@ -224,7 +225,7 @@ Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重�
 
 当前 realtime Web 页第一闭环保留。模型页已经通过 `WebShellForm → ModelCatalogController → CoreWorkerClient → LocalSub.Core.exe` 接入同一 Application Contract，支持查看、默认选择、下载/修复、取消和删除。
 
-当前模型页与 Phase 1B.2 已完成既有闭环。v0.1.3 启动策略切换的完整验证代码 head 为 `753a959e938a672e367c9f3a8638226dca841367`，P105 Windows CI run `34690755412` success。
+当前模型页与 Phase 1B.2 已完成既有闭环。v0.1.4 将 WebShell 统一为顶部横向 Tab + 单栏浅色界面，并取消模型页右侧详情栏。该视觉基线完整验证代码 head 为 `183a32816fedf0b4bcc4b9eb5d5f628e3408cb16`，P105 Windows CI run `34698144349` success。
 
 每一页切换后继续复用同一个 Application Contract。下一页为后台转写工作区，必须复用现有 Core 分析与转写链，不复制旧 WinForms 业务核心。旧 WinForms 在该迁移阶段仅作为显式备用入口。
 

@@ -188,18 +188,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B` Web UI 已切为默认入口，后台转写与设置页仍待迁移。
+当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.4 视觉基线完成，后台转写与设置编辑能力仍待迁移。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-753a959e938a672e367c9f3a8638226dca841367
+183a32816fedf0b4bcc4b9eb5d5f628e3408cb16
 ```
 
 P105 Windows CI：
 
 ```text
-run 34690755412
+run 34698144349
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10296548335
-sha256:bc04d00dc07539fa225ef230bf6b8103ee7b18b476ea1b76f8a140b19000c570
+ID 10299706108
+sha256:edcdaea766e7df324e4a23d7236fc5ddba75eae95dd6082d4dae87e6cdb17a22
 
 WebUi preview
-ID 10296318757
-sha256:61b618798951cf491903955dd0afd5e317e33e5c5ac4fbd187d8a813c81882ca
+ID 10299516539
+sha256:7c337eb1a496ccd81afaf3645f8ef126f9541c607ad0451c591619fb2ca7039b
 ```
 
 本阶段已经完成：
@@ -229,6 +229,8 @@ sha256:61b618798951cf491903955dd0afd5e317e33e5c5ac4fbd187d8a813c81882ca
 - 模型页 1280×800 自动预览已人工检查，视觉语言与实时页一致，无明显溢出或布局塌陷。
 
 v0.1.3 已切换默认启动路径：普通双击进入 WebShell。旧 WinForms 只作为迁移期备用界面，通过 `LocalSub.exe --legacy-ui` 或 `LOCALSUB_LEGACY_UI=1` 显式启动。默认 WebShell 已接入既有托盘控制器与 UI 响应监控。
+
+v0.1.4 已固定新的 Web UI 视觉基线：顶部横向一级 Tab、正文单栏、浅色低饱和配色、线性 SVG 图标、减少卡片嵌套。模型页不再使用列表与右侧详情分栏，详情进入列表下方；设置与文档改为单列行式布局。六张最终自动预览均已人工检查。
 
 下一步固定为：
 
@@ -278,7 +280,7 @@ Vue 不得：
 
 当前开发候选版本：
 
-- Development Version：`0.1.3`
+- Development Version：`0.1.4`
 - 当前正式 Release / RELEASE.md：`0.1.1`
 - 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 
