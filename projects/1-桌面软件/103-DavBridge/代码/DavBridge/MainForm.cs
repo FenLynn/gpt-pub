@@ -764,8 +764,10 @@ internal sealed class MainForm : Form
 
     private void ApplyActionAvailability(EngineState state)
     {
-        var canPause = state == EngineState.Running;
-        var canResume = state is EngineState.Paused or EngineState.WaitRetry;
+        var pausePending = _host.IsPausePending;
+        var canPause = _host.IsRunning && _host.Config.MigrationEnabled && !pausePending;
+        if (!canPause) canPause = state == EngineState.Running && _host.Config.MigrationEnabled && !pausePending;
+        var canResume = !pausePending && !_host.IsRunning && state is EngineState.Paused or EngineState.WaitRetry;
         _trayPause.Enabled = canPause;
         _trayResume.Enabled = canResume;
         _primaryAction.Visible = canPause || canResume;
