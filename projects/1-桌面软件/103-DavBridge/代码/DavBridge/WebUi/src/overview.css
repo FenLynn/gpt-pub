@@ -1985,3 +1985,195 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
 .global-tooltip{z-index:2147483000}
 .route-card-polished .route-line:before{right:-8px}
 .route-card-polished .route-line:after{right:-25px}
+
+
+/* v0.4.11 route semantics, optical centering, and task status/action separation. */
+.route-card-polished .endpoint.source strong{
+  color:#b77d00;
+}
+.route-card-polished .endpoint.target strong{
+  color:#8a4f1d;
+}
+.route-card-polished .route-line{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 22px 54px;
+  align-items:center;
+  gap:10px;
+  height:34px;
+}
+.route-card-polished .route-line:before,
+.route-card-polished .route-line:after{
+  content:none!important;
+  display:none!important;
+}
+.route-segment{
+  display:block;
+  height:4px;
+  border-radius:999px;
+  background:linear-gradient(90deg,#cbedf6 0%,#70c7f3 58%,#1789e8 100%);
+}
+.route-segment-right{
+  background:#1789e8;
+}
+.route-arrow{
+  width:18px;
+  height:18px;
+  justify-self:center;
+  border-top:4px solid #1789e8;
+  border-right:4px solid #1789e8;
+  border-radius:1px;
+  transform:rotate(45deg);
+  box-sizing:border-box;
+}
+
+.coverage-glyph,
+.quota-glyph{
+  transform:translateX(0);
+}
+.coverage-glyph{
+  width:40px;
+  height:40px;
+}
+.coverage-glyph rect{
+  fill:#1889e5;
+}
+.coverage-glyph rect:nth-of-type(1){opacity:.55}
+.coverage-glyph rect:nth-of-type(2){opacity:.73}
+.coverage-glyph rect:nth-of-type(3){opacity:.95}
+.coverage-check{display:none}
+.quota-glyph{
+  width:39px;
+  height:39px;
+  stroke-width:3;
+}
+
+.task-card{
+  display:grid;
+  grid-template-columns:58px 170px minmax(240px,1fr) auto;
+  align-items:center;
+  gap:29px;
+  padding-top:0;
+  box-sizing:border-box;
+}
+.task-copy{
+  min-width:0;
+  align-self:center;
+  gap:9px;
+}
+.task-name{
+  color:#5d7288;
+  font-size:14px;
+  line-height:1.35;
+  font-weight:450;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.task-center{
+  min-width:0;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:10px;
+}
+.task-status{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+}
+.task-status>div{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:9px;
+}
+.task-status strong{
+  color:#304b66;
+  font-size:14px;
+  font-weight:680;
+  white-space:nowrap;
+}
+.task-status small{
+  color:#8192a3;
+  font-size:11.5px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.task-status-icon{
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  flex:none;
+  border-radius:9px;
+  background:#edf3f7;
+  color:#647b90;
+}
+.task-status-icon.tone-active{background:#e7f4ff;color:#1688e8}
+.task-status-icon.tone-wait{background:#fff5de;color:#b27d1e}
+.task-status-icon.tone-warning{background:#fff0e8;color:#bc6641}
+.task-status-icon.tone-complete{background:#e8f7ef;color:#21875f}
+.task-status-icon svg{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.1;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.task-status-icon svg rect,
+.task-status-icon svg path[d^="M8 5.5"]{
+  fill:currentColor;
+  stroke:none;
+}
+.task-status-icon svg:last-child circle{fill:currentColor;stroke:none}
+.task-progress-center{
+  width:100%;
+  max-width:none;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+}
+.task-progress-center .progress-track{
+  height:9px;
+}
+.task-progress-center strong{
+  min-width:38px;
+  text-align:right;
+  font-size:10.5px;
+  color:#5c7187;
+}
+.task-action-row{
+  align-self:center;
+  margin:0;
+}
+.task-action-row .primary-button[aria-busy="true"]{
+  opacity:.58;
+}
+@media(max-width:999px){
+  .route-card-polished .route-line{
+    grid-template-columns:minmax(0,1fr) 18px 38px;
+    gap:8px;
+  }
+  .route-arrow{
+    width:15px;
+    height:15px;
+    border-width:3px;
+  }
+  .task-card{
+    grid-template-columns:42px 132px minmax(150px,1fr) auto;
+    gap:18px;
+    padding-top:0;
+  }
+  .task-name{font-size:12px}
+  .task-status{justify-content:flex-start}
+  .task-status strong{font-size:12.5px}
+  .task-status small{font-size:10px}
+}
+@media (min-width:1000px) and (min-height:740px){
+  .task-card{align-items:center;padding-top:0}
+}

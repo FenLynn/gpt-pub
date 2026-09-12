@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { hasNativeBridge, invoke, onNotice, onSnapshot } from './bridge'
 import { mockSnapshot } from './mock'
-import type { DavBridgeSnapshot, RecycleGroup, RecycleKind } from './types'
+import type { DavBridgeSnapshot, PrimaryAction, RecycleGroup, RecycleKind } from './types'
 
 type Tab = 'overview' | 'transfer' | 'recycle' | 'docs' | 'settings' | 'about'
 const previewTab = new URLSearchParams(window.location.search).get('tab')
@@ -15,6 +15,7 @@ const toast = ref('')
 const notice = ref<{ title: string; message: string; tone: string } | null>(null)
 const showActivity = ref(false)
 const selected = ref(new Set<string>())
+const pendingPrimaryAction = ref<PrimaryAction | null>(null)
 const hoverTip = ref<{ text:string; left:number; top:number; above:boolean } | null>(null)
 let activeTipTarget:HTMLElement|null=null
 let detachSnapshot: (() => void) | undefined
@@ -42,6 +43,23 @@ const sideStatusKind = computed(() => {
 const sideStatusSecondary = computed(() => {
   if (snapshot.value.routeStatus && snapshot.value.routeStatus !== snapshot.value.engineState) return snapshot.value.routeStatus
   return snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : '查看最近活动'
+})
+const taskStatusKind = computed(() => {
+  if (pendingPrimaryAction.value === 'pause') return 'pause'
+  if (pendingPrimaryAction.value === 'resume' || pendingPrimaryAction.value === 'retry') return 'run'
+  return sideStatusKind.value
+})
+const taskStatusText = computed(() => {
+  if (pendingPrimaryAction.value === 'pause') return '正在暂停'
+  if (pendingPrimaryAction.value === 'resume') return '正在继续'
+  if (pendingPrimaryAction.value === 'retry') return '正在重试'
+  return snapshot.value.engineState
+})
+const taskStatusSecondary = computed(() => {
+  const route=snapshot.value.routeStatus?.trim()
+  if (route && route !== snapshot.value.engineState) return route
+  if (snapshot.value.currentProgress !== null) return '当前任务执行中'
+  return snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : ''
 })
 const transferNextText = computed(() => {
   if (snapshot.value.humanActionCount > 0) return `先处理 ${snapshot.value.humanActionCount} 组人工审查，再继续自动队列`
@@ -111,11 +129,18 @@ function showNotice(value:{ title:string; message:string; tone:string }) {
 async function refresh() { if (!isNative) return; try { snapshot.value = await invoke<DavBridgeSnapshot>('app.getSnapshot') } catch (error) { notify(error instanceof Error ? error.message : '状态读取失败') } }
 async function command(method: string, params?: unknown) { if (!isNative || busy.value) return; busy.value = true; try { const result = await invoke<{ snapshot?: DavBridgeSnapshot; message?: string }>(method, params); if (result?.snapshot) snapshot.value = result.snapshot; if (result?.message) notify(result.message); await refresh() } catch (error) { notify(error instanceof Error ? error.message : '操作失败') } finally { busy.value = false } }
 async function primaryAction() {
-  if (snapshot.value.primaryAction === 'review') { tab.value='recycle'; recycleFilter.value='review'; return }
-  if (snapshot.value.primaryAction === 'settings') { await openSettings(); return }
-  if (snapshot.value.primaryAction === 'pause') await command('migration.pause')
-  if (snapshot.value.primaryAction === 'resume') await command('migration.resume')
-  if (snapshot.value.primaryAction === 'retry') await command('migration.retry')
+  const action=snapshot.value.primaryAction
+  if (action === 'review') { tab.value='recycle'; recycleFilter.value='review'; return }
+  if (action === 'settings') { await openSettings(); return }
+  if (action !== 'pause' && action !== 'resume' && action !== 'retry') return
+  pendingPrimaryAction.value=action
+  try {
+    if (action === 'pause') await command('migration.pause')
+    if (action === 'resume') await command('migration.resume')
+    if (action === 'retry') await command('migration.retry')
+  } finally {
+    pendingPrimaryAction.value=null
+  }
 }
 function selectGroup(group: RecycleGroup) { const next = new Set(selected.value); next.has(group.groupKey) ? next.delete(group.groupKey) : next.add(group.groupKey); selected.value = next }
 async function deferSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); await command('recycle.defer',{groupKeys:keys}); selected.value=new Set() }
@@ -235,7 +260,11 @@ onBeforeUnmount(()=>{
           <strong>InfiniCLOUD</strong>
         </div>
         <div class="route-core has-tip" :data-tip="snapshot.routeStatus">
-          <div class="route-line"><i></i><b>›</b><i></i></div>
+          <div class="route-line">
+            <span class="route-segment route-segment-left"></span>
+            <span class="route-arrow" aria-hidden="true"></span>
+            <span class="route-segment route-segment-right"></span>
+          </div>
         </div>
         <div class="endpoint target has-tip" data-tip="坚果云保存经过 StrongVerified 的强校验镜像">
           <svg class="nut-logo" viewBox="0 0 56 50" aria-hidden="true">
@@ -257,7 +286,7 @@ onBeforeUnmount(()=>{
 
       <div class="dashboard-grid">
         <article class="dashboard-card coverage-card">
-          <div class="feature-icon coverage-feature" aria-hidden="true"><svg class="coverage-glyph" viewBox="0 0 48 48"><path class="coverage-axis" d="M10 38h28"/><rect x="11" y="24" width="6" height="11" rx="3"/><rect x="21" y="17" width="6" height="18" rx="3"/><rect x="31" y="10" width="6" height="25" rx="3"/><path class="coverage-check" d="m29.5 15.5 3 3 6-7"/></svg></div>
+          <div class="feature-icon coverage-feature" aria-hidden="true"><svg class="coverage-glyph" viewBox="0 0 48 48"><path class="coverage-axis" d="M10 38h28"/><rect x="12" y="25" width="6" height="10" rx="3"/><rect x="21" y="18" width="6" height="17" rx="3"/><rect x="30" y="11" width="6" height="24" rx="3"/></svg></div>
           <div class="coverage-copy">
             <div class="card-title"><h3>镜像覆盖</h3><span class="info-dot has-tip" data-tip="StrongVerified 表示源端与目标端均重新读取并完成 SHA-256 一致性验证">i</span></div>
             <span class="coverage-count">{{ snapshot.verified }} / {{ snapshot.total }} 已校准</span>
@@ -267,7 +296,7 @@ onBeforeUnmount(()=>{
         </article>
 
         <article class="dashboard-card quota-card">
-          <div class="feature-icon quota-feature" aria-hidden="true"><svg class="quota-glyph" viewBox="0 0 48 48"><path d="M17 35V13m0 0-5.5 5.5M17 13l5.5 5.5M31 13v22m0 0-5.5-5.5M31 35l5.5-5.5"/></svg></div>
+          <div class="feature-icon quota-feature" aria-hidden="true"><svg class="quota-glyph" viewBox="0 0 48 48"><path d="M16 35V13m0 0-5 5M16 13l5 5M32 13v22m0 0-5-5M32 35l5-5"/></svg></div>
           <div class="quota-content">
             <div class="quota-head">
               <div class="card-title"><h3>流量预算</h3><span class="info-dot has-tip" :data-tip="quotaTip">i</span></div>
@@ -299,17 +328,38 @@ onBeforeUnmount(()=>{
           <div class="feature-icon task-feature" aria-hidden="true"><span>▤</span></div>
           <div class="task-copy">
             <div class="card-title"><h3>当前任务</h3><span class="info-dot has-tip" :data-tip="snapshot.currentDetail">i</span></div>
-            <strong class="task-name">{{ snapshot.currentTitle }}</strong>
-            <div v-if="snapshot.currentProgress!==null" class="task-progress"><div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div><strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong></div>
+            <span class="task-name">{{ snapshot.currentTitle }}</span>
           </div>
-          <div class="task-action-row"><button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy">
-            <svg v-if="snapshot.primaryAction==='pause'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg>
-            <svg v-else-if="snapshot.primaryAction==='resume'" class="action-icon action-icon-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.8 15 10l-8.5 5.2Z"/></svg>
-            <svg v-else-if="snapshot.primaryAction==='retry'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7.4A6 6 0 1 0 16 12" fill="none"/><path d="m12.8 4.5 3.1 2.8-3.6 2" fill="none"/></svg>
-            <svg v-else-if="snapshot.primaryAction==='review'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5h10v11H5Z" fill="none"/><path d="M7.5 8h5M7.5 11h5" fill="none"/></svg>
-            <svg v-else-if="snapshot.primaryAction==='settings'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.5" fill="none"/><circle cx="10" cy="10" r="6" fill="none"/></svg>
-            {{ busy?'处理中…':snapshot.primaryLabel }}
-          </button></div>
+
+          <div class="task-center">
+            <div class="task-status">
+              <span class="task-status-icon" :class="`tone-${snapshot.routeTone}`" aria-hidden="true">
+                <svg v-if="taskStatusKind==='pause'" viewBox="0 0 24 24"><rect x="7" y="5" width="3.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="3.2" height="14" rx="1.2"/></svg>
+                <svg v-else-if="taskStatusKind==='run'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"/></svg>
+                <svg v-else-if="taskStatusKind==='network'" viewBox="0 0 24 24"><path d="M5 10.5a10 10 0 0 1 14 0M8 14a6 6 0 0 1 8 0M11.2 17.2a1.2 1.2 0 1 1 1.6 0"/></svg>
+                <svg v-else-if="taskStatusKind==='wait'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><path d="M12 7.5V12l3 2"/></svg>
+                <svg v-else-if="taskStatusKind==='review'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.5v6M12 16.8v.2"/></svg>
+                <svg v-else-if="taskStatusKind==='complete'" viewBox="0 0 24 24"><path d="m6.5 12.5 3.3 3.3 7.8-8"/></svg>
+                <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>
+              </span>
+              <div><strong>{{ taskStatusText }}</strong><small v-if="taskStatusSecondary">{{ taskStatusSecondary }}</small></div>
+            </div>
+            <div v-if="snapshot.currentProgress!==null" class="task-progress task-progress-center">
+              <div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div>
+              <strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong>
+            </div>
+          </div>
+
+          <div class="task-action-row">
+            <button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy" :aria-busy="busy">
+              <svg v-if="snapshot.primaryAction==='pause'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg>
+              <svg v-else-if="snapshot.primaryAction==='resume'" class="action-icon action-icon-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.8 15 10l-8.5 5.2Z"/></svg>
+              <svg v-else-if="snapshot.primaryAction==='retry'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7.4A6 6 0 1 0 16 12" fill="none"/><path d="m12.8 4.5 3.1 2.8-3.6 2" fill="none"/></svg>
+              <svg v-else-if="snapshot.primaryAction==='review'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5h10v11H5Z" fill="none"/><path d="M7.5 8h5M7.5 11h5" fill="none"/></svg>
+              <svg v-else-if="snapshot.primaryAction==='settings'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.5" fill="none"/><circle cx="10" cy="10" r="6" fill="none"/></svg>
+              {{ snapshot.primaryLabel }}
+            </button>
+          </div>
         </article>
       </div>
     </section>
