@@ -89,7 +89,8 @@ LocalSub.Core.exe
 ├─ SenseVoice / Fun-ASR-Nano realtime
 ├─ VAD / realtime decode queue
 ├─ 媒体解析与波形
-└─ 后台离线 ASR
+├─ 后台离线 ASR
+└─ 模型下载、解压、校验、修复与重型删除
 ```
 
 已迁入 Core 的后台与 realtime 重实现不得重新引入 GUI 进程内静默 fallback。
@@ -100,6 +101,8 @@ Core IPC 当前包括：
 ping
 analyze
 transcribe
+model.download
+model.delete
 cancel
 shutdown
 
@@ -184,18 +187,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`2B` 实时字幕页第一闭环完成。
+当前 Phase：`Phase 1B.2 + Phase 2B` 模型页第一闭环完成。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-29c8d72419e28441afee2fb7d171b5e760b075ca
+ddc0ca3062cde51edafbff9762f611a3191a2a93
 ```
 
 P105 Windows CI：
 
 ```text
-run 34588657762
+run 34676285292
 success
 ```
 
@@ -203,33 +206,36 @@ Artifacts：
 
 ```text
 candidate
-ID 10194772256
-sha256:73553afd535f3c6fa35140752025b1eb3464e9e0c11d7cf08d56ce4903173180
+ID 10292018408
+sha256:bb3a933cd2389eac13fd422f9248336ca30a951dc6bf6b7eac3ce614d521591f
 
 WebUi preview
-ID 10194773158
-sha256:e1a038f058c2a9ba45b11e4ac30a1bb1af3d695913202d0ebdc6f166c73bb9d3
+ID 10292063301
+sha256:8088ef8f4c9a44feebf32bf5a713415b20df17cd4da0d761be6fc62e5d745140
 ```
 
-从 `bad29572451de0618058146ffd87faf14e009de2` 到该 head 的 7 个提交已经完成：
+本阶段已经完成：
 
-- 新增 Shell 应用层 `LiveSessionController`，统一协调 PotPlayer 发现、Overlay 与现有 Core realtime session。
-- Web bridge 已正式白名单接入 `live.start / live.stop`，Vue 不直接连接 Named Pipe。
-- realtime 页已经显示音源、已安装实时模型、状态、输入电平、partial/final 字幕和错误。
-- 状态覆盖 `idle / starting / running / stopping / failed`，启动和停止期间锁定易冲突控件。
-- Core 异常仍由 Shell proxy 与现有 generation 恢复链处理，未复制 `MainForm` 业务核心。
-- CI 已覆盖真实 WebView2 bridge 的 `app.getSnapshot / live.stop / live.start` 路径，其中 `live.start` 使用缺失模型验证明确失败，不下载真实模型。
-- 1280×800 与 1600×1000 自动预览保持现有统一视觉语言，无明显溢出或响应式塌陷。
+- 模型目录查看、安装状态、能力、评分、推荐标记与实时/后台默认模型选择进入 Web 模型页。
+- Web bridge 当前已包含 `model.list / model.select / model.download / model.cancel / model.delete`，Vue 只发送用户意图。
+- 重型 `ModelManager.cs` 已从 `LocalSub.exe` 编译中排除，Shell 只保留 `ModelManager.Proxy.cs`；`SharpCompress` 也已从 Shell 项目依赖移除。
+- 模型下载、断点续传、解压、校验、修复、目录替换与递归删除统一进入 `LocalSub.Core.exe`，Shell 不保留静默 fallback。
+- 旧 WinForms 的 realtime、后台转写和模型任务统一使用 `CoreWorkerBroker.Shared`，避免多个 Core 绕过重任务互斥。
+- Web 模型页显示 Core 模型任务、进度、错误与取消状态；删除使用二次确认。
+- 下载任务允许取消；删除一旦进入破坏性目录脱离与递归清理阶段即完成收尾，不允许用户中途取消，避免遗留 `.delete-*` 目录。
+- WebShell snapshot 推送的 coalescing 顺序已修正，状态变化可以在当前 snapshot 构建期间重新排队，不再存在已知的最终状态丢失窗口。
+- CI 已覆盖模型重实现编译隔离、Core `model.download / model.delete` IPC 失败恢复、真实 WebView2 模型命令 bridge、原 realtime/Core crash recovery/Process Loopback/native ASR 与 portable package 回归。
+- 模型页 1280×800 自动预览已人工检查，视觉语言与实时页一致，无明显溢出或布局塌陷。
 
 默认启动路径仍未切换，正常运行继续进入旧 WinForms。Web Shell 继续作为显式预览与逐页迁移入口。
 
 下一步固定为：
 
 1. 不提升 stable，不动 main。
-2. 优先用当前 candidate 在真实 Windows 上验证 PotPlayer + 已安装 realtime 模型，包括开始、停止、输入电平、字幕、seek、换片、窗口/全屏切换、长时间运行与运行中强杀 Core。
-3. 实机 realtime 没有阻断问题后，进入模型页接管，先做查看与选择，再推进 Phase 1B.2 的模型下载、解压、校验和大目录替换迁 Core。
-4. 后续依次迁后台转写与设置编辑。
-5. 实时、模型、后台、设置均完成必要验证前，不切换默认主界面。
+2. 在真实 Windows 上同时验证 realtime 与模型管理：真实 PotPlayer、真实模型、模型下载/修复、断点续传、取消、大模型解压、删除、Core 强杀与恢复。
+3. 实机没有阻断问题后，进入 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
+4. 后台页完成后迁设置编辑与 Overlay 联动细节。
+5. realtime、模型、后台、设置均完成必要验证前，不切换默认主界面。
 
 ## 9. Web UI 约束
 
@@ -262,6 +268,8 @@ Vue 不得：
 - 主要 CPU / 内存是否落在 Core。
 - 手动结束 Core 后 GUI 是否保持可用。
 - 关闭 Shell 后 Core 是否正确退出。
+- 模型真实下载、代理/直连、断点续传、取消与大模型解压是否符合预期。
+- 删除真实模型后目录、缓存与未完成下载是否彻底清理。
 
 不得把自动 CI 成功表述为这些实机项已完成。
 

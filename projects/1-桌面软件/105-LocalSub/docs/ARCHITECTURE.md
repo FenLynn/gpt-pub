@@ -95,7 +95,7 @@ Shell 按需启动 Core。IPC 断开时当前请求失败，但 GUI 保持可用
 {"kind":"response","id":"...","ok":true,"cancelled":false,"payload":{},"error":null}
 ```
 
-基础方法：`ping`、`analyze`、`transcribe`、`cancel`、`shutdown`。
+基础方法：`ping`、`analyze`、`transcribe`、`model.download`、`model.delete`、`cancel`、`shutdown`。模型重任务进度使用 `model-progress` 事件。
 
 realtime 第一版增加：
 
@@ -193,31 +193,40 @@ Phase 2A 继续遵守冻结 DTO 与白名单边界，默认启动仍保留旧 Wi
 
 ### Phase 1B.2：模型重任务迁入 Core
 
-迁移：
+状态：**第一闭环完成，真实网络与大模型实机验证仍待完成。**
 
-- 模型下载
-- 断点续传
+已迁入 Core：
+
+- 模型下载与断点续传
 - 解压
-- 校验
-- 大目录替换
-- 重型删除
+- 关键文件校验
+- 修复与目录替换
+- 重型递归删除
+
+Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重型 `ModelManager.cs` 已从 Shell 编译排除，Shell 不再直接依赖 SharpCompress。旧 WinForms 和新 Web 模型页均通过 Core 执行模型重任务。
+
+下载允许取消；删除进入破坏性目录脱离后必须完成清理，不向用户提供中途取消。
+
+最后完整验证代码 head：`ddc0ca3062cde51edafbff9762f611a3191a2a93`，P105 Windows CI run `34676285292` success。
 
 ### Phase 2B：逐页切换
 
-状态：**实时字幕页第一闭环完成，其他页面待迁移。**
+状态：**实时字幕页与模型页第一闭环完成，后台与设置待迁移。**
 
 推荐顺序：
 
 1. 实时字幕，第一闭环已完成
-2. 模型
+2. 模型，第一闭环已完成
 3. 后台转写与 waveform
 4. 设置细节
 
 实时页当前通过 `WebShellForm → LiveSessionController → LiveAsrPipeline proxy → CoreWorkerClient` 接入同一个 Core realtime session。Vue 不复制旧 `MainForm` 业务核心。
 
-当前 realtime Web 页最后完整验证代码 head：`29c8d72419e28441afee2fb7d171b5e760b075ca`，P105 Windows CI run `34588657762` success。
+当前 realtime Web 页第一闭环保留。模型页已经通过 `WebShellForm → ModelCatalogController → CoreWorkerClient → LocalSub.Core.exe` 接入同一 Application Contract，支持查看、默认选择、下载/修复、取消和删除。
 
-每一页切换后继续复用同一个 Application Contract。模型页接管时先做查看与选择，模型下载、解压、校验和大目录替换等重任务继续按 Phase 1B.2 收口到 Core。
+当前模型页与 Phase 1B.2 最后完整验证代码 head：`ddc0ca3062cde51edafbff9762f611a3191a2a93`，P105 Windows CI run `34676285292` success。
+
+每一页切换后继续复用同一个 Application Contract。下一页为后台转写工作区，必须复用现有 Core 分析与转写链，不复制旧 WinForms 业务核心。
 
 
 ### Phase 3：轻量 Shell 收口
