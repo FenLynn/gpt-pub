@@ -279,7 +279,8 @@ Vue 不得：
 当前开发候选版本：
 
 - Development Version：`0.1.2`
-- 当前正式 Release 仍为 `0.1.1`
+- 当前正式 Release / RELEASE.md：`0.1.1`
+- 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 
 现有正式版本：
 

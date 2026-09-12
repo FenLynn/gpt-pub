@@ -173,7 +173,23 @@ jobs:
             $text=Get-Content 'RELEASE.md' -Raw
             $m=[regex]::Match($text,'(?m)^Version:\s*([^\s]+)\s*$')
             if (-not $m.Success) { throw 'RELEASE.md must contain Version: x.y.z' }
-            if ($m.Groups[1].Value -ne $shellVersion) { throw "RELEASE.md version does not match source: $($m.Groups[1].Value) vs $shellVersion" }
+            $releaseVersion=$m.Groups[1].Value
+            try {
+              $sourceSemVer=[version]$shellVersion
+              $releaseSemVer=[version]$releaseVersion
+            } catch {
+              throw "Invalid source or RELEASE.md version: source=$shellVersion release=$releaseVersion"
+            }
+            if ($sourceSemVer -lt $releaseSemVer) {
+              throw "Development source version must not be older than the latest formal Release marker: source=$shellVersion release=$releaseVersion"
+            }
+            $formalRelease = '${{ github.event_name }}' -eq 'workflow_dispatch' -and '${{ inputs.formal_release }}' -eq 'true'
+            if ($formalRelease -and $releaseVersion -ne $shellVersion) {
+              throw "Formal release requires RELEASE.md to match source: release=$releaseVersion source=$shellVersion"
+            }
+            if ($releaseVersion -ne $shellVersion) {
+              Write-Host "Development candidate $shellVersion is ahead of formal Release marker $releaseVersion."
+            }
           }
 
       - name: Verify realtime compile-time isolation
