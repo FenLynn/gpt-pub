@@ -100,7 +100,7 @@ Shell 不得长期承担：
 - WASAPI 和 PotPlayer Process Loopback。
 - VAD。
 - sherpa / ONNX 等原生识别链。
-- 模型下载后的重 IO、解压、校验和目录替换。
+- 模型下载、断点续传、解压、校验、目录替换和大目录删除。
 - 可以阻塞、崩溃或耗时较长的计算任务。
 
 某能力一旦迁入 Core：
@@ -209,7 +209,7 @@ Core realtime 的 `sessionId` 与 PotPlayer `processId` 由 Shell 应用层持�
 - batchModelId / batchModelName
 - status
 
-模型页只允许轻量扫描与默认选择。下载、断点续传、解压、校验、修复和大目录删除进入 Phase 1B.2 后才通过 Core 长任务接口暴露 progress / lastError。
+模型页的轻量扫描与默认选择留在 Shell 应用层。Phase 1B.2 起，下载、断点续传、解压、校验、修复和大目录删除统一通过 Core 长任务接口执行，Shell 不保留进程内 fallback。
 
 ### settings
 

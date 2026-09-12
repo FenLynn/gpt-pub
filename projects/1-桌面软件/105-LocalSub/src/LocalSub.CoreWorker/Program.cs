@@ -149,6 +149,12 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
             case "live.stop":
                 await StopLiveRequestAsync(request);
                 break;
+            case "model.download":
+                StartOperation(request, DownloadModelAsync);
+                break;
+            case "model.delete":
+                StartOperation(request, DeleteModelAsync);
+                break;
             case "analyze":
                 StartOperation(request, AnalyzeAsync);
                 break;
@@ -215,6 +221,35 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         });
     }
 
+    async Task<object> DownloadModelAsync(WorkerRequest request, CancellationToken ct)
+    {
+        var modelId = RequireString(request.Payload, "modelId");
+        var settings = AppSettings.Load();
+        var catalog = new ModelCatalogService().Load();
+        var model = catalog.FirstOrDefault(x => string.Equals(x.Id, modelId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"模型 catalog 中找不到 {modelId}。");
+        var manager = new ModelManager(settings);
+        var progress = new Progress<ModelOperationProgress>(p =>
+            _ = SendEventAsync(request.Id, "model-progress", p));
+
+        await manager.DownloadAsync(model, progress, ct);
+        return new { modelId = model.Id, installed = manager.IsInstalled(model) };
+    }
+
+    async Task<object> DeleteModelAsync(WorkerRequest request, CancellationToken ct)
+    {
+        var modelId = RequireString(request.Payload, "modelId");
+        var settings = AppSettings.Load();
+        var catalog = new ModelCatalogService().Load();
+        var model = catalog.FirstOrDefault(x => string.Equals(x.Id, modelId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"模型 catalog 中找不到 {modelId}。");
+        var manager = new ModelManager(settings);
+        var progress = new Progress<ModelOperationProgress>(p =>
+            _ = SendEventAsync(request.Id, "model-progress", p));
+
+        await manager.DeleteAsync(model, progress, ct);
+        return new { modelId = model.Id, installed = manager.IsInstalled(model) };
+    }
     async Task<object> AnalyzeAsync(WorkerRequest request, CancellationToken ct)
     {
         var filePath = RequireString(request.Payload, "filePath");

@@ -210,6 +210,18 @@ jobs:
           if ($coreText -notmatch 'LOCALSUB_CORE_WORKER') {
             throw 'LocalSub.CoreWorker must define LOCALSUB_CORE_WORKER'
           }
+          if ($shellText -notmatch [regex]::Escape('Compile Remove="Services\ModelManager.cs"')) {
+            throw 'Heavy ModelManager implementation must be excluded from LocalSub.exe compilation'
+          }
+          if ($coreText -notmatch [regex]::Escape('..\LocalSub\Services\ModelManager.cs')) {
+            throw 'Heavy ModelManager implementation must be compiled into LocalSub.Core.exe'
+          }
+          if ($shellText -match 'SharpCompress') {
+            throw 'SharpCompress must not remain a LocalSub.exe package dependency after model heavy-work isolation'
+          }
+          if (-not (Test-Path 'src/LocalSub/Services/ModelManager.Proxy.cs')) {
+            throw 'Shell-side ModelManager proxy is missing'
+          }
 
       - name: Publish net8 shell app
         shell: pwsh
@@ -273,6 +285,56 @@ jobs:
             throw
           }
 
+      - name: Smoke test model operation IPC state machine
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $pipeName = "LocalSub.Core.ModelCI.$PID.$([guid]::NewGuid().ToString('N'))"
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.Core.exe') -WorkingDirectory (Resolve-Path 'publish') -ArgumentList @('--pipe', $pipeName, '--parent', "$PID") -PassThru
+          try {
+            $client = [System.IO.Pipes.NamedPipeClientStream]::new('.', $pipeName, [System.IO.Pipes.PipeDirection]::InOut, [System.IO.Pipes.PipeOptions]::Asynchronous)
+            $client.Connect(8000)
+            $reader = [System.IO.StreamReader]::new($client)
+            $writer = [System.IO.StreamWriter]::new($client)
+            $writer.AutoFlush = $true
+
+            $writer.WriteLine('{"kind":"request","id":"ci-model-download","method":"model.download","payload":{"modelId":"__ci_missing_model__"}}')
+            $downloadLine = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($downloadLine)) { throw 'model.download returned no response' }
+            $download = $downloadLine | ConvertFrom-Json
+            if ($download.kind -ne 'response' -or $download.id -ne 'ci-model-download' -or $download.ok -or $download.error -notmatch 'catalog') {
+              throw "Invalid model.download did not fail cleanly: $downloadLine"
+            }
+
+            Start-Sleep -Milliseconds 100
+            $writer.WriteLine('{"kind":"request","id":"ci-model-delete","method":"model.delete","payload":{"modelId":"__ci_missing_model__"}}')
+            $deleteLine = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($deleteLine)) { throw 'model.delete returned no response' }
+            $delete = $deleteLine | ConvertFrom-Json
+            if ($delete.kind -ne 'response' -or $delete.id -ne 'ci-model-delete' -or $delete.ok -or $delete.error -notmatch 'catalog') {
+              throw "Invalid model.delete did not fail cleanly: $deleteLine"
+            }
+
+            $writer.WriteLine('{"kind":"request","id":"ci-model-ping","method":"ping","payload":{}}')
+            $pingLine = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($pingLine)) { throw 'Core did not answer ping after model operation failures' }
+            $ping = $pingLine | ConvertFrom-Json
+            if ($ping.kind -ne 'response' -or $ping.id -ne 'ci-model-ping' -or -not $ping.ok) {
+              throw "Core unhealthy after model operation failures: $pingLine"
+            }
+
+            $writer.WriteLine('{"kind":"request","id":"ci-model-shutdown","method":"shutdown","payload":{}}')
+            $shutdownLine = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($shutdownLine)) { throw 'Core returned no shutdown response after model operation smoke' }
+            $writer.Dispose(); $reader.Dispose(); $client.Dispose()
+            if (-not $p.WaitForExit(5000)) { throw 'LocalSub.Core did not exit after model operation smoke shutdown' }
+            if ($p.ExitCode -ne 0) { throw "LocalSub.Core model operation smoke exited with $($p.ExitCode)" }
+          } catch {
+            if (Test-Path publish/Logs/core.log) { Get-Content publish/Logs/core.log }
+            try { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } } catch { }
+            throw
+          }
       - name: Smoke test realtime IPC state machine
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub

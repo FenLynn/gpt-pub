@@ -21,12 +21,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
     <PackageReference Include="NAudio" Version="2.3.0" />
-    <PackageReference Include="SharpCompress" Version="0.50.1" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.4" />
   </ItemGroup>
   <ItemGroup>
     <!-- Heavy background and realtime implementations are compiled only into LocalSub.Core.exe. -->
     <Compile Remove="Services\BatchTranscriptionService.cs" />
+    <Compile Remove="Services\ModelManager.cs" />
     <Compile Remove="Services\MediaAnalysisService.cs" />
     <Compile Remove="Services\AllAudioCaptureService.cs" />
     <Compile Remove="Services\ResilientPotPlayerCaptureService.cs" />

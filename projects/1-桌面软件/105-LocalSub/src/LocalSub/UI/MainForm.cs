@@ -462,7 +462,7 @@ public sealed class MainForm : Form
 
         modelDownloadButton.Click += async (_, _) => await DownloadSelected();
         modelCancelButton.Click += (_, _) => _modelDownloadCts?.Cancel();
-        modelDeleteButton.Click += (_, _) => DeleteSelected();
+        modelDeleteButton.Click += async (_, _) => await DeleteSelectedAsync();
         modelOpenButton.Click += (_, _) => Process.Start(new ProcessStartInfo("explorer.exe", _settings.ResolvedAsrRoot) { UseShellExecute = true });
         modelScanButton.Click += (_, _) => { AppendModelLog("重新扫描 ASR 模型目录。", true); RefreshModels(); };
         modelGrid.SelectionChanged += (_, _) =>
@@ -661,16 +661,59 @@ public sealed class MainForm : Form
         return i == 0 ? $"{v:0} {units[i]}" : $"{v:0.0} {units[i]}";
     }
 
-    void DeleteSelected()
+    async Task DeleteSelectedAsync()
     {
         var m = SelectedModel();
         if (m == null || _models == null || _modelDownloadCts != null) return;
         if (MessageBox.Show($"删除 {m.Name}？\n\n将同时清理该模型的缓存和未完成下载。", "LocalSub", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-        _models.Delete(m);
-        AppendModelLog($"已删除 {m.Name} 及其缓存。", true);
-        RefreshModels();
-    }
 
+        _activeModel = m;
+        _modelDownloadCts = new CancellationTokenSource();
+        _lastLoggedStage = "";
+        _lastLoggedBucket = -1;
+        downloadProgress.Style = ProgressBarStyle.Marquee;
+        downloadProgress.Value = 0;
+        modelStatusTitle.Text = $"{m.Name} · 删除";
+        modelStatusDetail.Text = "删除任务正在 LocalSub.Core 中执行";
+        AppendModelLog($"开始删除 {m.Name}。", true);
+        SetModelBusy(true);
+        SetModelRowStatus(m.Id, "删除中");
+
+        try
+        {
+            var progress = new Progress<ModelOperationProgress>(OnModelProgress);
+            await _models.DeleteAsync(m, progress, _modelDownloadCts.Token);
+            RefreshModels();
+            modelStatusTitle.Text = $"{m.Name} · 已删除";
+            modelStatusDetail.Text = "模型目录、缓存和未完成下载已清理。";
+            downloadProgress.Style = ProgressBarStyle.Continuous;
+            downloadProgress.Value = 100;
+            AppendModelLog($"已删除 {m.Name} 及其缓存。", true);
+        }
+        catch (OperationCanceledException)
+        {
+            modelStatusTitle.Text = $"{m.Name} · 已取消";
+            modelStatusDetail.Text = "删除任务已取消，请重新扫描确认当前目录状态。";
+            downloadProgress.Style = ProgressBarStyle.Continuous;
+            AppendModelLog("删除任务已取消。", true);
+            RefreshModels();
+        }
+        catch (Exception ex)
+        {
+            modelStatusTitle.Text = $"{m.Name} · 删除失败";
+            modelStatusDetail.Text = ex.Message.Split('\n')[0];
+            downloadProgress.Style = ProgressBarStyle.Continuous;
+            AppendModelLog("删除失败：" + ex.Message, true);
+            RefreshModels();
+        }
+        finally
+        {
+            SetModelBusy(false);
+            _modelDownloadCts.Dispose();
+            _modelDownloadCts = null;
+            _activeModel = null;
+        }
+    }
     void FillLiveModels()
     {
         var selectedBefore = (liveModelBox.SelectedItem as ModelDescriptor)?.Id;

@@ -114,6 +114,39 @@ public sealed class CoreWorkerClient : IAsyncDisposable
         _ = await SendOperationAsync("live.stop", new { sessionId }, null, ct);
     }
 
+    public async Task DownloadModelAsync(
+        string modelId,
+        IProgress<ModelOperationProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        _ = await SendOperationAsync(
+            "model.download",
+            new { modelId },
+            (eventName, value) =>
+            {
+                if (eventName != "model-progress" || progress == null) return;
+                var p = value.Deserialize<ModelOperationProgress>(JsonOptions);
+                if (p != null) progress.Report(p);
+            },
+            ct);
+    }
+
+    public async Task DeleteModelAsync(
+        string modelId,
+        IProgress<ModelOperationProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        _ = await SendOperationAsync(
+            "model.delete",
+            new { modelId },
+            (eventName, value) =>
+            {
+                if (eventName != "model-progress" || progress == null) return;
+                var p = value.Deserialize<ModelOperationProgress>(JsonOptions);
+                if (p != null) progress.Report(p);
+            },
+            ct);
+    }
     public async Task<BatchTranscriptionResult> TranscribeAsync(
         string filePath,
         string modelId,

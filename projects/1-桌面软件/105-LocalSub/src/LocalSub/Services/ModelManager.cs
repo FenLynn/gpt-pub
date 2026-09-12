@@ -323,11 +323,20 @@ public sealed class ModelManager
         return $"{title}。\n当前模式：{proxy}\n下载源：{new Uri(url).Host}\n若当前网络访问该模型源受限，请在“设置 → 下载代理”选择 SOCKS5 后重试。";
     }
 
-    public void Delete(ModelDescriptor model)
+    public Task DeleteAsync(
+        ModelDescriptor model,
+        IProgress<ModelOperationProgress>? progress = null,
+        CancellationToken ct = default)
+        => Task.Run(() => DeleteCore(model, progress, ct), ct);
+
+    void DeleteCore(ModelDescriptor model, IProgress<ModelOperationProgress>? progress, CancellationToken ct)
     {
-        // Remove the installed directory from its official path immediately so the UI
-        // can refresh at once, then perform recursive deletion in the background.
-        DetachAndDeleteDirectory(GetModelFolder(model));
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new("删除", null, Detail: $"准备删除 {model.Name}", IsIndeterminate: true));
+
+        var detached = new List<string>();
+        var modelPath = DetachDirectory(GetModelFolder(model));
+        if (!string.IsNullOrWhiteSpace(modelPath)) detached.Add(modelPath);
 
         if (!string.IsNullOrWhiteSpace(model.Url))
         {
@@ -340,37 +349,51 @@ public sealed class ModelManager
         var stagingRoot = Path.Combine(_settings.ResolvedAsrRoot, "._staging");
         if (Directory.Exists(stagingRoot))
         {
-            try
+            foreach (var dir in Directory.GetDirectories(stagingRoot, model.Id + "-*"))
             {
-                foreach (var dir in Directory.GetDirectories(stagingRoot, model.Id + "-*"))
-                    DetachAndDeleteDirectory(dir);
+                ct.ThrowIfCancellationRequested();
+                var stagingPath = DetachDirectory(dir);
+                if (!string.IsNullOrWhiteSpace(stagingPath)) detached.Add(stagingPath);
             }
-            catch { }
         }
+
+        for (var i = 0; i < detached.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            progress?.Report(new(
+                "删除",
+                detached.Count == 0 ? 100 : i * 100 / detached.Count,
+                Detail: $"清理目录 {i + 1}/{detached.Count}",
+                IsIndeterminate: true));
+            DeleteDirectory(detached[i]);
+        }
+
+        progress?.Report(new("完成", 100, Detail: $"{model.Name} 已删除"));
     }
 
-    static void DetachAndDeleteDirectory(string path)
+    static string? DetachDirectory(string path)
     {
-        if (!Directory.Exists(path)) return;
+        if (!Directory.Exists(path)) return null;
         var parent = Path.GetDirectoryName(path);
-        if (string.IsNullOrWhiteSpace(parent))
-        {
-            _ = Task.Run(() => TryDeleteDirectory(path));
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(parent)) return path;
 
         var detached = Path.Combine(parent, ".delete-" + Path.GetFileName(path) + "-" + Guid.NewGuid().ToString("N"));
         try
         {
             Directory.Move(path, detached);
-            _ = Task.Run(() => TryDeleteDirectory(detached));
+            return detached;
         }
         catch
         {
-            _ = Task.Run(() => TryDeleteDirectory(path));
+            return path;
         }
     }
 
+    static void DeleteDirectory(string path)
+    {
+        if (!Directory.Exists(path)) return;
+        Directory.Delete(path, true);
+    }
     sealed class AggregateFileProgress : IProgress<ModelOperationProgress>
     {
         readonly IProgress<ModelOperationProgress> _outer;
