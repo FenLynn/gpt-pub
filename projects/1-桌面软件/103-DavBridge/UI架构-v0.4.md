@@ -49,8 +49,11 @@ Vue 只能：
 ```text
 app.getSnapshot
 app.openSettings
+app.closeSettings
 migration.pause
 migration.resume
+migration.retry
+quota.calibrate
 recycle.defer
 recycle.delete
 ```
@@ -104,7 +107,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
-## v0.4.3 当前界面结构
+## v0.4.9 当前界面结构
 
 当前候选采用固定左侧导航：
 
@@ -119,7 +122,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 运行状态
 ```
 
-总览顶部保留配置读取状态、Cycle 和设置快捷入口。
+总览主页面保持固定左侧导航，配置异常时再显示必要入口；正常状态不重复占用顶部空间。
 
 总览主体结构：
 
@@ -127,9 +130,16 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 迁移路径
 → 三阶段状态
 → StrongVerified 覆盖率
-→ 当前任务
 → 上传 / 下载流量预算
-→ 底部运行控制
+→ 当前任务
+```
+
+v0.4.9 同时规定：
+
+```text
+转移页 → 三类队列概览 + 当前动作 + 总体覆盖
+文档页 → 单列正文
+左下角状态 → 图标 + 主状态 + 非重复副状态
 ```
 
 UI 文字策略：
@@ -180,6 +190,6 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 ## 当前阶段
 
-v0.4.3 位于 `p103-exp`，最后完成完整 CI 的代码 head 为 `0fcdde9fd7167a128d8104e644fe14fa29728ae9`，尚未提升到 `p103-stable` 或 `main`。
+v0.4.9 位于 `p103-exp`，最后完成完整 CI 的代码 head 为 `e94758c5c1097b24efed97defdc1bec765f0ee4a`，对应 run `34697665710`。它尚未提升到 `p103-stable` 或 `main`。
 
-下一关是用户 Windows 实机 UI 与交互验收。
+下一关是用户 Windows 实机 UI 与交互验收，重点检查总览流量区、转移页、回收站、文档页、设置字段和左下角状态区。
