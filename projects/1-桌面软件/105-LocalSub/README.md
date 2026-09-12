@@ -70,7 +70,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - Phase 1B.2 模型重任务迁 Core 第一闭环已完成：重型 `ModelManager` 仅编入 Core，Shell 使用 proxy，且不再依赖 SharpCompress。
 - Phase 2B 模型页第一闭环已完成：Web bridge 已接入 `model.list / model.select / model.download / model.cancel / model.delete`，并显示模型任务进度、错误和取消状态。
 - 旧 WinForms realtime、后台与模型任务已统一到 shared Core broker，模型删除进入破坏性阶段后不可由用户取消。
-- 当前最新完整验证代码 head 为 `ddc0ca3062cde51edafbff9762f611a3191a2a93`，P105 Windows CI run `34676285292` success；candidate Artifact `10292018408`，WebUi preview Artifact `10292063301`。
+- 当前最新完整验证代码 head 为 `bf3fd8fc0fe551550ef94b0f5918a645a94e5d99`，P105 Windows CI run `34682646712` success；candidate Artifact `10295025917`，WebUi preview Artifact `10294586606`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。

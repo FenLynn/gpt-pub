@@ -193,13 +193,13 @@ Core 只拥有重计算与长任务
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-ddc0ca3062cde51edafbff9762f611a3191a2a93
+bf3fd8fc0fe551550ef94b0f5918a645a94e5d99
 ```
 
 P105 Windows CI：
 
 ```text
-run 34676285292
+run 34682646712
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10292018408
-sha256:bb3a933cd2389eac13fd422f9248336ca30a951dc6bf6b7eac3ce614d521591f
+ID 10295025917
+sha256:215099d6179a01379b9ab5d922e069d37ee235cb8738bde15312cbcc360f1eea
 
 WebUi preview
-ID 10292063301
-sha256:8088ef8f4c9a44feebf32bf5a713415b20df17cd4da0d761be6fc62e5d745140
+ID 10294586606
+sha256:9f9b461b4163986e6d78259b3404ae6d3b30b3c2ef356faef6cae3220ef7503a
 ```
 
 本阶段已经完成：
