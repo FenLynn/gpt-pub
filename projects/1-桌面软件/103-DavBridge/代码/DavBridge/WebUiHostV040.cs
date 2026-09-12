@@ -78,7 +78,7 @@ internal sealed class WebUiHostV040 : IDisposable
         try
         {
             request=JsonSerializer.Deserialize<BridgeRequest>(args.WebMessageAsJson,JsonOptions); if(request is null||string.IsNullOrWhiteSpace(request.Id)||!AllowedMethods.Contains(request.Method??string.Empty)) throw new InvalidOperationException("不允许的界面命令。");
-            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync","已暂停"), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交继续请求"), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交重试请求"), "quota.calibrate"=>await InvokeMainTaskAsync("CalibrateAsync",string.Empty), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
+            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync","已收到安全暂停请求"), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交继续请求"), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交重试请求"), "quota.calibrate"=>await InvokeMainTaskAsync("CalibrateAsync",string.Empty), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
             Reply(request.Id,true,result,null);
         }
         catch(Exception ex){ Reply(request?.Id??string.Empty,false,null,ex is TargetInvocationException tie?tie.InnerException?.Message??tie.Message:ex.Message); }
@@ -86,7 +86,11 @@ internal sealed class WebUiHostV040 : IDisposable
     private async Task<object> OpenSettingsAsync()
     {
         if(_settingsDialog is not null&&!_settingsDialog.IsDisposed&&_settingsCompletion is not null) return await _settingsCompletion.Task.ConfigureAwait(true);
-        if(_host.Config.MigrationEnabled) await _host.PauseAsync(_cts.Token).ConfigureAwait(true);
+        if(_host.Config.MigrationEnabled||_host.IsRunning)
+        {
+            await _host.PauseAsync(_cts.Token).ConfigureAwait(true);
+            await _host.WaitUntilIdleAsync(_cts.Token).ConfigureAwait(true);
+        }
         var secrets=await _host.GetSecretsAsync(_cts.Token).ConfigureAwait(true);
         var dialog=new SettingsDialog(_host.Config,secrets.SourcePassword,secrets.TargetPassword,true)
         {
@@ -139,9 +143,12 @@ internal sealed class WebUiHostV040 : IDisposable
         var verified = _host.State.Files.Values.Count(r => r.Status == TransferStatus.StrongVerified);
         var total = Math.Max(_reconciliation.State.LastManifestObjectCount, _host.State.Files.Count);
         var coverage = total <= 0 ? 0 : Math.Clamp((double)verified / total, 0, 1);
-        var state = !_host.Config.MigrationEnabled ? EngineState.Paused : _host.State.EngineState;
+        var pausePending = _host.IsPausePending;
+        var state = !_host.Config.MigrationEnabled && !pausePending ? EngineState.Paused : _host.State.EngineState;
         var quota = QuotaPolicy.GetSnapshot(_host.Config, _host.State, DateTimeOffset.Now);
         var current = CurrentTask(state);
+        if (pausePending)
+            current = (current.Title, "已收到暂停请求。当前文件完成必要上传与强校验后，将在下一文件开始前停止。", current.Progress);
         var auditDone = !string.IsNullOrWhiteSpace(cycle) &&
                         string.Equals(_reconciliation.State.LastReconciledCycleId, cycle, StringComparison.OrdinalIgnoreCase);
 
@@ -158,8 +165,10 @@ internal sealed class WebUiHostV040 : IDisposable
                 "新增对象与既有 backlog 同级进入普通稳定池。")
         };
 
-        var (routeStatus, tone) = DescribeRoute(state, review);
-        var (primary, primaryLabel) = !_host.IsConfigured ? ("settings", "完成设置") : DescribePrimary(state, review);
+        var (routeStatus, tone) = pausePending ? ("正在安全暂停", "wait") : DescribeRoute(state, review);
+        var (primary, primaryLabel) = !_host.IsConfigured
+            ? ("settings", "完成设置")
+            : pausePending ? ("none", string.Empty) : DescribePrimary(state, review);
         var resetText = _host.Config.NextResetAt == default
             ? "流量尚未校准"
             : $"{ResetSchedulePolicy.NormalizeResetDate(_host.Config.NextResetAt):yyyy-MM-dd} · 09:00 后探测";
@@ -188,7 +197,7 @@ internal sealed class WebUiHostV040 : IDisposable
             BuildInfoV044.BuildUtc,
             cycle,
             _host.IsConfigured,
-            StateText(state),
+            pausePending ? "正在暂停" : StateText(state),
             routeStatus,
             tone,
             phases,
