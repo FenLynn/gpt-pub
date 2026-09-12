@@ -341,15 +341,32 @@ internal sealed class MainForm : Form
 
         await _host.ResumeAsync(_appCts.Token);
         ProductExperienceV044.Record("迁移已继续", "自动调度已恢复，DavBridge 将继续执行当前安全队列。", "info");
+
+        // Do not await the whole migration pass here. Resume is a short UI command; the actual
+        // pass must continue in the background so a later Pause command is never blocked by the
+        // previous Resume request remaining busy for minutes or hours.
+        _ = RunManualPassAsync();
+        UpdateView();
+    }
+
+    private async Task RunManualPassAsync()
+    {
         try
         {
             await _host.RunOnceAsync(_appCts.Token);
+        }
+        catch (OperationCanceledException) when (_appCts.IsCancellationRequested)
+        {
+            // Application shutdown owns this cancellation.
         }
         catch (Exception ex)
         {
             UiFeedbackBusV044.Publish("任务未继续", ex.Message, "warning");
         }
-        UpdateView();
+        finally
+        {
+            SafeUi(UpdateView);
+        }
     }
 
     private async Task PauseAsync()
