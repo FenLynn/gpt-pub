@@ -137,7 +137,9 @@ jobs:
           foreach ($spec in @(
             @{ Name='live-1280x800'; Size='1280,800'; Page='live' },
             @{ Name='live-1600x1000'; Size='1600,1000'; Page='live' },
+            @{ Name='batch-1280x800'; Size='1280,800'; Page='batch' },
             @{ Name='models-1280x800'; Size='1280,800'; Page='models' },
+            @{ Name='settings-1280x800'; Size='1280,800'; Page='settings' },
             @{ Name='docs-1280x800'; Size='1280,800'; Page='docs' }
           )) {
             $shot = (Resolve-Path 'preview').Path + "\localsub-$($spec.Name).png"
