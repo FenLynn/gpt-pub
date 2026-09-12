@@ -2177,3 +2177,151 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
 @media (min-width:1000px) and (min-height:740px){
   .task-card{align-items:center;padding-top:0}
 }
+
+
+/* v0.4.12 polished route, phase state language, centered module icons, unified quota risk colors. */
+.route-card-polished .route-core{
+  padding:0 6px;
+}
+.route-arrow-art{
+  display:block;
+  width:100%;
+  height:42px;
+  overflow:visible;
+  filter:drop-shadow(0 1px 1px rgba(20,130,215,.10));
+}
+.route-arrow-art path{
+  fill:none;
+  stroke:url(#routeArrowGradient);
+  stroke-width:3.7;
+  vector-effect:non-scaling-stroke;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.route-card-polished .route-line,
+.route-segment,
+.route-arrow{
+  display:none!important;
+}
+
+.route-card-polished .phase-icon,
+.route-card-polished .phase.done .phase-icon,
+.route-card-polished .phase.active .phase-icon,
+.route-card-polished .phase.warning .phase-icon,
+.route-card-polished .phase.waiting .phase-icon,
+.route-card-polished .phase:not(.done) .phase-icon{
+  width:28px;
+  height:28px;
+  border:0!important;
+  border-radius:0;
+  background:transparent!important;
+  box-shadow:none!important;
+  display:grid;
+  place-items:center;
+  color:inherit;
+}
+.phase-check{
+  width:25px;
+  height:25px;
+  fill:none;
+  stroke:#13a66b;
+  stroke-width:3.2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.phase-pulse{
+  position:relative;
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  background:#18ad72;
+  box-shadow:0 0 0 0 rgba(24,173,114,.30);
+  animation:phase-breathe 1.8s ease-in-out infinite;
+}
+.phase-pulse:after{
+  content:"";
+  position:absolute;
+  inset:-5px;
+  border:1px solid rgba(24,173,114,.22);
+  border-radius:50%;
+  opacity:.75;
+}
+.phase-idle-dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#cbd7e1;
+}
+.phase-idle-dot.warning{background:#e8ae3d}
+.route-card-polished .phase.active strong{
+  color:#21875f!important;
+  font-weight:680;
+}
+@keyframes phase-breathe{
+  0%,100%{transform:scale(.88);box-shadow:0 0 0 0 rgba(24,173,114,.28);opacity:.78}
+  50%{transform:scale(1.08);box-shadow:0 0 0 7px rgba(24,173,114,0);opacity:1}
+}
+
+.coverage-feature,
+.quota-feature{
+  grid-template-columns:1fr!important;
+  grid-template-rows:1fr!important;
+  justify-items:center!important;
+  align-items:center!important;
+  justify-content:stretch!important;
+  align-content:stretch!important;
+  padding:0!important;
+}
+.coverage-glyph,
+.quota-glyph{
+  grid-column:1!important;
+  grid-row:1!important;
+  justify-self:center!important;
+  align-self:center!important;
+  transform:none!important;
+}
+
+.quota-arrow.up,
+.quota-arrow.down{
+  color:#1688eb!important;
+}
+.quota-item .quota-track.safe i,
+.quota-item:first-child .quota-track.safe i,
+.quota-item:last-child .quota-track.safe i{
+  background:linear-gradient(90deg,#4bc889 0%,#1da968 100%)!important;
+}
+.quota-item .quota-track.warn i{
+  background:linear-gradient(90deg,#ffd45a 0%,#e9aa20 100%)!important;
+}
+.quota-item .quota-track.danger i{
+  background:linear-gradient(90deg,#f38c80 0%,#d9534f 100%)!important;
+}
+.quota-percent.safe{color:#1cab68!important}
+.quota-percent.warn{color:#e6a30d!important}
+.quota-percent.danger{color:#d9534f!important}
+
+.side-status.state-run .side-status-icon,
+.task-status-icon.state-run{
+  background:#e8f7ef!important;
+  color:#1f9d69!important;
+}
+.side-status.state-run strong,
+.task-status:has(.state-run) strong{
+  color:#21875f;
+}
+
+.task-action-row .primary-button.action-resume{
+  border-color:#a8dec5;
+  background:linear-gradient(180deg,#f0fbf5,#e2f6eb);
+  color:#1e9563;
+  box-shadow:0 6px 18px rgba(31,149,99,.07);
+}
+.task-action-row .primary-button.action-resume:hover{
+  background:linear-gradient(180deg,#e8f9ef,#d9f2e4);
+  border-color:#91d4b4;
+}
+.task-action-row .primary-button.action-pause{
+  color:#4d718d;
+  border-color:#c8deed;
+  background:linear-gradient(180deg,#f7fbfe,#edf5fa);
+}

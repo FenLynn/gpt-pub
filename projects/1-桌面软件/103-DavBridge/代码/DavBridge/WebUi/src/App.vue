@@ -145,7 +145,7 @@ async function primaryAction() {
 function selectGroup(group: RecycleGroup) { const next = new Set(selected.value); next.has(group.groupKey) ? next.delete(group.groupKey) : next.add(group.groupKey); selected.value = next }
 async function deferSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); await command('recycle.defer',{groupKeys:keys}); selected.value=new Set() }
 async function deleteSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); if (!window.confirm(`准备审查删除 ${keys.length} 个附件组。DavBridge 还会显示一次原生最终确认，并在删除前重新核对源端与目标身份。继续吗？`)) return; await command('recycle.delete',{groupKeys:keys}); selected.value=new Set() }
-function quotaClass(value:number){ return value>=.9?'danger':value>=.6?'warn':'safe' }
+function quotaClass(value:number){ const percent=Math.round(value*100); return percent>=80?'danger':percent>=60?'warn':'safe' }
 async function calibrateQuota(){ await command('quota.calibrate') }
 async function openSettings(){
   if(tab.value==='settings') return
@@ -225,7 +225,7 @@ onBeforeUnmount(()=>{
       </button>
     </nav>
 
-    <button type="button" class="side-status has-tip" :data-tip="sideStatusTip" @click="showActivity=true">
+    <button type="button" class="side-status has-tip" :class="`state-${sideStatusKind}`" :data-tip="sideStatusTip" @click="showActivity=true">
       <span class="side-status-icon" :class="`tone-${snapshot.routeTone}`" aria-hidden="true">
         <svg v-if="sideStatusKind==='pause'" viewBox="0 0 24 24"><rect x="7" y="5" width="3.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="3.2" height="14" rx="1.2"/></svg>
         <svg v-else-if="sideStatusKind==='run'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"/></svg>
@@ -260,11 +260,16 @@ onBeforeUnmount(()=>{
           <strong>InfiniCLOUD</strong>
         </div>
         <div class="route-core has-tip" :data-tip="snapshot.routeStatus">
-          <div class="route-line">
-            <span class="route-segment route-segment-left"></span>
-            <span class="route-arrow" aria-hidden="true"></span>
-            <span class="route-segment route-segment-right"></span>
-          </div>
+          <svg class="route-arrow-art" viewBox="0 0 420 48" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="routeArrowGradient" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#bfeaf5"/>
+                <stop offset="54%" stop-color="#5fc1ef"/>
+                <stop offset="100%" stop-color="#1789e8"/>
+              </linearGradient>
+            </defs>
+            <path d="M26 24 H394 L378 8 M394 24 L378 40"/>
+          </svg>
         </div>
         <div class="endpoint target has-tip" data-tip="坚果云保存经过 StrongVerified 的强校验镜像">
           <svg class="nut-logo" viewBox="0 0 56 50" aria-hidden="true">
@@ -278,7 +283,14 @@ onBeforeUnmount(()=>{
 
         <div class="phase-row">
           <div v-for="(phase,index) in snapshot.phases" :key="phase.key" class="phase-wrap">
-            <div class="phase has-tip" :class="phase.state" :data-tip="phase.hint"><span class="phase-icon">{{ phase.state==='done' ? '✓' : '' }}</span><strong>{{ phase.label }}</strong></div>
+            <div class="phase has-tip" :class="phase.state" :data-tip="phase.hint">
+              <span class="phase-icon" aria-hidden="true">
+                <svg v-if="phase.state==='done'" class="phase-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2 8.8-9.4"/></svg>
+                <span v-else-if="phase.state==='active'" class="phase-pulse"></span>
+                <span v-else class="phase-idle-dot" :class="{warning:phase.state==='warning'}"></span>
+              </span>
+              <strong>{{ phase.label }}</strong>
+            </div>
             <span v-if="index<snapshot.phases.length-1" class="phase-connector"></span>
           </div>
         </div>
@@ -333,7 +345,7 @@ onBeforeUnmount(()=>{
 
           <div class="task-center">
             <div class="task-status">
-              <span class="task-status-icon" :class="`tone-${snapshot.routeTone}`" aria-hidden="true">
+              <span class="task-status-icon" :class="[`tone-${snapshot.routeTone}`,`state-${taskStatusKind}`]" aria-hidden="true">
                 <svg v-if="taskStatusKind==='pause'" viewBox="0 0 24 24"><rect x="7" y="5" width="3.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="3.2" height="14" rx="1.2"/></svg>
                 <svg v-else-if="taskStatusKind==='run'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"/></svg>
                 <svg v-else-if="taskStatusKind==='network'" viewBox="0 0 24 24"><path d="M5 10.5a10 10 0 0 1 14 0M8 14a6 6 0 0 1 8 0M11.2 17.2a1.2 1.2 0 1 1 1.6 0"/></svg>
@@ -351,7 +363,7 @@ onBeforeUnmount(()=>{
           </div>
 
           <div class="task-action-row">
-            <button class="primary-button" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy" :aria-busy="busy">
+            <button class="primary-button" :class="[`action-${snapshot.primaryAction}`]" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy" :aria-busy="busy">
               <svg v-if="snapshot.primaryAction==='pause'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg>
               <svg v-else-if="snapshot.primaryAction==='resume'" class="action-icon action-icon-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.8 15 10l-8.5 5.2Z"/></svg>
               <svg v-else-if="snapshot.primaryAction==='retry'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7.4A6 6 0 1 0 16 12" fill="none"/><path d="m12.8 4.5 3.1 2.8-3.6 2" fill="none"/></svg>
