@@ -71,6 +71,32 @@ const taskStatusSecondary = computed(() => {
   if (snapshot.value.currentProgress !== null) return '当前任务执行中'
   return snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : ''
 })
+const primaryButtonDisabled = computed(() => busy.value || snapshot.value.primaryAction === 'none')
+const primaryButtonTone = computed(() => {
+  if (primaryButtonDisabled.value) return 'disabled'
+  if (snapshot.value.primaryAction === 'pause') return 'pause'
+  if (snapshot.value.primaryAction === 'resume' || snapshot.value.primaryAction === 'retry') return 'run'
+  return 'neutral'
+})
+const primaryButtonLabel = computed(() => {
+  if (pendingPrimaryAction.value === 'pause') return '正在暂停'
+  if (pendingPrimaryAction.value === 'resume') return '正在继续'
+  if (pendingPrimaryAction.value === 'retry') return '正在重试'
+  if (snapshot.value.primaryAction !== 'none') return snapshot.value.primaryLabel
+  const state = `${snapshot.value.engineState} ${snapshot.value.routeStatus}`
+  if (/正在暂停/.test(state)) return '正在暂停'
+  if (/额度|周期/.test(state)) return '等待额度'
+  if (/网络/.test(state)) return '等待网络'
+  if (/完成/.test(state)) return '已完成'
+  if (/人工/.test(state)) return '等待处理'
+  return '暂不可用'
+})
+const primaryButtonIcon = computed<PrimaryAction>(() => {
+  if (pendingPrimaryAction.value) return pendingPrimaryAction.value
+  if (snapshot.value.primaryAction !== 'none') return snapshot.value.primaryAction
+  if (/暂停/.test(`${snapshot.value.engineState} ${snapshot.value.routeStatus}`)) return 'pause'
+  return 'none'
+})
 const transferNextText = computed(() => {
   if (snapshot.value.humanActionCount > 0) return `先处理 ${snapshot.value.humanActionCount} 组人工审查，再继续自动队列`
   if (snapshot.value.primaryAction === 'resume') {
@@ -373,13 +399,20 @@ onBeforeUnmount(()=>{
           </div>
 
           <div class="task-action-row">
-            <button class="primary-button" :class="[`action-${snapshot.primaryAction}`]" v-if="snapshot.primaryAction!=='none'" @click="primaryAction" :disabled="busy" :aria-busy="busy">
-              <svg v-if="snapshot.primaryAction==='pause'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg>
-              <svg v-else-if="snapshot.primaryAction==='resume'" class="action-icon action-icon-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.8 15 10l-8.5 5.2Z"/></svg>
-              <svg v-else-if="snapshot.primaryAction==='retry'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7.4A6 6 0 1 0 16 12" fill="none"/><path d="m12.8 4.5 3.1 2.8-3.6 2" fill="none"/></svg>
-              <svg v-else-if="snapshot.primaryAction==='review'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5h10v11H5Z" fill="none"/><path d="M7.5 8h5M7.5 11h5" fill="none"/></svg>
-              <svg v-else-if="snapshot.primaryAction==='settings'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.5" fill="none"/><circle cx="10" cy="10" r="6" fill="none"/></svg>
-              {{ snapshot.primaryLabel }}
+            <button
+              class="primary-button task-primary-fixed"
+              :class="[`action-${snapshot.primaryAction}`,`action-tone-${primaryButtonTone}`]"
+              @click="primaryAction"
+              :disabled="primaryButtonDisabled"
+              :aria-busy="busy"
+              :aria-disabled="primaryButtonDisabled"
+            >
+              <svg v-if="primaryButtonIcon==='pause'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg>
+              <svg v-else-if="primaryButtonIcon==='resume'" class="action-icon action-icon-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.8 15 10l-8.5 5.2Z"/></svg>
+              <svg v-else-if="primaryButtonIcon==='retry'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7.4A6 6 0 1 0 16 12" fill="none"/><path d="m12.8 4.5 3.1 2.8-3.6 2" fill="none"/></svg>
+              <svg v-else-if="primaryButtonIcon==='review'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5h10v11H5Z" fill="none"/><path d="M7.5 8h5M7.5 11h5" fill="none"/></svg>
+              <svg v-else-if="primaryButtonIcon==='settings'" class="action-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.5" fill="none"/><circle cx="10" cy="10" r="6" fill="none"/></svg>
+              {{ primaryButtonLabel }}
             </button>
           </div>
         </article>
