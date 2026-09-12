@@ -24,7 +24,7 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前实验候选的产品版本为 v0.4.13，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前实验候选的产品版本为 v0.4.14，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
 
 ## 3. 最新完整验证代码基线
 
@@ -37,7 +37,7 @@
 对应 P103 CI：
 
 ```text
-run 34707132029
+run 34726420112
 scope          success
 core-smoke     success
 frontend       success
@@ -45,21 +45,21 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.13-win-x64`
+Windows candidate：`DavBridge-v0.4.14-win-x64`
 
-Artifact ID：`10302216592`
+Artifact ID：`10307014716`
 
 EXE：
 
 ```text
-2434653 bytes
-SHA256 dbda27fe28d79b64309de3c3f5dafaaa28ad51d2dc587c6546cb3bf38710ddd8
+2438749 bytes
+SHA256 d9aed38fb757579c6a8b9c6ab84e5536d680c15b5ca0982d2cd93b43a27e092a
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-ad6879dc4221decd2fe4eb1addaae4056d27b1f6301be051742973e855e505b8
+8edbc1b8bf7e3573807ce69509a9c56d48b7298fff985bf19b559966f74dc89d
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-09aa5495bf1c914bf3a18cc8800be17076a1e21f
+378bb37707a3a5f1d685427edb77294d916acdcc
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -312,6 +312,23 @@ v0.4.7 的实现存在两个明确问题，已在 v0.4.8 纠正。
 第七，本轮虽然修改了 `DavBridge.Core/MigrationEngine.cs`，但修改范围只限安全暂停边界判断，不改变 WebDAV 传输、条件 PUT、WriteUnknown reconciliation、StrongVerified、源端只读、quota/Cycle 或删除安全语义。
 
 
+
+### v0.4.14 暂停优先级与固定操作槽位
+
+第一，定位并修复“第一次暂停正常，继续后第二次暂停点不动”的真实根因。此前 `MainForm.ResumeNowAsync()` 在恢复后继续 `await _host.RunOnceAsync(...)`，导致 Web UI 的 resume 命令直到整轮迁移结束才返回，Vue 的全局 `busy` 因此长期保持 true。界面虽然通过 snapshot 推送已经显示新的“暂停”，按钮实际上仍处于 disabled。
+
+第二，手动“继续”现在只负责恢复调度并立即返回 UI。真正的 `RunOnceAsync` 由 `RunManualPassAsync` 在后台等待。这样恢复后的 UI 命令不会占住交互锁，后续暂停可以随时提交。
+
+第三，补充 active-run 优先判定。恢复后在源端对账或调度准备阶段，持久 `EngineState` 可能短暂保留上一轮的 `Paused`。现在只要 `IsRunning=true`、`MigrationEnabled=true` 且不处于 pause pending，Web snapshot 就优先暴露 `pause` 动作。暂停因此覆盖整个真实运行 pass，而不只覆盖 MigrationEngine 已写入 Running 之后的阶段。
+
+第四，主操作按钮改为固定 116 px 槽位，不再因为 `primaryAction=none` 从 DOM 消失。运行时可点击“暂停”为黄色轻立体按钮；暂停后“继续”以及“重试”为绿色轻立体按钮；安全暂停中、等待额度、等待网络、已完成等不可操作状态保留同一位置并变成灰色平面按钮。只有可点击按钮使用手型，灰色按钮使用普通或 progress 指针。
+
+第五，安全暂停期间按钮原位显示“正在暂停”，不会引起当前任务行布局跳动。达到安全边界后同一位置切换为绿色“继续”。
+
+第六，本轮没有修改 `DavBridge.Core`、WebDAV 传输、StrongVerified、quota/Cycle、Reconciliation 或 DELETE 安全链。v0.4.13 的 cooperative safe pause 语义保持不变。
+
+第七，准确代码 head `378bb37707a3a5f1d685427edb77294d916acdcc` 已通过 P103 CI run `34726420112` 的 scope、frontend、core-smoke、windows-build 和 report-status。浏览器预览同时复核 1100×825 与 870×525，固定操作槽位没有破坏既有布局。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -360,15 +377,15 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步应实机验证 v0.4.13 candidate，重点只看暂停链路：
+用户下一步应实机验证 v0.4.14，重点只看重复暂停与按钮状态：
 
-1. 鼠标移到“暂停 / 继续 / 重试”等可执行按钮上必须显示手型。
-2. 点击“暂停”后，不等待 C# 完成才反馈，首页中央状态与左下角必须立即变为“正在暂停”。
-3. 若当前文件尚未完成，允许它完成必要的安全收尾；这段时间属于“暂停已请求，尚未安全停住”，不是按钮失效。
-4. 当前文件达到 StrongVerified 或其他安全成员边界后，DavBridge 必须在下一个文件开始前真正停住并显示“已暂停 / 继续”。
-5. 暂停期间不得再启动第二个文件。Core Smoke 已覆盖这一不变量，但仍需用户真实 WebDAV 实机确认。
-6. 恢复“继续”后应从持久化账本继续正常调度，不重复已 StrongVerified 的文件。
-7. v0.4.12 的整体箭头、阶段呼吸灯、流量颜色、账号编辑、tooltip、回收站、文档等不得回退。
+1. 运行时右侧“暂停”固定为黄色可点击按钮，鼠标为手型。
+2. 第一次点击暂停后立即变为固定位置的灰色“正在暂停”，当前文件安全收尾后变为绿色“继续”。
+3. 点击“继续”后 UI 必须很快恢复为黄色“暂停”，不得因为上一条继续命令仍 busy 而长时间点不动。
+4. 在继续后的源端对账、调度准备、下载、上传和强校验阶段，只要真实 pass 仍在运行，暂停都应保持可用。
+5. 再次点击暂停必须重复执行同样的安全暂停流程，不能只在第一次有效。
+6. 等待额度、等待网络、已完成等没有动作时，按钮仍占据原位置但为灰色不可操作，布局不变化。
+7. 其余已经确认的整体箭头、阶段、流量、回收站、文档、tooltip 和设置不得变化。
 
 用户实机确认之前，不提升 `p103-stable`，不修改 `main`，不创建正式标签或 Release。
 
