@@ -589,7 +589,6 @@ button:disabled{cursor:default;opacity:.48}
   stroke-linecap:round;
 }
 .drop-zone strong{font-size:17px}
-.hover-hint{color:#91a0ae;font-size:12px}
 .status-line{
   display:flex;
   align-items:center;

@@ -511,7 +511,6 @@ onBeforeUnmount(() => {
                 <svg viewBox="0 0 48 48"><path d="M24 11v26 M11 24h26"></path></svg>
               </span>
               <strong>拖入视频或音频</strong>
-              <span class="hover-hint">悬浮查看说明</span>
             </div>
             <div class="status-line">
               <span>当前状态</span>

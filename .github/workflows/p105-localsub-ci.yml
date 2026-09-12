@@ -194,6 +194,48 @@ jobs:
             }
           }
 
+      - name: Verify v0.1.5 visual layout contract
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $app = Get-Content 'src/LocalSub/WebUi/src/App.vue' -Raw
+          $style = Get-Content 'src/LocalSub/WebUi/src/style.css' -Raw
+          $host = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
+
+          foreach ($required in @(
+            'class="sidebar"',
+            'class="side-nav"',
+            '<Teleport to="body">',
+            'class="global-tooltip"'
+          )) {
+            if ($app -notmatch [regex]::Escape($required)) {
+              throw "v0.1.5 Web UI contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'grid-template-columns:225px minmax(0,1fr)',
+            'z-index:2147483000'
+          )) {
+            if ($style -notmatch [regex]::Escape($required)) {
+              throw "v0.1.5 style contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'Width = 1100;',
+            'Height = 825;'
+          )) {
+            if ($host -notmatch [regex]::Escape($required)) {
+              throw "v0.1.5 4:3 host contract missing: $required"
+            }
+          }
+
+          if ($app -match 'class="top-tabs"') {
+            throw 'Primary navigation must remain in the left sidebar, not move back to top tabs.'
+          }
+
       - name: Verify default WebUi and legacy backup startup policy
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
