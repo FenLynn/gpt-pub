@@ -84,10 +84,18 @@ internal static class WindowPlacementV044
         ApplyDefaultFourThree(form);
         var defaultWidth = form.Width;
         var defaultHeight = form.Height;
+        var targetRatioOk =
+            DefaultWidth == 1100 &&
+            DefaultHeight == 825 &&
+            Math.Abs((double)DefaultWidth / DefaultHeight - 4d / 3d) < 0.0001;
+        var actualRatio = defaultHeight <= 0 ? 0 : (double)defaultWidth / defaultHeight;
         var defaultRatioOk =
-            defaultWidth == DefaultWidth &&
-            defaultHeight == DefaultHeight &&
-            Math.Abs((double)defaultWidth / defaultHeight - 4d / 3d) < 0.0001;
+            targetRatioOk &&
+            defaultWidth <= DefaultWidth &&
+            defaultHeight <= DefaultHeight &&
+            defaultWidth >= form.MinimumSize.Width &&
+            defaultHeight >= form.MinimumSize.Height &&
+            Math.Abs(actualRatio - 4d / 3d) <= 0.02;
 
         var legacy = new Rectangle(120, 90, 1100, 620);
         var working = new Rectangle(0, 0, 1920, 1040);
