@@ -503,14 +503,14 @@
   grid-template-columns:58px minmax(0,1fr);
   align-items:start;
   gap:29px;
-  padding-top:16px;
+  padding-top:10px;
   box-sizing:border-box;
 }
 .quota-content{
   min-width:0;
   display:grid;
   grid-template-rows:auto auto;
-  gap:9px;
+  gap:0;
 }
 .quota-head{
   display:flex;
@@ -1459,8 +1459,8 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
     align-content:start;
   }
   .coverage-card{align-items:center}
-  .quota-card{align-items:start;padding-top:16px}
-  .quota-content{grid-template-rows:auto auto;gap:8px}
+  .quota-card{align-items:start;padding-top:10px}
+  .quota-content{grid-template-rows:auto auto;gap:0}
   .quota-columns{align-items:center}
   .task-card{align-items:start;padding-top:22px}
   .transfer-page{
