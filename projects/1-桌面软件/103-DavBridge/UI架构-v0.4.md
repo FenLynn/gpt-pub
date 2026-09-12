@@ -107,7 +107,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
-## v0.4.13 当前界面结构
+## v0.4.14 当前界面结构
 
 当前候选采用固定左侧导航：
 
@@ -193,8 +193,8 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 ## 当前阶段
 
-v0.4.13 位于 `p103-exp`，最后完成完整 CI 的代码 head 为 `09aa5495bf1c914bf3a18cc8800be17076a1e21f`，对应 run `34707132029`。它尚未提升到 `p103-stable` 或 `main`。
+v0.4.14 位于 `p103-exp`，最后完成完整 CI 的代码 head 为 `378bb37707a3a5f1d685427edb77294d916acdcc`，对应 run `34726420112`。它尚未提升到 `p103-stable` 或 `main`。
 
-本轮为解决实机暂停失效感，窄范围修改了 AppHost 与 MigrationEngine：人工暂停不再中断当前 PUT，而是立即进入“正在暂停”，当前 member 安全完成后在下一 member 前停止。Core Smoke 已验证暂停后不会启动第二个 member。
+本轮只调整主操作控制链。手动 resume 立即释放 Web UI 命令，真实 active run 始终优先暴露 pause；按钮使用固定槽位，黄色表示可暂停，绿色表示可继续或重试，灰色表示当前不可操作。v0.4.13 的 cooperative safe pause 与所有核心安全不变量保持不变。
 
-下一关是用户 Windows 实机验证：鼠标手型、立即“正在暂停”反馈、当前文件安全收尾、最终“已暂停”、以及之后“继续”恢复。
+下一关是用户 Windows 实机连续验证“暂停 → 继续 → 再暂停”。
