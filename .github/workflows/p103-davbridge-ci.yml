@@ -189,7 +189,9 @@ jobs:
             $env:APPDATA=$roaming; $env:LOCALAPPDATA=$local
             $proc=Start-Process -FilePath (Resolve-Path 'build/DavBridge/DavBridge.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
             if ($proc.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "DavBridge self-test exit code $($proc.ExitCode)" }
-            $json=(Get-Content $report -Raw) | ConvertFrom-Json
+            $reportText=Get-Content $report -Raw
+            $reportText | Write-Host
+            $json=$reportText | ConvertFrom-Json
             if (-not $json.ok -or -not $json.webUiEmbedded -or -not $json.bridgeWhitelistValidated -or $json.coreLogicMovedToJavaScript) { throw 'DavBridge v0.4 native-host self-test failed' }
             if (-not $json.configBackupRecovery -or -not $json.stateBackupRecovery -or -not $json.reconcileBackupRecovery -or -not $json.productSidecarBackupRecovery -or -not $json.runtimeSessionSelfTest -or -not $json.windowFourThreeMigration -or -not $json.backgroundWakeSignal) { throw 'DavBridge v0.4.8 recovery and window migration self-test failed' }
             if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version mismatch: $($json.version)" }
