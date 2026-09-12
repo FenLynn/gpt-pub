@@ -6,21 +6,21 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.10**。
+当前 `p103-exp` 候选：**v0.4.11**。
 
 最后完成完整 CI 的代码 head：
 
 ```text
-9bd983c248b30c6908ccb89786766f4f6321fe1f
+3c9de7086438f5e8bff03d5ec71a5ac89befccae
 ```
 
-CI run：`34700404112`，结果 `success`。
+CI run：`34704232146`，结果 `success`。
 
-候选 Artifact：`DavBridge-v0.4.10-win-x64`，Artifact ID `10299967686`。
+候选 Artifact：`DavBridge-v0.4.11-win-x64`，Artifact ID `10301252775`。
 
-EXE SHA256：`19c5529124ec95d052e418e79b282dbd003ff9352331fe05c1741cb834ca33d5`。
+EXE SHA256：`54414f66e694a612f964dfad0e327864b06c96e28395affa90eab83d9aae527c`。
 
-Artifact ZIP SHA256：`1a637b19339d826c53e6a2e0cec24ced7c1834001d969fef08b22d4f34bc2e2e`。
+Artifact ZIP SHA256：`7713397e02e7cfd558873b0bd7be622811640fd113b492ddf66a9eb8c260fa16`。
 
 如果该 head 之后只有文档提交，仍以 `e94758c5...` 作为最后经过完整构建验证的代码 head。
 
@@ -90,7 +90,7 @@ v0.3 的 WinForms 业务 UI 源码仍保留用于历史追溯和回滚参照，�
 - HTTPS only；
 - IO progress。
 
-v0.4.10 UI 收束没有修改 `DavBridge.Core`。
+v0.4.11 UI 收束没有修改 `DavBridge.Core`。
 
 ## DavBridge Windows 宿主
 
@@ -235,8 +235,8 @@ Windows x64 使用 .NET 8 framework-dependent single EXE publish。
 .github/workflows/p103-davbridge-ci.yml
 ```
 
-最后已验证 run `34700404112` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
+最后已验证 run `34704232146` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
 
 ## 当前开发断点
 
-v0.4.10 目前只等待用户 Windows 实机 UI 与交互验收。重点检查路线与阶段间距、转移页、全局 tooltip、设置账户字段可编辑性和左下角状态 SVG。未经明确验收，不提升 stable/main，不扩展功能，不重构 Core。
+v0.4.11 目前只等待用户 Windows 实机 UI 与交互验收。重点检查顶部路线、品牌名称配色、图标居中、当前任务中央状态与进度，以及右侧动作按钮。未经明确验收，不提升 stable/main，不扩展功能，不重构 Core。
