@@ -188,18 +188,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.6 已完成主页、实时波形、模型配置/模型库、可编辑设置与静默托盘生命周期第一闭环。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.7 已完成主页、实时页与状态体系第二轮实机反馈收口。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-f016e7cb161b770f6a3229cdb37debf3548b8b94
+82e6a8bc40c91b8c1609143c3caeca4741d0879a
 ```
 
 P105 Windows CI：
 
 ```text
-run 34705240310
+run 34706837076
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10300893415
-sha256:9d27304580968307cb0949b5f11c0a53dcbad1b516553bbbfced8b88f4e80643
+ID 10302555345
+sha256:837bb8f651635460cdb54d4bc69f6b699ebe0fdd97f1b1aff8e5b33c34d3dc4f
 
 WebUi preview
-ID 10300958225
-sha256:bb31a46ad88402252d80fc951f140a6a9bc27e0bf7cf98e80776a0a4fca7792c
+ID 10302180659
+sha256:a13b58f49bf3b677073425a3a3bcbb255267de2ac7bfadc3486ad1b248f8c6a1
 ```
 
 本阶段已经完成：
@@ -236,13 +236,14 @@ v0.1.5 已纠正并冻结新视觉基线：恢复左侧一级导航；右侧严�
 
 v0.1.6 在该视觉基线上一次完成新的日常工作流：主页成为默认页并提供全局自检和实时字幕主按钮；实时页改为自然设置行并显示可关闭的归一化电平历史波形；模型页拆成“配置 / 模型库”，默认只显示需要配置的角色，模型库使用表格且仅内部滚动；设置页通过 `settings.update` 真正编辑 AppSettings，并可 `settings.previewSubtitle` 即时预览字幕；新增当前用户 Windows 启动注册、`--startup-silent`、静默托盘、托盘开始/停止实时字幕与启动后自动实时。PotPlayer 自动启动模式只等待播放器，不回退所有音频。
 
+v0.1.7 基于实机截图继续收口：主页改为纵向状态清单，主按钮移动到右上角；实时页顶部集中瞬时输入电平 bar、输入监视开关和运行状态；输入历史扩大到约 30 秒并持续左移；字幕区改为独立内部滚动，历史行常规显示、当前行加粗；设置滚动区预留 scrollbar gutter；文档字号提升；WebView2 与页面背景统一；正常启动后托盘图标始终存在；左下状态改为 DavBridge 风格业务状态。
+
 下一步固定为：
 
 1. 不提升 stable，不动 main。
-2. 在真实 Windows 上同时验证 realtime 与模型管理：真实 PotPlayer、真实模型、模型下载/修复、断点续传、取消、大模型解压、删除、Core 强杀与恢复。
+2. 用户实机验证 v0.1.7：常驻托盘、关闭/最小化行为、真实 PotPlayer、30 秒输入历史、字幕滚动、Overlay 设置即时生效。
 3. 下一步集中完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
-4. v0.1.6 的字幕设置、开机启动、静默托盘和自动实时字幕需在用户真实 Windows 上验证实际持久化、注册表、Overlay 与 PotPlayer 等待行为。
-5. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台达到必要功能覆盖后再进入 Phase 3 删除。
+4. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台达到必要功能覆盖后再进入 Phase 3 删除。
 
 ## 9. Web UI 约束
 

@@ -57,7 +57,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- 当前开发候选版本为 v0.1.6；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.7；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
@@ -82,7 +82,9 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - 模型页改为“配置 / 模型库”两个页内 Tab。默认只显示实时模型、后台模型和 VAD 配置，模型库使用表格呈现语言、体积、实时、准确、性价比、状态与操作。外层工作区禁止滚动，模型库和设置页仅在内部需要时滚动，滚动条默认隐藏并在悬浮时出现。
 - 设置页已接入真实 `settings.update` 白名单命令，可编辑字幕、启动与运行设置，并支持字幕即时预览。Windows 启动项由 Shell 写入当前用户 HKCU，不需要管理员权限。
 - 生命周期新增 `--startup-silent`、静默托盘启动、托盘开始/停止实时字幕、启动后自动实时字幕。PotPlayer 模式在播放器未出现时保持“等待 PotPlayer”，不得静默回退为所有音频。
-- 当前最新完整验证代码 head 为 `f016e7cb161b770f6a3229cdb37debf3548b8b94`，P105 Windows CI run `34705240310` success；candidate Artifact `10300893415`，WebUi preview Artifact `10300958225`。
+- v0.1.7 根据第二轮实机反馈继续收口：主页改为纵向状态清单并把实时主操作移动到右上角；实时页顶部集中瞬时电平 bar、输入监视开关和运行状态，输入历史扩大为约 30 秒，字幕区独立滚动且当前字幕加粗；设置滚动区预留安全边距；文档字号提升；背景统一。
+- 托盘图标改为 Shell 正常启动后始终存在，左下状态区改为 DavBridge 风格业务状态，区分运行、等待、异常、就绪与待配置。
+- 当前最新完整验证代码 head 为 `82e6a8bc40c91b8c1609143c3caeca4741d0879a`，P105 Windows CI run `34706837076` success；candidate Artifact `10302555345`，WebUi preview Artifact `10302180659`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
