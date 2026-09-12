@@ -159,7 +159,7 @@ internal sealed class SettingsDialog : Form
             ("账户与端点", BuildAccountPanel(), _endpointLocked
                 ? "当前任务已有迁移记录，端点身份已锁定。密码仍可更新；若以后迁移到另一套端点，应创建新的迁移任务。"
                 : "配置当前 Zotero 迁移任务的源端与目标端。密码仅保存在本机受保护存储中。"),
-            ("流量与限速", BuildQuotaPanel(), "当前周期已用量与重置日期由主页显示；人工校准入口位于安全与维护。"),
+            ("流量与限速", BuildQuotaPanel(), "设置上传限速和安全预留，并在这里校准坚果云当前周期上传、下载已用量与下一次重置日期。"),
             ("后台运行", BuildBackgroundPanel(), "主窗口关闭后任务继续在托盘运行；只有托盘菜单“退出”才结束 DavBridge 进程。"),
             ("安全与维护", BuildSafetyPanel(), "这里仅保留低频维护与安全检查。已经通过的验证会标记为绿色状态，日常迁移不会重复要求。")
         };
@@ -281,6 +281,20 @@ internal sealed class SettingsDialog : Form
         AddField(table, "普通预留 MB", _reserve);
         AddField(table, "冲刺预留 MB", _sprintReserve);
         AddFull(table, _sprint);
+
+        var main = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
+        var host = main is null ? null : UiCommandBridge.GetHost(main);
+        var calibrated = host?.Config.NextResetAt != default;
+        var detail = calibrated && host is not null
+            ? $"当前人工基线：上传 {host.Config.CalibrationUploadUsedBytes / 1_000_000d:0.0} MB，下载 {host.Config.CalibrationDownloadUsedBytes / 1_000_000d:0.0} MB；下一次重置日期 {ResetSchedulePolicy.NormalizeResetDate(host.Config.NextResetAt):yyyy-MM-dd}。"
+            : "录入坚果云网页当前显示的上传已用、下载已用以及下一次流量重置日期。";
+        AddFull(table, MaintenanceRow(
+            "本周期流量校准",
+            detail,
+            "CalibrateAsync",
+            calibrated ? "✓ 已校准" : "未校准",
+            calibrated,
+            calibrated ? "重新校准" : "校准"));
         return WrapCategory(table);
     }
 
@@ -318,7 +332,6 @@ internal sealed class SettingsDialog : Form
         list.Controls.Add(MaintenanceRow("运行环境自检", "检查 .NET 8、WebView2、Data 目录读写以及 config/state/reconcile 的可恢复性。", "RunStartupHealthCheckAsync", health.Status == "not_checked" ? "待检查" : health.Status == "ok" ? "✓ 正常" : "需注意", health.Status == "ok", "检查"));
         list.Controls.Add(MaintenanceRow("连接诊断", "检查源端、坚果云根目录和 Zotero 目标目录是否可访问。", "DiagnoseConnectionsAsync", ProductExperienceV044.ConnectionDiagnosticPassed ? "✓ 已通过" : "可执行", ProductExperienceV044.ConnectionDiagnosticPassed));
         list.Controls.Add(MaintenanceRow("迁移就绪扫描", "重新读取源清单并检查文件上限、Zotero 配对和迁移条件。", "ScanAsync", ProductExperienceV044.ReadinessScanPassed ? "✓ 已通过" : "可执行", ProductExperienceV044.ReadinessScanPassed));
-        list.Controls.Add(MaintenanceRow("校准流量", "按坚果云官方页面人工校正本周期上传、下载与重置日期。", "CalibrateAsync", host?.Config.NextResetAt != default ? "✓ 已校准" : "人工校准", host?.Config.NextResetAt != default, "校准"));
         list.Controls.Add(MaintenanceRow("首组验证", "真实迁移一个完整 Zotero 组并执行目标回读与 SHA-256 强校验。", "ValidateFirstGroupAsync", firstPassed ? "✓ 已通过" : "未执行", firstPassed));
         list.Controls.Add(MaintenanceRow("既有副本验证", "确认 GoodSync 等既有副本可在零上传条件下安全接管。", "ValidateExistingReplicaAsync", existingPassed ? "✓ 已通过" : "未执行", existingPassed));
         list.Controls.Add(MaintenanceRow("导出诊断信息", "生成脱敏 ZIP，仅包含版本、运行环境、状态、额度、自检和最近活动，不包含密码、WebDAV 凭据、真实文件名或私人目录。", "ExportDiagnosticsAsync", "脱敏 ZIP", false, "导出"));

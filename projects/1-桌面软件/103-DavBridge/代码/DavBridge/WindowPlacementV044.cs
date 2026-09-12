@@ -17,13 +17,33 @@ internal static class WindowPlacementV044
             if (!File.Exists(FilePath)) return;
             var state = JsonSerializer.Deserialize<PlacementState>(File.ReadAllText(FilePath));
             if (state is null || state.Width < form.MinimumSize.Width || state.Height < form.MinimumSize.Height) return;
-            var bounds = new Rectangle(state.X, state.Y, state.Width, state.Height);
-            var visible = Screen.AllScreens.Any(screen =>
+
+            var width = state.Width;
+            var height = state.Height;
+            var x = state.X;
+            var y = state.Y;
+            var migrateLegacyDefault = !state.Maximized && state.Width == 1100 && state.Height == 620;
+            if (migrateLegacyDefault)
             {
-                var intersection = Rectangle.Intersect(screen.WorkingArea, bounds);
-                return intersection.Width >= 160 && intersection.Height >= 120;
-            });
-            if (!visible) return;
+                height = 825;
+                y -= (825 - 620) / 2;
+            }
+
+            var requested = new Rectangle(x, y, width, height);
+            var screen = Screen.AllScreens
+                .OrderByDescending(candidate => Rectangle.Intersect(candidate.WorkingArea, requested).Width * Rectangle.Intersect(candidate.WorkingArea, requested).Height)
+                .FirstOrDefault();
+            if (screen is null) return;
+
+            var working = screen.WorkingArea;
+            width = Math.Min(width, working.Width);
+            height = Math.Min(height, working.Height);
+            x = Math.Clamp(x, working.Left, Math.Max(working.Left, working.Right - width));
+            y = Math.Clamp(y, working.Top, Math.Max(working.Top, working.Bottom - height));
+            var bounds = new Rectangle(x, y, width, height);
+            var intersection = Rectangle.Intersect(working, bounds);
+            if (intersection.Width < 160 || intersection.Height < 120) return;
+
             form.StartPosition = FormStartPosition.Manual;
             form.Bounds = bounds;
             if (state.Maximized) form.WindowState = FormWindowState.Maximized;

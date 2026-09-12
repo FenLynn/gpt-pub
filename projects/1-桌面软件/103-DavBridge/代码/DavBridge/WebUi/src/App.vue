@@ -68,6 +68,7 @@ function selectGroup(group: RecycleGroup) { const next = new Set(selected.value)
 async function deferSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); await command('recycle.defer',{groupKeys:keys}); selected.value=new Set() }
 async function deleteSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); if (!window.confirm(`准备审查删除 ${keys.length} 个附件组。DavBridge 还会显示一次原生最终确认，并在删除前重新核对源端与目标身份。继续吗？`)) return; await command('recycle.delete',{groupKeys:keys}); selected.value=new Set() }
 function quotaClass(value:number){ return value>=.9?'danger':value>=.6?'warn':'safe' }
+async function calibrateQuota(){ await command('quota.calibrate') }
 async function openSettings(){
   if(tab.value==='settings') return
   tab.value='settings'
@@ -191,6 +192,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
             <div class="quota-head">
               <div class="card-title"><h3>流量预算</h3><span class="info-dot has-tip" :data-tip="quotaTip">i</span></div>
               <span class="quota-reset has-tip" :data-tip="snapshot.quota.resetText">{{ resetLabel }}</span>
+              <button class="quota-calibrate has-tip" data-tip="按坚果云账户页当前显示值重新校准本周期上传、下载已用量与重置日期" @click="calibrateQuota" :disabled="busy">校准</button>
             </div>
             <div class="quota-columns">
               <div class="quota-item">

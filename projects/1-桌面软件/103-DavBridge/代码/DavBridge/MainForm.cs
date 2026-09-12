@@ -47,7 +47,7 @@ internal sealed class MainForm : Form
         ProductExperienceV044.Initialize(_host.Paths.LocalRoot);
         Text = "DavBridge";
         Width = 1100;
-        Height = 620;
+        Height = 825;
         MinimumSize = new Size(880, 540);
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -450,10 +450,41 @@ internal sealed class MainForm : Form
 
     private async Task CalibrateAsync()
     {
+        if (_host.Config.MigrationEnabled || _host.IsRunning)
+        {
+            var confirm = MessageBox.Show(
+                this,
+                "流量校准会修改本周期额度账本，需要先安全暂停当前迁移。\r\n\r\n是否现在暂停并继续校准？",
+                "校准流量",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
+            if (confirm != DialogResult.Yes) return;
+
+            await _host.PauseAsync(_appCts.Token);
+            var started = DateTime.UtcNow;
+            while (_host.IsRunning && DateTime.UtcNow - started < TimeSpan.FromSeconds(10))
+                await Task.Delay(80, _appCts.Token);
+
+            if (_host.IsRunning)
+            {
+                MessageBox.Show(
+                    this,
+                    "当前任务仍在完成安全暂停，请稍后再进行流量校准。",
+                    "校准流量",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            ProductExperienceV044.Record("迁移已暂停", "为进行流量校准，当前任务已安全暂停。", "info");
+        }
+
         using var dialog = new CalibrationDialog(_host.Config);
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         await _host.CalibrateAsync(dialog.UploadUsedBytes, dialog.DownloadUsedBytes, dialog.NextResetAt, _appCts.Token);
         ProductExperienceV044.Record("流量已校准", "已更新本周期上传、下载账本与下一次重置日期。", "success");
+        UiFeedbackBusV044.Publish("流量已校准", "上传、下载已用量与下一次重置日期已经更新。", "success");
         UpdateView();
     }
 

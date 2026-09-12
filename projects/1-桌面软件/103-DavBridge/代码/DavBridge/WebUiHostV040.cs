@@ -41,7 +41,7 @@ internal sealed class WebUiHostV040 : IDisposable
 {
     private const string Origin = "https://davbridge.local";
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-    private static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal) { "app.getSnapshot", "app.openSettings", "app.closeSettings", "migration.pause", "migration.resume", "migration.retry", "recycle.defer", "recycle.delete" };
+    private static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal) { "app.getSnapshot", "app.openSettings", "app.closeSettings", "migration.pause", "migration.resume", "migration.retry", "quota.calibrate", "recycle.defer", "recycle.delete" };
     private readonly MainForm _form; private readonly AppHost _host; private readonly ReconciliationRuntimeV030 _reconciliation;
     private readonly Panel _surface = new() { Dock = DockStyle.Fill, BackColor = Color.White };
     private readonly Panel _settingsLayer = new() { BackColor = Color.FromArgb(248,251,254), Visible = false };
@@ -53,7 +53,7 @@ internal sealed class WebUiHostV040 : IDisposable
     private SettingsDialog? _settingsDialog; private TaskCompletionSource<object>? _settingsCompletion;
     private WebUiHostV040(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) { _form=form; _host=host; _reconciliation=reconciliation; Mount(); Wire(); _=InitializeWebViewAsync(); }
     internal static WebUiHostV040 Attach(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) => new(form,host,reconciliation);
-    internal static void ValidateBridgeContract() { var expected=new[]{"app.getSnapshot","app.openSettings","app.closeSettings","migration.pause","migration.resume","migration.retry","recycle.defer","recycle.delete"}; if(!expected.All(AllowedMethods.Contains)||AllowedMethods.Count!=expected.Length) throw new InvalidOperationException("DavBridge Web UI command whitelist changed unexpectedly."); }
+    internal static void ValidateBridgeContract() { var expected=new[]{"app.getSnapshot","app.openSettings","app.closeSettings","migration.pause","migration.resume","migration.retry","quota.calibrate","recycle.defer","recycle.delete"}; if(!expected.All(AllowedMethods.Contains)||AllowedMethods.Count!=expected.Length) throw new InvalidOperationException("DavBridge Web UI command whitelist changed unexpectedly."); }
     private void Mount() { _ = _form.Handle; foreach(Control control in _form.Controls) control.Visible=false; _surface.Controls.Add(_loading); _surface.Controls.Add(_webView); _webView.Visible=false; _form.Controls.Add(_surface); _form.Controls.Add(_settingsLayer); _surface.BringToFront(); LayoutSettingsLayer(); }
     private void Wire() { _host.ProgressChanged+=OnProgress; _host.StateChanged+=OnStateChanged; _reconciliation.Changed+=OnReconciliationChanged; WebDavReadClient.GlobalIoProgress+=OnIo; UiFeedbackBusV044.Published+=OnNotice; _form.SizeChanged+=OnHostSizeChanged; _pushTimer.Tick+=(_,_)=>PushSnapshot(); _pushTimer.Start(); }
     private void OnHostSizeChanged(object? sender,EventArgs e)=>LayoutSettingsLayer();
@@ -78,7 +78,7 @@ internal sealed class WebUiHostV040 : IDisposable
         try
         {
             request=JsonSerializer.Deserialize<BridgeRequest>(args.WebMessageAsJson,JsonOptions); if(request is null||string.IsNullOrWhiteSpace(request.Id)||!AllowedMethods.Contains(request.Method??string.Empty)) throw new InvalidOperationException("不允许的界面命令。");
-            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync","已暂停"), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交继续请求"), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交重试请求"), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
+            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync","已暂停"), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交继续请求"), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交重试请求"), "quota.calibrate"=>await InvokeMainTaskAsync("CalibrateAsync",string.Empty), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
             Reply(request.Id,true,result,null);
         }
         catch(Exception ex){ Reply(request?.Id??string.Empty,false,null,ex is TargetInvocationException tie?tie.InnerException?.Message??tie.Message:ex.Message); }
@@ -116,7 +116,7 @@ internal sealed class WebUiHostV040 : IDisposable
         if(completion is not null) return await completion.Task.ConfigureAwait(true);
         _settingsLayer.Visible=false; return new { snapshot=BuildSnapshot() };
     }
-    private async Task<object> InvokeMainTaskAsync(string method,string message){ await InvokeMainFormTaskAsync(method); return new { message,snapshot=BuildSnapshot() }; }
+    private async Task<object> InvokeMainTaskAsync(string method,string message){ await InvokeMainFormTaskAsync(method); return string.IsNullOrWhiteSpace(message) ? new { snapshot=BuildSnapshot() } : new { message,snapshot=BuildSnapshot() }; }
     private async Task InvokeMainFormTaskAsync(string methodName){ var method=typeof(MainForm).GetMethod(methodName,BindingFlags.Instance|BindingFlags.NonPublic)??throw new InvalidOperationException($"DavBridge native host could not resolve {methodName}."); if(method.Invoke(_form,null) is Task task) await task.ConfigureAwait(true); }
     private async Task<object> DeferAsync(IReadOnlyList<string> keys){ if(keys.Count==0) throw new InvalidOperationException("请先选择待审查附件组。"); await _reconciliation.DeferGroupsAsync(keys,_cts.Token).ConfigureAwait(true); await ContinueAfterReviewAsync().ConfigureAwait(true); return new { message=$"本周期继续保留 {keys.Count} 个附件组。",snapshot=BuildSnapshot() }; }
     private async Task<object> DeleteAsync(IReadOnlyList<string> keys)

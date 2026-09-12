@@ -1,5 +1,5 @@
 /* DavBridge overview visual baseline
-   Target: approved Apple / Google inspired reference at a 1100 x 620 default window.
+   Target: approved Apple / Google inspired reference at a 1100 x 825 default window.
    This file loads after styles.css and intentionally overrides the older dashboard skin. */
 
 .app-shell{
@@ -524,6 +524,20 @@
   cursor:help;
   font-variant-numeric:tabular-nums;
 }
+.quota-calibrate{
+  min-width:48px;
+  height:27px;
+  padding:0 10px;
+  border:0;
+  border-radius:9px;
+  background:#e8f4fc;
+  color:#1682d3;
+  font:600 11px "Segoe UI",sans-serif;
+  cursor:pointer;
+}
+.quota-calibrate:hover{background:#dceffa}
+.quota-calibrate:disabled{opacity:.55;cursor:default}
+
 .quota-columns{
   display:grid;
   grid-template-columns:1fr 1px 1fr;
@@ -680,7 +694,7 @@
   padding-right:3px;
 }
 
-/* Desktop target is 1100 x 620. Smaller windows preserve the same proportions. */
+/* Desktop default is 1100 x 825. Smaller windows preserve the same responsive behavior. */
 @media(max-width:999px){
   .app-shell{grid-template-columns:174px minmax(0,1fr)}
   .sidebar{padding:22px 12px 14px}
@@ -1421,4 +1435,26 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
   .queue-row-main{gap:8px}.queue-row-main strong{font-size:12px}.queue-row-main span{font-size:9px}
   .queue-count{min-width:100px;gap:7px}.queue-count b{font-size:21px}.queue-count small{font-size:8.5px}
   .activity-drawer{width:min(330px,calc(100vw - 190px))}
+}
+
+
+/* v0.4.7 taller 16:12 default window: use the extra height instead of leaving a large dead zone. */
+@media (min-width:1000px) and (min-height:740px){
+  .page{padding-top:38px;padding-bottom:24px}
+  .overview-page:not(:has(.attention-card)){grid-template-rows:205px minmax(0,1fr)}
+  .overview-page{grid-template-rows:auto 205px minmax(0,1fr)}
+  .route-card-polished{
+    grid-template-rows:140px 48px;
+    padding-bottom:17px;
+  }
+  .route-card-polished .phase{height:48px}
+  .route-card-polished .phase strong{height:34px}
+  .dashboard-grid{
+    grid-template-rows:minmax(132px,1fr) minmax(174px,1.25fr) minmax(138px,1fr);
+  }
+  .coverage-card{align-items:center}
+  .quota-card{align-items:center;padding-top:0}
+  .task-card{align-items:center;padding-top:0}
+  .quota-content{gap:24px}
+  .transfer-page{padding-top:38px}
 }
