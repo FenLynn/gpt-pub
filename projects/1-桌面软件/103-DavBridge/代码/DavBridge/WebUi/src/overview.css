@@ -1477,3 +1477,229 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
     border-top:1px solid rgba(202,217,228,.70);
   }
 }
+
+
+/* v0.4.9 UI convergence: balanced quota, compact transfer, readable recycle/docs, unified status. */
+.quota-card{
+  align-items:center;
+  padding-top:0;
+  padding-bottom:0;
+}
+.quota-content{
+  align-self:center;
+  width:100%;
+}
+.quota-head{margin-bottom:14px}
+.quota-item:first-child .quota-track.safe i{background:linear-gradient(90deg,#42c989 0%,#18a968 100%)}
+.quota-item:last-child .quota-track.safe i{background:linear-gradient(90deg,#49b9f4 0%,#1688e8 100%)}
+.quota-track.warn i{background:linear-gradient(90deg,#f7cb4d 0%,#e9a61e 100%)}
+.quota-track.danger i{background:linear-gradient(90deg,#ed8a7f 0%,#d85f58 100%)}
+
+.side-status{
+  min-height:58px;
+  padding:9px 10px;
+  gap:11px;
+}
+.side-status-icon{
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  flex:none;
+  border-radius:10px;
+  background:#edf3f7;
+  color:#647b90;
+  font-size:13px;
+  font-weight:800;
+  line-height:1;
+}
+.side-status-icon.tone-active{background:#e7f4ff;color:#1688e8}
+.side-status-icon.tone-wait{background:#fff5de;color:#b27d1e}
+.side-status-icon.tone-warning{background:#fff0e8;color:#bc6641}
+.side-status-icon.tone-complete{background:#e8f7ef;color:#21875f}
+.side-status strong{font-size:13px}
+.side-status small{font-size:11px;line-height:1.25}
+
+.transfer-page{
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+  overflow:auto;
+  scrollbar-width:none;
+}
+.transfer-page::-webkit-scrollbar{width:0;height:0}
+.transfer-hero{
+  min-height:104px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:28px;
+  padding:2px 4px 22px;
+  border-bottom:1px solid rgba(202,217,228,.70);
+}
+.transfer-hero-copy{min-width:0;display:flex;flex-direction:column;gap:5px}
+.transfer-hero-copy>span,
+.transfer-state>span,
+.transfer-next>div>span{
+  color:#8092a5;
+  font-size:12px;
+  font-weight:650;
+}
+.transfer-hero-copy>strong{
+  color:#14223b;
+  font-size:25px;
+  line-height:1.18;
+  font-weight:730;
+  letter-spacing:-.4px;
+}
+.transfer-hero-copy>small{color:#708399;font-size:12.5px}
+.transfer-state{
+  min-width:160px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+}
+.transfer-state strong{color:#31516d;font-size:16px;font-weight:680}
+.queue-cards{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+}
+.queue-compact-card{
+  min-width:0;
+  min-height:104px;
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr) auto;
+  align-items:center;
+  gap:12px;
+  padding:16px 17px;
+  border:1px solid rgba(211,223,232,.72);
+  border-radius:16px;
+  background:rgba(255,255,255,.56);
+  box-shadow:0 5px 18px rgba(52,82,108,.025);
+}
+.queue-compact-card .queue-glyph{
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  font-size:18px;
+}
+.queue-compact-card>div{min-width:0;display:flex;flex-direction:column;gap:5px}
+.queue-compact-card>div strong{color:#263b53;font-size:15px;font-weight:700}
+.queue-compact-card>div small{color:#8091a2;font-size:11.5px;line-height:1.35}
+.queue-compact-card>b{
+  justify-self:end;
+  color:#172640;
+  font-size:30px;
+  line-height:1;
+  font-weight:730;
+  font-variant-numeric:tabular-nums;
+}
+.queue-compact-card.priority>b{color:#bd8722}
+.queue-compact-card.normal>b{color:#1687df}
+.queue-compact-card.review.attention>b{color:#c8643d}
+.transfer-next{
+  min-height:76px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  padding:15px 18px;
+  border-radius:15px;
+  background:rgba(235,243,248,.62);
+}
+.transfer-next>div{min-width:0;display:flex;flex-direction:column;gap:5px}
+.transfer-next>div strong{
+  color:#263c54;
+  font-size:14.5px;
+  line-height:1.45;
+  font-weight:650;
+}
+.transfer-route{
+  flex:none;
+  color:#4b708d;
+  font-size:13px;
+  font-weight:670;
+}
+.transfer-page .coverage-footer{
+  margin-top:0;
+  padding:5px 4px 0;
+  border-top:0;
+  grid-template-columns:122px minmax(0,1fr) auto;
+  font-size:12.5px;
+}
+.transfer-page .coverage-footer strong{font-size:12.5px}
+
+.recycle-tabs button{font-size:14px;min-width:112px;padding:10px 16px}
+.recycle-tabs button span{font-size:11.5px}
+.recycle-table{font-size:13.5px}
+.recycle-table th{font-size:12.5px;padding:11px 14px}
+.recycle-table td{padding:15px 14px;font-size:13.5px}
+.recycle-table td strong{font-size:14px}
+.state-pill{font-size:12px;padding:6px 10px}
+.recycle-actions>span{font-size:13px}
+.secondary-button,.danger-button{font-size:13px}
+.empty-cell{font-size:14px}
+
+.docs-page{
+  display:block;
+  overflow:auto;
+  scrollbar-width:none;
+}
+.docs-page::-webkit-scrollbar{width:0;height:0}
+.doc-nav{display:none}
+.doc-content{
+  width:min(790px,100%);
+  margin:0 auto;
+  padding:0 28px 44px;
+}
+.doc-content section{padding-bottom:30px}
+.doc-content h2{
+  margin:0 0 11px;
+  font-size:21px;
+  line-height:1.28;
+}
+.doc-content p{
+  max-width:none;
+  font-size:14.25px;
+  line-height:1.82;
+  color:#5c7187;
+}
+.doc-content code{font-size:12.5px}
+.doc-content details{
+  max-width:none;
+  margin:12px 0;
+  padding:14px 16px;
+}
+.doc-content summary{font-size:14px}
+
+.activity-drawer{width:390px}
+.activity-drawer header{padding:20px 20px 16px}
+.activity-drawer header span{font-size:16px}
+.activity-drawer header small{font-size:11px}
+.activity-list{padding:9px 14px 18px}
+.activity-list article{
+  grid-template-columns:84px minmax(0,1fr);
+  gap:13px;
+  padding:14px 9px;
+}
+.activity-list time{font-size:11px}
+.activity-list strong{font-size:13.5px}
+.activity-list span{font-size:12px;line-height:1.5}
+.activity-empty{font-size:12.5px}
+
+@media(max-width:999px){
+  .queue-cards{gap:10px}
+  .queue-compact-card{grid-template-columns:36px minmax(0,1fr);min-height:96px;padding:13px}
+  .queue-compact-card .queue-glyph{width:34px;height:34px}
+  .queue-compact-card>b{grid-column:2;font-size:24px;justify-self:start}
+  .queue-compact-card>div strong{font-size:13.5px}
+  .queue-compact-card>div small{font-size:10.5px}
+  .activity-drawer{width:min(370px,calc(100vw - 190px))}
+}
+@media (min-width:1000px) and (min-height:740px){
+  .quota-card{align-items:center;padding-top:0;padding-bottom:0}
+  .transfer-page{padding-top:34px;gap:20px}
+  .transfer-page .coverage-footer{margin-top:0;padding-top:5px;border-top:0}
+}

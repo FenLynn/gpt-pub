@@ -27,6 +27,29 @@ const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => re
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
 const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
+const sideStatusGlyph = computed(() => {
+  const text = `${snapshot.value.engineState} ${snapshot.value.routeStatus}`
+  if (/暂停/.test(text)) return 'Ⅱ'
+  if (/运行|迁移中/.test(text)) return '▶'
+  if (/网络/.test(text)) return '⌁'
+  if (/额度|周期/.test(text)) return '◷'
+  if (/人工|审查/.test(text)) return '!'
+  if (/完成/.test(text)) return '✓'
+  return '•'
+})
+const sideStatusSecondary = computed(() => {
+  if (snapshot.value.routeStatus && snapshot.value.routeStatus !== snapshot.value.engineState) return snapshot.value.routeStatus
+  return snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : '查看最近活动'
+})
+const transferNextText = computed(() => {
+  if (snapshot.value.humanActionCount > 0) return `先处理 ${snapshot.value.humanActionCount} 组人工审查，再继续自动队列`
+  if (snapshot.value.primaryAction === 'resume') {
+    if (snapshot.value.priorityCount > 0) return `恢复后先处理 ${snapshot.value.priorityCount} 组变化修复`
+    if (snapshot.value.normalCount > 0) return `恢复后继续处理 ${snapshot.value.normalCount} 组普通迁移`
+    return '恢复后重新检查当前清单'
+  }
+  return snapshot.value.currentDetail || snapshot.value.routeStatus
+})
 const resetLabel = computed(() => {
   const match = snapshot.value.quota.resetText.match(/(\d{4})-(\d{2})-(\d{2}).*?(\d{2}:\d{2})/)
   return match ? `${match[2]}/${match[3]} ${match[4]} 重置` : snapshot.value.quota.resetText
@@ -129,8 +152,8 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     </nav>
 
     <button type="button" class="side-status has-tip" :data-tip="sideStatusTip" @click="showActivity=true">
-      <i :class="`tone-${snapshot.routeTone}`"></i>
-      <div><strong>{{ snapshot.engineState }}</strong><small>{{ snapshot.routeStatus }}</small></div>
+      <span class="side-status-icon" :class="`tone-${snapshot.routeTone}`" aria-hidden="true">{{ sideStatusGlyph }}</span>
+      <div><strong>{{ snapshot.engineState }}</strong><small>{{ sideStatusSecondary }}</small></div>
     </button>
   </aside>
 
@@ -235,43 +258,49 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     </section>
 
     <section v-else-if="tab==='transfer'" class="page transfer-page">
-      <section class="queue-summary">
-        <div class="queue-summary-copy">
-          <span>当前调度</span>
+      <section class="transfer-hero">
+        <div class="transfer-hero-copy">
+          <span>迁移队列</span>
           <strong>{{ queueHeadline }}</strong>
-          <small>{{ snapshot.routeStatus }}<template v-if="snapshot.cycleId"> · Cycle {{ snapshot.cycleId }}</template></small>
+          <small><template v-if="snapshot.cycleId">Cycle {{ snapshot.cycleId }} · </template>{{ snapshot.routeStatus }}</small>
         </div>
-        <span class="queue-rule has-tip" data-tip="变化修复始终优先于普通迁移；需要人工审查时，DavBridge 会安全停在审查门前。">调度规则 <b>i</b></span>
-      </section>
-
-      <section class="queue-list" aria-label="迁移队列">
-        <article class="queue-row priority">
-          <div class="queue-glyph">↻</div>
-          <div class="queue-row-main"><strong>变化修复</strong><span class="has-tip" data-tip="历史 StrongVerified 附件组在源端发生真实内容变化，必须优先恢复镜像一致性。">历史镜像变化</span></div>
-          <div class="queue-count"><b>{{ snapshot.priorityCount }}</b><small>最高优先</small></div>
-        </article>
-        <article class="queue-row normal">
-          <div class="queue-glyph">⇢</div>
-          <div class="queue-row-main"><strong>普通迁移</strong><span class="has-tip" data-tip="尚未迁移的既有 backlog 与本周期新增附件组进入同一个稳定队列。">自动队列</span></div>
-          <div class="queue-count"><b>{{ snapshot.normalCount }}</b><small>按序处理</small></div>
-        </article>
-        <article class="queue-row review" :class="{attention:snapshot.humanActionCount>0}">
-          <div class="queue-glyph">✓</div>
-          <div class="queue-row-main"><strong>人工审查</strong><span class="has-tip" data-tip="跨周期仍从源端缺失的历史 StrongVerified 组，需要你明确选择保留或删除。">回收站安全门</span></div>
-          <div class="queue-count"><b>{{ snapshot.humanActionCount }}</b><small>{{ snapshot.humanActionCount ? '需要决定' : '无需处理' }}</small></div>
-        </article>
-      </section>
-
-      <article class="work-card">
-        <div class="work-icon"><span></span></div>
-        <div class="work-copy">
-          <div class="work-label-row"><span>当前执行</span><span class="info-dot has-tip" :data-tip="snapshot.currentDetail">i</span></div>
+        <div class="transfer-state">
+          <span>当前状态</span>
           <strong>{{ snapshot.currentTitle }}</strong>
         </div>
-        <div class="work-state">{{ snapshot.currentProgress===null?snapshot.routeStatus:`${Math.round(snapshot.currentProgress*100)}%` }}</div>
-      </article>
+      </section>
 
-      <div class="coverage-footer"><span>总体镜像覆盖</span><div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div><strong>{{ snapshot.verified }} / {{ snapshot.total }} · {{ coveragePercent }}%</strong></div>
+      <section class="queue-cards" aria-label="迁移队列概览">
+        <article class="queue-compact-card priority">
+          <span class="queue-glyph">↻</span>
+          <div><strong>变化修复</strong><small>历史镜像变化，最高优先</small></div>
+          <b>{{ snapshot.priorityCount }}</b>
+        </article>
+        <article class="queue-compact-card normal">
+          <span class="queue-glyph">⇢</span>
+          <div><strong>普通迁移</strong><small>既有 backlog 与新增对象</small></div>
+          <b>{{ snapshot.normalCount }}</b>
+        </article>
+        <article class="queue-compact-card review" :class="{attention:snapshot.humanActionCount>0}">
+          <span class="queue-glyph">✓</span>
+          <div><strong>人工审查</strong><small>{{ snapshot.humanActionCount ? '需要你明确决定' : '当前无需处理' }}</small></div>
+          <b>{{ snapshot.humanActionCount }}</b>
+        </article>
+      </section>
+
+      <section class="transfer-next">
+        <div>
+          <span>{{ snapshot.primaryAction==='resume' ? '恢复后' : '当前动作' }}</span>
+          <strong>{{ transferNextText }}</strong>
+        </div>
+        <span class="transfer-route">{{ snapshot.routeStatus }}</span>
+      </section>
+
+      <div class="coverage-footer">
+        <span>总体镜像覆盖</span>
+        <div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div>
+        <strong>{{ snapshot.verified }} / {{ snapshot.total }} · {{ coveragePercent }}%</strong>
+      </div>
     </section>
 
     <section v-else-if="tab==='recycle'" class="page recycle-page">
@@ -284,7 +313,6 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     </section>
 
     <section v-else-if="tab==='docs'" class="page docs-page">
-      <aside class="doc-nav"><a href="#overview-doc">使用概览</a><a href="#mirror-doc">镜像原则</a><a href="#verified-doc">StrongVerified</a><a href="#cycle-doc">Cycle 与额度</a><a href="#audit-doc">源端对账</a><a href="#recycle-doc">回收站</a><a href="#delete-doc">删除安全</a><a href="#faq-doc">常见问题</a></aside>
       <article class="doc-content">
         <section id="overview-doc"><h2>DavBridge 是什么</h2><p>DavBridge 长期维护 Zotero 附件从 InfiniCLOUD 到坚果云的单向强校验镜像。InfiniCLOUD 始终是唯一 authoritative source，坚果云只保存已经确认或正在建立的镜像副本。</p></section>
         <section id="mirror-doc"><h2>镜像原则</h2><p>源端只读，不做双向同步，不把坚果云变化反写 InfiniCLOUD。Zotero 的 <code>.zip + .prop</code> 作为逻辑附件组处理。</p></section>

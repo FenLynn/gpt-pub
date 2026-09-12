@@ -263,7 +263,7 @@ internal sealed class SettingsDialog : Form
         AddSubTitle(table, "InfiniCLOUD");
         AddField(table, "WebDAV URL", _sourceUrl);
         AddField(table, "源目录", _sourceRoot);
-        AddField(table, "Connection ID / User ID", _sourceUser);
+        AddField(table, "User ID", _sourceUser);
         AddPasswordField(table, "Apps Password", _sourcePassword);
 
         AddSubTitle(table, "坚果云");
@@ -451,7 +451,7 @@ internal sealed class SettingsDialog : Form
             BackColor = Color.FromArgb(248, 251, 254),
             Padding = Padding.Empty
         };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 154));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         return table;
     }
@@ -568,13 +568,8 @@ internal sealed class SettingsDialog : Form
     private static int PreferredFieldWidth(string label, Control control)
     {
         if (control is NumericUpDown) return 176;
-        if (label.Contains("URL", StringComparison.OrdinalIgnoreCase)) return 430;
-        if (label.Contains("目录", StringComparison.OrdinalIgnoreCase)) return 340;
-        if (label.Contains("User", StringComparison.OrdinalIgnoreCase) ||
-            label.Contains("邮箱", StringComparison.OrdinalIgnoreCase)) return 300;
-        if (label.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
-            label.Contains("密码", StringComparison.OrdinalIgnoreCase)) return 300;
-        return 320;
+        if (control is TextBox) return 430;
+        return 360;
     }
 
     private static Label FieldLabel(string text) => new()
