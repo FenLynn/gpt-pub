@@ -1,4 +1,4 @@
-export type PageKey = "live" | "batch" | "models" | "settings" | "docs";
+export type PageKey = "home" | "live" | "batch" | "models" | "settings" | "docs";
 
 export interface LiveModelOption {
   id: string;
@@ -80,9 +80,34 @@ export interface LocalSubSnapshot {
   };
   settings: {
     audioSource: string;
-    resourceProfile: string;
+    audioSourceId: "potplayer" | "allAudio";
+    resourceProfile: "Eco" | "Auto" | "MaxPerformance";
+    minimizeToTray: boolean;
+    startWithWindows: boolean;
+    startupRegistered: boolean;
+    silentStartup: boolean;
+    autoStartLive: boolean;
+    showLiveLevelHistory: boolean;
     subtitleAutoSize: boolean;
     subtitleFontSize: number;
+    subtitleAutoScalePercent: number;
+    subtitleBottomOffset: number;
+    subtitleMaxWidthPercent: number;
+    subtitleBackground: "None" | "Light" | "Dark";
+    subtitleBackgroundOpacity: number;
+    subtitleDisplaySeconds: number;
+    subtitleCurrentColor: string;
+    subtitlePreviousColor: string;
+    subtitlePreviousScalePercent: number;
+    subtitlePreviousOpacity: number;
+    subtitleOutlineColor: string;
+    subtitleOutlineWidth: number;
+    subtitleShadowOpacity: number;
+  };
+  system: {
+    potPlayerDetected: boolean;
+    autoStartPending: boolean;
+    autoStartStatus: string;
   };
 }
 
@@ -172,7 +197,7 @@ const fallbackCatalog: ModelCatalogItem[] = [
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.5", activePage: "live", busy: false, lastError: null },
+  app: { productVersion: "0.1.6", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
@@ -214,16 +239,44 @@ const fallback: LocalSubSnapshot = {
       canCancel: false
     }
   },
-  settings: { audioSource: "PotPlayer", resourceProfile: "Auto", subtitleAutoSize: true, subtitleFontSize: 28 }
+  settings: {
+    audioSource: "PotPlayer",
+    audioSourceId: "potplayer",
+    resourceProfile: "Auto",
+    minimizeToTray: true,
+    startWithWindows: false,
+    startupRegistered: false,
+    silentStartup: false,
+    autoStartLive: false,
+    showLiveLevelHistory: true,
+    subtitleAutoSize: true,
+    subtitleFontSize: 28,
+    subtitleAutoScalePercent: 100,
+    subtitleBottomOffset: 24,
+    subtitleMaxWidthPercent: 90,
+    subtitleBackground: "None",
+    subtitleBackgroundOpacity: 24,
+    subtitleDisplaySeconds: 3,
+    subtitleCurrentColor: "#FFFFFF",
+    subtitlePreviousColor: "#D8D8D8",
+    subtitlePreviousScalePercent: 66,
+    subtitlePreviousOpacity: 72,
+    subtitleOutlineColor: "#000000",
+    subtitleOutlineWidth: 1.5,
+    subtitleShadowOpacity: 55
+  },
+  system: { potPlayerDetected: true, autoStartPending: false, autoStartStatus: "" }
 };
 
 const previewPage = new URLSearchParams(window.location.search).get("page");
 let fallbackPage: PageKey =
-  previewPage === "batch" || previewPage === "models" || previewPage === "settings" || previewPage === "docs"
+  previewPage === "home" || previewPage === "live" || previewPage === "batch" || previewPage === "models" || previewPage === "settings" || previewPage === "docs"
     ? previewPage
-    : "live";
+    : "home";
 let fallbackLive = { ...fallback.live };
 let fallbackModels = { ...fallback.models, catalog: fallback.models.catalog.map(x => ({ ...x })) };
+let fallbackSettings = { ...fallback.settings };
+let fallbackSystem = { ...fallback.system };
 let sequence = 0;
 const pending = new Map<string, { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }>();
 const snapshotSubscribers = new Set<(snapshot: LocalSubSnapshot) => void>();
@@ -265,7 +318,9 @@ function fallbackSnapshot(): LocalSubSnapshot {
     ...fallback,
     app: { ...fallback.app, activePage: fallbackPage, busy: fallbackLive.state === "starting" || fallbackLive.state === "stopping" },
     live: { ...fallbackLive },
-    models: { ...fallbackModels, catalog: fallbackModels.catalog.map(x => ({ ...x })) }
+    models: { ...fallbackModels, catalog: fallbackModels.catalog.map(x => ({ ...x })) },
+    settings: { ...fallbackSettings },
+    system: { ...fallbackSystem }
   };
 }
 
@@ -351,6 +406,20 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         operation: { ...fallbackModels.operation, state: "idle", kind: null, stage: "已取消", canCancel: false }
       };
     }
+    if (method === "settings.update") {
+      fallbackSettings = { ...fallbackSettings, ...params } as typeof fallbackSettings;
+      if (typeof params.audioSource === "string") {
+        const sourceId = params.audioSource === "allAudio" ? "allAudio" : "potplayer";
+        fallbackLive = {
+          ...fallbackLive,
+          sourceId,
+          source: sourceId === "allAudio" ? "所有音频" : "PotPlayer"
+        };
+      }
+    }
+    if (method === "settings.previewSubtitle") {
+      // Browser preview has no native overlay. The settings snapshot still round-trips.
+    }
     if (method === "model.select") {
       const target = params.target === "batch" ? "batch" : params.target === "live" ? "live" : "";
       const modelId = typeof params.modelId === "string" ? params.modelId : "";
@@ -384,6 +453,8 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
     if (
       method === "app.getSnapshot" ||
       method === "app.navigate" ||
+      method === "settings.update" ||
+      method === "settings.previewSubtitle" ||
       method === "live.start" ||
       method === "live.stop" ||
       method === "model.list" ||
