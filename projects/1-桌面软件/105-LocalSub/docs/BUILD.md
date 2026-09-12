@@ -67,6 +67,22 @@ CI 负责 P105 路径 scope gate、Shell/Core publish、Core Named Pipe 真连�
 
 旧 `.github/workflows/p103-localsub-win-x64.yml` 属于编号错误历史，不再使用。
 
+## 启动方式
+
+v0.1.3 起普通双击或直接运行：
+
+```powershell
+.\LocalSub.exe
+```
+
+默认进入 Web UI。迁移期如需旧 WinForms 备用界面：
+
+```powershell
+.\LocalSub.exe --legacy-ui
+```
+
+也可临时设置 `LOCALSUB_LEGACY_UI=1`。该备用入口只用于迁移期对照与尚未迁移页面，不是默认产品入口。
+
 ## 增量覆盖交付
 
 Phase 1A 起，若本轮架构或 Core 有变化，最小覆盖集为：

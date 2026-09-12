@@ -41,8 +41,8 @@ LocalSub 已积累并实机验证大量 Windows/C# 技术资产，包括 Process
 
 - Shell / Core：C# .NET 8
 - IPC：Windows Named Pipe，newline-delimited JSON
-- 当前业务 UI：WinForms，暂时作为验证壳
-- Phase 2A 主 UI：WebView2 + Vue 3 + TypeScript，开始建立
+- 当前默认业务 UI：WebView2 + Vue 3 + TypeScript，v0.1.3 起普通启动直接进入 WebShell
+- 旧 WinForms：迁移期显式备用入口，仅 `--legacy-ui` 或 `LOCALSUB_LEGACY_UI=1` 启动
 - 字幕 Overlay：透明 TopMost WebView2
 - Rust：当前不引入
 
@@ -188,7 +188,7 @@ Shell 只保留 PotPlayer 进程发现、PID、窗口位置、最小化状态和
 
 最后完整验证代码 head：`3c31bd4951304ba637eee2fc8ed60d5f66fa6bc5`，P105 Windows CI run `34583489679` success。
 
-Phase 2A 继续遵守冻结 DTO 与白名单边界，默认启动仍保留旧 WinForms。
+Phase 2A 继续遵守冻结 DTO 与白名单边界。v0.1.3 起 WebShell 已成为默认启动入口，旧 WinForms 只保留显式备用。
 
 
 ### Phase 1B.2：模型重任务迁入 Core
@@ -211,7 +211,7 @@ Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重�
 
 ### Phase 2B：逐页切换
 
-状态：**实时字幕页与模型页第一闭环完成，后台与设置待迁移。**
+状态：**实时字幕页与模型页第一闭环完成，WebShell 已成为默认入口，后台与设置待迁移。**
 
 推荐顺序：
 
@@ -224,9 +224,9 @@ Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重�
 
 当前 realtime Web 页第一闭环保留。模型页已经通过 `WebShellForm → ModelCatalogController → CoreWorkerClient → LocalSub.Core.exe` 接入同一 Application Contract，支持查看、默认选择、下载/修复、取消和删除。
 
-当前模型页与 Phase 1B.2 最后完整验证代码 head：`ddc0ca3062cde51edafbff9762f611a3191a2a93`，P105 Windows CI run `34676285292` success。
+当前模型页与 Phase 1B.2 已完成既有闭环。v0.1.3 启动策略切换的完整验证代码 head 为 `753a959e938a672e367c9f3a8638226dca841367`，P105 Windows CI run `34690755412` success。
 
-每一页切换后继续复用同一个 Application Contract。下一页为后台转写工作区，必须复用现有 Core 分析与转写链，不复制旧 WinForms 业务核心。
+每一页切换后继续复用同一个 Application Contract。下一页为后台转写工作区，必须复用现有 Core 分析与转写链，不复制旧 WinForms 业务核心。旧 WinForms 在该迁移阶段仅作为显式备用入口。
 
 
 ### Phase 3：轻量 Shell 收口

@@ -19,7 +19,8 @@ Phase 1A 与 Phase 1B.1 第一闭环已经形成：
 
 ```text
 LocalSub.exe
-├─ WinForms 主界面，当前作为验证壳
+├─ Vue 3 + TypeScript / WebView2 主界面，v0.1.3 起默认入口
+├─ 旧 WinForms 备用界面，仅显式 `--legacy-ui` 启动
 ├─ 托盘
 ├─ WebView2 字幕 Overlay
 ├─ PotPlayer 进程发现与窗口跟随
@@ -56,7 +57,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- 当前开发候选版本为 v0.1.2；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.3；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
@@ -64,13 +65,15 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - 用户特定媒体、模型和机器条件下的高负载 GUI 响应性仍属于实机待验证项。
 - Phase 1B.0 Application Contract 已完成第一版。
 - Phase 1B.1 realtime Core 迁移第一闭环已完成，最后完整验证代码 head 为 `944cc4674b3fecefae5ef88c1c4bc88f30918013`，CI run `34581474053` success。
-- Phase 2A Web Shell 第一闭环已完成，Vue 3 + TypeScript + Vite production bundle 已嵌入 `LocalSub.exe`，真实 WebView2 bridge smoke 已通过；默认启动仍保留旧 WinForms。
+- Phase 2A Web Shell 第一闭环已完成，Vue 3 + TypeScript + Vite production bundle 已嵌入 `LocalSub.exe`，真实 WebView2 bridge smoke 已通过。
 - Phase 2A 最后完整验证代码 head 为 `3c31bd4951304ba637eee2fc8ed60d5f66fa6bc5`，CI run `34583489679` success。
 - Phase 2B 实时字幕页第一闭环已完成，Web bridge 已接入 `live.start / live.stop`，并通过独立 `LiveSessionController` 复用现有 Core realtime session，没有把旧 `MainForm` 业务逻辑复制到 Vue。
 - Phase 1B.2 模型重任务迁 Core 第一闭环已完成：重型 `ModelManager` 仅编入 Core，Shell 使用 proxy，且不再依赖 SharpCompress。
 - Phase 2B 模型页第一闭环已完成：Web bridge 已接入 `model.list / model.select / model.download / model.cancel / model.delete`，并显示模型任务进度、错误和取消状态。
 - 旧 WinForms realtime、后台与模型任务已统一到 shared Core broker，模型删除进入破坏性阶段后不可由用户取消。
-- 当前最新完整验证代码 head 为 `bf3fd8fc0fe551550ef94b0f5918a645a94e5d99`，P105 Windows CI run `34682646712` success；candidate Artifact `10295025917`，WebUi preview Artifact `10294586606`。
+- v0.1.3 起普通双击 `LocalSub.exe` 默认进入 Web UI。旧 WinForms 不再默认出现，仅通过 `LocalSub.exe --legacy-ui` 或 `LOCALSUB_LEGACY_UI=1` 作为迁移期备用入口。
+- WebShell 已挂接既有托盘控制器与 UI 响应监控，默认入口切换不牺牲这两项 Shell 能力。
+- 当前最新完整验证代码 head 为 `753a959e938a672e367c9f3a8638226dca841367`，P105 Windows CI run `34690755412` success；candidate Artifact `10296548335`，WebUi preview Artifact `10296318757`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。

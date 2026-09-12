@@ -375,6 +375,16 @@ Shell 找到 PID
 
 每一页切换到 Web UI 后，都必须继续使用同一个 Application Contract，不在 Vue 中复制旧控件事件处理逻辑。
 
+### 默认主界面与迁移期回退
+
+自 v0.1.3 起，普通启动 `LocalSub.exe` 直接进入 WebView2/Vue 主界面。旧 WinForms 不再默认出现，只作为尚未完成后台与设置迁移期间的显式备用入口：
+
+```text
+LocalSub.exe --legacy-ui
+```
+
+也可使用 `LOCALSUB_LEGACY_UI=1`。该备用入口不改变三层所有权，不允许 WebShell 在 Core 故障时退回 WinForms 执行重任务。Phase 3 删除旧 WinForms 后同时删除该备用入口。
+
 ## 12. 新阶段顺序
 
 调整后的迁移阶段：

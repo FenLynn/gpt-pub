@@ -75,8 +75,8 @@ p105-exp
 
 ```text
 LocalSub.exe
-├─ WinForms 主界面，当前仍为默认入口与验证壳
-├─ Phase 2A Vue/WebView2 主 Shell，当前为显式预览入口
+├─ Vue/WebView2 主 Shell，v0.1.3 起默认入口
+├─ 旧 WinForms 备用界面，仅 `--legacy-ui` 或 `LOCALSUB_LEGACY_UI=1` 显式启动
 ├─ WebView2 字幕 Overlay
 ├─ PotPlayer 进程发现、PID、窗口 bounds 与最小化状态
 ├─ Shell LiveAsrPipeline proxy
@@ -188,18 +188,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 1B.2 + Phase 2B` 模型页第一闭环完成。
+当前 Phase：`Phase 2B` Web UI 已切为默认入口，后台转写与设置页仍待迁移。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-bf3fd8fc0fe551550ef94b0f5918a645a94e5d99
+753a959e938a672e367c9f3a8638226dca841367
 ```
 
 P105 Windows CI：
 
 ```text
-run 34682646712
+run 34690755412
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10295025917
-sha256:215099d6179a01379b9ab5d922e069d37ee235cb8738bde15312cbcc360f1eea
+ID 10296548335
+sha256:bc04d00dc07539fa225ef230bf6b8103ee7b18b476ea1b76f8a140b19000c570
 
 WebUi preview
-ID 10294586606
-sha256:9f9b461b4163986e6d78259b3404ae6d3b30b3c2ef356faef6cae3220ef7503a
+ID 10296318757
+sha256:61b618798951cf491903955dd0afd5e317e33e5c5ac4fbd187d8a813c81882ca
 ```
 
 本阶段已经完成：
@@ -228,15 +228,15 @@ sha256:9f9b461b4163986e6d78259b3404ae6d3b30b3c2ef356faef6cae3220ef7503a
 - CI 已覆盖模型重实现编译隔离、Core `model.download / model.delete` IPC 失败恢复、真实 WebView2 模型命令 bridge、原 realtime/Core crash recovery/Process Loopback/native ASR 与 portable package 回归。
 - 模型页 1280×800 自动预览已人工检查，视觉语言与实时页一致，无明显溢出或布局塌陷。
 
-默认启动路径仍未切换，正常运行继续进入旧 WinForms。Web Shell 继续作为显式预览与逐页迁移入口。
+v0.1.3 已切换默认启动路径：普通双击进入 WebShell。旧 WinForms 只作为迁移期备用界面，通过 `LocalSub.exe --legacy-ui` 或 `LOCALSUB_LEGACY_UI=1` 显式启动。默认 WebShell 已接入既有托盘控制器与 UI 响应监控。
 
 下一步固定为：
 
 1. 不提升 stable，不动 main。
 2. 在真实 Windows 上同时验证 realtime 与模型管理：真实 PotPlayer、真实模型、模型下载/修复、断点续传、取消、大模型解压、删除、Core 强杀与恢复。
-3. 实机没有阻断问题后，进入 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
+3. 继续进入 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
 4. 后台页完成后迁设置编辑与 Overlay 联动细节。
-5. realtime、模型、后台、设置均完成必要验证前，不切换默认主界面。
+5. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台与设置达到必要功能覆盖后再进入 Phase 3 删除。
 
 ## 9. Web UI 约束
 
@@ -278,7 +278,7 @@ Vue 不得：
 
 当前开发候选版本：
 
-- Development Version：`0.1.2`
+- Development Version：`0.1.3`
 - 当前正式 Release / RELEASE.md：`0.1.1`
 - 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 
