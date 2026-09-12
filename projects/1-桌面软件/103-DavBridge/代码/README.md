@@ -6,23 +6,23 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.13**。
+当前 `p103-exp` 候选：**v0.4.14**。
 
 最后完成完整 CI 的代码 head：
 
 ```text
-09aa5495bf1c914bf3a18cc8800be17076a1e21f
+378bb37707a3a5f1d685427edb77294d916acdcc
 ```
 
-CI run：`34707132029`，结果 `success`。
+CI run：`34726420112`，结果 `success`。
 
-候选 Artifact：`DavBridge-v0.4.13-win-x64`，Artifact ID `10302216592`。
+候选 Artifact：`DavBridge-v0.4.14-win-x64`，Artifact ID `10307014716`。
 
-EXE SHA256：`dbda27fe28d79b64309de3c3f5dafaaa28ad51d2dc587c6546cb3bf38710ddd8`。
+EXE SHA256：`d9aed38fb757579c6a8b9c6ab84e5536d680c15b5ca0982d2cd93b43a27e092a`。
 
-Artifact ZIP SHA256：`ad6879dc4221decd2fe4eb1addaae4056d27b1f6301be051742973e855e505b8`。
+Artifact ZIP SHA256：`8edbc1b8bf7e3573807ce69509a9c56d48b7298fff985bf19b559966f74dc89d`。
 
-如果该 head 之后只有文档提交，仍以 `09aa5495...` 作为最后经过完整构建验证的代码 head。
+如果该 head 之后只有文档提交，仍以 `378bb377...` 作为最后经过完整构建验证的代码 head。
 
 ## 解决方案
 
@@ -236,8 +236,17 @@ Windows x64 使用 .NET 8 framework-dependent single EXE publish。
 .github/workflows/p103-davbridge-ci.yml
 ```
 
-最后已验证 run `34707132029` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
+最后已验证 run `34726420112` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
 
 ## 当前开发断点
 
-v0.4.13 等待用户 Windows 实机验证两阶段安全暂停。点击暂停必须立即显示“正在暂停”，当前 member 完成安全收尾后必须在下一 member 前真正停止并显示“已暂停 / 继续”。未经明确验收，不提升 stable/main，不创建正式 Release。
+v0.4.14 等待用户 Windows 实机连续验证“暂停 → 继续 → 再暂停”。继续命令必须立即释放 UI，任何真实 active run 都必须重新暴露黄色“暂停”。安全暂停期间按钮固定保留为灰色“正在暂停”，最终变为绿色“继续”。未经明确验收，不提升 stable/main，不创建正式 Release。
+
+
+### v0.4.14 重复暂停与主操作按钮
+
+手动“继续”不再等待整轮 `RunOnceAsync`，实际迁移 pass 在后台继续，从而避免 Vue `busy` 长时间锁住第二次暂停。
+
+Web snapshot 现在优先检查真实 `IsRunning`。只要迁移已启用且 pass 正在运行，主操作即为“暂停”，即使持久 `EngineState` 还短暂保留上一轮状态。
+
+主操作按钮固定占位：可点击暂停黄色，可点击继续/重试绿色，不可操作灰色。安全暂停中显示灰色“正在暂停”，不会因为按钮消失导致布局变化。
