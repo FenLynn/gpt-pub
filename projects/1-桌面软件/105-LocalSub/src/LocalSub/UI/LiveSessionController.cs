@@ -242,6 +242,33 @@ internal sealed class LiveSessionController : IAsyncDisposable
         }
     }
 
+    internal async Task ApplySettingsAsync(bool preview = false)
+    {
+        _settings = AppSettings.Load();
+        _models = new ModelManager(_settings);
+
+        await RunOnUiAsync(async () =>
+        {
+            if (_overlay == null || _overlay.IsDisposed)
+            {
+                if (!preview) return;
+                EnsureOverlay();
+            }
+
+            _overlay!.ApplySettings(_settings);
+            var snapshot = Snapshot;
+            if (snapshot.State == "running")
+            {
+                if (!_overlay.Visible) _overlay.Show();
+                await _overlay.SetTextAsync(snapshot.CurrentText, snapshot.PreviousText, ParseKeywords());
+            }
+            else if (preview)
+            {
+                await _overlay.PreviewAsync();
+            }
+        });
+    }
+
     internal void RefreshConfiguration()
     {
         _settings = AppSettings.Load();

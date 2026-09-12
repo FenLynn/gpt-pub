@@ -26,6 +26,9 @@ public sealed class AppSettings
     public ResourceProfile ResourceProfile { get; set; } = ResourceProfile.Auto;
     public bool MinimizeToTray { get; set; } = false;
     public bool StartWithWindows { get; set; } = false;
+    public bool SilentStartup { get; set; } = false;
+    public bool AutoStartLive { get; set; } = false;
+    public bool ShowLiveLevelHistory { get; set; } = true;
 
     public bool SubtitleAutoSize { get; set; } = true;
     public int SubtitleFontSize { get; set; } = 28;

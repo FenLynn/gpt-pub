@@ -20,6 +20,9 @@ internal static class Program
     static bool IsLegacyUiRequested =>
         Environment.GetEnvironmentVariable("LOCALSUB_LEGACY_UI") == "1" ||
         Environment.GetCommandLineArgs().Skip(1).Any(x => string.Equals(x, "--legacy-ui", StringComparison.OrdinalIgnoreCase));
+    static bool IsSilentStartup =>
+        !IsAnySmokeTest &&
+        Environment.GetCommandLineArgs().Skip(1).Any(x => string.Equals(x, "--startup-silent", StringComparison.OrdinalIgnoreCase));
     static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest || IsCoreRecoverySmokeTest || IsWebUiSmokeTest;
 
     [STAThread]
@@ -82,13 +85,18 @@ internal static class Program
         using var webShell = new WebShellForm(IsWebUiSmokeTest);
         LogStartup(startup, IsWebUiPreview ? "web-shell-preview-constructed" : "web-shell-constructed");
 
+        TrayController? tray = null;
         if (!IsWebUiSmokeTest)
         {
-            TrayController.Attach(webShell);
+            tray = TrayController.Attach(webShell);
             UiResponsivenessMonitor.Attach(webShell);
         }
 
-        webShell.Shown += (_, _) => LogStartup(startup, "window-shown", final: true);
+        webShell.Shown += (_, _) =>
+        {
+            LogStartup(startup, "window-shown", final: true);
+            if (IsSilentStartup) tray?.EnterBackground();
+        };
         Application.Run(webShell);
     }
 

@@ -1,5 +1,4 @@
 using System.Reflection;
-using Microsoft.Win32;
 using LocalSub.Core;
 using LocalSub.Models;
 using LocalSub.Services;
@@ -8,9 +7,6 @@ namespace LocalSub.UI;
 
 public static class SettingsFeatureEnhancer
 {
-    const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    const string RunValueName = "LocalSub";
-
     public static void Attach(Form root)
     {
         var tabs = FindControls<TabControl>(root).FirstOrDefault();
@@ -169,7 +165,7 @@ public static class SettingsFeatureEnhancer
         };
 
         var tray = new CheckBox { Text = "最小化到系统托盘", AutoSize = true, Checked = settings.MinimizeToTray };
-        var startup = new CheckBox { Text = "开机自动启动 LocalSub", AutoSize = true, Checked = IsStartupRegistered() || settings.StartWithWindows };
+        var startup = new CheckBox { Text = "开机自动启动 LocalSub", AutoSize = true, Checked = StartupRegistrationService.IsRegistered() || settings.StartWithWindows };
         flow.Controls.Add(tray);
         flow.Controls.Add(startup);
         flow.Controls.Add(new Label
@@ -197,8 +193,8 @@ public static class SettingsFeatureEnhancer
                 s.FfmpegPath = selectedFfmpegPath;
                 s.MinimizeToTray = tray.Checked;
                 s.StartWithWindows = startup.Checked;
-                ApplyStartupRegistration(startup.Checked);
                 s.Save();
+                StartupRegistrationService.Apply(s);
                 SyncMainSettings(root, s);
                 MessageBox.Show("字幕高级样式、性能、FFmpeg 与后台设置已保存。新的资源模式会在下一次启动识别任务时生效。", "LocalSub");
             }
@@ -291,27 +287,6 @@ public static class SettingsFeatureEnhancer
         row.Controls.Add(control);
         row.Controls.Add(new Label { Text = suffix, AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(8, 7, 0, 0) });
         return row;
-    }
-
-    static bool IsStartupRegistered()
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, false);
-            return !string.IsNullOrWhiteSpace(key?.GetValue(RunValueName) as string);
-        }
-        catch { return false; }
-    }
-
-    static void ApplyStartupRegistration(bool enabled)
-    {
-        using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath, true);
-        if (enabled)
-        {
-            var exe = Environment.ProcessPath ?? Path.Combine(PortablePaths.BaseDir, "LocalSub.exe");
-            key.SetValue(RunValueName, $"\"{exe}\"", RegistryValueKind.String);
-        }
-        else key.DeleteValue(RunValueName, false);
     }
 
     static IEnumerable<T> FindControls<T>(Control root) where T : Control
