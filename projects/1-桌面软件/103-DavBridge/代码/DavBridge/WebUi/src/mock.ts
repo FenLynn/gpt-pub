@@ -1,7 +1,7 @@
 import type { DavBridgeSnapshot } from './types'
 
 export const mockSnapshot: DavBridgeSnapshot = {
-  version: '0.4.9', buildCommit: 'preview', buildDate: '2026-09-12T13:00:00Z', cycleId: '260907', configured: true, engineState: '等待额度', routeStatus: '等待下一周期', routeTone: 'wait',
+  version: '0.4.10', buildCommit: 'preview', buildDate: '2026-09-12T14:50:00Z', cycleId: '260907', configured: true, engineState: '等待额度', routeStatus: '等待下一周期', routeTone: 'wait',
   phases: [
     { key: 'audit', label: '源端对账', state: 'done', hint: '本周期源端清单已经完成核对' },
     { key: 'repair', label: '变化修复', state: 'done', hint: '历史 StrongVerified 变化项已经处理' },

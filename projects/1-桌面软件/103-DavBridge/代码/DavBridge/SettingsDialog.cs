@@ -89,15 +89,6 @@ internal sealed class SettingsDialog : Form
         _autoResume.Checked = Config.AutoResume;
         _sprint.Checked = Config.EndOfCycleSprintEnabled;
 
-        if (_endpointLocked)
-        {
-            foreach (var box in new[] { _sourceUrl, _sourceRoot, _sourceUser, _targetUrl, _targetRoot, _targetUser })
-            {
-                box.ReadOnly = true;
-                box.ForeColor = Color.FromArgb(103, 120, 137);
-            }
-        }
-
         var save = CreateFooterButton("保存");
         var cancel = CreateFooterButton("取消");
         cancel.DialogResult = DialogResult.Cancel;
@@ -157,7 +148,7 @@ internal sealed class SettingsDialog : Form
         var categories = new[]
         {
             ("账户与端点", BuildAccountPanel(), _endpointLocked
-                ? "当前任务已有迁移记录，端点身份已锁定。密码仍可更新；若以后迁移到另一套端点，应创建新的迁移任务。"
+                ? "字段现在可以正常点击和编辑。已有迁移记录时，保存阶段仍会阻止 URL、目录或 User ID 改成另一套端点；密码可以正常更新。"
                 : "配置当前 Zotero 迁移任务的源端与目标端。密码仅保存在本机受保护存储中。"),
             ("流量与限速", BuildQuotaPanel(), "设置上传限速和安全预留，并在这里校准坚果云当前周期上传、下载已用量与下一次重置日期。"),
             ("后台运行", BuildBackgroundPanel(), "主窗口关闭后任务继续在托盘运行；只有托盘菜单“退出”才结束 DavBridge 进程。"),
@@ -503,8 +494,8 @@ internal sealed class SettingsDialog : Form
         if (HasExistingTransferRecords() && EndpointIdentityChanged(_original, proposed))
         {
             MessageBox.Show(this,
-                "当前任务已经有迁移和强校验记录。为避免把旧任务记录复用到另一套源端或目标端，不允许直接修改当前任务的端点身份。",
-                "端点身份已锁定", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "账户与端点字段可以正常编辑，但当前任务已经有迁移和强校验记录。为避免把旧账本误用于另一套端点，URL、目录或 User ID 的身份变化不能在当前任务中直接保存。应用密码仍可正常更新。",
+                "当前任务的端点身份受保护", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return false;
         }
 

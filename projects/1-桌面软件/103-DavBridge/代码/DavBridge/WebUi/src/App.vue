@@ -15,6 +15,8 @@ const toast = ref('')
 const notice = ref<{ title: string; message: string; tone: string } | null>(null)
 const showActivity = ref(false)
 const selected = ref(new Set<string>())
+const hoverTip = ref<{ text:string; left:number; top:number; above:boolean } | null>(null)
+let activeTipTarget:HTMLElement|null=null
 let detachSnapshot: (() => void) | undefined
 let detachNotice: (() => void) | undefined
 let toastTimer: number | undefined
@@ -27,15 +29,15 @@ const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => re
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
 const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
-const sideStatusGlyph = computed(() => {
+const sideStatusKind = computed(() => {
   const text = `${snapshot.value.engineState} ${snapshot.value.routeStatus}`
-  if (/暂停/.test(text)) return 'Ⅱ'
-  if (/运行|迁移中/.test(text)) return '▶'
-  if (/网络/.test(text)) return '⌁'
-  if (/额度|周期/.test(text)) return '◷'
-  if (/人工|审查/.test(text)) return '!'
-  if (/完成/.test(text)) return '✓'
-  return '•'
+  if (/暂停/.test(text)) return 'pause'
+  if (/运行|迁移中/.test(text)) return 'run'
+  if (/网络/.test(text)) return 'network'
+  if (/额度|周期/.test(text)) return 'wait'
+  if (/人工|审查/.test(text)) return 'review'
+  if (/完成/.test(text)) return 'complete'
+  return 'idle'
 })
 const sideStatusSecondary = computed(() => {
   if (snapshot.value.routeStatus && snapshot.value.routeStatus !== snapshot.value.engineState) return snapshot.value.routeStatus
@@ -72,6 +74,34 @@ const buildDateLabel = computed(() => {
   return Number.isNaN(date.getTime()) ? snapshot.value.buildDate : date.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
 })
 
+function tipElement(event:Event){
+  const node=event.target instanceof Element ? event.target : null
+  return node?.closest('[data-tip]') as HTMLElement | null
+}
+function showGlobalTip(event:Event){
+  const target=tipElement(event)
+  if(!target) return
+  const related=(event as MouseEvent).relatedTarget
+  if(related instanceof Node && target.contains(related)) return
+  const value=target.dataset.tip?.trim()
+  if(!value) return
+  const rect=target.getBoundingClientRect()
+  const above=rect.bottom+125>window.innerHeight && rect.top>140
+  const half=180
+  const left=Math.min(Math.max(rect.left+rect.width/2,half),Math.max(half,window.innerWidth-half))
+  hoverTip.value={text:value,left,top:above?rect.top-9:rect.bottom+9,above}
+  activeTipTarget=target
+}
+function hideGlobalTip(event:Event){
+  if(!activeTipTarget) return
+  const related=(event as MouseEvent).relatedTarget
+  if(related instanceof Node && activeTipTarget.contains(related)) return
+  const target=tipElement(event)
+  if(target!==activeTipTarget) return
+  hoverTip.value=null
+  activeTipTarget=null
+}
+function clearGlobalTip(){ hoverTip.value=null; activeTipTarget=null }
 function notify(message: string) { toast.value = message; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toast.value = '', 2600) }
 function showNotice(value:{ title:string; message:string; tone:string }) {
   notice.value=value
@@ -114,8 +144,27 @@ async function navigate(next:Tab){
   tab.value=next
 }
 function goOverview(){ if(tab.value==='settings'&&isNative) void invoke('app.closeSettings').catch(()=>{}); tab.value='overview' }
-onMounted(async()=>{ detachSnapshot=onSnapshot(value=>snapshot.value=value); detachNotice=onNotice(showNotice); window.addEventListener('davbridge:navigate-overview',goOverview); await refresh() })
-onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventListener('davbridge:navigate-overview',goOverview); if(toastTimer) window.clearTimeout(toastTimer); if(noticeTimer) window.clearTimeout(noticeTimer) })
+onMounted(async()=>{
+  detachSnapshot=onSnapshot(value=>snapshot.value=value)
+  detachNotice=onNotice(showNotice)
+  window.addEventListener('davbridge:navigate-overview',goOverview)
+  document.addEventListener('mouseover',showGlobalTip)
+  document.addEventListener('mouseout',hideGlobalTip)
+  window.addEventListener('scroll',clearGlobalTip,true)
+  window.addEventListener('resize',clearGlobalTip)
+  await refresh()
+})
+onBeforeUnmount(()=>{
+  detachSnapshot?.()
+  detachNotice?.()
+  window.removeEventListener('davbridge:navigate-overview',goOverview)
+  document.removeEventListener('mouseover',showGlobalTip)
+  document.removeEventListener('mouseout',hideGlobalTip)
+  window.removeEventListener('scroll',clearGlobalTip,true)
+  window.removeEventListener('resize',clearGlobalTip)
+  if(toastTimer) window.clearTimeout(toastTimer)
+  if(noticeTimer) window.clearTimeout(noticeTimer)
+})
 </script>
 
 <template>
@@ -144,7 +193,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     <div class="side-spacer"></div>
     <nav class="side-nav side-secondary">
       <button :class="{active:tab==='settings'}" @click="openSettings">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2m0 12.6v2.2M3.5 12h2.2m12.6 0h2.2M6 6l1.6 1.6m8.8 8.8L18 18M18 6l-1.6 1.6m-8.8 8.8L6 18"/><circle cx="12" cy="12" r="7.2"/></svg><span>设置</span>
+        <svg class="settings-gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg><span>设置</span>
       </button>
       <button :class="{active:tab==='about'}" @click="navigate('about')">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 10v6m0-9v.2"/></svg><span>关于</span>
@@ -152,7 +201,15 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     </nav>
 
     <button type="button" class="side-status has-tip" :data-tip="sideStatusTip" @click="showActivity=true">
-      <span class="side-status-icon" :class="`tone-${snapshot.routeTone}`" aria-hidden="true">{{ sideStatusGlyph }}</span>
+      <span class="side-status-icon" :class="`tone-${snapshot.routeTone}`" aria-hidden="true">
+        <svg v-if="sideStatusKind==='pause'" viewBox="0 0 24 24"><rect x="7" y="5" width="3.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="3.2" height="14" rx="1.2"/></svg>
+        <svg v-else-if="sideStatusKind==='run'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"/></svg>
+        <svg v-else-if="sideStatusKind==='network'" viewBox="0 0 24 24"><path d="M5 10.5a10 10 0 0 1 14 0M8 14a6 6 0 0 1 8 0M11.2 17.2a1.2 1.2 0 1 1 1.6 0"/></svg>
+        <svg v-else-if="sideStatusKind==='wait'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><path d="M12 7.5V12l3 2"/></svg>
+        <svg v-else-if="sideStatusKind==='review'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.5v6M12 16.8v.2"/></svg>
+        <svg v-else-if="sideStatusKind==='complete'" viewBox="0 0 24 24"><path d="m6.5 12.5 3.3 3.3 7.8-8"/></svg>
+        <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>
+      </span>
       <div><strong>{{ snapshot.engineState }}</strong><small>{{ sideStatusSecondary }}</small></div>
     </button>
   </aside>
@@ -200,7 +257,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
 
       <div class="dashboard-grid">
         <article class="dashboard-card coverage-card">
-          <div class="feature-icon coverage-feature" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="feature-icon coverage-feature" aria-hidden="true"><svg class="coverage-glyph" viewBox="0 0 48 48"><path class="coverage-axis" d="M10 38h28"/><rect x="11" y="24" width="6" height="11" rx="3"/><rect x="21" y="17" width="6" height="18" rx="3"/><rect x="31" y="10" width="6" height="25" rx="3"/><path class="coverage-check" d="m29.5 15.5 3 3 6-7"/></svg></div>
           <div class="coverage-copy">
             <div class="card-title"><h3>镜像覆盖</h3><span class="info-dot has-tip" data-tip="StrongVerified 表示源端与目标端均重新读取并完成 SHA-256 一致性验证">i</span></div>
             <span class="coverage-count">{{ snapshot.verified }} / {{ snapshot.total }} 已校准</span>
@@ -210,7 +267,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
         </article>
 
         <article class="dashboard-card quota-card">
-          <div class="feature-icon quota-feature" aria-hidden="true"><span>↑</span><span>↓</span></div>
+          <div class="feature-icon quota-feature" aria-hidden="true"><svg class="quota-glyph" viewBox="0 0 48 48"><path d="M17 35V13m0 0-5.5 5.5M17 13l5.5 5.5M31 13v22m0 0-5.5-5.5M31 35l5.5-5.5"/></svg></div>
           <div class="quota-content">
             <div class="quota-head">
               <div class="card-title"><h3>流量预算</h3><span class="info-dot has-tip" :data-tip="quotaTip">i</span></div>
@@ -258,49 +315,41 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     </section>
 
     <section v-else-if="tab==='transfer'" class="page transfer-page">
-      <section class="transfer-hero">
-        <div class="transfer-hero-copy">
+      <section class="transfer-head">
+        <div>
           <span>迁移队列</span>
           <strong>{{ queueHeadline }}</strong>
+        </div>
+        <div class="transfer-head-state">
+          <strong>{{ snapshot.currentTitle }}</strong>
           <small><template v-if="snapshot.cycleId">Cycle {{ snapshot.cycleId }} · </template>{{ snapshot.routeStatus }}</small>
         </div>
-        <div class="transfer-state">
-          <span>当前状态</span>
-          <strong>{{ snapshot.currentTitle }}</strong>
-        </div>
       </section>
 
-      <section class="queue-cards" aria-label="迁移队列概览">
-        <article class="queue-compact-card priority">
-          <span class="queue-glyph">↻</span>
-          <div><strong>变化修复</strong><small>历史镜像变化，最高优先</small></div>
-          <b>{{ snapshot.priorityCount }}</b>
+      <section class="transfer-list" aria-label="迁移队列概览">
+        <article class="transfer-row">
+          <div class="transfer-feature repair-feature" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M35.5 19A13 13 0 1 0 37 29"/><path d="M35.5 19V10m0 9h-9"/></svg></div>
+          <div class="transfer-label"><div class="card-title"><h3>变化修复</h3><span class="info-dot has-tip" data-tip="历史 StrongVerified 附件组发生真实内容变化时优先处理，先恢复既有镜像一致性。">i</span></div></div>
+          <b class="transfer-count repair">{{ snapshot.priorityCount }}</b>
         </article>
-        <article class="queue-compact-card normal">
-          <span class="queue-glyph">⇢</span>
-          <div><strong>普通迁移</strong><small>既有 backlog 与新增对象</small></div>
-          <b>{{ snapshot.normalCount }}</b>
+        <article class="transfer-row">
+          <div class="transfer-feature normal-feature" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M11 24h24"/><path d="m29 17 7 7-7 7"/></svg></div>
+          <div class="transfer-label"><div class="card-title"><h3>普通迁移</h3><span class="info-dot has-tip" data-tip="尚未迁移的既有 backlog 与本周期新增附件进入同一个普通队列，按安全调度顺序处理。">i</span></div></div>
+          <b class="transfer-count normal">{{ snapshot.normalCount }}</b>
         </article>
-        <article class="queue-compact-card review" :class="{attention:snapshot.humanActionCount>0}">
-          <span class="queue-glyph">✓</span>
-          <div><strong>人工审查</strong><small>{{ snapshot.humanActionCount ? '需要你明确决定' : '当前无需处理' }}</small></div>
-          <b>{{ snapshot.humanActionCount }}</b>
+        <article class="transfer-row">
+          <div class="transfer-feature review-feature" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 8 37 13v10c0 8.5-5.4 13.8-13 17-7.6-3.2-13-8.5-13-17V13Z"/><path d="m18.5 24 4 4 7.5-8"/></svg></div>
+          <div class="transfer-label"><div class="card-title"><h3>人工审查</h3><span class="info-dot has-tip" data-tip="只有跨周期仍从源端缺失的历史 StrongVerified 附件组才需要人工决定保留或删除。">i</span></div></div>
+          <b class="transfer-count review" :class="{attention:snapshot.humanActionCount>0}">{{ snapshot.humanActionCount }}</b>
         </article>
       </section>
 
-      <section class="transfer-next">
-        <div>
-          <span>{{ snapshot.primaryAction==='resume' ? '恢复后' : '当前动作' }}</span>
-          <strong>{{ transferNextText }}</strong>
-        </div>
-        <span class="transfer-route">{{ snapshot.routeStatus }}</span>
+      <section class="transfer-action">
+        <div><span>{{ snapshot.primaryAction==='resume' ? '恢复后' : '当前动作' }}</span><strong>{{ transferNextText }}</strong></div>
+        <span>{{ snapshot.routeStatus }}</span>
       </section>
 
-      <div class="coverage-footer">
-        <span>总体镜像覆盖</span>
-        <div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div>
-        <strong>{{ snapshot.verified }} / {{ snapshot.total }} · {{ coveragePercent }}%</strong>
-      </div>
+      <div class="coverage-footer"><span>总体镜像覆盖</span><div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div><strong>{{ snapshot.verified }} / {{ snapshot.total }} · {{ coveragePercent }}%</strong></div>
     </section>
 
     <section v-else-if="tab==='recycle'" class="page recycle-page">
@@ -358,6 +407,7 @@ onBeforeUnmount(()=>{ detachSnapshot?.(); detachNotice?.(); window.removeEventLi
     <div><strong>{{ notice.title }}</strong><span>{{ notice.message }}</span></div>
     <button aria-label="关闭提示" @click="notice=null">×</button>
   </div>
+  <div v-if="hoverTip" class="global-tooltip" :class="{above:hoverTip.above}" :style="{left:`${hoverTip.left}px`,top:`${hoverTip.top}px`}">{{ hoverTip.text }}</div>
   <div v-if="toast" class="toast" role="status">{{ toast }}</div>
 </main>
 </template>

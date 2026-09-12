@@ -1703,3 +1703,280 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
   .transfer-page{padding-top:34px;gap:20px}
   .transfer-page .coverage-footer{margin-top:0;padding-top:5px;border-top:0}
 }
+
+
+/* v0.4.10 second convergence: route continuity, phase rhythm, polished icons, global tooltip, simpler transfer. */
+.has-tip:after{display:none!important}
+.global-tooltip{
+  position:fixed;
+  z-index:10000;
+  width:max-content;
+  max-width:340px;
+  padding:9px 11px;
+  border:1px solid rgba(205,219,229,.88);
+  border-radius:11px;
+  background:rgba(255,255,255,.995);
+  color:#40546a;
+  box-shadow:0 14px 34px rgba(35,65,92,.14),0 2px 7px rgba(35,65,92,.05);
+  font-size:12px;
+  line-height:1.5;
+  font-weight:400;
+  pointer-events:none;
+  transform:translate(-50%,0);
+  white-space:normal;
+}
+.global-tooltip.above{transform:translate(-50%,-100%)}
+
+.route-card-polished .route-line:before{
+  right:0;
+}
+.route-card-polished .route-line:after{
+  right:-14px;
+}
+.route-card-polished .phase-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+}
+.route-card-polished .phase-wrap{display:contents}
+.route-card-polished .phase{
+  flex:0 0 auto;
+}
+.phase-connector{
+  flex:0 0 82px;
+  width:82px;
+}
+
+.coverage-feature{
+  display:grid;
+  place-items:center;
+  padding:0;
+}
+.coverage-glyph{
+  width:42px;
+  height:42px;
+  overflow:visible;
+}
+.coverage-glyph rect{
+  fill:url(#none);
+  fill:#1889e5;
+  opacity:.92;
+}
+.coverage-glyph rect:nth-of-type(1){opacity:.55}
+.coverage-glyph rect:nth-of-type(2){opacity:.72}
+.coverage-axis{
+  fill:none;
+  stroke:#8dc8f1;
+  stroke-width:2.2;
+  stroke-linecap:round;
+}
+.coverage-check{
+  fill:none;
+  stroke:#0e78d3;
+  stroke-width:2.4;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.coverage-progress i{
+  background:linear-gradient(90deg,#63cef7 0%,#34aaf0 48%,#0c82e8 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);
+}
+
+.quota-feature{
+  display:grid;
+  place-items:center;
+  padding:0;
+}
+.quota-glyph{
+  width:42px;
+  height:42px;
+  fill:none;
+  stroke:#7046ea;
+  stroke-width:2.9;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.quota-head{margin-bottom:8px}
+
+.settings-gear{
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.side-status-icon svg{
+  width:21px;
+  height:21px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.1;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.side-status-icon svg rect,
+.side-status-icon svg path[d^="M8 5.5"]{
+  fill:currentColor;
+  stroke:none;
+}
+.side-status-icon svg:last-child circle{fill:currentColor;stroke:none}
+
+.transfer-page{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  overflow:auto;
+  scrollbar-width:none;
+}
+.transfer-page::-webkit-scrollbar{width:0;height:0}
+.transfer-head{
+  min-height:92px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:28px;
+  padding:0 4px 18px;
+  border-bottom:1px solid rgba(202,217,228,.70);
+}
+.transfer-head>div:first-child{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.transfer-head>div:first-child>span{
+  color:#8293a5;
+  font-size:12px;
+  font-weight:650;
+}
+.transfer-head>div:first-child>strong{
+  color:#14223b;
+  font-size:25px;
+  line-height:1.16;
+  font-weight:730;
+  letter-spacing:-.4px;
+}
+.transfer-head-state{
+  flex:none;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;
+}
+.transfer-head-state strong{
+  color:#304d68;
+  font-size:15px;
+  font-weight:690;
+}
+.transfer-head-state small{
+  color:#8091a3;
+  font-size:11.5px;
+}
+
+.transfer-list{
+  display:grid;
+  grid-template-columns:1fr;
+}
+.transfer-row{
+  min-height:92px;
+  display:grid;
+  grid-template-columns:58px minmax(0,1fr) 96px;
+  align-items:center;
+  gap:29px;
+  padding:0 4px;
+  border-bottom:1px solid rgba(202,217,228,.70);
+}
+.transfer-feature{
+  width:58px;
+  height:58px;
+  border-radius:17px;
+  display:grid;
+  place-items:center;
+}
+.transfer-feature svg{
+  width:38px;
+  height:38px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.3;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.repair-feature{background:linear-gradient(145deg,#fff8e8,#fff0ce);color:#c58b21}
+.normal-feature{background:linear-gradient(145deg,#eef8ff,#dfefff);color:#1687e8}
+.review-feature{background:linear-gradient(145deg,#ecfbf4,#daf5e8);color:#1c9d69}
+.transfer-label{min-width:0}
+.transfer-label .card-title h3{font-size:17px}
+.transfer-count{
+  justify-self:end;
+  font-size:38px;
+  line-height:1;
+  font-weight:730;
+  font-variant-numeric:tabular-nums;
+  color:#172640;
+}
+.transfer-count.repair{color:#c28b24}
+.transfer-count.normal{color:#1688df}
+.transfer-count.review{color:#244058}
+.transfer-count.review.attention{color:#c8643d}
+.transfer-action{
+  min-height:82px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:26px;
+  padding:0 4px;
+  border-bottom:1px solid rgba(202,217,228,.70);
+}
+.transfer-action>div{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:16px;
+}
+.transfer-action>div>span{
+  flex:none;
+  color:#8494a4;
+  font-size:12px;
+  font-weight:650;
+}
+.transfer-action>div>strong{
+  color:#253b53;
+  font-size:15px;
+  line-height:1.4;
+  font-weight:650;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.transfer-action>span{
+  flex:none;
+  color:#4e718d;
+  font-size:13px;
+  font-weight:670;
+}
+.transfer-page .coverage-footer{
+  margin-top:18px;
+  padding:0 4px;
+  border-top:0;
+  grid-template-columns:122px minmax(0,1fr) auto;
+  gap:18px;
+  font-size:12.5px;
+}
+.transfer-page .coverage-footer strong{font-size:12.5px}
+
+@media(max-width:999px){
+  .route-card-polished .phase-row{gap:9px}
+  .phase-connector{flex-basis:48px;width:48px}
+  .transfer-row{grid-template-columns:46px minmax(0,1fr) 76px;gap:20px;min-height:82px}
+  .transfer-feature{width:46px;height:46px;border-radius:14px}
+  .transfer-feature svg{width:31px;height:31px}
+  .transfer-count{font-size:31px}
+  .transfer-head>div:first-child>strong{font-size:21px}
+}
+@media (min-width:1000px) and (min-height:740px){
+  .quota-card{align-items:center}
+  .transfer-page{padding-top:34px}
+}
