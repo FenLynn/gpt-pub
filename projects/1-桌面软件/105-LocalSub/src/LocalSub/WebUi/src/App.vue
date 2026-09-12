@@ -16,6 +16,7 @@ const selectedSource = ref<"potplayer" | "allAudio">("potplayer");
 const selectedModelId = ref("");
 const modelFilter = ref<"all" | "installed" | "live" | "batch">("all");
 const selectedCatalogModelId = ref("");
+const deleteConfirmId = ref("");
 let selectionInitialized = false;
 let unsubscribeSnapshot: (() => void) | null = null;
 
@@ -72,6 +73,11 @@ const filteredCatalogModels = computed(() => {
 const selectedCatalogModel = computed(() =>
   snapshot.value?.models.catalog.find(x => x.id === selectedCatalogModelId.value) ?? null
 );
+const modelOperation = computed(() => snapshot.value?.models.operation ?? null);
+const modelOperationBusy = computed(() => modelOperation.value?.state === "running");
+const modelHeavyBlocked = computed(() =>
+  liveState.value !== "idle" || modelOperationBusy.value || commandBusy.value
+);
 
 function applySnapshot(next: LocalSubSnapshot) {
   snapshot.value = next;
@@ -112,6 +118,11 @@ async function navigate(page: PageKey) {
   }
 }
 
+function selectCatalogModel(modelId: string) {
+  selectedCatalogModelId.value = modelId;
+  deleteConfirmId.value = "";
+}
+
 async function refreshModels() {
   commandBusy.value = true;
   error.value = null;
@@ -140,6 +151,48 @@ async function setDefaultModel(target: "live" | "batch") {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
     commandBusy.value = false;
+  }
+}
+
+async function downloadSelectedModel() {
+  const model = selectedCatalogModel.value;
+  if (!model || modelHeavyBlocked.value) return;
+
+  error.value = null;
+  deleteConfirmId.value = "";
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("model.download", { modelId: model.id }));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+    try { await refreshModels(); } catch { }
+  }
+}
+
+async function cancelModelOperation() {
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("model.cancel"));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
+async function deleteSelectedModel() {
+  const model = selectedCatalogModel.value;
+  if (!model || !model.installed || modelHeavyBlocked.value) return;
+
+  if (deleteConfirmId.value !== model.id) {
+    deleteConfirmId.value = model.id;
+    return;
+  }
+
+  deleteConfirmId.value = "";
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("model.delete", { modelId: model.id }));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+    try { await refreshModels(); } catch { }
   }
 }
 
@@ -189,6 +242,17 @@ onMounted(async () => {
         });
       } catch {
         // Expected: model selection must reject unknown catalog entries cleanly.
+      }
+      applySnapshot(await invoke<LocalSubSnapshot>("model.cancel"));
+      try {
+        await invoke<LocalSubSnapshot>("model.download", { modelId: "__ci_missing_model__" });
+      } catch {
+        // Expected: CI validates the WebView2 -> Shell download command without network traffic.
+      }
+      try {
+        await invoke<LocalSubSnapshot>("model.delete", { modelId: "__ci_missing_model__" });
+      } catch {
+        // Expected: CI validates the WebView2 -> Shell delete command without touching local models.
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
@@ -384,7 +448,7 @@ onBeforeUnmount(() => {
                 <h2>本地模型</h2>
                 <span
                   class="hint-dot"
-                  data-tip="本页只读取模型目录状态和保存默认选择。下载、校验、解压和大目录替换等重任务将在下一阶段迁入 LocalSub.Core。"
+                  data-tip="模型目录状态与默认选择由 Shell 管理。下载、断点续传、解压、校验、修复和删除均通过 LocalSub.Core 长任务执行。"
                 >i</span>
               </div>
               <button class="compact-button" type="button" :disabled="commandBusy" @click="refreshModels">
@@ -417,10 +481,11 @@ onBeforeUnmount(() => {
                 class="model-row"
                 :class="{
                   selected: selectedCatalogModelId === model.id,
-                  unavailable: !model.installed
+                  unavailable: !model.installed,
+                  working: snapshot.models.operation.modelId === model.id && modelOperationBusy
                 }"
                 type="button"
-                @click="selectedCatalogModelId = model.id"
+                @click="selectCatalogModel(model.id)"
               >
                 <div class="model-row-main">
                   <div class="model-name-line">
@@ -483,25 +548,70 @@ onBeforeUnmount(() => {
                 <button
                   class="primary-button model-action"
                   type="button"
-                  :disabled="commandBusy || !selectedCatalogModel.installed || !selectedCatalogModel.liveCapable || selectedCatalogModel.liveSelected"
+                  :disabled="commandBusy || modelOperationBusy || !selectedCatalogModel.installed || !selectedCatalogModel.liveCapable || selectedCatalogModel.liveSelected"
                   @click="setDefaultModel('live')"
                 >{{ selectedCatalogModel.liveSelected ? "实时默认" : "设为实时默认" }}</button>
                 <button
                   class="outline-button model-action"
                   type="button"
-                  :disabled="commandBusy || !selectedCatalogModel.installed || !selectedCatalogModel.batchCapable || selectedCatalogModel.batchSelected"
+                  :disabled="commandBusy || modelOperationBusy || !selectedCatalogModel.installed || !selectedCatalogModel.batchCapable || selectedCatalogModel.batchSelected"
                   @click="setDefaultModel('batch')"
                 >{{ selectedCatalogModel.batchSelected ? "后台默认" : "设为后台默认" }}</button>
               </div>
+
+              <div class="model-heavy-actions">
+                <button
+                  class="primary-button model-action"
+                  type="button"
+                  :disabled="modelHeavyBlocked"
+                  @click="downloadSelectedModel"
+                >{{ selectedCatalogModel.installed ? "下载 / 修复" : "下载模型" }}</button>
+                <button
+                  class="outline-button danger model-action"
+                  :class="{ armed: deleteConfirmId === selectedCatalogModel.id }"
+                  type="button"
+                  :disabled="modelHeavyBlocked || !selectedCatalogModel.installed"
+                  @click="deleteSelectedModel"
+                >{{ deleteConfirmId === selectedCatalogModel.id ? "确认删除" : "删除本地模型" }}</button>
+              </div>
+              <p v-if="deleteConfirmId === selectedCatalogModel.id" class="delete-warning">
+                再次点击将删除模型目录、缓存和未完成下载。
+              </p>
+              <p v-if="liveState !== 'idle'" class="model-block-note">
+                请先停止实时字幕，再执行模型下载、修复或删除。
+              </p>
             </article>
 
-            <article class="mini-card model-next-card">
+            <article class="mini-card model-operation-card" :class="{ failed: snapshot.models.operation.state === 'failed' }">
               <div class="mini-title">
-                <span>下一阶段</span>
-                <span class="hint-dot" data-tip="模型下载、断点续传、解压、校验、修复和大目录删除都属于重任务，不在 Web UI 或轻量 Shell 中执行。">i</span>
+                <span>Core 模型任务</span>
+                <span
+                  class="model-state-dot"
+                  :class="{ installed: modelOperationBusy }"
+                ></span>
               </div>
-              <strong>重任务迁入 Core</strong>
-              <p>当前先接管查看与默认选择，下载、修复和删除随后统一迁移。</p>
+              <strong>
+                {{ modelOperationBusy
+                  ? snapshot.models.operation.modelName + " · " + snapshot.models.operation.stage
+                  : snapshot.models.operation.stage }}
+              </strong>
+              <p>{{ snapshot.models.operation.lastError || snapshot.models.operation.detail }}</p>
+              <div v-if="modelOperationBusy" class="model-operation-progress">
+                <div class="level-track">
+                  <div
+                    class="level-fill"
+                    :class="{ indeterminate: snapshot.models.operation.isIndeterminate }"
+                    :style="{ width: (snapshot.models.operation.percent ?? 36) + '%' }"
+                  ></div>
+                </div>
+                <span v-if="snapshot.models.operation.percent !== null">{{ snapshot.models.operation.percent }}%</span>
+              </div>
+              <button
+                v-if="snapshot.models.operation.canCancel"
+                class="outline-button model-cancel-button"
+                type="button"
+                @click="cancelModelOperation"
+              >取消任务</button>
             </article>
           </aside>
         </section>

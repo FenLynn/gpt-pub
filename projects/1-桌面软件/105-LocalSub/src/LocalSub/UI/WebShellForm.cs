@@ -62,7 +62,10 @@ public sealed class WebShellForm : Form
         "live.start",
         "live.stop",
         "model.list",
-        "model.select"
+        "model.select",
+        "model.download",
+        "model.cancel",
+        "model.delete"
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
     {
@@ -95,7 +98,7 @@ public sealed class WebShellForm : Form
     {
         _smoke = smoke;
         _settings = AppSettings.Load();
-        _models = new ModelCatalogController();
+        _models = new ModelCatalogController(_core);
         _live = new LiveSessionController(_core);
 
         Text = "LocalSub";
@@ -109,6 +112,7 @@ public sealed class WebShellForm : Form
         _web.Visible = false;
 
         _live.Changed += OnLiveChanged;
+        _models.Changed += OnModelsChanged;
         _core.ConnectionBroken += OnCoreConnectionBroken;
         Shown += async (_, _) => await InitializeAsync();
         FormClosed += async (_, _) => await DisposeOwnedResourcesAsync();
@@ -116,7 +120,7 @@ public sealed class WebShellForm : Form
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate", "live.start", "live.stop", "model.list", "model.select" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -196,6 +200,15 @@ public sealed class WebShellForm : Form
                 case "model.select":
                     result = SelectModel(request.Params);
                     break;
+                case "model.download":
+                    result = await DownloadModelAsync(request.Params);
+                    break;
+                case "model.cancel":
+                    result = CancelModel();
+                    break;
+                case "model.delete":
+                    result = await DeleteModelAsync(request.Params);
+                    break;
                 default:
                     throw new InvalidOperationException("不允许的界面命令。");
             }
@@ -205,7 +218,7 @@ public sealed class WebShellForm : Form
         }
         catch (Exception ex)
         {
-            if (_smoke && request?.Method is "live.start" or "model.select")
+            if (_smoke && request?.Method is "live.start" or "model.select" or "model.download" or "model.delete")
                 RecordSmokeMethod(request.Method);
             Reply(request?.Id ?? string.Empty, false, null, ex.Message);
         }
@@ -261,6 +274,36 @@ public sealed class WebShellForm : Form
         return BuildSnapshot();
     }
 
+    async Task<object> DownloadModelAsync(JsonElement? parameters)
+    {
+        if (!TryReadString(parameters, "modelId", out var modelId))
+            throw new InvalidOperationException("请选择要下载的模型。");
+
+        await _models.DownloadAsync(modelId);
+        _live.RefreshConfiguration();
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
+    object CancelModel()
+    {
+        _models.Cancel();
+        return BuildSnapshot();
+    }
+
+    async Task<object> DeleteModelAsync(JsonElement? parameters)
+    {
+        if (!TryReadString(parameters, "modelId", out var modelId))
+            throw new InvalidOperationException("请选择要删除的模型。");
+
+        await _models.DeleteAsync(modelId);
+        _live.RefreshConfiguration();
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
     async Task<object> BuildSnapshotAsync(bool probeCore)
     {
         if (probeCore) await ProbeCoreAsync();
@@ -270,8 +313,15 @@ public sealed class WebShellForm : Form
     object BuildSnapshot()
     {
         var live = _live.Snapshot;
-        var busy = live.State is "starting" or "stopping";
-        var operation = live.State is "starting" or "running" or "stopping" ? "realtime" : null;
+        var models = _models.Snapshot;
+        var modelBusy = models.Operation.State == "running";
+        var busy = live.State is "starting" or "stopping" || modelBusy;
+        var operation = live.State is "starting" or "running" or "stopping"
+            ? "realtime"
+            : modelBusy && !string.IsNullOrWhiteSpace(models.Operation.Kind)
+                ? "model." + models.Operation.Kind
+                : null;
+        var coreState = modelBusy && _core.WorkerProcessId.HasValue ? "busy" : _coreState;
 
         return new
         {
@@ -280,11 +330,11 @@ public sealed class WebShellForm : Form
                 productVersion = typeof(WebShellForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.1",
                 activePage = _activePage,
                 busy,
-                lastError = live.LastError
+                lastError = live.LastError ?? models.Operation.LastError
             },
             core = new
             {
-                state = _coreState,
+                state = coreState,
                 pid = _core.WorkerProcessId,
                 generation = _core.ConnectionGeneration,
                 currentOperation = operation,
@@ -297,7 +347,7 @@ public sealed class WebShellForm : Form
                 state = "idle",
                 status = "现有后台转写继续由 Core 执行"
             },
-            models = _models.Snapshot,
+            models,
             settings = new
             {
                 audioSource = live.Source,
@@ -310,6 +360,13 @@ public sealed class WebShellForm : Form
 
     async Task ProbeCoreAsync()
     {
+        if (_models.Snapshot.Operation.State == "running")
+        {
+            _coreState = _core.WorkerProcessId.HasValue ? "ready" : "starting";
+            _coreError = null;
+            return;
+        }
+
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -341,6 +398,17 @@ public sealed class WebShellForm : Form
         ScheduleSnapshotPush();
     }
 
+    void OnModelsChanged()
+    {
+        var models = _models.Snapshot;
+        if (models.Operation.State == "running" && _core.WorkerProcessId.HasValue)
+        {
+            _coreState = "ready";
+            _coreError = null;
+        }
+        ScheduleSnapshotPush();
+    }
+
     void OnCoreConnectionBroken(string message)
     {
         _coreState = "failed";
@@ -357,15 +425,9 @@ public sealed class WebShellForm : Form
         {
             BeginInvoke(new Action(() =>
             {
-                try
-                {
-                    if (!_disposed && _web.CoreWebView2 != null)
-                        PostEvent("app.snapshot", BuildSnapshot());
-                }
-                finally
-                {
-                    Interlocked.Exchange(ref _snapshotPushPending, 0);
-                }
+                Interlocked.Exchange(ref _snapshotPushPending, 0);
+                if (!_disposed && _web.CoreWebView2 != null)
+                    PostEvent("app.snapshot", BuildSnapshot());
             }));
         }
         catch
@@ -396,12 +458,15 @@ public sealed class WebShellForm : Form
             !_smokeMethods.Contains("live.stop") ||
             !_smokeMethods.Contains("live.start") ||
             !_smokeMethods.Contains("model.list") ||
-            !_smokeMethods.Contains("model.select")) return;
+            !_smokeMethods.Contains("model.select") ||
+            !_smokeMethods.Contains("model.download") ||
+            !_smokeMethods.Contains("model.cancel") ||
+            !_smokeMethods.Contains("model.delete")) return;
 
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}");
     }
 
     static bool TryReadString(JsonElement? parameters, string propertyName, out string value)
@@ -423,7 +488,9 @@ public sealed class WebShellForm : Form
         _disposed = true;
 
         _live.Changed -= OnLiveChanged;
+        _models.Changed -= OnModelsChanged;
         _core.ConnectionBroken -= OnCoreConnectionBroken;
+        try { _models.Dispose(); } catch { }
         try { await _live.DisposeAsync(); } catch { }
         try { await _core.DisposeAsync(); } catch { }
 

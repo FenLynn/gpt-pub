@@ -208,6 +208,11 @@ Core realtime 的 `sessionId` 与 PotPlayer `processId` 由 Shell 应用层持�
 - liveModelId / liveModelName
 - batchModelId / batchModelName
 - status
+- operation.state: idle / running / failed
+- operation.kind: download / delete / null
+- operation.modelId / modelName
+- operation.stage / percent / detail / isIndeterminate
+- operation.lastError / canCancel
 
 模型页的轻量扫描与默认选择留在 Shell 应用层。Phase 1B.2 起，下载、断点续传、解压、校验、修复和大目录删除统一通过 Core 长任务接口执行，Shell 不保留进程内 fallback。
 
@@ -226,9 +231,12 @@ live.start
 live.stop
 model.list
 model.select
+model.download
+model.cancel
+model.delete
 ```
 
-`model.select` 只保存已安装且能力匹配的实时或后台默认模型，不执行下载或删除。
+`model.select` 只保存已安装且能力匹配的实时或后台默认模型。`model.download`、`model.delete` 通过 Shell 应用控制器进入 Core 长任务，`model.cancel` 只取消当前模型任务，不暴露 Core request ID。
 
 后续按页面迁移逐步加入：
 
@@ -238,9 +246,6 @@ batch.analyze
 batch.transcribe
 batch.cancel
 
-model.download
-model.cancel
-model.delete
 model.openFolder
 
 settings.get
@@ -259,6 +264,8 @@ overlay.preview
 ping
 analyze
 transcribe
+model.download
+model.delete
 cancel
 shutdown
 ```

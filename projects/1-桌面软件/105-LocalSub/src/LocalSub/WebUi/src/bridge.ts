@@ -65,6 +65,18 @@ export interface LocalSubSnapshot {
     batchModelId: string;
     batchModelName: string;
     status: string;
+    operation: {
+      state: "idle" | "running" | "failed";
+      kind: "download" | "delete" | null;
+      modelId: string;
+      modelName: string;
+      stage: string;
+      percent: number | null;
+      detail: string;
+      isIndeterminate: boolean;
+      lastError: string | null;
+      canCancel: boolean;
+    };
   };
   settings: {
     audioSource: string;
@@ -188,7 +200,19 @@ const fallback: LocalSubSnapshot = {
     liveModelName: "Zipformer Large 中文 INT8",
     batchModelId: "sensevoice-small-int8",
     batchModelName: "SenseVoice Small INT8",
-    status: "3 / 4 已安装"
+    status: "3 / 4 已安装",
+    operation: {
+      state: "idle",
+      kind: null,
+      modelId: "",
+      modelName: "",
+      stage: "就绪",
+      percent: null,
+      detail: "模型重任务由 LocalSub.Core 执行",
+      isIndeterminate: false,
+      lastError: null,
+      canCancel: false
+    }
   },
   settings: { audioSource: "PotPlayer", resourceProfile: "Auto", subtitleAutoSize: true, subtitleFontSize: 28 }
 };
@@ -277,6 +301,56 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         lastError: null
       };
     }
+    if (method === "model.download") {
+      const modelId = typeof params.modelId === "string" ? params.modelId : "";
+      const model = fallbackModels.catalog.find(x => x.id === modelId);
+      if (!model) throw new Error("模型 catalog 中不存在该模型。");
+      fallbackModels = {
+        ...fallbackModels,
+        catalog: fallbackModels.catalog.map(x => x.id === modelId ? { ...x, installed: true } : x),
+        installedCount: fallbackModels.catalog.filter(x => x.installed || x.id === modelId).length,
+        operation: {
+          state: "idle",
+          kind: null,
+          modelId,
+          modelName: model.name,
+          stage: "已完成",
+          percent: 100,
+          detail: model.name + " 已安装并通过关键文件检查",
+          isIndeterminate: false,
+          lastError: null,
+          canCancel: false
+        }
+      };
+    }
+    if (method === "model.delete") {
+      const modelId = typeof params.modelId === "string" ? params.modelId : "";
+      const model = fallbackModels.catalog.find(x => x.id === modelId);
+      if (!model) throw new Error("模型 catalog 中不存在该模型。");
+      fallbackModels = {
+        ...fallbackModels,
+        catalog: fallbackModels.catalog.map(x => x.id === modelId ? { ...x, installed: false } : x),
+        installedCount: fallbackModels.catalog.filter(x => x.installed && x.id !== modelId).length,
+        operation: {
+          state: "idle",
+          kind: null,
+          modelId,
+          modelName: model.name,
+          stage: "已删除",
+          percent: 100,
+          detail: model.name + " 已从本地模型目录清理",
+          isIndeterminate: false,
+          lastError: null,
+          canCancel: false
+        }
+      };
+    }
+    if (method === "model.cancel") {
+      fallbackModels = {
+        ...fallbackModels,
+        operation: { ...fallbackModels.operation, state: "idle", kind: null, stage: "已取消", canCancel: false }
+      };
+    }
     if (method === "model.select") {
       const target = params.target === "batch" ? "batch" : params.target === "live" ? "live" : "";
       const modelId = typeof params.modelId === "string" ? params.modelId : "";
@@ -313,7 +387,10 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
       method === "live.start" ||
       method === "live.stop" ||
       method === "model.list" ||
-      method === "model.select"
+      method === "model.select" ||
+      method === "model.download" ||
+      method === "model.cancel" ||
+      method === "model.delete"
     ) {
       const snapshot = fallbackSnapshot();
       emitSnapshot(snapshot);
