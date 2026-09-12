@@ -429,6 +429,9 @@ public sealed class WebShellForm : Form
         if (TryReadOptionalString(p, "subtitlePreviousColor", out var previousColor)) _settings.SubtitlePreviousColor = previousColor;
         if (TryReadOptionalString(p, "subtitleOutlineColor", out var outlineColor)) _settings.SubtitleOutlineColor = outlineColor;
 
+        if (_smoke)
+            return BuildSnapshot();
+
         _settings.Save();
         StartupRegistrationService.Apply(_settings);
         _live.RefreshConfiguration();
