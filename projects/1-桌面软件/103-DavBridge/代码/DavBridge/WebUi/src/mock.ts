@@ -1,16 +1,16 @@
 import type { DavBridgeSnapshot } from './types'
 
 export const mockSnapshot: DavBridgeSnapshot = {
-  version: '0.4.11', buildCommit: 'preview', buildDate: '2026-09-12T16:05:00Z', cycleId: '260907', configured: true, engineState: '等待额度', routeStatus: '等待下一周期', routeTone: 'wait',
+  version: '0.4.11', buildCommit: 'preview', buildDate: '2026-09-12T16:05:00Z', cycleId: '260907', configured: true, engineState: '运行中', routeStatus: '普通迁移中', routeTone: 'active',
   phases: [
     { key: 'audit', label: '源端对账', state: 'done', hint: '本周期源端清单已经完成核对' },
     { key: 'repair', label: '变化修复', state: 'done', hint: '历史 StrongVerified 变化项已经处理' },
     { key: 'migration', label: '等待周期', state: 'waiting', hint: '当前安全额度不足，等待下一周期继续' }
   ],
   verified: 2090, total: 6949, coverage: 0.301, coverageText: '2090 / 6949 已校准',
-  currentTitle: '等待下一周期', currentDetail: '坚果云当前安全额度不足，账本与断点保持不变。', currentProgress: null,
+  currentTitle: 'BZR4PLGF.zip', currentDetail: '当前正在处理普通迁移任务。', currentProgress: 0.63,
   quota: { uploadUsed: 794100000, uploadMax: 1000000000, uploadText: '794.1 MB / 1.0 GB', downloadUsed: 781100000, downloadMax: 3000000000, downloadText: '781.1 MB / 3.0 GB', resetText: '2026-10-07 · 09:00 后探测', isSprint: false },
-  priorityCount: 0, normalCount: 2704, humanActionCount: 0, primaryAction: 'none', primaryLabel: '',
+  priorityCount: 0, normalCount: 2704, humanActionCount: 0, primaryAction: 'pause', primaryLabel: '暂停',
   health: { status: 'ok', summary: '运行依赖、Data 目录与状态文件正常', checkedAt: '09-11 18:50' },
   runtime: { uptimeText: '已运行 2 小时 18 分', previousExitText: '上次正常退出', uncleanExitCount: 0, cleanupText: '无中断残留' },
   initialization: [
