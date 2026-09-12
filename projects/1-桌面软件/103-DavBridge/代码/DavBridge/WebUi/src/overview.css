@@ -2341,3 +2341,110 @@ button.side-status:focus-visible{outline:2px solid rgba(34,139,214,.30);outline-
   transform:scale(.985);
 }
 .side-status{cursor:pointer}
+
+
+/* v0.4.14 primary control: fixed slot, explicit operability, restrained depth. */
+.task-action-row{
+  width:116px;
+  min-width:116px;
+  display:flex;
+  align-items:center;
+  justify-content:stretch;
+}
+.task-action-row .task-primary-fixed{
+  width:116px;
+  min-width:116px;
+  height:40px;
+  min-height:40px;
+  padding:0 14px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  border-radius:12px;
+  font-weight:700;
+  letter-spacing:.05px;
+  opacity:1!important;
+  transition:transform .10s ease,box-shadow .12s ease,background .14s ease,border-color .14s ease,color .14s ease;
+}
+
+/* Running state exposes Pause as the high-priority yellow control. */
+.task-action-row .task-primary-fixed.action-tone-pause:not(:disabled){
+  color:#8d6207!important;
+  border-color:#e7bd54!important;
+  background:linear-gradient(180deg,#fff9dd 0%,#f9e9a9 100%)!important;
+  box-shadow:
+    0 3px 0 #d7aa3f,
+    0 8px 18px rgba(171,126,24,.15),
+    inset 0 1px 0 rgba(255,255,255,.92)!important;
+  transform:translateY(-1px);
+  cursor:pointer!important;
+}
+.task-action-row .task-primary-fixed.action-tone-pause:not(:disabled):hover{
+  background:linear-gradient(180deg,#fffbe7 0%,#f8e59a 100%)!important;
+  border-color:#ddb044!important;
+  box-shadow:
+    0 4px 0 #cf9f32,
+    0 10px 20px rgba(171,126,24,.18),
+    inset 0 1px 0 rgba(255,255,255,.96)!important;
+  transform:translateY(-2px);
+}
+
+/* Paused / retry state exposes Continue as the green control. */
+.task-action-row .task-primary-fixed.action-tone-run:not(:disabled){
+  color:#177b50!important;
+  border-color:#8fd0ae!important;
+  background:linear-gradient(180deg,#effbf4 0%,#d8f1e4 100%)!important;
+  box-shadow:
+    0 3px 0 #70bd96,
+    0 8px 18px rgba(31,149,99,.14),
+    inset 0 1px 0 rgba(255,255,255,.92)!important;
+  transform:translateY(-1px);
+  cursor:pointer!important;
+}
+.task-action-row .task-primary-fixed.action-tone-run:not(:disabled):hover{
+  background:linear-gradient(180deg,#f3fcf7 0%,#cfeddc 100%)!important;
+  border-color:#7bc69f!important;
+  box-shadow:
+    0 4px 0 #62b58c,
+    0 10px 20px rgba(31,149,99,.17),
+    inset 0 1px 0 rgba(255,255,255,.96)!important;
+  transform:translateY(-2px);
+}
+
+/* Review/settings remain neutral and clickable without changing the established palette. */
+.task-action-row .task-primary-fixed.action-tone-neutral:not(:disabled){
+  color:#326f9a!important;
+  border-color:#b6d4e8!important;
+  background:linear-gradient(180deg,#f7fbfe 0%,#eaf4fa 100%)!important;
+  box-shadow:
+    0 3px 0 #a9c8dc,
+    0 8px 18px rgba(54,112,151,.10),
+    inset 0 1px 0 rgba(255,255,255,.92)!important;
+  transform:translateY(-1px);
+  cursor:pointer!important;
+}
+
+/* Safe-pause pending and all non-actionable states stay in the same slot but lie flat and gray. */
+.task-action-row .task-primary-fixed.action-tone-disabled,
+.task-action-row .task-primary-fixed:disabled{
+  color:#82909d!important;
+  border-color:#d5dee5!important;
+  background:linear-gradient(180deg,#f3f5f7 0%,#e8edf1 100%)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.82),
+    inset 0 -1px 0 rgba(189,201,211,.34)!important;
+  transform:none!important;
+  opacity:1!important;
+  cursor:default!important;
+}
+.task-action-row .task-primary-fixed[aria-busy="true"]:disabled{
+  cursor:progress!important;
+}
+.task-action-row .task-primary-fixed:not(:disabled):active{
+  transform:translateY(2px)!important;
+  box-shadow:
+    0 1px 0 rgba(91,112,128,.30),
+    0 3px 8px rgba(52,79,99,.10),
+    inset 0 1px 3px rgba(64,87,104,.08)!important;
+}
