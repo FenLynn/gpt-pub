@@ -201,7 +201,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $app = Get-Content 'src/LocalSub/WebUi/src/App.vue' -Raw
           $style = Get-Content 'src/LocalSub/WebUi/src/style.css' -Raw
-          $host = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
+          $hostSource = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
 
           foreach ($required in @(
             'class="sidebar"',
@@ -227,7 +227,7 @@ jobs:
             'Width = 1100;',
             'Height = 825;'
           )) {
-            if ($host -notmatch [regex]::Escape($required)) {
+            if ($hostSource -notmatch [regex]::Escape($required)) {
               throw "v0.1.5 4:3 host contract missing: $required"
             }
           }
