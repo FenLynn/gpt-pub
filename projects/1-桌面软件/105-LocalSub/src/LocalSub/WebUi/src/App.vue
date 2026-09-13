@@ -54,10 +54,10 @@ const liveRunning = computed(() => liveState.value === "running");
 const liveTransitioning = computed(() => liveState.value === "starting" || liveState.value === "stopping");
 const liveControlsLocked = computed(() => liveRunning.value || liveTransitioning.value || commandBusy.value);
 const liveButtonText = computed(() => {
-  if (liveState.value === "starting") return "正在启动";
-  if (liveState.value === "stopping") return "正在停止";
-  if (liveRunning.value) return "停止实时字幕";
-  return "开始实时字幕";
+  if (liveState.value === "starting") return "启动中";
+  if (liveState.value === "stopping") return "停止中";
+  if (liveRunning.value) return "停止字幕";
+  return "开始字幕";
 });
 const liveStateLabel = computed(() => {
   switch (liveState.value) {
@@ -102,12 +102,12 @@ const sideStatusKind = computed(() => {
   return "idle";
 });
 const sideStatusTitle = computed(() => {
-  if (liveState.value === "running") return "实时字幕运行中";
-  if (liveState.value === "starting") return "实时字幕启动中";
-  if (liveState.value === "stopping") return "实时字幕停止中";
+  if (liveState.value === "running") return "实时字幕中";
+  if (liveState.value === "starting") return "正在启动";
+  if (liveState.value === "stopping") return "正在停止";
   if (snapshot.value?.system.autoStartPending) return snapshot.value.system.autoStartStatus || "等待自动启动";
   if (liveState.value === "failed" || snapshot.value?.core.state === "failed") return "需要处理";
-  return allReady.value ? "LocalSub 已就绪" : "等待配置";
+  return allReady.value ? "已就绪" : "等待配置";
 });
 const sideStatusSecondary = computed(() => {
   if (liveState.value === "running")
@@ -116,7 +116,7 @@ const sideStatusSecondary = computed(() => {
     return snapshot.value.system.autoStartStatus || "自动启动";
   if (!liveModelReady.value) return "实时模型未就绪";
   if (!inputReady.value) return "等待音源";
-  return "v" + (snapshot.value?.app.productVersion ?? "0.1.12");
+  return "v" + (snapshot.value?.app.productVersion ?? "0.1.13");
 });
 const sideStatusTip = computed(() => {
   const core = coreReady.value ? "Core 就绪" : "Core 未就绪";
