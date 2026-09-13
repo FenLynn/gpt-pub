@@ -19,6 +19,8 @@ export interface ModelCatalogItem {
   batchCapable: boolean;
   isComponent: boolean;
   installed: boolean;
+  hasLocalData: boolean;
+  needsRepair: boolean;
   liveSelected: boolean;
   batchSelected: boolean;
 }
@@ -58,21 +60,26 @@ export interface LocalSubSnapshot {
     status: string;
     selectedId: string;
     selectedName: string;
-    queue: Array<{ id: string; name: string; state: string; analyzed: boolean; transcribed: boolean; segments: number; realTimeFactor: number | null }>;
+    queue: Array<{ id: string; name: string; state: string; analyzed: boolean; transcribed: boolean; segments: number; realTimeFactor: number | null; missing: boolean; retryable: boolean }>;
     media: null | { durationMs: number; sampleRate: number; channels: number; decoderName: string; waveform: number[] };
     transcript: Array<{ startMs: number; endMs: number; text: string; keywords: string[] }>;
     result: null | { durationMs: number; processingMs: number; decoderName: string; realTimeFactor: number; segments: number };
     progress: { percent: number | null; stage: string; detail: string };
     canAnalyze: boolean;
     canTranscribe: boolean;
+    canRetry: boolean;
     canTranscribeAll: boolean;
     canRemove: boolean;
     canClear: boolean;
     canExport: boolean;
+    canExportAll: boolean;
     canCancel: boolean;
     batchModelId: string;
     batchModelName: string;
     keywords: string;
+    outputDirectoryName: string;
+    outputDirectoryCustom: boolean;
+    restored: boolean;
     lastError: string | null;
   };
   models: {
@@ -86,7 +93,7 @@ export interface LocalSubSnapshot {
     status: string;
     operation: {
       state: "idle" | "running" | "failed";
-      kind: "download" | "delete" | null;
+      kind: "download" | "repair" | "delete" | null;
       modelId: string;
       modelName: string;
       stage: string;
@@ -159,6 +166,8 @@ const fallbackCatalog: ModelCatalogItem[] = [
     batchCapable: false,
     isComponent: false,
     installed: true,
+    hasLocalData: true,
+    needsRepair: false,
     liveSelected: true,
     batchSelected: false
   },
@@ -176,6 +185,8 @@ const fallbackCatalog: ModelCatalogItem[] = [
     batchCapable: true,
     isComponent: false,
     installed: true,
+    hasLocalData: true,
+    needsRepair: false,
     liveSelected: false,
     batchSelected: true
   },
@@ -193,6 +204,8 @@ const fallbackCatalog: ModelCatalogItem[] = [
     batchCapable: true,
     isComponent: false,
     installed: false,
+    hasLocalData: false,
+    needsRepair: false,
     liveSelected: false,
     batchSelected: false
   },
@@ -210,13 +223,15 @@ const fallbackCatalog: ModelCatalogItem[] = [
     batchCapable: false,
     isComponent: true,
     installed: true,
+    hasLocalData: true,
+    needsRepair: false,
     liveSelected: false,
     batchSelected: false
   }
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.21", activePage: "home", busy: false, lastError: null },
+  app: { productVersion: "0.1.22", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
@@ -243,8 +258,8 @@ const fallback: LocalSubSnapshot = {
     selectedId: "demo-1",
     selectedName: "lecture-demo.mp4",
     queue: [
-      { id: "demo-1", name: "lecture-demo.mp4", state: "完成 5 段", analyzed: true, transcribed: true, segments: 5, realTimeFactor: 0.316 },
-      { id: "demo-2", name: "interview-demo.m4a", state: "等待分析", analyzed: false, transcribed: false, segments: 0, realTimeFactor: null }
+      { id: "demo-1", name: "lecture-demo.mp4", state: "完成 5 段", analyzed: true, transcribed: true, segments: 5, realTimeFactor: 0.316, missing: false, retryable: false },
+      { id: "demo-2", name: "interview-demo.m4a", state: "等待分析", analyzed: false, transcribed: false, segments: 0, realTimeFactor: null, missing: false, retryable: false }
     ],
     media: {
       durationMs: 257000,
@@ -264,14 +279,19 @@ const fallback: LocalSubSnapshot = {
     progress: { percent: 100, stage: "转写完成", detail: "已自动保存结构化记录" },
     canAnalyze: true,
     canTranscribe: true,
+    canRetry: false,
     canTranscribeAll: true,
     canRemove: true,
     canClear: true,
     canExport: true,
+    canExportAll: true,
     canCancel: false,
     batchModelId: "sensevoice-small-int8",
     batchModelName: "SenseVoice Small INT8",
     keywords: "",
+    outputDirectoryName: "LocalSub / Transcripts",
+    outputDirectoryCustom: false,
+    restored: true,
     lastError: null
   },
   models: {
@@ -451,7 +471,7 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           selectedId: "demo-1",
           selectedName: "lecture-demo.mp4",
           completed: 0,
-          queue: [{ id: "demo-1", name: "lecture-demo.mp4", state: "等待分析", analyzed: false, transcribed: false, segments: 0, realTimeFactor: null }],
+          queue: [{ id: "demo-1", name: "lecture-demo.mp4", state: "等待分析", analyzed: false, transcribed: false, segments: 0, realTimeFactor: null, missing: false, retryable: false }],
           status: "已添加 1 个媒体文件",
           transcript: [],
           result: null,
@@ -470,7 +490,7 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           status: "声音轨道已就绪",
           selectedId: selected.id,
           selectedName: selected.name,
-          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, state: x.transcribed ? x.state : "波形就绪" } : x),
+          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, state: x.transcribed ? x.state : "波形就绪", missing: false } : x),
           media: {
             durationMs: 257000,
             sampleRate: 16000,
@@ -504,7 +524,7 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           selectedId: selected.id,
           selectedName: selected.name,
           completed: Math.max(fallbackBatch.completed, fallbackBatch.queue.some(x => x.id === selected.id && x.transcribed) ? fallbackBatch.completed : fallbackBatch.completed + 1),
-          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, transcribed: true, state: "完成 5 段", segments: 5, realTimeFactor: 0.316 } : x),
+          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, transcribed: true, state: "完成 5 段", segments: 5, realTimeFactor: 0.316, missing: false, retryable: false } : x),
           transcript: [
             { startMs: 800, endMs: 5300, text: "这是后台转写工作区的结果预览。", keywords: words.filter(k => "这是后台转写工作区的结果预览。".includes(k)) },
             { startMs: 6100, endMs: 11200, text: "媒体分析和识别任务由独立 Core 执行。", keywords: words.filter(k => "媒体分析和识别任务由独立 Core 执行。".includes(k)) },
@@ -516,6 +536,8 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           progress: { percent: 100, stage: "转写完成", detail: "RTF 0.32" },
           canAnalyze: true,
           canTranscribe: true,
+          canRetry: false,
+          canExportAll: true,
           canCancel: false,
           lastError: null
         };
@@ -533,7 +555,9 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           transcribed: true,
           state: i === 0 ? "完成 5 段" : "完成 4 段",
           segments: i === 0 ? 5 : 4,
-          realTimeFactor: i === 0 ? 0.316 : 0.352
+          realTimeFactor: i === 0 ? 0.316 : 0.352,
+          missing: false,
+          retryable: false
         })),
         progress: { percent: 100, stage: "队列转写完成", detail: "已自动保存全部结构化记录" },
         canAnalyze: true,
@@ -542,10 +566,59 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         canRemove: true,
         canClear: true,
         canExport: true,
+        canExportAll: true,
+        canRetry: false,
         canCancel: false,
         lastError: null
       };
     }
+    if (method === "batch.retry") {
+      const id = typeof params.id === "string" ? params.id : fallbackBatch.selectedId;
+      const selected = fallbackBatch.queue.find(x => x.id === id) ?? fallbackBatch.queue[0];
+      if (selected) {
+        fallbackBatch = {
+          ...fallbackBatch,
+          state: "idle",
+          status: "重试完成",
+          selectedId: selected.id,
+          selectedName: selected.name,
+          completed: Math.max(fallbackBatch.completed, fallbackBatch.queue.some(x => x.id === selected.id && x.transcribed) ? fallbackBatch.completed : fallbackBatch.completed + 1),
+          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, transcribed: true, state: "完成 5 段", segments: 5, realTimeFactor: 0.316, missing: false, retryable: false } : x),
+          progress: { percent: 100, stage: "重试完成", detail: "结果已恢复并自动保存" },
+          canRetry: false,
+          canExport: true,
+          canExportAll: true,
+          lastError: null
+        };
+      }
+    }
+    if (method === "batch.pickOutputDirectory") {
+      fallbackBatch = {
+        ...fallbackBatch,
+        outputDirectoryName: "字幕输出",
+        outputDirectoryCustom: true,
+        status: "输出目录已更新"
+      };
+    }
+    if (method === "batch.export") {
+      const format = typeof params.format === "string" ? params.format.toUpperCase() : "SRT";
+      fallbackBatch = {
+        ...fallbackBatch,
+        status: format + " 已导出",
+        progress: { percent: 100, stage: "导出完成", detail: "lecture-demo." + format.toLowerCase() }
+      };
+    }
+    if (method === "batch.exportAll") {
+      fallbackBatch = {
+        ...fallbackBatch,
+        status: "整队结果已导出",
+        progress: { percent: 100, stage: "批量导出完成", detail: "TXT / SRT / VTT" }
+      };
+    }
+    if (method === "batch.openOutputDirectory") {
+      fallbackBatch = { ...fallbackBatch, status: "已打开输出目录" };
+    }
+
     if (method === "batch.remove") {
       const id = typeof params.id === "string" ? params.id : fallbackBatch.selectedId;
       const nextQueue = fallbackBatch.queue.filter(x => x.id !== id);
@@ -566,7 +639,9 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         canTranscribeAll: nextQueue.length > 0,
         canRemove: Boolean(nextSelected),
         canClear: nextQueue.length > 0,
-        canExport: Boolean(nextSelected?.transcribed)
+        canExport: Boolean(nextSelected?.transcribed),
+        canExportAll: nextQueue.some(x => x.transcribed),
+        canRetry: Boolean(nextSelected?.retryable)
       };
     }
     if (method === "batch.clear") {
@@ -588,6 +663,8 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         canRemove: false,
         canClear: false,
         canExport: false,
+        canExportAll: false,
+        canRetry: false,
         canCancel: false
       };
     }
@@ -610,13 +687,35 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         canTranscribe: Boolean(fallbackBatch.selectedId)
       };
     }
+    if (method === "model.repair") {
+      const modelId = typeof params.modelId === "string" ? params.modelId : "";
+      const model = fallbackModels.catalog.find(x => x.id === modelId);
+      if (!model) throw new Error("模型 catalog 中不存在该模型。");
+      fallbackModels = {
+        ...fallbackModels,
+        catalog: fallbackModels.catalog.map(x => x.id === modelId ? { ...x, installed: true, hasLocalData: true, needsRepair: false } : x),
+        installedCount: fallbackModels.catalog.filter(x => x.installed || x.id === modelId).length,
+        operation: {
+          state: "idle",
+          kind: null,
+          modelId,
+          modelName: model.name,
+          stage: "修复完成",
+          percent: 100,
+          detail: model.name + " 已修复并通过关键文件检查",
+          isIndeterminate: false,
+          lastError: null,
+          canCancel: false
+        }
+      };
+    }
     if (method === "model.download") {
       const modelId = typeof params.modelId === "string" ? params.modelId : "";
       const model = fallbackModels.catalog.find(x => x.id === modelId);
       if (!model) throw new Error("模型 catalog 中不存在该模型。");
       fallbackModels = {
         ...fallbackModels,
-        catalog: fallbackModels.catalog.map(x => x.id === modelId ? { ...x, installed: true } : x),
+        catalog: fallbackModels.catalog.map(x => x.id === modelId ? { ...x, installed: true, hasLocalData: true, needsRepair: false } : x),
         installedCount: fallbackModels.catalog.filter(x => x.installed || x.id === modelId).length,
         operation: {
           state: "idle",
@@ -638,7 +737,7 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
       if (!model) throw new Error("模型 catalog 中不存在该模型。");
       fallbackModels = {
         ...fallbackModels,
-        catalog: fallbackModels.catalog.map(x => x.id === modelId ? { ...x, installed: false } : x),
+        catalog: fallbackModels.catalog.map(x => x.id === modelId ? { ...x, installed: false, hasLocalData: false, needsRepair: false } : x),
         installedCount: fallbackModels.catalog.filter(x => x.installed && x.id !== modelId).length,
         operation: {
           state: "idle",
@@ -714,12 +813,18 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
       method === "model.list" ||
       method === "model.select" ||
       method === "model.download" ||
+      method === "model.repair" ||
       method === "model.cancel" ||
       method === "model.delete" ||
       method === "batch.pickFiles" ||
       method === "batch.analyze" ||
       method === "batch.transcribe" ||
       method === "batch.transcribeAll" ||
+      method === "batch.retry" ||
+      method === "batch.pickOutputDirectory" ||
+      method === "batch.export" ||
+      method === "batch.exportAll" ||
+      method === "batch.openOutputDirectory" ||
       method === "batch.remove" ||
       method === "batch.clear" ||
       method === "batch.exportTxt" ||
