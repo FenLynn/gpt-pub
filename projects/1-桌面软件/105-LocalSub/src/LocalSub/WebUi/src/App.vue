@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   disposeBridge,
   invoke,
+  subscribeLiveLevel,
   subscribeSnapshot,
   type LocalSubSnapshot,
   type ModelCatalogItem,
@@ -24,13 +25,16 @@ const settingsTab = ref<"subtitle" | "startup" | "runtime">(
 );
 const deleteConfirmId = ref("");
 const settingsSaveState = ref("");
+const liveLevel = ref(0);
 const levelHistory = ref<number[]>(Array.from({ length: 300 }, () => 0));
 const transcriptHistory = ref<string[]>([]);
 const transcriptScroll = ref<HTMLElement | null>(null);
 const hoverTip = ref<{ text: string; left: number; top: number; above: boolean } | null>(null);
 let activeTipTarget: HTMLElement | null = null;
 let selectionInitialized = false;
+let levelHistoryTick = 0;
 let unsubscribeSnapshot: (() => void) | null = null;
+let unsubscribeLiveLevel: (() => void) | null = null;
 let saveStateTimer: number | undefined;
 
 const nav: Array<{ key: PageKey; label: string; path: string }> = [
@@ -110,7 +114,7 @@ const sideStatusSecondary = computed(() => {
     return snapshot.value.system.autoStartStatus || "自动启动";
   if (!liveModelReady.value) return "实时模型未就绪";
   if (!inputReady.value) return "等待音源";
-  return "v" + (snapshot.value?.app.productVersion ?? "0.1.7");
+  return "v" + (snapshot.value?.app.productVersion ?? "0.1.8");
 });
 const sideStatusTip = computed(() => {
   const core = coreReady.value ? "Core 就绪" : "Core 未就绪";
@@ -124,21 +128,21 @@ const waveformPoints = computed(() => {
   const n = Math.max(1, values.length - 1);
   return values.map((value, index) => {
     const x = (index / n) * 100;
-    const centered = Math.max(0, Math.min(1, value));
-    const y = 21 - centered * 17;
+    const normalized = Math.max(0, Math.min(1, value));
+    const y = 38 - normalized * 34;
     return x.toFixed(2) + "," + y.toFixed(2);
   }).join(" ");
 });
-const waveformMirrorPoints = computed(() => {
-  const values = levelHistory.value;
-  const n = Math.max(1, values.length - 1);
-  return values.map((value, index) => {
-    const x = (index / n) * 100;
-    const centered = Math.max(0, Math.min(1, value));
-    const y = 21 + centered * 17;
-    return x.toFixed(2) + "," + y.toFixed(2);
-  }).join(" ");
-});
+
+function applyLiveLevel(value: number) {
+  const level = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  liveLevel.value = level;
+  if (!snapshot.value?.settings.showLiveLevelHistory || snapshot.value.live.state !== "running") return;
+
+  levelHistoryTick = (levelHistoryTick + 1) % 3;
+  if (levelHistoryTick !== 0) return;
+  levelHistory.value = [...levelHistory.value.slice(-299), level];
+}
 
 const modelFilters = [
   { key: "all", label: "全部" },
@@ -164,7 +168,6 @@ const modelHeavyBlocked = computed(() => liveState.value !== "idle" || modelOper
 
 function applySnapshot(next: LocalSubSnapshot) {
   const previous = snapshot.value;
-  const previousLevel = previous?.live.level ?? 0;
   const startingNewSession = previous?.live.state !== "starting" && next.live.state === "starting";
   const transcriptChanged =
     next.live.currentText !== (previous?.live.currentText ?? "") ||
@@ -173,6 +176,7 @@ function applySnapshot(next: LocalSubSnapshot) {
   if (startingNewSession) {
     transcriptHistory.value = [];
     levelHistory.value = Array.from({ length: 300 }, () => 0);
+    levelHistoryTick = 0;
   }
 
   const finalized = next.live.previousText.trim();
@@ -181,16 +185,12 @@ function applySnapshot(next: LocalSubSnapshot) {
   }
 
   snapshot.value = next;
+  liveLevel.value = Math.max(0, Math.min(1, next.live.level));
 
   if (!selectionInitialized || next.live.state === "idle" || next.live.state === "failed") {
     selectedSource.value = next.live.sourceId;
     selectedModelId.value = next.live.modelId || next.live.availableModels[0]?.id || "";
     selectionInitialized = true;
-  }
-
-  if (next.settings.showLiveLevelHistory && next.live.state === "running") {
-    const value = Number.isFinite(next.live.level) ? next.live.level : previousLevel;
-    levelHistory.value = [...levelHistory.value.slice(-299), Math.max(0, Math.min(1, value))];
   }
 
   if (transcriptChanged) {
@@ -407,6 +407,7 @@ function clearGlobalTip() {
 
 onMounted(async () => {
   unsubscribeSnapshot = subscribeSnapshot(applySnapshot);
+  unsubscribeLiveLevel = subscribeLiveLevel(applyLiveLevel);
   document.addEventListener("mouseover", showGlobalTip);
   document.addEventListener("mouseout", hideGlobalTip);
   window.addEventListener("scroll", clearGlobalTip, true);
@@ -439,6 +440,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   unsubscribeSnapshot?.();
+  unsubscribeLiveLevel?.();
   document.removeEventListener("mouseover", showGlobalTip);
   document.removeEventListener("mouseout", hideGlobalTip);
   window.removeEventListener("scroll", clearGlobalTip, true);
@@ -553,15 +555,34 @@ onBeforeUnmount(() => {
               <h2>实时字幕</h2>
               <span class="info-dot" data-tip="实时音频、VAD、Process Loopback 与 ASR 运行在 LocalSub.Core；Overlay 和 PotPlayer 窗口跟随由 Shell 管理。">i</span>
             </div>
-            <div class="instant-level" data-tip="当前输入电平，来自 Core 限频后的归一化音频幅度。">
-              <span>输入</span><div><i :style="{ width: Math.max(2, snapshot.live.level * 100) + '%' }"></i></div><b>{{ Math.round(snapshot.live.level * 100) }}%</b>
+
+            <div class="instant-level" data-tip="轻量 live.level 通道约 30 Hz 更新，顶部电平不再依赖整页 Snapshot。">
+              <span>输入</span>
+              <div><i :style="{ width: Math.max(1, liveLevel * 100) + '%' }"></i></div>
+              <b>{{ Math.round(liveLevel * 100) }}%</b>
             </div>
-            <div class="live-head-actions">
-              <label class="header-monitor" data-tip="显示或隐藏最近约 30 秒的输入电平历史。">
-                <svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg>
-                <span class="switch small-switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></span>
-              </label>
-              <span class="live-state" :class="'state-' + liveState"><i></i>{{ liveStateLabel }}</span>
+
+            <label class="live-monitor-toggle" data-tip="显示或隐藏最近约 30 秒的单线输入电平历史。">
+              <svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg>
+              <span class="switch small-switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></span>
+            </label>
+
+            <div class="live-task-status" :class="'state-' + liveState">
+              <span class="live-task-status-icon" aria-hidden="true">
+                <svg v-if="liveState === 'running'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+                <svg v-else-if="liveState === 'starting' || liveState === 'stopping'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                <svg v-else-if="liveState === 'failed'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
+                <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
+              </span>
+              <div><strong>{{ liveStateLabel }}</strong><small>{{ liveRunning ? snapshot.live.source : snapshot.live.status }}</small></div>
+            </div>
+
+            <div class="live-action-slot">
+              <button class="live-primary-action" :class="{ stop: liveRunning }" type="button" :disabled="liveButtonDisabled" @click="toggleLive">
+                <svg v-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+                <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
+                {{ liveButtonText }}
+              </button>
             </div>
           </header>
 
@@ -579,9 +600,9 @@ onBeforeUnmount(() => {
           <section v-if="snapshot.settings.showLiveLevelHistory" class="waveform-section">
             <div class="wave-head"><strong>输入电平历史</strong><span>最近约 30 秒</span></div>
             <svg class="level-wave" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="最近约 30 秒输入电平历史">
-              <line x1="0" y1="21" x2="100" y2="21"></line>
+              <line class="axis axis-x" x1="0" y1="38" x2="100" y2="38"></line>
+              <line class="axis axis-y" x1="0" y1="4" x2="0" y2="38"></line>
               <polyline :points="waveformPoints"></polyline>
-              <polyline class="mirror" :points="waveformMirrorPoints"></polyline>
             </svg>
             <div class="wave-axis"><span>30 s</span><span>15 s</span><span>现在</span></div>
           </section>
@@ -595,14 +616,6 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <footer class="live-actions">
-            <button class="primary-button large" :class="{ stop: liveRunning }" type="button" :disabled="liveButtonDisabled" @click="toggleLive">
-              <svg v-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
-              <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
-              {{ liveButtonText }}
-            </button>
-            <div class="status-strip"><span><i class="status-dot" :class="{ ok: coreReady }"></i>Core</span><span><i class="status-dot overlay" :class="{ ok: liveRunning }"></i>Overlay</span></div>
-          </footer>
         </section>
 
         <section v-else-if="activePage === 'batch'" class="page batch-page">
