@@ -114,7 +114,7 @@ const sideStatusSecondary = computed(() => {
     return snapshot.value.system.autoStartStatus || "自动启动";
   if (!liveModelReady.value) return "实时模型未就绪";
   if (!inputReady.value) return "等待音源";
-  return "v" + (snapshot.value?.app.productVersion ?? "0.1.8");
+  return "v" + (snapshot.value?.app.productVersion ?? "0.1.9");
 });
 const sideStatusTip = computed(() => {
   const core = coreReady.value ? "Core 就绪" : "Core 未就绪";
@@ -552,29 +552,28 @@ onBeforeUnmount(() => {
           <header class="live-topbar">
             <div class="live-title">
               <span class="compact-feature live"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg></span>
-              <h2>实时字幕</h2>
-              <span class="info-dot" data-tip="实时音频、VAD、Process Loopback 与 ASR 运行在 LocalSub.Core；Overlay 和 PotPlayer 窗口跟随由 Shell 管理。">i</span>
+              <div>
+                <div class="live-title-line"><h2>实时字幕</h2><span class="info-dot" data-tip="实时音频、VAD、Process Loopback 与 ASR 运行在 LocalSub.Core；Overlay 和 PotPlayer 窗口跟随由 Shell 管理。">i</span></div>
+                <small>{{ snapshot.live.modelName }}</small>
+              </div>
             </div>
 
-            <div class="instant-level" data-tip="轻量 live.level 通道约 30 Hz 更新，顶部电平不再依赖整页 Snapshot。">
-              <span>输入</span>
-              <div><i :style="{ width: Math.max(1, liveLevel * 100) + '%' }"></i></div>
-              <b>{{ Math.round(liveLevel * 100) }}%</b>
-            </div>
+            <div class="live-task-center">
+              <div class="live-task-status" :class="'state-' + liveState">
+                <span class="live-task-status-icon" aria-hidden="true">
+                  <svg v-if="liveState === 'running'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+                  <svg v-else-if="liveState === 'starting' || liveState === 'stopping'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                  <svg v-else-if="liveState === 'failed'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
+                  <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
+                </span>
+                <div><strong>{{ liveStateLabel }}</strong><small>{{ liveRunning ? snapshot.live.source : snapshot.live.status }}</small></div>
+              </div>
 
-            <label class="live-monitor-toggle" data-tip="显示或隐藏最近约 30 秒的单线输入电平历史。">
-              <svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg>
-              <span class="switch small-switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></span>
-            </label>
-
-            <div class="live-task-status" :class="'state-' + liveState">
-              <span class="live-task-status-icon" aria-hidden="true">
-                <svg v-if="liveState === 'running'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
-                <svg v-else-if="liveState === 'starting' || liveState === 'stopping'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
-                <svg v-else-if="liveState === 'failed'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
-                <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
-              </span>
-              <div><strong>{{ liveStateLabel }}</strong><small>{{ liveRunning ? snapshot.live.source : snapshot.live.status }}</small></div>
+              <div class="instant-level" data-tip="直接对送入 ASR 的 16 kHz 单声道样本计算短时 RMS 电平，约 30 Hz 更新。">
+                <span>输入电平</span>
+                <div><i :style="{ width: Math.max(1, liveLevel * 100) + '%' }"></i></div>
+                <b>{{ Math.round(liveLevel * 100) }}%</b>
+              </div>
             </div>
 
             <div class="live-action-slot">
@@ -597,14 +596,22 @@ onBeforeUnmount(() => {
             </label>
           </section>
 
-          <section v-if="snapshot.settings.showLiveLevelHistory" class="waveform-section">
-            <div class="wave-head"><strong>输入电平历史</strong><span>最近约 30 秒</span></div>
-            <svg class="level-wave" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="最近约 30 秒输入电平历史">
-              <line class="axis axis-x" x1="0" y1="38" x2="100" y2="38"></line>
-              <line class="axis axis-y" x1="0" y1="4" x2="0" y2="38"></line>
-              <polyline :points="waveformPoints"></polyline>
-            </svg>
-            <div class="wave-axis"><span>30 s</span><span>15 s</span><span>现在</span></div>
+          <section class="waveform-section" :class="{ collapsed: !snapshot.settings.showLiveLevelHistory }">
+            <div class="wave-head">
+              <div><strong>输入电平</strong><span>最近约 30 秒</span></div>
+              <label class="wave-history-toggle" data-tip="显示或隐藏最近约 30 秒的输入电平历史。">
+                <span>历史</span>
+                <span class="switch small-switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></span>
+              </label>
+            </div>
+            <template v-if="snapshot.settings.showLiveLevelHistory">
+              <svg class="level-wave" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="最近约 30 秒输入电平历史">
+                <line class="axis axis-x" x1="0" y1="38" x2="100" y2="38"></line>
+                <line class="axis axis-y" x1="0" y1="4" x2="0" y2="38"></line>
+                <polyline :points="waveformPoints"></polyline>
+              </svg>
+              <div class="wave-axis"><span>30 s</span><span>15 s</span><span>现在</span></div>
+            </template>
           </section>
 
           <section class="transcript-section">
