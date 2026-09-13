@@ -16,7 +16,7 @@ e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。
 
-v0.4.18 最终验证必须使用本轮文档同步后的最新 `p103-exp` head。
+最后完成完整构建验证的 v0.4.18 代码 head：`2c70a847c870133ae8e7f681929ff029ac35bcd8`。CI run `34752362599` 全绿。
 
 ## 解决方案
 
@@ -252,6 +252,6 @@ v0.4.18 当前只在 `p103-exp`。本轮在 About 页增加近 24 小时 operati
 
 `Program --self-test` 新增 `operationalHealthSummary`，CI 会强制验证。
 
-功能实现 head：`e76e4deda04ad0a5a9839e8a9781c0dbcce004d5`。最终可交付基线以当前文档同步后最新 `p103-exp` head 的完整 CI 为准。
+最后完整验证代码 head：`2c70a847c870133ae8e7f681929ff029ac35bcd8`。Windows candidate Artifact ID `10316611787`，EXE SHA256 `7a5d10b2caa99d30495d8f1754e2f72c4d9b9a9448ce6b5d0a2c588ac031d884`。后续若只有文档提交，仍以该代码 head 作为 v0.4.18 构建事实源。
 
 未经用户明确授权，不提升 stable/main，不创建 tag 或 Release。

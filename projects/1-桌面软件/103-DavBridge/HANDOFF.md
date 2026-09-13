@@ -36,32 +36,45 @@
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本为 **v0.4.18**。
+当前实验版本：**v0.4.18**。
 
-v0.4.18 功能实现 head：
-
-```text
-e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
-```
-
-该实现包含：
-
-- About 页近 24 小时 operational-health strip；
-- OperationalHealthV048 聚合；
-- 当前 StrongVerified / backlog 摘要；
-- 40 条活动窗口完整性判断；
-- deterministic native self-test；
-- Windows CI 对 `operationalHealthSummary` 的强制断言；
-- 产品版本提升到 v0.4.18。
-
-由于本轮随后同步了 HANDOFF、工作记录、阶段记录、用户手册、UI 架构和代码 README，最终可交付基线必须以**最新 p103-exp head 的完整 P103 CI**为准，不能把上述功能实现 head 当作最终 Artifact head。
-
-上一版 v0.4.17 已验证基线仍可回查：
+最后完成完整 P103 CI 的代码 head：
 
 ```text
-run 34751011145
-code head 958744f8703b567c634c0296530b21623d922381
+2c70a847c870133ae8e7f681929ff029ac35bcd8
 ```
+
+对应 CI：
+
+```text
+run 34752362599
+scope          success
+core-smoke     success
+frontend       success
+windows-build  success
+report-status  success
+```
+
+Windows candidate：`DavBridge-v0.4.18-win-x64`
+
+Artifact ID：`10316611787`
+
+EXE：
+
+```text
+2455133 bytes
+SHA256 7a5d10b2caa99d30495d8f1754e2f72c4d9b9a9448ce6b5d0a2c588ac031d884
+```
+
+Artifact ZIP SHA256：
+
+```text
+a5a0f702d484b3ecf78c5bc89c37518f7de39e9cd53589e6b036573936fd3b49
+```
+
+该 run 同时验证了 v0.4.18 的 `operationalHealthSummary` native self-test、About 1100×825 浏览器预览、原 19 项 Core Smoke、Windows single EXE、Runtime 私人数据边界和既有 native-host self-test。
+
+本段之后若只有文档提交，仍以 `2c70a847c870133ae8e7f681929ff029ac35bcd8` 作为最后完整构建验证的 v0.4.18 代码基线。
 
 ## 4. 当前分支快照
 
@@ -472,7 +485,7 @@ v0.4.18 功能实现 head：
 e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 ```
 
-本轮增加 About 页近 24 小时健康摘要、OperationalHealth DTO 与 deterministic native self-test。最终完整 CI 必须使用动态文档同步后的最新 `p103-exp` head。
+本轮增加 About 页近 24 小时健康摘要、OperationalHealth DTO 与 deterministic native self-test。准确验证代码 head `2c70a847c870133ae8e7f681929ff029ac35bcd8` 已通过完整 P103 CI run `34752362599`。
 
 下一步用户实机重点只看：
 
