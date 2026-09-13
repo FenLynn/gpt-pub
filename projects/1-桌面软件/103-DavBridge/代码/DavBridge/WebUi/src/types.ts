@@ -1,4 +1,4 @@
-export type PrimaryAction = 'pause' | 'resume' | 'review' | 'none'
+export type PrimaryAction = 'pause' | 'resume' | 'retry' | 'review' | 'settings' | 'none'
 export type RecycleKind = 'observing' | 'review' | 'history'
 
 export interface PhaseStep {
@@ -19,6 +19,33 @@ export interface QuotaInfo {
   isSprint: boolean
 }
 
+export interface HealthInfo {
+  status: 'ok' | 'warning' | 'error' | 'not_checked'
+  summary: string
+  checkedAt: string
+}
+
+export interface RuntimeInfo {
+  uptimeText: string
+  previousExitText: string
+  uncleanExitCount: number
+  cleanupText: string
+}
+
+export interface InitializationStep {
+  key: string
+  label: string
+  done: boolean
+  hint: string
+}
+
+export interface ActivityItem {
+  time: string
+  title: string
+  detail: string
+  tone: 'info' | 'success' | 'warning'
+}
+
 export interface RecycleGroup {
   groupKey: string
   name: string
@@ -33,6 +60,8 @@ export interface RecycleGroup {
 
 export interface DavBridgeSnapshot {
   version: string
+  buildCommit: string
+  buildDate: string
   cycleId: string
   configured: boolean
   engineState: string
@@ -52,5 +81,9 @@ export interface DavBridgeSnapshot {
   humanActionCount: number
   primaryAction: PrimaryAction
   primaryLabel: string
+  health: HealthInfo
+  runtime: RuntimeInfo
+  initialization: InitializationStep[]
+  activities: ActivityItem[]
   recycle: RecycleGroup[]
 }
