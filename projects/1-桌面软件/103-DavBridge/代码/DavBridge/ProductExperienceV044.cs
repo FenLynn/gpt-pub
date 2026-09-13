@@ -265,6 +265,67 @@ internal static class ProductExperienceV044
                !warming.WindowComplete;
     }
 
+    internal static bool ValidateOperationalLedgerPersistenceForSelfTest(string root)
+    {
+        lock (Gate)
+        {
+            var previousPath = _path;
+            var previousState = _state;
+            try
+            {
+                Directory.CreateDirectory(root);
+                var now = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero);
+                var path = Path.Combine(root, "product-operational-ledger-selftest.json");
+                var legacy = new ProductState
+                {
+                    SchemaVersion = 1,
+                    Activities = new List<ProductActivityV044>
+                    {
+                        new(now.AddHours(-3), "等待网络", "等待网络恢复。", "warning"),
+                        new(now.AddHours(-2), "迁移已暂停", "安全暂停完成。", "info"),
+                        new(now.AddHours(-1), "当前清单完成", "当前清单已完成。", "success")
+                    }
+                };
+                File.WriteAllText(path, JsonSerializer.Serialize(legacy, JsonOptions));
+
+                _path = path;
+                _state = Load(path, out var recovered);
+                if (recovered) return false;
+                var changed = EnsureOperationalLedgerLocked(now);
+                var firstCount = _state.OperationalEvents.Count;
+                SaveLocked();
+
+                var reloaded = Load(path, out recovered);
+                if (recovered) return false;
+                _state = reloaded;
+                var changedAgain = EnsureOperationalLedgerLocked(now.AddMinutes(1));
+                var secondCount = _state.OperationalEvents.Count;
+                var summary = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    now,
+                    24);
+
+                return changed &&
+                       !changedAgain &&
+                       _state.SchemaVersion == 2 &&
+                       _state.OperationalLedgerStartedAt.HasValue &&
+                       firstCount == 4 &&
+                       secondCount == firstCount &&
+                       summary.WarningCount == 1 &&
+                       summary.NetworkWaitCount == 1 &&
+                       summary.PauseCount == 1 &&
+                       summary.CompletionCount == 1 &&
+                       !summary.WindowComplete;
+            }
+            finally
+            {
+                _path = previousPath;
+                _state = previousState;
+            }
+        }
+    }
+
     private static OperationalHealthV048 SummarizeOperationalLedger(
         IEnumerable<OperationalEventV049> events,
         DateTimeOffset? ledgerStartedAt,
@@ -556,6 +617,7 @@ internal static class ProductExperienceV044
                 reconcileBackup = File.Exists(Path.Combine(host.Paths.RoamingRoot, "reconcile.json.bak"))
             },
             health = new { status = health.Status, summary = health.Summary, items = health.Items },
+            operationalHealth = BuildOperationalHealth(24),
             initialization = BuildInitializationSteps(host)
         };
 

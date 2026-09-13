@@ -553,7 +553,7 @@ onBeforeUnmount(()=>{
             <span>{{ healthWindowLabel }}</span>
             <strong>{{ healthSummaryText }}</strong>
           </div>
-          <small>{{ healthWorkloadText }}<template v-if="!snapshot.operationalHealth.windowComplete"> · 持续运行满 {{ snapshot.operationalHealth.hours }} 小时后显示完整窗口</template></small>
+          <small>{{ healthWorkloadText }}<template v-if="!snapshot.operationalHealth.windowComplete"> · 健康账本累计满 {{ snapshot.operationalHealth.hours }} 小时后显示完整窗口</template></small>
         </section>
       </article>
     </section>

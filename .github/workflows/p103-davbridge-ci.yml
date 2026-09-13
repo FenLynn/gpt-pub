@@ -197,6 +197,7 @@ jobs:
             if (-not $json.ok -or -not $json.webUiEmbedded -or -not $json.bridgeWhitelistValidated -or $json.coreLogicMovedToJavaScript) { throw 'DavBridge v0.4 native-host self-test failed' }
             if (-not $json.configBackupRecovery -or -not $json.stateBackupRecovery -or -not $json.reconcileBackupRecovery -or -not $json.productSidecarBackupRecovery -or -not $json.runtimeSessionSelfTest -or -not $json.windowFourThreeMigration -or -not $json.backgroundWakeSignal) { throw 'DavBridge v0.4.8 recovery and window migration self-test failed' }
             if (-not $json.operationalHealthLedger) { throw 'DavBridge v0.4.19 operational health ledger self-test failed' }
+            if (-not $json.operationalHealthPersistence) { throw 'DavBridge v0.4.19 operational health persistence self-test failed' }
             if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version mismatch: $($json.version)" }
           } finally { $env:APPDATA=$oldAppData; $env:LOCALAPPDATA=$oldLocal; Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
 
