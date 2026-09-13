@@ -6,29 +6,29 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.22**。
+当前 `p103-exp` 候选：**v0.4.23**。
 
-v0.4.22 最后完整验证代码 head：
+v0.4.23 最后完整验证代码 head：
 
 ```text
-fbfa4dad5a5146d7fd5047fe902ab93c3dc3cf02
+afe861ebcede0326b916ed9f3dd2431849f67d87
 ```
 
-完整 P103 CI run：`34759458930`，结果 `success`。
+完整 P103 CI run：`34760070491`，结果 `success`。
 
-Windows candidate Artifact ID：`10318775680`。
+Windows candidate Artifact ID：`10318343396`。
 
 EXE：`2467421 bytes`。
 
-EXE SHA256：`988729bed321bd20c3511b83a28a64320e5fd79a9eb003fa4cff287aff611cc8`。
+EXE SHA256：`6a23d598515c9c7e9eea135621a36600bdf6382e7681f4f99c9e52529da7fd5b`。
 
-Artifact ZIP SHA256：`97dd28bcce4c6d85a2bac80a470baad84f74c38134cdacf8981b7b30814336ee`。
+Artifact ZIP SHA256：`dcf18abe1a9a05d0026e884c5ae154acf98ab3d8b37f61fdc27091b8863d8788`。
 
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
 
-## v0.4.22 About 布局纠正
+## v0.4.23 About 信息分层
 
-恢复原 About 已认可的七行基础信息，不再删减。新增运行摘要继续保留，并统一成相同的左右两列单行格式，避免卡片化和解释文字堆叠。
+About 继续保持单行布局，但按“当前状态 / 最近活动 / 软件信息”三组重新排序。当前状态优先，软件信息降级。最近完成与暂停合并为“记录”，初始化只在未完成时出现，运行环境自检移入 tooltip。
 
 本轮不修改 DavBridge.Core 或任何迁移与安全语义。
 
@@ -250,7 +250,7 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.22 当前只在 `p103-exp`。当前 UI 断点是 About 布局纠正，原七行主体已恢复，新增摘要改为同构单行布局。
+v0.4.23 当前只在 `p103-exp`。当前 UI 断点是 About 信息分层，按当前状态、最近活动、软件信息三组展示，正常状态下减少常驻行数并突出运行优先级。
 
 以下 v0.4.20 观察连续性仍是当前底层健康语义：
 
