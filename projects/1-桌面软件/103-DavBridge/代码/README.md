@@ -28,9 +28,9 @@ Artifact ZIP SHA256：`9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f3765244211
 
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
 
-## v0.4.26 v0.4 最终收束
+## v0.4.25 surface 色阶收束
 
-v0.4.26 在 v0.4.24 收束候选基础上只做 surface 色阶修正。普通文字区从纯白或高透明度白色回到淡蓝灰 quiet / soft / panel 层，About 保持透明，真正抬升的 tooltip、选中 tab 和交互面保留更亮 surface。
+v0.4.25 在 v0.4.24 收束候选基础上只做 surface 色阶修正。普通文字区从纯白或高透明度白色回到淡蓝灰 quiet / soft / panel 层，About 保持透明，真正抬升的 tooltip、选中 tab 和交互面保留更亮 surface。
 
 页面结构、About 三级信息层次、生产 UI 所有权门、九张视觉预览、Core Smoke 20 项以及旧 WinForms UI 隔离规则均保持不变。
 
@@ -258,7 +258,7 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.26 已完成自动化收束验证，只位于 `p103-exp`。
+v0.4.26 已完成自动化收束验证，并已获得用户在当前会话中的 stable/main 收尾授权。
 
 最后完整验证代码 head：`3568eca17bda0b6674959c9897f6ec2dbebbb26f`。
 
@@ -266,5 +266,5 @@ CI run：`34763904669`，五项全绿。
 
 Core Smoke 20/20。Windows candidate Artifact ID：`10319489203`。
 
-下一步不是继续开发 v0.4 功能，而是用户真实 Windows 最终验收。终验通过后才进入 stable/main 提升流程。
+下一步只执行既定两级准入：`p103-exp → p103-stable → main`。不创建正式 tag 或 GitHub Release。
 

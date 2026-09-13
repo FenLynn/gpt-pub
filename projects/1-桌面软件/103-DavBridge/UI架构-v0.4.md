@@ -177,9 +177,9 @@ CI 固定生成九张浏览器视觉预览，包括四种总览尺寸、转移�
 
 旧 WinForms UI 源码继续保留为历史实现和回滚参考，不再承担生产业务页面。废弃 About selector 已从活动 CSS 删除。
 
-### v0.4.26 surface 层级
+### v0.4.25 surface 层级
 
-v0.4.26 保持 v0.4.24 的页面结构和交互职责，只重新统一 surface 色阶。
+v0.4.25 保持 v0.4.24 的页面结构和交互职责，只重新统一 surface 色阶。
 
 普通信息区不再使用纯白或高透明度白色作为默认背景，而是使用淡蓝灰 quiet / soft / panel 层。About 继续无卡片背景，直接融入 canvas。回收站当前选中 tab、tooltip 与少量真实交互层仍可使用更亮 surface，用于表达抬升和焦点。
 
@@ -239,4 +239,4 @@ v0.4.20 不增加新的主界面结构。About 页在 v0.4.19 匿名健康账本
 
 Vue 仍只接收聚合 OperationalHealth DTO，不读取匿名事件账本、runtime marker 或私人 Data，也不增加 bridge 命令。
 
-Overview、迁移页、暂停控制、WebDAV 和 DavBridge.Core 保持冻结。下一关仍是用户真实 Windows 视觉和长期运行观察。
+Overview、迁移页、暂停控制、WebDAV 和 DavBridge.Core 保持冻结。用户已在当前会话授权收束 v0.4.26 并执行 stable/main 两级提升。该提升不等于正式 Release，长期后台、真实网络与睡眠恢复继续作为稳定版运行观察项。

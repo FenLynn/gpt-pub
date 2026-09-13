@@ -86,7 +86,7 @@ Artifact ZIP SHA256：
 - Runtime 私人数据边界；
 - 既有 native-host self-test。
 
-本段之后若只有文档提交，仍以 `3568eca17bda0b6674959c9897f6ec2dbebbb26f` 作为最后完整构建验证的 v0.4.24 代码基线。
+本段之后若只有文档提交，仍以 `3568eca17bda0b6674959c9897f6ec2dbebbb26f` 作为最后完整构建验证的 v0.4.26 代码基线。
 
 ## 4. 当前分支快照
 
@@ -506,11 +506,11 @@ e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 
 自动化可证明的 v0.4 收束工作至此完成。真正的多小时或多日 Windows 无人值守、睡眠恢复、真实网络断开与真实 WebView2 视觉仍必须由用户实机确认，不能用 CI 伪装完成。
 
-### v0.4.26 surface 色阶修正
+### v0.4.25 surface 色阶修正
 
 用户实机指出普通文字附近仍有“白色背景”感。检查确认不是错觉，活动 CSS 中多个普通信息 surface 仍使用纯白或高透明度白色，造成淡蓝灰页面上出现“白纸贴片”视觉。
 
-v0.4.26 只修正 surface 色阶，不改布局、字号、信息结构或任何 Core 逻辑：
+v0.4.25 只修正 surface 色阶，不改布局、字号、信息结构或任何 Core 逻辑：
 
 - 页面 canvas 统一为更明确的淡蓝灰；
 - 普通信息区使用 quiet / soft / panel 三档淡蓝灰 surface；
@@ -583,13 +583,13 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-稳定主线继续保持 v0.4.16：
+稳定主线在本轮提升前仍为 v0.4.16：
 
 ```text
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前最终实验候选为 **v0.4.24**，只位于 `p103-exp`。
+当前最终候选为 **v0.4.26**，位于 `p103-exp`。
 
 最后完整验证代码 head：
 
@@ -605,13 +605,13 @@ EXE：`2467421 bytes`，SHA256 `72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f
 
 Artifact ZIP SHA256：`9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe`。
 
-Web UI preview Artifact ID：`10319379569`。预览已覆盖总览多尺寸、转移、回收站、文档、About 1100×825 与 About 900×620。
+Web UI preview Artifact ID：`10319379569`。预览覆盖总览多尺寸、转移、回收站、文档与 About。
 
-Core Smoke 为 20/20，通过新增的持久化暂停与重启收敛序列。Windows native self-test 全部通过。
+Core Smoke 为 20/20。Windows native self-test、Runtime 私人数据边界、生产 UI 所有权检查与 single EXE 构建均通过。
 
-当前唯一不能由 CI 替代的门是用户真实 Windows 终验，包括 WebView2 实际字体与 DPI、睡眠恢复、真实网络断开与恢复，以及多小时或多日无人值守。
+用户已在当前会话明确要求“把这些全部收完”，授权结束 v0.4.26 的候选阶段并执行 `p103-exp → p103-stable → main` 的两级准入收束。该授权用于稳定主线提升，不构成正式 tag 或 GitHub Release 授权。
 
-在用户真实 Windows 明确认可前，不把 v0.4.24 提升到 `p103-stable` 或 `main`，不创建 tag 或 Release。
+本次收尾不把 CI 描述成真实多日 Windows 运行证明。长期后台、真实网络切换与睡眠恢复继续作为稳定版实际运行观察项；若后续暴露真实问题，以追加修复处理，不重写本次历史。
 
 ## 10. 新对话固定读取顺序
 
