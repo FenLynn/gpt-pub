@@ -1160,9 +1160,13 @@ onBeforeUnmount(() => {
         <section v-else-if="activePage === 'docs'" class="page docs-page">
           <header class="page-head simple-head"><div class="page-feature docs-feature"><svg viewBox="0 0 48 48"><path d="M7 11c6-2 11-.8 17 2.8V40c-6-3.6-11-4.8-17-2.8z M41 11c-6-2-11-.8-17 2.8V40c6-3.6 11-4.8 17-2.8z"></path></svg></div><div class="page-title"><h2>文档</h2><span>LocalSub v{{ snapshot.app.productVersion }}</span></div></header>
           <section class="docs-list">
-            <div><b>01</b><span><strong>主页</strong><p>状态、自检和实时字幕主开关都集中在主页。</p></span></div>
-            <div><b>02</b><span><strong>零触感运行</strong><p>可设置开机启动、静默托盘和自动实时字幕。PotPlayer 未打开时保持等待，不静默切换音源。</p></span></div>
-            <div><b>03</b><span><strong>运行边界</strong><p>Vue 只显示状态和发送白名单命令。Shell 管理 Windows 原生能力，Core 负责音频、ASR、媒体分析和模型重任务。</p></span></div>
+            <div><b>01</b><span><strong>主页</strong><p>状态、自检和实时字幕主开关集中在主页，异常项会直接指出需要处理的 Core、模型或音源。</p></span></div>
+            <div><b>02</b><span><strong>实时字幕</strong><p>PotPlayer 模式跟随播放器窗口、最小化状态与重新打开；所有音频模式用于不依赖播放器的系统输出识别。</p></span></div>
+            <div><b>03</b><span><strong>后台转写</strong><p>支持多文件队列、整队顺序转写、取消和单项重试。队列与已完成结果会持久化，异常退出后可继续处理。</p></span></div>
+            <div><b>04</b><span><strong>字幕与结果</strong><p>结构化结果自动保存到输出目录，完成项可导出 SRT、VTT、TXT，整队可一次生成三种格式。</p></span></div>
+            <div><b>05</b><span><strong>本地模型</strong><p>模型支持下载、断点续传、关键文件健康检查、继续修复和删除；实时模型与后台模型分别选择。</p></span></div>
+            <div><b>06</b><span><strong>零触感运行</strong><p>可设置开机启动、静默托盘和自动实时字幕。PotPlayer 未打开时保持等待，不静默切换音源。</p></span></div>
+            <div><b>07</b><span><strong>运行边界</strong><p>Vue 只显示状态和发送白名单命令。Shell 管理 Windows 原生能力，Core 负责音频、ASR、媒体分析和模型重任务。</p></span></div>
           </section>
         </section>
 
