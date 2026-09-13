@@ -55,6 +55,20 @@ const healthWindowNote = computed(() => {
   if(!h.windowComplete) return `健康账本累计满 ${h.hours} 小时后显示完整窗口`
   return ''
 })
+const healthStatusText = computed(() => {
+  const h=snapshot.value.operationalHealth
+  if(h.observationGap) return '观察不连续'
+  if(h.warningCount>0) return `${h.warningCount} 次警告`
+  if(!h.windowComplete) return '建立中'
+  return '状态良好'
+})
+const recentActivityText = computed(() => {
+  const items:string[]=[]
+  if(recentComplete.value) items.push(`完成 ${recentComplete.value.time}`)
+  if(recentPause.value) items.push(`暂停 ${recentPause.value.time}`)
+  return items.length ? items.join(' · ') : '暂无近期完成或暂停'
+})
+const recentActivityTip = computed(() => [recentCompleteText.value,recentPauseText.value].join('；'))
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
 const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
 const sideStatusKind = computed(() => {
@@ -528,46 +542,59 @@ onBeforeUnmount(()=>{
         <h2>DavBridge</h2>
         <p>安全、持续地维护 Zotero 单向强校验镜像。</p>
 
-        <dl class="about-main-list">
-          <div><dt>版本</dt><dd>v{{ snapshot.version }}</dd></div>
-          <div><dt>构建</dt><dd>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</dd></div>
-          <div><dt>运行环境</dt><dd :class="`health-text ${snapshot.health.status}`">{{ snapshot.health.summary }}</dd></div>
-          <div><dt>运行会话</dt><dd>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</dd></div>
-          <div><dt>初始化</dt><dd>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</dd></div>
-          <div><dt>引擎</dt><dd>.NET 8 + WebView2</dd></div>
-          <div><dt>界面</dt><dd>Vue 3</dd></div>
-        </dl>
-
-        <section class="about-extra" aria-label="运行摘要">
-          <div class="about-extra-title">运行摘要</div>
-          <div class="about-extra-row has-tip" :data-tip="`当前 ${snapshot.cycleId ? 'Cycle '+snapshot.cycleId : 'Cycle 尚未校准'} 的保守流量账本`">
-            <span>本周期</span>
+        <section class="about-section about-section-primary" aria-label="当前状态">
+          <div class="about-section-title">当前状态</div>
+          <div class="about-row has-tip" :data-tip="snapshot.health.summary">
+            <span>运行</span>
+            <strong>{{ snapshot.engineState }}<template v-if="snapshot.routeStatus && snapshot.routeStatus !== snapshot.engineState"> · {{ snapshot.routeStatus }}</template></strong>
+          </div>
+          <div class="about-row">
+            <span>会话</span>
+            <strong>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</strong>
+          </div>
+          <div class="about-row has-tip" :data-tip="quotaTip">
+            <span>周期</span>
             <strong>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : '未校准' }} · {{ cycleTrafficText }}</strong>
           </div>
-          <div class="about-extra-row has-tip" data-tip="来自最近活动，只用于快速查看最近一次完成事件，不记录文件名">
-            <span>最近完成</span>
-            <strong>{{ recentCompleteText }}</strong>
+          <div
+            class="about-row has-tip"
+            :class="{warning:snapshot.operationalHealth.warningCount>0||snapshot.operationalHealth.observationGap}"
+            :data-tip="healthWindowNote || `完成 ${snapshot.operationalHealth.completionCount}，警告 ${snapshot.operationalHealth.warningCount}，暂停 ${snapshot.operationalHealth.pauseCount}，网络等待 ${snapshot.operationalHealth.networkWaitCount}`"
+          >
+            <span>健康</span>
+            <strong>{{ healthWindowLabel }} · {{ healthStatusText }}</strong>
           </div>
-          <div class="about-extra-row has-tip" data-tip="显示最近一次人工暂停或安全暂停事件">
-            <span>最近暂停</span>
-            <strong>{{ recentPauseText }}</strong>
+          <div v-if="initializedCount < snapshot.initialization.length" class="about-row warning">
+            <span>初始化</span>
+            <strong>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</strong>
           </div>
-          <div class="about-extra-row has-tip" :class="{warning:!!recentWarning}" :data-tip="recentWarning ? recentWarning.detail : '最近活动中没有警告事件'">
-            <span>最近异常</span>
+        </section>
+
+        <section class="about-section" aria-label="最近活动">
+          <div class="about-section-title">最近活动</div>
+          <div class="about-row has-tip" :class="{warning:!!recentWarning}" :data-tip="recentWarning ? recentWarning.detail : '最近活动中没有警告事件'">
+            <span>异常</span>
             <strong>{{ recentWarningText }}</strong>
           </div>
-          <div
-            class="about-extra-row about-health-row has-tip"
-            :class="{warning:snapshot.operationalHealth.warningCount>0||snapshot.operationalHealth.observationGap}"
-            :data-tip="healthWindowNote || `StrongVerified ${snapshot.operationalHealth.verifiedCount}，待处理 ${snapshot.operationalHealth.backlogCount}，网络等待 ${snapshot.operationalHealth.networkWaitCount}`"
-          >
-            <span>{{ healthWindowLabel }}</span>
-            <strong>
-              完成 {{ snapshot.operationalHealth.completionCount }} ·
-              警告 {{ snapshot.operationalHealth.warningCount }} ·
-              暂停 {{ snapshot.operationalHealth.pauseCount }}
-              <template v-if="snapshot.operationalHealth.observationGap"> · 观察不连续</template>
-            </strong>
+          <div class="about-row has-tip" :data-tip="recentActivityTip">
+            <span>记录</span>
+            <strong>{{ recentActivityText }}</strong>
+          </div>
+        </section>
+
+        <section class="about-section about-section-secondary" aria-label="软件信息">
+          <div class="about-section-title">软件信息</div>
+          <div class="about-row">
+            <span>版本</span>
+            <strong>v{{ snapshot.version }}</strong>
+          </div>
+          <div class="about-row has-tip" :data-tip="`完整构建：${snapshot.buildCommit || 'local'} · ${snapshot.buildDate || '本地构建'}`">
+            <span>构建</span>
+            <strong>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</strong>
+          </div>
+          <div class="about-row">
+            <span>技术栈</span>
+            <strong>.NET 8 + WebView2 · Vue 3</strong>
           </div>
         </section>
       </article>
