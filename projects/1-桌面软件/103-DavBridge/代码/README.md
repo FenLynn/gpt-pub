@@ -6,23 +6,23 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.15**。
+当前可靠性封板版本：**v0.4.16**。
 
-最后完成完整 CI 的代码 head：
+第一轮完成完整 CI 的 v0.4.16 代码 head：
 
 ```text
-92f3a05a8b351aab357250899c7de0ecb82ce760
+35015c8581cb537ae98813eb5f2efe0458525487
 ```
 
-CI run：`34736655980`，结果 `success`。
+CI run：`34743274402`，结果 `success`。
 
-候选 Artifact：`DavBridge-v0.4.15-win-x64`，Artifact ID `10311605517`。
+候选 Artifact：`DavBridge-v0.4.16-win-x64`，Artifact ID `10313388007`。
 
-EXE SHA256：`aa72ee8ec14c4fbf6fe8bcd117a3fc041864233af1bbaaec9ccf92b8a843569e`。
+EXE SHA256：`1da5a38f1ab5264699ab0778ba346e7dcf6a4df48089952eb1650c2d7de9f29f`。
 
-Artifact ZIP SHA256：`908b1bef4a812b5329565303672da14b051ad152a823c5df077ad2b102630770`。
+Artifact ZIP SHA256：`ea6d43a90f431fc1fe3b24b49944cab524040911af8b320a009a92c3f8518464`。
 
-如果该 head 之后只有文档提交，仍以 `92f3a05a...` 作为最后经过完整构建验证的代码 head。
+动态文档提交发生在该代码 head 之后，stable/main 提升必须使用 PR 自身准确 head 的完整 CI，不得只复用本 run。
 
 ## 解决方案
 
@@ -236,17 +236,20 @@ Windows x64 使用 .NET 8 framework-dependent single EXE publish。
 .github/workflows/p103-davbridge-ci.yml
 ```
 
-最后已验证 run `34736655980` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
+v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
 
 ## 当前开发断点
 
-v0.4.15 等待用户 Windows 实机验收：上传进度语义、强校验 / 安全暂停状态独立显示、最近活动去重、滚动条隐藏和原生模态背景降权。未经明确验收，不提升 stable/main，不创建正式 Release。
+v0.4.16 已进入稳定准入流程。本轮只增加可靠性回归，不改变 UI。用户已授权完整准入通过后执行 `p103-exp → p103-stable → main` 两级 PR；不授权 tag 或 Release。
 
+### v0.4.16 可靠性测试新增
 
-### v0.4.15 状态显示边界
+新增五项 Core Smoke：
 
-`WebUiHostV040` 现在只保存目标端 `WebDavIoOperation.Upload` 的 I/O 进度作为 `CurrentProgress`。同一文件后续进入目标端重新读取和 StrongVerified 时，上传进度可以保持 100%，而状态文字继续表达当前安全阶段。
+- repeated pause resume remains idempotent；
+- network list failure recovers on retry；
+- verification network loss recovers without re-put；
+- zero byte object verifies safely；
+- quota exact boundary is deterministic。
 
-`ProductExperienceV044.RecentActivities()` 在展示层合并短时间内同一状态转换产生的重复事件，不修改迁移账本或安全状态。
-
-`quota.calibrate` 通过原生模态包装器临时给 Web UI 根节点添加 `native-modal-open`，结束后无论成功、取消或异常都会在 finally 中移除。
+Core Smoke 总数增至 19 项。
