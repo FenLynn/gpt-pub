@@ -199,7 +199,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.16 workflow and visual contract
+      - name: Verify v0.1.17 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -222,6 +222,8 @@ jobs:
             'class="home-action-slot"',
             'class="home-primary-action"',
             'class="home-status-list"',
+            '<h2>运行概览</h2>',
+            '全部条件已就绪',
             'class="home-control-row"',
             'class="home-readiness"',
             'class="live-task-card"',
@@ -243,7 +245,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.16 Web UI contract missing: $required"
+              throw "v0.1.17 Web UI contract missing: $required"
             }
           }
 
@@ -253,6 +255,9 @@ jobs:
             '.about-page{',
             '.about-card{',
             'grid-template-columns:52px 168px minmax(220px,1fr) 126px',
+            'flex:0 1 440px',
+            'grid-template-rows:repeat(4,minmax(88px,1fr))',
+            'margin-top:auto',
             'grid-template-columns:52px minmax(190px,1fr) minmax(190px,auto) 74px',
             '.workspace{min-width:0;min-height:0;position:relative;overflow:hidden}',
             'scrollbar-color:transparent transparent',
@@ -263,7 +268,7 @@ jobs:
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.16 style contract missing: $required"
+              throw "v0.1.17 style contract missing: $required"
             }
           }
 
@@ -274,7 +279,7 @@ jobs:
             '"home", "live", "batch", "models", "settings", "docs", "about"'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.16 4:3 host contract missing: $required"
+              throw "v0.1.17 4:3 host contract missing: $required"
             }
           }
 

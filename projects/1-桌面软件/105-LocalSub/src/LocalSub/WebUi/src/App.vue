@@ -108,7 +108,7 @@ const homeStateText = computed(() => {
   if (snapshot.value?.core.state === "failed") return "识别核心需要处理";
   if (!liveModelReady.value) return "实时模型需要处理";
   if (!inputReady.value) return "等待可用音源";
-  return "LocalSub 已就绪";
+  return "全部条件已就绪";
 });
 const homeStateDetail = computed(() => {
   if (!snapshot.value) return "";
@@ -519,7 +519,7 @@ onBeforeUnmount(() => {
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M9 19h7l4-8 8 26 5-13h6"></path></svg>
         </div>
-        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.16" }}</small></div>
+        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.17" }}</small></div>
       </div>
 
       <nav class="side-nav" aria-label="主导航">
@@ -571,7 +571,7 @@ onBeforeUnmount(() => {
             </span>
 
             <div class="home-control-copy">
-              <h2>LocalSub</h2>
+              <h2>运行概览</h2>
               <small>本地字幕控制中心</small>
             </div>
 
@@ -609,9 +609,9 @@ onBeforeUnmount(() => {
               </span>
               <div class="home-row-copy">
                 <h3>运行条件</h3>
-                <small>识别核心、实时模型与当前音源</small>
+                <small>Core、模型与音源状态</small>
               </div>
-              <div class="home-readiness" data-tip="Core 可按需启动；实时模型必须已安装；PotPlayer 音源需要检测到播放器进程。">
+              <div class="home-readiness" data-tip="Core 可按需启动；实时模型需要已安装；使用 PotPlayer 音源时需要检测到播放器。">
                 <span :class="{ ok: coreOperational }"><i></i>Core</span>
                 <span :class="{ ok: liveModelReady }"><i></i>模型</span>
                 <span :class="{ ok: inputReady }"><i></i>音源</span>
@@ -629,7 +629,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="home-row-meta">
                 <strong>{{ liveStateLabel }}</strong>
-                <small>{{ liveRunning ? "当前会话使用已保存配置" : "开始时直接使用当前默认配置" }}</small>
+                <small>{{ liveRunning ? "当前会话使用已保存配置" : "开始时使用当前默认配置" }}</small>
               </div>
               <b class="home-row-result" :class="{ ok: liveModelReady && inputReady }">{{ liveRunning ? "运行" : "当前" }}</b>
             </article>
@@ -640,11 +640,11 @@ onBeforeUnmount(() => {
               </span>
               <div class="home-row-copy">
                 <h3>字幕显示</h3>
-                <small>Overlay 由 Windows Shell 管理并跟随播放器窗口</small>
+                <small>字幕窗口自动跟随播放器</small>
               </div>
               <div class="home-row-meta">
                 <strong>{{ liveRunning ? "正在显示" : "自动跟随" }}</strong>
-                <small>{{ liveRunning ? snapshot.live.status : "随实时字幕启动，无需单独操作" }}</small>
+                <small>{{ liveRunning ? snapshot.live.status : "随实时字幕自动开启" }}</small>
               </div>
               <b class="home-row-result ok">{{ liveRunning ? "运行" : "就绪" }}</b>
             </article>
@@ -659,7 +659,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="home-row-meta">
                 <strong>{{ batchModelReady ? "默认模型可用" : "需要准备模型" }}</strong>
-                <small>{{ batchModelReady ? "媒体分析与转写任务由独立 Core 执行" : "可在模型页安装或选择后台模型" }}</small>
+                <small>{{ batchModelReady ? "可用于本地媒体离线转写" : "可在模型页安装或选择后台模型" }}</small>
               </div>
               <b class="home-row-result" :class="{ ok: batchModelReady }">{{ batchModelReady ? "可用" : "需安装" }}</b>
             </article>
