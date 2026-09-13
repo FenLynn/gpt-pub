@@ -197,7 +197,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.11 workflow and visual contract
+      - name: Verify v0.1.12 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -219,13 +219,14 @@ jobs:
             'class="level-wave"',
             'class="transcript-scroll"',
             'subscribeLiveLevel',
+            'reportLiveLevelAck',
             'class="model-table-shell"',
             'settings.update',
             '<Teleport to="body">',
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.11 Web UI contract missing: $required"
+              throw "v0.1.12 Web UI contract missing: $required"
             }
           }
 
@@ -238,7 +239,7 @@ jobs:
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.11 style contract missing: $required"
+              throw "v0.1.12 style contract missing: $required"
             }
           }
 
@@ -248,7 +249,7 @@ jobs:
             'DefaultBackgroundColor = Color.FromArgb(244, 248, 251)'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.11 4:3 host contract missing: $required"
+              throw "v0.1.12 4:3 host contract missing: $required"
             }
           }
 
@@ -311,6 +312,39 @@ jobs:
           if (-not $levelHandler.Success) { throw 'LiveSessionController level handler not found.' }
           if ($levelHandler.Value -match 'NotifyChanged\(') {
             throw 'High-rate level samples must not trigger full app.snapshot updates.'
+          }
+
+      - name: Verify WebView2 meter delivery boundary
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $hostSource = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
+          $bridge = Get-Content 'src/LocalSub/WebUi/src/bridge.ts' -Raw
+          $app = Get-Content 'src/LocalSub/WebUi/src/App.vue' -Raw
+
+          foreach ($required in @(
+            'diagnostics.liveLevelAck',
+            'meter-browser.log',
+            'reportLiveLevelAck',
+            'if (next.live.state !== "running")',
+            'PostEvent("live.level", new { value = 0.73f })'
+          )) {
+            if (($hostSource + $bridge + $app) -notmatch [regex]::Escape($required)) {
+              throw "WebView2 meter delivery contract missing: $required"
+            }
+          }
+
+          if ($hostSource -match [regex]::Escape('if (_disposed || _web.CoreWebView2 == null) return;')) {
+            throw 'Background realtime callbacks must not touch WebView2 before marshaling to the UI thread.'
+          }
+
+          $handler = [regex]::Match($hostSource,'(?s)void OnLiveLevelChanged\(float value\).*?\n    \}')
+          if (-not $handler.Success) { throw 'OnLiveLevelChanged handler not found.' }
+          $beginInvokeIndex = $handler.Value.IndexOf('BeginInvoke')
+          $coreAccessIndex = $handler.Value.IndexOf('_web.CoreWebView2')
+          if ($coreAccessIndex -ge 0 -and $coreAccessIndex -lt $beginInvokeIndex) {
+            throw 'OnLiveLevelChanged touches WebView2 before BeginInvoke.'
           }
 
       - name: Verify LocalSub application icon contract
@@ -630,6 +664,7 @@ jobs:
           $env:LOCALSUB_WEBUI_SMOKE = '1'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           Remove-Item publish/Logs/webui-smoke-ready.txt -Force -ErrorAction SilentlyContinue
+          Remove-Item publish/Logs/meter-browser.log -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru
           $deadline = [DateTime]::UtcNow.AddSeconds(15)
           while ([DateTime]::UtcNow -lt $deadline) {
@@ -648,8 +683,15 @@ jobs:
             throw 'WebUi host did not complete a real app.getSnapshot bridge round trip.'
           }
           $ready = Get-Content publish/Logs/webui-smoke-ready.txt -Raw
-          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'bridge=live.stop' -or $ready -notmatch 'bridge=live.start' -or $ready -notmatch 'bridge=model.list' -or $ready -notmatch 'bridge=model.select' -or $ready -notmatch 'bridge=model.download' -or $ready -notmatch 'bridge=model.cancel' -or $ready -notmatch 'bridge=model.delete' -or $ready -notmatch 'webview2=ready') {
+          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'bridge=live.stop' -or $ready -notmatch 'bridge=live.start' -or $ready -notmatch 'bridge=model.list' -or $ready -notmatch 'bridge=model.select' -or $ready -notmatch 'bridge=model.download' -or $ready -notmatch 'bridge=model.cancel' -or $ready -notmatch 'bridge=model.delete' -or $ready -notmatch 'bridge=diagnostics.liveLevelAck' -or $ready -notmatch 'webview2=ready') {
             throw "Unexpected WebUi smoke marker: $ready"
+          }
+          if (-not (Test-Path publish/Logs/meter-browser.log)) {
+            throw 'Vue did not ACK the injected live.level event.'
+          }
+          $browserMeter = Get-Content publish/Logs/meter-browser.log -Raw
+          if ($browserMeter -notmatch 'value=0\.7300') {
+            throw "Vue ACK did not preserve injected meter value: $browserMeter"
           }
           if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log; throw 'WebUi host wrote a crash log.' }
           Stop-Process -Id $p.Id -Force
