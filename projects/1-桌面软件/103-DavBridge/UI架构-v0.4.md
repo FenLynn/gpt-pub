@@ -107,7 +107,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
-## v0.4.17 当前界面结构
+## v0.4.18 当前界面结构
 
 当前候选采用固定左侧导航：
 
@@ -193,10 +193,12 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 ## 当前阶段
 
-v0.4.16 已完成稳定准入，当前 `main` 与 `p103-stable` 均为 `73aefcf04570180bb9526a43cf805aff1e7673b3`。正式 GitHub Release 仍为 v0.4.0。
+v0.4.16 继续作为 stable/main 冻结基线，commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。正式 GitHub Release 仍为 v0.4.0。
 
-v0.4.17 位于 `p103-exp`，准确代码 head 为 `958744f8703b567c634c0296530b21623d922381`，完整 CI run `34751011145` 全绿。
+当前实验版本为 v0.4.18，功能实现 head `e76e4deda04ad0a5a9839e8a9781c0dbcce004d5`。
 
-本轮只增强 About 页长期运行可见性：使用既有安全 snapshot 与最近活动，在 About 页底部增加“本周期 / 最近完成 / 最近暂停 / 最近异常”四项轻量摘要，并新增 `about-1100x825.png` CI 预览。已有脱敏诊断导出不重复实现。
+v0.4.18 在 v0.4.17 About 页长期运行摘要下方增加一条轻量 operational-health strip，不做图表和复杂卡片。默认显示近 24 小时“完成 / 网络等待 / 警告 / 暂停”，以及当前 StrongVerified / backlog。活动保留窗口不足 24 小时时明确标注可能截断。
 
-不修改 Overview、暂停控制、迁移核心和安全链。下一关是用户 Windows 实机确认 About 页是否保持简洁有用。
+新增 native deterministic self-test 验证统计边界，并由 Windows CI 强制检查。
+
+Overview、迁移页、暂停控制与 DavBridge.Core 不变。下一步等待最终 `p103-exp` head CI 和用户实机视觉确认。
