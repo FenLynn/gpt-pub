@@ -9,6 +9,7 @@ namespace DavBridge;
 internal sealed record ProductActivityV044(DateTimeOffset At, string Title, string Detail, string Tone);
 internal sealed record InitializationStepV044(string Key, string Label, bool Done, string Hint);
 internal sealed record StartupHealthItemV044(string Key, string Label, string Status, string Detail);
+internal sealed record OperationalHealthV048(int Hours, int WarningCount, int NetworkWaitCount, int PauseCount, int CompletionCount, bool WindowComplete);
 
 internal sealed record StartupHealthReportV044(DateTimeOffset? CheckedAt, IReadOnlyList<StartupHealthItemV044> Items)
 {
@@ -217,6 +218,58 @@ internal static class ProductExperienceV044
     }
 
     public static void SetHealth(StartupHealthReportV044 report) => Health = report;
+
+    public static OperationalHealthV048 BuildOperationalHealth(int hours = 24)
+    {
+        lock (Gate)
+        {
+            var safeHours = Math.Clamp(hours, 1, 168);
+            var now = DateTimeOffset.Now;
+            var cutoff = now.AddHours(-safeHours);
+            var retained = _state.Activities.OrderBy(item => item.At).ToArray();
+            var windowComplete = retained.Length == 0 ||
+                                 retained.Length < 40 ||
+                                 retained[0].At <= cutoff;
+            return SummarizeOperationalHealth(retained, now, safeHours, windowComplete);
+        }
+    }
+
+    internal static bool ValidateOperationalHealthForSelfTest()
+    {
+        var now = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero);
+        var activities = new[]
+        {
+            new ProductActivityV044(now.AddHours(-2), "迁移已暂停", "安全暂停完成。", "info"),
+            new ProductActivityV044(now.AddHours(-3), "等待网络", "等待网络恢复。", "warning"),
+            new ProductActivityV044(now.AddHours(-4), "等待重试", "任务需要处理。", "warning"),
+            new ProductActivityV044(now.AddHours(-5), "当前清单完成", "当前清单已完成。", "success"),
+            new ProductActivityV044(now.AddHours(-30), "等待网络", "24 小时之外。", "warning")
+        };
+        var summary = SummarizeOperationalHealth(activities, now, 24, true);
+        return summary.Hours == 24 &&
+               summary.WarningCount == 2 &&
+               summary.NetworkWaitCount == 1 &&
+               summary.PauseCount == 1 &&
+               summary.CompletionCount == 1 &&
+               summary.WindowComplete;
+    }
+
+    private static OperationalHealthV048 SummarizeOperationalHealth(
+        IEnumerable<ProductActivityV044> activities,
+        DateTimeOffset now,
+        int hours,
+        bool windowComplete)
+    {
+        var cutoff = now.AddHours(-hours);
+        var recent = activities.Where(item => item.At >= cutoff && item.At <= now).ToArray();
+        return new OperationalHealthV048(
+            hours,
+            recent.Count(item => string.Equals(item.Tone, "warning", StringComparison.OrdinalIgnoreCase)),
+            recent.Count(item => string.Equals(item.Title, "等待网络", StringComparison.Ordinal)),
+            recent.Count(item => string.Equals(item.Title, "迁移已暂停", StringComparison.Ordinal)),
+            recent.Count(item => string.Equals(item.Title, "当前清单完成", StringComparison.Ordinal)),
+            windowComplete);
+    }
 
     public static IReadOnlyList<ProductActivityV044> RecentActivities(int max = 30)
     {
