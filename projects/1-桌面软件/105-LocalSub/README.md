@@ -57,7 +57,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- 当前开发候选版本为 v0.1.11；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.12；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
@@ -91,7 +91,9 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - v0.1.11 将 meter 与 ASR 数据源彻底合并：`LiveAsrPipeline.OnSamples` 对真正写入 ASR queue 的同一块 16 kHz mono PCM 直接计算 instantaneous peak `max(abs(sample))`。不使用 RMS、dB 映射或 release smoothing，也不再依赖 capture-only `LevelChanged` 支路。
 - Core、IPC client 与 WebShell 新增每秒一次的 meter 诊断摘要。若实机仍异常，可直接比较 Core `LIVE_METER`、`Logs/core-client.log` 的 `LIVE_METER_RX` 与 `Logs/meter-web.log`，精确定位哪一层丢失动态。
 - Shell/Web 继续使用独立约 30 Hz 轻量 `live.level`，不恢复整页 snapshot 高频刷新。实时页三段结构和 LocalSub 正式应用图标继续保留。
-- 当前最新完整验证代码 head 为 `a06199015be86d3c3a96185bf715e3d67063a45b`，P105 Windows CI run `34748702332` success；candidate Artifact `10315301533`，WebUi preview Artifact `10315042210`。
+- v0.1.12 使用用户实机日志把故障精确锁定到 WebShell 到 Vue：Core、IPC client 和 WebShell 均已收到明显动态 meter。WebShell realtime callback 现严格先 marshal 回 UI 线程，再访问 WebView2；Vue 运行态 meter 不再被 snapshot 覆盖；新增浏览器 ACK 日志 `Logs/meter-browser.log`。
+- CI 的真实 WebView2 smoke 现在注入 `live.level=0.73`，只有 Vue `applyLiveLevel` 回传 `0.7300` ACK 才通过，形成 Shell→WebView2→bridge→Vue 的端到端 meter 门禁。
+- 当前最新完整验证代码 head 为 `fe0984716b5760f2b1726df4321d68a5ef401ea4`，P105 Windows CI run `34750988540` success；candidate Artifact `10316435158`，WebUi preview Artifact `10316185726`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
