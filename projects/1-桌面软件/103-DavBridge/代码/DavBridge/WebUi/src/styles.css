@@ -3,7 +3,7 @@
   color:#172033;background:#f5f8fb;font-synthesis:none;
   --accent:#1688d4;--accent-strong:#0875bd;--accent-soft:#eaf5fd;
   --text:#172033;--text-2:#51627a;--text-3:#7f8ea3;
-  --surface:#ffffff;--surface-2:#f7fafc;--surface-3:#eef4f8;
+  --surface:#f7fbfd;--surface-2:#f1f7fb;--surface-3:#e9f2f7;
   --line:#dde6ee;--line-strong:#cfdae4;
   --green:#22a06b;--green-soft:#edf9f4;
   --amber:#b57a19;--amber-soft:#fff7e9;
@@ -13,7 +13,7 @@
   --radius:16px;--radius-sm:12px;
 }
 *{box-sizing:border-box}
-html,body,#app{margin:0;width:100%;height:100%;overflow:hidden;background:#f4f8fb;color:var(--text)}
+html,body,#app{margin:0;width:100%;height:100%;overflow:hidden;background:#f1f7fb;color:var(--text)}
 body{font-size:13px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button,input{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid rgba(22,136,212,.28);outline-offset:2px}
 button:disabled{cursor:default;opacity:.48}
