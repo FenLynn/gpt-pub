@@ -9,6 +9,8 @@ namespace DavBridge;
 internal sealed record ProductActivityV044(DateTimeOffset At, string Title, string Detail, string Tone);
 internal sealed record InitializationStepV044(string Key, string Label, bool Done, string Hint);
 internal sealed record StartupHealthItemV044(string Key, string Label, string Status, string Detail);
+internal sealed record OperationalHealthV048(int Hours, int WarningCount, int NetworkWaitCount, int PauseCount, int CompletionCount, bool WindowComplete, bool ObservationGap, long ObservationGapSeconds);
+internal sealed record OperationalEventV049(DateTimeOffset At, string Kind);
 
 internal sealed record StartupHealthReportV044(DateTimeOffset? CheckedAt, IReadOnlyList<StartupHealthItemV044> Items)
 {
@@ -170,7 +172,7 @@ internal static class ProductExperienceV044
 {
     private sealed class ProductState
     {
-        public int SchemaVersion { get; set; } = 1;
+        public int SchemaVersion { get; set; } = 2;
         public DateTimeOffset? ConnectionDiagnosticPassedAt { get; set; }
         public DateTimeOffset? ReadinessScanPassedAt { get; set; }
         public string? LastObservedCycleId { get; set; }
@@ -183,10 +185,15 @@ internal static class ProductExperienceV044
         public DateTimeOffset? LastTempCleanupAt { get; set; }
         public int LastTempCleanupFiles { get; set; }
         public long LastTempCleanupBytes { get; set; }
+        public DateTimeOffset? OperationalLedgerStartedAt { get; set; }
+        public DateTimeOffset? LastObservationGapAt { get; set; }
+        public long LastObservationGapSeconds { get; set; }
+        public List<OperationalEventV049> OperationalEvents { get; set; } = new();
         public List<ProductActivityV044> Activities { get; set; } = new();
     }
 
     private static readonly object Gate = new();
+    private static readonly TimeSpan ObservationGapThreshold = TimeSpan.FromMinutes(15);
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
     private static string? _path;
     private static ProductState _state = new();
@@ -213,10 +220,220 @@ internal static class ProductExperienceV044
             SidecarRecoveredFromBackup = recoveredFromBackup;
             if (recoveredFromBackup)
                 RepairPrimaryFromBackup(nextPath);
+            if (EnsureOperationalLedgerLocked(DateTimeOffset.Now))
+                SaveLocked();
         }
     }
 
     public static void SetHealth(StartupHealthReportV044 report) => Health = report;
+
+    public static OperationalHealthV048 BuildOperationalHealth(int hours = 24)
+    {
+        lock (Gate)
+        {
+            var safeHours = Math.Clamp(hours, 1, 168);
+            var now = DateTimeOffset.Now;
+            EnsureOperationalLedgerLocked(now);
+            return SummarizeOperationalLedger(
+                _state.OperationalEvents,
+                _state.OperationalLedgerStartedAt,
+                _state.LastObservationGapAt,
+                _state.LastObservationGapSeconds,
+                now,
+                safeHours);
+        }
+    }
+
+    internal static bool ValidateOperationalHealthForSelfTest()
+    {
+        var now = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero);
+        var events = new[]
+        {
+            new OperationalEventV049(now.AddHours(-2), "pause"),
+            new OperationalEventV049(now.AddHours(-3), "network"),
+            new OperationalEventV049(now.AddHours(-3), "warning"),
+            new OperationalEventV049(now.AddHours(-4), "warning"),
+            new OperationalEventV049(now.AddHours(-5), "complete"),
+            new OperationalEventV049(now.AddHours(-30), "network"),
+            new OperationalEventV049(now.AddHours(-30), "warning")
+        };
+
+        var complete = SummarizeOperationalLedger(events, now.AddHours(-48), null, 0, now, 24);
+        var warming = SummarizeOperationalLedger(events, now.AddHours(-6), null, 0, now, 24);
+        var gapped = SummarizeOperationalLedger(events, now.AddHours(-48), now.AddHours(-8), 7200, now, 24);
+        var oldGap = SummarizeOperationalLedger(events, now.AddHours(-48), now.AddHours(-30), 7200, now, 24);
+
+        return complete.Hours == 24 &&
+               complete.WarningCount == 2 &&
+               complete.NetworkWaitCount == 1 &&
+               complete.PauseCount == 1 &&
+               complete.CompletionCount == 1 &&
+               complete.WindowComplete &&
+               !complete.ObservationGap &&
+               !warming.WindowComplete &&
+               gapped.ObservationGap &&
+               gapped.ObservationGapSeconds == 7200 &&
+               !gapped.WindowComplete &&
+               oldGap.WindowComplete &&
+               !oldGap.ObservationGap;
+    }
+
+    internal static bool ValidateObservationContinuityForSelfTest()
+    {
+        lock (Gate)
+        {
+            var previousState = _state;
+            try
+            {
+                var now = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero);
+
+                _state = new ProductState
+                {
+                    SchemaVersion = 2,
+                    OperationalLedgerStartedAt = now.AddHours(-48),
+                    LastCleanExitAt = now.AddMinutes(-45)
+                };
+                RecordObservationGapLocked(now, previousUnclean: false, previousHeartbeatAt: null);
+                var cleanGap = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
+                    now,
+                    24);
+
+                _state = new ProductState
+                {
+                    SchemaVersion = 2,
+                    OperationalLedgerStartedAt = now.AddHours(-48),
+                    LastCleanExitAt = now.AddMinutes(-5)
+                };
+                RecordObservationGapLocked(now, previousUnclean: false, previousHeartbeatAt: null);
+                var shortRestart = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
+                    now,
+                    24);
+
+                _state = new ProductState
+                {
+                    SchemaVersion = 2,
+                    OperationalLedgerStartedAt = now.AddHours(-48)
+                };
+                RecordObservationGapLocked(now, previousUnclean: true, previousHeartbeatAt: now.AddMinutes(-40));
+                var uncleanGap = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
+                    now,
+                    24);
+
+                return cleanGap.ObservationGap &&
+                       cleanGap.ObservationGapSeconds == 2700 &&
+                       !cleanGap.WindowComplete &&
+                       !shortRestart.ObservationGap &&
+                       shortRestart.WindowComplete &&
+                       uncleanGap.ObservationGap &&
+                       uncleanGap.ObservationGapSeconds == 2400 &&
+                       !uncleanGap.WindowComplete;
+            }
+            finally
+            {
+                _state = previousState;
+            }
+        }
+    }
+
+    internal static bool ValidateOperationalLedgerPersistenceForSelfTest(string root)
+    {
+        lock (Gate)
+        {
+            var previousPath = _path;
+            var previousState = _state;
+            try
+            {
+                Directory.CreateDirectory(root);
+                var now = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero);
+                var path = Path.Combine(root, "product-operational-ledger-selftest.json");
+                var legacy = new ProductState
+                {
+                    SchemaVersion = 1,
+                    Activities = new List<ProductActivityV044>
+                    {
+                        new(now.AddHours(-3), "等待网络", "等待网络恢复。", "warning"),
+                        new(now.AddHours(-2), "迁移已暂停", "安全暂停完成。", "info"),
+                        new(now.AddHours(-1), "当前清单完成", "当前清单已完成。", "success")
+                    }
+                };
+                File.WriteAllText(path, JsonSerializer.Serialize(legacy, JsonOptions));
+
+                _path = path;
+                _state = Load(path, out var recovered);
+                if (recovered) return false;
+                var changed = EnsureOperationalLedgerLocked(now);
+                var firstCount = _state.OperationalEvents.Count;
+                SaveLocked();
+
+                var reloaded = Load(path, out recovered);
+                if (recovered) return false;
+                _state = reloaded;
+                var changedAgain = EnsureOperationalLedgerLocked(now.AddMinutes(1));
+                var secondCount = _state.OperationalEvents.Count;
+                var summary = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
+                    now,
+                    24);
+
+                return changed &&
+                       !changedAgain &&
+                       _state.SchemaVersion == 2 &&
+                       _state.OperationalLedgerStartedAt.HasValue &&
+                       firstCount == 4 &&
+                       secondCount == firstCount &&
+                       summary.WarningCount == 1 &&
+                       summary.NetworkWaitCount == 1 &&
+                       summary.PauseCount == 1 &&
+                       summary.CompletionCount == 1 &&
+                       !summary.WindowComplete;
+            }
+            finally
+            {
+                _path = previousPath;
+                _state = previousState;
+            }
+        }
+    }
+
+    private static OperationalHealthV048 SummarizeOperationalLedger(
+        IEnumerable<OperationalEventV049> events,
+        DateTimeOffset? ledgerStartedAt,
+        DateTimeOffset? lastObservationGapAt,
+        long lastObservationGapSeconds,
+        DateTimeOffset now,
+        int hours)
+    {
+        var cutoff = now.AddHours(-hours);
+        var recent = events.Where(item => item.At >= cutoff && item.At <= now).ToArray();
+        var observationGap = lastObservationGapAt.HasValue &&
+                             lastObservationGapAt.Value >= cutoff &&
+                             lastObservationGapAt.Value <= now;
+        var ledgerWindowComplete = ledgerStartedAt.HasValue && ledgerStartedAt.Value <= cutoff;
+        return new OperationalHealthV048(
+            hours,
+            recent.Count(item => string.Equals(item.Kind, "warning", StringComparison.Ordinal)),
+            recent.Count(item => string.Equals(item.Kind, "network", StringComparison.Ordinal)),
+            recent.Count(item => string.Equals(item.Kind, "pause", StringComparison.Ordinal)),
+            recent.Count(item => string.Equals(item.Kind, "complete", StringComparison.Ordinal)),
+            ledgerWindowComplete && !observationGap,
+            observationGap,
+            observationGap ? Math.Max(0, lastObservationGapSeconds) : 0);
+    }
 
     public static IReadOnlyList<ProductActivityV044> RecentActivities(int max = 30)
     {
@@ -280,7 +497,7 @@ internal static class ProductExperienceV044
                 string.Equals(last.Detail, safeDetail, StringComparison.Ordinal))
                 return;
 
-            _state.Activities.Add(new ProductActivityV044(now, safeTitle, safeDetail, safeTone));
+            AddActivityLocked(now, safeTitle, safeDetail, safeTone);
             TrimActivities();
             SaveLocked();
         }
@@ -304,7 +521,7 @@ internal static class ProductExperienceV044
                 EngineState.Complete => ("当前清单完成", "当前源清单已经完成安全处理。", "success"),
                 _ => ("状态更新", "DavBridge 运行状态已更新。", "info")
             };
-            _state.Activities.Add(new ProductActivityV044(DateTimeOffset.Now, title, detail, tone));
+            AddActivityLocked(DateTimeOffset.Now, title, detail, tone);
             TrimActivities();
             SaveLocked();
         }
@@ -319,7 +536,7 @@ internal static class ProductExperienceV044
             var hadPrevious = !string.IsNullOrWhiteSpace(_state.LastObservedCycleId);
             _state.LastObservedCycleId = cycleId;
             if (hadPrevious)
-                _state.Activities.Add(new ProductActivityV044(DateTimeOffset.Now, "进入新周期", $"Cycle {cycleId} 已确认。", "success"));
+                AddActivityLocked(DateTimeOffset.Now, "进入新周期", $"Cycle {cycleId} 已确认。", "success");
             TrimActivities();
             SaveLocked();
         }
@@ -354,6 +571,7 @@ internal static class ProductExperienceV044
     {
         lock (Gate)
         {
+            RecordObservationGapLocked(startedAt, previousUnclean, previousHeartbeatAt);
             _state.LastSessionStartedAt = startedAt;
             if (previousUnclean)
             {
@@ -361,11 +579,11 @@ internal static class ProductExperienceV044
                 _state.LastUncleanDetectedAt = startedAt;
                 var heartbeat = previousHeartbeatAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "未知";
                 var state = string.IsNullOrWhiteSpace(previousEngineState) ? "未知状态" : previousEngineState;
-                _state.Activities.Add(new ProductActivityV044(
+                AddActivityLocked(
                     startedAt,
                     "检测到上次异常中断",
                     $"上次会话最后心跳 {heartbeat}，状态 {state}。本次将继续使用已持久化的安全账本恢复。",
-                    "warning"));
+                    "warning");
             }
 
             if (cleanedTempFiles > 0)
@@ -373,11 +591,11 @@ internal static class ProductExperienceV044
                 _state.LastTempCleanupAt = startedAt;
                 _state.LastTempCleanupFiles = cleanedTempFiles;
                 _state.LastTempCleanupBytes = Math.Max(0, cleanedTempBytes);
-                _state.Activities.Add(new ProductActivityV044(
+                AddActivityLocked(
                     startedAt,
                     "已清理中断残留",
                     $"启动前清理 {cleanedTempFiles} 个未完成临时文件，共 {FormatBytesCompact(cleanedTempBytes)}。迁移进度仍由持久化账本决定。",
-                    "info"));
+                    "info");
             }
 
             TrimActivities();
@@ -492,6 +710,7 @@ internal static class ProductExperienceV044
                 reconcileBackup = File.Exists(Path.Combine(host.Paths.RoamingRoot, "reconcile.json.bak"))
             },
             health = new { status = health.Status, summary = health.Summary, items = health.Items },
+            operationalHealth = BuildOperationalHealth(24),
             initialization = BuildInitializationSteps(host)
         };
 
@@ -562,6 +781,7 @@ internal static class ProductExperienceV044
         {
             state = JsonSerializer.Deserialize<ProductState>(File.ReadAllText(path), JsonOptions) ?? new ProductState();
             state.Activities ??= new List<ProductActivityV044>();
+            state.OperationalEvents ??= new List<OperationalEventV049>();
             return true;
         }
         catch { return false; }
@@ -592,6 +812,80 @@ internal static class ProductExperienceV044
         File.WriteAllText(path, "{broken");
         var loaded = Load(path, out var recovered);
         return recovered && loaded.LastObservedCycleId == "backup-cycle" && loaded.Activities.Count == 1;
+    }
+
+    private static void RecordObservationGapLocked(
+        DateTimeOffset startedAt,
+        bool previousUnclean,
+        DateTimeOffset? previousHeartbeatAt)
+    {
+        var previousObservedAt = previousUnclean ? previousHeartbeatAt : _state.LastCleanExitAt;
+        if (!previousObservedAt.HasValue) return;
+
+        var gap = startedAt - previousObservedAt.Value;
+        if (gap <= ObservationGapThreshold || gap <= TimeSpan.Zero) return;
+
+        _state.LastObservationGapAt = startedAt;
+        _state.LastObservationGapSeconds = Math.Max(0, (long)gap.TotalSeconds);
+    }
+
+    private static void AddActivityLocked(DateTimeOffset at, string title, string detail, string tone)
+    {
+        _state.Activities.Add(new ProductActivityV044(at, title, detail, tone));
+        RecordOperationalEventLocked(at, title, tone);
+    }
+
+    private static bool EnsureOperationalLedgerLocked(DateTimeOffset now)
+    {
+        _state.OperationalEvents ??= new List<OperationalEventV049>();
+        var changed = false;
+
+        if (!_state.OperationalLedgerStartedAt.HasValue)
+        {
+            _state.OperationalLedgerStartedAt = now;
+            foreach (var activity in _state.Activities.OrderBy(item => item.At))
+                RecordOperationalEventLocked(activity.At, activity.Title, activity.Tone, trim: false);
+            changed = true;
+        }
+
+        if (_state.SchemaVersion < 2)
+        {
+            _state.SchemaVersion = 2;
+            changed = true;
+        }
+
+        changed |= TrimOperationalEventsLocked(now);
+        return changed;
+    }
+
+    private static void RecordOperationalEventLocked(
+        DateTimeOffset at,
+        string title,
+        string tone,
+        bool trim = true)
+    {
+        if (string.Equals(tone, "warning", StringComparison.OrdinalIgnoreCase))
+            _state.OperationalEvents.Add(new OperationalEventV049(at, "warning"));
+        if (string.Equals(title, "等待网络", StringComparison.Ordinal))
+            _state.OperationalEvents.Add(new OperationalEventV049(at, "network"));
+        if (string.Equals(title, "迁移已暂停", StringComparison.Ordinal))
+            _state.OperationalEvents.Add(new OperationalEventV049(at, "pause"));
+        if (string.Equals(title, "当前清单完成", StringComparison.Ordinal))
+            _state.OperationalEvents.Add(new OperationalEventV049(at, "complete"));
+
+        if (trim)
+            TrimOperationalEventsLocked(at);
+    }
+
+    private static bool TrimOperationalEventsLocked(DateTimeOffset now)
+    {
+        var cutoff = now.AddDays(-8);
+        var before = _state.OperationalEvents.Count;
+        _state.OperationalEvents = _state.OperationalEvents
+            .Where(item => item.At >= cutoff && item.At <= now.AddMinutes(5))
+            .OrderBy(item => item.At)
+            .ToList();
+        return before != _state.OperationalEvents.Count;
     }
 
     private static void TrimActivities()

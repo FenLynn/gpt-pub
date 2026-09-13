@@ -6,23 +6,39 @@
 
 当前正式版本：**v0.4.0**。
 
-当前可靠性封板版本：**v0.4.16**。
+当前 `p103-exp` 候选：**v0.4.26**，这是 v0.4 最终实验候选。
 
-第一轮完成完整 CI 的 v0.4.16 代码 head：
+v0.4.26 最后完整验证代码 head：
 
 ```text
-35015c8581cb537ae98813eb5f2efe0458525487
+3568eca17bda0b6674959c9897f6ec2dbebbb26f
 ```
 
-CI run：`34743274402`，结果 `success`。
+完整 P103 CI run：`34763904669`，结果 `success`。
 
-候选 Artifact：`DavBridge-v0.4.16-win-x64`，Artifact ID `10313388007`。
+Windows candidate Artifact ID：`10319489203`。
 
-EXE SHA256：`1da5a38f1ab5264699ab0778ba346e7dcf6a4df48089952eb1650c2d7de9f29f`。
+Web UI preview Artifact ID：`10319379569`。
 
-Artifact ZIP SHA256：`ea6d43a90f431fc1fe3b24b49944cab524040911af8b320a009a92c3f8518464`。
+EXE：`2467421 bytes`。
 
-动态文档提交发生在该代码 head 之后，stable/main 提升必须使用 PR 自身准确 head 的完整 CI，不得只复用本 run。
+EXE SHA256：`72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850`。
+
+Artifact ZIP SHA256：`9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe`。
+
+当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
+
+## v0.4.25 surface 色阶收束
+
+v0.4.25 在 v0.4.24 收束候选基础上只做 surface 色阶修正。普通文字区从纯白或高透明度白色回到淡蓝灰 quiet / soft / panel 层，About 保持透明，真正抬升的 tooltip、选中 tab 和交互面保留更亮 surface。
+
+页面结构、About 三级信息层次、生产 UI 所有权门、九张视觉预览、Core Smoke 20 项以及旧 WinForms UI 隔离规则均保持不变。
+
+## v0.4.26 左上版本号
+
+左上品牌区现在在 `DavBridge` 标题下直接显示 `v{{ snapshot.version }}`。该版本号来自现有安全 snapshot，不新增 bridge 命令。
+
+版本号使用小号浅灰文本，并针对窄窗口缩小。原“Zotero 镜像”副标题从品牌区移除。
 
 ## 解决方案
 
@@ -216,6 +232,8 @@ UI 迁移后仍必须运行原 Core Smoke，不能只做 Vue 构建。
 
 WebView2 用户数据位于 `%LOCALAPPDATA%/DavBridge/WebView2`，日志、缓存和临时文件继续与 Runtime 分离。
 
+v0.4.19 的 `%LOCALAPPDATA%/DavBridge/product-experience.json` schema 2 额外保存匿名 operational health 事件。事件只有时间与类别，最多保留 8 天，不包含真实文件名、路径、URL、凭据或 SHA，不参与迁移安全判断。
+
 ## 构建
 
 前端先执行：
@@ -240,16 +258,13 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.16 已进入稳定准入流程。本轮只增加可靠性回归，不改变 UI。用户已授权完整准入通过后执行 `p103-exp → p103-stable → main` 两级 PR；不授权 tag 或 Release。
+v0.4.26 已完成自动化收束验证，并已获得用户在当前会话中的 stable/main 收尾授权。
 
-### v0.4.16 可靠性测试新增
+最后完整验证代码 head：`3568eca17bda0b6674959c9897f6ec2dbebbb26f`。
 
-新增五项 Core Smoke：
+CI run：`34763904669`，五项全绿。
 
-- repeated pause resume remains idempotent；
-- network list failure recovers on retry；
-- verification network loss recovers without re-put；
-- zero byte object verifies safely；
-- quota exact boundary is deterministic。
+Core Smoke 20/20。Windows candidate Artifact ID：`10319489203`。
 
-Core Smoke 总数增至 19 项。
+下一步只执行既定两级准入：`p103-exp → p103-stable → main`。不创建正式 tag 或 GitHub Release。
+

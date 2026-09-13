@@ -28,6 +28,47 @@ const uploadFraction = computed(() => Math.min(1, snapshot.value.quota.uploadUse
 const downloadFraction = computed(() => Math.min(1, snapshot.value.quota.downloadUsed / Math.max(1, snapshot.value.quota.downloadMax)))
 const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => recycleFilter.value === 'observing' ? group.disposition === 'observing' : recycleFilter.value === 'review' ? group.disposition === 'review' || group.disposition === 'blocked' : group.disposition === 'history'))
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
+const quotaUsedText = (text:string) => text.split('/')[0]?.trim() || text
+const recentComplete = computed(() => snapshot.value.activities.find(item => /清单完成|迁移完成|处理完成/.test(item.title)))
+const recentPause = computed(() => snapshot.value.activities.find(item => /暂停/.test(item.title)))
+const recentWarning = computed(() => snapshot.value.activities.find(item => item.tone === 'warning'))
+const recentCompleteText = computed(() => recentComplete.value ? `${recentComplete.value.time} · ${recentComplete.value.title}` : '暂无近期完成记录')
+const recentPauseText = computed(() => recentPause.value ? `${recentPause.value.time} · ${recentPause.value.title}` : '暂无近期暂停记录')
+const recentWarningText = computed(() => recentWarning.value ? `${recentWarning.value.time} · ${recentWarning.value.title}` : '暂无近期异常')
+const cycleTrafficText = computed(() => `上传 ${quotaUsedText(snapshot.value.quota.uploadText)} · 下载 ${quotaUsedText(snapshot.value.quota.downloadText)}`)
+const healthWindowLabel = computed(() => {
+  const h=snapshot.value.operationalHealth
+  if(h.observationGap) return `近 ${h.hours} 小时观察不连续`
+  return h.windowComplete ? `近 ${h.hours} 小时` : '健康账本建立中'
+})
+const observationGapText = computed(() => {
+  const seconds=Math.max(0,snapshot.value.operationalHealth.observationGapSeconds)
+  if(seconds<=0) return ''
+  const minutes=Math.round(seconds/60)
+  if(minutes<60) return `检测到约 ${minutes} 分钟运行空窗`
+  const hours=seconds/3600
+  return `检测到约 ${hours>=10?Math.round(hours):hours.toFixed(1)} 小时运行空窗`
+})
+const healthWindowNote = computed(() => {
+  const h=snapshot.value.operationalHealth
+  if(h.observationGap) return `${observationGapText.value}，统计只代表 DavBridge 实际运行期间`
+  if(!h.windowComplete) return `健康账本累计满 ${h.hours} 小时后显示完整窗口`
+  return ''
+})
+const healthStatusText = computed(() => {
+  const h=snapshot.value.operationalHealth
+  if(h.observationGap) return '观察不连续'
+  if(h.warningCount>0) return `${h.warningCount} 次警告`
+  if(!h.windowComplete) return '建立中'
+  return '状态良好'
+})
+const recentActivityText = computed(() => {
+  const items:string[]=[]
+  if(recentComplete.value) items.push(`完成 ${recentComplete.value.time}`)
+  if(recentPause.value) items.push(`暂停 ${recentPause.value.time}`)
+  return items.length ? items.join(' · ') : '暂无近期完成或暂停'
+})
+const recentActivityTip = computed(() => [recentCompleteText.value,recentPauseText.value].join('；'))
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
 const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
 const sideStatusKind = computed(() => {
@@ -131,12 +172,12 @@ function formatQuotaBytes(bytes:number){
 const uploadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.uploadUsed)} / ${formatQuotaBytes(snapshot.value.quota.uploadMax)}`)
 const downloadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.downloadUsed)} / ${formatQuotaBytes(snapshot.value.quota.downloadMax)}`)
 const automaticQueueCount = computed(() => snapshot.value.priorityCount + snapshot.value.normalCount)
+const initializedCount = computed(() => snapshot.value.initialization.filter(step=>step.done).length)
 const queueHeadline = computed(() => snapshot.value.humanActionCount > 0
   ? `${snapshot.value.humanActionCount} 组等待人工决定`
   : automaticQueueCount.value > 0
     ? `${automaticQueueCount.value} 组等待自动处理`
     : '当前队列已清空')
-const initializedCount = computed(() => snapshot.value.initialization.filter(step=>step.done).length)
 const buildDateLabel = computed(() => {
   if(!snapshot.value.buildDate) return '本地构建'
   const date=new Date(snapshot.value.buildDate)
@@ -248,7 +289,7 @@ onBeforeUnmount(()=>{
   <aside class="sidebar">
     <div class="side-brand">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
-      <div class="brand-copy"><h1>DavBridge</h1><small>Zotero 镜像</small></div>
+      <div class="brand-copy"><h1>DavBridge</h1><small>v{{ snapshot.version }}</small></div>
     </div>
 
     <nav class="side-nav" aria-label="主导航">
@@ -500,15 +541,62 @@ onBeforeUnmount(()=>{
         <div class="about-logo"><span></span><span></span></div>
         <h2>DavBridge</h2>
         <p>安全、持续地维护 Zotero 单向强校验镜像。</p>
-        <dl>
-          <div><dt>版本</dt><dd>v{{ snapshot.version }}</dd></div>
-          <div><dt>构建</dt><dd>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</dd></div>
-          <div><dt>运行环境</dt><dd :class="`health-text ${snapshot.health.status}`">{{ snapshot.health.summary }}</dd></div>
-          <div><dt>运行会话</dt><dd>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</dd></div>
-          <div><dt>初始化</dt><dd>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</dd></div>
-          <div><dt>引擎</dt><dd>.NET 8 + WebView2</dd></div>
-          <div><dt>界面</dt><dd>Vue 3</dd></div>
-        </dl>
+
+        <section class="about-section about-section-primary" aria-label="当前状态">
+          <div class="about-section-title">当前状态</div>
+          <div class="about-row has-tip" :data-tip="snapshot.health.summary">
+            <span>运行</span>
+            <strong>{{ snapshot.engineState }}<template v-if="snapshot.routeStatus && snapshot.routeStatus !== snapshot.engineState"> · {{ snapshot.routeStatus }}</template></strong>
+          </div>
+          <div class="about-row">
+            <span>会话</span>
+            <strong>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</strong>
+          </div>
+          <div class="about-row has-tip" :data-tip="quotaTip">
+            <span>周期</span>
+            <strong>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : '未校准' }} · {{ cycleTrafficText }}</strong>
+          </div>
+          <div
+            class="about-row has-tip"
+            :class="{warning:snapshot.operationalHealth.warningCount>0||snapshot.operationalHealth.observationGap}"
+            :data-tip="healthWindowNote || `完成 ${snapshot.operationalHealth.completionCount}，警告 ${snapshot.operationalHealth.warningCount}，暂停 ${snapshot.operationalHealth.pauseCount}，网络等待 ${snapshot.operationalHealth.networkWaitCount}`"
+          >
+            <span>健康</span>
+            <strong>{{ healthWindowLabel }} · {{ healthStatusText }}</strong>
+          </div>
+          <div v-if="initializedCount < snapshot.initialization.length" class="about-row warning">
+            <span>初始化</span>
+            <strong>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</strong>
+          </div>
+        </section>
+
+        <section class="about-section" aria-label="最近活动">
+          <div class="about-section-title">最近活动</div>
+          <div class="about-row has-tip" :class="{warning:!!recentWarning}" :data-tip="recentWarning ? recentWarning.detail : '最近活动中没有警告事件'">
+            <span>异常</span>
+            <strong>{{ recentWarningText }}</strong>
+          </div>
+          <div class="about-row has-tip" :data-tip="recentActivityTip">
+            <span>记录</span>
+            <strong>{{ recentActivityText }}</strong>
+          </div>
+        </section>
+
+        <section class="about-section about-section-secondary" aria-label="软件信息">
+          <div class="about-section-title">软件信息</div>
+          <div class="about-row">
+            <span>版本</span>
+            <strong>v{{ snapshot.version }}</strong>
+          </div>
+          <div class="about-row has-tip" :data-tip="`完整构建：${snapshot.buildCommit || 'local'} · ${snapshot.buildDate || '本地构建'}`">
+            <span>构建</span>
+            <strong>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</strong>
+          </div>
+          <div class="about-row">
+            <span>技术栈</span>
+            <strong>.NET 8 + WebView2 · Vue 3</strong>
+          </div>
+        </section>
       </article>
     </section>
   </section>

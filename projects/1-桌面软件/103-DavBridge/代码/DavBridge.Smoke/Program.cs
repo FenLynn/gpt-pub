@@ -17,6 +17,7 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("oversize object blocks safely", TestOversizeAsync),
     ("safe pause stops before next member", TestSafePauseAsync),
     ("repeated pause resume remains idempotent", TestRepeatedPauseResumeAsync),
+    ("persistent pause restart sequence converges without duplicate put", TestPersistentPauseRestartConvergenceAsync),
     ("network list failure recovers on retry", TestNetworkRetryAsync),
     ("verification network loss recovers without re-put", TestVerificationRetryWithoutReputAsync),
     ("zero byte object verifies safely", TestZeroByteAsync),
@@ -417,6 +418,80 @@ static async Task TestRepeatedPauseResumeAsync()
         Check(target.PutCount == 3, "verified members must never be uploaded again after resume");
         Check(state.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified) == 3,
             "all three members must be strongly verified after repeated pause/resume");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestPersistentPauseRestartConvergenceAsync()
+{
+    const int fileCount = 12;
+    var payloads = Enumerable.Range(0, fileCount)
+        .ToDictionary(i => $"zotero/F{i:D2}.bin", i => Bytes($"payload-{i:D2}"));
+
+    var source = new FakeReadClient(payloads);
+    var pauseRequested = false;
+    var pauseAfterPutCount = 1;
+    var target = new FakeWriteClient
+    {
+        AfterPut = count =>
+        {
+            if (count == pauseAfterPutCount)
+                pauseRequested = true;
+        }
+    };
+
+    var root = NewTempRoot();
+    try
+    {
+        var statePath = Path.Combine(root, "state.json");
+        var store = new StateStore(statePath);
+
+        for (var pass = 0; pass < fileCount; pass++)
+        {
+            var state = File.Exists(statePath) ? await store.LoadAsync() : new MigrationState();
+            pauseRequested = false;
+            pauseAfterPutCount = target.PutCount + 1;
+
+            var engine = new MigrationEngine(
+                TestConfig(),
+                state,
+                store,
+                source,
+                target,
+                Path.Combine(root, "temp"),
+                pauseRequested: () => pauseRequested);
+
+            await engine.RunAsync(CancellationToken.None);
+
+            Check(state.EngineState == EngineState.Paused,
+                $"restart pass {pass + 1} must stop at the safe pause boundary");
+            Check(target.PutCount == pass + 1,
+                $"restart pass {pass + 1} must add exactly one PUT");
+            Check(state.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified) == pass + 1,
+                $"restart pass {pass + 1} must persist every completed StrongVerified member");
+        }
+
+        var finalState = await store.LoadAsync();
+        pauseRequested = false;
+        pauseAfterPutCount = int.MaxValue;
+
+        var finalEngine = new MigrationEngine(
+            TestConfig(),
+            finalState,
+            store,
+            source,
+            target,
+            Path.Combine(root, "temp"),
+            pauseRequested: () => pauseRequested);
+
+        await finalEngine.RunAsync(CancellationToken.None);
+
+        Check(finalState.EngineState == EngineState.Complete,
+            "final restart must converge to Complete");
+        Check(target.PutCount == fileCount,
+            "completed members must never be PUT again across repeated process-style restarts");
+        Check(finalState.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified) == fileCount,
+            "all members must remain StrongVerified after persistent restart convergence");
     }
     finally { Directory.Delete(root, true); }
 }
