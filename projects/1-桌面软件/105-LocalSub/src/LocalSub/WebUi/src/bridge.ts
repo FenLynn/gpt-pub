@@ -53,8 +53,22 @@ export interface LocalSubSnapshot {
   };
   batch: {
     queued: number;
-    state: string;
+    state: "idle" | "analyzing" | "transcribing" | "failed";
     status: string;
+    selectedId: string;
+    selectedName: string;
+    queue: Array<{ id: string; name: string; state: string; analyzed: boolean; transcribed: boolean }>;
+    media: null | { durationMs: number; sampleRate: number; channels: number; decoderName: string; waveform: number[] };
+    transcript: Array<{ startMs: number; endMs: number; text: string; keywords: string[] }>;
+    result: null | { durationMs: number; processingMs: number; decoderName: string; realTimeFactor: number; segments: number };
+    progress: { percent: number | null; stage: string; detail: string };
+    canAnalyze: boolean;
+    canTranscribe: boolean;
+    canCancel: boolean;
+    batchModelId: string;
+    batchModelName: string;
+    keywords: string;
+    lastError: string | null;
   };
   models: {
     catalog: ModelCatalogItem[];
@@ -197,7 +211,7 @@ const fallbackCatalog: ModelCatalogItem[] = [
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.18", activePage: "home", busy: false, lastError: null },
+  app: { productVersion: "0.1.19", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
@@ -216,7 +230,34 @@ const fallback: LocalSubSnapshot = {
     lastError: null,
     canStart: true
   },
-  batch: { queued: 0, state: "idle", status: "拖入媒体后开始后台转写" },
+  batch: {
+    queued: 2,
+    state: "idle",
+    status: "声音轨道已就绪",
+    selectedId: "demo-1",
+    selectedName: "lecture-demo.mp4",
+    queue: [
+      { id: "demo-1", name: "lecture-demo.mp4", state: "波形就绪", analyzed: true, transcribed: false },
+      { id: "demo-2", name: "interview-demo.m4a", state: "等待分析", analyzed: false, transcribed: false }
+    ],
+    media: {
+      durationMs: 257000,
+      sampleRate: 16000,
+      channels: 1,
+      decoderName: "FFmpeg",
+      waveform: Array.from({ length: 180 }, (_, i) => Math.min(1, 0.08 + Math.abs(Math.sin(i * 0.27)) * (0.35 + 0.45 * Math.abs(Math.sin(i * 0.07)))))
+    },
+    transcript: [],
+    result: null,
+    progress: { percent: 100, stage: "分析完成", detail: "lecture-demo.mp4" },
+    canAnalyze: true,
+    canTranscribe: true,
+    canCancel: false,
+    batchModelId: "sensevoice-small-int8",
+    batchModelName: "SenseVoice Small INT8",
+    keywords: "",
+    lastError: null
+  },
   models: {
     catalog: fallbackCatalog,
     catalogCount: fallbackCatalog.length,
@@ -274,6 +315,13 @@ let fallbackPage: PageKey =
     ? previewPage
     : "home";
 let fallbackLive = { ...fallback.live };
+let fallbackBatch: LocalSubSnapshot["batch"] = {
+  ...fallback.batch,
+  queue: fallback.batch.queue.map(x => ({ ...x })),
+  media: fallback.batch.media ? { ...fallback.batch.media, waveform: [...fallback.batch.media.waveform] } : null,
+  transcript: fallback.batch.transcript.map(x => ({ ...x, keywords: [...x.keywords] })),
+  progress: { ...fallback.batch.progress }
+};
 let fallbackModels = { ...fallback.models, catalog: fallback.models.catalog.map(x => ({ ...x })) };
 let fallbackSettings = { ...fallback.settings };
 let fallbackSystem = { ...fallback.system };
@@ -334,6 +382,13 @@ function fallbackSnapshot(): LocalSubSnapshot {
     ...fallback,
     app: { ...fallback.app, activePage: fallbackPage, busy: fallbackLive.state === "starting" || fallbackLive.state === "stopping" },
     live: { ...fallbackLive },
+    batch: {
+      ...fallbackBatch,
+      queue: fallbackBatch.queue.map(x => ({ ...x })),
+      media: fallbackBatch.media ? { ...fallbackBatch.media, waveform: [...fallbackBatch.media.waveform] } : null,
+      transcript: fallbackBatch.transcript.map(x => ({ ...x, keywords: [...x.keywords] })),
+      progress: { ...fallbackBatch.progress }
+    },
     models: { ...fallbackModels, catalog: fallbackModels.catalog.map(x => ({ ...x })) },
     settings: { ...fallbackSettings },
     system: { ...fallbackSystem }
@@ -370,6 +425,85 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         currentText: "",
         previousText: "",
         lastError: null
+      };
+    }
+    if (method === "batch.pickFiles") {
+      if (fallbackBatch.queue.length === 0) {
+        fallbackBatch = {
+          ...fallbackBatch,
+          queued: 1,
+          selectedId: "demo-1",
+          selectedName: "lecture-demo.mp4",
+          queue: [{ id: "demo-1", name: "lecture-demo.mp4", state: "等待分析", analyzed: false, transcribed: false }],
+          status: "已添加 1 个媒体文件"
+        };
+      }
+    }
+    if (method === "batch.analyze") {
+      const id = typeof params.id === "string" ? params.id : fallbackBatch.selectedId || fallbackBatch.queue[0]?.id || "";
+      const selected = fallbackBatch.queue.find(x => x.id === id) ?? fallbackBatch.queue[0];
+      if (selected) {
+        fallbackBatch = {
+          ...fallbackBatch,
+          state: "idle",
+          status: "声音轨道已就绪",
+          selectedId: selected.id,
+          selectedName: selected.name,
+          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, state: x.transcribed ? x.state : "波形就绪" } : x),
+          media: {
+            durationMs: 257000,
+            sampleRate: 16000,
+            channels: 1,
+            decoderName: "FFmpeg",
+            waveform: Array.from({ length: 180 }, (_, i) => Math.min(1, 0.08 + Math.abs(Math.sin(i * 0.27)) * (0.35 + 0.45 * Math.abs(Math.sin(i * 0.07)))))
+          },
+          progress: { percent: 100, stage: "分析完成", detail: selected.name },
+          canAnalyze: true,
+          canTranscribe: true,
+          canCancel: false,
+          lastError: null
+        };
+      }
+    }
+    if (method === "batch.transcribe") {
+      const id = typeof params.id === "string" ? params.id : fallbackBatch.selectedId;
+      const selected = fallbackBatch.queue.find(x => x.id === id) ?? fallbackBatch.queue[0];
+      const words = Array.isArray(params.keywords)
+        ? (params.keywords as unknown[]).filter((x): x is string => typeof x === "string")
+        : [];
+      if (selected) {
+        fallbackBatch = {
+          ...fallbackBatch,
+          state: "idle",
+          status: "已完成 5 段转写",
+          selectedId: selected.id,
+          selectedName: selected.name,
+          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, transcribed: true, state: "完成 5 段" } : x),
+          transcript: [
+            { startMs: 800, endMs: 5300, text: "这是后台转写工作区的结果预览。", keywords: words.filter(k => "这是后台转写工作区的结果预览。".includes(k)) },
+            { startMs: 6100, endMs: 11200, text: "媒体分析和识别任务由独立 Core 执行。", keywords: words.filter(k => "媒体分析和识别任务由独立 Core 执行。".includes(k)) },
+            { startMs: 12500, endMs: 18400, text: "界面在长时间转写过程中仍然保持响应。", keywords: words.filter(k => "界面在长时间转写过程中仍然保持响应。".includes(k)) },
+            { startMs: 19500, endMs: 24700, text: "完成后的结构化记录会自动保存。", keywords: words.filter(k => "完成后的结构化记录会自动保存。".includes(k)) },
+            { startMs: 26000, endMs: 31500, text: "下一步可以继续处理队列中的其他媒体。", keywords: words.filter(k => "下一步可以继续处理队列中的其他媒体。".includes(k)) }
+          ],
+          result: { durationMs: 257000, processingMs: 81300, decoderName: "FFmpeg", realTimeFactor: 0.316, segments: 5 },
+          progress: { percent: 100, stage: "转写完成", detail: "RTF 0.32" },
+          canAnalyze: true,
+          canTranscribe: true,
+          canCancel: false,
+          lastError: null
+        };
+      }
+    }
+    if (method === "batch.cancel") {
+      fallbackBatch = {
+        ...fallbackBatch,
+        state: "idle",
+        status: "后台任务已取消",
+        progress: { ...fallbackBatch.progress, stage: "已取消" },
+        canCancel: false,
+        canAnalyze: Boolean(fallbackBatch.selectedId),
+        canTranscribe: Boolean(fallbackBatch.selectedId)
       };
     }
     if (method === "model.download") {
@@ -477,7 +611,11 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
       method === "model.select" ||
       method === "model.download" ||
       method === "model.cancel" ||
-      method === "model.delete"
+      method === "model.delete" ||
+      method === "batch.pickFiles" ||
+      method === "batch.analyze" ||
+      method === "batch.transcribe" ||
+      method === "batch.cancel"
     ) {
       const snapshot = fallbackSnapshot();
       emitSnapshot(snapshot);
