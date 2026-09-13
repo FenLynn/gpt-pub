@@ -200,7 +200,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.20 workflow and visual contract
+      - name: Verify v0.1.21 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -264,7 +264,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.20 Web UI contract missing: $required"
+              throw "v0.1.21 Web UI contract missing: $required"
             }
           }
 
@@ -295,10 +295,19 @@ jobs:
             '.batch-queue-summary{',
             '.batch-queue-item{',
             '.batch-run-actions{',
-            '.batch-operation-bar{'
+            '.batch-operation-bar{',
+            '--ls-canvas:#f1f7fb',
+            '--ls-surface-quiet:rgba(236,245,250,.72)',
+            '--ls-surface-soft:rgba(241,248,252,.82)',
+            '--ls-surface-panel:rgba(246,251,253,.90)',
+            '--ls-surface-raised:rgba(252,254,255,.96)',
+            'background:var(--ls-canvas)!important',
+            'background:var(--ls-surface-quiet)!important',
+            'background:transparent!important',
+            'background:var(--ls-surface-raised)'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.20 style contract missing: $required"
+              throw "v0.1.21 style contract missing: $required"
             }
           }
 
@@ -318,7 +327,7 @@ jobs:
             'Downsample'
           )) {
             if ($batchSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.20 batch controller contract missing: $required"
+              throw "v0.1.21 batch controller contract missing: $required"
             }
           }
 
@@ -332,19 +341,23 @@ jobs:
             'TranscriptPersistenceService.ExportTxt'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.20 batch host contract missing: $required"
+              throw "v0.1.21 batch host contract missing: $required"
             }
           }
 
           foreach ($required in @(
             'Width = 1100;',
             'Height = 825;',
-            'DefaultBackgroundColor = Color.FromArgb(244, 248, 251)',
+            'DefaultBackgroundColor = Color.FromArgb(241, 247, 251)',
             '"home", "live", "batch", "models", "settings", "docs", "about"'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.20 4:3 host contract missing: $required"
+              throw "v0.1.21 4:3 host contract missing: $required"
             }
+          }
+
+          if ($style -match 'background:rgba\(255,255,255,\.66\)!important' -and $style -notmatch 'v0\.1\.21 surface tone correction') {
+            throw 'Old high-white ordinary status surface must not remain the active visual baseline.'
           }
 
           if ($app -match 'class="top-tabs"') {
