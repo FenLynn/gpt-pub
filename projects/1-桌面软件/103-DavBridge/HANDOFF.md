@@ -24,20 +24,20 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前实验候选的产品版本为 v0.4.15，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前可靠性封板版本为 v0.4.16，当前位于 `p103-exp`。用户已完成 v0.4.15 实机验收，并明确授权 v0.4.16 在完整准入通过后提升到 `p103-stable` 与 `main`。它仍不是正式 Release。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
 
 ## 3. 最新完整验证代码基线
 
-最新完成完整 P103 CI 的代码 head：
+最新完成完整 P103 CI 的可靠性封板代码 head：
 
 ```text
-09aa5495bf1c914bf3a18cc8800be17076a1e21f
+35015c8581cb537ae98813eb5f2efe0458525487
 ```
 
 对应 P103 CI：
 
 ```text
-run 34736655980
+run 34743274402
 scope          success
 core-smoke     success
 frontend       success
@@ -45,26 +45,26 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.15-win-x64`
+Windows candidate：`DavBridge-v0.4.16-win-x64`
 
-Artifact ID：`10311605517`
+Artifact ID：`10313388007`
 
 EXE：
 
 ```text
 2442845 bytes
-SHA256 aa72ee8ec14c4fbf6fe8bcd117a3fc041864233af1bbaaec9ccf92b8a843569e
+SHA256 1da5a38f1ab5264699ab0778ba346e7dcf6a4df48089952eb1650c2d7de9f29f
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-908b1bef4a812b5329565303672da14b051ad152a823c5df077ad2b102630770
+ea6d43a90f431fc1fe3b24b49944cab524040911af8b320a009a92c3f8518464
 ```
 
-CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
+CI 已通过 Vue typecheck、production build、浏览器视觉预览、扩展后的 Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `09aa5495...` 识别为最后完整验证的代码基线，而不是把后续纯文档提交误当成新的代码候选。
+本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `35015c85...` 识别为 v0.4.16 可靠性实现的第一轮完整验证代码基线；提升 PR 仍必须以其自身准确 head 的成功 CI 为准。
 
 ## 4. 当前分支快照
 
@@ -73,8 +73,8 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 ```text
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
-validated p103-exp code head
-92f3a05a8b351aab357250899c7de0ecb82ce760
+validated p103-exp reliability code head
+35015c8581cb537ae98813eb5f2efe0458525487
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -348,6 +348,23 @@ v0.4.7 的实现存在两个明确问题，已在 v0.4.8 纠正。
 
 第八，本轮没有修改 DavBridge.Core、WebDAV 传输、StrongVerified、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
 
+
+### v0.4.16 可靠性封板
+
+v0.4.16 不再调整已验收 UI，只扩展故障注入与恢复回归，目标是把当前版本冻结成 stable/main 基线。
+
+Core Smoke 在既有 14 项基础上新增 5 项：
+
+1. `repeated pause resume remains idempotent`：连续执行两次安全暂停和两次恢复，已经 StrongVerified 的文件不得重复 PUT，第三轮只处理剩余成员并最终 Complete。
+2. `network list failure recovers on retry`：源端 manifest 首次模拟网络失败必须进入 WaitNetwork，下一安全轮次自动恢复且对象只上传一次。
+3. `verification network loss recovers without re-put`：目标 PUT 已成功但 StrongVerified 重新 GET 遇到网络中断时，下一轮必须安全接管已上传目标，不得重复 PUT，也不得重复计上传额度。
+4. `zero byte object verifies safely`：零字节对象仍必须经过 PUT 和 StrongVerified，上传与下载账本保持 0 bytes。
+5. `quota exact boundary is deterministic`：所需字节恰好等于安全剩余额度时允许启动；多 1 byte 时必须在 PUT 前进入 WaitQuota。
+
+至此 Core Smoke 共 19 项。既有 Windows native self-test 继续覆盖 config/state/reconcile/product sidecar 的 .bak 恢复、runtime session、窗口迁移和 background wake signal。既有 smoke 继续覆盖 SourceChanged、WriteUnknown/crash recovery、既有副本安全接管、冲突保护、超大对象和大 manifest。
+
+自动化仍不能替代真实 InfiniCLOUD / 坚果云服务、Windows 实际睡眠/唤醒和长期多日运行，因此 v0.4.16 进入 main 只表示可发布稳定基线，不自动创建正式 Release。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -396,18 +413,18 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步应实机验证 v0.4.15，重点检查：
+v0.4.15 已由用户完成真实 Windows 实机验收。v0.4.16 只增加可靠性回归，不改变 UI 或迁移语义。
 
-1. 当前任务进度条必须明确标为“上传进度”。上传到 100% 后，如果仍在强校验或安全暂停收尾，中央状态继续正常显示，不得把 100% 解释成整个任务已完成。
-2. 安全暂停期间中央只显示“正在安全暂停 / 当前文件完成安全收尾后停止”，按钮固定显示灰色“暂停中”，不换行，不额外弹重复 Toast。
-3. 左下角只显示“正在暂停 / 安全收尾中”，信息不应和中央区域机械重复。
-4. 转移页暂停时右上角应为“已暂停 / Cycle xxxxxx”，不能再重复“Cycle xxxxxx · 已暂停”；底部也不重复同一状态。
-5. 最近活动不应再连续刷出“迁移已继续 + 迁移运行中”或“正在安全暂停 + 迁移已暂停”两条同义转换。
-6. 最近活动滚动条平时隐藏，鼠标进入列表时才轻量显示。
-7. 流量校准原生模态打开时，后方 Web UI 应轻度失焦降权，尤其绿色“继续”等动作不再显得像仍可点击。
-8. v0.4.14 的重复暂停能力、按钮颜色与固定槽位，以及既有首页、箭头、阶段、流量、回收站、文档、设置均不得回退。
+用户已经明确授权本轮在以下条件全部满足后执行提升：
 
-用户实机确认之前，不提升 `p103-stable`，不修改 `main`，不创建正式标签或 Release。
+1. v0.4.16 当前 exp 准确 head 完整 CI 全绿；
+2. exp 相对最新 main 无 behind，差异只属于 P103 允许范围；
+3. 通过 PR：`p103-exp → p103-stable`，并在 PR 准确 head 上完成完整准入；
+4. 再次确认 stable 相对最新 main 的范围；
+5. 通过 PR：`p103-stable → main`，并在该 PR 准确 head 上完成完整准入；
+6. 合并后按 B 级规则把 stable / exp 非强制同步到最新 main。
+
+本轮授权只覆盖 stable/main 准入，不授权创建 tag 或 GitHub Release。正式 Release 仍需后续针对具体版本单独人工授权。
 
 ## 10. 新对话固定读取顺序
 
