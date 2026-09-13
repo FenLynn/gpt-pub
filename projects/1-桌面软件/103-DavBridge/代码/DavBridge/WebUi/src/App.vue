@@ -29,6 +29,12 @@ const downloadFraction = computed(() => Math.min(1, snapshot.value.quota.downloa
 const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => recycleFilter.value === 'observing' ? group.disposition === 'observing' : recycleFilter.value === 'review' ? group.disposition === 'review' || group.disposition === 'blocked' : group.disposition === 'history'))
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
 const quotaUsedText = (text:string) => text.split('/')[0]?.trim() || text
+const recentComplete = computed(() => snapshot.value.activities.find(item => /清单完成|迁移完成|处理完成/.test(item.title)))
+const recentPause = computed(() => snapshot.value.activities.find(item => /暂停/.test(item.title)))
+const recentWarning = computed(() => snapshot.value.activities.find(item => item.tone === 'warning'))
+const recentCompleteText = computed(() => recentComplete.value ? `${recentComplete.value.time} · ${recentComplete.value.title}` : '暂无近期完成记录')
+const recentPauseText = computed(() => recentPause.value ? `${recentPause.value.time} · ${recentPause.value.title}` : '暂无近期暂停记录')
+const recentWarningText = computed(() => recentWarning.value ? `${recentWarning.value.time} · ${recentWarning.value.title}` : '暂无近期异常')
 const cycleTrafficText = computed(() => `上传 ${quotaUsedText(snapshot.value.quota.uploadText)} · 下载 ${quotaUsedText(snapshot.value.quota.downloadText)}`)
 const healthWindowLabel = computed(() => {
   const h=snapshot.value.operationalHealth
@@ -152,6 +158,7 @@ function formatQuotaBytes(bytes:number){
 const uploadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.uploadUsed)} / ${formatQuotaBytes(snapshot.value.quota.uploadMax)}`)
 const downloadText = computed(() => `${formatQuotaBytes(snapshot.value.quota.downloadUsed)} / ${formatQuotaBytes(snapshot.value.quota.downloadMax)}`)
 const automaticQueueCount = computed(() => snapshot.value.priorityCount + snapshot.value.normalCount)
+const initializedCount = computed(() => snapshot.value.initialization.filter(step=>step.done).length)
 const queueHeadline = computed(() => snapshot.value.humanActionCount > 0
   ? `${snapshot.value.humanActionCount} 组等待人工决定`
   : automaticQueueCount.value > 0
@@ -517,46 +524,52 @@ onBeforeUnmount(()=>{
 
     <section v-else class="page about-page">
       <article class="about-card">
-        <header class="about-hero">
-          <div class="about-logo"><span></span><span></span></div>
-          <div class="about-title">
-            <h2>DavBridge</h2>
-            <p>Zotero 单向强校验镜像</p>
-          </div>
-          <span class="about-version">v{{ snapshot.version }}</span>
-        </header>
+        <div class="about-logo"><span></span><span></span></div>
+        <h2>DavBridge</h2>
+        <p>安全、持续地维护 Zotero 单向强校验镜像。</p>
 
-        <section class="about-summary-grid" aria-label="运行摘要">
-          <div class="about-summary-item">
-            <span>运行</span>
-            <strong>{{ snapshot.health.status === 'ok' ? '正常' : snapshot.health.summary }}</strong>
-            <small>{{ snapshot.runtime.uptimeText }}</small>
+        <dl class="about-main-list">
+          <div><dt>版本</dt><dd>v{{ snapshot.version }}</dd></div>
+          <div><dt>构建</dt><dd>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</dd></div>
+          <div><dt>运行环境</dt><dd :class="`health-text ${snapshot.health.status}`">{{ snapshot.health.summary }}</dd></div>
+          <div><dt>运行会话</dt><dd>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</dd></div>
+          <div><dt>初始化</dt><dd>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</dd></div>
+          <div><dt>引擎</dt><dd>.NET 8 + WebView2</dd></div>
+          <div><dt>界面</dt><dd>Vue 3</dd></div>
+        </dl>
+
+        <section class="about-extra" aria-label="运行摘要">
+          <div class="about-extra-title">运行摘要</div>
+          <div class="about-extra-row has-tip" :data-tip="`当前 ${snapshot.cycleId ? 'Cycle '+snapshot.cycleId : 'Cycle 尚未校准'} 的保守流量账本`">
+            <span>本周期</span>
+            <strong>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : '未校准' }} · {{ cycleTrafficText }}</strong>
           </div>
-          <div class="about-summary-item">
-            <span>周期</span>
-            <strong>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : '未校准' }}</strong>
-            <small>{{ cycleTrafficText }}</small>
+          <div class="about-extra-row has-tip" data-tip="来自最近活动，只用于快速查看最近一次完成事件，不记录文件名">
+            <span>最近完成</span>
+            <strong>{{ recentCompleteText }}</strong>
+          </div>
+          <div class="about-extra-row has-tip" data-tip="显示最近一次人工暂停或安全暂停事件">
+            <span>最近暂停</span>
+            <strong>{{ recentPauseText }}</strong>
+          </div>
+          <div class="about-extra-row has-tip" :class="{warning:!!recentWarning}" :data-tip="recentWarning ? recentWarning.detail : '最近活动中没有警告事件'">
+            <span>最近异常</span>
+            <strong>{{ recentWarningText }}</strong>
           </div>
           <div
-            class="about-summary-item"
+            class="about-extra-row about-health-row has-tip"
             :class="{warning:snapshot.operationalHealth.warningCount>0||snapshot.operationalHealth.observationGap}"
+            :data-tip="healthWindowNote || `StrongVerified ${snapshot.operationalHealth.verifiedCount}，待处理 ${snapshot.operationalHealth.backlogCount}，网络等待 ${snapshot.operationalHealth.networkWaitCount}`"
           >
             <span>{{ healthWindowLabel }}</span>
             <strong>
-              {{ snapshot.operationalHealth.observationGap
-                ? '观察不连续'
-                : snapshot.operationalHealth.warningCount > 0
-                  ? `${snapshot.operationalHealth.warningCount} 次警告`
-                  : snapshot.operationalHealth.windowComplete ? '状态良好' : '建立中' }}
+              完成 {{ snapshot.operationalHealth.completionCount }} ·
+              警告 {{ snapshot.operationalHealth.warningCount }} ·
+              暂停 {{ snapshot.operationalHealth.pauseCount }}
+              <template v-if="snapshot.operationalHealth.observationGap"> · 观察不连续</template>
             </strong>
-            <small>{{ healthWindowNote || `完成 ${snapshot.operationalHealth.completionCount} · 警告 ${snapshot.operationalHealth.warningCount}` }}</small>
           </div>
         </section>
-
-        <footer class="about-meta">
-          <span>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</span>
-          <span>.NET 8 · WebView2 · Vue 3</span>
-        </footer>
       </article>
     </section>
   </section>
