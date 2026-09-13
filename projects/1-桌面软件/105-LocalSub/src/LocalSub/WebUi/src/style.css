@@ -2438,3 +2438,80 @@ html,body,#app,
   .batch-file-icon{width:25px;height:25px}
   .batch-remove{width:18px;height:18px;font-size:13px}
 }
+
+
+/* v0.1.21 surface tone correction, aligned with DavBridge v0.4.26 */
+:root{
+  --ls-canvas:#f1f7fb;
+  --ls-canvas-deep:#eaf3f8;
+  --ls-surface-quiet:rgba(236,245,250,.72);
+  --ls-surface-soft:rgba(241,248,252,.82);
+  --ls-surface-panel:rgba(246,251,253,.90);
+  --ls-surface-raised:rgba(252,254,255,.96);
+}
+
+html,body,#app,
+.workspace,
+.page,
+.home-page,
+.live-page,
+.batch-page,
+.models-page,
+.settings-page,
+.docs-page{
+  background:var(--ls-canvas)!important;
+}
+.app-shell{
+  background:linear-gradient(145deg,#f5fafe 0%,var(--ls-canvas) 66%,var(--ls-canvas-deep) 100%)!important;
+}
+.sidebar{
+  background:rgba(243,249,252,.92)!important;
+}
+
+/* Ordinary information surfaces should merge into the blue-gray canvas. */
+.side-status,
+.side-status.state-run,
+.side-status.state-complete,
+.side-status.state-wait,
+.side-status.state-warning{
+  background:var(--ls-surface-quiet)!important;
+}
+.home-readiness span{
+  background:var(--ls-surface-quiet);
+  border-color:rgba(205,219,229,.74);
+}
+.home-readiness span.ok{
+  background:rgba(232,246,239,.74);
+}
+.batch-surface{
+  background:var(--ls-surface-soft)!important;
+}
+.model-table th{
+  background:rgba(236,245,250,.80)!important;
+}
+.model-table tbody tr:hover{
+  background:rgba(229,241,248,.82);
+}
+.loading-card{
+  background:var(--ls-surface-panel);
+}
+
+/* About is informational, not a raised card. */
+.about-card{
+  border-color:transparent!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+/* Truly raised or interactive surfaces intentionally remain near-white. */
+.global-tooltip{
+  background:var(--ls-surface-raised);
+}
+.secondary-button,
+.option-row select,
+.model-config-row select,
+.settings-row select,
+.batch-keywords input,
+.color-row input[type="color"]{
+  background:var(--ls-surface-raised);
+}
