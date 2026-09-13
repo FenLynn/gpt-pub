@@ -519,7 +519,7 @@ onBeforeUnmount(() => {
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M9 19h7l4-8 8 26 5-13h6"></path></svg>
         </div>
-        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.17" }}</small></div>
+        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.18" }}</small></div>
       </div>
 
       <nav class="side-nav" aria-label="主导航">
@@ -765,9 +765,9 @@ onBeforeUnmount(() => {
         <section v-else-if="activePage === 'batch'" class="page batch-page">
           <header class="page-head simple-head">
             <div class="page-feature batch-feature"><svg viewBox="0 0 48 48"><path d="M12 7h16l8 8v26H12z M28 7v9h8 M18 24h12 M18 30h12"></path></svg></div>
-            <div class="page-title"><div class="title-line"><h2>后台转写</h2><span class="info-dot" data-tip="媒体分析、波形、VAD 和离线 ASR 已在 LocalSub.Core 中。Web 工作区继续复用同一 Core 链。">i</span></div><span>{{ snapshot.batch.status }}</span></div>
+            <div class="page-title"><div class="title-line"><h2>后台转写</h2><span class="info-dot" data-tip="媒体分析与离线识别都在独立 Core 中执行，不占用界面线程。">i</span></div><span>{{ snapshot.batch.status }}</span></div>
           </header>
-          <section class="batch-surface" data-tip="完整后台工作区正在迁移到 Web。当前绿色版本仍可通过 --legacy-ui 使用旧后台工作区。">
+          <section class="batch-surface" data-tip="Web 后台工作区将在下一版本直接接入现有 Core 转写链。">
             <span class="drop-feature"><svg viewBox="0 0 48 48"><path d="M24 11v26 M11 24h26"></path></svg></span>
             <strong>拖入视频或音频</strong>
             <span>0 个任务</span>

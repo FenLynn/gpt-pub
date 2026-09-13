@@ -199,7 +199,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.17 workflow and visual contract
+      - name: Verify v0.1.18 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -240,12 +240,14 @@ jobs:
             'subscribeLiveLevel',
             'reportLiveLevelAck',
             'class="model-table-shell"',
+            'class="settings-page"',
+            'class="docs-page"',
             'settings.update',
             '<Teleport to="body">',
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.17 Web UI contract missing: $required"
+              throw "v0.1.18 Web UI contract missing: $required"
             }
           }
 
@@ -265,10 +267,15 @@ jobs:
             'grid-template-columns:52px 168px minmax(240px,1fr) 116px',
             'background:linear-gradient(180deg,#fff9dd 0%,#f9e9a9 100%)',
             'background:linear-gradient(180deg,#effbf4 0%,#d8f1e4 100%)',
-            'z-index:2147483000'
+            'z-index:2147483000',
+            '.batch-page,',
+            '.models-page,',
+            '.settings-page,',
+            '.docs-page{',
+            '.inner-tabs button.active:after{'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.17 style contract missing: $required"
+              throw "v0.1.18 style contract missing: $required"
             }
           }
 
@@ -279,7 +286,7 @@ jobs:
             '"home", "live", "batch", "models", "settings", "docs", "about"'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.17 4:3 host contract missing: $required"
+              throw "v0.1.18 4:3 host contract missing: $required"
             }
           }
 

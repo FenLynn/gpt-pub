@@ -2024,3 +2024,189 @@ html,body,#app,
   }
   .home-startup-row{min-height:46px}
 }
+
+
+/* v0.1.18 global page consistency */
+.batch-page,
+.models-page,
+.settings-page,
+.docs-page{
+  width:min(100%,930px);
+  max-width:930px;
+  padding:28px 38px 18px 30px;
+  background:#f4f8fb!important;
+}
+.batch-page .page-head,
+.models-page .page-head,
+.settings-page .page-head,
+.docs-page .page-head{
+  min-height:92px;
+  margin:0;
+  grid-template-columns:50px minmax(0,1fr) auto;
+  gap:16px;
+  padding:0 0 14px;
+  border-bottom:1px solid rgba(202,217,228,.68);
+}
+.batch-page .page-feature,
+.models-page .page-feature,
+.settings-page .page-feature,
+.docs-page .page-feature{
+  width:48px;
+  height:48px;
+  border-radius:15px;
+}
+.batch-page .page-feature svg,
+.models-page .page-feature svg,
+.settings-page .page-feature svg,
+.docs-page .page-feature svg{
+  width:28px;
+  height:28px;
+}
+.batch-page .page-title h2,
+.models-page .page-title h2,
+.settings-page .page-title h2,
+.docs-page .page-title h2{
+  font-size:21px;
+  letter-spacing:-.42px;
+}
+.batch-page .page-title>span,
+.models-page .page-title>span,
+.settings-page .page-title>span,
+.docs-page .page-title>span{
+  margin-top:5px;
+  font-size:10.5px;
+}
+.inner-tabs{
+  height:45px;
+  flex:none;
+  display:flex;
+  align-items:end;
+  gap:20px;
+  padding:0 2px;
+  border-bottom:1px solid rgba(202,217,228,.62);
+}
+.inner-tabs button{
+  position:relative;
+  height:44px;
+  padding:0 2px;
+  border:0;
+  border-radius:0;
+  color:#718397;
+  background:transparent!important;
+  font-size:11.5px;
+  font-weight:620;
+}
+.inner-tabs button:hover{color:#2f627f}
+.inner-tabs button.active{
+  color:#177fb8;
+  font-weight:710;
+}
+.inner-tabs button.active:after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:-1px;
+  height:2px;
+  border-radius:2px 2px 0 0;
+  background:#1688d4;
+}
+.model-config{padding-top:4px}
+.model-config-row{
+  min-height:72px;
+  grid-template-columns:40px minmax(150px,1fr) minmax(220px,335px) 56px;
+  gap:16px;
+}
+.model-config-row .row-icon{
+  width:36px;
+  height:36px;
+  border-radius:11px;
+}
+.model-config-row>span:nth-child(2) strong{font-size:13.5px}
+.model-config-row>span:nth-child(2) small{font-size:10px}
+.model-config-foot{padding-top:12px}
+.model-library{grid-template-rows:44px minmax(0,1fr) 40px}
+.model-table td{height:54px}
+.settings-body{
+  padding-top:3px;
+  padding-right:13px;
+}
+.settings-row{
+  min-height:64px;
+  grid-template-columns:minmax(0,1fr) minmax(230px,340px);
+  gap:20px;
+}
+.setting-label strong{font-size:13px}
+.setting-label small{font-size:10px}
+.settings-row .row-icon{
+  width:36px;
+  height:36px;
+  border-radius:11px;
+}
+.docs-list{
+  padding:5px 8px 0 2px;
+}
+.docs-list>div{
+  min-height:92px;
+  grid-template-columns:36px minmax(0,1fr);
+  gap:14px;
+  align-items:center;
+  padding:15px 2px;
+}
+.docs-list>div>b{font-size:11px}
+.docs-list strong{font-size:14px}
+.docs-list p{
+  margin-top:5px;
+  font-size:11.8px;
+  line-height:1.58;
+}
+.batch-surface{
+  margin-top:16px;
+  border:1px dashed #c9dbe7;
+  border-radius:18px;
+  background:rgba(248,252,254,.72)!important;
+  box-shadow:none;
+}
+.batch-surface .drop-feature{
+  width:58px;
+  height:58px;
+  border-radius:18px;
+}
+.batch-surface strong{font-size:16px}
+.batch-surface>span:last-child{font-size:10.5px}
+@media(max-width:999px){
+  .batch-page,
+  .models-page,
+  .settings-page,
+  .docs-page{
+    padding:22px 24px 14px;
+  }
+  .batch-page .page-head,
+  .models-page .page-head,
+  .settings-page .page-head,
+  .docs-page .page-head{
+    min-height:78px;
+    grid-template-columns:42px minmax(0,1fr) auto;
+    gap:12px;
+    padding-bottom:11px;
+  }
+  .batch-page .page-feature,
+  .models-page .page-feature,
+  .settings-page .page-feature,
+  .docs-page .page-feature{
+    width:40px;
+    height:40px;
+    border-radius:13px;
+  }
+  .batch-page .page-title h2,
+  .models-page .page-title h2,
+  .settings-page .page-title h2,
+  .docs-page .page-title h2{
+    font-size:18px;
+  }
+  .model-config-row{
+    min-height:66px;
+    grid-template-columns:36px minmax(120px,1fr) minmax(190px,280px) 50px;
+    gap:12px;
+  }
+  .settings-row{min-height:58px}
+  .docs-list>div{min-height:80px}
+}
