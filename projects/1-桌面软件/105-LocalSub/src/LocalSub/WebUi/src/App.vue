@@ -136,6 +136,13 @@ const waveformPoints = computed(() => {
   }).join(" ");
 });
 
+function transcriptLineClass(index: number) {
+  const distance = Math.max(0, transcriptHistory.value.length - 1 - index);
+  if (distance === 0) return "recent";
+  if (distance <= 2) return "mid";
+  return "old";
+}
+
 function applyLiveLevel(value: number) {
   const level = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
   liveLevel.value = level;
@@ -559,13 +566,17 @@ onBeforeUnmount(() => {
         </section>
 
         <section v-else-if="activePage === 'live'" class="page live-page">
-          <header class="live-topbar">
-            <div class="live-title">
-              <span class="compact-feature live"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg></span>
-              <div>
-                <div class="live-title-line"><h2>实时字幕</h2><span class="info-dot" data-tip="实时音频、VAD、Process Loopback 与 ASR 运行在 LocalSub.Core；Overlay 和 PotPlayer 窗口跟随由 Shell 管理。">i</span></div>
-                <small>{{ snapshot.live.modelName }}</small>
+          <header class="live-task-card">
+            <span class="live-module-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg>
+            </span>
+
+            <div class="live-task-copy">
+              <div class="live-title-line">
+                <h2>实时字幕</h2>
+                <span class="info-dot" data-tip="Core 负责音频、VAD 与 ASR；Shell 负责 Overlay、PotPlayer 窗口跟随和 WebView2。">i</span>
               </div>
+              <small>{{ snapshot.live.modelName }}</small>
             </div>
 
             <div class="live-task-center">
@@ -576,18 +587,21 @@ onBeforeUnmount(() => {
                   <svg v-else-if="liveState === 'failed'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
                   <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
                 </span>
-                <div><strong>{{ liveStateLabel }}</strong><small>{{ liveRunning ? snapshot.live.source : snapshot.live.status }}</small></div>
+                <div>
+                  <strong>{{ liveStateLabel }}</strong>
+                  <small>{{ liveRunning ? snapshot.live.source : snapshot.live.status }}</small>
+                </div>
               </div>
 
-              <div class="instant-level" data-tip="直接对送入 ASR 的 16 kHz 单声道样本计算短时 RMS 电平，约 30 Hz 更新。">
-                <span>输入电平</span>
-                <div><i :style="{ width: Math.max(1, liveLevel * 100) + '%' }"></i></div>
+              <div class="instant-level" data-tip="来自与 ASR 同一音频链的实时 peak，约 30 Hz 更新。">
+                <span>输入</span>
+                <div class="meter-track"><i :style="{ width: Math.max(1, liveLevel * 100) + '%' }"></i></div>
                 <b>{{ Math.round(liveLevel * 100) }}%</b>
               </div>
             </div>
 
             <div class="live-action-slot">
-              <button class="live-primary-action" :class="{ stop: liveRunning }" type="button" :disabled="liveButtonDisabled" @click="toggleLive">
+              <button class="live-primary-action" :class="{ stop: liveRunning, start: !liveRunning }" type="button" :disabled="liveButtonDisabled" @click="toggleLive">
                 <svg v-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
                 <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
                 {{ liveButtonText }}
@@ -608,16 +622,18 @@ onBeforeUnmount(() => {
 
           <section class="waveform-section" :class="{ collapsed: !snapshot.settings.showLiveLevelHistory }">
             <div class="wave-head">
-              <div><strong>输入电平</strong><span>最近约 30 秒</span></div>
-              <label class="wave-history-toggle" data-tip="显示或隐藏最近约 30 秒的输入电平历史。">
+              <div>
+                <strong>输入电平</strong>
+                <span v-if="snapshot.settings.showLiveLevelHistory">最近 30 秒</span>
+              </div>
+              <label class="wave-history-toggle" data-tip="保留最近约 30 秒的输入电平历史；顶部实时 meter 始终保持高频刷新。">
                 <span>历史</span>
                 <span class="switch small-switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></span>
               </label>
             </div>
             <template v-if="snapshot.settings.showLiveLevelHistory">
-              <svg class="level-wave" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="最近约 30 秒输入电平历史">
-                <line class="axis axis-x" x1="0" y1="38" x2="100" y2="38"></line>
-                <line class="axis axis-y" x1="0" y1="4" x2="0" y2="38"></line>
+              <svg class="level-wave" viewBox="0 0 100 34" preserveAspectRatio="none" aria-label="最近约 30 秒输入电平历史">
+                <line class="axis axis-x" x1="0" y1="31" x2="100" y2="31"></line>
                 <polyline :points="waveformPoints"></polyline>
               </svg>
               <div class="wave-axis"><span>30 s</span><span>15 s</span><span>现在</span></div>
@@ -625,11 +641,14 @@ onBeforeUnmount(() => {
           </section>
 
           <section class="transcript-section">
-            <div class="transcript-head"><strong>字幕</strong><span>{{ snapshot.live.status }}</span></div>
+            <div class="transcript-head">
+              <div><strong>字幕</strong><span>自动跟随最新内容</span></div>
+              <span>{{ snapshot.live.status }}</span>
+            </div>
             <div ref="transcriptScroll" class="transcript-scroll">
-              <p v-for="(line,index) in transcriptHistory" :key="index">{{ line }}</p>
+              <p v-for="(line,index) in transcriptHistory" :key="index" class="history-line" :class="transcriptLineClass(index)">{{ line }}</p>
               <p v-if="snapshot.live.currentText" class="current">{{ snapshot.live.currentText }}</p>
-              <p v-else-if="transcriptHistory.length === 0" class="empty">实时识别结果会显示在这里。</p>
+              <p v-else-if="transcriptHistory.length === 0" class="empty">开始识别后，字幕会持续显示在这里。</p>
             </div>
           </section>
 

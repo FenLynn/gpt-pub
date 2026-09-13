@@ -197,7 +197,7 @@ const fallbackCatalog: ModelCatalogItem[] = [
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.12", activePage: "home", busy: false, lastError: null },
+  app: { productVersion: "0.1.13", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
