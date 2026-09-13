@@ -230,6 +230,7 @@ const installedBatchModels = computed(() => (snapshot.value?.models.catalog ?? [
 const vadModel = computed(() => (snapshot.value?.models.catalog ?? []).find(x => x.isComponent) ?? null);
 const batchBusy = computed(() => snapshot.value?.batch.state === "analyzing" || snapshot.value?.batch.state === "transcribing");
 const batchSelected = computed(() => snapshot.value?.batch.queue.find(x => x.id === snapshot.value?.batch.selectedId) ?? null);
+const batchPrimaryLabel = computed(() => snapshot.value?.batch.canRetry ? "重试当前" : "当前转写");
 const batchWaveformPoints = computed(() => {
   const values = snapshot.value?.batch.media?.waveform ?? [];
   if (values.length === 0) return "";
@@ -368,7 +369,8 @@ async function downloadModel(model: ModelCatalogItem) {
   error.value = null;
   deleteConfirmId.value = "";
   try {
-    applySnapshot(await invoke<LocalSubSnapshot>("model.download", { modelId: model.id }));
+    const method = model.installed || model.needsRepair || model.hasLocalData ? "model.repair" : "model.download";
+    applySnapshot(await invoke<LocalSubSnapshot>(method, { modelId: model.id }));
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
     try { await refreshModels(); } catch { }
@@ -455,7 +457,8 @@ async function transcribeBatch() {
   batchRequestBusy.value = true;
   error.value = null;
   try {
-    applySnapshot(await invoke<LocalSubSnapshot>("batch.transcribe", { id, keywords: parseBatchKeywords() }));
+    const method = snapshot.value?.batch.canRetry ? "batch.retry" : "batch.transcribe";
+    applySnapshot(await invoke<LocalSubSnapshot>(method, { id, keywords: parseBatchKeywords() }));
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
     try { await refresh(); } catch { }
@@ -507,18 +510,49 @@ async function clearBatchQueue() {
     batchRequestBusy.value = false;
   }
 }
-async function exportBatchTxt() {
+async function exportBatch(format: "txt" | "srt" | "vtt") {
   const id = snapshot.value?.batch.selectedId;
   if (!id || !snapshot.value?.batch.canExport || batchBusy.value) return;
   batchRequestBusy.value = true;
   batchClearArmed.value = false;
   error.value = null;
   try {
-    applySnapshot(await invoke<LocalSubSnapshot>("batch.exportTxt", { id }));
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.export", { id, format }));
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
     batchRequestBusy.value = false;
+  }
+}
+async function exportAllBatch() {
+  if (!snapshot.value?.batch.canExportAll || batchBusy.value) return;
+  batchRequestBusy.value = true;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.exportAll"));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    batchRequestBusy.value = false;
+  }
+}
+async function pickBatchOutputDirectory() {
+  if (batchBusy.value) return;
+  batchRequestBusy.value = true;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.pickOutputDirectory"));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    batchRequestBusy.value = false;
+  }
+}
+async function openBatchOutputDirectory() {
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.openOutputDirectory"));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
   }
 }
 
@@ -633,13 +667,20 @@ onMounted(async () => {
         await invoke<LocalSubSnapshot>("model.download", { modelId: "__ci_missing_model__" });
       } catch { }
       try {
+        await invoke<LocalSubSnapshot>("model.repair", { modelId: "__ci_missing_model__" });
+      } catch { }
+      try {
         await invoke<LocalSubSnapshot>("model.delete", { modelId: "__ci_missing_model__" });
       } catch { }
       applySnapshot(await invoke<LocalSubSnapshot>("batch.pickFiles"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.analyze", { id: "__ci_batch__" }));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.transcribe", { id: "__ci_batch__", keywords: [] }));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.transcribeAll", { keywords: [] }));
-      applySnapshot(await invoke<LocalSubSnapshot>("batch.exportTxt", { id: "__ci_batch__" }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.retry", { id: "__ci_batch__", keywords: [] }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.pickOutputDirectory"));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.export", { id: "__ci_batch__", format: "srt" }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.exportAll"));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.openOutputDirectory"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.remove", { id: "__ci_batch__" }));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.clear"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.cancel"));
@@ -668,7 +709,7 @@ onBeforeUnmount(() => {
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M9 19h7l4-8 8 26 5-13h6"></path></svg>
         </div>
-        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.21" }}</small></div>
+        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.22" }}</small></div>
       </div>
 
       <nav class="side-nav" aria-label="主导航">
@@ -937,10 +978,18 @@ onBeforeUnmount(() => {
                 <div><small>后台模型</small><strong>{{ snapshot.batch.batchModelName }}</strong></div>
               </div>
               <label class="batch-keywords" data-tip="关键词会随下一次转写保存，之后重新打开 LocalSub 仍会保留。"><span>关键词</span><input v-model="batchKeywords" type="text" placeholder="可选，逗号分隔" :disabled="batchBusy"></label>
+              <div class="batch-output-summary">
+                <button type="button" class="batch-output-button" :disabled="batchBusy || batchRequestBusy" data-tip="选择默认结果目录。结构化 JSON 自动保存到这里，整队导出也使用这里。" @click="pickBatchOutputDirectory">
+                  <svg viewBox="0 0 24 24"><path d="M3.5 7h6l2 2h9v10H3.5z"></path></svg>
+                  <span><small>输出目录</small><strong>{{ snapshot.batch.outputDirectoryName }}</strong></span>
+                </button>
+                <button type="button" class="batch-open-output" data-tip="在资源管理器打开输出目录" @click="openBatchOutputDirectory">↗</button>
+              </div>
               <div class="batch-run-actions">
+                <button v-if="snapshot.batch.canExportAll" class="batch-export-all" type="button" :disabled="batchBusy || batchRequestBusy" @click="exportAllBatch">全部导出</button>
                 <button class="batch-all-button" type="button" :disabled="!snapshot.batch.canTranscribeAll || batchBusy || batchRequestBusy || !batchModelReady" @click="transcribeAllBatch">全部转写</button>
-                <button class="batch-start-button" type="button" :disabled="!snapshot.batch.canTranscribe || batchBusy || batchRequestBusy || !batchModelReady" @click="transcribeBatch">
-                  <svg viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>当前
+                <button class="batch-start-button" type="button" :class="{retry:snapshot.batch.canRetry}" :disabled="!snapshot.batch.canTranscribe || batchBusy || batchRequestBusy || !batchModelReady" @click="transcribeBatch">
+                  <svg viewBox="0 0 24 24"><path v-if="snapshot.batch.canRetry" d="M18 8a7 7 0 1 0 1 7 M18 8v5h-5"></path><path v-else d="M8 5.5 18 12 8 18.5Z"></path></svg>{{ batchPrimaryLabel }}
                 </button>
               </div>
             </div>
@@ -951,10 +1000,10 @@ onBeforeUnmount(() => {
                 <small>已完成</small>
                 <button type="button" :class="{armed:batchClearArmed}" :disabled="batchBusy || batchRequestBusy" @click="clearBatchQueue">{{ batchClearArmed ? "确认清空" : "清空" }}</button>
               </div>
-              <article v-for="item in snapshot.batch.queue" :key="item.id" class="batch-queue-item" :class="{active:item.id===snapshot.batch.selectedId,done:item.transcribed}">
+              <article v-for="item in snapshot.batch.queue" :key="item.id" class="batch-queue-item" :class="{active:item.id===snapshot.batch.selectedId,done:item.transcribed,missing:item.missing,retry:item.retryable}">
                 <button class="batch-queue-select" type="button" :disabled="batchBusy" @click="analyzeBatch(item.id)">
                   <span class="batch-file-icon"><svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20H6z M14 3.5V8h4"></path></svg></span>
-                  <span><strong>{{ item.name }}</strong><small>{{ item.state }}<template v-if="item.transcribed"> · RTF {{ item.realTimeFactor?.toFixed(2) }}</template></small></span>
+                  <span><strong>{{ item.name }}</strong><small>{{ item.state }}<template v-if="item.transcribed"> · {{ item.segments }} 段 · RTF {{ item.realTimeFactor?.toFixed(2) }}</template></small></span>
                 </button>
                 <button class="batch-remove" type="button" :disabled="batchBusy || batchRequestBusy" data-tip="从当前队列移除，不删除原始媒体文件。" @click.stop="removeBatchItem(item.id)">×</button>
               </article>
@@ -967,8 +1016,12 @@ onBeforeUnmount(() => {
                   <small v-else>选择队列中的媒体以生成声音轨道</small>
                 </div>
                 <div class="batch-media-actions">
-                  <button v-if="batchSelected && !batchSelected.analyzed" type="button" :disabled="batchBusy" @click="analyzeBatch(batchSelected.id)">分析媒体</button>
-                  <button v-if="snapshot.batch.canExport" type="button" :disabled="batchBusy || batchRequestBusy" @click="exportBatchTxt">导出 TXT</button>
+                  <button v-if="batchSelected && !batchSelected.analyzed && !batchSelected.missing" type="button" :disabled="batchBusy" @click="analyzeBatch(batchSelected.id)">分析媒体</button>
+                  <template v-if="snapshot.batch.canExport">
+                    <button type="button" :disabled="batchBusy || batchRequestBusy" @click="exportBatch('srt')">SRT</button>
+                    <button type="button" :disabled="batchBusy || batchRequestBusy" @click="exportBatch('vtt')">VTT</button>
+                    <button type="button" :disabled="batchBusy || batchRequestBusy" @click="exportBatch('txt')">TXT</button>
+                  </template>
                 </div>
               </div>
               <div class="batch-wave-shell">
@@ -983,7 +1036,7 @@ onBeforeUnmount(() => {
             <section class="batch-transcript-panel">
               <div class="batch-transcript-head">
                 <div><strong>转写结果</strong><span v-if="snapshot.batch.result">{{ snapshot.batch.result.segments }} 段 · RTF {{ snapshot.batch.result.realTimeFactor.toFixed(2) }}</span></div>
-                <span>{{ snapshot.batch.transcript.length ? "结构化记录已自动保存，可另存 TXT" : "等待转写" }}</span>
+                <span>{{ snapshot.batch.transcript.length ? "结果已自动保存，可导出 SRT / VTT / TXT" : "等待转写" }}</span>
               </div>
               <div class="batch-transcript-scroll">
                 <p v-for="(line,index) in snapshot.batch.transcript" :key="index"><b>{{ formatBatchTime(line.startMs) }}</b><span>{{ line.text }}</span></p>
@@ -1046,9 +1099,9 @@ onBeforeUnmount(() => {
                   <tr v-for="model in filteredCatalogModels" :key="model.id">
                     <td><div class="table-model-name"><span class="mini-model-icon" :class="{installed:model.installed}"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="3"></ellipse><path d="M5 6.5V12c0 1.7 3.1 3 7 3s7-1.3 7-3V6.5 M5 12v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V12"></path></svg></span><span><strong>{{ model.name }}</strong><small><i v-if="model.recommended">推荐</i><span class="info-dot tiny" :data-tip="model.purpose">i</span></small></span></div></td>
                     <td>{{ model.languages }}</td><td>{{ model.sizeText }}</td><td class="score">{{ model.realtimeScore || "·" }}</td><td class="score">{{ model.accuracyScore || "·" }}</td><td class="score">{{ model.valueScore || "·" }}</td>
-                    <td><span class="install-state" :class="{installed:model.installed}">{{ model.installed ? "已安装" : "未安装" }}</span></td>
+                    <td><span class="install-state" :class="{installed:model.installed,repair:model.needsRepair}">{{ model.installed ? "已安装" : (model.needsRepair ? "需修复" : "未安装") }}</span></td>
                     <td class="table-actions">
-                      <button type="button" :disabled="modelHeavyBlocked" @click="downloadModel(model)">{{ model.installed ? "修复" : "下载" }}</button>
+                      <button type="button" :disabled="modelHeavyBlocked" @click="downloadModel(model)">{{ model.installed ? "校验/修复" : (model.needsRepair || model.hasLocalData ? "继续修复" : "下载") }}</button>
                       <button v-if="model.installed" type="button" class="delete-link" :class="{armed:deleteConfirmId===model.id}" :disabled="modelHeavyBlocked" @click="deleteModel(model)">{{ deleteConfirmId===model.id ? "确认" : "删除" }}</button>
                     </td>
                   </tr>
