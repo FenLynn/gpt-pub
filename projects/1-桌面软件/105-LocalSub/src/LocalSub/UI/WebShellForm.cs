@@ -709,8 +709,11 @@ public sealed class WebShellForm : Form
     {
         var normalized = string.Join(", ", keywords.Take(32));
         if (string.Equals(_settings.Keywords, normalized, StringComparison.Ordinal)) return;
+
+        var latest = AppSettings.Load();
+        latest.Keywords = normalized;
+        latest.Save();
         _settings.Keywords = normalized;
-        _settings.Save();
     }
 
     object CancelBatch()
