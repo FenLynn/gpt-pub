@@ -66,12 +66,18 @@ public sealed class WebShellForm : Form
         "model.list",
         "model.select",
         "model.download",
+        "model.repair",
         "model.cancel",
         "model.delete",
         "batch.pickFiles",
         "batch.analyze",
         "batch.transcribe",
         "batch.transcribeAll",
+        "batch.retry",
+        "batch.pickOutputDirectory",
+        "batch.export",
+        "batch.exportAll",
+        "batch.openOutputDirectory",
         "batch.remove",
         "batch.clear",
         "batch.exportTxt",
@@ -172,7 +178,7 @@ public sealed class WebShellForm : Form
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete", "batch.pickFiles", "batch.analyze", "batch.transcribe", "batch.transcribeAll", "batch.remove", "batch.clear", "batch.exportTxt", "batch.cancel", "diagnostics.liveLevelAck" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.repair", "model.cancel", "model.delete", "batch.pickFiles", "batch.analyze", "batch.transcribe", "batch.transcribeAll", "batch.retry", "batch.pickOutputDirectory", "batch.export", "batch.exportAll", "batch.openOutputDirectory", "batch.remove", "batch.clear", "batch.exportTxt", "batch.cancel", "diagnostics.liveLevelAck" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -273,6 +279,9 @@ public sealed class WebShellForm : Form
                 case "model.download":
                     result = await DownloadModelAsync(request.Params);
                     break;
+                case "model.repair":
+                    result = await RepairModelAsync(request.Params);
+                    break;
                 case "model.cancel":
                     result = CancelModel();
                     break;
@@ -290,6 +299,21 @@ public sealed class WebShellForm : Form
                     break;
                 case "batch.transcribeAll":
                     result = await TranscribeAllBatchAsync(request.Params);
+                    break;
+                case "batch.retry":
+                    result = await RetryBatchAsync(request.Params);
+                    break;
+                case "batch.pickOutputDirectory":
+                    result = PickBatchOutputDirectory();
+                    break;
+                case "batch.export":
+                    result = ExportBatch(request.Params);
+                    break;
+                case "batch.exportAll":
+                    result = ExportAllBatch();
+                    break;
+                case "batch.openOutputDirectory":
+                    result = OpenBatchOutputDirectory();
                     break;
                 case "batch.remove":
                     result = RemoveBatch(request.Params);
@@ -315,7 +339,7 @@ public sealed class WebShellForm : Form
         }
         catch (Exception ex)
         {
-            if (_smoke && request?.Method is "live.start" or "model.select" or "model.download" or "model.delete")
+            if (_smoke && request?.Method is "live.start" or "model.select" or "model.download" or "model.repair" or "model.delete")
                 RecordSmokeMethod(request.Method);
             Reply(request?.Id ?? string.Empty, false, null, ex.Message);
         }
@@ -596,6 +620,18 @@ public sealed class WebShellForm : Form
         return BuildSnapshot();
     }
 
+    async Task<object> RepairModelAsync(JsonElement? parameters)
+    {
+        if (!TryReadString(parameters, "modelId", out var modelId))
+            throw new InvalidOperationException("请选择要修复的模型。");
+
+        await _models.RepairAsync(modelId);
+        _live.RefreshConfiguration();
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
     object CancelModel()
     {
         _models.Cancel();
@@ -647,6 +683,7 @@ public sealed class WebShellForm : Form
         TryReadString(parameters, "id", out var id);
         var keywords = ReadStringArray(parameters, "keywords");
         PersistBatchKeywords(keywords);
+        EnsureBatchOutputWritable();
         var models = _models.Snapshot;
         await _batch.TranscribeAsync(id, models.BatchModelId, keywords);
         _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
@@ -660,10 +697,101 @@ public sealed class WebShellForm : Form
         EnsureBatchCoreAvailable(requireModel: true);
         var keywords = ReadStringArray(parameters, "keywords");
         PersistBatchKeywords(keywords);
+        EnsureBatchOutputWritable();
         var models = _models.Snapshot;
         await _batch.TranscribeAllAsync(models.BatchModelId, keywords);
         _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
         _coreError = null;
+        return BuildSnapshot();
+    }
+
+    async Task<object> RetryBatchAsync(JsonElement? parameters)
+    {
+        if (_smoke) return BuildSnapshot();
+        EnsureBatchCoreAvailable(requireModel: true);
+        TryReadString(parameters, "id", out var id);
+        var keywords = ReadStringArray(parameters, "keywords");
+        PersistBatchKeywords(keywords);
+        EnsureBatchOutputWritable();
+        var models = _models.Snapshot;
+        await _batch.RetryAsync(id, models.BatchModelId, keywords);
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
+    object PickBatchOutputDirectory()
+    {
+        if (_smoke) return BuildSnapshot();
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "选择后台转写结果默认输出目录",
+            ShowNewFolderButton = true,
+            UseDescriptionForTitle = true,
+            InitialDirectory = AppSettings.Load().ResolvedBatchOutputDirectory
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+            return BuildSnapshot();
+
+        var latest = AppSettings.Load();
+        latest.BatchOutputDirectory = Path.GetFullPath(dialog.SelectedPath);
+        latest.Save();
+        _settings.BatchOutputDirectory = latest.BatchOutputDirectory;
+        EnsureBatchOutputWritable();
+        return BuildSnapshot();
+    }
+
+    object ExportBatch(JsonElement? parameters)
+    {
+        if (_smoke) return BuildSnapshot();
+        TryReadString(parameters, "id", out var id);
+        TryReadString(parameters, "format", out var format);
+        format = (format ?? "srt").Trim().ToLowerInvariant();
+        if (format is not ("txt" or "srt" or "vtt"))
+            throw new InvalidOperationException("不支持的导出格式。");
+
+        var result = _batch.GetResult(id, out var suggestedFileName);
+        var baseName = Path.GetFileNameWithoutExtension(suggestedFileName);
+        var outputDir = AppSettings.Load().ResolvedBatchOutputDirectory;
+        Directory.CreateDirectory(outputDir);
+        using var dialog = new SaveFileDialog
+        {
+            InitialDirectory = outputDir,
+            Filter = format switch
+            {
+                "srt" => "SRT 字幕|*.srt|所有文件|*.*",
+                "vtt" => "WebVTT 字幕|*.vtt|所有文件|*.*",
+                _ => "文本文件|*.txt|所有文件|*.*"
+            },
+            FileName = baseName + "." + format,
+            DefaultExt = format,
+            AddExtension = true,
+            OverwritePrompt = true,
+            Title = "导出转写结果"
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            TranscriptPersistenceService.ExportByExtension(dialog.FileName, result.Items);
+            _batch.MarkExported(Path.GetFileName(dialog.FileName));
+        }
+        return BuildSnapshot();
+    }
+
+    object ExportAllBatch()
+    {
+        if (_smoke) return BuildSnapshot();
+        EnsureBatchOutputWritable();
+        var outputDir = AppSettings.Load().ResolvedBatchOutputDirectory;
+        _batch.ExportAllCompleted(outputDir);
+        return BuildSnapshot();
+    }
+
+    object OpenBatchOutputDirectory()
+    {
+        if (_smoke) return BuildSnapshot();
+        var outputDir = AppSettings.Load().ResolvedBatchOutputDirectory;
+        Directory.CreateDirectory(outputDir);
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{outputDir}\"") { UseShellExecute = true });
         return BuildSnapshot();
     }
 
@@ -714,6 +842,30 @@ public sealed class WebShellForm : Form
         latest.Keywords = normalized;
         latest.Save();
         _settings.Keywords = normalized;
+    }
+
+    void EnsureBatchOutputWritable()
+    {
+        var outputDir = AppSettings.Load().ResolvedBatchOutputDirectory;
+        Directory.CreateDirectory(outputDir);
+        var probe = Path.Combine(outputDir, ".localsub-write-probe-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            File.WriteAllText(probe, "LocalSub");
+            File.Delete(probe);
+            var root = Path.GetPathRoot(Path.GetFullPath(outputDir));
+            if (!string.IsNullOrWhiteSpace(root))
+            {
+                var drive = new DriveInfo(root);
+                if (drive.IsReady && drive.AvailableFreeSpace < 64L * 1024 * 1024)
+                    throw new IOException("输出磁盘剩余空间不足 64 MB，请更换输出目录。");
+            }
+        }
+        catch
+        {
+            try { if (File.Exists(probe)) File.Delete(probe); } catch { }
+            throw;
+        }
     }
 
     object CancelBatch()
@@ -777,7 +929,12 @@ public sealed class WebShellForm : Form
                 lastError = _coreError
             },
             live,
-            batch = _batch.BuildSnapshot(models.BatchModelId, models.BatchModelName, _settings.Keywords),
+            batch = _batch.BuildSnapshot(
+                models.BatchModelId,
+                models.BatchModelName,
+                _settings.Keywords,
+                BatchOutputDirectoryDisplayName(),
+                !string.IsNullOrWhiteSpace(_settings.BatchOutputDirectory)),
             models,
             settings = new
             {
@@ -813,6 +970,17 @@ public sealed class WebShellForm : Form
                 autoStartStatus = _autoStartStatus
             }
         };
+    }
+
+    string BatchOutputDirectoryDisplayName()
+    {
+        var current = AppSettings.Load();
+        _settings.BatchOutputDirectory = current.BatchOutputDirectory;
+        if (string.IsNullOrWhiteSpace(current.BatchOutputDirectory))
+            return "LocalSub / Transcripts";
+        var full = current.ResolvedBatchOutputDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var name = Path.GetFileName(full);
+        return string.IsNullOrWhiteSpace(name) ? full : name;
     }
 
     async Task ProbeCoreAsync()
