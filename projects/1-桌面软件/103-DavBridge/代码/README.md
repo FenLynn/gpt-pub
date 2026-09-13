@@ -6,23 +6,23 @@
 
 当前正式版本：**v0.4.0**。
 
-当前可靠性封板版本：**v0.4.16**。
+当前 `p103-exp` 候选：**v0.4.17**。
 
-第一轮完成完整 CI 的 v0.4.16 代码 head：
+v0.4.17 完整验证代码 head：
 
 ```text
-35015c8581cb537ae98813eb5f2efe0458525487
+958744f8703b567c634c0296530b21623d922381
 ```
 
-CI run：`34743274402`，结果 `success`。
+CI run：`34751011145`，结果 `success`。
 
-候选 Artifact：`DavBridge-v0.4.16-win-x64`，Artifact ID `10313388007`。
+候选 Artifact：`DavBridge-v0.4.17-win-x64`，Artifact ID `10315875953`。
 
-EXE SHA256：`1da5a38f1ab5264699ab0778ba346e7dcf6a4df48089952eb1650c2d7de9f29f`。
+EXE SHA256：`9edb36d76db79d2d73f14eb7f4ade6a3fae7dc546f0054c0077adac15c6ffe0f`。
 
-Artifact ZIP SHA256：`ea6d43a90f431fc1fe3b24b49944cab524040911af8b320a009a92c3f8518464`。
+Artifact ZIP SHA256：`ced0f55075168eb8cd669acdfd89a87876a5be17ce33760ab865368410654ada`。
 
-动态文档提交发生在该代码 head 之后，stable/main 提升必须使用 PR 自身准确 head 的完整 CI，不得只复用本 run。
+当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。
 
 ## 解决方案
 
@@ -240,16 +240,17 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.16 已进入稳定准入流程。本轮只增加可靠性回归，不改变 UI。用户已授权完整准入通过后执行 `p103-exp → p103-stable → main` 两级 PR；不授权 tag 或 Release。
+v0.4.17 当前只在 `p103-exp`。本轮不改 Core，只在 About 页增加长期运行摘要，并为 About 页增加 1100×825 CI 视觉预览。
 
-### v0.4.16 可靠性测试新增
+下一步等待用户实机查看。未经明确授权，不提升 `p103-stable` / `main`，不创建 tag 或 Release。
 
-新增五项 Core Smoke：
+### v0.4.17 长期运行摘要
 
-- repeated pause resume remains idempotent；
-- network list failure recovers on retry；
-- verification network loss recovers without re-put；
-- zero byte object verifies safely；
-- quota exact boundary is deterministic。
+关于页新增：
 
-Core Smoke 总数增至 19 项。
+- 本周期：Cycle + 当前上传 / 下载已用量；
+- 最近完成：最近完成事件；
+- 最近暂停：最近暂停事件；
+- 最近异常：最近 warning，没有则显示暂无近期异常。
+
+所有数据均来自既有安全 DTO 和通用活动记录，不新增真实文件名、私人路径、凭据或 SHA。已有脱敏诊断导出仍位于“设置 → 安全与维护”，本轮不重复实现。
