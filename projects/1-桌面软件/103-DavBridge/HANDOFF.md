@@ -26,7 +26,7 @@
 
 当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
 
-当前实验候选为 **v0.4.25**，只位于 `p103-exp`。这是当前 v0.4 最终实验候选。
+当前实验候选为 **v0.4.26**，只位于 `p103-exp`。这是当前 v0.4 最终实验候选。
 
 ## 3. 最新完整验证代码基线
 
@@ -36,18 +36,18 @@
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本：**v0.4.25**。
+当前实验版本：**v0.4.26**。
 
 最后完成完整 P103 CI 的代码 head：
 
 ```text
-3390342f7a77e85944e41610da55f235fdb528b8
+3568eca17bda0b6674959c9897f6ec2dbebbb26f
 ```
 
 对应 CI：
 
 ```text
-run 34763452329
+run 34763904669
 scope          success
 core-smoke     success
 frontend       success
@@ -55,23 +55,23 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.25-win-x64`
+Windows candidate：`DavBridge-v0.4.26-win-x64`
 
-Artifact ID：`10319852755`
+Artifact ID：`10319489203`
 
-Web UI preview Artifact ID：`10319292901`
+Web UI preview Artifact ID：`10319379569`
 
 EXE：
 
 ```text
 2467421 bytes
-SHA256 87b5ff61a78eb91375af42532ad091bc0064c7b7a7e4923c2d5f169e75ffcd5b
+SHA256 72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-6f31e857eceada95474cf0ae535a920d73c402cf1e936d224be5c055593c823a
+9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe
 ```
 
 该 run 同时验证：
@@ -86,7 +86,7 @@ Artifact ZIP SHA256：
 - Runtime 私人数据边界；
 - 既有 native-host self-test。
 
-本段之后若只有文档提交，仍以 `3390342f7a77e85944e41610da55f235fdb528b8` 作为最后完整构建验证的 v0.4.24 代码基线。
+本段之后若只有文档提交，仍以 `3568eca17bda0b6674959c9897f6ec2dbebbb26f` 作为最后完整构建验证的 v0.4.24 代码基线。
 
 ## 4. 当前分支快照
 
@@ -97,9 +97,9 @@ main         73aefcf04570180bb9526a43cf805aff1e7673b3
 p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-`p103-exp` 已在 stable/main 之上进入 v0.4.25 最终收束候选。当前最后完整验证代码 head 为 `3390342f7a77e85944e41610da55f235fdb528b8`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
+`p103-exp` 已在 stable/main 之上进入 v0.4.26 最终收束候选。当前最后完整验证代码 head 为 `3568eca17bda0b6674959c9897f6ec2dbebbb26f`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
 
-v0.4.25 当前未提升 stable/main。真实 Windows 最终验收仍是提升前最后一道门。
+v0.4.26 当前未提升 stable/main。真实 Windows 最终验收仍是提升前最后一道门。
 
 ## 5. 当前架构
 
@@ -506,11 +506,11 @@ e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 
 自动化可证明的 v0.4 收束工作至此完成。真正的多小时或多日 Windows 无人值守、睡眠恢复、真实网络断开与真实 WebView2 视觉仍必须由用户实机确认，不能用 CI 伪装完成。
 
-### v0.4.25 surface 色阶修正
+### v0.4.26 surface 色阶修正
 
 用户实机指出普通文字附近仍有“白色背景”感。检查确认不是错觉，活动 CSS 中多个普通信息 surface 仍使用纯白或高透明度白色，造成淡蓝灰页面上出现“白纸贴片”视觉。
 
-v0.4.25 只修正 surface 色阶，不改布局、字号、信息结构或任何 Core 逻辑：
+v0.4.26 只修正 surface 色阶，不改布局、字号、信息结构或任何 Core 逻辑：
 
 - 页面 canvas 统一为更明确的淡蓝灰；
 - 普通信息区使用 quiet / soft / panel 三档淡蓝灰 surface；
@@ -519,6 +519,21 @@ v0.4.25 只修正 surface 色阶，不改布局、字号、信息结构或任何
 - 只有 tooltip、选中 tab、输入类交互面等真正抬升层保留接近白色。
 
 CI 九张跨页面截图已复核，首页、转移、回收站、文档和 About 的 surface 层级保持一致。Core Smoke 20/20、Windows native self-test 与 single EXE 均继续通过。
+
+### v0.4.26 左上品牌版本号
+
+根据用户反馈，版本号从 About 的低频信息补充为全局左上品牌区的轻量第二行。
+
+左上品牌区现在固定为：
+
+```text
+DavBridge
+v0.4.26
+```
+
+版本号字号更小、颜色更淡，作为品牌名的次级信息显示。窄窗口下继续缩小，不改变导航宽度和其他侧栏布局。原先品牌名下方的“Zotero 镜像”不再占位。
+
+本轮只改品牌区显示和版本号，不修改页面结构、surface 色阶、bridge、DavBridge.Core 或任何迁移安全语义。
 
 ## 7. 核心冻结安全语义
 
@@ -579,18 +594,18 @@ main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 最后完整验证代码 head：
 
 ```text
-3390342f7a77e85944e41610da55f235fdb528b8
+3568eca17bda0b6674959c9897f6ec2dbebbb26f
 ```
 
-完整 CI run：`34763452329`，五个 jobs 全部 success。
+完整 CI run：`34763904669`，五个 jobs 全部 success。
 
-Windows candidate Artifact ID：`10319852755`。
+Windows candidate Artifact ID：`10319489203`。
 
-EXE：`2467421 bytes`，SHA256 `87b5ff61a78eb91375af42532ad091bc0064c7b7a7e4923c2d5f169e75ffcd5b`。
+EXE：`2467421 bytes`，SHA256 `72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850`。
 
-Artifact ZIP SHA256：`6f31e857eceada95474cf0ae535a920d73c402cf1e936d224be5c055593c823a`。
+Artifact ZIP SHA256：`9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe`。
 
-Web UI preview Artifact ID：`10319292901`。预览已覆盖总览多尺寸、转移、回收站、文档、About 1100×825 与 About 900×620。
+Web UI preview Artifact ID：`10319379569`。预览已覆盖总览多尺寸、转移、回收站、文档、About 1100×825 与 About 900×620。
 
 Core Smoke 为 20/20，通过新增的持久化暂停与重启收敛序列。Windows native self-test 全部通过。
 
