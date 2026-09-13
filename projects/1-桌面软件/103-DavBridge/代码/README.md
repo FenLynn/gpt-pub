@@ -6,31 +6,33 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.23**。
+当前 `p103-exp` 候选：**v0.4.24**，这是 v0.4 最终实验候选。
 
-v0.4.23 最后完整验证代码 head：
+v0.4.24 最后完整验证代码 head：
 
 ```text
-afe861ebcede0326b916ed9f3dd2431849f67d87
+382948ca2c743009cf2d935c74a65aba19a92889
 ```
 
-完整 P103 CI run：`34760070491`，结果 `success`。
+完整 P103 CI run：`34761379456`，结果 `success`。
 
-Windows candidate Artifact ID：`10318343396`。
+Windows candidate Artifact ID：`10319615252`。
 
 EXE：`2467421 bytes`。
 
-EXE SHA256：`6a23d598515c9c7e9eea135621a36600bdf6382e7681f4f99c9e52529da7fd5b`。
+EXE SHA256：`934092e89433462809db571e18f30e71905bbfa0ac763f99c807e81d0e0ac650`。
 
-Artifact ZIP SHA256：`dcf18abe1a9a05d0026e884c5ae154acf98ab3d8b37f61fdc27091b8863d8788`。
+Artifact ZIP SHA256：`b074930564e27dadbdd512efaa0b8e1293600068938282f855275cabe2442c82`。
 
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
 
-## v0.4.23 About 信息分层
+## v0.4.24 v0.4 最终收束
 
-About 继续保持单行布局，但按“当前状态 / 最近活动 / 软件信息”三组重新排序。当前状态优先，软件信息降级。最近完成与暂停合并为“记录”，初始化只在未完成时出现，运行环境自检移入 tooltip。
+当前 About 继续使用“当前状态 / 最近活动 / 软件信息”三级层次，不再继续增加常驻信息。
 
-本轮不修改 DavBridge.Core 或任何迁移与安全语义。
+本轮清理废弃 About CSS，新增生产 UI 所有权 CI 门，视觉预览覆盖回收站与文档，并将 Core Smoke 增至 20 项。新增测试模拟 12 轮安全暂停、状态落盘、重新加载与继续，最终确认无重复 PUT 并收敛到 Complete。
+
+旧 WinForms UI 文件继续保留，但只作为历史源码。当前生产入口必须继续使用 Vue + WebView2。
 
 ## 解决方案
 
@@ -250,30 +252,13 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.23 当前只在 `p103-exp`。当前 UI 断点是 About 信息分层，按当前状态、最近活动、软件信息三组展示，正常状态下减少常驻行数并突出运行优先级。
+v0.4.24 已完成自动化收束验证，只位于 `p103-exp`。
 
-以下 v0.4.20 观察连续性仍是当前底层健康语义：
+最后完整验证代码 head：`382948ca2c743009cf2d935c74a65aba19a92889`。
 
-### v0.4.20 运行观察连续性
+CI run：`34761379456`，五项全绿。
 
-`ProductExperienceV044` 在 v0.4.19 匿名健康账本之上增加：
+Core Smoke 20/20。Windows candidate Artifact ID：`10319615252`。
 
-- LastObservationGapAt；
-- LastObservationGapSeconds；
-- 15 分钟明显运行空窗阈值。
+下一步不是继续开发 v0.4 功能，而是用户真实 Windows 最终验收。终验通过后才进入 stable/main 提升流程。
 
-正常退出使用上次 clean exit 到本次启动计算空窗。异常中断使用上次 runtime heartbeat 到本次启动计算空窗。15 分钟以内的短重启不会让完整健康窗口失效。
-
-`OperationalHealthV048` 现在同时给出 `WindowComplete`、`ObservationGap` 和 `ObservationGapSeconds`。只有账本时间覆盖足够且最近统计窗口没有明显运行空窗时，`WindowComplete=true`。
-
-Vue 只接收以上聚合结果。About 页在存在空窗时显示“近 24 小时观察不连续”和近似时长，不读取 session marker 或 sidecar 原文件。
-
-native self-test 新增 `ValidateObservationContinuityForSelfTest()`，CI 强制要求 `operationalObservationContinuity=true`。
-
-最后完整验证代码 head：`1d900d066f00bffaeba2ade7fc75491316144128`。
-
-完整 CI run：`34756261258`。
-
-Windows candidate Artifact ID：`10317337650`。
-
-未经用户明确授权，不提升 stable/main，不创建 tag 或 Release。

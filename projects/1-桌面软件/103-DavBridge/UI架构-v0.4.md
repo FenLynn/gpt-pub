@@ -107,7 +107,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
-## v0.4.23 当前界面结构
+## v0.4.24 当前界面结构
 
 当前候选采用固定左侧导航：
 
@@ -169,6 +169,14 @@ About 继续使用单行左右布局，但不再让所有条目处于同一优�
 
 运行环境自检摘要进入“运行”行 tooltip，其他解释性内容继续使用 tooltip。v0.4.20 的 observation continuity 聚合字段继续使用，健康语义不变。
 
+### v0.4.24 最终 UI 收束
+
+v0.4.24 不重做页面，只做终审和防回归。总览、转移、回收站、文档与 About 的当前视觉结构视为 v0.4 冻结候选。
+
+CI 固定生成九张浏览器视觉预览，包括四种总览尺寸、转移、回收站、文档，以及两种 About 尺寸。生产 UI 所有权检查要求 `Program.cs` 继续挂载 `WebUiHostV040`，同时禁止旧 `UiShellV030`、`UiShellV032` 和旧 Dashboard 回到 `Program.cs` 或 `MainForm.cs`。
+
+旧 WinForms UI 源码继续保留为历史实现和回滚参考，不再承担生产业务页面。废弃 About selector 已从活动 CSS 删除。
+
 ## 构建
 
 前端：
@@ -211,7 +219,7 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 v0.4.16 继续作为 stable/main 冻结基线，commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。正式 GitHub Release 仍为 v0.4.0。
 
-当前实验版本为 v0.4.23，最后完整验证代码 head `afe861ebcede0326b916ed9f3dd2431849f67d87`，完整 P103 CI run `34760070491` 全绿。
+当前实验版本为 v0.4.24，最后完整验证代码 head `382948ca2c743009cf2d935c74a65aba19a92889`，完整 P103 CI run `34761379456` 全绿。
 
 v0.4.20 不增加新的主界面结构。About 页在 v0.4.19 匿名健康账本基础上增加运行观察连续性判断。超过 15 分钟的运行空窗会把状态标记为“近 24 小时观察不连续”，避免把未运行时间误读为零异常。
 

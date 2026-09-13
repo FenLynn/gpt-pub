@@ -26,7 +26,7 @@
 
 当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
 
-当前实验候选为 **v0.4.23**，只位于 `p103-exp`。
+当前实验候选为 **v0.4.24**，只位于 `p103-exp`。这是当前 v0.4 最终实验候选。
 
 ## 3. 最新完整验证代码基线
 
@@ -36,18 +36,18 @@
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本：**v0.4.23**。
+当前实验版本：**v0.4.24**。
 
 最后完成完整 P103 CI 的代码 head：
 
 ```text
-afe861ebcede0326b916ed9f3dd2431849f67d87
+382948ca2c743009cf2d935c74a65aba19a92889
 ```
 
 对应 CI：
 
 ```text
-run 34760070491
+run 34761379456
 scope          success
 core-smoke     success
 frontend       success
@@ -55,23 +55,23 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.23-win-x64`
+Windows candidate：`DavBridge-v0.4.24-win-x64`
 
-Artifact ID：`10318343396`
+Artifact ID：`10319615252`
 
-Web UI preview Artifact ID：`10319110230`
+Web UI preview Artifact ID：`10319555234`
 
 EXE：
 
 ```text
 2467421 bytes
-SHA256 6a23d598515c9c7e9eea135621a36600bdf6382e7681f4f99c9e52529da7fd5b
+SHA256 934092e89433462809db571e18f30e71905bbfa0ac763f99c807e81d0e0ac650
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-dcf18abe1a9a05d0026e884c5ae154acf98ab3d8b37f61fdc27091b8863d8788
+b074930564e27dadbdd512efaa0b8e1293600068938282f855275cabe2442c82
 ```
 
 该 run 同时验证：
@@ -81,12 +81,12 @@ dcf18abe1a9a05d0026e884c5ae154acf98ab3d8b37f61fdc27091b8863d8788
 - 15 分钟以内的短重启不会被误判为长期观察中断；
 - v0.4.19 匿名健康账本和 schema 1 到 schema 2 的兼容升级继续通过；
 - About 1100×825 浏览器预览；
-- 原 19 项 Core Smoke；
+- Core Smoke 20 项全部通过，其中新增持久化暂停、重启与最终收敛测试；
 - Windows single EXE；
 - Runtime 私人数据边界；
 - 既有 native-host self-test。
 
-本段之后若只有文档提交，仍以 `afe861ebcede0326b916ed9f3dd2431849f67d87` 作为最后完整构建验证的 v0.4.23 代码基线。
+本段之后若只有文档提交，仍以 `382948ca2c743009cf2d935c74a65aba19a92889` 作为最后完整构建验证的 v0.4.24 代码基线。
 
 ## 4. 当前分支快照
 
@@ -97,9 +97,9 @@ main         73aefcf04570180bb9526a43cf805aff1e7673b3
 p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-`p103-exp` 已在 stable/main 之上进入 v0.4.23 开发。当前最后完整验证代码 head 为 `afe861ebcede0326b916ed9f3dd2431849f67d87`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
+`p103-exp` 已在 stable/main 之上进入 v0.4.24 最终收束候选。当前最后完整验证代码 head 为 `382948ca2c743009cf2d935c74a65aba19a92889`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
 
-v0.4.23 当前未获得 stable/main 提升授权。
+v0.4.24 当前未提升 stable/main。真实 Windows 最终验收仍是提升前最后一道门。
 
 ## 5. 当前架构
 
@@ -490,6 +490,22 @@ e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 
 本轮只调整 About 信息优先级、分组、显示条件和版本号，不修改 DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、安全暂停、Reconciliation、回收站或 DELETE 安全链。
 
+### v0.4.24 v0.4 最终收束候选
+
+本轮把 v0.4 从持续精修状态收束为最终实验候选。
+
+第一，UI 终审不再改动已经确认的总览、转移、回收站和文档结构。About 延续 v0.4.23 的三级信息层级。CI 现在固定生成总览多尺寸、转移、回收站、文档、About 1100×825 以及 About 900×620 预览。
+
+第二，删除 `overview.css` 中已经失效的 `.about-ops` 和 `.about-health-strip` 历史覆盖层。CI 新增生产 UI 所有权检查，要求生产入口继续使用 `WebUiHostV040`，并阻止 `UiShellV030`、`UiShellV032`、旧 Dashboard 或废弃 About selector 回到当前生产路径。
+
+第三，Core Smoke 从 19 项增加到 20 项。新增持久化恢复序列连续执行 12 轮“处理一个成员、安全暂停、保存状态、重新加载、再继续”，最后再次启动并收敛到 Complete。测试确认每个成员只 PUT 一次，已经 StrongVerified 的成员不会因重复暂停或进程式重启再次上传。
+
+第四，Windows native self-test 继续通过 Web UI 嵌入、bridge 白名单、四类备份恢复、runtime session、4:3 窗口迁移、background wake、匿名健康账本、健康账本持久化和 observation continuity。
+
+第五，本轮没有修改 DavBridge.Core 的生产实现，没有改变 WebDAV、StrongVerified、quota/Cycle、安全暂停、Reconciliation、回收站或 DELETE 语义。
+
+自动化可证明的 v0.4 收束工作至此完成。真正的多小时或多日 Windows 无人值守、睡眠恢复、真实网络断开与真实 WebView2 视觉仍必须由用户实机确认，不能用 CI 伪装完成。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -544,29 +560,29 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本为 v0.4.20，只位于 `p103-exp`。
+当前最终实验候选为 **v0.4.24**，只位于 `p103-exp`。
 
 最后完整验证代码 head：
 
 ```text
-1d900d066f00bffaeba2ade7fc75491316144128
+382948ca2c743009cf2d935c74a65aba19a92889
 ```
 
-完整 CI run：`34756261258`，五个 jobs 全部 success。
+完整 CI run：`34761379456`，五个 jobs 全部 success。
 
-Windows candidate Artifact ID：`10317337650`。
+Windows candidate Artifact ID：`10319615252`。
 
-v0.4.20 的关键变化是把“健康账本已经覆盖 24 小时”和“DavBridge 实际连续观察了这 24 小时”分开。超过 15 分钟的运行空窗会让 About 明确显示“近 24 小时观察不连续”，避免把未运行时间误当作零异常。
+EXE：`2467421 bytes`，SHA256 `934092e89433462809db571e18f30e71905bbfa0ac763f99c807e81d0e0ac650`。
 
-下一步用户实机重点确认：
+Artifact ZIP SHA256：`b074930564e27dadbdd512efaa0b8e1293600068938282f855275cabe2442c82`。
 
-1. About 页“观察不连续”状态在真实 WebView2 中仍保持轻量，不显得像严重故障；
-2. 正常关闭后超过 15 分钟再启动，About 应显示观察不连续和近似空窗时长；
-3. 15 分钟以内的短重启不应误判为长期观察空窗；
-4. 空窗发生超过 24 小时后，如果之后持续运行，窗口应恢复为完整“近 24 小时”；
-5. 首页、暂停、安全暂停、迁移和流量界面不得出现任何回归。
+Web UI preview Artifact ID：`10319555234`。预览已覆盖总览多尺寸、转移、回收站、文档、About 1100×825 与 About 900×620。
 
-v0.4.20 未获得 stable/main 提升授权，也没有 tag / Release 授权。
+Core Smoke 为 20/20，通过新增的持久化暂停与重启收敛序列。Windows native self-test 全部通过。
+
+当前唯一不能由 CI 替代的门是用户真实 Windows 终验，包括 WebView2 实际字体与 DPI、睡眠恢复、真实网络断开与恢复，以及多小时或多日无人值守。
+
+在用户真实 Windows 明确认可前，不把 v0.4.24 提升到 `p103-stable` 或 `main`，不创建 tag 或 Release。
 
 ## 10. 新对话固定读取顺序
 
