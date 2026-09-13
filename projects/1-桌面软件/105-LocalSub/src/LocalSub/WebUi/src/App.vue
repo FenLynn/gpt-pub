@@ -131,7 +131,7 @@ const waveformPoints = computed(() => {
   return values.map((value, index) => {
     const x = (index / n) * 100;
     const normalized = Math.max(0, Math.min(1, value));
-    const y = 38 - normalized * 34;
+    const y = 31 - normalized * 27;
     return x.toFixed(2) + "," + y.toFixed(2);
   }).join(" ");
 });
