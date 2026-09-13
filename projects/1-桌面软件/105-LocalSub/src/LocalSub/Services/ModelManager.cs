@@ -34,7 +34,17 @@ public sealed class ModelManager
         return Directory.Exists(dir) && m.RequiredFiles.All(f =>
         {
             var p = Path.Combine(dir, f.Replace('/', Path.DirectorySeparatorChar));
-            return File.Exists(p) || Directory.Exists(p);
+            if (File.Exists(p))
+            {
+                try { return new FileInfo(p).Length > 0; }
+                catch { return false; }
+            }
+            if (Directory.Exists(p))
+            {
+                try { return Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories).Any(file => new FileInfo(file).Length > 0); }
+                catch { return false; }
+            }
+            return false;
         });
     }
 
