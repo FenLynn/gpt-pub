@@ -862,8 +862,12 @@ jobs:
           $ErrorActionPreference='Stop'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           Remove-Item publish/Logs -Recurse -Force -ErrorAction SilentlyContinue
-          foreach ($private in @('config.json','state.json','history.json')) {
-            if (Get-ChildItem publish -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private Data leaked into portable package: $private" }
+          # Real WebView2 smoke creates a disposable browser profile beside the EXE.
+          # It is runtime state, not a portable delivery asset.
+          Remove-Item publish/WebView2 -Recurse -Force -ErrorAction SilentlyContinue
+          if (Test-Path publish/WebView2) { throw 'WebView2 user-data/profile leaked into portable package' }
+          foreach ($private in @('config.json','state.json','history.json','Cookies','History','Login Data')) {
+            if (Get-ChildItem publish -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private/runtime Data leaked into portable package: $private" }
           }
           if (-not (Test-Path publish/LocalSub.exe)) { throw 'LocalSub.exe missing from portable package' }
           if (-not (Test-Path publish/LocalSub.Core.exe)) { throw 'LocalSub.Core.exe missing from portable package' }
