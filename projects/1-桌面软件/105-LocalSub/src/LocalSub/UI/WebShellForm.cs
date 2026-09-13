@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using LocalSub.Core;
@@ -1143,12 +1144,18 @@ public sealed class WebShellForm : Form
             !_smokeMethods.Contains("model.list") ||
             !_smokeMethods.Contains("model.select") ||
             !_smokeMethods.Contains("model.download") ||
+            !_smokeMethods.Contains("model.repair") ||
             !_smokeMethods.Contains("model.cancel") ||
             !_smokeMethods.Contains("model.delete") ||
             !_smokeMethods.Contains("batch.pickFiles") ||
             !_smokeMethods.Contains("batch.analyze") ||
             !_smokeMethods.Contains("batch.transcribe") ||
             !_smokeMethods.Contains("batch.transcribeAll") ||
+            !_smokeMethods.Contains("batch.retry") ||
+            !_smokeMethods.Contains("batch.pickOutputDirectory") ||
+            !_smokeMethods.Contains("batch.export") ||
+            !_smokeMethods.Contains("batch.exportAll") ||
+            !_smokeMethods.Contains("batch.openOutputDirectory") ||
             !_smokeMethods.Contains("batch.remove") ||
             !_smokeMethods.Contains("batch.clear") ||
             !_smokeMethods.Contains("batch.exportTxt") ||
@@ -1158,7 +1165,7 @@ public sealed class WebShellForm : Form
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}bridge=batch.pickFiles{Environment.NewLine}bridge=batch.analyze{Environment.NewLine}bridge=batch.transcribe{Environment.NewLine}bridge=batch.transcribeAll{Environment.NewLine}bridge=batch.remove{Environment.NewLine}bridge=batch.clear{Environment.NewLine}bridge=batch.exportTxt{Environment.NewLine}bridge=batch.cancel{Environment.NewLine}bridge=diagnostics.liveLevelAck{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.repair{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}bridge=batch.pickFiles{Environment.NewLine}bridge=batch.analyze{Environment.NewLine}bridge=batch.transcribe{Environment.NewLine}bridge=batch.transcribeAll{Environment.NewLine}bridge=batch.retry{Environment.NewLine}bridge=batch.pickOutputDirectory{Environment.NewLine}bridge=batch.export{Environment.NewLine}bridge=batch.exportAll{Environment.NewLine}bridge=batch.openOutputDirectory{Environment.NewLine}bridge=batch.remove{Environment.NewLine}bridge=batch.clear{Environment.NewLine}bridge=batch.exportTxt{Environment.NewLine}bridge=batch.cancel{Environment.NewLine}bridge=diagnostics.liveLevelAck{Environment.NewLine}");
     }
 
     static bool IsPotPlayerDetected()
