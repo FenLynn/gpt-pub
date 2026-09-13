@@ -49,7 +49,7 @@ internal sealed class WebUiHostV040 : IDisposable
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill, BackColor = Color.White };
     private readonly System.Windows.Forms.Timer _pushTimer = new() { Interval = 500 };
     private readonly CancellationTokenSource _cts = new();
-    private EngineProgress? _lastProgress; private WebDavIoProgress? _lastIo; private bool _webReady; private bool _disposed;
+    private EngineProgress? _lastProgress; private WebDavIoProgress? _lastUploadIo; private bool _webReady; private bool _disposed;
     private SettingsDialog? _settingsDialog; private TaskCompletionSource<object>? _settingsCompletion;
     private WebUiHostV040(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) { _form=form; _host=host; _reconciliation=reconciliation; Mount(); Wire(); _=InitializeWebViewAsync(); }
     internal static WebUiHostV040 Attach(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) => new(form,host,reconciliation);
@@ -78,7 +78,7 @@ internal sealed class WebUiHostV040 : IDisposable
         try
         {
             request=JsonSerializer.Deserialize<BridgeRequest>(args.WebMessageAsJson,JsonOptions); if(request is null||string.IsNullOrWhiteSpace(request.Id)||!AllowedMethods.Contains(request.Method??string.Empty)) throw new InvalidOperationException("不允许的界面命令。");
-            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync","已收到安全暂停请求"), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交继续请求"), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync","已提交重试请求"), "quota.calibrate"=>await InvokeMainTaskAsync("CalibrateAsync",string.Empty), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
+            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync",string.Empty), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync",string.Empty), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync",string.Empty), "quota.calibrate"=>await InvokeModalMainTaskAsync("CalibrateAsync"), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
             Reply(request.Id,true,result,null);
         }
         catch(Exception ex){ Reply(request?.Id??string.Empty,false,null,ex is TargetInvocationException tie?tie.InnerException?.Message??tie.Message:ex.Message); }
@@ -121,6 +121,29 @@ internal sealed class WebUiHostV040 : IDisposable
         _settingsLayer.Visible=false; return new { snapshot=BuildSnapshot() };
     }
     private async Task<object> InvokeMainTaskAsync(string method,string message){ await InvokeMainFormTaskAsync(method); return new { message=string.IsNullOrWhiteSpace(message)?null:message,snapshot=BuildSnapshot() }; }
+    private async Task<object> InvokeModalMainTaskAsync(string method)
+    {
+        await SetNativeModalVisualAsync(true).ConfigureAwait(true);
+        try
+        {
+            await InvokeMainFormTaskAsync(method).ConfigureAwait(true);
+            return new { message=(string?)null,snapshot=BuildSnapshot() };
+        }
+        finally
+        {
+            await SetNativeModalVisualAsync(false).ConfigureAwait(true);
+        }
+    }
+    private async Task SetNativeModalVisualAsync(bool active)
+    {
+        if(_disposed||!_webReady||_webView.IsDisposed)return;
+        var core=_webView.CoreWebView2;
+        if(core is null)return;
+        var script=active
+            ? "document.documentElement.classList.add('native-modal-open')"
+            : "document.documentElement.classList.remove('native-modal-open')";
+        try{await core.ExecuteScriptAsync(script).ConfigureAwait(true);}catch{}
+    }
     private async Task InvokeMainFormTaskAsync(string methodName){ var method=typeof(MainForm).GetMethod(methodName,BindingFlags.Instance|BindingFlags.NonPublic)??throw new InvalidOperationException($"DavBridge native host could not resolve {methodName}."); if(method.Invoke(_form,null) is Task task) await task.ConfigureAwait(true); }
     private async Task<object> DeferAsync(IReadOnlyList<string> keys){ if(keys.Count==0) throw new InvalidOperationException("请先选择待审查附件组。"); await _reconciliation.DeferGroupsAsync(keys,_cts.Token).ConfigureAwait(true); await ContinueAfterReviewAsync().ConfigureAwait(true); return new { message=$"本周期继续保留 {keys.Count} 个附件组。",snapshot=BuildSnapshot() }; }
     private async Task<object> DeleteAsync(IReadOnlyList<string> keys)
@@ -238,7 +261,7 @@ internal sealed class WebUiHostV040 : IDisposable
             BuildRecycleGroups());
     }
 
-    private (string Title,string Detail,double? Progress) CurrentTask(EngineState state){ var relative=_lastProgress?.RelativePath; if(!string.IsNullOrWhiteSpace(relative)){ double? fraction=null; if(_lastIo is not null&&PathMatches(_lastIo.RelativePath,relative)&&_lastIo.TotalBytes is >0) fraction=Math.Clamp((double)_lastIo.BytesProcessed/_lastIo.TotalBytes.Value,0,1); return(Path.GetFileName(relative),HumanizeProgress(_lastProgress?.Message),fraction); } if(_reconciliation.IsAuditing)return("源端对账","正在读取 InfiniCLOUD manifest 并核对历史 StrongVerified 账本",null); return state switch{ EngineState.WaitUser=>("等待人工审查","回收站存在需要明确决定的附件组",null),EngineState.WaitQuota=>("等待下一周期","坚果云当前安全额度不足，账本与断点已经保存",null),EngineState.WaitNetwork=>("等待网络","连接条件恢复后任务可以继续",null),EngineState.WaitRetry=>("需要处理",_lastProgress?.Message??"任务已经安全停止，请检查具体原因",null),EngineState.Complete=>("当前清单完成","当前源清单已经完成强校验",null),EngineState.Paused=>("已暂停","进度和流量账本已经保存",null),EngineState.Running=>("准备任务",_lastProgress?.Message??"正在调度下一安全任务",null),_=>("准备中","正在初始化 DavBridge",null)}; }
+    private (string Title,string Detail,double? Progress) CurrentTask(EngineState state){ var relative=_lastProgress?.RelativePath; if(!string.IsNullOrWhiteSpace(relative)){ double? fraction=null; if(_lastUploadIo is not null&&PathMatches(_lastUploadIo.RelativePath,relative)&&_lastUploadIo.TotalBytes is >0) fraction=Math.Clamp((double)_lastUploadIo.BytesProcessed/_lastUploadIo.TotalBytes.Value,0,1); return(Path.GetFileName(relative),HumanizeProgress(_lastProgress?.Message),fraction); } if(_reconciliation.IsAuditing)return("源端对账","正在读取 InfiniCLOUD manifest 并核对历史 StrongVerified 账本",null); return state switch{ EngineState.WaitUser=>("等待人工审查","回收站存在需要明确决定的附件组",null),EngineState.WaitQuota=>("等待下一周期","坚果云当前安全额度不足，账本与断点已经保存",null),EngineState.WaitNetwork=>("等待网络","连接条件恢复后任务可以继续",null),EngineState.WaitRetry=>("需要处理",_lastProgress?.Message??"任务已经安全停止，请检查具体原因",null),EngineState.Complete=>("当前清单完成","当前源清单已经完成强校验",null),EngineState.Paused=>("已暂停","进度和流量账本已经保存",null),EngineState.Running=>("准备任务",_lastProgress?.Message??"正在调度下一安全任务",null),_=>("准备中","正在初始化 DavBridge",null)}; }
     private IReadOnlyList<RecycleDto> BuildRecycleGroups()=>_reconciliation.GetRecycleGroups().Select(group=>{ var records=_host.State.Files.Values.Where(r=>string.Equals(r.GroupKey,group.GroupKey,StringComparison.OrdinalIgnoreCase)).ToArray(); var size=records.Sum(r=>Math.Max(0,r.SourceSize)); var verified=records.Where(r=>r.VerifiedAt.HasValue).Select(r=>r.VerifiedAt!.Value).DefaultIfEmpty().Max(); var disposition=ReconciliationPolicy.GetDisposition(group,_reconciliation.CurrentCycleId); var(kind,state)=disposition switch{RecycleDisposition.Observing=>("observing","首次观察"),RecycleDisposition.ReviewRequired=>("review","等待人工审查"),RecycleDisposition.Blocked=>("blocked","安全阻止"),RecycleDisposition.DeferredThisCycle=>("history","本周期保留"),RecycleDisposition.Removed=>("history","已人工删除"),_=>("history","活动")}; return new RecycleDto(group.GroupKey,Path.GetFileName(group.GroupKey.TrimEnd('/','\\')),group.FirstMissingCycleId??string.Empty,string.IsNullOrWhiteSpace(group.LastDeferredCycleId)?string.Empty:$"保留 {group.LastDeferredCycleId}",FormatBytes(size),verified==default?string.Empty:verified.ToLocalTime().ToString("yyyy-MM-dd"),state,kind,group.LastIssue); }).ToArray();
     private int PriorityGroupCount()=>_host.State.Files.Values.Where(r=>r.Status==TransferStatus.SourceChanged).Select(r=>r.GroupKey).Where(k=>!string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
     private int NormalBacklogCount(){ var stateGroups=_host.State.Files.Values.GroupBy(r=>r.GroupKey,StringComparer.OrdinalIgnoreCase).Count(g=>!string.IsNullOrWhiteSpace(g.Key)&&g.Any(r=>r.Status!=TransferStatus.StrongVerified&&r.Status!=TransferStatus.SourceChanged)); return Math.Max(0,stateGroups+_reconciliation.State.LastNewGroupCount); }
@@ -274,8 +297,23 @@ internal sealed class WebUiHostV040 : IDisposable
         });
     }
 
-    private void OnProgress(object? sender,EngineProgress progress){_lastProgress=progress;_lastIo=null;PushSnapshot();} private void OnStateChanged(object? sender,EventArgs e)=>PushSnapshot(); private void OnReconciliationChanged(object? sender,EventArgs e)=>PushSnapshot();
-    private void OnIo(object? sender,WebDavIoProgress progress){ if(!EndpointMatches(progress.BaseAddress,_host.Config.SourceBaseUrl)&&!EndpointMatches(progress.BaseAddress,_host.Config.TargetBaseUrl))return; _lastIo=progress; }
+    private void OnProgress(object? sender,EngineProgress progress)
+    {
+        _lastProgress=progress;
+        if(_lastUploadIo is not null)
+        {
+            if(string.IsNullOrWhiteSpace(progress.RelativePath)||!PathMatches(_lastUploadIo.RelativePath,progress.RelativePath))
+                _lastUploadIo=null;
+        }
+        PushSnapshot();
+    }
+    private void OnStateChanged(object? sender,EventArgs e)=>PushSnapshot(); private void OnReconciliationChanged(object? sender,EventArgs e)=>PushSnapshot();
+    private void OnIo(object? sender,WebDavIoProgress progress)
+    {
+        if(progress.Operation!=WebDavIoOperation.Upload)return;
+        if(!EndpointMatches(progress.BaseAddress,_host.Config.TargetBaseUrl))return;
+        _lastUploadIo=progress;
+    }
     private void PushSnapshot(){ SafeUi(()=>{ if(_disposed||!_webReady||_webView.IsDisposed)return; var core=_webView.CoreWebView2; if(core is null)return; PostEventOnUiThread(core,"snapshot",BuildSnapshot()); }); }
     private static void PostEventOnUiThread(CoreWebView2 core,string eventName,object payload){ core.PostWebMessageAsJson(JsonSerializer.Serialize(new{@event=eventName,payload},JsonOptions)); }
     private void Reply(string id,bool ok,object? result,string? error){ if(string.IsNullOrWhiteSpace(id))return; SafeUi(()=>{ if(_disposed||!_webReady||_webView.IsDisposed)return; var core=_webView.CoreWebView2; if(core is null)return; core.PostWebMessageAsJson(JsonSerializer.Serialize(new{id,ok,result,error},JsonOptions)); }); }
