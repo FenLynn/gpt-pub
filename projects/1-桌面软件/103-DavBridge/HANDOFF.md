@@ -26,7 +26,7 @@
 
 当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
 
-当前实验候选为 **v0.4.18**，只位于 `p103-exp`。
+当前实验候选为 **v0.4.19**，只位于 `p103-exp`。
 
 ## 3. 最新完整验证代码基线
 
@@ -36,18 +36,18 @@
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本：**v0.4.18**。
+当前实验版本：**v0.4.19**。
 
 最后完成完整 P103 CI 的代码 head：
 
 ```text
-2c70a847c870133ae8e7f681929ff029ac35bcd8
+723c77948e4a04cbb533b14d1236f99e9a37c801
 ```
 
 对应 CI：
 
 ```text
-run 34752362599
+run 34753217596
 scope          success
 core-smoke     success
 frontend       success
@@ -55,26 +55,35 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.18-win-x64`
+Windows candidate：`DavBridge-v0.4.19-win-x64`
 
-Artifact ID：`10316611787`
+Artifact ID：`10316692654`
+
+Web UI preview Artifact ID：`10316672736`
 
 EXE：
 
 ```text
-2455133 bytes
-SHA256 7a5d10b2caa99d30495d8f1754e2f72c4d9b9a9448ce6b5d0a2c588ac031d884
+2463325 bytes
+SHA256 939c3d602a5f1778336e0da1a4f1404d1a8201bf29b464d00e24171624e51efb
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-a5a0f702d484b3ecf78c5bc89c37518f7de39e9cd53589e6b036573936fd3b49
+f6d6efb654cd53cbf82b0ad0e5d0e8a6fb4a33f565e27511144c82e09cd5a3f7
 ```
 
-该 run 同时验证了 v0.4.18 的 `operationalHealthSummary` native self-test、About 1100×825 浏览器预览、原 19 项 Core Smoke、Windows single EXE、Runtime 私人数据边界和既有 native-host self-test。
+该 run 同时验证：
+- v0.4.19 event-level operational health ledger；
+- v0.4.19 旧 product-experience schema 1 → schema 2 升级、保存、重载与不重复计数；
+- About 1100×825 浏览器预览；
+- 原 19 项 Core Smoke；
+- Windows single EXE；
+- Runtime 私人数据边界；
+- 既有 native-host self-test。
 
-本段之后若只有文档提交，仍以 `2c70a847c870133ae8e7f681929ff029ac35bcd8` 作为最后完整构建验证的 v0.4.18 代码基线。
+本段之后若只有文档提交，仍以 `723c77948e4a04cbb533b14d1236f99e9a37c801` 作为最后完整构建验证的 v0.4.19 代码基线。
 
 ## 4. 当前分支快照
 
@@ -423,6 +432,29 @@ e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 
 最终验证必须以本轮文档同步后的最新 `p103-exp` head 为准，不能只复用中间 run。
 
+
+### v0.4.19 事件级健康账本
+
+第一，v0.4.18 的近 24 小时统计直接依赖最近 40 条通用活动，因此在高频状态变化时可能只能给出截断窗口。v0.4.19 将这部分改为独立的匿名事件账本，不再依赖活动列表长度。
+
+第二，`product-experience.json` 的 UI sidecar schema 提升到 2，并新增：
+- `OperationalLedgerStartedAt`；
+- `OperationalEvents`。
+
+每个事件只保存时间戳和匿名类别。当前类别只有 `warning`、`network`、`pause`、`complete`。不保存真实 Zotero 文件名、路径、URL、用户名、凭据、SHA、TransferRecord 或配额核心账本。
+
+第三，事件账本不是定时采样器。只有原本就会写入 product-experience 的低频状态事件发生时才一起记录，因此不会引入新的高频磁盘写入。
+
+第四，旧 schema 1 首次由 v0.4.19 读取时会一次性升级到 schema 2。已有最近活动会尽量投影成已知健康事件，但 `OperationalLedgerStartedAt` 从升级时刻开始，因此升级后的前 24 小时明确显示“健康账本建立中”，不会把有限旧活动冒充完整 24 小时历史。账本累计满 24 小时后，近 24 小时统计不再受最近活动 40 条上限影响。
+
+第五，匿名健康事件只保留最近 8 天，属于可再生 UI 辅助状态。删除 `product-experience.json(.bak)` 最多使健康统计重新建立，不得影响迁移安全、StrongVerified、quota、Cycle、Reconciliation 或 DELETE。
+
+第六，native self-test 同时验证聚合边界与持久化升级。旧 schema 1 sidecar 会被加载、升级、保存、重新加载，然后再次执行升级函数，必须保证事件不重复计数。
+
+第七，脱敏诊断 ZIP 新增聚合后的 `operationalHealth` 摘要，但不导出真实文件事件或私人数据。
+
+第八，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -471,31 +503,32 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-稳定主线仍为 v0.4.16：
+稳定主线继续保持 v0.4.16：
 
 ```text
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本为 v0.4.18，只位于 `p103-exp`。
+当前实验版本为 v0.4.19，只位于 `p103-exp`。
 
-v0.4.18 功能实现 head：
+最后完整验证代码 head：
 
 ```text
-e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
+723c77948e4a04cbb533b14d1236f99e9a37c801
 ```
 
-本轮增加 About 页近 24 小时健康摘要、OperationalHealth DTO 与 deterministic native self-test。准确验证代码 head `2c70a847c870133ae8e7f681929ff029ac35bcd8` 已通过完整 P103 CI run `34752362599`。
+完整 CI run：`34753217596`，五个 jobs 全部 success。
 
-下一步用户实机重点只看：
+v0.4.19 的关键变化只有 product-experience 匿名健康账本和 About 运行健康统计可信化，不改变首页、迁移页、暂停控制或 Core。
 
-1. About 页健康条仍然轻量，不像监控仪表盘；
-2. “完成 / 网络等待 / 警告 / 暂停”读起来是否直观；
-3. StrongVerified 与待处理数量是否有长期运行价值；
-4. 活动记录不足以覆盖完整 24 小时时，必须明确提示窗口可能截断；
-5. v0.4.16 冻结的首页、迁移和暂停逻辑不得变化。
+下一步用户实机重点确认：
 
-v0.4.18 未获得 stable/main 提升授权，也没有 Release 授权。
+1. About 页视觉仍保持轻量；
+2. 从 v0.4.18 升级后前 24 小时显示“健康账本建立中”是否自然；
+3. 24 小时后统计应继续显示“近 24 小时”，且不再受最近活动 40 条限制；
+4. 首页、暂停、迁移和流量界面不得出现任何回归。
+
+v0.4.19 未获得 stable/main 提升授权，也没有 tag / Release 授权。
 
 ## 10. 新对话固定读取顺序
 

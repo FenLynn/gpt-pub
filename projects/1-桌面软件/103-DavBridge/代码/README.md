@@ -6,17 +6,23 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.18**。
+当前 `p103-exp` 候选：**v0.4.19**。
 
-v0.4.18 功能实现 head：
+v0.4.19 最后完整验证代码 head：
 
 ```text
-e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
+723c77948e4a04cbb533b14d1236f99e9a37c801
 ```
 
-当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。
+完整 P103 CI run：`34753217596`，结果 `success`。
 
-最后完成完整构建验证的 v0.4.18 代码 head：`2c70a847c870133ae8e7f681929ff029ac35bcd8`。CI run `34752362599` 全绿。
+Windows candidate Artifact ID：`10316692654`。
+
+EXE SHA256：`939c3d602a5f1778336e0da1a4f1404d1a8201bf29b464d00e24171624e51efb`。
+
+Artifact ZIP SHA256：`f6d6efb654cd53cbf82b0ad0e5d0e8a6fb4a33f565e27511144c82e09cd5a3f7`。
+
+当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。
 
 ## 解决方案
 
@@ -210,6 +216,8 @@ UI 迁移后仍必须运行原 Core Smoke，不能只做 Vue 构建。
 
 WebView2 用户数据位于 `%LOCALAPPDATA%/DavBridge/WebView2`，日志、缓存和临时文件继续与 Runtime 分离。
 
+v0.4.19 的 `%LOCALAPPDATA%/DavBridge/product-experience.json` schema 2 额外保存匿名 operational health 事件。事件只有时间与类别，最多保留 8 天，不包含真实文件名、路径、URL、凭据或 SHA，不参与迁移安全判断。
+
 ## 构建
 
 前端先执行：
@@ -234,24 +242,31 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.18 当前只在 `p103-exp`。本轮在 About 页增加近 24 小时 operational-health strip，并增加 deterministic native self-test。
+v0.4.19 当前只在 `p103-exp`。
 
-### v0.4.18 运行健康摘要
+### v0.4.19 匿名运行健康账本
 
-`ProductExperienceV044.BuildOperationalHealth(24)` 从既有通用活动记录统计：
+`ProductExperienceV044` 的可再生 sidecar schema 提升到 2，新增：
 
-- warningCount；
-- networkWaitCount；
-- pauseCount；
-- completionCount；
-- windowComplete。
+- OperationalLedgerStartedAt；
+- OperationalEvents。
 
-`WebUiHostV040` 只把这些聚合值以及当前 verified/backlog 暴露给 Vue。没有新增真实文件名、路径、URL、凭据或 SHA。
+事件类别只有 warning / network / pause / complete，并且只在原本已有的低频产品活动写入点同步记录，不增加定时采样。
 
-如果 sidecar 的 40 条保留窗口不足以覆盖完整 24 小时，`windowComplete=false`，UI 明确提示活动窗口可能截断。
+旧 schema 1 首次启动会安全升级。已有最近活动可投影成部分匿名事件，但完整 24 小时窗口从升级时刻重新建立，因此升级后的前 24 小时 `WindowComplete=false`。
 
-`Program --self-test` 新增 `operationalHealthSummary`，CI 会强制验证。
+native self-test 同时覆盖：
 
-最后完整验证代码 head：`2c70a847c870133ae8e7f681929ff029ac35bcd8`。Windows candidate Artifact ID `10316611787`，EXE SHA256 `7a5d10b2caa99d30495d8f1754e2f72c4d9b9a9448ce6b5d0a2c588ac031d884`。后续若只有文档提交，仍以该代码 head 作为 v0.4.18 构建事实源。
+- 24 小时聚合边界；
+- 旧 schema 1 加载；
+- schema 2 升级；
+- 保存与重载；
+- 第二次升级不重复计数。
+
+最后完整验证代码 head：`723c77948e4a04cbb533b14d1236f99e9a37c801`。
+
+完整 CI run：`34753217596`。
+
+Windows candidate Artifact ID：`10316692654`。
 
 未经用户明确授权，不提升 stable/main，不创建 tag 或 Release。

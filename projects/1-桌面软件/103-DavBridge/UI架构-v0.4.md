@@ -107,7 +107,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
-## v0.4.18 当前界面结构
+## v0.4.19 当前界面结构
 
 当前候选采用固定左侧导航：
 
@@ -195,10 +195,12 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 v0.4.16 继续作为 stable/main 冻结基线，commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。正式 GitHub Release 仍为 v0.4.0。
 
-当前实验版本为 v0.4.18，功能实现 head `e76e4deda04ad0a5a9839e8a9781c0dbcce004d5`。
+当前实验版本为 v0.4.19，最后完整验证代码 head `723c77948e4a04cbb533b14d1236f99e9a37c801`，完整 P103 CI run `34753217596` 全绿。
 
-v0.4.18 在 v0.4.17 About 页长期运行摘要下方增加一条轻量 operational-health strip，不做图表和复杂卡片。默认显示近 24 小时“完成 / 网络等待 / 警告 / 暂停”，以及当前 StrongVerified / backlog。活动保留窗口不足 24 小时时明确标注可能截断。
+v0.4.19 不增加新的主界面结构。About 页仍沿用 v0.4.17 / v0.4.18 的轻量摘要，只把“近 24 小时运行健康”的数据源从最多 40 条活动列表切换为 C# 侧匿名事件账本。
 
-新增 native deterministic self-test 验证统计边界，并由 Windows CI 强制检查。
+Vue 仍只接收聚合 OperationalHealth DTO。事件账本不进入 JavaScript，不增加 bridge 命令，也不改变 Web UI 权限。
 
-Overview、迁移页、暂停控制与 DavBridge.Core 不变。下一步等待最终 `p103-exp` head CI 和用户实机视觉确认。
+升级后的前 24 小时显示“健康账本建立中”；账本累计满 24 小时后显示完整近 24 小时统计。中间应用重启不会重置账本建立时间。
+
+Overview、迁移页、暂停控制、WebDAV 和 DavBridge.Core 保持冻结。下一关仍是用户真实 Windows 视觉和长期运行观察。
