@@ -218,6 +218,194 @@ internal sealed class BatchWebController : IDisposable
         }
     }
 
+    internal async Task TranscribeAllAsync(string modelId, IEnumerable<string> keywords)
+    {
+        QueueItem[] items;
+        CancellationTokenSource cts;
+        lock (_gate)
+        {
+            EnsureIdleLocked();
+            if (_queue.Count == 0)
+                throw new InvalidOperationException("请先添加媒体文件。");
+
+            items = _queue.ToArray();
+            cts = BeginOperationLocked("transcribe-all", "transcribing", "正在转写整个队列", $"0 / {items.Length}");
+        }
+        RaiseChanged();
+
+        var completed = 0;
+        try
+        {
+            foreach (var item in items)
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                lock (_gate)
+                {
+                    _selectedId = item.Id;
+                    item.State = "转写中";
+                    _stage = $"队列 {completed + 1} / {items.Length}";
+                    _detail = item.Name;
+                    _status = $"正在转写 {item.Name}";
+                }
+                RaiseChanged();
+
+                var completedBefore = completed;
+                var progress = new Progress<BatchTranscriptionProgress>(p =>
+                {
+                    lock (_gate)
+                    {
+                        var itemPercent = Math.Clamp(p.Percent, 0, 100);
+                        _percent = (int)Math.Round(((completedBefore + itemPercent / 100d) / items.Length) * 100);
+                        _stage = $"队列 {completedBefore + 1} / {items.Length} · {(string.IsNullOrWhiteSpace(p.Stage) ? "后台转写" : p.Stage)}";
+                        _detail = string.IsNullOrWhiteSpace(p.Detail) ? item.Name : p.Detail;
+                        _status = $"正在转写 {item.Name}";
+                        item.State = itemPercent >= 100 ? "整理结果" : $"转写 {itemPercent}%";
+                    }
+                    RaiseChanged();
+                });
+
+                var modelProgress = new Progress<ModelOperationProgress>(p =>
+                {
+                    lock (_gate)
+                    {
+                        _stage = $"队列 {completedBefore + 1} / {items.Length} · {(string.IsNullOrWhiteSpace(p.Stage) ? "准备模型" : p.Stage)}";
+                        if (!string.IsNullOrWhiteSpace(p.Detail)) _detail = p.Detail!;
+                    }
+                    RaiseChanged();
+                });
+
+                var result = await _core.TranscribeAsync(item.Path, modelId, keywords, progress, modelProgress, cts.Token);
+                SaveAutomaticJson(result, modelId);
+
+                lock (_gate)
+                {
+                    _results[item.Id] = result;
+                    item.State = $"完成 {result.Items.Count} 段";
+                }
+                completed++;
+                RaiseChanged();
+            }
+
+            lock (_gate)
+            {
+                FinishOperationLocked(
+                    $"队列已完成 {completed} / {items.Length}",
+                    "队列转写完成",
+                    $"已自动保存 {completed} 份结构化记录",
+                    100);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            lock (_gate)
+            {
+                var active = SelectedLocked();
+                if (active != null && !_results.ContainsKey(active.Id)) active.State = "已取消";
+                FinishOperationLocked(
+                    $"队列已取消，完成 {completed} / {items.Length}",
+                    "已取消",
+                    completed == 0 ? "没有完成新的转写" : $"已保留 {completed} 个已完成结果",
+                    null);
+            }
+        }
+        catch (Exception ex)
+        {
+            lock (_gate)
+            {
+                var active = SelectedLocked();
+                if (active != null && !_results.ContainsKey(active.Id)) active.State = "转写失败";
+                FailOperationLocked(ex);
+            }
+            throw;
+        }
+        finally
+        {
+            EndOperation(cts);
+            RaiseChanged();
+        }
+    }
+
+    internal void Remove(string? id)
+    {
+        lock (_gate)
+        {
+            EnsureIdleLocked();
+            var item = !string.IsNullOrWhiteSpace(id)
+                ? _queue.FirstOrDefault(x => string.Equals(x.Id, id, StringComparison.Ordinal))
+                : SelectedLocked();
+            if (item == null) return;
+
+            var index = _queue.IndexOf(item);
+            _queue.Remove(item);
+            _analysis.Remove(item.Id);
+            _results.Remove(item.Id);
+
+            if (string.Equals(_selectedId, item.Id, StringComparison.Ordinal))
+            {
+                if (_queue.Count == 0) _selectedId = null;
+                else _selectedId = _queue[Math.Min(index, _queue.Count - 1)].Id;
+            }
+
+            _state = "idle";
+            _stage = "队列已更新";
+            _detail = item.Name;
+            _percent = null;
+            _lastError = null;
+            _status = _queue.Count == 0 ? "队列已清空" : $"队列中还有 {_queue.Count} 个媒体";
+        }
+        RaiseChanged();
+    }
+
+    internal void Clear()
+    {
+        lock (_gate)
+        {
+            EnsureIdleLocked();
+            _queue.Clear();
+            _analysis.Clear();
+            _results.Clear();
+            _selectedId = null;
+            _state = "idle";
+            _status = "队列已清空";
+            _stage = "待命";
+            _detail = "";
+            _percent = null;
+            _lastError = null;
+            _operationKind = null;
+        }
+        RaiseChanged();
+    }
+
+    internal BatchTranscriptionResult GetResult(string? id, out string suggestedFileName)
+    {
+        lock (_gate)
+        {
+            var item = SelectLocked(id);
+            if (!_results.TryGetValue(item.Id, out var result))
+                throw new InvalidOperationException("当前媒体还没有可导出的转写结果。");
+
+            var baseName = Path.GetFileNameWithoutExtension(item.Name);
+            foreach (var ch in Path.GetInvalidFileNameChars()) baseName = baseName.Replace(ch, '_');
+            if (string.IsNullOrWhiteSpace(baseName)) baseName = "transcript";
+            suggestedFileName = baseName + ".txt";
+            return result;
+        }
+    }
+
+    internal void MarkExported(string fileName)
+    {
+        lock (_gate)
+        {
+            _state = "idle";
+            _status = "TXT 已导出";
+            _stage = "导出完成";
+            _detail = fileName;
+            _percent = 100;
+            _lastError = null;
+        }
+        RaiseChanged();
+    }
+
     internal bool Cancel()
     {
         lock (_gate)
@@ -243,6 +431,7 @@ internal sealed class BatchWebController : IDisposable
             return new
             {
                 queued = _queue.Count,
+                completed = _results.Count,
                 state = _state,
                 status = _status,
                 selectedId = selected?.Id ?? "",
@@ -253,7 +442,9 @@ internal sealed class BatchWebController : IDisposable
                     name = x.Name,
                     state = x.State,
                     analyzed = _analysis.ContainsKey(x.Id),
-                    transcribed = _results.ContainsKey(x.Id)
+                    transcribed = _results.ContainsKey(x.Id),
+                    segments = _results.TryGetValue(x.Id, out var queueResult) ? queueResult.Items.Count : 0,
+                    realTimeFactor = _results.TryGetValue(x.Id, out queueResult) ? Math.Round(queueResult.RealTimeFactor, 3) : (double?)null
                 }).ToArray(),
                 media = analysis == null ? null : new
                 {
@@ -286,6 +477,10 @@ internal sealed class BatchWebController : IDisposable
                 },
                 canAnalyze = selected != null && _operationCts == null,
                 canTranscribe = selected != null && _operationCts == null,
+                canTranscribeAll = _queue.Count > 0 && _operationCts == null,
+                canRemove = selected != null && _operationCts == null,
+                canClear = _queue.Count > 0 && _operationCts == null,
+                canExport = result != null && _operationCts == null,
                 canCancel = _operationCts != null,
                 batchModelId = modelId,
                 batchModelName = modelName,
