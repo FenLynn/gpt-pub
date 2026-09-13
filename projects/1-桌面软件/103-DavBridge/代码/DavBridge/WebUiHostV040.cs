@@ -225,7 +225,9 @@ internal sealed class WebUiHostV040 : IDisposable
             operational.CompletionCount,
             priority + normal,
             verified,
-            operational.WindowComplete);
+            operational.WindowComplete,
+            operational.ObservationGap,
+            operational.ObservationGapSeconds);
         var runtime = RuntimeSessionV046.GetSnapshot();
         var runtimeDto = new RuntimeDto(
             runtime.UptimeText,
@@ -337,7 +339,7 @@ internal sealed class WebUiHostV040 : IDisposable
     private sealed record RuntimeDto(string UptimeText,string PreviousExitText,int UncleanExitCount,string CleanupText);
     private sealed record InitializationDto(string Key,string Label,bool Done,string Hint);
     private sealed record ActivityDto(string Time,string Title,string Detail,string Tone);
-    private sealed record OperationalHealthDto(int Hours,int WarningCount,int NetworkWaitCount,int PauseCount,int CompletionCount,int BacklogCount,int VerifiedCount,bool WindowComplete);
+    private sealed record OperationalHealthDto(int Hours,int WarningCount,int NetworkWaitCount,int PauseCount,int CompletionCount,int BacklogCount,int VerifiedCount,bool WindowComplete,bool ObservationGap,long ObservationGapSeconds);
     private sealed record RecycleDto(string GroupKey,string Name,string FirstMissing,string LastDecision,string SizeText,string VerifiedText,string State,string Disposition,string? Issue);
     private sealed record WebSnapshot(
         string Version,

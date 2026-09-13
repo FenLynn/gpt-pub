@@ -9,7 +9,7 @@ namespace DavBridge;
 internal sealed record ProductActivityV044(DateTimeOffset At, string Title, string Detail, string Tone);
 internal sealed record InitializationStepV044(string Key, string Label, bool Done, string Hint);
 internal sealed record StartupHealthItemV044(string Key, string Label, string Status, string Detail);
-internal sealed record OperationalHealthV048(int Hours, int WarningCount, int NetworkWaitCount, int PauseCount, int CompletionCount, bool WindowComplete);
+internal sealed record OperationalHealthV048(int Hours, int WarningCount, int NetworkWaitCount, int PauseCount, int CompletionCount, bool WindowComplete, bool ObservationGap, long ObservationGapSeconds);
 internal sealed record OperationalEventV049(DateTimeOffset At, string Kind);
 
 internal sealed record StartupHealthReportV044(DateTimeOffset? CheckedAt, IReadOnlyList<StartupHealthItemV044> Items)
@@ -186,11 +186,14 @@ internal static class ProductExperienceV044
         public int LastTempCleanupFiles { get; set; }
         public long LastTempCleanupBytes { get; set; }
         public DateTimeOffset? OperationalLedgerStartedAt { get; set; }
+        public DateTimeOffset? LastObservationGapAt { get; set; }
+        public long LastObservationGapSeconds { get; set; }
         public List<OperationalEventV049> OperationalEvents { get; set; } = new();
         public List<ProductActivityV044> Activities { get; set; } = new();
     }
 
     private static readonly object Gate = new();
+    private static readonly TimeSpan ObservationGapThreshold = TimeSpan.FromMinutes(15);
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
     private static string? _path;
     private static ProductState _state = new();
@@ -234,6 +237,8 @@ internal static class ProductExperienceV044
             return SummarizeOperationalLedger(
                 _state.OperationalEvents,
                 _state.OperationalLedgerStartedAt,
+                _state.LastObservationGapAt,
+                _state.LastObservationGapSeconds,
                 now,
                 safeHours);
         }
@@ -253,8 +258,10 @@ internal static class ProductExperienceV044
             new OperationalEventV049(now.AddHours(-30), "warning")
         };
 
-        var complete = SummarizeOperationalLedger(events, now.AddHours(-48), now, 24);
-        var warming = SummarizeOperationalLedger(events, now.AddHours(-6), now, 24);
+        var complete = SummarizeOperationalLedger(events, now.AddHours(-48), null, 0, now, 24);
+        var warming = SummarizeOperationalLedger(events, now.AddHours(-6), null, 0, now, 24);
+        var gapped = SummarizeOperationalLedger(events, now.AddHours(-48), now.AddHours(-8), 7200, now, 24);
+        var oldGap = SummarizeOperationalLedger(events, now.AddHours(-48), now.AddHours(-30), 7200, now, 24);
 
         return complete.Hours == 24 &&
                complete.WarningCount == 2 &&
@@ -262,7 +269,82 @@ internal static class ProductExperienceV044
                complete.PauseCount == 1 &&
                complete.CompletionCount == 1 &&
                complete.WindowComplete &&
-               !warming.WindowComplete;
+               !complete.ObservationGap &&
+               !warming.WindowComplete &&
+               gapped.ObservationGap &&
+               gapped.ObservationGapSeconds == 7200 &&
+               !gapped.WindowComplete &&
+               oldGap.WindowComplete &&
+               !oldGap.ObservationGap;
+    }
+
+    internal static bool ValidateObservationContinuityForSelfTest()
+    {
+        lock (Gate)
+        {
+            var previousState = _state;
+            try
+            {
+                var now = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero);
+
+                _state = new ProductState
+                {
+                    SchemaVersion = 2,
+                    OperationalLedgerStartedAt = now.AddHours(-48),
+                    LastCleanExitAt = now.AddMinutes(-45)
+                };
+                RecordObservationGapLocked(now, previousUnclean: false, previousHeartbeatAt: null);
+                var cleanGap = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
+                    now,
+                    24);
+
+                _state = new ProductState
+                {
+                    SchemaVersion = 2,
+                    OperationalLedgerStartedAt = now.AddHours(-48),
+                    LastCleanExitAt = now.AddMinutes(-5)
+                };
+                RecordObservationGapLocked(now, previousUnclean: false, previousHeartbeatAt: null);
+                var shortRestart = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
+                    now,
+                    24);
+
+                _state = new ProductState
+                {
+                    SchemaVersion = 2,
+                    OperationalLedgerStartedAt = now.AddHours(-48)
+                };
+                RecordObservationGapLocked(now, previousUnclean: true, previousHeartbeatAt: now.AddMinutes(-40));
+                var uncleanGap = SummarizeOperationalLedger(
+                    _state.OperationalEvents,
+                    _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
+                    now,
+                    24);
+
+                return cleanGap.ObservationGap &&
+                       cleanGap.ObservationGapSeconds == 2700 &&
+                       !cleanGap.WindowComplete &&
+                       !shortRestart.ObservationGap &&
+                       shortRestart.WindowComplete &&
+                       uncleanGap.ObservationGap &&
+                       uncleanGap.ObservationGapSeconds == 2400 &&
+                       !uncleanGap.WindowComplete;
+            }
+            finally
+            {
+                _state = previousState;
+            }
+        }
     }
 
     internal static bool ValidateOperationalLedgerPersistenceForSelfTest(string root)
@@ -303,6 +385,8 @@ internal static class ProductExperienceV044
                 var summary = SummarizeOperationalLedger(
                     _state.OperationalEvents,
                     _state.OperationalLedgerStartedAt,
+                    _state.LastObservationGapAt,
+                    _state.LastObservationGapSeconds,
                     now,
                     24);
 
@@ -329,18 +413,26 @@ internal static class ProductExperienceV044
     private static OperationalHealthV048 SummarizeOperationalLedger(
         IEnumerable<OperationalEventV049> events,
         DateTimeOffset? ledgerStartedAt,
+        DateTimeOffset? lastObservationGapAt,
+        long lastObservationGapSeconds,
         DateTimeOffset now,
         int hours)
     {
         var cutoff = now.AddHours(-hours);
         var recent = events.Where(item => item.At >= cutoff && item.At <= now).ToArray();
+        var observationGap = lastObservationGapAt.HasValue &&
+                             lastObservationGapAt.Value >= cutoff &&
+                             lastObservationGapAt.Value <= now;
+        var ledgerWindowComplete = ledgerStartedAt.HasValue && ledgerStartedAt.Value <= cutoff;
         return new OperationalHealthV048(
             hours,
             recent.Count(item => string.Equals(item.Kind, "warning", StringComparison.Ordinal)),
             recent.Count(item => string.Equals(item.Kind, "network", StringComparison.Ordinal)),
             recent.Count(item => string.Equals(item.Kind, "pause", StringComparison.Ordinal)),
             recent.Count(item => string.Equals(item.Kind, "complete", StringComparison.Ordinal)),
-            ledgerStartedAt.HasValue && ledgerStartedAt.Value <= cutoff);
+            ledgerWindowComplete && !observationGap,
+            observationGap,
+            observationGap ? Math.Max(0, lastObservationGapSeconds) : 0);
     }
 
     public static IReadOnlyList<ProductActivityV044> RecentActivities(int max = 30)
@@ -479,6 +571,7 @@ internal static class ProductExperienceV044
     {
         lock (Gate)
         {
+            RecordObservationGapLocked(startedAt, previousUnclean, previousHeartbeatAt);
             _state.LastSessionStartedAt = startedAt;
             if (previousUnclean)
             {
@@ -719,6 +812,21 @@ internal static class ProductExperienceV044
         File.WriteAllText(path, "{broken");
         var loaded = Load(path, out var recovered);
         return recovered && loaded.LastObservedCycleId == "backup-cycle" && loaded.Activities.Count == 1;
+    }
+
+    private static void RecordObservationGapLocked(
+        DateTimeOffset startedAt,
+        bool previousUnclean,
+        DateTimeOffset? previousHeartbeatAt)
+    {
+        var previousObservedAt = previousUnclean ? previousHeartbeatAt : _state.LastCleanExitAt;
+        if (!previousObservedAt.HasValue) return;
+
+        var gap = startedAt - previousObservedAt.Value;
+        if (gap <= ObservationGapThreshold || gap <= TimeSpan.Zero) return;
+
+        _state.LastObservationGapAt = startedAt;
+        _state.LastObservationGapSeconds = Math.Max(0, (long)gap.TotalSeconds);
     }
 
     private static void AddActivityLocked(DateTimeOffset at, string title, string detail, string tone)

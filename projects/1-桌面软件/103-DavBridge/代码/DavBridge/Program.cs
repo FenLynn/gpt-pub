@@ -93,6 +93,7 @@ internal static class Program
             var productSidecarBackupRecovery = ProductExperienceV044.ValidateBackupRecoveryForSelfTest(recoveryRoot);
             var operationalHealthLedger = ProductExperienceV044.ValidateOperationalHealthForSelfTest();
             var operationalHealthPersistence = ProductExperienceV044.ValidateOperationalLedgerPersistenceForSelfTest(recoveryRoot);
+            var operationalObservationContinuity = ProductExperienceV044.ValidateObservationContinuityForSelfTest();
             var runtimeSessionSelfTest = RuntimeSessionV046.ValidateForSelfTest(paths.LocalRoot, paths.TempRoot);
 
             using var host = new AppHost();
@@ -120,6 +121,7 @@ internal static class Program
                 productSidecarBackupRecovery,
                 operationalHealthLedger,
                 operationalHealthPersistence,
+                operationalObservationContinuity,
                 runtimeSessionSelfTest,
                 windowFourThreeMigration,
                 windowPlacementSelfTest,

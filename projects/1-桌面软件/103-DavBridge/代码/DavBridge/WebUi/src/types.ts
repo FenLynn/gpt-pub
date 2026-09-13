@@ -55,6 +55,8 @@ export interface OperationalHealthInfo {
   backlogCount: number
   verifiedCount: number
   windowComplete: boolean
+  observationGap: boolean
+  observationGapSeconds: number
 }
 
 export interface RecycleGroup {

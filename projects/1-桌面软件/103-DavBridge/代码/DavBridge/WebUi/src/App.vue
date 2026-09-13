@@ -36,7 +36,25 @@ const recentCompleteText = computed(() => recentComplete.value ? `${recentComple
 const recentPauseText = computed(() => recentPause.value ? `${recentPause.value.time} · ${recentPause.value.title}` : '暂无近期暂停记录')
 const recentWarningText = computed(() => recentWarning.value ? `${recentWarning.value.time} · ${recentWarning.value.title}` : '暂无近期异常')
 const cycleTrafficText = computed(() => `上传 ${quotaUsedText(snapshot.value.quota.uploadText)} · 下载 ${quotaUsedText(snapshot.value.quota.downloadText)}`)
-const healthWindowLabel = computed(() => snapshot.value.operationalHealth.windowComplete ? `近 ${snapshot.value.operationalHealth.hours} 小时` : '健康账本建立中')
+const healthWindowLabel = computed(() => {
+  const h=snapshot.value.operationalHealth
+  if(h.observationGap) return `近 ${h.hours} 小时观察不连续`
+  return h.windowComplete ? `近 ${h.hours} 小时` : '健康账本建立中'
+})
+const observationGapText = computed(() => {
+  const seconds=Math.max(0,snapshot.value.operationalHealth.observationGapSeconds)
+  if(seconds<=0) return ''
+  const minutes=Math.round(seconds/60)
+  if(minutes<60) return `检测到约 ${minutes} 分钟运行空窗`
+  const hours=seconds/3600
+  return `检测到约 ${hours>=10?Math.round(hours):hours.toFixed(1)} 小时运行空窗`
+})
+const healthWindowNote = computed(() => {
+  const h=snapshot.value.operationalHealth
+  if(h.observationGap) return `${observationGapText.value}，统计只代表 DavBridge 实际运行期间`
+  if(!h.windowComplete) return `健康账本累计满 ${h.hours} 小时后显示完整窗口`
+  return ''
+})
 const healthSummaryText = computed(() => {
   const h=snapshot.value.operationalHealth
   return `完成 ${h.completionCount} · 网络等待 ${h.networkWaitCount} · 警告 ${h.warningCount} · 暂停 ${h.pauseCount}`
@@ -548,12 +566,12 @@ onBeforeUnmount(()=>{
             <small>{{ recentWarning ? recentWarning.detail : '最近活动中没有警告事件' }}</small>
           </div>
         </section>
-        <section class="about-health-strip" :class="{warning:snapshot.operationalHealth.warningCount>0}" aria-label="近24小时运行健康">
+        <section class="about-health-strip" :class="{warning:snapshot.operationalHealth.warningCount>0||snapshot.operationalHealth.observationGap}" aria-label="运行健康">
           <div>
             <span>{{ healthWindowLabel }}</span>
             <strong>{{ healthSummaryText }}</strong>
           </div>
-          <small>{{ healthWorkloadText }}<template v-if="!snapshot.operationalHealth.windowComplete"> · 健康账本累计满 {{ snapshot.operationalHealth.hours }} 小时后显示完整窗口</template></small>
+          <small>{{ healthWorkloadText }}<template v-if="healthWindowNote"> · {{ healthWindowNote }}</template></small>
         </section>
       </article>
     </section>
