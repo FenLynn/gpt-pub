@@ -265,7 +265,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $core = Get-Content 'src/LocalSub.CoreWorker/Program.cs' -Raw
           $controller = Get-Content 'src/LocalSub/UI/LiveSessionController.cs' -Raw
-          $host = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
+          $hostSource = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
           $bridge = Get-Content 'src/LocalSub/WebUi/src/bridge.ts' -Raw
           $app = Get-Content 'src/LocalSub/WebUi/src/App.vue' -Raw
 
@@ -276,11 +276,11 @@ jobs:
             'subscribeLiveLevel',
             'levelHistoryTick = (levelHistoryTick + 1) % 3'
           )) {
-            if (($core + $controller + $host + $bridge + $app) -notmatch [regex]::Escape($required)) {
+            if (($core + $controller + $hostSource + $bridge + $app) -notmatch [regex]::Escape($required)) {
               throw "High-rate live level contract missing: $required"
             }
           }
-          $levelHandler = [regex]::Match($controller,'void OnLevelChanged\(float value\)(?s).*?\n    \}')
+          $levelHandler = [regex]::Match($controller,'(?s)void OnLevelChanged\(float value\).*?\n    \}')
           if (-not $levelHandler.Success) { throw 'LiveSessionController level handler not found.' }
           if ($levelHandler.Value -match 'NotifyChanged\(') {
             throw 'High-rate level samples must not trigger full app.snapshot updates.'
