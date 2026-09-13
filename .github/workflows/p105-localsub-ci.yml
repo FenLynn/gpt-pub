@@ -199,7 +199,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.15 workflow and visual contract
+      - name: Verify v0.1.16 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -211,6 +211,8 @@ jobs:
           foreach ($required in @(
             'class="sidebar"',
             'class="side-nav"',
+            'nav.slice(0,5)',
+            'nav.slice(5)',
             'class="brand-version"',
             "activePage === 'about'",
             'class="page about-page"',
@@ -241,7 +243,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.15 Web UI contract missing: $required"
+              throw "v0.1.16 Web UI contract missing: $required"
             }
           }
 
@@ -261,7 +263,7 @@ jobs:
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.15 style contract missing: $required"
+              throw "v0.1.16 style contract missing: $required"
             }
           }
 
@@ -272,7 +274,7 @@ jobs:
             '"home", "live", "batch", "models", "settings", "docs", "about"'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.15 4:3 host contract missing: $required"
+              throw "v0.1.16 4:3 host contract missing: $required"
             }
           }
 

@@ -44,8 +44,8 @@ const nav: Array<{ key: PageKey; label: string; path: string }> = [
   { key: "live", label: "实时字幕", path: "M3.5 12h3l1.7-4.4 3.2 8.8 2.8-6.3 1.7 1.9h4.6" },
   { key: "batch", label: "后台转写", path: "M6 3.5h8l4 4V20H6z M14 3.5V8h4 M9 12h6 M9 15.5h6" },
   { key: "models", label: "模型", path: "M5 7c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3z M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7 M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" },
-  { key: "settings", label: "设置", path: "M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5z M12 3.5v2 M12 18.5v2 M3.5 12h2 M18.5 12h2 M6 6l1.4 1.4 M16.6 16.6 18 18 M18 6l-1.4 1.4 M7.4 16.6 6 18" },
   { key: "docs", label: "文档", path: "M4.5 5.5c2.5-.7 5-.3 7.5 1.2v12c-2.5-1.5-5-1.9-7.5-1.2z M19.5 5.5c-2.5-.7-5-.3-7.5 1.2v12c2.5-1.5 5-1.9 7.5-1.2z" },
+  { key: "settings", label: "设置", path: "M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5z M12 3.5v2 M12 18.5v2 M3.5 12h2 M18.5 12h2 M6 6l1.4 1.4 M16.6 16.6 18 18 M18 6l-1.4 1.4 M7.4 16.6 6 18" },
   { key: "about", label: "关于", path: "M12 10.5v6 M12 7.2v.1 M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0z" }
 ];
 
@@ -519,11 +519,11 @@ onBeforeUnmount(() => {
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M9 19h7l4-8 8 26 5-13h6"></path></svg>
         </div>
-        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.15" }}</small></div>
+        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.16" }}</small></div>
       </div>
 
       <nav class="side-nav" aria-label="主导航">
-        <button v-for="item in nav.slice(0,4)" :key="item.key" type="button"
+        <button v-for="item in nav.slice(0,5)" :key="item.key" type="button"
           :class="{ active: activePage === item.key }" @click="navigate(item.key)">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="item.path"></path></svg>
           <span>{{ item.label }}</span>
@@ -533,7 +533,7 @@ onBeforeUnmount(() => {
       <div class="side-spacer"></div>
 
       <nav class="side-nav side-secondary" aria-label="辅助导航">
-        <button v-for="item in nav.slice(4)" :key="item.key" type="button"
+        <button v-for="item in nav.slice(5)" :key="item.key" type="button"
           :class="{ active: activePage === item.key }" @click="navigate(item.key)">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="item.path"></path></svg>
           <span>{{ item.label }}</span>
