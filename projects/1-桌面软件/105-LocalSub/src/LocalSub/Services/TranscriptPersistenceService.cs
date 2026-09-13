@@ -36,6 +36,7 @@ public static class TranscriptPersistenceService
 
     public static void ExportTxt(string path, IEnumerable<TranscriptItem> items, bool includeTime = true)
     {
+        EnsureParent(path);
         using var sw = new StreamWriter(path, false, new System.Text.UTF8Encoding(true));
         foreach (var item in items.OrderBy(x => x.Start))
         {
@@ -44,6 +45,62 @@ public static class TranscriptPersistenceService
         }
     }
 
+    public static void ExportSrt(string path, IEnumerable<TranscriptItem> items)
+    {
+        EnsureParent(path);
+        using var sw = new StreamWriter(path, false, new System.Text.UTF8Encoding(true));
+        var index = 1;
+        foreach (var item in items.OrderBy(x => x.Start))
+        {
+            sw.WriteLine(index++);
+            sw.WriteLine($"{FormatSrtTime(item.Start)} --> {FormatSrtTime(item.End)}");
+            sw.WriteLine(item.Text);
+            sw.WriteLine();
+        }
+    }
+
+    public static void ExportVtt(string path, IEnumerable<TranscriptItem> items)
+    {
+        EnsureParent(path);
+        using var sw = new StreamWriter(path, false, new System.Text.UTF8Encoding(true));
+        sw.WriteLine("WEBVTT");
+        sw.WriteLine();
+        foreach (var item in items.OrderBy(x => x.Start))
+        {
+            sw.WriteLine($"{FormatVttTime(item.Start)} --> {FormatVttTime(item.End)}");
+            sw.WriteLine(item.Text);
+            sw.WriteLine();
+        }
+    }
+
+    public static void ExportByExtension(string path, IEnumerable<TranscriptItem> items)
+    {
+        switch (Path.GetExtension(path).ToLowerInvariant())
+        {
+            case ".srt":
+                ExportSrt(path, items);
+                break;
+            case ".vtt":
+                ExportVtt(path, items);
+                break;
+            default:
+                ExportTxt(path, items, includeTime: true);
+                break;
+        }
+    }
+
+    static void EnsureParent(string path)
+    {
+        var parent = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
+    }
+
     static string FormatTime(TimeSpan t)
         => t.TotalHours >= 1 ? t.ToString(@"hh\:mm\:ss\.fff") : t.ToString(@"mm\:ss\.fff");
+
+    static string FormatSrtTime(TimeSpan t)
+        => $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00},{t.Milliseconds:000}";
+
+    static string FormatVttTime(TimeSpan t)
+        => $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}.{t.Milliseconds:000}";
 }
