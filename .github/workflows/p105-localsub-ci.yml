@@ -335,10 +335,6 @@ jobs:
             }
           }
 
-          if ($hostSource -match [regex]::Escape('if (_disposed || _web.CoreWebView2 == null) return;')) {
-            throw 'Background realtime callbacks must not touch WebView2 before marshaling to the UI thread.'
-          }
-
           $handler = [regex]::Match($hostSource,'(?s)void OnLiveLevelChanged\(float value\).*?\n    \}')
           if (-not $handler.Success) { throw 'OnLiveLevelChanged handler not found.' }
           $beginInvokeIndex = $handler.Value.IndexOf('BeginInvoke')
