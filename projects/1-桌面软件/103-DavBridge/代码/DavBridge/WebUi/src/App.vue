@@ -42,14 +42,18 @@ const sideStatusKind = computed(() => {
   if (/完成/.test(text)) return 'complete'
   return 'idle'
 })
+const safePausePending = computed(() =>
+  pendingPrimaryAction.value === 'pause' ||
+  /正在安全暂停|正在暂停/.test(`${snapshot.value.engineState} ${snapshot.value.routeStatus}`)
+)
 const sideStatusText = computed(() => {
-  if (pendingPrimaryAction.value === 'pause') return '正在暂停'
+  if (safePausePending.value) return '正在暂停'
   if (pendingPrimaryAction.value === 'resume') return '正在继续'
   if (pendingPrimaryAction.value === 'retry') return '正在重试'
   return snapshot.value.engineState
 })
 const sideStatusSecondary = computed(() => {
-  if (pendingPrimaryAction.value === 'pause') return '当前文件安全收尾后停止'
+  if (safePausePending.value) return '安全收尾中'
   if (pendingPrimaryAction.value === 'resume' || pendingPrimaryAction.value === 'retry') return snapshot.value.routeStatus || '正在恢复调度'
   if (snapshot.value.routeStatus && snapshot.value.routeStatus !== snapshot.value.engineState) return snapshot.value.routeStatus
   return snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : '查看最近活动'
@@ -60,15 +64,15 @@ const taskStatusKind = computed(() => {
   return sideStatusKind.value
 })
 const taskStatusText = computed(() => {
-  if (pendingPrimaryAction.value === 'pause') return '正在暂停'
+  if (safePausePending.value) return '正在安全暂停'
   if (pendingPrimaryAction.value === 'resume') return '正在继续'
   if (pendingPrimaryAction.value === 'retry') return '正在重试'
   return snapshot.value.engineState
 })
 const taskStatusSecondary = computed(() => {
+  if (safePausePending.value) return '当前文件完成安全收尾后停止'
   const route=snapshot.value.routeStatus?.trim()
   if (route && route !== snapshot.value.engineState) return route
-  if (snapshot.value.currentProgress !== null) return '当前任务执行中'
   return snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : ''
 })
 const primaryButtonDisabled = computed(() => busy.value || snapshot.value.primaryAction === 'none')
@@ -79,7 +83,7 @@ const primaryButtonTone = computed(() => {
   return 'neutral'
 })
 const primaryButtonLabel = computed(() => {
-  if (pendingPrimaryAction.value === 'pause') return '正在暂停'
+  if (safePausePending.value) return '暂停中'
   if (pendingPrimaryAction.value === 'resume') return '正在继续'
   if (pendingPrimaryAction.value === 'retry') return '正在重试'
   if (snapshot.value.primaryAction !== 'none') return snapshot.value.primaryLabel
@@ -105,6 +109,17 @@ const transferNextText = computed(() => {
     return '恢复后重新检查当前清单'
   }
   return snapshot.value.currentDetail || snapshot.value.routeStatus
+})
+const transferStateMeta = computed(() => {
+  const parts:string[] = []
+  if (snapshot.value.cycleId) parts.push(`Cycle ${snapshot.value.cycleId}`)
+  const route=snapshot.value.routeStatus?.trim()
+  if (route && route !== snapshot.value.currentTitle && route !== snapshot.value.engineState) parts.push(route)
+  return parts.join(' · ')
+})
+const transferActionStatus = computed(() => {
+  const route=snapshot.value.routeStatus?.trim()
+  return route && route !== snapshot.value.currentTitle && route !== snapshot.value.engineState ? route : ''
 })
 const resetLabel = computed(() => {
   const match = snapshot.value.quota.resetText.match(/(\d{4})-(\d{2})-(\d{2}).*?(\d{2}:\d{2})/)
@@ -393,6 +408,7 @@ onBeforeUnmount(()=>{
               <div><strong>{{ taskStatusText }}</strong><small v-if="taskStatusSecondary">{{ taskStatusSecondary }}</small></div>
             </div>
             <div v-if="snapshot.currentProgress!==null" class="task-progress task-progress-center">
+              <span class="task-progress-label">上传进度</span>
               <div class="progress-track"><i :style="{width:`${snapshot.currentProgress*100}%`}"></i></div>
               <strong>{{ Math.round(snapshot.currentProgress*100) }}%</strong>
             </div>
@@ -427,7 +443,7 @@ onBeforeUnmount(()=>{
         </div>
         <div class="transfer-head-state">
           <strong>{{ snapshot.currentTitle }}</strong>
-          <small><template v-if="snapshot.cycleId">Cycle {{ snapshot.cycleId }} · </template>{{ snapshot.routeStatus }}</small>
+          <small v-if="transferStateMeta">{{ transferStateMeta }}</small>
         </div>
       </section>
 
@@ -451,7 +467,7 @@ onBeforeUnmount(()=>{
 
       <section class="transfer-action">
         <div><span>{{ snapshot.primaryAction==='resume' ? '恢复后' : '当前动作' }}</span><strong>{{ transferNextText }}</strong></div>
-        <span>{{ snapshot.routeStatus }}</span>
+        <span v-if="transferActionStatus">{{ transferActionStatus }}</span>
       </section>
 
       <div class="coverage-footer"><span>总体镜像覆盖</span><div class="progress-track"><i :style="{width:`${coveragePercent}%`}"></i></div><strong>{{ snapshot.verified }} / {{ snapshot.total }} · {{ coveragePercent }}%</strong></div>
