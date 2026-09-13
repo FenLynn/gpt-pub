@@ -188,26 +188,32 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.18 完成后台、模型、设置、文档四页的全局一致性收口；v0.1.19 完成 Web 后台转写单文件闭环；v0.1.20 完成后台队列工作流，包括单项与整队顺序转写、队列移除、二次确认清空、总进度与取消、完成统计、每项 RTF、TXT 原生导出、关键词持久化和结构化记录自动保存。Vue 仍只表达状态和意图，真实文件路径与 Windows 对话框留在 Shell，媒体分析与 ASR 留在 Core。
+当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.18 完成后台、模型、设置、文档四页的全局一致性收口；v0.1.19 完成 Web 后台转写单文件闭环；v0.1.20 完成后台队列工作流；v0.1.21 完成全局 surface 色阶修正，解决用户指出的普通文字附近“白色背景 / 白纸贴片”感。
 
-meter 端到端链继续冻结在 v0.1.12 已验证实现。v0.1.18 至 v0.1.20 均未修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。
+v0.1.21 直接参考 DavBridge v0.4.26 已验证方案，但只移植视觉原则，不复制业务代码。当前 surface 规则：
 
-开始 v0.1.14 前，最新仓库 `main` 已通过正常 merge 同步进 `p105-exp`：
+- canvas：淡蓝灰 `#f1f7fb`，深一级 `#eaf3f8`；
+- quiet：`rgba(236,245,250,.72)`；
+- soft：`rgba(241,248,252,.82)`；
+- panel：`rgba(246,251,253,.90)`；
+- raised：`rgba(252,254,255,.96)`；
+- 普通信息 surface 使用 quiet / soft / panel，不再使用纯白或高透明白；
+- About 透明融入 canvas；
+- tooltip、输入、下拉、按钮等真实交互抬升面保留 raised；
+- WebView2 宿主 BackColor / DefaultBackgroundColor 同步为 `#f1f7fb`，避免页面边缘和加载瞬间露出旧色阶。
+
+本轮没有修改布局、字号、导航、batch、meter、Core、realtime、模型逻辑或 bridge 语义。meter 端到端链继续冻结在 v0.1.12 已验证实现。
+
+v0.1.21 最后一个经过完整自动门禁的代码 exact head：
 
 ```text
-sync merge: cff0be79420d4f26e8e19aba23112cfdbfede9ff
-```
-
-v0.1.20 最后一个经过完整自动门禁的代码 exact head：
-
-```text
-5d654ab7d5aa09c9764236d179fe8ad7103bb40a
+5015859d42bb4696fc7d6f0afe3887e5d313c0da
 ```
 
 P105 Windows CI：
 
 ```text
-run 34763244844
+run 34764703148
 success
 ```
 
@@ -215,32 +221,21 @@ Artifacts：
 
 ```text
 candidate
-ID 10319198369
+ID 10319869640
 
 WebUi preview
-ID 10318879324
+ID 10320750144
 ```
 
-v0.1.20 本轮完成：
-
-- 后台页从单文件演示闭环扩展为可日常使用的队列工作区。
-- 支持“当前”与“全部转写”。整队模式按队列顺序复用现有 Core `transcribe`，不在 Vue 增加第二套识别逻辑。
-- 支持单项移除与二次确认清空，操作只影响工作队列，不删除原始媒体。
-- 支持队列完成数、每项 segments 与 RTF、队列总进度、取消以及完成/失败状态。
-- 当前转写结果可通过 Shell 原生 `SaveFileDialog` 导出 TXT，Vue 不获得任意本地输出路径。
-- 结构化 JSON 继续自动保存到既有 Transcript persistence 路径。
-- batch 关键词在实际转写时持久化。保存前重新读取最新 AppSettings，仅更新 Keywords，避免覆盖模型页或其他页面刚保存的配置。
-- 1100×825 与 900×675 后台页最终截图已人工复核。最后一次人工复核发现标题完成统计重复，已在同一 v0.1.20 内修正后重新跑 exact-head 全套 CI。
-- portable candidate 已通过 manifest 与隐私边界门禁，不包含 WebView2 profile/cache、Cookies、History 或 Login Data。
-- Vue typecheck/build、v0.1.20 视觉契约、meter 保护门、Shell/Core publish、Core/model/realtime IPC、Core crash recovery、真实 WebView2 batch bridge、默认启动、静默托盘、legacy backup、旧后台工作区、Process Loopback、native ASR 与 package manifest 全部通过。
+最终人工复核覆盖主页、About、模型库、设置页以及 1100×825 / 900×675 预览。普通文字区与 canvas 的层级已经连续，白色只保留在真正需要抬升的交互面。portable candidate 已通过 manifest 与隐私边界检查，不包含 WebView2 profile/cache、Cookies、History 或 Login Data。
 
 下一步固定为：
 
 1. 不提升 stable，不动 main，不创建正式 Release。
-2. 用户在真实 Windows 上验证 v0.1.20，重点覆盖自己的长视频/音频、多个队列项、整队转写、运行中取消、TXT 导出、关键词持久化和长时间 GUI 响应性。
-3. 同时继续验证 realtime 长时间运行、PotPlayer 切片/seek、模型真实下载/修复/断点续传/删除等自动 CI 无法完全替代的机器条件。
-4. Web 后台达到实机信心后进入 Phase 3，逐步退役旧 WinForms 业务页；在明确达到退役里程碑前保留 `--legacy-ui` 备用入口。
-5. 任何 stable/main 提升与正式 Release 都必须再次获得用户对明确版本的当前授权。
+2. 用户实机验证 v0.1.21，重点确认高 DPI、真实 WebView2 字体抗锯齿环境下是否彻底消除“文字下方发白”观感。
+3. 同时继续验证 v0.1.20 已完成的长媒体、整队转写、取消、TXT 导出，以及 realtime 长时间运行和模型真实下载/修复。
+4. 实机信心足够后再进入 Phase 3，逐步退役旧 WinForms 业务页。
+5. stable/main 提升与正式 Release 仍需用户对明确版本再次授权。
 
 ## 9. Web UI 约束
 
