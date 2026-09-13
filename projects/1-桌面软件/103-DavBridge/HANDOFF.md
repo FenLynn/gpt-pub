@@ -26,7 +26,7 @@
 
 当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
 
-当前实验候选为 **v0.4.21**，只位于 `p103-exp`。
+当前实验候选为 **v0.4.22**，只位于 `p103-exp`。
 
 ## 3. 最新完整验证代码基线
 
@@ -36,18 +36,18 @@
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本：**v0.4.21**。
+当前实验版本：**v0.4.22**。
 
 最后完成完整 P103 CI 的代码 head：
 
 ```text
-dc4ba04ea82726903af3ffa5116ccaf903d94a2f
+fbfa4dad5a5146d7fd5047fe902ab93c3dc3cf02
 ```
 
 对应 CI：
 
 ```text
-run 34758434853
+run 34759458930
 scope          success
 core-smoke     success
 frontend       success
@@ -55,23 +55,23 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.21-win-x64`
+Windows candidate：`DavBridge-v0.4.22-win-x64`
 
-Artifact ID：`10318540523`
+Artifact ID：`10318775680`
 
-Web UI preview Artifact ID：`10318320920`
+Web UI preview Artifact ID：`10318447106`
 
 EXE：
 
 ```text
 2467421 bytes
-SHA256 55ed2936e887ddb4e2b9b844cc1f66a0f4c8e4f0e90bcefbfe2603793f7ab830
+SHA256 988729bed321bd20c3511b83a28a64320e5fd79a9eb003fa4cff287aff611cc8
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-f4f8523c4cae260f0b9ce3b0b750cb097cfb82efa37bf91e66595890ce7caa8c
+97dd28bcce4c6d85a2bac80a470baad84f74c38134cdacf8981b7b30814336ee
 ```
 
 该 run 同时验证：
@@ -86,7 +86,7 @@ f4f8523c4cae260f0b9ce3b0b750cb097cfb82efa37bf91e66595890ce7caa8c
 - Runtime 私人数据边界；
 - 既有 native-host self-test。
 
-本段之后若只有文档提交，仍以 `dc4ba04ea82726903af3ffa5116ccaf903d94a2f` 作为最后完整构建验证的 v0.4.21 代码基线。
+本段之后若只有文档提交，仍以 `fbfa4dad5a5146d7fd5047fe902ab93c3dc3cf02` 作为最后完整构建验证的 v0.4.22 代码基线。
 
 ## 4. 当前分支快照
 
@@ -97,9 +97,9 @@ main         73aefcf04570180bb9526a43cf805aff1e7673b3
 p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-`p103-exp` 已在 stable/main 之上进入 v0.4.21 开发。当前最后完整验证代码 head 为 `dc4ba04ea82726903af3ffa5116ccaf903d94a2f`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
+`p103-exp` 已在 stable/main 之上进入 v0.4.22 开发。当前最后完整验证代码 head 为 `fbfa4dad5a5146d7fd5047fe902ab93c3dc3cf02`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
 
-v0.4.21 当前未获得 stable/main 提升授权。
+v0.4.22 当前未获得 stable/main 提升授权。
 
 ## 5. 当前架构
 
@@ -478,19 +478,13 @@ e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 
 第七，本轮没有修改 `DavBridge.Core`、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
 
-### v0.4.21 About 信息架构简化
+### v0.4.22 About 布局纠正
 
-用户实机反馈 v0.4.20 About 页布局混乱、文字过多。检查确认 v0.4.20 新增的 `about-ops` 与健康摘要结构没有对应完整 CSS，导致部分内容按浏览器默认流式布局展示，同时最近完成、最近暂停、最近异常、健康统计与基础版本信息处于同一视觉层级。
+v0.4.21 对用户反馈理解错误，误删了原 About 中已经认可的逐行基础信息。v0.4.22 已恢复原有“版本 / 构建 / 运行环境 / 运行会话 / 初始化 / 引擎 / 界面”七行主体。
 
-v0.4.21 将 About 改为固定三层结构：
+v0.4.20 后新增的运行摘要信息也继续保留，但统一改为与原主体一致的左右两列单行布局，包括本周期、最近完成、最近暂停、最近异常与运行健康。解释性文字不再常驻堆叠，改为悬浮提示。
 
-- 顶部只保留应用标识、DavBridge 名称、简短副标题与版本号；
-- 中部只保留“运行 / 周期 / 健康”三个轻量摘要块；
-- 底部只保留弱化的构建信息与技术栈一行。
-
-最近完成、最近暂停和最近异常不再重复出现在 About，继续由“最近活动”抽屉承载。观察连续性、匿名健康账本与全部 C# 聚合语义保持不变。
-
-本轮只修改 Web UI 展示、版本号和文档，没有修改 DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、安全暂停、Reconciliation、回收站或 DELETE 安全链。
+本轮只调整 About 信息排版与版本号，不修改 DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、安全暂停、Reconciliation、回收站或 DELETE 安全链。
 
 ## 7. 核心冻结安全语义
 

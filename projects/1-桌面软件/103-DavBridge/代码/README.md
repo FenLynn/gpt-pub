@@ -6,29 +6,29 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.21**。
+当前 `p103-exp` 候选：**v0.4.22**。
 
-v0.4.21 最后完整验证代码 head：
+v0.4.22 最后完整验证代码 head：
 
 ```text
-dc4ba04ea82726903af3ffa5116ccaf903d94a2f
+fbfa4dad5a5146d7fd5047fe902ab93c3dc3cf02
 ```
 
-完整 P103 CI run：`34758434853`，结果 `success`。
+完整 P103 CI run：`34759458930`，结果 `success`。
 
-Windows candidate Artifact ID：`10318540523`。
+Windows candidate Artifact ID：`10318775680`。
 
 EXE：`2467421 bytes`。
 
-EXE SHA256：`55ed2936e887ddb4e2b9b844cc1f66a0f4c8e4f0e90bcefbfe2603793f7ab830`。
+EXE SHA256：`988729bed321bd20c3511b83a28a64320e5fd79a9eb003fa4cff287aff611cc8`。
 
-Artifact ZIP SHA256：`f4f8523c4cae260f0b9ce3b0b750cb097cfb82efa37bf91e66595890ce7caa8c`。
+Artifact ZIP SHA256：`97dd28bcce4c6d85a2bac80a470baad84f74c38134cdacf8981b7b30814336ee`。
 
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
 
-## v0.4.21 About 精简
+## v0.4.22 About 布局纠正
 
-用户实机反馈 v0.4.20 About 页布局混乱且文字过多。v0.4.21 删除 About 中重复的“最近完成 / 最近暂停 / 最近异常”信息，只保留运行、周期、健康三个摘要块，并补齐专用布局样式。最近活动仍由活动抽屉负责。
+恢复原 About 已认可的七行基础信息，不再删减。新增运行摘要继续保留，并统一成相同的左右两列单行格式，避免卡片化和解释文字堆叠。
 
 本轮不修改 DavBridge.Core 或任何迁移与安全语义。
 
@@ -250,7 +250,9 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.20 当前只在 `p103-exp`。
+v0.4.22 当前只在 `p103-exp`。当前 UI 断点是 About 布局纠正，原七行主体已恢复，新增摘要改为同构单行布局。
+
+以下 v0.4.20 观察连续性仍是当前底层健康语义：
 
 ### v0.4.20 运行观察连续性
 
