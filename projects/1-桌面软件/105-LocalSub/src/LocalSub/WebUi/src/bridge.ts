@@ -53,17 +53,22 @@ export interface LocalSubSnapshot {
   };
   batch: {
     queued: number;
+    completed: number;
     state: "idle" | "analyzing" | "transcribing" | "failed";
     status: string;
     selectedId: string;
     selectedName: string;
-    queue: Array<{ id: string; name: string; state: string; analyzed: boolean; transcribed: boolean }>;
+    queue: Array<{ id: string; name: string; state: string; analyzed: boolean; transcribed: boolean; segments: number; realTimeFactor: number | null }>;
     media: null | { durationMs: number; sampleRate: number; channels: number; decoderName: string; waveform: number[] };
     transcript: Array<{ startMs: number; endMs: number; text: string; keywords: string[] }>;
     result: null | { durationMs: number; processingMs: number; decoderName: string; realTimeFactor: number; segments: number };
     progress: { percent: number | null; stage: string; detail: string };
     canAnalyze: boolean;
     canTranscribe: boolean;
+    canTranscribeAll: boolean;
+    canRemove: boolean;
+    canClear: boolean;
+    canExport: boolean;
     canCancel: boolean;
     batchModelId: string;
     batchModelName: string;
@@ -211,7 +216,7 @@ const fallbackCatalog: ModelCatalogItem[] = [
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.19", activePage: "home", busy: false, lastError: null },
+  app: { productVersion: "0.1.20", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
@@ -232,13 +237,14 @@ const fallback: LocalSubSnapshot = {
   },
   batch: {
     queued: 2,
+    completed: 1,
     state: "idle",
-    status: "声音轨道已就绪",
+    status: "已完成 1 / 2",
     selectedId: "demo-1",
     selectedName: "lecture-demo.mp4",
     queue: [
-      { id: "demo-1", name: "lecture-demo.mp4", state: "波形就绪", analyzed: true, transcribed: false },
-      { id: "demo-2", name: "interview-demo.m4a", state: "等待分析", analyzed: false, transcribed: false }
+      { id: "demo-1", name: "lecture-demo.mp4", state: "完成 5 段", analyzed: true, transcribed: true, segments: 5, realTimeFactor: 0.316 },
+      { id: "demo-2", name: "interview-demo.m4a", state: "等待分析", analyzed: false, transcribed: false, segments: 0, realTimeFactor: null }
     ],
     media: {
       durationMs: 257000,
@@ -247,11 +253,21 @@ const fallback: LocalSubSnapshot = {
       decoderName: "FFmpeg",
       waveform: Array.from({ length: 180 }, (_, i) => Math.min(1, 0.08 + Math.abs(Math.sin(i * 0.27)) * (0.35 + 0.45 * Math.abs(Math.sin(i * 0.07)))))
     },
-    transcript: [],
-    result: null,
-    progress: { percent: 100, stage: "分析完成", detail: "lecture-demo.mp4" },
+    transcript: [
+      { startMs: 800, endMs: 5300, text: "这是后台转写工作区的结果预览。", keywords: [] },
+      { startMs: 6100, endMs: 11200, text: "媒体分析和识别任务由独立 Core 执行。", keywords: [] },
+      { startMs: 12500, endMs: 18400, text: "界面在长时间转写过程中仍然保持响应。", keywords: [] },
+      { startMs: 19500, endMs: 24700, text: "完成后的结构化记录会自动保存。", keywords: [] },
+      { startMs: 26000, endMs: 31500, text: "队列中的其他媒体可以继续顺序处理。", keywords: [] }
+    ],
+    result: { durationMs: 257000, processingMs: 81300, decoderName: "FFmpeg", realTimeFactor: 0.316, segments: 5 },
+    progress: { percent: 100, stage: "转写完成", detail: "已自动保存结构化记录" },
     canAnalyze: true,
     canTranscribe: true,
+    canTranscribeAll: true,
+    canRemove: true,
+    canClear: true,
+    canExport: true,
     canCancel: false,
     batchModelId: "sensevoice-small-int8",
     batchModelName: "SenseVoice Small INT8",
@@ -434,8 +450,13 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           queued: 1,
           selectedId: "demo-1",
           selectedName: "lecture-demo.mp4",
-          queue: [{ id: "demo-1", name: "lecture-demo.mp4", state: "等待分析", analyzed: false, transcribed: false }],
-          status: "已添加 1 个媒体文件"
+          completed: 0,
+          queue: [{ id: "demo-1", name: "lecture-demo.mp4", state: "等待分析", analyzed: false, transcribed: false, segments: 0, realTimeFactor: null }],
+          status: "已添加 1 个媒体文件",
+          transcript: [],
+          result: null,
+          media: null,
+          canExport: false
         };
       }
     }
@@ -460,6 +481,10 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           progress: { percent: 100, stage: "分析完成", detail: selected.name },
           canAnalyze: true,
           canTranscribe: true,
+          canTranscribeAll: true,
+          canRemove: true,
+          canClear: true,
+          canExport: true,
           canCancel: false,
           lastError: null
         };
@@ -478,7 +503,8 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
           status: "已完成 5 段转写",
           selectedId: selected.id,
           selectedName: selected.name,
-          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, transcribed: true, state: "完成 5 段" } : x),
+          completed: Math.max(fallbackBatch.completed, fallbackBatch.queue.some(x => x.id === selected.id && x.transcribed) ? fallbackBatch.completed : fallbackBatch.completed + 1),
+          queue: fallbackBatch.queue.map(x => x.id === selected.id ? { ...x, analyzed: true, transcribed: true, state: "完成 5 段", segments: 5, realTimeFactor: 0.316 } : x),
           transcript: [
             { startMs: 800, endMs: 5300, text: "这是后台转写工作区的结果预览。", keywords: words.filter(k => "这是后台转写工作区的结果预览。".includes(k)) },
             { startMs: 6100, endMs: 11200, text: "媒体分析和识别任务由独立 Core 执行。", keywords: words.filter(k => "媒体分析和识别任务由独立 Core 执行。".includes(k)) },
@@ -495,6 +521,84 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
         };
       }
     }
+    if (method === "batch.transcribeAll") {
+      fallbackBatch = {
+        ...fallbackBatch,
+        completed: fallbackBatch.queue.length,
+        state: "idle",
+        status: "队列已全部完成",
+        queue: fallbackBatch.queue.map((x, i) => ({
+          ...x,
+          analyzed: true,
+          transcribed: true,
+          state: i === 0 ? "完成 5 段" : "完成 4 段",
+          segments: i === 0 ? 5 : 4,
+          realTimeFactor: i === 0 ? 0.316 : 0.352
+        })),
+        progress: { percent: 100, stage: "队列转写完成", detail: "已自动保存全部结构化记录" },
+        canAnalyze: true,
+        canTranscribe: true,
+        canTranscribeAll: true,
+        canRemove: true,
+        canClear: true,
+        canExport: true,
+        canCancel: false,
+        lastError: null
+      };
+    }
+    if (method === "batch.remove") {
+      const id = typeof params.id === "string" ? params.id : fallbackBatch.selectedId;
+      const nextQueue = fallbackBatch.queue.filter(x => x.id !== id);
+      const nextSelected = nextQueue[0] ?? null;
+      fallbackBatch = {
+        ...fallbackBatch,
+        queued: nextQueue.length,
+        completed: nextQueue.filter(x => x.transcribed).length,
+        queue: nextQueue,
+        selectedId: nextSelected?.id ?? "",
+        selectedName: nextSelected?.name ?? "",
+        transcript: nextSelected?.transcribed ? fallbackBatch.transcript : [],
+        result: nextSelected?.transcribed ? fallbackBatch.result : null,
+        media: nextSelected?.analyzed ? fallbackBatch.media : null,
+        status: nextQueue.length ? "队列已更新" : "队列已清空",
+        canAnalyze: Boolean(nextSelected),
+        canTranscribe: Boolean(nextSelected),
+        canTranscribeAll: nextQueue.length > 0,
+        canRemove: Boolean(nextSelected),
+        canClear: nextQueue.length > 0,
+        canExport: Boolean(nextSelected?.transcribed)
+      };
+    }
+    if (method === "batch.clear") {
+      fallbackBatch = {
+        ...fallbackBatch,
+        queued: 0,
+        completed: 0,
+        selectedId: "",
+        selectedName: "",
+        queue: [],
+        media: null,
+        transcript: [],
+        result: null,
+        status: "队列已清空",
+        progress: { percent: null, stage: "待命", detail: "" },
+        canAnalyze: false,
+        canTranscribe: false,
+        canTranscribeAll: false,
+        canRemove: false,
+        canClear: false,
+        canExport: false,
+        canCancel: false
+      };
+    }
+    if (method === "batch.exportTxt") {
+      fallbackBatch = {
+        ...fallbackBatch,
+        status: fallbackBatch.result ? "TXT 已导出" : fallbackBatch.status,
+        progress: fallbackBatch.result ? { percent: 100, stage: "导出完成", detail: "lecture-demo.txt" } : fallbackBatch.progress
+      };
+    }
+
     if (method === "batch.cancel") {
       fallbackBatch = {
         ...fallbackBatch,
@@ -615,6 +719,10 @@ export async function invoke<T>(method: string, params: Record<string, unknown> 
       method === "batch.pickFiles" ||
       method === "batch.analyze" ||
       method === "batch.transcribe" ||
+      method === "batch.transcribeAll" ||
+      method === "batch.remove" ||
+      method === "batch.clear" ||
+      method === "batch.exportTxt" ||
       method === "batch.cancel"
     ) {
       const snapshot = fallbackSnapshot();
