@@ -30,61 +30,51 @@
 
 ## 3. 最新完整验证代码基线
 
-当前 v0.4.17 实验候选准确 head：
+当前稳定主线 v0.4.16：
 
 ```text
-958744f8703b567c634c0296530b21623d922381
+main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-对应完整 P103 CI：
+当前实验版本为 **v0.4.18**。
+
+v0.4.18 功能实现 head：
+
+```text
+e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
+```
+
+该实现包含：
+
+- About 页近 24 小时 operational-health strip；
+- OperationalHealthV048 聚合；
+- 当前 StrongVerified / backlog 摘要；
+- 40 条活动窗口完整性判断；
+- deterministic native self-test；
+- Windows CI 对 `operationalHealthSummary` 的强制断言；
+- 产品版本提升到 v0.4.18。
+
+由于本轮随后同步了 HANDOFF、工作记录、阶段记录、用户手册、UI 架构和代码 README，最终可交付基线必须以**最新 p103-exp head 的完整 P103 CI**为准，不能把上述功能实现 head 当作最终 Artifact head。
+
+上一版 v0.4.17 已验证基线仍可回查：
 
 ```text
 run 34751011145
-scope          success
-core-smoke     success
-frontend       success
-windows-build  success
-report-status  success
-```
-
-Windows candidate：`DavBridge-v0.4.17-win-x64`
-
-Artifact ID：`10315875953`
-
-EXE：
-
-```text
-2446941 bytes
-SHA256 9edb36d76db79d2d73f14eb7f4ade6a3fae7dc546f0054c0077adac15c6ffe0f
-```
-
-Artifact ZIP SHA256：
-
-```text
-ced0f55075168eb8cd669acdfd89a87876a5be17ce33760ab865368410654ada
-```
-
-CI 同时新增并检查 `about-1100x825.png`，用于关于页长期运行摘要的视觉验收。
-
-v0.4.16 稳定基线 commit：
-
-```text
-73aefcf04570180bb9526a43cf805aff1e7673b3
+code head 958744f8703b567c634c0296530b21623d922381
 ```
 
 ## 4. 当前分支快照
 
-当前实时关系：
+当前稳定分支关系：
 
 ```text
 main         73aefcf04570180bb9526a43cf805aff1e7673b3
 p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
-p103-exp     958744f8703b567c634c0296530b21623d922381
 ```
 
-`p103-exp` 相对 `main` ahead 6 / behind 0。v0.4.17 仍处于实验分支，没有授权提升 stable/main。
+`p103-exp` 已在 stable/main 之上进入 v0.4.18 开发。由于本文件本身也是最后 CI 触发提交的一部分，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的旧 exp SHA 当作永久事实。
 
-新对话必须重新查询三条分支实时 head 和祖先关系，不得把本快照视为永久事实。
+v0.4.18 当前未获得 stable/main 提升授权。
 
 ## 5. 当前架构
 
