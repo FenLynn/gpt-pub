@@ -197,7 +197,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.7 workflow and visual contract
+      - name: Verify v0.1.8 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -212,15 +212,18 @@ jobs:
             "activePage === 'home'",
             'class="home-status-list"',
             'class="instant-level"',
+            'class="live-task-status"',
+            'class="live-action-slot"',
             'class="level-wave"',
             'class="transcript-scroll"',
+            'subscribeLiveLevel',
             'class="model-table-shell"',
             'settings.update',
             '<Teleport to="body">',
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.7 Web UI contract missing: $required"
+              throw "v0.1.8 Web UI contract missing: $required"
             }
           }
 
@@ -229,10 +232,11 @@ jobs:
             '.workspace{min-width:0;min-height:0;position:relative;overflow:hidden}',
             'scrollbar-color:transparent transparent',
             'scrollbar-gutter:stable',
+            'grid-template-columns:auto minmax(130px,1fr) 54px 118px 126px',
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.7 style contract missing: $required"
+              throw "v0.1.8 style contract missing: $required"
             }
           }
 
@@ -242,13 +246,46 @@ jobs:
             'DefaultBackgroundColor = Color.FromArgb(244, 248, 251)'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.7 4:3 host contract missing: $required"
+              throw "v0.1.8 4:3 host contract missing: $required"
             }
           }
 
           if ($app -match 'class="top-tabs"') {
             throw 'Primary navigation must remain in the left sidebar, not move back to top tabs.'
           }
+
+          if ($app -match 'waveformMirrorPoints' -or $app -match 'class="mirror"') {
+            throw 'Realtime history must remain a single XY curve, not a mirrored waveform.'
+          }
+
+      - name: Verify lightweight high-rate live level channel
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $core = Get-Content 'src/LocalSub.CoreWorker/Program.cs' -Raw
+          $controller = Get-Content 'src/LocalSub/UI/LiveSessionController.cs' -Raw
+          $host = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
+          $bridge = Get-Content 'src/LocalSub/WebUi/src/bridge.ts' -Raw
+          $app = Get-Content 'src/LocalSub/WebUi/src/App.vue' -Raw
+
+          foreach ($required in @(
+            'now - previous < 33',
+            'internal event Action<float>? LevelChanged',
+            'PostEvent("live.level"',
+            'subscribeLiveLevel',
+            'levelHistoryTick = (levelHistoryTick + 1) % 3'
+          )) {
+            if (($core + $controller + $host + $bridge + $app) -notmatch [regex]::Escape($required)) {
+              throw "High-rate live level contract missing: $required"
+            }
+          }
+          $levelHandler = [regex]::Match($controller,'void OnLevelChanged\(float value\)(?s).*?\n    \}')
+          if (-not $levelHandler.Success) { throw 'LiveSessionController level handler not found.' }
+          if ($levelHandler.Value -match 'NotifyChanged\(') {
+            throw 'High-rate level samples must not trigger full app.snapshot updates.'
+          }
+
 
       - name: Verify persistent tray policy
         shell: pwsh
