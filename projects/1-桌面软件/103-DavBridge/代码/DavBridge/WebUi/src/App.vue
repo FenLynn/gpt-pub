@@ -28,6 +28,14 @@ const uploadFraction = computed(() => Math.min(1, snapshot.value.quota.uploadUse
 const downloadFraction = computed(() => Math.min(1, snapshot.value.quota.downloadUsed / Math.max(1, snapshot.value.quota.downloadMax)))
 const filteredRecycle = computed(() => snapshot.value.recycle.filter(group => recycleFilter.value === 'observing' ? group.disposition === 'observing' : recycleFilter.value === 'review' ? group.disposition === 'review' || group.disposition === 'blocked' : group.disposition === 'history'))
 const recycleCounts = computed(() => ({ observing: snapshot.value.recycle.filter(x => x.disposition === 'observing').length, review: snapshot.value.recycle.filter(x => x.disposition === 'review' || x.disposition === 'blocked').length, history: snapshot.value.recycle.filter(x => x.disposition === 'history').length }))
+const quotaUsedText = (text:string) => text.split('/')[0]?.trim() || text
+const recentComplete = computed(() => snapshot.value.activities.find(item => /清单完成|迁移完成|处理完成/.test(item.title)))
+const recentPause = computed(() => snapshot.value.activities.find(item => /暂停/.test(item.title)))
+const recentWarning = computed(() => snapshot.value.activities.find(item => item.tone === 'warning'))
+const recentCompleteText = computed(() => recentComplete.value ? `${recentComplete.value.time} · ${recentComplete.value.title}` : '暂无近期完成记录')
+const recentPauseText = computed(() => recentPause.value ? `${recentPause.value.time} · ${recentPause.value.title}` : '暂无近期暂停记录')
+const recentWarningText = computed(() => recentWarning.value ? `${recentWarning.value.time} · ${recentWarning.value.title}` : '暂无近期异常')
+const cycleTrafficText = computed(() => `上传 ${quotaUsedText(snapshot.value.quota.uploadText)} · 下载 ${quotaUsedText(snapshot.value.quota.downloadText)}`)
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
 const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
 const sideStatusKind = computed(() => {
@@ -509,6 +517,28 @@ onBeforeUnmount(()=>{
           <div><dt>引擎</dt><dd>.NET 8 + WebView2</dd></div>
           <div><dt>界面</dt><dd>Vue 3</dd></div>
         </dl>
+        <section class="about-ops" aria-label="长期运行摘要">
+          <div>
+            <span>本周期</span>
+            <strong>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : '未校准' }}</strong>
+            <small>{{ cycleTrafficText }}</small>
+          </div>
+          <div>
+            <span>最近完成</span>
+            <strong>{{ recentCompleteText }}</strong>
+            <small>来自最近活动，不记录文件名</small>
+          </div>
+          <div>
+            <span>最近暂停</span>
+            <strong>{{ recentPauseText }}</strong>
+            <small>用于确认长期后台运行中的人工介入</small>
+          </div>
+          <div :class="{warning:!!recentWarning}">
+            <span>最近异常</span>
+            <strong>{{ recentWarningText }}</strong>
+            <small>{{ recentWarning ? recentWarning.detail : '最近活动中没有警告事件' }}</small>
+          </div>
+        </section>
       </article>
     </section>
   </section>
