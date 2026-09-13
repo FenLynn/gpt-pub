@@ -197,7 +197,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.12 workflow and visual contract
+      - name: Verify v0.1.13 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -211,6 +211,8 @@ jobs:
             'class="side-nav"',
             "activePage === 'home'",
             'class="home-status-list"',
+            'class="live-task-card"',
+            'class="live-module-icon"',
             'class="instant-level"',
             'class="live-task-center"',
             'class="live-task-status"',
@@ -218,6 +220,8 @@ jobs:
             'class="wave-history-toggle"',
             'class="level-wave"',
             'class="transcript-scroll"',
+            'class="history-line"',
+            'transcriptLineClass',
             'subscribeLiveLevel',
             'reportLiveLevelAck',
             'class="model-table-shell"',
@@ -226,7 +230,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.12 Web UI contract missing: $required"
+              throw "v0.1.13 Web UI contract missing: $required"
             }
           }
 
@@ -235,11 +239,13 @@ jobs:
             '.workspace{min-width:0;min-height:0;position:relative;overflow:hidden}',
             'scrollbar-color:transparent transparent',
             'scrollbar-gutter:stable',
-            'grid-template-columns:minmax(220px,auto) minmax(280px,1fr) 126px',
+            'grid-template-columns:52px 168px minmax(240px,1fr) 116px',
+            'background:linear-gradient(180deg,#fff9dd 0%,#f9e9a9 100%)',
+            'background:linear-gradient(180deg,#effbf4 0%,#d8f1e4 100%)',
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.12 style contract missing: $required"
+              throw "v0.1.13 style contract missing: $required"
             }
           }
 
@@ -249,7 +255,7 @@ jobs:
             'DefaultBackgroundColor = Color.FromArgb(244, 248, 251)'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.12 4:3 host contract missing: $required"
+              throw "v0.1.13 4:3 host contract missing: $required"
             }
           }
 
@@ -259,6 +265,13 @@ jobs:
 
           if ($app -match 'waveformMirrorPoints' -or $app -match 'class="mirror"') {
             throw 'Realtime history must remain a single XY curve, not a mirrored waveform.'
+          }
+
+          if ($app -match 'class="live-topbar"') {
+            throw 'Realtime page must keep the unified DavBridge-style task card instead of the old fragmented top bar.'
+          }
+          if ($app -match 'line class="axis axis-y"') {
+            throw 'Realtime history should remain a compact single-curve history without the old y-axis scaffold.'
           }
 
       - name: Verify ASR-sample peak live meter and diagnostics
