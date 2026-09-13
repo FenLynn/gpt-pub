@@ -188,7 +188,9 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口，v0.1.15 完成左上版本身份与 DavBridge 风格 About 页，v0.1.16 将“文档”移入上方主导航并固定 DavBridge 式导航分组，v0.1.17 完成首页信息密度与层级精修。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.18 完成后台、模型、设置、文档四页的全局一致性收口；v0.1.19 完成 Web 后台转写单文件闭环；v0.1.20 完成后台队列工作流，包括单项与整队顺序转写、队列移除、二次确认清空、总进度与取消、完成统计、每项 RTF、TXT 原生导出、关键词持久化和结构化记录自动保存。Vue 仍只表达状态和意图，真实文件路径与 Windows 对话框留在 Shell，媒体分析与 ASR 留在 Core。
+
+meter 端到端链继续冻结在 v0.1.12 已验证实现。v0.1.18 至 v0.1.20 均未修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。
 
 开始 v0.1.14 前，最新仓库 `main` 已通过正常 merge 同步进 `p105-exp`：
 
@@ -196,16 +198,16 @@ Core 只拥有重计算与长任务
 sync merge: cff0be79420d4f26e8e19aba23112cfdbfede9ff
 ```
 
-最后一个经过完整自动门禁的代码 head：
+v0.1.20 最后一个经过完整自动门禁的代码 exact head：
 
 ```text
-0710dfc3d77a0be85c53ac698a5c4f1125e0ce95
+5d654ab7d5aa09c9764236d179fe8ad7103bb40a
 ```
 
 P105 Windows CI：
 
 ```text
-run 34760042555
+run 34763244844
 success
 ```
 
@@ -213,60 +215,32 @@ Artifacts：
 
 ```text
 candidate
-ID 10318463243
-downloaded artifact sha256: 1bdaebc2cf815b7b85f9aac7e3fa913425ee8fe4071c33175cf4f6695e09d613
-inner portable candidate sha256: 5c9bba2c4f8a2e88e2b40a4a4741bc1ef98db8cb85b6632bc6ed7b18b0215b94
+ID 10319198369
 
 WebUi preview
-ID 10318523166
-downloaded artifact sha256: 26f705b6214b4174dea94041ae8b008b4763254ed117d47e8689e294a9527b1b
+ID 10318879324
 ```
 
-v0.1.17 本轮完成：
+v0.1.20 本轮完成：
 
-- 首页主标题由重复的 `LocalSub` 改为“运行概览”，减少品牌重复。
-- 四条首页状态由被动撑满整页改为受控信息带，1100×825 与 900×675 都保持均衡密度。
-- “运行条件 / 实时配置 / 字幕显示 / 后台转写”说明进一步缩短，减少工程实现细节。
-- 底部“启动方式”保持锚定底部，形成稳定的顶部状态、中部条件、底部启动三层结构。
-- 第一版 v0.1.17 自动截图后发现 1100×825 中段过紧、底部空白偏大，已在同一版本内重新平衡高度后再次跑 exact-head CI。
-- 最终 1100×825 与 900×675 首页截图已人工复核。
-- 本轮不修改 meter、Core、realtime、模型和后台任务业务链。
-v0.1.16 本轮完成：
-
-- 将“文档”从左下辅助导航移入上方主导航，直接对齐 DavBridge 的分组逻辑。
-- 上方主导航固定为：主页、实时字幕、后台转写、模型、文档。
-- 左下辅助导航固定为：设置、关于。
-- 左上版本徽标同步为 v0.1.16。
-- 1100×825 首页预览已人工检查，文档入口确实位于上方主导航，设置与关于留在底部。
-- 本轮不修改 meter、Core、realtime、模型或后台任务逻辑。
-- CI 完整通过 Vue、视觉契约、meter/WebView2 ACK、Shell/Core publish、IPC、Process Loopback、native ASR 与 portable package。
-v0.1.14 本轮完成：
-
-- 首页从“五个同权重状态项”重构为控制中心。顶部固定为模块图标与名称、独立业务状态、固定动作槽。
-- 首页唯一主操作保持固定尺寸和位置。可开始时为绿色，实时运行时停止为黄色，不可操作时为灰色；启动中和停止中不改变布局。
-- 首页下方收敛为四条信息：运行条件、实时配置、字幕显示、后台转写。它们只解释状态与默认配置，不重复承担操作。
-- Core 停止但可按需启动时不再被首页误判为故障；真正 Core failure、模型缺失和 PotPlayer 等待分别给出明确语义。
-- 1100×825 与 900×675 首页自动预览均已人工检查，无明显溢出、按钮换行或左下状态截断。
-- 浏览器 preview mock 的产品版本同步为 0.1.14，自动截图与真实程序集身份保持一致。
-- CI 打包前明确移除真实 WebView2 smoke 生成的 `publish/WebView2` 用户数据目录，并新增 Cookies、History、Login Data 等 runtime/private data 的拒绝门禁。
-- 最终 portable candidate 已确认不含 WebView2 profile/cache；manifest 仅覆盖正式分发文件。
-- Vue typecheck/build、视觉契约、meter 保护门、WebView2 ACK、Shell/Core publish、Core/model/realtime IPC、Core crash recovery、默认启动、静默托盘、legacy backup、后台旧工作区、Process Loopback、native ASR 与 package manifest 均通过。
-
-v0.1.13 继续保留：
-
-- realtime 顶部固定为模块图标、名称、中央状态与实时电平、固定动作槽。
-- 音源和识别模型一行一个，30 秒历史保持单条低高度 XY 曲线。
-- 字幕区为实时页视觉主体，当前字幕最突出，近期历史逐级降低对比度。
-- meter 仍来自与 ASR 同一块 PCM 的 instantaneous peak，并通过独立 `live.level` 与浏览器 ACK 闭环。
+- 后台页从单文件演示闭环扩展为可日常使用的队列工作区。
+- 支持“当前”与“全部转写”。整队模式按队列顺序复用现有 Core `transcribe`，不在 Vue 增加第二套识别逻辑。
+- 支持单项移除与二次确认清空，操作只影响工作队列，不删除原始媒体。
+- 支持队列完成数、每项 segments 与 RTF、队列总进度、取消以及完成/失败状态。
+- 当前转写结果可通过 Shell 原生 `SaveFileDialog` 导出 TXT，Vue 不获得任意本地输出路径。
+- 结构化 JSON 继续自动保存到既有 Transcript persistence 路径。
+- batch 关键词在实际转写时持久化。保存前重新读取最新 AppSettings，仅更新 Keywords，避免覆盖模型页或其他页面刚保存的配置。
+- 1100×825 与 900×675 后台页最终截图已人工复核。最后一次人工复核发现标题完成统计重复，已在同一 v0.1.20 内修正后重新跑 exact-head 全套 CI。
+- portable candidate 已通过 manifest 与隐私边界门禁，不包含 WebView2 profile/cache、Cookies、History 或 Login Data。
+- Vue typecheck/build、v0.1.20 视觉契约、meter 保护门、Shell/Core publish、Core/model/realtime IPC、Core crash recovery、真实 WebView2 batch bridge、默认启动、静默托盘、legacy backup、旧后台工作区、Process Loopback、native ASR 与 package manifest 全部通过。
 
 下一步固定为：
 
 1. 不提升 stable，不动 main，不创建正式 Release。
-2. 用户实机验证 v0.1.17 当前 UI、v0.1.13 realtime 页面以及当前双 EXE 候选包，尤其确认首页密度、真实运行态按钮语义与长期 realtime 体验。
-3. 下一轮优先做全局页面一致性精修，统一后台、模型、设置、文档页的标题、间距、操作层级和空状态；首页与 realtime 不再做结构性反复。
-4. 全局视觉收口后进入 Web 后台转写工作区，直接复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
-5. Web 后台达到必要功能覆盖后，再进入 Phase 3 删除旧 WinForms 业务页。
-6. 模型真实网络下载、代理、断点续传、取消、大模型解压与真实目录删除仍保留为用户机器验证项。
+2. 用户在真实 Windows 上验证 v0.1.20，重点覆盖自己的长视频/音频、多个队列项、整队转写、运行中取消、TXT 导出、关键词持久化和长时间 GUI 响应性。
+3. 同时继续验证 realtime 长时间运行、PotPlayer 切片/seek、模型真实下载/修复/断点续传/删除等自动 CI 无法完全替代的机器条件。
+4. Web 后台达到实机信心后进入 Phase 3，逐步退役旧 WinForms 业务页；在明确达到退役里程碑前保留 `--legacy-ui` 备用入口。
+5. 任何 stable/main 提升与正式 Release 都必须再次获得用户对明确版本的当前授权。
 
 ## 9. Web UI 约束
 
