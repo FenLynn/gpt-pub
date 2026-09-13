@@ -27,12 +27,14 @@ internal static class BatchQueueStateStore
     static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
     internal static string StatePath => Path.Combine(PortablePaths.DataDir, "Batch", "queue-state.json");
 
-    internal static PersistedBatchQueueState Load()
+    internal static PersistedBatchQueueState Load() => LoadFrom(StatePath);
+
+    internal static PersistedBatchQueueState LoadFrom(string path)
     {
         try
         {
-            if (!File.Exists(StatePath)) return new(1, null, []);
-            return JsonSerializer.Deserialize<PersistedBatchQueueState>(File.ReadAllText(StatePath), Options)
+            if (!File.Exists(path)) return new(1, null, []);
+            return JsonSerializer.Deserialize<PersistedBatchQueueState>(File.ReadAllText(path), Options)
                 ?? new(1, null, []);
         }
         catch
@@ -42,6 +44,9 @@ internal static class BatchQueueStateStore
     }
 
     internal static void Save(string? selectedId, IEnumerable<(string Id, string Path, string Name, string State, BatchTranscriptionResult? Result)> queue)
+        => SaveTo(StatePath, selectedId, queue);
+
+    internal static void SaveTo(string path, string? selectedId, IEnumerable<(string Id, string Path, string Name, string State, BatchTranscriptionResult? Result)> queue)
     {
         var payload = new PersistedBatchQueueState(
             1,
@@ -61,11 +66,11 @@ internal static class BatchQueueStateStore
                         item.Text,
                         item.Keywords.ToArray())).ToArray()))).ToArray());
 
-        var parent = Path.GetDirectoryName(StatePath)!;
+        var parent = Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(parent);
-        var temp = StatePath + ".tmp";
+        var temp = path + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(payload, Options));
-        File.Move(temp, StatePath, true);
+        File.Move(temp, path, true);
     }
 
     internal static BatchTranscriptionResult ToResult(string filePath, PersistedBatchResult result)
