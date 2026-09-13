@@ -188,7 +188,7 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口，v0.1.15 完成左上版本身份与 DavBridge 风格 About 页。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口，v0.1.15 完成左上版本身份与 DavBridge 风格 About 页，v0.1.16 将“文档”移入上方主导航并固定 DavBridge 式导航分组。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 开始 v0.1.14 前，最新仓库 `main` 已通过正常 merge 同步进 `p105-exp`：
 
@@ -199,13 +199,13 @@ sync merge: cff0be79420d4f26e8e19aba23112cfdbfede9ff
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-d3098fc460e244e4adae6c02830547edcab595d2
+072366a2b675c84b8fd559647f3a18ababdd9ede
 ```
 
 P105 Windows CI：
 
 ```text
-run 34757394392
+run 34759409132
 success
 ```
 
@@ -213,15 +213,24 @@ Artifacts：
 
 ```text
 candidate
-ID 10316973391
-downloaded artifact sha256:0e4eedf05a8a583bea5f17887aa98065c327f67ab78b67e3db5a8b2544467348
-inner portable candidate sha256:88c4009662fb53a39a4d9d29ef585b16f5addeb129fc36c16a4d6d126deb475e
+ID 10318661783
+downloaded artifact sha256: aaeac550345de12a2a6f8d48b574e722dafbf17a6ff97157efc5e80aac8c7231
+inner portable candidate sha256: b89bd1b29b90e11b6bab70f5d48b32b115676d113f16a2f738c8be26891d6578
 
 WebUi preview
-ID 10317137976
-downloaded artifact sha256:38abd47581bc0c68cea3363d34c26a12046b18e7f6c018fdb47debb77bd7786c
+ID 10318716704
+downloaded artifact sha256: fa7dd424c4121113802ce1778920919203dd3f3245e750d9d883084b8bc2c11a
 ```
 
+v0.1.16 本轮完成：
+
+- 将“文档”从左下辅助导航移入上方主导航，直接对齐 DavBridge 的分组逻辑。
+- 上方主导航固定为：主页、实时字幕、后台转写、模型、文档。
+- 左下辅助导航固定为：设置、关于。
+- 左上版本徽标同步为 v0.1.16。
+- 1100×825 首页预览已人工检查，文档入口确实位于上方主导航，设置与关于留在底部。
+- 本轮不修改 meter、Core、realtime、模型或后台任务逻辑。
+- CI 完整通过 Vue、视觉契约、meter/WebView2 ACK、Shell/Core publish、IPC、Process Loopback、native ASR 与 portable package。
 v0.1.14 本轮完成：
 
 - 首页从“五个同权重状态项”重构为控制中心。顶部固定为模块图标与名称、独立业务状态、固定动作槽。
@@ -244,7 +253,7 @@ v0.1.13 继续保留：
 下一步固定为：
 
 1. 不提升 stable，不动 main，不创建正式 Release。
-2. 用户实机验证 v0.1.14 首页、v0.1.13 realtime 页面以及当前双 EXE 候选包，尤其确认真实运行态下的按钮语义、视觉密度与长期 realtime 体验。
+2. 用户实机验证 v0.1.16 当前 UI、v0.1.13 realtime 页面以及当前双 EXE 候选包，尤其确认导航分组、真实运行态按钮语义、视觉密度与长期 realtime 体验。
 3. 下一开发轮次进入 Web 后台转写工作区，直接复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
 4. Web 后台达到必要功能覆盖后，再进入 Phase 3 删除旧 WinForms 业务页。
 5. 模型真实网络下载、代理、断点续传、取消、大模型解压与真实目录删除仍保留为用户机器验证项。
@@ -289,7 +298,7 @@ Vue 不得：
 
 当前开发候选版本：
 
-- Development Version：`0.1.15`
+- Development Version：`0.1.16`
 - 当前正式 Release / RELEASE.md：`0.1.1`
 - 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 
