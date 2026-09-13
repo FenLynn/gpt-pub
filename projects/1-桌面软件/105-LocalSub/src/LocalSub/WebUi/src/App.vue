@@ -916,7 +916,7 @@ onBeforeUnmount(() => {
             <div class="page-feature batch-feature"><svg viewBox="0 0 48 48"><path d="M12 7h16l8 8v26H12z M28 7v9h8 M18 24h12 M18 30h12"></path></svg></div>
             <div class="page-title">
               <div class="title-line"><h2>后台转写</h2><span class="info-dot" data-tip="文件选择由 Windows Shell 完成，媒体分析与离线识别在独立 Core 中执行。">i</span></div>
-              <span>{{ snapshot.batch.queued ? snapshot.batch.completed + " / " + snapshot.batch.queued + " 已完成 · " + snapshot.batch.status : snapshot.batch.status }}</span>
+              <span>{{ batchBusy ? snapshot.batch.status : (snapshot.batch.queued ? snapshot.batch.completed + " / " + snapshot.batch.queued + " 已完成" : snapshot.batch.status) }}</span>
             </div>
             <button class="secondary-button icon-action" type="button" :disabled="batchBusy || batchRequestBusy" @click="pickBatchFiles">
               <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>添加媒体
