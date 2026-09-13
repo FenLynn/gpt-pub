@@ -26,7 +26,7 @@
 
 当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
 
-当前实验候选为 **v0.4.17**，只位于 `p103-exp`。
+当前实验候选为 **v0.4.18**，只位于 `p103-exp`。
 
 ## 3. 最新完整验证代码基线
 
@@ -391,6 +391,35 @@ Core Smoke 在既有 14 项基础上新增 5 项：
 
 第七，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
 
+
+### v0.4.18 近 24 小时运行健康
+
+第一，本轮延续 v0.4.17 的 About 页长期运行方向，但不新增图表，也不新增高频持久化采样。统计直接使用既有 `product-experience.json` 通用活动记录和当前安全 snapshot。
+
+第二，ProductExperience 新增 `OperationalHealthV048`，默认统计近 24 小时：
+- warning 活动数量；
+- 实际进入“等待网络”的次数；
+- 真正完成“迁移已暂停”的次数；
+- “当前清单完成”的次数。
+
+第三，About 页新增一条紧凑健康状态条，显示“完成 / 网络等待 / 警告 / 暂停”，并同时显示当前 StrongVerified 数量与当前 backlog。没有折线图、柱状图或大卡片。
+
+第四，活动 sidecar 最多保留 40 条事件。统计会判断近 24 小时窗口是否完整：如果已保留的最早事件早于 24 小时边界，或活动总数不足上限，则可以认为 24 小时窗口完整；否则 UI 会明确写“近期活动窗口 / 活动窗口可能已截断”，避免把不完整样本误称完整 24 小时统计。
+
+第五，新增 deterministic native self-test `ValidateOperationalHealthForSelfTest()`，固定构造 24 小时内外的暂停、网络等待、warning 与完成事件，验证统计边界。P103 Windows CI 强制要求 `operationalHealthSummary=true`。
+
+第六，统计不写入任何新的真实文件名、路径、URL、凭据或 SHA，也不参与迁移正确性判定。
+
+第七，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、暂停控制、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
+
+v0.4.18 功能实现 head：
+
+```text
+e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
+```
+
+最终验证必须以本轮文档同步后的最新 `p103-exp` head 为准，不能只复用中间 run。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -439,23 +468,31 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-v0.4.16 已完成稳定准入：
+稳定主线仍为 v0.4.16：
 
 ```text
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-正式 GitHub Release 仍为 v0.4.0，没有 v0.4.16 tag 或 Release。
+当前实验版本为 v0.4.18，只位于 `p103-exp`。
 
-当前 v0.4.17 仅位于 `p103-exp`，准确代码 head `958744f8703b567c634c0296530b21623d922381`，完整 CI run `34751011145` 已全绿。下一步只需用户实机查看“关于”页长期运行摘要是否有价值、是否保持简洁：
+v0.4.18 功能实现 head：
 
-1. 本周期只显示 Cycle 和当前上传 / 下载已用量；
-2. 最近完成、最近暂停、最近异常均来自通用活动，不出现文件名或私人路径；
-3. 没有异常时明确显示“暂无近期异常”；
-4. 关于页不能变成复杂仪表盘；
-5. v0.4.16 已冻结的首页、暂停、迁移和安全链不得变化。
+```text
+e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
+```
 
-v0.4.17 未获得 stable/main 提升授权，也没有 Release 授权。
+本轮增加 About 页近 24 小时健康摘要、OperationalHealth DTO 与 deterministic native self-test。最终完整 CI 必须使用动态文档同步后的最新 `p103-exp` head。
+
+下一步用户实机重点只看：
+
+1. About 页健康条仍然轻量，不像监控仪表盘；
+2. “完成 / 网络等待 / 警告 / 暂停”读起来是否直观；
+3. StrongVerified 与待处理数量是否有长期运行价值；
+4. 活动记录不足以覆盖完整 24 小时时，必须明确提示窗口可能截断；
+5. v0.4.16 冻结的首页、迁移和暂停逻辑不得变化。
+
+v0.4.18 未获得 stable/main 提升授权，也没有 Release 授权。
 
 ## 10. 新对话固定读取顺序
 
