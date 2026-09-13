@@ -200,7 +200,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.21 workflow and visual contract
+      - name: Verify v0.1.22 productization and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -209,6 +209,11 @@ jobs:
           $style = Get-Content 'src/LocalSub/WebUi/src/style.css' -Raw
           $hostSource = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
           $batchSource = Get-Content 'src/LocalSub/UI/BatchWebController.cs' -Raw
+          $queueState = Get-Content 'src/LocalSub/UI/BatchQueueStateStore.cs' -Raw
+          $persistence = Get-Content 'src/LocalSub/Services/TranscriptPersistenceService.cs' -Raw
+          $settingsSource = Get-Content 'src/LocalSub/Models/AppSettings.cs' -Raw
+          $modelSource = Get-Content 'src/LocalSub/UI/ModelCatalogController.cs' -Raw
+          $liveSource = Get-Content 'src/LocalSub/UI/LiveSessionController.cs' -Raw
 
           foreach ($required in @(
             'class="sidebar"',
@@ -242,10 +247,18 @@ jobs:
             'subscribeLiveLevel',
             'reportLiveLevelAck',
             'class="model-table-shell"',
+            'model.repair',
+            '校验/修复',
+            '继续修复',
             'batch.pickFiles',
             'batch.analyze',
             'batch.transcribe',
             'batch.transcribeAll',
+            'batch.retry',
+            'batch.pickOutputDirectory',
+            'batch.export',
+            'batch.exportAll',
+            'batch.openOutputDirectory',
             'batch.remove',
             'batch.clear',
             'batch.exportTxt',
@@ -255,7 +268,11 @@ jobs:
             'class="batch-queue-summary"',
             'class="batch-queue-item"',
             'class="batch-wave"',
-            '导出 TXT',
+            '输出目录',
+            '全部导出',
+            'SRT',
+            'VTT',
+            'TXT',
             'class="batch-transcript-scroll"',
             'class="page settings-page"',
             'class="page docs-page"',
@@ -264,7 +281,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.21 Web UI contract missing: $required"
+              throw "v0.1.22 Web UI contract missing: $required"
             }
           }
 
@@ -304,10 +321,20 @@ jobs:
             'background:var(--ls-canvas)!important',
             'background:var(--ls-surface-quiet)!important',
             'background:transparent!important',
-            'background:var(--ls-surface-raised)'
+            'background:var(--ls-surface-raised)',
+            'v0.1.22 product-density pass',
+            'body{font-size:15px}',
+            '.side-nav button{height:50px',
+            '.page-title h2,',
+            '.home-row-copy h3{font-size:17.5px}',
+            '.batch-output-summary{',
+            '.batch-export-all',
+            '.install-state.repair',
+            '.docs-list>div{min-height:72px',
+            '.about-card h2{font-size:29px}'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.21 style contract missing: $required"
+              throw "v0.1.22 style contract missing: $required"
             }
           }
 
@@ -316,6 +343,13 @@ jobs:
             '_core.AnalyzeAsync',
             '_core.TranscribeAsync',
             'TranscribeAllAsync',
+            'RetryAsync',
+            'RestorePersistentState',
+            'PersistState',
+            'ExportAllCompleted',
+            'canRetry',
+            'canExportAll',
+            'ResolvedBatchOutputDirectory',
             'internal void Remove',
             'internal void Clear',
             'GetResult',
@@ -327,21 +361,88 @@ jobs:
             'Downsample'
           )) {
             if ($batchSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.21 batch controller contract missing: $required"
+              throw "v0.1.22 batch controller contract missing: $required"
             }
           }
 
           foreach ($required in @(
+            '"model.repair"',
             '"batch.transcribeAll"',
-            '"batch.remove"',
+            '"batch.retry"',
+            '"batch.pickOutputDirectory"',
+            '"batch.export"',
+            '"batch.exportAll"',
+            '"batch.openOutputDirectory"',
+            '"batch.remove"'
             '"batch.clear"',
             '"batch.exportTxt"',
             'PersistBatchKeywords',
             'SaveFileDialog',
-            'TranscriptPersistenceService.ExportTxt'
+            'TranscriptPersistenceService.ExportTxt',
+            'TranscriptPersistenceService.ExportByExtension',
+            'EnsureBatchOutputWritable',
+            'AvailableFreeSpace < 64L * 1024 * 1024',
+            'FolderBrowserDialog',
+            'explorer.exe'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.21 batch host contract missing: $required"
+              throw "v0.1.22 batch host contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'queue-state.json',
+            'LoadFrom(string path)',
+            'SaveTo(string path',
+            'File.Move(temp, path, true)',
+            'PersistedBatchResult',
+            'ToResult'
+          )) {
+            if ($queueState -notmatch [regex]::Escape($required)) {
+              throw "v0.1.22 queue persistence contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'ExportSrt',
+            'ExportVtt',
+            'ExportByExtension',
+            'FormatSrtTime',
+            'FormatVttTime'
+          )) {
+            if ($persistence -notmatch [regex]::Escape($required)) {
+              throw "v0.1.22 subtitle export contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'BatchOutputDirectory',
+            'ResolvedBatchOutputDirectory'
+          )) {
+            if ($settingsSource -notmatch [regex]::Escape($required)) {
+              throw "v0.1.22 output settings contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'RepairAsync',
+            'HasLocalData',
+            'NeedsRepair',
+            'kind == "repair"'
+          )) {
+            if ($modelSource -notmatch [regex]::Escape($required)) {
+              throw "v0.1.22 model repair contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'Interval = 60',
+            'if (minimized)',
+            '_overlay.Hide()',
+            'FollowOverlayToPotPlayer()'
+          )) {
+            if ($liveSource -notmatch [regex]::Escape($required)) {
+              throw "v0.1.22 realtime player-follow contract missing: $required"
             }
           }
 
@@ -352,7 +453,7 @@ jobs:
             '"home", "live", "batch", "models", "settings", "docs", "about"'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.21 4:3 host contract missing: $required"
+              throw "v0.1.22 4:3 host contract missing: $required"
             }
           }
 
@@ -597,6 +698,24 @@ jobs:
           if (Get-ChildItem publish -Filter 'onnxruntime*.dll' -File -ErrorAction SilentlyContinue) { throw 'ONNX Runtime must not be bundled' }
           if (Test-Path publish/sherpa-onnx-c-api.dll) { throw 'sherpa native runtime must not be bundled' }
 
+      - name: Smoke test batch persistence and subtitle exports
+        shell: pwsh
+        working-directory: projects/1-桌面软件/105-LocalSub
+        run: |
+          $ErrorActionPreference='Stop'
+          $env:LOCALSUB_PRODUCTIZATION_SMOKE = '1'
+          Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath (Resolve-Path 'publish/LocalSub.exe') -WorkingDirectory (Resolve-Path 'publish') -PassThru -Wait
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path publish/LocalSub-crash.log) { Get-Content publish/LocalSub-crash.log }
+            throw "Productization smoke test failed. ExitCode=$($p.ExitCode)"
+          }
+          if (Test-Path publish/LocalSub-crash.log) {
+            Get-Content publish/LocalSub-crash.log
+            throw 'Productization smoke test wrote a crash log.'
+          }
+          Remove-Item Env:LOCALSUB_PRODUCTIZATION_SMOKE -ErrorAction SilentlyContinue
+
       - name: Smoke test LocalSub.Core IPC
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
@@ -793,7 +912,7 @@ jobs:
             throw 'WebUi host did not complete a real app.getSnapshot bridge round trip.'
           }
           $ready = Get-Content publish/Logs/webui-smoke-ready.txt -Raw
-          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'bridge=live.stop' -or $ready -notmatch 'bridge=live.start' -or $ready -notmatch 'bridge=model.list' -or $ready -notmatch 'bridge=model.select' -or $ready -notmatch 'bridge=model.download' -or $ready -notmatch 'bridge=model.cancel' -or $ready -notmatch 'bridge=model.delete' -or $ready -notmatch 'bridge=batch.pickFiles' -or $ready -notmatch 'bridge=batch.analyze' -or $ready -notmatch 'bridge=batch.transcribe' -or $ready -notmatch 'bridge=batch.transcribeAll' -or $ready -notmatch 'bridge=batch.remove' -or $ready -notmatch 'bridge=batch.clear' -or $ready -notmatch 'bridge=batch.exportTxt' -or $ready -notmatch 'bridge=batch.cancel' -or $ready -notmatch 'bridge=diagnostics.liveLevelAck' -or $ready -notmatch 'webview2=ready') {
+          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'bridge=live.stop' -or $ready -notmatch 'bridge=live.start' -or $ready -notmatch 'bridge=model.list' -or $ready -notmatch 'bridge=model.select' -or $ready -notmatch 'bridge=model.download' -or $ready -notmatch 'bridge=model.repair' -or $ready -notmatch 'bridge=model.cancel' -or $ready -notmatch 'bridge=model.delete' -or $ready -notmatch 'bridge=batch.pickFiles' -or $ready -notmatch 'bridge=batch.analyze' -or $ready -notmatch 'bridge=batch.transcribe' -or $ready -notmatch 'bridge=batch.transcribeAll' -or $ready -notmatch 'bridge=batch.retry' -or $ready -notmatch 'bridge=batch.pickOutputDirectory' -or $ready -notmatch 'bridge=batch.export' -or $ready -notmatch 'bridge=batch.exportAll' -or $ready -notmatch 'bridge=batch.openOutputDirectory' -or $ready -notmatch 'bridge=batch.remove' -or $ready -notmatch 'bridge=batch.clear' -or $ready -notmatch 'bridge=batch.exportTxt' -or $ready -notmatch 'bridge=batch.cancel' -or $ready -notmatch 'bridge=diagnostics.liveLevelAck' -or $ready -notmatch 'webview2=ready') {
             throw "Unexpected WebUi smoke marker: $ready"
           }
           if (-not (Test-Path publish/Logs/meter-browser.log)) {
