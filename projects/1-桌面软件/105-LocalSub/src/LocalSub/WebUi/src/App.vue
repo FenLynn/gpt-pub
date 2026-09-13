@@ -679,6 +679,7 @@ onMounted(async () => {
       applySnapshot(await invoke<LocalSubSnapshot>("batch.retry", { id: "__ci_batch__", keywords: [] }));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.pickOutputDirectory"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.export", { id: "__ci_batch__", format: "srt" }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.exportTxt", { id: "__ci_batch__" }));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.exportAll"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.openOutputDirectory"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.remove", { id: "__ci_batch__" }));
