@@ -1800,3 +1800,106 @@ html,body,#app,
   .home-row-result{min-width:50px;font-size:10px}
   .home-startup-row{min-height:48px}
 }
+
+
+/* v0.1.15 visible product identity and DavBridge-style About page */
+.brand-version{
+  display:inline-flex!important;
+  width:max-content;
+  margin-top:6px!important;
+  padding:2px 7px;
+  border:1px solid #cfe4f3;
+  border-radius:999px;
+  color:#147fc7!important;
+  background:#eaf5fd;
+  font-size:10px!important;
+  line-height:1.35;
+  font-weight:720;
+  letter-spacing:.15px;
+}
+
+.about-page{
+  display:grid;
+  place-items:center;
+  padding-top:26px;
+  padding-bottom:26px;
+}
+.about-card{
+  width:min(470px,92%);
+  padding:30px 30px 26px;
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:rgba(255,255,255,.92);
+  text-align:center;
+  box-shadow:0 16px 42px rgba(42,70,98,.07);
+}
+.about-logo{
+  width:64px;
+  height:64px;
+  margin:0 auto 14px;
+  display:grid;
+  place-items:center;
+  border-radius:19px;
+  color:#1688e8;
+  background:linear-gradient(145deg,#e8f5ff,#eef9ff);
+  box-shadow:inset 0 0 0 1px rgba(17,134,205,.05);
+}
+.about-logo svg{
+  width:38px;
+  height:38px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:3;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.about-card h2{
+  margin:0;
+  color:#111d38;
+  font-size:25px;
+  line-height:1.1;
+  font-weight:730;
+  letter-spacing:-.45px;
+}
+.about-card>p{
+  margin:7px 0 22px;
+  color:#76889a;
+  font-size:12.5px;
+  line-height:1.55;
+}
+.about-card dl{
+  margin:0;
+  border-top:1px solid var(--line-soft);
+}
+.about-card dl div{
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  padding:9px 2px;
+  border-bottom:1px solid var(--line-soft);
+}
+.about-card dt{
+  color:#8290a0;
+  font-size:11.5px;
+  white-space:nowrap;
+}
+.about-card dd{
+  min-width:0;
+  margin:0;
+  overflow:hidden;
+  color:#354c64;
+  font-size:11.5px;
+  font-weight:650;
+  text-align:right;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+@media(max-width:999px){
+  .brand-version{font-size:9px!important;padding:2px 6px}
+  .about-card{width:min(440px,94%);padding:26px 26px 22px}
+  .about-logo{width:58px;height:58px;border-radius:17px}
+  .about-logo svg{width:34px;height:34px}
+  .about-card h2{font-size:23px}
+}

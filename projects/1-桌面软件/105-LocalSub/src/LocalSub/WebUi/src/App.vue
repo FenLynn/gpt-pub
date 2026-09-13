@@ -45,7 +45,8 @@ const nav: Array<{ key: PageKey; label: string; path: string }> = [
   { key: "batch", label: "后台转写", path: "M6 3.5h8l4 4V20H6z M14 3.5V8h4 M9 12h6 M9 15.5h6" },
   { key: "models", label: "模型", path: "M5 7c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3z M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7 M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" },
   { key: "settings", label: "设置", path: "M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5z M12 3.5v2 M12 18.5v2 M3.5 12h2 M18.5 12h2 M6 6l1.4 1.4 M16.6 16.6 18 18 M18 6l-1.4 1.4 M7.4 16.6 6 18" },
-  { key: "docs", label: "文档", path: "M4.5 5.5c2.5-.7 5-.3 7.5 1.2v12c-2.5-1.5-5-1.9-7.5-1.2z M19.5 5.5c-2.5-.7-5-.3-7.5 1.2v12c2.5-1.5 5-1.9 7.5-1.2z" }
+  { key: "docs", label: "文档", path: "M4.5 5.5c2.5-.7 5-.3 7.5 1.2v12c-2.5-1.5-5-1.9-7.5-1.2z M19.5 5.5c-2.5-.7-5-.3-7.5 1.2v12c2.5-1.5 5-1.9 7.5-1.2z" },
+  { key: "about", label: "关于", path: "M12 10.5v6 M12 7.2v.1 M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0z" }
 ];
 
 const activePage = computed(() => snapshot.value?.app.activePage ?? "home");
@@ -160,7 +161,7 @@ const sideStatusSecondary = computed(() => {
     return snapshot.value.system.autoStartStatus || "自动启动";
   if (!liveModelReady.value) return "实时模型未就绪";
   if (!inputReady.value) return "等待音源";
-  return "v" + (snapshot.value?.app.productVersion ?? "0.1.14");
+  return coreOperational.value ? "本地识别" : "等待就绪";
 });
 const sideStatusTip = computed(() => {
   const core = coreReady.value ? "Core 已连接" : coreOperational.value ? "Core 按需启动" : "Core 需要处理";
@@ -518,7 +519,7 @@ onBeforeUnmount(() => {
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M9 19h7l4-8 8 26 5-13h6"></path></svg>
         </div>
-        <div class="brand-copy"><h1>LocalSub</h1><small>本地字幕</small></div>
+        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.15" }}</small></div>
       </div>
 
       <nav class="side-nav" aria-label="主导航">
@@ -876,13 +877,31 @@ onBeforeUnmount(() => {
           </section>
         </section>
 
-        <section v-else class="page docs-page">
+        <section v-else-if="activePage === 'docs'" class="page docs-page">
           <header class="page-head simple-head"><div class="page-feature docs-feature"><svg viewBox="0 0 48 48"><path d="M7 11c6-2 11-.8 17 2.8V40c-6-3.6-11-4.8-17-2.8z M41 11c-6-2-11-.8-17 2.8V40c6-3.6 11-4.8 17-2.8z"></path></svg></div><div class="page-title"><h2>文档</h2><span>LocalSub v{{ snapshot.app.productVersion }}</span></div></header>
           <section class="docs-list">
             <div><b>01</b><span><strong>主页</strong><p>状态、自检和实时字幕主开关都集中在主页。</p></span></div>
             <div><b>02</b><span><strong>零触感运行</strong><p>可设置开机启动、静默托盘和自动实时字幕。PotPlayer 未打开时保持等待，不静默切换音源。</p></span></div>
             <div><b>03</b><span><strong>运行边界</strong><p>Vue 只显示状态和发送白名单命令。Shell 管理 Windows 原生能力，Core 负责音频、ASR、媒体分析和模型重任务。</p></span></div>
           </section>
+        </section>
+
+        <section v-else-if="activePage === 'about'" class="page about-page">
+          <article class="about-card">
+            <div class="about-logo" aria-hidden="true">
+              <svg viewBox="0 0 48 48"><path d="M9 19h7l4-8 8 26 5-13h6"></path></svg>
+            </div>
+            <h2>LocalSub</h2>
+            <p>本地运行的实时字幕与媒体转写工具。</p>
+            <dl>
+              <div><dt>版本</dt><dd>v{{ snapshot.app.productVersion }}</dd></div>
+              <div><dt>运行环境</dt><dd>Windows x64 · .NET 8</dd></div>
+              <div><dt>应用架构</dt><dd>LocalSub.exe + LocalSub.Core.exe</dd></div>
+              <div><dt>识别核心</dt><dd>{{ coreStateText }} · generation {{ snapshot.core.generation }}</dd></div>
+              <div><dt>识别方式</dt><dd>本地离线 ASR</dd></div>
+              <div><dt>界面</dt><dd>Vue 3 + WebView2</dd></div>
+            </dl>
+          </article>
         </section>
       </template>
     </section>

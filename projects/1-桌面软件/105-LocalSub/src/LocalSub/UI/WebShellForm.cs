@@ -72,7 +72,7 @@ public sealed class WebShellForm : Form
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
     {
-        "home", "live", "batch", "models", "settings", "docs"
+        "home", "live", "batch", "models", "settings", "docs", "about"
     };
 
     readonly WebView2 _web = new()

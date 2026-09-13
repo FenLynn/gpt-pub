@@ -1,4 +1,4 @@
-export type PageKey = "home" | "live" | "batch" | "models" | "settings" | "docs";
+export type PageKey = "home" | "live" | "batch" | "models" | "settings" | "docs" | "about";
 
 export interface LiveModelOption {
   id: string;
@@ -197,7 +197,7 @@ const fallbackCatalog: ModelCatalogItem[] = [
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.14", activePage: "home", busy: false, lastError: null },
+  app: { productVersion: "0.1.15", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
@@ -270,7 +270,7 @@ const fallback: LocalSubSnapshot = {
 
 const previewPage = new URLSearchParams(window.location.search).get("page");
 let fallbackPage: PageKey =
-  previewPage === "home" || previewPage === "live" || previewPage === "batch" || previewPage === "models" || previewPage === "settings" || previewPage === "docs"
+  previewPage === "home" || previewPage === "live" || previewPage === "batch" || previewPage === "models" || previewPage === "settings" || previewPage === "docs" || previewPage === "about"
     ? previewPage
     : "home";
 let fallbackLive = { ...fallback.live };
