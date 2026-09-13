@@ -24,7 +24,7 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前实验候选的产品版本为 v0.4.14，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前实验候选的产品版本为 v0.4.15，位于 `p103-exp`。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
 
 ## 3. 最新完整验证代码基线
 
@@ -37,7 +37,7 @@
 对应 P103 CI：
 
 ```text
-run 34726420112
+run 34736655980
 scope          success
 core-smoke     success
 frontend       success
@@ -45,21 +45,21 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.14-win-x64`
+Windows candidate：`DavBridge-v0.4.15-win-x64`
 
-Artifact ID：`10307014716`
+Artifact ID：`10311605517`
 
 EXE：
 
 ```text
-2438749 bytes
-SHA256 d9aed38fb757579c6a8b9c6ab84e5536d680c15b5ca0982d2cd93b43a27e092a
+2442845 bytes
+SHA256 aa72ee8ec14c4fbf6fe8bcd117a3fc041864233af1bbaaec9ccf92b8a843569e
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-8edbc1b8bf7e3573807ce69509a9c56d48b7298fff985bf19b559966f74dc89d
+908b1bef4a812b5329565303672da14b051ad152a823c5df077ad2b102630770
 ```
 
 CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
@@ -74,7 +74,7 @@ CI 已再次通过 Vue typecheck、production build、浏览器视觉预览、Co
 main         042329ede97b09cd375ebcf7c55d7245fc56b933
 p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
 validated p103-exp code head
-378bb37707a3a5f1d685427edb77294d916acdcc
+92f3a05a8b351aab357250899c7de0ecb82ce760
 ```
 
 本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
@@ -329,6 +329,25 @@ v0.4.7 的实现存在两个明确问题，已在 v0.4.8 纠正。
 
 第七，准确代码 head `378bb37707a3a5f1d685427edb77294d916acdcc` 已通过 P103 CI run `34726420112` 的 scope、frontend、core-smoke、windows-build 和 report-status。浏览器预览同时复核 1100×825 与 870×525，固定操作槽位没有破坏既有布局。
 
+
+### v0.4.15 状态语义与活动记录收口
+
+第一，当前任务进度条现在只表示“上传进度”。WebUiHost 不再把源端下载或目标端强校验下载的 I/O 进度复用到该条进度条，只记录目标端 WebDAV Upload 的 BytesProcessed / TotalBytes。上传完成后即使仍在进行目标端重新读取和 StrongVerified，100% 也只表示上传字节已经完成，不表示整个安全事务结束。
+
+第二，任务状态和上传进度进一步分离。安全暂停时中央状态统一显示“正在安全暂停”，说明文字为“当前文件完成安全收尾后停止”；上传进度若存在则单独标记为“上传进度”。按钮文案缩短为“暂停中”，避免固定按钮槽位换行。
+
+第三，左下角全局状态在安全暂停期间只保留“正在暂停 / 安全收尾中”，不再重复长句。暂停命令也不再额外弹出重复 Toast，状态本身即为反馈。
+
+第四，转移页去掉暂停状态重复显示。若 currentTitle、EngineState 和 routeStatus 表达同一状态，右上角只显示 Cycle，底部也不重复同一条状态。
+
+第五，最近活动加入展示层语义合并。短时间内完全相同的活动会去重；“迁移已继续 + 迁移运行中”合并为一条有意义的恢复事件；安全暂停完成后，“迁移已暂停”会覆盖同一轮较早的“正在安全暂停”。持久原始安全账本不受影响。
+
+第六，最近活动滚动条改为默认透明，仅在鼠标进入活动列表时显示轻量滚动条，避免 Win32 风格粗滚动条长期占据右侧。
+
+第七，原生流量校准等模态操作打开时，Web UI 会进入轻度降饱和和半透明遮罩状态，后台主动作不再在视觉上像仍可点击。原生 DateTimePicker / MonthCalendar 仍保留 Windows 原生行为，不改变校准数据语义。
+
+第八，本轮没有修改 DavBridge.Core、WebDAV 传输、StrongVerified、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -377,15 +396,16 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-用户下一步应实机验证 v0.4.14，重点只看重复暂停与按钮状态：
+用户下一步应实机验证 v0.4.15，重点检查：
 
-1. 运行时右侧“暂停”固定为黄色可点击按钮，鼠标为手型。
-2. 第一次点击暂停后立即变为固定位置的灰色“正在暂停”，当前文件安全收尾后变为绿色“继续”。
-3. 点击“继续”后 UI 必须很快恢复为黄色“暂停”，不得因为上一条继续命令仍 busy 而长时间点不动。
-4. 在继续后的源端对账、调度准备、下载、上传和强校验阶段，只要真实 pass 仍在运行，暂停都应保持可用。
-5. 再次点击暂停必须重复执行同样的安全暂停流程，不能只在第一次有效。
-6. 等待额度、等待网络、已完成等没有动作时，按钮仍占据原位置但为灰色不可操作，布局不变化。
-7. 其余已经确认的整体箭头、阶段、流量、回收站、文档、tooltip 和设置不得变化。
+1. 当前任务进度条必须明确标为“上传进度”。上传到 100% 后，如果仍在强校验或安全暂停收尾，中央状态继续正常显示，不得把 100% 解释成整个任务已完成。
+2. 安全暂停期间中央只显示“正在安全暂停 / 当前文件完成安全收尾后停止”，按钮固定显示灰色“暂停中”，不换行，不额外弹重复 Toast。
+3. 左下角只显示“正在暂停 / 安全收尾中”，信息不应和中央区域机械重复。
+4. 转移页暂停时右上角应为“已暂停 / Cycle xxxxxx”，不能再重复“Cycle xxxxxx · 已暂停”；底部也不重复同一状态。
+5. 最近活动不应再连续刷出“迁移已继续 + 迁移运行中”或“正在安全暂停 + 迁移已暂停”两条同义转换。
+6. 最近活动滚动条平时隐藏，鼠标进入列表时才轻量显示。
+7. 流量校准原生模态打开时，后方 Web UI 应轻度失焦降权，尤其绿色“继续”等动作不再显得像仍可点击。
+8. v0.4.14 的重复暂停能力、按钮颜色与固定槽位，以及既有首页、箭头、阶段、流量、回收站、文档、设置均不得回退。
 
 用户实机确认之前，不提升 `p103-stable`，不修改 `main`，不创建正式标签或 Release。
 
