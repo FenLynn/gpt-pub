@@ -1568,3 +1568,235 @@ html,body,#app,
   .level-wave{height:56px}
   .transcript-scroll p.current{font-size:14px}
 }
+
+
+/* v0.1.14 home control center
+   Reuses the mature DavBridge hierarchy: module identity, independent state, fixed action slot,
+   borderless operating rows, and stable green/yellow/gray action semantics. */
+.home-page{
+  padding-top:30px;
+  padding-bottom:18px;
+}
+.home-control-head{
+  min-height:98px;
+  display:grid;
+  grid-template-columns:52px 168px minmax(220px,1fr) 126px;
+  align-items:center;
+  gap:18px;
+  flex:none;
+  padding:0 0 16px;
+  border-bottom:1px solid rgba(202,217,228,.72);
+}
+.home-module-icon{
+  width:52px;height:52px;
+  display:grid;place-items:center;
+  border-radius:16px;
+  color:#1688e8;
+  background:linear-gradient(145deg,#eef8ff,#dfefff);
+}
+.home-module-icon.ready{color:#1e9a68;background:linear-gradient(145deg,#eefbf5,#def5e9)}
+.home-module-icon svg{
+  width:29px;height:29px;
+  fill:none;stroke:currentColor;stroke-width:2.35;stroke-linecap:round;stroke-linejoin:round
+}
+.home-control-copy{min-width:0}
+.home-control-copy h2{
+  margin:0;color:#111d38;font-size:24px;line-height:1.05;font-weight:730;letter-spacing:-.5px
+}
+.home-control-copy small{
+  display:block;margin-top:6px;color:#8394a5;font-size:11px;white-space:nowrap
+}
+.home-control-state{
+  min-width:0;
+  display:grid;
+  grid-template-columns:31px minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+}
+.home-state-icon{
+  width:31px;height:31px;
+  display:grid;place-items:center;
+  border-radius:10px;
+  color:#647b90;background:#edf3f7
+}
+.home-state-icon svg{
+  width:18px;height:18px;
+  fill:none;stroke:currentColor;stroke-width:2.05;stroke-linecap:round;stroke-linejoin:round
+}
+.home-state-icon svg path[d^="M8 5.5"]{fill:currentColor;stroke:none}
+.home-control-state>div{min-width:0}
+.home-control-state strong{
+  display:block;overflow:hidden;color:#41576c;font-size:13px;line-height:1.2;font-weight:700;text-overflow:ellipsis;white-space:nowrap
+}
+.home-control-state small{
+  display:block;overflow:hidden;margin-top:4px;color:#8998a6;font-size:10px;line-height:1.25;text-overflow:ellipsis;white-space:nowrap
+}
+.home-control-state.state-run .home-state-icon,
+.home-control-state.state-complete .home-state-icon{color:#21875f;background:#e8f7ef}
+.home-control-state.state-run strong,
+.home-control-state.state-complete strong{color:#2b7659}
+.home-control-state.state-wait .home-state-icon{color:#a9781d;background:#fff5de}
+.home-control-state.state-warning .home-state-icon{color:#bc6641;background:#fff0e8}
+.home-control-state.state-warning strong{color:#8f5542}
+
+.home-action-slot{
+  width:126px;min-width:126px;
+  display:flex;align-items:center;justify-content:flex-end
+}
+.home-primary-action{
+  width:126px;min-width:126px;height:42px;min-height:42px;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:0 10px;
+  border:1px solid #c7d4de;border-radius:11px;
+  color:#728190;background:linear-gradient(180deg,#f5f7f9 0%,#e8edf1 100%);
+  box-shadow:0 3px 8px rgba(70,91,108,.04);
+  font-size:11.5px;font-weight:700;
+  transition:background .15s,border-color .15s,color .15s,box-shadow .15s,transform .08s
+}
+.home-primary-action.start{
+  color:#246f52;
+  border-color:#a9d8bd;
+  background:linear-gradient(180deg,#effbf4 0%,#d8f1e4 100%);
+  box-shadow:0 5px 14px rgba(45,137,94,.10),inset 0 1px 0 rgba(255,255,255,.72)
+}
+.home-primary-action.stop{
+  color:#7d5f18;
+  border-color:#ddc36d;
+  background:linear-gradient(180deg,#fff9dd 0%,#f9e9a9 100%);
+  box-shadow:0 5px 14px rgba(152,119,33,.10),inset 0 1px 0 rgba(255,255,255,.72)
+}
+.home-primary-action:not(:disabled):hover{filter:brightness(.985)}
+.home-primary-action:not(:disabled):active{transform:translateY(1px);box-shadow:none}
+.home-primary-action:disabled,
+.home-primary-action.disabled{
+  opacity:1;
+  cursor:default;
+  color:#8b969f;
+  border-color:#d7dfe5;
+  background:linear-gradient(180deg,#f4f6f8 0%,#e9edf0 100%);
+  box-shadow:none
+}
+.home-primary-action svg{
+  width:16px;height:16px;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round
+}
+.home-primary-action svg rect{fill:currentColor;stroke:none}
+
+.home-status-list{
+  flex:1;min-height:0;
+  display:grid;
+  grid-template-rows:repeat(4,minmax(72px,1fr));
+  padding:0;
+}
+.home-control-row{
+  min-width:0;
+  display:grid;
+  grid-template-columns:52px minmax(190px,1fr) minmax(190px,auto) 74px;
+  align-items:center;
+  gap:20px;
+  padding:0 4px;
+  border-bottom:1px solid rgba(202,217,228,.62);
+  background:transparent!important
+}
+.home-row-feature{
+  width:48px;height:48px;
+  display:grid;place-items:center;
+  border-radius:15px;
+  color:#1688e8;background:linear-gradient(145deg,#eef8ff,#dfefff)
+}
+.home-row-feature.readiness{color:#1e9a68;background:linear-gradient(145deg,#eefbf5,#def5e9)}
+.home-row-feature.overlay{color:#6d59cf;background:linear-gradient(145deg,#f3efff,#e8e2ff)}
+.home-row-feature.batch{color:#4b7aa0;background:linear-gradient(145deg,#eef4f8,#e2edf4)}
+.home-row-feature svg{
+  width:25px;height:25px;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round
+}
+.home-row-copy{min-width:0}
+.home-row-copy h3{
+  margin:0;color:#111d38;font-size:16px;line-height:1.15;font-weight:720;letter-spacing:-.2px
+}
+.home-row-copy small{
+  display:block;overflow:hidden;margin-top:6px;color:#7d8fa1;font-size:11px;line-height:1.25;text-overflow:ellipsis;white-space:nowrap
+}
+.home-readiness{
+  display:flex;align-items:center;justify-content:flex-end;gap:9px;
+  min-width:0
+}
+.home-readiness span{
+  height:28px;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:0 9px;
+  border:1px solid #dce4ea;border-radius:999px;
+  color:#7d8b98;background:rgba(248,250,252,.74);
+  font-size:10px;font-weight:650;white-space:nowrap
+}
+.home-readiness i{
+  width:7px;height:7px;border-radius:50%;
+  background:#aeb9c1;box-shadow:0 0 0 3px rgba(174,185,193,.10)
+}
+.home-readiness span.ok{color:#33755b;border-color:#d5e8de;background:#f4fbf7}
+.home-readiness span.ok i{background:#22a06b;box-shadow:0 0 0 3px rgba(34,160,107,.09)}
+.home-row-meta{
+  min-width:0;
+  display:flex;flex-direction:column;align-items:flex-end
+}
+.home-row-meta strong{
+  max-width:100%;overflow:hidden;color:#4c6277;font-size:11.5px;font-weight:680;text-overflow:ellipsis;white-space:nowrap
+}
+.home-row-meta small{
+  max-width:100%;overflow:hidden;margin-top:4px;color:#8b99a7;font-size:9.7px;text-overflow:ellipsis;white-space:nowrap
+}
+.home-row-result{
+  justify-self:end;
+  min-width:58px;
+  color:#8a97a3;font-size:11px;font-weight:700;text-align:right;white-space:nowrap
+}
+.home-row-result.ok{color:#278061}
+
+.home-startup-row{
+  min-height:54px;
+  grid-template-columns:34px 92px minmax(0,1fr) auto;
+  margin-top:0;
+  border-top:0;
+}
+.home-startup-row button{
+  min-width:44px;height:30px;padding:0 8px;
+  border:0;border-radius:8px;
+  color:#1688d4;background:transparent
+}
+.home-startup-row button:hover{background:#eaf4fb}
+
+@media(max-width:999px){
+  .home-page{padding-top:20px;padding-bottom:14px}
+  .home-control-head{
+    min-height:84px;
+    grid-template-columns:44px 122px minmax(160px,1fr) 116px;
+    gap:12px;
+    padding-bottom:12px;
+  }
+  .home-module-icon{width:44px;height:44px;border-radius:14px}
+  .home-module-icon svg{width:25px;height:25px}
+  .home-control-copy h2{font-size:21px}
+  .home-control-copy small{font-size:9.5px}
+  .home-control-state{grid-template-columns:27px minmax(0,1fr);gap:8px}
+  .home-state-icon{width:27px;height:27px}
+  .home-control-state strong{font-size:11.5px}
+  .home-control-state small{font-size:8.8px}
+  .home-action-slot,.home-primary-action{width:116px;min-width:116px}
+  .home-primary-action{height:39px;min-height:39px;font-size:10.5px}
+  .home-status-list{grid-template-rows:repeat(4,minmax(62px,1fr))}
+  .home-control-row{
+    grid-template-columns:44px minmax(145px,1fr) minmax(150px,auto) 62px;
+    gap:12px;
+  }
+  .home-row-feature{width:40px;height:40px;border-radius:13px}
+  .home-row-feature svg{width:22px;height:22px}
+  .home-row-copy h3{font-size:14px}
+  .home-row-copy small{font-size:9.8px}
+  .home-readiness{gap:5px}
+  .home-readiness span{height:25px;padding:0 7px;font-size:8.8px}
+  .home-row-meta strong{font-size:10.5px}
+  .home-row-meta small{font-size:8.6px}
+  .home-row-result{min-width:50px;font-size:10px}
+  .home-startup-row{min-height:48px}
+}

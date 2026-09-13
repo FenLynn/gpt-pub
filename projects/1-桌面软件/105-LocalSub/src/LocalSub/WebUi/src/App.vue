@@ -84,15 +84,59 @@ const inputReady = computed(() =>
   snapshot.value?.settings.audioSourceId === "allAudio" || Boolean(snapshot.value?.system.potPlayerDetected)
 );
 const coreReady = computed(() => snapshot.value?.core.state === "ready" || snapshot.value?.core.state === "busy");
-const allReady = computed(() => coreReady.value && liveModelReady.value && inputReady.value);
+const coreOperational = computed(() => {
+  const state = snapshot.value?.core.state;
+  return Boolean(state && state !== "failed");
+});
+const allReady = computed(() => coreOperational.value && liveModelReady.value && inputReady.value);
+const homeReadinessCount = computed(() =>
+  Number(coreOperational.value) + Number(liveModelReady.value) + Number(inputReady.value)
+);
+const coreStateText = computed(() => {
+  switch (snapshot.value?.core.state) {
+    case "ready": return "已连接";
+    case "busy": return "工作中";
+    case "starting": return "启动中";
+    case "failed": return "异常";
+    default: return "按需启动";
+  }
+});
 const homeStateText = computed(() => {
   if (liveRunning.value) return "实时字幕正在运行";
   if (snapshot.value?.system.autoStartPending) return snapshot.value.system.autoStartStatus || "等待自动启动";
-  return allReady.value ? "LocalSub 已就绪" : "还有项目需要处理";
+  if (snapshot.value?.core.state === "failed") return "识别核心需要处理";
+  if (!liveModelReady.value) return "实时模型需要处理";
+  if (!inputReady.value) return "等待可用音源";
+  return "LocalSub 已就绪";
+});
+const homeStateDetail = computed(() => {
+  if (!snapshot.value) return "";
+  if (liveRunning.value)
+    return [snapshot.value.live.source, snapshot.value.live.modelName].filter(Boolean).join(" · ");
+  if (snapshot.value.system.autoStartPending)
+    return snapshot.value.system.autoStartStatus || "自动启动等待中";
+  if (snapshot.value.core.state === "failed") return "Core 启动或连接异常";
+  if (!liveModelReady.value) return snapshot.value.models.liveModelName + " 尚未安装";
+  if (!inputReady.value)
+    return snapshot.value.settings.audioSourceId === "potplayer" ? "等待检测 PotPlayer" : "当前音源暂不可用";
+  return [snapshot.value.settings.audioSource, snapshot.value.models.liveModelName].filter(Boolean).join(" · ");
+});
+const homeActionLabel = computed(() => {
+  if (liveState.value === "starting") return "启动中";
+  if (liveState.value === "stopping") return "停止中";
+  return liveRunning.value ? "停止实时字幕" : "开始实时字幕";
 });
 const homeButtonDisabled = computed(() => {
   if (liveRunning.value) return commandBusy.value || liveTransitioning.value;
   return commandBusy.value || liveTransitioning.value || !liveModelReady.value || !inputReady.value;
+});
+const homeActionTip = computed(() => {
+  if (liveRunning.value) return "安全停止当前实时字幕会话。";
+  if (liveTransitioning.value) return liveState.value === "starting" ? "实时字幕正在启动。" : "实时字幕正在停止。";
+  if (!liveModelReady.value) return "请先在模型页安装并选择可用的实时模型。";
+  if (!inputReady.value)
+    return snapshot.value?.settings.audioSourceId === "potplayer" ? "当前选择 PotPlayer 音源，请先启动播放器。" : "当前音源暂不可用。";
+  return "使用当前默认音源和实时模型开始字幕。";
 });
 const sideStatusKind = computed(() => {
   if (liveState.value === "running") return "run";
@@ -116,10 +160,10 @@ const sideStatusSecondary = computed(() => {
     return snapshot.value.system.autoStartStatus || "自动启动";
   if (!liveModelReady.value) return "实时模型未就绪";
   if (!inputReady.value) return "等待音源";
-  return "v" + (snapshot.value?.app.productVersion ?? "0.1.13");
+  return "v" + (snapshot.value?.app.productVersion ?? "0.1.14");
 });
 const sideStatusTip = computed(() => {
-  const core = coreReady.value ? "Core 就绪" : "Core 未就绪";
+  const core = coreReady.value ? "Core 已连接" : coreOperational.value ? "Core 按需启动" : "Core 需要处理";
   const model = liveModelReady.value ? "实时模型可用" : "实时模型需要安装";
   const input = inputReady.value ? "音源可用" : "音源等待中";
   return [sideStatusTitle.value, core, model, input].join(" · ");
@@ -516,45 +560,108 @@ onBeforeUnmount(() => {
 
       <template v-else-if="snapshot">
         <section v-if="activePage === 'home'" class="page home-page">
-          <header class="home-toolbar">
-            <div class="home-title">
-              <span class="compact-feature" :class="{ ready: allReady || liveRunning }">
-                <svg viewBox="0 0 24 24">
-                  <path v-if="allReady || liveRunning" d="m5.5 12.5 4.2 4.2 8.8-9.4"></path>
-                  <path v-else d="M3 12h3l2-6 4 12 3-9 2 3h4"></path>
-                </svg>
-              </span>
-              <div><h2>{{ homeStateText }}</h2><span>LocalSub</span></div>
+          <header class="home-control-head">
+            <span class="home-module-icon" :class="{ ready: allReady || liveRunning }" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path v-if="liveRunning" d="M3.5 12h3l1.7-4.4 3.2 8.8 2.8-6.3 1.7 1.9h4.6"></path>
+                <path v-else-if="allReady" d="m5.5 12.5 4.2 4.2 8.8-9.4"></path>
+                <path v-else d="M3.5 12h3l1.7-4.4 3.2 8.8 2.8-6.3 1.7 1.9h4.6"></path>
+              </svg>
+            </span>
+
+            <div class="home-control-copy">
+              <h2>LocalSub</h2>
+              <small>本地字幕控制中心</small>
             </div>
-            <button class="home-action-button" type="button" :class="{ stop: liveRunning }"
-              :disabled="homeButtonDisabled" @click="toggleHomeLive">
-              <svg v-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
-              <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
-              {{ liveRunning ? "停止实时字幕" : "开始实时字幕" }}
-            </button>
+
+            <div class="home-control-state" :class="'state-' + sideStatusKind">
+              <span class="home-state-icon" aria-hidden="true">
+                <svg v-if="liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+                <svg v-else-if="liveTransitioning || snapshot.system.autoStartPending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                <svg v-else-if="sideStatusKind === 'warning'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
+                <svg v-else-if="allReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.3 3.3 7.8-8"></path></svg>
+                <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
+              </span>
+              <div>
+                <strong>{{ homeStateText }}</strong>
+                <small>{{ homeStateDetail }}</small>
+              </div>
+            </div>
+
+            <div class="home-action-slot">
+              <button class="home-primary-action" type="button"
+                :class="{ start: !liveRunning && !homeButtonDisabled, stop: liveRunning, disabled: homeButtonDisabled }"
+                :disabled="homeButtonDisabled" :aria-busy="liveTransitioning || commandBusy"
+                :data-tip="homeActionTip" @click="toggleHomeLive">
+                <svg v-if="liveTransitioning" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                <svg v-else-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+                <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
+                {{ homeActionLabel }}
+              </button>
+            </div>
           </header>
 
           <section class="home-status-list">
-            <div class="home-status-row" :data-tip="coreReady ? 'LocalSub.Core 已可接受识别、媒体分析和模型任务。' : 'Core 会在需要时自动启动；若启动失败会在这里显示异常。'">
-              <span class="status-mark" :class="{ ok: coreReady }"><i></i><svg v-if="coreReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
-              <strong>识别核心</strong><span>{{ coreReady ? "Core 已就绪" : "按需启动" }}</span><b :class="{ ok: coreReady }">{{ coreReady ? "正常" : "待命" }}</b>
-            </div>
-            <div class="home-status-row" :data-tip="'当前实时默认模型：' + snapshot.models.liveModelName">
-              <span class="status-mark" :class="{ ok: liveModelReady }"><i></i><svg v-if="liveModelReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
-              <strong>实时模型</strong><span>{{ snapshot.models.liveModelName }}</span><b :class="{ ok: liveModelReady }">{{ liveModelReady ? "可用" : "需安装" }}</b>
-            </div>
-            <div class="home-status-row" :data-tip="snapshot.settings.audioSourceId === 'potplayer' ? 'PotPlayer 模式使用进程专用音频捕获，不会静默回退到所有音频。' : '所有音频模式监听系统输出混音。'">
-              <span class="status-mark" :class="{ ok: inputReady }"><i></i><svg v-if="inputReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
-              <strong>音源</strong><span>{{ snapshot.settings.audioSource }}</span><b :class="{ ok: inputReady }">{{ inputReady ? "正常" : "等待" }}</b>
-            </div>
-            <div class="home-status-row" data-tip="Overlay 由 Windows Shell 管理，实时字幕运行时自动显示并跟随播放器窗口。">
-              <span class="status-mark ok"><i></i><svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
-              <strong>字幕 Overlay</strong><span>{{ liveRunning ? "正在显示" : "随实时字幕启动" }}</span><b class="ok">{{ liveRunning ? "运行" : "就绪" }}</b>
-            </div>
-            <div class="home-status-row" :data-tip="'当前后台默认模型：' + snapshot.models.batchModelName">
-              <span class="status-mark" :class="{ ok: batchModelReady }"><i></i><svg v-if="batchModelReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.8-8"></path></svg></span>
-              <strong>后台模型</strong><span>{{ snapshot.models.batchModelName }}</span><b :class="{ ok: batchModelReady }">{{ batchModelReady ? "可用" : "需安装" }}</b>
-            </div>
+            <article class="home-control-row">
+              <span class="home-row-feature readiness" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 12.5 9.2 17 19 7"></path></svg>
+              </span>
+              <div class="home-row-copy">
+                <h3>运行条件</h3>
+                <small>识别核心、实时模型与当前音源</small>
+              </div>
+              <div class="home-readiness" data-tip="Core 可按需启动；实时模型必须已安装；PotPlayer 音源需要检测到播放器进程。">
+                <span :class="{ ok: coreOperational }"><i></i>Core</span>
+                <span :class="{ ok: liveModelReady }"><i></i>模型</span>
+                <span :class="{ ok: inputReady }"><i></i>音源</span>
+              </div>
+              <b class="home-row-result" :class="{ ok: allReady }">{{ homeReadinessCount }}/3</b>
+            </article>
+
+            <article class="home-control-row">
+              <span class="home-row-feature live" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 9h4l4-4v14l-4-4H5z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10"></path></svg>
+              </span>
+              <div class="home-row-copy">
+                <h3>实时配置</h3>
+                <small>{{ snapshot.settings.audioSource }} · {{ snapshot.models.liveModelName }}</small>
+              </div>
+              <div class="home-row-meta">
+                <strong>{{ liveStateLabel }}</strong>
+                <small>{{ liveRunning ? "当前会话使用已保存配置" : "开始时直接使用当前默认配置" }}</small>
+              </div>
+              <b class="home-row-result" :class="{ ok: liveModelReady && inputReady }">{{ liveRunning ? "运行" : "当前" }}</b>
+            </article>
+
+            <article class="home-control-row">
+              <span class="home-row-feature overlay" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="13" rx="2"></rect><path d="M7 14h10M9 10h6"></path></svg>
+              </span>
+              <div class="home-row-copy">
+                <h3>字幕显示</h3>
+                <small>Overlay 由 Windows Shell 管理并跟随播放器窗口</small>
+              </div>
+              <div class="home-row-meta">
+                <strong>{{ liveRunning ? "正在显示" : "自动跟随" }}</strong>
+                <small>{{ liveRunning ? snapshot.live.status : "随实时字幕启动，无需单独操作" }}</small>
+              </div>
+              <b class="home-row-result ok">{{ liveRunning ? "运行" : "就绪" }}</b>
+            </article>
+
+            <article class="home-control-row">
+              <span class="home-row-feature batch" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20H6z M14 3.5V8h4 M9 12h6 M9 15.5h6"></path></svg>
+              </span>
+              <div class="home-row-copy">
+                <h3>后台转写</h3>
+                <small>{{ snapshot.models.batchModelName }}</small>
+              </div>
+              <div class="home-row-meta">
+                <strong>{{ batchModelReady ? "默认模型可用" : "需要准备模型" }}</strong>
+                <small>{{ batchModelReady ? "媒体分析与转写任务由独立 Core 执行" : "可在模型页安装或选择后台模型" }}</small>
+              </div>
+              <b class="home-row-result" :class="{ ok: batchModelReady }">{{ batchModelReady ? "可用" : "需安装" }}</b>
+            </article>
           </section>
 
           <footer class="home-startup-row" data-tip="可在设置中组合开机启动、静默进入托盘和启动后自动开启实时字幕。">

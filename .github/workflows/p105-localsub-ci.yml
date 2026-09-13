@@ -143,7 +143,8 @@ jobs:
             @{ Name='settings-subtitle-1100x825'; Size='1100,825'; Page='settings'; Query='' },
             @{ Name='settings-startup-1100x825'; Size='1100,825'; Page='settings'; Query='&settingsTab=startup' },
             @{ Name='docs-1100x825'; Size='1100,825'; Page='docs'; Query='' },
-            @{ Name='live-900x675'; Size='900,675'; Page='live'; Query='' }
+            @{ Name='live-900x675'; Size='900,675'; Page='live'; Query='' },
+            @{ Name='home-900x675'; Size='900,675'; Page='home'; Query='' }
           )) {
             $shot = (Resolve-Path 'preview').Path + "\localsub-$($spec.Name).png"
             $args = @(
@@ -197,7 +198,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.13 workflow and visual contract
+      - name: Verify v0.1.14 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -210,7 +211,12 @@ jobs:
             'class="sidebar"',
             'class="side-nav"',
             "activePage === 'home'",
+            'class="home-control-head"',
+            'class="home-action-slot"',
+            'class="home-primary-action"',
             'class="home-status-list"',
+            'class="home-control-row"',
+            'class="home-readiness"',
             'class="live-task-card"',
             'class="live-module-icon"',
             'class="instant-level"',
@@ -230,12 +236,14 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.13 Web UI contract missing: $required"
+              throw "v0.1.14 Web UI contract missing: $required"
             }
           }
 
           foreach ($required in @(
             'grid-template-columns:225px minmax(0,1fr)',
+            'grid-template-columns:52px 168px minmax(220px,1fr) 126px',
+            'grid-template-columns:52px minmax(190px,1fr) minmax(190px,auto) 74px',
             '.workspace{min-width:0;min-height:0;position:relative;overflow:hidden}',
             'scrollbar-color:transparent transparent',
             'scrollbar-gutter:stable',
@@ -245,7 +253,7 @@ jobs:
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.13 style contract missing: $required"
+              throw "v0.1.14 style contract missing: $required"
             }
           }
 
@@ -255,7 +263,7 @@ jobs:
             'DefaultBackgroundColor = Color.FromArgb(244, 248, 251)'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.13 4:3 host contract missing: $required"
+              throw "v0.1.14 4:3 host contract missing: $required"
             }
           }
 
