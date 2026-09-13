@@ -200,7 +200,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.19 workflow and visual contract
+      - name: Verify v0.1.20 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -245,10 +245,17 @@ jobs:
             'batch.pickFiles',
             'batch.analyze',
             'batch.transcribe',
+            'batch.transcribeAll',
+            'batch.remove',
+            'batch.clear',
+            'batch.exportTxt',
             'batch.cancel',
             'class="batch-workspace"',
             'class="batch-queue-strip"',
+            'class="batch-queue-summary"',
+            'class="batch-queue-item"',
             'class="batch-wave"',
+            '导出 TXT',
             'class="batch-transcript-scroll"',
             'class="page settings-page"',
             'class="page docs-page"',
@@ -257,7 +264,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.19 Web UI contract missing: $required"
+              throw "v0.1.20 Web UI contract missing: $required"
             }
           }
 
@@ -285,10 +292,13 @@ jobs:
             '.inner-tabs button.active:after{',
             '.batch-workspace{',
             '.batch-queue-strip{',
+            '.batch-queue-summary{',
+            '.batch-queue-item{',
+            '.batch-run-actions{',
             '.batch-operation-bar{'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.19 style contract missing: $required"
+              throw "v0.1.20 style contract missing: $required"
             }
           }
 
@@ -296,12 +306,33 @@ jobs:
             'CoreWorkerClient _core',
             '_core.AnalyzeAsync',
             '_core.TranscribeAsync',
+            'TranscribeAllAsync',
+            'internal void Remove',
+            'internal void Clear',
+            'GetResult',
+            'MarkExported',
             'SaveAutomaticJson',
+            'canTranscribeAll',
+            'completed = _results.Count',
             'selectedId',
             'Downsample'
           )) {
             if ($batchSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.19 batch controller contract missing: $required"
+              throw "v0.1.20 batch controller contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            '"batch.transcribeAll"',
+            '"batch.remove"',
+            '"batch.clear"',
+            '"batch.exportTxt"',
+            'PersistBatchKeywords',
+            'SaveFileDialog',
+            'TranscriptPersistenceService.ExportTxt'
+          )) {
+            if ($hostSource -notmatch [regex]::Escape($required)) {
+              throw "v0.1.20 batch host contract missing: $required"
             }
           }
 
@@ -312,7 +343,7 @@ jobs:
             '"home", "live", "batch", "models", "settings", "docs", "about"'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.19 4:3 host contract missing: $required"
+              throw "v0.1.20 4:3 host contract missing: $required"
             }
           }
 
@@ -749,7 +780,7 @@ jobs:
             throw 'WebUi host did not complete a real app.getSnapshot bridge round trip.'
           }
           $ready = Get-Content publish/Logs/webui-smoke-ready.txt -Raw
-          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'bridge=live.stop' -or $ready -notmatch 'bridge=live.start' -or $ready -notmatch 'bridge=model.list' -or $ready -notmatch 'bridge=model.select' -or $ready -notmatch 'bridge=model.download' -or $ready -notmatch 'bridge=model.cancel' -or $ready -notmatch 'bridge=model.delete' -or $ready -notmatch 'bridge=batch.pickFiles' -or $ready -notmatch 'bridge=batch.analyze' -or $ready -notmatch 'bridge=batch.transcribe' -or $ready -notmatch 'bridge=batch.cancel' -or $ready -notmatch 'bridge=diagnostics.liveLevelAck' -or $ready -notmatch 'webview2=ready') {
+          if ($ready -notmatch 'bridge=app.getSnapshot' -or $ready -notmatch 'bridge=live.stop' -or $ready -notmatch 'bridge=live.start' -or $ready -notmatch 'bridge=model.list' -or $ready -notmatch 'bridge=model.select' -or $ready -notmatch 'bridge=model.download' -or $ready -notmatch 'bridge=model.cancel' -or $ready -notmatch 'bridge=model.delete' -or $ready -notmatch 'bridge=batch.pickFiles' -or $ready -notmatch 'bridge=batch.analyze' -or $ready -notmatch 'bridge=batch.transcribe' -or $ready -notmatch 'bridge=batch.transcribeAll' -or $ready -notmatch 'bridge=batch.remove' -or $ready -notmatch 'bridge=batch.clear' -or $ready -notmatch 'bridge=batch.exportTxt' -or $ready -notmatch 'bridge=batch.cancel' -or $ready -notmatch 'bridge=diagnostics.liveLevelAck' -or $ready -notmatch 'webview2=ready') {
             throw "Unexpected WebUi smoke marker: $ready"
           }
           if (-not (Test-Path publish/Logs/meter-browser.log)) {
