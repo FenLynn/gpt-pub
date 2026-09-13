@@ -28,7 +28,11 @@ internal sealed class BatchWebController : IDisposable
 
     internal event Action? Changed;
 
-    internal BatchWebController(CoreWorkerClient core) => _core = core;
+    internal BatchWebController(CoreWorkerClient core)
+    {
+        _core = core;
+        RestorePersistentState();
+    }
 
     internal bool IsBusy
     {
@@ -68,6 +72,7 @@ internal sealed class BatchWebController : IDisposable
             _lastError = null;
             _status = _queue.Count == 0 ? "没有添加媒体" : $"已添加 {_queue.Count} 个媒体文件";
         }
+        PersistState();
         RaiseChanged();
     }
 
@@ -99,7 +104,11 @@ internal sealed class BatchWebController : IDisposable
         }
 
         RaiseChanged();
-        if (cached || cts == null) return;
+        if (cached || cts == null)
+        {
+            PersistState();
+            return;
+        }
 
         var progress = new Progress<MediaAnalysisProgress>(p =>
         {
@@ -143,6 +152,7 @@ internal sealed class BatchWebController : IDisposable
         finally
         {
             EndOperation(cts);
+            PersistState();
             RaiseChanged();
         }
     }
@@ -214,6 +224,7 @@ internal sealed class BatchWebController : IDisposable
         finally
         {
             EndOperation(cts);
+            PersistState();
             RaiseChanged();
         }
     }
@@ -321,9 +332,13 @@ internal sealed class BatchWebController : IDisposable
         finally
         {
             EndOperation(cts);
+            PersistState();
             RaiseChanged();
         }
     }
+
+    internal Task RetryAsync(string? id, string modelId, IEnumerable<string> keywords)
+        => TranscribeAsync(id, modelId, keywords);
 
     internal void Remove(string? id)
     {
@@ -353,6 +368,7 @@ internal sealed class BatchWebController : IDisposable
             _lastError = null;
             _status = _queue.Count == 0 ? "队列已清空" : $"队列中还有 {_queue.Count} 个媒体";
         }
+        PersistState();
         RaiseChanged();
     }
 
@@ -373,6 +389,7 @@ internal sealed class BatchWebController : IDisposable
             _lastError = null;
             _operationKind = null;
         }
+        PersistState();
         RaiseChanged();
     }
 
@@ -392,18 +409,46 @@ internal sealed class BatchWebController : IDisposable
         }
     }
 
-    internal void MarkExported(string fileName)
+    internal void MarkExported(string label)
     {
         lock (_gate)
         {
             _state = "idle";
-            _status = "TXT 已导出";
+            _status = "导出完成";
             _stage = "导出完成";
-            _detail = fileName;
+            _detail = label;
             _percent = 100;
             _lastError = null;
         }
         RaiseChanged();
+    }
+
+    internal int ExportAllCompleted(string outputDirectory)
+    {
+        (string Name, BatchTranscriptionResult Result)[] completed;
+        lock (_gate)
+        {
+            EnsureIdleLocked();
+            completed = _queue
+                .Where(x => _results.ContainsKey(x.Id))
+                .Select(x => (x.Name, _results[x.Id]))
+                .ToArray();
+        }
+
+        if (completed.Length == 0)
+            throw new InvalidOperationException("队列中还没有可导出的转写结果。");
+
+        Directory.CreateDirectory(outputDirectory);
+        foreach (var entry in completed)
+        {
+            var baseName = SafeBaseName(entry.Name);
+            TranscriptPersistenceService.ExportTxt(Path.Combine(outputDirectory, baseName + ".txt"), entry.Result.Items, includeTime: true);
+            TranscriptPersistenceService.ExportSrt(Path.Combine(outputDirectory, baseName + ".srt"), entry.Result.Items);
+            TranscriptPersistenceService.ExportVtt(Path.Combine(outputDirectory, baseName + ".vtt"), entry.Result.Items);
+        }
+
+        MarkExported($"已导出 {completed.Length} 组 TXT / SRT / VTT");
+        return completed.Length;
     }
 
     internal bool Cancel()
@@ -420,7 +465,7 @@ internal sealed class BatchWebController : IDisposable
         return true;
     }
 
-    internal object BuildSnapshot(string modelId, string modelName, string keywords)
+    internal object BuildSnapshot(string modelId, string modelName, string keywords, string outputDirectoryName, bool outputDirectoryCustom)
     {
         lock (_gate)
         {
@@ -444,7 +489,9 @@ internal sealed class BatchWebController : IDisposable
                     analyzed = _analysis.ContainsKey(x.Id),
                     transcribed = _results.ContainsKey(x.Id),
                     segments = _results.TryGetValue(x.Id, out var queueResult) ? queueResult.Items.Count : 0,
-                    realTimeFactor = _results.TryGetValue(x.Id, out queueResult) ? Math.Round(queueResult.RealTimeFactor, 3) : (double?)null
+                    realTimeFactor = _results.TryGetValue(x.Id, out queueResult) ? Math.Round(queueResult.RealTimeFactor, 3) : (double?)null,
+                    missing = !File.Exists(x.Path),
+                    retryable = File.Exists(x.Path) && (x.State.Contains("失败", StringComparison.Ordinal) || x.State.Contains("取消", StringComparison.Ordinal) || x.State.Contains("中断", StringComparison.Ordinal))
                 }).ToArray(),
                 media = analysis == null ? null : new
                 {
@@ -475,16 +522,22 @@ internal sealed class BatchWebController : IDisposable
                     stage = _stage,
                     detail = _detail
                 },
-                canAnalyze = selected != null && _operationCts == null,
-                canTranscribe = selected != null && _operationCts == null,
-                canTranscribeAll = _queue.Count > 0 && _operationCts == null,
+                canAnalyze = selected != null && File.Exists(selected.Path) && _operationCts == null,
+                canTranscribe = selected != null && File.Exists(selected.Path) && _operationCts == null,
+                canRetry = selected != null && File.Exists(selected.Path) && _operationCts == null &&
+                    (selected.State.Contains("失败", StringComparison.Ordinal) || selected.State.Contains("取消", StringComparison.Ordinal) || selected.State.Contains("中断", StringComparison.Ordinal)),
+                canTranscribeAll = _queue.Any(x => File.Exists(x.Path)) && _operationCts == null,
                 canRemove = selected != null && _operationCts == null,
                 canClear = _queue.Count > 0 && _operationCts == null,
                 canExport = result != null && _operationCts == null,
+                canExportAll = _results.Count > 0 && _operationCts == null,
                 canCancel = _operationCts != null,
                 batchModelId = modelId,
                 batchModelName = modelName,
                 keywords,
+                outputDirectoryName,
+                outputDirectoryCustom,
+                restored = _queue.Count > 0,
                 lastError = _lastError
             };
         }
@@ -558,11 +611,9 @@ internal sealed class BatchWebController : IDisposable
 
     void SaveAutomaticJson(BatchTranscriptionResult result, string modelId)
     {
-        var dir = Path.Combine(PortablePaths.DataDir, "Transcripts");
+        var dir = AppSettings.Load().ResolvedBatchOutputDirectory;
         Directory.CreateDirectory(dir);
-        var name = Path.GetFileNameWithoutExtension(result.FilePath);
-        foreach (var ch in Path.GetInvalidFileNameChars()) name = name.Replace(ch, '_');
-        if (string.IsNullOrWhiteSpace(name)) name = "transcript";
+        var name = SafeBaseName(result.FilePath);
         TranscriptPersistenceService.SaveJson(
             Path.Combine(dir, name + ".localsub.json"),
             result.FilePath,
@@ -570,6 +621,74 @@ internal sealed class BatchWebController : IDisposable
             result.Duration,
             result.ProcessingTime,
             result.Items);
+    }
+
+    void RestorePersistentState()
+    {
+        var persisted = BatchQueueStateStore.Load();
+        lock (_gate)
+        {
+            foreach (var saved in persisted.Queue.Take(200))
+            {
+                if (string.IsNullOrWhiteSpace(saved.Id) || string.IsNullOrWhiteSpace(saved.Path)) continue;
+                var result = saved.Result == null ? null : BatchQueueStateStore.ToResult(saved.Path, saved.Result);
+                var state = result != null
+                    ? $"完成 {result.Items.Count} 段"
+                    : File.Exists(saved.Path)
+                        ? saved.State.Contains("失败", StringComparison.Ordinal) ? "上次失败，可重试" :
+                          saved.State.Contains("取消", StringComparison.Ordinal) ? "上次取消，可重试" :
+                          saved.State.Contains("转写", StringComparison.Ordinal) || saved.State.Contains("分析", StringComparison.Ordinal) ? "上次任务中断，可重试" :
+                          "等待分析"
+                        : "源文件缺失";
+                var item = new QueueItem(saved.Id, saved.Path, string.IsNullOrWhiteSpace(saved.Name) ? Path.GetFileName(saved.Path) : saved.Name, state);
+                _queue.Add(item);
+                if (result != null) _results[item.Id] = result;
+            }
+
+            _selectedId = persisted.SelectedId != null && _queue.Any(x => x.Id == persisted.SelectedId)
+                ? persisted.SelectedId
+                : _queue.FirstOrDefault()?.Id;
+            if (_queue.Count > 0)
+            {
+                _status = _results.Count > 0
+                    ? $"已恢复 {_queue.Count} 个队列项，{_results.Count} 个结果"
+                    : $"已恢复 {_queue.Count} 个队列项";
+                _stage = "已恢复";
+                _detail = "上次后台队列已恢复";
+            }
+        }
+        PersistState();
+    }
+
+    void PersistState()
+    {
+        try
+        {
+            string? selectedId;
+            (string Id, string Path, string Name, string State, BatchTranscriptionResult? Result)[] snapshot;
+            lock (_gate)
+            {
+                selectedId = _selectedId;
+                snapshot = _queue.Select(x => (
+                    x.Id,
+                    x.Path,
+                    x.Name,
+                    x.State,
+                    _results.TryGetValue(x.Id, out var result) ? result : null)).ToArray();
+            }
+            BatchQueueStateStore.Save(selectedId, snapshot);
+        }
+        catch
+        {
+            // Queue persistence must never break active transcription.
+        }
+    }
+
+    static string SafeBaseName(string pathOrName)
+    {
+        var name = Path.GetFileNameWithoutExtension(pathOrName);
+        foreach (var ch in Path.GetInvalidFileNameChars()) name = name.Replace(ch, '_');
+        return string.IsNullOrWhiteSpace(name) ? "transcript" : name;
     }
 
     static float[] Downsample(float[] source, int maxPoints)
