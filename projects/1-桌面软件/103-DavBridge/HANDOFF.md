@@ -24,20 +24,30 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前可靠性封板版本为 v0.4.16，当前位于 `p103-exp`。用户已完成 v0.4.15 实机验收，并明确授权 v0.4.16 在完整准入通过后提升到 `p103-stable` 与 `main`。它仍不是正式 Release。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
+
+当前实验候选为 **v0.4.26**，只位于 `p103-exp`。这是当前 v0.4 最终实验候选。
 
 ## 3. 最新完整验证代码基线
 
-最新完成完整 P103 CI 的可靠性封板代码 head：
+当前稳定主线 v0.4.16：
 
 ```text
-35015c8581cb537ae98813eb5f2efe0458525487
+main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-对应 P103 CI：
+当前实验版本：**v0.4.26**。
+
+最后完成完整 P103 CI 的代码 head：
 
 ```text
-run 34743274402
+3568eca17bda0b6674959c9897f6ec2dbebbb26f
+```
+
+对应 CI：
+
+```text
+run 34763904669
 scope          success
 core-smoke     success
 frontend       success
@@ -45,41 +55,51 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.16-win-x64`
+Windows candidate：`DavBridge-v0.4.26-win-x64`
 
-Artifact ID：`10313388007`
+Artifact ID：`10319489203`
+
+Web UI preview Artifact ID：`10319379569`
 
 EXE：
 
 ```text
-2442845 bytes
-SHA256 1da5a38f1ab5264699ab0778ba346e7dcf6a4df48089952eb1650c2d7de9f29f
+2467421 bytes
+SHA256 72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-ea6d43a90f431fc1fe3b24b49944cab524040911af8b320a009a92c3f8518464
+9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe
 ```
 
-CI 已通过 Vue typecheck、production build、浏览器视觉预览、扩展后的 Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
+该 run 同时验证：
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `35015c85...` 识别为 v0.4.16 可靠性实现的第一轮完整验证代码基线；提升 PR 仍必须以其自身准确 head 的成功 CI 为准。
+- v0.4.20 运行观察连续性判定；
+- 超过 15 分钟的正常退出空窗和异常中断空窗都会使完整健康窗口失效；
+- 15 分钟以内的短重启不会被误判为长期观察中断；
+- v0.4.19 匿名健康账本和 schema 1 到 schema 2 的兼容升级继续通过；
+- About 1100×825 浏览器预览；
+- Core Smoke 20 项全部通过，其中新增持久化暂停、重启与最终收敛测试；
+- Windows single EXE；
+- Runtime 私人数据边界；
+- 既有 native-host self-test。
+
+本段之后若只有文档提交，仍以 `3568eca17bda0b6674959c9897f6ec2dbebbb26f` 作为最后完整构建验证的 v0.4.26 代码基线。
 
 ## 4. 当前分支快照
 
-本轮代码验证时：
+当前稳定分支关系：
 
 ```text
-main         042329ede97b09cd375ebcf7c55d7245fc56b933
-p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
-validated p103-exp reliability code head
-35015c8581cb537ae98813eb5f2efe0458525487
+main         73aefcf04570180bb9526a43cf805aff1e7673b3
+p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
+`p103-exp` 已在 stable/main 之上进入 v0.4.26 最终收束候选。当前最后完整验证代码 head 为 `3568eca17bda0b6674959c9897f6ec2dbebbb26f`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
 
-新对话必须重新查询三条分支实时 head 和祖先关系，不得把上述快照视为永久事实。
+v0.4.26 当前未提升 stable/main。真实 Windows 最终验收仍是提升前最后一道门。
 
 ## 5. 当前架构
 
@@ -365,6 +385,156 @@ Core Smoke 在既有 14 项基础上新增 5 项：
 
 自动化仍不能替代真实 InfiniCLOUD / 坚果云服务、Windows 实际睡眠/唤醒和长期多日运行，因此 v0.4.16 进入 main 只表示可发布稳定基线，不自动创建正式 Release。
 
+
+### v0.4.17 长期运行摘要
+
+第一，启动本轮前重新核对仓库后确认：脱敏诊断导出其实从 v0.4.4 就已经存在于“设置 → 安全与维护”，因此 v0.4.17 不重复增加第二套诊断功能。
+
+第二，v0.4.17 只增强“关于”页的长期后台运行可见性，不修改首页和迁移安全链。关于页在原版本、构建、运行环境、运行会话、初始化、引擎和界面信息下方增加轻量 2×2 运行摘要。
+
+第三，摘要只使用既有安全 snapshot 数据，不新增私人数据持久化：
+- 本周期：Cycle 与当前上传 / 下载已用量；
+- 最近完成：最近活动中可识别的清单或迁移完成事件；
+- 最近暂停：最近一次暂停事件；
+- 最近异常：最近一个 warning 活动；若没有则明确显示暂无近期异常。
+
+第四，以上摘要只来源于已有通用活动和 quota DTO，因此不包含真实 Zotero 文件名、远端路径、凭据或 SHA。活动历史只有有限窗口，摘要是“最近可见事件”，不是永久审计记录。
+
+第五，关于页继续去仪表盘化。新增摘要使用细分隔线和紧凑文字，不加入复杂图表、大卡片或新的导航层级。
+
+第六，P103 CI 新增 `about-1100x825.png` 浏览器预览，并保持原有 Overview / Transfer 多尺寸预览。准确代码 head `958744f8703b567c634c0296530b21623d922381` 已通过 run `34751011145` 全部 jobs。
+
+第七，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
+
+
+### v0.4.18 近 24 小时运行健康
+
+第一，本轮延续 v0.4.17 的 About 页长期运行方向，但不新增图表，也不新增高频持久化采样。统计直接使用既有 `product-experience.json` 通用活动记录和当前安全 snapshot。
+
+第二，ProductExperience 新增 `OperationalHealthV048`，默认统计近 24 小时：
+- warning 活动数量；
+- 实际进入“等待网络”的次数；
+- 真正完成“迁移已暂停”的次数；
+- “当前清单完成”的次数。
+
+第三，About 页新增一条紧凑健康状态条，显示“完成 / 网络等待 / 警告 / 暂停”，并同时显示当前 StrongVerified 数量与当前 backlog。没有折线图、柱状图或大卡片。
+
+第四，活动 sidecar 最多保留 40 条事件。统计会判断近 24 小时窗口是否完整：如果已保留的最早事件早于 24 小时边界，或活动总数不足上限，则可以认为 24 小时窗口完整；否则 UI 会明确写“近期活动窗口 / 活动窗口可能已截断”，避免把不完整样本误称完整 24 小时统计。
+
+第五，新增 deterministic native self-test `ValidateOperationalHealthForSelfTest()`，固定构造 24 小时内外的暂停、网络等待、warning 与完成事件，验证统计边界。P103 Windows CI 强制要求 `operationalHealthSummary=true`。
+
+第六，统计不写入任何新的真实文件名、路径、URL、凭据或 SHA，也不参与迁移正确性判定。
+
+第七，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、暂停控制、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
+
+v0.4.18 功能实现 head：
+
+```text
+e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
+```
+
+最终验证必须以本轮文档同步后的最新 `p103-exp` head 为准，不能只复用中间 run。
+
+
+### v0.4.19 事件级健康账本
+
+第一，v0.4.18 的近 24 小时统计直接依赖最近 40 条通用活动，因此在高频状态变化时可能只能给出截断窗口。v0.4.19 将这部分改为独立的匿名事件账本，不再依赖活动列表长度。
+
+第二，`product-experience.json` 的 UI sidecar schema 提升到 2，并新增：
+- `OperationalLedgerStartedAt`；
+- `OperationalEvents`。
+
+每个事件只保存时间戳和匿名类别。当前类别只有 `warning`、`network`、`pause`、`complete`。不保存真实 Zotero 文件名、路径、URL、用户名、凭据、SHA、TransferRecord 或配额核心账本。
+
+第三，事件账本不是定时采样器。只有原本就会写入 product-experience 的低频状态事件发生时才一起记录，因此不会引入新的高频磁盘写入。
+
+第四，旧 schema 1 首次由 v0.4.19 读取时会一次性升级到 schema 2。已有最近活动会尽量投影成已知健康事件，但 `OperationalLedgerStartedAt` 从升级时刻开始，因此升级后的前 24 小时明确显示“健康账本建立中”，不会把有限旧活动冒充完整 24 小时历史。账本累计满 24 小时后，近 24 小时统计不再受最近活动 40 条上限影响。
+
+第五，匿名健康事件只保留最近 8 天，属于可再生 UI 辅助状态。删除 `product-experience.json(.bak)` 最多使健康统计重新建立，不得影响迁移安全、StrongVerified、quota、Cycle、Reconciliation 或 DELETE。
+
+第六，native self-test 同时验证聚合边界与持久化升级。旧 schema 1 sidecar 会被加载、升级、保存、重新加载，然后再次执行升级函数，必须保证事件不重复计数。
+
+第七，脱敏诊断 ZIP 新增聚合后的 `operationalHealth` 摘要，但不导出真实文件事件或私人数据。
+
+第八，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
+
+### v0.4.20 运行观察连续性
+
+第一，v0.4.19 已经解决最近活动 40 条导致的统计截断，但仍有一个可信度缺口。如果 DavBridge 中间长时间没有运行，匿名事件账本本身仍然存在，单看事件数量可能把“没有被观察到的时间”误解成“没有异常”。
+
+第二，v0.4.20 在可再生的 `product-experience.json` 中新增 `LastObservationGapAt` 与 `LastObservationGapSeconds`。它们只描述最近一次明显运行空窗，不记录文件名、路径、URL、凭据、SHA 或迁移账本。
+
+第三，观察空窗阈值固定为 15 分钟。正常退出后到下一次启动超过 15 分钟，或异常中断后最后一次 runtime heartbeat 到下一次启动超过 15 分钟，都会记录一次观察空窗。短于或等于 15 分钟的普通更新和快速重启不会让健康窗口失效。
+
+第四，About 页现在区分三种状态：
+
+- 账本本身不足 24 小时时显示“健康账本建立中”；
+- 账本时间足够且最近 24 小时没有观察空窗时显示“近 24 小时”；
+- 最近 24 小时存在超过 15 分钟的运行空窗时显示“近 24 小时观察不连续”，并说明统计只代表 DavBridge 实际运行期间。
+
+第五，观察空窗只影响 About 页健康摘要可信度，不作为 warning 事件写入，也不参与迁移、安全暂停、StrongVerified、quota、Cycle、Reconciliation 或 DELETE 判定。
+
+第六，native self-test 新增 observation continuity 验证，同时覆盖 45 分钟正常退出空窗、5 分钟短重启和 40 分钟异常中断空窗。P103 CI 强制要求该测试通过。
+
+第七，本轮没有修改 `DavBridge.Core`、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
+
+### v0.4.23 About 信息分层
+
+用户继续反馈 v0.4.22 虽然恢复了单行布局，但信息总量仍偏多，主次不够清楚。v0.4.23 不再把所有条目放在同一层级，而是分成三组：
+
+- “当前状态”置顶，只保留运行、会话、周期、健康；初始化仅在未完成时出现；
+- “最近活动”只保留异常与记录两行，其中最近完成和最近暂停合并为“记录”；
+- “软件信息”置底，只保留版本、构建、技术栈。
+
+原先“运行环境”的自检摘要没有丢失，收进“运行”行的 tooltip。观察连续性、匿名健康账本和全部 C# 聚合语义保持不变。
+
+本轮只调整 About 信息优先级、分组、显示条件和版本号，不修改 DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、安全暂停、Reconciliation、回收站或 DELETE 安全链。
+
+### v0.4.24 v0.4 最终收束候选
+
+本轮把 v0.4 从持续精修状态收束为最终实验候选。
+
+第一，UI 终审不再改动已经确认的总览、转移、回收站和文档结构。About 延续 v0.4.23 的三级信息层级。CI 现在固定生成总览多尺寸、转移、回收站、文档、About 1100×825 以及 About 900×620 预览。
+
+第二，删除 `overview.css` 中已经失效的 `.about-ops` 和 `.about-health-strip` 历史覆盖层。CI 新增生产 UI 所有权检查，要求生产入口继续使用 `WebUiHostV040`，并阻止 `UiShellV030`、`UiShellV032`、旧 Dashboard 或废弃 About selector 回到当前生产路径。
+
+第三，Core Smoke 从 19 项增加到 20 项。新增持久化恢复序列连续执行 12 轮“处理一个成员、安全暂停、保存状态、重新加载、再继续”，最后再次启动并收敛到 Complete。测试确认每个成员只 PUT 一次，已经 StrongVerified 的成员不会因重复暂停或进程式重启再次上传。
+
+第四，Windows native self-test 继续通过 Web UI 嵌入、bridge 白名单、四类备份恢复、runtime session、4:3 窗口迁移、background wake、匿名健康账本、健康账本持久化和 observation continuity。
+
+第五，本轮没有修改 DavBridge.Core 的生产实现，没有改变 WebDAV、StrongVerified、quota/Cycle、安全暂停、Reconciliation、回收站或 DELETE 语义。
+
+自动化可证明的 v0.4 收束工作至此完成。真正的多小时或多日 Windows 无人值守、睡眠恢复、真实网络断开与真实 WebView2 视觉仍必须由用户实机确认，不能用 CI 伪装完成。
+
+### v0.4.25 surface 色阶修正
+
+用户实机指出普通文字附近仍有“白色背景”感。检查确认不是错觉，活动 CSS 中多个普通信息 surface 仍使用纯白或高透明度白色，造成淡蓝灰页面上出现“白纸贴片”视觉。
+
+v0.4.25 只修正 surface 色阶，不改布局、字号、信息结构或任何 Core 逻辑：
+
+- 页面 canvas 统一为更明确的淡蓝灰；
+- 普通信息区使用 quiet / soft / panel 三档淡蓝灰 surface；
+- About 继续透明融入 canvas；
+- 转移任务块、回收站行、文档折叠块和侧栏状态块取消高透明度白色；
+- 只有 tooltip、选中 tab、输入类交互面等真正抬升层保留接近白色。
+
+CI 九张跨页面截图已复核，首页、转移、回收站、文档和 About 的 surface 层级保持一致。Core Smoke 20/20、Windows native self-test 与 single EXE 均继续通过。
+
+### v0.4.26 左上品牌版本号
+
+根据用户反馈，版本号从 About 的低频信息补充为全局左上品牌区的轻量第二行。
+
+左上品牌区现在固定为：
+
+```text
+DavBridge
+v0.4.26
+```
+
+版本号字号更小、颜色更淡，作为品牌名的次级信息显示。窄窗口下继续缩小，不改变导航宽度和其他侧栏布局。原先品牌名下方的“Zotero 镜像”不再占位。
+
+本轮只改品牌区显示和版本号，不修改页面结构、surface 色阶、bridge、DavBridge.Core 或任何迁移安全语义。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -413,18 +583,35 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-v0.4.15 已由用户完成真实 Windows 实机验收。v0.4.16 只增加可靠性回归，不改变 UI 或迁移语义。
+稳定主线在本轮提升前仍为 v0.4.16：
 
-用户已经明确授权本轮在以下条件全部满足后执行提升：
+```text
+main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
+```
 
-1. v0.4.16 当前 exp 准确 head 完整 CI 全绿；
-2. exp 相对最新 main 无 behind，差异只属于 P103 允许范围；
-3. 通过 PR：`p103-exp → p103-stable`，并在 PR 准确 head 上完成完整准入；
-4. 再次确认 stable 相对最新 main 的范围；
-5. 通过 PR：`p103-stable → main`，并在该 PR 准确 head 上完成完整准入；
-6. 合并后按 B 级规则把 stable / exp 非强制同步到最新 main。
+当前最终候选为 **v0.4.26**，位于 `p103-exp`。
 
-本轮授权只覆盖 stable/main 准入，不授权创建 tag 或 GitHub Release。正式 Release 仍需后续针对具体版本单独人工授权。
+最后完整验证代码 head：
+
+```text
+3568eca17bda0b6674959c9897f6ec2dbebbb26f
+```
+
+完整 CI run：`34763904669`，五个 jobs 全部 success。
+
+Windows candidate Artifact ID：`10319489203`。
+
+EXE：`2467421 bytes`，SHA256 `72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850`。
+
+Artifact ZIP SHA256：`9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe`。
+
+Web UI preview Artifact ID：`10319379569`。预览覆盖总览多尺寸、转移、回收站、文档与 About。
+
+Core Smoke 为 20/20。Windows native self-test、Runtime 私人数据边界、生产 UI 所有权检查与 single EXE 构建均通过。
+
+用户已在当前会话明确要求“把这些全部收完”，授权结束 v0.4.26 的候选阶段并执行 `p103-exp → p103-stable → main` 的两级准入收束。该授权用于稳定主线提升，不构成正式 tag 或 GitHub Release 授权。
+
+本次收尾不把 CI 描述成真实多日 Windows 运行证明。长期后台、真实网络切换与睡眠恢复继续作为稳定版实际运行观察项；若后续暴露真实问题，以追加修复处理，不重写本次历史。
 
 ## 10. 新对话固定读取顺序
 
