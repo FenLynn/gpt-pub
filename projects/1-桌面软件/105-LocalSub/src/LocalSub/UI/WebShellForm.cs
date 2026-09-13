@@ -86,8 +86,8 @@ public sealed class WebShellForm : Form
     readonly WebView2 _web = new()
     {
         Dock = DockStyle.Fill,
-        BackColor = Color.FromArgb(244, 248, 251),
-        DefaultBackgroundColor = Color.FromArgb(244, 248, 251)
+        BackColor = Color.FromArgb(241, 247, 251),
+        DefaultBackgroundColor = Color.FromArgb(241, 247, 251)
     };
     readonly Label _loading = new()
     {
@@ -154,7 +154,7 @@ public sealed class WebShellForm : Form
         Height = 825;
         MinimumSize = new Size(900, 675);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(244, 248, 251);
+        BackColor = Color.FromArgb(241, 247, 251);
         Controls.Add(_loading);
         Controls.Add(_web);
         _web.Visible = false;
