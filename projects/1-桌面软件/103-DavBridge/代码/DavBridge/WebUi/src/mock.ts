@@ -1,7 +1,7 @@
 import type { DavBridgeSnapshot } from './types'
 
 export const mockSnapshot: DavBridgeSnapshot = {
-  version: '0.4.17', buildCommit: 'preview', buildDate: '2026-09-13T18:05:00Z', cycleId: '260907', configured: true, engineState: '运行中', routeStatus: '普通迁移中', routeTone: 'active',
+  version: '0.4.18', buildCommit: 'preview', buildDate: '2026-09-13T18:40:00Z', cycleId: '260907', configured: true, engineState: '运行中', routeStatus: '普通迁移中', routeTone: 'active',
   phases: [
     { key: 'audit', label: '源端对账', state: 'done', hint: '本周期源端清单已经完成核对' },
     { key: 'repair', label: '变化修复', state: 'done', hint: '历史 StrongVerified 变化项已经处理' },
@@ -25,5 +25,6 @@ export const mockSnapshot: DavBridgeSnapshot = {
     { time:'09-11 18:42', title:'运行环境自检', detail:'运行依赖与本机 Data 状态正常。', tone:'success' },
     { time:'09-11 18:41', title:'应用启动', detail:'本机配置、账本与运行状态已载入。', tone:'info' }
   ],
+  operationalHealth: { hours:24, warningCount:1, networkWaitCount:0, pauseCount:1, completionCount:1, backlogCount:2704, verifiedCount:2090, windowComplete:true },
   recycle: []
 }
