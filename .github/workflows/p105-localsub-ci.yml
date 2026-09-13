@@ -213,7 +213,7 @@ jobs:
             'class="side-nav"',
             'class="brand-version"',
             "activePage === 'about'",
-            'class="about-page"',
+            'class="page about-page"',
             'class="about-card"',
             "activePage === 'home'",
             'class="home-control-head"',
