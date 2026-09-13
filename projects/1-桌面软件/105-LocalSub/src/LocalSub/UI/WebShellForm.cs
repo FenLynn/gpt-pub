@@ -71,6 +71,10 @@ public sealed class WebShellForm : Form
         "batch.pickFiles",
         "batch.analyze",
         "batch.transcribe",
+        "batch.transcribeAll",
+        "batch.remove",
+        "batch.clear",
+        "batch.exportTxt",
         "batch.cancel",
         "diagnostics.liveLevelAck"
     };
@@ -168,7 +172,7 @@ public sealed class WebShellForm : Form
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete", "batch.pickFiles", "batch.analyze", "batch.transcribe", "batch.cancel", "diagnostics.liveLevelAck" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete", "batch.pickFiles", "batch.analyze", "batch.transcribe", "batch.transcribeAll", "batch.remove", "batch.clear", "batch.exportTxt", "batch.cancel", "diagnostics.liveLevelAck" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -283,6 +287,18 @@ public sealed class WebShellForm : Form
                     break;
                 case "batch.transcribe":
                     result = await TranscribeBatchAsync(request.Params);
+                    break;
+                case "batch.transcribeAll":
+                    result = await TranscribeAllBatchAsync(request.Params);
+                    break;
+                case "batch.remove":
+                    result = RemoveBatch(request.Params);
+                    break;
+                case "batch.clear":
+                    result = ClearBatch();
+                    break;
+                case "batch.exportTxt":
+                    result = ExportBatchTxt(request.Params);
                     break;
                 case "batch.cancel":
                     result = CancelBatch();
@@ -630,11 +646,71 @@ public sealed class WebShellForm : Form
         EnsureBatchCoreAvailable(requireModel: true);
         TryReadString(parameters, "id", out var id);
         var keywords = ReadStringArray(parameters, "keywords");
+        PersistBatchKeywords(keywords);
         var models = _models.Snapshot;
         await _batch.TranscribeAsync(id, models.BatchModelId, keywords);
         _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
         _coreError = null;
         return BuildSnapshot();
+    }
+
+    async Task<object> TranscribeAllBatchAsync(JsonElement? parameters)
+    {
+        if (_smoke) return BuildSnapshot();
+        EnsureBatchCoreAvailable(requireModel: true);
+        var keywords = ReadStringArray(parameters, "keywords");
+        PersistBatchKeywords(keywords);
+        var models = _models.Snapshot;
+        await _batch.TranscribeAllAsync(models.BatchModelId, keywords);
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
+    object RemoveBatch(JsonElement? parameters)
+    {
+        if (_smoke) return BuildSnapshot();
+        TryReadString(parameters, "id", out var id);
+        _batch.Remove(id);
+        return BuildSnapshot();
+    }
+
+    object ClearBatch()
+    {
+        if (_smoke) return BuildSnapshot();
+        _batch.Clear();
+        return BuildSnapshot();
+    }
+
+    object ExportBatchTxt(JsonElement? parameters)
+    {
+        if (_smoke) return BuildSnapshot();
+        TryReadString(parameters, "id", out var id);
+        var result = _batch.GetResult(id, out var suggestedFileName);
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "文本文件|*.txt|所有文件|*.*",
+            FileName = suggestedFileName,
+            DefaultExt = "txt",
+            AddExtension = true,
+            OverwritePrompt = true,
+            Title = "导出转写文本"
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            TranscriptPersistenceService.ExportTxt(dialog.FileName, result.Items, includeTime: true);
+            _batch.MarkExported(Path.GetFileName(dialog.FileName));
+        }
+        return BuildSnapshot();
+    }
+
+    void PersistBatchKeywords(IEnumerable<string> keywords)
+    {
+        var normalized = string.Join(", ", keywords.Take(32));
+        if (string.Equals(_settings.Keywords, normalized, StringComparison.Ordinal)) return;
+        _settings.Keywords = normalized;
+        _settings.Save();
     }
 
     object CancelBatch()
@@ -901,13 +977,17 @@ public sealed class WebShellForm : Form
             !_smokeMethods.Contains("batch.pickFiles") ||
             !_smokeMethods.Contains("batch.analyze") ||
             !_smokeMethods.Contains("batch.transcribe") ||
+            !_smokeMethods.Contains("batch.transcribeAll") ||
+            !_smokeMethods.Contains("batch.remove") ||
+            !_smokeMethods.Contains("batch.clear") ||
+            !_smokeMethods.Contains("batch.exportTxt") ||
             !_smokeMethods.Contains("batch.cancel") ||
             !_smokeMethods.Contains("diagnostics.liveLevelAck")) return;
 
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}bridge=batch.pickFiles{Environment.NewLine}bridge=batch.analyze{Environment.NewLine}bridge=batch.transcribe{Environment.NewLine}bridge=batch.cancel{Environment.NewLine}bridge=diagnostics.liveLevelAck{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}bridge=batch.pickFiles{Environment.NewLine}bridge=batch.analyze{Environment.NewLine}bridge=batch.transcribe{Environment.NewLine}bridge=batch.transcribeAll{Environment.NewLine}bridge=batch.remove{Environment.NewLine}bridge=batch.clear{Environment.NewLine}bridge=batch.exportTxt{Environment.NewLine}bridge=batch.cancel{Environment.NewLine}bridge=diagnostics.liveLevelAck{Environment.NewLine}");
     }
 
     static bool IsPotPlayerDetected()
