@@ -2515,3 +2515,264 @@ html,body,#app,
 .color-row input[type="color"]{
   background:var(--ls-surface-raised);
 }
+
+
+/* v0.1.22 product-density pass: larger typography/icons, less dead space */
+body{font-size:15px}
+
+.app-shell{grid-template-columns:228px minmax(0,1fr)}
+.sidebar{padding:38px 11px 12px 20px!important}
+.side-brand{gap:11px;padding:0 8px 24px 14px}
+.brand-mark{width:52px;height:52px;border-radius:16px}
+.brand-mark svg{width:33px;height:33px}
+.brand-copy h1{font-size:24px}
+.brand-copy small,.brand-version{font-size:11.5px!important}
+.side-nav{gap:5px;padding-left:8px}
+.side-nav button{height:50px;grid-template-columns:31px 1fr;gap:11px;padding:0 14px;font-size:16px}
+.side-nav svg{width:25px;height:25px}
+.side-secondary{margin-left:8px;margin-right:6px;padding-top:10px}
+.side-secondary button{height:46px}
+.side-status{margin:10px 6px 0 10px!important;min-height:56px!important;padding:8px 10px!important}
+.side-status-icon{width:34px!important;height:34px!important}
+.side-status-icon svg{width:22px;height:22px}
+.side-status strong{font-size:12.5px!important}
+.side-status small{font-size:10.5px!important}
+
+.page,
+.home-page,
+.live-page,
+.batch-page,
+.models-page,
+.settings-page,
+.docs-page{
+  width:min(100%,960px);
+  max-width:960px;
+  padding:22px 28px 15px 24px!important;
+}
+
+.page-head,
+.batch-page .page-head,
+.models-page .page-head,
+.settings-page .page-head,
+.docs-page .page-head{
+  min-height:80px;
+  grid-template-columns:54px minmax(0,1fr) auto;
+  gap:16px;
+  padding:0 0 11px;
+}
+.page-feature,
+.batch-page .page-feature,
+.models-page .page-feature,
+.settings-page .page-feature,
+.docs-page .page-feature{
+  width:52px;height:52px;border-radius:16px
+}
+.page-feature svg,
+.batch-page .page-feature svg,
+.models-page .page-feature svg,
+.settings-page .page-feature svg,
+.docs-page .page-feature svg{
+  width:30px;height:30px
+}
+.page-title h2,
+.batch-page .page-title h2,
+.models-page .page-title h2,
+.settings-page .page-title h2,
+.docs-page .page-title h2{
+  font-size:24px;letter-spacing:-.45px
+}
+.page-title>span,
+.batch-page .page-title>span,
+.models-page .page-title>span,
+.settings-page .page-title>span,
+.docs-page .page-title>span{
+  margin-top:4px;font-size:12px
+}
+.info-dot{width:19px;height:19px;font-size:10.5px}
+.secondary-button{min-height:40px;padding:0 14px;font-size:12.5px}
+.icon-action svg{width:18px;height:18px}
+
+/* Home */
+.home-control-head{
+  min-height:92px;
+  grid-template-columns:56px 185px minmax(220px,1fr) 134px;
+  gap:18px;
+  padding-bottom:11px;
+}
+.home-module-icon{width:54px;height:54px;border-radius:17px}
+.home-module-icon svg{width:31px;height:31px}
+.home-control-copy h2{font-size:24px}
+.home-control-copy small{font-size:12px}
+.home-status-list{
+  flex:1 1 auto;min-height:0;
+  grid-template-rows:repeat(4,minmax(74px,1fr))
+}
+.home-control-row{
+  grid-template-columns:56px minmax(190px,1fr) minmax(190px,auto) 80px;
+  gap:17px;padding:0 3px
+}
+.home-row-feature{width:52px;height:52px;border-radius:16px}
+.home-row-feature svg{width:28px;height:28px}
+.home-row-copy h3{font-size:17.5px}
+.home-row-copy small{margin-top:5px;font-size:12.3px}
+.home-row-meta strong{font-size:12.5px}
+.home-row-meta small{font-size:10.5px}
+.home-row-result{font-size:12px}
+.home-readiness span{height:30px;padding:0 10px;font-size:10.8px}
+.home-startup-row{min-height:48px}
+.home-startup-row strong{font-size:13px}
+.home-startup-row>span:nth-child(3){font-size:12px}
+
+/* Realtime */
+.live-task-card{
+  min-height:100px;
+  grid-template-columns:56px 178px minmax(235px,1fr) 124px;
+  gap:20px;padding-bottom:12px
+}
+.live-module-icon{width:54px;height:54px;border-radius:17px}
+.live-module-icon svg{width:31px;height:31px}
+.live-task-copy h2{font-size:22px}
+.live-task-copy>small{font-size:11px}
+.live-task-status strong{font-size:13px}
+.live-task-status small{font-size:10.5px}
+.live-task-status-icon{width:36px;height:36px}
+.instant-level{font-size:11.5px}
+.live-primary-action{height:42px;font-size:12.5px}
+.live-options .option-row{min-height:54px}
+.live-options .option-name strong{font-size:14px}
+.live-options .row-icon{width:34px;height:34px}
+.live-options .row-icon svg{width:21px;height:21px}
+.live-options .option-row select{height:39px;font-size:13px}
+.wave-head strong{font-size:13.5px}
+.wave-head small{font-size:11px}
+.transcript-scroll p{font-size:13.5px;line-height:1.5}
+.transcript-scroll p.current{font-size:16px}
+
+/* Batch */
+.batch-workspace{
+  grid-template-rows:68px 62px 116px minmax(150px,1fr) 46px
+}
+.batch-toolbar{
+  grid-template-columns:minmax(125px,.8fr) minmax(145px,1.05fr) minmax(130px,.9fr) auto;
+  gap:10px
+}
+.batch-tool-icon{width:38px;height:38px;border-radius:11px}
+.batch-tool-icon svg{width:22px;height:22px}
+.batch-model-summary small,.batch-keywords>span{font-size:10.5px}
+.batch-model-summary strong{font-size:12.5px}
+.batch-keywords input{height:38px;font-size:11.5px}
+.batch-output-summary{min-width:0;display:flex;align-items:center;gap:4px}
+.batch-output-button{
+  min-width:0;max-width:150px;height:40px;display:flex;align-items:center;gap:8px;
+  padding:0 8px;border:1px solid #d8e3ea;border-radius:10px;color:#526b7f;background:var(--ls-surface-raised);text-align:left
+}
+.batch-output-button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;flex:none}
+.batch-output-button span{min-width:0}
+.batch-output-button small,.batch-output-button strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-output-button small{color:#8a99a7;font-size:9.5px}
+.batch-output-button strong{margin-top:2px;font-size:11px}
+.batch-open-output{
+  width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#1688d4;font-size:16px
+}
+.batch-open-output:hover{background:#eaf4fb}
+.batch-run-actions{gap:6px}
+.batch-export-all,.batch-all-button,.batch-start-button{
+  height:40px!important;min-width:76px;padding:0 10px;font-size:10.8px!important
+}
+.batch-export-all{
+  border:1px solid #cbd9e2;border-radius:10px;color:#36765c;background:#edf8f3;font-weight:680
+}
+.batch-start-button{min-width:92px!important;width:auto!important}
+.batch-start-button.retry{color:#9b6a18;border-color:#e4c984;background:linear-gradient(180deg,#fff9df,#f6e9b4)}
+.batch-start-button.retry svg{fill:none;stroke:currentColor;stroke-width:2}
+.batch-queue-summary{height:48px}
+.batch-queue-summary strong{font-size:13px}
+.batch-queue-summary small{font-size:9.5px}
+.batch-queue-item{height:48px;min-width:188px;max-width:250px}
+.batch-queue-select{height:46px;grid-template-columns:33px minmax(0,1fr)}
+.batch-file-icon{width:31px;height:31px}
+.batch-file-icon svg{width:18px;height:18px}
+.batch-queue-select strong{font-size:11.5px}
+.batch-queue-select small{font-size:9.5px}
+.batch-queue-item.missing{opacity:.58}
+.batch-queue-item.retry{border-color:#ead9b7}
+.batch-media-head strong{font-size:13px}
+.batch-media-head small{font-size:10.5px}
+.batch-media-actions button{font-size:10.8px;font-weight:650}
+.batch-wave-shell{height:64px}
+.batch-transcript-head strong{font-size:13px}
+.batch-transcript-head span{font-size:10.3px}
+.batch-transcript-scroll p{grid-template-columns:62px minmax(0,1fr);font-size:12.5px;line-height:1.52}
+.batch-transcript-scroll p b{font-size:9.8px}
+.batch-operation-bar strong{font-size:10.8px}
+.batch-operation-bar span{font-size:9.8px}
+.batch-operation-bar>b{font-size:10px}
+
+/* Models */
+.inner-tabs{height:40px;gap:22px}
+.inner-tabs button{height:39px;font-size:12.5px}
+.model-config-row{
+  min-height:64px;
+  grid-template-columns:44px minmax(150px,1fr) minmax(220px,340px) 62px
+}
+.model-config-row .row-icon{width:40px;height:40px}
+.model-config-row>span:nth-child(2) strong{font-size:14.5px}
+.model-config-row>span:nth-child(2) small{font-size:11px}
+.model-config-row select{height:40px;font-size:13px}
+.library-toolbar{min-height:46px}
+.model-filter-bar button{height:34px;font-size:12px}
+.model-table th{height:40px;font-size:11.5px}
+.model-table td{height:62px;font-size:12px}
+.mini-model-icon{width:36px;height:36px}
+.table-model-name strong{font-size:12.5px}
+.table-model-name small{font-size:10px}
+.install-state{font-size:10.5px}
+.install-state.repair{color:#986b1d;background:#fff5de}
+.table-actions button{font-size:11.5px}
+.operation-bar{min-height:44px}
+.operation-bar span,.operation-bar strong{font-size:11px}
+.operation-bar small{font-size:10px}
+
+/* Settings */
+.settings-row{min-height:56px!important}
+.setting-label{gap:12px}
+.setting-label strong{font-size:14px}
+.setting-label small{font-size:11px}
+.settings-row .row-icon{width:38px;height:38px}
+.settings-row .row-icon svg{width:22px;height:22px}
+.settings-row select{height:40px;font-size:13px}
+.range-control{font-size:12px}
+.range-control b{font-size:11.5px}
+.settings-actions{padding-top:10px}
+
+/* Docs */
+.docs-list{padding-top:3px}
+.docs-list>div{min-height:72px;padding:12px 3px;gap:14px}
+.docs-list>div>b{font-size:12px}
+.docs-list strong{font-size:15.5px}
+.docs-list p{margin-top:4px;font-size:12.8px;line-height:1.55}
+
+/* About */
+.about-page{padding-top:18px!important;padding-bottom:18px!important}
+.about-card{width:min(520px,94%);padding:20px 24px 18px}
+.about-logo{width:72px;height:72px;margin-bottom:12px}
+.about-logo svg{width:42px;height:42px}
+.about-card h2{font-size:29px}
+.about-card>p{margin:6px 0 15px;font-size:13.5px}
+.about-card dl div{min-height:43px;padding:7px 2px}
+.about-card dt,.about-card dd{font-size:12.5px}
+
+@media(max-width:999px){
+  .app-shell{grid-template-columns:204px minmax(0,1fr)}
+  .sidebar{padding-left:14px!important;padding-top:28px!important}
+  .side-nav button{height:46px;font-size:14.5px}
+  .side-nav svg{width:23px;height:23px}
+  .page,.home-page,.live-page,.batch-page,.models-page,.settings-page,.docs-page{padding:18px 22px 12px 20px!important}
+  .page-title h2,.batch-page .page-title h2,.models-page .page-title h2,.settings-page .page-title h2,.docs-page .page-title h2{font-size:21px}
+  .home-control-head{grid-template-columns:48px 155px minmax(170px,1fr) 116px;gap:13px}
+  .home-module-icon,.home-row-feature{width:46px;height:46px}
+  .home-row-copy h3{font-size:15px}
+  .batch-toolbar{grid-template-columns:minmax(110px,.8fr) minmax(125px,1fr) minmax(115px,.85fr) auto;gap:6px}
+  .batch-output-button{max-width:125px}
+  .batch-export-all,.batch-all-button,.batch-start-button{min-width:64px;padding:0 7px;font-size:9.6px!important}
+}
