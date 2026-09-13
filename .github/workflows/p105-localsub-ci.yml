@@ -197,7 +197,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.9 workflow and visual contract
+      - name: Verify v0.1.10 workflow and visual contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -225,7 +225,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.9 Web UI contract missing: $required"
+              throw "v0.1.10 Web UI contract missing: $required"
             }
           }
 
@@ -238,7 +238,7 @@ jobs:
             'z-index:2147483000'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.9 style contract missing: $required"
+              throw "v0.1.10 style contract missing: $required"
             }
           }
 
@@ -248,7 +248,7 @@ jobs:
             'DefaultBackgroundColor = Color.FromArgb(244, 248, 251)'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.9 4:3 host contract missing: $required"
+              throw "v0.1.10 4:3 host contract missing: $required"
             }
           }
 
@@ -260,13 +260,16 @@ jobs:
             throw 'Realtime history must remain a single XY curve, not a mirrored waveform.'
           }
 
-      - name: Verify ASR-coupled high-rate live meter
+      - name: Verify WinForms-proven capture peak live meter
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
           $ErrorActionPreference='Stop'
           $core = Get-Content 'src/LocalSub.CoreWorker/Program.cs' -Raw
           $pipeline = Get-Content 'src/LocalSub/Services/LiveAsrPipeline.cs' -Raw
+          $allAudio = Get-Content 'src/LocalSub/Services/AllAudioCaptureService.cs' -Raw
+          $processAudio = Get-Content 'src/LocalSub/Services/ProcessLoopbackCaptureService.cs' -Raw
+          $legacy = Get-Content 'src/LocalSub/UI/MainForm.cs' -Raw
           $controller = Get-Content 'src/LocalSub/UI/LiveSessionController.cs' -Raw
           $hostSource = Get-Content 'src/LocalSub/UI/WebShellForm.cs' -Raw
           $bridge = Get-Content 'src/LocalSub/WebUi/src/bridge.ts' -Raw
@@ -274,20 +277,32 @@ jobs:
 
           foreach ($required in @(
             'now - previous < 33',
-            'MeasureMeterLevel(samples)',
-            '20.0 * Math.Log10(rms)',
+            '_allAudio.LevelChanged += ForwardCaptureLevel',
+            '_processAudio.LevelChanged += ForwardCaptureLevel',
+            'void ForwardCaptureLevel(float value)',
+            'LevelChanged?.Invoke(Math.Clamp(value, 0, 1))',
+            'LevelChanged?.Invoke(peak)',
+            '_liveAsr.LevelChanged += v => SafeUi(() => audioLevel.Value',
             'internal event Action<float>? LevelChanged',
             'PostEvent("live.level"',
             'subscribeLiveLevel',
             'levelHistoryTick = (levelHistoryTick + 1) % 3'
           )) {
-            if (($core + $pipeline + $controller + $hostSource + $bridge + $app) -notmatch [regex]::Escape($required)) {
-              throw "ASR-coupled live meter contract missing: $required"
+            if (($core + $pipeline + $allAudio + $processAudio + $legacy + $controller + $hostSource + $bridge + $app) -notmatch [regex]::Escape($required)) {
+              throw "WinForms-proven capture peak meter contract missing: $required"
             }
           }
-          if ($pipeline -match '_allAudio\.LevelChanged\s*\+=' -or $pipeline -match '_processAudio\.LevelChanged\s*\+=') {
-            throw 'Realtime UI meter must be driven from ASR input samples, not raw capture packet peaks.'
+
+          if ($pipeline -match 'MeasureMeterLevel\(' -or $pipeline -match 'Math\.Log10\(' -or $pipeline -match '_meterEnvelope') {
+            throw 'Realtime meter must not silently switch back to RMS/dB mapping.'
           }
+
+          $sampleHandler = [regex]::Match($pipeline,'(?s)void OnSamples\(float\[\] samples\).*?\n    \}')
+          if (-not $sampleHandler.Success) { throw 'LiveAsrPipeline OnSamples handler not found.' }
+          if ($sampleHandler.Value -match 'LevelChanged\?\.Invoke') {
+            throw 'OnSamples must feed ASR only; UI meter must remain on the capture peak path.'
+          }
+
           $levelHandler = [regex]::Match($controller,'(?s)void OnLevelChanged\(float value\).*?\n    \}')
           if (-not $levelHandler.Success) { throw 'LiveSessionController level handler not found.' }
           if ($levelHandler.Value -match 'NotifyChanged\(') {
