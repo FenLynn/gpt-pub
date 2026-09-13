@@ -91,7 +91,7 @@ internal static class Program
             var stateBackupRecovery = ValidateStateBackupRecovery(recoveryRoot);
             var reconcileBackupRecovery = ValidateReconcileBackupRecovery(recoveryRoot);
             var productSidecarBackupRecovery = ProductExperienceV044.ValidateBackupRecoveryForSelfTest(recoveryRoot);
-            var operationalHealthSummary = ProductExperienceV044.ValidateOperationalHealthForSelfTest();
+            var operationalHealthLedger = ProductExperienceV044.ValidateOperationalHealthForSelfTest();
             var runtimeSessionSelfTest = RuntimeSessionV046.ValidateForSelfTest(paths.LocalRoot, paths.TempRoot);
 
             using var host = new AppHost();
@@ -117,7 +117,7 @@ internal static class Program
                 stateBackupRecovery,
                 reconcileBackupRecovery,
                 productSidecarBackupRecovery,
-                operationalHealthSummary,
+                operationalHealthLedger,
                 runtimeSessionSelfTest,
                 windowFourThreeMigration,
                 windowPlacementSelfTest,

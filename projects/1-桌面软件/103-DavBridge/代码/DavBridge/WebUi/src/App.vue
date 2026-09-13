@@ -36,7 +36,7 @@ const recentCompleteText = computed(() => recentComplete.value ? `${recentComple
 const recentPauseText = computed(() => recentPause.value ? `${recentPause.value.time} · ${recentPause.value.title}` : '暂无近期暂停记录')
 const recentWarningText = computed(() => recentWarning.value ? `${recentWarning.value.time} · ${recentWarning.value.title}` : '暂无近期异常')
 const cycleTrafficText = computed(() => `上传 ${quotaUsedText(snapshot.value.quota.uploadText)} · 下载 ${quotaUsedText(snapshot.value.quota.downloadText)}`)
-const healthWindowLabel = computed(() => snapshot.value.operationalHealth.windowComplete ? `近 ${snapshot.value.operationalHealth.hours} 小时` : '近期活动窗口')
+const healthWindowLabel = computed(() => snapshot.value.operationalHealth.windowComplete ? `近 ${snapshot.value.operationalHealth.hours} 小时` : '健康账本建立中')
 const healthSummaryText = computed(() => {
   const h=snapshot.value.operationalHealth
   return `完成 ${h.completionCount} · 网络等待 ${h.networkWaitCount} · 警告 ${h.warningCount} · 暂停 ${h.pauseCount}`
@@ -553,7 +553,7 @@ onBeforeUnmount(()=>{
             <span>{{ healthWindowLabel }}</span>
             <strong>{{ healthSummaryText }}</strong>
           </div>
-          <small>{{ healthWorkloadText }}<template v-if="!snapshot.operationalHealth.windowComplete"> · 活动窗口可能已截断</template></small>
+          <small>{{ healthWorkloadText }}<template v-if="!snapshot.operationalHealth.windowComplete"> · 持续运行满 {{ snapshot.operationalHealth.hours }} 小时后显示完整窗口</template></small>
         </section>
       </article>
     </section>
