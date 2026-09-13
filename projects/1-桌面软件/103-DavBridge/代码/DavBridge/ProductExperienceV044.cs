@@ -221,7 +221,47 @@ internal static class ProductExperienceV044
     public static IReadOnlyList<ProductActivityV044> RecentActivities(int max = 30)
     {
         lock (Gate)
-            return _state.Activities.OrderByDescending(item => item.At).Take(Math.Max(1, max)).ToArray();
+        {
+            var limit = Math.Max(1, max);
+            var ordered = _state.Activities.OrderByDescending(item => item.At).ToArray();
+            var visible = new List<ProductActivityV044>(limit);
+
+            foreach (var item in ordered)
+            {
+                if (visible.Count > 0)
+                {
+                    var newer = visible[^1];
+                    var gap = newer.At - item.At;
+
+                    if (gap >= TimeSpan.Zero && gap <= TimeSpan.FromSeconds(10) &&
+                        string.Equals(newer.Title, item.Title, StringComparison.Ordinal) &&
+                        string.Equals(newer.Detail, item.Detail, StringComparison.Ordinal))
+                        continue;
+
+                    if (gap >= TimeSpan.Zero && gap <= TimeSpan.FromSeconds(45) &&
+                        string.Equals(newer.Title, "迁移运行中", StringComparison.Ordinal) &&
+                        string.Equals(item.Title, "迁移已继续", StringComparison.Ordinal))
+                    {
+                        visible[^1] = new ProductActivityV044(
+                            newer.At,
+                            "迁移已继续",
+                            "自动调度已恢复，DavBridge 正在执行安全队列。",
+                            "info");
+                        continue;
+                    }
+
+                    if (gap >= TimeSpan.Zero && gap <= TimeSpan.FromMinutes(2) &&
+                        string.Equals(newer.Title, "迁移已暂停", StringComparison.Ordinal) &&
+                        string.Equals(item.Title, "正在安全暂停", StringComparison.Ordinal))
+                        continue;
+                }
+
+                visible.Add(item);
+                if (visible.Count >= limit) break;
+            }
+
+            return visible.ToArray();
+        }
     }
 
     public static void Record(string title, string detail, string tone = "info")
@@ -229,7 +269,18 @@ internal static class ProductExperienceV044
         lock (Gate)
         {
             var safeTone = tone is "success" or "warning" ? tone : "info";
-            _state.Activities.Add(new ProductActivityV044(DateTimeOffset.Now, Clip(title, 64), Clip(detail.Replace('\r', ' ').Replace('\n', ' '), 220), safeTone));
+            var now = DateTimeOffset.Now;
+            var safeTitle = Clip(title, 64);
+            var safeDetail = Clip(detail.Replace('\r', ' ').Replace('\n', ' '), 220);
+            var last = _state.Activities.LastOrDefault();
+
+            if (last is not null &&
+                now - last.At <= TimeSpan.FromSeconds(3) &&
+                string.Equals(last.Title, safeTitle, StringComparison.Ordinal) &&
+                string.Equals(last.Detail, safeDetail, StringComparison.Ordinal))
+                return;
+
+            _state.Activities.Add(new ProductActivityV044(now, safeTitle, safeDetail, safeTone));
             TrimActivities();
             SaveLocked();
         }
