@@ -6,23 +6,23 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.14**。
+当前 `p103-exp` 候选：**v0.4.15**。
 
 最后完成完整 CI 的代码 head：
 
 ```text
-378bb37707a3a5f1d685427edb77294d916acdcc
+92f3a05a8b351aab357250899c7de0ecb82ce760
 ```
 
-CI run：`34726420112`，结果 `success`。
+CI run：`34736655980`，结果 `success`。
 
-候选 Artifact：`DavBridge-v0.4.14-win-x64`，Artifact ID `10307014716`。
+候选 Artifact：`DavBridge-v0.4.15-win-x64`，Artifact ID `10311605517`。
 
-EXE SHA256：`d9aed38fb757579c6a8b9c6ab84e5536d680c15b5ca0982d2cd93b43a27e092a`。
+EXE SHA256：`aa72ee8ec14c4fbf6fe8bcd117a3fc041864233af1bbaaec9ccf92b8a843569e`。
 
-Artifact ZIP SHA256：`8edbc1b8bf7e3573807ce69509a9c56d48b7298fff985bf19b559966f74dc89d`。
+Artifact ZIP SHA256：`908b1bef4a812b5329565303672da14b051ad152a823c5df077ad2b102630770`。
 
-如果该 head 之后只有文档提交，仍以 `378bb377...` 作为最后经过完整构建验证的代码 head。
+如果该 head 之后只有文档提交，仍以 `92f3a05a...` 作为最后经过完整构建验证的代码 head。
 
 ## 解决方案
 
@@ -236,17 +236,17 @@ Windows x64 使用 .NET 8 framework-dependent single EXE publish。
 .github/workflows/p103-davbridge-ci.yml
 ```
 
-最后已验证 run `34726420112` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
+最后已验证 run `34736655980` 同时包含 Core Smoke、Vue build、视觉预览、Windows publish、Runtime boundary 和 native-host self-test。
 
 ## 当前开发断点
 
-v0.4.14 等待用户 Windows 实机连续验证“暂停 → 继续 → 再暂停”。继续命令必须立即释放 UI，任何真实 active run 都必须重新暴露黄色“暂停”。安全暂停期间按钮固定保留为灰色“正在暂停”，最终变为绿色“继续”。未经明确验收，不提升 stable/main，不创建正式 Release。
+v0.4.15 等待用户 Windows 实机验收：上传进度语义、强校验 / 安全暂停状态独立显示、最近活动去重、滚动条隐藏和原生模态背景降权。未经明确验收，不提升 stable/main，不创建正式 Release。
 
 
-### v0.4.14 重复暂停与主操作按钮
+### v0.4.15 状态显示边界
 
-手动“继续”不再等待整轮 `RunOnceAsync`，实际迁移 pass 在后台继续，从而避免 Vue `busy` 长时间锁住第二次暂停。
+`WebUiHostV040` 现在只保存目标端 `WebDavIoOperation.Upload` 的 I/O 进度作为 `CurrentProgress`。同一文件后续进入目标端重新读取和 StrongVerified 时，上传进度可以保持 100%，而状态文字继续表达当前安全阶段。
 
-Web snapshot 现在优先检查真实 `IsRunning`。只要迁移已启用且 pass 正在运行，主操作即为“暂停”，即使持久 `EngineState` 还短暂保留上一轮状态。
+`ProductExperienceV044.RecentActivities()` 在展示层合并短时间内同一状态转换产生的重复事件，不修改迁移账本或安全状态。
 
-主操作按钮固定占位：可点击暂停黄色，可点击继续/重试绿色，不可操作灰色。安全暂停中显示灰色“正在暂停”，不会因为按钮消失导致布局变化。
+`quota.calibrate` 通过原生模态包装器临时给 Web UI 根节点添加 `native-modal-open`，结束后无论成功、取消或异常都会在 finally 中移除。
