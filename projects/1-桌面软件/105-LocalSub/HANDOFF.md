@@ -188,18 +188,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.8 已完成实时电平链路与实时页第三轮实机反馈收口。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.9 已完成实时电平算法、应用图标与实时页第四轮实机反馈收口。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-cf5dee671b13783c8541d4eeb20cd999a5074e8a
+3befd7ebd989c47f0e210ae55a311fca3bfc13ea
 ```
 
 P105 Windows CI：
 
 ```text
-run 34732116003
+run 34736880781
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10310386040
-sha256:bcb16fc89480cbb76ca32ad406243242516f82c5137b1b7a43c90b800e3022a0
+ID 10311715249
+sha256:a8a4b17fd4922597955904f257bfca4934de5d007c4fd935201217e03ceded9d
 
 WebUi preview
-ID 10309861877
-sha256:386a3077302552b3a81577b31ce71fbf1910d92c5c85815e373d2953b9b9c313
+ID 10311241889
+sha256:4ab1c759ba9b9c67bf5ae3e97cb4e50f9ba6ca95aeb09ac8adebe7cb857abbfb
 ```
 
 本阶段已经完成：
@@ -240,11 +240,14 @@ v0.1.7 基于实机截图继续收口：主页改为纵向状态清单，主按�
 
 v0.1.8 修正实时电平链路：Core 的 `live.level` 对外频率由约 10 Hz 提高到约 30 Hz；Shell 不再因每个电平样本触发完整 `app.snapshot`，而是通过独立轻量 `live.level` Web 事件转发；Vue 顶部电平条直接订阅该事件，30 秒历史每 3 个样本记录一次。历史波形改为单条 XY 曲线，不再镜像对称。实时页顶部按最新版 DavBridge 的语义拆成标题、实时电平、监视开关、状态和独立动作槽；普通页面背景改为统一实色浅蓝灰，避免半透明白层造成发白观感。
 
+v0.1.9 修正“字幕持续输出但 meter 基本不动”的观察点错误：Core realtime meter 不再直接转发采集层 packet peak，而是对真正送入 ASR 的 16 kHz 单声道样本计算短时 RMS，并以约 -54 dBFS 到 -6 dBFS 映射为 0 到 1，再采用快速 attack 和短 release 包络。实时页顶部按最新版 DavBridge 当前任务结构进一步收束为三段：标题、状态+电平、独立动作；30 秒历史开关移回波形自身标题行。新增 `Assets/LocalSub.ico`，同一图标写入 Shell EXE、主窗口、legacy 窗口和 NotifyIcon 托盘。
+
 下一步固定为：
 
 1. 不提升 stable，不动 main。
-2. 用户实机验证 v0.1.8：顶部电平条是否接近连续跳动、30 秒单线曲线是否持续左移、真实 PotPlayer 电平与字幕是否同步、状态和动作区是否清晰分离。
-3. 下一步集中完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
+2. 用户实机验证 v0.1.9：顶部 RMS meter 是否随真实音频快速变化、30 秒曲线是否持续左移、EXE/窗口/托盘图标是否正确显示。
+3. 若 meter 实机仍异常，下一步直接记录真实 `SamplesAvailable` 的 RMS/事件频率诊断，不再通过 UI 动画掩盖底层问题。
+4. meter 实机确认后继续完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
 4. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台达到必要功能覆盖后再进入 Phase 3 删除。
 
 ## 9. Web UI 约束
