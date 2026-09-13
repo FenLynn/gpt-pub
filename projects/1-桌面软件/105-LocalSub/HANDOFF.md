@@ -188,7 +188,7 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口，v0.1.15 完成左上版本身份与 DavBridge 风格 About 页，v0.1.16 将“文档”移入上方主导航并固定 DavBridge 式导航分组。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口，v0.1.15 完成左上版本身份与 DavBridge 风格 About 页，v0.1.16 将“文档”移入上方主导航并固定 DavBridge 式导航分组，v0.1.17 完成首页信息密度与层级精修。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 开始 v0.1.14 前，最新仓库 `main` 已通过正常 merge 同步进 `p105-exp`：
 
@@ -199,13 +199,13 @@ sync merge: cff0be79420d4f26e8e19aba23112cfdbfede9ff
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-072366a2b675c84b8fd559647f3a18ababdd9ede
+0710dfc3d77a0be85c53ac698a5c4f1125e0ce95
 ```
 
 P105 Windows CI：
 
 ```text
-run 34759409132
+run 34760042555
 success
 ```
 
@@ -213,15 +213,24 @@ Artifacts：
 
 ```text
 candidate
-ID 10318661783
-downloaded artifact sha256: aaeac550345de12a2a6f8d48b574e722dafbf17a6ff97157efc5e80aac8c7231
-inner portable candidate sha256: b89bd1b29b90e11b6bab70f5d48b32b115676d113f16a2f738c8be26891d6578
+ID 10318463243
+downloaded artifact sha256: 1bdaebc2cf815b7b85f9aac7e3fa913425ee8fe4071c33175cf4f6695e09d613
+inner portable candidate sha256: 5c9bba2c4f8a2e88e2b40a4a4741bc1ef98db8cb85b6632bc6ed7b18b0215b94
 
 WebUi preview
-ID 10318716704
-downloaded artifact sha256: fa7dd424c4121113802ce1778920919203dd3f3245e750d9d883084b8bc2c11a
+ID 10318523166
+downloaded artifact sha256: 26f705b6214b4174dea94041ae8b008b4763254ed117d47e8689e294a9527b1b
 ```
 
+v0.1.17 本轮完成：
+
+- 首页主标题由重复的 `LocalSub` 改为“运行概览”，减少品牌重复。
+- 四条首页状态由被动撑满整页改为受控信息带，1100×825 与 900×675 都保持均衡密度。
+- “运行条件 / 实时配置 / 字幕显示 / 后台转写”说明进一步缩短，减少工程实现细节。
+- 底部“启动方式”保持锚定底部，形成稳定的顶部状态、中部条件、底部启动三层结构。
+- 第一版 v0.1.17 自动截图后发现 1100×825 中段过紧、底部空白偏大，已在同一版本内重新平衡高度后再次跑 exact-head CI。
+- 最终 1100×825 与 900×675 首页截图已人工复核。
+- 本轮不修改 meter、Core、realtime、模型和后台任务业务链。
 v0.1.16 本轮完成：
 
 - 将“文档”从左下辅助导航移入上方主导航，直接对齐 DavBridge 的分组逻辑。
@@ -253,10 +262,11 @@ v0.1.13 继续保留：
 下一步固定为：
 
 1. 不提升 stable，不动 main，不创建正式 Release。
-2. 用户实机验证 v0.1.16 当前 UI、v0.1.13 realtime 页面以及当前双 EXE 候选包，尤其确认导航分组、真实运行态按钮语义、视觉密度与长期 realtime 体验。
-3. 下一开发轮次进入 Web 后台转写工作区，直接复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
-4. Web 后台达到必要功能覆盖后，再进入 Phase 3 删除旧 WinForms 业务页。
-5. 模型真实网络下载、代理、断点续传、取消、大模型解压与真实目录删除仍保留为用户机器验证项。
+2. 用户实机验证 v0.1.17 当前 UI、v0.1.13 realtime 页面以及当前双 EXE 候选包，尤其确认首页密度、真实运行态按钮语义与长期 realtime 体验。
+3. 下一轮优先做全局页面一致性精修，统一后台、模型、设置、文档页的标题、间距、操作层级和空状态；首页与 realtime 不再做结构性反复。
+4. 全局视觉收口后进入 Web 后台转写工作区，直接复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
+5. Web 后台达到必要功能覆盖后，再进入 Phase 3 删除旧 WinForms 业务页。
+6. 模型真实网络下载、代理、断点续传、取消、大模型解压与真实目录删除仍保留为用户机器验证项。
 
 ## 9. Web UI 约束
 
@@ -298,7 +308,7 @@ Vue 不得：
 
 当前开发候选版本：
 
-- Development Version：`0.1.16`
+- Development Version：`0.1.17`
 - 当前正式 Release / RELEASE.md：`0.1.1`
 - 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 

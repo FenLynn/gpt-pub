@@ -57,10 +57,11 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
+- v0.1.17 完成首页信息密度与层级精修：主区标题改为“运行概览”，四条状态行收紧但不拥挤，启动方式锚定底部，工程化说明改为更直接的用户文案；1100×825 与 900×675 均已人工复核。
 - v0.1.16 已将“文档”从左下辅助区移入上方主导航，与 DavBridge 的导航分组一致；左下只保留“设置”和“关于”。
 - v0.1.15 已把版本号直接放到左上品牌区，并新增独立“关于”页。About 页按 DavBridge 同类结构显示版本、运行环境、双进程架构、Core 状态、识别方式与界面技术栈。
 - v0.1.14 主页控制中心与 v0.1.13 realtime 页面结构继续保留，meter/Core 链保持 v0.1.12 已验证实现。
-- 当前开发候选版本为 v0.1.16；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.17；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 继续保存改造前 P105 可运行基线。仓库 `main` 可因其他项目正常前进；开始 v0.1.14 前已把最新 main 正常合入 `p105-exp`，未重置或覆盖 P105 独有历史。
@@ -102,7 +103,8 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - v0.1.15 左上品牌区不再显示“本地字幕”副标题，改为显眼的版本徽标；左侧辅助导航新增“关于”。
 - v0.1.15 About 页采用 DavBridge 同类居中产品卡，显示版本、Windows x64 / .NET 8、LocalSub.exe + LocalSub.Core.exe、Core generation、本地离线 ASR 与 Vue 3 + WebView2。
 - v0.1.16 主导航顺序固定为“主页 / 实时字幕 / 后台转写 / 模型 / 文档”，辅助导航固定为“设置 / 关于”。
-- 当前最新完整验证代码 head 为 `072366a2b675c84b8fd559647f3a18ababdd9ede`，P105 Windows CI run `34759409132` success；candidate Artifact `10318661783`，WebUi preview Artifact `10318716704`。
+- v0.1.17 进一步统一首页与 realtime 页的内容宽度、边距和信息密度，保留 DavBridge 式浅色单栏结构。
+- 当前最新完整验证代码 head 为 `0710dfc3d77a0be85c53ac698a5c4f1125e0ce95`，P105 Windows CI run `34760042555` success；candidate Artifact `10318463243`，WebUi preview Artifact `10318523166`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
