@@ -568,3 +568,270 @@ html,body,#app{background:#f4f8fb}
   .docs-list strong{font-size:15px}
   .docs-list p{font-size:12.5px}
 }
+
+
+/* v0.1.8 high-rate meter, single XY history, DavBridge-style status/action separation */
+html,body,#app,
+.app-shell,
+.workspace,
+.page{
+  background:#f4f8fb!important;
+}
+.sidebar{
+  background:#f8fbfd!important;
+}
+.live-page{
+  background:#f4f8fb!important;
+}
+
+.live-topbar{
+  min-height:64px;
+  display:grid;
+  grid-template-columns:auto minmax(130px,1fr) 54px 118px 126px;
+  align-items:center;
+  gap:13px;
+  border-bottom:1px solid rgba(202,217,228,.72);
+  background:transparent;
+}
+.live-title,
+.instant-level,
+.live-monitor-toggle,
+.live-task-status,
+.live-action-slot{
+  background:transparent!important;
+}
+.live-title{gap:9px}
+.live-title h2{font-size:22px}
+
+.instant-level{
+  display:grid;
+  grid-template-columns:auto minmax(90px,1fr) 34px;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  color:#74879a;
+  font-size:10.5px;
+}
+.instant-level>div{
+  height:8px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#dfe7ed;
+  box-shadow:inset 0 1px 1px rgba(67,91,112,.05);
+}
+.instant-level>div i{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#38b7f2 0%,#23a269 100%);
+  transition:width .025s linear;
+  will-change:width;
+}
+.instant-level b{
+  color:#4e6a80;
+  font-size:10.5px;
+  font-variant-numeric:tabular-nums;
+  text-align:right;
+}
+
+.live-monitor-toggle{
+  width:54px;
+  height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  color:#4d7969;
+  border-left:1px solid rgba(211,223,231,.72);
+}
+.live-monitor-toggle>svg{
+  width:16px;height:16px;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round
+}
+
+.live-task-status{
+  min-width:0;
+  display:grid;
+  grid-template-columns:28px minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+  padding:0;
+}
+.live-task-status-icon{
+  width:28px;height:28px;
+  display:grid;place-items:center;
+  border-radius:9px;
+  color:#647b90;
+  background:#edf3f7;
+}
+.live-task-status-icon svg{
+  width:17px;height:17px;
+  fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round
+}
+.live-task-status-icon svg path[d^="M8 5.5"]{fill:currentColor;stroke:none}
+.live-task-status>div{min-width:0}
+.live-task-status strong{
+  display:block;
+  color:#41576c;
+  font-size:11.5px;
+  line-height:1.2;
+  font-weight:680;
+  white-space:nowrap;
+}
+.live-task-status small{
+  display:block;
+  margin-top:3px;
+  overflow:hidden;
+  color:#8998a6;
+  font-size:9.5px;
+  line-height:1.2;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.live-task-status.state-running .live-task-status-icon{
+  color:#1f9d69;background:#e8f7ef
+}
+.live-task-status.state-running strong{color:#21875f}
+.live-task-status.state-starting .live-task-status-icon,
+.live-task-status.state-stopping .live-task-status-icon{
+  color:#1688d4;background:#e7f4ff
+}
+.live-task-status.state-failed .live-task-status-icon{
+  color:#bc6641;background:#fff0e8
+}
+.live-task-status.state-failed strong{color:#8f5542}
+
+.live-action-slot{
+  width:126px;
+  min-width:126px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+}
+.live-primary-action{
+  width:126px;
+  min-width:126px;
+  height:40px;
+  min-height:40px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:0 12px;
+  border:1px solid #b8d9eb;
+  border-radius:11px;
+  color:#29739f;
+  background:linear-gradient(180deg,#f8fcff,#edf6fb);
+  box-shadow:0 4px 12px rgba(43,104,143,.05);
+  font-size:11.5px;
+  font-weight:680;
+  transition:background .15s,border-color .15s,color .15s,opacity .15s,transform .1s;
+}
+.live-primary-action:not(:disabled){cursor:pointer}
+.live-primary-action:not(:disabled):hover{
+  border-color:#9fcbe3;
+  background:linear-gradient(180deg,#f2faff,#e7f3fa)
+}
+.live-primary-action:not(:disabled):active{transform:scale(.985)}
+.live-primary-action:disabled{cursor:progress;opacity:.52}
+.live-primary-action.stop{
+  color:#a3534c;
+  border-color:#e3c3bf;
+  background:linear-gradient(180deg,#fffafa,#fff1ef);
+  box-shadow:0 4px 12px rgba(150,76,69,.035);
+}
+.live-primary-action svg{
+  width:16px;height:16px;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round
+}
+.live-primary-action svg rect{fill:currentColor;stroke:none}
+
+.waveform-section{
+  background:transparent!important;
+}
+.wave-head,
+.wave-axis,
+.transcript-head,
+.transcript-scroll{
+  background:transparent!important;
+}
+.level-wave{
+  height:92px;
+  overflow:visible;
+}
+.level-wave .axis{
+  stroke:#cfdbe4;
+  stroke-width:.75;
+  vector-effect:non-scaling-stroke;
+}
+.level-wave .axis-y{opacity:.7}
+.level-wave polyline{
+  fill:none;
+  stroke:#1688e8;
+  stroke-width:1.55;
+  vector-effect:non-scaling-stroke;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.level-wave polyline.mirror{display:none!important}
+.wave-axis{padding-left:0}
+
+.transcript-section{
+  min-height:150px;
+  padding-bottom:4px;
+}
+.transcript-scroll{
+  padding-right:16px;
+}
+.transcript-scroll p{
+  background:transparent!important;
+}
+.transcript-scroll p.current{
+  font-weight:720;
+}
+
+.live-actions{display:none!important}
+
+/* Avoid semi-transparent white patches around ordinary text surfaces. */
+.home-status-list,
+.home-status-row,
+.home-startup-row,
+.option-list,
+.option-row,
+.model-config,
+.model-config-row,
+.settings-body,
+.settings-row,
+.docs-list,
+.docs-list>div{
+  background:transparent!important;
+}
+
+@media(max-width:999px){
+  .live-topbar{
+    grid-template-columns:auto minmax(92px,1fr) 46px 104px 116px;
+    gap:8px;
+    min-height:58px;
+  }
+  .live-title{gap:7px}
+  .live-title h2{font-size:19px}
+  .compact-feature.live{width:34px;height:34px}
+  .instant-level{
+    grid-template-columns:auto minmax(62px,1fr) 29px;
+    gap:6px;
+    font-size:9.5px;
+  }
+  .instant-level b{font-size:9.5px}
+  .live-monitor-toggle{width:46px;gap:4px}
+  .live-monitor-toggle>svg{width:14px;height:14px}
+  .small-switch{width:32px;height:19px}
+  .small-switch>span:after{width:15px;height:15px}
+  .small-switch input:checked+span:after{transform:translateX(13px)}
+  .live-task-status{grid-template-columns:25px minmax(0,1fr);gap:6px}
+  .live-task-status-icon{width:25px;height:25px}
+  .live-task-status strong{font-size:10.5px}
+  .live-task-status small{font-size:8.8px}
+  .live-action-slot,.live-primary-action{width:116px;min-width:116px}
+  .live-primary-action{height:38px;font-size:10.5px}
+  .level-wave{height:76px}
+}
