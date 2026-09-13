@@ -255,7 +255,7 @@ jobs:
             '.about-page{',
             '.about-card{',
             'grid-template-columns:52px 168px minmax(220px,1fr) 126px',
-            'flex:0 1 440px',
+            'flex:0 1 500px',
             'grid-template-rows:repeat(4,minmax(88px,1fr))',
             'margin-top:auto',
             'grid-template-columns:52px minmax(190px,1fr) minmax(190px,auto) 74px',
