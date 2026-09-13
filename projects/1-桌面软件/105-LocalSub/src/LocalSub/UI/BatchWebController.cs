@@ -1,4 +1,5 @@
 using LocalSub.Core;
+using LocalSub.Models;
 using LocalSub.Services;
 
 namespace LocalSub.UI;
@@ -168,6 +169,7 @@ internal sealed class BatchWebController : IDisposable
             cts = BeginOperationLocked("transcribe", "transcribing", "正在后台转写", "准备识别");
             item.State = "转写中";
         }
+        PersistState();
         RaiseChanged();
 
         var batchProgress = new Progress<BatchTranscriptionProgress>(p =>
@@ -239,9 +241,12 @@ internal sealed class BatchWebController : IDisposable
             if (_queue.Count == 0)
                 throw new InvalidOperationException("请先添加媒体文件。");
 
-            items = _queue.ToArray();
+            items = _queue.Where(x => File.Exists(x.Path) && !_results.ContainsKey(x.Id)).ToArray();
+            if (items.Length == 0)
+                throw new InvalidOperationException(_results.Count > 0 ? "队列中没有新的待转写项目。" : "队列中的媒体文件当前不可用。");
             cts = BeginOperationLocked("transcribe-all", "transcribing", "正在转写整个队列", $"0 / {items.Length}");
         }
+        PersistState();
         RaiseChanged();
 
         var completed = 0;
@@ -258,6 +263,7 @@ internal sealed class BatchWebController : IDisposable
                     _detail = item.Name;
                     _status = $"正在转写 {item.Name}";
                 }
+                PersistState();
                 RaiseChanged();
 
                 var completedBefore = completed;
