@@ -1928,8 +1928,8 @@ html,body,#app,
 }
 .home-control-copy small{font-size:10.5px}
 .home-status-list{
-  flex:0 1 440px;
-  min-height:352px;
+  flex:0 1 500px;
+  min-height:400px;
   grid-template-rows:repeat(4,minmax(88px,1fr));
   align-content:stretch;
 }
@@ -1994,8 +1994,8 @@ html,body,#app,
     font-size:10px;
   }
   .home-status-list{
-    flex:0 1 392px;
-    min-height:320px;
+    flex:0 1 430px;
+    min-height:344px;
     grid-template-rows:repeat(4,minmax(80px,1fr));
   }
   .home-control-row{
