@@ -289,7 +289,7 @@ onBeforeUnmount(()=>{
   <aside class="sidebar">
     <div class="side-brand">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
-      <div class="brand-copy"><h1>DavBridge</h1><small>Zotero 镜像</small></div>
+      <div class="brand-copy"><h1>DavBridge</h1><small>v{{ snapshot.version }}</small></div>
     </div>
 
     <nav class="side-nav" aria-label="主导航">

@@ -48,7 +48,16 @@
   font-weight:720;
   letter-spacing:-.5px;
 }
-.brand-copy small{display:none}
+.brand-copy small{
+  display:block;
+  margin-top:5px;
+  color:#91a2b2;
+  font-size:10.5px;
+  line-height:1;
+  font-weight:560;
+  letter-spacing:.12px;
+  font-variant-numeric:tabular-nums;
+}
 
 .side-nav{
   gap:7px;
@@ -710,6 +719,7 @@
   .side-brand{padding:0 8px 24px;gap:10px}
   .brand-mark{width:40px;height:40px;border-radius:13px}
   .brand-copy h1{font-size:18px}
+  .brand-copy small{margin-top:4px;font-size:9.5px}
   .side-nav{padding-left:0;gap:4px}
   .side-nav button{height:44px;padding:0 12px;font-size:12.5px;grid-template-columns:26px 1fr auto;gap:8px}
   .side-nav svg{width:21px;height:21px}
