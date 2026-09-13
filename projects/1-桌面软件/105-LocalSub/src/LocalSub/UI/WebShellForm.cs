@@ -68,6 +68,10 @@ public sealed class WebShellForm : Form
         "model.download",
         "model.cancel",
         "model.delete",
+        "batch.pickFiles",
+        "batch.analyze",
+        "batch.transcribe",
+        "batch.cancel",
         "diagnostics.liveLevelAck"
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
@@ -92,6 +96,7 @@ public sealed class WebShellForm : Form
     readonly CoreWorkerClient _core = new();
     readonly LiveSessionController _live;
     readonly ModelCatalogController _models;
+    readonly BatchWebController _batch;
     readonly AppSettings _settings;
     readonly bool _smoke;
     readonly HashSet<string> _smokeMethods = new(StringComparer.Ordinal);
@@ -136,6 +141,7 @@ public sealed class WebShellForm : Form
         _smoke = smoke;
         _settings = AppSettings.Load();
         _models = new ModelCatalogController(_core);
+        _batch = new BatchWebController(_core);
         _live = new LiveSessionController(_core);
 
         Text = "LocalSub";
@@ -152,6 +158,7 @@ public sealed class WebShellForm : Form
         _live.Changed += OnLiveChanged;
         _live.LevelChanged += OnLiveLevelChanged;
         _models.Changed += OnModelsChanged;
+        _batch.Changed += OnBatchChanged;
         _core.ConnectionBroken += OnCoreConnectionBroken;
         _autoStartTimer.Tick += async (_, _) => await TryAutoStartLiveAsync();
         _autoStartPending = !_smoke && _settings.AutoStartLive;
@@ -161,7 +168,7 @@ public sealed class WebShellForm : Form
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete", "diagnostics.liveLevelAck" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete", "batch.pickFiles", "batch.analyze", "batch.transcribe", "batch.cancel", "diagnostics.liveLevelAck" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -267,6 +274,18 @@ public sealed class WebShellForm : Form
                     break;
                 case "model.delete":
                     result = await DeleteModelAsync(request.Params);
+                    break;
+                case "batch.pickFiles":
+                    result = PickBatchFiles();
+                    break;
+                case "batch.analyze":
+                    result = await AnalyzeBatchAsync(request.Params);
+                    break;
+                case "batch.transcribe":
+                    result = await TranscribeBatchAsync(request.Params);
+                    break;
+                case "batch.cancel":
+                    result = CancelBatch();
                     break;
                 case "diagnostics.liveLevelAck":
                     result = RecordBrowserLevelAck(request.Params);
@@ -579,6 +598,66 @@ public sealed class WebShellForm : Form
         return BuildSnapshot();
     }
 
+    object PickBatchFiles()
+    {
+        if (_smoke) return BuildSnapshot();
+
+        using var dialog = new OpenFileDialog
+        {
+            Multiselect = true,
+            Filter = "媒体文件|*.mp4;*.mkv;*.mov;*.avi;*.m4v;*.webm;*.mp3;*.m4a;*.aac;*.flac;*.wav;*.wma;*.ts;*.m2ts|所有文件|*.*",
+            Title = "选择要后台转写的媒体"
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+            _batch.AddFiles(dialog.FileNames);
+        return BuildSnapshot();
+    }
+
+    async Task<object> AnalyzeBatchAsync(JsonElement? parameters)
+    {
+        if (_smoke) return BuildSnapshot();
+        EnsureBatchCoreAvailable(requireModel: false);
+        TryReadString(parameters, "id", out var id);
+        await _batch.SelectAndAnalyzeAsync(id);
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
+    async Task<object> TranscribeBatchAsync(JsonElement? parameters)
+    {
+        if (_smoke) return BuildSnapshot();
+        EnsureBatchCoreAvailable(requireModel: true);
+        TryReadString(parameters, "id", out var id);
+        var keywords = ReadStringArray(parameters, "keywords");
+        var models = _models.Snapshot;
+        await _batch.TranscribeAsync(id, models.BatchModelId, keywords);
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+        return BuildSnapshot();
+    }
+
+    object CancelBatch()
+    {
+        _batch.Cancel();
+        return BuildSnapshot();
+    }
+
+    void EnsureBatchCoreAvailable(bool requireModel)
+    {
+        var live = _live.Snapshot;
+        if (live.State is "starting" or "running" or "stopping")
+            throw new InvalidOperationException("实时字幕运行时不能启动后台媒体任务，请先停止实时字幕。");
+        if (_models.Snapshot.Operation.State == "running")
+            throw new InvalidOperationException("模型任务正在运行，请等待完成后再开始后台转写。");
+        if (!requireModel) return;
+
+        var models = _models.Snapshot;
+        var selected = models.Catalog.FirstOrDefault(x => string.Equals(x.Id, models.BatchModelId, StringComparison.OrdinalIgnoreCase));
+        if (selected == null || !selected.Installed || !selected.BatchCapable)
+            throw new InvalidOperationException("默认后台模型不可用，请先在模型页安装并选择后台模型。");
+    }
+
     async Task<object> BuildSnapshotAsync(bool probeCore)
     {
         if (probeCore) await ProbeCoreAsync();
@@ -590,13 +669,16 @@ public sealed class WebShellForm : Form
         var live = _live.Snapshot;
         var models = _models.Snapshot;
         var modelBusy = models.Operation.State == "running";
-        var busy = live.State is "starting" or "stopping" || modelBusy;
+        var batchBusy = _batch.IsBusy;
+        var busy = live.State is "starting" or "stopping" || modelBusy || batchBusy;
         var operation = live.State is "starting" or "running" or "stopping"
             ? "realtime"
-            : modelBusy && !string.IsNullOrWhiteSpace(models.Operation.Kind)
-                ? "model." + models.Operation.Kind
-                : null;
-        var coreState = modelBusy && _core.WorkerProcessId.HasValue ? "busy" : _coreState;
+            : batchBusy && !string.IsNullOrWhiteSpace(_batch.OperationKind)
+                ? "batch." + _batch.OperationKind
+                : modelBusy && !string.IsNullOrWhiteSpace(models.Operation.Kind)
+                    ? "model." + models.Operation.Kind
+                    : null;
+        var coreState = (modelBusy || batchBusy) && _core.WorkerProcessId.HasValue ? "busy" : _coreState;
 
         return new
         {
@@ -605,7 +687,7 @@ public sealed class WebShellForm : Form
                 productVersion = typeof(WebShellForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.1",
                 activePage = _activePage,
                 busy,
-                lastError = live.LastError ?? models.Operation.LastError
+                lastError = live.LastError ?? models.Operation.LastError ?? _batch.LastError
             },
             core = new
             {
@@ -616,12 +698,7 @@ public sealed class WebShellForm : Form
                 lastError = _coreError
             },
             live,
-            batch = new
-            {
-                queued = 0,
-                state = "idle",
-                status = "现有后台转写继续由 Core 执行"
-            },
+            batch = _batch.BuildSnapshot(models.BatchModelId, models.BatchModelName, _settings.Keywords),
             models,
             settings = new
             {
@@ -661,7 +738,7 @@ public sealed class WebShellForm : Form
 
     async Task ProbeCoreAsync()
     {
-        if (_models.Snapshot.Operation.State == "running")
+        if (_models.Snapshot.Operation.State == "running" || _batch.IsBusy)
         {
             _coreState = _core.WorkerProcessId.HasValue ? "ready" : "starting";
             _coreError = null;
@@ -746,6 +823,16 @@ public sealed class WebShellForm : Form
         _meterMax = 0f;
     }
 
+    void OnBatchChanged()
+    {
+        if (_batch.IsBusy && _core.WorkerProcessId.HasValue)
+        {
+            _coreState = "busy";
+            _coreError = null;
+        }
+        ScheduleSnapshotPush();
+    }
+
     void OnModelsChanged()
     {
         var models = _models.Snapshot;
@@ -811,12 +898,16 @@ public sealed class WebShellForm : Form
             !_smokeMethods.Contains("model.download") ||
             !_smokeMethods.Contains("model.cancel") ||
             !_smokeMethods.Contains("model.delete") ||
+            !_smokeMethods.Contains("batch.pickFiles") ||
+            !_smokeMethods.Contains("batch.analyze") ||
+            !_smokeMethods.Contains("batch.transcribe") ||
+            !_smokeMethods.Contains("batch.cancel") ||
             !_smokeMethods.Contains("diagnostics.liveLevelAck")) return;
 
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}bridge=diagnostics.liveLevelAck{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}bridge=batch.pickFiles{Environment.NewLine}bridge=batch.analyze{Environment.NewLine}bridge=batch.transcribe{Environment.NewLine}bridge=batch.cancel{Environment.NewLine}bridge=diagnostics.liveLevelAck{Environment.NewLine}");
     }
 
     static bool IsPotPlayerDetected()
@@ -883,6 +974,23 @@ public sealed class WebShellForm : Form
         return value.Length > 0;
     }
 
+    static string[] ReadStringArray(JsonElement? parameters, string propertyName)
+    {
+        if (!parameters.HasValue ||
+            parameters.Value.ValueKind != JsonValueKind.Object ||
+            !parameters.Value.TryGetProperty(propertyName, out var node) ||
+            node.ValueKind != JsonValueKind.Array)
+            return [];
+
+        return node.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.String)
+            .Select(x => x.GetString()?.Trim() ?? "")
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(32)
+            .ToArray();
+    }
+
     async Task DisposeOwnedResourcesAsync()
     {
         if (_disposed) return;
@@ -891,10 +999,12 @@ public sealed class WebShellForm : Form
         _live.Changed -= OnLiveChanged;
         _live.LevelChanged -= OnLiveLevelChanged;
         _models.Changed -= OnModelsChanged;
+        _batch.Changed -= OnBatchChanged;
         _core.ConnectionBroken -= OnCoreConnectionBroken;
         _autoStartTimer.Stop();
         _autoStartTimer.Dispose();
         try { _models.Dispose(); } catch { }
+        try { _batch.Dispose(); } catch { }
         try { await _live.DisposeAsync(); } catch { }
         try { await _core.DisposeAsync(); } catch { }
 
