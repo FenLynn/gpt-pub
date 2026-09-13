@@ -34,6 +34,7 @@ internal sealed class LiveSessionController : IAsyncDisposable
     bool _disposed;
 
     internal event Action? Changed;
+    internal event Action<float>? LevelChanged;
 
     internal LiveSessionController(CoreWorkerClient core)
     {
@@ -302,8 +303,9 @@ internal sealed class LiveSessionController : IAsyncDisposable
 
     void OnLevelChanged(float value)
     {
-        lock (_stateGate) _level = Math.Clamp(value, 0, 1);
-        NotifyChanged();
+        var level = Math.Clamp(value, 0, 1);
+        lock (_stateGate) _level = level;
+        LevelChanged?.Invoke(level);
     }
 
     void OnStatusChanged(string text)

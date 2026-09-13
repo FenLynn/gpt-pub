@@ -197,7 +197,7 @@ const fallbackCatalog: ModelCatalogItem[] = [
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.7", activePage: "home", busy: false, lastError: null },
+  app: { productVersion: "0.1.8", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
@@ -280,6 +280,7 @@ let fallbackSystem = { ...fallback.system };
 let sequence = 0;
 const pending = new Map<string, { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }>();
 const snapshotSubscribers = new Set<(snapshot: LocalSubSnapshot) => void>();
+const liveLevelSubscribers = new Set<(value: number) => void>();
 
 function hasNativeBridge(): boolean {
   return Boolean(window.chrome?.webview);
@@ -291,12 +292,23 @@ function emitSnapshot(snapshot: LocalSubSnapshot) {
   }
 }
 
+function emitLiveLevel(value: number) {
+  const level = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  for (const subscriber of liveLevelSubscribers) {
+    try { subscriber(level); } catch { }
+  }
+}
+
 function nativeMessageHandler(event: MessageEvent) {
   const message = event.data as BridgeResponse<unknown> | BridgeEvent<unknown>;
   if (!message || typeof message !== "object") return;
 
   if (message.kind === "event") {
     if (message.event === "app.snapshot") emitSnapshot(message.payload as LocalSubSnapshot);
+    if (message.event === "live.level") {
+      const payload = message.payload as { value?: number };
+      emitLiveLevel(typeof payload?.value === "number" ? payload.value : 0);
+    }
     return;
   }
 
@@ -486,8 +498,14 @@ export function subscribeSnapshot(callback: (snapshot: LocalSubSnapshot) => void
   return () => snapshotSubscribers.delete(callback);
 }
 
+export function subscribeLiveLevel(callback: (value: number) => void): () => void {
+  liveLevelSubscribers.add(callback);
+  return () => liveLevelSubscribers.delete(callback);
+}
+
 export function disposeBridge() {
   if (hasNativeBridge()) window.chrome!.webview!.removeEventListener("message", nativeMessageHandler);
   pending.clear();
   snapshotSubscribers.clear();
+  liveLevelSubscribers.clear();
 }

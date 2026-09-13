@@ -100,6 +100,8 @@ public sealed class WebShellForm : Form
     string _coreState = "stopped";
     string? _coreError;
     int _snapshotPushPending;
+    int _levelPushPending;
+    float _latestLiveLevel;
     bool _autoStartPending;
     bool _autoStartBusy;
     string _autoStartStatus = "";
@@ -142,6 +144,7 @@ public sealed class WebShellForm : Form
         _web.Visible = false;
 
         _live.Changed += OnLiveChanged;
+        _live.LevelChanged += OnLiveLevelChanged;
         _models.Changed += OnModelsChanged;
         _core.ConnectionBroken += OnCoreConnectionBroken;
         _autoStartTimer.Tick += async (_, _) => await TryAutoStartLiveAsync();
@@ -660,6 +663,27 @@ public sealed class WebShellForm : Form
         ScheduleSnapshotPush();
     }
 
+    void OnLiveLevelChanged(float value)
+    {
+        _latestLiveLevel = Math.Clamp(value, 0, 1);
+        if (_disposed || _web.CoreWebView2 == null) return;
+        if (Interlocked.Exchange(ref _levelPushPending, 1) != 0) return;
+
+        try
+        {
+            BeginInvoke(new Action(() =>
+            {
+                Interlocked.Exchange(ref _levelPushPending, 0);
+                if (!_disposed && _web.CoreWebView2 != null)
+                    PostEvent("live.level", new { value = _latestLiveLevel });
+            }));
+        }
+        catch
+        {
+            Interlocked.Exchange(ref _levelPushPending, 0);
+        }
+    }
+
     void OnModelsChanged()
     {
         var models = _models.Snapshot;
@@ -802,6 +826,7 @@ public sealed class WebShellForm : Form
         _disposed = true;
 
         _live.Changed -= OnLiveChanged;
+        _live.LevelChanged -= OnLiveLevelChanged;
         _models.Changed -= OnModelsChanged;
         _core.ConnectionBroken -= OnCoreConnectionBroken;
         _autoStartTimer.Stop();

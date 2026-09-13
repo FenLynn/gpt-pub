@@ -356,7 +356,7 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         {
             var now = Environment.TickCount64;
             var previous = Interlocked.Read(ref lastLevelSent);
-            if (value > 0 && now - previous < 100) return;
+            if (now - previous < 33) return;
             Interlocked.Exchange(ref lastLevelSent, now);
             _ = SendEventAsync(sessionId, "live.level", new { value = Math.Clamp(value, 0, 1) });
         };
