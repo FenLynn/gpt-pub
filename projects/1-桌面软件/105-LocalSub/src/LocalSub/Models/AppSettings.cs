@@ -20,6 +20,7 @@ public sealed class AppSettings
     public string LiveModelId { get; set; } = "streaming-zipformer-zh-large-int8";
     public string BatchModelId { get; set; } = "sensevoice-small-int8";
     public string Keywords { get; set; } = "";
+    public string BatchOutputDirectory { get; set; } = "";
     public string FfmpegPath { get; set; } = "";
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -52,6 +53,17 @@ public sealed class AppSettings
 
     [JsonIgnore]
     public string ResolvedAsrRoot => PortablePaths.ResolvePortablePath(AsrRoot);
+
+    [JsonIgnore]
+    public string ResolvedBatchOutputDirectory
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(BatchOutputDirectory))
+                return Path.GetFullPath(BatchOutputDirectory);
+            return Path.Combine(PortablePaths.DataDir, "Transcripts");
+        }
+    }
 
     public static AppSettings Load()
     {
