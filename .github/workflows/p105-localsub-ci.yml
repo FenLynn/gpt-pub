@@ -213,6 +213,7 @@ jobs:
           $persistence = Get-Content 'src/LocalSub/Services/TranscriptPersistenceService.cs' -Raw
           $settingsSource = Get-Content 'src/LocalSub/Models/AppSettings.cs' -Raw
           $modelSource = Get-Content 'src/LocalSub/UI/ModelCatalogController.cs' -Raw
+          $modelManager = Get-Content 'src/LocalSub/Services/ModelManager.cs' -Raw
           $liveSource = Get-Content 'src/LocalSub/UI/LiveSessionController.cs' -Raw
 
           foreach ($required in @(
@@ -276,6 +277,9 @@ jobs:
             'class="batch-transcript-scroll"',
             'class="page settings-page"',
             'class="page docs-page"',
+            '<b>07</b>',
+            '支持多文件队列、整队顺序转写',
+            '模型支持下载、断点续传、关键文件健康检查',
             'settings.update',
             '<Teleport to="body">',
             'class="global-tooltip"'
@@ -432,6 +436,16 @@ jobs:
           )) {
             if ($modelSource -notmatch [regex]::Escape($required)) {
               throw "v0.1.22 model repair contract missing: $required"
+            }
+          }
+
+          foreach ($required in @(
+            'new FileInfo(p).Length > 0',
+            'Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories)',
+            'new FileInfo(file).Length > 0'
+          )) {
+            if ($modelManager -notmatch [regex]::Escape($required)) {
+              throw "v0.1.22 model health contract missing: $required"
             }
           }
 
