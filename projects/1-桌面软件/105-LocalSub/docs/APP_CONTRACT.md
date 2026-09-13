@@ -247,16 +247,22 @@ model.delete
 
 `model.select` 只保存已安装且能力匹配的实时或后台默认模型。`model.download`、`model.delete` 通过 Shell 应用控制器进入 Core 长任务。`model.cancel` 只用于可安全中断的下载任务，不暴露 Core request ID；删除一旦进入目录脱离与递归清理阶段即完成收尾，不允许用户中途取消。
 
-v0.1.19 已实现：
+v0.1.19 完成第一版 Web 后台闭环，v0.1.20 扩展为完整队列工作流。当前批处理白名单为：
 
 ```text
 batch.pickFiles
 batch.analyze
 batch.transcribe
+batch.transcribeAll
+batch.remove
+batch.clear
+batch.exportTxt
 batch.cancel
 ```
 
-文件选择由 Shell 原生对话框完成。Vue 只接收 opaque queue id、显示名、媒体摘要、下采样波形、转写段落和进度，真实文件路径继续只保留在 Shell 的 `BatchWebController` 中。分析与转写直接复用 `CoreWorkerClient` 的现有 `analyze / transcribe / cancel` 链。
+文件选择与 TXT 导出都由 Shell 原生对话框完成。Vue 只接收 opaque queue id、显示名、媒体摘要、下采样波形、转写段落、完成统计和进度，真实输入与输出路径继续只由 Shell 持有。媒体分析与单项/整队转写直接复用 `CoreWorkerClient` 的现有 Core 链，整队转写在 Shell 应用控制器中顺序调度，不在 Vue 复制业务核心。取消使用同一 Core cancellation 边界，已经完成的队列结果保留。
+
+v0.1.20 的 batch snapshot 额外提供完成数、每项 segments / RTF 与 `canTranscribeAll / canRemove / canClear / canExport` 等显式能力位。关键词在实际转写时由 Shell 重新读取最新 `AppSettings`，只更新 `Keywords` 后持久化，避免覆盖模型页或其他页面刚保存的设置。
 
 后续逐步加入：
 
