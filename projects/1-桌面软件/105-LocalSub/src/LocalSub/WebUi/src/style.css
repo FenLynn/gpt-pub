@@ -835,3 +835,297 @@ html,body,#app,
   .live-primary-action{height:38px;font-size:10.5px}
   .level-wave{height:76px}
 }
+
+
+/* v0.1.9 unified realtime hierarchy. */
+.live-page{
+  display:flex;
+  flex-direction:column;
+  background:#f4f8fb!important;
+}
+
+.live-topbar{
+  min-height:84px;
+  display:grid;
+  grid-template-columns:minmax(220px,auto) minmax(280px,1fr) 126px;
+  align-items:center;
+  gap:28px;
+  flex:none;
+  padding:4px 0 12px;
+  border-bottom:1px solid rgba(202,217,228,.72);
+  background:transparent!important;
+}
+.live-title{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  min-width:0;
+}
+.live-title>div{min-width:0}
+.live-title-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.live-title-line h2{
+  margin:0;
+  color:#14223a;
+  font-size:23px;
+  line-height:1.08;
+  font-weight:720;
+  letter-spacing:-.45px;
+}
+.live-title>div>small{
+  display:block;
+  margin-top:5px;
+  overflow:hidden;
+  color:#8394a5;
+  font-size:10.5px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.compact-feature.live{
+  width:42px;
+  height:42px;
+  border-radius:13px;
+}
+
+.live-task-center{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:8px;
+}
+.live-task-status{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+}
+.live-task-status-icon{
+  width:27px;
+  height:27px;
+  flex:none;
+  border-radius:9px;
+}
+.live-task-status>div{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+}
+.live-task-status strong{
+  flex:none;
+  font-size:12px;
+}
+.live-task-status small{
+  min-width:0;
+  margin:0;
+  font-size:9.8px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.instant-level{
+  display:grid;
+  grid-template-columns:48px minmax(120px,1fr) 34px;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  color:#75879a;
+  font-size:10px;
+}
+.instant-level>div{
+  height:8px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#dce6ed;
+}
+.instant-level>div i{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#38b7f2 0%,#23a269 100%);
+  transition:width .02s linear;
+  will-change:width;
+}
+.instant-level b{
+  min-width:34px;
+  color:#4f6c82;
+  font-size:10px;
+  font-variant-numeric:tabular-nums;
+  text-align:right;
+}
+.live-action-slot{
+  width:126px;
+  min-width:126px;
+  justify-self:end;
+}
+.live-primary-action{
+  width:126px;
+  min-width:126px;
+  height:40px;
+}
+
+.live-monitor-toggle{display:none!important}
+
+.live-options{
+  flex:none;
+  margin:0;
+  padding:9px 0 0;
+  border-bottom:1px solid rgba(211,223,231,.64);
+}
+.live-options .option-row{
+  min-height:61px;
+  border-bottom:0;
+}
+.live-options .option-row + .option-row{
+  border-top:1px solid rgba(222,231,237,.72);
+}
+.live-options .option-row select{
+  height:39px;
+  background:#f7fafc;
+}
+.live-options .row-icon{
+  width:37px;
+  height:37px;
+  background:transparent;
+}
+.live-options .row-icon.audio{color:#1688e8}
+.live-options .row-icon.model{color:#7658d6;background:transparent}
+
+.waveform-section{
+  flex:none;
+  margin:0;
+  padding:14px 0 4px;
+  border:0;
+  background:transparent!important;
+}
+.waveform-section.collapsed{
+  padding-bottom:13px;
+  border-bottom:1px solid rgba(211,223,231,.64);
+}
+.wave-head{
+  min-height:28px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  margin:0 0 5px;
+}
+.wave-head>div{
+  display:flex;
+  align-items:baseline;
+  gap:9px;
+}
+.wave-head strong{
+  color:#385168;
+  font-size:12.5px;
+}
+.wave-head>div>span{
+  color:#8a98a6;
+  font-size:9.8px;
+}
+.wave-history-toggle{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#708396;
+  font-size:10px;
+  cursor:pointer;
+}
+.wave-history-toggle .small-switch{
+  width:34px;
+  height:20px;
+}
+.wave-history-toggle .small-switch>span:after{
+  width:16px;
+  height:16px;
+  left:2px;
+  top:2px;
+}
+.wave-history-toggle .small-switch input:checked+span:after{
+  transform:translateX(14px);
+}
+.level-wave{
+  height:94px;
+  margin-top:2px;
+}
+.wave-axis{
+  padding-top:2px;
+  color:#9aa7b2;
+}
+
+.transcript-section{
+  flex:1;
+  min-height:145px;
+  margin-top:9px;
+  padding-top:12px;
+  border-top:1px solid rgba(211,223,231,.64);
+  background:transparent!important;
+}
+.transcript-head{
+  height:28px;
+}
+.transcript-scroll{
+  padding-top:2px;
+  padding-right:14px;
+}
+.transcript-scroll p{
+  padding:4px 0;
+  color:#7d8e9d;
+  font-size:12.5px;
+}
+.transcript-scroll p.current{
+  color:#243b50;
+  font-size:14px;
+  font-weight:720;
+}
+
+/* Ordinary informational surfaces stay on the same matte background. */
+.live-title,
+.live-title-line,
+.live-task-center,
+.live-task-status,
+.live-action-slot,
+.live-options,
+.waveform-section,
+.wave-head,
+.wave-history-toggle,
+.transcript-section,
+.transcript-head,
+.transcript-scroll{
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+@media(max-width:999px){
+  .live-topbar{
+    min-height:76px;
+    grid-template-columns:minmax(180px,auto) minmax(190px,1fr) 116px;
+    gap:16px;
+    padding-bottom:10px;
+  }
+  .live-title{gap:8px}
+  .live-title-line h2{font-size:20px}
+  .live-title>div>small{font-size:9.5px}
+  .compact-feature.live{width:36px;height:36px}
+  .live-task-center{gap:6px}
+  .live-task-status-icon{width:24px;height:24px}
+  .live-task-status strong{font-size:10.8px}
+  .live-task-status small{font-size:9px}
+  .instant-level{
+    grid-template-columns:42px minmax(74px,1fr) 30px;
+    gap:7px;
+    font-size:9px;
+  }
+  .instant-level b{font-size:9px}
+  .live-action-slot,.live-primary-action{
+    width:116px;
+    min-width:116px;
+  }
+  .live-options .option-row{min-height:56px}
+  .level-wave{height:78px}
+}
