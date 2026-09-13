@@ -240,8 +240,8 @@ jobs:
             'subscribeLiveLevel',
             'reportLiveLevelAck',
             'class="model-table-shell"',
-            'class="settings-page"',
-            'class="docs-page"',
+            'class="page settings-page"',
+            'class="page docs-page"',
             'settings.update',
             '<Teleport to="body">',
             'class="global-tooltip"'
