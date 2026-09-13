@@ -67,7 +67,8 @@ public sealed class WebShellForm : Form
         "model.select",
         "model.download",
         "model.cancel",
-        "model.delete"
+        "model.delete",
+        "diagnostics.liveLevelAck"
     };
     static readonly HashSet<string> AllowedPages = new(StringComparer.Ordinal)
     {
@@ -160,7 +161,7 @@ public sealed class WebShellForm : Form
 
     internal static void ValidateBridgeContract()
     {
-        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete" };
+        var expected = new[] { "app.getSnapshot", "app.navigate", "settings.update", "settings.previewSubtitle", "live.start", "live.stop", "model.list", "model.select", "model.download", "model.cancel", "model.delete", "diagnostics.liveLevelAck" };
         if (AllowedMethods.Count != expected.Length || expected.Any(x => !AllowedMethods.Contains(x)))
             throw new InvalidOperationException("LocalSub WebUi bridge whitelist changed unexpectedly.");
     }
@@ -190,12 +191,19 @@ public sealed class WebShellForm : Form
             {
                 if (!args.Uri.StartsWith(Origin + "/", StringComparison.OrdinalIgnoreCase)) args.Cancel = true;
             };
-            core.NavigationCompleted += (_, args) =>
+            core.NavigationCompleted += async (_, args) =>
             {
                 if (!args.IsSuccess) return;
                 _loading.Visible = false;
                 _web.Visible = true;
                 _web.BringToFront();
+
+                if (_smoke)
+                {
+                    await Task.Delay(700);
+                    if (!_disposed && _web.CoreWebView2 != null)
+                        PostEvent("live.level", new { value = 0.73f });
+                }
             };
 
             core.Navigate(_smoke ? Origin + "/index.html?smoke=1" : Origin + "/index.html");
@@ -260,6 +268,9 @@ public sealed class WebShellForm : Form
                 case "model.delete":
                     result = await DeleteModelAsync(request.Params);
                     break;
+                case "diagnostics.liveLevelAck":
+                    result = RecordBrowserLevelAck(request.Params);
+                    break;
                 default:
                     throw new InvalidOperationException("不允许的界面命令。");
             }
@@ -273,6 +284,27 @@ public sealed class WebShellForm : Form
                 RecordSmokeMethod(request.Method);
             Reply(request?.Id ?? string.Empty, false, null, ex.Message);
         }
+    }
+
+    object RecordBrowserLevelAck(JsonElement? parameters)
+    {
+        var value = 0f;
+        if (parameters.HasValue &&
+            parameters.Value.ValueKind == JsonValueKind.Object &&
+            parameters.Value.TryGetProperty("value", out var valueNode) &&
+            valueNode.TryGetSingle(out var parsed))
+            value = Math.Clamp(parsed, 0, 1);
+
+        try
+        {
+            PortablePaths.EnsureBaseFolders();
+            File.AppendAllText(
+                Path.Combine(PortablePaths.LogsDir, "meter-browser.log"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] value={value:0.0000}{Environment.NewLine}");
+        }
+        catch { }
+
+        return new { recorded = true, value };
     }
 
     async Task<object> NavigateAsync(JsonElement? parameters)
@@ -672,7 +704,7 @@ public sealed class WebShellForm : Form
     {
         _latestLiveLevel = Math.Clamp(value, 0, 1);
         RecordWebMeterEvent(_latestLiveLevel);
-        if (_disposed || _web.CoreWebView2 == null) return;
+        if (_disposed) return;
         if (Interlocked.Exchange(ref _levelPushPending, 1) != 0) return;
 
         try
@@ -680,8 +712,8 @@ public sealed class WebShellForm : Form
             BeginInvoke(new Action(() =>
             {
                 Interlocked.Exchange(ref _levelPushPending, 0);
-                if (!_disposed && _web.CoreWebView2 != null)
-                    PostEvent("live.level", new { value = _latestLiveLevel });
+                if (_disposed || _web.CoreWebView2 == null) return;
+                PostEvent("live.level", new { value = _latestLiveLevel });
             }));
         }
         catch
@@ -734,7 +766,7 @@ public sealed class WebShellForm : Form
 
     void ScheduleSnapshotPush()
     {
-        if (_disposed || _web.CoreWebView2 == null) return;
+        if (_disposed) return;
         if (Interlocked.Exchange(ref _snapshotPushPending, 1) != 0) return;
 
         try
@@ -742,8 +774,8 @@ public sealed class WebShellForm : Form
             BeginInvoke(new Action(() =>
             {
                 Interlocked.Exchange(ref _snapshotPushPending, 0);
-                if (!_disposed && _web.CoreWebView2 != null)
-                    PostEvent("app.snapshot", BuildSnapshot());
+                if (_disposed || _web.CoreWebView2 == null) return;
+                PostEvent("app.snapshot", BuildSnapshot());
             }));
         }
         catch
@@ -778,12 +810,13 @@ public sealed class WebShellForm : Form
             !_smokeMethods.Contains("model.select") ||
             !_smokeMethods.Contains("model.download") ||
             !_smokeMethods.Contains("model.cancel") ||
-            !_smokeMethods.Contains("model.delete")) return;
+            !_smokeMethods.Contains("model.delete") ||
+            !_smokeMethods.Contains("diagnostics.liveLevelAck")) return;
 
         Directory.CreateDirectory(PortablePaths.LogsDir);
         File.WriteAllText(
             Path.Combine(PortablePaths.LogsDir, "webui-smoke-ready.txt"),
-            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}");
+            $"webview2=ready{Environment.NewLine}bridge=app.getSnapshot{Environment.NewLine}bridge=settings.update{Environment.NewLine}bridge=live.stop{Environment.NewLine}bridge=live.start{Environment.NewLine}bridge=model.list{Environment.NewLine}bridge=model.select{Environment.NewLine}bridge=model.download{Environment.NewLine}bridge=model.cancel{Environment.NewLine}bridge=model.delete{Environment.NewLine}bridge=diagnostics.liveLevelAck{Environment.NewLine}");
     }
 
     static bool IsPotPlayerDetected()

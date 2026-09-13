@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   disposeBridge,
   invoke,
+  reportLiveLevelAck,
   subscribeLiveLevel,
   subscribeSnapshot,
   type LocalSubSnapshot,
@@ -33,6 +34,7 @@ const hoverTip = ref<{ text: string; left: number; top: number; above: boolean }
 let activeTipTarget: HTMLElement | null = null;
 let selectionInitialized = false;
 let levelHistoryTick = 0;
+let lastMeterAckAt = 0;
 let unsubscribeSnapshot: (() => void) | null = null;
 let unsubscribeLiveLevel: (() => void) | null = null;
 let saveStateTimer: number | undefined;
@@ -114,7 +116,7 @@ const sideStatusSecondary = computed(() => {
     return snapshot.value.system.autoStartStatus || "自动启动";
   if (!liveModelReady.value) return "实时模型未就绪";
   if (!inputReady.value) return "等待音源";
-  return "v" + (snapshot.value?.app.productVersion ?? "0.1.11");
+  return "v" + (snapshot.value?.app.productVersion ?? "0.1.12");
 });
 const sideStatusTip = computed(() => {
   const core = coreReady.value ? "Core 就绪" : "Core 未就绪";
@@ -137,6 +139,13 @@ const waveformPoints = computed(() => {
 function applyLiveLevel(value: number) {
   const level = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
   liveLevel.value = level;
+
+  const now = Date.now();
+  if (now - lastMeterAckAt >= 1000) {
+    lastMeterAckAt = now;
+    reportLiveLevelAck(level);
+  }
+
   if (!snapshot.value?.settings.showLiveLevelHistory || snapshot.value.live.state !== "running") return;
 
   levelHistoryTick = (levelHistoryTick + 1) % 3;
@@ -185,7 +194,8 @@ function applySnapshot(next: LocalSubSnapshot) {
   }
 
   snapshot.value = next;
-  liveLevel.value = Math.max(0, Math.min(1, next.live.level));
+  if (next.live.state !== "running")
+    liveLevel.value = Math.max(0, Math.min(1, next.live.level));
 
   if (!selectionInitialized || next.live.state === "idle" || next.live.state === "failed") {
     selectedSource.value = next.live.sourceId;

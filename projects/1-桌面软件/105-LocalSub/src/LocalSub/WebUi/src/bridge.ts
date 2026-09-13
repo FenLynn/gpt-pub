@@ -197,7 +197,7 @@ const fallbackCatalog: ModelCatalogItem[] = [
 ];
 
 const fallback: LocalSubSnapshot = {
-  app: { productVersion: "0.1.11", activePage: "home", busy: false, lastError: null },
+  app: { productVersion: "0.1.12", activePage: "home", busy: false, lastError: null },
   core: { state: "ready", pid: 24816, generation: 2, currentOperation: null, lastError: null },
   live: {
     state: "idle",
@@ -300,7 +300,11 @@ function emitLiveLevel(value: number) {
 }
 
 function nativeMessageHandler(event: MessageEvent) {
-  const message = event.data as BridgeResponse<unknown> | BridgeEvent<unknown>;
+  let message = event.data as BridgeResponse<unknown> | BridgeEvent<unknown> | string;
+  if (typeof message === "string") {
+    try { message = JSON.parse(message) as BridgeResponse<unknown> | BridgeEvent<unknown>; }
+    catch { return; }
+  }
   if (!message || typeof message !== "object") return;
 
   if (message.kind === "event") {
@@ -501,6 +505,16 @@ export function subscribeSnapshot(callback: (snapshot: LocalSubSnapshot) => void
 export function subscribeLiveLevel(callback: (value: number) => void): () => void {
   liveLevelSubscribers.add(callback);
   return () => liveLevelSubscribers.delete(callback);
+}
+
+export function reportLiveLevelAck(value: number): void {
+  if (!hasNativeBridge()) return;
+  const level = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  window.chrome!.webview!.postMessage({
+    id: "meter-ack-" + Date.now() + "-" + ++sequence,
+    method: "diagnostics.liveLevelAck",
+    params: { value: level }
+  });
 }
 
 export function disposeBridge() {
