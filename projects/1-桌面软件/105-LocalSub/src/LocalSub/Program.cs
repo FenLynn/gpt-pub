@@ -15,6 +15,7 @@ internal static class Program
     static bool IsBatchUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_BATCH_UI_SMOKE") == "1";
     static bool IsOfflineAsrSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_OFFLINE_ASR_SMOKE") == "1";
     static bool IsCoreRecoverySmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_CORE_RECOVERY_SMOKE") == "1";
+    static bool IsProductizationSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_PRODUCTIZATION_SMOKE") == "1";
     static bool IsWebUiSmokeTest => Environment.GetEnvironmentVariable("LOCALSUB_WEBUI_SMOKE") == "1";
     static bool IsWebUiPreview => Environment.GetEnvironmentVariable("LOCALSUB_WEBUI_PREVIEW") == "1";
     static bool IsLegacyUiRequested =>
@@ -23,7 +24,7 @@ internal static class Program
     static bool IsSilentStartup =>
         !IsAnySmokeTest &&
         Environment.GetCommandLineArgs().Skip(1).Any(x => string.Equals(x, "--startup-silent", StringComparison.OrdinalIgnoreCase));
-    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest || IsCoreRecoverySmokeTest || IsWebUiSmokeTest;
+    static bool IsAnySmokeTest => IsStartupSmokeTest || IsProcessLoopbackSmokeTest || IsBatchUiSmokeTest || IsOfflineAsrSmokeTest || IsCoreRecoverySmokeTest || IsProductizationSmokeTest || IsWebUiSmokeTest;
 
     [STAThread]
     static void Main()
@@ -57,6 +58,12 @@ internal static class Program
             if (IsCoreRecoverySmokeTest)
             {
                 RunCoreRecoverySmokeTestAsync().GetAwaiter().GetResult();
+                return;
+            }
+
+            if (IsProductizationSmokeTest)
+            {
+                ProductizationSmoke.Run();
                 return;
             }
 
