@@ -14,11 +14,13 @@ Microsoft WebView2
 现有 DavBridge.Core 与既有 C# 安全链
 ```
 
-这次迁移的目的只有一个：替换显示与交互层，避免继续用 WinForms 控件布局承担现代 UI 工作。
+这次迁移的目的只有一个：替换显示与交互层，避免继续用 WinForms 控件布局承担现代业务 UI 工作。
+
+WinForms 仍作为 Windows 原生宿主技术存在，但不再负责总览、转移、回收站和文档等业务页面布局。
 
 ## 冻结边界
 
-以下已经验证的逻辑不属于 UI，v0.4 架构迁移不得重写、复制到 JavaScript 或改变语义：
+以下已经验证的安全逻辑不属于 UI，v0.4 架构迁移不得复制到 JavaScript 或改变语义。v0.4.13 仅在 C# 内增加人工暂停的安全边界协调，不改变下列不变量：
 
 - InfiniCLOUD authoritative source 与源端只读；
 - Zotero `.zip + .prop` Group；
@@ -47,8 +49,11 @@ Vue 只能：
 ```text
 app.getSnapshot
 app.openSettings
+app.closeSettings
 migration.pause
 migration.resume
+migration.retry
+quota.calibrate
 recycle.defer
 recycle.delete
 ```
@@ -65,9 +70,7 @@ Vue 不得直接执行 WebDAV PUT、DELETE 或修改源端。
 
 ## DELETE 双门
 
-Web UI 的删除按钮只表示“请求进入删除审查”。真正删除仍由既有 C# 安全链执行。
-
-流程为：
+Web UI 的删除按钮只表示请求进入删除审查。真正删除仍由既有 C# 安全链执行。
 
 ```text
 Web UI 选择对象
@@ -104,6 +107,52 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
+## v0.4.15 当前界面结构
+
+当前候选采用固定左侧导航：
+
+```text
+总览
+转移
+回收站
+文档
+
+设置
+关于
+运行状态
+```
+
+总览主页面保持固定左侧导航，配置异常时再显示必要入口；正常状态不重复占用顶部空间。
+
+总览主体结构：
+
+```text
+迁移路径
+→ 三阶段状态
+→ StrongVerified 覆盖率
+→ 上传 / 下载流量预算
+→ 当前任务
+```
+
+v0.4.9 同时规定：
+
+```text
+转移页 → 三条轻量队列行 + 当前动作 + 总体覆盖
+文档页 → 单列正文
+左下角状态 → SVG 图标 + 主状态 + 非重复副状态
+当前任务 → 对象在左，真实状态和进度在中，动作在右
+悬浮提示 → Teleport 到 body 的全局最高层
+人工暂停 → UI 立即反馈“正在暂停”，Core 在安全 member 边界落到 Paused
+```
+
+UI 文字策略：
+
+- 主页面只保留决策所需信息；
+- StrongVerified、Cycle、阶段状态、端点角色等定义进入 tooltip；
+- 人工操作仍必须明显；
+- tooltip 不能替代危险操作确认；
+- 任何布局精修不得改变 bridge 权限或 C# 安全链。
+
 ## 构建
 
 前端：
@@ -116,10 +165,44 @@ npm run build
 
 生成 `WebUi/dist` 后由 `DavBridge.csproj` 作为 EmbeddedResource 嵌入程序集。
 
-Windows 交付仍保持 framework-dependent 单 EXE。WebView2 Runtime 使用系统 Evergreen Runtime，不把完整浏览器捆进 DavBridge。
+Windows 交付保持 framework-dependent single EXE。WebView2 Runtime 使用系统 Evergreen Runtime，不把完整浏览器捆入 DavBridge。
 
-## 回滚
+## 验证规则
 
-v0.3 WinForms UI 文件目前仍保留在源码中作为实验阶段回滚参照，但 v0.4 正常运行路径不再挂载旧 UI shell。
+每个 UI 候选至少检查：
 
-`main` 与 `p103-stable` 仍是 v0.1.7，只有用户完成真实 Windows 验收后才考虑提升。
+- Core Smoke；
+- main 到候选的 Core / Reconciliation / WebDAV / Data 差异；
+- Vue typecheck 与 production build；
+- production bundle；
+- 浏览器视觉预览；
+- Windows single EXE publish；
+- Runtime 私人数据边界；
+- native-host self-test；
+- 用户真实 Windows 最终视觉验收。
+
+自动截图只能提前发现明显布局错误，不能代替实机视觉事实。
+
+## 回滚与历史 UI
+
+v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照，但 v0.4 正常运行路径不再挂载旧业务 UI shell。
+
+不得因为旧源码仍存在，就在新开发中继续叠加 WinForms 业务控件。
+
+当前正式回滚基线是 v0.4.0，不再把历史 v0.1.7 或 v0.3.x 描述为当前正式版本。
+
+## 当前阶段
+
+v0.4.15 位于 `p103-exp`，最后完成完整 CI 的代码 head 为 `92f3a05a8b351aab357250899c7de0ecb82ce760`，对应 run `34736655980`。它尚未提升到 `p103-stable` 或 `main`。
+
+本轮只收口状态语义与显示边界：
+
+- 当前任务进度只表示目标端上传字节进度；
+- 强校验、安全暂停等后续过程由独立状态文字表达；
+- 安全暂停中央、左下角、固定按钮避免重复长句；
+- 转移页去掉重复状态；
+- 最近活动在展示层合并同一状态转换产生的重复事件；
+- 最近活动滚动条默认隐藏；
+- 原生模态打开时 Web UI 背景降权。
+
+下一关是用户 Windows 实机验收这些细节，不扩展功能。

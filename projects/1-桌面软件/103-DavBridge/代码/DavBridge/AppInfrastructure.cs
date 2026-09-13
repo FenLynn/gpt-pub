@@ -150,13 +150,15 @@ internal sealed class AppHost : IDisposable
     private readonly ConfigStore _configStore;
     private readonly CredentialStore _credentialStore;
     private readonly StateStore _stateStore;
+    private readonly SemaphoreSlim _backgroundWake = new(0, 1);
     private CancellationTokenSource? _activeRun;
-    private bool _manualPaused = true;
+    private volatile bool _manualPaused = true;
 
     public DavBridgeConfig Config { get; private set; } = new();
     public MigrationState State { get; private set; } = new();
     public AppPaths Paths => _paths;
     public bool IsRunning => _activeRun is not null;
+    public bool IsPausePending => _manualPaused && IsRunning;
     public bool IsConfigured { get; private set; }
 
     public event EventHandler<EngineProgress>? ProgressChanged;
@@ -328,14 +330,35 @@ internal sealed class AppHost : IDisposable
     {
         Config.MigrationEnabled = enabled;
         _manualPaused = !enabled;
-        if (!enabled)
+
+        // Manual pause is cooperative: finish the current file's safe transaction, then stop before
+        // the next member. Application shutdown still cancels the linked run token immediately.
+        if (!enabled && !IsRunning)
         {
-            _activeRun?.Cancel();
             State.EngineState = EngineState.Paused;
+            State.CurrentGroupKey = null;
             await _stateStore.SaveAsync(State, CancellationToken.None).ConfigureAwait(false);
         }
+
         await _configStore.SaveAsync(Config, cancellationToken).ConfigureAwait(false);
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task<bool> CompleteManualPauseAtHostBoundaryAsync()
+    {
+        if (!_manualPaused && Config.MigrationEnabled) return false;
+        State.EngineState = EngineState.Paused;
+        State.CurrentGroupKey = null;
+        await _stateStore.SaveAsync(State, CancellationToken.None).ConfigureAwait(false);
+        PublishProgress(EngineState.Paused, null, null, "Safe pause complete.");
+        StateChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    public async Task WaitUntilIdleAsync(CancellationToken cancellationToken = default)
+    {
+        while (IsRunning)
+            await Task.Delay(80, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task RunOnceAsync(CancellationToken cancellationToken = default)
@@ -410,6 +433,8 @@ internal sealed class AppHost : IDisposable
                     $"新周期真实上传探测已通过，本次探测上传 {probe.UploadBytes} B。新周期已确认，下一重置日期为 {Config.NextResetAt:yyyy-MM-dd}，先执行源端对账。" );
             }
 
+            if (await CompleteManualPauseAtHostBoundaryAsync().ConfigureAwait(false)) return;
+
             ReconciliationGateV030 reconciliation;
             try
             {
@@ -432,6 +457,8 @@ internal sealed class AppHost : IDisposable
                 return;
             }
 
+            if (await CompleteManualPauseAtHostBoundaryAsync().ConfigureAwait(false)) return;
+
             if (reconciliation.RequiresHumanAction)
             {
                 State.EngineState = EngineState.WaitUser;
@@ -445,7 +472,8 @@ internal sealed class AppHost : IDisposable
             using var source = new WebDavReadClient(Config.SourceBaseUrl, Config.SourceUsername, secrets.SourcePassword);
             var gate = new RequestGate(TimeSpan.FromMilliseconds(Config.TargetMinimumRequestIntervalMs));
             using var target = new WebDavWriteClient(Config.TargetBaseUrl, Config.TargetUsername, secrets.TargetPassword, gate);
-            var engine = new MigrationEngine(Config, State, _stateStore, source, target, _paths.TempRoot);
+            var engine = new MigrationEngine(Config, State, _stateStore, source, target, _paths.TempRoot,
+                pauseRequested: () => _manualPaused || !Config.MigrationEnabled);
             engine.ProgressChanged += (_, progress) => ProgressChanged?.Invoke(this, progress);
             await engine.RunAsync(_activeRun.Token).ConfigureAwait(false);
             await _configStore.SaveAsync(Config, _activeRun.Token).ConfigureAwait(false);
@@ -462,6 +490,12 @@ internal sealed class AppHost : IDisposable
         {
             _activeRun.Dispose();
             _activeRun = null;
+            if (_manualPaused || !Config.MigrationEnabled)
+            {
+                State.EngineState = EngineState.Paused;
+                State.CurrentGroupKey = null;
+                await _stateStore.SaveAsync(State, CancellationToken.None).ConfigureAwait(false);
+            }
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -477,9 +511,32 @@ internal sealed class AppHost : IDisposable
             }
 
             var delay = GetNextBackgroundDelay();
-            try { await Task.Delay(delay, cancellationToken).ConfigureAwait(false); }
+            try { await WaitForBackgroundWakeOrDelayAsync(delay, cancellationToken).ConfigureAwait(false); }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    public void RequestBackgroundWake()
+    {
+        try
+        {
+            if (_backgroundWake.CurrentCount == 0)
+                _backgroundWake.Release();
+        }
+        catch (SemaphoreFullException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private async Task WaitForBackgroundWakeOrDelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var delayTask = Task.Delay(delay, linked.Token);
+        var wakeTask = _backgroundWake.WaitAsync(linked.Token);
+        var completed = await Task.WhenAny(delayTask, wakeTask).ConfigureAwait(false);
+        linked.Cancel();
+        try { await completed.ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     public Task ResumeAsync(CancellationToken cancellationToken = default) =>
@@ -591,5 +648,6 @@ internal sealed class AppHost : IDisposable
     {
         _activeRun?.Cancel();
         _activeRun?.Dispose();
+        _backgroundWake.Dispose();
     }
 }
