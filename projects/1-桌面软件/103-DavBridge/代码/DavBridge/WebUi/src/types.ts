@@ -46,6 +46,17 @@ export interface ActivityItem {
   tone: 'info' | 'success' | 'warning'
 }
 
+export interface OperationalHealthInfo {
+  hours: number
+  warningCount: number
+  networkWaitCount: number
+  pauseCount: number
+  completionCount: number
+  backlogCount: number
+  verifiedCount: number
+  windowComplete: boolean
+}
+
 export interface RecycleGroup {
   groupKey: string
   name: string
@@ -85,5 +96,6 @@ export interface DavBridgeSnapshot {
   runtime: RuntimeInfo
   initialization: InitializationStep[]
   activities: ActivityItem[]
+  operationalHealth: OperationalHealthInfo
   recycle: RecycleGroup[]
 }
