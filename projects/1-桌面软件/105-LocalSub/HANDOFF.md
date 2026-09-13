@@ -64,9 +64,9 @@ p105-exp
 
 从该点起：
 
-- `main` 保持正式主线。
-- `p105-stable` 保持改造前可运行基线。
-- 新架构只在 `p105-exp` 推进。
+- `main` 保持全仓正式主线，允许因其他项目的稳定准入正常前进。
+- `p105-stable` 保持改造前 P105 可运行基线。
+- 新架构只在 `p105-exp` 推进；每个新阶段开始前按仓库规则把最新 `main` 正常合入 `p105-exp`，不得重置 P105 独有历史。
 - 旧版本需要回退或对照时，从 stable 或准确 SHA 重新构建。
 - exp 实验失败时使用 revert 或后续修复提交，不强推、不重置长期分支。
 - 新候选没有通过自动门禁和必要实机验证前，不提升到 stable。
@@ -188,18 +188,24 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.13 已完成 realtime 页面第一轮 DavBridge 风格精修。meter 端到端链保持 v0.1.12 已验证闭环，本轮不改音频与 Core 算法，只重构视觉层级、字幕历史呈现和固定动作槽。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+
+开始 v0.1.14 前，最新仓库 `main` 已通过正常 merge 同步进 `p105-exp`：
+
+```text
+sync merge: cff0be79420d4f26e8e19aba23112cfdbfede9ff
+```
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-91f811e2dc580b32b5dcb4b562ef8078fbb769e4
+1cab728d2ac31db93faff91521aed9f38e3da5d2
 ```
 
 P105 Windows CI：
 
 ```text
-run 34753260233
+run 34754861926
 success
 ```
 
@@ -207,56 +213,41 @@ Artifacts：
 
 ```text
 candidate
-ID 10316124208
-sha256:050df57b1ecd0b520a8a0db9d6ef659c8cc42138196e766e85147adbb2b281ab
+ID 10317375667
+downloaded artifact sha256:0e4eedf05a8a583bea5f17887aa98065c327f67ab78b67e3db5a8b2544467348
+inner portable candidate sha256:88c4009662fb53a39a4d9d29ef585b16f5addeb129fc36c16a4d6d126deb475e
 
 WebUi preview
-ID 10316697829
-sha256:814eb52ae44ea7113c772950587a01817cae65a93b8001ad7faf42cfd2d86e8b
+ID 10317450676
+downloaded artifact sha256:38abd47581bc0c68cea3363d34c26a12046b18e7f6c018fdb47debb77bd7786c
 ```
 
-本阶段已经完成：
+v0.1.14 本轮完成：
 
-- 模型目录查看、安装状态、能力、评分、推荐标记与实时/后台默认模型选择进入 Web 模型页。
-- Web bridge 当前已包含 `model.list / model.select / model.download / model.cancel / model.delete`，Vue 只发送用户意图。
-- 重型 `ModelManager.cs` 已从 `LocalSub.exe` 编译中排除，Shell 只保留 `ModelManager.Proxy.cs`；`SharpCompress` 也已从 Shell 项目依赖移除。
-- 模型下载、断点续传、解压、校验、修复、目录替换与递归删除统一进入 `LocalSub.Core.exe`，Shell 不保留静默 fallback。
-- 旧 WinForms 的 realtime、后台转写和模型任务统一使用 `CoreWorkerBroker.Shared`，避免多个 Core 绕过重任务互斥。
-- Web 模型页显示 Core 模型任务、进度、错误与取消状态；删除使用二次确认。
-- 下载任务允许取消；删除一旦进入破坏性目录脱离与递归清理阶段即完成收尾，不允许用户中途取消，避免遗留 `.delete-*` 目录。
-- WebShell snapshot 推送的 coalescing 顺序已修正，状态变化可以在当前 snapshot 构建期间重新排队，不再存在已知的最终状态丢失窗口。
-- CI 已覆盖模型重实现编译隔离、Core `model.download / model.delete` IPC 失败恢复、真实 WebView2 模型命令 bridge、原 realtime/Core crash recovery/Process Loopback/native ASR 与 portable package 回归。
-- 模型页 1280×800 自动预览已人工检查，视觉语言与实时页一致，无明显溢出或布局塌陷。
+- 首页从“五个同权重状态项”重构为控制中心。顶部固定为模块图标与名称、独立业务状态、固定动作槽。
+- 首页唯一主操作保持固定尺寸和位置。可开始时为绿色，实时运行时停止为黄色，不可操作时为灰色；启动中和停止中不改变布局。
+- 首页下方收敛为四条信息：运行条件、实时配置、字幕显示、后台转写。它们只解释状态与默认配置，不重复承担操作。
+- Core 停止但可按需启动时不再被首页误判为故障；真正 Core failure、模型缺失和 PotPlayer 等待分别给出明确语义。
+- 1100×825 与 900×675 首页自动预览均已人工检查，无明显溢出、按钮换行或左下状态截断。
+- 浏览器 preview mock 的产品版本同步为 0.1.14，自动截图与真实程序集身份保持一致。
+- CI 打包前明确移除真实 WebView2 smoke 生成的 `publish/WebView2` 用户数据目录，并新增 Cookies、History、Login Data 等 runtime/private data 的拒绝门禁。
+- 最终 portable candidate 已确认不含 WebView2 profile/cache；manifest 仅覆盖正式分发文件。
+- Vue typecheck/build、视觉契约、meter 保护门、WebView2 ACK、Shell/Core publish、Core/model/realtime IPC、Core crash recovery、默认启动、静默托盘、legacy backup、后台旧工作区、Process Loopback、native ASR 与 package manifest 均通过。
 
-v0.1.3 已切换默认启动路径：普通双击进入 WebShell。旧 WinForms 只作为迁移期备用界面，通过 `LocalSub.exe --legacy-ui` 或 `LOCALSUB_LEGACY_UI=1` 显式启动。默认 WebShell 已接入既有托盘控制器与 UI 响应监控。
+v0.1.13 继续保留：
 
-v0.1.4 曾将一级导航误改为顶部 Tab，用户实机反馈明确否定该方向。
-
-v0.1.5 已纠正并冻结新视觉基线：恢复左侧一级导航；右侧严格保持单栏，不再出现页面级二次左右分栏；默认窗口与最新版 DavBridge 对齐为 1100×825 的 4:3；说明性长文字移入浅色全局 Tooltip；Tooltip 使用 Teleport 到 body 且全局最高层级；字号与线性 SVG 图标整体放大。
-
-v0.1.6 在该视觉基线上一次完成新的日常工作流：主页成为默认页并提供全局自检和实时字幕主按钮；实时页改为自然设置行并显示可关闭的归一化电平历史波形；模型页拆成“配置 / 模型库”，默认只显示需要配置的角色，模型库使用表格且仅内部滚动；设置页通过 `settings.update` 真正编辑 AppSettings，并可 `settings.previewSubtitle` 即时预览字幕；新增当前用户 Windows 启动注册、`--startup-silent`、静默托盘、托盘开始/停止实时字幕与启动后自动实时。PotPlayer 自动启动模式只等待播放器，不回退所有音频。
-
-v0.1.7 基于实机截图继续收口：主页改为纵向状态清单，主按钮移动到右上角；实时页顶部集中瞬时输入电平 bar、输入监视开关和运行状态；输入历史扩大到约 30 秒并持续左移；字幕区改为独立内部滚动，历史行常规显示、当前行加粗；设置滚动区预留 scrollbar gutter；文档字号提升；WebView2 与页面背景统一；正常启动后托盘图标始终存在；左下状态改为 DavBridge 风格业务状态。
-
-v0.1.8 修正实时电平链路：Core 的 `live.level` 对外频率由约 10 Hz 提高到约 30 Hz；Shell 不再因每个电平样本触发完整 `app.snapshot`，而是通过独立轻量 `live.level` Web 事件转发；Vue 顶部电平条直接订阅该事件，30 秒历史每 3 个样本记录一次。历史波形改为单条 XY 曲线，不再镜像对称。实时页顶部按最新版 DavBridge 的语义拆成标题、实时电平、监视开关、状态和独立动作槽；普通页面背景改为统一实色浅蓝灰，避免半透明白层造成发白观感。
-
-v0.1.9 曾尝试将 meter 改为 ASR 输入 RMS，但用户实机确认 PotPlayer 播歌时仍几乎不动。复查旧 WinForms 基线后确认，旧界面那个已验证“反应很及时”的进度条实际直接使用采集服务 `LevelChanged` packet peak，而不是 ASR RMS。
-
-v0.1.10 曾恢复旧 WinForms capture `LevelChanged` 路径，但用户再次实机确认 PotPlayer 播放且字幕可识别时 meter 仍无有效动态。全链复查确认 capture service 三个实现文件与旧稳定基线完全相同，真正变化集中在迁 Core 后的 meter 事件支路。
-
-v0.1.11 取消与 ASR 并行的 capture-only meter 支路。Core `LiveAsrPipeline.OnSamples` 对真正进入 ASR queue 的同一块 16 kHz mono PCM 直接计算 `max(abs(sample))` instantaneous peak，并立刻触发 `LevelChanged`；不使用 RMS、不做 dB 映射、不做 release smoothing。这样只要 ASR 确实持续消费音频，meter 与字幕就不再存在数据源分叉。Core、Shell IPC 与 WebShell 各自增加每秒一次的 meter 诊断摘要，分别记录事件数与 min/max；WebShell 诊断写入 `Logs/meter-web.log`，IPC 接收摘要写入 `Logs/core-client.log`，Core 记录 `LIVE_METER`。CI 已冻结这一结构。
-v0.1.12 根据用户上传的 Core / IPC / WebShell 三层日志完成最终边界定位。实机日志证明 PotPlayer 时 Core peak 可达 0.8330，IPC 和 WebShell 同样收到明显动态，因此音频、Core 与 IPC 均正常；故障被锁定在 WebShell 到 Vue。修复点：后台 realtime callback 不再在 `BeginInvoke` 前读取 WebView2 控件；所有 WebView2 meter 投递先 marshal 回 UI 线程。Vue 运行态不再被 snapshot 覆盖专用 `liveLevel`；bridge 对 string/object 两种 message payload 都兼容。新增 `diagnostics.liveLevelAck` 与 `Logs/meter-browser.log`。CI 的真实 WebView2 smoke 会由 Shell 注入 `0.73`，只有 Vue 的 `applyLiveLevel` 收到并回传 `0.7300` ACK 才通过。
-
-v0.1.13 在不改动已验证 meter/Core 链的前提下，按最新版 DavBridge 的当前任务模块重新组织 realtime 页面：顶部固定为“模块图标 / 名称 / 中央状态与实时电平 / 固定动作槽”；开始按钮采用克制绿色立体层级，运行时停止按钮使用黄色高优先级动作语义；音源与模型保留一行一个的单栏配置；30 秒历史波形进一步压低高度并移除多余 y 轴；字幕区成为主要内容区，当前字幕最突出，近期历史逐级降低对比度并自动跟随。左下业务状态卡同步收紧，1100×825 与 900×675 预览均已人工检查。
-
+- realtime 顶部固定为模块图标、名称、中央状态与实时电平、固定动作槽。
+- 音源和识别模型一行一个，30 秒历史保持单条低高度 XY 曲线。
+- 字幕区为实时页视觉主体，当前字幕最突出，近期历史逐级降低对比度。
+- meter 仍来自与 ASR 同一块 PCM 的 instantaneous peak，并通过独立 `live.level` 与浏览器 ACK 闭环。
 
 下一步固定为：
 
-1. 不提升 stable，不动 main。
-2. v0.1.13 实机重点验证实时页在真实运行态下的视觉密度、字幕历史层级、黄色停止按钮与 30 秒曲线观感；meter 数据链不再改算法。
-3. 下一轮按既定计划精修主页控制中心，使首页成为日常零学习成本入口。
-4. 随后完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
-5. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台达到必要功能覆盖后再进入 Phase 3 删除。
+1. 不提升 stable，不动 main，不创建正式 Release。
+2. 用户实机验证 v0.1.14 首页、v0.1.13 realtime 页面以及当前双 EXE 候选包，尤其确认真实运行态下的按钮语义、视觉密度与长期 realtime 体验。
+3. 下一开发轮次进入 Web 后台转写工作区，直接复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
+4. Web 后台达到必要功能覆盖后，再进入 Phase 3 删除旧 WinForms 业务页。
+5. 模型真实网络下载、代理、断点续传、取消、大模型解压与真实目录删除仍保留为用户机器验证项。
 
 ## 9. Web UI 约束
 
@@ -298,7 +289,7 @@ Vue 不得：
 
 当前开发候选版本：
 
-- Development Version：`0.1.6`
+- Development Version：`0.1.14`
 - 当前正式 Release / RELEASE.md：`0.1.1`
 - 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 

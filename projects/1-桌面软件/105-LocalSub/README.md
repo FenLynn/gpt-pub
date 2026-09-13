@@ -57,12 +57,11 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- v0.1.13 realtime 页面已完成第一轮 DavBridge 风格精修，meter/Core 链保持 v0.1.12 已验证实现。
-
-- 当前开发候选版本为 v0.1.13；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- v0.1.14 已完成主页控制中心精修，并把 DavBridge 已验证的“模块身份 / 独立状态 / 固定动作槽 / 无卡片状态行”设计逻辑迁入首页。meter/Core 链保持 v0.1.12 已验证实现，v0.1.13 realtime 页面结构保持不变。
+- 当前开发候选版本为 v0.1.14；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
-- `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
+- `p105-stable` 继续保存改造前 P105 可运行基线。仓库 `main` 可因其他项目正常前进；开始 v0.1.14 前已把最新 main 正常合入 `p105-exp`，未重置或覆盖 P105 独有历史。
 - Phase 1A 自动门禁已覆盖 Core IPC、Core 强杀与 generation 2 重连、Shell 启动、后台工作区、Process Loopback、sherpa runtime 与 native offline ASR。
 - 用户特定媒体、模型和机器条件下的高负载 GUI 响应性仍属于实机待验证项。
 - Phase 1B.0 Application Contract 已完成第一版。
@@ -95,7 +94,10 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - Shell/Web 继续使用独立约 30 Hz 轻量 `live.level`，不恢复整页 snapshot 高频刷新。实时页三段结构和 LocalSub 正式应用图标继续保留。
 - v0.1.12 使用用户实机日志把故障精确锁定到 WebShell 到 Vue：Core、IPC client 和 WebShell 均已收到明显动态 meter。WebShell realtime callback 现严格先 marshal 回 UI 线程，再访问 WebView2；Vue 运行态 meter 不再被 snapshot 覆盖；新增浏览器 ACK 日志 `Logs/meter-browser.log`。
 - CI 的真实 WebView2 smoke 现在注入 `live.level=0.73`，只有 Vue `applyLiveLevel` 回传 `0.7300` ACK 才通过，形成 Shell→WebView2→bridge→Vue 的端到端 meter 门禁。
-- 当前最新完整验证代码 head 为 `fe0984716b5760f2b1726df4321d68a5ef401ea4`，P105 Windows CI run `34750988540` success；candidate Artifact `10316435158`，WebUi preview Artifact `10316185726`。
+- v0.1.13 realtime 页面已在不改 meter/Core 链的前提下完成 DavBridge 风格精修，固定动作槽、黄色停止按钮、30 秒低高度历史和字幕主视觉已经形成。
+- v0.1.14 首页重构为真正的控制中心：顶部固定显示模块身份、当前业务状态与唯一主操作；下方只解释运行条件、实时配置、字幕显示与后台能力；开始按钮为绿色、停止按钮为黄色、不可操作态为灰色，按钮槽始终固定。
+- v0.1.14 同时修正绿色包边界。真实 WebView2 smoke 生成的 `WebView2/` profile/cache 会在打包前明确清除，CI 额外拒绝 Cookies、History、Login Data 等运行状态进入候选包。
+- 当前最新完整验证代码 head 为 `1cab728d2ac31db93faff91521aed9f38e3da5d2`，P105 Windows CI run `34754861926` success；candidate Artifact `10317375667`，WebUi preview Artifact `10317450676`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
