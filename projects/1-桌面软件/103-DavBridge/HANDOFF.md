@@ -26,7 +26,7 @@
 
 当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
 
-当前实验候选为 **v0.4.19**，只位于 `p103-exp`。
+当前实验候选为 **v0.4.20**，只位于 `p103-exp`。
 
 ## 3. 最新完整验证代码基线
 
@@ -36,18 +36,18 @@
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本：**v0.4.19**。
+当前实验版本：**v0.4.20**。
 
 最后完成完整 P103 CI 的代码 head：
 
 ```text
-723c77948e4a04cbb533b14d1236f99e9a37c801
+1d900d066f00bffaeba2ade7fc75491316144128
 ```
 
 对应 CI：
 
 ```text
-run 34753217596
+run 34756261258
 scope          success
 core-smoke     success
 frontend       success
@@ -55,35 +55,38 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.19-win-x64`
+Windows candidate：`DavBridge-v0.4.20-win-x64`
 
-Artifact ID：`10316692654`
+Artifact ID：`10317337650`
 
-Web UI preview Artifact ID：`10316672736`
+Web UI preview Artifact ID：`10317891802`
 
 EXE：
 
 ```text
-2463325 bytes
-SHA256 939c3d602a5f1778336e0da1a4f1404d1a8201bf29b464d00e24171624e51efb
+2467421 bytes
+SHA256 6110cbb0c9e5324dc482a91dc7fd33d53aaf12fac930e9a162527a7284e4d09e
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-f6d6efb654cd53cbf82b0ad0e5d0e8a6fb4a33f565e27511144c82e09cd5a3f7
+981407dc30b75b9899f3887c9a267f8dbb886233327279998870ce9a900619bd
 ```
 
 该 run 同时验证：
-- v0.4.19 event-level operational health ledger；
-- v0.4.19 旧 product-experience schema 1 → schema 2 升级、保存、重载与不重复计数；
+
+- v0.4.20 运行观察连续性判定；
+- 超过 15 分钟的正常退出空窗和异常中断空窗都会使完整健康窗口失效；
+- 15 分钟以内的短重启不会被误判为长期观察中断；
+- v0.4.19 匿名健康账本和 schema 1 到 schema 2 的兼容升级继续通过；
 - About 1100×825 浏览器预览；
 - 原 19 项 Core Smoke；
 - Windows single EXE；
 - Runtime 私人数据边界；
 - 既有 native-host self-test。
 
-本段之后若只有文档提交，仍以 `723c77948e4a04cbb533b14d1236f99e9a37c801` 作为最后完整构建验证的 v0.4.19 代码基线。
+本段之后若只有文档提交，仍以 `1d900d066f00bffaeba2ade7fc75491316144128` 作为最后完整构建验证的 v0.4.20 代码基线。
 
 ## 4. 当前分支快照
 
@@ -94,9 +97,9 @@ main         73aefcf04570180bb9526a43cf805aff1e7673b3
 p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-`p103-exp` 已在 stable/main 之上进入 v0.4.18 开发。由于本文件本身也是最后 CI 触发提交的一部分，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的旧 exp SHA 当作永久事实。
+`p103-exp` 已在 stable/main 之上进入 v0.4.20 开发。当前最后完整验证代码 head 为 `1d900d066f00bffaeba2ade7fc75491316144128`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
 
-v0.4.18 当前未获得 stable/main 提升授权。
+v0.4.20 当前未获得 stable/main 提升授权。
 
 ## 5. 当前架构
 
@@ -455,6 +458,26 @@ e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 
 第八，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
 
+### v0.4.20 运行观察连续性
+
+第一，v0.4.19 已经解决最近活动 40 条导致的统计截断，但仍有一个可信度缺口。如果 DavBridge 中间长时间没有运行，匿名事件账本本身仍然存在，单看事件数量可能把“没有被观察到的时间”误解成“没有异常”。
+
+第二，v0.4.20 在可再生的 `product-experience.json` 中新增 `LastObservationGapAt` 与 `LastObservationGapSeconds`。它们只描述最近一次明显运行空窗，不记录文件名、路径、URL、凭据、SHA 或迁移账本。
+
+第三，观察空窗阈值固定为 15 分钟。正常退出后到下一次启动超过 15 分钟，或异常中断后最后一次 runtime heartbeat 到下一次启动超过 15 分钟，都会记录一次观察空窗。短于或等于 15 分钟的普通更新和快速重启不会让健康窗口失效。
+
+第四，About 页现在区分三种状态：
+
+- 账本本身不足 24 小时时显示“健康账本建立中”；
+- 账本时间足够且最近 24 小时没有观察空窗时显示“近 24 小时”；
+- 最近 24 小时存在超过 15 分钟的运行空窗时显示“近 24 小时观察不连续”，并说明统计只代表 DavBridge 实际运行期间。
+
+第五，观察空窗只影响 About 页健康摘要可信度，不作为 warning 事件写入，也不参与迁移、安全暂停、StrongVerified、quota、Cycle、Reconciliation 或 DELETE 判定。
+
+第六，native self-test 新增 observation continuity 验证，同时覆盖 45 分钟正常退出空窗、5 分钟短重启和 40 分钟异常中断空窗。P103 CI 强制要求该测试通过。
+
+第七，本轮没有修改 `DavBridge.Core`、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站或 DELETE 安全链。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -509,26 +532,29 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
 ```
 
-当前实验版本为 v0.4.19，只位于 `p103-exp`。
+当前实验版本为 v0.4.20，只位于 `p103-exp`。
 
 最后完整验证代码 head：
 
 ```text
-723c77948e4a04cbb533b14d1236f99e9a37c801
+1d900d066f00bffaeba2ade7fc75491316144128
 ```
 
-完整 CI run：`34753217596`，五个 jobs 全部 success。
+完整 CI run：`34756261258`，五个 jobs 全部 success。
 
-v0.4.19 的关键变化只有 product-experience 匿名健康账本和 About 运行健康统计可信化，不改变首页、迁移页、暂停控制或 Core。
+Windows candidate Artifact ID：`10317337650`。
+
+v0.4.20 的关键变化是把“健康账本已经覆盖 24 小时”和“DavBridge 实际连续观察了这 24 小时”分开。超过 15 分钟的运行空窗会让 About 明确显示“近 24 小时观察不连续”，避免把未运行时间误当作零异常。
 
 下一步用户实机重点确认：
 
-1. About 页视觉仍保持轻量；
-2. 从 v0.4.18 升级后前 24 小时显示“健康账本建立中”是否自然；
-3. 24 小时后统计应继续显示“近 24 小时”，且不再受最近活动 40 条限制；
-4. 首页、暂停、迁移和流量界面不得出现任何回归。
+1. About 页“观察不连续”状态在真实 WebView2 中仍保持轻量，不显得像严重故障；
+2. 正常关闭后超过 15 分钟再启动，About 应显示观察不连续和近似空窗时长；
+3. 15 分钟以内的短重启不应误判为长期观察空窗；
+4. 空窗发生超过 24 小时后，如果之后持续运行，窗口应恢复为完整“近 24 小时”；
+5. 首页、暂停、安全暂停、迁移和流量界面不得出现任何回归。
 
-v0.4.19 未获得 stable/main 提升授权，也没有 tag / Release 授权。
+v0.4.20 未获得 stable/main 提升授权，也没有 tag / Release 授权。
 
 ## 10. 新对话固定读取顺序
 

@@ -6,23 +6,25 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.19**。
+当前 `p103-exp` 候选：**v0.4.20**。
 
-v0.4.19 最后完整验证代码 head：
+v0.4.20 最后完整验证代码 head：
 
 ```text
-723c77948e4a04cbb533b14d1236f99e9a37c801
+1d900d066f00bffaeba2ade7fc75491316144128
 ```
 
-完整 P103 CI run：`34753217596`，结果 `success`。
+完整 P103 CI run：`34756261258`，结果 `success`。
 
-Windows candidate Artifact ID：`10316692654`。
+Windows candidate Artifact ID：`10317337650`。
 
-EXE SHA256：`939c3d602a5f1778336e0da1a4f1404d1a8201bf29b464d00e24171624e51efb`。
+EXE：`2467421 bytes`。
 
-Artifact ZIP SHA256：`f6d6efb654cd53cbf82b0ad0e5d0e8a6fb4a33f565e27511144c82e09cd5a3f7`。
+EXE SHA256：`6110cbb0c9e5324dc482a91dc7fd33d53aaf12fac930e9a162527a7284e4d09e`。
 
-当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。
+Artifact ZIP SHA256：`981407dc30b75b9899f3887c9a267f8dbb886233327279998870ce9a900619bd`。
+
+当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
 
 ## 解决方案
 
@@ -242,31 +244,28 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.19 当前只在 `p103-exp`。
+v0.4.20 当前只在 `p103-exp`。
 
-### v0.4.19 匿名运行健康账本
+### v0.4.20 运行观察连续性
 
-`ProductExperienceV044` 的可再生 sidecar schema 提升到 2，新增：
+`ProductExperienceV044` 在 v0.4.19 匿名健康账本之上增加：
 
-- OperationalLedgerStartedAt；
-- OperationalEvents。
+- LastObservationGapAt；
+- LastObservationGapSeconds；
+- 15 分钟明显运行空窗阈值。
 
-事件类别只有 warning / network / pause / complete，并且只在原本已有的低频产品活动写入点同步记录，不增加定时采样。
+正常退出使用上次 clean exit 到本次启动计算空窗。异常中断使用上次 runtime heartbeat 到本次启动计算空窗。15 分钟以内的短重启不会让完整健康窗口失效。
 
-旧 schema 1 首次启动会安全升级。已有最近活动可投影成部分匿名事件，但完整 24 小时窗口从升级时刻重新建立，因此升级后的前 24 小时 `WindowComplete=false`。
+`OperationalHealthV048` 现在同时给出 `WindowComplete`、`ObservationGap` 和 `ObservationGapSeconds`。只有账本时间覆盖足够且最近统计窗口没有明显运行空窗时，`WindowComplete=true`。
 
-native self-test 同时覆盖：
+Vue 只接收以上聚合结果。About 页在存在空窗时显示“近 24 小时观察不连续”和近似时长，不读取 session marker 或 sidecar 原文件。
 
-- 24 小时聚合边界；
-- 旧 schema 1 加载；
-- schema 2 升级；
-- 保存与重载；
-- 第二次升级不重复计数。
+native self-test 新增 `ValidateObservationContinuityForSelfTest()`，CI 强制要求 `operationalObservationContinuity=true`。
 
-最后完整验证代码 head：`723c77948e4a04cbb533b14d1236f99e9a37c801`。
+最后完整验证代码 head：`1d900d066f00bffaeba2ade7fc75491316144128`。
 
-完整 CI run：`34753217596`。
+完整 CI run：`34756261258`。
 
-Windows candidate Artifact ID：`10316692654`。
+Windows candidate Artifact ID：`10317337650`。
 
 未经用户明确授权，不提升 stable/main，不创建 tag 或 Release。

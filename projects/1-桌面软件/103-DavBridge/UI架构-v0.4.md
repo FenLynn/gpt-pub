@@ -107,7 +107,7 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - 前端静态资源编译后嵌入 DavBridge.exe；
 - WebView2 用户数据存于 `%LOCALAPPDATA%/DavBridge/WebView2`。
 
-## v0.4.19 当前界面结构
+## v0.4.20 当前界面结构
 
 当前候选采用固定左侧导航：
 
@@ -153,6 +153,14 @@ UI 文字策略：
 - tooltip 不能替代危险操作确认；
 - 任何布局精修不得改变 bridge 权限或 C# 安全链。
 
+### v0.4.20 About 健康窗口连续性
+
+About 页继续保持轻量单条健康状态，不增加图表或新的导航层级。C# 侧 OperationalHealth DTO 新增 observationGap 与 observationGapSeconds 聚合字段。
+
+Vue 只根据聚合结果区分“健康账本建立中”“近 24 小时”和“近 24 小时观察不连续”。运行空窗细节不进入活动抽屉，也不新增 bridge 命令。
+
+观察连续性只改变健康摘要的可信度文案和轻量 warning 视觉，不改变首页、迁移页、暂停控制或任何安全操作。
+
 ## 构建
 
 前端：
@@ -195,12 +203,10 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 v0.4.16 继续作为 stable/main 冻结基线，commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。正式 GitHub Release 仍为 v0.4.0。
 
-当前实验版本为 v0.4.19，最后完整验证代码 head `723c77948e4a04cbb533b14d1236f99e9a37c801`，完整 P103 CI run `34753217596` 全绿。
+当前实验版本为 v0.4.20，最后完整验证代码 head `1d900d066f00bffaeba2ade7fc75491316144128`，完整 P103 CI run `34756261258` 全绿。
 
-v0.4.19 不增加新的主界面结构。About 页仍沿用 v0.4.17 / v0.4.18 的轻量摘要，只把“近 24 小时运行健康”的数据源从最多 40 条活动列表切换为 C# 侧匿名事件账本。
+v0.4.20 不增加新的主界面结构。About 页在 v0.4.19 匿名健康账本基础上增加运行观察连续性判断。超过 15 分钟的运行空窗会把状态标记为“近 24 小时观察不连续”，避免把未运行时间误读为零异常。
 
-Vue 仍只接收聚合 OperationalHealth DTO。事件账本不进入 JavaScript，不增加 bridge 命令，也不改变 Web UI 权限。
-
-升级后的前 24 小时显示“健康账本建立中”；账本累计满 24 小时后显示完整近 24 小时统计。中间应用重启不会重置账本建立时间。
+Vue 仍只接收聚合 OperationalHealth DTO，不读取匿名事件账本、runtime marker 或私人 Data，也不增加 bridge 命令。
 
 Overview、迁移页、暂停控制、WebDAV 和 DavBridge.Core 保持冻结。下一关仍是用户真实 Windows 视觉和长期运行观察。
