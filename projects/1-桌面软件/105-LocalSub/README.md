@@ -57,7 +57,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- 当前开发候选版本为 v0.1.10；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.11；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
@@ -87,10 +87,11 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - v0.1.8 将 `live.level` 从约 10 Hz 提升到约 30 Hz，并新增 Shell 到 Web 的独立轻量 `live.level` 事件。电平样本不再触发完整 `app.snapshot`，顶部 bar 直接使用高频事件，历史图每 3 个样本记录一次，保持约 30 秒窗口。
 - 实时历史波形改为单条 XY 曲线，不再使用上下镜像。实时页顶部按最新版 DavBridge 的“状态与动作分离”思路拆分，状态为独立图标与文字，主按钮使用固定动作槽。普通工作区背景统一为实色浅蓝灰，减少文字周围的发白层次感。
 - v0.1.9 曾尝试以 ASR 输入 RMS 驱动 meter，但用户实机确认 PotPlayer 播歌时仍几乎不动。复查旧 WinForms 基线后确认，旧界面已验证灵敏的输入进度条实际使用 capture service packet peak。
-- v0.1.10 恢复旧 WinForms 已验证的 meter 源：All Audio 与 PotPlayer capture `LevelChanged` 重新直接进入 Core `ForwardCaptureLevel`，`OnSamples` 只负责 ASR。Shell/Web 继续使用独立约 30 Hz 轻量 `live.level`，不恢复整页 snapshot 高频刷新。
-- CI 已冻结该经验：必须保留 capture peak 证据链，并禁止 meter 再静默切回 RMS/dB 映射。
-- 实时页三段结构和 LocalSub 正式应用图标继续保留。
-- 当前最新完整验证代码 head 为 `cae3fb79a5a52e72c39d1989909fdd42022e484d`，P105 Windows CI run `34743524085` success；candidate Artifact `10313676426`，WebUi preview Artifact `10312664280`。
+- v0.1.10 恢复旧 WinForms capture `LevelChanged` 后，用户仍确认 PotPlayer 播放且字幕可识别时 meter 基本无动态，因此继续全链复查。
+- v0.1.11 将 meter 与 ASR 数据源彻底合并：`LiveAsrPipeline.OnSamples` 对真正写入 ASR queue 的同一块 16 kHz mono PCM 直接计算 instantaneous peak `max(abs(sample))`。不使用 RMS、dB 映射或 release smoothing，也不再依赖 capture-only `LevelChanged` 支路。
+- Core、IPC client 与 WebShell 新增每秒一次的 meter 诊断摘要。若实机仍异常，可直接比较 Core `LIVE_METER`、`Logs/core-client.log` 的 `LIVE_METER_RX` 与 `Logs/meter-web.log`，精确定位哪一层丢失动态。
+- Shell/Web 继续使用独立约 30 Hz 轻量 `live.level`，不恢复整页 snapshot 高频刷新。实时页三段结构和 LocalSub 正式应用图标继续保留。
+- 当前最新完整验证代码 head 为 `a06199015be86d3c3a96185bf715e3d67063a45b`，P105 Windows CI run `34748702332` success；candidate Artifact `10315301533`，WebUi preview Artifact `10315042210`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。

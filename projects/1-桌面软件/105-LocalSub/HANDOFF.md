@@ -188,18 +188,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.10 已根据实机对照恢复旧 WinForms 已验证的 capture peak meter 路径。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.11 已完成 realtime meter 全链复查：meter 直接从与 ASR 共用的 `SamplesAvailable` 16 kHz mono PCM 块计算 instantaneous peak，并加入 Core / IPC / WebShell 三层低频诊断。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-cae3fb79a5a52e72c39d1989909fdd42022e484d
+a06199015be86d3c3a96185bf715e3d67063a45b
 ```
 
 P105 Windows CI：
 
 ```text
-run 34743524085
+run 34748702332
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10313676426
-sha256:b4d9cc6f3185877386fc20ea2ab693e31fdc2a05884f10fc85bd101bdfd52cb3
+ID 10315301533
+sha256:295594295cf7b642472c641c7165945985869de7b46a9a958a619630c04abc5c
 
 WebUi preview
-ID 10312664280
-sha256:bb852cc0c9cb0b76a3254ac50420441d8f0c18e34a1d4b77d01875a0640293bf
+ID 10315042210
+sha256:41898da02dc9a31b61219367a34e57f83cfd0dafc35e1d83393424d76c1768a8
 ```
 
 本阶段已经完成：
@@ -242,13 +242,15 @@ v0.1.8 修正实时电平链路：Core 的 `live.level` 对外频率由约 10 Hz
 
 v0.1.9 曾尝试将 meter 改为 ASR 输入 RMS，但用户实机确认 PotPlayer 播歌时仍几乎不动。复查旧 WinForms 基线后确认，旧界面那个已验证“反应很及时”的进度条实际直接使用采集服务 `LevelChanged` packet peak，而不是 ASR RMS。
 
-v0.1.10 因此恢复旧 WinForms 已验证的 meter 源：`AllAudioCaptureService.LevelChanged` 与 `ResilientPotPlayerCaptureService.LevelChanged` 重新进入 Core `LiveAsrPipeline.ForwardCaptureLevel`，`OnSamples` 只负责 ASR 数据，不再计算 UI meter。Shell/Web 仍保留 v0.1.8 建立的独立约 30 Hz 轻量 `live.level` 通道，因此恢复旧灵敏度的同时不恢复整页 snapshot 高频刷新。CI 新增门禁，明确禁止 meter 再静默切回 RMS/dB 映射，并要求旧 WinForms、capture service、Core proxy 与 Vue 轻量通道之间的证据链同时存在。
+v0.1.10 曾恢复旧 WinForms capture `LevelChanged` 路径，但用户再次实机确认 PotPlayer 播放且字幕可识别时 meter 仍无有效动态。全链复查确认 capture service 三个实现文件与旧稳定基线完全相同，真正变化集中在迁 Core 后的 meter 事件支路。
+
+v0.1.11 取消与 ASR 并行的 capture-only meter 支路。Core `LiveAsrPipeline.OnSamples` 对真正进入 ASR queue 的同一块 16 kHz mono PCM 直接计算 `max(abs(sample))` instantaneous peak，并立刻触发 `LevelChanged`；不使用 RMS、不做 dB 映射、不做 release smoothing。这样只要 ASR 确实持续消费音频，meter 与字幕就不再存在数据源分叉。Core、Shell IPC 与 WebShell 各自增加每秒一次的 meter 诊断摘要，分别记录事件数与 min/max；WebShell 诊断写入 `Logs/meter-web.log`，IPC 接收摘要写入 `Logs/core-client.log`，Core 记录 `LIVE_METER`。CI 已冻结这一结构。
 
 下一步固定为：
 
 1. 不提升 stable，不动 main。
-2. 用户实机验证 v0.1.10：PotPlayer 播歌时顶部 capture peak meter 是否恢复旧 WinForms 的快速变化，30 秒曲线是否持续左移。
-3. 若 capture peak 实机仍异常，下一步只诊断 capture service 与 Core 事件值，不再修改 UI 映射。
+2. 用户实机验证 v0.1.11：PotPlayer 或所有音频播放时顶部 meter 与 30 秒曲线是否恢复持续动态。
+3. 若仍异常，不再修改 meter 算法。直接读取 `Logs/core-client.log` 与 `Logs/meter-web.log`，并结合 Core `LIVE_METER` 摘要判断故障位于 Core 采样、IPC 还是 WebShell。
 4. meter 实机确认后继续完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
 5. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台达到必要功能覆盖后再进入 Phase 3 删除。
 
