@@ -10,6 +10,7 @@ type Pending = { resolve: (value: unknown) => void; reject: (reason: Error) => v
 const webview = (window as unknown as { chrome?: { webview?: WebViewApi } }).chrome?.webview
 const pending = new Map<string, Pending>()
 const listeners = new Set<(snapshot: DavBridgeSnapshot) => void>()
+const noticeListeners = new Set<(notice: { title: string; message: string; tone: string }) => void>()
 let sequence = 0
 
 if (webview) {
@@ -24,12 +25,14 @@ if (webview) {
       return
     }
     if (message.event === 'snapshot') listeners.forEach(listener => listener(message.payload as DavBridgeSnapshot))
+    if (message.event === 'notice') noticeListeners.forEach(listener => listener(message.payload as { title: string; message: string; tone: string }))
     if (message.event === 'navigate' && message.payload === 'overview') window.dispatchEvent(new CustomEvent('davbridge:navigate-overview'))
   })
 }
 
 export function hasNativeBridge() { return Boolean(webview) }
 export function onSnapshot(listener: (snapshot: DavBridgeSnapshot) => void) { listeners.add(listener); return () => listeners.delete(listener) }
+export function onNotice(listener: (notice: { title: string; message: string; tone: string }) => void) { noticeListeners.add(listener); return () => noticeListeners.delete(listener) }
 export async function invoke<T = unknown>(method: string, params?: unknown): Promise<T> {
   if (!webview) throw new Error('Native bridge is not available')
   const id = `db-${Date.now()}-${++sequence}`

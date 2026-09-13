@@ -15,6 +15,12 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("crash recovery after put", TestCrashRecoveryAsync),
     ("partial group budgets only unfinished member", TestPartialGroupQuotaAsync),
     ("oversize object blocks safely", TestOversizeAsync),
+    ("safe pause stops before next member", TestSafePauseAsync),
+    ("repeated pause resume remains idempotent", TestRepeatedPauseResumeAsync),
+    ("network list failure recovers on retry", TestNetworkRetryAsync),
+    ("verification network loss recovers without re-put", TestVerificationRetryWithoutReputAsync),
+    ("zero byte object verifies safely", TestZeroByteAsync),
+    ("quota exact boundary is deterministic", TestQuotaExactBoundaryAsync),
     ("large zotero manifest", TestLargeManifestAsync)
 };
 
@@ -331,6 +337,220 @@ static async Task TestOversizeAsync()
     finally { Directory.Delete(root, true); }
 }
 
+static async Task TestSafePauseAsync()
+{
+    var source = new FakeReadClient(new Dictionary<string, byte[]>
+    {
+        ["zotero/A.bin"] = Bytes("first-file"),
+        ["zotero/B.bin"] = Bytes("second-file")
+    });
+    var pauseRequested = false;
+    var target = new FakeWriteClient
+    {
+        AfterPut = count => { if (count == 1) pauseRequested = true; }
+    };
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"),
+            pauseRequested: () => pauseRequested);
+        await engine.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Paused, "safe pause must end in Paused");
+        Check(target.PutCount == 1, "safe pause must not start the next member");
+        Check(state.Files.TryGetValue("A.bin", out var first) && first.Status == TransferStatus.StrongVerified,
+            "the in-flight member must finish strong verification before pause");
+        Check(!state.Files.TryGetValue("B.bin", out var second) || second.Status != TransferStatus.StrongVerified,
+            "the next member must remain unprocessed");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestRepeatedPauseResumeAsync()
+{
+    var source = new FakeReadClient(new Dictionary<string, byte[]>
+    {
+        ["zotero/A.bin"] = Bytes("first-file"),
+        ["zotero/B.bin"] = Bytes("second-file"),
+        ["zotero/C.bin"] = Bytes("third-file")
+    });
+    var pauseRequested = false;
+    var pauseAfterPutCount = 1;
+    var target = new FakeWriteClient
+    {
+        AfterPut = count =>
+        {
+            if (count == pauseAfterPutCount)
+                pauseRequested = true;
+        }
+    };
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+
+        var first = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"),
+            pauseRequested: () => pauseRequested);
+        await first.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Paused, "first pause must end in Paused");
+        Check(target.PutCount == 1, "first pass must upload exactly one member");
+        Check(state.Files["A.bin"].Status == TransferStatus.StrongVerified, "first member must be verified before first pause");
+
+        pauseRequested = false;
+        pauseAfterPutCount = 2;
+        var second = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"),
+            pauseRequested: () => pauseRequested);
+        await second.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Paused, "second pause must also end in Paused");
+        Check(target.PutCount == 2, "second pass must upload exactly one additional member");
+        Check(state.Files["A.bin"].Status == TransferStatus.StrongVerified, "first verified member must remain verified");
+        Check(state.Files["B.bin"].Status == TransferStatus.StrongVerified, "second member must be verified before second pause");
+
+        pauseRequested = false;
+        pauseAfterPutCount = int.MaxValue;
+        var third = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"),
+            pauseRequested: () => pauseRequested);
+        await third.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Complete, "third pass should finish the remaining member");
+        Check(target.PutCount == 3, "verified members must never be uploaded again after resume");
+        Check(state.Files.Values.Count(x => x.Status == TransferStatus.StrongVerified) == 3,
+            "all three members must be strongly verified after repeated pause/resume");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestNetworkRetryAsync()
+{
+    var source = new FakeReadClient(new Dictionary<string, byte[]>
+    {
+        ["zotero/A.bin"] = Bytes("network-retry")
+    })
+    {
+        ListFailuresRemaining = 1
+    };
+    var target = new FakeWriteClient();
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+
+        var first = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
+        await first.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.WaitNetwork, "transient source listing failure must enter WaitNetwork");
+        Check(target.PutCount == 0, "network failure before listing completes must not PUT");
+
+        var second = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
+        await second.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Complete, "next safe pass must recover after transient network failure");
+        Check(target.PutCount == 1, "recovered pass must upload the object exactly once");
+        Check(state.Files["A.bin"].Status == TransferStatus.StrongVerified, "recovered object must become StrongVerified");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestVerificationRetryWithoutReputAsync()
+{
+    var data = Bytes("verify-after-network-loss");
+    var source = new FakeReadClient(new Dictionary<string, byte[]>
+    {
+        ["zotero/A.bin"] = data
+    });
+    var target = new FakeWriteClient
+    {
+        DownloadFailuresRemaining = 1
+    };
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+
+        var first = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
+        await first.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.WaitNetwork, "verification network loss must enter WaitNetwork");
+        Check(target.PutCount == 1, "first pass must have uploaded exactly once before verification failed");
+        Check(state.UploadAttemptBytesSinceCalibration == data.LongLength,
+            "failed verification must not lose conservative upload accounting");
+
+        var second = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
+        await second.RunAsync(CancellationToken.None);
+        Check(state.EngineState == EngineState.Complete, "retry must safely adopt the already uploaded target");
+        Check(target.PutCount == 1, "retry after verification loss must never PUT the same bytes again");
+        Check(state.Files["A.bin"].Status == TransferStatus.StrongVerified, "retry must finish StrongVerified");
+        Check(state.UploadAttemptBytesSinceCalibration == data.LongLength,
+            "retry must not double-charge upload bytes");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestZeroByteAsync()
+{
+    var source = new FakeReadClient(new Dictionary<string, byte[]>
+    {
+        ["zotero/empty.bin"] = Array.Empty<byte>()
+    });
+    var target = new FakeWriteClient();
+    var root = NewTempRoot();
+    try
+    {
+        var state = new MigrationState();
+        var store = new StateStore(Path.Combine(root, "state.json"));
+        var engine = new MigrationEngine(TestConfig(), state, store, source, target, Path.Combine(root, "temp"));
+        await engine.RunAsync(CancellationToken.None);
+
+        Check(state.EngineState == EngineState.Complete, "zero byte object must complete safely");
+        Check(target.PutCount == 1, "zero byte object still requires one target PUT");
+        Check(state.Files["empty.bin"].Status == TransferStatus.StrongVerified, "zero byte object must be StrongVerified");
+        Check(state.UploadAttemptBytesSinceCalibration == 0, "zero byte upload must not consume quota");
+        Check(state.VerifiedDownloadBytesSinceCalibration == 0, "zero byte verification must not consume download bytes");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static async Task TestQuotaExactBoundaryAsync()
+{
+    var exact = Bytes("0123456789");
+    var config = TestConfig();
+    config.UploadQuotaBytes = 60;
+    config.NormalReserveBytes = 50;
+    config.DownloadQuotaBytes = 1_000;
+    var root = NewTempRoot();
+    try
+    {
+        var exactState = new MigrationState();
+        var exactStore = new StateStore(Path.Combine(root, "exact-state.json"));
+        var exactTarget = new FakeWriteClient();
+        var exactEngine = new MigrationEngine(
+            config,
+            exactState,
+            exactStore,
+            new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/A.bin"] = exact }),
+            exactTarget,
+            Path.Combine(root, "exact-temp"));
+        await exactEngine.RunAsync(CancellationToken.None);
+        Check(exactState.EngineState == EngineState.Complete, "required bytes equal to safe remaining must be allowed");
+        Check(exactTarget.PutCount == 1, "exact-boundary upload must proceed");
+
+        var overState = new MigrationState();
+        var overStore = new StateStore(Path.Combine(root, "over-state.json"));
+        var overTarget = new FakeWriteClient();
+        var overEngine = new MigrationEngine(
+            config,
+            overState,
+            overStore,
+            new FakeReadClient(new Dictionary<string, byte[]> { ["zotero/B.bin"] = new byte[11] }),
+            overTarget,
+            Path.Combine(root, "over-temp"));
+        await overEngine.RunAsync(CancellationToken.None);
+        Check(overState.EngineState == EngineState.WaitQuota, "one byte over safe remaining must wait for quota");
+        Check(overTarget.PutCount == 0, "over-boundary object must not start PUT");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
 static Task TestLargeManifestAsync()
 {
     const int attachments = 6000;
@@ -380,6 +600,7 @@ sealed class FakeReadClient : IReadOnlyWebDavClient
     protected readonly Dictionary<string, byte[]> Files;
     private readonly Dictionary<string, int> _metadataReads = new(StringComparer.OrdinalIgnoreCase);
     public bool MutateOnSecondMetadataRead { get; set; }
+    public int ListFailuresRemaining { get; set; }
     public long TotalBytes => Files.Values.Sum(x => (long)x.Length);
 
     public FakeReadClient(Dictionary<string, byte[]> files)
@@ -389,6 +610,11 @@ sealed class FakeReadClient : IReadOnlyWebDavClient
 
     public Task<IReadOnlyList<WebDavEntry>> ListDirectoryAsync(string relativeDirectory, CancellationToken cancellationToken)
     {
+        if (ListFailuresRemaining > 0)
+        {
+            ListFailuresRemaining--;
+            throw new HttpRequestException("simulated source listing network loss");
+        }
         var prefix = relativeDirectory.Trim('/') + "/";
         IReadOnlyList<WebDavEntry> result = Files
             .Where(x => x.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -437,6 +663,8 @@ sealed class FakeWriteClient : IWritableWebDavClient
 {
     private readonly Dictionary<string, byte[]> _files;
     public bool DropWrites { get; set; }
+    public Action<int>? AfterPut { get; init; }
+    public int DownloadFailuresRemaining { get; set; }
     public int PutCount { get; private set; }
     public int DownloadCount { get; private set; }
 
@@ -474,6 +702,11 @@ sealed class FakeWriteClient : IWritableWebDavClient
     public Task<DownloadResult> DownloadAndHashAsync(string relativePath, CancellationToken cancellationToken)
     {
         DownloadCount++;
+        if (DownloadFailuresRemaining > 0)
+        {
+            DownloadFailuresRemaining--;
+            throw new HttpRequestException("simulated target verification network loss");
+        }
         var data = _files[relativePath];
         return Task.FromResult(new DownloadResult(data.LongLength, HashBytes(data)));
     }
@@ -482,6 +715,7 @@ sealed class FakeWriteClient : IWritableWebDavClient
     {
         PutCount++;
         var data = await File.ReadAllBytesAsync(localFilePath, cancellationToken);
+        AfterPut?.Invoke(PutCount);
         if (!DropWrites)
             _files[relativePath] = data;
         return new PutResult(System.Net.HttpStatusCode.Created, true);

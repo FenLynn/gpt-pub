@@ -104,14 +104,20 @@ jobs:
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 0.3; done
           browser=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
           test -n "$browser"
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=870,525 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-870x525.png" http://127.0.0.1:4173/
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=900,620 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png" http://127.0.0.1:4173/
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,825 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-1100x825.png" http://127.0.0.1:4173/
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1200,760 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png" http://127.0.0.1:4173/
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,825 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/transfer-1100x825.png" 'http://127.0.0.1:4173/?tab=transfer'
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-870x525.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png") -gt 10000
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-1100x825.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-1200x760.png") -gt 10000
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/transfer-1100x825.png") -gt 10000
       - name: Upload Vue visual previews
         uses: actions/upload-artifact@v4
         with:
-          name: DavBridge-v0.4.0-webui-preview
+          name: DavBridge-webui-preview
           path: build/WebUiPreview/*.png
           if-no-files-found: error
           retention-days: 14
@@ -153,11 +159,9 @@ jobs:
 
       - name: Publish framework-dependent single EXE
         shell: pwsh
-        run: >-
-          dotnet publish 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'
-          -c Release -r win-x64 --self-contained false --no-restore
-          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded
-          -o build/DavBridge
+        run: |
+          $buildUtc=(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+          dotnet publish 'projects/1-桌面软件/103-DavBridge/代码/DavBridge/DavBridge.csproj'             -c Release -r win-x64 --self-contained false --no-restore             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded             "-p:DavBridgeCommit=$env:GITHUB_SHA" "-p:DavBridgeBuildUtc=$buildUtc"             -o build/DavBridge
 
       - name: Verify Runtime boundary
         shell: pwsh
@@ -167,7 +171,7 @@ jobs:
           if (!(Test-Path $exe -PathType Leaf)) { throw 'DavBridge.exe missing' }
           $unexpected=Get-ChildItem 'build/DavBridge' -File | Where-Object { $_.Name -ne 'DavBridge.exe' }
           if ($unexpected) { $unexpected | Select-Object Name,Length | Format-Table; throw 'Default P103 Runtime must remain a single-file delivery.' }
-          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','reconcile.json','DavBridge.log')) {
+          foreach ($private in @('config.json','state.json','state.json.bak','secrets.dat','reconcile.json','product-experience.json','product-experience.json.bak','runtime-session.json','startup-error.log','DavBridge.log')) {
             if (Get-ChildItem 'build/DavBridge' -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private Data leaked into Runtime: $private" }
           }
 
@@ -185,8 +189,11 @@ jobs:
             $env:APPDATA=$roaming; $env:LOCALAPPDATA=$local
             $proc=Start-Process -FilePath (Resolve-Path 'build/DavBridge/DavBridge.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
             if ($proc.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "DavBridge self-test exit code $($proc.ExitCode)" }
-            $json=(Get-Content $report -Raw) | ConvertFrom-Json
+            $reportText=Get-Content $report -Raw
+            $reportText | Write-Host
+            $json=$reportText | ConvertFrom-Json
             if (-not $json.ok -or -not $json.webUiEmbedded -or -not $json.bridgeWhitelistValidated -or $json.coreLogicMovedToJavaScript) { throw 'DavBridge v0.4 native-host self-test failed' }
+            if (-not $json.configBackupRecovery -or -not $json.stateBackupRecovery -or -not $json.reconcileBackupRecovery -or -not $json.productSidecarBackupRecovery -or -not $json.runtimeSessionSelfTest -or -not $json.windowFourThreeMigration -or -not $json.backgroundWakeSignal) { throw 'DavBridge v0.4.8 recovery and window migration self-test failed' }
             if (-not $json.version.StartsWith($env:EXPECTED_VERSION + '.')) { throw "Self-test version mismatch: $($json.version)" }
           } finally { $env:APPDATA=$oldAppData; $env:LOCALAPPDATA=$oldLocal; Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
 
@@ -219,7 +226,7 @@ jobs:
           - Native host and business core: existing C# / .NET 8
           - Core migration logic: unchanged
           - Deployment: framework-dependent single EXE, Windows x64
-          - Stable rollback baseline: v0.1.7 on main
+          - Stable rollback baseline: v0.4.0 on main
           - Candidate: ${{ github.sha }}
           - EXE bytes: $env:DAVBRIDGE_BYTES
           - EXE SHA-256: $env:DAVBRIDGE_SHA256
