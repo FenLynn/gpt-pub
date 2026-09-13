@@ -8,6 +8,7 @@ public sealed class TrayController : IDisposable
     static readonly ConditionalWeakTable<Form, TrayController> Controllers = new();
     readonly Form _form;
     readonly NotifyIcon _icon;
+    readonly Icon _appIcon;
     readonly ToolStripMenuItem _toggleLive;
     readonly ToolStripMenuItem _status;
     bool _explicitExit;
@@ -26,10 +27,11 @@ public sealed class TrayController : IDisposable
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(exit);
 
+        _appIcon = AppIcon.Create();
         _icon = new NotifyIcon
         {
             Text = "LocalSub 本地字幕",
-            Icon = SystemIcons.Application,
+            Icon = _appIcon,
             ContextMenuStrip = menu,
             Visible = true
         };
@@ -128,5 +130,6 @@ public sealed class TrayController : IDisposable
             shell.TrayStateChanged -= RefreshState;
         _icon.Visible = false;
         _icon.Dispose();
+        _appIcon.Dispose();
     }
 }

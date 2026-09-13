@@ -134,6 +134,7 @@ public sealed class WebShellForm : Form
         _live = new LiveSessionController(_core);
 
         Text = "LocalSub";
+        Icon = AppIcon.Create();
         Width = 1100;
         Height = 825;
         MinimumSize = new Size(900, 675);

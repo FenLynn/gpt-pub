@@ -10,6 +10,7 @@
     <RootNamespace>LocalSub</RootNamespace>
     <Version>0.1.9</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\LocalSub.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PlatformTarget>x64</PlatformTarget>
     <SelfContained>false</SelfContained>

@@ -74,6 +74,7 @@ public sealed class MainForm : Form
     public MainForm()
     {
         Text = "LocalSub 0.1.0 dev";
+        Icon = AppIcon.Create();
         Width = 1120;
         Height = 760;
         StartPosition = FormStartPosition.CenterScreen;
