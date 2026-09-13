@@ -188,18 +188,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.12 已根据用户实机日志修复 realtime meter 的最后 WebView2 投递边界。Core / IPC / WebShell 数值链已由实机日志证实正常，WebShell 现在严格先 marshal 到 UI 线程后再访问 WebView2，Vue 增加 meter ACK。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.13 已完成 realtime 页面第一轮 DavBridge 风格精修。meter 端到端链保持 v0.1.12 已验证闭环，本轮不改音频与 Core 算法，只重构视觉层级、字幕历史呈现和固定动作槽。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-fe0984716b5760f2b1726df4321d68a5ef401ea4
+91f811e2dc580b32b5dcb4b562ef8078fbb769e4
 ```
 
 P105 Windows CI：
 
 ```text
-run 34750988540
+run 34753260233
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10316435158
-sha256:9b11e5f8932b757ab77365752b126ab7a60e72c05d754d3de9dc508cff537361
+ID 10316124208
+sha256:050df57b1ecd0b520a8a0db9d6ef659c8cc42138196e766e85147adbb2b281ab
 
 WebUi preview
-ID 10316185726
-sha256:3aac9286963637b2703e279f4cf56864f4f7598238d49868d5176c597c02d19f
+ID 10316697829
+sha256:814eb52ae44ea7113c772950587a01817cae65a93b8001ad7faf42cfd2d86e8b
 ```
 
 本阶段已经完成：
@@ -247,13 +247,15 @@ v0.1.10 曾恢复旧 WinForms capture `LevelChanged` 路径，但用户再次实
 v0.1.11 取消与 ASR 并行的 capture-only meter 支路。Core `LiveAsrPipeline.OnSamples` 对真正进入 ASR queue 的同一块 16 kHz mono PCM 直接计算 `max(abs(sample))` instantaneous peak，并立刻触发 `LevelChanged`；不使用 RMS、不做 dB 映射、不做 release smoothing。这样只要 ASR 确实持续消费音频，meter 与字幕就不再存在数据源分叉。Core、Shell IPC 与 WebShell 各自增加每秒一次的 meter 诊断摘要，分别记录事件数与 min/max；WebShell 诊断写入 `Logs/meter-web.log`，IPC 接收摘要写入 `Logs/core-client.log`，Core 记录 `LIVE_METER`。CI 已冻结这一结构。
 v0.1.12 根据用户上传的 Core / IPC / WebShell 三层日志完成最终边界定位。实机日志证明 PotPlayer 时 Core peak 可达 0.8330，IPC 和 WebShell 同样收到明显动态，因此音频、Core 与 IPC 均正常；故障被锁定在 WebShell 到 Vue。修复点：后台 realtime callback 不再在 `BeginInvoke` 前读取 WebView2 控件；所有 WebView2 meter 投递先 marshal 回 UI 线程。Vue 运行态不再被 snapshot 覆盖专用 `liveLevel`；bridge 对 string/object 两种 message payload 都兼容。新增 `diagnostics.liveLevelAck` 与 `Logs/meter-browser.log`。CI 的真实 WebView2 smoke 会由 Shell 注入 `0.73`，只有 Vue 的 `applyLiveLevel` 收到并回传 `0.7300` ACK 才通过。
 
+v0.1.13 在不改动已验证 meter/Core 链的前提下，按最新版 DavBridge 的当前任务模块重新组织 realtime 页面：顶部固定为“模块图标 / 名称 / 中央状态与实时电平 / 固定动作槽”；开始按钮采用克制绿色立体层级，运行时停止按钮使用黄色高优先级动作语义；音源与模型保留一行一个的单栏配置；30 秒历史波形进一步压低高度并移除多余 y 轴；字幕区成为主要内容区，当前字幕最突出，近期历史逐级降低对比度并自动跟随。左下业务状态卡同步收紧，1100×825 与 900×675 预览均已人工检查。
+
 
 下一步固定为：
 
 1. 不提升 stable，不动 main。
-2. 用户实机验证 v0.1.12：PotPlayer 播放时顶部 meter 与 30 秒曲线是否恢复持续动态。
-3. 若仍异常，读取新增 `Logs/meter-browser.log` 并与 `core.log / core-client.log / meter-web.log` 对照，不再修改采样算法。
-4. meter 实机确认后继续完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
+2. v0.1.13 实机重点验证实时页在真实运行态下的视觉密度、字幕历史层级、黄色停止按钮与 30 秒曲线观感；meter 数据链不再改算法。
+3. 下一轮按既定计划精修主页控制中心，使首页成为日常零学习成本入口。
+4. 随后完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
 5. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台达到必要功能覆盖后再进入 Phase 3 删除。
 
 ## 9. Web UI 约束
