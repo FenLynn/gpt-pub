@@ -188,18 +188,18 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.7 已完成主页、实时页与状态体系第二轮实机反馈收口。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B` Web UI 已切为默认入口，v0.1.8 已完成实时电平链路与实时页第三轮实机反馈收口。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-82e6a8bc40c91b8c1609143c3caeca4741d0879a
+cf5dee671b13783c8541d4eeb20cd999a5074e8a
 ```
 
 P105 Windows CI：
 
 ```text
-run 34706837076
+run 34732116003
 success
 ```
 
@@ -207,12 +207,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10302555345
-sha256:837bb8f651635460cdb54d4bc69f6b699ebe0fdd97f1b1aff8e5b33c34d3dc4f
+ID 10310386040
+sha256:bcb16fc89480cbb76ca32ad406243242516f82c5137b1b7a43c90b800e3022a0
 
 WebUi preview
-ID 10302180659
-sha256:a13b58f49bf3b677073425a3a3bcbb255267de2ac7bfadc3486ad1b248f8c6a1
+ID 10309861877
+sha256:386a3077302552b3a81577b31ce71fbf1910d92c5c85815e373d2953b9b9c313
 ```
 
 本阶段已经完成：
@@ -238,10 +238,12 @@ v0.1.6 在该视觉基线上一次完成新的日常工作流：主页成为默�
 
 v0.1.7 基于实机截图继续收口：主页改为纵向状态清单，主按钮移动到右上角；实时页顶部集中瞬时输入电平 bar、输入监视开关和运行状态；输入历史扩大到约 30 秒并持续左移；字幕区改为独立内部滚动，历史行常规显示、当前行加粗；设置滚动区预留 scrollbar gutter；文档字号提升；WebView2 与页面背景统一；正常启动后托盘图标始终存在；左下状态改为 DavBridge 风格业务状态。
 
+v0.1.8 修正实时电平链路：Core 的 `live.level` 对外频率由约 10 Hz 提高到约 30 Hz；Shell 不再因每个电平样本触发完整 `app.snapshot`，而是通过独立轻量 `live.level` Web 事件转发；Vue 顶部电平条直接订阅该事件，30 秒历史每 3 个样本记录一次。历史波形改为单条 XY 曲线，不再镜像对称。实时页顶部按最新版 DavBridge 的语义拆成标题、实时电平、监视开关、状态和独立动作槽；普通页面背景改为统一实色浅蓝灰，避免半透明白层造成发白观感。
+
 下一步固定为：
 
 1. 不提升 stable，不动 main。
-2. 用户实机验证 v0.1.7：常驻托盘、关闭/最小化行为、真实 PotPlayer、30 秒输入历史、字幕滚动、Overlay 设置即时生效。
+2. 用户实机验证 v0.1.8：顶部电平条是否接近连续跳动、30 秒单线曲线是否持续左移、真实 PotPlayer 电平与字幕是否同步、状态和动作区是否清晰分离。
 3. 下一步集中完成 Web 后台转写工作区，复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。
 4. 旧 WinForms 在迁移期间只作为显式备用入口，待 Web 后台达到必要功能覆盖后再进入 Phase 3 删除。
 

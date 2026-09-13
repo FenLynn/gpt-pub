@@ -132,7 +132,7 @@ Vue 不得直接：
 
 ## 6. UI 状态契约
 
-主 UI 以 snapshot 为事实源，而不是从控件反推业务状态。
+主 UI 的业务状态以 snapshot 为事实源，而不是从控件反推业务状态。高频遥测允许使用受控的轻量事件，当前唯一例外是 `live.level`，它不改变业务状态，只驱动实时电平显示。
 
 建议顶层状态：
 
@@ -321,7 +321,7 @@ Failed
 
 音量事件不得按音频 callback 原始频率穿过全部链路。
 
-Core 内部可以高频处理，但对外 `live.level` 默认限制到约 10 Hz。
+Core 内部可以高频处理，对外 `live.level` 默认限制到约 30 Hz。Shell 不应为每个电平样本重建和发送完整 `app.snapshot`，而应将其作为独立轻量事件转发到 Web。Vue 可以对显示历史进一步降采样。
 
 `live.partial`、`live.final`、错误和状态变化按实际事件即时发送。
 
@@ -330,7 +330,7 @@ Core 内部可以高频处理，但对外 `live.level` 默认限制到约 10 Hz�
 ```text
 Core
 → Named Pipe
-→ Shell
+→ Shell 轻量 live.level 事件
 → WebView2
 → Vue
 ```

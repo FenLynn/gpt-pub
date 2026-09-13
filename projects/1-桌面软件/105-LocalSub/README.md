@@ -57,7 +57,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- 当前开发候选版本为 v0.1.7；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.8；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 与 `main` 从该点保持为改造前可运行基线，新架构只在 `p105-exp` 推进。
@@ -84,7 +84,9 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - 生命周期新增 `--startup-silent`、静默托盘启动、托盘开始/停止实时字幕、启动后自动实时字幕。PotPlayer 模式在播放器未出现时保持“等待 PotPlayer”，不得静默回退为所有音频。
 - v0.1.7 根据第二轮实机反馈继续收口：主页改为纵向状态清单并把实时主操作移动到右上角；实时页顶部集中瞬时电平 bar、输入监视开关和运行状态，输入历史扩大为约 30 秒，字幕区独立滚动且当前字幕加粗；设置滚动区预留安全边距；文档字号提升；背景统一。
 - 托盘图标改为 Shell 正常启动后始终存在，左下状态区改为 DavBridge 风格业务状态，区分运行、等待、异常、就绪与待配置。
-- 当前最新完整验证代码 head 为 `82e6a8bc40c91b8c1609143c3caeca4741d0879a`，P105 Windows CI run `34706837076` success；candidate Artifact `10302555345`，WebUi preview Artifact `10302180659`。
+- v0.1.8 将 `live.level` 从约 10 Hz 提升到约 30 Hz，并新增 Shell 到 Web 的独立轻量 `live.level` 事件。电平样本不再触发完整 `app.snapshot`，顶部 bar 直接使用高频事件，历史图每 3 个样本记录一次，保持约 30 秒窗口。
+- 实时历史波形改为单条 XY 曲线，不再使用上下镜像。实时页顶部按最新版 DavBridge 的“状态与动作分离”思路拆分，状态为独立图标与文字，主按钮使用固定动作槽。普通工作区背景统一为实色浅蓝灰，减少文字周围的发白层次感。
+- 当前最新完整验证代码 head 为 `cf5dee671b13783c8541d4eeb20cd999a5074e8a`，P105 Windows CI run `34732116003` success；candidate Artifact `10310386040`，WebUi preview Artifact `10309861877`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。

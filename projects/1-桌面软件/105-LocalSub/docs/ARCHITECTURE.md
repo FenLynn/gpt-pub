@@ -111,7 +111,7 @@ live.discontinuity
 live.failed
 ```
 
-`live.start` 成功后返回 session ID，长期事件不依赖原 start request 保持 pending。`live.level` 对外默认约 10 Hz。当前版本 realtime session 存在时明确拒绝其他重任务并发，避免原生资源隐式竞争。
+`live.start` 成功后返回 session ID，长期事件不依赖原 start request 保持 pending。v0.1.8 起 `live.level` 对外默认约 30 Hz，Shell 使用独立轻量 Web 事件转发，不再让高频电平变化触发完整 `app.snapshot`。当前版本 realtime session 存在时明确拒绝其他重任务并发，避免原生资源隐式竞争。
 
 ## 迁移阶段
 
@@ -227,7 +227,7 @@ Shell 只保留 catalog、安装状态检查、默认选择和 Core proxy。重�
 
 当前 realtime Web 页第一闭环保留。模型页已经通过 `WebShellForm → ModelCatalogController → CoreWorkerClient → LocalSub.Core.exe` 接入同一 Application Contract，支持查看、默认选择、下载/修复、取消和删除。
 
-当前模型页与 Phase 1B.2 已完成既有闭环。v0.1.6 在 v0.1.5 视觉基线上增加默认主页、自检与单一主按钮；实时页只使用节流后的 `live.level` 绘制 Web 波形；模型页拆为“配置 / 模型库”；设置页通过白名单 `settings.update / settings.previewSubtitle` 写入 Shell AppSettings 并控制 Overlay；Shell 生命周期增加 HKCU 开机启动、`--startup-silent`、托盘实时开关和 PotPlayer 等待式 AutoStartLive。完整验证代码 head 为 `f016e7cb161b770f6a3229cdb37debf3548b8b94`，P105 Windows CI run `34705240310` success。
+当前模型页与 Phase 1B.2 已完成既有闭环。v0.1.8 的 realtime Web 页使用两种通道：业务状态继续由 snapshot 管理，高频电平则通过 `Core live.level → Shell LevelChanged → Web live.level` 轻量事件约 30 Hz 更新。Vue 对历史曲线每 3 个样本记录一次，维持约 30 秒窗口。模型页继续使用“配置 / 模型库”，设置页继续通过白名单 `settings.update / settings.previewSubtitle` 写入 Shell AppSettings 并控制 Overlay；Shell 生命周期保持 HKCU 开机启动、`--startup-silent`、托盘实时开关和 PotPlayer 等待式 AutoStartLive。最新完整验证代码 head 为 `cf5dee671b13783c8541d4eeb20cd999a5074e8a`，P105 Windows CI run `34732116003` success。
 
 下一页仍为后台转写工作区，必须复用现有 Core `analyze / transcribe / cancel`，不复制旧 WinForms 业务核心。设置页和启动生命周期已进入 Web 第一闭环，旧 WinForms 现主要保留后台工作区回退与迁移对照。
 
