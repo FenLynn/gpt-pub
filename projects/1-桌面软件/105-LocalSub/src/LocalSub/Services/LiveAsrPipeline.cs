@@ -31,9 +31,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
 
     public LiveAsrPipeline()
     {
-        _allAudio.LevelChanged += ForwardCaptureLevel;
         _allAudio.SamplesAvailable += OnSamples;
-        _processAudio.LevelChanged += ForwardCaptureLevel;
         _processAudio.SamplesAvailable += OnSamples;
         _processAudio.StatusChanged += text => StatusChanged?.Invoke(text);
         _processAudio.SessionDiscontinuity += OnProcessAudioDiscontinuity;
@@ -148,15 +146,22 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         }
     }
 
-    void ForwardCaptureLevel(float value)
-    {
-        if (!_running) return;
-        LevelChanged?.Invoke(Math.Clamp(value, 0, 1));
-    }
-
     void OnSamples(float[] samples)
     {
         if (!_running || samples.Length == 0) return;
+
+        // Meter the same 16 kHz mono block that is handed to ASR, but use the
+        // instantaneous absolute peak rather than RMS. This preserves the quick
+        // response of the original WinForms meter while eliminating the fragile
+        // parallel LevelChanged branch from the capture services.
+        var peak = 0f;
+        foreach (var sample in samples)
+        {
+            if (!float.IsFinite(sample)) continue;
+            peak = Math.Max(peak, Math.Abs(sample));
+        }
+        LevelChanged?.Invoke(Math.Clamp(peak, 0, 1));
+
         _queue?.Writer.TryWrite(samples);
     }
 

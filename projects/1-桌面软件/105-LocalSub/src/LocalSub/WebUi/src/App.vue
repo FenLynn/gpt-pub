@@ -114,7 +114,7 @@ const sideStatusSecondary = computed(() => {
     return snapshot.value.system.autoStartStatus || "自动启动";
   if (!liveModelReady.value) return "实时模型未就绪";
   if (!inputReady.value) return "等待音源";
-  return "v" + (snapshot.value?.app.productVersion ?? "0.1.10");
+  return "v" + (snapshot.value?.app.productVersion ?? "0.1.11");
 });
 const sideStatusTip = computed(() => {
   const core = coreReady.value ? "Core 就绪" : "Core 未就绪";

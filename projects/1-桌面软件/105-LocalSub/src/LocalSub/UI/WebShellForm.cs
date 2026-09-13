@@ -102,6 +102,10 @@ public sealed class WebShellForm : Form
     int _snapshotPushPending;
     int _levelPushPending;
     float _latestLiveLevel;
+    long _meterWindowStarted;
+    int _meterEventCount;
+    float _meterMin = 1f;
+    float _meterMax;
     bool _autoStartPending;
     bool _autoStartBusy;
     string _autoStartStatus = "";
@@ -667,6 +671,7 @@ public sealed class WebShellForm : Form
     void OnLiveLevelChanged(float value)
     {
         _latestLiveLevel = Math.Clamp(value, 0, 1);
+        RecordWebMeterEvent(_latestLiveLevel);
         if (_disposed || _web.CoreWebView2 == null) return;
         if (Interlocked.Exchange(ref _levelPushPending, 1) != 0) return;
 
@@ -683,6 +688,30 @@ public sealed class WebShellForm : Form
         {
             Interlocked.Exchange(ref _levelPushPending, 0);
         }
+    }
+
+    void RecordWebMeterEvent(float value)
+    {
+        var now = Environment.TickCount64;
+        if (_meterWindowStarted == 0) _meterWindowStarted = now;
+        _meterEventCount++;
+        _meterMin = Math.Min(_meterMin, value);
+        _meterMax = Math.Max(_meterMax, value);
+        if (now - _meterWindowStarted < 1000) return;
+
+        try
+        {
+            PortablePaths.EnsureBaseFolders();
+            File.AppendAllText(
+                Path.Combine(PortablePaths.LogsDir, "meter-web.log"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] events={_meterEventCount} min={_meterMin:0.0000} max={_meterMax:0.0000}{Environment.NewLine}");
+        }
+        catch { }
+
+        _meterWindowStarted = now;
+        _meterEventCount = 0;
+        _meterMin = 1f;
+        _meterMax = 0f;
     }
 
     void OnModelsChanged()

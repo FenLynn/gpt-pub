@@ -24,6 +24,10 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     Task? _readerTask;
     int _connectionGeneration;
     int _brokenGeneration;
+    long _meterWindowStarted;
+    int _meterEventCount;
+    float _meterMin = 1f;
+    float _meterMax;
     bool _disposed;
 
     internal event Action<string, string, JsonElement>? LiveEventReceived;
@@ -359,6 +363,13 @@ public sealed class CoreWorkerClient : IAsyncDisposable
 
                     if (eventName.StartsWith("live.", StringComparison.Ordinal))
                     {
+                        if (eventName == "live.level" &&
+                            payload.ValueKind == JsonValueKind.Object &&
+                            payload.TryGetProperty("value", out var levelNode) &&
+                            levelNode.TryGetSingle(out var levelValue))
+                        {
+                            RecordMeterEvent(levelValue);
+                        }
                         try { LiveEventReceived?.Invoke(id, eventName, payload); } catch { }
                     }
                     continue;
@@ -472,6 +483,23 @@ public sealed class CoreWorkerClient : IAsyncDisposable
     static int SafeExitCode(Process process)
     {
         try { return process.HasExited ? process.ExitCode : -1; } catch { return -1; }
+    }
+
+    void RecordMeterEvent(float value)
+    {
+        var level = Math.Clamp(value, 0, 1);
+        var now = Environment.TickCount64;
+        if (_meterWindowStarted == 0) _meterWindowStarted = now;
+        _meterEventCount++;
+        _meterMin = Math.Min(_meterMin, level);
+        _meterMax = Math.Max(_meterMax, level);
+        if (now - _meterWindowStarted < 1000) return;
+
+        LogClient($"LIVE_METER_RX events={_meterEventCount} min={_meterMin:0.0000} max={_meterMax:0.0000}");
+        _meterWindowStarted = now;
+        _meterEventCount = 0;
+        _meterMin = 1f;
+        _meterMax = 0f;
     }
 
     static void LogClient(string text)

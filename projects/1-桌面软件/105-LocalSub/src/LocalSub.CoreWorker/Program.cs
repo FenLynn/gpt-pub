@@ -352,13 +352,31 @@ internal sealed class CoreWorkerHost : IAsyncDisposable
         }
 
         var lastLevelSent = 0L;
+        var meterWindowStarted = Environment.TickCount64;
+        var meterEventCount = 0;
+        var meterMin = 1f;
+        var meterMax = 0f;
         pipeline.LevelChanged += value =>
         {
+            var level = Math.Clamp(value, 0, 1);
             var now = Environment.TickCount64;
+
+            meterEventCount++;
+            meterMin = Math.Min(meterMin, level);
+            meterMax = Math.Max(meterMax, level);
+            if (now - meterWindowStarted >= 1000)
+            {
+                Log($"LIVE_METER session={sessionId} source={(processId.HasValue ? "process" : "all")} events={meterEventCount} min={meterMin:0.0000} max={meterMax:0.0000}");
+                meterWindowStarted = now;
+                meterEventCount = 0;
+                meterMin = 1f;
+                meterMax = 0f;
+            }
+
             var previous = Interlocked.Read(ref lastLevelSent);
             if (now - previous < 33) return;
             Interlocked.Exchange(ref lastLevelSent, now);
-            _ = SendEventAsync(sessionId, "live.level", new { value = Math.Clamp(value, 0, 1) });
+            _ = SendEventAsync(sessionId, "live.level", new { value = level });
         };
         pipeline.StatusChanged += text =>
             _ = SendEventAsync(sessionId, "live.status", new { text });

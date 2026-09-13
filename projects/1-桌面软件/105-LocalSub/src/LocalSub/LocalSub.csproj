@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>LocalSub</AssemblyName>
     <RootNamespace>LocalSub</RootNamespace>
-    <Version>0.1.10</Version>
+    <Version>0.1.11</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\LocalSub.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
