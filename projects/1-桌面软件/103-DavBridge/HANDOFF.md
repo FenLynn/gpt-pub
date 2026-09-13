@@ -24,20 +24,22 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前可靠性封板版本为 v0.4.16，当前位于 `p103-exp`。用户已完成 v0.4.15 实机验收，并明确授权 v0.4.16 在完整准入通过后提升到 `p103-stable` 与 `main`。它仍不是正式 Release。它尚未提升到 `p103-stable` 或 `main`，也不是正式 Release。
+当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
+
+当前实验候选为 **v0.4.17**，只位于 `p103-exp`。
 
 ## 3. 最新完整验证代码基线
 
-最新完成完整 P103 CI 的可靠性封板代码 head：
+当前 v0.4.17 实验候选准确 head：
 
 ```text
-35015c8581cb537ae98813eb5f2efe0458525487
+958744f8703b567c634c0296530b21623d922381
 ```
 
-对应 P103 CI：
+对应完整 P103 CI：
 
 ```text
-run 34743274402
+run 34751011145
 scope          success
 core-smoke     success
 frontend       success
@@ -45,41 +47,44 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.16-win-x64`
+Windows candidate：`DavBridge-v0.4.17-win-x64`
 
-Artifact ID：`10313388007`
+Artifact ID：`10315875953`
 
 EXE：
 
 ```text
-2442845 bytes
-SHA256 1da5a38f1ab5264699ab0778ba346e7dcf6a4df48089952eb1650c2d7de9f29f
+2446941 bytes
+SHA256 9edb36d76db79d2d73f14eb7f4ade6a3fae7dc546f0054c0077adac15c6ffe0f
 ```
 
 Artifact ZIP SHA256：
 
 ```text
-ea6d43a90f431fc1fe3b24b49944cab524040911af8b320a009a92c3f8518464
+ced0f55075168eb8cd669acdfd89a87876a5be17ce33760ab865368410654ada
 ```
 
-CI 已通过 Vue typecheck、production build、浏览器视觉预览、扩展后的 Core Smoke、Windows x64 framework dependent single EXE、Runtime 私人数据边界、native host self test 和 Artifact 生成。
+CI 同时新增并检查 `about-1100x825.png`，用于关于页长期运行摘要的视觉验收。
 
-本 HANDOFF 更新发生在该代码 head 之后，因此新对话必须把 `35015c85...` 识别为 v0.4.16 可靠性实现的第一轮完整验证代码基线；提升 PR 仍必须以其自身准确 head 的成功 CI 为准。
+v0.4.16 稳定基线 commit：
+
+```text
+73aefcf04570180bb9526a43cf805aff1e7673b3
+```
 
 ## 4. 当前分支快照
 
-本轮代码验证时：
+当前实时关系：
 
 ```text
-main         042329ede97b09cd375ebcf7c55d7245fc56b933
-p103-stable  d8d5aed844ca2944c8511c85c0a892dbbd411fc5
-validated p103-exp reliability code head
-35015c8581cb537ae98813eb5f2efe0458525487
+main         73aefcf04570180bb9526a43cf805aff1e7673b3
+p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
+p103-exp     958744f8703b567c634c0296530b21623d922381
 ```
 
-本轮继续保持 `p103-exp` 在当前 `main` 之上开发。新对话仍必须重新查询实时 ahead、behind 与 merge base，不得依赖本快照推断祖先关系。
+`p103-exp` 相对 `main` ahead 6 / behind 0。v0.4.17 仍处于实验分支，没有授权提升 stable/main。
 
-新对话必须重新查询三条分支实时 head 和祖先关系，不得把上述快照视为永久事实。
+新对话必须重新查询三条分支实时 head 和祖先关系，不得把本快照视为永久事实。
 
 ## 5. 当前架构
 
@@ -365,6 +370,27 @@ Core Smoke 在既有 14 项基础上新增 5 项：
 
 自动化仍不能替代真实 InfiniCLOUD / 坚果云服务、Windows 实际睡眠/唤醒和长期多日运行，因此 v0.4.16 进入 main 只表示可发布稳定基线，不自动创建正式 Release。
 
+
+### v0.4.17 长期运行摘要
+
+第一，启动本轮前重新核对仓库后确认：脱敏诊断导出其实从 v0.4.4 就已经存在于“设置 → 安全与维护”，因此 v0.4.17 不重复增加第二套诊断功能。
+
+第二，v0.4.17 只增强“关于”页的长期后台运行可见性，不修改首页和迁移安全链。关于页在原版本、构建、运行环境、运行会话、初始化、引擎和界面信息下方增加轻量 2×2 运行摘要。
+
+第三，摘要只使用既有安全 snapshot 数据，不新增私人数据持久化：
+- 本周期：Cycle 与当前上传 / 下载已用量；
+- 最近完成：最近活动中可识别的清单或迁移完成事件；
+- 最近暂停：最近一次暂停事件；
+- 最近异常：最近一个 warning 活动；若没有则明确显示暂无近期异常。
+
+第四，以上摘要只来源于已有通用活动和 quota DTO，因此不包含真实 Zotero 文件名、远端路径、凭据或 SHA。活动历史只有有限窗口，摘要是“最近可见事件”，不是永久审计记录。
+
+第五，关于页继续去仪表盘化。新增摘要使用细分隔线和紧凑文字，不加入复杂图表、大卡片或新的导航层级。
+
+第六，P103 CI 新增 `about-1100x825.png` 浏览器预览，并保持原有 Overview / Transfer 多尺寸预览。准确代码 head `958744f8703b567c634c0296530b21623d922381` 已通过 run `34751011145` 全部 jobs。
+
+第七，本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、人工暂停、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
+
 ## 7. 核心冻结安全语义
 
 以下语义继续冻结，不允许因为 UI 修改而降低安全门：
@@ -413,18 +439,23 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-v0.4.15 已由用户完成真实 Windows 实机验收。v0.4.16 只增加可靠性回归，不改变 UI 或迁移语义。
+v0.4.16 已完成稳定准入：
 
-用户已经明确授权本轮在以下条件全部满足后执行提升：
+```text
+main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
+```
 
-1. v0.4.16 当前 exp 准确 head 完整 CI 全绿；
-2. exp 相对最新 main 无 behind，差异只属于 P103 允许范围；
-3. 通过 PR：`p103-exp → p103-stable`，并在 PR 准确 head 上完成完整准入；
-4. 再次确认 stable 相对最新 main 的范围；
-5. 通过 PR：`p103-stable → main`，并在该 PR 准确 head 上完成完整准入；
-6. 合并后按 B 级规则把 stable / exp 非强制同步到最新 main。
+正式 GitHub Release 仍为 v0.4.0，没有 v0.4.16 tag 或 Release。
 
-本轮授权只覆盖 stable/main 准入，不授权创建 tag 或 GitHub Release。正式 Release 仍需后续针对具体版本单独人工授权。
+当前 v0.4.17 仅位于 `p103-exp`，准确代码 head `958744f8703b567c634c0296530b21623d922381`，完整 CI run `34751011145` 已全绿。下一步只需用户实机查看“关于”页长期运行摘要是否有价值、是否保持简洁：
+
+1. 本周期只显示 Cycle 和当前上传 / 下载已用量；
+2. 最近完成、最近暂停、最近异常均来自通用活动，不出现文件名或私人路径；
+3. 没有异常时明确显示“暂无近期异常”；
+4. 关于页不能变成复杂仪表盘；
+5. v0.4.16 已冻结的首页、暂停、迁移和安全链不得变化。
+
+v0.4.17 未获得 stable/main 提升授权，也没有 Release 授权。
 
 ## 10. 新对话固定读取顺序
 
