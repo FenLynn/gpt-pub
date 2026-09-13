@@ -6,33 +6,33 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.24**，这是 v0.4 最终实验候选。
+当前 `p103-exp` 候选：**v0.4.25**，这是 v0.4 最终实验候选。
 
-v0.4.24 最后完整验证代码 head：
+v0.4.25 最后完整验证代码 head：
 
 ```text
-382948ca2c743009cf2d935c74a65aba19a92889
+3390342f7a77e85944e41610da55f235fdb528b8
 ```
 
-完整 P103 CI run：`34761379456`，结果 `success`。
+完整 P103 CI run：`34763452329`，结果 `success`。
 
-Windows candidate Artifact ID：`10319615252`。
+Windows candidate Artifact ID：`10319852755`。
+
+Web UI preview Artifact ID：`10319292901`。
 
 EXE：`2467421 bytes`。
 
-EXE SHA256：`934092e89433462809db571e18f30e71905bbfa0ac763f99c807e81d0e0ac650`。
+EXE SHA256：`87b5ff61a78eb91375af42532ad091bc0064c7b7a7e4923c2d5f169e75ffcd5b`。
 
-Artifact ZIP SHA256：`b074930564e27dadbdd512efaa0b8e1293600068938282f855275cabe2442c82`。
+Artifact ZIP SHA256：`6f31e857eceada95474cf0ae535a920d73c402cf1e936d224be5c055593c823a`。
 
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
 
-## v0.4.24 v0.4 最终收束
+## v0.4.25 v0.4 最终收束
 
-当前 About 继续使用“当前状态 / 最近活动 / 软件信息”三级层次，不再继续增加常驻信息。
+v0.4.25 在 v0.4.24 收束候选基础上只做 surface 色阶修正。普通文字区从纯白或高透明度白色回到淡蓝灰 quiet / soft / panel 层，About 保持透明，真正抬升的 tooltip、选中 tab 和交互面保留更亮 surface。
 
-本轮清理废弃 About CSS，新增生产 UI 所有权 CI 门，视觉预览覆盖回收站与文档，并将 Core Smoke 增至 20 项。新增测试模拟 12 轮安全暂停、状态落盘、重新加载与继续，最终确认无重复 PUT 并收敛到 Complete。
-
-旧 WinForms UI 文件继续保留，但只作为历史源码。当前生产入口必须继续使用 Vue + WebView2。
+页面结构、About 三级信息层次、生产 UI 所有权门、九张视觉预览、Core Smoke 20 项以及旧 WinForms UI 隔离规则均保持不变。
 
 ## 解决方案
 
@@ -252,13 +252,13 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.24 已完成自动化收束验证，只位于 `p103-exp`。
+v0.4.25 已完成自动化收束验证，只位于 `p103-exp`。
 
-最后完整验证代码 head：`382948ca2c743009cf2d935c74a65aba19a92889`。
+最后完整验证代码 head：`3390342f7a77e85944e41610da55f235fdb528b8`。
 
-CI run：`34761379456`，五项全绿。
+CI run：`34763452329`，五项全绿。
 
-Core Smoke 20/20。Windows candidate Artifact ID：`10319615252`。
+Core Smoke 20/20。Windows candidate Artifact ID：`10319852755`。
 
 下一步不是继续开发 v0.4 功能，而是用户真实 Windows 最终验收。终验通过后才进入 stable/main 提升流程。
 
