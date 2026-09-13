@@ -6,23 +6,17 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.17**。
+当前 `p103-exp` 候选：**v0.4.18**。
 
-v0.4.17 完整验证代码 head：
+v0.4.18 功能实现 head：
 
 ```text
-958744f8703b567c634c0296530b21623d922381
+e76e4deda04ad0a5a9839e8a9781c0dbcce004d5
 ```
 
-CI run：`34751011145`，结果 `success`。
-
-候选 Artifact：`DavBridge-v0.4.17-win-x64`，Artifact ID `10315875953`。
-
-EXE SHA256：`9edb36d76db79d2d73f14eb7f4ade6a3fae7dc546f0054c0077adac15c6ffe0f`。
-
-Artifact ZIP SHA256：`ced0f55075168eb8cd669acdfd89a87876a5be17ce33760ab865368410654ada`。
-
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。
+
+v0.4.18 最终验证必须使用本轮文档同步后的最新 `p103-exp` head。
 
 ## 解决方案
 
@@ -240,17 +234,24 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.17 当前只在 `p103-exp`。本轮不改 Core，只在 About 页增加长期运行摘要，并为 About 页增加 1100×825 CI 视觉预览。
+v0.4.18 当前只在 `p103-exp`。本轮在 About 页增加近 24 小时 operational-health strip，并增加 deterministic native self-test。
 
-下一步等待用户实机查看。未经明确授权，不提升 `p103-stable` / `main`，不创建 tag 或 Release。
+### v0.4.18 运行健康摘要
 
-### v0.4.17 长期运行摘要
+`ProductExperienceV044.BuildOperationalHealth(24)` 从既有通用活动记录统计：
 
-关于页新增：
+- warningCount；
+- networkWaitCount；
+- pauseCount；
+- completionCount；
+- windowComplete。
 
-- 本周期：Cycle + 当前上传 / 下载已用量；
-- 最近完成：最近完成事件；
-- 最近暂停：最近暂停事件；
-- 最近异常：最近 warning，没有则显示暂无近期异常。
+`WebUiHostV040` 只把这些聚合值以及当前 verified/backlog 暴露给 Vue。没有新增真实文件名、路径、URL、凭据或 SHA。
 
-所有数据均来自既有安全 DTO 和通用活动记录，不新增真实文件名、私人路径、凭据或 SHA。已有脱敏诊断导出仍位于“设置 → 安全与维护”，本轮不重复实现。
+如果 sidecar 的 40 条保留窗口不足以覆盖完整 24 小时，`windowComplete=false`，UI 明确提示活动窗口可能截断。
+
+`Program --self-test` 新增 `operationalHealthSummary`，CI 会强制验证。
+
+功能实现 head：`e76e4deda04ad0a5a9839e8a9781c0dbcce004d5`。最终可交付基线以当前文档同步后最新 `p103-exp` head 的完整 CI 为准。
+
+未经用户明确授权，不提升 stable/main，不创建 tag 或 Release。
