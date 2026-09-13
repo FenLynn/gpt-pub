@@ -22,6 +22,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     bool _useSenseVoice;
     bool _useFunAsrNano;
     string _streamingLabel = "Streaming ASR";
+    float _meterEnvelope;
 
     public event Action<float>? LevelChanged;
     public event Action<string>? PartialResult;
@@ -31,9 +32,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
 
     public LiveAsrPipeline()
     {
-        _allAudio.LevelChanged += v => LevelChanged?.Invoke(v);
         _allAudio.SamplesAvailable += OnSamples;
-        _processAudio.LevelChanged += v => LevelChanged?.Invoke(v);
         _processAudio.SamplesAvailable += OnSamples;
         _processAudio.StatusChanged += text => StatusChanged?.Invoke(text);
         _processAudio.SessionDiscontinuity += OnProcessAudioDiscontinuity;
@@ -94,6 +93,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _useSenseVoice = isSenseVoice;
         _useFunAsrNano = isFunAsrNano;
         _streamingLabel = isSenseVoice ? "SenseVoice" : isFunAsrNano ? "Fun-ASR-Nano" : model.Name.Replace(" INT8", "");
+        _meterEnvelope = 0;
         _running = true;
 
         try
@@ -151,7 +151,39 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
     void OnSamples(float[] samples)
     {
         if (!_running || samples.Length == 0) return;
+
+        // Meter the exact 16 kHz mono samples that are fed into ASR. This keeps the
+        // visible meter coupled to recognition itself instead of a separate capture
+        // packet peak that can look static for compressed stereo program material.
+        var measured = MeasureMeterLevel(samples);
+        _meterEnvelope = measured >= _meterEnvelope
+            ? measured
+            : _meterEnvelope * 0.68f + measured * 0.32f;
+        LevelChanged?.Invoke(_meterEnvelope);
+
         _queue?.Writer.TryWrite(samples);
+    }
+
+    static float MeasureMeterLevel(float[] samples)
+    {
+        double sumSquares = 0;
+        var count = 0;
+        foreach (var sample in samples)
+        {
+            if (!float.IsFinite(sample)) continue;
+            var value = Math.Clamp(sample, -1f, 1f);
+            sumSquares += value * value;
+            count++;
+        }
+
+        if (count == 0) return 0;
+        var rms = Math.Sqrt(sumSquares / count);
+        if (rms <= 0.000001) return 0;
+
+        // Map short-time RMS from roughly -54 dBFS..-6 dBFS into a useful 0..1
+        // meter range. Attack is immediate; release smoothing is applied above.
+        var db = 20.0 * Math.Log10(rms);
+        return (float)Math.Clamp((db + 54.0) / 48.0, 0.0, 1.0);
     }
 
     void OnProcessAudioDiscontinuity()
@@ -216,6 +248,7 @@ public sealed class LiveAsrPipeline : IAsyncDisposable
         _useSenseVoice = false;
         _useFunAsrNano = false;
         _streamingLabel = "Streaming ASR";
+        _meterEnvelope = 0;
         LevelChanged?.Invoke(0);
     }
 
