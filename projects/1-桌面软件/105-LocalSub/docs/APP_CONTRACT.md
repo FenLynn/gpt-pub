@@ -247,15 +247,22 @@ model.delete
 
 `model.select` 只保存已安装且能力匹配的实时或后台默认模型。`model.download`、`model.delete` 通过 Shell 应用控制器进入 Core 长任务。`model.cancel` 只用于可安全中断的下载任务，不暴露 Core request ID；删除一旦进入目录脱离与递归清理阶段即完成收尾，不允许用户中途取消。
 
-后续按页面迁移逐步加入：
+v0.1.19 已实现：
 
 ```text
 batch.pickFiles
 batch.analyze
 batch.transcribe
 batch.cancel
+```
 
+文件选择由 Shell 原生对话框完成。Vue 只接收 opaque queue id、显示名、媒体摘要、下采样波形、转写段落和进度，真实文件路径继续只保留在 Shell 的 `BatchWebController` 中。分析与转写直接复用 `CoreWorkerClient` 的现有 `analyze / transcribe / cancel` 链。
+
+后续逐步加入：
+
+```text
 model.openFolder
+```
 
 后续新增设置字段必须继续扩展现有 `settings.update` 白名单，不建立任意 key/value 配置通道。
 ```
