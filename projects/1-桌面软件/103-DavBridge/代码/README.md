@@ -6,25 +6,31 @@
 
 当前正式版本：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.20**。
+当前 `p103-exp` 候选：**v0.4.21**。
 
-v0.4.20 最后完整验证代码 head：
+v0.4.21 最后完整验证代码 head：
 
 ```text
-1d900d066f00bffaeba2ade7fc75491316144128
+dc4ba04ea82726903af3ffa5116ccaf903d94a2f
 ```
 
-完整 P103 CI run：`34756261258`，结果 `success`。
+完整 P103 CI run：`34758434853`，结果 `success`。
 
-Windows candidate Artifact ID：`10317337650`。
+Windows candidate Artifact ID：`10318540523`。
 
 EXE：`2467421 bytes`。
 
-EXE SHA256：`6110cbb0c9e5324dc482a91dc7fd33d53aaf12fac930e9a162527a7284e4d09e`。
+EXE SHA256：`55ed2936e887ddb4e2b9b844cc1f66a0f4c8e4f0e90bcefbfe2603793f7ab830`。
 
-Artifact ZIP SHA256：`981407dc30b75b9899f3887c9a267f8dbb886233327279998870ce9a900619bd`。
+Artifact ZIP SHA256：`f4f8523c4cae260f0b9ce3b0b750cb097cfb82efa37bf91e66595890ce7caa8c`。
 
 当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
+
+## v0.4.21 About 精简
+
+用户实机反馈 v0.4.20 About 页布局混乱且文字过多。v0.4.21 删除 About 中重复的“最近完成 / 最近暂停 / 最近异常”信息，只保留运行、周期、健康三个摘要块，并补齐专用布局样式。最近活动仍由活动抽屉负责。
+
+本轮不修改 DavBridge.Core 或任何迁移与安全语义。
 
 ## 解决方案
 
