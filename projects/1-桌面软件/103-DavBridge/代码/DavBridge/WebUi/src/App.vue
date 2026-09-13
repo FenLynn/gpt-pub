@@ -36,6 +36,15 @@ const recentCompleteText = computed(() => recentComplete.value ? `${recentComple
 const recentPauseText = computed(() => recentPause.value ? `${recentPause.value.time} · ${recentPause.value.title}` : '暂无近期暂停记录')
 const recentWarningText = computed(() => recentWarning.value ? `${recentWarning.value.time} · ${recentWarning.value.title}` : '暂无近期异常')
 const cycleTrafficText = computed(() => `上传 ${quotaUsedText(snapshot.value.quota.uploadText)} · 下载 ${quotaUsedText(snapshot.value.quota.downloadText)}`)
+const healthWindowLabel = computed(() => snapshot.value.operationalHealth.windowComplete ? `近 ${snapshot.value.operationalHealth.hours} 小时` : '近期活动窗口')
+const healthSummaryText = computed(() => {
+  const h=snapshot.value.operationalHealth
+  return `完成 ${h.completionCount} · 网络等待 ${h.networkWaitCount} · 警告 ${h.warningCount} · 暂停 ${h.pauseCount}`
+})
+const healthWorkloadText = computed(() => {
+  const h=snapshot.value.operationalHealth
+  return `StrongVerified ${h.verifiedCount} · 待处理 ${h.backlogCount}`
+})
 const quotaTip = computed(() => `${snapshot.value.cycleId ? `Cycle ${snapshot.value.cycleId}` : 'Cycle 未校准'}。额度按本地账本保守统计，重置后通过真实探测确认新周期。`)
 const sideStatusTip = computed(() => `点击查看最近活动 · ${snapshot.value.routeStatus}${snapshot.value.cycleId ? ` · Cycle ${snapshot.value.cycleId}` : ''}`)
 const sideStatusKind = computed(() => {
@@ -538,6 +547,13 @@ onBeforeUnmount(()=>{
             <strong>{{ recentWarningText }}</strong>
             <small>{{ recentWarning ? recentWarning.detail : '最近活动中没有警告事件' }}</small>
           </div>
+        </section>
+        <section class="about-health-strip" :class="{warning:snapshot.operationalHealth.warningCount>0}" aria-label="近24小时运行健康">
+          <div>
+            <span>{{ healthWindowLabel }}</span>
+            <strong>{{ healthSummaryText }}</strong>
+          </div>
+          <small>{{ healthWorkloadText }}<template v-if="!snapshot.operationalHealth.windowComplete"> · 活动窗口可能已截断</template></small>
         </section>
       </article>
     </section>
