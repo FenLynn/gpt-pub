@@ -28,6 +28,7 @@ const deleteConfirmId = ref("");
 const settingsSaveState = ref("");
 const batchKeywords = ref("");
 const batchRequestBusy = ref(false);
+const batchClearArmed = ref(false);
 let batchKeywordsInitialized = false;
 const liveLevel = ref(0);
 const levelHistory = ref<number[]>(Array.from({ length: 300 }, () => 0));
@@ -462,6 +463,65 @@ async function transcribeBatch() {
     batchRequestBusy.value = false;
   }
 }
+async function transcribeAllBatch() {
+  if (!snapshot.value?.batch.canTranscribeAll || batchBusy.value) return;
+  batchRequestBusy.value = true;
+  batchClearArmed.value = false;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.transcribeAll", { keywords: parseBatchKeywords() }));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+    try { await refresh(); } catch { }
+  } finally {
+    batchRequestBusy.value = false;
+  }
+}
+async function removeBatchItem(id: string) {
+  if (!id || batchBusy.value) return;
+  batchRequestBusy.value = true;
+  batchClearArmed.value = false;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.remove", { id }));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    batchRequestBusy.value = false;
+  }
+}
+async function clearBatchQueue() {
+  if (!snapshot.value?.batch.canClear || batchBusy.value) return;
+  if (!batchClearArmed.value) {
+    batchClearArmed.value = true;
+    return;
+  }
+  batchRequestBusy.value = true;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.clear"));
+    batchClearArmed.value = false;
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    batchRequestBusy.value = false;
+  }
+}
+async function exportBatchTxt() {
+  const id = snapshot.value?.batch.selectedId;
+  if (!id || !snapshot.value?.batch.canExport || batchBusy.value) return;
+  batchRequestBusy.value = true;
+  batchClearArmed.value = false;
+  error.value = null;
+  try {
+    applySnapshot(await invoke<LocalSubSnapshot>("batch.exportTxt", { id }));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    batchRequestBusy.value = false;
+  }
+}
+
 async function cancelBatch() {
   error.value = null;
   try {
@@ -578,6 +638,10 @@ onMounted(async () => {
       applySnapshot(await invoke<LocalSubSnapshot>("batch.pickFiles"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.analyze", { id: "__ci_batch__" }));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.transcribe", { id: "__ci_batch__", keywords: [] }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.transcribeAll", { keywords: [] }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.exportTxt", { id: "__ci_batch__" }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.remove", { id: "__ci_batch__" }));
+      applySnapshot(await invoke<LocalSubSnapshot>("batch.clear"));
       applySnapshot(await invoke<LocalSubSnapshot>("batch.cancel"));
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
@@ -604,7 +668,7 @@ onBeforeUnmount(() => {
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M9 19h7l4-8 8 26 5-13h6"></path></svg>
         </div>
-        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.19" }}</small></div>
+        <div class="brand-copy"><h1>LocalSub</h1><small class="brand-version">v{{ snapshot?.app.productVersion ?? "0.1.20" }}</small></div>
       </div>
 
       <nav class="side-nav" aria-label="主导航">
@@ -850,7 +914,10 @@ onBeforeUnmount(() => {
         <section v-else-if="activePage === 'batch'" class="page batch-page">
           <header class="page-head simple-head">
             <div class="page-feature batch-feature"><svg viewBox="0 0 48 48"><path d="M12 7h16l8 8v26H12z M28 7v9h8 M18 24h12 M18 30h12"></path></svg></div>
-            <div class="page-title"><div class="title-line"><h2>后台转写</h2><span class="info-dot" data-tip="文件选择由 Windows Shell 完成，媒体分析与离线识别在独立 Core 中执行。">i</span></div><span>{{ snapshot.batch.status }}</span></div>
+            <div class="page-title">
+              <div class="title-line"><h2>后台转写</h2><span class="info-dot" data-tip="文件选择由 Windows Shell 完成，媒体分析与离线识别在独立 Core 中执行。">i</span></div>
+              <span>{{ snapshot.batch.queued ? snapshot.batch.completed + " / " + snapshot.batch.queued + " 已完成 · " + snapshot.batch.status : snapshot.batch.status }}</span>
+            </div>
             <button class="secondary-button icon-action" type="button" :disabled="batchBusy || batchRequestBusy" @click="pickBatchFiles">
               <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>添加媒体
             </button>
@@ -869,19 +936,28 @@ onBeforeUnmount(() => {
                 <span class="batch-tool-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="3"></ellipse><path d="M5 6.5V12c0 1.7 3.1 3 7 3s7-1.3 7-3V6.5 M5 12v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V12"></path></svg></span>
                 <div><small>后台模型</small><strong>{{ snapshot.batch.batchModelName }}</strong></div>
               </div>
-              <label class="batch-keywords"><span>关键词</span><input v-model="batchKeywords" type="text" placeholder="可选，逗号分隔" :disabled="batchBusy"></label>
-              <button class="batch-start-button" type="button" :disabled="!snapshot.batch.canTranscribe || batchBusy || batchRequestBusy || !batchModelReady" @click="transcribeBatch">
-                <svg viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>转写当前
-              </button>
+              <label class="batch-keywords" data-tip="关键词会随下一次转写保存，之后重新打开 LocalSub 仍会保留。"><span>关键词</span><input v-model="batchKeywords" type="text" placeholder="可选，逗号分隔" :disabled="batchBusy"></label>
+              <div class="batch-run-actions">
+                <button class="batch-all-button" type="button" :disabled="!snapshot.batch.canTranscribeAll || batchBusy || batchRequestBusy || !batchModelReady" @click="transcribeAllBatch">全部转写</button>
+                <button class="batch-start-button" type="button" :disabled="!snapshot.batch.canTranscribe || batchBusy || batchRequestBusy || !batchModelReady" @click="transcribeBatch">
+                  <svg viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>当前
+                </button>
+              </div>
             </div>
 
             <div class="batch-queue-strip">
-              <button v-for="item in snapshot.batch.queue" :key="item.id" type="button"
-                :class="{active:item.id===snapshot.batch.selectedId,done:item.transcribed}"
-                :disabled="batchBusy" @click="analyzeBatch(item.id)">
-                <span class="batch-file-icon"><svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20H6z M14 3.5V8h4"></path></svg></span>
-                <span><strong>{{ item.name }}</strong><small>{{ item.state }}</small></span>
-              </button>
+              <div class="batch-queue-summary">
+                <strong>{{ snapshot.batch.completed }}/{{ snapshot.batch.queued }}</strong>
+                <small>已完成</small>
+                <button type="button" :class="{armed:batchClearArmed}" :disabled="batchBusy || batchRequestBusy" @click="clearBatchQueue">{{ batchClearArmed ? "确认清空" : "清空" }}</button>
+              </div>
+              <article v-for="item in snapshot.batch.queue" :key="item.id" class="batch-queue-item" :class="{active:item.id===snapshot.batch.selectedId,done:item.transcribed}">
+                <button class="batch-queue-select" type="button" :disabled="batchBusy" @click="analyzeBatch(item.id)">
+                  <span class="batch-file-icon"><svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20H6z M14 3.5V8h4"></path></svg></span>
+                  <span><strong>{{ item.name }}</strong><small>{{ item.state }}<template v-if="item.transcribed"> · RTF {{ item.realTimeFactor?.toFixed(2) }}</template></small></span>
+                </button>
+                <button class="batch-remove" type="button" :disabled="batchBusy || batchRequestBusy" data-tip="从当前队列移除，不删除原始媒体文件。" @click.stop="removeBatchItem(item.id)">×</button>
+              </article>
             </div>
 
             <section class="batch-media-panel">
@@ -890,7 +966,10 @@ onBeforeUnmount(() => {
                   <small v-if="snapshot.batch.media">{{ Math.round(snapshot.batch.media.durationMs/1000) }} s · {{ snapshot.batch.media.sampleRate }} Hz · {{ snapshot.batch.media.channels }} 声道 · {{ snapshot.batch.media.decoderName }}</small>
                   <small v-else>选择队列中的媒体以生成声音轨道</small>
                 </div>
-                <button v-if="batchSelected && !batchSelected.analyzed" type="button" :disabled="batchBusy" @click="analyzeBatch(batchSelected.id)">分析媒体</button>
+                <div class="batch-media-actions">
+                  <button v-if="batchSelected && !batchSelected.analyzed" type="button" :disabled="batchBusy" @click="analyzeBatch(batchSelected.id)">分析媒体</button>
+                  <button v-if="snapshot.batch.canExport" type="button" :disabled="batchBusy || batchRequestBusy" @click="exportBatchTxt">导出 TXT</button>
+                </div>
               </div>
               <div class="batch-wave-shell">
                 <svg v-if="batchWaveformPoints" class="batch-wave" viewBox="0 0 100 28" preserveAspectRatio="none">
@@ -904,7 +983,7 @@ onBeforeUnmount(() => {
             <section class="batch-transcript-panel">
               <div class="batch-transcript-head">
                 <div><strong>转写结果</strong><span v-if="snapshot.batch.result">{{ snapshot.batch.result.segments }} 段 · RTF {{ snapshot.batch.result.realTimeFactor.toFixed(2) }}</span></div>
-                <span>{{ snapshot.batch.transcript.length ? "自动保存结构化记录" : "等待转写" }}</span>
+                <span>{{ snapshot.batch.transcript.length ? "结构化记录已自动保存，可另存 TXT" : "等待转写" }}</span>
               </div>
               <div class="batch-transcript-scroll">
                 <p v-for="(line,index) in snapshot.batch.transcript" :key="index"><b>{{ formatBatchTime(line.startMs) }}</b><span>{{ line.text }}</span></p>
