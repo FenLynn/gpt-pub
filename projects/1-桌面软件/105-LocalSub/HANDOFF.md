@@ -188,7 +188,7 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
+当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.13 完成 realtime 页面第一轮 DavBridge 风格精修，v0.1.14 完成主页控制中心精修与 portable package 边界收口，v0.1.15 完成左上版本身份与 DavBridge 风格 About 页。meter 端到端链继续冻结在 v0.1.12 已验证实现，本轮没有修改音频采样、Core realtime 算法或 WebView2 meter ACK 链。Web 后台转写工作区仍待接入现有 Core `analyze / transcribe / cancel`。
 
 开始 v0.1.14 前，最新仓库 `main` 已通过正常 merge 同步进 `p105-exp`：
 
@@ -199,13 +199,13 @@ sync merge: cff0be79420d4f26e8e19aba23112cfdbfede9ff
 最后一个经过完整自动门禁的代码 head：
 
 ```text
-1cab728d2ac31db93faff91521aed9f38e3da5d2
+d3098fc460e244e4adae6c02830547edcab595d2
 ```
 
 P105 Windows CI：
 
 ```text
-run 34754861926
+run 34757394392
 success
 ```
 
@@ -213,12 +213,12 @@ Artifacts：
 
 ```text
 candidate
-ID 10317375667
+ID 10316973391
 downloaded artifact sha256:0e4eedf05a8a583bea5f17887aa98065c327f67ab78b67e3db5a8b2544467348
 inner portable candidate sha256:88c4009662fb53a39a4d9d29ef585b16f5addeb129fc36c16a4d6d126deb475e
 
 WebUi preview
-ID 10317450676
+ID 10317137976
 downloaded artifact sha256:38abd47581bc0c68cea3363d34c26a12046b18e7f6c018fdb47debb77bd7786c
 ```
 
@@ -289,7 +289,7 @@ Vue 不得：
 
 当前开发候选版本：
 
-- Development Version：`0.1.14`
+- Development Version：`0.1.15`
 - 当前正式 Release / RELEASE.md：`0.1.1`
 - 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 

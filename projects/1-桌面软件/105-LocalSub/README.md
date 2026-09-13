@@ -57,8 +57,9 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
-- v0.1.14 已完成主页控制中心精修，并把 DavBridge 已验证的“模块身份 / 独立状态 / 固定动作槽 / 无卡片状态行”设计逻辑迁入首页。meter/Core 链保持 v0.1.12 已验证实现，v0.1.13 realtime 页面结构保持不变。
-- 当前开发候选版本为 v0.1.14；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- v0.1.15 已把版本号直接放到左上品牌区，并新增独立“关于”页。About 页按 DavBridge 同类结构显示版本、运行环境、双进程架构、Core 状态、识别方式与界面技术栈。
+- v0.1.14 主页控制中心与 v0.1.13 realtime 页面结构继续保留，meter/Core 链保持 v0.1.12 已验证实现。
+- 当前开发候选版本为 v0.1.15；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 继续保存改造前 P105 可运行基线。仓库 `main` 可因其他项目正常前进；开始 v0.1.14 前已把最新 main 正常合入 `p105-exp`，未重置或覆盖 P105 独有历史。
@@ -97,7 +98,9 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - v0.1.13 realtime 页面已在不改 meter/Core 链的前提下完成 DavBridge 风格精修，固定动作槽、黄色停止按钮、30 秒低高度历史和字幕主视觉已经形成。
 - v0.1.14 首页重构为真正的控制中心：顶部固定显示模块身份、当前业务状态与唯一主操作；下方只解释运行条件、实时配置、字幕显示与后台能力；开始按钮为绿色、停止按钮为黄色、不可操作态为灰色，按钮槽始终固定。
 - v0.1.14 同时修正绿色包边界。真实 WebView2 smoke 生成的 `WebView2/` profile/cache 会在打包前明确清除，CI 额外拒绝 Cookies、History、Login Data 等运行状态进入候选包。
-- 当前最新完整验证代码 head 为 `1cab728d2ac31db93faff91521aed9f38e3da5d2`，P105 Windows CI run `34754861926` success；candidate Artifact `10317375667`，WebUi preview Artifact `10317450676`。
+- v0.1.15 左上品牌区不再显示“本地字幕”副标题，改为显眼的版本徽标；左侧辅助导航新增“关于”。
+- v0.1.15 About 页采用 DavBridge 同类居中产品卡，显示版本、Windows x64 / .NET 8、LocalSub.exe + LocalSub.Core.exe、Core generation、本地离线 ASR 与 Vue 3 + WebView2。
+- 当前最新完整验证代码 head 为 `d3098fc460e244e4adae6c02830547edcab595d2`，P105 Windows CI run `34757394392` success；candidate Artifact `10316973391`，WebUi preview Artifact `10317137976`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
