@@ -529,7 +529,7 @@ onBeforeUnmount(()=>{
         <section class="about-summary-grid" aria-label="运行摘要">
           <div class="about-summary-item">
             <span>运行</span>
-            <strong>{{ snapshot.health.status === 'healthy' ? '正常' : snapshot.health.summary }}</strong>
+            <strong>{{ snapshot.health.status === 'ok' ? '正常' : snapshot.health.summary }}</strong>
             <small>{{ snapshot.runtime.uptimeText }}</small>
           </div>
           <div class="about-summary-item">
