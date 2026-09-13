@@ -86,6 +86,9 @@ internal sealed class ModelCatalogController : IDisposable
     internal Task DownloadAsync(string modelId)
         => RunOperationAsync("download", modelId, (model, progress, ct) => _core.DownloadModelAsync(model.Id, progress, ct));
 
+    internal Task RepairAsync(string modelId)
+        => RunOperationAsync("repair", modelId, (model, progress, ct) => _core.DownloadModelAsync(model.Id, progress, ct));
+
     internal Task DeleteAsync(string modelId)
         => RunOperationAsync("delete", modelId, (model, progress, ct) => _core.DeleteModelAsync(model.Id, progress, ct));
 
@@ -121,9 +124,9 @@ internal sealed class ModelCatalogController : IDisposable
                 kind,
                 model.Id,
                 model.Name,
-                kind == "delete" ? "准备删除" : "准备下载",
+                kind == "delete" ? "准备删除" : kind == "repair" ? "准备修复" : "准备下载",
                 0,
-                kind == "delete" ? "正在启动 Core 删除任务" : "正在启动 Core 下载任务",
+                kind == "delete" ? "正在启动 Core 删除任务" : kind == "repair" ? "正在检查本地文件并准备续传/修复" : "正在启动 Core 下载任务",
                 false,
                 null,
                 kind == "download");
@@ -141,9 +144,9 @@ internal sealed class ModelCatalogController : IDisposable
                 {
                     State = "idle",
                     Kind = null,
-                    Stage = kind == "delete" ? "已删除" : "已完成",
+                    Stage = kind == "delete" ? "已删除" : kind == "repair" ? "修复完成" : "已完成",
                     Percent = 100,
-                    Detail = kind == "delete" ? $"{model.Name} 已从本地模型目录清理" : $"{model.Name} 已安装并通过关键文件检查",
+                    Detail = kind == "delete" ? $"{model.Name} 已从本地模型目录清理" : kind == "repair" ? $"{model.Name} 已修复并通过关键文件检查" : $"{model.Name} 已安装并通过关键文件检查",
                     IsIndeterminate = false,
                     LastError = null,
                     CanCancel = false
@@ -226,6 +229,8 @@ internal sealed class ModelCatalogController : IDisposable
         {
             var component = IsComponent(model);
             var installed = _manager.IsInstalled(model);
+            var modelFolder = _manager.GetModelFolder(model);
+            var hasLocalData = Directory.Exists(modelFolder) && Directory.EnumerateFileSystemEntries(modelFolder).Any();
             return new ModelCatalogItem(
                 model.Id,
                 model.Name,
@@ -240,6 +245,8 @@ internal sealed class ModelCatalogController : IDisposable
                 model.BatchCapable && !component,
                 component,
                 installed,
+                hasLocalData,
+                hasLocalData && !installed,
                 !component && string.Equals(model.Id, _settings.LiveModelId, StringComparison.OrdinalIgnoreCase),
                 !component && string.Equals(model.Id, _settings.BatchModelId, StringComparison.OrdinalIgnoreCase));
         }).ToArray();
@@ -305,6 +312,8 @@ internal sealed record ModelCatalogItem(
     bool BatchCapable,
     bool IsComponent,
     bool Installed,
+    bool HasLocalData,
+    bool NeedsRepair,
     bool LiveSelected,
     bool BatchSelected);
 
