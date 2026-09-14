@@ -188,32 +188,58 @@ Core 只拥有重计算与长任务
 
 ## 8. 当前唯一开发断点
 
-当前 Phase：`Phase 2B`。Web UI 已是默认入口。v0.1.18 完成后台、模型、设置、文档四页的全局一致性收口；v0.1.19 完成 Web 后台转写单文件闭环；v0.1.20 完成后台队列工作流；v0.1.21 完成全局 surface 色阶修正，解决用户指出的普通文字附近“白色背景 / 白纸贴片”感。
+当前 Phase：`Phase 2B`。Web UI 已是默认入口。当前开发候选为 **v0.1.23**。
 
-v0.1.21 直接参考 DavBridge v0.4.26 已验证方案，但只移植视觉原则，不复制业务代码。当前 surface 规则：
+### v0.1.22 已完成的产品能力
 
-- canvas：淡蓝灰 `#f1f7fb`，深一级 `#eaf3f8`；
-- quiet：`rgba(236,245,250,.72)`；
-- soft：`rgba(241,248,252,.82)`；
-- panel：`rgba(246,251,253,.90)`；
-- raised：`rgba(252,254,255,.96)`；
-- 普通信息 surface 使用 quiet / soft / panel，不再使用纯白或高透明白；
-- About 透明融入 canvas；
-- tooltip、输入、下拉、按钮等真实交互抬升面保留 raised；
-- WebView2 宿主 BackColor / DefaultBackgroundColor 同步为 `#f1f7fb`，避免页面边缘和加载瞬间露出旧色阶。
+- Web 后台队列状态原子持久化，重启可恢复队列与已完成转写结果。
+- 转写中异常退出的项目恢复为“上次任务中断，可重试”。
+- 全部转写跳过已完成项目与缺失源文件。
+- 单项重试。
+- 默认输出目录与 Explorer 打开目录。
+- 开始长转写前真实检查输出目录可写性与最低磁盘空间。
+- 单项 SRT / VTT / TXT 导出。
+- 整队一次导出 TXT / SRT / VTT。
+- 模型下载沿用现有断点续传、缓存损坏清理和重新解压链，Web 模型页增加 repair / continue 入口。
+- 模型安装健康判定不再只看路径存在，关键文件必须非空，关键目录必须包含实际非空文件。
+- productization smoke 真实覆盖队列 JSON 往返、完成结果恢复、TXT/SRT/VTT 文件生成。
+- 文档页已扩展为 7 项实际工作流说明。
 
-本轮没有修改布局、字号、导航、batch、meter、Core、realtime、模型逻辑或 bridge 语义。meter 端到端链继续冻结在 v0.1.12 已验证实现。
+### v0.1.23 当前视觉基线
 
-v0.1.21 最后一个经过完整自动门禁的代码 exact head：
+用户否定 v0.1.22 的整体蓝灰铺底与首页纵向间距。v0.1.23 已直接读取 DavBridge 当前 `styles.css / overview.css` 对齐，而不是凭截图近似。
+
+固定视觉原则：
+
+- Shell 外层使用 DavBridge 同类浅色渐变：`#f5fafe → #f1f7fb → #eaf3f8`。
+- `workspace / page` 不再强制铺整片 `#f1f7fb`，内容页透明叠在 Shell 上。
+- near-white raised 只给按钮、输入、下拉、tooltip 等真正交互抬升面。
+- 蓝色用于主要功能，绿色用于 ready / complete，紫色用于字幕、后台或模型辅助层级。
+- 主页不再使用 `flex:1 + minmax(...,1fr)` 把四行平均撑满视口。
+- 主页从顶部连续向下排列，1100×825 下四行固定 104 px，功能图标 58 px，行标题 18 px，主标题 29 px；底部允许自然留白。
+- 900×675 使用独立响应式节奏，四行 82 px，保持可读性且不横向溢出。
+- 左侧导航继续保持 DavBridge 式一级导航，不改回顶部 Tab。
+
+### v0.1.23 绿色包边界
+
+最终验包曾发现 smoke 运行态 `Data/Batch/queue-state.json` 混入中间候选。已在同一 v0.1.23 内修复：
+
+- 打包前删除整个 `publish/Data`。
+- 压缩前拒绝任何 `queue-state.json`。
+- 重新解包候选后再次拒绝 `Data/` 与 `queue-state.json`。
+- 继续拒绝 WebView2 profile/cache、Cookies、History、Login Data。
+- 最终候选包 manifest 共 10 个正式文件，人工逐项校验尺寸与 SHA256 全部通过。
+
+最后一个经过完整自动门禁的 **代码 exact head**：
 
 ```text
-5015859d42bb4696fc7d6f0afe3887e5d313c0da
+9704026a3dcc042256ae5983031f88ba71ff8272
 ```
 
 P105 Windows CI：
 
 ```text
-run 34764703148
+run 34796680266
 success
 ```
 
@@ -221,21 +247,30 @@ Artifacts：
 
 ```text
 candidate
-ID 10319869640
+ID 10329834406
 
 WebUi preview
-ID 10320750144
+ID 10330465400
 ```
 
-最终人工复核覆盖主页、About、模型库、设置页以及 1100×825 / 900×675 预览。普通文字区与 canvas 的层级已经连续，白色只保留在真正需要抬升的交互面。portable candidate 已通过 manifest 与隐私边界检查，不包含 WebView2 profile/cache、Cookies、History 或 Login Data。
+当前用户侧文件：
+
+```text
+LocalSub-v0.1.23-Windows-x64-full-candidate.zip
+LocalSub-v0.1.23-double-EXE-update.zip
+LocalSub-v0.1.23.exe
+LocalSub.Core-v0.1.23.exe
+LocalSub-v0.1.23-SHA256.txt
+```
 
 下一步固定为：
 
-1. 不提升 stable，不动 main，不创建正式 Release。
-2. 用户实机验证 v0.1.21，重点确认高 DPI、真实 WebView2 字体抗锯齿环境下是否彻底消除“文字下方发白”观感。
-3. 同时继续验证 v0.1.20 已完成的长媒体、整队转写、取消、TXT 导出，以及 realtime 长时间运行和模型真实下载/修复。
-4. 实机信心足够后再进入 Phase 3，逐步退役旧 WinForms 业务页。
-5. stable/main 提升与正式 Release 仍需用户对明确版本再次授权。
+1. 用户实机重点验证 v0.1.23 首页视觉、真实 Windows DPI 和字体抗锯齿环境。
+2. 同时验证真实长媒体、跨重启队列恢复、中断重试、SRT/VTT/TXT 导出与整队导出。
+3. 验证真实模型下载、断点续传、损坏缓存重试与 repair。
+4. 继续长时间验证 realtime、PotPlayer 窗口跟随、meter 和 Overlay。
+5. 只有上述实机信心足够后，才进入 Phase 3 逐步退役旧 WinForms 业务页。
+6. 不提升 stable，不动 main，不创建正式 Release，除非用户对明确版本再次授权。
 
 ## 9. Web UI 约束
 
@@ -277,7 +312,7 @@ Vue 不得：
 
 当前开发候选版本：
 
-- Development Version：`0.1.17`
+- Development Version：`0.1.23`
 - 当前正式 Release / RELEASE.md：`0.1.1`
 - 开发版本允许领先正式 Release；只有明确授权正式发布时才更新 RELEASE.md
 
