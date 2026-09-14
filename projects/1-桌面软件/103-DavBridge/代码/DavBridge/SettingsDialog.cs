@@ -29,6 +29,7 @@ internal sealed class SettingsDialog : Form
         ReshowDelay = 500,
         ShowAlways = true
     };
+    private TableLayoutPanel? _dataContent;
 
     public DavBridgeConfig Config { get; private set; }
     public string SourcePassword => _sourcePassword.Text;
@@ -301,8 +302,6 @@ internal sealed class SettingsDialog : Form
 
     private Control BuildDataPanel()
     {
-        var paths = AppPaths.Create();
-        var overview = DataManagementV050.BuildOverview(paths);
         var content = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -313,6 +312,18 @@ internal sealed class SettingsDialog : Form
             Margin = Padding.Empty
         };
         content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _dataContent = content;
+        PopulateDataPanel(content);
+        return WrapCategory(content);
+    }
+
+    private void PopulateDataPanel(TableLayoutPanel content)
+    {
+        var paths = AppPaths.Create();
+        var overview = DataManagementV050.BuildOverview(paths);
+
+        content.SuspendLayout();
+        content.Controls.Clear();
 
         content.Controls.Add(BuildDataDirectoryCard(
             "持久数据目录",
@@ -338,7 +349,7 @@ internal sealed class SettingsDialog : Form
             ("从备份恢复", "RestoreDataAsync")));
 
         content.Controls.Add(BuildDataInventoryCard(overview));
-        return WrapCategory(content);
+        content.ResumeLayout(true);
     }
 
     private Control BuildDataDirectoryCard(string title, string badge, string description, string path, string openMethod, string? changeMethod)
@@ -549,30 +560,29 @@ internal sealed class SettingsDialog : Form
         };
         button.FlatAppearance.BorderSize = 0;
         button.FlatAppearance.MouseOverBackColor = Color.FromArgb(218, 238, 250);
-        var keepSettingsOpen = methodName is "OpenDataRootAsync" or "OpenLocalDataRootAsync";
-        button.Click += (_, _) => InvokeDataMaintenance(methodName, keepSettingsOpen);
+        button.Click += async (_, _) => await InvokeDataMaintenanceAsync(methodName);
         return button;
     }
 
-    private void InvokeDataMaintenance(string methodName, bool keepSettingsOpen)
+    private async Task InvokeDataMaintenanceAsync(string methodName)
     {
         var mainForm = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
         if (mainForm is null) return;
 
-        if (keepSettingsOpen)
-        {
-            var task = UiCommandBridge.InvokeTask(mainForm, methodName);
-            if (task is not null) _ = task;
-            return;
-        }
+        var task = UiCommandBridge.InvokeTask(mainForm, methodName);
+        if (task is null) return;
 
-        DialogResult = DialogResult.Cancel;
-        Close();
-        mainForm.BeginInvoke(new Action(() =>
+        try
         {
-            var task = UiCommandBridge.InvokeTask(mainForm, methodName);
-            if (task is not null) _ = task;
-        }));
+            await task.ConfigureAwait(true);
+            if (!IsDisposed && _dataContent is not null)
+                PopulateDataPanel(_dataContent);
+        }
+        catch (Exception ex)
+        {
+            if (!IsDisposed)
+                MessageBox.Show(this, ex.Message, "数据与迁移", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private Control BuildSafetyPanel()

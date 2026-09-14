@@ -57,27 +57,27 @@ button:disabled{cursor:default;opacity:.48}
 .about-title-line h2{margin:0;font-size:27px;line-height:1.1;color:#16243d}
 .about-title-line b{
   padding:3px 7px;border-radius:999px;background:#eaf4fa;color:#5f8198;
-  font-size:10.5px;font-weight:650
+  font-size:11.5px;font-weight:650
 }
-.about-hero p{margin:5px 0 0;color:#6f8294;font-size:13px;line-height:1.5}
+.about-hero p{margin:5px 0 0;color:#6f8294;font-size:13.5px;line-height:1.5}
 .about-tabs{
   display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0 0 13px;padding:4px;
   border-radius:12px;background:#eaf2f7
 }
 .about-tabs button{
-  height:34px;border:0;border-radius:9px;background:transparent;color:#71869a;
-  font-size:12px;font-weight:620
+  height:38px;border:0;border-radius:9px;background:transparent;color:#71869a;
+  font-size:14px;font-weight:650
 }
 .about-tabs button.active{background:#f9fcfe;color:#227caf;box-shadow:0 2px 8px rgba(53,91,119,.07)}
 .about-pane{border-top:1px solid #e4ebf0}
-.about-pane .about-row{min-height:42px;grid-template-columns:92px minmax(0,1fr);gap:18px;padding:8px 3px}
-.about-pane .about-row>span{font-size:12px;color:#76889a}
-.about-pane .about-row>strong{font-size:12.5px;color:#354f66;font-weight:620}
+.about-pane .about-row{min-height:48px;grid-template-columns:104px minmax(0,1fr);gap:18px;padding:9px 4px}
+.about-pane .about-row>span{font-size:13.5px;color:#76889a}
+.about-pane .about-row>strong{font-size:14px;color:#354f66;font-weight:620}
 .about-pane .about-row.warning>strong{color:#a06c1d}
 @media(max-width:999px){
   .about-card{width:min(500px,94%)}
-  .about-title-line h2{font-size:25px}
-  .about-hero p{font-size:12.5px}
+  .about-title-line h2{font-size:26px}
+  .about-hero p{font-size:13px}
 }
 
 /* v0.5.3: About content switches below a fixed top anchor. */
