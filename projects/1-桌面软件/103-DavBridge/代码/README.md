@@ -8,31 +8,33 @@
 
 当前 stable/main 源码基线：**v0.4.26**。
 
-当前实验候选：**v0.5.2**，仅位于 `p103-exp`，尚未授权提升 stable/main。
+当前实验候选：**v0.5.4**，仅位于 `p103-exp`，尚未授权提升 stable/main。
 
-v0.5.2 代码验证 head：
+v0.5.4 产品代码 head：
 
 ```text
-787b15f346cdddf4588239122603dfb3605ece9b
+de54d7372d48703778928b76a2132b49bc0bf2ec
 ```
 
-完整 P103 CI run：`34845319350`，五项全绿，Core Smoke 20/20。
+其后的已验证文档收束候选为 `ff5b0bc6f204033ce410b7b50d29c8fdc46bb8b0`，没有产品代码变化。
+
+完整 P103 CI run：`34851609542`，五项全绿，Core Smoke 20/20。
 
 Windows candidate：
 
 ```text
-DavBridge-v0.5.2-win-x64
-Artifact ID 10348157125
-Artifact ZIP SHA256 fcfc979cf4d590a37808a2e1dbd3467a8e7fbcf3ec921df0ac333a618e8957fa
-EXE bytes 2520667
-EXE SHA256 d84d1b8a58cdd06634c422f1c8c73d704f833a2ef8dc8a8d8366dd4067f410ef
+DavBridge-v0.5.4-win-x64
+Artifact ID 10351408103
+Artifact ZIP SHA256 92a538ccaa20128dd256b0f97896af7a8b9cb3f71f371e61c35ad632d4f48920
+EXE bytes 2524763
+EXE SHA256 d122b36515451778e0dd765e37521085554407b49167e7797a588cc6bdf32880
 ```
 
-Web UI preview Artifact ID：`10347747961`。
+Web UI preview Artifact ID：`10351222653`。
 
 Windows native-host self-test 已通过 `dataPortabilityV050=true`，原有 config/state/reconcile/product sidecar 恢复、runtime session、4:3 窗口迁移、background wake 和健康账本测试继续通过。
 
-v0.4.26 stable/main head 当前为 `9579bf0207862f5b6da81b5a3edf87026c156b11`。v0.5.2 没有 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
+v0.4.26 stable/main head 当前为 `9579bf0207862f5b6da81b5a3edf87026c156b11`。v0.5.4 没有 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
 
 ## v0.4.25 surface 色阶收束
 
@@ -299,15 +301,15 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 v0.4.26 已完成 stable/main 两级准入。
 
-v0.5.0 数据可发现与迁移主题已经完成代码实现和自动化验证，当前仅存在于 `p103-exp`，等待用户真实 Windows 验收。
+v0.5.4 已完成数据可发现、DataRoot 迁移、备份恢复、信息架构和数据维护按钮上下文收束，当前仅存在于 `p103-exp`，等待用户真实 Windows 验收。
 
 优先实机检查：
 
-1. About 的“数据与迁移”与文件清单；
-2. 设置中的同名分类；
-3. 打开持久 DataRoot 和本机 LocalRoot；
-4. 手动创建一份备份；
-5. 使用非生产测试目录验证 DataRoot 迁移和恢复。
+1. 在“设置 → 数据与迁移”连续点击打开持久 DataRoot、打开本机 LocalRoot、立即备份和查看全部，确认始终留在当前设置页；
+2. 取消更改 DataRoot 和取消恢复后确认仍停留在数据页；
+3. 备份完成后确认最近备份状态原地刷新；
+4. 使用非生产测试目录验证 DataRoot 迁移和恢复成功时按既有安全流程重启；
+5. 检查 About“关于 / 运行状态”两个 Tab 的字号、顶部固定锚点和切换稳定性。
 
 未获得用户明确授权前，不提升 stable/main，也不创建正式 Release。
 

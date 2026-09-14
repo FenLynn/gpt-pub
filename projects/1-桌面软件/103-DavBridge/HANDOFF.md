@@ -34,26 +34,34 @@ v0.4.26 当前 stable/main head：
 9579bf0207862f5b6da81b5a3edf87026c156b11
 ```
 
-v0.5.4 信息架构收束代码 head：
+v0.5.4 产品代码 head：
 
 ```text
 de54d7372d48703778928b76a2132b49bc0bf2ec
 ```
+
+该代码提交后的文档收束候选为：
+
+```text
+ff5b0bc6f204033ce410b7b50d29c8fdc46bb8b0
+```
+
+`ff5b0bc...` 的直接父提交是 `de54d737...`，且只修改 P103 文档，没有产品代码变化。后续若再有纯文档状态同步提交，实际 `p103-exp` tip 可能继续前移，因此新对话仍必须实时查询 live Git，不得把这里的 SHA 当作永久分支 tip。
 
 新对话必须实时查询 `main / p103-stable / p103-exp` 的当前 head，不得把以上 SHA 当作永久分支 tip。v0.5.4 目前只存在于 `p103-exp`，尚未授权提升 stable/main，也没有正式 tag 或 GitHub Release。
 
 ## 3. 最新完整验证与准入链
 
-当前最新实验候选使用准确 `p103-exp` 代码 head：
+当前 v0.5.4 产品代码 head：
 
 ```text
 de54d7372d48703778928b76a2132b49bc0bf2ec
 ```
 
-对应完整 P103 CI：
+在其后的文档收束提交 `ff5b0bc6f204033ce410b7b50d29c8fdc46bb8b0` 上，完整 P103 CI 再次通过：
 
 ```text
-run 34850919066
+run 34851609542
 scope          success
 core-smoke     success
 frontend       success
@@ -61,19 +69,19 @@ windows-build  success
 report-status  success
 ```
 
-Core Smoke 继续通过 **20/20**。Windows native-host self-test 继续通过 `dataPortabilityV050=true`。
+Core Smoke 明确输出 **20/20 passed**。Windows native-host self-test 明确通过 `dataPortabilityV050=true`。
 
 v0.5.4 Windows Artifact：
 
 ```text
 DavBridge-v0.5.4-win-x64
-Artifact ID 10350981977
-Artifact ZIP SHA256 f3c4890f403e861d9bb62228235e6fd32602bc0761603e1ca433cc9a205e86dd
+Artifact ID 10351408103
+Artifact ZIP SHA256 92a538ccaa20128dd256b0f97896af7a8b9cb3f71f371e61c35ad632d4f48920
 EXE bytes 2524763
-EXE SHA256 0372beb5c7ac67c37ddd7583db977dc4dbe7161e38e03ee35c85f73c745e1438
+EXE SHA256 d122b36515451778e0dd765e37521085554407b49167e7797a588cc6bdf32880
 ```
 
-Web UI preview Artifact ID：`10350402343`。
+Web UI preview Artifact ID：`10351222653`。
 
 v0.5.4 对 v0.5.3 处理两类实机反馈：
 
@@ -93,7 +101,7 @@ v0.5.4 对 v0.5.3 处理两类实机反馈：
 ```text
 main         9579bf0207862f5b6da81b5a3edf87026c156b11
 p103-stable  9579bf0207862f5b6da81b5a3edf87026c156b11
-p103-exp     de54d7372d48703778928b76a2132b49bc0bf2ec
+p103-exp     live tip 必须实时查询；v0.5.4 产品代码 de54d737...，已验证文档收束候选 ff5b0bc...
 ```
 
 v0.5.4 当前继续领先 main，恢复时必须重新查询 live Git，不使用静态 ahead 数猜测分支关系。
@@ -623,22 +631,25 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 - 未授权提升 stable/main；
 - 未授权创建正式 tag 或 Release。
 
-代码验证 head：`de54d7372d48703778928b76a2132b49bc0bf2ec`。
+产品代码 head：`de54d7372d48703778928b76a2132b49bc0bf2ec`。
 
-完整 CI：`34850919066`，五项全绿，Core Smoke 20/20，`dataPortabilityV050=true`。
+已验证文档收束候选：`ff5b0bc6f204033ce410b7b50d29c8fdc46bb8b0`。该提交只修改 P103 文档，产品代码仍对应 `de54d737...`。
 
-Windows Artifact ID：`10350981977`。
+完整 CI：`34851609542`，五项全绿，Core Smoke 20/20，`dataPortabilityV050=true`。
 
-EXE SHA256：`0372beb5c7ac67c37ddd7583db977dc4dbe7161e38e03ee35c85f73c745e1438`。
+Windows Artifact ID：`10351408103`。
 
-Web UI preview Artifact ID：`10350402343`。
+EXE SHA256：`d122b36515451778e0dd765e37521085554407b49167e7797a588cc6bdf32880`。
+
+Web UI preview Artifact ID：`10351222653`。
 
 下一步重点实机检查：
 
 1. 数据页的打开目录、更改位置、备份、恢复、查看全部是否都保持当前上下文；
 2. 取消更改位置或恢复后是否仍留在数据页；
 3. 备份完成后最近备份状态是否原地刷新；
-4. About 两个 Tab 的标题和正文大小是否达到正常阅读尺度。
+4. About 两个 Tab 的标题和正文大小是否达到正常阅读尺度；
+5. 实机通过后，如用户明确授权提升，再执行 `p103-exp → p103-stable → main` 两级准入；正式 tag / GitHub Release 仍需单独人工授权。
 
 ## 10. 新对话固定读取顺序
 
