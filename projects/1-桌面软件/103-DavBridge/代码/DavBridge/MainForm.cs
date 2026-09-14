@@ -834,6 +834,135 @@ internal sealed class MainForm : Form
         }
     }
 
+    private async Task EnsureDataMaintenanceIdleAsync()
+    {
+        if (_host.Config.MigrationEnabled || _host.IsRunning)
+        {
+            await _host.PauseAsync(_appCts.Token);
+            await _host.WaitUntilIdleAsync(_appCts.Token);
+        }
+    }
+
+    private Task OpenDataRootAsync()
+    {
+        DataManagementV050.OpenFolder(_host.Paths.DataRoot);
+        return Task.CompletedTask;
+    }
+
+    private Task OpenLocalDataRootAsync()
+    {
+        DataManagementV050.OpenFolder(_host.Paths.LocalRoot);
+        return Task.CompletedTask;
+    }
+
+    private async Task BackupDataAsync()
+    {
+        await EnsureDataMaintenanceIdleAsync();
+        var backupDirectory = DataManagementV050.GetBackupDirectory(_host.Paths);
+        Directory.CreateDirectory(backupDirectory);
+        using var dialog = new SaveFileDialog
+        {
+            Title = "备份 DavBridge 关键数据",
+            Filter = "DavBridge 备份包 (*.zip)|*.zip",
+            DefaultExt = "zip",
+            AddExtension = true,
+            InitialDirectory = backupDirectory,
+            FileName = "DavBridge-Backup-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".zip"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        var result = DataManagementV050.CreateBackup(_host.Paths, dialog.FileName, true);
+        ProductExperienceV044.Record("关键数据已备份", "核心配置、迁移账本与可迁移记录已写入校验备份包。", "success");
+        UiFeedbackBusV044.Publish("关键数据已备份", Path.GetFileName(result), "success");
+    }
+
+    private async Task RestoreDataAsync()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "恢复 DavBridge 关键数据",
+            Filter = "DavBridge 备份包 (*.zip)|*.zip",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        var inspection = DataManagementV050.InspectBackup(dialog.FileName);
+        var confirm = MessageBox.Show(
+            this,
+            "备份版本：" + inspection.ProductVersion + Environment.NewLine +
+            "创建时间：" + inspection.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm") + Environment.NewLine +
+            "文件数量：" + inspection.FileCount + Environment.NewLine + Environment.NewLine +
+            "恢复前 DavBridge 会先安全暂停，并自动保存当前数据快照。备份包会先完整校验，再原子替换已包含的数据文件。" + Environment.NewLine +
+            (inspection.ContainsMachineBoundSecrets
+                ? "凭据文件使用 Windows DPAPI。若当前 Windows 用户无法解密，凭据会自动跳过，需要重新输入。"
+                : "此备份不包含可恢复凭据。") + Environment.NewLine + Environment.NewLine +
+            "继续恢复吗？",
+            "恢复 DavBridge 数据",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+        if (confirm != DialogResult.Yes) return;
+
+        await EnsureDataMaintenanceIdleAsync();
+        var result = DataManagementV050.RestoreBackup(_host.Paths, dialog.FileName);
+        var secretText = result.SecretsSkipped ? "凭据未恢复，请重新输入 WebDAV 密码。" : "可用凭据已恢复。";
+        MessageBox.Show(
+            this,
+            "数据恢复完成。" + Environment.NewLine + Environment.NewLine +
+            "恢复文件：" + result.RestoredCount + Environment.NewLine +
+            "恢复前快照：" + result.SafetyBackupPath + Environment.NewLine +
+            secretText + Environment.NewLine + Environment.NewLine +
+            "DavBridge 现在需要重新启动以从恢复后的数据重新建立运行状态。",
+            "恢复完成",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+        RestartAfterDataMaintenance();
+    }
+
+    private async Task ChangeDataRootAsync()
+    {
+        var selected = DataRootDialogV050.Show(this, _host.Paths.DataRoot);
+        if (string.IsNullOrWhiteSpace(selected)) return;
+        var normalized = Path.GetFullPath(selected);
+        if (string.Equals(normalized.TrimEnd(Path.DirectorySeparatorChar), _host.Paths.DataRoot.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var confirm = MessageBox.Show(
+            this,
+            "DavBridge 将把核心持久数据复制到：" + Environment.NewLine + normalized + Environment.NewLine + Environment.NewLine +
+            "当前迁移会先安全暂停。所有核心文件复制并逐个校验成功后，才会更新唯一 bootstrap 指针。旧数据目录不会自动删除，可作为额外回退副本。" + Environment.NewLine + Environment.NewLine +
+            "继续更改数据目录吗？",
+            "更改 DavBridge 数据目录",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2);
+        if (confirm != DialogResult.Yes) return;
+
+        await EnsureDataMaintenanceIdleAsync();
+        var oldRoot = _host.Paths.DataRoot;
+        DataManagementV050.MigrateDataRoot(_host.Paths, normalized);
+        MessageBox.Show(
+            this,
+            "数据目录已经迁移并校验完成。" + Environment.NewLine + Environment.NewLine +
+            "新目录：" + normalized + Environment.NewLine +
+            "旧目录仍保留：" + oldRoot + Environment.NewLine + Environment.NewLine +
+            "DavBridge 现在需要重新启动以使用新的唯一数据目录。",
+            "数据目录已更改",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+        RestartAfterDataMaintenance();
+    }
+
+    private void RestartAfterDataMaintenance()
+    {
+        WindowPlacementV044.Save(this);
+        _exitRequested = true;
+        _trayIcon.Visible = false;
+        _appCts.Cancel();
+        Application.Restart();
+        Environment.Exit(0);
+    }
+
     private void ShowWindow()
     {
         ShowInTaskbar = true;

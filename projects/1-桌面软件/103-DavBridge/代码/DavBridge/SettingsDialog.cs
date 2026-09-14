@@ -152,6 +152,7 @@ internal sealed class SettingsDialog : Form
                 : "配置当前 Zotero 迁移任务的源端与目标端。密码仅保存在本机受保护存储中。"),
             ("流量与限速", BuildQuotaPanel(), "设置上传限速和安全预留，并在这里校准坚果云当前周期上传、下载已用量与下一次重置日期。"),
             ("后台运行", BuildBackgroundPanel(), "主窗口关闭后任务继续在托盘运行；只有托盘菜单“退出”才结束 DavBridge 进程。"),
+            ("数据与迁移", BuildDataPanel(), "所有持久数据位置、备份和恢复都集中在这里。持久数据目录可以手动迁移，本机缓存目录保持固定。"),
             ("安全与维护", BuildSafetyPanel(), "这里仅保留低频维护与安全检查。已经通过的验证会标记为绿色状态，日常迁移不会重复要求。")
         };
 
@@ -295,6 +296,59 @@ internal sealed class SettingsDialog : Form
         AddFull(table, _autoStart);
         AddFull(table, _startMinimized);
         AddFull(table, _autoResume);
+        return WrapCategory(table);
+    }
+
+    private Control BuildDataPanel()
+    {
+        var table = CategoryTable("数据与迁移");
+        var paths = AppPaths.Create();
+        var overview = DataManagementV050.BuildOverview(paths);
+        var list = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 1,
+            Margin = Padding.Empty,
+            BackColor = Color.FromArgb(248, 251, 254)
+        };
+        list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        list.Controls.Add(MaintenanceRow(
+            "持久数据目录",
+            "唯一持久数据根目录。config、state、reconcile、兼容状态和 DPAPI 凭据都从这里读取。当前：" + paths.DataRoot,
+            "ChangeDataRootAsync",
+            "唯一入口",
+            true,
+            "更改"));
+        list.Controls.Add(MaintenanceRow(
+            "打开持久数据",
+            "直接在资源管理器中打开当前持久数据目录：" + paths.DataRoot,
+            "OpenDataRootAsync",
+            overview.PresentPersistentCount + " 项存在",
+            true,
+            "打开"));
+        list.Controls.Add(MaintenanceRow(
+            "本机运行目录",
+            "这里保存 WebView2、Temp、窗口状态、运行会话和体验记录。它固定在本机，不是需要记忆的迁移根目录。当前：" + paths.LocalRoot,
+            "OpenLocalDataRootAsync",
+            "本机数据",
+            true,
+            "打开"));
+        list.Controls.Add(MaintenanceRow(
+            "备份关键数据",
+            "生成带 manifest 与 SHA-256 的 DavBridge 备份 ZIP，包含核心持久数据和 product-experience 记录。DPAPI 凭据会标记为当前 Windows 用户绑定。",
+            "BackupDataAsync",
+            overview.LastBackupText,
+            overview.HasManualBackup,
+            "备份"));
+        list.Controls.Add(MaintenanceRow(
+            "恢复关键数据",
+            "选择 DavBridge 备份 ZIP。恢复前自动生成当前数据安全快照，先完整校验，再原子替换。跨 Windows 用户无法解密的 DPAPI 凭据会自动跳过。",
+            "RestoreDataAsync",
+            "校验后恢复",
+            false,
+            "恢复"));
+        AddFull(table, list);
         return WrapCategory(table);
     }
 
