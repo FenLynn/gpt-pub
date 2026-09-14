@@ -8,31 +8,31 @@
 
 当前 stable/main 源码基线：**v0.4.26**。
 
-当前实验候选：**v0.5.1**，仅位于 `p103-exp`，尚未授权提升 stable/main。
+当前实验候选：**v0.5.2**，仅位于 `p103-exp`，尚未授权提升 stable/main。
 
-v0.5.1 验证 head：
+v0.5.2 代码验证 head：
 
 ```text
-f85ca5f7cd82d25226b0ffb3f944487f0cd55eb3
+787b15f346cdddf4588239122603dfb3605ece9b
 ```
 
-完整 P103 CI run：`34842273545`，五项全绿，Core Smoke 20/20。
+完整 P103 CI run：`34845319350`，五项全绿，Core Smoke 20/20。
 
 Windows candidate：
 
 ```text
-DavBridge-v0.5.1-win-x64
-Artifact ID 10347045725
-Artifact ZIP SHA256 2c8430c73f1c2a5142220454bb274be0dabb0b46a91821d1b11b417d4f855a71
-EXE bytes 2524763
-EXE SHA256 9856ed8cddbfcb0c2050f39a24fe9b9c2c7883896475a5f6a232d0f9387b4413
+DavBridge-v0.5.2-win-x64
+Artifact ID 10348157125
+Artifact ZIP SHA256 fcfc979cf4d590a37808a2e1dbd3467a8e7fbcf3ec921df0ac333a618e8957fa
+EXE bytes 2520667
+EXE SHA256 d84d1b8a58cdd06634c422f1c8c73d704f833a2ef8dc8a8d8366dd4067f410ef
 ```
 
-Web UI preview Artifact ID：`10346279073`。
+Web UI preview Artifact ID：`10347747961`。
 
 Windows native-host self-test 已通过 `dataPortabilityV050=true`，原有 config/state/reconcile/product sidecar 恢复、runtime session、4:3 窗口迁移、background wake 和健康账本测试继续通过。
 
-v0.4.26 stable/main head 当前为 `9579bf0207862f5b6da81b5a3edf87026c156b11`。v0.5.1 没有 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
+v0.4.26 stable/main head 当前为 `9579bf0207862f5b6da81b5a3edf87026c156b11`。v0.5.2 没有 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
 
 ## v0.4.25 surface 色阶收束
 
@@ -326,3 +326,21 @@ About 恢复轻量摘要，只保留持久数据、最近备份和数据管理�
 ```
 
 随后单独显示备份与恢复、关键持久数据、本机运行数据。CI 新增 `data-1100x825.png` 视觉预览。
+
+
+## v0.5.2 About 与数据设置归位
+
+v0.5.2 删除 Web UI 内独立数据管理页。数据管理最终固定在原生 `设置 → 数据与迁移`。
+
+About 只保留两个 Tab：`关于` 和 `运行状态`。默认 About 不再显示数据路径、备份按钮、完整文件清单或技术栈。
+
+原生数据设置页使用更大字号的目录卡片：
+
+```text
+持久数据目录  可修改
+本机运行目录  固定
+```
+
+备份恢复独立成块，完整受管理文件清单通过 `DataInventoryDialogV052` 按需打开。
+
+这保持了“所有数据都能从软件内查到”，同时避免 About 和主导航被低频维护信息占满。
