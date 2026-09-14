@@ -532,7 +532,11 @@ jobs:
           if ($app -match 'class="option-list live-options"') {
             throw 'v0.1.24 must not restore the old two-row realtime option list.'
           }
-          if ($app -match 'homeButtonDisabled[\s\S]{0,260}!inputReady') {
+          $homeDisabled = [regex]::Match($app,'(?s)const homeButtonDisabled = computed\(\(\) => \{.*?\n\}\);')
+          if (-not $homeDisabled.Success) {
+            throw 'v0.1.24 homeButtonDisabled block not found.'
+          }
+          if ($homeDisabled.Value -match '!inputReady') {
             throw 'Missing PotPlayer must not disable the home start action.'
           }
           if ($app -match '<small>{{ snapshot.live.modelName }}</small>') {
