@@ -41,7 +41,7 @@ internal sealed class WebUiHostV040 : IDisposable
 {
     private const string Origin = "https://davbridge.local";
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-    private static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal) { "app.getSnapshot", "app.openSettings", "app.closeSettings", "migration.pause", "migration.resume", "migration.retry", "quota.calibrate", "recycle.defer", "recycle.delete" };
+    private static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal) { "app.getSnapshot", "app.openSettings", "app.closeSettings", "migration.pause", "migration.resume", "migration.retry", "quota.calibrate", "recycle.defer", "recycle.delete", "data.openRoot", "data.openLocal", "data.changeRoot", "data.backup", "data.restore" };
     private readonly MainForm _form; private readonly AppHost _host; private readonly ReconciliationRuntimeV030 _reconciliation;
     private readonly Panel _surface = new() { Dock = DockStyle.Fill, BackColor = Color.White };
     private readonly Panel _settingsLayer = new() { BackColor = Color.FromArgb(248,251,254), Visible = false };
@@ -53,7 +53,7 @@ internal sealed class WebUiHostV040 : IDisposable
     private SettingsDialog? _settingsDialog; private TaskCompletionSource<object>? _settingsCompletion;
     private WebUiHostV040(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) { _form=form; _host=host; _reconciliation=reconciliation; Mount(); Wire(); _=InitializeWebViewAsync(); }
     internal static WebUiHostV040 Attach(MainForm form, AppHost host, ReconciliationRuntimeV030 reconciliation) => new(form,host,reconciliation);
-    internal static void ValidateBridgeContract() { var expected=new[]{"app.getSnapshot","app.openSettings","app.closeSettings","migration.pause","migration.resume","migration.retry","quota.calibrate","recycle.defer","recycle.delete"}; if(!expected.All(AllowedMethods.Contains)||AllowedMethods.Count!=expected.Length) throw new InvalidOperationException("DavBridge Web UI command whitelist changed unexpectedly."); }
+    internal static void ValidateBridgeContract() { var expected=new[]{"app.getSnapshot","app.openSettings","app.closeSettings","migration.pause","migration.resume","migration.retry","quota.calibrate","recycle.defer","recycle.delete","data.openRoot","data.openLocal","data.changeRoot","data.backup","data.restore"}; if(!expected.All(AllowedMethods.Contains)||AllowedMethods.Count!=expected.Length) throw new InvalidOperationException("DavBridge Web UI command whitelist changed unexpectedly."); }
     private void Mount() { _ = _form.Handle; foreach(Control control in _form.Controls) control.Visible=false; _surface.Controls.Add(_loading); _surface.Controls.Add(_webView); _webView.Visible=false; _form.Controls.Add(_surface); _form.Controls.Add(_settingsLayer); _surface.BringToFront(); LayoutSettingsLayer(); }
     private void Wire() { _host.ProgressChanged+=OnProgress; _host.StateChanged+=OnStateChanged; _reconciliation.Changed+=OnReconciliationChanged; WebDavReadClient.GlobalIoProgress+=OnIo; UiFeedbackBusV044.Published+=OnNotice; _form.SizeChanged+=OnHostSizeChanged; _pushTimer.Tick+=(_,_)=>PushSnapshot(); _pushTimer.Start(); }
     private void OnHostSizeChanged(object? sender,EventArgs e)=>LayoutSettingsLayer();
@@ -78,7 +78,7 @@ internal sealed class WebUiHostV040 : IDisposable
         try
         {
             request=JsonSerializer.Deserialize<BridgeRequest>(args.WebMessageAsJson,JsonOptions); if(request is null||string.IsNullOrWhiteSpace(request.Id)||!AllowedMethods.Contains(request.Method??string.Empty)) throw new InvalidOperationException("不允许的界面命令。");
-            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync",string.Empty), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync",string.Empty), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync",string.Empty), "quota.calibrate"=>await InvokeModalMainTaskAsync("CalibrateAsync"), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), _=>throw new InvalidOperationException("不允许的界面命令。") };
+            object? result=request.Method switch { "app.getSnapshot"=>BuildSnapshot(), "app.openSettings"=>await OpenSettingsAsync(), "app.closeSettings"=>await CloseSettingsAsync(), "migration.pause"=>await InvokeMainTaskAsync("PauseAsync",string.Empty), "migration.resume"=>await InvokeMainTaskAsync("ResumeNowAsync",string.Empty), "migration.retry"=>await InvokeMainTaskAsync("ResumeNowAsync",string.Empty), "quota.calibrate"=>await InvokeModalMainTaskAsync("CalibrateAsync"), "recycle.defer"=>await DeferAsync(ReadGroupKeys(request.Params)), "recycle.delete"=>await DeleteAsync(ReadGroupKeys(request.Params)), "data.openRoot"=>await InvokeMainTaskAsync("OpenDataRootAsync",string.Empty), "data.openLocal"=>await InvokeMainTaskAsync("OpenLocalDataRootAsync",string.Empty), "data.changeRoot"=>await InvokeModalMainTaskAsync("ChangeDataRootAsync"), "data.backup"=>await InvokeModalMainTaskAsync("BackupDataAsync"), "data.restore"=>await InvokeModalMainTaskAsync("RestoreDataAsync"), _=>throw new InvalidOperationException("不允许的界面命令。") };
             Reply(request.Id,true,result,null);
         }
         catch(Exception ex){ Reply(request?.Id??string.Empty,false,null,ex is TargetInvocationException tie?tie.InnerException?.Message??tie.Message:ex.Message); }
@@ -271,7 +271,8 @@ internal sealed class WebUiHostV040 : IDisposable
             initialization,
             activities,
             operationalDto,
-            BuildRecycleGroups());
+            BuildRecycleGroups(),
+            DataManagementV050.BuildOverview(_host.Paths));
     }
 
     private (string Title,string Detail,double? Progress) CurrentTask(EngineState state){ var relative=_lastProgress?.RelativePath; if(!string.IsNullOrWhiteSpace(relative)){ double? fraction=null; if(_lastUploadIo is not null&&PathMatches(_lastUploadIo.RelativePath,relative)&&_lastUploadIo.TotalBytes is >0) fraction=Math.Clamp((double)_lastUploadIo.BytesProcessed/_lastUploadIo.TotalBytes.Value,0,1); return(Path.GetFileName(relative),HumanizeProgress(_lastProgress?.Message),fraction); } if(_reconciliation.IsAuditing)return("源端对账","正在读取 InfiniCLOUD manifest 并核对历史 StrongVerified 账本",null); return state switch{ EngineState.WaitUser=>("等待人工审查","回收站存在需要明确决定的附件组",null),EngineState.WaitQuota=>("等待下一周期","坚果云当前安全额度不足，账本与断点已经保存",null),EngineState.WaitNetwork=>("等待网络","连接条件恢复后任务可以继续",null),EngineState.WaitRetry=>("需要处理",_lastProgress?.Message??"任务已经安全停止，请检查具体原因",null),EngineState.Complete=>("当前清单完成","当前源清单已经完成强校验",null),EngineState.Paused=>("已暂停","进度和流量账本已经保存",null),EngineState.Running=>("准备任务",_lastProgress?.Message??"正在调度下一安全任务",null),_=>("准备中","正在初始化 DavBridge",null)}; }
@@ -369,7 +370,8 @@ internal sealed class WebUiHostV040 : IDisposable
         IReadOnlyList<InitializationDto> Initialization,
         IReadOnlyList<ActivityDto> Activities,
         OperationalHealthDto OperationalHealth,
-        IReadOnlyList<RecycleDto> Recycle);
+        IReadOnlyList<RecycleDto> Recycle,
+        DataOverviewV050 Data);
 
 }
 

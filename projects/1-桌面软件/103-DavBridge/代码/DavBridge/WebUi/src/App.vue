@@ -239,6 +239,7 @@ async function deferSelected() { const keys=[...selected.value]; if (!keys.lengt
 async function deleteSelected() { const keys=[...selected.value]; if (!keys.length) return notify('请先选择待审查附件组'); if (!window.confirm(`准备审查删除 ${keys.length} 个附件组。DavBridge 还会显示一次原生最终确认，并在删除前重新核对源端与目标身份。继续吗？`)) return; await command('recycle.delete',{groupKeys:keys}); selected.value=new Set() }
 function quotaClass(value:number){ const percent=Math.round(value*100); return percent>=80?'danger':percent>=60?'warn':'safe' }
 async function calibrateQuota(){ await command('quota.calibrate') }
+async function dataCommand(method:'data.openRoot'|'data.openLocal'|'data.changeRoot'|'data.backup'|'data.restore'){ await command(method) }
 async function openSettings(){
   if(tab.value==='settings') return
   tab.value='settings'
@@ -580,6 +581,42 @@ onBeforeUnmount(()=>{
             <span>记录</span>
             <strong>{{ recentActivityText }}</strong>
           </div>
+        </section>
+
+        <section class="about-section about-data-section" aria-label="数据与迁移">
+          <div class="about-section-title">数据与迁移</div>
+          <div class="about-row about-row-actions has-tip" :data-tip="`唯一持久数据根目录：${snapshot.data.dataRoot}`">
+            <span>数据目录</span>
+            <strong>{{ snapshot.data.dataRoot }}</strong>
+            <div class="about-actions">
+              <button @click="dataCommand('data.openRoot')" :disabled="busy">打开</button>
+              <button @click="dataCommand('data.changeRoot')" :disabled="busy">更改</button>
+            </div>
+          </div>
+          <div class="about-row about-row-actions has-tip" :data-tip="`本机运行目录：${snapshot.data.localRoot}。保存缓存、临时文件、窗口状态和运行会话，不作为唯一迁移根目录。`">
+            <span>本机目录</span>
+            <strong>{{ snapshot.data.localRoot }}</strong>
+            <div class="about-actions">
+              <button @click="dataCommand('data.openLocal')" :disabled="busy">打开</button>
+            </div>
+          </div>
+          <div class="about-row about-row-actions has-tip" :data-tip="snapshot.data.lastBackupPath || '尚未创建手动备份'">
+            <span>数据备份</span>
+            <strong>{{ snapshot.data.lastBackupText }}</strong>
+            <div class="about-actions">
+              <button @click="dataCommand('data.backup')" :disabled="busy">备份</button>
+              <button @click="dataCommand('data.restore')" :disabled="busy">恢复</button>
+            </div>
+          </div>
+          <details class="about-data-files">
+            <summary>文件与目录清单 <small>{{ snapshot.data.files.length }} 项</small></summary>
+            <div class="about-file-list">
+              <div v-for="file in snapshot.data.files" :key="file.key" class="about-file-row has-tip" :data-tip="`${file.path}｜${file.purpose}｜备份策略：${file.backupPolicy}`">
+                <span><b>{{ file.label }}</b><small>{{ file.category }}</small></span>
+                <strong :class="{missing:!file.exists}">{{ file.status }}</strong>
+              </div>
+            </div>
+          </details>
         </section>
 
         <section class="about-section about-section-secondary" aria-label="软件信息">

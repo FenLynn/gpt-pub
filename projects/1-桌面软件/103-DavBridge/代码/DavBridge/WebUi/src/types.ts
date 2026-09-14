@@ -100,4 +100,29 @@ export interface DavBridgeSnapshot {
   activities: ActivityItem[]
   operationalHealth: OperationalHealthInfo
   recycle: RecycleGroup[]
+  data: DataOverview
+}
+
+
+export interface DataFileInfo {
+  key: string
+  label: string
+  category: string
+  path: string
+  purpose: string
+  backupPolicy: string
+  status: string
+  exists: boolean
+}
+
+export interface DataOverview {
+  dataRoot: string
+  localRoot: string
+  bootstrapPath: string
+  backupDirectory: string
+  lastBackupText: string
+  lastBackupPath: string
+  hasManualBackup: boolean
+  presentPersistentCount: number
+  files: DataFileInfo[]
 }
