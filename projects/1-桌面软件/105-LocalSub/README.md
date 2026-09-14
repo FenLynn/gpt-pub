@@ -57,6 +57,8 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 
 ## 当前状态
 
+- v0.1.24 固定“简洁清晰、空间给主内容、小字进 tooltip”的 UI 原则。主页去掉标题左侧装饰图标，常驻说明大幅收缩，启动方式并入第五个同级信息行；实时页将音源与识别模型放入同一横排，每个标题与短下拉同一行，把纵向空间让给输入电平和字幕区。
+- v0.1.24 修改 PotPlayer 启动语义：播放器未运行时仍允许用户点击开始，Shell 保存启动意图并持续等待 PotPlayer，检测到播放器后复用既有 Core Process Loopback 链自动开始识别；等待期间可取消，不静默回退 All Audio。
 - v0.1.23 直接按 DavBridge 当前 WebUI 源码重做配色与主页纵向节奏：外层浅色渐变，内容页透明，近白 raised 只用于真正交互面；主页四条状态行不再拉伸填满视口，改为从顶部连续向下排列，58 px 功能图标、18 px 行标题与更大的状态文字建立清晰层次，底部自然留白。1100×825 与 900×675 已人工检查。
 - v0.1.23 同时加强绿色包边界：CI 打包前删除运行态 `Data/`，并在压缩前与重新解包后拒绝任何 `queue-state.json`。最终候选人工拆包确认不含运行态 Data、WebView2 profile、Cookies、History 或 Login Data，manifest 10 个正式文件逐项验证通过。
 - v0.1.22 完成后台产品化：队列与已完成结果跨重启恢复，中断项可重试；支持默认输出目录、输出可写性/磁盘空间预检、SRT/VTT/TXT 单项与整队导出；模型支持继续修复，健康检查要求关键文件非空。productization smoke 已真实验证队列 JSON 与三种字幕格式输出。
@@ -68,7 +70,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - v0.1.16 已将“文档”从左下辅助区移入上方主导航，与 DavBridge 的导航分组一致；左下只保留“设置”和“关于”。
 - v0.1.15 已把版本号直接放到左上品牌区，并新增独立“关于”页。About 页按 DavBridge 同类结构显示版本、运行环境、双进程架构、Core 状态、识别方式与界面技术栈。
 - v0.1.14 主页控制中心与 v0.1.13 realtime 页面结构继续保留，meter/Core 链保持 v0.1.12 已验证实现。
-- 当前开发候选版本为 v0.1.23；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
+- 当前开发候选版本为 v0.1.24；正式 Release 仍为 v0.1.1，既有正式标签与 Release 保持不可变。
 - 每个面向用户交付测试包的开发轮次默认递增一次 patch 版本，并提供 exact-head CI 对应 EXE/候选包。
 - 本轮新架构改造前，`main = p105-stable = p105-exp = 042329ede97b09cd375ebcf7c55d7245fc56b933`。
 - `p105-stable` 继续保存改造前 P105 可运行基线。仓库 `main` 可因其他项目正常前进；开始 v0.1.14 前已把最新 main 正常合入 `p105-exp`，未重置或覆盖 P105 独有历史。
@@ -111,7 +113,7 @@ Shell 编译已经排除 realtime 重实现与 Process Loopback。PotPlayer 的�
 - v0.1.15 About 页采用 DavBridge 同类居中产品卡，显示版本、Windows x64 / .NET 8、LocalSub.exe + LocalSub.Core.exe、Core generation、本地离线 ASR 与 Vue 3 + WebView2。
 - v0.1.16 主导航顺序固定为“主页 / 实时字幕 / 后台转写 / 模型 / 文档”，辅助导航固定为“设置 / 关于”。
 - v0.1.17 进一步统一首页与 realtime 页的内容宽度、边距和信息密度，保留 DavBridge 式浅色单栏结构。
-- 当前最新完整验证代码 exact head 为 `9704026a3dcc042256ae5983031f88ba71ff8272`，P105 Windows CI run `34796680266` success；candidate Artifact `10329834406`，WebUi preview Artifact `10330465400`。
+- 当前最新完整验证代码 exact head 为 `00d29bc3c0917fe8458cea32386ec66f542785f2`，P105 Windows CI run `34833535741` success；candidate Artifact `10343452102`，WebUi preview Artifact `10343142859`。
 - 详细边界见 [`docs/APP_CONTRACT.md`](docs/APP_CONTRACT.md)。
 
 当前状态证据见 [`阶段记录.md`](阶段记录.md) 和 [`工作记录.md`](工作记录.md)。
