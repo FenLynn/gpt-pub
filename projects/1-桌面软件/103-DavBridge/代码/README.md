@@ -355,3 +355,14 @@ Web UI tooltip 统一由 global tooltip 控制，500 ms 后显示。旧 CSS 伪�
 数据设置页继续去掉常驻说明文字，目录用途、备份说明和文件清单说明下沉为 tooltip。
 
 About 页面改为顶部固定锚点，“关于 / 运行状态”只切换下方内容，品牌区和版本号不再随内容高度变化。
+
+
+## v0.5.4 数据维护动作留页
+
+v0.5.4 将 Settings 数据页所有 MainForm 维护动作统一改为 await 后原地刷新，不再关闭 Settings。
+
+`InvokeDataMaintenanceAsync` 不含 `Close()` 或 `DialogResult`。因此以后新增数据页按钮时，默认也不会再次引入“点击后返回主页”的旧行为。
+
+备份完成后 `PopulateDataPanel` 会重新读取 DataOverview，原地刷新最近备份、路径和文件状态。
+
+About Tab 标题和正文统一放大一档，保持顶部固定框架。

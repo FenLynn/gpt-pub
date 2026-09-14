@@ -351,3 +351,20 @@ CI 视觉预览由旧 `data-1100x825.png` 改为 `about-status-1100x825.png`，�
 About 的布局规则固定为顶部对齐。品牌图标、软件名、版本号、说明和 Tab 条属于稳定框架，“关于 / 运行状态”只替换 Tab 下方 pane。不得再使用随内容高度变化的垂直居中布局。
 
 数据设置页的说明文字默认隐藏到 tooltip，只保留用户决策真正需要的标题、状态、路径和动作。
+
+
+## v0.5.4 数据页动作上下文规则
+
+数据与迁移页所有按钮属于 Settings 内部维护动作，按钮本身不得切换 Web 主页面，也不得关闭 Settings。
+
+```text
+Settings → 数据与迁移
+  action
+  → MainForm 维护 Task
+  → 若应用仍存活
+  → 原地刷新 DataOverview
+```
+
+只有 ChangeDataRoot / Restore 成功后的应用重启属于合法离页。取消操作必须留在原页。
+
+About 当前字号基线：Tab 14 px，行标签约 13.5 px，值约 14 px。
