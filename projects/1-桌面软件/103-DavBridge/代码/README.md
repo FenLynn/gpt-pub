@@ -8,27 +8,31 @@
 
 当前 stable/main 源码基线：**v0.4.26**。
 
-v0.4.26 首次 main 准入提交：`829def0a9776da47fd432a0831fa666993781356`。
+当前实验候选：**v0.5.0**，仅位于 `p103-exp`，尚未授权提升 stable/main。
 
-最终候选验证 head：
+v0.5.0 功能代码 head：
 
 ```text
-c9da993f465d1e216d30deb5f5cefd517b67b9ce
+488697e2d7b490a3d681750ae2810a194477a6d4
 ```
 
-完整 P103 CI run：`34765050320`，五项全绿，Core Smoke 20/20。
+完整 P103 CI run：`34839817188`，五项全绿，Core Smoke 20/20。
 
-Windows candidate Artifact ID：`10320800368`。
+Windows candidate：
 
-Web UI preview Artifact ID：`10319959437`。
+```text
+DavBridge-v0.5.0-win-x64
+Artifact ID 10345802101
+Artifact ZIP SHA256 b8d087fc107b2964de5d73e1a501e9fb281b4d8035fc6f28d70e42240f89f33c
+EXE bytes 2516571
+EXE SHA256 3c1fbc49a19da04d1f14efd01704befbfa73badc0e63ca429540303c6edcbae7
+```
 
-EXE SHA256：`3b0f8b56e0261290f6668cfce7f8d12909fd146fc5af0bd29cbb446cef28987f`。
+Web UI preview Artifact ID：`10346095118`。
 
-Artifact ZIP SHA256：`e699f320c4b899bb728c4be1013bc05fb68c0e8df4cba4057ff8e40353af2123`。
+Windows native-host self-test 已通过 `dataPortabilityV050=true`，原有 config/state/reconcile/product sidecar 恢复、runtime session、4:3 窗口迁移、background wake 和健康账本测试继续通过。
 
-准入记录：PR #432 将候选提升到 `p103-stable`，PR #433 将稳定候选提升到 `main`。
-
-正式 Release 没有随 stable/main 自动变化，仍需独立人工授权。
+v0.4.26 stable/main head 当前为 `9579bf0207862f5b6da81b5a3edf87026c156b11`。v0.5.0 没有 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
 
 ## v0.4.25 surface 色阶收束
 
@@ -41,6 +45,14 @@ v0.4.25 在 v0.4.24 收束候选基础上只做 surface 色阶修正。普通文
 左上品牌区现在在 `DavBridge` 标题下直接显示 `v{{ snapshot.version }}`。该版本号来自现有安全 snapshot，不新增 bridge 命令。
 
 版本号使用小号浅灰文本，并针对窄窗口缩小。原“Zotero 镜像”副标题从品牌区移除。
+
+## v0.5.0 数据可发现与迁移中心
+
+v0.5.0 新增 `DataManagementV050.cs`，负责 DataRoot bootstrap、文件清单聚合、数据目录迁移、备份 ZIP、manifest、SHA-256 校验、恢复 staging、恢复前安全快照和 DPAPI 凭据兼容处理。
+
+持久 DataRoot 默认仍为 `%APPDATA%\DavBridge`，但可以迁移到新的空目录。固定 `%LOCALAPPDATA%\DavBridge\bootstrap.json(.bak)` 只保存当前 DataRoot 指针。
+
+About 和设置都显示“数据与迁移”。Web UI 只接收安全 DataOverview，不读取 state/reconcile/secrets 内容。所有目录选择、备份和恢复实际操作仍由 C# 原生宿主执行。
 
 ## 解决方案
 
@@ -130,9 +142,17 @@ v0.4.13 对 `DavBridge.Core/MigrationEngine.cs` 只增加人工暂停的安全 m
 - 导航与 Web 权限边界；
 - 原生设置和危险确认入口。
 
+`DataManagementV050.cs`
+
+- 当前 DataRoot 的 bootstrap 解析和安全迁移；
+- 持久文件与本机运行文件的清单聚合；
+- 带 manifest 和 SHA-256 的备份 ZIP；
+- 恢复前安全快照、staging 和原子替换；
+- DPAPI CurrentUser 凭据无法解密时安全跳过。
+
 `ReconciliationRuntimeV030.cs`
 
-- `%APPDATA%/DavBridge/reconcile.json` sidecar；
+- 当前 DataRoot 下的 `reconcile.json` sidecar；
 - 每 Cycle 自动源端对账；
 - 源 metadata 变化后的 InfiniCLOUD SHA256 复核；
 - 首次缺失、跨周期审查、人工保留；
@@ -221,20 +241,37 @@ UI 迁移后仍必须运行原 Core Smoke，不能只做 Vue 构建。
 
 ## 本地 Data
 
-核心 Data 保持兼容：
+v0.5.0 将数据分为“持久 DataRoot”和“固定本机 LocalRoot”。
+
+默认持久 DataRoot：
 
 ```text
-%APPDATA%/DavBridge/config.json
-%APPDATA%/DavBridge/state.json
-%APPDATA%/DavBridge/state.json.bak
-%APPDATA%/DavBridge/secrets.dat
-%APPDATA%/DavBridge/reconcile.json
-%APPDATA%/DavBridge/reconcile.json.bak
+%APPDATA%\DavBridge
 ```
 
-WebView2 用户数据位于 `%LOCALAPPDATA%/DavBridge/WebView2`，日志、缓存和临时文件继续与 Runtime 分离。
+当前 DataRoot 内包含：
 
-v0.4.19 的 `%LOCALAPPDATA%/DavBridge/product-experience.json` schema 2 额外保存匿名 operational health 事件。事件只有时间与类别，最多保留 8 天，不包含真实文件名、路径、URL、凭据或 SHA，不参与迁移安全判断。
+```text
+config.json(.bak)
+state.json(.bak)
+reconcile.json(.bak)
+v2-compat.json(.bak)
+secrets.dat
+Backups\
+```
+
+固定入口：
+
+```text
+%LOCALAPPDATA%\DavBridge\bootstrap.json
+%LOCALAPPDATA%\DavBridge\bootstrap.json.bak
+```
+
+固定本机 LocalRoot 还包含 `product-experience.json(.bak)`、`window.json`、`runtime-session.json`、`backup-status.json`、`startup-error.log`、`Temp\`、`WebView2\` 和 `WebUi\`。
+
+WebView2 用户数据、日志、缓存和临时文件继续与 Runtime 发布包分离。匿名 operational health 仍只保存时间与类别，不保存真实文件名、路径、URL、凭据或 SHA，不参与迁移安全判断。
+
+回退 v0.4.26 时必须注意：旧版不认识 bootstrap。若 v0.5.0 已使用自定义 DataRoot，需要先把当前持久数据安全复制回 `%APPDATA%\DavBridge`，再启动旧版。
 
 ## 构建
 
@@ -260,10 +297,16 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.26 已完成开发、验证和 stable/main 两级准入。
+v0.4.26 已完成 stable/main 两级准入。
 
-当前不再存在待提升的 v0.4 实验候选。没有新开发时，`p103-exp` 应与最新 main 同步。
+v0.5.0 数据可发现与迁移主题已经完成代码实现和自动化验证，当前仅存在于 `p103-exp`，等待用户真实 Windows 验收。
 
-后续工作只分为真实缺陷维护和 v0.5 新主题评估。不得为了继续滚版本而主动创建 v0.4.27。
+优先实机检查：
 
-正式 GitHub Release 仍为 v0.4.0，本轮没有获得 v0.4.26 正式 tag 或 Release 授权。
+1. About 的“数据与迁移”与文件清单；
+2. 设置中的同名分类；
+3. 打开持久 DataRoot 和本机 LocalRoot；
+4. 手动创建一份备份；
+5. 使用非生产测试目录验证 DataRoot 迁移和恢复。
+
+未获得用户明确授权前，不提升 stable/main，也不创建正式 Release。
