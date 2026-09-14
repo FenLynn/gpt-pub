@@ -231,12 +231,10 @@ v0.3 WinForms 业务 UI 源码目前仍保留作为历史回滚和实现参照�
 
 ## 当前阶段
 
-v0.4.16 继续作为 stable/main 冻结基线，commit `73aefcf04570180bb9526a43cf805aff1e7673b3`。正式 GitHub Release 仍为 v0.4.0。
+v0.4.26 已完成 stable/main 两级准入，当前作为 v0.4 稳定主线基线。首次 main 准入提交为 `829def0a9776da47fd432a0831fa666993781356`，最终候选验证 head 为 `c9da993f465d1e216d30deb5f5cefd517b67b9ce`，对应 P103 CI run `34765050320` 五项全绿。
 
-当前实验版本为 v0.4.26，最后完整验证代码 head `3568eca17bda0b6674959c9897f6ec2dbebbb26f`，完整 P103 CI run `34763904669` 全绿。
+正式 GitHub Release 仍为 v0.4.0，本轮没有 tag 或 Release 授权。
 
-v0.4.20 不增加新的主界面结构。About 页在 v0.4.19 匿名健康账本基础上增加运行观察连续性判断。超过 15 分钟的运行空窗会把状态标记为“近 24 小时观察不连续”，避免把未运行时间误读为零异常。
+v0.4 UI 结构、surface 层级、品牌区版本号、生产 UI 所有权门和旧 WinForms 隔离规则均冻结。Vue 仍只接收聚合安全 DTO，不读取匿名事件账本、runtime marker 或私人 Data，也不增加 bridge 命令。
 
-Vue 仍只接收聚合 OperationalHealth DTO，不读取匿名事件账本、runtime marker 或私人 Data，也不增加 bridge 命令。
-
-Overview、迁移页、暂停控制、WebDAV 和 DavBridge.Core 保持冻结。用户已在当前会话授权收束 v0.4.26 并执行 stable/main 两级提升。该提升不等于正式 Release，长期后台、真实网络与睡眠恢复继续作为稳定版运行观察项。
+后续只处理真实缺陷和长期运行反馈。新的功能主题必须先评估 v0.5，不在 v0.4 上继续堆叠页面与状态。
