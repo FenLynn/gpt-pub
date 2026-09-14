@@ -56,15 +56,18 @@ const nav: Array<{ key: PageKey; label: string; path: string }> = [
 const activePage = computed(() => snapshot.value?.app.activePage ?? "home");
 const liveState = computed(() => snapshot.value?.live.state ?? "idle");
 const liveRunning = computed(() => liveState.value === "running");
+const livePending = computed(() => Boolean(snapshot.value?.system.autoStartPending));
 const liveTransitioning = computed(() => liveState.value === "starting" || liveState.value === "stopping");
-const liveControlsLocked = computed(() => liveRunning.value || liveTransitioning.value || commandBusy.value);
+const liveControlsLocked = computed(() => liveRunning.value || livePending.value || liveTransitioning.value || commandBusy.value);
 const liveButtonText = computed(() => {
   if (liveState.value === "starting") return "启动中";
   if (liveState.value === "stopping") return "停止中";
+  if (livePending.value) return "停止等待";
   if (liveRunning.value) return "停止字幕";
   return "开始字幕";
 });
 const liveStateLabel = computed(() => {
+  if (livePending.value) return snapshot.value?.system.autoStartStatus || "等待音源";
   switch (liveState.value) {
     case "starting": return "启动中";
     case "running": return "识别中";
@@ -75,7 +78,7 @@ const liveStateLabel = computed(() => {
 });
 const liveButtonDisabled = computed(() => {
   if (liveTransitioning.value || commandBusy.value) return true;
-  if (liveRunning.value) return false;
+  if (liveRunning.value || livePending.value) return false;
   return !snapshot.value?.live.canStart || !selectedModelId.value;
 });
 
@@ -129,18 +132,20 @@ const homeStateDetail = computed(() => {
 const homeActionLabel = computed(() => {
   if (liveState.value === "starting") return "启动中";
   if (liveState.value === "stopping") return "停止中";
+  if (livePending.value) return "停止等待";
   return liveRunning.value ? "停止实时字幕" : "开始实时字幕";
 });
 const homeButtonDisabled = computed(() => {
-  if (liveRunning.value) return commandBusy.value || liveTransitioning.value;
-  return commandBusy.value || liveTransitioning.value || !liveModelReady.value || !inputReady.value;
+  if (liveRunning.value || livePending.value) return commandBusy.value || liveTransitioning.value;
+  return commandBusy.value || liveTransitioning.value || !liveModelReady.value;
 });
 const homeActionTip = computed(() => {
+  if (livePending.value) return "已进入等待音源状态。点击可取消等待；打开 PotPlayer 后会自动开始识别。";
   if (liveRunning.value) return "安全停止当前实时字幕会话。";
   if (liveTransitioning.value) return liveState.value === "starting" ? "实时字幕正在启动。" : "实时字幕正在停止。";
   if (!liveModelReady.value) return "请先在模型页安装并选择可用的实时模型。";
-  if (!inputReady.value)
-    return snapshot.value?.settings.audioSourceId === "potplayer" ? "当前选择 PotPlayer 音源，请先启动播放器。" : "当前音源暂不可用。";
+  if (!inputReady.value && snapshot.value?.settings.audioSourceId === "potplayer")
+    return "可以先启动 LocalSub。当前没有 PotPlayer 时会持续监测，检测到播放器后自动开始识别。";
   return "使用当前默认音源和实时模型开始字幕。";
 });
 const sideStatusKind = computed(() => {
@@ -172,6 +177,14 @@ const sideStatusTip = computed(() => {
   const model = liveModelReady.value ? "实时模型可用" : "实时模型需要安装";
   const input = inputReady.value ? "音源可用" : "音源等待中";
   return [sideStatusTitle.value, core, model, input].join(" · ");
+});
+
+const startupModeLabel = computed(() => {
+  if (!snapshot.value) return "";
+  const parts = [snapshot.value.settings.startWithWindows ? "开机启动" : "手动启动"];
+  if (snapshot.value.settings.silentStartup) parts.push("静默托盘");
+  if (snapshot.value.settings.autoStartLive) parts.push("自动实时");
+  return parts.join(" · ");
 });
 
 const waveformPoints = computed(() => {
@@ -310,7 +323,7 @@ async function toggleLive() {
   commandBusy.value = true;
   error.value = null;
   try {
-    if (liveRunning.value) {
+    if (liveRunning.value || livePending.value) {
       applySnapshot(await invoke<LocalSubSnapshot>("live.stop"));
     } else {
       applySnapshot(await invoke<LocalSubSnapshot>("live.start", {
@@ -328,7 +341,7 @@ async function toggleLive() {
 
 async function toggleHomeLive() {
   if (!snapshot.value) return;
-  if (liveRunning.value) {
+  if (liveRunning.value || livePending.value) {
     await toggleLive();
     return;
   }
@@ -753,40 +766,31 @@ onBeforeUnmount(() => {
       <template v-else-if="snapshot">
         <section v-if="activePage === 'home'" class="page home-page">
           <header class="home-control-head">
-            <span class="home-module-icon" :class="{ ready: allReady || liveRunning }" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path v-if="liveRunning" d="M3.5 12h3l1.7-4.4 3.2 8.8 2.8-6.3 1.7 1.9h4.6"></path>
-                <path v-else-if="allReady" d="m5.5 12.5 4.2 4.2 8.8-9.4"></path>
-                <path v-else d="M3.5 12h3l1.7-4.4 3.2 8.8 2.8-6.3 1.7 1.9h4.6"></path>
-              </svg>
-            </span>
-
             <div class="home-control-copy">
-              <h2>运行概览</h2>
-              <small>本地字幕控制中心</small>
+              <div class="home-title-line">
+                <h2>运行概览</h2>
+                <span class="info-dot" data-tip="集中查看实时字幕、后台转写与启动方式。次要说明已收进悬浮提示。">i</span>
+              </div>
             </div>
 
-            <div class="home-control-state" :class="'state-' + sideStatusKind">
+            <div class="home-control-state" :class="'state-' + sideStatusKind" :data-tip="homeStateDetail">
               <span class="home-state-icon" aria-hidden="true">
                 <svg v-if="liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
-                <svg v-else-if="liveTransitioning || snapshot.system.autoStartPending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                <svg v-else-if="liveTransitioning || livePending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
                 <svg v-else-if="sideStatusKind === 'warning'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
                 <svg v-else-if="allReady" viewBox="0 0 24 24"><path d="m6.5 12.5 3.3 3.3 7.8-8"></path></svg>
                 <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
               </span>
-              <div>
-                <strong>{{ homeStateText }}</strong>
-                <small>{{ homeStateDetail }}</small>
-              </div>
+              <strong>{{ homeStateText }}</strong>
             </div>
 
             <div class="home-action-slot">
               <button class="home-primary-action" type="button"
-                :class="{ start: !liveRunning && !homeButtonDisabled, stop: liveRunning, disabled: homeButtonDisabled }"
+                :class="{ start: !liveRunning && !livePending && !homeButtonDisabled, stop: liveRunning || livePending, disabled: homeButtonDisabled }"
                 :disabled="homeButtonDisabled" :aria-busy="liveTransitioning || commandBusy"
                 :data-tip="homeActionTip" @click="toggleHomeLive">
                 <svg v-if="liveTransitioning" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
-                <svg v-else-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+                <svg v-else-if="!liveRunning && !livePending" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
                 <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
                 {{ homeActionLabel }}
               </button>
@@ -794,15 +798,10 @@ onBeforeUnmount(() => {
           </header>
 
           <section class="home-status-list">
-            <article class="home-control-row">
-              <span class="home-row-feature readiness" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M5 12.5 9.2 17 19 7"></path></svg>
-              </span>
-              <div class="home-row-copy">
-                <h3>运行条件</h3>
-                <small>Core、模型与音源状态</small>
-              </div>
-              <div class="home-readiness" data-tip="Core 可按需启动；实时模型需要已安装；使用 PotPlayer 音源时需要检测到播放器。">
+            <article class="home-control-row" data-tip="Core 可按需启动；实时模型必须已安装。PotPlayer 未打开时也可以先开始，LocalSub 会持续等待音源。">
+              <span class="home-row-feature readiness" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5 9.2 17 19 7"></path></svg></span>
+              <div class="home-row-copy"><div class="home-row-title"><h3>运行条件</h3><span class="info-dot tiny">i</span></div></div>
+              <div class="home-readiness">
                 <span :class="{ ok: coreOperational }"><i></i>Core</span>
                 <span :class="{ ok: liveModelReady }"><i></i>模型</span>
                 <span :class="{ ok: inputReady }"><i></i>音源</span>
@@ -810,89 +809,59 @@ onBeforeUnmount(() => {
               <b class="home-row-result" :class="{ ok: allReady }">{{ homeReadinessCount }}/3</b>
             </article>
 
-            <article class="home-control-row">
-              <span class="home-row-feature live" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M5 9h4l4-4v14l-4-4H5z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10"></path></svg>
-              </span>
-              <div class="home-row-copy">
-                <h3>实时配置</h3>
-                <small>{{ snapshot.settings.audioSource }} · {{ snapshot.models.liveModelName }}</small>
-              </div>
-              <div class="home-row-meta">
-                <strong>{{ liveStateLabel }}</strong>
-                <small>{{ liveRunning ? "当前会话使用已保存配置" : "开始时使用当前默认配置" }}</small>
-              </div>
-              <b class="home-row-result" :class="{ ok: liveModelReady && inputReady }">{{ liveRunning ? "运行" : "当前" }}</b>
+            <article class="home-control-row" data-tip="开始实时字幕时使用当前默认音源与实时模型。等待音源期间配置会锁定，避免启动目标发生变化。">
+              <span class="home-row-feature live" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 9h4l4-4v14l-4-4H5z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10"></path></svg></span>
+              <div class="home-row-copy"><div class="home-row-title"><h3>实时配置</h3><span class="info-dot tiny">i</span></div></div>
+              <div class="home-row-main">{{ snapshot.settings.audioSource }} · {{ snapshot.models.liveModelName }}</div>
+              <b class="home-row-result" :class="{ ok: liveModelReady }">{{ livePending ? "等待" : (liveRunning ? "运行" : "当前") }}</b>
             </article>
 
-            <article class="home-control-row">
-              <span class="home-row-feature overlay" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="13" rx="2"></rect><path d="M7 14h10M9 10h6"></path></svg>
-              </span>
-              <div class="home-row-copy">
-                <h3>字幕显示</h3>
-                <small>字幕窗口自动跟随播放器</small>
-              </div>
-              <div class="home-row-meta">
-                <strong>{{ liveRunning ? "正在显示" : "自动跟随" }}</strong>
-                <small>{{ liveRunning ? snapshot.live.status : "随实时字幕自动开启" }}</small>
-              </div>
+            <article class="home-control-row" data-tip="字幕 Overlay 随实时字幕自动开启，并跟随 PotPlayer 窗口。">
+              <span class="home-row-feature overlay" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="13" rx="2"></rect><path d="M7 14h10M9 10h6"></path></svg></span>
+              <div class="home-row-copy"><div class="home-row-title"><h3>字幕显示</h3><span class="info-dot tiny">i</span></div></div>
+              <div class="home-row-main">自动跟随播放器</div>
               <b class="home-row-result ok">{{ liveRunning ? "运行" : "就绪" }}</b>
             </article>
 
-            <article class="home-control-row">
-              <span class="home-row-feature batch" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20H6z M14 3.5V8h4 M9 12h6 M9 15.5h6"></path></svg>
-              </span>
-              <div class="home-row-copy">
-                <h3>后台转写</h3>
-                <small>{{ snapshot.models.batchModelName }}</small>
-              </div>
-              <div class="home-row-meta">
-                <strong>{{ batchModelReady ? "默认模型可用" : "需要准备模型" }}</strong>
-                <small>{{ batchModelReady ? "可用于本地媒体离线转写" : "可在模型页安装或选择后台模型" }}</small>
-              </div>
+            <article class="home-control-row" data-tip="后台转写使用独立默认模型。未安装时可到模型页下载或切换。">
+              <span class="home-row-feature batch" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20H6z M14 3.5V8h4 M9 12h6 M9 15.5h6"></path></svg></span>
+              <div class="home-row-copy"><div class="home-row-title"><h3>后台转写</h3><span class="info-dot tiny">i</span></div></div>
+              <div class="home-row-main">{{ snapshot.models.batchModelName }}</div>
               <b class="home-row-result" :class="{ ok: batchModelReady }">{{ batchModelReady ? "可用" : "需安装" }}</b>
             </article>
-          </section>
 
-          <footer class="home-startup-row" data-tip="可在设置中组合开机启动、静默进入托盘和启动后自动开启实时字幕。">
-            <span class="startup-row-icon"><svg viewBox="0 0 24 24"><path d="M12 3v8 M8.5 5.5A8 8 0 1 0 15.5 5.5"></path></svg></span>
-            <strong>启动方式</strong>
-            <span>{{ snapshot.settings.startWithWindows ? "开机启动" : "手动启动" }}{{ snapshot.settings.silentStartup ? " · 静默托盘" : "" }}{{ snapshot.settings.autoStartLive ? " · 自动实时" : "" }}</span>
-            <button type="button" @click="navigate('settings')">调整</button>
-          </footer>
+            <article class="home-control-row startup" data-tip="可在设置中组合开机启动、静默托盘和启动后自动开启实时字幕。">
+              <span class="home-row-feature startup" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v8 M8.5 5.5A8 8 0 1 0 15.5 5.5"></path></svg></span>
+              <div class="home-row-copy"><div class="home-row-title"><h3>启动方式</h3><span class="info-dot tiny">i</span></div></div>
+              <div class="home-row-main">{{ startupModeLabel }}</div>
+              <button class="home-row-link" type="button" @click="navigate('settings')">调整</button>
+            </article>
+          </section>
         </section>
 
         <section v-else-if="activePage === 'live'" class="page live-page">
           <header class="live-task-card">
-            <span class="live-module-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg>
-            </span>
+            <span class="live-module-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-6 4 12 3-9 2 3h4"></path></svg></span>
 
             <div class="live-task-copy">
               <div class="live-title-line">
                 <h2>实时字幕</h2>
-                <span class="info-dot" data-tip="Core 负责音频、VAD 与 ASR；Shell 负责 Overlay、PotPlayer 窗口跟随和 WebView2。">i</span>
+                <span class="info-dot" data-tip="识别在独立 Core 中运行；PotPlayer 音源未出现时可以先启动并持续等待。">i</span>
               </div>
-              <small>{{ snapshot.live.modelName }}</small>
             </div>
 
             <div class="live-task-center">
-              <div class="live-task-status" :class="'state-' + liveState">
+              <div class="live-task-status" :class="'state-' + (livePending ? 'starting' : liveState)" :data-tip="snapshot.live.status">
                 <span class="live-task-status-icon" aria-hidden="true">
-                  <svg v-if="liveState === 'running'" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
-                  <svg v-else-if="liveState === 'starting' || liveState === 'stopping'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                  <svg v-if="liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+                  <svg v-else-if="liveTransitioning || livePending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
                   <svg v-else-if="liveState === 'failed'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5v6M12 17v.1"></path></svg>
                   <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
                 </span>
-                <div>
-                  <strong>{{ liveStateLabel }}</strong>
-                  <small>{{ liveRunning ? snapshot.live.source : snapshot.live.status }}</small>
-                </div>
+                <strong>{{ liveStateLabel }}</strong>
               </div>
 
-              <div class="instant-level" data-tip="来自与 ASR 同一音频链的实时 peak，约 30 Hz 更新。">
+              <div class="instant-level" data-tip="与 ASR 使用同一块 16 kHz mono PCM，约 30 Hz 更新。">
                 <span>输入</span>
                 <div class="meter-track"><i :style="{ width: Math.max(1, liveLevel * 100) + '%' }"></i></div>
                 <b>{{ Math.round(liveLevel * 100) }}%</b>
@@ -900,32 +869,33 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="live-action-slot">
-              <button class="live-primary-action" :class="{ stop: liveRunning, start: !liveRunning }" type="button" :disabled="liveButtonDisabled" @click="toggleLive">
-                <svg v-if="!liveRunning" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
+              <button class="live-primary-action" :class="{ stop: liveRunning || livePending, start: !liveRunning && !livePending }" type="button" :disabled="liveButtonDisabled" @click="toggleLive">
+                <svg v-if="!liveRunning && !livePending" viewBox="0 0 24 24"><path d="M8 5.5 18 12 8 18.5Z"></path></svg>
                 <svg v-else viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"></rect><rect x="13.8" y="6" width="3.2" height="12" rx="1"></rect></svg>
                 {{ liveButtonText }}
               </button>
             </div>
           </header>
 
-          <section class="option-list live-options">
-            <label class="option-row">
-              <span class="option-name"><span class="row-icon audio"><svg viewBox="0 0 24 24"><path d="M5 9h4l4-4v14l-4-4H5z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10"></path></svg></span><strong>音源</strong></span>
+          <section class="live-control-strip">
+            <label class="live-inline-control" data-tip="选择实时监听的音频来源。PotPlayer 未启动时仍可先点击开始，LocalSub 会等待播放器出现。">
+              <span class="row-icon audio"><svg viewBox="0 0 24 24"><path d="M5 9h4l4-4v14l-4-4H5z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10"></path></svg></span>
+              <strong>音源</strong>
               <select v-model="selectedSource" :disabled="liveControlsLocked"><option value="potplayer">PotPlayer</option><option value="allAudio">所有音频</option></select>
+              <span class="info-dot tiny">i</span>
             </label>
-            <label class="option-row">
-              <span class="option-name"><span class="row-icon model"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="3"></ellipse><path d="M5 6.5V12c0 1.7 3.1 3 7 3s7-1.3 7-3V6.5 M5 12v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V12"></path></svg></span><strong>识别模型</strong></span>
+            <label class="live-inline-control model" data-tip="仅列出已经安装并支持实时识别的模型。">
+              <span class="row-icon model"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="3"></ellipse><path d="M5 6.5V12c0 1.7 3.1 3 7 3s7-1.3 7-3V6.5 M5 12v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V12"></path></svg></span>
+              <strong>识别模型</strong>
               <select v-model="selectedModelId" :disabled="liveControlsLocked || snapshot.live.availableModels.length === 0"><option v-for="model in snapshot.live.availableModels" :key="model.id" :value="model.id">{{ model.name }}</option><option v-if="snapshot.live.availableModels.length === 0" value="">未安装实时模型</option></select>
+              <span class="info-dot tiny">i</span>
             </label>
           </section>
 
           <section class="waveform-section" :class="{ collapsed: !snapshot.settings.showLiveLevelHistory }">
             <div class="wave-head">
-              <div>
-                <strong>输入电平</strong>
-                <span v-if="snapshot.settings.showLiveLevelHistory">最近 30 秒</span>
-              </div>
-              <label class="wave-history-toggle" data-tip="保留最近约 30 秒的输入电平历史；顶部实时 meter 始终保持高频刷新。">
+              <div><strong>输入电平</strong><span class="info-dot tiny" data-tip="显示最近约 30 秒输入峰值历史。">i</span></div>
+              <label class="wave-history-toggle" data-tip="关闭后只隐藏历史曲线，顶部实时电平仍持续更新。">
                 <span>历史</span>
                 <span class="switch small-switch"><input type="checkbox" :checked="snapshot.settings.showLiveLevelHistory" @change="boolSetting('showLiveLevelHistory',$event)"><span></span></span>
               </label>
@@ -941,16 +911,14 @@ onBeforeUnmount(() => {
 
           <section class="transcript-section">
             <div class="transcript-head">
-              <div><strong>字幕</strong><span>自动跟随最新内容</span></div>
-              <span>{{ snapshot.live.status }}</span>
+              <div><strong>字幕</strong><span class="info-dot tiny" data-tip="当前字幕突出显示，近期历史逐级弱化并自动跟随最新内容。">i</span></div>
             </div>
             <div ref="transcriptScroll" class="transcript-scroll">
               <p v-for="(line,index) in transcriptHistory" :key="index" class="history-line" :class="transcriptLineClass(index)">{{ line }}</p>
               <p v-if="snapshot.live.currentText" class="current">{{ snapshot.live.currentText }}</p>
-              <p v-else-if="transcriptHistory.length === 0" class="empty">开始识别后，字幕会持续显示在这里。</p>
+              <p v-else-if="transcriptHistory.length === 0" class="empty">暂无字幕</p>
             </div>
           </section>
-
         </section>
 
         <section v-else-if="activePage === 'batch'" class="page batch-page">
