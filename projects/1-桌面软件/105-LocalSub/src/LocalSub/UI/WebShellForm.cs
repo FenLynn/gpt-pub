@@ -124,9 +124,14 @@ public sealed class WebShellForm : Form
     float _meterMin = 1f;
     float _meterMax;
     bool _autoStartPending;
+    bool _manualStartPending;
     bool _autoStartBusy;
+    string _manualStartSourceId = "";
+    string _manualStartModelId = "";
     string _autoStartStatus = "";
     bool _disposed;
+
+    bool HasPendingLiveStart => _autoStartPending || _manualStartPending;
 
     internal event Action? TrayStateChanged;
     internal bool IsLiveRunning => _live.Snapshot.State == "running";
@@ -135,7 +140,7 @@ public sealed class WebShellForm : Form
         get
         {
             var live = _live.Snapshot;
-            if (_autoStartPending && !string.IsNullOrWhiteSpace(_autoStartStatus)) return _autoStartStatus;
+            if (HasPendingLiveStart && !string.IsNullOrWhiteSpace(_autoStartStatus)) return _autoStartStatus;
             return live.State switch
             {
                 "running" => "实时字幕运行中",
@@ -171,7 +176,7 @@ public sealed class WebShellForm : Form
         _models.Changed += OnModelsChanged;
         _batch.Changed += OnBatchChanged;
         _core.ConnectionBroken += OnCoreConnectionBroken;
-        _autoStartTimer.Tick += async (_, _) => await TryAutoStartLiveAsync();
+        _autoStartTimer.Tick += async (_, _) => await TryPendingLiveStartAsync();
         _autoStartPending = !_smoke && _settings.AutoStartLive;
         Shown += async (_, _) => await InitializeAsync();
         FormClosed += async (_, _) => await DisposeOwnedResourcesAsync();
@@ -225,10 +230,10 @@ public sealed class WebShellForm : Form
             };
 
             core.Navigate(_smoke ? Origin + "/index.html?smoke=1" : Origin + "/index.html");
-            if (_autoStartPending)
+            if (HasPendingLiveStart)
             {
                 _autoStartTimer.Start();
-                _ = TryAutoStartLiveAsync();
+                _ = TryPendingLiveStartAsync();
             }
         }
         catch (Exception ex)
@@ -382,8 +387,14 @@ public sealed class WebShellForm : Form
 
     internal async Task ToggleLiveFromTrayAsync()
     {
-        _autoStartPending = false;
-        _autoStartTimer.Stop();
+        if (HasPendingLiveStart)
+        {
+            ClearPendingLiveStart();
+            TrayStateChanged?.Invoke();
+            ScheduleSnapshotPush();
+            return;
+        }
+
         var live = _live.Snapshot;
         if (live.State == "running")
         {
@@ -397,47 +408,52 @@ public sealed class WebShellForm : Form
         if (string.IsNullOrWhiteSpace(live.ModelId))
             throw new InvalidOperationException("没有可用的实时识别模型。");
 
-        await _live.StartAsync(live.SourceId, live.ModelId);
-        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
-        _coreError = null;
+        await StartOrWaitLiveAsync(live.SourceId, live.ModelId, manualRequest: true);
         TrayStateChanged?.Invoke();
     }
 
-    async Task TryAutoStartLiveAsync()
+    async Task TryPendingLiveStartAsync()
     {
-        if (_disposed || !_autoStartPending || _autoStartBusy) return;
+        if (_disposed || !HasPendingLiveStart || _autoStartBusy) return;
         _autoStartBusy = true;
         try
         {
-            var current = AppSettings.Load();
-            if (!current.AutoStartLive)
+            var manual = _manualStartPending;
+            if (!manual)
             {
-                _autoStartPending = false;
-                _autoStartTimer.Stop();
-                _autoStartStatus = "";
-                return;
+                var current = AppSettings.Load();
+                if (!current.AutoStartLive)
+                {
+                    _autoStartPending = false;
+                    UpdatePendingStartTimer();
+                    if (!HasPendingLiveStart) _autoStartStatus = "";
+                    return;
+                }
             }
 
             _live.RefreshConfiguration();
             var live = _live.Snapshot;
             if (live.State == "running")
             {
-                _autoStartPending = false;
-                _autoStartTimer.Stop();
-                _autoStartStatus = "";
+                ClearPendingLiveStart();
                 return;
             }
             if (live.State is "starting" or "stopping") return;
 
-            if (live.SourceId == "potplayer" && !IsPotPlayerDetected())
+            var sourceId = manual ? _manualStartSourceId : live.SourceId;
+            var modelId = manual ? _manualStartModelId : live.ModelId;
+
+            if (sourceId == "potplayer" && !IsPotPlayerDetected())
             {
+                _coreError = null;
                 _autoStartStatus = "等待 PotPlayer";
                 TrayStateChanged?.Invoke();
                 ScheduleSnapshotPush();
                 return;
             }
 
-            if (!live.CanStart || string.IsNullOrWhiteSpace(live.ModelId))
+            var modelReady = live.AvailableModels.Any(x => string.Equals(x.Id, modelId, StringComparison.OrdinalIgnoreCase));
+            if (!modelReady || string.IsNullOrWhiteSpace(modelId))
             {
                 _autoStartStatus = "等待实时模型";
                 TrayStateChanged?.Invoke();
@@ -445,29 +461,32 @@ public sealed class WebShellForm : Form
                 return;
             }
 
-            _autoStartStatus = "自动启动中";
+            _autoStartStatus = manual ? "正在连接音源" : "自动启动中";
             TrayStateChanged?.Invoke();
             ScheduleSnapshotPush();
-            await _live.StartAsync(live.SourceId, live.ModelId);
+
+            await _live.StartAsync(sourceId, modelId);
             _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
             _coreError = null;
-            _autoStartPending = false;
-            _autoStartStatus = "";
-            _autoStartTimer.Stop();
+            ClearPendingLiveStart();
             TrayStateChanged?.Invoke();
         }
         catch (Exception ex)
         {
-            _coreError = ex.Message;
-            if (_live.Snapshot.SourceId == "potplayer" && !IsPotPlayerDetected())
+            var sourceId = _manualStartPending ? _manualStartSourceId : _live.Snapshot.SourceId;
+            if (sourceId == "potplayer" && !IsPotPlayerDetected())
             {
+                _coreError = null;
                 _autoStartStatus = "等待 PotPlayer";
+                UpdatePendingStartTimer();
             }
             else
             {
-                _autoStartPending = false;
-                _autoStartTimer.Stop();
-                _autoStartStatus = "自动启动失败";
+                _coreError = ex.Message;
+                if (_manualStartPending) _manualStartPending = false;
+                else _autoStartPending = false;
+                _autoStartStatus = "启动失败";
+                UpdatePendingStartTimer();
             }
             TrayStateChanged?.Invoke();
             ScheduleSnapshotPush();
@@ -476,6 +495,64 @@ public sealed class WebShellForm : Form
         {
             _autoStartBusy = false;
         }
+    }
+
+    async Task StartOrWaitLiveAsync(string sourceId, string modelId, bool manualRequest)
+    {
+        _live.RefreshConfiguration();
+        var live = _live.Snapshot;
+        if (!live.AvailableModels.Any(x => string.Equals(x.Id, modelId, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("请选择已安装且可用于实时识别的模型。");
+
+        _settings.AudioSource = sourceId switch
+        {
+            "potplayer" => AudioSourceMode.PotPlayer,
+            "allAudio" => AudioSourceMode.AllAudio,
+            _ => throw new InvalidOperationException("不支持的实时音源。")
+        };
+        _settings.LiveModelId = modelId;
+        _settings.Save();
+        _live.RefreshConfiguration();
+
+        _autoStartPending = false;
+        _manualStartPending = false;
+        _manualStartSourceId = "";
+        _manualStartModelId = "";
+
+        if (manualRequest && sourceId == "potplayer" && !IsPotPlayerDetected())
+        {
+            _manualStartPending = true;
+            _manualStartSourceId = sourceId;
+            _manualStartModelId = modelId;
+            _autoStartStatus = "等待 PotPlayer";
+            _coreError = null;
+            UpdatePendingStartTimer();
+            TrayStateChanged?.Invoke();
+            ScheduleSnapshotPush();
+            return;
+        }
+
+        _autoStartStatus = "";
+        UpdatePendingStartTimer();
+        await _live.StartAsync(sourceId, modelId);
+        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
+        _coreError = null;
+    }
+
+    void ClearPendingLiveStart()
+    {
+        _autoStartPending = false;
+        _manualStartPending = false;
+        _manualStartSourceId = "";
+        _manualStartModelId = "";
+        _autoStartStatus = "";
+        UpdatePendingStartTimer();
+    }
+
+    void UpdatePendingStartTimer()
+    {
+        if (HasPendingLiveStart) _autoStartTimer.Start();
+        else _autoStartTimer.Stop();
     }
 
     async Task<object> UpdateSettingsAsync(JsonElement? parameters)
@@ -547,15 +624,15 @@ public sealed class WebShellForm : Form
         if (!_settings.AutoStartLive)
         {
             _autoStartPending = false;
-            _autoStartStatus = "";
-            _autoStartTimer.Stop();
+            if (!_manualStartPending) _autoStartStatus = "";
         }
         else if (wasAutoStartPending)
         {
             _autoStartPending = true;
-            _autoStartStatus = _live.Snapshot.SourceId == "potplayer" && !IsPotPlayerDetected() ? "等待 PotPlayer" : "等待自动启动";
-            _autoStartTimer.Start();
+            if (!_manualStartPending)
+                _autoStartStatus = _live.Snapshot.SourceId == "potplayer" && !IsPotPlayerDetected() ? "等待 PotPlayer" : "等待自动启动";
         }
+        UpdatePendingStartTimer();
 
         TrayStateChanged?.Invoke();
         return BuildSnapshot();
@@ -574,20 +651,16 @@ public sealed class WebShellForm : Form
         if (!TryReadString(parameters, "modelId", out var modelId))
             throw new InvalidOperationException("请选择实时识别模型。");
 
-        _autoStartPending = false;
-        _autoStartTimer.Stop();
-        await _live.StartAsync(source, modelId);
-        _coreState = _core.WorkerProcessId.HasValue ? "ready" : _coreState;
-        _coreError = null;
+        await StartOrWaitLiveAsync(source, modelId, manualRequest: true);
         return BuildSnapshot();
     }
 
     async Task<object> StopLiveAsync()
     {
-        _autoStartPending = false;
-        _autoStartTimer.Stop();
+        ClearPendingLiveStart();
         await _live.StopAsync();
         TrayStateChanged?.Invoke();
+        ScheduleSnapshotPush();
         return BuildSnapshot();
     }
 
@@ -967,7 +1040,7 @@ public sealed class WebShellForm : Form
             system = new
             {
                 potPlayerDetected = IsPotPlayerDetected(),
-                autoStartPending = _autoStartPending,
+                autoStartPending = HasPendingLiveStart,
                 autoStartStatus = _autoStartStatus
             }
         };
