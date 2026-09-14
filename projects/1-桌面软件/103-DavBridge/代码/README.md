@@ -344,3 +344,14 @@ About 只保留两个 Tab：`关于` 和 `运行状态`。默认 About 不再显
 备份恢复独立成块，完整受管理文件清单通过 `DataInventoryDialogV052` 按需打开。
 
 这保持了“所有数据都能从软件内查到”，同时避免 About 和主导航被低频维护信息占满。
+
+
+## v0.5.3 实机交互修正
+
+v0.5.3 修复数据设置页两个“打开”动作误关闭 Settings 的问题。只读打开目录现在保持 Settings 打开；更改 DataRoot、备份和恢复仍使用原有维护流程。
+
+Web UI tooltip 统一由 global tooltip 控制，500 ms 后显示。旧 CSS 伪元素即时 tooltip 已移除。原生 Settings 和 DataInventory 清单 tooltip 同样使用 500 ms 延迟。
+
+数据设置页继续去掉常驻说明文字，目录用途、备份说明和文件清单说明下沉为 tooltip。
+
+About 页面改为顶部固定锚点，“关于 / 运行状态”只切换下方内容，品牌区和版本号不再随内容高度变化。

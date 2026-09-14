@@ -340,3 +340,14 @@ About 的“关于”Tab 只保留版本、构建和数据维护入口提示。�
 完整文件清单仍然可发现，但通过原生 `DataInventoryDialogV052` 按需打开，不常驻占用设置页。
 
 CI 视觉预览由旧 `data-1100x825.png` 改为 `about-status-1100x825.png`，与 About 默认页的 1100×825、900×620 一起形成当前 About 回归基线。
+
+
+## v0.5.3 Tooltip 与 About 固定锚点
+
+当前 Web UI 只保留一套 tooltip 实现：全局 `global-tooltip`。进入带 `data-tip` 的元素 500 ms 后才显示；离开元素立即取消。旧 `.has-tip:after` CSS 即时 tooltip 已删除，防止双重提示和过度弹出。
+
+原生 Settings 的 ToolTip 与文件清单 ToolTip 同样使用 500 ms InitialDelay 和 ReshowDelay。
+
+About 的布局规则固定为顶部对齐。品牌图标、软件名、版本号、说明和 Tab 条属于稳定框架，“关于 / 运行状态”只替换 Tab 下方 pane。不得再使用随内容高度变化的垂直居中布局。
+
+数据设置页的说明文字默认隐藏到 tooltip，只保留用户决策真正需要的标题、状态、路径和动作。

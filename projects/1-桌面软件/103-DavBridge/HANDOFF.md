@@ -26,7 +26,7 @@
 
 当前稳定主线基线仍为 **DavBridge v0.4.26**。v0.4.26 已完成 `p103-exp → p103-stable → main` 两级准入，但没有获得正式 tag 或 GitHub Release 授权，因此正式 Release 仍保持 v0.4.0。
 
-当前实验分支已经进入 **DavBridge v0.5.2**。本轮主题是“数据可发现、可迁移、可备份、可恢复”，目标是让用户即使隔半年再次打开软件，也能直接从软件内确认所有受管理数据的位置、用途、备份策略和恢复入口。
+当前实验分支已经进入 **DavBridge v0.5.3**。本轮主题是“数据可发现、可迁移、可备份、可恢复”，目标是让用户即使隔半年再次打开软件，也能直接从软件内确认所有受管理数据的位置、用途、备份策略和恢复入口。
 
 v0.4.26 当前 stable/main head：
 
@@ -34,26 +34,26 @@ v0.4.26 当前 stable/main head：
 9579bf0207862f5b6da81b5a3edf87026c156b11
 ```
 
-v0.5.2 信息架构收束代码 head：
+v0.5.3 信息架构收束代码 head：
 
 ```text
-787b15f346cdddf4588239122603dfb3605ece9b
+06bc26e20835481c64de31c72dc7d17634707b35
 ```
 
-新对话必须实时查询 `main / p103-stable / p103-exp` 的当前 head，不得把以上 SHA 当作永久分支 tip。v0.5.2 目前只存在于 `p103-exp`，尚未授权提升 stable/main，也没有正式 tag 或 GitHub Release。
+新对话必须实时查询 `main / p103-stable / p103-exp` 的当前 head，不得把以上 SHA 当作永久分支 tip。v0.5.3 目前只存在于 `p103-exp`，尚未授权提升 stable/main，也没有正式 tag 或 GitHub Release。
 
 ## 3. 最新完整验证与准入链
 
 当前最新实验候选使用准确 `p103-exp` 代码 head：
 
 ```text
-787b15f346cdddf4588239122603dfb3605ece9b
+06bc26e20835481c64de31c72dc7d17634707b35
 ```
 
 对应完整 P103 CI：
 
 ```text
-run 34845319350
+run 34847690721
 scope          success
 core-smoke     success
 frontend       success
@@ -61,34 +61,30 @@ windows-build  success
 report-status  success
 ```
 
-Core Smoke 继续通过 **20/20**。Windows native-host self-test 继续通过 `dataPortabilityV050=true`，原有 config/state/reconcile/product-experience 恢复、runtime session、4:3 窗口迁移、background wake、匿名健康账本和 observation continuity 均继续通过。
+Core Smoke 继续通过 **20/20**。Windows native-host self-test 继续通过 `dataPortabilityV050=true`。
 
-v0.5.2 Windows Artifact：
+v0.5.3 Windows Artifact：
 
 ```text
-DavBridge-v0.5.2-win-x64
-Artifact ID 10348157125
-Artifact ZIP SHA256 fcfc979cf4d590a37808a2e1dbd3467a8e7fbcf3ec921df0ac333a618e8957fa
+DavBridge-v0.5.3-win-x64
+Artifact ID 10348353753
+Artifact ZIP SHA256 4e2d588fde8eb7bb5f37b00e7c21fdc358aff92f489f9c2fcd94964c2f75b5ca
 EXE bytes 2520667
-EXE SHA256 d84d1b8a58cdd06634c422f1c8c73d704f833a2ef8dc8a8d8366dd4067f410ef
+EXE SHA256 7e082892e74d755fb8e05295c3bc74a8a37348023ec2e034a2232d969d6156e9
 ```
 
-Web UI preview Artifact ID：`10347747961`。
+Web UI preview Artifact ID：`10349395170`。
 
-v0.5.2 对 v0.5.1 的主要修正是信息架构，而不是数据语义：
+v0.5.3 对 v0.5.2 只做四项实机反馈修正：
 
-1. About 只保留两个 Tab：`关于` 和 `运行状态`；
-2. 默认 About 只显示产品名、版本、构建和“数据与备份位于设置”的入口提示；
-3. 运行状态 Tab 单独显示运行、健康、Cycle、会话、最近异常与最近记录；
-4. 数据管理完全退出 About，不占左侧一级导航；
-5. 数据管理固定归属 `设置 → 数据与迁移`；
-6. 设置中的数据页改为更大字号和更明确的“持久数据目录，可修改 / 本机运行目录，固定”；
-7. 完整 21 项文件与目录清单再下沉一层，通过“查看全部”打开原生清单窗体；
-8. 浏览器视觉 CI 用 `about-1100x825.png`、`about-900x620.png` 和 `about-status-1100x825.png` 复核两个 About Tab。
+1. 设置里的“打开持久数据 / 打开本机运行目录”改为原地打开资源管理器，不关闭设置，也不返回主页；
+2. Web UI 全局悬浮提示和原生设置 ToolTip 统一为 500 ms 延迟，移除旧 CSS 即时 tooltip，避免同一元素同时出现两套提示；
+3. “设置 → 数据与迁移”进一步去掉常驻小字，目录说明、备份说明、清单说明改为 500 ms 悬浮提示，只保留标题、状态、路径和操作；
+4. About 页面顶部固定上对齐，品牌区、版本号和 Tab 条位置不随“关于 / 运行状态”切换而上下移动，只切换下方内容。
+
+浏览器视觉 CI 已对比 `about-1100x825.png`、`about-status-1100x825.png` 和 `about-900x620.png`，两个 About Tab 顶部锚点一致。
 
 本轮没有修改 DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、Reconciliation、回收站状态机或 DELETE 安全链。
-
-正式 stable/main 当前仍保持 v0.4.26。v0.5.2 尚未获得 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
 
 ## 4. 当前分支策略
 
@@ -97,11 +93,11 @@ v0.5.2 对 v0.5.1 的主要修正是信息架构，而不是数据语义：
 ```text
 main         9579bf0207862f5b6da81b5a3edf87026c156b11
 p103-stable  9579bf0207862f5b6da81b5a3edf87026c156b11
-p103-exp     787b15f346cdddf4588239122603dfb3605ece9b
+p103-exp     06bc26e20835481c64de31c72dc7d17634707b35
 ```
 
-v0.5.2 当前继续领先 main，恢复时必须重新查询 live Git，不使用静态 ahead 数猜测分支关系。
-v0.5.2 目前只作为实验候选。没有用户明确授权时，不得提升 `p103-stable` 或 `main`，也不得创建正式 tag 或 GitHub Release。
+v0.5.3 当前继续领先 main，恢复时必须重新查询 live Git，不使用静态 ahead 数猜测分支关系。
+v0.5.3 目前只作为实验候选。没有用户明确授权时，不得提升 `p103-stable` 或 `main`，也不得创建正式 tag 或 GitHub Release。
 
 正式 DavBridge Release 仍为 v0.4.0。stable/main 准入和实验候选验证都不构成 Release 授权。
 
@@ -617,60 +613,32 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-**v0.5.2 已完成 About 重排、数据管理归位到设置、字体放大和自动化验证，等待用户真实 Windows 验收。**
+**v0.5.3 已完成目录打开行为、统一 500 ms tooltip、数据页减字和 About 固定顶部四项实机修正，等待用户真实 Windows 复核。**
 
-当前产品状态：
+当前状态：
 
-- stable/main 稳定基线：v0.4.26；
-- 实验候选：v0.5.2，仅在 `p103-exp`；
-- 正式 GitHub Release：仍为 v0.4.0；
-- v0.5.2 尚未获得 stable/main 提升授权；
-- v0.5.2 尚未获得正式 tag 或 GitHub Release 授权。
+- stable/main：v0.4.26；
+- p103-exp：v0.5.3；
+- 正式 GitHub Release：v0.4.0；
+- 未授权提升 stable/main；
+- 未授权创建正式 tag 或 Release。
 
-v0.5.2 代码验证 head：`787b15f346cdddf4588239122603dfb3605ece9b`。
+代码验证 head：`06bc26e20835481c64de31c72dc7d17634707b35`。
 
-完整 CI：`34845319350`，五项全绿，Core Smoke 20/20，`dataPortabilityV050=true`。
+完整 CI：`34847690721`，五项全绿，Core Smoke 20/20，`dataPortabilityV050=true`。
 
-Windows candidate Artifact ID：`10348157125`。
+Windows Artifact ID：`10348353753`。
 
-EXE SHA256：`d84d1b8a58cdd06634c422f1c8c73d704f833a2ef8dc8a8d8366dd4067f410ef`。
+EXE SHA256：`7e082892e74d755fb8e05295c3bc74a8a37348023ec2e034a2232d969d6156e9`。
 
-Web UI preview Artifact ID：`10347747961`。
+Web UI preview Artifact ID：`10349395170`。
 
-信息架构已经固定为：
+下一步只检查四件事：
 
-```text
-左侧一级导航
-  总览
-  转移
-  回收站
-  文档
-  设置
-  关于
-
-关于
-  关于
-  运行状态
-
-设置
-  账户与端点
-  流量与限速
-  后台运行
-  数据与迁移
-  安全与维护
-
-设置 → 数据与迁移
-  持久数据目录  可修改
-  本机运行目录  固定
-  备份与恢复
-  文件与目录清单 → 查看全部
-```
-
-原则：数据管理属于低频维护，不进入左侧一级业务导航；About 不承担运维管理，只显示产品信息和运行摘要；完整文件清单保留可发现性，但默认不常驻展开。
-
-下一步只做用户实机检查，不继续扩功能。重点检查 About 两个 Tab 的字号与密度、设置数据页的可读性，以及“查看全部”清单是否足够清楚。
-
-凭据恢复规则不变：同一 Windows 用户下 DPAPI `secrets.dat` 通常可直接恢复；跨电脑或跨 Windows 用户无法解密时只跳过凭据，需要重新输入密码，其他配置和迁移状态仍恢复。
+1. 两个“打开目录”后设置页是否仍保持原位置；
+2. 所有当前 UI 悬浮提示是否约 500 ms 后才显示；
+3. 数据与迁移页是否已经足够简洁；
+4. About 两个 Tab 切换时顶部品牌区是否完全不跳。
 
 ## 10. 新对话固定读取顺序
 
