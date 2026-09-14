@@ -4,29 +4,31 @@
 
 ## 当前版本
 
-当前正式版本：**v0.4.0**。
+当前正式 GitHub Release：**v0.4.0**。
 
-当前 `p103-exp` 候选：**v0.4.26**，这是 v0.4 最终实验候选。
+当前 stable/main 源码基线：**v0.4.26**。
 
-v0.4.26 最后完整验证代码 head：
+v0.4.26 首次 main 准入提交：`829def0a9776da47fd432a0831fa666993781356`。
+
+最终候选验证 head：
 
 ```text
-3568eca17bda0b6674959c9897f6ec2dbebbb26f
+c9da993f465d1e216d30deb5f5cefd517b67b9ce
 ```
 
-完整 P103 CI run：`34763904669`，结果 `success`。
+完整 P103 CI run：`34765050320`，五项全绿，Core Smoke 20/20。
 
-Windows candidate Artifact ID：`10319489203`。
+Windows candidate Artifact ID：`10320800368`。
 
-Web UI preview Artifact ID：`10319379569`。
+Web UI preview Artifact ID：`10319959437`。
 
-EXE：`2467421 bytes`。
+EXE SHA256：`3b0f8b56e0261290f6668cfce7f8d12909fd146fc5af0bd29cbb446cef28987f`。
 
-EXE SHA256：`72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850`。
+Artifact ZIP SHA256：`e699f320c4b899bb728c4be1013bc05fb68c0e8df4cba4057ff8e40353af2123`。
 
-Artifact ZIP SHA256：`9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe`。
+准入记录：PR #432 将候选提升到 `p103-stable`，PR #433 将稳定候选提升到 `main`。
 
-当前 stable/main 稳定基线仍为 v0.4.16 commit `73aefcf04570180bb9526a43cf805aff1e7673b3`.
+正式 Release 没有随 stable/main 自动变化，仍需独立人工授权。
 
 ## v0.4.25 surface 色阶收束
 
@@ -258,13 +260,10 @@ v0.4.16 第一轮完整验证 run `34743274402` 同时包含扩展 Core Smoke、
 
 ## 当前开发断点
 
-v0.4.26 已完成自动化收束验证，并已获得用户在当前会话中的 stable/main 收尾授权。
+v0.4.26 已完成开发、验证和 stable/main 两级准入。
 
-最后完整验证代码 head：`3568eca17bda0b6674959c9897f6ec2dbebbb26f`。
+当前不再存在待提升的 v0.4 实验候选。没有新开发时，`p103-exp` 应与最新 main 同步。
 
-CI run：`34763904669`，五项全绿。
+后续工作只分为真实缺陷维护和 v0.5 新主题评估。不得为了继续滚版本而主动创建 v0.4.27。
 
-Core Smoke 20/20。Windows candidate Artifact ID：`10319489203`。
-
-下一步只执行既定两级准入：`p103-exp → p103-stable → main`。不创建正式 tag 或 GitHub Release。
-
+正式 GitHub Release 仍为 v0.4.0，本轮没有获得 v0.4.26 正式 tag 或 Release 授权。
