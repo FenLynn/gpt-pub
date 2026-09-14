@@ -128,6 +128,7 @@ jobs:
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,825 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/docs-1100x825.png" 'http://127.0.0.1:4173/?tab=docs'
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,825 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/about-1100x825.png" 'http://127.0.0.1:4173/?tab=about'
           "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=900,620 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/about-900x620.png" 'http://127.0.0.1:4173/?tab=about'
+          "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,825 --screenshot="$GITHUB_WORKSPACE/build/WebUiPreview/data-1100x825.png" 'http://127.0.0.1:4173/?tab=data'
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-870x525.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-900x620.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/overview-1100x825.png") -gt 10000
@@ -137,6 +138,7 @@ jobs:
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/docs-1100x825.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/about-1100x825.png") -gt 10000
           test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/about-900x620.png") -gt 10000
+          test $(stat -c%s "$GITHUB_WORKSPACE/build/WebUiPreview/data-1100x825.png") -gt 10000
       - name: Upload Vue visual previews
         uses: actions/upload-artifact@v4
         with:
