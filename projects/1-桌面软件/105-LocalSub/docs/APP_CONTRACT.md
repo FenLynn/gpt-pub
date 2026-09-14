@@ -225,7 +225,9 @@ Vue 只能通过 `settings.update` 提交白名单字段。Shell 负责范围校
 
 ### system
 
-v0.1.6 当前至少包含 `potPlayerDetected`、`autoStartPending` 和 `autoStartStatus`。PotPlayer PID、HWND、Core session ID 和注册表路径不暴露给 Vue。
+v0.1.24 当前至少包含 `potPlayerDetected`、`autoStartPending` 和 `autoStartStatus`。PotPlayer PID、HWND、Core session ID 和注册表路径不暴露给 Vue。
+
+为保持 snapshot 兼容，字段名 `autoStartPending` 继续保留，但 v0.1.24 起其 UI 语义扩展为“存在待执行的 realtime 启动意图”。该 pending 可能来自登录后 AutoStartLive，也可能来自用户在 PotPlayer 尚未运行时手动点击开始。Vue 不得据此自行轮询 PotPlayer，进程检测、待启动 source/model 和 timer 生命周期全部属于 Shell。
 
 ## 7. Shell 到 Web UI 命令白名单
 
@@ -324,7 +326,9 @@ live.discontinuity
 live.failed
 ```
 
-`live.stop` 必须可以基于当前 session 明确停止实时链。
+v0.1.24 起，`live.start` 表达用户的启动意图，而不是要求目标 PotPlayer 在调用瞬间已经存在。若选定 PotPlayer 但进程尚未出现，Shell 必须保存 source/model，进入 pending 状态并持续检测；检测到 PotPlayer 后才调用既有 Core realtime 链。不得静默改为 All Audio，也不得让 Vue 自己轮询进程。
+
+`live.stop` 必须同时具备两种语义：若已有 realtime session，则明确停止当前 session；若仍处于等待音源 pending，则取消该启动意图。
 
 Core 需要显式维护：
 
@@ -385,6 +389,20 @@ Shell 找到 PID
 ```
 
 不得让 Vue 直接参与 PotPlayer 进程控制。
+
+v0.1.24 手动启动等待流程固定为：
+
+```text
+Vue live.start(source=potplayer, modelId)
+→ Shell 校验并保存用户启动意图
+→ 若 PotPlayer 不存在，Shell 进入 waiting/pending
+→ Shell timer 持续检测 PotPlayer
+→ PotPlayer 出现
+→ Shell 调用既有 LiveSessionController.StartAsync
+→ Core 建立 Process Loopback 与 ASR
+```
+
+pending 期间 Vue 只显示状态并锁定对应 source/model 控件。再次发送 `live.stop` 取消 pending。
 
 ## 11. 页面迁移顺序
 
