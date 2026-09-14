@@ -200,7 +200,7 @@ jobs:
             }
           }
 
-      - name: Verify v0.1.22 productization and visual contract
+      - name: Verify v0.1.23 DavBridge palette and product contract
         shell: pwsh
         working-directory: projects/1-桌面软件/105-LocalSub
         run: |
@@ -285,7 +285,7 @@ jobs:
             'class="global-tooltip"'
           )) {
             if ($app -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 Web UI contract missing: $required"
+              throw "v0.1.23 Web UI contract missing: $required"
             }
           }
 
@@ -335,10 +335,18 @@ jobs:
             '.batch-export-all',
             '.install-state.repair',
             '.docs-list>div{min-height:72px',
-            '.about-card h2{font-size:29px}'
+            '.about-card h2{font-size:29px}',
+            'v0.1.23 DavBridge palette + top-stacked home hierarchy',
+            'grid-template-columns:225px minmax(0,1fr)!important',
+            'background:linear-gradient(145deg,#f5fafe 0%,#f1f7fb 66%,#eaf3f8 100%)!important',
+            'background:transparent!important',
+            'grid-template-rows:repeat(4,104px)!important',
+            'width:58px;height:58px',
+            'font-size:18px!important',
+            'background:linear-gradient(145deg,#f1edff,#e5ddff)!important'
           )) {
             if ($style -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 style contract missing: $required"
+              throw "v0.1.23 style contract missing: $required"
             }
           }
 
@@ -365,7 +373,7 @@ jobs:
             'Downsample'
           )) {
             if ($batchSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 batch controller contract missing: $required"
+              throw "v0.1.23 batch controller contract missing: $required"
             }
           }
 
@@ -390,7 +398,7 @@ jobs:
             'explorer.exe'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 batch host contract missing: $required"
+              throw "v0.1.23 batch host contract missing: $required"
             }
           }
 
@@ -403,7 +411,7 @@ jobs:
             'ToResult'
           )) {
             if ($queueState -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 queue persistence contract missing: $required"
+              throw "v0.1.23 queue persistence contract missing: $required"
             }
           }
 
@@ -415,7 +423,7 @@ jobs:
             'FormatVttTime'
           )) {
             if ($persistence -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 subtitle export contract missing: $required"
+              throw "v0.1.23 subtitle export contract missing: $required"
             }
           }
 
@@ -424,7 +432,7 @@ jobs:
             'ResolvedBatchOutputDirectory'
           )) {
             if ($settingsSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 output settings contract missing: $required"
+              throw "v0.1.23 output settings contract missing: $required"
             }
           }
 
@@ -435,7 +443,7 @@ jobs:
             'kind == "repair"'
           )) {
             if ($modelSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 model repair contract missing: $required"
+              throw "v0.1.23 model repair contract missing: $required"
             }
           }
 
@@ -445,7 +453,7 @@ jobs:
             'new FileInfo(file).Length > 0'
           )) {
             if ($modelManager -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 model health contract missing: $required"
+              throw "v0.1.23 model health contract missing: $required"
             }
           }
 
@@ -456,7 +464,7 @@ jobs:
             'FollowOverlayToPotPlayer()'
           )) {
             if ($liveSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 realtime player-follow contract missing: $required"
+              throw "v0.1.23 realtime player-follow contract missing: $required"
             }
           }
 
@@ -467,12 +475,20 @@ jobs:
             '"home", "live", "batch", "models", "settings", "docs", "about"'
           )) {
             if ($hostSource -notmatch [regex]::Escape($required)) {
-              throw "v0.1.22 4:3 host contract missing: $required"
+              throw "v0.1.23 4:3 host contract missing: $required"
             }
           }
 
           if ($style -match 'background:rgba\(255,255,255,\.66\)!important' -and $style -notmatch 'v0\.1\.21 surface tone correction') {
             throw 'Old high-white ordinary status surface must not remain the active visual baseline.'
+          }
+
+          $v23 = $style.Substring($style.IndexOf('v0.1.23 DavBridge palette + top-stacked home hierarchy'))
+          if ($v23 -notmatch 'workspace,[\s\S]*?background:transparent!important') {
+            throw 'v0.1.23 must keep the content canvas transparent over the DavBridge shell gradient.'
+          }
+          if ($v23 -match 'grid-template-rows:repeat\(4,minmax\([^\)]*1fr') {
+            throw 'v0.1.23 home rows must not stretch to fill the full viewport.'
           }
 
           if ($app -match 'class="top-tabs"') {
