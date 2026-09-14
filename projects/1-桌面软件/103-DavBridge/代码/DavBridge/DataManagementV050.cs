@@ -101,13 +101,18 @@ internal static class DataBootstrapV050
         Directory.CreateDirectory(Path.GetDirectoryName(bootstrapPath)!);
         var temp = bootstrapPath + ".tmp";
         var backup = bootstrapPath + ".bak";
+        var backupTemp = backup + ".tmp";
         var json = JsonSerializer.Serialize(new BootstrapState { DataRoot = normalized }, JsonOptions);
+
         File.WriteAllText(temp, json);
         using (var stream = new FileStream(temp, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             stream.Flush(true);
-        if (File.Exists(bootstrapPath))
-            File.Copy(bootstrapPath, backup, true);
         File.Move(temp, bootstrapPath, true);
+
+        File.Copy(bootstrapPath, backupTemp, true);
+        using (var stream = new FileStream(backupTemp, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            stream.Flush(true);
+        File.Move(backupTemp, backup, true);
     }
 }
 
@@ -348,10 +353,13 @@ internal static class DataManagementV050
             File.WriteAllText(Path.Combine(paths.LocalRoot, "product-experience.json"), "{\"sample\":\"experience\"}");
 
             DataBootstrapV050.SetDataRoot(bootstrap, data);
-            DataBootstrapV050.SetDataRoot(bootstrap, data);
+            var alternate = Path.Combine(root, "alternate-data");
+            Directory.CreateDirectory(alternate);
+            DataBootstrapV050.SetDataRoot(bootstrap, alternate);
             File.WriteAllText(bootstrap, "{broken");
-            if (!string.Equals(DataBootstrapV050.ResolveDataRoot(Path.Combine(root, "fallback"), bootstrap), Path.GetFullPath(data), StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(DataBootstrapV050.ResolveDataRoot(Path.Combine(root, "fallback"), bootstrap), Path.GetFullPath(alternate), StringComparison.OrdinalIgnoreCase))
                 return false;
+            DataBootstrapV050.SetDataRoot(bootstrap, data);
 
             var zip = Path.Combine(root, "test-backup.zip");
             CreateBackup(paths, zip, true);
