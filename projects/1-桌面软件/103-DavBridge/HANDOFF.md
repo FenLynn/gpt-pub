@@ -24,30 +24,36 @@
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前稳定主线基线已经提升为 **DavBridge v0.4.26**。v0.4.26 已完成 `p103-exp → p103-stable → main` 两级准入，但本轮没有获得正式 tag 或 GitHub Release 授权，因此正式 Release 仍保持 v0.4.0。
+当前稳定主线基线仍为 **DavBridge v0.4.26**。v0.4.26 已完成 `p103-exp → p103-stable → main` 两级准入，但没有获得正式 tag 或 GitHub Release 授权，因此正式 Release 仍保持 v0.4.0。
 
-v0.4.26 主线源码准入提交：
+当前实验分支已经进入 **DavBridge v0.5.0**。本轮主题是“数据可发现、可迁移、可备份、可恢复”，目标是让用户即使隔半年再次打开软件，也能直接从软件内确认所有受管理数据的位置、用途、备份策略和恢复入口。
+
+v0.4.26 当前 stable/main head：
 
 ```text
-829def0a9776da47fd432a0831fa666993781356
+9579bf0207862f5b6da81b5a3edf87026c156b11
 ```
 
-该 SHA 是 v0.4.26 首次进入 `main` 的准入提交。后续纯文档收尾会继续追加正常 merge commit，因此新对话必须实时查询 `main / p103-stable / p103-exp` 的当前 head，不得把本 SHA 当作永久分支 tip。
+v0.5.0 功能代码 head：
 
-当前没有新的 v0.4 实验版本。v0.4 功能扩张已经冻结，后续只处理真实缺陷和长期运行反馈；新的产品主题应单独评估 v0.5。
+```text
+488697e2d7b490a3d681750ae2810a194477a6d4
+```
+
+新对话必须实时查询 `main / p103-stable / p103-exp` 的当前 head，不得把以上 SHA 当作永久分支 tip。v0.5.0 目前只存在于 `p103-exp`，尚未授权提升 stable/main，也没有正式 tag 或 GitHub Release。
 
 ## 3. 最新完整验证与准入链
 
-最终候选在进入 stable/main 前使用准确 `p103-exp` head：
+当前最新实验候选使用准确 `p103-exp` 功能代码 head：
 
 ```text
-c9da993f465d1e216d30deb5f5cefd517b67b9ce
+488697e2d7b490a3d681750ae2810a194477a6d4
 ```
 
 对应完整 P103 CI：
 
 ```text
-run 34765050320
+run 34839817188
 scope          success
 core-smoke     success
 frontend       success
@@ -55,20 +61,27 @@ windows-build  success
 report-status  success
 ```
 
-Core Smoke：**20/20**。
-
-最终候选 Windows Artifact：
+Core Smoke 继续通过 **20/20**。Windows native-host self-test 新增并通过：
 
 ```text
-DavBridge-v0.4.26-win-x64
-Artifact ID 10320800368
-Artifact ZIP SHA256 e699f320c4b899bb728c4be1013bc05fb68c0e8df4cba4057ff8e40353af2123
-EXE SHA256 3b0f8b56e0261290f6668cfce7f8d12909fd146fc5af0bd29cbb446cef28987f
+dataPortabilityV050 = true
 ```
 
-Web UI preview Artifact ID：`10319959437`。
+同时 config/state/reconcile/product-experience 备份恢复、runtime session、4:3 窗口迁移、background wake、匿名健康账本和 observation continuity 均继续通过。
 
-两级准入链：
+v0.5.0 Windows Artifact：
+
+```text
+DavBridge-v0.5.0-win-x64
+Artifact ID 10345802101
+Artifact ZIP SHA256 b8d087fc107b2964de5d73e1a501e9fb281b4d8035fc6f28d70e42240f89f33c
+EXE bytes 2516571
+EXE SHA256 3c1fbc49a19da04d1f14efd01704befbfa73badc0e63ca429540303c6edcbae7
+```
+
+Web UI preview Artifact ID：`10346095118`。
+
+v0.4.26 已完成的 stable/main 准入链仍为：
 
 ```text
 p103-exp c9da993f...
@@ -92,11 +105,19 @@ main 准入后的 Repository hygiene run `34765658303` 通过。
 
 ## 4. 当前分支策略
 
-v0.4.26 已经进入 stable/main。完成本次纯文档收尾后，`main`、`p103-stable` 和未进入下一开发阶段的 `p103-exp` 应再次同步到同一最新主线 head。
+当前实时关系：
 
-因此新对话恢复时必须先实时查询三条长期分支关系。若 `p103-exp` 没有新的独有开发提交，应把它视为已冻结的 v0.4.26 基线，而不是继续默认滚动 v0.4.27。
+```text
+main         9579bf0207862f5b6da81b5a3edf87026c156b11
+p103-stable  9579bf0207862f5b6da81b5a3edf87026c156b11
+p103-exp     488697e2d7b490a3d681750ae2810a194477a6d4
+```
 
-正式 Release 仍为 v0.4.0。stable/main 准入不构成 Release 授权。
+在 v0.5.0 功能代码完成时，`p103-exp` 相对 `main` 为 ahead 8、behind 0。后续文档提交会继续增加 ahead 数，因此恢复时必须重新查询 live Git。
+
+v0.5.0 目前只作为实验候选。没有用户明确授权时，不得提升 `p103-stable` 或 `main`，也不得创建正式 tag 或 GitHub Release。
+
+正式 DavBridge Release 仍为 v0.4.0。stable/main 准入和实验候选验证都不构成 Release 授权。
 
 ## 5. 当前架构
 
@@ -126,6 +147,11 @@ migration.retry
 quota.calibrate
 recycle.defer
 recycle.delete
+data.openRoot
+data.openLocal
+data.changeRoot
+data.backup
+data.restore
 ```
 
 ## 6. 最新总览 UI 状态
@@ -561,54 +587,79 @@ Web UI 删除意图
 
 ## 8. Data 与隐私边界
 
-核心 Data 继续位于：
+v0.5.0 将“持久数据”和“本机运行数据”明确分开。
+
+默认持久数据根目录仍为：
 
 ```text
-%APPDATA%\DavBridge\config.json
-%APPDATA%\DavBridge\state.json
-%APPDATA%\DavBridge\state.json.bak
-%APPDATA%\DavBridge\secrets.dat
-%APPDATA%\DavBridge\reconcile.json
-%APPDATA%\DavBridge\reconcile.json.bak
+%APPDATA%\DavBridge
 ```
 
-窗口外观状态另外保存在 `%LOCALAPPDATA%\\DavBridge\\window.json`，仅包含窗口 X/Y、宽高和最大化状态，不包含账户、文件清单或凭据。
+但用户现在可以从软件内把该根目录迁移到其他空目录。真正的当前目录由固定入口记录：
 
-v0.4.5 的 UI 辅助状态保存在 `%LOCALAPPDATA%\\DavBridge\\product-experience.json(.bak)`，只保存通用初始化/活动状态，不保存核心迁移数据或私人文件信息。
+```text
+%LOCALAPPDATA%\DavBridge\bootstrap.json
+%LOCALAPPDATA%\DavBridge\bootstrap.json.bak
+```
+
+bootstrap 主、备必须始终指向同一个当前 DataRoot。主文件损坏时允许从备份恢复；主、备同时不可读时必须阻止启动，绝不静默回到默认目录。
+
+当前 DataRoot 承载：
+
+```text
+config.json(.bak)
+state.json(.bak)
+reconcile.json(.bak)
+v2-compat.json(.bak)
+secrets.dat
+Backups\
+```
+
+其中 `secrets.dat` 继续使用 Windows DPAPI CurrentUser。
+
+固定本机运行目录仍为：
+
+```text
+%LOCALAPPDATA%\DavBridge
+```
+
+这里保存 `product-experience.json(.bak)`、`window.json`、`runtime-session.json`、`backup-status.json`、`startup-error.log`、`Temp\`、`WebView2\` 和 `WebUi\` 等机器相关状态与缓存。
+
+About 的“数据与迁移”区和设置中的同名分类都必须能让用户直接看到两类目录，并通过“文件与目录清单”确认每项的路径、用途、存在状态和备份策略。
 
 Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、私人 Zotero 文件清单、用户日志或其他私人 Data。
 
 ## 9. 当前准确断点
 
-**v0.4.26 的功能开发与 stable/main 准入已经完成。**
+**v0.5.0 数据可发现与迁移主题已经完成代码实现和自动化验证，等待用户真实 Windows 验收。**
 
 当前产品状态：
 
 - stable/main 稳定基线：v0.4.26；
+- 实验候选：v0.5.0，仅在 `p103-exp`；
 - 正式 GitHub Release：仍为 v0.4.0；
-- 不存在已授权的 v0.4.26 tag 或 GitHub Release；
-- v0.4 不再主动增加普通功能；
-- `p103-exp` 在没有新开发时应与最新 main 同步；
-- 长期后台、真实网络和睡眠恢复继续作为稳定版实际运行观察项。
+- v0.5.0 尚未获得 stable/main 提升授权；
+- v0.5.0 尚未获得正式 tag 或 GitHub Release 授权；
+- DavBridge.Core、WebDAV、StrongVerified、quota/Cycle、Reconciliation、回收站和 DELETE 安全链没有因本轮数据管理功能降低安全门。
 
-最后完整候选验证 head：`c9da993f465d1e216d30deb5f5cefd517b67b9ce`。
+v0.5.0 功能代码 head：`488697e2d7b490a3d681750ae2810a194477a6d4`。
 
-最后完整候选 CI：`34765050320`，五项全绿，Core Smoke 20/20。
+完整 CI：`34839817188`，五项全绿，Core Smoke 20/20，`dataPortabilityV050=true`。
 
-稳定准入 PR：#432。
+Windows candidate Artifact ID：`10345802101`。
 
-主线准入 PR：#433。
+EXE SHA256：`3c1fbc49a19da04d1f14efd01704befbfa73badc0e63ca429540303c6edcbae7`。
 
-v0.4.26 首次进入 main 的源码准入提交：`829def0a9776da47fd432a0831fa666993781356`。
+Web UI preview Artifact ID：`10346095118`。
 
-后续纯文档收尾会继续追加 merge commit，因此**不要**用上面的 admission SHA 猜测当前 branch tip。每次接续先查 live Git。
+下一步优先级：
 
-下一阶段只有两种合理入口：
+1. 用户在真实 Windows 上检查 About 的“数据与迁移”、设置中的“数据与迁移”、打开目录、手动备份；
+2. 使用非生产测试目录验证一次 DataRoot 迁移和恢复，不直接拿唯一生产账本做第一次交互试验；
+3. 若实机确认通过，再由用户明确决定是否提升 stable/main；
+4. 未授权前不得自动晋级，也不得创建正式 Release。
 
-1. 真实运行发现缺陷，按兼容修复处理；
-2. 出现明显的新产品主题，先论证 v0.5，再恢复功能开发。
-
-不因为版本号推进而继续制造 v0.4.27、v0.4.28。
+特别回退规则：一旦用户已经把 DataRoot 改到自定义目录，v0.4.26 不认识 `bootstrap.json`。此时不能直接启动旧版并假设它会读取自定义目录。需要先退出 v0.5.0，把当前持久数据安全复制回 `%APPDATA%\DavBridge`，再运行 v0.4.26。
 
 ## 10. 新对话固定读取顺序
 

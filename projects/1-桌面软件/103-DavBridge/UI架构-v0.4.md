@@ -1,4 +1,4 @@
-# DavBridge v0.4 UI 架构
+# DavBridge v0.4 / v0.5 UI 架构
 
 ## 决策
 
@@ -56,6 +56,11 @@ migration.retry
 quota.calibrate
 recycle.defer
 recycle.delete
+data.openRoot
+data.openLocal
+data.changeRoot
+data.backup
+data.restore
 ```
 
 Vue 不得直接读取：
@@ -94,6 +99,9 @@ WinForms 不再承担业务页面布局，只保留 Windows 原生能力：
 - WebView2 生命周期；
 - 原生设置对话框；
 - 最终危险操作确认；
+- DataRoot 目录选择与资源管理器打开；
+- 备份和恢复的原生文件选择；
+- 数据迁移后的应用重启；
 - 已有后台运行入口。
 
 ## WebView2 安全约束
@@ -238,3 +246,39 @@ v0.4.26 已完成 stable/main 两级准入，当前作为 v0.4 稳定主线基�
 v0.4 UI 结构、surface 层级、品牌区版本号、生产 UI 所有权门和旧 WinForms 隔离规则均冻结。Vue 仍只接收聚合安全 DTO，不读取匿名事件账本、runtime marker 或私人 Data，也不增加 bridge 命令。
 
 后续只处理真实缺陷和长期运行反馈。新的功能主题必须先评估 v0.5，不在 v0.4 上继续堆叠页面与状态。
+
+
+## v0.5.0 数据可发现与迁移中心
+
+v0.5.0 不把本地文件系统权限交给 Vue。前端只能显示 C# 聚合后的 DataOverview，并发送固定白名单意图。
+
+```text
+About / 设置
+→ data.openRoot / data.openLocal / data.changeRoot / data.backup / data.restore
+→ WebUiHostV040 白名单
+→ MainForm 原生维护动作
+→ DataManagementV050
+→ Windows 文件系统 / ZIP / SHA-256 / DPAPI
+```
+
+前端不能传任意文件路径给 C# 执行写入。DataRoot 的实际选择仍由原生 FolderBrowserDialog 完成，备份和恢复路径仍由原生 SaveFileDialog / OpenFileDialog 完成。
+
+About 的 DataOverview 只公开当前本机可见的路径、用途、存在状态和备份策略，不把 `state.json`、`reconcile.json`、`secrets.dat` 内容送入 JavaScript。
+
+持久 DataRoot 与本机 LocalRoot 明确分离：
+
+```text
+DataRoot
+  config/state/reconcile/v2-compat/secrets/Backups
+  可由用户安全迁移
+
+LocalRoot
+  bootstrap/product-experience/window/runtime/Temp/WebView2/WebUi
+  固定在 LocalAppData
+```
+
+bootstrap 是唯一固定入口。主文件和 `.bak` 必须始终指向同一个当前 DataRoot，防止损坏恢复时静默退回旧目录。
+
+备份和恢复均由 C# 执行 manifest 与 SHA-256 校验。恢复前必须创建当前数据安全快照。DPAPI 密文无法在当前 Windows 用户下解密时只跳过 `secrets.dat`，不得降低其他数据恢复校验。
+
+本轮不修改 DavBridge.Core 的迁移实现。

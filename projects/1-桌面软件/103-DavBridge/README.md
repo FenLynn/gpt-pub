@@ -80,16 +80,13 @@ Vue 前端只接收安全 DTO 和发送固定白名单意图。WebDAV 凭据、D
 
 ## Data 边界
 
-Runtime 与私人 Data 严格分离：
+Runtime 与私人 Data 严格分离。
 
-```text
-%APPDATA%\DavBridge\config.json
-%APPDATA%\DavBridge\state.json
-%APPDATA%\DavBridge\state.json.bak
-%APPDATA%\DavBridge\secrets.dat
-%APPDATA%\DavBridge\reconcile.json
-%APPDATA%\DavBridge\reconcile.json.bak
-```
+DavBridge 默认持久 DataRoot 为 `%APPDATA%\DavBridge`。支持自定义 DataRoot 的版本通过固定的 `%LOCALAPPDATA%\DavBridge\bootstrap.json(.bak)` 找到当前持久目录。
+
+持久 DataRoot 承载 config、state、reconcile、v2-compat、DPAPI `secrets.dat` 及其必要备份。WebView2、Temp、窗口状态、运行会话等机器相关内容继续位于 `%LOCALAPPDATA%\DavBridge`。
+
+软件内应能够直接查看受管理文件和目录的路径、用途及备份策略，用户不应依赖记忆判断数据位置。
 
 Release、Artifact、源码和 CI 不得包含真实 WebDAV 凭据、私人 Zotero 文件清单、用户日志或其他私人 Data。
 
