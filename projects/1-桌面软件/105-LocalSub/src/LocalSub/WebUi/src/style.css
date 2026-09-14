@@ -2776,3 +2776,370 @@ body{font-size:15px}
   .batch-output-button{max-width:125px}
   .batch-export-all,.batch-all-button,.batch-start-button{min-width:64px;padding:0 7px;font-size:9.6px!important}
 }
+
+
+/* v0.1.23 DavBridge palette + top-stacked home hierarchy
+   Exact visual principle: pale gradient shell, transparent content canvas,
+   white only for raised controls, larger home typography/icons, natural bottom breathing room. */
+:root{
+  --ls-canvas:#f1f7fb;
+  --ls-canvas-deep:#eaf3f8;
+  --ls-surface-quiet:rgba(236,245,250,.72);
+  --ls-surface-soft:rgba(241,248,252,.82);
+  --ls-surface-panel:rgba(246,251,253,.90);
+  --ls-surface-raised:rgba(252,254,255,.96);
+  --accent:#1688d4;
+  --accent-strong:#0875bd;
+  --accent-soft:#eaf5fd;
+  --text:#172033;
+  --text-2:#51627a;
+  --text-3:#7f8ea3;
+  --line:#dde6ee;
+  --line-soft:#e8eef3;
+  --green:#22a06b;
+  --green-soft:#edf9f4;
+  --amber:#b57a19;
+  --amber-soft:#fff7e9;
+  --red:#bf514b;
+  --red-soft:#fff1f0;
+  --purple:#7046ea;
+}
+
+html,body,#app{
+  background:#f1f7fb!important;
+}
+.app-shell{
+  grid-template-columns:225px minmax(0,1fr)!important;
+  background:linear-gradient(145deg,#f5fafe 0%,#f1f7fb 66%,#eaf3f8 100%)!important;
+}
+.sidebar{
+  padding:48px 12px 14px 24px!important;
+  border-right:1px solid #dbe6ef!important;
+  background:rgba(243,249,252,.92)!important;
+  box-shadow:4px 0 20px rgba(50,88,120,.025)!important;
+}
+.workspace,
+.page,
+.home-page,
+.live-page,
+.batch-page,
+.models-page,
+.settings-page,
+.docs-page,
+.about-page{
+  background:transparent!important;
+}
+.side-status,
+.side-status.state-run,
+.side-status.state-complete,
+.side-status.state-wait,
+.side-status.state-warning{
+  background:rgba(236,245,250,.72)!important;
+}
+.brand-mark{
+  width:50px;height:50px;
+  background:linear-gradient(145deg,#e5f4ff,#eef9ff)!important;
+}
+.brand-copy h1{font-size:22px}
+.side-nav{gap:7px;padding-left:12px}
+.side-nav button{
+  height:48px;
+  grid-template-columns:29px 1fr;
+  padding:0 15px;
+  font-size:15px;
+  color:#516785;
+}
+.side-nav button.active{
+  background:linear-gradient(135deg,#e5f3ff,#dceffd)!important;
+  color:#087fe0!important;
+}
+.side-nav svg{width:23px;height:23px}
+.side-secondary{margin-left:12px;margin-right:7px;padding-top:14px}
+.side-secondary button{height:43px}
+
+/* Match DavBridge content placement instead of vertically centering a blue-gray page. */
+.home-page{
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:30px 49px 14px 30px!important;
+  display:block!important;
+  overflow:hidden;
+}
+.home-control-head{
+  width:100%;
+  min-height:112px;
+  display:grid;
+  grid-template-columns:64px 190px minmax(240px,1fr) 150px;
+  align-items:center;
+  gap:24px;
+  padding:0 4px 18px 13px;
+  border-bottom:1px solid rgba(202,217,228,.70);
+}
+.home-module-icon{
+  width:62px;height:62px;
+  border-radius:18px;
+  color:#1688e8;
+  background:linear-gradient(145deg,#eef8ff,#dfefff);
+}
+.home-module-icon.ready{
+  color:#18a56b;
+  background:linear-gradient(145deg,#ecfbf4,#daf5e8);
+}
+.home-module-icon svg{width:36px;height:36px;stroke-width:2.55}
+.home-control-copy h2{
+  font-size:29px;
+  line-height:1.04;
+  font-weight:730;
+  letter-spacing:-.65px;
+  color:#101c39;
+}
+.home-control-copy small{
+  margin-top:8px;
+  color:#788ba0;
+  font-size:13.5px;
+}
+.home-control-state{
+  grid-template-columns:40px minmax(0,1fr);
+  gap:13px;
+}
+.home-state-icon{
+  width:40px;height:40px;
+  border-radius:12px;
+}
+.home-state-icon svg{width:23px;height:23px}
+.home-control-state strong{
+  font-size:15.5px;
+  line-height:1.2;
+  color:#293e59;
+}
+.home-control-state small{
+  margin-top:5px;
+  font-size:12px;
+  color:#7f8ea3;
+}
+.home-action-slot{width:150px}
+.home-primary-action{
+  width:150px;min-width:150px;
+  height:46px;min-height:46px;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:690;
+}
+.home-primary-action svg{width:19px;height:19px}
+
+/* Four operating rows now stack from the top with fixed rhythm.
+   No flex growth, so the bottom of the page is allowed to stay empty. */
+.home-status-list{
+  width:100%;
+  display:grid!important;
+  grid-template-rows:repeat(4,104px)!important;
+  flex:none!important;
+  min-height:0!important;
+  padding:0 4px 0 13px!important;
+}
+.home-control-row{
+  min-height:104px!important;
+  grid-template-columns:62px minmax(210px,1fr) minmax(230px,auto) 86px!important;
+  gap:25px!important;
+  padding:0!important;
+  border-bottom:1px solid rgba(202,217,228,.70)!important;
+}
+.home-row-feature{
+  width:58px;height:58px;
+  border-radius:17px;
+}
+.home-row-feature svg{width:31px;height:31px;stroke-width:2.15}
+.home-row-feature.readiness{
+  color:#18a56b;
+  background:linear-gradient(145deg,#ecfbf4,#daf5e8);
+}
+.home-row-feature.live{
+  color:#1688e8;
+  background:linear-gradient(145deg,#eef8ff,#dfefff);
+}
+.home-row-feature.overlay{
+  color:#7046ea;
+  background:linear-gradient(145deg,#f1edff,#e5ddff);
+}
+.home-row-feature.batch{
+  color:#5e49ce;
+  background:linear-gradient(145deg,#f3efff,#e8e2ff);
+}
+.home-row-copy h3{
+  font-size:18px!important;
+  line-height:1.14;
+  font-weight:720;
+  letter-spacing:-.25px;
+  color:#111d38;
+}
+.home-row-copy small{
+  margin-top:8px!important;
+  font-size:13px!important;
+  line-height:1.3;
+  color:#697d95;
+}
+.home-row-meta strong{
+  font-size:14px!important;
+  color:#293e59;
+}
+.home-row-meta small{
+  margin-top:6px!important;
+  font-size:11.5px!important;
+  color:#7f8ea3;
+}
+.home-row-result{
+  min-width:72px;
+  font-size:13.5px!important;
+  color:#667990;
+}
+.home-row-result.ok{color:#278061}
+.home-readiness{
+  gap:10px;
+}
+.home-readiness span{
+  height:34px!important;
+  padding:0 12px!important;
+  border:1px solid #dbe5ec;
+  border-radius:999px;
+  background:rgba(252,254,255,.84)!important;
+  color:#63778d;
+  font-size:12px!important;
+}
+.home-readiness span.ok{
+  border-color:#d5e8de;
+  background:#edf8f3!important;
+  color:#2d795b;
+}
+.home-readiness i{width:8px;height:8px}
+
+/* Startup is one compact final line, followed by intentional blank canvas. */
+.home-startup-row{
+  width:100%;
+  min-height:66px!important;
+  grid-template-columns:42px 108px minmax(0,1fr) auto!important;
+  gap:14px!important;
+  margin:0!important;
+  padding:0 4px 0 13px;
+  border:0!important;
+}
+.startup-row-icon{
+  width:38px;height:38px;
+  border-radius:12px;
+  color:#60798f;
+  background:#eef3f7;
+}
+.startup-row-icon svg{width:22px;height:22px}
+.home-startup-row strong{
+  font-size:14px!important;
+  color:#293e59;
+}
+.home-startup-row>span:nth-child(3){
+  font-size:12.5px!important;
+  color:#72859a;
+}
+.home-startup-row button{
+  height:34px;
+  padding:0 11px;
+  border-radius:9px;
+  font-size:12px;
+}
+.home-startup-row button:hover{background:#eaf4fb}
+
+/* Keep the same DavBridge white-raised vs transparent-information hierarchy elsewhere. */
+.secondary-button,
+.option-row select,
+.model-config-row select,
+.settings-row select,
+.batch-keywords input,
+.batch-output-button,
+.color-row input[type="color"]{
+  background:rgba(252,254,255,.96)!important;
+}
+.page-feature,
+.row-icon,
+.live-module-icon,
+.batch-tool-icon,
+.mini-model-icon,
+.home-row-feature,
+.home-module-icon{
+  box-shadow:none!important;
+}
+.settings-feature{
+  color:#7046ea!important;
+  background:linear-gradient(145deg,#f1edff,#e5ddff)!important;
+}
+.batch-feature{
+  color:#1688e8!important;
+  background:linear-gradient(145deg,#eef8ff,#dfefff)!important;
+}
+.model-feature{
+  color:#7046ea!important;
+  background:linear-gradient(145deg,#f1edff,#e5ddff)!important;
+}
+.docs-feature{
+  color:#18a56b!important;
+  background:linear-gradient(145deg,#ecfbf4,#daf5e8)!important;
+}
+
+@media(max-width:999px){
+  .app-shell{grid-template-columns:204px minmax(0,1fr)!important}
+  .sidebar{padding:28px 10px 12px 14px!important}
+  .side-brand{padding:0 8px 22px 12px}
+  .brand-mark{width:48px;height:48px}
+  .brand-copy h1{font-size:21px}
+  .side-nav{gap:5px;padding-left:8px}
+  .side-nav button{height:45px;padding:0 12px;font-size:14px}
+  .side-nav svg{width:22px;height:22px}
+  .side-secondary{margin-left:8px;margin-right:5px;padding-top:10px}
+
+  .home-page{
+    padding:20px 26px 12px 22px!important;
+  }
+  .home-control-head{
+    min-height:96px;
+    grid-template-columns:52px 150px minmax(160px,1fr) 118px;
+    gap:14px;
+    padding:0 0 14px;
+  }
+  .home-module-icon{width:50px;height:50px;border-radius:15px}
+  .home-module-icon svg{width:29px;height:29px}
+  .home-control-copy h2{font-size:24px}
+  .home-control-copy small{margin-top:6px;font-size:11px}
+  .home-control-state{grid-template-columns:32px minmax(0,1fr);gap:9px}
+  .home-state-icon{width:32px;height:32px}
+  .home-state-icon svg{width:19px;height:19px}
+  .home-control-state strong{font-size:12.5px}
+  .home-control-state small{font-size:9.5px}
+  .home-action-slot,.home-primary-action{width:118px;min-width:118px}
+  .home-primary-action{height:41px;min-height:41px;font-size:11px}
+
+  .home-status-list{
+    grid-template-rows:repeat(4,82px)!important;
+    padding:0!important;
+  }
+  .home-control-row{
+    min-height:82px!important;
+    grid-template-columns:50px minmax(150px,1fr) minmax(160px,auto) 68px!important;
+    gap:14px!important;
+  }
+  .home-row-feature{width:48px;height:48px;border-radius:15px}
+  .home-row-feature svg{width:27px;height:27px}
+  .home-row-copy h3{font-size:16px!important}
+  .home-row-copy small{margin-top:5px!important;font-size:10.8px!important}
+  .home-row-meta strong{font-size:11.5px!important}
+  .home-row-meta small{margin-top:4px!important;font-size:9.2px!important}
+  .home-row-result{font-size:11.5px!important}
+  .home-readiness{gap:5px}
+  .home-readiness span{height:28px!important;padding:0 8px!important;font-size:9.5px!important}
+  .home-startup-row{
+    min-height:54px!important;
+    grid-template-columns:34px 82px minmax(0,1fr) auto!important;
+    padding:0!important;
+    gap:9px!important;
+  }
+  .startup-row-icon{width:32px;height:32px}
+  .startup-row-icon svg{width:19px;height:19px}
+  .home-startup-row strong{font-size:12px!important}
+  .home-startup-row>span:nth-child(3){font-size:10.5px!important}
+}
