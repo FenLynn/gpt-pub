@@ -8,31 +8,31 @@
 
 当前 stable/main 源码基线：**v0.4.26**。
 
-当前实验候选：**v0.5.0**，仅位于 `p103-exp`，尚未授权提升 stable/main。
+当前实验候选：**v0.5.1**，仅位于 `p103-exp`，尚未授权提升 stable/main。
 
-v0.5.0 功能代码 head：
+v0.5.1 验证 head：
 
 ```text
-488697e2d7b490a3d681750ae2810a194477a6d4
+f85ca5f7cd82d25226b0ffb3f944487f0cd55eb3
 ```
 
-完整 P103 CI run：`34839817188`，五项全绿，Core Smoke 20/20。
+完整 P103 CI run：`34842273545`，五项全绿，Core Smoke 20/20。
 
 Windows candidate：
 
 ```text
-DavBridge-v0.5.0-win-x64
-Artifact ID 10345802101
-Artifact ZIP SHA256 b8d087fc107b2964de5d73e1a501e9fb281b4d8035fc6f28d70e42240f89f33c
-EXE bytes 2516571
-EXE SHA256 3c1fbc49a19da04d1f14efd01704befbfa73badc0e63ca429540303c6edcbae7
+DavBridge-v0.5.1-win-x64
+Artifact ID 10347045725
+Artifact ZIP SHA256 2c8430c73f1c2a5142220454bb274be0dabb0b46a91821d1b11b417d4f855a71
+EXE bytes 2524763
+EXE SHA256 9856ed8cddbfcb0c2050f39a24fe9b9c2c7883896475a5f6a232d0f9387b4413
 ```
 
-Web UI preview Artifact ID：`10346095118`。
+Web UI preview Artifact ID：`10346279073`。
 
 Windows native-host self-test 已通过 `dataPortabilityV050=true`，原有 config/state/reconcile/product sidecar 恢复、runtime session、4:3 窗口迁移、background wake 和健康账本测试继续通过。
 
-v0.4.26 stable/main head 当前为 `9579bf0207862f5b6da81b5a3edf87026c156b11`。v0.5.0 没有 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
+v0.4.26 stable/main head 当前为 `9579bf0207862f5b6da81b5a3edf87026c156b11`。v0.5.1 没有 stable/main 提升授权，也没有正式 tag 或 GitHub Release 授权。
 
 ## v0.4.25 surface 色阶收束
 
@@ -310,3 +310,19 @@ v0.5.0 数据可发现与迁移主题已经完成代码实现和自动化验证�
 5. 使用非生产测试目录验证 DataRoot 迁移和恢复。
 
 未获得用户明确授权前，不提升 stable/main，也不创建正式 Release。
+
+
+## v0.5.1 About 与数据管理分层
+
+v0.5.1 只调整 v0.5 数据中心的信息架构。
+
+About 恢复轻量摘要，只保留持久数据、最近备份和数据管理入口。完整文件与目录清单进入独立 `data` 二级页。
+
+二级页顶部明确区分：
+
+```text
+持久数据目录  可修改
+本机运行目录  固定
+```
+
+随后单独显示备份与恢复、关键持久数据、本机运行数据。CI 新增 `data-1100x825.png` 视觉预览。
