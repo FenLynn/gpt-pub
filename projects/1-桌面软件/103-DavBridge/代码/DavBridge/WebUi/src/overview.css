@@ -1073,7 +1073,7 @@
 
 /* About */
 .about-card{
-  width:min(500px,90%);
+  width:min(620px,94%);
   padding:34px;
   border:1px solid rgba(211,223,232,.75);
   border-radius:22px;
