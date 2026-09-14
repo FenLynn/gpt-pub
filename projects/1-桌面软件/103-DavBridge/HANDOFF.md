@@ -18,36 +18,36 @@
 
 ## 2. 当前版本与正式发布事实
 
-当前正式 Release 仍为 DavBridge v0.4.0。
+当前正式 GitHub Release 仍为 **DavBridge v0.4.0**。
 
 正式标签：`p103-v0.4.0`
 
 正式 Release commit：`94aa30fe488235b1a15065d54e6cf3b8c94fef47`
 
-当前稳定主线基线为 **v0.4.16**。它已经通过两级 PR 准入并进入 `p103-stable` 与 `main`，但没有创建 tag 或 GitHub Release，因此正式 Release 仍是 v0.4.0。
+当前稳定主线基线已经提升为 **DavBridge v0.4.26**。v0.4.26 已完成 `p103-exp → p103-stable → main` 两级准入，但本轮没有获得正式 tag 或 GitHub Release 授权，因此正式 Release 仍保持 v0.4.0。
 
-当前实验候选为 **v0.4.26**，只位于 `p103-exp`。这是当前 v0.4 最终实验候选。
-
-## 3. 最新完整验证代码基线
-
-当前稳定主线 v0.4.16：
+v0.4.26 主线源码准入提交：
 
 ```text
-main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
+829def0a9776da47fd432a0831fa666993781356
 ```
 
-当前实验版本：**v0.4.26**。
+该 SHA 是 v0.4.26 首次进入 `main` 的准入提交。后续纯文档收尾会继续追加正常 merge commit，因此新对话必须实时查询 `main / p103-stable / p103-exp` 的当前 head，不得把本 SHA 当作永久分支 tip。
 
-最后完成完整 P103 CI 的代码 head：
+当前没有新的 v0.4 实验版本。v0.4 功能扩张已经冻结，后续只处理真实缺陷和长期运行反馈；新的产品主题应单独评估 v0.5。
+
+## 3. 最新完整验证与准入链
+
+最终候选在进入 stable/main 前使用准确 `p103-exp` head：
 
 ```text
-3568eca17bda0b6674959c9897f6ec2dbebbb26f
+c9da993f465d1e216d30deb5f5cefd517b67b9ce
 ```
 
-对应 CI：
+对应完整 P103 CI：
 
 ```text
-run 34763904669
+run 34765050320
 scope          success
 core-smoke     success
 frontend       success
@@ -55,51 +55,48 @@ windows-build  success
 report-status  success
 ```
 
-Windows candidate：`DavBridge-v0.4.26-win-x64`
+Core Smoke：**20/20**。
 
-Artifact ID：`10319489203`
-
-Web UI preview Artifact ID：`10319379569`
-
-EXE：
+最终候选 Windows Artifact：
 
 ```text
-2467421 bytes
-SHA256 72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850
+DavBridge-v0.4.26-win-x64
+Artifact ID 10320800368
+Artifact ZIP SHA256 e699f320c4b899bb728c4be1013bc05fb68c0e8df4cba4057ff8e40353af2123
+EXE SHA256 3b0f8b56e0261290f6668cfce7f8d12909fd146fc5af0bd29cbb446cef28987f
 ```
 
-Artifact ZIP SHA256：
+Web UI preview Artifact ID：`10319959437`。
+
+两级准入链：
 
 ```text
-9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe
+p103-exp c9da993f...
+→ PR #432
+→ p103-stable 07fd8e69...
+→ PR #433
+→ main 829def0a...
 ```
 
-该 run 同时验证：
+PR #432 的准确 head CI run `34765239872` 五项全绿。
 
-- v0.4.20 运行观察连续性判定；
-- 超过 15 分钟的正常退出空窗和异常中断空窗都会使完整健康窗口失效；
-- 15 分钟以内的短重启不会被误判为长期观察中断；
-- v0.4.19 匿名健康账本和 schema 1 到 schema 2 的兼容升级继续通过；
-- About 1100×825 浏览器预览；
-- Core Smoke 20 项全部通过，其中新增持久化暂停、重启与最终收敛测试；
-- Windows single EXE；
-- Runtime 私人数据边界；
-- 既有 native-host self-test。
+`p103-stable` 合并后的 push CI run `34765423397` 全绿。
 
-本段之后若只有文档提交，仍以 `3568eca17bda0b6674959c9897f6ec2dbebbb26f` 作为最后完整构建验证的 v0.4.26 代码基线。
+PR #433 的准确 stable head CI run `34765464456` 五项全绿，同时 Repository hygiene run `34765464521` 通过。
 
-## 4. 当前分支快照
+main 准入后的 Repository hygiene run `34765658303` 通过。
 
-当前稳定分支关系：
+该验证链继续覆盖生产 UI 所有权、Vue typecheck/build、九张跨页面视觉预览、Runtime 私人数据边界、Windows single EXE、native-host self-test、匿名健康账本、observation continuity，以及持久化暂停与重启收敛。
 
-```text
-main         73aefcf04570180bb9526a43cf805aff1e7673b3
-p103-stable  73aefcf04570180bb9526a43cf805aff1e7673b3
-```
+自动化测试不冒充真实多日 Windows 运行证明。长期后台、真实睡眠恢复和真实网络切换继续作为稳定版运行观察项，发现真实问题后按追加修复处理。
 
-`p103-exp` 已在 stable/main 之上进入 v0.4.26 最终收束候选。当前最后完整验证代码 head 为 `3568eca17bda0b6674959c9897f6ec2dbebbb26f`。由于本文件同步后还会产生纯文档提交，新对话必须实时查询 `p103-exp` head、ahead/behind 与最新成功 CI，不得把文档中的代码 SHA 当作分支永久 head。
+## 4. 当前分支策略
 
-v0.4.26 当前未提升 stable/main。真实 Windows 最终验收仍是提升前最后一道门。
+v0.4.26 已经进入 stable/main。完成本次纯文档收尾后，`main`、`p103-stable` 和未进入下一开发阶段的 `p103-exp` 应再次同步到同一最新主线 head。
+
+因此新对话恢复时必须先实时查询三条长期分支关系。若 `p103-exp` 没有新的独有开发提交，应把它视为已冻结的 v0.4.26 基线，而不是继续默认滚动 v0.4.27。
+
+正式 Release 仍为 v0.4.0。stable/main 准入不构成 Release 授权。
 
 ## 5. 当前架构
 
@@ -583,35 +580,35 @@ Runtime、Artifact、Release、源码和 CI 不得包含真实 WebDAV 凭据、�
 
 ## 9. 当前准确断点
 
-稳定主线在本轮提升前仍为 v0.4.16：
+**v0.4.26 的功能开发与 stable/main 准入已经完成。**
 
-```text
-main = p103-stable = 73aefcf04570180bb9526a43cf805aff1e7673b3
-```
+当前产品状态：
 
-当前最终候选为 **v0.4.26**，位于 `p103-exp`。
+- stable/main 稳定基线：v0.4.26；
+- 正式 GitHub Release：仍为 v0.4.0；
+- 不存在已授权的 v0.4.26 tag 或 GitHub Release；
+- v0.4 不再主动增加普通功能；
+- `p103-exp` 在没有新开发时应与最新 main 同步；
+- 长期后台、真实网络和睡眠恢复继续作为稳定版实际运行观察项。
 
-最后完整验证代码 head：
+最后完整候选验证 head：`c9da993f465d1e216d30deb5f5cefd517b67b9ce`。
 
-```text
-3568eca17bda0b6674959c9897f6ec2dbebbb26f
-```
+最后完整候选 CI：`34765050320`，五项全绿，Core Smoke 20/20。
 
-完整 CI run：`34763904669`，五个 jobs 全部 success。
+稳定准入 PR：#432。
 
-Windows candidate Artifact ID：`10319489203`。
+主线准入 PR：#433。
 
-EXE：`2467421 bytes`，SHA256 `72698de0fcd2a1b0c4d726959a97a5b7359a22feb0cee03f0bdbb3d819873850`。
+v0.4.26 首次进入 main 的源码准入提交：`829def0a9776da47fd432a0831fa666993781356`。
 
-Artifact ZIP SHA256：`9615ae2686a96dd9c14a3a51e77c5f5c127481a400ea90f37652442113e9e7fe`。
+后续纯文档收尾会继续追加 merge commit，因此**不要**用上面的 admission SHA 猜测当前 branch tip。每次接续先查 live Git。
 
-Web UI preview Artifact ID：`10319379569`。预览覆盖总览多尺寸、转移、回收站、文档与 About。
+下一阶段只有两种合理入口：
 
-Core Smoke 为 20/20。Windows native self-test、Runtime 私人数据边界、生产 UI 所有权检查与 single EXE 构建均通过。
+1. 真实运行发现缺陷，按兼容修复处理；
+2. 出现明显的新产品主题，先论证 v0.5，再恢复功能开发。
 
-用户已在当前会话明确要求“把这些全部收完”，授权结束 v0.4.26 的候选阶段并执行 `p103-exp → p103-stable → main` 的两级准入收束。该授权用于稳定主线提升，不构成正式 tag 或 GitHub Release 授权。
-
-本次收尾不把 CI 描述成真实多日 Windows 运行证明。长期后台、真实网络切换与睡眠恢复继续作为稳定版实际运行观察项；若后续暴露真实问题，以追加修复处理，不重写本次历史。
+不因为版本号推进而继续制造 v0.4.27、v0.4.28。
 
 ## 10. 新对话固定读取顺序
 
