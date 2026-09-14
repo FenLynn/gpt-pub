@@ -1104,11 +1104,18 @@ jobs:
           $ErrorActionPreference='Stop'
           Remove-Item publish/LocalSub-crash.log -Force -ErrorAction SilentlyContinue
           Remove-Item publish/Logs -Recurse -Force -ErrorAction SilentlyContinue
+          # Smoke tests and normal execution may create portable runtime state.
+          # Data belongs to the user's working copy and must never ship in a fresh green package.
+          Remove-Item publish/Data -Recurse -Force -ErrorAction SilentlyContinue
           # Real WebView2 smoke creates a disposable browser profile beside the EXE.
           # It is runtime state, not a portable delivery asset.
           Remove-Item publish/WebView2 -Recurse -Force -ErrorAction SilentlyContinue
+          if (Test-Path publish/Data) { throw 'Portable runtime Data leaked into portable package' }
           if (Test-Path publish/WebView2) { throw 'WebView2 user-data/profile leaked into portable package' }
-          foreach ($private in @('config.json','state.json','history.json','Cookies','History','Login Data')) {
+          if (Get-ChildItem publish -Recurse -Force -Filter 'queue-state.json' -ErrorAction SilentlyContinue) {
+            throw 'Batch queue runtime state leaked into portable package'
+          }
+          foreach ($private in @('config.json','state.json','history.json','queue-state.json','Cookies','History','Login Data')) {
             if (Get-ChildItem publish -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Private/runtime Data leaked into portable package: $private" }
           }
           if (-not (Test-Path publish/LocalSub.exe)) { throw 'LocalSub.exe missing from portable package' }
@@ -1129,6 +1136,10 @@ jobs:
           $verify=Join-Path $env:RUNNER_TEMP 'localsub-package-verify'
           Remove-Item $verify -Recurse -Force -ErrorAction SilentlyContinue
           Expand-Archive LocalSub-candidate-win-x64-net8.zip -DestinationPath $verify -Force
+          if (Test-Path (Join-Path $verify 'Data')) { throw 'Re-extracted candidate unexpectedly contains runtime Data' }
+          if (Get-ChildItem $verify -Recurse -Force -Filter 'queue-state.json' -ErrorAction SilentlyContinue) {
+            throw 'Re-extracted candidate unexpectedly contains batch queue runtime state'
+          }
           foreach ($line in Get-Content (Join-Path $verify 'MANIFEST-SHA256.txt')) {
             if ([string]::IsNullOrWhiteSpace($line)) { continue }
             $parts=$line -split "`t"
