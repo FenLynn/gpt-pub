@@ -91,6 +91,7 @@ internal static class Program
             var stateBackupRecovery = ValidateStateBackupRecovery(recoveryRoot);
             var reconcileBackupRecovery = ValidateReconcileBackupRecovery(recoveryRoot);
             var productSidecarBackupRecovery = ProductExperienceV044.ValidateBackupRecoveryForSelfTest(recoveryRoot);
+            var dataPortabilityV050 = DataManagementV050.ValidateForSelfTest(Path.Combine(recoveryRoot, "data-v050"));
             var operationalHealthLedger = ProductExperienceV044.ValidateOperationalHealthForSelfTest();
             var operationalHealthPersistence = ProductExperienceV044.ValidateOperationalLedgerPersistenceForSelfTest(recoveryRoot);
             var operationalObservationContinuity = ProductExperienceV044.ValidateObservationContinuityForSelfTest();
@@ -119,6 +120,7 @@ internal static class Program
                 stateBackupRecovery,
                 reconcileBackupRecovery,
                 productSidecarBackupRecovery,
+                dataPortabilityV050,
                 operationalHealthLedger,
                 operationalHealthPersistence,
                 operationalObservationContinuity,

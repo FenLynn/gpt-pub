@@ -7,12 +7,14 @@ using Microsoft.Win32;
 namespace DavBridge;
 
 internal sealed record AppPaths(
+    string DataRoot,
     string RoamingRoot,
     string LocalRoot,
     string TempRoot,
     string ConfigPath,
     string StatePath,
-    string SecretsPath)
+    string SecretsPath,
+    string BootstrapPath)
 {
     public static AppPaths Create()
     {
@@ -24,15 +26,19 @@ internal sealed record AppPaths(
         if (string.IsNullOrWhiteSpace(localBase))
             localBase = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-        var roaming = Path.Combine(roamingBase, "DavBridge");
+        var defaultDataRoot = Path.Combine(roamingBase, "DavBridge");
         var local = Path.Combine(localBase, "DavBridge");
+        var bootstrap = Path.Combine(local, "bootstrap.json");
+        var dataRoot = DataBootstrapV050.ResolveDataRoot(defaultDataRoot, bootstrap);
         return new AppPaths(
-            roaming,
+            dataRoot,
+            dataRoot,
             local,
             Path.Combine(local, "Temp"),
-            Path.Combine(roaming, "config.json"),
-            Path.Combine(roaming, "state.json"),
-            Path.Combine(roaming, "secrets.dat"));
+            Path.Combine(dataRoot, "config.json"),
+            Path.Combine(dataRoot, "state.json"),
+            Path.Combine(dataRoot, "secrets.dat"),
+            bootstrap);
     }
 }
 
