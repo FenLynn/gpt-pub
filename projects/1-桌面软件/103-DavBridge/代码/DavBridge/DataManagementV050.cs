@@ -54,21 +54,45 @@ internal static class DataBootstrapV050
     public static string ResolveDataRoot(string defaultRoot, string bootstrapPath)
     {
         var fallback = Path.GetFullPath(defaultRoot);
+        var backupPath = bootstrapPath + ".bak";
+        if (TryRead(bootstrapPath, out var primary))
+            return primary;
+
+        if (TryRead(backupPath, out var recovered))
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(bootstrapPath)!);
+                File.Copy(backupPath, bootstrapPath, true);
+            }
+            catch
+            {
+            }
+            return recovered;
+        }
+
+        if (File.Exists(bootstrapPath) || File.Exists(backupPath))
+            throw new InvalidDataException("DavBridge 数据目录指针 bootstrap.json 及其备份均无法读取。为避免误用空数据目录，程序已停止自动回退。");
+
+        SetDataRoot(bootstrapPath, fallback);
+        return fallback;
+    }
+
+    private static bool TryRead(string path, out string dataRoot)
+    {
+        dataRoot = string.Empty;
+        if (!File.Exists(path)) return false;
         try
         {
-            if (File.Exists(bootstrapPath))
-            {
-                var state = JsonSerializer.Deserialize<BootstrapState>(File.ReadAllText(bootstrapPath), JsonOptions);
-                if (state is not null && !string.IsNullOrWhiteSpace(state.DataRoot))
-                    return Path.GetFullPath(Environment.ExpandEnvironmentVariables(state.DataRoot.Trim()));
-            }
+            var state = JsonSerializer.Deserialize<BootstrapState>(File.ReadAllText(path), JsonOptions);
+            if (state is null || string.IsNullOrWhiteSpace(state.DataRoot)) return false;
+            dataRoot = Path.GetFullPath(Environment.ExpandEnvironmentVariables(state.DataRoot.Trim()));
+            return true;
         }
         catch
         {
+            return false;
         }
-
-        try { SetDataRoot(bootstrapPath, fallback); } catch { }
-        return fallback;
     }
 
     public static void SetDataRoot(string bootstrapPath, string dataRoot)
@@ -324,6 +348,8 @@ internal static class DataManagementV050
             File.WriteAllText(Path.Combine(paths.LocalRoot, "product-experience.json"), "{\"sample\":\"experience\"}");
 
             DataBootstrapV050.SetDataRoot(bootstrap, data);
+            DataBootstrapV050.SetDataRoot(bootstrap, data);
+            File.WriteAllText(bootstrap, "{broken");
             if (!string.Equals(DataBootstrapV050.ResolveDataRoot(Path.Combine(root, "fallback"), bootstrap), Path.GetFullPath(data), StringComparison.OrdinalIgnoreCase))
                 return false;
 
