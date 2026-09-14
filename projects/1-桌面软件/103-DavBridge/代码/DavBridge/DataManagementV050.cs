@@ -224,7 +224,7 @@ internal static class DataManagementV050
             "DavBridge-before-restore-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".zip");
         CreateBackup(paths, safetyBackup, false);
 
-        var staging = Path.Combine(paths.LocalRoot, "RestoreStaging", Guid.NewGuid().ToString("N"));
+        var staging = Path.Combine(paths.TempRoot, "RestoreStaging", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(staging);
         var restored = 0;
         var secretsSkipped = false;
@@ -278,6 +278,8 @@ internal static class DataManagementV050
 
         Directory.CreateDirectory(target);
         ProbeWritable(target);
+        if (Directory.EnumerateFileSystemEntries(target).Any())
+            throw new InvalidOperationException("目标数据目录必须为空。为避免覆盖其他文件，请选择或新建一个空目录。");
 
         foreach (var name in PersistentFileNames())
         {
@@ -373,6 +375,7 @@ internal static class DataManagementV050
             new Descriptor("secrets", "secrets.dat", "凭据", paths.SecretsPath, "Windows DPAPI CurrentUser 保护的 WebDAV 凭据。", "本机可恢复，跨 Windows 用户可能跳过", false, true),
             new Descriptor("backups", "Backups", "备份目录", GetBackupDirectory(paths), "默认保存手动备份与恢复前自动安全快照。", "自身不嵌套进入备份包", true, true),
             new Descriptor("bootstrap", "bootstrap.json", "固定入口", paths.BootstrapPath, "只保存唯一持久数据目录位置。固定留在 LocalAppData。", "不随迁移包恢复", false, false),
+            new Descriptor("bootstrap-bak", "bootstrap.json.bak", "固定入口备份", paths.BootstrapPath + ".bak", "上一次 bootstrap 指针的自动回退副本。", "不随迁移包恢复", false, false),
             new Descriptor("experience", "product-experience.json", "体验记录", Path.Combine(local, "product-experience.json"), "About 健康、活动、初始化与观察连续性。", "迁移备份", false, false),
             new Descriptor("experience-bak", "product-experience.json.bak", "体验备份", Path.Combine(local, "product-experience.json.bak"), "体验记录的自动回退副本。", "迁移备份", false, false),
             new Descriptor("window", "window.json", "本机外观", Path.Combine(local, "window.json"), "窗口位置、尺寸与最大化状态。", "不迁移", false, false),
