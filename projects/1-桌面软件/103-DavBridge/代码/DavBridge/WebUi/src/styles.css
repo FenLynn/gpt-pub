@@ -49,94 +49,33 @@ button:disabled{cursor:default;opacity:.48}
 }
 
 
-.about-summary-row{grid-template-columns:74px minmax(0,1fr) auto;gap:12px}
-.about-summary-row>strong{text-align:left;color:#526980}
-.about-summary-row>em{
-  min-width:42px;text-align:center;padding:4px 7px;border-radius:999px;
-  background:#edf6fb;color:#4c86a8;font-size:8.8px;font-style:normal;font-weight:650
-}
-.about-summary-row>button{
-  min-width:46px;height:25px;padding:0 9px;border:0;border-radius:8px;
-  background:#e8f4fb;color:#237dad;font:600 9.5px "Segoe UI",sans-serif
-}
-.about-summary-row>button:hover{background:#dceef8}
-.about-summary-row>button:disabled{opacity:.5}
-.about-data-section{margin-top:13px}
 
-.data-page{overflow:auto;scrollbar-width:none}
-.data-page::-webkit-scrollbar{width:0}
-.data-workspace{width:min(820px,100%);margin:0 auto;padding:2px 0 28px}
-.data-head{display:flex;align-items:flex-start;gap:13px;margin-bottom:20px}
-.data-back{
-  width:32px;height:32px;margin-top:2px;border:0;border-radius:10px;background:#eaf3f8;
-  color:#3f789b;font-size:24px;line-height:1;display:grid;place-items:center
+/* v0.5.2 About uses two concise tabs. Data maintenance lives in native Settings. */
+.about-hero{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:18px;text-align:left}
+.about-hero .about-logo{margin:0;flex:none}
+.about-title-line{display:flex;align-items:baseline;gap:9px}
+.about-title-line h2{margin:0;font-size:27px;line-height:1.1;color:#16243d}
+.about-title-line b{
+  padding:3px 7px;border-radius:999px;background:#eaf4fa;color:#5f8198;
+  font-size:10.5px;font-weight:650
 }
-.data-back:hover{background:#dfeef6}
-.data-head>div{min-width:0}
-.data-head span{display:block;color:#7e90a2;font-size:9.5px;font-weight:650}
-.data-head h2{margin:2px 0 4px;color:#17243e;font-size:22px;line-height:1.15}
-.data-head p{margin:0;color:#6f8193;font-size:11px}
-
-.data-location-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.data-location{
-  min-width:0;padding:17px 18px;border:1px solid #dce8ef;border-radius:18px;
-  background:rgba(245,250,253,.86)
+.about-hero p{margin:5px 0 0;color:#6f8294;font-size:13px;line-height:1.5}
+.about-tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0 0 13px;padding:4px;
+  border-radius:12px;background:#eaf2f7
 }
-.data-location.primary{background:rgba(239,248,253,.9)}
-.data-location.fixed{background:rgba(244,248,250,.78)}
-.data-location-title>div{display:flex;align-items:center;gap:8px}
-.data-location-title span{color:#334e64;font-size:12px;font-weight:680}
-.data-location-title strong{
-  padding:3px 7px;border-radius:999px;background:#e8f5fc;color:#2d84b7;font-size:8.5px
+.about-tabs button{
+  height:34px;border:0;border-radius:9px;background:transparent;color:#71869a;
+  font-size:12px;font-weight:620
 }
-.data-location.fixed .data-location-title strong{background:#edf1f4;color:#748493}
-.data-location-title small{display:block;margin-top:4px;color:#8797a6;font-size:9.3px}
-.data-location code{
-  display:block;margin:12px 0 13px;padding:8px 10px;border-radius:10px;background:#eaf3f8;
-  color:#496479;font-size:9.7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
-}
-.data-location.fixed code{background:#eef3f6}
-.data-location-actions{display:flex;justify-content:flex-end;gap:7px}
-.data-location-actions button,.data-backup-actions button{
-  min-height:30px;padding:0 11px;border:1px solid #d9e7ef;border-radius:9px;
-  background:#f9fcfe;color:#3d789a;font-size:9.8px;font-weight:620
-}
-.data-location-actions button.primary{border-color:#cfe5f2;background:#e8f5fc;color:#247fae}
-.data-location-actions button:disabled,.data-backup-actions button:disabled{opacity:.5}
-
-.data-backup-panel{
-  margin-top:14px;padding:14px 17px;border-top:1px solid #dfe8ee;border-bottom:1px solid #dfe8ee;
-  display:flex;align-items:center;justify-content:space-between;gap:18px
-}
-.data-backup-panel>div:first-child{min-width:0;display:grid;grid-template-columns:auto auto;gap:2px 10px;align-items:baseline}
-.data-backup-panel span{color:#62768a;font-size:10px}
-.data-backup-panel strong{color:#38536a;font-size:10.5px}
-.data-backup-panel small{
-  grid-column:1/-1;max-width:520px;color:#98a5b0;font-size:8.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
-}
-.data-backup-actions{display:flex;gap:7px;flex:none}
-
-.data-file-section{margin-top:18px}
-.data-file-section>header{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:6px;padding:0 2px}
-.data-file-section>header>div{display:flex;align-items:baseline;gap:8px}
-.data-file-section>header span{color:#38536a;font-size:11px;font-weight:680}
-.data-file-section>header small{color:#93a1ad;font-size:8.8px}
-.data-file-section>header p{margin:0;color:#95a2ae;font-size:8.8px}
-.data-file-table{border-top:1px solid #e2e9ee}
-.data-file-item{
-  min-height:37px;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(120px,.8fr) auto;
-  align-items:center;gap:12px;padding:6px 3px;border-bottom:1px solid #edf1f4;cursor:help
-}
-.data-file-item>div{min-width:0;display:flex;align-items:baseline;gap:8px}
-.data-file-item strong{min-width:0;color:#3f566b;font-size:9.8px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.data-file-item small{color:#9aa7b3;font-size:8.4px;white-space:nowrap}
-.data-file-item>span{color:#7d8fa0;font-size:8.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.data-file-item>b{color:#678096;font-size:8.8px;font-weight:560;white-space:nowrap}
-.data-file-item>b.missing{color:#a4adb5}
-
+.about-tabs button.active{background:#f9fcfe;color:#227caf;box-shadow:0 2px 8px rgba(53,91,119,.07)}
+.about-pane{border-top:1px solid #e4ebf0}
+.about-pane .about-row{min-height:42px;grid-template-columns:92px minmax(0,1fr);gap:18px;padding:8px 3px}
+.about-pane .about-row>span{font-size:12px;color:#76889a}
+.about-pane .about-row>strong{font-size:12.5px;color:#354f66;font-weight:620}
+.about-pane .about-row.warning>strong{color:#a06c1d}
 @media(max-width:999px){
-  .about-summary-row{grid-template-columns:64px minmax(0,1fr) auto;gap:8px}
-  .data-location-grid{grid-template-columns:1fr}
-  .data-file-item{grid-template-columns:minmax(0,1fr) auto}
-  .data-file-item>span{display:none}
+  .about-card{width:min(500px,94%)}
+  .about-title-line h2{font-size:25px}
+  .about-hero p{font-size:12.5px}
 }

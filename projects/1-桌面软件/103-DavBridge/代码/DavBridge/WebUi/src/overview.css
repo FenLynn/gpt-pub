@@ -1073,15 +1073,14 @@
 
 /* About */
 .about-card{
-  width:min(520px,92%);
+  width:min(560px,92%);
   padding:34px;
   border:1px solid rgba(211,223,232,.75);
   border-radius:22px;
   background:rgba(255,255,255,.78);
   box-shadow:0 14px 38px rgba(44,75,101,.045);
 }
-.about-card h2{font-size:24px;color:#16243d}
-.about-card>p{font-size:12px}
+
 
 /* Settings overlay is native but aligns with the same workspace width. */
 @media(max-width:999px){

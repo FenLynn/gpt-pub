@@ -301,55 +301,262 @@ internal sealed class SettingsDialog : Form
 
     private Control BuildDataPanel()
     {
-        var table = CategoryTable("数据与迁移");
         var paths = AppPaths.Create();
         var overview = DataManagementV050.BuildOverview(paths);
-        var list = new TableLayoutPanel
+        var content = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 1,
-            Margin = Padding.Empty,
-            BackColor = Color.FromArgb(248, 251, 254)
+            BackColor = Color.FromArgb(248, 251, 254),
+            Padding = new Padding(2, 2, 8, 8),
+            Margin = Padding.Empty
         };
-        list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        list.Controls.Add(MaintenanceRow(
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        content.Controls.Add(BuildDataDirectoryCard(
             "持久数据目录",
-            "唯一持久数据根目录。config、state、reconcile、兼容状态和 DPAPI 凭据都从这里读取。当前：" + paths.DataRoot,
-            "ChangeDataRootAsync",
-            "唯一入口",
-            true,
-            "更改"));
-        list.Controls.Add(MaintenanceRow(
-            "打开持久数据",
-            "直接在资源管理器中打开当前持久数据目录：" + paths.DataRoot,
+            "可修改",
+            "配置、迁移账本、对账状态、凭据和备份都从这里读取。这是唯一需要长期记住的数据目录。",
+            paths.DataRoot,
             "OpenDataRootAsync",
-            overview.PresentPersistentCount + " 项存在",
-            true,
-            "打开"));
-        list.Controls.Add(MaintenanceRow(
+            "ChangeDataRootAsync"));
+
+        content.Controls.Add(BuildDataDirectoryCard(
             "本机运行目录",
-            "这里保存 WebView2、Temp、窗口状态、运行会话和体验记录。它固定在本机，不是需要记忆的迁移根目录。当前：" + paths.LocalRoot,
+            "固定",
+            "保存缓存、临时文件、窗口状态、WebView2 和运行会话。位置固定，不参与 DataRoot 迁移。",
+            paths.LocalRoot,
             "OpenLocalDataRootAsync",
-            "本机数据",
-            true,
-            "打开"));
-        list.Controls.Add(MaintenanceRow(
-            "备份关键数据",
-            "生成带 manifest 与 SHA-256 的 DavBridge 备份 ZIP，包含核心持久数据和 product-experience 记录。DPAPI 凭据会标记为当前 Windows 用户绑定。",
-            "BackupDataAsync",
+            null));
+
+        content.Controls.Add(BuildDataActionCard(
+            "备份与恢复",
             overview.LastBackupText,
-            overview.HasManualBackup,
-            "备份"));
-        list.Controls.Add(MaintenanceRow(
-            "恢复关键数据",
-            "选择 DavBridge 备份 ZIP。恢复前自动生成当前数据安全快照，先完整校验，再原子替换。跨 Windows 用户无法解密的 DPAPI 凭据会自动跳过。",
-            "RestoreDataAsync",
-            "校验后恢复",
-            false,
-            "恢复"));
-        AddFull(table, list);
-        return WrapCategory(table);
+            string.IsNullOrWhiteSpace(overview.LastBackupPath) ? "尚未创建手动备份" : overview.LastBackupPath,
+            ("立即备份", "BackupDataAsync"),
+            ("从备份恢复", "RestoreDataAsync")));
+
+        content.Controls.Add(BuildDataInventoryCard(overview));
+        return WrapCategory(content);
+    }
+
+    private Control BuildDataDirectoryCard(string title, string badge, string description, string path, string openMethod, string? changeMethod)
+    {
+        var card = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 2,
+            Margin = new Padding(0, 0, 0, 12),
+            Padding = new Padding(16, 13, 16, 13),
+            BackColor = Color.FromArgb(241, 247, 251)
+        };
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        var titlePanel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty
+        };
+        var titleLabel = new Label
+        {
+            Text = title,
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 11.5F),
+            ForeColor = Color.FromArgb(43, 64, 82),
+            Margin = new Padding(0, 2, 8, 0)
+        };
+        var badgeLabel = new Label
+        {
+            Text = badge,
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 9.5F),
+            ForeColor = badge == "固定" ? Color.FromArgb(102, 119, 134) : Color.FromArgb(36, 122, 172),
+            BackColor = badge == "固定" ? Color.FromArgb(233, 239, 243) : Color.FromArgb(226, 242, 251),
+            Padding = new Padding(7, 3, 7, 3),
+            Margin = Padding.Empty
+        };
+        titlePanel.Controls.Add(titleLabel);
+        titlePanel.Controls.Add(badgeLabel);
+        card.Controls.Add(titlePanel, 0, 0);
+
+        var actions = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty
+        };
+        actions.Controls.Add(CreateDataButton("打开", openMethod, false));
+        if (!string.IsNullOrWhiteSpace(changeMethod))
+            actions.Controls.Add(CreateDataButton("更改位置", changeMethod, true));
+        card.Controls.Add(actions, 1, 0);
+
+        var detail = new Label
+        {
+            Text = description,
+            AutoSize = true,
+            MaximumSize = new Size(620, 0),
+            Font = new Font("Segoe UI", 10.5F),
+            ForeColor = Color.FromArgb(104, 124, 142),
+            Margin = new Padding(0, 8, 0, 0)
+        };
+        card.Controls.Add(detail, 0, 1);
+        card.SetColumnSpan(detail, 2);
+
+        var pathLabel = new Label
+        {
+            Text = path,
+            AutoSize = true,
+            MaximumSize = new Size(700, 0),
+            Font = new Font("Segoe UI", 10.5F),
+            ForeColor = Color.FromArgb(62, 88, 108),
+            BackColor = Color.FromArgb(233, 242, 247),
+            Padding = new Padding(10, 7, 10, 7),
+            Margin = new Padding(0, 9, 0, 0)
+        };
+        _tips.SetToolTip(pathLabel, path);
+        card.Controls.Add(pathLabel, 0, 2);
+        card.SetColumnSpan(pathLabel, 2);
+        return card;
+    }
+
+    private Control BuildDataActionCard(string title, string status, string detail, params (string Text, string Method)[] actions)
+    {
+        var card = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 2,
+            Margin = new Padding(0, 0, 0, 12),
+            Padding = new Padding(16, 12, 16, 12),
+            BackColor = Color.FromArgb(244, 249, 252)
+        };
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        var copy = new Panel { Dock = DockStyle.Fill, AutoSize = true, BackColor = Color.Transparent, Margin = Padding.Empty };
+        var titleLabel = new Label
+        {
+            Text = title + "    " + status,
+            Dock = DockStyle.Top,
+            Height = 25,
+            Font = new Font("Segoe UI Semibold", 11F),
+            ForeColor = Color.FromArgb(48, 71, 91)
+        };
+        var detailLabel = new Label
+        {
+            Text = detail,
+            Dock = DockStyle.Top,
+            Height = 25,
+            Font = new Font("Segoe UI", 10F),
+            ForeColor = Color.FromArgb(126, 143, 158),
+            AutoEllipsis = true
+        };
+        _tips.SetToolTip(detailLabel, detail);
+        copy.Controls.Add(detailLabel);
+        copy.Controls.Add(titleLabel);
+        card.Controls.Add(copy, 0, 0);
+
+        var actionPanel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty
+        };
+        foreach (var item in actions)
+            actionPanel.Controls.Add(CreateDataButton(item.Text, item.Method, item.Text == "立即备份"));
+        card.Controls.Add(actionPanel, 1, 0);
+        return card;
+    }
+
+    private Control BuildDataInventoryCard(DataOverviewV050 overview)
+    {
+        var card = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 2,
+            Margin = new Padding(0, 0, 0, 4),
+            Padding = new Padding(16, 12, 16, 12),
+            BackColor = Color.FromArgb(244, 249, 252)
+        };
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        var label = new Label
+        {
+            Text = "文件与目录清单\r\n" + overview.Files.Count + " 项受管理文件与目录，可查看用途、完整路径、状态和备份策略。",
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 10.8F),
+            ForeColor = Color.FromArgb(48, 71, 91),
+            Margin = Padding.Empty
+        };
+        card.Controls.Add(label, 0, 0);
+
+        var view = new Button
+        {
+            Text = "查看全部",
+            AutoSize = false,
+            Width = 82,
+            Height = 34,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(235, 246, 253),
+            ForeColor = Color.FromArgb(36, 101, 148),
+            Font = new Font("Segoe UI Semibold", 10F),
+            Margin = new Padding(8, 2, 0, 2),
+            TabStop = false
+        };
+        view.FlatAppearance.BorderSize = 0;
+        view.Click += (_, _) =>
+        {
+            using var dialog = new DataInventoryDialogV052(overview);
+            dialog.ShowDialog(this);
+        };
+        card.Controls.Add(view, 1, 0);
+        return card;
+    }
+
+    private Button CreateDataButton(string text, string methodName, bool primary)
+    {
+        var button = new Button
+        {
+            Text = text,
+            AutoSize = false,
+            Width = text.Length >= 4 ? 88 : 62,
+            Height = 34,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = primary ? Color.FromArgb(225, 241, 252) : Color.FromArgb(239, 247, 251),
+            ForeColor = Color.FromArgb(31, 112, 162),
+            Font = new Font("Segoe UI Semibold", 10F),
+            Margin = new Padding(6, 0, 0, 0),
+            TabStop = false
+        };
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(218, 238, 250);
+        button.Click += (_, _) => InvokeDataMaintenance(methodName);
+        return button;
+    }
+
+    private void InvokeDataMaintenance(string methodName)
+    {
+        var mainForm = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
+        if (mainForm is null) return;
+        DialogResult = DialogResult.Cancel;
+        Close();
+        mainForm.BeginInvoke(new Action(() =>
+        {
+            var task = UiCommandBridge.InvokeTask(mainForm, methodName);
+            if (task is not null) _ = task;
+        }));
     }
 
     private Control BuildSafetyPanel()
@@ -774,5 +981,71 @@ internal sealed class SettingsDialog : Form
         }
         panel.Controls.Add(control, 0, row);
         panel.SetColumnSpan(control, 2);
+    }
+}
+
+
+internal sealed class DataInventoryDialogV052 : Form
+{
+    public DataInventoryDialogV052(DataOverviewV050 overview)
+    {
+        Text = "DavBridge 文件与目录清单";
+        Icon = AppBranding.CreateIcon();
+        Width = 820;
+        Height = 590;
+        MinimumSize = new Size(720, 500);
+        StartPosition = FormStartPosition.CenterParent;
+        BackColor = Color.FromArgb(248, 251, 254);
+        Font = new Font("Segoe UI", 10.5F);
+
+        var shell = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(22, 18, 22, 16),
+            BackColor = BackColor
+        };
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var head = new Label
+        {
+            Text = "文件与目录清单\r\n这里列出 DavBridge 当前受管理的数据位置、用途和备份策略。",
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI Semibold", 11.5F),
+            ForeColor = Color.FromArgb(45, 66, 85)
+        };
+        shell.Controls.Add(head, 0, 0);
+
+        var list = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            GridLines = false,
+            HideSelection = false,
+            BorderStyle = BorderStyle.None,
+            BackColor = Color.FromArgb(244, 249, 252),
+            ForeColor = Color.FromArgb(54, 74, 91),
+            Font = new Font("Segoe UI", 10.5F)
+        };
+        list.Columns.Add("名称", 185);
+        list.Columns.Add("类别", 120);
+        list.Columns.Add("状态", 115);
+        list.Columns.Add("备份策略", 250);
+        foreach (var file in overview.Files)
+        {
+            var item = new ListViewItem(file.Label);
+            item.SubItems.Add(file.Category);
+            item.SubItems.Add(file.Status);
+            item.SubItems.Add(file.BackupPolicy);
+            item.ToolTipText = file.Path + Environment.NewLine + file.Purpose;
+            list.Items.Add(item);
+        }
+        list.ShowItemToolTips = true;
+        shell.Controls.Add(list, 0, 1);
+        Controls.Add(shell);
     }
 }

@@ -4,9 +4,12 @@ import { hasNativeBridge, invoke, onNotice, onSnapshot } from './bridge'
 import { mockSnapshot } from './mock'
 import type { DavBridgeSnapshot, PrimaryAction, RecycleGroup, RecycleKind } from './types'
 
-type Tab = 'overview' | 'transfer' | 'recycle' | 'docs' | 'settings' | 'about' | 'data'
-const previewTab = new URLSearchParams(window.location.search).get('tab')
-const initialTab:Tab = previewTab==='transfer'||previewTab==='recycle'||previewTab==='docs'||previewTab==='about'||previewTab==='data' ? previewTab : 'overview'
+type Tab = 'overview' | 'transfer' | 'recycle' | 'docs' | 'settings' | 'about'
+type AboutPanel = 'product' | 'status'
+const previewParams = new URLSearchParams(window.location.search)
+const previewTab = previewParams.get('tab')
+const initialTab:Tab = previewTab==='transfer'||previewTab==='recycle'||previewTab==='docs'||previewTab==='about' ? previewTab : 'overview'
+const aboutPanel = ref<AboutPanel>(previewParams.get('about')==='status' ? 'status' : 'product')
 const tab = ref<Tab>(initialTab)
 const recycleFilter = ref<RecycleKind>('observing')
 const snapshot = ref<DavBridgeSnapshot>(mockSnapshot)
@@ -183,11 +186,7 @@ const buildDateLabel = computed(() => {
   const date=new Date(snapshot.value.buildDate)
   return Number.isNaN(date.getTime()) ? snapshot.value.buildDate : date.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
 })
-const persistentDataFiles = computed(() => snapshot.value.data.files.filter(file => {
-  const root=snapshot.value.data.dataRoot.replace(/[\\/]+$/,'').toLowerCase()
-  return file.path.toLowerCase().startsWith(root + '\\') || file.path.toLowerCase().startsWith(root + '/')
-}))
-const localDataFiles = computed(() => snapshot.value.data.files.filter(file => !persistentDataFiles.value.includes(file)))
+
 
 function tipElement(event:Event){
   const node=event.target instanceof Element ? event.target : null
@@ -542,144 +541,22 @@ onBeforeUnmount(()=>{
       </article>
     </section>
 
-    <section v-else-if="tab==='data'" class="page data-page">
-      <article class="data-workspace">
-        <header class="data-head">
-          <button class="data-back" @click="tab='about'" aria-label="返回关于">‹</button>
-          <div>
-            <span>数据与迁移</span>
-            <h2>数据管理</h2>
-            <p>所有 DavBridge 数据位置、用途、备份范围和恢复入口都集中在这里。</p>
-          </div>
-        </header>
-
-        <section class="data-location-grid">
-          <article class="data-location primary">
-            <div class="data-location-title">
-              <div><span>持久数据目录</span><strong>可修改</strong></div>
-              <small>配置、迁移账本、对账状态、凭据和备份</small>
-            </div>
-            <code :title="snapshot.data.dataRoot">{{ snapshot.data.dataRoot }}</code>
-            <div class="data-location-actions">
-              <button @click="dataCommand('data.openRoot')" :disabled="busy">打开</button>
-              <button class="primary" @click="dataCommand('data.changeRoot')" :disabled="busy">更改位置</button>
-            </div>
-          </article>
-          <article class="data-location fixed">
-            <div class="data-location-title">
-              <div><span>本机运行目录</span><strong>固定</strong></div>
-              <small>缓存、临时文件、窗口状态、WebView2 和运行会话</small>
-            </div>
-            <code :title="snapshot.data.localRoot">{{ snapshot.data.localRoot }}</code>
-            <div class="data-location-actions">
-              <button @click="dataCommand('data.openLocal')" :disabled="busy">打开</button>
-            </div>
-          </article>
-        </section>
-
-        <section class="data-backup-panel">
-          <div>
-            <span>备份与恢复</span>
-            <strong>{{ snapshot.data.lastBackupText }}</strong>
-            <small>{{ snapshot.data.lastBackupPath || '尚未创建手动备份' }}</small>
-          </div>
-          <div class="data-backup-actions">
-            <button @click="dataCommand('data.backup')" :disabled="busy">立即备份</button>
-            <button @click="dataCommand('data.restore')" :disabled="busy">从备份恢复</button>
-          </div>
-        </section>
-
-        <section class="data-file-section">
-          <header><div><span>关键持久数据</span><small>{{ persistentDataFiles.length }} 项</small></div><p>随 DataRoot 一起迁移，按各自策略进入备份。</p></header>
-          <div class="data-file-table">
-            <div v-for="file in persistentDataFiles" :key="file.key" class="data-file-item has-tip" :data-tip="`${file.path}｜${file.purpose}`">
-              <div><strong>{{ file.label }}</strong><small>{{ file.category }}</small></div>
-              <span>{{ file.backupPolicy }}</span>
-              <b :class="{missing:!file.exists}">{{ file.status }}</b>
-            </div>
-          </div>
-        </section>
-
-        <section class="data-file-section">
-          <header><div><span>本机运行数据</span><small>{{ localDataFiles.length }} 项</small></div><p>固定保留在当前 Windows 用户下，不等同于持久 DataRoot。</p></header>
-          <div class="data-file-table">
-            <div v-for="file in localDataFiles" :key="file.key" class="data-file-item has-tip" :data-tip="`${file.path}｜${file.purpose}`">
-              <div><strong>{{ file.label }}</strong><small>{{ file.category }}</small></div>
-              <span>{{ file.backupPolicy }}</span>
-              <b :class="{missing:!file.exists}">{{ file.status }}</b>
-            </div>
-          </div>
-        </section>
-      </article>
-    </section>
-
     <section v-else class="page about-page">
       <article class="about-card">
-        <div class="about-logo"><span></span><span></span></div>
-        <h2>DavBridge</h2>
-        <p>安全、持续地维护 Zotero 单向强校验镜像。</p>
+        <div class="about-hero">
+          <div class="about-logo"><span></span><span></span></div>
+          <div>
+            <div class="about-title-line"><h2>DavBridge</h2><b>v{{ snapshot.version }}</b></div>
+            <p>安全、持续地维护 Zotero 单向强校验镜像。</p>
+          </div>
+        </div>
 
-        <section class="about-section about-section-primary" aria-label="当前状态">
-          <div class="about-section-title">当前状态</div>
-          <div class="about-row has-tip" :data-tip="snapshot.health.summary">
-            <span>运行</span>
-            <strong>{{ snapshot.engineState }}<template v-if="snapshot.routeStatus && snapshot.routeStatus !== snapshot.engineState"> · {{ snapshot.routeStatus }}</template></strong>
-          </div>
-          <div class="about-row">
-            <span>会话</span>
-            <strong>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</strong>
-          </div>
-          <div class="about-row has-tip" :data-tip="quotaTip">
-            <span>周期</span>
-            <strong>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : '未校准' }} · {{ cycleTrafficText }}</strong>
-          </div>
-          <div
-            class="about-row has-tip"
-            :class="{warning:snapshot.operationalHealth.warningCount>0||snapshot.operationalHealth.observationGap}"
-            :data-tip="healthWindowNote || `完成 ${snapshot.operationalHealth.completionCount}，警告 ${snapshot.operationalHealth.warningCount}，暂停 ${snapshot.operationalHealth.pauseCount}，网络等待 ${snapshot.operationalHealth.networkWaitCount}`"
-          >
-            <span>健康</span>
-            <strong>{{ healthWindowLabel }} · {{ healthStatusText }}</strong>
-          </div>
-          <div v-if="initializedCount < snapshot.initialization.length" class="about-row warning">
-            <span>初始化</span>
-            <strong>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</strong>
-          </div>
-        </section>
+        <nav class="about-tabs" aria-label="关于信息">
+          <button :class="{active:aboutPanel==='product'}" @click="aboutPanel='product'">关于</button>
+          <button :class="{active:aboutPanel==='status'}" @click="aboutPanel='status'">运行状态</button>
+        </nav>
 
-        <section class="about-section" aria-label="最近活动">
-          <div class="about-section-title">最近活动</div>
-          <div class="about-row has-tip" :class="{warning:!!recentWarning}" :data-tip="recentWarning ? recentWarning.detail : '最近活动中没有警告事件'">
-            <span>异常</span>
-            <strong>{{ recentWarningText }}</strong>
-          </div>
-          <div class="about-row has-tip" :data-tip="recentActivityTip">
-            <span>记录</span>
-            <strong>{{ recentActivityText }}</strong>
-          </div>
-        </section>
-
-        <section class="about-section about-data-section" aria-label="数据与迁移">
-          <div class="about-section-title">数据与迁移</div>
-          <div class="about-row about-summary-row has-tip" :data-tip="`唯一持久数据目录，可在数据管理中安全迁移。当前：${snapshot.data.dataRoot}`">
-            <span>持久数据</span>
-            <strong>{{ snapshot.data.dataRoot }}</strong>
-            <em>可修改</em>
-          </div>
-          <div class="about-row about-summary-row has-tip" :data-tip="snapshot.data.lastBackupPath || '尚未创建手动备份'">
-            <span>最近备份</span>
-            <strong>{{ snapshot.data.lastBackupText }}</strong>
-            <button @click="dataCommand('data.backup')" :disabled="busy">备份</button>
-          </div>
-          <div class="about-row about-summary-row">
-            <span>数据管理</span>
-            <strong>{{ snapshot.data.files.length }} 项文件与目录</strong>
-            <button @click="tab='data'">查看详情</button>
-          </div>
-        </section>
-
-        <section class="about-section about-section-secondary" aria-label="软件信息">
-          <div class="about-section-title">软件信息</div>
+        <section v-if="aboutPanel==='product'" class="about-pane" aria-label="关于 DavBridge">
           <div class="about-row">
             <span>版本</span>
             <strong>v{{ snapshot.version }}</strong>
@@ -689,8 +566,43 @@ onBeforeUnmount(()=>{
             <strong>{{ snapshot.buildCommit || 'local' }} · {{ buildDateLabel }}</strong>
           </div>
           <div class="about-row">
-            <span>技术栈</span>
-            <strong>.NET 8 + WebView2 · Vue 3</strong>
+            <span>数据与备份</span>
+            <strong>设置 → 数据与迁移</strong>
+          </div>
+        </section>
+
+        <section v-else class="about-pane" aria-label="运行状态">
+          <div class="about-row has-tip" :data-tip="snapshot.health.summary">
+            <span>运行</span>
+            <strong>{{ snapshot.engineState }}<template v-if="snapshot.routeStatus && snapshot.routeStatus !== snapshot.engineState"> · {{ snapshot.routeStatus }}</template></strong>
+          </div>
+          <div
+            class="about-row has-tip"
+            :class="{warning:snapshot.operationalHealth.warningCount>0||snapshot.operationalHealth.observationGap}"
+            :data-tip="healthWindowNote || `完成 ${snapshot.operationalHealth.completionCount}，警告 ${snapshot.operationalHealth.warningCount}，暂停 ${snapshot.operationalHealth.pauseCount}，网络等待 ${snapshot.operationalHealth.networkWaitCount}`"
+          >
+            <span>健康</span>
+            <strong>{{ healthWindowLabel }} · {{ healthStatusText }}</strong>
+          </div>
+          <div class="about-row has-tip" :data-tip="quotaTip">
+            <span>周期</span>
+            <strong>{{ snapshot.cycleId ? `Cycle ${snapshot.cycleId}` : '未校准' }} · {{ cycleTrafficText }}</strong>
+          </div>
+          <div class="about-row">
+            <span>会话</span>
+            <strong>{{ snapshot.runtime.uptimeText }} · {{ snapshot.runtime.previousExitText }}</strong>
+          </div>
+          <div class="about-row has-tip" :class="{warning:!!recentWarning}" :data-tip="recentWarning ? recentWarning.detail : '最近活动中没有警告事件'">
+            <span>最近异常</span>
+            <strong>{{ recentWarningText }}</strong>
+          </div>
+          <div class="about-row has-tip" :data-tip="recentActivityTip">
+            <span>最近记录</span>
+            <strong>{{ recentActivityText }}</strong>
+          </div>
+          <div v-if="initializedCount < snapshot.initialization.length" class="about-row warning">
+            <span>初始化</span>
+            <strong>{{ initializedCount }} / {{ snapshot.initialization.length }} 项完成</strong>
           </div>
         </section>
       </article>
