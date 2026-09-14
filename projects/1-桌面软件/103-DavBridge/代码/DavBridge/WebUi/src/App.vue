@@ -25,6 +25,7 @@ let detachSnapshot: (() => void) | undefined
 let detachNotice: (() => void) | undefined
 let toastTimer: number | undefined
 let noticeTimer: number | undefined
+let hoverTipTimer: number | undefined
 const isNative = hasNativeBridge()
 const coveragePercent = computed(() => Math.round(snapshot.value.coverage * 1000) / 10)
 const uploadFraction = computed(() => Math.min(1, snapshot.value.quota.uploadUsed / Math.max(1, snapshot.value.quota.uploadMax)))
@@ -199,12 +200,18 @@ function showGlobalTip(event:Event){
   if(related instanceof Node && target.contains(related)) return
   const value=target.dataset.tip?.trim()
   if(!value) return
-  const rect=target.getBoundingClientRect()
-  const above=rect.bottom+125>window.innerHeight && rect.top>140
-  const half=180
-  const left=Math.min(Math.max(rect.left+rect.width/2,half),Math.max(half,window.innerWidth-half))
-  hoverTip.value={text:value,left,top:above?rect.top-9:rect.bottom+9,above}
+  if(hoverTipTimer) window.clearTimeout(hoverTipTimer)
+  hoverTip.value=null
   activeTipTarget=target
+  hoverTipTimer=window.setTimeout(()=>{
+    if(activeTipTarget!==target || !target.isConnected) return
+    const rect=target.getBoundingClientRect()
+    const above=rect.bottom+125>window.innerHeight && rect.top>140
+    const half=180
+    const left=Math.min(Math.max(rect.left+rect.width/2,half),Math.max(half,window.innerWidth-half))
+    hoverTip.value={text:value,left,top:above?rect.top-9:rect.bottom+9,above}
+    hoverTipTimer=undefined
+  },500)
 }
 function hideGlobalTip(event:Event){
   if(!activeTipTarget) return
@@ -212,10 +219,17 @@ function hideGlobalTip(event:Event){
   if(related instanceof Node && activeTipTarget.contains(related)) return
   const target=tipElement(event)
   if(target!==activeTipTarget) return
+  if(hoverTipTimer) window.clearTimeout(hoverTipTimer)
+  hoverTipTimer=undefined
   hoverTip.value=null
   activeTipTarget=null
 }
-function clearGlobalTip(){ hoverTip.value=null; activeTipTarget=null }
+function clearGlobalTip(){
+  if(hoverTipTimer) window.clearTimeout(hoverTipTimer)
+  hoverTipTimer=undefined
+  hoverTip.value=null
+  activeTipTarget=null
+}
 function notify(message: string) { toast.value = message; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toast.value = '', 2600) }
 function showNotice(value:{ title:string; message:string; tone:string }) {
   notice.value=value
@@ -286,6 +300,7 @@ onBeforeUnmount(()=>{
   window.removeEventListener('resize',clearGlobalTip)
   if(toastTimer) window.clearTimeout(toastTimer)
   if(noticeTimer) window.clearTimeout(noticeTimer)
+  if(hoverTipTimer) window.clearTimeout(hoverTipTimer)
 })
 </script>
 

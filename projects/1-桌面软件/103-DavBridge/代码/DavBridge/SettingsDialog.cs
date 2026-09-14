@@ -25,8 +25,8 @@ internal sealed class SettingsDialog : Form
     private readonly ToolTip _tips = new()
     {
         AutoPopDelay = 12000,
-        InitialDelay = 350,
-        ReshowDelay = 100,
+        InitialDelay = 500,
+        ReshowDelay = 500,
         ShowAlways = true
     };
 
@@ -398,17 +398,9 @@ internal sealed class SettingsDialog : Form
             actions.Controls.Add(CreateDataButton("更改位置", changeMethod, true));
         card.Controls.Add(actions, 1, 0);
 
-        var detail = new Label
-        {
-            Text = description,
-            AutoSize = true,
-            MaximumSize = new Size(620, 0),
-            Font = new Font("Segoe UI", 10.5F),
-            ForeColor = Color.FromArgb(104, 124, 142),
-            Margin = new Padding(0, 8, 0, 0)
-        };
-        card.Controls.Add(detail, 0, 1);
-        card.SetColumnSpan(detail, 2);
+        _tips.SetToolTip(titleLabel, description);
+        _tips.SetToolTip(badgeLabel, description);
+        _tips.SetToolTip(titlePanel, description);
 
         var pathLabel = new Label
         {
@@ -419,10 +411,10 @@ internal sealed class SettingsDialog : Form
             ForeColor = Color.FromArgb(62, 88, 108),
             BackColor = Color.FromArgb(233, 242, 247),
             Padding = new Padding(10, 7, 10, 7),
-            Margin = new Padding(0, 9, 0, 0)
+            Margin = new Padding(0, 10, 0, 0)
         };
-        _tips.SetToolTip(pathLabel, path);
-        card.Controls.Add(pathLabel, 0, 2);
+        _tips.SetToolTip(pathLabel, description + Environment.NewLine + path);
+        card.Controls.Add(pathLabel, 0, 1);
         card.SetColumnSpan(pathLabel, 2);
         return card;
     }
@@ -441,27 +433,41 @@ internal sealed class SettingsDialog : Form
         card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var copy = new Panel { Dock = DockStyle.Fill, AutoSize = true, BackColor = Color.Transparent, Margin = Padding.Empty };
+        var copy = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty
+        };
         var titleLabel = new Label
         {
-            Text = title + "    " + status,
-            Dock = DockStyle.Top,
-            Height = 25,
-            Font = new Font("Segoe UI Semibold", 11F),
-            ForeColor = Color.FromArgb(48, 71, 91)
+            Text = title,
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 11.5F),
+            ForeColor = Color.FromArgb(48, 71, 91),
+            Margin = new Padding(0, 5, 10, 0)
         };
-        var detailLabel = new Label
+        var statusLabel = new Label
         {
-            Text = detail,
-            Dock = DockStyle.Top,
-            Height = 25,
-            Font = new Font("Segoe UI", 10F),
-            ForeColor = Color.FromArgb(126, 143, 158),
-            AutoEllipsis = true
+            Text = status,
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 10F),
+            ForeColor = Color.FromArgb(83, 119, 143),
+            BackColor = Color.FromArgb(233, 242, 247),
+            Padding = new Padding(7, 3, 7, 3),
+            Margin = new Padding(0, 2, 0, 0)
         };
-        _tips.SetToolTip(detailLabel, detail);
-        copy.Controls.Add(detailLabel);
+        var backupHint = string.IsNullOrWhiteSpace(detail) || detail == "尚未创建手动备份"
+            ? "生成带 manifest 与 SHA-256 的关键数据备份；恢复前会先校验并自动保存当前数据快照。"
+            : "最近备份：" + detail + Environment.NewLine + "生成和恢复都会执行 manifest 与 SHA-256 校验。";
+        _tips.SetToolTip(titleLabel, backupHint);
+        _tips.SetToolTip(statusLabel, backupHint);
+        _tips.SetToolTip(copy, backupHint);
         copy.Controls.Add(titleLabel);
+        copy.Controls.Add(statusLabel);
         card.Controls.Add(copy, 0, 0);
 
         var actionPanel = new FlowLayoutPanel
@@ -494,12 +500,13 @@ internal sealed class SettingsDialog : Form
 
         var label = new Label
         {
-            Text = "文件与目录清单\r\n" + overview.Files.Count + " 项受管理文件与目录，可查看用途、完整路径、状态和备份策略。",
+            Text = "文件与目录清单    " + overview.Files.Count + " 项",
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 10.8F),
+            Font = new Font("Segoe UI Semibold", 11.3F),
             ForeColor = Color.FromArgb(48, 71, 91),
-            Margin = Padding.Empty
+            Margin = new Padding(0, 5, 0, 0)
         };
+        _tips.SetToolTip(label, "查看每个受管理文件与目录的类别、状态、完整路径、用途和备份策略。");
         card.Controls.Add(label, 0, 0);
 
         var view = new Button
@@ -542,14 +549,23 @@ internal sealed class SettingsDialog : Form
         };
         button.FlatAppearance.BorderSize = 0;
         button.FlatAppearance.MouseOverBackColor = Color.FromArgb(218, 238, 250);
-        button.Click += (_, _) => InvokeDataMaintenance(methodName);
+        var keepSettingsOpen = methodName is "OpenDataRootAsync" or "OpenLocalDataRootAsync";
+        button.Click += (_, _) => InvokeDataMaintenance(methodName, keepSettingsOpen);
         return button;
     }
 
-    private void InvokeDataMaintenance(string methodName)
+    private void InvokeDataMaintenance(string methodName, bool keepSettingsOpen)
     {
         var mainForm = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
         if (mainForm is null) return;
+
+        if (keepSettingsOpen)
+        {
+            var task = UiCommandBridge.InvokeTask(mainForm, methodName);
+            if (task is not null) _ = task;
+            return;
+        }
+
         DialogResult = DialogResult.Cancel;
         Close();
         mainForm.BeginInvoke(new Action(() =>
@@ -987,6 +1003,15 @@ internal sealed class SettingsDialog : Form
 
 internal sealed class DataInventoryDialogV052 : Form
 {
+    private readonly ToolTip _tips = new()
+    {
+        AutoPopDelay = 12000,
+        InitialDelay = 500,
+        ReshowDelay = 500,
+        ShowAlways = true
+    };
+    private ListViewItem? _hoveredItem;
+
     public DataInventoryDialogV052(DataOverviewV050 overview)
     {
         Text = "DavBridge 文件与目录清单";
@@ -1012,11 +1037,13 @@ internal sealed class DataInventoryDialogV052 : Form
 
         var head = new Label
         {
-            Text = "文件与目录清单\r\n这里列出 DavBridge 当前受管理的数据位置、用途和备份策略。",
+            Text = "文件与目录清单",
             Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI Semibold", 11.5F),
-            ForeColor = Color.FromArgb(45, 66, 85)
+            Font = new Font("Segoe UI Semibold", 12F),
+            ForeColor = Color.FromArgb(45, 66, 85),
+            TextAlign = ContentAlignment.MiddleLeft
         };
+        _tips.SetToolTip(head, "这里列出 DavBridge 当前受管理的数据位置、用途和备份策略。");
         shell.Controls.Add(head, 0, 0);
 
         var list = new ListView
@@ -1041,10 +1068,22 @@ internal sealed class DataInventoryDialogV052 : Form
             item.SubItems.Add(file.Category);
             item.SubItems.Add(file.Status);
             item.SubItems.Add(file.BackupPolicy);
-            item.ToolTipText = file.Path + Environment.NewLine + file.Purpose;
+            item.Tag = file.Path + Environment.NewLine + file.Purpose;
             list.Items.Add(item);
         }
-        list.ShowItemToolTips = true;
+        list.ShowItemToolTips = false;
+        list.MouseMove += (_, e) =>
+        {
+            var item = list.GetItemAt(e.X, e.Y);
+            if (ReferenceEquals(item, _hoveredItem)) return;
+            _hoveredItem = item;
+            _tips.SetToolTip(list, item?.Tag as string);
+        };
+        list.MouseLeave += (_, _) =>
+        {
+            _hoveredItem = null;
+            _tips.SetToolTip(list, null);
+        };
         shell.Controls.Add(list, 0, 1);
         Controls.Add(shell);
     }
