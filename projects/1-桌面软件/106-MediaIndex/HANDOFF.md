@@ -12,7 +12,7 @@
 - 正式主线：`main`
 - 固定流转：`main → p106-exp → p106-stable → main`
 
-当前用户明确要求：暂不修改任何公共文件，只建立 P106 自有目录和长期分支。因此 `/目录.md` 尚未登记 P106。后续需要通过独立的统一仓库任务补齐共享索引，不得在当前 P106 开发提交中夹带。
+当前用户明确要求：暂不修改任何公共文件，只建立 P106 自有目录和长期分支。因此 `/目录.md` 尚未登记 P106。后续通过独立统一仓库任务补齐，不得在当前 P106 开发提交中夹带。
 
 ## 2. 新对话强制读取顺序
 
@@ -32,26 +32,47 @@
 
 当前处于 **Phase 0：图片算法 A 阶段验证**。
 
-已经由用户本机完成并可追溯的受控测试包括：
+已完成：
 
-- 全局感知哈希对 JPEG 重压缩、缩放、PNG 转换表现稳定。
-- 默认 Mean hash 对裁剪非常弱。
-- DoubleGradient 放宽阈值后可恢复 Crop10，但 Crop30 仍失效。
-- SIFT + Lowe ratio + RANSAC 在受控 Crop30 集上 Top-1 为 20/20。
-- 同一 SIFT 测试的初始 verdict 阈值对 20 张 unrelated 产生 19/20 假阳性，因此该判定阈值明确作废，不能进入正式设计。
+- A0 受控 Krokiet / SIFT 基线。
+- A1 第一轮 20 图、340 Query 自然样例正样本矩阵。
+- A2 第一轮 222 hard-negative。
+- A3 第一轮 100k 至 500k hash 微基准与候选索引探索。
 
-准确数字见 `docs/algorithm-validation.md`。
+当前架构候选：
+
+```text
+Exact hash
+→ Lane A: global / multi-region pHash
+→ Lane B: scalable local-feature index
+→ candidate union
+→ SIFT + RANSAC
+→ content consistency
+→ Confirmed / Probable / Similar / Not found
+```
+
+### 已否决的简化
+
+- 单纯调宽全局 pHash 阈值。
+- 全库逐图 SIFT。
+- 只看 RANSAC inliers。
+- 只看 inlier ratio。
+- 把视觉语义相似直接作为同源结论。
+
+### 当前主要风险
+
+Lane B 尚未冻结。小库中 ORB、LSH 与 BoVW 均显示价值，但 50 万规模的紧凑 local-feature inverted index 尚未经过真实分布验证。
 
 ## 4. 当前唯一下一步
 
-继续 A 阶段自验证，不要求用户手工调参：
+继续在 `p106-exp`：
 
-1. A1：真实自然图片正样本鲁棒性。
-2. A2：难负样本与近重复但非同源样本。
-3. A3：候选召回、多区域 hash 与 10 万至 50 万级规模压力测试。
-4. A4：算法冻结后，再用少量用户真实素材做域验收。
+1. 扩大公开图片交叉验证集。
+2. 比较 compact ORB LSH 与 visual-word inverted index。
+3. 专门处理低纹理图片。
+4. 冻结 candidate Top-k 策略后，再进入 A4 用户真实域验收。
 
-在 A1 至 A3 形成可复现实验记录前，不开始正式 UI，不冻结生产阈值。
+不需要用户继续手工调 Krokiet 参数。
 
 ## 5. 写入边界
 
@@ -61,7 +82,7 @@
 projects/1-桌面软件/106-MediaIndex/
 ```
 
-以及后续用户明确授权的 P106 专属 CI。当前不得修改：
+当前不得修改：
 
 - `/目录.md`
 - `/GPT_RULES.md`
