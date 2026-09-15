@@ -1,0 +1,4 @@
+query,expected_source,relation,expected_start_sec
+Query/Videos/q01.mp4,folder/source01.mp4,Partial clip,125.0
+Query/Videos/q02.mp4,folder/source02.mp4,Same video,
+Query/Videos/negative01.mp4,,Unrelated,
