@@ -26,7 +26,7 @@ ranked source locations
 
 ## 图片检索漏斗
 
-R001 至 R015 已经否定单算法方案。当前更合理的是双召回加纹理自适应精确验证：
+R001 至 R016 已经否定单算法方案。当前更合理的是双召回加纹理自适应精确验证：
 
 ```text
 Query
@@ -48,6 +48,8 @@ Exact content hash
 └──────────────┬───────────────┘
                ↓
 cheap local rerank
+               ↓
+optional verifier thumbnail cache
                ↓
       ┌────────┴────────┐
       │                 │
@@ -83,9 +85,9 @@ R015 表明：
 
 - 补回任意位置裁剪。
 - 补回复合攻击。
-- 为最终 SIFT verifier 提供紧凑候选。
+- 为最终 verifier 提供紧凑候选。
 
-当前方向从多表 ORB LSH 进一步收敛到：
+当前方向：
 
 ```text
 local descriptors
@@ -106,7 +108,7 @@ R013 synthetic 500k 微基准中：
 
 150 图相关压力集仍表明，当前应保守保留约 Top-50 candidates，再进入 verifier。
 
-## 精确验证
+## 深度 verifier
 
 已证明以下规则都不充分：
 
@@ -127,7 +129,20 @@ R013 synthetic 500k 微基准中：
 - warp 后全局 NCC
 - 局部 block NCC / 一致像素区域
 
-最终阈值必须由跨数据集 benchmark 冻结。
+### verifier source
+
+R016 新增一个重要候选：
+
+```text
+不要为所有 500k 文件永久保存大量 SIFT descriptors
+而是保存 256 至 320px grayscale verifier thumbnail
+→ candidate 出现后临时构建 SIFT
+→ 热点 descriptor cache
+```
+
+当前 320px JPEG60 的 500k 存储估计约 4.26 GiB，低于 128 SIFT descriptors/image 的约 8.2 GB raw payload，同时还能复用给低纹理模板验证和离线盘场景。
+
+该方案当前领先，但尚未冻结。
 
 ## 低纹理路径
 
@@ -138,11 +153,12 @@ clock、horse、cell 等少关键点样本证明，SIFT 不能覆盖所有图片
 ```text
 feature count / texture score low
 → candidate set already small
+→ verifier thumbnail
 → multi-scale grayscale template
 → edge consistency
 ```
 
-30 个低纹理困难 Query 中，探索性实现 Top-1 29/30，Top-5 30/30，但朴素实现很慢，所以只允许候选后运行。
+30 个低纹理困难 Query 中，探索性实现 Top-1 29/30、Top-5 30/30，但朴素实现很慢，所以只允许候选后运行。
 
 ## 持久化结构
 
@@ -169,24 +185,19 @@ R014 的 500k synthetic metadata 微基准约 67.22 MiB，说明 SQLite 不构�
 - postings
 - IDF
 - stop-word bitmap
+- optional verifier thumbnail store
+- hot descriptor cache
 
 不要求每次 Query 从 SQLite 逐行读取视觉指纹。
 
-## SIFT 存储策略
+## 隐私模式
 
-全量 compact CV_8U SIFT 仍未冻结。
+verifier thumbnail 可以泄露媒体内容。
 
-500k raw descriptor payload：
+正式产品需要至少两种模式：
 
-- 64 descriptors/image：约 4.1 GB
-- 128 descriptors/image：约 8.2 GB
-- 256 descriptors/image：约 16.4 GB
-
-当前继续比较：
-
-1. 全量 compact storage。
-2. candidate 后按需生成。
-3. background lazy generation + hot cache。
+1. 完整检索模式，允许本地 verifier cache。
+2. 隐私优先模式，不保存可逆视觉缩略图，只保留不可直接浏览的指纹，接受较弱的离线深度确认能力。
 
 ## 存储设备
 
