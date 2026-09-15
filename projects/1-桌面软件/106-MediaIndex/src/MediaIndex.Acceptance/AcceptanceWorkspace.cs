@@ -120,7 +120,7 @@ internal sealed class AcceptanceWorkspace
 
             if (!relative.StartsWith("..", StringComparison.Ordinal))
             {
-                return relative.Replace('\', '/');
+                return relative.Replace('\\', '/');
             }
         }
         catch
