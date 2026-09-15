@@ -23,3 +23,7 @@
 - `v005_sampling_rate_benchmark.py`：比较 0.5 / 1 / 2 / 4 s uniform sampling。
 - `v006_piecewise_temporal_alignment.py`：验证 cut 后的 piecewise offset segmentation。
 - `v007_orb_visual_word_video_negative.py`：证明无 timestamp 的小词表 ORB BoVW whole-video voting 不可靠。
+
+- `v008_visual_edit_benchmark.py`：验证字幕、letterbox、竖屏裁剪等视觉修改。
+- `v009_composite_video_benchmark.py`：验证一个 Query 同时来自多个源视频片段。
+- `v010_audio_chromaprint_benchmark.py`：验证 Chromaprint 对重编码、clip、speed 与 unrelated audio 的区分。
