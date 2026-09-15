@@ -6,13 +6,13 @@ MediaIndex 是面向大规模照片与视频库存的只读内容检索工具。
 
 ## 当前阶段
 
-**Phase 0：真实域验收前最后收口。**
+**Phase 0：真实域验收工具已准备，等待 A4 + V011 用户真实数据。**
 
 图片算法验证已完成至 R016。
 
 视频算法、时间层和规模验证已完成至 V014。
 
-当前不进入正式 UI 开发。下一阶段是 A4 + V011 用户真实域验收。
+合成 / 程序样例不再继续无边界扩张。下一步必须转到用户真实库存分布。
 
 ## 项目身份
 
@@ -59,32 +59,31 @@ Tier V2 selected-frame verifier
 Exact / Same / Derived / Partial / Composite / Ambiguous / Similar / Not found
 ```
 
-视频当前已经验证：
+## 当前真实域验收工具
 
-- 完整转码。
-- 分辨率 / fps 变化。
-- 3 s 至 8 s clip。
-- speed change。
-- 插片头。
-- 中间删除。
-- 字幕。
-- letterbox。
-- 画中画。
-- 强竖屏裁剪及 SIFT rescue。
-- 多源 Composite。
-- 共享片头 / 片尾歧义。
-- source 内重复片段。
-- Audio fingerprint。
-- 1,000 h 至 50,000 h 索引容量模型。
+```text
+experiments/
+  install_acceptance_env.bat
+  prepare_real_domain_acceptance.bat
+  run_real_domain_acceptance.bat
+  a004_real_image_acceptance_runner.py
+  v011_real_video_acceptance_runner.py
+  acceptance_summary.py
+```
+
+完整说明见 `docs/real-domain-acceptance.md`。
+
+用户真实媒体留在本地 workspace，只需回传匿名结果 JSON。
 
 ## 当前重要工程结论
 
-1. 图片与视频共享视觉算法，不共享相同的索引记录密度。
+1. 图片与视频共享视觉算法，不共享相同索引记录密度。
 2. 视频不能给每个 1 fps frame 保存完整图片 signature。
 3. 视频必须保留 timestamp。
 4. Audio fingerprint 是 supporting evidence，不是 Same video 的充分条件。
 5. 短 clip、共享片头和重复片段必须显式表达歧义。
-6. 合成验证已经足够暴露架构边界，下一步必须用用户真实域验收。
+6. 强竖屏裁剪可以通过 local SIFT geometry rescue。
+7. synthetic validation 已基本完成使命，生产阈值必须由真实域决定。
 
 ## 当前文档
 
