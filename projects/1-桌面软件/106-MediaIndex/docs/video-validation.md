@@ -216,11 +216,119 @@ Same video / Derived / Partial clip / Similar / Not found
 - 认为 3 s clip Top-1 就足以自动 Confirmed。
 - 认为 ORB 一定能救回所有 crop + watermark 难例。
 
+## V005｜Frame sampling rate
+
+固定同一 6 视频相关库，对 9 个来自目标视频的 Query 测试 uniform sampling：full transcode、8 s clip、5 s clip、3 s clip、crop10、watermark、crop + watermark + clip、1.05× speed、前插 3 s；另加 1 个 unrelated 5 s negative。
+
+| sampling interval | 9 个 related Top-1 | <3 temporal inliers |
+|---:|---:|---:|
+| 0.5 s | 9/9 | 0 |
+| 1.0 s | 9/9 | 1 |
+| 2.0 s | 5/9 | 4 |
+| 4.0 s | 5/9 | 4 |
+
+关键观察：
+
+- 0.5 s sampling 下，强组合 crop + watermark clip 仍有 5 个时间一致点，speed105 为 45/46。
+- 1 s sampling 仍保持 9/9 Top-1，但强组合 clip 只剩 2 个时间一致点，属于 weak evidence。
+- 2 s 与 4 s 在短 clip 上明显失败。一个核心原因是 sampling phase alias，例如库存按偶数秒采样，而从 7 s 开始的 clip 落在奇数秒视觉时刻。
+- unrelated 5 s 在 0.5 s 与 1 s 测试均未形成有效时间匹配。
+
+结论：当前 V1 更适合 `约 1 fps uniform baseline + selective denser / scene keyframes`。scene-adaptive sampling 应作为增强，不应完全替代 uniform baseline。
+
+可复现脚本：`experiments/v005_sampling_rate_benchmark.py`。
+
+## V006｜Piecewise temporal alignment
+
+对实际视频 pHash correspondences 做受限 affine 与连续 offset segmentation。
+
+8 s clip：
+
+- matched pairs 约 7/8，在 V003 较宽阈值下为 8/8。
+- slope ≈ 1.0。
+- offset ≈ 7.0 s。
+
+前插 3 s：
+
+- matched pairs 24/27。
+- slope ≈ 1.0。
+- offset ≈ -3.0 s。
+
+删除中间 4 s：
+
+- matched pairs 20/20。
+- segment 1：query 约 0 至 7 s，offset ≈ 0 s，8 samples。
+- segment 2：query 约 8 至 19 s，offset ≈ 4.1 s，12 samples。
+- 受限到正常轻微 speed range 的单一 affine model 只能解释约 12/20。
+
+因此时间模型应采用层级：
+
+```text
+constant offset
+→ small affine speed
+→ piecewise monotonic alignment
+```
+
+正式 Model C 需要 query/source 时间单调、局部 slope 合理、允许 gap，并对切段数量设置惩罚。当前简单 segmentation 已能正确暴露 cut boundary，后续再比较 dynamic programming、subsequence DTW 与 monotonic longest-path。
+
+可复现脚本：`experiments/v006_piecewise_temporal_alignment.py`。
+
+## V007｜Frame-level visual-word retrieval 反例
+
+测试能否把图片 Lane B 直接压成 whole-video Bag of Visual Words。
+
+设置：
+
+- 6 个相关视频。
+- 144 source sampled frames。
+- ORB 500 features/frame。
+- 256-word MiniBatchKMeans codebook。
+- IDF weighted shared visual words。
+
+无时间约束的 whole-video voting 表现不可靠：exact 8 s clip 的最高 vote 可以落到错误视频，crop10、watermark 和强组合 clip 也容易被复用相似场景的其他视频抢走。
+
+加入 frame timestamp consistency 后：
+
+- crop10 恢复正确源 Top-1。
+- watermark 恢复正确源 Top-1。
+- speed105 恢复正确源 Top-1。
+- exact 8 s clip 在这个小 ORB codebook 上仍失败。
+- 强组合 crop + watermark clip 仍无法形成稳定候选。
+
+结论：视频 Lane B 不能把一个视频压成无时间信息的 whole-video BoVW。postings 至少保留 `visual_word → video_id → timestamp/frame_id`，候选评分必须联合 visual discrimination 与 temporal consistency。256-word ORB codebook 也明显不够判别，后续优先比较更大 vocabulary、SIFT/RootSIFT visual words、multi-assignment 和 stop words。
+
+可复现脚本：`experiments/v007_orb_visual_word_video_negative.py`。
+
+## V005 至 V007 后的当前视频结论
+
+```text
+video
+  ↓
+exact hash / metadata
+  ↓
+约 1 fps uniform baseline
++ selective denser / scene keyframes
+  ↓
+timestamp-preserving frame retrieval
+  ↓
+candidate videos + correspondences
+  ↓
+constant / affine / piecewise temporal alignment
+  ↓
+selected-frame image verifier
+  ↓
+Same video / Derived / Partial clip / Composite / Similar / Not found
+```
+
+新增已否决简化：
+
+- uniform sampling 低到 0.5 fps 甚至更低并认为仍足够覆盖短片段。
+- scene-change keyframes 完全替代 uniform baseline。
+- 把整个视频压成无 timestamp 的小词表 BoVW。
+
 ## 下一步
 
-- V005：frame signature sampling rate，0.25 / 0.5 / 1 / scene-adaptive fps。
-- V006：piecewise monotonic temporal alignment。
-- V007：frame-level visual-word inverted index 直接复用图片 Lane B。
 - V008：字幕、黑边、竖屏裁剪、画中画。
-- V009：更真实的长视频与多段拼接。
+- V009：更长视频、多段拼接、重复片段与跨视频 composite。
 - V010：音频 fingerprint 是否值得作为独立 Lane C。
+- V011：真实视频小域验收设计。
