@@ -25,6 +25,8 @@ internal sealed class AcceptanceWorkspace
     public string ImageResultPath => Path.Combine(ResultsDirectory, "a004_results.json");
     public string VideoResultPath => Path.Combine(ResultsDirectory, "v011_results.json");
     public string SummaryResultPath => Path.Combine(ResultsDirectory, "real_domain_summary.json");
+    public string AutoSmokeDirectory => Path.Combine(Root, "AutoSmoke");
+    public string AutoSmokeSummaryPath => Path.Combine(AutoSmokeDirectory, "auto_smoke_summary.json");
 
     public AcceptanceWorkspaceState Load()
     {
