@@ -114,3 +114,24 @@ GUI 内完成：
 ## 接续入口
 
 新对话先读 `HANDOFF.md`，再按其中顺序核对仓库真实状态。
+
+
+## Windows Acceptance 单 EXE
+
+当前 P106 已有 Windows x64 单 EXE 候选。
+
+构建由：
+
+```text
+.github/workflows/p106-mediaindex-acceptance.yml
+```
+
+完成。
+
+外部交付：
+
+```text
+MediaIndex-Acceptance-v0.0.1-win-x64.exe
+```
+
+内部算法 Worker 嵌入主 EXE，并按需释放到用户 LocalAppData。最终用户不需要单独安装或管理 Python、.NET Runtime 或第二个 Worker EXE。
