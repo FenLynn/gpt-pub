@@ -15,3 +15,4 @@
 - `r013_visual_word_index_microbench.py`：模拟 50 万图片的紧凑 visual word 倒排索引。
 - `r014_sqlite_metadata_microbench.py`：模拟 50 万媒体元数据和 exact hash 的 SQLite 存储。
 - `r015_phash_scan_microbench.py`：比较不同 region 数量下的 pHash 连续内存扫描成本。
+- `r016_thumbnail_verifier_microbench.py`：比较缩略图缓存的存储量、SIFT 重建成本与精确验证能力。
