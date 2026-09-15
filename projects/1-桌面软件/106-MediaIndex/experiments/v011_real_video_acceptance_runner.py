@@ -70,55 +70,159 @@ def fit_model(
     distance_threshold,
     residual_threshold,
 ):
+    empty = {
+        "score": -9.0,
+        "inliers": 0,
+        "fraction": 0.0,
+        "offset": None,
+        "scale": None,
+        "median_hamming": 99.0,
+    }
+
     if len(query_hashes) < 2 or len(source_hashes) < 2:
-        return {
-            "score": -9.0,
-            "inliers": 0,
-            "fraction": 0.0,
-            "offset": None,
-            "scale": None,
-            "median_hamming": 99.0,
-        }
+        return empty.copy()
 
     distance = np.bitwise_count(
         query_hashes[:, None] ^ source_hashes[None, :]
     ).astype(np.int16)
 
-    best_source = distance.argmin(axis=1)
-    best_distance = distance[
-        np.arange(len(query_hashes)),
-        best_source,
-    ]
+    # Keep several plausible source-frame matches for every query frame.
+    # A single nearest pHash frame can be wrong in repetitive or slowly
+    # changing footage even when the whole temporal sequence is correct.
+    per_query = []
+    all_points = []
 
-    points = np.asarray(
-        [
-            (
-                query_times[index],
-                source_times[best_source[index]],
-                best_distance[index],
+    top_k = min(5, len(source_hashes))
+
+    for query_index in range(len(query_hashes)):
+        order = np.argsort(distance[query_index])[:top_k]
+        candidates = []
+
+        for source_index in order:
+            current_distance = int(
+                distance[query_index, source_index]
             )
-            for index in range(len(query_hashes))
-            if best_distance[index] <= distance_threshold
-        ],
-        dtype=float,
-    )
+            if current_distance > distance_threshold:
+                continue
 
-    if len(points) < 2:
-        return {
-            "score": -9.0,
-            "inliers": 0,
-            "fraction": 0.0,
-            "offset": None,
-            "scale": None,
-            "median_hamming": 99.0,
-        }
+            point = (
+                float(query_times[query_index]),
+                float(source_times[source_index]),
+                current_distance,
+            )
+            candidates.append(point)
+            all_points.append(point)
+
+        per_query.append(candidates)
+
+    if sum(bool(items) for items in per_query) < 2:
+        return empty.copy()
+
+    def evaluate(scale: float, offset: float):
+        chosen = []
+
+        for candidates in per_query:
+            if not candidates:
+                continue
+
+            predicted = None
+            best_candidate = None
+            best_residual = None
+
+            for query_time, source_time, current_distance in candidates:
+                if predicted is None:
+                    predicted = scale * query_time + offset
+
+                residual = abs(source_time - predicted)
+
+                key = (
+                    residual,
+                    current_distance,
+                )
+
+                if (
+                    best_candidate is None
+                    or key
+                    < (
+                        best_residual,
+                        best_candidate[2],
+                    )
+                ):
+                    best_candidate = (
+                        query_time,
+                        source_time,
+                        current_distance,
+                    )
+                    best_residual = residual
+
+            if (
+                best_candidate is not None
+                and best_residual is not None
+                and best_residual <= residual_threshold
+            ):
+                chosen.append(
+                    (
+                        best_candidate,
+                        best_residual,
+                    )
+                )
+
+        if len(chosen) < 2:
+            return None
+
+        distances = [
+            item[0][2]
+            for item in chosen
+        ]
+        residuals = [
+            item[1]
+            for item in chosen
+        ]
+
+        count = len(chosen)
+        median_hamming = float(
+            np.median(distances)
+        )
+        median_residual = float(
+            np.median(residuals)
+        )
+
+        key = (
+            count,
+            -median_hamming,
+            -median_residual,
+            -abs(scale - 1.0),
+        )
+
+        return (
+            key,
+            count,
+            median_hamming,
+            float(scale),
+            float(offset),
+        )
 
     best = None
 
-    for first in range(len(points)):
-        for second in range(first + 1, len(points)):
-            q1, s1 = points[first, :2]
-            q2, s2 = points[second, :2]
+    # Constant-offset hypotheses are both cheap and especially important
+    # for ordinary clips, head/tail trims and transcoded copies.
+    for query_time, source_time, _ in all_points:
+        candidate = evaluate(
+            1.0,
+            source_time - query_time,
+        )
+        if candidate is not None and (
+            best is None
+            or candidate[0] > best[0]
+        ):
+            best = candidate
+
+    # Also allow small speed changes.
+    for first in range(len(all_points)):
+        q1, s1, _ = all_points[first]
+
+        for second in range(first + 1, len(all_points)):
+            q2, s2, _ = all_points[second]
 
             if abs(q2 - q1) < 1e-9:
                 continue
@@ -128,43 +232,19 @@ def fit_model(
                 continue
 
             offset = s1 - scale * q1
-            residual = np.abs(
-                points[:, 1]
-                - (scale * points[:, 0] + offset)
-            )
-            mask = residual <= residual_threshold
-            count = int(mask.sum())
-
-            if count < 2:
-                continue
-
-            median_hamming = float(
-                np.median(points[mask, 2])
-            )
-            key = (
-                count,
-                -median_hamming,
-                -abs(scale - 1.0),
+            candidate = evaluate(
+                float(scale),
+                float(offset),
             )
 
-            if best is None or key > best[0]:
-                best = (
-                    key,
-                    count,
-                    median_hamming,
-                    float(scale),
-                    float(offset),
-                )
+            if candidate is not None and (
+                best is None
+                or candidate[0] > best[0]
+            ):
+                best = candidate
 
     if best is None:
-        return {
-            "score": -9.0,
-            "inliers": 0,
-            "fraction": 0.0,
-            "offset": None,
-            "scale": None,
-            "median_hamming": 99.0,
-        }
+        return empty.copy()
 
     _, count, median_hamming, scale, offset = best
     fraction = count / max(1, len(query_hashes))
