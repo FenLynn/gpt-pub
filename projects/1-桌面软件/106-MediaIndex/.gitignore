@@ -1,0 +1,6 @@
+.build/
+dist/
+src/MediaIndex.Acceptance/MediaIndex.Acceptance.ico
+experiments/MediaIndex-Acceptance/
+*.pyc
+__pycache__/
