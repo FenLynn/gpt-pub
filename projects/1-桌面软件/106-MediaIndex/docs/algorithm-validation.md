@@ -325,3 +325,171 @@ Confirmed / Probable / Similar / Not found
 - R012：低纹理专门 fallback。
 - R013：可扩展 local-feature inverted index 原型。
 - R014：图片链消融与生产阈值冻结。
+
+
+## R010｜150 图相关场景压力集
+
+为避免 20 张小库过于乐观，额外从 3 套世界地图 / 地形渲染图按相同地理网格切出 150 张库存图，每套 50 张。同一地理位置在不同渲染图中内容高度相关，但不是同一源文件，可充当相关 hard negatives。
+
+从其中一套 50 张源图生成 5 类 Query，共 250 个：
+
+- JPEG20
+- Crop50
+- Crop70
+- 非对称 Crop50
+- Crop50 + Resize + 水印 + JPEG 的组合攻击
+
+### 201-region pHash
+
+| 变换 | Top-1 | Top-5 | Top-20 |
+|---|---:|---:|---:|
+| JPEG20 | 50/50 | 50/50 | 50/50 |
+| Crop50 | 50/50 | 50/50 | 50/50 |
+| Crop70 | 50/50 | 50/50 | 50/50 |
+| 非对称 Crop50 | 11/50 | 30/50 | 38/50 |
+| 组合攻击 | 8/50 | 16/50 | 30/50 |
+
+### ORB LSH
+
+128 ORB descriptors/image，8 个表，每表 20 bits：
+
+| 变换 | Top-5 | Top-20 |
+|---|---:|---:|
+| JPEG20 | 50/50 | 50/50 |
+| Crop50 | 37/50 | 39/50 |
+| Crop70 | 22/50 | 28/50 |
+| 非对称 Crop50 | 41/50 | 44/50 |
+| 组合攻击 | 20/50 | 30/50 |
+
+pHash 与 ORB LSH 候选并集：
+
+- Top-20：237/250
+- Top-30：242/250
+- Top-50：248/250
+- Top-75：250/250
+
+### SIFT BoVW
+
+512 visual words，小型 codebook：
+
+| 变换 | Top-5 | Top-20 | Top-50 |
+|---|---:|---:|---:|
+| JPEG20 | 49/50 | 50/50 | 50/50 |
+| Crop50 | 44/50 | 48/50 | 50/50 |
+| Crop70 | 26/50 | 41/50 | 48/50 |
+| 非对称 Crop50 | 43/50 | 47/50 | 50/50 |
+| 组合攻击 | 23/50 | 41/50 | 46/50 |
+
+pHash + ORB LSH + SIFT BoVW：
+
+- Top-20：246/250
+- Top-30：248/250
+- Top-50：250/250
+
+重要结论：
+
+1. 20 张小库的 Top-5 满召回明显过于乐观。
+2. 在强相关 hard-negative 库中，**Top-50 是比 Top-20 更稳妥的当前候选预算**。
+3. 组合攻击仍是最难召回场景。
+4. BoVW 在较相关库中能补回一部分 pHash / LSH 漏检，但仍不能单独承担召回。
+5. 该 150 图压力集仍然远小于真实 50 万库，Top-50 只是当前工程候选，不是最终冻结值。
+
+本轮 150 图索引下，pHash + LSH 查询循环 median 约 3.44 ms，P95 约 7.96 ms。该时间不含真实数据库、磁盘与精确验证。
+
+## R011｜紧凑精确特征的存储 / 召回权衡
+
+### ORB / AKAZE 作为最终几何验证
+
+在与 R007 相同的 200 true-pair 主体上，使用 compact binary features 进行几何 + 内容一致性验证：
+
+- ORB 256 descriptors：145/200 被探索性高置信规则确认，0/198 hard-negative false positive。
+- AKAZE 256 descriptors：145/200 被确认，0/198 false positive。
+
+两者在 Crop70 与组合攻击上的确认率明显低于 SIFT，因此当前不建议把 ORB / AKAZE 单独作为最终 verifier。
+
+### CV_8U SIFT
+
+OpenCV SIFT 使用 CV_8U 描述子以降低存储：
+
+- 64 descriptors/image：descriptor payload 8 KB/image。
+- 128 descriptors/image：16 KB/image。
+- 256 descriptors/image：32 KB/image。
+
+在 128 descriptors/image 条件下，稍微收紧探索性规则中的 query-feature fraction 后：
+
+- true confirmed：159/200
+- hard-negative false positive：0/198
+
+256 descriptors/image：
+
+- true confirmed：168/200
+- hard-negative false positive：0/198
+
+仅计算 descriptor raw payload：
+
+- 128 × 128 bytes × 500k ≈ 8.2 GB
+- 256 × 128 bytes × 500k ≈ 16.4 GB
+
+还未计入 keypoint 坐标与索引开销。
+
+结论：compact SIFT 可以作为离线精确验证缓存候选，但全量持久化会形成数 GB 至十余 GB 的额外索引，需要与“候选后按需读取 / 生成”策略继续比较。
+
+## R012｜低纹理 fallback
+
+R007 的主要 SIFT 失败集中在 clock、horse、cell 等低纹理 / 少关键点图片。
+
+对这 3 张图各生成 10 类困难变化，共 30 Query：
+
+- JPEG20
+- Crop30 / 50 / 70
+- 非对称 Crop50
+- 水印
+- 5° 旋转
+- 透视
+- 组合攻击
+- 镜像
+
+使用多尺度 grayscale + edge template correlation，在 20 张库存候选中排名：
+
+- Top-1：29/30
+- Top-5：30/30
+- 唯一 Top-1 失败为 clock + perspective，正确原图排第 3。
+
+但该朴素实现对 30 × 20 候选、17 个尺度总计耗时约 52.6 s，因此 **绝不能全库运行**。
+
+结论：
+
+1. 低纹理并不是无解。
+2. template / edge correlation 适合在“局部特征不足”时作为候选后 fallback。
+3. 必须先缩小到很小的候选集再运行。
+4. 低纹理路径与普通高纹理路径应该分支处理，而不是强迫所有图片走同一算法。
+
+## 更新后的当前判断
+
+当前图片链更适合采用分层漏斗，而不是一条固定算法：
+
+```text
+Exact hash
+  ↓
+Lane A: pHash / multi-region hash
+  +
+Lane B: local-feature inverted retrieval
+  ↓
+candidate union，当前压力集倾向保留约 Top-50
+  ↓
+cheap local rerank
+  ↓
+high-texture:
+    SIFT + RANSAC + content consistency
+low-texture:
+    multi-scale template / edge fallback
+  ↓
+Confirmed / Probable / Similar / Not found
+```
+
+当前最大的未决项已从“算法是否可行”收敛为：
+
+- Lane B 在 50 万真实分布下采用哪种 inverted index。
+- SIFT 精确特征是全量 compact 持久化，还是候选后按需生成 / 缓存。
+- Top-50 是否能在更大、更多样的公开图库中保持足够召回。
+- A4 用户真实素材域验收。
