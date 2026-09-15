@@ -9,6 +9,11 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+set "APP=%~dp0dist\MediaIndex-Acceptance-v0.0.1-win-x64\MediaIndex Acceptance.exe"
+if exist "%APP%" (
+  start "" "%APP%"
+  exit /b 0
+)
 echo.
-echo Build finished successfully.
+echo Build finished, but the app was not found at the expected path.
 pause
