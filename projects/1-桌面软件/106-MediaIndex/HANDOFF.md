@@ -185,3 +185,36 @@ real-domain run: pending / completed
 phase: <当前阶段>
 next action: <唯一明确断点>
 ```
+
+
+## 10. Acceptance 单 EXE 候选
+
+用户已经授权 P106 专用 workflow 作为此前“只改 P106 目录”规则的唯一额外例外：
+
+```text
+.github/workflows/p106-mediaindex-acceptance.yml
+```
+
+当前成功候选：
+
+```text
+version: 0.0.1
+commit: 70a6918ea3eb4516586082449be9442d0b96b4bf
+run: 34942719186
+delivery: one self-contained Windows x64 EXE
+sha256: 1e1d4ea51d2309bff42068d703e0849748cf0a1bc6f0ebb59c26be22dc1ee0c7
+```
+
+架构：
+
+```text
+MediaIndex Acceptance.exe
+  ↓ embedded resource
+private algorithm worker
+  ↓ extract on demand
+%LOCALAPPDATA%\FenLynn\MediaIndex\Acceptance\Runtime
+```
+
+用户侧不需要 Python、仓库、BAT 或 .NET Runtime。
+
+下一步仍然是用该 EXE 完成 A4 + V011 真实域 smoke acceptance。
