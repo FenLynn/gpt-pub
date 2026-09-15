@@ -326,9 +326,226 @@ Same video / Derived / Partial clip / Composite / Similar / Not found
 - scene-change keyframes 完全替代 uniform baseline。
 - 把整个视频压成无 timestamp 的小词表 BoVW。
 
+## V008｜字幕、黑边、竖屏裁剪与画中画
+
+以同一 24 s 源视频生成 4 类视觉修改，并在 6 视频相关库中检索。
+
+### 字幕 / 底部覆盖
+
+global pHash：
+
+- 正确源 Top-1。
+- 16 个时间一致 samples。
+- median Hamming 约 10。
+
+multi-region pHash：
+
+- 正确源 Top-1。
+- 19 个时间一致 samples。
+
+说明常规字幕条和底部覆盖对时间序列 pHash 影响有限。
+
+### 黑边 / letterbox
+
+global pHash：
+
+- 正确源 Top-1。
+- 14 个时间一致 samples。
+
+multi-region：
+
+- 正确源 Top-1。
+- 12 个时间一致 samples。
+
+说明上下黑边本身不是主要风险。
+
+### 画中画 / 缩小后置于背景
+
+global pHash：未形成有效匹配。
+
+multi-region pHash：
+
+- 正确源恢复 Top-1。
+- 约 7 个时间一致 samples。
+- 仍属于弱证据。
+
+### 竖屏中心裁剪
+
+将 640×360 源视频中心裁成约 202×360，再缩放为 360×640。
+
+- global pHash：未形成有效匹配。
+- 当前 28-region source pHash：错误视频排第一，正确源仅为第二候选。
+
+这是目前非常明确的视觉失败案例。
+
+结论：
+
+1. 字幕和 letterbox 可由 Lane A 直接覆盖。
+2. 画中画可被 multi-region 部分救回，但需要 verifier。
+3. 强竖屏裁剪必须依赖更强的 local-feature Lane B、orientation-aware crop handling 或 source-frame local geometry。
+
+可复现脚本：`experiments/v008_visual_edit_benchmark.py`。
+
+## V009｜跨视频 Composite
+
+构造 24 s composite：
+
+```text
+segment 1: lib_01 的 2 至 10 s
+segment 2: lib_04 的 8 至 16 s
+segment 3: lib_02 的 14 至 22 s
+```
+
+每段 8 s，重新编码后作为一个 Query。
+
+1 fps pHash frame retrieval 自动形成 3 个连续 source runs：
+
+```text
+query 约 0.0 至 7.0 s
+→ lib_01
+8 samples
+median Hamming ≈ 0
+
+query 约 8.0 至 14.9 s
+→ lib_04
+8 samples
+median Hamming ≈ 1
+
+query 约 15.9 至 22.9 s
+→ lib_02
+8 samples
+median Hamming ≈ 0
+```
+
+这说明 Composite / edited sequence 不需要强迫归到一个 source video。
+
+正式结果结构应允许：
+
+```text
+Query video
+→ source segment A
+→ source segment B
+→ source segment C
+```
+
+每段分别返回 source video、source interval、query interval 与 confidence。
+
+可复现脚本：`experiments/v009_composite_video_benchmark.py`。
+
+## V010｜Audio fingerprint Lane C
+
+### 方法
+
+使用 FFmpeg / Chromaprint raw fingerprint。程序生成 24 s 的多频段合成音频，只用于验证结构。
+
+source fingerprint：172 个 raw uint32 entries。
+
+### AAC 低码率重编码
+
+source → AAC 48 kbps：
+
+- mean bit Hamming ≈ 0.63。
+- median = 0。
+- 100% entries Hamming ≤ 8。
+
+音频重编码鲁棒性非常高。
+
+### 8 s 中间片段
+
+clip fingerprint：43 entries。
+
+滑窗匹配到 source：
+
+- best raw offset = 57 fingerprint entries。
+- mean Hamming ≈ 2.42。
+- median = 2。
+- 100% entries ≤ 8。
+
+raw offset 需要结合 Chromaprint 的内部窗口延迟校准后才能转换成精确秒数，但已经足够用于快速 source-time 候选。
+
+### 1.05× 速度变化
+
+不做时间缩放时：
+
+- mean Hamming ≈ 7.37。
+
+加入 fingerprint sequence scale search：
+
+- best scale ≈ 1.055。
+- mean Hamming ≈ 2.69。
+- median = 2。
+- 100% entries ≤ 8。
+
+与真实 1.05× 非常接近。
+
+### Unrelated audio
+
+- mean Hamming ≈ 14.60。
+- median ≈ 15。
+- Hamming ≤ 8 的比例约 1.7%。
+
+与同源重编码 / clip 分离明显。
+
+### 关键反例，同音轨但不同视频
+
+把完全相同的 source audio 复用到另一个视觉完全不同的视频：
+
+- Chromaprint 与 source 完全相同。
+- mean Hamming = 0。
+
+因此音频 fingerprint **绝不能单独证明视频同源**。
+
+### 结论
+
+Audio Lane C 很值得保留，最适合：
+
+- 帮助长视频快速定位时间 offset。
+- 视觉被强水印、竖屏裁剪或静态画面破坏时提供独立证据。
+- 与视觉时间模型交叉确认。
+
+但必须满足：
+
+```text
+audio match
+≠
+same video
+```
+
+音频只能是独立 supporting lane，不得覆盖视觉冲突。
+
+可复现脚本：`experiments/v010_audio_chromaprint_benchmark.py`。
+
+## V010 后的当前视频架构
+
+```text
+                 Query video
+                       │
+              exact hash / metadata
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+   Visual lanes                  Audio Lane C
+        │                             │
+~1 fps baseline frames          Chromaprint-like
++ extra keyframes                time sequence
+        │                             │
+pHash + timestamp local index         │
+        │                             │
+        └──────────────┬──────────────┘
+                       ▼
+             candidate correspondences
+                       │
+        constant / affine / piecewise
+               temporal alignment
+                       │
+             selected-frame verifier
+                       │
+Exact / Same / Derived / Partial / Composite / Similar
+```
+
 ## 下一步
 
-- V008：字幕、黑边、竖屏裁剪、画中画。
-- V009：更长视频、多段拼接、重复片段与跨视频 composite。
-- V010：音频 fingerprint 是否值得作为独立 Lane C。
-- V011：真实视频小域验收设计。
+- V011：真实视频小域验收设计与测试工具。
+- V012：更长视频、重复镜头与相同片头片尾。
+- V013：竖屏强裁剪的 local-feature rescue。
+- 然后把图片 A4 与视频 V11 合并为一次真实用户域验收。
