@@ -29,9 +29,10 @@
 11. `docs/video-architecture.md`
 12. `docs/index-storage.md`
 13. `docs/real-domain-acceptance.md`
-14. `docs/benchmark-plan.md`
-15. `设计与演进.md`
-16. 实时比较 `main / p106-stable / p106-exp`
+14. `docs/acceptance-app.md`
+15. `docs/benchmark-plan.md`
+16. `设计与演进.md`
+17. 实时比较 `main / p106-stable / p106-exp`
 
 ## 3. 当前断点
 
@@ -51,28 +52,45 @@
 
 ## 4. 真实域工具
 
-```text
-experiments/
-  install_acceptance_env.bat
-  prepare_real_domain_acceptance.bat
-  run_real_domain_acceptance.bat
-  a004_real_image_acceptance_runner.py
-  v011_real_video_acceptance_runner.py
-  acceptance_summary.py
-  image_manifest_template.csv
-  video_manifest_template.csv
-```
-
-用户本机流程：
+当前首选入口已经改为 GUI：
 
 ```text
-1. install_acceptance_env.bat
-2. prepare_real_domain_acceptance.bat
-3. 把私人媒体放入生成的本地 workspace
-4. 填 image_manifest.csv / video_manifest.csv
-5. run_real_domain_acceptance.bat
-6. 只提供 a004_results.json / v011_results.json / real_domain_summary.json
+build_acceptance.bat
+→ MediaIndex Acceptance.exe
 ```
+
+GUI 源码：
+
+```text
+src/MediaIndex.Acceptance/
+```
+
+portable builder：
+
+```text
+build/BuildAcceptancePortable.ps1
+build_acceptance.bat
+```
+
+private worker：
+
+```text
+experiments/acceptance_worker.py
+```
+
+用户流程：
+
+```text
+1. 第一次双击 build_acceptance.bat
+2. 以后直接运行 dist/.../MediaIndex Acceptance.exe
+3. 选库存目录
+4. 拖入或添加 Query
+5. 双击每条 Query 设置真实源，或设为无对应
+6. 点开始
+7. 只导出匿名结果 JSON
+```
+
+旧 CSV / BAT 流程保留为 fallback。
 
 私人媒体、绝对路径和可辨认缓存不得写入公开仓库。
 
