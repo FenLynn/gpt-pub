@@ -598,9 +598,9 @@ internal sealed class MainForm : Form
         {
             MessageBox.Show(
                 this,
-                "当前目录缺少 Runtime\MediaIndex.Acceptance.Worker.exe。
-
-"
+                "当前目录缺少 Runtime\\MediaIndex.Acceptance.Worker.exe。"
+                + Environment.NewLine
+                + Environment.NewLine
                 + "请使用 P106 的 build_acceptance.bat 生成完整便携版。"
                 + "正式便携版中不会要求你安装 Python。",
                 "运行组件缺失",
@@ -744,8 +744,9 @@ internal sealed class MainForm : Form
         {
             MessageBox.Show(
                 this,
-                $"查询文件不存在：
-{missingQuery.QueryPath}",
+                "查询文件不存在："
+                + Environment.NewLine
+                + missingQuery.QueryPath,
                 "MediaIndex Acceptance");
             return false;
         }
@@ -764,8 +765,8 @@ internal sealed class MainForm : Form
         {
             MessageBox.Show(
                 this,
-                "有一条标准答案不在对应库存目录内：
-"
+                "有一条标准答案不在对应库存目录内："
+                + Environment.NewLine
                 + outside.ExpectedSourcePath,
                 "请重新设置标准答案");
             return false;
