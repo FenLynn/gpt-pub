@@ -24,28 +24,40 @@
 6. `阶段记录.md`
 7. `工作记录.md`
 8. `docs/algorithm-validation.md`
-9. `docs/benchmark-plan.md`
-10. `docs/index-storage.md`
-11. `设计与演进.md`
-12. 实时比较 `main / p106-stable / p106-exp`
+9. `docs/video-validation.md`
+10. `docs/architecture.md`
+11. `docs/video-architecture.md`
+12. `docs/index-storage.md`
+13. `docs/benchmark-plan.md`
+14. `设计与演进.md`
+15. 实时比较 `main / p106-stable / p106-exp`
 
 ## 3. 当前断点
 
-当前处于 **Phase 0：图片算法与索引冻结前验证**。
+当前处于：
 
-已完成至 R016：
+**Phase 0：共享视觉索引冻结前验证 + 视频时间层验证。**
+
+图片已完成至 R016：
 
 - Krokiet / SIFT 受控基线。
-- 20 图、340 Query 自然样例正样本矩阵。
+- 20 图、340 Query 正样本矩阵。
 - 222 hard-negative。
-- 150 图相关场景压力集，250 Query。
-- ORB LSH、ORB / SIFT BoVW。
-- compact verifier 消融。
-- 低纹理 fallback。
-- 100k 至 500k pHash 扫描微基准。
-- 500k synthetic visual-word inverted index。
-- 500k SQLite metadata microbenchmark。
-- verifier thumbnail cache 容量、SIFT 重建与 hard-negative 验证。
+- 150 图相关场景压力集。
+- 500k pHash、visual-word、SQLite 微基准。
+- compact verifier 与低纹理 fallback。
+- verifier thumbnail cache。
+
+视频已完成至 V004：
+
+- 完整 H.264 / H.265 / fps 变化。
+- 水印、crop 与组合视觉变化。
+- 中间 clip 与 source offset。
+- 1.05× speed。
+- 前插片头。
+- 删除中间片段的 piecewise 时间反例。
+- 6 视频相关库的 full / 8 s / 5 s / 3 s clip 检索。
+- unrelated negative。
 
 可复现脚本：
 
@@ -54,19 +66,26 @@ experiments/r013_visual_word_index_microbench.py
 experiments/r014_sqlite_metadata_microbench.py
 experiments/r015_phash_scan_microbench.py
 experiments/r016_thumbnail_verifier_microbench.py
+experiments/v001_video_sequence_benchmark.py
 ```
 
-## 4. 当前架构候选
+## 4. 当前统一架构候选
 
 ```text
 SQLite metadata / exact hash
-→ Lane A: 28 至 60 selected pHash regions
-→ Lane B: compact visual-word inverted index
-→ candidate union，当前约 Top-50
-→ optional 256 至 320px verifier thumbnail
-→ high texture: SIFT + RANSAC + content consistency
-→ low texture: template / edge fallback
-→ Confirmed / Probable / Similar / Not found
+→ shared visual engine
+   ├─ Lane A: selected pHash regions
+   └─ Lane B: compact visual-word inverted index
+→ candidate media
+
+image
+→ verifier thumbnail
+→ SIFT / NCC or low-texture fallback
+
+video
+→ sampled-frame correspondences
+→ offset / affine / piecewise monotonic temporal model
+→ selected-frame image verifier
 ```
 
 ### 已否决的简化
@@ -74,32 +93,35 @@ SQLite metadata / exact hash
 - 单纯调宽全局 pHash 阈值。
 - 默认 201-region 全表第一层。
 - 全库逐图 SIFT。
-- 只看 RANSAC inliers。
-- 只看 inlier ratio。
-- ORB / AKAZE 单独取代 final SIFT verifier。
+- 只看 RANSAC inliers 或 ratio。
+- ORB / AKAZE 单独取代 final image verifier。
 - 把视觉语义相似直接作为同源结论。
-- 把 20 图小库的 Top-5 满召回当成大库结论。
+- 把 20 图小库 Top-5 当成大库结论。
 - 默认要求 500k 全量保存大量 SIFT descriptors。
-
-### 当前主要风险
-
-1. visual-word Lane B 仍需更大的真实图片分布验证。
-2. 28 至 60 regions 的最终 layout 未冻结。
-3. verifier thumbnail 的 256 / 320px 与 codec 未冻结。
-4. Top-50 仍需 A4 真实域验收。
-5. thumbnail cache 可泄露媒体内容，必须设计隐私模式。
+- 视频只使用文件 hash、首帧或一个全局视频 hash。
+- 视频时间层只允许固定 offset 或单一 affine speed。
+- 3 s clip Top-1 即自动 Confirmed。
 
 ## 5. 当前唯一下一步
 
-继续在 `p106-exp`：
+在 `p106-exp` 并行推进：
 
-1. 扩大公开真实图片交叉验证集。
+### Image freeze
+
+1. 更大公开真实图片交叉验证。
 2. 冻结 visual-word quantization / inverted index。
 3. 冻结 Lane A region layout。
 4. 冻结 verifier thumbnail / privacy mode。
-5. 然后进入 A4 用户真实域验收。
+5. 进入 A4 用户真实图片域验收。
 
-不需要用户继续手工调 Krokiet 参数。
+### Video V005-V007
+
+1. 采样率与 scene-adaptive sampling。
+2. piecewise monotonic temporal alignment。
+3. frame-level visual-word inverted retrieval。
+4. 随后测试字幕、竖屏裁剪、多段拼接与音频 fingerprint。
+
+不需要用户继续手工调参数。
 
 ## 6. 写入边界
 
@@ -126,8 +148,8 @@ main: <实时 SHA>
 p106-stable: <实时 SHA / ahead-behind>
 p106-exp: <实时 SHA / ahead-behind>
 catalog registration: pending / completed
+image benchmark: <最新 R 编号>
+video benchmark: <最新 V 编号>
 phase: <当前阶段>
-verified benchmark: <最后一轮编号>
-invalidated assumptions: <已否决规则>
 next action: <唯一明确断点>
 ```
