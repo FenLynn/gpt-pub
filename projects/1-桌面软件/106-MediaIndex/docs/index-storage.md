@@ -211,3 +211,127 @@ open SQLite
 - storage identity 在移动硬盘盘符变化时的稳定性。
 - postings 增量构建与 compact rebuild。
 - thumbnail cache 的分块文件格式与随机读取。
+
+
+## 10. 视频索引不能复制图片签名结构
+
+V014 证明，视频规模必须按总时长而不是文件数估算。
+
+如果使用约 1 fps baseline：
+
+- 1,000 h 约 3.6M frames。
+- 10,000 h 约 36M frames。
+- 50,000 h 约 180M frames。
+
+若每个 baseline frame 只保存：
+
+```text
+video_id
+timestamp
+global pHash
+约 16 bytes
+```
+
+10,000 h 约 0.54 GiB，仍然很轻。
+
+但如果每帧复制图片级结构：
+
+- 28-region hash：10,000 h 约 7.78 GiB。
+- 24 local postings × 8 bytes：约 6.44 GiB。
+- 6 KB verifier thumbnail/frame：约 201 GiB。
+
+因此禁止把图片的完整 visual signature 原样附着到每个 sampled video frame。
+
+## 11. 视频建议采用三层视觉索引
+
+当前候选结构：
+
+```text
+Tier V0
+约 1 fps baseline
+global pHash
+video_id
+timestamp
+
+Tier V1
+scene / motion / periodic sparse keyframes
+selected local visual words
+timestamp-preserving postings
+
+Tier V2
+very sparse verifier thumbnails
+or online source decode on demand
+```
+
+### Tier V0
+
+职责：
+
+- 完整转码。
+- 普通 clip。
+- 初步 source video / offset。
+- 为 Lane B 与 Audio Lane 提供候选。
+
+目标是轻量、连续、覆盖所有时间位置。
+
+### Tier V1
+
+职责：
+
+- crop。
+- watermark。
+- 竖屏。
+- 画中画。
+- pHash Lane A 失败时的 local-feature candidate rescue。
+
+不能丢弃 timestamp。
+
+### Tier V2
+
+不再默认按 1 fps 保存 thumbnail。
+
+优先方案：
+
+- scene-adaptive sparse thumbnails。
+- 每分钟数量上限。
+- 只对离线卷或用户指定媒体保留。
+- 在线源文件存在时按需解码。
+- 对热点候选建立临时 descriptor cache。
+
+## 12. Audio Lane C 容量
+
+V010 的 raw Chromaprint 量级约 28.7 bytes/s。
+
+粗略：
+
+| 总视频时长 | raw audio fingerprint |
+|---:|---:|
+| 1,000 h | 0.096 GiB |
+| 5,000 h | 0.481 GiB |
+| 10,000 h | 0.961 GiB |
+| 50,000 h | 4.806 GiB |
+
+因此 Audio Lane C 的容量明显小于“每秒 thumbnail”方案，适合作为长视频时间定位和视觉困难场景的 supporting index。
+
+## 13. 统一索引格式的当前边界
+
+图片：
+
+```text
+one file
+→ one image signature set
+```
+
+视频：
+
+```text
+one file
+→ many Tier V0 temporal anchors
+→ sparse Tier V1 local keyframes
+→ optional Tier V2 verifier cache
+→ optional Audio Lane C
+```
+
+共享的是 hash、local descriptor、verifier 算法实现。
+
+不能强迫图片和视频在持久化层使用完全相同的记录密度。
