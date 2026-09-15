@@ -115,6 +115,39 @@ internal sealed class BackendRunner
                 StringComparison.OrdinalIgnoreCase);
     }
 
+    public async Task<int> RunAutoSmokeAsync(
+        string imageLibrary,
+        string videoLibrary,
+        string workDirectory,
+        IProgress<string> progress,
+        CancellationToken cancellationToken)
+    {
+        var arguments = new List<string>
+        {
+            "auto",
+            "--workdir", workDirectory,
+            "--max-images", "8",
+            "--max-videos", "4"
+        };
+
+        if (!string.IsNullOrWhiteSpace(imageLibrary))
+        {
+            arguments.Add("--image-library");
+            arguments.Add(imageLibrary);
+        }
+
+        if (!string.IsNullOrWhiteSpace(videoLibrary))
+        {
+            arguments.Add("--video-library");
+            arguments.Add(videoLibrary);
+        }
+
+        return await RunWorkerAsync(
+            arguments,
+            progress,
+            cancellationToken);
+    }
+
     public async Task<int> RunImageAsync(
         string library,
         string manifest,
