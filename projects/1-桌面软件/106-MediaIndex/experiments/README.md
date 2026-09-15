@@ -32,3 +32,16 @@
 - `v012_long_video_repeated_segments.py`：验证共享片头片尾、长视频和同源内部重复片段。
 - `v013_vertical_crop_sift_rescue.py`：验证强竖屏裁剪在 pHash 候选后的 SIFT + RANSAC rescue。
 - `v014_video_index_scale.py`：按总视频时长估算 1 fps baseline、local postings、thumbnail 与 Audio Lane 容量。
+
+
+## 真实域验收工具
+
+- `install_acceptance_env.bat`：创建独立 Python 环境。
+- `prepare_real_domain_acceptance.bat`：创建仓库外私有验收目录结构。
+- `run_real_domain_acceptance.bat`：顺序运行 A4 图片与 V011 视频 baseline。
+- `a004_real_image_acceptance_runner.py`：图片真实域候选召回与保守 verifier baseline。
+- `v011_real_video_acceptance_runner.py`：视频 Tier V0 pHash + 时间模型 baseline。
+- `acceptance_summary.py`：合并两个 JSON 的匿名摘要。
+- `image_manifest_template.csv` 与 `video_manifest_template.csv`：manifest 模板。
+
+真实媒体不得提交到本目录。
