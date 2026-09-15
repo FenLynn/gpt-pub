@@ -4,6 +4,7 @@ import sys
 
 import a004_real_image_acceptance_runner as image_runner
 import acceptance_summary as summary_runner
+import auto_real_domain_smoke as auto_runner
 import v011_real_video_acceptance_runner as video_runner
 
 
@@ -29,7 +30,7 @@ def main() -> int:
     if len(sys.argv) < 2:
         print(
             "Usage: MediaIndex.Acceptance.Worker.exe "
-            "{image|video|summary|selftest} [arguments...]",
+            "{image|video|summary|auto|selftest} [arguments...]",
             file=sys.stderr,
         )
         return 2
@@ -45,6 +46,9 @@ def main() -> int:
 
     if command == "summary":
         return run_module(summary_runner, arguments)
+
+    if command == "auto":
+        return run_module(auto_runner, arguments)
 
     if command == "selftest":
         print('{"ok":true,"worker":"MediaIndex.Acceptance.Worker"}')
