@@ -29,7 +29,7 @@ def main() -> int:
     if len(sys.argv) < 2:
         print(
             "Usage: MediaIndex.Acceptance.Worker.exe "
-            "{image|video|summary} [arguments...]",
+            "{image|video|summary|selftest} [arguments...]",
             file=sys.stderr,
         )
         return 2
@@ -45,6 +45,10 @@ def main() -> int:
 
     if command == "summary":
         return run_module(summary_runner, arguments)
+
+    if command == "selftest":
+        print('{"ok":true,"worker":"MediaIndex.Acceptance.Worker"}')
+        return 0
 
     print(
         f"Unknown command: {command}",
