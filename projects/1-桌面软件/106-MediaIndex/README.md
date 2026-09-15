@@ -61,19 +61,34 @@ Exact / Same / Derived / Partial / Composite / Ambiguous / Similar / Not found
 
 ## 当前真实域验收工具
 
+为减少用户操作，当前已经从 BAT + CSV 流程进一步收敛为 Windows GUI：
+
 ```text
-experiments/
-  install_acceptance_env.bat
-  prepare_real_domain_acceptance.bat
-  run_real_domain_acceptance.bat
-  a004_real_image_acceptance_runner.py
-  v011_real_video_acceptance_runner.py
-  acceptance_summary.py
+build_acceptance.bat
+  ↓
+自动构建 portable
+  ↓
+MediaIndex Acceptance.exe
 ```
 
-完整说明见 `docs/real-domain-acceptance.md`。
+GUI 内完成：
 
-用户真实媒体留在本地 workspace，只需回传匿名结果 JSON。
+- 选择图片库存。
+- 选择视频库存。
+- 添加或拖入 Query。
+- 双击 Query 设置真实源。
+- hard negative 点“设为无对应”。
+- 点击“开始真实域验收”。
+- 点击“导出匿名结果”。
+
+用户不再需要手写 CSV，也不需要在正式 portable 运行时管理 Python 环境。
+
+详细说明：
+
+- `docs/acceptance-app.md`
+- `docs/real-domain-acceptance.md`
+
+旧 BAT / CSV 工具仍保留为底层 fallback。
 
 ## 当前重要工程结论
 
