@@ -1,0 +1,198 @@
+name: P106 MediaIndex Acceptance Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [p106-exp, p106-stable]
+    paths:
+      - 'projects/1-桌面软件/106-MediaIndex/**'
+      - '.github/workflows/p106-mediaindex-acceptance.yml'
+  pull_request:
+    branches: [p106-stable, main]
+    paths:
+      - 'projects/1-桌面软件/106-MediaIndex/**'
+      - '.github/workflows/p106-mediaindex-acceptance.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p106-mediaindex-acceptance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: 'utf-8'
+
+jobs:
+  scope:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce P106 source and target
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_ref='${{ github.head_ref }}'
+          base_ref='${{ github.base_ref }}'
+          if [[ "$base_ref" == 'p106-stable' ]]; then
+            [[ "$head_ref" == 'p106-exp' ]] || { echo "P106 stable admission must be p106-exp -> p106-stable"; exit 1; }
+          elif [[ "$base_ref" == 'main' ]]; then
+            [[ "$head_ref" == 'p106-stable' ]] || { echo "P106 main admission must be p106-stable -> main"; exit 1; }
+          else
+            echo "Unexpected P106 PR target: $base_ref"
+            exit 1
+          fi
+
+      - name: Enforce P106 path scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha='${{ github.event.pull_request.base.sha }}'
+          head_sha='${{ github.event.pull_request.head.sha }}'
+          bad=0
+          while IFS=$'\t' read -r status path; do
+            case "$path" in
+              projects/1-桌面软件/106-MediaIndex/*|.github/workflows/p106-mediaindex-acceptance.yml) ;;
+              *) echo "Out-of-scope P106 path: $status $path"; bad=1 ;;
+            esac
+          done < <(git -c core.quotepath=false diff --name-status "$base_sha" "$head_sha")
+          [[ "$bad" -eq 0 ]]
+
+  build:
+    needs: scope
+    if: always() && (needs.scope.result == 'success' || needs.scope.result == 'skipped')
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Read product version
+        id: product-version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $project='projects/1-桌面软件/106-MediaIndex/src/MediaIndex.Acceptance/MediaIndex.Acceptance.csproj'
+          [xml]$xml=Get-Content $project -Raw
+          $version=@($xml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'MediaIndex Acceptance <Version> is missing' }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Install worker build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pyinstaller>=6.10,<7" "opencv-python>=4.10,<5" "numpy>=2.0,<3" "pillow>=10,<13" "pillow-heif>=0.18,<2"
+
+      - name: Build private algorithm worker
+        shell: pwsh
+        working-directory: projects/1-桌面软件/106-MediaIndex/experiments
+        run: |
+          $ErrorActionPreference='Stop'
+          $args=@('--noconfirm','--clean','--onefile','--console','--name','MediaIndex.Acceptance.Worker','--distpath',"$env:GITHUB_WORKSPACE/build/P106-worker",'--workpath',"$env:GITHUB_WORKSPACE/build/P106-worker-work",'--specpath',"$env:GITHUB_WORKSPACE/build/P106-worker-spec",'--collect-all','pillow_heif','acceptance_worker.py')
+          python -m PyInstaller @args
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed: $LASTEXITCODE" }
+          $worker="$env:GITHUB_WORKSPACE/build/P106-worker/MediaIndex.Acceptance.Worker.exe"
+          if (!(Test-Path $worker -PathType Leaf)) { throw 'Acceptance worker EXE missing' }
+          $generated="$env:GITHUB_WORKSPACE/projects/1-桌面软件/106-MediaIndex/src/MediaIndex.Acceptance/Generated"
+          New-Item -ItemType Directory -Force $generated | Out-Null
+          Copy-Item $worker (Join-Path $generated 'MediaIndex.Acceptance.Worker.exe') -Force
+
+      - name: Generate application icon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          & 'projects/1-桌面软件/106-MediaIndex/build/GenerateAcceptanceIcon.ps1' -OutputPath 'projects/1-桌面软件/106-MediaIndex/src/MediaIndex.Acceptance/MediaIndex.Acceptance.ico'
+
+      - name: Publish self-contained single EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $project='projects/1-桌面软件/106-MediaIndex/src/MediaIndex.Acceptance/MediaIndex.Acceptance.csproj'
+          dotnet restore $project
+          if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed: $LASTEXITCODE" }
+          dotnet publish $project -c Release -r win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o build/P106
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed: $LASTEXITCODE" }
+          $exe='build/P106/MediaIndex.Acceptance.exe'
+          if (!(Test-Path $exe -PathType Leaf)) { throw 'MediaIndex.Acceptance.exe missing' }
+          $unexpected=Get-ChildItem 'build/P106' -File | Where-Object { $_.Name -ne 'MediaIndex.Acceptance.exe' }
+          if ($unexpected) { $unexpected | Select-Object Name,Length | Format-Table; throw 'P106 default delivery must remain a single EXE' }
+
+      - name: Run embedded-worker self-test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP ('P106-SelfTest-' + [guid]::NewGuid().ToString('N'))
+          New-Item $root -ItemType Directory -Force | Out-Null
+          $report=Join-Path $root 'self-test.json'
+          $p=Start-Process -FilePath (Resolve-Path 'build/P106/MediaIndex.Acceptance.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "MediaIndex Acceptance self-test exit code $($p.ExitCode)" }
+          $json=Get-Content $report -Raw | ConvertFrom-Json
+          $json | ConvertTo-Json -Depth 6 | Write-Host
+          if (-not $json.ok) { throw 'Acceptance self-test returned ok=false' }
+          if (-not $json.embeddedWorker) { throw 'Embedded worker not found in host EXE' }
+          if (-not $json.extractedWorker) { throw 'Embedded worker extraction failed' }
+          Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Rename delivery and generate SHA-256
+        id: package
+        shell: pwsh
+        env:
+          PRODUCT_VERSION: ${{ steps.product-version.outputs.value }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $source='build/P106/MediaIndex.Acceptance.exe'
+          $delivery="build/P106/MediaIndex-Acceptance-v$env:PRODUCT_VERSION-win-x64.exe"
+          Move-Item $source $delivery -Force
+          $hash=(Get-FileHash $delivery -Algorithm SHA256).Hash.ToLowerInvariant()
+          $bytes=(Get-Item $delivery).Length
+          $shaFile="build/P106/MediaIndex-Acceptance-v$env:PRODUCT_VERSION-win-x64-SHA256.txt"
+          "MediaIndex-Acceptance-v$env:PRODUCT_VERSION-win-x64.exe  $bytes bytes  sha256=$hash" | Set-Content $shaFile -Encoding utf8
+          "exe=$delivery" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "sha=$shaFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "hash=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "bytes=$bytes" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload Windows EXE candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: MediaIndex-Acceptance-v${{ steps.product-version.outputs.value }}-win-x64
+          path: |
+            ${{ steps.package.outputs.exe }}
+            ${{ steps.package.outputs.sha }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write summary
+        if: always()
+        shell: pwsh
+        run: |
+          $lines=@(
+            "## P106 MediaIndex Acceptance v${{ steps.product-version.outputs.value }}",
+            "- Delivery: one self-contained Windows x64 EXE",
+            "- Internal architecture: .NET 8 WinForms shell + embedded isolated algorithm worker",
+            "- Worker extraction: private LocalAppData runtime",
+            "- Python required on user machine: no",
+            "- .NET runtime required on user machine: no",
+            "- Candidate commit: ${{ github.sha }}",
+            "- EXE bytes: ${{ steps.package.outputs.bytes }}",
+            "- SHA-256: ${{ steps.package.outputs.hash }}"
+          )
+          $lines | Add-Content $env:GITHUB_STEP_SUMMARY
