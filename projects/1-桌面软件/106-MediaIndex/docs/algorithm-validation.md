@@ -663,3 +663,106 @@ Confirmed / Probable / Similar / Not found
 - SIFT 是全量 compact 存储，还是候选后按需生成与缓存。
 - Top-50 在更大真实图库中的召回。
 - A4 用户真实素材域验收。
+
+
+## R016｜缩略图验证缓存，替代全量 SIFT 持久化的探索
+
+### 动机
+
+R011 表明，全量保存 compact SIFT 在 500k 图片规模可能需要数 GB 至十余 GB raw descriptor payload。
+
+另一条路线是保存较小的灰度缩略图缓存，在候选已经缩小到约 Top-50 后，临时从缩略图提取 SIFT，并同时复用同一缩略图做 warp NCC、template 和 edge fallback。
+
+### 数据
+
+使用 20 张自然 / 实际样例图，10 类困难变换，共 200 true pairs。
+
+负样本：
+
+- 190 个跨图配对。
+- 4 个 stereo same-scene hard negatives。
+
+缩略图：
+
+- grayscale
+- JPEG quality 60
+- max dimension 192 / 256 / 320 / 384
+
+高置信探索规则：
+
+```text
+inliers >= 8
+ratio >= 0.75
+query coverage >= 0.03
+NCC >= threshold
+```
+
+其中 threshold 根据缩略图尺寸保守选择。该规则仍不是生产阈值。
+
+### 结果
+
+| max dimension | avg JPEG bytes | 500k cache estimate | SIFT extract median | true confirmed | hard-negative FP |
+|---:|---:|---:|---:|---:|---:|
+| 192 | 4.10 KB | 1.91 GiB | 6.35 ms | 97/200 | 0/194 |
+| 256 | 6.59 KB | 3.07 GiB | 11.31 ms | 123/200 | 0/194 |
+| 320 | 9.15 KB | 4.26 GiB | 16.79 ms | 131/200 | 0/194 |
+| 384 | 12.33 KB | 5.74 GiB | 26.25 ms | 141/200 | 0/194 |
+
+50 个候选连续提取 SIFT 的粗略串行时间：
+
+- 192：约 315 ms
+- 256：约 534 ms
+- 320：约 745 ms
+- 384：约 1.10 s
+
+320 条件下 8 线程测试约 650 ms，说明 OpenCV 内部并行和内存访问会限制简单线程池的收益。
+
+### WebP 补充
+
+320px grayscale WebP：
+
+| quality | avg bytes | 500k estimate | true confirmed |
+|---:|---:|---:|---:|
+| 40 | 5.47 KB | 2.55 GiB | 118/200 |
+| 50 | 6.21 KB | 2.89 GiB | 118/200 |
+| 70 | 7.80 KB | 3.63 GiB | 128/200 |
+| 80 | 9.87 KB | 4.60 GiB | 135/200 |
+| 90 | 14.91 KB | 6.95 GiB | 137/200 |
+
+JPEG60 与 WebP70 至 80 都进入可接受候选范围，尚未冻结具体 codec。
+
+### 结论
+
+1. 缩略图缓存可以把“必须全量保存 SIFT descriptors”改成“候选后即时重建 verifier”。
+2. 256 至 320px 是当前更值得继续验证的区间。
+3. 320px JPEG60 在本样本上约 4.26 GiB / 500k，低于 128 SIFT descriptors/image 的约 8.2 GB raw payload。
+4. 同一缩略图还能承担低纹理 template / edge fallback，这是 raw descriptors 不具备的复用价值。
+5. 最坏 Top-50 深度验证目前仍可能需要约 0.5 至 0.8 s CPU，因此必须保留分层早停，普通压缩 / exact-hash 命中不应进入该路径。
+6. 对离线移动硬盘，缩略图缓存还有额外价值，因为源文件不在线时仍保留足够视觉证据。
+7. 缩略图本身可泄露媒体内容，正式产品必须提供本地隐私说明，并允许用户选择不保存视觉缓存的模式。
+
+可复现脚本：`experiments/r016_thumbnail_verifier_microbench.py`。
+
+## R016 后的存储策略候选
+
+当前 SIFT 策略不再只有“全存”与“完全按需”两种极端。
+
+更合理的候选是：
+
+```text
+all files:
+  pHash regions
+  compact visual-word postings
+  optional 256 to 320px verification thumbnail
+
+query:
+  exact / pHash / inverted index
+  ↓
+  Top-50 candidates
+  ↓
+  reconstruct SIFT from thumbnail only when needed
+  ↓
+  cache hot candidate descriptors
+```
+
+这条路线目前比“500k 全量持久化 128 至 256 个 SIFT descriptors”更值得优先推进，但仍需 A4 真实照片域验证。
