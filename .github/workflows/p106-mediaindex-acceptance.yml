@@ -100,6 +100,16 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "pyinstaller>=6.10,<7" "opencv-python>=4.10,<5" "numpy>=2.0,<3" "pillow>=10,<13" "pillow-heif>=0.18,<2"
 
+      - name: Run automated A4 and V011 regression
+        shell: pwsh
+        working-directory: projects/1-桌面软件/106-MediaIndex/experiments
+        run: |
+          $ErrorActionPreference='Stop'
+          python ci_acceptance_regression.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "Acceptance regression failed: $LASTEXITCODE"
+          }
+
       - name: Build private algorithm worker
         shell: pwsh
         working-directory: projects/1-桌面软件/106-MediaIndex/experiments
