@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MediaIndex.Acceptance;
 
@@ -134,11 +135,11 @@ internal sealed class AcceptanceWorkspace
         value ??= string.Empty;
         if (value.Contains('"'))
         {
-            value = value.Replace(""", """");
+            value = value.Replace("\"", "\"\"");
         }
 
         return value.IndexOfAny([',', '"', '\r', '\n']) >= 0
-            ? $""{value}""
+            ? $"\"{value}\""
             : value;
     }
 
