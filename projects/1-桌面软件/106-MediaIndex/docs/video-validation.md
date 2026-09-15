@@ -543,9 +543,262 @@ pHash + timestamp local index         │
 Exact / Same / Derived / Partial / Composite / Similar
 ```
 
-## 下一步
+## V011｜真实视频域验收工具
 
-- V011：真实视频小域验收设计与测试工具。
-- V012：更长视频、重复镜头与相同片头片尾。
-- V013：竖屏强裁剪的 local-feature rescue。
-- 然后把图片 A4 与视频 V11 合并为一次真实用户域验收。
+已建立仓库外真实数据验收协议与 baseline runner。
+
+新增：
+
+- `docs/real-domain-acceptance.md`。
+- `experiments/v011_real_video_acceptance_runner.py`。
+
+runner 当前只实现：
+
+- 1 fps 左右 uniform pHash sampling。
+- candidate video 排名。
+- constant / small affine 时间模型。
+- source offset 与 scale 估计。
+- Top-1、margin、start error 统计。
+
+它明确不包含：
+
+- local-feature Lane B。
+- Composite piecewise alignment。
+- Audio Lane C。
+
+因此 V011 当前状态是 **工具与协议已准备，用户真实数据尚未执行**。真实数据不得提交公开仓库。
+
+## V012｜更长视频、共享片头片尾与重复片段
+
+### 数据
+
+构造 4 个 60 s 视频：
+
+- 前 6 s 使用完全相同的共享片头。
+- 后 6 s 使用完全相同的共享片尾。
+- 中间为各自独立内容。
+- `long_2` 额外在约 18 至 23 s 和 36 至 41 s 放入同一重复 motif。
+
+### 共享片头 4 s Query
+
+结果：
+
+- 4 个库存视频全部得到完全相同的最高分。
+- 每个视频均有 4/4 一致 samples。
+
+所以共享片头单独出现时，系统不能给出唯一 source。
+
+正确行为应是：
+
+```text
+Ambiguous / Multiple candidates
+而不是任意挑一个 Confirmed
+```
+
+### 共享片尾 4 s Query
+
+结果与共享片头相同：
+
+- 4 个视频完全并列。
+- 无法唯一定位 source。
+
+### 独立中段 8 s Query
+
+从 `long_2` 的约 25 s 开始截取：
+
+- `long_2` 8/8 一致。
+- 其他 3 个视频没有有效时间匹配。
+
+唯一 source 恢复稳定。
+
+### 跨越共享片头与独立内容的 8 s Query
+
+从约 4 s 开始，前一部分属于公共片头，后一部分进入 `long_2` 独立内容：
+
+- `long_2` 获得 8 个一致 samples。
+- 其他视频只有约 2 个共享片头证据。
+
+说明 Query 只要包含足够独立内容，就可以打破片头歧义。
+
+### 同一视频内部重复片段
+
+从 `long_2` 第一次 repeated motif 截取 5 s：
+
+- 正确 source video 唯一为 `long_2`。
+- 同时出现两个强 source offset mode，约对应 18 s 与 36 s 两个重复位置。
+
+这说明即使 source video 唯一，source interval 仍可能不唯一。
+
+### 结论
+
+1. 视频结果模型必须支持 `Ambiguous source`。
+2. 同一 source video 必须允许返回多个候选 source intervals。
+3. 共享片头、片尾、片尾 logo、模板动画等高频片段需要类似 stop segment 的降权机制。
+4. source 唯一性不能只看 Top-1，必须看候选 margin 与时间区间唯一性。
+
+可复现脚本：`experiments/v012_long_video_repeated_segments.py`。
+
+## V013｜竖屏强裁剪的 SIFT rescue
+
+### 目的
+
+V008 中强竖屏裁剪使 global pHash 失效，multi-region pHash 甚至把错误视频排在正确视频之前。
+
+本轮使用两阶段方法：
+
+```text
+pHash 只负责保留 Top-3 candidate videos
+并给出粗略 offset
+→
+在 offset ±1 s 附近做 SIFT + RANSAC frame verification
+```
+
+### 8 s 强竖屏裁剪
+
+pHash Top-3：
+
+- 正确 `lib_02` 进入候选，但证据只有 2 个一致 offset votes。
+
+SIFT rerank：
+
+- `lib_02` 恢复第一。
+- 3 个时间一致 verified frames。
+- median inliers ≈ 89。
+- median inlier ratio ≈ 0.568。
+- 另外两个候选均为 0 个 verified frames。
+
+### 竖屏裁剪 + 水印
+
+pHash：
+
+- 错误 `lib_00` 排第一。
+- 正确 `lib_02` 仅第二。
+
+SIFT rerank：
+
+- `lib_02` 恢复第一。
+- 3 个 verified frames。
+- median inliers ≈ 89。
+- median inlier ratio ≈ 0.622。
+- 其他候选为 0。
+
+### 非中心 50% crop + 水印
+
+pHash 已把正确 source 放到第一候选，但证据仍弱。
+
+SIFT rerank：
+
+- 正确 `lib_02` 第一。
+- 3 个 verified frames。
+- median inliers ≈ 126。
+- median inlier ratio ≈ 0.668。
+
+### 结论
+
+1. V008 的强竖屏失败可以由 local geometry 明显救回。
+2. 但是前提是正确 source 仍进入候选集合。
+3. 所以视频 Lane A 不能只留 Top-1，必须给 Lane B 保留足够 candidate width。
+4. 正式视频 Lane B 应直接使用 timestamp-preserving local-feature inverted index，而不是依赖 pHash Top-3 这个实验性捷径。
+5. 粗略 offset 允许存在约 1 s 误差，local verifier 应在邻域内搜索。
+
+可复现脚本：`experiments/v013_vertical_crop_sift_rescue.py`。
+
+## V014｜视频索引规模模型
+
+### 为什么必须单独考虑视频规模
+
+图片中每个文件只产生一组视觉签名。
+
+视频如果按 1 fps 采样，1 小时会产生 3600 个 baseline frames。因此把图片的全部 28-region hash、visual words 和 verifier thumbnail 原样复制到每个 sampled frame，会迅速膨胀。
+
+### 1 fps baseline 的理论容量
+
+假设每个 baseline frame：
+
+- `video_id + timestamp + global pHash` 合计约 16 bytes。
+- 对照方案保存 28-region hash。
+- visual words 假设 24 postings/frame，每 posting 8 bytes。
+- verifier thumbnail 粗略按 6 KB/frame。
+
+| 总视频时长 | baseline 16 B | 28-region | 24 postings | thumbnail every frame |
+|---:|---:|---:|---:|---:|
+| 1,000 h | 0.054 GiB | 0.778 GiB | 0.644 GiB | 20.1 GiB |
+| 5,000 h | 0.268 GiB | 3.889 GiB | 3.219 GiB | 100.6 GiB |
+| 10,000 h | 0.536 GiB | 7.778 GiB | 6.437 GiB | 201.2 GiB |
+| 50,000 h | 2.682 GiB | 38.892 GiB | 32.187 GiB | 1005.8 GiB |
+
+最明显的结论是：
+
+> 视频绝不能给每个 1 fps baseline frame 保存完整图片级 verifier thumbnail。
+
+### 稀疏 local-feature / verifier keyframes
+
+如果 local visual words 和 thumbnail 只保存到平均每 10 s 一个 sparse keyframe：
+
+在 10,000 h 视频库中：
+
+- keyframes 约 3.6M。
+- 24 visual-word postings/keyframe 约 0.64 GiB。
+- 若每张 verifier thumbnail 仍按 6 KB，约 20.1 GiB。
+
+thumbnail 仍然偏大，所以视频 verifier cache 需要进一步：
+
+- 更低分辨率。
+- scene-adaptive 稀疏保存。
+- 总量上限。
+- 只对离线盘或高价值媒体启用。
+- 或候选时从在线源文件即时提取。
+
+### Audio Lane C 规模
+
+根据 V010 中 24 s 音频约 172 个 raw uint32 Chromaprint entries，粗略约 28.7 bytes/s。
+
+| 总视频时长 | raw audio fingerprint |
+|---:|---:|
+| 1,000 h | 0.096 GiB |
+| 5,000 h | 0.481 GiB |
+| 10,000 h | 0.961 GiB |
+| 50,000 h | 4.806 GiB |
+
+因此 Audio Lane C 的存储成本相对温和。
+
+### V014 后的视频索引分层
+
+当前不再计划把完整图片签名复制给每个视频 frame。
+
+更合理的是：
+
+```text
+Tier V0
+约 1 fps baseline
+global pHash + video_id + timestamp
+极轻量
+
+Tier V1
+scene / motion / periodic sparse keyframes
+selected local visual words
+timestamp-preserving postings
+
+Tier V2
+更稀疏的 verifier thumbnail
+或在线源文件即时提取
+
+Tier A
+Audio fingerprint sequence
+独立 supporting lane
+```
+
+这会显著改变后续统一索引格式，是当前非常重要的工程结论。
+
+可复现脚本：`experiments/v014_video_index_scale.py`。
+
+## V014 后的下一步
+
+当前合成 / 程序样例阶段已经暴露了主要结构性问题。
+
+接下来优先级改为：
+
+1. 图片 A4 与视频 V011 合并做一次真实用户域验收。
+2. 真实域验证 Tier V0 约 1 fps baseline 是否足够。
+3. 真实域决定 sparse keyframe 密度和 verifier cache 策略。
+4. 再根据用户真实视频总时长估算最终索引容量。
