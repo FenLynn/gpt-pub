@@ -318,13 +318,9 @@ Confirmed / Probable / Similar / Not found
 
 其中 Lane B 的 **可扩展实现仍未冻结**。当前优先继续比较紧凑 ORB LSH、BoVW / inverted index，以及必要时才考虑 embedding。
 
-## 待执行
+## 后续验证
 
-- R010：更大公开图片集上的候选召回交叉验证。
-- R011：同场景连拍 / 同主体近似照片 hard negative 扩充。
-- R012：低纹理专门 fallback。
-- R013：可扩展 local-feature inverted index 原型。
-- R014：图片链消融与生产阈值冻结。
+R010 至 R012 已在下文完成。R013 至 R015 继续验证大规模索引与存储工程边界。
 
 
 ## R010｜150 图相关场景压力集
@@ -492,4 +488,178 @@ Confirmed / Probable / Similar / Not found
 - Lane B 在 50 万真实分布下采用哪种 inverted index。
 - SIFT 精确特征是全量 compact 持久化，还是候选后按需生成 / 缓存。
 - Top-50 是否能在更大、更多样的公开图库中保持足够召回。
+- A4 用户真实素材域验收。
+
+
+## R013｜50 万图 visual-word 倒排索引微基准
+
+### 目的
+
+验证 Lane B 是否必须依赖重量级向量数据库，还是可以先采用紧凑的 visual-word inverted index。
+
+本轮只测试索引工程量级，不测试真实图片识别准确率。
+
+### 合成分布
+
+- 图片数：500,000
+- visual words/image：48
+- vocabulary：65,536
+- 20% word assignment 来自 512 个高频词
+- 其余来自长尾词
+- 每图内部重复 word 去重
+- 停用词：全词表 df 最高的 1%
+
+最终：
+
+- 平均 unique words/image：约 47.90
+- postings：23,950,892
+- postings 本体：约 91.37 MiB
+- offsets：约 0.50 MiB
+- IDF：约 0.25 MiB
+- 构建时临时 word matrix：约 91.55 MiB
+
+因此 50 万图、约 48 个紧凑 visual words/image 的核心倒排 postings 可以控制在约 100 MiB 量级，不需要为每个图片保存多表 LSH 的重复 posting。
+
+### 稀疏候选累计
+
+搜索只对命中的 postings 做 `unique + sparse bincount`，不再为每次 Query 分配 50 万长度 dense score array。
+
+500k 条件下，Query 含 4 个高频干扰词、8 个随机噪声词：
+
+| Query 中保留的目标长尾词 | Top-5 | Top-20 | Top-50 | median | P95 |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 1/100 | 1/100 | 1/100 | 约 0.22 ms | 约 0.32 ms |
+| 2 | 59/100 | 100/100 | 100/100 | 约 0.26 ms | 约 0.46 ms |
+| 4 | 100/100 | 100/100 | 100/100 | 约 0.29 ms | 约 0.57 ms |
+
+以上召回数字来自合成 visual-word 模型，只用于说明“共享多个具有区分度的局部词时，稀疏倒排很容易把目标推入 Top-50”，不得当作真实图片召回率。
+
+### stop-word 作用
+
+在 4 个目标长尾词条件下，额外强制加入 4 个最高频视觉词：
+
+- 不过滤 stop words：median postings touched 约 41,406，median query 约 2.97 ms。
+- 过滤 top 1% stop words：median postings touched 约 3,554，median query 约 0.25 ms。
+
+结论：
+
+1. visual-word inverted index 在 50 万规模的核心 postings 内存可控制在约百 MiB。
+2. stop-word 过滤非常重要，可以把候选 posting 量压低一个数量级。
+3. sparse accumulation 明显优于 dense 50 万 score array。
+4. Lane B 值得优先做 inverted index，而不是默认上 HNSW 或 embedding。
+5. 该微基准只证明索引结构量级，真实 visual-word 量化误差仍需公开大图库验证。
+
+可复现脚本：`experiments/r013_visual_word_index_microbench.py`。
+
+## R014｜50 万媒体 SQLite 元数据微基准
+
+### 数据结构
+
+模拟 500,000 个媒体文件，字段包括：
+
+- storage_id
+- relative path
+- size
+- mtime
+- width / height
+- 16-byte exact hash
+- status
+- 8-byte global image hash
+
+索引：
+
+- exact_hash
+- storage_id + relpath
+
+构建阶段使用 `journal_mode=OFF` 与 `synchronous=OFF`，所以构建时间只表示批量导入量级，不代表正式产品的数据安全设置。
+
+### 结果
+
+500k files + 500k image_signatures：
+
+- SQLite 文件：约 67.22 MiB
+- files 批量写入：约 2.78 s
+- signatures 批量写入：约 0.58 s
+- warm exact-hash lookup：median 约 0.0069 ms，P95 约 0.0096 ms
+- warm storage/path lookup：median 约 0.0063 ms，P95 约 0.0074 ms
+- 顺序读取 500k global hash rows：约 0.44 s
+
+结论：
+
+1. SQLite 保存文件目录、设备映射、exact hash 和轻量 signature 完全可行。
+2. 50 万级 metadata 不是系统主要风险。
+3. 大块 pHash arrays 与 local-feature postings 更适合独立紧凑文件或 mmap，而不是把所有高频检索数据逐条从 SQLite 读取。
+4. SQLite 继续作为事实数据库和增量扫描状态库，视觉索引可以采用旁路二进制结构。
+
+可复现脚本：`experiments/r014_sqlite_metadata_microbench.py`。
+
+## R015｜pHash region 数量与全表扫描成本
+
+使用随机 64-bit hashes，执行：
+
+```text
+XOR
+→ popcount
+→ 每图 region min
+→ Top-20
+```
+
+每组重复 6 次，排除第一次后取 warm median。
+
+| 库存 | regions/image | raw RAM | warm median |
+|---:|---:|---:|---:|
+| 100k | 28 | 21.36 MiB | 8.67 ms |
+| 300k | 28 | 64.09 MiB | 29.74 ms |
+| 500k | 28 | 106.81 MiB | 47.01 ms |
+| 100k | 60 | 45.78 MiB | 14.13 ms |
+| 300k | 60 | 137.33 MiB | 52.22 ms |
+| 500k | 60 | 228.88 MiB | 67.20 ms |
+| 100k | 201 | 153.35 MiB | 40.30 ms |
+| 300k | 201 | 460.05 MiB | 107.38 ms |
+| 500k | 201 | 766.75 MiB | 200.68 ms |
+
+环境噪声会影响具体毫秒数，所以该表用于比较量级与 region 数量趋势，不作为产品 SLA。
+
+结论：
+
+1. 201-region 在 50 万图时 raw hash 已接近 0.75 GiB，单 Query 连续扫描约 0.2 s，作为默认常驻全表扫描过重。
+2. 28 至 60 region 的 raw RAM 约 107 至 229 MiB，更适合 V1 的 Lane A 常驻候选层。
+3. 201-region 可以保留为研究上限或二阶段候选内细化，不建议作为每个 Query 的第一步全库扫描。
+4. Lane A 也应从“尽量多 region”转向“有限 region + Lane B 局部倒排互补”。
+
+可复现脚本：`experiments/r015_phash_scan_microbench.py`。
+
+## R015 后的阶段性收敛
+
+截至当前，图片主链已经出现较稳定的工程方向：
+
+```text
+SQLite metadata / exact hash
+  ↓
+Lane A
+  28 至 60 个精选 pHash regions
+  常驻内存或 mmap
+  ↓
+Lane B
+  compact visual-word inverted index
+  约百 MiB postings 量级
+  stop-word + IDF
+  ↓
+候选并集
+  当前继续以 Top-50 为保守预算
+  ↓
+高纹理
+  SIFT + RANSAC + content consistency
+低纹理
+  template / edge fallback
+  ↓
+Confirmed / Probable / Similar / Not found
+```
+
+当前仍未冻结：
+
+- 28、60 或其他 region layout 的最终选择。
+- visual-word codebook 的真实训练策略与版本升级机制。
+- SIFT 是全量 compact 存储，还是候选后按需生成与缓存。
+- Top-50 在更大真实图库中的召回。
 - A4 用户真实素材域验收。
