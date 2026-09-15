@@ -74,6 +74,7 @@ def fit_model(
         return {
             "score": -9.0,
             "inliers": 0,
+            "fraction": 0.0,
             "offset": None,
             "scale": None,
             "median_hamming": 99.0,
@@ -171,10 +172,18 @@ def fit_model(
             fraction - median_hamming / 128.0
         ),
         "inliers": count,
+        "fraction": float(fraction),
         "offset": offset,
         "scale": scale,
         "median_hamming": median_hamming,
     }
+
+
+def resolve_query(raw: str, manifest: Path) -> Path:
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = manifest.parent / path
+    return path.resolve()
 
 
 def main() -> None:
@@ -226,10 +235,11 @@ def main() -> None:
     results = []
 
     for row in rows:
-        query = Path(row["query"]).expanduser().resolve()
+        query = resolve_query(row["query"], manifest)
         expected = (
-            row["expected_source"]
+            row.get("expected_source", "")
             .replace("\\", "/")
+            .strip()
             .lstrip("./")
         )
         expected_start = (
@@ -282,20 +292,41 @@ def main() -> None:
             )
         )
 
+        margin = (
+            top[0]["score"]
+            - second[0]["score"]
+        )
+        is_positive = bool(expected)
+        strong_match_baseline = (
+            top[0]["inliers"] >= 3
+            and top[0]["fraction"] >= 0.50
+            and top[0]["median_hamming"] <= 12
+            and top[0]["score"] >= 0.35
+            and margin >= 0.05
+        )
+
         record = {
             "query": query.name,
             "expected_source": expected,
+            "is_positive": is_positive,
             "top1_source": top[1],
-            "correct_top1": top[1] == expected,
+            "correct_top1": (
+                top[1] == expected
+                if is_positive
+                else None
+            ),
             "relation": row.get("relation", ""),
             "inliers": top[0]["inliers"],
+            "fraction": top[0]["fraction"],
             "estimated_offset_sec": top[0]["offset"],
             "estimated_scale": top[0]["scale"],
             "median_hamming": top[0]["median_hamming"],
             "score": top[0]["score"],
-            "margin_to_second": (
-                top[0]["score"]
-                - second[0]["score"]
+            "margin_to_second": margin,
+            "strong_match_baseline": bool(strong_match_baseline),
+            "unexpected_strong_match_baseline": bool(
+                (not is_positive)
+                and strong_match_baseline
             ),
         }
 
@@ -310,33 +341,57 @@ def main() -> None:
 
         results.append(record)
 
-    correct = sum(
-        record["correct_top1"]
+    positives = [
+        record
         for record in results
+        if record["is_positive"]
+    ]
+    negatives = [
+        record
+        for record in results
+        if not record["is_positive"]
+    ]
+
+    correct = sum(
+        bool(record["correct_top1"])
+        for record in positives
     )
 
     start_errors = [
         record["start_abs_error_sec"]
-        for record in results
+        for record in positives
         if "start_abs_error_sec" in record
     ]
 
+    unexpected_strong = sum(
+        record["unexpected_strong_match_baseline"]
+        for record in negatives
+    )
+
     summary = {
         "queries": len(results),
-        "top1_correct": correct,
-        "top1_accuracy": (
-            correct / max(1, len(results))
+        "positive_queries": len(positives),
+        "negative_queries": len(negatives),
+        "top1_correct_positive": correct,
+        "top1_accuracy_positive": (
+            correct / max(1, len(positives))
         ),
-        "median_margin": (
+        "unexpected_strong_match_count_baseline": (
+            unexpected_strong
+        ),
+        "unexpected_strong_match_rate_baseline": (
+            unexpected_strong / max(1, len(negatives))
+        ),
+        "median_margin_positive": (
             float(
                 np.median(
                     [
                         record["margin_to_second"]
-                        for record in results
+                        for record in positives
                     ]
                 )
             )
-            if results
+            if positives
             else None
         ),
         "median_start_abs_error_sec": (
@@ -347,7 +402,9 @@ def main() -> None:
         "note": (
             "Baseline pHash temporal runner only. "
             "No local-feature Lane B, Composite "
-            "piecewise alignment, or Audio Lane C."
+            "piecewise alignment, or Audio Lane C. "
+            "The strong-match threshold is exploratory, "
+            "not production-frozen."
         ),
     }
 
