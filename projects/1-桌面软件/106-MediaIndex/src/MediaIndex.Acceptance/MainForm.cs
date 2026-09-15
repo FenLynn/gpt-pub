@@ -28,6 +28,7 @@ internal sealed class MainForm : Form
     private readonly Label _resultDetail = new();
     private readonly TextBox _log = new();
     private readonly ProgressBar _progress = new();
+    private readonly Button _autoButton = new();
     private readonly Button _runButton = new();
     private readonly Button _cancelButton = new();
     private readonly Button _exportButton = new();
@@ -258,7 +259,7 @@ internal sealed class MainForm : Form
         _resultHeadline.Location = new Point(22, 17);
         card.Controls.Add(_resultHeadline);
 
-        _resultDetail.Text = "结果会保存在本机 AppData，默认不复制任何私人媒体。";
+        _resultDetail.Text = "推荐直接点“自动验收”。程序会从真实库存自动抽样并生成已知答案的测试 Query。";
         _resultDetail.AutoSize = true;
         _resultDetail.ForeColor = Color.FromArgb(93, 104, 121);
         _resultDetail.Location = new Point(22, 48);
@@ -270,12 +271,22 @@ internal sealed class MainForm : Form
         _progress.Value = 0;
         card.Controls.Add(_progress);
 
-        _runButton.Text = "开始真实域验收";
-        _runButton.Font = new Font(Font.FontFamily, 10F, FontStyle.Bold);
-        _runButton.BackColor = Color.FromArgb(61, 120, 220);
-        _runButton.ForeColor = Color.White;
+        _autoButton.Text = "自动验收（推荐）";
+        _autoButton.Font = new Font(Font.FontFamily, 10F, FontStyle.Bold);
+        _autoButton.BackColor = Color.FromArgb(61, 120, 220);
+        _autoButton.ForeColor = Color.White;
+        _autoButton.FlatStyle = FlatStyle.Flat;
+        _autoButton.FlatAppearance.BorderSize = 0;
+        _autoButton.Height = 40;
+        _autoButton.Click += async (_, _) => await RunAutoSmokeAsync();
+        card.Controls.Add(_autoButton);
+
+        _runButton.Text = "运行手工样本";
+        _runButton.Font = new Font(Font.FontFamily, 9.5F);
+        _runButton.BackColor = Color.White;
+        _runButton.ForeColor = Color.FromArgb(52, 66, 84);
         _runButton.FlatStyle = FlatStyle.Flat;
-        _runButton.FlatAppearance.BorderSize = 0;
+        _runButton.FlatAppearance.BorderColor = Color.FromArgb(210, 218, 230);
         _runButton.Height = 40;
         _runButton.Click += async (_, _) => await RunAcceptanceAsync();
         card.Controls.Add(_runButton);
@@ -310,13 +321,16 @@ internal sealed class MainForm : Form
             _progress.Location = new Point(22, 80);
             _progress.Size = new Size(leftWidth, 18);
 
-            _runButton.Location = new Point(22, 110);
-            _runButton.Width = 170;
+            _autoButton.Location = new Point(22, 110);
+            _autoButton.Width = 168;
 
-            _cancelButton.Location = new Point(202, 110);
-            _cancelButton.Width = 78;
+            _runButton.Location = new Point(198, 110);
+            _runButton.Width = 118;
 
-            _exportButton.Location = new Point(290, 110);
+            _cancelButton.Location = new Point(324, 110);
+            _cancelButton.Width = 72;
+
+            _exportButton.Location = new Point(404, 110);
             _exportButton.Width = 120;
 
             _log.Location = new Point(leftWidth + 44, 18);
@@ -585,6 +599,139 @@ internal sealed class MainForm : Form
                 }
             }
         }
+    }
+
+    private async Task RunAutoSmokeAsync()
+    {
+        SaveState();
+
+        var imageLibrary = Directory.Exists(_state.ImageLibraryPath)
+            ? _state.ImageLibraryPath
+            : string.Empty;
+        var videoLibrary = Directory.Exists(_state.VideoLibraryPath)
+            ? _state.VideoLibraryPath
+            : string.Empty;
+
+        if (string.IsNullOrWhiteSpace(imageLibrary)
+            && string.IsNullOrWhiteSpace(videoLibrary))
+        {
+            MessageBox.Show(
+                this,
+                "只需要先选择图片库存或视频库存中的至少一个，然后直接点自动验收。",
+                "还没有选择库存",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!_backend.IsReady)
+        {
+            MessageBox.Show(
+                this,
+                "当前 EXE 的算法组件不可用，请使用最新的单 EXE 版本。",
+                "运行组件缺失",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        SetRunning(true);
+        _runCancellation = new CancellationTokenSource();
+        _log.Clear();
+        _progress.Value = 5;
+        _resultHeadline.Text = "自动验收中";
+        _resultDetail.Text = "正在从真实库存自动抽样并生成压缩、裁剪、水印和视频片段测试。";
+
+        var progress = new Progress<string>(AppendLog);
+
+        try
+        {
+            AppendLog("开始自动真实素材 smoke acceptance...");
+
+            var exit = await _backend.RunAutoSmokeAsync(
+                imageLibrary,
+                videoLibrary,
+                _workspace.AutoSmokeDirectory,
+                progress,
+                _runCancellation.Token);
+
+            if (exit != 0)
+            {
+                throw new InvalidOperationException(
+                    $"自动验收退出码：{exit}");
+            }
+
+            _progress.Value = 100;
+            ShowAutoSmokeSummary();
+            _exportButton.Enabled = true;
+            AppendLog("自动验收完成。");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog("已停止。");
+            _resultHeadline.Text = "自动验收已停止";
+            _progress.Value = 0;
+        }
+        catch (Exception exception)
+        {
+            AppendLog("ERROR: " + exception.Message);
+            _resultHeadline.Text = "自动验收失败";
+            _resultDetail.Text = exception.Message;
+            MessageBox.Show(
+                this,
+                exception.Message,
+                "MediaIndex Acceptance",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _runCancellation?.Dispose();
+            _runCancellation = null;
+            SetRunning(false);
+        }
+    }
+
+    private void ShowAutoSmokeSummary()
+    {
+        if (!File.Exists(_workspace.AutoSmokeSummaryPath))
+        {
+            _resultHeadline.Text = "自动验收完成";
+            _resultDetail.Text = "结果文件未找到。";
+            return;
+        }
+
+        using var document = JsonDocument.Parse(
+            File.ReadAllText(_workspace.AutoSmokeSummaryPath));
+        var root = document.RootElement;
+        var pieces = new List<string>();
+
+        if (root.TryGetProperty("image", out var image)
+            && image.ValueKind == JsonValueKind.Object)
+        {
+            pieces.Add(
+                "图片自动 Query "
+                + IntValue(root, "generated_image_queries")
+                + "，Top50 "
+                + Percent(image, "candidate_topk_recall")
+                + "，误确认 "
+                + IntValue(image, "false_confirmed_count_baseline"));
+        }
+
+        if (root.TryGetProperty("video", out var video)
+            && video.ValueKind == JsonValueKind.Object)
+        {
+            pieces.Add(
+                "视频自动 Query "
+                + IntValue(root, "generated_video_queries")
+                + "，Top1 "
+                + Percent(video, "top1_accuracy_positive"));
+        }
+
+        _resultHeadline.Text = "自动验收完成";
+        _resultDetail.Text = pieces.Count > 0
+            ? string.Join("    ", pieces)
+            : "没有生成可测试的媒体 Query。";
     }
 
     private async Task RunAcceptanceAsync()
@@ -917,7 +1064,8 @@ internal sealed class MainForm : Form
         {
             _workspace.ImageResultPath,
             _workspace.VideoResultPath,
-            _workspace.SummaryResultPath
+            _workspace.SummaryResultPath,
+            _workspace.AutoSmokeSummaryPath
         })
         {
             if (File.Exists(source))
@@ -987,6 +1135,7 @@ internal sealed class MainForm : Form
 
     private void SetRunning(bool running)
     {
+        _autoButton.Enabled = !running;
         _runButton.Enabled = !running;
         _cancelButton.Enabled = running;
         _grid.Enabled = !running;
