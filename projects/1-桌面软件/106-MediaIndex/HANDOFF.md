@@ -33,7 +33,7 @@
 
 当前处于 **Phase 0：图片算法与索引冻结前验证**。
 
-已完成至 R015：
+已完成至 R016：
 
 - Krokiet / SIFT 受控基线。
 - 20 图、340 Query 自然样例正样本矩阵。
@@ -45,6 +45,7 @@
 - 100k 至 500k pHash 扫描微基准。
 - 500k synthetic visual-word inverted index。
 - 500k SQLite metadata microbenchmark。
+- verifier thumbnail cache 容量、SIFT 重建与 hard-negative 验证。
 
 可复现脚本：
 
@@ -52,6 +53,7 @@
 experiments/r013_visual_word_index_microbench.py
 experiments/r014_sqlite_metadata_microbench.py
 experiments/r015_phash_scan_microbench.py
+experiments/r016_thumbnail_verifier_microbench.py
 ```
 
 ## 4. 当前架构候选
@@ -61,6 +63,7 @@ SQLite metadata / exact hash
 → Lane A: 28 至 60 selected pHash regions
 → Lane B: compact visual-word inverted index
 → candidate union，当前约 Top-50
+→ optional 256 至 320px verifier thumbnail
 → high texture: SIFT + RANSAC + content consistency
 → low texture: template / edge fallback
 → Confirmed / Probable / Similar / Not found
@@ -76,23 +79,24 @@ SQLite metadata / exact hash
 - ORB / AKAZE 单独取代 final SIFT verifier。
 - 把视觉语义相似直接作为同源结论。
 - 把 20 图小库的 Top-5 满召回当成大库结论。
+- 默认要求 500k 全量保存大量 SIFT descriptors。
 
 ### 当前主要风险
 
 1. visual-word Lane B 仍需更大的真实图片分布验证。
 2. 28 至 60 regions 的最终 layout 未冻结。
-3. compact SIFT 全量存储可能达到数 GB 至十余 GB。
+3. verifier thumbnail 的 256 / 320px 与 codec 未冻结。
 4. Top-50 仍需 A4 真实域验收。
-5. 低纹理 fallback 有效但只能候选后运行。
+5. thumbnail cache 可泄露媒体内容，必须设计隐私模式。
 
 ## 5. 当前唯一下一步
 
 继续在 `p106-exp`：
 
 1. 扩大公开真实图片交叉验证集。
-2. 冻结 visual-word quantization / inverted index 方案。
+2. 冻结 visual-word quantization / inverted index。
 3. 冻结 Lane A region layout。
-4. 比较 SIFT storage 与按需 / cache 策略。
+4. 冻结 verifier thumbnail / privacy mode。
 5. 然后进入 A4 用户真实域验收。
 
 不需要用户继续手工调 Krokiet 参数。
