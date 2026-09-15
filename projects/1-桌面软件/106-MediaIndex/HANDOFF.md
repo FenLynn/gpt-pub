@@ -12,7 +12,7 @@
 - 正式主线：`main`
 - 固定流转：`main → p106-exp → p106-stable → main`
 
-当前用户明确要求：暂不修改任何公共文件，只建立 P106 自有目录和长期分支。因此 `/目录.md` 尚未登记 P106。后续通过独立统一仓库任务补齐，不得在当前 P106 开发提交中夹带。
+当前用户明确要求：暂不修改任何公共文件，只建立和维护 P106 自有目录与长期分支。因此 `/目录.md` 尚未登记 P106。后续通过独立统一仓库任务补齐。
 
 ## 2. 新对话强制读取顺序
 
@@ -32,12 +32,16 @@
 
 当前处于 **Phase 0：图片算法 A 阶段验证**。
 
-已完成：
+已完成至 `docs/algorithm-validation.md` 的 R012，包括：
 
-- A0 受控 Krokiet / SIFT 基线。
-- A1 第一轮 20 图、340 Query 自然样例正样本矩阵。
-- A2 第一轮 222 hard-negative。
-- A3 第一轮 100k 至 500k hash 微基准与候选索引探索。
+- Krokiet / SIFT 受控基线。
+- 20 图、340 Query 自然样例正样本矩阵。
+- 222 hard-negative。
+- 100k 至 500k hash 微基准。
+- 150 图相关场景压力集，250 Query。
+- ORB LSH、ORB/SIFT BoVW 候选索引探索。
+- compact ORB / AKAZE / CV_8U SIFT 精确验证消融。
+- 低纹理 template / edge fallback。
 
 当前架构候选：
 
@@ -45,9 +49,9 @@
 Exact hash
 → Lane A: global / multi-region pHash
 → Lane B: scalable local-feature index
-→ candidate union
-→ SIFT + RANSAC
-→ content consistency
+→ candidate union，当前压力集倾向约 Top-50
+→ high texture: SIFT + RANSAC + content consistency
+→ low texture: template / edge fallback
 → Confirmed / Probable / Similar / Not found
 ```
 
@@ -57,20 +61,24 @@ Exact hash
 - 全库逐图 SIFT。
 - 只看 RANSAC inliers。
 - 只看 inlier ratio。
+- ORB / AKAZE 单独取代 final SIFT verifier。
 - 把视觉语义相似直接作为同源结论。
 
 ### 当前主要风险
 
-Lane B 尚未冻结。小库中 ORB、LSH 与 BoVW 均显示价值，但 50 万规模的紧凑 local-feature inverted index 尚未经过真实分布验证。
+1. Lane B 的 50 万规模 inverted index 尚未冻结。
+2. Top-50 是目前相关压力集支持的候选预算，还需更大公开数据交叉验证。
+3. compact SIFT 若全量持久化，500k raw descriptors 约需数 GB 至十余 GB。
+4. 低纹理 fallback 有效但不能全库运行。
 
 ## 4. 当前唯一下一步
 
 继续在 `p106-exp`：
 
 1. 扩大公开图片交叉验证集。
-2. 比较 compact ORB LSH 与 visual-word inverted index。
-3. 专门处理低纹理图片。
-4. 冻结 candidate Top-k 策略后，再进入 A4 用户真实域验收。
+2. 实现并比较 local-feature inverted index。
+3. 比较 compact SIFT 全量持久化与按需生成 / 缓存。
+4. 冻结 candidate Top-k 后再进入 A4 用户真实域验收。
 
 不需要用户继续手工调 Krokiet 参数。
 
