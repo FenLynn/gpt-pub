@@ -55,8 +55,8 @@
 当前首选入口已经改为 GUI：
 
 ```text
-build_acceptance.bat
-→ MediaIndex Acceptance.exe
+start_acceptance.bat
+→ 自动构建或直接启动 MediaIndex Acceptance.exe
 ```
 
 GUI 源码：
@@ -81,8 +81,8 @@ experiments/acceptance_worker.py
 用户流程：
 
 ```text
-1. 第一次双击 build_acceptance.bat
-2. 以后直接运行 dist/.../MediaIndex Acceptance.exe
+1. 双击 start_acceptance.bat
+2. 若 portable 已存在会直接启动；若不存在会自动构建并启动
 3. 选库存目录
 4. 拖入或添加 Query
 5. 双击每条 Query 设置真实源，或设为无对应
