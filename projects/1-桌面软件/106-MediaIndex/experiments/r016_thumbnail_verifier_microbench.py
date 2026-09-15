@@ -451,6 +451,32 @@ def main() -> None:
                     )
                 )
 
+        try:
+            left, right, _ = data.stereo_motorcycle()
+            left = resize_max(to_bgr(left))
+            right = resize_max(to_bgr(right))
+            right_thumb, _ = make_thumbnail(
+                right,
+                max_dim,
+                quality=60,
+            )
+            right_feature = extract_sift(detector, right_thumb)
+            for stereo_query in (
+                left,
+                crop_center(left, 0.5),
+                crop_asymmetric(left, 0.5),
+                crop_center(left, 0.3),
+            ):
+                negative_metrics.append(
+                    match(
+                        matcher,
+                        extract_sift(detector, stereo_query),
+                        right_feature,
+                    )
+                )
+        except Exception:
+            pass
+
         if max_dim == 192:
             ncc_threshold = 0.85
         elif max_dim == 256:
