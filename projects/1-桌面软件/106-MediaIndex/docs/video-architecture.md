@@ -241,3 +241,51 @@ Video engine
 ```
 
 视频对图片底座只增加时间语义，不复制视觉算法。
+
+## 11. V005 至 V007 收敛
+
+### Sampling baseline
+
+V005 对 0.5 / 1 / 2 / 4 s uniform sampling 的结果说明：
+
+- 0.5 s：9/9 related Top-1，困难 clip 仍有较充分时间证据。
+- 1 s：9/9，当前存储与召回的更合理基础点。
+- 2 s 与 4 s：仅 5/9，短 clip 出现明显 sampling phase alias。
+
+因此当前方向不是单纯降低采样率，而是：
+
+```text
+约 1 fps uniform baseline
++
+scene / motion adaptive extra samples
+```
+
+scene keyframe 只能增强，不能完全替代 uniform baseline。
+
+### Timestamp-preserving Lane B
+
+V007 否定了 whole-video small-vocabulary ORB BoVW。相关视频之间会共享大量视觉词，如果丢掉 timestamp，exact clip 都可能被错误视频抢走。
+
+视频 local-feature postings 至少保留：
+
+```text
+visual token
+→ video_id
+→ timestamp / frame_id
+```
+
+candidate score 应同时考虑 visual score 与时间一致性。
+
+### Piecewise temporal model
+
+V006 的删除中段案例可以被两个 offset segment 正确解释，而单一 affine 只能覆盖部分证据。
+
+正式模型层级固定为：
+
+```text
+constant offset
+→ small affine speed
+→ piecewise monotonic alignment
+```
+
+Model C 后续优先采用 dynamic programming 或 monotonic longest-path，而不是无限增加 RANSAC 直线。
