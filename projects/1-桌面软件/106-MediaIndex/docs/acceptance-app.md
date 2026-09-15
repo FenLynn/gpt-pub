@@ -24,13 +24,15 @@
 
 ## 用户操作目标
 
-第一次只需要双击：
+用户统一只需要双击：
 
 ```text
-build_acceptance.bat
+start_acceptance.bat
 ```
 
-该脚本自动：
+如果 portable 已经存在，它会直接启动；如果还没有，它会自动调用 build 并在完成后启动。
+
+首次自动构建时会：
 
 1. 查找本机 Python。
 2. 创建私有 build venv。
