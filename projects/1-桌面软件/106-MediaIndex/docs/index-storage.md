@@ -45,6 +45,10 @@ visual-word inverted index
   postings
   idf
   stop-word bitmap
+
+optional verifier cache
+  compact grayscale thumbnails
+  hot descriptor cache
 ```
 
 这样可以避免每个 Query 对数十万 SQLite rows 做对象化读取。
@@ -88,7 +92,9 @@ R013 的 synthetic visual-word index：
 - incremental append / rebuild
 - codebook upgrade migration
 
-## 5. SIFT 精确特征
+## 5. 精确验证缓存
+
+### 方案 A，全量 compact SIFT
 
 如果全量保存 CV_8U SIFT descriptors：
 
@@ -100,15 +106,65 @@ R013 的 synthetic visual-word index：
 
 还不含 keypoint 坐标和索引。
 
-因此当前必须比较三种策略：
+### 方案 B，验证缩略图
 
-1. 全量 compact SIFT。
-2. Query 候选出现后按需从原图计算。
-3. 后台懒生成，并建立 LRU / persistent hot cache。
+R016 的 grayscale JPEG60 样例：
 
-当前倾向 2 或 3，但尚未冻结。
+| max dimension | 500k cache estimate | SIFT extraction median |
+|---:|---:|---:|
+| 192 | 1.91 GiB | 6.35 ms |
+| 256 | 3.07 GiB | 11.31 ms |
+| 320 | 4.26 GiB | 16.79 ms |
+| 384 | 5.74 GiB | 26.25 ms |
 
-## 6. 离线盘
+320px JPEG60 在 200 个困难 true pairs 中探索性高置信确认 131/200，并对 194 hard negatives 保持 0 FP。
+
+320px WebP70 的存储估计约 3.63 GiB，true confirmed 128/200。
+
+### 当前倾向
+
+优先继续验证：
+
+```text
+all files:
+  selected pHash
+  visual-word postings
+  optional 256 to 320px grayscale verifier thumbnail
+
+deep verification:
+  decode thumbnail
+  build SIFT only for current candidates
+  cache hot descriptors
+```
+
+原因：
+
+1. 缩略图既可重建 SIFT，也可用于 NCC、template 和 edge fallback。
+2. 离线移动硬盘不在线时仍有视觉证据。
+3. 相比全量 128 至 256 SIFT descriptors，存储更容易控制。
+4. 普通 exact / pHash 命中不进入深度验证，因此 0.5 至 0.8 s 的最坏 Top-50 verifier CPU 不代表常规 Query 延迟。
+
+尚未冻结：
+
+- 256 还是 320px。
+- JPEG 还是 WebP。
+- 是否默认启用缩略图缓存。
+- 隐私模式下是否允许完全禁用视觉缓存。
+
+## 6. 隐私边界
+
+缩略图缓存与 hash 不同，它能泄露可辨认媒体内容。
+
+正式产品必须：
+
+- 明确说明 verifier thumbnail 属于本地视觉缓存。
+- 默认不上传。
+- 不进入公开日志。
+- 支持清空。
+- 支持禁用视觉缓存的隐私模式。
+- 加密方案是否必要由正式威胁模型决定。
+
+## 7. 离线盘
 
 库存卷必须使用稳定 storage identity，不只记录 Windows 盘符。
 
@@ -132,7 +188,7 @@ file
 
 > 该素材库存中存在，位于某个离线存储卷的某个相对路径。
 
-## 7. 启动加载草案
+## 8. 启动加载草案
 
 预计：
 
@@ -141,16 +197,17 @@ open SQLite
 → validate schema / index version
 → mmap pHash arrays
 → mmap visual-word offsets / postings
-→ open lightweight caches
+→ open optional thumbnail / descriptor caches
 → ready
 ```
 
 不应在每次启动重新读取原媒体或重建视觉索引。
 
-## 8. 待验证
+## 9. 待验证
 
 - Windows NTFS 下 mmap 启动与随机访问。
 - 断电安全下 SQLite WAL 配置。
 - 50 万至 100 万的增量 update。
 - storage identity 在移动硬盘盘符变化时的稳定性。
 - postings 增量构建与 compact rebuild。
+- thumbnail cache 的分块文件格式与随机读取。
