@@ -27,3 +27,8 @@
 - `v008_visual_edit_benchmark.py`：验证字幕、letterbox、竖屏裁剪等视觉修改。
 - `v009_composite_video_benchmark.py`：验证一个 Query 同时来自多个源视频片段。
 - `v010_audio_chromaprint_benchmark.py`：验证 Chromaprint 对重编码、clip、speed 与 unrelated audio 的区分。
+
+- `v011_real_video_acceptance_runner.py`：真实视频小域 baseline 验收工具，读取 manifest 并输出 Top-1、margin、offset 与 scale。
+- `v012_long_video_repeated_segments.py`：验证共享片头片尾、长视频和同源内部重复片段。
+- `v013_vertical_crop_sift_rescue.py`：验证强竖屏裁剪在 pHash 候选后的 SIFT + RANSAC rescue。
+- `v014_video_index_scale.py`：按总视频时长估算 1 fps baseline、local postings、thumbnail 与 Audio Lane 容量。
