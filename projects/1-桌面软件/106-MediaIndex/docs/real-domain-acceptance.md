@@ -147,3 +147,152 @@ A4 / V011 之后：
 - 若 failure 只集中在已知边界，则做定向 fallback。
 - 若 false Confirmed 出现，优先提高判定保守性。
 - 若 candidate 召回不足，修 Lane A / Lane B，而不是放宽 final verifier。
+
+
+## 8. Windows 一键真实域工具链
+
+当前已经提供：
+
+```text
+experiments/
+  install_acceptance_env.bat
+  prepare_real_domain_acceptance.bat
+  run_real_domain_acceptance.bat
+  image_manifest_template.csv
+  video_manifest_template.csv
+  a004_real_image_acceptance_runner.py
+  v011_real_video_acceptance_runner.py
+  acceptance_summary.py
+```
+
+### 第一次使用
+
+在 `experiments` 目录双击：
+
+```text
+install_acceptance_env.bat
+```
+
+该脚本优先使用 `python`，若不存在再尝试 `py -3`。
+
+当前安装：
+
+- OpenCV
+- NumPy
+- Pillow
+- pillow-heif
+
+因此 A4 runner 可直接读取常见 JPG / PNG / WebP / TIFF，并支持 HEIC / HEIF。
+
+### 创建本地私有工作区
+
+双击：
+
+```text
+prepare_real_domain_acceptance.bat
+```
+
+默认生成：
+
+```text
+experiments/MediaIndex-Acceptance/
+├─ Library/
+│  ├─ Images/
+│  └─ Videos/
+├─ Query/
+│  ├─ Images/
+│  └─ Videos/
+├─ image_manifest.csv
+└─ video_manifest.csv
+```
+
+也可以把自定义目录作为第一个参数传入。
+
+该工作区只用于本机，不得提交仓库。
+
+### 图片 manifest
+
+```csv
+query,expected_source,relation
+Query/Images/q01.jpg,folder/source01.jpg,Same source
+Query/Images/q02.jpg,folder/source02.jpg,Crop
+Query/Images/negative01.jpg,,Hard negative
+```
+
+规则：
+
+- `query` 可使用相对于 acceptance root 的路径，也可用绝对路径。
+- `expected_source` 使用相对于 `Library/Images` 的路径。
+- hard negative 的 `expected_source` 留空。
+
+A4 runner 当前输出：
+
+- selected-region pHash candidate Top-k。
+- expected source 是否进入 Top-50。
+- SIFT / RANSAC / NCC baseline rerank。
+- Top-1。
+- baseline Confirmed recall。
+- hard-negative false Confirmed。
+- Query latency。
+
+这些 baseline threshold 只用于验收分布观察，不是生产阈值。
+
+### 视频 manifest
+
+```csv
+query,expected_source,relation,expected_start_sec
+Query/Videos/q01.mp4,folder/source01.mp4,Partial clip,125.0
+Query/Videos/q02.mp4,folder/source02.mp4,Same video,
+Query/Videos/negative01.mp4,,Unrelated,
+```
+
+视频 runner 当前输出：
+
+- Top-1 source。
+- temporal inliers。
+- fraction。
+- estimated offset。
+- estimated scale。
+- median Hamming。
+- second-candidate margin。
+- positive Top-1 accuracy。
+- negative exploratory strong-match count。
+
+### 一键执行
+
+完成媒体与 manifest 后，双击：
+
+```text
+run_real_domain_acceptance.bat
+```
+
+生成：
+
+```text
+a004_results.json
+v011_results.json
+real_domain_summary.json
+```
+
+后续分析时，优先只提供这三个 JSON。
+
+不需要上传私人原照片或原视频，除非用户主动选择提供某个失败案例用于进一步诊断。
+
+## 9. A4 / V011 的解释边界
+
+当前 A4 图片 runner 已经包含较完整的 pHash candidate + SIFT verifier baseline。
+
+V011 视频 runner 仍故意保持轻量，只作为 Tier V0 基线：
+
+- 没有 timestamp local-feature Lane B。
+- 没有 Audio Lane C。
+- 没有 Composite piecewise solver。
+
+如果 V011 在竖屏、强 crop、重复片头等已知难例中失败，不代表最终视频架构失败。重点是记录失败是否符合 V001 至 V014 已知边界。
+
+真实域验收真正要警惕的是：
+
+- 普通常规同源变化大量漏召回。
+- unrelated negatives 产生强 false match。
+- candidate source 连 Top-k 都进不去。
+- 已知简单 clip 不能恢复 source time。
