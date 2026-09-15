@@ -107,6 +107,7 @@ def fit_model(
         return {
             "score": -9.0,
             "inliers": 0,
+            "fraction": 0.0,
             "offset": None,
             "scale": None,
             "median_hamming": 99.0,
@@ -159,6 +160,7 @@ def fit_model(
         return {
             "score": -9.0,
             "inliers": 0,
+            "fraction": 0.0,
             "offset": None,
             "scale": None,
             "median_hamming": 99.0,
