@@ -1,12 +1,12 @@
 # P106｜MediaIndex Release Status
 
-Version: 0.0.0-dev
+Version: 0.0.1-dev
 
 ## 当前状态
 
 **没有正式发布授权。**
 
-P106 当前处于 Phase 0 算法验证阶段：
+P106 当前处于 Phase 0 真实域验收准备阶段。Acceptance GUI 已进入 `v0.0.1-dev` 源码预览，但仍未授权正式发布：
 
 - 没有正式 tag。
 - 没有 GitHub Release。
