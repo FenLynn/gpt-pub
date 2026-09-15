@@ -9,6 +9,11 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from PIL import Image
+import pillow_heif
+
+
+pillow_heif.register_heif_opener()
 
 
 IMAGE_EXTS = {
@@ -29,6 +34,11 @@ def sha256(path: Path) -> str:
 
 
 def load_image(path: Path) -> np.ndarray:
+    if path.suffix.lower() in {".heic", ".heif"}:
+        with Image.open(path) as source:
+            rgb = np.asarray(source.convert("RGB"))
+        return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+
     data = np.fromfile(str(path), dtype=np.uint8)
     image = cv2.imdecode(data, cv2.IMREAD_COLOR)
     if image is None:
