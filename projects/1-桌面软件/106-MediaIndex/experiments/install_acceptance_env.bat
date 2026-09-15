@@ -27,7 +27,7 @@ if not exist ".venv\Scripts\python.exe" (
 
 ".venv\Scripts\python.exe" -m pip install --upgrade pip
 if errorlevel 1 goto failed
-".venv\Scripts\python.exe" -m pip install opencv-python numpy
+".venv\Scripts\python.exe" -m pip install opencv-python numpy pillow pillow-heif
 if errorlevel 1 goto failed
 
 echo.
