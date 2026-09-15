@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 
 import a004_real_image_acceptance_runner as image_runner
+import auto_real_domain_smoke as auto_runner
 import v011_real_video_acceptance_runner as video_runner
 
 
@@ -391,6 +392,37 @@ def main() -> None:
             ],
         )
         assert_video_results(video_output)
+
+
+        auto_root = root / "auto_smoke"
+        run_module(
+            auto_runner,
+            [
+                "--image-library", str(image_library),
+                "--video-library", str(video_library),
+                "--workdir", str(auto_root),
+                "--max-images", "4",
+                "--max-videos", "2",
+            ],
+        )
+        auto_summary_path = auto_root / "auto_smoke_summary.json"
+        if not auto_summary_path.exists():
+            raise AssertionError("automatic smoke summary missing")
+        auto_summary = json.loads(
+            auto_summary_path.read_text(encoding="utf-8")
+        )
+        if int(auto_summary["generated_image_queries"]) < 4:
+            raise AssertionError(
+                f"automatic image queries too few: {auto_summary}"
+            )
+        if int(auto_summary["generated_video_queries"]) < 2:
+            raise AssertionError(
+                f"automatic video queries too few: {auto_summary}"
+            )
+        if not auto_summary.get("image"):
+            raise AssertionError("automatic image summary missing")
+        if not auto_summary.get("video"):
+            raise AssertionError("automatic video summary missing")
 
         print(
             json.dumps(
