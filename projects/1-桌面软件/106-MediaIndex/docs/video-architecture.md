@@ -289,3 +289,53 @@ constant offset
 ```
 
 Model C 后续优先采用 dynamic programming 或 monotonic longest-path，而不是无限增加 RANSAC 直线。
+
+## 12. V008 至 V010 收敛
+
+### Visual edit severity
+
+V008 把视频视觉变换分成了两类：
+
+- 字幕 / letterbox：Lane A pHash 序列通常已经足够。
+- 画中画 / 强竖屏裁剪：Lane A 明显变弱，尤其竖屏中心裁剪在当前 28-region source pHash 中会错排。
+
+所以视频 visual path 也必须 texture / transform aware。竖屏和画中画优先进入 frame-level local-feature Lane B 与 verifier，而不是继续放宽全局 Hamming 阈值。
+
+### Composite source graph
+
+V009 表明一个 Query 可以由多个库存视频片段组成。结果模型不能只返回一个 source video，而应允许：
+
+```text
+query segment
+→ source video
+→ source interval
+→ temporal transform
+→ confidence
+```
+
+多个 segment 共同组成 Composite / edited sequence 结果。
+
+### Audio Lane C
+
+V010 已验证 Chromaprint-like sequence 具有高价值：
+
+- AAC 低码率重编码几乎保持 fingerprint。
+- 8 s clip 可以通过 fingerprint sliding 找到 source 区间。
+- 1.05× audio speed 可以通过 scale search 恢复约 1.055。
+- unrelated audio 与同源 fingerprint 分离明显。
+
+但同一个音轨放到完全不同的视频时 fingerprint 可以 100% 相同。因此：
+
+```text
+audio evidence
+只能支持 / 加速
+不能单独宣布 same video
+```
+
+Audio Lane C 当前定位：
+
+- candidate video / timestamp acceleration。
+- 静态画面与严重视觉裁剪的 supporting evidence。
+- 与 visual temporal model 做 cross-check。
+
+最终高置信 Same / Derived 仍要求视觉证据或明确的多模态一致性。
