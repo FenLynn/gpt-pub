@@ -477,7 +477,8 @@ internal sealed class MainForm : Form
             QueryPath = path,
             Relation = kind == QueryMediaKind.Image
                 ? "Same source"
-                : "Same video"
+                : "Same video",
+            IsLabeled = false
         });
     }
 
@@ -526,6 +527,7 @@ internal sealed class MainForm : Form
         }
 
         query.ExpectedSourcePath = sourceDialog.FileName;
+        query.IsLabeled = true;
 
         using var editor = new QueryEditorDialog(query);
         if (editor.ShowDialog(this) == DialogResult.OK)
@@ -545,6 +547,7 @@ internal sealed class MainForm : Form
         {
             query.ExpectedSourcePath = string.Empty;
             query.ExpectedStartSeconds = null;
+            query.IsLabeled = true;
             query.Relation = query.Kind == QueryMediaKind.Image
                 ? "Hard negative"
                 : "Unrelated";
@@ -719,6 +722,23 @@ internal sealed class MainForm : Form
                 this,
                 "请先添加几个真实 Query。可以直接把图片或视频拖进这个窗口。",
                 "还没有查询样本",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return false;
+        }
+
+        var unlabeled = _state.Queries.FirstOrDefault(q => !q.IsLabeled);
+        if (unlabeled is not null)
+        {
+            MessageBox.Show(
+                this,
+                "还有 Query 没有设置标准答案："
+                + Environment.NewLine
+                + unlabeled.QueryName
+                + Environment.NewLine
+                + Environment.NewLine
+                + "双击这一行选择真实源，或者选中后点“设为无对应”。",
+                "还差一步",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
             return false;
@@ -952,8 +972,10 @@ internal sealed class MainForm : Form
             _grid.Rows[index].Cells["Expected"].ToolTipText = query.ExpectedSourcePath;
         }
 
-        _queryCountLabel.Text =
-            $"已加入 {_state.Queries.Count} 个 Query。双击一行可设置真实源，完全无关的样本点“设为无对应”。";
+        var unlabeledCount = _state.Queries.Count(q => !q.IsLabeled);
+        _queryCountLabel.Text = unlabeledCount > 0
+            ? $"已加入 {_state.Queries.Count} 个 Query，还有 {unlabeledCount} 个未设置标准答案。双击一行即可设置。"
+            : $"已加入 {_state.Queries.Count} 个 Query，标准答案已全部设置。";
     }
 
     private void RefreshStatus()
