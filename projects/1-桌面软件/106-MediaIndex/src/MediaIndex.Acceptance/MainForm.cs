@@ -975,7 +975,7 @@ internal sealed class MainForm : Form
     {
         if (InvokeRequired)
         {
-            BeginInvoke(() => AppendLog(line));
+            BeginInvoke(new Action(() => AppendLog(line)));
             return;
         }
 
