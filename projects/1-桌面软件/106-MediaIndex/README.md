@@ -64,9 +64,9 @@ Exact / Same / Derived / Partial / Composite / Ambiguous / Similar / Not found
 为减少用户操作，当前已经从 BAT + CSV 流程进一步收敛为 Windows GUI：
 
 ```text
-build_acceptance.bat
+start_acceptance.bat
   ↓
-自动构建 portable
+若未构建则自动 build
   ↓
 MediaIndex Acceptance.exe
 ```
