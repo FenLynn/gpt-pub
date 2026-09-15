@@ -5,7 +5,7 @@
 ## 1. 项目身份
 
 - 项目：MediaIndex
-- 预留编号：`P106`
+- 编号：`P106`
 - 路径：`projects/1-桌面软件/106-MediaIndex/`
 - 日常开发：`p106-exp`
 - 稳定候选：`p106-stable`
@@ -35,56 +35,69 @@
 
 ## 3. 当前断点
 
-当前处于：
-
-**Phase 0：真实域验收前最后收口。**
+**Phase 0：等待 A4 + V011 真实用户域验收。**
 
 图片：
 
 - R001 至 R016 已完成。
-- A4 协议已准备，真实用户数据未执行。
+- A4 图片 runner 已完成。
+- 真实用户数据未执行。
 
 视频：
 
-- V001 至 V014 已完成合成 / 程序样例验证。
-- V011 runner 已准备，真实用户视频未执行。
+- V001 至 V014 已完成 synthetic / programmatic 验证。
+- V011 视频 runner 已完成并支持 negatives。
+- 真实用户数据未执行。
 
-最新新增结论：
+## 4. 真实域工具
 
-- shared intro / outro 会造成多 source 歧义。
-- 一个 source 内重复内容会产生多个合法 intervals。
-- vertical crop + watermark 可以通过 local SIFT geometry rescue。
-- video local postings 必须保留 timestamp。
-- 约 1 fps baseline 适合作为当前 Tier V0 候选。
-- 视频必须采用 V0 / V1 / V2 分层索引。
-- Audio Lane C 很有价值，但不能单独证明 Same video。
+```text
+experiments/
+  install_acceptance_env.bat
+  prepare_real_domain_acceptance.bat
+  run_real_domain_acceptance.bat
+  a004_real_image_acceptance_runner.py
+  v011_real_video_acceptance_runner.py
+  acceptance_summary.py
+  image_manifest_template.csv
+  video_manifest_template.csv
+```
 
-## 4. 当前统一架构
+用户本机流程：
+
+```text
+1. install_acceptance_env.bat
+2. prepare_real_domain_acceptance.bat
+3. 把私人媒体放入生成的本地 workspace
+4. 填 image_manifest.csv / video_manifest.csv
+5. run_real_domain_acceptance.bat
+6. 只提供 a004_results.json / v011_results.json / real_domain_summary.json
+```
+
+私人媒体、绝对路径和可辨认缓存不得写入公开仓库。
+
+## 5. 当前统一架构
 
 ```text
 SQLite metadata / exact hash
         ↓
 shared visual primitives
         ↓
-image:
-  selected pHash
-  visual-word retrieval
-  verifier
+image
+  selected pHash candidate retrieval
+  local geometry verifier
 
-video:
-  Tier V0
-    ~1 fps lightweight temporal anchors
-  Tier V1
-    sparse timestamp local-feature keyframes
-  Tier V2
-    sparse verifier cache / source decode
+video
+  Tier V0 ~1 fps temporal anchors
+  Tier V1 sparse timestamp local keyframes
+  Tier V2 sparse verifier / source decode
   Audio Lane C
-  temporal alignment
+  piecewise temporal alignment
         ↓
 Exact / Same / Derived / Partial / Composite / Ambiguous / Similar / Not found
 ```
 
-## 5. 已否决的重要简化
+## 6. 已否决的重要简化
 
 - 单一 pHash。
 - 默认 201-region 全表。
@@ -100,21 +113,29 @@ Exact / Same / Derived / Partial / Composite / Ambiguous / Similar / Not found
 - 每个 1 fps video frame 保存完整图片级 thumbnail / signature。
 - 对共享片头强行输出唯一 source。
 
-## 6. 当前唯一下一步
+## 7. 当前唯一下一步
 
 执行 **A4 + V011 真实域验收**。
 
-真实媒体全部留在仓库外。
+正式建议：
 
-推荐：
+- 图片 Library 100 至 300。
+- 图片正样本 30 至 50。
+- 图片 hard negatives 20 至 50。
+- 视频 Library 20 至 50。
+- 总视频时长 2 至 5 小时以上。
+- 视频 Query 30 个以上。
 
-- 100 至 300 张真实图片。
-- 20 至 50 个真实视频，总时长至少 2 至 5 小时。
-- 真实 Query 包含压缩、截图、裁剪、短 clip、同片头、同 BGM、竖屏、水印和 unrelated negatives。
+若用户希望更快启动，可先做更小 smoke acceptance，再扩大。
 
-只把去标识化结果写回仓库。
+真实域通过后：
 
-## 7. 写入边界
+```text
+freeze Phase 0
+→ build first MediaIndex MVP
+```
+
+## 8. 写入边界
 
 当前只允许修改：
 
@@ -131,17 +152,18 @@ projects/1-桌面软件/106-MediaIndex/
 - 公共 workflow
 - 其他共享入口
 
-## 8. 恢复模板
+## 9. 恢复模板
 
 ```text
 P106 MediaIndex
 main: <实时 SHA>
 p106-stable: <实时 SHA / ahead-behind>
 p106-exp: <实时 SHA / ahead-behind>
-catalog registration: pending / completed
+catalog registration: pending
 image benchmark: R016
 video benchmark: V014
-real-domain: pending / completed
+real-domain toolkit: ready
+real-domain run: pending / completed
 phase: <当前阶段>
 next action: <唯一明确断点>
 ```
