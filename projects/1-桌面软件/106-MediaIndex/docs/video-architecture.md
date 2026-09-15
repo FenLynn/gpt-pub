@@ -339,3 +339,142 @@ Audio Lane C 当前定位：
 - 与 visual temporal model 做 cross-check。
 
 最终高置信 Same / Derived 仍要求视觉证据或明确的多模态一致性。
+
+
+## 13. Shared intro, repeated segments and ambiguity
+
+V012 adds two required concepts.
+
+### Ambiguous source
+
+If a 3 to 5 s Query contains only a shared intro or outro used by multiple videos, several sources can be equally correct.
+
+The system must allow:
+
+```text
+Ambiguous
+multiple source videos
+same confidence class
+```
+
+It must not break ties arbitrarily and label one video Confirmed.
+
+### Multiple positions in one source
+
+A repeated sequence can occur twice inside the same source video.
+
+Therefore a source result can contain:
+
+```text
+source video
+candidate interval 1
+candidate interval 2
+...
+```
+
+The temporal layer needs interval uniqueness, not only source-video uniqueness.
+
+Common intro, outro, logo and template sequences should be downweighted similarly to stop words.
+
+## 14. Strong crop rescue
+
+V013 shows a practical rescue path for vertical crop and crop plus watermark.
+
+Experimental chain:
+
+```text
+pHash candidate shortlist
+→ rough temporal offset
+→ search around offset ±1 s
+→ SIFT + RANSAC
+→ candidate rerank
+```
+
+For the tested 8 s vertical crop queries:
+
+- correct source survived the pHash Top-3.
+- SIFT restored the correct source to first place.
+- incorrect candidates produced no verified frames.
+
+This validates local geometry as a deep video verifier.
+
+However, the production path should not depend on pHash Top-3. Timestamp-preserving local-feature postings should be able to retrieve the source independently when strong crop weakens pHash.
+
+## 15. Tiered video indexing
+
+V014 shows that video indexing must scale with total hours.
+
+Current architecture:
+
+```text
+Tier V0
+approximately 1 fps
+global pHash
+video_id
+timestamp
+
+Tier V1
+sparse scene / motion / periodic keyframes
+local visual words
+timestamp-preserving inverted postings
+
+Tier V2
+very sparse verifier thumbnail
+or source decode on demand
+
+Audio Lane C
+compact time-sequence fingerprint
+```
+
+Important consequence:
+
+> The image engine and video engine share algorithms, but they should not store the same amount of data per visual sample.
+
+A 10,000 h library contains about 36M baseline samples at 1 fps. Storing a small pHash anchor for each is practical. Storing image-level thumbnails for every sample is not.
+
+## 16. Current result graph
+
+Video matching should be represented as evidence and source intervals, not one scalar similarity.
+
+A candidate can contain:
+
+```text
+candidate video
+visual correspondences
+audio correspondences
+time model
+matched query intervals
+matched source intervals
+ambiguity
+selected-frame verification
+confidence
+```
+
+Final relation can be:
+
+- Exact file
+- Same video
+- Derived video
+- Partial clip
+- Composite / edited sequence
+- Ambiguous
+- Similar
+- Not found
+
+## 17. Real-domain gate
+
+The next architecture gate is V011 together with image A4.
+
+Synthetic validation has already exposed:
+
+- short-clip ambiguity
+- shared intro ambiguity
+- repeated intervals
+- strong vertical crop
+- composite editing
+- speed changes
+- middle deletion
+- same audio with different video
+- video index growth
+
+The remaining question is no longer whether these cases exist. It is how often they occur in the user's real inventory and which thresholds are appropriate there.
