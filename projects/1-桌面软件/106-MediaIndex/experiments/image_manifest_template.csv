@@ -1,0 +1,4 @@
+query,expected_source,relation
+Query/Images/q01.jpg,folder/source01.jpg,Same source
+Query/Images/q02.jpg,folder/source02.jpg,Crop
+Query/Images/negative01.jpg,,Hard negative
