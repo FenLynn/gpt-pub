@@ -25,31 +25,42 @@
 7. `工作记录.md`
 8. `docs/algorithm-validation.md`
 9. `docs/benchmark-plan.md`
-10. `设计与演进.md`
-11. 实时比较 `main / p106-stable / p106-exp`
+10. `docs/index-storage.md`
+11. `设计与演进.md`
+12. 实时比较 `main / p106-stable / p106-exp`
 
 ## 3. 当前断点
 
-当前处于 **Phase 0：图片算法 A 阶段验证**。
+当前处于 **Phase 0：图片算法与索引冻结前验证**。
 
-已完成至 `docs/algorithm-validation.md` 的 R012，包括：
+已完成至 R015：
 
 - Krokiet / SIFT 受控基线。
 - 20 图、340 Query 自然样例正样本矩阵。
 - 222 hard-negative。
-- 100k 至 500k hash 微基准。
 - 150 图相关场景压力集，250 Query。
-- ORB LSH、ORB/SIFT BoVW 候选索引探索。
-- compact ORB / AKAZE / CV_8U SIFT 精确验证消融。
-- 低纹理 template / edge fallback。
+- ORB LSH、ORB / SIFT BoVW。
+- compact verifier 消融。
+- 低纹理 fallback。
+- 100k 至 500k pHash 扫描微基准。
+- 500k synthetic visual-word inverted index。
+- 500k SQLite metadata microbenchmark。
 
-当前架构候选：
+可复现脚本：
 
 ```text
-Exact hash
-→ Lane A: global / multi-region pHash
-→ Lane B: scalable local-feature index
-→ candidate union，当前压力集倾向约 Top-50
+experiments/r013_visual_word_index_microbench.py
+experiments/r014_sqlite_metadata_microbench.py
+experiments/r015_phash_scan_microbench.py
+```
+
+## 4. 当前架构候选
+
+```text
+SQLite metadata / exact hash
+→ Lane A: 28 至 60 selected pHash regions
+→ Lane B: compact visual-word inverted index
+→ candidate union，当前约 Top-50
 → high texture: SIFT + RANSAC + content consistency
 → low texture: template / edge fallback
 → Confirmed / Probable / Similar / Not found
@@ -58,31 +69,35 @@ Exact hash
 ### 已否决的简化
 
 - 单纯调宽全局 pHash 阈值。
+- 默认 201-region 全表第一层。
 - 全库逐图 SIFT。
 - 只看 RANSAC inliers。
 - 只看 inlier ratio。
 - ORB / AKAZE 单独取代 final SIFT verifier。
 - 把视觉语义相似直接作为同源结论。
+- 把 20 图小库的 Top-5 满召回当成大库结论。
 
 ### 当前主要风险
 
-1. Lane B 的 50 万规模 inverted index 尚未冻结。
-2. Top-50 是目前相关压力集支持的候选预算，还需更大公开数据交叉验证。
-3. compact SIFT 若全量持久化，500k raw descriptors 约需数 GB 至十余 GB。
-4. 低纹理 fallback 有效但不能全库运行。
+1. visual-word Lane B 仍需更大的真实图片分布验证。
+2. 28 至 60 regions 的最终 layout 未冻结。
+3. compact SIFT 全量存储可能达到数 GB 至十余 GB。
+4. Top-50 仍需 A4 真实域验收。
+5. 低纹理 fallback 有效但只能候选后运行。
 
-## 4. 当前唯一下一步
+## 5. 当前唯一下一步
 
 继续在 `p106-exp`：
 
-1. 扩大公开图片交叉验证集。
-2. 实现并比较 local-feature inverted index。
-3. 比较 compact SIFT 全量持久化与按需生成 / 缓存。
-4. 冻结 candidate Top-k 后再进入 A4 用户真实域验收。
+1. 扩大公开真实图片交叉验证集。
+2. 冻结 visual-word quantization / inverted index 方案。
+3. 冻结 Lane A region layout。
+4. 比较 SIFT storage 与按需 / cache 策略。
+5. 然后进入 A4 用户真实域验收。
 
 不需要用户继续手工调 Krokiet 参数。
 
-## 5. 写入边界
+## 6. 写入边界
 
 当前只允许修改：
 
@@ -99,7 +114,7 @@ projects/1-桌面软件/106-MediaIndex/
 - 公共 workflow
 - 其他共享入口
 
-## 6. 恢复模板
+## 7. 恢复模板
 
 ```text
 P106 MediaIndex
