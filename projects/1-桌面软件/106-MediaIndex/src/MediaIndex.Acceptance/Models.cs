@@ -16,6 +16,7 @@ internal sealed class AcceptanceQuery
     public string ExpectedSourcePath { get; set; } = string.Empty;
     public string Relation { get; set; } = string.Empty;
     public double? ExpectedStartSeconds { get; set; }
+    public bool IsLabeled { get; set; }
 
     [JsonIgnore]
     public string KindText => Kind == QueryMediaKind.Image ? "图片" : "视频";
@@ -25,9 +26,11 @@ internal sealed class AcceptanceQuery
 
     [JsonIgnore]
     public string ExpectedName =>
-        string.IsNullOrWhiteSpace(ExpectedSourcePath)
-            ? "无对应源"
-            : Path.GetFileName(ExpectedSourcePath);
+        !IsLabeled
+            ? "未设置"
+            : string.IsNullOrWhiteSpace(ExpectedSourcePath)
+                ? "无对应源"
+                : Path.GetFileName(ExpectedSourcePath);
 }
 
 internal sealed class AcceptanceWorkspaceState
