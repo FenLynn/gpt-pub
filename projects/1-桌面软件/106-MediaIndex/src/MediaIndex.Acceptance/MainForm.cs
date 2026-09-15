@@ -104,7 +104,7 @@ internal sealed class MainForm : Form
 
         var subtitle = new Label
         {
-            Text = "只需选库存目录、加入几个查询样本、设置标准答案，然后点开始。CSV 和命令行由程序自动处理。",
+            Text = "推荐模式只需选择图片或视频库存，然后点“自动验收”。手工 Query 仅用于特殊失败案例。",
             AutoSize = true,
             Font = new Font(Font.FontFamily, 9.5F),
             ForeColor = Color.FromArgb(93, 104, 121),
@@ -189,7 +189,7 @@ internal sealed class MainForm : Form
     {
         var card = CreateCard();
 
-        var title = CreateSectionTitle("2  加入查询样本并设置标准答案");
+        var title = CreateSectionTitle("2  手工样本（可选，普通验收不需要）");
         title.Location = new Point(22, 15);
         card.Controls.Add(title);
 
@@ -298,7 +298,7 @@ internal sealed class MainForm : Form
         _cancelButton.Click += (_, _) => _runCancellation?.Cancel();
         card.Controls.Add(_cancelButton);
 
-        _exportButton.Text = "导出匿名结果";
+        _exportButton.Text = "导出匿名摘要";
         _exportButton.Height = 40;
         _exportButton.FlatStyle = FlatStyle.Flat;
         _exportButton.Enabled = File.Exists(_workspace.SummaryResultPath);
@@ -1039,14 +1039,23 @@ internal sealed class MainForm : Form
 
     private void ExportResults()
     {
-        if (!File.Exists(_workspace.SummaryResultPath))
+        var hasManualSummary = File.Exists(_workspace.SummaryResultPath);
+        var hasAutoSummary = File.Exists(_workspace.AutoSmokeSummaryPath);
+
+        if (!hasManualSummary && !hasAutoSummary)
         {
+            MessageBox.Show(
+                this,
+                "当前还没有可导出的验收摘要。",
+                "MediaIndex Acceptance",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
             return;
         }
 
         using var dialog = new FolderBrowserDialog
         {
-            Description = "选择匿名结果导出目录",
+            Description = "选择匿名摘要导出目录",
             UseDescriptionForTitle = true
         };
 
@@ -1062,8 +1071,6 @@ internal sealed class MainForm : Form
 
         foreach (var source in new[]
         {
-            _workspace.ImageResultPath,
-            _workspace.VideoResultPath,
             _workspace.SummaryResultPath,
             _workspace.AutoSmokeSummaryPath
         })
@@ -1089,9 +1096,15 @@ internal sealed class MainForm : Form
         _imageLibrary.Text = _state.ImageLibraryPath;
         _videoLibrary.Text = _state.VideoLibraryPath;
 
-        if (File.Exists(_workspace.SummaryResultPath))
+        if (File.Exists(_workspace.AutoSmokeSummaryPath))
+        {
+            ShowAutoSmokeSummary();
+            _exportButton.Enabled = true;
+        }
+        else if (File.Exists(_workspace.SummaryResultPath))
         {
             ShowSummary();
+            _exportButton.Enabled = true;
         }
     }
 
