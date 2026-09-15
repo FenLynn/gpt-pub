@@ -20,4 +20,11 @@
     <DebugType>embedded</DebugType>
     <ApplicationIcon Condition="Exists('$(MSBuildProjectDirectory)\MediaIndex.Acceptance.ico')">MediaIndex.Acceptance.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource
+      Include="Generated\MediaIndex.Acceptance.Worker.exe"
+      LogicalName="MediaIndex.Acceptance.Worker.exe"
+      Condition="Exists('$(MSBuildProjectDirectory)\Generated\MediaIndex.Acceptance.Worker.exe')" />
+  </ItemGroup>
 </Project>
