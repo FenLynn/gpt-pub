@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import sys
 
 import a004_real_image_acceptance_runner as image_runner
@@ -27,52 +26,30 @@ def run_module(module, argv: list[str]) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="MediaIndex Acceptance worker"
-    )
-    subparsers = parser.add_subparsers(
-        dest="command",
-        required=True,
-    )
-
-    image_parser = subparsers.add_parser("image")
-    image_parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-    )
-
-    video_parser = subparsers.add_parser("video")
-    video_parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-    )
-
-    summary_parser = subparsers.add_parser("summary")
-    summary_parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-    )
-
-    parsed = parser.parse_args()
-
-    if parsed.command == "image":
-        return run_module(
-            image_runner,
-            parsed.args,
+    if len(sys.argv) < 2:
+        print(
+            "Usage: MediaIndex.Acceptance.Worker.exe "
+            "{image|video|summary} [arguments...]",
+            file=sys.stderr,
         )
+        return 2
 
-    if parsed.command == "video":
-        return run_module(
-            video_runner,
-            parsed.args,
-        )
+    command = sys.argv[1].strip().lower()
+    arguments = sys.argv[2:]
 
-    if parsed.command == "summary":
-        return run_module(
-            summary_runner,
-            parsed.args,
-        )
+    if command == "image":
+        return run_module(image_runner, arguments)
 
+    if command == "video":
+        return run_module(video_runner, arguments)
+
+    if command == "summary":
+        return run_module(summary_runner, arguments)
+
+    print(
+        f"Unknown command: {command}",
+        file=sys.stderr,
+    )
     return 2
 
 
