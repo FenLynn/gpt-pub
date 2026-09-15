@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -6,17 +8,112 @@ namespace MediaIndex.Acceptance;
 
 internal sealed class BackendRunner
 {
-    private readonly string _appDirectory;
+    private const string WorkerResourceName = "MediaIndex.Acceptance.Worker.exe";
+
+    private readonly string _runtimeDirectory;
 
     public BackendRunner()
     {
-        _appDirectory = AppContext.BaseDirectory;
+        _runtimeDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FenLynn",
+            "MediaIndex",
+            "Acceptance",
+            "Runtime");
     }
 
     public string WorkerPath =>
-        Path.Combine(_appDirectory, "Runtime", "MediaIndex.Acceptance.Worker.exe");
+        Path.Combine(_runtimeDirectory, WorkerResourceName);
 
-    public bool IsReady => File.Exists(WorkerPath);
+    public bool EmbeddedWorkerAvailable =>
+        Assembly.GetExecutingAssembly()
+            .GetManifestResourceNames()
+            .Contains(WorkerResourceName, StringComparer.Ordinal);
+
+    public bool IsReady =>
+        File.Exists(WorkerPath) || EmbeddedWorkerAvailable;
+
+    public void EnsureWorkerExtracted()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        using var resource = assembly.GetManifestResourceStream(WorkerResourceName);
+
+        if (resource is null)
+        {
+            if (File.Exists(WorkerPath))
+            {
+                return;
+            }
+
+            throw new FileNotFoundException(
+                "Embedded acceptance worker is missing.",
+                WorkerResourceName);
+        }
+
+        Directory.CreateDirectory(_runtimeDirectory);
+
+        var embeddedHash = HashStream(resource);
+        resource.Position = 0;
+
+        if (File.Exists(WorkerPath))
+        {
+            using var existing = File.OpenRead(WorkerPath);
+            var existingHash = HashStream(existing);
+            if (CryptographicOperations.FixedTimeEquals(
+                embeddedHash,
+                existingHash))
+            {
+                return;
+            }
+        }
+
+        var tempPath = WorkerPath + ".tmp-" + Guid.NewGuid().ToString("N");
+
+        try
+        {
+            using (var output = new FileStream(
+                tempPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None))
+            {
+                resource.CopyTo(output);
+                output.Flush(true);
+            }
+
+            File.Move(tempPath, WorkerPath, true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    public async Task<bool> SelfTestAsync(CancellationToken cancellationToken)
+    {
+        EnsureWorkerExtracted();
+
+        var output = new StringBuilder();
+        var progress = new Progress<string>(line => output.AppendLine(line));
+        var exitCode = await RunWorkerAsync(
+            ["selftest"],
+            progress,
+            cancellationToken);
+
+        return exitCode == 0
+            && output.ToString().Contains(
+                "\"ok\":true",
+                StringComparison.OrdinalIgnoreCase);
+    }
 
     public async Task<int> RunImageAsync(
         string library,
@@ -83,7 +180,8 @@ internal sealed class BackendRunner
 
         try
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(path, Encoding.UTF8));
+            using var document = JsonDocument.Parse(
+                File.ReadAllText(path, Encoding.UTF8));
             var root = document.RootElement;
 
             return new AcceptanceSummary
@@ -95,7 +193,9 @@ internal sealed class BackendRunner
                     ? video.Clone()
                     : null,
                 PrivateMediaCommitted =
-                    root.TryGetProperty("private_media_committed", out var committed)
+                    root.TryGetProperty(
+                        "private_media_committed",
+                        out var committed)
                     && committed.ValueKind == JsonValueKind.True,
                 PhaseGate =
                     root.TryGetProperty("phase_gate", out var gate)
@@ -114,17 +214,12 @@ internal sealed class BackendRunner
         IProgress<string> progress,
         CancellationToken cancellationToken)
     {
-        if (!IsReady)
-        {
-            throw new FileNotFoundException(
-                "Acceptance worker is missing.",
-                WorkerPath);
-        }
+        EnsureWorkerExtracted();
 
         var startInfo = new ProcessStartInfo
         {
             FileName = WorkerPath,
-            WorkingDirectory = _appDirectory,
+            WorkingDirectory = _runtimeDirectory,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -161,7 +256,8 @@ internal sealed class BackendRunner
 
         if (!process.Start())
         {
-            throw new InvalidOperationException("Could not start acceptance worker.");
+            throw new InvalidOperationException(
+                "Could not start acceptance worker.");
         }
 
         process.BeginOutputReadLine();
@@ -169,5 +265,11 @@ internal sealed class BackendRunner
 
         await process.WaitForExitAsync(cancellationToken);
         return process.ExitCode;
+    }
+
+    private static byte[] HashStream(Stream stream)
+    {
+        using var sha = SHA256.Create();
+        return sha.ComputeHash(stream);
     }
 }
