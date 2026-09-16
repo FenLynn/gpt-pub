@@ -682,10 +682,9 @@ def query_image(
         )
 
         verified = []
+        verified_ids = set()
 
-        for row in candidate_rows[
-            : min(verify_k, len(candidate_rows))
-        ]:
+        def verify_candidate(row):
             source_path = library / row["relpath"]
             online = source_path.is_file()
 
@@ -751,7 +750,55 @@ def query_image(
                 except Exception as exc:
                     item["verification_error"] = str(exc)
 
+            return item
+
+        initial_count = min(
+            verify_k,
+            len(candidate_rows),
+        )
+
+        for row in candidate_rows[:initial_count]:
+            item = verify_candidate(row)
             verified.append(item)
+            verified_ids.add(int(row["id"]))
+
+        initial_has_strong = any(
+            item.get("confirmed_baseline")
+            or item.get("probable_geometry_baseline")
+            for item in verified
+        )
+
+        adaptive_verified = 0
+
+        if not initial_has_strong:
+            adaptive_ids = list(
+                dict.fromkeys(
+                    local_ids[:12]
+                    + phash_ids[:12]
+                    + ordered_ids[:24]
+                )
+            )
+
+            for image_id in adaptive_ids:
+                if image_id in verified_ids:
+                    continue
+
+                row = row_map.get(image_id)
+                if row is None:
+                    continue
+
+                item = verify_candidate(row)
+                verified.append(item)
+                verified_ids.add(image_id)
+                adaptive_verified += 1
+
+                if (
+                    item.get("confirmed_baseline")
+                    or item.get(
+                        "probable_geometry_baseline"
+                    )
+                ):
+                    break
 
         confirmed = [
             item
@@ -903,6 +950,9 @@ def query_image(
             "lane_b_query_ms": float(
                 local_meta["query_ms"]
             ),
+            "initial_verified": int(initial_count),
+            "adaptive_verified": int(adaptive_verified),
+            "total_verified": int(len(verified)),
             "total_ms": total_ms,
             "results": results[:10],
         }
