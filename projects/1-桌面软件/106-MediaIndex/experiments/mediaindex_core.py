@@ -13,10 +13,11 @@ import cv2
 import numpy as np
 
 import a004_real_image_acceptance_runner as image_engine
+import local_feature_index as local_index
 
 
 IMAGE_EXTS = image_engine.IMAGE_EXTS
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def index_id(library: Path) -> str:
@@ -58,10 +59,24 @@ def db_connect(index_dir: Path) -> sqlite3.Connection:
             width INTEGER NOT NULL,
             height INTEGER NOT NULL,
             region_hashes BLOB NOT NULL,
+            local_words BLOB,
             sha256 TEXT
         )
         """
     )
+    columns = {
+        row["name"]
+        for row in connection.execute(
+            "PRAGMA table_info(images)"
+        )
+    }
+
+    if "local_words" not in columns:
+        connection.execute(
+            "ALTER TABLE images ADD COLUMN local_words BLOB"
+        )
+        connection.commit()
+
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_images_size ON images(size)"
     )
@@ -130,7 +145,7 @@ def build_index(
             for row in connection.execute(
                 """
                 SELECT id,relpath,size,mtime_ns,width,height,
-                       region_hashes,sha256
+                       region_hashes,local_words,sha256
                 FROM images
                 """
             )
@@ -167,12 +182,17 @@ def build_index(
                 and int(row["size"]) == int(stat.st_size)
                 and int(row["mtime_ns"]) == int(stat.st_mtime_ns)
                 and row["region_hashes"]
+                and row["local_words"] is not None
             ):
                 reused += 1
             else:
                 try:
                     image = image_engine.load_image(path)
                     hashes = image_engine.region_hashes(image)
+                    local_words = local_index.extract_words(image)
+                    local_blob = local_index.words_to_blob(
+                        local_words
+                    )
                     height, width = image.shape[:2]
                 except Exception as exc:
                     failed.append(
@@ -193,9 +213,9 @@ def build_index(
                         """
                         INSERT INTO images(
                             relpath,size,mtime_ns,width,height,
-                            region_hashes,sha256
+                            region_hashes,local_words,sha256
                         )
-                        VALUES(?,?,?,?,?,?,NULL)
+                        VALUES(?,?,?,?,?,?,?,NULL)
                         """,
                         (
                             relpath,
@@ -204,6 +224,7 @@ def build_index(
                             int(width),
                             int(height),
                             blob,
+                            local_blob,
                         ),
                     )
                     added += 1
@@ -212,7 +233,7 @@ def build_index(
                         """
                         UPDATE images
                         SET size=?,mtime_ns=?,width=?,height=?,
-                            region_hashes=?,sha256=NULL
+                            region_hashes=?,local_words=?,sha256=NULL
                         WHERE relpath=?
                         """,
                         (
@@ -221,6 +242,7 @@ def build_index(
                             int(width),
                             int(height),
                             blob,
+                            local_blob,
                             relpath,
                         ),
                     )
@@ -245,7 +267,7 @@ def build_index(
         rows = list(
             connection.execute(
                 """
-                SELECT id,region_hashes
+                SELECT id,region_hashes,local_words
                 FROM images
                 ORDER BY id
                 """
@@ -295,6 +317,18 @@ def build_index(
             index_dir / "image_ids.npy",
         )
 
+        local_stats = local_index.build_index_arrays(
+            index_dir,
+            [
+                (
+                    int(row["id"]),
+                    row["local_words"],
+                )
+                for row in rows
+            ],
+            len(rows),
+        )
+
         set_meta(
             connection,
             "indexed_count",
@@ -323,6 +357,7 @@ def build_index(
             "failures": failed[:50],
             "seconds": elapsed,
             "matrix_bytes": int(matrix.nbytes),
+            **local_stats,
         }
 
         json_write(output, payload)
@@ -483,25 +518,91 @@ def query_image(
         )
 
         if keep == len(scores):
-            order = np.argsort(scores)
+            phash_order = np.argsort(scores)
         else:
             partial = np.argpartition(
                 scores,
                 keep - 1,
             )[:keep]
-            order = partial[
+            phash_order = partial[
                 np.argsort(scores[partial])
             ]
+
+        phash_ids = [
+            int(ids[index])
+            for index in phash_order
+        ]
+
+        query_local_words = local_index.extract_words(
+            image
+        )
+        local_ids_array, local_scores_array, local_meta = (
+            local_index.search_index(
+                index_dir,
+                query_local_words,
+                top_k,
+            )
+        )
+
+        local_ids = [
+            int(value)
+            for value in local_ids_array
+        ]
+
+        phash_rank = {
+            image_id: rank
+            for rank, image_id in enumerate(
+                phash_ids,
+                start=1,
+            )
+        }
+        local_rank = {
+            image_id: rank
+            for rank, image_id in enumerate(
+                local_ids,
+                start=1,
+            )
+        }
+        local_score_by_id = {
+            image_id: float(score)
+            for image_id, score in zip(
+                local_ids,
+                local_scores_array,
+            )
+        }
+
+        union_ids = set(phash_ids)
+        union_ids.update(local_ids)
+
+        def rrf_score(image_id: int) -> float:
+            value = 0.0
+
+            if image_id in phash_rank:
+                value += 1.0 / (
+                    20.0 + phash_rank[image_id]
+                )
+
+            if image_id in local_rank:
+                value += 1.0 / (
+                    20.0 + local_rank[image_id]
+                )
+
+            return value
+
+        ordered_ids = sorted(
+            union_ids,
+            key=lambda image_id: (
+                -rrf_score(image_id),
+                phash_rank.get(image_id, 10**9),
+                local_rank.get(image_id, 10**9),
+                image_id,
+            ),
+        )
 
         candidate_ms = (
             time.perf_counter()
             - candidate_started
         ) * 1000
-
-        ordered_ids = [
-            int(ids[index])
-            for index in order
-        ]
 
         placeholders = ",".join(
             "?"
@@ -534,9 +635,36 @@ def query_image(
             candidate_rows,
         )
 
-        score_by_id = {
-            int(ids[index]): int(scores[index])
-            for index in order
+        score_by_id = {}
+
+        for image_id in ordered_ids:
+            position = int(
+                np.searchsorted(
+                    ids,
+                    image_id,
+                )
+            )
+
+            if (
+                position < len(ids)
+                and int(ids[position]) == image_id
+            ):
+                score_by_id[image_id] = int(
+                    scores[position]
+                )
+
+        candidate_lane_by_id = {
+            image_id: (
+                "A+B"
+                if (
+                    image_id in phash_rank
+                    and image_id in local_rank
+                )
+                else "A"
+                if image_id in phash_rank
+                else "B"
+            )
+            for image_id in ordered_ids
         }
 
         detector = cv2.SIFT_create(
@@ -566,9 +694,24 @@ def query_image(
                 "relpath": row["relpath"],
                 "path": str(source_path),
                 "online": bool(online),
-                "phash_distance": score_by_id[
+                "phash_distance": score_by_id.get(
+                    int(row["id"]),
+                    999,
+                ),
+                "local_score": local_score_by_id.get(
+                    int(row["id"]),
+                    0.0,
+                ),
+                "candidate_lane": candidate_lane_by_id.get(
+                    int(row["id"]),
+                    "",
+                ),
+                "phash_rank": phash_rank.get(
                     int(row["id"])
-                ],
+                ),
+                "local_rank": local_rank.get(
+                    int(row["id"])
+                ),
                 "exact": bool(
                     exact_id is not None
                     and int(row["id"]) == exact_id
@@ -718,6 +861,21 @@ def query_image(
             "indexed_images": int(len(matrix)),
             "ranking_mode": ranking_mode,
             "candidate_ms": candidate_ms,
+            "lane_a_candidates": int(len(phash_ids)),
+            "lane_b_candidates": int(len(local_ids)),
+            "candidate_union_count": int(len(ordered_ids)),
+            "lane_b_ready": bool(
+                local_index.index_available(index_dir)
+            ),
+            "lane_b_query_words": int(
+                len(query_local_words)
+            ),
+            "lane_b_postings_touched": int(
+                local_meta["postings_touched"]
+            ),
+            "lane_b_query_ms": float(
+                local_meta["query_ms"]
+            ),
             "total_ms": total_ms,
             "results": results[:10],
         }
@@ -749,6 +907,14 @@ def index_info(
             "index_dir": str(index_dir.resolve()),
             "library_root": meta.get("library_root", ""),
             "images": count,
+            "local_lane_ready": bool(
+                local_index.index_available(index_dir)
+            ),
+            "local_postings_bytes": int(
+                (index_dir / "local_postings.npy").stat().st_size
+                if (index_dir / "local_postings.npy").is_file()
+                else 0
+            ),
             "schema_version": meta.get(
                 "schema_version",
                 "",
