@@ -709,23 +709,51 @@ internal sealed class MainForm : Form
         if (root.TryGetProperty("image", out var image)
             && image.ValueKind == JsonValueKind.Object)
         {
-            pieces.Add(
+            var imageText =
                 "图片自动 Query "
                 + IntValue(root, "generated_image_queries")
+                + "，Top1 "
+                + Percent(image, "top1_accuracy_positive")
                 + "，Top50 "
                 + Percent(image, "candidate_topk_recall")
-                + "，误确认 "
-                + IntValue(image, "false_confirmed_count_baseline"));
+                + "，Confirmed "
+                + Percent(image, "confirmed_recall_baseline");
+
+            var negativeCount = IntNumber(
+                image,
+                "negative_queries");
+
+            imageText += negativeCount > 0
+                ? "，负样本误确认 "
+                    + IntValue(
+                        image,
+                        "false_confirmed_count_baseline")
+                : "，负样本未测";
+
+            pieces.Add(imageText);
         }
 
         if (root.TryGetProperty("video", out var video)
             && video.ValueKind == JsonValueKind.Object)
         {
-            pieces.Add(
+            var videoText =
                 "视频自动 Query "
                 + IntValue(root, "generated_video_queries")
                 + "，Top1 "
-                + Percent(video, "top1_accuracy_positive"));
+                + Percent(video, "top1_accuracy_positive");
+
+            var videoNegativeCount = IntNumber(
+                video,
+                "negative_queries");
+
+            videoText += videoNegativeCount > 0
+                ? "，负样本强匹配 "
+                    + IntValue(
+                        video,
+                        "unexpected_strong_match_count_baseline")
+                : "，负样本未测";
+
+            pieces.Add(videoText);
         }
 
         _resultHeadline.Text = "自动验收完成";
@@ -1005,6 +1033,18 @@ internal sealed class MainForm : Form
         }
 
         return "N/A";
+    }
+
+    private static int IntNumber(JsonElement root, string name)
+    {
+        if (root.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetInt32(out var number))
+        {
+            return number;
+        }
+
+        return 0;
     }
 
     private static string IntValue(JsonElement root, string name)
