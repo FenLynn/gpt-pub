@@ -49,3 +49,22 @@ Windows CI 已通过：
 - artifact upload。
 
 该候选仍属于 `p106-exp` 实验版本，不代表正式 stable/main Release。
+
+## MediaIndex v0.1.0 Product Preview
+
+P106 已开始构建正式主程序：
+
+```text
+MediaIndex-v0.1.0-win-x64.exe
+```
+
+状态仍为：
+
+```text
+p106-exp preview
+not stable
+not main
+no GitHub Release tag
+```
+
+该 Preview 只有在 P106 Windows CI 同时通过 acceptance regression、known hard-negative、persistent core、incremental reuse、exact lookup、single-EXE self-test 后才允许作为 downloadable artifact 提供给用户。
