@@ -100,6 +100,12 @@ internal sealed class QueryHit
     [JsonPropertyName("phash_distance")]
     public int PhashDistance { get; set; }
 
+    [JsonPropertyName("local_score")]
+    public double LocalScore { get; set; }
+
+    [JsonPropertyName("candidate_lane")]
+    public string CandidateLane { get; set; } = string.Empty;
+
     [JsonPropertyName("inliers")]
     public double Inliers { get; set; }
 
