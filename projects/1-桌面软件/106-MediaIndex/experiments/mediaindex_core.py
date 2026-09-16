@@ -719,6 +719,25 @@ def build_index(
         )
         connection.commit()
 
+        active_generation = (
+            target_generation.name
+            if target_generation != index_dir
+            else meta.get(
+                "active_generation",
+                "",
+            )
+        )
+
+        if active_generation:
+            index_generation.cleanup(
+                index_dir,
+                active_generation=active_generation,
+                keep=3,
+            )
+            index_generation.cleanup_incomplete(
+                index_dir
+            )
+
         elapsed = time.perf_counter() - started
 
         payload = {
@@ -736,6 +755,10 @@ def build_index(
             "seconds": elapsed,
             "matrix_bytes": int(matrix.nbytes),
             "local_index_mode": local_mode,
+            "active_generation": active_generation,
+            "generation_created": bool(
+                needs_new_generation
+            ),
             "local_compact_threshold": int(
                 compact_threshold
             ),
@@ -752,15 +775,45 @@ def build_index(
         connection.close()
 
 
-def ensure_index_files(index_dir: Path):
+def ensure_index_files(
+    index_dir: Path,
+    meta: dict[str, str],
+) -> Path:
     database = index_dir / "index.sqlite3"
-    matrix = index_dir / "region_hashes.npy"
-    ids = index_dir / "image_ids.npy"
 
-    if not database.exists() or not matrix.exists() or not ids.exists():
+    if not database.is_file():
         raise SystemExit(
             f"Incomplete MediaIndex image index: {index_dir}"
         )
+
+    generation_dir = (
+        index_generation.resolve_active(
+            index_dir,
+            meta,
+        )
+    )
+    matrix = (
+        generation_dir
+        / "region_hashes.npy"
+    )
+    ids = (
+        generation_dir
+        / "image_ids.npy"
+    )
+
+    if (
+        not matrix.is_file()
+        or not ids.is_file()
+        or not local_index.index_available(
+            generation_dir
+        )
+    ):
+        raise SystemExit(
+            "Incomplete MediaIndex active generation: "
+            f"{generation_dir}"
+        )
+
+    return generation_dir
 
 
 def score_candidates(
@@ -854,23 +907,32 @@ def query_image(
     verify_k: int,
 ) -> None:
     started = time.perf_counter()
-    ensure_index_files(index_dir)
+
+    database = index_dir / "index.sqlite3"
+    if not database.is_file():
+        raise SystemExit(
+            f"Incomplete MediaIndex image index: {index_dir}"
+        )
 
     connection = db_connect(index_dir)
 
     try:
         meta = load_meta(connection)
+        generation_dir = ensure_index_files(
+            index_dir,
+            meta,
+        )
         library_value = meta.get("library_root")
         if not library_value:
             raise SystemExit("Index has no library_root metadata")
 
         library = Path(library_value)
         matrix = np.load(
-            index_dir / "region_hashes.npy",
+            generation_dir / "region_hashes.npy",
             mmap_mode="r",
         )
         ids = np.load(
-            index_dir / "image_ids.npy",
+            generation_dir / "image_ids.npy",
             mmap_mode="r",
         )
 
@@ -923,7 +985,7 @@ def query_image(
         )
         local_ids_array, local_scores_array, local_meta = (
             local_overlay.search_index(
-                index_dir,
+                generation_dir,
                 query_local_words,
                 top_k,
             )
@@ -1317,6 +1379,7 @@ def query_image(
             "query": str(query.resolve()),
             "library_root": str(library),
             "index_dir": str(index_dir.resolve()),
+            "active_generation": generation_dir.name,
             "indexed_images": int(len(matrix)),
             "ranking_mode": ranking_mode,
             "candidate_ms": candidate_ms,
@@ -1324,7 +1387,9 @@ def query_image(
             "lane_b_candidates": int(len(local_ids)),
             "candidate_union_count": int(len(ordered_ids)),
             "lane_b_ready": bool(
-                local_index.index_available(index_dir)
+                local_index.index_available(
+                    generation_dir
+                )
             ),
             "lane_b_overlay": bool(
                 local_meta.get(
@@ -1365,11 +1430,20 @@ def index_info(
     index_dir: Path,
     output: Path,
 ) -> None:
-    ensure_index_files(index_dir)
+    database = index_dir / "index.sqlite3"
+    if not database.is_file():
+        raise SystemExit(
+            f"Incomplete MediaIndex image index: {index_dir}"
+        )
+
     connection = db_connect(index_dir)
 
     try:
         meta = load_meta(connection)
+        generation_dir = ensure_index_files(
+            index_dir,
+            meta,
+        )
         count = int(
             connection.execute(
                 "SELECT COUNT(*) AS n FROM images"
@@ -1380,13 +1454,22 @@ def index_info(
             "ok": True,
             "index_dir": str(index_dir.resolve()),
             "library_root": meta.get("library_root", ""),
+            "active_generation": generation_dir.name,
             "images": count,
             "local_lane_ready": bool(
-                local_index.index_available(index_dir)
+                local_index.index_available(
+                    generation_dir
+                )
             ),
             "local_postings_bytes": int(
-                (index_dir / "local_postings.npy").stat().st_size
-                if (index_dir / "local_postings.npy").is_file()
+                (
+                    generation_dir
+                    / "local_postings.npy"
+                ).stat().st_size
+                if (
+                    generation_dir
+                    / "local_postings.npy"
+                ).is_file()
                 else 0
             ),
             "schema_version": meta.get(
