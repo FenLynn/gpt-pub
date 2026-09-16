@@ -33,7 +33,11 @@ ALL_ARRAY_FILES = (
 
 
 def _fsync_file(path: Path) -> None:
-    with path.open("rb") as handle:
+    # Windows _commit requires a writable descriptor.
+    # Generation payloads are private files owned by MediaIndex,
+    # so opening read/write is valid before activation.
+    with path.open("r+b") as handle:
+        handle.flush()
         os.fsync(handle.fileno())
 
 
