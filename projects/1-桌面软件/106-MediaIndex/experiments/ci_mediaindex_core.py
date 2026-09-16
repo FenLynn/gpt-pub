@@ -58,6 +58,20 @@ def main() -> None:
         if build["images"] != 10:
             raise AssertionError(build)
 
+        if build.get("local_postings", 0) <= 0:
+            raise AssertionError(build)
+
+        for filename in (
+            "local_postings.npy",
+            "local_offsets.npy",
+            "local_idf.npy",
+            "local_stop.npy",
+        ):
+            if not (index_dir / filename).is_file():
+                raise AssertionError(
+                    f"Missing Lane B index file: {filename}"
+                )
+
         cases = [
             (0, "recompress"),
             (1, "resize"),
