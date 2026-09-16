@@ -188,3 +188,28 @@ Product Preview 当前先完成持久图片检索。视频持久索引会沿该�
 ## 接续入口
 
 新对话先读 `HANDOFF.md`，再按照其中顺序核对仓库真实状态和 CI。
+
+## v0.2.0｜Persistent Lane B
+
+v0.2.0 把此前 benchmark 阶段的 local-feature 候选召回正式接入持久索引。
+
+```text
+Lane A
+selected multi-region pHash
+
+Lane B
+ORB descriptors
+→ deterministic compact local words
+→ persistent inverted postings
+
+Lane A + Lane B
+→ reciprocal-rank candidate union
+→ adaptive deep verification
+→ Confirmed / Probable / Candidate
+```
+
+当前 Lane B 的职责仅是候选召回。它不会因为 local-word 相似直接宣布同源。
+
+对于极端小裁剪，若保守 `Confirmed` 未满足，但 SIFT 几何、query coverage 与内容一致性共同形成很强证据，则可进入独立 `Probable` 层。`Confirmed` 的 hard-negative 门槛没有因此降低。
+
+深度验证采用自适应预算：先验证少量融合候选，如果尚无强证据，再优先扩展 Lane B 与 Lane A 的靠前候选，找到强证据后停止。
