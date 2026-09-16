@@ -335,3 +335,71 @@ one file
 共享的是 hash、local descriptor、verifier 算法实现。
 
 不能强迫图片和视频在持久化层使用完全相同的记录密度。
+
+
+## 14. R017｜v0.2.0 实际 Lane B 规模估算
+
+R017 改用 v0.2.0 当前真实参数：
+
+```text
+vocab_size = 32768
+local words/image cap = 64
+postings dtype = uint32
+offsets dtype = int64
+IDF dtype = float32
+stop-word threshold = max(25, 15% of images)
+```
+
+在合成 correlated-cluster workload 中：
+
+| Images | Mean unique words/image | Postings | Raw postings | Build time |
+| ---: | ---: | ---: | ---: | ---: |
+| 10k | 62.99 | 0.630M | 2.40 MiB | 0.09 s |
+| 100k | 63.00 | 6.300M | 24.03 MiB | 0.95 s |
+| 500k | 62.99 | 31.497M | 120.15 MiB | 4.65 s |
+
+500k 时其余 fixed arrays 约：
+
+```text
+offsets  0.25 MiB
+idf      0.13 MiB
+stop     0.03 MiB
+```
+
+SQLite 中每图最多 64 个 uint16 local words 的 raw truth payload 约 61.0 MiB。
+
+因此当前 v0.2.0 Lane B 在 500k 图片下，单看 local-word truth payload + inverted postings，raw payload 约 181 MiB，尚未计 SQLite row/page overhead。
+
+### production-style mmap query
+
+500k，200 queries，每个 query 保留 1 个 target-specific local word：
+
+```text
+Top20 = 200/200
+Top50 = 200/200
+median query = 1.30 ms
+P95 query = 3.42 ms
+median postings touched = 14,479
+```
+
+这里每次 query 都重新以 mmap 模式打开 postings/offsets/idf/stop，仍然只是 Linux container 微基准，不是 Windows SLA。
+
+### 信息丢失边界
+
+如果 query 只保留 correlated cluster 共享特征，而 0 个 target-specific word 存活：
+
+| Images | Top5 | Top20 | Top50 |
+| ---: | ---: | ---: | ---: |
+| 10k | 12/100 | 47/100 | 98/100 |
+| 100k | 9/100 | 39/100 | 96/100 |
+| 500k | 2/100 | 11/100 | 37/100 |
+
+500k 时，只要保留 1 个 target-specific word：
+
+```text
+Top5  = 97/100
+Top20 = 100/100
+Top50 = 100/100
+```
+
+因此 Top50 是合理的保守 candidate budget，但不能被解释为可以弥补“query 已没有目标特异信息”。这类情况仍必须依赖 Lane A、其他局部证据与 verifier。

@@ -838,3 +838,43 @@ inliers * 2
 2. Lane B 仍只承担 candidate recall，不能单独宣布同源。
 3. 当前 24-image stress 证明链路正确，但不能替代 10k 到 500k 规模验证。
 4. 下一阶段重点是 postings 规模、查询延迟、stop-word 行为与 candidate budget。
+
+
+## R017｜Persistent Lane B 10k / 100k / 500k scale
+
+脚本：`experiments/r017_persistent_lane_b_scale.py`。
+
+该轮不是实际图片召回测试，而是对 v0.2.0 Lane B 的数据结构和 retrieval mechanics 做结构性规模压力。
+
+### 参数
+
+```text
+vocab = 32768
+64 words/image cap
+uint32 postings
+IDF
+15% stop-word threshold
+cluster size = 50
+```
+
+每个 synthetic image 含 global-common、cluster-shared 与 target-specific 三类 local words。
+
+### 结果
+
+| N | Postings | Raw postings | Build | mmap median | mmap P95 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 10k | 0.630M | 2.40 MiB | 0.09 s | | |
+| 100k | 6.300M | 24.03 MiB | 0.95 s | | |
+| 500k | 31.497M | 120.15 MiB | 4.65 s | 1.30 ms | 3.42 ms |
+
+500k mmap query 的 median postings touched 约 14,479。
+
+当至少 1 个 target-specific word 存活时，500k 下 Top20 与 Top50 均为 100/100。0 个 target-specific word 时，500k Top20 只有 11/100，Top50 37/100。
+
+### 结论
+
+1. 当前 compact inverted postings 在 500k 数量级的 raw memory 仍合理。
+2. 查询成本由命中 postings 数量决定，不需要扫描 500k 全库 descriptors。
+3. Top50 继续作为当前安全 candidate budget。
+4. 如果 target-specific local evidence 完全消失，增大 K 无法从根本上恢复信息。
+5. R017 不能替代真实 500k 媒体库，它只验证数据结构规模与候选机制。

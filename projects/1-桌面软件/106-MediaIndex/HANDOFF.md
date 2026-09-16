@@ -392,3 +392,32 @@ R017+ larger correlated-library validation
 → candidate budget Top20 / Top50 refinement
 → real-domain acceptance
 ```
+
+
+## 15. R017 scale 断点
+
+v0.2.0 通过后已继续完成 synthetic persistent Lane B scale：
+
+```text
+500k images
+31.497M postings
+120.15 MiB raw uint32 postings
+~61.0 MiB raw local-word truth payload
+production-style mmap:
+  median 1.30 ms
+  P95 3.42 ms
+  median postings touched 14,479
+```
+
+在至少 1 个 target-specific word 存活时，500k synthetic queries Top20/Top50 100/100。
+
+若 0 个 target-specific word 存活，500k Top20 11/100、Top50 37/100。该边界再次确认 Lane B 只能是 candidate lane。
+
+下一步应优先做：
+
+```text
+larger real-image correlated library
+→ Windows NTFS mmap
+→ incremental postings rebuild
+→ verifier cache / offline volume
+```
