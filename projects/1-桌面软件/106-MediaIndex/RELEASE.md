@@ -68,3 +68,33 @@ no GitHub Release tag
 ```
 
 该 Preview 只有在 P106 Windows CI 同时通过 acceptance regression、known hard-negative、persistent core、incremental reuse、exact lookup、single-EXE self-test 后才允许作为 downloadable artifact 提供给用户。
+
+## 2026-09-16｜MediaIndex v0.1.0 Product Preview CI 通过
+
+Windows CI 已完整通过：
+
+```text
+Run: 35071827474
+Commit: 3084e8605cbb489b99db1624d23af3b1bf340cdc
+Artifact: MediaIndex-v0.1.0-win-x64
+Artifact ID: 10435739179
+EXE bytes: 235793460
+EXE SHA-256: bb6ddb309ad329dba009964ed4989cc33e7cfef9d3094ef6d2b9d435e79768ae
+```
+
+通过项：
+
+- A4/V011 automated regression
+- known hard-negative gate
+- persistent core smoke
+- incremental rebuild reuse
+- exact byte-identical lookup
+- algorithm worker build
+- Acceptance single EXE publish + self-test
+- MediaIndex main single EXE publish + embedded-worker self-test
+- artifact upload
+- SHA-256 generation
+
+known hard-negative suite 当前 4/4 均未被误提升为 Confirmed。
+
+该版本仍属于 `p106-exp` Product Preview，不等同于 stable/main 正式 Release。
