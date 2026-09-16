@@ -218,3 +218,28 @@ private algorithm worker
 用户侧不需要 Python、仓库、BAT 或 .NET Runtime。
 
 下一步仍然是用该 EXE 完成 A4 + V011 真实域 smoke acceptance。
+
+
+## 11. v0.0.2 用户自动验收发现
+
+用户本机 Round 1 库：
+
+```text
+20 library images
+40 automatic positive queries
+Top-50 recall = 100%
+Top-1 = 85%
+Confirmed recall = 57.5%
+```
+
+6 个 Top-1 失败均为 Crop30 / asymmetric Crop，且没有高置信 Confirmed。旧版在该路径上会让噪声 SIFT verification score 覆盖 pHash 的正确候选顺序。
+
+v0.0.3 已修改：
+
+- 有 Confirmed 时 verifier 优先。
+- 无 Confirmed 时 multi-region pHash 优先，verifier 只作 tie-break。
+- GUI 明示 Top1 / Top50 / Confirmed。
+- 自动 smoke 加 synthetic unrelated sanity negatives。
+- V011 继续使用 sequence-aware temporal fitting。
+
+不要把 v0.0.2 的“Top50 100% / 误确认 0”视为整体验收通过，因为该轮没有负样本且 Top1 仅 85%。
