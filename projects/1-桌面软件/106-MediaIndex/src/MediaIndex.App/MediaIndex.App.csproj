@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>MediaIndex</AssemblyName>
+    <RootNamespace>MediaIndex.App</RootNamespace>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <Product>MediaIndex</Product>
+    <Company>FenLynn</Company>
+    <Description>Persistent source-media index and lookup tool</Description>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>embedded</DebugType>
+    <ApplicationIcon Condition="Exists('$(MSBuildProjectDirectory)\MediaIndex.ico')">MediaIndex.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource
+      Include="Generated\MediaIndex.Worker.exe"
+      LogicalName="MediaIndex.Worker.exe"
+      Condition="Exists('$(MSBuildProjectDirectory)\Generated\MediaIndex.Worker.exe')" />
+  </ItemGroup>
+</Project>
