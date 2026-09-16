@@ -718,6 +718,8 @@ def query_image(
                 ),
                 "verification_score": 0.0,
                 "confirmed_baseline": False,
+                "probable_geometry_baseline": False,
+                "probable_geometry_score": 0.0,
                 "inliers": 0,
                 "ratio": 0.0,
                 "query_coverage": 0.0,
@@ -756,6 +758,11 @@ def query_image(
             for item in verified
             if item.get("confirmed_baseline")
         ]
+        probable = [
+            item
+            for item in verified
+            if item.get("probable_geometry_baseline")
+        ]
 
         if exact_id is not None:
             verified.sort(
@@ -778,6 +785,24 @@ def query_image(
                 reverse=True,
             )
             ranking_mode = "confirmed_verifier"
+        elif probable:
+            verified.sort(
+                key=lambda item: (
+                    item.get(
+                        "probable_geometry_baseline",
+                        False,
+                    ),
+                    item.get(
+                        "probable_geometry_score",
+                        0.0,
+                    ),
+                    item.get("verification_score", 0.0),
+                    item.get("local_score", 0.0),
+                    -item["phash_distance"],
+                ),
+                reverse=True,
+            )
+            ranking_mode = "probable_geometry"
         else:
             shortlist = verified[:]
             source_cache = {}
@@ -828,6 +853,8 @@ def query_image(
                 confidence = "Exact"
             elif item.get("confirmed_baseline"):
                 confidence = "Confirmed"
+            elif item.get("probable_geometry_baseline"):
+                confidence = "Probable"
             elif rank == 1:
                 template = item.get("template_score")
                 if (
