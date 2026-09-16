@@ -32,6 +32,28 @@ ALL_ARRAY_FILES = (
 )
 
 
+def _fsync_file(path: Path) -> None:
+    with path.open("rb") as handle:
+        os.fsync(handle.fileno())
+
+
+def _fsync_directory(path: Path) -> None:
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY,
+        )
+    except OSError:
+        return
+
+    try:
+        os.fsync(descriptor)
+    except OSError:
+        pass
+    finally:
+        os.close(descriptor)
+
+
 def generations_root(index_dir: Path) -> Path:
     root = index_dir / GENERATIONS_DIR
     root.mkdir(
@@ -109,17 +131,40 @@ def generation_complete(path: Path) -> bool:
         "files",
         [],
     )
+    sizes = data.get(
+        "sizes",
+        {},
+    )
 
-    if not isinstance(
-        files,
-        list,
+    if (
+        not isinstance(files, list)
+        or not isinstance(sizes, dict)
     ):
         return False
 
-    return all(
-        (path / str(name)).is_file()
-        for name in files
-    )
+    for name in files:
+        filename = str(name)
+        target = path / filename
+
+        if not target.is_file():
+            return False
+
+        expected = sizes.get(filename)
+        if expected is None:
+            return False
+
+        try:
+            actual = int(
+                target.stat().st_size
+            )
+            expected_size = int(expected)
+        except (OSError, TypeError, ValueError):
+            return False
+
+        if actual != expected_size:
+            return False
+
+    return True
 
 
 def inherit_files(
@@ -192,6 +237,11 @@ def write_manifest(
             + ", ".join(missing)
         )
 
+    for name in names:
+        _fsync_file(
+            generation_dir / name
+        )
+
     payload = {
         "schema": 1,
         "generation": generation_dir.name,
@@ -245,6 +295,9 @@ def write_manifest(
     os.replace(
         temp,
         target,
+    )
+    _fsync_directory(
+        generation_dir
     )
 
     # Re-open after replace. A generation is only eligible
