@@ -120,6 +120,16 @@ jobs:
             throw "Hard-negative suite failed: $LASTEXITCODE"
           }
 
+      - name: Run persistent MediaIndex core smoke
+        shell: pwsh
+        working-directory: projects/1-桌面软件/106-MediaIndex/experiments
+        run: |
+          $ErrorActionPreference='Stop'
+          python ci_mediaindex_core.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "Persistent MediaIndex core smoke failed: $LASTEXITCODE"
+          }
+
       - name: Build private algorithm worker
         shell: pwsh
         working-directory: projects/1-桌面软件/106-MediaIndex/experiments
@@ -134,11 +144,16 @@ jobs:
           New-Item -ItemType Directory -Force $generated | Out-Null
           Copy-Item $worker (Join-Path $generated 'MediaIndex.Acceptance.Worker.exe') -Force
 
+          $mainGenerated="$env:GITHUB_WORKSPACE/projects/1-桌面软件/106-MediaIndex/src/MediaIndex.App/Generated"
+          New-Item -ItemType Directory -Force $mainGenerated | Out-Null
+          Copy-Item $worker (Join-Path $mainGenerated 'MediaIndex.Worker.exe') -Force
+
       - name: Generate application icon
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
           & 'projects/1-桌面软件/106-MediaIndex/build/GenerateAcceptanceIcon.ps1' -OutputPath 'projects/1-桌面软件/106-MediaIndex/src/MediaIndex.Acceptance/MediaIndex.Acceptance.ico'
+          & 'projects/1-桌面软件/106-MediaIndex/build/GenerateAcceptanceIcon.ps1' -OutputPath 'projects/1-桌面软件/106-MediaIndex/src/MediaIndex.App/MediaIndex.ico'
 
       - name: Publish self-contained single EXE
         shell: pwsh
@@ -169,6 +184,71 @@ jobs:
           if (-not $json.embeddedWorker) { throw 'Embedded worker not found in host EXE' }
           if (-not $json.extractedWorker) { throw 'Embedded worker extraction failed' }
           Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Publish MediaIndex main single EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $project='projects/1-桌面软件/106-MediaIndex/src/MediaIndex.App/MediaIndex.App.csproj'
+          dotnet restore $project
+          if ($LASTEXITCODE -ne 0) { throw "MediaIndex dotnet restore failed: $LASTEXITCODE" }
+          dotnet publish $project -c Release -r win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o build/P106-MediaIndex
+          if ($LASTEXITCODE -ne 0) { throw "MediaIndex dotnet publish failed: $LASTEXITCODE" }
+          $exe='build/P106-MediaIndex/MediaIndex.exe'
+          if (!(Test-Path $exe -PathType Leaf)) { throw 'MediaIndex.exe missing' }
+          $unexpected=Get-ChildItem 'build/P106-MediaIndex' -File | Where-Object { $_.Name -ne 'MediaIndex.exe' }
+          if ($unexpected) { $unexpected | Select-Object Name,Length | Format-Table; throw 'MediaIndex default delivery must remain a single EXE' }
+
+      - name: Run MediaIndex embedded-worker self-test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP ('P106-MediaIndex-SelfTest-' + [guid]::NewGuid().ToString('N'))
+          New-Item $root -ItemType Directory -Force | Out-Null
+          $report=Join-Path $root 'self-test.json'
+          $p=Start-Process -FilePath (Resolve-Path 'build/P106-MediaIndex/MediaIndex.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "MediaIndex self-test exit code $($p.ExitCode)" }
+          $json=Get-Content $report -Raw | ConvertFrom-Json
+          $json | ConvertTo-Json -Depth 6 | Write-Host
+          if (-not $json.ok) { throw 'MediaIndex self-test returned ok=false' }
+          if (-not $json.embeddedWorker) { throw 'MediaIndex embedded worker not found' }
+          if (-not $json.extractedWorker) { throw 'MediaIndex worker extraction failed' }
+          Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Package MediaIndex main EXE
+        id: main-package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $project='projects/1-桌面软件/106-MediaIndex/src/MediaIndex.App/MediaIndex.App.csproj'
+          [xml]$xml=Get-Content $project -Raw
+          $version=@($xml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'MediaIndex <Version> is missing' }
+
+          $source='build/P106-MediaIndex/MediaIndex.exe'
+          $delivery="build/P106-MediaIndex/MediaIndex-v$version-win-x64.exe"
+          Move-Item $source $delivery -Force
+
+          $hash=(Get-FileHash $delivery -Algorithm SHA256).Hash.ToLowerInvariant()
+          $bytes=(Get-Item $delivery).Length
+          $shaFile="build/P106-MediaIndex/MediaIndex-v$version-win-x64-SHA256.txt"
+          "MediaIndex-v$version-win-x64.exe  $bytes bytes  sha256=$hash" | Set-Content $shaFile -Encoding utf8
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "exe=$delivery" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "sha=$shaFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "hash=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "bytes=$bytes" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload MediaIndex main EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: MediaIndex-v${{ steps.main-package.outputs.version }}-win-x64
+          path: |
+            ${{ steps.main-package.outputs.exe }}
+            ${{ steps.main-package.outputs.sha }}
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Rename delivery and generate SHA-256
         id: package
@@ -212,6 +292,14 @@ jobs:
             "- .NET runtime required on user machine: no",
             "- Candidate commit: ${{ github.sha }}",
             "- EXE bytes: ${{ steps.package.outputs.bytes }}",
-            "- SHA-256: ${{ steps.package.outputs.hash }}"
+            "- SHA-256: ${{ steps.package.outputs.hash }}",
+            "",
+            "## MediaIndex main v${{ steps.main-package.outputs.version }}",
+            "- Delivery: one self-contained Windows x64 EXE",
+            "- Persistent image index: SQLite metadata + NumPy hash matrix",
+            "- Incremental rebuild smoke: required",
+            "- Known hard-negative suite: required",
+            "- Main EXE bytes: ${{ steps.main-package.outputs.bytes }}",
+            "- Main SHA-256: ${{ steps.main-package.outputs.hash }}"
           )
           $lines | Add-Content $env:GITHUB_STEP_SUMMARY
