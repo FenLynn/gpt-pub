@@ -277,6 +277,113 @@ def template_fallback_score(
     return float(best)
 
 
+def block_ncc_after_warp(
+    query_gray: np.ndarray,
+    source_gray: np.ndarray,
+    homography: np.ndarray,
+    rows: int = 6,
+    cols: int = 6,
+) -> dict:
+    height, width = source_gray.shape
+
+    warped = cv2.warpPerspective(
+        query_gray,
+        homography,
+        (width, height),
+        flags=cv2.INTER_LINEAR,
+        borderValue=0,
+    )
+
+    valid = (
+        cv2.warpPerspective(
+            np.ones(
+                query_gray.shape,
+                dtype=np.uint8,
+            )
+            * 255,
+            homography,
+            (width, height),
+            flags=cv2.INTER_NEAREST,
+            borderValue=0,
+        )
+        > 0
+    )
+
+    values = []
+
+    for row in range(rows):
+        y1 = int(round(row * height / rows))
+        y2 = int(round((row + 1) * height / rows))
+
+        for col in range(cols):
+            x1 = int(round(col * width / cols))
+            x2 = int(round((col + 1) * width / cols))
+
+            block_mask = valid[y1:y2, x1:x2]
+            if block_mask.size == 0:
+                continue
+
+            if (
+                np.count_nonzero(block_mask)
+                < block_mask.size * 0.55
+            ):
+                continue
+
+            left = warped[
+                y1:y2,
+                x1:x2,
+            ][block_mask].astype(np.float32)
+
+            right = source_gray[
+                y1:y2,
+                x1:x2,
+            ][block_mask].astype(np.float32)
+
+            if left.size < 100:
+                continue
+
+            # Low-variance blank background is weak evidence and can
+            # hide a replaced central subject in poster/template cases.
+            if left.std() < 6.0 or right.std() < 6.0:
+                continue
+
+            value = float(
+                np.corrcoef(
+                    left,
+                    right,
+                )[0, 1]
+            )
+
+            if np.isfinite(value):
+                values.append(value)
+
+    if not values:
+        return {
+            "block_ncc_count": 0,
+            "block_ncc_median": 0.0,
+            "block_ncc_p10": 0.0,
+            "block_ncc_high_fraction": 0.0,
+        }
+
+    array = np.asarray(
+        values,
+        dtype=np.float32,
+    )
+
+    return {
+        "block_ncc_count": int(len(array)),
+        "block_ncc_median": float(
+            np.median(array)
+        ),
+        "block_ncc_p10": float(
+            np.percentile(array, 10)
+        ),
+        "block_ncc_high_fraction": float(
+            np.mean(array >= 0.88)
+        ),
+    }
+
+
 def extract_sift(detector, image: np.ndarray):
     image = resize_max(image)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -296,6 +403,10 @@ def verify_pair(matcher, query_feature, source_feature):
         "query_coverage": 0.0,
         "source_coverage": 0.0,
         "ncc": 0.0,
+        "block_ncc_count": 0,
+        "block_ncc_median": 0.0,
+        "block_ncc_p10": 0.0,
+        "block_ncc_high_fraction": 0.0,
         "confirmed_baseline": False,
     }
 
@@ -370,11 +481,28 @@ def verify_pair(matcher, query_feature, source_feature):
         homography,
     )
 
+    block_stats = block_ncc_after_warp(
+        query_gray,
+        source_gray,
+        homography,
+    )
+
+    spatially_consistent = (
+        block_stats["block_ncc_count"] < 4
+        or (
+            block_stats["block_ncc_median"] >= 0.88
+            and block_stats[
+                "block_ncc_high_fraction"
+            ] >= 0.65
+        )
+    )
+
     confirmed = (
         inliers >= 12
         and ratio >= 0.75
         and query_coverage >= 0.05
         and ncc >= 0.88
+        and spatially_consistent
     )
 
     return {
@@ -385,6 +513,7 @@ def verify_pair(matcher, query_feature, source_feature):
         "query_coverage": float(query_coverage),
         "source_coverage": float(source_coverage),
         "ncc": float(ncc),
+        **block_stats,
         "confirmed_baseline": bool(confirmed),
     }
 
