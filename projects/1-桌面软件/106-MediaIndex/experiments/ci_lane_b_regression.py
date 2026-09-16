@@ -309,34 +309,31 @@ def main() -> None:
                 and source_id not in phash_list[:20]
             )
 
-            integrated = None
-
-            if seed < 4:
-                output = root / f"full_{seed:02d}.json"
-                run_core(
-                    [
-                        "query-image",
-                        "--index-dir", str(index_dir),
-                        "--query", str(query_path),
-                        "--output", str(output),
-                        "--topk", "20",
-                        "--verify-k", "10",
-                    ]
+            output = root / f"full_{seed:02d}.json"
+            run_core(
+                [
+                    "query-image",
+                    "--index-dir", str(index_dir),
+                    "--query", str(query_path),
+                    "--output", str(output),
+                    "--topk", "20",
+                    "--verify-k", "8",
+                ]
+            )
+            integrated = json.loads(
+                output.read_text(
+                    encoding="utf-8"
                 )
-                integrated = json.loads(
-                    output.read_text(
-                        encoding="utf-8"
-                    )
-                )
-                top = (
-                    integrated["results"][0]
-                    if integrated["results"]
-                    else {}
-                )
-                integrated_top1 += int(
-                    top.get("relpath")
-                    == source_name
-                )
+            )
+            top = (
+                integrated["results"][0]
+                if integrated["results"]
+                else {}
+            )
+            integrated_top1 += int(
+                top.get("relpath")
+                == source_name
+            )
 
             details.append(
                 {
@@ -374,7 +371,7 @@ def main() -> None:
             "phash_top5": phash5,
             "union_top20": union20,
             "lane_b_top5_rescues": rescues,
-            "integrated_top1_first4": integrated_top1,
+            "integrated_top1_all12": integrated_top1,
             "build": {
                 "images": build["images"],
                 "local_postings": build[
@@ -404,7 +401,7 @@ def main() -> None:
         if rescues < 2:
             raise AssertionError(summary)
 
-        if integrated_top1 < 4:
+        if integrated_top1 < 12:
             raise AssertionError(summary)
 
 
