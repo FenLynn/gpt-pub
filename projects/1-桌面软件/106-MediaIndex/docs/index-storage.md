@@ -403,3 +403,88 @@ Top50 = 100/100
 ```
 
 因此 Top50 是合理的保守 candidate budget，但不能被解释为可以弥补“query 已没有目标特异信息”。这类情况仍必须依赖 Lane A、其他局部证据与 verifier。
+
+
+## 15. R018｜Base snapshot + delta overlay
+
+当前 v0.2.0 每次增量扫描虽然可以复用 SQLite 中已有 `local_words`，但最后仍会从全部 rows 重建完整 Lane B postings。
+
+对几十万库存来说，日常只改变少量文件时不够优雅。
+
+R018 验证以下结构：
+
+```text
+immutable base snapshot
+  postings / offsets / idf / stop
+
++ delta overlay
+  updated image current words
+  new image words
+
++ sorted override/delete ids
+  updated ids mask old base postings
+  deleted ids mask old base postings
+
+query
+  search base with mask
+  search delta
+  merge scores
+```
+
+Delta 在 compact 之前复用 base 的 IDF 与 stop-word bitmap。由于 overlay 目标控制在几个百分点以内，避免每次小更新都改全局统计。
+
+### 500k synthetic structural benchmark
+
+变更 mix：
+
+```text
+70% updated existing files
+20% new files
+10% deleted files
+```
+
+| Changed fraction | Delta postings | Delta raw | Mask raw | Query median | Query P95 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.1% | 28,373 | 0.108 MiB | 0.0015 MiB | 0.719 ms | 1.280 ms |
+| 1% | 283,536 | 1.082 MiB | 0.0153 MiB | 0.795 ms | 1.343 ms |
+| 5% | 1,417,480 | 5.407 MiB | 0.0763 MiB | 0.878 ms | 1.307 ms |
+
+同一实现的 base-only：
+
+```text
+median = 0.514 ms
+P95 = 0.996 ms
+Top20 = 240/240
+```
+
+每个 overlay 档位均对四类 query 各验证 60 个：
+
+```text
+unchanged Top20 = 60/60
+updated   Top20 = 60/60
+new       Top20 = 60/60
+deleted old ID absent = 60/60
+```
+
+### 当前工程判断
+
+建议把正式增量 Lane B 设计为：
+
+```text
+base generation
++ delta generation
++ override/delete mask
+→ compact when delta reaches threshold
+```
+
+初始 compact 阈值建议从 5% 附近开始继续验证，而不是直接冻结为产品常量。
+
+这样小规模文件变化只需要：
+
+1. 更新 SQLite truth。
+2. 重建很小的 delta。
+3. 原 base snapshot 保持只读。
+4. 查询合并 base 与 delta。
+5. 达到阈值后生成新 base，再原子切换 generation。
+
+该设计同时更适合 crash-safe sidecar generation，因为正在使用的 base 不需要就地修改。

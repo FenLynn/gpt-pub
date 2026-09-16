@@ -878,3 +878,32 @@ cluster size = 50
 3. Top50 继续作为当前安全 candidate budget。
 4. 如果 target-specific local evidence 完全消失，增大 K 无法从根本上恢复信息。
 5. R017 不能替代真实 500k 媒体库，它只验证数据结构规模与候选机制。
+
+
+## R018｜Lane B delta overlay
+
+脚本：`experiments/r018_lane_b_delta_overlay.py`。
+
+目的：验证 500k base 下，小比例新增、修改、删除是否必须重建完整 31M postings。
+
+结构：
+
+```text
+base inverted index
++ delta inverted index
++ override/delete sorted ID mask
+```
+
+500k synthetic benchmark：
+
+| Changed | Delta raw | Median | P95 |
+| ---: | ---: | ---: | ---: |
+| 0.1% | 0.108 MiB | 0.719 ms | 1.280 ms |
+| 1% | 1.082 MiB | 0.795 ms | 1.343 ms |
+| 5% | 5.407 MiB | 0.878 ms | 1.307 ms |
+
+base-only median 约 0.514 ms。
+
+对 unchanged、updated、new 三类 current source，所有档位 Top20 均 60/60。deleted source 的旧 ID 在所有档位均 60/60 被 mask。
+
+结论：base + delta 是值得进入产品实现的增量策略。R018 仍是 structural synthetic benchmark，不能视为真实 NTFS / SQLite / crash recovery SLA。

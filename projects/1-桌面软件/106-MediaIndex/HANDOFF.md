@@ -421,3 +421,37 @@ larger real-image correlated library
 → incremental postings rebuild
 → verifier cache / offline volume
 ```
+
+
+## 16. R018 delta overlay 断点
+
+已验证：
+
+```text
+500k immutable base
++ 0.1% / 1% / 5% delta
++ override/delete mask
+```
+
+在 5% delta 下：
+
+```text
+delta postings: 1.417M
+delta raw: 5.41 MiB
+query median: 0.88 ms
+query P95: 1.31 ms
+```
+
+unchanged / updated / new 均 Top20 60/60，deleted old ID 均 60/60 被排除。
+
+因此下一产品实现方向建议：
+
+```text
+SQLite truth
+→ immutable base generation
+→ delta generation
+→ override/delete mask
+→ atomic generation switch on compaction
+```
+
+compact 阈值暂以约 5% 作为待继续验证的起点，不冻结。
