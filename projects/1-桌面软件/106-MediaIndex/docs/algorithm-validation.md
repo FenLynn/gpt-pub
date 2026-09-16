@@ -811,3 +811,30 @@ inliers * 2
 - 自动验收新增 synthetic unrelated sanity negatives，使“误确认 0”至少有基础负样本含义，同时继续明确它不能替代 same-scene hard negatives。
 
 该修正进入 Acceptance v0.0.3 候选。
+
+## R013｜Persistent Lane B 产品化 stress
+
+目标：验证 local-feature Lane B 从 benchmark 进入 persistent product index 后，能否在高度相关场景和极端小裁剪下真实救回 Lane A 漏检。
+
+测试集：24 个高度相关 library scenes。每张图共享强相关背景，只在局部嵌入不同高纹理 patch。12 个 query 仅保留该 patch，并额外执行约 0.82 倍 resize 与 JPEG 压缩。
+
+最终结果：
+
+| Metric | Result |
+| --- | ---: |
+| Queries | 12 |
+| Lane B Top20 | 12/12 |
+| Lane A + Lane B union Top20 | 12/12 |
+| pHash Top20 miss rescued by Lane B | 2 |
+| End-to-end Top1 | 12/12 |
+| hard-negative false Confirmed | 0 |
+| hard-negative false Probable geometry | 0 |
+
+过程中 end-to-end Top1 先后为 9/12、11/12、最终 12/12。最后一个失败根因定位到 template fallback 的 scale normalization：source 大图被 resize，query 小图未 resize，二者相对尺度被人为改变。修复为 common-scale preprocessing 后通过。
+
+结论：
+
+1. Persistent Lane B 已证明不仅增加候选数量，而是能真实救回 Lane A Top20 完全漏掉的来源。
+2. Lane B 仍只承担 candidate recall，不能单独宣布同源。
+3. 当前 24-image stress 证明链路正确，但不能替代 10k 到 500k 规模验证。
+4. 下一阶段重点是 postings 规模、查询延迟、stop-word 行为与 candidate budget。
