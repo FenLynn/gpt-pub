@@ -98,3 +98,31 @@ EXE SHA-256: bb6ddb309ad329dba009964ed4989cc33e7cfef9d3094ef6d2b9d435e79768ae
 known hard-negative suite 当前 4/4 均未被误提升为 Confirmed。
 
 该版本仍属于 `p106-exp` Product Preview，不等同于 stable/main 正式 Release。
+
+## 2026-09-16｜MediaIndex v0.2.0 Product Preview CI 通过
+
+Windows CI 已完整通过：
+
+```text
+Run: 35099480358
+Commit: 6e7ddadb5bf9695244556b6868bc20459d0eb52c
+Artifact: MediaIndex-v0.2.0-win-x64
+Artifact ID: 10447951988
+Main EXE bytes: 235809844
+Main EXE SHA-256: 9af2c3ca43344427c8e751ae1e0a49895ae50c50cdeeb4d40dfbf20ea121f64e
+```
+
+本轮新增并通过：
+
+- persistent local-feature Lane B
+- Lane A / Lane B candidate fusion
+- adaptive deep verification
+- conservative Probable geometry layer
+- relative-scale-preserving template fallback
+- 12/12 correlated small-crop stress end-to-end Top1
+- 2 个 pHash Top20 漏检由 Lane B rescue
+- hard-negative gate 继续保持 0 false Confirmed
+- hard-negative gate 继续保持 0 false Probable geometry
+- main EXE embedded-worker self-test
+
+该版本仍属于 `p106-exp` Product Preview，不等同于 stable/main 正式 Release。
