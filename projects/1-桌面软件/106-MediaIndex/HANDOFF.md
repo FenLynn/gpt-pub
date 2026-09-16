@@ -349,3 +349,46 @@ persistent local-feature Lane B
 → larger correlated-library regression
 → 10k/100k/500k scale
 ```
+
+## 14. v0.2.0 成功断点
+
+2026-09-16，persistent Lane B 已产品化并通过完整 Windows CI。
+
+```text
+version: 0.2.0
+commit: 6e7ddadb5bf9695244556b6868bc20459d0eb52c
+run: 35099480358
+artifact: MediaIndex-v0.2.0-win-x64
+artifact id: 10447951988
+exe bytes: 235809844
+sha256: 9af2c3ca43344427c8e751ae1e0a49895ae50c50cdeeb4d40dfbf20ea121f64e
+```
+
+Lane B stress 结果：
+
+```text
+queries: 12
+local Top20 recall: 12/12
+union Top20 recall: 12/12
+pHash Top20 misses rescued by Lane B: 2
+end-to-end Top1: 12/12
+```
+
+hard-negative gate：
+
+```text
+false Confirmed: 0
+false Probable geometry: 0
+```
+
+最后一个失败样本的根因不是召回，而是 template fallback 对 source/query 分别独立缩放，破坏了相对尺度。修复为使用 source 的 common scale 同步缩放 query 后，q06 真源 template score 从约 0.14 提升到约 0.85，错误 scene_08 约 0.29。
+
+下一工程断点：
+
+```text
+R017+ larger correlated-library validation
+→ 10k / 100k / 500k persistent Lane B scale
+→ postings latency / memory
+→ candidate budget Top20 / Top50 refinement
+→ real-domain acceptance
+```
