@@ -766,3 +766,48 @@ query:
 ```
 
 这条路线目前比“500k 全量持久化 128 至 256 个 SIFT descriptors”更值得优先推进，但仍需 A4 真实照片域验证。
+
+
+## A4-REAL-01｜自动真实素材验收首轮暴露 rerank 偏差
+
+2026-09-16，使用用户本机此前 Round 1 的 20 图库存，通过 Acceptance v0.0.2 的“自动验收”生成 40 个正样本 Query：
+
+- JPEG 重压缩
+- Resize50
+- Crop30
+- 非对称 Crop
+- 水印
+
+结果：
+
+- candidate Top-50 recall：40/40，100%
+- Top-1 accuracy：34/40，85%
+- exploratory Confirmed recall：23/40，57.5%
+- 本轮没有真实负样本，因此 `false_confirmed=0` 不能解释为真实负样本误报已通过
+- median query time：约 1.27 s
+- P95：约 1.48 s
+
+6 个 Top-1 错误全部发生在 Crop30 / 非对称 Crop，并且全部属于没有任何 candidate 达到高置信 `Confirmed` 的情形。错误候选反复偏向同一张库存图，说明旧 rerank 中：
+
+```text
+inliers * 2
++ ratio
++ coverage
++ NCC
+```
+
+仍可能在低置信几何匹配时被噪声 SIFT inlier 数量主导。
+
+该结果反而确认了两件事：
+
+1. 候选召回层在这组数据上没有丢失真源，因为 40/40 真源都在 Top-50。
+2. 问题集中在候选后的排序与置信分层，而不是全链路召回失败。
+
+修正：
+
+- 若至少一个候选达到高置信 Confirmed，继续由 SIFT / RANSAC / NCC verifier 排序。
+- 若没有任何候选达到 Confirmed，不再让低置信 SIFT 分数强行决定 Top-1，回退到 crop-tolerant multi-region pHash 顺序，并仅用 verifier 作 tie-break。
+- 自动验收 UI 必须同时显示 Top-1、Top-50 和 Confirmed，不得只显示 Top-50。
+- 自动验收新增 synthetic unrelated sanity negatives，使“误确认 0”至少有基础负样本含义，同时继续明确它不能替代 same-scene hard negatives。
+
+该修正进入 Acceptance v0.0.3 候选。
