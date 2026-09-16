@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import math
 import tempfile
@@ -485,59 +486,66 @@ def benchmark_mmap(
         top20 = 0
         top50 = 0
 
-        for target in targets:
-            query = make_query(
-                index,
-                int(target),
-                1,
-                rng,
-            )
+        postings = np.load(
+            root / "postings.npy",
+            mmap_mode="r",
+        )
+        offsets = np.load(
+            root / "offsets.npy",
+            mmap_mode="r",
+        )
+        idf = np.load(
+            root / "idf.npy",
+            mmap_mode="r",
+        )
+        stop = np.load(
+            root / "stop.npy",
+            mmap_mode="r",
+        )
 
-            started = time.perf_counter()
-
-            postings = np.load(
-                root / "postings.npy",
-                mmap_mode="r",
-            )
-            offsets = np.load(
-                root / "offsets.npy",
-                mmap_mode="r",
-            )
-            idf = np.load(
-                root / "idf.npy",
-                mmap_mode="r",
-            )
-            stop = np.load(
-                root / "stop.npy",
-                mmap_mode="r",
-            )
-
-            ranked, touched = search_arrays(
-                postings,
-                offsets,
-                idf,
-                stop,
-                query,
-                50,
-            )
-
-            timings.append(
-                (
-                    time.perf_counter()
-                    - started
+        try:
+            for target in targets:
+                query = make_query(
+                    index,
+                    int(target),
+                    1,
+                    rng,
                 )
-                * 1000
-            )
-            touched_values.append(
-                touched
-            )
 
-            top20 += int(
-                target in ranked[:20]
-            )
-            top50 += int(
-                target in ranked[:50]
-            )
+                started = time.perf_counter()
+
+                ranked, touched = search_arrays(
+                    postings,
+                    offsets,
+                    idf,
+                    stop,
+                    query,
+                    50,
+                )
+
+                timings.append(
+                    (
+                        time.perf_counter()
+                        - started
+                    )
+                    * 1000
+                )
+                touched_values.append(
+                    touched
+                )
+
+                top20 += int(
+                    target in ranked[:20]
+                )
+                top50 += int(
+                    target in ranked[:50]
+                )
+        finally:
+            del postings
+            del offsets
+            del idf
+            del stop
+            gc.collect()
 
         return {
             "queries": int(
