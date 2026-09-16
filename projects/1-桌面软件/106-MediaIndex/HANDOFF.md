@@ -319,3 +319,33 @@ v0.1.0 larger real library
 ```
 
 不要再把“手工逐条 Query 标答案”作为默认验收流程。
+
+## 13. v0.1.0 成功断点
+
+2026-09-16，正式主程序第一次完整 Windows CI 成功。
+
+```text
+version: 0.1.0
+commit: 3084e8605cbb489b99db1624d23af3b1bf340cdc
+run: 35071827474
+artifact: MediaIndex-v0.1.0-win-x64
+artifact id: 10435739179
+exe bytes: 235793460
+sha256: bb6ddb309ad329dba009964ed4989cc33e7cfef9d3094ef6d2b9d435e79768ae
+```
+
+本轮 CI 证明：
+
+- hard-negative gate 可真实阻止危险误确认
+- template-lookalike false Confirmed 已通过 local block consistency 修复
+- persistent Lane A build/query/incremental/exact 全部通过
+- 主 EXE 内嵌 worker 可释放并自检
+
+下一开发断点不再是 v0.1.0 构建，而是：
+
+```text
+persistent local-feature Lane B
+→ candidate union
+→ larger correlated-library regression
+→ 10k/100k/500k scale
+```
