@@ -488,3 +488,64 @@ base generation
 5. 达到阈值后生成新 base，再原子切换 generation。
 
 该设计同时更适合 crash-safe sidecar generation，因为正在使用的 base 不需要就地修改。
+
+## 16. v0.3.0｜Lane B delta overlay 已产品化
+
+R018 的结构已进入正式 `mediaindex_core.py`。
+
+当前文件：
+
+```text
+base:
+  local_postings.npy
+  local_offsets.npy
+  local_idf.npy
+  local_stop.npy
+
+delta:
+  local_delta_postings.npy
+  local_delta_offsets.npy
+  local_override_ids.npy
+```
+
+`local_override_ids.npy` 同时屏蔽：
+
+- 已更新文件在 base 中的旧 postings。
+- 已删除文件在 base 中的旧 postings。
+
+Query 时：
+
+```text
+search base excluding override/delete IDs
++ search delta
+→ merge scores
+```
+
+增量 build 当前行为：
+
+```text
+首次索引       → base
+少量真实变化   → delta
+无变化         → reuse
+累计变化到阈值 → compact
+```
+
+当前 compact 工程起点为约 5%，并设置最小 32 IDs。该值仍是 provisional，不视为最终产品常量。
+
+Windows CI 已实际验证修改、新增、删除和无变化复用的完整生命周期。
+
+### 下一存储问题
+
+当前每个 `.npy` 文件使用临时文件 + `os.replace` 实现单文件原子替换，但一组 base/delta 文件还没有 generation-level 原子提交。
+
+因此下一步必须升级为：
+
+```text
+immutable generation directory
+→ write all files
+→ fsync / validate
+→ atomic manifest pointer switch
+→ keep previous generation for recovery
+```
+
+这样进程崩溃或断电发生在多文件写入中间时，启动仍然只会看到最后一个完整 generation。
