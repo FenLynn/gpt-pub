@@ -61,16 +61,46 @@ def main() -> None:
         if build.get("local_postings", 0) <= 0:
             raise AssertionError(build)
 
+        active_generation = build.get(
+            "active_generation",
+            "",
+        )
+        generation_dir = (
+            index_dir
+            / "generations"
+            / active_generation
+        )
+
+        if not active_generation:
+            raise AssertionError(build)
+
         for filename in (
+            "region_hashes.npy",
+            "image_ids.npy",
             "local_postings.npy",
             "local_offsets.npy",
             "local_idf.npy",
             "local_stop.npy",
+            "generation.json",
         ):
-            if not (index_dir / filename).is_file():
+            if not (
+                generation_dir
+                / filename
+            ).is_file():
                 raise AssertionError(
-                    f"Missing Lane B index file: {filename}"
+                    "Missing active generation file: "
+                    + filename
                 )
+
+        if (
+            index_dir / "region_hashes.npy"
+        ).exists() or (
+            index_dir / "image_ids.npy"
+        ).exists():
+            raise AssertionError(
+                "Managed generation leaked arrays "
+                "into the legacy root"
+            )
 
         cases = [
             (0, "recompress"),
@@ -151,6 +181,20 @@ def main() -> None:
         if rebuild["reused"] != 10:
             raise AssertionError(rebuild)
 
+        if rebuild.get(
+            "active_generation"
+        ) != active_generation:
+            raise AssertionError(
+                {
+                    "reason": (
+                        "no-change rebuild switched "
+                        "generation"
+                    ),
+                    "initial": active_generation,
+                    "rebuild": rebuild,
+                }
+            )
+
         # Mutate a tiny subset. Lane B must use a delta overlay,
         # not rebuild the immutable base.
         updated_image = fixtures.transform(
@@ -202,8 +246,34 @@ def main() -> None:
                 delta_build
             )
 
-        if not (
+        delta_generation = delta_build.get(
+            "active_generation",
+            "",
+        )
+        delta_generation_dir = (
             index_dir
+            / "generations"
+            / delta_generation
+        )
+
+        if (
+            not delta_generation
+            or delta_generation
+            == active_generation
+        ):
+            raise AssertionError(
+                {
+                    "reason": (
+                        "delta build did not switch "
+                        "to a new generation"
+                    ),
+                    "initial": active_generation,
+                    "delta": delta_build,
+                }
+            )
+
+        if not (
+            delta_generation_dir
             / "local_override_ids.npy"
         ).is_file():
             raise AssertionError(
@@ -363,6 +433,20 @@ def main() -> None:
         ) < 3:
             raise AssertionError(
                 overlay_reuse
+            )
+
+        if overlay_reuse.get(
+            "active_generation"
+        ) != delta_generation:
+            raise AssertionError(
+                {
+                    "reason": (
+                        "overlay reuse unexpectedly "
+                        "switched generation"
+                    ),
+                    "delta": delta_generation,
+                    "reuse": overlay_reuse,
+                }
             )
 
         # Exact byte-identical query.
