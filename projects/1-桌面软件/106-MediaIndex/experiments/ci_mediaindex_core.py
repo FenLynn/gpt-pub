@@ -8,6 +8,7 @@ from pathlib import Path
 import cv2
 
 import ci_acceptance_regression as fixtures
+import ci_crash_safe_generation as crash_generation
 import mediaindex_core as core
 
 
@@ -21,6 +22,8 @@ def run_module(argv: list[str]) -> None:
 
 
 def main() -> None:
+    crash_generation.main()
+
     with tempfile.TemporaryDirectory(
         prefix="p106-core-ci-"
     ) as temp:
