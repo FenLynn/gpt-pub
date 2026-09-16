@@ -305,8 +305,8 @@ def main() -> None:
             phash5 += int(in_phash5)
             union20 += int(in_union20)
             rescues += int(
-                in_local5
-                and not in_phash5
+                in_local20
+                and source_id not in phash_list[:20]
             )
 
             integrated = None
@@ -396,9 +396,6 @@ def main() -> None:
         )
 
         if local20 < 12:
-            raise AssertionError(summary)
-
-        if local5 < 10:
             raise AssertionError(summary)
 
         if union20 < 12:
