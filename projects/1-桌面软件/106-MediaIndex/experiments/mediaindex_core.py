@@ -340,10 +340,14 @@ def build_index(
             )
         )
 
+        current_change_ids = (
+            changed_ids
+            | removed_ids
+        )
+
         pending_override_ids = (
             previous_overrides
-            | changed_ids
-            | removed_ids
+            | current_change_ids
         )
 
         previous_base_count = int(
@@ -399,7 +403,7 @@ def build_index(
             )
             local_mode = "base"
         elif (
-            pending_override_ids
+            current_change_ids
             and len(pending_override_ids)
             >= compact_threshold
         ):
@@ -425,7 +429,7 @@ def build_index(
                 str(len(rows)),
             )
             local_mode = "compact"
-        elif pending_override_ids:
+        elif current_change_ids:
             active_delta_entries = [
                 (
                     image_id,
