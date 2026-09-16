@@ -200,7 +200,7 @@ def template_fallback_score(
         140,
     )
 
-    scale_values = (
+    shrink_values = (
         0.50,
         0.60,
         0.70,
@@ -210,69 +210,88 @@ def template_fallback_score(
         1.00,
     )
 
+    scale_pairs = [
+        (scale_y, scale_x)
+        for scale_y in shrink_values
+        for scale_x in shrink_values
+    ]
+
+    # A transformed query can also be smaller than the matching
+    # source content. The original fallback only searched <= 1.0,
+    # so crop+downscale queries could never recover their true
+    # source even when the candidate was already recalled.
+    scale_pairs.extend(
+        (
+            (1.10, 1.10),
+            (1.20, 1.20),
+            (1.25, 1.25),
+            (1.35, 1.35),
+            (1.50, 1.50),
+        )
+    )
+
     best = -1.0
 
-    for scale_y in scale_values:
-        for scale_x in scale_values:
-            width = max(
-                20,
-                int(round(query.shape[1] * scale_x)),
-            )
-            height = max(
-                20,
-                int(round(query.shape[0] * scale_y)),
-            )
+    for scale_y, scale_x in scale_pairs:
+        width = max(
+            20,
+            int(round(query.shape[1] * scale_x)),
+        )
+        height = max(
+            20,
+            int(round(query.shape[0] * scale_y)),
+        )
 
-            if (
-                width > source.shape[1]
-                or height > source.shape[0]
-            ):
-                continue
+        if (
+            width > source.shape[1]
+            or height > source.shape[0]
+        ):
+            continue
 
-            candidate = cv2.resize(
-                query,
-                (width, height),
-                interpolation=(
-                    cv2.INTER_AREA
-                    if scale_x < 1.0 or scale_y < 1.0
-                    else cv2.INTER_LINEAR
-                ),
-            )
+        candidate = cv2.resize(
+            query,
+            (width, height),
+            interpolation=(
+                cv2.INTER_AREA
+                if scale_x < 1.0 or scale_y < 1.0
+                else cv2.INTER_LINEAR
+            ),
+        )
 
-            gray_result = cv2.matchTemplate(
-                source,
-                candidate,
+        gray_result = cv2.matchTemplate(
+            source,
+            candidate,
+            cv2.TM_CCOEFF_NORMED,
+        )
+        gray_score = float(
+            np.nanmax(gray_result)
+        )
+
+        candidate_edge = cv2.Canny(
+            candidate,
+            60,
+            140,
+        )
+
+        edge_score = 0.0
+        if (
+            np.count_nonzero(candidate_edge) >= 30
+            and np.count_nonzero(source_edge) >= 30
+        ):
+            edge_result = cv2.matchTemplate(
+                source_edge,
+                candidate_edge,
                 cv2.TM_CCOEFF_NORMED,
             )
-            gray_score = float(
-                np.nanmax(gray_result)
+            edge_score = float(
+                np.nanmax(edge_result)
             )
 
-            candidate_edge = cv2.Canny(
-                candidate,
-                60,
-                140,
-            )
-
-            edge_score = 0.0
-            if (
-                np.count_nonzero(candidate_edge) >= 30
-                and np.count_nonzero(source_edge) >= 30
-            ):
-                edge_result = cv2.matchTemplate(
-                    source_edge,
-                    candidate_edge,
-                    cv2.TM_CCOEFF_NORMED,
-                )
-                edge_score = float(
-                    np.nanmax(edge_result)
-                )
-
-            score = (
-                0.75 * gray_score
-                + 0.25 * max(0.0, edge_score)
-            )
-            best = max(best, score)
+        score = (
+            0.75 * gray_score
+            + 0.25 * max(0.0, edge_score)
+        )
+        best = max(best, score)
 
     return float(best)
 
