@@ -108,7 +108,7 @@ internal sealed class MainForm : Form
 
         var preview = new Label
         {
-            Text = "v0.2.0 Preview",
+            Text = "v0.3.0 Preview",
             AutoSize = true,
             Font = new Font(Font.FontFamily, 9F, FontStyle.Bold),
             ForeColor = Color.FromArgb(61, 120, 220),
@@ -218,7 +218,7 @@ internal sealed class MainForm : Form
             Text =
                 "• 递归扫描 JPG、PNG、WebP、TIFF、HEIC / HEIF 等常见图片。\r\n"
                 + "• 同时建立持久 pHash Lane A 与 local-feature Lane B。\r\n"
-                + "• 二次建立索引时复用未变化文件。\r\n"
+                + "• 小规模变更写入 delta overlay，无变化时零重建；达到阈值才 compact。\r\n"
                 + "• 原盘暂时离线时，仍可利用持久索引产生候选，在线时再做深度验证。"
         };
         tips.Controls.Add(tipsText);
