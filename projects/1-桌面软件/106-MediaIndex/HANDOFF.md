@@ -505,6 +505,8 @@ crash-safe immutable generation
 
 ## 18. Crash-safe generation 收口
 
+主程序候选版本：`MediaIndex v0.4.0`。
+
 2026-09-17，crash-safe generation 已从独立实验收口到 persistent core。
 
 唯一正式 generation 实现：
