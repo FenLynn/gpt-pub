@@ -126,3 +126,32 @@ Main EXE SHA-256: 9af2c3ca43344427c8e751ae1e0a49895ae50c50cdeeb4d40dfbf20ea121f6
 - main EXE embedded-worker self-test
 
 该版本仍属于 `p106-exp` Product Preview，不等同于 stable/main 正式 Release。
+
+## 2026-09-16｜MediaIndex v0.3.0 Product Preview CI 通过
+
+Windows CI 已完整通过：
+
+```text
+Run: 35104960886
+Commit: 19d4f410310d11645507a1ae9bb9fc9f23054134
+Artifact: MediaIndex-v0.3.0-win-x64
+Artifact ID: 10449394604
+Main EXE bytes: 235818036
+Main EXE SHA-256: 66342c481f6a916cbab95e7ddf4df39a4d2aaeec9d728399f11f8a68ba48c723
+```
+
+本轮新增并通过：
+
+- persistent Lane B immutable base + delta overlay
+- override/delete mask
+- changed/new/deleted real delta lifecycle regression
+- no-change delta reuse
+- provisional 5% compaction threshold
+- 10k / 100k / 500k structural scale guard
+- Windows mmap lifetime / handle cleanup
+- A4/V011 regression
+- known hard-negative gate
+- persistent Lane B crop stress
+- main EXE embedded-worker self-test
+
+该版本仍属于 `p106-exp` Product Preview，不等同于 stable/main 正式 Release。
