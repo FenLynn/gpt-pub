@@ -427,14 +427,33 @@ def main() -> None:
                 }
             )
 
-        verified.sort(
-            key=lambda item: (
-                item["confirmed_baseline"],
-                item["verification_score"],
-                -item["phash_distance"],
-            ),
-            reverse=True,
+        has_confirmed_candidate = any(
+            item["confirmed_baseline"]
+            for item in verified
         )
+
+        if has_confirmed_candidate:
+            verified.sort(
+                key=lambda item: (
+                    item["confirmed_baseline"],
+                    item["verification_score"],
+                    -item["phash_distance"],
+                ),
+                reverse=True,
+            )
+            ranking_mode = "confirmed_verifier"
+        else:
+            # When geometry/content verification cannot confirm any
+            # candidate, do not let a noisy SIFT inlier count dominate.
+            # Fall back to the crop-tolerant multi-region pHash order,
+            # using the verifier only as a tie breaker.
+            verified.sort(
+                key=lambda item: (
+                    item["phash_distance"],
+                    -item["verification_score"],
+                )
+            )
+            ranking_mode = "phash_fallback"
 
         top = verified[0] if verified else None
         false_confirmed = (
@@ -472,6 +491,7 @@ def main() -> None:
             "correct_confirmed_baseline": bool(correct_confirmed),
             "false_confirmed_baseline": bool(false_confirmed),
             "query_ms": float(elapsed_ms),
+            "ranking_mode": ranking_mode,
             "top_candidates": verified[:10],
         }
         results.append(record)
