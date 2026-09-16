@@ -151,6 +151,220 @@ def main() -> None:
         if rebuild["reused"] != 10:
             raise AssertionError(rebuild)
 
+        # Mutate a tiny subset. Lane B must use a delta overlay,
+        # not rebuild the immutable base.
+        updated_image = fixtures.transform(
+            fixtures.rich_image(2),
+            "watermark",
+        )
+        fixtures.save_jpeg(
+            originals[2],
+            updated_image,
+            quality=84,
+        )
+
+        new_source = library / "img_10.jpg"
+        fixtures.save_jpeg(
+            new_source,
+            fixtures.rich_image(10),
+        )
+
+        deleted_source = originals[3]
+        deleted_source.unlink()
+
+        delta_result = root / "delta-build.json"
+        run_module(
+            [
+                "build-index",
+                "--library", str(library),
+                "--index-dir", str(index_dir),
+                "--output", str(delta_result),
+            ]
+        )
+        delta_build = json.loads(
+            delta_result.read_text(
+                encoding="utf-8"
+            )
+        )
+
+        if delta_build.get(
+            "local_index_mode"
+        ) != "delta":
+            raise AssertionError(
+                delta_build
+            )
+
+        if delta_build.get(
+            "local_delta_override_count",
+            0,
+        ) < 3:
+            raise AssertionError(
+                delta_build
+            )
+
+        if not (
+            index_dir
+            / "local_override_ids.npy"
+        ).is_file():
+            raise AssertionError(
+                "delta override mask missing"
+            )
+
+        delta_cases = [
+            (
+                "updated",
+                originals[2],
+                fixtures.transform(
+                    updated_image,
+                    "crop30",
+                ),
+            ),
+            (
+                "new",
+                new_source,
+                fixtures.transform(
+                    fixtures.rich_image(10),
+                    "resize",
+                ),
+            ),
+        ]
+
+        delta_queries = []
+
+        for label, source, query_image in delta_cases:
+            query = queries / f"delta_{label}.jpg"
+            fixtures.save_jpeg(
+                query,
+                query_image,
+                quality=80,
+            )
+            output = root / f"delta_{label}.json"
+
+            run_module(
+                [
+                    "query-image",
+                    "--index-dir", str(index_dir),
+                    "--query", str(query),
+                    "--output", str(output),
+                    "--topk", "10",
+                    "--verify-k", "8",
+                ]
+            )
+
+            data = json.loads(
+                output.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if (
+                not data["results"]
+                or data["results"][0]["relpath"]
+                != source.name
+            ):
+                raise AssertionError(
+                    {
+                        "label": label,
+                        "expected": source.name,
+                        "result": data,
+                    }
+                )
+
+            if not data.get(
+                "lane_b_overlay",
+                False,
+            ):
+                raise AssertionError(
+                    data
+                )
+
+            delta_queries.append(
+                {
+                    "label": label,
+                    "top": data["results"][0],
+                    "override_count": data.get(
+                        "lane_b_override_count"
+                    ),
+                }
+            )
+
+        deleted_query = queries / "deleted_old.jpg"
+        fixtures.save_jpeg(
+            deleted_query,
+            fixtures.rich_image(3),
+            quality=90,
+        )
+        deleted_output = root / "deleted.json"
+
+        run_module(
+            [
+                "query-image",
+                "--index-dir", str(index_dir),
+                "--query", str(deleted_query),
+                "--output", str(deleted_output),
+                "--topk", "10",
+                "--verify-k", "8",
+            ]
+        )
+
+        deleted_result = json.loads(
+            deleted_output.read_text(
+                encoding="utf-8"
+            )
+        )
+
+        if any(
+            item["relpath"]
+            == "img_03.jpg"
+            for item
+            in deleted_result["results"]
+        ):
+            raise AssertionError(
+                {
+                    "reason": (
+                        "deleted image leaked from "
+                        "immutable Lane B base"
+                    ),
+                    "result": deleted_result,
+                }
+            )
+
+        # A subsequent no-change build must keep the existing
+        # base+delta overlay instead of rebuilding it.
+        overlay_reuse_output = (
+            root / "overlay-reuse.json"
+        )
+        run_module(
+            [
+                "build-index",
+                "--library", str(library),
+                "--index-dir", str(index_dir),
+                "--output", str(
+                    overlay_reuse_output
+                ),
+            ]
+        )
+        overlay_reuse = json.loads(
+            overlay_reuse_output.read_text(
+                encoding="utf-8"
+            )
+        )
+
+        if overlay_reuse.get(
+            "local_index_mode"
+        ) != "reuse":
+            raise AssertionError(
+                overlay_reuse
+            )
+
+        if overlay_reuse.get(
+            "local_delta_override_count",
+            0,
+        ) < 3:
+            raise AssertionError(
+                overlay_reuse
+            )
+
         # Exact byte-identical query.
         exact_query = queries / "exact.jpg"
         exact_query.write_bytes(
@@ -185,6 +399,9 @@ def main() -> None:
                     "ok": True,
                     "index_build": build,
                     "incremental_rebuild": rebuild,
+                    "delta_build": delta_build,
+                    "delta_queries": delta_queries,
+                    "overlay_reuse": overlay_reuse,
                     "queries": results,
                     "exact": exact["results"][0],
                 },
