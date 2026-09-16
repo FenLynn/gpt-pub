@@ -502,3 +502,51 @@ crash-safe immutable generation
 → storage identity / offline volumes
 → persistent video Tier V0
 ```
+
+## 18. Crash-safe generation 收口
+
+2026-09-17，crash-safe generation 已从独立实验收口到 persistent core。
+
+唯一正式 generation 实现：
+
+```text
+experiments/index_generation.py
+```
+
+活动 generation 指针：
+
+```text
+index.sqlite3
+meta.active_generation
+```
+
+读取规则：
+
+```text
+SQLite active_generation
+→ generations/<id>/generation.json
+→ Lane A + Lane B 同代读取
+```
+
+写入规则：
+
+```text
+private generation
+→ payload fsync
+→ generation.json fsync + size validation
+→ set active_generation in current SQLite transaction
+→ commit
+→ cleanup
+```
+
+回归：
+
+```text
+experiments/ci_crash_safe_generation.py
+→ 由 ci_mediaindex_core.py 调用
+→ 无需修改 106 目录外 workflow
+```
+
+已删除重复 `crash_safe_generation.py`，禁止再建立第二套 `CURRENT.json` 指针。
+
+当前下一步先确认本轮 Windows CI 全绿。CI 通过后，进入 storage identity / offline volume lifecycle。
