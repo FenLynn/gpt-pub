@@ -8,8 +8,8 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>MediaIndex.Acceptance</AssemblyName>
     <RootNamespace>MediaIndex.Acceptance</RootNamespace>
-    <Version>0.0.3</Version>
-    <FileVersion>0.0.3.0</FileVersion>
+    <Version>0.0.4</Version>
+    <FileVersion>0.0.4.0</FileVersion>
     <Product>MediaIndex Acceptance</Product>
     <Company>FenLynn</Company>
     <Description>Real domain acceptance tool for MediaIndex P106</Description>
