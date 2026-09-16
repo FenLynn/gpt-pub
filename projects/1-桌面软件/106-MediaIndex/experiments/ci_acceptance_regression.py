@@ -427,6 +427,16 @@ def main() -> None:
         image_auto = auto_summary["image"]
         video_auto = auto_summary["video"]
 
+        if float(
+            image_auto.get(
+                "top1_accuracy_positive",
+                0.0,
+            )
+        ) < 1.0:
+            raise AssertionError(
+                f"automatic image Top-1 < 100%: {auto_summary}"
+            )
+
         if int(image_auto.get("negative_queries", 0)) < 1:
             raise AssertionError(
                 f"automatic image negative sanity missing: {auto_summary}"
