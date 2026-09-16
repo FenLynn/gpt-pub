@@ -4,3 +4,6 @@ src/MediaIndex.Acceptance/MediaIndex.Acceptance.ico
 experiments/MediaIndex-Acceptance/
 *.pyc
 __pycache__/
+src/MediaIndex.Acceptance/Generated/
+src/MediaIndex.App/Generated/
+src/MediaIndex.App/MediaIndex.ico
