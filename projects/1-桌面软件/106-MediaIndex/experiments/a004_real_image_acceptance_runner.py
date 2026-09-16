@@ -384,6 +384,28 @@ def block_ncc_after_warp(
     }
 
 
+def probable_geometry_baseline(metrics: dict) -> bool:
+    block_count = int(metrics.get("block_ncc_count", 0))
+    block_median = float(metrics.get("block_ncc_median", 0.0))
+    local_content_ok = (block_count < 4 or block_median >= 0.55)
+    return bool(
+        int(metrics.get("inliers", 0)) >= 20
+        and float(metrics.get("ratio", 0.0)) >= 0.82
+        and float(metrics.get("query_coverage", 0.0)) >= 0.10
+        and float(metrics.get("ncc", 0.0)) >= 0.60
+        and local_content_ok
+    )
+
+
+def probable_geometry_score(metrics: dict) -> float:
+    return float(
+        int(metrics.get("inliers", 0))
+        + 30.0 * float(metrics.get("ratio", 0.0))
+        + 20.0 * float(metrics.get("query_coverage", 0.0))
+        + 30.0 * max(0.0, float(metrics.get("ncc", 0.0)))
+        + 10.0 * max(0.0, float(metrics.get("block_ncc_median", 0.0)))
+    )
+
 def extract_sift(detector, image: np.ndarray):
     image = resize_max(image)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -408,6 +430,8 @@ def verify_pair(matcher, query_feature, source_feature):
         "block_ncc_p10": 0.0,
         "block_ncc_high_fraction": 0.0,
         "confirmed_baseline": False,
+        "probable_geometry_baseline": False,
+        "probable_geometry_score": 0.0,
     }
 
     if (
@@ -508,7 +532,7 @@ def verify_pair(matcher, query_feature, source_feature):
         and spatially_consistent
     )
 
-    return {
+    result = {
         "good_matches": len(good),
         "inliers": inliers,
         "ratio": float(ratio),
@@ -519,6 +543,9 @@ def verify_pair(matcher, query_feature, source_feature):
         **block_stats,
         "confirmed_baseline": bool(confirmed),
     }
+    result["probable_geometry_baseline"] = probable_geometry_baseline(result)
+    result["probable_geometry_score"] = probable_geometry_score(result)
+    return result
 
 
 def resolve_query(raw: str, manifest: Path) -> Path:
