@@ -387,14 +387,38 @@ def block_ncc_after_warp(
 def probable_geometry_baseline(metrics: dict) -> bool:
     block_count = int(metrics.get("block_ncc_count", 0))
     block_median = float(metrics.get("block_ncc_median", 0.0))
-    local_content_ok = (block_count < 4 or block_median >= 0.55)
-    return bool(
+    block_p10 = float(metrics.get("block_ncc_p10", 0.0))
+
+    local_content_ok = (
+        block_count < 4
+        or block_median >= 0.55
+    )
+
+    high_ratio_path = (
         int(metrics.get("inliers", 0)) >= 20
         and float(metrics.get("ratio", 0.0)) >= 0.82
         and float(metrics.get("query_coverage", 0.0)) >= 0.10
         and float(metrics.get("ncc", 0.0)) >= 0.60
         and local_content_ok
     )
+
+    strong_mass_content_ok = (
+        block_count < 4
+        or (
+            block_median >= 0.75
+            and block_p10 >= 0.65
+        )
+    )
+
+    high_mass_path = (
+        int(metrics.get("inliers", 0)) >= 35
+        and float(metrics.get("query_fraction", 0.0)) >= 0.12
+        and float(metrics.get("query_coverage", 0.0)) >= 0.20
+        and float(metrics.get("ncc", 0.0)) >= 0.75
+        and strong_mass_content_ok
+    )
+
+    return bool(high_ratio_path or high_mass_path)
 
 
 def probable_geometry_score(metrics: dict) -> float:
