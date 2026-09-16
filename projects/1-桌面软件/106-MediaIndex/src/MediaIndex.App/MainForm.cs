@@ -108,7 +108,7 @@ internal sealed class MainForm : Form
 
         var preview = new Label
         {
-            Text = "v0.1.0 Preview",
+            Text = "v0.2.0 Preview",
             AutoSize = true,
             Font = new Font(Font.FontFamily, 9F, FontStyle.Bold),
             ForeColor = Color.FromArgb(61, 120, 220),
@@ -217,7 +217,7 @@ internal sealed class MainForm : Form
             ForeColor = Color.FromArgb(72, 84, 102),
             Text =
                 "• 递归扫描 JPG、PNG、WebP、TIFF、HEIC / HEIF 等常见图片。\r\n"
-                + "• 记录持久 pHash 索引，不需要每次查询重新扫描整个图库。\r\n"
+                + "• 同时建立持久 pHash Lane A 与 local-feature Lane B。\r\n"
                 + "• 二次建立索引时复用未变化文件。\r\n"
                 + "• 原盘暂时离线时，仍可利用持久索引产生候选，在线时再做深度验证。"
         };
@@ -420,6 +420,12 @@ internal sealed class MainForm : Form
             Name = "Confidence",
             HeaderText = "判断",
             Width = 92
+        });
+        _results.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Lane",
+            HeaderText = "候选路",
+            Width = 72
         });
         _results.Columns.Add(new DataGridViewTextBoxColumn
         {
@@ -665,6 +671,7 @@ internal sealed class MainForm : Form
                     var rowIndex = _results.Rows.Add(
                         hit.Rank,
                         hit.Confidence,
+                        hit.CandidateLane,
                         hit.Relpath,
                         hit.PhashDistance,
                         hit.Inliers.ToString("0"),
