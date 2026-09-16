@@ -14,10 +14,11 @@ import numpy as np
 
 import a004_real_image_acceptance_runner as image_engine
 import local_feature_index as local_index
+import local_feature_overlay as local_overlay
 
 
 IMAGE_EXTS = image_engine.IMAGE_EXTS
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def index_id(library: Path) -> str:
@@ -157,6 +158,8 @@ def build_index(
         updated = 0
         reused = 0
         failed = []
+        changed_ids = set()
+        removed_ids = set()
 
         print(f"Scanning {len(files)} images...")
 
@@ -209,7 +212,7 @@ def build_index(
                 ).tobytes()
 
                 if row is None:
-                    connection.execute(
+                    cursor = connection.execute(
                         """
                         INSERT INTO images(
                             relpath,size,mtime_ns,width,height,
@@ -226,6 +229,9 @@ def build_index(
                             blob,
                             local_blob,
                         ),
+                    )
+                    changed_ids.add(
+                        int(cursor.lastrowid)
                     )
                     added += 1
                 else:
@@ -246,6 +252,9 @@ def build_index(
                             relpath,
                         ),
                     )
+                    changed_ids.add(
+                        int(row["id"])
+                    )
                     updated += 1
 
             if number % 100 == 0 or number == len(files):
@@ -256,6 +265,10 @@ def build_index(
 
         removed = 0
         for relpath in set(existing) - seen:
+            old_row = existing[relpath]
+            removed_ids.add(
+                int(old_row["id"])
+            )
             connection.execute(
                 "DELETE FROM images WHERE relpath=?",
                 (relpath,),
@@ -317,18 +330,229 @@ def build_index(
             index_dir / "image_ids.npy",
         )
 
-        local_stats = local_index.build_index_arrays(
-            index_dir,
-            [
-                (
-                    int(row["id"]),
-                    row["local_words"],
-                )
-                for row in rows
-            ],
-            len(rows),
+        base_exists = local_index.index_available(
+            index_dir
+        )
+        previous_overrides = set(
+            int(value)
+            for value in local_overlay.load_override_ids(
+                index_dir
+            )
         )
 
+        pending_override_ids = (
+            previous_overrides
+            | changed_ids
+            | removed_ids
+        )
+
+        previous_base_count = int(
+            meta.get(
+                "local_base_count",
+                (
+                    len(existing)
+                    if base_exists
+                    else 0
+                ),
+            )
+        )
+
+        compact_threshold = max(
+            32,
+            int(
+                np.ceil(
+                    max(
+                        1,
+                        previous_base_count,
+                    )
+                    * 0.05
+                )
+            ),
+        )
+
+        current_by_id = {
+            int(row["id"]): row
+            for row in rows
+        }
+
+        if not base_exists:
+            local_stats = (
+                local_index.build_index_arrays(
+                    index_dir,
+                    [
+                        (
+                            int(row["id"]),
+                            row["local_words"],
+                        )
+                        for row in rows
+                    ],
+                    len(rows),
+                )
+            )
+            local_overlay.clear_overlay(
+                index_dir
+            )
+            set_meta(
+                connection,
+                "local_base_count",
+                str(len(rows)),
+            )
+            local_mode = "base"
+        elif (
+            pending_override_ids
+            and len(pending_override_ids)
+            >= compact_threshold
+        ):
+            local_stats = (
+                local_index.build_index_arrays(
+                    index_dir,
+                    [
+                        (
+                            int(row["id"]),
+                            row["local_words"],
+                        )
+                        for row in rows
+                    ],
+                    len(rows),
+                )
+            )
+            local_overlay.clear_overlay(
+                index_dir
+            )
+            set_meta(
+                connection,
+                "local_base_count",
+                str(len(rows)),
+            )
+            local_mode = "compact"
+        elif pending_override_ids:
+            active_delta_entries = [
+                (
+                    image_id,
+                    current_by_id[
+                        image_id
+                    ]["local_words"],
+                )
+                for image_id
+                in sorted(
+                    pending_override_ids
+                )
+                if image_id
+                in current_by_id
+            ]
+
+            overlay_stats = (
+                local_overlay.build_overlay(
+                    index_dir,
+                    active_delta_entries,
+                    np.asarray(
+                        sorted(
+                            pending_override_ids
+                        ),
+                        dtype=np.uint32,
+                    ),
+                )
+            )
+
+            local_stats = {
+                "local_postings": int(
+                    np.load(
+                        index_dir
+                        / "local_postings.npy",
+                        mmap_mode="r",
+                    ).shape[0]
+                ),
+                "local_postings_bytes": int(
+                    (
+                        index_dir
+                        / "local_postings.npy"
+                    ).stat().st_size
+                ),
+                "local_vocab_size": int(
+                    local_index.VOCAB_SIZE
+                ),
+                "local_words_per_image_cap": int(
+                    local_index.WORDS_PER_IMAGE
+                ),
+                "local_stop_words": int(
+                    np.count_nonzero(
+                        np.load(
+                            index_dir
+                            / "local_stop.npy",
+                            mmap_mode="r",
+                        )
+                    )
+                ),
+                "local_build_seconds": 0.0,
+                **overlay_stats,
+            }
+            local_mode = "delta"
+        else:
+            local_stats = {
+                "local_postings": int(
+                    np.load(
+                        index_dir
+                        / "local_postings.npy",
+                        mmap_mode="r",
+                    ).shape[0]
+                ),
+                "local_postings_bytes": int(
+                    (
+                        index_dir
+                        / "local_postings.npy"
+                    ).stat().st_size
+                ),
+                "local_vocab_size": int(
+                    local_index.VOCAB_SIZE
+                ),
+                "local_words_per_image_cap": int(
+                    local_index.WORDS_PER_IMAGE
+                ),
+                "local_stop_words": int(
+                    np.count_nonzero(
+                        np.load(
+                            index_dir
+                            / "local_stop.npy",
+                            mmap_mode="r",
+                        )
+                    )
+                ),
+                "local_build_seconds": 0.0,
+                "local_delta_postings": int(
+                    np.load(
+                        index_dir
+                        / local_overlay.DELTA_POSTINGS,
+                        mmap_mode="r",
+                    ).shape[0]
+                    if (
+                        index_dir
+                        / local_overlay.DELTA_POSTINGS
+                    ).is_file()
+                    else 0
+                ),
+                "local_delta_postings_bytes": int(
+                    (
+                        index_dir
+                        / local_overlay.DELTA_POSTINGS
+                    ).stat().st_size
+                    if (
+                        index_dir
+                        / local_overlay.DELTA_POSTINGS
+                    ).is_file()
+                    else 0
+                ),
+                "local_delta_override_count": int(
+                    len(previous_overrides)
+                ),
+                "local_delta_build_seconds": 0.0,
+            }
+            local_mode = "reuse"
+
+        set_meta(
+            connection,
+            "local_index_mode",
+            local_mode,
+        )
         set_meta(
             connection,
             "indexed_count",
@@ -357,6 +581,13 @@ def build_index(
             "failures": failed[:50],
             "seconds": elapsed,
             "matrix_bytes": int(matrix.nbytes),
+            "local_index_mode": local_mode,
+            "local_compact_threshold": int(
+                compact_threshold
+            ),
+            "local_pending_override_count": int(
+                len(pending_override_ids)
+            ),
             **local_stats,
         }
 
@@ -537,7 +768,7 @@ def query_image(
             image
         )
         local_ids_array, local_scores_array, local_meta = (
-            local_index.search_index(
+            local_overlay.search_index(
                 index_dir,
                 query_local_words,
                 top_k,
@@ -940,6 +1171,18 @@ def query_image(
             "candidate_union_count": int(len(ordered_ids)),
             "lane_b_ready": bool(
                 local_index.index_available(index_dir)
+            ),
+            "lane_b_overlay": bool(
+                local_meta.get(
+                    "overlay",
+                    False,
+                )
+            ),
+            "lane_b_override_count": int(
+                local_meta.get(
+                    "override_count",
+                    0,
+                )
             ),
             "lane_b_query_words": int(
                 len(query_local_words)
