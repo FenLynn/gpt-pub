@@ -278,8 +278,7 @@ def write_manifest(
     with temp.open(
         "w",
         encoding="utf-8",
-        newline="
-",
+        newline="\n",
     ) as handle:
         json.dump(
             payload,
