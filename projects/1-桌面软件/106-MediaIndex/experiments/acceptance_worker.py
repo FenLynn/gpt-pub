@@ -5,6 +5,7 @@ import sys
 import a004_real_image_acceptance_runner as image_runner
 import acceptance_summary as summary_runner
 import auto_real_domain_smoke as auto_runner
+import mediaindex_core as core_runner
 import v011_real_video_acceptance_runner as video_runner
 
 
@@ -30,7 +31,7 @@ def main() -> int:
     if len(sys.argv) < 2:
         print(
             "Usage: MediaIndex.Acceptance.Worker.exe "
-            "{image|video|summary|auto|selftest} [arguments...]",
+            "{image|video|summary|auto|build-index|query-image|index-info|selftest} [arguments...]",
             file=sys.stderr,
         )
         return 2
@@ -49,6 +50,16 @@ def main() -> int:
 
     if command == "auto":
         return run_module(auto_runner, arguments)
+
+    if command in {
+        "build-index",
+        "query-image",
+        "index-info",
+    }:
+        return run_module(
+            core_runner,
+            [command, *arguments],
+        )
 
     if command == "selftest":
         print('{"ok":true,"worker":"MediaIndex.Acceptance.Worker"}')
