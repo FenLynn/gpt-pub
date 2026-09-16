@@ -110,6 +110,16 @@ jobs:
             throw "Acceptance regression failed: $LASTEXITCODE"
           }
 
+      - name: Run known hard-negative suite
+        shell: pwsh
+        working-directory: projects/1-桌面软件/106-MediaIndex/experiments
+        run: |
+          $ErrorActionPreference='Stop'
+          python ci_hard_negative_suite.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "Hard-negative suite failed: $LASTEXITCODE"
+          }
+
       - name: Build private algorithm worker
         shell: pwsh
         working-directory: projects/1-桌面软件/106-MediaIndex/experiments
