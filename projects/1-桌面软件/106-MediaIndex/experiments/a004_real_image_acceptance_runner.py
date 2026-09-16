@@ -191,8 +191,34 @@ def template_fallback_score(
     query_gray: np.ndarray,
     source_gray: np.ndarray,
 ) -> float:
-    source = resize_gray_max(source_gray)
-    query = resize_gray_max(query_gray)
+    source_height, source_width = source_gray.shape
+    common_scale = min(
+        1.0,
+        360 / max(source_height, source_width),
+    )
+
+    if common_scale < 1.0:
+        source = cv2.resize(
+            source_gray,
+            (
+                max(16, int(round(source_width * common_scale))),
+                max(16, int(round(source_height * common_scale))),
+            ),
+            interpolation=cv2.INTER_AREA,
+        )
+
+        query_height, query_width = query_gray.shape
+        query = cv2.resize(
+            query_gray,
+            (
+                max(16, int(round(query_width * common_scale))),
+                max(16, int(round(query_height * common_scale))),
+            ),
+            interpolation=cv2.INTER_AREA,
+        )
+    else:
+        source = source_gray
+        query = query_gray
 
     source_edge = cv2.Canny(
         source,
