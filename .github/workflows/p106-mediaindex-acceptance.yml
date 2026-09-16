@@ -140,6 +140,16 @@ jobs:
             throw "Persistent Lane B regression failed: $LASTEXITCODE"
           }
 
+      - name: Run 500k Lane B scale guard
+        shell: pwsh
+        working-directory: projects/1-桌面软件/106-MediaIndex/experiments
+        run: |
+          $ErrorActionPreference='Stop'
+          python ci_scale_guard.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "500k Lane B scale guard failed: $LASTEXITCODE"
+          }
+
       - name: Build private algorithm worker
         shell: pwsh
         working-directory: projects/1-桌面软件/106-MediaIndex/experiments
@@ -306,7 +316,7 @@ jobs:
             "",
             "## MediaIndex main v${{ steps.main-package.outputs.version }}",
             "- Delivery: one self-contained Windows x64 EXE",
-            "- Persistent image index: SQLite metadata + pHash Lane A + local-feature Lane B",
+            "- Persistent image index: SQLite metadata + pHash Lane A + local-feature Lane B + delta overlay",
             "- Incremental rebuild smoke: required",
             "- Known hard-negative suite: required",
             "- Main EXE bytes: ${{ steps.main-package.outputs.bytes }}",
