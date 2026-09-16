@@ -166,6 +166,117 @@ def ncc_after_warp(
     return float(np.corrcoef(left, right)[0, 1])
 
 
+def resize_gray_max(
+    gray: np.ndarray,
+    max_dim: int = 360,
+) -> np.ndarray:
+    height, width = gray.shape
+    scale = min(
+        1.0,
+        max_dim / max(height, width),
+    )
+    if scale >= 1.0:
+        return gray
+    return cv2.resize(
+        gray,
+        (
+            max(16, int(round(width * scale))),
+            max(16, int(round(height * scale))),
+        ),
+        interpolation=cv2.INTER_AREA,
+    )
+
+
+def template_fallback_score(
+    query_gray: np.ndarray,
+    source_gray: np.ndarray,
+) -> float:
+    source = resize_gray_max(source_gray)
+    query = resize_gray_max(query_gray)
+
+    source_edge = cv2.Canny(
+        source,
+        60,
+        140,
+    )
+
+    scale_values = (
+        0.50,
+        0.60,
+        0.70,
+        0.75,
+        0.80,
+        0.90,
+        1.00,
+    )
+
+    best = -1.0
+
+    for scale_y in scale_values:
+        for scale_x in scale_values:
+            width = max(
+                20,
+                int(round(query.shape[1] * scale_x)),
+            )
+            height = max(
+                20,
+                int(round(query.shape[0] * scale_y)),
+            )
+
+            if (
+                width > source.shape[1]
+                or height > source.shape[0]
+            ):
+                continue
+
+            candidate = cv2.resize(
+                query,
+                (width, height),
+                interpolation=(
+                    cv2.INTER_AREA
+                    if scale_x < 1.0 or scale_y < 1.0
+                    else cv2.INTER_LINEAR
+                ),
+            )
+
+            gray_result = cv2.matchTemplate(
+                source,
+                candidate,
+                cv2.TM_CCOEFF_NORMED,
+            )
+            gray_score = float(
+                np.nanmax(gray_result)
+            )
+
+            candidate_edge = cv2.Canny(
+                candidate,
+                60,
+                140,
+            )
+
+            edge_score = 0.0
+            if (
+                np.count_nonzero(candidate_edge) >= 30
+                and np.count_nonzero(source_edge) >= 30
+            ):
+                edge_result = cv2.matchTemplate(
+                    source_edge,
+                    candidate_edge,
+                    cv2.TM_CCOEFF_NORMED,
+                )
+                edge_score = float(
+                    np.nanmax(edge_result)
+                )
+
+            score = (
+                0.75 * gray_score
+                + 0.25 * max(0.0, edge_score)
+            )
+            best = max(best, score)
+
+    return float(best)
+
+
 def extract_sift(detector, image: np.ndarray):
     image = resize_max(image)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -443,17 +554,51 @@ def main() -> None:
             )
             ranking_mode = "confirmed_verifier"
         else:
-            # When geometry/content verification cannot confirm any
-            # candidate, do not let a noisy SIFT inlier count dominate.
-            # Fall back to the crop-tolerant multi-region pHash order,
-            # using the verifier only as a tie breaker.
+            # Low-confidence geometry is exactly where the Round1
+            # acceptance exposed wrong Top-1 choices. First keep a
+            # very small pHash shortlist, then use a low-resolution,
+            # anisotropic grayscale/edge template fallback. This is
+            # candidate-only work, never a full-library template scan.
             verified.sort(
                 key=lambda item: (
                     item["phash_distance"],
                     -item["verification_score"],
                 )
             )
-            ranking_mode = "phash_fallback"
+
+            shortlist = verified[: min(8, len(verified))]
+            item_by_name = {
+                item["name"]: item
+                for item in index
+            }
+
+            for candidate in shortlist:
+                source_item = item_by_name[
+                    candidate["source"]
+                ]
+                candidate["template_score"] = (
+                    template_fallback_score(
+                        query_feature[0],
+                        source_item["sift"][0],
+                    )
+                )
+
+            for candidate in verified[len(shortlist):]:
+                candidate["template_score"] = None
+
+            shortlist.sort(
+                key=lambda item: (
+                    -float(item["template_score"]),
+                    item["phash_distance"],
+                    -item["verification_score"],
+                )
+            )
+
+            verified = (
+                shortlist
+                + verified[len(shortlist):]
+            )
+            ranking_mode = "template_fallback"
 
         top = verified[0] if verified else None
         false_confirmed = (
