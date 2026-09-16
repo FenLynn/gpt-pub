@@ -393,6 +393,7 @@ def main() -> None:
             )
 
         stress = []
+        false_probable_geometry = 0
 
         for row in data["results"]:
             top = (
@@ -400,12 +401,27 @@ def main() -> None:
                 if row["top_candidates"]
                 else {}
             )
+            false_probable_geometry += int(
+                any(
+                    bool(
+                        candidate.get(
+                            "probable_geometry_baseline",
+                            False,
+                        )
+                    )
+                    for candidate in row["top_candidates"]
+                )
+            )
+
             stress.append(
                 {
                     "query": row["query_name"],
                     "top_source": row["top1_source"],
                     "confirmed": top.get(
                         "confirmed_baseline"
+                    ),
+                    "probable_geometry": top.get(
+                        "probable_geometry_baseline"
                     ),
                     "inliers": top.get("inliers"),
                     "ratio": top.get("ratio"),
@@ -419,12 +435,27 @@ def main() -> None:
                 }
             )
 
+        if false_probable_geometry != 0:
+            raise AssertionError(
+                json.dumps(
+                    {
+                        "false_probable_geometry": (
+                            false_probable_geometry
+                        ),
+                        "results": data["results"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+
         print(
             json.dumps(
                 {
                     "ok": True,
                     "known_hard_negatives": len(rows),
                     "false_confirmed": 0,
+                    "false_probable_geometry": 0,
                     "stress": stress,
                 },
                 ensure_ascii=False,
