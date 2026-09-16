@@ -243,3 +243,79 @@ v0.0.3 已修改：
 - V011 继续使用 sequence-aware temporal fitting。
 
 不要把 v0.0.2 的“Top50 100% / 误确认 0”视为整体验收通过，因为该轮没有负样本且 Top1 仅 85%。
+
+## 12. Product Preview 断点
+
+当前已经从 Phase 0 Acceptance 进入：
+
+```text
+Phase 1
+MediaIndex v0.1.0 Product Preview
+```
+
+新增正式用户入口：
+
+```text
+src/MediaIndex.App/
+```
+
+新增持久核心：
+
+```text
+experiments/mediaindex_core.py
+experiments/ci_mediaindex_core.py
+```
+
+新增 known hard-negative gate：
+
+```text
+experiments/ci_hard_negative_suite.py
+```
+
+新的普通用户流程：
+
+```text
+choose image library
+→ build/update persistent index
+→ drag/select query image
+→ search
+→ inspect returned source path
+```
+
+Acceptance 继续存在，但定位改为 regression / diagnostics。
+
+### 当前持久索引
+
+```text
+%LOCALAPPDATA%\FenLynn\MediaIndex\Indexes\<library-id>\
+  index.sqlite3
+  region_hashes.npy
+  image_ids.npy
+```
+
+### 当前 CI gate
+
+必须通过：
+
+- A4/V011 regression
+- known hard-negative suite
+- persistent core smoke
+- incremental rebuild reuse
+- exact byte-identical lookup
+- main EXE self-test
+- Acceptance EXE self-test
+- single EXE checks
+- SHA-256
+
+### 下一主线
+
+```text
+v0.1.0 larger real library
+→ persistent local-feature Lane B
+→ 10k/100k/500k scale
+→ removable/offline drive lifecycle
+→ persistent video Tier V0
+→ video Tier V1 + Audio Lane C
+```
+
+不要再把“手工逐条 Query 标答案”作为默认验收流程。
