@@ -108,7 +108,7 @@ internal sealed class CoreRunner
 
         return exit == 0
             && output.ToString().Contains(
-                ""ok":true",
+                "\"ok\":true",
                 StringComparison.OrdinalIgnoreCase);
     }
 
