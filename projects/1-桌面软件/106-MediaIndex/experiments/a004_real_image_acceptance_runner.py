@@ -494,6 +494,9 @@ def verify_pair(matcher, query_feature, source_feature):
             and block_stats[
                 "block_ncc_high_fraction"
             ] >= 0.65
+            and block_stats[
+                "block_ncc_p10"
+            ] >= 0.72
         )
     )
 
