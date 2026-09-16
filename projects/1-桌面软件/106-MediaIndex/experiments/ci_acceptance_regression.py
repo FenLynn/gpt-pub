@@ -424,6 +424,37 @@ def main() -> None:
         if not auto_summary.get("video"):
             raise AssertionError("automatic video summary missing")
 
+        image_auto = auto_summary["image"]
+        video_auto = auto_summary["video"]
+
+        if int(image_auto.get("negative_queries", 0)) < 1:
+            raise AssertionError(
+                f"automatic image negative sanity missing: {auto_summary}"
+            )
+        if int(
+            image_auto.get(
+                "false_confirmed_count_baseline",
+                0,
+            )
+        ) != 0:
+            raise AssertionError(
+                f"automatic image false confirmed: {auto_summary}"
+            )
+
+        if int(video_auto.get("negative_queries", 0)) < 1:
+            raise AssertionError(
+                f"automatic video negative sanity missing: {auto_summary}"
+            )
+        if int(
+            video_auto.get(
+                "unexpected_strong_match_count_baseline",
+                0,
+            )
+        ) != 0:
+            raise AssertionError(
+                f"automatic video strong false match: {auto_summary}"
+            )
+
         print(
             json.dumps(
                 {
