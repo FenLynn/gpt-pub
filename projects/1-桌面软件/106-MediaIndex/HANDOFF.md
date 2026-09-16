@@ -455,3 +455,50 @@ SQLite truth
 ```
 
 compact 阈值暂以约 5% 作为待继续验证的起点，不冻结。
+
+## 17. v0.3.0 成功断点
+
+2026-09-16，Lane B base + delta overlay 已产品化并通过完整 Windows CI。
+
+```text
+version: 0.3.0
+commit: 19d4f410310d11645507a1ae9bb9fc9f23054134
+run: 35104960886
+artifact: MediaIndex-v0.3.0-win-x64
+artifact id: 10449394604
+exe bytes: 235818036
+sha256: 66342c481f6a916cbab95e7ddf4df39a4d2aaeec9d728399f11f8a68ba48c723
+```
+
+当前 Lane B 持久结构：
+
+```text
+base
+  local_postings.npy
+  local_offsets.npy
+  local_idf.npy
+  local_stop.npy
+
+delta
+  local_delta_postings.npy
+  local_delta_offsets.npy
+  local_override_ids.npy
+```
+
+实际集成回归已验证：
+
+- 修改 1 张、添加 1 张、删除 1 张会走 `local_index_mode=delta`。
+- updated/new Query 均能命中当前版本。
+- deleted 旧 ID 不会从 immutable base 幽灵返回。
+- 后续无变化扫描走 `local_index_mode=reuse`，不重写 delta。
+- 500k scale guard 在 Windows runner 上通过。
+
+下一工程断点：
+
+```text
+crash-safe immutable generation
+→ atomic manifest switch
+→ startup recovery
+→ storage identity / offline volumes
+→ persistent video Tier V0
+```
