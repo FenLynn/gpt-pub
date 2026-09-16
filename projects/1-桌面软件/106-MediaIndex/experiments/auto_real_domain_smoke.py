@@ -157,6 +157,62 @@ def safe_relative(path: Path, root: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
+def synthetic_negative_image(
+    seed: int,
+    width: int = 960,
+    height: int = 720,
+) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    image = rng.integers(
+        0,
+        256,
+        size=(height, width, 3),
+        dtype=np.uint8,
+    )
+
+    image = cv2.GaussianBlur(
+        image,
+        (0, 0),
+        sigmaX=2.0,
+        sigmaY=2.0,
+    )
+
+    for index in range(20):
+        x1 = int(rng.integers(0, max(1, width - 80)))
+        y1 = int(rng.integers(0, max(1, height - 80)))
+        x2 = min(
+            width - 1,
+            x1 + int(rng.integers(30, 180)),
+        )
+        y2 = min(
+            height - 1,
+            y1 + int(rng.integers(30, 180)),
+        )
+        color = tuple(
+            int(value)
+            for value in rng.integers(0, 256, size=3)
+        )
+        cv2.rectangle(
+            image,
+            (x1, y1),
+            (x2, y2),
+            color,
+            2,
+        )
+
+    cv2.putText(
+        image,
+        f"MEDIAINDEX NEGATIVE {seed}",
+        (40, height - 50),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1.2,
+        (255, 255, 255),
+        3,
+        cv2.LINE_AA,
+    )
+    return image
+
+
 def build_image_smoke(
     library_root: Path,
     work_root: Path,
@@ -207,6 +263,27 @@ def build_image_smoke(
                 }
             )
             generated += 1
+
+    negative_count = min(4, max(2, max_images // 2))
+    for negative_index in range(negative_count):
+        query = query_root / (
+            f"negative_{negative_index:02d}.jpg"
+        )
+        save_jpeg(
+            query,
+            synthetic_negative_image(
+                10600 + negative_index
+            ),
+            quality=86,
+        )
+        rows.append(
+            {
+                "query": str(query),
+                "expected_source": "",
+                "relation": "Synthetic hard-negative sanity",
+            }
+        )
+        generated += 1
 
     manifest = work_root / "auto_image_manifest.csv"
     with manifest.open(
@@ -320,6 +397,92 @@ def make_video_clip(
     return written >= max(2, int(min(3.0, duration) * fps * 0.8))
 
 
+def make_synthetic_negative_video(
+    output: Path,
+    duration: float = 8.0,
+    fps: int = 6,
+) -> bool:
+    width = 640
+    height = 360
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    writer = cv2.VideoWriter(
+        str(output),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (width, height),
+    )
+    if not writer.isOpened():
+        return False
+
+    rng = np.random.default_rng(10677)
+    total = int(duration * fps)
+
+    for frame_index in range(total):
+        yy, xx = np.mgrid[0:height, 0:width]
+        phase = frame_index * 7
+        frame = np.empty(
+            (height, width, 3),
+            dtype=np.uint8,
+        )
+        frame[..., 0] = (
+            (xx * 3 + yy + phase) % 256
+        ).astype(np.uint8)
+        frame[..., 1] = (
+            (yy * 5 + phase * 2) % 256
+        ).astype(np.uint8)
+        frame[..., 2] = (
+            ((xx + yy) * 2 + phase * 3) % 256
+        ).astype(np.uint8)
+
+        center = (
+            int(
+                width
+                * (
+                    0.15
+                    + 0.70
+                    * (
+                        frame_index
+                        / max(1, total - 1)
+                    )
+                )
+            ),
+            int(
+                height
+                * (
+                    0.5
+                    + 0.20
+                    * math.sin(frame_index * 0.4)
+                )
+            ),
+        )
+        color = tuple(
+            int(value)
+            for value in rng.integers(40, 245, size=3)
+        )
+        cv2.circle(
+            frame,
+            center,
+            28,
+            color,
+            -1,
+        )
+        cv2.putText(
+            frame,
+            "MEDIAINDEX NEGATIVE",
+            (24, 42),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        writer.write(frame)
+
+    writer.release()
+    return True
+
+
 def build_video_smoke(
     library_root: Path,
     work_root: Path,
@@ -386,6 +549,20 @@ def build_video_smoke(
             )
             generated += 1
 
+    negative_query = query_root / "negative_sanity.mp4"
+    if make_synthetic_negative_video(
+        negative_query
+    ):
+        rows.append(
+            {
+                "query": str(negative_query),
+                "expected_source": "",
+                "relation": "Synthetic unrelated sanity",
+                "expected_start_sec": "",
+            }
+        )
+        generated += 1
+
     manifest = work_root / "auto_video_manifest.csv"
     with manifest.open(
         "w",
@@ -450,8 +627,9 @@ def summarize(
         },
         "interpretation": (
             "Automatically generated positive transformations from "
-            "real inventory. This smoke test does not replace manual "
-            "same-scene hard negatives."
+            "real inventory plus synthetic unrelated sanity negatives. "
+            "This smoke test does not replace manual same-scene "
+            "hard negatives."
         ),
     }
 
