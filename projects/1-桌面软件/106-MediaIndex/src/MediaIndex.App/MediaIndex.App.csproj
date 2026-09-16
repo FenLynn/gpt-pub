@@ -8,8 +8,8 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>MediaIndex</AssemblyName>
     <RootNamespace>MediaIndex.App</RootNamespace>
-    <Version>0.3.0</Version>
-    <FileVersion>0.3.0.0</FileVersion>
+    <Version>0.4.0</Version>
+    <FileVersion>0.4.0.0</FileVersion>
     <Product>MediaIndex</Product>
     <Company>FenLynn</Company>
     <Description>Persistent source-media index and lookup tool</Description>
