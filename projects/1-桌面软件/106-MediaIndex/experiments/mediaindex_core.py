@@ -13,12 +13,13 @@ import cv2
 import numpy as np
 
 import a004_real_image_acceptance_runner as image_engine
+import index_generation
 import local_feature_index as local_index
 import local_feature_overlay as local_overlay
 
 
 IMAGE_EXTS = image_engine.IMAGE_EXTS
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def index_id(library: Path) -> str:
@@ -114,6 +115,109 @@ def scan_images(library: Path) -> list[Path]:
         ],
         key=lambda path: path.as_posix().casefold(),
     )
+
+
+def local_stats_from_dir(
+    generation_dir: Path,
+) -> dict:
+    postings_path = (
+        generation_dir
+        / "local_postings.npy"
+    )
+    stop_path = (
+        generation_dir
+        / "local_stop.npy"
+    )
+
+    postings_count = 0
+    postings_bytes = 0
+    stop_words = 0
+
+    if postings_path.is_file():
+        array = np.load(
+            postings_path,
+            mmap_mode="r",
+        )
+        try:
+            postings_count = int(
+                array.shape[0]
+            )
+            postings_bytes = int(
+                array.nbytes
+            )
+        finally:
+            del array
+
+    if stop_path.is_file():
+        array = np.load(
+            stop_path,
+            mmap_mode="r",
+        )
+        try:
+            stop_words = int(
+                np.count_nonzero(
+                    array
+                )
+            )
+        finally:
+            del array
+
+    delta_path = (
+        generation_dir
+        / local_overlay.DELTA_POSTINGS
+    )
+    delta_override = (
+        generation_dir
+        / local_overlay.OVERRIDE_IDS
+    )
+
+    delta_count = 0
+    delta_bytes = 0
+    override_count = 0
+
+    if delta_path.is_file():
+        array = np.load(
+            delta_path,
+            mmap_mode="r",
+        )
+        try:
+            delta_count = int(
+                array.shape[0]
+            )
+            delta_bytes = int(
+                array.nbytes
+            )
+        finally:
+            del array
+
+    if delta_override.is_file():
+        array = np.load(
+            delta_override,
+            mmap_mode="r",
+        )
+        try:
+            override_count = int(
+                array.shape[0]
+            )
+        finally:
+            del array
+
+    return {
+        "local_postings": postings_count,
+        "local_postings_bytes": postings_bytes,
+        "local_vocab_size": int(
+            local_index.VOCAB_SIZE
+        ),
+        "local_words_per_image_cap": int(
+            local_index.WORDS_PER_IMAGE
+        ),
+        "local_stop_words": stop_words,
+        "local_build_seconds": 0.0,
+        "local_delta_postings": delta_count,
+        "local_delta_postings_bytes": delta_bytes,
+        "local_delta_override_count": override_count,
+        "local_delta_build_seconds": 0.0,
+    }
 
 
 def build_index(
@@ -275,7 +379,18 @@ def build_index(
             )
             removed += 1
 
-        connection.commit()
+        source_generation = (
+            index_generation.resolve_active(
+                index_dir,
+                meta,
+            )
+        )
+        managed_before = bool(
+            meta.get(
+                "active_generation",
+                "",
+            )
+        )
 
         rows = list(
             connection.execute(
@@ -310,33 +425,32 @@ def build_index(
 
         if matrix_rows:
             matrix = np.stack(matrix_rows)
-            id_array = np.asarray(ids, dtype=np.int64)
+            id_array = np.asarray(
+                ids,
+                dtype=np.int64,
+            )
         else:
-            matrix = np.empty((0, 0), dtype=np.uint64)
-            id_array = np.empty((0,), dtype=np.int64)
+            matrix = np.empty(
+                (0, 0),
+                dtype=np.uint64,
+            )
+            id_array = np.empty(
+                (0,),
+                dtype=np.int64,
+            )
 
-        matrix_tmp = index_dir / "region_hashes.tmp.npy"
-        ids_tmp = index_dir / "image_ids.tmp.npy"
-
-        np.save(matrix_tmp, matrix)
-        np.save(ids_tmp, id_array)
-
-        os.replace(
-            matrix_tmp,
-            index_dir / "region_hashes.npy",
-        )
-        os.replace(
-            ids_tmp,
-            index_dir / "image_ids.npy",
+        base_exists = (
+            local_index.index_available(
+                source_generation
+            )
         )
 
-        base_exists = local_index.index_available(
-            index_dir
-        )
         previous_overrides = set(
             int(value)
-            for value in local_overlay.load_override_ids(
-                index_dir
+            for value in (
+                local_overlay.load_override_ids(
+                    source_generation
+                )
             )
         )
 
@@ -379,178 +493,214 @@ def build_index(
             for row in rows
         }
 
-        if not base_exists:
-            local_stats = (
-                local_index.build_index_arrays(
-                    index_dir,
-                    [
-                        (
-                            int(row["id"]),
-                            row["local_words"],
-                        )
-                        for row in rows
-                    ],
-                    len(rows),
-                )
-            )
-            local_overlay.clear_overlay(
-                index_dir
-            )
-            set_meta(
-                connection,
-                "local_base_count",
-                str(len(rows)),
-            )
-            local_mode = "base"
-        elif (
-            current_change_ids
-            and len(pending_override_ids)
-            >= compact_threshold
-        ):
-            local_stats = (
-                local_index.build_index_arrays(
-                    index_dir,
-                    [
-                        (
-                            int(row["id"]),
-                            row["local_words"],
-                        )
-                        for row in rows
-                    ],
-                    len(rows),
-                )
-            )
-            local_overlay.clear_overlay(
-                index_dir
-            )
-            set_meta(
-                connection,
-                "local_base_count",
-                str(len(rows)),
-            )
-            local_mode = "compact"
-        elif current_change_ids:
-            active_delta_entries = [
-                (
-                    image_id,
-                    current_by_id[
-                        image_id
-                    ]["local_words"],
-                )
-                for image_id
-                in sorted(
-                    pending_override_ids
-                )
-                if image_id
-                in current_by_id
-            ]
+        legacy_arrays_exist = (
+            source_generation == index_dir
+            and (
+                source_generation
+                / "region_hashes.npy"
+            ).is_file()
+        )
 
-            overlay_stats = (
-                local_overlay.build_overlay(
-                    index_dir,
-                    active_delta_entries,
-                    np.asarray(
-                        sorted(
-                            pending_override_ids
+        needs_migration = (
+            not managed_before
+            and legacy_arrays_exist
+        )
+
+        needs_new_generation = bool(
+            current_change_ids
+            or not base_exists
+            or needs_migration
+        )
+
+        target_generation = (
+            source_generation
+        )
+        generation_manifest = None
+
+        if needs_new_generation:
+            target_generation = (
+                index_generation.create_generation(
+                    index_dir
+                )
+            )
+
+            if (
+                needs_migration
+                and not current_change_ids
+                and base_exists
+            ):
+                index_generation.inherit_files(
+                    source_generation,
+                    target_generation,
+                    index_generation.ALL_ARRAY_FILES,
+                )
+                local_mode = "migrate"
+                local_stats = (
+                    local_stats_from_dir(
+                        target_generation
+                    )
+                )
+            else:
+                matrix_tmp = (
+                    target_generation
+                    / "region_hashes.tmp.npy"
+                )
+                ids_tmp = (
+                    target_generation
+                    / "image_ids.tmp.npy"
+                )
+
+                np.save(
+                    matrix_tmp,
+                    matrix,
+                )
+                np.save(
+                    ids_tmp,
+                    id_array,
+                )
+
+                os.replace(
+                    matrix_tmp,
+                    target_generation
+                    / "region_hashes.npy",
+                )
+                os.replace(
+                    ids_tmp,
+                    target_generation
+                    / "image_ids.npy",
+                )
+
+                if not base_exists:
+                    local_stats = (
+                        local_index.build_index_arrays(
+                            target_generation,
+                            [
+                                (
+                                    int(row["id"]),
+                                    row["local_words"],
+                                )
+                                for row in rows
+                            ],
+                            len(rows),
+                        )
+                    )
+                    local_overlay.clear_overlay(
+                        target_generation
+                    )
+                    set_meta(
+                        connection,
+                        "local_base_count",
+                        str(len(rows)),
+                    )
+                    local_mode = "base"
+                elif (
+                    current_change_ids
+                    and len(
+                        pending_override_ids
+                    )
+                    >= compact_threshold
+                ):
+                    local_stats = (
+                        local_index.build_index_arrays(
+                            target_generation,
+                            [
+                                (
+                                    int(row["id"]),
+                                    row["local_words"],
+                                )
+                                for row in rows
+                            ],
+                            len(rows),
+                        )
+                    )
+                    local_overlay.clear_overlay(
+                        target_generation
+                    )
+                    set_meta(
+                        connection,
+                        "local_base_count",
+                        str(len(rows)),
+                    )
+                    local_mode = "compact"
+                elif current_change_ids:
+                    index_generation.inherit_files(
+                        source_generation,
+                        target_generation,
+                        (
+                            "local_postings.npy",
+                            "local_offsets.npy",
+                            "local_idf.npy",
+                            "local_stop.npy",
                         ),
-                        dtype=np.uint32,
+                    )
+
+                    active_delta_entries = [
+                        (
+                            image_id,
+                            current_by_id[
+                                image_id
+                            ]["local_words"],
+                        )
+                        for image_id
+                        in sorted(
+                            pending_override_ids
+                        )
+                        if image_id
+                        in current_by_id
+                    ]
+
+                    overlay_stats = (
+                        local_overlay.build_overlay(
+                            target_generation,
+                            active_delta_entries,
+                            np.asarray(
+                                sorted(
+                                    pending_override_ids
+                                ),
+                                dtype=np.uint32,
+                            ),
+                        )
+                    )
+
+                    local_stats = {
+                        **local_stats_from_dir(
+                            target_generation
+                        ),
+                        **overlay_stats,
+                    }
+                    local_mode = "delta"
+                else:
+                    raise RuntimeError(
+                        "Unexpected generation build state"
+                    )
+
+            generation_manifest = (
+                index_generation.write_manifest(
+                    target_generation,
+                    mode=local_mode,
+                    files=(
+                        index_generation.ALL_ARRAY_FILES
+                    ),
+                    previous_generation=(
+                        source_generation.name
+                        if managed_before
+                        else None
                     ),
                 )
             )
 
-            local_stats = {
-                "local_postings": int(
-                    np.load(
-                        index_dir
-                        / "local_postings.npy",
-                        mmap_mode="r",
-                    ).shape[0]
-                ),
-                "local_postings_bytes": int(
-                    (
-                        index_dir
-                        / "local_postings.npy"
-                    ).stat().st_size
-                ),
-                "local_vocab_size": int(
-                    local_index.VOCAB_SIZE
-                ),
-                "local_words_per_image_cap": int(
-                    local_index.WORDS_PER_IMAGE
-                ),
-                "local_stop_words": int(
-                    np.count_nonzero(
-                        np.load(
-                            index_dir
-                            / "local_stop.npy",
-                            mmap_mode="r",
-                        )
-                    )
-                ),
-                "local_build_seconds": 0.0,
-                **overlay_stats,
-            }
-            local_mode = "delta"
+            set_meta(
+                connection,
+                "active_generation",
+                target_generation.name,
+            )
         else:
-            local_stats = {
-                "local_postings": int(
-                    np.load(
-                        index_dir
-                        / "local_postings.npy",
-                        mmap_mode="r",
-                    ).shape[0]
-                ),
-                "local_postings_bytes": int(
-                    (
-                        index_dir
-                        / "local_postings.npy"
-                    ).stat().st_size
-                ),
-                "local_vocab_size": int(
-                    local_index.VOCAB_SIZE
-                ),
-                "local_words_per_image_cap": int(
-                    local_index.WORDS_PER_IMAGE
-                ),
-                "local_stop_words": int(
-                    np.count_nonzero(
-                        np.load(
-                            index_dir
-                            / "local_stop.npy",
-                            mmap_mode="r",
-                        )
-                    )
-                ),
-                "local_build_seconds": 0.0,
-                "local_delta_postings": int(
-                    np.load(
-                        index_dir
-                        / local_overlay.DELTA_POSTINGS,
-                        mmap_mode="r",
-                    ).shape[0]
-                    if (
-                        index_dir
-                        / local_overlay.DELTA_POSTINGS
-                    ).is_file()
-                    else 0
-                ),
-                "local_delta_postings_bytes": int(
-                    (
-                        index_dir
-                        / local_overlay.DELTA_POSTINGS
-                    ).stat().st_size
-                    if (
-                        index_dir
-                        / local_overlay.DELTA_POSTINGS
-                    ).is_file()
-                    else 0
-                ),
-                "local_delta_override_count": int(
-                    len(previous_overrides)
-                ),
-                "local_delta_build_seconds": 0.0,
-            }
             local_mode = "reuse"
+            local_stats = (
+                local_stats_from_dir(
+                    source_generation
+                )
+            )
 
         set_meta(
             connection,
