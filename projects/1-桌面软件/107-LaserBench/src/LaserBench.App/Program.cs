@@ -93,6 +93,15 @@ internal static class Program
             };
             AppConfigStore.Save(config);
 
+            try
+            {
+                WebUiAssets.ValidateEmbeddedResources();
+            }
+            catch (Exception ex)
+            {
+                errors.Add("webui resources missing: " + ex.Message);
+            }
+
             var exp = AppPaths.ResolveExperimentDirectory(config);
             var first = SafeFile.WriteTextAtomicUnique(exp, "120000_power1_13A", ".csv", "x,y\n0,1\n");
             var second = SafeFile.WriteTextAtomicUnique(exp, "120000_power1_13A", ".csv", "x,y\n0,2\n");
@@ -122,6 +131,7 @@ internal static class Program
                 errors,
                 version = Application.ProductVersion,
                 portableRoot = AppPaths.Root,
+                webUiEmbedded = !errors.Any(x => x.StartsWith("webui resources missing", StringComparison.Ordinal)),
                 directories = new
                 {
                     exp = AppPaths.ExpDir,
