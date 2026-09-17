@@ -20,8 +20,10 @@
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)\WebUi" Command="npm run build" />
     <Error Condition="!Exists('$(MSBuildProjectDirectory)\WebUi\dist\index.html')" Text="LaserBench WebUi build did not produce dist/index.html." />
     <ItemGroup>
+      <EmbeddedResource Remove="WebUi\dist\index.html;WebUi\dist\assets\*.js;WebUi\dist\assets\*.css" />
       <EmbeddedResource Include="WebUi\dist\index.html" LogicalName="LaserBench.WebUi.index.html" />
-      <EmbeddedResource Include="WebUi\dist\assets\*" LogicalName="LaserBench.WebUi.assets.%(Filename)%(Extension)" />
+      <EmbeddedResource Include="WebUi\dist\assets\*.js" LogicalName="LaserBench.WebUi.assets.%(Filename)%(Extension)" />
+      <EmbeddedResource Include="WebUi\dist\assets\*.css" LogicalName="LaserBench.WebUi.assets.%(Filename)%(Extension)" />
     </ItemGroup>
   </Target>
   <Target Name="GenerateLaserBenchIcon" BeforeTargets="PrepareForBuild">
