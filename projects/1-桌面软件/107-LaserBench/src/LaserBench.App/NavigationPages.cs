@@ -64,6 +64,7 @@ internal sealed class TopBarControl : UserControl
 
         _timer.Tick += (_, _) => { _phase += 0.22f; Invalidate(); };
         _timer.Start();
+        PerformLayout();
     }
 
     public void SetCapturing(bool capturing)
@@ -93,7 +94,8 @@ internal sealed class TopBarControl : UserControl
         var x = 191;
         foreach (var kind in Enum.GetValues<ModuleKind>())
         {
-            _moduleButtons[kind].SetBounds(x, y, 26, 26);
+            if (_moduleButtons.TryGetValue(kind, out var button))
+                button.SetBounds(x, y, 26, 26);
             x += 29;
         }
         _camera.SetBounds(Math.Max(x + 10, Width - 188), y, 26, 26);
