@@ -18,7 +18,7 @@ internal abstract class ModuleViewBase : UserControl
         Kind = kind;
         Provider = provider;
         Config = config;
-        BackColor = UiTheme.Back;
+        BackColor = UiTheme.PlotBack;
         Margin = Padding.Empty;
         Padding = Padding.Empty;
         DoubleBuffered = true;
@@ -72,20 +72,21 @@ internal static class PlotDrawer
         var plot = Rectangle.FromLTRB(bounds.Left + left, bounds.Top + top, bounds.Right - right, bounds.Bottom - bottom);
         if (plot.Width < 10 || plot.Height < 10) return plot;
 
-        using var grid = new Pen(UiTheme.Grid, 1f);
-        for (var i = 0; i <= 5; i++)
+        // Grid is always dashed. Plot boundaries remain solid so the hierarchy is unambiguous.
+        using var grid = new Pen(UiTheme.Grid, 1f) { DashStyle = DashStyle.Dash };
+        for (var i = 1; i < 5; i++)
         {
             var x = plot.Left + i * plot.Width / 5f;
             g.DrawLine(grid, x, plot.Top, x, plot.Bottom);
         }
-        for (var i = 0; i <= 4; i++)
+        for (var i = 1; i < 4; i++)
         {
             var y = plot.Top + i * plot.Height / 4f;
             g.DrawLine(grid, plot.Left, y, plot.Right, y);
         }
-        using var axis = new Pen(Color.FromArgb(165, UiTheme.Muted), 1f);
-        g.DrawLine(axis, plot.Left, plot.Bottom, plot.Right, plot.Bottom);
-        g.DrawLine(axis, plot.Left, plot.Top, plot.Left, plot.Bottom);
+
+        using var border = new Pen(UiTheme.Border, 1f);
+        g.DrawRectangle(border, plot);
         return plot;
     }
 
@@ -154,14 +155,14 @@ internal sealed class PowerModuleView : ModuleViewBase
         DrawModuleIcon(e.Graphics);
 
         var snapshot = Provider.Snapshot(Config);
-        var readoutWidth = Math.Clamp(Width / 6, 92, 125);
+        var readoutWidth = Math.Clamp(Width / 6, 96, 132);
         var left = new Rectangle(0, 0, Math.Max(10, Width - readoutWidth), Height);
         var readout = new Rectangle(left.Right, 0, readoutWidth, Height);
 
         using (var divider = new Pen(UiTheme.Divider, 1f) { DashStyle = DashStyle.Dot })
             e.Graphics.DrawLine(divider, left.Right, 4, left.Right, Height - 4);
 
-        var overviewHeight = Math.Clamp(Height / 9, 30, 45);
+        var overviewHeight = Math.Clamp(Height / 9, 30, 44);
         _overviewRect = new Rectangle(left.Left + 8, left.Bottom - overviewHeight - 5, left.Width - 16, overviewHeight);
         var mainBounds = Rectangle.FromLTRB(left.Left + 2, left.Top + 2, left.Right - 2, _overviewRect.Top - 2);
         var plot = PlotDrawer.DrawGrid(e.Graphics, mainBounds, 38, 9, 12, 22);
@@ -191,9 +192,9 @@ internal sealed class PowerModuleView : ModuleViewBase
 
     private void DrawOverview(Graphics g, IReadOnlyList<(double Time, double Value)> history)
     {
-        using var back = new SolidBrush(Color.FromArgb(247, 250, 253));
+        using var back = new SolidBrush(UiTheme.Surface);
         g.FillRectangle(back, _overviewRect);
-        using var border = new Pen(UiTheme.Grid, 1f);
+        using var border = new Pen(UiTheme.Border, 1f);
         g.DrawRectangle(border, _overviewRect);
         var inner = Rectangle.Inflate(_overviewRect, -4, -4);
         var min = history.Min(x => x.Value);
@@ -208,21 +209,21 @@ internal sealed class PowerModuleView : ModuleViewBase
         g.DrawRectangle(selectPen, x1, inner.Top, Math.Max(1, x2 - x1), inner.Height);
     }
 
-    private void DrawReadout(Graphics g, Rectangle rect, IReadOnlyList<NumericTrace> traces)
+    private static void DrawReadout(Graphics g, Rectangle rect, IReadOnlyList<NumericTrace> traces)
     {
-        var y = 22;
+        var y = 20;
         for (var i = 0; i < traces.Count; i++)
         {
             var trace = traces[i];
-            TextRenderer.DrawText(g, trace.Name, UiTheme.Tiny, new Point(rect.Left + 9, y), UiTheme.Muted, Color.Transparent);
-            y += 14;
-            TextRenderer.DrawText(g, $"{trace.Value:F2} {trace.Unit}", UiTheme.Value, new Point(rect.Left + 9, y), UiTheme.Ink, Color.Transparent);
-            y += 28;
+            TextRenderer.DrawText(g, trace.Name, UiTheme.Tiny, new Point(rect.Left + 10, y), UiTheme.Muted, Color.Transparent);
+            y += 15;
+            TextRenderer.DrawText(g, $"{trace.Value:F2} {trace.Unit}", UiTheme.ValueBold, new Point(rect.Left + 10, y), UiTheme.Ink, Color.Transparent);
+            y += 30;
         }
         if (traces.Count > 0)
         {
-            TextRenderer.DrawText(g, $"Max · {traces[0].Name}", UiTheme.Tiny, new Point(rect.Left + 9, y + 3), UiTheme.Muted, Color.Transparent);
-            TextRenderer.DrawText(g, $"{traces[0].MaxValue:F2} {traces[0].Unit}", UiTheme.ValueBold, new Point(rect.Left + 9, y + 18), UiTheme.Ink, Color.Transparent);
+            TextRenderer.DrawText(g, $"最大值 · {traces[0].Name}", UiTheme.Tiny, new Point(rect.Left + 10, y + 3), UiTheme.Muted, Color.Transparent);
+            TextRenderer.DrawText(g, $"{traces[0].MaxValue:F2} {traces[0].Unit}", UiTheme.ValueBold, new Point(rect.Left + 10, y + 18), UiTheme.Ink, Color.Transparent);
         }
     }
 
@@ -281,9 +282,8 @@ internal sealed class SpectrumModuleView : ModuleViewBase
         var snapshot = Provider.Snapshot(Config);
         DrawModuleIcon(e.Graphics);
 
-        var top = new Rectangle(28, 2, Math.Max(10, Width - 34), 24);
         var metrics = $"λc {snapshot.CenterWavelength:F2} nm   3 dB {snapshot.Linewidth3Db:F2} nm   RMS {snapshot.LinewidthRms:F2} nm   P {snapshot.SpectrumPower:F1} dBm";
-        TextRenderer.DrawText(e.Graphics, metrics, UiTheme.Tiny, new Point(top.Left, 7), UiTheme.Ink, Color.Transparent);
+        TextRenderer.DrawText(e.Graphics, metrics, UiTheme.Tiny, new Point(28, 7), UiTheme.Ink, Color.Transparent);
         GlyphPainter.Draw(e.Graphics, GlyphKind.Expand, new Rectangle(Width - 23, 5, 16, 16), UiTheme.Muted, 1.2f);
 
         var bounds = new Rectangle(2, 25, Width - 4, Height - 27);
@@ -303,24 +303,38 @@ internal sealed class BeamModuleView : ModuleViewBase
 {
     private readonly CompactSlider _zSlider = new() { Minimum = -20, Maximum = 20 };
     private readonly CompactSlider _attSlider = new() { Minimum = 0, Maximum = 30 };
-    private readonly GlyphButton _waistButton = new(GlyphKind.Capture) { Active = true };
+    private readonly GlyphButton _playButton = new(GlyphKind.Capture);
+    private readonly System.Windows.Forms.Timer _playTimer = new() { Interval = 80 };
     private Rectangle _spotRect;
     private float _spotZoom = 1f;
     private PointF _spotPan = PointF.Empty;
     private bool _pan;
+    private bool _playing;
     private Point _panStart;
     private PointF _panOrigin;
+    private double _browseZ;
 
     public BeamModuleView(IInstrumentProvider provider, AppConfig config) : base(ModuleKind.Beam, provider, config)
     {
-        _zSlider.Value = config.BeamZ;
+        // v0.1.2: Z is a browser for already-acquired spot planes. It must not reshape the caustic curve.
+        _browseZ = Math.Clamp(config.BeamZ, _zSlider.Minimum, _zSlider.Maximum);
+        Config.BeamZ = 0;
+        _zSlider.Value = _browseZ;
         _attSlider.Value = config.BeamAttenuation;
         Controls.Add(_zSlider);
         Controls.Add(_attSlider);
-        Controls.Add(_waistButton);
-        _zSlider.ValueChanged += (_, _) => { Config.BeamZ = _zSlider.Value; Invalidate(); };
+        Controls.Add(_playButton);
+
+        _zSlider.ValueChanged += (_, _) => { _browseZ = _zSlider.Value; Invalidate(); };
         _attSlider.ValueChanged += (_, _) => { Config.BeamAttenuation = _attSlider.Value; Invalidate(); };
-        _waistButton.Click += (_, _) => { _zSlider.Value = 0; Config.BeamZ = 0; Invalidate(); };
+        _playButton.Click += (_, _) => TogglePlayback();
+        _playTimer.Tick += (_, _) =>
+        {
+            var next = _zSlider.Value + 0.55;
+            if (next > _zSlider.Maximum) next = _zSlider.Minimum;
+            _zSlider.Value = next;
+        };
+
         MouseWheel += (_, e) =>
         {
             if (_spotRect.Contains(e.Location))
@@ -337,9 +351,9 @@ internal sealed class BeamModuleView : ModuleViewBase
         var bottomH = 32;
         var y = Math.Max(0, Height - bottomH + 6);
         var leftW = Math.Max(220, Width / 2);
-        _zSlider.SetBounds(42, y, Math.Max(70, leftW / 3), 20);
-        _waistButton.SetBounds(_zSlider.Right + 42, y - 2, 24, 24);
-        _attSlider.SetBounds(_waistButton.Right + 54, y, Math.Max(70, leftW / 3), 20);
+        _zSlider.SetBounds(55, y, Math.Max(78, leftW / 3), 20);
+        _playButton.SetBounds(_zSlider.Right + 55, y - 2, 24, 24);
+        _attSlider.SetBounds(_playButton.Right + 58, y, Math.Max(72, leftW / 3), 20);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -358,7 +372,7 @@ internal sealed class BeamModuleView : ModuleViewBase
         using (var divider = new Pen(UiTheme.Divider, 1f) { DashStyle = DashStyle.Dot })
             e.Graphics.DrawLine(divider, split, 4, split, content.Bottom - 4);
 
-        DrawSpot(e.Graphics, _spotRect);
+        DrawSpot(e.Graphics, _spotRect, snapshot);
         var plot = PlotDrawer.DrawGrid(e.Graphics, causticBounds, 35, 10, 8, 22);
         var xSeries = snapshot.Beam.Select(p => (p.Z, p.X)).ToArray();
         var ySeries = snapshot.Beam.Select(p => (p.Z, p.Y)).ToArray();
@@ -369,12 +383,16 @@ internal sealed class BeamModuleView : ModuleViewBase
         PlotDrawer.DrawLegend(e.Graphics, plot, new[] { ("X", UiTheme.Accent), ("Y", UiTheme.Orange) });
         PlotDrawer.DrawUnit(e.Graphics, plot, "mm");
 
+        var markerX = plot.Left + (float)((Math.Clamp(_browseZ, -24, 24) + 24) / 48.0 * plot.Width);
+        using (var marker = new Pen(Color.FromArgb(150, UiTheme.Accent2), 1f) { DashStyle = DashStyle.Dot })
+            e.Graphics.DrawLine(marker, markerX, plot.Top, markerX, plot.Bottom);
+
         using var bottomPen = new Pen(UiTheme.Divider, 1f);
         e.Graphics.DrawLine(bottomPen, 4, content.Bottom, Width - 4, content.Bottom);
         var yText = Height - 24;
-        TextRenderer.DrawText(e.Graphics, "Z", UiTheme.Tiny, new Point(10, yText + 3), UiTheme.Muted, Color.Transparent);
-        TextRenderer.DrawText(e.Graphics, $"{Config.BeamZ:F1} mm", UiTheme.Tiny, new Point(_zSlider.Right + 3, yText + 3), UiTheme.Ink, Color.Transparent);
-        TextRenderer.DrawText(e.Graphics, "Att", UiTheme.Tiny, new Point(_waistButton.Right + 27, yText + 3), UiTheme.Muted, Color.Transparent);
+        TextRenderer.DrawText(e.Graphics, "Z位置", UiTheme.Tiny, new Point(9, yText + 3), UiTheme.Muted, Color.Transparent);
+        TextRenderer.DrawText(e.Graphics, $"{_browseZ:F1} mm", UiTheme.Tiny, new Point(_zSlider.Right + 3, yText + 3), UiTheme.Ink, Color.Transparent);
+        TextRenderer.DrawText(e.Graphics, "Att", UiTheme.Tiny, new Point(_playButton.Right + 28, yText + 3), UiTheme.Muted, Color.Transparent);
         TextRenderer.DrawText(e.Graphics, $"{Config.BeamAttenuation:F1} dB", UiTheme.Tiny, new Point(_attSlider.Right + 3, yText + 3), UiTheme.Ink, Color.Transparent);
 
         var m2 = $"M²x {snapshot.M2X:F2}    M²y {snapshot.M2Y:F2}    M̄² {snapshot.M2Mean:F2}";
@@ -382,27 +400,40 @@ internal sealed class BeamModuleView : ModuleViewBase
         TextRenderer.DrawText(e.Graphics, m2, UiTheme.ValueBold, new Point(Math.Max(_attSlider.Right + 72, Width - size.Width - 10), yText), UiTheme.Ink, Color.Transparent);
     }
 
-    private void DrawSpot(Graphics g, Rectangle rect)
+    private void DrawSpot(Graphics g, Rectangle rect, MeasurementSnapshot snapshot)
     {
-        using var back = new SolidBrush(Color.FromArgb(248, 251, 254));
+        using var back = new SolidBrush(UiTheme.Surface);
         g.FillRectangle(back, rect);
-        using var border = new Pen(UiTheme.Grid, 1f);
+        using var border = new Pen(UiTheme.Border, 1f);
         g.DrawRectangle(border, rect);
 
+        var nearest = snapshot.Beam.OrderBy(p => Math.Abs(p.Z - _browseZ)).First();
         var center = new PointF(rect.Left + rect.Width / 2f + _spotPan.X, rect.Top + rect.Height / 2f + _spotPan.Y);
-        var radius = Math.Min(rect.Width, rect.Height) * .29f * _spotZoom;
-        for (var i = 16; i >= 1; i--)
+        var baseRadius = Math.Min(rect.Width, rect.Height) * .11f * _spotZoom;
+        var rxMax = Math.Max(8f, baseRadius * (float)(nearest.X / 0.42));
+        var ryMax = Math.Max(8f, baseRadius * (float)(nearest.Y / 0.46));
+
+        for (var i = 18; i >= 1; i--)
         {
-            var t = i / 16f;
-            var alpha = (int)(12 + 13 * (1 - t));
+            var t = i / 18f;
+            var alpha = (int)(10 + 18 * (1 - t));
             using var brush = new SolidBrush(Color.FromArgb(alpha, 44, 128, 205));
-            var rx = radius * t;
-            var ry = radius * .82f * t;
+            var rx = rxMax * t;
+            var ry = ryMax * t;
             g.FillEllipse(brush, center.X - rx, center.Y - ry, rx * 2, ry * 2);
         }
-        using var cross = new Pen(Color.FromArgb(85, UiTheme.Muted), 1f) { DashStyle = DashStyle.Dot };
+        using var cross = new Pen(Color.FromArgb(75, UiTheme.Muted), 1f) { DashStyle = DashStyle.Dot };
         g.DrawLine(cross, center.X, rect.Top + 6, center.X, rect.Bottom - 6);
         g.DrawLine(cross, rect.Left + 6, center.Y, rect.Right - 6, center.Y);
+    }
+
+    private void TogglePlayback()
+    {
+        _playing = !_playing;
+        _playButton.Active = _playing;
+        _playButton.Filled = _playing;
+        _playButton.Invalidate();
+        if (_playing) _playTimer.Start(); else _playTimer.Stop();
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -431,6 +462,16 @@ internal sealed class BeamModuleView : ModuleViewBase
     {
         base.OnMouseUp(e);
         if (_pan) { _pan = false; Cursor = Cursors.Default; }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _playTimer.Stop();
+            _playTimer.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
 
