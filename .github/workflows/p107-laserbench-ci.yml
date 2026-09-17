@@ -126,6 +126,42 @@ jobs:
           Copy-Item $report build/TestEvidence/self-test.json -Force
           Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
 
+      - name: Run real GUI startup smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP ('LaserBench-GuiSmoke-' + [guid]::NewGuid().ToString('N'))
+          New-Item $root -ItemType Directory -Force | Out-Null
+          $oldRoot=$env:LASERBENCH_ROOT
+          $proc=$null
+          try {
+            $env:LASERBENCH_ROOT=$root
+            $proc=Start-Process -FilePath (Resolve-Path 'build/App/LaserBench.App.exe') -PassThru
+            Start-Sleep -Seconds 5
+            if ($proc.HasExited) {
+              $startup=Join-Path $root 'logs/startup.log'
+              $crash=Join-Path $root 'logs/crash.log'
+              if (Test-Path $startup) { Get-Content $startup -Raw | Write-Host }
+              if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
+              throw "LaserBench GUI exited during startup with code $($proc.ExitCode)."
+            }
+            $startup=Join-Path $root 'logs/startup.log'
+            if (!(Test-Path $startup -PathType Leaf)) { throw 'GUI startup did not create startup.log.' }
+            $startupText=Get-Content $startup -Raw
+            $startupText | Write-Host
+            if ($startupText -notmatch 'window-shown') { throw 'GUI startup never reached window-shown.' }
+            if ($startupText -notmatch 'workspace-ready') {
+              $crash=Join-Path $root 'logs/crash.log'
+              if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
+              throw 'GUI startup never reached workspace-ready.'
+            }
+            Copy-Item $startup build/TestEvidence/gui-startup.log -Force
+          } finally {
+            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+            $env:LASERBENCH_ROOT=$oldRoot
+            Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Assemble portable package
         shell: pwsh
         env:
@@ -207,7 +243,7 @@ jobs:
           "$(Split-Path $zip -Leaf)  $zipBytes bytes  sha256=$zipHash" | Set-Content build/SHA256.txt -Encoding utf8
           Get-Content build/SHA256.txt | Write-Host
 
-      - name: Upload LaserBench v0.1.0 candidate artifact
+      - name: Upload LaserBench candidate artifact
         uses: actions/upload-artifact@v4
         with:
           name: LaserBench-v${{ steps.product-version.outputs.value }}-win-x64
@@ -215,6 +251,6 @@ jobs:
             build/LaserBench_v${{ steps.product-version.outputs.value }}_portable.zip
             build/SHA256.txt
             build/manifest.json
-            build/TestEvidence/*.json
+            build/TestEvidence/*
           if-no-files-found: error
           retention-days: 14
