@@ -11,6 +11,7 @@ import storage_lifecycle as lifecycle
 
 
 STORAGE_ID = "CI-VOLUME-001"
+LEGACY_STORAGE_ID = "CI-VOLUME-LEGACY"
 
 
 def run_module(argv: list[str]) -> None:
@@ -37,9 +38,45 @@ def meta(index_dir: Path) -> dict[str, str]:
         connection.close()
 
 
+def write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def build(
     library: Path,
     storage_root: Path,
+    index_dir: Path,
+    output: Path,
+    *,
+    storage_id: str = STORAGE_ID,
+    library_relative: str = "Library",
+) -> dict:
+    run_module(
+        [
+            "build-index",
+            "--library", str(library),
+            "--index-dir", str(index_dir),
+            "--output", str(output),
+            "--storage-id", storage_id,
+            "--storage-root", str(storage_root),
+            "--library-relative", library_relative,
+        ]
+    )
+    return json.loads(
+        output.read_text(encoding="utf-8")
+    )
+
+
+def legacy_build(
+    library: Path,
     index_dir: Path,
     output: Path,
 ) -> dict:
@@ -49,9 +86,6 @@ def build(
             "--library", str(library),
             "--index-dir", str(index_dir),
             "--output", str(output),
-            "--storage-id", STORAGE_ID,
-            "--storage-root", str(storage_root),
-            "--library-relative", "Library",
         ]
     )
     return json.loads(
@@ -76,6 +110,56 @@ def query(
     )
     return json.loads(
         output.read_text(encoding="utf-8")
+    )
+
+
+def write_location_marker(
+    index_dir: Path,
+    *,
+    storage_id: str,
+    storage_root: Path,
+    library_relative: str,
+    library_root: Path,
+) -> None:
+    write_json(
+        index_dir / lifecycle.LOCATION_MARKER_NAME,
+        {
+            "version": 1,
+            "index_id": lifecycle.stable_index_id(
+                storage_id,
+                library_relative,
+            ),
+            "storage_id": storage_id,
+            "storage_root": str(storage_root),
+            "library_relative": library_relative,
+            "library_root": str(library_root),
+        },
+    )
+
+
+def write_rebind_marker(
+    index_dir: Path,
+    *,
+    storage_id: str,
+    library_relative: str,
+    previous_library_root: Path,
+    library_root: Path,
+) -> None:
+    write_json(
+        index_dir / lifecycle.REBIND_MARKER_NAME,
+        {
+            "version": 1,
+            "index_id": lifecycle.stable_index_id(
+                storage_id,
+                library_relative,
+            ),
+            "storage_id": storage_id,
+            "library_relative": library_relative,
+            "previous_library_root": str(
+                previous_library_root
+            ),
+            "library_root": str(library_root),
+        },
     )
 
 
@@ -211,6 +295,36 @@ def main() -> None:
         detached.rename(mount_c)
         library_c = mount_c / "Library"
 
+        write_location_marker(
+            index_dir,
+            storage_id=STORAGE_ID,
+            storage_root=mount_c,
+            library_relative="Library",
+            library_root=library_c,
+        )
+
+        auto_reattached = query(
+            index_dir,
+            query_path,
+            root / "auto-reattached-query.json",
+        )
+        if (
+            not auto_reattached.get(
+                "storage_reattached"
+            )
+            or not auto_reattached.get(
+                "storage_online"
+            )
+            or not auto_reattached["results"]
+            or not auto_reattached["results"][0][
+                "online"
+            ]
+            or auto_reattached["results"][0][
+                "relpath"
+            ] != "img_01.jpg"
+        ):
+            raise AssertionError(auto_reattached)
+
         reattached = build(
             library_c,
             mount_c,
@@ -219,7 +333,7 @@ def main() -> None:
         )
 
         if (
-            not reattached.get("storage_rebound")
+            reattached.get("storage_rebound")
             or reattached["reused"] != 4
             or reattached.get("active_generation")
             != initial_generation
@@ -253,6 +367,93 @@ def main() -> None:
         if final_meta.get("storage_id") != STORAGE_ID:
             raise AssertionError(final_meta)
 
+        # Legacy v0.4 style index. It has library_root but no storage_id.
+        legacy_mount_a = root / "legacy-a"
+        legacy_library_a = legacy_mount_a / "LegacyLibrary"
+        legacy_library_a.mkdir(parents=True)
+
+        for seed in range(2):
+            fixtures.save_jpeg(
+                legacy_library_a / f"legacy_{seed:02d}.jpg",
+                fixtures.rich_image(seed + 20),
+            )
+
+        legacy_old_index = root / "legacy-path-index"
+        legacy_initial = legacy_build(
+            legacy_library_a,
+            legacy_old_index,
+            root / "legacy-initial.json",
+        )
+        if legacy_initial["images"] != 2:
+            raise AssertionError(legacy_initial)
+
+        legacy_mount_b = root / "legacy-b"
+        legacy_mount_a.rename(legacy_mount_b)
+        legacy_library_b = (
+            legacy_mount_b / "LegacyLibrary"
+        )
+
+        legacy_stable_id = lifecycle.stable_index_id(
+            LEGACY_STORAGE_ID,
+            "LegacyLibrary",
+        )
+        legacy_stable_index = (
+            root / "Indexes" / legacy_stable_id
+        )
+        legacy_stable_index.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        legacy_old_index.rename(
+            legacy_stable_index
+        )
+
+        write_rebind_marker(
+            legacy_stable_index,
+            storage_id=LEGACY_STORAGE_ID,
+            library_relative="LegacyLibrary",
+            previous_library_root=legacy_library_a,
+            library_root=legacy_library_b,
+        )
+
+        legacy_rebound = build(
+            legacy_library_b,
+            legacy_mount_b,
+            legacy_stable_index,
+            root / "legacy-rebound.json",
+            storage_id=LEGACY_STORAGE_ID,
+            library_relative="LegacyLibrary",
+        )
+
+        if (
+            not legacy_rebound.get(
+                "storage_rebound"
+            )
+            or legacy_rebound["reused"] != 2
+            or (
+                legacy_stable_index
+                / lifecycle.REBIND_MARKER_NAME
+            ).exists()
+        ):
+            raise AssertionError(legacy_rebound)
+
+        legacy_meta = meta(
+            legacy_stable_index
+        )
+        if (
+            legacy_meta.get("storage_id")
+            != LEGACY_STORAGE_ID
+            or legacy_meta.get("library_relative")
+            != "LegacyLibrary"
+            or lifecycle.path_key(
+                legacy_meta.get("library_root", "")
+            )
+            != lifecycle.path_key(
+                legacy_library_b
+            )
+        ):
+            raise AssertionError(legacy_meta)
+
         print(
             json.dumps(
                 {
@@ -263,10 +464,18 @@ def main() -> None:
                     "offline_top": offline["results"][0][
                         "relpath"
                     ],
+                    "auto_reattached": bool(
+                        auto_reattached.get(
+                            "storage_reattached"
+                        )
+                    ),
                     "reattached_reused": reattached[
                         "reused"
                     ],
                     "identity_guard": wrong_id_failed,
+                    "legacy_rebind_reused": (
+                        legacy_rebound["reused"]
+                    ),
                 },
                 ensure_ascii=False,
                 indent=2,
