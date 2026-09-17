@@ -15,6 +15,7 @@ internal sealed class TopBarControl : UserControl
     private readonly GlyphButton _camera = new(GlyphKind.Camera);
     private readonly GlyphButton _record = new(GlyphKind.Record);
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 80 };
+    private readonly ToolTip _toolTip = new() { InitialDelay = 350, ReshowDelay = 100, AutoPopDelay = 5000 };
     private float _phase;
 
     public event EventHandler? CaptureClicked;
@@ -28,7 +29,7 @@ internal sealed class TopBarControl : UserControl
         _config = config;
         _provider = provider;
         Height = 34;
-        BackColor = Color.FromArgb(247, 250, 253);
+        BackColor = UiTheme.Toolbar;
         DoubleBuffered = true;
 
         Controls.Add(_capture);
@@ -53,6 +54,7 @@ internal sealed class TopBarControl : UserControl
             };
             _moduleButtons[kind] = button;
             Controls.Add(button);
+            _toolTip.SetToolTip(button, $"本次采集包含{ModuleName(kind)}");
         }
 
         _capture.Click += (_, _) => CaptureClicked?.Invoke(this, EventArgs.Empty);
@@ -61,6 +63,13 @@ internal sealed class TopBarControl : UserControl
         _clear.Click += (_, _) => _label.Clear();
         _confirm.Click += (_, _) => ConfirmLabel();
         _label.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { ConfirmLabel(); e.SuppressKeyPress = true; } };
+
+        _toolTip.SetToolTip(_capture, "开始采集；采集中再次点击可停止");
+        _toolTip.SetToolTip(_label, "实验标签");
+        _toolTip.SetToolTip(_clear, "清空标签");
+        _toolTip.SetToolTip(_confirm, "确认标签");
+        _toolTip.SetToolTip(_camera, "保存当前软件窗口截图");
+        _toolTip.SetToolTip(_record, "开始或停止窗口录像");
 
         _timer.Tick += (_, _) => { _phase += 0.22f; Invalidate(); };
         _timer.Start();
@@ -180,9 +189,22 @@ internal sealed class TopBarControl : UserControl
         }
     }
 
+    private static string ModuleName(ModuleKind kind) => kind switch
+    {
+        ModuleKind.Power => "功率",
+        ModuleKind.Spectrum => "光谱",
+        ModuleKind.Beam => "光束",
+        _ => "示波器"
+    };
+
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { _timer.Stop(); _timer.Dispose(); }
+        if (disposing)
+        {
+            _timer.Stop();
+            _timer.Dispose();
+            _toolTip.Dispose();
+        }
         base.Dispose(disposing);
     }
 }
@@ -192,13 +214,13 @@ internal sealed class SidebarControl : UserControl
     private readonly AppConfig _config;
     private readonly List<(GlyphKind Glyph, string Text, string Key)> _items = new()
     {
-        (GlyphKind.Dashboard, "Dashboard", "dashboard"),
-        (GlyphKind.Power, "Power", "power"),
-        (GlyphKind.Spectrum, "Spectrum", "spectrum"),
-        (GlyphKind.Beam, "Beam", "beam"),
-        (GlyphKind.Scope, "Scope", "scope"),
-        (GlyphKind.Data, "Data", "data"),
-        (GlyphKind.Settings, "Settings", "settings")
+        (GlyphKind.Dashboard, "总览", "dashboard"),
+        (GlyphKind.Power, "功率", "power"),
+        (GlyphKind.Spectrum, "光谱", "spectrum"),
+        (GlyphKind.Beam, "光束", "beam"),
+        (GlyphKind.Scope, "示波器", "scope"),
+        (GlyphKind.Data, "数据", "data"),
+        (GlyphKind.Settings, "设置", "settings")
     };
     private string _active = "dashboard";
     private int _hoverIndex = -1;
@@ -212,7 +234,7 @@ internal sealed class SidebarControl : UserControl
         _config = config;
         Expanded = config.SidebarExpanded;
         Width = Expanded ? 122 : 38;
-        BackColor = Color.FromArgb(238, 244, 249);
+        BackColor = UiTheme.Sidebar;
         DoubleBuffered = true;
         Cursor = Cursors.Hand;
         MouseMove += (_, e) => { _hoverIndex = HitIndex(e.Y); Invalidate(); };
@@ -256,8 +278,8 @@ internal sealed class SidebarControl : UserControl
         using (var status = new SolidBrush(UiTheme.Green)) e.Graphics.FillEllipse(status, 13, bottomY + 8, 7, 7);
         if (Expanded)
         {
-            TextRenderer.DrawText(e.Graphics, "System OK", UiTheme.Tiny, new Point(28, bottomY + 3), UiTheme.Muted, Color.Transparent);
-            var version = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.1.0");
+            TextRenderer.DrawText(e.Graphics, "系统正常", UiTheme.Tiny, new Point(28, bottomY + 3), UiTheme.Muted, Color.Transparent);
+            var version = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.1.2");
             var s = TextRenderer.MeasureText(version, UiTheme.Tiny);
             TextRenderer.DrawText(e.Graphics, version, UiTheme.Tiny, new Point(Width - s.Width - 5, 3), UiTheme.Muted, Color.Transparent);
         }
@@ -312,20 +334,20 @@ internal sealed class ModulePageControl : UserControl
         BackColor = UiTheme.Back;
         var view = dashboard.CreateView(kind);
         view.Dock = DockStyle.Fill;
-        var settings = new Panel { Dock = DockStyle.Right, Width = 210, BackColor = Color.FromArgb(247, 250, 253), Padding = new Padding(12) };
-        var title = new Label { Dock = DockStyle.Top, Height = 28, Font = UiTheme.ValueBold, ForeColor = UiTheme.Ink, Text = kind.ToString() };
+        var settings = new Panel { Dock = DockStyle.Right, Width = 230, BackColor = UiTheme.Surface, Padding = new Padding(14) };
+        var title = new Label { Dock = DockStyle.Top, Height = 30, Font = UiTheme.ValueBold, ForeColor = UiTheme.Ink, Text = ModuleName(kind) };
         var info = new Label
         {
             Dock = DockStyle.Top,
-            Height = 130,
+            Height = 150,
             Font = UiTheme.Small,
             ForeColor = UiTheme.Muted,
             Text = kind switch
             {
-                ModuleKind.Power => "Trace visibility, statistics slots and acquisition window are configured here. Dashboard remains read-focused.",
-                ModuleKind.Spectrum => "OSA transport, sweep policy, trace mode and linewidth metrics will live here when real hardware is connected.",
-                ModuleKind.Beam => "Default waist scan position, attenuation range and BeamSquared acquisition policy are configured here.",
-                _ => "Choose up to two channels and configure their independent vertical scales here. Dashboard only shows time-domain and FFT."
+                ModuleKind.Power => "这里配置曲线显示、统计项和采集时间窗。总览页只保留高频查看所需信息。",
+                ModuleKind.Spectrum => "真实 OSA 接入后，这里配置通信、扫描策略、Trace 模式以及 linewidth 计算参数。",
+                ModuleKind.Beam => "这里配置 BeamSquared 采集策略和衰减范围。总览页底部 Z 条仅用于浏览不同轴向位置的已采集光斑，不改变右侧焦散曲线。",
+                _ => "最多选择两个通道，并分别配置垂直量程。总览页只显示已配置的时域波形和 FFT。"
             }
         };
         settings.Controls.Add(info);
@@ -333,6 +355,14 @@ internal sealed class ModulePageControl : UserControl
         Controls.Add(view);
         Controls.Add(settings);
     }
+
+    private static string ModuleName(ModuleKind kind) => kind switch
+    {
+        ModuleKind.Power => "功率",
+        ModuleKind.Spectrum => "光谱 OSA",
+        ModuleKind.Beam => "光束质量",
+        _ => "示波器"
+    };
 }
 
 internal sealed class DataPageControl : UserControl
@@ -348,7 +378,7 @@ internal sealed class DataPageControl : UserControl
         AllowUserToAddRows = false,
         AllowUserToDeleteRows = false,
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-        BackgroundColor = Color.White,
+        BackgroundColor = UiTheme.PlotBack,
         BorderStyle = BorderStyle.None,
         RowHeadersVisible = false
     };
@@ -362,10 +392,10 @@ internal sealed class DataPageControl : UserControl
         _label.Text = config.ConfirmedLabel;
 
         var top = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 72, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(2), BackColor = UiTheme.Back };
-        var useFolder = NewButton("Use folder");
-        var useDate = NewButton("Default date");
-        var open = NewButton("Open exp");
-        var scan = NewButton("Scan label");
+        var useFolder = NewButton("使用自定义文件夹");
+        var useDate = NewButton("按日期自动归档");
+        var open = NewButton("打开数据目录");
+        var scan = NewButton("扫描标签");
         top.Controls.AddRange(new Control[] { _folder, useFolder, useDate, open, _label, scan, _current });
 
         useFolder.Click += (_, _) =>
@@ -386,9 +416,9 @@ internal sealed class DataPageControl : UserControl
         open.Click += (_, _) => Process.Start(new ProcessStartInfo(AppPaths.ResolveExperimentDirectory(_config)) { UseShellExecute = true });
         scan.Click += (_, _) => Scan();
 
-        _grid.Columns.Add("time", "Time");
-        _grid.Columns.Add("source", "Source / version");
-        _grid.Columns.Add("file", "File");
+        _grid.Columns.Add("time", "时间");
+        _grid.Columns.Add("source", "来源 / 版本");
+        _grid.Columns.Add("file", "文件");
         Controls.Add(_grid);
         Controls.Add(top);
         RefreshCurrent();
@@ -400,14 +430,14 @@ internal sealed class DataPageControl : UserControl
         Text = text,
         AutoSize = true,
         FlatStyle = FlatStyle.Flat,
-        BackColor = Color.White,
+        BackColor = UiTheme.PlotBack,
         ForeColor = UiTheme.Ink,
         Margin = new Padding(4, 0, 4, 0)
     };
 
     private void RefreshCurrent()
     {
-        _current.Text = "  " + AppPaths.ResolveExperimentDirectory(_config);
+        _current.Text = "当前：" + AppPaths.ResolveExperimentDirectory(_config);
     }
 
     private void Scan()
@@ -423,7 +453,7 @@ internal sealed class DataPageControl : UserControl
             if (!string.IsNullOrWhiteSpace(label) && !name.Contains("_" + label, StringComparison.OrdinalIgnoreCase)) continue;
             var time = name.Length >= 6 && name.Take(6).All(char.IsDigit) ? name[..6] : File.GetLastWriteTime(file).ToString("HHmmss");
             var rest = name.Length > 7 ? name[7..] : name;
-            var version = rest.EndsWith("_1", StringComparison.OrdinalIgnoreCase) || rest.Contains("_2", StringComparison.OrdinalIgnoreCase) ? "versioned" : "base";
+            var version = rest.EndsWith("_1", StringComparison.OrdinalIgnoreCase) || rest.Contains("_2", StringComparison.OrdinalIgnoreCase) ? "重名版本" : "基础版本";
             _grid.Rows.Add(time, $"{rest}  · {version}", Path.GetFileName(file));
         }
     }
@@ -443,27 +473,27 @@ internal sealed class SettingsPageControl : UserControl
 
         var table = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, RowCount = 1, BackColor = UiTheme.Back };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        AddRow(table, "Portable root", AppPaths.Root, AppPaths.IsWritable() ? "Writable" : "Read-only");
-        AddRow(table, ".NET runtime", Environment.Version.ToString(), "Available");
-        AddRow(table, "Mode", "Simulator", "No hardware required in v0.1.0");
-        AddAliasRow(table, "Power 1 alias", _config.Power1Alias, v => _config.Power1Alias = v);
-        AddAliasRow(table, "Power 2 alias", _config.Power2Alias, v => _config.Power2Alias = v);
-        AddAliasRow(table, "Math 1 alias", _config.Math1Alias, v => _config.Math1Alias = v);
-        AddAliasRow(table, "OSA 1 alias", _config.Osa1Alias, v => _config.Osa1Alias = v);
-        AddAliasRow(table, "Beam alias", _config.BeamAlias, v => _config.BeamAlias = v);
-        AddAliasRow(table, "Scope CH1 alias", _config.Scope1Alias, v => _config.Scope1Alias = v);
-        AddAliasRow(table, "Scope CH2 alias", _config.Scope2Alias, v => _config.Scope2Alias = v);
+        AddRow(table, "程序目录", AppPaths.Root, AppPaths.IsWritable() ? "可写" : "只读");
+        AddRow(table, ".NET 运行环境", Environment.Version.ToString(), "可用");
+        AddRow(table, "运行模式", "Simulator 模拟器", "当前无需连接真实硬件");
+        AddAliasRow(table, "功率 1 别名", _config.Power1Alias, v => _config.Power1Alias = v);
+        AddAliasRow(table, "功率 2 别名", _config.Power2Alias, v => _config.Power2Alias = v);
+        AddAliasRow(table, "计算通道 1 别名", _config.Math1Alias, v => _config.Math1Alias = v);
+        AddAliasRow(table, "OSA 1 别名", _config.Osa1Alias, v => _config.Osa1Alias = v);
+        AddAliasRow(table, "光束设备别名", _config.BeamAlias, v => _config.BeamAlias = v);
+        AddAliasRow(table, "示波器 CH1 别名", _config.Scope1Alias, v => _config.Scope1Alias = v);
+        AddAliasRow(table, "示波器 CH2 别名", _config.Scope2Alias, v => _config.Scope2Alias = v);
 
-        var auto = new CheckBox { Text = "Capture screenshot automatically after each Test", Checked = _config.AutoScreenshot, AutoSize = true, ForeColor = UiTheme.Ink, Margin = new Padding(3, 10, 3, 10) };
+        var auto = new CheckBox { Text = "每次采集完成后自动保存软件窗口截图", Checked = _config.AutoScreenshot, AutoSize = true, ForeColor = UiTheme.Ink, Margin = new Padding(3, 10, 3, 10) };
         auto.CheckedChanged += (_, _) => { _config.AutoScreenshot = auto.Checked; AppConfigStore.Save(_config); };
         table.Controls.Add(auto, 1, table.RowCount);
         table.SetColumnSpan(auto, 2);
         table.RowCount++;
 
-        var offline = new Button { Text = "Open offline dependency guide", AutoSize = true, FlatStyle = FlatStyle.Flat };
+        var offline = new Button { Text = "打开离线依赖安装说明", AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.PlotBack };
         offline.Click += (_, _) =>
         {
             var guide = Path.Combine(AppPaths.Root, "OFFLINE-DEPENDENCIES.txt");
@@ -476,12 +506,12 @@ internal sealed class SettingsPageControl : UserControl
         Controls.Add(table);
     }
 
-    private void AddRow(TableLayoutPanel table, string name, string value, string status)
+    private static void AddRow(TableLayoutPanel table, string name, string value, string status)
     {
         var row = table.RowCount++;
         table.Controls.Add(new Label { Text = name, AutoSize = true, ForeColor = UiTheme.Muted, Margin = new Padding(3, 8, 3, 8) }, 0, row);
-        table.Controls.Add(new Label { Text = value, AutoSize = true, ForeColor = UiTheme.Ink, Margin = new Padding(3, 8, 3, 8) }, 1, row);
-        table.Controls.Add(new Label { Text = status, AutoSize = true, ForeColor = status.Contains("Read") ? UiTheme.Red : UiTheme.Green, Margin = new Padding(3, 8, 3, 8) }, 2, row);
+        table.Controls.Add(new Label { Text = value, AutoSize = true, ForeColor = UiTheme.Ink, Margin = new Padding(3, 8, 3, 8), MaximumSize = new Size(290, 0) }, 1, row);
+        table.Controls.Add(new Label { Text = status, AutoSize = true, ForeColor = status.Contains("只读") ? UiTheme.Red : UiTheme.Green, Margin = new Padding(3, 8, 3, 8) }, 2, row);
     }
 
     private void AddAliasRow(TableLayoutPanel table, string name, string value, Action<string> setter)
