@@ -7,6 +7,7 @@ namespace MediaIndex.App;
 internal sealed class AppStorage
 {
     private const string RebindMarkerName = "storage-rebind.json";
+    private const string LocationMarkerName = "storage-location.json";
     private string _lastLoadedLibraryPath = string.Empty;
 
     public AppStorage()
@@ -116,6 +117,8 @@ internal sealed class AppStorage
                     : null);
         }
 
+        Directory.CreateDirectory(target);
+
         if (!string.IsNullOrWhiteSpace(migratedFrom)
             && !PathEquals(
                 migratedFrom,
@@ -126,6 +129,10 @@ internal sealed class AppStorage
                 target,
                 migratedFrom);
         }
+
+        WriteLocationMarker(
+            binding,
+            target);
 
         bindings[key] = binding.IndexId;
 
@@ -212,26 +219,53 @@ internal sealed class AppStorage
         string indexDirectory,
         string previousLibraryPath)
     {
-        var marker = Path.Combine(
-            indexDirectory,
-            RebindMarkerName);
+        WriteAtomicJson(
+            Path.Combine(
+                indexDirectory,
+                RebindMarkerName),
+            new
+            {
+                version = 1,
+                index_id = binding.IndexId,
+                storage_id = binding.StorageId,
+                library_relative = binding.LibraryRelativePath,
+                previous_library_root = NormalizePath(
+                    previousLibraryPath),
+                library_root = binding.LibraryPath,
+                created_utc = DateTimeOffset.UtcNow
+                    .ToString("O")
+            });
+    }
+
+    private static void WriteLocationMarker(
+        StorageBinding binding,
+        string indexDirectory)
+    {
+        WriteAtomicJson(
+            Path.Combine(
+                indexDirectory,
+                LocationMarkerName),
+            new
+            {
+                version = 1,
+                index_id = binding.IndexId,
+                storage_id = binding.StorageId,
+                storage_root = binding.StorageRoot,
+                library_relative = binding.LibraryRelativePath,
+                library_root = binding.LibraryPath,
+                updated_utc = DateTimeOffset.UtcNow
+                    .ToString("O")
+            });
+    }
+
+    private static void WriteAtomicJson(
+        string path,
+        object payload)
+    {
         var temp =
-            marker
+            path
             + ".tmp-"
             + Guid.NewGuid().ToString("N");
-
-        var payload = new
-        {
-            version = 1,
-            index_id = binding.IndexId,
-            storage_id = binding.StorageId,
-            library_relative = binding.LibraryRelativePath,
-            previous_library_root = NormalizePath(
-                previousLibraryPath),
-            library_root = binding.LibraryPath,
-            created_utc = DateTimeOffset.UtcNow
-                .ToString("O")
-        };
 
         try
         {
@@ -253,7 +287,7 @@ internal sealed class AppStorage
 
             File.Move(
                 temp,
-                marker,
+                path,
                 true);
         }
         finally
@@ -364,47 +398,9 @@ internal sealed class AppStorage
     private void SaveBindings(
         Dictionary<string, string> bindings)
     {
-        var temp =
-            BindingsPath
-            + ".tmp-"
-            + Guid.NewGuid().ToString("N");
-
-        try
-        {
-            using (var stream = new FileStream(
-                       temp,
-                       FileMode.CreateNew,
-                       FileAccess.Write,
-                       FileShare.None))
-            {
-                JsonSerializer.Serialize(
-                    stream,
-                    bindings,
-                    new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    });
-                stream.Flush(true);
-            }
-
-            File.Move(
-                temp,
-                BindingsPath,
-                true);
-        }
-        finally
-        {
-            try
-            {
-                if (File.Exists(temp))
-                {
-                    File.Delete(temp);
-                }
-            }
-            catch
-            {
-            }
-        }
+        WriteAtomicJson(
+            BindingsPath,
+            bindings);
     }
 
     private string LegacyIndexDirectoryFor(
