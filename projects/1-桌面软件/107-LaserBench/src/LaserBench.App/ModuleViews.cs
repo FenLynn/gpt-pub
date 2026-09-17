@@ -362,8 +362,8 @@ internal sealed class BeamModuleView : ModuleViewBase
         var plot = PlotDrawer.DrawGrid(e.Graphics, causticBounds, 35, 10, 8, 22);
         var xSeries = snapshot.Beam.Select(p => (p.Z, p.X)).ToArray();
         var ySeries = snapshot.Beam.Select(p => (p.Z, p.Y)).ToArray();
-        var minY = Math.Min(xSeries.Min(x => x.X), ySeries.Min(x => x.X)) * .8;
-        var maxY = Math.Max(xSeries.Max(x => x.X), ySeries.Max(x => x.X)) * 1.04;
+        var minY = Math.Min(xSeries.Min(x => x.X), ySeries.Min(x => x.Y)) * .8;
+        var maxY = Math.Max(xSeries.Max(x => x.X), ySeries.Max(x => x.Y)) * 1.04;
         PlotDrawer.DrawSeries(e.Graphics, plot, xSeries, UiTheme.Accent, -24, 24, minY, maxY);
         PlotDrawer.DrawSeries(e.Graphics, plot, ySeries, UiTheme.Orange, -24, 24, minY, maxY);
         PlotDrawer.DrawLegend(e.Graphics, plot, new[] { ("X", UiTheme.Accent), ("Y", UiTheme.Orange) });
