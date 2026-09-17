@@ -17,28 +17,41 @@ internal static class StorageIdentity
 
     public static StorageBinding Resolve(string library)
     {
-        var full = Path.GetFullPath(library)
-            .TrimEnd(
-                Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar);
+        var full = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(library));
 
-        var root = Path.GetPathRoot(full);
+        var pathRoot = Path.GetPathRoot(full);
 
-        if (string.IsNullOrWhiteSpace(root))
+        if (string.IsNullOrWhiteSpace(pathRoot))
         {
             throw new InvalidOperationException(
                 $"Cannot resolve storage root for: {full}");
         }
 
-        root = EnsureRootSeparator(root);
-
+        string root;
         string storageId;
 
         if (OperatingSystem.IsWindows()
-            && !root.StartsWith(
+            && !full.StartsWith(
                 @"\\",
                 StringComparison.Ordinal))
         {
+            var volumePath = new StringBuilder(BufferLength);
+
+            if (!GetVolumePathName(
+                    full,
+                    volumePath,
+                    (uint)volumePath.Capacity)
+                || volumePath.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    "Cannot resolve Windows volume mount point "
+                    + $"for: {full}");
+            }
+
+            root = EnsureRootSeparator(
+                volumePath.ToString());
+
             var volumeName = new StringBuilder(BufferLength);
 
             if (GetVolumeNameForVolumeMountPoint(
@@ -80,25 +93,30 @@ internal static class StorageIdentity
                         .ToUpperInvariant();
             }
         }
-        else if (root.StartsWith(
-                     @"\\",
-                     StringComparison.Ordinal))
-        {
-            storageId =
-                "unc:"
-                + root
-                    .TrimEnd('\\', '/')
-                    .ToUpperInvariant();
-        }
         else
         {
-            storageId =
-                "root:"
-                + root
-                    .TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar)
-                    .ToUpperInvariant();
+            root = EnsureRootSeparator(pathRoot);
+
+            if (root.StartsWith(
+                    @"\\",
+                    StringComparison.Ordinal))
+            {
+                storageId =
+                    "unc:"
+                    + root
+                        .TrimEnd('\\', '/')
+                        .ToUpperInvariant();
+            }
+            else
+            {
+                storageId =
+                    "root:"
+                    + root
+                        .TrimEnd(
+                            Path.DirectorySeparatorChar,
+                            Path.AltDirectorySeparatorChar)
+                        .ToUpperInvariant();
+            }
         }
 
         var relative = NormalizeRelative(
@@ -159,6 +177,16 @@ internal static class StorageIdentity
 
         return root + Path.DirectorySeparatorChar;
     }
+
+    [DllImport(
+        "kernel32.dll",
+        CharSet = CharSet.Unicode,
+        SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetVolumePathName(
+        string lpszFileName,
+        StringBuilder lpszVolumePathName,
+        uint cchBufferLength);
 
     [DllImport(
         "kernel32.dll",
