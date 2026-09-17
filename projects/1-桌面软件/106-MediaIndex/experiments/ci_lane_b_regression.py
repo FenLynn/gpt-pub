@@ -141,16 +141,16 @@ def run_core(argv: list[str]) -> None:
 
 
 def phash_top_ids(
-    index_dir: Path,
+    generation_dir: Path,
     query: np.ndarray,
     top_k: int,
 ) -> list[int]:
     matrix = np.load(
-        index_dir / "region_hashes.npy",
+        generation_dir / "region_hashes.npy",
         mmap_mode="r",
     )
     ids = np.load(
-        index_dir / "image_ids.npy",
+        generation_dir / "image_ids.npy",
         mmap_mode="r",
     )
 
@@ -219,6 +219,31 @@ def main() -> None:
         if build.get("local_postings", 0) <= 0:
             raise AssertionError(build)
 
+        active_generation = build.get(
+            "active_generation",
+            "",
+        )
+        if not active_generation:
+            raise AssertionError(
+                {
+                    "reason": "missing active generation",
+                    "build": build,
+                }
+            )
+
+        generation_dir = (
+            index_dir
+            / "generations"
+            / active_generation
+        )
+        if not generation_dir.is_dir():
+            raise AssertionError(
+                {
+                    "reason": "active generation missing",
+                    "generation": str(generation_dir),
+                }
+            )
+
         connection = sqlite3.connect(
             index_dir / "index.sqlite3"
         )
@@ -274,7 +299,7 @@ def main() -> None:
                 query_image
             )
             local_ids, _, meta = lane_b.search_index(
-                index_dir,
+                generation_dir,
                 words,
                 top_k=20,
             )
@@ -284,7 +309,7 @@ def main() -> None:
             ]
 
             phash_list = phash_top_ids(
-                index_dir,
+                generation_dir,
                 query_image,
                 top_k=20,
             )
@@ -372,6 +397,7 @@ def main() -> None:
             "union_top20": union20,
             "lane_b_top5_rescues": rescues,
             "integrated_top1_all12": integrated_top1,
+            "active_generation": active_generation,
             "build": {
                 "images": build["images"],
                 "local_postings": build[
