@@ -12,6 +12,8 @@ import mediaindex_core as core
 
 
 BINDING_VERSION = "1"
+REBIND_MARKER_NAME = "storage-rebind.json"
+LOCATION_MARKER_NAME = "storage-location.json"
 
 
 def canonical_storage_id(value: str) -> str:
@@ -39,6 +41,20 @@ def stable_index_id(storage_id: str, library_relative: str) -> str:
 
 def path_key(value: str | Path) -> str:
     return str(Path(value).resolve()).casefold()
+
+
+def _read_json(path: Path) -> dict | None:
+    if not path.is_file():
+        return None
+
+    try:
+        value = json.loads(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    return value if isinstance(value, dict) else None
 
 
 def _read_meta(index_dir: Path) -> dict[str, str]:
@@ -86,6 +102,66 @@ def _binding_values(
     }
 
 
+def _legacy_rebind_authorized(
+    *,
+    index_dir: Path,
+    meta: dict[str, str],
+    library: Path,
+    storage_id: str,
+    library_relative: str,
+) -> bool:
+    marker = _read_json(
+        index_dir / REBIND_MARKER_NAME
+    )
+    if marker is None:
+        return False
+
+    try:
+        expected_id = stable_index_id(
+            storage_id,
+            library_relative,
+        )
+        marker_id = str(marker["index_id"])
+        marker_storage = canonical_storage_id(
+            str(marker["storage_id"])
+        )
+        marker_relative = canonical_relative(
+            str(marker["library_relative"])
+        )
+        previous_root = str(
+            marker["previous_library_root"]
+        )
+        current_root = str(marker["library_root"])
+    except (KeyError, TypeError, ValueError):
+        return False
+
+    old_library = meta.get("library_root", "").strip()
+    if not old_library:
+        return False
+
+    return (
+        marker_id.casefold() == expected_id.casefold()
+        and index_dir.name.casefold()
+        == expected_id.casefold()
+        and marker_storage
+        == canonical_storage_id(storage_id)
+        and marker_relative.upper()
+        == canonical_relative(library_relative).upper()
+        and path_key(previous_root)
+        == path_key(old_library)
+        and path_key(current_root)
+        == path_key(library)
+    )
+
+
+def _remove_rebind_marker(index_dir: Path) -> None:
+    marker = index_dir / REBIND_MARKER_NAME
+    try:
+        marker.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def prepare_binding(
     *,
     library: Path,
@@ -113,7 +189,8 @@ def prepare_binding(
 
     if (
         existing_id
-        and existing_relative.upper() != wanted_relative.upper()
+        and existing_relative.upper()
+        != wanted_relative.upper()
     ):
         raise SystemExit(
             "Index library-relative path mismatch. "
@@ -126,13 +203,24 @@ def prepare_binding(
         and path_key(old_library) != path_key(library)
     )
 
+    legacy_authorized = False
+
     if not existing_id and rebound:
-        raise SystemExit(
-            "Legacy path-bound index cannot be rebound before "
-            "a storage identity has been adopted at its original path."
+        legacy_authorized = _legacy_rebind_authorized(
+            index_dir=index_dir,
+            meta=meta,
+            library=library,
+            storage_id=storage_id,
+            library_relative=library_relative,
         )
 
-    if existing_id and rebound:
+        if not legacy_authorized:
+            raise SystemExit(
+                "Legacy path-bound index cannot be rebound "
+                "without a valid MediaIndex remount marker."
+            )
+
+    if rebound and (existing_id or legacy_authorized):
         _write_meta(
             index_dir,
             _binding_values(
@@ -163,6 +251,68 @@ def finalize_binding(
             library_relative=library_relative,
         ),
     )
+    _remove_rebind_marker(index_dir)
+
+
+def refresh_location_from_marker(
+    index_dir: Path,
+) -> bool:
+    meta = _read_meta(index_dir)
+    existing_id = meta.get("storage_id", "").strip()
+    if not existing_id:
+        return False
+
+    marker = _read_json(
+        index_dir / LOCATION_MARKER_NAME
+    )
+    if marker is None:
+        return False
+
+    try:
+        marker_id = str(marker["index_id"])
+        storage_id = str(marker["storage_id"])
+        storage_root = Path(
+            str(marker["storage_root"])
+        )
+        library_relative = str(
+            marker["library_relative"]
+        )
+        library = Path(
+            str(marker["library_root"])
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+    expected_id = stable_index_id(
+        storage_id,
+        library_relative,
+    )
+
+    if (
+        marker_id.casefold()
+        != expected_id.casefold()
+        or index_dir.name.casefold()
+        != expected_id.casefold()
+        or canonical_storage_id(storage_id)
+        != canonical_storage_id(existing_id)
+        or canonical_relative(library_relative).upper()
+        != canonical_relative(
+            meta.get("library_relative", ".")
+        ).upper()
+        or not library.is_dir()
+    ):
+        return False
+
+    _write_meta(
+        index_dir,
+        _binding_values(
+            library=library,
+            storage_id=storage_id,
+            storage_root=storage_root,
+            library_relative=library_relative,
+        ),
+    )
+    return True
 
 
 def _rewrite_output(
@@ -273,6 +423,21 @@ def build_index_with_binding(args: argparse.Namespace) -> None:
 
 
 def delegate_and_augment(command: str, arguments: list[str]) -> None:
+    try:
+        index_pos = arguments.index("--index-dir") + 1
+        output_pos = arguments.index("--output") + 1
+        index_dir = Path(arguments[index_pos])
+        output = Path(arguments[output_pos])
+    except (ValueError, IndexError):
+        index_dir = None
+        output = None
+
+    reattached = False
+    if index_dir is not None:
+        reattached = refresh_location_from_marker(
+            index_dir
+        )
+
     original = sys.argv[:]
     try:
         sys.argv = [original[0], command, *arguments]
@@ -280,17 +445,15 @@ def delegate_and_augment(command: str, arguments: list[str]) -> None:
     finally:
         sys.argv = original
 
-    try:
-        index_pos = arguments.index("--index-dir") + 1
-        output_pos = arguments.index("--output") + 1
-        index_dir = Path(arguments[index_pos])
-        output = Path(arguments[output_pos])
-    except (ValueError, IndexError):
+    if index_dir is None or output is None:
         return
 
     _rewrite_output(
         output,
         index_dir=index_dir,
+        extra={
+            "storage_reattached": reattached,
+        },
     )
 
 
