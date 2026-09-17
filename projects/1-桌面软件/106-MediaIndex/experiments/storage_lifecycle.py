@@ -258,8 +258,7 @@ def refresh_location_from_marker(
     index_dir: Path,
 ) -> bool:
     meta = _read_meta(index_dir)
-    existing_id = meta.get("storage_id", "").strip()
-    if not existing_id:
+    if not meta:
         return False
 
     marker = _read_json(
@@ -293,15 +292,31 @@ def refresh_location_from_marker(
         != expected_id.casefold()
         or index_dir.name.casefold()
         != expected_id.casefold()
-        or canonical_storage_id(storage_id)
-        != canonical_storage_id(existing_id)
-        or canonical_relative(library_relative).upper()
-        != canonical_relative(
-            meta.get("library_relative", ".")
-        ).upper()
         or not library.is_dir()
     ):
         return False
+
+    existing_id = meta.get("storage_id", "").strip()
+
+    if existing_id:
+        if (
+            canonical_storage_id(storage_id)
+            != canonical_storage_id(existing_id)
+            or canonical_relative(library_relative).upper()
+            != canonical_relative(
+                meta.get("library_relative", ".")
+            ).upper()
+        ):
+            return False
+    else:
+        if not _legacy_rebind_authorized(
+            index_dir=index_dir,
+            meta=meta,
+            library=library,
+            storage_id=storage_id,
+            library_relative=library_relative,
+        ):
+            return False
 
     _write_meta(
         index_dir,
@@ -312,6 +327,10 @@ def refresh_location_from_marker(
             library_relative=library_relative,
         ),
     )
+
+    if not existing_id:
+        _remove_rebind_marker(index_dir)
+
     return True
 
 
