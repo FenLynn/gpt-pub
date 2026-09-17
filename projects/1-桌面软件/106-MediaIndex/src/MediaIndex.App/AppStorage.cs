@@ -288,10 +288,8 @@ internal sealed class AppStorage
     private static string NormalizePath(
         string value)
     {
-        return Path.GetFullPath(value)
-            .TrimEnd(
-                Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar);
+        return Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(value));
     }
 
     private static string BindingKey(
