@@ -119,12 +119,17 @@ internal sealed class CoreRunner
         IProgress<string> progress,
         CancellationToken cancellationToken)
     {
+        var binding = StorageIdentity.Resolve(library);
+
         return RunAsync(
             [
                 "build-index",
                 "--library", library,
                 "--index-dir", indexDir,
-                "--output", output
+                "--output", output,
+                "--storage-id", binding.StorageId,
+                "--storage-root", binding.StorageRoot,
+                "--library-relative", binding.LibraryRelativePath
             ],
             progress,
             cancellationToken);

@@ -29,10 +29,21 @@ internal static class Program
         try
         {
             var core = new CoreRunner();
-            var ok = core
+            var workerOk = core
                 .SelfTestAsync(CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
+
+            var binding = StorageIdentity.Resolve(
+                Path.GetTempPath());
+
+            var storageIdentityOk =
+                !string.IsNullOrWhiteSpace(
+                    binding.StorageId)
+                && !string.IsNullOrWhiteSpace(
+                    binding.IndexId);
+
+            var ok = workerOk && storageIdentityOk;
 
             var report = new
             {
@@ -43,7 +54,10 @@ internal static class Program
                     .Version?
                     .ToString() ?? string.Empty,
                 embeddedWorker = core.EmbeddedWorkerAvailable,
-                extractedWorker = File.Exists(core.WorkerPath)
+                extractedWorker = File.Exists(core.WorkerPath),
+                storageIdentity = binding.StorageId,
+                storageIndexId = binding.IndexId,
+                storageIdentityOk
             };
 
             var fullPath = Path.GetFullPath(reportPath);

@@ -5,7 +5,8 @@ import sys
 import a004_real_image_acceptance_runner as image_runner
 import acceptance_summary as summary_runner
 import auto_real_domain_smoke as auto_runner
-import mediaindex_core as core_runner
+import ci_storage_lifecycle as storage_ci
+import storage_lifecycle as core_runner
 import v011_real_video_acceptance_runner as video_runner
 
 
@@ -62,7 +63,11 @@ def main() -> int:
         )
 
     if command == "selftest":
-        print('{"ok":true,"worker":"MediaIndex.Acceptance.Worker"}')
+        storage_ci.main()
+        print(
+            '{"ok":true,"worker":"MediaIndex.Acceptance.Worker",'
+            '"storageLifecycle":true}'
+        )
         return 0
 
     print(

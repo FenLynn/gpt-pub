@@ -6,10 +6,13 @@ namespace MediaIndex.App;
 
 internal sealed class AppStorage
 {
+    private string _lastLoadedLibraryPath = string.Empty;
+
     public AppStorage()
     {
         Root = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
             "FenLynn",
             "MediaIndex");
         Directory.CreateDirectory(Root);
@@ -18,9 +21,14 @@ internal sealed class AppStorage
     }
 
     public string Root { get; }
-    public string SettingsPath => Path.Combine(Root, "settings.json");
-    public string IndexesRoot => Path.Combine(Root, "Indexes");
-    public string ResultsRoot => Path.Combine(Root, "Results");
+    public string SettingsPath =>
+        Path.Combine(Root, "settings.json");
+    public string BindingsPath =>
+        Path.Combine(Root, "storage-bindings.json");
+    public string IndexesRoot =>
+        Path.Combine(Root, "Indexes");
+    public string ResultsRoot =>
+        Path.Combine(Root, "Results");
 
     public AppSettings LoadSettings()
     {
@@ -31,9 +39,18 @@ internal sealed class AppStorage
 
         try
         {
-            return JsonSerializer.Deserialize<AppSettings>(
-                File.ReadAllText(SettingsPath, Encoding.UTF8),
-                JsonModel.Options) ?? new AppSettings();
+            var settings =
+                JsonSerializer.Deserialize<AppSettings>(
+                    File.ReadAllText(
+                        SettingsPath,
+                        Encoding.UTF8),
+                    JsonModel.Options)
+                ?? new AppSettings();
+
+            _lastLoadedLibraryPath =
+                settings.ImageLibraryPath;
+
+            return settings;
         }
         catch
         {
@@ -56,20 +73,59 @@ internal sealed class AppStorage
 
     public string IndexDirectoryFor(string library)
     {
-        var normalized = Path.GetFullPath(library)
-            .TrimEnd(
-                Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar)
-            .ToUpperInvariant();
+        var full = NormalizePath(library);
+        var bindings = LoadBindings();
+        var key = BindingKey(full);
 
-        var bytes = SHA256.HashData(
-            Encoding.UTF8.GetBytes(normalized));
+        if (!Directory.Exists(full))
+        {
+            if (bindings.TryGetValue(
+                    key,
+                    out var rememberedId)
+                && !string.IsNullOrWhiteSpace(
+                    rememberedId))
+            {
+                return Path.Combine(
+                    IndexesRoot,
+                    rememberedId);
+            }
 
-        var id = Convert
-            .ToHexString(bytes)
-            .ToLowerInvariant()[..16];
+            return LegacyIndexDirectoryFor(full);
+        }
 
-        return Path.Combine(IndexesRoot, id);
+        var binding = StorageIdentity.Resolve(full);
+        var target = Path.Combine(
+            IndexesRoot,
+            binding.IndexId);
+
+        if (!Directory.Exists(target))
+        {
+            var legacyCurrent =
+                LegacyIndexDirectoryFor(full);
+
+            if (Directory.Exists(legacyCurrent)
+                && !PathEquals(
+                    legacyCurrent,
+                    target))
+            {
+                Directory.Move(
+                    legacyCurrent,
+                    target);
+            }
+            else
+            {
+                TryMigrateRememberedBinding(
+                    binding,
+                    target,
+                    bindings);
+            }
+        }
+
+        bindings[key] = binding.IndexId;
+        SaveBindings(bindings);
+        _lastLoadedLibraryPath = full;
+
+        return target;
     }
 
     public string NewResultPath(string prefix)
@@ -84,5 +140,174 @@ internal sealed class AppStorage
         return Path.Combine(
             ResultsRoot,
             $"Validation-{DateTime.Now:yyyyMMdd-HHmmss}");
+    }
+
+    private void TryMigrateRememberedBinding(
+        StorageBinding binding,
+        string target,
+        Dictionary<string, string> bindings)
+    {
+        if (string.IsNullOrWhiteSpace(
+                _lastLoadedLibraryPath))
+        {
+            return;
+        }
+
+        var previous = NormalizePath(
+            _lastLoadedLibraryPath);
+
+        if (PathEquals(previous, binding.LibraryPath))
+        {
+            return;
+        }
+
+        var previousKey = BindingKey(previous);
+
+        if (bindings.TryGetValue(
+                previousKey,
+                out var previousId)
+            && string.Equals(
+                previousId,
+                binding.IndexId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var source = Path.Combine(
+                IndexesRoot,
+                previousId);
+
+            if (Directory.Exists(source)
+                && !Directory.Exists(target)
+                && !PathEquals(source, target))
+            {
+                Directory.Move(
+                    source,
+                    target);
+            }
+
+            bindings[previousKey] =
+                binding.IndexId;
+        }
+    }
+
+    private Dictionary<string, string> LoadBindings()
+    {
+        if (!File.Exists(BindingsPath))
+        {
+            return new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            var value =
+                JsonSerializer.Deserialize<
+                    Dictionary<string, string>>(
+                    File.ReadAllText(
+                        BindingsPath,
+                        Encoding.UTF8),
+                    JsonModel.Options);
+
+            return value is null
+                ? new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(
+                    value,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private void SaveBindings(
+        Dictionary<string, string> bindings)
+    {
+        var temp =
+            BindingsPath
+            + ".tmp-"
+            + Guid.NewGuid().ToString("N");
+
+        try
+        {
+            using (var stream = new FileStream(
+                       temp,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                JsonSerializer.Serialize(
+                    stream,
+                    bindings,
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
+                stream.Flush(true);
+            }
+
+            File.Move(
+                temp,
+                BindingsPath,
+                true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temp))
+                {
+                    File.Delete(temp);
+                }
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private string LegacyIndexDirectoryFor(
+        string library)
+    {
+        var normalized = NormalizePath(library)
+            .ToUpperInvariant();
+
+        var bytes = SHA256.HashData(
+            Encoding.UTF8.GetBytes(normalized));
+
+        var id = Convert
+            .ToHexString(bytes)
+            .ToLowerInvariant()[..16];
+
+        return Path.Combine(
+            IndexesRoot,
+            id);
+    }
+
+    private static string NormalizePath(
+        string value)
+    {
+        return Path.GetFullPath(value)
+            .TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
+    }
+
+    private static string BindingKey(
+        string value)
+    {
+        return NormalizePath(value)
+            .ToUpperInvariant();
+    }
+
+    private static bool PathEquals(
+        string left,
+        string right)
+    {
+        return string.Equals(
+            NormalizePath(left),
+            NormalizePath(right),
+            StringComparison.OrdinalIgnoreCase);
     }
 }
