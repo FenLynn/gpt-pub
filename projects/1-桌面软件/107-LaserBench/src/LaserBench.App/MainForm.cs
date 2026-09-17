@@ -5,15 +5,15 @@ namespace LaserBench;
 internal sealed class MainForm : Form
 {
     private readonly bool _safeMode;
-    private readonly Panel _contentHost = new() { Dock = DockStyle.Fill, BackColor = Color.White };
-    private readonly Panel _bootPanel = new() { Dock = DockStyle.Fill, BackColor = Color.White };
+    private readonly Panel _contentHost = new() { Dock = DockStyle.Fill, BackColor = UiTheme.PlotBack };
+    private readonly Panel _bootPanel = new() { Dock = DockStyle.Fill, BackColor = UiTheme.Back };
     private readonly Label _bootLabel = new()
     {
         Dock = DockStyle.Fill,
         TextAlign = ContentAlignment.MiddleCenter,
         Font = new Font("Segoe UI", 11f, FontStyle.Regular),
-        ForeColor = Color.FromArgb(66, 78, 92),
-        Text = "LaserBench\r\nInitializing workspace..."
+        ForeColor = UiTheme.Ink,
+        Text = "LaserBench\r\n正在初始化工作区..."
     };
 
     private AppConfig? _config;
@@ -30,8 +30,8 @@ internal sealed class MainForm : Form
     public MainForm(bool safeMode = false)
     {
         _safeMode = safeMode;
-        Text = safeMode ? "LaserBench [Safe Mode]" : "LaserBench";
-        BackColor = Color.White;
+        Text = safeMode ? "LaserBench [安全模式]" : "LaserBench";
+        BackColor = UiTheme.Back;
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1100, 700);
         Size = new Size(1500, 900);
@@ -61,19 +61,19 @@ internal sealed class MainForm : Form
 
         try
         {
-            SetBootText("LaserBench\r\nLoading configuration...");
+            SetBootText("LaserBench\r\n正在读取配置...");
             StartupDiagnostics.Stage("config-load", "begin");
             _config = AppConfigStore.Load();
             StartupDiagnostics.Stage("config-load");
 
-            SetBootText("LaserBench\r\nStarting simulator...");
+            SetBootText("LaserBench\r\n正在启动模拟仪器...");
             StartupDiagnostics.Stage("simulator", "begin");
             _provider = new SimulatorProvider();
             _captureService = new CaptureService(_provider);
             var probe = _provider.Snapshot(_config);
             StartupDiagnostics.Stage("simulator", $"power={probe.Power.Count}; spectrum={probe.Spectrum.Count}; beam={probe.Beam.Count}");
 
-            SetBootText("LaserBench\r\nBuilding dashboard...");
+            SetBootText("LaserBench\r\n正在构建总览界面...");
             StartupDiagnostics.Stage("topbar", "begin");
             _topBar = new TopBarControl(_config, _provider) { Dock = DockStyle.Top, Height = 34 };
             StartupDiagnostics.Stage("topbar");
@@ -143,15 +143,15 @@ internal sealed class MainForm : Form
 
     private void ShowStartupFailure(Exception exception)
     {
-        var panel = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(36) };
+        var panel = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Back, Padding = new Padding(36) };
         var title = new Label
         {
             AutoSize = false,
             Dock = DockStyle.Top,
             Height = 44,
             Font = new Font("Segoe UI Semibold", 15f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(42, 55, 69),
-            Text = "LaserBench started, but the workspace could not be initialized."
+            ForeColor = UiTheme.Ink,
+            Text = "LaserBench 已启动，但工作区初始化失败。"
         };
         var details = new TextBox
         {
@@ -161,7 +161,7 @@ internal sealed class MainForm : Form
             ScrollBars = ScrollBars.Vertical,
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font("Consolas", 9f),
-            Text = $"{exception}\r\n\r\nDiagnostic log:\r\n{StartupDiagnostics.CrashLogPath}\r\n\r\nTry safe mode from PowerShell:\r\n.\\LaserBench.App.exe --safe"
+            Text = $"{exception}\r\n\r\n诊断日志：\r\n{StartupDiagnostics.CrashLogPath}\r\n\r\n可在 PowerShell 中尝试安全模式：\r\n.\\LaserBench.App.exe --safe"
         };
         panel.Controls.Add(details);
         panel.Controls.Add(title);
@@ -170,7 +170,7 @@ internal sealed class MainForm : Form
         Controls.Clear();
         Controls.Add(panel);
         ResumeLayout(true);
-        Text = "LaserBench [Startup diagnostics]";
+        Text = "LaserBench [启动诊断]";
     }
 
     private void Navigate(string key)
@@ -255,12 +255,12 @@ internal sealed class MainForm : Form
             var result = await _captureService.CaptureAsync(frozen, _captureCancellation.Token);
             if (!result.Cancelled && frozen.AutoScreenshot) SaveScreenshot(result.RequestedAt, frozen.ConfirmedLabel);
             if (result.Errors.Count > 0)
-                MessageBox.Show(this, string.Join(Environment.NewLine, result.Errors), "LaserBench capture", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, string.Join(Environment.NewLine, result.Errors), "LaserBench 采集", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
             StartupDiagnostics.Crash("capture", ex);
-            MessageBox.Show(this, ex.Message, "LaserBench capture", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, ex.Message, "LaserBench 采集", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
         {
@@ -309,7 +309,7 @@ internal sealed class MainForm : Form
         catch (Exception ex)
         {
             StartupDiagnostics.Crash("screenshot", ex);
-            MessageBox.Show(this, ex.Message, "Screenshot failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, ex.Message, "截图失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -318,12 +318,12 @@ internal sealed class MainForm : Form
         if (_topBar is null || _config is null) return;
         if (_safeMode)
         {
-            MessageBox.Show(this, "Recording is disabled in safe mode.", "LaserBench safe mode", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "安全模式下已禁用窗口录像。", "LaserBench 安全模式", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         if (_recorder is null)
         {
-            MessageBox.Show(this, $"Recording is unavailable. See {StartupDiagnostics.CrashLogPath} if initialization failed.", "LaserBench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, $"窗口录像当前不可用。如初始化失败，请查看：{StartupDiagnostics.CrashLogPath}", "LaserBench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -344,7 +344,7 @@ internal sealed class MainForm : Form
         {
             StartupDiagnostics.Crash("recording", ex);
             _topBar.SetRecording(false);
-            MessageBox.Show(this, ex.Message, "Recording failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, ex.Message, "录像失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 }
