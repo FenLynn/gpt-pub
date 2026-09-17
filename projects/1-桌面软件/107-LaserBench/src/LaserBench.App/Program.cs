@@ -29,8 +29,52 @@ internal static class Program
             return;
         }
 
-        ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
+        StartupDiagnostics.Initialize();
+        StartupDiagnostics.Stage("portable-root", AppPaths.Root);
+
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, eventArgs) =>
+        {
+            StartupDiagnostics.Crash("WinForms UI thread", eventArgs.Exception);
+            MessageBox.Show(
+                $"LaserBench encountered a UI error but kept the diagnostic record.\n\n{eventArgs.Exception.Message}\n\nLog: {StartupDiagnostics.CrashLogPath}",
+                "LaserBench error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
+        {
+            if (eventArgs.ExceptionObject is Exception exception)
+                StartupDiagnostics.Crash("AppDomain unhandled exception", exception);
+        };
+        TaskScheduler.UnobservedTaskException += (_, eventArgs) =>
+        {
+            StartupDiagnostics.Crash("Unobserved task exception", eventArgs.Exception);
+            eventArgs.SetObserved();
+        };
+
+        var safeMode = args.Any(x => x.Equals("--safe", StringComparison.OrdinalIgnoreCase));
+
+        try
+        {
+            StartupDiagnostics.Stage("application-configuration", "initializing");
+            ApplicationConfiguration.Initialize();
+            StartupDiagnostics.Stage("application-configuration");
+
+            var form = new MainForm(safeMode);
+            StartupDiagnostics.Stage("main-form-created", safeMode ? "safe mode" : "normal mode");
+            Application.Run(form);
+            StartupDiagnostics.Stage("message-loop-exit");
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Crash("Fatal startup failure", ex);
+            MessageBox.Show(
+                $"LaserBench could not complete startup.\n\n{ex.Message}\n\nA diagnostic log was written to:\n{StartupDiagnostics.CrashLogPath}\n\nYou can also try: LaserBench.App.exe --safe",
+                "LaserBench startup failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
     }
 
     private static int RunSelfTest(string reportPath)
