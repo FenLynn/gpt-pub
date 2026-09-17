@@ -6,6 +6,7 @@ namespace MediaIndex.App;
 
 internal sealed class AppStorage
 {
+    private const string RebindMarkerName = "storage-rebind.json";
     private string _lastLoadedLibraryPath = string.Empty;
 
     public AppStorage()
@@ -103,14 +104,27 @@ internal sealed class AppStorage
                 _lastLoadedLibraryPath,
                 full);
 
+        string? migratedFrom = null;
+
         if (!Directory.Exists(target))
         {
-            TryMigrateLegacyIndex(
+            migratedFrom = TryMigrateLegacyIndex(
                 binding,
                 target,
                 previousIsSameLibrary
                     ? _lastLoadedLibraryPath
                     : null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(migratedFrom)
+            && !PathEquals(
+                migratedFrom,
+                binding.LibraryPath))
+        {
+            WriteRebindMarker(
+                binding,
+                target,
+                migratedFrom);
         }
 
         bindings[key] = binding.IndexId;
@@ -148,7 +162,7 @@ internal sealed class AppStorage
             $"Validation-{DateTime.Now:yyyyMMdd-HHmmss}");
     }
 
-    private void TryMigrateLegacyIndex(
+    private string? TryMigrateLegacyIndex(
         StorageBinding binding,
         string target,
         string? previousLibraryPath)
@@ -165,13 +179,13 @@ internal sealed class AppStorage
             Directory.Move(
                 currentLegacy,
                 target);
-            return;
+            return binding.LibraryPath;
         }
 
         if (string.IsNullOrWhiteSpace(
                 previousLibraryPath))
         {
-            return;
+            return null;
         }
 
         var previousLegacy =
@@ -186,6 +200,74 @@ internal sealed class AppStorage
             Directory.Move(
                 previousLegacy,
                 target);
+            return NormalizePath(
+                previousLibraryPath);
+        }
+
+        return null;
+    }
+
+    private static void WriteRebindMarker(
+        StorageBinding binding,
+        string indexDirectory,
+        string previousLibraryPath)
+    {
+        var marker = Path.Combine(
+            indexDirectory,
+            RebindMarkerName);
+        var temp =
+            marker
+            + ".tmp-"
+            + Guid.NewGuid().ToString("N");
+
+        var payload = new
+        {
+            version = 1,
+            index_id = binding.IndexId,
+            storage_id = binding.StorageId,
+            library_relative = binding.LibraryRelativePath,
+            previous_library_root = NormalizePath(
+                previousLibraryPath),
+            library_root = binding.LibraryPath,
+            created_utc = DateTimeOffset.UtcNow
+                .ToString("O")
+        };
+
+        try
+        {
+            using (var stream = new FileStream(
+                       temp,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                JsonSerializer.Serialize(
+                    stream,
+                    payload,
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
+                stream.Flush(true);
+            }
+
+            File.Move(
+                temp,
+                marker,
+                true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temp))
+                {
+                    File.Delete(temp);
+                }
+            }
+            catch
+            {
+            }
         }
     }
 
