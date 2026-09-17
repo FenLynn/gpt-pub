@@ -2,33 +2,29 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前 `v0.1.1` 是启动稳定性修复版。它继续保持 Portable、Simulator 和高密度 Dashboard 的基础设计，并针对真实 Windows 11 首次启动加入窗口优先显示、分阶段启动日志、全局异常记录与安全模式。
+当前开发版本为 **v0.2.0 Dashboard Refactor 候选**。本轮不改设备抽象和 Portable 数据边界，集中把主页面从工程原型提升为可长期使用的实验工作台界面。
 
 ## 当前能力
 
-- Windows x64 Portable 软件，配置和数据跟随程序目录，不使用 AppData 作为产品状态根目录。
-- 轻量双层启动：原生 AOT `LaserBench.exe` 负责 .NET 8 Desktop Runtime 检查，`LaserBench.App.exe` 为 framework-dependent 主程序。
-- 缺少 .NET 8 Desktop Runtime 时，启动器提供 Microsoft 在线安装路径和离线安装说明。
-- `v0.1.1` 主窗口先显示，再初始化 Simulator、Dashboard、录像等工作区组件，避免组件初始化失败时静默无窗口退出。
-- 启动过程写入 `logs/startup.log`；未处理异常写入 `logs/crash.log`。
-- 支持 `LaserBench.App.exe --safe` 安全模式，安全模式跳过录像初始化但保留主窗口与 Simulator Dashboard。
-- 如果工作区初始化仍失败，主窗口保持可见并直接显示异常与日志路径，而不是静默退出。
-- 内置 Power、Spectrum、Beam、Scope 四类 Simulator，无真实硬件也可完整查看 Dashboard 和验证采集链。
-- Dashboard 使用紧凑单行顶栏、折叠图标导航、四个无卡片观测区。
-- Power 支持多 Trace、当前值、Channel 1 Max 与底部全局时间缩略条。
-- Spectrum 显示实时光谱、中心波长、3 dB linewidth、RMS linewidth 与功率摘要。
-- Beam 同屏显示光斑和 caustic，底部单行保留 Z、自动束腰、Attenuation 与 M²x / M²y / M̄²。
-- Scope 同屏显示最多两个通道的时域与 FFT。
-- 四个模块可双击进入独立页；从模块左上角图标拖出可形成浮动窗口，拖回主窗口时自动回到原槽位。
-- 单次 Test 可独立选择 Power / Spectrum / Beam / Scope。
-- Label 在点击 Test 时冻结到本轮采集上下文。
-- 截图保存到 `data/pic/`，录像保存到 `data/video/`，两者都不建立日期子目录。
-- 实验原始数据保存到 `data/exp/<日期或自定义文件夹>/`，该目录下一层直接是原始文件。
-- 所有保存遵守永不覆盖规则，重名自动追加 `_1`、`_2`。
-- 内置低码率 MJPEG AVI 应用窗口录像，不额外捆绑 FFmpeg。
-- Data 页支持当前实验文件夹切换和按 Label 扫描现有数据版本。
+- Windows x64 Portable 软件，配置和数据跟随程序目录，不把产品状态拆到 AppData。
+- `LaserBench.exe` 为 NativeAOT 轻量启动器，负责 .NET 8 Desktop Runtime x64 检测；`LaserBench.App.exe` 为 framework-dependent WinForms 主程序。
+- 启动过程写入 `logs/startup.log`，未处理异常写入 `logs/crash.log`，支持 `LaserBench.App.exe --safe`。
+- 内置 Power、Spectrum、Beam、Scope 四类 Simulator，无真实硬件也可完整验证 Dashboard、Test、保存、截图和录像链路。
+- Dashboard 使用原生 Windows 标题栏、单行极窄顶栏、窄折叠导航以及四象限高密度观测区。
+- 四个模块之间只使用细虚线分隔，不使用大卡片、阴影或宽边距；绘图区保持白底，应用壳体使用浅蓝灰背景。
+- 所有绘图内部网格为虚线，绘图区边界为实线；Legend 透明、无边框并放在图内。
+- Power 左侧为多 Trace 时间图和底部时间总览条，右侧独立显示当前值与少量统计槽；数学通道使用独立右轴，不与物理功率共用纵坐标尺度。
+- Spectrum 顶部单行显示中心波长、3 dB linewidth、RMS linewidth、功率与当前 OSA，曲线区域占主要空间。
+- Beam 左侧显示当前 Z 位置光斑，右侧显示完整 caustic；Z 条只浏览已采集的轴向光斑，不改变右侧 caustic。底部一行保留 Z、播放浏览、Attenuation、M²x、M²y、M̄²。
+- Scope Dashboard 只显示最多两个通道的时域和 FFT，详细通道纵轴设置进入独立页。
+- 四个模块支持双击进入独立页；从左上模块图标拖出可形成可调整大小的浮动窗口，拖回主窗口后自动嵌回原槽位。
+- 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
+- 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。
+- 实验数据写入 `data/exp/<日期或自定义实验文件夹>/`，该目录下一层直接是数据文件。
+- 所有保存执行 never-overwrite，重名自动追加 `_1`、`_2`。
+- Data 页支持当前实验文件夹切换和按 Label 扫描已有数据。
 
-## 目录规则
+## Portable 目录
 
 ```text
 LaserBench/
@@ -37,23 +33,21 @@ LaserBench/
 ├─ config/
 ├─ data/
 │  ├─ exp/
-│  │  └─ 2026-09-17/ 或用户自定义目录/
+│  │  └─ YYYY-MM-DD/ 或用户自定义目录/
 │  │     └─ HHmmss_<channel>_<label>.csv
 │  ├─ pic/
 │  │  └─ HHmmss_<page>_<label>.png
 │  └─ video/
 │     └─ HHmmss_screen_<label>.avi
 ├─ logs/
-│  ├─ startup.log
-│  └─ crash.log
 ├─ runtime/
 ├─ tools/
 └─ OFFLINE-DEPENDENCIES.txt
 ```
 
-`pic` 与 `video` 不按日期继续分层。只有 `exp` 在没有自定义实验文件夹时自动使用当日日期目录。
+只有 `data/exp/` 使用日期或用户自定义实验目录；`data/pic/` 与 `data/video/` 下直接保存文件。
 
-## 文件命名
+## 文件命名与安全保存
 
 默认：
 
@@ -61,36 +55,36 @@ LaserBench/
 HHmmss_<channel-or-device>_<label>.<ext>
 ```
 
-例如：
+公开示例：
 
 ```text
-221836_power1_13A.csv
-221836_osa1_13A.csv
-221836_beam_13A.csv
-221836_scope_time_13A.csv
+221836_power1_demo.csv
+221836_osa1_demo.csv
+221836_beam_demo.csv
+221836_scope_time_demo.csv
 ```
 
-设置 Alias 后，前台显示和新保存文件优先使用 Alias。文件名冲突时永远不覆盖：
+设置 Alias 后，前台显示和新文件名优先使用 Alias。目标文件存在时永远不覆盖，例如：
 
 ```text
-221836_power_out_13A.csv
-221836_power_out_13A_1.csv
-221836_power_out_13A_2.csv
+221836_power_out_demo.csv
+221836_power_out_demo_1.csv
+221836_power_out_demo_2.csv
 ```
 
 ## 技术路线
 
-当前基础 Runtime 故意保持轻量：
-
 ```text
 C# / .NET 8 / WinForms / Windows x64
 + 自绘图表与控件
++ NativeAOT 依赖启动器
++ Simulator / Device Abstraction
 + 无 WebView2
 + 无 Electron
 + 无第三方图表库
 ```
 
-主程序为 framework-dependent 单文件，避免把完整 .NET Runtime 重复塞进每个更新包。启动器使用 NativeAOT，因此在主 Runtime 缺失时仍能运行依赖检测。
+主程序为 framework-dependent 单文件，避免每个更新包重复携带完整 .NET Runtime。
 
 ## 分支
 
@@ -100,27 +94,29 @@ C# / .NET 8 / WinForms / Windows x64
 正式主线：main
 ```
 
-正式 Release 必须继续遵守仓库人工授权门。普通开发和测试只生成限期 Artifact。
+普通开发只生成限期 CI Artifact。正式标签和 GitHub Release 必须继续满足仓库人工授权门。
 
 ## 当前硬件边界
 
-`v0.1.1` 仍只启用 Simulator。真实仪器接入按独立模块逐个验证，不在基础包中预装未使用 SDK：
+v0.2.0 仍默认启用 Simulator。真实仪器按最小闭环逐个接入：
 
-- Ophir Juno / OphirLMMeasurement
-- Yokogawa AQ6370D
-- Ophir Spiricon BeamSquared / SP920
-- Tektronix MSO44
+1. Ophir Juno / OphirLMMeasurement
+2. Yokogawa AQ6370D
+3. Ophir Spiricon BeamSquared / SP920
+4. Tektronix MSO44
 
-每个真实驱动接入前先做硬件 Probe、依赖检测和真实 Windows 验收，UI 与数据格式继续复用同一设备抽象层。
+真实驱动只能接设备抽象层，不允许重写 Dashboard 或绕开统一安全保存层。
 
-## 构建
+## 构建与验证
 
-P107 Windows CI 会：
+P107 Windows CI 会执行：
 
-1. 做 P107 范围门禁。
-2. 使用 .NET 8 构建主程序和 NativeAOT 启动器。
-3. 执行无 UI self-test，核对 Portable 根目录、Simulator、采集、目录层级和永不覆盖规则。
-4. 生成 `LaserBench_v0.1.1_portable.zip`、manifest 与 SHA-256。
-5. 上传限期 GitHub Actions Artifact，不创建标签或正式 Release。
+1. P107 范围门禁。
+2. .NET 8 主程序构建与发布。
+3. NativeAOT 依赖启动器发布。
+4. 无 UI self-test，验证 Simulator、选择性采集、目录规则和 never-overwrite。
+5. 真实 GUI 启动 smoke，至少验证工作区能够进入 `workspace-ready`。
+6. Portable Runtime 边界和启动器检查。
+7. 生成候选 ZIP、manifest、SHA-256 并上传限期 Artifact。
 
-接续开发先读 `HANDOFF.md`。
+UI、DPI、交互密度和真实仪器仍以 Windows 11 实机验收为准。

@@ -21,10 +21,10 @@ internal sealed class AppConfig
     public bool CaptureSpectrum { get; set; } = true;
     public bool CaptureBeam { get; set; } = true;
     public bool CaptureScope { get; set; } = false;
-    public bool AutoScreenshot { get; set; } = false;
-    public bool SidebarExpanded { get; set; } = false;
-    public double BeamZ { get; set; } = 0.0;
-    public double BeamAttenuation { get; set; } = 0.0;
+    public bool AutoScreenshot { get; set; }
+    public bool SidebarExpanded { get; set; }
+    public double BeamZ { get; set; }
+    public double BeamAttenuation { get; set; }
     public string Power1Alias { get; set; } = "power1";
     public string Power2Alias { get; set; } = "power2";
     public string Math1Alias { get; set; } = "math1";
@@ -97,7 +97,13 @@ internal static class AppPaths
         }
         finally
         {
-            try { if (File.Exists(probe)) File.Delete(probe); } catch { }
+            try
+            {
+                if (File.Exists(probe)) File.Delete(probe);
+            }
+            catch
+            {
+            }
         }
     }
 }
@@ -117,8 +123,7 @@ internal static class AppConfigStore
                 return fresh;
             }
 
-            var config = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(AppPaths.ConfigFile), Options);
-            return config ?? new AppConfig();
+            return JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(AppPaths.ConfigFile), Options) ?? new AppConfig();
         }
         catch
         {
@@ -133,8 +138,7 @@ internal static class AppConfigStore
         File.WriteAllText(temp, JsonSerializer.Serialize(config, Options), new UTF8Encoding(false));
         if (File.Exists(AppPaths.ConfigFile))
         {
-            var backup = AppPaths.ConfigFile + ".bak";
-            File.Copy(AppPaths.ConfigFile, backup, true);
+            File.Copy(AppPaths.ConfigFile, AppPaths.ConfigFile + ".bak", true);
             File.Move(temp, AppPaths.ConfigFile, true);
         }
         else
@@ -157,8 +161,7 @@ internal static class SafeFile
             builder.Append(invalid.Contains(c) || char.IsControl(c) ? '_' : c);
 
         var safe = Spaces.Replace(builder.ToString(), "_").Trim('_', '.', ' ');
-        if (safe.Length > 64) safe = safe[..64];
-        return safe;
+        return safe.Length > 64 ? safe[..64] : safe;
     }
 
     public static string ComposeBaseName(DateTime timestamp, string source, string label)
@@ -247,49 +250,49 @@ internal sealed class SimulatorProvider : IInstrumentProvider
     public MeasurementSnapshot Snapshot(AppConfig config)
     {
         var t = Now;
-        var p1 = PowerValue(0, t);
-        var p2 = PowerValue(1, t);
-        var math = PowerValue(2, t);
         var power = new[]
         {
-            new NumericTrace(config.Power1Alias, "kW", p1, SampleMax(0, t, 120)),
-            new NumericTrace(config.Power2Alias, "kW", p2, SampleMax(1, t, 120)),
-            new NumericTrace(config.Math1Alias, "%", math, SampleMax(2, t, 120))
+            new NumericTrace(config.Power1Alias, "kW", PowerValue(0, t), SampleMax(0, t, 120)),
+            new NumericTrace(config.Power2Alias, "kW", PowerValue(1, t), SampleMax(1, t, 120)),
+            new NumericTrace(config.Math1Alias, "%", PowerValue(2, t), SampleMax(2, t, 120))
         };
 
-        var spectrum = Enumerable.Range(0, 520).Select(i =>
+        var center = 1080.22 + 0.025 * Math.Sin(t / 80.0);
+        var linewidth = 2.04 + 0.025 * Math.Sin(t / 52.0);
+        var sigma = linewidth / 2.35482;
+        var spectrum = Enumerable.Range(0, 560).Select(i =>
         {
-            var x = 1068.0 + i * (24.0 / 519.0);
-            var sigma = 2.03 / 2.35482;
-            var main = -4.2 * Math.Exp(-0.5 * Math.Pow((x - 1080.21) / sigma, 2));
-            var shoulder = -20.0 * Math.Exp(-0.5 * Math.Pow((x - 1083.5) / 1.6, 2));
-            var floor = -82.0 + 2.0 * Math.Sin(i * 0.31 + t * 0.2);
-            var y = Math.Max(floor, -4.0 + main + 0.18 * shoulder);
+            var x = 1068.0 + i * (24.0 / 559.0);
+            var main = 74.5 * Gaussian(x, center, sigma);
+            var shoulder = 10.5 * Gaussian(x, center + 3.8, 0.72);
+            var ripple = 0.65 * Math.Sin(i * 0.23 + t * 0.18) + 0.35 * Math.Sin(i * 0.071);
+            var y = Math.Min(-3.0, -79.0 + main + shoulder + ripple);
             return new SpectrumPoint(x, y);
         }).ToArray();
 
-        var beam = Enumerable.Range(0, 240).Select(i =>
+        // The caustic is fixed. BeamZ is a browser position in the UI, not a curve control.
+        var beam = Enumerable.Range(0, 260).Select(i =>
         {
-            var z = -24.0 + i * (48.0 / 239.0);
-            var x = 0.42 * Math.Sqrt(1.0 + Math.Pow((z - config.BeamZ) / 7.6, 2));
-            var y = 0.46 * Math.Sqrt(1.0 + Math.Pow((z - config.BeamZ - 0.8) / 8.3, 2));
-            return new BeamPoint(z, x, y);
+            var z = -24.0 + i * (48.0 / 259.0);
+            var wx = 0.30 * Math.Sqrt(1.0 + Math.Pow((z + 0.45) / 6.9, 2));
+            var wy = 0.34 * Math.Sqrt(1.0 + Math.Pow((z - 0.55) / 7.7, 2));
+            return new BeamPoint(z, wx, wy);
         }).ToArray();
 
-        var scopeTime = Enumerable.Range(0, 520).Select(i =>
+        var scopeTime = Enumerable.Range(0, 560).Select(i =>
         {
-            var ms = i * (5.0 / 519.0);
+            var ms = i * (5.0 / 559.0);
             var s = ms / 1000.0;
-            var ch1 = 0.76 * Math.Sin(2 * Math.PI * 1200 * s) + 0.12 * Math.Sin(2 * Math.PI * 2400 * s + 0.3);
-            var ch2 = 0.48 * Math.Sin(2 * Math.PI * 1200 * s + 0.9) + 0.08 * Math.Sin(2 * Math.PI * 3100 * s);
+            var ch1 = 0.73 * Math.Sin(2 * Math.PI * 1200 * s) + 0.10 * Math.Sin(2 * Math.PI * 2400 * s + 0.32);
+            var ch2 = 0.46 * Math.Sin(2 * Math.PI * 1200 * s + 0.82) + 0.075 * Math.Sin(2 * Math.PI * 3100 * s);
             return new ScopePoint(ms, ch1, ch2);
         }).ToArray();
 
-        var scopeFft = Enumerable.Range(0, 420).Select(i =>
+        var scopeFft = Enumerable.Range(0, 460).Select(i =>
         {
-            var khz = i * (5.0 / 419.0);
-            var ch1 = 0.95 * Gaussian(khz, 1.20, 0.09) + 0.16 * Gaussian(khz, 2.40, 0.14) + 0.015;
-            var ch2 = 0.70 * Gaussian(khz, 1.20, 0.11) + 0.12 * Gaussian(khz, 3.10, 0.18) + 0.012;
+            var khz = i * (5.0 / 459.0);
+            var ch1 = 0.95 * Gaussian(khz, 1.20, 0.085) + 0.15 * Gaussian(khz, 2.40, 0.14) + 0.010;
+            var ch2 = 0.69 * Gaussian(khz, 1.20, 0.105) + 0.12 * Gaussian(khz, 3.10, 0.18) + 0.008;
             return new ScopePoint(khz, ch1, ch2);
         }).ToArray();
 
@@ -301,12 +304,12 @@ internal sealed class SimulatorProvider : IInstrumentProvider
             Beam = beam,
             ScopeTime = scopeTime,
             ScopeFft = scopeFft,
-            CenterWavelength = 1080.21 + 0.03 * Math.Sin(t / 80.0),
-            Linewidth3Db = 2.03 + 0.02 * Math.Sin(t / 50.0),
-            LinewidthRms = 2.18 + 0.02 * Math.Cos(t / 70.0),
-            SpectrumPower = -3.2 + 0.1 * Math.Sin(t / 30.0),
-            M2X = 1.08 + 0.01 * Math.Sin(t / 35.0),
-            M2Y = 1.12 + 0.01 * Math.Cos(t / 42.0)
+            CenterWavelength = center,
+            Linewidth3Db = linewidth,
+            LinewidthRms = 2.20 + 0.02 * Math.Cos(t / 68.0),
+            SpectrumPower = -3.1 + 0.08 * Math.Sin(t / 33.0),
+            M2X = 1.08 + 0.012 * Math.Sin(t / 35.0),
+            M2Y = 1.12 + 0.011 * Math.Cos(t / 42.0)
         };
     }
 

@@ -14,10 +14,11 @@ internal sealed class DashboardControl : UserControl
     {
         _provider = provider;
         _config = config;
-        BackColor = UiTheme.PlotBack;
+        BackColor = UiTheme.Back;
         Margin = Padding.Empty;
         Padding = Padding.Empty;
         DoubleBuffered = true;
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
 
         foreach (var kind in Enum.GetValues<ModuleKind>())
         {
@@ -53,16 +54,24 @@ internal sealed class DashboardControl : UserControl
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        using var dashed = new Pen(UiTheme.Divider, 1f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+        e.Graphics.Clear(UiTheme.Back);
         var midX = Width / 2;
         var midY = Height / 2;
-        e.Graphics.DrawLine(dashed, midX, 3, midX, Height - 3);
-        e.Graphics.DrawLine(dashed, 3, midY, Width - 3, midY);
+        using var separator = new Pen(UiTheme.Divider, 1f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+        e.Graphics.DrawLine(separator, midX, 4, midX, Height - 4);
+        e.Graphics.DrawLine(separator, 4, midY, Width - 4, midY);
 
         foreach (var kind in _floating.Keys.ToArray())
         {
             var rect = GetSlot(kind);
-            GlyphPainter.Draw(e.Graphics, GlyphPainter.ForModule(kind), new Rectangle(rect.Left + rect.Width / 2 - 12, rect.Top + rect.Height / 2 - 12, 24, 24), Color.FromArgb(80, UiTheme.Muted), 1.5f);
+            using var fill = new SolidBrush(Color.FromArgb(70, UiTheme.Surface));
+            e.Graphics.FillRectangle(fill, rect);
+            GlyphPainter.Draw(
+                e.Graphics,
+                GlyphPainter.ForModule(kind),
+                new Rectangle(rect.Left + rect.Width / 2 - 12, rect.Top + rect.Height / 2 - 12, 24, 24),
+                Color.FromArgb(82, UiTheme.Muted),
+                1.45f);
         }
     }
 
@@ -82,9 +91,9 @@ internal sealed class DashboardControl : UserControl
         var midY = Height / 2;
         return kind switch
         {
-            ModuleKind.Power => Rectangle.FromLTRB(0, 0, Math.Max(0, midX), Math.Max(0, midY)),
-            ModuleKind.Spectrum => Rectangle.FromLTRB(Math.Min(Width, midX + 1), 0, Width, Math.Max(0, midY)),
-            ModuleKind.Beam => Rectangle.FromLTRB(0, Math.Min(Height, midY + 1), Math.Max(0, midX), Height),
+            ModuleKind.Power => Rectangle.FromLTRB(0, 0, Math.Max(0, midX - 1), Math.Max(0, midY - 1)),
+            ModuleKind.Spectrum => Rectangle.FromLTRB(Math.Min(Width, midX + 1), 0, Width, Math.Max(0, midY - 1)),
+            ModuleKind.Beam => Rectangle.FromLTRB(0, Math.Min(Height, midY + 1), Math.Max(0, midX - 1), Height),
             _ => Rectangle.FromLTRB(Math.Min(Width, midX + 1), Math.Min(Height, midY + 1), Width, Height)
         };
     }
@@ -117,6 +126,7 @@ internal sealed class DashboardControl : UserControl
     {
         if (!_floating.Remove(kind)) return;
         if (view.Parent == form) form.Controls.Remove(view);
+        view.Dock = DockStyle.None;
         Controls.Add(view);
         LayoutEmbeddedViews();
         if (closeForm && !form.IsDisposed) form.CloseAfterAttach();
@@ -130,7 +140,10 @@ internal sealed class DashboardControl : UserControl
             _refreshTimer.Stop();
             _refreshTimer.Dispose();
             foreach (var form in _floating.Values.ToArray())
-                try { form.Close(); } catch { }
+            {
+                try { form.Close(); }
+                catch { }
+            }
         }
         base.Dispose(disposing);
     }
@@ -147,7 +160,7 @@ internal sealed class FloatingModuleForm : Form
     {
         _mainForm = mainForm;
         Text = $"LaserBench · {ModuleName(kind)}";
-        BackColor = UiTheme.PlotBack;
+        BackColor = UiTheme.Back;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = true;
         Controls.Add(view);
@@ -171,11 +184,7 @@ internal sealed class FloatingModuleForm : Form
     protected override void WndProc(ref Message m)
     {
         base.WndProc(ref m);
-        if (m.Msg == WM_EXITSIZEMOVE && !_closeAfterAttach && _mainForm is not null && _mainForm.Visible)
-        {
-            var cursor = Cursor.Position;
-            if (_mainForm.Bounds.Contains(cursor))
-                AttachRequested?.Invoke();
-        }
+        if (m.Msg != WM_EXITSIZEMOVE || _closeAfterAttach || _mainForm is null || !_mainForm.Visible) return;
+        if (_mainForm.Bounds.Contains(Cursor.Position)) AttachRequested?.Invoke();
     }
 }

@@ -4,27 +4,35 @@ namespace LaserBench;
 
 internal static class UiTheme
 {
-    // Quiet light instrument palette. Only plotting areas are pure white.
-    public static readonly Color Back = Color.FromArgb(243, 247, 250);
-    public static readonly Color Surface = Color.FromArgb(248, 250, 252);
+    // LaserBench v0.2 light instrument theme: quiet shell, white plots, restrained status color.
+    public static readonly Color Back = Color.FromArgb(242, 247, 251);
+    public static readonly Color Surface = Color.FromArgb(248, 251, 253);
+    public static readonly Color ModuleBack = Color.FromArgb(250, 252, 254);
     public static readonly Color Toolbar = Color.FromArgb(247, 250, 252);
-    public static readonly Color Sidebar = Color.FromArgb(237, 243, 248);
+    public static readonly Color Sidebar = Color.FromArgb(236, 243, 248);
     public static readonly Color PlotBack = Color.White;
-    public static readonly Color Ink = Color.FromArgb(38, 55, 70);
-    public static readonly Color Muted = Color.FromArgb(112, 128, 144);
-    public static readonly Color Divider = Color.FromArgb(202, 216, 228);
-    public static readonly Color Border = Color.FromArgb(170, 188, 204);
-    public static readonly Color Grid = Color.FromArgb(226, 235, 243);
-    public static readonly Color Accent = Color.FromArgb(39, 132, 199);
-    public static readonly Color Accent2 = Color.FromArgb(74, 166, 205);
-    public static readonly Color Green = Color.FromArgb(47, 163, 106);
-    public static readonly Color Red = Color.FromArgb(210, 67, 67);
-    public static readonly Color GrayOff = Color.FromArgb(156, 167, 178);
-    public static readonly Color Orange = Color.FromArgb(224, 139, 58);
-    public static readonly Font Small = new("Segoe UI", 8.25f, FontStyle.Regular, GraphicsUnit.Point);
+    public static readonly Color Ink = Color.FromArgb(34, 50, 64);
+    public static readonly Color Muted = Color.FromArgb(104, 122, 139);
+    public static readonly Color Muted2 = Color.FromArgb(137, 153, 168);
+    public static readonly Color Divider = Color.FromArgb(198, 212, 224);
+    public static readonly Color Border = Color.FromArgb(158, 178, 195);
+    public static readonly Color Grid = Color.FromArgb(224, 233, 241);
+    public static readonly Color Axis = Color.FromArgb(133, 151, 168);
+    public static readonly Color Accent = Color.FromArgb(37, 128, 194);
+    public static readonly Color Accent2 = Color.FromArgb(75, 165, 205);
+    public static readonly Color Green = Color.FromArgb(45, 160, 104);
+    public static readonly Color Red = Color.FromArgb(207, 66, 66);
+    public static readonly Color GrayOff = Color.FromArgb(155, 167, 178);
+    public static readonly Color Orange = Color.FromArgb(223, 135, 54);
+
+    public static readonly Font Micro = new("Segoe UI", 7.0f, FontStyle.Regular, GraphicsUnit.Point);
     public static readonly Font Tiny = new("Segoe UI", 7.5f, FontStyle.Regular, GraphicsUnit.Point);
+    public static readonly Font Small = new("Segoe UI", 8.25f, FontStyle.Regular, GraphicsUnit.Point);
+    public static readonly Font SmallBold = new("Segoe UI Semibold", 8.25f, FontStyle.Bold, GraphicsUnit.Point);
     public static readonly Font Value = new("Segoe UI", 9.25f, FontStyle.Regular, GraphicsUnit.Point);
-    public static readonly Font ValueBold = new("Segoe UI Semibold", 9.25f, FontStyle.Bold, GraphicsUnit.Point);
+    public static readonly Font ValueBold = new("Segoe UI Semibold", 9.5f, FontStyle.Bold, GraphicsUnit.Point);
+    public static readonly Font Metric = new("Segoe UI Semibold", 12.0f, FontStyle.Bold, GraphicsUnit.Point);
+    public static readonly Font MetricLarge = new("Segoe UI Semibold", 14.5f, FontStyle.Bold, GraphicsUnit.Point);
 }
 
 internal enum GlyphKind
@@ -39,6 +47,7 @@ internal enum GlyphKind
     Camera,
     Record,
     Capture,
+    Stop,
     Check,
     Clear,
     Expand
@@ -49,7 +58,12 @@ internal static class GlyphPainter
     public static void Draw(Graphics g, GlyphKind glyph, Rectangle bounds, Color color, float width = 1.6f)
     {
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var pen = new Pen(color, width) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+        using var pen = new Pen(color, width)
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round,
+            LineJoin = LineJoin.Round
+        };
         var r = Rectangle.Inflate(bounds, -3, -3);
         var cx = r.Left + r.Width / 2f;
         var cy = r.Top + r.Height / 2f;
@@ -66,17 +80,19 @@ internal static class GlyphPainter
             case GlyphKind.Power:
                 g.DrawLines(pen, new[]
                 {
-                    new PointF(r.Left, cy + 2), new PointF(r.Left + r.Width * .22f, cy + 2),
+                    new PointF(r.Left, cy + 2),
+                    new PointF(r.Left + r.Width * .22f, cy + 2),
                     new PointF(r.Left + r.Width * .38f, r.Top + r.Height * .22f),
                     new PointF(r.Left + r.Width * .53f, r.Bottom - r.Height * .18f),
-                    new PointF(r.Left + r.Width * .70f, cy - 1), new PointF(r.Right, cy - 1)
+                    new PointF(r.Left + r.Width * .70f, cy - 1),
+                    new PointF(r.Right, cy - 1)
                 });
                 break;
             case GlyphKind.Spectrum:
                 using (var path = new GraphicsPath())
                 {
-                    path.AddBezier(r.Left, r.Bottom - 2, r.Left + r.Width * .25f, r.Bottom - 2, r.Left + r.Width * .33f, r.Top + 2, cx, r.Top + 1);
-                    path.AddBezier(cx, r.Top + 1, r.Left + r.Width * .67f, r.Top + 2, r.Left + r.Width * .75f, r.Bottom - 2, r.Right, r.Bottom - 2);
+                    path.AddBezier(r.Left, r.Bottom - 2, r.Left + r.Width * .24f, r.Bottom - 2, r.Left + r.Width * .35f, r.Top + 2, cx, r.Top + 1);
+                    path.AddBezier(cx, r.Top + 1, r.Left + r.Width * .65f, r.Top + 2, r.Left + r.Width * .76f, r.Bottom - 2, r.Right, r.Bottom - 2);
                     g.DrawPath(pen, path);
                 }
                 break;
@@ -113,17 +129,32 @@ internal static class GlyphPainter
                 g.DrawEllipse(pen, cx - 3, cy - 1, 6, 6);
                 break;
             case GlyphKind.Record:
-                using (var brush = new SolidBrush(color)) g.FillEllipse(brush, cx - 4, cy - 4, 8, 8);
+                using (var brush = new SolidBrush(color))
+                    g.FillEllipse(brush, cx - 4, cy - 4, 8, 8);
                 break;
             case GlyphKind.Capture:
                 using (var brush = new SolidBrush(color))
                 {
-                    var pts = new[] { new PointF(r.Left + 3, r.Top + 2), new PointF(r.Right - 1, cy), new PointF(r.Left + 3, r.Bottom - 2) };
+                    var pts = new[]
+                    {
+                        new PointF(r.Left + 3, r.Top + 2),
+                        new PointF(r.Right - 1, cy),
+                        new PointF(r.Left + 3, r.Bottom - 2)
+                    };
                     g.FillPolygon(brush, pts);
                 }
                 break;
+            case GlyphKind.Stop:
+                using (var brush = new SolidBrush(color))
+                    g.FillRectangle(brush, cx - 4.5f, cy - 4.5f, 9, 9);
+                break;
             case GlyphKind.Check:
-                g.DrawLines(pen, new[] { new PointF(r.Left + 2, cy), new PointF(cx - 1, r.Bottom - 3), new PointF(r.Right - 2, r.Top + 3) });
+                g.DrawLines(pen, new[]
+                {
+                    new PointF(r.Left + 2, cy),
+                    new PointF(cx - 1, r.Bottom - 3),
+                    new PointF(r.Right - 2, r.Top + 3)
+                });
                 break;
             case GlyphKind.Clear:
                 g.DrawLine(pen, r.Left + 2, r.Top + 2, r.Right - 2, r.Bottom - 2);
@@ -172,10 +203,10 @@ internal sealed class GlyphButton : Control
         var color = Danger ? UiTheme.Red : Active ? UiTheme.Green : UiTheme.Muted;
         if (_hover || Filled)
         {
-            using var back = new SolidBrush(Color.FromArgb(_hover ? 26 : 18, color));
+            using var back = new SolidBrush(Color.FromArgb(_hover ? 25 : 17, color));
             e.Graphics.FillRoundedRectangle(back, ClientRectangle.InflateCopy(-2, -2), 4);
         }
-        GlyphPainter.Draw(e.Graphics, Glyph, ClientRectangle, color, 1.6f);
+        GlyphPainter.Draw(e.Graphics, Glyph, ClientRectangle, color, 1.55f);
     }
 
     protected override void OnClick(EventArgs e)
@@ -189,7 +220,7 @@ internal sealed class CompactSlider : Control
 {
     private bool _dragging;
     private double _value;
-    public double Minimum { get; set; } = 0;
+    public double Minimum { get; set; }
     public double Maximum { get; set; } = 100;
     public event EventHandler? ValueChanged;
 
@@ -221,16 +252,20 @@ internal sealed class CompactSlider : Control
         e.Graphics.DrawLine(track, 5, y, Width - 5, y);
         var t = Maximum <= Minimum ? 0 : (Value - Minimum) / (Maximum - Minimum);
         var x = 5f + (float)t * Math.Max(1, Width - 10);
-        using var fill = new Pen(UiTheme.Accent, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var fill = new Pen(UiTheme.Accent, 2.1f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         e.Graphics.DrawLine(fill, 5, y, x, y);
         using var thumb = new SolidBrush(UiTheme.Accent);
-        e.Graphics.FillEllipse(thumb, x - 4, y - 4, 8, 8);
+        e.Graphics.FillEllipse(thumb, x - 3.5f, y - 3.5f, 7, 7);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
-        if (e.Button == MouseButtons.Left) { _dragging = true; SetFromX(e.X); }
+        if (e.Button == MouseButtons.Left)
+        {
+            _dragging = true;
+            SetFromX(e.X);
+        }
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -263,8 +298,9 @@ internal static class GraphicsExtensions
 
     public static void FillRoundedRectangle(this Graphics graphics, Brush brush, Rectangle rectangle, int radius)
     {
+        if (rectangle.Width <= 0 || rectangle.Height <= 0) return;
         using var path = new GraphicsPath();
-        var d = radius * 2;
+        var d = Math.Min(radius * 2, Math.Min(rectangle.Width, rectangle.Height));
         path.AddArc(rectangle.Left, rectangle.Top, d, d, 180, 90);
         path.AddArc(rectangle.Right - d, rectangle.Top, d, d, 270, 90);
         path.AddArc(rectangle.Right - d, rectangle.Bottom - d, d, d, 0, 90);
