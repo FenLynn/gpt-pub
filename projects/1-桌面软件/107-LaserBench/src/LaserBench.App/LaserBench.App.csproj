@@ -12,8 +12,23 @@
     <DebugType>embedded</DebugType>
     <ApplicationIcon>LaserBench.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+  </ItemGroup>
+  <Target Name="BuildLaserBenchWebUi" BeforeTargets="PrepareResources" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)\WebUi" Command="npm install --no-audit --no-fund" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)\WebUi" Command="npm run build" />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\WebUi\dist\index.html')" Text="LaserBench WebUi build did not produce dist/index.html." />
+    <ItemGroup>
+      <EmbeddedResource Include="WebUi\dist\index.html" LogicalName="LaserBench.WebUi.index.html" />
+      <EmbeddedResource Include="WebUi\dist\assets\*" LogicalName="LaserBench.WebUi.assets.%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
   <Target Name="GenerateLaserBenchIcon" BeforeTargets="PrepareForBuild">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Build\GenerateAppIcon.ps1&quot; -OutputPath &quot;$(MSBuildProjectDirectory)\LaserBench.ico&quot;" />
+  </Target>
+  <Target Name="CleanWebView2ReferenceDocs" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)Microsoft.Web.WebView2.Core.xml;$(PublishDir)Microsoft.Web.WebView2.WinForms.xml;$(PublishDir)Microsoft.Web.WebView2.Wpf.xml" />
   </Target>
   <Target Name="CleanGeneratedLaserBenchIcon" AfterTargets="Build;Publish">
     <Delete Files="$(MSBuildProjectDirectory)\LaserBench.ico" />

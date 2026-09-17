@@ -1,37 +1,34 @@
-using System.Drawing.Imaging;
-
 namespace LaserBench;
 
 internal sealed class MainForm : Form
 {
     private readonly bool _safeMode;
-    private readonly Panel _contentHost = new() { Dock = DockStyle.Fill, BackColor = UiTheme.PlotBack };
-    private readonly Panel _bootPanel = new() { Dock = DockStyle.Fill, BackColor = UiTheme.Back };
+    private readonly Panel _bootPanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(239, 246, 251) };
     private readonly Label _bootLabel = new()
     {
         Dock = DockStyle.Fill,
         TextAlign = ContentAlignment.MiddleCenter,
         Font = new Font("Segoe UI", 11f, FontStyle.Regular),
-        ForeColor = UiTheme.Ink,
+        ForeColor = Color.FromArgb(35, 61, 83),
         Text = "LaserBench\r\n正在初始化工作区..."
     };
 
     private AppConfig? _config;
     private IInstrumentProvider? _provider;
     private CaptureService? _captureService;
-    private TopBarControl? _topBar;
-    private SidebarControl? _sidebar;
-    private DashboardControl? _dashboard;
     private ScreenRecorder? _recorder;
+    private WebUiHost? _webUi;
     private CancellationTokenSource? _captureCancellation;
-    private string _currentPage = "dashboard";
     private bool _workspaceReady;
+
+    internal bool IsCapturing => _captureCancellation is not null;
+    internal bool IsRecording => _recorder?.IsRecording == true;
 
     public MainForm(bool safeMode = false)
     {
         _safeMode = safeMode;
         Text = safeMode ? "LaserBench [安全模式]" : "LaserBench";
-        BackColor = UiTheme.Back;
+        BackColor = Color.FromArgb(239, 246, 251);
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1100, 700);
         Size = new Size(1500, 900);
@@ -50,15 +47,16 @@ internal sealed class MainForm : Form
 
         FormClosing += (_, _) =>
         {
+            try { _captureCancellation?.Cancel(); } catch { }
             try { if (_recorder?.IsRecording == true) _recorder.Stop(); } catch (Exception ex) { StartupDiagnostics.Crash("recorder shutdown", ex); }
             try { if (_config is not null) AppConfigStore.Save(_config); } catch (Exception ex) { StartupDiagnostics.Crash("config save on close", ex); }
+            try { _webUi?.Dispose(); } catch (Exception ex) { StartupDiagnostics.Crash("webui shutdown", ex); }
         };
     }
 
     private void InitializeWorkspace()
     {
-        if (_workspaceReady) return;
-
+        if (_workspaceReady || _webUi is not null) return;
         try
         {
             SetBootText("LaserBench\r\n正在读取配置...");
@@ -72,38 +70,6 @@ internal sealed class MainForm : Form
             _captureService = new CaptureService(_provider);
             var probe = _provider.Snapshot(_config);
             StartupDiagnostics.Stage("simulator", $"power={probe.Power.Count}; spectrum={probe.Spectrum.Count}; beam={probe.Beam.Count}");
-
-            SetBootText("LaserBench\r\n正在构建总览界面...");
-            StartupDiagnostics.Stage("topbar", "begin");
-            _topBar = new TopBarControl(_config, _provider) { Dock = DockStyle.Top, Height = 34 };
-            StartupDiagnostics.Stage("topbar");
-
-            StartupDiagnostics.Stage("sidebar", "begin");
-            _sidebar = new SidebarControl(_config) { Dock = DockStyle.Left };
-            StartupDiagnostics.Stage("sidebar");
-
-            StartupDiagnostics.Stage("dashboard", "begin");
-            _dashboard = new DashboardControl(_provider, _config) { Dock = DockStyle.Fill };
-            StartupDiagnostics.Stage("dashboard");
-
-            var body = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.PlotBack };
-            body.Controls.Add(_contentHost);
-            body.Controls.Add(_sidebar);
-
-            SuspendLayout();
-            Controls.Clear();
-            Controls.Add(body);
-            Controls.Add(_topBar);
-            ResumeLayout(true);
-
-            _dashboard.OpenModuleRequested += OpenModule;
-            _topBar.CaptureClicked += async (_, _) => await ToggleCaptureAsync();
-            _topBar.ScreenshotClicked += (_, _) => SaveScreenshot();
-            _topBar.RecordClicked += (_, _) => ToggleRecording();
-            _topBar.LabelConfirmed += _ => AppConfigStore.Save(_config);
-            _topBar.CaptureSelectionChanged += (_, _) => AppConfigStore.Save(_config);
-            _sidebar.NavigateRequested += Navigate;
-            _sidebar.ExpandedChanged += _ => PerformLayout();
 
             if (!_safeMode)
             {
@@ -119,14 +85,18 @@ internal sealed class MainForm : Form
                     _recorder = null;
                 }
             }
-            else
-            {
-                StartupDiagnostics.Stage("recorder", "skipped in safe mode");
-            }
+            else StartupDiagnostics.Stage("recorder", "skipped in safe mode");
 
-            ShowDashboard();
-            _workspaceReady = true;
-            StartupDiagnostics.Stage("workspace-ready", _safeMode ? "safe mode" : "normal mode");
+            SetBootText("LaserBench\r\n正在加载 WebView2 + Vue 界面...");
+            StartupDiagnostics.Stage("webui", "begin");
+            Controls.Clear();
+            _webUi = WebUiHost.Attach(this, _config, _provider);
+            _webUi.Ready += () =>
+            {
+                _workspaceReady = true;
+                StartupDiagnostics.Stage("workspace-ready", _safeMode ? "safe mode; webui" : "normal mode; webui");
+            };
+            _webUi.Failed += ex => StartupDiagnostics.Crash("webui host failed", ex);
         }
         catch (Exception ex)
         {
@@ -143,14 +113,14 @@ internal sealed class MainForm : Form
 
     private void ShowStartupFailure(Exception exception)
     {
-        var panel = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Back, Padding = new Padding(36) };
+        var panel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(243, 247, 250), Padding = new Padding(36) };
         var title = new Label
         {
             AutoSize = false,
             Dock = DockStyle.Top,
             Height = 44,
             Font = new Font("Segoe UI Semibold", 15f, FontStyle.Bold),
-            ForeColor = UiTheme.Ink,
+            ForeColor = Color.FromArgb(38, 55, 70),
             Text = "LaserBench 已启动，但工作区初始化失败。"
         };
         var details = new TextBox
@@ -165,7 +135,6 @@ internal sealed class MainForm : Form
         };
         panel.Controls.Add(details);
         panel.Controls.Add(title);
-
         SuspendLayout();
         Controls.Clear();
         Controls.Add(panel);
@@ -173,101 +142,75 @@ internal sealed class MainForm : Form
         Text = "LaserBench [启动诊断]";
     }
 
-    private void Navigate(string key)
+    internal async Task<object> ToggleCaptureFromWebAsync()
     {
-        if (!_workspaceReady) return;
-        switch (key)
-        {
-            case "dashboard": ShowDashboard(); break;
-            case "power": OpenModule(ModuleKind.Power); break;
-            case "spectrum": OpenModule(ModuleKind.Spectrum); break;
-            case "beam": OpenModule(ModuleKind.Beam); break;
-            case "scope": OpenModule(ModuleKind.Scope); break;
-            case "data": ShowData(); break;
-            case "settings": ShowSettings(); break;
-        }
-    }
-
-    private void ShowDashboard()
-    {
-        if (_dashboard is null || _sidebar is null) return;
-        _currentPage = "dashboard";
-        _sidebar.SetActive("dashboard");
-        ShowContent(_dashboard);
-    }
-
-    private void OpenModule(ModuleKind kind)
-    {
-        if (_dashboard is null || _sidebar is null || _config is null) return;
-        _currentPage = kind.ToString().ToLowerInvariant();
-        _sidebar.SetActive(_currentPage);
-        var page = new ModulePageControl(kind, _dashboard, _config) { Dock = DockStyle.Fill };
-        ShowContent(page, disposePrevious: true);
-    }
-
-    private void ShowData()
-    {
-        if (_sidebar is null || _config is null) return;
-        _currentPage = "data";
-        _sidebar.SetActive("data");
-        ShowContent(new DataPageControl(_config) { Dock = DockStyle.Fill }, disposePrevious: true);
-    }
-
-    private void ShowSettings()
-    {
-        if (_sidebar is null || _config is null) return;
-        _currentPage = "settings";
-        _sidebar.SetActive("settings");
-        var page = new SettingsPageControl(_config) { Dock = DockStyle.Fill };
-        page.AliasesChanged += (_, _) =>
-        {
-            _topBar?.RefreshAliases();
-            _dashboard?.Invalidate(true);
-        };
-        ShowContent(page, disposePrevious: true);
-    }
-
-    private void ShowContent(Control control, bool disposePrevious = false)
-    {
-        var previous = _contentHost.Controls.Cast<Control>().FirstOrDefault();
-        if (ReferenceEquals(previous, control)) return;
-        _contentHost.Controls.Clear();
-        if (disposePrevious && previous is not null && !ReferenceEquals(previous, _dashboard)) previous.Dispose();
-        _contentHost.Controls.Add(control);
-        control.Dock = DockStyle.Fill;
-    }
-
-    private async Task ToggleCaptureAsync()
-    {
-        if (_captureService is null || _config is null || _topBar is null) return;
+        if (_captureService is null || _config is null)
+            throw new InvalidOperationException("采集服务尚未就绪。");
 
         if (_captureCancellation is not null)
         {
             _captureCancellation.Cancel();
-            return;
+            _webUi?.PushNow();
+            return new { message = "正在停止采集。" };
         }
 
         var frozen = CloneConfig(_config);
         _captureCancellation = new CancellationTokenSource();
-        _topBar.SetCapturing(true);
+        _webUi?.PushNow();
         try
         {
             var result = await _captureService.CaptureAsync(frozen, _captureCancellation.Token);
-            if (!result.Cancelled && frozen.AutoScreenshot) SaveScreenshot(result.RequestedAt, frozen.ConfirmedLabel);
+            if (!result.Cancelled && frozen.AutoScreenshot)
+                await SaveScreenshotFromWebAsync(result.RequestedAt, frozen.ConfirmedLabel);
             if (result.Errors.Count > 0)
-                MessageBox.Show(this, string.Join(Environment.NewLine, result.Errors), "LaserBench 采集", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                throw new InvalidOperationException(string.Join(Environment.NewLine, result.Errors));
+            return new { message = result.Cancelled ? "采集已停止。" : $"采集完成，共保存 {result.Files.Count} 个文件。" };
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            StartupDiagnostics.Crash("capture", ex);
-            MessageBox.Show(this, ex.Message, "LaserBench 采集", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return new { message = "采集已停止。" };
         }
         finally
         {
             _captureCancellation.Dispose();
             _captureCancellation = null;
-            _topBar.SetCapturing(false);
+            _webUi?.PushNow();
         }
+    }
+
+    internal Task<object> SaveScreenshotFromWebAsync()
+        => SaveScreenshotFromWebAsync(DateTime.Now, _config?.ConfirmedLabel ?? string.Empty);
+
+    private async Task<object> SaveScreenshotFromWebAsync(DateTime timestamp, string label)
+    {
+        if (_webUi is null) throw new InvalidOperationException("Web UI 尚未就绪。");
+        Directory.CreateDirectory(AppPaths.PicDir);
+        var partial = Path.Combine(AppPaths.PicDir, $".{Guid.NewGuid():N}.png.partial");
+        try
+        {
+            await using (var stream = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None))
+                await _webUi.CapturePreviewAsync(stream);
+            var baseName = SafeFile.ComposeBaseName(timestamp, "dashboard", label);
+            var file = SafeFile.MovePartialToUnique(partial, AppPaths.PicDir, baseName, ".png");
+            return new { message = "截图已保存。", file = Path.GetFileName(file) };
+        }
+        catch
+        {
+            try { if (File.Exists(partial)) File.Delete(partial); } catch { }
+            throw;
+        }
+    }
+
+    internal object ToggleRecordingFromWeb()
+    {
+        if (_config is null) throw new InvalidOperationException("配置尚未就绪。");
+        if (_safeMode) throw new InvalidOperationException("安全模式下已禁用窗口录像。");
+        if (_recorder is null) throw new InvalidOperationException("窗口录像当前不可用，请查看启动日志。");
+
+        if (_recorder.IsRecording) _recorder.Stop();
+        else _recorder.Start(_config.ConfirmedLabel);
+        _webUi?.PushNow();
+        return new { recording = _recorder.IsRecording };
     }
 
     private static AppConfig CloneConfig(AppConfig source) => new()
@@ -290,61 +233,4 @@ internal sealed class MainForm : Form
         Scope1Alias = source.Scope1Alias,
         Scope2Alias = source.Scope2Alias
     };
-
-    private void SaveScreenshot(DateTime? timestamp = null, string? label = null)
-    {
-        if (_config is null) return;
-        try
-        {
-            var time = timestamp ?? DateTime.Now;
-            var safeLabel = label ?? _config.ConfirmedLabel;
-            using var bitmap = new Bitmap(Math.Max(1, ClientSize.Width), Math.Max(1, ClientSize.Height), PixelFormat.Format24bppRgb);
-            DrawToBitmap(bitmap, new Rectangle(Point.Empty, ClientSize));
-            var partial = Path.Combine(AppPaths.PicDir, $".{Guid.NewGuid():N}.png.partial");
-            bitmap.Save(partial, ImageFormat.Png);
-            var source = _currentPage == "dashboard" ? "dashboard" : _currentPage;
-            var baseName = SafeFile.ComposeBaseName(time, source, safeLabel);
-            SafeFile.MovePartialToUnique(partial, AppPaths.PicDir, baseName, ".png");
-        }
-        catch (Exception ex)
-        {
-            StartupDiagnostics.Crash("screenshot", ex);
-            MessageBox.Show(this, ex.Message, "截图失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
-    }
-
-    private void ToggleRecording()
-    {
-        if (_topBar is null || _config is null) return;
-        if (_safeMode)
-        {
-            MessageBox.Show(this, "安全模式下已禁用窗口录像。", "LaserBench 安全模式", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-        if (_recorder is null)
-        {
-            MessageBox.Show(this, $"窗口录像当前不可用。如初始化失败，请查看：{StartupDiagnostics.CrashLogPath}", "LaserBench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        try
-        {
-            if (_recorder.IsRecording)
-            {
-                _recorder.Stop();
-                _topBar.SetRecording(false);
-            }
-            else
-            {
-                _recorder.Start(_config.ConfirmedLabel);
-                _topBar.SetRecording(true);
-            }
-        }
-        catch (Exception ex)
-        {
-            StartupDiagnostics.Crash("recording", ex);
-            _topBar.SetRecording(false);
-            MessageBox.Show(this, ex.Message, "录像失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
-    }
 }
