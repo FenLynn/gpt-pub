@@ -116,6 +116,7 @@ jobs:
             $json=Get-Content $report -Raw | ConvertFrom-Json
             $json | ConvertTo-Json -Depth 8 | Write-Host
             if (-not $json.ok) { throw 'LaserBench self-test reported failure.' }
+            if (-not $json.webUiEmbedded) { throw 'Embedded WebUi self-test failed.' }
             if (-not $json.neverOverwrite) { throw 'Never-overwrite self-test failed.' }
             if (-not $json.simulator) { throw 'Simulator self-test failed.' }
             if ($json.captureFiles.Count -lt 7) { throw 'Capture self-test produced too few files.' }
@@ -137,23 +138,36 @@ jobs:
           try {
             $env:LASERBENCH_ROOT=$root
             $proc=Start-Process -FilePath (Resolve-Path 'build/App/LaserBench.App.exe') -PassThru
-            Start-Sleep -Seconds 5
-            if ($proc.HasExited) {
-              $startup=Join-Path $root 'logs/startup.log'
-              $crash=Join-Path $root 'logs/crash.log'
-              if (Test-Path $startup) { Get-Content $startup -Raw | Write-Host }
-              if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
-              throw "LaserBench GUI exited during startup with code $($proc.ExitCode)."
-            }
             $startup=Join-Path $root 'logs/startup.log'
+            $crash=Join-Path $root 'logs/crash.log'
+            $deadline=(Get-Date).AddSeconds(30)
+            $ready=$false
+            while ((Get-Date) -lt $deadline) {
+              if ($proc.HasExited) {
+                if (Test-Path $startup) { Get-Content $startup -Raw | Write-Host }
+                if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
+                throw "LaserBench GUI exited during startup with code $($proc.ExitCode)."
+              }
+              if (Test-Path $startup -PathType Leaf) {
+                $startupText=Get-Content $startup -Raw
+                if ($startupText -match 'workspace-ready') {
+                  $ready=$true
+                  break
+                }
+              }
+              Start-Sleep -Milliseconds 500
+            }
             if (!(Test-Path $startup -PathType Leaf)) { throw 'GUI startup did not create startup.log.' }
             $startupText=Get-Content $startup -Raw
             $startupText | Write-Host
             if ($startupText -notmatch 'window-shown') { throw 'GUI startup never reached window-shown.' }
-            if ($startupText -notmatch 'workspace-ready') {
-              $crash=Join-Path $root 'logs/crash.log'
+            if ($startupText -notmatch 'webui-ready') {
               if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
-              throw 'GUI startup never reached workspace-ready.'
+              throw 'GUI startup never reached webui-ready.'
+            }
+            if (-not $ready -or $startupText -notmatch 'workspace-ready') {
+              if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
+              throw 'GUI startup never reached workspace-ready within 30 seconds.'
             }
             Copy-Item $startup build/TestEvidence/gui-startup.log -Force
           } finally {
