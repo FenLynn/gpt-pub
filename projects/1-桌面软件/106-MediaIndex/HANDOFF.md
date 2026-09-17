@@ -503,11 +503,20 @@ crash-safe immutable generation
 → persistent video Tier V0
 ```
 
-## 18. Crash-safe generation 收口
+## 18. v0.4.0 Crash-safe generation 成功断点
 
-主程序候选版本：`MediaIndex v0.4.0`。
+2026-09-17，crash-safe generation 已从独立实验收口到 persistent core，并通过完整 Windows CI。
 
-2026-09-17，crash-safe generation 已从独立实验收口到 persistent core。
+```text
+version: 0.4.0
+validated commit: 1efee409cefd36212abbbd30137be5a2e1a9c135
+run: 35164878140
+artifact: MediaIndex-v0.4.0-win-x64
+artifact id: 10474551525
+artifact bytes: 141055028
+exe bytes: 235854900
+sha256: 674d2df7c5921bf619d6fcb7c07faee714096e9a638d635e07cb36780ab494b9
+```
 
 唯一正式 generation 实现：
 
@@ -541,14 +550,32 @@ private generation
 → cleanup
 ```
 
-回归：
+本轮 CI 已证明：
+
+- A4/V011 regression 通过。
+- known hard-negative suite 通过。
+- crash-safe persistent core smoke 通过。
+- persistent Lane B regression 通过。
+- 500k Lane B scale guard 通过。
+- 主 EXE 与 Acceptance EXE 均成功构建。
+- 两个 embedded-worker self-test 均通过。
+- Windows fsync 路径已实际验证。
+- Lane A、Lane B 与 delta overlay 均从同一 active generation 读取。
+
+回归入口：
 
 ```text
 experiments/ci_crash_safe_generation.py
 → 由 ci_mediaindex_core.py 调用
-→ 无需修改 106 目录外 workflow
 ```
 
 已删除重复 `crash_safe_generation.py`，禁止再建立第二套 `CURRENT.json` 指针。
 
-当前下一步先确认本轮 Windows CI 全绿。CI 通过后，进入 storage identity / offline volume lifecycle。
+下一工程断点：
+
+```text
+storage identity
+→ removable / offline volume lifecycle
+→ resumable background indexing
+→ persistent video Tier V0
+```
