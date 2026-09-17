@@ -98,17 +98,24 @@ internal sealed class AppStorage
             IndexesRoot,
             binding.IndexId);
 
+        var previousIsSameLibrary =
+            IsDriveLetterRebind(
+                _lastLoadedLibraryPath,
+                full);
+
         if (!Directory.Exists(target))
         {
             TryMigrateLegacyIndex(
                 binding,
-                target);
+                target,
+                previousIsSameLibrary
+                    ? _lastLoadedLibraryPath
+                    : null);
         }
 
         bindings[key] = binding.IndexId;
 
-        if (!string.IsNullOrWhiteSpace(
-                _lastLoadedLibraryPath))
+        if (previousIsSameLibrary)
         {
             try
             {
@@ -143,114 +150,101 @@ internal sealed class AppStorage
 
     private void TryMigrateLegacyIndex(
         StorageBinding binding,
-        string target)
+        string target,
+        string? previousLibraryPath)
     {
-        var candidates = new HashSet<string>(
-            StringComparer.OrdinalIgnoreCase);
+        var currentLegacy =
+            LegacyIndexDirectoryFor(
+                binding.LibraryPath);
 
-        AddLegacyCandidate(
-            candidates,
-            binding.LibraryPath,
-            target);
-
-        if (!string.IsNullOrWhiteSpace(
-                _lastLoadedLibraryPath))
+        if (Directory.Exists(currentLegacy)
+            && !PathEquals(
+                currentLegacy,
+                target))
         {
-            AddLegacyCandidate(
-                candidates,
-                _lastLoadedLibraryPath,
+            Directory.Move(
+                currentLegacy,
                 target);
+            return;
         }
 
-        foreach (var historicalPath in
-                 DriveLetterVariants(
-                     binding.LibraryPath))
-        {
-            AddLegacyCandidate(
-                candidates,
-                historicalPath,
-                target);
-        }
-
-        var existing = candidates
-            .Where(Directory.Exists)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        if (existing.Length != 1)
+        if (string.IsNullOrWhiteSpace(
+                previousLibraryPath))
         {
             return;
         }
 
-        Directory.Move(
-            existing[0],
-            target);
+        var previousLegacy =
+            LegacyIndexDirectoryFor(
+                previousLibraryPath);
+
+        if (Directory.Exists(previousLegacy)
+            && !PathEquals(
+                previousLegacy,
+                target))
+        {
+            Directory.Move(
+                previousLegacy,
+                target);
+        }
     }
 
-    private void AddLegacyCandidate(
-        HashSet<string> candidates,
-        string library,
-        string target)
+    private static bool IsDriveLetterRebind(
+        string previous,
+        string current)
     {
+        if (!OperatingSystem.IsWindows()
+            || string.IsNullOrWhiteSpace(previous)
+            || string.IsNullOrWhiteSpace(current))
+        {
+            return false;
+        }
+
         try
         {
-            var candidate =
-                LegacyIndexDirectoryFor(library);
+            var oldPath = NormalizePath(previous);
+            var newPath = NormalizePath(current);
 
-            if (!PathEquals(
-                    candidate,
-                    target))
+            if (PathEquals(oldPath, newPath))
             {
-                candidates.Add(candidate);
+                return true;
             }
+
+            var oldRoot = Path.GetPathRoot(oldPath);
+            var newRoot = Path.GetPathRoot(newPath);
+
+            if (!IsDriveLetterRoot(oldRoot)
+                || !IsDriveLetterRoot(newRoot))
+            {
+                return false;
+            }
+
+            var oldRelative = oldPath[oldRoot!.Length..]
+                .TrimStart(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+            var newRelative = newPath[newRoot!.Length..]
+                .TrimStart(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+
+            return string.Equals(
+                oldRelative,
+                newRelative,
+                StringComparison.OrdinalIgnoreCase);
         }
         catch
         {
+            return false;
         }
     }
 
-    private static IEnumerable<string>
-        DriveLetterVariants(string library)
+    private static bool IsDriveLetterRoot(
+        string? root)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            yield break;
-        }
-
-        string full;
-        string? root;
-
-        try
-        {
-            full = NormalizePath(library);
-            root = Path.GetPathRoot(full);
-        }
-        catch
-        {
-            yield break;
-        }
-
-        if (string.IsNullOrWhiteSpace(root)
-            || root.Length < 2
-            || root[1] != ':')
-        {
-            yield break;
-        }
-
-        var tail = full[root.Length..]
-            .TrimStart(
-                Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar);
-
-        for (var drive = 'A'; drive <= 'Z'; drive++)
-        {
-            var candidateRoot = $"{drive}:\\";
-            yield return string.IsNullOrWhiteSpace(tail)
-                ? candidateRoot
-                : Path.Combine(
-                    candidateRoot,
-                    tail);
-        }
+        return !string.IsNullOrWhiteSpace(root)
+            && root.Length >= 2
+            && root[1] == ':';
     }
 
     private Dictionary<string, string> LoadBindings()
