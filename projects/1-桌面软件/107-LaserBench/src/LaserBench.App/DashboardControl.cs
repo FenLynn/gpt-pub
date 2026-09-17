@@ -53,16 +53,16 @@ internal sealed class DashboardControl : UserControl
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        using var dotted = new Pen(UiTheme.Divider, 1f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+        using var dashed = new Pen(UiTheme.Divider, 1f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
         var midX = Width / 2;
         var midY = Height / 2;
-        e.Graphics.DrawLine(dotted, midX, 2, midX, Height - 2);
-        e.Graphics.DrawLine(dotted, 2, midY, Width - 2, midY);
+        e.Graphics.DrawLine(dashed, midX, 3, midX, Height - 3);
+        e.Graphics.DrawLine(dashed, 3, midY, Width - 3, midY);
 
         foreach (var kind in _floating.Keys.ToArray())
         {
             var rect = GetSlot(kind);
-            GlyphPainter.Draw(e.Graphics, GlyphPainter.ForModule(kind), new Rectangle(rect.Left + rect.Width / 2 - 12, rect.Top + rect.Height / 2 - 12, 24, 24), Color.FromArgb(90, UiTheme.Muted), 1.5f);
+            GlyphPainter.Draw(e.Graphics, GlyphPainter.ForModule(kind), new Rectangle(rect.Left + rect.Width / 2 - 12, rect.Top + rect.Height / 2 - 12, 24, 24), Color.FromArgb(80, UiTheme.Muted), 1.5f);
         }
     }
 
@@ -146,13 +146,21 @@ internal sealed class FloatingModuleForm : Form
     public FloatingModuleForm(ModuleKind kind, ModuleViewBase view, Form? mainForm)
     {
         _mainForm = mainForm;
-        Text = $"LaserBench · {kind}";
+        Text = $"LaserBench · {ModuleName(kind)}";
         BackColor = UiTheme.PlotBack;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = true;
         Controls.Add(view);
         view.Dock = DockStyle.Fill;
     }
+
+    private static string ModuleName(ModuleKind kind) => kind switch
+    {
+        ModuleKind.Power => "功率",
+        ModuleKind.Spectrum => "光谱",
+        ModuleKind.Beam => "光束质量",
+        _ => "示波器"
+    };
 
     public void CloseAfterAttach()
     {
