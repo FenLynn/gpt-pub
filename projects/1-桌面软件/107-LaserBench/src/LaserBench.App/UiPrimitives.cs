@@ -4,15 +4,19 @@ namespace LaserBench;
 
 internal static class UiTheme
 {
-    public static readonly Color Back = Color.FromArgb(244, 248, 252);
-    public static readonly Color Surface = Color.FromArgb(248, 251, 254);
+    // Quiet light instrument palette. Only plotting areas are pure white.
+    public static readonly Color Back = Color.FromArgb(243, 247, 250);
+    public static readonly Color Surface = Color.FromArgb(248, 250, 252);
+    public static readonly Color Toolbar = Color.FromArgb(247, 250, 252);
+    public static readonly Color Sidebar = Color.FromArgb(237, 243, 248);
     public static readonly Color PlotBack = Color.White;
-    public static readonly Color Ink = Color.FromArgb(42, 55, 69);
-    public static readonly Color Muted = Color.FromArgb(112, 128, 145);
-    public static readonly Color Divider = Color.FromArgb(188, 202, 216);
-    public static readonly Color Grid = Color.FromArgb(228, 235, 242);
-    public static readonly Color Accent = Color.FromArgb(36, 128, 191);
-    public static readonly Color Accent2 = Color.FromArgb(67, 167, 207);
+    public static readonly Color Ink = Color.FromArgb(38, 55, 70);
+    public static readonly Color Muted = Color.FromArgb(112, 128, 144);
+    public static readonly Color Divider = Color.FromArgb(202, 216, 228);
+    public static readonly Color Border = Color.FromArgb(170, 188, 204);
+    public static readonly Color Grid = Color.FromArgb(226, 235, 243);
+    public static readonly Color Accent = Color.FromArgb(39, 132, 199);
+    public static readonly Color Accent2 = Color.FromArgb(74, 166, 205);
     public static readonly Color Green = Color.FromArgb(47, 163, 106);
     public static readonly Color Red = Color.FromArgb(210, 67, 67);
     public static readonly Color GrayOff = Color.FromArgb(156, 167, 178);
@@ -169,7 +173,7 @@ internal sealed class GlyphButton : Control
         if (_hover || Filled)
         {
             using var back = new SolidBrush(Color.FromArgb(_hover ? 26 : 18, color));
-            e.Graphics.FillRoundedRectangle(back, ClientRectangle.InflateCopy(-2, -2), 5);
+            e.Graphics.FillRoundedRectangle(back, ClientRectangle.InflateCopy(-2, -2), 4);
         }
         GlyphPainter.Draw(e.Graphics, Glyph, ClientRectangle, color, 1.6f);
     }
