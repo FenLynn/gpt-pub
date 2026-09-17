@@ -15,7 +15,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
   </ItemGroup>
-  <Target Name="BuildLaserBenchWebUi" BeforeTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'">
+  <Target Name="BuildLaserBenchWebUi" BeforeTargets="AssignTargetPaths" Condition="'$(DesignTimeBuild)' != 'true'">
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)\WebUi" Command="npm install --no-audit --no-fund" />
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)\WebUi" Command="npm run build" />
     <Error Condition="!Exists('$(MSBuildProjectDirectory)\WebUi\dist\index.html')" Text="LaserBench WebUi build did not produce dist/index.html." />
