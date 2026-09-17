@@ -415,6 +415,50 @@ def main() -> None:
             previous_library_root=legacy_library_a,
             library_root=legacy_library_b,
         )
+        write_location_marker(
+            legacy_stable_index,
+            storage_id=LEGACY_STORAGE_ID,
+            storage_root=legacy_mount_b,
+            library_relative="LegacyLibrary",
+            library_root=legacy_library_b,
+        )
+
+        legacy_query = queries / "legacy-query.jpg"
+        fixtures.save_jpeg(
+            legacy_query,
+            fixtures.transform(
+                fixtures.rich_image(20),
+                "resize",
+            ),
+            quality=82,
+        )
+
+        legacy_first_query = query(
+            legacy_stable_index,
+            legacy_query,
+            root / "legacy-first-query.json",
+        )
+
+        if (
+            not legacy_first_query.get(
+                "storage_reattached"
+            )
+            or not legacy_first_query.get(
+                "storage_online"
+            )
+            or not legacy_first_query["results"]
+            or not legacy_first_query["results"][0][
+                "online"
+            ]
+            or legacy_first_query["results"][0][
+                "relpath"
+            ] != "legacy_00.jpg"
+            or (
+                legacy_stable_index
+                / lifecycle.REBIND_MARKER_NAME
+            ).exists()
+        ):
+            raise AssertionError(legacy_first_query)
 
         legacy_rebound = build(
             legacy_library_b,
@@ -426,7 +470,7 @@ def main() -> None:
         )
 
         if (
-            not legacy_rebound.get(
+            legacy_rebound.get(
                 "storage_rebound"
             )
             or legacy_rebound["reused"] != 2
@@ -473,6 +517,11 @@ def main() -> None:
                         "reused"
                     ],
                     "identity_guard": wrong_id_failed,
+                    "legacy_first_query_reattached": bool(
+                        legacy_first_query.get(
+                            "storage_reattached"
+                        )
+                    ),
                     "legacy_rebind_reused": (
                         legacy_rebound["reused"]
                     ),
