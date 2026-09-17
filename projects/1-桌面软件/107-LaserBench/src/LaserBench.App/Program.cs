@@ -80,6 +80,7 @@ internal static class Program
     private static int RunSelfTest(string reportPath)
     {
         var errors = new List<string>();
+        var webUiEmbedded = false;
         try
         {
             AppPaths.Initialize();
@@ -95,7 +96,11 @@ internal static class Program
 
             try
             {
-                WebUiAssets.ValidateEmbeddedResources();
+                var webUiRoot = WebUiAssets.Extract();
+                webUiEmbedded = File.Exists(Path.Combine(webUiRoot, "index.html")) &&
+                                Directory.Exists(Path.Combine(webUiRoot, "assets")) &&
+                                Directory.EnumerateFiles(Path.Combine(webUiRoot, "assets")).Any();
+                if (!webUiEmbedded) errors.Add("webui extraction incomplete");
             }
             catch (Exception ex)
             {
@@ -131,7 +136,7 @@ internal static class Program
                 errors,
                 version = Application.ProductVersion,
                 portableRoot = AppPaths.Root,
-                webUiEmbedded = !errors.Any(x => x.StartsWith("webui resources missing", StringComparison.Ordinal)),
+                webUiEmbedded,
                 directories = new
                 {
                     exp = AppPaths.ExpDir,
