@@ -2,13 +2,17 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前 `v0.1.0` 是第一版 Product Preview。它优先建立可长期演进的 Portable 架构、数据规则、Simulator 和高密度 Dashboard，不把尚未验证的厂商 SDK 一次性打包进基础 Runtime。
+当前 `v0.1.1` 是启动稳定性修复版。它继续保持 Portable、Simulator 和高密度 Dashboard 的基础设计，并针对真实 Windows 11 首次启动加入窗口优先显示、分阶段启动日志、全局异常记录与安全模式。
 
 ## 当前能力
 
 - Windows x64 Portable 软件，配置和数据跟随程序目录，不使用 AppData 作为产品状态根目录。
 - 轻量双层启动：原生 AOT `LaserBench.exe` 负责 .NET 8 Desktop Runtime 检查，`LaserBench.App.exe` 为 framework-dependent 主程序。
 - 缺少 .NET 8 Desktop Runtime 时，启动器提供 Microsoft 在线安装路径和离线安装说明。
+- `v0.1.1` 主窗口先显示，再初始化 Simulator、Dashboard、录像等工作区组件，避免组件初始化失败时静默无窗口退出。
+- 启动过程写入 `logs/startup.log`；未处理异常写入 `logs/crash.log`。
+- 支持 `LaserBench.App.exe --safe` 安全模式，安全模式跳过录像初始化但保留主窗口与 Simulator Dashboard。
+- 如果工作区初始化仍失败，主窗口保持可见并直接显示异常与日志路径，而不是静默退出。
 - 内置 Power、Spectrum、Beam、Scope 四类 Simulator，无真实硬件也可完整查看 Dashboard 和验证采集链。
 - Dashboard 使用紧凑单行顶栏、折叠图标导航、四个无卡片观测区。
 - Power 支持多 Trace、当前值、Channel 1 Max 与底部全局时间缩略条。
@@ -40,6 +44,8 @@ LaserBench/
 │  └─ video/
 │     └─ HHmmss_screen_<label>.avi
 ├─ logs/
+│  ├─ startup.log
+│  └─ crash.log
 ├─ runtime/
 ├─ tools/
 └─ OFFLINE-DEPENDENCIES.txt
@@ -98,7 +104,7 @@ C# / .NET 8 / WinForms / Windows x64
 
 ## 当前硬件边界
 
-`v0.1.0` 只启用 Simulator。真实仪器接入按独立模块逐个验证，不在基础包中预装未使用 SDK：
+`v0.1.1` 仍只启用 Simulator。真实仪器接入按独立模块逐个验证，不在基础包中预装未使用 SDK：
 
 - Ophir Juno / OphirLMMeasurement
 - Yokogawa AQ6370D
@@ -114,7 +120,7 @@ P107 Windows CI 会：
 1. 做 P107 范围门禁。
 2. 使用 .NET 8 构建主程序和 NativeAOT 启动器。
 3. 执行无 UI self-test，核对 Portable 根目录、Simulator、采集、目录层级和永不覆盖规则。
-4. 生成 `LaserBench_v0.1.0_portable.zip`、manifest 与 SHA-256。
+4. 生成 `LaserBench_v0.1.1_portable.zip`、manifest 与 SHA-256。
 5. 上传限期 GitHub Actions Artifact，不创建标签或正式 Release。
 
 接续开发先读 `HANDOFF.md`。
