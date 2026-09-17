@@ -1,0 +1,220 @@
+name: P107 LaserBench CI
+
+on:
+  push:
+    branches: [p107-exp, p107-stable]
+    paths:
+      - 'projects/1-桌面软件/107-LaserBench/**'
+      - '.github/workflows/p107-laserbench-ci.yml'
+      - '目录.md'
+      - 'projects/1-桌面软件/README.md'
+  pull_request:
+    branches: [p107-exp, p107-stable, main]
+    paths:
+      - 'projects/1-桌面软件/107-LaserBench/**'
+      - '.github/workflows/p107-laserbench-ci.yml'
+      - '目录.md'
+      - 'projects/1-桌面软件/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p107-laserbench-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  PROJECT_ROOT: 'projects/1-桌面软件/107-LaserBench'
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce P107 pull-request scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          bad=$(git -c core.quotePath=false diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Ev '^(projects/1-桌面软件/107-LaserBench/|projects/1-桌面软件/README\.md$|目录\.md$|\.github/workflows/p107-laserbench-ci\.yml$)' || true)
+          if [[ -n "$bad" ]]; then
+            echo 'Out-of-scope P107 changes:'
+            echo "$bad"
+            exit 1
+          fi
+
+  windows-build:
+    needs: scope
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Read product version
+        id: product-version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          [xml]$xml=Get-Content "$env:PROJECT_ROOT/src/Directory.Build.props" -Raw
+          $version=@($xml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'LaserBench <Version> is missing.' }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Restore projects
+        shell: pwsh
+        run: |
+          dotnet restore "$env:PROJECT_ROOT/src/LaserBench.App/LaserBench.App.csproj"
+          dotnet restore "$env:PROJECT_ROOT/src/LaserBench.Launcher/LaserBench.Launcher.csproj"
+
+      - name: Build main application
+        shell: pwsh
+        run: dotnet build "$env:PROJECT_ROOT/src/LaserBench.App/LaserBench.App.csproj" -c Release --no-restore
+
+      - name: Publish main application
+        shell: pwsh
+        run: |
+          dotnet publish "$env:PROJECT_ROOT/src/LaserBench.App/LaserBench.App.csproj" `
+            -c Release -r win-x64 --self-contained false --no-restore `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded `
+            -o build/App
+          if (!(Test-Path 'build/App/LaserBench.App.exe' -PathType Leaf)) { throw 'LaserBench.App.exe missing.' }
+
+      - name: Publish NativeAOT dependency launcher
+        shell: pwsh
+        run: |
+          dotnet publish "$env:PROJECT_ROOT/src/LaserBench.Launcher/LaserBench.Launcher.csproj" `
+            -c Release -r win-x64 --self-contained true --no-restore `
+            -p:PublishAot=true -p:StripSymbols=true `
+            -o build/Launcher
+          if (!(Test-Path 'build/Launcher/LaserBench.exe' -PathType Leaf)) { throw 'LaserBench.exe launcher missing.' }
+
+      - name: Run isolated application self-test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP ('LaserBench-SelfTest-' + [guid]::NewGuid().ToString('N'))
+          $report=Join-Path $root 'self-test.json'
+          New-Item $root -ItemType Directory -Force | Out-Null
+          $oldRoot=$env:LASERBENCH_ROOT
+          try {
+            $env:LASERBENCH_ROOT=$root
+            $proc=Start-Process -FilePath (Resolve-Path 'build/App/LaserBench.App.exe') -ArgumentList "--self-test=$report" -Wait -PassThru
+            if ($proc.ExitCode -ne 0) {
+              if (Test-Path $report) { Get-Content $report -Raw | Write-Host }
+              throw "LaserBench self-test exit code $($proc.ExitCode)"
+            }
+            $json=Get-Content $report -Raw | ConvertFrom-Json
+            $json | ConvertTo-Json -Depth 8 | Write-Host
+            if (-not $json.ok) { throw 'LaserBench self-test reported failure.' }
+            if (-not $json.neverOverwrite) { throw 'Never-overwrite self-test failed.' }
+            if (-not $json.simulator) { throw 'Simulator self-test failed.' }
+            if ($json.captureFiles.Count -lt 7) { throw 'Capture self-test produced too few files.' }
+          } finally {
+            $env:LASERBENCH_ROOT=$oldRoot
+          }
+          New-Item build/TestEvidence -ItemType Directory -Force | Out-Null
+          Copy-Item $report build/TestEvidence/self-test.json -Force
+          Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Assemble portable package
+        shell: pwsh
+        env:
+          PRODUCT_VERSION: ${{ steps.product-version.outputs.value }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $pkg='build/Portable'
+          New-Item $pkg -ItemType Directory -Force | Out-Null
+          Copy-Item 'build/Launcher/LaserBench.exe' "$pkg/LaserBench.exe" -Force
+          Copy-Item 'build/App/LaserBench.App.exe' "$pkg/LaserBench.App.exe" -Force
+          New-Item "$pkg/tools" -ItemType Directory -Force | Out-Null
+          Copy-Item "$env:PROJECT_ROOT/tools/install-dotnet8.ps1" "$pkg/tools/install-dotnet8.ps1" -Force
+          Copy-Item "$env:PROJECT_ROOT/OFFLINE-DEPENDENCIES.txt" "$pkg/OFFLINE-DEPENDENCIES.txt" -Force
+          Copy-Item "$env:PROJECT_ROOT/README.md" "$pkg/README.md" -Force
+          foreach ($dir in @('config','data/exp','data/pic','data/video','logs','runtime')) {
+            New-Item (Join-Path $pkg $dir) -ItemType Directory -Force | Out-Null
+          }
+          $versionInfo=[ordered]@{
+            product='LaserBench'
+            version=$env:PRODUCT_VERSION
+            commit=$env:GITHUB_SHA
+            buildUtc=(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            runtime='framework-dependent .NET 8 Desktop x64'
+            launcher='NativeAOT x64'
+          }
+          $versionInfo | ConvertTo-Json | Set-Content "$pkg/version.json" -Encoding utf8
+
+      - name: Verify portable Runtime boundary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $pkg='build/Portable'
+          foreach ($required in @('LaserBench.exe','LaserBench.App.exe','OFFLINE-DEPENDENCIES.txt','tools/install-dotnet8.ps1','version.json')) {
+            if (!(Test-Path (Join-Path $pkg $required) -PathType Leaf)) { throw "Missing package file: $required" }
+          }
+          $unexpected=Get-ChildItem $pkg -Recurse -File | Where-Object { $_.Extension -in '.dll','.pdb' }
+          if ($unexpected) {
+            $unexpected | Select-Object FullName,Length | Format-Table
+            throw 'Base Portable package unexpectedly contains loose DLL/PDB payload.'
+          }
+          foreach ($private in @('app.json','app.json.bak','*.csv','*.png','*.avi','*.log')) {
+            if (Get-ChildItem $pkg -Recurse -Force -Filter $private -ErrorAction SilentlyContinue) { throw "Runtime contains generated/private Data matching $private" }
+          }
+
+      - name: Verify dependency launcher
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $report=Join-Path $env:RUNNER_TEMP 'laserbench-launcher-check.json'
+          $proc=Start-Process -FilePath (Resolve-Path 'build/Portable/LaserBench.exe') -WorkingDirectory (Resolve-Path 'build/Portable') -ArgumentList "--check=$report" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "Launcher check failed: $($proc.ExitCode)" }
+          $json=Get-Content $report -Raw | ConvertFrom-Json
+          $json | ConvertTo-Json | Write-Host
+          if (-not $json.ok -or -not $json.appExists -or -not $json.dotnetDesktop8 -or -not $json.portable) { throw 'Launcher dependency check returned an invalid result.' }
+          Copy-Item $report build/TestEvidence/launcher-check.json -Force
+
+      - name: Create manifest, ZIP and SHA-256
+        shell: pwsh
+        env:
+          PRODUCT_VERSION: ${{ steps.product-version.outputs.value }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $pkg=Resolve-Path 'build/Portable'
+          $manifest=@()
+          foreach ($file in Get-ChildItem $pkg -Recurse -File | Sort-Object FullName) {
+            $relative=[IO.Path]::GetRelativePath($pkg.Path,$file.FullName).Replace('\','/')
+            $manifest += [ordered]@{
+              path=$relative
+              bytes=$file.Length
+              sha256=(Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Set-Content build/manifest.json -Encoding utf8
+          $zip="build/LaserBench_v$env:PRODUCT_VERSION`_portable.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path 'build/Portable/*' -DestinationPath $zip -CompressionLevel Optimal
+          $zipHash=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $zipBytes=(Get-Item $zip).Length
+          "$(Split-Path $zip -Leaf)  $zipBytes bytes  sha256=$zipHash" | Set-Content build/SHA256.txt -Encoding utf8
+          Get-Content build/SHA256.txt | Write-Host
+
+      - name: Upload LaserBench v0.1.0 candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LaserBench-v${{ steps.product-version.outputs.value }}-win-x64
+          path: |
+            build/LaserBench_v${{ steps.product-version.outputs.value }}_portable.zip
+            build/SHA256.txt
+            build/manifest.json
+            build/TestEvidence/*.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,41 @@
+LaserBench v0.1.0 offline dependency guide
+========================================
+
+LaserBench is a portable application. Its configuration and data stay with the LaserBench folder.
+
+Required runtime for v0.1.0
+---------------------------
+Microsoft .NET 8 Desktop Runtime, Windows x64.
+
+Offline preparation on a computer with Internet access
+-------------------------------------------------------
+1. Open the official Microsoft .NET 8 download page:
+   https://dotnet.microsoft.com/download/dotnet/8.0
+2. Under ".NET Desktop Runtime", download the Windows x64 installer.
+3. Copy that installer together with the complete LaserBench portable folder to the offline computer, for example by USB drive.
+
+Offline installation
+--------------------
+1. Run the Microsoft .NET 8 Desktop Runtime x64 installer.
+2. Keep the complete LaserBench folder in a normal writable location such as D:\LaserBench or another experiment drive.
+3. Do not place the portable folder under a location where ordinary users cannot write.
+4. Run LaserBench.exe again.
+
+Important portable layout
+-------------------------
+LaserBench.exe
+LaserBench.App.exe
+config\
+data\exp\
+data\pic\
+data\video\
+logs\
+runtime\
+tools\
+
+Only data\exp uses a date folder by default when no custom experiment folder is selected.
+data\pic and data\video store files directly and do not create date subfolders.
+
+Future optional hardware dependencies
+-------------------------------------
+LaserBench will detect vendor SDKs or drivers only when the corresponding hardware module is introduced. They will not be bundled into the base portable package unless redistribution is both necessary and permitted. Each missing dependency will provide an online action and an offline installation note.
