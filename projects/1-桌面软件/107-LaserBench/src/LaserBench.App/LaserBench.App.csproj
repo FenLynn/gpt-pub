@@ -19,11 +19,13 @@
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)\WebUi" Command="npm install --no-audit --no-fund" />
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)\WebUi" Command="npm run build" />
     <Error Condition="!Exists('$(MSBuildProjectDirectory)\WebUi\dist\index.html')" Text="LaserBench WebUi build did not produce dist/index.html." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\WebUi\dist\assets\app.js')" Text="LaserBench WebUi build did not produce dist/assets/app.js." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\WebUi\dist\assets\app.css')" Text="LaserBench WebUi build did not produce dist/assets/app.css." />
     <ItemGroup>
-      <EmbeddedResource Remove="WebUi\dist\index.html;WebUi\dist\assets\*.js;WebUi\dist\assets\*.css" />
+      <EmbeddedResource Remove="WebUi\dist\index.html;WebUi\dist\assets\app.js;WebUi\dist\assets\app.css" />
       <EmbeddedResource Include="WebUi\dist\index.html" LogicalName="LaserBench.WebUi.index.html" />
-      <EmbeddedResource Include="WebUi\dist\assets\*.js" LogicalName="LaserBench.WebUi.assets.%(Filename)%(Extension)" />
-      <EmbeddedResource Include="WebUi\dist\assets\*.css" LogicalName="LaserBench.WebUi.assets.%(Filename)%(Extension)" />
+      <EmbeddedResource Include="WebUi\dist\assets\app.js" LogicalName="LaserBench.WebUi.assets.app.js" />
+      <EmbeddedResource Include="WebUi\dist\assets\app.css" LogicalName="LaserBench.WebUi.assets.app.css" />
     </ItemGroup>
   </Target>
   <Target Name="GenerateLaserBenchIcon" BeforeTargets="PrepareForBuild">
