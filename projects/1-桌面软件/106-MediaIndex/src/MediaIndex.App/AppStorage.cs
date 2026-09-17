@@ -100,28 +100,27 @@ internal sealed class AppStorage
 
         if (!Directory.Exists(target))
         {
-            var legacyCurrent =
-                LegacyIndexDirectoryFor(full);
-
-            if (Directory.Exists(legacyCurrent)
-                && !PathEquals(
-                    legacyCurrent,
-                    target))
-            {
-                Directory.Move(
-                    legacyCurrent,
-                    target);
-            }
-            else
-            {
-                TryMigrateRememberedBinding(
-                    binding,
-                    target,
-                    bindings);
-            }
+            TryMigrateLegacyIndex(
+                binding,
+                target);
         }
 
         bindings[key] = binding.IndexId;
+
+        if (!string.IsNullOrWhiteSpace(
+                _lastLoadedLibraryPath))
+        {
+            try
+            {
+                bindings[
+                    BindingKey(_lastLoadedLibraryPath)
+                ] = binding.IndexId;
+            }
+            catch
+            {
+            }
+        }
+
         SaveBindings(bindings);
         _lastLoadedLibraryPath = full;
 
@@ -142,50 +141,115 @@ internal sealed class AppStorage
             $"Validation-{DateTime.Now:yyyyMMdd-HHmmss}");
     }
 
-    private void TryMigrateRememberedBinding(
+    private void TryMigrateLegacyIndex(
         StorageBinding binding,
-        string target,
-        Dictionary<string, string> bindings)
+        string target)
     {
-        if (string.IsNullOrWhiteSpace(
+        var candidates = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+
+        AddLegacyCandidate(
+            candidates,
+            binding.LibraryPath,
+            target);
+
+        if (!string.IsNullOrWhiteSpace(
                 _lastLoadedLibraryPath))
         {
-            return;
+            AddLegacyCandidate(
+                candidates,
+                _lastLoadedLibraryPath,
+                target);
         }
 
-        var previous = NormalizePath(
-            _lastLoadedLibraryPath);
+        foreach (var historicalPath in
+                 DriveLetterVariants(
+                     binding.LibraryPath))
+        {
+            AddLegacyCandidate(
+                candidates,
+                historicalPath,
+                target);
+        }
 
-        if (PathEquals(previous, binding.LibraryPath))
+        var existing = candidates
+            .Where(Directory.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (existing.Length != 1)
         {
             return;
         }
 
-        var previousKey = BindingKey(previous);
+        Directory.Move(
+            existing[0],
+            target);
+    }
 
-        if (bindings.TryGetValue(
-                previousKey,
-                out var previousId)
-            && string.Equals(
-                previousId,
-                binding.IndexId,
-                StringComparison.OrdinalIgnoreCase))
+    private void AddLegacyCandidate(
+        HashSet<string> candidates,
+        string library,
+        string target)
+    {
+        try
         {
-            var source = Path.Combine(
-                IndexesRoot,
-                previousId);
+            var candidate =
+                LegacyIndexDirectoryFor(library);
 
-            if (Directory.Exists(source)
-                && !Directory.Exists(target)
-                && !PathEquals(source, target))
+            if (!PathEquals(
+                    candidate,
+                    target))
             {
-                Directory.Move(
-                    source,
-                    target);
+                candidates.Add(candidate);
             }
+        }
+        catch
+        {
+        }
+    }
 
-            bindings[previousKey] =
-                binding.IndexId;
+    private static IEnumerable<string>
+        DriveLetterVariants(string library)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            yield break;
+        }
+
+        string full;
+        string? root;
+
+        try
+        {
+            full = NormalizePath(library);
+            root = Path.GetPathRoot(full);
+        }
+        catch
+        {
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(root)
+            || root.Length < 2
+            || root[1] != ':')
+        {
+            yield break;
+        }
+
+        var tail = full[root.Length..]
+            .TrimStart(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
+
+        for (var drive = 'A'; drive <= 'Z'; drive++)
+        {
+            var candidateRoot = $"{drive}:\\";
+            yield return string.IsNullOrWhiteSpace(tail)
+                ? candidateRoot
+                : Path.Combine(
+                    candidateRoot,
+                    tail);
         }
     }
 
