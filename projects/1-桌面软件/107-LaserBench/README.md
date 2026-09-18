@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.2.0 Dashboard Refactor 候选**。本轮不改设备抽象和 Portable 数据边界，集中把主页面从工程原型提升为可长期使用的实验工作台界面。
+当前开发版本为 **v0.4.9 稳定候选**。0.4.x 已完成 Vue/WebView2 工作台、统一采集状态、模块独立页、数据中心、设置持久化、截图录像与 Portable 安全保存闭环；真实厂商硬件仍按设备抽象层逐项接入。
 
 ## 当前能力
 
@@ -75,11 +75,11 @@ HHmmss_<channel-or-device>_<label>.<ext>
 ## 技术路线
 
 ```text
-C# / .NET 8 / WinForms / Windows x64
-+ 自绘图表与控件
+C# / .NET 8 / WinForms Host / Windows x64
++ Vue 3 / TypeScript / Vite / WebView2 工作台
++ Canvas 高频绘图
 + NativeAOT 依赖启动器
 + Simulator / Device Abstraction
-+ 无 WebView2
 + 无 Electron
 + 无第三方图表库
 ```
@@ -98,7 +98,7 @@ C# / .NET 8 / WinForms / Windows x64
 
 ## 当前硬件边界
 
-v0.2.0 仍默认启用 Simulator。真实仪器按最小闭环逐个接入：
+v0.4.9 仍默认启用 Simulator。真实仪器按最小闭环逐个接入：
 
 1. Ophir Juno / OphirLMMeasurement
 2. Yokogawa AQ6370D
