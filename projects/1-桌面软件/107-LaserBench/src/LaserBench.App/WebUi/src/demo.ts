@@ -79,14 +79,14 @@ export function createDemoSnapshot(): LaserSnapshot {
   const p2 = powerSeries(1, '#ff8200', 'back', 'kW')
   const p3 = powerSeries(2, '#08a84f', 'eta', '%')
   return {
-    version: '0.3.3', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, recording: false,
+    version: '0.4.0', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, recording: false,
     captureSelection: { power: true, spectrum: true, beam: true, scope: false },
     config: {
       experimentFolder: '', autoScreenshot: false,
       aliases: { power1:'out', power2:'back', math1:'eta', osa1:'osa1', beam:'beam', scope1:'ch1', scope2:'ch2' },
-      rootPath: 'D:\\LaserBench'
+      rootPath: 'D:\\LaserBench', powerWindow:600, osaStart:1060, osaStop:1100, scopeTimeSpan:0.24, scopeFftMax:50, scopeCh1:true, scopeCh2:true
     },
-    data: { experimentFolder: new Date().toISOString().slice(0,10), files: [], pictureCount: 0, videoCount: 0 },
+    data: { experimentFolder: new Date().toISOString().slice(0,10), fileCount:0, files: [], pictureCount: 0, videoCount: 0 },
     devices: [
       { alias:'out', kind:'power', status:'online' }, { alias:'back', kind:'power', status:'online' },
       { alias:'osa1', kind:'spectrum', status:'online' }, { alias:'beam', kind:'beam', status:'online' },
