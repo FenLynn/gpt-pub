@@ -240,6 +240,14 @@ internal sealed class WebUiHost : IDisposable
             _config.CurrentExperimentFolder=(folder.GetString()??string.Empty).Trim();
         if (v.TryGetProperty("autoScreenshot",out var auto) && (auto.ValueKind==JsonValueKind.True || auto.ValueKind==JsonValueKind.False))
             _config.AutoScreenshot=auto.GetBoolean();
+        if (v.TryGetProperty("powerWindow",out var pw) && pw.ValueKind==JsonValueKind.Number) _config.PowerWindow=Math.Clamp(pw.GetDouble(),30,3600);
+        if (v.TryGetProperty("osaStart",out var os) && os.ValueKind==JsonValueKind.Number) _config.OsaStart=Math.Clamp(os.GetDouble(),600,1700);
+        if (v.TryGetProperty("osaStop",out var oe) && oe.ValueKind==JsonValueKind.Number) _config.OsaStop=Math.Clamp(oe.GetDouble(),600,1700);
+        if (_config.OsaStop<=_config.OsaStart) _config.OsaStop=_config.OsaStart+1;
+        if (v.TryGetProperty("scopeTimeSpan",out var st) && st.ValueKind==JsonValueKind.Number) _config.ScopeTimeSpan=Math.Clamp(st.GetDouble(),0.01,1000);
+        if (v.TryGetProperty("scopeFftMax",out var sf) && sf.ValueKind==JsonValueKind.Number) _config.ScopeFftMax=Math.Clamp(sf.GetDouble(),0.1,500);
+        if (v.TryGetProperty("scopeCh1",out var c1) && (c1.ValueKind==JsonValueKind.True||c1.ValueKind==JsonValueKind.False)) _config.ScopeCh1=c1.GetBoolean();
+        if (v.TryGetProperty("scopeCh2",out var c2) && (c2.ValueKind==JsonValueKind.True||c2.ValueKind==JsonValueKind.False)) _config.ScopeCh2=c2.GetBoolean();
         if (v.TryGetProperty("aliases",out var aliases) && aliases.ValueKind==JsonValueKind.Object)
         {
             static string Alias(JsonElement a,string key,string current)
@@ -288,12 +296,12 @@ internal sealed class WebUiHost : IDisposable
     private object BuildSnapshot()
     {
         var snap = _provider.Snapshot(_config);
-        var firstHistory = _provider.PowerHistory(0, 600, 360);
+        var firstHistory = _provider.PowerHistory(0, _config.PowerWindow, 720);
         var end = firstHistory.LastOrDefault().Time;
         var colors = new[] { "#075ee6", "#ff8200", "#08a84f" };
         var traces = snap.Power.Select((trace, index) =>
         {
-            var history = _provider.PowerHistory(index, 600, 360)
+            var history = _provider.PowerHistory(index, _config.PowerWindow, 720)
                 .Select(point => new { x = point.Time - end, y = point.Value })
                 .ToArray();
             return new { trace.Name, trace.Unit, trace.Value, trace.MaxValue, color = colors[Math.Min(index, colors.Length - 1)], points = history };
@@ -331,7 +339,9 @@ internal sealed class WebUiHost : IDisposable
                     power1=_config.Power1Alias,power2=_config.Power2Alias,math1=_config.Math1Alias,osa1=_config.Osa1Alias,
                     beam=_config.BeamAlias,scope1=_config.Scope1Alias,scope2=_config.Scope2Alias
                 },
-                rootPath = AppPaths.Root
+                rootPath = AppPaths.Root,
+                powerWindow=_config.PowerWindow, osaStart=_config.OsaStart, osaStop=_config.OsaStop,
+                scopeTimeSpan=_config.ScopeTimeSpan, scopeFftMax=_config.ScopeFftMax, scopeCh1=_config.ScopeCh1, scopeCh2=_config.ScopeCh2
             },
             data = BuildDataSummary(),
             devices = BuildDevices(),
@@ -382,8 +392,9 @@ internal sealed class WebUiHost : IDisposable
     private object BuildDataSummary()
     {
         var exp=AppPaths.ResolveExperimentDirectory(_config);
-        var files=Directory.EnumerateFiles(exp)
-            .Select(path=>new FileInfo(path))
+        var allFiles=Directory.EnumerateFiles(exp).Select(path=>new FileInfo(path)).ToArray();
+        var files=allFiles
+            .AsEnumerable()
             .OrderByDescending(f=>f.LastWriteTime)
             .Take(100)
             .Select(f=>new { name=f.Name, size=f.Length, modified=f.LastWriteTime })
@@ -391,6 +402,7 @@ internal sealed class WebUiHost : IDisposable
         return new
         {
             experimentFolder=Path.GetFileName(exp),
+            fileCount=allFiles.Length,
             files,
             pictureCount=Directory.Exists(AppPaths.PicDir)?Directory.EnumerateFiles(AppPaths.PicDir,"*.png").Count():0,
             videoCount=Directory.Exists(AppPaths.VideoDir)?Directory.EnumerateFiles(AppPaths.VideoDir,"*.avi").Count():0
