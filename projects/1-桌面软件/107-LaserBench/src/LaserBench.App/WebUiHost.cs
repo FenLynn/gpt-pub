@@ -307,8 +307,8 @@ internal sealed class WebUiHost : IDisposable
             return new { trace.Name, trace.Unit, trace.Value, trace.MaxValue, color = colors[Math.Min(index, colors.Length - 1)], points = history };
         }).ToArray();
 
-        var spectrumMain = snap.Spectrum.Select(p => new { x = p.X, y = p.Y }).ToArray();
-        var spectrumRef = snap.Spectrum.Select(p => new { x = p.X, y = Math.Max(-100, p.Y - 5.5 - 2.5 * Math.Exp(-0.5 * Math.Pow((p.X - snap.CenterWavelength) / 0.7, 2))) }).ToArray();
+        var spectrumMain = snap.Spectrum.Where(p=>p.X>=_config.OsaStart && p.X<=_config.OsaStop).Select(p => new { x = p.X, y = p.Y }).ToArray();
+        var spectrumRef = snap.Spectrum.Where(p=>p.X>=_config.OsaStart && p.X<=_config.OsaStop).Select(p => new { x = p.X, y = Math.Max(-100, p.Y - 5.5 - 2.5 * Math.Exp(-0.5 * Math.Pow((p.X - snap.CenterWavelength) / 0.7, 2))) }).ToArray();
         var beam = snap.Beam.Select(p => new { x = p.Z, y = p.X * 1000.0 }).ToArray();
         var beamY = snap.Beam.Select(p => new { x = p.Z, y = p.Y * 1000.0 }).ToArray();
         var nearest = snap.Beam.OrderBy(p => Math.Abs(p.Z - _config.BeamZ)).FirstOrDefault();
@@ -322,6 +322,9 @@ internal sealed class WebUiHost : IDisposable
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
             capturing = _form.IsCapturing,
+            captureState = _form.CaptureState,
+            lastCaptureMessage = _form.LastCaptureMessage,
+            lastCaptureAt = _form.LastCaptureAt,
             recording = _form.IsRecording,
             captureSelection = new
             {
@@ -384,7 +387,7 @@ internal sealed class WebUiHost : IDisposable
                 {
                     new { name = _config.Scope1Alias.ToUpperInvariant(), color = "#075ee6", points = scopeFft.Select(p => new { x = p.X, y = p.Ch1 }).ToArray() },
                     new { name = _config.Scope2Alias.ToUpperInvariant(), color = "#ff7a00", points = scopeFft.Select(p => new { x = p.X, y = p.Ch2 }).ToArray() }
-                }
+                }.Where((_,i)=>i==0?_config.ScopeCh1:_config.ScopeCh2).ToArray()
             }
         };
     }
@@ -397,7 +400,7 @@ internal sealed class WebUiHost : IDisposable
             .AsEnumerable()
             .OrderByDescending(f=>f.LastWriteTime)
             .Take(100)
-            .Select(f=>new { name=f.Name, size=f.Length, modified=f.LastWriteTime })
+            .Select(f=>new { name=f.Name, size=f.Length, modified=f.LastWriteTime, extension=f.Extension.TrimStart('.').ToLowerInvariant(), group=ParseDataGroup(f.Name) })
             .ToArray();
         return new
         {
@@ -407,6 +410,13 @@ internal sealed class WebUiHost : IDisposable
             pictureCount=Directory.Exists(AppPaths.PicDir)?Directory.EnumerateFiles(AppPaths.PicDir,"*.png").Count():0,
             videoCount=Directory.Exists(AppPaths.VideoDir)?Directory.EnumerateFiles(AppPaths.VideoDir,"*.avi").Count():0
         };
+    }
+
+    private static string ParseDataGroup(string name)
+    {
+        var stem=Path.GetFileNameWithoutExtension(name);
+        var parts=stem.Split('_',StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length>0 && parts[0].Length==6 && parts[0].All(char.IsDigit) ? parts[0] : "other";
     }
 
     private object[] BuildDevices()
