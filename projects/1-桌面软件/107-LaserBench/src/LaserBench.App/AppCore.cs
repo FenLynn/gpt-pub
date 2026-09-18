@@ -32,6 +32,13 @@ internal sealed class AppConfig
     public string BeamAlias { get; set; } = "beam";
     public string Scope1Alias { get; set; } = "ch1";
     public string Scope2Alias { get; set; } = "ch2";
+    public double PowerWindow { get; set; } = 600;
+    public double OsaStart { get; set; } = 1060;
+    public double OsaStop { get; set; } = 1100;
+    public double ScopeTimeSpan { get; set; } = 0.24;
+    public double ScopeFftMax { get; set; } = 50;
+    public bool ScopeCh1 { get; set; } = true;
+    public bool ScopeCh2 { get; set; } = true;
 }
 
 internal static class AppPaths
@@ -262,7 +269,7 @@ internal sealed class SimulatorProvider : IInstrumentProvider
         var sigma = linewidth / 2.35482;
         var spectrum = Enumerable.Range(0, 560).Select(i =>
         {
-            var x = 1068.0 + i * (24.0 / 559.0);
+            var x = 1060.0 + i * (40.0 / 559.0);
             var main = 74.5 * Gaussian(x, center, sigma);
             var shoulder = 10.5 * Gaussian(x, center + 3.8, 0.72);
             var ripple = 0.65 * Math.Sin(i * 0.23 + t * 0.18) + 0.35 * Math.Sin(i * 0.071);
@@ -281,7 +288,7 @@ internal sealed class SimulatorProvider : IInstrumentProvider
 
         var scopeTime = Enumerable.Range(0, 560).Select(i =>
         {
-            var ms = i * (5.0 / 559.0);
+            var ms = i * (0.24 / 559.0);
             var s = ms / 1000.0;
             var ch1 = 0.73 * Math.Sin(2 * Math.PI * 1200 * s) + 0.10 * Math.Sin(2 * Math.PI * 2400 * s + 0.32);
             var ch2 = 0.46 * Math.Sin(2 * Math.PI * 1200 * s + 0.82) + 0.075 * Math.Sin(2 * Math.PI * 3100 * s);
@@ -290,7 +297,7 @@ internal sealed class SimulatorProvider : IInstrumentProvider
 
         var scopeFft = Enumerable.Range(0, 460).Select(i =>
         {
-            var khz = i * (5.0 / 459.0);
+            var khz = i * (50000.0 / 459.0);
             var ch1 = 0.95 * Gaussian(khz, 1.20, 0.085) + 0.15 * Gaussian(khz, 2.40, 0.14) + 0.010;
             var ch2 = 0.69 * Gaussian(khz, 1.20, 0.105) + 0.12 * Gaussian(khz, 3.10, 0.18) + 0.008;
             return new ScopePoint(khz, ch1, ch2);
