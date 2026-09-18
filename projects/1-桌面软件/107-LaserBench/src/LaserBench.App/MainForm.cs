@@ -20,7 +20,13 @@ internal sealed class MainForm : Form
     private WebUiHost? _webUi;
     private CancellationTokenSource? _captureCancellation;
     private bool _workspaceReady;
+    private string _captureState = "idle";
+    private string _lastCaptureMessage = "尚未执行采集";
+    private DateTime? _lastCaptureAt;
 
+    internal string CaptureState => _captureState;
+    internal string LastCaptureMessage => _lastCaptureMessage;
+    internal DateTime? LastCaptureAt => _lastCaptureAt;
     internal bool IsCapturing => _captureCancellation is not null;
     internal bool IsRecording => _recorder?.IsRecording == true;
 
@@ -150,31 +156,40 @@ internal sealed class MainForm : Form
 
         if (_captureCancellation is not null)
         {
+            _captureState = "stopping";
             _captureCancellation.Cancel();
             _webUi?.PushNow();
             return new { message = "正在停止采集。" };
         }
 
         var frozen = CloneConfig(_config);
+        _captureState = "starting";
         _captureCancellation = new CancellationTokenSource();
         _webUi?.PushNow();
         try
         {
+            _captureState = "running";
+            _webUi?.PushNow();
             var result = await _captureService.CaptureAsync(frozen, _captureCancellation.Token);
             if (!result.Cancelled && frozen.AutoScreenshot)
                 await SaveScreenshotFromWebAsync(result.RequestedAt, frozen.ConfirmedLabel);
             if (result.Errors.Count > 0)
                 throw new InvalidOperationException(string.Join(Environment.NewLine, result.Errors));
-            return new { message = result.Cancelled ? "采集已停止。" : $"采集完成，共保存 {result.Files.Count} 个文件。" };
+            _lastCaptureAt = DateTime.Now;
+            _lastCaptureMessage = result.Cancelled ? "采集已停止" : $"采集完成，共保存 {result.Files.Count} 个文件";
+            return new { message = _lastCaptureMessage };
         }
         catch (OperationCanceledException)
         {
-            return new { message = "采集已停止。" };
+            _lastCaptureAt = DateTime.Now;
+            _lastCaptureMessage = "采集已停止";
+            return new { message = _lastCaptureMessage };
         }
         finally
         {
             _captureCancellation.Dispose();
             _captureCancellation = null;
+            _captureState = "idle";
             _webUi?.PushNow();
         }
     }
