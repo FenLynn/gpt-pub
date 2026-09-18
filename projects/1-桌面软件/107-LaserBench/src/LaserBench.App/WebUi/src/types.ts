@@ -16,9 +16,17 @@ export interface LaserSnapshot {
     autoScreenshot: boolean
     aliases: Record<string,string>
     rootPath: string
+    powerWindow: number
+    osaStart: number
+    osaStop: number
+    scopeTimeSpan: number
+    scopeFftMax: number
+    scopeCh1: boolean
+    scopeCh2: boolean
   }
   data: {
     experimentFolder: string
+    fileCount: number
     files: { name:string; size:number; modified:string }[]
     pictureCount: number
     videoCount: number
