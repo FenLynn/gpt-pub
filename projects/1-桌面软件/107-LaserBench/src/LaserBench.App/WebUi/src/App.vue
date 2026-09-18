@@ -41,7 +41,8 @@ const powerSeries = computed<PlotSeries[]>(() => snapshot.value.power.traces.map
 })))
 const powerLeftMax = computed(() => Math.max(5, Math.ceil(Math.max(...snapshot.value.power.traces.filter(t=>t.unit!=='%').flatMap(t=>t.points.map(p=>p.y)), 1) / 5) * 5))
 const devicesShown = computed(() => snapshot.value.devices.slice(0,5))
-const moduleActive = (name:string) => snapshot.value.capturing && !!snapshot.value.captureSelection[name]
+const moduleActive = (name:string) => snapshot.value.captureState==='running' && !!snapshot.value.captureSelection[name]
+const captureStateText=computed(()=>({idle:'就绪',starting:'启动中',running:'采集中',stopping:'停止中',error:'错误'}[snapshot.value.captureState]??'就绪'))
 const filteredFiles=computed(()=>{const q=dataFilter.value.trim().toLowerCase();return q?snapshot.value.data.files.filter(f=>f.name.toLowerCase().includes(q)):snapshot.value.data.files})
 const recordDurationText = computed(() => {
   const total=Math.max(0,Math.floor(recordElapsed.value))
@@ -133,7 +134,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
     <header class="topbar">
       <div class="brand-lockup" title="LaserBench"><div class="brand-logo">LB</div><div v-if="sidebarExpanded" class="brand-copy"><b>LaserBench</b><small>v{{snapshot.version}}</small></div></div>
       <div class="vsep"></div>
-      <button class="run-btn" :class="{stopping:snapshot.capturing}" @click="toggleCapture" :title="snapshot.capturing?'停止采集':'开始采集'">
+      <button class="run-btn" :class="{stopping:snapshot.captureState==='stopping',running:snapshot.captureState==='running'}" @click="toggleCapture" :disabled="snapshot.captureState==='starting'" :title="snapshot.capturing?'停止采集':'开始采集'">
         <svg v-if="!snapshot.capturing" viewBox="0 0 24 24" class="fill-icon"><path d="M8 5v14l11-7z"/></svg>
         <svg v-else viewBox="0 0 24 24" class="fill-icon"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
       </button>
@@ -149,6 +150,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam,breathing:moduleActive('beam')}" @click="toggleSource('beam')" title="本次采集包含光束"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
       <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope,breathing:moduleActive('scope')}" @click="toggleSource('scope')" title="本次采集包含示波器"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></button>
 
+      <span class="capture-state" :class="snapshot.captureState">{{captureStateText}}</span>
       <div class="top-spacer"></div>
       <div class="device-strip"><span v-for="d in devicesShown" :key="d.kind+d.alias" class="device-pill"><i :class="['status-dot',d.status]"></i>{{d.alias}}</span></div>
       <div class="vsep"></div>
@@ -175,8 +177,9 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
 
       <section v-if="activePage==='data'" class="utility-page">
         <div class="utility-head"><div><h2>数据</h2><p>当前实验目录：{{snapshot.data.experimentFolder}}</p></div><div class="utility-actions"><input class="data-search" v-model="dataFilter" placeholder="按 Label / 文件名筛选"/><button @click="refreshData">刷新</button><button @click="openFolder('exp')">打开实验目录</button></div></div>
+        <div class="capture-summary"><b>{{snapshot.lastCaptureMessage}}</b><span v-if="snapshot.lastCaptureAt">{{new Date(snapshot.lastCaptureAt).toLocaleString()}}</span></div>
         <div class="data-stats"><div><span>实验文件</span><b>{{snapshot.data.fileCount}}</b></div><div><span>截图</span><b>{{snapshot.data.pictureCount}}</b></div><div><span>录像</span><b>{{snapshot.data.videoCount}}</b></div></div>
-        <div class="file-table"><div class="file-row file-head"><span>文件名</span><span>大小</span><span>修改时间</span></div><div v-for="f in filteredFiles" :key="f.name" class="file-row"><span>{{f.name}}</span><span>{{formatBytes(f.size)}}</span><span>{{new Date(f.modified).toLocaleString()}}</span></div><div v-if="!filteredFiles.length" class="empty-state">当前实验目录还没有数据文件</div></div>
+        <div class="file-table"><div class="file-row file-head"><span>文件名</span><span>类型</span><span>大小</span><span>修改时间</span></div><div v-for="f in filteredFiles" :key="f.name" class="file-row"><span>{{f.name}}</span><span>{{f.extension.toUpperCase()}}</span><span>{{formatBytes(f.size)}}</span><span>{{new Date(f.modified).toLocaleString()}}</span></div><div v-if="!filteredFiles.length" class="empty-state">当前实验目录还没有数据文件</div></div>
       </section>
 
       <section v-if="activePage==='settings'" class="utility-page settings-page">
@@ -192,8 +195,8 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
           <div class="module-head power-head"><div class="panel-mark power-accent" :class="{breathing:moduleActive('power')}"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div><strong>功率</strong><div class="head-metrics"><span v-for="t in snapshot.power.traces" :key="t.name"><em>{{t.name}}</em><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></span><span v-if="snapshot.power.traces[0]" class="head-muted"><em>Max</em><b>{{snapshot.power.traces[0].maxValue.toFixed(2)}}</b><small>{{snapshot.power.traces[0].unit}}</small></span></div></div>
           <div class="power-layout">
             <div class="power-chart-zone">
-              <PlotCanvas class="main-plot" :series="powerSeries" :x-min="-600" :x-max="0" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" />
-              <div class="overview-row"><div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="-600" :x-max="0" :compact="true" /><div class="overview-selected"><i></i><i></i></div></div></div>
+              <PlotCanvas class="main-plot" :series="powerSeries" :x-min="-settingsDraft.powerWindow" :x-max="0" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" />
+              <div class="overview-row"><div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="-settingsDraft.powerWindow" :x-max="0" :compact="true" /><div class="overview-selected"><i></i><i></i></div></div></div>
             </div>
  
           </div>
@@ -201,7 +204,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
 
         <article class="instrument-panel spectrum-panel" :class="{hidden:!['dashboard','spectrum'].includes(activePage)}">
           <div class="spectrum-head"><div class="panel-mark inline spectrum-accent" :class="{breathing:moduleActive('spectrum')}"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><div class="osa-metrics"><span>λ<sub>c</sub><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b>nm</span><i></i><span><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b>nm</span><i></i><span><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b>nm</span><i></i><span><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b>dBm</span></div><button class="select-like">OSA1<svg viewBox="0 0 24 24"><path d="m7 9 5 5 5-5"/></svg></button></div>
-          <PlotCanvas class="spectrum-plot" :series="snapshot.spectrum.traces" :y-min="-100" :y-max="0" x-label="nm" y-label="功率 (dBm)" />
+          <PlotCanvas class="spectrum-plot" :series="snapshot.spectrum.traces" :x-min="settingsDraft.osaStart" :x-max="settingsDraft.osaStop" :y-min="-100" :y-max="0" x-label="nm" y-label="功率 (dBm)" />
         </article>
 
         <article class="instrument-panel beam-panel" :class="{hidden:!['dashboard','beam'].includes(activePage)}">
@@ -210,7 +213,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
  
         </article>
 
-        <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}"><div class="module-head scope-head"><div class="panel-mark scope-accent" :class="{breathing:moduleActive('scope')}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong><div class="scope-readouts"><span>CH1 <b>{{snapshot.scope.time[0]?.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b> V</span><span>CH2 <b>{{snapshot.scope.time[1]?.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b> V</span><span>采样 <b>2.5</b> MSa/s</span></div></div><div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :y-min="-1" :y-max="1" x-label="ms" :tight="true" /><PlotCanvas :series="snapshot.scope.fft" x-label="kHz" :tight="true" /></div></article>
+        <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}"><div class="module-head scope-head"><div class="panel-mark scope-accent" :class="{breathing:moduleActive('scope')}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong><div class="scope-readouts"><span>CH1 <b>{{snapshot.scope.time[0]?.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b> V</span><span>CH2 <b>{{snapshot.scope.time[1]?.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b> V</span><span>采样 <b>2.5</b> MSa/s</span></div></div><div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="-1" :y-max="1" x-label="ms" :tight="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="kHz" :tight="true" /></div></article>
       </section>
     </main>
   </div>
