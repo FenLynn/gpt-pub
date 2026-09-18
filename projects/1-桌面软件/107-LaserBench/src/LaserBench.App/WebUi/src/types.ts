@@ -9,6 +9,9 @@ export interface LaserSnapshot {
   timestamp: string
   label: string
   capturing: boolean
+  captureState: 'idle'|'starting'|'running'|'stopping'|'error'
+  lastCaptureMessage: string
+  lastCaptureAt?: string | null
   recording: boolean
   captureSelection: Record<string, boolean>
   config: {
@@ -27,7 +30,7 @@ export interface LaserSnapshot {
   data: {
     experimentFolder: string
     fileCount: number
-    files: { name:string; size:number; modified:string }[]
+    files: { name:string; size:number; modified:string; extension:string; group:string }[]
     pictureCount: number
     videoCount: number
   }
