@@ -232,6 +232,8 @@ internal sealed class MainForm : Form
         Osa1Alias = source.Osa1Alias,
         BeamAlias = source.BeamAlias,
         Scope1Alias = source.Scope1Alias,
-        Scope2Alias = source.Scope2Alias
+        Scope2Alias = source.Scope2Alias,
+        PowerWindow=source.PowerWindow, OsaStart=source.OsaStart, OsaStop=source.OsaStop,
+        ScopeTimeSpan=source.ScopeTimeSpan, ScopeFftMax=source.ScopeFftMax, ScopeCh1=source.ScopeCh1, ScopeCh2=source.ScopeCh2
     };
 }
