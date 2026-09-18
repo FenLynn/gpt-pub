@@ -17,6 +17,12 @@ const beamAtt = ref(snapshot.value.beam.attenuation)
 const beamPlaying = ref(false)
 const cameraFlash = ref(false)
 const recordElapsed = ref(0)
+const saveNotice = ref('')
+const settingsDraft = ref({
+  experimentFolder: snapshot.value.config?.experimentFolder ?? '',
+  autoScreenshot: snapshot.value.config?.autoScreenshot ?? false,
+  aliases: { ...(snapshot.value.config?.aliases ?? {}) }
+})
 let beamTimer:number|undefined
 let clockTimer:number|undefined
 let recordTimer:number|undefined
@@ -92,10 +98,24 @@ function toggleBeamPlay(){
     void updateZ(next)
   },260)
 }
+async function saveSettings(){
+  await request('app.setConfig',settingsDraft.value)
+  saveNotice.value='设置已保存'
+  window.setTimeout(()=>saveNotice.value='',1600)
+}
+async function refreshData(){ await request('app.refreshData') }
+async function openFolder(kind:'exp'|'pic'|'video'|'root'){ await request('app.openFolder',{kind}) }
+function formatBytes(n:number){ if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB' }
 function nav(page:string){activePage.value=page}
 
 onMounted(()=>{
-  stopSnapshot=onSnapshot(s=>{snapshot.value=s;if(document.activeElement?.id!=='labelInput')labelDraft.value=s.label})
+  stopSnapshot=onSnapshot(s=>{
+    snapshot.value=s
+    if(document.activeElement?.id!=='labelInput')labelDraft.value=s.label
+    if(activePage.value!=='settings'){
+      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})}}
+    }
+  })
   if(hasNativeBridge) void request('app.getSnapshot')
   else clockTimer=window.setInterval(()=>snapshot.value.timestamp=new Date().toISOString(),1000)
 })
@@ -126,7 +146,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <div class="top-spacer"></div>
       <div class="device-strip"><span v-for="d in devicesShown" :key="d.kind+d.alias" class="device-pill"><i :class="['status-dot',d.status]"></i>{{d.alias}}</span></div>
       <div class="vsep"></div>
-      <button class="icon-btn camera-btn" :class="{flash:cameraFlash}" @click="screenshot" title="截图"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+      <button class="icon-btn camera-btn" :class="{flash:cameraFlash}" @click="screenshot" title="截图"><span v-if="cameraFlash" class="capture-bubble"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
       <button class="record-btn" :class="{active:snapshot.recording}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span v-if="snapshot.recording" class="record-duration">{{recordDurationText}}</span></button>
       <div class="vsep"></div><span class="clock">{{clockText}}</span>
     </header>
@@ -144,9 +164,23 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
     </aside>
 
     <main class="workspace">
-      <div v-if="activePage!=='dashboard'" class="page-ribbon"><button @click="nav('dashboard')">总览</button><span>/</span><strong>{{pageNames[activePage]}}</strong><span class="page-note">当前架构迁移阶段，主页面已切换为 WebView2 + Vue；模块详细配置将在此框架内继续收口。</span></div>
+      <div v-if="activePage!=='dashboard'" class="page-ribbon"><button @click="nav('dashboard')">总览</button><span>/</span><strong>{{pageNames[activePage]}}</strong></div>
 
-      <section class="dashboard-grid" :class="{'focus-mode':activePage!=='dashboard'}">
+      <section v-if="activePage==='data'" class="utility-page">
+        <div class="utility-head"><div><h2>数据</h2><p>当前实验目录：{{snapshot.data.experimentFolder}}</p></div><div class="utility-actions"><button @click="refreshData">刷新</button><button @click="openFolder('exp')">打开实验目录</button></div></div>
+        <div class="data-stats"><div><span>实验文件</span><b>{{snapshot.data.files.length}}</b></div><div><span>截图</span><b>{{snapshot.data.pictureCount}}</b></div><div><span>录像</span><b>{{snapshot.data.videoCount}}</b></div></div>
+        <div class="file-table"><div class="file-row file-head"><span>文件名</span><span>大小</span><span>修改时间</span></div><div v-for="f in snapshot.data.files" :key="f.name" class="file-row"><span>{{f.name}}</span><span>{{formatBytes(f.size)}}</span><span>{{new Date(f.modified).toLocaleString()}}</span></div><div v-if="!snapshot.data.files.length" class="empty-state">当前实验目录还没有数据文件</div></div>
+      </section>
+
+      <section v-if="activePage==='settings'" class="utility-page settings-page">
+        <div class="utility-head"><div><h2>设置</h2><p>Portable 根目录：{{snapshot.config.rootPath}}</p></div><div class="utility-actions"><span class="save-notice">{{saveNotice}}</span><button class="primary" @click="saveSettings">保存设置</button></div></div>
+        <div class="settings-grid">
+          <div class="setting-group"><h3>实验与保存</h3><label><span>实验文件夹</span><input v-model="settingsDraft.experimentFolder" placeholder="留空则使用 YYYY-MM-DD"/></label><label class="switch-row"><span>测试完成后自动截图</span><input type="checkbox" v-model="settingsDraft.autoScreenshot"/></label><div class="folder-actions"><button @click="openFolder('root')">程序目录</button><button @click="openFolder('pic')">截图目录</button><button @click="openFolder('video')">录像目录</button></div></div>
+          <div class="setting-group"><h3>设备 Alias</h3><label v-for="(v,k) in settingsDraft.aliases" :key="k"><span>{{k}}</span><input v-model="settingsDraft.aliases[k]"/></label></div>
+        </div>
+      </section>
+
+      <section v-if="!['data','settings'].includes(activePage)" class="dashboard-grid" :class="{'focus-mode':activePage!=='dashboard'}">
         <article class="instrument-panel power-panel" :class="{hidden:!['dashboard','power'].includes(activePage)}">
           <div class="panel-mark power-mark"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div>
           <div class="power-layout">

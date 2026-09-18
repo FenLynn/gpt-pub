@@ -56,6 +56,9 @@ internal sealed class WebUiHost : IDisposable
         "app.capture",
         "app.screenshot",
         "app.record",
+        "app.setConfig",
+        "app.refreshData",
+        "app.openFolder",
         "beam.setZ",
         "beam.setAttenuation"
     };
@@ -189,6 +192,9 @@ internal sealed class WebUiHost : IDisposable
                 "app.capture" => await _form.ToggleCaptureFromWebAsync(),
                 "app.screenshot" => await _form.SaveScreenshotFromWebAsync(),
                 "app.record" => _form.ToggleRecordingFromWeb(),
+                "app.setConfig" => SetConfig(request.Params),
+                "app.refreshData" => BuildSnapshot(),
+                "app.openFolder" => OpenFolder(request.Params),
                 "beam.setZ" => SetBeamZ(request.Params),
                 "beam.setAttenuation" => SetBeamAttenuation(request.Params),
                 _ => throw new InvalidOperationException("不允许的界面命令。")
@@ -223,6 +229,46 @@ internal sealed class WebUiHost : IDisposable
         }
         AppConfigStore.Save(_config);
         return new { snapshot = BuildSnapshot() };
+    }
+
+    private object SetConfig(JsonElement? value)
+    {
+        if (!value.HasValue || value.Value.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("设置参数无效。");
+        var v=value.Value;
+        if (v.TryGetProperty("experimentFolder",out var folder) && folder.ValueKind==JsonValueKind.String)
+            _config.CurrentExperimentFolder=(folder.GetString()??string.Empty).Trim();
+        if (v.TryGetProperty("autoScreenshot",out var auto) && (auto.ValueKind==JsonValueKind.True || auto.ValueKind==JsonValueKind.False))
+            _config.AutoScreenshot=auto.GetBoolean();
+        if (v.TryGetProperty("aliases",out var aliases) && aliases.ValueKind==JsonValueKind.Object)
+        {
+            static string Alias(JsonElement a,string key,string current)
+                => a.TryGetProperty(key,out var p) && p.ValueKind==JsonValueKind.String && !string.IsNullOrWhiteSpace(p.GetString()) ? p.GetString()!.Trim() : current;
+            _config.Power1Alias=Alias(aliases,"power1",_config.Power1Alias);
+            _config.Power2Alias=Alias(aliases,"power2",_config.Power2Alias);
+            _config.Math1Alias=Alias(aliases,"math1",_config.Math1Alias);
+            _config.Osa1Alias=Alias(aliases,"osa1",_config.Osa1Alias);
+            _config.BeamAlias=Alias(aliases,"beam",_config.BeamAlias);
+            _config.Scope1Alias=Alias(aliases,"scope1",_config.Scope1Alias);
+            _config.Scope2Alias=Alias(aliases,"scope2",_config.Scope2Alias);
+        }
+        AppConfigStore.Save(_config);
+        return new { snapshot=BuildSnapshot() };
+    }
+
+    private object OpenFolder(JsonElement? value)
+    {
+        var kind=ReadString(value,"kind");
+        var path=kind switch
+        {
+            "exp" => AppPaths.ResolveExperimentDirectory(_config),
+            "pic" => AppPaths.PicDir,
+            "video" => AppPaths.VideoDir,
+            "root" => AppPaths.Root,
+            _ => throw new InvalidOperationException("未知目录。")
+        };
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute=true });
+        return new { path };
     }
 
     private object SetBeamZ(JsonElement? value)
@@ -276,6 +322,18 @@ internal sealed class WebUiHost : IDisposable
                 beam = _config.CaptureBeam,
                 scope = _config.CaptureScope
             },
+            config = new
+            {
+                experimentFolder = _config.CurrentExperimentFolder,
+                autoScreenshot = _config.AutoScreenshot,
+                aliases = new
+                {
+                    power1=_config.Power1Alias,power2=_config.Power2Alias,math1=_config.Math1Alias,osa1=_config.Osa1Alias,
+                    beam=_config.BeamAlias,scope1=_config.Scope1Alias,scope2=_config.Scope2Alias
+                },
+                rootPath = AppPaths.Root
+            },
+            data = BuildDataSummary(),
             devices = BuildDevices(),
             power = new { traces },
             spectrum = new
@@ -318,6 +376,24 @@ internal sealed class WebUiHost : IDisposable
                     new { name = _config.Scope2Alias.ToUpperInvariant(), color = "#ff7a00", points = scopeFft.Select(p => new { x = p.X, y = p.Ch2 }).ToArray() }
                 }
             }
+        };
+    }
+
+    private object BuildDataSummary()
+    {
+        var exp=AppPaths.ResolveExperimentDirectory(_config);
+        var files=Directory.EnumerateFiles(exp)
+            .Select(path=>new FileInfo(path))
+            .OrderByDescending(f=>f.LastWriteTime)
+            .Take(100)
+            .Select(f=>new { name=f.Name, size=f.Length, modified=f.LastWriteTime })
+            .ToArray();
+        return new
+        {
+            experimentFolder=Path.GetFileName(exp),
+            files,
+            pictureCount=Directory.Exists(AppPaths.PicDir)?Directory.EnumerateFiles(AppPaths.PicDir,"*.png").Count():0,
+            videoCount=Directory.Exists(AppPaths.VideoDir)?Directory.EnumerateFiles(AppPaths.VideoDir,"*.avi").Count():0
         };
     }
 

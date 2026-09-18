@@ -11,6 +11,18 @@ export interface LaserSnapshot {
   capturing: boolean
   recording: boolean
   captureSelection: Record<string, boolean>
+  config: {
+    experimentFolder: string
+    autoScreenshot: boolean
+    aliases: Record<string,string>
+    rootPath: string
+  }
+  data: {
+    experimentFolder: string
+    files: { name:string; size:number; modified:string }[]
+    pictureCount: number
+    videoCount: number
+  }
   devices: DeviceState[]
   power: { traces: MetricTrace[] }
   spectrum: {
