@@ -6,8 +6,8 @@ function gaussian(x: number, center: number, sigma: number) {
 
 function powerSeries(index: number, color: string, name: string, unit: string): { name:string; unit:string; value:number; maxValue:number; color:string; points:PlotPoint[] } {
   const points: PlotPoint[] = []
-  for (let i = 0; i < 360; i++) {
-    const x = -600 + i * 600 / 359
+  for (let i = 0; i < 900; i++) {
+    const x = -600 + i * 600 / 899
     const elapsed = x + 600
     const rise = 1 - Math.exp(-elapsed / 14)
     const value = index === 0
@@ -24,8 +24,8 @@ function powerSeries(index: number, color: string, name: string, unit: string): 
 function spectrum(): PlotSeries[] {
   const blue: PlotPoint[] = []
   const orange: PlotPoint[] = []
-  for (let i = 0; i < 520; i++) {
-    const x = 1060 + i * 43 / 519
+  for (let i = 0; i < 1200; i++) {
+    const x = 1060 + i * 43 / 1199
     const noise = 2.1 * Math.sin(i * .83) + 1.2 * Math.sin(i * .19)
     blue.push({ x, y: -89 + 83 * gaussian(x, 1080.2, .72) + 13 * gaussian(x, 1083.4, 1.1) + noise })
     orange.push({ x, y: -94 + 70 * gaussian(x, 1080.2, .68) + 8 * gaussian(x, 1083.3, 1.05) + .7 * noise })
@@ -39,8 +39,8 @@ function spectrum(): PlotSeries[] {
 function caustic(): PlotSeries[] {
   const x: PlotPoint[] = []
   const y: PlotPoint[] = []
-  for (let i = 0; i < 41; i++) {
-    const z = -28 + i * 56 / 40
+  for (let i = 0; i < 81; i++) {
+    const z = -28 + i * 56 / 80
     x.push({ x: z, y: 20 + 0.165 * Math.pow(z + .4, 2) })
     y.push({ x: z, y: 34 + 0.19 * Math.pow(z - .7, 2) })
   }
@@ -53,8 +53,8 @@ function caustic(): PlotSeries[] {
 function scopeTime(): PlotSeries[] {
   const ch1: PlotPoint[] = []
   const ch2: PlotPoint[] = []
-  for (let i = 0; i < 520; i++) {
-    const x = i * 240 / 519
+  for (let i = 0; i < 1400; i++) {
+    const x = i * 240 / 1399
     ch1.push({ x, y: .68 * Math.sin(x * .205) + .06 * Math.sin(x * .61) })
     ch2.push({ x, y: .29 * Math.sin(x * .205 + .9) + .03 * Math.sin(x * .47) })
   }
@@ -64,8 +64,8 @@ function scopeTime(): PlotSeries[] {
 function scopeFft(): PlotSeries[] {
   const ch1: PlotPoint[] = []
   const ch2: PlotPoint[] = []
-  for (let i = 0; i < 520; i++) {
-    const x = i * 54 / 519
+  for (let i = 0; i < 1400; i++) {
+    const x = i * 54 / 1399
     const floor1 = -78 + 2.2 * Math.sin(i * .33)
     const floor2 = -88 + 1.6 * Math.sin(i * .27)
     ch1.push({ x, y: floor1 + 72 * gaussian(x, 7, .43) + 47 * gaussian(x, 14.1, .28) + 34 * gaussian(x, 21.2, .26) + 25 * gaussian(x, 28.3, .24) })
@@ -79,7 +79,7 @@ export function createDemoSnapshot(): LaserSnapshot {
   const p2 = powerSeries(1, '#ff8200', 'back', 'kW')
   const p3 = powerSeries(2, '#08a84f', 'eta', '%')
   return {
-    version: '0.3.2', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, recording: false,
+    version: '0.3.3', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, recording: false,
     captureSelection: { power: true, spectrum: true, beam: true, scope: false },
     config: {
       experimentFolder: '', autoScreenshot: false,
