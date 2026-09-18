@@ -22,8 +22,11 @@ const saveNotice = ref('')
 const settingsDraft = ref({
   experimentFolder: snapshot.value.config?.experimentFolder ?? '',
   autoScreenshot: snapshot.value.config?.autoScreenshot ?? false,
-  aliases: { ...(snapshot.value.config?.aliases ?? {}) }
+  aliases: { ...(snapshot.value.config?.aliases ?? {}) },
+  powerWindow:snapshot.value.config?.powerWindow??600, osaStart:snapshot.value.config?.osaStart??1060, osaStop:snapshot.value.config?.osaStop??1100,
+  scopeTimeSpan:snapshot.value.config?.scopeTimeSpan??0.24, scopeFftMax:snapshot.value.config?.scopeFftMax??50, scopeCh1:snapshot.value.config?.scopeCh1??true, scopeCh2:snapshot.value.config?.scopeCh2??true
 })
+const dataFilter=ref('')
 let beamTimer:number|undefined
 let clockTimer:number|undefined
 let recordTimer:number|undefined
@@ -39,6 +42,7 @@ const powerSeries = computed<PlotSeries[]>(() => snapshot.value.power.traces.map
 const powerLeftMax = computed(() => Math.max(5, Math.ceil(Math.max(...snapshot.value.power.traces.filter(t=>t.unit!=='%').flatMap(t=>t.points.map(p=>p.y)), 1) / 5) * 5))
 const devicesShown = computed(() => snapshot.value.devices.slice(0,5))
 const moduleActive = (name:string) => snapshot.value.capturing && !!snapshot.value.captureSelection[name]
+const filteredFiles=computed(()=>{const q=dataFilter.value.trim().toLowerCase();return q?snapshot.value.data.files.filter(f=>f.name.toLowerCase().includes(q)):snapshot.value.data.files})
 const recordDurationText = computed(() => {
   const total=Math.max(0,Math.floor(recordElapsed.value))
   const h=Math.floor(total/3600),m=Math.floor((total%3600)/60),s=total%60
@@ -115,7 +119,7 @@ onMounted(()=>{
     snapshot.value=s
     if(document.activeElement?.id!=='labelInput')labelDraft.value=s.label
     if(activePage.value!=='settings'){
-      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})}}
+      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})},powerWindow:s.config?.powerWindow??600,osaStart:s.config?.osaStart??1060,osaStop:s.config?.osaStop??1100,scopeTimeSpan:s.config?.scopeTimeSpan??0.24,scopeFftMax:s.config?.scopeFftMax??50,scopeCh1:s.config?.scopeCh1??true,scopeCh2:s.config?.scopeCh2??true}
     }
   })
   if(hasNativeBridge) void request('app.getSnapshot')
@@ -170,16 +174,16 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <div v-if="activePage!=='dashboard'" class="page-ribbon"><button @click="nav('dashboard')">总览</button><span>/</span><strong>{{pageNames[activePage]}}</strong></div>
 
       <section v-if="activePage==='data'" class="utility-page">
-        <div class="utility-head"><div><h2>数据</h2><p>当前实验目录：{{snapshot.data.experimentFolder}}</p></div><div class="utility-actions"><button @click="refreshData">刷新</button><button @click="openFolder('exp')">打开实验目录</button></div></div>
-        <div class="data-stats"><div><span>实验文件</span><b>{{snapshot.data.files.length}}</b></div><div><span>截图</span><b>{{snapshot.data.pictureCount}}</b></div><div><span>录像</span><b>{{snapshot.data.videoCount}}</b></div></div>
-        <div class="file-table"><div class="file-row file-head"><span>文件名</span><span>大小</span><span>修改时间</span></div><div v-for="f in snapshot.data.files" :key="f.name" class="file-row"><span>{{f.name}}</span><span>{{formatBytes(f.size)}}</span><span>{{new Date(f.modified).toLocaleString()}}</span></div><div v-if="!snapshot.data.files.length" class="empty-state">当前实验目录还没有数据文件</div></div>
+        <div class="utility-head"><div><h2>数据</h2><p>当前实验目录：{{snapshot.data.experimentFolder}}</p></div><div class="utility-actions"><input class="data-search" v-model="dataFilter" placeholder="按 Label / 文件名筛选"/><button @click="refreshData">刷新</button><button @click="openFolder('exp')">打开实验目录</button></div></div>
+        <div class="data-stats"><div><span>实验文件</span><b>{{snapshot.data.fileCount}}</b></div><div><span>截图</span><b>{{snapshot.data.pictureCount}}</b></div><div><span>录像</span><b>{{snapshot.data.videoCount}}</b></div></div>
+        <div class="file-table"><div class="file-row file-head"><span>文件名</span><span>大小</span><span>修改时间</span></div><div v-for="f in filteredFiles" :key="f.name" class="file-row"><span>{{f.name}}</span><span>{{formatBytes(f.size)}}</span><span>{{new Date(f.modified).toLocaleString()}}</span></div><div v-if="!filteredFiles.length" class="empty-state">当前实验目录还没有数据文件</div></div>
       </section>
 
       <section v-if="activePage==='settings'" class="utility-page settings-page">
         <div class="utility-head"><div><h2>设置</h2><p>Portable 根目录：{{snapshot.config.rootPath}}</p></div><div class="utility-actions"><span class="save-notice">{{saveNotice}}</span><button class="primary" @click="saveSettings">保存设置</button></div></div>
         <div class="settings-grid">
           <div class="setting-group"><h3>实验与保存</h3><label><span>实验文件夹</span><input v-model="settingsDraft.experimentFolder" placeholder="留空则使用 YYYY-MM-DD"/></label><label class="switch-row"><span>测试完成后自动截图</span><input type="checkbox" v-model="settingsDraft.autoScreenshot"/></label><div class="folder-actions"><button @click="openFolder('root')">程序目录</button><button @click="openFolder('pic')">截图目录</button><button @click="openFolder('video')">录像目录</button></div></div>
-          <div class="setting-group"><h3>设备 Alias</h3><label v-for="(v,k) in settingsDraft.aliases" :key="k"><span>{{k}}</span><input v-model="settingsDraft.aliases[k]"/></label></div>
+          <div class="setting-group"><h3>设备 Alias</h3><label v-for="(v,k) in settingsDraft.aliases" :key="k"><span>{{k}}</span><input v-model="settingsDraft.aliases[k]"/></label></div><div class="setting-group"><h3>功率</h3><label><span>历史窗口</span><select v-model.number="settingsDraft.powerWindow"><option :value="120">2 min</option><option :value="300">5 min</option><option :value="600">10 min</option><option :value="1800">30 min</option></select></label></div><div class="setting-group"><h3>光谱 OSA</h3><label><span>起始波长</span><input type="number" v-model.number="settingsDraft.osaStart"/></label><label><span>终止波长</span><input type="number" v-model.number="settingsDraft.osaStop"/></label></div><div class="setting-group"><h3>示波器</h3><label><span>时间窗 (ms)</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTimeSpan"/></label><label><span>FFT 上限 (MHz)</span><input type="number" v-model.number="settingsDraft.scopeFftMax"/></label><label><span>CH1</span><input type="checkbox" v-model="settingsDraft.scopeCh1"/></label><label><span>CH2</span><input type="checkbox" v-model="settingsDraft.scopeCh2"/></label></div><div class="setting-group"><h3>运行环境</h3><label><span>运行模式</span><b>{{snapshot.mode==='SIM'?'Simulator 模拟器':'Hardware 硬件'}}</b></label><label><span>程序目录</span><small>{{snapshot.config.rootPath}}</small></label></div>
         </div>
       </section>
 
