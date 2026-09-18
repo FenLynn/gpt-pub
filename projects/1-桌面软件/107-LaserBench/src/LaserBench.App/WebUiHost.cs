@@ -107,6 +107,21 @@ internal sealed class WebUiHost : IDisposable
         await _webView.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream);
     }
 
+    internal async Task CaptureRecordingPreviewAsync(Stream stream)
+    {
+        if (!_ready || _webView.CoreWebView2 is null)
+            throw new InvalidOperationException("Web UI is not ready for recording capture.");
+        await _webView.CoreWebView2.ExecuteScriptAsync("document.documentElement.classList.add('record-capture')");
+        try
+        {
+            await _webView.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream);
+        }
+        finally
+        {
+            try { await _webView.CoreWebView2.ExecuteScriptAsync("document.documentElement.classList.remove('record-capture')"); } catch { }
+        }
+    }
+
     private async Task InitializeAsync()
     {
         try

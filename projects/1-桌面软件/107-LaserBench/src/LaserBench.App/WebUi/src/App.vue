@@ -15,8 +15,12 @@ const labelDraft = ref(snapshot.value.label)
 const beamZ = ref(snapshot.value.beam.z)
 const beamAtt = ref(snapshot.value.beam.attenuation)
 const beamPlaying = ref(false)
+const cameraFlash = ref(false)
+const recordElapsed = ref(0)
 let beamTimer:number|undefined
 let clockTimer:number|undefined
+let recordTimer:number|undefined
+let recordStartedAt:number|undefined
 let stopSnapshot: (()=>void)|undefined
 
 const powerSeries = computed<PlotSeries[]>(() => snapshot.value.power.traces.map(t => ({
@@ -27,6 +31,12 @@ const powerSeries = computed<PlotSeries[]>(() => snapshot.value.power.traces.map
 })))
 const powerLeftMax = computed(() => Math.max(5, Math.ceil(Math.max(...snapshot.value.power.traces.filter(t=>t.unit!=='%').flatMap(t=>t.points.map(p=>p.y)), 1) / 5) * 5))
 const devicesShown = computed(() => snapshot.value.devices.slice(0,5))
+const recordDurationText = computed(() => {
+  const total=Math.max(0,Math.floor(recordElapsed.value))
+  const h=Math.floor(total/3600),m=Math.floor((total%3600)/60),s=total%60
+  const pad=(v:number)=>String(v).padStart(2,'0')
+  return h>0?`${pad(h)}:${pad(m)}:${pad(s)}`:`${pad(m)}:${pad(s)}`
+})
 const clockText = computed(() => {
   const d = new Date(snapshot.value.timestamp)
   if (Number.isNaN(d.getTime())) return snapshot.value.timestamp
@@ -36,6 +46,18 @@ const clockText = computed(() => {
 
 watch(() => snapshot.value.beam.z, v => { if(!beamPlaying.value) beamZ.value=v })
 watch(() => snapshot.value.beam.attenuation, v => beamAtt.value=v)
+watch(() => snapshot.value.recording, recording => {
+  if(recordTimer){window.clearInterval(recordTimer);recordTimer=undefined}
+  if(recording){
+    if(recordStartedAt===undefined) recordStartedAt=Date.now()
+    const update=()=>recordElapsed.value=(Date.now()-(recordStartedAt??Date.now()))/1000
+    update()
+    recordTimer=window.setInterval(update,250)
+  }else{
+    recordStartedAt=undefined
+    recordElapsed.value=0
+  }
+},{immediate:true})
 
 async function setLabel() {
   snapshot.value.label = labelDraft.value.trim()
@@ -47,7 +69,14 @@ async function toggleSource(module:string) {
   await request('app.setCaptureSelection',{module,selected:next})
 }
 async function toggleCapture(){ await request('app.capture') }
-async function screenshot(){ await request('app.screenshot') }
+async function screenshot(){
+  await request('app.screenshot')
+  cameraFlash.value=false
+  window.requestAnimationFrame(()=>{
+    cameraFlash.value=true
+    window.setTimeout(()=>cameraFlash.value=false,260)
+  })
+}
 async function toggleRecord(){ await request('app.record') }
 async function updateZ(value:number){beamZ.value=value;await request('beam.setZ',{value})}
 async function updateAtt(value:number){beamAtt.value=value;await request('beam.setAttenuation',{value})}
@@ -70,7 +99,7 @@ onMounted(()=>{
   if(hasNativeBridge) void request('app.getSnapshot')
   else clockTimer=window.setInterval(()=>snapshot.value.timestamp=new Date().toISOString(),1000)
 })
-onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTimer);if(clockTimer)window.clearInterval(clockTimer)})
+onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTimer);if(clockTimer)window.clearInterval(clockTimer);if(recordTimer)window.clearInterval(recordTimer)})
 </script>
 
 <template>
@@ -97,8 +126,8 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <div class="top-spacer"></div>
       <div class="device-strip"><span v-for="d in devicesShown" :key="d.kind+d.alias" class="device-pill"><i :class="['status-dot',d.status]"></i>{{d.alias}}</span></div>
       <div class="vsep"></div>
-      <button class="icon-btn" @click="screenshot" title="截图"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
-      <button class="record-btn" :class="{active:snapshot.recording}" @click="toggleRecord" title="录像"><i></i><span>REC</span></button>
+      <button class="icon-btn camera-btn" :class="{flash:cameraFlash}" @click="screenshot" title="截图"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+      <button class="record-btn" :class="{active:snapshot.recording}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span v-if="snapshot.recording" class="record-duration">{{recordDurationText}}</span></button>
       <div class="vsep"></div><span class="clock">{{clockText}}</span>
     </header>
 
@@ -119,11 +148,11 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
 
       <section class="dashboard-grid" :class="{'focus-mode':activePage!=='dashboard'}">
         <article class="instrument-panel power-panel" :class="{hidden:!['dashboard','power'].includes(activePage)}">
-          <div class="panel-mark"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div>
+          <div class="panel-mark power-mark"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div>
           <div class="power-layout">
             <div class="power-chart-zone">
               <PlotCanvas class="main-plot" :series="powerSeries" :x-min="-600" :x-max="0" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" />
-              <div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="-600" :x-max="0" :compact="true" /><div class="overview-selected"><i></i><i></i></div></div>
+              <div class="overview-row"><div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="-600" :x-max="0" :compact="true" /><div class="overview-selected"><i></i><i></i></div></div></div>
             </div>
             <div class="metric-rail">
               <div v-for="t in snapshot.power.traces" :key="t.name" class="metric-item"><div class="metric-name"><i :style="{background:t.color}"></i>{{t.name}}</div><div class="metric-value">{{t.value.toFixed(t.unit==='%'?1:2)}}<span>{{t.unit}}</span></div></div>
@@ -139,12 +168,11 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         </article>
 
         <article class="instrument-panel beam-panel" :class="{hidden:!['dashboard','beam'].includes(activePage)}">
-          <div class="panel-mark"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
           <div class="beam-body"><div class="beam-image-wrap"><BeamProfileCanvas :width-x="snapshot.beam.spotWidthX" :width-y="snapshot.beam.spotWidthY" :attenuation="beamAtt" /><div class="beam-tools"><button title="放大">＋</button><button title="缩小">−</button><button title="适应">⛶</button></div></div><PlotCanvas class="caustic-plot" :series="snapshot.beam.caustic" :vertical-marker="beamZ" x-label="Z (mm)" y-label="束宽 (μm)" /></div>
-          <div class="beam-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b><div class="m2-block"><span>M²<sub>x</sub><b>{{snapshot.beam.m2x.toFixed(2)}}</b></span><span>M²<sub>y</sub><b>{{snapshot.beam.m2y.toFixed(2)}}</b></span><span>M̄²<b>{{snapshot.beam.m2mean.toFixed(2)}}</b></span></div></div>
+          <div class="beam-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b><div class="m2-block"><span>M²<sub>x</sub><b>{{snapshot.beam.m2x.toFixed(2)}}</b></span><span>M²<sub>y</sub><b>{{snapshot.beam.m2y.toFixed(2)}}</b></span><span>M̄²<b>{{snapshot.beam.m2mean.toFixed(2)}}</b></span></div><div class="beam-mark" title="光束"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div></div>
         </article>
 
-        <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}"><div class="scope-head"><div class="panel-mark inline"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div></div><div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :y-min="-1" :y-max="1" x-label="ms" /><PlotCanvas :series="snapshot.scope.fft" x-label="kHz" /></div></article>
+        <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}"><div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :y-min="-1" :y-max="1" x-label="ms" :tight="true" /><PlotCanvas :series="snapshot.scope.fft" x-label="kHz" :tight="true" /></div><div class="scope-mark" title="示波器"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div></article>
       </section>
     </main>
   </div>

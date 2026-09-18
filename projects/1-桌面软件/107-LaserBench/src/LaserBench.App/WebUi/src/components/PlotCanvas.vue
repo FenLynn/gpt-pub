@@ -15,9 +15,10 @@ const props = withDefaults(defineProps<{
   rightYLabel?: string
   timeAxis?: boolean
   compact?: boolean
+  tight?: boolean
   verticalMarker?: number | null
 }>(), {
-  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, compact: false, verticalMarker: null
+  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, compact: false, tight: false, verticalMarker: null
 })
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -64,7 +65,7 @@ function draw() {
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
-  const m = props.compact ? {l:2,r:2,t:2,b:2} : {l:56,r:hasRight?56:18,t:16,b:36}
+  const m = props.compact ? {l:2,r:2,t:2,b:2} : props.tight ? {l:42,r:hasRight?46:8,t:7,b:27} : {l:50,r:hasRight?50:12,t:10,b:30}
   const pw = Math.max(10,w-m.l-m.r), ph = Math.max(10,h-m.t-m.b)
   const {x0,x1,y0,y1,r0,r1} = bounds.value
   const sx = (x:number) => m.l + (x-x0)/(x1-x0||1)*pw
@@ -101,7 +102,7 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font='12px "Segoe UI", sans-serif';ctx.fillStyle='#38516a';ctx.textBaseline='middle'
+  ctx.font='11px "Segoe UI", sans-serif';ctx.fillStyle='#38516a';ctx.textBaseline='middle'
   for(let i=0;i<4;i++) {
     const t=i/3, y=m.t+ph*t, v=y1-(y1-y0)*t, text=fmt(v,y1-y0)
     ctx.textAlign='right';ctx.fillText(text,m.l-8,y)
@@ -115,8 +116,8 @@ function draw() {
     else text=fmt(v,x1-x0)
     ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+8)
   }
-  ctx.fillStyle='#203c58';ctx.font='13px "Segoe UI", sans-serif'
-  if(props.xLabel){ctx.textAlign='right';ctx.fillText(props.xLabel,m.l+pw,m.t+ph+23)}
+  ctx.fillStyle='#203c58';ctx.font='12px "Segoe UI", sans-serif'
+  if(props.xLabel){ctx.textAlign='right';ctx.fillText(props.xLabel,m.l+pw,m.t+ph+19)}
   if(props.yLabel){ctx.save();ctx.translate(16,m.t+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(props.yLabel,0,0);ctx.restore()}
   if(hasRight&&props.rightYLabel){ctx.save();ctx.translate(w-11,m.t+ph/2);ctx.rotate(Math.PI/2);ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(props.rightYLabel,0,0);ctx.restore()}
 

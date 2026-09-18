@@ -91,6 +91,7 @@ internal sealed class MainForm : Form
             StartupDiagnostics.Stage("webui", "begin");
             Controls.Clear();
             _webUi = WebUiHost.Attach(this, _config, _provider);
+            _recorder?.SetPreviewSource(_webUi.CaptureRecordingPreviewAsync);
             _webUi.Ready += () =>
             {
                 _workspaceReady = true;

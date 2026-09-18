@@ -10,6 +10,8 @@ internal sealed class ScreenRecorder : IDisposable
     private string? _partialPath;
     private DateTime _startedAt;
     private string _label = string.Empty;
+    private Func<Stream, Task>? _previewSource;
+    private bool _frameBusy;
 
     public bool IsRecording => _writer is not null;
     public string? LastSavedPath { get; private set; }
@@ -18,8 +20,11 @@ internal sealed class ScreenRecorder : IDisposable
     {
         _source = source;
         _timer = new System.Windows.Forms.Timer { Interval = 200 };
-        _timer.Tick += (_, _) => CaptureTick();
+        _timer.Tick += async (_, _) => await CaptureTickAsync();
     }
+
+    public void SetPreviewSource(Func<Stream, Task> previewSource)
+        => _previewSource = previewSource;
 
     public void Start(string label)
     {
@@ -32,7 +37,7 @@ internal sealed class ScreenRecorder : IDisposable
         var size = GetRecordingSize(_source.ClientSize);
         _writer = new AviMjpegWriter(_partialPath, size.Width, size.Height, 5);
         _timer.Start();
-        CaptureTick();
+        _ = CaptureTickAsync();
     }
 
     public string? Stop()
@@ -53,25 +58,49 @@ internal sealed class ScreenRecorder : IDisposable
         }
     }
 
-    private void CaptureTick()
+    private async Task CaptureTickAsync()
     {
-        if (_writer is null || _source.Width <= 0 || _source.Height <= 0) return;
+        if (_frameBusy || _writer is null || _source.Width <= 0 || _source.Height <= 0) return;
+        _frameBusy = true;
+        var writer = _writer;
         try
         {
-            using var original = new Bitmap(_source.ClientSize.Width, _source.ClientSize.Height, PixelFormat.Format24bppRgb);
-            _source.DrawToBitmap(original, new Rectangle(Point.Empty, _source.ClientSize));
-            var targetSize = new Size(_writer.Width, _writer.Height);
-            using var frame = new Bitmap(targetSize.Width, targetSize.Height, PixelFormat.Format24bppRgb);
-            using (var g = Graphics.FromImage(frame))
+            Bitmap original;
+            if (_previewSource is not null)
             {
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
-                g.DrawImage(original, new Rectangle(Point.Empty, targetSize));
+                using var png = new MemoryStream();
+                await _previewSource(png);
+                if (!ReferenceEquals(_writer, writer) || _writer is null) return;
+                png.Position = 0;
+                using var decoded = new Bitmap(png);
+                original = new Bitmap(decoded);
             }
-            _writer.WriteFrame(frame);
+            else
+            {
+                original = new Bitmap(_source.ClientSize.Width, _source.ClientSize.Height, PixelFormat.Format24bppRgb);
+                _source.DrawToBitmap(original, new Rectangle(Point.Empty, _source.ClientSize));
+            }
+
+            using (original)
+            {
+                if (!ReferenceEquals(_writer, writer) || _writer is null) return;
+                var targetSize = new Size(writer.Width, writer.Height);
+                using var frame = new Bitmap(targetSize.Width, targetSize.Height, PixelFormat.Format24bppRgb);
+                using (var g = Graphics.FromImage(frame))
+                {
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
+                    g.DrawImage(original, new Rectangle(Point.Empty, targetSize));
+                }
+                writer.WriteFrame(frame);
+            }
         }
         catch
         {
             // Recording is an auxiliary visual log. Measurement acquisition must not be interrupted by a frame failure.
+        }
+        finally
+        {
+            _frameBusy = false;
         }
     }
 
