@@ -54,3 +54,6 @@
 
 /* v0.4.0 plot-only white surfaces */
 .workspace,.dashboard-grid,.instrument-panel,.module-head,.spectrum-head,.scope-head,.power-layout,.power-chart-zone,.beam-body,.scope-plots{background:#edf5fa!important}.main-plot,.spectrum-plot,.caustic-plot,.scope-plots>.plot-canvas,.overview-shell{background:#fff!important;border-radius:4px;overflow:hidden}.dashboard-grid{gap:7px}.data-search{height:30px;width:220px;border:1px solid #b9c8d3;border-radius:4px;padding:0 9px;background:#fff}.setting-group select,.setting-group input[type=number]{height:28px;border:1px solid #bdcfdd;border-radius:3px;padding:0 7px;background:#fff;color:#263b4c}.setting-group small{font-size:10px;color:#657d90;overflow-wrap:anywhere}.setting-group b{font-size:14px;color:#253d50}
+
+/* v0.4.9 stabilization */
+.capture-state{font-size:10px;padding:3px 7px;border-radius:9px;background:#dce7ee;color:#526c7e;white-space:nowrap}.capture-state.running{background:#d9f0e2;color:#237444}.capture-state.starting,.capture-state.stopping{background:#f5ead0;color:#8a6617}.run-btn:disabled{opacity:.55;cursor:wait}.capture-summary{display:flex;align-items:center;gap:12px;margin:0 0 8px;padding:7px 10px;border-radius:4px;background:#e8f1f6;color:#405d72}.capture-summary b{font-size:13px}.capture-summary span{font-size:10px;color:#7890a1}.file-row{grid-template-columns:minmax(300px,1fr) 70px 90px 170px}
