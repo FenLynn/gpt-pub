@@ -70,6 +70,26 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'LaserBench <Version> is missing.' }
           "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
+      - name: Verify acquisition GIF animation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName System.Drawing
+          $assetDir=Join-Path $env:PROJECT_ROOT 'src/LaserBench.App/WebUi/src/assets'
+          foreach ($name in @('acq-power.gif','acq-spectrum.gif','acq-scope.gif','acq-beam.gif')) {
+            $path=Join-Path $assetDir $name
+            if (!(Test-Path $path -PathType Leaf)) { throw "Missing acquisition GIF: $name" }
+            $image=[System.Drawing.Image]::FromFile((Resolve-Path $path))
+            try {
+              $dimension=New-Object System.Drawing.Imaging.FrameDimension($image.FrameDimensionsList[0])
+              $frames=$image.GetFrameCount($dimension)
+              Write-Host "$name frames=$frames"
+              if ($frames -lt 4) { throw "$name is not a visible multi-frame GIF." }
+            } finally {
+              $image.Dispose()
+            }
+          }
+
       - name: Restore projects
         shell: pwsh
         run: |

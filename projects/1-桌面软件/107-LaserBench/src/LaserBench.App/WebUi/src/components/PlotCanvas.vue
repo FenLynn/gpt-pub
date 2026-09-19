@@ -14,13 +14,15 @@ const props = withDefaults(defineProps<{
   yLabel?: string
   rightYLabel?: string
   timeAxis?: boolean
+  timeOriginMs?: number
+  timeValidMax?: number
   compact?: boolean
   tight?: boolean
   stacked?: boolean
   xPadding?: number
   verticalMarker?: number | null
 }>(), {
-  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, compact: false, tight: false, stacked: false, xPadding: 0, verticalMarker: null
+  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, timeOriginMs: undefined, timeValidMax: undefined, compact: false, tight: false, stacked: false, xPadding: 0, verticalMarker: null
 })
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -126,8 +128,14 @@ function draw() {
   for(let i=0;i<6;i++) {
     const t=i/5, x=m.l+pw*t, v=x0+(x1-x0)*t
     let text:string
-    if(props.timeAxis){const d=new Date(Date.now()+v*1000); text=d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})}
-    else text=fmt(v,x1-x0)
+    if(props.timeAxis){
+      if(props.timeValidMax!==undefined && v>props.timeValidMax+1e-6) text=''
+      else {
+        const base=props.timeOriginMs ?? Date.now()
+        const d=new Date(base+v*1000)
+        text=d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})
+      }
+    } else text=fmt(v,x1-x0)
     ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+3)
   }
   if(props.series.length){
@@ -136,7 +144,7 @@ function draw() {
   }
 }
 
-watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.xPadding,props.verticalMarker],draw,{deep:true})
+watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.timeOriginMs,props.timeValidMax,props.xPadding,props.verticalMarker],draw,{deep:true})
 onMounted(()=>{observer=new ResizeObserver(draw);if(canvas.value)observer.observe(canvas.value);draw()})
 onBeforeUnmount(()=>observer?.disconnect())
 </script>
