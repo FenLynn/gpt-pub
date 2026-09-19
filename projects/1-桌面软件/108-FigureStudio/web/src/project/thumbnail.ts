@@ -34,7 +34,11 @@ export function figureThumbnailDataUrl(
 
   if (!dataset) {
     content = '<text x="90" y="58" text-anchor="middle" fill="#8a929a" font-size="11">缺少数据</text>';
-  } else if (figure.templateId === "heatmap" || figure.templateId === "surface-3d") {
+  } else if (
+    figure.templateId === "heatmap" ||
+    figure.templateId === "contour" ||
+    figure.templateId === "surface-3d"
+  ) {
     const scale = figure.figureOverrides.colorScale ?? "Viridis";
     const gradientId = "g";
     const palettes: Record<string, string[]> = {
@@ -72,7 +76,12 @@ export function figureThumbnailDataUrl(
       '" fill="url(#' +
       gradientId +
       ')" opacity="0.9"/>' +
-      '<ellipse cx="96" cy="52" rx="38" ry="23" fill="#ffffff" opacity="0.22"/>';
+      '<ellipse cx="96" cy="52" rx="38" ry="23" fill="#ffffff" opacity="0.22"/>' +
+      (figure.templateId === "contour"
+        ? '<path d="M28 72 C52 46 70 82 96 50 S142 32 166 54" fill="none" stroke="#202328" stroke-width="0.8" opacity="0.68"/>' +
+          '<path d="M22 57 C48 30 77 65 104 36 S146 24 170 38" fill="none" stroke="#202328" stroke-width="0.65" opacity="0.58"/>' +
+          '<path d="M34 84 C58 65 85 92 114 68 S150 54 166 70" fill="none" stroke="#202328" stroke-width="0.65" opacity="0.58"/>'
+        : "");
   } else {
     const visible = figure.seriesOrder
       .map((id) => dataset.ys.find((series) => series.id === id))
@@ -83,22 +92,69 @@ export function figureThumbnailDataUrl(
     const categoricalX = dataset.x.values.some(
       (value) => typeof value === "string"
     );
-    const xValues = categoricalX
+    const waterfall = figure.templateId === "waterfall";
+    const doubleY = figure.templateId === "double-y";
+    const waterfallXOffset = waterfall
+      ? figure.figureOverrides.waterfallXOffset ?? 0.5
+      : 0;
+    const waterfallYOffset = waterfall
+      ? figure.figureOverrides.waterfallYOffset ?? 5
+      : 0;
+
+    const baseX = categoricalX
       ? dataset.x.values.map((_value, index) => index)
       : numbers(
           dataset.x.values.map((value) =>
             typeof value === "number" ? value : null
           )
         );
-    const allY = visible.flatMap((series) => numbers(series.values));
+    const xValues =
+      waterfall && !categoricalX
+        ? visible.flatMap((_series, seriesIndex) =>
+            baseX.map((value) => value + seriesIndex * waterfallXOffset)
+          )
+        : baseX;
+    const allY = visible.flatMap((series, seriesIndex) =>
+      numbers(series.values).map(
+        (value) => value + seriesIndex * waterfallYOffset
+      )
+    );
     const minX = Math.min(...xValues, 0);
     const maxX = Math.max(...xValues, 1);
     const minY = Math.min(...allY, 0);
     const maxY = Math.max(...allY, 1);
+
+    const leftY = visible.flatMap((series, seriesIndex) => {
+      const axis =
+        figure.seriesOverrides[series.id]?.yAxis ??
+        (seriesIndex === 0 ? "left" : "right");
+      return axis === "left" ? numbers(series.values) : [];
+    });
+    const rightY = visible.flatMap((series, seriesIndex) => {
+      const axis =
+        figure.seriesOverrides[series.id]?.yAxis ??
+        (seriesIndex === 0 ? "left" : "right");
+      return axis === "right" ? numbers(series.values) : [];
+    });
+    const leftMinY = Math.min(...leftY, 0);
+    const leftMaxY = Math.max(...leftY, 1);
+    const rightMinY = Math.min(...rightY, 0);
+    const rightMaxY = Math.max(...rightY, 1);
+
     const sx = (value: number) =>
       left + ((value - minX) / Math.max(1e-12, maxX - minX)) * (width - left - right);
-    const sy = (value: number) =>
-      top + (1 - (value - minY) / Math.max(1e-12, maxY - minY)) * (height - top - bottom);
+    const syRange = (value: number, low: number, high: number) =>
+      top + (1 - (value - low) / Math.max(1e-12, high - low)) * (height - top - bottom);
+    const sy = (value: number) => syRange(value, minY, maxY);
+    const syForSeries = (value: number, series: (typeof visible)[number], seriesIndex: number) => {
+      if (!doubleY) return sy(value);
+      const axis =
+        figure.seriesOverrides[series.id]?.yAxis ??
+        (seriesIndex === 0 ? "left" : "right");
+      return axis === "right"
+        ? syRange(value, rightMinY, rightMaxY)
+        : syRange(value, leftMinY, leftMaxY);
+    };
 
     const barTemplate =
       figure.templateId === "bar" ||
@@ -163,9 +219,18 @@ export function figureThumbnailDataUrl(
           const rawX = dataset.x.values[index];
           const y = series.values[index];
           if (rawX === null || y === null) continue;
-          const x =
+          const base =
             categoricalX || typeof rawX !== "number" ? index : rawX;
-          points.push(sx(x).toFixed(1) + "," + sy(y).toFixed(1));
+          const x =
+            waterfall && !categoricalX
+              ? base + seriesIndex * waterfallXOffset
+              : base;
+          const plottedY = y + seriesIndex * waterfallYOffset;
+          points.push(
+            sx(x).toFixed(1) +
+              "," +
+              syForSeries(plottedY, series, seriesIndex).toFixed(1)
+          );
         }
         return (
           '<polyline points="' +
@@ -194,6 +259,9 @@ export function figureThumbnailDataUrl(
     bg +
     '"/>' +
     '<path d="M14 10V96H172" fill="none" stroke="#3d4349" stroke-width="0.8"/>' +
+    (figure.templateId === "double-y"
+      ? '<path d="M172 10V96" fill="none" stroke="#3d4349" stroke-width="0.8"/>'
+      : "") +
     content +
     '<text x="14" y="108" fill="#59616a" font-size="9" font-family="Arial, sans-serif">' +
     esc(figure.name).slice(0, 28) +
