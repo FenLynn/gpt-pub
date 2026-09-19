@@ -1,3 +1,7 @@
+import {
+  hasExplicitFieldCoordinates,
+  resolveFieldRowCoordinates
+} from "../data/field";
 import type {
   Dataset,
   FigureSpec,
@@ -209,15 +213,17 @@ export function checkFigure(
   } else {
     const rowCount = visibleSeries.length;
     const columnCount = dataset.x.values.length;
-    const rowCoordinateMismatch =
-      dataset.metadata?.rowCoordinates !== undefined &&
-      dataset.metadata.rowCoordinates.length !== rowCount;
+    const resolvedRows = resolveFieldRowCoordinates(dataset, visibleSeries);
+    const explicitRows = hasExplicitFieldCoordinates(dataset, visibleSeries);
     const fieldProblems: string[] = [];
     if (field2DTemplate && (rowCount < 2 || columnCount < 2)) {
       fieldProblems.push("二维场图至少需要 2 × 2 数据");
     }
-    if (rowCoordinateMismatch) {
-      fieldProblems.push("Y 行坐标数量与矩阵行数不一致");
+    if (
+      resolvedRows.length > 1 &&
+      new Set(resolvedRows).size !== resolvedRows.length
+    ) {
+      fieldProblems.push("Y 行坐标存在重复值");
     }
     const finiteZ = visibleSeries.flatMap((series) =>
       series.values.filter(
@@ -257,7 +263,9 @@ export function checkFigure(
         : rowCount +
           " × " +
           columnCount +
-          " 矩阵结构有效，Z 范围设置有效。"
+          " 矩阵结构有效；" +
+          (explicitRows ? "Y 行坐标已解析" : "Y 行坐标使用自动序号") +
+          "；Z 范围设置有效。"
     });
   }
 
@@ -522,8 +530,7 @@ export function checkFigure(
   }
   if ((o.yScale ?? "linear") === "log") {
     const numericY = field2DTemplate
-      ? (dataset.metadata?.rowCoordinates ??
-          visibleSeries.map((_series, index) => index + 1)).filter(
+      ? resolveFieldRowCoordinates(dataset, visibleSeries).filter(
           (value): value is number =>
             typeof value === "number" && Number.isFinite(value)
         )

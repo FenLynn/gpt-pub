@@ -22,6 +22,7 @@ export interface PlotAxisColumn extends Omit<Column, "values"> {
 
 export interface SheetMetadata {
   rowCoordinates?: number[];
+  rowCoordinateByColumnId?: Record<string, number>;
   rowAxisName?: string;
   rowAxisUnit?: string;
 }

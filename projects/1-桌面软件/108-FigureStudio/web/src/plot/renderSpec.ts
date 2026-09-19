@@ -1,3 +1,4 @@
+import { resolveFieldRowCoordinates } from "../data/field";
 import type {
   Dataset,
   PlotColumn,
@@ -195,9 +196,7 @@ export function buildTraces(args: {
     const xIsNumeric = dataset.x.values.every(
       (value) => value === null || typeof value === "number"
     );
-    const yValues =
-      dataset.metadata?.rowCoordinates ??
-      series.map((_, index) => index);
+    const yValues = resolveFieldRowCoordinates(dataset, series);
     const zValues = series.map((column) => column.values);
     const zAuto = figure.figureOverrides.zAutoRange !== false;
     const colorbar = {
@@ -290,9 +289,7 @@ export function buildTraces(args: {
       {
         type: "surface",
         x: surfaceX,
-        y:
-          dataset.metadata?.rowCoordinates ??
-          series.map((_, index) => index),
+        y: resolveFieldRowCoordinates(dataset, series),
         z: series.map((column) => column.values),
         colorscale: figure.figureOverrides.colorScale ?? "Viridis",
         reversescale: figure.figureOverrides.reverseColorScale ?? false,

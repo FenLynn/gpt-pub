@@ -402,7 +402,19 @@ keys = visible_keys()
 if template == "surface-3d":
     ax = fig.add_subplot(111, projection="3d")
     z = np.array([finite_array(series[key]) for key in keys], dtype=float)
-    y_values = P["metadata"].get("rowCoordinates") or list(range(len(keys)))
+    row_map = P["metadata"].get("rowCoordinateByColumnId") or {}
+    legacy_rows = P["metadata"].get("rowCoordinates") or []
+    y_values = []
+    for row_index, key in enumerate(keys):
+        if key in row_map:
+            y_values.append(float(row_map[key]))
+        elif len(legacy_rows) == len(keys):
+            y_values.append(float(legacy_rows[row_index]))
+        else:
+            try:
+                y_values.append(float(names.get(key, row_index)))
+            except (TypeError, ValueError):
+                y_values.append(float(row_index))
     y = np.array(y_values, dtype=float)
     sx = x if not x_is_categorical else np.arange(len(raw_x), dtype=float)
     X, Y = np.meshgrid(sx, y)
@@ -433,7 +445,19 @@ if template == "surface-3d":
 elif template in ("heatmap", "contour"):
     ax = fig.add_subplot(111)
     z = np.array([finite_array(series[key]) for key in keys], dtype=float)
-    y_values = P["metadata"].get("rowCoordinates") or list(range(len(keys)))
+    row_map = P["metadata"].get("rowCoordinateByColumnId") or {}
+    legacy_rows = P["metadata"].get("rowCoordinates") or []
+    y_values = []
+    for row_index, key in enumerate(keys):
+        if key in row_map:
+            y_values.append(float(row_map[key]))
+        elif len(legacy_rows) == len(keys):
+            y_values.append(float(legacy_rows[row_index]))
+        else:
+            try:
+                y_values.append(float(names.get(key, row_index)))
+            except (TypeError, ValueError):
+                y_values.append(float(row_index))
     y = np.array(y_values, dtype=float)
     sx = x if not x_is_categorical else np.arange(len(raw_x), dtype=float)
     cmap_name = mpl_cmap(O.get("colorScale", "Viridis"))
@@ -448,20 +472,35 @@ elif template in ("heatmap", "contour"):
         artist = ax.pcolormesh(sx, y, z, shading="auto", **field_kwargs)
     else:
         levels = max(3, min(64, int(O.get("contourLevels", 12))))
+        contour_fill = O.get("contourFill", True)
+        contour_labels = O.get("contourLabels", False)
+        contour_lines = (
+            O.get("contourLines", True)
+            or contour_labels
+            or not contour_fill
+        )
         artist = None
         line_artist = None
-        if O.get("contourFill", True):
-            artist = ax.contourf(sx, y, z, levels=levels, **field_kwargs)
-        if O.get("contourLines", True) or not O.get("contourFill", True):
+        if contour_fill:
+            artist = ax.contourf(
+                sx, y, z, levels=levels, **field_kwargs
+            )
+        if contour_lines:
             line_artist = ax.contour(
-                sx, y, z,
+                sx,
+                y,
+                z,
                 levels=levels,
                 colors=None if not contour_fill else "#202328",
                 linewidths=0.45,
                 **({} if contour_fill else field_kwargs)
             )
             if contour_labels:
-                ax.clabel(line_artist, inline=True, fontsize=font_size * 0.9)
+                ax.clabel(
+                    line_artist,
+                    inline=True,
+                    fontsize=font_size * 0.9
+                )
             if artist is None:
                 artist = line_artist
 
