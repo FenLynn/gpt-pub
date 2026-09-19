@@ -6,18 +6,32 @@ FigureStudio（工作名：Scientific Figure Studio）是一个面向科研论�
 
 ## 当前阶段
 
-当前仅建立 **架构与产品设计工作区**，尚未开始实现代码。
+当前进入 **v0.1 Web 交互原型阶段**。
 
-第一阶段优先冻结：
+第一阶段优先验证：
 
-- Project / Dataset / Figure / PlotSpec 核心模型；
-- `.sfig` 项目容器与 Embedded / Linked 数据策略；
+- Project / Dataset / Figure / PlotSpec 核心边界；
+- 默认科研审美是否成立；
+- 三栏式项目 / Figure / Properties 工作流；
 - Template 与 Preset 分离；
 - 设置继承与局部 override；
 - mm / pt / dpi 物理单位体系；
 - Plotly 交互预览与未来 Matplotlib publication renderer 的边界；
-- SVG / PDF / EPS / PNG / TIFF 导出模型；
-- 项目树、数据引用、自动更新与可复现性。
+- GitHub Pages 快速评审。
+
+## 当前 Web Demo 能力
+
+- 程序生成的公开安全合成光谱数据；
+- CSV / TSV / TXT 导入；
+- XY 多曲线；
+- Scientific / Nature / Presentation preset；
+- Arial / Times New Roman；
+- 线宽、marker、颜色、legend、X/Y label 实时调整；
+- LaTeX / MathJax 轴标题试验；
+- 浏览器内 Save demo / Restore；
+- SVG / PNG 导出。
+
+当前项目格式保存仍是浏览器原型，正式 \`.sfig\` 容器将在项目模型稳定后接入。
 
 ## 产品原则
 
@@ -36,26 +50,26 @@ FigureStudio（工作名：Scientific Figure Studio）是一个面向科研论�
 - Field：heatmap / beam-like intensity map / contour；
 - 3D：surface / scatter 3D。
 
-多 panel 暂不进入 v0.1 UI，但数据模型从第一天保留 Figure → Panel → Axes → Series 层级。
+当前先完成 XY 闭环，Bar / Field / 3D 后续追加。
 
-## 预期技术路线
+## 技术路线
 
-~~~text
+\`\`\`text
 React + TypeScript + Vite
 + Plotly.js（实时交互预览）
-+ Tauri（Windows 桌面壳）
++ Tauri（后续 Windows 桌面壳）
 + PlotSpec 中间层
 + Matplotlib renderer（后续出版输出）
-~~~
+\`\`\`
 
 Web 与桌面共用核心代码。Web 端以手动选择、拖拽、下载导出为主；桌面端增加 Linked File、目录访问和自动 reload。
 
-## 分支
+## 分支与预览
 
-~~~text
+\`\`\`text
 日常设计与开发：p108-exp
 稳定候选：      p108-stable（尚未创建）
 正式主线：      main
-~~~
+\`\`\`
 
-当前阶段不创建 CI、Artifact、tag 或 Release。
+P108 使用专属 GitHub Pages workflow 作为开发预览入口。Pages 不是正式发布，也不会自动创建 tag 或 GitHub Release。

@@ -1,0 +1,103 @@
+name: P108 FigureStudio Pages
+
+on:
+  push:
+    branches:
+      - p108-exp
+    paths:
+      - "projects/1-桌面软件/108-FigureStudio/**"
+      - ".github/workflows/p108-figurestudio-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: p108-figurestudio-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: P108 scope gate
+        shell: bash
+        run: |
+          git fetch origin main
+          while IFS= read -r file; do
+            case "$file" in
+              projects/1-桌面软件/108-FigureStudio/*|.github/workflows/p108-figurestudio-pages.yml)
+                ;;
+              *)
+                echo "::error file=$file::P108 branch contains an out-of-scope change"
+                exit 1
+                ;;
+            esac
+          done < <(git -c core.quotepath=false diff --name-only origin/main...HEAD)
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install and build
+        shell: bash
+        env:
+          APP_DIR: projects/1-桌面软件/108-FigureStudio/web
+        run: |
+          npm --prefix "$APP_DIR" install --no-audit --no-fund
+          npm --prefix "$APP_DIR" run build
+
+      - name: Assemble Pages site
+        shell: bash
+        env:
+          APP_DIR: projects/1-桌面软件/108-FigureStudio/web
+        run: |
+          mkdir -p _site/p108
+          cp -a "$APP_DIR/dist/." _site/p108/
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=./p108/">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>GPT-Pub demos</title>
+            </head>
+            <body>
+              <p><a href="./p108/">Open FigureStudio P108</a></p>
+            </body>
+          </html>
+          HTML
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 8
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
