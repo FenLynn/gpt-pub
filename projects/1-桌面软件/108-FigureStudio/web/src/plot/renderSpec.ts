@@ -84,7 +84,7 @@ function legendAnchor(position: LegendPosition) {
   return map[position];
 }
 
-function visibleSeries(dataset: Dataset, figure: FigureSpec): Column[] {
+function visibleSeries(dataset: Dataset, figure: FigureSpec): PlotColumn[] {
   return orderSeries(dataset, figure.seriesOrder).filter(
     (series) => figure.seriesOverrides[series.id]?.visible !== false
   );
@@ -94,7 +94,7 @@ function baseXYTrace(
   dataset: Dataset,
   figure: FigureSpec,
   preset: PresetDefinition,
-  series: Column,
+  series: PlotColumn,
   sourceIndex: number,
   modeDefault: "lines" | "markers" | "lines+markers",
   yValues?: Array<number | null>
