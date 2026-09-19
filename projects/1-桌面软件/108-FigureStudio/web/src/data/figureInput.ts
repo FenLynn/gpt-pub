@@ -66,7 +66,9 @@ export function resolveFigureInput(
       label: labels.incomplete,
       detail:
         requirement.x === "optional"
-          ? "当前图型至少需要一列数据；X 可以留空并自动使用行号。"
+          ? "当前图型至少需要 " +
+            requirement.minSeries +
+            " 列主数据；X 可以留空并自动使用行号。"
           : "当前图型的数据映射尚未满足要求。"
     };
   }

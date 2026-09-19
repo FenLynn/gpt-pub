@@ -624,6 +624,34 @@ export function buildLayout(args: {
     }
   };
 
+  const doubleYAxisSeries = isDoubleY
+    ? orderSeries(
+        dataset,
+        figure.seriesOrder,
+        figure.dataRef?.yColumnIds
+      ).filter(
+        (series) => figure.seriesOverrides[series.id]?.visible !== false
+      )
+    : [];
+  const doubleYAxisSide = (series: PlotColumn) => {
+    const orderIndex = figure.seriesOrder.indexOf(series.id);
+    const sourceIndex = Math.max(
+      0,
+      dataset.ys.findIndex((item) => item.id === series.id)
+    );
+    const stableIndex = orderIndex >= 0 ? orderIndex : sourceIndex;
+    return (
+      figure.seriesOverrides[series.id]?.yAxis ??
+      (stableIndex === 0 ? "left" : "right")
+    );
+  };
+  const leftSeries = doubleYAxisSeries.filter(
+    (series) => doubleYAxisSide(series) === "left"
+  );
+  const rightSeries = doubleYAxisSeries.filter(
+    (series) => doubleYAxisSide(series) === "right"
+  );
+
   const resolvedXTitle =
     displayText?.xTitle ??
     overrides.xTitle ??
@@ -636,26 +664,11 @@ export function buildLayout(args: {
           dataset.metadata?.rowAxisName ?? "Y",
           dataset.metadata?.rowAxisUnit
         )
+      : isDoubleY && leftSeries[0]
+      ? autoAxisTitle(leftSeries[0].name, leftSeries[0].unit)
       : dataset.ys[0]
       ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
       : "Y");
-  const rightSeries =
-    isDoubleY
-      ? orderSeries(
-          dataset,
-          figure.seriesOrder,
-          figure.dataRef?.yColumnIds
-        ).filter((series) => {
-          const stableIndex = Math.max(
-            0,
-            figure.seriesOrder.indexOf(series.id)
-          );
-          const axis =
-            figure.seriesOverrides[series.id]?.yAxis ??
-            (stableIndex === 0 ? "left" : "right");
-          return axis === "right";
-        })
-      : [];
   const resolvedRightYTitle =
     displayText?.rightYTitle ??
     overrides.rightYTitle ??
@@ -851,6 +864,7 @@ export function buildLayout(args: {
 
   layout.yaxis = {
     ...commonAxis,
+    mirror: isDoubleY ? false : commonAxis.mirror,
     type: yScale,
     autorange: yRange
       ? false

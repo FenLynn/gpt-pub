@@ -2207,13 +2207,30 @@ function App() {
   const waterfallTemplate = activeFigure?.templateId === "waterfall";
   const offsetSpectrumTemplate =
     activeFigure?.templateId === "offset-spectrum";
+  const doubleYAxisSide = (
+    seriesId: string,
+    fallbackIndex: number
+  ): "left" | "right" => {
+    const orderIndex = activeFigure?.seriesOrder.indexOf(seriesId) ?? -1;
+    const stableIndex = orderIndex >= 0 ? orderIndex : fallbackIndex;
+    return (
+      activeFigure?.seriesOverrides[seriesId]?.yAxis ??
+      (stableIndex === 0 ? "left" : "right")
+    );
+  };
+  const leftYSeries = doubleYTemplate
+    ? orderedSeries.find(
+        (series, index) =>
+          (activeFigure?.seriesOverrides[series.id]?.visible ?? true) &&
+          doubleYAxisSide(series.id, index) === "left"
+      )
+    : undefined;
   const rightYSeries = doubleYTemplate
-    ? orderedSeries.find((series, index) => {
-        const axis =
-          activeFigure?.seriesOverrides[series.id]?.yAxis ??
-          (index === 0 ? "left" : "right");
-        return axis === "right";
-      })
+    ? orderedSeries.find(
+        (series, index) =>
+          (activeFigure?.seriesOverrides[series.id]?.visible ?? true) &&
+          doubleYAxisSide(series.id, index) === "right"
+      )
     : undefined;
   const graphInspectorTabs: Array<[InspectorTab, string]> = [
     ["data", "数据"],
@@ -4058,7 +4075,9 @@ function App() {
                                                   )
                                                 }
                                               />
-                                              <div className="axis-range-head">Y</div>
+                                              <div className="axis-range-head">
+                                                {doubleYTemplate ? "左 Y" : "Y"}
+                                              </div>
                                               <label className="axis-auto">
                                                 <MiniSwitch
                                                   checked={activeFigure.figureOverrides.yAutoRange !== false}
@@ -4145,7 +4164,11 @@ function App() {
                                                 )}
                                                 </div>
                                                 <div className="prop-row">
-                                                  <label>Y 标度</label>
+                                                  <label>
+                                                    {doubleYTemplate
+                                                      ? "左 Y 标度"
+                                                      : "Y 标度"}
+                                                  </label>
                                                   <select
                                                     value={activeFigure.figureOverrides.yScale ?? "linear"}
                                                     onChange={(event) =>
@@ -4818,7 +4841,9 @@ function App() {
                       </div>
                     </div>
                     <div className="prop-row">
-                      <label>Y 标题</label>
+                      <label>
+                        {doubleYTemplate ? "左 Y 标题" : "Y 标题"}
+                      </label>
                       <div className="control-with-reset">
                         <input
                           type="text"
@@ -4831,6 +4856,13 @@ function App() {
                                   plotDataset.metadata.rowAxisUnit +
                                   ")"
                                 : plotDataset.metadata?.rowAxisName ?? "Y"
+                              : doubleYTemplate && leftYSeries
+                              ? leftYSeries.unit
+                                ? leftYSeries.name +
+                                  " (" +
+                                  leftYSeries.unit +
+                                  ")"
+                                : leftYSeries.name
                               : plotDataset.ys[0]
                               ? plotDataset.ys[0].unit
                                 ? plotDataset.ys[0].name +

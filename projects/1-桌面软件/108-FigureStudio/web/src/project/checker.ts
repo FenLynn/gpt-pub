@@ -42,6 +42,29 @@ export function checkFigure(
       mainSeriesIds.has(series.id) &&
       figure.seriesOverrides[series.id]?.visible !== false
   );
+  const stableDoubleYSide = (seriesId: string) => {
+    const orderIndex = figure.seriesOrder.indexOf(seriesId);
+    const sourceIndex = Math.max(
+      0,
+      dataset.ys.findIndex((series) => series.id === seriesId)
+    );
+    const stableIndex = orderIndex >= 0 ? orderIndex : sourceIndex;
+    return (
+      figure.seriesOverrides[seriesId]?.yAxis ??
+      (stableIndex === 0 ? "left" : "right")
+    );
+  };
+  const leftYSeries = doubleYTemplate
+    ? visibleSeries.filter(
+        (series) => stableDoubleYSide(series.id) === "left"
+      )
+    : [];
+  const rightYSeries = doubleYTemplate
+    ? visibleSeries.filter(
+        (series) => stableDoubleYSide(series.id) === "right"
+      )
+    : [];
+
   const items: CheckItem[] = [];
 
   const ref = figure.dataRef;
@@ -141,13 +164,17 @@ export function checkFigure(
       : "数据包含单位，但 X 轴标题未显示单位。"
   });
 
+  const ySource =
+    doubleYTemplate && leftYSeries[0]
+      ? leftYSeries[0]
+      : dataset.ys[0];
   const yUnit = fieldTemplate
     ? dataset.metadata?.rowAxisUnit
-    : dataset.ys[0]?.unit;
+    : ySource?.unit;
   const autoYTitle = fieldTemplate
     ? autoAxisTitle(dataset.metadata?.rowAxisName ?? "Y", yUnit)
-    : dataset.ys[0]
-    ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
+    : ySource
+    ? autoAxisTitle(ySource.name, ySource.unit)
     : "Y";
   items.push({
     id: "y-unit",
@@ -273,39 +300,24 @@ export function checkFigure(
   }
 
   if (doubleYTemplate) {
-    const orderedVisible = figure.seriesOrder
-      .map((id) => visibleSeries.find((series) => series.id === id))
-      .filter((series): series is NonNullable<typeof series> => Boolean(series));
-    const leftSeries = orderedVisible.filter((series, index) => {
-      const axis =
-        figure.seriesOverrides[series.id]?.yAxis ??
-        (index === 0 ? "left" : "right");
-      return axis === "left";
-    });
-    const rightSeries = orderedVisible.filter((series, index) => {
-      const axis =
-        figure.seriesOverrides[series.id]?.yAxis ??
-        (index === 0 ? "left" : "right");
-      return axis === "right";
-    });
     items.push({
       id: "double-y-assignment",
       level:
-        leftSeries.length > 0 && rightSeries.length > 0 ? "pass" : "warn",
+        leftYSeries.length > 0 && rightYSeries.length > 0 ? "pass" : "warn",
       title: "双 Y 轴分配",
       detail:
-        leftSeries.length > 0 && rightSeries.length > 0
+        leftYSeries.length > 0 && rightYSeries.length > 0
           ? "左 Y " +
-            leftSeries.length +
+            leftYSeries.length +
             " 条，右 Y " +
-            rightSeries.length +
+            rightYSeries.length +
             " 条；两侧都有实际数据。"
           : "双 Y 图需要左右两侧都至少有一条可见数据；请在“曲线”页调整 Y 轴归属。"
     });
 
-    const rightUnit = rightSeries[0]?.unit;
-    const autoRightTitle = rightSeries[0]
-      ? autoAxisTitle(rightSeries[0].name, rightUnit)
+    const rightUnit = rightYSeries[0]?.unit;
+    const autoRightTitle = rightYSeries[0]
+      ? autoAxisTitle(rightYSeries[0].name, rightUnit)
       : "Right Y";
     if (rightUnit) {
       items.push({
@@ -516,16 +528,9 @@ export function checkFigure(
             typeof value === "number" && Number.isFinite(value)
         )
       : visibleSeries
-          .filter((series, index) => {
+          .filter((series) => {
             if (!doubleYTemplate) return true;
-            const orderedIndex = Math.max(
-              0,
-              figure.seriesOrder.indexOf(series.id)
-            );
-            const axis =
-              figure.seriesOverrides[series.id]?.yAxis ??
-              (orderedIndex === 0 ? "left" : "right");
-            return axis === "left";
+            return stableDoubleYSide(series.id) === "left";
           })
           .flatMap((series) =>
             series.values.filter(
@@ -541,17 +546,7 @@ export function checkFigure(
   }
 
   if (doubleYTemplate && (o.rightYScale ?? "linear") === "log") {
-    const rightValues = visibleSeries
-      .filter((series) => {
-        const orderedIndex = Math.max(
-          0,
-          figure.seriesOrder.indexOf(series.id)
-        );
-        const axis =
-          figure.seriesOverrides[series.id]?.yAxis ??
-          (orderedIndex === 0 ? "left" : "right");
-        return axis === "right";
-      })
+    const rightValues = rightYSeries
       .flatMap((series) =>
         series.values.filter(
           (value): value is number =>

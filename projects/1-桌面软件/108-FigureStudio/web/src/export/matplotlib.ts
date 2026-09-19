@@ -37,13 +37,24 @@ export function generateMatplotlibScript(
   const heightIn = widthIn / ratio;
 
   const order = orderedSeriesIds(dataset, figure);
+  const seriesSide = (id: string, fallbackIndex: number) => {
+    const orderIndex = figure.seriesOrder.indexOf(id);
+    const stableIndex = orderIndex >= 0 ? orderIndex : fallbackIndex;
+    return (
+      figure.seriesOverrides[id]?.yAxis ??
+      (stableIndex === 0 ? "left" : "right")
+    );
+  };
+  const leftSeries = order
+    .map((id, index) => {
+      const series = dataset.ys.find((item) => item.id === id);
+      return seriesSide(id, index) === "left" ? series : undefined;
+    })
+    .find(Boolean);
   const rightSeries = order
     .map((id, index) => {
       const series = dataset.ys.find((item) => item.id === id);
-      const axis =
-        figure.seriesOverrides[id]?.yAxis ??
-        (index === 0 ? "left" : "right");
-      return axis === "right" ? series : undefined;
+      return seriesSide(id, index) === "right" ? series : undefined;
     })
     .find(Boolean);
 
@@ -85,6 +96,8 @@ export function generateMatplotlibScript(
               dataset.metadata?.rowAxisName ?? "Y",
               dataset.metadata?.rowAxisUnit
             )
+          : leftSeries
+          ? autoAxisTitle(leftSeries.name, leftSeries.unit)
           : dataset.ys[0]
           ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
           : "Y"),
