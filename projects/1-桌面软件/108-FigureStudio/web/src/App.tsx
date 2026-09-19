@@ -1752,7 +1752,6 @@ function App() {
         legendBorderColor: source.legendBorderColor,
         legendBorderWidthPt: source.legendBorderWidthPt,
         legendItemWidthPx: source.legendItemWidthPx,
-        axisStyle: source.axisStyle,
         axisTitleColor: source.axisTitleColor,
         axisTitleSizePt: source.axisTitleSizePt,
         tickLabelColor: source.tickLabelColor,
