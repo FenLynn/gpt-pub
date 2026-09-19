@@ -571,6 +571,43 @@ export function checkFigure(
     }
   }
 
+  if (
+    figure.templateId === "xy-errorbar" &&
+    (o.yScale ?? "linear") === "log" &&
+    errorSeries
+  ) {
+    const errorMainSeries =
+      figure.seriesOrder
+        .map((id) => visibleSeries.find((series) => series.id === id))
+        .find((series) => Boolean(series)) ?? visibleSeries[0];
+    if (errorMainSeries) {
+      let invalidLowerBounds = 0;
+      const pairCount = Math.min(
+        errorMainSeries.values.length,
+        errorSeries.values.length
+      );
+      for (let index = 0; index < pairCount; index += 1) {
+        const value = errorMainSeries.values[index];
+        const error = errorSeries.values[index];
+        if (
+          typeof value !== "number" ||
+          !Number.isFinite(value) ||
+          typeof error !== "number" ||
+          !Number.isFinite(error)
+        ) {
+          continue;
+        }
+        if (value - Math.abs(error) <= 0) invalidLowerBounds += 1;
+      }
+      if (invalidLowerBounds > 0) {
+        logIssues.push(
+          invalidLowerBounds +
+            " 个误差棒下界 ≤ 0，在 Y 对数轴上无法完整显示"
+        );
+      }
+    }
+  }
+
   if (doubleYTemplate && (o.rightYScale ?? "linear") === "log") {
     const rightValues = rightYSeries
       .flatMap((series) =>
