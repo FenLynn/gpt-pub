@@ -2746,7 +2746,7 @@ function App() {
                                 (item) => item.id === column.id
                               );
                               const checked =
-                                activeFigure.dataRef.yColumnIds.includes(
+                                activeFigure.dataRef?.yColumnIds.includes(
                                   column.id
                                 ) ?? false;
                               return (
@@ -2759,7 +2759,7 @@ function App() {
                                     checked={checked}
                                     onChange={() => {
                                       const current =
-                                        activeFigure.dataRef.yColumnIds ?? [];
+                                        activeFigure.dataRef?.yColumnIds ?? [];
                                       const next = checked
                                         ? current.filter((id) => id !== column.id)
                                         : [...current, column.id];
