@@ -196,6 +196,24 @@ function ExplorerActionIcon(props: { kind: "rename" | "delete" }) {
   );
 }
 
+function LayerArrowIcon(props: { direction: "up" | "down" }) {
+  return (
+    <svg className="layer-arrow-icon" viewBox="0 0 16 16" aria-hidden="true">
+      {props.direction === "up" ? (
+        <>
+          <path d="M8 12.5V3.5" />
+          <path d="M4.7 6.7 8 3.4l3.3 3.3" />
+        </>
+      ) : (
+        <>
+          <path d="M8 3.5v9" />
+          <path d="M4.7 9.3 8 12.6l3.3-3.3" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function MiniSwitch(props: {
   checked: boolean;
   onChange: (value: boolean) => void;
@@ -555,6 +573,15 @@ function App() {
       }
     }
   }, [activeSheet, selectedColumnId]);
+
+  useEffect(() => {
+    if (
+      fieldTemplate &&
+      (inspectorTab === "series" || inspectorTab === "legend")
+    ) {
+      setInspectorTab("figure");
+    }
+  }, [fieldTemplate, inspectorTab]);
 
   useEffect(() => {
     if (!activeFigure) return;
@@ -1718,6 +1745,7 @@ function App() {
         fontFamily: source.fontFamily,
         fontSizePt: source.fontSizePt,
         background: source.background,
+        zTitle: source.zTitle,
         tickDirection: source.tickDirection,
         axisStyle: source.axisStyle,
         xReverse: source.xReverse,
@@ -2089,9 +2117,21 @@ function App() {
     primaryOverride.color ||
     preset.palette[primaryIndex % preset.palette.length];
   const visible = primaryOverride.visible ?? true;
+  const surfaceTemplate = activeFigure?.templateId === "surface-3d";
   const fieldTemplate =
-    activeFigure?.templateId === "heatmap" ||
-    activeFigure?.templateId === "surface-3d";
+    activeFigure?.templateId === "heatmap" || surfaceTemplate;
+  const graphInspectorTabs: Array<[InspectorTab, string]> = [
+    ["data", "数据"],
+    ["figure", fieldTemplate ? "图 / 色图" : "图"],
+    ...(!fieldTemplate
+      ? ([["series", "曲线"]] as Array<[InspectorTab, string]>)
+      : []),
+    ["axis", surfaceTemplate ? "标题" : "轴"],
+    ...(!fieldTemplate
+      ? ([["legend", "图例"]] as Array<[InspectorTab, string]>)
+      : []),
+    ["check", warningCount ? "检查 " + warningCount : "检查"]
+  ];
   const barTemplate =
     activeFigure?.templateId === "bar" ||
     activeFigure?.templateId === "grouped-bar" ||
@@ -2851,19 +2891,11 @@ function App() {
           ) : activeFigure && plotDataset ? (
             <>
               <div className="inspector-tabs">
-                {([
-                  ["data", "数据"],
-                  ["figure", "图"],
-                  ["series", "曲线"],
-                  ["axis", "轴"],
-                  ["legend", "图例"],
-                  ["check", warningCount ? "检查 " + warningCount : "检查"]
-                ] as Array<[InspectorTab, string]>).map(([id, label]) => (
+                {graphInspectorTabs.map(([id, label]) => (
                   <button
                     key={id}
                     type="button"
                     className={inspectorTab === id ? "is-active" : ""}
-                    disabled={id === "series" && fieldTemplate}
                     onClick={() => setInspectorTab(id)}
                   >
                     {label}
@@ -3566,7 +3598,7 @@ function App() {
                             });
                           }}
                         >
-                          ↓
+                          <LayerArrowIcon direction="down" />
                         </button>
                         <button
                           type="button"
@@ -3588,7 +3620,7 @@ function App() {
                             });
                           }}
                         >
-                          ↑
+                          <LayerArrowIcon direction="up" />
                         </button>
                       </div>
                     </div>
@@ -3602,381 +3634,392 @@ function App() {
                       <span>支持 LaTeX</span>
                     </div>
 
-                    <div className="section-divider">范围</div>
-                    <div className="axis-range-grid">
-                      <div className="axis-range-head">X</div>
-                      <label className="axis-auto">
-                        <MiniSwitch
-                          checked={activeFigure.figureOverrides.xAutoRange !== false}
-                          onChange={(value) =>
-                            setFigureField("xAutoRange", value)
-                          }
-                        />
-                        <span>自动</span>
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="最小"
-                        disabled={activeFigure.figureOverrides.xAutoRange !== false}
-                        value={activeFigure.figureOverrides.xMin ?? ""}
-                        onChange={(event) =>
-                          setFigureField(
-                            "xMin",
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value)
-                          )
-                        }
-                      />
-                      <input
-                        type="number"
-                        placeholder="最大"
-                        disabled={activeFigure.figureOverrides.xAutoRange !== false}
-                        value={activeFigure.figureOverrides.xMax ?? ""}
-                        onChange={(event) =>
-                          setFigureField(
-                            "xMax",
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value)
-                          )
-                        }
-                      />
-                      <div className="axis-range-head">Y</div>
-                      <label className="axis-auto">
-                        <MiniSwitch
-                          checked={activeFigure.figureOverrides.yAutoRange !== false}
-                          onChange={(value) =>
-                            setFigureField("yAutoRange", value)
-                          }
-                        />
-                        <span>自动</span>
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="最小"
-                        disabled={activeFigure.figureOverrides.yAutoRange !== false}
-                        value={activeFigure.figureOverrides.yMin ?? ""}
-                        onChange={(event) =>
-                          setFigureField(
-                            "yMin",
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value)
-                          )
-                        }
-                      />
-                      <input
-                        type="number"
-                        placeholder="最大"
-                        disabled={activeFigure.figureOverrides.yAutoRange !== false}
-                        value={activeFigure.figureOverrides.yMax ?? ""}
-                        onChange={(event) =>
-                          setFigureField(
-                            "yMax",
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value)
-                          )
-                        }
-                      />
-                    </div>
-
-                    <div className="axis-reverse-row">
-                      <label>
-                        <span>X 反向</span>
-                        <MiniSwitch
-                          checked={activeFigure.figureOverrides.xReverse ?? false}
-                          onChange={(value) => setFigureField("xReverse", value)}
-                        />
-                      </label>
-                      <label>
-                        <span>Y 反向</span>
-                        <MiniSwitch
-                          checked={activeFigure.figureOverrides.yReverse ?? false}
-                          onChange={(value) => setFigureField("yReverse", value)}
-                        />
-                      </label>
-                    </div>
-
-                    {(xAxisIssue || yAxisIssue) && (
-                      <div className="axis-validation is-error">
-                        {[xAxisIssue, yAxisIssue].filter(Boolean).join("；")}
-                      </div>
-                    )}
-
-                    {!fieldTemplate && (
+                    {!surfaceTemplate ? (
                       <>
-                        <div className="prop-row">
-                          <label>X 标度</label>
-                          <select
-                            value={activeFigure.figureOverrides.xScale ?? "linear"}
-                            onChange={(event) =>
-                              setFigureField(
-                                "xScale",
-                                event.target.value as AxisScale
-                              )
-                            }
-                          >
-                            <option value="linear">线性</option>
-                            <option value="log">对数</option>
-                          </select>
-                        </div>
-                        <div className="prop-row">
-                          <label>Y 标度</label>
-                          <select
-                            value={activeFigure.figureOverrides.yScale ?? "linear"}
-                            onChange={(event) =>
-                              setFigureField(
-                                "yScale",
-                                event.target.value as AxisScale
-                              )
-                            }
-                          >
-                            <option value="linear">线性</option>
-                            <option value="log">对数</option>
-                          </select>
-                        </div>
+                                            <div className="section-divider">范围</div>
+                                            <div className="axis-range-grid">
+                                              <div className="axis-range-head">X</div>
+                                              <label className="axis-auto">
+                                                <MiniSwitch
+                                                  checked={activeFigure.figureOverrides.xAutoRange !== false}
+                                                  onChange={(value) =>
+                                                    setFigureField("xAutoRange", value)
+                                                  }
+                                                />
+                                                <span>自动</span>
+                                              </label>
+                                              <input
+                                                type="number"
+                                                placeholder="最小"
+                                                disabled={activeFigure.figureOverrides.xAutoRange !== false}
+                                                value={activeFigure.figureOverrides.xMin ?? ""}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "xMin",
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value)
+                                                  )
+                                                }
+                                              />
+                                              <input
+                                                type="number"
+                                                placeholder="最大"
+                                                disabled={activeFigure.figureOverrides.xAutoRange !== false}
+                                                value={activeFigure.figureOverrides.xMax ?? ""}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "xMax",
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value)
+                                                  )
+                                                }
+                                              />
+                                              <div className="axis-range-head">Y</div>
+                                              <label className="axis-auto">
+                                                <MiniSwitch
+                                                  checked={activeFigure.figureOverrides.yAutoRange !== false}
+                                                  onChange={(value) =>
+                                                    setFigureField("yAutoRange", value)
+                                                  }
+                                                />
+                                                <span>自动</span>
+                                              </label>
+                                              <input
+                                                type="number"
+                                                placeholder="最小"
+                                                disabled={activeFigure.figureOverrides.yAutoRange !== false}
+                                                value={activeFigure.figureOverrides.yMin ?? ""}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "yMin",
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value)
+                                                  )
+                                                }
+                                              />
+                                              <input
+                                                type="number"
+                                                placeholder="最大"
+                                                disabled={activeFigure.figureOverrides.yAutoRange !== false}
+                                                value={activeFigure.figureOverrides.yMax ?? ""}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "yMax",
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value)
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                        
+                                            <div className="axis-reverse-row">
+                                              <label>
+                                                <span>X 反向</span>
+                                                <MiniSwitch
+                                                  checked={activeFigure.figureOverrides.xReverse ?? false}
+                                                  onChange={(value) => setFigureField("xReverse", value)}
+                                                />
+                                              </label>
+                                              <label>
+                                                <span>Y 反向</span>
+                                                <MiniSwitch
+                                                  checked={activeFigure.figureOverrides.yReverse ?? false}
+                                                  onChange={(value) => setFigureField("yReverse", value)}
+                                                />
+                                              </label>
+                                            </div>
+                        
+                                            {(xAxisIssue || yAxisIssue) && (
+                                              <div className="axis-validation is-error">
+                                                {[xAxisIssue, yAxisIssue].filter(Boolean).join("；")}
+                                              </div>
+                                            )}
+                        
+                                            {!fieldTemplate && (
+                                              <>
+                                                <div className="prop-row">
+                                                  <label>X 标度</label>
+                                                  <select
+                                                    value={activeFigure.figureOverrides.xScale ?? "linear"}
+                                                    onChange={(event) =>
+                                                      setFigureField(
+                                                        "xScale",
+                                                        event.target.value as AxisScale
+                                                      )
+                                                    }
+                                                  >
+                                                    <option value="linear">线性</option>
+                                                    <option value="log">对数</option>
+                                                  </select>
+                                                </div>
+                                                <div className="prop-row">
+                                                  <label>Y 标度</label>
+                                                  <select
+                                                    value={activeFigure.figureOverrides.yScale ?? "linear"}
+                                                    onChange={(event) =>
+                                                      setFigureField(
+                                                        "yScale",
+                                                        event.target.value as AxisScale
+                                                      )
+                                                    }
+                                                  >
+                                                    <option value="linear">线性</option>
+                                                    <option value="log">对数</option>
+                                                  </select>
+                                                </div>
+                                              </>
+                                            )}
+                        
+                                            <div className="section-divider">刻度</div>
+                                            <div className="prop-row">
+                                              <label>外框 / Tick</label>
+                                              <select
+                                                value={activeFigure.figureOverrides.axisStyle ?? "regular"}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "axisStyle",
+                                                    event.target.value as AxisStylePreset
+                                                  )
+                                                }
+                                              >
+                                                <option value="regular">常规</option>
+                                                <option value="bold">加粗</option>
+                                              </select>
+                                            </div>
+                                            <div className="prop-row">
+                                              <label>刻度方向</label>
+                                              <select
+                                                value={activeFigure.figureOverrides.tickDirection ?? "inside"}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "tickDirection",
+                                                    event.target.value as TickDirection
+                                                  )
+                                                }
+                                              >
+                                                <option value="inside">向内</option>
+                                                <option value="outside">向外</option>
+                                              </select>
+                                            </div>
+                                            <div className="tick-step-grid">
+                                              <span />
+                                              <b>大刻度间距</b>
+                                              <b>小刻度间距</b>
+                                              <span>X</span>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                placeholder="自动"
+                                                value={activeFigure.figureOverrides.xMajorTickStep ?? ""}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "xMajorTickStep",
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value)
+                                                  )
+                                                }
+                                              />
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                placeholder="自动"
+                                                value={activeFigure.figureOverrides.xMinorTickStep ?? ""}
+                                                onChange={(event) => {
+                                                  const value =
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value);
+                                                  setFigureField("xMinorTickStep", value);
+                                                  if (value !== undefined) setFigureField("minorTicks", true);
+                                                }}
+                                              />
+                                              <span>Y</span>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                placeholder="自动"
+                                                value={activeFigure.figureOverrides.yMajorTickStep ?? ""}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "yMajorTickStep",
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value)
+                                                  )
+                                                }
+                                              />
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                placeholder="自动"
+                                                value={activeFigure.figureOverrides.yMinorTickStep ?? ""}
+                                                onChange={(event) => {
+                                                  const value =
+                                                    event.target.value === ""
+                                                      ? undefined
+                                                      : Number(event.target.value);
+                                                  setFigureField("yMinorTickStep", value);
+                                                  if (value !== undefined) setFigureField("minorTicks", true);
+                                                }}
+                                              />
+                                            </div>
+                                            <div className="prop-row">
+                                              <label>小刻度</label>
+                                              <MiniSwitch
+                                                checked={activeFigure.figureOverrides.minorTicks ?? false}
+                                                onChange={(value) => setFigureField("minorTicks", value)}
+                                              />
+                                            </div>
+                                            {(activeFigure.figureOverrides.xScale === "log" ||
+                                              activeFigure.figureOverrides.yScale === "log") && (
+                                              <div className="axis-note">
+                                                对数轴的刻度间距使用 log10 单位：1 = 一个 decade，
+                                                0.1 = 0.1 decade。
+                                              </div>
+                                            )}
+                        
+                                            <div className="prop-row">
+                                              <label>网格</label>
+                                              <MiniSwitch
+                                                checked={
+                                                  activeFigure.figureOverrides.gridVisible ??
+                                                  preset.showGrid
+                                                }
+                                                onChange={(value) => setFigureField("gridVisible", value)}
+                                              />
+                                            </div>
+                        
+                                            <div className="section-divider">刻度标签</div>
+                                            <div className="tick-format-grid">
+                                              <span />
+                                              <b>格式</b>
+                                              <b>位数</b>
+                                              <span>X</span>
+                                              <select
+                                                value={activeFigure.figureOverrides.xTickFormat ?? "auto"}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "xTickFormat",
+                                                    event.target.value as TickLabelFormat
+                                                  )
+                                                }
+                                              >
+                                                <option value="auto">自动</option>
+                                                <option value="decimal">十进制</option>
+                                                <option value="scientific">科学计数</option>
+                                                <option value="engineering">工程计数</option>
+                                              </select>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="12"
+                                                step="1"
+                                                disabled={
+                                                  (activeFigure.figureOverrides.xTickFormat ?? "auto") ===
+                                                  "auto"
+                                                }
+                                                value={activeFigure.figureOverrides.xTickDecimals ?? 2}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "xTickDecimals",
+                                                    Math.max(0, Math.min(12, Number(event.target.value)))
+                                                  )
+                                                }
+                                              />
+                                              <span>Y</span>
+                                              <select
+                                                value={activeFigure.figureOverrides.yTickFormat ?? "auto"}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "yTickFormat",
+                                                    event.target.value as TickLabelFormat
+                                                  )
+                                                }
+                                              >
+                                                <option value="auto">自动</option>
+                                                <option value="decimal">十进制</option>
+                                                <option value="scientific">科学计数</option>
+                                                <option value="engineering">工程计数</option>
+                                              </select>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="12"
+                                                step="1"
+                                                disabled={
+                                                  (activeFigure.figureOverrides.yTickFormat ?? "auto") ===
+                                                  "auto"
+                                                }
+                                                value={activeFigure.figureOverrides.yTickDecimals ?? 2}
+                                                onChange={(event) =>
+                                                  setFigureField(
+                                                    "yTickDecimals",
+                                                    Math.max(0, Math.min(12, Number(event.target.value)))
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                        
+                                            <div className="tick-affix-grid">
+                                              <label>
+                                                <span>X 前缀</span>
+                                                <input
+                                                  type="text"
+                                                  value={activeFigure.figureOverrides.xTickPrefix ?? ""}
+                                                  onChange={(event) =>
+                                                    setFigureField("xTickPrefix", event.target.value)
+                                                  }
+                                                />
+                                              </label>
+                                              <label>
+                                                <span>X 后缀</span>
+                                                <input
+                                                  type="text"
+                                                  value={activeFigure.figureOverrides.xTickSuffix ?? ""}
+                                                  onChange={(event) =>
+                                                    setFigureField("xTickSuffix", event.target.value)
+                                                  }
+                                                />
+                                              </label>
+                                              <label>
+                                                <span>Y 前缀</span>
+                                                <input
+                                                  type="text"
+                                                  value={activeFigure.figureOverrides.yTickPrefix ?? ""}
+                                                  onChange={(event) =>
+                                                    setFigureField("yTickPrefix", event.target.value)
+                                                  }
+                                                />
+                                              </label>
+                                              <label>
+                                                <span>Y 后缀</span>
+                                                <input
+                                                  type="text"
+                                                  value={activeFigure.figureOverrides.yTickSuffix ?? ""}
+                                                  onChange={(event) =>
+                                                    setFigureField("yTickSuffix", event.target.value)
+                                                  }
+                                                />
+                                              </label>
+                                            </div>
+                        
+                        
                       </>
-                    )}
-
-                    <div className="section-divider">刻度</div>
-                    <div className="prop-row">
-                      <label>外框 / Tick</label>
-                      <select
-                        value={activeFigure.figureOverrides.axisStyle ?? "regular"}
-                        onChange={(event) =>
-                          setFigureField(
-                            "axisStyle",
-                            event.target.value as AxisStylePreset
-                          )
-                        }
-                      >
-                        <option value="regular">常规</option>
-                        <option value="bold">加粗</option>
-                      </select>
-                    </div>
-                    <div className="prop-row">
-                      <label>刻度方向</label>
-                      <select
-                        value={activeFigure.figureOverrides.tickDirection ?? "inside"}
-                        onChange={(event) =>
-                          setFigureField(
-                            "tickDirection",
-                            event.target.value as TickDirection
-                          )
-                        }
-                      >
-                        <option value="inside">向内</option>
-                        <option value="outside">向外</option>
-                      </select>
-                    </div>
-                    <div className="tick-step-grid">
-                      <span />
-                      <b>大刻度间距</b>
-                      <b>小刻度间距</b>
-                      <span>X</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="自动"
-                        value={activeFigure.figureOverrides.xMajorTickStep ?? ""}
-                        onChange={(event) =>
-                          setFigureField(
-                            "xMajorTickStep",
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value)
-                          )
-                        }
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="自动"
-                        value={activeFigure.figureOverrides.xMinorTickStep ?? ""}
-                        onChange={(event) => {
-                          const value =
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value);
-                          setFigureField("xMinorTickStep", value);
-                          if (value !== undefined) setFigureField("minorTicks", true);
-                        }}
-                      />
-                      <span>Y</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="自动"
-                        value={activeFigure.figureOverrides.yMajorTickStep ?? ""}
-                        onChange={(event) =>
-                          setFigureField(
-                            "yMajorTickStep",
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value)
-                          )
-                        }
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="自动"
-                        value={activeFigure.figureOverrides.yMinorTickStep ?? ""}
-                        onChange={(event) => {
-                          const value =
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value);
-                          setFigureField("yMinorTickStep", value);
-                          if (value !== undefined) setFigureField("minorTicks", true);
-                        }}
-                      />
-                    </div>
-                    <div className="prop-row">
-                      <label>小刻度</label>
-                      <MiniSwitch
-                        checked={activeFigure.figureOverrides.minorTicks ?? false}
-                        onChange={(value) => setFigureField("minorTicks", value)}
-                      />
-                    </div>
-                    {(activeFigure.figureOverrides.xScale === "log" ||
-                      activeFigure.figureOverrides.yScale === "log") && (
+                    ) : (
                       <div className="axis-note">
-                        对数轴的刻度间距使用 log10 单位：1 = 一个 decade，
-                        0.1 = 0.1 decade。
+                        3D 曲面当前只显示真正生效的文字与色图属性；3D 范围、
+                        Tick 和相机参数将在专用 3D 轴面板中统一提供。
                       </div>
                     )}
-
-                    <div className="prop-row">
-                      <label>网格</label>
-                      <MiniSwitch
-                        checked={
-                          activeFigure.figureOverrides.gridVisible ??
-                          preset.showGrid
-                        }
-                        onChange={(value) => setFigureField("gridVisible", value)}
-                      />
-                    </div>
-
-                    <div className="section-divider">刻度标签</div>
-                    <div className="tick-format-grid">
-                      <span />
-                      <b>格式</b>
-                      <b>位数</b>
-                      <span>X</span>
-                      <select
-                        value={activeFigure.figureOverrides.xTickFormat ?? "auto"}
-                        onChange={(event) =>
-                          setFigureField(
-                            "xTickFormat",
-                            event.target.value as TickLabelFormat
-                          )
-                        }
-                      >
-                        <option value="auto">自动</option>
-                        <option value="decimal">十进制</option>
-                        <option value="scientific">科学计数</option>
-                        <option value="engineering">工程计数</option>
-                      </select>
-                      <input
-                        type="number"
-                        min="0"
-                        max="12"
-                        step="1"
-                        disabled={
-                          (activeFigure.figureOverrides.xTickFormat ?? "auto") ===
-                          "auto"
-                        }
-                        value={activeFigure.figureOverrides.xTickDecimals ?? 2}
-                        onChange={(event) =>
-                          setFigureField(
-                            "xTickDecimals",
-                            Math.max(0, Math.min(12, Number(event.target.value)))
-                          )
-                        }
-                      />
-                      <span>Y</span>
-                      <select
-                        value={activeFigure.figureOverrides.yTickFormat ?? "auto"}
-                        onChange={(event) =>
-                          setFigureField(
-                            "yTickFormat",
-                            event.target.value as TickLabelFormat
-                          )
-                        }
-                      >
-                        <option value="auto">自动</option>
-                        <option value="decimal">十进制</option>
-                        <option value="scientific">科学计数</option>
-                        <option value="engineering">工程计数</option>
-                      </select>
-                      <input
-                        type="number"
-                        min="0"
-                        max="12"
-                        step="1"
-                        disabled={
-                          (activeFigure.figureOverrides.yTickFormat ?? "auto") ===
-                          "auto"
-                        }
-                        value={activeFigure.figureOverrides.yTickDecimals ?? 2}
-                        onChange={(event) =>
-                          setFigureField(
-                            "yTickDecimals",
-                            Math.max(0, Math.min(12, Number(event.target.value)))
-                          )
-                        }
-                      />
-                    </div>
-
-                    <div className="tick-affix-grid">
-                      <label>
-                        <span>X 前缀</span>
-                        <input
-                          type="text"
-                          value={activeFigure.figureOverrides.xTickPrefix ?? ""}
-                          onChange={(event) =>
-                            setFigureField("xTickPrefix", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        <span>X 后缀</span>
-                        <input
-                          type="text"
-                          value={activeFigure.figureOverrides.xTickSuffix ?? ""}
-                          onChange={(event) =>
-                            setFigureField("xTickSuffix", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        <span>Y 前缀</span>
-                        <input
-                          type="text"
-                          value={activeFigure.figureOverrides.yTickPrefix ?? ""}
-                          onChange={(event) =>
-                            setFigureField("yTickPrefix", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        <span>Y 后缀</span>
-                        <input
-                          type="text"
-                          value={activeFigure.figureOverrides.yTickSuffix ?? ""}
-                          onChange={(event) =>
-                            setFigureField("yTickSuffix", event.target.value)
-                          }
-                        />
-                      </label>
-                    </div>
 
                     <div className="section-divider">标题与标签</div>
                     <div className="prop-row">
@@ -4010,6 +4053,18 @@ function App() {
                         }
                       />
                     </div>
+                    {surfaceTemplate && (
+                      <div className="prop-row">
+                        <label>Z 标题</label>
+                        <input
+                          type="text"
+                          value={activeFigure.figureOverrides.zTitle ?? ""}
+                          onChange={(event) =>
+                            setFigureField("zTitle", event.target.value)
+                          }
+                        />
+                      </div>
+                    )}
                     <div className="prop-row">
                       <label>标题字号</label>
                       <div className="compact-number">
@@ -4134,7 +4189,7 @@ function App() {
                   </section>
                 )}
 
-                {inspectorTab === "legend" && (
+                {inspectorTab === "legend" && !fieldTemplate && (
                   <section className="inspector-pane">
                     <div className="pane-heading">
                       <strong>图例</strong>

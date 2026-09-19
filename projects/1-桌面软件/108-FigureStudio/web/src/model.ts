@@ -155,6 +155,7 @@ export interface FigureOverrides {
 
   xTitle?: string;
   yTitle?: string;
+  zTitle?: string;
   axisTitleColor?: string;
   axisTitleSizePt?: number;
   tickLabelColor?: string;

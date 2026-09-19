@@ -1759,3 +1759,14 @@ button:disabled {
   background: #fffdf0;
   color: #756e3f;
 }
+
+
+.layer-arrow-icon {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

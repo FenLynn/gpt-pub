@@ -599,7 +599,14 @@ export function buildLayout(args: {
         showbackground: false
       },
       zaxis: {
-        title: "Z",
+        title: {
+          text: overrides.zTitle ?? "Z",
+          font: {
+            family: fontFamily,
+            size: axisTitleSizePx,
+            color: overrides.axisTitleColor ?? "#17191c"
+          }
+        },
         gridcolor: "#e3e6e9",
         zeroline: false,
         showbackground: false
