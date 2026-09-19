@@ -228,7 +228,7 @@ button:disabled {
 
 .explorer-toolbar {
   display: grid;
-  grid-template-columns: repeat(2, calc(27px * var(--ui-scale))) 1fr repeat(2, calc(27px * var(--ui-scale)));
+  grid-template-columns: repeat(3, calc(27px * var(--ui-scale))) 1fr repeat(2, calc(27px * var(--ui-scale)));
   align-items: center;
   gap: calc(2px * var(--ui-scale));
   padding: 0 calc(6px * var(--ui-scale));
