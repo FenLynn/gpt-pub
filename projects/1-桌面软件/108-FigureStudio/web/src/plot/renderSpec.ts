@@ -3,7 +3,8 @@ import type {
   PlotColumn,
   FigureSpec,
   LegendPosition,
-  PresetDefinition
+  PresetDefinition,
+  TickLabelFormat
 } from "../model";
 
 export const DESIGN_DPI = 96;
@@ -223,6 +224,16 @@ export function buildTraces(args: {
         dataset.ys.findIndex((item) => item.id === column.id)
       );
       const override = figure.seriesOverrides[column.id] || {};
+      const fillColor =
+        override.color ||
+        preset.palette[sourceIndex % preset.palette.length];
+      const markerColor =
+        override.barColorMode === "points"
+          ? column.values.map(
+              (_value, pointIndex) =>
+                preset.palette[pointIndex % preset.palette.length]
+            )
+          : fillColor;
       return {
         type: "bar",
         name: column.name,
@@ -230,11 +241,9 @@ export function buildTraces(args: {
         y: column.values,
         opacity: override.opacity ?? 0.92,
         marker: {
-          color:
-            override.color ||
-            preset.palette[sourceIndex % preset.palette.length],
+          color: markerColor,
           line: {
-            color: override.barBorderColor ?? "#ffffff",
+            color: override.barBorderColor ?? fillColor,
             width: ptToPx(override.barBorderWidthPt ?? 0.3)
           }
         },
@@ -317,24 +326,53 @@ function rangeFor(
   autoRange: boolean | undefined,
   minValue: number | undefined,
   maxValue: number | undefined,
-  scale: "linear" | "log"
+  scale: "linear" | "log",
+  reverse: boolean
 ) {
   if (autoRange !== false) return undefined;
   if (
     minValue === undefined ||
     maxValue === undefined ||
     !Number.isFinite(minValue) ||
-    !Number.isFinite(maxValue)
+    !Number.isFinite(maxValue) ||
+    minValue >= maxValue
   ) {
     return undefined;
   }
 
-  if (scale === "log") {
-    if (minValue <= 0 || maxValue <= 0) return undefined;
-    return [Math.log10(minValue), Math.log10(maxValue)];
-  }
+  const range =
+    scale === "log"
+      ? minValue > 0 && maxValue > 0
+        ? [Math.log10(minValue), Math.log10(maxValue)]
+        : undefined
+      : [minValue, maxValue];
 
-  return [minValue, maxValue];
+  return range && reverse ? [range[1], range[0]] : range;
+}
+
+function tickFormatString(
+  format: TickLabelFormat | undefined,
+  decimals: number | undefined
+): string | undefined {
+  if (!format || format === "auto") return undefined;
+  const digits = Math.max(
+    0,
+    Math.min(12, Number.isFinite(decimals) ? Math.round(decimals as number) : 2)
+  );
+  if (format === "decimal") return "." + digits + "f";
+  if (format === "scientific") return "." + digits + "e";
+  return "." + Math.max(1, digits + 1) + "s";
+}
+
+function rgba(hex: string, opacity: number): string {
+  const clean = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return hex;
+  const value = Number.parseInt(clean, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  const alpha = Math.max(0, Math.min(1, opacity));
+  return "rgba(" + red + "," + green + "," + blue + "," + alpha + ")";
 }
 
 export function buildLayout(args: {
@@ -380,8 +418,8 @@ export function buildLayout(args: {
       ? {
           x: overrides.legendX ?? presetLegendPosition.x,
           y: overrides.legendY ?? presetLegendPosition.y,
-          xanchor: "left",
-          yanchor: "top"
+          xanchor: overrides.legendXAnchor ?? "left",
+          yanchor: overrides.legendYAnchor ?? "top"
         }
       : presetLegendPosition;
   const legendOrientation = overrides.legendOrientation ?? "horizontal";
@@ -392,13 +430,15 @@ export function buildLayout(args: {
     overrides.xAutoRange,
     overrides.xMin,
     overrides.xMax,
-    xScale
+    xScale,
+    overrides.xReverse ?? false
   );
   const yRange = rangeFor(
     overrides.yAutoRange,
     overrides.yMin,
     overrides.yMax,
-    yScale
+    yScale,
+    overrides.yReverse ?? false
   );
 
   const commonAxis = {
@@ -493,11 +533,14 @@ export function buildLayout(args: {
     legend: {
       ...legendPosition,
       orientation: legendOrientation === "horizontal" ? "h" : "v",
-      bgcolor:
-        overrides.legendBackground ??
-        (overrides.legendFrame
-          ? "rgba(255,255,255,0.90)"
-          : "rgba(255,255,255,0)"),
+      bgcolor: overrides.legendBackground
+        ? rgba(
+            overrides.legendBackground,
+            overrides.legendBackgroundOpacity ?? 1
+          )
+        : overrides.legendFrame
+        ? "rgba(255,255,255,0.90)"
+        : "rgba(255,255,255,0)",
       bordercolor: overrides.legendBorderColor ?? "#cdd2d7",
       borderwidth: overrides.legendFrame
         ? ptToPx(overrides.legendBorderWidthPt ?? 0.6)
@@ -572,7 +615,11 @@ export function buildLayout(args: {
   layout.xaxis = {
     ...commonAxis,
     type: xScale,
-    autorange: xRange ? false : true,
+    autorange: xRange
+      ? false
+      : overrides.xReverse
+      ? "reversed"
+      : true,
     range: xRange,
     title: {
       text:
@@ -588,6 +635,12 @@ export function buildLayout(args: {
       overrides.xMajorTickStep && overrides.xMajorTickStep > 0
         ? overrides.xMajorTickStep
         : undefined,
+    tickformat: tickFormatString(
+      overrides.xTickFormat,
+      overrides.xTickDecimals
+    ),
+    tickprefix: overrides.xTickPrefix || undefined,
+    ticksuffix: overrides.xTickSuffix || undefined,
     minor: {
       ...commonAxis.minor,
       dtick:
@@ -602,7 +655,11 @@ export function buildLayout(args: {
   layout.yaxis = {
     ...commonAxis,
     type: yScale,
-    autorange: yRange ? false : true,
+    autorange: yRange
+      ? false
+      : overrides.yReverse
+      ? "reversed"
+      : true,
     range: yRange,
     title: {
       text:
@@ -618,6 +675,12 @@ export function buildLayout(args: {
       overrides.yMajorTickStep && overrides.yMajorTickStep > 0
         ? overrides.yMajorTickStep
         : undefined,
+    tickformat: tickFormatString(
+      overrides.yTickFormat,
+      overrides.yTickDecimals
+    ),
+    tickprefix: overrides.yTickPrefix || undefined,
+    ticksuffix: overrides.yTickSuffix || undefined,
     minor: {
       ...commonAxis.minor,
       dtick:

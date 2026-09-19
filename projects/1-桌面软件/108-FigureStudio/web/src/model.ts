@@ -90,6 +90,13 @@ export type MarkerSymbol =
 export type AxisScale = "linear" | "log";
 export type TickDirection = "inside" | "outside";
 export type AxisStylePreset = "regular" | "bold";
+export type TickLabelFormat =
+  | "auto"
+  | "decimal"
+  | "scientific"
+  | "engineering";
+export type LegendXAnchor = "left" | "center" | "right";
+export type LegendYAnchor = "top" | "middle" | "bottom";
 export type LegendPosition =
   | "top-left"
   | "top-center"
@@ -134,6 +141,7 @@ export interface SeriesOverride {
   opacity?: number;
   barBorderColor?: string;
   barBorderWidthPt?: number;
+  barColorMode?: "series" | "points";
 }
 
 export interface FigureOverrides {
@@ -151,6 +159,14 @@ export interface FigureOverrides {
   axisTitleSizePt?: number;
   tickLabelColor?: string;
   tickLabelSizePt?: number;
+  xTickFormat?: TickLabelFormat;
+  yTickFormat?: TickLabelFormat;
+  xTickDecimals?: number;
+  yTickDecimals?: number;
+  xTickPrefix?: string;
+  xTickSuffix?: string;
+  yTickPrefix?: string;
+  yTickSuffix?: string;
   aspectMode?: AspectMode;
   customAspectWidth?: number;
   customAspectHeight?: number;
@@ -159,6 +175,8 @@ export interface FigureOverrides {
   yScale?: AxisScale;
   xAutoRange?: boolean;
   yAutoRange?: boolean;
+  xReverse?: boolean;
+  yReverse?: boolean;
   xMin?: number;
   xMax?: number;
   yMin?: number;
@@ -176,12 +194,15 @@ export interface FigureOverrides {
   legendPosition?: LegendPosition;
   legendX?: number;
   legendY?: number;
+  legendXAnchor?: LegendXAnchor;
+  legendYAnchor?: LegendYAnchor;
   legendOrientation?: LegendOrientation;
   legendFrame?: boolean;
   legendColumns?: number;
   legendFontSizePt?: number;
   legendFontColor?: string;
   legendBackground?: string;
+  legendBackgroundOpacity?: number;
   legendBorderColor?: string;
   legendBorderWidthPt?: number;
   legendItemWidthPx?: number;

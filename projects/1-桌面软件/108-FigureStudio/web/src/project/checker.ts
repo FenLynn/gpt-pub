@@ -158,6 +158,78 @@ export function checkFigure(
     });
   }
 
+  const axisIssues: string[] = [];
+  const checkAxis = (
+    label: string,
+    auto: boolean | undefined,
+    min: number | undefined,
+    max: number | undefined,
+    scale: "linear" | "log",
+    major: number | undefined,
+    minor: number | undefined
+  ) => {
+    if (auto === false) {
+      if (
+        min === undefined ||
+        max === undefined ||
+        !Number.isFinite(min) ||
+        !Number.isFinite(max) ||
+        min >= max
+      ) {
+        axisIssues.push(label + " 手动范围需要满足 最小值 < 最大值");
+      } else if (scale === "log" && (min <= 0 || max <= 0)) {
+        axisIssues.push(label + " 对数范围必须大于 0");
+      }
+    }
+    if (major !== undefined && (!Number.isFinite(major) || major <= 0)) {
+      axisIssues.push(label + " 大刻度间距必须大于 0");
+    }
+    if (minor !== undefined && (!Number.isFinite(minor) || minor <= 0)) {
+      axisIssues.push(label + " 小刻度间距必须大于 0");
+    }
+  };
+
+  checkAxis(
+    "X 轴",
+    o.xAutoRange,
+    o.xMin,
+    o.xMax,
+    o.xScale ?? "linear",
+    o.xMajorTickStep,
+    o.xMinorTickStep
+  );
+  checkAxis(
+    "Y 轴",
+    o.yAutoRange,
+    o.yMin,
+    o.yMax,
+    o.yScale ?? "linear",
+    o.yMajorTickStep,
+    o.yMinorTickStep
+  );
+
+  items.push({
+    id: "axis-validity",
+    level: axisIssues.length ? "warn" : "pass",
+    title: "坐标轴数值",
+    detail: axisIssues.length
+      ? axisIssues.join("；") + "。无效值不会写入渲染范围。"
+      : "坐标轴范围和刻度间距有效。"
+  });
+
+  const legendFarOutside =
+    o.legendPosition === "custom" &&
+    ((o.legendX !== undefined && (o.legendX < -0.25 || o.legendX > 1.25)) ||
+      (o.legendY !== undefined && (o.legendY < -0.25 || o.legendY > 1.25)));
+  items.push({
+    id: "legend-position",
+    level: legendFarOutside ? "warn" : "pass",
+    title: "图例位置",
+    detail: legendFarOutside
+      ? "自由图例位置远离绘图区，导出前请确认没有被裁切。"
+      : "图例位置处于合理范围。"
+  });
+
   items.push({
     id: "raster",
     level: "pass",
