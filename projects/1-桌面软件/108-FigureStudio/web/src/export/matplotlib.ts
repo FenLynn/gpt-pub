@@ -605,7 +605,27 @@ elif template in ("heatmap", "contour"):
     if template == "heatmap":
         artist = ax.pcolormesh(sx, y, z, shading="auto", **field_kwargs)
     else:
-        levels = max(3, min(64, int(O.get("contourLevels", 12))))
+        level_count = max(3, min(64, int(O.get("contourLevels", 12))))
+        finite_z = z[np.isfinite(z)]
+        if O.get("zAutoRange", True) is False:
+            level_min = O.get("zMin")
+            level_max = O.get("zMax")
+        else:
+            level_min = float(np.min(finite_z)) if finite_z.size else 0.0
+            level_max = float(np.max(finite_z)) if finite_z.size else 1.0
+        if (
+            level_min is None
+            or level_max is None
+            or not np.isfinite(level_min)
+            or not np.isfinite(level_max)
+        ):
+            level_min, level_max = 0.0, 1.0
+        if not level_max > level_min:
+            padding = max(abs(float(level_min)) * 0.05, 0.5)
+            level_min -= padding
+            level_max += padding
+        levels = np.linspace(level_min, level_max, level_count)
+
         contour_fill = O.get("contourFill", True)
         contour_labels = O.get("contourLabels", False)
         contour_lines = (
