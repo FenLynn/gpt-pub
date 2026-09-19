@@ -257,3 +257,39 @@ Dependent Graph
 - Dependents 数量。
 
 这些属于大型 Project 的导航能力，不应该挤占当前基础工作流。
+
+
+## 2026-09-19：Workbook 结构第二轮收敛
+
+对照 Origin 官方帮助后，本轮继续吸收四个高价值概念：
+
+- Workbook 内部持有多个 Worksheet，而不是让每个 Sheet 占一个应用级文档 Tab；
+- Column Designation 是 Plot Setup 的默认输入语义；
+- Plot Setup 允许显式查看和修改数据映射；
+- Project Explorer 可以反查 Workbook / Sheet 的 dependent Graph。
+
+对应 FigureStudio 的实现：
+
+```text
+顶部 Document Tabs
+├ DataBook
+├ Graph
+└ Graph
+
+DataBook 内部
+├ Sheet1
+├ Sheet2
+└ Sheet3
+```
+
+Graph Inspector 新增“数据”页，显式维护 Source Sheet / X / Y[] / Y Error / Z。Sheet 数据属性新增 Dependents 列表，可以直接跳到引用当前 Sheet 的 Graph。
+
+Column Metadata 新增可选 Comments 行；Name / Unit 默认显示。F(x) 等公式计算保留到数据计算阶段，不用占位假功能。
+
+Origin 官方参考：
+
+- https://docs.originlab.com/user-guide/worksheets-columns/
+- https://docs.originlab.com/origin-help/wkscol-setdesignation/
+- https://docs.originlab.com/origin-help/wksheaderrow-datasupportdisplay/
+- https://docs.originlab.com/origin-help/plot-setup/
+- https://docs.originlab.com/origin-help/project-explorer/

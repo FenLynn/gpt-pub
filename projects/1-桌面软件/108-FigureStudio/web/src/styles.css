@@ -1250,3 +1250,154 @@ button:disabled {
     min-height: calc(29px * var(--ui-scale));
   }
 }
+
+
+/* Origin-style Workbook / Worksheet iteration */
+.sheet-workspace {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) calc(33px * var(--ui-scale));
+}
+.sheet-tabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: calc(2px * var(--ui-scale));
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 calc(6px * var(--ui-scale));
+  border-top: 1px solid #cfd5da;
+  background: #eef1f3;
+  scrollbar-width: thin;
+}
+.sheet-tabs button {
+  display: flex;
+  max-width: calc(170px * var(--ui-scale));
+  height: calc(27px * var(--ui-scale));
+  align-items: center;
+  gap: calc(5px * var(--ui-scale));
+  padding: 0 calc(8px * var(--ui-scale));
+  border: 1px solid transparent;
+  border-radius: calc(5px * var(--ui-scale));
+  background: transparent;
+  color: #626d76;
+  cursor: pointer;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.sheet-tabs button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sheet-tabs button.is-active {
+  border-color: #c8d1d8;
+  background: #fff;
+  color: #20252b;
+  box-shadow: 0 1px 2px rgba(20, 29, 37, 0.06);
+}
+.sheet-tabs .sheet-tab-add {
+  width: calc(28px * var(--ui-scale));
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 0;
+  font-size: 1rem;
+}
+.column-comment-row th {
+  top: calc(100px * var(--ui-scale));
+  height: calc(31px * var(--ui-scale));
+  background: #fbfbfc;
+}
+.column-comment-row input {
+  width: 100%;
+  height: 100%;
+  padding: 0 calc(6px * var(--ui-scale));
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #6a747d;
+  font-size: 0.74rem;
+}
+.column-comment-row input:focus {
+  background: #f3f7fa;
+  box-shadow: inset 0 0 0 1px #86a0b4;
+}
+.dependents-list,
+.mapping-series-list {
+  display: grid;
+  gap: calc(3px * var(--ui-scale));
+  margin: calc(6px * var(--ui-scale)) 0;
+}
+.dependents-list button {
+  display: grid;
+  grid-template-columns: calc(18px * var(--ui-scale)) minmax(0, 1fr);
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  min-height: calc(28px * var(--ui-scale));
+  padding: 0 calc(6px * var(--ui-scale));
+  border: 1px solid transparent;
+  border-radius: calc(5px * var(--ui-scale));
+  background: transparent;
+  color: #55616b;
+  cursor: pointer;
+  text-align: left;
+}
+.dependents-list button:hover {
+  border-color: #d3d9de;
+  background: #fff;
+}
+.dependents-list button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.empty-dependents {
+  padding: calc(6px * var(--ui-scale));
+  color: #8a939b;
+  font-size: 0.74rem;
+}
+.mapping-series-list label {
+  display: grid;
+  grid-template-columns: calc(18px * var(--ui-scale)) minmax(0, 1fr);
+  align-items: center;
+  gap: calc(5px * var(--ui-scale));
+  min-height: calc(28px * var(--ui-scale));
+  padding: 0 calc(6px * var(--ui-scale));
+  border: 1px solid transparent;
+  border-radius: calc(5px * var(--ui-scale));
+  color: #66717a;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.mapping-series-list label:hover,
+.mapping-series-list label.is-mapped {
+  border-color: #d4dbe0;
+  background: #fff;
+  color: #30373d;
+}
+.mapping-series-list input {
+  margin: 0;
+}
+.mapping-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(8px * var(--ui-scale));
+}
+.mapping-actions button {
+  height: calc(28px * var(--ui-scale));
+  padding: 0 calc(8px * var(--ui-scale));
+  border: 1px solid #cfd5da;
+  border-radius: calc(5px * var(--ui-scale));
+  background: #fff;
+  color: #4e5962;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+.inspector-tabs {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+@media (max-width: 1280px) {
+  .inspector-tabs button {
+    padding-left: calc(2px * var(--ui-scale));
+    padding-right: calc(2px * var(--ui-scale));
+    font-size: 0.72rem;
+  }
+}

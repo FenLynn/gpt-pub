@@ -6,6 +6,7 @@ export interface Column {
   id: string;
   name: string;
   unit?: string;
+  comment?: string;
   role: ColumnRole;
   values: CellValue[];
 }
@@ -211,7 +212,7 @@ export interface UserDefaults {
 }
 
 export type DocumentRef =
-  | { type: "sheet"; id: string }
+  | { type: "book"; id: string }
   | { type: "figure"; id: string };
 
 export type ExplorerSelection =
@@ -220,4 +221,10 @@ export type ExplorerSelection =
   | { type: "sheet"; id: string }
   | { type: "figure"; id: string };
 
-export type InspectorTab = "figure" | "series" | "axis" | "legend" | "check";
+export type InspectorTab =
+  | "data"
+  | "figure"
+  | "series"
+  | "axis"
+  | "legend"
+  | "check";

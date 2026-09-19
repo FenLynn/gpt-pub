@@ -244,7 +244,7 @@ function App() {
     () => createInitialProject(readUserDefaults()),
     []
   );
-  const initialSheetId = initialProject.dataBooks[0]?.sheets[0]?.id ?? "";
+  const initialBookId = initialProject.dataBooks[0]?.id ?? "";
   const initialFigureId = initialProject.figures[0]?.id ?? "";
 
   const history = useHistoryState<ProjectState>(initialProject);
@@ -257,13 +257,22 @@ function App() {
   const dataActionRef = useRef<"import" | "link" | "replace" | "reload">("import");
 
   const [openDocs, setOpenDocs] = useState<DocumentRef[]>(() => [
-    ...(initialSheetId ? [{ type: "sheet", id: initialSheetId } as DocumentRef] : []),
+    ...(initialBookId ? [{ type: "book", id: initialBookId } as DocumentRef] : []),
     ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
   ]);
   const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
-    initialSheetId
-      ? { type: "sheet", id: initialSheetId }
+    initialBookId
+      ? { type: "book", id: initialBookId }
       : { type: "figure", id: initialFigureId }
+  );
+  const [activeSheetByBook, setActiveSheetByBook] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        initialProject.dataBooks.map((book) => [
+          book.id,
+          book.sheets[0]?.id ?? ""
+        ])
+      )
   );
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(initialProject.folders.map((folder) => folder.id))
@@ -279,6 +288,7 @@ function App() {
   const [uiScale, setUiScale] = useState(readUiScale);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("series");
   const [dataInspectorTab, setDataInspectorTab] = useState<"data" | "column">("data");
+  const [showColumnMeta, setShowColumnMeta] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [toast, setToast] = useState("");
@@ -290,10 +300,14 @@ function App() {
     }, 2200);
   }, []);
 
-  const activeSheetContext =
-    activeDoc.type === "sheet" ? findSheet(project, activeDoc.id) : undefined;
-  const activeBook = activeSheetContext?.book;
-  const activeSheet = activeSheetContext?.sheet;
+  const activeBook =
+    activeDoc.type === "book"
+      ? project.dataBooks.find((book) => book.id === activeDoc.id)
+      : undefined;
+  const activeSheet =
+    activeBook?.sheets.find(
+      (sheet) => sheet.id === activeSheetByBook[activeBook.id]
+    ) ?? activeBook?.sheets[0];
 
   const activeFigure =
     activeDoc.type === "figure"
@@ -368,6 +382,14 @@ function App() {
   );
 
   const warningCount = checkItems.filter((item) => item.level === "warn").length;
+  const dependentFigures = activeSheet
+    ? project.figures.filter(
+        (figure) => figure.dataRef.sheetId === activeSheet.id
+      )
+    : [];
+  const allSheets = project.dataBooks.flatMap((book) =>
+    book.sheets.map((sheet) => ({ book, sheet }))
+  );
 
   useEffect(() => {
     document.documentElement.style.setProperty("--ui-scale", String(uiScale));
@@ -589,6 +611,16 @@ function App() {
     }
   }
 
+  function openSheetDocument(sheetId: string) {
+    const context = findSheet(project, sheetId);
+    if (!context) return;
+    setActiveSheetByBook((current) => ({
+      ...current,
+      [context.book.id]: sheetId
+    }));
+    openDocument({ type: "book", id: context.book.id });
+  }
+
   function closeDocument(doc: DocumentRef) {
     setOpenDocs((current) => {
       const next = current.filter((item) => docKey(item) !== docKey(doc));
@@ -604,16 +636,19 @@ function App() {
     history.replace(next);
     setExpandedFolders(new Set(next.folders.map((folder) => folder.id)));
     setExpandedBooks(new Set(next.dataBooks.map((book) => book.id)));
-    const sheetId = next.dataBooks[0]?.sheets[0]?.id;
+    const bookId = next.dataBooks[0]?.id;
     const figureId = next.figures[0]?.id;
     const docs: DocumentRef[] = [
-      ...(sheetId ? [{ type: "sheet", id: sheetId } as DocumentRef] : []),
+      ...(bookId ? [{ type: "book", id: bookId } as DocumentRef] : []),
       ...(figureId ? [{ type: "figure", id: figureId } as DocumentRef] : [])
     ];
-    setOpenDocs(docs);
-    setActiveDoc(
-      docs[0] ?? { type: "figure", id: figureId ?? "" }
+    setActiveSheetByBook(
+      Object.fromEntries(
+        next.dataBooks.map((book) => [book.id, book.sheets[0]?.id ?? ""])
+      )
     );
+    setOpenDocs(docs);
+    setActiveDoc(docs[0] ?? { type: "figure", id: figureId ?? "" });
     setExplorerSelection(null);
   }
 
@@ -621,8 +656,7 @@ function App() {
     if (doc.type === "figure") {
       return project.figures.find((figure) => figure.id === doc.id)?.name ?? "图形";
     }
-    const context = findSheet(project, doc.id);
-    return context ? context.book.name + " · " + context.sheet.name : "数据表";
+    return project.dataBooks.find((book) => book.id === doc.id)?.name ?? "数据簿";
   }
 
   function newProject() {
@@ -803,7 +837,11 @@ function App() {
         dataBooks: [...current.dataBooks, book]
       }));
       setExpandedBooks((current) => new Set([...current, book.id]));
-      openDocument({ type: "sheet", id: nextSheet.id });
+      setActiveSheetByBook((current) => ({
+        ...current,
+        [book.id]: nextSheet.id
+      }));
+      openDocument({ type: "book", id: book.id });
       setExplorerSelection({ type: "book", id: book.id });
       showToast(action === "link" ? "已创建 Linked Data" : "已导入数据表");
     } catch (error) {
@@ -835,11 +873,15 @@ function App() {
       dataBooks: [...current.dataBooks, book]
     }));
     setExpandedBooks((current) => new Set([...current, book.id]));
-    openDocument({ type: "sheet", id: sheet.id });
+    setActiveSheetByBook((current) => ({
+      ...current,
+      [book.id]: sheet.id
+    }));
+    openDocument({ type: "book", id: book.id });
   }
 
   function addSheet() {
-    if (!activeBook) return;
+    if (!activeBook || activeBook.source.kind === "linked") return;
     const sheet: DataSheet = {
       id: makeId("sheet"),
       name: "Sheet" + String(activeBook.sheets.length + 1),
@@ -852,7 +894,11 @@ function App() {
       ...book,
       sheets: [...book.sheets, sheet]
     }));
-    openDocument({ type: "sheet", id: sheet.id });
+    setActiveSheetByBook((current) => ({
+      ...current,
+      [activeBook.id]: sheet.id
+    }));
+    openDocument({ type: "book", id: activeBook.id });
   }
 
   function addRow() {
@@ -1026,7 +1072,11 @@ function App() {
       }));
       setPasteText("");
       setPasteOpen(false);
-      openDocument({ type: "sheet", id: next.id });
+      setActiveSheetByBook((current) => ({
+        ...current,
+        [activeBook.id]: next.id
+      }));
+      openDocument({ type: "book", id: activeBook.id });
       showToast("已粘贴为新工作表");
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "无法解析粘贴数据。");
@@ -1191,16 +1241,22 @@ function App() {
           activeFigureId: figures[0]?.id ?? ""
         };
       });
-      setOpenDocs((current) =>
-        current.filter(
+      setOpenDocs((current) => {
+        const next = current.filter(
           (doc) =>
             !(
-              (doc.type === "sheet" && sheetIds.has(doc.id)) ||
+              (doc.type === "book" && doc.id === book.id) ||
               (doc.type === "figure" &&
                 linkedFigures.some((figure) => figure.id === doc.id))
             )
-        )
-      );
+        );
+        const activeRemoved =
+          (activeDoc.type === "book" && activeDoc.id === book.id) ||
+          (activeDoc.type === "figure" &&
+            linkedFigures.some((figure) => figure.id === activeDoc.id));
+        if (activeRemoved && next.length) setActiveDoc(next[next.length - 1]);
+        return next;
+      });
       return;
     }
 
@@ -1235,7 +1291,15 @@ function App() {
           (figure) => figure.dataRef.sheetId !== context.sheet.id
         )
       }));
-      closeDocument({ type: "sheet", id: context.sheet.id });
+      const fallbackSheet = context.book.sheets.find(
+        (sheet) => sheet.id !== context.sheet.id
+      );
+      if (fallbackSheet) {
+        setActiveSheetByBook((current) => ({
+          ...current,
+          [context.book.id]: fallbackSheet.id
+        }));
+      }
       return;
     }
 
@@ -1375,7 +1439,13 @@ function App() {
             setExplorerSelection({ type: "book", id: book.id });
             setExpandedBooks((current) => new Set([...current, book.id]));
             const first = book.sheets[0];
-            if (first) openDocument({ type: "sheet", id: first.id });
+            if (first) {
+              setActiveSheetByBook((current) => ({
+                ...current,
+                [book.id]: current[book.id] || first.id
+              }));
+            }
+            openDocument({ type: "book", id: book.id });
           }}
         >
           <span
@@ -1402,7 +1472,9 @@ function App() {
               key={sheet.id}
               type="button"
               className={
-                activeDoc.type === "sheet" && activeDoc.id === sheet.id
+                activeDoc.type === "book" &&
+                activeDoc.id === book.id &&
+                activeSheet?.id === sheet.id
                   ? "explorer-row is-active"
                   : explorerSelection?.type === "sheet" &&
                     explorerSelection.id === sheet.id
@@ -1412,7 +1484,11 @@ function App() {
               style={{ paddingLeft: 31 + depth * 14 }}
               onClick={() => {
                 setExplorerSelection({ type: "sheet", id: sheet.id });
-                openDocument({ type: "sheet", id: sheet.id });
+                setActiveSheetByBook((current) => ({
+                  ...current,
+                  [book.id]: sheet.id
+                }));
+                openDocument({ type: "book", id: book.id });
               }}
             >
               <span />
@@ -1719,7 +1795,7 @@ function App() {
                 }
                 onClick={() => openDocument(doc)}
               >
-                <Icon kind={doc.type === "sheet" ? "sheet" : "graph"} />
+                <Icon kind={doc.type === "book" ? "book" : "graph"} />
                 <span>{docTitle(doc)}</span>
                 <i
                   role="button"
@@ -1735,7 +1811,7 @@ function App() {
             ))}
           </div>
 
-          {activeDoc.type === "sheet" && activeSheet && activeBook ? (
+          {activeDoc.type === "book" && activeSheet && activeBook ? (
             <>
               <div className="data-toolbar">
                 <div className="data-toolbar-left">
@@ -1748,10 +1824,12 @@ function App() {
                   >
                     {activeBook.source.kind === "linked" ? "LINKED" : "EMBEDDED"}
                   </span>
-                  <strong>{activeSheet.name}</strong>
+                  <strong>{activeBook.name} · {activeSheet.name}</strong>
                 </div>
                 <div className="data-toolbar-actions">
-                  <button type="button" onClick={addSheet}>+ Sheet</button>
+                  <button type="button" onClick={() => setShowColumnMeta((value) => !value)}>
+                    {showColumnMeta ? "隐藏备注" : "备注行"}
+                  </button>
                   <button type="button" disabled={dataReadOnly} onClick={addRow}>+ 行</button>
                   <button type="button" disabled={dataReadOnly} onClick={addColumn}>+ 列</button>
                   <button type="button" onClick={() => setPasteOpen(true)} disabled={dataReadOnly}>粘贴表</button>
@@ -1867,6 +1945,26 @@ function App() {
                           </th>
                         ))}
                       </tr>
+                      {showColumnMeta && (
+                        <tr className="column-comment-row">
+                          <th className="row-index-head">备注</th>
+                          {activeSheet.columns.map((column) => (
+                            <th key={column.id}>
+                              <input
+                                value={column.comment ?? ""}
+                                readOnly={dataReadOnly}
+                                placeholder="—"
+                                onFocus={() => setSelectedColumnId(column.id)}
+                                onChange={(event) =>
+                                  updateColumn(column.id, {
+                                    comment: event.target.value || undefined
+                                  })
+                                }
+                              />
+                            </th>
+                          ))}
+                        </tr>
+                      )}
                     </thead>
                     <tbody>
                       {Array.from({ length: displayedRows }, (_, rowIndex) => (
@@ -1898,6 +1996,34 @@ function App() {
                       当前表有 {rowCount} 行；Web 编辑器为保证流畅仅显示前 {displayedRows} 行，绘图仍使用全部数据。
                     </div>
                   )}
+                </div>
+                <div className="sheet-tabs">
+                  {activeBook.sheets.map((sheet) => (
+                    <button
+                      key={sheet.id}
+                      type="button"
+                      className={sheet.id === activeSheet.id ? "is-active" : ""}
+                      onClick={() => {
+                        setExplorerSelection({ type: "sheet", id: sheet.id });
+                        setActiveSheetByBook((current) => ({
+                          ...current,
+                          [activeBook.id]: sheet.id
+                        }));
+                      }}
+                    >
+                      <Icon kind="sheet" />
+                      <span>{sheet.name}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="sheet-tab-add"
+                    disabled={dataReadOnly}
+                    onClick={addSheet}
+                    title={dataReadOnly ? "Linked Data 不可新增 Sheet" : "新建 Sheet"}
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </>
@@ -1945,7 +2071,7 @@ function App() {
                 </div>
 
                 <div className="figure-actions">
-                  <button type="button" onClick={() => openDocument({ type: "sheet", id: activeFigure.dataRef.sheetId })}>数据</button>
+                  <button type="button" onClick={() => openSheetDocument(activeFigure.dataRef.sheetId)}>数据</button>
                   <button type="button" onClick={() => void resetView()}>重置</button>
                   <button type="button" onClick={() => void exportFigure("svg")}>SVG</button>
                   <button type="button" onClick={() => void exportFigure("png")}>PNG</button>
@@ -1998,7 +2124,7 @@ function App() {
         </section>
 
         <aside className="right-panel">
-          {activeDoc.type === "sheet" && activeSheet && activeBook ? (
+          {activeDoc.type === "book" && activeSheet && activeBook ? (
             <>
               <div className="data-inspector-tabs">
                 <button
@@ -2056,10 +2182,22 @@ function App() {
                       </>
                     )}
 
-                    <div className="section-divider">工作表</div>
+                    <div className="section-divider">数据簿 / 工作表</div>
 
                     <div className="prop-row">
-                      <label>名称</label>
+                      <label>数据簿</label>
+                      <input
+                        value={activeBook.name}
+                        onChange={(event) =>
+                          patchBook(activeBook.id, (book) => ({
+                            ...book,
+                            name: event.target.value
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>工作表</label>
                       <input
                         value={activeSheet.name}
                         onChange={(event) =>
@@ -2077,6 +2215,24 @@ function App() {
                     <div className="prop-row prop-muted">
                       <label>列数</label>
                       <span>{activeSheet.columns.length}</span>
+                    </div>
+
+                    <div className="section-divider">依赖图形 · {dependentFigures.length}</div>
+                    <div className="dependents-list">
+                      {dependentFigures.length ? (
+                        dependentFigures.map((figure) => (
+                          <button
+                            key={figure.id}
+                            type="button"
+                            onClick={() => openDocument({ type: "figure", id: figure.id })}
+                          >
+                            <Icon kind="graph" />
+                            <span>{figure.name}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <span className="empty-dependents">当前 Sheet 尚未被 Graph 使用</span>
+                      )}
                     </div>
 
                     <div className="source-actions">
@@ -2127,6 +2283,18 @@ function App() {
                       />
                     </div>
                     <div className="prop-row">
+                      <label>备注</label>
+                      <input
+                        value={selectedColumn.comment ?? ""}
+                        readOnly={dataReadOnly}
+                        onChange={(event) =>
+                          updateColumn(selectedColumn.id, {
+                            comment: event.target.value || undefined
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
                       <label>角色</label>
                       <select
                         value={selectedColumn.role}
@@ -2168,6 +2336,7 @@ function App() {
             <>
               <div className="inspector-tabs">
                 {([
+                  ["data", "数据"],
                   ["figure", "图"],
                   ["series", "曲线"],
                   ["axis", "轴"],
@@ -2187,6 +2356,169 @@ function App() {
               </div>
 
               <div className="inspector-scroll">
+                {inspectorTab === "data" && figureSheet && (
+                  <section className="inspector-pane">
+                    <div className="pane-heading">
+                      <strong>数据映射</strong>
+                      <span>Plot Setup</span>
+                    </div>
+                    <div className="prop-row">
+                      <label>工作表</label>
+                      <select
+                        value={activeFigure.dataRef.sheetId}
+                        onChange={(event) => {
+                          const context = findSheet(project, event.target.value);
+                          if (!context) return;
+                          const dataRef = defaultDataRef(context.sheet);
+                          patchActiveFigure((figure) => ({
+                            ...figure,
+                            dataRef,
+                            seriesOrder: dataRef.yColumnIds,
+                            seriesOverrides: {}
+                          }));
+                          setSelectedSeriesIds(dataRef.yColumnIds.slice(0, 1));
+                        }}
+                      >
+                        {allSheets.map(({ book, sheet }) => (
+                          <option key={sheet.id} value={sheet.id}>
+                            {book.name} / {sheet.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="prop-row">
+                      <label>X</label>
+                      <select
+                        value={activeFigure.dataRef.xColumnId}
+                        onChange={(event) =>
+                          patchActiveFigure((figure) => ({
+                            ...figure,
+                            dataRef: { ...figure.dataRef, xColumnId: event.target.value }
+                          }))
+                        }
+                      >
+                        {figureSheet.columns.map((column, index) => (
+                          <option key={column.id} value={column.id}>
+                            {columnLabel(index, column.role)} · {column.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="section-divider">
+                      Y / Series · {activeFigure.dataRef.yColumnIds.length}
+                    </div>
+                    <div className="mapping-series-list">
+                      {figureSheet.columns
+                        .filter(
+                          (column) =>
+                            column.id !== activeFigure.dataRef.xColumnId &&
+                            column.role !== "Label" &&
+                            column.role !== "XErr" &&
+                            column.role !== "YErr"
+                        )
+                        .map((column) => {
+                          const index = figureSheet.columns.findIndex(
+                            (item) => item.id === column.id
+                          );
+                          const checked = activeFigure.dataRef.yColumnIds.includes(column.id);
+                          return (
+                            <label key={column.id} className={checked ? "is-mapped" : ""}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  const current = activeFigure.dataRef.yColumnIds;
+                                  if (checked && current.length <= 1) {
+                                    showToast("Graph 至少保留一列 Y");
+                                    return;
+                                  }
+                                  const next = checked
+                                    ? current.filter((id) => id !== column.id)
+                                    : [...current, column.id];
+                                  patchActiveFigure((figure) => ({
+                                    ...figure,
+                                    dataRef: { ...figure.dataRef, yColumnIds: next },
+                                    seriesOrder: [
+                                      ...figure.seriesOrder.filter((id) => next.includes(id)),
+                                      ...next.filter((id) => !figure.seriesOrder.includes(id))
+                                    ]
+                                  }));
+                                }}
+                              />
+                              <span>{columnLabel(index, column.role)} · {column.name}</span>
+                            </label>
+                          );
+                        })}
+                    </div>
+                    <div className="section-divider">辅助列</div>
+                    <div className="prop-row">
+                      <label>Y Error</label>
+                      <select
+                        value={activeFigure.dataRef.yErrorColumnId ?? ""}
+                        onChange={(event) =>
+                          patchActiveFigure((figure) => ({
+                            ...figure,
+                            dataRef: {
+                              ...figure.dataRef,
+                              yErrorColumnId: event.target.value || undefined
+                            },
+                            figureOverrides: {
+                              ...figure.figureOverrides,
+                              errorSeriesId: event.target.value || undefined
+                            }
+                          }))
+                        }
+                      >
+                        <option value="">无</option>
+                        {figureSheet.columns.map((column, index) => (
+                          <option key={column.id} value={column.id}>
+                            {columnLabel(index, column.role)} · {column.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {fieldTemplate && (
+                      <div className="prop-row">
+                        <label>Z</label>
+                        <select
+                          value={activeFigure.dataRef.zColumnId ?? ""}
+                          onChange={(event) =>
+                            patchActiveFigure((figure) => ({
+                              ...figure,
+                              dataRef: {
+                                ...figure.dataRef,
+                                zColumnId: event.target.value || undefined
+                              }
+                            }))
+                          }
+                        >
+                          <option value="">按 Y 列矩阵</option>
+                          {figureSheet.columns.map((column, index) => (
+                            <option key={column.id} value={column.id}>
+                              {columnLabel(index, column.role)} · {column.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="mapping-actions">
+                      <button
+                        type="button"
+                        onClick={() => openSheetDocument(activeFigure.dataRef.sheetId)}
+                      >
+                        打开源 DataBook
+                      </button>
+                    </div>
+                    <div className="column-role-help">
+                      <strong>稳定映射</strong>
+                      <p>
+                        Column Role 只负责新建图时的默认选择；已有 Graph
+                        明确保存 Sheet / X / Y / Error / Z 的 Column ID。
+                      </p>
+                    </div>
+                  </section>
+                )}
+
                 {inspectorTab === "figure" && (
                   <section className="inspector-pane">
                     <div className="pane-heading">
