@@ -527,7 +527,7 @@ export function buildTraces(args: {
       preset,
       main,
       sourceIndex,
-      "lines+markers"
+      "markers"
     ) as any;
     const errorId = figure.figureOverrides.errorSeriesId;
     const errorSeries = dataset.ys.find((column) => column.id === errorId);
