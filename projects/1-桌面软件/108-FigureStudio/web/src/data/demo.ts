@@ -529,7 +529,6 @@ export function createInitialProject(
       legendVisible: false,
       colorScale: "RdBu",
       reverseColorScale: true,
-      colorbarTitle: "归一化强度",
       zTitle: "归一化强度 (a.u.)"
     }
   );
