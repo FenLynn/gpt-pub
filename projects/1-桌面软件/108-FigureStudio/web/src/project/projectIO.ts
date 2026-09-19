@@ -4,31 +4,57 @@ import type {
   Column,
   DataBook,
   DataSheet,
+  DataSource,
   FigureSpec,
   ProjectState
 } from "../model";
 
-const APP_VERSION = "0.3.0-web";
+const APP_VERSION = "0.4.0-web";
 
 interface ColumnMeta extends Omit<Column, "values"> {
   [key: string]: unknown;
 }
 
-interface SheetMeta {
+interface SheetMetaV04 extends Omit<DataSheet, "columns"> {
+  columns: ColumnMeta[];
+  dataPath: string;
+  [key: string]: unknown;
+}
+
+interface BookMetaV04 extends Omit<DataBook, "sheets"> {
+  sheets: SheetMetaV04[];
+  [key: string]: unknown;
+}
+
+interface ProjectDocumentV04 {
+  format: "sfig";
+  schemaVersion: "0.4";
+  projectId: string;
+  name: string;
+  folders: ProjectState["folders"];
+  dataBooks: BookMetaV04[];
+  figures: FigureSpec[];
+  activeFigureId: string;
+  defaults: ProjectState["defaults"];
+  [key: string]: unknown;
+}
+
+interface SheetMetaV03 {
   id: string;
   name: string;
+  comment?: string;
   columns: ColumnMeta[];
   metadata?: DataSheet["metadata"];
   dataPath: string;
   [key: string]: unknown;
 }
 
-interface BookMeta {
+interface BookMetaV03 {
   id: string;
   name: string;
   folderId?: string;
-  source: DataBook["source"];
-  sheets: SheetMeta[];
+  source: DataSource;
+  sheets: SheetMetaV03[];
   [key: string]: unknown;
 }
 
@@ -38,7 +64,7 @@ interface ProjectDocumentV03 {
   projectId: string;
   name: string;
   folders: ProjectState["folders"];
-  dataBooks: BookMeta[];
+  dataBooks: BookMetaV03[];
   figures: FigureSpec[];
   activeFigureId: string;
   defaults: ProjectState["defaults"];
@@ -79,12 +105,17 @@ interface LegacyProjectDocument {
   [key: string]: unknown;
 }
 
-function stripSheet(sheet: DataSheet): SheetMeta {
+function normalizeLoadedSource(source: DataSource): DataSource {
+  return source.kind === "linked"
+    ? { ...source, status: "needs-relink" }
+    : source;
+}
+
+function stripSheet(sheet: DataSheet): SheetMetaV04 {
   const columns = sheet.columns.map((column) => {
     const { values: _values, ...meta } = column;
     return meta;
   });
-
   return {
     ...sheet,
     columns,
@@ -92,7 +123,7 @@ function stripSheet(sheet: DataSheet): SheetMeta {
   };
 }
 
-function stripBook(book: DataBook): BookMeta {
+function stripBook(book: DataBook): BookMetaV04 {
   return {
     ...book,
     sheets: book.sheets.map(stripSheet)
@@ -100,18 +131,18 @@ function stripBook(book: DataBook): BookMeta {
 }
 
 export function encodeProject(project: ProjectState): Uint8Array {
-  const document: ProjectDocumentV03 = {
+  const document: ProjectDocumentV04 = {
     ...(project as ProjectState & Record<string, unknown>),
-    schemaVersion: "0.3",
+    schemaVersion: "0.4",
     dataBooks: project.dataBooks.map(stripBook)
-  } as ProjectDocumentV03;
+  } as ProjectDocumentV04;
 
   const files: Record<string, Uint8Array> = {
     "manifest.json": strToU8(
       JSON.stringify(
         {
           format: "sfig",
-          schemaVersion: "0.3",
+          schemaVersion: "0.4",
           projectId: project.projectId,
           createdWith: APP_VERSION
         },
@@ -137,28 +168,27 @@ export function encodeProject(project: ProjectState): Uint8Array {
   return zipSync(files, { level: 6 });
 }
 
-function loadV03(
+function loadSheetValues(
   archive: Record<string, Uint8Array>,
-  document: ProjectDocumentV03
+  sheetMeta: { id: string; name: string; columns: ColumnMeta[]; dataPath: string }
+): Record<string, CellValue[]> {
+  const bytes = archive[sheetMeta.dataPath];
+  if (!bytes) throw new Error("项目文件缺少数据表：" + sheetMeta.name);
+  return JSON.parse(strFromU8(bytes)) as Record<string, CellValue[]>;
+}
+
+function loadV04(
+  archive: Record<string, Uint8Array>,
+  document: ProjectDocumentV04
 ): ProjectState {
   const dataBooks: DataBook[] = document.dataBooks.map((book) => ({
     ...book,
-    source:
-      book.source.kind === "linked"
-        ? { ...book.source, status: "needs-relink" }
-        : book.source,
     sheets: book.sheets.map((sheetMeta) => {
-      const bytes = archive[sheetMeta.dataPath];
-      if (!bytes) throw new Error("项目文件缺少数据表：" + sheetMeta.name);
-
-      const values = JSON.parse(strFromU8(bytes)) as Record<
-        string,
-        CellValue[]
-      >;
+      const values = loadSheetValues(archive, sheetMeta);
       const { dataPath: _dataPath, ...sheetRest } = sheetMeta;
-
       return {
         ...sheetRest,
+        source: normalizeLoadedSource(sheetMeta.source),
         columns: sheetMeta.columns.map((column) => ({
           ...column,
           values: values[column.id] ?? []
@@ -167,19 +197,58 @@ function loadV03(
     })
   }));
 
-  const fallbackActive = document.figures[0]?.id ?? "";
-
   return {
     ...(document as unknown as ProjectState),
     format: "sfig",
-    schemaVersion: "0.3",
+    schemaVersion: "0.4",
     dataBooks,
     activeFigureId: document.figures.some(
       (figure) => figure.id === document.activeFigureId
     )
       ? document.activeFigureId
-      : fallbackActive
+      : document.figures[0]?.id ?? ""
   };
+}
+
+function migrateV03(
+  archive: Record<string, Uint8Array>,
+  document: ProjectDocumentV03
+): ProjectState {
+  const dataBooks: DataBook[] = document.dataBooks.map((book) => {
+    const { source, sheets, ...bookRest } = book;
+    return {
+      ...bookRest,
+      sheets: sheets.map((sheetMeta) => {
+        const values = loadSheetValues(archive, sheetMeta);
+        const { dataPath: _dataPath, ...sheetRest } = sheetMeta;
+        return {
+          ...sheetRest,
+          source: normalizeLoadedSource(source),
+          columns: sheetMeta.columns.map((column) => ({
+            ...column,
+            values: values[column.id] ?? []
+          }))
+        } as DataSheet;
+      })
+    };
+  });
+
+  return {
+    ...(document as unknown as Record<string, unknown>),
+    format: "sfig",
+    schemaVersion: "0.4",
+    projectId: document.projectId,
+    name: document.name,
+    folders: document.folders ?? [],
+    dataBooks,
+    figures: document.figures,
+    activeFigureId: document.figures.some(
+      (figure) => figure.id === document.activeFigureId
+    )
+      ? document.activeFigureId
+      : document.figures[0]?.id ?? "",
+    defaults: document.defaults
+  } as ProjectState;
 }
 
 function legacyRole(
@@ -206,6 +275,7 @@ function migrateLegacy(
     const sheet: DataSheet = {
       id: dataset.id,
       name: dataset.name,
+      source: { kind: "embedded" },
       metadata: dataset.metadata,
       columns: [
         {
@@ -225,7 +295,6 @@ function migrateLegacy(
       id: "book-" + dataset.id,
       name: dataset.name,
       folderId: dataset.folderId,
-      source: { kind: "embedded" },
       sheets: [sheet]
     };
   });
@@ -242,7 +311,6 @@ function migrateLegacy(
         )
       : dataset?.ys.map((column) => column.id) ?? [];
     const errorId = legacy.figureOverrides?.errorSeriesId;
-
     return {
       ...legacy,
       dataRef: {
@@ -258,7 +326,7 @@ function migrateLegacy(
   return {
     ...(document as unknown as Record<string, unknown>),
     format: "sfig",
-    schemaVersion: "0.3",
+    schemaVersion: "0.4",
     projectId: document.projectId,
     name: document.name,
     folders: document.folders ?? [],
@@ -270,7 +338,7 @@ function migrateLegacy(
       ? document.activeFigureId
       : figures[0]?.id ?? "",
     defaults: document.defaults
-  };
+  } as ProjectState;
 }
 
 export function decodeProject(bytes: Uint8Array): ProjectState {
@@ -278,18 +346,20 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
   const projectBytes = archive["project.json"];
   if (!projectBytes) throw new Error("项目文件缺少 project.json。");
 
-  const raw = JSON.parse(strFromU8(projectBytes)) as
-    | ProjectDocumentV03
-    | LegacyProjectDocument;
+  const raw = JSON.parse(strFromU8(projectBytes)) as {
+    format?: string;
+    schemaVersion?: string;
+  };
 
   if (raw.format !== "sfig") {
     throw new Error("不是有效的 FigureStudio 项目文件。");
   }
-
-  if (raw.schemaVersion === "0.3") {
-    return loadV03(archive, raw as ProjectDocumentV03);
+  if (raw.schemaVersion === "0.4") {
+    return loadV04(archive, raw as ProjectDocumentV04);
   }
-
+  if (raw.schemaVersion === "0.3") {
+    return migrateV03(archive, raw as ProjectDocumentV03);
+  }
   if (raw.schemaVersion === "0.1" || raw.schemaVersion === "0.2") {
     return migrateLegacy(archive, raw as LegacyProjectDocument);
   }

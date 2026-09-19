@@ -253,7 +253,9 @@ function App() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dataInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
-  const dataActionRef = useRef<"import" | "link" | "replace" | "reload">("import");
+  const dataActionRef = useRef<
+    "import" | "append" | "link" | "replace" | "reload"
+  >("import");
 
   const [openDocs, setOpenDocs] = useState<DocumentRef[]>(() => [
     ...(initialBookId ? [{ type: "book", id: initialBookId } as DocumentRef] : []),
@@ -706,7 +708,9 @@ function App() {
       ?.folderId;
   }
 
-  function triggerDataFile(action: "import" | "link" | "replace" | "reload") {
+  function triggerDataFile(
+    action: "import" | "append" | "link" | "replace" | "reload"
+  ) {
     dataActionRef.current = action;
     dataInputRef.current?.click();
   }
@@ -756,7 +760,7 @@ function App() {
     bookId: string,
     sheetId: string,
     incoming: DataSheet,
-    sourcePatch?: Partial<DataBook["source"]>
+    sourcePatch?: Partial<DataSheet["source"]>
   ): boolean {
     const book = project.dataBooks.find((item) => item.id === bookId);
     const existing = book?.sheets.find((sheet) => sheet.id === sheetId);
@@ -793,17 +797,21 @@ function App() {
       return false;
     }
 
+    const updatedSheet = sourcePatch
+      ? {
+          ...nextSheet,
+          source: { ...nextSheet.source, ...sourcePatch }
+        }
+      : nextSheet;
+
     patchProject((current) => ({
       ...current,
       dataBooks: current.dataBooks.map((item) =>
         item.id === bookId
           ? {
               ...item,
-              source: sourcePatch
-                ? { ...item.source, ...sourcePatch }
-                : item.source,
               sheets: item.sheets.map((sheet) =>
-                sheet.id === sheetId ? nextSheet : sheet
+                sheet.id === sheetId ? updatedSheet : sheet
               )
             }
           : item
@@ -818,7 +826,7 @@ function App() {
       const action = dataActionRef.current;
 
       if ((action === "replace" || action === "reload") && activeBook && activeSheet) {
-        if (activeBook.source.kind === "linked" && action === "replace") {
+        if (activeSheet.source.kind === "linked" && action === "replace") {
           showToast("Linked Data 请使用“重新加载”");
           return;
         }
@@ -848,14 +856,28 @@ function App() {
       }
 
       const bookId = makeId("book");
-      const nextSheet = {
+      if (action === "append" && activeBook) {
+        const nextSheet: DataSheet = {
+          ...sheet,
+          id: makeId("sheet"),
+          source: { kind: "embedded" }
+        };
+        patchBook(activeBook.id, (book) => ({
+          ...book,
+          sheets: [...book.sheets, nextSheet]
+        }));
+        setActiveSheetByBook((current) => ({
+          ...current,
+          [activeBook.id]: nextSheet.id
+        }));
+        setExplorerSelection({ type: "sheet", id: nextSheet.id });
+        showToast("已导入为新 Sheet");
+        return;
+      }
+
+      const nextSheet: DataSheet = {
         ...sheet,
-        id: makeId("sheet")
-      };
-      const book: DataBook = {
-        id: bookId,
-        name: sheet.name,
-        folderId: selectedFolderId(),
+        id: makeId("sheet"),
         source:
           action === "link"
             ? {
@@ -865,7 +887,12 @@ function App() {
                 modifiedMs: file.lastModified,
                 status: "ok"
               }
-            : { kind: "embedded" },
+            : { kind: "embedded" }
+      };
+      const book: DataBook = {
+        id: bookId,
+        name: sheet.name,
+        folderId: selectedFolderId(),
         sheets: [nextSheet]
       };
 
@@ -892,6 +919,7 @@ function App() {
     const sheet: DataSheet = {
       id: makeId("sheet"),
       name: "Sheet1",
+      source: { kind: "embedded" },
       columns: [
         { id: makeId("col"), name: "X", role: "X", values: [null, null, null] },
         { id: makeId("col"), name: "Y", role: "Y", values: [null, null, null] }
@@ -901,7 +929,6 @@ function App() {
       id: makeId("book"),
       name: "新数据表",
       folderId: selectedFolderId(),
-      source: { kind: "embedded" },
       sheets: [sheet]
     };
 
@@ -918,10 +945,11 @@ function App() {
   }
 
   function addSheet() {
-    if (!activeBook || activeBook.source.kind === "linked") return;
+    if (!activeBook) return;
     const sheet: DataSheet = {
       id: makeId("sheet"),
       name: "Sheet" + String(activeBook.sheets.length + 1),
+      source: { kind: "embedded" },
       columns: [
         { id: makeId("col"), name: "X", role: "X", values: [null, null, null] },
         { id: makeId("col"), name: "Y", role: "Y", values: [null, null, null] }
@@ -939,11 +967,12 @@ function App() {
   }
 
   function duplicateActiveSheet(withData: boolean) {
-    if (!activeBook || !activeSheet || activeBook.source.kind === "linked") return;
+    if (!activeBook || !activeSheet) return;
     const copy: DataSheet = {
       ...activeSheet,
       id: makeId("sheet"),
       name: activeSheet.name + (withData ? " 副本" : " 结构"),
+      source: { kind: "embedded" },
       columns: activeSheet.columns.map((column) => ({
         ...column,
         id: makeId("col"),
@@ -985,7 +1014,7 @@ function App() {
   }
 
   function addRow() {
-    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    if (!activeSheet || activeSheet?.source.kind === "linked") return;
     patchSheet(activeSheet.id, (sheet) => ({
       ...sheet,
       columns: sheet.columns.map((column) => ({
@@ -996,7 +1025,7 @@ function App() {
   }
 
   function addColumn() {
-    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    if (!activeSheet || activeSheet?.source.kind === "linked") return;
     const rows = sheetRowCount(activeSheet);
     const column: Column = {
       id: makeId("col"),
@@ -1031,7 +1060,7 @@ function App() {
   }
 
   function updateColumn(columnId: string, patch: Partial<Column>) {
-    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    if (!activeSheet || activeSheet?.source.kind === "linked") return;
     patchSheet(activeSheet.id, (sheet) => ({
       ...sheet,
       columns: sheet.columns.map((column) =>
@@ -1041,7 +1070,7 @@ function App() {
   }
 
   function deleteColumn(columnId: string) {
-    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    if (!activeSheet || activeSheet?.source.kind === "linked") return;
     if (activeSheet.columns.length <= 1) {
       showToast("数据表至少保留一列");
       return;
@@ -1073,7 +1102,7 @@ function App() {
   }
 
   function reorderColumns(dragId: string, targetId: string) {
-    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    if (!activeSheet || activeSheet?.source.kind === "linked") return;
     patchSheet(activeSheet.id, (sheet) => {
       const columns = sheet.columns.filter((column) => column.id !== dragId);
       const dragged = sheet.columns.find((column) => column.id === dragId);
@@ -1121,19 +1150,19 @@ function App() {
     showToast("已从列角色创建图形");
   }
 
-  function unlinkBook() {
-    if (!activeBook) return;
+  function unlinkSheet() {
+    if (!activeSheet) return;
     if (
       !window.confirm(
         "解除链接后，当前缓存数据会变成可编辑的 Embedded Data。是否继续？"
       )
     )
       return;
-    patchBook(activeBook.id, (book) => ({
-      ...book,
+    patchSheet(activeSheet.id, (sheet) => ({
+      ...sheet,
       source: { kind: "embedded" }
     }));
-    showToast("已解除链接，现在可以编辑数据");
+    showToast("已解除当前 Sheet 链接，现在可以编辑");
   }
 
   function pasteAsNewSheet() {
@@ -1503,14 +1532,6 @@ function App() {
     const target = project.dataBooks.find((book) => book.id === targetBookId);
     if (!source || !target || source.book.id === targetBookId) return;
 
-    if (
-      source.book.source.kind === "linked" ||
-      target.source.kind === "linked"
-    ) {
-      showToast("Linked Data 的 Sheet 不能跨 DataBook 移动");
-      return;
-    }
-
     if (source.book.sheets.length <= 1) {
       showToast("源 DataBook 至少需要保留一个 Sheet");
       return;
@@ -1597,7 +1618,10 @@ function App() {
           >
             {open ? "⌄" : "›"}
           </span>
-          <Icon kind="book" linked={book.source.kind === "linked"} />
+          <Icon
+            kind="book"
+            linked={book.sheets.some((sheet) => sheet.source.kind === "linked")}
+          />
           <span className="tree-label">{book.name}</span>
         </button>
 
@@ -1606,7 +1630,7 @@ function App() {
             <button
               key={sheet.id}
               type="button"
-              draggable={book.source.kind !== "linked"}
+              draggable
               title={sheet.comment || sheet.name}
               onDragStart={(event) =>
                 event.dataTransfer.setData("text/plain", "sheet-tree:" + sheet.id)
@@ -1616,7 +1640,7 @@ function App() {
                 const [type, id] = event.dataTransfer
                   .getData("text/plain")
                   .split(":");
-                if (type === "sheet-tree" && book.source.kind !== "linked") {
+                if (type === "sheet-tree") {
                   patchBook(book.id, (currentBook) => {
                     const dragged = currentBook.sheets.find((item) => item.id === id);
                     const next = currentBook.sheets.filter((item) => item.id !== id);
@@ -1648,7 +1672,7 @@ function App() {
               }}
             >
               <span />
-              <Icon kind="sheet" />
+              <Icon kind="sheet" linked={sheet.source.kind === "linked"} />
               <span className="tree-label">{sheet.name}</span>
             </button>
           ))}
@@ -1803,7 +1827,7 @@ function App() {
   const selectedColumn =
     activeSheet?.columns.find((column) => column.id === selectedColumnId) ??
     activeSheet?.columns[0];
-  const dataReadOnly = activeBook?.source.kind === "linked";
+  const dataReadOnly = activeSheet?.source.kind === "linked";
 
   const scaledWidth = Math.max(1, Number(layout.width) * previewScale);
   const scaledHeight = Math.max(1, Number(layout.height) * previewScale);
@@ -1973,12 +1997,12 @@ function App() {
                 <div className="data-toolbar-left">
                   <span
                     className={
-                      activeBook.source.kind === "linked"
+                      activeSheet.source.kind === "linked"
                         ? "source-badge is-linked"
                         : "source-badge"
                     }
                   >
-                    {activeBook.source.kind === "linked" ? "LINKED" : "EMBEDDED"}
+                    {activeSheet.source.kind === "linked" ? "LINKED" : "EMBEDDED"}
                   </span>
                   <strong>{activeBook.name} · {activeSheet.name}</strong>
                 </div>
@@ -1988,12 +2012,13 @@ function App() {
                   </button>
                   <button type="button" disabled={dataReadOnly} onClick={addRow}>+ 行</button>
                   <button type="button" disabled={dataReadOnly} onClick={addColumn}>+ 列</button>
-                  <button type="button" onClick={() => setPasteOpen(true)} disabled={dataReadOnly}>粘贴表</button>
+                  <button type="button" onClick={() => triggerDataFile("append")}>导入 Sheet</button>
+                  <button type="button" onClick={() => setPasteOpen(true)}>粘贴表</button>
                   <button type="button" onClick={createGraphFromSheet}>新建图</button>
                   {dataReadOnly ? (
                     <>
                       <button type="button" onClick={() => triggerDataFile("reload")}>重新加载</button>
-                      <button type="button" onClick={unlinkBook}>解除链接</button>
+                      <button type="button" onClick={unlinkSheet}>解除链接</button>
                     </>
                   ) : (
                     <button type="button" onClick={() => triggerDataFile("replace")}>替换表</button>
@@ -2010,7 +2035,7 @@ function App() {
                         {activeSheet.columns.map((column, index) => (
                           <th
                             key={column.id}
-                            draggable={!dataReadOnly}
+                            draggable
                             className={
                               selectedColumn?.id === column.id
                                 ? "data-column is-selected"
@@ -2187,9 +2212,8 @@ function App() {
                   <button
                     type="button"
                     className="sheet-tab-add"
-                    disabled={dataReadOnly}
                     onClick={addSheet}
-                    title={dataReadOnly ? "Linked Data 不可新增 Sheet" : "新建 Sheet"}
+                    title="新建 Embedded Sheet"
                   >
                     +
                   </button>
@@ -2322,28 +2346,28 @@ function App() {
                     <div className="prop-row">
                       <label>来源</label>
                       <span className="property-text">
-                        {activeBook.source.kind === "linked" ? "Linked Data" : "Embedded Data"}
+                        {activeSheet.source.kind === "linked" ? "Linked Data" : "Embedded Data"}
                       </span>
                     </div>
 
-                    {activeBook.source.kind === "linked" && (
+                    {activeSheet.source.kind === "linked" && (
                       <>
                         <div className="prop-row">
                           <label>文件</label>
                           <span className="property-text ellipsis">
-                            {activeBook.source.fileName ?? "未定位"}
+                            {activeSheet.source.fileName ?? "未定位"}
                           </span>
                         </div>
                         <div className="prop-row">
                           <label>状态</label>
                           <span
                             className={
-                              activeBook.source.status === "ok"
+                              activeSheet.source.status === "ok"
                                 ? "link-status is-ok"
                                 : "link-status"
                             }
                           >
-                            {activeBook.source.status === "ok"
+                            {activeSheet.source.status === "ok"
                               ? "已链接"
                               : "需要重新定位"}
                           </span>
@@ -2419,10 +2443,11 @@ function App() {
                     </div>
 
                     <div className="source-actions">
-                      {activeBook.source.kind === "linked" ? (
+                      {activeSheet.source.kind === "linked" ? (
                         <>
                           <button type="button" onClick={() => triggerDataFile("reload")}>重新选择 / 加载</button>
-                          <button type="button" onClick={unlinkBook}>解除链接并编辑</button>
+                          <button type="button" onClick={() => duplicateActiveSheet(true)}>创建可编辑副本</button>
+                          <button type="button" onClick={unlinkSheet}>解除链接并编辑</button>
                         </>
                       ) : (
                         <>

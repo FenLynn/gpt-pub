@@ -25,6 +25,7 @@ export interface DataSheet {
   id: string;
   name: string;
   comment?: string;
+  source: DataSource;
   columns: Column[];
   metadata?: SheetMetadata;
 }
@@ -46,7 +47,6 @@ export interface DataBook {
   id: string;
   name: string;
   folderId?: string;
-  source: DataSource;
   sheets: DataSheet[];
 }
 
@@ -196,7 +196,7 @@ export interface ProjectDefaults {
 
 export interface ProjectState {
   format: "sfig";
-  schemaVersion: "0.3";
+  schemaVersion: "0.4";
   projectId: string;
   name: string;
   folders: ProjectFolder[];

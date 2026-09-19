@@ -121,6 +121,7 @@ export function parseDelimitedText(text: string, fileName: string): DataSheet {
   return {
     id: "sheet-" + Date.now().toString(36),
     name: cleanName,
+    source: { kind: "embedded" },
     columns
   };
 }

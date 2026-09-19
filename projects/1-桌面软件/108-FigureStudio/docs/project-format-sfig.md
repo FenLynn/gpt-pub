@@ -54,7 +54,8 @@ project.sfig
 
 - 0.1 → 0.3
 - 0.2 → 0.3
-- 0.3 native
+- 0.3 → 0.4
+- 0.4 native
 
 未来版本不得让旧应用静默覆盖未知新 schema。
 
@@ -174,3 +175,19 @@ sheetId + xColumnId + yColumnIds + yErrorColumnId
 ```
 
 旧项目数据和 Figure 样式不需要用户手工重建。
+
+
+## 8. v0.4 Sheet-level Source
+
+v0.4 将 Embedded / Linked 数据身份从 DataBook 下沉到 Sheet。
+
+```text
+DataBook
+├ Sheet A → linked → raw.csv
+├ Sheet B → embedded → processed
+└ Sheet C → embedded → summary
+```
+
+DataBook 是组织容器，不再强迫所有 Sheet 共用一种来源模式。
+
+v0.3 项目打开时，原 DataBook.source 会自动迁移到每个 Sheet.source；Linked source 进入 needs-relink 状态。

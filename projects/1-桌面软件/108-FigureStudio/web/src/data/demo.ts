@@ -38,6 +38,7 @@ export function createSpectrumSheet(): DataSheet {
   return {
     id: id("sheet-spectrum"),
     name: "Spectrum",
+    source: { kind: "embedded" },
     columns: [
       {
         id: "wavelength",
@@ -114,6 +115,7 @@ export function createFieldSheet(): DataSheet {
   return {
     id: id("sheet-field"),
     name: "Beam field",
+    source: { kind: "embedded" },
     columns,
     metadata: {
       rowCoordinates,
@@ -187,7 +189,6 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     id: id("book-spectrum"),
     name: "OSA 光谱数据",
     folderId: "folder-experiment",
-    source: { kind: "embedded" },
     sheets: [spectrumSheet]
   };
 
@@ -195,7 +196,6 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     id: id("book-field"),
     name: "二维光场数据",
     folderId: "folder-experiment",
-    source: { kind: "embedded" },
     sheets: [fieldSheet]
   };
 
@@ -241,7 +241,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
 
   return {
     format: "sfig",
-    schemaVersion: "0.3",
+    schemaVersion: "0.4",
     projectId: id("project"),
     name: "未命名项目",
     folders,
