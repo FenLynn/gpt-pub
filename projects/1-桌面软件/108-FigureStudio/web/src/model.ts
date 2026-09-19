@@ -169,7 +169,7 @@ export interface FigureOverrides {
 
 export interface FigureDataRef {
   sheetId: string;
-  xColumnId: string;
+  xColumnId?: string;
   yColumnIds: string[];
   yErrorColumnId?: string;
   zColumnId?: string;
@@ -179,7 +179,7 @@ export interface FigureSpec {
   id: string;
   name: string;
   folderId?: string;
-  dataRef: FigureDataRef;
+  dataRef?: FigureDataRef;
   templateId: PlotTemplateId;
   presetId: PresetId;
   figureOverrides: FigureOverrides;
@@ -194,9 +194,15 @@ export interface ProjectDefaults {
   figureOverrides: FigureOverrides;
 }
 
+export type FigureInputState =
+  | "empty"
+  | "incomplete"
+  | "ready"
+  | "broken";
+
 export interface ProjectState {
   format: "sfig";
-  schemaVersion: "0.4";
+  schemaVersion: "0.5";
   projectId: string;
   name: string;
   folders: ProjectFolder[];

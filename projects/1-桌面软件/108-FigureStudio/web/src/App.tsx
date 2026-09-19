@@ -11,10 +11,12 @@ import { createInitialProject } from "./data/demo";
 import {
   columnLabel,
   defaultDataRef,
+  emptyDataset,
   findSheet,
   sheetRowCount,
   sheetToDataset
 } from "./data/adapter";
+import { resolveFigureInput } from "./data/figureInput";
 import { downloadMatplotlibScript } from "./export/matplotlib";
 import { useHistoryState } from "./hooks/useHistoryState";
 import { parseDelimitedText } from "./lib/csv";
@@ -59,7 +61,7 @@ import {
   readProjectFile
 } from "./project/projectIO";
 
-const AUTOSAVE_KEY = "figurestudio-p108-autosave-v04";
+const AUTOSAVE_KEY = "figurestudio-p108-autosave-v05";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const PNG_SCALE = PNG_DPI / 96;
@@ -315,14 +317,19 @@ function App() {
       ? project.figures.find((figure) => figure.id === activeDoc.id)
       : undefined;
 
-  const figureSheetContext = activeFigure
-    ? findSheet(project, activeFigure.dataRef.sheetId)
+  const figureInput = activeFigure
+    ? resolveFigureInput(project, activeFigure)
     : undefined;
-  const figureSheet = figureSheetContext?.sheet;
-  const plotDataset =
-    activeFigure && figureSheet
-      ? sheetToDataset(figureSheet, activeFigure)
+  const figureSheetContext =
+    activeFigure?.dataRef
+      ? findSheet(project, activeFigure.dataRef?.sheetId)
       : undefined;
+  const figureSheet = figureSheetContext?.sheet;
+  const plotDataset = activeFigure
+    ? figureInput?.state === "ready" && figureSheet
+      ? sheetToDataset(figureSheet, activeFigure)
+      : emptyDataset(activeFigure.name)
+    : undefined;
   const preset = activeFigure
     ? presets[activeFigure.presetId]
     : presets.scientific;
@@ -385,7 +392,7 @@ function App() {
   const warningCount = checkItems.filter((item) => item.level === "warn").length;
   const dependentFigures = activeSheet
     ? project.figures.filter(
-        (figure) => figure.dataRef.sheetId === activeSheet.id
+        (figure) => figure.dataRef?.sheetId === activeSheet.id
       )
     : [];
   const allSheets = project.dataBooks.flatMap((book) =>
@@ -682,11 +689,11 @@ function App() {
     try {
       const raw = sessionStorage.getItem(AUTOSAVE_KEY);
       if (!raw) {
-        showToast("没有可恢复的 v0.4 自动保存");
+        showToast("没有可恢复的 v0.5 自动保存");
         return;
       }
       const next = JSON.parse(raw) as ProjectState;
-      if (next.schemaVersion !== "0.4") throw new Error("version");
+      if (next.schemaVersion !== "0.5") throw new Error("version");
       resetWorkspace(next);
       showToast("已恢复自动保存");
     } catch {
@@ -748,13 +755,13 @@ function App() {
   }
 
   function referencedColumnIds(figure: FigureSpec): string[] {
+    const ref = figure.dataRef;
+    if (!ref) return [];
     return [
-      figure.dataRef.xColumnId,
-      ...figure.dataRef.yColumnIds,
-      ...(figure.dataRef.yErrorColumnId
-        ? [figure.dataRef.yErrorColumnId]
-        : []),
-      ...(figure.dataRef.zColumnId ? [figure.dataRef.zColumnId] : [])
+      ...(ref.xColumnId ? [ref.xColumnId] : []),
+      ...ref.yColumnIds,
+      ...(ref.yErrorColumnId ? [ref.yErrorColumnId] : []),
+      ...(ref.zColumnId ? [ref.zColumnId] : [])
     ].filter(Boolean);
   }
 
@@ -771,7 +778,7 @@ function App() {
     const nextSheet = reconcileSheet(existing, incoming);
     const available = new Set(nextSheet.columns.map((column) => column.id));
     const dependents = project.figures.filter(
-      (figure) => figure.dataRef.sheetId === sheetId
+      (figure) => figure.dataRef?.sheetId === sheetId
     );
     const broken = dependents.filter((figure) =>
       referencedColumnIds(figure).some((id) => !available.has(id))
@@ -1080,7 +1087,7 @@ function App() {
 
     const dependents = project.figures.filter(
       (figure) =>
-        figure.dataRef.sheetId === activeSheet.id &&
+        figure.dataRef?.sheetId === activeSheet.id &&
         referencedColumnIds(figure).includes(columnId)
     );
 
@@ -1118,8 +1125,10 @@ function App() {
   function createGraphFromSheet() {
     if (!activeSheet || !activeBook) return;
     const dataRef = defaultDataRef(activeSheet);
-    if (!dataRef.xColumnId || dataRef.yColumnIds.length === 0) {
-      window.alert("请先指定至少一列 X 和一列 Y。");
+    if (dataRef.yColumnIds.length === 0) {
+      window.alert(
+        "当前工作表没有识别到可绘制的 Y 数据。你也可以先新建空图，再在图形的“数据”页手动绑定。"
+      );
       return;
     }
 
@@ -1150,6 +1159,35 @@ function App() {
     openDocument({ type: "figure", id: figure.id });
     setExplorerSelection({ type: "figure", id: figure.id });
     showToast("已从列角色创建图形");
+  }
+
+  function createBlankFigure() {
+    const figure: FigureSpec = {
+      id: makeId("figure"),
+      name: "图 " + String(project.figures.length + 1),
+      folderId: selectedFolderId(),
+      templateId: project.defaults.templateId,
+      presetId: project.defaults.presetId,
+      figureOverrides: {
+        aspectMode: "4:3",
+        ...project.defaults.figureOverrides,
+        xTitle: "X",
+        yTitle: "Y"
+      },
+      seriesOverrides: {},
+      seriesOrder: []
+    };
+
+    patchProject((current) => ({
+      ...current,
+      figures: [...current.figures, figure],
+      activeFigureId: figure.id
+    }));
+    openDocument({ type: "figure", id: figure.id });
+    setExplorerSelection({ type: "figure", id: figure.id });
+    setInspectorTab("data");
+    setSelectedSeriesIds([]);
+    showToast("已新建空图");
   }
 
   function unlinkSheet() {
@@ -1327,7 +1365,7 @@ function App() {
       if (!book) return;
       const sheetIds = new Set(book.sheets.map((sheet) => sheet.id));
       const linkedFigures = project.figures.filter((figure) =>
-        sheetIds.has(figure.dataRef.sheetId)
+        Boolean(figure.dataRef && sheetIds.has(figure.dataRef?.sheetId))
       );
 
       if (linkedFigures.length) {
@@ -1373,7 +1411,7 @@ function App() {
         return;
       }
       const linked = project.figures.filter(
-        (figure) => figure.dataRef.sheetId === context.sheet.id
+        (figure) => figure.dataRef?.sheetId === context.sheet.id
       );
       if (linked.length) {
         window.alert(
@@ -1847,7 +1885,7 @@ function App() {
         </div>
 
         <div className="top-file-actions">
-          <button type="button" onClick={newProject}>新建</button>
+          <button type="button" onClick={newProject}>新建项目</button>
           <button type="button" onClick={() => projectInputRef.current?.click()}>打开</button>
           <button type="button" onClick={() => downloadProject(project)}>保存</button>
           <span className="toolbar-divider" />
@@ -1916,8 +1954,11 @@ function App() {
             <button type="button" onClick={createFolder} title="新建文件夹">
               <Icon kind="folder" />
             </button>
-            <button type="button" onClick={addBlankBook} title="新建数据表">
+            <button type="button" onClick={addBlankBook} title="新建数据簿">
               <Icon kind="book" />
+            </button>
+            <button type="button" onClick={createBlankFigure} title="新建空图">
+              <Icon kind="graph" />
             </button>
             <span />
             <button type="button" disabled={!explorerSelection} onClick={renameSelected} title="重命名">✎</button>
@@ -2269,12 +2310,23 @@ function App() {
                 </div>
 
                 <div className="figure-actions">
-                  <button type="button" onClick={() => openSheetDocument(activeFigure.dataRef.sheetId)}>数据</button>
+                  <button
+                    type="button"
+                    disabled={!figureSheet || !activeFigure.dataRef}
+                    onClick={() => {
+                      if (activeFigure.dataRef) {
+                        activeFigure.dataRef && openSheetDocument(activeFigure.dataRef.sheetId);
+                      }
+                    }}
+                  >
+                    源数据
+                  </button>
                   <button type="button" onClick={() => void resetView()}>重置</button>
                   <button type="button" onClick={() => void exportFigure("svg")}>SVG</button>
                   <button type="button" onClick={() => void exportFigure("png")}>PNG</button>
                   <button
                     type="button"
+                    disabled={figureInput?.state !== "ready"}
                     onClick={() =>
                       downloadMatplotlibScript(
                         plotDataset,
@@ -2577,29 +2629,62 @@ function App() {
               </div>
 
               <div className="inspector-scroll">
-                {inspectorTab === "data" && figureSheet && (
+                {inspectorTab === "data" && (
                   <section className="inspector-pane">
                     <div className="pane-heading">
-                      <strong>数据映射</strong>
-                      <span>数据映射</span>
+                      <strong>数据输入</strong>
+                      <span
+                        className={
+                          "input-state-badge is-" +
+                          (figureInput?.state ?? "empty")
+                        }
+                      >
+                        {figureInput?.label ?? "空图"}
+                      </span>
                     </div>
+
+                    <div className="input-state-detail">
+                      {figureInput?.detail}
+                    </div>
+
                     <div className="prop-row">
                       <label>工作表</label>
                       <select
-                        value={activeFigure.dataRef.sheetId}
+                        value={activeFigure.dataRef?.sheetId ?? ""}
                         onChange={(event) => {
-                          const context = findSheet(project, event.target.value);
+                          const sheetId = event.target.value;
+                          if (!sheetId) {
+                            patchActiveFigure((figure) => ({
+                              ...figure,
+                              dataRef: undefined,
+                              seriesOrder: [],
+                              seriesOverrides: {},
+                              figureOverrides: {
+                                ...figure.figureOverrides,
+                                errorSeriesId: undefined
+                              }
+                            }));
+                            setSelectedSeriesIds([]);
+                            return;
+                          }
+
+                          const context = findSheet(project, sheetId);
                           if (!context) return;
                           const dataRef = defaultDataRef(context.sheet);
                           patchActiveFigure((figure) => ({
                             ...figure,
                             dataRef,
                             seriesOrder: dataRef.yColumnIds,
-                            seriesOverrides: {}
+                            seriesOverrides: {},
+                            figureOverrides: {
+                              ...figure.figureOverrides,
+                              errorSeriesId: dataRef.yErrorColumnId
+                            }
                           }));
                           setSelectedSeriesIds(dataRef.yColumnIds.slice(0, 1));
                         }}
                       >
+                        <option value="">未选择（空图）</option>
                         {allSheets.map(({ book, sheet }) => (
                           <option key={sheet.id} value={sheet.id}>
                             {book.name} / {sheet.name}
@@ -2607,134 +2692,198 @@ function App() {
                         ))}
                       </select>
                     </div>
-                    <div className="prop-row">
-                      <label>X</label>
-                      <select
-                        value={activeFigure.dataRef.xColumnId}
-                        onChange={(event) =>
-                          patchActiveFigure((figure) => ({
-                            ...figure,
-                            dataRef: { ...figure.dataRef, xColumnId: event.target.value }
-                          }))
-                        }
-                      >
-                        {figureSheet.columns.map((column, index) => (
-                          <option key={column.id} value={column.id}>
-                            {columnLabel(index, column.role)} · {column.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="section-divider">
-                      Y / Series · {activeFigure.dataRef.yColumnIds.length}
-                    </div>
-                    <div className="mapping-series-list">
-                      {figureSheet.columns
-                        .filter(
-                          (column) =>
-                            column.id !== activeFigure.dataRef.xColumnId &&
-                            column.role !== "Label" &&
-                            column.role !== "XErr" &&
-                            column.role !== "YErr"
-                        )
-                        .map((column) => {
-                          const index = figureSheet.columns.findIndex(
-                            (item) => item.id === column.id
-                          );
-                          const checked = activeFigure.dataRef.yColumnIds.includes(column.id);
-                          return (
-                            <label key={column.id} className={checked ? "is-mapped" : ""}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => {
-                                  const current = activeFigure.dataRef.yColumnIds;
-                                  if (checked && current.length <= 1) {
-                                    showToast("图形至少保留一列 Y");
-                                    return;
-                                  }
-                                  const next = checked
-                                    ? current.filter((id) => id !== column.id)
-                                    : [...current, column.id];
-                                  patchActiveFigure((figure) => ({
-                                    ...figure,
-                                    dataRef: { ...figure.dataRef, yColumnIds: next },
-                                    seriesOrder: [
-                                      ...figure.seriesOrder.filter((id) => next.includes(id)),
-                                      ...next.filter((id) => !figure.seriesOrder.includes(id))
-                                    ]
-                                  }));
-                                }}
-                              />
-                              <span>{columnLabel(index, column.role)} · {column.name}</span>
-                            </label>
-                          );
-                        })}
-                    </div>
-                    <div className="section-divider">辅助列</div>
-                    <div className="prop-row">
-                      <label>Y 误差</label>
-                      <select
-                        value={activeFigure.dataRef.yErrorColumnId ?? ""}
-                        onChange={(event) =>
-                          patchActiveFigure((figure) => ({
-                            ...figure,
-                            dataRef: {
-                              ...figure.dataRef,
-                              yErrorColumnId: event.target.value || undefined
-                            },
-                            figureOverrides: {
-                              ...figure.figureOverrides,
-                              errorSeriesId: event.target.value || undefined
-                            }
-                          }))
-                        }
-                      >
-                        <option value="">无</option>
-                        {figureSheet.columns.map((column, index) => (
-                          <option key={column.id} value={column.id}>
-                            {columnLabel(index, column.role)} · {column.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {fieldTemplate && (
-                      <div className="prop-row">
-                        <label>Z</label>
-                        <select
-                          value={activeFigure.dataRef.zColumnId ?? ""}
-                          onChange={(event) =>
-                            patchActiveFigure((figure) => ({
-                              ...figure,
-                              dataRef: {
-                                ...figure.dataRef,
-                                zColumnId: event.target.value || undefined
-                              }
-                            }))
-                          }
-                        >
-                          <option value="">按 Y 列矩阵</option>
-                          {figureSheet.columns.map((column, index) => (
-                            <option key={column.id} value={column.id}>
-                              {columnLabel(index, column.role)} · {column.name}
-                            </option>
-                          ))}
-                        </select>
+
+                    {activeFigure.dataRef && !figureSheet && (
+                      <div className="mapping-warning">
+                        原工作表无法解析。请选择新的工作表恢复数据映射。
                       </div>
                     )}
-                    <div className="mapping-actions">
-                      <button
-                        type="button"
-                        onClick={() => openSheetDocument(activeFigure.dataRef.sheetId)}
-                      >
-                        打开源数据簿
-                      </button>
-                    </div>
+
+                    {activeFigure.dataRef && figureSheet && (
+                      <>
+                        <div className="prop-row">
+                          <label>X</label>
+                          <select
+                            value={activeFigure.dataRef.xColumnId ?? ""}
+                            onChange={(event) =>
+                              patchActiveFigure((figure) => ({
+                                ...figure,
+                                dataRef: {
+                                  ...(figure.dataRef ?? {
+                                    sheetId: figureSheet.id,
+                                    yColumnIds: []
+                                  }),
+                                  xColumnId: event.target.value || undefined
+                                }
+                              }))
+                            }
+                          >
+                            <option value="">行号（自动）</option>
+                            {figureSheet.columns
+                              .filter((column) => column.role !== "Label")
+                              .map((column, index) => (
+                                <option key={column.id} value={column.id}>
+                                  {columnLabel(index, column.role)} · {column.name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        <div className="section-divider">
+                          Y / 数据列 · {activeFigure.dataRef.yColumnIds.length}
+                        </div>
+                        <div className="mapping-series-list">
+                          {figureSheet.columns
+                            .filter(
+                              (column) =>
+                                column.id !== activeFigure.dataRef?.xColumnId &&
+                                column.role !== "Label" &&
+                                column.role !== "XErr" &&
+                                column.role !== "YErr"
+                            )
+                            .map((column) => {
+                              const index = figureSheet.columns.findIndex(
+                                (item) => item.id === column.id
+                              );
+                              const checked =
+                                activeFigure.dataRef.yColumnIds.includes(
+                                  column.id
+                                ) ?? false;
+                              return (
+                                <label
+                                  key={column.id}
+                                  className={checked ? "is-mapped" : ""}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => {
+                                      const current =
+                                        activeFigure.dataRef.yColumnIds ?? [];
+                                      const next = checked
+                                        ? current.filter((id) => id !== column.id)
+                                        : [...current, column.id];
+                                      patchActiveFigure((figure) => ({
+                                        ...figure,
+                                        dataRef: {
+                                          ...(figure.dataRef ?? {
+                                            sheetId: figureSheet.id,
+                                            yColumnIds: []
+                                          }),
+                                          yColumnIds: next
+                                        },
+                                        seriesOrder: [
+                                          ...figure.seriesOrder.filter((id) =>
+                                            next.includes(id)
+                                          ),
+                                          ...next.filter(
+                                            (id) =>
+                                              !figure.seriesOrder.includes(id)
+                                          )
+                                        ]
+                                      }));
+                                    }}
+                                  />
+                                  <span>
+                                    {columnLabel(index, column.role)} · {column.name}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                        </div>
+
+                        <div className="section-divider">辅助列</div>
+                        <div className="prop-row">
+                          <label>Y 误差</label>
+                          <select
+                            value={activeFigure.dataRef.yErrorColumnId ?? ""}
+                            onChange={(event) =>
+                              patchActiveFigure((figure) => ({
+                                ...figure,
+                                dataRef: {
+                                  ...(figure.dataRef ?? {
+                                    sheetId: figureSheet.id,
+                                    yColumnIds: []
+                                  }),
+                                  yErrorColumnId:
+                                    event.target.value || undefined
+                                },
+                                figureOverrides: {
+                                  ...figure.figureOverrides,
+                                  errorSeriesId:
+                                    event.target.value || undefined
+                                }
+                              }))
+                            }
+                          >
+                            <option value="">无</option>
+                            {figureSheet.columns.map((column, index) => (
+                              <option key={column.id} value={column.id}>
+                                {columnLabel(index, column.role)} · {column.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {fieldTemplate && (
+                          <div className="prop-row">
+                            <label>Z</label>
+                            <select
+                              value={activeFigure.dataRef.zColumnId ?? ""}
+                              onChange={(event) =>
+                                patchActiveFigure((figure) => ({
+                                  ...figure,
+                                  dataRef: {
+                                    ...(figure.dataRef ?? {
+                                      sheetId: figureSheet.id,
+                                      yColumnIds: []
+                                    }),
+                                    zColumnId:
+                                      event.target.value || undefined
+                                  }
+                                }))
+                              }
+                            >
+                              <option value="">按 Y 列矩阵</option>
+                              {figureSheet.columns.map((column, index) => (
+                                <option key={column.id} value={column.id}>
+                                  {columnLabel(index, column.role)} · {column.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div className="mapping-actions">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openSheetDocument(activeFigure.dataRef!.sheetId)
+                            }
+                          >
+                            打开源数据簿
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    {!activeFigure.dataRef && (
+                      <div className="empty-input-card">
+                        <Icon kind="graph" />
+                        <strong>这是一个空图</strong>
+                        <p>
+                          可以先设置图型、尺寸和样式。需要数据时，再在上方选择工作表并指定数据列。
+                        </p>
+                        <p>
+                          对当前 XY / 柱状图，X 可以留空并自动使用 1, 2, 3… 行号；至少需要一列 Y 才进入“可绘制”状态。
+                        </p>
+                      </div>
+                    )}
+
                     <div className="column-role-help">
-                      <strong>稳定映射</strong>
+                      <strong>输入状态</strong>
                       <p>
-                        列角色只负责新建图时的默认选择；已有图形
-                        会明确保存工作表以及 X / Y / 误差 / Z 的稳定列引用。
+                        空图 = 未绑定数据；待完成 = 已选工作表但映射不足；可绘制 = 当前图型要求已满足；引用失效 = 原数据对象不存在。
                       </p>
                     </div>
                   </section>

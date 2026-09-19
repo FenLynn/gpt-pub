@@ -36,23 +36,29 @@ export function columnLabel(index: number, role: Column["role"]): string {
 }
 
 export function defaultDataRef(sheet: DataSheet): FigureDataRef {
-  const xIndex = Math.max(
-    0,
-    sheet.columns.findIndex((column) => column.role === "X") >= 0
-      ? sheet.columns.findIndex((column) => column.role === "X")
-      : sheet.columns.findIndex((column) => column.role !== "Label")
-  );
-  const x = sheet.columns[xIndex] ?? sheet.columns[0];
-  const nextXOffset = sheet.columns
-    .slice(xIndex + 1)
-    .findIndex((column) => column.role === "X");
+  const firstXIndex = sheet.columns.findIndex((column) => column.role === "X");
+  const x = firstXIndex >= 0 ? sheet.columns[firstXIndex] : undefined;
+
+  const nextXOffset =
+    firstXIndex >= 0
+      ? sheet.columns
+          .slice(firstXIndex + 1)
+          .findIndex((column) => column.role === "X")
+      : -1;
   const segmentEnd =
-    nextXOffset >= 0 ? xIndex + 1 + nextXOffset : sheet.columns.length;
-  const segment = sheet.columns.slice(xIndex + 1, segmentEnd);
+    firstXIndex >= 0 && nextXOffset >= 0
+      ? firstXIndex + 1 + nextXOffset
+      : sheet.columns.length;
+  const segment =
+    firstXIndex >= 0
+      ? sheet.columns.slice(firstXIndex + 1, segmentEnd)
+      : sheet.columns;
 
   const ys = segment.filter((column) => column.role === "Y");
   const fallbackYs = segment.filter(
-    (column) => !["Label", "XErr", "YErr"].includes(column.role)
+    (column) =>
+      column.id !== x?.id &&
+      !["X", "Label", "XErr", "YErr"].includes(column.role)
   );
   const yColumns = ys.length ? ys : fallbackYs;
   const yError = segment.find((column) => column.role === "YErr");
@@ -60,10 +66,24 @@ export function defaultDataRef(sheet: DataSheet): FigureDataRef {
 
   return {
     sheetId: sheet.id,
-    xColumnId: x?.id ?? "",
+    xColumnId: x?.id,
     yColumnIds: yColumns.map((column) => column.id),
     yErrorColumnId: yError?.id,
     zColumnId: z?.id
+  };
+}
+
+export function emptyDataset(name = "空图"): Dataset {
+  return {
+    id: "__empty__",
+    name,
+    x: {
+      id: "__row_index__",
+      name: "X",
+      role: "X",
+      values: []
+    },
+    ys: []
   };
 }
 
@@ -83,13 +103,10 @@ export function sheetToDataset(
   figure?: FigureSpec
 ): Dataset {
   const dataRef = figure?.dataRef ?? defaultDataRef(sheet);
-  const explicitMapping = Boolean(figure);
-  const x =
-    sheet.columns.find((column) => column.id === dataRef.xColumnId) ??
-    (!explicitMapping
-      ? sheet.columns.find((column) => column.role === "X") ??
-        sheet.columns[0]
-      : undefined);
+  const explicitMapping = Boolean(figure?.dataRef);
+  const explicitX = dataRef.xColumnId
+    ? sheet.columns.find((column) => column.id === dataRef.xColumnId)
+    : undefined;
 
   const yIds = new Set([
     ...dataRef.yColumnIds,
@@ -98,26 +115,40 @@ export function sheetToDataset(
   ]);
 
   let ys = sheet.columns.filter(
-    (column) => column.id !== x?.id && yIds.has(column.id)
+    (column) => column.id !== explicitX?.id && yIds.has(column.id)
   );
 
   if (!explicitMapping && ys.length === 0) {
     ys = sheet.columns.filter(
-      (column) => column.id !== x?.id && column.role !== "Label"
+      (column) => column.id !== explicitX?.id && column.role !== "Label"
     );
   }
+
+  const rowCount = Math.max(
+    0,
+    ...ys.map((column) => column.values.length)
+  );
+
+  const x: PlotColumn = explicitX
+    ? { ...explicitX, values: numericValues(explicitX.values) }
+    : dataRef.xColumnId
+    ? {
+        id: dataRef.xColumnId,
+        name: "缺失的 X 数据列",
+        role: "X",
+        values: []
+      }
+    : {
+        id: "__row_index__",
+        name: "行号",
+        role: "X",
+        values: Array.from({ length: rowCount }, (_, index) => index + 1)
+      };
 
   return {
     id: sheet.id,
     name: sheet.name,
-    x: x
-      ? { ...x, values: numericValues(x.values) }
-      : {
-          id: dataRef.xColumnId || "missing-x",
-          name: "缺失的 X 数据列",
-          role: "X",
-          values: []
-        },
+    x,
     ys: ys.map((column) => ({
       ...column,
       values: numericValues(column.values)

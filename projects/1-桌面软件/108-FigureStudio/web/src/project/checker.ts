@@ -30,25 +30,31 @@ export function checkFigure(
   );
   const items: CheckItem[] = [];
 
+  const ref = figure.dataRef;
   const availableSeries = new Set(dataset.ys.map((series) => series.id));
-  const missingSeries = figure.dataRef.yColumnIds.filter(
-    (id) => !availableSeries.has(id)
-  );
+  const missingSeries = ref
+    ? ref.yColumnIds.filter((id) => !availableSeries.has(id))
+    : [];
   const missingError =
-    figure.dataRef.yErrorColumnId &&
-    !availableSeries.has(figure.dataRef.yErrorColumnId);
+    ref?.yErrorColumnId &&
+    !availableSeries.has(ref.yErrorColumnId);
   const mappingBroken =
-    dataset.x.values.length === 0 ||
-    missingSeries.length > 0 ||
-    Boolean(missingError);
+    Boolean(ref) &&
+    (ref.yColumnIds.length === 0 ||
+      missingSeries.length > 0 ||
+      Boolean(missingError));
 
   items.push({
     id: "data-mapping",
-    level: mappingBroken ? "warn" : "pass",
+    level: !ref ? "info" : mappingBroken ? "warn" : "pass",
     title: "数据映射",
-    detail: mappingBroken
-      ? "Graph 的显式数据引用不完整；请在“数据”页重新选择 X / Y / Error 列。"
-      : "Graph 的 X / Y / Error 引用均可解析到稳定 Column ID。"
+    detail: !ref
+      ? "当前是空图，可以稍后在“数据”页绑定工作表。"
+      : mappingBroken
+      ? "图形的数据引用不完整；请在“数据”页重新选择数据列。"
+      : ref.xColumnId
+      ? "X / Y / 误差引用均使用稳定 Column ID。"
+      : "Y 数据引用完整；X 自动使用行号。"
   });
 
   items.push({

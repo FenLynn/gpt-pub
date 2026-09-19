@@ -1420,3 +1420,78 @@ button:disabled {
 .sheet-tabs button[draggable="true"]:active {
   cursor: grabbing;
 }
+
+
+.input-state-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(21px * var(--ui-scale));
+  padding: 0 calc(7px * var(--ui-scale));
+  border: 1px solid #cfd5da;
+  border-radius: 999px;
+  background: #f7f8f9;
+  color: #64707a;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.input-state-badge.is-ready {
+  border-color: #b8d7c1;
+  background: #edf7ef;
+  color: #3e7450;
+}
+
+.input-state-badge.is-incomplete {
+  border-color: #e3d3a6;
+  background: #fff8e8;
+  color: #8a6b27;
+}
+
+.input-state-badge.is-broken {
+  border-color: #e2bcbc;
+  background: #fff0f0;
+  color: #925252;
+}
+
+.input-state-detail {
+  margin: calc(3px * var(--ui-scale)) 0 calc(8px * var(--ui-scale));
+  color: #747f88;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.mapping-warning {
+  margin: calc(6px * var(--ui-scale)) 0;
+  padding: calc(8px * var(--ui-scale));
+  border: 1px solid #e2bcbc;
+  border-radius: calc(6px * var(--ui-scale));
+  background: #fff4f4;
+  color: #8b5151;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.empty-input-card {
+  display: grid;
+  grid-template-columns: calc(21px * var(--ui-scale)) minmax(0, 1fr);
+  gap: calc(5px * var(--ui-scale)) calc(7px * var(--ui-scale));
+  margin: calc(8px * var(--ui-scale)) 0;
+  padding: calc(10px * var(--ui-scale));
+  border: 1px dashed #cbd3d9;
+  border-radius: calc(7px * var(--ui-scale));
+  background: #fafbfc;
+  color: #5f6972;
+}
+
+.empty-input-card strong {
+  align-self: center;
+  color: #384149;
+  font-size: 0.82rem;
+}
+
+.empty-input-card p {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}

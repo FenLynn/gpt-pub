@@ -9,30 +9,30 @@ import type {
   ProjectState
 } from "../model";
 
-const APP_VERSION = "0.4.0-web";
+const APP_VERSION = "0.5.0-web";
 
 interface ColumnMeta extends Omit<Column, "values"> {
   [key: string]: unknown;
 }
 
-interface SheetMetaV04 extends Omit<DataSheet, "columns"> {
+interface SheetMetaV05 extends Omit<DataSheet, "columns"> {
   columns: ColumnMeta[];
   dataPath: string;
   [key: string]: unknown;
 }
 
-interface BookMetaV04 extends Omit<DataBook, "sheets"> {
-  sheets: SheetMetaV04[];
+interface BookMetaV05 extends Omit<DataBook, "sheets"> {
+  sheets: SheetMetaV05[];
   [key: string]: unknown;
 }
 
-interface ProjectDocumentV04 {
+interface ProjectDocumentV05 {
   format: "sfig";
-  schemaVersion: "0.4";
+  schemaVersion: "0.5";
   projectId: string;
   name: string;
   folders: ProjectState["folders"];
-  dataBooks: BookMetaV04[];
+  dataBooks: BookMetaV05[];
   figures: FigureSpec[];
   activeFigureId: string;
   defaults: ProjectState["defaults"];
@@ -55,6 +55,19 @@ interface BookMetaV03 {
   folderId?: string;
   source: DataSource;
   sheets: SheetMetaV03[];
+  [key: string]: unknown;
+}
+
+interface ProjectDocumentV04 {
+  format: "sfig";
+  schemaVersion: "0.4";
+  projectId: string;
+  name: string;
+  folders: ProjectState["folders"];
+  dataBooks: BookMetaV05[];
+  figures: FigureSpec[];
+  activeFigureId: string;
+  defaults: ProjectState["defaults"];
   [key: string]: unknown;
 }
 
@@ -111,7 +124,7 @@ function normalizeLoadedSource(source: DataSource): DataSource {
     : source;
 }
 
-function stripSheet(sheet: DataSheet): SheetMetaV04 {
+function stripSheet(sheet: DataSheet): SheetMetaV05 {
   const columns = sheet.columns.map((column) => {
     const { values: _values, ...meta } = column;
     return meta;
@@ -123,7 +136,7 @@ function stripSheet(sheet: DataSheet): SheetMetaV04 {
   };
 }
 
-function stripBook(book: DataBook): BookMetaV04 {
+function stripBook(book: DataBook): BookMetaV05 {
   return {
     ...book,
     sheets: book.sheets.map(stripSheet)
@@ -131,18 +144,18 @@ function stripBook(book: DataBook): BookMetaV04 {
 }
 
 export function encodeProject(project: ProjectState): Uint8Array {
-  const document: ProjectDocumentV04 = {
+  const document: ProjectDocumentV05 = {
     ...(project as ProjectState & Record<string, unknown>),
-    schemaVersion: "0.4",
+    schemaVersion: "0.5",
     dataBooks: project.dataBooks.map(stripBook)
-  } as ProjectDocumentV04;
+  } as ProjectDocumentV05;
 
   const files: Record<string, Uint8Array> = {
     "manifest.json": strToU8(
       JSON.stringify(
         {
           format: "sfig",
-          schemaVersion: "0.4",
+          schemaVersion: "0.5",
           projectId: project.projectId,
           createdWith: APP_VERSION
         },
@@ -177,9 +190,9 @@ function loadSheetValues(
   return JSON.parse(strFromU8(bytes)) as Record<string, CellValue[]>;
 }
 
-function loadV04(
+function loadV05(
   archive: Record<string, Uint8Array>,
-  document: ProjectDocumentV04
+  document: ProjectDocumentV05
 ): ProjectState {
   const dataBooks: DataBook[] = document.dataBooks.map((book) => ({
     ...book,
@@ -200,7 +213,7 @@ function loadV04(
   return {
     ...(document as unknown as ProjectState),
     format: "sfig",
-    schemaVersion: "0.4",
+    schemaVersion: "0.5",
     dataBooks,
     activeFigureId: document.figures.some(
       (figure) => figure.id === document.activeFigureId
@@ -208,6 +221,16 @@ function loadV04(
       ? document.activeFigureId
       : document.figures[0]?.id ?? ""
   };
+}
+
+function migrateV04(
+  archive: Record<string, Uint8Array>,
+  document: ProjectDocumentV04
+): ProjectState {
+  return loadV05(archive, {
+    ...document,
+    schemaVersion: "0.5"
+  } as ProjectDocumentV05);
 }
 
 function migrateV03(
@@ -236,7 +259,7 @@ function migrateV03(
   return {
     ...(document as unknown as Record<string, unknown>),
     format: "sfig",
-    schemaVersion: "0.4",
+    schemaVersion: "0.5",
     projectId: document.projectId,
     name: document.name,
     folders: document.folders ?? [],
@@ -326,7 +349,7 @@ function migrateLegacy(
   return {
     ...(document as unknown as Record<string, unknown>),
     format: "sfig",
-    schemaVersion: "0.4",
+    schemaVersion: "0.5",
     projectId: document.projectId,
     name: document.name,
     folders: document.folders ?? [],
@@ -355,7 +378,7 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
     throw new Error("不是有效的 FigureStudio 项目文件。");
   }
   if (raw.schemaVersion === "0.4") {
-    return loadV04(archive, raw as ProjectDocumentV04);
+    return loadV04(archive, raw as ProjectDocumentV05);
   }
   if (raw.schemaVersion === "0.3") {
     return migrateV03(archive, raw as ProjectDocumentV03);
