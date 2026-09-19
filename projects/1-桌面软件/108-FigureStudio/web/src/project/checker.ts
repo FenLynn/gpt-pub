@@ -351,6 +351,15 @@ export function checkFigure(
     }
   }
 
+  if (figure.templateId === "xy-errorbar" && !ref?.yErrorColumnId) {
+    items.push({
+      id: "error-data",
+      level: "warn",
+      title: "误差数据",
+      detail: "误差棒图需要在“数据”页明确映射 YErr 误差列。"
+    });
+  }
+
   const errorSeries = ref?.yErrorColumnId
     ? dataset.ys.find((series) => series.id === ref.yErrorColumnId)
     : undefined;
