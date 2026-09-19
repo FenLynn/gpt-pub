@@ -1,5 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import type {
+  CellValue,
   Column,
   DataBook,
   DataSheet,
@@ -152,7 +153,7 @@ function loadV03(
 
       const values = JSON.parse(strFromU8(bytes)) as Record<
         string,
-        Array<number | null>
+        CellValue[]
       >;
       const { dataPath: _dataPath, ...sheetRest } = sheetMeta;
 
