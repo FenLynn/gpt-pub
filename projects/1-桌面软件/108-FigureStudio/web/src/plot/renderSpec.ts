@@ -61,13 +61,21 @@ export function resolveCanvasMm(
   return { widthMm, heightMm, ratio, aspectMode };
 }
 
-export function orderSeries(dataset: Dataset, seriesOrder: string[]): PlotColumn[] {
-  const byId = new Map(dataset.ys.map((series) => [series.id, series]));
+export function orderSeries(
+  dataset: Dataset,
+  seriesOrder: string[],
+  allowedIds?: string[]
+): PlotColumn[] {
+  const allowed = allowedIds ? new Set(allowedIds) : undefined;
+  const candidates = allowed
+    ? dataset.ys.filter((series) => allowed.has(series.id))
+    : dataset.ys;
+  const byId = new Map(candidates.map((series) => [series.id, series]));
   const ordered = seriesOrder
     .map((id) => byId.get(id))
     .filter((series): series is PlotColumn => Boolean(series));
 
-  for (const series of dataset.ys) {
+  for (const series of candidates) {
     if (!ordered.some((item) => item.id === series.id)) ordered.push(series);
   }
 
@@ -93,7 +101,11 @@ function legendAnchor(position: LegendPosition) {
 }
 
 function visibleSeries(dataset: Dataset, figure: FigureSpec): PlotColumn[] {
-  return orderSeries(dataset, figure.seriesOrder).filter(
+  return orderSeries(
+    dataset,
+    figure.seriesOrder,
+    figure.dataRef?.yColumnIds
+  ).filter(
     (series) => figure.seriesOverrides[series.id]?.visible !== false
   );
 }
@@ -134,6 +146,7 @@ function baseXYTrace(
     mode,
     name: override.legendLabel ?? series.name,
     showlegend: override.showInLegend ?? true,
+    meta: { figureStudioSeriesId: series.id },
     x: dataset.x.values,
     y: yValues ?? series.values,
     opacity,
@@ -330,6 +343,7 @@ export function buildTraces(args: {
         type: "bar",
         name: override.legendLabel ?? column.name,
         showlegend: override.showInLegend ?? true,
+        meta: { figureStudioSeriesId: column.id },
         x: dataset.x.values,
         y: column.values,
         opacity: override.opacity ?? 0.92,
@@ -433,9 +447,11 @@ export function buildTraces(args: {
     }
 
     if (template === "double-y") {
+      const orderIndex = figure.seriesOrder.indexOf(column.id);
+      const stableIndex = orderIndex >= 0 ? orderIndex : sourceIndex;
       const axis =
         figure.seriesOverrides[column.id]?.yAxis ??
-        (index === 0 ? "left" : "right");
+        (stableIndex === 0 ? "left" : "right");
       trace.yaxis = axis === "right" ? "y2" : "y";
     }
 
@@ -613,7 +629,7 @@ export function buildLayout(args: {
   const resolvedYTitle =
     displayText?.yTitle ??
     overrides.yTitle ??
-    (isField2D
+    (isField2D || figure.templateId === "surface-3d"
       ? autoAxisTitle(
           dataset.metadata?.rowAxisName ?? "Y",
           dataset.metadata?.rowAxisUnit
@@ -623,10 +639,18 @@ export function buildLayout(args: {
       : "Y");
   const rightSeries =
     isDoubleY
-      ? orderSeries(dataset, figure.seriesOrder).filter((series, index) => {
+      ? orderSeries(
+          dataset,
+          figure.seriesOrder,
+          figure.dataRef?.yColumnIds
+        ).filter((series) => {
+          const stableIndex = Math.max(
+            0,
+            figure.seriesOrder.indexOf(series.id)
+          );
           const axis =
             figure.seriesOverrides[series.id]?.yAxis ??
-            (index === 0 ? "left" : "right");
+            (stableIndex === 0 ? "left" : "right");
           return axis === "right";
         })
       : [];

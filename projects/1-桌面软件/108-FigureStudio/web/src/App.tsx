@@ -390,7 +390,11 @@ function App() {
   const orderedSeries = useMemo(
     () =>
       plotDataset && activeFigure
-        ? orderSeries(plotDataset, activeFigure.seriesOrder)
+        ? orderSeries(
+            plotDataset,
+            activeFigure.seriesOrder,
+            activeFigure.dataRef?.yColumnIds
+          )
         : [],
     [plotDataset, activeFigure]
   );
@@ -749,9 +753,15 @@ function App() {
       node.removeAllListeners?.("plotly_relayout");
 
       node.on?.("plotly_click", (event: any) => {
-        const index = event?.points?.[0]?.curveNumber;
+        const point = event?.points?.[0];
+        const metaId = point?.data?.meta?.figureStudioSeriesId;
+        const index = point?.curveNumber;
         const series =
-          typeof index === "number" ? orderedSeries[index] : undefined;
+          typeof metaId === "string"
+            ? orderedSeries.find((item) => item.id === metaId)
+            : typeof index === "number"
+            ? orderedSeries[index]
+            : undefined;
         if (series) {
           selectSeries(
             series.id,

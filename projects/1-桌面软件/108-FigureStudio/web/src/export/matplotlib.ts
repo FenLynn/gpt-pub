@@ -5,11 +5,16 @@ function autoAxisTitle(name: string, unit?: string): string {
 }
 
 function orderedSeriesIds(dataset: Dataset, figure: FigureSpec): string[] {
-  const ids = figure.seriesOrder.filter((id) =>
-    dataset.ys.some((series) => series.id === id)
+  const allowed = new Set(
+    figure.dataRef?.yColumnIds ?? dataset.ys.map((series) => series.id)
+  );
+  const ids = figure.seriesOrder.filter(
+    (id) =>
+      allowed.has(id) &&
+      dataset.ys.some((series) => series.id === id)
   );
   for (const series of dataset.ys) {
-    if (!ids.includes(series.id)) ids.push(series.id);
+    if (allowed.has(series.id) && !ids.includes(series.id)) ids.push(series.id);
   }
   return ids;
 }
@@ -181,7 +186,8 @@ def axis_for_series(key, visible_index):
     style = S.get(key, {})
     side = style.get("yAxis")
     if side is None:
-        side = "left" if visible_index == 0 else "right"
+        stable_index = order.index(key) if key in order else visible_index
+        side = "left" if stable_index == 0 else "right"
     return side
 
 def apply_tick_formatter(axis_obj, which, mode, decimals, prefix, suffix):
