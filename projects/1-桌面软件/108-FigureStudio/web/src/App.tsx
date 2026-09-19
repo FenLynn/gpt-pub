@@ -2150,8 +2150,6 @@ function App() {
     activeFigure?.figureOverrides.fontFamily || preset.fontFamily;
   const effectiveFontSizePt =
     activeFigure?.figureOverrides.fontSizePt ?? preset.fontSizePt;
-  const effectiveLegendVisible =
-    activeFigure?.figureOverrides.legendVisible ?? true;
   const aspectMode = activeFigure?.figureOverrides.aspectMode ?? "4:3";
   const canvasMm = activeFigure
     ? resolveCanvasMm(preset, activeFigure)
@@ -2184,6 +2182,13 @@ function App() {
   const field2DTemplate =
     activeFigure?.templateId === "heatmap" || contourTemplate;
   const fieldTemplate = field2DTemplate || surfaceTemplate;
+  const effectiveLegendVisible =
+    activeFigure?.figureOverrides.legendVisible ??
+    (!fieldTemplate &&
+      orderedSeries.filter(
+        (series) =>
+          activeFigure?.seriesOverrides[series.id]?.visible !== false
+      ).length > 1);
   const fieldRowSeries = fieldTemplate ? orderedSeries : [];
   const fieldRowCoordinates =
     fieldTemplate && plotDataset
@@ -4459,7 +4464,7 @@ function App() {
                                             <div className="prop-row">
                                               <label>刻度方向</label>
                                               <select
-                                                value={activeFigure.figureOverrides.tickDirection ?? "inside"}
+                                                value={activeFigure.figureOverrides.tickDirection ?? "outside"}
                                                 onChange={(event) =>
                                                   setFigureField(
                                                     "tickDirection",
@@ -5164,7 +5169,7 @@ function App() {
                       <select
                         value={
                           activeFigure.figureOverrides.legendPosition ??
-                          "top-left"
+                          "top-right"
                         }
                         onChange={(event) => {
                           const value = event.target.value as LegendPosition;
@@ -5181,7 +5186,7 @@ function App() {
                       </select>
                     </div>
 
-                    {(activeFigure.figureOverrides.legendPosition ?? "top-left") ===
+                    {(activeFigure.figureOverrides.legendPosition ?? "top-right") ===
                       "custom" && (
                       <div className="legend-position-grid">
                         <label>
@@ -5219,7 +5224,7 @@ function App() {
                       </div>
                     )}
 
-                    {(activeFigure.figureOverrides.legendPosition ?? "top-left") ===
+                    {(activeFigure.figureOverrides.legendPosition ?? "top-right") ===
                       "custom" && (
                       <div className="legend-anchor-grid">
                         <label>
