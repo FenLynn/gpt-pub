@@ -575,13 +575,16 @@ function App() {
   }, [activeSheet, selectedColumnId]);
 
   useEffect(() => {
+    const isFieldTemplate =
+      activeFigure?.templateId === "heatmap" ||
+      activeFigure?.templateId === "surface-3d";
     if (
-      fieldTemplate &&
+      isFieldTemplate &&
       (inspectorTab === "series" || inspectorTab === "legend")
     ) {
       setInspectorTab("figure");
     }
-  }, [fieldTemplate, inspectorTab]);
+  }, [activeFigure?.templateId, inspectorTab]);
 
   useEffect(() => {
     if (!activeFigure) return;
