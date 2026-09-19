@@ -188,6 +188,7 @@ jobs:
           Copy-Item 'build/App/LaserBench.App.exe' "$pkg/LaserBench.App.exe" -Force
           New-Item "$pkg/tools" -ItemType Directory -Force | Out-Null
           Copy-Item "$env:PROJECT_ROOT/tools/install-dotnet8.ps1" "$pkg/tools/install-dotnet8.ps1" -Force
+          Copy-Item "$env:PROJECT_ROOT/tools/install-webview2.ps1" "$pkg/tools/install-webview2.ps1" -Force
           Copy-Item "$env:PROJECT_ROOT/OFFLINE-DEPENDENCIES.txt" "$pkg/OFFLINE-DEPENDENCIES.txt" -Force
           Copy-Item "$env:PROJECT_ROOT/README.md" "$pkg/README.md" -Force
           foreach ($dir in @('config','data/exp','data/pic','data/video','logs','runtime')) {
@@ -198,7 +199,7 @@ jobs:
             version=$env:PRODUCT_VERSION
             commit=$env:GITHUB_SHA
             buildUtc=(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-            runtime='framework-dependent .NET 8 Desktop x64'
+            runtime='.NET 8 Desktop x64 + WebView2 Evergreen'
             launcher='NativeAOT x64'
           }
           $versionInfo | ConvertTo-Json | Set-Content "$pkg/version.json" -Encoding utf8
@@ -208,7 +209,7 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $pkg='build/Portable'
-          foreach ($required in @('LaserBench.exe','LaserBench.App.exe','OFFLINE-DEPENDENCIES.txt','tools/install-dotnet8.ps1','version.json')) {
+          foreach ($required in @('LaserBench.exe','LaserBench.App.exe','OFFLINE-DEPENDENCIES.txt','tools/install-dotnet8.ps1','tools/install-webview2.ps1','version.json')) {
             if (!(Test-Path (Join-Path $pkg $required) -PathType Leaf)) { throw "Missing package file: $required" }
           }
           $unexpected=Get-ChildItem $pkg -Recurse -File | Where-Object { $_.Extension -in '.dll','.pdb' }
@@ -229,7 +230,7 @@ jobs:
           if ($proc.ExitCode -ne 0) { if (Test-Path $report) { Get-Content $report -Raw | Write-Host }; throw "Launcher check failed: $($proc.ExitCode)" }
           $json=Get-Content $report -Raw | ConvertFrom-Json
           $json | ConvertTo-Json | Write-Host
-          if (-not $json.ok -or -not $json.appExists -or -not $json.dotnetDesktop8 -or -not $json.portable) { throw 'Launcher dependency check returned an invalid result.' }
+          if (-not $json.ok -or -not $json.appExists -or -not $json.dotnetDesktop8 -or -not $json.webView2Runtime -or -not $json.portable) { throw 'Launcher dependency check returned an invalid result.' }
           Copy-Item $report build/TestEvidence/launcher-check.json -Force
 
       - name: Create manifest, ZIP and SHA-256

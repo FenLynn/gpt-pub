@@ -90,7 +90,8 @@ internal static class Program
                 CapturePower = true,
                 CaptureSpectrum = true,
                 CaptureBeam = true,
-                CaptureScope = true
+                CaptureScope = true,
+                ScopeTimeSpan = 1.25
             };
             AppConfigStore.Save(config);
 
@@ -117,6 +118,8 @@ internal static class Program
             var snapshot = provider.Snapshot(config);
             if (snapshot.Power.Count < 2 || snapshot.Spectrum.Count < 100 || snapshot.Beam.Count < 100 || snapshot.ScopeTime.Count < 100)
                 errors.Add("simulator payload incomplete");
+            if (snapshot.ScopeTime.Count == 0 || Math.Abs(snapshot.ScopeTime[^1].X - config.ScopeTimeSpan) > 0.001)
+                errors.Add("scope time-span setting not applied");
 
             var service = new CaptureService(provider);
             var capture = service.CaptureAsync(config, CancellationToken.None).GetAwaiter().GetResult();

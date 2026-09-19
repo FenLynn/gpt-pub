@@ -2,12 +2,12 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.4.9 稳定候选**。0.4.x 已完成 Vue/WebView2 工作台、统一采集状态、模块独立页、数据中心、设置持久化、截图录像与 Portable 安全保存闭环；真实厂商硬件仍按设备抽象层逐项接入。
+当前维护版本为 **v0.4.10 稳定候选**。0.4.x 已完成 Vue/WebView2 工作台、统一采集状态、模块聚焦页、数据中心、设置持久化、截图录像与 Portable 安全保存闭环；v0.4.10 主要完成技术栈/依赖/文档收口和 Scope 配置一致性修正。真实厂商硬件留给 0.5.x 按设备抽象层逐项接入。
 
 ## 当前能力
 
 - Windows x64 Portable 软件，配置和数据跟随程序目录，不把产品状态拆到 AppData。
-- `LaserBench.exe` 为 NativeAOT 轻量启动器，负责 .NET 8 Desktop Runtime x64 检测；`LaserBench.App.exe` 为 framework-dependent WinForms 主程序。
+- `LaserBench.exe` 为 NativeAOT 轻量启动器，负责 .NET 8 Desktop Runtime x64 与 Microsoft Edge WebView2 Evergreen Runtime 检测；`LaserBench.App.exe` 为 framework-dependent WinForms/WebView2 主程序。
 - 启动过程写入 `logs/startup.log`，未处理异常写入 `logs/crash.log`，支持 `LaserBench.App.exe --safe`。
 - 内置 Power、Spectrum、Beam、Scope 四类 Simulator，无真实硬件也可完整验证 Dashboard、Test、保存、截图和录像链路。
 - Dashboard 使用原生 Windows 标题栏、单行极窄顶栏、窄折叠导航以及四象限高密度观测区。
@@ -17,12 +17,12 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - Spectrum 顶部单行显示中心波长、3 dB linewidth、RMS linewidth、功率与当前 OSA，曲线区域占主要空间。
 - Beam 左侧显示当前 Z 位置光斑，右侧显示完整 caustic；Z 条只浏览已采集的轴向光斑，不改变右侧 caustic。底部一行保留 Z、播放浏览、Attenuation、M²x、M²y、M̄²。
 - Scope Dashboard 只显示最多两个通道的时域和 FFT，详细通道纵轴设置进入独立页。
-- 四个模块支持双击进入独立页；从左上模块图标拖出可形成可调整大小的浮动窗口，拖回主窗口后自动嵌回原槽位。
+- 四个模块可从侧栏进入独立聚焦页；旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复，当前不把 Floating 描述为已完成功能。
 - 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
 - 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。
 - 实验数据写入 `data/exp/<日期或自定义实验文件夹>/`，该目录下一层直接是数据文件。
 - 所有保存执行 never-overwrite，重名自动追加 `_1`、`_2`。
-- Data 页支持当前实验文件夹切换和按 Label 扫描已有数据。
+- Data 页显示当前实验目录、最近采集摘要、文件统计，并支持按文件名/Label 筛选；实验目录切换位于 Settings。
 
 ## Portable 目录
 
@@ -84,7 +84,7 @@ C# / .NET 8 / WinForms Host / Windows x64
 + 无第三方图表库
 ```
 
-主程序为 framework-dependent 单文件，避免每个更新包重复携带完整 .NET Runtime。
+主程序为 framework-dependent 单文件，避免每个更新包重复携带完整 .NET Runtime。基础外部运行依赖为 .NET 8 Desktop Runtime x64 与 WebView2 Evergreen Runtime；Portable 包提供两者的在线安装脚本和离线说明。
 
 ## 分支
 
@@ -98,7 +98,7 @@ C# / .NET 8 / WinForms Host / Windows x64
 
 ## 当前硬件边界
 
-v0.4.9 仍默认启用 Simulator。真实仪器按最小闭环逐个接入：
+v0.4.10 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
 
 1. Ophir Juno / OphirLMMeasurement
 2. Yokogawa AQ6370D

@@ -286,9 +286,10 @@ internal sealed class SimulatorProvider : IInstrumentProvider
             return new BeamPoint(z, wx, wy);
         }).ToArray();
 
+        var scopeSpanMs = Math.Clamp(config.ScopeTimeSpan, 0.01, 1000.0);
         var scopeTime = Enumerable.Range(0, 560).Select(i =>
         {
-            var ms = i * (0.24 / 559.0);
+            var ms = i * (scopeSpanMs / 559.0);
             var s = ms / 1000.0;
             var ch1 = 0.73 * Math.Sin(2 * Math.PI * 1200 * s) + 0.10 * Math.Sin(2 * Math.PI * 2400 * s + 0.32);
             var ch2 = 0.46 * Math.Sin(2 * Math.PI * 1200 * s + 0.82) + 0.075 * Math.Sin(2 * Math.PI * 3100 * s);
