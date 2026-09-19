@@ -592,7 +592,7 @@ function rangeFor(
     return undefined;
   }
 
-  const range =
+  const range: [number, number] | undefined =
     scale === "log"
       ? minValue > 0 && maxValue > 0
         ? [Math.log10(minValue), Math.log10(maxValue)]
