@@ -9,9 +9,9 @@ export const presets: Record<PresetId, PresetDefinition> = {
     heightMm: 88.5,
     fontFamily: "Arial",
     fontSizePt: 8,
-    lineWidthPt: 1.15,
+    lineWidthPt: 1.35,
     axisWidthPt: 0.8,
-    markerSizePt: 4.2,
+    markerSizePt: 4.5,
     showGrid: false,
     palette: ["#1F77B4","#FF7F0E","#2CA02C","#D62728","#9467BD","#8C564B","#E377C2","#7F7F7F","#BCBD22","#17BECF"]
   },
@@ -23,7 +23,7 @@ export const presets: Record<PresetId, PresetDefinition> = {
     heightMm: 66.75,
     fontFamily: "Arial",
     fontSizePt: 7.5,
-    lineWidthPt: 1.0,
+    lineWidthPt: 1.05,
     axisWidthPt: 0.72,
     markerSizePt: 3.8,
     showGrid: false,
@@ -37,9 +37,9 @@ export const presets: Record<PresetId, PresetDefinition> = {
     heightMm: 120,
     fontFamily: "Arial",
     fontSizePt: 10.5,
-    lineWidthPt: 1.6,
+    lineWidthPt: 1.8,
     axisWidthPt: 0.95,
-    markerSizePt: 5.4,
+    markerSizePt: 5.6,
     showGrid: false,
     palette: ["#1F77B4","#FF7F0E","#2CA02C","#D62728","#9467BD","#17BECF"]
   }
