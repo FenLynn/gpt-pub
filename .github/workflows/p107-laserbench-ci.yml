@@ -177,9 +177,9 @@ jobs:
             $startupText=Get-Content $startup -Raw
             $startupText | Write-Host
             if ($startupText -notmatch 'window-shown') { throw 'GUI startup never reached window-shown.' }
-            if ($startupText -notmatch 'webui-acq-vectors.*running') {
+            if ($startupText -notmatch 'webui-acq-vectors.*verified') {
               if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
-              throw 'WebView2 acquisition vector timeline did not advance.'
+              throw 'WebView2 acquisition vector render-state verification failed.'
             }
             if ($startupText -notmatch 'webui-ready') {
               if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }

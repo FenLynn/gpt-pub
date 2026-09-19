@@ -179,20 +179,18 @@ internal sealed class WebUiHost : IDisposable
                     if (!string.Equals(structure, "true", StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException("WebView2 acquisition vector structure/animation is incomplete.");
 
-                    await core.ExecuteScriptAsync(
-                        "(()=>{const e=document.querySelector('.topbar .module-toggle.active');" +
-                        "if(!e){window.__lbAcqAnimT=null;return null;}" +
-                        "const a=[e,...e.querySelectorAll('*')].flatMap(n=>typeof n.getAnimations==='function'?n.getAnimations():[]).find(x=>x.playState==='running');" +
-                        "window.__lbAcqAnimT=a&&typeof a.currentTime==='number'?a.currentTime:-1;return window.__lbAcqAnimT})()");
-                    await Task.Delay(320);
-                    var moving = await core.ExecuteScriptAsync(
-                        "(()=>{if(window.__lbAcqAnimT===null)return true;const e=document.querySelector('.topbar .module-toggle.active');" +
-                        "if(!e)return false;const a=[e,...e.querySelectorAll('*')].flatMap(n=>typeof n.getAnimations==='function'?n.getAnimations():[]).find(x=>x.playState==='running');" +
-                        "return !!a&&typeof a.currentTime==='number'&&a.currentTime>window.__lbAcqAnimT+150})()");
-                    if (!string.Equals(moving, "true", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException("WebView2 acquisition vector CSS animation is not advancing.");
+                    var rendered = await core.ExecuteScriptAsync(
+                        "(()=>{const active=document.querySelector('.topbar .module-toggle.active');if(!active)return true;" +
+                        "const target=[active,...active.querySelectorAll('*')].find(n=>typeof n.getAnimations==='function'&&n.getAnimations().length>0);" +
+                        "if(!target)return false;const a=target.getAnimations()[0];if(!a)return false;" +
+                        "const wasPaused=a.playState==='paused';a.pause();a.currentTime=600;" +
+                        "const s1=getComputedStyle(target);const v1=s1.transform+'|'+s1.opacity;" +
+                        "a.currentTime=2600;const s2=getComputedStyle(target);const v2=s2.transform+'|'+s2.opacity;" +
+                        "if(!wasPaused)a.play();return v1!==v2})()");
+                    if (!string.Equals(rendered, "true", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("WebView2 acquisition vector CSS animation does not produce distinct rendered states.");
 
-                    StartupDiagnostics.Stage("webui-acq-vectors", "running");
+                    StartupDiagnostics.Stage("webui-acq-vectors", "verified");
                     _ready = true;
                     _loading.Visible = false;
                     _webView.Visible = true;
