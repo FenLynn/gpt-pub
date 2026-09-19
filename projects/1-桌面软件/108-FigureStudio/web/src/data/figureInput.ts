@@ -57,19 +57,30 @@ export function resolveFigureInput(
   }
 
   const requirement = templateDefinition(figure.templateId).input;
+  const missingYError =
+    requirement.yError === "required" && !ref.yErrorColumnId;
   if (
     ref.yColumnIds.length < requirement.minSeries ||
-    (requirement.x === "required" && !ref.xColumnId)
+    (requirement.x === "required" && !ref.xColumnId) ||
+    missingYError
   ) {
+    const details: string[] = [];
+    if (ref.yColumnIds.length < requirement.minSeries) {
+      details.push("至少需要 " + requirement.minSeries + " 列主 Y 数据");
+    }
+    if (requirement.x === "required" && !ref.xColumnId) {
+      details.push("需要明确的 X 数据列");
+    }
+    if (missingYError) {
+      details.push("误差棒图需要映射 YErr 误差列");
+    }
+    if (requirement.x === "optional" && !ref.xColumnId) {
+      details.push("X 可留空并自动使用行号");
+    }
     return {
       state: "incomplete",
       label: labels.incomplete,
-      detail:
-        requirement.x === "optional"
-          ? "当前图型至少需要 " +
-            requirement.minSeries +
-            " 列主数据；X 可以留空并自动使用行号。"
-          : "当前图型的数据映射尚未满足要求。"
+      detail: details.join("；") + "。"
     };
   }
 
