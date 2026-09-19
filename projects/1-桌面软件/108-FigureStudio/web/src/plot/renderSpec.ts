@@ -23,9 +23,9 @@ export function mmToPx(valueMm: number): number {
 
 export function plotFontFamily(font: "Arial" | "Times New Roman"): string {
   if (font === "Times New Roman") {
-    return '"Times New Roman", "Songti SC", "SimSun", serif';
+    return '"Times New Roman", "Songti SC", "SimSun", "Noto Serif CJK SC", serif';
   }
-  return 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
+  return 'Arial, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif';
 }
 
 function autoAxisTitle(name: string, unit?: string): string {
@@ -692,9 +692,12 @@ export function buildLayout(args: {
         ? autoAxisTitle(rightSeries[0].name, rightSeries[0].unit)
         : "右 Y")
   );
+  const resolvedPlotTitle = normalizePlotlyMathText(
+    displayText?.plotTitle ?? overrides.plotTitle
+  );
   const hasXTitle = Boolean(String(resolvedXTitle ?? "").trim());
   const hasYTitle = Boolean(String(resolvedYTitle ?? "").trim());
-  const hasPlotTitle = Boolean(String(displayText?.plotTitle ?? overrides.plotTitle ?? "").trim());
+  const hasPlotTitle = Boolean(String(resolvedPlotTitle ?? "").trim());
 
   const layout: any = {
     width: Math.round(mmToPx(canvas.widthMm)),
@@ -722,7 +725,7 @@ export function buildLayout(args: {
     plot_bgcolor: background,
     title: overrides.plotTitle
       ? {
-          text: displayText?.plotTitle ?? overrides.plotTitle,
+          text: resolvedPlotTitle,
           x: 0.5,
           xanchor: "center",
           y: 0.985,
