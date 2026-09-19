@@ -54,7 +54,7 @@ function scopeTime(): PlotSeries[] {
   const ch1: PlotPoint[] = []
   const ch2: PlotPoint[] = []
   for (let i = 0; i < 1400; i++) {
-    const x = i * 240 / 1399
+    const x = i * 0.24 / 1399
     ch1.push({ x, y: .68 * Math.sin(x * .205) + .06 * Math.sin(x * .61) })
     ch2.push({ x, y: .29 * Math.sin(x * .205 + .9) + .03 * Math.sin(x * .47) })
   }
@@ -65,7 +65,7 @@ function scopeFft(): PlotSeries[] {
   const ch1: PlotPoint[] = []
   const ch2: PlotPoint[] = []
   for (let i = 0; i < 1400; i++) {
-    const x = i * 54 / 1399
+    const x = i * 54000 / 1399
     const floor1 = -78 + 2.2 * Math.sin(i * .33)
     const floor2 = -88 + 1.6 * Math.sin(i * .27)
     ch1.push({ x, y: floor1 + 72 * gaussian(x, 7, .43) + 47 * gaussian(x, 14.1, .28) + 34 * gaussian(x, 21.2, .26) + 25 * gaussian(x, 28.3, .24) })
@@ -79,7 +79,7 @@ export function createDemoSnapshot(): LaserSnapshot {
   const p2 = powerSeries(1, '#ff8200', 'back', 'kW')
   const p3 = powerSeries(2, '#08a84f', 'eta', '%')
   return {
-    version: '0.4.9', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
+    version: '0.4.10', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
     captureSelection: { power: true, spectrum: true, beam: true, scope: false },
     config: {
       experimentFolder: '', autoScreenshot: false,

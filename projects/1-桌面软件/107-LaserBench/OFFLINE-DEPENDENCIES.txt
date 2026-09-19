@@ -1,25 +1,40 @@
-LaserBench v0.1.0 offline dependency guide
-========================================
+LaserBench v0.4.10 offline dependency guide
+=========================================
 
-LaserBench is a portable application. Its configuration and data stay with the LaserBench folder.
+LaserBench is a portable application. Its configuration, runtime cache and experiment data stay with the LaserBench folder.
 
-Required runtime for v0.1.0
----------------------------
-Microsoft .NET 8 Desktop Runtime, Windows x64.
+Required runtimes for v0.4.10
+-----------------------------
+1. Microsoft .NET 8 Desktop Runtime, Windows x64.
+2. Microsoft Edge WebView2 Evergreen Runtime.
+
+LaserBench.exe is a NativeAOT dependency launcher. It checks both required runtimes before starting LaserBench.App.exe.
+
+Online installation
+-------------------
+The portable package contains:
+  tools\install-dotnet8.ps1
+  tools\install-webview2.ps1
+
+Both scripts download only from Microsoft sources and verify the downloaded executable has a valid Microsoft Authenticode signature before installation.
 
 Offline preparation on a computer with Internet access
 -------------------------------------------------------
-1. Open the official Microsoft .NET 8 download page:
+1. Download the Microsoft .NET 8 Desktop Runtime x64 installer:
    https://dotnet.microsoft.com/download/dotnet/8.0
-2. Under ".NET Desktop Runtime", download the Windows x64 installer.
-3. Copy that installer together with the complete LaserBench portable folder to the offline computer, for example by USB drive.
+
+2. Download the Microsoft Edge WebView2 Evergreen Standalone Installer for x64:
+   https://developer.microsoft.com/microsoft-edge/webview2/#download-section
+
+3. Copy both installers together with the complete LaserBench portable folder to the offline computer.
 
 Offline installation
 --------------------
-1. Run the Microsoft .NET 8 Desktop Runtime x64 installer.
-2. Keep the complete LaserBench folder in a normal writable location such as D:\LaserBench or another experiment drive.
-3. Do not place the portable folder under a location where ordinary users cannot write.
-4. Run LaserBench.exe again.
+1. Install Microsoft .NET 8 Desktop Runtime x64.
+2. Install Microsoft Edge WebView2 Evergreen Runtime x64.
+3. Keep the complete LaserBench folder in a normal writable location such as D:\LaserBench or another experiment drive.
+4. Do not place the portable folder under a location where ordinary users cannot write.
+5. Run LaserBench.exe again.
 
 Important portable layout
 -------------------------
@@ -32,10 +47,14 @@ data\video\
 logs\
 runtime\
 tools\
+  install-dotnet8.ps1
+  install-webview2.ps1
+OFFLINE-DEPENDENCIES.txt
 
 Only data\exp uses a date folder by default when no custom experiment folder is selected.
 data\pic and data\video store files directly and do not create date subfolders.
+runtime\ contains LaserBench-owned caches such as extracted Web UI assets and WebView2 user data; it is not experiment data.
 
 Future optional hardware dependencies
 -------------------------------------
-LaserBench will detect vendor SDKs or drivers only when the corresponding hardware module is introduced. They will not be bundled into the base portable package unless redistribution is both necessary and permitted. Each missing dependency will provide an online action and an offline installation note.
+LaserBench detects vendor SDKs or drivers only when the corresponding hardware module is introduced. They are not bundled into the base portable package merely for future use. Each hardware integration must add explicit detection plus online/offline dependency instructions before it can be considered complete.

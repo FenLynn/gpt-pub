@@ -17,7 +17,7 @@
 | P103 | [DavBridge](103-DavBridge/) | v0.4 候选源码已纳入主线 | `103-DavBridge/` |
 | P104 | [CodexHandoff](104-CodexHandoff/) | v1.0.0-alpha.1 Tauri 重构开发中 | `104-CodexHandoff/` |
 | P105 | [LocalSub](105-LocalSub/) | v0.1.1-dev 候选源码已纳入主线 | `105-LocalSub/` |
-| P107 | [LaserBench](107-LaserBench/) | v0.2.0 Dashboard Refactor 候选，待实机 UI 验收 | `107-LaserBench/` |
+| P107 | [LaserBench](107-LaserBench/) | v0.4.10 维护稳定候选，待 Windows 实机 UI 验收 | `107-LaserBench/` |
 
 ## 分支模型
 

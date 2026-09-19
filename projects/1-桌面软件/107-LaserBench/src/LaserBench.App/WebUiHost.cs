@@ -317,7 +317,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.3.0",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.10",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
@@ -382,7 +382,7 @@ internal sealed class WebUiHost : IDisposable
                 {
                     new { name = _config.Scope1Alias.ToUpperInvariant(), color = "#075ee6", points = scopeTime.Select(p => new { x = p.X, y = p.Ch1 }).ToArray() },
                     new { name = _config.Scope2Alias.ToUpperInvariant(), color = "#ff7a00", points = scopeTime.Select(p => new { x = p.X, y = p.Ch2 }).ToArray() }
-                },
+                }.Where((_,i)=>i==0?_config.ScopeCh1:_config.ScopeCh2).ToArray(),
                 fft = new object[]
                 {
                     new { name = _config.Scope1Alias.ToUpperInvariant(), color = "#075ee6", points = scopeFft.Select(p => new { x = p.X, y = p.Ch1 }).ToArray() },
