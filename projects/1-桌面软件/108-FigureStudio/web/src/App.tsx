@@ -1832,6 +1832,9 @@ function App() {
         tickLabelSizePt: source.tickLabelSizePt,
         barGap: source.barGap,
         barGroupGap: source.barGroupGap,
+        barLabelsVisible: source.barLabelsVisible,
+        barLabelDecimals: source.barLabelDecimals,
+        barLabelPosition: source.barLabelPosition,
         offsetStep: source.offsetStep,
         waterfallXOffset: source.waterfallXOffset,
         waterfallYOffset: source.waterfallYOffset,
@@ -4092,6 +4095,71 @@ function App() {
                             <span>%</span>
                           </div>
                         </div>
+                        <div className="prop-row">
+                          <label>数值标签</label>
+                          <MiniSwitch
+                            checked={
+                              activeFigure.figureOverrides.barLabelsVisible ??
+                              false
+                            }
+                            onChange={(value) =>
+                              setFigureField("barLabelsVisible", value)
+                            }
+                          />
+                        </div>
+                        {activeFigure.figureOverrides.barLabelsVisible && (
+                          <>
+                            <div className="prop-row">
+                              <label>标签小数位</label>
+                              <div className="compact-number">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="6"
+                                  step="1"
+                                  value={
+                                    activeFigure.figureOverrides
+                                      .barLabelDecimals ?? 0
+                                  }
+                                  onChange={(event) =>
+                                    setFigureField(
+                                      "barLabelDecimals",
+                                      Math.max(
+                                        0,
+                                        Math.min(
+                                          6,
+                                          Math.round(Number(event.target.value))
+                                        )
+                                      )
+                                    )
+                                  }
+                                />
+                                <span>位</span>
+                              </div>
+                            </div>
+                            <div className="prop-row">
+                              <label>标签位置</label>
+                              <select
+                                value={
+                                  activeFigure.figureOverrides
+                                    .barLabelPosition ??
+                                  (activeFigure.templateId === "stacked-bar"
+                                    ? "inside"
+                                    : "outside")
+                                }
+                                onChange={(event) =>
+                                  setFigureField(
+                                    "barLabelPosition",
+                                    event.target.value as "inside" | "outside"
+                                  )
+                                }
+                              >
+                                <option value="outside">柱外</option>
+                                <option value="inside">柱内</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
 
