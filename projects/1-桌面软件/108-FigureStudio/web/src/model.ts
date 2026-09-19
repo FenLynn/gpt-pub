@@ -1,28 +1,59 @@
 export type NumericValue = number | null;
+export type ColumnRole = "X" | "Y" | "Z" | "XErr" | "YErr" | "Label" | "None";
 
 export interface Column {
   id: string;
   name: string;
   unit?: string;
+  role: ColumnRole;
   values: NumericValue[];
   [key: string]: unknown;
 }
 
-export interface DatasetMetadata {
+export interface SheetMetadata {
   rowCoordinates?: number[];
   rowAxisName?: string;
   rowAxisUnit?: string;
   [key: string]: unknown;
 }
 
-export interface Dataset {
+export interface DataSheet {
+  id: string;
+  name: string;
+  columns: Column[];
+  metadata?: SheetMetadata;
+  [key: string]: unknown;
+}
+
+export type DataSourceKind = "embedded" | "linked";
+export type LinkedStatus = "ok" | "changed" | "needs-relink" | "missing";
+
+export interface DataSource {
+  kind: DataSourceKind;
+  fileName?: string;
+  path?: string;
+  relativePath?: string;
+  size?: number;
+  modifiedMs?: number;
+  status?: LinkedStatus;
+  [key: string]: unknown;
+}
+
+export interface DataBook {
   id: string;
   name: string;
   folderId?: string;
+  source: DataSource;
+  sheets: DataSheet[];
+  [key: string]: unknown;
+}
+
+export interface Dataset {
+  id: string;
+  name: string;
   x: Column;
   ys: Column[];
-  metadata?: DatasetMetadata;
-  [key: string]: unknown;
+  metadata?: SheetMetadata;
 }
 
 export interface ProjectFolder {
@@ -136,16 +167,25 @@ export interface FigureOverrides {
   [key: string]: unknown;
 }
 
+export interface FigureDataRef {
+  sheetId: string;
+  xColumnId: string;
+  yColumnIds: string[];
+  yErrorColumnId?: string;
+  zColumnId?: string;
+}
+
 export interface FigureSpec {
   id: string;
   name: string;
   folderId?: string;
-  datasetId: string;
+  dataRef: FigureDataRef;
   templateId: PlotTemplateId;
   presetId: PresetId;
   figureOverrides: FigureOverrides;
   seriesOverrides: Record<string, SeriesOverride>;
   seriesOrder: string[];
+  datasetId?: string;
   [key: string]: unknown;
 }
 
@@ -157,11 +197,11 @@ export interface ProjectDefaults {
 
 export interface ProjectState {
   format: "sfig";
-  schemaVersion: "0.2";
+  schemaVersion: "0.3";
   projectId: string;
   name: string;
   folders: ProjectFolder[];
-  datasets: Dataset[];
+  dataBooks: DataBook[];
   figures: FigureSpec[];
   activeFigureId: string;
   defaults: ProjectDefaults;
@@ -174,11 +214,14 @@ export interface UserDefaults {
   figureOverrides: FigureOverrides;
 }
 
-export type ExplorerItemType = "folder" | "dataset" | "figure";
+export type DocumentRef =
+  | { type: "sheet"; id: string }
+  | { type: "figure"; id: string };
 
-export interface ExplorerSelection {
-  type: ExplorerItemType;
-  id: string;
-}
+export type ExplorerSelection =
+  | { type: "folder"; id: string }
+  | { type: "book"; id: string }
+  | { type: "sheet"; id: string }
+  | { type: "figure"; id: string };
 
 export type InspectorTab = "figure" | "series" | "axis" | "legend" | "check";

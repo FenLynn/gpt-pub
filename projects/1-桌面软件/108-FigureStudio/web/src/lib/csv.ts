@@ -1,4 +1,4 @@
-import type { Column, Dataset, NumericValue } from "../model";
+import type { Column, ColumnRole, DataSheet, NumericValue } from "../model";
 
 function makeId(text: string, index: number): string {
   const safe = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -41,7 +41,15 @@ function splitNameAndUnit(label: string): { name: string; unit?: string } {
   };
 }
 
-export function parseDelimitedText(text: string, fileName: string): Dataset {
+function roleForColumn(index: number, label: string): ColumnRole {
+  const lower = label.toLowerCase();
+  if (/yerr|y error|sigma|std|error/.test(lower)) return "YErr";
+  if (/xerr|x error/.test(lower)) return "XErr";
+  if (/label|name|sample/.test(lower)) return "Label";
+  return index === 0 ? "X" : "Y";
+}
+
+export function parseDelimitedText(text: string, fileName: string): DataSheet {
   const lines = text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
@@ -69,7 +77,7 @@ export function parseDelimitedText(text: string, fileName: string): Dataset {
   });
 
   const body = looksLikeHeader ? rows.slice(1) : rows;
-  const numericColumns: Column[] = [];
+  const columns: Column[] = [];
 
   names.forEach((label, columnIndex) => {
     const values = body.map((row) => toNumber(row[columnIndex] || ""));
@@ -78,25 +86,25 @@ export function parseDelimitedText(text: string, fileName: string): Dataset {
 
     if (validCount >= threshold) {
       const parsed = splitNameAndUnit(label);
-      numericColumns.push({
+      columns.push({
         id: makeId(parsed.name, columnIndex),
         name: parsed.name,
         unit: parsed.unit,
+        role: roleForColumn(columns.length, label),
         values
       });
     }
   });
 
-  if (numericColumns.length < 2) {
+  if (columns.length < 2) {
     throw new Error("没有识别到至少两列有效数值数据。");
   }
 
   const cleanName = fileName.replace(/\.[^.]+$/, "") || "导入数据";
 
   return {
-    id: "dataset-" + Date.now().toString(36),
+    id: "sheet-" + Date.now().toString(36),
     name: cleanName,
-    x: numericColumns[0],
-    ys: numericColumns.slice(1, 9)
+    columns
   };
 }

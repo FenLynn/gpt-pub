@@ -1,5 +1,7 @@
+import { defaultDataRef, sheetToDataset } from "./adapter";
 import type {
-  Dataset,
+  DataBook,
+  DataSheet,
   FigureSpec,
   ProjectState,
   UserDefaults
@@ -9,7 +11,7 @@ function id(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
 }
 
-export function createSpectrumDataset(folderId?: string): Dataset {
+export function createSpectrumSheet(): DataSheet {
   const x: number[] = [];
   const measured: number[] = [];
   const fit: number[] = [];
@@ -34,77 +36,85 @@ export function createSpectrumDataset(folderId?: string): Dataset {
   }
 
   return {
-    id: id("dataset-spectrum"),
-    name: "合成 OSA 光谱",
-    folderId,
-    x: {
-      id: "wavelength",
-      name: "波长",
-      unit: "nm",
-      values: x
-    },
-    ys: [
+    id: id("sheet-spectrum"),
+    name: "Spectrum",
+    columns: [
+      {
+        id: "wavelength",
+        name: "波长",
+        unit: "nm",
+        role: "X",
+        values: x
+      },
       {
         id: "measured",
         name: "测量数据",
         unit: "dBm",
+        role: "Y",
         values: measured
       },
       {
         id: "fit",
         name: "高斯拟合",
         unit: "dBm",
+        role: "Y",
         values: fit
       },
       {
         id: "sigma",
         name: "标准差",
         unit: "dB",
+        role: "YErr",
         values: sigma
       }
     ]
   };
 }
 
-export function createFieldDataset(folderId?: string): Dataset {
+export function createFieldSheet(): DataSheet {
   const x: number[] = [];
-  const ys = [];
+  const columns = [];
   const rowCoordinates: number[] = [];
 
   for (let i = 0; i < 96; i += 1) {
     x.push(Number((-3.2 + (6.4 * i) / 95).toFixed(4)));
   }
 
+  columns.push({
+    id: "x-position",
+    name: "X",
+    unit: "mm",
+    role: "X" as const,
+    values: x
+  });
+
   for (let row = 0; row < 25; row += 1) {
     const y = -2.4 + (4.8 * row) / 24;
     rowCoordinates.push(Number(y.toFixed(4)));
     const values = x.map((xValue) => {
       const r2 = Math.pow(xValue / 1.08, 2) + Math.pow(y / 0.82, 2);
-      const shoulder = 0.12 * Math.exp(
-        -Math.pow((xValue - 1.25) / 0.52, 2) - Math.pow((y + 0.35) / 0.62, 2)
-      );
+      const shoulder =
+        0.12 *
+        Math.exp(
+          -Math.pow((xValue - 1.25) / 0.52, 2) -
+            Math.pow((y + 0.35) / 0.62, 2)
+        );
       return Number((Math.exp(-2 * r2) + shoulder).toFixed(6));
     });
 
-    ys.push({
+    columns.push({
       id: "row-" + String(row + 1),
       name: y.toFixed(2),
       unit: "a.u.",
+      role: "Y" as const,
       values
     });
   }
 
   return {
-    id: id("dataset-field"),
-    name: "合成二维光场",
-    folderId,
-    x: {
-      id: "x-position",
-      name: "X",
-      unit: "mm",
-      values: x
-    },
-    ys,
+    id: id("sheet-field"),
+    name: "Beam field",
+    columns,
     metadata: {
       rowCoordinates,
       rowAxisName: "Y",
@@ -114,7 +124,7 @@ export function createFieldDataset(folderId?: string): Dataset {
 }
 
 function makeFigure(
-  dataset: Dataset,
+  sheet: DataSheet,
   name: string,
   templateId: FigureSpec["templateId"],
   defaults: UserDefaults,
@@ -122,20 +132,30 @@ function makeFigure(
   overrides: FigureSpec["figureOverrides"] = {},
   seriesOverrides: FigureSpec["seriesOverrides"] = {}
 ): FigureSpec {
+  const dataRef = defaultDataRef(sheet);
+  const dataset = sheetToDataset(sheet);
+
   return {
     id: id("figure"),
     name,
     folderId,
-    datasetId: dataset.id,
+    dataRef,
     templateId,
     presetId: defaults.presetId,
     figureOverrides: {
       aspectMode: "4:3",
       ...defaults.figureOverrides,
+      xTitle: dataset.x.unit
+        ? dataset.x.name + " (" + dataset.x.unit + ")"
+        : dataset.x.name,
+      yTitle: dataset.ys[0]?.unit
+        ? dataset.ys[0].name + " (" + dataset.ys[0].unit + ")"
+        : dataset.ys[0]?.name || "Y",
+      errorSeriesId: dataRef.yErrorColumnId,
       ...overrides
     },
     seriesOverrides,
-    seriesOrder: dataset.ys.map((series) => series.id)
+    seriesOrder: dataRef.yColumnIds
   };
 }
 
@@ -156,56 +176,64 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
   };
 
   const folders = [
-    { id: "folder-paper", name: "论文" },
-    { id: "folder-main", name: "主文", parentId: "folder-paper" },
-    { id: "folder-supp", name: "补充材料", parentId: "folder-paper" },
-    { id: "folder-experiment", name: "实验" },
-    { id: "folder-raw", name: "原始数据", parentId: "folder-experiment" }
+    { id: "folder-experiment", name: "实验数据" },
+    { id: "folder-paper", name: "论文" }
   ];
 
-  const spectrum = createSpectrumDataset("folder-raw");
-  const field = createFieldDataset("folder-raw");
+  const spectrumSheet = createSpectrumSheet();
+  const fieldSheet = createFieldSheet();
+
+  const spectrumBook: DataBook = {
+    id: id("book-spectrum"),
+    name: "OSA 光谱数据",
+    folderId: "folder-experiment",
+    source: { kind: "embedded" },
+    sheets: [spectrumSheet]
+  };
+
+  const fieldBook: DataBook = {
+    id: id("book-field"),
+    name: "二维光场数据",
+    folderId: "folder-experiment",
+    source: { kind: "embedded" },
+    sheets: [fieldSheet]
+  };
 
   const spectrumFigure = makeFigure(
-    spectrum,
-    "图 1 · 光谱",
+    spectrumSheet,
+    "Fig 1 · 光谱",
     "spectrum",
     defaults,
-    "folder-main",
+    "folder-paper",
     {
       xTitle: "波长 λ (nm)",
       yTitle: "功率 (dBm)"
-    },
-    {
-      sigma: { visible: false }
     }
   );
 
   const heatmapFigure = makeFigure(
-    field,
-    "图 2 · 光场",
+    fieldSheet,
+    "Fig 2 · 光场",
     "heatmap",
     defaults,
-    "folder-main",
+    "folder-paper",
     {
       xTitle: "X (mm)",
       yTitle: "Y (mm)",
-      aspectMode: "4:3",
       legendVisible: false,
       colorScale: "Viridis"
     }
   );
 
   const surfaceFigure = makeFigure(
-    field,
-    "图 3 · 3D 光场",
+    fieldSheet,
+    "Fig S1 · 3D 光场",
     "surface-3d",
     defaults,
-    "folder-supp",
+    "folder-paper",
     {
       xTitle: "X (mm)",
       yTitle: "Y (mm)",
-      aspectMode: "4:3",
       legendVisible: false,
       colorScale: "Viridis"
     }
@@ -213,11 +241,11 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
 
   return {
     format: "sfig",
-    schemaVersion: "0.2",
+    schemaVersion: "0.3",
     projectId: id("project"),
     name: "未命名项目",
     folders,
-    datasets: [spectrum, field],
+    dataBooks: [spectrumBook, fieldBook],
     figures: [spectrumFigure, heatmapFigure, surfaceFigure],
     activeFigureId: spectrumFigure.id,
     defaults: {

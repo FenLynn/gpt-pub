@@ -1,71 +1,116 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import type { Dataset, ProjectState } from "../model";
+import type {
+  Column,
+  DataBook,
+  DataSheet,
+  FigureSpec,
+  ProjectState
+} from "../model";
 
-const APP_VERSION = "0.2.0-web";
+const APP_VERSION = "0.3.0-web";
 
-interface ColumnMeta {
-  id: string;
-  name: string;
-  unit?: string;
+interface ColumnMeta extends Omit<Column, "values"> {
   [key: string]: unknown;
 }
 
-interface DatasetIndexEntry {
+interface SheetMeta {
   id: string;
   name: string;
-  folderId?: string;
-  x: ColumnMeta;
-  ys: ColumnMeta[];
-  metadata?: Dataset["metadata"];
+  columns: ColumnMeta[];
+  metadata?: DataSheet["metadata"];
   dataPath: string;
   [key: string]: unknown;
 }
 
-interface ProjectDocument {
+interface BookMeta {
+  id: string;
+  name: string;
+  folderId?: string;
+  source: DataBook["source"];
+  sheets: SheetMeta[];
+  [key: string]: unknown;
+}
+
+interface ProjectDocumentV03 {
   format: "sfig";
-  schemaVersion: "0.1" | "0.2";
+  schemaVersion: "0.3";
   projectId: string;
   name: string;
-  folders?: ProjectState["folders"];
-  datasets: DatasetIndexEntry[];
-  figures: ProjectState["figures"];
+  folders: ProjectState["folders"];
+  dataBooks: BookMeta[];
+  figures: FigureSpec[];
   activeFigureId: string;
   defaults: ProjectState["defaults"];
   [key: string]: unknown;
 }
 
-function datasetIndex(dataset: Dataset): DatasetIndexEntry {
-  const { x, ys, ...datasetRest } = dataset as Dataset & Record<string, unknown>;
-  const { values: _xValues, ...xMeta } = x;
-  const yMeta = ys.map((column) => {
+interface LegacyDatasetMeta {
+  id: string;
+  name: string;
+  folderId?: string;
+  x: {
+    id: string;
+    name: string;
+    unit?: string;
+    [key: string]: unknown;
+  };
+  ys: Array<{
+    id: string;
+    name: string;
+    unit?: string;
+    [key: string]: unknown;
+  }>;
+  metadata?: DataSheet["metadata"];
+  dataPath: string;
+  [key: string]: unknown;
+}
+
+interface LegacyProjectDocument {
+  format: "sfig";
+  schemaVersion: "0.1" | "0.2";
+  projectId: string;
+  name: string;
+  folders?: ProjectState["folders"];
+  datasets: LegacyDatasetMeta[];
+  figures: Array<Record<string, any>>;
+  activeFigureId: string;
+  defaults: ProjectState["defaults"];
+  [key: string]: unknown;
+}
+
+function stripSheet(sheet: DataSheet): SheetMeta {
+  const columns = sheet.columns.map((column) => {
     const { values: _values, ...meta } = column;
     return meta;
   });
 
   return {
-    ...datasetRest,
-    id: dataset.id,
-    name: dataset.name,
-    folderId: dataset.folderId,
-    x: xMeta,
-    ys: yMeta,
-    metadata: dataset.metadata,
-    dataPath: "data/" + dataset.id + ".json"
+    ...sheet,
+    columns,
+    dataPath: "data/" + sheet.id + ".json"
+  };
+}
+
+function stripBook(book: DataBook): BookMeta {
+  return {
+    ...book,
+    sheets: book.sheets.map(stripSheet)
   };
 }
 
 export function encodeProject(project: ProjectState): Uint8Array {
-  const projectDocument = {
+  const document: ProjectDocumentV03 = {
     ...(project as ProjectState & Record<string, unknown>),
-    datasets: project.datasets.map(datasetIndex)
-  } as unknown as ProjectDocument;
+    schemaVersion: "0.3",
+    dataBooks: project.dataBooks.map(stripBook)
+  } as ProjectDocumentV03;
 
   const files: Record<string, Uint8Array> = {
     "manifest.json": strToU8(
       JSON.stringify(
         {
           format: "sfig",
-          schemaVersion: project.schemaVersion,
+          schemaVersion: "0.3",
           projectId: project.projectId,
           createdWith: APP_VERSION
         },
@@ -73,41 +118,157 @@ export function encodeProject(project: ProjectState): Uint8Array {
         2
       )
     ),
-    "project.json": strToU8(JSON.stringify(projectDocument, null, 2))
+    "project.json": strToU8(JSON.stringify(document, null, 2))
   };
 
-  for (const dataset of project.datasets) {
-    files["data/" + dataset.id + ".json"] = strToU8(
-      JSON.stringify({
-        x: dataset.x.values,
-        ys: Object.fromEntries(
-          dataset.ys.map((column) => [column.id, column.values])
+  for (const book of project.dataBooks) {
+    for (const sheet of book.sheets) {
+      files["data/" + sheet.id + ".json"] = strToU8(
+        JSON.stringify(
+          Object.fromEntries(
+            sheet.columns.map((column) => [column.id, column.values])
+          )
         )
-      })
-    );
+      );
+    }
   }
 
   return zipSync(files, { level: 6 });
 }
 
-function migrateProjectDocument(document: ProjectDocument): ProjectDocument {
-  if (document.schemaVersion === "0.2") return document;
+function loadV03(
+  archive: Record<string, Uint8Array>,
+  document: ProjectDocumentV03
+): ProjectState {
+  const dataBooks: DataBook[] = document.dataBooks.map((book) => ({
+    ...book,
+    source:
+      book.source.kind === "linked"
+        ? { ...book.source, status: "needs-relink" }
+        : book.source,
+    sheets: book.sheets.map((sheetMeta) => {
+      const bytes = archive[sheetMeta.dataPath];
+      if (!bytes) throw new Error("项目文件缺少数据表：" + sheetMeta.name);
+
+      const values = JSON.parse(strFromU8(bytes)) as Record<
+        string,
+        Array<number | null>
+      >;
+      const { dataPath: _dataPath, ...sheetRest } = sheetMeta;
+
+      return {
+        ...sheetRest,
+        columns: sheetMeta.columns.map((column) => ({
+          ...column,
+          values: values[column.id] ?? []
+        }))
+      } as DataSheet;
+    })
+  }));
+
+  const fallbackActive = document.figures[0]?.id ?? "";
 
   return {
-    ...document,
-    schemaVersion: "0.2",
-    folders: document.folders ?? [
-      { id: "folder-data", name: "数据" },
-      { id: "folder-figures", name: "图形" }
-    ],
-    datasets: document.datasets.map((dataset) => ({
-      ...dataset,
-      folderId: dataset.folderId ?? "folder-data"
-    })),
-    figures: document.figures.map((figure) => ({
-      ...figure,
-      folderId: figure.folderId ?? "folder-figures"
-    }))
+    ...(document as unknown as ProjectState),
+    format: "sfig",
+    schemaVersion: "0.3",
+    dataBooks,
+    activeFigureId: document.figures.some(
+      (figure) => figure.id === document.activeFigureId
+    )
+      ? document.activeFigureId
+      : fallbackActive
+  };
+}
+
+function legacyRole(
+  column: LegacyDatasetMeta["ys"][number],
+  index: number
+): Column["role"] {
+  const text = (column.id + " " + column.name).toLowerCase();
+  if (/yerr|y error|sigma|std|error/.test(text)) return "YErr";
+  return index >= 0 ? "Y" : "Y";
+}
+
+function migrateLegacy(
+  archive: Record<string, Uint8Array>,
+  document: LegacyProjectDocument
+): ProjectState {
+  const books: DataBook[] = document.datasets.map((dataset) => {
+    const bytes = archive[dataset.dataPath];
+    if (!bytes) throw new Error("旧项目缺少数据：" + dataset.name);
+    const values = JSON.parse(strFromU8(bytes)) as {
+      x: Array<number | null>;
+      ys: Record<string, Array<number | null>>;
+    };
+
+    const sheet: DataSheet = {
+      id: dataset.id,
+      name: dataset.name,
+      metadata: dataset.metadata,
+      columns: [
+        {
+          ...dataset.x,
+          role: "X",
+          values: values.x
+        },
+        ...dataset.ys.map((column, index) => ({
+          ...column,
+          role: legacyRole(column, index),
+          values: values.ys[column.id] ?? []
+        }))
+      ]
+    };
+
+    return {
+      id: "book-" + dataset.id,
+      name: dataset.name,
+      folderId: dataset.folderId,
+      source: { kind: "embedded" },
+      sheets: [sheet]
+    };
+  });
+
+  const datasetById = new Map(
+    document.datasets.map((dataset) => [dataset.id, dataset])
+  );
+
+  const figures: FigureSpec[] = document.figures.map((legacy) => {
+    const dataset = datasetById.get(String(legacy.datasetId));
+    const yIds = Array.isArray(legacy.seriesOrder)
+      ? legacy.seriesOrder.filter((id: string) =>
+          dataset?.ys.some((column) => column.id === id)
+        )
+      : dataset?.ys.map((column) => column.id) ?? [];
+    const errorId = legacy.figureOverrides?.errorSeriesId;
+
+    return {
+      ...legacy,
+      dataRef: {
+        sheetId: String(legacy.datasetId),
+        xColumnId: dataset?.x.id ?? "",
+        yColumnIds: yIds.filter((id: string) => id !== errorId),
+        yErrorColumnId: errorId
+      },
+      seriesOrder: yIds.filter((id: string) => id !== errorId)
+    } as FigureSpec;
+  });
+
+  return {
+    ...(document as unknown as Record<string, unknown>),
+    format: "sfig",
+    schemaVersion: "0.3",
+    projectId: document.projectId,
+    name: document.name,
+    folders: document.folders ?? [],
+    dataBooks: books,
+    figures,
+    activeFigureId: figures.some(
+      (figure) => figure.id === document.activeFigureId
+    )
+      ? document.activeFigureId
+      : figures[0]?.id ?? "",
+    defaults: document.defaults
   };
 }
 
@@ -116,63 +277,23 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
   const projectBytes = archive["project.json"];
   if (!projectBytes) throw new Error("项目文件缺少 project.json。");
 
-  const raw = JSON.parse(strFromU8(projectBytes)) as ProjectDocument;
+  const raw = JSON.parse(strFromU8(projectBytes)) as
+    | ProjectDocumentV03
+    | LegacyProjectDocument;
 
   if (raw.format !== "sfig") {
     throw new Error("不是有效的 FigureStudio 项目文件。");
   }
 
-  if (raw.schemaVersion !== "0.1" && raw.schemaVersion !== "0.2") {
-    throw new Error("暂不支持这个项目文件版本。");
+  if (raw.schemaVersion === "0.3") {
+    return loadV03(archive, raw as ProjectDocumentV03);
   }
 
-  const projectDocument = migrateProjectDocument(raw);
+  if (raw.schemaVersion === "0.1" || raw.schemaVersion === "0.2") {
+    return migrateLegacy(archive, raw as LegacyProjectDocument);
+  }
 
-  const datasets: Dataset[] = projectDocument.datasets.map((meta) => {
-    const dataBytes = archive[meta.dataPath];
-    if (!dataBytes) {
-      throw new Error("项目文件缺少数据：" + meta.name);
-    }
-
-    const data = JSON.parse(strFromU8(dataBytes)) as {
-      x: Dataset["x"]["values"];
-      ys: Record<string, Dataset["ys"][number]["values"]>;
-    };
-
-    const { dataPath: _dataPath, ...datasetMeta } = meta;
-
-    return {
-      ...datasetMeta,
-      id: meta.id,
-      name: meta.name,
-      folderId: meta.folderId,
-      x: {
-        ...meta.x,
-        values: data.x
-      },
-      ys: meta.ys.map((column) => ({
-        ...column,
-        values: data.ys[column.id] ?? []
-      })),
-      metadata: meta.metadata
-    } as Dataset;
-  });
-
-  const fallbackActive = projectDocument.figures[0]?.id ?? "";
-
-  return {
-    ...(projectDocument as unknown as ProjectState),
-    format: "sfig",
-    schemaVersion: "0.2",
-    folders: projectDocument.folders ?? [],
-    datasets,
-    activeFigureId:
-      projectDocument.figures.some(
-        (figure) => figure.id === projectDocument.activeFigureId
-      )
-        ? projectDocument.activeFigureId
-        : fallbackActive
-  };
+  throw new Error("暂不支持这个项目文件版本。");
 }
 
 export function downloadProject(project: ProjectState) {
