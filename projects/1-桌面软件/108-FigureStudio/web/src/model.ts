@@ -238,6 +238,9 @@ export interface FigureOverrides {
 
   barGap?: number;
   barGroupGap?: number;
+  barLabelsVisible?: boolean;
+  barLabelDecimals?: number;
+  barLabelPosition?: "inside" | "outside";
 
   errorSeriesId?: string;
   offsetStep?: number;
