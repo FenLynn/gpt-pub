@@ -214,6 +214,27 @@ export function buildTraces(args: {
     const yValues = resolveFieldRowCoordinates(dataset, series);
     const zValues = series.map((column) => column.values);
     const zAuto = figure.figureOverrides.zAutoRange !== false;
+    const zFinite = zValues
+      .flat()
+      .filter(
+        (value): value is number =>
+          typeof value === "number" && Number.isFinite(value)
+      );
+    const zDataMin = zFinite.length ? Math.min(...zFinite) : 0;
+    const zDataMax = zFinite.length ? Math.max(...zFinite) : 1;
+    let zLevelMin =
+      !zAuto && Number.isFinite(figure.figureOverrides.zMin)
+        ? (figure.figureOverrides.zMin as number)
+        : zDataMin;
+    let zLevelMax =
+      !zAuto && Number.isFinite(figure.figureOverrides.zMax)
+        ? (figure.figureOverrides.zMax as number)
+        : zDataMax;
+    if (!(zLevelMax > zLevelMin)) {
+      const padding = Math.max(Math.abs(zLevelMin) * 0.05, 0.5);
+      zLevelMin -= padding;
+      zLevelMax += padding;
+    }
     const fieldFontFamily = plotFontFamily(
       figure.figureOverrides.fontFamily ?? preset.fontFamily
     );
@@ -255,6 +276,12 @@ export function buildTraces(args: {
         figure.figureOverrides.contourLines !== false ||
         contourLabels ||
         !contourFill;
+      const contourLevelCount = Math.max(
+        3,
+        Math.min(64, Math.round(figure.figureOverrides.contourLevels ?? 12))
+      );
+      const contourLevelSize =
+        (zLevelMax - zLevelMin) / Math.max(1, contourLevelCount - 1);
       return [
         {
           type: "contour",
@@ -264,15 +291,15 @@ export function buildTraces(args: {
           colorscale: figure.figureOverrides.colorScale ?? "Viridis",
           reversescale: figure.figureOverrides.reverseColorScale ?? false,
           showscale: figure.figureOverrides.colorbarVisible ?? true,
-          zauto: zAuto,
-          zmin: zAuto ? undefined : figure.figureOverrides.zMin,
-          zmax: zAuto ? undefined : figure.figureOverrides.zMax,
-          autocontour: true,
-          ncontours: Math.max(
-            3,
-            Math.min(64, Math.round(figure.figureOverrides.contourLevels ?? 12))
-          ),
+          zauto: false,
+          zmin: zLevelMin,
+          zmax: zLevelMax,
+          autocontour: false,
+          ncontours: contourLevelCount,
           contours: {
+            start: zLevelMin,
+            end: zLevelMax,
+            size: contourLevelSize,
             coloring: contourFill ? "fill" : "lines",
             showlabels: contourLabels,
             labelfont: {
@@ -1309,6 +1336,7 @@ export function buildLayout(args: {
   if (isField2D && equalFieldAspect) {
     layout.xaxis.scaleanchor = "y";
     layout.xaxis.scaleratio = 1;
+    layout.yaxis.constrain = "domain";
   }
 
   return layout;
