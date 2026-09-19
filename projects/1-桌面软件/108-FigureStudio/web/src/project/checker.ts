@@ -13,6 +13,10 @@ export interface CheckItem {
   detail: string;
 }
 
+function autoAxisTitle(name: string, unit?: string): string {
+  return unit ? name + " (" + unit + ")" : name;
+}
+
 function titleHasUnit(title: string | undefined, unit?: string): boolean {
   if (!unit) return true;
   if (!title) return false;
@@ -100,35 +104,130 @@ export function checkFigure(
 
   items.push({
     id: "x-unit",
-    level: titleHasUnit(o.xTitle ?? dataset.x.name, dataset.x.unit) ? "pass" : "warn",
+    level: titleHasUnit(
+      o.xTitle ?? autoAxisTitle(dataset.x.name, dataset.x.unit),
+      dataset.x.unit
+    ) ? "pass" : "warn",
     title: "X 轴单位",
-    detail: titleHasUnit(o.xTitle ?? dataset.x.name, dataset.x.unit)
+    detail: titleHasUnit(
+      o.xTitle ?? autoAxisTitle(dataset.x.name, dataset.x.unit),
+      dataset.x.unit
+    )
       ? "X 轴标题包含数据单位。"
       : "数据包含单位，但 X 轴标题未显示单位。"
   });
 
-  const yUnit =
-    figure.templateId === "heatmap" || figure.templateId === "surface-3d"
-      ? dataset.metadata?.rowAxisUnit
-      : dataset.ys[0]?.unit;
+  const fieldTemplate =
+    figure.templateId === "heatmap" || figure.templateId === "surface-3d";
+  const yUnit = fieldTemplate
+    ? dataset.metadata?.rowAxisUnit
+    : dataset.ys[0]?.unit;
+  const autoYTitle = fieldTemplate
+    ? autoAxisTitle(dataset.metadata?.rowAxisName ?? "Y", yUnit)
+    : dataset.ys[0]
+    ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
+    : "Y";
   items.push({
     id: "y-unit",
-    level: titleHasUnit(o.yTitle ?? "Y", yUnit) ? "pass" : "warn",
+    level: titleHasUnit(o.yTitle ?? autoYTitle, yUnit) ? "pass" : "warn",
     title: "Y 轴单位",
-    detail: titleHasUnit(o.yTitle ?? "Y", yUnit)
+    detail: titleHasUnit(o.yTitle ?? autoYTitle, yUnit)
       ? "Y 轴标题包含数据单位。"
       : "数据包含单位，但 Y 轴标题未显示单位。"
   });
 
   items.push({
     id: "series-count",
-    level: visibleSeries.length <= 8 ? "pass" : "warn",
-    title: "曲线数量",
+    level:
+      visibleSeries.length === 0
+        ? ref
+          ? "warn"
+          : "info"
+        : visibleSeries.length <= 8
+        ? "pass"
+        : "warn",
+    title: "数据层数量",
     detail:
-      visibleSeries.length <= 8
-        ? "当前可见曲线数量较容易辨识。"
-        : "可见曲线较多，建议分组、筛选或使用更明确编码。"
+      visibleSeries.length === 0
+        ? ref
+          ? "当前没有可见主数据层。"
+          : "当前为空图，尚未绑定主数据层。"
+        : visibleSeries.length <= 8
+        ? "当前可见数据层数量较容易辨识。"
+        : "可见数据层较多，建议分组、筛选或使用更明确编码。"
   });
+
+  const xLength = dataset.x.values.length;
+  const lengthMismatches = visibleSeries.filter(
+    (series) => xLength > 0 && series.values.length !== xLength
+  );
+  items.push({
+    id: "data-length",
+    level: lengthMismatches.length ? "warn" : "pass",
+    title: "数据长度",
+    detail: lengthMismatches.length
+      ? lengthMismatches.length +
+        " 个数据层与 X 列长度不同；超出配对范围的点可能不会显示。"
+      : "可见数据层与 X 数据长度一致。"
+  });
+
+  const errorSeries = ref?.yErrorColumnId
+    ? dataset.ys.find((series) => series.id === ref.yErrorColumnId)
+    : undefined;
+  if (errorSeries) {
+    const mainLength = Math.max(
+      0,
+      ...visibleSeries
+        .filter((series) => series.id !== errorSeries.id)
+        .map((series) => series.values.length)
+    );
+    const negativeErrors = errorSeries.values.filter(
+      (value) => typeof value === "number" && value < 0
+    ).length;
+    const errorProblems: string[] = [];
+    if (mainLength > 0 && errorSeries.values.length !== mainLength) {
+      errorProblems.push("误差列长度与主数据不一致");
+    }
+    if (negativeErrors > 0) {
+      errorProblems.push(negativeErrors + " 个误差值为负数");
+    }
+    items.push({
+      id: "error-data",
+      level: errorProblems.length ? "warn" : "pass",
+      title: "误差数据",
+      detail: errorProblems.length
+        ? errorProblems.join("；") + "。"
+        : "误差列长度和数值有效。"
+    });
+  }
+
+  const xCategoricalValues = dataset.x.values.filter(
+    (value): value is string => typeof value === "string"
+  );
+  if (xCategoricalValues.length) {
+    const populated = xCategoricalValues.filter((value) => value.trim() !== "");
+    const duplicates = populated.length - new Set(populated).size;
+    const barLike =
+      figure.templateId === "bar" ||
+      figure.templateId === "grouped-bar" ||
+      figure.templateId === "stacked-bar";
+    items.push({
+      id: "category-axis",
+      level:
+        duplicates > 0 || (barLike && populated.length > 30)
+          ? "warn"
+          : "pass",
+      title: "分类 X 轴",
+      detail:
+        duplicates > 0
+          ? "存在 " +
+            duplicates +
+            " 个重复类别；同名类别会落在同一分类位置，请确认这是预期行为。"
+          : barLike && populated.length > 30
+          ? "分类数量超过 30，柱状图的 Tick 标签可能过密。"
+          : "文本 / 分类 X 按数据顺序显示。"
+    });
+  }
 
   const alphaTooLow = visibleSeries.some(
     (series) => (figure.seriesOverrides[series.id]?.opacity ?? 1) < 0.55
@@ -142,20 +241,22 @@ export function checkFigure(
       : "主要数据层透明度适合论文输出。"
   });
 
-  if (figure.figureOverrides.legendFrame) {
-    items.push({
-      id: "legend-frame",
-      level: figure.presetId === "nature" ? "warn" : "info",
-      title: "图例边框",
-      detail: "当前图例有边框；若非必要，可关闭以减少视觉噪声。"
-    });
-  } else {
-    items.push({
-      id: "legend-frame",
-      level: "pass",
-      title: "图例边框",
-      detail: "图例保持简洁。"
-    });
+  if (!fieldTemplate && (o.legendVisible ?? true)) {
+      if (figure.figureOverrides.legendFrame) {
+        items.push({
+          id: "legend-frame",
+          level: figure.presetId === "nature" ? "warn" : "info",
+          title: "图例边框",
+          detail: "当前图例有边框；若非必要，可关闭以减少视觉噪声。"
+        });
+      } else {
+        items.push({
+          id: "legend-frame",
+          level: "pass",
+          title: "图例边框",
+          detail: "图例保持简洁。"
+        });
+      }
   }
 
   const xCategorical = dataset.x.values.some(
@@ -233,18 +334,53 @@ export function checkFigure(
       : "坐标轴范围和刻度间距有效。"
   });
 
+  const logIssues: string[] = [];
+  if ((o.xScale ?? "linear") === "log" && !xCategorical) {
+    const numericX = dataset.x.values.filter(
+      (value): value is number => typeof value === "number" && Number.isFinite(value)
+    );
+    if (!numericX.some((value) => value > 0)) {
+      logIssues.push("X 对数轴没有可显示的正值");
+    } else if (numericX.some((value) => value <= 0)) {
+      logIssues.push("X 数据包含非正值，这些点在对数轴上不会显示");
+    }
+  }
+  if ((o.yScale ?? "linear") === "log") {
+    const numericY = visibleSeries.flatMap((series) =>
+      series.values.filter(
+        (value): value is number =>
+          typeof value === "number" && Number.isFinite(value)
+      )
+    );
+    if (numericY.length && !numericY.some((value) => value > 0)) {
+      logIssues.push("Y 对数轴没有可显示的正值");
+    } else if (numericY.some((value) => value <= 0)) {
+      logIssues.push("Y 数据包含非正值，这些点在对数轴上不会显示");
+    }
+  }
+  if (logIssues.length) {
+    items.push({
+      id: "log-data",
+      level: "warn",
+      title: "对数轴数据",
+      detail: logIssues.join("；") + "。"
+    });
+  }
+
   const legendFarOutside =
     o.legendPosition === "custom" &&
     ((o.legendX !== undefined && (o.legendX < -0.25 || o.legendX > 1.25)) ||
       (o.legendY !== undefined && (o.legendY < -0.25 || o.legendY > 1.25)));
-  items.push({
-    id: "legend-position",
-    level: legendFarOutside ? "warn" : "pass",
-    title: "图例位置",
-    detail: legendFarOutside
-      ? "自由图例位置远离绘图区，导出前请确认没有被裁切。"
-      : "图例位置处于合理范围。"
-  });
+  if (!fieldTemplate && (o.legendVisible ?? true)) {
+    items.push({
+      id: "legend-position",
+      level: legendFarOutside ? "warn" : "pass",
+      title: "图例位置",
+      detail: legendFarOutside
+        ? "自由图例位置远离绘图区，导出前请确认没有被裁切。"
+        : "图例位置处于合理范围。"
+    });
+  }
 
   items.push({
     id: "raster",
