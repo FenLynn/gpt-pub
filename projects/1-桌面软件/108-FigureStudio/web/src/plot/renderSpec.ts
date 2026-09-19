@@ -412,7 +412,7 @@ export function buildTraces(args: {
                   color: figure.figureOverrides.axisTitleColor ?? "#17191c"
                 }
               }
-            : undefined
+            : { text: "" }
         },
         lighting: {
           ambient: 0.82,
@@ -645,6 +645,27 @@ function finiteNumericValues(values: unknown[]): number[] {
   );
 }
 
+function coordinateExtent(
+  values: number[],
+  extendHalfCell: boolean
+): [number, number] | undefined {
+  if (!values.length) return undefined;
+  const sorted = [...values].sort((a, b) => a - b);
+  if (sorted.length === 1) {
+    const padding = Math.max(Math.abs(sorted[0]) * 0.05, 0.5);
+    return [sorted[0] - padding, sorted[0] + padding];
+  }
+  if (!extendHalfCell) return [sorted[0], sorted[sorted.length - 1]];
+
+  const lowStep = sorted[1] - sorted[0];
+  const highStep =
+    sorted[sorted.length - 1] - sorted[sorted.length - 2];
+  return [
+    sorted[0] - lowStep / 2,
+    sorted[sorted.length - 1] + highStep / 2
+  ];
+}
+
 function matplotlibAutoRange(
   values: number[],
   scale: "linear" | "log",
@@ -794,6 +815,27 @@ export function buildLayout(args: {
   const isDoubleY = figure.templateId === "double-y";
   const isField2D =
     figure.templateId === "heatmap" || figure.templateId === "contour";
+  const fieldSeriesForTicks = isField2D
+    ? orderSeries(
+        dataset,
+        figure.seriesOrder,
+        figure.dataRef?.yColumnIds
+      )
+    : [];
+  const fieldExtendsCells = figure.templateId === "heatmap";
+  const fieldXTickRange =
+    isField2D && !xIsCategorical
+      ? coordinateExtent(
+          finiteNumericValues(dataset.x.values),
+          fieldExtendsCells
+        )
+      : undefined;
+  const fieldYTickRange = isField2D
+    ? coordinateExtent(
+        resolveFieldRowCoordinates(dataset, fieldSeriesForTicks),
+        fieldExtendsCells
+      )
+    : undefined;
   const continuousXY =
     !isField2D &&
     figure.templateId !== "surface-3d" &&
@@ -882,11 +924,11 @@ export function buildLayout(args: {
     !xIsCategorical &&
     xScale === "linear" &&
     !overrides.xMajorTickStep
-      ? matplotlibNiceTickStep(xRange)
+      ? matplotlibNiceTickStep(xRange ?? fieldXTickRange)
       : undefined;
   const yAutoTickStep =
     yScale === "linear" && !overrides.yMajorTickStep
-      ? matplotlibNiceTickStep(yRange)
+      ? matplotlibNiceTickStep(yRange ?? fieldYTickRange)
       : undefined;
   const rightYAutoTickStep =
     rightYScale === "linear" && !overrides.rightYMajorTickStep
