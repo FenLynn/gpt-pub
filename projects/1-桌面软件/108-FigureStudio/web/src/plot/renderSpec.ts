@@ -428,15 +428,38 @@ export function buildLayout(args: {
     }
   };
 
+  const resolvedXTitle =
+    displayText?.xTitle ??
+    overrides.xTitle ??
+    dataset.x.name;
+  const resolvedYTitle =
+    displayText?.yTitle ??
+    overrides.yTitle ??
+    (figure.templateId === "heatmap"
+      ? dataset.metadata?.rowAxisName ?? "Y"
+      : dataset.ys[0]?.name ?? "Y");
+  const hasXTitle = Boolean(String(resolvedXTitle ?? "").trim());
+  const hasYTitle = Boolean(String(resolvedYTitle ?? "").trim());
+  const hasPlotTitle = Boolean(String(displayText?.plotTitle ?? overrides.plotTitle ?? "").trim());
+
   const layout: any = {
     width: Math.round(mmToPx(canvas.widthMm)),
     height: Math.round(mmToPx(canvas.heightMm)),
     autosize: false,
     margin: {
-      l: 4,
-      r: 4,
-      t: 4,
-      b: 4,
+      // These are minimum content-safe margins, not decorative whitespace.
+      // automargin may only expand them when real tick/title content requires it.
+      l: Math.round(mmToPx(hasYTitle ? 10.2 : 6.2)),
+      r: Math.round(
+        mmToPx(
+          figure.templateId === "heatmap" ||
+            figure.templateId === "surface-3d"
+            ? 8
+            : 2.2
+        )
+      ),
+      t: Math.round(mmToPx(hasPlotTitle ? 7.2 : 2.2)),
+      b: Math.round(mmToPx(hasXTitle ? 9.2 : 5.8)),
       pad: 0,
       autoexpand: true
     },
@@ -508,7 +531,7 @@ export function buildLayout(args: {
       bgcolor: background,
       xaxis: {
         title: {
-          text: displayText?.xTitle ?? overrides.xTitle ?? dataset.x.name,
+          text: resolvedXTitle,
           font: {
             family: fontFamily,
             size: axisTitleSizePx,
@@ -521,11 +544,7 @@ export function buildLayout(args: {
       },
       yaxis: {
         title: {
-          text:
-            displayText?.yTitle ??
-            overrides.yTitle ??
-            dataset.metadata?.rowAxisName ??
-            "Y",
+          text: resolvedYTitle,
           font: {
             family: fontFamily,
             size: axisTitleSizePx,
@@ -557,10 +576,8 @@ export function buildLayout(args: {
     range: xRange,
     title: {
       text:
-        displayText?.xTitle ??
-        overrides.xTitle ??
-        dataset.x.name,
-      standoff: Math.round(mmToPx(1.8)),
+        resolvedXTitle,
+      standoff: Math.round(mmToPx(0.9)),
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
@@ -589,12 +606,8 @@ export function buildLayout(args: {
     range: yRange,
     title: {
       text:
-        displayText?.yTitle ??
-        overrides.yTitle ??
-        (figure.templateId === "heatmap"
-          ? dataset.metadata?.rowAxisName ?? "Y"
-          : dataset.ys[0]?.name ?? "Y"),
-      standoff: Math.round(mmToPx(1.5)),
+        resolvedYTitle,
+      standoff: Math.round(mmToPx(0.7)),
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
