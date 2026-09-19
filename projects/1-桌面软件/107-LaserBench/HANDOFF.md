@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.13 Readability / Focus Page Refine**，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.14 Focus Page Structure Correction**，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际设备提供者仍是 Simulator；真实 Ophir、Yokogawa、BeamSquared、Tektronix Driver 尚未正式接入。
-- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.13 将 Dashboard 继续维持图优先，同时把独立模块页明确改为较舒展的状态/数据/右侧配置/左下图形工作页；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
+- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.14 纠正独立模块页：单条标题/状态栏、左上无卡片读数、左下图形、右侧整列配置；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
 
 ## 当前产品不变量
 

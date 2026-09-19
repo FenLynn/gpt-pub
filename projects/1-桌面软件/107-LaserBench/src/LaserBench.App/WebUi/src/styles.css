@@ -218,3 +218,232 @@
   .dashboard-grid.focus-mode .instrument-panel:not(.hidden){grid-template-columns:minmax(0,1fr) 240px!important;grid-template-rows:40px 104px minmax(0,1fr)!important}
   .focus-metric b{font-size:22px}
 }
+
+
+/* v0.4.14 focused-page correction: status / readout / plot / right config */
+.dashboard-grid.focus-mode{
+  display:block!important;
+  padding:4px 8px 8px!important;
+  background:#314251!important
+}
+.dashboard-grid.focus-mode .instrument-panel:not(.hidden){
+  height:100%!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 300px!important;
+  grid-template-rows:44px 92px minmax(0,1fr)!important;
+  grid-template-areas:
+    "head head"
+    "summary config"
+    "plot config"!important;
+  column-gap:10px!important;
+  row-gap:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#314251!important
+}
+.focus-mode .graph-overlay{
+  grid-area:head!important;
+  height:44px!important;
+  min-height:44px!important;
+  padding:0 10px!important;
+  background:#314251!important;
+  border:0!important;
+  border-bottom:1px solid #4b5f6f!important
+}
+.focus-mode .graph-overlay .module-title{
+  gap:7px!important
+}
+.focus-mode .graph-overlay strong{
+  font-size:14px!important;
+  font-weight:650!important
+}
+.focus-page-state{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-left:10px;
+  padding-left:10px;
+  border-left:1px solid #506474;
+  font-size:11px;
+  font-weight:500;
+  color:#9fb1bf
+}
+.focus-page-state i{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#7d909f
+}
+.focus-page-state.running{
+  color:#87e7ae
+}
+.focus-page-state.running i{
+  background:#2ed477;
+  box-shadow:0 0 7px rgba(46,212,119,.48)
+}
+.focus-mode .graph-overlay .head-metrics,
+.focus-mode .graph-overlay .osa-metrics,
+.focus-mode .graph-overlay .scope-readouts,
+.focus-mode .graph-overlay .beam-top-controls,
+.focus-mode .graph-overlay .m2-block{
+  display:none!important
+}
+
+/* Left-upper readout area: plain information, not cards. */
+.focus-summary{
+  grid-area:summary!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:0!important;
+  min-width:0!important;
+  padding:10px 8px 10px 10px!important;
+  background:#314251!important;
+  border:0!important;
+  border-bottom:1px solid #415564!important
+}
+.focus-metric{
+  flex:0 1 220px!important;
+  min-width:130px!important;
+  max-width:240px!important;
+  height:62px!important;
+  display:grid!important;
+  grid-template-columns:auto auto!important;
+  grid-template-rows:18px 31px!important;
+  align-content:center!important;
+  justify-content:start!important;
+  column-gap:7px!important;
+  padding:2px 24px 2px 12px!important;
+  margin:0!important;
+  background:transparent!important;
+  border:0!important;
+  border-right:1px solid #4b5f6f!important;
+  border-radius:0!important;
+  cursor:pointer!important;
+  text-align:left!important
+}
+.focus-metric:last-child{
+  border-right:0!important
+}
+.focus-metric:hover{
+  background:rgba(255,255,255,.025)!important
+}
+.focus-metric span{
+  grid-column:1 / 3!important;
+  font-size:11px!important;
+  line-height:18px!important;
+  color:#9fb2c0!important
+}
+.focus-metric b{
+  font-size:27px!important;
+  line-height:31px!important;
+  color:#f1f6f9!important;
+  font-weight:680!important;
+  letter-spacing:-.02em!important;
+  font-variant-numeric:tabular-nums!important;
+  margin:0!important
+}
+.focus-metric small{
+  align-self:end!important;
+  padding-bottom:4px!important;
+  font-size:10px!important;
+  color:#aebdca!important
+}
+.focus-metric.passive{
+  cursor:default!important
+}
+
+/* Right configuration is a real side pane, not a floating card. */
+.focus-mode .module-config-dock{
+  grid-area:config!important;
+  position:static!important;
+  width:auto!important;
+  height:100%!important;
+  top:auto!important;
+  right:auto!important;
+  margin:0!important;
+  background:#2d3f4d!important;
+  border:0!important;
+  border-left:1px solid #526777!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  overflow:auto!important
+}
+.focus-mode .module-config-dock summary{
+  height:44px!important;
+  display:flex!important;
+  align-items:center!important;
+  padding:0 14px!important;
+  border:0!important;
+  border-bottom:1px solid #506474!important;
+  color:#d8e2e9!important;
+  font-size:12px!important;
+  font-weight:600!important
+}
+.focus-mode .dock-row{
+  grid-template-columns:104px minmax(0,1fr)!important;
+  gap:10px!important;
+  padding:11px 14px!important;
+  font-size:12px!important
+}
+.focus-mode .dock-row input,
+.focus-mode .dock-row select{
+  height:32px!important
+}
+.focus-mode .dock-checks{
+  padding:12px 14px!important;
+  gap:10px 16px!important
+}
+.focus-mode .dock-checks label{
+  font-size:12px!important
+}
+.focus-mode .dock-control{
+  padding:12px 14px!important
+}
+.focus-mode .dock-play{
+  margin:10px 14px!important
+}
+
+/* The graph is deliberately the lower-left working region. */
+.focus-mode .power-layout,
+.focus-mode .spectrum-plot,
+.focus-mode .beam-body,
+.focus-mode .scope-plots{
+  grid-area:plot!important;
+  min-height:0!important;
+  height:auto!important;
+  margin:0!important
+}
+.focus-mode .power-layout{
+  padding:0!important
+}
+.focus-mode .power-chart-zone{
+  grid-template-rows:minmax(0,1fr) 42px!important;
+  gap:2px!important
+}
+.focus-mode .overview-row{
+  padding:0 34px 1px!important
+}
+.focus-mode .beam-body{
+  gap:8px!important;
+  padding:0!important
+}
+.focus-mode .scope-plots{
+  gap:8px!important;
+  padding:0!important
+}
+.focus-mode .spectrum-plot{
+  display:block!important;
+  width:100%!important
+}
+
+@media(max-width:1200px){
+  .dashboard-grid.focus-mode .instrument-panel:not(.hidden){
+    grid-template-columns:minmax(0,1fr) 250px!important;
+    grid-template-rows:42px 82px minmax(0,1fr)!important
+  }
+  .focus-mode .graph-overlay{height:42px!important;min-height:42px!important}
+  .focus-summary{padding-top:6px!important;padding-bottom:6px!important}
+  .focus-metric{height:56px!important;min-width:110px!important;padding-right:14px!important}
+  .focus-metric b{font-size:23px!important}
+}
