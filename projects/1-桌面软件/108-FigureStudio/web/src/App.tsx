@@ -1,14 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 import Plotly from "plotly.js-dist-min";
 import { createInitialProject } from "./data/demo";
+import {
+  columnLabel,
+  defaultDataRef,
+  findSheet,
+  normalizeFigureForSheet,
+  sheetRowCount,
+  sheetToDataset
+} from "./data/adapter";
 import { downloadMatplotlibScript } from "./export/matplotlib";
 import { useHistoryState } from "./hooks/useHistoryState";
 import { parseDelimitedText } from "./lib/csv";
 import type {
   AspectMode,
   AxisScale,
+  CellValue,
   ColorScaleId,
-  Dataset,
+  Column,
+  ColumnRole,
+  DataBook,
+  DataSheet,
+  DocumentRef,
   ExplorerSelection,
   FigureOverrides,
   FigureSpec,
@@ -33,21 +53,34 @@ import {
   resolveCanvasMm
 } from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
-import { templateLabel, templates } from "./plot/templates";
+import { templates } from "./plot/templates";
 import { checkFigure } from "./project/checker";
 import {
   downloadProject,
   readProjectFile
 } from "./project/projectIO";
-import { figureThumbnailDataUrl } from "./project/thumbnail";
 
-const AUTOSAVE_KEY = "figurestudio-p108-autosave-v02";
+const AUTOSAVE_KEY = "figurestudio-p108-autosave-v03";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const PNG_SCALE = PNG_DPI / 96;
 
+const ROLE_OPTIONS: Array<{ value: ColumnRole; label: string }> = [
+  { value: "X", label: "X" },
+  { value: "Y", label: "Y" },
+  { value: "Z", label: "Z" },
+  { value: "XErr", label: "XErr" },
+  { value: "YErr", label: "YErr" },
+  { value: "Label", label: "Label" },
+  { value: "None", label: "无" }
+];
+
 function makeId(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+function docKey(doc: DocumentRef): string {
+  return doc.type + ":" + doc.id;
 }
 
 function axisLabel(name: string, unit?: string): string {
@@ -68,56 +101,61 @@ function readUiScale(): number {
   return [0.9, 1, 1.1, 1.25, 1.4].includes(value) ? value : 1.1;
 }
 
-function makeFigure(
-  dataset: Dataset,
-  project: ProjectState,
-  folderId?: string,
-  name?: string
-): FigureSpec {
-  return {
-    id: makeId("figure"),
-    name: name ?? "图 " + String(project.figures.length + 1),
-    folderId,
-    datasetId: dataset.id,
-    templateId: project.defaults.templateId,
-    presetId: project.defaults.presetId,
-    figureOverrides: {
-      aspectMode: "4:3",
-      ...project.defaults.figureOverrides,
-      xTitle: axisLabel(dataset.x.name, dataset.x.unit),
-      yTitle: axisLabel(dataset.ys[0]?.name || "Y", dataset.ys[0]?.unit)
-    },
-    seriesOverrides: {},
-    seriesOrder: dataset.ys.map((series) => series.id)
-  };
+function parseCell(text: string, role: ColumnRole): CellValue {
+  if (text.trim() === "") return null;
+  if (role === "Label") return text;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : text;
 }
 
-function styleDefaultsFromFigure(figure: FigureSpec): UserDefaults {
-  const source = figure.figureOverrides;
-  const keep: FigureOverrides = {
-    aspectMode: source.aspectMode,
-    customAspectWidth: source.customAspectWidth,
-    customAspectHeight: source.customAspectHeight,
-    fontFamily: source.fontFamily,
-    fontSizePt: source.fontSizePt,
-    background: source.background,
-    tickDirection: source.tickDirection,
-    minorTicks: source.minorTicks,
-    gridVisible: source.gridVisible,
-    legendVisible: source.legendVisible,
-    legendPosition: source.legendPosition,
-    legendOrientation: source.legendOrientation,
-    legendFrame: source.legendFrame,
-    legendColumns: source.legendColumns,
-    colorScale: source.colorScale,
-    reverseColorScale: source.reverseColorScale
+function Icon(props: {
+  kind: "folder" | "book" | "sheet" | "graph";
+  linked?: boolean;
+}) {
+  const common = {
+    width: 16,
+    height: 16,
+    viewBox: "0 0 16 16",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.25,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const
   };
 
-  return {
-    templateId: figure.templateId,
-    presetId: figure.presetId,
-    figureOverrides: keep
-  };
+  return (
+    <span className="item-icon-wrap">
+      {props.kind === "folder" && (
+        <svg {...common} aria-hidden="true">
+          <path d="M1.8 4.1h4l1.4 1.5h7v6.9a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z" />
+          <path d="M1.8 4.1V3.3A1.1 1.1 0 0 1 2.9 2.2h3l1.2 1.2h5.1a1 1 0 0 1 1 1v1.2" />
+        </svg>
+      )}
+      {props.kind === "book" && (
+        <svg {...common} aria-hidden="true">
+          <rect x="2" y="2.1" width="12" height="11.8" rx="1.2" />
+          <path d="M2 5.2h12M5.8 2.1v11.8M9.8 2.1v11.8M2 9.2h12" />
+        </svg>
+      )}
+      {props.kind === "sheet" && (
+        <svg {...common} aria-hidden="true">
+          <path d="M3 1.8h7l3 3v9.4H3z" />
+          <path d="M10 1.8v3h3M5 7h6M5 9.5h6M5 12h4" />
+        </svg>
+      )}
+      {props.kind === "graph" && (
+        <svg {...common} aria-hidden="true">
+          <path d="M2.2 2.1v11.5h11.6" />
+          <path d="M4 11l2.4-2.2 2.1.8 3.2-4.2 2 1.2" />
+        </svg>
+      )}
+      {props.linked && (
+        <span className="link-badge" title="Linked Data">
+          ↗
+        </span>
+      )}
+    </span>
+  );
 }
 
 function MiniSwitch(props: {
@@ -152,6 +190,45 @@ function ResetIcon(props: { visible: boolean; onReset: () => void }) {
   );
 }
 
+function CellEditor(props: {
+  value: CellValue;
+  role: ColumnRole;
+  readOnly: boolean;
+  onCommit: (value: CellValue) => void;
+}) {
+  const [text, setText] = useState(
+    props.value === null || props.value === undefined
+      ? ""
+      : String(props.value)
+  );
+
+  useEffect(() => {
+    setText(
+      props.value === null || props.value === undefined
+        ? ""
+        : String(props.value)
+    );
+  }, [props.value]);
+
+  return (
+    <input
+      className="sheet-cell-input"
+      value={text}
+      readOnly={props.readOnly}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={() => {
+        const next = parseCell(text, props.role);
+        if (next !== props.value) props.onCommit(next);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");
   link.href = dataUrl;
@@ -161,35 +238,14 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   link.remove();
 }
 
-function sparkPath(values: Array<number | null>, width: number, height: number): string {
-  const points = values
-    .map((value, index) => ({ value, index }))
-    .filter(
-      (item): item is { value: number; index: number } =>
-        typeof item.value === "number" && Number.isFinite(item.value)
-    );
-  if (points.length < 2) return "";
-
-  const min = Math.min(...points.map((item) => item.value));
-  const max = Math.max(...points.map((item) => item.value));
-  const span = Math.max(1e-12, max - min);
-  const maxIndex = Math.max(1, values.length - 1);
-
-  return points
-    .filter((_, index) => index % Math.max(1, Math.floor(points.length / 90)) === 0)
-    .map((item, index) => {
-      const x = (item.index / maxIndex) * width;
-      const y = height - ((item.value - min) / span) * height;
-      return (index === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1);
-    })
-    .join(" ");
-}
-
 function App() {
   const initialProject = useMemo(
     () => createInitialProject(readUserDefaults()),
     []
   );
+  const initialSheetId = initialProject.dataBooks[0]?.sheets[0]?.id ?? "";
+  const initialFigureId = initialProject.figures[0]?.id ?? "";
+
   const history = useHistoryState<ProjectState>(initialProject);
   const project = history.value;
 
@@ -197,23 +253,34 @@ function App() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dataInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
-  const dataActionRef = useRef<"add" | "replace">("add");
+  const dataActionRef = useRef<"import" | "link" | "replace" | "reload">("import");
 
-  const [selectedSeriesIds, setSelectedSeriesIds] = useState<string[]>([]);
-  const [previewScale, setPreviewScale] = useState(1);
-  const [pasteOpen, setPasteOpen] = useState(false);
-  const [pasteText, setPasteText] = useState("");
-  const [toast, setToast] = useState("");
-  const [uiScale, setUiScale] = useState(readUiScale);
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("series");
-  const [explorerView, setExplorerView] = useState<"list" | "thumb">("list");
-  const [explorerSelection, setExplorerSelection] =
-    useState<ExplorerSelection | null>(null);
+  const [openDocs, setOpenDocs] = useState<DocumentRef[]>(() => [
+    ...(initialSheetId ? [{ type: "sheet", id: initialSheetId } as DocumentRef] : []),
+    ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
+  ]);
+  const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
+    initialSheetId
+      ? { type: "sheet", id: initialSheetId }
+      : { type: "figure", id: initialFigureId }
+  );
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(initialProject.folders.map((folder) => folder.id))
   );
-  const [pendingReplacement, setPendingReplacement] =
-    useState<Dataset | null>(null);
+  const [expandedBooks, setExpandedBooks] = useState<Set<string>>(
+    () => new Set(initialProject.dataBooks.map((book) => book.id))
+  );
+  const [explorerSelection, setExplorerSelection] =
+    useState<ExplorerSelection | null>(null);
+  const [selectedColumnId, setSelectedColumnId] = useState("");
+  const [selectedSeriesIds, setSelectedSeriesIds] = useState<string[]>([]);
+  const [previewScale, setPreviewScale] = useState(1);
+  const [uiScale, setUiScale] = useState(readUiScale);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("series");
+  const [dataInspectorTab, setDataInspectorTab] = useState<"data" | "column">("data");
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [toast, setToast] = useState("");
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -222,85 +289,81 @@ function App() {
     }, 2200);
   }, []);
 
+  const activeSheetContext =
+    activeDoc.type === "sheet" ? findSheet(project, activeDoc.id) : undefined;
+  const activeBook = activeSheetContext?.book;
+  const activeSheet = activeSheetContext?.sheet;
+
   const activeFigure =
-    project.figures.find((figure) => figure.id === project.activeFigureId) ??
-    project.figures[0];
+    activeDoc.type === "figure"
+      ? project.figures.find((figure) => figure.id === activeDoc.id)
+      : undefined;
 
-  const activeDataset = project.datasets.find(
-    (dataset) => dataset.id === activeFigure?.datasetId
-  );
-
+  const figureSheetContext = activeFigure
+    ? findSheet(project, activeFigure.dataRef.sheetId)
+    : undefined;
+  const figureSheet = figureSheetContext?.sheet;
+  const plotDataset =
+    activeFigure && figureSheet
+      ? sheetToDataset(figureSheet, activeFigure)
+      : undefined;
   const preset = activeFigure
     ? presets[activeFigure.presetId]
     : presets.scientific;
 
   const orderedSeries = useMemo(
     () =>
-      activeDataset && activeFigure
-        ? orderSeries(activeDataset, activeFigure.seriesOrder)
+      plotDataset && activeFigure
+        ? orderSeries(plotDataset, activeFigure.seriesOrder)
         : [],
-    [activeDataset, activeFigure]
+    [plotDataset, activeFigure]
   );
 
   const primarySeries =
     orderedSeries.find((series) =>
       selectedSeriesIds.includes(series.id)
     ) ?? orderedSeries[0];
-
+  const selectedSeries =
+    selectedSeriesIds.length
+      ? selectedSeriesIds
+      : primarySeries
+      ? [primarySeries.id]
+      : [];
   const primaryOverride =
     primarySeries && activeFigure
       ? activeFigure.seriesOverrides[primarySeries.id] || {}
       : {};
 
-  const selectedIds = selectedSeriesIds.length
-    ? selectedSeriesIds
-    : primarySeries
-    ? [primarySeries.id]
-    : [];
-
-  const effectiveFontFamily =
-    activeFigure?.figureOverrides.fontFamily || preset.fontFamily;
-  const effectiveFontSizePt =
-    activeFigure?.figureOverrides.fontSizePt ?? preset.fontSizePt;
-  const effectiveLegendVisible =
-    activeFigure?.figureOverrides.legendVisible ?? true;
-  const aspectMode =
-    activeFigure?.figureOverrides.aspectMode ?? "4:3";
-
-  const canvasMm = activeFigure
-    ? resolveCanvasMm(preset, activeFigure)
-    : { widthMm: preset.widthMm, heightMm: preset.heightMm };
-
-  const traces = useMemo(
-    () =>
-      activeDataset && activeFigure
-        ? buildTraces({
-            dataset: activeDataset,
-            figure: activeFigure,
-            preset
-          })
-        : [],
-    [activeDataset, activeFigure, preset]
-  );
-
   const layout = useMemo(
     () =>
-      activeDataset && activeFigure
+      plotDataset && activeFigure
         ? buildLayout({
-            dataset: activeDataset,
+            dataset: plotDataset,
             figure: activeFigure,
             preset
           })
         : { width: 640, height: 480 },
-    [activeDataset, activeFigure, preset]
+    [plotDataset, activeFigure, preset]
+  );
+
+  const traces = useMemo(
+    () =>
+      plotDataset && activeFigure
+        ? buildTraces({
+            dataset: plotDataset,
+            figure: activeFigure,
+            preset
+          })
+        : [],
+    [plotDataset, activeFigure, preset]
   );
 
   const checkItems = useMemo(
     () =>
-      activeDataset && activeFigure
-        ? checkFigure(activeDataset, activeFigure, preset)
+      plotDataset && activeFigure
+        ? checkFigure(plotDataset, activeFigure, preset)
         : [],
-    [activeDataset, activeFigure, preset]
+    [plotDataset, activeFigure, preset]
   );
 
   const warningCount = checkItems.filter((item) => item.level === "warn").length;
@@ -315,32 +378,27 @@ function App() {
   }, [project]);
 
   useEffect(() => {
-    const valid = selectedSeriesIds.filter((id) =>
-      orderedSeries.some((series) => series.id === id)
-    );
-    if (valid.length !== selectedSeriesIds.length) {
-      setSelectedSeriesIds(valid);
-      return;
+    if (activeSheet) {
+      if (
+        !selectedColumnId ||
+        !activeSheet.columns.some((column) => column.id === selectedColumnId)
+      ) {
+        setSelectedColumnId(activeSheet.columns[0]?.id ?? "");
+      }
     }
-    if (valid.length === 0 && orderedSeries[0]) {
-      setSelectedSeriesIds([orderedSeries[0].id]);
-    }
-  }, [orderedSeries, selectedSeriesIds]);
+  }, [activeSheet, selectedColumnId]);
 
   useEffect(() => {
     if (!activeFigure) return;
-    const first = orderSeries(
-      project.datasets.find((dataset) => dataset.id === activeFigure.datasetId) ?? {
-        id: "",
-        name: "",
-        x: { id: "", name: "", values: [] },
-        ys: []
-      },
-      activeFigure.seriesOrder
-    )[0];
-    setSelectedSeriesIds(first ? [first.id] : []);
-    setExplorerSelection({ type: "figure", id: activeFigure.id });
-  }, [activeFigure?.id]);
+    const valid = selectedSeriesIds.filter((id) =>
+      orderedSeries.some((series) => series.id === id)
+    );
+    if (valid.length === 0 && orderedSeries[0]) {
+      setSelectedSeriesIds([orderedSeries[0].id]);
+    } else if (valid.length !== selectedSeriesIds.length) {
+      setSelectedSeriesIds(valid);
+    }
+  }, [activeFigure?.id, orderedSeries, selectedSeriesIds]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -359,7 +417,7 @@ function App() {
       } else if (event.key.toLowerCase() === "s") {
         event.preventDefault();
         downloadProject(project);
-        showToast("项目已保存为 .sfig");
+        showToast("项目已保存");
       }
     };
 
@@ -368,16 +426,15 @@ function App() {
   }, [history, project, showToast]);
 
   useEffect(() => {
+    if (!activeFigure) return;
     const node = canvasRef.current;
     if (!node) return;
 
     const updateScale = () => {
       const rect = node.getBoundingClientRect();
-      const availableWidth = Math.max(160, rect.width - 24);
-      const availableHeight = Math.max(160, rect.height - 24);
       const fit = Math.min(
-        availableWidth / Number(layout.width),
-        availableHeight / Number(layout.height)
+        Math.max(160, rect.width - 24) / Number(layout.width),
+        Math.max(160, rect.height - 24) / Number(layout.height)
       );
       setPreviewScale(Math.max(0.1, Math.min(4, fit)));
     };
@@ -386,7 +443,7 @@ function App() {
     const observer = new ResizeObserver(updateScale);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [layout.width, layout.height]);
+  }, [activeFigure, layout.width, layout.height]);
 
   const selectSeries = useCallback(
     (id: string, additive = false) => {
@@ -414,7 +471,7 @@ function App() {
       scrollZoom: activeFigure.templateId !== "surface-3d"
     };
 
-    const handleDomClick = (event: MouseEvent) => {
+    const handleDomClick = (event: globalThis.MouseEvent) => {
       const target = event.target as Element | null;
       if (!target) return;
       if (target.closest(".legend")) {
@@ -433,6 +490,7 @@ function App() {
 
     Plotly.react(node, traces, layout, config).then(() => {
       if (cancelled) return;
+
       node.removeAllListeners?.("plotly_click");
       node.removeAllListeners?.("plotly_legendclick");
 
@@ -462,13 +520,40 @@ function App() {
       node.removeAllListeners?.("plotly_legendclick");
       node.removeEventListener("click", handleDomClick);
     };
-  }, [activeFigure, layout, orderedSeries, traces, selectSeries]);
+  }, [activeFigure, layout, orderedSeries, selectSeries, traces]);
 
   const patchProject = useCallback(
     (updater: (current: ProjectState) => ProjectState) => {
       history.commit(updater);
     },
     [history]
+  );
+
+  const patchSheet = useCallback(
+    (sheetId: string, updater: (sheet: DataSheet) => DataSheet) => {
+      patchProject((current) => ({
+        ...current,
+        dataBooks: current.dataBooks.map((book) => ({
+          ...book,
+          sheets: book.sheets.map((sheet) =>
+            sheet.id === sheetId ? updater(sheet) : sheet
+          )
+        }))
+      }));
+    },
+    [patchProject]
+  );
+
+  const patchBook = useCallback(
+    (bookId: string, updater: (book: DataBook) => DataBook) => {
+      patchProject((current) => ({
+        ...current,
+        dataBooks: current.dataBooks.map((book) =>
+          book.id === bookId ? updater(book) : book
+        )
+      }));
+    },
+    [patchProject]
   );
 
   const patchActiveFigure = useCallback(
@@ -483,6 +568,469 @@ function App() {
     },
     [activeFigure, patchProject]
   );
+
+  function openDocument(doc: DocumentRef) {
+    setOpenDocs((current) =>
+      current.some((item) => docKey(item) === docKey(doc))
+        ? current
+        : [...current, doc]
+    );
+    setActiveDoc(doc);
+
+    if (doc.type === "figure") {
+      history.updateWithoutHistory((current) => ({
+        ...current,
+        activeFigureId: doc.id
+      }));
+      setInspectorTab("series");
+    } else {
+      setDataInspectorTab("data");
+    }
+  }
+
+  function closeDocument(doc: DocumentRef) {
+    setOpenDocs((current) => {
+      const next = current.filter((item) => docKey(item) !== docKey(doc));
+      if (docKey(activeDoc) === docKey(doc)) {
+        const fallback = next[next.length - 1];
+        if (fallback) setActiveDoc(fallback);
+      }
+      return next;
+    });
+  }
+
+  function resetWorkspace(next: ProjectState) {
+    history.replace(next);
+    setExpandedFolders(new Set(next.folders.map((folder) => folder.id)));
+    setExpandedBooks(new Set(next.dataBooks.map((book) => book.id)));
+    const sheetId = next.dataBooks[0]?.sheets[0]?.id;
+    const figureId = next.figures[0]?.id;
+    const docs: DocumentRef[] = [
+      ...(sheetId ? [{ type: "sheet", id: sheetId } as DocumentRef] : []),
+      ...(figureId ? [{ type: "figure", id: figureId } as DocumentRef] : [])
+    ];
+    setOpenDocs(docs);
+    setActiveDoc(
+      docs[0] ?? { type: "figure", id: figureId ?? "" }
+    );
+    setExplorerSelection(null);
+  }
+
+  function docTitle(doc: DocumentRef): string {
+    if (doc.type === "figure") {
+      return project.figures.find((figure) => figure.id === doc.id)?.name ?? "图形";
+    }
+    const context = findSheet(project, doc.id);
+    return context ? context.book.name + " · " + context.sheet.name : "数据表";
+  }
+
+  function newProject() {
+    if (!window.confirm("新建项目会替换当前工作区，是否继续？")) return;
+    resetWorkspace(createInitialProject(readUserDefaults()));
+    showToast("已新建项目");
+  }
+
+  async function openProject(file: File) {
+    try {
+      resetWorkspace(await readProjectFile(file));
+      showToast("项目已打开");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "项目打开失败。");
+    } finally {
+      if (projectInputRef.current) projectInputRef.current.value = "";
+    }
+  }
+
+  function restoreAutosave() {
+    try {
+      const raw = localStorage.getItem(AUTOSAVE_KEY);
+      if (!raw) {
+        showToast("没有可恢复的 v0.3 自动保存");
+        return;
+      }
+      const next = JSON.parse(raw) as ProjectState;
+      if (next.schemaVersion !== "0.3") throw new Error("version");
+      resetWorkspace(next);
+      showToast("已恢复自动保存");
+    } catch {
+      showToast("自动保存无法恢复");
+    }
+  }
+
+  function selectedFolderId(): string | undefined {
+    if (!explorerSelection) return undefined;
+    if (explorerSelection.type === "folder") return explorerSelection.id;
+    if (explorerSelection.type === "book") {
+      return project.dataBooks.find((book) => book.id === explorerSelection.id)
+        ?.folderId;
+    }
+    if (explorerSelection.type === "sheet") {
+      return findSheet(project, explorerSelection.id)?.book.folderId;
+    }
+    return project.figures.find((figure) => figure.id === explorerSelection.id)
+      ?.folderId;
+  }
+
+  function triggerDataFile(action: "import" | "link" | "replace" | "reload") {
+    dataActionRef.current = action;
+    dataInputRef.current?.click();
+  }
+
+  function reconcileSheet(existing: DataSheet, incoming: DataSheet): DataSheet {
+    const used = new Set<string>();
+    const columns = incoming.columns.map((incomingColumn) => {
+      const matched = existing.columns.find(
+        (old) =>
+          !used.has(old.id) &&
+          (old.id === incomingColumn.id ||
+            old.name.trim().toLowerCase() ===
+              incomingColumn.name.trim().toLowerCase())
+      );
+
+      if (!matched) return incomingColumn;
+      used.add(matched.id);
+
+      return {
+        ...incomingColumn,
+        id: matched.id,
+        role: matched.role
+      };
+    });
+
+    return {
+      ...incoming,
+      id: existing.id,
+      name: existing.name,
+      metadata: incoming.metadata ?? existing.metadata,
+      columns
+    };
+  }
+
+  function replaceSheet(
+    bookId: string,
+    sheetId: string,
+    incoming: DataSheet,
+    sourcePatch?: Partial<DataBook["source"]>
+  ) {
+    patchProject((current) => {
+      const book = current.dataBooks.find((item) => item.id === bookId);
+      const existing = book?.sheets.find((sheet) => sheet.id === sheetId);
+      if (!book || !existing) return current;
+
+      const nextSheet = reconcileSheet(existing, incoming);
+      const nextBooks = current.dataBooks.map((item) =>
+        item.id === bookId
+          ? {
+              ...item,
+              source: sourcePatch
+                ? { ...item.source, ...sourcePatch }
+                : item.source,
+              sheets: item.sheets.map((sheet) =>
+                sheet.id === sheetId ? nextSheet : sheet
+              )
+            }
+          : item
+      );
+
+      const nextFigures = current.figures.map((figure) =>
+        figure.dataRef.sheetId === sheetId
+          ? normalizeFigureForSheet(figure, nextSheet)
+          : figure
+      );
+
+      return {
+        ...current,
+        dataBooks: nextBooks,
+        figures: nextFigures
+      };
+    });
+  }
+
+  async function handleDataFile(file: File) {
+    try {
+      const sheet = parseDelimitedText(await file.text(), file.name);
+      const action = dataActionRef.current;
+
+      if ((action === "replace" || action === "reload") && activeBook && activeSheet) {
+        if (activeBook.source.kind === "linked" && action === "replace") {
+          showToast("Linked Data 请使用“重新加载”");
+          return;
+        }
+
+        replaceSheet(
+          activeBook.id,
+          activeSheet.id,
+          sheet,
+          action === "reload"
+            ? {
+                kind: "linked",
+                fileName: file.name,
+                size: file.size,
+                modifiedMs: file.lastModified,
+                status: "ok"
+              }
+            : undefined
+        );
+        showToast(action === "reload" ? "Linked Data 已重新加载" : "数据表已替换");
+        return;
+      }
+
+      const bookId = makeId("book");
+      const nextSheet = {
+        ...sheet,
+        id: makeId("sheet")
+      };
+      const book: DataBook = {
+        id: bookId,
+        name: sheet.name,
+        folderId: selectedFolderId(),
+        source:
+          action === "link"
+            ? {
+                kind: "linked",
+                fileName: file.name,
+                size: file.size,
+                modifiedMs: file.lastModified,
+                status: "ok"
+              }
+            : { kind: "embedded" },
+        sheets: [nextSheet]
+      };
+
+      patchProject((current) => ({
+        ...current,
+        dataBooks: [...current.dataBooks, book]
+      }));
+      setExpandedBooks((current) => new Set([...current, book.id]));
+      openDocument({ type: "sheet", id: nextSheet.id });
+      setExplorerSelection({ type: "book", id: book.id });
+      showToast(action === "link" ? "已创建 Linked Data" : "已导入数据表");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "数据导入失败。");
+    } finally {
+      if (dataInputRef.current) dataInputRef.current.value = "";
+    }
+  }
+
+  function addBlankBook() {
+    const sheet: DataSheet = {
+      id: makeId("sheet"),
+      name: "Sheet1",
+      columns: [
+        { id: makeId("col"), name: "X", role: "X", values: [null, null, null] },
+        { id: makeId("col"), name: "Y", role: "Y", values: [null, null, null] }
+      ]
+    };
+    const book: DataBook = {
+      id: makeId("book"),
+      name: "新数据表",
+      folderId: selectedFolderId(),
+      source: { kind: "embedded" },
+      sheets: [sheet]
+    };
+
+    patchProject((current) => ({
+      ...current,
+      dataBooks: [...current.dataBooks, book]
+    }));
+    setExpandedBooks((current) => new Set([...current, book.id]));
+    openDocument({ type: "sheet", id: sheet.id });
+  }
+
+  function addSheet() {
+    if (!activeBook) return;
+    const sheet: DataSheet = {
+      id: makeId("sheet"),
+      name: "Sheet" + String(activeBook.sheets.length + 1),
+      columns: [
+        { id: makeId("col"), name: "X", role: "X", values: [null, null, null] },
+        { id: makeId("col"), name: "Y", role: "Y", values: [null, null, null] }
+      ]
+    };
+    patchBook(activeBook.id, (book) => ({
+      ...book,
+      sheets: [...book.sheets, sheet]
+    }));
+    openDocument({ type: "sheet", id: sheet.id });
+  }
+
+  function addRow() {
+    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    patchSheet(activeSheet.id, (sheet) => ({
+      ...sheet,
+      columns: sheet.columns.map((column) => ({
+        ...column,
+        values: [...column.values, null]
+      }))
+    }));
+  }
+
+  function addColumn() {
+    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    const rows = sheetRowCount(activeSheet);
+    const column: Column = {
+      id: makeId("col"),
+      name: "列 " + String(activeSheet.columns.length + 1),
+      role: "None",
+      values: Array.from({ length: Math.max(1, rows) }, () => null)
+    };
+    patchSheet(activeSheet.id, (sheet) => ({
+      ...sheet,
+      columns: [...sheet.columns, column]
+    }));
+    setSelectedColumnId(column.id);
+    setDataInspectorTab("column");
+  }
+
+  function updateCell(
+    sheetId: string,
+    columnId: string,
+    rowIndex: number,
+    value: CellValue
+  ) {
+    patchSheet(sheetId, (sheet) => ({
+      ...sheet,
+      columns: sheet.columns.map((column) => {
+        if (column.id !== columnId) return column;
+        const values = [...column.values];
+        while (values.length <= rowIndex) values.push(null);
+        values[rowIndex] = value;
+        return { ...column, values };
+      })
+    }));
+  }
+
+  function updateColumn(columnId: string, patch: Partial<Column>) {
+    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    patchSheet(activeSheet.id, (sheet) => ({
+      ...sheet,
+      columns: sheet.columns.map((column) =>
+        column.id === columnId ? { ...column, ...patch } : column
+      )
+    }));
+  }
+
+  function deleteColumn(columnId: string) {
+    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    if (activeSheet.columns.length <= 1) {
+      showToast("数据表至少保留一列");
+      return;
+    }
+    if (!window.confirm("删除这一列？引用它的图会自动修复数据映射。")) return;
+
+    patchProject((current) => {
+      const context = findSheet(current, activeSheet.id);
+      if (!context) return current;
+      const nextSheet = {
+        ...context.sheet,
+        columns: context.sheet.columns.filter((column) => column.id !== columnId)
+      };
+      return {
+        ...current,
+        dataBooks: current.dataBooks.map((book) =>
+          book.id === context.book.id
+            ? {
+                ...book,
+                sheets: book.sheets.map((sheet) =>
+                  sheet.id === nextSheet.id ? nextSheet : sheet
+                )
+              }
+            : book
+        ),
+        figures: current.figures.map((figure) =>
+          figure.dataRef.sheetId === nextSheet.id
+            ? normalizeFigureForSheet(figure, nextSheet)
+            : figure
+        )
+      };
+    });
+  }
+
+  function reorderColumns(dragId: string, targetId: string) {
+    if (!activeSheet || activeBook?.source.kind === "linked") return;
+    patchSheet(activeSheet.id, (sheet) => {
+      const columns = sheet.columns.filter((column) => column.id !== dragId);
+      const dragged = sheet.columns.find((column) => column.id === dragId);
+      const index = columns.findIndex((column) => column.id === targetId);
+      if (!dragged || index < 0) return sheet;
+      columns.splice(index, 0, dragged);
+      return { ...sheet, columns };
+    });
+  }
+
+  function createGraphFromSheet() {
+    if (!activeSheet || !activeBook) return;
+    const dataRef = defaultDataRef(activeSheet);
+    if (!dataRef.xColumnId || dataRef.yColumnIds.length === 0) {
+      window.alert("请先指定至少一列 X 和一列 Y。");
+      return;
+    }
+
+    const dataset = sheetToDataset(activeSheet);
+    const figure: FigureSpec = {
+      id: makeId("figure"),
+      name: "Graph " + String(project.figures.length + 1),
+      folderId: activeBook.folderId,
+      dataRef,
+      templateId: project.defaults.templateId,
+      presetId: project.defaults.presetId,
+      figureOverrides: {
+        aspectMode: "4:3",
+        ...project.defaults.figureOverrides,
+        xTitle: axisLabel(dataset.x.name, dataset.x.unit),
+        yTitle: axisLabel(dataset.ys[0]?.name || "Y", dataset.ys[0]?.unit),
+        errorSeriesId: dataRef.yErrorColumnId
+      },
+      seriesOverrides: {},
+      seriesOrder: dataRef.yColumnIds
+    };
+
+    patchProject((current) => ({
+      ...current,
+      figures: [...current.figures, figure],
+      activeFigureId: figure.id
+    }));
+    openDocument({ type: "figure", id: figure.id });
+    setExplorerSelection({ type: "figure", id: figure.id });
+    showToast("已从列角色创建图形");
+  }
+
+  function unlinkBook() {
+    if (!activeBook) return;
+    if (
+      !window.confirm(
+        "解除链接后，当前缓存数据会变成可编辑的 Embedded Data。是否继续？"
+      )
+    )
+      return;
+    patchBook(activeBook.id, (book) => ({
+      ...book,
+      source: { kind: "embedded" }
+    }));
+    showToast("已解除链接，现在可以编辑数据");
+  }
+
+  function pasteAsNewSheet() {
+    if (!activeBook || !pasteText.trim()) return;
+    try {
+      const sheet = parseDelimitedText(pasteText, "粘贴数据.csv");
+      const next = {
+        ...sheet,
+        id: makeId("sheet"),
+        name: "Sheet" + String(activeBook.sheets.length + 1)
+      };
+      patchBook(activeBook.id, (book) => ({
+        ...book,
+        sheets: [...book.sheets, next]
+      }));
+      setPasteText("");
+      setPasteOpen(false);
+      openDocument({ type: "sheet", id: next.id });
+      showToast("已粘贴为新工作表");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "无法解析粘贴数据。");
+    }
+  }
 
   function setFigureField<K extends keyof FigureOverrides>(
     key: K,
@@ -506,10 +1054,10 @@ function App() {
   }
 
   function updateSelectedSeries(patch: SeriesOverride) {
-    if (!selectedIds.length) return;
+    if (!selectedSeries.length) return;
     patchActiveFigure((figure) => {
       const next = { ...figure.seriesOverrides };
-      for (const id of selectedIds) {
+      for (const id of selectedSeries) {
         next[id] = { ...(next[id] || {}), ...patch };
       }
       return { ...figure, seriesOverrides: next };
@@ -517,10 +1065,10 @@ function App() {
   }
 
   function resetSelectedSeriesField(field: keyof SeriesOverride) {
-    if (!selectedIds.length) return;
+    if (!selectedSeries.length) return;
     patchActiveFigure((figure) => {
       const next = { ...figure.seriesOverrides };
-      for (const id of selectedIds) {
+      for (const id of selectedSeries) {
         const value = { ...(next[id] || {}) };
         delete value[field];
         if (Object.keys(value).length === 0) delete next[id];
@@ -530,267 +1078,11 @@ function App() {
     });
   }
 
-  function activateFigure(figureId: string) {
-    history.updateWithoutHistory((current) => ({
-      ...current,
-      activeFigureId: figureId
-    }));
-  }
-
-  function reorderSeries(dragId: string, targetId: string) {
-    if (!activeFigure || dragId === targetId) return;
-    patchActiveFigure((figure) => {
-      const next = figure.seriesOrder.filter((id) => id !== dragId);
-      const targetIndex = next.indexOf(targetId);
-      if (targetIndex < 0) return figure;
-      next.splice(targetIndex, 0, dragId);
-      return { ...figure, seriesOrder: next };
-    });
-  }
-
-  function moveSelectedSeries(direction: "up" | "down") {
-    if (!primarySeries || !activeFigure) return;
-
-    patchActiveFigure((figure) => {
-      const normalized = [...figure.seriesOrder];
-      const index = normalized.indexOf(primarySeries.id);
-      if (index < 0) return figure;
-
-      const target =
-        direction === "up"
-          ? Math.min(normalized.length - 1, index + 1)
-          : Math.max(0, index - 1);
-
-      if (target === index) return figure;
-
-      [normalized[index], normalized[target]] = [
-        normalized[target],
-        normalized[index]
-      ];
-      return { ...figure, seriesOrder: normalized };
-    });
-  }
-
-  function newProject() {
-    if (!window.confirm("新建项目会替换当前工作区，是否继续？")) return;
-    history.replace(createInitialProject(readUserDefaults()));
-    showToast("已新建项目");
-  }
-
-  function restoreAutosave() {
-    try {
-      const raw = localStorage.getItem(AUTOSAVE_KEY);
-      if (!raw) {
-        showToast("没有可恢复的自动保存");
-        return;
-      }
-      const recovered = JSON.parse(raw) as ProjectState;
-      if (recovered.format !== "sfig" || recovered.schemaVersion !== "0.2") {
-        throw new Error("版本不匹配");
-      }
-      history.replace(recovered);
-      showToast("已恢复自动保存");
-    } catch {
-      showToast("自动保存无法恢复");
-    }
-  }
-
-  async function openProject(file: File) {
-    try {
-      const next = await readProjectFile(file);
-      history.replace(next);
-      setExpandedFolders(new Set(next.folders.map((folder) => folder.id)));
-      showToast("项目已打开");
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "项目打开失败。");
-    } finally {
-      if (projectInputRef.current) projectInputRef.current.value = "";
-    }
-  }
-
-  function saveProject() {
-    downloadProject(project);
-    showToast("项目已保存为 .sfig");
-  }
-
-  function triggerDataFile(action: "add" | "replace") {
-    dataActionRef.current = action;
-    dataInputRef.current?.click();
-  }
-
-  function reconcileReplace(
-    currentProject: ProjectState,
-    datasetId: string,
-    replacement: Dataset
-  ): ProjectState | null {
-    const oldDataset = currentProject.datasets.find(
-      (dataset) => dataset.id === datasetId
-    );
-    if (!oldDataset) return currentProject;
-
-    const exact = oldDataset.ys.every((column) =>
-      replacement.ys.some((next) => next.id === column.id)
-    );
-
-    let mapping = new Map<string, string>();
-
-    if (exact) {
-      mapping = new Map(
-        oldDataset.ys.map((column) => [column.id, column.id])
-      );
-    } else {
-      const proceed = window.confirm(
-        "新数据列结构与原数据不完全一致。是否按列顺序重新映射所有关联图？"
-      );
-      if (!proceed) return null;
-
-      const count = Math.min(oldDataset.ys.length, replacement.ys.length);
-      for (let index = 0; index < count; index += 1) {
-        mapping.set(oldDataset.ys[index].id, replacement.ys[index].id);
-      }
-    }
-
-    const stableDataset: Dataset = {
-      ...replacement,
-      id: oldDataset.id,
-      folderId: oldDataset.folderId
-    };
-
-    const figures = currentProject.figures.map((figure) => {
-      if (figure.datasetId !== datasetId) return figure;
-
-      const nextOverrides: Record<string, SeriesOverride> = {};
-      for (const [oldId, override] of Object.entries(figure.seriesOverrides)) {
-        const mapped = mapping.get(oldId);
-        if (mapped) nextOverrides[mapped] = override;
-      }
-
-      const mappedOrder = figure.seriesOrder
-        .map((oldId) => mapping.get(oldId))
-        .filter((value): value is string => Boolean(value));
-
-      for (const column of replacement.ys) {
-        if (!mappedOrder.includes(column.id)) mappedOrder.push(column.id);
-      }
-
-      const errorSeriesId = figure.figureOverrides.errorSeriesId
-        ? mapping.get(figure.figureOverrides.errorSeriesId)
-        : undefined;
-
-      return {
-        ...figure,
-        seriesOrder: mappedOrder,
-        seriesOverrides: nextOverrides,
-        figureOverrides: {
-          ...figure.figureOverrides,
-          errorSeriesId
-        }
-      };
-    });
-
-    return {
-      ...currentProject,
-      datasets: currentProject.datasets.map((dataset) =>
-        dataset.id === datasetId ? stableDataset : dataset
-      ),
-      figures
-    };
-  }
-
-  async function handleDataFile(file: File) {
-    try {
-      const parsed = parseDelimitedText(await file.text(), file.name);
-
-      if (dataActionRef.current === "replace" && activeDataset) {
-        setPendingReplacement(parsed);
-      } else {
-        const targetFolder =
-          explorerSelection?.type === "folder"
-            ? explorerSelection.id
-            : activeDataset?.folderId;
-        parsed.folderId = targetFolder;
-        patchProject((current) => {
-          const figureFolder =
-            activeFigure?.folderId ??
-            current.folders.find((folder) => folder.name === "主文")?.id;
-          const figure = makeFigure(parsed, current, figureFolder);
-          return {
-            ...current,
-            datasets: [...current.datasets, parsed],
-            figures: [...current.figures, figure],
-            activeFigureId: figure.id
-          };
-        });
-        showToast("已导入数据并创建图形");
-      }
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "数据导入失败。");
-    } finally {
-      if (dataInputRef.current) dataInputRef.current.value = "";
-    }
-  }
-
-  function acceptReplacement() {
-    if (!pendingReplacement || !activeDataset) return;
-    patchProject((current) => {
-      const next = reconcileReplace(
-        current,
-        activeDataset.id,
-        pendingReplacement
-      );
-      return next ?? current;
-    });
-    setPendingReplacement(null);
-    showToast("数据已替换，关联图和样式已保留");
-  }
-
-  function importPastedData() {
-    if (!pasteText.trim()) return;
-    try {
-      const parsed = parseDelimitedText(pasteText, "剪贴板数据.csv");
-      parsed.folderId =
-        explorerSelection?.type === "folder"
-          ? explorerSelection.id
-          : activeDataset?.folderId;
-      patchProject((current) => {
-        const figure = makeFigure(parsed, current, activeFigure?.folderId);
-        return {
-          ...current,
-          datasets: [...current.datasets, parsed],
-          figures: [...current.figures, figure],
-          activeFigureId: figure.id
-        };
-      });
-      setPasteOpen(false);
-      setPasteText("");
-      showToast("已从剪贴板创建数据集");
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "无法解析粘贴数据。");
-    }
-  }
-
-  function addFigureForDataset(dataset: Dataset) {
-    patchProject((current) => {
-      const folderId =
-        explorerSelection?.type === "folder"
-          ? explorerSelection.id
-          : activeFigure?.folderId;
-      const figure = makeFigure(dataset, current, folderId);
-      return {
-        ...current,
-        figures: [...current.figures, figure],
-        activeFigureId: figure.id
-      };
-    });
-  }
-
   function createFolder() {
     const name = window.prompt("新文件夹名称", "新文件夹");
     if (!name?.trim()) return;
     const parentId =
-      explorerSelection?.type === "folder"
-        ? explorerSelection.id
-        : undefined;
+      explorerSelection?.type === "folder" ? explorerSelection.id : undefined;
     const folder: ProjectFolder = {
       id: makeId("folder"),
       name: name.trim(),
@@ -804,16 +1096,13 @@ function App() {
     setExplorerSelection({ type: "folder", id: folder.id });
   }
 
-  function renameExplorerItem() {
+  function renameSelected() {
     if (!explorerSelection) return;
 
     if (explorerSelection.type === "folder") {
-      const item = project.folders.find(
-        (folder) => folder.id === explorerSelection.id
-      );
-      if (!item) return;
-      const name = window.prompt("重命名文件夹", item.name);
-      if (!name?.trim()) return;
+      const item = project.folders.find((folder) => folder.id === explorerSelection.id);
+      const name = item && window.prompt("重命名文件夹", item.name);
+      if (!item || !name?.trim()) return;
       patchProject((current) => ({
         ...current,
         folders: current.folders.map((folder) =>
@@ -823,28 +1112,25 @@ function App() {
       return;
     }
 
-    if (explorerSelection.type === "dataset") {
-      const item = project.datasets.find(
-        (dataset) => dataset.id === explorerSelection.id
-      );
-      if (!item) return;
-      const name = window.prompt("重命名数据", item.name);
-      if (!name?.trim()) return;
-      patchProject((current) => ({
-        ...current,
-        datasets: current.datasets.map((dataset) =>
-          dataset.id === item.id ? { ...dataset, name: name.trim() } : dataset
-        )
-      }));
+    if (explorerSelection.type === "book") {
+      const item = project.dataBooks.find((book) => book.id === explorerSelection.id);
+      const name = item && window.prompt("重命名数据表", item.name);
+      if (!item || !name?.trim()) return;
+      patchBook(item.id, (book) => ({ ...book, name: name.trim() }));
       return;
     }
 
-    const item = project.figures.find(
-      (figure) => figure.id === explorerSelection.id
-    );
-    if (!item) return;
-    const name = window.prompt("重命名图形", item.name);
-    if (!name?.trim()) return;
+    if (explorerSelection.type === "sheet") {
+      const context = findSheet(project, explorerSelection.id);
+      const name = context && window.prompt("重命名工作表", context.sheet.name);
+      if (!context || !name?.trim()) return;
+      patchSheet(context.sheet.id, (sheet) => ({ ...sheet, name: name.trim() }));
+      return;
+    }
+
+    const item = project.figures.find((figure) => figure.id === explorerSelection.id);
+    const name = item && window.prompt("重命名图形", item.name);
+    if (!item || !name?.trim()) return;
     patchProject((current) => ({
       ...current,
       figures: current.figures.map((figure) =>
@@ -853,161 +1139,143 @@ function App() {
     }));
   }
 
-  function duplicateExplorerItem() {
+  function deleteSelected() {
     if (!explorerSelection) return;
 
     if (explorerSelection.type === "figure") {
-      const item = project.figures.find(
-        (figure) => figure.id === explorerSelection.id
-      );
-      if (!item) return;
-      const duplicate: FigureSpec = {
-        ...structuredClone(item),
-        id: makeId("figure"),
-        name: item.name + " 副本"
-      };
-      patchProject((current) => ({
-        ...current,
-        figures: [...current.figures, duplicate],
-        activeFigureId: duplicate.id
-      }));
-      showToast("已复制图形");
-      return;
-    }
-
-    if (explorerSelection.type === "dataset") {
-      const item = project.datasets.find(
-        (dataset) => dataset.id === explorerSelection.id
-      );
-      if (!item) return;
-      const duplicate: Dataset = {
-        ...structuredClone(item),
-        id: makeId("dataset"),
-        name: item.name + " 副本"
-      };
+      const id = explorerSelection.id;
+      const item = project.figures.find((figure) => figure.id === id);
+      if (!item || !window.confirm("删除图形“" + item.name + "”？")) return;
       patchProject((current) => {
-        const figure = makeFigure(
-          duplicate,
-          current,
-          activeFigure?.folderId,
-          "图 " + String(current.figures.length + 1)
-        );
-        return {
-          ...current,
-          datasets: [...current.datasets, duplicate],
-          figures: [...current.figures, figure],
-          activeFigureId: figure.id
-        };
-      });
-      showToast("已复制数据并创建新图");
-    }
-  }
-
-  function deleteExplorerItem() {
-    if (!explorerSelection) return;
-
-    if (explorerSelection.type === "folder") {
-      const folder = project.folders.find(
-        (item) => item.id === explorerSelection.id
-      );
-      if (!folder) return;
-      if (!window.confirm("删除文件夹？其中内容会移动到上一级，不会删除数据或图形。"))
-        return;
-
-      patchProject((current) => ({
-        ...current,
-        folders: current.folders
-          .filter((item) => item.id !== folder.id)
-          .map((item) =>
-            item.parentId === folder.id
-              ? { ...item, parentId: folder.parentId }
-              : item
-          ),
-        datasets: current.datasets.map((dataset) =>
-          dataset.folderId === folder.id
-            ? { ...dataset, folderId: folder.parentId }
-            : dataset
-        ),
-        figures: current.figures.map((figure) =>
-          figure.folderId === folder.id
-            ? { ...figure, folderId: folder.parentId }
-            : figure
-        )
-      }));
-      setExplorerSelection(null);
-      return;
-    }
-
-    if (explorerSelection.type === "figure") {
-      const item = project.figures.find(
-        (figure) => figure.id === explorerSelection.id
-      );
-      if (!item || project.figures.length <= 1) {
-        showToast("项目至少保留一张图");
-        return;
-      }
-      if (!window.confirm("删除图形“" + item.name + "”？")) return;
-      patchProject((current) => {
-        const figures = current.figures.filter(
-          (figure) => figure.id !== item.id
-        );
+        const figures = current.figures.filter((figure) => figure.id !== id);
         return {
           ...current,
           figures,
           activeFigureId:
-            current.activeFigureId === item.id
+            current.activeFigureId === id
               ? figures[0]?.id ?? ""
               : current.activeFigureId
         };
       });
+      closeDocument({ type: "figure", id });
       return;
     }
 
-    const item = project.datasets.find(
-      (dataset) => dataset.id === explorerSelection.id
-    );
-    if (!item) return;
-    const linked = project.figures.filter(
-      (figure) => figure.datasetId === item.id
-    );
-    const message = linked.length
-      ? "该数据被 " + linked.length + " 张图引用。删除数据会同时删除这些图形，是否继续？"
-      : "删除数据“" + item.name + "”？";
-    if (!window.confirm(message)) return;
-
-    patchProject((current) => {
-      const figures = current.figures.filter(
-        (figure) => figure.datasetId !== item.id
+    if (explorerSelection.type === "book") {
+      const book = project.dataBooks.find((item) => item.id === explorerSelection.id);
+      if (!book) return;
+      const sheetIds = new Set(book.sheets.map((sheet) => sheet.id));
+      const linkedFigures = project.figures.filter((figure) =>
+        sheetIds.has(figure.dataRef.sheetId)
       );
-      if (!figures.length) return current;
-      return {
-        ...current,
-        datasets: current.datasets.filter(
-          (dataset) => dataset.id !== item.id
-        ),
-        figures,
-        activeFigureId: figures.some(
-          (figure) => figure.id === current.activeFigureId
+      if (
+        !window.confirm(
+          "删除数据表“" +
+            book.name +
+            "”会同时删除引用它的 " +
+            linkedFigures.length +
+            " 张图。是否继续？"
         )
-          ? current.activeFigureId
-          : figures[0].id
-      };
-    });
+      )
+        return;
+
+      patchProject((current) => {
+        const figures = current.figures.filter(
+          (figure) => !sheetIds.has(figure.dataRef.sheetId)
+        );
+        return {
+          ...current,
+          dataBooks: current.dataBooks.filter((item) => item.id !== book.id),
+          figures,
+          activeFigureId: figures[0]?.id ?? ""
+        };
+      });
+      setOpenDocs((current) =>
+        current.filter(
+          (doc) =>
+            !(
+              (doc.type === "sheet" && sheetIds.has(doc.id)) ||
+              (doc.type === "figure" &&
+                linkedFigures.some((figure) => figure.id === doc.id))
+            )
+        )
+      );
+      return;
+    }
+
+    if (explorerSelection.type === "sheet") {
+      const context = findSheet(project, explorerSelection.id);
+      if (!context) return;
+      if (context.book.sheets.length <= 1) {
+        showToast("DataBook 至少保留一个 Sheet");
+        return;
+      }
+      const linked = project.figures.filter(
+        (figure) => figure.dataRef.sheetId === context.sheet.id
+      );
+      if (
+        !window.confirm(
+          "删除 Sheet 会同时删除引用它的 " + linked.length + " 张图。是否继续？"
+        )
+      )
+        return;
+
+      patchProject((current) => ({
+        ...current,
+        dataBooks: current.dataBooks.map((book) =>
+          book.id === context.book.id
+            ? {
+                ...book,
+                sheets: book.sheets.filter((sheet) => sheet.id !== context.sheet.id)
+              }
+            : book
+        ),
+        figures: current.figures.filter(
+          (figure) => figure.dataRef.sheetId !== context.sheet.id
+        )
+      }));
+      closeDocument({ type: "sheet", id: context.sheet.id });
+      return;
+    }
+
+    const folder = project.folders.find((item) => item.id === explorerSelection.id);
+    if (!folder) return;
+    if (!window.confirm("删除文件夹？其中内容会移动到上一级。")) return;
+    patchProject((current) => ({
+      ...current,
+      folders: current.folders
+        .filter((item) => item.id !== folder.id)
+        .map((item) =>
+          item.parentId === folder.id
+            ? { ...item, parentId: folder.parentId }
+            : item
+        ),
+      dataBooks: current.dataBooks.map((book) =>
+        book.folderId === folder.id
+          ? { ...book, folderId: folder.parentId }
+          : book
+      ),
+      figures: current.figures.map((figure) =>
+        figure.folderId === folder.id
+          ? { ...figure, folderId: folder.parentId }
+          : figure
+      )
+    }));
   }
 
   function moveExplorerItem(
-    type: "dataset" | "figure",
+    type: "book" | "figure",
     id: string,
     folderId?: string
   ) {
     patchProject((current) => ({
       ...current,
-      datasets:
-        type === "dataset"
-          ? current.datasets.map((dataset) =>
-              dataset.id === id ? { ...dataset, folderId } : dataset
+      dataBooks:
+        type === "book"
+          ? current.dataBooks.map((book) =>
+              book.id === id ? { ...book, folderId } : book
             )
-          : current.datasets,
+          : current.dataBooks,
       figures:
         type === "figure"
           ? current.figures.map((figure) =>
@@ -1019,28 +1287,44 @@ function App() {
 
   function saveDefault(scope: "project" | "user") {
     if (!activeFigure) return;
-    const defaults = styleDefaultsFromFigure(activeFigure);
+    const source = activeFigure.figureOverrides;
+    const defaults: UserDefaults = {
+      templateId: activeFigure.templateId,
+      presetId: activeFigure.presetId,
+      figureOverrides: {
+        aspectMode: source.aspectMode,
+        customAspectWidth: source.customAspectWidth,
+        customAspectHeight: source.customAspectHeight,
+        fontFamily: source.fontFamily,
+        fontSizePt: source.fontSizePt,
+        background: source.background,
+        tickDirection: source.tickDirection,
+        minorTicks: source.minorTicks,
+        gridVisible: source.gridVisible,
+        legendVisible: source.legendVisible,
+        legendPosition: source.legendPosition,
+        legendOrientation: source.legendOrientation,
+        legendFrame: source.legendFrame,
+        legendColumns: source.legendColumns,
+        colorScale: source.colorScale,
+        reverseColorScale: source.reverseColorScale
+      }
+    };
 
     if (scope === "user") {
       localStorage.setItem(USER_DEFAULTS_KEY, JSON.stringify(defaults));
       showToast("已保存为我的默认设置");
-      return;
+    } else {
+      patchProject((current) => ({ ...current, defaults }));
+      showToast("已保存为项目默认设置");
     }
-
-    patchProject((current) => ({
-      ...current,
-      defaults
-    }));
-    showToast("已保存为本项目默认设置");
   }
 
   async function resetView() {
     if (!plotRef.current || !activeFigure) return;
     if (activeFigure.templateId === "surface-3d") {
       await Plotly.relayout(plotRef.current, {
-        "scene.camera": {
-          eye: { x: 1.45, y: 1.45, z: 1.12 }
-        }
+        "scene.camera": { eye: { x: 1.45, y: 1.45, z: 1.12 } }
       });
     } else {
       await Plotly.relayout(plotRef.current, {
@@ -1070,42 +1354,95 @@ function App() {
     showToast(format === "png" ? "已导出 600 dpi PNG" : "已导出 SVG");
   }
 
-  function currentItemFolderId(): string | undefined {
-    if (!explorerSelection) return undefined;
-    if (explorerSelection.type === "folder") return explorerSelection.id;
-    if (explorerSelection.type === "dataset") {
-      return project.datasets.find(
-        (dataset) => dataset.id === explorerSelection.id
-      )?.folderId;
-    }
-    return project.figures.find(
-      (figure) => figure.id === explorerSelection.id
-    )?.folderId;
+  function renderBook(book: DataBook, depth: number): ReactNode {
+    const open = expandedBooks.has(book.id);
+    const selected =
+      explorerSelection?.type === "book" &&
+      explorerSelection.id === book.id;
+
+    return (
+      <div key={book.id}>
+        <button
+          type="button"
+          draggable
+          className={selected ? "explorer-row is-selected" : "explorer-row"}
+          style={{ paddingLeft: 7 + depth * 14 }}
+          onDragStart={(event) =>
+            event.dataTransfer.setData("text/plain", "book:" + book.id)
+          }
+          onClick={() => {
+            setExplorerSelection({ type: "book", id: book.id });
+            setExpandedBooks((current) => new Set([...current, book.id]));
+            const first = book.sheets[0];
+            if (first) openDocument({ type: "sheet", id: first.id });
+          }}
+        >
+          <span
+            className="folder-chevron"
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpandedBooks((current) => {
+                const next = new Set(current);
+                if (next.has(book.id)) next.delete(book.id);
+                else next.add(book.id);
+                return next;
+              });
+            }}
+          >
+            {open ? "⌄" : "›"}
+          </span>
+          <Icon kind="book" linked={book.source.kind === "linked"} />
+          <span className="tree-label">{book.name}</span>
+        </button>
+
+        {open &&
+          book.sheets.map((sheet) => (
+            <button
+              key={sheet.id}
+              type="button"
+              className={
+                activeDoc.type === "sheet" && activeDoc.id === sheet.id
+                  ? "explorer-row is-active"
+                  : explorerSelection?.type === "sheet" &&
+                    explorerSelection.id === sheet.id
+                  ? "explorer-row is-selected"
+                  : "explorer-row"
+              }
+              style={{ paddingLeft: 31 + depth * 14 }}
+              onClick={() => {
+                setExplorerSelection({ type: "sheet", id: sheet.id });
+                openDocument({ type: "sheet", id: sheet.id });
+              }}
+            >
+              <span />
+              <Icon kind="sheet" />
+              <span className="tree-label">{sheet.name}</span>
+            </button>
+          ))}
+      </div>
+    );
   }
 
-  function renderExplorerFolder(
-    folder: ProjectFolder,
-    depth: number
-  ): ReactNode {
+  function renderFolder(folder: ProjectFolder, depth: number): ReactNode {
     const open = expandedFolders.has(folder.id);
-    const childFolders = project.folders.filter(
-      (item) => item.parentId === folder.id
-    );
-    const datasets = project.datasets.filter(
-      (item) => item.folderId === folder.id
-    );
-    const figures = project.figures.filter(
-      (item) => item.folderId === folder.id
-    );
     const selected =
       explorerSelection?.type === "folder" &&
       explorerSelection.id === folder.id;
+    const children = project.folders.filter(
+      (item) => item.parentId === folder.id
+    );
+    const books = project.dataBooks.filter(
+      (book) => book.folderId === folder.id
+    );
+    const figures = project.figures.filter(
+      (figure) => figure.folderId === folder.id
+    );
 
     return (
       <div key={folder.id}>
         <button
           type="button"
-          className={selected ? "explorer-row is-selected folder-row" : "explorer-row folder-row"}
+          className={selected ? "explorer-row is-selected" : "explorer-row"}
           style={{ paddingLeft: 7 + depth * 14 }}
           onClick={() => setExplorerSelection({ type: "folder", id: folder.id })}
           onDoubleClick={() =>
@@ -1119,9 +1456,8 @@ function App() {
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
-            const value = event.dataTransfer.getData("text/plain");
-            const [type, id] = value.split(":");
-            if (type === "dataset" || type === "figure") {
+            const [type, id] = event.dataTransfer.getData("text/plain").split(":");
+            if (type === "book" || type === "figure") {
               moveExplorerItem(type, id, folder.id);
             }
           }}
@@ -1140,52 +1476,21 @@ function App() {
           >
             {open ? "⌄" : "›"}
           </span>
-          <span className="tree-symbol">▱</span>
+          <Icon kind="folder" />
           <span className="tree-label">{folder.name}</span>
         </button>
 
         {open && (
           <>
-            {childFolders.map((child) =>
-              renderExplorerFolder(child, depth + 1)
-            )}
-            {datasets.map((dataset) => (
-              <button
-                key={dataset.id}
-                type="button"
-                draggable
-                className={
-                  explorerSelection?.type === "dataset" &&
-                  explorerSelection.id === dataset.id
-                    ? "explorer-row is-selected"
-                    : "explorer-row"
-                }
-                style={{ paddingLeft: 31 + depth * 14 }}
-                onDragStart={(event) =>
-                  event.dataTransfer.setData(
-                    "text/plain",
-                    "dataset:" + dataset.id
-                  )
-                }
-                onClick={() => {
-                  setExplorerSelection({ type: "dataset", id: dataset.id });
-                  const linked = project.figures.find(
-                    (figure) => figure.datasetId === dataset.id
-                  );
-                  if (linked) activateFigure(linked.id);
-                }}
-              >
-                <span className="tree-symbol">▦</span>
-                <span className="tree-label">{dataset.name}</span>
-              </button>
-            ))}
+            {children.map((child) => renderFolder(child, depth + 1))}
+            {books.map((book) => renderBook(book, depth + 1))}
             {figures.map((figure) => (
               <button
                 key={figure.id}
                 type="button"
                 draggable
                 className={
-                  figure.id === activeFigure.id
+                  activeDoc.type === "figure" && activeDoc.id === figure.id
                     ? "explorer-row is-active"
                     : explorerSelection?.type === "figure" &&
                       explorerSelection.id === figure.id
@@ -1201,10 +1506,11 @@ function App() {
                 }
                 onClick={() => {
                   setExplorerSelection({ type: "figure", id: figure.id });
-                  activateFigure(figure.id);
+                  openDocument({ type: "figure", id: figure.id });
                 }}
               >
-                <span className="tree-symbol">▧</span>
+                <span />
+                <Icon kind="graph" />
                 <span className="tree-label">{figure.name}</span>
               </button>
             ))}
@@ -1214,62 +1520,64 @@ function App() {
     );
   }
 
-  if (!activeFigure || !activeDataset) {
-    return <div className="fatal-state">项目中没有可显示的图形。</div>;
-  }
+  const effectiveFontFamily =
+    activeFigure?.figureOverrides.fontFamily || preset.fontFamily;
+  const effectiveFontSizePt =
+    activeFigure?.figureOverrides.fontSizePt ?? preset.fontSizePt;
+  const effectiveLegendVisible =
+    activeFigure?.figureOverrides.legendVisible ?? true;
+  const aspectMode = activeFigure?.figureOverrides.aspectMode ?? "4:3";
+  const canvasMm = activeFigure
+    ? resolveCanvasMm(preset, activeFigure)
+    : { widthMm: preset.widthMm, heightMm: preset.heightMm };
 
   const lineWidth = primaryOverride.lineWidthPt ?? preset.lineWidthPt;
   const lineStyle = primaryOverride.lineStyle ?? "solid";
   const lineVisible = primaryOverride.lineVisible ?? true;
   const markerVisible =
     primaryOverride.markerVisible ??
-    (activeFigure.templateId === "xy-scatter" ||
-      activeFigure.templateId === "xy-line-marker" ||
-      activeFigure.templateId === "xy-errorbar");
+    (activeFigure?.templateId === "xy-scatter" ||
+      activeFigure?.templateId === "xy-line-marker" ||
+      activeFigure?.templateId === "xy-errorbar");
   const markerSymbol = primaryOverride.markerSymbol ?? "circle";
   const markerSize = primaryOverride.markerSizePt ?? preset.markerSizePt;
   const opacity = primaryOverride.opacity ?? 1;
-  const primaryIndex = primarySeries
-    ? Math.max(
-        0,
-        activeDataset.ys.findIndex((series) => series.id === primarySeries.id)
-      )
-    : 0;
+  const primaryIndex =
+    primarySeries && plotDataset
+      ? Math.max(
+          0,
+          plotDataset.ys.findIndex((series) => series.id === primarySeries.id)
+        )
+      : 0;
   const selectedColor =
     primaryOverride.color ||
     preset.palette[primaryIndex % preset.palette.length];
   const visible = primaryOverride.visible ?? true;
+  const fieldTemplate =
+    activeFigure?.templateId === "heatmap" ||
+    activeFigure?.templateId === "surface-3d";
+  const barTemplate =
+    activeFigure?.templateId === "bar" ||
+    activeFigure?.templateId === "grouped-bar" ||
+    activeFigure?.templateId === "stacked-bar";
+  const layerIndex =
+    activeFigure && primarySeries
+      ? activeFigure.seriesOrder.indexOf(primarySeries.id)
+      : -1;
 
-  const layerIndex = primarySeries
-    ? activeFigure.seriesOrder.indexOf(primarySeries.id)
-    : -1;
-  const isTopLayer = layerIndex === activeFigure.seriesOrder.length - 1;
-  const isBottomLayer = layerIndex <= 0;
+  const rowCount = activeSheet ? sheetRowCount(activeSheet) : 0;
+  const displayedRows = Math.min(rowCount, 1500);
+  const selectedColumn =
+    activeSheet?.columns.find((column) => column.id === selectedColumnId) ??
+    activeSheet?.columns[0];
+  const dataReadOnly = activeBook?.source.kind === "linked";
 
   const scaledWidth = Math.max(1, Number(layout.width) * previewScale);
   const scaledHeight = Math.max(1, Number(layout.height) * previewScale);
-  const fieldTemplate =
-    activeFigure.templateId === "heatmap" ||
-    activeFigure.templateId === "surface-3d";
-  const barTemplate =
-    activeFigure.templateId === "bar" ||
-    activeFigure.templateId === "grouped-bar" ||
-    activeFigure.templateId === "stacked-bar";
 
   const rootFolders = project.folders.filter((folder) => !folder.parentId);
-  const rootDatasets = project.datasets.filter((dataset) => !dataset.folderId);
+  const rootBooks = project.dataBooks.filter((book) => !book.folderId);
   const rootFigures = project.figures.filter((figure) => !figure.folderId);
-
-  const oldPreviewPath = sparkPath(
-    activeDataset.ys[0]?.values ?? [],
-    420,
-    120
-  );
-  const newPreviewPath = sparkPath(
-    pendingReplacement?.ys[0]?.values ?? [],
-    420,
-    120
-  );
 
   return (
     <div className="app-shell">
@@ -1282,7 +1590,7 @@ function App() {
         <div className="top-file-actions">
           <button type="button" onClick={newProject}>新建</button>
           <button type="button" onClick={() => projectInputRef.current?.click()}>打开</button>
-          <button type="button" onClick={saveProject}>保存</button>
+          <button type="button" onClick={() => downloadProject(project)}>保存</button>
           <span className="toolbar-divider" />
           <button type="button" disabled={!history.canUndo} onClick={history.undo}>撤销</button>
           <button type="button" disabled={!history.canRedo} onClick={history.redo}>重做</button>
@@ -1302,6 +1610,7 @@ function App() {
               <option value={1.4}>140%</option>
             </select>
           </label>
+
           <input
             ref={projectInputRef}
             className="hidden-input"
@@ -1322,10 +1631,10 @@ function App() {
               if (file) void handleDataFile(file);
             }}
           />
+
           <button className="quiet-button" type="button" onClick={restoreAutosave}>恢复</button>
-          <button className="quiet-button" type="button" onClick={() => setPasteOpen(true)}>粘贴</button>
-          <button className="quiet-button" type="button" onClick={() => triggerDataFile("replace")}>替换</button>
-          <button className="primary-button" type="button" onClick={() => triggerDataFile("add")}>导入数据</button>
+          <button className="quiet-button" type="button" onClick={() => triggerDataFile("link")}>链接数据</button>
+          <button className="primary-button" type="button" onClick={() => triggerDataFile("import")}>导入数据</button>
         </div>
       </header>
 
@@ -1335,7 +1644,6 @@ function App() {
             <input
               className="project-name-input"
               value={project.name}
-              aria-label="项目名称"
               onChange={(event) =>
                 patchProject((current) => ({
                   ...current,
@@ -1346,429 +1654,625 @@ function App() {
           </div>
 
           <div className="explorer-toolbar">
-            <button type="button" onClick={createFolder} title="新建文件夹">＋</button>
-            <button
-              type="button"
-              onClick={() => setExplorerView((value) => value === "list" ? "thumb" : "list")}
-              title="列表 / 缩略图"
-            >
-              {explorerView === "list" ? "▦" : "☷"}
+            <button type="button" onClick={createFolder} title="新建文件夹">
+              <Icon kind="folder" />
+            </button>
+            <button type="button" onClick={addBlankBook} title="新建数据表">
+              <Icon kind="book" />
             </button>
             <span />
-            <button type="button" disabled={!explorerSelection} onClick={renameExplorerItem} title="重命名">✎</button>
-            <button
-              type="button"
-              disabled={!explorerSelection || explorerSelection.type === "folder"}
-              onClick={duplicateExplorerItem}
-              title="复制"
-            >
-              ⧉
-            </button>
-            <button type="button" disabled={!explorerSelection} onClick={deleteExplorerItem} title="删除">⌫</button>
+            <button type="button" disabled={!explorerSelection} onClick={renameSelected} title="重命名">✎</button>
+            <button type="button" disabled={!explorerSelection} onClick={deleteSelected} title="删除">⌫</button>
           </div>
 
-          <div className="left-scroll">
-            {explorerView === "list" ? (
-              <div
-                className="project-tree"
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  const target = event.target as Element;
-                  if (target.closest(".folder-row")) return;
-                  const value = event.dataTransfer.getData("text/plain");
-                  const [type, id] = value.split(":");
-                  if (type === "dataset" || type === "figure") {
-                    moveExplorerItem(type, id, undefined);
-                  }
+          <div
+            className="left-scroll project-tree"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              const target = event.target as Element;
+              if (target.closest(".explorer-row")) return;
+              const [type, id] = event.dataTransfer.getData("text/plain").split(":");
+              if (type === "book" || type === "figure") {
+                moveExplorerItem(type, id, undefined);
+              }
+            }}
+          >
+            {rootFolders.map((folder) => renderFolder(folder, 0))}
+            {rootBooks.map((book) => renderBook(book, 0))}
+            {rootFigures.map((figure) => (
+              <button
+                key={figure.id}
+                type="button"
+                draggable
+                className={
+                  activeDoc.type === "figure" && activeDoc.id === figure.id
+                    ? "explorer-row is-active"
+                    : "explorer-row"
+                }
+                onDragStart={(event) =>
+                  event.dataTransfer.setData("text/plain", "figure:" + figure.id)
+                }
+                onClick={() => {
+                  setExplorerSelection({ type: "figure", id: figure.id });
+                  openDocument({ type: "figure", id: figure.id });
                 }}
               >
-                {rootFolders.map((folder) => renderExplorerFolder(folder, 0))}
-                {rootDatasets.map((dataset) => (
-                  <button
-                    key={dataset.id}
-                    type="button"
-                    draggable
-                    className="explorer-row"
-                    onDragStart={(event) =>
-                      event.dataTransfer.setData("text/plain", "dataset:" + dataset.id)
-                    }
-                    onClick={() => setExplorerSelection({ type: "dataset", id: dataset.id })}
-                  >
-                    <span className="tree-symbol">▦</span>
-                    <span className="tree-label">{dataset.name}</span>
-                  </button>
-                ))}
-                {rootFigures.map((figure) => (
-                  <button
-                    key={figure.id}
-                    type="button"
-                    draggable
-                    className={figure.id === activeFigure.id ? "explorer-row is-active" : "explorer-row"}
-                    onDragStart={(event) =>
-                      event.dataTransfer.setData("text/plain", "figure:" + figure.id)
-                    }
-                    onClick={() => activateFigure(figure.id)}
-                  >
-                    <span className="tree-symbol">▧</span>
-                    <span className="tree-label">{figure.name}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="thumbnail-grid">
-                {project.figures.map((figure) => {
-                  const dataset = project.datasets.find((item) => item.id === figure.datasetId);
-                  const itemPreset = presets[figure.presetId];
-                  return (
-                    <button
-                      key={figure.id}
-                      type="button"
-                      className={figure.id === activeFigure.id ? "thumbnail-card is-active" : "thumbnail-card"}
-                      onClick={() => {
-                        setExplorerSelection({ type: "figure", id: figure.id });
-                        activateFigure(figure.id);
-                      }}
-                    >
-                      <img
-                        src={figureThumbnailDataUrl(dataset, figure, itemPreset)}
-                        alt=""
-                      />
-                      <span>{figure.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {!fieldTemplate && (
-              <div className="series-panel">
-                <div className="series-panel-title">
-                  <span>曲线</span>
-                  <small>{selectedIds.length > 1 ? selectedIds.length + " 条已选" : "Ctrl 多选 · 拖动排序"}</small>
-                </div>
-                {[...orderedSeries].reverse().map((series) => {
-                  const sourceIndex = Math.max(
-                    0,
-                    activeDataset.ys.findIndex((item) => item.id === series.id)
-                  );
-                  const override = activeFigure.seriesOverrides[series.id] || {};
-                  const color =
-                    override.color ||
-                    preset.palette[sourceIndex % preset.palette.length];
-                  const selected = selectedIds.includes(series.id);
-
-                  return (
-                    <button
-                      key={series.id}
-                      type="button"
-                      draggable
-                      className={selected ? "series-row series-selected" : "series-row"}
-                      onDragStart={(event) =>
-                        event.dataTransfer.setData("text/plain", "series:" + series.id)
-                      }
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        const value = event.dataTransfer.getData("text/plain");
-                        const [type, id] = value.split(":");
-                        if (type === "series") reorderSeries(id, series.id);
-                      }}
-                      onClick={(event) =>
-                        selectSeries(series.id, event.ctrlKey || event.metaKey)
-                      }
-                    >
-                      <span
-                        className="series-color"
-                        style={{
-                          backgroundColor: color,
-                          opacity: override.visible === false ? 0.25 : 1
-                        }}
-                      />
-                      <span className="series-name">{series.name}</span>
-                      <span className="drag-handle">⋮⋮</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                <span />
+                <Icon kind="graph" />
+                <span className="tree-label">{figure.name}</span>
+              </button>
+            ))}
           </div>
         </aside>
 
         <section className="center-panel">
-          <div className="figure-toolbar">
-            <div className="toolbar-selects">
-              <label>
-                <span>图型</span>
-                <select
-                  value={activeFigure.templateId}
-                  onChange={(event) =>
-                    patchActiveFigure((figure) => ({
-                      ...figure,
-                      templateId: event.target.value as PlotTemplateId
-                    }))
-                  }
-                >
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>样式</span>
-                <select
-                  value={activeFigure.presetId}
-                  onChange={(event) =>
-                    patchActiveFigure((figure) => ({
-                      ...figure,
-                      presetId: event.target.value as PresetId
-                    }))
-                  }
-                >
-                  {presetOrder.map((id) => (
-                    <option key={id} value={id}>
-                      {presets[id].label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="figure-actions">
-              <button type="button" onClick={() => void resetView()}>重置</button>
-              <button type="button" onClick={() => void exportFigure("svg")}>SVG</button>
-              <button type="button" onClick={() => void exportFigure("png")}>PNG</button>
+          <div className="document-tabs">
+            {openDocs.map((doc) => (
               <button
+                key={docKey(doc)}
                 type="button"
-                onClick={() => downloadMatplotlibScript(activeDataset, activeFigure, preset)}
+                className={
+                  docKey(doc) === docKey(activeDoc)
+                    ? "document-tab is-active"
+                    : "document-tab"
+                }
+                onClick={() => openDocument(doc)}
               >
-                Python
-              </button>
-            </div>
-          </div>
-
-          <div ref={canvasRef} className="canvas-area">
-            <div
-              className="scaled-paper-shell"
-              style={{
-                width: scaledWidth + "px",
-                height: scaledHeight + "px"
-              }}
-            >
-              <div
-                className="figure-paper"
-                style={{
-                  width: layout.width + "px",
-                  height: layout.height + "px",
-                  transform: "scale(" + previewScale + ")"
-                }}
-              >
-                <div
-                  ref={plotRef}
-                  className="plot-host"
-                  style={{
-                    width: layout.width + "px",
-                    height: layout.height + "px"
+                <Icon kind={doc.type === "sheet" ? "sheet" : "graph"} />
+                <span>{docTitle(doc)}</span>
+                <i
+                  role="button"
+                  aria-label="关闭"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    closeDocument(doc);
                   }}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <aside className="right-panel">
-          <div className="inspector-tabs">
-            {([
-              ["figure", "图"],
-              ["series", "曲线"],
-              ["axis", "轴"],
-              ["legend", "图例"],
-              ["check", warningCount ? "检查 " + warningCount : "检查"]
-            ] as Array<[InspectorTab, string]>).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                className={inspectorTab === id ? "is-active" : ""}
-                disabled={id === "series" && fieldTemplate}
-                onClick={() => setInspectorTab(id)}
-              >
-                {label}
+                >
+                  ×
+                </i>
               </button>
             ))}
           </div>
 
-          <div className="inspector-scroll">
-            {inspectorTab === "figure" && (
-              <section className="inspector-pane">
-                <div className="pane-heading">
-                  <strong>图形</strong>
-                  <span>
-                    <button type="button" onClick={() => saveDefault("project")}>项目默认</button>
-                    <button type="button" onClick={() => saveDefault("user")}>我的默认</button>
-                  </span>
-                </div>
-
-                <div className="prop-row">
-                  <label>比例</label>
-                  <select
-                    value={aspectMode}
-                    onChange={(event) =>
-                      setFigureField("aspectMode", event.target.value as AspectMode)
+          {activeDoc.type === "sheet" && activeSheet && activeBook ? (
+            <>
+              <div className="data-toolbar">
+                <div className="data-toolbar-left">
+                  <span
+                    className={
+                      activeBook.source.kind === "linked"
+                        ? "source-badge is-linked"
+                        : "source-badge"
                     }
                   >
-                    <option value="16:9">16 : 9</option>
-                    <option value="4:3">4 : 3</option>
-                    <option value="3:2">3 : 2</option>
-                    <option value="custom">自定义</option>
-                  </select>
+                    {activeBook.source.kind === "linked" ? "LINKED" : "EMBEDDED"}
+                  </span>
+                  <strong>{activeSheet.name}</strong>
                 </div>
+                <div className="data-toolbar-actions">
+                  <button type="button" onClick={addSheet}>+ Sheet</button>
+                  <button type="button" disabled={dataReadOnly} onClick={addRow}>+ 行</button>
+                  <button type="button" disabled={dataReadOnly} onClick={addColumn}>+ 列</button>
+                  <button type="button" onClick={() => setPasteOpen(true)} disabled={dataReadOnly}>粘贴表</button>
+                  <button type="button" onClick={createGraphFromSheet}>新建图</button>
+                  {dataReadOnly ? (
+                    <>
+                      <button type="button" onClick={() => triggerDataFile("reload")}>重新加载</button>
+                      <button type="button" onClick={unlinkBook}>解除链接</button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => triggerDataFile("replace")}>替换表</button>
+                  )}
+                </div>
+              </div>
 
-                {aspectMode === "custom" && (
-                  <div className="prop-row">
-                    <label>自定义</label>
-                    <div className="ratio-pair">
-                      <input
-                        type="number"
-                        min="1"
-                        step="0.1"
-                        value={activeFigure.figureOverrides.customAspectWidth ?? 4}
-                        onChange={(event) =>
-                          setFigureField("customAspectWidth", Number(event.target.value))
-                        }
-                      />
-                      <span>:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        step="0.1"
-                        value={activeFigure.figureOverrides.customAspectHeight ?? 3}
-                        onChange={(event) =>
-                          setFigureField("customAspectHeight", Number(event.target.value))
-                        }
-                      />
+              <div className="sheet-workspace">
+                <div className="sheet-table-scroll">
+                  <table className="data-sheet">
+                    <thead>
+                      <tr className="column-role-row">
+                        <th className="row-index-head">#</th>
+                        {activeSheet.columns.map((column, index) => (
+                          <th
+                            key={column.id}
+                            draggable={!dataReadOnly}
+                            className={
+                              selectedColumn?.id === column.id
+                                ? "data-column is-selected"
+                                : "data-column"
+                            }
+                            onDragStart={(event) =>
+                              event.dataTransfer.setData(
+                                "text/plain",
+                                "column:" + column.id
+                              )
+                            }
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => {
+                              const [type, id] = event.dataTransfer
+                                .getData("text/plain")
+                                .split(":");
+                              if (type === "column") reorderColumns(id, column.id);
+                            }}
+                            onClick={() => {
+                              setSelectedColumnId(column.id);
+                              setDataInspectorTab("column");
+                            }}
+                          >
+                            <div className="column-letter">
+                              <span>{columnLabel(index, column.role)}</span>
+                              {!dataReadOnly && (
+                                <button
+                                  type="button"
+                                  title="删除列"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteColumn(column.id);
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                            <select
+                              value={column.role}
+                              disabled={dataReadOnly}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) =>
+                                updateColumn(column.id, {
+                                  role: event.target.value as ColumnRole
+                                })
+                              }
+                            >
+                              {ROLE_OPTIONS.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                  {item.label}
+                                </option>
+                              ))}
+                            </select>
+                          </th>
+                        ))}
+                      </tr>
+                      <tr className="column-name-row">
+                        <th className="row-index-head">名称</th>
+                        {activeSheet.columns.map((column) => (
+                          <th key={column.id}>
+                            <input
+                              value={column.name}
+                              readOnly={dataReadOnly}
+                              onFocus={() => setSelectedColumnId(column.id)}
+                              onChange={(event) =>
+                                updateColumn(column.id, { name: event.target.value })
+                              }
+                            />
+                          </th>
+                        ))}
+                      </tr>
+                      <tr className="column-unit-row">
+                        <th className="row-index-head">单位</th>
+                        {activeSheet.columns.map((column) => (
+                          <th key={column.id}>
+                            <input
+                              value={column.unit ?? ""}
+                              readOnly={dataReadOnly}
+                              placeholder="—"
+                              onFocus={() => setSelectedColumnId(column.id)}
+                              onChange={(event) =>
+                                updateColumn(column.id, {
+                                  unit: event.target.value || undefined
+                                })
+                              }
+                            />
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: displayedRows }, (_, rowIndex) => (
+                        <tr key={rowIndex}>
+                          <th className="row-number">{rowIndex + 1}</th>
+                          {activeSheet.columns.map((column) => (
+                            <td key={column.id}>
+                              <CellEditor
+                                value={column.values[rowIndex] ?? null}
+                                role={column.role}
+                                readOnly={Boolean(dataReadOnly)}
+                                onCommit={(value) =>
+                                  updateCell(
+                                    activeSheet.id,
+                                    column.id,
+                                    rowIndex,
+                                    value
+                                  )
+                                }
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {rowCount > displayedRows && (
+                    <div className="row-limit-note">
+                      当前表有 {rowCount} 行；Web 编辑器为保证流畅仅显示前 {displayedRows} 行，绘图仍使用全部数据。
                     </div>
-                  </div>
-                )}
-
-                <div className="prop-row">
-                  <label>字体</label>
-                  <div className="control-with-reset">
+                  )}
+                </div>
+              </div>
+            </>
+          ) : activeFigure && plotDataset ? (
+            <>
+              <div className="figure-toolbar">
+                <div className="toolbar-selects">
+                  <label>
+                    <span>图型</span>
                     <select
-                      value={effectiveFontFamily}
+                      value={activeFigure.templateId}
                       onChange={(event) =>
-                        setFigureField(
-                          "fontFamily",
-                          event.target.value as "Arial" | "Times New Roman"
-                        )
+                        patchActiveFigure((figure) => ({
+                          ...figure,
+                          templateId: event.target.value as PlotTemplateId
+                        }))
                       }
                     >
-                      <option>Arial</option>
-                      <option>Times New Roman</option>
+                      {templates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.label}
+                        </option>
+                      ))}
                     </select>
-                    <ResetIcon
-                      visible={activeFigure.figureOverrides.fontFamily !== undefined}
-                      onReset={() => resetFigureField("fontFamily")}
+                  </label>
+
+                  <label>
+                    <span>样式</span>
+                    <select
+                      value={activeFigure.presetId}
+                      onChange={(event) =>
+                        patchActiveFigure((figure) => ({
+                          ...figure,
+                          presetId: event.target.value as PresetId
+                        }))
+                      }
+                    >
+                      {presetOrder.map((id) => (
+                        <option key={id} value={id}>
+                          {presets[id].label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="figure-actions">
+                  <button type="button" onClick={() => openDocument({ type: "sheet", id: activeFigure.dataRef.sheetId })}>数据</button>
+                  <button type="button" onClick={() => void resetView()}>重置</button>
+                  <button type="button" onClick={() => void exportFigure("svg")}>SVG</button>
+                  <button type="button" onClick={() => void exportFigure("png")}>PNG</button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      downloadMatplotlibScript(
+                        plotDataset,
+                        activeFigure,
+                        preset
+                      )
+                    }
+                  >
+                    Python
+                  </button>
+                </div>
+              </div>
+
+              <div ref={canvasRef} className="canvas-area">
+                <div
+                  className="scaled-paper-shell"
+                  style={{
+                    width: scaledWidth + "px",
+                    height: scaledHeight + "px"
+                  }}
+                >
+                  <div
+                    className="figure-paper"
+                    style={{
+                      width: layout.width + "px",
+                      height: layout.height + "px",
+                      transform: "scale(" + previewScale + ")"
+                    }}
+                  >
+                    <div
+                      ref={plotRef}
+                      className="plot-host"
+                      style={{
+                        width: layout.width + "px",
+                        height: layout.height + "px"
+                      }}
                     />
                   </div>
                 </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-document">从左侧打开一个数据表或图形。</div>
+          )}
+        </section>
 
-                <div className="prop-row">
-                  <label>字号</label>
-                  <div className="control-with-reset">
-                    <div className="compact-number">
+        <aside className="right-panel">
+          {activeDoc.type === "sheet" && activeSheet && activeBook ? (
+            <>
+              <div className="data-inspector-tabs">
+                <button
+                  type="button"
+                  className={dataInspectorTab === "data" ? "is-active" : ""}
+                  onClick={() => setDataInspectorTab("data")}
+                >
+                  数据
+                </button>
+                <button
+                  type="button"
+                  className={dataInspectorTab === "column" ? "is-active" : ""}
+                  onClick={() => setDataInspectorTab("column")}
+                >
+                  列
+                </button>
+              </div>
+
+              <div className="inspector-scroll">
+                {dataInspectorTab === "data" && (
+                  <section className="inspector-pane">
+                    <div className="pane-heading">
+                      <strong>{activeBook.name}</strong>
+                    </div>
+
+                    <div className="prop-row">
+                      <label>来源</label>
+                      <span className="property-text">
+                        {activeBook.source.kind === "linked" ? "Linked Data" : "Embedded Data"}
+                      </span>
+                    </div>
+
+                    {activeBook.source.kind === "linked" && (
+                      <>
+                        <div className="prop-row">
+                          <label>文件</label>
+                          <span className="property-text ellipsis">
+                            {activeBook.source.fileName ?? "未定位"}
+                          </span>
+                        </div>
+                        <div className="prop-row">
+                          <label>状态</label>
+                          <span
+                            className={
+                              activeBook.source.status === "ok"
+                                ? "link-status is-ok"
+                                : "link-status"
+                            }
+                          >
+                            {activeBook.source.status === "ok"
+                              ? "已链接"
+                              : "需要重新定位"}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="section-divider">工作表</div>
+
+                    <div className="prop-row">
+                      <label>名称</label>
                       <input
-                        type="number"
-                        min="5"
-                        max="18"
-                        step="0.25"
-                        value={effectiveFontSizePt}
+                        value={activeSheet.name}
                         onChange={(event) =>
-                          setFigureField("fontSizePt", Number(event.target.value))
+                          patchSheet(activeSheet.id, (sheet) => ({
+                            ...sheet,
+                            name: event.target.value
+                          }))
                         }
                       />
-                      <span>pt</span>
                     </div>
-                    <ResetIcon
-                      visible={activeFigure.figureOverrides.fontSizePt !== undefined}
-                      onReset={() => resetFigureField("fontSizePt")}
-                    />
-                  </div>
-                </div>
+                    <div className="prop-row prop-muted">
+                      <label>行数</label>
+                      <span>{rowCount}</span>
+                    </div>
+                    <div className="prop-row prop-muted">
+                      <label>列数</label>
+                      <span>{activeSheet.columns.length}</span>
+                    </div>
 
-                <div className="prop-row">
-                  <label>背景</label>
-                  <div className="control-with-reset color-control">
-                    <input
-                      type="color"
-                      value={activeFigure.figureOverrides.background ?? "#ffffff"}
-                      onChange={(event) =>
-                        setFigureField("background", event.target.value)
-                      }
-                    />
-                    <span>{activeFigure.figureOverrides.background?.toUpperCase() ?? "#FFFFFF"}</span>
-                    <ResetIcon
-                      visible={activeFigure.figureOverrides.background !== undefined}
-                      onReset={() => resetFigureField("background")}
-                    />
-                  </div>
-                </div>
+                    <div className="source-actions">
+                      {activeBook.source.kind === "linked" ? (
+                        <>
+                          <button type="button" onClick={() => triggerDataFile("reload")}>重新选择 / 加载</button>
+                          <button type="button" onClick={unlinkBook}>解除链接并编辑</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => triggerDataFile("replace")}>替换当前表</button>
+                          <button type="button" onClick={createGraphFromSheet}>按列角色新建图</button>
+                        </>
+                      )}
+                    </div>
+                  </section>
+                )}
 
-                <div className="prop-row prop-muted">
-                  <label>尺寸</label>
-                  <span>
-                    {canvasMm.widthMm.toFixed(0)} × {canvasMm.heightMm.toFixed(1)} mm
-                  </span>
-                </div>
+                {dataInspectorTab === "column" && selectedColumn && (
+                  <section className="inspector-pane">
+                    <div className="pane-heading">
+                      <strong>{selectedColumn.name}</strong>
+                      <span>{selectedColumn.role}</span>
+                    </div>
 
-                {(activeFigure.templateId === "xy-errorbar" ||
-                  activeFigure.templateId === "offset-spectrum" ||
-                  fieldTemplate) && (
-                  <>
-                    <div className="section-divider">图型参数</div>
+                    <div className="prop-row">
+                      <label>名称</label>
+                      <input
+                        value={selectedColumn.name}
+                        readOnly={dataReadOnly}
+                        onChange={(event) =>
+                          updateColumn(selectedColumn.id, {
+                            name: event.target.value
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>单位</label>
+                      <input
+                        value={selectedColumn.unit ?? ""}
+                        readOnly={dataReadOnly}
+                        onChange={(event) =>
+                          updateColumn(selectedColumn.id, {
+                            unit: event.target.value || undefined
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>角色</label>
+                      <select
+                        value={selectedColumn.role}
+                        disabled={dataReadOnly}
+                        onChange={(event) =>
+                          updateColumn(selectedColumn.id, {
+                            role: event.target.value as ColumnRole
+                          })
+                        }
+                      >
+                        {ROLE_OPTIONS.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="prop-row prop-muted">
+                      <label>有效值</label>
+                      <span>
+                        {
+                          selectedColumn.values.filter(
+                            (value) => value !== null && value !== ""
+                          ).length
+                        }
+                      </span>
+                    </div>
 
-                    {activeFigure.templateId === "xy-errorbar" && (
-                      <div className="prop-row">
-                        <label>误差列</label>
+                    <div className="column-role-help">
+                      <strong>列角色</strong>
+                      <p><b>X</b> 横坐标；<b>Y</b> 主数据；<b>Z</b> 二维/三维场；<b>XErr / YErr</b> 误差；<b>Label</b> 文本标签。</p>
+                      <p>角色只决定“新建图”时的默认映射；已有图通过稳定 Column ID 引用，不会因你改角色而突然换数据。</p>
+                    </div>
+                  </section>
+                )}
+              </div>
+            </>
+          ) : activeFigure && plotDataset ? (
+            <>
+              <div className="inspector-tabs">
+                {([
+                  ["figure", "图"],
+                  ["series", "曲线"],
+                  ["axis", "轴"],
+                  ["legend", "图例"],
+                  ["check", warningCount ? "检查 " + warningCount : "检查"]
+                ] as Array<[InspectorTab, string]>).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={inspectorTab === id ? "is-active" : ""}
+                    disabled={id === "series" && fieldTemplate}
+                    onClick={() => setInspectorTab(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="inspector-scroll">
+                {inspectorTab === "figure" && (
+                  <section className="inspector-pane">
+                    <div className="pane-heading">
+                      <strong>{activeFigure.name}</strong>
+                      <span>
+                        <button type="button" onClick={() => saveDefault("project")}>项目默认</button>
+                        <button type="button" onClick={() => saveDefault("user")}>我的默认</button>
+                      </span>
+                    </div>
+
+                    <div className="prop-row">
+                      <label>数据表</label>
+                      <span className="property-text ellipsis">
+                        {figureSheetContext?.book.name} · {figureSheet?.name}
+                      </span>
+                    </div>
+
+                    <div className="prop-row">
+                      <label>比例</label>
+                      <select
+                        value={aspectMode}
+                        onChange={(event) =>
+                          setFigureField("aspectMode", event.target.value as AspectMode)
+                        }
+                      >
+                        <option value="16:9">16 : 9</option>
+                        <option value="4:3">4 : 3</option>
+                        <option value="3:2">3 : 2</option>
+                        <option value="custom">自定义</option>
+                      </select>
+                    </div>
+
+                    <div className="prop-row">
+                      <label>字体</label>
+                      <div className="control-with-reset">
                         <select
-                          value={activeFigure.figureOverrides.errorSeriesId ?? ""}
+                          value={effectiveFontFamily}
                           onChange={(event) =>
                             setFigureField(
-                              "errorSeriesId",
-                              event.target.value || undefined
+                              "fontFamily",
+                              event.target.value as "Arial" | "Times New Roman"
                             )
                           }
                         >
-                          <option value="">无</option>
-                          {activeDataset.ys.map((series) => (
-                            <option key={series.id} value={series.id}>
-                              {series.name}
-                            </option>
-                          ))}
+                          <option>Arial</option>
+                          <option>Times New Roman</option>
                         </select>
+                        <ResetIcon
+                          visible={activeFigure.figureOverrides.fontFamily !== undefined}
+                          onReset={() => resetFigureField("fontFamily")}
+                        />
                       </div>
-                    )}
+                    </div>
 
-                    {activeFigure.templateId === "offset-spectrum" && (
-                      <div className="prop-row">
-                        <label>层间偏移</label>
+                    <div className="prop-row">
+                      <label>字号</label>
+                      <div className="control-with-reset">
                         <div className="compact-number">
                           <input
                             type="number"
-                            step="0.5"
-                            value={activeFigure.figureOverrides.offsetStep ?? 5}
+                            min="5"
+                            max="18"
+                            step="0.25"
+                            value={effectiveFontSizePt}
                             onChange={(event) =>
-                              setFigureField("offsetStep", Number(event.target.value))
+                              setFigureField("fontSizePt", Number(event.target.value))
                             }
                           />
-                          <span>Y</span>
+                          <span>pt</span>
                         </div>
+                        <ResetIcon
+                          visible={activeFigure.figureOverrides.fontSizePt !== undefined}
+                          onReset={() => resetFigureField("fontSizePt")}
+                        />
                       </div>
-                    )}
+                    </div>
+
+                    <div className="prop-row prop-muted">
+                      <label>尺寸</label>
+                      <span>
+                        {canvasMm.widthMm.toFixed(0)} × {canvasMm.heightMm.toFixed(1)} mm
+                      </span>
+                    </div>
 
                     {fieldTemplate && (
                       <>
+                        <div className="section-divider">场图</div>
                         <div className="prop-row">
                           <label>色图</label>
                           <select
@@ -1788,505 +2292,428 @@ function App() {
                             <option>Greys</option>
                           </select>
                         </div>
+                      </>
+                    )}
+                  </section>
+                )}
+
+                {inspectorTab === "series" && !fieldTemplate && primarySeries && (
+                  <section className="inspector-pane">
+                    <div className="pane-heading">
+                      <strong>
+                        {selectedSeries.length > 1
+                          ? selectedSeries.length + " 条曲线"
+                          : primarySeries.name}
+                      </strong>
+                      <span>Ctrl / ⌘ 多选</span>
+                    </div>
+
+                    <div className="series-selector">
+                      {orderedSeries.map((series) => {
+                        const sourceIndex = Math.max(
+                          0,
+                          plotDataset.ys.findIndex((item) => item.id === series.id)
+                        );
+                        const override = activeFigure.seriesOverrides[series.id] || {};
+                        const color =
+                          override.color ||
+                          preset.palette[sourceIndex % preset.palette.length];
+                        return (
+                          <button
+                            key={series.id}
+                            type="button"
+                            className={
+                              selectedSeries.includes(series.id)
+                                ? "series-select-row is-selected"
+                                : "series-select-row"
+                            }
+                            onClick={(event) =>
+                              selectSeries(series.id, event.ctrlKey || event.metaKey)
+                            }
+                          >
+                            <i style={{ backgroundColor: color }} />
+                            <span>{series.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="section-divider">样式</div>
+
+                    <div className="prop-row">
+                      <label>显示</label>
+                      <MiniSwitch
+                        checked={visible}
+                        onChange={(value) => updateSelectedSeries({ visible: value })}
+                      />
+                    </div>
+
+                    {!barTemplate && (
+                      <>
                         <div className="prop-row">
-                          <label>反转色图</label>
+                          <label>线条</label>
                           <MiniSwitch
-                            checked={activeFigure.figureOverrides.reverseColorScale ?? false}
+                            checked={lineVisible}
                             onChange={(value) =>
-                              setFigureField("reverseColorScale", value)
+                              updateSelectedSeries({ lineVisible: value })
                             }
                           />
+                        </div>
+
+                        <div className="prop-row">
+                          <label>线型</label>
+                          <select
+                            value={lineStyle}
+                            onChange={(event) =>
+                              updateSelectedSeries({
+                                lineStyle: event.target.value as LineStyle
+                              })
+                            }
+                          >
+                            <option value="solid">实线</option>
+                            <option value="dash">虚线</option>
+                            <option value="dot">点线</option>
+                            <option value="dashdot">点划线</option>
+                          </select>
+                        </div>
+
+                        <div className="prop-row">
+                          <label>线宽</label>
+                          <div className="control-with-reset">
+                            <div className="compact-number">
+                              <input
+                                type="number"
+                                min="0.3"
+                                max="6"
+                                step="0.05"
+                                value={lineWidth}
+                                onChange={(event) =>
+                                  updateSelectedSeries({
+                                    lineWidthPt: Number(event.target.value)
+                                  })
+                                }
+                              />
+                              <span>pt</span>
+                            </div>
+                            <ResetIcon
+                              visible={primaryOverride.lineWidthPt !== undefined}
+                              onReset={() => resetSelectedSeriesField("lineWidthPt")}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="prop-row">
+                          <label>数据点</label>
+                          <select
+                            value={markerVisible ? markerSymbol : "none"}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              if (value === "none") {
+                                updateSelectedSeries({ markerVisible: false });
+                              } else {
+                                updateSelectedSeries({
+                                  markerVisible: true,
+                                  markerSymbol: value as MarkerSymbol
+                                });
+                              }
+                            }}
+                          >
+                            <option value="none">无</option>
+                            <option value="circle">圆点</option>
+                            <option value="square">方形</option>
+                            <option value="diamond">菱形</option>
+                            <option value="triangle-up">上三角</option>
+                            <option value="triangle-down">下三角</option>
+                            <option value="cross">十字</option>
+                            <option value="x">X</option>
+                          </select>
+                        </div>
+
+                        <div className="prop-row">
+                          <label>点大小</label>
+                          <div className="compact-number">
+                            <input
+                              type="number"
+                              min="1"
+                              max="16"
+                              step="0.25"
+                              value={markerSize}
+                              disabled={!markerVisible}
+                              onChange={(event) =>
+                                updateSelectedSeries({
+                                  markerSizePt: Number(event.target.value)
+                                })
+                              }
+                            />
+                            <span>pt</span>
+                          </div>
                         </div>
                       </>
                     )}
-                  </>
-                )}
-              </section>
-            )}
-
-            {inspectorTab === "series" && !fieldTemplate && primarySeries && (
-              <section className="inspector-pane">
-                <div className="pane-heading">
-                  <strong>
-                    {selectedIds.length > 1
-                      ? selectedIds.length + " 条曲线"
-                      : primarySeries.name}
-                  </strong>
-                  <span>Ctrl / ⌘ 多选</span>
-                </div>
-
-                <div className="prop-row">
-                  <label>显示</label>
-                  <MiniSwitch
-                    checked={visible}
-                    onChange={(value) => updateSelectedSeries({ visible: value })}
-                  />
-                </div>
-
-                {!barTemplate && (
-                  <>
-                    <div className="prop-row">
-                      <label>线条</label>
-                      <MiniSwitch
-                        checked={lineVisible}
-                        onChange={(value) =>
-                          updateSelectedSeries({ lineVisible: value })
-                        }
-                      />
-                    </div>
 
                     <div className="prop-row">
-                      <label>线型</label>
-                      <select
-                        value={lineStyle}
-                        onChange={(event) =>
-                          updateSelectedSeries({
-                            lineStyle: event.target.value as LineStyle
-                          })
-                        }
-                      >
-                        <option value="solid">实线</option>
-                        <option value="dash">虚线</option>
-                        <option value="dot">点线</option>
-                        <option value="dashdot">点划线</option>
-                      </select>
-                    </div>
-
-                    <div className="prop-row">
-                      <label>线宽</label>
-                      <div className="control-with-reset">
-                        <div className="compact-number">
-                          <input
-                            type="number"
-                            min="0.3"
-                            max="6"
-                            step="0.05"
-                            value={lineWidth}
-                            onChange={(event) =>
-                              updateSelectedSeries({
-                                lineWidthPt: Number(event.target.value)
-                              })
-                            }
-                          />
-                          <span>pt</span>
-                        </div>
-                        <ResetIcon
-                          visible={primaryOverride.lineWidthPt !== undefined}
-                          onReset={() => resetSelectedSeriesField("lineWidthPt")}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="prop-row">
-                      <label>数据点</label>
-                      <select
-                        value={markerVisible ? markerSymbol : "none"}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          if (value === "none") {
-                            updateSelectedSeries({ markerVisible: false });
-                          } else {
+                      <label>透明度</label>
+                      <div className="compact-number">
+                        <input
+                          type="number"
+                          min="5"
+                          max="100"
+                          step="5"
+                          value={Math.round(opacity * 100)}
+                          onChange={(event) =>
                             updateSelectedSeries({
-                              markerVisible: true,
-                              markerSymbol: value as MarkerSymbol
-                            });
+                              opacity: Number(event.target.value) / 100
+                            })
                           }
-                        }}
-                      >
-                        <option value="none">无</option>
-                        <option value="circle">圆点</option>
-                        <option value="square">方形</option>
-                        <option value="diamond">菱形</option>
-                        <option value="triangle-up">上三角</option>
-                        <option value="triangle-down">下三角</option>
-                        <option value="cross">十字</option>
-                        <option value="x">X</option>
-                      </select>
+                        />
+                        <span>%</span>
+                      </div>
                     </div>
 
                     <div className="prop-row">
-                      <label>点大小</label>
-                      <div className="control-with-reset">
-                        <div className="compact-number">
-                          <input
-                            type="number"
-                            min="1"
-                            max="16"
-                            step="0.25"
-                            value={markerSize}
-                            disabled={!markerVisible}
-                            onChange={(event) =>
-                              updateSelectedSeries({
-                                markerSizePt: Number(event.target.value)
-                              })
-                            }
-                          />
-                          <span>pt</span>
-                        </div>
+                      <label>颜色</label>
+                      <div className="control-with-reset color-control">
+                        <input
+                          type="color"
+                          value={selectedColor}
+                          onChange={(event) =>
+                            updateSelectedSeries({ color: event.target.value })
+                          }
+                        />
+                        <span>{selectedColor.toUpperCase()}</span>
                         <ResetIcon
-                          visible={primaryOverride.markerSizePt !== undefined}
-                          onReset={() => resetSelectedSeriesField("markerSizePt")}
+                          visible={primaryOverride.color !== undefined}
+                          onReset={() => resetSelectedSeriesField("color")}
                         />
                       </div>
                     </div>
-                  </>
+
+                    <div className="prop-row">
+                      <label>图层</label>
+                      <div className="layer-inline">
+                        <button
+                          type="button"
+                          disabled={layerIndex <= 0}
+                          onClick={() => {
+                            if (!primarySeries) return;
+                            patchActiveFigure((figure) => {
+                              const order = [...figure.seriesOrder];
+                              const index = order.indexOf(primarySeries.id);
+                              if (index <= 0) return figure;
+                              [order[index - 1], order[index]] = [
+                                order[index],
+                                order[index - 1]
+                              ];
+                              return { ...figure, seriesOrder: order };
+                            });
+                          }}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            !activeFigure ||
+                            layerIndex >= activeFigure.seriesOrder.length - 1
+                          }
+                          onClick={() => {
+                            if (!primarySeries) return;
+                            patchActiveFigure((figure) => {
+                              const order = [...figure.seriesOrder];
+                              const index = order.indexOf(primarySeries.id);
+                              if (index < 0 || index >= order.length - 1) return figure;
+                              [order[index], order[index + 1]] = [
+                                order[index + 1],
+                                order[index]
+                              ];
+                              return { ...figure, seriesOrder: order };
+                            });
+                          }}
+                        >
+                          ↑
+                        </button>
+                      </div>
+                    </div>
+                  </section>
                 )}
 
-                <div className="prop-row">
-                  <label>透明度</label>
-                  <div className="control-with-reset">
-                    <div className="compact-number">
+                {inspectorTab === "axis" && (
+                  <section className="inspector-pane">
+                    <div className="pane-heading"><strong>坐标轴</strong></div>
+
+                    <div className="prop-row">
+                      <label>X 标题</label>
                       <input
-                        type="number"
-                        min="5"
-                        max="100"
-                        step="5"
-                        value={Math.round(opacity * 100)}
-                        onChange={(event) =>
-                          updateSelectedSeries({
-                            opacity: Number(event.target.value) / 100
-                          })
-                        }
+                        type="text"
+                        value={activeFigure.figureOverrides.xTitle ?? ""}
+                        onChange={(event) => setFigureField("xTitle", event.target.value)}
                       />
-                      <span>%</span>
                     </div>
-                    <ResetIcon
-                      visible={primaryOverride.opacity !== undefined}
-                      onReset={() => resetSelectedSeriesField("opacity")}
-                    />
-                  </div>
-                </div>
-
-                <div className="prop-row">
-                  <label>颜色</label>
-                  <div className="control-with-reset color-control">
-                    <input
-                      type="color"
-                      value={selectedColor}
-                      onChange={(event) =>
-                        updateSelectedSeries({ color: event.target.value })
-                      }
-                    />
-                    <span>{selectedColor.toUpperCase()}</span>
-                    <ResetIcon
-                      visible={primaryOverride.color !== undefined}
-                      onReset={() => resetSelectedSeriesField("color")}
-                    />
-                  </div>
-                </div>
-
-                <div className="prop-row">
-                  <label>图层</label>
-                  <div className="layer-inline">
-                    <button
-                      type="button"
-                      disabled={isBottomLayer}
-                      onClick={() => moveSelectedSeries("down")}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isTopLayer}
-                      onClick={() => moveSelectedSeries("up")}
-                    >
-                      ↑
-                    </button>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {inspectorTab === "axis" && (
-              <section className="inspector-pane">
-                <div className="pane-heading">
-                  <strong>坐标轴</strong>
-                  <span>点击图中坐标轴可直接进入</span>
-                </div>
-
-                <div className="prop-row">
-                  <label>X 标题</label>
-                  <input
-                    type="text"
-                    value={
-                      activeFigure.figureOverrides.xTitle ??
-                      axisLabel(activeDataset.x.name, activeDataset.x.unit)
-                    }
-                    onChange={(event) =>
-                      setFigureField("xTitle", event.target.value)
-                    }
-                  />
-                </div>
-
-                <div className="prop-row">
-                  <label>Y 标题</label>
-                  <input
-                    type="text"
-                    value={
-                      activeFigure.figureOverrides.yTitle ??
-                      axisLabel(
-                        fieldTemplate
-                          ? activeDataset.metadata?.rowAxisName ?? "Y"
-                          : activeDataset.ys[0]?.name ?? "Y",
-                        fieldTemplate
-                          ? activeDataset.metadata?.rowAxisUnit
-                          : activeDataset.ys[0]?.unit
-                      )
-                    }
-                    onChange={(event) =>
-                      setFigureField("yTitle", event.target.value)
-                    }
-                  />
-                </div>
-
-                {!fieldTemplate && (
-                  <>
                     <div className="prop-row">
-                      <label>X 标度</label>
+                      <label>Y 标题</label>
+                      <input
+                        type="text"
+                        value={activeFigure.figureOverrides.yTitle ?? ""}
+                        onChange={(event) => setFigureField("yTitle", event.target.value)}
+                      />
+                    </div>
+
+                    {!fieldTemplate && (
+                      <>
+                        <div className="prop-row">
+                          <label>X 标度</label>
+                          <select
+                            value={activeFigure.figureOverrides.xScale ?? "linear"}
+                            onChange={(event) =>
+                              setFigureField("xScale", event.target.value as AxisScale)
+                            }
+                          >
+                            <option value="linear">线性</option>
+                            <option value="log">对数</option>
+                          </select>
+                        </div>
+                        <div className="prop-row">
+                          <label>Y 标度</label>
+                          <select
+                            value={activeFigure.figureOverrides.yScale ?? "linear"}
+                            onChange={(event) =>
+                              setFigureField("yScale", event.target.value as AxisScale)
+                            }
+                          >
+                            <option value="linear">线性</option>
+                            <option value="log">对数</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="prop-row">
+                      <label>刻度方向</label>
                       <select
-                        value={activeFigure.figureOverrides.xScale ?? "linear"}
+                        value={activeFigure.figureOverrides.tickDirection ?? "inside"}
                         onChange={(event) =>
-                          setFigureField("xScale", event.target.value as AxisScale)
+                          setFigureField(
+                            "tickDirection",
+                            event.target.value as TickDirection
+                          )
                         }
                       >
-                        <option value="linear">线性</option>
-                        <option value="log">对数</option>
+                        <option value="inside">向内</option>
+                        <option value="outside">向外</option>
                       </select>
                     </div>
-
                     <div className="prop-row">
-                      <label>Y 标度</label>
-                      <select
-                        value={activeFigure.figureOverrides.yScale ?? "linear"}
-                        onChange={(event) =>
-                          setFigureField("yScale", event.target.value as AxisScale)
+                      <label>次刻度</label>
+                      <MiniSwitch
+                        checked={activeFigure.figureOverrides.minorTicks ?? false}
+                        onChange={(value) => setFigureField("minorTicks", value)}
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>网格</label>
+                      <MiniSwitch
+                        checked={
+                          activeFigure.figureOverrides.gridVisible ??
+                          preset.showGrid
                         }
-                      >
-                        <option value="linear">线性</option>
-                        <option value="log">对数</option>
-                      </select>
+                        onChange={(value) => setFigureField("gridVisible", value)}
+                      />
                     </div>
-
-                    <div className="prop-row">
-                      <label>X 范围</label>
-                      <div className="range-control">
-                        <MiniSwitch
-                          checked={activeFigure.figureOverrides.xAutoRange !== false}
-                          onChange={(value) => setFigureField("xAutoRange", value)}
-                        />
-                        <input
-                          type="number"
-                          placeholder="min"
-                          disabled={activeFigure.figureOverrides.xAutoRange !== false}
-                          value={activeFigure.figureOverrides.xMin ?? ""}
-                          onChange={(event) =>
-                            setFigureField(
-                              "xMin",
-                              event.target.value === "" ? undefined : Number(event.target.value)
-                            )
-                          }
-                        />
-                        <input
-                          type="number"
-                          placeholder="max"
-                          disabled={activeFigure.figureOverrides.xAutoRange !== false}
-                          value={activeFigure.figureOverrides.xMax ?? ""}
-                          onChange={(event) =>
-                            setFigureField(
-                              "xMax",
-                              event.target.value === "" ? undefined : Number(event.target.value)
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="prop-row">
-                      <label>Y 范围</label>
-                      <div className="range-control">
-                        <MiniSwitch
-                          checked={activeFigure.figureOverrides.yAutoRange !== false}
-                          onChange={(value) => setFigureField("yAutoRange", value)}
-                        />
-                        <input
-                          type="number"
-                          placeholder="min"
-                          disabled={activeFigure.figureOverrides.yAutoRange !== false}
-                          value={activeFigure.figureOverrides.yMin ?? ""}
-                          onChange={(event) =>
-                            setFigureField(
-                              "yMin",
-                              event.target.value === "" ? undefined : Number(event.target.value)
-                            )
-                          }
-                        />
-                        <input
-                          type="number"
-                          placeholder="max"
-                          disabled={activeFigure.figureOverrides.yAutoRange !== false}
-                          value={activeFigure.figureOverrides.yMax ?? ""}
-                          onChange={(event) =>
-                            setFigureField(
-                              "yMax",
-                              event.target.value === "" ? undefined : Number(event.target.value)
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-                  </>
+                  </section>
                 )}
 
-                <div className="prop-row">
-                  <label>刻度方向</label>
-                  <select
-                    value={activeFigure.figureOverrides.tickDirection ?? "inside"}
-                    onChange={(event) =>
-                      setFigureField(
-                        "tickDirection",
-                        event.target.value as TickDirection
-                      )
-                    }
-                  >
-                    <option value="inside">向内</option>
-                    <option value="outside">向外</option>
-                  </select>
-                </div>
-
-                <div className="prop-row">
-                  <label>次刻度</label>
-                  <MiniSwitch
-                    checked={activeFigure.figureOverrides.minorTicks ?? false}
-                    onChange={(value) => setFigureField("minorTicks", value)}
-                  />
-                </div>
-
-                <div className="prop-row">
-                  <label>网格</label>
-                  <MiniSwitch
-                    checked={
-                      activeFigure.figureOverrides.gridVisible ??
-                      preset.showGrid
-                    }
-                    onChange={(value) => setFigureField("gridVisible", value)}
-                  />
-                </div>
-              </section>
-            )}
-
-            {inspectorTab === "legend" && (
-              <section className="inspector-pane">
-                <div className="pane-heading">
-                  <strong>图例</strong>
-                  <span>点击图例可直接进入</span>
-                </div>
-
-                <div className="prop-row">
-                  <label>显示</label>
-                  <MiniSwitch
-                    checked={effectiveLegendVisible}
-                    onChange={(value) => setFigureField("legendVisible", value)}
-                  />
-                </div>
-
-                <div className="prop-row">
-                  <label>位置</label>
-                  <select
-                    value={
-                      activeFigure.figureOverrides.legendPosition ?? "top-left"
-                    }
-                    onChange={(event) =>
-                      setFigureField(
-                        "legendPosition",
-                        event.target.value as LegendPosition
-                      )
-                    }
-                  >
-                    <option value="top-left">左上</option>
-                    <option value="top-center">上中</option>
-                    <option value="top-right">右上</option>
-                    <option value="bottom-left">左下</option>
-                    <option value="bottom-center">下中</option>
-                    <option value="bottom-right">右下</option>
-                  </select>
-                </div>
-
-                <div className="prop-row">
-                  <label>方向</label>
-                  <select
-                    value={
-                      activeFigure.figureOverrides.legendOrientation ??
-                      "horizontal"
-                    }
-                    onChange={(event) =>
-                      setFigureField(
-                        "legendOrientation",
-                        event.target.value as LegendOrientation
-                      )
-                    }
-                  >
-                    <option value="horizontal">横向</option>
-                    <option value="vertical">纵向</option>
-                  </select>
-                </div>
-
-                <div className="prop-row">
-                  <label>列数</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="6"
-                    step="1"
-                    value={activeFigure.figureOverrides.legendColumns ?? 1}
-                    onChange={(event) =>
-                      setFigureField(
-                        "legendColumns",
-                        Math.max(1, Number(event.target.value))
-                      )
-                    }
-                  />
-                </div>
-
-                <div className="prop-row">
-                  <label>边框</label>
-                  <MiniSwitch
-                    checked={activeFigure.figureOverrides.legendFrame ?? false}
-                    onChange={(value) => setFigureField("legendFrame", value)}
-                  />
-                </div>
-              </section>
-            )}
-
-            {inspectorTab === "check" && (
-              <section className="inspector-pane checker-pane">
-                <div className="pane-heading">
-                  <strong>出版检查</strong>
-                  <span>{warningCount ? warningCount + " 项需要确认" : "未发现明显问题"}</span>
-                </div>
-
-                <div className="checker-list">
-                  {checkItems.map((item) => (
-                    <div className={"check-item " + item.level} key={item.id}>
-                      <span className="check-icon">
-                        {item.level === "pass" ? "✓" : item.level === "warn" ? "!" : "i"}
-                      </span>
-                      <div>
-                        <strong>{item.title}</strong>
-                        <p>{item.detail}</p>
-                      </div>
+                {inspectorTab === "legend" && (
+                  <section className="inspector-pane">
+                    <div className="pane-heading"><strong>图例</strong></div>
+                    <div className="prop-row">
+                      <label>显示</label>
+                      <MiniSwitch
+                        checked={effectiveLegendVisible}
+                        onChange={(value) => setFigureField("legendVisible", value)}
+                      />
                     </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
+                    <div className="prop-row">
+                      <label>位置</label>
+                      <select
+                        value={
+                          activeFigure.figureOverrides.legendPosition ?? "top-left"
+                        }
+                        onChange={(event) =>
+                          setFigureField(
+                            "legendPosition",
+                            event.target.value as LegendPosition
+                          )
+                        }
+                      >
+                        <option value="top-left">左上</option>
+                        <option value="top-center">上中</option>
+                        <option value="top-right">右上</option>
+                        <option value="bottom-left">左下</option>
+                        <option value="bottom-center">下中</option>
+                        <option value="bottom-right">右下</option>
+                      </select>
+                    </div>
+                    <div className="prop-row">
+                      <label>方向</label>
+                      <select
+                        value={
+                          activeFigure.figureOverrides.legendOrientation ??
+                          "horizontal"
+                        }
+                        onChange={(event) =>
+                          setFigureField(
+                            "legendOrientation",
+                            event.target.value as LegendOrientation
+                          )
+                        }
+                      >
+                        <option value="horizontal">横向</option>
+                        <option value="vertical">纵向</option>
+                      </select>
+                    </div>
+                    <div className="prop-row">
+                      <label>边框</label>
+                      <MiniSwitch
+                        checked={activeFigure.figureOverrides.legendFrame ?? false}
+                        onChange={(value) => setFigureField("legendFrame", value)}
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {inspectorTab === "check" && (
+                  <section className="inspector-pane checker-pane">
+                    <div className="pane-heading">
+                      <strong>出版检查</strong>
+                      <span>{warningCount ? warningCount + " 项需要确认" : "未发现明显问题"}</span>
+                    </div>
+                    <div className="checker-list">
+                      {checkItems.map((item) => (
+                        <div className={"check-item " + item.level} key={item.id}>
+                          <span className="check-icon">
+                            {item.level === "pass" ? "✓" : item.level === "warn" ? "!" : "i"}
+                          </span>
+                          <div>
+                            <strong>{item.title}</strong>
+                            <p>{item.detail}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="empty-inspector">选择数据表或图形查看属性。</div>
+          )}
         </aside>
       </main>
 
-      {pasteOpen && (
+      {pasteOpen && activeBook && (
         <div className="modal-backdrop" onMouseDown={() => setPasteOpen(false)}>
           <div className="paste-dialog" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="dialog-title">粘贴数据</div>
+            <div className="dialog-title">粘贴为新工作表</div>
             <textarea
               autoFocus
               value={pasteText}
@@ -2295,42 +2722,7 @@ function App() {
             />
             <div className="dialog-actions">
               <button type="button" onClick={() => setPasteOpen(false)}>取消</button>
-              <button className="primary-button" type="button" onClick={importPastedData}>导入</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pendingReplacement && (
-        <div className="modal-backdrop" onMouseDown={() => setPendingReplacement(null)}>
-          <div className="replace-dialog" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="dialog-title">替换数据预览</div>
-            <div className="replace-summary">
-              <div>
-                <strong>当前数据</strong>
-                <span>{activeDataset.name}</span>
-                <small>{activeDataset.x.values.length} 行 · {activeDataset.ys.length} 个 Y</small>
-              </div>
-              <div className="replace-arrow">→</div>
-              <div>
-                <strong>新数据</strong>
-                <span>{pendingReplacement.name}</span>
-                <small>{pendingReplacement.x.values.length} 行 · {pendingReplacement.ys.length} 个 Y</small>
-              </div>
-            </div>
-            <div className="diff-preview">
-              <div className="diff-legend">
-                <span><i className="old-line" />旧数据</span>
-                <span><i className="new-line" />新数据</span>
-              </div>
-              <svg viewBox="0 0 420 120" preserveAspectRatio="none">
-                <path d={oldPreviewPath} className="old-path" />
-                <path d={newPreviewPath} className="new-path" />
-              </svg>
-            </div>
-            <div className="dialog-actions">
-              <button type="button" onClick={() => setPendingReplacement(null)}>取消</button>
-              <button className="primary-button" type="button" onClick={acceptReplacement}>确认替换</button>
+              <button className="primary-button" type="button" onClick={pasteAsNewSheet}>创建 Sheet</button>
             </div>
           </div>
         </div>
