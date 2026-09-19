@@ -102,15 +102,20 @@ v0.4 将数据源身份放在 **工作表**，而不是数据簿。
 已有能力继续保留：
 
 - Line / Scatter / Line + Marker / Errorbar；
-- Spectrum / Offset Spectrum；
-- Bar / Grouped / Stacked；
-- Heatmap / Surface 3D；
+- Spectrum / Offset Spectrum / Waterfall / 双 Y；
+- Bar / Grouped / Stacked，并支持柱状图数值标签；
+- Heatmap / Contour / Surface 3D；
 - Scientific / Nature / Presentation；
+- Matplotlib tab10 风格科研默认、向外 Tick、模板感知的自动图例；
+- 图例支持图内六位置、自由拖动与“图外右侧”出版布局；
+- 标题、轴标题、图例、色条支持本地 MathJax / LaTeX，不依赖 CDN；
+- 双 Y 左右轴标题与刻度可随对应数据颜色区分；
+- 场图实际行坐标、色图 / Z 范围 / Colorbar / Contour levels；
 - 曲线批量样式；
 - 轴 / 图例属性；
 - Publication Checker；
 - SVG / PNG 600 dpi；
-- Matplotlib Python script export；
+- Matplotlib Python script export，并与 GUI 主要默认样式保持一致；
 - Tauri + Matplotlib publication renderer 基础层。
 
 ## 本轮明确延后
@@ -148,3 +153,10 @@ Figure 文档与数据绑定正式分离。左侧项目树可以直接“新建�
 - 引用失效：原工作表或 Column ID 已无法解析，不做静默 fallback。
 
 当前 XY / Bar / Field / 3D 模板均允许 X 留空；无显式 X 时使用 `1, 2, 3, ...` 行号。工作表快捷建图只要求至少一列主数据 Y。
+
+
+## Matplotlib Gallery 视觉基准
+
+P108 当前把 Matplotlib 官方 Gallery 作为科研单图的主要视觉参考之一，但不机械复制 API。重点对齐的是出版语义：稳定色循环、合理线宽 / marker、向外 Tick、克制网格、按需要显示图例、Errorbar / Bar / Field / 3D 的典型表达。
+
+新建项目中增加“常用图验收”文件夹，内置 Scatter、Errorbar、Bar、Grouped Bar、Stacked Bar 的可点击 QA 示例。该文件夹用于开发和交互验收，不改变 .sfig schema 0.5。
