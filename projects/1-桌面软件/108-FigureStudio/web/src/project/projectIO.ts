@@ -377,8 +377,11 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
   if (raw.format !== "sfig") {
     throw new Error("不是有效的 FigureStudio 项目文件。");
   }
+  if (raw.schemaVersion === "0.5") {
+    return loadV05(archive, raw as ProjectDocumentV05);
+  }
   if (raw.schemaVersion === "0.4") {
-    return loadV04(archive, raw as ProjectDocumentV05);
+    return migrateV04(archive, raw as ProjectDocumentV04);
   }
   if (raw.schemaVersion === "0.3") {
     return migrateV03(archive, raw as ProjectDocumentV03);
