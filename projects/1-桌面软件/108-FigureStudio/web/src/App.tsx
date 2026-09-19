@@ -22,7 +22,6 @@ import { downloadMatplotlibScript } from "./export/matplotlib";
 import { useHistoryState } from "./hooks/useHistoryState";
 import { parseDelimitedText } from "./lib/csv";
 import {
-  plainMathFallback,
   resolveSafeMathText,
   type MathTextState
 } from "./lib/mathText";
@@ -419,12 +418,6 @@ function App() {
   const rawXTitle = activeFigure?.figureOverrides.xTitle;
   const rawYTitle = activeFigure?.figureOverrides.yTitle;
   const rawRightYTitle = activeFigure?.figureOverrides.rightYTitle;
-  const [displayText, setDisplayText] = useState<{
-    plotTitle?: string;
-    xTitle?: string;
-    yTitle?: string;
-    rightYTitle?: string;
-  }>({});
   const [mathTextState, setMathTextState] = useState<{
     plotTitle: MathTextState;
     xTitle: MathTextState;
@@ -438,12 +431,6 @@ function App() {
   });
 
   useEffect(() => {
-    setDisplayText({
-      plotTitle: plainMathFallback(rawPlotTitle),
-      xTitle: plainMathFallback(rawXTitle),
-      yTitle: plainMathFallback(rawYTitle),
-      rightYTitle: plainMathFallback(rawRightYTitle)
-    });
     setMathTextState({
       plotTitle: "plain",
       xTitle: "plain",
@@ -459,12 +446,6 @@ function App() {
       resolveSafeMathText(rawRightYTitle)
     ]).then(([plotTitle, xTitle, yTitle, rightYTitle]) => {
       if (cancelled) return;
-      setDisplayText({
-        plotTitle: plotTitle.text,
-        xTitle: xTitle.text,
-        yTitle: yTitle.text,
-        rightYTitle: rightYTitle.text
-      });
       setMathTextState({
         plotTitle: plotTitle.state,
         xTitle: xTitle.state,
@@ -561,11 +542,10 @@ function App() {
         ? buildLayout({
             dataset: plotDataset,
             figure: activeFigure,
-            preset,
-            displayText
+            preset
           })
         : { width: 640, height: 480 },
-    [plotDataset, activeFigure, preset, displayText]
+    [plotDataset, activeFigure, preset]
   );
 
   const traces = useMemo(
