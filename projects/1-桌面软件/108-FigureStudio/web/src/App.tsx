@@ -1329,42 +1329,37 @@ function App() {
       const linkedFigures = project.figures.filter((figure) =>
         sheetIds.has(figure.dataRef.sheetId)
       );
-      if (
-        !window.confirm(
-          "删除数据表“" +
-            book.name +
-            "”会同时删除引用它的 " +
-            linkedFigures.length +
-            " 张图。是否继续？"
-        )
-      )
-        return;
 
-      patchProject((current) => {
-        const figures = current.figures.filter(
-          (figure) => !sheetIds.has(figure.dataRef.sheetId)
+      if (linkedFigures.length) {
+        window.alert(
+          "不能删除数据簿“" +
+            book.name +
+            "”：其中工作表仍被 " +
+            linkedFigures.length +
+            " 张图引用。\n\n" +
+            linkedFigures.map((figure) => "• " + figure.name).join("\n") +
+            "\n\n请先删除这些图形，或在图形的“数据”页改用其他工作表。"
         );
-        return {
-          ...current,
-          dataBooks: current.dataBooks.filter((item) => item.id !== book.id),
-          figures,
-          activeFigureId: figures[0]?.id ?? ""
-        };
-      });
+        return;
+      }
+
+      if (!window.confirm("删除数据簿“" + book.name + "”？")) return;
+
+      patchProject((current) => ({
+        ...current,
+        dataBooks: current.dataBooks.filter((item) => item.id !== book.id)
+      }));
       setOpenDocs((current) => {
         const next = current.filter(
-          (doc) =>
-            !(
-              (doc.type === "book" && doc.id === book.id) ||
-              (doc.type === "figure" &&
-                linkedFigures.some((figure) => figure.id === doc.id))
-            )
+          (doc) => !(doc.type === "book" && doc.id === book.id)
         );
-        const activeRemoved =
-          (activeDoc.type === "book" && activeDoc.id === book.id) ||
-          (activeDoc.type === "figure" &&
-            linkedFigures.some((figure) => figure.id === activeDoc.id));
-        if (activeRemoved && next.length) setActiveDoc(next[next.length - 1]);
+        if (
+          activeDoc.type === "book" &&
+          activeDoc.id === book.id &&
+          next.length
+        ) {
+          setActiveDoc(next[next.length - 1]);
+        }
         return next;
       });
       return;
@@ -1380,12 +1375,20 @@ function App() {
       const linked = project.figures.filter(
         (figure) => figure.dataRef.sheetId === context.sheet.id
       );
-      if (
-        !window.confirm(
-          "删除工作表会同时删除引用它的 " + linked.length + " 张图。是否继续？"
-        )
-      )
+      if (linked.length) {
+        window.alert(
+          "不能删除工作表“" +
+            context.sheet.name +
+            "”：它仍被 " +
+            linked.length +
+            " 张图引用。\n\n" +
+            linked.map((figure) => "• " + figure.name).join("\n") +
+            "\n\n请先在这些图形的“数据”页修改映射，或删除对应图形。"
+        );
         return;
+      }
+
+      if (!window.confirm("删除工作表“" + context.sheet.name + "”？")) return;
 
       patchProject((current) => ({
         ...current,
@@ -1396,9 +1399,6 @@ function App() {
                 sheets: book.sheets.filter((sheet) => sheet.id !== context.sheet.id)
               }
             : book
-        ),
-        figures: current.figures.filter(
-          (figure) => figure.dataRef.sheetId !== context.sheet.id
         )
       }));
       const fallbackSheet = context.book.sheets.find(
