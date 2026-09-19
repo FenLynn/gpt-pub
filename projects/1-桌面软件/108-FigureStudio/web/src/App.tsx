@@ -396,7 +396,8 @@ function App() {
   }, [uiScale]);
 
   useEffect(() => {
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project));
+    sessionStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project));
+    document.title = project.name + " · FigureStudio";
   }, [project]);
 
   useEffect(() => {
@@ -677,7 +678,7 @@ function App() {
 
   function restoreAutosave() {
     try {
-      const raw = localStorage.getItem(AUTOSAVE_KEY);
+      const raw = sessionStorage.getItem(AUTOSAVE_KEY);
       if (!raw) {
         showToast("没有可恢复的 v0.3 自动保存");
         return;
@@ -1497,6 +1498,54 @@ function App() {
     showToast(format === "png" ? "已导出 600 dpi PNG" : "已导出 SVG");
   }
 
+  function moveSheetToBook(sheetId: string, targetBookId: string) {
+    const source = findSheet(project, sheetId);
+    const target = project.dataBooks.find((book) => book.id === targetBookId);
+    if (!source || !target || source.book.id === targetBookId) return;
+
+    if (
+      source.book.source.kind === "linked" ||
+      target.source.kind === "linked"
+    ) {
+      showToast("Linked Data 的 Sheet 不能跨 DataBook 移动");
+      return;
+    }
+
+    if (source.book.sheets.length <= 1) {
+      showToast("源 DataBook 至少需要保留一个 Sheet");
+      return;
+    }
+
+    patchProject((current) => ({
+      ...current,
+      dataBooks: current.dataBooks.map((book) => {
+        if (book.id === source.book.id) {
+          return {
+            ...book,
+            sheets: book.sheets.filter((sheet) => sheet.id !== sheetId)
+          };
+        }
+        if (book.id === targetBookId) {
+          return {
+            ...book,
+            sheets: [...book.sheets, source.sheet]
+          };
+        }
+        return book;
+      })
+    }));
+
+    setActiveSheetByBook((current) => ({
+      ...current,
+      [targetBookId]: sheetId,
+      [source.book.id]:
+        source.book.sheets.find((sheet) => sheet.id !== sheetId)?.id ?? ""
+    }));
+    openDocument({ type: "book", id: targetBookId });
+    setExplorerSelection({ type: "sheet", id: sheetId });
+    showToast("Sheet 已移动，Graph 引用保持不变");
+  }
+
   function renderBook(book: DataBook, depth: number): ReactNode {
     const open = expandedBooks.has(book.id);
     const selected =
@@ -1513,6 +1562,14 @@ function App() {
           onDragStart={(event) =>
             event.dataTransfer.setData("text/plain", "book:" + book.id)
           }
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            const [type, id] = event.dataTransfer
+              .getData("text/plain")
+              .split(":");
+            if (type === "sheet-tree") moveSheetToBook(id, book.id);
+          }}
           onClick={() => {
             setExplorerSelection({ type: "book", id: book.id });
             setExpandedBooks((current) => new Set([...current, book.id]));
