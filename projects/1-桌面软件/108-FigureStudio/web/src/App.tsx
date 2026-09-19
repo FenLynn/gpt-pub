@@ -5192,6 +5192,7 @@ function App() {
                         <option value="bottom-left">左下</option>
                         <option value="bottom-center">下中</option>
                         <option value="bottom-right">右下</option>
+                        <option value="outside-right">图外右侧</option>
                         <option value="custom">自由</option>
                       </select>
                     </div>
