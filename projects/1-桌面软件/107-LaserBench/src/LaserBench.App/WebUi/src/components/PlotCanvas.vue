@@ -65,7 +65,7 @@ function draw() {
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
-  const m = props.compact ? {l:2,r:2,t:2,b:2} : props.tight ? {l:42,r:hasRight?46:8,t:7,b:27} : {l:50,r:hasRight?50:12,t:10,b:30}
+  const m = props.compact ? {l:2,r:2,t:2,b:2} : props.tight ? {l:34,r:hasRight?36:6,t:5,b:20} : {l:40,r:hasRight?40:8,t:6,b:22}
   const pw = Math.max(10,w-m.l-m.r), ph = Math.max(10,h-m.t-m.b)
   const {x0,x1,y0,y1,r0,r1} = bounds.value
   const sx = (x:number) => m.l + (x-x0)/(x1-x0||1)*pw
@@ -102,7 +102,7 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font='11px "Segoe UI", sans-serif';ctx.fillStyle='#38516a';ctx.textBaseline='middle'
+  ctx.font='10px "Segoe UI", sans-serif';ctx.fillStyle='#52697e';ctx.textBaseline='middle'
   for(let i=0;i<4;i++) {
     const t=i/3, y=m.t+ph*t, v=y1-(y1-y0)*t, text=fmt(v,y1-y0)
     ctx.textAlign='right';ctx.fillText(text,m.l-8,y)
@@ -114,15 +114,15 @@ function draw() {
     let text:string
     if(props.timeAxis){const d=new Date(Date.now()+v*1000); text=d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})}
     else text=fmt(v,x1-x0)
-    ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+8)
+    ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+5)
   }
-  ctx.fillStyle='#203c58';ctx.font='12px "Segoe UI", sans-serif'
-  if(props.xLabel){ctx.textAlign='right';ctx.fillText(props.xLabel,m.l+pw,m.t+ph+19)}
-  if(props.yLabel){ctx.save();ctx.translate(16,m.t+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(props.yLabel,0,0);ctx.restore()}
-  if(hasRight&&props.rightYLabel){ctx.save();ctx.translate(w-11,m.t+ph/2);ctx.rotate(Math.PI/2);ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(props.rightYLabel,0,0);ctx.restore()}
+  ctx.fillStyle='rgba(32,60,88,.76)';ctx.font='10px "Segoe UI", sans-serif'
+  if(props.yLabel){ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(props.yLabel,m.l+5,m.t+5)}
+  if(hasRight&&props.rightYLabel){ctx.textAlign='right';ctx.textBaseline='top';ctx.fillText(props.rightYLabel,m.l+pw-5,m.t+5)}
+  if(props.xLabel){ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText(props.xLabel,m.l+pw-5,m.t+ph-5)}
 
   if(props.series.length){
-    let lx=m.l+pw-12, ly=m.t+9;ctx.font='12px "Segoe UI", sans-serif';ctx.textBaseline='middle'
+    let lx=m.l+pw-12, ly=m.t+24;ctx.font='10px "Segoe UI", sans-serif';ctx.textBaseline='middle'
     for(let i=props.series.length-1;i>=0;i--){const s=props.series[i];const tw=ctx.measureText(s.name).width;lx-=tw+30;ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+16,ly);ctx.stroke();ctx.fillStyle='#35516c';ctx.textAlign='left';ctx.fillText(s.name,lx+20,ly)}
   }
 }

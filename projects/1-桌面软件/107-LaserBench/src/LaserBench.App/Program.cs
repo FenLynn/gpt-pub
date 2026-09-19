@@ -91,9 +91,12 @@ internal static class Program
                 CaptureSpectrum = true,
                 CaptureBeam = true,
                 CaptureScope = true,
-                ScopeTimeSpan = 1.25
+                ScopeTimeSpan = 1.25,
+                DashboardPower2 = false
             };
             AppConfigStore.Save(config);
+            var persistedConfig = AppConfigStore.Load();
+            if (persistedConfig.DashboardPower2) errors.Add("dashboard display preference persistence failed");
 
             try
             {

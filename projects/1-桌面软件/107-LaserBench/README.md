@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前维护版本为 **v0.4.10 稳定候选**。0.4.x 已完成 Vue/WebView2 工作台、统一采集状态、模块聚焦页、数据中心、设置持久化、截图录像与 Portable 安全保存闭环；v0.4.10 主要完成技术栈/依赖/文档收口和 Scope 配置一致性修正。真实厂商硬件留给 0.5.x 按设备抽象层逐项接入。
+当前开发版本为 **v0.4.11（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.11 将 Dashboard 重构为“图优先”工作台：冷深蓝灰壳体、仅绘图区白底、模块标题/坐标标题/关键读数贴边悬浮，低频参数移入对应模块页，并新增单实例 Big Readout 远距监视。真实厂商硬件仍留给 0.5.x 按设备抽象层逐项接入。
 
 ## 当前能力
 
@@ -10,13 +10,14 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - `LaserBench.exe` 为 NativeAOT 轻量启动器，负责 .NET 8 Desktop Runtime x64 与 Microsoft Edge WebView2 Evergreen Runtime 检测；`LaserBench.App.exe` 为 framework-dependent WinForms/WebView2 主程序。
 - 启动过程写入 `logs/startup.log`，未处理异常写入 `logs/crash.log`，支持 `LaserBench.App.exe --safe`。
 - 内置 Power、Spectrum、Beam、Scope 四类 Simulator，无真实硬件也可完整验证 Dashboard、Test、保存、截图和录像链路。
-- Dashboard 使用原生 Windows 标题栏、单行极窄顶栏、窄折叠导航以及四象限高密度观测区。
-- 四个模块之间只使用细虚线分隔，不使用大卡片、阴影或宽边距；绘图区保持白底，应用壳体使用浅蓝灰背景。
-- 所有绘图内部网格为虚线，绘图区边界为实线；Legend 透明、无边框并放在图内。
-- Power 左侧为多 Trace 时间图和底部时间总览条，右侧独立显示当前值与少量统计槽；数学通道使用独立右轴，不与物理功率共用纵坐标尺度。
-- Spectrum 顶部单行显示中心波长、3 dB linewidth、RMS linewidth、功率与当前 OSA，曲线区域占主要空间。
-- Beam 左侧显示当前 Z 位置光斑，右侧显示完整 caustic；Z 条只浏览已采集的轴向光斑，不改变右侧 caustic。底部一行保留 Z、播放浏览、Attenuation、M²x、M²y、M̄²。
-- Scope Dashboard 只显示最多两个通道的时域和 FFT，详细通道纵轴设置进入独立页。
+- Dashboard 使用原生 Windows 标题栏、极窄顶栏和窄折叠导航；四象限中图占绝对主体，模块标题与关键读数以紧凑悬浮条贴近图边缘。
+- Dashboard 壳体统一冷深蓝灰；**只有真实 Plot / 图像绘图区使用白底**，模块容器、标题区和页面底板不再使用白色卡片。
+- 所有绘图内部网格为虚线，绘图区边界为实线；Legend 透明、无边框并放在图内；坐标标题可浮在图内边缘以减少留白。
+- Power 独立页可逐个选择物理 Channel / Math Channel 是否进入 Dashboard；该显示选择与 Test 采集选择互不影响。数学百分比继续使用独立右轴。
+- Spectrum 独立页承载扫描范围等低频参数；Dashboard 只保留曲线与中心波长、3 dB、RMS、功率等结果。
+- Beam 左侧显示当前 Z 位置光斑，右侧显示完整 caustic；**Z / 播放 / Attenuation** 作为高频观察控制继续常驻 Dashboard，M² 结果贴边显示。
+- Scope Dashboard 只显示最多两个通道的时域和 FFT；时间窗、FFT 范围和通道显示选择进入 Scope 独立页。
+- Dashboard 关键结果可点击进入单实例 **Big Readout**；新指标复用同一窗口，支持拖动、缩放、应用内最大化和关闭，适合远距离观察。
 - 四个模块可从侧栏进入独立聚焦页；旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复，当前不把 Floating 描述为已完成功能。
 - 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
 - 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。
@@ -98,7 +99,7 @@ C# / .NET 8 / WinForms Host / Windows x64
 
 ## 当前硬件边界
 
-v0.4.10 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
+v0.4.11 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
 
 1. Ophir Juno / OphirLMMeasurement
 2. Yokogawa AQ6370D

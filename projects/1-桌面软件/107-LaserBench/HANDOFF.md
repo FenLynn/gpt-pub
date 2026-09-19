@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前维护基线：**v0.4.10 Maintenance Baseline 候选**。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.11 Graph-first Dashboard**，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际设备提供者仍是 Simulator；真实 Ophir、Yokogawa、BeamSquared、Tektronix Driver 尚未正式接入。
-- Web UI 已有 Dashboard、模块聚焦页、Data 和 Settings；旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复，不得描述为已完成。
+- Web UI 已有 Dashboard、模块聚焦页、Data 和 Settings。v0.4.11 开始将低频模块参数移入对应聚焦页，并增加单实例 Big Readout；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
 
 ## 当前产品不变量
 
@@ -43,11 +43,12 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `data/pic/`、`data/video/` 直接存文件，不按日期分目录。
 - 所有保存永不覆盖，冲突追加 `_1`、`_2`。
 - Label、Alias 和本轮采集选择在 Test 点击瞬间冻结。
-- Dashboard 负责高密度观测，低频设置进入独立页或 Settings。
+- Dashboard 负责最终综合观测，图占绝对主体；低频模块参数进入对应 Power / Spectrum / Beam / Scope 页，全局 Settings 只负责跨模块设置。
 - Windows 原生标题栏保留；顶栏单行极窄；左侧导航保持窄并可折叠。
 - Power、Spectrum、Beam、Scope 使用四象限高密度结构，不使用大卡片、阴影和宽边距。
-- 绘图区白底；壳体浅蓝灰；内部网格虚线，绘图区边界实线；Legend 透明图内。
-- Power 物理功率与数学百分比通道使用独立纵轴，时间总览条只属于左侧曲线区。
+- Dashboard 壳体使用冷深蓝灰，只有实际 Plot / 图像绘图区白底；内部网格虚线，Legend 透明图内，坐标标题允许贴图边缘悬浮。
+- Power 物理功率与数学百分比通道使用独立纵轴；每个 Channel / Math Channel 的 Dashboard 显示开关在 Power 页管理，且与 Test 采集选择分离。
+- Dashboard 关键结果支持单实例 Big Readout，点击新指标复用同一监视窗，可拖动、缩放和应用内最大化。
 - Beam Z 只浏览轴向光斑并同步 caustic 参考线，不改写 caustic。
 - Scope Dashboard 最多显示两个通道时域和 FFT，通道开关必须同时作用于时域和 FFT。
 - 不使用 Electron、FFmpeg 或第三方图表库；生产 UI 明确允许 WebView2，绘图继续使用 Canvas。

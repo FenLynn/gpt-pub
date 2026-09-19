@@ -248,6 +248,9 @@ internal sealed class WebUiHost : IDisposable
         if (v.TryGetProperty("scopeFftMax",out var sf) && sf.ValueKind==JsonValueKind.Number) _config.ScopeFftMax=Math.Clamp(sf.GetDouble(),0.1,500);
         if (v.TryGetProperty("scopeCh1",out var c1) && (c1.ValueKind==JsonValueKind.True||c1.ValueKind==JsonValueKind.False)) _config.ScopeCh1=c1.GetBoolean();
         if (v.TryGetProperty("scopeCh2",out var c2) && (c2.ValueKind==JsonValueKind.True||c2.ValueKind==JsonValueKind.False)) _config.ScopeCh2=c2.GetBoolean();
+        if (v.TryGetProperty("dashboardPower1",out var dp1) && (dp1.ValueKind==JsonValueKind.True||dp1.ValueKind==JsonValueKind.False)) _config.DashboardPower1=dp1.GetBoolean();
+        if (v.TryGetProperty("dashboardPower2",out var dp2) && (dp2.ValueKind==JsonValueKind.True||dp2.ValueKind==JsonValueKind.False)) _config.DashboardPower2=dp2.GetBoolean();
+        if (v.TryGetProperty("dashboardMath1",out var dm1) && (dm1.ValueKind==JsonValueKind.True||dm1.ValueKind==JsonValueKind.False)) _config.DashboardMath1=dm1.GetBoolean();
         if (v.TryGetProperty("aliases",out var aliases) && aliases.ValueKind==JsonValueKind.Object)
         {
             static string Alias(JsonElement a,string key,string current)
@@ -317,7 +320,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.10",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.11",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
@@ -344,7 +347,8 @@ internal sealed class WebUiHost : IDisposable
                 },
                 rootPath = AppPaths.Root,
                 powerWindow=_config.PowerWindow, osaStart=_config.OsaStart, osaStop=_config.OsaStop,
-                scopeTimeSpan=_config.ScopeTimeSpan, scopeFftMax=_config.ScopeFftMax, scopeCh1=_config.ScopeCh1, scopeCh2=_config.ScopeCh2
+                scopeTimeSpan=_config.ScopeTimeSpan, scopeFftMax=_config.ScopeFftMax, scopeCh1=_config.ScopeCh1, scopeCh2=_config.ScopeCh2,
+                dashboardPower1=_config.DashboardPower1, dashboardPower2=_config.DashboardPower2, dashboardMath1=_config.DashboardMath1
             },
             data = BuildDataSummary(),
             devices = BuildDevices(),

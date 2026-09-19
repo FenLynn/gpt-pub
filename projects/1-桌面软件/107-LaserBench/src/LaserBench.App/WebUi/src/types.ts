@@ -26,6 +26,9 @@ export interface LaserSnapshot {
     scopeFftMax: number
     scopeCh1: boolean
     scopeCh2: boolean
+    dashboardPower1: boolean
+    dashboardPower2: boolean
+    dashboardMath1: boolean
   }
   data: {
     experimentFolder: string

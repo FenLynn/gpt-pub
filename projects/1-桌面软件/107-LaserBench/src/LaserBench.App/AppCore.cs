@@ -39,6 +39,9 @@ internal sealed class AppConfig
     public double ScopeFftMax { get; set; } = 50;
     public bool ScopeCh1 { get; set; } = true;
     public bool ScopeCh2 { get; set; } = true;
+    public bool DashboardPower1 { get; set; } = true;
+    public bool DashboardPower2 { get; set; } = true;
+    public bool DashboardMath1 { get; set; } = true;
 }
 
 internal static class AppPaths

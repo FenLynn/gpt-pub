@@ -19,12 +19,17 @@ const beamPlaying = ref(false)
 const cameraFlash = ref(false)
 const recordElapsed = ref(0)
 const saveNotice = ref('')
+type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
+const bigReadoutKind = ref<BigReadoutKind|null>(null)
+const bigReadoutMaximized = ref(false)
+const bigReadoutRect = ref({ x: 150, y: 110, w: 520, h: 300 })
 const settingsDraft = ref({
   experimentFolder: snapshot.value.config?.experimentFolder ?? '',
   autoScreenshot: snapshot.value.config?.autoScreenshot ?? false,
   aliases: { ...(snapshot.value.config?.aliases ?? {}) },
   powerWindow:snapshot.value.config?.powerWindow??600, osaStart:snapshot.value.config?.osaStart??1060, osaStop:snapshot.value.config?.osaStop??1100,
-  scopeTimeSpan:snapshot.value.config?.scopeTimeSpan??0.24, scopeFftMax:snapshot.value.config?.scopeFftMax??50, scopeCh1:snapshot.value.config?.scopeCh1??true, scopeCh2:snapshot.value.config?.scopeCh2??true
+  scopeTimeSpan:snapshot.value.config?.scopeTimeSpan??0.24, scopeFftMax:snapshot.value.config?.scopeFftMax??50, scopeCh1:snapshot.value.config?.scopeCh1??true, scopeCh2:snapshot.value.config?.scopeCh2??true,
+  dashboardPower1:snapshot.value.config?.dashboardPower1??true, dashboardPower2:snapshot.value.config?.dashboardPower2??true, dashboardMath1:snapshot.value.config?.dashboardMath1??true
 })
 const dataFilter=ref('')
 let beamTimer:number|undefined
@@ -33,13 +38,20 @@ let recordTimer:number|undefined
 let recordStartedAt:number|undefined
 let stopSnapshot: (()=>void)|undefined
 
-const powerSeries = computed<PlotSeries[]>(() => snapshot.value.power.traces.map(t => ({
+const powerVisibility = computed(() => [settingsDraft.value.dashboardPower1, settingsDraft.value.dashboardPower2, settingsDraft.value.dashboardMath1])
+const visiblePowerTraces = computed(() => snapshot.value.power.traces.filter((_,index) => powerVisibility.value[index] ?? true))
+const powerSeries = computed<PlotSeries[]>(() => visiblePowerTraces.value.map(t => ({
   name: t.name,
   color: t.color,
   axis: t.unit === '%' ? 'right' : 'left',
   points: t.points
 })))
-const powerLeftMax = computed(() => Math.max(5, Math.ceil(Math.max(...snapshot.value.power.traces.filter(t=>t.unit!=='%').flatMap(t=>t.points.map(p=>p.y)), 1) / 5) * 5))
+const powerLeftMax = computed(() => {
+  const values=visiblePowerTraces.value.filter(t=>t.unit!=='%').flatMap(t=>t.points.map(p=>p.y))
+  return Math.max(5, Math.ceil(Math.max(...values, 1) / 5) * 5)
+})
+function powerVisible(index:number){ return powerVisibility.value[index] ?? true }
+function powerReadoutKind(index:number):BigReadoutKind { return (['power0','power1','power2'][index] ?? 'power0') as BigReadoutKind }
 const devicesShown = computed(() => snapshot.value.devices.slice(0,5))
 const moduleActive = (name:string) => snapshot.value.captureState==='running' && !!snapshot.value.captureSelection[name]
 const captureStateText=computed(()=>({idle:'就绪',starting:'启动中',running:'采集中',stopping:'停止中',error:'错误'}[snapshot.value.captureState]??'就绪'))
@@ -56,6 +68,66 @@ const clockText = computed(() => {
   const pad=(v:number)=>String(v).padStart(2,'0')
   return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 })
+const bigReadout = computed(() => {
+  const power=(index:number) => {
+    const t=snapshot.value.power.traces[index]
+    return t ? { title:t.name, value:t.value.toFixed(t.unit==='%'?1:2), unit:t.unit } : null
+  }
+  switch(bigReadoutKind.value){
+    case 'power0': return power(0)
+    case 'power1': return power(1)
+    case 'power2': return power(2)
+    case 'spectrumCenter': return { title:'中心波长', value:snapshot.value.spectrum.centerWavelength.toFixed(2), unit:'nm' }
+    case 'spectrum3db': return { title:'3 dB 线宽', value:snapshot.value.spectrum.linewidth3Db.toFixed(2), unit:'nm' }
+    case 'spectrumRms': return { title:'RMS 线宽', value:snapshot.value.spectrum.linewidthRms.toFixed(2), unit:'nm' }
+    case 'spectrumPower': return { title:'光谱功率', value:snapshot.value.spectrum.power.toFixed(1), unit:'dBm' }
+    case 'beamM2x': return { title:'M²x', value:snapshot.value.beam.m2x.toFixed(2), unit:'' }
+    case 'beamM2y': return { title:'M²y', value:snapshot.value.beam.m2y.toFixed(2), unit:'' }
+    case 'beamM2': return { title:'平均 M²', value:snapshot.value.beam.m2mean.toFixed(2), unit:'' }
+    case 'scope0': {
+      const t=snapshot.value.scope.time[0]; return t ? { title:t.name, value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : null
+    }
+    case 'scope1': {
+      const t=snapshot.value.scope.time[1]; return t ? { title:t.name, value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : null
+    }
+    default: return null
+  }
+})
+const bigReadoutStyle = computed(() => bigReadoutMaximized.value
+  ? { left:'7px', top:'7px', width:'calc(100vw - 14px)', height:'calc(100vh - 14px)' }
+  : { left:`${bigReadoutRect.value.x}px`, top:`${bigReadoutRect.value.y}px`, width:`${bigReadoutRect.value.w}px`, height:`${bigReadoutRect.value.h}px` })
+
+function openReadout(kind:BigReadoutKind){
+  bigReadoutRect.value.x=Math.max(0,Math.min(bigReadoutRect.value.x,Math.max(0,window.innerWidth-bigReadoutRect.value.w)))
+  bigReadoutRect.value.y=Math.max(0,Math.min(bigReadoutRect.value.y,Math.max(0,window.innerHeight-bigReadoutRect.value.h)))
+  bigReadoutKind.value=kind
+}
+function closeReadout(){ bigReadoutKind.value=null; bigReadoutMaximized.value=false }
+function persistReadoutRect(){ try{localStorage.setItem('laserbench.bigReadout.rect',JSON.stringify(bigReadoutRect.value))}catch{} }
+function toggleReadoutMax(){ bigReadoutMaximized.value=!bigReadoutMaximized.value }
+function beginReadoutDrag(e:PointerEvent){
+  if(bigReadoutMaximized.value)return
+  const start={x:e.clientX,y:e.clientY,left:bigReadoutRect.value.x,top:bigReadoutRect.value.y}
+  const move=(ev:PointerEvent)=>{
+    const maxX=Math.max(0,window.innerWidth-bigReadoutRect.value.w)
+    const maxY=Math.max(0,window.innerHeight-bigReadoutRect.value.h)
+    bigReadoutRect.value.x=Math.max(0,Math.min(maxX,start.left+ev.clientX-start.x))
+    bigReadoutRect.value.y=Math.max(0,Math.min(maxY,start.top+ev.clientY-start.y))
+  }
+  const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);persistReadoutRect()}
+  window.addEventListener('pointermove',move);window.addEventListener('pointerup',up)
+}
+function beginReadoutResize(e:PointerEvent){
+  if(bigReadoutMaximized.value)return
+  e.stopPropagation()
+  const start={x:e.clientX,y:e.clientY,w:bigReadoutRect.value.w,h:bigReadoutRect.value.h}
+  const move=(ev:PointerEvent)=>{
+    bigReadoutRect.value.w=Math.max(300,Math.min(window.innerWidth-bigReadoutRect.value.x,start.w+ev.clientX-start.x))
+    bigReadoutRect.value.h=Math.max(190,Math.min(window.innerHeight-bigReadoutRect.value.y,start.h+ev.clientY-start.y))
+  }
+  const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);persistReadoutRect()}
+  window.addEventListener('pointermove',move);window.addEventListener('pointerup',up)
+}
 
 watch(() => snapshot.value.beam.z, v => { if(!beamPlaying.value) beamZ.value=v })
 watch(() => snapshot.value.beam.attenuation, v => beamAtt.value=v)
@@ -116,11 +188,15 @@ function formatBytes(n:number){ if(n<1024)return n+' B'; if(n<1048576)return (n/
 function nav(page:string){activePage.value=page}
 
 onMounted(()=>{
+  try{
+    const saved=localStorage.getItem('laserbench.bigReadout.rect')
+    if(saved){const r=JSON.parse(saved);if(r&&Number.isFinite(r.x)&&Number.isFinite(r.y)&&Number.isFinite(r.w)&&Number.isFinite(r.h))bigReadoutRect.value={x:r.x,y:r.y,w:r.w,h:r.h}}
+  }catch{}
   stopSnapshot=onSnapshot(s=>{
     snapshot.value=s
     if(document.activeElement?.id!=='labelInput')labelDraft.value=s.label
-    if(activePage.value!=='settings'){
-      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})},powerWindow:s.config?.powerWindow??600,osaStart:s.config?.osaStart??1060,osaStop:s.config?.osaStop??1100,scopeTimeSpan:s.config?.scopeTimeSpan??0.24,scopeFftMax:s.config?.scopeFftMax??50,scopeCh1:s.config?.scopeCh1??true,scopeCh2:s.config?.scopeCh2??true}
+    if(!['settings','power','spectrum','scope'].includes(activePage.value)){
+      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})},powerWindow:s.config?.powerWindow??600,osaStart:s.config?.osaStart??1060,osaStop:s.config?.osaStop??1100,scopeTimeSpan:s.config?.scopeTimeSpan??0.24,scopeFftMax:s.config?.scopeFftMax??50,scopeCh1:s.config?.scopeCh1??true,scopeCh2:s.config?.scopeCh2??true,dashboardPower1:s.config?.dashboardPower1??true,dashboardPower2:s.config?.dashboardPower2??true,dashboardMath1:s.config?.dashboardMath1??true}
     }
   })
   if(hasNativeBridge) void request('app.getSnapshot')
@@ -186,35 +262,51 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         <div class="utility-head"><div><h2>设置</h2><p>Portable 根目录：{{snapshot.config.rootPath}}</p></div><div class="utility-actions"><span class="save-notice">{{saveNotice}}</span><button class="primary" @click="saveSettings">保存设置</button></div></div>
         <div class="settings-grid">
           <div class="setting-group"><h3>实验与保存</h3><label><span>实验文件夹</span><input v-model="settingsDraft.experimentFolder" placeholder="留空则使用 YYYY-MM-DD"/></label><label class="switch-row"><span>测试完成后自动截图</span><input type="checkbox" v-model="settingsDraft.autoScreenshot"/></label><div class="folder-actions"><button @click="openFolder('root')">程序目录</button><button @click="openFolder('pic')">截图目录</button><button @click="openFolder('video')">录像目录</button></div></div>
-          <div class="setting-group"><h3>设备 Alias</h3><label v-for="(v,k) in settingsDraft.aliases" :key="k"><span>{{k}}</span><input v-model="settingsDraft.aliases[k]"/></label></div><div class="setting-group"><h3>功率</h3><label><span>历史窗口</span><select v-model.number="settingsDraft.powerWindow"><option :value="120">2 min</option><option :value="300">5 min</option><option :value="600">10 min</option><option :value="1800">30 min</option></select></label></div><div class="setting-group"><h3>光谱 OSA</h3><label><span>起始波长</span><input type="number" v-model.number="settingsDraft.osaStart"/></label><label><span>终止波长</span><input type="number" v-model.number="settingsDraft.osaStop"/></label></div><div class="setting-group"><h3>示波器</h3><label><span>时间窗 (ms)</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTimeSpan"/></label><label><span>FFT 上限 (MHz)</span><input type="number" v-model.number="settingsDraft.scopeFftMax"/></label><label><span>CH1</span><input type="checkbox" v-model="settingsDraft.scopeCh1"/></label><label><span>CH2</span><input type="checkbox" v-model="settingsDraft.scopeCh2"/></label></div><div class="setting-group"><h3>运行环境</h3><label><span>运行模式</span><b>{{snapshot.mode==='SIM'?'Simulator 模拟器':'Hardware 硬件'}}</b></label><label><span>程序目录</span><small>{{snapshot.config.rootPath}}</small></label></div>
+          <div class="setting-group"><h3>设备 Alias</h3><label v-for="(v,k) in settingsDraft.aliases" :key="k"><span>{{k}}</span><input v-model="settingsDraft.aliases[k]"/></label></div><div class="setting-group"><h3>运行环境</h3><label><span>运行模式</span><b>{{snapshot.mode==='SIM'?'Simulator 模拟器':'Hardware 硬件'}}</b></label><label><span>程序目录</span><small>{{snapshot.config.rootPath}}</small></label></div>
         </div>
       </section>
 
       <section v-if="!['data','settings'].includes(activePage)" class="dashboard-grid" :class="{'focus-mode':activePage!=='dashboard'}">
         <article class="instrument-panel power-panel" :class="{hidden:!['dashboard','power'].includes(activePage)}">
-          <div class="module-head power-head"><div class="panel-mark power-accent" :class="{breathing:moduleActive('power')}"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div><strong>功率</strong><div class="head-metrics"><span v-for="t in snapshot.power.traces" :key="t.name"><em>{{t.name}}</em><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></span><span v-if="snapshot.power.traces[0]" class="head-muted"><em>Max</em><b>{{snapshot.power.traces[0].maxValue.toFixed(2)}}</b><small>{{snapshot.power.traces[0].unit}}</small></span></div></div>
-          <div class="power-layout">
-            <div class="power-chart-zone">
-              <PlotCanvas class="main-plot" :series="powerSeries" :x-min="-settingsDraft.powerWindow" :x-max="0" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" />
-              <div class="overview-row"><div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="-settingsDraft.powerWindow" :x-max="0" :compact="true" /><div class="overview-selected"><i></i><i></i></div></div></div>
+          <div class="module-head power-head graph-overlay">
+            <div class="module-title"><div class="panel-mark power-accent" :class="{breathing:moduleActive('power')}"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div><strong>功率</strong></div>
+            <div class="head-metrics">
+              <template v-for="(t,index) in snapshot.power.traces" :key="t.name"><button v-if="powerVisible(index)" class="metric-trigger" @click="openReadout(powerReadoutKind(index))"><em>{{t.name}}</em><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></button></template>
             </div>
- 
           </div>
+          <details v-if="activePage==='power'" class="module-config-dock" open>
+            <summary>显示 / 参数</summary>
+            <div class="dock-row"><span>历史窗口</span><select v-model.number="settingsDraft.powerWindow" @change="saveSettings"><option :value="120">2 min</option><option :value="300">5 min</option><option :value="600">10 min</option><option :value="1800">30 min</option></select></div>
+            <div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.dashboardPower1" @change="saveSettings"/>{{snapshot.power.traces[0]?.name ?? 'power1'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardPower2" @change="saveSettings"/>{{snapshot.power.traces[1]?.name ?? 'power2'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardMath1" @change="saveSettings"/>{{snapshot.power.traces[2]?.name ?? 'math1'}}</label></div>
+          </details>
+          <div class="power-layout"><div class="power-chart-zone">
+            <PlotCanvas class="main-plot" :series="powerSeries" :x-min="-settingsDraft.powerWindow" :x-max="0" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" />
+            <div class="overview-row"><div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="-settingsDraft.powerWindow" :x-max="0" :compact="true" /><div class="overview-selected"><i></i><i></i></div></div></div>
+          </div></div>
         </article>
 
         <article class="instrument-panel spectrum-panel" :class="{hidden:!['dashboard','spectrum'].includes(activePage)}">
-          <div class="spectrum-head"><div class="panel-mark inline spectrum-accent" :class="{breathing:moduleActive('spectrum')}"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><div class="osa-metrics"><span>λ<sub>c</sub><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b>nm</span><i></i><span><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b>nm</span><i></i><span><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b>nm</span><i></i><span><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b>dBm</span></div><button class="select-like">OSA1<svg viewBox="0 0 24 24"><path d="m7 9 5 5 5-5"/></svg></button></div>
-          <PlotCanvas class="spectrum-plot" :series="snapshot.spectrum.traces" :x-min="settingsDraft.osaStart" :x-max="settingsDraft.osaStop" :y-min="-100" :y-max="0" x-label="nm" y-label="功率 (dBm)" />
+          <div class="spectrum-head graph-overlay"><div class="module-title"><div class="panel-mark inline spectrum-accent" :class="{breathing:moduleActive('spectrum')}"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><strong>光谱</strong></div><div class="osa-metrics"><button class="metric-trigger primary-metric" @click="openReadout('spectrumCenter')"><em>λc</em><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrum3db')"><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrumRms')"><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger primary-metric" @click="openReadout('spectrumPower')"><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button></div></div>
+          <details v-if="activePage==='spectrum'" class="module-config-dock" open><summary>扫描参数</summary><div class="dock-row"><span>起始 nm</span><input type="number" v-model.number="settingsDraft.osaStart" @change="saveSettings"/></div><div class="dock-row"><span>终止 nm</span><input type="number" v-model.number="settingsDraft.osaStop" @change="saveSettings"/></div></details>
+          <PlotCanvas class="spectrum-plot" :series="snapshot.spectrum.traces" :x-min="settingsDraft.osaStart" :x-max="settingsDraft.osaStop" :y-min="-100" :y-max="0" x-label="波长 (nm)" y-label="功率 (dBm)" />
         </article>
 
         <article class="instrument-panel beam-panel" :class="{hidden:!['dashboard','beam'].includes(activePage)}">
-          <div class="module-head beam-head"><div class="panel-mark beam-accent" :class="{breathing:moduleActive('beam')}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><span>M²<sub>x</sub><b>{{snapshot.beam.m2x.toFixed(2)}}</b></span><span>M²<sub>y</sub><b>{{snapshot.beam.m2y.toFixed(2)}}</b></span><span>M̄²<b>{{snapshot.beam.m2mean.toFixed(2)}}</b></span></div></div>
+          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{breathing:moduleActive('beam')}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M̄²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
           <div class="beam-body"><div class="beam-image-wrap"><BeamProfileCanvas :width-x="snapshot.beam.spotWidthX" :width-y="snapshot.beam.spotWidthY" :attenuation="beamAtt" /><div class="beam-tools"><button title="放大">＋</button><button title="缩小">−</button><button title="适应">⛶</button></div></div><PlotCanvas class="caustic-plot" :series="snapshot.beam.caustic" :vertical-marker="beamZ" x-label="Z (mm)" y-label="束宽 (μm)" /></div>
- 
         </article>
 
-        <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}"><div class="module-head scope-head"><div class="panel-mark scope-accent" :class="{breathing:moduleActive('scope')}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong><div class="scope-readouts"><span v-for="trace in snapshot.scope.time" :key="trace.name">{{trace.name}} <b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b> V</span><span>采样 <b>2.5</b> MSa/s</span></div></div><div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="-1" :y-max="1" x-label="ms" :tight="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="kHz" :tight="true" /></div></article>
+        <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}">
+          <div class="module-head scope-head graph-overlay"><div class="module-title"><div class="panel-mark scope-accent" :class="{breathing:moduleActive('scope')}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong></div><div class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button><span class="secondary-metric">SR <b>2.5</b> MSa/s</span></div></div>
+          <details v-if="activePage==='scope'" class="module-config-dock" open><summary>显示 / 参数</summary><div class="dock-row"><span>时间窗 ms</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTimeSpan" @change="saveSettings"/></div><div class="dock-row"><span>FFT 上限 MHz</span><input type="number" v-model.number="settingsDraft.scopeFftMax" @change="saveSettings"/></div><div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.scopeCh1" @change="saveSettings"/>CH1</label><label><input type="checkbox" v-model="settingsDraft.scopeCh2" @change="saveSettings"/>CH2</label></div></details>
+          <div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="-1" :y-max="1" x-label="时间 (ms)" :tight="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="频率 (kHz)" :tight="true" /></div>
+        </article>
       </section>
     </main>
+    <div v-if="bigReadout" class="big-readout-window" :class="{maximized:bigReadoutMaximized}" :style="bigReadoutStyle" role="dialog" aria-label="大读数">
+      <div class="big-readout-bar" @pointerdown="beginReadoutDrag" @dblclick="toggleReadoutMax"><span>MONITOR · {{bigReadout.title}}</span><div><button @pointerdown.stop @click="toggleReadoutMax" :title="bigReadoutMaximized?'还原':'最大化'">{{bigReadoutMaximized?'❐':'□'}}</button><button @pointerdown.stop @click="closeReadout" title="关闭">×</button></div></div>
+      <div class="big-readout-body"><div class="big-readout-title">{{bigReadout.title}}</div><div class="big-readout-value">{{bigReadout.value}}<small v-if="bigReadout.unit">{{bigReadout.unit}}</small></div><div class="big-readout-status"><i></i> LIVE</div></div>
+      <div v-if="!bigReadoutMaximized" class="big-readout-resize" @pointerdown="beginReadoutResize"></div>
+    </div>
   </div>
 </template>
