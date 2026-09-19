@@ -1889,3 +1889,175 @@
   max-height:100%!important;
   align-self:stretch!important
 }
+
+
+/* v0.4.22 — top-only acquisition motion, camera-equivalent REC feedback, frame-attached metrics */
+
+/* Only the four top acquisition selectors may animate. Module-title marks are deliberately static. */
+.dashboard-grid:not(.focus-mode) .panel-mark,
+.dashboard-grid:not(.focus-mode) .panel-mark svg{
+  animation:none!important;
+  filter:none!important
+}
+.dashboard-grid:not(.focus-mode) .panel-mark .acq-gif{
+  display:none!important
+}
+.topbar .module-toggle .acq-gif{
+  width:31px!important;
+  height:31px!important;
+  object-fit:contain!important;
+  image-rendering:auto!important;
+  filter:drop-shadow(0 0 2px rgba(46,212,119,.30))!important
+}
+
+/* REC uses the exact same one-shot press/white-flash keyframes as the camera button. */
+.camera-btn.flash,
+.record-btn.flash{
+  animation:cameraFlash .26s ease!important
+}
+.camera-btn.flash::after,
+.record-btn.flash::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  inset:3px!important;
+  border:0!important;
+  border-radius:5px!important;
+  background:rgba(255,255,255,.72)!important;
+  pointer-events:none!important;
+  animation:cameraBlink .26s ease!important
+}
+.record-btn:hover{
+  transform:none!important;
+  filter:none!important;
+  box-shadow:none!important
+}
+.record-btn:hover::after{
+  display:none!important
+}
+.record-btn.flash::after{
+  display:block!important
+}
+.record-btn.active i{
+  animation:none!important;
+  opacity:1!important
+}
+
+/* Put the information strip against the plot frame rather than floating in the 34 px header. */
+.dashboard-grid:not(.focus-mode) .graph-overlay{
+  align-items:end!important;
+  padding-top:0!important;
+  padding-bottom:0!important
+}
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts,
+.dashboard-grid:not(.focus-mode) .m2-block{
+  height:28px!important;
+  align-self:end!important;
+  align-items:baseline!important;
+  padding-bottom:1px!important;
+  box-sizing:border-box!important;
+  gap:0!important
+}
+.dashboard-grid:not(.focus-mode) .module-title{
+  align-self:end!important;
+  height:28px!important;
+  padding-bottom:1px!important;
+  box-sizing:border-box!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger{
+  height:27px!important;
+  min-height:27px!important;
+  margin:0!important;
+  padding:0!important;
+  display:inline-flex!important;
+  align-items:baseline!important;
+  justify-content:center!important;
+  gap:4px!important;
+  border:0!important
+}
+
+/* A separator owns exactly half of the 16 px inter-metric gap on each side. */
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger{
+  position:relative!important;
+  margin-left:16px!important;
+  padding-left:0!important;
+  border-left:0!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger::before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  left:-8px!important;
+  top:50%!important;
+  width:1px!important;
+  height:17px!important;
+  transform:translateY(-50%)!important;
+  background:rgba(205,217,225,.48)!important
+}
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric{
+  position:relative!important;
+  height:27px!important;
+  margin-left:16px!important;
+  padding-left:0!important;
+  border-left:0!important;
+  display:inline-flex!important;
+  align-items:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric::before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  left:-8px!important;
+  top:50%!important;
+  width:1px!important;
+  height:17px!important;
+  transform:translateY(-50%)!important;
+  background:rgba(205,217,225,.48)!important
+}
+
+/* M² follows the exact same spacing grammar; no legacy padding is allowed to skew separators. */
+.dashboard-grid:not(.focus-mode) .m2-block{
+  padding-left:0!important;
+  padding-right:0!important;
+  margin:0!important;
+  justify-content:flex-end!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block .metric-trigger{
+  padding:0!important;
+  margin-left:0!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block .metric-trigger + .metric-trigger{
+  margin-left:16px!important
+}
+
+/* Keep names/values/units on one optical baseline. */
+.dashboard-grid:not(.focus-mode) .metric-trigger em,
+.dashboard-grid:not(.focus-mode) .secondary-metric em{
+  font-size:16.5px!important;
+  line-height:1!important;
+  font-weight:400!important;
+  align-self:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger b,
+.dashboard-grid:not(.focus-mode) .secondary-metric b{
+  font-size:17.5px!important;
+  line-height:1!important;
+  align-self:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger small,
+.dashboard-grid:not(.focus-mode) .secondary-metric small{
+  font-size:11.5px!important;
+  line-height:1!important;
+  font-weight:400!important;
+  align-self:baseline!important;
+  vertical-align:baseline!important
+}
+
+/* Scope remains clipped to the accepted panel geometry. */
+.dashboard-grid:not(.focus-mode) .scope-plots{
+  grid-template-rows:minmax(0,56fr) minmax(0,44fr)!important;
+  gap:1px!important;
+  overflow:hidden!important
+}

@@ -36,8 +36,8 @@ function margins(){
   return props.compact
     ? {l:0,r:0,t:0,b:0}
     : props.stacked
-      ? {l:38,r:38,t:3,b:18}
-      : {l:38,r:38,t:8,b:21}
+      ? {l:38,r:38,t:2,b:18}
+      : {l:38,r:38,t:3,b:21}
 }
 
 const bounds = computed(() => {

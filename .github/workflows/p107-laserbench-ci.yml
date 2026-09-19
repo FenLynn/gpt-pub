@@ -87,9 +87,12 @@ jobs:
               $delays=@()
               for($i=0;$i -lt $frames;$i++){ $delays += [BitConverter]::ToUInt32($delay.Value,$i*4) }
               $avgDelay=[Math]::Round((($delays | Measure-Object -Average).Average)*10,1)
-              Write-Host "$name frames=$frames avgDelayMs=$avgDelay"
-              if ($frames -lt 4) { throw "$name is not a visible multi-frame GIF." }
-              if ($avgDelay -lt 300) { throw "$name animation is too fast; average frame delay must be >=300 ms." }
+              $cycleMs=[Math]::Round(($delays | Measure-Object -Sum).Sum*10,1)
+              Write-Host "$name size=$($image.Width)x$($image.Height) frames=$frames avgDelayMs=$avgDelay cycleMs=$cycleMs"
+              if ($image.Width -lt 72 -or $image.Height -lt 72) { throw "$name resolution is too low; require >=72x72." }
+              if ($frames -lt 36) { throw "$name is not smooth enough; require >=36 frames." }
+              if ($avgDelay -gt 140) { throw "$name frame cadence is too coarse; require <=140 ms average." }
+              if ($cycleMs -lt 4000) { throw "$name cycle is too fast; require >=4000 ms per cycle." }
             } finally {
               $image.Dispose()
             }
