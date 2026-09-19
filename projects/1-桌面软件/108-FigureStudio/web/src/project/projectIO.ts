@@ -3,12 +3,19 @@ import type { Dataset, ProjectState } from "../model";
 
 const APP_VERSION = "0.2.0-web";
 
+interface ColumnMeta {
+  id: string;
+  name: string;
+  unit?: string;
+  [key: string]: unknown;
+}
+
 interface DatasetIndexEntry {
   id: string;
   name: string;
   folderId?: string;
-  x: Omit<Dataset["x"], "values">;
-  ys: Array<Omit<Dataset["ys"][number], "values">>;
+  x: ColumnMeta;
+  ys: ColumnMeta[];
   metadata?: Dataset["metadata"];
   dataPath: string;
   [key: string]: unknown;
