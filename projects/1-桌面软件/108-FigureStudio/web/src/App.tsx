@@ -295,6 +295,111 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   link.remove();
 }
 
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngDataUrlWithDpi(dataUrl: string, dpi: number): string {
+  const commaIndex = dataUrl.indexOf(",");
+  if (
+    commaIndex < 0 ||
+    !dataUrl.slice(0, commaIndex).includes("image/png") ||
+    !dataUrl.slice(0, commaIndex).includes(";base64")
+  ) {
+    return dataUrl;
+  }
+
+  const binary = atob(dataUrl.slice(commaIndex + 1));
+  const source = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    source[index] = binary.charCodeAt(index);
+  }
+
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+  if (
+    source.length < signature.length ||
+    signature.some((value, index) => source[index] !== value)
+  ) {
+    return dataUrl;
+  }
+
+  const pixelsPerMeter = Math.max(1, Math.round(dpi / 0.0254));
+  const physData = new Uint8Array(9);
+  const physDataView = new DataView(physData.buffer);
+  physDataView.setUint32(0, pixelsPerMeter, false);
+  physDataView.setUint32(4, pixelsPerMeter, false);
+  physData[8] = 1;
+
+  const type = new Uint8Array([112, 72, 89, 115]); // pHYs
+  const crcInput = new Uint8Array(type.length + physData.length);
+  crcInput.set(type, 0);
+  crcInput.set(physData, type.length);
+
+  const physChunk = new Uint8Array(4 + 4 + physData.length + 4);
+  const physView = new DataView(physChunk.buffer);
+  physView.setUint32(0, physData.length, false);
+  physChunk.set(type, 4);
+  physChunk.set(physData, 8);
+  physView.setUint32(8 + physData.length, crc32(crcInput), false);
+
+  const parts: Uint8Array[] = [source.slice(0, 8)];
+  const sourceView = new DataView(
+    source.buffer,
+    source.byteOffset,
+    source.byteLength
+  );
+  let offset = 8;
+  let inserted = false;
+
+  while (offset + 12 <= source.length) {
+    const length = sourceView.getUint32(offset, false);
+    const end = offset + 12 + length;
+    if (end > source.length) return dataUrl;
+
+    const chunkType = String.fromCharCode(
+      source[offset + 4],
+      source[offset + 5],
+      source[offset + 6],
+      source[offset + 7]
+    );
+    if (chunkType !== "pHYs") {
+      parts.push(source.slice(offset, end));
+    }
+    if (chunkType === "IHDR" && !inserted) {
+      parts.push(physChunk);
+      inserted = true;
+    }
+    offset = end;
+  }
+
+  if (!inserted || offset !== source.length) return dataUrl;
+
+  const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Uint8Array(totalLength);
+  let writeOffset = 0;
+  for (const part of parts) {
+    output.set(part, writeOffset);
+    writeOffset += part.length;
+  }
+
+  let encoded = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < output.length; index += chunkSize) {
+    encoded += String.fromCharCode(
+      ...output.subarray(index, Math.min(index + chunkSize, output.length))
+    );
+  }
+
+  return dataUrl.slice(0, commaIndex + 1) + btoa(encoded);
+}
+
 function App() {
   const initialProject = useMemo(
     () => createInitialProject(readUserDefaults(), VISUAL_QA_MODE),
@@ -1896,7 +2001,7 @@ function App() {
     });
 
     downloadDataUrl(
-      dataUrl,
+      format === "png" ? pngDataUrlWithDpi(dataUrl, PNG_DPI) : dataUrl,
       activeFigure.name.replace(/[\\/:*?"<>|]+/g, "-") +
         (format === "png" ? "-600dpi.png" : ".svg")
     );
