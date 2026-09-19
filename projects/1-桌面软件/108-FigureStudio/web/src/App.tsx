@@ -20,9 +20,14 @@ import { resolveFigureInput } from "./data/figureInput";
 import { downloadMatplotlibScript } from "./export/matplotlib";
 import { useHistoryState } from "./hooks/useHistoryState";
 import { parseDelimitedText } from "./lib/csv";
+import {
+  plainMathFallback,
+  resolveSafeMathText
+} from "./lib/mathText";
 import type {
   AspectMode,
   AxisScale,
+  AxisStylePreset,
   CellValue,
   ColorScaleId,
   Column,
@@ -159,6 +164,31 @@ function Icon(props: {
         </span>
       )}
     </span>
+  );
+}
+
+function TreeChevron(props: { open: boolean }) {
+  return (
+    <svg
+      className={props.open ? "tree-chevron-svg is-open" : "tree-chevron-svg"}
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+    >
+      <path d="M4.25 2.5 8 6 4.25 9.5" />
+    </svg>
+  );
+}
+
+function ExplorerActionIcon(props: { kind: "rename" | "delete" }) {
+  return props.kind === "rename" ? (
+    <svg className="explorer-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3 11.8 3.6 9l6.7-6.7 2.4 2.4L6 11.4z" />
+      <path d="M9.4 3.2 11.8 5.6M2.7 13.3h10.6" />
+    </svg>
+  ) : (
+    <svg className="explorer-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4.3 5.1v7.4h7.4V5.1M3 3.7h10M6.1 3.7V2.4h3.8v1.3M6.4 7v3.5M9.6 7v3.5" />
+    </svg>
   );
 }
 
@@ -359,16 +389,53 @@ function App() {
       ? activeFigure.seriesOverrides[primarySeries.id] || {}
       : {};
 
+  const rawPlotTitle = activeFigure?.figureOverrides.plotTitle;
+  const rawXTitle = activeFigure?.figureOverrides.xTitle;
+  const rawYTitle = activeFigure?.figureOverrides.yTitle;
+  const [displayText, setDisplayText] = useState<{
+    plotTitle?: string;
+    xTitle?: string;
+    yTitle?: string;
+  }>({});
+
+  useEffect(() => {
+    const immediate = {
+      plotTitle: plainMathFallback(rawPlotTitle),
+      xTitle: plainMathFallback(rawXTitle),
+      yTitle: plainMathFallback(rawYTitle)
+    };
+    setDisplayText(immediate);
+
+    let cancelled = false;
+    void Promise.all([
+      resolveSafeMathText(rawPlotTitle),
+      resolveSafeMathText(rawXTitle),
+      resolveSafeMathText(rawYTitle)
+    ]).then(([plotTitle, xTitle, yTitle]) => {
+      if (!cancelled) setDisplayText({ plotTitle, xTitle, yTitle });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawPlotTitle, rawXTitle, rawYTitle]);
+
+  const latexFallbackActive =
+    Boolean(rawPlotTitle && displayText.plotTitle !== rawPlotTitle) ||
+    Boolean(rawXTitle && displayText.xTitle !== rawXTitle) ||
+    Boolean(rawYTitle && displayText.yTitle !== rawYTitle);
+
   const layout = useMemo(
     () =>
       plotDataset && activeFigure
         ? buildLayout({
             dataset: plotDataset,
             figure: activeFigure,
-            preset
+            preset,
+            displayText
           })
         : { width: 640, height: 480 },
-    [plotDataset, activeFigure, preset]
+    [plotDataset, activeFigure, preset, displayText]
   );
 
   const traces = useMemo(
@@ -502,7 +569,20 @@ function App() {
       responsive: false,
       displaylogo: false,
       displayModeBar: false,
-      scrollZoom: activeFigure.templateId !== "surface-3d"
+      scrollZoom: activeFigure.templateId !== "surface-3d",
+      editable: false,
+      edits: {
+        annotationPosition: false,
+        annotationTail: false,
+        annotationText: false,
+        axisTitleText: false,
+        colorbarPosition: false,
+        colorbarTitleText: false,
+        legendPosition: true,
+        legendText: false,
+        shapePosition: false,
+        titleText: false
+      }
     };
 
     const handleDomClick = (event: globalThis.MouseEvent) => {
@@ -511,6 +591,7 @@ function App() {
       if (target.closest(".legend")) {
         setInspectorTab("legend");
       } else if (
+        target.closest(".gtitle") ||
         target.closest(".xtitle") ||
         target.closest(".ytitle") ||
         target.closest(".xaxislayer-above") ||
@@ -527,6 +608,7 @@ function App() {
 
       node.removeAllListeners?.("plotly_click");
       node.removeAllListeners?.("plotly_legendclick");
+      node.removeAllListeners?.("plotly_relayout");
 
       node.on?.("plotly_click", (event: any) => {
         const index = event?.points?.[0]?.curveNumber;
@@ -545,6 +627,30 @@ function App() {
         return false;
       });
 
+      node.on?.("plotly_relayout", (event: Record<string, unknown>) => {
+        const x = event["legend.x"];
+        const y = event["legend.y"];
+        if (typeof x !== "number" || typeof y !== "number") return;
+
+        history.commit((current) => ({
+          ...current,
+          figures: current.figures.map((figure) =>
+            figure.id === activeFigure.id
+              ? {
+                  ...figure,
+                  figureOverrides: {
+                    ...figure.figureOverrides,
+                    legendPosition: "custom",
+                    legendX: x,
+                    legendY: y
+                  }
+                }
+              : figure
+          )
+        }));
+        setInspectorTab("legend");
+      });
+
       node.addEventListener("click", handleDomClick);
     });
 
@@ -552,9 +658,10 @@ function App() {
       cancelled = true;
       node.removeAllListeners?.("plotly_click");
       node.removeAllListeners?.("plotly_legendclick");
+      node.removeAllListeners?.("plotly_relayout");
       node.removeEventListener("click", handleDomClick);
     };
-  }, [activeFigure, layout, orderedSeries, selectSeries, traces]);
+  }, [activeFigure, history, layout, orderedSeries, selectSeries, traces]);
 
   const patchProject = useCallback(
     (updater: (current: ProjectState) => ProjectState) => {
@@ -1521,6 +1628,17 @@ function App() {
         legendOrientation: source.legendOrientation,
         legendFrame: source.legendFrame,
         legendColumns: source.legendColumns,
+        legendFontSizePt: source.legendFontSizePt,
+        legendFontColor: source.legendFontColor,
+        legendBackground: source.legendBackground,
+        legendBorderColor: source.legendBorderColor,
+        legendBorderWidthPt: source.legendBorderWidthPt,
+        legendItemWidthPx: source.legendItemWidthPx,
+        axisStyle: source.axisStyle,
+        axisTitleColor: source.axisTitleColor,
+        axisTitleSizePt: source.axisTitleSizePt,
+        tickLabelColor: source.tickLabelColor,
+        tickLabelSizePt: source.tickLabelSizePt,
         colorScale: source.colorScale,
         reverseColorScale: source.reverseColorScale
       }
@@ -1658,7 +1776,7 @@ function App() {
               });
             }}
           >
-            {open ? "⌄" : "›"}
+            <TreeChevron open={open} />
           </span>
           <Icon
             kind="book"
@@ -1773,7 +1891,7 @@ function App() {
               });
             }}
           >
-            {open ? "⌄" : "›"}
+            <TreeChevron open={open} />
           </span>
           <Icon kind="folder" />
           <span className="tree-label">{folder.name}</span>
@@ -1963,8 +2081,12 @@ function App() {
               <Icon kind="graph" />
             </button>
             <span />
-            <button type="button" disabled={!explorerSelection} onClick={renameSelected} title="重命名">✎</button>
-            <button type="button" disabled={!explorerSelection} onClick={deleteSelected} title="删除">⌫</button>
+            <button type="button" disabled={!explorerSelection} onClick={renameSelected} title="重命名">
+              <ExplorerActionIcon kind="rename" />
+            </button>
+            <button type="button" disabled={!explorerSelection} onClick={deleteSelected} title="删除">
+              <ExplorerActionIcon kind="delete" />
+            </button>
           </div>
 
           <div
@@ -3176,7 +3298,7 @@ function App() {
                     </div>
 
                     <div className="prop-row">
-                      <label>颜色</label>
+                      <label>{barTemplate ? "填充颜色" : "颜色"}</label>
                       <div className="control-with-reset color-control">
                         <input
                           type="color"
@@ -3192,6 +3314,87 @@ function App() {
                         />
                       </div>
                     </div>
+
+                    {barTemplate && (
+                      <>
+                        <div className="prop-row">
+                          <label>边框颜色</label>
+                          <div className="control-with-reset color-control">
+                            <input
+                              type="color"
+                              value={primaryOverride.barBorderColor ?? "#ffffff"}
+                              onChange={(event) =>
+                                updateSelectedSeries({
+                                  barBorderColor: event.target.value
+                                })
+                              }
+                            />
+                            <span>
+                              {(primaryOverride.barBorderColor ?? "#FFFFFF").toUpperCase()}
+                            </span>
+                            <ResetIcon
+                              visible={primaryOverride.barBorderColor !== undefined}
+                              onReset={() =>
+                                resetSelectedSeriesField("barBorderColor")
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="prop-row">
+                          <label>边框宽度</label>
+                          <div className="compact-number">
+                            <input
+                              type="number"
+                              min="0"
+                              max="4"
+                              step="0.1"
+                              value={primaryOverride.barBorderWidthPt ?? 0.3}
+                              onChange={(event) =>
+                                updateSelectedSeries({
+                                  barBorderWidthPt: Number(event.target.value)
+                                })
+                              }
+                            />
+                            <span>pt</span>
+                          </div>
+                        </div>
+                        <div className="prop-row">
+                          <label>柱间距</label>
+                          <div className="compact-number">
+                            <input
+                              type="number"
+                              min="0"
+                              max="0.9"
+                              step="0.02"
+                              value={activeFigure.figureOverrides.barGap ?? 0.2}
+                              onChange={(event) =>
+                                setFigureField("barGap", Number(event.target.value))
+                              }
+                            />
+                            <span>比</span>
+                          </div>
+                        </div>
+                        <div className="prop-row">
+                          <label>组内间距</label>
+                          <div className="compact-number">
+                            <input
+                              type="number"
+                              min="0"
+                              max="0.9"
+                              step="0.02"
+                              value={activeFigure.figureOverrides.barGroupGap ?? 0.08}
+                              onChange={(event) =>
+                                setFigureField(
+                                  "barGroupGap",
+                                  Number(event.target.value)
+                                )
+                              }
+                            />
+                            <span>比</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     <div className="prop-row">
                       <label>图层</label>
@@ -3244,22 +3447,88 @@ function App() {
 
                 {inspectorTab === "axis" && (
                   <section className="inspector-pane">
-                    <div className="pane-heading"><strong>坐标轴</strong></div>
-
-                    <div className="prop-row">
-                      <label>X 标题</label>
-                      <input
-                        type="text"
-                        value={activeFigure.figureOverrides.xTitle ?? ""}
-                        onChange={(event) => setFigureField("xTitle", event.target.value)}
-                      />
+                    <div className="pane-heading">
+                      <strong>坐标轴与文字</strong>
+                      <span>支持 LaTeX</span>
                     </div>
-                    <div className="prop-row">
-                      <label>Y 标题</label>
+
+                    <div className="section-divider">范围</div>
+                    <div className="axis-range-grid">
+                      <div className="axis-range-head">X</div>
+                      <label className="axis-auto">
+                        <MiniSwitch
+                          checked={activeFigure.figureOverrides.xAutoRange !== false}
+                          onChange={(value) =>
+                            setFigureField("xAutoRange", value)
+                          }
+                        />
+                        <span>自动</span>
+                      </label>
                       <input
-                        type="text"
-                        value={activeFigure.figureOverrides.yTitle ?? ""}
-                        onChange={(event) => setFigureField("yTitle", event.target.value)}
+                        type="number"
+                        placeholder="最小"
+                        disabled={activeFigure.figureOverrides.xAutoRange !== false}
+                        value={activeFigure.figureOverrides.xMin ?? ""}
+                        onChange={(event) =>
+                          setFigureField(
+                            "xMin",
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value)
+                          )
+                        }
+                      />
+                      <input
+                        type="number"
+                        placeholder="最大"
+                        disabled={activeFigure.figureOverrides.xAutoRange !== false}
+                        value={activeFigure.figureOverrides.xMax ?? ""}
+                        onChange={(event) =>
+                          setFigureField(
+                            "xMax",
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value)
+                          )
+                        }
+                      />
+                      <div className="axis-range-head">Y</div>
+                      <label className="axis-auto">
+                        <MiniSwitch
+                          checked={activeFigure.figureOverrides.yAutoRange !== false}
+                          onChange={(value) =>
+                            setFigureField("yAutoRange", value)
+                          }
+                        />
+                        <span>自动</span>
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="最小"
+                        disabled={activeFigure.figureOverrides.yAutoRange !== false}
+                        value={activeFigure.figureOverrides.yMin ?? ""}
+                        onChange={(event) =>
+                          setFigureField(
+                            "yMin",
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value)
+                          )
+                        }
+                      />
+                      <input
+                        type="number"
+                        placeholder="最大"
+                        disabled={activeFigure.figureOverrides.yAutoRange !== false}
+                        value={activeFigure.figureOverrides.yMax ?? ""}
+                        onChange={(event) =>
+                          setFigureField(
+                            "yMax",
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value)
+                          )
+                        }
                       />
                     </div>
 
@@ -3270,7 +3539,10 @@ function App() {
                           <select
                             value={activeFigure.figureOverrides.xScale ?? "linear"}
                             onChange={(event) =>
-                              setFigureField("xScale", event.target.value as AxisScale)
+                              setFigureField(
+                                "xScale",
+                                event.target.value as AxisScale
+                              )
                             }
                           >
                             <option value="linear">线性</option>
@@ -3282,7 +3554,10 @@ function App() {
                           <select
                             value={activeFigure.figureOverrides.yScale ?? "linear"}
                             onChange={(event) =>
-                              setFigureField("yScale", event.target.value as AxisScale)
+                              setFigureField(
+                                "yScale",
+                                event.target.value as AxisScale
+                              )
                             }
                           >
                             <option value="linear">线性</option>
@@ -3292,6 +3567,22 @@ function App() {
                       </>
                     )}
 
+                    <div className="section-divider">刻度</div>
+                    <div className="prop-row">
+                      <label>外框 / Tick</label>
+                      <select
+                        value={activeFigure.figureOverrides.axisStyle ?? "regular"}
+                        onChange={(event) =>
+                          setFigureField(
+                            "axisStyle",
+                            event.target.value as AxisStylePreset
+                          )
+                        }
+                      >
+                        <option value="regular">常规</option>
+                        <option value="bold">加粗</option>
+                      </select>
+                    </div>
                     <div className="prop-row">
                       <label>刻度方向</label>
                       <select
@@ -3307,8 +3598,75 @@ function App() {
                         <option value="outside">向外</option>
                       </select>
                     </div>
+                    <div className="tick-step-grid">
+                      <span />
+                      <b>大刻度</b>
+                      <b>小刻度</b>
+                      <span>X</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="自动"
+                        value={activeFigure.figureOverrides.xMajorTickStep ?? ""}
+                        onChange={(event) =>
+                          setFigureField(
+                            "xMajorTickStep",
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value)
+                          )
+                        }
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="自动"
+                        value={activeFigure.figureOverrides.xMinorTickStep ?? ""}
+                        onChange={(event) => {
+                          const value =
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value);
+                          setFigureField("xMinorTickStep", value);
+                          if (value !== undefined) setFigureField("minorTicks", true);
+                        }}
+                      />
+                      <span>Y</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="自动"
+                        value={activeFigure.figureOverrides.yMajorTickStep ?? ""}
+                        onChange={(event) =>
+                          setFigureField(
+                            "yMajorTickStep",
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value)
+                          )
+                        }
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="自动"
+                        value={activeFigure.figureOverrides.yMinorTickStep ?? ""}
+                        onChange={(event) => {
+                          const value =
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value);
+                          setFigureField("yMinorTickStep", value);
+                          if (value !== undefined) setFigureField("minorTicks", true);
+                        }}
+                      />
+                    </div>
                     <div className="prop-row">
-                      <label>次刻度</label>
+                      <label>小刻度</label>
                       <MiniSwitch
                         checked={activeFigure.figureOverrides.minorTicks ?? false}
                         onChange={(value) => setFigureField("minorTicks", value)}
@@ -3324,31 +3682,190 @@ function App() {
                         onChange={(value) => setFigureField("gridVisible", value)}
                       />
                     </div>
+
+                    <div className="section-divider">标题与标签</div>
+                    <div className="prop-row">
+                      <label>图标题</label>
+                      <input
+                        type="text"
+                        placeholder="可输入 $E=mc^2$"
+                        value={activeFigure.figureOverrides.plotTitle ?? ""}
+                        onChange={(event) =>
+                          setFigureField("plotTitle", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>X 标题</label>
+                      <input
+                        type="text"
+                        value={activeFigure.figureOverrides.xTitle ?? ""}
+                        onChange={(event) =>
+                          setFigureField("xTitle", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>Y 标题</label>
+                      <input
+                        type="text"
+                        value={activeFigure.figureOverrides.yTitle ?? ""}
+                        onChange={(event) =>
+                          setFigureField("yTitle", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>标题字号</label>
+                      <div className="compact-number">
+                        <input
+                          type="number"
+                          min="5"
+                          max="24"
+                          step="0.25"
+                          value={
+                            activeFigure.figureOverrides.axisTitleSizePt ??
+                            effectiveFontSizePt
+                          }
+                          onChange={(event) =>
+                            setFigureField(
+                              "axisTitleSizePt",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                        <span>pt</span>
+                      </div>
+                    </div>
+                    <div className="prop-row">
+                      <label>标题颜色</label>
+                      <input
+                        className="compact-color"
+                        type="color"
+                        value={
+                          activeFigure.figureOverrides.axisTitleColor ?? "#17191c"
+                        }
+                        onChange={(event) =>
+                          setFigureField("axisTitleColor", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>图标题字号</label>
+                      <div className="compact-number">
+                        <input
+                          type="number"
+                          min="5"
+                          max="28"
+                          step="0.25"
+                          value={
+                            activeFigure.figureOverrides.plotTitleSizePt ??
+                            effectiveFontSizePt * 1.12
+                          }
+                          onChange={(event) =>
+                            setFigureField(
+                              "plotTitleSizePt",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                        <span>pt</span>
+                      </div>
+                    </div>
+                    <div className="prop-row">
+                      <label>图标题颜色</label>
+                      <input
+                        className="compact-color"
+                        type="color"
+                        value={
+                          activeFigure.figureOverrides.plotTitleColor ?? "#17191c"
+                        }
+                        onChange={(event) =>
+                          setFigureField("plotTitleColor", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>刻度字号</label>
+                      <div className="compact-number">
+                        <input
+                          type="number"
+                          min="5"
+                          max="20"
+                          step="0.25"
+                          value={
+                            activeFigure.figureOverrides.tickLabelSizePt ??
+                            effectiveFontSizePt
+                          }
+                          onChange={(event) =>
+                            setFigureField(
+                              "tickLabelSizePt",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                        <span>pt</span>
+                      </div>
+                    </div>
+                    <div className="prop-row">
+                      <label>刻度颜色</label>
+                      <input
+                        className="compact-color"
+                        type="color"
+                        value={
+                          activeFigure.figureOverrides.tickLabelColor ?? "#17191c"
+                        }
+                        onChange={(event) =>
+                          setFigureField("tickLabelColor", event.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div
+                      className={
+                        latexFallbackActive
+                          ? "latex-status is-error"
+                          : "latex-status"
+                      }
+                    >
+                      {latexFallbackActive
+                        ? "LaTeX 无法解析：画布已安全显示原始输入，不会中断绘图。"
+                        : "LaTeX 即时预览：例如 $\\lambda$, $P_{out}$, $E=mc^2$。"}
+                    </div>
                   </section>
                 )}
 
                 {inspectorTab === "legend" && (
                   <section className="inspector-pane">
-                    <div className="pane-heading"><strong>图例</strong></div>
+                    <div className="pane-heading">
+                      <strong>图例</strong>
+                      <span>可直接拖动</span>
+                    </div>
+
+                    <div className="legend-drag-hint">
+                      在画布上直接拖动图例即可自由定位；拖动后位置会写回项目，并与导出保持一致。
+                    </div>
+
                     <div className="prop-row">
                       <label>显示</label>
                       <MiniSwitch
                         checked={effectiveLegendVisible}
-                        onChange={(value) => setFigureField("legendVisible", value)}
+                        onChange={(value) =>
+                          setFigureField("legendVisible", value)
+                        }
                       />
                     </div>
                     <div className="prop-row">
                       <label>位置</label>
                       <select
                         value={
-                          activeFigure.figureOverrides.legendPosition ?? "top-left"
+                          activeFigure.figureOverrides.legendPosition ??
+                          "top-left"
                         }
-                        onChange={(event) =>
-                          setFigureField(
-                            "legendPosition",
-                            event.target.value as LegendPosition
-                          )
-                        }
+                        onChange={(event) => {
+                          const value = event.target.value as LegendPosition;
+                          setFigureField("legendPosition", value);
+                        }}
                       >
                         <option value="top-left">左上</option>
                         <option value="top-center">上中</option>
@@ -3356,10 +3873,50 @@ function App() {
                         <option value="bottom-left">左下</option>
                         <option value="bottom-center">下中</option>
                         <option value="bottom-right">右下</option>
+                        <option value="custom">自由</option>
                       </select>
                     </div>
+
+                    {(activeFigure.figureOverrides.legendPosition ?? "top-left") ===
+                      "custom" && (
+                      <div className="legend-position-grid">
+                        <label>
+                          <span>X</span>
+                          <input
+                            type="number"
+                            min="-1"
+                            max="2"
+                            step="0.01"
+                            value={activeFigure.figureOverrides.legendX ?? 0.02}
+                            onChange={(event) =>
+                              setFigureField(
+                                "legendX",
+                                Number(event.target.value)
+                              )
+                            }
+                          />
+                        </label>
+                        <label>
+                          <span>Y</span>
+                          <input
+                            type="number"
+                            min="-1"
+                            max="2"
+                            step="0.01"
+                            value={activeFigure.figureOverrides.legendY ?? 0.985}
+                            onChange={(event) =>
+                              setFigureField(
+                                "legendY",
+                                Number(event.target.value)
+                              )
+                            }
+                          />
+                        </label>
+                      </div>
+                    )}
+
                     <div className="prop-row">
-                      <label>方向</label>
+                      <label>排列</label>
                       <select
                         value={
                           activeFigure.figureOverrides.legendOrientation ??
@@ -3377,11 +3934,172 @@ function App() {
                       </select>
                     </div>
                     <div className="prop-row">
+                      <label>列数</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="8"
+                        value={activeFigure.figureOverrides.legendColumns ?? 1}
+                        onChange={(event) =>
+                          setFigureField(
+                            "legendColumns",
+                            Math.max(1, Number(event.target.value))
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="section-divider">文字与符号</div>
+                    <div className="prop-row">
+                      <label>字号</label>
+                      <div className="compact-number">
+                        <input
+                          type="number"
+                          min="5"
+                          max="20"
+                          step="0.25"
+                          value={
+                            activeFigure.figureOverrides.legendFontSizePt ??
+                            effectiveFontSizePt * 0.92
+                          }
+                          onChange={(event) =>
+                            setFigureField(
+                              "legendFontSizePt",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                        <span>pt</span>
+                      </div>
+                    </div>
+                    <div className="prop-row">
+                      <label>文字颜色</label>
+                      <input
+                        className="compact-color"
+                        type="color"
+                        value={
+                          activeFigure.figureOverrides.legendFontColor ??
+                          "#17191c"
+                        }
+                        onChange={(event) =>
+                          setFigureField(
+                            "legendFontColor",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>符号宽度</label>
+                      <div className="compact-number">
+                        <input
+                          type="number"
+                          min="30"
+                          max="120"
+                          step="2"
+                          value={
+                            activeFigure.figureOverrides.legendItemWidthPx ?? 30
+                          }
+                          onChange={(event) =>
+                            setFigureField(
+                              "legendItemWidthPx",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                        <span>px</span>
+                      </div>
+                    </div>
+
+                    <div className="section-divider">背景与边框</div>
+                    <div className="prop-row">
+                      <label>背景</label>
+                      <div className="control-with-reset color-control">
+                        <input
+                          type="color"
+                          value={
+                            activeFigure.figureOverrides.legendBackground ??
+                            "#ffffff"
+                          }
+                          onChange={(event) =>
+                            setFigureField(
+                              "legendBackground",
+                              event.target.value
+                            )
+                          }
+                        />
+                        <span>
+                          {(
+                            activeFigure.figureOverrides.legendBackground ??
+                            "透明"
+                          ).toUpperCase()}
+                        </span>
+                        <ResetIcon
+                          visible={
+                            activeFigure.figureOverrides.legendBackground !==
+                            undefined
+                          }
+                          onReset={() =>
+                            resetFigureField("legendBackground")
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="prop-row">
                       <label>边框</label>
                       <MiniSwitch
-                        checked={activeFigure.figureOverrides.legendFrame ?? false}
-                        onChange={(value) => setFigureField("legendFrame", value)}
+                        checked={
+                          activeFigure.figureOverrides.legendFrame ?? false
+                        }
+                        onChange={(value) =>
+                          setFigureField("legendFrame", value)
+                        }
                       />
+                    </div>
+                    <div className="prop-row">
+                      <label>边框颜色</label>
+                      <input
+                        className="compact-color"
+                        type="color"
+                        disabled={
+                          !(activeFigure.figureOverrides.legendFrame ?? false)
+                        }
+                        value={
+                          activeFigure.figureOverrides.legendBorderColor ??
+                          "#cdd2d7"
+                        }
+                        onChange={(event) =>
+                          setFigureField(
+                            "legendBorderColor",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="prop-row">
+                      <label>边框宽度</label>
+                      <div className="compact-number">
+                        <input
+                          type="number"
+                          min="0"
+                          max="4"
+                          step="0.1"
+                          disabled={
+                            !(activeFigure.figureOverrides.legendFrame ?? false)
+                          }
+                          value={
+                            activeFigure.figureOverrides.legendBorderWidthPt ??
+                            0.6
+                          }
+                          onChange={(event) =>
+                            setFigureField(
+                              "legendBorderWidthPt",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                        <span>pt</span>
+                      </div>
                     </div>
                   </section>
                 )}

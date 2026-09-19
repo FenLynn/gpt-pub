@@ -89,13 +89,15 @@ export type MarkerSymbol =
   | "x";
 export type AxisScale = "linear" | "log";
 export type TickDirection = "inside" | "outside";
+export type AxisStylePreset = "regular" | "bold";
 export type LegendPosition =
   | "top-left"
   | "top-center"
   | "top-right"
   | "bottom-left"
   | "bottom-center"
-  | "bottom-right";
+  | "bottom-right"
+  | "custom";
 export type LegendOrientation = "horizontal" | "vertical";
 export type ColorScaleId =
   | "Viridis"
@@ -130,14 +132,25 @@ export interface SeriesOverride {
   markerSizePt?: number;
   color?: string;
   opacity?: number;
+  barBorderColor?: string;
+  barBorderWidthPt?: number;
 }
 
 export interface FigureOverrides {
   fontFamily?: "Arial" | "Times New Roman";
   fontSizePt?: number;
   background?: string;
+
+  plotTitle?: string;
+  plotTitleColor?: string;
+  plotTitleSizePt?: number;
+
   xTitle?: string;
   yTitle?: string;
+  axisTitleColor?: string;
+  axisTitleSizePt?: number;
+  tickLabelColor?: string;
+  tickLabelSizePt?: number;
   aspectMode?: AspectMode;
   customAspectWidth?: number;
   customAspectHeight?: number;
@@ -151,14 +164,30 @@ export interface FigureOverrides {
   yMin?: number;
   yMax?: number;
   tickDirection?: TickDirection;
+  axisStyle?: AxisStylePreset;
+  xMajorTickStep?: number;
+  xMinorTickStep?: number;
+  yMajorTickStep?: number;
+  yMinorTickStep?: number;
   minorTicks?: boolean;
   gridVisible?: boolean;
 
   legendVisible?: boolean;
   legendPosition?: LegendPosition;
+  legendX?: number;
+  legendY?: number;
   legendOrientation?: LegendOrientation;
   legendFrame?: boolean;
   legendColumns?: number;
+  legendFontSizePt?: number;
+  legendFontColor?: string;
+  legendBackground?: string;
+  legendBorderColor?: string;
+  legendBorderWidthPt?: number;
+  legendItemWidthPx?: number;
+
+  barGap?: number;
+  barGroupGap?: number;
 
   errorSeriesId?: string;
   offsetStep?: number;

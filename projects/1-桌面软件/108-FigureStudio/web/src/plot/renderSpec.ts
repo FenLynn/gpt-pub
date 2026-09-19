@@ -71,7 +71,7 @@ export function orderSeries(dataset: Dataset, seriesOrder: string[]): PlotColumn
 
 function legendAnchor(position: LegendPosition) {
   const map: Record<
-    LegendPosition,
+    Exclude<LegendPosition, "custom">,
     { x: number; y: number; xanchor: string; yanchor: string }
   > = {
     "top-left": { x: 0.02, y: 0.985, xanchor: "left", yanchor: "top" },
@@ -81,6 +81,9 @@ function legendAnchor(position: LegendPosition) {
     "bottom-center": { x: 0.5, y: 0.02, xanchor: "center", yanchor: "bottom" },
     "bottom-right": { x: 0.98, y: 0.02, xanchor: "right", yanchor: "bottom" }
   };
+  if (position === "custom") {
+    return { x: 0.02, y: 0.985, xanchor: "left", yanchor: "top" };
+  }
   return map[position];
 }
 
@@ -231,8 +234,8 @@ export function buildTraces(args: {
             override.color ||
             preset.palette[sourceIndex % preset.palette.length],
           line: {
-            color: "#ffffff",
-            width: 0.3
+            color: override.barBorderColor ?? "#ffffff",
+            width: ptToPx(override.barBorderWidthPt ?? 0.3)
           }
         },
         hovertemplate:
@@ -338,20 +341,49 @@ export function buildLayout(args: {
   dataset: Dataset;
   figure: FigureSpec;
   preset: PresetDefinition;
+  displayText?: {
+    plotTitle?: string;
+    xTitle?: string;
+    yTitle?: string;
+  };
 }) {
-  const { dataset, figure, preset } = args;
+  const { dataset, figure, preset, displayText } = args;
   const overrides = figure.figureOverrides;
   const canvas = resolveCanvasMm(preset, figure);
   const fontFamily = plotFontFamily(overrides.fontFamily || preset.fontFamily);
   const fontSizePt = overrides.fontSizePt ?? preset.fontSizePt;
   const fontSizePx = ptToPx(fontSizePt);
-  const axisWidthPx = ptToPx(preset.axisWidthPt);
+  const axisStyle = overrides.axisStyle ?? "regular";
+  const axisWidthPt =
+    axisStyle === "bold"
+      ? Math.max(1, preset.axisWidthPt * 1.45)
+      : preset.axisWidthPt;
+  const axisWidthPx = ptToPx(axisWidthPt);
+  const majorTickLengthPt = axisStyle === "bold" ? 5 : 3.6;
+  const minorTickLengthPt = axisStyle === "bold" ? 3.1 : 2.2;
+  const tickLabelSizePx = ptToPx(
+    overrides.tickLabelSizePt ?? fontSizePt
+  );
+  const axisTitleSizePx = ptToPx(
+    overrides.axisTitleSizePt ?? fontSizePt * 1.02
+  );
+  const plotTitleSizePx = ptToPx(
+    overrides.plotTitleSizePt ?? fontSizePt * 1.12
+  );
   const background = overrides.background ?? "#ffffff";
   const tickDirection = overrides.tickDirection ?? "inside";
   const gridVisible = overrides.gridVisible ?? preset.showGrid;
-  const legendPosition = legendAnchor(
-    overrides.legendPosition ?? "top-left"
-  );
+  const legendPositionMode = overrides.legendPosition ?? "top-left";
+  const presetLegendPosition = legendAnchor(legendPositionMode);
+  const legendPosition =
+    legendPositionMode === "custom"
+      ? {
+          x: overrides.legendX ?? presetLegendPosition.x,
+          y: overrides.legendY ?? presetLegendPosition.y,
+          xanchor: "left",
+          yanchor: "top"
+        }
+      : presetLegendPosition;
   const legendOrientation = overrides.legendOrientation ?? "horizontal";
   const legendColumns = Math.max(1, overrides.legendColumns ?? 1);
   const xScale = overrides.xScale ?? "linear";
@@ -375,9 +407,14 @@ export function buildLayout(args: {
     linewidth: axisWidthPx,
     linecolor: "#202328",
     ticks: tickDirection,
-    ticklen: ptToPx(3.6),
+    ticklen: ptToPx(majorTickLengthPt),
     tickwidth: axisWidthPx,
     tickcolor: "#202328",
+    tickfont: {
+      family: fontFamily,
+      size: tickLabelSizePx,
+      color: overrides.tickLabelColor ?? "#17191c"
+    },
     showgrid: gridVisible,
     gridcolor: "#e3e6e9",
     gridwidth: 0.45,
@@ -385,7 +422,7 @@ export function buildLayout(args: {
     automargin: false,
     minor: {
       ticks: overrides.minorTicks ? tickDirection : "",
-      ticklen: overrides.minorTicks ? ptToPx(2.2) : 0,
+      ticklen: overrides.minorTicks ? ptToPx(minorTickLengthPt) : 0,
       tickwidth: axisWidthPx * 0.85,
       showgrid: false
     }
@@ -402,12 +439,28 @@ export function buildLayout(args: {
           ? 12
           : 4.5
       )),
-      t: Math.round(mmToPx(5.5)),
+      t: Math.round(
+        mmToPx(overrides.plotTitle ? 9.5 : 5.5)
+      ),
       b: Math.round(mmToPx(12.5)),
       pad: 0
     },
     paper_bgcolor: background,
     plot_bgcolor: background,
+    title: overrides.plotTitle
+      ? {
+          text: displayText?.plotTitle ?? overrides.plotTitle,
+          x: 0.5,
+          xanchor: "center",
+          y: 0.985,
+          yanchor: "top",
+          font: {
+            family: fontFamily,
+            size: plotTitleSizePx,
+            color: overrides.plotTitleColor ?? "#17191c"
+          }
+        }
+      : undefined,
     showlegend: overrides.legendVisible ?? true,
     hovermode: "closest",
     dragmode: figure.templateId === "surface-3d" ? "orbit" : "zoom",
@@ -420,12 +473,18 @@ export function buildLayout(args: {
     legend: {
       ...legendPosition,
       orientation: legendOrientation === "horizontal" ? "h" : "v",
-      bgcolor: overrides.legendFrame
-        ? "rgba(255,255,255,0.90)"
-        : "rgba(255,255,255,0)",
-      bordercolor: "#cdd2d7",
-      borderwidth: overrides.legendFrame ? 0.6 : 0,
+      bgcolor:
+        overrides.legendBackground ??
+        (overrides.legendFrame
+          ? "rgba(255,255,255,0.90)"
+          : "rgba(255,255,255,0)"),
+      bordercolor: overrides.legendBorderColor ?? "#cdd2d7",
+      borderwidth: overrides.legendFrame
+        ? ptToPx(overrides.legendBorderWidthPt ?? 0.6)
+        : 0,
       traceorder: "normal",
+      itemsizing: "constant",
+      itemwidth: Math.max(30, overrides.legendItemWidthPx ?? 30),
       entrywidthmode:
         legendOrientation === "horizontal" && legendColumns > 1
           ? "fraction"
@@ -436,26 +495,46 @@ export function buildLayout(args: {
           : undefined,
       font: {
         family: fontFamily,
-        size: fontSizePx * 0.92
+        size: ptToPx(
+          overrides.legendFontSizePt ?? fontSizePt * 0.92
+        ),
+        color: overrides.legendFontColor ?? "#17191c"
       }
     },
-    barmode: figure.templateId === "stacked-bar" ? "stack" : "group"
+    barmode: figure.templateId === "stacked-bar" ? "stack" : "group",
+    bargap: overrides.barGap ?? 0.2,
+    bargroupgap: overrides.barGroupGap ?? 0.08
   };
 
   if (figure.templateId === "surface-3d") {
     layout.scene = {
       bgcolor: background,
       xaxis: {
-        title: overrides.xTitle ?? dataset.x.name,
+        title: {
+          text: displayText?.xTitle ?? overrides.xTitle ?? dataset.x.name,
+          font: {
+            family: fontFamily,
+            size: axisTitleSizePx,
+            color: overrides.axisTitleColor ?? "#17191c"
+          }
+        },
         gridcolor: "#e3e6e9",
         zeroline: false,
         showbackground: false
       },
       yaxis: {
-        title:
-          overrides.yTitle ??
-          dataset.metadata?.rowAxisName ??
-          "Y",
+        title: {
+          text:
+            displayText?.yTitle ??
+            overrides.yTitle ??
+            dataset.metadata?.rowAxisName ??
+            "Y",
+          font: {
+            family: fontFamily,
+            size: axisTitleSizePx,
+            color: overrides.axisTitleColor ?? "#17191c"
+          }
+        },
         gridcolor: "#e3e6e9",
         zeroline: false,
         showbackground: false
@@ -480,9 +559,29 @@ export function buildLayout(args: {
     autorange: xRange ? false : true,
     range: xRange,
     title: {
-      text: overrides.xTitle ?? dataset.x.name,
+      text:
+        displayText?.xTitle ??
+        overrides.xTitle ??
+        dataset.x.name,
       standoff: Math.round(mmToPx(1.8)),
-      font: { family: fontFamily, size: fontSizePx * 1.02 }
+      font: {
+        family: fontFamily,
+        size: axisTitleSizePx,
+        color: overrides.axisTitleColor ?? "#17191c"
+      }
+    },
+    dtick:
+      overrides.xMajorTickStep && overrides.xMajorTickStep > 0
+        ? overrides.xMajorTickStep
+        : undefined,
+    minor: {
+      ...commonAxis.minor,
+      dtick:
+        overrides.minorTicks &&
+        overrides.xMinorTickStep &&
+        overrides.xMinorTickStep > 0
+          ? overrides.xMinorTickStep
+          : undefined
     }
   };
 
@@ -493,12 +592,30 @@ export function buildLayout(args: {
     range: yRange,
     title: {
       text:
+        displayText?.yTitle ??
         overrides.yTitle ??
         (figure.templateId === "heatmap"
           ? dataset.metadata?.rowAxisName ?? "Y"
           : dataset.ys[0]?.name ?? "Y"),
       standoff: Math.round(mmToPx(1.5)),
-      font: { family: fontFamily, size: fontSizePx * 1.02 }
+      font: {
+        family: fontFamily,
+        size: axisTitleSizePx,
+        color: overrides.axisTitleColor ?? "#17191c"
+      }
+    },
+    dtick:
+      overrides.yMajorTickStep && overrides.yMajorTickStep > 0
+        ? overrides.yMajorTickStep
+        : undefined,
+    minor: {
+      ...commonAxis.minor,
+      dtick:
+        overrides.minorTicks &&
+        overrides.yMinorTickStep &&
+        overrides.yMinorTickStep > 0
+          ? overrides.yMinorTickStep
+          : undefined
     }
   };
 
