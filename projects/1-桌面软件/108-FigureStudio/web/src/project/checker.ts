@@ -71,9 +71,13 @@ export function checkFigure(
         (series) => stableDoubleYSide(series.id) === "right"
       )
     : [];
+  const automaticLegendSeriesCount =
+    figure.templateId === "bar" || figure.templateId === "xy-errorbar"
+      ? Math.min(1, visibleSeries.length)
+      : visibleSeries.length;
   const effectiveLegendVisible =
     !fieldTemplate &&
-    (o.legendVisible ?? visibleSeries.length > 1);
+    (o.legendVisible ?? automaticLegendSeriesCount > 1);
 
   const items: CheckItem[] = [];
 
