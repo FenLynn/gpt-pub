@@ -447,3 +447,221 @@
   .focus-metric{height:56px!important;min-width:110px!important;padding-right:14px!important}
   .focus-metric b{font-size:23px!important}
 }
+
+
+/* v0.4.15 Dashboard-first correction */
+.dashboard-grid:not(.focus-mode){
+  grid-template-rows:48% 52%!important;
+  gap:2px!important;
+  background:#314251!important
+}
+.dashboard-grid:not(.focus-mode) .power-panel,
+.dashboard-grid:not(.focus-mode) .spectrum-panel,
+.dashboard-grid:not(.focus-mode) .beam-panel,
+.dashboard-grid:not(.focus-mode) .scope-panel{
+  grid-template-rows:34px minmax(0,1fr)!important;
+  background:#314251!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay{
+  height:34px!important;
+  min-height:34px!important;
+  padding:0 8px!important;
+  background:#314251!important;
+  border:0!important;
+  box-shadow:none!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay .module-title{
+  gap:5px!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay strong{
+  font-size:12.5px!important;
+  font-weight:650!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay .panel-mark{
+  width:20px!important;
+  height:20px!important;
+  flex-basis:20px!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay .panel-mark svg{
+  width:19px!important;
+  height:19px!important
+}
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts{
+  gap:9px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger{
+  height:27px!important;
+  padding:0 4px!important;
+  gap:4px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger em{
+  font-size:9.5px!important;
+  color:#a9bac7!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger b{
+  font-size:14.5px!important;
+  line-height:1!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger small{
+  font-size:8.5px!important
+}
+.dashboard-grid:not(.focus-mode) .secondary-trigger b{
+  font-size:13px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls{
+  gap:6px!important;
+  margin-left:7px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls .control-label{
+  font-size:10px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls input[type=range]{
+  width:78px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls>b{
+  min-width:47px!important;
+  font-size:11px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls .play-mini{
+  width:25px!important;
+  height:24px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-head .m2-block{
+  gap:5px!important;
+  padding-left:4px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-head .m2-block .metric-trigger{
+  padding:0 2px!important
+}
+.dashboard-grid:not(.focus-mode) .power-chart-zone{
+  grid-template-rows:minmax(0,1fr) 30px!important;
+  gap:2px!important
+}
+.dashboard-grid:not(.focus-mode) .overview-row{
+  padding:0 34px 1px!important
+}
+.dashboard-grid:not(.focus-mode) .scope-plots{
+  grid-template-rows:56% 44%!important;
+  gap:4px!important;
+  padding:0!important
+}
+.dashboard-grid:not(.focus-mode) .beam-body{
+  gap:3px!important
+}
+
+/* Selection checks should breathe away from the top edge. */
+.module-toggle.active::after{
+  top:7px!important;
+  right:-1px!important;
+  font-size:12px!important
+}
+
+/* Screenshot feedback must render above the whole Web UI, never under charts. */
+.capture-toast{
+  position:fixed!important;
+  top:42px!important;
+  right:122px!important;
+  z-index:2147483000!important;
+  height:30px;
+  min-width:112px;
+  display:grid;
+  place-items:center;
+  padding:0 14px;
+  border-radius:15px;
+  background:#f7fbfd;
+  border:1px solid #7f929f;
+  color:#29495f;
+  font-size:11px;
+  box-shadow:0 6px 20px rgba(0,0,0,.24);
+  pointer-events:none;
+  animation:captureToastTop .9s ease forwards
+}
+@keyframes captureToastTop{
+  0%{opacity:0;transform:translateY(-6px) scale(.94)}
+  18%,67%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(-5px) scale(.96)}
+}
+.capture-bubble{display:none!important}
+
+/* Recording duration: always HH:MM:SS while active and never clipped/hidden. */
+.record-btn{overflow:visible!important}
+.record-btn.active{
+  min-width:132px!important
+}
+.record-duration{
+  display:none!important;
+  width:58px!important;
+  min-width:58px!important;
+  max-width:58px!important;
+  overflow:visible!important;
+  contain:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  white-space:nowrap!important;
+  font-variant-numeric:tabular-nums!important
+}
+.record-duration.shown{
+  display:inline-block!important;
+  visibility:visible!important;
+  opacity:1!important
+}
+.record-capture .record-duration.shown{
+  visibility:visible!important;
+  opacity:1!important
+}
+
+/* Big Readout hugs the value much more tightly. */
+.big-readout-top{
+  left:calc(7px * var(--readout-scale))!important;
+  right:calc(5px * var(--readout-scale))!important;
+  top:calc(5px * var(--readout-scale))!important;
+  height:calc(20px * var(--readout-scale))!important
+}
+.big-readout-identity{
+  gap:calc(4px * var(--readout-scale))!important;
+  font-size:calc(10px * var(--readout-scale))!important
+}
+.big-readout-identity i{
+  width:calc(7px * var(--readout-scale))!important;
+  height:calc(7px * var(--readout-scale))!important
+}
+.readout-theme-toggle{
+  width:calc(31px * var(--readout-scale))!important;
+  height:calc(17px * var(--readout-scale))!important
+}
+.readout-close{
+  width:calc(19px * var(--readout-scale))!important;
+  height:calc(19px * var(--readout-scale))!important;
+  font-size:calc(20px * var(--readout-scale))!important
+}
+.big-readout-body{
+  padding:calc(22px * var(--readout-scale)) calc(6px * var(--readout-scale)) calc(4px * var(--readout-scale))!important
+}
+.big-readout-value{
+  font-size:calc(82px * var(--readout-scale))!important;
+  line-height:.82!important
+}
+.big-readout-value small{
+  margin-left:.18em!important
+}
+.big-readout-resize{
+  width:calc(22px * var(--readout-scale))!important;
+  height:calc(22px * var(--readout-scale))!important
+}
+
+@media(max-width:1200px){
+  .dashboard-grid:not(.focus-mode) .graph-overlay{height:32px!important;min-height:32px!important}
+  .dashboard-grid:not(.focus-mode) .power-panel,
+  .dashboard-grid:not(.focus-mode) .spectrum-panel,
+  .dashboard-grid:not(.focus-mode) .beam-panel,
+  .dashboard-grid:not(.focus-mode) .scope-panel{grid-template-rows:32px minmax(0,1fr)!important}
+  .dashboard-grid:not(.focus-mode) .head-metrics,
+  .dashboard-grid:not(.focus-mode) .osa-metrics,
+  .dashboard-grid:not(.focus-mode) .scope-readouts{gap:5px!important}
+  .dashboard-grid:not(.focus-mode) .metric-trigger b{font-size:13px!important}
+  .dashboard-grid:not(.focus-mode) .metric-trigger em,
+  .dashboard-grid:not(.focus-mode) .metric-trigger small{font-size:8.5px!important}
+  .dashboard-grid:not(.focus-mode) .beam-top-controls input[type=range]{width:58px!important}
+}

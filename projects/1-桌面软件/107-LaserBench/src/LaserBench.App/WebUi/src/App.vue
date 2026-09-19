@@ -22,8 +22,8 @@ const saveNotice = ref('')
 type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
 const bigReadoutKind = ref<BigReadoutKind|null>(null)
 const bigReadoutLight = ref(false)
-const BIG_READOUT_BASE_W = 400
-const BIG_READOUT_BASE_H = 205
+const BIG_READOUT_BASE_W = 390
+const BIG_READOUT_BASE_H = 150
 const bigReadoutRect = ref({ x: 150, y: 110, scale: 1 })
 const settingsDraft = ref({
   experimentFolder: snapshot.value.config?.experimentFolder ?? '',
@@ -250,8 +250,8 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <div class="top-spacer"></div>
       <div class="device-strip"><span v-for="d in devicesShown" :key="d.kind+d.alias" class="device-pill"><i :class="['status-dot',d.status]"></i>{{d.alias}}</span></div>
       <div class="vsep"></div>
-      <button class="icon-btn camera-btn" :class="{flash:cameraFlash}" @click="screenshot" title="截图"><span v-if="cameraFlash" class="capture-bubble"></span><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
-      <button class="record-btn" :class="{active:snapshot.recording}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span v-if="snapshot.recording" class="record-duration">{{recordDurationText}}</span></button>
+      <button class="icon-btn camera-btn" :class="{flash:cameraFlash}" @click="screenshot" title="截图"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+      <button class="record-btn" :class="{active:snapshot.recording}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span class="record-duration" :class="{shown:snapshot.recording}">{{snapshot.recording?recordDurationText:'00:00:00'}}</span></button>
       <div class="vsep"></div><span class="clock">{{clockText}}</span>
     </header>
 
@@ -347,6 +347,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         </article>
       </section>
     </main>
+    <div v-if="cameraFlash" class="capture-toast">截图已保存</div>
     <div v-if="bigReadout" class="big-readout-window" :class="{light:bigReadoutLight}" :style="bigReadoutStyle" role="dialog" aria-label="大读数" @pointerdown="beginReadoutDrag">
       <div class="big-readout-top">
         <div class="big-readout-identity"><i></i><span>{{bigReadout.title}}</span></div>

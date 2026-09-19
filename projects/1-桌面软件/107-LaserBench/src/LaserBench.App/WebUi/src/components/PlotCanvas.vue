@@ -45,7 +45,10 @@ const bounds = computed(() => {
 function fmt(v:number, span:number) {
   if (Math.abs(span) >= 100) return v.toFixed(0)
   if (Math.abs(span) >= 10) return v.toFixed(1)
-  return v.toFixed(2).replace(/\.00$/,'')
+  if (Math.abs(span) >= 1) return v.toFixed(2).replace(/\.00$/,'')
+  if (Math.abs(span) >= .1) return v.toFixed(2)
+  if (Math.abs(span) >= .01) return v.toFixed(3)
+  return v.toFixed(4)
 }
 
 function draw() {
@@ -65,7 +68,7 @@ function draw() {
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
-  const m = props.compact ? {l:0,r:0,t:0,b:0} : props.tight ? {l:32,r:hasRight?32:2,t:2,b:18} : {l:34,r:hasRight?34:2,t:2,b:18}
+  const m = props.compact ? {l:0,r:0,t:0,b:0} : props.tight ? {l:35,r:hasRight?35:2,t:2,b:20} : {l:37,r:hasRight?37:2,t:2,b:20}
   const pw = Math.max(10,w-m.l-m.r), ph = Math.max(10,h-m.t-m.b)
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(m.l,m.t,pw,ph)
@@ -103,7 +106,7 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font='10.5px "Segoe UI", sans-serif';ctx.fillStyle='#c6d2db';ctx.textBaseline='middle'
+  ctx.font='11.5px "Segoe UI", sans-serif';ctx.fillStyle='#d1dbe2';ctx.textBaseline='middle'
   for(let i=0;i<4;i++) {
     const t=i/3, y=m.t+ph*t, v=y1-(y1-y0)*t, text=fmt(v,y1-y0)
     ctx.textAlign='right';ctx.fillText(text,m.l-4,y)
@@ -118,7 +121,7 @@ function draw() {
     ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+3)
   }
   if(props.series.length){
-    let lx=m.l+pw-8, ly=m.t+11;ctx.font='10px "Segoe UI", sans-serif';ctx.textBaseline='middle'
+    let lx=m.l+pw-8, ly=m.t+12;ctx.font='10.5px "Segoe UI", sans-serif';ctx.textBaseline='middle'
     for(let i=props.series.length-1;i>=0;i--){const s=props.series[i];const tw=ctx.measureText(s.name).width;lx-=tw+30;ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+16,ly);ctx.stroke();ctx.fillStyle='#35516c';ctx.textAlign='left';ctx.fillText(s.name,lx+20,ly)}
   }
 }
