@@ -1045,3 +1045,12 @@
   .dashboard-grid:not(.focus-mode) .beam-head{grid-template-columns:70px minmax(0,1fr) max-content!important}
   .dashboard-grid:not(.focus-mode) .module-title{width:70px!important;min-width:70px!important;max-width:70px!important}
 }
+
+.dashboard-grid:not(.focus-mode) .graph-overlay .panel-mark,
+.dashboard-grid:not(.focus-mode) .spectrum-head .panel-mark{
+  position:static!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important
+}
