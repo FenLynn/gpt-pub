@@ -60,6 +60,14 @@ export interface LaserSnapshot {
     osaShowRef: boolean
     osaSweepMode: string
     osaMarkerPeak: boolean
+    osaSamplePoints: number
+    osaVideoBandwidthHz: number
+    osaTraceMode: string
+    osaSmoothingPoints: number
+    osaWavelengthOffsetNm: number
+    osaWavelengthReference: string
+    osaAutoPeakSearch: boolean
+    osaPeakThresholdDb: number
     beamRunMode: string
     beamWidthMethod: string
     beamAutoOutlier: boolean

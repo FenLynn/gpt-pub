@@ -65,6 +65,14 @@ internal sealed class AppConfig
     public bool OsaShowRef { get; set; } = true;
     public string OsaSweepMode { get; set; } = "REPEAT";
     public bool OsaMarkerPeak { get; set; } = true;
+    public int OsaSamplePoints { get; set; } = 1001;
+    public double OsaVideoBandwidthHz { get; set; } = 1000;
+    public string OsaTraceMode { get; set; } = "WRITE";
+    public int OsaSmoothingPoints { get; set; } = 1;
+    public double OsaWavelengthOffsetNm { get; set; }
+    public string OsaWavelengthReference { get; set; } = "AIR";
+    public bool OsaAutoPeakSearch { get; set; } = true;
+    public double OsaPeakThresholdDb { get; set; } = 3.0;
 
     public string BeamRunMode { get; set; } = "AUTO";
     public string BeamWidthMethod { get; set; } = "D4SIGMA";

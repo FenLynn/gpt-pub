@@ -3064,3 +3064,232 @@
   .dashboard-grid.focus-mode .focus-head-value{min-width:94px!important;padding-left:9px!important;padding-right:9px!important}
   .dashboard-grid.focus-mode .focus-head-value b{font-size:22px!important}
 }
+
+
+/* v0.4.27 — compact workstation, native folder workflow, precise alignment */
+
+/* Top workflow: Folder -> Label -> sources -> Run. */
+.folder-picker-btn{
+  width:32px!important;height:30px!important;flex:0 0 32px!important;display:grid!important;place-items:center!important;
+  border:1px solid rgba(120,145,164,.66)!important;border-radius:4px!important;background:#263a49!important;color:#9fb3c2!important;
+  cursor:pointer!important;padding:0!important
+}
+.folder-picker-btn:hover{background:#314b5b!important;color:#dce9f1!important}
+.folder-picker-btn svg{width:18px!important;height:18px!important}
+.label-wrap{height:30px!important;width:166px!important;padding-right:58px!important}
+.label-wrap input{height:30px!important;line-height:30px!important;padding:0 7px!important}
+.label-actions{
+  top:0!important;bottom:0!important;right:0!important;height:30px!important;display:flex!important;align-items:center!important
+}
+.label-actions .clear-label,.label-actions .check-btn{
+  width:28px!important;min-width:28px!important;height:30px!important;display:flex!important;align-items:center!important;justify-content:center!important;
+  margin:0!important;padding:0!important;border-radius:0!important;line-height:1!important
+}
+.label-actions .clear-label{font-size:18px!important;padding-bottom:1px!important}
+.label-actions .check-btn svg{display:block!important;width:15px!important;height:15px!important;margin:0!important}
+.topbar .run-btn{margin-left:2px!important}
+.topbar .module-toggle{height:30px!important}
+
+/* REC uses the exact same vertical center for dot and text. */
+.record-btn{
+  height:30px!important;display:grid!important;grid-template-columns:10px auto auto!important;align-items:center!important;
+  column-gap:5px!important;padding:0 7px!important;line-height:1!important
+}
+.record-btn i{
+  width:9px!important;height:9px!important;align-self:center!important;justify-self:center!important;margin:0!important
+}
+.record-btn>span{align-self:center!important;line-height:1!important;margin:0!important}
+.record-duration{display:block!important;line-height:1!important}
+
+/* Values: unit bottoms align with numeric bottoms, not optical baselines above them. */
+.dashboard-grid:not(.focus-mode) .metric-value-chip{
+  align-items:flex-end!important;padding-top:3px!important;padding-bottom:3px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-value-chip b,
+.dashboard-grid:not(.focus-mode) .metric-value-chip small{
+  align-self:flex-end!important;line-height:1!important;margin:0!important;padding:0!important
+}
+.dashboard-grid.focus-mode .focus-head-value>div{
+  align-items:flex-end!important;margin-top:4px!important
+}
+.dashboard-grid.focus-mode .focus-head-value b,
+.dashboard-grid.focus-mode .focus-head-value small{
+  align-self:flex-end!important;line-height:1!important;margin:0!important;padding:0!important
+}
+
+/* Compact focused-page header: only tall enough for current title/icon. */
+.dashboard-grid.focus-mode .instrument-panel:not(.hidden){
+  grid-template-columns:minmax(0,1fr) 348px!important;
+  grid-template-rows:78px minmax(0,1fr)!important;
+  grid-template-areas:"head config" "plot config"!important
+}
+.dashboard-grid.focus-mode.config-collapsed .instrument-panel:not(.hidden){
+  grid-template-columns:minmax(0,1fr) 32px!important
+}
+.dashboard-grid.focus-mode .graph-overlay{
+  height:78px!important;min-height:78px!important;
+  grid-template-columns:205px auto minmax(0,1fr)!important;
+  column-gap:10px!important;padding:7px 14px!important;align-items:center!important
+}
+.dashboard-grid.focus-mode .module-title{
+  grid-column:1!important;grid-row:1!important;
+  height:62px!important;grid-template-columns:48px minmax(0,1fr)!important;grid-template-rows:36px 18px!important;column-gap:10px!important
+}
+.dashboard-grid.focus-mode .module-title .panel-mark{
+  width:46px!important;height:46px!important;grid-row:1/3!important
+}
+.dashboard-grid.focus-mode .module-title .panel-mark svg{width:43px!important;height:43px!important}
+.dashboard-grid.focus-mode .module-title strong{
+  font-size:24px!important;padding-bottom:3px!important;align-self:end!important
+}
+.dashboard-grid.focus-mode .focus-page-state{
+  margin:0!important;padding:0!important;border:0!important;font-size:10.5px!important
+}
+
+/* Every module's channel/device info hugs the title on its right side. */
+.dashboard-grid.focus-mode .power-channel-board,
+.dashboard-grid.focus-mode .focus-head-status{
+  grid-column:2!important;grid-row:1!important;align-self:center!important;justify-self:start!important
+}
+.power-channel-board{
+  min-width:0!important;padding:0 10px!important;border-left:1px solid rgba(126,149,166,.32)!important;
+  display:grid!important;grid-template-columns:auto auto!important;gap:5px 12px!important;align-content:center!important
+}
+.power-channel-board>div{
+  display:grid!important;grid-template-rows:repeat(4,12px)!important;gap:2px!important
+}
+.power-channel-board strong{display:none!important}
+.power-channel-board span,.focus-head-status span{
+  font-size:9.5px!important;line-height:12px!important;gap:5px!important
+}
+.channel-light{width:6px!important;height:6px!important;flex-basis:6px!important}
+.focus-head-status{
+  min-width:0!important;padding:0 10px!important;border-left:1px solid rgba(126,149,166,.32)!important;
+  display:flex!important;flex-direction:column!important;gap:4px!important
+}
+.dashboard-grid.focus-mode .focus-head-metrics{
+  grid-column:3!important;grid-row:1!important;justify-self:stretch!important;justify-content:flex-start!important
+}
+.dashboard-grid.focus-mode .focus-head-value{
+  min-width:100px!important;height:58px!important;padding:5px 12px!important
+}
+.dashboard-grid.focus-mode .focus-head-value>span{font-size:10px!important}
+.dashboard-grid.focus-mode .focus-head-value b{font-size:23px!important}
+.dashboard-grid.focus-mode .focus-head-value small{font-size:9.5px!important}
+.dashboard-grid.focus-mode .beam-focus-values .focus-head-value{min-width:86px!important;padding-left:9px!important;padding-right:9px!important}
+.dashboard-grid.focus-mode .beam-focus-values .focus-head-value b{font-size:21px!important}
+
+/* Plot begins directly under the compact header. */
+.dashboard-grid.focus-mode .power-layout,
+.dashboard-grid.focus-mode .spectrum-plot,
+.dashboard-grid.focus-mode .beam-body,
+.dashboard-grid.focus-mode .scope-plots{
+  grid-row:2!important;grid-column:1!important
+}
+
+/* Right-side fold button lives at the far-right edge and stays almost invisible until hover. */
+.module-pane-collapse{
+  left:auto!important;right:2px!important;top:7px!important;width:27px!important;height:31px!important;
+  opacity:.12!important;background:#2b3d4a!important;border-color:rgba(126,149,166,.28)!important;box-shadow:none!important;
+  transition:opacity .14s ease,background .14s ease,color .14s ease!important
+}
+.module-side-pane:hover .module-pane-collapse,.module-pane-collapse:hover,.module-pane-collapse:focus-visible{
+  opacity:.92!important;background:#395262!important
+}
+.dashboard-grid.focus-mode.config-collapsed .module-pane-collapse{
+  left:auto!important;right:2px!important;top:7px!important;opacity:.18!important
+}
+.dashboard-grid.focus-mode.config-collapsed .module-side-pane:hover .module-pane-collapse{opacity:.92!important}
+
+/* Right-side forms: strict two-column alignment, units belong to title text. */
+.dashboard-grid.focus-mode .config-row{
+  min-height:35px!important;display:grid!important;
+  grid-template-columns:minmax(145px,1fr) 126px!important;align-items:center!important;column-gap:10px!important
+}
+.dashboard-grid.focus-mode .config-row>small{display:none!important}
+.dashboard-grid.focus-mode .config-row input[type=number],
+.dashboard-grid.focus-mode .config-row input[type=text],
+.dashboard-grid.focus-mode .config-row select{
+  grid-column:2!important;width:126px!important;height:29px!important;justify-self:end!important
+}
+.dashboard-grid.focus-mode .config-row.switch{
+  grid-template-columns:minmax(145px,1fr) 50px!important;padding-right:0!important
+}
+.config-static{
+  grid-template-columns:minmax(145px,1fr) 126px!important;gap:10px!important;min-height:35px!important
+}
+.config-static b{text-align:right!important;overflow-wrap:anywhere!important}
+
+/* Consistent on/off capsule switches. */
+.toggle-pill{
+  width:44px!important;height:22px!important;border:1px solid #627989!important;border-radius:12px!important;
+  background:#22343f!important;position:relative!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;
+  padding:0 6px!important;color:#8fa4b2!important;font-size:9px!important;line-height:1!important;cursor:pointer!important
+}
+.toggle-pill::before{
+  content:""!important;position:absolute!important;left:3px!important;top:3px!important;width:14px!important;height:14px!important;
+  border-radius:50%!important;background:#8ea1ae!important;transition:left .14s ease,background .14s ease!important
+}
+.toggle-pill.on{background:#244d3b!important;border-color:#3d7b5e!important;color:#a9edc2!important;justify-content:flex-start!important}
+.toggle-pill.on::before{left:25px!important;background:#39d77f!important}
+.toggle-pill span{position:relative!important;z-index:1!important;line-height:1!important}
+.config-checks{
+  display:grid!important;grid-template-columns:1fr!important;gap:3px!important;padding:5px 0!important
+}
+.config-checks>div{
+  min-height:31px!important;display:grid!important;grid-template-columns:minmax(145px,1fr) 50px!important;align-items:center!important;
+  color:#c3d0d8!important;font-size:11px!important
+}
+.config-checks .toggle-pill{justify-self:end!important}
+
+/* Slider rows use units in captions and keep values aligned. */
+.dashboard-grid.focus-mode .config-control{
+  grid-template-columns:105px minmax(0,1fr) 68px!important;gap:8px!important;min-height:38px!important
+}
+.dashboard-grid.focus-mode .config-control b{text-align:right!important}
+
+/* Spectrum has many parameters: tighter vertical rhythm without looking crowded. */
+.spectrum-panel .module-pane-scroll .config-section{padding-top:10px!important;padding-bottom:10px!important}
+.spectrum-panel .module-pane-scroll .config-section h4{margin-bottom:7px!important}
+
+/* Scope priority: FFT is above and larger; time domain is below. */
+.dashboard-grid .scope-plots{
+  grid-template-rows:minmax(0,64fr) minmax(0,36fr)!important;gap:3px!important
+}
+.dashboard-grid.focus-mode .scope-plots{gap:5px!important}
+
+/* Beam focused workspace: balanced two-column geometry instead of an oversized profile. */
+.dashboard-grid.focus-mode .beam-body{
+  height:auto!important;align-self:center!important;grid-template-columns:44% 56%!important;gap:8px!important;padding:8px 0!important;overflow:hidden!important
+}
+.dashboard-grid.focus-mode .beam-image-wrap{
+  width:100%!important;height:auto!important;aspect-ratio:1 / 1!important;align-self:center!important;justify-self:stretch!important
+}
+.dashboard-grid.focus-mode .caustic-plot{
+  width:100%!important;height:auto!important;aspect-ratio:1.272727 / 1!important;align-self:center!important
+}
+
+/* Keep dashboard Beam compact geometry independent from focused-page balancing. */
+.dashboard-grid:not(.focus-mode) .beam-body{
+  grid-template-columns:51% 49%!important;align-items:stretch!important
+}
+.dashboard-grid:not(.focus-mode) .beam-image-wrap{
+  height:100%!important;width:auto!important;aspect-ratio:1 / 1!important
+}
+
+/* Slightly smaller side pane on wide workstation pages. */
+.module-side-tabs{height:42px!important}
+.module-side-inner{grid-template-rows:42px minmax(0,1fr)!important}
+.module-side-tabs button{height:42px!important}
+
+@media(max-width:1400px){
+  .dashboard-grid.focus-mode .instrument-panel:not(.hidden){grid-template-columns:minmax(0,1fr) 316px!important}
+  .dashboard-grid.focus-mode.config-collapsed .instrument-panel:not(.hidden){grid-template-columns:minmax(0,1fr) 32px!important}
+  .dashboard-grid.focus-mode .graph-overlay{grid-template-columns:180px auto minmax(0,1fr)!important}
+  .dashboard-grid.focus-mode .module-title{grid-template-columns:42px minmax(0,1fr)!important}
+  .dashboard-grid.focus-mode .module-title .panel-mark{width:40px!important;height:40px!important}
+  .dashboard-grid.focus-mode .module-title .panel-mark svg{width:38px!important;height:38px!important}
+  .dashboard-grid.focus-mode .module-title strong{font-size:21px!important}
+  .dashboard-grid.focus-mode .focus-head-value{min-width:86px!important;padding-left:7px!important;padding-right:7px!important}
+  .dashboard-grid.focus-mode .focus-head-value b{font-size:20px!important}
+}

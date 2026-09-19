@@ -97,6 +97,14 @@ internal static class Program
                 PowerScale = 1.25,
                 OsaResolution = 0.1,
                 OsaSensitivity = "HIGH1",
+                OsaSamplePoints = 2001,
+                OsaVideoBandwidthHz = 10000,
+                OsaTraceMode = "MAXHOLD",
+                OsaSmoothingPoints = 5,
+                OsaWavelengthOffsetNm = 0.125,
+                OsaWavelengthReference = "VACUUM",
+                OsaAutoPeakSearch = false,
+                OsaPeakThresholdDb = 6.5,
                 BeamWidthMethod = "FWHM",
                 ScopeVoltsDiv = 0.5,
                 ScopeTriggerSource = "CH2",
@@ -110,7 +118,11 @@ internal static class Program
             if (persistedConfig.DashboardPower2) errors.Add("dashboard display preference persistence failed");
             if (persistedConfig.PowerAverageSamples != 8 || Math.Abs(persistedConfig.PowerScale - 1.25) > 1e-9)
                 errors.Add("power workstation preference persistence failed");
-            if (Math.Abs(persistedConfig.OsaResolution - 0.1) > 1e-9 || persistedConfig.OsaSensitivity != "HIGH1")
+            if (Math.Abs(persistedConfig.OsaResolution - 0.1) > 1e-9 || persistedConfig.OsaSensitivity != "HIGH1" ||
+                persistedConfig.OsaSamplePoints != 2001 || Math.Abs(persistedConfig.OsaVideoBandwidthHz - 10000) > 1e-9 ||
+                persistedConfig.OsaTraceMode != "MAXHOLD" || persistedConfig.OsaSmoothingPoints != 5 ||
+                Math.Abs(persistedConfig.OsaWavelengthOffsetNm - 0.125) > 1e-9 || persistedConfig.OsaWavelengthReference != "VACUUM" ||
+                persistedConfig.OsaAutoPeakSearch || Math.Abs(persistedConfig.OsaPeakThresholdDb - 6.5) > 1e-9)
                 errors.Add("OSA workstation preference persistence failed");
             if (persistedConfig.BeamWidthMethod != "FWHM")
                 errors.Add("beam workstation preference persistence failed");

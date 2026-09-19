@@ -97,11 +97,13 @@ jobs:
           $css=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/styles.css" -Raw
           $types=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/types.ts" -Raw
           $backend=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/InstrumentBackends.cs" -Raw
+          $host=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUiHost.cs" -Raw
           $required=@(
             'class="metric-value-chip"',
             'class="module-config-dock workstation-config module-side-pane"',
             'module-side-tabs',
-            'folderInput',
+            'folder-picker-btn',
+            'app.pickExperimentFolder',
             'powerRangeStartPct',
             'powerRangeEndPct',
             'powerAverageSamples',
@@ -112,13 +114,19 @@ jobs:
             'spectrumInterfaceEnabled',
             'beamInterfaceEnabled',
             'scopeInterfaceEnabled',
+            'osaSamplePoints',
+            'osaVideoBandwidthHz',
+            'osaTraceMode',
+            'scope-fft-plot',
+            'scope-time-plot',
             'show-axis-labels',
             "activePage==='dashboard'"
           )
           foreach($needle in $required){ if($app -notlike "*$needle*"){ throw "Workstation UI contract missing: $needle" } }
-          foreach($needle in @('powerAverageSamples','osaResolution','beamWidthMethod','scopeVoltsDiv','InstrumentInterfaceState','powerInterfaceEnabled','spectrumInterfaceEnabled','beamInterfaceEnabled','scopeInterfaceEnabled')){
+          foreach($needle in @('powerAverageSamples','osaResolution','beamWidthMethod','scopeVoltsDiv','osaSamplePoints','osaVideoBandwidthHz','osaTraceMode','InstrumentInterfaceState','powerInterfaceEnabled','spectrumInterfaceEnabled','beamInterfaceEnabled','scopeInterfaceEnabled')){
             if($types -notlike "*$needle*"){ throw "Web UI config type missing: $needle" }
           }
+          foreach($needle in @('FolderBrowserDialog','app.pickExperimentFolder','OsaSamplePoints','OsaVideoBandwidthHz','OsaTraceMode')){ if($host -notlike "*$needle*"){ throw "WebUiHost workstation contract missing: $needle" } }
           foreach($needle in @('Ophir Juno','Yokogawa AQ6370D','BeamSquared','Tektronix MSO44','DataPlaneReady','InstrumentProviderFactory')){
             if($backend -notlike "*$needle*"){ throw "Instrument backend contract missing: $needle" }
           }

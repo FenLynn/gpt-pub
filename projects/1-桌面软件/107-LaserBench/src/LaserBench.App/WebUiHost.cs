@@ -59,6 +59,7 @@ internal sealed class WebUiHost : IDisposable
         "app.setConfig",
         "app.refreshData",
         "app.openFolder",
+        "app.pickExperimentFolder",
         "beam.setZ",
         "beam.setAttenuation"
     };
@@ -239,6 +240,7 @@ internal sealed class WebUiHost : IDisposable
                 "app.setConfig" => SetConfig(request.Params),
                 "app.refreshData" => BuildSnapshot(),
                 "app.openFolder" => OpenFolder(request.Params),
+                "app.pickExperimentFolder" => PickExperimentFolder(),
                 "beam.setZ" => SetBeamZ(request.Params),
                 "beam.setAttenuation" => SetBeamAttenuation(request.Params),
                 _ => throw new InvalidOperationException("不允许的界面命令。")
@@ -316,6 +318,14 @@ internal sealed class WebUiHost : IDisposable
         if (v.TryGetProperty("osaShowRef",out var osr) && (osr.ValueKind==JsonValueKind.True||osr.ValueKind==JsonValueKind.False)) _config.OsaShowRef=osr.GetBoolean();
         if (v.TryGetProperty("osaSweepMode",out var osm) && osm.ValueKind==JsonValueKind.String) _config.OsaSweepMode=(osm.GetString()??"REPEAT").Trim().ToUpperInvariant();
         if (v.TryGetProperty("osaMarkerPeak",out var omp) && (omp.ValueKind==JsonValueKind.True||omp.ValueKind==JsonValueKind.False)) _config.OsaMarkerPeak=omp.GetBoolean();
+        if (v.TryGetProperty("osaSamplePoints",out var osp) && osp.ValueKind==JsonValueKind.Number) _config.OsaSamplePoints=Math.Clamp(osp.GetInt32(),101,10001);
+        if (v.TryGetProperty("osaVideoBandwidthHz",out var ovb) && ovb.ValueKind==JsonValueKind.Number) _config.OsaVideoBandwidthHz=Math.Clamp(ovb.GetDouble(),1,1_000_000);
+        if (v.TryGetProperty("osaTraceMode",out var otm) && otm.ValueKind==JsonValueKind.String) _config.OsaTraceMode=(otm.GetString()??"WRITE").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("osaSmoothingPoints",out var osmp) && osmp.ValueKind==JsonValueKind.Number) _config.OsaSmoothingPoints=Math.Clamp(osmp.GetInt32(),1,101);
+        if (v.TryGetProperty("osaWavelengthOffsetNm",out var owo) && owo.ValueKind==JsonValueKind.Number) _config.OsaWavelengthOffsetNm=Math.Clamp(owo.GetDouble(),-100,100);
+        if (v.TryGetProperty("osaWavelengthReference",out var owr) && owr.ValueKind==JsonValueKind.String) _config.OsaWavelengthReference=(owr.GetString()??"AIR").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("osaAutoPeakSearch",out var oap) && (oap.ValueKind==JsonValueKind.True||oap.ValueKind==JsonValueKind.False)) _config.OsaAutoPeakSearch=oap.GetBoolean();
+        if (v.TryGetProperty("osaPeakThresholdDb",out var opt) && opt.ValueKind==JsonValueKind.Number) _config.OsaPeakThresholdDb=Math.Clamp(opt.GetDouble(),0,100);
 
         if (v.TryGetProperty("beamRunMode",out var brm) && brm.ValueKind==JsonValueKind.String) _config.BeamRunMode=(brm.GetString()??"AUTO").Trim().ToUpperInvariant();
         if (v.TryGetProperty("beamWidthMethod",out var bwm) && bwm.ValueKind==JsonValueKind.String) _config.BeamWidthMethod=(bwm.GetString()??"D4SIGMA").Trim().ToUpperInvariant();
@@ -355,6 +365,43 @@ internal sealed class WebUiHost : IDisposable
         }
         AppConfigStore.Save(_config);
         return new { snapshot=BuildSnapshot() };
+    }
+
+    private object PickExperimentFolder()
+    {
+        Directory.CreateDirectory(AppPaths.ExpDir);
+        var root = Path.GetFullPath(AppPaths.ExpDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var current = string.IsNullOrWhiteSpace(_config.CurrentExperimentFolder)
+            ? root
+            : Path.Combine(root, _config.CurrentExperimentFolder);
+        if (!Directory.Exists(current)) current = root;
+
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "选择或新建实验文件夹（data\\exp 下一级）",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true,
+            InitialDirectory = current,
+            SelectedPath = current
+        };
+        if (dialog.ShowDialog(_form) != DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+            return new { cancelled = true, folder = _config.CurrentExperimentFolder };
+
+        var selected = Path.GetFullPath(dialog.SelectedPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.Equals(selected, root, StringComparison.OrdinalIgnoreCase))
+        {
+            _config.CurrentExperimentFolder = string.Empty;
+            AppConfigStore.Save(_config);
+            return new { cancelled = false, folder = string.Empty, path = root };
+        }
+
+        var parent = Path.GetDirectoryName(selected)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (!string.Equals(parent, root, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("请选择 data\\exp 下一级实验文件夹；可在选择窗口中直接新建文件夹。");
+
+        _config.CurrentExperimentFolder = Path.GetFileName(selected);
+        AppConfigStore.Save(_config);
+        return new { cancelled = false, folder = _config.CurrentExperimentFolder, path = selected };
     }
 
     private object OpenFolder(JsonElement? value)
@@ -410,7 +457,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.26",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.27",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
@@ -446,6 +493,10 @@ internal sealed class WebUiHost : IDisposable
                 osaResolution=_config.OsaResolution, osaSensitivity=_config.OsaSensitivity, osaAverage=_config.OsaAverage,
                 osaRefLevel=_config.OsaRefLevel, osaDbPerDiv=_config.OsaDbPerDiv, osaShowRef=_config.OsaShowRef,
                 osaSweepMode=_config.OsaSweepMode, osaMarkerPeak=_config.OsaMarkerPeak,
+                osaSamplePoints=_config.OsaSamplePoints, osaVideoBandwidthHz=_config.OsaVideoBandwidthHz,
+                osaTraceMode=_config.OsaTraceMode, osaSmoothingPoints=_config.OsaSmoothingPoints,
+                osaWavelengthOffsetNm=_config.OsaWavelengthOffsetNm, osaWavelengthReference=_config.OsaWavelengthReference,
+                osaAutoPeakSearch=_config.OsaAutoPeakSearch, osaPeakThresholdDb=_config.OsaPeakThresholdDb,
                 beamRunMode=_config.BeamRunMode, beamWidthMethod=_config.BeamWidthMethod, beamAutoOutlier=_config.BeamAutoOutlier,
                 beamShowX=_config.BeamShowX, beamShowY=_config.BeamShowY,
                 scopeVoltsDiv=_config.ScopeVoltsDiv, scopeOffset=_config.ScopeOffset, scopeCoupling=_config.ScopeCoupling,
