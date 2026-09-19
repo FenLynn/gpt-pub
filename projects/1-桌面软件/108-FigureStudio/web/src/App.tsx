@@ -93,10 +93,6 @@ function docKey(doc: DocumentRef): string {
   return doc.type + ":" + doc.id;
 }
 
-function axisLabel(name: string, unit?: string): string {
-  return unit ? name + " (" + unit + ")" : name;
-}
-
 function readUserDefaults(): UserDefaults | undefined {
   try {
     const raw = localStorage.getItem(USER_DEFAULTS_KEY);
@@ -1383,8 +1379,6 @@ function App() {
       figureOverrides: {
         aspectMode: "4:3",
         ...project.defaults.figureOverrides,
-        xTitle: axisLabel(dataset.x.name, dataset.x.unit),
-        yTitle: axisLabel(dataset.ys[0]?.name || "Y", dataset.ys[0]?.unit),
         errorSeriesId: dataRef.yErrorColumnId
       },
       seriesOverrides: {},
@@ -1410,9 +1404,7 @@ function App() {
       presetId: project.defaults.presetId,
       figureOverrides: {
         aspectMode: "4:3",
-        ...project.defaults.figureOverrides,
-        xTitle: "X",
-        yTitle: "Y"
+        ...project.defaults.figureOverrides
       },
       seriesOverrides: {},
       seriesOrder: []
@@ -3332,6 +3324,42 @@ function App() {
                       />
                     </div>
 
+                    <div className="prop-row">
+                      <label>图例显示</label>
+                      <MiniSwitch
+                        checked={primaryOverride.showInLegend ?? true}
+                        onChange={(value) =>
+                          updateSelectedSeries({ showInLegend: value })
+                        }
+                      />
+                    </div>
+
+                    <div className="prop-row">
+                      <label>图例名称</label>
+                      <div className="control-with-reset">
+                        <input
+                          type="text"
+                          disabled={selectedSeries.length !== 1}
+                          placeholder={primarySeries.name}
+                          value={primaryOverride.legendLabel ?? ""}
+                          onChange={(event) =>
+                            updateSelectedSeries({
+                              legendLabel:
+                                event.target.value === ""
+                                  ? undefined
+                                  : event.target.value
+                            })
+                          }
+                        />
+                        <ResetIcon
+                          visible={primaryOverride.legendLabel !== undefined}
+                          onReset={() =>
+                            resetSelectedSeriesField("legendLabel")
+                          }
+                        />
+                      </div>
+                    </div>
+
                     {!barTemplate && (
                       <>
                         <div className="prop-row">
@@ -4068,23 +4096,68 @@ function App() {
                     </div>
                     <div className="prop-row">
                       <label>X 标题</label>
-                      <input
-                        type="text"
-                        value={activeFigure.figureOverrides.xTitle ?? ""}
-                        onChange={(event) =>
-                          setFigureField("xTitle", event.target.value)
-                        }
-                      />
+                      <div className="control-with-reset">
+                        <input
+                          type="text"
+                          placeholder={
+                            "自动：" +
+                            (plotDataset.x.unit
+                              ? plotDataset.x.name + " (" + plotDataset.x.unit + ")"
+                              : plotDataset.x.name)
+                          }
+                          value={activeFigure.figureOverrides.xTitle ?? ""}
+                          onChange={(event) =>
+                            setFigureField(
+                              "xTitle",
+                              event.target.value === ""
+                                ? undefined
+                                : event.target.value
+                            )
+                          }
+                        />
+                        <ResetIcon
+                          visible={
+                            activeFigure.figureOverrides.xTitle !== undefined
+                          }
+                          onReset={() => resetFigureField("xTitle")}
+                        />
+                      </div>
                     </div>
                     <div className="prop-row">
                       <label>Y 标题</label>
-                      <input
-                        type="text"
-                        value={activeFigure.figureOverrides.yTitle ?? ""}
-                        onChange={(event) =>
-                          setFigureField("yTitle", event.target.value)
-                        }
-                      />
+                      <div className="control-with-reset">
+                        <input
+                          type="text"
+                          placeholder={
+                            "自动：" +
+                            (fieldTemplate
+                              ? plotDataset.metadata?.rowAxisName ?? "Y"
+                              : plotDataset.ys[0]
+                              ? plotDataset.ys[0].unit
+                                ? plotDataset.ys[0].name +
+                                  " (" +
+                                  plotDataset.ys[0].unit +
+                                  ")"
+                                : plotDataset.ys[0].name
+                              : "Y")
+                          }
+                          value={activeFigure.figureOverrides.yTitle ?? ""}
+                          onChange={(event) =>
+                            setFigureField(
+                              "yTitle",
+                              event.target.value === ""
+                                ? undefined
+                                : event.target.value
+                            )
+                          }
+                        />
+                        <ResetIcon
+                          visible={
+                            activeFigure.figureOverrides.yTitle !== undefined
+                          }
+                          onReset={() => resetFigureField("yTitle")}
+                        />
+                      </div>
                     </div>
                     {surfaceTemplate && (
                       <div className="prop-row">
@@ -4230,7 +4303,7 @@ function App() {
                     </div>
 
                     <div className="legend-drag-hint">
-                      在画布上直接拖动图例即可自由定位；拖动后位置会写回项目，并与导出保持一致。
+                      在画布上直接拖动图例即可自由定位；拖动后位置会写回项目，并与导出保持一致。名称与单项显示在“曲线”页设置。
                     </div>
 
                     <div className="prop-row">

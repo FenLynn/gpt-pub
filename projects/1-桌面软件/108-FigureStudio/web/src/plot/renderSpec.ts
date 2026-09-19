@@ -26,6 +26,10 @@ export function plotFontFamily(font: "Arial" | "Times New Roman"): string {
   return 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
 }
 
+function autoAxisTitle(name: string, unit?: string): string {
+  return unit ? name + " (" + unit + ")" : name;
+}
+
 export function aspectRatioFor(
   mode = "4:3",
   customWidth = 4,
@@ -128,7 +132,8 @@ function baseXYTrace(
   return {
     type: "scatter",
     mode,
-    name: series.name,
+    name: override.legendLabel ?? series.name,
+    showlegend: override.showInLegend ?? true,
     x: dataset.x.values,
     y: yValues ?? series.values,
     opacity,
@@ -245,7 +250,8 @@ export function buildTraces(args: {
           : fillColor;
       return {
         type: "bar",
-        name: column.name,
+        name: override.legendLabel ?? column.name,
+        showlegend: override.showInLegend ?? true,
         x: dataset.x.values,
         y: column.values,
         opacity: override.opacity ?? 0.92,
@@ -485,13 +491,15 @@ export function buildLayout(args: {
   const resolvedXTitle =
     displayText?.xTitle ??
     overrides.xTitle ??
-    dataset.x.name;
+    autoAxisTitle(dataset.x.name, dataset.x.unit);
   const resolvedYTitle =
     displayText?.yTitle ??
     overrides.yTitle ??
     (figure.templateId === "heatmap"
       ? dataset.metadata?.rowAxisName ?? "Y"
-      : dataset.ys[0]?.name ?? "Y");
+      : dataset.ys[0]
+      ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
+      : "Y");
   const hasXTitle = Boolean(String(resolvedXTitle ?? "").trim());
   const hasYTitle = Boolean(String(resolvedYTitle ?? "").trim());
   const hasPlotTitle = Boolean(String(displayText?.plotTitle ?? overrides.plotTitle ?? "").trim());

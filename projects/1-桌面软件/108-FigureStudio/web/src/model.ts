@@ -136,6 +136,8 @@ export interface PresetDefinition {
 
 export interface SeriesOverride {
   visible?: boolean;
+  showInLegend?: boolean;
+  legendLabel?: string;
   lineVisible?: boolean;
   lineWidthPt?: number;
   lineStyle?: LineStyle;

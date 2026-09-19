@@ -146,40 +146,47 @@ export async function resolveSafeMathText(
   const segments = latexSegments(value);
   if (!segments.length) return { text: value, state: "plain" };
 
-  const inline = composeSafeInline(value, segments);
-  if (inline !== null) {
-    return { text: inline, state: "valid" };
-  }
-
   const isPureFormula =
     segments.length === 1 &&
     segments[0].start === 0 &&
     segments[0].end === value.length;
-  if (!isPureFormula) {
-    return { text: plainMathFallback(value), state: "invalid" };
-  }
-
   const mathJax = (window as any).MathJax;
-  if (!mathJax?.tex2svgPromise) {
-    return { text: plainMathFallback(value), state: "unavailable" };
-  }
 
-  try {
-    if (mathJax.startup?.promise) await mathJax.startup.promise;
-    const node = await mathJax.tex2svgPromise(segments[0].expression, {
-      display: false
-    });
-    if (
-      node?.querySelector?.('[data-mml-node="merror"]') ||
-      node?.querySelector?.(".merror")
-    ) {
+  // A pure formula should use real MathJax whenever it is available.
+  if (isPureFormula && mathJax?.tex2svgPromise) {
+    try {
+      if (mathJax.startup?.promise) await mathJax.startup.promise;
+      const node = await mathJax.tex2svgPromise(segments[0].expression, {
+        display: false
+      });
+      if (
+        node?.querySelector?.('[data-mml-node="merror"]') ||
+        node?.querySelector?.(".merror")
+      ) {
+        return { text: plainMathFallback(value), state: "invalid" };
+      }
+      return {
+        text: "$" + segments[0].expression + "$",
+        state: "valid"
+      };
+    } catch {
       return { text: plainMathFallback(value), state: "invalid" };
     }
-    return {
-      text: "$" + segments[0].expression + "$",
-      state: "valid"
-    };
-  } catch {
-    return { text: plainMathFallback(value), state: "invalid" };
   }
+
+  // Mixed scientific labels are converted locally so Plotly cannot replace
+  // just the math fragment and accidentally drop surrounding literal text.
+  const inline = composeSafeInline(value, segments);
+  if (inline !== null) {
+    return {
+      text: inline,
+      state: isPureFormula && !mathJax ? "unavailable" : "valid"
+    };
+  }
+
+  // Unsupported complex mixed text stays completely visible as source text.
+  return {
+    text: plainMathFallback(value),
+    state: mathJax ? "invalid" : "unavailable"
+  };
 }
