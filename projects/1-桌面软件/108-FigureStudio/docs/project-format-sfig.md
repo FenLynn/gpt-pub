@@ -1,19 +1,19 @@
-# .sfig Project Format v0.3
+# .sfig Project Format v0.4
 
 ## 1. 事实模型
-
-`.sfig` 的长期项目模型现在明确为：
 
 ```text
 Project
 ├─ folders[]
 ├─ dataBooks[]
-│  ├─ source
 │  └─ sheets[]
+│     ├─ source
+│     ├─ columns[]
+│     └─ metadata
 └─ figures[]
 ```
 
-数据与图形独立保存，Graph 只保存引用和显示参数。
+DataBook 是组织容器；Sheet 是数据事实对象；Graph 只保存稳定数据引用和绘图参数。
 
 ## 2. 容器
 
@@ -23,20 +23,20 @@ project.sfig
 ├─ project.json
 └─ data/
    ├─ <sheet-id>.json
-   ├─ <sheet-id>.json
    └─ ...
 ```
 
 `project.json` 保存：
 
-- Folder hierarchy
-- DataBook metadata
-- Sheet / Column metadata
-- Embedded / Linked source metadata
-- FigureSpec
-- Template / Preset / overrides
+- 文件夹层级；
+- DataBook metadata；
+- Sheet metadata；
+- Sheet-level Embedded / Linked source identity；
+- Column metadata；
+- FigureSpec；
+- Template / Preset / overrides。
 
-`data/<sheet-id>.json` 保存 Sheet 的列值。
+`data/<sheet-id>.json` 保存 Sheet 的实际列值。
 
 ## 3. schemaVersion
 
@@ -45,51 +45,76 @@ project.sfig
 ```json
 {
   "format": "sfig",
-  "schemaVersion": "0.3",
-  "createdWith": "0.3.0-web"
+  "schemaVersion": "0.4",
+  "createdWith": "0.4.0-web"
 }
 ```
 
 读取器支持：
 
-- 0.1 → 0.3
-- 0.2 → 0.3
+- 0.1 → 0.4
+- 0.2 → 0.4
 - 0.3 → 0.4
 - 0.4 native
 
-未来版本不得让旧应用静默覆盖未知新 schema。
+未知未来 schemaVersion 不允许被旧应用静默覆盖保存。
 
-## 4. DataBook / Sheet
-
-DataBook 是项目中的数据文档：
+## 4. DataBook
 
 ```text
 DataBook
 ├─ id
 ├─ name
-├─ folderId
-├─ source
+├─ folderId?
 └─ sheets[]
 ```
 
-Sheet：
+DataBook 不拥有统一 source。
+
+同一 DataBook 可以同时包含：
+
+```text
+Sheet A → linked
+Sheet B → embedded
+Sheet C → embedded
+```
+
+## 5. Sheet
 
 ```text
 Sheet
 ├─ id
 ├─ name
+├─ comment?
+├─ source
 ├─ columns[]
-└─ metadata
+└─ metadata?
 ```
 
-Column：
+source：
 
 ```text
-id
-name
-unit
-role
-values[]
+kind = embedded | linked
+fileName?
+path?
+relativePath?
+size?
+modifiedMs?
+status?
+```
+
+Web 重新打开 Linked Sheet 时，如果不能确认原外部文件身份，状态进入 `needs-relink`，不能假装仍与源文件同步。
+
+## 6. Column
+
+```text
+Column
+├─ id
+├─ name
+├─ unit?
+├─ comment?
+├─ role
+└─ values[]
 ```
 
 role：
@@ -98,13 +123,15 @@ role：
 X / Y / Z / XErr / YErr / Label / None
 ```
 
-单元格允许 number / text / null。
+单元格允许：
 
-## 5. Graph 数据引用
+```text
+number | string | null
+```
 
-Graph 不再依赖旧的 `datasetId` 作为主要引用。
+Renderer 通过 adapter 得到纯数值 PlotColumn，不直接消费 Spreadsheet 的混合类型数据。
 
-正式引用：
+## 7. Graph 数据引用
 
 ```text
 figure.dataRef
@@ -115,79 +142,90 @@ figure.dataRef
 └─ zColumnId?
 ```
 
-Column role 只负责创建 Graph 时的默认映射。
+这些 ID 是项目事实。
 
-一旦 Graph 创建，稳定 Column ID 成为事实，因此：
+因此：
 
-- 改列名：Graph 不断；
-- 改单位：Graph 数据不换；
-- 改 Column role：Graph 不静默重映射；
-- 移动 DataBook/Graph 文件夹：Graph 不断。
+- 改列名不会换数据；
+- 改单位不会换数据；
+- 改 role 不会让已有 Graph 自动重映射；
+- 移动 Sheet 到另一个 DataBook 不会断 Graph；
+- 删除被引用列会被阻止；
+- 删除被引用 Sheet / DataBook 会被阻止；
+- Replace / Reload 若无法保持所有引用会被拒绝。
 
-## 6. Embedded / Linked
+新建 Graph 时可以使用 Column Role 推导默认映射；创建完成后即固化为稳定 ID。
 
-Embedded：
+## 8. Embedded / Linked
 
-- 数据值以项目内容为事实源；
-- Sheet 可直接编辑；
-- 分享 `.sfig` 即可完整迁移。
+Embedded Sheet：
 
-Linked：
+- `.sfig` 是事实源；
+- 可编辑；
+- 可作为处理/汇总工作表。
+
+Linked Sheet：
 
 - 外部文件是事实源；
-- 项目保存当前缓存数据和 source identity；
+- 当前缓存值保存在项目中用于预览和迁移；
 - 默认只读；
-- Web Reload 时用户重新选择文件；
-- Tauri 可通过 path / identity / watcher 自动 Reload；
-- 解除链接后缓存数据转为 Embedded，可继续编辑。
+- Web Reload 需要重新选择源文件；
+- 可以创建 Embedded 可编辑副本；
+- 可以解除链接，把当前缓存转为 Embedded；
+- Tauri 后续通过 path / identity / watcher 自动发现变化。
 
-保存后重新打开 Linked 项目时，如果平台无法确认原文件身份，应进入 needs-relink 状态，而不是假装链接仍有效。
+Reload 只更新源数据，不得改 Graph 样式；用户设置的 role / comment 等工作表元数据应保留。
 
-## 7. migration
+## 9. migration
 
-0.1 / 0.2 的旧 Dataset：
+### 0.1 / 0.2
+
+旧 Dataset：
 
 ```text
 Dataset
-├─ x
-└─ ys[]
+├ x
+└ ys[]
 ```
 
-迁移为：
+迁移：
 
 ```text
 DataBook
-└─ Sheet
-   ├─ X column
-   └─ Y / YErr columns
+└ Sheet (embedded)
+   ├ X
+   └ Y / YErr ...
 ```
 
-旧 Figure 的：
+旧 Figure 的 `datasetId + seriesOrder + errorSeriesId` 转成稳定 `sheetId + columnId` 引用。
 
-```text
-datasetId + seriesOrder + errorSeriesId
-```
+### 0.3
 
-迁移为：
-
-```text
-sheetId + xColumnId + yColumnIds + yErrorColumnId
-```
-
-旧项目数据和 Figure 样式不需要用户手工重建。
-
-
-## 8. v0.4 Sheet-level Source
-
-v0.4 将 Embedded / Linked 数据身份从 DataBook 下沉到 Sheet。
+旧结构：
 
 ```text
 DataBook
-├ Sheet A → linked → raw.csv
-├ Sheet B → embedded → processed
-└ Sheet C → embedded → summary
+├ source
+└ sheets[]
 ```
 
-DataBook 是组织容器，不再强迫所有 Sheet 共用一种来源模式。
+迁移：
 
-v0.3 项目打开时，原 DataBook.source 会自动迁移到每个 Sheet.source；Linked source 进入 needs-relink 状态。
+```text
+DataBook
+└ sheets[]
+   └ each sheet.source = old DataBook.source
+```
+
+Linked source 重新打开后进入 `needs-relink`。
+
+## 10. 不作为事实源的内容
+
+以下内容不能反过来决定项目事实：
+
+- Plotly layout；
+- 导出的 PNG / SVG / PDF / EPS / TIFF；
+- Figure thumbnail；
+- Matplotlib Python script；
+- UI 临时选择状态；
+- 浏览器文档 Tab 状态。
