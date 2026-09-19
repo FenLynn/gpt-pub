@@ -322,7 +322,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     defaults,
     "folder-paper",
     {
-      xTitle: "波长 $\\lambda$ (nm)",
+      xTitle: "$\\lambda$ (nm)",
       yTitle: "光谱功率 (dBm)"
     }
   );
