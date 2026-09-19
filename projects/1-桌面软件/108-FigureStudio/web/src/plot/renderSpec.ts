@@ -623,7 +623,9 @@ export function buildLayout(args: {
   const background = overrides.background ?? "#ffffff";
   const tickDirection = overrides.tickDirection ?? "outside";
   const gridVisible = overrides.gridVisible ?? preset.showGrid;
-  const legendPositionMode = overrides.legendPosition ?? "top-right";
+  const legendPositionMode =
+    overrides.legendPosition ??
+    (figure.templateId === "double-y" ? "top-left" : "top-right");
   const presetLegendPosition = legendAnchor(legendPositionMode);
   const legendPosition =
     legendPositionMode === "custom"
