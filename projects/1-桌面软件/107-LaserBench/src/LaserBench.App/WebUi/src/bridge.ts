@@ -51,11 +51,12 @@ export function request<T = unknown>(method: string, params?: unknown): Promise<
   return new Promise<T>((resolve, reject) => {
     pending.set(id, { resolve: value => resolve(value as T), reject })
     webview.postMessage({ id, method, params: params ?? null })
+    const timeoutMs = method === 'app.pickExperimentFolder' ? 10 * 60 * 1000 : 10000
     window.setTimeout(() => {
       const item = pending.get(id)
       if (!item) return
       pending.delete(id)
       item.reject(new Error(`Bridge timeout: ${method}`))
-    }, 10000)
+    }, timeoutMs)
   })
 }
