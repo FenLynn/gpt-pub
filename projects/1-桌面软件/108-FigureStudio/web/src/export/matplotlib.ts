@@ -773,14 +773,28 @@ else:
             marker_default = template in ("xy-scatter", "xy-line-marker", "xy-errorbar")
             line_visible = style.get("lineVisible", line_default)
             marker_visible = style.get("markerVisible", marker_default)
-            linestyle = mpl_linestyle(style.get("lineStyle", "solid")) if line_visible else "None"
+            series_name = str(names.get(key, key))
+            is_fit = "fit" in series_name.lower() or "拟合" in series_name
+            line_style_value = style.get(
+                "lineStyle",
+                "dash" if is_fit else "solid"
+            )
+            linestyle = mpl_linestyle(line_style_value) if line_visible else "None"
             marker = mpl_marker(style.get("markerSymbol", "circle")) if marker_visible else None
+            default_line_width = float(PRESET["lineWidthPt"])
+            line_width = float(
+                style["lineWidthPt"]
+                if "lineWidthPt" in style
+                else max(0.65, default_line_width * 0.9)
+                if is_fit
+                else default_line_width
+            )
 
             common = dict(
                 label=label,
                 color=color,
                 alpha=alpha,
-                linewidth=float(style.get("lineWidthPt", PRESET["lineWidthPt"])),
+                linewidth=line_width,
                 linestyle=linestyle,
                 marker=marker,
                 markersize=float(style.get("markerSizePt", PRESET["markerSizePt"])),
