@@ -277,7 +277,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       tickDirection: "outside",
       minorTicks: false,
       gridVisible: false,
-      legendPosition: "top-left",
+      legendPosition: "top-right",
       legendOrientation: "vertical",
       legendFrame: false
     }
@@ -336,7 +336,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       xTitle: "泵浦电流 (A)",
       yTitle: "输出功率 (W)",
       rightYTitle: "光光效率 (%)",
-      legendPosition: "top-right",
+      legendPosition: "top-left",
       legendOrientation: "vertical"
     },
     {
