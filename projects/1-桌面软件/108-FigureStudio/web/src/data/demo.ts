@@ -277,7 +277,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       tickDirection: "outside",
       minorTicks: false,
       gridVisible: false,
-      legendPosition: "top-right",
+      legendPosition: "top-left",
       legendOrientation: "vertical",
       legendFrame: false
     }
@@ -373,8 +373,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     defaults,
     "folder-paper",
     {
-      xTitle: "X (mm)",
-      yTitle: "Y (mm)",
+      xTitle: "横向位置 (mm)",
+      yTitle: "纵向位置 (mm)",
       legendVisible: false,
       colorScale: "Viridis",
       colorbarTitle: "归一化强度"
@@ -388,8 +388,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     defaults,
     "folder-paper",
     {
-      xTitle: "X (mm)",
-      yTitle: "Y (mm)",
+      xTitle: "横向位置 (mm)",
+      yTitle: "纵向位置 (mm)",
       legendVisible: false,
       colorScale: "Viridis",
       colorbarTitle: "归一化强度",
@@ -406,8 +406,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     defaults,
     "folder-paper",
     {
-      xTitle: "X (mm)",
-      yTitle: "Y (mm)",
+      xTitle: "横向位置 (mm)",
+      yTitle: "纵向位置 (mm)",
       legendVisible: false,
       colorScale: "RdBu",
       reverseColorScale: true,
