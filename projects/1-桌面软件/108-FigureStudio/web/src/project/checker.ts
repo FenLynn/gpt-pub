@@ -29,6 +29,11 @@ export function checkFigure(
   preset: PresetDefinition
 ): CheckItem[] {
   const o = figure.figureOverrides;
+  const field2DTemplate =
+    figure.templateId === "heatmap" || figure.templateId === "contour";
+  const fieldTemplate = field2DTemplate || figure.templateId === "surface-3d";
+  const doubleYTemplate = figure.templateId === "double-y";
+  const waterfallTemplate = figure.templateId === "waterfall";
   const mainSeriesIds = new Set(
     figure.dataRef?.yColumnIds ?? figure.seriesOrder
   );
@@ -136,8 +141,6 @@ export function checkFigure(
       : "数据包含单位，但 X 轴标题未显示单位。"
   });
 
-  const fieldTemplate =
-    figure.templateId === "heatmap" || figure.templateId === "surface-3d";
   const yUnit = fieldTemplate
     ? dataset.metadata?.rowAxisUnit
     : dataset.ys[0]?.unit;
@@ -155,26 +158,81 @@ export function checkFigure(
       : "数据包含单位，但 Y 轴标题未显示单位。"
   });
 
-  items.push({
-    id: "series-count",
-    level:
-      visibleSeries.length === 0
-        ? ref
-          ? "warn"
-          : "info"
-        : visibleSeries.length <= 8
-        ? "pass"
-        : "warn",
-    title: "数据层数量",
-    detail:
-      visibleSeries.length === 0
-        ? ref
-          ? "当前没有可见主数据层。"
-          : "当前为空图，尚未绑定主数据层。"
-        : visibleSeries.length <= 8
-        ? "当前可见数据层数量较容易辨识。"
-        : "可见数据层较多，建议分组、筛选或使用更明确编码。"
-  });
+  if (!fieldTemplate) {
+    items.push({
+      id: "series-count",
+      level:
+        visibleSeries.length === 0
+          ? ref
+            ? "warn"
+            : "info"
+          : visibleSeries.length <= 8
+          ? "pass"
+          : "warn",
+      title: "数据层数量",
+      detail:
+        visibleSeries.length === 0
+          ? ref
+            ? "当前没有可见主数据层。"
+            : "当前为空图，尚未绑定主数据层。"
+          : visibleSeries.length <= 8
+          ? "当前可见数据层数量较容易辨识。"
+          : "可见数据层较多，建议分组、筛选或使用更明确编码。"
+    });
+  } else {
+    const rowCount = visibleSeries.length;
+    const columnCount = dataset.x.values.length;
+    const rowCoordinateMismatch =
+      dataset.metadata?.rowCoordinates !== undefined &&
+      dataset.metadata.rowCoordinates.length !== rowCount;
+    const fieldProblems: string[] = [];
+    if (field2DTemplate && (rowCount < 2 || columnCount < 2)) {
+      fieldProblems.push("二维场图至少需要 2 × 2 数据");
+    }
+    if (rowCoordinateMismatch) {
+      fieldProblems.push("Y 行坐标数量与矩阵行数不一致");
+    }
+    const finiteZ = visibleSeries.flatMap((series) =>
+      series.values.filter(
+        (value): value is number =>
+          typeof value === "number" && Number.isFinite(value)
+      )
+    );
+    if (finiteZ.length === 0) {
+      fieldProblems.push("Z 矩阵没有有限数值");
+    }
+    if (
+      o.zAutoRange === false &&
+      (o.zMin === undefined ||
+        o.zMax === undefined ||
+        !Number.isFinite(o.zMin) ||
+        !Number.isFinite(o.zMax) ||
+        o.zMin >= o.zMax)
+    ) {
+      fieldProblems.push("手动 Z 范围需要满足 最小值 < 最大值");
+    }
+    if (
+      figure.templateId === "contour" &&
+      (o.contourLevels !== undefined &&
+        (!Number.isFinite(o.contourLevels) ||
+          o.contourLevels < 3 ||
+          o.contourLevels > 64))
+    ) {
+      fieldProblems.push("Contour 级数应在 3–64 之间");
+    }
+
+    items.push({
+      id: "field-matrix",
+      level: fieldProblems.length ? "warn" : "pass",
+      title: "场图矩阵",
+      detail: fieldProblems.length
+        ? fieldProblems.join("；") + "。"
+        : rowCount +
+          " × " +
+          columnCount +
+          " 矩阵结构有效，Z 范围设置有效。"
+    });
+  }
 
   const xLength = dataset.x.values.length;
   const lengthMismatches = visibleSeries.filter(
@@ -189,6 +247,79 @@ export function checkFigure(
         " 个数据层与 X 列长度不同；超出配对范围的点可能不会显示。"
       : "可见数据层与 X 数据长度一致。"
   });
+
+  if (waterfallTemplate) {
+    const waterfallProblems: string[] = [];
+    if (visibleSeries.length < 2) {
+      waterfallProblems.push("瀑布图至少需要两条可见曲线");
+    }
+    const xCategoricalForWaterfall = dataset.x.values.some(
+      (value) => typeof value === "string"
+    );
+    if (
+      xCategoricalForWaterfall &&
+      (o.waterfallXOffset ?? 0.5) !== 0
+    ) {
+      waterfallProblems.push("分类 X 不支持数值 X 偏移，当前只应用 Y 偏移");
+    }
+    items.push({
+      id: "waterfall-input",
+      level: waterfallProblems.length ? "warn" : "pass",
+      title: "瀑布图输入",
+      detail: waterfallProblems.length
+        ? waterfallProblems.join("；") + "。"
+        : "多曲线输入和 X/Y 偏移设置有效。"
+    });
+  }
+
+  if (doubleYTemplate) {
+    const orderedVisible = figure.seriesOrder
+      .map((id) => visibleSeries.find((series) => series.id === id))
+      .filter((series): series is NonNullable<typeof series> => Boolean(series));
+    const leftSeries = orderedVisible.filter((series, index) => {
+      const axis =
+        figure.seriesOverrides[series.id]?.yAxis ??
+        (index === 0 ? "left" : "right");
+      return axis === "left";
+    });
+    const rightSeries = orderedVisible.filter((series, index) => {
+      const axis =
+        figure.seriesOverrides[series.id]?.yAxis ??
+        (index === 0 ? "left" : "right");
+      return axis === "right";
+    });
+    items.push({
+      id: "double-y-assignment",
+      level:
+        leftSeries.length > 0 && rightSeries.length > 0 ? "pass" : "warn",
+      title: "双 Y 轴分配",
+      detail:
+        leftSeries.length > 0 && rightSeries.length > 0
+          ? "左 Y " +
+            leftSeries.length +
+            " 条，右 Y " +
+            rightSeries.length +
+            " 条；两侧都有实际数据。"
+          : "双 Y 图需要左右两侧都至少有一条可见数据；请在“曲线”页调整 Y 轴归属。"
+    });
+
+    const rightUnit = rightSeries[0]?.unit;
+    const autoRightTitle = rightSeries[0]
+      ? autoAxisTitle(rightSeries[0].name, rightUnit)
+      : "Right Y";
+    if (rightUnit) {
+      items.push({
+        id: "right-y-unit",
+        level: titleHasUnit(o.rightYTitle ?? autoRightTitle, rightUnit)
+          ? "pass"
+          : "warn",
+        title: "右 Y 轴单位",
+        detail: titleHasUnit(o.rightYTitle ?? autoRightTitle, rightUnit)
+          ? "右 Y 轴标题包含数据单位。"
+          : "右 Y 数据包含单位，但右 Y 轴标题未显示单位。"
+      });
+    }
+  }
 
   const errorSeries = ref?.yErrorColumnId
     ? dataset.ys.find((series) => series.id === ref.yErrorColumnId)
@@ -248,17 +379,19 @@ export function checkFigure(
     });
   }
 
-  const alphaTooLow = visibleSeries.some(
-    (series) => (figure.seriesOverrides[series.id]?.opacity ?? 1) < 0.55
-  );
-  items.push({
-    id: "opacity",
-    level: alphaTooLow ? "warn" : "pass",
-    title: "透明度",
-    detail: alphaTooLow
-      ? "存在透明度低于 55% 的主要数据层，印刷后可能不够清晰。"
-      : "主要数据层透明度适合论文输出。"
-  });
+  if (!fieldTemplate) {
+      const alphaTooLow = visibleSeries.some(
+        (series) => (figure.seriesOverrides[series.id]?.opacity ?? 1) < 0.55
+      );
+      items.push({
+        id: "opacity",
+        level: alphaTooLow ? "warn" : "pass",
+        title: "透明度",
+        detail: alphaTooLow
+          ? "存在透明度低于 55% 的主要数据层，印刷后可能不够清晰。"
+          : "主要数据层透明度适合论文输出。"
+      });
+  }
 
   if (!fieldTemplate && (o.legendVisible ?? true)) {
       if (figure.figureOverrides.legendFrame) {
@@ -343,6 +476,17 @@ export function checkFigure(
     o.yMajorTickStep,
     o.yMinorTickStep
   );
+  if (doubleYTemplate) {
+    checkAxis(
+      "右 Y 轴",
+      o.rightYAutoRange,
+      o.rightYMin,
+      o.rightYMax,
+      o.rightYScale ?? "linear",
+      o.rightYMajorTickStep,
+      o.rightYMinorTickStep
+    );
+  }
 
   items.push({
     id: "axis-validity",
@@ -365,18 +509,62 @@ export function checkFigure(
     }
   }
   if ((o.yScale ?? "linear") === "log") {
-    const numericY = visibleSeries.flatMap((series) =>
-      series.values.filter(
-        (value): value is number =>
-          typeof value === "number" && Number.isFinite(value)
-      )
-    );
+    const numericY = field2DTemplate
+      ? (dataset.metadata?.rowCoordinates ??
+          visibleSeries.map((_series, index) => index + 1)).filter(
+          (value): value is number =>
+            typeof value === "number" && Number.isFinite(value)
+        )
+      : visibleSeries
+          .filter((series, index) => {
+            if (!doubleYTemplate) return true;
+            const orderedIndex = Math.max(
+              0,
+              figure.seriesOrder.indexOf(series.id)
+            );
+            const axis =
+              figure.seriesOverrides[series.id]?.yAxis ??
+              (orderedIndex === 0 ? "left" : "right");
+            return axis === "left";
+          })
+          .flatMap((series) =>
+            series.values.filter(
+              (value): value is number =>
+                typeof value === "number" && Number.isFinite(value)
+            )
+          );
     if (numericY.length && !numericY.some((value) => value > 0)) {
       logIssues.push("Y 对数轴没有可显示的正值");
     } else if (numericY.some((value) => value <= 0)) {
       logIssues.push("Y 数据包含非正值，这些点在对数轴上不会显示");
     }
   }
+
+  if (doubleYTemplate && (o.rightYScale ?? "linear") === "log") {
+    const rightValues = visibleSeries
+      .filter((series) => {
+        const orderedIndex = Math.max(
+          0,
+          figure.seriesOrder.indexOf(series.id)
+        );
+        const axis =
+          figure.seriesOverrides[series.id]?.yAxis ??
+          (orderedIndex === 0 ? "left" : "right");
+        return axis === "right";
+      })
+      .flatMap((series) =>
+        series.values.filter(
+          (value): value is number =>
+            typeof value === "number" && Number.isFinite(value)
+        )
+      );
+    if (rightValues.length && !rightValues.some((value) => value > 0)) {
+      logIssues.push("右 Y 对数轴没有可显示的正值");
+    } else if (rightValues.some((value) => value <= 0)) {
+      logIssues.push("右 Y 数据包含非正值，这些点在对数轴上不会显示");
+    }
+  }
+
   if (logIssues.length) {
     items.push({
       id: "log-data",
