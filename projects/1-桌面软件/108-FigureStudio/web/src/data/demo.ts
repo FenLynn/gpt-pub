@@ -9,7 +9,7 @@ function id(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
 }
 
-export function createSpectrumDataset(): Dataset {
+export function createSpectrumDataset(folderId?: string): Dataset {
   const x: number[] = [];
   const measured: number[] = [];
   const fit: number[] = [];
@@ -36,6 +36,7 @@ export function createSpectrumDataset(): Dataset {
   return {
     id: id("dataset-spectrum"),
     name: "合成 OSA 光谱",
+    folderId,
     x: {
       id: "wavelength",
       name: "波长",
@@ -65,7 +66,7 @@ export function createSpectrumDataset(): Dataset {
   };
 }
 
-export function createFieldDataset(): Dataset {
+export function createFieldDataset(folderId?: string): Dataset {
   const x: number[] = [];
   const ys = [];
   const rowCoordinates: number[] = [];
@@ -96,6 +97,7 @@ export function createFieldDataset(): Dataset {
   return {
     id: id("dataset-field"),
     name: "合成二维光场",
+    folderId,
     x: {
       id: "x-position",
       name: "X",
@@ -116,12 +118,14 @@ function makeFigure(
   name: string,
   templateId: FigureSpec["templateId"],
   defaults: UserDefaults,
+  folderId?: string,
   overrides: FigureSpec["figureOverrides"] = {},
   seriesOverrides: FigureSpec["seriesOverrides"] = {}
 ): FigureSpec {
   return {
     id: id("figure"),
     name,
+    folderId,
     datasetId: dataset.id,
     templateId,
     presetId: defaults.presetId,
@@ -151,14 +155,23 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     }
   };
 
-  const spectrum = createSpectrumDataset();
-  const field = createFieldDataset();
+  const folders = [
+    { id: "folder-paper", name: "论文" },
+    { id: "folder-main", name: "主文", parentId: "folder-paper" },
+    { id: "folder-supp", name: "补充材料", parentId: "folder-paper" },
+    { id: "folder-experiment", name: "实验" },
+    { id: "folder-raw", name: "原始数据", parentId: "folder-experiment" }
+  ];
+
+  const spectrum = createSpectrumDataset("folder-raw");
+  const field = createFieldDataset("folder-raw");
 
   const spectrumFigure = makeFigure(
     spectrum,
     "图 1 · 光谱",
     "spectrum",
     defaults,
+    "folder-main",
     {
       xTitle: "波长 λ (nm)",
       yTitle: "功率 (dBm)"
@@ -168,27 +181,42 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     }
   );
 
-  const heatmapFigure = makeFigure(field, "图 2 · 光场", "heatmap", defaults, {
-    xTitle: "X (mm)",
-    yTitle: "Y (mm)",
-    aspectMode: "4:3",
-    legendVisible: false,
-    colorScale: "Viridis"
-  });
+  const heatmapFigure = makeFigure(
+    field,
+    "图 2 · 光场",
+    "heatmap",
+    defaults,
+    "folder-main",
+    {
+      xTitle: "X (mm)",
+      yTitle: "Y (mm)",
+      aspectMode: "4:3",
+      legendVisible: false,
+      colorScale: "Viridis"
+    }
+  );
 
-  const surfaceFigure = makeFigure(field, "图 3 · 3D 光场", "surface-3d", defaults, {
-    xTitle: "X (mm)",
-    yTitle: "Y (mm)",
-    aspectMode: "4:3",
-    legendVisible: false,
-    colorScale: "Viridis"
-  });
+  const surfaceFigure = makeFigure(
+    field,
+    "图 3 · 3D 光场",
+    "surface-3d",
+    defaults,
+    "folder-supp",
+    {
+      xTitle: "X (mm)",
+      yTitle: "Y (mm)",
+      aspectMode: "4:3",
+      legendVisible: false,
+      colorScale: "Viridis"
+    }
+  );
 
   return {
     format: "sfig",
-    schemaVersion: "0.1",
+    schemaVersion: "0.2",
     projectId: id("project"),
     name: "未命名项目",
+    folders,
     datasets: [spectrum, field],
     figures: [spectrumFigure, heatmapFigure, surfaceFigure],
     activeFigureId: spectrumFigure.id,

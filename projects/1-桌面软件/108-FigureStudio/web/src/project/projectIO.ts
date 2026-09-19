@@ -1,11 +1,12 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import type { Dataset, ProjectState } from "../model";
 
-const APP_VERSION = "0.1.0-web";
+const APP_VERSION = "0.2.0-web";
 
 interface DatasetIndexEntry {
   id: string;
   name: string;
+  folderId?: string;
   x: Omit<Dataset["x"], "values">;
   ys: Array<Omit<Dataset["ys"][number], "values">>;
   metadata?: Dataset["metadata"];
@@ -15,9 +16,10 @@ interface DatasetIndexEntry {
 
 interface ProjectDocument {
   format: "sfig";
-  schemaVersion: "0.1";
+  schemaVersion: "0.1" | "0.2";
   projectId: string;
   name: string;
+  folders?: ProjectState["folders"];
   datasets: DatasetIndexEntry[];
   figures: ProjectState["figures"];
   activeFigureId: string;
@@ -37,6 +39,7 @@ function datasetIndex(dataset: Dataset): DatasetIndexEntry {
     ...datasetRest,
     id: dataset.id,
     name: dataset.name,
+    folderId: dataset.folderId,
     x: xMeta,
     ys: yMeta,
     metadata: dataset.metadata,
@@ -48,7 +51,7 @@ export function encodeProject(project: ProjectState): Uint8Array {
   const projectDocument = {
     ...(project as ProjectState & Record<string, unknown>),
     datasets: project.datasets.map(datasetIndex)
-  } as ProjectDocument;
+  } as unknown as ProjectDocument;
 
   const files: Record<string, Uint8Array> = {
     "manifest.json": strToU8(
@@ -80,21 +83,43 @@ export function encodeProject(project: ProjectState): Uint8Array {
   return zipSync(files, { level: 6 });
 }
 
+function migrateProjectDocument(document: ProjectDocument): ProjectDocument {
+  if (document.schemaVersion === "0.2") return document;
+
+  return {
+    ...document,
+    schemaVersion: "0.2",
+    folders: document.folders ?? [
+      { id: "folder-data", name: "数据" },
+      { id: "folder-figures", name: "图形" }
+    ],
+    datasets: document.datasets.map((dataset) => ({
+      ...dataset,
+      folderId: dataset.folderId ?? "folder-data"
+    })),
+    figures: document.figures.map((figure) => ({
+      ...figure,
+      folderId: figure.folderId ?? "folder-figures"
+    }))
+  };
+}
+
 export function decodeProject(bytes: Uint8Array): ProjectState {
   const archive = unzipSync(bytes);
   const projectBytes = archive["project.json"];
   if (!projectBytes) throw new Error("项目文件缺少 project.json。");
 
-  const projectDocument = JSON.parse(
-    strFromU8(projectBytes)
-  ) as ProjectDocument;
+  const raw = JSON.parse(strFromU8(projectBytes)) as ProjectDocument;
 
-  if (
-    projectDocument.format !== "sfig" ||
-    projectDocument.schemaVersion !== "0.1"
-  ) {
+  if (raw.format !== "sfig") {
+    throw new Error("不是有效的 FigureStudio 项目文件。");
+  }
+
+  if (raw.schemaVersion !== "0.1" && raw.schemaVersion !== "0.2") {
     throw new Error("暂不支持这个项目文件版本。");
   }
+
+  const projectDocument = migrateProjectDocument(raw);
 
   const datasets: Dataset[] = projectDocument.datasets.map((meta) => {
     const dataBytes = archive[meta.dataPath];
@@ -113,6 +138,7 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
       ...datasetMeta,
       id: meta.id,
       name: meta.name,
+      folderId: meta.folderId,
       x: {
         ...meta.x,
         values: data.x
@@ -130,7 +156,8 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
   return {
     ...(projectDocument as unknown as ProjectState),
     format: "sfig",
-    schemaVersion: "0.1",
+    schemaVersion: "0.2",
+    folders: projectDocument.folders ?? [],
     datasets,
     activeFigureId:
       projectDocument.figures.some(

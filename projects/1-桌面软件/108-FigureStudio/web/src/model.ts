@@ -5,20 +5,30 @@ export interface Column {
   name: string;
   unit?: string;
   values: NumericValue[];
+  [key: string]: unknown;
 }
 
 export interface DatasetMetadata {
   rowCoordinates?: number[];
   rowAxisName?: string;
   rowAxisUnit?: string;
+  [key: string]: unknown;
 }
 
 export interface Dataset {
   id: string;
   name: string;
+  folderId?: string;
   x: Column;
   ys: Column[];
   metadata?: DatasetMetadata;
+  [key: string]: unknown;
+}
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  parentId?: string;
 }
 
 export type PresetId = "scientific" | "nature" | "presentation";
@@ -41,6 +51,7 @@ export type MarkerSymbol =
   | "square"
   | "diamond"
   | "triangle-up"
+  | "triangle-down"
   | "cross"
   | "x";
 export type AxisScale = "linear" | "log";
@@ -86,6 +97,7 @@ export interface SeriesOverride {
   markerSizePt?: number;
   color?: string;
   opacity?: number;
+  [key: string]: unknown;
 }
 
 export interface FigureOverrides {
@@ -120,17 +132,21 @@ export interface FigureOverrides {
   offsetStep?: number;
   colorScale?: ColorScaleId;
   reverseColorScale?: boolean;
+
+  [key: string]: unknown;
 }
 
 export interface FigureSpec {
   id: string;
   name: string;
+  folderId?: string;
   datasetId: string;
   templateId: PlotTemplateId;
   presetId: PresetId;
   figureOverrides: FigureOverrides;
   seriesOverrides: Record<string, SeriesOverride>;
   seriesOrder: string[];
+  [key: string]: unknown;
 }
 
 export interface ProjectDefaults {
@@ -141,13 +157,15 @@ export interface ProjectDefaults {
 
 export interface ProjectState {
   format: "sfig";
-  schemaVersion: "0.1";
+  schemaVersion: "0.2";
   projectId: string;
   name: string;
+  folders: ProjectFolder[];
   datasets: Dataset[];
   figures: FigureSpec[];
   activeFigureId: string;
   defaults: ProjectDefaults;
+  [key: string]: unknown;
 }
 
 export interface UserDefaults {
@@ -155,3 +173,12 @@ export interface UserDefaults {
   presetId: PresetId;
   figureOverrides: FigureOverrides;
 }
+
+export type ExplorerItemType = "folder" | "dataset" | "figure";
+
+export interface ExplorerSelection {
+  type: ExplorerItemType;
+  id: string;
+}
+
+export type InspectorTab = "figure" | "series" | "axis" | "legend" | "check";
