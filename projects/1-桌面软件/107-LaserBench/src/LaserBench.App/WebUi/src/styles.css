@@ -1054,3 +1054,145 @@
   top:auto!important;
   bottom:auto!important
 }
+
+
+/* v0.4.17 typography + beam viewport refinement */
+/* Keep the established dashboard plot geometry; only refine beam viewport and header typography. */
+.dashboard-grid:not(.focus-mode) .graph-overlay{
+  height:34px!important;
+  min-height:34px!important;
+  padding-top:0!important;
+  padding-bottom:0!important
+}
+.dashboard-grid:not(.focus-mode) .module-title{
+  align-self:stretch!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important
+}
+.dashboard-grid:not(.focus-mode) .module-title strong{
+  font-size:14.5px!important;
+  line-height:1!important;
+  font-weight:700!important;
+  letter-spacing:.15px!important;
+  color:#82d9b5!important
+}
+.dashboard-grid:not(.focus-mode) .module-title .panel-mark{
+  width:21px!important;
+  height:21px!important;
+  flex-basis:21px!important;
+  color:#82d9b5!important
+}
+.dashboard-grid:not(.focus-mode) .module-title .panel-mark.selected{
+  color:#2ed477!important
+}
+.dashboard-grid:not(.focus-mode) .module-title .panel-mark svg{
+  width:20px!important;
+  height:20px!important;
+  stroke-width:1.9!important
+}
+
+/* Results use a warm bright value color; tick labels stay cool gray-blue. */
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts,
+.dashboard-grid:not(.focus-mode) .m2-block{
+  height:100%!important;
+  align-items:center!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger{
+  height:31px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  padding-top:0!important;
+  padding-bottom:0!important;
+  font-variant-numeric:tabular-nums!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger em{
+  font-size:9.5px!important;
+  line-height:1!important;
+  color:#92a9b8!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger b{
+  font-size:16px!important;
+  line-height:1!important;
+  font-weight:720!important;
+  color:#fff0bd!important;
+  letter-spacing:-.15px!important;
+  font-variant-numeric:tabular-nums!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger.primary-metric b{
+  font-size:17px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger.secondary-trigger b{
+  font-size:15.5px!important;
+  color:#f6e8bb!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger small{
+  font-size:9px!important;
+  line-height:1!important;
+  color:#a8bac6!important
+}
+.dashboard-grid:not(.focus-mode) .secondary-metric{
+  display:inline-flex!important;
+  align-items:baseline!important;
+  gap:4px!important;
+  color:#91a7b6!important
+}
+.dashboard-grid:not(.focus-mode) .secondary-metric b{
+  font-size:13.5px!important;
+  color:#fff0bd!important
+}
+
+/* Beam image aligns to the caustic DATA rectangle: same top/bottom gutter, and its left edge matches plot data left. */
+.dashboard-grid:not(.focus-mode) .beam-body{
+  overflow:hidden!important
+}
+.dashboard-grid:not(.focus-mode) .beam-image-wrap{
+  margin:8px 0 21px 38px!important;
+  min-width:0!important;
+  min-height:0!important;
+  border:0!important;
+  border-radius:0!important;
+  overflow:hidden!important;
+  background:#02081c!important;
+  box-sizing:border-box!important
+}
+.beam-interactive{
+  width:100%!important;
+  height:100%!important;
+  display:block!important;
+  cursor:grab!important;
+  touch-action:none!important;
+  user-select:none!important
+}
+.beam-interactive.dragging{
+  cursor:grabbing!important
+}
+.beam-tools{display:none!important}
+
+/* M² readout keeps breathing room from both edges. */
+.dashboard-grid:not(.focus-mode) .m2-block{
+  padding-left:12px!important;
+  padding-right:14px!important;
+  gap:5px!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block .metric-trigger{
+  padding-left:4px!important;
+  padding-right:4px!important
+}
+
+/* Sidebar selected page: same border on all four sides, no thick blue left stripe. */
+.sidebar button.active{
+  background:#3a5061!important;
+  color:#f2f6f9!important;
+  border:1px solid #566c7c!important;
+  box-shadow:none!important
+}
+.sidebar button.active::before{
+  display:none!important
+}
+.sidebar button.active svg{
+  transform:none!important
+}

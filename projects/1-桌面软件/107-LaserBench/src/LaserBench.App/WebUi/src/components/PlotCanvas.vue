@@ -16,9 +16,10 @@ const props = withDefaults(defineProps<{
   timeAxis?: boolean
   compact?: boolean
   tight?: boolean
+  xPadding?: number
   verticalMarker?: number | null
 }>(), {
-  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, compact: false, tight: false, verticalMarker: null
+  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, compact: false, tight: false, xPadding: 0, verticalMarker: null
 })
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -35,8 +36,12 @@ const bounds = computed(() => {
     const span = Math.max(1e-9, max-min)
     return [min-span*ratio,max+span*ratio] as const
   }
-  const x0 = props.xMin ?? (xs.length ? Math.min(...xs) : 0)
-  const x1 = props.xMax ?? (xs.length ? Math.max(...xs) : 1)
+  const rawX0 = xs.length ? Math.min(...xs) : 0
+  const rawX1 = xs.length ? Math.max(...xs) : 1
+  const xSpan = Math.max(1e-9, rawX1-rawX0)
+  const xPad = Math.max(0, props.xPadding) * xSpan
+  const x0 = props.xMin ?? (rawX0-xPad)
+  const x1 = props.xMax ?? (rawX1+xPad)
   const [ya,yb] = ys.length ? pad(Math.min(...ys),Math.max(...ys)) : [0,1]
   const [ra,rb] = rys.length ? pad(Math.min(...rys),Math.max(...rys)) : [0,1]
   return { x0, x1, y0: props.yMin ?? ya, y1: props.yMax ?? yb, r0: props.rightYMin ?? ra, r1: props.rightYMax ?? rb }
@@ -106,7 +111,7 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font='11.5px "Segoe UI", sans-serif';ctx.fillStyle='#d1dbe2';ctx.textBaseline='middle'
+  ctx.font='11.5px "Segoe UI", sans-serif';ctx.fillStyle='#9fb2c0';ctx.textBaseline='middle'
   for(let i=0;i<4;i++) {
     const t=i/3, y=m.t+ph*t, v=y1-(y1-y0)*t, text=fmt(v,y1-y0)
     ctx.textAlign='right';ctx.fillText(text,m.l-4,y)
@@ -126,7 +131,7 @@ function draw() {
   }
 }
 
-watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.verticalMarker],draw,{deep:true})
+watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.xPadding,props.verticalMarker],draw,{deep:true})
 onMounted(()=>{observer=new ResizeObserver(draw);if(canvas.value)observer.observe(canvas.value);draw()})
 onBeforeUnmount(()=>observer?.disconnect())
 </script>
