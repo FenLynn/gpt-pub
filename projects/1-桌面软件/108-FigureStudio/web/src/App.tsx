@@ -3554,7 +3554,7 @@ function App() {
                                   if (!value) {
                                     setFigureField("contourLines", true);
                                   }
-                                }
+                                }}
                               />
                             </div>
                             <div className="prop-row">
@@ -3581,7 +3581,7 @@ function App() {
                                   if (value) {
                                     setFigureField("contourLines", true);
                                   }
-                                }
+                                }}
                               />
                             </div>
                           </>
