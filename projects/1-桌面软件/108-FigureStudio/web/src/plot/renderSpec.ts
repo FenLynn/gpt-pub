@@ -551,7 +551,7 @@ export function buildTraces(args: {
       preset,
       column,
       sourceIndex,
-      template === "double-y" ? "lines+markers" : modeDefault,
+      modeDefault,
       yValues
     ) as any;
 
