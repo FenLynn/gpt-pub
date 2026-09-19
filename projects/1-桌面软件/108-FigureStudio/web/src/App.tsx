@@ -59,7 +59,7 @@ import {
   readProjectFile
 } from "./project/projectIO";
 
-const AUTOSAVE_KEY = "figurestudio-p108-autosave-v03";
+const AUTOSAVE_KEY = "figurestudio-p108-autosave-v04";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const PNG_SCALE = PNG_DPI / 96;
@@ -682,11 +682,11 @@ function App() {
     try {
       const raw = sessionStorage.getItem(AUTOSAVE_KEY);
       if (!raw) {
-        showToast("没有可恢复的 v0.3 自动保存");
+        showToast("没有可恢复的 v0.4 自动保存");
         return;
       }
       const next = JSON.parse(raw) as ProjectState;
-      if (next.schemaVersion !== "0.3") throw new Error("version");
+      if (next.schemaVersion !== "0.4") throw new Error("version");
       resetWorkspace(next);
       showToast("已恢复自动保存");
     } catch {
