@@ -1770,3 +1770,31 @@ button:disabled {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+
+.reset-arrow-icon {
+  width: calc(13px * var(--ui-scale));
+  height: calc(13px * var(--ui-scale));
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tick-angle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(5px * var(--ui-scale));
+  margin: calc(4px * var(--ui-scale)) 0 calc(7px * var(--ui-scale));
+}
+
+.tick-angle-grid > label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: calc(5px * var(--ui-scale));
+  min-width: 0;
+  color: #707a82;
+  font-size: 0.69rem;
+}

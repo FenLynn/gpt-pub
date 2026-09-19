@@ -237,7 +237,10 @@ function ResetIcon(props: { visible: boolean; onReset: () => void }) {
       title="恢复继承值"
       onClick={props.onReset}
     >
-      ↺
+      <svg className="reset-arrow-icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M5.1 5.2H2.8V2.9" />
+        <path d="M3 5.1a5.2 5.2 0 1 1-.1 5.9" />
+      </svg>
     </button>
   );
 }
@@ -1760,6 +1763,8 @@ function App() {
         xTickSuffix: source.xTickSuffix,
         yTickPrefix: source.yTickPrefix,
         yTickSuffix: source.yTickSuffix,
+        xTickAngle: source.xTickAngle,
+        yTickAngle: source.yTickAngle,
         minorTicks: source.minorTicks,
         gridVisible: source.gridVisible,
         legendVisible: source.legendVisible,
@@ -4074,6 +4079,53 @@ function App() {
                                             </div>
                         
                         
+                      <div className="tick-angle-grid">
+                        <label>
+                          <span>X 旋转</span>
+                          <div className="compact-number">
+                            <input
+                              type="number"
+                              min="-180"
+                              max="180"
+                              step="5"
+                              value={activeFigure.figureOverrides.xTickAngle ?? 0}
+                              onChange={(event) =>
+                                setFigureField(
+                                  "xTickAngle",
+                                  Math.max(
+                                    -180,
+                                    Math.min(180, Number(event.target.value))
+                                  )
+                                )
+                              }
+                            />
+                            <span>°</span>
+                          </div>
+                        </label>
+                        <label>
+                          <span>Y 旋转</span>
+                          <div className="compact-number">
+                            <input
+                              type="number"
+                              min="-180"
+                              max="180"
+                              step="5"
+                              value={activeFigure.figureOverrides.yTickAngle ?? 0}
+                              onChange={(event) =>
+                                setFigureField(
+                                  "yTickAngle",
+                                  Math.max(
+                                    -180,
+                                    Math.min(180, Number(event.target.value))
+                                  )
+                                )
+                              }
+                            />
+                            <span>°</span>
+                          </div>
+                        </label>
+                      </div>
+
                       </>
                     ) : (
                       <div className="axis-note">

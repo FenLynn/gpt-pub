@@ -175,6 +175,8 @@ export interface FigureOverrides {
   xTickSuffix?: string;
   yTickPrefix?: string;
   yTickSuffix?: string;
+  xTickAngle?: number;
+  yTickAngle?: number;
   aspectMode?: AspectMode;
   customAspectWidth?: number;
   customAspectHeight?: number;

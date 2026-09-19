@@ -179,6 +179,9 @@ export function buildTraces(args: {
   const template = figure.templateId;
 
   if (template === "heatmap") {
+    const xIsNumeric = dataset.x.values.every(
+      (value) => value === null || typeof value === "number"
+    );
     return [
       {
         type: "heatmap",
@@ -194,7 +197,9 @@ export function buildTraces(args: {
           outlinewidth: 0,
           len: 0.86
         },
-        hovertemplate: "X=%{x:.4g}<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
+        hovertemplate:
+          (xIsNumeric ? "X=%{x:.4g}" : "X=%{x}") +
+          "<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
       }
     ];
   }
@@ -673,6 +678,7 @@ export function buildLayout(args: {
         ),
     tickprefix: overrides.xTickPrefix || undefined,
     ticksuffix: overrides.xTickSuffix || undefined,
+    tickangle: overrides.xTickAngle ?? 0,
     minor: {
       ...commonAxis.minor,
       dtick:
@@ -714,6 +720,7 @@ export function buildLayout(args: {
     ),
     tickprefix: overrides.yTickPrefix || undefined,
     ticksuffix: overrides.yTickSuffix || undefined,
+    tickangle: overrides.yTickAngle ?? 0,
     minor: {
       ...commonAxis.minor,
       dtick:
