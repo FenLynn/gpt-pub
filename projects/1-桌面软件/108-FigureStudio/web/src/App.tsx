@@ -81,7 +81,7 @@ const ROLE_OPTIONS: Array<{ value: ColumnRole; label: string }> = [
   { value: "Z", label: "Z" },
   { value: "XErr", label: "XErr" },
   { value: "YErr", label: "YErr" },
-  { value: "Label", label: "Label" },
+  { value: "Label", label: "标签" },
   { value: "None", label: "无" }
 ];
 
@@ -4315,7 +4315,7 @@ function App() {
                                                               rightYSeries.unit +
                                                               ")"
                                                             : rightYSeries.name
-                                                          : "Right Y")
+                                                          : "右 Y")
                                                       }
                                                       value={
                                                         activeFigure.figureOverrides
@@ -4964,11 +4964,11 @@ function App() {
                             "自动：" +
                             (fieldTemplate
                               ? plotDataset.metadata?.rowAxisUnit
-                                ? (plotDataset.metadata?.rowAxisName ?? "Y") +
+                                ? (plotDataset.metadata?.rowAxisName ?? "纵向位置") +
                                   " (" +
                                   plotDataset.metadata.rowAxisUnit +
                                   ")"
-                                : plotDataset.metadata?.rowAxisName ?? "Y"
+                                : plotDataset.metadata?.rowAxisName ?? "纵向位置"
                               : doubleYTemplate && leftYSeries
                               ? leftYSeries.unit
                                 ? leftYSeries.name +
@@ -4983,7 +4983,7 @@ function App() {
                                   plotDataset.ys[0].unit +
                                   ")"
                                 : plotDataset.ys[0].name
-                              : "Y")
+                              : "纵轴")
                           }
                           value={activeFigure.figureOverrides.yTitle ?? ""}
                           onChange={(event) =>
