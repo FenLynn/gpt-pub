@@ -5179,7 +5179,7 @@ function App() {
                       <select
                         value={
                           activeFigure.figureOverrides.legendPosition ??
-                          "top-right"
+                          (doubleYTemplate ? "top-left" : "top-right")
                         }
                         onChange={(event) => {
                           const value = event.target.value as LegendPosition;
@@ -5196,7 +5196,8 @@ function App() {
                       </select>
                     </div>
 
-                    {(activeFigure.figureOverrides.legendPosition ?? "top-right") ===
+                    {(activeFigure.figureOverrides.legendPosition ??
+                      (doubleYTemplate ? "top-left" : "top-right")) ===
                       "custom" && (
                       <div className="legend-position-grid">
                         <label>
@@ -5234,7 +5235,8 @@ function App() {
                       </div>
                     )}
 
-                    {(activeFigure.figureOverrides.legendPosition ?? "top-right") ===
+                    {(activeFigure.figureOverrides.legendPosition ??
+                      (doubleYTemplate ? "top-left" : "top-right")) ===
                       "custom" && (
                       <div className="legend-anchor-grid">
                         <label>
