@@ -241,7 +241,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
 
   return {
     format: "sfig",
-    schemaVersion: "0.4",
+    schemaVersion: "0.5",
     projectId: id("project"),
     name: "未命名项目",
     folders,
