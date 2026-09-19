@@ -36,21 +36,27 @@ export function columnLabel(index: number, role: Column["role"]): string {
 }
 
 export function defaultDataRef(sheet: DataSheet): FigureDataRef {
-  const x =
-    sheet.columns.find((column) => column.role === "X") ??
-    sheet.columns.find((column) => column.role !== "Label") ??
-    sheet.columns[0];
-
-  const ys = sheet.columns.filter((column) => column.role === "Y");
-  const fallbackYs = sheet.columns.filter(
-    (column) =>
-      column.id !== x?.id &&
-      !["Label", "XErr", "YErr"].includes(column.role)
+  const xIndex = Math.max(
+    0,
+    sheet.columns.findIndex((column) => column.role === "X") >= 0
+      ? sheet.columns.findIndex((column) => column.role === "X")
+      : sheet.columns.findIndex((column) => column.role !== "Label")
   );
+  const x = sheet.columns[xIndex] ?? sheet.columns[0];
+  const nextXOffset = sheet.columns
+    .slice(xIndex + 1)
+    .findIndex((column) => column.role === "X");
+  const segmentEnd =
+    nextXOffset >= 0 ? xIndex + 1 + nextXOffset : sheet.columns.length;
+  const segment = sheet.columns.slice(xIndex + 1, segmentEnd);
 
+  const ys = segment.filter((column) => column.role === "Y");
+  const fallbackYs = segment.filter(
+    (column) => !["Label", "XErr", "YErr"].includes(column.role)
+  );
   const yColumns = ys.length ? ys : fallbackYs;
-  const yError = sheet.columns.find((column) => column.role === "YErr");
-  const z = sheet.columns.find((column) => column.role === "Z");
+  const yError = segment.find((column) => column.role === "YErr");
+  const z = segment.find((column) => column.role === "Z");
 
   return {
     sheetId: sheet.id,
@@ -77,10 +83,13 @@ export function sheetToDataset(
   figure?: FigureSpec
 ): Dataset {
   const dataRef = figure?.dataRef ?? defaultDataRef(sheet);
+  const explicitMapping = Boolean(figure);
   const x =
     sheet.columns.find((column) => column.id === dataRef.xColumnId) ??
-    sheet.columns.find((column) => column.role === "X") ??
-    sheet.columns[0];
+    (!explicitMapping
+      ? sheet.columns.find((column) => column.role === "X") ??
+        sheet.columns[0]
+      : undefined);
 
   const yIds = new Set([
     ...dataRef.yColumnIds,
@@ -92,7 +101,7 @@ export function sheetToDataset(
     (column) => column.id !== x?.id && yIds.has(column.id)
   );
 
-  if (ys.length === 0) {
+  if (!explicitMapping && ys.length === 0) {
     ys = sheet.columns.filter(
       (column) => column.id !== x?.id && column.role !== "Label"
     );
@@ -104,8 +113,8 @@ export function sheetToDataset(
     x: x
       ? { ...x, values: numericValues(x.values) }
       : {
-          id: "x",
-          name: "X",
+          id: dataRef.xColumnId || "missing-x",
+          name: "缺失的 X 数据列",
           role: "X",
           values: []
         },
@@ -114,39 +123,5 @@ export function sheetToDataset(
       values: numericValues(column.values)
     })),
     metadata: sheet.metadata
-  };
-}
-
-export function normalizeFigureForSheet(
-  figure: FigureSpec,
-  sheet: DataSheet
-): FigureSpec {
-  const available = new Set(sheet.columns.map((column) => column.id));
-  const fallback = defaultDataRef(sheet);
-  const xColumnId = available.has(figure.dataRef.xColumnId)
-    ? figure.dataRef.xColumnId
-    : fallback.xColumnId;
-  const yColumnIds = figure.dataRef.yColumnIds.filter((id) =>
-    available.has(id)
-  );
-
-  return {
-    ...figure,
-    dataRef: {
-      ...figure.dataRef,
-      sheetId: sheet.id,
-      xColumnId,
-      yColumnIds: yColumnIds.length ? yColumnIds : fallback.yColumnIds,
-      yErrorColumnId:
-        figure.dataRef.yErrorColumnId &&
-        available.has(figure.dataRef.yErrorColumnId)
-          ? figure.dataRef.yErrorColumnId
-          : fallback.yErrorColumnId,
-      zColumnId:
-        figure.dataRef.zColumnId && available.has(figure.dataRef.zColumnId)
-          ? figure.dataRef.zColumnId
-          : fallback.zColumnId
-    },
-    seriesOrder: figure.seriesOrder.filter((id) => available.has(id))
   };
 }

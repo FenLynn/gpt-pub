@@ -30,6 +30,27 @@ export function checkFigure(
   );
   const items: CheckItem[] = [];
 
+  const availableSeries = new Set(dataset.ys.map((series) => series.id));
+  const missingSeries = figure.dataRef.yColumnIds.filter(
+    (id) => !availableSeries.has(id)
+  );
+  const missingError =
+    figure.dataRef.yErrorColumnId &&
+    !availableSeries.has(figure.dataRef.yErrorColumnId);
+  const mappingBroken =
+    dataset.x.values.length === 0 ||
+    missingSeries.length > 0 ||
+    Boolean(missingError);
+
+  items.push({
+    id: "data-mapping",
+    level: mappingBroken ? "warn" : "pass",
+    title: "数据映射",
+    detail: mappingBroken
+      ? "Graph 的显式数据引用不完整；请在“数据”页重新选择 X / Y / Error 列。"
+      : "Graph 的 X / Y / Error 引用均可解析到稳定 Column ID。"
+  });
+
   items.push({
     id: "background",
     level: (o.background ?? "#ffffff").toLowerCase() === "#ffffff" ? "pass" : "warn",
