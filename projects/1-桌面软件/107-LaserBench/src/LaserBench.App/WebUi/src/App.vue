@@ -22,8 +22,8 @@ const saveNotice = ref('')
 type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
 const bigReadoutKind = ref<BigReadoutKind|null>(null)
 const bigReadoutLight = ref(false)
-const BIG_READOUT_BASE_W = 520
-const BIG_READOUT_BASE_H = 300
+const BIG_READOUT_BASE_W = 400
+const BIG_READOUT_BASE_H = 205
 const bigReadoutRect = ref({ x: 150, y: 110, scale: 1 })
 const settingsDraft = ref({
   experimentFolder: snapshot.value.config?.experimentFolder ?? '',
@@ -62,7 +62,7 @@ const recordDurationText = computed(() => {
   const total=Math.max(0,Math.floor(recordElapsed.value))
   const h=Math.floor(total/3600),m=Math.floor((total%3600)/60),s=total%60
   const pad=(v:number)=>String(v).padStart(2,'0')
-  return h>0?`${pad(h)}:${pad(m)}:${pad(s)}`:`${pad(m)}:${pad(s)}`
+  return `${pad(h)}:${pad(m)}:${pad(s)}`
 })
 const clockText = computed(() => {
   const d = new Date(snapshot.value.timestamp)
@@ -228,7 +228,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <div class="brand-lockup" title="LaserBench"><div class="brand-logo">LB</div><div v-if="sidebarExpanded" class="brand-copy"><b>LaserBench</b><small>v{{snapshot.version}}</small></div></div>
+      <div class="brand-lockup" title="LaserBench"><div class="brand-logo">L</div><div v-if="sidebarExpanded" class="brand-copy"><b>LaserBench</b><small>v{{snapshot.version}}</small></div></div>
       <div class="vsep"></div>
       <button class="run-btn" :class="{stopping:snapshot.captureState==='stopping',running:snapshot.captureState==='running'}" @click="toggleCapture" :disabled="snapshot.captureState==='starting'" :title="snapshot.capturing?'停止采集':'开始采集'">
         <svg v-if="!snapshot.capturing" viewBox="0 0 24 24" class="fill-icon"><path d="M8 5v14l11-7z"/></svg>
@@ -289,10 +289,13 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <section v-if="!['data','settings'].includes(activePage)" class="dashboard-grid" :class="{'focus-mode':activePage!=='dashboard'}">
         <article class="instrument-panel power-panel" :class="{hidden:!['dashboard','power'].includes(activePage)}">
           <div class="module-head power-head graph-overlay">
-            <div class="module-title"><div class="panel-mark power-accent" :class="{breathing:moduleActive('power')}"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div><strong>功率</strong></div>
+            <div class="module-title"><div class="panel-mark power-accent" :class="{selected:snapshot.captureSelection.power,breathing:moduleActive('power')}"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div><strong>功率</strong></div>
             <div class="head-metrics">
               <template v-for="(t,index) in snapshot.power.traces" :key="t.name"><button v-if="powerVisible(index)" class="metric-trigger" @click="openReadout(powerReadoutKind(index))"><em>{{t.name}}</em><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></button></template>
             </div>
+          </div>
+          <div v-if="activePage==='power'" class="focus-summary">
+            <button v-for="(t,index) in snapshot.power.traces" :key="t.name" v-show="powerVisible(index)" class="focus-metric" @click="openReadout(powerReadoutKind(index))"><span>{{t.name}}</span><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></button>
           </div>
           <details v-if="activePage==='power'" class="module-config-dock" open>
             <summary>显示 / 参数</summary>
@@ -306,18 +309,39 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         </article>
 
         <article class="instrument-panel spectrum-panel" :class="{hidden:!['dashboard','spectrum'].includes(activePage)}">
-          <div class="spectrum-head graph-overlay"><div class="module-title"><div class="panel-mark inline spectrum-accent" :class="{breathing:moduleActive('spectrum')}"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><strong>光谱</strong></div><div class="osa-metrics"><button class="metric-trigger primary-metric" @click="openReadout('spectrumCenter')"><em>λc</em><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrum3db')"><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrumRms')"><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger primary-metric" @click="openReadout('spectrumPower')"><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button></div></div>
+          <div class="spectrum-head graph-overlay"><div class="module-title"><div class="panel-mark inline spectrum-accent" :class="{selected:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><strong>光谱</strong></div><div class="osa-metrics"><button class="metric-trigger primary-metric" @click="openReadout('spectrumCenter')"><em>λc</em><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrum3db')"><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrumRms')"><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger primary-metric" @click="openReadout('spectrumPower')"><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button></div></div>
+          <div v-if="activePage==='spectrum'" class="focus-summary">
+            <button class="focus-metric" @click="openReadout('spectrumCenter')"><span>中心波长</span><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button>
+            <button class="focus-metric" @click="openReadout('spectrum3db')"><span>3 dB</span><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button>
+            <button class="focus-metric" @click="openReadout('spectrumRms')"><span>RMS</span><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button>
+            <button class="focus-metric" @click="openReadout('spectrumPower')"><span>功率</span><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button>
+          </div>
           <details v-if="activePage==='spectrum'" class="module-config-dock" open><summary>扫描参数</summary><div class="dock-row"><span>起始 nm</span><input type="number" v-model.number="settingsDraft.osaStart" @change="saveSettings"/></div><div class="dock-row"><span>终止 nm</span><input type="number" v-model.number="settingsDraft.osaStop" @change="saveSettings"/></div></details>
           <PlotCanvas class="spectrum-plot" :series="snapshot.spectrum.traces" :x-min="settingsDraft.osaStart" :x-max="settingsDraft.osaStop" :y-min="-100" :y-max="0" x-label="波长 (nm)" y-label="功率 (dBm)" />
         </article>
 
         <article class="instrument-panel beam-panel" :class="{hidden:!['dashboard','beam'].includes(activePage)}">
-          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{breathing:moduleActive('beam')}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M̄²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
+          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{selected:snapshot.captureSelection.beam,breathing:moduleActive('beam')}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M̄²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
+          <div v-if="activePage==='beam'" class="focus-summary">
+            <button class="focus-metric" @click="openReadout('beamM2x')"><span>M²x</span><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button>
+            <button class="focus-metric" @click="openReadout('beamM2y')"><span>M²y</span><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button>
+            <button class="focus-metric" @click="openReadout('beamM2')"><span>平均 M²</span><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button>
+          </div>
+          <details v-if="activePage==='beam'" class="module-config-dock beam-page-config" open>
+            <summary>观察控制</summary>
+            <div class="dock-control"><span>Z 位置</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b></div>
+            <div class="dock-control"><span>Attenuation</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div>
+            <button class="dock-play" :class="{active:beamPlaying}" @click="toggleBeamPlay">{{beamPlaying?'停止 Z 浏览':'自动 Z 浏览'}}</button>
+          </details>
           <div class="beam-body"><div class="beam-image-wrap"><BeamProfileCanvas :width-x="snapshot.beam.spotWidthX" :width-y="snapshot.beam.spotWidthY" :attenuation="beamAtt" /><div class="beam-tools"><button title="放大">＋</button><button title="缩小">−</button><button title="适应">⛶</button></div></div><PlotCanvas class="caustic-plot" :series="snapshot.beam.caustic" :vertical-marker="beamZ" x-label="Z (mm)" y-label="束宽 (μm)" /></div>
         </article>
 
         <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}">
-          <div class="module-head scope-head graph-overlay"><div class="module-title"><div class="panel-mark scope-accent" :class="{breathing:moduleActive('scope')}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong></div><div class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button><span class="secondary-metric">SR <b>2.5</b> MSa/s</span></div></div>
+          <div class="module-head scope-head graph-overlay"><div class="module-title"><div class="panel-mark scope-accent" :class="{selected:snapshot.captureSelection.scope,breathing:moduleActive('scope')}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong></div><div class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button><span class="secondary-metric">SR <b>2.5</b> MSa/s</span></div></div>
+          <div v-if="activePage==='scope'" class="focus-summary">
+            <button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="focus-metric" @click="openReadout(index===0?'scope0':'scope1')"><span>{{trace.name}}</span><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button>
+            <div class="focus-metric passive"><span>采样率</span><b>2.5</b><small>MSa/s</small></div>
+          </div>
           <details v-if="activePage==='scope'" class="module-config-dock" open><summary>显示 / 参数</summary><div class="dock-row"><span>时间窗 ms</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTimeSpan" @change="saveSettings"/></div><div class="dock-row"><span>FFT 上限 MHz</span><input type="number" v-model.number="settingsDraft.scopeFftMax" @change="saveSettings"/></div><div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.scopeCh1" @change="saveSettings"/>CH1</label><label><input type="checkbox" v-model="settingsDraft.scopeCh2" @change="saveSettings"/>CH2</label></div></details>
           <div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="-1" :y-max="1" x-label="时间 (ms)" :tight="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="频率 (kHz)" :tight="true" /></div>
         </article>

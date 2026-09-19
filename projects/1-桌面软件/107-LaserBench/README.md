@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.4.12（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.12 继续收紧 v0.4.11 的“图优先”工作台：冷深蓝灰壳体、仅绘图区白底、模块标题/坐标标题/关键读数贴边悬浮，低频参数移入对应模块页，并新增单实例 Big Readout 远距监视。真实厂商硬件仍留给 0.5.x 按设备抽象层逐项接入。
+当前开发版本为 **v0.4.13（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.13 在 v0.4.12 的图优先边界上继续做可读性与独立模块页分层：冷深蓝灰壳体、仅绘图区白底、模块标题/坐标标题/关键读数贴边悬浮，低频参数移入对应模块页，并新增单实例 Big Readout 远距监视。真实厂商硬件仍留给 0.5.x 按设备抽象层逐项接入。
 
 ## 当前能力
 
@@ -10,15 +10,16 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - `LaserBench.exe` 为 NativeAOT 轻量启动器，负责 .NET 8 Desktop Runtime x64 与 Microsoft Edge WebView2 Evergreen Runtime 检测；`LaserBench.App.exe` 为 framework-dependent WinForms/WebView2 主程序。
 - 启动过程写入 `logs/startup.log`，未处理异常写入 `logs/crash.log`，支持 `LaserBench.App.exe --safe`。
 - 内置 Power、Spectrum、Beam、Scope 四类 Simulator，无真实硬件也可完整验证 Dashboard、Test、保存、截图和录像链路。
-- Dashboard 使用原生 Windows 标题栏、极窄顶栏和窄折叠导航；四象限中图占绝对主体，模块标题与关键读数以紧凑悬浮条贴近图边缘。
+- Dashboard 使用原生 Windows 标题栏、极窄顶栏和窄折叠导航；四象限中图占绝对主体。模块标题行与壳体同底色并稍微放宽高度，刻度字号提高一级，避免下半区过度拥挤。
 - Dashboard 壳体统一冷深蓝灰；**只有真实 Plot / 图像绘图区使用白底**，模块容器、标题区和页面底板不再使用白色卡片。
+- 顶部采集选择图标与对应模块左上角图标联动：选中变绿，实际采集中执行绿色呼吸动画。
 - 所有绘图内部网格为虚线；Legend 透明、无边框并放在数据区内。Dashboard 不显示 X/Y 轴标题文字，只保留必要刻度；刻度边缘保持深色，纯白只属于真实数据区。
 - Power 独立页可逐个选择物理 Channel / Math Channel 是否进入 Dashboard；该显示选择与 Test 采集选择互不影响。数学百分比继续使用独立右轴。
 - Spectrum 独立页承载扫描范围等低频参数；Dashboard 只保留曲线与中心波长、3 dB、RMS、功率等结果。
 - Beam 左侧显示当前 Z 位置光斑，右侧显示完整 caustic；**Z / 播放 / Attenuation** 作为高频观察控制继续常驻 Dashboard，M² 结果贴边显示。
 - Scope Dashboard 只显示最多两个通道的时域和 FFT；时间窗、FFT 范围和通道显示选择进入 Scope 独立页。
 - Dashboard 关键结果可点击进入单实例 **Big Readout**；新指标复用同一窗口。窗口左上为绿色状态点 + 小字指标名，右上为黑/白显示切换与关闭，右下为拖拽缩放手柄；拖拽缩放时整个读数窗口等比例缩放。
-- 四个模块可从侧栏进入独立聚焦页；旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复，当前不把 Floating 描述为已完成功能。
+- 四个模块可从侧栏进入独立聚焦页；独立页不追求 Dashboard 的极限紧凑，采用顶部状态/标题、左侧数据显示、左下图形显示、右侧配置的工作页结构。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复，当前不把 Floating 描述为已完成功能。
 - 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
 - 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。
 - 实验数据写入 `data/exp/<日期或自定义实验文件夹>/`，该目录下一层直接是数据文件。
@@ -99,7 +100,7 @@ C# / .NET 8 / WinForms Host / Windows x64
 
 ## 当前硬件边界
 
-v0.4.12 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
+v0.4.13 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
 
 1. Ophir Juno / OphirLMMeasurement
 2. Yokogawa AQ6370D
