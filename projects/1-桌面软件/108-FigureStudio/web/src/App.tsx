@@ -12,7 +12,6 @@ import {
   columnLabel,
   defaultDataRef,
   findSheet,
-  normalizeFigureForSheet,
   sheetRowCount,
   sheetToDataset
 } from "./data/adapter";
@@ -741,19 +740,61 @@ function App() {
     };
   }
 
+  function referencedColumnIds(figure: FigureSpec): string[] {
+    return [
+      figure.dataRef.xColumnId,
+      ...figure.dataRef.yColumnIds,
+      ...(figure.dataRef.yErrorColumnId
+        ? [figure.dataRef.yErrorColumnId]
+        : []),
+      ...(figure.dataRef.zColumnId ? [figure.dataRef.zColumnId] : [])
+    ].filter(Boolean);
+  }
+
   function replaceSheet(
     bookId: string,
     sheetId: string,
     incoming: DataSheet,
     sourcePatch?: Partial<DataBook["source"]>
-  ) {
-    patchProject((current) => {
-      const book = current.dataBooks.find((item) => item.id === bookId);
-      const existing = book?.sheets.find((sheet) => sheet.id === sheetId);
-      if (!book || !existing) return current;
+  ): boolean {
+    const book = project.dataBooks.find((item) => item.id === bookId);
+    const existing = book?.sheets.find((sheet) => sheet.id === sheetId);
+    if (!book || !existing) return false;
 
-      const nextSheet = reconcileSheet(existing, incoming);
-      const nextBooks = current.dataBooks.map((item) =>
+    const nextSheet = reconcileSheet(existing, incoming);
+    const available = new Set(nextSheet.columns.map((column) => column.id));
+    const dependents = project.figures.filter(
+      (figure) => figure.dataRef.sheetId === sheetId
+    );
+    const broken = dependents.filter((figure) =>
+      referencedColumnIds(figure).some((id) => !available.has(id))
+    );
+
+    if (broken.length) {
+      window.alert(
+        "此次更新会让 " +
+          broken.length +
+          " 张图失去已绑定的数据列，因此已取消。\n\n" +
+          broken.map((figure) => "• " + figure.name).join("\n") +
+          "\n\n请保留原列名，或先在 Graph 的“数据”页修改映射。"
+      );
+      return false;
+    }
+
+    if (
+      dependents.length > 0 &&
+      !window.confirm(
+        "当前 Sheet 被 " +
+          dependents.length +
+          " 张图引用。更新数据后这些图会同步刷新，但不会改变列映射和图形样式。是否继续？"
+      )
+    ) {
+      return false;
+    }
+
+    patchProject((current) => ({
+      ...current,
+      dataBooks: current.dataBooks.map((item) =>
         item.id === bookId
           ? {
               ...item,
@@ -765,20 +806,9 @@ function App() {
               )
             }
           : item
-      );
-
-      const nextFigures = current.figures.map((figure) =>
-        figure.dataRef.sheetId === sheetId
-          ? normalizeFigureForSheet(figure, nextSheet)
-          : figure
-      );
-
-      return {
-        ...current,
-        dataBooks: nextBooks,
-        figures: nextFigures
-      };
-    });
+      )
+    }));
+    return true;
   }
 
   async function handleDataFile(file: File) {
@@ -792,7 +822,7 @@ function App() {
           return;
         }
 
-        replaceSheet(
+        const replaced = replaceSheet(
           activeBook.id,
           activeSheet.id,
           sheet,
@@ -806,7 +836,13 @@ function App() {
               }
             : undefined
         );
-        showToast(action === "reload" ? "Linked Data 已重新加载" : "数据表已替换");
+        if (replaced) {
+          showToast(
+            action === "reload"
+              ? "Linked Data 已重新加载"
+              : "数据表已替换"
+          );
+        }
         return;
       }
 
@@ -1009,34 +1045,30 @@ function App() {
       showToast("数据表至少保留一列");
       return;
     }
-    if (!window.confirm("删除这一列？引用它的图会自动修复数据映射。")) return;
 
-    patchProject((current) => {
-      const context = findSheet(current, activeSheet.id);
-      if (!context) return current;
-      const nextSheet = {
-        ...context.sheet,
-        columns: context.sheet.columns.filter((column) => column.id !== columnId)
-      };
-      return {
-        ...current,
-        dataBooks: current.dataBooks.map((book) =>
-          book.id === context.book.id
-            ? {
-                ...book,
-                sheets: book.sheets.map((sheet) =>
-                  sheet.id === nextSheet.id ? nextSheet : sheet
-                )
-              }
-            : book
-        ),
-        figures: current.figures.map((figure) =>
-          figure.dataRef.sheetId === nextSheet.id
-            ? normalizeFigureForSheet(figure, nextSheet)
-            : figure
-        )
-      };
-    });
+    const dependents = project.figures.filter(
+      (figure) =>
+        figure.dataRef.sheetId === activeSheet.id &&
+        referencedColumnIds(figure).includes(columnId)
+    );
+
+    if (dependents.length) {
+      window.alert(
+        "不能删除这列：它正在被 " +
+          dependents.length +
+          " 张图引用。\n\n" +
+          dependents.map((figure) => "• " + figure.name).join("\n") +
+          "\n\n请先在 Graph 的“数据”页移除或替换这列。"
+      );
+      return;
+    }
+
+    if (!window.confirm("删除这一列？")) return;
+
+    patchSheet(activeSheet.id, (sheet) => ({
+      ...sheet,
+      columns: sheet.columns.filter((column) => column.id !== columnId)
+    }));
   }
 
   function reorderColumns(dragId: string, targetId: string) {
