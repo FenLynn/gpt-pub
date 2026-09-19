@@ -43,7 +43,7 @@ function latexSegments(value: string): MathSegment[] {
 }
 
 function hasUnbalancedMathDelimiters(value: string): boolean {
-  const dollars = (value.match(/\$/g) ?? []).length;
+  const dollars = (value.match(/(?<!\\)\$/g) ?? []).length;
   if (dollars % 2 !== 0) return true;
   const opens = (value.match(/\\\(/g) ?? []).length;
   const closes = (value.match(/\\\)/g) ?? []).length;
@@ -58,6 +58,55 @@ function balancedBraces(value: string): boolean {
     if (depth < 0) return false;
   }
   return depth === 0;
+}
+
+function escapeTextForLatex(value: string): string {
+  return Array.from(value)
+    .map((char) => {
+      switch (char) {
+        case "\\":
+          return "\\backslash{}";
+        case "{":
+          return "\\{";
+        case "}":
+          return "\\}";
+        case "$":
+          return "\\$";
+        case "%":
+          return "\\%";
+        case "#":
+          return "\\#";
+        case "&":
+          return "\\&";
+        case "_":
+          return "\\_";
+        case "^":
+          return "\\^{}";
+        case "\n":
+        case "\r":
+        case "\t":
+          return " ";
+        default:
+          return char;
+      }
+    })
+    .join("");
+}
+
+function mathJaxExpression(value: string, segments: MathSegment[]): string | null {
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const segment of segments) {
+    const literal = value.slice(cursor, segment.start);
+    if (literal) parts.push("\\text{" + escapeTextForLatex(literal) + "}");
+    const expression = segment.expression.trim();
+    if (!expression || !balancedBraces(expression)) return null;
+    parts.push(expression);
+    cursor = segment.end;
+  }
+  const tail = value.slice(cursor);
+  if (tail) parts.push("\\text{" + escapeTextForLatex(tail) + "}");
+  return parts.join("");
 }
 
 function normalizeScriptWrappers(value: string): string {
@@ -87,16 +136,11 @@ function simpleLatexToPlotly(expression: string): string | null {
   if (!balancedBraces(expression)) return null;
   let value = normalizeScriptWrappers(expression.trim());
   value = value.replace(/\\sqrt\{([^{}]+)\}/g, "√($1)");
-  value = value.replace(
-    /\\frac\{([^{}]+)\}\{([^{}]+)\}/g,
-    "($1)/($2)"
-  );
+  value = value.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, "($1)/($2)");
   value = stripSimpleGroups(value);
   value = convertScript(value, "sub");
   value = convertScript(value, "sup");
-  value = value.replace(/\\([A-Za-z]+)/g, (full, name: string) => {
-    return SYMBOLS[name] ?? full;
-  });
+  value = value.replace(/\\([A-Za-z]+)/g, (full, name: string) => SYMBOLS[name] ?? full);
   value = value
     .replace(/\\,/g, " ")
     .replace(/\\;/g, " ")
@@ -108,20 +152,7 @@ function simpleLatexToPlotly(expression: string): string | null {
   return value;
 }
 
-export function plainMathFallback(
-  value: string | undefined
-): string | undefined {
-  if (!value) return value;
-  return value
-    .replace(/\$/g, "&#36;")
-    .replace(/\\\(/g, "&#92;(")
-    .replace(/\\\)/g, "&#92;)");
-}
-
-function composeSafeInline(
-  value: string,
-  segments: MathSegment[]
-): string | null {
+function composeFallback(value: string, segments: MathSegment[]): string | null {
   const parts: string[] = [];
   let cursor = 0;
   for (const segment of segments) {
@@ -135,58 +166,50 @@ function composeSafeInline(
   return parts.join("");
 }
 
-export async function resolveSafeMathText(
-  value: string | undefined
-): Promise<SafeMathText> {
+export function plainMathFallback(value: string | undefined): string | undefined {
+  if (!value) return value;
+  return value
+    .replace(/\$/g, "&#36;")
+    .replace(/\\\(/g, "&#92;(")
+    .replace(/\\\)/g, "&#92;)");
+}
+
+function visibleFallback(value: string, segments: MathSegment[]): string {
+  return composeFallback(value, segments) ?? plainMathFallback(value) ?? value;
+}
+
+export function normalizePlotlyMathText(value: string | undefined): string | undefined {
+  if (!value) return value;
+  if (hasUnbalancedMathDelimiters(value)) return plainMathFallback(value);
+  const segments = latexSegments(value);
+  if (!segments.length) return value;
+  const expression = mathJaxExpression(value, segments);
+  if (!expression) return visibleFallback(value, segments);
+  return "$" + expression + "$";
+}
+
+export async function resolveSafeMathText(value: string | undefined): Promise<SafeMathText> {
   if (!value) return { text: value, state: "plain" };
   if (hasUnbalancedMathDelimiters(value)) {
     return { text: plainMathFallback(value), state: "invalid" };
   }
-
   const segments = latexSegments(value);
   if (!segments.length) return { text: value, state: "plain" };
+  const expression = mathJaxExpression(value, segments);
+  if (!expression) return { text: visibleFallback(value, segments), state: "invalid" };
 
-  const isPureFormula =
-    segments.length === 1 &&
-    segments[0].start === 0 &&
-    segments[0].end === value.length;
   const mathJax = (window as any).MathJax;
-
-  // A pure formula should use real MathJax whenever it is available.
-  if (isPureFormula && mathJax?.tex2svgPromise) {
-    try {
-      if (mathJax.startup?.promise) await mathJax.startup.promise;
-      const node = await mathJax.tex2svgPromise(segments[0].expression, {
-        display: false
-      });
-      if (
-        node?.querySelector?.('[data-mml-node="merror"]') ||
-        node?.querySelector?.(".merror")
-      ) {
-        return { text: plainMathFallback(value), state: "invalid" };
-      }
-      return {
-        text: "$" + segments[0].expression + "$",
-        state: "valid"
-      };
-    } catch {
-      return { text: plainMathFallback(value), state: "invalid" };
+  if (!mathJax?.tex2svgPromise) {
+    return { text: visibleFallback(value, segments), state: "unavailable" };
+  }
+  try {
+    if (mathJax.startup?.promise) await mathJax.startup.promise;
+    const node = await mathJax.tex2svgPromise(expression, { display: false });
+    if (node?.querySelector?.('[data-mml-node="merror"]') || node?.querySelector?.(".merror")) {
+      return { text: visibleFallback(value, segments), state: "invalid" };
     }
+    return { text: "$" + expression + "$", state: "valid" };
+  } catch {
+    return { text: visibleFallback(value, segments), state: "invalid" };
   }
-
-  // Mixed scientific labels are converted locally so Plotly cannot replace
-  // just the math fragment and accidentally drop surrounding literal text.
-  const inline = composeSafeInline(value, segments);
-  if (inline !== null) {
-    return {
-      text: inline,
-      state: isPureFormula && !mathJax ? "unavailable" : "valid"
-    };
-  }
-
-  // Unsupported complex mixed text stays completely visible as source text.
-  return {
-    text: plainMathFallback(value),
-    state: mathJax ? "invalid" : "unavailable"
-  };
 }

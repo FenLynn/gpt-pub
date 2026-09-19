@@ -81,7 +81,7 @@ export function emptyDataset(name = "空图"): Dataset {
     name,
     x: {
       id: "__row_index__",
-      name: "X",
+      name: "",
       role: "X",
       values: []
     },

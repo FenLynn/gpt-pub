@@ -37,7 +37,7 @@ export function createSpectrumSheet(): DataSheet {
 
   return {
     id: id("sheet-spectrum"),
-    name: "Spectrum",
+    name: "光谱",
     source: { kind: "embedded" },
     columns: [
       {
@@ -83,7 +83,7 @@ export function createFieldSheet(): DataSheet {
 
   columns.push({
     id: "x-position",
-    name: "X",
+    name: "横向位置",
     unit: "mm",
     role: "X" as const,
     values: x
@@ -114,7 +114,7 @@ export function createFieldSheet(): DataSheet {
 
   return {
     id: id("sheet-field"),
-    name: "Beam field",
+    name: "二维光场",
     source: { kind: "embedded" },
     columns,
     metadata: {
@@ -125,7 +125,7 @@ export function createFieldSheet(): DataSheet {
           value
         ])
       ),
-      rowAxisName: "Y",
+      rowAxisName: "纵向位置",
       rowAxisUnit: "mm"
     }
   };
@@ -278,8 +278,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       minorTicks: false,
       gridVisible: false,
       legendVisible: true,
-      legendPosition: "top-left",
-      legendOrientation: "horizontal",
+      legendPosition: "top-right",
+      legendOrientation: "vertical",
       legendFrame: false
     }
   };
@@ -322,8 +322,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     defaults,
     "folder-paper",
     {
-      xTitle: "波长 λ (nm)",
-      yTitle: "功率 (dBm)"
+      xTitle: "波长 $\\lambda$ (nm)",
+      yTitle: "光谱功率 (dBm)"
     }
   );
 
@@ -334,7 +334,11 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     defaults,
     "folder-paper",
     {
-      legendPosition: "top-left"
+      xTitle: "泵浦电流 (A)",
+      yTitle: "输出功率 (W)",
+      rightYTitle: "光光效率 (%)",
+      legendPosition: "top-right",
+      legendOrientation: "vertical"
     },
     {
       "output-power": {
@@ -365,7 +369,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
 
   const heatmapFigure = makeFigure(
     fieldSheet,
-    "Fig 4 · Heatmap",
+    "Fig 4 · 热图",
     "heatmap",
     defaults,
     "folder-paper",
@@ -373,13 +377,14 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       xTitle: "X (mm)",
       yTitle: "Y (mm)",
       legendVisible: false,
-      colorScale: "Viridis"
+      colorScale: "Viridis",
+      colorbarTitle: "归一化强度"
     }
   );
 
   const contourFigure = makeFigure(
     fieldSheet,
-    "Fig 5 · Contour",
+    "Fig 5 · 等高线",
     "contour",
     defaults,
     "folder-paper",
@@ -388,6 +393,7 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       yTitle: "Y (mm)",
       legendVisible: false,
       colorScale: "Viridis",
+      colorbarTitle: "归一化强度",
       contourLevels: 12,
       contourFill: true,
       contourLines: true
@@ -404,7 +410,9 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       xTitle: "X (mm)",
       yTitle: "Y (mm)",
       legendVisible: false,
-      colorScale: "Viridis"
+      colorScale: "Viridis",
+      colorbarTitle: "归一化强度",
+      zTitle: "归一化强度 (a.u.)"
     }
   );
 

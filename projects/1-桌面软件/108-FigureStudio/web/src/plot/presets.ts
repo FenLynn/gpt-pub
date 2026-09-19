@@ -4,44 +4,44 @@ export const presets: Record<PresetId, PresetDefinition> = {
   scientific: {
     id: "scientific",
     label: "科研默认",
-    description: "接近 Matplotlib 的通用科研论文风格",
+    description: "Matplotlib 风格的通用论文图：紧凑、清晰、低装饰",
     widthMm: 118,
-    heightMm: 76,
+    heightMm: 88.5,
     fontFamily: "Arial",
-    fontSizePt: 7,
-    lineWidthPt: 1.0,
-    axisWidthPt: 0.72,
-    markerSizePt: 4.0,
+    fontSizePt: 8,
+    lineWidthPt: 1.15,
+    axisWidthPt: 0.8,
+    markerSizePt: 4.2,
     showGrid: false,
-    palette: ["#4C78A8", "#F58518", "#54A24B", "#E45756", "#72B7B2", "#B279A2"]
+    palette: ["#1F77B4","#FF7F0E","#2CA02C","#D62728","#9467BD","#8C564B","#E377C2","#7F7F7F","#BCBD22","#17BECF"]
   },
   nature: {
     id: "nature",
     label: "Nature 单栏",
-    description: "紧凑单栏论文尺寸预设",
+    description: "89 mm 单栏尺寸，保持可读字号与克制线宽",
     widthMm: 89,
-    heightMm: 62,
+    heightMm: 66.75,
     fontFamily: "Arial",
-    fontSizePt: 6.5,
-    lineWidthPt: 0.9,
-    axisWidthPt: 0.6,
-    markerSizePt: 3.5,
+    fontSizePt: 7.5,
+    lineWidthPt: 1.0,
+    axisWidthPt: 0.72,
+    markerSizePt: 3.8,
     showGrid: false,
-    palette: ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9"]
+    palette: ["#0072B2","#D55E00","#009E73","#CC79A7","#E69F00","#56B4E9","#000000"]
   },
   presentation: {
     id: "presentation",
     label: "演示",
-    description: "适合 PPT 与大屏展示",
+    description: "适合 PPT 与大屏展示，字号和线条按比例放大",
     widthMm: 160,
-    heightMm: 100,
+    heightMm: 120,
     fontFamily: "Arial",
-    fontSizePt: 10,
-    lineWidthPt: 1.8,
-    axisWidthPt: 1.0,
-    markerSizePt: 5.6,
+    fontSizePt: 10.5,
+    lineWidthPt: 1.6,
+    axisWidthPt: 0.95,
+    markerSizePt: 5.4,
     showGrid: false,
-    palette: ["#3366CC", "#DC3912", "#109618", "#990099", "#0099C6", "#DD4477"]
+    palette: ["#1F77B4","#FF7F0E","#2CA02C","#D62728","#9467BD","#17BECF"]
   }
 };
 

@@ -1,4 +1,5 @@
 import { resolveFieldRowCoordinates } from "../data/field";
+import { normalizePlotlyMathText } from "../lib/mathText";
 import type {
   Dataset,
   PlotColumn,
@@ -145,7 +146,7 @@ function baseXYTrace(
   return {
     type: "scatter",
     mode,
-    name: override.legendLabel ?? series.name,
+    name: normalizePlotlyMathText(override.legendLabel ?? series.name),
     showlegend: override.showInLegend ?? true,
     meta: { figureStudioSeriesId: series.id },
     x: dataset.x.values,
@@ -165,8 +166,8 @@ function baseXYTrace(
       size: ptToPx(markerSizePt),
       symbol: override.markerSymbol ?? "circle",
       line: {
-        color: "#ffffff",
-        width: 0.35
+        color,
+        width: ptToPx(0.35)
       }
     },
     hovertemplate:
@@ -217,7 +218,7 @@ export function buildTraces(args: {
       outlinewidth: 0,
       len: 0.86,
       title: figure.figureOverrides.colorbarTitle
-        ? { text: figure.figureOverrides.colorbarTitle }
+        ? { text: normalizePlotlyMathText(figure.figureOverrides.colorbarTitle) }
         : undefined
     };
 
@@ -321,7 +322,7 @@ export function buildTraces(args: {
           outlinewidth: 0,
           len: 0.76,
           title: figure.figureOverrides.colorbarTitle
-            ? { text: figure.figureOverrides.colorbarTitle }
+            ? { text: normalizePlotlyMathText(figure.figureOverrides.colorbarTitle) }
             : undefined
         },
         hovertemplate: "X=%{x:.4g}<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
@@ -353,12 +354,12 @@ export function buildTraces(args: {
           : fillColor;
       return {
         type: "bar",
-        name: override.legendLabel ?? column.name,
+        name: normalizePlotlyMathText(override.legendLabel ?? column.name),
         showlegend: override.showInLegend ?? true,
         meta: { figureStudioSeriesId: column.id },
         x: dataset.x.values,
         y: column.values,
-        opacity: override.opacity ?? 0.92,
+        opacity: override.opacity ?? 1,
         marker: {
           color: markerColor,
           line: {
@@ -550,18 +551,18 @@ export function buildLayout(args: {
   const majorTickLengthPt = axisStyle === "bold" ? 5 : 3.6;
   const minorTickLengthPt = axisStyle === "bold" ? 3.1 : 2.2;
   const tickLabelSizePx = ptToPx(
-    overrides.tickLabelSizePt ?? fontSizePt
+    overrides.tickLabelSizePt ?? fontSizePt * 0.96
   );
   const axisTitleSizePx = ptToPx(
-    overrides.axisTitleSizePt ?? fontSizePt * 1.02
+    overrides.axisTitleSizePt ?? fontSizePt * 1.08
   );
   const plotTitleSizePx = ptToPx(
-    overrides.plotTitleSizePt ?? fontSizePt * 1.12
+    overrides.plotTitleSizePt ?? fontSizePt * 1.18
   );
   const background = overrides.background ?? "#ffffff";
   const tickDirection = overrides.tickDirection ?? "inside";
   const gridVisible = overrides.gridVisible ?? preset.showGrid;
-  const legendPositionMode = overrides.legendPosition ?? "top-left";
+  const legendPositionMode = overrides.legendPosition ?? "top-right";
   const presetLegendPosition = legendAnchor(legendPositionMode);
   const legendPosition =
     legendPositionMode === "custom"
@@ -572,7 +573,7 @@ export function buildLayout(args: {
           yanchor: overrides.legendYAnchor ?? "top"
         }
       : presetLegendPosition;
-  const legendOrientation = overrides.legendOrientation ?? "horizontal";
+  const legendOrientation = overrides.legendOrientation ?? "vertical";
   const legendColumns = Math.max(1, overrides.legendColumns ?? 1);
   const xIsCategorical = dataset.x.values.some(
     (value) => typeof value === "string"
@@ -662,29 +663,35 @@ export function buildLayout(args: {
     (series) => doubleYAxisSide(series) === "right"
   );
 
-  const resolvedXTitle =
+  const emptyFigure = dataset.id === "__empty__";
+  const resolvedXTitle = normalizePlotlyMathText(
     displayText?.xTitle ??
-    overrides.xTitle ??
-    autoAxisTitle(dataset.x.name, dataset.x.unit);
-  const resolvedYTitle =
+      overrides.xTitle ??
+      (emptyFigure ? "" : autoAxisTitle(dataset.x.name, dataset.x.unit))
+  );
+  const resolvedYTitle = normalizePlotlyMathText(
     displayText?.yTitle ??
-    overrides.yTitle ??
-    (isField2D || figure.templateId === "surface-3d"
-      ? autoAxisTitle(
-          dataset.metadata?.rowAxisName ?? "Y",
-          dataset.metadata?.rowAxisUnit
-        )
-      : isDoubleY && leftSeries[0]
-      ? autoAxisTitle(leftSeries[0].name, leftSeries[0].unit)
-      : dataset.ys[0]
-      ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
-      : "Y");
-  const resolvedRightYTitle =
+      overrides.yTitle ??
+      (emptyFigure
+        ? ""
+        : isField2D || figure.templateId === "surface-3d"
+        ? autoAxisTitle(
+            dataset.metadata?.rowAxisName ?? "纵向位置",
+            dataset.metadata?.rowAxisUnit
+          )
+        : isDoubleY && leftSeries[0]
+        ? autoAxisTitle(leftSeries[0].name, leftSeries[0].unit)
+        : dataset.ys[0]
+        ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
+        : "")
+  );
+  const resolvedRightYTitle = normalizePlotlyMathText(
     displayText?.rightYTitle ??
-    overrides.rightYTitle ??
-    (rightSeries[0]
-      ? autoAxisTitle(rightSeries[0].name, rightSeries[0].unit)
-      : "Right Y");
+      overrides.rightYTitle ??
+      (rightSeries[0]
+        ? autoAxisTitle(rightSeries[0].name, rightSeries[0].unit)
+        : "右 Y")
+  );
   const hasXTitle = Boolean(String(resolvedXTitle ?? "").trim());
   const hasYTitle = Boolean(String(resolvedYTitle ?? "").trim());
   const hasPlotTitle = Boolean(String(displayText?.plotTitle ?? overrides.plotTitle ?? "").trim());
@@ -767,7 +774,7 @@ export function buildLayout(args: {
       font: {
         family: fontFamily,
         size: ptToPx(
-          overrides.legendFontSizePt ?? fontSizePt * 0.92
+          overrides.legendFontSizePt ?? fontSizePt * 0.94
         ),
         color: overrides.legendFontColor ?? "#17191c"
       }
@@ -808,7 +815,7 @@ export function buildLayout(args: {
       },
       zaxis: {
         title: {
-          text: overrides.zTitle ?? "Z",
+          text: normalizePlotlyMathText(overrides.zTitle ?? "Z"),
           font: {
             family: fontFamily,
             size: axisTitleSizePx,
