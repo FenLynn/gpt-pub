@@ -1655,3 +1655,107 @@ button:disabled {
 .plot-host .legend {
   cursor: move;
 }
+
+
+.axis-reverse-row,
+.legend-anchor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(6px * var(--ui-scale));
+  margin: calc(5px * var(--ui-scale)) 0;
+}
+
+.axis-reverse-row label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(6px * var(--ui-scale));
+  min-width: 0;
+  color: #5e6972;
+  font-size: 0.75rem;
+}
+
+.axis-validation,
+.axis-note {
+  margin: calc(6px * var(--ui-scale)) 0;
+  padding: calc(6px * var(--ui-scale)) calc(7px * var(--ui-scale));
+  border: 1px solid #d9dfe3;
+  border-radius: calc(5px * var(--ui-scale));
+  background: #f8f9fa;
+  color: #6b757d;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.axis-validation.is-error {
+  border-color: #e2c7a7;
+  background: #fff8ee;
+  color: #865f31;
+}
+
+.tick-format-grid {
+  display: grid;
+  grid-template-columns:
+    calc(24px * var(--ui-scale))
+    minmax(0, 1fr)
+    calc(64px * var(--ui-scale));
+  align-items: center;
+  gap: calc(5px * var(--ui-scale));
+  margin: calc(5px * var(--ui-scale)) 0;
+}
+
+.tick-format-grid > b {
+  color: #727c84;
+  font-size: 0.69rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tick-format-grid > span {
+  color: #4d5861;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tick-format-grid select,
+.tick-format-grid input,
+.tick-affix-grid input,
+.legend-anchor-grid select {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-h);
+  padding: 0 calc(5px * var(--ui-scale));
+  border: 1px solid #cfd5da;
+  border-radius: calc(4px * var(--ui-scale));
+  background: #fff;
+  color: #30363c;
+  font-size: 0.76rem;
+}
+
+.tick-format-grid input:disabled {
+  background: #f1f3f4;
+  color: #9aa2a9;
+}
+
+.tick-affix-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(5px * var(--ui-scale));
+  margin-bottom: calc(7px * var(--ui-scale));
+}
+
+.tick-affix-grid label,
+.legend-anchor-grid label {
+  display: grid;
+  gap: calc(3px * var(--ui-scale));
+  min-width: 0;
+  color: #707a82;
+  font-size: 0.68rem;
+}
+
+.latex-status.is-warn {
+  border-color: #d9d7b9;
+  background: #fffdf0;
+  color: #756e3f;
+}
