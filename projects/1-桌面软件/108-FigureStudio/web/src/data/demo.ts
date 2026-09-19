@@ -457,13 +457,11 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     {
       "output-power": {
         yAxis: "left",
-        color: "#1F77B4",
-        markerVisible: true
+        color: "#1F77B4"
       },
       efficiency: {
         yAxis: "right",
-        color: "#FF7F0E",
-        markerVisible: true
+        color: "#FF7F0E"
       }
     }
   );
