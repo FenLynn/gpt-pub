@@ -321,6 +321,35 @@ button:disabled {
   height: 100%;
 }
 
+.item-icon-wrap .icon-surface {
+  fill: var(--icon-fill, transparent);
+}
+
+.item-icon-wrap.icon-folder {
+  --icon-fill: #f7e8a8;
+  color: #a9822f;
+}
+
+.item-icon-wrap.icon-book {
+  --icon-fill: #dcecf8;
+  color: #4f7899;
+}
+
+.item-icon-wrap.icon-sheet {
+  --icon-fill: #edf6fc;
+  color: #5f87a7;
+}
+
+.item-icon-wrap.icon-graph {
+  --icon-fill: #f6dddd;
+  color: #9b5d5d;
+}
+
+.explorer-row.is-active .item-icon-wrap,
+.document-tab.is-active .item-icon-wrap {
+  filter: saturate(1.08);
+}
+
 .link-badge {
   position: absolute;
   right: calc(-4px * var(--ui-scale));
