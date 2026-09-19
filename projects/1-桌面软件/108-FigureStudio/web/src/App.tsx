@@ -71,6 +71,8 @@ import {
 } from "./project/projectIO";
 
 const AUTOSAVE_KEY = "figurestudio-p108-autosave-v05";
+const VISUAL_QA_MODE =
+  new URLSearchParams(window.location.search).get("qa") === "1";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const PNG_SCALE = PNG_DPI / 96;
@@ -295,7 +297,7 @@ function downloadDataUrl(dataUrl: string, filename: string) {
 
 function App() {
   const initialProject = useMemo(
-    () => createInitialProject(readUserDefaults()),
+    () => createInitialProject(readUserDefaults(), VISUAL_QA_MODE),
     []
   );
   const initialBookId = initialProject.dataBooks[0]?.id ?? "";
@@ -939,7 +941,9 @@ function App() {
 
   function newProject() {
     if (!window.confirm("新建项目会替换当前工作区，是否继续？")) return;
-    resetWorkspace(createInitialProject(readUserDefaults()));
+    resetWorkspace(
+      createInitialProject(readUserDefaults(), VISUAL_QA_MODE)
+    );
     showToast("已新建项目");
   }
 
