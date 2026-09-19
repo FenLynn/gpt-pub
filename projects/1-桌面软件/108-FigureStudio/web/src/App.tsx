@@ -22,7 +22,8 @@ import { useHistoryState } from "./hooks/useHistoryState";
 import { parseDelimitedText } from "./lib/csv";
 import {
   plainMathFallback,
-  resolveSafeMathText
+  resolveSafeMathText,
+  type MathTextState
 } from "./lib/mathText";
 import type {
   AspectMode,
@@ -397,14 +398,27 @@ function App() {
     xTitle?: string;
     yTitle?: string;
   }>({});
+  const [mathTextState, setMathTextState] = useState<{
+    plotTitle: MathTextState;
+    xTitle: MathTextState;
+    yTitle: MathTextState;
+  }>({
+    plotTitle: "plain",
+    xTitle: "plain",
+    yTitle: "plain"
+  });
 
   useEffect(() => {
-    const immediate = {
+    setDisplayText({
       plotTitle: plainMathFallback(rawPlotTitle),
       xTitle: plainMathFallback(rawXTitle),
       yTitle: plainMathFallback(rawYTitle)
-    };
-    setDisplayText(immediate);
+    });
+    setMathTextState({
+      plotTitle: "plain",
+      xTitle: "plain",
+      yTitle: "plain"
+    });
 
     let cancelled = false;
     void Promise.all([
@@ -412,7 +426,17 @@ function App() {
       resolveSafeMathText(rawXTitle),
       resolveSafeMathText(rawYTitle)
     ]).then(([plotTitle, xTitle, yTitle]) => {
-      if (!cancelled) setDisplayText({ plotTitle, xTitle, yTitle });
+      if (cancelled) return;
+      setDisplayText({
+        plotTitle: plotTitle.text,
+        xTitle: xTitle.text,
+        yTitle: yTitle.text
+      });
+      setMathTextState({
+        plotTitle: plotTitle.state,
+        xTitle: xTitle.state,
+        yTitle: yTitle.state
+      });
     });
 
     return () => {
@@ -421,9 +445,9 @@ function App() {
   }, [rawPlotTitle, rawXTitle, rawYTitle]);
 
   const latexFallbackActive =
-    Boolean(rawPlotTitle && displayText.plotTitle !== rawPlotTitle) ||
-    Boolean(rawXTitle && displayText.xTitle !== rawXTitle) ||
-    Boolean(rawYTitle && displayText.yTitle !== rawYTitle);
+    mathTextState.plotTitle === "invalid" ||
+    mathTextState.xTitle === "invalid" ||
+    mathTextState.yTitle === "invalid";
 
   const layout = useMemo(
     () =>

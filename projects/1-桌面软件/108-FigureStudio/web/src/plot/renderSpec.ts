@@ -419,7 +419,7 @@ export function buildLayout(args: {
     gridcolor: "#e3e6e9",
     gridwidth: 0.45,
     zeroline: false,
-    automargin: false,
+    automargin: true,
     minor: {
       ticks: overrides.minorTicks ? tickDirection : "",
       ticklen: overrides.minorTicks ? ptToPx(minorTickLengthPt) : 0,
@@ -433,17 +433,12 @@ export function buildLayout(args: {
     height: Math.round(mmToPx(canvas.heightMm)),
     autosize: false,
     margin: {
-      l: Math.round(mmToPx(14)),
-      r: Math.round(mmToPx(
-        figure.templateId === "heatmap" || figure.templateId === "surface-3d"
-          ? 12
-          : 4.5
-      )),
-      t: Math.round(
-        mmToPx(overrides.plotTitle ? 9.5 : 5.5)
-      ),
-      b: Math.round(mmToPx(12.5)),
-      pad: 0
+      l: 4,
+      r: 4,
+      t: 4,
+      b: 4,
+      pad: 0,
+      autoexpand: true
     },
     paper_bgcolor: background,
     plot_bgcolor: background,
@@ -454,6 +449,8 @@ export function buildLayout(args: {
           xanchor: "center",
           y: 0.985,
           yanchor: "top",
+          automargin: true,
+          pad: { t: 2, b: 2, l: 0, r: 0 },
           font: {
             family: fontFamily,
             size: plotTitleSizePx,
