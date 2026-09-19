@@ -539,7 +539,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     "folder-gallery",
     {
       xTitle: "温度 (°C)",
-      yTitle: "归一化响应 (a.u.)"
+      yTitle: "归一化响应 (a.u.)",
+      legendPosition: "outside-right"
     },
     {
       "sample-a": {
@@ -601,7 +602,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     {
       yTitle: "占比 (%)",
       barGap: 0.18,
-      barGroupGap: 0.06
+      barGroupGap: 0.06,
+      legendPosition: "outside-right"
     },
     {
       fundamental: { color: "#1F77B4" },
@@ -618,7 +620,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     "folder-gallery",
     {
       yTitle: "占比 (%)",
-      barGap: 0.22
+      barGap: 0.22,
+      legendPosition: "outside-right"
     },
     {
       fundamental: { color: "#1F77B4" },
