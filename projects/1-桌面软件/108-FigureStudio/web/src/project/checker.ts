@@ -39,7 +39,7 @@ export function checkFigure(
     ref?.yErrorColumnId &&
     !availableSeries.has(ref.yErrorColumnId);
   const mappingBroken =
-    Boolean(ref) &&
+    ref !== undefined &&
     (ref.yColumnIds.length === 0 ||
       missingSeries.length > 0 ||
       Boolean(missingError));
