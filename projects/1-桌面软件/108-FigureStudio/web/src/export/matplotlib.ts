@@ -566,7 +566,7 @@ if template == "surface-3d":
         **kwargs
     )
     if O.get("colorbarVisible", True):
-        cb = fig.colorbar(surf, ax=ax, shrink=0.76)
+        cb = fig.colorbar(surf, ax=ax, shrink=0.66, pad=0.10)
         if O.get("colorbarTitle"):
             cb.set_label(O["colorbarTitle"])
     ax.set_box_aspect((4, 4, 3))
