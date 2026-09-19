@@ -373,7 +373,10 @@ function makeFigure(
   };
 }
 
-export function createInitialProject(userDefaults?: UserDefaults): ProjectState {
+export function createInitialProject(
+  userDefaults?: UserDefaults,
+  includeVisualQa = false
+): ProjectState {
   const defaults: UserDefaults = userDefaults ?? {
     templateId: "xy-line",
     presetId: "scientific",
@@ -391,7 +394,9 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
   const folders = [
     { id: "folder-experiment", name: "实验数据" },
     { id: "folder-paper", name: "论文" },
-    { id: "folder-gallery", name: "常用图验收" }
+    ...(includeVisualQa
+      ? [{ id: "folder-gallery", name: "常用图验收" }]
+      : [])
   ];
 
   const spectrumSheet = createSpectrumSheet();
@@ -643,7 +648,12 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     projectId: id("project"),
     name: "未命名项目",
     folders,
-    dataBooks: [spectrumBook, fieldBook, commonPlotsBook, galleryBook],
+    dataBooks: [
+      spectrumBook,
+      fieldBook,
+      commonPlotsBook,
+      ...(includeVisualQa ? [galleryBook] : [])
+    ],
     figures: [
       spectrumFigure,
       doubleYFigure,
@@ -651,11 +661,15 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       heatmapFigure,
       contourFigure,
       surfaceFigure,
-      scatterFigure,
-      errorbarFigure,
-      barFigure,
-      groupedBarFigure,
-      stackedBarFigure
+      ...(includeVisualQa
+        ? [
+            scatterFigure,
+            errorbarFigure,
+            barFigure,
+            groupedBarFigure,
+            stackedBarFigure
+          ]
+        : [])
     ],
     activeFigureId: spectrumFigure.id,
     defaults: {
