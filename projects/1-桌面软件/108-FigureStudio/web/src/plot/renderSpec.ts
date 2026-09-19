@@ -424,7 +424,7 @@ export function buildTraces(args: {
           color: markerColor,
           line: {
             color: override.barBorderColor ?? fillColor,
-            width: ptToPx(override.barBorderWidthPt ?? 0.3)
+            width: ptToPx(override.barBorderWidthPt ?? 0)
           }
         },
         hovertemplate:
@@ -736,10 +736,14 @@ export function buildLayout(args: {
   };
   const leftYColor = seriesColor(leftSeries[0]);
   const rightYColor = seriesColor(rightSeries[0]);
+  const automaticLegendSeriesCount =
+    figure.templateId === "bar" || figure.templateId === "xy-errorbar"
+      ? Math.min(1, visibleSeries(dataset, figure).length)
+      : visibleSeries(dataset, figure).length;
   const effectiveLegendVisible =
     !isField2D &&
     figure.templateId !== "surface-3d" &&
-    (overrides.legendVisible ?? visibleSeries(dataset, figure).length > 1);
+    (overrides.legendVisible ?? automaticLegendSeriesCount > 1);
 
   const emptyFigure = dataset.id === "__empty__";
   const resolvedXTitle = normalizePlotlyMathText(
