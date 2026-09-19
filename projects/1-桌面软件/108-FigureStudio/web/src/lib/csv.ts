@@ -34,7 +34,7 @@ function toNumber(cell: string): NumericValue {
 
 function splitNameAndUnit(label: string): { name: string; unit?: string } {
   const match = label.trim().match(/^(.*?)\s*[\[(]([^\])]+)[\])]\s*$/);
-  if (!match) return { name: label.trim() || "Column" };
+  if (!match) return { name: label.trim() || "列" };
   return {
     name: match[1].trim() || label.trim(),
     unit: match[2].trim()
@@ -50,7 +50,7 @@ export function parseDelimitedText(text: string, fileName: string): Dataset {
     .filter(Boolean);
 
   if (lines.length < 2) {
-    throw new Error("Need at least two rows of data.");
+    throw new Error("数据至少需要两行。");
   }
 
   const delimiter = detectDelimiter(lines[0]);
@@ -65,7 +65,7 @@ export function parseDelimitedText(text: string, fileName: string): Dataset {
 
   const names = Array.from({ length: width }, (_, index) => {
     if (looksLikeHeader && firstRow[index]) return firstRow[index];
-    return "Column " + String(index + 1);
+    return "列 " + String(index + 1);
   });
 
   const body = looksLikeHeader ? rows.slice(1) : rows;
@@ -88,10 +88,10 @@ export function parseDelimitedText(text: string, fileName: string): Dataset {
   });
 
   if (numericColumns.length < 2) {
-    throw new Error("Could not find at least two numeric columns.");
+    throw new Error("没有识别到至少两列有效数值数据。");
   }
 
-  const cleanName = fileName.replace(/\.[^.]+$/, "") || "Imported dataset";
+  const cleanName = fileName.replace(/\.[^.]+$/, "") || "导入数据";
 
   return {
     id: "dataset-" + Date.now().toString(36),

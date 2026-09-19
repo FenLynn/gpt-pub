@@ -36,6 +36,7 @@ export interface SeriesOverride {
   markerVisible?: boolean;
   markerSizePt?: number;
   color?: string;
+  opacity?: number;
 }
 
 export interface FigureOverrides {
@@ -47,9 +48,10 @@ export interface FigureOverrides {
 }
 
 export interface StoredProject {
-  version: 1;
+  version: 2;
   dataset: Dataset;
   presetId: PresetId;
   figureOverrides: FigureOverrides;
   seriesOverrides: Record<string, SeriesOverride>;
+  seriesOrder: string[];
 }

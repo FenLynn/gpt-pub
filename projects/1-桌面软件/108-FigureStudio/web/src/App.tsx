@@ -9,17 +9,16 @@ import type {
   SeriesOverride,
   StoredProject
 } from "./model";
+import {
+  buildLayout,
+  buildTraces,
+  orderSeries,
+  PNG_DPI
+} from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
 
-const STORAGE_KEY = "figurestudio-p108-demo-v1";
-
-function ptToPx(value: number): number {
-  return value * (96 / 72);
-}
-
-function mmToPx(value: number): number {
-  return value * (96 / 25.4);
-}
+const STORAGE_KEY = "figurestudio-p108-demo-v2";
+const PNG_SCALE = PNG_DPI / 96;
 
 function axisLabel(name: string, unit?: string): string {
   return unit ? name + " (" + unit + ")" : name;
@@ -49,26 +48,79 @@ function ResetButton(props: { visible: boolean; onReset: () => void }) {
   if (!props.visible) return null;
   return (
     <button className="reset-button" type="button" onClick={props.onReset}>
-      Reset
+      恢复
     </button>
   );
 }
 
+function downloadDataUrl(dataUrl: string, filename: string) {
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function App() {
   const plotRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [dataset, setDataset] = useState<Dataset>(() => createDemoDataset());
   const [presetId, setPresetId] = useState<PresetId>("scientific");
   const [selectedSeriesId, setSelectedSeriesId] = useState("measured");
+  const [seriesOrder, setSeriesOrder] = useState<string[]>(["measured", "fit"]);
+  const [previewScale, setPreviewScale] = useState(1.6);
   const [figureOverrides, setFigureOverrides] = useState<FigureOverrides>({
-    xTitle: "Wavelength $\\lambda$ (nm)",
-    yTitle: "Power (dBm)"
+    xTitle: "波长 λ (nm)",
+    yTitle: "功率 (dBm)"
   });
   const [seriesOverrides, setSeriesOverrides] = useState<Record<string, SeriesOverride>>({});
-  const [message, setMessage] = useState("Synthetic demo data · safe to edit");
+  const [message, setMessage] = useState("当前为合成演示数据，可放心调整");
 
   const preset = presets[presetId];
+  const orderedSeries = useMemo(
+    () => orderSeries(dataset, seriesOrder),
+    [dataset, seriesOrder]
+  );
+
+  const selectedSeries =
+    dataset.ys.find((series) => series.id === selectedSeriesId) || dataset.ys[0];
+  const selectedOverride = selectedSeries
+    ? seriesOverrides[selectedSeries.id] || {}
+    : {};
+
+  const effectiveFontFamily = figureOverrides.fontFamily || preset.fontFamily;
+  const effectiveFontSizePt = figureOverrides.fontSizePt ?? preset.fontSizePt;
+  const effectiveLegendVisible = figureOverrides.legendVisible ?? true;
+  const effectiveXTitle =
+    figureOverrides.xTitle || axisLabel(dataset.x.name, dataset.x.unit);
+  const effectiveYTitle =
+    figureOverrides.yTitle ||
+    axisLabel(dataset.ys[0]?.name || "Y", dataset.ys[0]?.unit);
+
+  const traces = useMemo(
+    () =>
+      buildTraces({
+        dataset,
+        orderedSeries,
+        preset,
+        seriesOverrides
+      }),
+    [dataset, orderedSeries, preset, seriesOverrides]
+  );
+
+  const layout = useMemo(
+    () =>
+      buildLayout({
+        preset,
+        figureOverrides,
+        xTitle: effectiveXTitle,
+        yTitle: effectiveYTitle
+      }),
+    [preset, figureOverrides, effectiveXTitle, effectiveYTitle]
+  );
 
   useEffect(() => {
     if (!dataset.ys.some((series) => series.id === selectedSeriesId)) {
@@ -76,145 +128,36 @@ function App() {
     }
   }, [dataset, selectedSeriesId]);
 
-  const selectedSeries = dataset.ys.find((series) => series.id === selectedSeriesId) || dataset.ys[0];
-  const selectedOverride = selectedSeries ? seriesOverrides[selectedSeries.id] || {} : {};
+  useEffect(() => {
+    const node = canvasRef.current;
+    if (!node) return;
 
-  const effectiveFontFamily = figureOverrides.fontFamily || preset.fontFamily;
-  const effectiveFontSizePt = figureOverrides.fontSizePt || preset.fontSizePt;
-  const effectiveLegendVisible = figureOverrides.legendVisible ?? true;
-  const effectiveXTitle = figureOverrides.xTitle || axisLabel(dataset.x.name, dataset.x.unit);
-  const effectiveYTitle =
-    figureOverrides.yTitle ||
-    axisLabel(dataset.ys[0]?.name === "Measured" ? "Power" : dataset.ys[0]?.name || "Y", dataset.ys[0]?.unit);
+    const updateScale = () => {
+      const rect = node.getBoundingClientRect();
+      const availableWidth = Math.max(320, rect.width - 90);
+      const availableHeight = Math.max(260, rect.height - 90);
+      const fit = Math.min(
+        availableWidth / layout.width,
+        availableHeight / layout.height
+      );
+      setPreviewScale(Math.max(0.75, Math.min(2.35, fit)));
+    };
 
-  const traces = useMemo(() => {
-    return dataset.ys.map((series, index) => {
-      const override = seriesOverrides[series.id] || {};
-      const lineWidthPt = override.lineWidthPt || preset.lineWidthPt;
-      const markerVisible = override.markerVisible ?? false;
-      const markerSizePt = override.markerSizePt || preset.markerSizePt;
-      const color = override.color || preset.palette[index % preset.palette.length];
-      const isFit = /fit/i.test(series.name);
-
-      return {
-        type: "scatter",
-        mode: markerVisible ? "lines+markers" : "lines",
-        name: series.name,
-        x: dataset.x.values,
-        y: series.values,
-        line: {
-          color,
-          width: ptToPx(isFit ? Math.max(0.65, lineWidthPt * 0.9) : lineWidthPt),
-          dash: isFit ? "dash" : "solid"
-        },
-        marker: {
-          color,
-          size: ptToPx(markerSizePt),
-          symbol: "circle",
-          line: {
-            color: "#ffffff",
-            width: 0.45
-          }
-        },
-        hovertemplate:
-          "<b>" +
-          series.name +
-          "</b><br>" +
-          dataset.x.name +
-          ": %{x:.4f}" +
-          (dataset.x.unit ? " " + dataset.x.unit : "") +
-          "<br>" +
-          (series.unit ? "%{y:.3f} " + series.unit : "%{y:.3f}") +
-          "<extra></extra>"
-      };
-    });
-  }, [dataset, preset, seriesOverrides]);
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [layout.width, layout.height]);
 
   useEffect(() => {
     const node = plotRef.current as any;
     if (!node) return;
 
-    const fontSizePx = ptToPx(effectiveFontSizePt);
-    const axisWidthPx = ptToPx(preset.axisWidthPt);
-
-    const layout = {
-      autosize: true,
-      height: 548,
-      margin: { l: 76, r: 30, t: 26, b: 68, pad: 0 },
-      paper_bgcolor: "#ffffff",
-      plot_bgcolor: "#ffffff",
-      showlegend: effectiveLegendVisible,
-      hovermode: "closest",
-      dragmode: "zoom",
-      uirevision: "figurestudio-preview",
-      font: {
-        family: effectiveFontFamily,
-        size: fontSizePx,
-        color: "#17191c"
-      },
-      legend: {
-        orientation: "h",
-        x: 0.02,
-        y: 0.985,
-        xanchor: "left",
-        yanchor: "top",
-        bgcolor: "rgba(255,255,255,0.78)",
-        borderwidth: 0,
-        font: {
-          family: effectiveFontFamily,
-          size: fontSizePx * 0.92
-        }
-      },
-      xaxis: {
-        title: {
-          text: effectiveXTitle,
-          standoff: 12,
-          font: { family: effectiveFontFamily, size: fontSizePx * 1.02 }
-        },
-        showline: true,
-        mirror: true,
-        linewidth: axisWidthPx,
-        linecolor: "#202328",
-        ticks: "inside",
-        ticklen: ptToPx(3.6),
-        tickwidth: axisWidthPx,
-        tickcolor: "#202328",
-        showgrid: preset.showGrid,
-        gridcolor: "#e8eaed",
-        gridwidth: 0.7,
-        zeroline: false,
-        automargin: true
-      },
-      yaxis: {
-        title: {
-          text: effectiveYTitle,
-          standoff: 10,
-          font: { family: effectiveFontFamily, size: fontSizePx * 1.02 }
-        },
-        showline: true,
-        mirror: true,
-        linewidth: axisWidthPx,
-        linecolor: "#202328",
-        ticks: "inside",
-        ticklen: ptToPx(3.6),
-        tickwidth: axisWidthPx,
-        tickcolor: "#202328",
-        showgrid: preset.showGrid,
-        gridcolor: "#e8eaed",
-        gridwidth: 0.7,
-        zeroline: false,
-        automargin: true
-      }
-    };
-
     const config = {
-      responsive: true,
+      responsive: false,
       displaylogo: false,
-      scrollZoom: true,
-      modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"],
-      toImageButtonOptions: {
-        filename: "figurestudio-demo"
-      }
+      displayModeBar: false,
+      scrollZoom: true
     };
 
     let cancelled = false;
@@ -224,7 +167,7 @@ function App() {
       node.removeAllListeners?.("plotly_click");
       node.on?.("plotly_click", (event: any) => {
         const index = event?.points?.[0]?.curveNumber;
-        const series = typeof index === "number" ? dataset.ys[index] : undefined;
+        const series = typeof index === "number" ? orderedSeries[index] : undefined;
         if (series) setSelectedSeriesId(series.id);
       });
     });
@@ -233,16 +176,7 @@ function App() {
       cancelled = true;
       node.removeAllListeners?.("plotly_click");
     };
-  }, [
-    dataset,
-    traces,
-    preset,
-    effectiveFontFamily,
-    effectiveFontSizePt,
-    effectiveLegendVisible,
-    effectiveXTitle,
-    effectiveYTitle
-  ]);
+  }, [traces, layout, orderedSeries]);
 
   function updateSeriesOverride(patch: SeriesOverride) {
     if (!selectedSeries) return;
@@ -272,7 +206,10 @@ function App() {
     });
   }
 
-  function setFigureField<K extends keyof FigureOverrides>(key: K, value: FigureOverrides[K]) {
+  function setFigureField<K extends keyof FigureOverrides>(
+    key: K,
+    value: FigureOverrides[K]
+  ) {
     setFigureOverrides((current) => ({ ...current, [key]: value }));
   }
 
@@ -284,20 +221,44 @@ function App() {
     });
   }
 
+  function moveSelectedSeries(direction: "up" | "down") {
+    if (!selectedSeries) return;
+
+    setSeriesOrder((current) => {
+      const normalized = orderSeries(dataset, current).map((series) => series.id);
+      const index = normalized.indexOf(selectedSeries.id);
+      if (index < 0) return normalized;
+
+      const target =
+        direction === "up"
+          ? Math.min(normalized.length - 1, index + 1)
+          : Math.max(0, index - 1);
+
+      if (target === index) return normalized;
+
+      const next = [...normalized];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   async function importFile(file: File) {
     try {
       const text = await file.text();
       const parsed = parseDelimitedText(text, file.name);
       setDataset(parsed);
       setSelectedSeriesId(parsed.ys[0]?.id || "");
+      setSeriesOrder(parsed.ys.map((series) => series.id));
       setSeriesOverrides({});
       setFigureOverrides({
         xTitle: axisLabel(parsed.x.name, parsed.x.unit),
         yTitle: axisLabel(parsed.ys[0]?.name || "Y", parsed.ys[0]?.unit)
       });
-      setMessage("Imported " + file.name + " · " + String(parsed.ys.length) + " Y series");
+      setMessage(
+        "已导入 " + file.name + " · " + String(parsed.ys.length) + " 条 Y 曲线"
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not import file.");
+      setMessage(error instanceof Error ? error.message : "数据导入失败。");
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -305,20 +266,21 @@ function App() {
 
   function saveDemoProject() {
     const project: StoredProject = {
-      version: 1,
+      version: 2,
       dataset,
       presetId,
       figureOverrides,
-      seriesOverrides
+      seriesOverrides,
+      seriesOrder
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
-    setMessage("Saved in this browser · prototype local storage");
+    setMessage("当前项目状态已保存到本浏览器");
   }
 
   function restoreDemoProject() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      setMessage("No saved browser project yet.");
+      setMessage("本浏览器还没有保存过项目状态。");
       return;
     }
 
@@ -328,52 +290,73 @@ function App() {
       setPresetId(project.presetId);
       setFigureOverrides(project.figureOverrides || {});
       setSeriesOverrides(project.seriesOverrides || {});
+      setSeriesOrder(
+        project.seriesOrder?.length
+          ? project.seriesOrder
+          : project.dataset.ys.map((series) => series.id)
+      );
       setSelectedSeriesId(project.dataset.ys[0]?.id || "");
-      setMessage("Restored browser project.");
+      setMessage("已恢复浏览器中的项目状态");
     } catch {
-      setMessage("Saved project could not be restored.");
+      setMessage("保存的项目状态无法恢复。");
     }
   }
 
   function resetDemo() {
-    setDataset(createDemoDataset());
+    const demo = createDemoDataset();
+    setDataset(demo);
     setPresetId("scientific");
     setSelectedSeriesId("measured");
+    setSeriesOrder(demo.ys.map((series) => series.id));
     setFigureOverrides({
-      xTitle: "Wavelength $\\lambda$ (nm)",
-      yTitle: "Power (dBm)"
+      xTitle: "波长 λ (nm)",
+      yTitle: "功率 (dBm)"
     });
     setSeriesOverrides({});
-    setMessage("Reset to synthetic demo data.");
+    setMessage("已恢复为默认合成演示数据");
+  }
+
+  async function resetView() {
+    if (!plotRef.current) return;
+    await Plotly.relayout(plotRef.current, {
+      "xaxis.autorange": true,
+      "yaxis.autorange": true
+    });
+    setMessage("已恢复完整坐标范围");
   }
 
   async function exportFigure(format: "svg" | "png") {
-    if (!plotRef.current) return;
-    const width = Math.round(mmToPx(preset.widthMm));
-    const height = Math.round(mmToPx(preset.heightMm));
+    const node = plotRef.current as any;
+    if (!node) return;
 
-    await Plotly.downloadImage(plotRef.current, {
+    setMessage(format === "svg" ? "正在生成 SVG…" : "正在生成 600 dpi PNG…");
+
+    const dataUrl = await Plotly.toImage(node, {
       format,
       filename: "figurestudio-" + presetId,
-      width,
-      height,
-      scale: format === "png" ? 3 : 1
+      width: layout.width,
+      height: layout.height,
+      scale: format === "png" ? PNG_SCALE : 1
     });
 
+    downloadDataUrl(
+      dataUrl,
+      "figurestudio-" +
+        presetId +
+        (format === "png" ? "-600dpi.png" : ".svg")
+    );
+
     setMessage(
-      "Exported " +
+      "已导出 " +
         format.toUpperCase() +
-        " · " +
-        String(preset.widthMm) +
-        " × " +
-        String(preset.heightMm) +
-        " mm"
+        " · 与当前预览使用同一 Plotly 画布、同一布局和同一图层"
     );
   }
 
-  const lineWidth = selectedOverride.lineWidthPt || preset.lineWidthPt;
+  const lineWidth = selectedOverride.lineWidthPt ?? preset.lineWidthPt;
   const markerVisible = selectedOverride.markerVisible ?? false;
-  const markerSize = selectedOverride.markerSizePt || preset.markerSizePt;
+  const markerSize = selectedOverride.markerSizePt ?? preset.markerSizePt;
+  const opacity = selectedOverride.opacity ?? 1;
   const selectedIndex = selectedSeries
     ? Math.max(
         0,
@@ -383,6 +366,15 @@ function App() {
   const selectedColor =
     selectedOverride.color || preset.palette[selectedIndex % preset.palette.length];
 
+  const layerIndex = selectedSeries
+    ? seriesOrder.indexOf(selectedSeries.id)
+    : -1;
+  const isTopLayer = layerIndex === seriesOrder.length - 1;
+  const isBottomLayer = layerIndex <= 0;
+
+  const scaledWidth = Math.round(layout.width * previewScale);
+  const scaledHeight = Math.round(layout.height * previewScale);
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -390,15 +382,15 @@ function App() {
           <div className="brand-mark">F</div>
           <div>
             <div className="brand-title">FigureStudio</div>
-            <div className="brand-subtitle">P108 · scientific plotting prototype</div>
+            <div className="brand-subtitle">P108 · 科研论文绘图工作台</div>
           </div>
         </div>
 
-        <nav className="menu-strip" aria-label="Main menu">
-          <button type="button">File</button>
-          <button type="button">Edit</button>
-          <button type="button">Plot</button>
-          <button type="button">Template</button>
+        <nav className="menu-strip" aria-label="主菜单">
+          <button type="button">文件</button>
+          <button type="button">编辑</button>
+          <button type="button">绘图</button>
+          <button type="button">模板</button>
         </nav>
 
         <div className="top-actions">
@@ -413,17 +405,17 @@ function App() {
             }}
           />
           <button className="quiet-button" type="button" onClick={restoreDemoProject}>
-            Restore
+            恢复项目
           </button>
           <button className="quiet-button" type="button" onClick={saveDemoProject}>
-            Save demo
+            保存状态
           </button>
           <button
             className="primary-button"
             type="button"
             onClick={() => fileInputRef.current?.click()}
           >
-            Import data
+            导入数据
           </button>
         </div>
       </header>
@@ -431,8 +423,8 @@ function App() {
       <main className="workspace">
         <aside className="left-panel">
           <div className="panel-heading">
-            <span>Project</span>
-            <button type="button" title="Reset demo" onClick={resetDemo}>
+            <span>项目</span>
+            <button type="button" title="恢复默认演示" onClick={resetDemo}>
               ↺
             </button>
           </div>
@@ -441,14 +433,14 @@ function App() {
             <div className="tree-row tree-root">
               <span className="chevron">⌄</span>
               <span className="tree-icon">◇</span>
-              <span>Untitled project</span>
+              <span>未命名项目</span>
             </div>
 
             <div className="tree-row tree-folder">
               <span className="tree-indent" />
               <span className="chevron">⌄</span>
               <span className="tree-icon">▱</span>
-              <span>Data</span>
+              <span>数据</span>
             </div>
 
             <button className="tree-row tree-button tree-selected" type="button">
@@ -483,29 +475,35 @@ function App() {
               <span className="tree-indent" />
               <span className="chevron">⌄</span>
               <span className="tree-icon">▱</span>
-              <span>Figures</span>
+              <span>图形</span>
             </div>
 
             <button className="tree-row tree-button" type="button">
               <span className="tree-indent wide" />
               <span className="tree-icon">▧</span>
-              <span>Figure 1 · Spectrum</span>
+              <span>图 1 · 光谱</span>
             </button>
 
             <div className="tree-row tree-folder">
               <span className="tree-indent" />
               <span className="chevron">›</span>
               <span className="tree-icon">▱</span>
-              <span>Templates</span>
+              <span>模板</span>
             </div>
           </div>
 
           <div className="left-section">
-            <div className="section-label">Series</div>
+            <div className="section-label">曲线与图层</div>
             <div className="series-list">
-              {dataset.ys.map((series, index) => {
+              {[...orderedSeries].reverse().map((series) => {
+                const sourceIndex = Math.max(
+                  0,
+                  dataset.ys.findIndex((item) => item.id === series.id)
+                );
                 const override = seriesOverrides[series.id] || {};
-                const color = override.color || preset.palette[index % preset.palette.length];
+                const color =
+                  override.color || preset.palette[sourceIndex % preset.palette.length];
+
                 return (
                   <button
                     key={series.id}
@@ -519,6 +517,7 @@ function App() {
                   >
                     <span className="series-color" style={{ backgroundColor: color }} />
                     <span>{series.name}</span>
+                    <span className="layer-mark">图层</span>
                   </button>
                 );
               })}
@@ -527,7 +526,7 @@ function App() {
 
           <div className="left-footer">
             <button type="button" onClick={() => fileInputRef.current?.click()}>
-              + Add dataset
+              + 添加数据
             </button>
           </div>
         </aside>
@@ -548,23 +547,53 @@ function App() {
             </div>
 
             <div className="figure-actions">
-              <button type="button" onClick={() => exportFigure("svg")}>
-                SVG
+              <span className="wysiwyg-badge">所见即所得</span>
+              <button type="button" onClick={() => void resetView()}>
+                重置视图
               </button>
-              <button type="button" onClick={() => exportFigure("png")}>
-                PNG
+              <button type="button" onClick={() => void exportFigure("svg")}>
+                导出 SVG
+              </button>
+              <button type="button" onClick={() => void exportFigure("png")}>
+                导出 PNG 600 dpi
               </button>
             </div>
           </div>
 
-          <div className="canvas-area">
-            <div className="paper-stage">
+          <div ref={canvasRef} className="canvas-area">
+            <div className="paper-stage" style={{ width: scaledWidth + "px" }}>
               <div className="paper-caption">
-                <span>Figure 1</span>
-                <span>{preset.widthMm} × {preset.heightMm} mm</span>
+                <span>图 1</span>
+                <span>
+                  {preset.widthMm} × {preset.heightMm} mm · 预览缩放{" "}
+                  {Math.round(previewScale * 100)}%
+                </span>
               </div>
-              <div className="figure-paper">
-                <div ref={plotRef} className="plot-host" />
+
+              <div
+                className="scaled-paper-shell"
+                style={{
+                  width: scaledWidth + "px",
+                  height: scaledHeight + "px"
+                }}
+              >
+                <div
+                  className="figure-paper"
+                  style={{
+                    width: layout.width + "px",
+                    height: layout.height + "px",
+                    transform: "scale(" + previewScale + ")"
+                  }}
+                >
+                  <div
+                    ref={plotRef}
+                    className="plot-host"
+                    style={{
+                      width: layout.width + "px",
+                      height: layout.height + "px"
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -572,7 +601,8 @@ function App() {
           <div className="statusbar">
             <span className="status-message">{message}</span>
             <span className="status-meta">
-              {preset.label} · {preset.widthMm} mm · {effectiveFontFamily} · {effectiveFontSizePt} pt
+              {preset.label} · {preset.widthMm} × {preset.heightMm} mm ·{" "}
+              {effectiveFontFamily} · {effectiveFontSizePt} pt
             </span>
           </div>
         </section>
@@ -580,18 +610,21 @@ function App() {
         <aside className="right-panel">
           <div className="inspector-heading">
             <div>
-              <div className="inspector-kicker">Properties</div>
-              <div className="inspector-title">{selectedSeries?.name || "Figure"}</div>
+              <div className="inspector-kicker">属性</div>
+              <div className="inspector-title">{selectedSeries?.name || "图形"}</div>
             </div>
-            <span className="selection-badge">Series</span>
+            <span className="selection-badge">曲线</span>
           </div>
 
           <section className="property-section">
-            <div className="property-title">Figure</div>
+            <div className="property-title">图形</div>
 
             <label className="field">
-              <span>Preset</span>
-              <select value={presetId} onChange={(event) => setPresetId(event.target.value as PresetId)}>
+              <span>预设</span>
+              <select
+                value={presetId}
+                onChange={(event) => setPresetId(event.target.value as PresetId)}
+              >
                 {presetOrder.map((id) => (
                   <option key={id} value={id}>
                     {presets[id].label}
@@ -602,11 +635,14 @@ function App() {
 
             <div className="field-with-reset">
               <label className="field">
-                <span>Font</span>
+                <span>字体</span>
                 <select
                   value={effectiveFontFamily}
                   onChange={(event) =>
-                    setFigureField("fontFamily", event.target.value as "Arial" | "Times New Roman")
+                    setFigureField(
+                      "fontFamily",
+                      event.target.value as "Arial" | "Times New Roman"
+                    )
                   }
                 >
                   <option>Arial</option>
@@ -621,7 +657,7 @@ function App() {
 
             <div className="field-with-reset">
               <label className="field">
-                <span>Font size</span>
+                <span>字号</span>
                 <div className="number-unit">
                   <input
                     type="number"
@@ -629,7 +665,9 @@ function App() {
                     max="16"
                     step="0.25"
                     value={effectiveFontSizePt}
-                    onChange={(event) => setFigureField("fontSizePt", Number(event.target.value))}
+                    onChange={(event) =>
+                      setFigureField("fontSizePt", Number(event.target.value))
+                    }
                   />
                   <span>pt</span>
                 </div>
@@ -641,13 +679,13 @@ function App() {
             </div>
 
             <Toggle
-              label="Legend"
+              label="显示图例"
               checked={effectiveLegendVisible}
               onChange={(value) => setFigureField("legendVisible", value)}
             />
 
             <label className="field">
-              <span>X label</span>
+              <span>X 轴标题</span>
               <input
                 type="text"
                 value={effectiveXTitle}
@@ -656,7 +694,7 @@ function App() {
             </label>
 
             <label className="field">
-              <span>Y label</span>
+              <span>Y 轴标题</span>
               <input
                 type="text"
                 value={effectiveYTitle}
@@ -665,16 +703,33 @@ function App() {
             </label>
 
             <div className="hint">
-              LaTeX is enabled for the Pages prototype. Try <code>$\lambda$</code>.
+              支持 Unicode 与 LaTeX，例如：<code>$\lambda$</code>
             </div>
           </section>
 
           <section className="property-section">
-            <div className="property-title">Series</div>
+            <div className="property-title">曲线</div>
+
+            <div className="layer-controls">
+              <button
+                type="button"
+                disabled={isTopLayer}
+                onClick={() => moveSelectedSeries("up")}
+              >
+                上移一层
+              </button>
+              <button
+                type="button"
+                disabled={isBottomLayer}
+                onClick={() => moveSelectedSeries("down")}
+              >
+                下移一层
+              </button>
+            </div>
 
             <div className="field-with-reset">
               <label className="field">
-                <span>Line width</span>
+                <span>线宽</span>
                 <div className="range-line">
                   <input
                     type="range"
@@ -695,15 +750,38 @@ function App() {
               />
             </div>
 
+            <div className="field-with-reset">
+              <label className="field">
+                <span>透明度</span>
+                <div className="range-line">
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.05"
+                    value={opacity}
+                    onChange={(event) =>
+                      updateSeriesOverride({ opacity: Number(event.target.value) })
+                    }
+                  />
+                  <strong>{Math.round(opacity * 100)}%</strong>
+                </div>
+              </label>
+              <ResetButton
+                visible={selectedOverride.opacity !== undefined}
+                onReset={() => resetSeriesField("opacity")}
+              />
+            </div>
+
             <Toggle
-              label="Markers"
+              label="显示数据点"
               checked={markerVisible}
               onChange={(value) => updateSeriesOverride({ markerVisible: value })}
             />
 
             <div className="field-with-reset">
               <label className="field">
-                <span>Marker size</span>
+                <span>数据点大小</span>
                 <div className="range-line">
                   <input
                     type="range"
@@ -727,12 +805,14 @@ function App() {
 
             <div className="field-with-reset">
               <label className="field color-field">
-                <span>Color</span>
+                <span>颜色</span>
                 <div>
                   <input
                     type="color"
                     value={selectedColor}
-                    onChange={(event) => updateSeriesOverride({ color: event.target.value })}
+                    onChange={(event) =>
+                      updateSeriesOverride({ color: event.target.value })
+                    }
                   />
                   <span className="color-value">{selectedColor.toUpperCase()}</span>
                 </div>
@@ -745,22 +825,28 @@ function App() {
           </section>
 
           <section className="property-section property-summary">
-            <div className="property-title">Publication</div>
+            <div className="property-title">出版信息</div>
             <dl>
               <div>
-                <dt>Canvas</dt>
-                <dd>{preset.widthMm} × {preset.heightMm} mm</dd>
+                <dt>画布尺寸</dt>
+                <dd>
+                  {preset.widthMm} × {preset.heightMm} mm
+                </dd>
               </div>
               <div>
-                <dt>Axes</dt>
+                <dt>轴线宽度</dt>
                 <dd>{preset.axisWidthPt} pt</dd>
               </div>
               <div>
-                <dt>Grid</dt>
-                <dd>{preset.showGrid ? "On" : "Off"}</dd>
+                <dt>网格</dt>
+                <dd>{preset.showGrid ? "开启" : "关闭"}</dd>
               </div>
               <div>
-                <dt>Renderer</dt>
+                <dt>PNG</dt>
+                <dd>{PNG_DPI} dpi</dd>
+              </div>
+              <div>
+                <dt>渲染器</dt>
                 <dd>Plotly.js</dd>
               </div>
             </dl>

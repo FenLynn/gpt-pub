@@ -3,8 +3,8 @@ import type { PresetDefinition, PresetId } from "../model";
 export const presets: Record<PresetId, PresetDefinition> = {
   scientific: {
     id: "scientific",
-    label: "Scientific",
-    description: "Matplotlib-like general scientific style",
+    label: "科研默认",
+    description: "接近 Matplotlib 的通用科研论文风格",
     widthMm: 118,
     heightMm: 76,
     fontFamily: "Arial",
@@ -17,8 +17,8 @@ export const presets: Record<PresetId, PresetDefinition> = {
   },
   nature: {
     id: "nature",
-    label: "Nature",
-    description: "Compact single-column publication preset",
+    label: "Nature 单栏",
+    description: "紧凑单栏论文尺寸预设",
     widthMm: 89,
     heightMm: 62,
     fontFamily: "Arial",
@@ -31,8 +31,8 @@ export const presets: Record<PresetId, PresetDefinition> = {
   },
   presentation: {
     id: "presentation",
-    label: "Presentation",
-    description: "Larger text and strokes for slides",
+    label: "演示",
+    description: "适合 PPT 与大屏展示",
     widthMm: 160,
     heightMm: 100,
     fontFamily: "Arial",

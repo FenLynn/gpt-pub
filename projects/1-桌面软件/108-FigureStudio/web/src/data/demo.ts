@@ -24,23 +24,23 @@ export function createDemoDataset(): Dataset {
 
   return {
     id: "dataset-demo-spectrum",
-    name: "Synthetic OSA spectrum",
+    name: "合成 OSA 光谱",
     x: {
       id: "wavelength",
-      name: "Wavelength",
+      name: "波长",
       unit: "nm",
       values: x
     },
     ys: [
       {
         id: "measured",
-        name: "Measured",
+        name: "测量数据",
         unit: "dBm",
         values: measured
       },
       {
         id: "fit",
-        name: "Gaussian fit",
+        name: "高斯拟合",
         unit: "dBm",
         values: fit
       }
