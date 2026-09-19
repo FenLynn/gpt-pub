@@ -1,4 +1,5 @@
 import type {
+  AspectMode,
   Column,
   Dataset,
   FigureOverrides,
@@ -23,6 +24,36 @@ export function plotFontFamily(font: "Arial" | "Times New Roman"): string {
     return '"Times New Roman", "Songti SC", "SimSun", serif';
   }
   return 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
+}
+
+export function aspectRatioFor(
+  mode: AspectMode = "4:3",
+  customWidth = 4,
+  customHeight = 3
+): number {
+  if (mode === "16:9") return 16 / 9;
+  if (mode === "3:2") return 3 / 2;
+  if (mode === "custom") {
+    const width = Number.isFinite(customWidth) && customWidth > 0 ? customWidth : 4;
+    const height = Number.isFinite(customHeight) && customHeight > 0 ? customHeight : 3;
+    return width / height;
+  }
+  return 4 / 3;
+}
+
+export function resolveCanvasMm(
+  preset: PresetDefinition,
+  figureOverrides: FigureOverrides
+) {
+  const aspectMode = figureOverrides.aspectMode ?? "4:3";
+  const ratio = aspectRatioFor(
+    aspectMode,
+    figureOverrides.customAspectWidth,
+    figureOverrides.customAspectHeight
+  );
+  const widthMm = preset.widthMm;
+  const heightMm = widthMm / ratio;
+  return { widthMm, heightMm, ratio, aspectMode };
 }
 
 export function orderSeries(dataset: Dataset, seriesOrder: string[]): Column[] {
@@ -101,14 +132,15 @@ export function buildLayout(args: {
   yTitle: string;
 }) {
   const { preset, figureOverrides, xTitle, yTitle } = args;
+  const canvas = resolveCanvasMm(preset, figureOverrides);
   const fontFamily = plotFontFamily(figureOverrides.fontFamily || preset.fontFamily);
   const fontSizePt = figureOverrides.fontSizePt ?? preset.fontSizePt;
   const fontSizePx = ptToPx(fontSizePt);
   const axisWidthPx = ptToPx(preset.axisWidthPt);
 
   return {
-    width: Math.round(mmToPx(preset.widthMm)),
-    height: Math.round(mmToPx(preset.heightMm)),
+    width: Math.round(mmToPx(canvas.widthMm)),
+    height: Math.round(mmToPx(canvas.heightMm)),
     autosize: false,
     margin: {
       l: Math.round(mmToPx(14)),
@@ -122,7 +154,7 @@ export function buildLayout(args: {
     showlegend: figureOverrides.legendVisible ?? true,
     hovermode: "closest",
     dragmode: "zoom",
-    uirevision: "figurestudio-wysiwyg-v2",
+    uirevision: "figurestudio-wysiwyg-v3",
     font: {
       family: fontFamily,
       size: fontSizePx,

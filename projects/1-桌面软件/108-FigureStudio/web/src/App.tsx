@@ -3,6 +3,7 @@ import Plotly from "plotly.js-dist-min";
 import { createDemoDataset } from "./data/demo";
 import { parseDelimitedText } from "./lib/csv";
 import type {
+  AspectMode,
   Dataset,
   FigureOverrides,
   PresetId,
@@ -13,42 +14,39 @@ import {
   buildLayout,
   buildTraces,
   orderSeries,
-  PNG_DPI
+  PNG_DPI,
+  resolveCanvasMm
 } from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
 
-const STORAGE_KEY = "figurestudio-p108-demo-v2";
+const STORAGE_KEY = "figurestudio-p108-demo-v3";
 const PNG_SCALE = PNG_DPI / 96;
 
 function axisLabel(name: string, unit?: string): string {
   return unit ? name + " (" + unit + ")" : name;
 }
 
-function Toggle(props: {
+function MiniSwitch(props: {
   checked: boolean;
   onChange: (value: boolean) => void;
-  label: string;
 }) {
   return (
-    <label className="toggle-row">
-      <span>{props.label}</span>
-      <button
-        type="button"
-        className={props.checked ? "switch switch-on" : "switch"}
-        aria-pressed={props.checked}
-        onClick={() => props.onChange(!props.checked)}
-      >
-        <span />
-      </button>
-    </label>
+    <button
+      type="button"
+      className={props.checked ? "mini-switch is-on" : "mini-switch"}
+      aria-pressed={props.checked}
+      onClick={() => props.onChange(!props.checked)}
+    >
+      <span />
+    </button>
   );
 }
 
-function ResetButton(props: { visible: boolean; onReset: () => void }) {
+function ResetIcon(props: { visible: boolean; onReset: () => void }) {
   if (!props.visible) return null;
   return (
-    <button className="reset-button" type="button" onClick={props.onReset}>
-      恢复
+    <button className="reset-icon" type="button" title="恢复继承值" onClick={props.onReset}>
+      ↺
     </button>
   );
 }
@@ -71,13 +69,13 @@ function App() {
   const [presetId, setPresetId] = useState<PresetId>("scientific");
   const [selectedSeriesId, setSelectedSeriesId] = useState("measured");
   const [seriesOrder, setSeriesOrder] = useState<string[]>(["measured", "fit"]);
-  const [previewScale, setPreviewScale] = useState(1.6);
+  const [previewScale, setPreviewScale] = useState(1);
   const [figureOverrides, setFigureOverrides] = useState<FigureOverrides>({
     xTitle: "波长 λ (nm)",
-    yTitle: "功率 (dBm)"
+    yTitle: "功率 (dBm)",
+    aspectMode: "4:3"
   });
   const [seriesOverrides, setSeriesOverrides] = useState<Record<string, SeriesOverride>>({});
-  const [message, setMessage] = useState("当前为合成演示数据，可放心调整");
 
   const preset = presets[presetId];
   const orderedSeries = useMemo(
@@ -99,6 +97,8 @@ function App() {
   const effectiveYTitle =
     figureOverrides.yTitle ||
     axisLabel(dataset.ys[0]?.name || "Y", dataset.ys[0]?.unit);
+  const aspectMode = figureOverrides.aspectMode ?? "4:3";
+  const canvasMm = resolveCanvasMm(preset, figureOverrides);
 
   const traces = useMemo(
     () =>
@@ -134,13 +134,13 @@ function App() {
 
     const updateScale = () => {
       const rect = node.getBoundingClientRect();
-      const availableWidth = Math.max(320, rect.width - 90);
-      const availableHeight = Math.max(260, rect.height - 90);
+      const availableWidth = Math.max(160, rect.width - 28);
+      const availableHeight = Math.max(160, rect.height - 28);
       const fit = Math.min(
         availableWidth / layout.width,
         availableHeight / layout.height
       );
-      setPreviewScale(Math.max(0.75, Math.min(2.35, fit)));
+      setPreviewScale(Math.max(0.1, Math.min(4, fit)));
     };
 
     updateScale();
@@ -250,15 +250,13 @@ function App() {
       setSelectedSeriesId(parsed.ys[0]?.id || "");
       setSeriesOrder(parsed.ys.map((series) => series.id));
       setSeriesOverrides({});
-      setFigureOverrides({
+      setFigureOverrides((current) => ({
+        ...current,
         xTitle: axisLabel(parsed.x.name, parsed.x.unit),
         yTitle: axisLabel(parsed.ys[0]?.name || "Y", parsed.ys[0]?.unit)
-      });
-      setMessage(
-        "已导入 " + file.name + " · " + String(parsed.ys.length) + " 条 Y 曲线"
-      );
+      }));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "数据导入失败。");
+      window.alert(error instanceof Error ? error.message : "数据导入失败。");
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -266,7 +264,7 @@ function App() {
 
   function saveDemoProject() {
     const project: StoredProject = {
-      version: 2,
+      version: 3,
       dataset,
       presetId,
       figureOverrides,
@@ -274,21 +272,20 @@ function App() {
       seriesOrder
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
-    setMessage("当前项目状态已保存到本浏览器");
   }
 
   function restoreDemoProject() {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      setMessage("本浏览器还没有保存过项目状态。");
-      return;
-    }
+    if (!raw) return;
 
     try {
       const project = JSON.parse(raw) as StoredProject;
       setDataset(project.dataset);
       setPresetId(project.presetId);
-      setFigureOverrides(project.figureOverrides || {});
+      setFigureOverrides({
+        aspectMode: "4:3",
+        ...(project.figureOverrides || {})
+      });
       setSeriesOverrides(project.seriesOverrides || {});
       setSeriesOrder(
         project.seriesOrder?.length
@@ -296,9 +293,8 @@ function App() {
           : project.dataset.ys.map((series) => series.id)
       );
       setSelectedSeriesId(project.dataset.ys[0]?.id || "");
-      setMessage("已恢复浏览器中的项目状态");
     } catch {
-      setMessage("保存的项目状态无法恢复。");
+      window.alert("保存的项目状态无法恢复。");
     }
   }
 
@@ -310,10 +306,10 @@ function App() {
     setSeriesOrder(demo.ys.map((series) => series.id));
     setFigureOverrides({
       xTitle: "波长 λ (nm)",
-      yTitle: "功率 (dBm)"
+      yTitle: "功率 (dBm)",
+      aspectMode: "4:3"
     });
     setSeriesOverrides({});
-    setMessage("已恢复为默认合成演示数据");
   }
 
   async function resetView() {
@@ -322,14 +318,11 @@ function App() {
       "xaxis.autorange": true,
       "yaxis.autorange": true
     });
-    setMessage("已恢复完整坐标范围");
   }
 
   async function exportFigure(format: "svg" | "png") {
     const node = plotRef.current as any;
     if (!node) return;
-
-    setMessage(format === "svg" ? "正在生成 SVG…" : "正在生成 600 dpi PNG…");
 
     const dataUrl = await Plotly.toImage(node, {
       format,
@@ -344,12 +337,6 @@ function App() {
       "figurestudio-" +
         presetId +
         (format === "png" ? "-600dpi.png" : ".svg")
-    );
-
-    setMessage(
-      "已导出 " +
-        format.toUpperCase() +
-        " · 与当前预览使用同一 Plotly 画布、同一布局和同一图层"
     );
   }
 
@@ -366,24 +353,19 @@ function App() {
   const selectedColor =
     selectedOverride.color || preset.palette[selectedIndex % preset.palette.length];
 
-  const layerIndex = selectedSeries
-    ? seriesOrder.indexOf(selectedSeries.id)
-    : -1;
+  const layerIndex = selectedSeries ? seriesOrder.indexOf(selectedSeries.id) : -1;
   const isTopLayer = layerIndex === seriesOrder.length - 1;
   const isBottomLayer = layerIndex <= 0;
 
-  const scaledWidth = Math.round(layout.width * previewScale);
-  const scaledHeight = Math.round(layout.height * previewScale);
+  const scaledWidth = Math.max(1, layout.width * previewScale);
+  const scaledHeight = Math.max(1, layout.height * previewScale);
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-group">
           <div className="brand-mark">F</div>
-          <div>
-            <div className="brand-title">FigureStudio</div>
-            <div className="brand-subtitle">P108 · 科研论文绘图工作台</div>
-          </div>
+          <div className="brand-title">FigureStudio</div>
         </div>
 
         <nav className="menu-strip" aria-label="主菜单">
@@ -405,10 +387,10 @@ function App() {
             }}
           />
           <button className="quiet-button" type="button" onClick={restoreDemoProject}>
-            恢复项目
+            恢复
           </button>
           <button className="quiet-button" type="button" onClick={saveDemoProject}>
-            保存状态
+            保存
           </button>
           <button
             className="primary-button"
@@ -424,203 +406,105 @@ function App() {
         <aside className="left-panel">
           <div className="panel-heading">
             <span>项目</span>
-            <button type="button" title="恢复默认演示" onClick={resetDemo}>
+            <button type="button" title="恢复演示数据" onClick={resetDemo}>
               ↺
             </button>
           </div>
 
-          <div className="tree">
-            <div className="tree-row tree-root">
-              <span className="chevron">⌄</span>
-              <span className="tree-icon">◇</span>
-              <span>未命名项目</span>
-            </div>
-
-            <div className="tree-row tree-folder">
-              <span className="tree-indent" />
-              <span className="chevron">⌄</span>
-              <span className="tree-icon">▱</span>
-              <span>数据</span>
-            </div>
-
-            <button className="tree-row tree-button tree-selected" type="button">
-              <span className="tree-indent wide" />
-              <span className="tree-icon">▦</span>
-              <span className="tree-label">{dataset.name}</span>
-            </button>
-
-            <div className="column-list">
-              <div className="column-row">
-                <span className="role-chip">X</span>
-                <span>{axisLabel(dataset.x.name, dataset.x.unit)}</span>
+          <div className="left-scroll">
+            <div className="tree">
+              <div className="tree-row tree-root">
+                <span className="chevron">⌄</span>
+                <span className="tree-icon">◇</span>
+                <span>未命名项目</span>
               </div>
-              {dataset.ys.map((series, index) => (
-                <button
-                  key={series.id}
-                  type="button"
-                  className={
-                    selectedSeries?.id === series.id
-                      ? "column-row column-button column-selected"
-                      : "column-row column-button"
-                  }
-                  onClick={() => setSelectedSeriesId(series.id)}
-                >
-                  <span className="role-chip">Y{index + 1}</span>
-                  <span>{axisLabel(series.name, series.unit)}</span>
-                </button>
-              ))}
-            </div>
 
-            <div className="tree-row tree-folder tree-space">
-              <span className="tree-indent" />
-              <span className="chevron">⌄</span>
-              <span className="tree-icon">▱</span>
-              <span>图形</span>
-            </div>
+              <div className="tree-row tree-folder">
+                <span className="tree-indent" />
+                <span className="chevron">⌄</span>
+                <span className="tree-icon">▱</span>
+                <span>数据</span>
+              </div>
 
-            <button className="tree-row tree-button" type="button">
-              <span className="tree-indent wide" />
-              <span className="tree-icon">▧</span>
-              <span>图 1 · 光谱</span>
-            </button>
+              <button className="tree-row tree-button tree-selected" type="button">
+                <span className="tree-indent wide" />
+                <span className="tree-icon">▦</span>
+                <span className="tree-label">{dataset.name}</span>
+              </button>
 
-            <div className="tree-row tree-folder">
-              <span className="tree-indent" />
-              <span className="chevron">›</span>
-              <span className="tree-icon">▱</span>
-              <span>模板</span>
-            </div>
-          </div>
-
-          <div className="left-section">
-            <div className="section-label">曲线与图层</div>
-            <div className="series-list">
-              {[...orderedSeries].reverse().map((series) => {
-                const sourceIndex = Math.max(
-                  0,
-                  dataset.ys.findIndex((item) => item.id === series.id)
-                );
-                const override = seriesOverrides[series.id] || {};
-                const color =
-                  override.color || preset.palette[sourceIndex % preset.palette.length];
-
-                return (
+              <div className="column-list">
+                <div className="column-row">
+                  <span className="role-chip">X</span>
+                  <span>{axisLabel(dataset.x.name, dataset.x.unit)}</span>
+                </div>
+                {dataset.ys.map((series, index) => (
                   <button
                     key={series.id}
                     type="button"
                     className={
                       selectedSeries?.id === series.id
-                        ? "series-row series-selected"
-                        : "series-row"
+                        ? "column-row column-button column-selected"
+                        : "column-row column-button"
                     }
                     onClick={() => setSelectedSeriesId(series.id)}
                   >
-                    <span className="series-color" style={{ backgroundColor: color }} />
-                    <span>{series.name}</span>
-                    <span className="layer-mark">图层</span>
+                    <span className="role-chip">Y{index + 1}</span>
+                    <span>{axisLabel(series.name, series.unit)}</span>
                   </button>
-                );
-              })}
-            </div>
-          </div>
+                ))}
+              </div>
 
-          <div className="left-footer">
-            <button type="button" onClick={() => fileInputRef.current?.click()}>
-              + 添加数据
-            </button>
+              <div className="tree-row tree-folder tree-space">
+                <span className="tree-indent" />
+                <span className="chevron">⌄</span>
+                <span className="tree-icon">▱</span>
+                <span>图形</span>
+              </div>
+
+              <button className="tree-row tree-button" type="button">
+                <span className="tree-indent wide" />
+                <span className="tree-icon">▧</span>
+                <span>图 1 · 光谱</span>
+              </button>
+            </div>
+
+            <div className="left-section">
+              <div className="section-label">曲线</div>
+              <div className="series-list">
+                {[...orderedSeries].reverse().map((series) => {
+                  const sourceIndex = Math.max(
+                    0,
+                    dataset.ys.findIndex((item) => item.id === series.id)
+                  );
+                  const override = seriesOverrides[series.id] || {};
+                  const color =
+                    override.color || preset.palette[sourceIndex % preset.palette.length];
+
+                  return (
+                    <button
+                      key={series.id}
+                      type="button"
+                      className={
+                        selectedSeries?.id === series.id
+                          ? "series-row series-selected"
+                          : "series-row"
+                      }
+                      onClick={() => setSelectedSeriesId(series.id)}
+                    >
+                      <span className="series-color" style={{ backgroundColor: color }} />
+                      <span className="series-name">{series.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </aside>
 
         <section className="center-panel">
           <div className="figure-toolbar">
-            <div className="preset-tabs">
-              {presetOrder.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={id === presetId ? "preset-tab preset-active" : "preset-tab"}
-                  onClick={() => setPresetId(id)}
-                >
-                  {presets[id].label}
-                </button>
-              ))}
-            </div>
-
-            <div className="figure-actions">
-              <span className="wysiwyg-badge">所见即所得</span>
-              <button type="button" onClick={() => void resetView()}>
-                重置视图
-              </button>
-              <button type="button" onClick={() => void exportFigure("svg")}>
-                导出 SVG
-              </button>
-              <button type="button" onClick={() => void exportFigure("png")}>
-                导出 PNG 600 dpi
-              </button>
-            </div>
-          </div>
-
-          <div ref={canvasRef} className="canvas-area">
-            <div className="paper-stage" style={{ width: scaledWidth + "px" }}>
-              <div className="paper-caption">
-                <span>图 1</span>
-                <span>
-                  {preset.widthMm} × {preset.heightMm} mm · 预览缩放{" "}
-                  {Math.round(previewScale * 100)}%
-                </span>
-              </div>
-
-              <div
-                className="scaled-paper-shell"
-                style={{
-                  width: scaledWidth + "px",
-                  height: scaledHeight + "px"
-                }}
-              >
-                <div
-                  className="figure-paper"
-                  style={{
-                    width: layout.width + "px",
-                    height: layout.height + "px",
-                    transform: "scale(" + previewScale + ")"
-                  }}
-                >
-                  <div
-                    ref={plotRef}
-                    className="plot-host"
-                    style={{
-                      width: layout.width + "px",
-                      height: layout.height + "px"
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="statusbar">
-            <span className="status-message">{message}</span>
-            <span className="status-meta">
-              {preset.label} · {preset.widthMm} × {preset.heightMm} mm ·{" "}
-              {effectiveFontFamily} · {effectiveFontSizePt} pt
-            </span>
-          </div>
-        </section>
-
-        <aside className="right-panel">
-          <div className="inspector-heading">
-            <div>
-              <div className="inspector-kicker">属性</div>
-              <div className="inspector-title">{selectedSeries?.name || "图形"}</div>
-            </div>
-            <span className="selection-badge">曲线</span>
-          </div>
-
-          <section className="property-section">
-            <div className="property-title">图形</div>
-
-            <label className="field">
-              <span>预设</span>
+            <div className="toolbar-field">
+              <span>样式</span>
               <select
                 value={presetId}
                 onChange={(event) => setPresetId(event.target.value as PresetId)}
@@ -631,182 +515,276 @@ function App() {
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            <div className="field-with-reset">
-              <label className="field">
-                <span>字体</span>
+            <div className="figure-actions">
+              <button type="button" onClick={() => void resetView()}>
+                重置视图
+              </button>
+              <button type="button" onClick={() => void exportFigure("svg")}>
+                SVG
+              </button>
+              <button type="button" onClick={() => void exportFigure("png")}>
+                PNG
+              </button>
+            </div>
+          </div>
+
+          <div ref={canvasRef} className="canvas-area">
+            <div
+              className="scaled-paper-shell"
+              style={{
+                width: scaledWidth + "px",
+                height: scaledHeight + "px"
+              }}
+            >
+              <div
+                className="figure-paper"
+                style={{
+                  width: layout.width + "px",
+                  height: layout.height + "px",
+                  transform: "scale(" + previewScale + ")"
+                }}
+              >
+                <div
+                  ref={plotRef}
+                  className="plot-host"
+                  style={{
+                    width: layout.width + "px",
+                    height: layout.height + "px"
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside className="right-panel">
+          <div className="inspector-heading">
+            <span>属性</span>
+            <strong>{selectedSeries?.name || "图形"}</strong>
+          </div>
+
+          <div className="inspector-scroll">
+            <section className="inspector-group">
+              <div className="group-title">画布</div>
+
+              <div className="prop-row">
+                <label>比例</label>
                 <select
-                  value={effectiveFontFamily}
+                  value={aspectMode}
                   onChange={(event) =>
-                    setFigureField(
-                      "fontFamily",
-                      event.target.value as "Arial" | "Times New Roman"
-                    )
+                    setFigureField("aspectMode", event.target.value as AspectMode)
                   }
                 >
-                  <option>Arial</option>
-                  <option>Times New Roman</option>
+                  <option value="16:9">16 : 9</option>
+                  <option value="4:3">4 : 3</option>
+                  <option value="3:2">3 : 2</option>
+                  <option value="custom">自定义</option>
                 </select>
-              </label>
-              <ResetButton
-                visible={figureOverrides.fontFamily !== undefined}
-                onReset={() => resetFigureField("fontFamily")}
-              />
-            </div>
+              </div>
 
-            <div className="field-with-reset">
-              <label className="field">
-                <span>字号</span>
-                <div className="number-unit">
-                  <input
-                    type="number"
-                    min="5"
-                    max="16"
-                    step="0.25"
-                    value={effectiveFontSizePt}
-                    onChange={(event) =>
-                      setFigureField("fontSizePt", Number(event.target.value))
-                    }
-                  />
-                  <span>pt</span>
+              {aspectMode === "custom" && (
+                <div className="prop-row">
+                  <label>自定义</label>
+                  <div className="ratio-pair">
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.1"
+                      value={figureOverrides.customAspectWidth ?? 4}
+                      onChange={(event) =>
+                        setFigureField("customAspectWidth", Number(event.target.value))
+                      }
+                    />
+                    <span>:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.1"
+                      value={figureOverrides.customAspectHeight ?? 3}
+                      onChange={(event) =>
+                        setFigureField("customAspectHeight", Number(event.target.value))
+                      }
+                    />
+                  </div>
                 </div>
-              </label>
-              <ResetButton
-                visible={figureOverrides.fontSizePt !== undefined}
-                onReset={() => resetFigureField("fontSizePt")}
-              />
-            </div>
+              )}
 
-            <Toggle
-              label="显示图例"
-              checked={effectiveLegendVisible}
-              onChange={(value) => setFigureField("legendVisible", value)}
-            />
-
-            <label className="field">
-              <span>X 轴标题</span>
-              <input
-                type="text"
-                value={effectiveXTitle}
-                onChange={(event) => setFigureField("xTitle", event.target.value)}
-              />
-            </label>
-
-            <label className="field">
-              <span>Y 轴标题</span>
-              <input
-                type="text"
-                value={effectiveYTitle}
-                onChange={(event) => setFigureField("yTitle", event.target.value)}
-              />
-            </label>
-
-            <div className="hint">
-              支持 Unicode 与 LaTeX，例如：<code>$\lambda$</code>
-            </div>
-          </section>
-
-          <section className="property-section">
-            <div className="property-title">曲线</div>
-
-            <div className="layer-controls">
-              <button
-                type="button"
-                disabled={isTopLayer}
-                onClick={() => moveSelectedSeries("up")}
-              >
-                上移一层
-              </button>
-              <button
-                type="button"
-                disabled={isBottomLayer}
-                onClick={() => moveSelectedSeries("down")}
-              >
-                下移一层
-              </button>
-            </div>
-
-            <div className="field-with-reset">
-              <label className="field">
-                <span>线宽</span>
-                <div className="range-line">
-                  <input
-                    type="range"
-                    min="0.4"
-                    max="3"
-                    step="0.05"
-                    value={lineWidth}
+              <div className="prop-row">
+                <label>字体</label>
+                <div className="control-with-reset">
+                  <select
+                    value={effectiveFontFamily}
                     onChange={(event) =>
-                      updateSeriesOverride({ lineWidthPt: Number(event.target.value) })
+                      setFigureField(
+                        "fontFamily",
+                        event.target.value as "Arial" | "Times New Roman"
+                      )
                     }
+                  >
+                    <option>Arial</option>
+                    <option>Times New Roman</option>
+                  </select>
+                  <ResetIcon
+                    visible={figureOverrides.fontFamily !== undefined}
+                    onReset={() => resetFigureField("fontFamily")}
                   />
-                  <strong>{lineWidth.toFixed(2)} pt</strong>
                 </div>
-              </label>
-              <ResetButton
-                visible={selectedOverride.lineWidthPt !== undefined}
-                onReset={() => resetSeriesField("lineWidthPt")}
-              />
-            </div>
+              </div>
 
-            <div className="field-with-reset">
-              <label className="field">
-                <span>透明度</span>
-                <div className="range-line">
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1"
-                    step="0.05"
-                    value={opacity}
-                    onChange={(event) =>
-                      updateSeriesOverride({ opacity: Number(event.target.value) })
-                    }
+              <div className="prop-row">
+                <label>字号</label>
+                <div className="control-with-reset">
+                  <div className="compact-number">
+                    <input
+                      type="number"
+                      min="5"
+                      max="16"
+                      step="0.25"
+                      value={effectiveFontSizePt}
+                      onChange={(event) =>
+                        setFigureField("fontSizePt", Number(event.target.value))
+                      }
+                    />
+                    <span>pt</span>
+                  </div>
+                  <ResetIcon
+                    visible={figureOverrides.fontSizePt !== undefined}
+                    onReset={() => resetFigureField("fontSizePt")}
                   />
-                  <strong>{Math.round(opacity * 100)}%</strong>
                 </div>
-              </label>
-              <ResetButton
-                visible={selectedOverride.opacity !== undefined}
-                onReset={() => resetSeriesField("opacity")}
-              />
-            </div>
+              </div>
 
-            <Toggle
-              label="显示数据点"
-              checked={markerVisible}
-              onChange={(value) => updateSeriesOverride({ markerVisible: value })}
-            />
+              <div className="prop-row">
+                <label>图例</label>
+                <MiniSwitch
+                  checked={effectiveLegendVisible}
+                  onChange={(value) => setFigureField("legendVisible", value)}
+                />
+              </div>
 
-            <div className="field-with-reset">
-              <label className="field">
-                <span>数据点大小</span>
-                <div className="range-line">
-                  <input
-                    type="range"
-                    min="2"
-                    max="10"
-                    step="0.25"
-                    value={markerSize}
-                    disabled={!markerVisible}
-                    onChange={(event) =>
-                      updateSeriesOverride({ markerSizePt: Number(event.target.value) })
-                    }
+              <div className="prop-row prop-muted">
+                <label>尺寸</label>
+                <span>
+                  {canvasMm.widthMm.toFixed(0)} × {canvasMm.heightMm.toFixed(1)} mm
+                </span>
+              </div>
+            </section>
+
+            <section className="inspector-group">
+              <div className="group-title">曲线</div>
+
+              <div className="prop-row">
+                <label>图层</label>
+                <div className="layer-inline">
+                  <button
+                    type="button"
+                    title="下移一层"
+                    disabled={isBottomLayer}
+                    onClick={() => moveSelectedSeries("down")}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    title="上移一层"
+                    disabled={isTopLayer}
+                    onClick={() => moveSelectedSeries("up")}
+                  >
+                    ↑
+                  </button>
+                </div>
+              </div>
+
+              <div className="prop-row">
+                <label>线宽</label>
+                <div className="control-with-reset">
+                  <div className="compact-number">
+                    <input
+                      type="number"
+                      min="0.4"
+                      max="3"
+                      step="0.05"
+                      value={lineWidth}
+                      onChange={(event) =>
+                        updateSeriesOverride({ lineWidthPt: Number(event.target.value) })
+                      }
+                    />
+                    <span>pt</span>
+                  </div>
+                  <ResetIcon
+                    visible={selectedOverride.lineWidthPt !== undefined}
+                    onReset={() => resetSeriesField("lineWidthPt")}
                   />
-                  <strong>{markerSize.toFixed(1)} pt</strong>
                 </div>
-              </label>
-              <ResetButton
-                visible={selectedOverride.markerSizePt !== undefined}
-                onReset={() => resetSeriesField("markerSizePt")}
-              />
-            </div>
+              </div>
 
-            <div className="field-with-reset">
-              <label className="field color-field">
-                <span>颜色</span>
-                <div>
+              <div className="prop-row">
+                <label>透明度</label>
+                <div className="control-with-reset">
+                  <div className="compact-number">
+                    <input
+                      type="number"
+                      min="10"
+                      max="100"
+                      step="5"
+                      value={Math.round(opacity * 100)}
+                      onChange={(event) =>
+                        updateSeriesOverride({
+                          opacity: Number(event.target.value) / 100
+                        })
+                      }
+                    />
+                    <span>%</span>
+                  </div>
+                  <ResetIcon
+                    visible={selectedOverride.opacity !== undefined}
+                    onReset={() => resetSeriesField("opacity")}
+                  />
+                </div>
+              </div>
+
+              <div className="prop-row">
+                <label>数据点</label>
+                <select
+                  value={markerVisible ? "circle" : "none"}
+                  onChange={(event) =>
+                    updateSeriesOverride({ markerVisible: event.target.value !== "none" })
+                  }
+                >
+                  <option value="none">无</option>
+                  <option value="circle">圆点</option>
+                </select>
+              </div>
+
+              <div className="prop-row">
+                <label>点大小</label>
+                <div className="control-with-reset">
+                  <div className="compact-number">
+                    <input
+                      type="number"
+                      min="2"
+                      max="10"
+                      step="0.25"
+                      value={markerSize}
+                      disabled={!markerVisible}
+                      onChange={(event) =>
+                        updateSeriesOverride({ markerSizePt: Number(event.target.value) })
+                      }
+                    />
+                    <span>pt</span>
+                  </div>
+                  <ResetIcon
+                    visible={selectedOverride.markerSizePt !== undefined}
+                    onReset={() => resetSeriesField("markerSizePt")}
+                  />
+                </div>
+              </div>
+
+              <div className="prop-row">
+                <label>颜色</label>
+                <div className="control-with-reset color-control">
                   <input
                     type="color"
                     value={selectedColor}
@@ -814,43 +792,37 @@ function App() {
                       updateSeriesOverride({ color: event.target.value })
                     }
                   />
-                  <span className="color-value">{selectedColor.toUpperCase()}</span>
+                  <span>{selectedColor.toUpperCase()}</span>
+                  <ResetIcon
+                    visible={selectedOverride.color !== undefined}
+                    onReset={() => resetSeriesField("color")}
+                  />
                 </div>
-              </label>
-              <ResetButton
-                visible={selectedOverride.color !== undefined}
-                onReset={() => resetSeriesField("color")}
-              />
-            </div>
-          </section>
+              </div>
+            </section>
 
-          <section className="property-section property-summary">
-            <div className="property-title">出版信息</div>
-            <dl>
-              <div>
-                <dt>画布尺寸</dt>
-                <dd>
-                  {preset.widthMm} × {preset.heightMm} mm
-                </dd>
+            <section className="inspector-group">
+              <div className="group-title">坐标轴</div>
+
+              <div className="prop-row">
+                <label>X 标题</label>
+                <input
+                  type="text"
+                  value={effectiveXTitle}
+                  onChange={(event) => setFigureField("xTitle", event.target.value)}
+                />
               </div>
-              <div>
-                <dt>轴线宽度</dt>
-                <dd>{preset.axisWidthPt} pt</dd>
+
+              <div className="prop-row">
+                <label>Y 标题</label>
+                <input
+                  type="text"
+                  value={effectiveYTitle}
+                  onChange={(event) => setFigureField("yTitle", event.target.value)}
+                />
               </div>
-              <div>
-                <dt>网格</dt>
-                <dd>{preset.showGrid ? "开启" : "关闭"}</dd>
-              </div>
-              <div>
-                <dt>PNG</dt>
-                <dd>{PNG_DPI} dpi</dd>
-              </div>
-              <div>
-                <dt>渲染器</dt>
-                <dd>Plotly.js</dd>
-              </div>
-            </dl>
-          </section>
+            </section>
+          </div>
         </aside>
       </main>
     </div>

@@ -15,6 +15,7 @@ export interface Dataset {
 }
 
 export type PresetId = "scientific" | "nature" | "presentation";
+export type AspectMode = "16:9" | "4:3" | "3:2" | "custom";
 
 export interface PresetDefinition {
   id: PresetId;
@@ -45,10 +46,13 @@ export interface FigureOverrides {
   legendVisible?: boolean;
   xTitle?: string;
   yTitle?: string;
+  aspectMode?: AspectMode;
+  customAspectWidth?: number;
+  customAspectHeight?: number;
 }
 
 export interface StoredProject {
-  version: 2;
+  version: 3;
   dataset: Dataset;
   presetId: PresetId;
   figureOverrides: FigureOverrides;
