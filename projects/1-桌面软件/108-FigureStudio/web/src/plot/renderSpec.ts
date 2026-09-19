@@ -235,6 +235,7 @@ export function buildTraces(args: {
             text: normalizePlotlyMathText(
               figure.figureOverrides.colorbarTitle
             ),
+            side: "right",
             font: {
               family: fieldFontFamily,
               size: ptToPx(
@@ -364,6 +365,7 @@ export function buildTraces(args: {
                 text: normalizePlotlyMathText(
                   figure.figureOverrides.colorbarTitle
                 ),
+                side: "right",
                 font: {
                   family: plotFontFamily(
                     figure.figureOverrides.fontFamily ?? preset.fontFamily
