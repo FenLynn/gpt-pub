@@ -269,7 +269,7 @@ def configure_axis(axis_obj, side="left"):
     apply_tick_formatter(axis_obj, "y", fmt, decimals, prefix, suffix)
     axis_obj.tick_params(
         axis="y",
-        direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
+        direction="in" if O.get("tickDirection", "outside") == "inside" else "out",
         labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
@@ -315,7 +315,7 @@ def configure_x(axis_obj):
 
     axis_obj.tick_params(
         axis="x",
-        direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
+        direction="in" if O.get("tickDirection", "outside") == "inside" else "out",
         labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
@@ -393,7 +393,7 @@ def legend_kwargs():
     return kwargs
 
 def add_legend(axis_obj, secondary=None):
-    if not O.get("legendVisible", True):
+    if not O.get("legendVisible", len(keys) > 1):
         return
     handles, labels = axis_obj.get_legend_handles_labels()
     if secondary is not None:
@@ -447,7 +447,7 @@ if template == "surface-3d":
         X, Y, z,
         cmap=cmap_name,
         linewidth=0,
-        antialiased=True,
+        antialiased=False,
         **kwargs
     )
     if O.get("colorbarVisible", True):
@@ -550,6 +550,8 @@ else:
     base_bar_width = numeric_spacing * (1.0 - bar_gap)
 
     stack_bottom = np.zeros(len(x), dtype=float)
+    left_axis_color = None
+    right_axis_color = None
 
     for source_index, key in enumerate(order):
         if key not in series:
@@ -568,10 +570,17 @@ else:
                 current_x = current_x + plotted * float(O.get("waterfallXOffset", 0.5))
 
         target = ax
+        axis_side = "left"
         if template == "double-y" and axis_for_series(key, plotted) == "right":
             target = ax2
+            axis_side = "right"
 
         color = color_for(key, source_index)
+        if template == "double-y":
+            if axis_side == "right" and right_axis_color is None:
+                right_axis_color = color
+            elif axis_side == "left" and left_axis_color is None:
+                left_axis_color = color
         alpha = float(style.get("opacity", 1.0))
         label = label_for(key)
 
@@ -579,7 +588,7 @@ else:
             if template == "bar" and plotted > 0:
                 continue
             edge = style.get("barBorderColor", color)
-            edge_width = float(style.get("barBorderWidthPt", 0.3))
+            edge_width = float(style.get("barBorderWidthPt", 0.0))
             bar_color = color
             if style.get("barColorMode") == "points":
                 bar_color = [palette[i % len(palette)] for i in range(len(current_x))]
@@ -637,25 +646,35 @@ else:
                 linestyle=linestyle,
                 marker=marker,
                 markersize=float(style.get("markerSizePt", PRESET["markerSizePt"])),
+                markeredgecolor=color,
+                markeredgewidth=0.0 if template == "xy-scatter" else 0.55,
             )
 
             if template == "xy-errorbar" and plotted == 0:
                 error_id = O.get("errorSeriesId")
                 yerr = finite_array(series[error_id]) if error_id in series else None
-                target.errorbar(current_x, y, yerr=yerr, capsize=2, **common)
+                target.errorbar(current_x, y, yerr=yerr, capsize=0, **common)
             elif template != "xy-errorbar":
                 target.plot(current_x, y, **common)
 
         plotted += 1
 
     finish_2d_axes(ax)
+    if template == "double-y" and left_axis_color is not None:
+        if O.get("tickLabelColor") is None:
+            ax.tick_params(axis="y", colors=left_axis_color)
+        if O.get("axisTitleColor") is None:
+            ax.yaxis.label.set_color(left_axis_color)
     if ax2 is not None:
         configure_axis(ax2, "right")
+        right_label_color = O.get("axisTitleColor") or right_axis_color or "#17191c"
         ax2.set_ylabel(
             P["autoTitles"]["rightY"],
             fontsize=O.get("axisTitleSizePt", font_size * 1.08),
-            color=O.get("axisTitleColor", "#17191c"),
+            color=right_label_color,
         )
+        if right_axis_color is not None and O.get("tickLabelColor") is None:
+            ax2.tick_params(axis="y", colors=right_axis_color)
         for spine in ax2.spines.values():
             spine.set_linewidth(axis_width)
         add_legend(ax, ax2)
