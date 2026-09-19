@@ -348,7 +348,9 @@ export function buildTraces(args: {
         colorbar: {
           thickness: 11,
           outlinewidth: 0,
-          len: 0.72,
+          len: 0.66,
+          x: 1.06,
+          xpad: 4,
           tickfont: {
             family: plotFontFamily(
               figure.figureOverrides.fontFamily ?? preset.fontFamily
