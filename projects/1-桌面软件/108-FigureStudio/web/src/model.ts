@@ -113,6 +113,7 @@ export type LegendPosition =
   | "bottom-left"
   | "bottom-center"
   | "bottom-right"
+  | "outside-right"
   | "custom";
 export type LegendOrientation = "horizontal" | "vertical";
 export type ColorScaleId =
