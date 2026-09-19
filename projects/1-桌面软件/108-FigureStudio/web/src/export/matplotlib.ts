@@ -358,7 +358,7 @@ def finish_2d_axes(axis_obj):
     axis_obj.set_facecolor(O.get("background", "#ffffff"))
 
 def legend_kwargs():
-    position = O.get("legendPosition", "top-right")
+    position = O.get("legendPosition", "top-left" if template == "double-y" else "top-right")
     loc_map = {
         "top-left": "upper left",
         "top-center": "upper center",
