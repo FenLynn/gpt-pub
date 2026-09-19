@@ -2,6 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PlotCanvas from './components/PlotCanvas.vue'
 import BeamProfileCanvas from './components/BeamProfileCanvas.vue'
+import powerAcqGif from './assets/acq-power.gif'
+import spectrumAcqGif from './assets/acq-spectrum.gif'
+import beamAcqGif from './assets/acq-beam.gif'
+import scopeAcqGif from './assets/acq-scope.gif'
 import { createDemoSnapshot } from './demo'
 import { hasNativeBridge, onSnapshot, request } from './bridge'
 import type { LaserSnapshot, PlotSeries } from './types'
@@ -16,6 +20,14 @@ const labelDraft = ref(snapshot.value.label)
 const beamZ = ref(snapshot.value.beam.z)
 const beamAtt = ref(snapshot.value.beam.attenuation)
 const beamPlaying = ref(false)
+const beamZDragging = ref(false)
+const beamAttDragging = ref(false)
+let beamZPending:number|null=null
+let beamAttPending:number|null=null
+let beamZSendBusy=false
+let beamAttSendBusy=false
+let beamZHoldUntil=0
+let beamAttHoldUntil=0
 const cameraFlash = ref(false)
 const recordElapsed = ref(0)
 const saveNotice = ref('')
@@ -183,8 +195,12 @@ function beginReadoutResize(e:PointerEvent,win:BigReadoutWindow){
   window.addEventListener('pointermove',move);window.addEventListener('pointerup',up)
 }
 
-watch(() => snapshot.value.beam.z, v => { if(!beamPlaying.value) beamZ.value=v })
-watch(() => snapshot.value.beam.attenuation, v => beamAtt.value=v)
+watch(() => snapshot.value.beam.z, v => {
+  if(!beamPlaying.value && !beamZDragging.value && Date.now()>=beamZHoldUntil) beamZ.value=v
+})
+watch(() => snapshot.value.beam.attenuation, v => {
+  if(!beamAttDragging.value && Date.now()>=beamAttHoldUntil) beamAtt.value=v
+})
 watch(() => snapshot.value.recording, recording => {
   if(recordTimer){window.clearInterval(recordTimer);recordTimer=undefined}
   if(recording){
@@ -219,8 +235,47 @@ async function screenshot(){
 async function toggleRecord(){ await request('app.record') }
 async function updateZ(value:number){beamZ.value=value;await request('beam.setZ',{value})}
 async function updateAtt(value:number){beamAtt.value=value;await request('beam.setAttenuation',{value})}
-function onZInput(e:Event){const target=e.target as HTMLInputElement;void updateZ(Number(target.value))}
-function onAttInput(e:Event){const target=e.target as HTMLInputElement;void updateAtt(Number(target.value))}
+async function flushBeamZ(){
+  if(beamZSendBusy||beamZPending===null)return
+  beamZSendBusy=true
+  const value=beamZPending
+  beamZPending=null
+  try{await request('beam.setZ',{value})}
+  finally{beamZSendBusy=false;if(beamZPending!==null)void flushBeamZ()}
+}
+async function flushBeamAtt(){
+  if(beamAttSendBusy||beamAttPending===null)return
+  beamAttSendBusy=true
+  const value=beamAttPending
+  beamAttPending=null
+  try{await request('beam.setAttenuation',{value})}
+  finally{beamAttSendBusy=false;if(beamAttPending!==null)void flushBeamAtt()}
+}
+function beginZDrag(){
+  if(beamPlaying.value){
+    beamPlaying.value=false
+    if(beamTimer){window.clearInterval(beamTimer);beamTimer=undefined}
+  }
+  beamZDragging.value=true
+  beamZHoldUntil=Number.POSITIVE_INFINITY
+}
+function endZDrag(){beamZDragging.value=false;beamZHoldUntil=Date.now()+450;beamZPending=beamZ.value;void flushBeamZ()}
+function beginAttDrag(){beamAttDragging.value=true;beamAttHoldUntil=Number.POSITIVE_INFINITY}
+function endAttDrag(){beamAttDragging.value=false;beamAttHoldUntil=Date.now()+450;beamAttPending=beamAtt.value;void flushBeamAtt()}
+function onZInput(e:Event){
+  const value=Number((e.target as HTMLInputElement).value)
+  beamZ.value=value
+  beamZHoldUntil=Date.now()+450
+  beamZPending=value
+  void flushBeamZ()
+}
+function onAttInput(e:Event){
+  const value=Number((e.target as HTMLInputElement).value)
+  beamAtt.value=value
+  beamAttHoldUntil=Date.now()+450
+  beamAttPending=value
+  void flushBeamAtt()
+}
 function toggleBeamPlay(){
   beamPlaying.value=!beamPlaying.value
   if(beamTimer){window.clearInterval(beamTimer);beamTimer=undefined}
@@ -290,10 +345,10 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <button class="icon-btn check-btn" @click="setLabel" title="确认标签"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></button>
       <div class="vsep"></div>
 
-      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power,breathing:moduleActive('power')}" @click="toggleSource('power')" title="本次采集包含功率"><svg viewBox="0 0 24 24"><path class="power-bar bar-1" d="M4 19V10"/><path class="power-bar bar-2" d="M9 19V5"/><path class="power-bar bar-3" d="M14 19V11"/><path class="power-bar bar-4" d="M19 19V8"/></svg></button>
-      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}" @click="toggleSource('spectrum')" title="本次采集包含光谱"><svg viewBox="0 0 24 24"><path class="travel-wave spectrum-wave" d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></button>
-      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam,breathing:moduleActive('beam')}" @click="toggleSource('beam')" title="本次采集包含光束"><svg viewBox="0 0 24 24"><circle class="beam-ring ring-1" cx="12" cy="12" r="3.2"/><circle class="beam-ring ring-2" cx="12" cy="12" r="5.8"/><circle class="beam-ring ring-3" cx="12" cy="12" r="8.4"/><circle class="beam-core" cx="12" cy="12" r="1.6"/><path class="beam-cross" d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
-      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope,breathing:moduleActive('scope')}" @click="toggleSource('scope')" title="本次采集包含示波器"><svg viewBox="0 0 24 24"><path class="travel-wave scope-wave" d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></button>
+      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power,breathing:moduleActive('power')}" @click="toggleSource('power')" title="本次采集包含功率"><img v-if="moduleActive('power')" class="acq-gif" :src="powerAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></button>
+      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}" @click="toggleSource('spectrum')" title="本次采集包含光谱"><img v-if="moduleActive('spectrum')" class="acq-gif" :src="spectrumAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></button>
+      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam,breathing:moduleActive('beam')}" @click="toggleSource('beam')" title="本次采集包含光束"><img v-if="moduleActive('beam')" class="acq-gif" :src="beamAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope,breathing:moduleActive('scope')}" @click="toggleSource('scope')" title="本次采集包含示波器"><img v-if="moduleActive('scope')" class="acq-gif" :src="scopeAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></button>
 
       <span class="capture-state" :class="snapshot.captureState">{{captureStateText}}</span>
       <div class="top-spacer"></div>
@@ -306,10 +361,10 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
 
     <aside class="sidebar" :class="{expanded:sidebarExpanded}">
       <button :class="{active:activePage==='dashboard'}" @click="nav('dashboard')" title="总览"><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9H7v-7h10v7"/></svg><span v-if="sidebarExpanded">总览</span></button>
-      <button class="power-accent" :class="{active:activePage==='power',breathing:moduleActive('power')}" @click="nav('power')" title="功率"><svg viewBox="0 0 24 24"><path class="power-bar bar-1" d="M4 19V10"/><path class="power-bar bar-2" d="M9 19V5"/><path class="power-bar bar-3" d="M14 19V11"/><path class="power-bar bar-4" d="M19 19V8"/></svg><span v-if="sidebarExpanded">功率</span></button>
-      <button class="spectrum-accent" :class="{active:activePage==='spectrum',breathing:moduleActive('spectrum')}" @click="nav('spectrum')" title="光谱"><svg viewBox="0 0 24 24"><path class="travel-wave spectrum-wave" d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg><span v-if="sidebarExpanded">光谱</span></button>
-      <button class="beam-accent" :class="{active:activePage==='beam',breathing:moduleActive('beam')}" @click="nav('beam')" title="光束"><svg viewBox="0 0 24 24"><circle class="beam-ring ring-1" cx="12" cy="12" r="3.2"/><circle class="beam-ring ring-2" cx="12" cy="12" r="5.8"/><circle class="beam-ring ring-3" cx="12" cy="12" r="8.4"/><circle class="beam-core" cx="12" cy="12" r="1.6"/><path class="beam-cross" d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg><span v-if="sidebarExpanded">光束</span></button>
-      <button class="scope-accent" :class="{active:activePage==='scope',breathing:moduleActive('scope')}" @click="nav('scope')" title="示波器"><svg viewBox="0 0 24 24"><path class="travel-wave scope-wave" d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg><span v-if="sidebarExpanded">示波器</span></button>
+      <button class="power-accent" :class="{active:activePage==='power'}" @click="nav('power')" title="功率"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg><span v-if="sidebarExpanded">功率</span></button>
+      <button class="spectrum-accent" :class="{active:activePage==='spectrum'}" @click="nav('spectrum')" title="光谱"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg><span v-if="sidebarExpanded">光谱</span></button>
+      <button class="beam-accent" :class="{active:activePage==='beam'}" @click="nav('beam')" title="光束"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span v-if="sidebarExpanded">光束</span></button>
+      <button class="scope-accent" :class="{active:activePage==='scope'}" @click="nav('scope')" title="示波器"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg><span v-if="sidebarExpanded">示波器</span></button>
       <button :class="{active:activePage==='data'}" @click="nav('data')" title="数据"><svg viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5zM8 10h8M8 14h8M8 18h5"/></svg><span v-if="sidebarExpanded">数据</span></button>
       <div class="side-spacer"></div>
       <button :class="{active:activePage==='settings'}" @click="nav('settings')" title="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span v-if="sidebarExpanded">设置</span></button>
@@ -338,7 +393,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <section v-if="!['data','settings'].includes(activePage)" class="dashboard-grid" :class="{'focus-mode':activePage!=='dashboard'}">
         <article class="instrument-panel power-panel" :class="{hidden:!['dashboard','power'].includes(activePage)}">
           <div class="module-head power-head graph-overlay">
-            <div class="module-title"><div class="panel-mark power-accent" :class="{selected:snapshot.captureSelection.power,breathing:moduleActive('power')}"><svg viewBox="0 0 24 24"><path class="power-bar bar-1" d="M4 19V10"/><path class="power-bar bar-2" d="M9 19V5"/><path class="power-bar bar-3" d="M14 19V11"/><path class="power-bar bar-4" d="M19 19V8"/></svg></div><strong>功率</strong><span v-if="activePage==='power'" class="focus-page-state" :class="{running:moduleActive('power')}"><i></i>{{moduleActive('power')?'采集中':'就绪'}}</span></div>
+            <div class="module-title"><div class="panel-mark power-accent" :class="{selected:snapshot.captureSelection.power,breathing:moduleActive('power')}"><img v-if="moduleActive('power')" class="acq-gif" :src="powerAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div><strong>功率</strong><span v-if="activePage==='power'" class="focus-page-state" :class="{running:moduleActive('power')}"><i></i>{{moduleActive('power')?'采集中':'就绪'}}</span></div>
             <div class="head-metrics">
               <template v-for="(t,index) in snapshot.power.traces" :key="t.name"><button v-if="powerVisible(index)" class="metric-trigger" @click="openReadout(powerReadoutKind(index))"><em>{{t.name}}</em><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></button></template>
             </div>
@@ -358,7 +413,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         </article>
 
         <article class="instrument-panel spectrum-panel" :class="{hidden:!['dashboard','spectrum'].includes(activePage)}">
-          <div class="spectrum-head graph-overlay"><div class="module-title"><div class="panel-mark inline spectrum-accent" :class="{selected:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}"><svg viewBox="0 0 24 24"><path class="travel-wave spectrum-wave" d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><strong>光谱</strong><span v-if="activePage==='spectrum'" class="focus-page-state" :class="{running:moduleActive('spectrum')}"><i></i>{{moduleActive('spectrum')?'采集中':'就绪'}}</span></div><div class="osa-metrics"><button class="metric-trigger primary-metric" @click="openReadout('spectrumCenter')"><em>λc</em><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrum3db')"><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrumRms')"><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger primary-metric" @click="openReadout('spectrumPower')"><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button></div></div>
+          <div class="spectrum-head graph-overlay"><div class="module-title"><div class="panel-mark inline spectrum-accent" :class="{selected:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}"><img v-if="moduleActive('spectrum')" class="acq-gif" :src="spectrumAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><strong>光谱</strong><span v-if="activePage==='spectrum'" class="focus-page-state" :class="{running:moduleActive('spectrum')}"><i></i>{{moduleActive('spectrum')?'采集中':'就绪'}}</span></div><div class="osa-metrics"><button class="metric-trigger primary-metric" @click="openReadout('spectrumCenter')"><em>λc</em><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrum3db')"><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrumRms')"><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger primary-metric" @click="openReadout('spectrumPower')"><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button></div></div>
           <div v-if="activePage==='spectrum'" class="focus-summary">
             <button class="focus-metric" @click="openReadout('spectrumCenter')"><span>中心波长</span><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button>
             <button class="focus-metric" @click="openReadout('spectrum3db')"><span>3 dB</span><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button>
@@ -370,7 +425,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         </article>
 
         <article class="instrument-panel beam-panel" :class="{hidden:!['dashboard','beam'].includes(activePage)}">
-          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{selected:snapshot.captureSelection.beam,breathing:moduleActive('beam')}"><svg viewBox="0 0 24 24"><circle class="beam-ring ring-1" cx="12" cy="12" r="3.2"/><circle class="beam-ring ring-2" cx="12" cy="12" r="5.8"/><circle class="beam-ring ring-3" cx="12" cy="12" r="8.4"/><circle class="beam-core" cx="12" cy="12" r="1.6"/><path class="beam-cross" d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></div><strong>光束</strong><span v-if="activePage==='beam'" class="focus-page-state" :class="{running:moduleActive('beam')}"><i></i>{{moduleActive('beam')?'采集中':'就绪'}}</span></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M̄²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
+          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{selected:snapshot.captureSelection.beam,breathing:moduleActive('beam')}"><img v-if="moduleActive('beam')" class="acq-gif" :src="beamAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong><span v-if="activePage==='beam'" class="focus-page-state" :class="{running:moduleActive('beam')}"><i></i>{{moduleActive('beam')?'采集中':'就绪'}}</span></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @keydown="beginZDrag" @keyup="endZDrag" @blur="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @keydown="beginAttDrag" @keyup="endAttDrag" @blur="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M̄²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
           <div v-if="activePage==='beam'" class="focus-summary">
             <button class="focus-metric" @click="openReadout('beamM2x')"><span>M²x</span><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button>
             <button class="focus-metric" @click="openReadout('beamM2y')"><span>M²y</span><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button>
@@ -378,15 +433,15 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
           </div>
           <details v-if="activePage==='beam'" class="module-config-dock beam-page-config" open>
             <summary>观察控制</summary>
-            <div class="dock-control"><span>Z 位置</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b></div>
-            <div class="dock-control"><span>Attenuation</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div>
+            <div class="dock-control"><span>Z 位置</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @keydown="beginZDrag" @keyup="endZDrag" @blur="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b></div>
+            <div class="dock-control"><span>Attenuation</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @keydown="beginAttDrag" @keyup="endAttDrag" @blur="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div>
             <button class="dock-play" :class="{active:beamPlaying}" @click="toggleBeamPlay">{{beamPlaying?'停止 Z 浏览':'自动 Z 浏览'}}</button>
           </details>
           <div class="beam-body"><div class="beam-image-wrap"><BeamProfileCanvas :width-x="snapshot.beam.spotWidthX" :width-y="snapshot.beam.spotWidthY" :attenuation="beamAtt" /></div><PlotCanvas class="caustic-plot" :series="snapshot.beam.caustic" :vertical-marker="beamZ" :x-padding="0.04" x-label="Z (mm)" y-label="束宽 (μm)" /></div>
         </article>
 
         <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}">
-          <div class="module-head scope-head graph-overlay"><div class="module-title"><div class="panel-mark scope-accent" :class="{selected:snapshot.captureSelection.scope,breathing:moduleActive('scope')}"><svg viewBox="0 0 24 24"><path class="travel-wave scope-wave" d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong><span v-if="activePage==='scope'" class="focus-page-state" :class="{running:moduleActive('scope')}"><i></i>{{moduleActive('scope')?'采集中':'就绪'}}</span></div><div class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button><span class="secondary-metric">SR <b>2.5</b> MSa/s</span></div></div>
+          <div class="module-head scope-head graph-overlay"><div class="module-title"><div class="panel-mark scope-accent" :class="{selected:snapshot.captureSelection.scope,breathing:moduleActive('scope')}"><img v-if="moduleActive('scope')" class="acq-gif" :src="scopeAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong><span v-if="activePage==='scope'" class="focus-page-state" :class="{running:moduleActive('scope')}"><i></i>{{moduleActive('scope')?'采集中':'就绪'}}</span></div><div class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button><span class="secondary-metric">SR <b>2.5</b> MSa/s</span></div></div>
           <div v-if="activePage==='scope'" class="focus-summary">
             <button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="focus-metric" @click="openReadout(index===0?'scope0':'scope1')"><span>{{trace.name}}</span><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button>
             <div class="focus-metric passive"><span>采样率</span><b>2.5</b><small>MSa/s</small></div>

@@ -79,7 +79,7 @@ export function createDemoSnapshot(): LaserSnapshot {
   const p2 = powerSeries(1, '#ff8200', 'back', 'kW')
   const p3 = powerSeries(2, '#08a84f', 'eta', '%')
   return {
-    version: '0.4.18', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
+    version: '0.4.19', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
     captureSelection: { power: true, spectrum: true, beam: true, scope: false },
     config: {
       experimentFolder: '', autoScreenshot: false,

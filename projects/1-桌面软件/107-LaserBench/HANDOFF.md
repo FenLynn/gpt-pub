@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.18 Acquisition Motion / Header Density**，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.19 GIF Acquisition / Header Polish / Slider Stability**，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际设备提供者仍是 Simulator；真实 Ophir、Yokogawa、BeamSquared、Tektronix Driver 尚未正式接入。
-- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.18 继续锁定 Dashboard：四宫格外部位置不动，只调整采集动态图标、Beam 内部分栏、标题行文字密度、Scope 内部间隙和 REC 紧凑度；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
+- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.19 继续锁定 Dashboard：外部几何不动，running 图标改为 GIF；标题数据右边界/分隔/字号继续统一；REC 对齐；Beam Z/Att 拖动稳定性修复；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
 
 ## 当前产品不变量
 
@@ -49,7 +49,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - Dashboard 壳体使用冷深蓝灰，只有实际 Plot / 图像数据区白底；刻度区保持深色。Dashboard 不显示 X/Y 轴标题文字，只保留刻度数值与透明图内 Legend。
 - Power 物理功率与数学百分比通道使用独立纵轴；每个 Channel / Math Channel 的 Dashboard 显示开关在 Power 页管理，且与 Test 采集选择分离。
 - Dashboard 关键结果支持多个 Big Readout 同时存在；同一指标只保留一个窗口。每窗独立拖动、等比例缩放、黑白主题与关闭，并尽量紧贴读数内容。
-- 顶部采集选择图标与模块左上图标联动：选中绿色，running 时按模块语义动画——Power bar 跳动、Spectrum/Scope 横向波动、Beam 同心环外扩。
+- 顶部采集选择图标与模块左上图标联动：选中绿色；running 时直接调用内置 GIF，确保动画在 WebView2 下清晰可见。
 - Beam Z 只浏览轴向光斑并同步 caustic 参考线，不改写 caustic。
 - Scope Dashboard 最多显示两个通道时域和 FFT，通道开关必须同时作用于时域和 FFT。
 - 不使用 Electron、FFmpeg 或第三方图表库；生产 UI 明确允许 WebView2，绘图继续使用 Canvas。
