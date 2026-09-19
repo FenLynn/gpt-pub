@@ -1401,3 +1401,22 @@ button:disabled {
     font-size: 0.72rem;
   }
 }
+
+
+.sheet-copy-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(5px * var(--ui-scale));
+}
+
+.sheet-copy-actions button {
+  min-width: 0;
+}
+
+.sheet-tabs button[draggable="true"] {
+  cursor: grab;
+}
+
+.sheet-tabs button[draggable="true"]:active {
+  cursor: grabbing;
+}

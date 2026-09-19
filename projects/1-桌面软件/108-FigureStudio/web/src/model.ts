@@ -24,6 +24,7 @@ export interface SheetMetadata {
 export interface DataSheet {
   id: string;
   name: string;
+  comment?: string;
   columns: Column[];
   metadata?: SheetMetadata;
 }

@@ -901,6 +901,52 @@ function App() {
     openDocument({ type: "book", id: activeBook.id });
   }
 
+  function duplicateActiveSheet(withData: boolean) {
+    if (!activeBook || !activeSheet || activeBook.source.kind === "linked") return;
+    const copy: DataSheet = {
+      ...activeSheet,
+      id: makeId("sheet"),
+      name: activeSheet.name + (withData ? " 副本" : " 结构"),
+      columns: activeSheet.columns.map((column) => ({
+        ...column,
+        id: makeId("col"),
+        values: withData ? [...column.values] : []
+      }))
+    };
+
+    patchBook(activeBook.id, (book) => ({
+      ...book,
+      sheets: [...book.sheets, copy]
+    }));
+    setActiveSheetByBook((current) => ({
+      ...current,
+      [activeBook.id]: copy.id
+    }));
+    setExplorerSelection({ type: "sheet", id: copy.id });
+    showToast(withData ? "已复制工作表" : "已复制工作表结构");
+  }
+
+  function reorderSheets(dragId: string, targetId: string) {
+    if (!activeBook || dragId === targetId) return;
+    patchBook(activeBook.id, (book) => {
+      const dragged = book.sheets.find((sheet) => sheet.id === dragId);
+      const next = book.sheets.filter((sheet) => sheet.id !== dragId);
+      const targetIndex = next.findIndex((sheet) => sheet.id === targetId);
+      if (!dragged || targetIndex < 0) return book;
+      next.splice(targetIndex, 0, dragged);
+      return { ...book, sheets: next };
+    });
+  }
+
+  function renameSheet(sheet: DataSheet) {
+    const name = window.prompt("工作表名称", sheet.name);
+    if (!name?.trim()) return;
+    patchSheet(sheet.id, (current) => ({
+      ...current,
+      name: name.trim()
+    }));
+  }
+
   function addRow() {
     if (!activeSheet || activeBook?.source.kind === "linked") return;
     patchSheet(activeSheet.id, (sheet) => ({
@@ -1471,6 +1517,27 @@ function App() {
             <button
               key={sheet.id}
               type="button"
+              draggable={book.source.kind !== "linked"}
+              title={sheet.comment || sheet.name}
+              onDragStart={(event) =>
+                event.dataTransfer.setData("text/plain", "sheet-tree:" + sheet.id)
+              }
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                const [type, id] = event.dataTransfer
+                  .getData("text/plain")
+                  .split(":");
+                if (type === "sheet-tree" && book.source.kind !== "linked") {
+                  patchBook(book.id, (currentBook) => {
+                    const dragged = currentBook.sheets.find((item) => item.id === id);
+                    const next = currentBook.sheets.filter((item) => item.id !== id);
+                    const targetIndex = next.findIndex((item) => item.id === sheet.id);
+                    if (!dragged || targetIndex < 0) return currentBook;
+                    next.splice(targetIndex, 0, dragged);
+                    return { ...currentBook, sheets: next };
+                  });
+                }
+              }}
               className={
                 activeDoc.type === "book" &&
                 activeDoc.id === book.id &&
@@ -2002,7 +2069,20 @@ function App() {
                     <button
                       key={sheet.id}
                       type="button"
+                      draggable={!dataReadOnly}
+                      title={sheet.comment || sheet.name}
                       className={sheet.id === activeSheet.id ? "is-active" : ""}
+                      onDragStart={(event) =>
+                        event.dataTransfer.setData("text/plain", "sheet-tab:" + sheet.id)
+                      }
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        const [type, id] = event.dataTransfer
+                          .getData("text/plain")
+                          .split(":");
+                        if (type === "sheet-tab") reorderSheets(id, sheet.id);
+                      }}
+                      onDoubleClick={() => !dataReadOnly && renameSheet(sheet)}
                       onClick={() => {
                         setExplorerSelection({ type: "sheet", id: sheet.id });
                         setActiveSheetByBook((current) => ({
@@ -2208,6 +2288,20 @@ function App() {
                         }
                       />
                     </div>
+                    <div className="prop-row">
+                      <label>备注</label>
+                      <input
+                        value={activeSheet.comment ?? ""}
+                        readOnly={dataReadOnly}
+                        placeholder="实验条件、样品、用途…"
+                        onChange={(event) =>
+                          patchSheet(activeSheet.id, (sheet) => ({
+                            ...sheet,
+                            comment: event.target.value || undefined
+                          }))
+                        }
+                      />
+                    </div>
                     <div className="prop-row prop-muted">
                       <label>行数</label>
                       <span>{rowCount}</span>
@@ -2243,8 +2337,16 @@ function App() {
                         </>
                       ) : (
                         <>
-                          <button type="button" onClick={() => triggerDataFile("replace")}>替换当前表</button>
                           <button type="button" onClick={createGraphFromSheet}>按列角色新建图</button>
+                          <button type="button" onClick={() => triggerDataFile("replace")}>替换当前表</button>
+                          <div className="sheet-copy-actions">
+                            <button type="button" onClick={() => duplicateActiveSheet(true)}>
+                              复制 Sheet
+                            </button>
+                            <button type="button" onClick={() => duplicateActiveSheet(false)}>
+                              复制结构
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>
