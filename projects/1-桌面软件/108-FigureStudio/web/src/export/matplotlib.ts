@@ -393,7 +393,8 @@ def legend_kwargs():
     return kwargs
 
 def add_legend(axis_obj, secondary=None):
-    if not O.get("legendVisible", len(keys) > 1):
+    default_visible = len(keys) > 1 and template not in ("bar", "xy-errorbar")
+    if not O.get("legendVisible", default_visible):
         return
     handles, labels = axis_obj.get_legend_handles_labels()
     if secondary is not None:
