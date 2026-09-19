@@ -119,7 +119,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
-from matplotlib.ticker import MultipleLocator, FixedLocator, FuncFormatter, EngFormatter
+from matplotlib.ticker import MultipleLocator, FixedLocator, NullFormatter, FuncFormatter, EngFormatter
 
 P = json.loads(${payloadLiteral})
 O = P["figureOverrides"]
@@ -337,6 +337,7 @@ def apply_log_tick_spacing(axis_obj, which, step, minor=False):
     target = axis_obj.xaxis if which == "x" else axis_obj.yaxis
     if minor:
         target.set_minor_locator(locator)
+        target.set_minor_formatter(NullFormatter())
     else:
         target.set_major_locator(locator)
 
