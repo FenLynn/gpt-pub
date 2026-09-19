@@ -1,110 +1,176 @@
-# .sfig Project Format v0.1
+# .sfig Project Format v0.3
 
-## 1. 目标
+## 1. 事实模型
 
-`.sfig` 是 FigureStudio 的项目事实源。目标是：
+`.sfig` 的长期项目模型现在明确为：
 
-- 单文件；
-- 数据、Figure、模板状态可一起迁移；
-- 同一 Dataset 不因被多张 Figure 引用而重复保存；
-- schema 可升级；
-- 未知字段尽量 round-trip 保留；
-- 导出的 PNG / SVG / PDF / EPS / TIFF 不默认塞入项目。
+```text
+Project
+├─ folders[]
+├─ dataBooks[]
+│  ├─ source
+│  └─ sheets[]
+└─ figures[]
+```
 
-## 2. v0.1 实际容器
+数据与图形独立保存，Graph 只保存引用和显示参数。
 
-当前 Web v0.1 已经使用 ZIP 容器：
+## 2. 容器
 
 ```text
 project.sfig
 ├─ manifest.json
 ├─ project.json
 └─ data/
-   ├─ <dataset-id>.json
-   ├─ <dataset-id>.json
+   ├─ <sheet-id>.json
+   ├─ <sheet-id>.json
    └─ ...
 ```
 
-`project.json` 保存 Project、Figure、模板/样式设置和 Dataset metadata。
+`project.json` 保存：
 
-`data/<dataset-id>.json` 保存数值数组。
+- Folder hierarchy
+- DataBook metadata
+- Sheet / Column metadata
+- Embedded / Linked source metadata
+- FigureSpec
+- Template / Preset / overrides
 
-当前数值数据仍是 **压缩 JSON**，目的是先冻结项目模型和兼容行为；后续大型数据可无痛迁移为 Arrow / TypedArray binary，而不改变 Figure 对 Dataset ID 的引用方式。
+`data/<sheet-id>.json` 保存 Sheet 的列值。
 
-## 3. manifest
+## 3. schemaVersion
+
+当前：
 
 ```json
 {
   "format": "sfig",
-  "schemaVersion": "0.1",
-  "projectId": "project-...",
-  "createdWith": "0.1.0-web"
+  "schemaVersion": "0.3",
+  "createdWith": "0.3.0-web"
 }
 ```
 
-## 4. Dataset 与 Figure
+读取器支持：
 
-Figure 不复制数据，只保存：
+- 0.1 → 0.3
+- 0.2 → 0.3
+- 0.3 native
 
-```text
-figure.datasetId
-figure.seriesOrder
-figure.seriesOverrides
-figure.figureOverrides
-figure.templateId
-figure.presetId
-```
+未来版本不得让旧应用静默覆盖未知新 schema。
 
-因此同一 Dataset 可以同时生成：
+## 4. DataBook / Sheet
+
+DataBook 是项目中的数据文档：
 
 ```text
-Dataset A
-├─ Figure 1 · Line
-├─ Figure 2 · Heatmap
-└─ Figure 3 · 3D Surface
+DataBook
+├─ id
+├─ name
+├─ folderId
+├─ source
+└─ sheets[]
 ```
 
-Dataset 只保存一次。
+Sheet：
 
-## 5. Replace Data
+```text
+Sheet
+├─ id
+├─ name
+├─ columns[]
+└─ metadata
+```
 
-Replace Data 保留原 Dataset ID。
+Column：
 
-若列 ID / 列名匹配：
+```text
+id
+name
+unit
+role
+values[]
+```
 
-- 自动重连所有 Figure；
-- Figure 样式不变；
-- Series override 保留。
+role：
 
-若列结构变化：
+```text
+X / Y / Z / XErr / YErr / Label / None
+```
 
-- 不静默猜测；
-- UI 明确请求用户确认是否按列顺序重映射。
+单元格允许 number / text / null。
+
+## 5. Graph 数据引用
+
+Graph 不再依赖旧的 `datasetId` 作为主要引用。
+
+正式引用：
+
+```text
+figure.dataRef
+├─ sheetId
+├─ xColumnId
+├─ yColumnIds[]
+├─ yErrorColumnId?
+└─ zColumnId?
+```
+
+Column role 只负责创建 Graph 时的默认映射。
+
+一旦 Graph 创建，稳定 Column ID 成为事实，因此：
+
+- 改列名：Graph 不断；
+- 改单位：Graph 数据不换；
+- 改 Column role：Graph 不静默重映射；
+- 移动 DataBook/Graph 文件夹：Graph 不断。
 
 ## 6. Embedded / Linked
 
-Web v0.1 使用 Embedded。
+Embedded：
 
-Linked Source 已保留为桌面端方向，计划包含：
+- 数据值以项目内容为事实源；
+- Sheet 可直接编辑；
+- 分享 `.sfig` 即可完整迁移。
 
-- absolute path
-- relative path
-- filename
-- size
-- modified time
-- optional content hash
+Linked：
 
-Linked 不改变 Dataset ID 与 Figure 依赖模型。
+- 外部文件是事实源；
+- 项目保存当前缓存数据和 source identity；
+- 默认只读；
+- Web Reload 时用户重新选择文件；
+- Tauri 可通过 path / identity / watcher 自动 Reload；
+- 解除链接后缓存数据转为 Embedded，可继续编辑。
 
-## 7. 兼容与 migration
+保存后重新打开 Linked 项目时，如果平台无法确认原文件身份，应进入 needs-relink 状态，而不是假装链接仍有效。
 
-所有正式 schema 变化必须提供 migration。
+## 7. migration
 
-v0.1 读写策略：
+0.1 / 0.2 的旧 Dataset：
 
-- 项目顶层未知字段保留；
-- Dataset / Column metadata 未知字段尽量保留；
-- Figure 对象直接 round-trip；
-- 不识别的未来 schemaVersion 不擅自保存回旧版本。
+```text
+Dataset
+├─ x
+└─ ys[]
+```
 
-这避免“旧版打开新版文件再保存后把新字段删掉”。
+迁移为：
+
+```text
+DataBook
+└─ Sheet
+   ├─ X column
+   └─ Y / YErr columns
+```
+
+旧 Figure 的：
+
+```text
+datasetId + seriesOrder + errorSeriesId
+```
+
+迁移为：
+
+```text
+sheetId + xColumnId + yColumnIds + yErrorColumnId
+```
+
+旧项目数据和 Figure 样式不需要用户手工重建。

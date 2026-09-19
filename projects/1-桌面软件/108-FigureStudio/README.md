@@ -2,29 +2,72 @@
 
 FigureStudio 是一个面向科研论文出图的模板驱动工作台。
 
-> **Matplotlib 风格科研审美 + Origin 式项目组织 + 现代 Web 交互**
+> **Matplotlib 风格科研审美 + Origin 式项目/数据组织 + 现代 Web 交互**
 
 ## 当前状态
 
-当前 `p108-exp` 已进入 v0.2 工作台阶段，GitHub Pages 是实时交互预览入口。
+当前 `p108-exp` 已进入 **v0.3 Data Workspace** 阶段，GitHub Pages 是实时交互预览入口。
 
-核心能力：
+这一阶段先解决最根本的问题：数据不再是 Graph 的附属物，而是可独立打开、编辑、导入和链接的一等文档。
 
-- 单视口工作台，页面本身不纵向滚动；
-- 中央科研画布最大化显示；
-- 16:9 / 4:3 / 3:2 / custom；
-- UI Scale 90%–140%，默认 110%，不改变论文图物理尺寸；
-- Project Explorer 文件夹、拖拽、重命名、复制、删除、缩略图；
-- 多 Dataset / 多 Figure / stable ID 引用；
-- CSV / TSV / TXT / Clipboard；
-- Replace Data + 旧/新数据差异预览；
-- Undo / Redo / autosave recovery；
-- `.sfig` schema 0.2，并兼容迁移 v0.1；
+## 核心文档模型
+
+```text
+Project
+├─ Folder
+├─ DataBook
+│  ├─ Sheet
+│  └─ Sheet
+└─ Graph
+```
+
+Graph 只通过稳定引用读取数据：
+
+```text
+Graph
+└─ dataRef
+   ├─ sheetId
+   ├─ xColumnId
+   ├─ yColumnIds[]
+   ├─ yErrorColumnId?
+   └─ zColumnId?
+```
+
+因此移动文件夹、重命名 DataBook / Sheet 或修改列角色，不会静默换掉已有 Graph 的数据。
+
+## v0.3 数据工作区
+
+- 左侧 Project Explorer 只负责组织项目对象；
+- Folder / DataBook / Sheet / Graph 使用明显不同的矢量图标；
+- DataBook 可以展开多个 Sheet；
+- 中间使用文档 Tab，同时打开 Data Sheet 和 Graph；
+- 打开 Sheet 时，中间是真正的 Spreadsheet；
+- Sheet 支持直接编辑单元格、列名和单位；
+- 支持新增行、列、Sheet，列拖拽排序和删除；
+- 科研列角色：X / Y / Z / XErr / YErr / Label / None；
+- 列头以 A(X)、B(Y)、C(YErr) 等形式显示；
+- “按列角色新建图”将当前角色固化成稳定 Column ID 引用；
+- Embedded Data 可编辑；
+- Linked Data 默认只读；
+- Web Linked Data 支持重新选择/加载源文件，以及“解除链接并编辑”；
+- CSV / TSV / TXT 导入；
+- 粘贴表格数据为新 Sheet；
+- Graph 可以一键跳回其源 Sheet；
+- `.sfig` 升级到 schema 0.3；
+- 打开旧 schema 0.1 / 0.2 项目时自动迁移成 DataBook → Sheet。
+
+## 绘图能力
+
+已有绘图功能继续保留：
+
+- Line / Scatter / Line + Marker / Errorbar；
+- Spectrum / Offset Spectrum；
+- Bar / Grouped / Stacked；
+- Heatmap；
+- Surface 3D；
 - Scientific / Nature / Presentation；
-- Line / Scatter / Marker / Errorbar / Spectrum / Offset；
-- Bar / Grouped / Stacked / Heatmap / Surface 3D；
-- 曲线多选、批量样式、拖拽图层；
-- 轴 / 图例紧凑属性面板；
+- 曲线批量样式；
+- 轴 / 图例属性；
 - Publication Checker；
 - SVG / PNG 600 dpi；
 - Matplotlib Python script export。
@@ -39,13 +82,18 @@ FigureStudio 是一个面向科研论文出图的模板驱动工作台。
 
 ## 技术路线
 
-    Dataset / FigureSpec / Preset
-              │
-       ┌──────┴──────┐
-       │             │
-    Plotly        Matplotlib
-       │             │
-    Web/Tauri    publication
+```text
+DataBook / Sheet
+       │
+   stable column IDs
+       │
+     Graph
+       │
+   FigureSpec
+      /   \
+ Plotly   Matplotlib
+ Web/UI   publication
+```
 
 ## 分支
 
