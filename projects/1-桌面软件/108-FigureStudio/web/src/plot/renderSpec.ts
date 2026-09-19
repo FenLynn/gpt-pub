@@ -178,25 +178,86 @@ export function buildTraces(args: {
   const series = visibleSeries(dataset, figure);
   const template = figure.templateId;
 
-  if (template === "heatmap") {
+  if (template === "heatmap" || template === "contour") {
     const xIsNumeric = dataset.x.values.every(
       (value) => value === null || typeof value === "number"
     );
+    const yValues =
+      dataset.metadata?.rowCoordinates ??
+      series.map((_, index) => index);
+    const zValues = series.map((column) => column.values);
+    const zAuto = figure.figureOverrides.zAutoRange !== false;
+    const colorbar = {
+      thickness: 12,
+      outlinewidth: 0,
+      len: 0.86,
+      title: figure.figureOverrides.colorbarTitle
+        ? { text: figure.figureOverrides.colorbarTitle }
+        : undefined
+    };
+
+    if (template === "contour") {
+      return [
+        {
+          type: "contour",
+          x: dataset.x.values,
+          y: yValues,
+          z: zValues,
+          colorscale: figure.figureOverrides.colorScale ?? "Viridis",
+          reversescale: figure.figureOverrides.reverseColorScale ?? false,
+          showscale: figure.figureOverrides.colorbarVisible ?? true,
+          zauto: zAuto,
+          zmin: zAuto ? undefined : figure.figureOverrides.zMin,
+          zmax: zAuto ? undefined : figure.figureOverrides.zMax,
+          autocontour: true,
+          ncontours: Math.max(
+            3,
+            Math.min(64, Math.round(figure.figureOverrides.contourLevels ?? 12))
+          ),
+          contours: {
+            coloring:
+              figure.figureOverrides.contourFill === false ? "lines" : "fill",
+            showlabels: figure.figureOverrides.contourLabels ?? false,
+            labelfont: {
+              family: plotFontFamily(
+                figure.figureOverrides.fontFamily ?? preset.fontFamily
+              ),
+              size: ptToPx(
+                (figure.figureOverrides.tickLabelSizePt ??
+                  figure.figureOverrides.fontSizePt ??
+                  preset.fontSizePt) * 0.9
+              ),
+              color: figure.figureOverrides.tickLabelColor ?? "#17191c"
+            }
+          },
+          line: {
+            width:
+              figure.figureOverrides.contourLines === false
+                ? 0
+                : ptToPx(0.45),
+            color: "rgba(32,35,40,0.72)"
+          },
+          colorbar,
+          hovertemplate:
+            (xIsNumeric ? "X=%{x:.4g}" : "X=%{x}") +
+            "<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
+        }
+      ];
+    }
+
     return [
       {
         type: "heatmap",
         x: dataset.x.values,
-        y:
-          dataset.metadata?.rowCoordinates ??
-          series.map((_, index) => index),
-        z: series.map((column) => column.values),
+        y: yValues,
+        z: zValues,
         colorscale: figure.figureOverrides.colorScale ?? "Viridis",
         reversescale: figure.figureOverrides.reverseColorScale ?? false,
-        colorbar: {
-          thickness: 12,
-          outlinewidth: 0,
-          len: 0.86
-        },
+        showscale: figure.figureOverrides.colorbarVisible ?? true,
+        zauto: zAuto,
+        zmin: zAuto ? undefined : figure.figureOverrides.zMin,
+        zmax: zAuto ? undefined : figure.figureOverrides.zMax,
+        colorbar,
         hovertemplate:
           (xIsNumeric ? "X=%{x:.4g}" : "X=%{x}") +
           "<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
@@ -220,11 +281,23 @@ export function buildTraces(args: {
         z: series.map((column) => column.values),
         colorscale: figure.figureOverrides.colorScale ?? "Viridis",
         reversescale: figure.figureOverrides.reverseColorScale ?? false,
-        showscale: true,
+        showscale: figure.figureOverrides.colorbarVisible ?? true,
+        cauto: figure.figureOverrides.zAutoRange !== false,
+        cmin:
+          figure.figureOverrides.zAutoRange === false
+            ? figure.figureOverrides.zMin
+            : undefined,
+        cmax:
+          figure.figureOverrides.zAutoRange === false
+            ? figure.figureOverrides.zMax
+            : undefined,
         colorbar: {
           thickness: 12,
           outlinewidth: 0,
-          len: 0.76
+          len: 0.76,
+          title: figure.figureOverrides.colorbarTitle
+            ? { text: figure.figureOverrides.colorbarTitle }
+            : undefined
         },
         hovertemplate: "X=%{x:.4g}<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
       }
@@ -317,28 +390,56 @@ export function buildTraces(args: {
     template === "offset-spectrum"
       ? figure.figureOverrides.offsetStep ?? 5
       : 0;
+  const waterfallYOffset =
+    template === "waterfall"
+      ? figure.figureOverrides.waterfallYOffset ?? 5
+      : 0;
+  const waterfallXOffset =
+    template === "waterfall"
+      ? figure.figureOverrides.waterfallXOffset ?? 0.5
+      : 0;
+  const xIsNumeric = dataset.x.values.every(
+    (value) => value === null || typeof value === "number"
+  );
 
   return series.map((column, index) => {
     const sourceIndex = Math.max(
       0,
       dataset.ys.findIndex((item) => item.id === column.id)
     );
+    const totalYOffset = offsetStep + waterfallYOffset;
     const yValues =
-      offsetStep === 0
+      totalYOffset === 0
         ? undefined
         : column.values.map((value) =>
-            value === null ? null : value + index * offsetStep
+            value === null ? null : value + index * totalYOffset
           );
-
-    return baseXYTrace(
+    const trace = baseXYTrace(
       dataset,
       figure,
       preset,
       column,
       sourceIndex,
-      modeDefault,
+      template === "double-y" ? "lines+markers" : modeDefault,
       yValues
-    );
+    ) as any;
+
+    if (template === "waterfall" && waterfallXOffset !== 0 && xIsNumeric) {
+      trace.x = dataset.x.values.map((value) =>
+        typeof value === "number"
+          ? value + index * waterfallXOffset
+          : value
+      );
+    }
+
+    if (template === "double-y") {
+      const axis =
+        figure.seriesOverrides[column.id]?.yAxis ??
+        (index === 0 ? "left" : "right");
+      trace.yaxis = axis === "right" ? "y2" : "y";
+    }
+
+    return trace;
   });
 }
 
@@ -449,6 +550,10 @@ export function buildLayout(args: {
   );
   const xScale = xIsCategorical ? "linear" : overrides.xScale ?? "linear";
   const yScale = overrides.yScale ?? "linear";
+  const rightYScale = overrides.rightYScale ?? "linear";
+  const isDoubleY = figure.templateId === "double-y";
+  const isField2D =
+    figure.templateId === "heatmap" || figure.templateId === "contour";
   const xRange = xIsCategorical
     ? undefined
     : rangeFor(
@@ -464,6 +569,13 @@ export function buildLayout(args: {
     overrides.yMax,
     yScale,
     overrides.yReverse ?? false
+  );
+  const rightYRange = rangeFor(
+    overrides.rightYAutoRange,
+    overrides.rightYMin,
+    overrides.rightYMax,
+    rightYScale,
+    overrides.rightYReverse ?? false
   );
 
   const commonAxis = {
@@ -500,11 +612,28 @@ export function buildLayout(args: {
   const resolvedYTitle =
     displayText?.yTitle ??
     overrides.yTitle ??
-    (figure.templateId === "heatmap"
-      ? dataset.metadata?.rowAxisName ?? "Y"
+    (isField2D
+      ? autoAxisTitle(
+          dataset.metadata?.rowAxisName ?? "Y",
+          dataset.metadata?.rowAxisUnit
+        )
       : dataset.ys[0]
       ? autoAxisTitle(dataset.ys[0].name, dataset.ys[0].unit)
       : "Y");
+  const rightSeries =
+    isDoubleY
+      ? orderSeries(dataset, figure.seriesOrder).filter((series, index) => {
+          const axis =
+            figure.seriesOverrides[series.id]?.yAxis ??
+            (index === 0 ? "left" : "right");
+          return axis === "right";
+        })
+      : [];
+  const resolvedRightYTitle =
+    overrides.rightYTitle ??
+    (rightSeries[0]
+      ? autoAxisTitle(rightSeries[0].name, rightSeries[0].unit)
+      : "Right Y");
   const hasXTitle = Boolean(String(resolvedXTitle ?? "").trim());
   const hasYTitle = Boolean(String(resolvedYTitle ?? "").trim());
   const hasPlotTitle = Boolean(String(displayText?.plotTitle ?? overrides.plotTitle ?? "").trim());
@@ -519,8 +648,9 @@ export function buildLayout(args: {
       l: Math.round(mmToPx(hasYTitle ? 10.2 : 6.2)),
       r: Math.round(
         mmToPx(
-          figure.templateId === "heatmap" ||
-            figure.templateId === "surface-3d"
+          isDoubleY
+            ? 10.2
+            : isField2D || figure.templateId === "surface-3d"
             ? 8
             : 2.2
         )
@@ -732,7 +862,58 @@ export function buildLayout(args: {
     }
   };
 
-  if (figure.templateId === "heatmap") {
+  if (isDoubleY) {
+    layout.yaxis2 = {
+      ...commonAxis,
+      mirror: false,
+      overlaying: "y",
+      side: "right",
+      type: rightYScale,
+      autorange: rightYRange
+        ? false
+        : overrides.rightYReverse
+        ? "reversed"
+        : true,
+      range: rightYRange,
+      title: {
+        text: resolvedRightYTitle,
+        standoff: Math.round(mmToPx(0.7)),
+        font: {
+          family: fontFamily,
+          size: axisTitleSizePx,
+          color: overrides.axisTitleColor ?? "#17191c"
+        }
+      },
+      showgrid: false,
+      dtick:
+        overrides.rightYMajorTickStep &&
+        overrides.rightYMajorTickStep > 0
+          ? overrides.rightYMajorTickStep
+          : undefined,
+      tickformat: tickFormatString(
+        overrides.rightYTickFormat,
+        overrides.rightYTickDecimals
+      ),
+      tickprefix: overrides.rightYTickPrefix || undefined,
+      ticksuffix: overrides.rightYTickSuffix || undefined,
+      tickangle: overrides.rightYTickAngle ?? 0,
+      minor: {
+        ...commonAxis.minor,
+        showgrid: false,
+        dtick:
+          overrides.minorTicks &&
+          overrides.rightYMinorTickStep &&
+          overrides.rightYMinorTickStep > 0
+            ? overrides.rightYMinorTickStep
+            : undefined
+      }
+    };
+  }
+
+  const equalFieldAspect =
+    overrides.fieldEqualAspect ??
+    (figure.templateId === "heatmap");
+  if (isField2D && equalFieldAspect) {
     layout.xaxis.scaleanchor = "y";
     layout.xaxis.scaleratio = 1;
   }

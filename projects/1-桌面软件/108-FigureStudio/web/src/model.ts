@@ -78,10 +78,13 @@ export type PlotTemplateId =
   | "xy-errorbar"
   | "spectrum"
   | "offset-spectrum"
+  | "waterfall"
+  | "double-y"
   | "bar"
   | "grouped-bar"
   | "stacked-bar"
   | "heatmap"
+  | "contour"
   | "surface-3d";
 export type LineStyle = "solid" | "dash" | "dot" | "dashdot";
 export type MarkerSymbol =
@@ -138,6 +141,7 @@ export interface SeriesOverride {
   visible?: boolean;
   showInLegend?: boolean;
   legendLabel?: string;
+  yAxis?: "left" | "right";
   lineVisible?: boolean;
   lineWidthPt?: number;
   lineStyle?: LineStyle;
@@ -162,6 +166,7 @@ export interface FigureOverrides {
 
   xTitle?: string;
   yTitle?: string;
+  rightYTitle?: string;
   zTitle?: string;
   axisTitleColor?: string;
   axisTitleSizePt?: number;
@@ -183,20 +188,32 @@ export interface FigureOverrides {
 
   xScale?: AxisScale;
   yScale?: AxisScale;
+  rightYScale?: AxisScale;
   xAutoRange?: boolean;
   yAutoRange?: boolean;
+  rightYAutoRange?: boolean;
   xReverse?: boolean;
   yReverse?: boolean;
+  rightYReverse?: boolean;
   xMin?: number;
   xMax?: number;
   yMin?: number;
   yMax?: number;
+  rightYMin?: number;
+  rightYMax?: number;
   tickDirection?: TickDirection;
   axisStyle?: AxisStylePreset;
   xMajorTickStep?: number;
   xMinorTickStep?: number;
   yMajorTickStep?: number;
   yMinorTickStep?: number;
+  rightYMajorTickStep?: number;
+  rightYMinorTickStep?: number;
+  rightYTickFormat?: TickLabelFormat;
+  rightYTickDecimals?: number;
+  rightYTickPrefix?: string;
+  rightYTickSuffix?: string;
+  rightYTickAngle?: number;
   minorTicks?: boolean;
   gridVisible?: boolean;
 
@@ -222,8 +239,20 @@ export interface FigureOverrides {
 
   errorSeriesId?: string;
   offsetStep?: number;
+  waterfallXOffset?: number;
+  waterfallYOffset?: number;
   colorScale?: ColorScaleId;
   reverseColorScale?: boolean;
+  zAutoRange?: boolean;
+  zMin?: number;
+  zMax?: number;
+  colorbarVisible?: boolean;
+  colorbarTitle?: string;
+  fieldEqualAspect?: boolean;
+  contourLevels?: number;
+  contourFill?: boolean;
+  contourLines?: boolean;
+  contourLabels?: boolean;
 
 }
 
