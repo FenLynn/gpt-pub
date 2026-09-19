@@ -8,7 +8,6 @@ export interface Column {
   unit?: string;
   role: ColumnRole;
   values: CellValue[];
-  [key: string]: unknown;
 }
 
 export interface PlotColumn extends Omit<Column, "values"> {
@@ -19,7 +18,6 @@ export interface SheetMetadata {
   rowCoordinates?: number[];
   rowAxisName?: string;
   rowAxisUnit?: string;
-  [key: string]: unknown;
 }
 
 export interface DataSheet {
@@ -27,7 +25,6 @@ export interface DataSheet {
   name: string;
   columns: Column[];
   metadata?: SheetMetadata;
-  [key: string]: unknown;
 }
 
 export type DataSourceKind = "embedded" | "linked";
@@ -41,7 +38,6 @@ export interface DataSource {
   size?: number;
   modifiedMs?: number;
   status?: LinkedStatus;
-  [key: string]: unknown;
 }
 
 export interface DataBook {
@@ -50,7 +46,6 @@ export interface DataBook {
   folderId?: string;
   source: DataSource;
   sheets: DataSheet[];
-  [key: string]: unknown;
 }
 
 export interface Dataset {
@@ -133,7 +128,6 @@ export interface SeriesOverride {
   markerSizePt?: number;
   color?: string;
   opacity?: number;
-  [key: string]: unknown;
 }
 
 export interface FigureOverrides {
@@ -169,7 +163,6 @@ export interface FigureOverrides {
   colorScale?: ColorScaleId;
   reverseColorScale?: boolean;
 
-  [key: string]: unknown;
 }
 
 export interface FigureDataRef {
@@ -191,7 +184,6 @@ export interface FigureSpec {
   seriesOverrides: Record<string, SeriesOverride>;
   seriesOrder: string[];
   datasetId?: string;
-  [key: string]: unknown;
 }
 
 export interface ProjectDefaults {
@@ -210,7 +202,6 @@ export interface ProjectState {
   figures: FigureSpec[];
   activeFigureId: string;
   defaults: ProjectDefaults;
-  [key: string]: unknown;
 }
 
 export interface UserDefaults {

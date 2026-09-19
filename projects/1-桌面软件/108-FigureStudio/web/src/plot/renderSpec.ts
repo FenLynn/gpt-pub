@@ -1,6 +1,6 @@
 import type {
-  Column,
   Dataset,
+  PlotColumn,
   FigureSpec,
   LegendPosition,
   PresetDefinition
@@ -56,11 +56,11 @@ export function resolveCanvasMm(
   return { widthMm, heightMm, ratio, aspectMode };
 }
 
-export function orderSeries(dataset: Dataset, seriesOrder: string[]): Column[] {
+export function orderSeries(dataset: Dataset, seriesOrder: string[]): PlotColumn[] {
   const byId = new Map(dataset.ys.map((series) => [series.id, series]));
   const ordered = seriesOrder
     .map((id) => byId.get(id))
-    .filter((series): series is Column => Boolean(series));
+    .filter((series): series is PlotColumn => Boolean(series));
 
   for (const series of dataset.ys) {
     if (!ordered.some((item) => item.id === series.id)) ordered.push(series);
