@@ -584,7 +584,10 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     defaults,
     "folder-gallery",
     {
-      yTitle: "占比 (%)"
+      yTitle: "占比 (%)",
+      barLabelsVisible: true,
+      barLabelDecimals: 0,
+      barLabelPosition: "outside"
     },
     {
       fundamental: {
@@ -603,6 +606,9 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       yTitle: "占比 (%)",
       barGap: 0.18,
       barGroupGap: 0.06,
+      barLabelsVisible: true,
+      barLabelDecimals: 0,
+      barLabelPosition: "outside",
       legendPosition: "outside-right"
     },
     {
@@ -621,6 +627,9 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     {
       yTitle: "占比 (%)",
       barGap: 0.22,
+      barLabelsVisible: true,
+      barLabelDecimals: 0,
+      barLabelPosition: "inside",
       legendPosition: "outside-right"
     },
     {
