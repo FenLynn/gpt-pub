@@ -1,4 +1,4 @@
-# .sfig Project Format v0.4
+# .sfig Project Format v0.5
 
 ## 1. 事实模型
 
@@ -45,17 +45,18 @@ project.sfig
 ```json
 {
   "format": "sfig",
-  "schemaVersion": "0.4",
-  "createdWith": "0.4.0-web"
+  "schemaVersion": "0.5",
+  "createdWith": "0.5.0-web"
 }
 ```
 
 读取器支持：
 
-- 0.1 → 0.4
-- 0.2 → 0.4
-- 0.3 → 0.4
-- 0.4 native
+- 0.1 → 0.5
+- 0.2 → 0.5
+- 0.3 → 0.5
+- 0.4 → 0.5
+- 0.5 native
 
 未知未来 schemaVersion 不允许被旧应用静默覆盖保存。
 
@@ -134,9 +135,9 @@ Renderer 通过 adapter 得到纯数值 PlotColumn，不直接消费 Spreadsheet
 ## 7. Graph 数据引用
 
 ```text
-figure.dataRef
+figure.dataRef?          ← 空图时不存在
 ├─ sheetId
-├─ xColumnId
+├─ xColumnId?            ← 留空时使用行号
 ├─ yColumnIds[]
 ├─ yErrorColumnId?
 └─ zColumnId?
@@ -229,3 +230,14 @@ Linked source 重新打开后进入 `needs-relink`。
 - Matplotlib Python script；
 - UI 临时选择状态；
 - 浏览器文档 Tab 状态。
+
+### v0.5 Figure Input
+
+`FigureSpec.dataRef` 允许不存在，表示合法空图。输入状态由 Project + FigureSpec 派生，不单独保存：
+
+- `empty`：没有 dataRef；
+- `incomplete`：已有工作表，但模板最小输入未满足；
+- `ready`：输入完整且所有引用可解析；
+- `broken`：Sheet / Column 引用失效。
+
+当前模板至少需要一列主数据 Series；X 可选。没有 X 时 adapter 生成 1-based 行号视图，不写回 Spreadsheet。
