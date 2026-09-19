@@ -158,7 +158,21 @@ export function checkFigure(
     });
   }
 
+  const xCategorical = dataset.x.values.some(
+    (value) => typeof value === "string"
+  );
   const axisIssues: string[] = [];
+  if (
+    xCategorical &&
+    ((o.xScale ?? "linear") === "log" ||
+      o.xAutoRange === false ||
+      o.xMajorTickStep !== undefined ||
+      o.xMinorTickStep !== undefined)
+  ) {
+    axisIssues.push(
+      "X 是分类轴，数值范围 / 对数 / 数值刻度间距将被忽略"
+    );
+  }
   const checkAxis = (
     label: string,
     auto: boolean | undefined,
@@ -189,15 +203,17 @@ export function checkFigure(
     }
   };
 
-  checkAxis(
-    "X 轴",
-    o.xAutoRange,
-    o.xMin,
-    o.xMax,
-    o.xScale ?? "linear",
-    o.xMajorTickStep,
-    o.xMinorTickStep
-  );
+  if (!xCategorical) {
+    checkAxis(
+      "X 轴",
+      o.xAutoRange,
+      o.xMin,
+      o.xMax,
+      o.xScale ?? "linear",
+      o.xMajorTickStep,
+      o.xMinorTickStep
+    );
+  }
   checkAxis(
     "Y 轴",
     o.yAutoRange,

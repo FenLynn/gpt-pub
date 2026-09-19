@@ -116,6 +116,9 @@ function baseXYTrace(
   const color =
     override.color || preset.palette[sourceIndex % preset.palette.length];
   const opacity = override.opacity ?? 1;
+  const xIsNumeric = dataset.x.values.every(
+    (value) => value === null || typeof value === "number"
+  );
 
   let mode = "";
   if (lineVisible) mode += "lines";
@@ -152,7 +155,8 @@ function baseXYTrace(
       series.name +
       "</b><br>" +
       dataset.x.name +
-      "：%{x:.4g}" +
+      "：" +
+      (xIsNumeric ? "%{x:.4g}" : "%{x}") +
       (dataset.x.unit ? " " + dataset.x.unit : "") +
       "<br>%{y:.4g}" +
       (series.unit ? " " + series.unit : "") +
@@ -191,10 +195,15 @@ export function buildTraces(args: {
   }
 
   if (template === "surface-3d") {
+    const surfaceX = dataset.x.values.every(
+      (value) => value === null || typeof value === "number"
+    )
+      ? dataset.x.values
+      : dataset.x.values.map((_value, index) => index + 1);
     return [
       {
         type: "surface",
-        x: dataset.x.values,
+        x: surfaceX,
         y:
           dataset.metadata?.rowCoordinates ??
           series.map((_, index) => index),
@@ -424,15 +433,20 @@ export function buildLayout(args: {
       : presetLegendPosition;
   const legendOrientation = overrides.legendOrientation ?? "horizontal";
   const legendColumns = Math.max(1, overrides.legendColumns ?? 1);
-  const xScale = overrides.xScale ?? "linear";
-  const yScale = overrides.yScale ?? "linear";
-  const xRange = rangeFor(
-    overrides.xAutoRange,
-    overrides.xMin,
-    overrides.xMax,
-    xScale,
-    overrides.xReverse ?? false
+  const xIsCategorical = dataset.x.values.some(
+    (value) => typeof value === "string"
   );
+  const xScale = xIsCategorical ? "linear" : overrides.xScale ?? "linear";
+  const yScale = overrides.yScale ?? "linear";
+  const xRange = xIsCategorical
+    ? undefined
+    : rangeFor(
+        overrides.xAutoRange,
+        overrides.xMin,
+        overrides.xMax,
+        xScale,
+        overrides.xReverse ?? false
+      );
   const yRange = rangeFor(
     overrides.yAutoRange,
     overrides.yMin,
@@ -621,7 +635,7 @@ export function buildLayout(args: {
 
   layout.xaxis = {
     ...commonAxis,
-    type: xScale,
+    type: xIsCategorical ? "category" : xScale,
     autorange: xRange
       ? false
       : overrides.xReverse
@@ -629,8 +643,7 @@ export function buildLayout(args: {
       : true,
     range: xRange,
     title: {
-      text:
-        resolvedXTitle,
+      text: resolvedXTitle,
       standoff: Math.round(mmToPx(0.9)),
       font: {
         family: fontFamily,
@@ -639,18 +652,23 @@ export function buildLayout(args: {
       }
     },
     dtick:
-      overrides.xMajorTickStep && overrides.xMajorTickStep > 0
+      !xIsCategorical &&
+      overrides.xMajorTickStep &&
+      overrides.xMajorTickStep > 0
         ? overrides.xMajorTickStep
         : undefined,
-    tickformat: tickFormatString(
-      overrides.xTickFormat,
-      overrides.xTickDecimals
-    ),
+    tickformat: xIsCategorical
+      ? undefined
+      : tickFormatString(
+          overrides.xTickFormat,
+          overrides.xTickDecimals
+        ),
     tickprefix: overrides.xTickPrefix || undefined,
     ticksuffix: overrides.xTickSuffix || undefined,
     minor: {
       ...commonAxis.minor,
       dtick:
+        !xIsCategorical &&
         overrides.minorTicks &&
         overrides.xMinorTickStep &&
         overrides.xMinorTickStep > 0

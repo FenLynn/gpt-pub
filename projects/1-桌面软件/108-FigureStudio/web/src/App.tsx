@@ -465,6 +465,9 @@ function App() {
     };
   }, [rawPlotTitle, rawXTitle, rawYTitle]);
 
+  const xAxisCategorical =
+    plotDataset?.x.values.some((value) => typeof value === "string") ?? false;
+
   const latexFallbackActive =
     mathTextState.plotTitle === "invalid" ||
     mathTextState.xTitle === "invalid" ||
@@ -3644,7 +3647,11 @@ function App() {
                                               <div className="axis-range-head">X</div>
                                               <label className="axis-auto">
                                                 <MiniSwitch
-                                                  checked={activeFigure.figureOverrides.xAutoRange !== false}
+                                                  checked={
+                                                    xAxisCategorical ||
+                                                    activeFigure.figureOverrides.xAutoRange !== false
+                                                  }
+                                                  disabled={xAxisCategorical}
                                                   onChange={(value) =>
                                                     setFigureField("xAutoRange", value)
                                                   }
@@ -3654,7 +3661,10 @@ function App() {
                                               <input
                                                 type="number"
                                                 placeholder="最小"
-                                                disabled={activeFigure.figureOverrides.xAutoRange !== false}
+                                                disabled={
+                                                  xAxisCategorical ||
+                                                  activeFigure.figureOverrides.xAutoRange !== false
+                                                }
                                                 value={activeFigure.figureOverrides.xMin ?? ""}
                                                 onChange={(event) =>
                                                   setFigureField(
@@ -3668,7 +3678,10 @@ function App() {
                                               <input
                                                 type="number"
                                                 placeholder="最大"
-                                                disabled={activeFigure.figureOverrides.xAutoRange !== false}
+                                                disabled={
+                                                  xAxisCategorical ||
+                                                  activeFigure.figureOverrides.xAutoRange !== false
+                                                }
                                                 value={activeFigure.figureOverrides.xMax ?? ""}
                                                 onChange={(event) =>
                                                   setFigureField(
@@ -3746,6 +3759,11 @@ function App() {
                                               <>
                                                 <div className="prop-row">
                                                   <label>X 标度</label>
+                                                  {xAxisCategorical ? (
+                                                  <span className="property-text">
+                                                    分类 / 文本
+                                                  </span>
+                                                ) : (
                                                   <select
                                                     value={activeFigure.figureOverrides.xScale ?? "linear"}
                                                     onChange={(event) =>
@@ -3758,6 +3776,7 @@ function App() {
                                                     <option value="linear">线性</option>
                                                     <option value="log">对数</option>
                                                   </select>
+                                                )}
                                                 </div>
                                                 <div className="prop-row">
                                                   <label>Y 标度</label>
@@ -3818,6 +3837,7 @@ function App() {
                                                 min="0"
                                                 step="any"
                                                 placeholder="自动"
+                                                disabled={xAxisCategorical}
                                                 value={activeFigure.figureOverrides.xMajorTickStep ?? ""}
                                                 onChange={(event) =>
                                                   setFigureField(
@@ -3833,6 +3853,7 @@ function App() {
                                                 min="0"
                                                 step="any"
                                                 placeholder="自动"
+                                                disabled={xAxisCategorical}
                                                 value={activeFigure.figureOverrides.xMinorTickStep ?? ""}
                                                 onChange={(event) => {
                                                   const value =
@@ -3882,6 +3903,13 @@ function App() {
                                                 onChange={(value) => setFigureField("minorTicks", value)}
                                               />
                                             </div>
+                                            {xAxisCategorical && (
+                                              <div className="axis-note">
+                                                X 当前是文本 / 分类轴：按数据顺序显示类别；
+                                                数值范围、对数标度和数值 Tick 间距对 X 不适用。
+                                              </div>
+                                            )}
+
                                             {(activeFigure.figureOverrides.xScale === "log" ||
                                               activeFigure.figureOverrides.yScale === "log") && (
                                               <div className="axis-note">
@@ -3908,6 +3936,7 @@ function App() {
                                               <b>位数</b>
                                               <span>X</span>
                                               <select
+                                                disabled={xAxisCategorical}
                                                 value={activeFigure.figureOverrides.xTickFormat ?? "auto"}
                                                 onChange={(event) =>
                                                   setFigureField(
@@ -3927,8 +3956,9 @@ function App() {
                                                 max="12"
                                                 step="1"
                                                 disabled={
+                                                  xAxisCategorical ||
                                                   (activeFigure.figureOverrides.xTickFormat ?? "auto") ===
-                                                  "auto"
+                                                    "auto"
                                                 }
                                                 value={activeFigure.figureOverrides.xTickDecimals ?? 2}
                                                 onChange={(event) =>

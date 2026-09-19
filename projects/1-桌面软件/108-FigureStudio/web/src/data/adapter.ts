@@ -5,6 +5,7 @@ import type {
   DataSheet,
   Dataset,
   FigureDataRef,
+  PlotAxisColumn,
   PlotColumn,
   FigureSpec,
   ProjectState
@@ -99,6 +100,32 @@ function numericValues(values: CellValue[]): Array<number | null> {
   });
 }
 
+
+function axisValues(values: CellValue[]): Array<number | string | null> {
+  const populated = values.filter(
+    (value) =>
+      value !== null &&
+      !(typeof value === "string" && value.trim() === "")
+  );
+  const allNumeric =
+    populated.length > 0 &&
+    populated.every((value) => {
+      if (typeof value === "number") return Number.isFinite(value);
+      return typeof value === "string" && Number.isFinite(Number(value));
+    });
+
+  if (allNumeric) return numericValues(values);
+
+  return values.map((value) => {
+    if (value === null) return null;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed === "" ? null : trimmed;
+    }
+    return Number.isFinite(value) ? String(value) : null;
+  });
+}
+
 export function sheetToDataset(
   sheet: DataSheet,
   figure?: FigureSpec
@@ -130,8 +157,8 @@ export function sheetToDataset(
     ...ys.map((column) => column.values.length)
   );
 
-  const x: PlotColumn = explicitX
-    ? { ...explicitX, values: numericValues(explicitX.values) }
+  const x: PlotAxisColumn = explicitX
+    ? { ...explicitX, values: axisValues(explicitX.values) }
     : dataRef.xColumnId
     ? {
         id: dataRef.xColumnId,
