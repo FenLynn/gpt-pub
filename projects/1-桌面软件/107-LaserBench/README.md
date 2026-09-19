@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.4.26（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.26 继续锁定已经认可的 Dashboard 四宫格外部几何，重点重做四个独立模块工作站页、参数/结果层级和真实仪器接口控制层。
+当前开发版本为 **v0.4.27（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.27 继续锁定 Dashboard 四宫格外部几何，重点收紧顶栏实验工作流、独立模块标题密度、Scope FFT 优先布局、右侧参数控件语法和 OSA 参数完整度。
 
 ## 当前能力
 
@@ -16,12 +16,12 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - 顶部四个采集选择图标使用内联 SVG + CSS 动画；模块左上角图标只同步绿色 selected 状态并保持静止。Power 四根粗 bar 缓慢起伏；Spectrum 单峰只做纵向变高→变低；Scope 波形持续向左流动、不往返；Beam 十字线/中心 target 固定、仅外环缓慢扩散。
 - 所有绘图内部网格为虚线；Legend 透明、无边框并放在数据区内。Dashboard 不显示 X/Y 轴标题文字，只保留必要刻度；刻度边缘保持深色，纯白只属于真实数据区。
 - Power 独立页使用工作站布局，并提供活动通道、历史窗口、显示选择、移动平均、Offset、Scale、Normalize、Power density、Zero、当前值归一化、Pass/Fail 阈值等常用功率计工作流；Dashboard 显示选择与 Test 采集选择继续严格分离，数学百分比继续使用独立右轴。
-- Spectrum 独立页按 OSA 基础工作流提供 Start/Stop、Center/Span、Resolution bandwidth、Sensitivity、Averaging、Sweep mode、Reference level、dB/div、Reference trace 与 Peak marker；Dashboard 只保留曲线与中心波长、3 dB、RMS、功率等结果。
+- Spectrum 独立页除 Start/Stop、Center/Span、RBW、Sensitivity、Average、Sweep、Reference level、dB/div、Reference trace 与 Peak marker 外，v0.4.27 进一步补齐采样点数、视频带宽、轨迹模式、平滑点数、波长偏移、空气/真空波长基准、自动峰值搜索与峰值阈值；其中波长偏移、平滑和显示点数在 Simulator 工作页直接生效，其余真实 OSA 参数进入统一配置等待 AQ6370D Driver 映射。
 - Beam 左侧显示当前 Z 位置 2D 光斑，右侧显示完整 caustic；**Z / 播放 / Attenuation** 作为高频观察控制继续常驻 Dashboard。Beam 独立页补充 M²x/M²y/M²、X/Y beam width、ellipticity、ISO 11146 D4σ/FWHM 选择、outlier 与 X/Y caustic 显示；不加入 3D 光斑。
-- Scope Dashboard 只显示最多两个通道的时域和 FFT；独立页提供时间窗、FFT 上限、Volts/div、Offset、Coupling、通道开关、Trigger source/level/slope、Acquisition mode 与 Average count。
+- Scope Dashboard 与独立页均改为 **FFT 在上、时域在下**，FFT 获得更高的图形权重；独立页继续提供时间窗、FFT 上限、Volts/div、Offset、Coupling、通道开关、Trigger source/level/slope、Acquisition mode 与 Average count。
 - Dashboard 关键结果可点击进入 **Big Readout**，不同指标允许同时弹出多个读数窗；同一指标只保留一个实例并可再次点击提到最前。每个窗独立拖动、等比例缩放和黑/白显示；左上状态/名称常显，右上控制与右下缩放手柄默认隐藏，hover 时才显示。**Big Readout 只在 Dashboard 显示，切到任何独立模块页时全部隐藏，返回 Dashboard 后恢复。**
 - 四个模块可从侧栏进入独立工作页；v0.4.26 将标题图标/名称/关键读数合并成更高的工作站标题区，右侧参数面板可折叠，并拆为“设置 / 结果”两个页签。设置参数使用中文，结果页同时列出测量结果、当前测试参数和接口状态。独立页坐标刻度、轴标题与 Legend 放大，坐标 gutter 与壳体同色，只有真实 Plot 矩形白底；Beam 光斑视窗保持正方形并与 caustic 图上下边框对齐。Power 独立页下方范围条继续与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
-- 顶栏同时提供可编辑 Label 与实验文件夹；两者的清空/确认控件使用同一垂直对齐。Dashboard 的数值 chip 增高并扩大数字，Big Readout 黑白切换与关闭按钮使用同一中心线。
+- 顶栏实验工作流为“文件夹 → Label → Power / Spectrum / Beam / Scope 采集源 → Run”。实验文件夹不再使用文本框，而是单独文件夹按钮打开 Windows 原生 FolderBrowserDialog，可在 `data/exp/` 下选择或新建一级实验目录；Label 的 × / ✓、REC 状态点/文字和 Dashboard 数值单位继续锁定同一垂直/底部基线。
 - v0.4.26 建立真实仪器**接口控制层**：Ophir Juno / OphirLMMeasurement、Yokogawa AQ6370D、Ophir Spiricon SP920 / BeamSquared、Tektronix MSO44 的启用状态与接口地址进入 Portable 配置、C# adapter registry、WebUi snapshot 与 self-test。**这不等于真实 Driver 已接通**：当前数据平面仍为 Simulator，任何真实接口只有在对应 Windows + SDK/SCPI Probe 完成后才能标记 `DataPlaneReady` 并进入正式 Provider。
 - 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
 - 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。

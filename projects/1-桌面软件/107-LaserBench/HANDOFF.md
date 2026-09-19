@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.26 Workstation UI / Instrument Interface Control Plane**，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.27 Compact Workstation / Native Folder Flow**，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际数据提供者仍是 Simulator；v0.4.26 已建立 Ophir Juno、Yokogawa AQ6370D、BeamSquared/SP920、Tektronix MSO44 的接口配置、adapter registry、状态快照与 Provider 选择边界，但四个真实 Driver 的数据平面均保持 `DataPlaneReady=false`，不得把“已配置”写成“已连接”。
-- Web UI 已有 Dashboard、Power/Spectrum/Beam/Scope 工作站式独立页、Data 和 Settings。v0.4.26 保持 Dashboard 四宫格几何，独立页改为高标题区 + 大 Plot + 可折叠“设置/结果”侧栏；参数显示中文，结果页记录完整测量/测试参数/接口状态。
+- Web UI 已有 Dashboard、Power/Spectrum/Beam/Scope 工作站式独立页、Data 和 Settings。v0.4.27 将独立页标题区从上一版进一步压缩到仅覆盖模块图标/标题/通道状态的高度；通道信息紧贴标题，右侧参数侧栏继续支持“设置/结果”双页签与折叠。Scope 采用 FFT 上、时域下且 FFT 更大的结构。
 
 ## 当前产品不变量
 
