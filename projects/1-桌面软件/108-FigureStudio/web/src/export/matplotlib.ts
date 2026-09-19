@@ -569,6 +569,7 @@ if template == "surface-3d":
         cb = fig.colorbar(surf, ax=ax, shrink=0.76)
         if O.get("colorbarTitle"):
             cb.set_label(O["colorbarTitle"])
+    ax.set_box_aspect((4, 4, 3))
     ax.set_xlabel(P["autoTitles"]["x"])
     ax.set_ylabel(P["autoTitles"]["y"])
     ax.set_zlabel(P["autoTitles"]["z"])
