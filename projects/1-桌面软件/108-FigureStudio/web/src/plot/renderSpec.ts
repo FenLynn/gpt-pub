@@ -214,14 +214,19 @@ export function buildTraces(args: {
     const yValues = resolveFieldRowCoordinates(dataset, series);
     const zValues = series.map((column) => column.values);
     const zAuto = figure.figureOverrides.zAutoRange !== false;
-    const zFinite = zValues
-      .flat()
-      .filter(
-        (value): value is number =>
-          typeof value === "number" && Number.isFinite(value)
-      );
-    const zDataMin = zFinite.length ? Math.min(...zFinite) : 0;
-    const zDataMax = zFinite.length ? Math.max(...zFinite) : 1;
+    let zDataMin = Number.POSITIVE_INFINITY;
+    let zDataMax = Number.NEGATIVE_INFINITY;
+    for (const row of zValues) {
+      for (const value of row) {
+        if (typeof value !== "number" || !Number.isFinite(value)) continue;
+        if (value < zDataMin) zDataMin = value;
+        if (value > zDataMax) zDataMax = value;
+      }
+    }
+    if (!Number.isFinite(zDataMin) || !Number.isFinite(zDataMax)) {
+      zDataMin = 0;
+      zDataMax = 1;
+    }
     let zLevelMin =
       !zAuto && Number.isFinite(figure.figureOverrides.zMin)
         ? (figure.figureOverrides.zMin as number)
