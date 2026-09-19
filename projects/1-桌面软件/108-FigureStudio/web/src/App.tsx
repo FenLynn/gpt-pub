@@ -150,7 +150,7 @@ function Icon(props: {
         </svg>
       )}
       {props.linked && (
-        <span className="link-badge" title="Linked Data">
+        <span className="link-badge" title="链接数据">
           ↗
         </span>
       )}
@@ -783,7 +783,7 @@ function App() {
           broken.length +
           " 张图失去已绑定的数据列，因此已取消。\n\n" +
           broken.map((figure) => "• " + figure.name).join("\n") +
-          "\n\n请保留原列名，或先在 Graph 的“数据”页修改映射。"
+          "\n\n请保留原列名，或先在图形的“数据”页修改映射。"
       );
       return false;
     }
@@ -791,7 +791,7 @@ function App() {
     if (
       dependents.length > 0 &&
       !window.confirm(
-        "当前 Sheet 被 " +
+        "当前工作表被 " +
           dependents.length +
           " 张图引用。更新数据后这些图会同步刷新，但不会改变列映射和图形样式。是否继续？"
       )
@@ -829,7 +829,7 @@ function App() {
 
       if ((action === "replace" || action === "reload") && activeBook && activeSheet) {
         if (activeSheet.source.kind === "linked" && action === "replace") {
-          showToast("Linked Data 请使用“重新加载”");
+          showToast("链接数据请使用“重新加载”");
           return;
         }
 
@@ -850,7 +850,7 @@ function App() {
         if (replaced) {
           showToast(
             action === "reload"
-              ? "Linked Data 已重新加载"
+              ? "链接数据已重新加载"
               : "数据表已替换"
           );
         }
@@ -873,7 +873,7 @@ function App() {
           [activeBook.id]: nextSheet.id
         }));
         setExplorerSelection({ type: "sheet", id: nextSheet.id });
-        showToast("已导入为新 Sheet");
+        showToast("已导入为新工作表");
         return;
       }
 
@@ -909,7 +909,7 @@ function App() {
       }));
       openDocument({ type: "book", id: book.id });
       setExplorerSelection({ type: "book", id: book.id });
-      showToast(action === "link" ? "已创建 Linked Data" : "已导入数据表");
+      showToast(action === "link" ? "已创建链接数据" : "已导入数据表");
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "数据导入失败。");
     } finally {
@@ -920,7 +920,7 @@ function App() {
   function addBlankBook() {
     const sheet: DataSheet = {
       id: makeId("sheet"),
-      name: "Sheet1",
+      name: "工作表1",
       source: { kind: "embedded" },
       columns: [
         { id: makeId("col"), name: "X", role: "X", values: [null, null, null] },
@@ -950,7 +950,7 @@ function App() {
     if (!activeBook) return;
     const sheet: DataSheet = {
       id: makeId("sheet"),
-      name: "Sheet" + String(activeBook.sheets.length + 1),
+      name: "工作表" + String(activeBook.sheets.length + 1),
       source: { kind: "embedded" },
       columns: [
         { id: makeId("col"), name: "X", role: "X", values: [null, null, null] },
@@ -1126,7 +1126,7 @@ function App() {
     const dataset = sheetToDataset(activeSheet);
     const figure: FigureSpec = {
       id: makeId("figure"),
-      name: "Graph " + String(project.figures.length + 1),
+      name: "图 " + String(project.figures.length + 1),
       folderId: activeBook.folderId,
       dataRef,
       templateId: project.defaults.templateId,
@@ -1156,7 +1156,7 @@ function App() {
     if (!activeSheet) return;
     if (
       !window.confirm(
-        "解除链接后，当前缓存数据会变成可编辑的 Embedded Data。是否继续？"
+        "解除链接后，当前缓存数据会变成可编辑的项目内数据。是否继续？"
       )
     )
       return;
@@ -1164,7 +1164,7 @@ function App() {
       ...sheet,
       source: { kind: "embedded" }
     }));
-    showToast("已解除当前 Sheet 链接，现在可以编辑");
+    showToast("已解除当前工作表链接，现在可以编辑");
   }
 
   function pasteAsNewSheet() {
@@ -1174,7 +1174,7 @@ function App() {
       const next = {
         ...sheet,
         id: makeId("sheet"),
-        name: "Sheet" + String(activeBook.sheets.length + 1)
+        name: "工作表" + String(activeBook.sheets.length + 1)
       };
       patchBook(activeBook.id, (book) => ({
         ...book,
@@ -1374,7 +1374,7 @@ function App() {
       const context = findSheet(project, explorerSelection.id);
       if (!context) return;
       if (context.book.sheets.length <= 1) {
-        showToast("DataBook 至少保留一个 Sheet");
+        showToast("数据簿至少保留一个工作表");
         return;
       }
       const linked = project.figures.filter(
@@ -1382,7 +1382,7 @@ function App() {
       );
       if (
         !window.confirm(
-          "删除 Sheet 会同时删除引用它的 " + linked.length + " 张图。是否继续？"
+          "删除工作表会同时删除引用它的 " + linked.length + " 张图。是否继续？"
         )
       )
         return;
@@ -1535,7 +1535,7 @@ function App() {
     if (!source || !target || source.book.id === targetBookId) return;
 
     if (source.book.sheets.length <= 1) {
-      showToast("源 DataBook 至少需要保留一个 Sheet");
+      showToast("源数据簿至少需要保留一个工作表");
       return;
     }
 
@@ -1566,7 +1566,7 @@ function App() {
     }));
     openDocument({ type: "book", id: targetBookId });
     setExplorerSelection({ type: "sheet", id: sheetId });
-    showToast("Sheet 已移动，Graph 引用保持不变");
+    showToast("工作表已移动，图形引用保持不变");
   }
 
   function renderBook(book: DataBook, depth: number): ReactNode {
@@ -2004,7 +2004,7 @@ function App() {
                         : "source-badge"
                     }
                   >
-                    {activeSheet.source.kind === "linked" ? "LINKED" : "EMBEDDED"}
+                    {activeSheet.source.kind === "linked" ? "已链接" : "项目内"}
                   </span>
                   <strong>{activeBook.name} · {activeSheet.name}</strong>
                 </div>
@@ -2014,7 +2014,7 @@ function App() {
                   </button>
                   <button type="button" disabled={dataReadOnly} onClick={addRow}>+ 行</button>
                   <button type="button" disabled={dataReadOnly} onClick={addColumn}>+ 列</button>
-                  <button type="button" onClick={() => triggerDataFile("append")}>导入 Sheet</button>
+                  <button type="button" onClick={() => triggerDataFile("append")}>导入工作表</button>
                   <button type="button" onClick={() => setPasteOpen(true)}>粘贴表</button>
                   <button type="button" onClick={createGraphFromSheet}>新建图</button>
                   {dataReadOnly ? (
@@ -2207,7 +2207,10 @@ function App() {
                         }));
                       }}
                     >
-                      <Icon kind="sheet" />
+                      <Icon
+                        kind="sheet"
+                        linked={sheet.source.kind === "linked"}
+                      />
                       <span>{sheet.name}</span>
                     </button>
                   ))}
@@ -2215,7 +2218,7 @@ function App() {
                     type="button"
                     className="sheet-tab-add"
                     onClick={addSheet}
-                    title="新建 Embedded Sheet"
+                    title="新建项目内工作表"
                   >
                     +
                   </button>
@@ -2348,7 +2351,7 @@ function App() {
                     <div className="prop-row">
                       <label>来源</label>
                       <span className="property-text">
-                        {activeSheet.source.kind === "linked" ? "Linked Data" : "Embedded Data"}
+                        {activeSheet.source.kind === "linked" ? "链接数据" : "项目内数据"}
                       </span>
                     </div>
 
@@ -2440,7 +2443,7 @@ function App() {
                           </button>
                         ))
                       ) : (
-                        <span className="empty-dependents">当前 Sheet 尚未被 Graph 使用</span>
+                        <span className="empty-dependents">当前工作表尚未被图形使用</span>
                       )}
                     </div>
 
@@ -2578,7 +2581,7 @@ function App() {
                   <section className="inspector-pane">
                     <div className="pane-heading">
                       <strong>数据映射</strong>
-                      <span>Plot Setup</span>
+                      <span>数据映射</span>
                     </div>
                     <div className="prop-row">
                       <label>工作表</label>
@@ -2647,7 +2650,7 @@ function App() {
                                 onChange={() => {
                                   const current = activeFigure.dataRef.yColumnIds;
                                   if (checked && current.length <= 1) {
-                                    showToast("Graph 至少保留一列 Y");
+                                    showToast("图形至少保留一列 Y");
                                     return;
                                   }
                                   const next = checked
@@ -2670,7 +2673,7 @@ function App() {
                     </div>
                     <div className="section-divider">辅助列</div>
                     <div className="prop-row">
-                      <label>Y Error</label>
+                      <label>Y 误差</label>
                       <select
                         value={activeFigure.dataRef.yErrorColumnId ?? ""}
                         onChange={(event) =>
@@ -2724,14 +2727,14 @@ function App() {
                         type="button"
                         onClick={() => openSheetDocument(activeFigure.dataRef.sheetId)}
                       >
-                        打开源 DataBook
+                        打开源数据簿
                       </button>
                     </div>
                     <div className="column-role-help">
                       <strong>稳定映射</strong>
                       <p>
-                        Column Role 只负责新建图时的默认选择；已有 Graph
-                        明确保存 Sheet / X / Y / Error / Z 的 Column ID。
+                        列角色只负责新建图时的默认选择；已有图形
+                        会明确保存工作表以及 X / Y / 误差 / Z 的稳定列引用。
                       </p>
                     </div>
                   </section>
@@ -3273,7 +3276,7 @@ function App() {
             />
             <div className="dialog-actions">
               <button type="button" onClick={() => setPasteOpen(false)}>取消</button>
-              <button className="primary-button" type="button" onClick={pasteAsNewSheet}>创建 Sheet</button>
+              <button className="primary-button" type="button" onClick={pasteAsNewSheet}>创建工作表</button>
             </div>
           </div>
         </div>
