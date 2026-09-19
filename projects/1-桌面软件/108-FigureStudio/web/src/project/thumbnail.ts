@@ -80,7 +80,16 @@ export function figureThumbnailDataUrl(
       .filter((series) => figure.seriesOverrides[series.id]?.visible !== false)
       .slice(0, 4);
 
-    const xValues = numbers(dataset.x.values);
+    const categoricalX = dataset.x.values.some(
+      (value) => typeof value === "string"
+    );
+    const xValues = categoricalX
+      ? dataset.x.values.map((_value, index) => index)
+      : numbers(
+          dataset.x.values.map((value) =>
+            typeof value === "number" ? value : null
+          )
+        );
     const allY = visible.flatMap((series) => numbers(series.values));
     const minX = Math.min(...xValues, 0);
     const maxX = Math.max(...xValues, 1);
@@ -91,18 +100,71 @@ export function figureThumbnailDataUrl(
     const sy = (value: number) =>
       top + (1 - (value - minY) / Math.max(1e-12, maxY - minY)) * (height - top - bottom);
 
+    const barTemplate =
+      figure.templateId === "bar" ||
+      figure.templateId === "grouped-bar" ||
+      figure.templateId === "stacked-bar";
+
     content = visible
       .map((series, seriesIndex) => {
-        const sourceIndex = Math.max(0, dataset.ys.findIndex((item) => item.id === series.id));
+        const sourceIndex = Math.max(
+          0,
+          dataset.ys.findIndex((item) => item.id === series.id)
+        );
         const color =
           figure.seriesOverrides[series.id]?.color ??
           preset.palette[sourceIndex % preset.palette.length];
-        const points: string[] = [];
         const step = Math.max(1, Math.ceil(dataset.x.values.length / 60));
+
+        if (barTemplate) {
+          const bars: string[] = [];
+          const count = Math.max(1, dataset.x.values.length);
+          const plotWidth = width - left - right;
+          const groupWidth = plotWidth / count;
+          const seriesCount = Math.max(1, visible.length);
+          const barWidth =
+            figure.templateId === "stacked-bar"
+              ? Math.max(1, groupWidth * 0.62)
+              : Math.max(1, (groupWidth * 0.72) / seriesCount);
+
+          for (let index = 0; index < dataset.x.values.length; index += step) {
+            const y = series.values[index];
+            if (y === null) continue;
+            const center = left + (index + 0.5) * groupWidth;
+            const x =
+              figure.templateId === "stacked-bar"
+                ? center - barWidth / 2
+                : center -
+                  (barWidth * seriesCount) / 2 +
+                  seriesIndex * barWidth;
+            const zeroY = sy(0);
+            const valueY = sy(y);
+            const topY = Math.min(zeroY, valueY);
+            const barHeight = Math.max(0.8, Math.abs(zeroY - valueY));
+            bars.push(
+              '<rect x="' +
+                x.toFixed(1) +
+                '" y="' +
+                topY.toFixed(1) +
+                '" width="' +
+                Math.max(0.8, barWidth * 0.88).toFixed(1) +
+                '" height="' +
+                barHeight.toFixed(1) +
+                '" fill="' +
+                color +
+                '" opacity="0.88"/>'
+            );
+          }
+          return bars.join("");
+        }
+
+        const points: string[] = [];
         for (let index = 0; index < dataset.x.values.length; index += step) {
-          const x = dataset.x.values[index];
+          const rawX = dataset.x.values[index];
           const y = series.values[index];
-          if (x === null || y === null) continue;
+          if (rawX === null || y === null) continue;
+          const x =
+            categoricalX || typeof rawX !== "number" ? index : rawX;
           points.push(sx(x).toFixed(1) + "," + sy(y).toFixed(1));
         }
         return (
