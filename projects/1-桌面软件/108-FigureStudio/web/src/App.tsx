@@ -17,6 +17,7 @@ import {
   sheetToDataset
 } from "./data/adapter";
 import { resolveFigureInput } from "./data/figureInput";
+import { resolveFieldRowCoordinates } from "./data/field";
 import { downloadMatplotlibScript } from "./export/matplotlib";
 import { useHistoryState } from "./hooks/useHistoryState";
 import { parseDelimitedText } from "./lib/csv";
@@ -2203,6 +2204,11 @@ function App() {
   const field2DTemplate =
     activeFigure?.templateId === "heatmap" || contourTemplate;
   const fieldTemplate = field2DTemplate || surfaceTemplate;
+  const fieldRowSeries = fieldTemplate ? orderedSeries : [];
+  const fieldRowCoordinates =
+    fieldTemplate && plotDataset
+      ? resolveFieldRowCoordinates(plotDataset, fieldRowSeries)
+      : [];
   const doubleYTemplate = activeFigure?.templateId === "double-y";
   const waterfallTemplate = activeFigure?.templateId === "waterfall";
   const offsetSpectrumTemplate =
@@ -3186,8 +3192,135 @@ function App() {
                             <strong>矩阵模式</strong>
                             <span>
                               每个勾选列是一行 Z 数据；X 列给出横向坐标。
-                              Y 行坐标来自数据表元信息，未设置时使用 0, 1, 2…
+                              Y 行坐标可在下方设置；未设置时会尝试数字列名，否则使用 0, 1, 2…
                             </span>
+                          </div>
+                        )}
+
+                        {fieldTemplate && (
+                          <div className="field-row-axis-editor">
+                            <div className="section-divider">Y 行轴</div>
+                            <div className="field-axis-name-grid">
+                              <label>
+                                <span>名称</span>
+                                <input
+                                  type="text"
+                                  value={figureSheet.metadata?.rowAxisName ?? ""}
+                                  placeholder="温度 / 时间 / 泵浦功率"
+                                  onChange={(event) =>
+                                    patchSheet(figureSheet.id, (sheet) => ({
+                                      ...sheet,
+                                      metadata: {
+                                        ...(sheet.metadata ?? {}),
+                                        rowAxisName:
+                                          event.target.value || undefined
+                                      }
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label>
+                                <span>单位</span>
+                                <input
+                                  type="text"
+                                  value={figureSheet.metadata?.rowAxisUnit ?? ""}
+                                  placeholder="°C / min / W"
+                                  onChange={(event) =>
+                                    patchSheet(figureSheet.id, (sheet) => ({
+                                      ...sheet,
+                                      metadata: {
+                                        ...(sheet.metadata ?? {}),
+                                        rowAxisUnit:
+                                          event.target.value || undefined
+                                      }
+                                    }))
+                                  }
+                                />
+                              </label>
+                            </div>
+                            <label className="field-row-values">
+                              <span>
+                                行坐标 · 当前 {fieldRowSeries.length} 行
+                              </span>
+                              <input
+                                key={
+                                  activeFigure.id +
+                                  ":" +
+                                  fieldRowSeries.map((row) => row.id).join(",") +
+                                  ":" +
+                                  fieldRowCoordinates.join(",")
+                                }
+                                type="text"
+                                defaultValue={fieldRowCoordinates.join(", ")}
+                                placeholder="例如 0, 5, 10, 15"
+                                onBlur={(event) => {
+                                  const raw = event.currentTarget.value.trim();
+                                  if (!raw) {
+                                    patchSheet(figureSheet.id, (sheet) => {
+                                      const metadata = {
+                                        ...(sheet.metadata ?? {})
+                                      };
+                                      const map = {
+                                        ...(metadata.rowCoordinateByColumnId ??
+                                          {})
+                                      };
+                                      for (const row of fieldRowSeries) {
+                                        delete map[row.id];
+                                      }
+                                      metadata.rowCoordinateByColumnId =
+                                        Object.keys(map).length
+                                          ? map
+                                          : undefined;
+                                      metadata.rowCoordinates = undefined;
+                                      return { ...sheet, metadata };
+                                    });
+                                    return;
+                                  }
+
+                                  const values = raw
+                                    .split(/[，,;；\s]+/)
+                                    .filter(Boolean)
+                                    .map(Number);
+                                  if (
+                                    values.length !== fieldRowSeries.length ||
+                                    values.some(
+                                      (value) => !Number.isFinite(value)
+                                    )
+                                  ) {
+                                    window.alert(
+                                      "Y 行坐标需要 " +
+                                        fieldRowSeries.length +
+                                        " 个有限数字，并与当前矩阵行一一对应。"
+                                    );
+                                    event.currentTarget.value =
+                                      fieldRowCoordinates.join(", ");
+                                    return;
+                                  }
+
+                                  patchSheet(figureSheet.id, (sheet) => ({
+                                    ...sheet,
+                                    metadata: {
+                                      ...(sheet.metadata ?? {}),
+                                      rowCoordinates: undefined,
+                                      rowCoordinateByColumnId: {
+                                        ...(sheet.metadata
+                                          ?.rowCoordinateByColumnId ?? {}),
+                                        ...Object.fromEntries(
+                                          fieldRowSeries.map((row, index) => [
+                                            row.id,
+                                            values[index]
+                                          ])
+                                        )
+                                      }
+                                    }
+                                  }));
+                                }}
+                              />
+                            </label>
+                            <div className="field-data-note is-compact">
+                              坐标绑定数据列 ID；重排、隐藏或选择子集后仍跟随正确行。
+                              清空可恢复自动坐标。
+                            </div>
                           </div>
                         )}
 
