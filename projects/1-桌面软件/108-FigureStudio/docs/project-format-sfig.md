@@ -1,54 +1,110 @@
-# .sfig Project Format Draft
+# .sfig Project Format v0.1
 
-## 目标
+## 1. 目标
 
-单文件、可迁移、可恢复、可分享，同时允许大型数据使用 Linked 模式避免项目膨胀。
+`.sfig` 是 FigureStudio 的项目事实源。目标是：
 
-## 概念结构
+- 单文件；
+- 数据、Figure、模板状态可一起迁移；
+- 同一 Dataset 不因被多张 Figure 引用而重复保存；
+- schema 可升级；
+- 未知字段尽量 round-trip 保留；
+- 导出的 PNG / SVG / PDF / EPS / TIFF 不默认塞入项目。
 
-~~~text
+## 2. v0.1 实际容器
+
+当前 Web v0.1 已经使用 ZIP 容器：
+
+```text
 project.sfig
 ├─ manifest.json
 ├─ project.json
-├─ data/
-│  └─ <dataset-id>.<binary>
-├─ figures/
-│  └─ <figure-id>.json
-├─ templates/
-├─ presets/
-├─ assets/
-└─ previews/
-~~~
+└─ data/
+   ├─ <dataset-id>.json
+   ├─ <dataset-id>.json
+   └─ ...
+```
 
-容器实现可采用 ZIP 类格式，但具体压缩算法尚未冻结。
+`project.json` 保存 Project、Figure、模板/样式设置和 Dataset metadata。
 
-## 必须字段
+`data/<dataset-id>.json` 保存数值数组。
 
-~~~json
+当前数值数据仍是 **压缩 JSON**，目的是先冻结项目模型和兼容行为；后续大型数据可无痛迁移为 Arrow / TypedArray binary，而不改变 Figure 对 Dataset ID 的引用方式。
+
+## 3. manifest
+
+```json
 {
   "format": "sfig",
   "schemaVersion": "0.1",
-  "projectId": "stable-id",
-  "createdWith": "app-version"
+  "projectId": "project-...",
+  "createdWith": "0.1.0-web"
 }
-~~~
+```
 
-## Dataset 模式
+## 4. Dataset 与 Figure
 
-### Embedded
+Figure 不复制数据，只保存：
 
-数据真正写入容器，适合论文归档、分享和长期保存。
+```text
+figure.datasetId
+figure.seriesOrder
+figure.seriesOverrides
+figure.figureOverrides
+figure.templateId
+figure.presetId
+```
 
-### Linked
+因此同一 Dataset 可以同时生成：
 
-项目保存数据来源身份，不复制大型原始文件。至少考虑 absolute path、relative path、filename、size、modified time 与 optional content hash。
+```text
+Dataset A
+├─ Figure 1 · Line
+├─ Figure 2 · Heatmap
+└─ Figure 3 · 3D Surface
+```
 
-## 去重与导出
+Dataset 只保存一次。
 
-- Figure 只引用 Dataset ID，不复制 Dataset。
-- SVG / PDF / EPS / PNG / TIFF 默认不嵌入项目。
-- 小缩略图可以缓存并重建，不是事实源。
+## 5. Replace Data
 
-## Migration
+Replace Data 保留原 Dataset ID。
 
-所有正式 schema 变化必须提供 migration。读取未知字段时默认保留，不得无理由丢弃。
+若列 ID / 列名匹配：
+
+- 自动重连所有 Figure；
+- Figure 样式不变；
+- Series override 保留。
+
+若列结构变化：
+
+- 不静默猜测；
+- UI 明确请求用户确认是否按列顺序重映射。
+
+## 6. Embedded / Linked
+
+Web v0.1 使用 Embedded。
+
+Linked Source 已保留为桌面端方向，计划包含：
+
+- absolute path
+- relative path
+- filename
+- size
+- modified time
+- optional content hash
+
+Linked 不改变 Dataset ID 与 Figure 依赖模型。
+
+## 7. 兼容与 migration
+
+所有正式 schema 变化必须提供 migration。
+
+v0.1 读写策略：
+
+- 项目顶层未知字段保留；
+- Dataset / Column metadata 未知字段尽量保留；
+- Figure 对象直接 round-trip；
+- 不识别的未来 schemaVersion 不擅自保存回旧版本。
+
+这避免“旧版打开新版文件再保存后把新字段删掉”。

@@ -1,39 +1,158 @@
-# Dataset / PlotSpec / Template / Export Draft
+# Dataset / PlotSpec / Template / Export v0.1
 
 ## Dataset
 
-Dataset 最小语义：id、name、source、columns、metadata。
+Dataset 当前包含：
 
-Column 至少包含 id、name、type、unit、role。典型 role：X / Y / Z / Error / Category / Label。
+```text
+id
+name
+x
+ys[]
+metadata
+```
 
-## Figure 引用与 Transform
+Column 包含：
 
-Figure 通过 datasetId 与 columnId 引用数据。Project Tree 中移动对象不得破坏引用。
+```text
+id
+name
+unit
+values
+```
 
-offset、scale、normalize、crop、sort、baseline subtract、log 等显示处理保存为可追溯 Transform，不覆盖 raw Dataset。
+二维场可额外通过 metadata 保存 rowCoordinates / rowAxisName / rowAxisUnit。
 
-## PlotSpec
+## Figure / PlotSpec
 
-PlotSpec 只保存长期语义，不暴露 Plotly 专属字段。主要包含物理尺寸、panels、axes、series、annotations、legend 和 style references。
+Figure 是长期可编辑对象，不是导出的图片：
+
+```text
+Figure
+├─ id / name
+├─ datasetId
+├─ templateId
+├─ presetId
+├─ figureOverrides
+├─ seriesOverrides
+└─ seriesOrder
+```
+
+Renderer 把同一 FigureSpec 映射为 Plotly traces/layout。
+
+UI 不直接把 Plotly 私有结构保存为项目事实。
 
 ## Template
 
-首批候选：XY Line、XY Scatter、Line+Marker、Errorbar、Spectrum、Multi Spectrum、Offset Spectrum、Simple/Grouped/Stacked Bar、Heatmap、Surface 3D。
+v0.1 已实现：
+
+### XY
+
+- 折线
+- 散点
+- 点线
+- 误差棒
+- 光谱
+- 堆叠光谱
+
+### Bar
+
+- 单柱状图
+- 分组柱状图
+- 堆叠柱状图
+
+### Field
+
+- Heatmap / beam-like intensity map
+
+### 3D
+
+- Surface 3D
+
+Offset Spectrum 的 offset 只在渲染时作用，不修改 raw Dataset。
 
 ## Preset
 
-首批候选：Nature、Scientific、Optica、Presentation、Dark。
+v0.1：
 
-## 字体与数学
+- Scientific
+- Nature
+- Presentation
 
-主要字体为 Arial 与 Times New Roman。复杂数学表达式走 LaTeX/MathJax/Matplotlib mathtext；简单 λ μ Δ ± × 优先 Unicode。
+并支持：
 
-## 颜色
+```text
+Factory
+→ User Default
+→ Project Default
+→ Preset
+→ Figure override
+→ Series override
+```
 
-默认 palette 应自然、克制、色盲友好。二维连续色图优先 viridis、cividis、magma、inferno、coolwarm、gray，不默认推荐 rainbow / jet。
+用户临时修改默认只落在当前 Figure / Series；只有明确点击“项目默认”或“我的默认”才提升作用域。
 
-## 导出
+## 轴与图例
 
-计划支持 SVG、PDF、EPS、PNG、TIFF。内部尺寸使用 mm / pt；raster 才使用 dpi，常用 300 / 600 / 1200 dpi。
+v0.1 支持：
 
-交互预览优先 Plotly；后续 publication renderer 允许 Matplotlib 直接生成出版文件。Heatmap / 3D 的矢量导出允许“文字与轴矢量 + 数据层 rasterized”的混合策略，并在 UI 明确提示。
+- X / Y title
+- linear / log
+- auto / manual range
+- inward / outward ticks
+- minor ticks
+- grid
+- legend show/hide
+- legend position
+- horizontal / vertical
+- columns
+- frame
+
+## 样式
+
+Series：
+
+- visible
+- line visible
+- line style
+- line width
+- marker symbol
+- marker size
+- color
+- opacity
+- layer order
+
+Field：
+
+- Viridis
+- Cividis
+- Magma
+- Inferno
+- RdBu
+- Greys
+- reverse colorscale
+
+## Export
+
+Web v0.1：
+
+- SVG
+- PNG 600 dpi
+
+核心规则：
+
+> 预览只对固定出版画布做 CSS 缩放；导出直接从同一 Plotly DOM / layout 生成。
+
+因此预览与导出共享：
+
+- 坐标范围
+- trace order
+- opacity
+- legend
+- margins
+- font
+- line width
+- marker
+- aspect ratio
+
+PDF / EPS / TIFF 留给后续 Matplotlib publication renderer，不用另一套“重新布局”的 Web 导出逻辑冒充出版 renderer。

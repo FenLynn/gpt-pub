@@ -10,6 +10,7 @@ interface DatasetIndexEntry {
   ys: Array<Omit<Dataset["ys"][number], "values">>;
   metadata?: Dataset["metadata"];
   dataPath: string;
+  [key: string]: unknown;
 }
 
 interface ProjectDocument {
@@ -21,38 +22,33 @@ interface ProjectDocument {
   figures: ProjectState["figures"];
   activeFigureId: string;
   defaults: ProjectState["defaults"];
+  [key: string]: unknown;
 }
 
 function datasetIndex(dataset: Dataset): DatasetIndexEntry {
+  const { x, ys, ...datasetRest } = dataset as Dataset & Record<string, unknown>;
+  const { values: _xValues, ...xMeta } = x;
+  const yMeta = ys.map((column) => {
+    const { values: _values, ...meta } = column;
+    return meta;
+  });
+
   return {
+    ...datasetRest,
     id: dataset.id,
     name: dataset.name,
-    x: {
-      id: dataset.x.id,
-      name: dataset.x.name,
-      unit: dataset.x.unit
-    },
-    ys: dataset.ys.map((column) => ({
-      id: column.id,
-      name: column.name,
-      unit: column.unit
-    })),
+    x: xMeta,
+    ys: yMeta,
     metadata: dataset.metadata,
     dataPath: "data/" + dataset.id + ".json"
   };
 }
 
 export function encodeProject(project: ProjectState): Uint8Array {
-  const projectDocument: ProjectDocument = {
-    format: project.format,
-    schemaVersion: project.schemaVersion,
-    projectId: project.projectId,
-    name: project.name,
-    datasets: project.datasets.map(datasetIndex),
-    figures: project.figures,
-    activeFigureId: project.activeFigureId,
-    defaults: project.defaults
-  };
+  const projectDocument = {
+    ...(project as ProjectState & Record<string, unknown>),
+    datasets: project.datasets.map(datasetIndex)
+  } as ProjectDocument;
 
   const files: Record<string, Uint8Array> = {
     "manifest.json": strToU8(
@@ -111,7 +107,10 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
       ys: Record<string, Dataset["ys"][number]["values"]>;
     };
 
+    const { dataPath: _dataPath, ...datasetMeta } = meta;
+
     return {
+      ...datasetMeta,
       id: meta.id,
       name: meta.name,
       x: {
@@ -123,23 +122,22 @@ export function decodeProject(bytes: Uint8Array): ProjectState {
         values: data.ys[column.id] ?? []
       })),
       metadata: meta.metadata
-    };
+    } as Dataset;
   });
 
+  const fallbackActive = projectDocument.figures[0]?.id ?? "";
+
   return {
+    ...(projectDocument as unknown as ProjectState),
     format: "sfig",
     schemaVersion: "0.1",
-    projectId: projectDocument.projectId,
-    name: projectDocument.name,
     datasets,
-    figures: projectDocument.figures,
     activeFigureId:
       projectDocument.figures.some(
         (figure) => figure.id === projectDocument.activeFigureId
       )
         ? projectDocument.activeFigureId
-        : projectDocument.figures[0]?.id ?? "",
-    defaults: projectDocument.defaults
+        : fallbackActive
   };
 }
 
