@@ -1,4 +1,4 @@
-import { defaultDataRef, sheetToDataset } from "./adapter";
+import { defaultDataRef } from "./adapter";
 import type {
   DataBook,
   DataSheet,
@@ -119,9 +119,124 @@ export function createFieldSheet(): DataSheet {
     columns,
     metadata: {
       rowCoordinates,
+      rowCoordinateByColumnId: Object.fromEntries(
+        rowCoordinates.map((value, index) => [
+          "row-" + String(index + 1),
+          value
+        ])
+      ),
       rowAxisName: "Y",
       rowAxisUnit: "mm"
     }
+  };
+}
+
+export function createDualYAxisSheet(): DataSheet {
+  const current: number[] = [];
+  const output: number[] = [];
+  const efficiency: number[] = [];
+
+  for (let i = 0; i < 36; i += 1) {
+    const x = 0.4 + i * 0.08;
+    const aboveThreshold = Math.max(0, x - 0.72);
+    current.push(Number(x.toFixed(3)));
+    output.push(
+      Number(
+        (
+          0.08 +
+          14.5 * aboveThreshold +
+          0.25 * Math.sin(i * 0.35)
+        ).toFixed(3)
+      )
+    );
+    efficiency.push(
+      Number(
+        (
+          4 +
+          58 * (1 - Math.exp(-aboveThreshold * 1.7))
+        ).toFixed(2)
+      )
+    );
+  }
+
+  return {
+    id: id("sheet-double-y"),
+    name: "双 Y 示例",
+    source: { kind: "embedded" },
+    columns: [
+      {
+        id: "pump-current",
+        name: "泵浦电流",
+        unit: "A",
+        role: "X",
+        values: current
+      },
+      {
+        id: "output-power",
+        name: "输出功率",
+        unit: "W",
+        role: "Y",
+        values: output
+      },
+      {
+        id: "efficiency",
+        name: "光光效率",
+        unit: "%",
+        role: "Y",
+        values: efficiency
+      }
+    ]
+  };
+}
+
+export function createWaterfallSheet(): DataSheet {
+  const wavelength: number[] = [];
+  const columns: DataSheet["columns"] = [];
+
+  for (let i = 0; i < 240; i += 1) {
+    wavelength.push(Number((1048 + i * 0.13).toFixed(3)));
+  }
+
+  columns.push({
+    id: "waterfall-wavelength",
+    name: "波长",
+    unit: "nm",
+    role: "X",
+    values: wavelength
+  });
+
+  for (let row = 0; row < 7; row += 1) {
+    const pump = 0.6 + row * 0.2;
+    const center = 1061.8 + row * 0.38;
+    const values = wavelength.map((x, index) => {
+      const main =
+        Math.exp(-Math.pow((x - center) / 1.45, 2));
+      const shoulder =
+        0.22 *
+        Math.exp(-Math.pow((x - (center + 4.1)) / 0.9, 2));
+      const baseline =
+        -48 +
+        row * 1.25 +
+        0.18 * Math.sin(index * 0.24 + row);
+      return Number(
+        (baseline + 40 * main + 8 * shoulder).toFixed(3)
+      );
+    });
+
+    columns.push({
+      id: "waterfall-" + String(row + 1),
+      name: pump.toFixed(1) + " W",
+      unit: "dBm",
+      role: "Y",
+      values
+    });
+  }
+
+  return {
+    id: id("sheet-waterfall"),
+    name: "瀑布光谱",
+    source: { kind: "embedded" },
+    columns
   };
 }
 
@@ -135,8 +250,6 @@ function makeFigure(
   seriesOverrides: FigureSpec["seriesOverrides"] = {}
 ): FigureSpec {
   const dataRef = defaultDataRef(sheet);
-  const dataset = sheetToDataset(sheet);
-
   return {
     id: id("figure"),
     name,
@@ -147,12 +260,6 @@ function makeFigure(
     figureOverrides: {
       aspectMode: "4:3",
       ...defaults.figureOverrides,
-      xTitle: dataset.x.unit
-        ? dataset.x.name + " (" + dataset.x.unit + ")"
-        : dataset.x.name,
-      yTitle: dataset.ys[0]?.unit
-        ? dataset.ys[0].name + " (" + dataset.ys[0].unit + ")"
-        : dataset.ys[0]?.name || "Y",
       errorSeriesId: dataRef.yErrorColumnId,
       ...overrides
     },
@@ -184,6 +291,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
 
   const spectrumSheet = createSpectrumSheet();
   const fieldSheet = createFieldSheet();
+  const doubleYSheet = createDualYAxisSheet();
+  const waterfallSheet = createWaterfallSheet();
 
   const spectrumBook: DataBook = {
     id: id("book-spectrum"),
@@ -199,6 +308,13 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     sheets: [fieldSheet]
   };
 
+  const commonPlotsBook: DataBook = {
+    id: id("book-common"),
+    name: "常用图型示例",
+    folderId: "folder-experiment",
+    sheets: [doubleYSheet, waterfallSheet]
+  };
+
   const spectrumFigure = makeFigure(
     spectrumSheet,
     "Fig 1 · 光谱",
@@ -211,9 +327,45 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     }
   );
 
+  const doubleYFigure = makeFigure(
+    doubleYSheet,
+    "Fig 2 · 双 Y",
+    "double-y",
+    defaults,
+    "folder-paper",
+    {
+      legendPosition: "top-left"
+    },
+    {
+      "output-power": {
+        yAxis: "left",
+        color: "#0072B2",
+        markerVisible: true
+      },
+      efficiency: {
+        yAxis: "right",
+        color: "#D55E00",
+        markerVisible: true
+      }
+    }
+  );
+
+  const waterfallFigure = makeFigure(
+    waterfallSheet,
+    "Fig 3 · 瀑布图",
+    "waterfall",
+    defaults,
+    "folder-paper",
+    {
+      waterfallXOffset: 0.35,
+      waterfallYOffset: 4.2,
+      legendVisible: false
+    }
+  );
+
   const heatmapFigure = makeFigure(
     fieldSheet,
-    "Fig 2 · 光场",
+    "Fig 4 · Heatmap",
     "heatmap",
     defaults,
     "folder-paper",
@@ -222,6 +374,23 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       yTitle: "Y (mm)",
       legendVisible: false,
       colorScale: "Viridis"
+    }
+  );
+
+  const contourFigure = makeFigure(
+    fieldSheet,
+    "Fig 5 · Contour",
+    "contour",
+    defaults,
+    "folder-paper",
+    {
+      xTitle: "X (mm)",
+      yTitle: "Y (mm)",
+      legendVisible: false,
+      colorScale: "Viridis",
+      contourLevels: 12,
+      contourFill: true,
+      contourLines: true
     }
   );
 
@@ -245,8 +414,15 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     projectId: id("project"),
     name: "未命名项目",
     folders,
-    dataBooks: [spectrumBook, fieldBook],
-    figures: [spectrumFigure, heatmapFigure, surfaceFigure],
+    dataBooks: [spectrumBook, fieldBook, commonPlotsBook],
+    figures: [
+      spectrumFigure,
+      doubleYFigure,
+      waterfallFigure,
+      heatmapFigure,
+      contourFigure,
+      surfaceFigure
+    ],
     activeFigureId: spectrumFigure.id,
     defaults: {
       templateId: defaults.templateId,
