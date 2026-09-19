@@ -66,7 +66,7 @@ beam.setAttenuation
 
 ## 视觉方向
 
-v0.4.17 继续采用 Graph-first Dashboard；v0.4.16 已定型的主图位置保持不动，只精修 Beam 与文字层级：
+v0.4.18 继续采用 Graph-first Dashboard；已定型的四宫格外部位置保持不动，只精修模块语义动画、Beam 内部比例、标题行密度、Scope 内部间距与 REC：
 
 - Dashboard 非绘图区统一冷深蓝灰，只有真实 Plot / 图像绘图区白底。
 - Dashboard 图占绝对主体；模块标题栏与壳体同底色，适度增加高度和刻度字号以保证可读性。Dashboard 不渲染 X/Y 轴标题文字，只保留必要刻度；刻度 gutter 属于深色壳体，白色只填实际数据矩形。

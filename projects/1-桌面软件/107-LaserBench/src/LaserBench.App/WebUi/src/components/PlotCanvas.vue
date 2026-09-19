@@ -16,10 +16,11 @@ const props = withDefaults(defineProps<{
   timeAxis?: boolean
   compact?: boolean
   tight?: boolean
+  stacked?: boolean
   xPadding?: number
   verticalMarker?: number | null
 }>(), {
-  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, compact: false, tight: false, xPadding: 0, verticalMarker: null
+  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, compact: false, tight: false, stacked: false, xPadding: 0, verticalMarker: null
 })
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -73,7 +74,11 @@ function draw() {
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
-  const m = props.compact ? {l:0,r:0,t:0,b:0} : {l:38,r:38,t:8,b:21}
+  const m = props.compact
+    ? {l:0,r:0,t:0,b:0}
+    : props.stacked
+      ? {l:38,r:38,t:3,b:12}
+      : {l:38,r:38,t:8,b:21}
   const pw = Math.max(10,w-m.l-m.r), ph = Math.max(10,h-m.t-m.b)
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(m.l,m.t,pw,ph)

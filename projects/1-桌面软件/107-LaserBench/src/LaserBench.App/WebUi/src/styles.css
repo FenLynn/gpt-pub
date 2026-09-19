@@ -1196,3 +1196,234 @@
 .sidebar button.active svg{
   transform:none!important
 }
+
+
+/* v0.4.18 acquisition motion + dense header typography */
+/* Keep the v0.4.17 dashboard geometry fixed. Only header content, Beam internals, Scope inner gap and REC are refined. */
+
+/* Acquisition icons: larger and module-specific motion while running. */
+.topbar .module-toggle{
+  width:33px!important;
+  height:34px!important;
+  min-width:33px!important;
+  padding:1px!important
+}
+.topbar .module-toggle svg{
+  width:29px!important;
+  height:29px!important;
+  overflow:visible!important
+}
+.dashboard-grid:not(.focus-mode) .module-title .panel-mark{
+  width:24px!important;
+  height:24px!important;
+  flex:0 0 24px!important
+}
+.dashboard-grid:not(.focus-mode) .module-title .panel-mark svg{
+  width:24px!important;
+  height:24px!important;
+  overflow:visible!important;
+  stroke-width:1.9!important
+}
+/* Stop the old whole-icon breathing; animate icon anatomy instead. */
+.module-toggle.breathing svg,
+.panel-mark.breathing svg{
+  animation:none!important;
+  opacity:1!important;
+  filter:drop-shadow(0 0 3px rgba(46,212,119,.48))!important
+}
+.module-toggle.breathing .power-bar,
+.panel-mark.breathing .power-bar{
+  transform-box:fill-box;
+  transform-origin:center bottom;
+  animation:powerBarDance .58s ease-in-out infinite alternate
+}
+.module-toggle.breathing .power-bar.bar-2,
+.panel-mark.breathing .power-bar.bar-2{animation-delay:-.22s}
+.module-toggle.breathing .power-bar.bar-3,
+.panel-mark.breathing .power-bar.bar-3{animation-delay:-.41s}
+.module-toggle.breathing .power-bar.bar-4,
+.panel-mark.breathing .power-bar.bar-4{animation-delay:-.12s}
+@keyframes powerBarDance{
+  0%{transform:scaleY(.55)}
+  45%{transform:scaleY(1.12)}
+  100%{transform:scaleY(.78)}
+}
+.module-toggle.breathing .travel-wave,
+.panel-mark.breathing .travel-wave{
+  transform-box:view-box;
+  transform-origin:center;
+  animation:waveTravel .72s linear infinite
+}
+@keyframes waveTravel{
+  from{transform:translateX(-2.2px)}
+  to{transform:translateX(2.2px)}
+}
+.module-toggle.breathing .beam-ring,
+.panel-mark.breathing .beam-ring{
+  transform-box:view-box;
+  transform-origin:12px 12px;
+  animation:beamRingOut 1.25s ease-out infinite
+}
+.module-toggle.breathing .beam-ring.ring-2,
+.panel-mark.breathing .beam-ring.ring-2{animation-delay:-.42s}
+.module-toggle.breathing .beam-ring.ring-3,
+.panel-mark.breathing .beam-ring.ring-3{animation-delay:-.84s}
+.module-toggle.breathing .beam-core,
+.panel-mark.breathing .beam-core{
+  animation:beamCorePulse .7s ease-in-out infinite alternate
+}
+@keyframes beamRingOut{
+  0%{transform:scale(.58);opacity:.95}
+  72%{opacity:.58}
+  100%{transform:scale(1.12);opacity:.12}
+}
+@keyframes beamCorePulse{
+  from{opacity:.55}
+  to{opacity:1}
+}
+
+/* Header typography: use the full 34 px height, larger labels and results, minimal vertical waste. */
+.dashboard-grid:not(.focus-mode) .power-head,
+.dashboard-grid:not(.focus-mode) .spectrum-head,
+.dashboard-grid:not(.focus-mode) .scope-head{
+  grid-template-columns:96px minmax(0,1fr)!important;
+  column-gap:5px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-head{
+  grid-template-columns:96px minmax(0,1fr) max-content!important;
+  column-gap:5px!important
+}
+.dashboard-grid:not(.focus-mode) .module-title{
+  width:96px!important;
+  min-width:96px!important;
+  max-width:96px!important;
+  gap:6px!important
+}
+.dashboard-grid:not(.focus-mode) .module-title strong{
+  font-size:15.5px!important;
+  line-height:1!important;
+  font-weight:720!important;
+  letter-spacing:.1px!important
+}
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts,
+.dashboard-grid:not(.focus-mode) .m2-block{
+  gap:6px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger{
+  height:33px!important;
+  gap:4px!important;
+  padding:0 3px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger em{
+  font-size:11.5px!important;
+  line-height:1!important;
+  font-weight:560!important;
+  color:#9db5c4!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger b{
+  font-size:18px!important;
+  line-height:1!important;
+  font-weight:730!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger.primary-metric b{
+  font-size:18.5px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger.secondary-trigger b{
+  font-size:17px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger small{
+  font-size:9.5px!important;
+  line-height:1!important
+}
+.dashboard-grid:not(.focus-mode) .secondary-metric{
+  font-size:10.5px!important
+}
+.dashboard-grid:not(.focus-mode) .secondary-metric b{
+  font-size:15px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls .control-label{
+  font-size:11.5px!important;
+  font-weight:600!important;
+  color:#9db5c4!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls>b{
+  font-size:12.5px!important;
+  color:#fff0bd!important
+}
+
+/* Beam only: square spot viewport, slightly wider left side and narrower caustic. Outer Dashboard cell is unchanged. */
+.dashboard-grid:not(.focus-mode) .beam-body{
+  grid-template-columns:51% 49%!important;
+  gap:3px!important;
+  overflow:hidden!important
+}
+.dashboard-grid:not(.focus-mode) .beam-image-wrap{
+  height:calc(100% - 29px)!important;
+  width:auto!important;
+  max-width:calc(100% - 38px)!important;
+  aspect-ratio:1 / 1!important;
+  justify-self:start!important;
+  align-self:start!important;
+  margin:8px 0 21px 38px!important
+}
+
+/* Scope only: compress the two internal plots; no outer panel geometry changes. */
+.dashboard-grid:not(.focus-mode) .scope-plots{
+  gap:1px!important
+}
+
+/* REC: tighter capsule, larger breathing dot, fully centered label/time. */
+.record-btn.active{
+  min-width:0!important;
+  width:auto!important;
+  height:26px!important;
+  padding:0 7px!important;
+  gap:4px!important;
+  border-radius:13px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important
+}
+.record-btn.active i{
+  width:10px!important;
+  height:10px!important;
+  flex:0 0 10px!important;
+  margin:0!important;
+  align-self:center!important;
+  animation:recDotPulse .9s ease-in-out infinite alternate!important
+}
+.record-btn.active>span:not(.record-duration){
+  display:inline-flex!important;
+  align-items:center!important;
+  height:100%!important;
+  font-size:10.5px!important;
+  line-height:1!important;
+  font-weight:700!important
+}
+.record-btn.active .record-duration,
+.record-duration.shown{
+  width:49px!important;
+  min-width:49px!important;
+  font-size:10.5px!important;
+  line-height:1!important;
+  font-weight:650!important;
+  margin:0!important;
+  align-self:center!important
+}
+@keyframes recDotPulse{
+  from{transform:scale(.88);opacity:.72}
+  to{transform:scale(1.12);opacity:1}
+}
+
+@media(max-width:1250px){
+  .dashboard-grid:not(.focus-mode) .power-head,
+  .dashboard-grid:not(.focus-mode) .spectrum-head,
+  .dashboard-grid:not(.focus-mode) .scope-head{grid-template-columns:88px minmax(0,1fr)!important}
+  .dashboard-grid:not(.focus-mode) .beam-head{grid-template-columns:88px minmax(0,1fr) max-content!important}
+  .dashboard-grid:not(.focus-mode) .module-title{width:88px!important;min-width:88px!important;max-width:88px!important}
+  .dashboard-grid:not(.focus-mode) .module-title strong{font-size:14.5px!important}
+  .dashboard-grid:not(.focus-mode) .metric-trigger em{font-size:10.5px!important}
+  .dashboard-grid:not(.focus-mode) .metric-trigger b{font-size:16.5px!important}
+}
