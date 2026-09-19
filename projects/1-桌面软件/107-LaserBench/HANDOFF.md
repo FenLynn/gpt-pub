@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际设备提供者仍是 Simulator；真实 Ophir、Yokogawa、BeamSquared、Tektronix Driver 尚未正式接入。
-- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.24 继续锁定 Dashboard：顶栏四个采集选择器使用内联 SVG/SMIL 动画，并由 WebView2 实际时间轴门禁验证；模块标题图标静态；v0.4.23 的双手柄、刻度安全、结果背景、相机/REC hover 均保留。
+- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.24 继续锁定 Dashboard：顶栏四个采集选择器使用内联 SVG + CSS keyframes 动画，并由 WebView2 Web Animations API 时间轴门禁验证；模块标题图标静态；v0.4.23 的双手柄、刻度安全、结果背景、相机/REC hover 均保留。
 
 ## 当前产品不变量
 

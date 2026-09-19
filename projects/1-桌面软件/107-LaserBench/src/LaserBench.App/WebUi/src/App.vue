@@ -387,29 +387,28 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <div class="vsep"></div>
 
       <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power}" @click="toggleSource('power')" title="本次采集包含功率">
-        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="2.5" y="10" width="4" height="10" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="10;5;11;7;10" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="10;15;9;13;10" dur="4.8s" repeatCount="indefinite"/></rect>
-          <rect x="7.5" y="6" width="4" height="14" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="6;11;4;9;6" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="14;9;16;11;14" dur="4.8s" repeatCount="indefinite"/></rect>
-          <rect x="12.5" y="12" width="4" height="8" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="12;7;11;5;12" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="8;13;9;15;8" dur="4.8s" repeatCount="indefinite"/></rect>
-          <rect x="17.5" y="8" width="4" height="12" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="8;12;6;10;8" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="12;8;14;10;12" dur="4.8s" repeatCount="indefinite"/></rect>
+        <svg class="acq-vector acq-power" viewBox="0 0 24 24" aria-hidden="true">
+          <rect class="bar b1" x="2.5" y="10" width="4" height="10" rx="1.4"/>
+          <rect class="bar b2" x="7.5" y="6" width="4" height="14" rx="1.4"/>
+          <rect class="bar b3" x="12.5" y="12" width="4" height="8" rx="1.4"/>
+          <rect class="bar b4" x="17.5" y="8" width="4" height="12" rx="1.4"/>
         </svg>
       </button>
       <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum}" @click="toggleSource('spectrum')" title="本次采集包含光谱">
-        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M2 18c3 0 4-12 8-12s4 12 7 12c2 0 2-4 5-4"><animateTransform v-if="snapshot.captureSelection.spectrum" attributeName="transform" type="translate" values="-1.1 0;1.1 0;-1.1 0" dur="4.8s" repeatCount="indefinite"/></path>
+        <svg class="acq-vector acq-spectrum" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="wave" d="M2 18c3 0 4-12 8-12s4 12 7 12c2 0 2-4 5-4"/>
         </svg>
       </button>
       <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam}" @click="toggleSource('beam')" title="本次采集包含光束">
-        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>
-          <circle cx="12" cy="12" r="2"/>
-          <circle v-if="!snapshot.captureSelection.beam" cx="12" cy="12" r="7"/>
-          <circle v-if="snapshot.captureSelection.beam" cx="12" cy="12" r="4" class="beam-pulse-ring"><animate attributeName="r" values="4;9;4" dur="4.8s" repeatCount="indefinite"/><animate attributeName="opacity" values=".9;.18;.9" dur="4.8s" repeatCount="indefinite"/></circle>
+        <svg class="acq-vector acq-beam" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="cross" d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>
+          <circle class="core" cx="12" cy="12" r="2"/>
+          <circle class="beam-ring" cx="12" cy="12" r="7"/>
         </svg>
       </button>
       <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope}" @click="toggleSource('scope')" title="本次采集包含示波器">
-        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M1.5 12h2.5c1.6 0 1.6-7 3.2-7s1.6 14 3.2 14S12 5 13.6 5s1.6 14 3.2 14 1.6-7 3.2-7h2.5"><animateTransform v-if="snapshot.captureSelection.scope" attributeName="transform" type="translate" values="-1 0;1 0;-1 0" dur="4.8s" repeatCount="indefinite"/></path>
+        <svg class="acq-vector acq-scope" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="wave" d="M1.5 12h2.5c1.6 0 1.6-7 3.2-7s1.6 14 3.2 14S12 5 13.6 5s1.6 14 3.2 14 1.6-7 3.2-7h2.5"/>
         </svg>
       </button>
 

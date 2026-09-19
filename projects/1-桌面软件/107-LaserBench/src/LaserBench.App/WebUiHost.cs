@@ -173,21 +173,24 @@ internal sealed class WebUiHost : IDisposable
 
                     var structure = await core.ExecuteScriptAsync(
                         "(()=>{const all=document.querySelectorAll('.topbar .module-toggle svg.acq-vector');" +
-                        "const active=document.querySelectorAll('.topbar .module-toggle.active svg.acq-vector');" +
-                        "const anim=document.querySelectorAll('.topbar .module-toggle.active svg.acq-vector animate,.topbar .module-toggle.active svg.acq-vector animateTransform');" +
-                        "return all.length===4&&(active.length===0||anim.length>0)})()");
+                        "const active=document.querySelector('.topbar .module-toggle.active');" +
+                        "if(all.length!==4)return false;if(!active)return true;" +
+                        "return [active,...active.querySelectorAll('*')].some(n=>typeof n.getAnimations==='function'&&n.getAnimations().length>0)})()");
                     if (!string.Equals(structure, "true", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException("WebView2 acquisition vector structure is incomplete.");
+                        throw new InvalidOperationException("WebView2 acquisition vector structure/animation is incomplete.");
 
                     await core.ExecuteScriptAsync(
-                        "(()=>{const e=document.querySelector('.topbar .module-toggle.active svg.acq-vector')||document.querySelector('.topbar .module-toggle svg.acq-vector');" +
-                        "window.__lbAcqVectorT=e&&typeof e.getCurrentTime==='function'?e.getCurrentTime():-1;return window.__lbAcqVectorT})()");
+                        "(()=>{const e=document.querySelector('.topbar .module-toggle.active');" +
+                        "if(!e){window.__lbAcqAnimT=null;return null;}" +
+                        "const a=[e,...e.querySelectorAll('*')].flatMap(n=>typeof n.getAnimations==='function'?n.getAnimations():[]).find(x=>x.playState==='running');" +
+                        "window.__lbAcqAnimT=a&&typeof a.currentTime==='number'?a.currentTime:-1;return window.__lbAcqAnimT})()");
                     await Task.Delay(320);
                     var moving = await core.ExecuteScriptAsync(
-                        "(()=>{const e=document.querySelector('.topbar .module-toggle.active svg.acq-vector')||document.querySelector('.topbar .module-toggle svg.acq-vector');" +
-                        "return !!e&&typeof e.getCurrentTime==='function'&&e.getCurrentTime()>(window.__lbAcqVectorT??-1)+0.15})()");
+                        "(()=>{if(window.__lbAcqAnimT===null)return true;const e=document.querySelector('.topbar .module-toggle.active');" +
+                        "if(!e)return false;const a=[e,...e.querySelectorAll('*')].flatMap(n=>typeof n.getAnimations==='function'?n.getAnimations():[]).find(x=>x.playState==='running');" +
+                        "return !!a&&typeof a.currentTime==='number'&&a.currentTime>window.__lbAcqAnimT+150})()");
                     if (!string.Equals(moving, "true", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException("WebView2 acquisition vector timeline is not advancing.");
+                        throw new InvalidOperationException("WebView2 acquisition vector CSS animation is not advancing.");
 
                     StartupDiagnostics.Stage("webui-acq-vectors", "running");
                     _ready = true;

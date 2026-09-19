@@ -75,12 +75,16 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $app=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/App.vue" -Raw
-          $count=([regex]::Matches($app,'class="acq-vector"')).Count
+          $css=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/styles.css" -Raw
+          $count=([regex]::Matches($app,'class="acq-vector')).Count
           if ($count -ne 4) { throw "Expected 4 top acquisition vector icons, found $count." }
           if ($app -match 'acq-(power|spectrum|scope|beam)\.gif' -or $app -match 'AcqGif|acqGif') {
             throw 'App.vue still depends on animated GIF assets.'
           }
-          if ($app -notmatch 'dur="4\.8s"') { throw 'Slow 4.8 s acquisition animation cycle is missing.' }
+          if ($app -match '<animate|animateTransform') { throw 'SMIL animation nodes remain in App.vue.' }
+          if ($css -notmatch '@keyframes lbPowerBar1' -or $css -notmatch '@keyframes lbBeamRing' -or $css -notmatch '4\.8s') {
+            throw 'Verified CSS vector keyframes are missing.'
+          }
 
       - name: Restore projects
         shell: pwsh

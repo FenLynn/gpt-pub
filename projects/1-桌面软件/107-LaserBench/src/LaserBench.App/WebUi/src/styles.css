@@ -2269,3 +2269,53 @@
   animation:none!important;
   filter:none!important
 }
+
+
+/* v0.4.24 runtime fix — Chromium/WebView2 verified CSS vector motion */
+.topbar .module-toggle .acq-vector .bar,
+.topbar .module-toggle .acq-vector .wave,
+.topbar .module-toggle .acq-vector .beam-ring{
+  animation:none!important
+}
+.topbar .module-toggle.active .acq-power .bar{
+  transform-box:fill-box!important;
+  transform-origin:center bottom!important;
+  animation-duration:4.8s!important;
+  animation-timing-function:ease-in-out!important;
+  animation-iteration-count:infinite!important
+}
+.topbar .module-toggle.active .acq-power .b1{animation-name:lbPowerBar1!important}
+.topbar .module-toggle.active .acq-power .b2{animation-name:lbPowerBar2!important}
+.topbar .module-toggle.active .acq-power .b3{animation-name:lbPowerBar3!important}
+.topbar .module-toggle.active .acq-power .b4{animation-name:lbPowerBar4!important}
+@keyframes lbPowerBar1{0%,100%{transform:scaleY(.78)}25%{transform:scaleY(1.18)}55%{transform:scaleY(.66)}78%{transform:scaleY(1.05)}}
+@keyframes lbPowerBar2{0%,100%{transform:scaleY(1)}20%{transform:scaleY(.62)}48%{transform:scaleY(1.2)}75%{transform:scaleY(.82)}}
+@keyframes lbPowerBar3{0%,100%{transform:scaleY(.72)}28%{transform:scaleY(1.22)}58%{transform:scaleY(.86)}82%{transform:scaleY(1.08)}}
+@keyframes lbPowerBar4{0%,100%{transform:scaleY(.92)}22%{transform:scaleY(1.16)}52%{transform:scaleY(.64)}80%{transform:scaleY(1.04)}}
+
+.topbar .module-toggle.active .acq-spectrum .wave,
+.topbar .module-toggle.active .acq-scope .wave{
+  transform-box:view-box!important;
+  transform-origin:center!important;
+  animation:lbWaveTravel 4.8s ease-in-out infinite!important
+}
+@keyframes lbWaveTravel{
+  0%,100%{transform:translateX(-1.1px)}
+  50%{transform:translateX(1.1px)}
+}
+
+.topbar .module-toggle .acq-beam .cross,
+.topbar .module-toggle .acq-beam .core{
+  animation:none!important;
+  transform:none!important;
+  opacity:1!important
+}
+.topbar .module-toggle.active .acq-beam .beam-ring{
+  transform-box:view-box!important;
+  transform-origin:12px 12px!important;
+  animation:lbBeamRing 4.8s ease-in-out infinite!important
+}
+@keyframes lbBeamRing{
+  0%,100%{transform:scale(.62);opacity:.9}
+  55%{transform:scale(1.22);opacity:.18}
+}
