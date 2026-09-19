@@ -181,7 +181,12 @@ if preferred_font == "Times New Roman":
         "SimSun",
         "Noto Serif CJK SC",
         "Source Han Serif SC",
-    ]
+    ] + sorted(
+        name
+        for name in available_fonts
+        if name.startswith("Noto Serif CJK")
+        or name.startswith("Source Han Serif")
+    )
     fallback_font = "DejaVu Serif"
 else:
     latin_candidates = [
@@ -196,7 +201,12 @@ else:
         "Noto Sans CJK SC",
         "Source Han Sans SC",
         "SimHei",
-    ]
+    ] + sorted(
+        name
+        for name in available_fonts
+        if name.startswith("Noto Sans CJK")
+        or name.startswith("Source Han Sans")
+    )
     fallback_font = "DejaVu Sans"
 
 font_candidates = (
