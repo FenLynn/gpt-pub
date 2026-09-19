@@ -2,6 +2,18 @@ export interface PlotPoint { x: number; y: number }
 export interface PlotSeries { name: string; color: string; axis?: 'left' | 'right'; points: PlotPoint[]; markers?: boolean }
 export interface MetricTrace { name: string; unit: string; value: number; maxValue: number; color: string; points: PlotPoint[] }
 export interface DeviceState { alias: string; kind: string; status: 'online' | 'busy' | 'error' | 'offline' }
+export interface InstrumentInterfaceState {
+  kind: 'power'|'spectrum'|'beam'|'scope'
+  driverId: string
+  deviceName: string
+  vendorSoftware: string
+  interfaceName: string
+  enabled: boolean
+  dataPlaneReady: boolean
+  endpoint: string
+  state: 'disabled'|'configured'|'invalid'
+  message: string
+}
 
 export interface LaserSnapshot {
   version: string
@@ -61,7 +73,16 @@ export interface LaserSnapshot {
     scopeTriggerSlope: string
     scopeAcquisition: string
     scopeAverage: number
+    powerInterfaceEnabled: boolean
+    powerInterfaceEndpoint: string
+    spectrumInterfaceEnabled: boolean
+    spectrumInterfaceEndpoint: string
+    beamInterfaceEnabled: boolean
+    beamInterfaceEndpoint: string
+    scopeInterfaceEnabled: boolean
+    scopeInterfaceEndpoint: string
   }
+  interfaces: InstrumentInterfaceState[]
   data: {
     experimentFolder: string
     fileCount: number

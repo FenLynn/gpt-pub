@@ -96,24 +96,34 @@ jobs:
           $app=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/App.vue" -Raw
           $css=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/styles.css" -Raw
           $types=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/types.ts" -Raw
+          $backend=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/InstrumentBackends.cs" -Raw
           $required=@(
             'class="metric-value-chip"',
-            'class="module-config-dock workstation-config"',
+            'class="module-config-dock workstation-config module-side-pane"',
+            'module-side-tabs',
+            'folderInput',
             'powerRangeStartPct',
             'powerRangeEndPct',
             'powerAverageSamples',
-            'OSA 扫描 / 分析',
-            'BeamSquared / M²',
-            'scopeTriggerSource',
+            '波长范围',
+            'M² 分析',
+            '触发 / 采集',
+            'powerInterfaceEnabled',
+            'spectrumInterfaceEnabled',
+            'beamInterfaceEnabled',
+            'scopeInterfaceEnabled',
             'show-axis-labels',
             "activePage==='dashboard'"
           )
           foreach($needle in $required){ if($app -notlike "*$needle*"){ throw "Workstation UI contract missing: $needle" } }
-          foreach($needle in @('powerAverageSamples','osaResolution','beamWidthMethod','scopeVoltsDiv')){
+          foreach($needle in @('powerAverageSamples','osaResolution','beamWidthMethod','scopeVoltsDiv','InstrumentInterfaceState','powerInterfaceEnabled','spectrumInterfaceEnabled','beamInterfaceEnabled','scopeInterfaceEnabled')){
             if($types -notlike "*$needle*"){ throw "Web UI config type missing: $needle" }
           }
-          if($css -notmatch 'grid-template-columns:minmax\(0,1fr\) 304px' -or $css -notmatch 'metric-value-chip'){
-            throw 'Workstation layout / Dashboard metric-chip CSS missing.'
+          foreach($needle in @('Ophir Juno','Yokogawa AQ6370D','BeamSquared','Tektronix MSO44','DataPlaneReady','InstrumentProviderFactory')){
+            if($backend -notlike "*$needle*"){ throw "Instrument backend contract missing: $needle" }
+          }
+          if($css -notmatch 'grid-template-columns:minmax\(0,1fr\) 360px' -or $css -notmatch 'module-side-tabs' -or $css -notmatch 'metric-value-chip'){
+            throw 'Workstation layout / side-pane / Dashboard metric-chip CSS missing.'
           }
 
       - name: Restore projects

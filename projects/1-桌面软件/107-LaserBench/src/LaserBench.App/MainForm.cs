@@ -70,12 +70,16 @@ internal sealed class MainForm : Form
             _config = AppConfigStore.Load();
             StartupDiagnostics.Stage("config-load");
 
-            SetBootText("LaserBench\r\n正在启动模拟仪器...");
+            SetBootText("LaserBench\r\n正在建立仪器接口控制层...");
+            var providerSelection = InstrumentProviderFactory.Create(_config);
+            StartupDiagnostics.Stage("instrument-interfaces", string.Join("; ", providerSelection.Interfaces.Select(x => $"{x.Kind}:{x.State}:{x.Endpoint}")));
+
+            SetBootText("LaserBench\r\n正在启动 Simulator 数据平面...");
             StartupDiagnostics.Stage("simulator", "begin");
-            _provider = new SimulatorProvider();
+            _provider = providerSelection.Provider;
             _captureService = new CaptureService(_provider);
             var probe = _provider.Snapshot(_config);
-            StartupDiagnostics.Stage("simulator", $"power={probe.Power.Count}; spectrum={probe.Spectrum.Count}; beam={probe.Beam.Count}");
+            StartupDiagnostics.Stage("simulator", $"source={providerSelection.DataSource}; power={probe.Power.Count}; spectrum={probe.Spectrum.Count}; beam={probe.Beam.Count}");
 
             if (!_safeMode)
             {
@@ -248,7 +252,55 @@ internal sealed class MainForm : Form
         BeamAlias = source.BeamAlias,
         Scope1Alias = source.Scope1Alias,
         Scope2Alias = source.Scope2Alias,
-        PowerWindow=source.PowerWindow, OsaStart=source.OsaStart, OsaStop=source.OsaStop,
-        ScopeTimeSpan=source.ScopeTimeSpan, ScopeFftMax=source.ScopeFftMax, ScopeCh1=source.ScopeCh1, ScopeCh2=source.ScopeCh2
+        PowerWindow = source.PowerWindow,
+        OsaStart = source.OsaStart,
+        OsaStop = source.OsaStop,
+        ScopeTimeSpan = source.ScopeTimeSpan,
+        ScopeFftMax = source.ScopeFftMax,
+        ScopeCh1 = source.ScopeCh1,
+        ScopeCh2 = source.ScopeCh2,
+        DashboardPower1 = source.DashboardPower1,
+        DashboardPower2 = source.DashboardPower2,
+        DashboardMath1 = source.DashboardMath1,
+        PowerActiveTrace = source.PowerActiveTrace,
+        PowerAverageSamples = source.PowerAverageSamples,
+        PowerOffset = source.PowerOffset,
+        PowerScale = source.PowerScale,
+        PowerNormalize = source.PowerNormalize,
+        PowerNormalizeValue = source.PowerNormalizeValue,
+        PowerDensity = source.PowerDensity,
+        PowerAreaCm2 = source.PowerAreaCm2,
+        PowerPassFail = source.PowerPassFail,
+        PowerLow = source.PowerLow,
+        PowerHigh = source.PowerHigh,
+        OsaResolution = source.OsaResolution,
+        OsaSensitivity = source.OsaSensitivity,
+        OsaAverage = source.OsaAverage,
+        OsaRefLevel = source.OsaRefLevel,
+        OsaDbPerDiv = source.OsaDbPerDiv,
+        OsaShowRef = source.OsaShowRef,
+        OsaSweepMode = source.OsaSweepMode,
+        OsaMarkerPeak = source.OsaMarkerPeak,
+        BeamRunMode = source.BeamRunMode,
+        BeamWidthMethod = source.BeamWidthMethod,
+        BeamAutoOutlier = source.BeamAutoOutlier,
+        BeamShowX = source.BeamShowX,
+        BeamShowY = source.BeamShowY,
+        ScopeVoltsDiv = source.ScopeVoltsDiv,
+        ScopeOffset = source.ScopeOffset,
+        ScopeCoupling = source.ScopeCoupling,
+        ScopeTriggerSource = source.ScopeTriggerSource,
+        ScopeTriggerLevel = source.ScopeTriggerLevel,
+        ScopeTriggerSlope = source.ScopeTriggerSlope,
+        ScopeAcquisition = source.ScopeAcquisition,
+        ScopeAverage = source.ScopeAverage,
+        PowerInterfaceEnabled = source.PowerInterfaceEnabled,
+        PowerInterfaceEndpoint = source.PowerInterfaceEndpoint,
+        SpectrumInterfaceEnabled = source.SpectrumInterfaceEnabled,
+        SpectrumInterfaceEndpoint = source.SpectrumInterfaceEndpoint,
+        BeamInterfaceEnabled = source.BeamInterfaceEnabled,
+        BeamInterfaceEndpoint = source.BeamInterfaceEndpoint,
+        ScopeInterfaceEnabled = source.ScopeInterfaceEnabled,
+        ScopeInterfaceEndpoint = source.ScopeInterfaceEndpoint
     };
 }

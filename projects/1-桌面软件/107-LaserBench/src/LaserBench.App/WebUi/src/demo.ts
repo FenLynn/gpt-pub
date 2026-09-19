@@ -79,7 +79,7 @@ export function createDemoSnapshot(): LaserSnapshot {
   const p2 = powerSeries(1, '#ff8200', 'back', 'kW')
   const p3 = powerSeries(2, '#08a84f', 'eta', '%')
   return {
-    version: '0.4.25', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
+    version: '0.4.26', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
     captureSelection: { power: true, spectrum: true, beam: true, scope: false },
     config: {
       experimentFolder: '', autoScreenshot: false,
@@ -88,8 +88,18 @@ export function createDemoSnapshot(): LaserSnapshot {
       powerActiveTrace:0, powerAverageSamples:1, powerOffset:0, powerScale:1, powerNormalize:false, powerNormalizeValue:1, powerDensity:false, powerAreaCm2:1, powerPassFail:false, powerLow:0, powerHigh:20,
       osaResolution:0.05, osaSensitivity:'MID', osaAverage:1, osaRefLevel:0, osaDbPerDiv:10, osaShowRef:true, osaSweepMode:'REPEAT', osaMarkerPeak:true,
       beamRunMode:'AUTO', beamWidthMethod:'D4SIGMA', beamAutoOutlier:true, beamShowX:true, beamShowY:true,
-      scopeVoltsDiv:0.25, scopeOffset:0, scopeCoupling:'DC', scopeTriggerSource:'CH1', scopeTriggerLevel:0, scopeTriggerSlope:'RISING', scopeAcquisition:'SAMPLE', scopeAverage:16
+      scopeVoltsDiv:0.25, scopeOffset:0, scopeCoupling:'DC', scopeTriggerSource:'CH1', scopeTriggerLevel:0, scopeTriggerSlope:'RISING', scopeAcquisition:'SAMPLE', scopeAverage:16,
+      powerInterfaceEnabled:false, powerInterfaceEndpoint:'AUTO',
+      spectrumInterfaceEnabled:false, spectrumInterfaceEndpoint:'TCPIP::AUTO',
+      beamInterfaceEnabled:false, beamInterfaceEndpoint:'AUTO',
+      scopeInterfaceEnabled:false, scopeInterfaceEndpoint:'TCPIP::AUTO'
     },
+    interfaces: [
+      { kind:'power', driverId:'ophir-juno-lmmeasurement', deviceName:'Ophir Juno', vendorSoftware:'OphirLMMeasurement', interfaceName:'.NET / COM SDK', enabled:false, dataPlaneReady:false, endpoint:'AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' },
+      { kind:'spectrum', driverId:'yokogawa-aq6370d', deviceName:'Yokogawa AQ6370D', vendorSoftware:'Yokogawa', interfaceName:'TCP/IP / SCPI / VISA', enabled:false, dataPlaneReady:false, endpoint:'TCPIP::AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' },
+      { kind:'beam', driverId:'spiricon-beamsquared-sp920', deviceName:'Ophir Spiricon SP920', vendorSoftware:'BeamSquared', interfaceName:'BeamSquared API / SDK', enabled:false, dataPlaneReady:false, endpoint:'AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' },
+      { kind:'scope', driverId:'tektronix-mso44', deviceName:'Tektronix MSO44', vendorSoftware:'TekVISA', interfaceName:'VISA / SCPI', enabled:false, dataPlaneReady:false, endpoint:'TCPIP::AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' }
+    ],
     data: { experimentFolder: new Date().toISOString().slice(0,10), fileCount:0, files: [], pictureCount: 0, videoCount: 0 },
     devices: [
       { alias:'out', kind:'power', status:'online' }, { alias:'back', kind:'power', status:'online' },

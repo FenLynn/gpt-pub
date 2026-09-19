@@ -332,6 +332,15 @@ internal sealed class WebUiHost : IDisposable
         if (v.TryGetProperty("scopeAcquisition",out var sac) && sac.ValueKind==JsonValueKind.String) _config.ScopeAcquisition=(sac.GetString()??"SAMPLE").Trim().ToUpperInvariant();
         if (v.TryGetProperty("scopeAverage",out var sav) && sav.ValueKind==JsonValueKind.Number) _config.ScopeAverage=Math.Clamp(sav.GetInt32(),2,1024);
 
+        if (v.TryGetProperty("powerInterfaceEnabled",out var pie) && (pie.ValueKind==JsonValueKind.True||pie.ValueKind==JsonValueKind.False)) _config.PowerInterfaceEnabled=pie.GetBoolean();
+        if (v.TryGetProperty("powerInterfaceEndpoint",out var pip) && pip.ValueKind==JsonValueKind.String) _config.PowerInterfaceEndpoint=(pip.GetString()??"AUTO").Trim();
+        if (v.TryGetProperty("spectrumInterfaceEnabled",out var sie) && (sie.ValueKind==JsonValueKind.True||sie.ValueKind==JsonValueKind.False)) _config.SpectrumInterfaceEnabled=sie.GetBoolean();
+        if (v.TryGetProperty("spectrumInterfaceEndpoint",out var sip) && sip.ValueKind==JsonValueKind.String) _config.SpectrumInterfaceEndpoint=(sip.GetString()??"TCPIP::AUTO").Trim();
+        if (v.TryGetProperty("beamInterfaceEnabled",out var bie) && (bie.ValueKind==JsonValueKind.True||bie.ValueKind==JsonValueKind.False)) _config.BeamInterfaceEnabled=bie.GetBoolean();
+        if (v.TryGetProperty("beamInterfaceEndpoint",out var bip) && bip.ValueKind==JsonValueKind.String) _config.BeamInterfaceEndpoint=(bip.GetString()??"AUTO").Trim();
+        if (v.TryGetProperty("scopeInterfaceEnabled",out var scie) && (scie.ValueKind==JsonValueKind.True||scie.ValueKind==JsonValueKind.False)) _config.ScopeInterfaceEnabled=scie.GetBoolean();
+        if (v.TryGetProperty("scopeInterfaceEndpoint",out var scip) && scip.ValueKind==JsonValueKind.String) _config.ScopeInterfaceEndpoint=(scip.GetString()??"TCPIP::AUTO").Trim();
+
         if (v.TryGetProperty("aliases",out var aliases) && aliases.ValueKind==JsonValueKind.Object)
         {
             static string Alias(JsonElement a,string key,string current)
@@ -401,7 +410,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.25",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.26",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
@@ -441,8 +450,18 @@ internal sealed class WebUiHost : IDisposable
                 beamShowX=_config.BeamShowX, beamShowY=_config.BeamShowY,
                 scopeVoltsDiv=_config.ScopeVoltsDiv, scopeOffset=_config.ScopeOffset, scopeCoupling=_config.ScopeCoupling,
                 scopeTriggerSource=_config.ScopeTriggerSource, scopeTriggerLevel=_config.ScopeTriggerLevel,
-                scopeTriggerSlope=_config.ScopeTriggerSlope, scopeAcquisition=_config.ScopeAcquisition, scopeAverage=_config.ScopeAverage
+                scopeTriggerSlope=_config.ScopeTriggerSlope, scopeAcquisition=_config.ScopeAcquisition, scopeAverage=_config.ScopeAverage,
+                powerInterfaceEnabled=_config.PowerInterfaceEnabled, powerInterfaceEndpoint=_config.PowerInterfaceEndpoint,
+                spectrumInterfaceEnabled=_config.SpectrumInterfaceEnabled, spectrumInterfaceEndpoint=_config.SpectrumInterfaceEndpoint,
+                beamInterfaceEnabled=_config.BeamInterfaceEnabled, beamInterfaceEndpoint=_config.BeamInterfaceEndpoint,
+                scopeInterfaceEnabled=_config.ScopeInterfaceEnabled, scopeInterfaceEndpoint=_config.ScopeInterfaceEndpoint
             },
+            interfaces = InstrumentBackendRegistry.InspectAll(_config).Select(x => new
+            {
+                kind=x.Kind.ToString().ToLowerInvariant(),
+                x.DriverId, x.DeviceName, x.VendorSoftware, x.InterfaceName,
+                x.Enabled, x.DataPlaneReady, x.Endpoint, x.State, x.Message
+            }).ToArray(),
             data = BuildDataSummary(),
             devices = BuildDevices(),
             power = new { traces },

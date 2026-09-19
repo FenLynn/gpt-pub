@@ -36,8 +36,8 @@ let pendingAxis:'x'|'y'|'right'|null=null
 function margins(){
   if(props.compact)return {l:0,r:0,t:0,b:0}
   if(props.showAxisLabels)return props.stacked
-    ? {l:58,r:48,t:6,b:36}
-    : {l:58,r:48,t:6,b:38}
+    ? {l:76,r:60,t:8,b:48}
+    : {l:76,r:60,t:8,b:50}
   return props.stacked
     ? {l:38,r:38,t:4,b:18}
     : {l:38,r:38,t:4,b:21}
@@ -87,7 +87,7 @@ function draw() {
   ctx.setTransform(dpr,0,0,dpr,0,0)
   const w = rect.width, h = rect.height
   ctx.clearRect(0,0,w,h)
-  ctx.fillStyle = '#3b4d5b'
+  ctx.fillStyle = props.showAxisLabels ? '#314251' : '#3b4d5b'
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
@@ -112,14 +112,14 @@ function draw() {
   ctx.save(); ctx.beginPath(); ctx.rect(m.l,m.t,pw,ph); ctx.clip()
   for (const s of props.series) {
     if (s.points.length < 2) continue
-    ctx.strokeStyle=s.color; ctx.lineWidth=props.compact?1.2:1.8; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.beginPath()
+    ctx.strokeStyle=s.color; ctx.lineWidth=props.compact?1.2:(props.showAxisLabels?2.2:1.8); ctx.lineJoin='round'; ctx.lineCap='round'; ctx.beginPath()
     s.points.forEach((p,i)=>{ const x=sx(p.x), y=sy(p.y,s.axis==='right'?'right':'left'); if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y) })
     ctx.stroke()
     if (s.markers && !props.compact) {
       ctx.fillStyle='#fff'; ctx.lineWidth=1.5
       for (let i=0;i<s.points.length;i+=Math.max(1,Math.floor(s.points.length/24))) {
         const p=s.points[i], x=sx(p.x), y=sy(p.y,s.axis==='right'?'right':'left')
-        ctx.beginPath();ctx.arc(x,y,2.8,0,Math.PI*2);ctx.fill();ctx.strokeStyle=s.color;ctx.stroke()
+        ctx.beginPath();ctx.arc(x,y,props.showAxisLabels?3.4:2.8,0,Math.PI*2);ctx.fill();ctx.strokeStyle=s.color;ctx.stroke()
       }
     }
   }
@@ -129,7 +129,7 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font='11.5px "Segoe UI", sans-serif';ctx.fillStyle='#9fb2c0'
+  ctx.font=(props.showAxisLabels?'14px':'11.5px')+' "Segoe UI","Microsoft YaHei UI",sans-serif';ctx.fillStyle=props.showAxisLabels?'#c8d5de':'#9fb2c0'
   for(let i=0;i<4;i++) {
     const t=i/3, y=m.t+ph*t, v=y1-(y1-y0)*t, text=fmt(v,y1-y0)
     ctx.textBaseline=i===0?'top':i===3?'bottom':'middle'
@@ -151,14 +151,25 @@ function draw() {
     ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+3)
   }
   if(props.series.length){
-    let lx=m.l+pw-8, ly=m.t+12;ctx.font='10.5px "Segoe UI", sans-serif';ctx.textBaseline='middle'
-    for(let i=props.series.length-1;i>=0;i--){const s=props.series[i];const tw=ctx.measureText(s.name).width;lx-=tw+30;ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+16,ly);ctx.stroke();ctx.fillStyle='#35516c';ctx.textAlign='left';ctx.fillText(s.name,lx+20,ly)}
+    if(props.showAxisLabels){
+      let lx=m.l+14, ly=m.t+ph-18
+      ctx.font='600 13.5px "Segoe UI","Microsoft YaHei UI",sans-serif';ctx.textBaseline='middle'
+      for(const s of props.series){
+        const tw=ctx.measureText(s.name).width
+        ctx.strokeStyle=s.color;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+24,ly);ctx.stroke()
+        ctx.fillStyle='#2b4358';ctx.textAlign='left';ctx.fillText(s.name,lx+30,ly)
+        lx+=tw+64
+      }
+    }else{
+      let lx=m.l+pw-8, ly=m.t+12;ctx.font='10.5px "Segoe UI", sans-serif';ctx.textBaseline='middle'
+      for(let i=props.series.length-1;i>=0;i--){const s=props.series[i];const tw=ctx.measureText(s.name).width;lx-=tw+30;ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+16,ly);ctx.stroke();ctx.fillStyle='#35516c';ctx.textAlign='left';ctx.fillText(s.name,lx+20,ly)}
+    }
   }
 
   if(props.showAxisLabels){
     ctx.save()
     ctx.fillStyle='#dce6ed'
-    ctx.font='600 12px "Segoe UI", sans-serif'
+    ctx.font='700 15.5px "Segoe UI","Microsoft YaHei UI",sans-serif'
     ctx.textAlign='center';ctx.textBaseline='middle'
     if(props.xLabel)ctx.fillText(props.xLabel,m.l+pw/2,h-11)
     if(props.yLabel){ctx.translate(12,m.t+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText(props.yLabel,0,0);ctx.rotate(Math.PI/2);ctx.translate(-12,-(m.t+ph/2))}
@@ -172,7 +183,7 @@ function draw() {
     const drawHint=(text:string,x:number,y:number,angle=0)=>{
       ctx.save()
       ctx.translate(x,y);ctx.rotate(angle)
-      ctx.font='600 12px "Segoe UI", sans-serif'
+      ctx.font='600 13px "Segoe UI","Microsoft YaHei UI",sans-serif'
       ctx.textAlign='center';ctx.textBaseline='middle'
       const tw=ctx.measureText(text).width
       ctx.fillStyle='rgba(25,43,56,.88)'

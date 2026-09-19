@@ -80,6 +80,17 @@ internal sealed class AppConfig
     public string ScopeTriggerSlope { get; set; } = "RISING";
     public string ScopeAcquisition { get; set; } = "SAMPLE";
     public int ScopeAverage { get; set; } = 16;
+
+    // Real-instrument interface control plane. These settings are persisted,
+    // but they never silently replace the active Simulator data plane.
+    public bool PowerInterfaceEnabled { get; set; }
+    public string PowerInterfaceEndpoint { get; set; } = "AUTO";
+    public bool SpectrumInterfaceEnabled { get; set; }
+    public string SpectrumInterfaceEndpoint { get; set; } = "TCPIP::AUTO";
+    public bool BeamInterfaceEnabled { get; set; }
+    public string BeamInterfaceEndpoint { get; set; } = "AUTO";
+    public bool ScopeInterfaceEnabled { get; set; }
+    public string ScopeInterfaceEndpoint { get; set; } = "TCPIP::AUTO";
 }
 
 internal static class AppPaths

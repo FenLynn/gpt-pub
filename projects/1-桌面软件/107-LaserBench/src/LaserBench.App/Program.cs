@@ -99,7 +99,11 @@ internal static class Program
                 OsaSensitivity = "HIGH1",
                 BeamWidthMethod = "FWHM",
                 ScopeVoltsDiv = 0.5,
-                ScopeTriggerSource = "CH2"
+                ScopeTriggerSource = "CH2",
+                SpectrumInterfaceEnabled = true,
+                SpectrumInterfaceEndpoint = "TCPIP0::192.0.2.10::inst0::INSTR",
+                ScopeInterfaceEnabled = true,
+                ScopeInterfaceEndpoint = "TCPIP0::192.0.2.20::inst0::INSTR"
             };
             AppConfigStore.Save(config);
             var persistedConfig = AppConfigStore.Load();
@@ -112,6 +116,14 @@ internal static class Program
                 errors.Add("beam workstation preference persistence failed");
             if (Math.Abs(persistedConfig.ScopeVoltsDiv - 0.5) > 1e-9 || persistedConfig.ScopeTriggerSource != "CH2")
                 errors.Add("scope workstation preference persistence failed");
+            if (!persistedConfig.SpectrumInterfaceEnabled || persistedConfig.SpectrumInterfaceEndpoint != "TCPIP0::192.0.2.10::inst0::INSTR" ||
+                !persistedConfig.ScopeInterfaceEnabled || persistedConfig.ScopeInterfaceEndpoint != "TCPIP0::192.0.2.20::inst0::INSTR")
+                errors.Add("instrument interface preference persistence failed");
+            var interfaceStates = InstrumentBackendRegistry.InspectAll(persistedConfig);
+            if (interfaceStates.Count != 4 || interfaceStates.Single(x => x.Kind == ModuleKind.Spectrum).State != "configured" ||
+                interfaceStates.Single(x => x.Kind == ModuleKind.Scope).State != "configured" ||
+                interfaceStates.Any(x => x.DataPlaneReady))
+                errors.Add("instrument interface registry contract failed");
 
             try
             {
@@ -167,6 +179,7 @@ internal static class Program
                 },
                 neverOverwrite = Path.GetFileNameWithoutExtension(second).EndsWith("_1", StringComparison.Ordinal),
                 simulator = snapshot.Power.Count >= 2 && snapshot.Spectrum.Count >= 100,
+                interfaces = interfaceStates.Select(x => new { kind=x.Kind.ToString(), x.State, x.Enabled, x.DataPlaneReady, x.Endpoint }).ToArray(),
                 captureFiles = capture.Files.Select(Path.GetFileName).ToArray(),
                 first = Path.GetFileName(first),
                 second = Path.GetFileName(second)
