@@ -789,7 +789,7 @@ else:
                     ),
                 )
         else:
-            line_default = template not in ("xy-scatter",)
+            line_default = template not in ("xy-scatter", "xy-errorbar")
             marker_default = template in ("xy-scatter", "xy-line-marker", "xy-errorbar")
             line_visible = style.get("lineVisible", line_default)
             marker_visible = style.get("markerVisible", marker_default)
@@ -819,13 +819,20 @@ else:
                 marker=marker,
                 markersize=float(style.get("markerSizePt", PRESET["markerSizePt"])),
                 markeredgecolor=color,
-                markeredgewidth=0.0 if template == "xy-scatter" else 0.55,
+                markeredgewidth=0.0 if template in ("xy-scatter", "xy-errorbar") else 0.55,
             )
 
             if template == "xy-errorbar" and plotted == 0:
                 error_id = O.get("errorSeriesId")
                 yerr = finite_array(series[error_id]) if error_id in series else None
-                target.errorbar(current_x, y, yerr=yerr, capsize=0, **common)
+                target.errorbar(
+                    current_x,
+                    y,
+                    yerr=yerr,
+                    capsize=0,
+                    elinewidth=0.8,
+                    **common
+                )
             elif template != "xy-errorbar":
                 target.plot(current_x, y, **common)
 
