@@ -83,8 +83,13 @@ jobs:
             try {
               $dimension=New-Object System.Drawing.Imaging.FrameDimension($image.FrameDimensionsList[0])
               $frames=$image.GetFrameCount($dimension)
-              Write-Host "$name frames=$frames"
+              $delay=$image.GetPropertyItem(0x5100)
+              $delays=@()
+              for($i=0;$i -lt $frames;$i++){ $delays += [BitConverter]::ToUInt32($delay.Value,$i*4) }
+              $avgDelay=[Math]::Round((($delays | Measure-Object -Average).Average)*10,1)
+              Write-Host "$name frames=$frames avgDelayMs=$avgDelay"
               if ($frames -lt 4) { throw "$name is not a visible multi-frame GIF." }
+              if ($avgDelay -lt 300) { throw "$name animation is too fast; average frame delay must be >=300 ms." }
             } finally {
               $image.Dispose()
             }

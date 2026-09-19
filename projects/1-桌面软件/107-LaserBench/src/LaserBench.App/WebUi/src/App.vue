@@ -29,6 +29,7 @@ let beamAttSendBusy=false
 let beamZHoldUntil=0
 let beamAttHoldUntil=0
 const cameraFlash = ref(false)
+const recordFlash = ref(false)
 const recordElapsed = ref(0)
 const saveNotice = ref('')
 type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
@@ -246,7 +247,14 @@ async function screenshot(){
     window.setTimeout(()=>cameraFlash.value=false,900)
   })
 }
-async function toggleRecord(){ await request('app.record') }
+async function toggleRecord(){
+  await request('app.record')
+  recordFlash.value=false
+  window.requestAnimationFrame(()=>{
+    recordFlash.value=true
+    window.setTimeout(()=>recordFlash.value=false,520)
+  })
+}
 async function updateZ(value:number){beamZ.value=value;await request('beam.setZ',{value})}
 async function updateAtt(value:number){beamAtt.value=value;await request('beam.setAttenuation',{value})}
 async function flushBeamZ(){
@@ -369,7 +377,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <div class="device-strip"><span v-for="d in devicesShown" :key="d.kind+d.alias" class="device-pill"><i :class="['status-dot',d.status]"></i>{{d.alias}}</span></div>
       <div class="vsep"></div>
       <button class="icon-btn camera-btn" :class="{flash:cameraFlash}" @click="screenshot" title="截图"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
-      <button class="record-btn" :class="{active:snapshot.recording}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span class="record-duration" :class="{shown:snapshot.recording}">{{snapshot.recording?recordDurationText:'00:00:00'}}</span></button>
+      <button class="record-btn" :class="{active:snapshot.recording,flash:recordFlash}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span class="record-duration" :class="{shown:snapshot.recording}">{{snapshot.recording?recordDurationText:'00:00:00'}}</span></button>
       <div class="vsep"></div><span class="clock">{{clockText}}</span>
     </header>
 
@@ -421,7 +429,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
             <div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.dashboardPower1" @change="saveSettings"/>{{snapshot.power.traces[0]?.name ?? 'power1'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardPower2" @change="saveSettings"/>{{snapshot.power.traces[1]?.name ?? 'power2'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardMath1" @change="saveSettings"/>{{snapshot.power.traces[2]?.name ?? 'math1'}}</label></div>
           </details>
           <div class="power-layout"><div class="power-chart-zone">
-            <PlotCanvas class="main-plot" :series="powerSeries" :x-min="0" :x-max="settingsDraft.powerWindow" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" />
+            <PlotCanvas class="main-plot" :series="powerSeries" :x-min="0" :x-max="settingsDraft.powerWindow" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间 (HH:MM)" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" />
             <div class="overview-row"><div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="0" :x-max="settingsDraft.powerWindow" :compact="true" /><div class="overview-selected" :style="{width:powerProgressPct+'%'}"><i></i></div></div></div>
           </div></div>
         </article>
@@ -461,7 +469,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
             <div class="focus-metric passive"><span>采样率</span><b>2.5</b><small>MSa/s</small></div>
           </div>
           <details v-if="activePage==='scope'" class="module-config-dock" open><summary>显示 / 参数</summary><div class="dock-row"><span>时间窗 ms</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTimeSpan" @change="saveSettings"/></div><div class="dock-row"><span>FFT 上限 MHz</span><input type="number" v-model.number="settingsDraft.scopeFftMax" @change="saveSettings"/></div><div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.scopeCh1" @change="saveSettings"/>CH1</label><label><input type="checkbox" v-model="settingsDraft.scopeCh2" @change="saveSettings"/>CH2</label></div></details>
-          <div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="-1" :y-max="1" x-label="时间 (ms)" :tight="true" :stacked="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="频率 (kHz)" :tight="true" :stacked="true" /></div>
+          <div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="-1" :y-max="1" x-label="时间 (ms)" y-label="电压 (V)" :tight="true" :stacked="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="频率 (kHz)" y-label="幅值 (a.u.)" :tight="true" :stacked="true" /></div>
         </article>
       </section>
     </main>

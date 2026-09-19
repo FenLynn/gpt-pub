@@ -1756,3 +1756,136 @@
 .dashboard-grid:not(.focus-mode) .overview-shell .plot-canvas{
   opacity:.7!important
 }
+
+
+/* v0.4.21 slower acquisition GIFs + disciplined header separators + axis hover */
+.topbar .module-toggle .acq-gif{
+  width:30px!important;
+  height:30px!important;
+  image-rendering:auto!important
+}
+.dashboard-grid:not(.focus-mode) .panel-mark .acq-gif{
+  width:24px!important;
+  height:24px!important;
+  image-rendering:auto!important
+}
+
+/* Header data forms one compact instrument strip whose right edge follows the plot frame. */
+.dashboard-grid:not(.focus-mode) .graph-overlay{
+  padding-left:10px!important;
+  padding-right:38px!important
+}
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts{
+  gap:0!important;
+  justify-content:flex-end!important;
+  align-items:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block{
+  gap:0!important;
+  padding-left:0!important;
+  padding-right:0!important;
+  justify-content:flex-end!important;
+  align-items:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger{
+  height:30px!important;
+  margin:0!important;
+  padding:0 2px!important;
+  border:0!important;
+  display:inline-flex!important;
+  align-items:baseline!important;
+  gap:4px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger{
+  margin-left:10px!important;
+  padding-left:10px!important;
+  border-left:1px solid rgba(205,217,225,.46)!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger::before{
+  display:none!important
+}
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric{
+  margin-left:10px!important;
+  padding-left:10px!important;
+  border-left:1px solid rgba(205,217,225,.46)!important;
+  align-items:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric::before{
+  display:none!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger em,
+.dashboard-grid:not(.focus-mode) .secondary-metric em{
+  font-size:16.5px!important;
+  line-height:1!important;
+  font-weight:400!important;
+  align-self:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger b,
+.dashboard-grid:not(.focus-mode) .secondary-metric b{
+  font-size:17.5px!important;
+  line-height:1!important;
+  align-self:baseline!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger small,
+.dashboard-grid:not(.focus-mode) .secondary-metric small{
+  font-size:11.5px!important;
+  line-height:1!important;
+  font-weight:400!important;
+  align-self:baseline!important;
+  vertical-align:baseline!important
+}
+
+/* REC: no continuous pulse. One camera-like click animation on start/stop only. */
+.record-btn:hover{
+  transform:none!important;
+  filter:brightness(1.035)!important;
+  box-shadow:none!important
+}
+.record-btn:hover::after{
+  display:none!important
+}
+.record-btn.active i{
+  animation:none!important;
+  opacity:1!important
+}
+.record-btn.flash{
+  animation:recordTapOnce .34s cubic-bezier(.2,.8,.2,1)!important
+}
+.record-btn.flash::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  inset:2px!important;
+  border-radius:inherit!important;
+  background:rgba(255,255,255,.32)!important;
+  border:1px solid rgba(255,255,255,.48)!important;
+  pointer-events:none!important;
+  animation:recordBlinkOnce .46s ease!important
+}
+@keyframes recordTapOnce{
+  0%{transform:scale(1)}
+  38%{transform:scale(.94)}
+  100%{transform:scale(1)}
+}
+@keyframes recordBlinkOnce{
+  0%{opacity:0}
+  32%{opacity:1}
+  100%{opacity:0}
+}
+
+/* Scope rows use fr units so the 1 px gap is inside the available height, never below it. */
+.dashboard-grid:not(.focus-mode) .scope-plots{
+  grid-template-rows:minmax(0,56fr) minmax(0,44fr)!important;
+  gap:1px!important;
+  overflow:hidden!important
+}
+.dashboard-grid:not(.focus-mode) .scope-plots>.plot-canvas{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:100%!important;
+  align-self:stretch!important
+}

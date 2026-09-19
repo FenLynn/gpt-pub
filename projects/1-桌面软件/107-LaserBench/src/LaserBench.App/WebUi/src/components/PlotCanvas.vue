@@ -26,7 +26,19 @@ const props = withDefaults(defineProps<{
 })
 
 const canvas = ref<HTMLCanvasElement | null>(null)
+const axisHint = ref<'x'|'y'|'right'|null>(null)
 let observer: ResizeObserver | null = null
+let axisShowTimer:number|undefined
+let axisHideTimer:number|undefined
+let pendingAxis:'x'|'y'|'right'|null=null
+
+function margins(){
+  return props.compact
+    ? {l:0,r:0,t:0,b:0}
+    : props.stacked
+      ? {l:38,r:38,t:3,b:18}
+      : {l:38,r:38,t:8,b:21}
+}
 
 const bounds = computed(() => {
   const all = props.series.flatMap(s => s.points)
@@ -76,11 +88,7 @@ function draw() {
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
-  const m = props.compact
-    ? {l:0,r:0,t:0,b:0}
-    : props.stacked
-      ? {l:38,r:38,t:3,b:12}
-      : {l:38,r:38,t:8,b:21}
+  const m = margins()
   const pw = Math.max(10,w-m.l-m.r), ph = Math.max(10,h-m.t-m.b)
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(m.l,m.t,pw,ph)
@@ -142,11 +150,74 @@ function draw() {
     let lx=m.l+pw-8, ly=m.t+12;ctx.font='10.5px "Segoe UI", sans-serif';ctx.textBaseline='middle'
     for(let i=props.series.length-1;i>=0;i--){const s=props.series[i];const tw=ctx.measureText(s.name).width;lx-=tw+30;ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+16,ly);ctx.stroke();ctx.fillStyle='#35516c';ctx.textAlign='left';ctx.fillText(s.name,lx+20,ly)}
   }
+
+  const hint=axisHint.value
+  const hintText=hint==='x'?props.xLabel:hint==='y'?props.yLabel:hint==='right'?props.rightYLabel:''
+  if(hintText){
+    const drawHint=(text:string,x:number,y:number,angle=0)=>{
+      ctx.save()
+      ctx.translate(x,y);ctx.rotate(angle)
+      ctx.font='600 12px "Segoe UI", sans-serif'
+      ctx.textAlign='center';ctx.textBaseline='middle'
+      const tw=ctx.measureText(text).width
+      ctx.fillStyle='rgba(25,43,56,.88)'
+      ctx.fillRect(-tw/2-7,-10,tw+14,20)
+      ctx.fillStyle='#f3f7fa'
+      ctx.fillText(text,0,0)
+      ctx.restore()
+    }
+    if(hint==='x') drawHint(hintText,m.l+pw/2,Math.min(h-10,m.t+ph+Math.max(10,m.b/2)))
+    else if(hint==='y') drawHint(hintText,11,m.t+ph/2,-Math.PI/2)
+    else if(hint==='right') drawHint(hintText,w-11,m.t+ph/2,Math.PI/2)
+  }
 }
 
-watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.timeOriginMs,props.timeValidMax,props.xPadding,props.verticalMarker],draw,{deep:true})
+function scheduleAxisHint(next:'x'|'y'|'right'|null){
+  if(axisHideTimer!==undefined){window.clearTimeout(axisHideTimer);axisHideTimer=undefined}
+  if(next===null){
+    pendingAxis=null
+    if(axisShowTimer!==undefined){window.clearTimeout(axisShowTimer);axisShowTimer=undefined}
+    if(axisHint.value!==null && axisHideTimer===undefined){
+      axisHideTimer=window.setTimeout(()=>{axisHint.value=null;axisHideTimer=undefined;draw()},460)
+    }
+    return
+  }
+  if(axisHint.value===next)return
+  if(pendingAxis===next)return
+  pendingAxis=next
+  if(axisShowTimer!==undefined)window.clearTimeout(axisShowTimer)
+  axisShowTimer=window.setTimeout(()=>{
+    axisShowTimer=undefined
+    if(pendingAxis===next){axisHint.value=next;draw()}
+  },300)
+}
+function onPointerMove(e:PointerEvent){
+  if(props.compact){scheduleAxisHint(null);return}
+  const el=canvas.value
+  if(!el)return
+  const rect=el.getBoundingClientRect()
+  const x=e.clientX-rect.left,y=e.clientY-rect.top
+  const m=margins(),pw=Math.max(10,rect.width-m.l-m.r),ph=Math.max(10,rect.height-m.t-m.b)
+  const cx=m.l+pw/2,cy=m.t+ph/2
+  let next:'x'|'y'|'right'|null=null
+  const nearX=y>=m.t+ph-3 && y<=rect.height && Math.abs(x-cx)<=pw*.30
+  const nearY=x>=0 && x<=m.l+5 && Math.abs(y-cy)<=ph*.30
+  const hasRight=props.series.some(s=>s.axis==='right')
+  const nearRight=hasRight && x>=m.l+pw-4 && x<=rect.width && Math.abs(y-cy)<=ph*.30
+  if(nearY && props.yLabel)next='y'
+  else if(nearRight && props.rightYLabel)next='right'
+  else if(nearX && props.xLabel)next='x'
+  scheduleAxisHint(next)
+}
+function onPointerLeave(){scheduleAxisHint(null)}
+
+watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.xLabel,props.yLabel,props.rightYLabel,props.timeOriginMs,props.timeValidMax,props.xPadding,props.verticalMarker],draw,{deep:true})
 onMounted(()=>{observer=new ResizeObserver(draw);if(canvas.value)observer.observe(canvas.value);draw()})
-onBeforeUnmount(()=>observer?.disconnect())
+onBeforeUnmount(()=>{
+  observer?.disconnect()
+  if(axisShowTimer!==undefined)window.clearTimeout(axisShowTimer)
+  if(axisHideTimer!==undefined)window.clearTimeout(axisHideTimer)
+})
 </script>
 
-<template><canvas ref="canvas" class="plot-canvas"></canvas></template>
+<template><canvas ref="canvas" class="plot-canvas" @pointermove="onPointerMove" @pointerleave="onPointerLeave"></canvas></template>

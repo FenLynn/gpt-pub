@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.20 Acquisition Visibility / Power Timeline**，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.21 Slow Motion / Header Alignment / Axis Hover**，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际设备提供者仍是 Simulator；真实 Ophir、Yokogawa、BeamSquared、Tektronix Driver 尚未正式接入。
-- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.20 继续锁定 Dashboard：选中采集源即播放 GIF；去掉顶部勾/idle 就绪；统一单位基线；Power 时间历史从左向右增长并重做 overview；REC 增强 hover 反馈；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
+- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.21 继续锁定 Dashboard：GIF 降速与 Beam 稳定性、REC 单次触发反馈、顶部 metric 分隔/对齐、Scope 底图边界、轴标题 hover；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
 
 ## 当前产品不变量
 

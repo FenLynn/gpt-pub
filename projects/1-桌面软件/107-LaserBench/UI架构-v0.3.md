@@ -66,7 +66,7 @@ beam.setAttenuation
 
 ## 视觉方向
 
-v0.4.20 继续采用 Graph-first Dashboard；已定型的四宫格外部位置保持不动，只修采集动画触发、顶部数据基线、Power 历史导航和 REC 触发反馈：
+v0.4.21 继续采用 Graph-first Dashboard；已定型的四宫格外部位置保持不动，只修动画节奏、顶部 metric 对齐、Scope 内部边界和轴标题 hover：
 
 - Dashboard 非绘图区统一冷深蓝灰，只有真实 Plot / 图像绘图区白底。
 - Dashboard 图占绝对主体；模块标题栏与壳体同底色，适度增加高度和刻度字号以保证可读性。Dashboard 不渲染 X/Y 轴标题文字，只保留必要刻度；刻度 gutter 属于深色壳体，白色只填实际数据矩形。
@@ -77,3 +77,8 @@ v0.4.20 继续采用 Graph-first Dashboard；已定型的四宫格外部位置�
 - 关键测量值支持多个 Big Readout 并存：每窗左上状态/名称常显，右上黑白切换与关闭、右下等比例缩放手柄默认隐藏并在 hover/focus 时出现；各窗共享同一 Snapshot，只改变前端呈现。
 - 采集选择图标和模块标题图标共享选择/运行状态：selected 为绿色，running 为绿色呼吸动画。
 - 内部网格使用虚线，绘图区边界使用实线，Legend 保持透明图内。
+
+
+### v0.4.21 轴标题 Hover
+
+Dashboard 的 X/Y 轴标题默认隐藏。鼠标在轴中央附近停留约 300 ms 后显示完整“标题 (单位)”，离开热区后约 460 ms 再隐藏，避免长期占据 Plot 空间。
