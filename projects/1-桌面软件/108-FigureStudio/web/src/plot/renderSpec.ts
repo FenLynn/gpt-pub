@@ -413,6 +413,18 @@ export function buildTraces(args: {
                 preset.palette[pointIndex % preset.palette.length]
             )
           : fillColor;
+      const labelVisible =
+        figure.figureOverrides.barLabelsVisible ?? false;
+      const labelDecimals = Math.max(
+        0,
+        Math.min(
+          6,
+          Math.round(figure.figureOverrides.barLabelDecimals ?? 0)
+        )
+      );
+      const labelPosition =
+        figure.figureOverrides.barLabelPosition ??
+        (template === "stacked-bar" ? "inside" : "outside");
       return {
         type: "bar",
         name: normalizePlotlyMathText(override.legendLabel ?? column.name),
@@ -427,6 +439,34 @@ export function buildTraces(args: {
             color: override.barBorderColor ?? fillColor,
             width: ptToPx(override.barBorderWidthPt ?? 0)
           }
+        },
+        texttemplate: labelVisible
+          ? "%{y:." + String(labelDecimals) + "f}"
+          : undefined,
+        textposition: labelVisible ? labelPosition : "none",
+        textangle: 0,
+        cliponaxis: false,
+        insidetextfont: {
+          family: plotFontFamily(
+            figure.figureOverrides.fontFamily ?? preset.fontFamily
+          ),
+          size: ptToPx(
+            (figure.figureOverrides.tickLabelSizePt ??
+              figure.figureOverrides.fontSizePt ??
+              preset.fontSizePt) * 0.9
+          ),
+          color: "#ffffff"
+        },
+        outsidetextfont: {
+          family: plotFontFamily(
+            figure.figureOverrides.fontFamily ?? preset.fontFamily
+          ),
+          size: ptToPx(
+            (figure.figureOverrides.tickLabelSizePt ??
+              figure.figureOverrides.fontSizePt ??
+              preset.fontSizePt) * 0.9
+          ),
+          color: figure.figureOverrides.tickLabelColor ?? "#17191c"
         },
         hovertemplate:
           "<b>" +
