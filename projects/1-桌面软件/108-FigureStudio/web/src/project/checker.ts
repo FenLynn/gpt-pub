@@ -71,6 +71,9 @@ export function checkFigure(
         (series) => stableDoubleYSide(series.id) === "right"
       )
     : [];
+  const effectiveLegendVisible =
+    !fieldTemplate &&
+    (o.legendVisible ?? visibleSeries.length > 1);
 
   const items: CheckItem[] = [];
 
@@ -179,7 +182,7 @@ export function checkFigure(
     ? dataset.metadata?.rowAxisUnit
     : ySource?.unit;
   const autoYTitle = fieldTemplate
-    ? autoAxisTitle(dataset.metadata?.rowAxisName ?? "Y", yUnit)
+    ? autoAxisTitle(dataset.metadata?.rowAxisName ?? "纵向位置", yUnit)
     : ySource
     ? autoAxisTitle(ySource.name, ySource.unit)
     : "Y";
@@ -329,7 +332,7 @@ export function checkFigure(
     const rightUnit = rightYSeries[0]?.unit;
     const autoRightTitle = rightYSeries[0]
       ? autoAxisTitle(rightYSeries[0].name, rightUnit)
-      : "Right Y";
+      : "右 Y";
     if (rightUnit) {
       items.push({
         id: "right-y-unit",
@@ -416,7 +419,7 @@ export function checkFigure(
       });
   }
 
-  if (!fieldTemplate && (o.legendVisible ?? true)) {
+  if (effectiveLegendVisible) {
       if (figure.figureOverrides.legendFrame) {
         items.push({
           id: "legend-frame",
@@ -583,7 +586,7 @@ export function checkFigure(
     o.legendPosition === "custom" &&
     ((o.legendX !== undefined && (o.legendX < -0.25 || o.legendX > 1.25)) ||
       (o.legendY !== undefined && (o.legendY < -0.25 || o.legendY > 1.25)));
-  if (!fieldTemplate && (o.legendVisible ?? true)) {
+  if (effectiveLegendVisible) {
     items.push({
       id: "legend-position",
       level: legendFarOutside ? "warn" : "pass",
