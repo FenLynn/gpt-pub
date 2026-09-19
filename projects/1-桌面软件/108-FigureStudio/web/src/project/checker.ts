@@ -41,11 +41,14 @@ export function checkFigure(
   const mainSeriesIds = new Set(
     figure.dataRef?.yColumnIds ?? figure.seriesOrder
   );
-  const visibleSeries = dataset.ys.filter(
-    (series) =>
-      mainSeriesIds.has(series.id) &&
-      figure.seriesOverrides[series.id]?.visible !== false
+  const mappedSeries = dataset.ys.filter((series) =>
+    mainSeriesIds.has(series.id)
   );
+  const visibleSeries = fieldTemplate
+    ? mappedSeries
+    : mappedSeries.filter(
+        (series) => figure.seriesOverrides[series.id]?.visible !== false
+      );
   const stableDoubleYSide = (seriesId: string) => {
     const orderIndex = figure.seriesOrder.indexOf(seriesId);
     const sourceIndex = Math.max(

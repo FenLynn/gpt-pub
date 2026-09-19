@@ -189,8 +189,21 @@ export function buildTraces(args: {
   preset: PresetDefinition;
 }) {
   const { dataset, figure, preset } = args;
-  const series = visibleSeries(dataset, figure);
   const template = figure.templateId;
+  const mappedSeries = orderSeries(
+    dataset,
+    figure.seriesOrder,
+    figure.dataRef?.yColumnIds
+  );
+  const fieldTemplate =
+    template === "heatmap" ||
+    template === "contour" ||
+    template === "surface-3d";
+  const series = fieldTemplate
+    ? mappedSeries
+    : mappedSeries.filter(
+        (item) => figure.seriesOverrides[item.id]?.visible !== false
+      );
 
   if (template === "heatmap" || template === "contour") {
     const xIsNumeric = dataset.x.values.every(

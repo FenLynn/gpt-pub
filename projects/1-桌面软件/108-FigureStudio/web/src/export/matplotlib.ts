@@ -174,9 +174,12 @@ def mpl_cmap(name):
     return base + "_r" if O.get("reverseColorScale", False) else base
 
 def visible_keys():
+    field_template = template in ("heatmap", "contour", "surface-3d")
     return [
         key for key in order
-        if key in series and S.get(key, {}).get("visible", True)
+        if key in series and (
+            field_template or S.get(key, {}).get("visible", True)
+        )
     ]
 
 def mpl_marker(symbol):
