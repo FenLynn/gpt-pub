@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FigureStudio",
+  "version": "0.2.0",
+  "identifier": "com.fenlynn.figurestudio",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../web run dev -- --host 127.0.0.1",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm --prefix ../web run build",
+    "frontendDist": "../web/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "FigureStudio",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}
