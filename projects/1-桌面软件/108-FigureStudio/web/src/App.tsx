@@ -1090,7 +1090,7 @@ function App() {
           dependents.length +
           " 张图引用。\n\n" +
           dependents.map((figure) => "• " + figure.name).join("\n") +
-          "\n\n请先在 Graph 的“数据”页移除或替换这列。"
+          "\n\n请先在图形的“数据”页移除或替换这列。"
       );
       return;
     }
@@ -2460,7 +2460,7 @@ function App() {
                           <button type="button" onClick={() => triggerDataFile("replace")}>替换当前表</button>
                           <div className="sheet-copy-actions">
                             <button type="button" onClick={() => duplicateActiveSheet(true)}>
-                              复制 Sheet
+                              复制工作表
                             </button>
                             <button type="button" onClick={() => duplicateActiveSheet(false)}>
                               复制结构
