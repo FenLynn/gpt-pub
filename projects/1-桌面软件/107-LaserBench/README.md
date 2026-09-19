@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.4.25（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.25 不移动已经认可的 Dashboard 四宫格几何，重点收口顶部交互、结果层级和四个独立模块工作页。
+当前开发版本为 **v0.4.26（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.26 继续锁定已经认可的 Dashboard 四宫格外部几何，重点重做四个独立模块工作站页、参数/结果层级和真实仪器接口控制层。
 
 ## 当前能力
 
@@ -20,7 +20,9 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - Beam 左侧显示当前 Z 位置 2D 光斑，右侧显示完整 caustic；**Z / 播放 / Attenuation** 作为高频观察控制继续常驻 Dashboard。Beam 独立页补充 M²x/M²y/M²、X/Y beam width、ellipticity、ISO 11146 D4σ/FWHM 选择、outlier 与 X/Y caustic 显示；不加入 3D 光斑。
 - Scope Dashboard 只显示最多两个通道的时域和 FFT；独立页提供时间窗、FFT 上限、Volts/div、Offset、Coupling、通道开关、Trigger source/level/slope、Acquisition mode 与 Average count。
 - Dashboard 关键结果可点击进入 **Big Readout**，不同指标允许同时弹出多个读数窗；同一指标只保留一个实例并可再次点击提到最前。每个窗独立拖动、等比例缩放和黑/白显示；左上状态/名称常显，右上控制与右下缩放手柄默认隐藏，hover 时才显示。**Big Readout 只在 Dashboard 显示，切到任何独立模块页时全部隐藏，返回 Dashboard 后恢复。**
-- 四个模块可从侧栏进入独立工作页；左上图标/名称/状态允许占两行高度，上方横排完整关键数据，右侧整列放参数，中央/下方为主数据图。独立页不省略轴标题和单位，轴标题常驻；页面壳体继续使用深灰蓝，只有 Plot / 数据图区域白底。Power 独立页下方范围条与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
+- 四个模块可从侧栏进入独立工作页；v0.4.26 将标题图标/名称/关键读数合并成更高的工作站标题区，右侧参数面板可折叠，并拆为“设置 / 结果”两个页签。设置参数使用中文，结果页同时列出测量结果、当前测试参数和接口状态。独立页坐标刻度、轴标题与 Legend 放大，坐标 gutter 与壳体同色，只有真实 Plot 矩形白底；Beam 光斑视窗保持正方形并与 caustic 图上下边框对齐。Power 独立页下方范围条继续与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
+- 顶栏同时提供可编辑 Label 与实验文件夹；两者的清空/确认控件使用同一垂直对齐。Dashboard 的数值 chip 增高并扩大数字，Big Readout 黑白切换与关闭按钮使用同一中心线。
+- v0.4.26 建立真实仪器**接口控制层**：Ophir Juno / OphirLMMeasurement、Yokogawa AQ6370D、Ophir Spiricon SP920 / BeamSquared、Tektronix MSO44 的启用状态与接口地址进入 Portable 配置、C# adapter registry、WebUi snapshot 与 self-test。**这不等于真实 Driver 已接通**：当前数据平面仍为 Simulator，任何真实接口只有在对应 Windows + SDK/SCPI Probe 完成后才能标记 `DataPlaneReady` 并进入正式 Provider。
 - 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
 - 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。
 - 实验数据写入 `data/exp/<日期或自定义实验文件夹>/`，该目录下一层直接是数据文件。
