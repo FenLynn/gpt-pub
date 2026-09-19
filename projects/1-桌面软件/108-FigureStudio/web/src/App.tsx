@@ -2182,13 +2182,23 @@ function App() {
   const field2DTemplate =
     activeFigure?.templateId === "heatmap" || contourTemplate;
   const fieldTemplate = field2DTemplate || surfaceTemplate;
+  const automaticLegendSeriesCount =
+    activeFigure?.templateId === "bar" ||
+    activeFigure?.templateId === "xy-errorbar"
+      ? Math.min(
+          1,
+          orderedSeries.filter(
+            (series) =>
+              activeFigure?.seriesOverrides[series.id]?.visible !== false
+          ).length
+        )
+      : orderedSeries.filter(
+          (series) =>
+            activeFigure?.seriesOverrides[series.id]?.visible !== false
+        ).length;
   const effectiveLegendVisible =
     activeFigure?.figureOverrides.legendVisible ??
-    (!fieldTemplate &&
-      orderedSeries.filter(
-        (series) =>
-          activeFigure?.seriesOverrides[series.id]?.visible !== false
-      ).length > 1);
+    (!fieldTemplate && automaticLegendSeriesCount > 1);
   const fieldRowSeries = fieldTemplate ? orderedSeries : [];
   const fieldRowCoordinates =
     fieldTemplate && plotDataset
@@ -4029,7 +4039,7 @@ function App() {
                               min="0"
                               max="4"
                               step="0.1"
-                              value={primaryOverride.barBorderWidthPt ?? 0.3}
+                              value={primaryOverride.barBorderWidthPt ?? 0}
                               onChange={(event) =>
                                 updateSelectedSeries({
                                   barBorderWidthPt: Number(event.target.value)
