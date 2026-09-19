@@ -653,7 +653,7 @@ function matplotlibAutoRange(
 
 function matplotlibNiceTickStep(
   range: [number, number] | undefined,
-  targetIntervals: number
+  targetIntervals = 6
 ): number | undefined {
   if (!range) return undefined;
   const span = Math.abs(range[1] - range[0]);
@@ -662,11 +662,14 @@ function matplotlibNiceTickStep(
   const raw = span / Math.max(2, targetIntervals);
   const exponent = Math.floor(Math.log10(raw));
   const base = Math.pow(10, exponent);
-  const fraction = raw / base;
-  const steps = [1, 2, 2.5, 5, 10];
-  const niceFraction =
-    steps.find((step) => fraction <= step) ?? steps[steps.length - 1];
-  return niceFraction * base;
+  const candidates = [1, 2, 2.5, 5, 10].map(
+    (step) => step * base
+  );
+  return candidates.reduce((best, candidate) =>
+    Math.abs(candidate - raw) < Math.abs(best - raw)
+      ? candidate
+      : best
+  );
 }
 
 function tickFormatString(
@@ -843,18 +846,15 @@ export function buildLayout(args: {
     !xIsCategorical &&
     xScale === "linear" &&
     !overrides.xMajorTickStep
-      ? matplotlibNiceTickStep(
-          xRange,
-          canvas.widthMm >= 150 ? 8 : canvas.widthMm >= 110 ? 7 : 6
-        )
+      ? matplotlibNiceTickStep(xRange)
       : undefined;
   const yAutoTickStep =
     yScale === "linear" && !overrides.yMajorTickStep
-      ? matplotlibNiceTickStep(yRange, 5)
+      ? matplotlibNiceTickStep(yRange)
       : undefined;
   const rightYAutoTickStep =
     rightYScale === "linear" && !overrides.rightYMajorTickStep
-      ? matplotlibNiceTickStep(rightYRange, 5)
+      ? matplotlibNiceTickStep(rightYRange)
       : undefined;
 
   const commonAxis = {
