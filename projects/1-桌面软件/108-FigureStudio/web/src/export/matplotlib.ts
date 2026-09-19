@@ -150,6 +150,7 @@ plt.rcParams.update({
     "font.family": font,
     "font.size": font_size,
     "axes.linewidth": axis_width,
+    "mathtext.fontset": "stix" if font == "Times New Roman" else "dejavusans",
     "svg.fonttype": "none",
     "pdf.fonttype": 42,
 })
@@ -269,9 +270,16 @@ def configure_axis(axis_obj, side="left"):
     axis_obj.tick_params(
         axis="y",
         direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
-        labelsize=O.get("tickLabelSizePt", font_size),
+        labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
+        length=5.0 if O.get("axisStyle", "regular") == "bold" else 3.6,
+    )
+    axis_obj.tick_params(
+        axis="y",
+        which="minor",
+        width=axis_width * 0.85,
+        length=3.1 if O.get("axisStyle", "regular") == "bold" else 2.2,
     )
     plt.setp(axis_obj.get_yticklabels(), rotation=angle)
 
@@ -308,27 +316,34 @@ def configure_x(axis_obj):
     axis_obj.tick_params(
         axis="x",
         direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
-        labelsize=O.get("tickLabelSizePt", font_size),
+        labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
+        length=5.0 if O.get("axisStyle", "regular") == "bold" else 3.6,
+    )
+    axis_obj.tick_params(
+        axis="x",
+        which="minor",
+        width=axis_width * 0.85,
+        length=3.1 if O.get("axisStyle", "regular") == "bold" else 2.2,
     )
     plt.setp(axis_obj.get_xticklabels(), rotation=O.get("xTickAngle", 0))
 
 def apply_titles(axis_obj):
     axis_obj.set_xlabel(
         P["autoTitles"]["x"],
-        fontsize=O.get("axisTitleSizePt", font_size),
+        fontsize=O.get("axisTitleSizePt", font_size * 1.08),
         color=O.get("axisTitleColor", "#17191c"),
     )
     axis_obj.set_ylabel(
         P["autoTitles"]["y"],
-        fontsize=O.get("axisTitleSizePt", font_size),
+        fontsize=O.get("axisTitleSizePt", font_size * 1.08),
         color=O.get("axisTitleColor", "#17191c"),
     )
     if O.get("plotTitle"):
         axis_obj.set_title(
             O["plotTitle"],
-            fontsize=O.get("plotTitleSizePt", font_size * 1.12),
+            fontsize=O.get("plotTitleSizePt", font_size * 1.18),
             color=O.get("plotTitleColor", "#17191c"),
         )
 
@@ -343,7 +358,7 @@ def finish_2d_axes(axis_obj):
     axis_obj.set_facecolor(O.get("background", "#ffffff"))
 
 def legend_kwargs():
-    position = O.get("legendPosition", "top-left")
+    position = O.get("legendPosition", "top-right")
     loc_map = {
         "top-left": "upper left",
         "top-center": "upper center",
@@ -354,7 +369,7 @@ def legend_kwargs():
     }
     kwargs = {
         "frameon": O.get("legendFrame", False),
-        "fontsize": O.get("legendFontSizePt", font_size * 0.92),
+        "fontsize": O.get("legendFontSizePt", font_size * 0.94),
         "ncol": max(1, int(O.get("legendColumns", 1))),
     }
     if position == "custom":
@@ -638,7 +653,7 @@ else:
         configure_axis(ax2, "right")
         ax2.set_ylabel(
             P["autoTitles"]["rightY"],
-            fontsize=O.get("axisTitleSizePt", font_size),
+            fontsize=O.get("axisTitleSizePt", font_size * 1.08),
             color=O.get("axisTitleColor", "#17191c"),
         )
         for spine in ax2.spines.values():
