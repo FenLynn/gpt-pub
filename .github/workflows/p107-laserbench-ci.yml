@@ -82,8 +82,38 @@ jobs:
             throw 'App.vue still depends on animated GIF assets.'
           }
           if ($app -match '<animate|animateTransform') { throw 'SMIL animation nodes remain in App.vue.' }
-          if ($css -notmatch '@keyframes lbPowerBar1' -or $css -notmatch '@keyframes lbBeamRing' -or $css -notmatch '4\.8s') {
+          if ($css -notmatch '@keyframes lbPowerBar1' -or $css -notmatch '@keyframes lbBeamRing' -or $css -notmatch '@keyframes lbSpectrumPeak' -or $css -notmatch '@keyframes lbScopeFlow') {
             throw 'Verified CSS vector keyframes are missing.'
+          }
+          if ($css -notmatch 'lbSpectrumPeak 4\.8s' -or $css -notmatch 'lbScopeFlow 6\.4s linear') {
+            throw 'Spectrum/Scope acquisition motion semantics regressed.'
+          }
+
+      - name: Verify workstation UI contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $app=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/App.vue" -Raw
+          $css=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/styles.css" -Raw
+          $types=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/types.ts" -Raw
+          $required=@(
+            'class="metric-value-chip"',
+            'class="module-config-dock workstation-config"',
+            'powerRangeStartPct',
+            'powerRangeEndPct',
+            'powerAverageSamples',
+            'OSA 扫描 / 分析',
+            'BeamSquared / M²',
+            'scopeTriggerSource',
+            'show-axis-labels',
+            "activePage==='dashboard'"
+          )
+          foreach($needle in $required){ if($app -notlike "*$needle*"){ throw "Workstation UI contract missing: $needle" } }
+          foreach($needle in @('powerAverageSamples','osaResolution','beamWidthMethod','scopeVoltsDiv')){
+            if($types -notlike "*$needle*"){ throw "Web UI config type missing: $needle" }
+          }
+          if($css -notmatch 'grid-template-columns:minmax\(0,1fr\) 304px' -or $css -notmatch 'metric-value-chip'){
+            throw 'Workstation layout / Dashboard metric-chip CSS missing.'
           }
 
       - name: Restore projects

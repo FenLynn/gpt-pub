@@ -40,7 +40,20 @@ const settingsDraft = ref({
   aliases: { ...(snapshot.value.config?.aliases ?? {}) },
   powerWindow:snapshot.value.config?.powerWindow??600, osaStart:snapshot.value.config?.osaStart??1060, osaStop:snapshot.value.config?.osaStop??1100,
   scopeTimeSpan:snapshot.value.config?.scopeTimeSpan??0.24, scopeFftMax:snapshot.value.config?.scopeFftMax??50, scopeCh1:snapshot.value.config?.scopeCh1??true, scopeCh2:snapshot.value.config?.scopeCh2??true,
-  dashboardPower1:snapshot.value.config?.dashboardPower1??true, dashboardPower2:snapshot.value.config?.dashboardPower2??true, dashboardMath1:snapshot.value.config?.dashboardMath1??true
+  dashboardPower1:snapshot.value.config?.dashboardPower1??true, dashboardPower2:snapshot.value.config?.dashboardPower2??true, dashboardMath1:snapshot.value.config?.dashboardMath1??true,
+  powerActiveTrace:snapshot.value.config?.powerActiveTrace??0, powerAverageSamples:snapshot.value.config?.powerAverageSamples??1,
+  powerOffset:snapshot.value.config?.powerOffset??0, powerScale:snapshot.value.config?.powerScale??1,
+  powerNormalize:snapshot.value.config?.powerNormalize??false, powerNormalizeValue:snapshot.value.config?.powerNormalizeValue??1,
+  powerDensity:snapshot.value.config?.powerDensity??false, powerAreaCm2:snapshot.value.config?.powerAreaCm2??1,
+  powerPassFail:snapshot.value.config?.powerPassFail??false, powerLow:snapshot.value.config?.powerLow??0, powerHigh:snapshot.value.config?.powerHigh??20,
+  osaResolution:snapshot.value.config?.osaResolution??0.05, osaSensitivity:snapshot.value.config?.osaSensitivity??'MID',
+  osaAverage:snapshot.value.config?.osaAverage??1, osaRefLevel:snapshot.value.config?.osaRefLevel??0, osaDbPerDiv:snapshot.value.config?.osaDbPerDiv??10,
+  osaShowRef:snapshot.value.config?.osaShowRef??true, osaSweepMode:snapshot.value.config?.osaSweepMode??'REPEAT', osaMarkerPeak:snapshot.value.config?.osaMarkerPeak??true,
+  beamRunMode:snapshot.value.config?.beamRunMode??'AUTO', beamWidthMethod:snapshot.value.config?.beamWidthMethod??'D4SIGMA',
+  beamAutoOutlier:snapshot.value.config?.beamAutoOutlier??true, beamShowX:snapshot.value.config?.beamShowX??true, beamShowY:snapshot.value.config?.beamShowY??true,
+  scopeVoltsDiv:snapshot.value.config?.scopeVoltsDiv??0.25, scopeOffset:snapshot.value.config?.scopeOffset??0, scopeCoupling:snapshot.value.config?.scopeCoupling??'DC',
+  scopeTriggerSource:snapshot.value.config?.scopeTriggerSource??'CH1', scopeTriggerLevel:snapshot.value.config?.scopeTriggerLevel??0,
+  scopeTriggerSlope:snapshot.value.config?.scopeTriggerSlope??'RISING', scopeAcquisition:snapshot.value.config?.scopeAcquisition??'SAMPLE', scopeAverage:snapshot.value.config?.scopeAverage??16
 })
 const dataFilter=ref('')
 const powerRangeStartPct=ref(0)
@@ -83,6 +96,69 @@ const powerLeftMax = computed(() => {
   const values=visiblePowerTraces.value.filter(t=>t.unit!=='%').flatMap(t=>t.points.map(p=>p.y))
   return Math.max(5, Math.ceil(Math.max(...values, 1) / 5) * 5)
 })
+function powerTransform(value:number,index:number){
+  if(index!==settingsDraft.value.powerActiveTrace)return value
+  let next=(value+settingsDraft.value.powerOffset)*settingsDraft.value.powerScale
+  if(settingsDraft.value.powerNormalize) next/=Math.max(1e-12,settingsDraft.value.powerNormalizeValue)
+  if(settingsDraft.value.powerDensity) next/=Math.max(1e-9,settingsDraft.value.powerAreaCm2)
+  return next
+}
+function averagedPowerPoints(points:{x:number;y:number}[],count:number){
+  const n=Math.max(1,Math.floor(count))
+  if(n<=1)return points
+  let sum=0
+  const q:number[]=[]
+  return points.map(p=>{
+    q.push(p.y);sum+=p.y
+    if(q.length>n)sum-=q.shift()!
+    return {x:p.x,y:sum/q.length}
+  })
+}
+const powerPageSeries = computed<PlotSeries[]>(() => powerSeries.value.map((s,index)=>{
+  const transformed=s.points.map(p=>({x:p.x,y:powerTransform(p.y,index)}))
+  return {...s,points:index===settingsDraft.value.powerActiveTrace?averagedPowerPoints(transformed,settingsDraft.value.powerAverageSamples):transformed}
+}))
+const powerPageLeftMax = computed(()=>{
+  const values=powerPageSeries.value.filter(s=>s.axis!=='right').flatMap(s=>s.points.map(p=>p.y)).filter(Number.isFinite)
+  return Math.max(1,Math.ceil(Math.max(...values,1)*1.08))
+})
+const powerPageUnit = computed(()=>{
+  const t=snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]
+  if(!t)return ''
+  if(settingsDraft.value.powerDensity && t.unit!=='%')return t.unit+'/cm²'
+  if(settingsDraft.value.powerNormalize)return 'rel.'
+  return t.unit
+})
+const powerPageAxisLabel = computed(()=>{
+  const t=snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]
+  if(!t)return '功率'
+  if(settingsDraft.value.powerDensity && t.unit!=='%')return `功率密度 (${t.unit}/cm²)`
+  if(settingsDraft.value.powerNormalize)return '归一化值 (rel.)'
+  return t.unit==='%'?'效率 (%)':`功率 (${t.unit})`
+})
+const powerActiveValue = computed(()=>{
+  const t=snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]
+  return t?powerTransform(t.value,settingsDraft.value.powerActiveTrace):0
+})
+const powerPassState = computed(()=>{
+  if(!settingsDraft.value.powerPassFail)return 'OFF'
+  return powerActiveValue.value>=settingsDraft.value.powerLow && powerActiveValue.value<=settingsDraft.value.powerHigh?'PASS':'FAIL'
+})
+const spectrumPageSeries = computed(()=>snapshot.value.spectrum.traces.filter((_,i)=>i===0||settingsDraft.value.osaShowRef))
+const osaCenterDraft = computed({
+  get:()=> (settingsDraft.value.osaStart+settingsDraft.value.osaStop)/2,
+  set:(v:number)=>{const span=settingsDraft.value.osaStop-settingsDraft.value.osaStart;settingsDraft.value.osaStart=v-span/2;settingsDraft.value.osaStop=v+span/2}
+})
+const osaSpanDraft = computed({
+  get:()=> settingsDraft.value.osaStop-settingsDraft.value.osaStart,
+  set:(v:number)=>{const span=Math.max(.01,v);const c=osaCenterDraft.value;settingsDraft.value.osaStart=c-span/2;settingsDraft.value.osaStop=c+span/2}
+})
+const osaYMax = computed(()=>settingsDraft.value.osaRefLevel)
+const osaYMin = computed(()=>settingsDraft.value.osaRefLevel-settingsDraft.value.osaDbPerDiv*10)
+const beamPageCaustic = computed(()=>snapshot.value.beam.caustic.filter((_,i)=>(i===0&&settingsDraft.value.beamShowX)||(i===1&&settingsDraft.value.beamShowY)))
+const beamEllipticity = computed(()=>snapshot.value.beam.spotWidthX>0?snapshot.value.beam.spotWidthY/snapshot.value.beam.spotWidthX:0)
+const scopeYMin = computed(()=>settingsDraft.value.scopeOffset-settingsDraft.value.scopeVoltsDiv*4)
+const scopeYMax = computed(()=>settingsDraft.value.scopeOffset+settingsDraft.value.scopeVoltsDiv*4)
 function powerVisible(index:number){ return powerVisibility.value[index] ?? true }
 function powerReadoutKind(index:number):BigReadoutKind { return (['power0','power1','power2'][index] ?? 'power0') as BigReadoutKind }
 function updatePowerRangeFromPointer(side:'start'|'end',clientX:number){
@@ -186,6 +262,7 @@ function bringReadoutToFront(win:BigReadoutWindow){
   win.z=++readoutZ
 }
 function openReadout(kind:BigReadoutKind){
+  if(activePage.value!=='dashboard')return
   const existing=bigReadoutWindows.value.find(w=>w.kind===kind)
   if(existing){bringReadoutToFront(existing);clampReadout(existing);persistReadouts();return}
   const offset=(bigReadoutWindows.value.length%6)*24
@@ -326,6 +403,30 @@ function toggleBeamPlay(){
     void updateZ(next)
   },260)
 }
+function zeroPowerActive(){
+  const t=snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]
+  if(!t)return
+  settingsDraft.value.powerOffset=-t.value
+  void saveSettings()
+}
+function normalizePowerAtCurrent(){
+  const t=snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]
+  if(!t)return
+  settingsDraft.value.powerNormalizeValue=Math.max(1e-12,Math.abs((t.value+settingsDraft.value.powerOffset)*settingsDraft.value.powerScale))
+  settingsDraft.value.powerNormalize=true
+  void saveSettings()
+}
+function resetPowerProcessing(){
+  settingsDraft.value.powerAverageSamples=1
+  settingsDraft.value.powerOffset=0
+  settingsDraft.value.powerScale=1
+  settingsDraft.value.powerNormalize=false
+  settingsDraft.value.powerNormalizeValue=1
+  settingsDraft.value.powerDensity=false
+  settingsDraft.value.powerAreaCm2=1
+  settingsDraft.value.powerPassFail=false
+  void saveSettings()
+}
 async function saveSettings(){
   await request('app.setConfig',settingsDraft.value)
   saveNotice.value='设置已保存'
@@ -360,8 +461,8 @@ onMounted(()=>{
   stopSnapshot=onSnapshot(s=>{
     snapshot.value=s
     if(document.activeElement?.id!=='labelInput')labelDraft.value=s.label
-    if(!['settings','power','spectrum','scope'].includes(activePage.value)){
-      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})},powerWindow:s.config?.powerWindow??600,osaStart:s.config?.osaStart??1060,osaStop:s.config?.osaStop??1100,scopeTimeSpan:s.config?.scopeTimeSpan??0.24,scopeFftMax:s.config?.scopeFftMax??50,scopeCh1:s.config?.scopeCh1??true,scopeCh2:s.config?.scopeCh2??true,dashboardPower1:s.config?.dashboardPower1??true,dashboardPower2:s.config?.dashboardPower2??true,dashboardMath1:s.config?.dashboardMath1??true}
+    if(!['settings','power','spectrum','beam','scope'].includes(activePage.value)){
+      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})},powerWindow:s.config?.powerWindow??600,osaStart:s.config?.osaStart??1060,osaStop:s.config?.osaStop??1100,scopeTimeSpan:s.config?.scopeTimeSpan??0.24,scopeFftMax:s.config?.scopeFftMax??50,scopeCh1:s.config?.scopeCh1??true,scopeCh2:s.config?.scopeCh2??true,dashboardPower1:s.config?.dashboardPower1??true,dashboardPower2:s.config?.dashboardPower2??true,dashboardMath1:s.config?.dashboardMath1??true,powerActiveTrace:s.config?.powerActiveTrace??0,powerAverageSamples:s.config?.powerAverageSamples??1,powerOffset:s.config?.powerOffset??0,powerScale:s.config?.powerScale??1,powerNormalize:s.config?.powerNormalize??false,powerNormalizeValue:s.config?.powerNormalizeValue??1,powerDensity:s.config?.powerDensity??false,powerAreaCm2:s.config?.powerAreaCm2??1,powerPassFail:s.config?.powerPassFail??false,powerLow:s.config?.powerLow??0,powerHigh:s.config?.powerHigh??20,osaResolution:s.config?.osaResolution??0.05,osaSensitivity:s.config?.osaSensitivity??'MID',osaAverage:s.config?.osaAverage??1,osaRefLevel:s.config?.osaRefLevel??0,osaDbPerDiv:s.config?.osaDbPerDiv??10,osaShowRef:s.config?.osaShowRef??true,osaSweepMode:s.config?.osaSweepMode??'REPEAT',osaMarkerPeak:s.config?.osaMarkerPeak??true,beamRunMode:s.config?.beamRunMode??'AUTO',beamWidthMethod:s.config?.beamWidthMethod??'D4SIGMA',beamAutoOutlier:s.config?.beamAutoOutlier??true,beamShowX:s.config?.beamShowX??true,beamShowY:s.config?.beamShowY??true,scopeVoltsDiv:s.config?.scopeVoltsDiv??0.25,scopeOffset:s.config?.scopeOffset??0,scopeCoupling:s.config?.scopeCoupling??'DC',scopeTriggerSource:s.config?.scopeTriggerSource??'CH1',scopeTriggerLevel:s.config?.scopeTriggerLevel??0,scopeTriggerSlope:s.config?.scopeTriggerSlope??'RISING',scopeAcquisition:s.config?.scopeAcquisition??'SAMPLE',scopeAverage:s.config?.scopeAverage??16}
     }
   })
   if(hasNativeBridge) void request('app.getSnapshot')
@@ -381,9 +482,11 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       </button>
       <div class="label-wrap">
         <input id="labelInput" v-model="labelDraft" @keyup.enter="setLabel" placeholder="Label" />
-        <button class="clear-label" @click="labelDraft=''">×</button>
+        <div class="label-actions">
+          <button class="clear-label" @click="labelDraft=''" title="清空 Label">×</button>
+          <button class="check-btn" @click="setLabel" title="确认 Label"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></button>
+        </div>
       </div>
-      <button class="icon-btn check-btn" @click="setLabel" title="确认标签"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></button>
       <div class="vsep"></div>
 
       <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power}" @click="toggleSource('power')" title="本次采集包含功率">
@@ -396,7 +499,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       </button>
       <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum}" @click="toggleSource('spectrum')" title="本次采集包含光谱">
         <svg class="acq-vector acq-spectrum" viewBox="0 0 24 24" aria-hidden="true">
-          <path class="wave" d="M2 18c3 0 4-12 8-12s4 12 7 12c2 0 2-4 5-4"/>
+          <path class="peak" d="M2 18c3 0 4-12 8-12s4 12 7 12c2 0 2-4 5-4"/>
         </svg>
       </button>
       <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam}" @click="toggleSource('beam')" title="本次采集包含光束">
@@ -408,7 +511,10 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       </button>
       <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope}" @click="toggleSource('scope')" title="本次采集包含示波器">
         <svg class="acq-vector acq-scope" viewBox="0 0 24 24" aria-hidden="true">
-          <path class="wave" d="M1.5 12h2.5c1.6 0 1.6-7 3.2-7s1.6 14 3.2 14S12 5 13.6 5s1.6 14 3.2 14 1.6-7 3.2-7h2.5"/>
+          <g class="scope-wave-flow">
+            <path d="M0 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h6"/>
+            <path transform="translate(24 0)" d="M0 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h6"/>
+          </g>
         </svg>
       </button>
 
@@ -429,7 +535,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <button class="scope-accent" :class="{active:activePage==='scope'}" @click="nav('scope')" title="示波器"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg><span v-if="sidebarExpanded">示波器</span></button>
       <button :class="{active:activePage==='data'}" @click="nav('data')" title="数据"><svg viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5zM8 10h8M8 14h8M8 18h5"/></svg><span v-if="sidebarExpanded">数据</span></button>
       <div class="side-spacer"></div>
-      <button :class="{active:activePage==='settings'}" @click="nav('settings')" title="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span v-if="sidebarExpanded">设置</span></button>
+      <button :class="{active:activePage==='settings'}" @click="nav('settings')" title="设置"><svg viewBox="0 0 24 24"><path d="M9.7 3.2h4.6l.7 2.1 2 .8 2-1 2.3 4-1.7 1.4.2 2.1 1.5 1.6-2.3 4-2.1-.8-1.8 1.2-.4 2.3H9.7L9 18.7l-2-.8-2 1-2.3-4 1.7-1.4-.2-2.1-1.5-1.6 2.3-4 2.1.8L9 5.5z"/><circle cx="12" cy="12" r="3"/></svg><span v-if="sidebarExpanded">设置</span></button>
       <button class="side-search" title="搜索"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg><span v-if="sidebarExpanded">搜索</span></button>
       <button class="side-collapse" @click="sidebarExpanded=!sidebarExpanded" :title="sidebarExpanded?'折叠':'展开'"><svg viewBox="0 0 24 24"><path :d="sidebarExpanded?'m14 6-6 6 6 6':'m10 6 6 6-6 6'"/></svg><span v-if="sidebarExpanded">{{sidebarExpanded?'折叠':''}}</span></button>
     </aside>
@@ -457,64 +563,156 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
           <div class="module-head power-head graph-overlay">
             <div class="module-title"><div class="panel-mark power-accent" :class="{selected:snapshot.captureSelection.power}"><svg viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></div><strong>功率</strong><span v-if="activePage==='power'" class="focus-page-state" :class="{running:moduleActive('power')}"><i></i>{{moduleActive('power')?'采集中':'就绪'}}</span></div>
             <div class="head-metrics">
-              <template v-for="(t,index) in snapshot.power.traces" :key="t.name"><button v-if="powerVisible(index)" class="metric-trigger" @click="openReadout(powerReadoutKind(index))"><em>{{t.name}}</em><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></button></template>
+              <template v-for="(t,index) in snapshot.power.traces" :key="t.name"><button v-if="powerVisible(index)" class="metric-trigger" @click="openReadout(powerReadoutKind(index))"><em>{{t.name}}</em><span class="metric-value-chip"><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></span></button></template>
             </div>
           </div>
-          <div v-if="activePage==='power'" class="focus-summary">
-            <button v-for="(t,index) in snapshot.power.traces" :key="t.name" v-show="powerVisible(index)" class="focus-metric" @click="openReadout(powerReadoutKind(index))"><span>{{t.name}}</span><b>{{t.value.toFixed(t.unit==='%'?1:2)}}</b><small>{{t.unit}}</small></button>
+
+          <div v-if="activePage==='power'" class="focus-summary focus-power-summary">
+            <div v-for="(t,index) in snapshot.power.traces" :key="t.name" v-show="powerVisible(index)" class="focus-metric" :class="{selected:index===settingsDraft.powerActiveTrace}">
+              <span>{{t.name}}</span><div><b>{{powerTransform(t.value,index).toFixed(t.unit==='%'?1:2)}}</b><small>{{index===settingsDraft.powerActiveTrace?powerPageUnit:t.unit}}</small></div><small>Max {{t.maxValue.toFixed(t.unit==='%'?1:2)}} {{t.unit}}</small>
+            </div>
+            <div class="focus-metric pass-state" :class="powerPassState.toLowerCase()"><span>判定</span><div><b>{{powerPassState}}</b></div><small v-if="settingsDraft.powerPassFail">{{settingsDraft.powerLow}} – {{settingsDraft.powerHigh}}</small></div>
           </div>
-          <details v-if="activePage==='power'" class="module-config-dock" open>
-            <summary>显示 / 参数</summary>
-            <div class="dock-row"><span>历史窗口</span><select v-model.number="settingsDraft.powerWindow" @change="saveSettings"><option :value="120">2 min</option><option :value="300">5 min</option><option :value="600">10 min</option><option :value="1800">30 min</option></select></div>
-            <div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.dashboardPower1" @change="saveSettings"/>{{snapshot.power.traces[0]?.name ?? 'power1'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardPower2" @change="saveSettings"/>{{snapshot.power.traces[1]?.name ?? 'power2'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardMath1" @change="saveSettings"/>{{snapshot.power.traces[2]?.name ?? 'math1'}}</label></div>
+
+          <details v-if="activePage==='power'" class="module-config-dock workstation-config" open>
+            <summary>功率计参数</summary>
+            <div class="config-section"><h4>通道 / 显示</h4>
+              <label class="config-row"><span>活动通道</span><select v-model.number="settingsDraft.powerActiveTrace" @change="saveSettings"><option v-for="(t,index) in snapshot.power.traces" :key="t.name" :value="index">{{t.name}}</option></select></label>
+              <label class="config-row"><span>历史窗口</span><select v-model.number="settingsDraft.powerWindow" @change="saveSettings"><option :value="120">2 min</option><option :value="300">5 min</option><option :value="600">10 min</option><option :value="1800">30 min</option></select></label>
+              <div class="config-checks"><label><input type="checkbox" v-model="settingsDraft.dashboardPower1" @change="saveSettings"/>{{snapshot.power.traces[0]?.name ?? 'power1'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardPower2" @change="saveSettings"/>{{snapshot.power.traces[1]?.name ?? 'power2'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardMath1" @change="saveSettings"/>{{snapshot.power.traces[2]?.name ?? 'math1'}}</label></div>
+            </div>
+            <div class="config-section"><h4>测量处理</h4>
+              <label class="config-row"><span>平均采样数</span><input type="number" min="1" max="200" v-model.number="settingsDraft.powerAverageSamples" @change="saveSettings"/><small>samples</small></label>
+              <label class="config-row"><span>Offset</span><input type="number" step="0.01" v-model.number="settingsDraft.powerOffset" @change="saveSettings"/><small>{{snapshot.power.traces[settingsDraft.powerActiveTrace]?.unit}}</small></label>
+              <label class="config-row"><span>Scale</span><input type="number" step="0.01" v-model.number="settingsDraft.powerScale" @change="saveSettings"/><small>×</small></label>
+              <label class="config-row switch"><span>Normalize</span><input type="checkbox" v-model="settingsDraft.powerNormalize" @change="saveSettings"/></label>
+              <label class="config-row"><span>Normalize reference</span><input type="number" step="0.01" v-model.number="settingsDraft.powerNormalizeValue" @change="saveSettings"/><small>{{snapshot.power.traces[settingsDraft.powerActiveTrace]?.unit}}</small></label>
+              <label class="config-row switch"><span>Power density</span><input type="checkbox" v-model="settingsDraft.powerDensity" @change="saveSettings"/></label>
+              <label class="config-row"><span>Sensor area</span><input type="number" step="0.01" min="0.000001" v-model.number="settingsDraft.powerAreaCm2" @change="saveSettings"/><small>cm²</small></label>
+              <div class="config-actions"><button @click="zeroPowerActive">Zero</button><button @click="normalizePowerAtCurrent">Normalize now</button><button @click="resetPowerProcessing">Reset processing</button></div>
+            </div>
+            <div class="config-section"><h4>Pass / Fail</h4>
+              <label class="config-row switch"><span>Enable limits</span><input type="checkbox" v-model="settingsDraft.powerPassFail" @change="saveSettings"/></label>
+              <label class="config-row"><span>Low limit</span><input type="number" step="0.01" v-model.number="settingsDraft.powerLow" @change="saveSettings"/></label>
+              <label class="config-row"><span>High limit</span><input type="number" step="0.01" v-model.number="settingsDraft.powerHigh" @change="saveSettings"/></label>
+            </div>
           </details>
+
           <div class="power-layout"><div class="power-chart-zone">
-            <PlotCanvas class="main-plot" :series="powerSeries" :x-min="powerRangeStart" :x-max="powerRangeEnd" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间 (HH:MM)" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" />
+            <PlotCanvas class="main-plot" :series="activePage==='power'?powerPageSeries:powerSeries" :x-min="powerRangeStart" :x-max="powerRangeEnd" :y-min="0" :y-max="activePage==='power'?powerPageLeftMax:powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间 (HH:MM)" :y-label="activePage==='power'?powerPageAxisLabel:'功率 (kW)'" right-y-label="效率 (%)" :show-axis-labels="activePage==='power'" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" />
             <div class="overview-row"><div ref="powerOverviewShell" class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="0" :x-max="settingsDraft.powerWindow" :compact="true" /><div class="overview-selected" :style="powerSelectionStyle"><i class="overview-handle start" @pointerdown.stop="beginPowerRangeDrag($event,'start')"></i><i class="overview-handle end" @pointerdown.stop="beginPowerRangeDrag($event,'end')"></i></div></div></div>
           </div></div>
         </article>
 
         <article class="instrument-panel spectrum-panel" :class="{hidden:!['dashboard','spectrum'].includes(activePage)}">
-          <div class="spectrum-head graph-overlay"><div class="module-title"><div class="panel-mark inline spectrum-accent" :class="{selected:snapshot.captureSelection.spectrum}"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><strong>光谱</strong><span v-if="activePage==='spectrum'" class="focus-page-state" :class="{running:moduleActive('spectrum')}"><i></i>{{moduleActive('spectrum')?'采集中':'就绪'}}</span></div><div class="osa-metrics"><button class="metric-trigger primary-metric" @click="openReadout('spectrumCenter')"><em>λc</em><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrum3db')"><em>3 dB</em><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrumRms')"><em>RMS</em><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button><button class="metric-trigger primary-metric" @click="openReadout('spectrumPower')"><em>P</em><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button></div></div>
-          <div v-if="activePage==='spectrum'" class="focus-summary">
-            <button class="focus-metric" @click="openReadout('spectrumCenter')"><span>中心波长</span><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></button>
-            <button class="focus-metric" @click="openReadout('spectrum3db')"><span>3 dB</span><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></button>
-            <button class="focus-metric" @click="openReadout('spectrumRms')"><span>RMS</span><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></button>
-            <button class="focus-metric" @click="openReadout('spectrumPower')"><span>功率</span><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></button>
+          <div class="spectrum-head graph-overlay">
+            <div class="module-title"><div class="panel-mark inline spectrum-accent" :class="{selected:snapshot.captureSelection.spectrum}"><svg viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></div><strong>光谱</strong><span v-if="activePage==='spectrum'" class="focus-page-state" :class="{running:moduleActive('spectrum')}"><i></i>{{moduleActive('spectrum')?'采集中':'就绪'}}</span></div>
+            <div class="osa-metrics"><button class="metric-trigger primary-metric" @click="openReadout('spectrumCenter')"><em>λc</em><span class="metric-value-chip"><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></span></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrum3db')"><em>3 dB</em><span class="metric-value-chip"><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></span></button><button class="metric-trigger secondary-trigger" @click="openReadout('spectrumRms')"><em>RMS</em><span class="metric-value-chip"><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></span></button><button class="metric-trigger primary-metric" @click="openReadout('spectrumPower')"><em>P</em><span class="metric-value-chip"><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></span></button></div>
           </div>
-          <details v-if="activePage==='spectrum'" class="module-config-dock" open><summary>扫描参数</summary><div class="dock-row"><span>起始 nm</span><input type="number" v-model.number="settingsDraft.osaStart" @change="saveSettings"/></div><div class="dock-row"><span>终止 nm</span><input type="number" v-model.number="settingsDraft.osaStop" @change="saveSettings"/></div></details>
-          <PlotCanvas class="spectrum-plot" :series="snapshot.spectrum.traces" :x-min="settingsDraft.osaStart" :x-max="settingsDraft.osaStop" :y-min="-100" :y-max="0" x-label="波长 (nm)" y-label="功率 (dBm)" />
+
+          <div v-if="activePage==='spectrum'" class="focus-summary">
+            <div class="focus-metric"><span>中心波长 λc</span><div><b>{{snapshot.spectrum.centerWavelength.toFixed(2)}}</b><small>nm</small></div></div>
+            <div class="focus-metric"><span>3 dB 线宽</span><div><b>{{snapshot.spectrum.linewidth3Db.toFixed(2)}}</b><small>nm</small></div></div>
+            <div class="focus-metric"><span>RMS 线宽</span><div><b>{{snapshot.spectrum.linewidthRms.toFixed(2)}}</b><small>nm</small></div></div>
+            <div class="focus-metric"><span>积分功率</span><div><b>{{snapshot.spectrum.power.toFixed(1)}}</b><small>dBm</small></div></div>
+          </div>
+
+          <details v-if="activePage==='spectrum'" class="module-config-dock workstation-config" open>
+            <summary>OSA 扫描 / 分析</summary>
+            <div class="config-section"><h4>波长范围</h4>
+              <label class="config-row"><span>Start wavelength</span><input type="number" step="0.01" v-model.number="settingsDraft.osaStart" @change="saveSettings"/><small>nm</small></label>
+              <label class="config-row"><span>Stop wavelength</span><input type="number" step="0.01" v-model.number="settingsDraft.osaStop" @change="saveSettings"/><small>nm</small></label>
+              <label class="config-row"><span>Center wavelength</span><input type="number" step="0.01" v-model.number="osaCenterDraft" @change="saveSettings"/><small>nm</small></label>
+              <label class="config-row"><span>Span</span><input type="number" step="0.01" min="0.01" v-model.number="osaSpanDraft" @change="saveSettings"/><small>nm</small></label>
+            </div>
+            <div class="config-section"><h4>采集</h4>
+              <label class="config-row"><span>Resolution bandwidth</span><select v-model.number="settingsDraft.osaResolution" @change="saveSettings"><option :value="0.02">0.02</option><option :value="0.05">0.05</option><option :value="0.1">0.10</option><option :value="0.2">0.20</option><option :value="0.5">0.50</option><option :value="1">1.00</option></select><small>nm</small></label>
+              <label class="config-row"><span>Sensitivity</span><select v-model="settingsDraft.osaSensitivity" @change="saveSettings"><option>LOW</option><option>MID</option><option>HIGH1</option><option>HIGH2</option></select></label>
+              <label class="config-row"><span>Averaging</span><input type="number" min="1" max="999" v-model.number="settingsDraft.osaAverage" @change="saveSettings"/><small>sweeps</small></label>
+              <label class="config-row"><span>Sweep mode</span><select v-model="settingsDraft.osaSweepMode" @change="saveSettings"><option>SINGLE</option><option>REPEAT</option></select></label>
+            </div>
+            <div class="config-section"><h4>显示 / Marker</h4>
+              <label class="config-row"><span>Reference level</span><input type="number" step="1" v-model.number="settingsDraft.osaRefLevel" @change="saveSettings"/><small>dBm</small></label>
+              <label class="config-row"><span>Scale</span><input type="number" min="0.1" max="10" step="0.1" v-model.number="settingsDraft.osaDbPerDiv" @change="saveSettings"/><small>dB/div</small></label>
+              <label class="config-row switch"><span>Reference trace</span><input type="checkbox" v-model="settingsDraft.osaShowRef" @change="saveSettings"/></label>
+              <label class="config-row switch"><span>Peak marker</span><input type="checkbox" v-model="settingsDraft.osaMarkerPeak" @change="saveSettings"/></label>
+            </div>
+          </details>
+          <PlotCanvas class="spectrum-plot" :series="activePage==='spectrum'?spectrumPageSeries:snapshot.spectrum.traces" :x-min="settingsDraft.osaStart" :x-max="settingsDraft.osaStop" :y-min="activePage==='spectrum'?osaYMin:-100" :y-max="activePage==='spectrum'?osaYMax:0" :vertical-marker="activePage==='spectrum'&&settingsDraft.osaMarkerPeak?snapshot.spectrum.centerWavelength:undefined" x-label="波长 (nm)" y-label="功率 (dBm)" :show-axis-labels="activePage==='spectrum'" />
         </article>
 
         <article class="instrument-panel beam-panel" :class="{hidden:!['dashboard','beam'].includes(activePage)}">
-          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{selected:snapshot.captureSelection.beam}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong><span v-if="activePage==='beam'" class="focus-page-state" :class="{running:moduleActive('beam')}"><i></i>{{moduleActive('beam')?'采集中':'就绪'}}</span></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @keydown="beginZDrag" @keyup="endZDrag" @blur="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @keydown="beginAttDrag" @keyup="endAttDrag" @blur="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
-          <div v-if="activePage==='beam'" class="focus-summary">
-            <button class="focus-metric" @click="openReadout('beamM2x')"><span>M²x</span><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button>
-            <button class="focus-metric" @click="openReadout('beamM2y')"><span>M²y</span><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button>
-            <button class="focus-metric" @click="openReadout('beamM2')"><span>M²</span><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button>
+          <div class="module-head beam-head graph-overlay">
+            <div class="module-title"><div class="panel-mark beam-accent" :class="{selected:snapshot.captureSelection.beam}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong><span v-if="activePage==='beam'" class="focus-page-state" :class="{running:moduleActive('beam')}"><i></i>{{moduleActive('beam')?'采集中':'就绪'}}</span></div>
+            <div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @keydown="beginZDrag" @keyup="endZDrag" @blur="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @keydown="beginAttDrag" @keyup="endAttDrag" @blur="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div>
+            <div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><span class="metric-value-chip"><b>{{snapshot.beam.m2x.toFixed(2)}}</b></span></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><span class="metric-value-chip"><b>{{snapshot.beam.m2y.toFixed(2)}}</b></span></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M²</em><span class="metric-value-chip"><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></span></button></div>
           </div>
-          <details v-if="activePage==='beam'" class="module-config-dock beam-page-config" open>
-            <summary>观察控制</summary>
-            <div class="dock-control"><span>Z 位置</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @keydown="beginZDrag" @keyup="endZDrag" @blur="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b></div>
-            <div class="dock-control"><span>Attenuation</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @keydown="beginAttDrag" @keyup="endAttDrag" @blur="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div>
-            <button class="dock-play" :class="{active:beamPlaying}" @click="toggleBeamPlay">{{beamPlaying?'停止 Z 浏览':'自动 Z 浏览'}}</button>
+
+          <div v-if="activePage==='beam'" class="focus-summary">
+            <div class="focus-metric"><span>M² X</span><div><b>{{snapshot.beam.m2x.toFixed(2)}}</b></div></div>
+            <div class="focus-metric"><span>M² Y</span><div><b>{{snapshot.beam.m2y.toFixed(2)}}</b></div></div>
+            <div class="focus-metric"><span>M²</span><div><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></div></div>
+            <div class="focus-metric"><span>Beam width X</span><div><b>{{snapshot.beam.spotWidthX.toFixed(0)}}</b><small>μm</small></div></div>
+            <div class="focus-metric"><span>Beam width Y</span><div><b>{{snapshot.beam.spotWidthY.toFixed(0)}}</b><small>μm</small></div></div>
+            <div class="focus-metric"><span>Ellipticity Y/X</span><div><b>{{beamEllipticity.toFixed(3)}}</b></div></div>
+          </div>
+
+          <details v-if="activePage==='beam'" class="module-config-dock workstation-config beam-page-config" open>
+            <summary>BeamSquared / M²</summary>
+            <div class="config-section"><h4>位置 / 衰减</h4>
+              <label class="config-control"><span>Z position</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b></label>
+              <label class="config-control"><span>Attenuation</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></label>
+              <button class="config-action" :class="{active:beamPlaying}" @click="toggleBeamPlay">{{beamPlaying?'停止 Z 浏览':'自动 Z 浏览'}}</button>
+            </div>
+            <div class="config-section"><h4>M² 分析</h4>
+              <label class="config-row"><span>Run mode</span><select v-model="settingsDraft.beamRunMode" @change="saveSettings"><option>AUTO</option><option>MANUAL</option></select></label>
+              <label class="config-row"><span>Width method</span><select v-model="settingsDraft.beamWidthMethod" @change="saveSettings"><option value="D4SIGMA">D4σ / ISO 11146</option><option value="FWHM">FWHM</option></select></label>
+              <label class="config-row switch"><span>Automatic outlier rejection</span><input type="checkbox" v-model="settingsDraft.beamAutoOutlier" @change="saveSettings"/></label>
+              <label class="config-row switch"><span>Show X caustic</span><input type="checkbox" v-model="settingsDraft.beamShowX" @change="saveSettings"/></label>
+              <label class="config-row switch"><span>Show Y caustic</span><input type="checkbox" v-model="settingsDraft.beamShowY" @change="saveSettings"/></label>
+            </div>
           </details>
-          <div class="beam-body"><div class="beam-image-wrap"><BeamProfileCanvas :width-x="snapshot.beam.spotWidthX" :width-y="snapshot.beam.spotWidthY" :attenuation="beamAtt" /></div><PlotCanvas class="caustic-plot" :series="snapshot.beam.caustic" :vertical-marker="beamZ" :x-padding="0.04" x-label="Z (mm)" y-label="束宽 (μm)" /></div>
+          <div class="beam-body"><div class="beam-image-wrap"><BeamProfileCanvas :width-x="snapshot.beam.spotWidthX" :width-y="snapshot.beam.spotWidthY" :attenuation="beamAtt" /></div><PlotCanvas class="caustic-plot" :series="activePage==='beam'?beamPageCaustic:snapshot.beam.caustic" :vertical-marker="beamZ" :x-padding="0.04" x-label="Z (mm)" y-label="束宽 (μm)" :show-axis-labels="activePage==='beam'" /></div>
         </article>
 
         <article class="instrument-panel scope-panel" :class="{hidden:!['dashboard','scope'].includes(activePage)}">
-          <div class="module-head scope-head graph-overlay"><div class="module-title"><div class="panel-mark scope-accent" :class="{selected:snapshot.captureSelection.scope}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong><span v-if="activePage==='scope'" class="focus-page-state" :class="{running:moduleActive('scope')}"><i></i>{{moduleActive('scope')?'采集中':'就绪'}}</span></div><div class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button><span class="secondary-metric"><em>SR</em><b>2.5</b><small>MSa/s</small></span></div></div>
-          <div v-if="activePage==='scope'" class="focus-summary">
-            <button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="focus-metric" @click="openReadout(index===0?'scope0':'scope1')"><span>{{trace.name}}</span><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></button>
-            <div class="focus-metric passive"><span>采样率</span><b>2.5</b><small>MSa/s</small></div>
+          <div class="module-head scope-head graph-overlay">
+            <div class="module-title"><div class="panel-mark scope-accent" :class="{selected:snapshot.captureSelection.scope}"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong><span v-if="activePage==='scope'" class="focus-page-state" :class="{running:moduleActive('scope')}"><i></i>{{moduleActive('scope')?'采集中':'就绪'}}</span></div>
+            <div class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><span class="metric-value-chip"><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></span></button><span class="secondary-metric"><em>SR</em><span class="metric-value-chip"><b>2.5</b><small>MSa/s</small></span></span></div>
           </div>
-          <details v-if="activePage==='scope'" class="module-config-dock" open><summary>显示 / 参数</summary><div class="dock-row"><span>时间窗 ms</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTimeSpan" @change="saveSettings"/></div><div class="dock-row"><span>FFT 上限 MHz</span><input type="number" v-model.number="settingsDraft.scopeFftMax" @change="saveSettings"/></div><div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.scopeCh1" @change="saveSettings"/>CH1</label><label><input type="checkbox" v-model="settingsDraft.scopeCh2" @change="saveSettings"/>CH2</label></div></details>
-          <div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="-1" :y-max="1" x-label="时间 (ms)" y-label="电压 (V)" :tight="true" :stacked="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="频率 (kHz)" y-label="幅值 (a.u.)" :tight="true" :stacked="true" /></div>
+
+          <div v-if="activePage==='scope'" class="focus-summary">
+            <div v-for="trace in snapshot.scope.time" :key="trace.name" class="focus-metric"><span>{{trace.name}}</span><div><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></div></div>
+            <div class="focus-metric"><span>Sample rate</span><div><b>2.5</b><small>MSa/s</small></div></div>
+            <div class="focus-metric"><span>Trigger</span><div><b>{{settingsDraft.scopeTriggerSource}}</b><small>{{settingsDraft.scopeTriggerLevel.toFixed(2)}} V</small></div></div>
+          </div>
+
+          <details v-if="activePage==='scope'" class="module-config-dock workstation-config" open>
+            <summary>示波器参数</summary>
+            <div class="config-section"><h4>Horizontal</h4>
+              <label class="config-row"><span>Time span</span><input type="number" step="0.01" min="0.01" v-model.number="settingsDraft.scopeTimeSpan" @change="saveSettings"/><small>ms</small></label>
+              <label class="config-row"><span>FFT upper limit</span><input type="number" step="0.1" min="0.1" v-model.number="settingsDraft.scopeFftMax" @change="saveSettings"/><small>MHz</small></label>
+            </div>
+            <div class="config-section"><h4>Vertical / Channels</h4>
+              <label class="config-row"><span>Volts / div</span><input type="number" step="0.01" min="0.001" v-model.number="settingsDraft.scopeVoltsDiv" @change="saveSettings"/><small>V/div</small></label>
+              <label class="config-row"><span>Vertical offset</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeOffset" @change="saveSettings"/><small>V</small></label>
+              <label class="config-row"><span>Coupling</span><select v-model="settingsDraft.scopeCoupling" @change="saveSettings"><option>DC</option><option>AC</option><option>GND</option></select></label>
+              <div class="config-checks"><label><input type="checkbox" v-model="settingsDraft.scopeCh1" @change="saveSettings"/>CH1</label><label><input type="checkbox" v-model="settingsDraft.scopeCh2" @change="saveSettings"/>CH2</label></div>
+            </div>
+            <div class="config-section"><h4>Trigger / Acquisition</h4>
+              <label class="config-row"><span>Trigger source</span><select v-model="settingsDraft.scopeTriggerSource" @change="saveSettings"><option>CH1</option><option>CH2</option></select></label>
+              <label class="config-row"><span>Trigger level</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTriggerLevel" @change="saveSettings"/><small>V</small></label>
+              <label class="config-row"><span>Trigger slope</span><select v-model="settingsDraft.scopeTriggerSlope" @change="saveSettings"><option>RISING</option><option>FALLING</option></select></label>
+              <label class="config-row"><span>Acquisition</span><select v-model="settingsDraft.scopeAcquisition" @change="saveSettings"><option>SAMPLE</option><option>AVERAGE</option><option>PEAK</option></select></label>
+              <label class="config-row"><span>Average count</span><input type="number" min="2" max="1024" v-model.number="settingsDraft.scopeAverage" @change="saveSettings"/><small>acq</small></label>
+            </div>
+          </details>
+          <div class="scope-plots"><PlotCanvas :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="activePage==='scope'?scopeYMin:-1" :y-max="activePage==='scope'?scopeYMax:1" x-label="时间 (ms)" y-label="电压 (V)" :show-axis-labels="activePage==='scope'" :tight="true" :stacked="true" /><PlotCanvas :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" x-label="频率 (kHz)" y-label="幅值 (a.u.)" :show-axis-labels="activePage==='scope'" :tight="true" :stacked="true" /></div>
         </article>
       </section>
     </main>
     <div v-if="cameraFlash" class="capture-toast">截图已保存</div>
-    <div v-for="win in bigReadoutWindows" :key="win.id" class="big-readout-window" :class="{light:win.light}" :style="readoutStyle(win)" role="dialog" aria-label="大读数" @pointerdown="beginReadoutDrag($event,win)">
+    <template v-if="activePage==='dashboard'"><div v-for="win in bigReadoutWindows" :key="win.id" class="big-readout-window" :class="{light:win.light}" :style="readoutStyle(win)" role="dialog" aria-label="大读数" @pointerdown="beginReadoutDrag($event,win)">
       <div class="big-readout-top">
         <div class="big-readout-identity"><i></i><span>{{readoutData(win.kind)?.title}}</span></div>
         <div class="big-readout-actions">
@@ -524,6 +722,6 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       </div>
       <div class="big-readout-body"><div class="big-readout-value">{{readoutData(win.kind)?.value}}<small v-if="readoutData(win.kind)?.unit">{{readoutData(win.kind)?.unit}}</small></div></div>
       <div class="big-readout-resize" @pointerdown.stop="beginReadoutResize($event,win)" title="拖动缩放"><i></i><i></i><i></i></div>
-    </div>
+    </div></template>
   </div>
 </template>

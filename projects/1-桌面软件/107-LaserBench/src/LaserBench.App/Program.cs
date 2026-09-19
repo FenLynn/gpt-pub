@@ -92,11 +92,26 @@ internal static class Program
                 CaptureBeam = true,
                 CaptureScope = true,
                 ScopeTimeSpan = 1.25,
-                DashboardPower2 = false
+                DashboardPower2 = false,
+                PowerAverageSamples = 8,
+                PowerScale = 1.25,
+                OsaResolution = 0.1,
+                OsaSensitivity = "HIGH1",
+                BeamWidthMethod = "FWHM",
+                ScopeVoltsDiv = 0.5,
+                ScopeTriggerSource = "CH2"
             };
             AppConfigStore.Save(config);
             var persistedConfig = AppConfigStore.Load();
             if (persistedConfig.DashboardPower2) errors.Add("dashboard display preference persistence failed");
+            if (persistedConfig.PowerAverageSamples != 8 || Math.Abs(persistedConfig.PowerScale - 1.25) > 1e-9)
+                errors.Add("power workstation preference persistence failed");
+            if (Math.Abs(persistedConfig.OsaResolution - 0.1) > 1e-9 || persistedConfig.OsaSensitivity != "HIGH1")
+                errors.Add("OSA workstation preference persistence failed");
+            if (persistedConfig.BeamWidthMethod != "FWHM")
+                errors.Add("beam workstation preference persistence failed");
+            if (Math.Abs(persistedConfig.ScopeVoltsDiv - 0.5) > 1e-9 || persistedConfig.ScopeTriggerSource != "CH2")
+                errors.Add("scope workstation preference persistence failed");
 
             try
             {

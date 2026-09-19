@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.24 Vector Motion / WebView2 Runtime Gate**，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.25 Workstation Pages / Dashboard Readout Hierarchy**，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际设备提供者仍是 Simulator；真实 Ophir、Yokogawa、BeamSquared、Tektronix Driver 尚未正式接入。
-- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.24 继续锁定 Dashboard：顶栏四个采集选择器使用内联 SVG + CSS keyframes 动画，并由 WebView2 Web Animations API 时间轴门禁验证；模块标题图标静态；v0.4.23 的双手柄、刻度安全、结果背景、相机/REC hover 均保留。
+- Web UI 已有 Dashboard、Power/Spectrum/Beam/Scope 工作站式独立页、Data 和 Settings。v0.4.25 锁定 Dashboard 四宫格几何，重点完善指标 chip、Label 控件、模块页参数体系与 Big Readout 页面边界。
 
 ## 当前产品不变量
 
@@ -48,8 +48,8 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - Power、Spectrum、Beam、Scope 使用四象限高密度结构，不使用大卡片、阴影和宽边距。
 - Dashboard 壳体使用冷深蓝灰，只有实际 Plot / 图像数据区白底；刻度区保持深色。Dashboard 不显示 X/Y 轴标题文字，只保留刻度数值与透明图内 Legend。
 - Power 物理功率与数学百分比通道使用独立纵轴；每个 Channel / Math Channel 的 Dashboard 显示开关在 Power 页管理，且与 Test 采集选择分离。
-- Dashboard 关键结果支持多个 Big Readout 同时存在；同一指标只保留一个窗口。每窗独立拖动、等比例缩放、黑白主题与关闭，并尽量紧贴读数内容。
-- 顶部采集选择图标与模块左上图标共享 selected 绿色状态，但只有顶栏四个选择图标允许 GIF 动画；模块标题图标固定静态。GIF 必须先通过 WebView2 实际解码才允许工作区进入 ready。
+- Dashboard 关键结果支持多个 Big Readout 同时存在；同一指标只保留一个窗口。每窗独立拖动、等比例缩放、黑白主题与关闭，并尽量紧贴读数内容。Big Readout 只在 Dashboard 显示，切换到独立页时隐藏。
+- 顶部采集选择图标与模块左上图标共享 selected 绿色状态，但只有顶栏四个选择图标允许内联 SVG + CSS 动画；模块标题图标固定静态。Power bar 缓慢起伏、Spectrum 单峰纵向伸缩、Scope 持续左移、Beam 仅外环扩散。
 - Beam Z 只浏览轴向光斑并同步 caustic 参考线，不改写 caustic。
 - Scope Dashboard 最多显示两个通道时域和 FFT，通道开关必须同时作用于时域和 FFT。
 - 不使用 Electron、FFmpeg 或第三方图表库；生产 UI 明确允许 WebView2，绘图继续使用 Canvas。

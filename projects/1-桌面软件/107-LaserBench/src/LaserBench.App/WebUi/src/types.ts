@@ -29,6 +29,38 @@ export interface LaserSnapshot {
     dashboardPower1: boolean
     dashboardPower2: boolean
     dashboardMath1: boolean
+    powerActiveTrace: number
+    powerAverageSamples: number
+    powerOffset: number
+    powerScale: number
+    powerNormalize: boolean
+    powerNormalizeValue: number
+    powerDensity: boolean
+    powerAreaCm2: number
+    powerPassFail: boolean
+    powerLow: number
+    powerHigh: number
+    osaResolution: number
+    osaSensitivity: string
+    osaAverage: number
+    osaRefLevel: number
+    osaDbPerDiv: number
+    osaShowRef: boolean
+    osaSweepMode: string
+    osaMarkerPeak: boolean
+    beamRunMode: string
+    beamWidthMethod: string
+    beamAutoOutlier: boolean
+    beamShowX: boolean
+    beamShowY: boolean
+    scopeVoltsDiv: number
+    scopeOffset: number
+    scopeCoupling: string
+    scopeTriggerSource: string
+    scopeTriggerLevel: number
+    scopeTriggerSlope: string
+    scopeAcquisition: string
+    scopeAverage: number
   }
   data: {
     experimentFolder: string

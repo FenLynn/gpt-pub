@@ -42,6 +42,44 @@ internal sealed class AppConfig
     public bool DashboardPower1 { get; set; } = true;
     public bool DashboardPower2 { get; set; } = true;
     public bool DashboardMath1 { get; set; } = true;
+
+    // Module-page workstation controls. These are view/measurement settings and
+    // remain independent from the Dashboard geometry.
+    public int PowerActiveTrace { get; set; }
+    public int PowerAverageSamples { get; set; } = 1;
+    public double PowerOffset { get; set; }
+    public double PowerScale { get; set; } = 1.0;
+    public bool PowerNormalize { get; set; }
+    public double PowerNormalizeValue { get; set; } = 1.0;
+    public bool PowerDensity { get; set; }
+    public double PowerAreaCm2 { get; set; } = 1.0;
+    public bool PowerPassFail { get; set; }
+    public double PowerLow { get; set; }
+    public double PowerHigh { get; set; } = 20.0;
+
+    public double OsaResolution { get; set; } = 0.05;
+    public string OsaSensitivity { get; set; } = "MID";
+    public int OsaAverage { get; set; } = 1;
+    public double OsaRefLevel { get; set; }
+    public double OsaDbPerDiv { get; set; } = 10.0;
+    public bool OsaShowRef { get; set; } = true;
+    public string OsaSweepMode { get; set; } = "REPEAT";
+    public bool OsaMarkerPeak { get; set; } = true;
+
+    public string BeamRunMode { get; set; } = "AUTO";
+    public string BeamWidthMethod { get; set; } = "D4SIGMA";
+    public bool BeamAutoOutlier { get; set; } = true;
+    public bool BeamShowX { get; set; } = true;
+    public bool BeamShowY { get; set; } = true;
+
+    public double ScopeVoltsDiv { get; set; } = 0.25;
+    public double ScopeOffset { get; set; }
+    public string ScopeCoupling { get; set; } = "DC";
+    public string ScopeTriggerSource { get; set; } = "CH1";
+    public double ScopeTriggerLevel { get; set; }
+    public string ScopeTriggerSlope { get; set; } = "RISING";
+    public string ScopeAcquisition { get; set; } = "SAMPLE";
+    public int ScopeAverage { get; set; } = 16;
 }
 
 internal static class AppPaths

@@ -66,15 +66,15 @@ beam.setAttenuation
 
 ## 视觉方向
 
-v0.4.24 继续采用 Graph-first Dashboard；四宫格外部位置不动，顶栏采集动画由外部 GIF 改为内联 SVG + CSS keyframes，并在 WebView2 中直接验证运行时间轴。
+v0.4.25 继续采用 Graph-first Dashboard；四宫格外部位置锁定，Dashboard 只微调 Label、顶栏动画与“数值+单位”chip，主要开发重心转到四个独立模块工作页。
 
 - Dashboard 非绘图区统一冷深蓝灰，只有真实 Plot / 图像绘图区白底。
 - Dashboard 图占绝对主体；模块标题栏与壳体同底色，适度增加高度和刻度字号以保证可读性。Dashboard 不渲染 X/Y 轴标题文字，只保留必要刻度；刻度 gutter 属于深色壳体，白色只填实际数据矩形。
 - Power / Spectrum / Scope 的低频参数进入各自模块页；Beam Z / 播放 / Attenuation 因高频操作继续常驻 Dashboard。
 - Beam 光斑图不显示色条和比例尺；滚轮缩放、左键拖动、双击复位。
-- 独立模块页不使用 Dashboard 的极限紧凑模板，使用顶部状态、左侧数据、左下图形、右侧配置的布局。
+- 独立模块页不使用 Dashboard 的极限紧凑模板，统一为“左上两行图标/名称/状态 + 上方完整读数 + 中央/下方数据图 + 右侧整列配置”；独立页轴标题和单位常驻，壳体保持深色，只有 Plot / 图像区白底。
 - Power 的 Dashboard Trace 显示选择与 Test 采集选择分离并由 C# 配置持久化。
-- 关键测量值支持多个 Big Readout 并存：每窗左上状态/名称常显，右上黑白切换与关闭、右下等比例缩放手柄默认隐藏并在 hover/focus 时出现；各窗共享同一 Snapshot，只改变前端呈现。
+- 关键测量值支持多个 Big Readout 并存：每窗左上状态/名称常显，右上黑白切换与关闭、右下等比例缩放手柄默认隐藏并在 hover/focus 时出现；各窗共享同一 Snapshot，只改变前端呈现。Big Readout 只在 Dashboard 渲染。
 - 采集选择图标与模块标题图标共享 selected 绿色状态；只有顶栏四个采集选择图标播放 GIF，模块标题图标固定静态。
 - 内部网格使用虚线，绘图区边界使用实线，Legend 保持透明图内。
 
@@ -97,3 +97,8 @@ Dashboard 的 X/Y 轴标题默认隐藏。鼠标在轴中央附近停留约 300 
 ### v0.4.24 顶栏采集向量动画
 
 顶栏 4 个采集选择器使用内联 SVG + CSS keyframes，不再依赖外部 GIF。模块标题图标固定静态。WebUiHost 在 `webui-ready` 前检查 4 个向量图标结构，并验证选中图标的 Web Animations API timeline 在 320 ms 内实际推进；这项检查属于真实 Windows GUI smoke 的一部分。
+
+
+### v0.4.25 独立模块工作页
+
+Power / Spectrum / Beam / Scope 不再只是 Dashboard 模块放大版，而使用统一工作站布局。右侧参数通过同一个 `app.setConfig` 白名单入口持久化到 Portable 配置；Power 范围条与 Dashboard 共享同一前端双手柄状态。独立页 PlotCanvas 启用常驻轴标题/单位，Dashboard 仍保持 300 ms hover 标题策略。

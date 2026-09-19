@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.4.24（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.24 保持四宫格外部位置不动：废弃外部 GIF 动图，顶部四个采集图标改成 WebView2 原生内联 SVG + CSS keyframes 动画并由 GUI smoke 验证时间轴实际前进；模块左上图标继续静态。相机/REC 统一 hover 浮起；M²、顶部结果背景、Y 轴端点刻度和 Power 左右双手柄范围窗均保留。
+当前开发版本为 **v0.4.25（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.25 不移动已经认可的 Dashboard 四宫格几何，重点收口顶部交互、结果层级和四个独立模块工作页。
 
 ## 当前能力
 
@@ -13,14 +13,14 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - Dashboard 使用原生 Windows 标题栏、极窄顶栏和窄折叠导航；四象限中图占绝对主体。模块标题行与壳体同底色并稍微放宽高度，刻度字号提高一级，避免下半区过度拥挤。
 - Dashboard 壳体统一冷深蓝灰；**只有真实 Plot / 图像绘图区使用白底**，模块容器、标题区和页面底板不再使用白色卡片。
 - Beam 光斑视图去掉色条/比例尺，支持滚轮缩放、左键拖动、双击复位；左边界和上下边界与相邻 Plot 数据区对齐。
-- 顶部四个采集选择图标选中后播放高分辨率平滑 GIF；对应模块左上角图标只同步绿色 selected 状态并保持静止。Power 仅四根粗 bar 缓慢起伏，Spectrum/Scope 缓慢平移，Beam 十字线/中心 target 固定、仅外环缓慢扩散；旧的选中勾不再显示。
+- 顶部四个采集选择图标使用内联 SVG + CSS 动画；模块左上角图标只同步绿色 selected 状态并保持静止。Power 四根粗 bar 缓慢起伏；Spectrum 单峰只做纵向变高→变低；Scope 波形持续向左流动、不往返；Beam 十字线/中心 target 固定、仅外环缓慢扩散。
 - 所有绘图内部网格为虚线；Legend 透明、无边框并放在数据区内。Dashboard 不显示 X/Y 轴标题文字，只保留必要刻度；刻度边缘保持深色，纯白只属于真实数据区。
-- Power 独立页可逐个选择物理 Channel / Math Channel 是否进入 Dashboard；该显示选择与 Test 采集选择互不影响。数学百分比继续使用独立右轴。
-- Spectrum 独立页承载扫描范围等低频参数；Dashboard 只保留曲线与中心波长、3 dB、RMS、功率等结果。
-- Beam 左侧显示当前 Z 位置光斑，右侧显示完整 caustic；**Z / 播放 / Attenuation** 作为高频观察控制继续常驻 Dashboard，M² 结果贴边显示。
-- Scope Dashboard 只显示最多两个通道的时域和 FFT；时间窗、FFT 范围和通道显示选择进入 Scope 独立页。
-- Dashboard 关键结果可点击进入 **Big Readout**，不同指标允许同时弹出多个读数窗；同一指标只保留一个实例并可再次点击提到最前。每个窗独立拖动、等比例缩放和黑/白显示；左上状态/名称常显，右上控制与右下缩放手柄默认隐藏，hover 时才显示。
-- 四个模块可从侧栏进入独立聚焦页；独立页不追求 Dashboard 的极限紧凑，采用顶部单条标题/状态栏、左上无卡片读数区、左下图形显示、右侧整列配置，不再显示额外 breadcrumb 或三张大数据卡片。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复，当前不把 Floating 描述为已完成功能。
+- Power 独立页使用工作站布局，并提供活动通道、历史窗口、显示选择、移动平均、Offset、Scale、Normalize、Power density、Zero、当前值归一化、Pass/Fail 阈值等常用功率计工作流；Dashboard 显示选择与 Test 采集选择继续严格分离，数学百分比继续使用独立右轴。
+- Spectrum 独立页按 OSA 基础工作流提供 Start/Stop、Center/Span、Resolution bandwidth、Sensitivity、Averaging、Sweep mode、Reference level、dB/div、Reference trace 与 Peak marker；Dashboard 只保留曲线与中心波长、3 dB、RMS、功率等结果。
+- Beam 左侧显示当前 Z 位置 2D 光斑，右侧显示完整 caustic；**Z / 播放 / Attenuation** 作为高频观察控制继续常驻 Dashboard。Beam 独立页补充 M²x/M²y/M²、X/Y beam width、ellipticity、ISO 11146 D4σ/FWHM 选择、outlier 与 X/Y caustic 显示；不加入 3D 光斑。
+- Scope Dashboard 只显示最多两个通道的时域和 FFT；独立页提供时间窗、FFT 上限、Volts/div、Offset、Coupling、通道开关、Trigger source/level/slope、Acquisition mode 与 Average count。
+- Dashboard 关键结果可点击进入 **Big Readout**，不同指标允许同时弹出多个读数窗；同一指标只保留一个实例并可再次点击提到最前。每个窗独立拖动、等比例缩放和黑/白显示；左上状态/名称常显，右上控制与右下缩放手柄默认隐藏，hover 时才显示。**Big Readout 只在 Dashboard 显示，切到任何独立模块页时全部隐藏，返回 Dashboard 后恢复。**
+- 四个模块可从侧栏进入独立工作页；左上图标/名称/状态允许占两行高度，上方横排完整关键数据，右侧整列放参数，中央/下方为主数据图。独立页不省略轴标题和单位，轴标题常驻；页面壳体继续使用深灰蓝，只有 Plot / 数据图区域白底。Power 独立页下方范围条与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
 - 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
 - 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。
 - 实验数据写入 `data/exp/<日期或自定义实验文件夹>/`，该目录下一层直接是数据文件。
@@ -101,7 +101,7 @@ C# / .NET 8 / WinForms Host / Windows x64
 
 ## 当前硬件边界
 
-v0.4.24 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
+v0.4.25 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
 
 1. Ophir Juno / OphirLMMeasurement
 2. Yokogawa AQ6370D

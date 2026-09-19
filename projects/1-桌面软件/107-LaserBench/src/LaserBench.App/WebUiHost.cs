@@ -295,6 +295,43 @@ internal sealed class WebUiHost : IDisposable
         if (v.TryGetProperty("dashboardPower1",out var dp1) && (dp1.ValueKind==JsonValueKind.True||dp1.ValueKind==JsonValueKind.False)) _config.DashboardPower1=dp1.GetBoolean();
         if (v.TryGetProperty("dashboardPower2",out var dp2) && (dp2.ValueKind==JsonValueKind.True||dp2.ValueKind==JsonValueKind.False)) _config.DashboardPower2=dp2.GetBoolean();
         if (v.TryGetProperty("dashboardMath1",out var dm1) && (dm1.ValueKind==JsonValueKind.True||dm1.ValueKind==JsonValueKind.False)) _config.DashboardMath1=dm1.GetBoolean();
+
+        if (v.TryGetProperty("powerActiveTrace",out var pat) && pat.ValueKind==JsonValueKind.Number) _config.PowerActiveTrace=Math.Clamp(pat.GetInt32(),0,2);
+        if (v.TryGetProperty("powerAverageSamples",out var pas) && pas.ValueKind==JsonValueKind.Number) _config.PowerAverageSamples=Math.Clamp(pas.GetInt32(),1,200);
+        if (v.TryGetProperty("powerOffset",out var po) && po.ValueKind==JsonValueKind.Number) _config.PowerOffset=Math.Clamp(po.GetDouble(),-1e9,1e9);
+        if (v.TryGetProperty("powerScale",out var ps) && ps.ValueKind==JsonValueKind.Number) _config.PowerScale=Math.Clamp(ps.GetDouble(),-1e6,1e6);
+        if (v.TryGetProperty("powerNormalize",out var pn) && (pn.ValueKind==JsonValueKind.True||pn.ValueKind==JsonValueKind.False)) _config.PowerNormalize=pn.GetBoolean();
+        if (v.TryGetProperty("powerNormalizeValue",out var pnv) && pnv.ValueKind==JsonValueKind.Number) _config.PowerNormalizeValue=Math.Clamp(Math.Abs(pnv.GetDouble()),1e-12,1e12);
+        if (v.TryGetProperty("powerDensity",out var pd) && (pd.ValueKind==JsonValueKind.True||pd.ValueKind==JsonValueKind.False)) _config.PowerDensity=pd.GetBoolean();
+        if (v.TryGetProperty("powerAreaCm2",out var pa) && pa.ValueKind==JsonValueKind.Number) _config.PowerAreaCm2=Math.Clamp(Math.Abs(pa.GetDouble()),1e-9,1e9);
+        if (v.TryGetProperty("powerPassFail",out var ppf) && (ppf.ValueKind==JsonValueKind.True||ppf.ValueKind==JsonValueKind.False)) _config.PowerPassFail=ppf.GetBoolean();
+        if (v.TryGetProperty("powerLow",out var pl) && pl.ValueKind==JsonValueKind.Number) _config.PowerLow=Math.Clamp(pl.GetDouble(),-1e9,1e9);
+        if (v.TryGetProperty("powerHigh",out var ph) && ph.ValueKind==JsonValueKind.Number) _config.PowerHigh=Math.Clamp(ph.GetDouble(),-1e9,1e9);
+
+        if (v.TryGetProperty("osaResolution",out var ores) && ores.ValueKind==JsonValueKind.Number) _config.OsaResolution=Math.Clamp(ores.GetDouble(),0.001,10);
+        if (v.TryGetProperty("osaSensitivity",out var osen) && osen.ValueKind==JsonValueKind.String) _config.OsaSensitivity=(osen.GetString()??"MID").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("osaAverage",out var oa) && oa.ValueKind==JsonValueKind.Number) _config.OsaAverage=Math.Clamp(oa.GetInt32(),1,999);
+        if (v.TryGetProperty("osaRefLevel",out var orl) && orl.ValueKind==JsonValueKind.Number) _config.OsaRefLevel=Math.Clamp(orl.GetDouble(),-90,30);
+        if (v.TryGetProperty("osaDbPerDiv",out var odb) && odb.ValueKind==JsonValueKind.Number) _config.OsaDbPerDiv=Math.Clamp(odb.GetDouble(),0.1,10);
+        if (v.TryGetProperty("osaShowRef",out var osr) && (osr.ValueKind==JsonValueKind.True||osr.ValueKind==JsonValueKind.False)) _config.OsaShowRef=osr.GetBoolean();
+        if (v.TryGetProperty("osaSweepMode",out var osm) && osm.ValueKind==JsonValueKind.String) _config.OsaSweepMode=(osm.GetString()??"REPEAT").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("osaMarkerPeak",out var omp) && (omp.ValueKind==JsonValueKind.True||omp.ValueKind==JsonValueKind.False)) _config.OsaMarkerPeak=omp.GetBoolean();
+
+        if (v.TryGetProperty("beamRunMode",out var brm) && brm.ValueKind==JsonValueKind.String) _config.BeamRunMode=(brm.GetString()??"AUTO").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("beamWidthMethod",out var bwm) && bwm.ValueKind==JsonValueKind.String) _config.BeamWidthMethod=(bwm.GetString()??"D4SIGMA").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("beamAutoOutlier",out var bao) && (bao.ValueKind==JsonValueKind.True||bao.ValueKind==JsonValueKind.False)) _config.BeamAutoOutlier=bao.GetBoolean();
+        if (v.TryGetProperty("beamShowX",out var bsx) && (bsx.ValueKind==JsonValueKind.True||bsx.ValueKind==JsonValueKind.False)) _config.BeamShowX=bsx.GetBoolean();
+        if (v.TryGetProperty("beamShowY",out var bsy) && (bsy.ValueKind==JsonValueKind.True||bsy.ValueKind==JsonValueKind.False)) _config.BeamShowY=bsy.GetBoolean();
+
+        if (v.TryGetProperty("scopeVoltsDiv",out var svd) && svd.ValueKind==JsonValueKind.Number) _config.ScopeVoltsDiv=Math.Clamp(Math.Abs(svd.GetDouble()),0.001,1000);
+        if (v.TryGetProperty("scopeOffset",out var so) && so.ValueKind==JsonValueKind.Number) _config.ScopeOffset=Math.Clamp(so.GetDouble(),-1000,1000);
+        if (v.TryGetProperty("scopeCoupling",out var scp) && scp.ValueKind==JsonValueKind.String) _config.ScopeCoupling=(scp.GetString()??"DC").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("scopeTriggerSource",out var sts) && sts.ValueKind==JsonValueKind.String) _config.ScopeTriggerSource=(sts.GetString()??"CH1").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("scopeTriggerLevel",out var stl) && stl.ValueKind==JsonValueKind.Number) _config.ScopeTriggerLevel=Math.Clamp(stl.GetDouble(),-1000,1000);
+        if (v.TryGetProperty("scopeTriggerSlope",out var stsl) && stsl.ValueKind==JsonValueKind.String) _config.ScopeTriggerSlope=(stsl.GetString()??"RISING").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("scopeAcquisition",out var sac) && sac.ValueKind==JsonValueKind.String) _config.ScopeAcquisition=(sac.GetString()??"SAMPLE").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("scopeAverage",out var sav) && sav.ValueKind==JsonValueKind.Number) _config.ScopeAverage=Math.Clamp(sav.GetInt32(),2,1024);
+
         if (v.TryGetProperty("aliases",out var aliases) && aliases.ValueKind==JsonValueKind.Object)
         {
             static string Alias(JsonElement a,string key,string current)
@@ -364,7 +401,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.24",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.25",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
@@ -392,7 +429,19 @@ internal sealed class WebUiHost : IDisposable
                 rootPath = AppPaths.Root,
                 powerWindow=_config.PowerWindow, osaStart=_config.OsaStart, osaStop=_config.OsaStop,
                 scopeTimeSpan=_config.ScopeTimeSpan, scopeFftMax=_config.ScopeFftMax, scopeCh1=_config.ScopeCh1, scopeCh2=_config.ScopeCh2,
-                dashboardPower1=_config.DashboardPower1, dashboardPower2=_config.DashboardPower2, dashboardMath1=_config.DashboardMath1
+                dashboardPower1=_config.DashboardPower1, dashboardPower2=_config.DashboardPower2, dashboardMath1=_config.DashboardMath1,
+                powerActiveTrace=_config.PowerActiveTrace, powerAverageSamples=_config.PowerAverageSamples, powerOffset=_config.PowerOffset,
+                powerScale=_config.PowerScale, powerNormalize=_config.PowerNormalize, powerNormalizeValue=_config.PowerNormalizeValue,
+                powerDensity=_config.PowerDensity, powerAreaCm2=_config.PowerAreaCm2, powerPassFail=_config.PowerPassFail,
+                powerLow=_config.PowerLow, powerHigh=_config.PowerHigh,
+                osaResolution=_config.OsaResolution, osaSensitivity=_config.OsaSensitivity, osaAverage=_config.OsaAverage,
+                osaRefLevel=_config.OsaRefLevel, osaDbPerDiv=_config.OsaDbPerDiv, osaShowRef=_config.OsaShowRef,
+                osaSweepMode=_config.OsaSweepMode, osaMarkerPeak=_config.OsaMarkerPeak,
+                beamRunMode=_config.BeamRunMode, beamWidthMethod=_config.BeamWidthMethod, beamAutoOutlier=_config.BeamAutoOutlier,
+                beamShowX=_config.BeamShowX, beamShowY=_config.BeamShowY,
+                scopeVoltsDiv=_config.ScopeVoltsDiv, scopeOffset=_config.ScopeOffset, scopeCoupling=_config.ScopeCoupling,
+                scopeTriggerSource=_config.ScopeTriggerSource, scopeTriggerLevel=_config.ScopeTriggerLevel,
+                scopeTriggerSlope=_config.ScopeTriggerSlope, scopeAcquisition=_config.ScopeAcquisition, scopeAverage=_config.ScopeAverage
             },
             data = BuildDataSummary(),
             devices = BuildDevices(),

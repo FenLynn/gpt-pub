@@ -19,10 +19,11 @@ const props = withDefaults(defineProps<{
   compact?: boolean
   tight?: boolean
   stacked?: boolean
+  showAxisLabels?: boolean
   xPadding?: number
   verticalMarker?: number | null
 }>(), {
-  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, timeOriginMs: undefined, timeValidMax: undefined, compact: false, tight: false, stacked: false, xPadding: 0, verticalMarker: null
+  xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, timeOriginMs: undefined, timeValidMax: undefined, compact: false, tight: false, stacked: false, showAxisLabels: false, xPadding: 0, verticalMarker: null
 })
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -33,11 +34,13 @@ let axisHideTimer:number|undefined
 let pendingAxis:'x'|'y'|'right'|null=null
 
 function margins(){
-  return props.compact
-    ? {l:0,r:0,t:0,b:0}
-    : props.stacked
-      ? {l:38,r:38,t:4,b:18}
-      : {l:38,r:38,t:4,b:21}
+  if(props.compact)return {l:0,r:0,t:0,b:0}
+  if(props.showAxisLabels)return props.stacked
+    ? {l:58,r:48,t:6,b:36}
+    : {l:58,r:48,t:6,b:38}
+  return props.stacked
+    ? {l:38,r:38,t:4,b:18}
+    : {l:38,r:38,t:4,b:21}
 }
 
 const bounds = computed(() => {
@@ -152,7 +155,18 @@ function draw() {
     for(let i=props.series.length-1;i>=0;i--){const s=props.series[i];const tw=ctx.measureText(s.name).width;lx-=tw+30;ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+16,ly);ctx.stroke();ctx.fillStyle='#35516c';ctx.textAlign='left';ctx.fillText(s.name,lx+20,ly)}
   }
 
-  const hint=axisHint.value
+  if(props.showAxisLabels){
+    ctx.save()
+    ctx.fillStyle='#dce6ed'
+    ctx.font='600 12px "Segoe UI", sans-serif'
+    ctx.textAlign='center';ctx.textBaseline='middle'
+    if(props.xLabel)ctx.fillText(props.xLabel,m.l+pw/2,h-11)
+    if(props.yLabel){ctx.translate(12,m.t+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText(props.yLabel,0,0);ctx.rotate(Math.PI/2);ctx.translate(-12,-(m.t+ph/2))}
+    if(hasRight&&props.rightYLabel){ctx.translate(w-12,m.t+ph/2);ctx.rotate(Math.PI/2);ctx.fillText(props.rightYLabel,0,0)}
+    ctx.restore()
+  }
+
+  const hint=props.showAxisLabels?null:axisHint.value
   const hintText=hint==='x'?props.xLabel:hint==='y'?props.yLabel:hint==='right'?props.rightYLabel:''
   if(hintText){
     const drawHint=(text:string,x:number,y:number,angle=0)=>{
@@ -174,6 +188,7 @@ function draw() {
 }
 
 function scheduleAxisHint(next:'x'|'y'|'right'|null){
+  if(props.showAxisLabels){axisHint.value=null;return}
   if(axisHideTimer!==undefined){window.clearTimeout(axisHideTimer);axisHideTimer=undefined}
   if(next===null){
     pendingAxis=null
@@ -212,7 +227,7 @@ function onPointerMove(e:PointerEvent){
 }
 function onPointerLeave(){scheduleAxisHint(null)}
 
-watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.xLabel,props.yLabel,props.rightYLabel,props.timeOriginMs,props.timeValidMax,props.xPadding,props.verticalMarker],draw,{deep:true})
+watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.xLabel,props.yLabel,props.rightYLabel,props.timeOriginMs,props.timeValidMax,props.showAxisLabels,props.xPadding,props.verticalMarker],draw,{deep:true})
 onMounted(()=>{observer=new ResizeObserver(draw);if(canvas.value)observer.observe(canvas.value);draw()})
 onBeforeUnmount(()=>{
   observer?.disconnect()

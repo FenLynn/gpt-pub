@@ -79,12 +79,16 @@ export function createDemoSnapshot(): LaserSnapshot {
   const p2 = powerSeries(1, '#ff8200', 'back', 'kW')
   const p3 = powerSeries(2, '#08a84f', 'eta', '%')
   return {
-    version: '0.4.24', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
+    version: '0.4.25', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
     captureSelection: { power: true, spectrum: true, beam: true, scope: false },
     config: {
       experimentFolder: '', autoScreenshot: false,
       aliases: { power1:'out', power2:'back', math1:'eta', osa1:'osa1', beam:'beam', scope1:'ch1', scope2:'ch2' },
-      rootPath: 'D:\\LaserBench', powerWindow:600, osaStart:1060, osaStop:1100, scopeTimeSpan:0.24, scopeFftMax:50, scopeCh1:true, scopeCh2:true, dashboardPower1:true, dashboardPower2:true, dashboardMath1:true
+      rootPath: 'D:\\LaserBench', powerWindow:600, osaStart:1060, osaStop:1100, scopeTimeSpan:0.24, scopeFftMax:50, scopeCh1:true, scopeCh2:true, dashboardPower1:true, dashboardPower2:true, dashboardMath1:true,
+      powerActiveTrace:0, powerAverageSamples:1, powerOffset:0, powerScale:1, powerNormalize:false, powerNormalizeValue:1, powerDensity:false, powerAreaCm2:1, powerPassFail:false, powerLow:0, powerHigh:20,
+      osaResolution:0.05, osaSensitivity:'MID', osaAverage:1, osaRefLevel:0, osaDbPerDiv:10, osaShowRef:true, osaSweepMode:'REPEAT', osaMarkerPeak:true,
+      beamRunMode:'AUTO', beamWidthMethod:'D4SIGMA', beamAutoOutlier:true, beamShowX:true, beamShowY:true,
+      scopeVoltsDiv:0.25, scopeOffset:0, scopeCoupling:'DC', scopeTriggerSource:'CH1', scopeTriggerLevel:0, scopeTriggerSlope:'RISING', scopeAcquisition:'SAMPLE', scopeAverage:16
     },
     data: { experimentFolder: new Date().toISOString().slice(0,10), fileCount:0, files: [], pictureCount: 0, videoCount: 0 },
     devices: [
