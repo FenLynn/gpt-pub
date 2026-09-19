@@ -4638,7 +4638,9 @@ function App() {
                                             )}
 
                                             {(activeFigure.figureOverrides.xScale === "log" ||
-                                              activeFigure.figureOverrides.yScale === "log") && (
+                                              activeFigure.figureOverrides.yScale === "log" ||
+                                              (doubleYTemplate &&
+                                                activeFigure.figureOverrides.rightYScale === "log")) && (
                                               <div className="axis-note">
                                                 对数轴的刻度间距使用 log10 单位：1 = 一个 decade，
                                                 0.1 = 0.1 decade。
