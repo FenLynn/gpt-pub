@@ -27,7 +27,7 @@ Simulator / 后续真实仪器
 - 截图、录像和配置持久化；
 - 未来厂商 SDK。
 
-Vue 只负责显示、布局、Canvas 绘图和发送白名单意图。v0.4.11 继续复用同一 bridge 命令：
+Vue 只负责显示、布局、Canvas 绘图和发送白名单意图。v0.4.12 继续复用同一 bridge 命令：
 
 ```text
 app.getSnapshot
@@ -66,11 +66,11 @@ beam.setAttenuation
 
 ## 视觉方向
 
-v0.4.11 起采用 Graph-first 工作台：
+v0.4.12 继续采用并收紧 Graph-first 工作台：
 
 - Dashboard 非绘图区统一冷深蓝灰，只有真实 Plot / 图像绘图区白底。
-- 图占绝对主体；模块名、关键读数和坐标标题尽量贴边或浮在图内，避免独立大标题区和宽留白。
+- 图占绝对主体；模块名和关键读数保留在极窄深色标题行。Dashboard 不渲染 X/Y 轴标题文字，只保留必要刻度；刻度 gutter 属于深色壳体，白色只填实际数据矩形。
 - Power / Spectrum / Scope 的低频参数进入各自模块页；Beam Z / 播放 / Attenuation 因高频操作继续常驻 Dashboard。
 - Power 的 Dashboard Trace 显示选择与 Test 采集选择分离并由 C# 配置持久化。
-- 关键测量值支持单实例 Big Readout，前端只改变呈现方式，数据仍来自同一 Snapshot。
+- 关键测量值支持单实例 Big Readout：左上状态/名称、右上黑白切换与关闭、右下拖拽等比例缩放；前端只改变呈现方式，数据仍来自同一 Snapshot。
 - 内部网格使用虚线，绘图区边界使用实线，Legend 保持透明图内。

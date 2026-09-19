@@ -61,12 +61,14 @@ function draw() {
   ctx.setTransform(dpr,0,0,dpr,0,0)
   const w = rect.width, h = rect.height
   ctx.clearRect(0,0,w,h)
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = '#314251'
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
-  const m = props.compact ? {l:2,r:2,t:2,b:2} : props.tight ? {l:34,r:hasRight?36:6,t:5,b:20} : {l:40,r:hasRight?40:8,t:6,b:22}
+  const m = props.compact ? {l:0,r:0,t:0,b:0} : props.tight ? {l:28,r:hasRight?28:2,t:2,b:15} : {l:30,r:hasRight?30:2,t:2,b:15}
   const pw = Math.max(10,w-m.l-m.r), ph = Math.max(10,h-m.t-m.b)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(m.l,m.t,pw,ph)
   const {x0,x1,y0,y1,r0,r1} = bounds.value
   const sx = (x:number) => m.l + (x-x0)/(x1-x0||1)*pw
   const sy = (y:number, axis:'left'|'right'='left') => {
@@ -81,7 +83,6 @@ function draw() {
     ctx.restore()
   }
 
-  ctx.save(); ctx.strokeStyle = props.compact ? '#b9cde0' : '#7897b4'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.strokeRect(m.l+.5,m.t+.5,pw,ph); ctx.restore()
   ctx.save(); ctx.beginPath(); ctx.rect(m.l,m.t,pw,ph); ctx.clip()
   for (const s of props.series) {
     if (s.points.length < 2) continue
@@ -102,11 +103,11 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font='10px "Segoe UI", sans-serif';ctx.fillStyle='#52697e';ctx.textBaseline='middle'
+  ctx.font='9px "Segoe UI", sans-serif';ctx.fillStyle='#b9c8d3';ctx.textBaseline='middle'
   for(let i=0;i<4;i++) {
     const t=i/3, y=m.t+ph*t, v=y1-(y1-y0)*t, text=fmt(v,y1-y0)
-    ctx.textAlign='right';ctx.fillText(text,m.l-8,y)
-    if(hasRight){const rv=r1-(r1-r0)*t;ctx.textAlign='left';ctx.fillText(fmt(rv,r1-r0),m.l+pw+8,y)}
+    ctx.textAlign='right';ctx.fillText(text,m.l-4,y)
+    if(hasRight){const rv=r1-(r1-r0)*t;ctx.textAlign='left';ctx.fillText(fmt(rv,r1-r0),m.l+pw+4,y)}
   }
   ctx.textBaseline='top'
   for(let i=0;i<6;i++) {
@@ -114,15 +115,10 @@ function draw() {
     let text:string
     if(props.timeAxis){const d=new Date(Date.now()+v*1000); text=d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})}
     else text=fmt(v,x1-x0)
-    ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+5)
+    ctx.textAlign=i===0?'left':i===5?'right':'center';ctx.fillText(text,x,m.t+ph+3)
   }
-  ctx.fillStyle='rgba(32,60,88,.76)';ctx.font='10px "Segoe UI", sans-serif'
-  if(props.yLabel){ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(props.yLabel,m.l+5,m.t+5)}
-  if(hasRight&&props.rightYLabel){ctx.textAlign='right';ctx.textBaseline='top';ctx.fillText(props.rightYLabel,m.l+pw-5,m.t+5)}
-  if(props.xLabel){ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText(props.xLabel,m.l+pw-5,m.t+ph-5)}
-
   if(props.series.length){
-    let lx=m.l+pw-12, ly=m.t+24;ctx.font='10px "Segoe UI", sans-serif';ctx.textBaseline='middle'
+    let lx=m.l+pw-8, ly=m.t+10;ctx.font='9px "Segoe UI", sans-serif';ctx.textBaseline='middle'
     for(let i=props.series.length-1;i>=0;i--){const s=props.series[i];const tw=ctx.measureText(s.name).width;lx-=tw+30;ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+16,ly);ctx.stroke();ctx.fillStyle='#35516c';ctx.textAlign='left';ctx.fillText(s.name,lx+20,ly)}
   }
 }

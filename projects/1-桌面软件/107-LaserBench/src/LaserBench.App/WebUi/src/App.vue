@@ -21,8 +21,10 @@ const recordElapsed = ref(0)
 const saveNotice = ref('')
 type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
 const bigReadoutKind = ref<BigReadoutKind|null>(null)
-const bigReadoutMaximized = ref(false)
-const bigReadoutRect = ref({ x: 150, y: 110, w: 520, h: 300 })
+const bigReadoutLight = ref(false)
+const BIG_READOUT_BASE_W = 520
+const BIG_READOUT_BASE_H = 300
+const bigReadoutRect = ref({ x: 150, y: 110, scale: 1 })
 const settingsDraft = ref({
   experimentFolder: snapshot.value.config?.experimentFolder ?? '',
   autoScreenshot: snapshot.value.config?.autoScreenshot ?? false,
@@ -93,24 +95,31 @@ const bigReadout = computed(() => {
     default: return null
   }
 })
-const bigReadoutStyle = computed(() => bigReadoutMaximized.value
-  ? { left:'7px', top:'7px', width:'calc(100vw - 14px)', height:'calc(100vh - 14px)' }
-  : { left:`${bigReadoutRect.value.x}px`, top:`${bigReadoutRect.value.y}px`, width:`${bigReadoutRect.value.w}px`, height:`${bigReadoutRect.value.h}px` })
+const bigReadoutSize = computed(() => ({
+  w: BIG_READOUT_BASE_W * bigReadoutRect.value.scale,
+  h: BIG_READOUT_BASE_H * bigReadoutRect.value.scale
+}))
+const bigReadoutStyle = computed(() => ({
+  left:`${bigReadoutRect.value.x}px`,
+  top:`${bigReadoutRect.value.y}px`,
+  width:`${bigReadoutSize.value.w}px`,
+  height:`${bigReadoutSize.value.h}px`,
+  '--readout-scale': String(bigReadoutRect.value.scale)
+}))
 
-function openReadout(kind:BigReadoutKind){
-  bigReadoutRect.value.x=Math.max(0,Math.min(bigReadoutRect.value.x,Math.max(0,window.innerWidth-bigReadoutRect.value.w)))
-  bigReadoutRect.value.y=Math.max(0,Math.min(bigReadoutRect.value.y,Math.max(0,window.innerHeight-bigReadoutRect.value.h)))
-  bigReadoutKind.value=kind
+function clampReadoutPosition(){
+  bigReadoutRect.value.x=Math.max(0,Math.min(bigReadoutRect.value.x,Math.max(0,window.innerWidth-bigReadoutSize.value.w)))
+  bigReadoutRect.value.y=Math.max(0,Math.min(bigReadoutRect.value.y,Math.max(0,window.innerHeight-bigReadoutSize.value.h)))
 }
-function closeReadout(){ bigReadoutKind.value=null; bigReadoutMaximized.value=false }
+function openReadout(kind:BigReadoutKind){ clampReadoutPosition(); bigReadoutKind.value=kind }
+function closeReadout(){ bigReadoutKind.value=null }
+function toggleReadoutTheme(){ bigReadoutLight.value=!bigReadoutLight.value }
 function persistReadoutRect(){ try{localStorage.setItem('laserbench.bigReadout.rect',JSON.stringify(bigReadoutRect.value))}catch{} }
-function toggleReadoutMax(){ bigReadoutMaximized.value=!bigReadoutMaximized.value }
 function beginReadoutDrag(e:PointerEvent){
-  if(bigReadoutMaximized.value)return
   const start={x:e.clientX,y:e.clientY,left:bigReadoutRect.value.x,top:bigReadoutRect.value.y}
   const move=(ev:PointerEvent)=>{
-    const maxX=Math.max(0,window.innerWidth-bigReadoutRect.value.w)
-    const maxY=Math.max(0,window.innerHeight-bigReadoutRect.value.h)
+    const maxX=Math.max(0,window.innerWidth-bigReadoutSize.value.w)
+    const maxY=Math.max(0,window.innerHeight-bigReadoutSize.value.h)
     bigReadoutRect.value.x=Math.max(0,Math.min(maxX,start.left+ev.clientX-start.x))
     bigReadoutRect.value.y=Math.max(0,Math.min(maxY,start.top+ev.clientY-start.y))
   }
@@ -118,12 +127,17 @@ function beginReadoutDrag(e:PointerEvent){
   window.addEventListener('pointermove',move);window.addEventListener('pointerup',up)
 }
 function beginReadoutResize(e:PointerEvent){
-  if(bigReadoutMaximized.value)return
   e.stopPropagation()
-  const start={x:e.clientX,y:e.clientY,w:bigReadoutRect.value.w,h:bigReadoutRect.value.h}
+  const start={x:e.clientX,y:e.clientY,scale:bigReadoutRect.value.scale}
   const move=(ev:PointerEvent)=>{
-    bigReadoutRect.value.w=Math.max(300,Math.min(window.innerWidth-bigReadoutRect.value.x,start.w+ev.clientX-start.x))
-    bigReadoutRect.value.h=Math.max(190,Math.min(window.innerHeight-bigReadoutRect.value.y,start.h+ev.clientY-start.y))
+    const dx=(ev.clientX-start.x)/BIG_READOUT_BASE_W
+    const dy=(ev.clientY-start.y)/BIG_READOUT_BASE_H
+    const requested=start.scale+Math.max(dx,dy)
+    const maxScale=Math.max(.55,Math.min(
+      (window.innerWidth-bigReadoutRect.value.x-4)/BIG_READOUT_BASE_W,
+      (window.innerHeight-bigReadoutRect.value.y-4)/BIG_READOUT_BASE_H
+    ))
+    bigReadoutRect.value.scale=Math.max(.55,Math.min(maxScale,requested))
   }
   const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);persistReadoutRect()}
   window.addEventListener('pointermove',move);window.addEventListener('pointerup',up)
@@ -190,7 +204,13 @@ function nav(page:string){activePage.value=page}
 onMounted(()=>{
   try{
     const saved=localStorage.getItem('laserbench.bigReadout.rect')
-    if(saved){const r=JSON.parse(saved);if(r&&Number.isFinite(r.x)&&Number.isFinite(r.y)&&Number.isFinite(r.w)&&Number.isFinite(r.h))bigReadoutRect.value={x:r.x,y:r.y,w:r.w,h:r.h}}
+    if(saved){
+      const r=JSON.parse(saved)
+      if(r&&Number.isFinite(r.x)&&Number.isFinite(r.y)){
+        const scale=Number.isFinite(r.scale)?r.scale:(Number.isFinite(r.w)?r.w/BIG_READOUT_BASE_W:1)
+        bigReadoutRect.value={x:r.x,y:r.y,scale:Math.max(.55,Math.min(3,scale))}
+      }
+    }
   }catch{}
   stopSnapshot=onSnapshot(s=>{
     snapshot.value=s
@@ -303,10 +323,16 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         </article>
       </section>
     </main>
-    <div v-if="bigReadout" class="big-readout-window" :class="{maximized:bigReadoutMaximized}" :style="bigReadoutStyle" role="dialog" aria-label="大读数">
-      <div class="big-readout-bar" @pointerdown="beginReadoutDrag" @dblclick="toggleReadoutMax"><span>MONITOR · {{bigReadout.title}}</span><div><button @pointerdown.stop @click="toggleReadoutMax" :title="bigReadoutMaximized?'还原':'最大化'">{{bigReadoutMaximized?'❐':'□'}}</button><button @pointerdown.stop @click="closeReadout" title="关闭">×</button></div></div>
-      <div class="big-readout-body"><div class="big-readout-title">{{bigReadout.title}}</div><div class="big-readout-value">{{bigReadout.value}}<small v-if="bigReadout.unit">{{bigReadout.unit}}</small></div><div class="big-readout-status"><i></i> LIVE</div></div>
-      <div v-if="!bigReadoutMaximized" class="big-readout-resize" @pointerdown="beginReadoutResize"></div>
+    <div v-if="bigReadout" class="big-readout-window" :class="{light:bigReadoutLight}" :style="bigReadoutStyle" role="dialog" aria-label="大读数" @pointerdown="beginReadoutDrag">
+      <div class="big-readout-top">
+        <div class="big-readout-identity"><i></i><span>{{bigReadout.title}}</span></div>
+        <div class="big-readout-actions">
+          <button class="readout-theme-toggle" @pointerdown.stop @click="toggleReadoutTheme" :title="bigReadoutLight?'切换为黑底白字':'切换为白底黑字'"><span></span></button>
+          <button class="readout-close" @pointerdown.stop @click="closeReadout" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="big-readout-body"><div class="big-readout-value">{{bigReadout.value}}<small v-if="bigReadout.unit">{{bigReadout.unit}}</small></div></div>
+      <div class="big-readout-resize" @pointerdown.stop="beginReadoutResize" title="拖动缩放"><i></i><i></i><i></i></div>
     </div>
   </div>
 </template>
