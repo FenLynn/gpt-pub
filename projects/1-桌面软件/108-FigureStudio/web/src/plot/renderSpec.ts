@@ -580,7 +580,7 @@ function rangeFor(
   maxValue: number | undefined,
   scale: "linear" | "log",
   reverse: boolean
-) {
+): [number, number] | undefined {
   if (autoRange !== false) return undefined;
   if (
     minValue === undefined ||
@@ -843,7 +843,10 @@ export function buildLayout(args: {
     !xIsCategorical &&
     xScale === "linear" &&
     !overrides.xMajorTickStep
-      ? matplotlibNiceTickStep(xRange, canvas.widthMm >= 150 ? 7 : 6)
+      ? matplotlibNiceTickStep(
+          xRange,
+          canvas.widthMm >= 150 ? 8 : canvas.widthMm >= 110 ? 7 : 6
+        )
       : undefined;
   const yAutoTickStep =
     yScale === "linear" && !overrides.yMajorTickStep
