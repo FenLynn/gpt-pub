@@ -982,7 +982,7 @@ export function buildLayout(args: {
       r: Math.round(
         mmToPx(
           outsideRightLegend
-            ? 31
+            ? 22
             : isDoubleY
             ? 10.2
             : isField2D || figure.templateId === "surface-3d"
