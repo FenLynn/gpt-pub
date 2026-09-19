@@ -504,6 +504,7 @@ export function buildLayout(args: {
     plotTitle?: string;
     xTitle?: string;
     yTitle?: string;
+    rightYTitle?: string;
   };
 }) {
   const { dataset, figure, preset, displayText } = args;
@@ -630,6 +631,7 @@ export function buildLayout(args: {
         })
       : [];
   const resolvedRightYTitle =
+    displayText?.rightYTitle ??
     overrides.rightYTitle ??
     (rightSeries[0]
       ? autoAxisTitle(rightSeries[0].name, rightSeries[0].unit)
