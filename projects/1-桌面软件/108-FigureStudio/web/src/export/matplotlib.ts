@@ -118,6 +118,7 @@ import json
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from matplotlib.ticker import MultipleLocator, FixedLocator, FuncFormatter, EngFormatter
 
 P = json.loads(${payloadLiteral})
@@ -140,17 +141,84 @@ else:
     x = np.array([np.nan if v is None else float(v) for v in raw_x], dtype=float)
     x_labels = None
 
-font = O.get("fontFamily") or PRESET["fontFamily"]
+preferred_font = O.get("fontFamily") or PRESET["fontFamily"]
 font_size = O.get("fontSizePt") or PRESET["fontSizePt"]
 axis_width = PRESET["axisWidthPt"]
 if O.get("axisStyle", "regular") == "bold":
     axis_width = max(1.0, axis_width * 1.45)
 
+def contains_cjk(value):
+    if isinstance(value, str):
+        return any(
+            "\\u3400" <= ch <= "\\u4dbf"
+            or "\\u4e00" <= ch <= "\\u9fff"
+            or "\\uf900" <= ch <= "\\ufaff"
+            for ch in value
+        )
+    if isinstance(value, dict):
+        return any(contains_cjk(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(contains_cjk(item) for item in value)
+    return False
+
+available_fonts = {entry.name for entry in font_manager.fontManager.ttflist}
+has_cjk_text = contains_cjk({
+    "titles": P.get("autoTitles", {}),
+    "names": names,
+    "seriesOverrides": S,
+    "plotTitle": O.get("plotTitle", ""),
+})
+
+if preferred_font == "Times New Roman":
+    latin_candidates = [
+        "Times New Roman",
+        "Times",
+        "Liberation Serif",
+        "DejaVu Serif",
+    ]
+    cjk_candidates = [
+        "Songti SC",
+        "SimSun",
+        "Noto Serif CJK SC",
+        "Source Han Serif SC",
+    ]
+    fallback_font = "DejaVu Serif"
+else:
+    latin_candidates = [
+        "Arial",
+        "Arial Unicode MS",
+        "Liberation Sans",
+        "DejaVu Sans",
+    ]
+    cjk_candidates = [
+        "Microsoft YaHei",
+        "PingFang SC",
+        "Noto Sans CJK SC",
+        "Source Han Sans SC",
+        "SimHei",
+    ]
+    fallback_font = "DejaVu Sans"
+
+font_candidates = (
+    cjk_candidates + latin_candidates
+    if has_cjk_text
+    else latin_candidates + cjk_candidates
+)
+font = next(
+    (candidate for candidate in font_candidates if candidate in available_fonts),
+    fallback_font,
+)
+font_stack = [font] + [
+    candidate
+    for candidate in font_candidates
+    if candidate != font and candidate in available_fonts
+]
+
 plt.rcParams.update({
-    "font.family": font,
+    "font.family": font_stack,
     "font.size": font_size,
     "axes.linewidth": axis_width,
-    "mathtext.fontset": "stix" if font == "Times New Roman" else "dejavusans",
+    "mathtext.fontset": "stix" if preferred_font == "Times New Roman" else "dejavusans",
     "svg.fonttype": "none",
     "pdf.fonttype": 42,
 })
