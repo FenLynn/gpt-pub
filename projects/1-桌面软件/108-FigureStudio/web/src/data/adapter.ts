@@ -1,4 +1,5 @@
 import type {
+  CellValue,
   Column,
   DataBook,
   DataSheet,
@@ -60,6 +61,17 @@ export function defaultDataRef(sheet: DataSheet): FigureDataRef {
   };
 }
 
+function numericValues(values: CellValue[]): Array<number | null> {
+  return values.map((value) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  });
+}
+
 export function sheetToDataset(
   sheet: DataSheet,
   figure?: FigureSpec
@@ -89,14 +101,18 @@ export function sheetToDataset(
   return {
     id: sheet.id,
     name: sheet.name,
-    x:
-      x ?? {
-        id: "x",
-        name: "X",
-        role: "X",
-        values: []
-      },
-    ys,
+    x: x
+      ? { ...x, values: numericValues(x.values) }
+      : {
+          id: "x",
+          name: "X",
+          role: "X",
+          values: []
+        },
+    ys: ys.map((column) => ({
+      ...column,
+      values: numericValues(column.values)
+    })),
     metadata: sheet.metadata
   };
 }

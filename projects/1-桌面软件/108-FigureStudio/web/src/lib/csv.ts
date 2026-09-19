@@ -1,4 +1,4 @@
-import type { Column, ColumnRole, DataSheet, NumericValue } from "../model";
+import type { CellValue, Column, ColumnRole, DataSheet } from "../model";
 
 function makeId(text: string, index: number): string {
   const safe = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -25,11 +25,11 @@ function cleanCell(cell: string): string {
   return cell.trim().replace(/^"(.*)"$/, "$1").trim();
 }
 
-function toNumber(cell: string): NumericValue {
+function toCell(cell: string): CellValue {
   const cleaned = cleanCell(cell);
   if (!cleaned) return null;
   const value = Number(cleaned);
-  return Number.isFinite(value) ? value : null;
+  return Number.isFinite(value) ? value : cleaned;
 }
 
 function splitNameAndUnit(label: string): { name: string; unit?: string } {
@@ -41,12 +41,24 @@ function splitNameAndUnit(label: string): { name: string; unit?: string } {
   };
 }
 
-function roleForColumn(index: number, label: string): ColumnRole {
+function roleForColumn(
+  index: number,
+  label: string,
+  values: CellValue[],
+  firstNumericAssigned: boolean
+): ColumnRole {
   const lower = label.toLowerCase();
   if (/yerr|y error|sigma|std|error/.test(lower)) return "YErr";
   if (/xerr|x error/.test(lower)) return "XErr";
-  if (/label|name|sample/.test(lower)) return "Label";
-  return index === 0 ? "X" : "Y";
+  if (/label|name|sample|id/.test(lower)) return "Label";
+
+  const nonNull = values.filter((value) => value !== null);
+  const numeric = nonNull.filter((value) => typeof value === "number").length;
+  const numericRatio = nonNull.length ? numeric / nonNull.length : 0;
+
+  if (numericRatio < 0.6) return "Label";
+  if (!firstNumericAssigned || index === 0) return "X";
+  return "Y";
 }
 
 export function parseDelimitedText(text: string, fileName: string): DataSheet {
@@ -54,8 +66,7 @@ export function parseDelimitedText(text: string, fileName: string): DataSheet {
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+    .filter((line) => line.trim().length > 0);
 
   if (lines.length < 2) {
     throw new Error("数据至少需要两行。");
@@ -78,26 +89,31 @@ export function parseDelimitedText(text: string, fileName: string): DataSheet {
 
   const body = looksLikeHeader ? rows.slice(1) : rows;
   const columns: Column[] = [];
+  let firstNumericAssigned = false;
 
   names.forEach((label, columnIndex) => {
-    const values = body.map((row) => toNumber(row[columnIndex] || ""));
-    const validCount = values.filter((value) => value !== null).length;
-    const threshold = Math.max(2, Math.ceil(body.length * 0.6));
+    const values = body.map((row) => toCell(row[columnIndex] || ""));
+    const parsed = splitNameAndUnit(label);
+    const role = roleForColumn(
+      columnIndex,
+      label,
+      values,
+      firstNumericAssigned
+    );
 
-    if (validCount >= threshold) {
-      const parsed = splitNameAndUnit(label);
-      columns.push({
-        id: makeId(parsed.name, columnIndex),
-        name: parsed.name,
-        unit: parsed.unit,
-        role: roleForColumn(columns.length, label),
-        values
-      });
-    }
+    if (role === "X") firstNumericAssigned = true;
+
+    columns.push({
+      id: makeId(parsed.name, columnIndex),
+      name: parsed.name,
+      unit: parsed.unit,
+      role,
+      values
+    });
   });
 
   if (columns.length < 2) {
-    throw new Error("没有识别到至少两列有效数值数据。");
+    throw new Error("没有识别到至少两列数据。");
   }
 
   const cleanName = fileName.replace(/\.[^.]+$/, "") || "导入数据";

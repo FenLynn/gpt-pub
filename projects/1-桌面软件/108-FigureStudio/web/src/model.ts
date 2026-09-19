@@ -1,4 +1,5 @@
 export type NumericValue = number | null;
+export type CellValue = number | string | null;
 export type ColumnRole = "X" | "Y" | "Z" | "XErr" | "YErr" | "Label" | "None";
 
 export interface Column {
@@ -6,8 +7,12 @@ export interface Column {
   name: string;
   unit?: string;
   role: ColumnRole;
-  values: NumericValue[];
+  values: CellValue[];
   [key: string]: unknown;
+}
+
+export interface PlotColumn extends Omit<Column, "values"> {
+  values: NumericValue[];
 }
 
 export interface SheetMetadata {
@@ -51,8 +56,8 @@ export interface DataBook {
 export interface Dataset {
   id: string;
   name: string;
-  x: Column;
-  ys: Column[];
+  x: PlotColumn;
+  ys: PlotColumn[];
   metadata?: SheetMetadata;
 }
 
