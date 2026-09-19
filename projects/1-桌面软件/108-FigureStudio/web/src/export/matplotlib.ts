@@ -372,7 +372,10 @@ def legend_kwargs():
         "fontsize": O.get("legendFontSizePt", font_size * 0.94),
         "ncol": max(1, int(O.get("legendColumns", 1))),
     }
-    if position == "custom":
+    if position == "outside-right":
+        kwargs["loc"] = "upper left"
+        kwargs["bbox_to_anchor"] = (1.02, 1.0)
+    elif position == "custom":
         xa = O.get("legendXAnchor", "left")
         ya = O.get("legendYAnchor", "top")
         loc_by_anchor = {
