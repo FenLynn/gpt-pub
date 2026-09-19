@@ -145,10 +145,12 @@ function Icon(props: {
         </svg>
       )}
       {props.kind === "graph" && (
-        <svg {...common} aria-hidden="true">
-          <rect className="icon-surface" x="1.5" y="1.5" width="13" height="13" rx="2.1" />
-          <path d="M3 3v9.5h10" />
-          <path d="M4.3 10.6l2.2-2 2 .7 3.1-4 1.3.8" />
+        <svg {...common} className="graph-flat-icon" aria-hidden="true">
+          <path d="M2.4 2.6v10.8h11.2" />
+          <path d="M3.8 10.8l2.25-2.15 2.15.9 3.15-4.15 2.05 1.35" />
+          <circle cx="6.05" cy="8.65" r=".55" fill="currentColor" stroke="none" />
+          <circle cx="8.2" cy="9.55" r=".55" fill="currentColor" stroke="none" />
+          <circle cx="11.35" cy="5.4" r=".55" fill="currentColor" stroke="none" />
         </svg>
       )}
       {props.linked && (

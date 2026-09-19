@@ -341,8 +341,12 @@ button:disabled {
 }
 
 .item-icon-wrap.icon-graph {
-  --icon-fill: #f6dddd;
-  color: #9b5d5d;
+  --icon-fill: transparent;
+  color: #c87474;
+}
+
+.item-icon-wrap.icon-graph .graph-flat-icon {
+  stroke-width: 1.35;
 }
 
 .explorer-row.is-active .item-icon-wrap,
