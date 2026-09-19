@@ -29,8 +29,13 @@ export function checkFigure(
   preset: PresetDefinition
 ): CheckItem[] {
   const o = figure.figureOverrides;
+  const mainSeriesIds = new Set(
+    figure.dataRef?.yColumnIds ?? figure.seriesOrder
+  );
   const visibleSeries = dataset.ys.filter(
-    (series) => figure.seriesOverrides[series.id]?.visible !== false
+    (series) =>
+      mainSeriesIds.has(series.id) &&
+      figure.seriesOverrides[series.id]?.visible !== false
   );
   const items: CheckItem[] = [];
 
@@ -60,6 +65,20 @@ export function checkFigure(
       ? "X / Y / 误差引用均使用稳定 Column ID。"
       : "Y 数据引用完整；X 自动使用行号。"
   });
+
+  const mappedMainCount = figure.dataRef?.yColumnIds.length ?? 0;
+  const singleSeriesTemplate =
+    figure.templateId === "bar" || figure.templateId === "xy-errorbar";
+  if (singleSeriesTemplate && mappedMainCount > 1) {
+    items.push({
+      id: "template-input",
+      level: "warn",
+      title: "图型输入",
+      detail:
+        (figure.templateId === "bar" ? "普通柱状图" : "误差棒图") +
+        "当前只绘制第一列主 Y；其余已映射 Y 不会显示。请减少映射或改用适合多系列的图型。"
+    });
+  }
 
   items.push({
     id: "background",
