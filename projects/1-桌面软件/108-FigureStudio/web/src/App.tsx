@@ -124,29 +124,30 @@ function Icon(props: {
   };
 
   return (
-    <span className="item-icon-wrap">
+    <span className={"item-icon-wrap icon-" + props.kind}>
       {props.kind === "folder" && (
         <svg {...common} aria-hidden="true">
-          <path d="M1.8 4.1h4l1.4 1.5h7v6.9a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z" />
+          <path className="icon-surface" d="M1.8 4.1h4l1.4 1.5h7v6.9a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z" />
           <path d="M1.8 4.1V3.3A1.1 1.1 0 0 1 2.9 2.2h3l1.2 1.2h5.1a1 1 0 0 1 1 1v1.2" />
         </svg>
       )}
       {props.kind === "book" && (
         <svg {...common} aria-hidden="true">
-          <rect x="2" y="2.1" width="12" height="11.8" rx="1.2" />
+          <rect className="icon-surface" x="2" y="2.1" width="12" height="11.8" rx="1.2" />
           <path d="M2 5.2h12M5.8 2.1v11.8M9.8 2.1v11.8M2 9.2h12" />
         </svg>
       )}
       {props.kind === "sheet" && (
         <svg {...common} aria-hidden="true">
-          <path d="M3 1.8h7l3 3v9.4H3z" />
+          <path className="icon-surface" d="M3 1.8h7l3 3v9.4H3z" />
           <path d="M10 1.8v3h3M5 7h6M5 9.5h6M5 12h4" />
         </svg>
       )}
       {props.kind === "graph" && (
         <svg {...common} aria-hidden="true">
-          <path d="M2.2 2.1v11.5h11.6" />
-          <path d="M4 11l2.4-2.2 2.1.8 3.2-4.2 2 1.2" />
+          <rect className="icon-surface" x="1.5" y="1.5" width="13" height="13" rx="2.1" />
+          <path d="M3 3v9.5h10" />
+          <path d="M4.3 10.6l2.2-2 2 .7 3.1-4 1.3.8" />
         </svg>
       )}
       {props.linked && (
