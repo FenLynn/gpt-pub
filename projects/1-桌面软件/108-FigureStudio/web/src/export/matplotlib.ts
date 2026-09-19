@@ -148,6 +148,18 @@ ax2 = None
 def finite_array(values):
     return np.array([np.nan if v is None else float(v) for v in values], dtype=float)
 
+def mpl_cmap(name):
+    mapping = {
+        "Viridis": "viridis",
+        "Cividis": "cividis",
+        "Magma": "magma",
+        "Inferno": "inferno",
+        "RdBu": "RdBu",
+        "Greys": "Greys",
+    }
+    base = mapping.get(name, str(name))
+    return base + "_r" if O.get("reverseColorScale", False) else base
+
 def visible_keys():
     return [
         key for key in order
@@ -381,9 +393,7 @@ if template == "surface-3d":
     y = np.array(y_values, dtype=float)
     sx = x if not x_is_categorical else np.arange(len(raw_x), dtype=float)
     X, Y = np.meshgrid(sx, y)
-    cmap_name = O.get("colorScale", "Viridis")
-    if O.get("reverseColorScale", False):
-        cmap_name += "_r"
+    cmap_name = mpl_cmap(O.get("colorScale", "Viridis"))
     kwargs = {}
     if O.get("zAutoRange", True) is False:
         if O.get("zMin") is not None:
@@ -413,9 +423,7 @@ elif template in ("heatmap", "contour"):
     y_values = P["metadata"].get("rowCoordinates") or list(range(len(keys)))
     y = np.array(y_values, dtype=float)
     sx = x if not x_is_categorical else np.arange(len(raw_x), dtype=float)
-    cmap_name = O.get("colorScale", "Viridis")
-    if O.get("reverseColorScale", False):
-        cmap_name += "_r"
+    cmap_name = mpl_cmap(O.get("colorScale", "Viridis"))
     field_kwargs = {"cmap": cmap_name}
     if O.get("zAutoRange", True) is False:
         if O.get("zMin") is not None:
@@ -435,11 +443,11 @@ elif template in ("heatmap", "contour"):
             line_artist = ax.contour(
                 sx, y, z,
                 levels=levels,
-                colors=None if not O.get("contourFill", True) else "#202328",
+                colors=None if not contour_fill else "#202328",
                 linewidths=0.45,
-                **({} if O.get("contourFill", True) else field_kwargs)
+                **({} if contour_fill else field_kwargs)
             )
-            if O.get("contourLabels", False):
+            if contour_labels:
                 ax.clabel(line_artist, inline=True, fontsize=font_size * 0.9)
             if artist is None:
                 artist = line_artist

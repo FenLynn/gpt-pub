@@ -2976,7 +2976,8 @@ function App() {
 
                     <div className="column-role-help">
                       <strong>列角色</strong>
-                      <p><b>X</b> 横坐标；<b>Y</b> 主数据；<b>Z</b> 二维/三维场；<b>XErr / YErr</b> 误差；<b>Label</b> 文本标签。</p>
+                      <p><b>X</b> 横坐标；<b>Y</b> 主数据；<b>Z</b> 场数据角色；<b>XErr / YErr</b> 误差；<b>Label</b> 文本标签。</p>
+                      <p>当前 Heatmap / Contour / 3D 使用“多列组成矩阵”的简单模式；XYZ 散点插值将作为独立输入模式提供。</p>
                       <p>角色只决定“新建图”时的默认映射；已有图通过稳定 Column ID 引用，不会因你改角色而突然换数据。</p>
                     </div>
                   </section>
@@ -3100,7 +3101,8 @@ function App() {
                         </div>
 
                         <div className="section-divider">
-                          Y / 数据列 · {activeFigure.dataRef.yColumnIds.length}
+                          {fieldTemplate ? "矩阵行 / Z 数据" : "Y / 数据列"} ·{" "}
+                          {activeFigure.dataRef.yColumnIds.length}
                         </div>
                         <div className="mapping-series-list">
                           {figureSheet.columns
@@ -3162,66 +3164,54 @@ function App() {
                             })}
                         </div>
 
-                        <div className="section-divider">辅助列</div>
-                        <div className="prop-row">
-                          <label>Y 误差</label>
-                          <select
-                            value={activeFigure.dataRef.yErrorColumnId ?? ""}
-                            onChange={(event) =>
-                              patchActiveFigure((figure) => ({
-                                ...figure,
-                                dataRef: {
-                                  ...(figure.dataRef ?? {
-                                    sheetId: figureSheet.id,
-                                    yColumnIds: []
-                                  }),
-                                  yErrorColumnId:
-                                    event.target.value || undefined
-                                },
-                                figureOverrides: {
-                                  ...figure.figureOverrides,
-                                  errorSeriesId:
-                                    event.target.value || undefined
-                                }
-                              }))
-                            }
-                          >
-                            <option value="">无</option>
-                            {figureSheet.columns.map((column, index) => (
-                              <option key={column.id} value={column.id}>
-                                {columnLabel(index, column.role)} · {column.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
                         {fieldTemplate && (
-                          <div className="prop-row">
-                            <label>Z</label>
-                            <select
-                              value={activeFigure.dataRef.zColumnId ?? ""}
-                              onChange={(event) =>
-                                patchActiveFigure((figure) => ({
-                                  ...figure,
-                                  dataRef: {
-                                    ...(figure.dataRef ?? {
-                                      sheetId: figureSheet.id,
-                                      yColumnIds: []
-                                    }),
-                                    zColumnId:
-                                      event.target.value || undefined
-                                  }
-                                }))
-                              }
-                            >
-                              <option value="">按 Y 列矩阵</option>
-                              {figureSheet.columns.map((column, index) => (
-                                <option key={column.id} value={column.id}>
-                                  {columnLabel(index, column.role)} · {column.name}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="field-data-note">
+                            <strong>矩阵模式</strong>
+                            <span>
+                              每个勾选列是一行 Z 数据；X 列给出横向坐标。
+                              Y 行坐标来自数据表元信息，未设置时使用 0, 1, 2…
+                            </span>
                           </div>
+                        )}
+
+                        {activeFigure.templateId === "xy-errorbar" && (
+                          <>
+                            <div className="section-divider">辅助列</div>
+                            <div className="prop-row">
+                              <label>Y 误差</label>
+                              <select
+                                value={
+                                  activeFigure.dataRef.yErrorColumnId ?? ""
+                                }
+                                onChange={(event) =>
+                                  patchActiveFigure((figure) => ({
+                                    ...figure,
+                                    dataRef: {
+                                      ...(figure.dataRef ?? {
+                                        sheetId: figureSheet.id,
+                                        yColumnIds: []
+                                      }),
+                                      yErrorColumnId:
+                                        event.target.value || undefined
+                                    },
+                                    figureOverrides: {
+                                      ...figure.figureOverrides,
+                                      errorSeriesId:
+                                        event.target.value || undefined
+                                    }
+                                  }))
+                                }
+                              >
+                                <option value="">无</option>
+                                {figureSheet.columns.map((column, index) => (
+                                  <option key={column.id} value={column.id}>
+                                    {columnLabel(index, column.role)} ·{" "}
+                                    {column.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </>
                         )}
 
                         <div className="mapping-actions">
@@ -3559,8 +3549,11 @@ function App() {
                                   activeFigure.figureOverrides.contourFill !==
                                   false
                                 }
-                                onChange={(value) =>
-                                  setFigureField("contourFill", value)
+                                onChange={(value) => {
+                                  setFigureField("contourFill", value);
+                                  if (!value) {
+                                    setFigureField("contourLines", true);
+                                  }
                                 }
                               />
                             </div>
@@ -3583,8 +3576,11 @@ function App() {
                                   activeFigure.figureOverrides.contourLabels ??
                                   false
                                 }
-                                onChange={(value) =>
-                                  setFigureField("contourLabels", value)
+                                onChange={(value) => {
+                                  setFigureField("contourLabels", value);
+                                  if (value) {
+                                    setFigureField("contourLines", true);
+                                  }
                                 }
                               />
                             </div>

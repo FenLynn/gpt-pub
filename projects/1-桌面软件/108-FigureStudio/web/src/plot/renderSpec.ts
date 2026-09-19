@@ -210,6 +210,12 @@ export function buildTraces(args: {
     };
 
     if (template === "contour") {
+      const contourFill = figure.figureOverrides.contourFill !== false;
+      const contourLabels = figure.figureOverrides.contourLabels ?? false;
+      const contourLines =
+        figure.figureOverrides.contourLines !== false ||
+        contourLabels ||
+        !contourFill;
       return [
         {
           type: "contour",
@@ -228,9 +234,8 @@ export function buildTraces(args: {
             Math.min(64, Math.round(figure.figureOverrides.contourLevels ?? 12))
           ),
           contours: {
-            coloring:
-              figure.figureOverrides.contourFill === false ? "lines" : "fill",
-            showlabels: figure.figureOverrides.contourLabels ?? false,
+            coloring: contourFill ? "fill" : "lines",
+            showlabels: contourLabels,
             labelfont: {
               family: plotFontFamily(
                 figure.figureOverrides.fontFamily ?? preset.fontFamily
@@ -244,10 +249,7 @@ export function buildTraces(args: {
             }
           },
           line: {
-            width:
-              figure.figureOverrides.contourLines === false
-                ? 0
-                : ptToPx(0.45),
+            width: contourLines ? ptToPx(0.45) : 0,
             color: "rgba(32,35,40,0.72)"
           },
           colorbar,
