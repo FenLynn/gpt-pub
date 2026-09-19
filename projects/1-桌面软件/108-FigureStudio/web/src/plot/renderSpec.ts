@@ -1147,7 +1147,8 @@ export function buildLayout(args: {
       camera: {
         eye: { x: 1.45, y: 1.45, z: 1.12 }
       },
-      aspectmode: "auto"
+      aspectmode: "manual",
+      aspectratio: { x: 1, y: 1, z: 0.75 }
     };
     return layout;
   }
