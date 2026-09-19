@@ -769,7 +769,7 @@ else:
                 )
         else:
             line_default = template not in ("xy-scatter",)
-            marker_default = template in ("xy-scatter", "xy-line-marker", "xy-errorbar", "double-y")
+            marker_default = template in ("xy-scatter", "xy-line-marker", "xy-errorbar")
             line_visible = style.get("lineVisible", line_default)
             marker_visible = style.get("markerVisible", marker_default)
             linestyle = mpl_linestyle(style.get("lineStyle", "solid")) if line_visible else "None"
