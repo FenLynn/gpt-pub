@@ -732,7 +732,8 @@ function App() {
       return {
         ...incomingColumn,
         id: matched.id,
-        role: matched.role
+        role: matched.role,
+        comment: matched.comment ?? incomingColumn.comment
       };
     });
 
@@ -740,6 +741,7 @@ function App() {
       ...incoming,
       id: existing.id,
       name: existing.name,
+      comment: existing.comment ?? incoming.comment,
       metadata: incoming.metadata ?? existing.metadata,
       columns
     };
