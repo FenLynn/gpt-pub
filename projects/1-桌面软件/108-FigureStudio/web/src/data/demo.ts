@@ -274,10 +274,9 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     presetId: "scientific",
     figureOverrides: {
       aspectMode: "4:3",
-      tickDirection: "inside",
+      tickDirection: "outside",
       minorTicks: false,
       gridVisible: false,
-      legendVisible: true,
       legendPosition: "top-right",
       legendOrientation: "vertical",
       legendFrame: false
@@ -343,12 +342,12 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     {
       "output-power": {
         yAxis: "left",
-        color: "#0072B2",
+        color: "#1F77B4",
         markerVisible: true
       },
       efficiency: {
         yAxis: "right",
-        color: "#D55E00",
+        color: "#FF7F0E",
         markerVisible: true
       }
     }
@@ -410,7 +409,8 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
       xTitle: "X (mm)",
       yTitle: "Y (mm)",
       legendVisible: false,
-      colorScale: "Viridis",
+      colorScale: "RdBu",
+      reverseColorScale: true,
       colorbarTitle: "归一化强度",
       zTitle: "归一化强度 (a.u.)"
     }
