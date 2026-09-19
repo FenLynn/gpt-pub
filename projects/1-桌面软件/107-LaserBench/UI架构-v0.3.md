@@ -66,7 +66,7 @@ beam.setAttenuation
 
 ## 视觉方向
 
-v0.4.23 继续采用 Graph-first Dashboard；已定型的四宫格外部位置保持不动，只修 WebView2 GIF 兼容、结果条背景层级、端点刻度和 Power 双手柄历史窗：
+v0.4.24 继续采用 Graph-first Dashboard；四宫格外部位置不动，顶栏采集动画由外部 GIF 改为内联 SVG/SMIL，并在 WebView2 中直接验证运行时间轴。
 
 - Dashboard 非绘图区统一冷深蓝灰，只有真实 Plot / 图像绘图区白底。
 - Dashboard 图占绝对主体；模块标题栏与壳体同底色，适度增加高度和刻度字号以保证可读性。Dashboard 不渲染 X/Y 轴标题文字，只保留必要刻度；刻度 gutter 属于深色壳体，白色只填实际数据矩形。
@@ -92,3 +92,8 @@ Dashboard 的 X/Y 轴标题默认隐藏。鼠标在轴中央附近停留约 300 
 ### v0.4.23 浏览器资源与 Power 范围窗
 
 四个顶栏 GIF 不再只做文件级帧数检查；Vue 会主动 preload，WebUiHost 等待 WebView2 报告全部解码完成，失败则不进入 `webui-ready`。Power overview 固定左右两个范围手柄，默认覆盖完整窗口；主图只显示两手柄之间的区间。
+
+
+### v0.4.24 顶栏采集向量动画
+
+顶栏 4 个采集选择器使用内联 SVG/SMIL，不再依赖外部 GIF。模块标题图标固定静态。WebUiHost 在 `webui-ready` 前检查 4 个向量图标结构，并验证选中图标的 SVG timeline 在 320 ms 内实际推进；这项检查属于真实 Windows GUI smoke 的一部分。

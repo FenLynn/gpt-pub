@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.23 Browser GIF / Dual Range / Tick Safety**，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.24 Vector Motion / WebView2 Runtime Gate**，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -34,7 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - 当前实际设备提供者仍是 Simulator；真实 Ophir、Yokogawa、BeamSquared、Tektronix Driver 尚未正式接入。
-- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.23 继续锁定 Dashboard：标准 GIF89a + WebView2 实际解码门禁；模块标题图标固定；相机/REC 同款 hover 浮起；顶部 metric 背景场；Y 轴端点刻度防裁切；Power overview 左右双手柄；旧 WinForms 的模块拖出浮窗/拖回嵌入仍未恢复，不得描述为已完成。
+- Web UI 已有 Dashboard、模块独立页、Data 和 Settings。v0.4.24 继续锁定 Dashboard：顶栏四个采集选择器使用内联 SVG/SMIL 动画，并由 WebView2 实际时间轴门禁验证；模块标题图标静态；v0.4.23 的双手柄、刻度安全、结果背景、相机/REC hover 均保留。
 
 ## 当前产品不变量
 

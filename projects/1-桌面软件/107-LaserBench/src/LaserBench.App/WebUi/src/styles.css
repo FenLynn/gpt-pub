@@ -2235,3 +2235,37 @@
   left:var(--range-left,0%)!important;
   width:var(--range-width,100%)!important
 }
+
+
+/* v0.4.24 — inline vector acquisition motion; no external animated-image dependency */
+.topbar .module-toggle .acq-gif{display:none!important}
+.topbar .module-toggle .acq-vector{
+  display:block!important;
+  width:31px!important;
+  height:31px!important;
+  overflow:visible!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:1.8!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+  pointer-events:none!important
+}
+.topbar .module-toggle .acq-vector rect{
+  fill:currentColor!important;
+  stroke:none!important
+}
+.topbar .module-toggle.active .acq-vector{
+  filter:drop-shadow(0 0 2px rgba(46,212,119,.30))!important
+}
+.topbar .module-toggle .beam-pulse-ring{
+  fill:none!important;
+  stroke:currentColor!important
+}
+
+/* Keep module-title icons static and clean. */
+.dashboard-grid:not(.focus-mode) .panel-mark,
+.dashboard-grid:not(.focus-mode) .panel-mark svg{
+  animation:none!important;
+  filter:none!important
+}

@@ -157,23 +157,39 @@ internal sealed class WebUiHost : IDisposable
                 if (!args.IsSuccess) return;
                 try
                 {
-                    var assetsReady = false;
+                    var vectorsMounted = false;
                     for (var attempt = 0; attempt < 40; attempt++)
                     {
-                        var state = await core.ExecuteScriptAsync("document.documentElement.dataset.acqAssets || ''");
-                        if (state.Contains("failed", StringComparison.OrdinalIgnoreCase))
-                            throw new InvalidOperationException("WebView2 failed to decode one or more acquisition GIF assets.");
-                        if (state.Contains("ready", StringComparison.OrdinalIgnoreCase))
+                        var state = await core.ExecuteScriptAsync("document.documentElement.dataset.acqVectors || ''");
+                        if (state.Contains("mounted", StringComparison.OrdinalIgnoreCase))
                         {
-                            assetsReady = true;
+                            vectorsMounted = true;
                             break;
                         }
                         await Task.Delay(100);
                     }
-                    if (!assetsReady)
-                        throw new TimeoutException("WebView2 acquisition GIF decode check did not complete.");
+                    if (!vectorsMounted)
+                        throw new TimeoutException("WebView2 acquisition vector icons did not mount.");
 
-                    StartupDiagnostics.Stage("webui-acq-assets", "decoded");
+                    var structure = await core.ExecuteScriptAsync(
+                        "(()=>{const all=document.querySelectorAll('.topbar .module-toggle svg.acq-vector');" +
+                        "const active=document.querySelectorAll('.topbar .module-toggle.active svg.acq-vector');" +
+                        "const anim=document.querySelectorAll('.topbar .module-toggle.active svg.acq-vector animate,.topbar .module-toggle.active svg.acq-vector animateTransform');" +
+                        "return all.length===4&&(active.length===0||anim.length>0)})()");
+                    if (!string.Equals(structure, "true", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("WebView2 acquisition vector structure is incomplete.");
+
+                    await core.ExecuteScriptAsync(
+                        "(()=>{const e=document.querySelector('.topbar .module-toggle.active svg.acq-vector')||document.querySelector('.topbar .module-toggle svg.acq-vector');" +
+                        "window.__lbAcqVectorT=e&&typeof e.getCurrentTime==='function'?e.getCurrentTime():-1;return window.__lbAcqVectorT})()");
+                    await Task.Delay(320);
+                    var moving = await core.ExecuteScriptAsync(
+                        "(()=>{const e=document.querySelector('.topbar .module-toggle.active svg.acq-vector')||document.querySelector('.topbar .module-toggle svg.acq-vector');" +
+                        "return !!e&&typeof e.getCurrentTime==='function'&&e.getCurrentTime()>(window.__lbAcqVectorT??-1)+0.15})()");
+                    if (!string.Equals(moving, "true", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("WebView2 acquisition vector timeline is not advancing.");
+
+                    StartupDiagnostics.Stage("webui-acq-vectors", "running");
                     _ready = true;
                     _loading.Visible = false;
                     _webView.Visible = true;
@@ -185,7 +201,7 @@ internal sealed class WebUiHost : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    StartupDiagnostics.Crash("webui acquisition asset verification", ex);
+                    StartupDiagnostics.Crash("webui acquisition vector verification", ex);
                     _loading.Text = "LaserBench 新界面资源校验失败\r\n\r\n" + ex.Message;
                     _loading.ForeColor = Color.FromArgb(151, 67, 62);
                     Failed?.Invoke(ex);
@@ -347,7 +363,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.23",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.24",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,

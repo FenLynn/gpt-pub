@@ -2,10 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PlotCanvas from './components/PlotCanvas.vue'
 import BeamProfileCanvas from './components/BeamProfileCanvas.vue'
-import powerAcqGif from './assets/acq-power.gif'
-import spectrumAcqGif from './assets/acq-spectrum.gif'
-import beamAcqGif from './assets/acq-beam.gif'
-import scopeAcqGif from './assets/acq-scope.gif'
 import { createDemoSnapshot } from './demo'
 import { hasNativeBridge, onSnapshot, request } from './bridge'
 import type { LaserSnapshot, PlotSeries } from './types'
@@ -29,7 +25,6 @@ let beamAttSendBusy=false
 let beamZHoldUntil=0
 let beamAttHoldUntil=0
 const cameraFlash = ref(false)
-const acqGifFailed = ref<Record<string,boolean>>({})
 const recordElapsed = ref(0)
 const saveNotice = ref('')
 type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
@@ -266,7 +261,6 @@ async function setLabel() {
 async function toggleSource(module:string) {
   const next=!snapshot.value.captureSelection[module]
   snapshot.value.captureSelection[module]=next
-  if(next)acqGifFailed.value[module]=false
   await request('app.setCaptureSelection',{module,selected:next})
 }
 async function toggleCapture(){ await request('app.capture') }
@@ -342,21 +336,8 @@ async function openFolder(kind:'exp'|'pic'|'video'|'root'){ await request('app.o
 function formatBytes(n:number){ if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB' }
 function nav(page:string){activePage.value=page}
 
-async function verifyAcquisitionAssets(){
-  const entries:[string,string][]=[
-    ['power',powerAcqGif],['spectrum',spectrumAcqGif],['beam',beamAcqGif],['scope',scopeAcqGif]
-  ]
-  const results=await Promise.all(entries.map(([name,src])=>new Promise<boolean>(resolve=>{
-    const img=new Image()
-    img.onload=()=>resolve(img.naturalWidth>=72&&img.naturalHeight>=72)
-    img.onerror=()=>{acqGifFailed.value[name]=true;resolve(false)}
-    img.src=src
-  })))
-  document.documentElement.dataset.acqAssets=results.every(Boolean)?'ready':'failed'
-}
-
 onMounted(()=>{
-  void verifyAcquisitionAssets()
+  document.documentElement.dataset.acqVectors='mounted'
   try{
     const saved=localStorage.getItem('laserbench.bigReadouts.v3')
     const parsed=saved?JSON.parse(saved):[]
@@ -405,10 +386,32 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <button class="icon-btn check-btn" @click="setLabel" title="确认标签"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></button>
       <div class="vsep"></div>
 
-      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power,breathing:moduleActive('power')}" @click="toggleSource('power')" title="本次采集包含功率"><img v-if="snapshot.captureSelection.power&&!acqGifFailed.power" class="acq-gif" :src="powerAcqGif" alt="" @error="acqGifFailed.power=true"/><svg v-else viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></button>
-      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}" @click="toggleSource('spectrum')" title="本次采集包含光谱"><img v-if="snapshot.captureSelection.spectrum&&!acqGifFailed.spectrum" class="acq-gif" :src="spectrumAcqGif" alt="" @error="acqGifFailed.spectrum=true"/><svg v-else viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></button>
-      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam,breathing:moduleActive('beam')}" @click="toggleSource('beam')" title="本次采集包含光束"><img v-if="snapshot.captureSelection.beam&&!acqGifFailed.beam" class="acq-gif" :src="beamAcqGif" alt="" @error="acqGifFailed.beam=true"/><svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
-      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope,breathing:moduleActive('scope')}" @click="toggleSource('scope')" title="本次采集包含示波器"><img v-if="snapshot.captureSelection.scope&&!acqGifFailed.scope" class="acq-gif" :src="scopeAcqGif" alt="" @error="acqGifFailed.scope=true"/><svg v-else viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></button>
+      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power}" @click="toggleSource('power')" title="本次采集包含功率">
+        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2.5" y="10" width="4" height="10" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="10;5;11;7;10" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="10;15;9;13;10" dur="4.8s" repeatCount="indefinite"/></rect>
+          <rect x="7.5" y="6" width="4" height="14" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="6;11;4;9;6" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="14;9;16;11;14" dur="4.8s" repeatCount="indefinite"/></rect>
+          <rect x="12.5" y="12" width="4" height="8" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="12;7;11;5;12" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="8;13;9;15;8" dur="4.8s" repeatCount="indefinite"/></rect>
+          <rect x="17.5" y="8" width="4" height="12" rx="1.4"><animate v-if="snapshot.captureSelection.power" attributeName="y" values="8;12;6;10;8" dur="4.8s" repeatCount="indefinite"/><animate v-if="snapshot.captureSelection.power" attributeName="height" values="12;8;14;10;12" dur="4.8s" repeatCount="indefinite"/></rect>
+        </svg>
+      </button>
+      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum}" @click="toggleSource('spectrum')" title="本次采集包含光谱">
+        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 18c3 0 4-12 8-12s4 12 7 12c2 0 2-4 5-4"><animateTransform v-if="snapshot.captureSelection.spectrum" attributeName="transform" type="translate" values="-1.1 0;1.1 0;-1.1 0" dur="4.8s" repeatCount="indefinite"/></path>
+        </svg>
+      </button>
+      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam}" @click="toggleSource('beam')" title="本次采集包含光束">
+        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle v-if="!snapshot.captureSelection.beam" cx="12" cy="12" r="7"/>
+          <circle v-if="snapshot.captureSelection.beam" cx="12" cy="12" r="4" class="beam-pulse-ring"><animate attributeName="r" values="4;9;4" dur="4.8s" repeatCount="indefinite"/><animate attributeName="opacity" values=".9;.18;.9" dur="4.8s" repeatCount="indefinite"/></circle>
+        </svg>
+      </button>
+      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope}" @click="toggleSource('scope')" title="本次采集包含示波器">
+        <svg class="acq-vector" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M1.5 12h2.5c1.6 0 1.6-7 3.2-7s1.6 14 3.2 14S12 5 13.6 5s1.6 14 3.2 14 1.6-7 3.2-7h2.5"><animateTransform v-if="snapshot.captureSelection.scope" attributeName="transform" type="translate" values="-1 0;1 0;-1 0" dur="4.8s" repeatCount="indefinite"/></path>
+        </svg>
+      </button>
 
       <span v-if="snapshot.captureState!=='idle'" class="capture-state" :class="snapshot.captureState">{{captureStateText}}</span>
       <div class="top-spacer"></div>
