@@ -240,6 +240,111 @@ export function createWaterfallSheet(): DataSheet {
   };
 }
 
+export function createScatterErrorbarSheet(): DataSheet {
+  const temperature: number[] = [];
+  const sampleA: number[] = [];
+  const sampleB: number[] = [];
+  const uncertainty: number[] = [];
+
+  for (let i = 0; i < 15; i += 1) {
+    const x = 20 + i * 5;
+    const a =
+      0.42 +
+      0.0082 * (x - 20) +
+      0.035 * Math.sin(i * 0.72);
+    const b =
+      0.5 +
+      0.0066 * (x - 20) +
+      0.045 * Math.cos(i * 0.58 + 0.35);
+    const e = 0.025 + 0.008 * (0.5 + 0.5 * Math.sin(i * 0.83));
+
+    temperature.push(x);
+    sampleA.push(Number(a.toFixed(4)));
+    sampleB.push(Number(b.toFixed(4)));
+    uncertainty.push(Number(e.toFixed(4)));
+  }
+
+  return {
+    id: id("sheet-scatter-errorbar"),
+    name: "散点与误差棒",
+    source: { kind: "embedded" },
+    columns: [
+      {
+        id: "temperature",
+        name: "温度",
+        unit: "°C",
+        role: "X",
+        values: temperature
+      },
+      {
+        id: "sample-a",
+        name: "样品 A",
+        unit: "a.u.",
+        role: "Y",
+        values: sampleA
+      },
+      {
+        id: "sample-b",
+        name: "样品 B",
+        unit: "a.u.",
+        role: "Y",
+        values: sampleB
+      },
+      {
+        id: "response-error",
+        name: "测量不确定度",
+        unit: "a.u.",
+        role: "YErr",
+        values: uncertainty
+      }
+    ]
+  };
+}
+
+export function createBarSheet(): DataSheet {
+  const categories = ["条件 A", "条件 B", "条件 C", "条件 D", "条件 E"];
+  const fundamental = [62, 58, 66, 71, 68];
+  const higherOrder = [24, 29, 20, 18, 21];
+  const loss = categories.map(
+    (_label, index) => 100 - fundamental[index] - higherOrder[index]
+  );
+
+  return {
+    id: id("sheet-bar"),
+    name: "柱状图",
+    source: { kind: "embedded" },
+    columns: [
+      {
+        id: "condition",
+        name: "实验条件",
+        role: "X",
+        values: categories
+      },
+      {
+        id: "fundamental",
+        name: "基模",
+        unit: "%",
+        role: "Y",
+        values: fundamental
+      },
+      {
+        id: "higher-order",
+        name: "高阶模",
+        unit: "%",
+        role: "Y",
+        values: higherOrder
+      },
+      {
+        id: "loss",
+        name: "其他损耗",
+        unit: "%",
+        role: "Y",
+        values: loss
+      }
+    ]
+  };
+}
+
 function makeFigure(
   sheet: DataSheet,
   name: string,
@@ -285,13 +390,16 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
 
   const folders = [
     { id: "folder-experiment", name: "实验数据" },
-    { id: "folder-paper", name: "论文" }
+    { id: "folder-paper", name: "论文" },
+    { id: "folder-gallery", name: "常用图验收" }
   ];
 
   const spectrumSheet = createSpectrumSheet();
   const fieldSheet = createFieldSheet();
   const doubleYSheet = createDualYAxisSheet();
   const waterfallSheet = createWaterfallSheet();
+  const scatterErrorbarSheet = createScatterErrorbarSheet();
+  const barSheet = createBarSheet();
 
   const spectrumBook: DataBook = {
     id: id("book-spectrum"),
@@ -312,6 +420,13 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     name: "常用图型示例",
     folderId: "folder-experiment",
     sheets: [doubleYSheet, waterfallSheet]
+  };
+
+  const galleryBook: DataBook = {
+    id: id("book-gallery"),
+    name: "Matplotlib 验收数据",
+    folderId: "folder-gallery",
+    sheets: [scatterErrorbarSheet, barSheet]
   };
 
   const spectrumFigure = makeFigure(
@@ -416,20 +531,121 @@ export function createInitialProject(userDefaults?: UserDefaults): ProjectState 
     }
   );
 
+  const scatterFigure = makeFigure(
+    scatterErrorbarSheet,
+    "QA 1 · 散点图",
+    "xy-scatter",
+    defaults,
+    "folder-gallery",
+    {
+      xTitle: "温度 (°C)",
+      yTitle: "归一化响应 (a.u.)"
+    },
+    {
+      "sample-a": {
+        color: "#1F77B4",
+        markerSymbol: "circle",
+        markerSizePt: 4.8
+      },
+      "sample-b": {
+        color: "#FF7F0E",
+        markerSymbol: "square",
+        markerSizePt: 4.8
+      }
+    }
+  );
+
+  const errorbarFigure = makeFigure(
+    scatterErrorbarSheet,
+    "QA 2 · 误差棒",
+    "xy-errorbar",
+    defaults,
+    "folder-gallery",
+    {
+      xTitle: "温度 (°C)",
+      yTitle: "样品 A 响应 (a.u.)",
+      legendVisible: false
+    },
+    {
+      "sample-a": {
+        color: "#1F77B4",
+        lineVisible: false,
+        markerVisible: true,
+        markerSizePt: 4.8
+      }
+    }
+  );
+
+  const barFigure = makeFigure(
+    barSheet,
+    "QA 3 · 柱状图",
+    "bar",
+    defaults,
+    "folder-gallery",
+    {
+      yTitle: "占比 (%)"
+    },
+    {
+      fundamental: {
+        color: "#1F77B4"
+      }
+    }
+  );
+
+  const groupedBarFigure = makeFigure(
+    barSheet,
+    "QA 4 · 分组柱状图",
+    "grouped-bar",
+    defaults,
+    "folder-gallery",
+    {
+      yTitle: "占比 (%)",
+      barGap: 0.18,
+      barGroupGap: 0.06
+    },
+    {
+      fundamental: { color: "#1F77B4" },
+      "higher-order": { color: "#FF7F0E" },
+      loss: { color: "#2CA02C" }
+    }
+  );
+
+  const stackedBarFigure = makeFigure(
+    barSheet,
+    "QA 5 · 堆叠柱状图",
+    "stacked-bar",
+    defaults,
+    "folder-gallery",
+    {
+      yTitle: "占比 (%)",
+      barGap: 0.22
+    },
+    {
+      fundamental: { color: "#1F77B4" },
+      "higher-order": { color: "#FF7F0E" },
+      loss: { color: "#2CA02C" }
+    }
+  );
+
   return {
     format: "sfig",
     schemaVersion: "0.5",
     projectId: id("project"),
     name: "未命名项目",
     folders,
-    dataBooks: [spectrumBook, fieldBook, commonPlotsBook],
+    dataBooks: [spectrumBook, fieldBook, commonPlotsBook, galleryBook],
     figures: [
       spectrumFigure,
       doubleYFigure,
       waterfallFigure,
       heatmapFigure,
       contourFigure,
-      surfaceFigure
+      surfaceFigure,
+      scatterFigure,
+      errorbarFigure,
+      barFigure,
+      groupedBarFigure,
+      stackedBarFigure
     ],
     activeFigureId: spectrumFigure.id,
     defaults: {
