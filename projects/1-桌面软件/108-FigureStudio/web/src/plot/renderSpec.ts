@@ -167,7 +167,7 @@ function baseXYTrace(
       symbol: override.markerSymbol ?? "circle",
       line: {
         color,
-        width: ptToPx(0.35)
+        width: ptToPx(modeDefault === "markers" ? 0 : 0.55)
       }
     },
     hovertemplate:
@@ -213,12 +213,36 @@ export function buildTraces(args: {
     const yValues = resolveFieldRowCoordinates(dataset, series);
     const zValues = series.map((column) => column.values);
     const zAuto = figure.figureOverrides.zAutoRange !== false;
+    const fieldFontFamily = plotFontFamily(
+      figure.figureOverrides.fontFamily ?? preset.fontFamily
+    );
+    const fieldFontSizePt =
+      figure.figureOverrides.fontSizePt ?? preset.fontSizePt;
     const colorbar = {
-      thickness: 12,
+      thickness: 11,
       outlinewidth: 0,
-      len: 0.86,
+      len: 0.88,
+      tickfont: {
+        family: fieldFontFamily,
+        size: ptToPx(
+          figure.figureOverrides.tickLabelSizePt ?? fieldFontSizePt * 0.96
+        ),
+        color: figure.figureOverrides.tickLabelColor ?? "#17191c"
+      },
       title: figure.figureOverrides.colorbarTitle
-        ? { text: normalizePlotlyMathText(figure.figureOverrides.colorbarTitle) }
+        ? {
+            text: normalizePlotlyMathText(
+              figure.figureOverrides.colorbarTitle
+            ),
+            font: {
+              family: fieldFontFamily,
+              size: ptToPx(
+                figure.figureOverrides.axisTitleSizePt ??
+                  fieldFontSizePt * 1.08
+              ),
+              color: figure.figureOverrides.axisTitleColor ?? "#17191c"
+            }
+          }
         : undefined
     };
 
@@ -286,6 +310,8 @@ export function buildTraces(args: {
         zmin: zAuto ? undefined : figure.figureOverrides.zMin,
         zmax: zAuto ? undefined : figure.figureOverrides.zMax,
         colorbar,
+        zsmooth: false,
+        hoverongaps: false,
         hovertemplate:
           (xIsNumeric ? "X=%{x:.4g}" : "X=%{x}") +
           "<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
@@ -318,13 +344,47 @@ export function buildTraces(args: {
             ? figure.figureOverrides.zMax
             : undefined,
         colorbar: {
-          thickness: 12,
+          thickness: 11,
           outlinewidth: 0,
-          len: 0.76,
+          len: 0.72,
+          tickfont: {
+            family: plotFontFamily(
+              figure.figureOverrides.fontFamily ?? preset.fontFamily
+            ),
+            size: ptToPx(
+              (figure.figureOverrides.tickLabelSizePt ??
+                figure.figureOverrides.fontSizePt ??
+                preset.fontSizePt) * 0.96
+            ),
+            color: figure.figureOverrides.tickLabelColor ?? "#17191c"
+          },
           title: figure.figureOverrides.colorbarTitle
-            ? { text: normalizePlotlyMathText(figure.figureOverrides.colorbarTitle) }
+            ? {
+                text: normalizePlotlyMathText(
+                  figure.figureOverrides.colorbarTitle
+                ),
+                font: {
+                  family: plotFontFamily(
+                    figure.figureOverrides.fontFamily ?? preset.fontFamily
+                  ),
+                  size: ptToPx(
+                    figure.figureOverrides.axisTitleSizePt ??
+                      (figure.figureOverrides.fontSizePt ??
+                        preset.fontSizePt) * 1.08
+                  ),
+                  color: figure.figureOverrides.axisTitleColor ?? "#17191c"
+                }
+              }
             : undefined
         },
+        lighting: {
+          ambient: 0.82,
+          diffuse: 0.72,
+          specular: 0.08,
+          roughness: 0.92,
+          fresnel: 0.03
+        },
+        lightposition: { x: 100, y: 160, z: 220 },
         hovertemplate: "X=%{x:.4g}<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
       }
     ];
@@ -399,8 +459,9 @@ export function buildTraces(args: {
         type: "data",
         array: errorSeries.values,
         visible: true,
-        thickness: 0.8,
-        width: 2
+        color: trace.line?.color,
+        thickness: ptToPx(0.8),
+        width: 0
       };
     }
     return [trace];
@@ -548,8 +609,8 @@ export function buildLayout(args: {
       ? Math.max(1, preset.axisWidthPt * 1.45)
       : preset.axisWidthPt;
   const axisWidthPx = ptToPx(axisWidthPt);
-  const majorTickLengthPt = axisStyle === "bold" ? 5 : 3.6;
-  const minorTickLengthPt = axisStyle === "bold" ? 3.1 : 2.2;
+  const majorTickLengthPt = axisStyle === "bold" ? 5 : 3.5;
+  const minorTickLengthPt = axisStyle === "bold" ? 3 : 2;
   const tickLabelSizePx = ptToPx(
     overrides.tickLabelSizePt ?? fontSizePt * 0.96
   );
@@ -560,7 +621,7 @@ export function buildLayout(args: {
     overrides.plotTitleSizePt ?? fontSizePt * 1.18
   );
   const background = overrides.background ?? "#ffffff";
-  const tickDirection = overrides.tickDirection ?? "inside";
+  const tickDirection = overrides.tickDirection ?? "outside";
   const gridVisible = overrides.gridVisible ?? preset.showGrid;
   const legendPositionMode = overrides.legendPosition ?? "top-right";
   const presetLegendPosition = legendAnchor(legendPositionMode);
@@ -662,6 +723,23 @@ export function buildLayout(args: {
   const rightSeries = doubleYAxisSeries.filter(
     (series) => doubleYAxisSide(series) === "right"
   );
+  const seriesColor = (series: PlotColumn | undefined) => {
+    if (!series) return "#17191c";
+    const sourceIndex = Math.max(
+      0,
+      dataset.ys.findIndex((item) => item.id === series.id)
+    );
+    return (
+      figure.seriesOverrides[series.id]?.color ??
+      preset.palette[sourceIndex % preset.palette.length]
+    );
+  };
+  const leftYColor = seriesColor(leftSeries[0]);
+  const rightYColor = seriesColor(rightSeries[0]);
+  const effectiveLegendVisible =
+    !isField2D &&
+    figure.templateId !== "surface-3d" &&
+    (overrides.legendVisible ?? visibleSeries(dataset, figure).length > 1);
 
   const emptyFigure = dataset.id === "__empty__";
   const resolvedXTitle = normalizePlotlyMathText(
@@ -739,7 +817,7 @@ export function buildLayout(args: {
           }
         }
       : undefined,
-    showlegend: overrides.legendVisible ?? true,
+    showlegend: effectiveLegendVisible,
     hovermode: "closest",
     dragmode: figure.templateId === "surface-3d" ? "orbit" : "zoom",
     uirevision: figure.id,
@@ -799,9 +877,22 @@ export function buildLayout(args: {
             color: overrides.axisTitleColor ?? "#17191c"
           }
         },
-        gridcolor: "#e3e6e9",
+        showbackground: true,
+        backgroundcolor: "#f3f3f3",
+        showline: true,
+        linecolor: "#555b61",
+        linewidth: ptToPx(0.65),
+        gridcolor: "#d8dadd",
+        gridwidth: 1,
         zeroline: false,
-        showbackground: false
+        ticks: "outside",
+        ticklen: ptToPx(3.5),
+        tickcolor: "#4a4f54",
+        tickfont: {
+          family: fontFamily,
+          size: tickLabelSizePx,
+          color: overrides.tickLabelColor ?? "#17191c"
+        }
       },
       yaxis: {
         title: {
@@ -812,9 +903,22 @@ export function buildLayout(args: {
             color: overrides.axisTitleColor ?? "#17191c"
           }
         },
-        gridcolor: "#e3e6e9",
+        showbackground: true,
+        backgroundcolor: "#f3f3f3",
+        showline: true,
+        linecolor: "#555b61",
+        linewidth: ptToPx(0.65),
+        gridcolor: "#d8dadd",
+        gridwidth: 1,
         zeroline: false,
-        showbackground: false
+        ticks: "outside",
+        ticklen: ptToPx(3.5),
+        tickcolor: "#4a4f54",
+        tickfont: {
+          family: fontFamily,
+          size: tickLabelSizePx,
+          color: overrides.tickLabelColor ?? "#17191c"
+        }
       },
       zaxis: {
         title: {
@@ -825,9 +929,22 @@ export function buildLayout(args: {
             color: overrides.axisTitleColor ?? "#17191c"
           }
         },
-        gridcolor: "#e3e6e9",
+        showbackground: true,
+        backgroundcolor: "#f3f3f3",
+        showline: true,
+        linecolor: "#555b61",
+        linewidth: ptToPx(0.65),
+        gridcolor: "#d8dadd",
+        gridwidth: 1,
         zeroline: false,
-        showbackground: false
+        ticks: "outside",
+        ticklen: ptToPx(3.5),
+        tickcolor: "#4a4f54",
+        tickfont: {
+          family: fontFamily,
+          size: tickLabelSizePx,
+          color: overrides.tickLabelColor ?? "#17191c"
+        }
       },
       camera: {
         eye: { x: 1.45, y: 1.45, z: 1.12 }
@@ -892,14 +1009,22 @@ export function buildLayout(args: {
       ? "reversed"
       : true,
     range: yRange,
+    tickcolor: isDoubleY ? leftYColor : commonAxis.tickcolor,
+    tickfont: {
+      ...commonAxis.tickfont,
+      color:
+        overrides.tickLabelColor ??
+        (isDoubleY ? leftYColor : "#17191c")
+    },
     title: {
-      text:
-        resolvedYTitle,
+      text: resolvedYTitle,
       standoff: Math.round(mmToPx(0.7)),
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
-        color: overrides.axisTitleColor ?? "#17191c"
+        color:
+          overrides.axisTitleColor ??
+          (isDoubleY ? leftYColor : "#17191c")
       }
     },
     dtick:
@@ -937,13 +1062,18 @@ export function buildLayout(args: {
         ? "reversed"
         : true,
       range: rightYRange,
+      tickcolor: rightYColor,
+      tickfont: {
+        ...commonAxis.tickfont,
+        color: overrides.tickLabelColor ?? rightYColor
+      },
       title: {
         text: resolvedRightYTitle,
         standoff: Math.round(mmToPx(0.7)),
         font: {
           family: fontFamily,
           size: axisTitleSizePx,
-          color: overrides.axisTitleColor ?? "#17191c"
+          color: overrides.axisTitleColor ?? rightYColor
         }
       },
       showgrid: false,
