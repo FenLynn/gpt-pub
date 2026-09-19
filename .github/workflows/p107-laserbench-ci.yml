@@ -189,6 +189,10 @@ jobs:
             $startupText=Get-Content $startup -Raw
             $startupText | Write-Host
             if ($startupText -notmatch 'window-shown') { throw 'GUI startup never reached window-shown.' }
+            if ($startupText -notmatch 'webui-acq-assets.*decoded') {
+              if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
+              throw 'WebView2 did not decode all acquisition GIF assets.'
+            }
             if ($startupText -notmatch 'webui-ready') {
               if (Test-Path $crash) { Get-Content $crash -Raw | Write-Host }
               throw 'GUI startup never reached webui-ready.'

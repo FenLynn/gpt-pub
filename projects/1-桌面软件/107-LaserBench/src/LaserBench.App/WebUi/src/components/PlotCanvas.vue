@@ -36,8 +36,8 @@ function margins(){
   return props.compact
     ? {l:0,r:0,t:0,b:0}
     : props.stacked
-      ? {l:38,r:38,t:2,b:18}
-      : {l:38,r:38,t:3,b:21}
+      ? {l:38,r:38,t:4,b:18}
+      : {l:38,r:38,t:4,b:21}
 }
 
 const bounds = computed(() => {
@@ -126,9 +126,10 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font='11.5px "Segoe UI", sans-serif';ctx.fillStyle='#9fb2c0';ctx.textBaseline='middle'
+  ctx.font='11.5px "Segoe UI", sans-serif';ctx.fillStyle='#9fb2c0'
   for(let i=0;i<4;i++) {
     const t=i/3, y=m.t+ph*t, v=y1-(y1-y0)*t, text=fmt(v,y1-y0)
+    ctx.textBaseline=i===0?'top':i===3?'bottom':'middle'
     ctx.textAlign='right';ctx.fillText(text,m.l-4,y)
     if(hasRight){const rv=r1-(r1-r0)*t;ctx.textAlign='left';ctx.fillText(fmt(rv,r1-r0),m.l+pw+4,y)}
   }

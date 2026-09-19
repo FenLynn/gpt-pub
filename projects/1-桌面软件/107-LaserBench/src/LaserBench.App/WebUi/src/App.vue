@@ -29,7 +29,7 @@ let beamAttSendBusy=false
 let beamZHoldUntil=0
 let beamAttHoldUntil=0
 const cameraFlash = ref(false)
-const recordFlash = ref(false)
+const acqGifFailed = ref<Record<string,boolean>>({})
 const recordElapsed = ref(0)
 const saveNotice = ref('')
 type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
@@ -48,6 +48,9 @@ const settingsDraft = ref({
   dashboardPower1:snapshot.value.config?.dashboardPower1??true, dashboardPower2:snapshot.value.config?.dashboardPower2??true, dashboardMath1:snapshot.value.config?.dashboardMath1??true
 })
 const dataFilter=ref('')
+const powerRangeStartPct=ref(0)
+const powerRangeEndPct=ref(100)
+const powerOverviewShell=ref<HTMLElement|null>(null)
 let beamTimer:number|undefined
 let clockTimer:number|undefined
 let recordTimer:number|undefined
@@ -75,13 +78,40 @@ const powerTimeOriginMs = computed(() => {
   const now=new Date(snapshot.value.timestamp).getTime()
   return (Number.isFinite(now)?now:Date.now())-powerHistorySpan.value*1000
 })
-const powerProgressPct = computed(() => Math.max(1.5,Math.min(100,powerHistorySpan.value/settingsDraft.value.powerWindow*100)))
+const powerRangeStart = computed(() => settingsDraft.value.powerWindow*powerRangeStartPct.value/100)
+const powerRangeEnd = computed(() => settingsDraft.value.powerWindow*powerRangeEndPct.value/100)
+const powerSelectionStyle = computed(() => ({
+  '--range-left':`${powerRangeStartPct.value}%`,
+  '--range-width':`${Math.max(0,powerRangeEndPct.value-powerRangeStartPct.value)}%`
+}))
 const powerLeftMax = computed(() => {
   const values=visiblePowerTraces.value.filter(t=>t.unit!=='%').flatMap(t=>t.points.map(p=>p.y))
   return Math.max(5, Math.ceil(Math.max(...values, 1) / 5) * 5)
 })
 function powerVisible(index:number){ return powerVisibility.value[index] ?? true }
 function powerReadoutKind(index:number):BigReadoutKind { return (['power0','power1','power2'][index] ?? 'power0') as BigReadoutKind }
+function updatePowerRangeFromPointer(side:'start'|'end',clientX:number){
+  const el=powerOverviewShell.value
+  if(!el)return
+  const rect=el.getBoundingClientRect()
+  const pct=Math.max(0,Math.min(100,(clientX-rect.left)/Math.max(1,rect.width)*100))
+  const minGap=2
+  if(side==='start')powerRangeStartPct.value=Math.min(pct,powerRangeEndPct.value-minGap)
+  else powerRangeEndPct.value=Math.max(pct,powerRangeStartPct.value+minGap)
+}
+function beginPowerRangeDrag(e:PointerEvent,side:'start'|'end'){
+  e.preventDefault()
+  updatePowerRangeFromPointer(side,e.clientX)
+  const move=(ev:PointerEvent)=>updatePowerRangeFromPointer(side,ev.clientX)
+  const stop=()=>{
+    window.removeEventListener('pointermove',move)
+    window.removeEventListener('pointerup',stop)
+    window.removeEventListener('pointercancel',stop)
+  }
+  window.addEventListener('pointermove',move)
+  window.addEventListener('pointerup',stop)
+  window.addEventListener('pointercancel',stop)
+}
 const devicesShown = computed(() => snapshot.value.devices.slice(0,5))
 const moduleActive = (name:string) => snapshot.value.captureState==='running' && !!snapshot.value.captureSelection[name]
 const captureStateText=computed(()=>({idle:'就绪',starting:'启动中',running:'采集中',stopping:'停止中',error:'错误'}[snapshot.value.captureState]??'就绪'))
@@ -114,7 +144,7 @@ function readoutData(kind:BigReadoutKind):BigReadoutData|null {
     case 'spectrumPower': return { title:'光谱功率', value:snapshot.value.spectrum.power.toFixed(1), unit:'dBm' }
     case 'beamM2x': return { title:'M²x', value:snapshot.value.beam.m2x.toFixed(2), unit:'' }
     case 'beamM2y': return { title:'M²y', value:snapshot.value.beam.m2y.toFixed(2), unit:'' }
-    case 'beamM2': return { title:'平均 M²', value:snapshot.value.beam.m2mean.toFixed(2), unit:'' }
+    case 'beamM2': return { title:'M²', value:snapshot.value.beam.m2mean.toFixed(2), unit:'' }
     case 'scope0': {
       const t=snapshot.value.scope.time[0]; return t ? { title:t.name, value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : null
     }
@@ -236,6 +266,7 @@ async function setLabel() {
 async function toggleSource(module:string) {
   const next=!snapshot.value.captureSelection[module]
   snapshot.value.captureSelection[module]=next
+  if(next)acqGifFailed.value[module]=false
   await request('app.setCaptureSelection',{module,selected:next})
 }
 async function toggleCapture(){ await request('app.capture') }
@@ -247,14 +278,7 @@ async function screenshot(){
     window.setTimeout(()=>cameraFlash.value=false,900)
   })
 }
-async function toggleRecord(){
-  await request('app.record')
-  recordFlash.value=false
-  window.requestAnimationFrame(()=>{
-    recordFlash.value=true
-    window.setTimeout(()=>recordFlash.value=false,900)
-  })
-}
+async function toggleRecord(){ await request('app.record') }
 async function updateZ(value:number){beamZ.value=value;await request('beam.setZ',{value})}
 async function updateAtt(value:number){beamAtt.value=value;await request('beam.setAttenuation',{value})}
 async function flushBeamZ(){
@@ -318,7 +342,21 @@ async function openFolder(kind:'exp'|'pic'|'video'|'root'){ await request('app.o
 function formatBytes(n:number){ if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB' }
 function nav(page:string){activePage.value=page}
 
+async function verifyAcquisitionAssets(){
+  const entries:[string,string][]=[
+    ['power',powerAcqGif],['spectrum',spectrumAcqGif],['beam',beamAcqGif],['scope',scopeAcqGif]
+  ]
+  const results=await Promise.all(entries.map(([name,src])=>new Promise<boolean>(resolve=>{
+    const img=new Image()
+    img.onload=()=>resolve(img.naturalWidth>=72&&img.naturalHeight>=72)
+    img.onerror=()=>{acqGifFailed.value[name]=true;resolve(false)}
+    img.src=src
+  })))
+  document.documentElement.dataset.acqAssets=results.every(Boolean)?'ready':'failed'
+}
+
 onMounted(()=>{
+  void verifyAcquisitionAssets()
   try{
     const saved=localStorage.getItem('laserbench.bigReadouts.v3')
     const parsed=saved?JSON.parse(saved):[]
@@ -367,17 +405,17 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <button class="icon-btn check-btn" @click="setLabel" title="确认标签"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></button>
       <div class="vsep"></div>
 
-      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power,breathing:moduleActive('power')}" @click="toggleSource('power')" title="本次采集包含功率"><img v-if="snapshot.captureSelection.power" class="acq-gif" :src="powerAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></button>
-      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}" @click="toggleSource('spectrum')" title="本次采集包含光谱"><img v-if="snapshot.captureSelection.spectrum" class="acq-gif" :src="spectrumAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></button>
-      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam,breathing:moduleActive('beam')}" @click="toggleSource('beam')" title="本次采集包含光束"><img v-if="snapshot.captureSelection.beam" class="acq-gif" :src="beamAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
-      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope,breathing:moduleActive('scope')}" @click="toggleSource('scope')" title="本次采集包含示波器"><img v-if="snapshot.captureSelection.scope" class="acq-gif" :src="scopeAcqGif" alt=""/><svg v-else viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></button>
+      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power,breathing:moduleActive('power')}" @click="toggleSource('power')" title="本次采集包含功率"><img v-if="snapshot.captureSelection.power&&!acqGifFailed.power" class="acq-gif" :src="powerAcqGif" alt="" @error="acqGifFailed.power=true"/><svg v-else viewBox="0 0 24 24"><path d="M4 19V10M9 19V5M14 19v-8M19 19V8"/></svg></button>
+      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum,breathing:moduleActive('spectrum')}" @click="toggleSource('spectrum')" title="本次采集包含光谱"><img v-if="snapshot.captureSelection.spectrum&&!acqGifFailed.spectrum" class="acq-gif" :src="spectrumAcqGif" alt="" @error="acqGifFailed.spectrum=true"/><svg v-else viewBox="0 0 24 24"><path d="M3 19c4 0 5-14 9-14s5 14 9 14"/></svg></button>
+      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam,breathing:moduleActive('beam')}" @click="toggleSource('beam')" title="本次采集包含光束"><img v-if="snapshot.captureSelection.beam&&!acqGifFailed.beam" class="acq-gif" :src="beamAcqGif" alt="" @error="acqGifFailed.beam=true"/><svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope,breathing:moduleActive('scope')}" @click="toggleSource('scope')" title="本次采集包含示波器"><img v-if="snapshot.captureSelection.scope&&!acqGifFailed.scope" class="acq-gif" :src="scopeAcqGif" alt="" @error="acqGifFailed.scope=true"/><svg v-else viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></button>
 
       <span v-if="snapshot.captureState!=='idle'" class="capture-state" :class="snapshot.captureState">{{captureStateText}}</span>
       <div class="top-spacer"></div>
       <div class="device-strip"><span v-for="d in devicesShown" :key="d.kind+d.alias" class="device-pill"><i :class="['status-dot',d.status]"></i>{{d.alias}}</span></div>
       <div class="vsep"></div>
-      <button class="icon-btn camera-btn" :class="{flash:cameraFlash}" @click="screenshot" title="截图"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
-      <button class="record-btn" :class="{active:snapshot.recording,flash:recordFlash}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span class="record-duration" :class="{shown:snapshot.recording}">{{snapshot.recording?recordDurationText:'00:00:00'}}</span></button>
+      <button class="icon-btn camera-btn" @click="screenshot" title="截图"><svg viewBox="0 0 24 24"><path d="M4 8h4l1.5-2h5L16 8h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+      <button class="record-btn" :class="{active:snapshot.recording}" @click="toggleRecord" title="录像"><i></i><span>REC</span><span class="record-duration" :class="{shown:snapshot.recording}">{{snapshot.recording?recordDurationText:'00:00:00'}}</span></button>
       <div class="vsep"></div><span class="clock">{{clockText}}</span>
     </header>
 
@@ -429,8 +467,8 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
             <div class="dock-checks"><label><input type="checkbox" v-model="settingsDraft.dashboardPower1" @change="saveSettings"/>{{snapshot.power.traces[0]?.name ?? 'power1'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardPower2" @change="saveSettings"/>{{snapshot.power.traces[1]?.name ?? 'power2'}}</label><label><input type="checkbox" v-model="settingsDraft.dashboardMath1" @change="saveSettings"/>{{snapshot.power.traces[2]?.name ?? 'math1'}}</label></div>
           </details>
           <div class="power-layout"><div class="power-chart-zone">
-            <PlotCanvas class="main-plot" :series="powerSeries" :x-min="0" :x-max="settingsDraft.powerWindow" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间 (HH:MM)" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" />
-            <div class="overview-row"><div class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="0" :x-max="settingsDraft.powerWindow" :compact="true" /><div class="overview-selected" :style="{width:powerProgressPct+'%'}"><i></i></div></div></div>
+            <PlotCanvas class="main-plot" :series="powerSeries" :x-min="powerRangeStart" :x-max="powerRangeEnd" :y-min="0" :y-max="powerLeftMax" :right-y-min="0" :right-y-max="100" x-label="时间 (HH:MM)" y-label="功率 (kW)" right-y-label="效率 (%)" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" />
+            <div class="overview-row"><div ref="powerOverviewShell" class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="0" :x-max="settingsDraft.powerWindow" :compact="true" /><div class="overview-selected" :style="powerSelectionStyle"><i class="overview-handle start" @pointerdown.stop="beginPowerRangeDrag($event,'start')"></i><i class="overview-handle end" @pointerdown.stop="beginPowerRangeDrag($event,'end')"></i></div></div></div>
           </div></div>
         </article>
 
@@ -447,11 +485,11 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
         </article>
 
         <article class="instrument-panel beam-panel" :class="{hidden:!['dashboard','beam'].includes(activePage)}">
-          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{selected:snapshot.captureSelection.beam}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong><span v-if="activePage==='beam'" class="focus-page-state" :class="{running:moduleActive('beam')}"><i></i>{{moduleActive('beam')?'采集中':'就绪'}}</span></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @keydown="beginZDrag" @keyup="endZDrag" @blur="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @keydown="beginAttDrag" @keyup="endAttDrag" @blur="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M̄²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
+          <div class="module-head beam-head graph-overlay"><div class="module-title"><div class="panel-mark beam-accent" :class="{selected:snapshot.captureSelection.beam}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><strong>光束</strong><span v-if="activePage==='beam'" class="focus-page-state" :class="{running:moduleActive('beam')}"><i></i>{{moduleActive('beam')?'采集中':'就绪'}}</span></div><div class="beam-top-controls"><span class="control-label">Z</span><input type="range" min="-24" max="24" step="0.1" :value="beamZ" @pointerdown="beginZDrag" @pointerup="endZDrag" @pointercancel="endZDrag" @keydown="beginZDrag" @keyup="endZDrag" @blur="endZDrag" @input="onZInput"/><b>{{beamZ.toFixed(1)}} mm</b><button class="play-mini" :class="{active:beamPlaying}" @click="toggleBeamPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="control-label">Att</span><input type="range" min="0" max="40" step="0.1" :value="beamAtt" @pointerdown="beginAttDrag" @pointerup="endAttDrag" @pointercancel="endAttDrag" @keydown="beginAttDrag" @keyup="endAttDrag" @blur="endAttDrag" @input="onAttInput"/><b>{{beamAtt.toFixed(1)}} dB</b></div><div class="m2-block"><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2x')"><em>M²x</em><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button><button class="metric-trigger secondary-trigger" @click="openReadout('beamM2y')"><em>M²y</em><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button><button class="metric-trigger primary-metric" @click="openReadout('beamM2')"><em>M²</em><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button></div></div>
           <div v-if="activePage==='beam'" class="focus-summary">
             <button class="focus-metric" @click="openReadout('beamM2x')"><span>M²x</span><b>{{snapshot.beam.m2x.toFixed(2)}}</b></button>
             <button class="focus-metric" @click="openReadout('beamM2y')"><span>M²y</span><b>{{snapshot.beam.m2y.toFixed(2)}}</b></button>
-            <button class="focus-metric" @click="openReadout('beamM2')"><span>平均 M²</span><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button>
+            <button class="focus-metric" @click="openReadout('beamM2')"><span>M²</span><b>{{snapshot.beam.m2mean.toFixed(2)}}</b></button>
           </div>
           <details v-if="activePage==='beam'" class="module-config-dock beam-page-config" open>
             <summary>观察控制</summary>

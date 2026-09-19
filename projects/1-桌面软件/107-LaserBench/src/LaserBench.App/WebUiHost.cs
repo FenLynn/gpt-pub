@@ -152,17 +152,44 @@ internal sealed class WebUiHost : IDisposable
             };
             core.NewWindowRequested += (_, args) => args.Handled = true;
             core.PermissionRequested += (_, args) => args.State = CoreWebView2PermissionState.Deny;
-            core.NavigationCompleted += (_, args) =>
+            core.NavigationCompleted += async (_, args) =>
             {
                 if (!args.IsSuccess) return;
-                _ready = true;
-                _loading.Visible = false;
-                _webView.Visible = true;
-                _webView.BringToFront();
-                _pushTimer.Start();
-                StartupDiagnostics.Stage("webui-ready");
-                PushSnapshot();
-                Ready?.Invoke();
+                try
+                {
+                    var assetsReady = false;
+                    for (var attempt = 0; attempt < 40; attempt++)
+                    {
+                        var state = await core.ExecuteScriptAsync("document.documentElement.dataset.acqAssets || ''");
+                        if (state.Contains("failed", StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException("WebView2 failed to decode one or more acquisition GIF assets.");
+                        if (state.Contains("ready", StringComparison.OrdinalIgnoreCase))
+                        {
+                            assetsReady = true;
+                            break;
+                        }
+                        await Task.Delay(100);
+                    }
+                    if (!assetsReady)
+                        throw new TimeoutException("WebView2 acquisition GIF decode check did not complete.");
+
+                    StartupDiagnostics.Stage("webui-acq-assets", "decoded");
+                    _ready = true;
+                    _loading.Visible = false;
+                    _webView.Visible = true;
+                    _webView.BringToFront();
+                    _pushTimer.Start();
+                    StartupDiagnostics.Stage("webui-ready");
+                    PushSnapshot();
+                    Ready?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    StartupDiagnostics.Crash("webui acquisition asset verification", ex);
+                    _loading.Text = "LaserBench 新界面资源校验失败\r\n\r\n" + ex.Message;
+                    _loading.ForeColor = Color.FromArgb(151, 67, 62);
+                    Failed?.Invoke(ex);
+                }
             };
             core.Navigate(Origin + "/index.html");
         }
@@ -320,7 +347,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.22",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.23",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,

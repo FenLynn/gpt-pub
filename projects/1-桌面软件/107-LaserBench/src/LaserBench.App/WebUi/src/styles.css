@@ -2061,3 +2061,177 @@
   gap:1px!important;
   overflow:hidden!important
 }
+
+
+/* v0.4.23 — reliable top GIFs, quiet controls, frame-safe ticks, true two-handle Power window */
+
+/* Module headers themselves stay transparent on the shell; only result strips get a subtle field. */
+.dashboard-grid:not(.focus-mode) .graph-overlay{
+  background:transparent!important
+}
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts,
+.dashboard-grid:not(.focus-mode) .m2-block{
+  height:27px!important;
+  align-self:end!important;
+  margin-bottom:1px!important;
+  padding:0 6px!important;
+  border:1px solid rgba(205,220,230,.16)!important;
+  border-radius:3px!important;
+  background:rgba(20,33,43,.34)!important;
+  box-sizing:border-box!important;
+  overflow:visible!important
+}
+
+/* Metric separators are exactly centered in the gap: 7 px each side. */
+.dashboard-grid:not(.focus-mode) .metric-trigger{
+  height:25px!important;
+  min-height:25px!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  background:transparent!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger{
+  margin-left:14px!important;
+  padding-left:0!important;
+  border-left:0!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger::before{
+  display:block!important;
+  content:""!important;
+  position:absolute!important;
+  left:-7px!important;
+  top:50%!important;
+  width:1px!important;
+  height:16px!important;
+  transform:translateY(-50%)!important;
+  background:rgba(205,217,225,.46)!important
+}
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric{
+  height:25px!important;
+  margin-left:14px!important;
+  padding-left:0!important;
+  border-left:0!important
+}
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric::before{
+  display:block!important;
+  content:""!important;
+  position:absolute!important;
+  left:-7px!important;
+  top:50%!important;
+  width:1px!important;
+  height:16px!important;
+  transform:translateY(-50%)!important;
+  background:rgba(205,217,225,.46)!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block{
+  gap:0!important;
+  margin-left:auto!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block .metric-trigger + .metric-trigger{
+  margin-left:14px!important
+}
+
+/* Camera and REC share one calm hover lift. No recording-time blink, ring, flash or extra frame. */
+.camera-btn,
+.record-btn{
+  position:relative!important;
+  transition:transform .13s ease,background .13s ease,box-shadow .13s ease!important
+}
+.camera-btn:hover,
+.record-btn:hover{
+  transform:translateY(-1px)!important;
+  background:rgba(116,145,166,.18)!important;
+  box-shadow:0 2px 5px rgba(0,0,0,.16)!important;
+  filter:none!important
+}
+.camera-btn:active,
+.record-btn:active{
+  transform:translateY(0) scale(.96)!important
+}
+.camera-btn::after,
+.record-btn::after,
+.camera-btn.flash::after,
+.record-btn.flash::after{
+  display:none!important
+}
+.camera-btn.flash,
+.record-btn.flash{
+  animation:none!important
+}
+.record-btn.active i{
+  animation:none!important;
+  opacity:1!important
+}
+
+/* Top acquisition images are clean transparent assets; broken assets never get a visible frame. */
+.topbar .module-toggle{
+  overflow:hidden!important;
+  background:transparent!important
+}
+.topbar .module-toggle.active .acq-gif{
+  width:31px!important;
+  height:31px!important;
+  object-fit:contain!important;
+  border:0!important;
+  outline:0!important;
+  background:transparent!important;
+  box-shadow:none!important
+}
+
+/* Power overview is a real two-handle view window. Default handles remain at both ends. */
+.dashboard-grid:not(.focus-mode) .overview-shell{
+  position:relative!important;
+  overflow:hidden!important;
+  background:#263946!important;
+  border:1px solid rgba(128,153,171,.42)!important
+}
+.dashboard-grid:not(.focus-mode) .overview-shell::after{
+  display:none!important
+}
+.dashboard-grid:not(.focus-mode) .overview-selected{
+  top:0!important;
+  bottom:0!important;
+  right:auto!important;
+  min-width:2%!important;
+  background:rgba(190,220,239,.10)!important;
+  border-left:1px solid rgba(219,234,244,.55)!important;
+  border-right:1px solid rgba(219,234,244,.55)!important;
+  box-shadow:0 0 0 100vmax rgba(30,44,55,.58)!important;
+  transition:none!important;
+  pointer-events:none!important
+}
+.dashboard-grid:not(.focus-mode) .overview-selected .overview-handle{
+  position:absolute!important;
+  top:2px!important;
+  bottom:2px!important;
+  width:7px!important;
+  border-radius:3px!important;
+  background:#dbeaf3!important;
+  box-shadow:0 0 0 1px rgba(36,62,80,.70),0 0 5px rgba(218,235,246,.28)!important;
+  cursor:ew-resize!important;
+  pointer-events:auto!important;
+  touch-action:none!important
+}
+.dashboard-grid:not(.focus-mode) .overview-selected .overview-handle.start{
+  left:-4px!important;
+  right:auto!important
+}
+.dashboard-grid:not(.focus-mode) .overview-selected .overview-handle.end{
+  right:-4px!important;
+  left:auto!important
+}
+
+/* Scope's two plot canvases stay fully inside the accepted geometry. */
+.dashboard-grid:not(.focus-mode) .scope-plots{
+  grid-template-rows:minmax(0,56fr) minmax(0,44fr)!important;
+  gap:2px!important;
+  overflow:hidden!important
+}
+
+.dashboard-grid:not(.focus-mode) .overview-selected{
+  left:var(--range-left,0%)!important;
+  width:var(--range-width,100%)!important
+}
