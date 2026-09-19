@@ -94,7 +94,8 @@ function legendAnchor(position: LegendPosition) {
     "top-right": { x: 0.98, y: 0.985, xanchor: "right", yanchor: "top" },
     "bottom-left": { x: 0.02, y: 0.02, xanchor: "left", yanchor: "bottom" },
     "bottom-center": { x: 0.5, y: 0.02, xanchor: "center", yanchor: "bottom" },
-    "bottom-right": { x: 0.98, y: 0.02, xanchor: "right", yanchor: "bottom" }
+    "bottom-right": { x: 0.98, y: 0.02, xanchor: "right", yanchor: "bottom" },
+    "outside-right": { x: 1.02, y: 0.985, xanchor: "left", yanchor: "top" }
   };
   if (position === "custom") {
     return { x: 0.02, y: 0.985, xanchor: "left", yanchor: "top" };
@@ -746,6 +747,8 @@ export function buildLayout(args: {
     !isField2D &&
     figure.templateId !== "surface-3d" &&
     (overrides.legendVisible ?? automaticLegendSeriesCount > 1);
+  const outsideRightLegend =
+    effectiveLegendVisible && legendPositionMode === "outside-right";
 
   const emptyFigure = dataset.id === "__empty__";
   const resolvedXTitle = normalizePlotlyMathText(
@@ -793,7 +796,9 @@ export function buildLayout(args: {
       l: Math.round(mmToPx(hasYTitle ? 10.2 : 6.2)),
       r: Math.round(
         mmToPx(
-          isDoubleY
+          outsideRightLegend
+            ? 31
+            : isDoubleY
             ? 10.2
             : isField2D || figure.templateId === "surface-3d"
             ? 8
