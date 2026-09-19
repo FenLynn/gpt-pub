@@ -118,7 +118,7 @@ import json
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator, FuncFormatter, EngFormatter
+from matplotlib.ticker import MultipleLocator, FixedLocator, FuncFormatter, EngFormatter
 
 P = json.loads(${payloadLiteral})
 O = P["figureOverrides"]
@@ -241,6 +241,27 @@ def apply_tick_formatter(axis_obj, which, mode, decimals, prefix, suffix):
     target = axis_obj.xaxis if which == "x" else axis_obj.yaxis
     target.set_major_formatter(formatter)
 
+def apply_log_tick_spacing(axis_obj, which, step, minor=False):
+    if step is None or step <= 0:
+        return
+    getter = axis_obj.get_xlim if which == "x" else axis_obj.get_ylim
+    low, high = getter()
+    low, high = min(low, high), max(low, high)
+    if low <= 0 or high <= 0:
+        return
+    log_low, log_high = math.log10(low), math.log10(high)
+    start = math.floor(log_low / step) * step
+    stop = math.ceil(log_high / step) * step
+    exponents = np.arange(start, stop + step * 0.5, step)
+    if len(exponents) == 0 or len(exponents) > 200:
+        return
+    locator = FixedLocator(np.power(10.0, exponents))
+    target = axis_obj.xaxis if which == "x" else axis_obj.yaxis
+    if minor:
+        target.set_minor_locator(locator)
+    else:
+        target.set_major_locator(locator)
+
 def configure_axis(axis_obj, side="left"):
     is_right = side == "right"
     scale = O.get("rightYScale", "linear") if is_right else O.get("yScale", "linear")
@@ -262,10 +283,16 @@ def configure_axis(axis_obj, side="left"):
             axis_obj.set_ylim(low, high)
     if reverse:
         axis_obj.invert_yaxis()
-    if major is not None and major > 0 and scale == "linear":
-        axis_obj.yaxis.set_major_locator(MultipleLocator(major))
-    if O.get("minorTicks", False) and minor is not None and minor > 0 and scale == "linear":
-        axis_obj.yaxis.set_minor_locator(MultipleLocator(minor))
+    if major is not None and major > 0:
+        if scale == "linear":
+            axis_obj.yaxis.set_major_locator(MultipleLocator(major))
+        else:
+            apply_log_tick_spacing(axis_obj, "y", major)
+    if O.get("minorTicks", False) and minor is not None and minor > 0:
+        if scale == "linear":
+            axis_obj.yaxis.set_minor_locator(MultipleLocator(minor))
+        else:
+            apply_log_tick_spacing(axis_obj, "y", minor, minor=True)
     apply_tick_formatter(axis_obj, "y", fmt, decimals, prefix, suffix)
     axis_obj.tick_params(
         axis="y",
@@ -300,10 +327,16 @@ def configure_x(axis_obj):
             axis_obj.invert_xaxis()
         major = O.get("xMajorTickStep")
         minor = O.get("xMinorTickStep")
-        if major is not None and major > 0 and scale == "linear":
-            axis_obj.xaxis.set_major_locator(MultipleLocator(major))
-        if O.get("minorTicks", False) and minor is not None and minor > 0 and scale == "linear":
-            axis_obj.xaxis.set_minor_locator(MultipleLocator(minor))
+        if major is not None and major > 0:
+            if scale == "linear":
+                axis_obj.xaxis.set_major_locator(MultipleLocator(major))
+            else:
+                apply_log_tick_spacing(axis_obj, "x", major)
+        if O.get("minorTicks", False) and minor is not None and minor > 0:
+            if scale == "linear":
+                axis_obj.xaxis.set_minor_locator(MultipleLocator(minor))
+            else:
+                apply_log_tick_spacing(axis_obj, "x", minor, minor=True)
         apply_tick_formatter(
             axis_obj,
             "x",
