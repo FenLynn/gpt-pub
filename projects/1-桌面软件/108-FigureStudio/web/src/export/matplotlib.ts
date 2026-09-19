@@ -552,6 +552,15 @@ else:
     bar_gap = max(0.0, min(0.9, float(O.get("barGap", 0.2))))
     group_gap = max(0.0, min(0.9, float(O.get("barGroupGap", 0.08))))
     base_bar_width = numeric_spacing * (1.0 - bar_gap)
+    bar_labels = bool(O.get("barLabelsVisible", False))
+    bar_label_decimals = max(
+        0, min(6, int(O.get("barLabelDecimals", 0)))
+    )
+    bar_label_position = O.get(
+        "barLabelPosition",
+        "inside" if template == "stacked-bar" else "outside"
+    )
+    bar_label_fmt = "%." + str(bar_label_decimals) + "f"
 
     stack_bottom = np.zeros(len(x), dtype=float)
     left_axis_color = None
@@ -600,7 +609,7 @@ else:
             if template == "grouped-bar":
                 width = base_bar_width * (1.0 - group_gap) / visible_count
                 offset = (plotted - (visible_count - 1) / 2.0) * width
-                target.bar(
+                container = target.bar(
                     current_x + offset,
                     y,
                     width=width,
@@ -611,7 +620,7 @@ else:
                     alpha=alpha,
                 )
             elif template == "stacked-bar":
-                target.bar(
+                container = target.bar(
                     current_x,
                     y,
                     width=base_bar_width,
@@ -624,7 +633,7 @@ else:
                 )
                 stack_bottom = np.nan_to_num(stack_bottom) + np.nan_to_num(y)
             else:
-                target.bar(
+                container = target.bar(
                     current_x,
                     y,
                     width=base_bar_width,
@@ -633,6 +642,19 @@ else:
                     edgecolor=edge,
                     linewidth=edge_width,
                     alpha=alpha,
+                )
+
+            if bar_labels:
+                inside = bar_label_position == "inside"
+                target.bar_label(
+                    container,
+                    fmt=bar_label_fmt,
+                    label_type="center" if inside else "edge",
+                    padding=0 if inside else 3,
+                    fontsize=font_size * 0.9,
+                    color="#ffffff" if inside else O.get(
+                        "tickLabelColor", "#17191c"
+                    ),
                 )
         else:
             line_default = template not in ("xy-scatter",)
