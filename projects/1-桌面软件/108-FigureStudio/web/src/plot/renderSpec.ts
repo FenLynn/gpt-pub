@@ -602,6 +602,73 @@ function rangeFor(
   return range && reverse ? [range[1], range[0]] : range;
 }
 
+function finiteNumericValues(values: unknown[]): number[] {
+  return values.filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value)
+  );
+}
+
+function matplotlibAutoRange(
+  values: number[],
+  scale: "linear" | "log",
+  reverse: boolean,
+  margin = 0.05
+): [number, number] | undefined {
+  const finite =
+    scale === "log" ? values.filter((value) => value > 0) : values;
+  if (!finite.length) return undefined;
+
+  if (scale === "log") {
+    const logs = finite.map((value) => Math.log10(value));
+    let low = Math.min(...logs);
+    let high = Math.max(...logs);
+    let span = high - low;
+    if (!(span > 0)) {
+      span = 0.2;
+      low -= span / 2;
+      high += span / 2;
+    } else {
+      const padding = span * margin;
+      low -= padding;
+      high += padding;
+    }
+    return reverse ? [high, low] : [low, high];
+  }
+
+  let low = Math.min(...finite);
+  let high = Math.max(...finite);
+  let span = high - low;
+  if (!(span > 0)) {
+    const padding = Math.max(Math.abs(low) * margin, 0.5);
+    low -= padding;
+    high += padding;
+  } else {
+    const padding = span * margin;
+    low -= padding;
+    high += padding;
+  }
+  return reverse ? [high, low] : [low, high];
+}
+
+function matplotlibNiceTickStep(
+  range: [number, number] | undefined,
+  targetIntervals: number
+): number | undefined {
+  if (!range) return undefined;
+  const span = Math.abs(range[1] - range[0]);
+  if (!(span > 0) || !Number.isFinite(span)) return undefined;
+
+  const raw = span / Math.max(2, targetIntervals);
+  const exponent = Math.floor(Math.log10(raw));
+  const base = Math.pow(10, exponent);
+  const fraction = raw / base;
+  const steps = [1, 2, 2.5, 5, 10];
+  const niceFraction =
+    steps.find((step) => fraction <= step) ?? steps[steps.length - 1];
+  return niceFraction * base;
+}
+
 function tickFormatString(
   format: TickLabelFormat | undefined,
   decimals: number | undefined
@@ -688,29 +755,104 @@ export function buildLayout(args: {
   const isDoubleY = figure.templateId === "double-y";
   const isField2D =
     figure.templateId === "heatmap" || figure.templateId === "contour";
+  const continuousXY =
+    !isField2D &&
+    figure.templateId !== "surface-3d" &&
+    figure.templateId !== "bar" &&
+    figure.templateId !== "grouped-bar" &&
+    figure.templateId !== "stacked-bar";
+  const rangeTraces: any[] = continuousXY
+    ? (buildTraces({ dataset, figure, preset }) as any[])
+    : [];
+  const autoXValues: number[] = [];
+  const autoLeftYValues: number[] = [];
+  const autoRightYValues: number[] = [];
+
+  for (const trace of rangeTraces) {
+    autoXValues.push(...finiteNumericValues(Array.isArray(trace.x) ? trace.x : []));
+    const yValues = Array.isArray(trace.y) ? trace.y : [];
+    const targetY =
+      isDoubleY && trace.yaxis === "y2"
+        ? autoRightYValues
+        : autoLeftYValues;
+    const errors =
+      Array.isArray(trace.error_y?.array) ? trace.error_y.array : undefined;
+
+    for (let index = 0; index < yValues.length; index += 1) {
+      const value = yValues[index];
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      const error = errors?.[index];
+      if (typeof error === "number" && Number.isFinite(error)) {
+        targetY.push(value - Math.abs(error), value + Math.abs(error));
+      } else {
+        targetY.push(value);
+      }
+    }
+  }
+
   const xRange = xIsCategorical
     ? undefined
-    : rangeFor(
-        overrides.xAutoRange,
+    : overrides.xAutoRange === false
+    ? rangeFor(
+        false,
         overrides.xMin,
         overrides.xMax,
         xScale,
         overrides.xReverse ?? false
-      );
-  const yRange = rangeFor(
-    overrides.yAutoRange,
-    overrides.yMin,
-    overrides.yMax,
-    yScale,
-    overrides.yReverse ?? false
-  );
-  const rightYRange = rangeFor(
-    overrides.rightYAutoRange,
-    overrides.rightYMin,
-    overrides.rightYMax,
-    rightYScale,
-    overrides.rightYReverse ?? false
-  );
+      )
+    : continuousXY
+    ? matplotlibAutoRange(
+        autoXValues,
+        xScale,
+        overrides.xReverse ?? false
+      )
+    : undefined;
+  const yRange =
+    overrides.yAutoRange === false
+      ? rangeFor(
+          false,
+          overrides.yMin,
+          overrides.yMax,
+          yScale,
+          overrides.yReverse ?? false
+        )
+      : continuousXY
+      ? matplotlibAutoRange(
+          autoLeftYValues,
+          yScale,
+          overrides.yReverse ?? false
+        )
+      : undefined;
+  const rightYRange =
+    overrides.rightYAutoRange === false
+      ? rangeFor(
+          false,
+          overrides.rightYMin,
+          overrides.rightYMax,
+          rightYScale,
+          overrides.rightYReverse ?? false
+        )
+      : isDoubleY
+      ? matplotlibAutoRange(
+          autoRightYValues,
+          rightYScale,
+          overrides.rightYReverse ?? false
+        )
+      : undefined;
+  const xAutoTickStep =
+    !xIsCategorical &&
+    xScale === "linear" &&
+    !overrides.xMajorTickStep
+      ? matplotlibNiceTickStep(xRange, canvas.widthMm >= 150 ? 7 : 6)
+      : undefined;
+  const yAutoTickStep =
+    yScale === "linear" && !overrides.yMajorTickStep
+      ? matplotlibNiceTickStep(yRange, 5)
+      : undefined;
+  const rightYAutoTickStep =
+    rightYScale === "linear" && !overrides.rightYMajorTickStep
+      ? matplotlibNiceTickStep(rightYRange, 5)
+      : undefined;
 
   const commonAxis = {
     showline: true,
@@ -1028,7 +1170,7 @@ export function buildLayout(args: {
       overrides.xMajorTickStep &&
       overrides.xMajorTickStep > 0
         ? overrides.xMajorTickStep
-        : undefined,
+        : xAutoTickStep,
     tickformat: xIsCategorical
       ? undefined
       : tickFormatString(
@@ -1081,7 +1223,7 @@ export function buildLayout(args: {
     dtick:
       overrides.yMajorTickStep && overrides.yMajorTickStep > 0
         ? overrides.yMajorTickStep
-        : undefined,
+        : yAutoTickStep,
     tickformat: tickFormatString(
       overrides.yTickFormat,
       overrides.yTickDecimals
@@ -1132,7 +1274,7 @@ export function buildLayout(args: {
         overrides.rightYMajorTickStep &&
         overrides.rightYMajorTickStep > 0
           ? overrides.rightYMajorTickStep
-          : undefined,
+          : rightYAutoTickStep,
       tickformat: tickFormatString(
         overrides.rightYTickFormat,
         overrides.rightYTickDecimals
