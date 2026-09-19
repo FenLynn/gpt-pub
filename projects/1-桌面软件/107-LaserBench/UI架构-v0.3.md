@@ -66,13 +66,13 @@ beam.setAttenuation
 
 ## 视觉方向
 
-v0.4.13 继续采用 Graph-first Dashboard，并把 Focus Page 与 Dashboard 明确区分：
+v0.4.16 继续采用 Graph-first Dashboard，并把 Dashboard 对齐规则与 Focus Page 明确区分：
 
 - Dashboard 非绘图区统一冷深蓝灰，只有真实 Plot / 图像绘图区白底。
 - Dashboard 图占绝对主体；模块标题栏与壳体同底色，适度增加高度和刻度字号以保证可读性。Dashboard 不渲染 X/Y 轴标题文字，只保留必要刻度；刻度 gutter 属于深色壳体，白色只填实际数据矩形。
 - Power / Spectrum / Scope 的低频参数进入各自模块页；Beam Z / 播放 / Attenuation 因高频操作继续常驻 Dashboard。
 - 独立模块页不使用 Dashboard 的极限紧凑模板，使用顶部状态、左侧数据、左下图形、右侧配置的布局。
 - Power 的 Dashboard Trace 显示选择与 Test 采集选择分离并由 C# 配置持久化。
-- 关键测量值支持单实例 Big Readout：左上状态/名称、右上黑白切换与关闭、右下拖拽等比例缩放；读数窗应紧贴内容，前端只改变呈现方式，数据仍来自同一 Snapshot。
+- 关键测量值支持多个 Big Readout 并存：每窗左上状态/名称常显，右上黑白切换与关闭、右下等比例缩放手柄默认隐藏并在 hover/focus 时出现；各窗共享同一 Snapshot，只改变前端呈现。
 - 采集选择图标和模块标题图标共享选择/运行状态：selected 为绿色，running 为绿色呼吸动画。
 - 内部网格使用虚线，绘图区边界使用实线，Legend 保持透明图内。

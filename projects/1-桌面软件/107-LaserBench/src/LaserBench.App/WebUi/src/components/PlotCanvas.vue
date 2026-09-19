@@ -64,11 +64,11 @@ function draw() {
   ctx.setTransform(dpr,0,0,dpr,0,0)
   const w = rect.width, h = rect.height
   ctx.clearRect(0,0,w,h)
-  ctx.fillStyle = '#314251'
+  ctx.fillStyle = '#3b4d5b'
   ctx.fillRect(0,0,w,h)
 
   const hasRight = props.series.some(s => s.axis === 'right')
-  const m = props.compact ? {l:0,r:0,t:0,b:0} : props.tight ? {l:35,r:hasRight?35:2,t:2,b:20} : {l:37,r:hasRight?37:2,t:2,b:20}
+  const m = props.compact ? {l:0,r:0,t:0,b:0} : {l:38,r:38,t:8,b:21}
   const pw = Math.max(10,w-m.l-m.r), ph = Math.max(10,h-m.t-m.b)
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(m.l,m.t,pw,ph)

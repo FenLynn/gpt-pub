@@ -665,3 +665,383 @@
   .dashboard-grid:not(.focus-mode) .metric-trigger small{font-size:8.5px!important}
   .dashboard-grid:not(.focus-mode) .beam-top-controls input[type=range]{width:58px!important}
 }
+
+
+/* v0.4.16 Dashboard alignment + multi-readout polish */
+:root{--dashboard-shell:#3b4d5b}
+
+/* Dashboard shell: lighter, aligned, bounded. */
+.workspace{background:var(--dashboard-shell)!important}
+.dashboard-grid:not(.focus-mode){
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  grid-template-rows:48% 52%!important;
+  gap:2px!important;
+  background:var(--dashboard-shell)!important;
+  overflow:hidden!important
+}
+.dashboard-grid:not(.focus-mode)>.instrument-panel{
+  min-width:0!important;
+  max-width:100%!important;
+  width:100%!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  background:var(--dashboard-shell)!important
+}
+.dashboard-grid:not(.focus-mode) .power-panel,
+.dashboard-grid:not(.focus-mode) .spectrum-panel,
+.dashboard-grid:not(.focus-mode) .beam-panel,
+.dashboard-grid:not(.focus-mode) .scope-panel{
+  grid-template-rows:34px minmax(0,1fr)!important;
+  padding:0!important
+}
+.dashboard-grid:not(.focus-mode) .power-layout,
+.dashboard-grid:not(.focus-mode) .power-chart-zone,
+.dashboard-grid:not(.focus-mode) .beam-body,
+.dashboard-grid:not(.focus-mode) .scope-plots,
+.dashboard-grid:not(.focus-mode) .overview-row{
+  min-width:0!important;
+  width:100%!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  background:var(--dashboard-shell)!important
+}
+.dashboard-grid:not(.focus-mode) .main-plot,
+.dashboard-grid:not(.focus-mode) .spectrum-plot,
+.dashboard-grid:not(.focus-mode) .caustic-plot,
+.dashboard-grid:not(.focus-mode) .scope-plots>.plot-canvas{
+  min-width:0!important;
+  max-width:100%!important;
+  width:100%!important;
+  box-sizing:border-box!important;
+  background:var(--dashboard-shell)!important;
+  border:0!important;
+  border-radius:0!important
+}
+
+/* One common header grammar: same height, baseline, left/right padding and shell color. */
+.dashboard-grid:not(.focus-mode) .graph-overlay{
+  position:static!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  height:34px!important;
+  min-height:34px!important;
+  box-sizing:border-box!important;
+  align-items:center!important;
+  padding:0 10px!important;
+  background:var(--dashboard-shell)!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  overflow:hidden!important;
+  color:#e6edf2!important
+}
+.dashboard-grid:not(.focus-mode) .power-head,
+.dashboard-grid:not(.focus-mode) .spectrum-head,
+.dashboard-grid:not(.focus-mode) .scope-head{
+  display:grid!important;
+  grid-template-columns:78px minmax(0,1fr)!important;
+  column-gap:8px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-head{
+  display:grid!important;
+  grid-template-columns:78px minmax(0,1fr) max-content!important;
+  column-gap:7px!important
+}
+.dashboard-grid:not(.focus-mode) .module-title{
+  width:78px!important;
+  min-width:78px!important;
+  max-width:78px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:5px!important;
+  overflow:visible!important;
+  white-space:nowrap!important
+}
+.dashboard-grid:not(.focus-mode) .module-title strong{
+  font-size:12.5px!important;
+  line-height:1!important;
+  font-weight:650!important
+}
+.dashboard-grid:not(.focus-mode) .module-title .panel-mark{
+  width:19px!important;
+  height:19px!important;
+  flex:0 0 19px!important
+}
+.dashboard-grid:not(.focus-mode) .module-title .panel-mark svg{
+  width:18px!important;
+  height:18px!important
+}
+
+/* Header metrics never overlap the module title and never cross the right edge. */
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts{
+  min-width:0!important;
+  max-width:100%!important;
+  width:100%!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:8px!important;
+  overflow:hidden!important;
+  white-space:nowrap!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger{
+  flex:0 1 auto!important;
+  min-width:0!important;
+  height:26px!important;
+  padding:0 3px!important;
+  gap:4px!important;
+  border:0!important;
+  background:transparent!important;
+  overflow:visible!important;
+  white-space:nowrap!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger:hover{
+  background:rgba(255,255,255,.055)!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger em{
+  font-size:9px!important;
+  line-height:1!important;
+  color:#b6c4ce!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger b{
+  font-size:14px!important;
+  line-height:1!important;
+  color:#f5f8fa!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger small{
+  font-size:8.5px!important;
+  line-height:1!important;
+  color:#becad2!important
+}
+.dashboard-grid:not(.focus-mode) .secondary-trigger b{font-size:12.5px!important}
+.dashboard-grid:not(.focus-mode) .secondary-metric{
+  flex:0 0 auto!important;
+  font-size:9px!important;
+  color:#b5c2cb!important
+}
+.dashboard-grid:not(.focus-mode) .secondary-metric b{
+  font-size:12px!important;
+  color:#eef3f6!important
+}
+
+/* Beam header stays transparent/embedded; M2 has an explicit safe zone. */
+.dashboard-grid:not(.focus-mode) .beam-top-controls{
+  min-width:0!important;
+  max-width:100%!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:5px!important;
+  overflow:hidden!important;
+  white-space:nowrap!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls .control-label{font-size:9.5px!important}
+.dashboard-grid:not(.focus-mode) .beam-top-controls input[type=range]{
+  flex:0 1 74px!important;
+  width:74px!important;
+  min-width:42px!important;
+  height:12px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls>b{
+  flex:0 0 auto!important;
+  min-width:45px!important;
+  font-size:10.5px!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls .play-mini{
+  flex:0 0 23px!important;
+  width:23px!important;
+  height:23px!important;
+  border:0!important;
+  background:transparent!important;
+  color:#b9c6ce!important
+}
+.dashboard-grid:not(.focus-mode) .beam-top-controls .play-mini:hover{
+  background:rgba(255,255,255,.055)!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block{
+  min-width:max-content!important;
+  margin:0!important;
+  padding:0 11px 0 9px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:4px!important;
+  overflow:visible!important;
+  white-space:nowrap!important
+}
+.dashboard-grid:not(.focus-mode) .m2-block .metric-trigger{
+  padding:0 4px!important;
+  overflow:visible!important
+}
+
+/* Less crowding below, without adding decorative whitespace. */
+.dashboard-grid:not(.focus-mode) .power-chart-zone{
+  grid-template-rows:minmax(0,1fr) 30px!important;
+  gap:2px!important
+}
+.dashboard-grid:not(.focus-mode) .overview-row{padding:0 38px 1px!important}
+.dashboard-grid:not(.focus-mode) .scope-plots{
+  grid-template-rows:56% 44%!important;
+  gap:4px!important;
+  padding:0!important
+}
+.dashboard-grid:not(.focus-mode) .beam-body{
+  grid-template-columns:40% 60%!important;
+  gap:3px!important;
+  padding:0!important
+}
+
+/* Overlay controls on plots should obstruct as little as possible. */
+.beam-tools{background:transparent!important}
+.beam-tools button{
+  background:rgba(3,16,33,.28)!important;
+  border-color:rgba(255,255,255,.18)!important;
+  backdrop-filter:none!important
+}
+.overview-selected{background:rgba(69,121,161,.09)!important}
+
+/* Selection check has deliberate top clearance. */
+.module-toggle.active::after{
+  top:7px!important;
+  right:-1px!important
+}
+
+/* iPhone-like recording indicator: red capsule, white REC and white HH:MM:SS. */
+.record-btn.active{
+  height:28px!important;
+  min-width:124px!important;
+  max-width:none!important;
+  padding:0 10px!important;
+  gap:6px!important;
+  border-radius:14px!important;
+  background:#d74444!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  overflow:visible!important
+}
+.record-btn.active i{
+  width:7px!important;
+  height:7px!important;
+  background:#fff!important;
+  box-shadow:0 0 0 2px rgba(255,255,255,.16)!important
+}
+.record-btn.active>span{color:#fff!important}
+.record-btn.active .record-duration,
+.record-duration.shown{
+  display:inline-block!important;
+  width:58px!important;
+  min-width:58px!important;
+  max-width:none!important;
+  color:#fff!important;
+  font-size:11px!important;
+  font-weight:650!important;
+  letter-spacing:.15px!important;
+  visibility:visible!important;
+  opacity:1!important;
+  overflow:visible!important;
+  contain:none!important;
+  text-align:left!important
+}
+.record-btn:not(.active) .record-duration{display:none!important}
+
+/* Screenshot feedback is global and translucent, above every dashboard layer. */
+.capture-toast{
+  z-index:2147483646!important;
+  background:rgba(247,251,253,.94)!important;
+  pointer-events:none!important
+}
+
+/* Multi Big Readout: window hugs its value; controls only reveal on hover/focus. */
+.big-readout-window{
+  min-width:0!important;
+  min-height:0!important;
+  border:0!important;
+  border-radius:calc(3px * var(--readout-scale))!important;
+  overflow:hidden!important
+}
+.big-readout-top{
+  left:calc(6px * var(--readout-scale))!important;
+  right:calc(4px * var(--readout-scale))!important;
+  top:calc(4px * var(--readout-scale))!important;
+  height:calc(16px * var(--readout-scale))!important
+}
+.big-readout-identity{
+  gap:calc(4px * var(--readout-scale))!important;
+  font-size:calc(9px * var(--readout-scale))!important
+}
+.big-readout-identity i{
+  width:calc(6px * var(--readout-scale))!important;
+  height:calc(6px * var(--readout-scale))!important
+}
+.big-readout-body{
+  position:absolute!important;
+  inset:calc(17px * var(--readout-scale)) calc(4px * var(--readout-scale)) calc(2px * var(--readout-scale))!important;
+  width:auto!important;
+  height:auto!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important
+}
+.big-readout-value{
+  font-size:calc(70px * var(--readout-scale))!important;
+  line-height:.82!important;
+  white-space:nowrap!important
+}
+.big-readout-value small{
+  margin-left:.16em!important;
+  font-size:.27em!important
+}
+.big-readout-actions,
+.big-readout-resize{
+  opacity:0!important;
+  pointer-events:none!important;
+  transition:opacity .12s ease!important
+}
+.big-readout-window:hover .big-readout-actions,
+.big-readout-window:focus-within .big-readout-actions,
+.big-readout-window:hover .big-readout-resize,
+.big-readout-window:focus-within .big-readout-resize{
+  opacity:1!important;
+  pointer-events:auto!important
+}
+.big-readout-actions{gap:calc(3px * var(--readout-scale))!important}
+.readout-theme-toggle{
+  width:calc(28px * var(--readout-scale))!important;
+  height:calc(15px * var(--readout-scale))!important
+}
+.readout-theme-toggle span{
+  width:calc(10px * var(--readout-scale))!important;
+  height:calc(10px * var(--readout-scale))!important
+}
+.readout-close{
+  width:calc(17px * var(--readout-scale))!important;
+  height:calc(17px * var(--readout-scale))!important;
+  font-size:calc(18px * var(--readout-scale))!important
+}
+.big-readout-resize{
+  width:calc(20px * var(--readout-scale))!important;
+  height:calc(20px * var(--readout-scale))!important
+}
+
+/* Responsive priority: never overlap; drop secondary spectrum metrics first. */
+@media(max-width:1500px){
+  .dashboard-grid:not(.focus-mode) .spectrum-head .osa-metrics .secondary-trigger:nth-child(3){display:none!important}
+  .dashboard-grid:not(.focus-mode) .beam-top-controls input[type=range]{width:56px!important;flex-basis:56px!important}
+}
+@media(max-width:1250px){
+  .dashboard-grid:not(.focus-mode) .spectrum-head .osa-metrics .secondary-trigger:nth-child(2){display:none!important}
+  .dashboard-grid:not(.focus-mode) .graph-overlay{padding-left:7px!important;padding-right:7px!important}
+  .dashboard-grid:not(.focus-mode) .power-head,
+  .dashboard-grid:not(.focus-mode) .spectrum-head,
+  .dashboard-grid:not(.focus-mode) .scope-head{grid-template-columns:70px minmax(0,1fr)!important}
+  .dashboard-grid:not(.focus-mode) .beam-head{grid-template-columns:70px minmax(0,1fr) max-content!important}
+  .dashboard-grid:not(.focus-mode) .module-title{width:70px!important;min-width:70px!important;max-width:70px!important}
+}

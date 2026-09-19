@@ -20,11 +20,12 @@ const cameraFlash = ref(false)
 const recordElapsed = ref(0)
 const saveNotice = ref('')
 type BigReadoutKind = 'power0'|'power1'|'power2'|'spectrumCenter'|'spectrum3db'|'spectrumRms'|'spectrumPower'|'beamM2x'|'beamM2y'|'beamM2'|'scope0'|'scope1'
-const bigReadoutKind = ref<BigReadoutKind|null>(null)
-const bigReadoutLight = ref(false)
-const BIG_READOUT_BASE_W = 390
-const BIG_READOUT_BASE_H = 150
-const bigReadoutRect = ref({ x: 150, y: 110, scale: 1 })
+type BigReadoutWindow = { id:number; kind:BigReadoutKind; x:number; y:number; scale:number; light:boolean; z:number }
+const BIG_READOUT_KINDS:BigReadoutKind[]=['power0','power1','power2','spectrumCenter','spectrum3db','spectrumRms','spectrumPower','beamM2x','beamM2y','beamM2','scope0','scope1']
+const bigReadoutWindows = ref<BigReadoutWindow[]>([])
+const BIG_READOUT_BASE_H = 90
+let nextReadoutId = 1
+let readoutZ = 12000
 const settingsDraft = ref({
   experimentFolder: snapshot.value.config?.experimentFolder ?? '',
   autoScreenshot: snapshot.value.config?.autoScreenshot ?? false,
@@ -70,12 +71,13 @@ const clockText = computed(() => {
   const pad=(v:number)=>String(v).padStart(2,'0')
   return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 })
-const bigReadout = computed(() => {
+type BigReadoutData = { title:string; value:string; unit:string }
+function readoutData(kind:BigReadoutKind):BigReadoutData|null {
   const power=(index:number) => {
     const t=snapshot.value.power.traces[index]
     return t ? { title:t.name, value:t.value.toFixed(t.unit==='%'?1:2), unit:t.unit } : null
   }
-  switch(bigReadoutKind.value){
+  switch(kind){
     case 'power0': return power(0)
     case 'power1': return power(1)
     case 'power2': return power(2)
@@ -92,54 +94,92 @@ const bigReadout = computed(() => {
     case 'scope1': {
       const t=snapshot.value.scope.time[1]; return t ? { title:t.name, value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : null
     }
-    default: return null
   }
-})
-const bigReadoutSize = computed(() => ({
-  w: BIG_READOUT_BASE_W * bigReadoutRect.value.scale,
-  h: BIG_READOUT_BASE_H * bigReadoutRect.value.scale
-}))
-const bigReadoutStyle = computed(() => ({
-  left:`${bigReadoutRect.value.x}px`,
-  top:`${bigReadoutRect.value.y}px`,
-  width:`${bigReadoutSize.value.w}px`,
-  height:`${bigReadoutSize.value.h}px`,
-  '--readout-scale': String(bigReadoutRect.value.scale)
-}))
-
-function clampReadoutPosition(){
-  bigReadoutRect.value.x=Math.max(0,Math.min(bigReadoutRect.value.x,Math.max(0,window.innerWidth-bigReadoutSize.value.w)))
-  bigReadoutRect.value.y=Math.max(0,Math.min(bigReadoutRect.value.y,Math.max(0,window.innerHeight-bigReadoutSize.value.h)))
+  return null
 }
-function openReadout(kind:BigReadoutKind){ clampReadoutPosition(); bigReadoutKind.value=kind }
-function closeReadout(){ bigReadoutKind.value=null }
-function toggleReadoutTheme(){ bigReadoutLight.value=!bigReadoutLight.value }
-function persistReadoutRect(){ try{localStorage.setItem('laserbench.bigReadout.rect',JSON.stringify(bigReadoutRect.value))}catch{} }
-function beginReadoutDrag(e:PointerEvent){
-  const start={x:e.clientX,y:e.clientY,left:bigReadoutRect.value.x,top:bigReadoutRect.value.y}
-  const move=(ev:PointerEvent)=>{
-    const maxX=Math.max(0,window.innerWidth-bigReadoutSize.value.w)
-    const maxY=Math.max(0,window.innerHeight-bigReadoutSize.value.h)
-    bigReadoutRect.value.x=Math.max(0,Math.min(maxX,start.left+ev.clientX-start.x))
-    bigReadoutRect.value.y=Math.max(0,Math.min(maxY,start.top+ev.clientY-start.y))
+function readoutBaseWidth(kind:BigReadoutKind){
+  const d=readoutData(kind)
+  if(!d)return 220
+  const valueChars=d.value.length
+  const unitChars=Math.min(4,d.unit.length)
+  return Math.max(180,Math.min(430,Math.round(28+valueChars*39+unitChars*13)))
+}
+function readoutSize(win:BigReadoutWindow){
+  return {w:readoutBaseWidth(win.kind)*win.scale,h:BIG_READOUT_BASE_H*win.scale}
+}
+function readoutStyle(win:BigReadoutWindow){
+  const size=readoutSize(win)
+  return {
+    left:`${win.x}px`,
+    top:`${win.y}px`,
+    width:`${size.w}px`,
+    height:`${size.h}px`,
+    zIndex:String(win.z),
+    '--readout-scale':String(win.scale)
   }
-  const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);persistReadoutRect()}
+}
+function persistReadouts(){
+  try{
+    localStorage.setItem('laserbench.bigReadouts.v3',JSON.stringify(
+      bigReadoutWindows.value.map(({kind,x,y,scale,light})=>({kind,x,y,scale,light}))
+    ))
+  }catch{}
+}
+function clampReadout(win:BigReadoutWindow){
+  const size=readoutSize(win)
+  win.x=Math.max(0,Math.min(win.x,Math.max(0,window.innerWidth-size.w)))
+  win.y=Math.max(0,Math.min(win.y,Math.max(0,window.innerHeight-size.h)))
+}
+function bringReadoutToFront(win:BigReadoutWindow){
+  win.z=++readoutZ
+}
+function openReadout(kind:BigReadoutKind){
+  const existing=bigReadoutWindows.value.find(w=>w.kind===kind)
+  if(existing){bringReadoutToFront(existing);clampReadout(existing);persistReadouts();return}
+  const offset=(bigReadoutWindows.value.length%6)*24
+  const win:BigReadoutWindow={id:nextReadoutId++,kind,x:118+offset,y:82+offset,scale:1,light:false,z:++readoutZ}
+  clampReadout(win)
+  bigReadoutWindows.value.push(win)
+  persistReadouts()
+}
+function closeReadout(id:number){
+  bigReadoutWindows.value=bigReadoutWindows.value.filter(w=>w.id!==id)
+  persistReadouts()
+}
+function toggleReadoutTheme(win:BigReadoutWindow){
+  bringReadoutToFront(win)
+  win.light=!win.light
+  persistReadouts()
+}
+function beginReadoutDrag(e:PointerEvent,win:BigReadoutWindow){
+  bringReadoutToFront(win)
+  const start={x:e.clientX,y:e.clientY,left:win.x,top:win.y}
+  const move=(ev:PointerEvent)=>{
+    const size=readoutSize(win)
+    const maxX=Math.max(0,window.innerWidth-size.w)
+    const maxY=Math.max(0,window.innerHeight-size.h)
+    win.x=Math.max(0,Math.min(maxX,start.left+ev.clientX-start.x))
+    win.y=Math.max(0,Math.min(maxY,start.top+ev.clientY-start.y))
+  }
+  const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);persistReadouts()}
   window.addEventListener('pointermove',move);window.addEventListener('pointerup',up)
 }
-function beginReadoutResize(e:PointerEvent){
+function beginReadoutResize(e:PointerEvent,win:BigReadoutWindow){
   e.stopPropagation()
-  const start={x:e.clientX,y:e.clientY,scale:bigReadoutRect.value.scale}
+  bringReadoutToFront(win)
+  const baseW=readoutBaseWidth(win.kind)
+  const start={x:e.clientX,y:e.clientY,scale:win.scale}
   const move=(ev:PointerEvent)=>{
-    const dx=(ev.clientX-start.x)/BIG_READOUT_BASE_W
+    const dx=(ev.clientX-start.x)/baseW
     const dy=(ev.clientY-start.y)/BIG_READOUT_BASE_H
     const requested=start.scale+Math.max(dx,dy)
-    const maxScale=Math.max(.55,Math.min(
-      (window.innerWidth-bigReadoutRect.value.x-4)/BIG_READOUT_BASE_W,
-      (window.innerHeight-bigReadoutRect.value.y-4)/BIG_READOUT_BASE_H
+    const maxScale=Math.max(.5,Math.min(
+      (window.innerWidth-win.x-3)/baseW,
+      (window.innerHeight-win.y-3)/BIG_READOUT_BASE_H
     ))
-    bigReadoutRect.value.scale=Math.max(.55,Math.min(maxScale,requested))
+    win.scale=Math.max(.5,Math.min(maxScale,requested))
   }
-  const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);persistReadoutRect()}
+  const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);persistReadouts()}
   window.addEventListener('pointermove',move);window.addEventListener('pointerup',up)
 }
 
@@ -203,13 +243,22 @@ function nav(page:string){activePage.value=page}
 
 onMounted(()=>{
   try{
-    const saved=localStorage.getItem('laserbench.bigReadout.rect')
-    if(saved){
-      const r=JSON.parse(saved)
-      if(r&&Number.isFinite(r.x)&&Number.isFinite(r.y)){
-        const scale=Number.isFinite(r.scale)?r.scale:(Number.isFinite(r.w)?r.w/BIG_READOUT_BASE_W:1)
-        bigReadoutRect.value={x:r.x,y:r.y,scale:Math.max(.55,Math.min(3,scale))}
-      }
+    const saved=localStorage.getItem('laserbench.bigReadouts.v3')
+    const parsed=saved?JSON.parse(saved):[]
+    if(Array.isArray(parsed)){
+      bigReadoutWindows.value=parsed.slice(0,12).filter(r=>r&&BIG_READOUT_KINDS.includes(r.kind)&&Number.isFinite(r.x)&&Number.isFinite(r.y)).map(r=>{
+        const win:BigReadoutWindow={
+          id:nextReadoutId++,
+          kind:r.kind,
+          x:r.x,
+          y:r.y,
+          scale:Number.isFinite(r.scale)?Math.max(.5,Math.min(3,r.scale)):1,
+          light:!!r.light,
+          z:++readoutZ
+        }
+        clampReadout(win)
+        return win
+      })
     }
   }catch{}
   stopSnapshot=onSnapshot(s=>{
@@ -348,16 +397,16 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       </section>
     </main>
     <div v-if="cameraFlash" class="capture-toast">截图已保存</div>
-    <div v-if="bigReadout" class="big-readout-window" :class="{light:bigReadoutLight}" :style="bigReadoutStyle" role="dialog" aria-label="大读数" @pointerdown="beginReadoutDrag">
+    <div v-for="win in bigReadoutWindows" :key="win.id" class="big-readout-window" :class="{light:win.light}" :style="readoutStyle(win)" role="dialog" aria-label="大读数" @pointerdown="beginReadoutDrag($event,win)">
       <div class="big-readout-top">
-        <div class="big-readout-identity"><i></i><span>{{bigReadout.title}}</span></div>
+        <div class="big-readout-identity"><i></i><span>{{readoutData(win.kind)?.title}}</span></div>
         <div class="big-readout-actions">
-          <button class="readout-theme-toggle" @pointerdown.stop @click="toggleReadoutTheme" :title="bigReadoutLight?'切换为黑底白字':'切换为白底黑字'"><span></span></button>
-          <button class="readout-close" @pointerdown.stop @click="closeReadout" title="关闭">×</button>
+          <button class="readout-theme-toggle" @pointerdown.stop @click="toggleReadoutTheme(win)" :title="win.light?'切换为黑底白字':'切换为白底黑字'"><span></span></button>
+          <button class="readout-close" @pointerdown.stop @click="closeReadout(win.id)" title="关闭">×</button>
         </div>
       </div>
-      <div class="big-readout-body"><div class="big-readout-value">{{bigReadout.value}}<small v-if="bigReadout.unit">{{bigReadout.unit}}</small></div></div>
-      <div class="big-readout-resize" @pointerdown.stop="beginReadoutResize" title="拖动缩放"><i></i><i></i><i></i></div>
+      <div class="big-readout-body"><div class="big-readout-value">{{readoutData(win.kind)?.value}}<small v-if="readoutData(win.kind)?.unit">{{readoutData(win.kind)?.unit}}</small></div></div>
+      <div class="big-readout-resize" @pointerdown.stop="beginReadoutResize($event,win)" title="拖动缩放"><i></i><i></i><i></i></div>
     </div>
   </div>
 </template>

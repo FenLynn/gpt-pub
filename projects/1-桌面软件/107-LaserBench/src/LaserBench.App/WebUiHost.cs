@@ -320,7 +320,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.15",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.16",
             mode = _provider.IsSimulator ? "SIM" : "HW",
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
