@@ -48,6 +48,7 @@ import type {
   MarkerSymbol,
   PlotTemplateId,
   PresetId,
+  PublicationMode,
   ProjectFolder,
   ProjectState,
   SeriesOverride,
@@ -63,6 +64,7 @@ import {
   resolveCanvasMm
 } from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
+import { resolvePublicationMetrics } from "./plot/publication";
 import { templates } from "./plot/templates";
 import { checkFigure } from "./project/checker";
 import {
@@ -1879,6 +1881,7 @@ function App() {
       templateId: activeFigure.templateId,
       presetId: activeFigure.presetId,
       figureOverrides: {
+        publicationMode: source.publicationMode,
         aspectMode: source.aspectMode,
         customAspectWidth: source.customAspectWidth,
         customAspectHeight: source.customAspectHeight,
@@ -2258,16 +2261,35 @@ function App() {
     );
   }
 
+  const publicationMetrics = activeFigure
+    ? resolvePublicationMetrics(preset, activeFigure)
+    : {
+        mode: "single" as const,
+        widthMm: preset.widthMm,
+        fontSizePt: preset.fontSizePt,
+        lineWidthPt: preset.lineWidthPt,
+        axisWidthPt: preset.axisWidthPt,
+        markerSizePt: preset.markerSizePt,
+        majorTickLengthPt: 3.5,
+        minorTickLengthPt: 2,
+        axisTitleScale: 1.08,
+        plotTitleScale: 1.18,
+        legendScale: 0.94,
+        outerMarginScale: 1
+      };
   const effectiveFontFamily =
     activeFigure?.figureOverrides.fontFamily || preset.fontFamily;
   const effectiveFontSizePt =
-    activeFigure?.figureOverrides.fontSizePt ?? preset.fontSizePt;
+    activeFigure?.figureOverrides.fontSizePt ?? publicationMetrics.fontSizePt;
+  const publicationMode =
+    activeFigure?.figureOverrides.publicationMode ?? "single";
   const aspectMode = activeFigure?.figureOverrides.aspectMode ?? "4:3";
   const canvasMm = activeFigure
     ? resolveCanvasMm(preset, activeFigure)
-    : { widthMm: preset.widthMm, heightMm: preset.heightMm };
+    : { widthMm: publicationMetrics.widthMm, heightMm: preset.heightMm };
 
-  const lineWidth = primaryOverride.lineWidthPt ?? preset.lineWidthPt;
+  const lineWidth =
+    primaryOverride.lineWidthPt ?? publicationMetrics.lineWidthPt;
   const lineStyle = primaryOverride.lineStyle ?? "solid";
   const lineVisible = primaryOverride.lineVisible ?? true;
   const markerVisible =
@@ -2276,7 +2298,8 @@ function App() {
       activeFigure?.templateId === "xy-line-marker" ||
       activeFigure?.templateId === "xy-errorbar");
   const markerSymbol = primaryOverride.markerSymbol ?? "circle";
-  const markerSize = primaryOverride.markerSizePt ?? preset.markerSizePt;
+  const markerSize =
+    primaryOverride.markerSizePt ?? publicationMetrics.markerSizePt;
   const opacity = primaryOverride.opacity ?? 1;
   const primaryIndex =
     primarySeries && plotDataset
@@ -3524,6 +3547,22 @@ function App() {
                     </div>
 
                     <div className="prop-row">
+                      <label>版式</label>
+                      <select
+                        value={publicationMode}
+                        onChange={(event) =>
+                          setFigureField(
+                            "publicationMode",
+                            event.target.value as PublicationMode
+                          )
+                        }
+                      >
+                        <option value="single">单图</option>
+                        <option value="quad-panel">四合一子图</option>
+                      </select>
+                    </div>
+
+                    <div className="prop-row">
                       <label>比例</label>
                       <select
                         value={aspectMode}
@@ -3588,6 +3627,18 @@ function App() {
                       <span>
                         {canvasMm.widthMm.toFixed(0)} × {canvasMm.heightMm.toFixed(1)} mm
                       </span>
+                    </div>
+                    <div className="column-role-help publication-mode-note">
+                      <strong>
+                        {publicationMode === "quad-panel"
+                          ? "四合一子图版式"
+                          : "单图版式"}
+                      </strong>
+                      <p>
+                        {publicationMode === "quad-panel"
+                          ? "按 2 × 2 组图中的单个面板设计：缩小物理画布并压紧页边距，但不会把字号、线宽和 marker 等比例缩小。"
+                          : "按独立论文图设计：保留更舒展的外边距和单图尺寸。"}
+                      </p>
                     </div>
 
                     {(offsetSpectrumTemplate || waterfallTemplate) && (
