@@ -129,8 +129,10 @@ internal sealed class OphirJunoWorker : IDisposable
             {
                 int handle;
                 lm.OpenUSBDevice(serial, out handle);
-                lm.StartStream(handle, 0);
                 opened.Add((handle, serial));
+
+                EnsurePowerMeasurementMode(lm, handle, serial);
+                lm.StartStream(handle, 0);
             }
 
             SetStatus("streaming", $"已打开 {opened.Count} 台 Ophir USB 设备，等待首个测量包…", false, string.Join(", ", opened.Select(x => x.Serial)));
@@ -188,7 +190,7 @@ internal sealed class OphirJunoWorker : IDisposable
                     _failureCount = 0;
                     SetStatus(
                         "ready",
-                        $"Ophir Juno 实时流已接入（{traces.Count} 条真实/数学通道；GetData W 已标准化为 kW）。",
+                        $"Ophir Juno Power 模式实时流已接入（{traces.Count} 条真实/数学通道；GetData W 已标准化为 kW）。",
                         true,
                         string.Join(", ", opened.Select(x => x.Serial)),
                         snapshot.Timestamp);
@@ -214,6 +216,28 @@ internal sealed class OphirJunoWorker : IDisposable
                 catch { }
             }
         }
+    }
+
+    private static void EnsurePowerMeasurementMode(dynamic lm, int handle, string serial)
+    {
+        int currentIndex;
+        object optionsObject;
+        lm.GetMeasurementMode(handle, 0, out currentIndex, out optionsObject);
+
+        var options = ToStrings(optionsObject);
+        var powerIndex = Array.FindIndex(
+            options,
+            option => option.Trim().Equals("Power", StringComparison.OrdinalIgnoreCase));
+
+        if (powerIndex < 0)
+        {
+            var available = options.Length == 0 ? "无" : string.Join(", ", options);
+            throw new InvalidOperationException(
+                $"Ophir {serial} 当前传感器不提供标准 Power 测量模式；可用模式：{available}。LaserBench 不会把 Energy/Exposure 数据当成功率。");
+        }
+
+        if (currentIndex != powerIndex)
+            lm.SetMeasurementMode(handle, 0, powerIndex);
     }
 
     private static string[] SelectSerials(string[] serials, string endpoint)

@@ -127,6 +127,11 @@ internal sealed class TektronixMso44Worker : HardwareWorkerBase
         await connection.WriteLineAsync($":ACQUIRE:MODE {mode}", token);
         if (mode == "AVERAGE")
             await connection.WriteLineAsync($":ACQUIRE:NUMAVG {Math.Clamp(Config.ScopeAverage, 2, 1024)}", token);
+
+        // LaserBench is a live workstation. Do not inherit a front-panel STOP or SINGLE state
+        // and then repeatedly return an old waveform.
+        await connection.WriteLineAsync(":ACQUIRE:STOPAFTER RUNSTOP", token);
+        await connection.WriteLineAsync(":ACQUIRE:STATE RUN", token);
     }
 
     private static async Task<TekWaveform> ReadChannelAsync(ScpiTcpConnection connection, string channel, CancellationToken token)

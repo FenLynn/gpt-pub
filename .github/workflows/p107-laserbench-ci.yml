@@ -149,13 +149,13 @@ jobs:
           $hybrid=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/HybridInstrumentProvider.cs" -Raw
           $bridge=Get-Content "$env:PROJECT_ROOT/src/LaserBench.BeamSquaredBridge/Program.cs" -Raw
 
-          foreach($needle in @('ScanUSB','OpenUSBDevice','StartStream','GetData','CoLMMeasurement')){
+          foreach($needle in @('ScanUSB','OpenUSBDevice','GetMeasurementMode','SetMeasurementMode','StartStream','GetData','CoLMMeasurement')){
             if($juno -notlike "*$needle*"){ throw "Ophir Juno driver contract missing: $needle" }
           }
-          foreach($needle in @('10001','open \"anonymous\"',':TRACE:DATA:X? TRA',':TRACE:DATA:Y? TRA','*IDN?')){
+          foreach($needle in @('10001','open \"anonymous\"',':STAT:OPER:EVEN?',':TRACE:DATA:X? TRA',':TRACE:DATA:Y? TRA','*IDN?')){
             if($aq -notlike "*$needle*"){ throw "AQ6370D driver contract missing: $needle" }
           }
-          foreach($needle in @('4000',':WFMOUTPRE:XINCR?',':WFMOUTPRE:XZERO?',':WFMOUTPRE:PT_OFF?',':CURVE?','SignalMath.Fft')){
+          foreach($needle in @('4000',':ACQUIRE:STOPAFTER RUNSTOP',':ACQUIRE:STATE RUN',':WFMOUTPRE:XINCR?',':WFMOUTPRE:XZERO?',':WFMOUTPRE:PT_OFF?',':CURVE?','SignalMath.Fft')){
             if($tek -notlike "*$needle*"){ throw "Tektronix MSO44 driver contract missing: $needle" }
           }
           foreach($needle in @('M2.Automation.dll','LaserBench.BeamSquaredBridge.exe','SNAPSHOT')){

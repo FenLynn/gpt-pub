@@ -107,10 +107,10 @@ C# / .NET 8 / WinForms Host / Windows x64
 
 v0.5.0 已实现四条真实通信路径，但 **CI 只能验证代码、协议解析、bridge、构建和无硬件启动；不能替代实验室实机验收**。
 
-1. **Ophir Juno**：安装 StarLab / OphirLMMeasurement 后，LaserBench 通过 COM 扫描 USB、打开设备并持续 `GetData`；`AUTO` 使用发现到的设备，也可填写序列号。
-2. **Yokogawa AQ6370D**：仪器网络设置启用 socket remote，填写 IP 或 TCPIP 地址；LaserBench 直接连接 TCP 10001，执行 LAN authentication、`*IDN?`、扫描参数和 TRA X/Y 读取，不要求 NI-VISA。
+1. **Ophir Juno**：安装 StarLab / OphirLMMeasurement 后，LaserBench 通过 COM 扫描 USB、打开设备，先读取可用 measurement modes 并显式切到标准 **Power** 模式，再 StartStream / `GetData`；`AUTO` 使用发现到的设备，也可填写序列号。若传感器不提供 Power 模式，LaserBench 会拒绝把 Energy/Exposure 数据当成功率。
+2. **Yokogawa AQ6370D**：仪器网络设置启用 socket remote，填写 IP 或 TCPIP 地址；LaserBench 直接连接 TCP 10001，执行 LAN authentication、`*IDN?`、扫描参数，并按 `:STAT:OPER:EVEN?` 的 sweep-complete 事件同步后再读取 TRA X/Y，不要求 NI-VISA。SINGLE 每轮取得新扫描，REPEAT 按完成事件逐帧读取，避免旧 TRA/半帧。
 3. **BeamSquared / SP920**：安装 BeamSquared 且 Automation 组件可用。Portable 内自带 LaserBench 的 net48 bridge，但不复制厂商 `M2.Automation.dll`；默认从 BeamSquared 安装目录寻找，也可填写自定义安装目录/DLL 路径。
-4. **Tektronix MSO44**：仪器 LAN remote/socket 可用后填写 IP；LaserBench 直接连接 raw TCP 4000，读取 CH1/CH2 waveform preamble + CURVe?，根据真实 `XINCR/XZERO/PT_OFF/YMULT/YOFF/YZERO` 还原波形并本地计算 FFT。
+4. **Tektronix MSO44**：仪器 LAN remote/socket 可用后填写 IP；LaserBench 直接连接 raw TCP 4000，显式进入连续采集 RUNSTOP/RUN，读取 CH1/CH2 waveform preamble + CURVe?，根据真实 `XINCR/XZERO/PT_OFF/YMULT/YOFF/YZERO` 还原波形并本地计算 FFT。
 
 真实 Driver 只能接设备抽象层，不允许重写 Dashboard 或绕开统一安全保存层。每台实机最终验收必须记录：依赖版本、设备身份、固件、枚举/握手、连续读取、拔插/断网重连、时间戳、Test 保存与长时间稳定性。
 

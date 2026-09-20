@@ -50,6 +50,7 @@ internal sealed class Aq6370dWorker : HardwareWorkerBase
             throw new InvalidOperationException($"目标设备不是预期的 Yokogawa AQ6370 系列：{identity}");
 
         string? appliedSignature = null;
+        var repeatStarted = false;
         while (!token.IsCancellationRequested &&
                Enabled &&
                string.Equals(endpointText, Endpoint, StringComparison.OrdinalIgnoreCase) &&
@@ -60,7 +61,26 @@ internal sealed class Aq6370dWorker : HardwareWorkerBase
             {
                 await ApplySettingsAsync(connection, token);
                 appliedSignature = signature;
+                repeatStarted = false;
             }
+
+            var repeat = Config.OsaSweepMode.Equals("REPEAT", StringComparison.OrdinalIgnoreCase);
+            if (repeat)
+            {
+                if (!repeatStarted)
+                {
+                    await connection.WriteLineAsync("*CLS", token);
+                    await connection.WriteLineAsync(":INITIATE", token);
+                    repeatStarted = true;
+                }
+            }
+            else
+            {
+                await connection.WriteLineAsync("*CLS", token);
+                await connection.WriteLineAsync(":INITIATE", token);
+            }
+
+            await WaitForFreshSweepAsync(connection, identity, token);
 
             var xRaw = await connection.QueryAsync(":TRACE:DATA:X? TRA", token);
             var yRaw = await connection.QueryAsync(":TRACE:DATA:Y? TRA", token);
@@ -124,7 +144,29 @@ internal sealed class Aq6370dWorker : HardwareWorkerBase
 
         var repeat = Config.OsaSweepMode.Equals("REPEAT", StringComparison.OrdinalIgnoreCase);
         await connection.WriteLineAsync($":INITIATE:SMODE {(repeat ? "REPEAT" : "SINGLE")}", token);
-        await connection.WriteLineAsync(":INITIATE", token);
+    }
+
+    private async Task WaitForFreshSweepAsync(ScpiTcpConnection connection, string identity, CancellationToken token)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(120);
+        while (!token.IsCancellationRequested)
+        {
+            var eventText = await connection.QueryAsync(":STAT:OPER:EVEN?", token);
+            var eventValue = (int)Math.Round(InstrumentParse.Double(eventText, "AQ6370D operation event"));
+            if ((eventValue & 0x1) != 0) return;
+
+            if (DateTime.UtcNow >= deadline)
+                throw new TimeoutException("AQ6370D sweep 在 120 秒内未报告完成（STAT:OPER:EVEN bit0）。");
+
+            MarkStatus(
+                "streaming",
+                "AQ6370D 已连接，正在等待新的 sweep 完成后再读取 TRA…",
+                Latest is not null,
+                identity);
+            await Task.Delay(80, token);
+        }
+
+        token.ThrowIfCancellationRequested();
     }
 
     private static string NormalizeSensitivity(string value)
