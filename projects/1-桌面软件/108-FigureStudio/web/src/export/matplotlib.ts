@@ -589,6 +589,17 @@ if template == "surface-3d":
         if O.get("colorbarTitle"):
             cb.set_label(O["colorbarTitle"])
     ax.set_box_aspect((4, 4, 3))
+    tick_direction = "in" if O.get("tickDirection", "inside") == "inside" else "out"
+    for axis_name in ("x", "y", "z"):
+        ax.tick_params(
+            axis=axis_name,
+            which="major",
+            direction=tick_direction,
+            labelsize=O.get("tickLabelSizePt", font_size * 0.96),
+            width=axis_width,
+            length=PRESET["majorTickLengthPt"],
+            colors=O.get("tickLabelColor", "#17191c"),
+        )
     ax.set_xlabel(P["autoTitles"]["x"])
     ax.set_ylabel(P["autoTitles"]["y"])
     ax.set_zlabel(P["autoTitles"]["z"])
