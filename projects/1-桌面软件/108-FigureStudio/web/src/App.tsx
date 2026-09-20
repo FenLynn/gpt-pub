@@ -5303,7 +5303,7 @@ function App() {
                       </div>
                     )}
                     <div className="prop-row">
-                      <label>标题字号</label>
+                      <label>轴标题字号</label>
                       <div className="compact-number">
                         <input
                           type="number"
@@ -5312,7 +5312,7 @@ function App() {
                           step="0.25"
                           value={
                             activeFigure.figureOverrides.axisTitleSizePt ??
-                            effectiveFontSizePt
+                            effectiveFontSizePt * publicationMetrics.axisTitleScale
                           }
                           onChange={(event) =>
                             setFigureField(
@@ -5347,7 +5347,7 @@ function App() {
                           step="0.25"
                           value={
                             activeFigure.figureOverrides.plotTitleSizePt ??
-                            effectiveFontSizePt * 1.12
+                            effectiveFontSizePt * publicationMetrics.plotTitleScale
                           }
                           onChange={(event) =>
                             setFigureField(
@@ -5382,7 +5382,7 @@ function App() {
                           step="0.25"
                           value={
                             activeFigure.figureOverrides.tickLabelSizePt ??
-                            effectiveFontSizePt
+                            effectiveFontSizePt * 0.96
                           }
                           onChange={(event) =>
                             setFigureField(
