@@ -72,7 +72,7 @@ export function resolvePublicationMetrics(
     plotTitleScale: 1.12,
     plotTitlePadPt: 4.5,
     legendScale: 0.92,
-    outerMarginScale: 0.88
+    outerMarginScale: 0.78
   };
 }
 
