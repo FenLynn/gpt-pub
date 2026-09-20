@@ -386,7 +386,7 @@ def configure_axis(axis_obj, side="left"):
     apply_tick_formatter(axis_obj, "y", fmt, decimals, prefix, suffix)
     axis_obj.tick_params(
         axis="y",
-        direction="in" if O.get("tickDirection", "outside") == "inside" else "out",
+        direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
         labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
@@ -438,7 +438,7 @@ def configure_x(axis_obj):
 
     axis_obj.tick_params(
         axis="x",
-        direction="in" if O.get("tickDirection", "outside") == "inside" else "out",
+        direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
         labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
@@ -890,6 +890,9 @@ else:
             ax.tick_params(axis="y", colors=left_axis_color)
         if O.get("axisTitleColor") is None:
             ax.yaxis.label.set_color(left_axis_color)
+        ax.spines["left"].set_color(left_axis_color)
+        # twinx creates overlapping spines; keep exactly one visible line per side.
+        ax.spines["right"].set_visible(False)
     if ax2 is not None:
         configure_axis(ax2, "right")
         right_label_color = O.get("axisTitleColor") or right_axis_color or "#17191c"
@@ -902,6 +905,12 @@ else:
             ax2.tick_params(axis="y", colors=right_axis_color)
         for spine in ax2.spines.values():
             spine.set_linewidth(axis_width)
+        ax2.spines["left"].set_visible(False)
+        ax2.spines["top"].set_visible(False)
+        ax2.spines["bottom"].set_visible(False)
+        ax2.spines["right"].set_visible(True)
+        if right_axis_color is not None:
+            ax2.spines["right"].set_color(right_axis_color)
         add_legend(ax, ax2)
     else:
         add_legend(ax)
