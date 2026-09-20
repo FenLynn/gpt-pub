@@ -152,9 +152,12 @@ internal sealed class OphirJunoWorker : IDisposable
                     for (var j = 0; j < values.Length; j++)
                     {
                         if (j < statuses.Length && statuses[j] != 0) continue;
-                        latestValues[i] = values[j];
+                        // OphirLMMeasurement power-mode GetData values are SI watts.
+                        // LaserBench's power workspace is standardized to kW.
+                        var kilowatts = values[j] / 1000.0;
+                        latestValues[i] = kilowatts;
                         haveValue[i] = true;
-                        AddHistory(i, nowSeconds, values[j]);
+                        AddHistory(i, nowSeconds, kilowatts);
                     }
                 }
 
@@ -170,7 +173,7 @@ internal sealed class OphirJunoWorker : IDisposable
                             1 => _config.Power2Alias,
                             _ => $"power{i + 1}"
                         };
-                        traces.Add(new NumericTrace(alias, "W", latestValues[i], WindowMax(i, _config.PowerWindow, latestValues[i])));
+                        traces.Add(new NumericTrace(alias, "kW", latestValues[i], WindowMax(i, _config.PowerWindow, latestValues[i])));
                     }
 
                     if (opened.Count >= 2 && haveValue[0] && haveValue[1] && Math.Abs(latestValues[0]) > 1e-18)
@@ -185,7 +188,7 @@ internal sealed class OphirJunoWorker : IDisposable
                     _failureCount = 0;
                     SetStatus(
                         "ready",
-                        $"Ophir Juno 实时流已接入（{traces.Count} 条真实/数学通道，COM GetData）。",
+                        $"Ophir Juno 实时流已接入（{traces.Count} 条真实/数学通道；GetData W 已标准化为 kW）。",
                         true,
                         string.Join(", ", opened.Select(x => x.Serial)),
                         snapshot.Timestamp);
