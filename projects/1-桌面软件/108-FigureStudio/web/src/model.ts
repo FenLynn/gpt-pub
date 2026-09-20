@@ -72,6 +72,7 @@ export interface ProjectFolder {
 
 export type PresetId = "scientific" | "nature" | "presentation";
 export type PublicationMode = "single" | "quad-panel";
+export type ColorCycleId = "matplotlib" | "matlab";
 export type AspectMode = "16:9" | "4:3" | "3:2" | "custom";
 export type PlotTemplateId =
   | "xy-line"
@@ -161,6 +162,7 @@ export interface SeriesOverride {
 
 export interface FigureOverrides {
   publicationMode?: PublicationMode;
+  colorCycle?: ColorCycleId;
   fontFamily?: "Arial" | "Times New Roman";
   fontSizePt?: number;
   background?: string;
