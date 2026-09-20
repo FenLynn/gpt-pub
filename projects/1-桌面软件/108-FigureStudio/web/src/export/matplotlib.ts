@@ -887,11 +887,13 @@ else:
 fig.patch.set_facecolor(O.get("background", "#ffffff"))
 fig.tight_layout()
 
-# Publication examples:
-# fig.savefig("figure.svg", bbox_inches="tight")
-# fig.savefig("figure.pdf", bbox_inches="tight")
-# fig.savefig("figure.eps", bbox_inches="tight")
-# fig.savefig("figure.tiff", dpi=600, bbox_inches="tight")
+# Publication examples: preserve the exact FigureStudio physical canvas.
+# Avoid bbox_inches="tight" here because it changes the exported figure size.
+# fig.savefig("figure.svg")
+# fig.savefig("figure.pdf")
+# fig.savefig("figure.eps")
+# fig.savefig("figure.tiff", dpi=600)
+# fig.savefig("figure.png", dpi=600)
 plt.show()
 `;
 }
