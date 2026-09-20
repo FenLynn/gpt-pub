@@ -152,7 +152,8 @@ internal static class Program
                 .Select(i =>
                 {
                     var x = 1078.0 + i * 0.005;
-                    var y = -75.0 + 70.0 * Math.Exp(-0.5 * Math.Pow((x - 1080.0) / 0.32, 2));
+                    var linearPower = Math.Exp(-0.5 * Math.Pow((x - 1080.0) / 0.32, 2));
+                    var y = -5.0 + 10.0 * Math.Log10(Math.Max(linearPower, 1e-12));
                     return new SpectrumPoint(x, y);
                 }).ToArray();
             var spectrumAnalysis = SignalMath.AnalyzeSpectrum(syntheticSpectrum, DateTime.Now);

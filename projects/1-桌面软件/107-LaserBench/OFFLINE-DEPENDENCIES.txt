@@ -1,60 +1,70 @@
-LaserBench v0.4.10 offline dependency guide
+LaserBench v0.5.0 offline dependency guide
 =========================================
 
-LaserBench is a portable application. Its configuration, runtime cache and experiment data stay with the LaserBench folder.
-
-Required runtimes for v0.4.10
------------------------------
+LaserBench base runtime
+-----------------------
 1. Microsoft .NET 8 Desktop Runtime, Windows x64.
 2. Microsoft Edge WebView2 Evergreen Runtime.
 
-LaserBench.exe is a NativeAOT dependency launcher. It checks both required runtimes before starting LaserBench.App.exe.
+LaserBench.exe is the NativeAOT dependency launcher. Base Simulator operation does not require vendor software.
 
-Online installation
--------------------
+Portable hardware bridge
+------------------------
+The candidate package includes:
+  runtime\BeamSquaredBridge\LaserBench.BeamSquaredBridge.exe
+
+This executable is LaserBench-owned glue for the vendor BeamSquared Automation API. It does NOT bundle Ophir/Spiricon vendor DLLs.
+
+Real hardware dependencies
+--------------------------
+Ophir Juno
+  - Install a current Ophir StarLab/Ophir software package that exposes
+    OphirLMMeasurement.CoLMMeasurement and the Juno USB driver.
+  - In LaserBench Power > 设置 > 设备接口, enable the real interface.
+  - Endpoint AUTO scans attached Ophir USB devices; a serial number can be supplied to select a specific device.
+
+Yokogawa AQ6370D
+  - No VISA package is required for LaserBench's direct socket path.
+  - Configure the OSA Ethernet remote interface for socket control.
+  - Enter the OSA IP address (or an explicit TCPIP/socket address).
+  - LaserBench uses TCP port 10001, performs the AQ6370 LAN authentication handshake,
+    verifies *IDN?, applies supported sweep settings, and reads TRA wavelength/level arrays.
+
+Ophir Spiricon BeamSquared / SP920
+  - Install BeamSquared with its Automation component.
+  - The vendor M2.Automation.dll must remain in the BeamSquared installation; LaserBench does not redistribute it.
+  - BeamSquared Automation requires .NET Framework. LaserBench therefore runs the bundled
+    LaserBench.BeamSquaredBridge.exe as a separate .NET Framework 4.8 process.
+  - AUTO searches the conventional BeamSquared install location. A custom BeamSquared folder
+    or M2.Automation.dll path can be entered when required.
+
+Tektronix MSO44
+  - No TekVISA package is required for LaserBench's direct raw-socket path.
+  - Enable LAN remote/socket access on the oscilloscope and enter its IP address.
+  - LaserBench uses raw TCP port 4000, verifies *IDN?, reads CH1/CH2 waveform preamble + CURVe?,
+    reconstructs the physical waveform and computes FFT locally.
+
+Safety / data provenance
+------------------------
+- Enabling a real interface never silently falls back to Simulator for that module.
+- The module becomes real only after an actual sample has been read; UI status must show "已连接 / 实时".
+- If a selected Test module has real hardware enabled but is not ready, Test is blocked for that module
+  instead of writing Simulator/empty data as if it were hardware data.
+- Other modules may continue to use Simulator, so MIXED mode is expected and supported.
+
+Online installation for base runtimes
+-------------------------------------
 The portable package contains:
   tools\install-dotnet8.ps1
   tools\install-webview2.ps1
 
-Both scripts download only from Microsoft sources and verify the downloaded executable has a valid Microsoft Authenticode signature before installation.
+Both scripts download only from Microsoft sources and verify Microsoft Authenticode signatures.
 
-Offline preparation on a computer with Internet access
--------------------------------------------------------
-1. Download the Microsoft .NET 8 Desktop Runtime x64 installer:
-   https://dotnet.microsoft.com/download/dotnet/8.0
-
-2. Download the Microsoft Edge WebView2 Evergreen Standalone Installer for x64:
-   https://developer.microsoft.com/microsoft-edge/webview2/#download-section
-
-3. Copy both installers together with the complete LaserBench portable folder to the offline computer.
-
-Offline installation
---------------------
-1. Install Microsoft .NET 8 Desktop Runtime x64.
-2. Install Microsoft Edge WebView2 Evergreen Runtime x64.
-3. Keep the complete LaserBench folder in a normal writable location such as D:\LaserBench or another experiment drive.
-4. Do not place the portable folder under a location where ordinary users cannot write.
-5. Run LaserBench.exe again.
-
-Important portable layout
--------------------------
-LaserBench.exe
-LaserBench.App.exe
-config\
-data\exp\
-data\pic\
-data\video\
-logs\
-runtime\
-tools\
-  install-dotnet8.ps1
-  install-webview2.ps1
-OFFLINE-DEPENDENCIES.txt
-
-Only data\exp uses a date folder by default when no custom experiment folder is selected.
-data\pic and data\video store files directly and do not create date subfolders.
-runtime\ contains LaserBench-owned caches such as extracted Web UI assets and WebView2 user data; it is not experiment data.
-
-Future optional hardware dependencies
--------------------------------------
-LaserBench detects vendor SDKs or drivers only when the corresponding hardware module is introduced. They are not bundled into the base portable package merely for future use. Each hardware integration must add explicit detection plus online/offline dependency instructions before it can be considered complete.
+Offline preparation
+-------------------
+1. Download/install Microsoft .NET 8 Desktop Runtime x64.
+2. Download/install Microsoft Edge WebView2 Evergreen Runtime x64.
+3. For BeamSquared hardware, ensure .NET Framework 4.8/4.8.1 and the vendor BeamSquared Automation installation are available.
+4. For Juno hardware, ensure Ophir StarLab/OphirLMMeasurement and its USB driver are installed.
+5. Keep the complete LaserBench folder in a writable location such as D:\LaserBench.
+6. Start LaserBench.exe, configure each module interface, and use "立即重新探测".

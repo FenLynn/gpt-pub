@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 正在开发 **v0.4.27 Compact Workstation / Native Folder Flow**，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 已进入 **v0.5.0 Real Hardware Data Plane** 开发候选，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -33,7 +33,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - 生产 UI 从 v0.3.0 起为 **WinForms Host + Microsoft WebView2 + Vue 3 / TypeScript / Vite + Canvas**。
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
-- 当前实际数据提供者仍是 Simulator；v0.4.26 已建立 Ophir Juno、Yokogawa AQ6370D、BeamSquared/SP920、Tektronix MSO44 的接口配置、adapter registry、状态快照与 Provider 选择边界，但四个真实 Driver 的数据平面均保持 `DataPlaneReady=false`，不得把“已配置”写成“已连接”。
+- v0.5.0 已将 `InstrumentProviderFactory` 切到 `HybridInstrumentProvider`：Juno=USB/COM STA worker，AQ6370D=TCP/SCPI worker，BeamSquared=net48 Automation bridge，MSO44=raw TCP/SCPI worker。本模块真实接口关闭时才使用 Simulator；启用真实接口但尚未 ready 时绝不伪装为 Simulator 数据。`DataPlaneReady=true` 只能由后台 worker 在成功读取真实样本后产生。
 - Web UI 已有 Dashboard、Power/Spectrum/Beam/Scope 工作站式独立页、Data 和 Settings。v0.4.27 将独立页标题区从上一版进一步压缩到仅覆盖模块图标/标题/通道状态的高度；通道信息紧贴标题，右侧参数侧栏继续支持“设置/结果”双页签与折叠。Scope 采用 FFT 上、时域下且 FFT 更大的结构。
 
 ## 当前产品不变量
@@ -65,14 +65,14 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 
 ## 下一阶段边界
 
-0.4.x 收口后，0.5.x 再进入真实仪器 Probe：
+v0.5.0 的源码/CI 目标是把四条真实通信链做到可执行并安全失败；下一步不是再搭抽象层，而是拿实验室实机逐台完成 Probe 验收：
 
-1. Ophir Juno / OphirLMMeasurement
-2. Yokogawa AQ6370D
-3. Ophir Spiricon BeamSquared / SP920
-4. Tektronix MSO44
+1. Juno：确认 StarLab/OphirLMMeasurement 版本、USB 枚举、传感器 power mode、连续 GetData 与拔插恢复。
+2. AQ6370D：确认固件/remote interface、10001 socket authentication、*IDN?、TRA 点数/单位、扫描状态与断网恢复。
+3. BeamSquared/SP920：确认安装目录、M2.Automation.dll 版本、net48 bridge、Rail/Quantitative/LaserResults 生命周期及单位。
+4. MSO44：确认 raw socket 4000、*IDN?、waveform preamble、CURVe? 编码、采样率、trigger/pretrigger 坐标和连续刷新。
 
-每个设备先验证依赖、枚举、最小读取、时间戳和真实 Windows 行为，再进入正式 Driver。不得为了接某台设备重写 Dashboard 或绕开统一安全保存层。
+没有上述实机证据前，不把 v0.5.0 描述为“真机验收完成”，也不提升 stable。
 
 ## 发布边界
 

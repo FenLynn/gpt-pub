@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.4.27（p107-exp）**，稳定候选仍为 v0.4.10，等待本轮 Windows 实机视觉验收后再决定是否提升。v0.4.27 继续锁定 Dashboard 四宫格外部几何，重点收紧顶栏实验工作流、独立模块标题密度、Scope FFT 优先布局、右侧参数控件语法和 OSA 参数完整度。
+当前开发版本为 **v0.5.0（p107-exp）**，稳定候选仍为 v0.4.10。v0.5.0 正式进入真实仪器数据平面阶段：在保留 Simulator 的同时，四个模块改为可独立切换的混合 Provider，并开始直接连接 Juno、AQ6370D、BeamSquared/SP920 与 MSO44。真实硬件仍必须经过目标 Windows + 实机验证后才能提升 stable。
 
 ## 当前能力
 
@@ -22,7 +22,9 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - Dashboard 关键结果可点击进入 **Big Readout**，不同指标允许同时弹出多个读数窗；同一指标只保留一个实例并可再次点击提到最前。每个窗独立拖动、等比例缩放和黑/白显示；左上状态/名称常显，右上控制与右下缩放手柄默认隐藏，hover 时才显示。**Big Readout 只在 Dashboard 显示，切到任何独立模块页时全部隐藏，返回 Dashboard 后恢复。**
 - 四个模块可从侧栏进入独立工作页；v0.4.26 将标题图标/名称/关键读数合并成更高的工作站标题区，右侧参数面板可折叠，并拆为“设置 / 结果”两个页签。设置参数使用中文，结果页同时列出测量结果、当前测试参数和接口状态。独立页坐标刻度、轴标题与 Legend 放大，坐标 gutter 与壳体同色，只有真实 Plot 矩形白底；Beam 光斑视窗保持正方形并与 caustic 图上下边框对齐。Power 独立页下方范围条继续与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
 - 顶栏实验工作流为“文件夹 → Label → Power / Spectrum / Beam / Scope 采集源 → Run”。实验文件夹不再使用文本框，而是单独文件夹按钮打开 Windows 原生 FolderBrowserDialog，可在 `data/exp/` 下选择或新建一级实验目录；Label 的 × / ✓、REC 状态点/文字和 Dashboard 数值单位继续锁定同一垂直/底部基线。
-- v0.4.26 建立真实仪器**接口控制层**：Ophir Juno / OphirLMMeasurement、Yokogawa AQ6370D、Ophir Spiricon SP920 / BeamSquared、Tektronix MSO44 的启用状态与接口地址进入 Portable 配置、C# adapter registry、WebUi snapshot 与 self-test。**这不等于真实 Driver 已接通**：当前数据平面仍为 Simulator，任何真实接口只有在对应 Windows + SDK/SCPI Probe 完成后才能标记 `DataPlaneReady` 并进入正式 Provider。
+- v0.5.0 将真实仪器从“控制层骨架”推进到**实际通信数据平面**。Power 使用 Ophir StarLab 安装的 `OphirLMMeasurement.CoLMMeasurement` COM（STA thread：ScanUSB → OpenUSBDevice → StartStream → GetData）；Spectrum 直接通过 AQ6370D Ethernet socket/SCPI（10001、LAN authentication、TRA X/Y）；Scope 直接通过 MSO44 raw TCP/SCPI（4000、WFMOutpre/CURVe?）读取真实时域并在 LaserBench 本地 FFT；BeamSquared 因官方 Automation 依赖 .NET Framework/.NET Remoting，使用独立 net48 `LaserBench.BeamSquaredBridge.exe` 与 .NET 8 主进程隔离。
+- 四个模块采用**独立混合数据平面**：某模块真实接口关闭时才使用该模块 Simulator；一旦用户启用真实接口，在实际设备 ready 前该模块不会静默回退 Simulator。Power 真机可与 Spectrum Simulator 同时运行，反之亦然。
+- 右侧“设备接口”区现在显示 connecting/authenticating/streaming/ready/faulted/dependency-missing 等运行时状态、设备身份、最后真实样本时间和失败计数，并支持“立即重新探测”。Test 对已启用但未 ready 的真实模块会阻止保存，避免把 Simulator/空数据伪装成真实实验数据。
 - 单次 Test 可独立选择 Power、Spectrum、Beam、Scope，Label 在点击 Test 瞬间冻结。
 - 截图直接写入 `data/pic/`，录像直接写入 `data/video/`，两者都不创建日期子目录。
 - 实验数据写入 `data/exp/<日期或自定义实验文件夹>/`，该目录下一层直接是数据文件。
@@ -103,14 +105,14 @@ C# / .NET 8 / WinForms Host / Windows x64
 
 ## 当前硬件边界
 
-v0.4.25 仍默认启用 Simulator。真实仪器从 0.5.x 起按最小闭环逐个接入：
+v0.5.0 已实现四条真实通信路径，但 **CI 只能验证代码、协议解析、bridge、构建和无硬件启动；不能替代实验室实机验收**。
 
-1. Ophir Juno / OphirLMMeasurement
-2. Yokogawa AQ6370D
-3. Ophir Spiricon BeamSquared / SP920
-4. Tektronix MSO44
+1. **Ophir Juno**：安装 StarLab / OphirLMMeasurement 后，LaserBench 通过 COM 扫描 USB、打开设备并持续 `GetData`；`AUTO` 使用发现到的设备，也可填写序列号。
+2. **Yokogawa AQ6370D**：仪器网络设置启用 socket remote，填写 IP 或 TCPIP 地址；LaserBench 直接连接 TCP 10001，执行 LAN authentication、`*IDN?`、扫描参数和 TRA X/Y 读取，不要求 NI-VISA。
+3. **BeamSquared / SP920**：安装 BeamSquared 且 Automation 组件可用。Portable 内自带 LaserBench 的 net48 bridge，但不复制厂商 `M2.Automation.dll`；默认从 BeamSquared 安装目录寻找，也可填写自定义安装目录/DLL 路径。
+4. **Tektronix MSO44**：仪器 LAN remote/socket 可用后填写 IP；LaserBench 直接连接 raw TCP 4000，读取 CH1/CH2 waveform preamble + CURVe?，根据真实 `XINCR/XZERO/PT_OFF/YMULT/YOFF/YZERO` 还原波形并本地计算 FFT。
 
-真实驱动只能接设备抽象层，不允许重写 Dashboard 或绕开统一安全保存层。
+真实 Driver 只能接设备抽象层，不允许重写 Dashboard 或绕开统一安全保存层。每台实机最终验收必须记录：依赖版本、设备身份、固件、枚举/握手、连续读取、拔插/断网重连、时间戳、Test 保存与长时间稳定性。
 
 ## 构建与验证
 
