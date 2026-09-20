@@ -835,7 +835,7 @@ export function buildLayout(args: {
     overrides.plotTitleSizePt ?? fontSizePt * metrics.plotTitleScale
   );
   const background = overrides.background ?? "#ffffff";
-  const tickDirection = overrides.tickDirection ?? "outside";
+  const tickDirection = overrides.tickDirection ?? "inside";
   const gridVisible = overrides.gridVisible ?? preset.showGrid;
   const legendPositionMode =
     overrides.legendPosition ??
@@ -1004,6 +1004,7 @@ export function buildLayout(args: {
       ticks: overrides.minorTicks ? tickDirection : "",
       ticklen: overrides.minorTicks ? ptToPx(minorTickLengthPt) : 0,
       tickwidth: axisWidthPx * 0.85,
+      tickcolor: "#202328",
       showgrid: false
     }
   };
@@ -1206,14 +1207,14 @@ export function buildLayout(args: {
         showbackground: true,
         backgroundcolor: "#f3f3f3",
         showline: true,
-        linecolor: "#555b61",
-        linewidth: ptToPx(0.65),
+        linecolor: "#202328",
+        linewidth: axisWidthPx,
         gridcolor: "#d8dadd",
         gridwidth: 1,
         zeroline: false,
-        ticks: "outside",
-        ticklen: ptToPx(3.5),
-        tickcolor: "#4a4f54",
+        ticks: tickDirection,
+        ticklen: ptToPx(majorTickLengthPt),
+        tickcolor: "#202328",
         tickfont: {
           family: fontFamily,
           size: tickLabelSizePx,
@@ -1232,14 +1233,14 @@ export function buildLayout(args: {
         showbackground: true,
         backgroundcolor: "#f3f3f3",
         showline: true,
-        linecolor: "#555b61",
-        linewidth: ptToPx(0.65),
+        linecolor: "#202328",
+        linewidth: axisWidthPx,
         gridcolor: "#d8dadd",
         gridwidth: 1,
         zeroline: false,
-        ticks: "outside",
-        ticklen: ptToPx(3.5),
-        tickcolor: "#4a4f54",
+        ticks: tickDirection,
+        ticklen: ptToPx(majorTickLengthPt),
+        tickcolor: "#202328",
         tickfont: {
           family: fontFamily,
           size: tickLabelSizePx,
@@ -1258,14 +1259,14 @@ export function buildLayout(args: {
         showbackground: true,
         backgroundcolor: "#f3f3f3",
         showline: true,
-        linecolor: "#555b61",
-        linewidth: ptToPx(0.65),
+        linecolor: "#202328",
+        linewidth: axisWidthPx,
         gridcolor: "#d8dadd",
         gridwidth: 1,
         zeroline: false,
-        ticks: "outside",
-        ticklen: ptToPx(3.5),
-        tickcolor: "#4a4f54",
+        ticks: tickDirection,
+        ticklen: ptToPx(majorTickLengthPt),
+        tickcolor: "#202328",
         tickfont: {
           family: fontFamily,
           size: tickLabelSizePx,
@@ -1316,6 +1317,7 @@ export function buildLayout(args: {
     tickangle: overrides.xTickAngle ?? 0,
     minor: {
       ...commonAxis.minor,
+      tickcolor: isDoubleY ? leftYColor : commonAxis.minor.tickcolor,
       dtick:
         !xIsCategorical &&
         overrides.minorTicks &&
@@ -1336,6 +1338,7 @@ export function buildLayout(args: {
       ? "reversed"
       : true,
     range: yRange,
+    linecolor: isDoubleY ? leftYColor : commonAxis.linecolor,
     tickcolor: isDoubleY ? leftYColor : commonAxis.tickcolor,
     tickfont: {
       ...commonAxis.tickfont,
@@ -1389,6 +1392,7 @@ export function buildLayout(args: {
         ? "reversed"
         : true,
       range: rightYRange,
+      linecolor: rightYColor,
       tickcolor: rightYColor,
       tickfont: {
         ...commonAxis.tickfont,
@@ -1418,6 +1422,7 @@ export function buildLayout(args: {
       tickangle: overrides.rightYTickAngle ?? 0,
       minor: {
         ...commonAxis.minor,
+        tickcolor: rightYColor,
         showgrid: false,
         dtick:
           overrides.minorTicks &&
