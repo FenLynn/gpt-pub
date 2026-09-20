@@ -22,7 +22,7 @@ namespace LaserBench.BeamSquaredBridge
                 var assembly = Assembly.LoadFrom(assemblyPath);
                 var type = assembly.GetType("M2.Automation.AutomatedBeamSquared", throwOnError: true);
                 _automation = Activator.CreateInstance(type, new object[] { false });
-                var status = SafeString(Get(Get(_automation, "RunManager"), "RunStatus"));
+                var status = TryString(TryGetObject(_automation, "RunManager"), "RunStatus");
                 Console.WriteLine("READY\t" + B64("BeamSquared Automation; RunStatus=" + status));
                 Console.Out.Flush();
 
