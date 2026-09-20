@@ -134,6 +134,17 @@ function baseXYTrace(
     (modeDefault === "markers" || modeDefault === "lines+markers");
   const lineWidthPt = override.lineWidthPt ?? metrics.lineWidthPt;
   const markerSizePt = override.markerSizePt ?? metrics.markerSizePt;
+  const automaticMarkerCap =
+    markerVisible &&
+    lineVisible &&
+    figure.templateId !== "xy-scatter" &&
+    figure.templateId !== "xy-errorbar"
+      ? metrics.mode === "quad-panel"
+        ? 22
+        : 28
+      : 0;
+  const markerMaxDisplayed =
+    override.markerMaxDisplayed ?? automaticMarkerCap;
   const color =
     override.color || preset.palette[sourceIndex % preset.palette.length];
   const opacity = override.opacity ?? 1;
@@ -168,6 +179,10 @@ function baseXYTrace(
       color,
       size: ptToPx(markerSizePt),
       symbol: override.markerSymbol ?? "circle",
+      maxdisplayed:
+        markerVisible && markerMaxDisplayed > 0
+          ? Math.max(1, Math.round(markerMaxDisplayed))
+          : 0,
       line: {
         color,
         width: ptToPx(modeDefault === "markers" ? 0 : 0.55)
