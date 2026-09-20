@@ -91,7 +91,9 @@ export function generateMatplotlibScript(
       majorTickLengthPt: metrics.majorTickLengthPt,
       minorTickLengthPt: metrics.minorTickLengthPt,
       axisTitleScale: metrics.axisTitleScale,
+      axisTitlePadPt: metrics.axisTitlePadPt,
       plotTitleScale: metrics.plotTitleScale,
+      plotTitlePadPt: metrics.plotTitlePadPt,
       legendScale: metrics.legendScale,
       showGrid: preset.showGrid,
       palette
@@ -459,6 +461,7 @@ def apply_titles(axis_obj):
     axis_obj.set_xlabel(
         P["autoTitles"]["x"],
         fontsize=O.get("axisTitleSizePt", font_size * PRESET["axisTitleScale"]),
+        labelpad=PRESET["axisTitlePadPt"],
         color=O.get("axisTitleColor", "#17191c"),
     )
     axis_obj.set_ylabel(
@@ -470,6 +473,7 @@ def apply_titles(axis_obj):
         axis_obj.set_title(
             O["plotTitle"],
             fontsize=O.get("plotTitleSizePt", font_size * PRESET["plotTitleScale"]),
+            pad=PRESET["plotTitlePadPt"],
             color=O.get("plotTitleColor", "#17191c"),
         )
 
