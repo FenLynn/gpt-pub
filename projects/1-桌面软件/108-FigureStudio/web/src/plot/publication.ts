@@ -14,7 +14,9 @@ export interface PublicationMetrics {
   majorTickLengthPt: number;
   minorTickLengthPt: number;
   axisTitleScale: number;
+  axisTitlePadPt: number;
   plotTitleScale: number;
+  plotTitlePadPt: number;
   legendScale: number;
   outerMarginScale: number;
 }
@@ -45,7 +47,9 @@ export function resolvePublicationMetrics(
       majorTickLengthPt: 3.5,
       minorTickLengthPt: 2,
       axisTitleScale: 1.08,
+      axisTitlePadPt: 4,
       plotTitleScale: 1.18,
+      plotTitlePadPt: 6,
       legendScale: 0.94,
       outerMarginScale: 1
     };
@@ -64,7 +68,9 @@ export function resolvePublicationMetrics(
     majorTickLengthPt: 3.0,
     minorTickLengthPt: 1.7,
     axisTitleScale: 1.05,
+    axisTitlePadPt: 3.5,
     plotTitleScale: 1.12,
+    plotTitlePadPt: 4.5,
     legendScale: 0.92,
     outerMarginScale: 0.88
   };
