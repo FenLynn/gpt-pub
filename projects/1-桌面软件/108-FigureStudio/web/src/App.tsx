@@ -2353,7 +2353,7 @@ function App() {
       : activeFigure?.templateId === "xy-scatter" ||
         activeFigure?.templateId === "xy-errorbar"
       ? 0
-      : 0.55);
+      : 0.45);
   const errorBarWidth = primaryOverride.errorBarWidthPt ?? 0.8;
   const errorBarCapSize = primaryOverride.errorBarCapSizePt ?? 0;
   const errorBarColor = primaryOverride.errorBarColor ?? selectedColor;
