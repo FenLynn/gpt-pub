@@ -7,6 +7,7 @@ import type {
   FigureSpec,
   PresetDefinition
 } from "../model";
+import { resolvePublicationMetrics } from "../plot/publication";
 
 export type CheckLevel = "pass" | "warn" | "info";
 
@@ -33,6 +34,7 @@ export function checkFigure(
   preset: PresetDefinition
 ): CheckItem[] {
   const o = figure.figureOverrides;
+  const publication = resolvePublicationMetrics(preset, figure);
   const field2DTemplate =
     figure.templateId === "heatmap" || figure.templateId === "contour";
   const fieldTemplate = field2DTemplate || figure.templateId === "surface-3d";
@@ -140,7 +142,21 @@ export function checkFigure(
     detail: grid ? "当前启用了网格，请确认期刊和图型确实需要。" : "未使用装饰性背景网格。"
   });
 
-  const fontSize = o.fontSizePt ?? preset.fontSizePt;
+  const fontSize = o.fontSizePt ?? publication.fontSizePt;
+  items.push({
+    id: "publication-layout",
+    level: "pass",
+    title: "出版版式",
+    detail:
+      publication.mode === "quad-panel"
+        ? "四合一子图模式：单面板宽度 " +
+          publication.widthMm.toFixed(0) +
+          " mm，使用紧凑页边距并保持可读字号。"
+        : "单图模式：图宽 " +
+          publication.widthMm.toFixed(0) +
+          " mm，按独立论文图留白。"
+  });
+
   items.push({
     id: "font-size",
     level: fontSize >= 5.5 && fontSize <= 9 ? "pass" : "warn",
