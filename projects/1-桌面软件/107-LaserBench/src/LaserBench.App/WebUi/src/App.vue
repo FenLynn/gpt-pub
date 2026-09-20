@@ -762,27 +762,27 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       </div>
       <div class="vsep"></div>
 
-      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power}" @click="toggleSource('power')" title="本次采集包含功率">
+      <button class="module-toggle power-accent" :class="{active:snapshot.captureSelection.power}" :aria-pressed="snapshot.captureSelection.power" @click="toggleSource('power')" title="本次采集包含功率">
         <svg class="acq-vector acq-power" viewBox="0 0 24 24" aria-hidden="true">
-          <rect class="bar b1" x="2.5" y="10" width="4" height="10" rx="1.4"/>
-          <rect class="bar b2" x="7.5" y="6" width="4" height="14" rx="1.4"/>
-          <rect class="bar b3" x="12.5" y="12" width="4" height="8" rx="1.4"/>
-          <rect class="bar b4" x="17.5" y="8" width="4" height="12" rx="1.4"/>
+          <rect class="bar b1" x="3.0" y="10" width="2.7" height="10" rx="0.9"/>
+          <rect class="bar b2" x="8.1" y="6" width="2.7" height="14" rx="0.9"/>
+          <rect class="bar b3" x="13.2" y="12" width="2.7" height="8" rx="0.9"/>
+          <rect class="bar b4" x="18.3" y="8" width="2.7" height="12" rx="0.9"/>
         </svg>
       </button>
-      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum}" @click="toggleSource('spectrum')" title="本次采集包含光谱">
+      <button class="module-toggle spectrum-accent" :class="{active:snapshot.captureSelection.spectrum}" :aria-pressed="snapshot.captureSelection.spectrum" @click="toggleSource('spectrum')" title="本次采集包含光谱">
         <svg class="acq-vector acq-spectrum" viewBox="0 0 24 24" aria-hidden="true">
           <path class="peak" d="M2 18c3.5 0 4.5-12 10-12s6.5 12 10 12"/>
         </svg>
       </button>
-      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam}" @click="toggleSource('beam')" title="本次采集包含光束">
+      <button class="module-toggle beam-accent" :class="{active:snapshot.captureSelection.beam}" :aria-pressed="snapshot.captureSelection.beam" @click="toggleSource('beam')" title="本次采集包含光束">
         <svg class="acq-vector acq-beam" viewBox="0 0 24 24" aria-hidden="true">
           <path class="cross" d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>
           <circle class="core" cx="12" cy="12" r="2"/>
           <circle class="beam-ring" cx="12" cy="12" r="7"/>
         </svg>
       </button>
-      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope}" @click="toggleSource('scope')" title="本次采集包含示波器">
+      <button class="module-toggle scope-accent" :class="{active:snapshot.captureSelection.scope}" :aria-pressed="snapshot.captureSelection.scope" @click="toggleSource('scope')" title="本次采集包含示波器">
         <svg class="acq-vector acq-scope" viewBox="0 0 24 24" aria-hidden="true">
           <g class="scope-wave-flow">
             <path d="M0 12C2.5 12 2.5 4 6 4C10 4 10 20 14 20C18 20 18 12 24 12"/>
@@ -838,7 +838,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
       <section v-if="!['data','settings'].includes(activePage)" class="dashboard-grid" :class="{'focus-mode':activePage!=='dashboard','config-collapsed':activePage!=='dashboard'&&focusConfigCollapsed}">
         <article class="instrument-panel power-panel" :class="{hidden:!['dashboard','power'].includes(activePage)}">
           <div class="module-head power-head graph-overlay">
-            <div class="module-title"><div class="panel-mark power-accent" :class="['state-'+moduleStatusTone('power'),{selected:snapshot.captureSelection.power}]" :title="'功率：'+moduleStatusText('power')"><svg viewBox="0 0 24 24"><rect x="2" y="8" width="4.2" height="12" rx="1.2"/><rect x="7.3" y="4" width="4.2" height="16" rx="1.2"/><rect x="12.6" y="10" width="4.2" height="10" rx="1.2"/><rect x="17.9" y="6" width="4.2" height="14" rx="1.2"/></svg></div><strong>功率</strong></div>
+            <div class="module-title"><div class="panel-mark power-accent" :class="['state-'+moduleStatusTone('power'),{selected:snapshot.captureSelection.power}]" :title="'功率：'+moduleStatusText('power')"><svg viewBox="0 0 24 24"><rect x="3.0" y="8" width="2.8" height="12" rx="0.9"/><rect x="8.1" y="4" width="2.8" height="16" rx="0.9"/><rect x="13.2" y="10" width="2.8" height="10" rx="0.9"/><rect x="18.3" y="6" width="2.8" height="14" rx="0.9"/></svg></div><strong>功率</strong></div>
             <template v-if="activePage==='power'">
               <div class="focus-head-metrics">
                 <div v-for="(t,index) in snapshot.power.traces" :key="'power-head-'+t.name" v-show="powerVisible(index)" class="focus-head-value">

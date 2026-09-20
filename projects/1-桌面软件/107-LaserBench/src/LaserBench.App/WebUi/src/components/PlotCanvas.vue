@@ -51,8 +51,8 @@ let pendingAxis:AxisName|null=null
 function margins(){
   if(props.compact)return {l:0,r:0,t:0,b:0}
   if(props.showAxisLabels)return props.stacked
-    ? {l:68,r:52,t:7,b:43}
-    : {l:68,r:52,t:7,b:45}
+    ? {l:64,r:48,t:6,b:39}
+    : {l:64,r:48,t:6,b:41}
   return props.stacked
     ? {l:36,r:36,t:4,b:18}
     : {l:36,r:36,t:4,b:21}
@@ -147,7 +147,7 @@ function draw() {
   const rightTicks=uniformTicks(r0,r1,5)
 
   if (!props.compact) {
-    ctx.save(); ctx.strokeStyle = '#d9e7f1'; ctx.lineWidth = 1; ctx.setLineDash([4,4])
+    ctx.save(); ctx.strokeStyle = '#dbe6ed'; ctx.lineWidth = 1; ctx.setLineDash([3,4])
     for(const v of visibleX){
       const x=sx(v)
       if(x>m.l+.5&&x<m.l+pw-.5){ctx.beginPath();ctx.moveTo(x,m.t);ctx.lineTo(x,m.t+ph);ctx.stroke()}
@@ -179,7 +179,7 @@ function draw() {
   ctx.restore()
   if (props.compact) return
 
-  ctx.font=(props.showAxisLabels?'13.5px':'11.5px')+' "Segoe UI","Microsoft YaHei UI",sans-serif'
+  ctx.font=(props.showAxisLabels?'13px':'11.25px')+' "Segoe UI","Microsoft YaHei UI",sans-serif'
   ctx.fillStyle=props.showAxisLabels?'#c8d5de':'#9fb2c0'
   ctx.textBaseline='middle'
   yTicks.forEach((v,i)=>{
@@ -200,13 +200,14 @@ function draw() {
 
   if(props.series.length){
     if(props.showAxisLabels){
-      let lx=m.l+13, ly=m.t+ph-17
-      ctx.font='600 13px "Segoe UI","Microsoft YaHei UI",sans-serif';ctx.textBaseline='middle'
+      let lx=m.l+12, ly=m.t+ph-15
+      ctx.font='600 12.5px "Segoe UI","Microsoft YaHei UI",sans-serif';ctx.textBaseline='middle'
       for(const s of props.series){
         const tw=ctx.measureText(s.name).width
-        ctx.strokeStyle=s.color;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+23,ly);ctx.stroke()
-        ctx.fillStyle='#2b4358';ctx.textAlign='left';ctx.fillText(s.name,lx+29,ly)
-        lx+=tw+62
+        if(lx+tw+57>m.l+pw-6)break
+        ctx.strokeStyle=s.color;ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+21,ly);ctx.stroke()
+        ctx.fillStyle='#2b4358';ctx.textAlign='left';ctx.fillText(s.name,lx+27,ly)
+        lx+=tw+57
       }
     }else{
       let lx=m.l+pw-8, ly=m.t+12;ctx.font='10.5px "Segoe UI", sans-serif';ctx.textBaseline='middle'
@@ -217,11 +218,11 @@ function draw() {
   if(props.showAxisLabels){
     ctx.save()
     ctx.fillStyle='#dce6ed'
-    ctx.font='700 15px "Segoe UI","Microsoft YaHei UI",sans-serif'
+    ctx.font='650 14.5px "Segoe UI","Microsoft YaHei UI",sans-serif'
     ctx.textAlign='center';ctx.textBaseline='middle'
-    if(props.xLabel)ctx.fillText(props.xLabel,m.l+pw/2,h-10)
-    if(props.yLabel){ctx.translate(13,m.t+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText(props.yLabel,0,0)}
-    if(hasRight&&props.rightYLabel){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.translate(w-13,m.t+ph/2);ctx.rotate(Math.PI/2);ctx.fillText(props.rightYLabel,0,0)}
+    if(props.xLabel)ctx.fillText(props.xLabel,m.l+pw/2,h-9)
+    if(props.yLabel){ctx.translate(14,m.t+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText(props.yLabel,0,0)}
+    if(hasRight&&props.rightYLabel){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.translate(w-14,m.t+ph/2);ctx.rotate(Math.PI/2);ctx.fillText(props.rightYLabel,0,0)}
     ctx.restore()
   }
 
@@ -336,13 +337,13 @@ onBeforeUnmount(()=>{
 .plot-canvas{display:block;width:100%;height:100%}
 .plot-canvas.editable{cursor:default}
 .axis-unit-select{
-  position:absolute;z-index:7;left:26px;top:50%;width:58px;height:21px;
+  position:absolute;z-index:7;left:29px;top:50%;width:56px;height:20px;
   transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;
-  border:0;border-radius:3px;background:rgba(37,57,70,.88);color:#dce6ed;
-  font:650 10px "Segoe UI","Microsoft YaHei UI",sans-serif;text-align:center;
+  border:1px solid rgba(91,120,138,.44);border-radius:2px;background:rgba(34,52,64,.92);color:#dce6ed;
+  font:650 9.5px "Segoe UI","Microsoft YaHei UI",sans-serif;text-align:center;
   padding:0 3px;outline:none;cursor:pointer
 }
 .axis-unit-select:hover,.axis-unit-select:focus{background:#315064;color:#fff}
-.axis-inline-editor{position:absolute;z-index:8;width:84px;height:26px;padding:2px 6px;border:1px solid #4d7895;border-radius:3px;background:#20333f;color:#f3f7fa;font:600 12px "Segoe UI","Microsoft YaHei UI",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.24);outline:none;font-variant-numeric:tabular-nums}
+.axis-inline-editor{position:absolute;z-index:8;width:82px;height:26px;padding:2px 6px;border:1px solid #5a7c90;border-radius:2px;background:#20333f;color:#f3f7fa;font:600 12px "Segoe UI","Microsoft YaHei UI",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.24);outline:none;font-variant-numeric:tabular-nums}
 .axis-inline-editor:focus{border-color:#6fc1ef;box-shadow:0 0 0 2px rgba(80,176,232,.16),0 3px 12px rgba(0,0,0,.24)}
 </style>

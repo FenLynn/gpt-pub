@@ -3798,3 +3798,434 @@
   .scope-channel-board button span{font-size:9.8px!important}
   .scope-channel-board button b{font-size:10.4px!important}
 }
+
+/* v0.5.2 — industrial detail audit
+   Final visual contract: quiet chrome, one-pixel structure, no decorative button frames,
+   consistent 30 px controls, health colors separate from acquisition-selection colors. */
+
+/* ---------- Top bar ---------- */
+.topbar{
+  height:40px!important;
+  min-height:40px!important;
+  padding:4px 8px!important;
+  gap:4px!important;
+  align-items:center!important;
+  background:#253340!important;
+  border-bottom:1px solid #3f515f!important;
+  box-shadow:none!important
+}
+.topbar .vsep{height:20px!important;margin:0 2px!important;background:#465866!important}
+.topbar .module-toggle{
+  width:31px!important;height:30px!important;min-width:31px!important;
+  padding:1px!important;margin:0!important;
+  display:grid!important;place-items:center!important;
+  border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important;
+  color:#738a9a!important;opacity:.92!important;
+  transition:color .12s ease,opacity .12s ease!important
+}
+.topbar .module-toggle:hover{
+  background:transparent!important;box-shadow:none!important;
+  color:#9fc6d9!important;opacity:1!important;transform:none!important
+}
+.topbar .module-toggle.active{
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  color:#55b9df!important;opacity:1!important
+}
+.topbar .module-toggle.active::after{display:none!important;content:none!important}
+.topbar .module-toggle:focus-visible{
+  outline:none!important;
+  box-shadow:inset 0 -2px 0 rgba(109,190,226,.72)!important
+}
+.topbar .module-toggle .acq-vector{
+  width:25px!important;height:25px!important;overflow:visible!important;
+  filter:none!important;stroke-width:1.65!important
+}
+.topbar .module-toggle.active .acq-vector{filter:none!important}
+.topbar .module-toggle .acq-power .bar{
+  fill:currentColor!important;stroke:none!important
+}
+.topbar .module-toggle .acq-spectrum .peak,
+.topbar .module-toggle .acq-scope .scope-wave-flow path{
+  fill:none!important;stroke:currentColor!important;stroke-width:1.65!important
+}
+.topbar .module-toggle .acq-beam .cross,
+.topbar .module-toggle .acq-beam .beam-ring,
+.topbar .module-toggle .acq-beam .core{
+  stroke:currentColor!important;stroke-width:1.55!important
+}
+.topbar .module-toggle .acq-beam .core{fill:currentColor!important;stroke:none!important}
+.topbar .run-btn{margin-left:3px!important}
+
+/* Folder / Label form one optical baseline. */
+.folder-picker-btn,.label-wrap,.record-btn,.camera-btn{align-self:center!important}
+.folder-picker-btn{
+  width:30px!important;height:30px!important;padding:0!important;
+  display:grid!important;place-items:center!important;
+  border:0!important;border-radius:2px!important;background:transparent!important;box-shadow:none!important
+}
+.folder-picker-btn:hover{background:rgba(211,154,74,.08)!important}
+.folder-current-name{
+  height:30px!important;line-height:30px!important;margin:0 4px 0 0!important;
+  color:#b4c2cb!important;font-size:11.5px!important;font-weight:600!important
+}
+.label-wrap{
+  width:176px!important;height:30px!important;padding-right:55px!important;
+  border:1px solid #536875!important;border-radius:3px!important;
+  background:#223440!important;box-shadow:none!important
+}
+.label-wrap:focus-within{border-color:#6b92a8!important;box-shadow:0 0 0 1px rgba(91,151,184,.10)!important}
+.label-wrap input{
+  height:28px!important;line-height:28px!important;padding:0 7px!important;
+  font-size:12px!important;color:#e0e9ee!important
+}
+.label-actions{
+  right:0!important;top:0!important;bottom:0!important;height:28px!important;
+  border-left:1px solid rgba(129,153,169,.34)!important;
+  align-items:center!important
+}
+.label-actions .clear-label,.label-actions .check-btn{
+  width:27px!important;min-width:27px!important;height:28px!important;
+  padding:0!important;border-radius:0!important;
+  display:grid!important;place-items:center!important;
+  line-height:1!important;background:transparent!important
+}
+.label-actions .clear-label{
+  font-size:18px!important;font-family:"Segoe UI Symbol","Segoe UI",sans-serif!important;
+  font-weight:300!important;color:#92a6b3!important
+}
+.label-actions .check-btn{border-left:1px solid rgba(129,153,169,.22)!important;color:#75b3d5!important}
+.label-actions .check-btn svg{width:14px!important;height:14px!important;margin:0!important}
+.label-actions button:hover{background:rgba(102,145,171,.10)!important}
+
+/* Device strip and REC: small, centered status semantics. */
+.device-strip{gap:13px!important;height:30px!important;align-items:center!important}
+.device-pill{
+  height:30px!important;display:flex!important;align-items:center!important;gap:5px!important;
+  color:#aab9c3!important;font-size:11.5px!important;line-height:1!important
+}
+.status-dot{
+  width:7px!important;height:7px!important;flex:0 0 7px!important;
+  box-shadow:none!important;border:0!important
+}
+.camera-btn{
+  width:29px!important;height:30px!important;border:0!important;border-radius:2px!important;
+  background:transparent!important;box-shadow:none!important;color:#aab9c3!important
+}
+.camera-btn:hover{background:rgba(103,139,162,.08)!important;color:#d7e4eb!important;transform:none!important}
+.record-btn{
+  height:30px!important;min-width:58px!important;padding:0 7px!important;gap:6px!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  border:1px solid transparent!important;border-radius:3px!important;
+  background:transparent!important;box-shadow:none!important;
+  color:#aebdc7!important;font-size:11px!important;font-weight:650!important;line-height:1!important
+}
+.record-btn:hover{background:rgba(112,143,163,.07)!important}
+.record-btn.active{
+  min-width:116px!important;background:rgba(126,45,51,.30)!important;
+  border-color:rgba(215,94,101,.30)!important;color:#ffaaaa!important
+}
+.record-btn i{
+  width:7px!important;height:7px!important;flex:0 0 7px!important;margin:0!important;align-self:center!important
+}
+.record-btn>span,.record-duration{line-height:1!important;align-self:center!important;margin:0!important}
+.clock{height:30px!important;display:flex!important;align-items:center!important;font-size:11.5px!important;color:#aebdc7!important}
+
+/* ---------- Dashboard ---------- */
+.workspace{padding:3px!important;background:#314251!important}
+.dashboard-grid:not(.focus-mode){
+  gap:2px!important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr) minmax(0,1fr)!important;
+  background:#314251!important
+}
+.dashboard-grid:not(.focus-mode) .instrument-panel{
+  display:grid!important;
+  grid-template-rows:34px minmax(0,1fr)!important;
+  min-width:0!important;min-height:0!important;
+  border:1px solid #4a5c69!important;border-radius:2px!important;
+  background:#314251!important;overflow:hidden!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay{
+  position:static!important;left:auto!important;right:auto!important;top:auto!important;
+  width:100%!important;height:34px!important;min-height:34px!important;
+  display:flex!important;align-items:center!important;
+  padding:0 7px!important;gap:7px!important;
+  border:0!important;border-bottom:1px solid rgba(103,126,142,.38)!important;
+  border-radius:0!important;background:#314251!important;
+  box-shadow:none!important;backdrop-filter:none!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay .module-title{
+  height:33px!important;display:flex!important;align-items:center!important;gap:6px!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay .panel-mark{
+  width:20px!important;height:20px!important;flex:0 0 20px!important;
+  display:grid!important;place-items:center!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay .panel-mark svg{
+  width:19px!important;height:19px!important;stroke-width:1.7!important
+}
+.dashboard-grid:not(.focus-mode) .graph-overlay strong{
+  font-size:12.5px!important;font-weight:650!important;line-height:1!important;color:#dce6ec!important
+}
+.dashboard-grid:not(.focus-mode) .power-layout,
+.dashboard-grid:not(.focus-mode) .spectrum-plot,
+.dashboard-grid:not(.focus-mode) .beam-body,
+.dashboard-grid:not(.focus-mode) .scope-plots{
+  min-width:0!important;min-height:0!important;width:100%!important;height:100%!important;
+  grid-row:2!important;margin:0!important
+}
+.dashboard-grid:not(.focus-mode) .power-layout{padding:0!important}
+.dashboard-grid:not(.focus-mode) .power-chart-zone{grid-template-rows:minmax(0,1fr) 34px!important;gap:2px!important}
+.dashboard-grid:not(.focus-mode) .spectrum-plot{display:block!important}
+.dashboard-grid:not(.focus-mode) .scope-plots{gap:2px!important;overflow:hidden!important}
+
+/* Dashboard metric hierarchy: labels on chassis, only values form fields. */
+.dashboard-grid:not(.focus-mode) .head-metrics,
+.dashboard-grid:not(.focus-mode) .osa-metrics,
+.dashboard-grid:not(.focus-mode) .scope-readouts,
+.dashboard-grid:not(.focus-mode) .m2-block{
+  min-width:0!important;height:33px!important;margin:0 0 0 auto!important;
+  display:flex!important;align-items:center!important;justify-content:flex-end!important;
+  overflow:hidden!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger,
+.dashboard-grid:not(.focus-mode) .secondary-metric{
+  height:30px!important;min-width:0!important;padding:0 2px!important;
+  display:inline-flex!important;align-items:center!important;gap:5px!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger,
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric{margin-left:14px!important}
+.dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger::before,
+.dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric::before{
+  left:-7px!important;height:15px!important;background:rgba(170,191,204,.24)!important
+}
+.dashboard-grid:not(.focus-mode) .metric-trigger em,
+.dashboard-grid:not(.focus-mode) .secondary-metric em{
+  font-size:10.5px!important;line-height:1!important;color:#a8b8c3!important
+}
+.dashboard-grid:not(.focus-mode) .metric-value-chip{
+  min-width:64px!important;height:27px!important;min-height:27px!important;
+  padding:4px 7px!important;
+  display:inline-flex!important;align-items:baseline!important;justify-content:center!important;gap:4px!important;
+  border:1px solid rgba(136,160,176,.25)!important;border-radius:2px!important;
+  background:rgba(20,31,40,.58)!important;box-shadow:none!important
+}
+.dashboard-grid:not(.focus-mode) .metric-value-chip b{
+  font-size:17.5px!important;line-height:1!important;font-weight:700!important
+}
+.dashboard-grid:not(.focus-mode) .metric-value-chip small{
+  font-size:9.5px!important;line-height:1!important;color:#b5c3cc!important
+}
+
+/* Health color always wins over acquisition-selection class on module icons. */
+.graph-overlay .panel-mark.selected.state-ok{color:#39d77f!important}
+.graph-overlay .panel-mark.selected.state-warn{color:#e1ad4d!important}
+.graph-overlay .panel-mark.selected.state-offline{color:#8194a1!important}
+.graph-overlay .panel-mark.selected.state-error{color:#e36a59!important}
+
+/* Beam dashboard: same top/bottom plot baseline, square profile kept inside its own cell. */
+.dashboard-grid:not(.focus-mode) .beam-body{
+  grid-template-columns:minmax(0,51%) minmax(0,49%)!important;
+  gap:4px!important;padding:4px!important;align-items:stretch!important
+}
+.dashboard-grid:not(.focus-mode) .beam-profile-column{
+  height:100%!important;min-height:0!important;display:flex!important;align-items:stretch!important;justify-content:flex-end!important
+}
+.dashboard-grid:not(.focus-mode) .beam-image-wrap{
+  height:100%!important;max-height:100%!important;width:auto!important;max-width:100%!important;
+  aspect-ratio:1/1!important;margin:0!important;align-self:stretch!important
+}
+.dashboard-grid:not(.focus-mode) .caustic-plot{height:100%!important;margin:0!important;align-self:stretch!important}
+
+/* Power overview shares the exact PlotCanvas horizontal gutter. */
+.dashboard-grid:not(.focus-mode) .overview-row{padding:0 36px 2px!important}
+.overview-shell{
+  border:1px solid #667b89!important;border-radius:2px!important;
+  background:#fff!important;box-shadow:none!important
+}
+.overview-selected{background:rgba(55,138,189,.09)!important;border-left:1px solid #5d8aa6!important;border-right:1px solid #5d8aa6!important}
+.overview-selected .overview-handle{
+  width:6px!important;border-radius:1px!important;background:#4d748d!important;box-shadow:none!important
+}
+
+/* ---------- Focused module pages ---------- */
+.dashboard-grid.focus-mode{padding-top:28px!important;background:#314251!important}
+.dashboard-grid.focus-mode .instrument-panel:not(.hidden){
+  grid-template-rows:78px minmax(0,1fr)!important;
+  border:1px solid #4a5d6a!important;border-radius:2px!important;
+  background:#314251!important
+}
+.dashboard-grid.focus-mode .graph-overlay{
+  position:relative!important;left:auto!important;right:auto!important;top:auto!important;
+  height:78px!important;min-height:78px!important;
+  padding:7px 13px!important;column-gap:10px!important;
+  border:0!important;border-bottom:1px solid #526674!important;border-radius:0!important;
+  background:#304250!important;box-shadow:none!important;backdrop-filter:none!important
+}
+.dashboard-grid.focus-mode .module-title .panel-mark{filter:none!important}
+.dashboard-grid.focus-mode .module-title .panel-mark svg{stroke-width:1.7!important}
+.dashboard-grid.focus-mode .focus-head-metrics{
+  min-width:0!important;gap:0!important;overflow:hidden!important
+}
+.dashboard-grid.focus-mode .focus-head-value{
+  min-width:98px!important;height:57px!important;padding:6px 10px!important;
+  border:0!important;border-left:1px solid rgba(116,140,155,.25)!important;
+  background:transparent!important;box-shadow:none!important
+}
+.dashboard-grid.focus-mode .focus-head-value>span{
+  font-size:10.5px!important;line-height:1.1!important;color:#a8bac5!important
+}
+.dashboard-grid.focus-mode .focus-head-value>div{
+  min-height:25px!important;margin-top:4px!important;
+  display:flex!important;align-items:baseline!important;gap:4px!important
+}
+.dashboard-grid.focus-mode .focus-head-value b{font-size:23px!important;line-height:1!important}
+.dashboard-grid.focus-mode .focus-head-value small{font-size:9.5px!important;line-height:1!important;align-self:baseline!important}
+
+/* Channel selectors are controls, not decorative cards. */
+.power-channel-board,.scope-channel-board{
+  border-left:1px solid rgba(116,140,155,.30)!important;
+  background:transparent!important;box-shadow:none!important
+}
+.power-channel-board button,.scope-channel-board button{
+  border:1px solid transparent!important;border-radius:2px!important;box-shadow:none!important
+}
+.power-channel-board button:hover:not(:disabled),.scope-channel-board button:hover{
+  background:rgba(75,128,157,.09)!important;border-color:rgba(94,143,170,.24)!important
+}
+.power-channel-board button.active,.scope-channel-board button.active{
+  background:#294454!important;border-color:#4c7085!important;color:#f1f6f8!important;
+  box-shadow:inset 2px 0 0 #58add7!important
+}
+.power-channel-board button:disabled{opacity:.25!important}
+.channel-light{box-shadow:none!important}
+
+/* Right dock: flat, readable, aligned. */
+.dashboard-grid.focus-mode .module-side-pane{
+  border-left:1px solid #526573!important;background:#2a3c49!important;box-shadow:none!important
+}
+.module-side-tabs{
+  height:44px!important;background:#293a47!important;
+  border-bottom:1px solid #536674!important;box-shadow:none!important
+}
+.module-side-tabs button{
+  height:44px!important;border-radius:0!important;
+  font-size:13px!important;font-weight:650!important;color:#9fb2bf!important;
+  background:transparent!important
+}
+.module-side-tabs button.active{
+  color:#edf4f7!important;background:#304856!important;border-bottom:2px solid #55b1df!important
+}
+.module-pane-collapse{
+  right:0!important;top:8px!important;left:auto!important;
+  width:24px!important;height:32px!important;padding:0!important;
+  border:0!important;border-left:1px solid rgba(113,137,153,.38)!important;
+  border-radius:2px 0 0 2px!important;background:#2b3e4b!important;
+  color:#9eb0bc!important;box-shadow:none!important;opacity:.34!important
+}
+.module-pane-collapse svg{width:14px!important;height:14px!important}
+.module-side-pane:hover .module-pane-collapse,.module-pane-collapse:hover,.module-pane-collapse:focus-visible{
+  opacity:1!important;background:#354d5c!important;color:#eef4f7!important
+}
+.module-pane-scroll{
+  padding:7px 12px 20px!important;
+  scrollbar-color:#536b7a transparent!important
+}
+.dashboard-grid.focus-mode .module-side-pane .config-section{
+  padding:12px 2px 13px!important;
+  border-bottom:1px solid rgba(91,114,129,.42)!important;
+  background:transparent!important
+}
+.dashboard-grid.focus-mode .module-side-pane .config-section h4,
+.results-pane .result-section h4{
+  margin:0 0 8px!important;
+  font-size:11.5px!important;font-weight:700!important;line-height:1.2!important;
+  color:#9bc4db!important;letter-spacing:.02em!important
+}
+.dashboard-grid.focus-mode .config-row,.config-static{
+  min-height:36px!important;
+  font-size:11.5px!important;line-height:1.25!important
+}
+.dashboard-grid.focus-mode .config-row>span:first-child,.config-static>span:first-child{color:#b6c4cd!important}
+.dashboard-grid.focus-mode .config-row input[type=number],
+.dashboard-grid.focus-mode .config-row input[type=text],
+.dashboard-grid.focus-mode .config-row select{
+  height:30px!important;
+  border:1px solid #536b79!important;border-radius:2px!important;
+  background:#21323d!important;color:#e1e9ee!important;
+  box-shadow:none!important;padding:0 7px!important
+}
+.dashboard-grid.focus-mode .config-row input:focus,
+.dashboard-grid.focus-mode .config-row select:focus{
+  outline:none!important;border-color:#6da7c6!important;box-shadow:0 0 0 1px rgba(86,161,201,.13)!important
+}
+.active-channel-config{
+  background:rgba(32,54,67,.32)!important;
+  border-top:0!important
+}
+.toggle-pill{
+  border:1px solid #536b79!important;border-radius:11px!important;
+  background:#22333e!important;box-shadow:none!important
+}
+.toggle-pill.on{background:#285169!important;border-color:#4b7c96!important}
+.config-actions{gap:6px!important}
+.dashboard-grid.focus-mode .config-actions button,.probe-btn,.config-action{
+  min-height:30px!important;border:1px solid #5a7180!important;border-radius:2px!important;
+  background:#283b47!important;box-shadow:none!important;color:#c9d6dd!important
+}
+.dashboard-grid.focus-mode .config-actions button:hover,.probe-btn:hover,.config-action:hover{background:#344d5b!important;color:#f0f5f7!important}
+.result-row{
+  min-height:34px!important;border-bottom:1px solid rgba(91,114,129,.28)!important;
+  background:transparent!important
+}
+.result-row:last-child{border-bottom:0!important}
+
+/* Beam quality bar follows the same flat visual language. */
+.beam-frame-quality{
+  border:1px solid #566d7b!important;border-radius:2px!important;
+  background:#253844!important;box-shadow:none!important
+}
+.frame-meter{height:5px!important;border-radius:1px!important}
+.frame-meter i{border-radius:1px!important}
+
+/* Big readout controls share one centerline and do not jump on hover. */
+.big-readout-top{align-items:center!important}
+.big-readout-actions{height:24px!important;display:flex!important;align-items:center!important;gap:2px!important}
+.big-readout-actions button{
+  width:22px!important;height:22px!important;min-width:22px!important;padding:0!important;margin:0!important;
+  display:grid!important;place-items:center!important;line-height:1!important;border-radius:2px!important
+}
+.big-readout-theme-toggle span{display:block!important;margin:0!important}
+.big-readout-close{font-size:18px!important;font-weight:300!important;line-height:1!important;padding-bottom:1px!important}
+
+/* Sidebar: restrained hover/active states, no card-like shadow. */
+.sidebar{padding:6px 4px!important;gap:3px!important;background:#293846!important}
+.sidebar button{
+  width:38px!important;height:38px!important;border-radius:2px!important;
+  background:transparent!important;box-shadow:none!important
+}
+.sidebar button:hover{background:#324654!important;transform:none!important}
+.sidebar button.active{background:#354b5a!important;box-shadow:inset 2px 0 0 #5aa8d4!important}
+.sidebar svg{width:21px!important;height:21px!important}
+
+/* No decorative rounding on plot/data surfaces. */
+.main-plot,.spectrum-plot,.caustic-plot,.scope-fft-plot,.scope-time-plot,.beam-image-wrap{
+  border-radius:1px!important
+}
+
+@media(max-width:1400px){
+  .topbar{gap:3px!important;padding-left:6px!important;padding-right:6px!important}
+  .folder-current-name{max-width:88px!important}
+  .label-wrap{width:158px!important}
+  .device-strip{gap:9px!important}
+  .device-pill{font-size:10.5px!important}
+  .dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger,
+  .dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric{margin-left:10px!important}
+  .dashboard-grid:not(.focus-mode) .metric-trigger + .metric-trigger::before,
+  .dashboard-grid:not(.focus-mode) .scope-readouts .secondary-metric::before{left:-5px!important}
+  .dashboard-grid:not(.focus-mode) .metric-value-chip{min-width:58px!important;padding-left:5px!important;padding-right:5px!important}
+  .dashboard-grid:not(.focus-mode) .metric-value-chip b{font-size:16px!important}
+  .dashboard-grid.focus-mode .focus-head-value{min-width:84px!important;padding-left:7px!important;padding-right:7px!important}
+  .dashboard-grid.focus-mode .focus-head-value b{font-size:20px!important}
+}
