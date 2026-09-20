@@ -5768,7 +5768,7 @@ function App() {
                       <select
                         value={
                           activeFigure.figureOverrides.legendOrientation ??
-                          "horizontal"
+                          "vertical"
                         }
                         onChange={(event) =>
                           setFigureField(
@@ -5782,7 +5782,7 @@ function App() {
                       </select>
                     </div>
                     {(activeFigure.figureOverrides.legendOrientation ??
-                      "horizontal") === "horizontal" && (
+                      "vertical") === "horizontal" && (
                       <div className="prop-row">
                         <label>列数</label>
                         <input
