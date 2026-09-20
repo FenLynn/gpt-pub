@@ -4991,7 +4991,7 @@ function App() {
                                             <div className="prop-row">
                                               <label>刻度方向</label>
                                               <select
-                                                value={activeFigure.figureOverrides.tickDirection ?? "outside"}
+                                                value={activeFigure.figureOverrides.tickDirection ?? "inside"}
                                                 onChange={(event) =>
                                                   setFigureField(
                                                     "tickDirection",
