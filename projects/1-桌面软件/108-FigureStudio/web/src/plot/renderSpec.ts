@@ -1,6 +1,9 @@
 import { resolveFieldRowCoordinates } from "../data/field";
 import { normalizePlotlyMathText } from "../lib/mathText";
-import { resolvePublicationMetrics } from "./publication";
+import {
+  resolvePublicationMetrics,
+  resolveSeriesPalette
+} from "./publication";
 import type {
   Dataset,
   PlotColumn,
@@ -125,6 +128,7 @@ function baseXYTrace(
 ) {
   const override = figure.seriesOverrides[series.id] || {};
   const metrics = resolvePublicationMetrics(preset, figure);
+  const palette = resolveSeriesPalette(preset, figure);
   const isFit = /fit|拟合/i.test(series.name);
   const lineVisible =
     override.lineVisible ??
@@ -146,7 +150,7 @@ function baseXYTrace(
   const markerMaxDisplayed =
     override.markerMaxDisplayed ?? automaticMarkerCap;
   const color =
-    override.color || preset.palette[sourceIndex % preset.palette.length];
+    override.color || palette[sourceIndex % palette.length];
   const opacity = override.opacity ?? 1;
   const xIsNumeric = dataset.x.values.every(
     (value) => value === null || typeof value === "number"
@@ -209,6 +213,7 @@ export function buildTraces(args: {
 }) {
   const { dataset, figure, preset } = args;
   const metrics = resolvePublicationMetrics(preset, figure);
+  const palette = resolveSeriesPalette(preset, figure);
   const template = figure.templateId;
   const mappedSeries = orderSeries(
     dataset,
@@ -459,12 +464,12 @@ export function buildTraces(args: {
       const override = figure.seriesOverrides[column.id] || {};
       const fillColor =
         override.color ||
-        preset.palette[sourceIndex % preset.palette.length];
+        palette[sourceIndex % palette.length];
       const markerColor =
         override.barColorMode === "points"
           ? column.values.map(
               (_value, pointIndex) =>
-                preset.palette[pointIndex % preset.palette.length]
+                palette[pointIndex % palette.length]
             )
           : fillColor;
       const labelVisible =
@@ -786,6 +791,7 @@ export function buildLayout(args: {
   const { dataset, figure, preset, displayText } = args;
   const overrides = figure.figureOverrides;
   const metrics = resolvePublicationMetrics(preset, figure);
+  const palette = resolveSeriesPalette(preset, figure);
   const canvas = resolveCanvasMm(preset, figure);
   const fontFamily = plotFontFamily(overrides.fontFamily || preset.fontFamily);
   const fontSizePt = overrides.fontSizePt ?? metrics.fontSizePt;
@@ -1022,7 +1028,7 @@ export function buildLayout(args: {
     );
     return (
       figure.seriesOverrides[series.id]?.color ??
-      preset.palette[sourceIndex % preset.palette.length]
+      palette[sourceIndex % palette.length]
     );
   };
   const leftYColor = seriesColor(leftSeries[0]);
