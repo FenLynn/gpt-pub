@@ -2286,7 +2286,9 @@ function App() {
         majorTickLengthPt: 3.5,
         minorTickLengthPt: 2,
         axisTitleScale: 1.08,
+        axisTitlePadPt: 4,
         plotTitleScale: 1.18,
+        plotTitlePadPt: 6,
         legendScale: 0.94,
         outerMarginScale: 1
       };
