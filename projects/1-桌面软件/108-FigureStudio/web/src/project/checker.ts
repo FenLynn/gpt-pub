@@ -652,13 +652,18 @@ export function checkFigure(
     o.legendPosition === "custom" &&
     ((o.legendX !== undefined && (o.legendX < -0.25 || o.legendX > 1.25)) ||
       (o.legendY !== undefined && (o.legendY < -0.25 || o.legendY > 1.25)));
+  const compactOutsideLegend =
+    publication.mode === "quad-panel" &&
+    o.legendPosition === "outside-right";
   if (effectiveLegendVisible) {
     items.push({
       id: "legend-position",
-      level: legendFarOutside ? "warn" : "pass",
+      level: legendFarOutside || compactOutsideLegend ? "warn" : "pass",
       title: "图例位置",
       detail: legendFarOutside
         ? "自由图例位置远离绘图区，导出前请确认没有被裁切。"
+        : compactOutsideLegend
+        ? "四合一子图使用图外右侧图例会明显压缩绘图区；组图通常优先使用图内图例，或在最终 2 × 2 版面中使用共享图例。"
         : "图例位置处于合理范围。"
     });
   }
