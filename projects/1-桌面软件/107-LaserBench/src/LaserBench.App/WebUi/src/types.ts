@@ -55,6 +55,15 @@ export interface LaserSnapshot {
     powerPassFail: boolean
     powerLow: number
     powerHigh: number
+    power1DisplayUnit: string
+    power2DisplayUnit: string
+    math1DisplayUnit: string
+    power1AxisMin: number
+    power1AxisMax: number
+    power2AxisMin: number
+    power2AxisMax: number
+    math1AxisMin: number
+    math1AxisMax: number
     osaResolution: number
     osaSensitivity: string
     osaAverage: number

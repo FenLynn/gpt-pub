@@ -311,6 +311,15 @@ internal sealed class WebUiHost : IDisposable
         if (v.TryGetProperty("powerPassFail",out var ppf) && (ppf.ValueKind==JsonValueKind.True||ppf.ValueKind==JsonValueKind.False)) _config.PowerPassFail=ppf.GetBoolean();
         if (v.TryGetProperty("powerLow",out var pl) && pl.ValueKind==JsonValueKind.Number) _config.PowerLow=Math.Clamp(pl.GetDouble(),-1e9,1e9);
         if (v.TryGetProperty("powerHigh",out var ph) && ph.ValueKind==JsonValueKind.Number) _config.PowerHigh=Math.Clamp(ph.GetDouble(),-1e9,1e9);
+        if (v.TryGetProperty("power1DisplayUnit",out var p1du) && p1du.ValueKind==JsonValueKind.String) _config.Power1DisplayUnit=NormalizePowerUnit(p1du.GetString());
+        if (v.TryGetProperty("power2DisplayUnit",out var p2du) && p2du.ValueKind==JsonValueKind.String) _config.Power2DisplayUnit=NormalizePowerUnit(p2du.GetString());
+        if (v.TryGetProperty("math1DisplayUnit",out var m1du) && m1du.ValueKind==JsonValueKind.String) _config.Math1DisplayUnit=NormalizeCustomUnit(m1du.GetString());
+        if (v.TryGetProperty("power1AxisMin",out var p1amin) && p1amin.ValueKind==JsonValueKind.Number) _config.Power1AxisMin=Math.Clamp(p1amin.GetDouble(),-1e12,1e12);
+        if (v.TryGetProperty("power1AxisMax",out var p1amax) && p1amax.ValueKind==JsonValueKind.Number) _config.Power1AxisMax=Math.Clamp(p1amax.GetDouble(),-1e12,1e12);
+        if (v.TryGetProperty("power2AxisMin",out var p2amin) && p2amin.ValueKind==JsonValueKind.Number) _config.Power2AxisMin=Math.Clamp(p2amin.GetDouble(),-1e12,1e12);
+        if (v.TryGetProperty("power2AxisMax",out var p2amax) && p2amax.ValueKind==JsonValueKind.Number) _config.Power2AxisMax=Math.Clamp(p2amax.GetDouble(),-1e12,1e12);
+        if (v.TryGetProperty("math1AxisMin",out var m1amin) && m1amin.ValueKind==JsonValueKind.Number) _config.Math1AxisMin=Math.Clamp(m1amin.GetDouble(),-1e12,1e12);
+        if (v.TryGetProperty("math1AxisMax",out var m1amax) && m1amax.ValueKind==JsonValueKind.Number) _config.Math1AxisMax=Math.Clamp(m1amax.GetDouble(),-1e12,1e12);
 
         if (v.TryGetProperty("osaResolution",out var ores) && ores.ValueKind==JsonValueKind.Number) _config.OsaResolution=Math.Clamp(ores.GetDouble(),0.001,10);
         if (v.TryGetProperty("osaSensitivity",out var osen) && osen.ValueKind==JsonValueKind.String) _config.OsaSensitivity=(osen.GetString()??"MID").Trim().ToUpperInvariant();
@@ -367,6 +376,18 @@ internal sealed class WebUiHost : IDisposable
         }
         AppConfigStore.Save(_config);
         return new { snapshot=BuildSnapshot() };
+    }
+
+    private static string NormalizePowerUnit(string? value)
+    {
+        var unit=(value??"kW").Trim();
+        return unit is "kW" or "W" or "mW" ? unit : "kW";
+    }
+
+    private static string NormalizeCustomUnit(string? value)
+    {
+        var unit=(value??string.Empty).Trim();
+        return unit.Length>12 ? unit[..12] : unit;
     }
 
     private object ProbeInterfaces(JsonElement? value)
@@ -485,7 +506,7 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.5.0",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.5.1",
             mode = runtime?.DataPlaneMode ?? (_provider.IsSimulator ? "SIM" : "HW"),
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
@@ -518,6 +539,10 @@ internal sealed class WebUiHost : IDisposable
                 powerScale=_config.PowerScale, powerNormalize=_config.PowerNormalize, powerNormalizeValue=_config.PowerNormalizeValue,
                 powerDensity=_config.PowerDensity, powerAreaCm2=_config.PowerAreaCm2, powerPassFail=_config.PowerPassFail,
                 powerLow=_config.PowerLow, powerHigh=_config.PowerHigh,
+                power1DisplayUnit=_config.Power1DisplayUnit, power2DisplayUnit=_config.Power2DisplayUnit, math1DisplayUnit=_config.Math1DisplayUnit,
+                power1AxisMin=_config.Power1AxisMin, power1AxisMax=_config.Power1AxisMax,
+                power2AxisMin=_config.Power2AxisMin, power2AxisMax=_config.Power2AxisMax,
+                math1AxisMin=_config.Math1AxisMin, math1AxisMax=_config.Math1AxisMax,
                 osaResolution=_config.OsaResolution, osaSensitivity=_config.OsaSensitivity, osaAverage=_config.OsaAverage,
                 osaRefLevel=_config.OsaRefLevel, osaDbPerDiv=_config.OsaDbPerDiv, osaShowRef=_config.OsaShowRef,
                 osaSweepMode=_config.OsaSweepMode, osaMarkerPeak=_config.OsaMarkerPeak,

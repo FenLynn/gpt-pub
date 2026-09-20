@@ -95,6 +95,15 @@ internal static class Program
                 DashboardPower2 = false,
                 PowerAverageSamples = 8,
                 PowerScale = 1.25,
+                Power1DisplayUnit = "W",
+                Power2DisplayUnit = "mW",
+                Math1DisplayUnit = "ratio",
+                Power1AxisMin = -2,
+                Power1AxisMax = 25000,
+                Power2AxisMin = 0,
+                Power2AxisMax = 900000,
+                Math1AxisMin = -10,
+                Math1AxisMax = 120,
                 OsaResolution = 0.1,
                 OsaSensitivity = "HIGH1",
                 OsaSamplePoints = 2001,
@@ -116,7 +125,11 @@ internal static class Program
             AppConfigStore.Save(config);
             var persistedConfig = AppConfigStore.Load();
             if (persistedConfig.DashboardPower2) errors.Add("dashboard display preference persistence failed");
-            if (persistedConfig.PowerAverageSamples != 8 || Math.Abs(persistedConfig.PowerScale - 1.25) > 1e-9)
+            if (persistedConfig.PowerAverageSamples != 8 || Math.Abs(persistedConfig.PowerScale - 1.25) > 1e-9 ||
+                persistedConfig.Power1DisplayUnit != "W" || persistedConfig.Power2DisplayUnit != "mW" || persistedConfig.Math1DisplayUnit != "ratio" ||
+                Math.Abs(persistedConfig.Power1AxisMin + 2) > 1e-9 || Math.Abs(persistedConfig.Power1AxisMax - 25000) > 1e-9 ||
+                Math.Abs(persistedConfig.Power2AxisMax - 900000) > 1e-9 || Math.Abs(persistedConfig.Math1AxisMin + 10) > 1e-9 ||
+                Math.Abs(persistedConfig.Math1AxisMax - 120) > 1e-9)
                 errors.Add("power workstation preference persistence failed");
             if (Math.Abs(persistedConfig.OsaResolution - 0.1) > 1e-9 || persistedConfig.OsaSensitivity != "HIGH1" ||
                 persistedConfig.OsaSamplePoints != 2001 || Math.Abs(persistedConfig.OsaVideoBandwidthHz - 10000) > 1e-9 ||

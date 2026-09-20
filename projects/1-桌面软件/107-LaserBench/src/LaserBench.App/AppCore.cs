@@ -56,6 +56,15 @@ internal sealed class AppConfig
     public bool PowerPassFail { get; set; }
     public double PowerLow { get; set; }
     public double PowerHigh { get; set; } = 20.0;
+    public string Power1DisplayUnit { get; set; } = "kW";
+    public string Power2DisplayUnit { get; set; } = "kW";
+    public string Math1DisplayUnit { get; set; } = "%";
+    public double Power1AxisMin { get; set; }
+    public double Power1AxisMax { get; set; }
+    public double Power2AxisMin { get; set; }
+    public double Power2AxisMax { get; set; }
+    public double Math1AxisMin { get; set; }
+    public double Math1AxisMax { get; set; } = 100.0;
 
     public double OsaResolution { get; set; } = 0.05;
     public string OsaSensitivity { get; set; } = "MID";
