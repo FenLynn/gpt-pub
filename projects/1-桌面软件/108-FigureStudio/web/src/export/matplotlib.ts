@@ -837,6 +837,19 @@ else:
                 else default_line_width
             )
 
+            marker_hollow = bool(style.get("markerHollow", False))
+            marker_face = (
+                "none"
+                if marker_hollow
+                else style.get("markerFillColor", color)
+            )
+            default_marker_edge_width = (
+                0.8
+                if marker_hollow
+                else 0.0
+                if template in ("xy-scatter", "xy-errorbar")
+                else 0.55
+            )
             common = dict(
                 label=label,
                 color=color,
@@ -846,8 +859,11 @@ else:
                 marker=marker,
                 markersize=float(style.get("markerSizePt", PRESET["markerSizePt"])),
                 markevery=markevery,
-                markeredgecolor=color,
-                markeredgewidth=0.0 if template in ("xy-scatter", "xy-errorbar") else 0.55,
+                markerfacecolor=marker_face,
+                markeredgecolor=style.get("markerEdgeColor", color),
+                markeredgewidth=float(
+                    style.get("markerEdgeWidthPt", default_marker_edge_width)
+                ),
             )
 
             if template == "xy-errorbar" and plotted == 0:
@@ -857,8 +873,10 @@ else:
                     current_x,
                     y,
                     yerr=yerr,
-                    capsize=0,
-                    elinewidth=0.8,
+                    capsize=float(style.get("errorBarCapSizePt", 0.0)),
+                    elinewidth=float(style.get("errorBarWidthPt", 0.8)),
+                    ecolor=style.get("errorBarColor", color),
+                    capthick=float(style.get("errorBarWidthPt", 0.8)),
                     **common
                 )
             elif template != "xy-errorbar":
