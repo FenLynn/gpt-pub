@@ -153,6 +153,13 @@ export interface SeriesOverride {
   markerSymbol?: MarkerSymbol;
   markerSizePt?: number;
   markerMaxDisplayed?: number;
+  markerHollow?: boolean;
+  markerFillColor?: string;
+  markerEdgeColor?: string;
+  markerEdgeWidthPt?: number;
+  errorBarWidthPt?: number;
+  errorBarCapSizePt?: number;
+  errorBarColor?: string;
   color?: string;
   opacity?: number;
   barBorderColor?: string;
