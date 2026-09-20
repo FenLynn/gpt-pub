@@ -923,7 +923,7 @@ else:
         add_legend(ax)
 
 fig.patch.set_facecolor(O.get("background", "#ffffff"))
-fig.tight_layout()
+fig.tight_layout(pad=0.72 if O.get("publicationMode", "single") == "quad-panel" else 1.02)
 
 # Publication examples: preserve the exact FigureStudio physical canvas.
 # Avoid bbox_inches="tight" here because it changes the exported figure size.
