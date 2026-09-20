@@ -115,17 +115,23 @@ jobs:
             'beamInterfaceEnabled',
             'scopeInterfaceEnabled',
             'osaSamplePoints',
-            'osaVideoBandwidthHz',
             'osaTraceMode',
             'scope-fft-plot',
             'scope-time-plot',
             'interface-live',
             'app.probeInterfaces',
             '立即重新探测',
+            '本地平滑点数',
+            '本地显示偏移',
+            'BeamSquared 只读桥',
+            'Run / rail / Ultracal',
             'show-axis-labels',
             "activePage==='dashboard'"
           )
           foreach($needle in $required){ if($app -notlike "*$needle*"){ throw "Workstation UI contract missing: $needle" } }
+          if($app -like '*视频带宽（Hz）*'){ throw 'AQ6370D UI must not expose unsupported VBW as a live hardware control.' }
+          if($app -like '*峰值阈值（dB）*'){ throw 'AQ6370D UI must not expose an unmapped peak-threshold control.' }
+          if($app -notlike '*:disabled="settingsDraft.beamInterfaceEnabled"*'){ throw 'BeamSquared real-hardware motion/control lock is missing.' }
           foreach($needle in @('powerAverageSamples','osaResolution','beamWidthMethod','scopeVoltsDiv','osaSamplePoints','osaVideoBandwidthHz','osaTraceMode','InstrumentInterfaceState','powerInterfaceEnabled','spectrumInterfaceEnabled','beamInterfaceEnabled','scopeInterfaceEnabled')){
             if($types -notlike "*$needle*"){ throw "Web UI config type missing: $needle" }
           }

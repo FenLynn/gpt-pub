@@ -34,6 +34,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - `DashboardControl`、`ModuleViews`、`NavigationPages`、`UiPrimitives` 是旧 WinForms UI 的回滚参考，不是当前生产入口。
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - v0.5.0 已将 `InstrumentProviderFactory` 切到 `HybridInstrumentProvider`：Juno=USB/COM STA worker，AQ6370D=TCP/SCPI worker，BeamSquared=net48 Automation bridge，MSO44=raw TCP/SCPI worker。本模块真实接口关闭时才使用 Simulator；启用真实接口但尚未 ready 时绝不伪装为 Simulator 数据。`DataPlaneReady=true` 只能由后台 worker 在成功读取真实样本后产生。
+- v0.5.0 最终 UI/Driver 边界按“看得见的控件必须真有效”收口：AQ6370D 面板不再暴露无官方命令依据的 VBW / 未映射峰值阈值，本地平滑与显示偏移明确标注为本地处理；BeamSquared 真机模式锁定 Z/Att/自动浏览和 Simulator M² 参数，只保留结果读取与 X/Y 显示开关，防止把未实现的机械/分析控制伪装成已接通。
 - Web UI 已有 Dashboard、Power/Spectrum/Beam/Scope 工作站式独立页、Data 和 Settings。v0.4.27 将独立页标题区从上一版进一步压缩到仅覆盖模块图标/标题/通道状态的高度；通道信息紧贴标题，右侧参数侧栏继续支持“设置/结果”双页签与折叠。Scope 采用 FFT 上、时域下且 FFT 更大的结构。
 
 ## 当前产品不变量

@@ -16,8 +16,8 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - 顶部四个采集选择图标使用内联 SVG + CSS 动画；模块左上角图标只同步绿色 selected 状态并保持静止。Power 四根粗 bar 缓慢起伏；Spectrum 单峰只做纵向变高→变低；Scope 波形持续向左流动、不往返；Beam 十字线/中心 target 固定、仅外环缓慢扩散。
 - 所有绘图内部网格为虚线；Legend 透明、无边框并放在数据区内。Dashboard 不显示 X/Y 轴标题文字，只保留必要刻度；刻度边缘保持深色，纯白只属于真实数据区。
 - Power 独立页使用工作站布局，并提供活动通道、历史窗口、显示选择、移动平均、Offset、Scale、Normalize、Power density、Zero、当前值归一化、Pass/Fail 阈值等常用功率计工作流；Dashboard 显示选择与 Test 采集选择继续严格分离，数学百分比继续使用独立右轴。
-- Spectrum 独立页除 Start/Stop、Center/Span、RBW、Sensitivity、Average、Sweep、Reference level、dB/div、Reference trace 与 Peak marker 外，v0.4.27 进一步补齐采样点数、视频带宽、轨迹模式、平滑点数、波长偏移、空气/真空波长基准、自动峰值搜索与峰值阈值；其中波长偏移、平滑和显示点数在 Simulator 工作页直接生效，其余真实 OSA 参数进入统一配置等待 AQ6370D Driver 映射。
-- Beam 左侧显示当前 Z 位置 2D 光斑，右侧显示完整 caustic；**Z / 播放 / Attenuation** 作为高频观察控制继续常驻 Dashboard。Beam 独立页补充 M²x/M²y/M²、X/Y beam width、ellipticity、ISO 11146 D4σ/FWHM 选择、outlier 与 X/Y caustic 显示；不加入 3D 光斑。
+- Spectrum 独立页保留 Center/Span、RBW、Sensitivity、Average、Sweep、采样点数、Trace mode、空气/真空基准等已经有 AQ6370D 命令映射的采集参数；本地平滑、显示偏移、参考光谱和峰值标记被明确归入 LaserBench 本地显示处理。v0.4.27 曾加入但没有 AQ6370D 官方命令依据的 VBW 与未映射峰值阈值已从当前操作面板移除，避免“能改 UI、不能改仪器”的假控制。
+- Beam 左侧显示当前 Z 位置 2D 光斑，右侧显示完整 caustic；Simulator 下仍保留 Z / 播放 / Attenuation 以及 D4σ/FWHM、outlier 等实验工作流。**真实 BeamSquared 接口启用后，这些尚未映射/可能引发机械运动的控制会自动锁定**；v0.5.0 的 bridge 只读取 RunStatus、BeamWidth 与 M²，Run / rail / Ultracal 和厂商分析算法继续由 BeamSquared 管理。X/Y 曲线显示属于 LaserBench 本地显示控制。
 - Scope Dashboard 与独立页均改为 **FFT 在上、时域在下**，FFT 获得更高的图形权重；独立页继续提供时间窗、FFT 上限、Volts/div、Offset、Coupling、通道开关、Trigger source/level/slope、Acquisition mode 与 Average count。
 - Dashboard 关键结果可点击进入 **Big Readout**，不同指标允许同时弹出多个读数窗；同一指标只保留一个实例并可再次点击提到最前。每个窗独立拖动、等比例缩放和黑/白显示；左上状态/名称常显，右上控制与右下缩放手柄默认隐藏，hover 时才显示。**Big Readout 只在 Dashboard 显示，切到任何独立模块页时全部隐藏，返回 Dashboard 后恢复。**
 - 四个模块可从侧栏进入独立工作页；v0.4.26 将标题图标/名称/关键读数合并成更高的工作站标题区，右侧参数面板可折叠，并拆为“设置 / 结果”两个页签。设置参数使用中文，结果页同时列出测量结果、当前测试参数和接口状态。独立页坐标刻度、轴标题与 Legend 放大，坐标 gutter 与壳体同色，只有真实 Plot 矩形白底；Beam 光斑视窗保持正方形并与 caustic 图上下边框对齐。Power 独立页下方范围条继续与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
