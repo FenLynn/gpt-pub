@@ -146,6 +146,7 @@ jobs:
           if($app -like '*视频带宽（Hz）*'){ throw 'AQ6370D UI must not expose unsupported VBW as a live hardware control.' }
           if($app -like '*峰值阈值（dB）*'){ throw 'AQ6370D UI must not expose an unmapped peak-threshold control.' }
           if($app -notlike '*:disabled="settingsDraft.beamInterfaceEnabled"*'){ throw 'BeamSquared real-hardware motion/control lock is missing.' }
+          if($app -notlike '*Dashboard uses one physical-power Y axis, so its curves stay in provider-canonical kW.*'){ throw 'Dashboard shared Power axis must stay canonical kW.' }
           foreach($needle in @('powerAverageSamples','power1DisplayUnit','power1AxisMin','math1DisplayUnit','osaResolution','beamWidthMethod','scopeVoltsDiv','scopeActiveChannel','scopeCh1VoltsDiv','scopeCh2VoltsDiv','scopeCh1Coupling','scopeCh2Coupling','osaSamplePoints','osaVideoBandwidthHz','osaTraceMode','InstrumentInterfaceState','powerInterfaceEnabled','spectrumInterfaceEnabled','beamInterfaceEnabled','scopeInterfaceEnabled')){
             if($types -notlike "*$needle*"){ throw "Web UI config type missing: $needle" }
           }

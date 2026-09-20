@@ -149,11 +149,12 @@ function powerProcessedCanonical(value:number,index:number){
   }
   return next
 }
+// Dashboard uses one physical-power Y axis, so its curves stay in provider-canonical kW.
 const powerSeries = computed<PlotSeries[]>(() => visiblePowerTraces.value.map(({t,index}) => {
   const xs=t.points.map(p=>p.x),minX=xs.length?Math.min(...xs):0
   return {
     name:powerAliasForIndex(index),color:t.color,axis:(t.unit==='%'?'right':'left') as 'left'|'right',
-    points:t.points.map(p=>({x:p.x-minX,y:powerDisplayRaw(p.y,index)}))
+    points:t.points.map(p=>({x:p.x-minX,y:p.y}))
   }
 }))
 const powerTimeOriginMs = computed(() => {
@@ -220,7 +221,7 @@ const powerPageAutoLeftMax = computed(()=>{
   const values=powerPageSeries.value.filter(s=>s.axis!=='right').flatMap(s=>s.points.map(p=>p.y)).filter(Number.isFinite)
   return Math.max(1,Math.ceil(Math.max(...values,1)*1.08))
 })
-const powerPageLeftMin = computed(()=>!activePowerIsMath.value?activePowerAxisMin.value:Math.min(settingsDraft.value.power1AxisMin,settingsDraft.value.power2AxisMin))
+const powerPageLeftMin = computed(()=>!activePowerIsMath.value?activePowerAxisMin.value:0)
 const powerPageLeftMax = computed(()=>!activePowerIsMath.value && activePowerAxisMax.value>activePowerAxisMin.value ? activePowerAxisMax.value : powerPageAutoLeftMax.value)
 const powerPageRightMin = computed(()=>activePowerIsMath.value?activePowerAxisMin.value:settingsDraft.value.math1AxisMin)
 const powerPageRightMax = computed(()=>activePowerIsMath.value&&activePowerAxisMax.value>activePowerAxisMin.value?activePowerAxisMax.value:(settingsDraft.value.math1AxisMax>settingsDraft.value.math1AxisMin?settingsDraft.value.math1AxisMax:100))
