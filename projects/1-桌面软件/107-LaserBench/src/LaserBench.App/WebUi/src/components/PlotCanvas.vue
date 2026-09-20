@@ -6,6 +6,7 @@ type AxisName = 'x'|'y'|'right'
 type AxisEnd = 'min'|'max'
 const emit = defineEmits<{
   (e:'axis-limit-change', payload:{axis:AxisName;end:AxisEnd;value:number}):void
+  (e:'axis-unit-change', value:string):void
 }>()
 
 const props = withDefaults(defineProps<{
@@ -29,9 +30,12 @@ const props = withDefaults(defineProps<{
   xPadding?: number
   verticalMarker?: number | null
   editableAxes?: boolean
+  yUnitOptions?: string[]
+  yUnit?: string
 }>(), {
   xLabel: '', yLabel: '', rightYLabel: '', timeAxis: false, timeOriginMs: undefined, timeValidMax: undefined,
-  compact: false, tight: false, stacked: false, showAxisLabels: false, xPadding: 0, verticalMarker: null, editableAxes: false
+  compact: false, tight: false, stacked: false, showAxisLabels: false, xPadding: 0, verticalMarker: null, editableAxes: false,
+  yUnitOptions: () => [], yUnit: ''
 })
 
 const shell = ref<HTMLDivElement | null>(null)
@@ -138,12 +142,13 @@ function draw() {
   }
 
   const xTickInfo=props.timeAxis?timeTicks(x0,x1):{values:uniformTicks(x0,x1,6),step:(x1-x0)/5}
+  const visibleX=xTickInfo.values.filter(v=>props.timeValidMax===undefined||v<=props.timeValidMax+1e-6)
   const yTicks=uniformTicks(y0,y1,5)
   const rightTicks=uniformTicks(r0,r1,5)
 
   if (!props.compact) {
     ctx.save(); ctx.strokeStyle = '#d9e7f1'; ctx.lineWidth = 1; ctx.setLineDash([4,4])
-    for(const v of xTickInfo.values){
+    for(const v of visibleX){
       const x=sx(v)
       if(x>m.l+.5&&x<m.l+pw-.5){ctx.beginPath();ctx.moveTo(x,m.t);ctx.lineTo(x,m.t+ph);ctx.stroke()}
     }
@@ -185,7 +190,6 @@ function draw() {
   })
 
   ctx.textBaseline='top'
-  const visibleX=xTickInfo.values.filter(v=>props.timeValidMax===undefined||v<=props.timeValidMax+1e-6)
   visibleX.forEach((v,i)=>{
     const x=sx(v)
     const text=props.timeAxis?formatTime(v,xTickInfo.step):fmt(v,x1-x0)
@@ -303,6 +307,10 @@ function commitEdit(){
   edit.value=null
 }
 function cancelEdit(){edit.value=null}
+function onUnitSelect(e:Event){
+  const target=e.target as HTMLSelectElement|null
+  if(target)emit('axis-unit-change',target.value)
+}
 
 watch(()=>[props.series,props.xMin,props.xMax,props.yMin,props.yMax,props.rightYMin,props.rightYMax,props.xLabel,props.yLabel,props.rightYLabel,props.timeOriginMs,props.timeValidMax,props.showAxisLabels,props.xPadding,props.verticalMarker],draw,{deep:true})
 onMounted(()=>{observer=new ResizeObserver(draw);if(shell.value)observer.observe(shell.value);draw()})
@@ -315,7 +323,10 @@ onBeforeUnmount(()=>{
 
 <template>
   <div ref="shell" class="plot-shell">
-    <canvas ref="canvas" class="plot-canvas" @pointermove="onPointerMove" @pointerleave="onPointerLeave" @click="beginAxisEdit"></canvas>
+    <canvas ref="canvas" class="plot-canvas" :class="{editable:editableAxes}" :title="editableAxes?'点击坐标轴端点数字可直接修改范围':''" @pointermove="onPointerMove" @pointerleave="onPointerLeave" @click="beginAxisEdit"></canvas>
+    <select v-if="showAxisLabels && yUnitOptions.length" class="axis-unit-select" :value="yUnit" title="切换纵轴显示单位" @change="onUnitSelect">
+      <option v-for="unit in yUnitOptions" :key="unit" :value="unit">{{unit}}</option>
+    </select>
     <input v-if="edit" ref="editor" class="axis-inline-editor" :style="{left:edit.left+'px',top:edit.top+'px'}" v-model="edit.value" @keydown.enter.prevent="commitEdit" @keydown.esc.prevent="cancelEdit" @blur="commitEdit" />
   </div>
 </template>
@@ -323,6 +334,15 @@ onBeforeUnmount(()=>{
 <style scoped>
 .plot-shell{position:relative;display:block;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
 .plot-canvas{display:block;width:100%;height:100%}
+.plot-canvas.editable{cursor:default}
+.axis-unit-select{
+  position:absolute;z-index:7;left:26px;top:50%;width:58px;height:21px;
+  transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;
+  border:0;border-radius:3px;background:rgba(37,57,70,.88);color:#dce6ed;
+  font:650 10px "Segoe UI","Microsoft YaHei UI",sans-serif;text-align:center;
+  padding:0 3px;outline:none;cursor:pointer
+}
+.axis-unit-select:hover,.axis-unit-select:focus{background:#315064;color:#fff}
 .axis-inline-editor{position:absolute;z-index:8;width:84px;height:26px;padding:2px 6px;border:1px solid #4d7895;border-radius:3px;background:#20333f;color:#f3f7fa;font:600 12px "Segoe UI","Microsoft YaHei UI",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.24);outline:none;font-variant-numeric:tabular-nums}
 .axis-inline-editor:focus{border-color:#6fc1ef;box-shadow:0 0 0 2px rgba(80,176,232,.16),0 3px 12px rgba(0,0,0,.24)}
 </style>

@@ -116,6 +116,13 @@ internal static class Program
                 OsaPeakThresholdDb = 6.5,
                 BeamWidthMethod = "FWHM",
                 ScopeVoltsDiv = 0.5,
+                ScopeActiveChannel = 2,
+                ScopeCh1VoltsDiv = 0.25,
+                ScopeCh1Offset = 0.1,
+                ScopeCh1Coupling = "DC",
+                ScopeCh2VoltsDiv = 0.5,
+                ScopeCh2Offset = -0.2,
+                ScopeCh2Coupling = "AC",
                 ScopeTriggerSource = "CH2",
                 SpectrumInterfaceEnabled = true,
                 SpectrumInterfaceEndpoint = "TCPIP0::192.0.2.10::inst0::INSTR",
@@ -139,7 +146,11 @@ internal static class Program
                 errors.Add("OSA workstation preference persistence failed");
             if (persistedConfig.BeamWidthMethod != "FWHM")
                 errors.Add("beam workstation preference persistence failed");
-            if (Math.Abs(persistedConfig.ScopeVoltsDiv - 0.5) > 1e-9 || persistedConfig.ScopeTriggerSource != "CH2")
+            if (Math.Abs(persistedConfig.ScopeVoltsDiv - 0.5) > 1e-9 || persistedConfig.ScopeTriggerSource != "CH2" ||
+                persistedConfig.ScopeActiveChannel != 2 || Math.Abs(persistedConfig.ScopeCh1VoltsDiv - 0.25) > 1e-9 ||
+                Math.Abs(persistedConfig.ScopeCh1Offset - 0.1) > 1e-9 || persistedConfig.ScopeCh1Coupling != "DC" ||
+                Math.Abs(persistedConfig.ScopeCh2VoltsDiv - 0.5) > 1e-9 || Math.Abs(persistedConfig.ScopeCh2Offset + 0.2) > 1e-9 ||
+                persistedConfig.ScopeCh2Coupling != "AC")
                 errors.Add("scope workstation preference persistence failed");
             if (!persistedConfig.SpectrumInterfaceEnabled || persistedConfig.SpectrumInterfaceEndpoint != "TCPIP0::192.0.2.10::inst0::INSTR" ||
                 !persistedConfig.ScopeInterfaceEnabled || persistedConfig.ScopeInterfaceEndpoint != "TCPIP0::192.0.2.20::inst0::INSTR")

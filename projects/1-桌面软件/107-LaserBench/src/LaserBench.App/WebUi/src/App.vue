@@ -64,6 +64,13 @@ const settingsDraft = ref({
   beamRunMode:snapshot.value.config?.beamRunMode??'AUTO', beamWidthMethod:snapshot.value.config?.beamWidthMethod??'D4SIGMA',
   beamAutoOutlier:snapshot.value.config?.beamAutoOutlier??true, beamShowX:snapshot.value.config?.beamShowX??true, beamShowY:snapshot.value.config?.beamShowY??true,
   scopeVoltsDiv:snapshot.value.config?.scopeVoltsDiv??0.25, scopeOffset:snapshot.value.config?.scopeOffset??0, scopeCoupling:snapshot.value.config?.scopeCoupling??'DC',
+  scopeActiveChannel:snapshot.value.config?.scopeActiveChannel??1,
+  scopeCh1VoltsDiv:snapshot.value.config?.scopeCh1VoltsDiv??snapshot.value.config?.scopeVoltsDiv??0.25,
+  scopeCh1Offset:snapshot.value.config?.scopeCh1Offset??snapshot.value.config?.scopeOffset??0,
+  scopeCh1Coupling:snapshot.value.config?.scopeCh1Coupling??snapshot.value.config?.scopeCoupling??'DC',
+  scopeCh2VoltsDiv:snapshot.value.config?.scopeCh2VoltsDiv??snapshot.value.config?.scopeVoltsDiv??0.25,
+  scopeCh2Offset:snapshot.value.config?.scopeCh2Offset??snapshot.value.config?.scopeOffset??0,
+  scopeCh2Coupling:snapshot.value.config?.scopeCh2Coupling??snapshot.value.config?.scopeCoupling??'DC',
   scopeTriggerSource:snapshot.value.config?.scopeTriggerSource??'CH1', scopeTriggerLevel:snapshot.value.config?.scopeTriggerLevel??0,
   scopeTriggerSlope:snapshot.value.config?.scopeTriggerSlope??'RISING', scopeAcquisition:snapshot.value.config?.scopeAcquisition??'SAMPLE', scopeAverage:snapshot.value.config?.scopeAverage??16,
   powerInterfaceEnabled:snapshot.value.config?.powerInterfaceEnabled??false, powerInterfaceEndpoint:snapshot.value.config?.powerInterfaceEndpoint??'AUTO',
@@ -128,10 +135,24 @@ function powerDisplayRaw(value:number,index:number){
   const base=snapshot.value.power.traces[index]?.unit ?? ''
   return value*powerUnitScale(index,base)
 }
+function convertPowerFromKw(value:number,unit:string){
+  if(unit==='W')return value*1000
+  if(unit==='mW')return value*1_000_000
+  return value
+}
+function powerProcessedCanonical(value:number,index:number){
+  let next=value
+  if(index===settingsDraft.value.powerActiveTrace){
+    next=(next+settingsDraft.value.powerOffset)*settingsDraft.value.powerScale
+    if(settingsDraft.value.powerNormalize) next/=Math.max(1e-12,settingsDraft.value.powerNormalizeValue)
+    if(settingsDraft.value.powerDensity) next/=Math.max(1e-9,settingsDraft.value.powerAreaCm2)
+  }
+  return next
+}
 const powerSeries = computed<PlotSeries[]>(() => visiblePowerTraces.value.map(({t,index}) => {
   const xs=t.points.map(p=>p.x),minX=xs.length?Math.min(...xs):0
   return {
-    name:powerAliasForIndex(index),color:t.color,axis:t.unit==='%'?'right':'left',
+    name:powerAliasForIndex(index),color:t.color,axis:(t.unit==='%'?'right':'left') as 'left'|'right',
     points:t.points.map(p=>({x:p.x-minX,y:powerDisplayRaw(p.y,index)}))
   }
 }))
@@ -150,13 +171,7 @@ const powerLeftMax = computed(() => {
   return Math.max(5, Math.ceil(Math.max(...values, 1) / 5) * 5)
 })
 function powerTransform(value:number,index:number){
-  let next=value
-  if(index===settingsDraft.value.powerActiveTrace){
-    next=(next+settingsDraft.value.powerOffset)*settingsDraft.value.powerScale
-    if(settingsDraft.value.powerNormalize) next/=Math.max(1e-12,settingsDraft.value.powerNormalizeValue)
-    if(settingsDraft.value.powerDensity) next/=Math.max(1e-9,settingsDraft.value.powerAreaCm2)
-  }
-  return powerDisplayRaw(next,index)
+  return powerDisplayRaw(powerProcessedCanonical(value,index),index)
 }
 function averagedPowerPoints(points:{x:number;y:number}[],count:number){
   const n=Math.max(1,Math.floor(count))
@@ -165,13 +180,18 @@ function averagedPowerPoints(points:{x:number;y:number}[],count:number){
   const q:number[]=[]
   return points.map(p=>{q.push(p.y);sum+=p.y;if(q.length>n)sum-=q.shift()!;return {x:p.x,y:sum/q.length}})
 }
+const activePowerIsMath = computed(()=>snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]?.unit==='%')
+const powerAxisUnit = computed(()=>activePowerIsMath.value?settingsDraft.value.power1DisplayUnit:baseDisplayUnit(settingsDraft.value.powerActiveTrace))
 const powerPageSeries = computed<PlotSeries[]>(() => snapshot.value.power.traces.map((t,index)=>{
   const xs=t.points.map(p=>p.x),minX=xs.length?Math.min(...xs):0
-  const transformed=t.points.map(p=>({x:p.x-minX,y:powerTransform(p.y,index)}))
-  return {name:powerAliasForIndex(index),color:t.color,axis:t.unit==='%'?'right':'left',
+  const transformed=t.points.map(p=>{
+    const raw=powerProcessedCanonical(p.y,index)
+    const y=t.unit==='%'?raw:convertPowerFromKw(raw,powerAxisUnit.value)
+    return {x:p.x-minX,y}
+  })
+  return {name:powerAliasForIndex(index),color:t.color,axis:(t.unit==='%'?'right':'left') as 'left'|'right',
     points:index===settingsDraft.value.powerActiveTrace?averagedPowerPoints(transformed,settingsDraft.value.powerAverageSamples):transformed}
 }).filter((_,index)=>powerVisibility.value[index]??true))
-const activePowerIsMath = computed(()=>snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]?.unit==='%')
 const activePowerAlias = computed({
   get:()=>powerAliasForIndex(settingsDraft.value.powerActiveTrace),
   set:(value:string)=>{const key=powerAliasKey(settingsDraft.value.powerActiveTrace);if(key)settingsDraft.value.aliases[key]=value}
@@ -214,9 +234,9 @@ const powerPageUnit = computed(()=>{
 const powerPageAxisLabel = computed(()=>{
   const t=snapshot.value.power.traces[settingsDraft.value.powerActiveTrace]
   if(!t)return '功率'
-  if(settingsDraft.value.powerDensity && t.unit!=='%')return `功率密度 (${powerPageUnit.value})`
-  if(settingsDraft.value.powerNormalize)return '归一化值 (rel.)'
-  return t.unit==='%'?'数学':`功率 (${baseDisplayUnit(settingsDraft.value.powerActiveTrace)})`
+  if(settingsDraft.value.powerDensity && t.unit!=='%')return '功率密度'
+  if(settingsDraft.value.powerNormalize)return '归一化值'
+  return '功率'
 })
 const powerPageRightAxisLabel = computed(()=>`数学${settingsDraft.value.math1DisplayUnit?' ('+settingsDraft.value.math1DisplayUnit+')':''}`)
 const dashboardMathAxisLabel = computed(()=>`数学${settingsDraft.value.math1DisplayUnit?' ('+settingsDraft.value.math1DisplayUnit+')':''}`)
@@ -326,8 +346,44 @@ const osaYMax = computed(()=>settingsDraft.value.osaRefLevel)
 const osaYMin = computed(()=>settingsDraft.value.osaRefLevel-settingsDraft.value.osaDbPerDiv*10)
 const beamPageCaustic = computed(()=>snapshot.value.beam.caustic.filter((_,i)=>(i===0&&settingsDraft.value.beamShowX)||(i===1&&settingsDraft.value.beamShowY)))
 const beamEllipticity = computed(()=>snapshot.value.beam.spotWidthX>0?snapshot.value.beam.spotWidthY/snapshot.value.beam.spotWidthX:0)
-const scopeYMin = computed(()=>settingsDraft.value.scopeOffset-settingsDraft.value.scopeVoltsDiv*4)
-const scopeYMax = computed(()=>settingsDraft.value.scopeOffset+settingsDraft.value.scopeVoltsDiv*4)
+function scopeAlias(channel:1|2){
+  const key=channel===1?'scope1':'scope2'
+  return settingsDraft.value.aliases[key] || (channel===1?'CH1':'CH2')
+}
+function scopeTrace(channel:1|2,domain:'time'|'fft'='time'){
+  const name=scopeAlias(channel).toUpperCase()
+  return snapshot.value.scope[domain].find(t=>t.name.toUpperCase()===name)
+}
+const activeScopeChannel = computed<1|2>(()=>settingsDraft.value.scopeActiveChannel===2?2:1)
+const activeScopeAlias = computed({
+  get:()=>scopeAlias(activeScopeChannel.value),
+  set:(value:string)=>{settingsDraft.value.aliases[activeScopeChannel.value===1?'scope1':'scope2']=value}
+})
+const activeScopeVisible = computed({
+  get:()=>activeScopeChannel.value===1?settingsDraft.value.scopeCh1:settingsDraft.value.scopeCh2,
+  set:(value:boolean)=>{if(activeScopeChannel.value===1)settingsDraft.value.scopeCh1=value;else settingsDraft.value.scopeCh2=value}
+})
+const activeScopeVoltsDiv = computed({
+  get:()=>activeScopeChannel.value===1?settingsDraft.value.scopeCh1VoltsDiv:settingsDraft.value.scopeCh2VoltsDiv,
+  set:(value:number)=>{if(activeScopeChannel.value===1)settingsDraft.value.scopeCh1VoltsDiv=value;else settingsDraft.value.scopeCh2VoltsDiv=value}
+})
+const activeScopeOffset = computed({
+  get:()=>activeScopeChannel.value===1?settingsDraft.value.scopeCh1Offset:settingsDraft.value.scopeCh2Offset,
+  set:(value:number)=>{if(activeScopeChannel.value===1)settingsDraft.value.scopeCh1Offset=value;else settingsDraft.value.scopeCh2Offset=value}
+})
+const activeScopeCoupling = computed({
+  get:()=>activeScopeChannel.value===1?settingsDraft.value.scopeCh1Coupling:settingsDraft.value.scopeCh2Coupling,
+  set:(value:string)=>{if(activeScopeChannel.value===1)settingsDraft.value.scopeCh1Coupling=value;else settingsDraft.value.scopeCh2Coupling=value}
+})
+const scopeCh1YMin = computed(()=>settingsDraft.value.scopeCh1Offset-settingsDraft.value.scopeCh1VoltsDiv*4)
+const scopeCh1YMax = computed(()=>settingsDraft.value.scopeCh1Offset+settingsDraft.value.scopeCh1VoltsDiv*4)
+const scopeCh2YMin = computed(()=>settingsDraft.value.scopeCh2Offset-settingsDraft.value.scopeCh2VoltsDiv*4)
+const scopeCh2YMax = computed(()=>settingsDraft.value.scopeCh2Offset+settingsDraft.value.scopeCh2VoltsDiv*4)
+const scopeTimeSeries = computed<PlotSeries[]>(()=>snapshot.value.scope.time.map(t=>({
+  ...t,
+  axis:(t.name.toUpperCase()===scopeAlias(2).toUpperCase()?'right':'left') as 'left'|'right'
+})))
+function selectScopeChannel(channel:1|2){settingsDraft.value.scopeActiveChannel=channel;void saveSettings()}
 function powerVisible(index:number){ return powerVisibility.value[index] ?? true }
 function powerReadoutKind(index:number):BigReadoutKind { return (['power0','power1','power2'][index] ?? 'power0') as BigReadoutKind }
 function updatePowerRangeFromPointer(side:'start'|'end',clientX:number){
@@ -369,9 +425,14 @@ function onSpectrumAxisLimit(p:{axis:'x'|'y'|'right';end:'min'|'max';value:numbe
 function onScopeTimeAxisLimit(p:{axis:'x'|'y'|'right';end:'min'|'max';value:number}){
   if(p.axis==='x'&&p.end==='max')settingsDraft.value.scopeTimeSpan=Math.max(.01,p.value)
   if(p.axis==='y'){
-    const min=p.end==='min'?p.value:scopeYMin.value
-    const max=p.end==='max'?p.value:scopeYMax.value
-    if(max>min){settingsDraft.value.scopeOffset=(max+min)/2;settingsDraft.value.scopeVoltsDiv=(max-min)/8}
+    const min=p.end==='min'?p.value:scopeCh1YMin.value
+    const max=p.end==='max'?p.value:scopeCh1YMax.value
+    if(max>min){settingsDraft.value.scopeCh1Offset=(max+min)/2;settingsDraft.value.scopeCh1VoltsDiv=(max-min)/8}
+  }
+  if(p.axis==='right'){
+    const min=p.end==='min'?p.value:scopeCh2YMin.value
+    const max=p.end==='max'?p.value:scopeCh2YMax.value
+    if(max>min){settingsDraft.value.scopeCh2Offset=(max+min)/2;settingsDraft.value.scopeCh2VoltsDiv=(max-min)/8}
   }
   void saveSettings()
 }
@@ -417,10 +478,10 @@ function readoutData(kind:BigReadoutKind):BigReadoutData|null {
     case 'beamM2y': return { title:'M²y', value:snapshot.value.beam.m2y.toFixed(2), unit:'' }
     case 'beamM2': return { title:'M²', value:snapshot.value.beam.m2mean.toFixed(2), unit:'' }
     case 'scope0': {
-      const t=snapshot.value.scope.time[0]; return t ? { title:t.name, value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : null
+      const t=scopeTrace(1); return t ? { title:scopeAlias(1), value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : {title:scopeAlias(1),value:'—',unit:'V'}
     }
     case 'scope1': {
-      const t=snapshot.value.scope.time[1]; return t ? { title:t.name, value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : null
+      const t=scopeTrace(2); return t ? { title:scopeAlias(2), value:(t.points.at(-1)?.y??0).toFixed(3), unit:'V' } : {title:scopeAlias(2),value:'—',unit:'V'}
     }
   }
   return null
@@ -673,7 +734,7 @@ onMounted(()=>{
     snapshot.value=s
     if(document.activeElement?.id!=='labelInput')labelDraft.value=s.label
     if(!['settings','power','spectrum','beam','scope'].includes(activePage.value)){
-      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})},powerWindow:s.config?.powerWindow??600,osaStart:s.config?.osaStart??1060,osaStop:s.config?.osaStop??1100,scopeTimeSpan:s.config?.scopeTimeSpan??0.24,scopeFftMax:s.config?.scopeFftMax??50,scopeCh1:s.config?.scopeCh1??true,scopeCh2:s.config?.scopeCh2??true,dashboardPower1:s.config?.dashboardPower1??true,dashboardPower2:s.config?.dashboardPower2??true,dashboardMath1:s.config?.dashboardMath1??true,powerActiveTrace:s.config?.powerActiveTrace??0,powerAverageSamples:s.config?.powerAverageSamples??1,powerOffset:s.config?.powerOffset??0,powerScale:s.config?.powerScale??1,powerNormalize:s.config?.powerNormalize??false,powerNormalizeValue:s.config?.powerNormalizeValue??1,powerDensity:s.config?.powerDensity??false,powerAreaCm2:s.config?.powerAreaCm2??1,powerPassFail:s.config?.powerPassFail??false,powerLow:s.config?.powerLow??0,powerHigh:s.config?.powerHigh??20,power1DisplayUnit:s.config?.power1DisplayUnit??'kW',power2DisplayUnit:s.config?.power2DisplayUnit??'kW',math1DisplayUnit:s.config?.math1DisplayUnit??'%',power1AxisMin:s.config?.power1AxisMin??0,power1AxisMax:s.config?.power1AxisMax??0,power2AxisMin:s.config?.power2AxisMin??0,power2AxisMax:s.config?.power2AxisMax??0,math1AxisMin:s.config?.math1AxisMin??0,math1AxisMax:s.config?.math1AxisMax??100,osaResolution:s.config?.osaResolution??0.05,osaSensitivity:s.config?.osaSensitivity??'MID',osaAverage:s.config?.osaAverage??1,osaRefLevel:s.config?.osaRefLevel??0,osaDbPerDiv:s.config?.osaDbPerDiv??10,osaShowRef:s.config?.osaShowRef??true,osaSweepMode:s.config?.osaSweepMode??'REPEAT',osaMarkerPeak:s.config?.osaMarkerPeak??true,osaSamplePoints:s.config?.osaSamplePoints??1001,osaVideoBandwidthHz:s.config?.osaVideoBandwidthHz??1000,osaTraceMode:s.config?.osaTraceMode??'WRITE',osaSmoothingPoints:s.config?.osaSmoothingPoints??1,osaWavelengthOffsetNm:s.config?.osaWavelengthOffsetNm??0,osaWavelengthReference:s.config?.osaWavelengthReference??'AIR',osaAutoPeakSearch:s.config?.osaAutoPeakSearch??true,osaPeakThresholdDb:s.config?.osaPeakThresholdDb??3,beamRunMode:s.config?.beamRunMode??'AUTO',beamWidthMethod:s.config?.beamWidthMethod??'D4SIGMA',beamAutoOutlier:s.config?.beamAutoOutlier??true,beamShowX:s.config?.beamShowX??true,beamShowY:s.config?.beamShowY??true,scopeVoltsDiv:s.config?.scopeVoltsDiv??0.25,scopeOffset:s.config?.scopeOffset??0,scopeCoupling:s.config?.scopeCoupling??'DC',scopeTriggerSource:s.config?.scopeTriggerSource??'CH1',scopeTriggerLevel:s.config?.scopeTriggerLevel??0,scopeTriggerSlope:s.config?.scopeTriggerSlope??'RISING',scopeAcquisition:s.config?.scopeAcquisition??'SAMPLE',scopeAverage:s.config?.scopeAverage??16,powerInterfaceEnabled:s.config?.powerInterfaceEnabled??false,powerInterfaceEndpoint:s.config?.powerInterfaceEndpoint??'AUTO',spectrumInterfaceEnabled:s.config?.spectrumInterfaceEnabled??false,spectrumInterfaceEndpoint:s.config?.spectrumInterfaceEndpoint??'TCPIP::AUTO',beamInterfaceEnabled:s.config?.beamInterfaceEnabled??false,beamInterfaceEndpoint:s.config?.beamInterfaceEndpoint??'AUTO',scopeInterfaceEnabled:s.config?.scopeInterfaceEnabled??false,scopeInterfaceEndpoint:s.config?.scopeInterfaceEndpoint??'TCPIP::AUTO'}
+      settingsDraft.value={experimentFolder:s.config?.experimentFolder??'',autoScreenshot:s.config?.autoScreenshot??false,aliases:{...(s.config?.aliases??{})},powerWindow:s.config?.powerWindow??600,osaStart:s.config?.osaStart??1060,osaStop:s.config?.osaStop??1100,scopeTimeSpan:s.config?.scopeTimeSpan??0.24,scopeFftMax:s.config?.scopeFftMax??50,scopeCh1:s.config?.scopeCh1??true,scopeCh2:s.config?.scopeCh2??true,dashboardPower1:s.config?.dashboardPower1??true,dashboardPower2:s.config?.dashboardPower2??true,dashboardMath1:s.config?.dashboardMath1??true,powerActiveTrace:s.config?.powerActiveTrace??0,powerAverageSamples:s.config?.powerAverageSamples??1,powerOffset:s.config?.powerOffset??0,powerScale:s.config?.powerScale??1,powerNormalize:s.config?.powerNormalize??false,powerNormalizeValue:s.config?.powerNormalizeValue??1,powerDensity:s.config?.powerDensity??false,powerAreaCm2:s.config?.powerAreaCm2??1,powerPassFail:s.config?.powerPassFail??false,powerLow:s.config?.powerLow??0,powerHigh:s.config?.powerHigh??20,power1DisplayUnit:s.config?.power1DisplayUnit??'kW',power2DisplayUnit:s.config?.power2DisplayUnit??'kW',math1DisplayUnit:s.config?.math1DisplayUnit??'%',power1AxisMin:s.config?.power1AxisMin??0,power1AxisMax:s.config?.power1AxisMax??0,power2AxisMin:s.config?.power2AxisMin??0,power2AxisMax:s.config?.power2AxisMax??0,math1AxisMin:s.config?.math1AxisMin??0,math1AxisMax:s.config?.math1AxisMax??100,osaResolution:s.config?.osaResolution??0.05,osaSensitivity:s.config?.osaSensitivity??'MID',osaAverage:s.config?.osaAverage??1,osaRefLevel:s.config?.osaRefLevel??0,osaDbPerDiv:s.config?.osaDbPerDiv??10,osaShowRef:s.config?.osaShowRef??true,osaSweepMode:s.config?.osaSweepMode??'REPEAT',osaMarkerPeak:s.config?.osaMarkerPeak??true,osaSamplePoints:s.config?.osaSamplePoints??1001,osaVideoBandwidthHz:s.config?.osaVideoBandwidthHz??1000,osaTraceMode:s.config?.osaTraceMode??'WRITE',osaSmoothingPoints:s.config?.osaSmoothingPoints??1,osaWavelengthOffsetNm:s.config?.osaWavelengthOffsetNm??0,osaWavelengthReference:s.config?.osaWavelengthReference??'AIR',osaAutoPeakSearch:s.config?.osaAutoPeakSearch??true,osaPeakThresholdDb:s.config?.osaPeakThresholdDb??3,beamRunMode:s.config?.beamRunMode??'AUTO',beamWidthMethod:s.config?.beamWidthMethod??'D4SIGMA',beamAutoOutlier:s.config?.beamAutoOutlier??true,beamShowX:s.config?.beamShowX??true,beamShowY:s.config?.beamShowY??true,scopeVoltsDiv:s.config?.scopeVoltsDiv??0.25,scopeOffset:s.config?.scopeOffset??0,scopeCoupling:s.config?.scopeCoupling??'DC',scopeActiveChannel:s.config?.scopeActiveChannel??1,scopeCh1VoltsDiv:s.config?.scopeCh1VoltsDiv??s.config?.scopeVoltsDiv??0.25,scopeCh1Offset:s.config?.scopeCh1Offset??s.config?.scopeOffset??0,scopeCh1Coupling:s.config?.scopeCh1Coupling??s.config?.scopeCoupling??'DC',scopeCh2VoltsDiv:s.config?.scopeCh2VoltsDiv??s.config?.scopeVoltsDiv??0.25,scopeCh2Offset:s.config?.scopeCh2Offset??s.config?.scopeOffset??0,scopeCh2Coupling:s.config?.scopeCh2Coupling??s.config?.scopeCoupling??'DC',scopeTriggerSource:s.config?.scopeTriggerSource??'CH1',scopeTriggerLevel:s.config?.scopeTriggerLevel??0,scopeTriggerSlope:s.config?.scopeTriggerSlope??'RISING',scopeAcquisition:s.config?.scopeAcquisition??'SAMPLE',scopeAverage:s.config?.scopeAverage??16,powerInterfaceEnabled:s.config?.powerInterfaceEnabled??false,powerInterfaceEndpoint:s.config?.powerInterfaceEndpoint??'AUTO',spectrumInterfaceEnabled:s.config?.spectrumInterfaceEnabled??false,spectrumInterfaceEndpoint:s.config?.spectrumInterfaceEndpoint??'TCPIP::AUTO',beamInterfaceEnabled:s.config?.beamInterfaceEnabled??false,beamInterfaceEndpoint:s.config?.beamInterfaceEndpoint??'AUTO',scopeInterfaceEnabled:s.config?.scopeInterfaceEnabled??false,scopeInterfaceEndpoint:s.config?.scopeInterfaceEndpoint??'TCPIP::AUTO'}
     }
   })
   if(hasNativeBridge) void request('app.getSnapshot')
@@ -818,7 +879,7 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
 <div v-else class="module-pane-scroll results-pane"><div class="result-section"><h4>测量结果</h4><div class="result-row"><span>活动通道</span><b>{{snapshot.power.traces[settingsDraft.powerActiveTrace]?.name}}</b></div><div class="result-row"><span>原始当前值</span><b>{{snapshot.power.traces[settingsDraft.powerActiveTrace]?.value.toFixed(4)}} {{snapshot.power.traces[settingsDraft.powerActiveTrace]?.unit}}</b></div><div class="result-row"><span>处理后值</span><b>{{powerActiveValue.toFixed(4)}} {{powerPageUnit}}</b></div><div class="result-row"><span>历史最大值</span><b>{{snapshot.power.traces[settingsDraft.powerActiveTrace]?.maxValue.toFixed(4)}}</b></div><div class="result-row"><span>历史窗口</span><b>{{settingsDraft.powerWindow/60}} 分钟</b></div><div class="result-row"><span>Dashboard 曲线</span><b>{{[settingsDraft.dashboardPower1?'power1':'',settingsDraft.dashboardPower2?'power2':'',settingsDraft.dashboardMath1?'math1':''].filter(Boolean).join(' / ')||'无'}}</b></div><div class="result-row"><span>判定状态</span><b>{{powerPassState}}</b></div></div><div class="result-section"><h4>处理参数</h4><div class="result-row"><span>平均采样数</span><b>{{settingsDraft.powerAverageSamples}} 点</b></div><div class="result-row"><span>偏移 / 缩放</span><b>{{settingsDraft.powerOffset}} / {{settingsDraft.powerScale}}</b></div><div class="result-row"><span>归一化</span><b>{{settingsDraft.powerNormalize?'启用':'关闭'}}</b></div><div class="result-row"><span>归一化参考值</span><b>{{settingsDraft.powerNormalizeValue}}</b></div><div class="result-row"><span>功率密度</span><b>{{settingsDraft.powerDensity?'启用':'关闭'}}</b></div><div class="result-row"><span>传感器面积</span><b>{{settingsDraft.powerAreaCm2}} cm²</b></div><div class="result-row"><span>判定上下限</span><b>{{settingsDraft.powerPassFail?(settingsDraft.powerLow+' – '+settingsDraft.powerHigh):'关闭'}}</b></div></div><div class="result-section"><h4>接口状态</h4><div class="result-row"><span>当前数据源</span><b>{{dataPlaneText()}}</b></div><div class="result-row"><span>目标设备</span><b>{{interfaceFor('power')?.deviceName}}</b></div><div class="result-row"><span>厂商软件</span><b>{{interfaceFor('power')?.vendorSoftware}}</b></div><div class="result-row"><span>通信接口</span><b>{{interfaceFor('power')?.interfaceName}}</b></div><div class="result-row"><span>接口地址</span><b>{{interfaceFor('power')?.endpoint}}</b></div><div class="result-row"><span>配置状态</span><b>{{interfaceStateText(interfaceFor('power')?.state)}}</b></div><div class="result-row"><span>设备身份</span><b>{{interfaceFor('power')?.identity||'—'}}</b></div><div class="result-row"><span>最后真实样本</span><b>{{interfaceSampleTime('power')}}</b></div><div class="result-row"><span>连续失败</span><b>{{interfaceFor('power')?.failureCount??0}}</b></div><p>{{interfaceFor('power')?.message}}</p></div></div></div></aside>
 
           <div class="power-layout"><div class="power-chart-zone">
-            <PlotCanvas class="main-plot" :series="activePage==='power'?powerPageSeries:powerSeries" :x-min="powerRangeStart" :x-max="powerRangeEnd" :y-min="activePage==='power'?powerPageLeftMin:0" :y-max="activePage==='power'?powerPageLeftMax:powerLeftMax" :right-y-min="activePage==='power'?powerPageRightMin:settingsDraft.math1AxisMin" :right-y-max="activePage==='power'?powerPageRightMax:(settingsDraft.math1AxisMax||100)" x-label="时间" :y-label="activePage==='power'?powerPageAxisLabel:'功率 ('+settingsDraft.power1DisplayUnit+')'" :right-y-label="activePage==='power'?powerPageRightAxisLabel:dashboardMathAxisLabel" :show-axis-labels="activePage==='power'" :editable-axes="activePage==='power'" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" @axis-limit-change="onPowerAxisLimit" />
+            <PlotCanvas class="main-plot" :series="activePage==='power'?powerPageSeries:powerSeries" :x-min="powerRangeStart" :x-max="powerRangeEnd" :y-min="activePage==='power'?powerPageLeftMin:0" :y-max="activePage==='power'?powerPageLeftMax:powerLeftMax" :right-y-min="activePage==='power'?powerPageRightMin:settingsDraft.math1AxisMin" :right-y-max="activePage==='power'?powerPageRightMax:(settingsDraft.math1AxisMax||100)" x-label="时间" :y-label="activePage==='power'?powerPageAxisLabel:'功率 (kW)'" :right-y-label="activePage==='power'?powerPageRightAxisLabel:dashboardMathAxisLabel" :show-axis-labels="activePage==='power'" :editable-axes="activePage==='power'" :y-unit-options="activePage==='power'&&!activePowerIsMath&&!settingsDraft.powerNormalize&&!settingsDraft.powerDensity?['kW','W','mW']:[]" :y-unit="powerAxisUnit" @axis-unit-change="activePowerDisplayUnit=$event;saveSettings()" :time-axis="true" :time-origin-ms="powerTimeOriginMs" :time-valid-max="powerHistorySpan" @axis-limit-change="onPowerAxisLimit" />
             <div class="overview-row"><div ref="powerOverviewShell" class="overview-shell"><PlotCanvas :series="powerSeries.slice(0,1)" :x-min="0" :x-max="settingsDraft.powerWindow" :compact="true" /><div class="overview-selected" :style="powerSelectionStyle"><i class="overview-handle start" @pointerdown.stop="beginPowerRangeDrag($event,'start')"></i><i class="overview-handle end" @pointerdown.stop="beginPowerRangeDrag($event,'end')"></i></div></div></div>
           </div></div>
         </article>
@@ -901,12 +962,15 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
           <div class="module-head scope-head graph-overlay">
             <div class="module-title"><div class="panel-mark scope-accent" :class="['state-'+moduleStatusTone('scope'),{selected:snapshot.captureSelection.scope}]" :title="'示波器：'+moduleStatusText('scope')"><svg viewBox="0 0 24 24"><path d="M2 12h3c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-14 3-14 1.5 14 3 14 1.5-7 3-7h2"/></svg></div><strong>示波器</strong></div>
             <template v-if="activePage==='scope'">
+              <div class="scope-channel-board" aria-label="示波器通道">
+                <button :class="{active:activeScopeChannel===1}" @click="selectScopeChannel(1)"><i class="channel-light" :class="{online:settingsDraft.scopeCh1}"></i><span>{{scopeAlias(1)}}</span><b>{{scopeTrace(1)?.points.at(-1)?.y.toFixed(3) ?? '—'}} V</b></button>
+                <button :class="{active:activeScopeChannel===2}" @click="selectScopeChannel(2)"><i class="channel-light" :class="{online:settingsDraft.scopeCh2}"></i><span>{{scopeAlias(2)}}</span><b>{{scopeTrace(2)?.points.at(-1)?.y.toFixed(3) ?? '—'}} V</b></button>
+              </div>
               <div class="focus-head-metrics">
-                <div v-for="trace in snapshot.scope.time" :key="'scope-head-'+trace.name" class="focus-head-value"><span>{{trace.name}}</span><div><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></div></div>
+                <div class="focus-head-value focus-head-active"><span>{{activeScopeAlias}}</span><div><b>{{scopeTrace(activeScopeChannel)?.points.at(-1)?.y.toFixed(3) ?? '—'}}</b><small>V</small></div></div>
                 <div class="focus-head-value"><span>采样率</span><div><b>{{sampleRateParts().value}}</b><small>{{sampleRateParts().unit}}</small></div></div>
                 <div class="focus-head-value"><span>触发</span><div><b>{{settingsDraft.scopeTriggerSource}}</b><small>{{settingsDraft.scopeTriggerLevel.toFixed(2)}} V</small></div></div>
               </div>
-              <div class="focus-head-status"><span><i class="channel-light" :class="{online:settingsDraft.scopeCh1}"></i>CH1</span><span><i class="channel-light" :class="{online:settingsDraft.scopeCh2}"></i>CH2</span></div>
             </template>
             <div v-else class="scope-readouts"><button v-for="(trace,index) in snapshot.scope.time" :key="trace.name" class="metric-trigger" @click="openReadout(index===0?'scope0':'scope1')"><em>{{trace.name}}</em><span class="metric-value-chip"><b>{{trace.points.at(-1)?.y.toFixed(3) ?? '0.000'}}</b><small>V</small></span></button><span class="secondary-metric"><em>SR</em><span class="metric-value-chip"><b>{{sampleRateParts().value}}</b><small>{{sampleRateParts().unit}}</small></span></span></div>
           </div>
@@ -919,10 +983,10 @@ onBeforeUnmount(()=>{stopSnapshot?.();if(beamTimer)window.clearInterval(beamTime
 
           <aside v-if="activePage==='scope'" class="module-config-dock workstation-config module-side-pane" :class="{collapsed:focusConfigCollapsed}"><button class="module-pane-collapse" @click="focusConfigCollapsed=!focusConfigCollapsed" :title="focusConfigCollapsed?'展开参数面板':'折叠参数面板'"><svg viewBox="0 0 24 24"><path :d="focusConfigCollapsed?'m15 6-6 6 6 6':'m9 6 6 6-6 6'"/></svg></button><div class="module-side-inner"><div class="module-side-tabs"><button :class="{active:modulePaneTab.scope==='settings'}" @click="modulePaneTab.scope='settings'">设置</button><button :class="{active:modulePaneTab.scope==='results'}" @click="modulePaneTab.scope='results'">结果</button></div><div v-if="modulePaneTab.scope==='settings'" class="module-pane-scroll">
 <div class="config-section"><h4>水平</h4><label class="config-row"><span>时间范围（ms）</span><input type="number" step="0.01" min="0.01" v-model.number="settingsDraft.scopeTimeSpan" @change="saveSettings"/></label><label class="config-row"><span>FFT 上限频率（MHz）</span><input type="number" step="0.1" min="0.1" v-model.number="settingsDraft.scopeFftMax" @change="saveSettings"/></label></div>
-<div class="config-section"><h4>垂直 / 通道</h4><label class="config-row"><span>垂直刻度（V/div）</span><input type="number" step="0.01" min="0.001" v-model.number="settingsDraft.scopeVoltsDiv" @change="saveSettings"/></label><label class="config-row"><span>垂直偏移（V）</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeOffset" @change="saveSettings"/></label><label class="config-row"><span>耦合方式</span><select v-model="settingsDraft.scopeCoupling" @change="saveSettings"><option value="DC">直流（DC）</option><option value="AC">交流（AC）</option><option value="GND">接地（GND）</option></select></label><div class="config-checks"><div><span>显示 CH1</span><button type="button" class="toggle-pill" :class="{on:settingsDraft.scopeCh1}" @click="flipSetting('scopeCh1')"><span>{{settingsDraft.scopeCh1?'开':'关'}}</span></button></div><div><span>显示 CH2</span><button type="button" class="toggle-pill" :class="{on:settingsDraft.scopeCh2}" @click="flipSetting('scopeCh2')"><span>{{settingsDraft.scopeCh2?'开':'关'}}</span></button></div></div></div>
+<div class="config-section active-channel-config"><h4>当前通道 · {{activeScopeAlias}}</h4><div class="config-static"><span>通道</span><b>CH{{activeScopeChannel}}</b></div><label class="config-row"><span>显示名称</span><input type="text" v-model="activeScopeAlias" @change="saveSettings"/></label><div class="config-row switch"><span>显示曲线</span><button type="button" class="toggle-pill" :class="{on:activeScopeVisible}" @click="activeScopeVisible=!activeScopeVisible;saveSettings()"><span>{{activeScopeVisible?'开':'关'}}</span></button></div><label class="config-row"><span>垂直刻度（V/div）</span><input type="number" step="0.01" min="0.001" v-model.number="activeScopeVoltsDiv" @change="saveSettings"/></label><label class="config-row"><span>垂直偏移（V）</span><input type="number" step="0.01" v-model.number="activeScopeOffset" @change="saveSettings"/></label><label class="config-row"><span>耦合方式</span><select v-model="activeScopeCoupling" @change="saveSettings"><option value="DC">直流（DC）</option><option value="AC">交流（AC）</option><option value="GND">接地（GND）</option></select></label></div>
 <div class="config-section"><h4>触发 / 采集</h4><label class="config-row"><span>触发源</span><select v-model="settingsDraft.scopeTriggerSource" @change="saveSettings"><option>CH1</option><option>CH2</option></select></label><label class="config-row"><span>触发电平（V）</span><input type="number" step="0.01" v-model.number="settingsDraft.scopeTriggerLevel" @change="saveSettings"/></label><label class="config-row"><span>触发沿</span><select v-model="settingsDraft.scopeTriggerSlope" @change="saveSettings"><option value="RISING">上升沿</option><option value="FALLING">下降沿</option></select></label><label class="config-row"><span>采集模式</span><select v-model="settingsDraft.scopeAcquisition" @change="saveSettings"><option value="SAMPLE">采样</option><option value="AVERAGE">平均</option><option value="PEAK">峰值检测</option></select></label><label class="config-row"><span>平均次数（次）</span><input type="number" min="2" max="1024" v-model.number="settingsDraft.scopeAverage" @change="saveSettings"/></label></div><div class="config-section interface-config"><h4>设备接口</h4><div class="config-row switch"><span>启用真实接口</span><button type="button" class="toggle-pill" :class="{on:settingsDraft.scopeInterfaceEnabled}" @click="flipSetting('scopeInterfaceEnabled')"><span>{{settingsDraft.scopeInterfaceEnabled?'开':'关'}}</span></button></div><div class="config-static"><span>目标设备</span><b>Tektronix MSO44</b></div><div class="config-static"><span>通信方式</span><b>LAN Raw TCP/SCPI · port 4000</b></div><label class="config-row"><span>IP / TCPIP 地址</span><input type="text" v-model="settingsDraft.scopeInterfaceEndpoint" placeholder="192.168.1.50" @change="saveSettings"/></label><div class="interface-live" :class="interfaceFor('scope')?.state"><i></i><span>{{interfaceStateText(interfaceFor('scope')?.state)}}</span><small>{{interfaceFor('scope')?.identity||'等待 *IDN? 身份'}}</small></div><button class="probe-btn" @click="probeInterface('scope')">立即重新探测</button></div></div>
-<div v-else class="module-pane-scroll results-pane"><div class="result-section"><h4>波形结果</h4><div v-for="trace in snapshot.scope.time" :key="'scope-result-'+trace.name" class="result-row"><span>{{trace.name}} 当前值</span><b>{{trace.points.at(-1)?.y.toFixed(5) ?? '0.00000'}} V</b></div><div class="result-row"><span>采样率</span><b>{{sampleRateParts().value}} {{sampleRateParts().unit}}</b></div></div><div class="result-section"><h4>采集参数</h4><div class="result-row"><span>时间范围</span><b>{{settingsDraft.scopeTimeSpan}} ms</b></div><div class="result-row"><span>FFT 上限</span><b>{{settingsDraft.scopeFftMax}} MHz</b></div><div class="result-row"><span>垂直刻度</span><b>{{settingsDraft.scopeVoltsDiv}} V/div</b></div><div class="result-row"><span>垂直偏移</span><b>{{settingsDraft.scopeOffset}} V</b></div><div class="result-row"><span>耦合方式</span><b>{{settingsDraft.scopeCoupling==='DC'?'直流（DC）':settingsDraft.scopeCoupling==='AC'?'交流（AC）':'接地（GND）'}}</b></div><div class="result-row"><span>通道显示</span><b>CH1 {{settingsDraft.scopeCh1?'开':'关'}} / CH2 {{settingsDraft.scopeCh2?'开':'关'}}</b></div><div class="result-row"><span>触发</span><b>{{settingsDraft.scopeTriggerSource}} / {{settingsDraft.scopeTriggerSlope==='RISING'?'上升沿':'下降沿'}} / {{settingsDraft.scopeTriggerLevel}} V</b></div><div class="result-row"><span>采集模式</span><b>{{settingsDraft.scopeAcquisition==='SAMPLE'?'采样':settingsDraft.scopeAcquisition==='AVERAGE'?'平均':'峰值检测'}}</b></div><div class="result-row"><span>平均次数</span><b>{{settingsDraft.scopeAverage}} 次</b></div></div><div class="result-section"><h4>接口状态</h4><div class="result-row"><span>当前数据源</span><b>{{dataPlaneText()}}</b></div><div class="result-row"><span>目标设备</span><b>{{interfaceFor('scope')?.deviceName}}</b></div><div class="result-row"><span>通信接口</span><b>{{interfaceFor('scope')?.interfaceName}}</b></div><div class="result-row"><span>接口地址</span><b>{{interfaceFor('scope')?.endpoint}}</b></div><div class="result-row"><span>配置状态</span><b>{{interfaceStateText(interfaceFor('scope')?.state)}}</b></div><div class="result-row"><span>设备身份</span><b>{{interfaceFor('scope')?.identity||'—'}}</b></div><div class="result-row"><span>最后真实样本</span><b>{{interfaceSampleTime('scope')}}</b></div><div class="result-row"><span>连续失败</span><b>{{interfaceFor('scope')?.failureCount??0}}</b></div><p>{{interfaceFor('scope')?.message}}</p></div></div></div></aside>
-          <div class="scope-plots"><PlotCanvas class="scope-fft-plot" :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" :y-min="activePage==='scope'?scopeFftYMin:undefined" :y-max="activePage==='scope'?scopeFftYMax:undefined" x-label="频率 (kHz)" y-label="FFT 幅值 (a.u.)" :show-axis-labels="activePage==='scope'" :editable-axes="activePage==='scope'" :tight="true" :stacked="true" @axis-limit-change="onScopeFftAxisLimit" /><PlotCanvas class="scope-time-plot" :series="snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="activePage==='scope'?scopeYMin:-1" :y-max="activePage==='scope'?scopeYMax:1" x-label="时间 (ms)" y-label="电压 (V)" :show-axis-labels="activePage==='scope'" :editable-axes="activePage==='scope'" :tight="true" :stacked="true" @axis-limit-change="onScopeTimeAxisLimit" /></div>
+<div v-else class="module-pane-scroll results-pane"><div class="result-section"><h4>波形结果</h4><div v-for="trace in snapshot.scope.time" :key="'scope-result-'+trace.name" class="result-row"><span>{{trace.name}} 当前值</span><b>{{trace.points.at(-1)?.y.toFixed(5) ?? '0.00000'}} V</b></div><div class="result-row"><span>采样率</span><b>{{sampleRateParts().value}} {{sampleRateParts().unit}}</b></div></div><div class="result-section"><h4>采集参数</h4><div class="result-row"><span>时间范围</span><b>{{settingsDraft.scopeTimeSpan}} ms</b></div><div class="result-row"><span>FFT 上限</span><b>{{settingsDraft.scopeFftMax}} MHz</b></div><div class="result-row"><span>{{scopeAlias(1)}} 垂直</span><b>{{settingsDraft.scopeCh1VoltsDiv}} V/div · {{settingsDraft.scopeCh1Offset}} V · {{settingsDraft.scopeCh1Coupling}}</b></div><div class="result-row"><span>{{scopeAlias(2)}} 垂直</span><b>{{settingsDraft.scopeCh2VoltsDiv}} V/div · {{settingsDraft.scopeCh2Offset}} V · {{settingsDraft.scopeCh2Coupling}}</b></div><div class="result-row"><span>通道显示</span><b>{{scopeAlias(1)}} {{settingsDraft.scopeCh1?'开':'关'}} / {{scopeAlias(2)}} {{settingsDraft.scopeCh2?'开':'关'}}</b></div><div class="result-row"><span>触发</span><b>{{settingsDraft.scopeTriggerSource}} / {{settingsDraft.scopeTriggerSlope==='RISING'?'上升沿':'下降沿'}} / {{settingsDraft.scopeTriggerLevel}} V</b></div><div class="result-row"><span>采集模式</span><b>{{settingsDraft.scopeAcquisition==='SAMPLE'?'采样':settingsDraft.scopeAcquisition==='AVERAGE'?'平均':'峰值检测'}}</b></div><div class="result-row"><span>平均次数</span><b>{{settingsDraft.scopeAverage}} 次</b></div></div><div class="result-section"><h4>接口状态</h4><div class="result-row"><span>当前数据源</span><b>{{dataPlaneText()}}</b></div><div class="result-row"><span>目标设备</span><b>{{interfaceFor('scope')?.deviceName}}</b></div><div class="result-row"><span>通信接口</span><b>{{interfaceFor('scope')?.interfaceName}}</b></div><div class="result-row"><span>接口地址</span><b>{{interfaceFor('scope')?.endpoint}}</b></div><div class="result-row"><span>配置状态</span><b>{{interfaceStateText(interfaceFor('scope')?.state)}}</b></div><div class="result-row"><span>设备身份</span><b>{{interfaceFor('scope')?.identity||'—'}}</b></div><div class="result-row"><span>最后真实样本</span><b>{{interfaceSampleTime('scope')}}</b></div><div class="result-row"><span>连续失败</span><b>{{interfaceFor('scope')?.failureCount??0}}</b></div><p>{{interfaceFor('scope')?.message}}</p></div></div></div></aside>
+          <div class="scope-plots"><PlotCanvas class="scope-fft-plot" :series="snapshot.scope.fft" :x-min="0" :x-max="settingsDraft.scopeFftMax*1000" :y-min="activePage==='scope'?scopeFftYMin:undefined" :y-max="activePage==='scope'?scopeFftYMax:undefined" x-label="频率 (kHz)" y-label="FFT 幅值 (a.u.)" :show-axis-labels="activePage==='scope'" :editable-axes="activePage==='scope'" :tight="true" :stacked="true" @axis-limit-change="onScopeFftAxisLimit" /><PlotCanvas class="scope-time-plot" :series="activePage==='scope'?scopeTimeSeries:snapshot.scope.time" :x-min="0" :x-max="settingsDraft.scopeTimeSpan" :y-min="activePage==='scope'?scopeCh1YMin:-1" :y-max="activePage==='scope'?scopeCh1YMax:1" :right-y-min="activePage==='scope'?scopeCh2YMin:undefined" :right-y-max="activePage==='scope'?scopeCh2YMax:undefined" x-label="时间 (ms)" :y-label="activePage==='scope'?scopeAlias(1)+' (V)':'电压 (V)'" :right-y-label="activePage==='scope'?scopeAlias(2)+' (V)':''" :show-axis-labels="activePage==='scope'" :editable-axes="activePage==='scope'" :tight="true" :stacked="true" @axis-limit-change="onScopeTimeAxisLimit" /></div>
         </article>
       </section>
     </main>

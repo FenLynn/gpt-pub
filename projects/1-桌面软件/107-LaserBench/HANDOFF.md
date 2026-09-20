@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 已进入 **v0.5.0 Real Hardware Data Plane** 开发候选，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 为 **v0.5.1 Industrial UI / Channel Workstation** 开发候选，建立在 v0.5.0 Real Hardware Data Plane 之上，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -35,7 +35,8 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - C# 继续拥有设备通信、Simulator、采集、Test 冻结语义、配置、路径、安全保存、截图录像和未来厂商 SDK。
 - v0.5.0 已将 `InstrumentProviderFactory` 切到 `HybridInstrumentProvider`：Juno=USB/COM STA worker，AQ6370D=TCP/SCPI worker，BeamSquared=net48 Automation bridge，MSO44=raw TCP/SCPI worker。本模块真实接口关闭时才使用 Simulator；启用真实接口但尚未 ready 时绝不伪装为 Simulator 数据。`DataPlaneReady=true` 只能由后台 worker 在成功读取真实样本后产生。
 - v0.5.0 最终 UI/Driver 边界按“看得见的控件必须真有效”收口：AQ6370D 面板不再暴露无官方命令依据的 VBW / 未映射峰值阈值，本地平滑明确标注为本地处理；波长偏移在真机模式通过官方 WAVELENGTH:SHIFT 下发、Simulator 才本地模拟；BeamSquared 真机模式锁定 Z/Att/自动浏览和 Simulator M² 参数，只保留结果读取与 X/Y 显示开关，防止把未实现的机械/分析控制伪装成已接通。
-- Web UI 已有 Dashboard、Power/Spectrum/Beam/Scope 工作站式独立页、Data 和 Settings。v0.4.27 将独立页标题区从上一版进一步压缩到仅覆盖模块图标/标题/通道状态的高度；通道信息紧贴标题，右侧参数侧栏继续支持“设置/结果”双页签与折叠。Scope 采用 FFT 上、时域下且 FFT 更大的结构。
+- v0.5.1 对生产 Web UI 做统一工业设计收口：PlotCanvas 的 major tick/grid 共源、时间轴避免重复分钟标签、轴端数字支持直接输入；Dashboard metric 数字/单位 baseline 统一，Spectrum 补齐 nm/dBm 单位；当前实验文件夹名以内嵌无框文本显示。模块静态图标用绿/黄/灰/红表达健康状态，顶栏采集选择改蓝青色。
+- Power 顶部 power/math 通道矩阵和 Scope 顶部 CH1/CH2 现在都是真正的右栏上下文入口；Power 显示单位/范围按通道持久化，Scope CH1/CH2 的 V/div、Offset、Coupling 分别持久化并由 MSO44 Driver 分别下发。Beam 独立页增加不伪造真机状态的 Frame Quality 条。
 
 ## 当前产品不变量
 
@@ -50,7 +51,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - Dashboard 壳体使用冷深蓝灰，只有实际 Plot / 图像数据区白底；刻度区保持深色。Dashboard 不显示 X/Y 轴标题文字，只保留刻度数值与透明图内 Legend。
 - Power 物理功率与数学百分比通道使用独立纵轴；每个 Channel / Math Channel 的 Dashboard 显示开关在 Power 页管理，且与 Test 采集选择分离。
 - Dashboard 关键结果支持多个 Big Readout 同时存在；同一指标只保留一个窗口。每窗独立拖动、等比例缩放、黑白主题与关闭，并尽量紧贴读数内容。Big Readout 只在 Dashboard 显示，切换到独立页时隐藏。
-- 顶部采集选择图标与模块左上图标共享 selected 绿色状态，但只有顶栏四个选择图标允许内联 SVG + CSS 动画；模块标题图标固定静态。Power bar 缓慢起伏、Spectrum 单峰纵向伸缩、Scope 持续左移、Beam 仅外环扩散。
+- 顶部采集选择图标使用蓝青色表示“本次 Test/Run 选择”并允许内联 SVG + CSS 动画；模块左上图标固定静态，以绿/黄/灰/红表示设备健康状态。两套颜色语义不得再混用。Power bar 缓慢起伏、Spectrum 单峰纵向伸缩、Scope 持续左移、Beam 仅外环扩散。
 - Beam Z 只浏览轴向光斑并同步 caustic 参考线，不改写 caustic。
 - Scope Dashboard 最多显示两个通道时域和 FFT，通道开关必须同时作用于时域和 FFT。
 - 不使用 Electron、FFmpeg 或第三方图表库；生产 UI 明确允许 WebView2，绘图继续使用 Canvas。

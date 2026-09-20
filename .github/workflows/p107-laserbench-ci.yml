@@ -95,6 +95,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $app=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/App.vue" -Raw
           $css=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/styles.css" -Raw
+          $plot=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/components/PlotCanvas.vue" -Raw
           $types=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUi/src/types.ts" -Raw
           $backend=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/InstrumentBackends.cs" -Raw
           $hostSource=Get-Content "$env:PROJECT_ROOT/src/LaserBench.App/WebUiHost.cs" -Raw
@@ -103,10 +104,19 @@ jobs:
             'class="module-config-dock workstation-config module-side-pane"',
             'module-side-tabs',
             'folder-picker-btn',
+            'folder-current-name',
+            'currentFolderDisplay',
             'app.pickExperimentFolder',
             'powerRangeStartPct',
             'powerRangeEndPct',
             'powerAverageSamples',
+            'powerHeaderSlots',
+            'activePowerDisplayUnit',
+            'power1DisplayUnit',
+            'scope-channel-board',
+            'activeScopeVoltsDiv',
+            'scopeCh1VoltsDiv',
+            'beam-frame-quality',
             '波长范围',
             'M² 分析',
             '触发 / 采集',
@@ -126,22 +136,33 @@ jobs:
             'BeamSquared 只读桥',
             'Run / rail / Ultracal',
             'show-axis-labels',
+            'editable-axes',
+            'axis-limit-change',
+            '<small>nm</small>',
+            '<small>dBm</small>',
             "activePage==='dashboard'"
           )
           foreach($needle in $required){ if($app -notlike "*$needle*"){ throw "Workstation UI contract missing: $needle" } }
           if($app -like '*视频带宽（Hz）*'){ throw 'AQ6370D UI must not expose unsupported VBW as a live hardware control.' }
           if($app -like '*峰值阈值（dB）*'){ throw 'AQ6370D UI must not expose an unmapped peak-threshold control.' }
           if($app -notlike '*:disabled="settingsDraft.beamInterfaceEnabled"*'){ throw 'BeamSquared real-hardware motion/control lock is missing.' }
-          foreach($needle in @('powerAverageSamples','osaResolution','beamWidthMethod','scopeVoltsDiv','osaSamplePoints','osaVideoBandwidthHz','osaTraceMode','InstrumentInterfaceState','powerInterfaceEnabled','spectrumInterfaceEnabled','beamInterfaceEnabled','scopeInterfaceEnabled')){
+          foreach($needle in @('powerAverageSamples','power1DisplayUnit','power1AxisMin','math1DisplayUnit','osaResolution','beamWidthMethod','scopeVoltsDiv','scopeActiveChannel','scopeCh1VoltsDiv','scopeCh2VoltsDiv','scopeCh1Coupling','scopeCh2Coupling','osaSamplePoints','osaVideoBandwidthHz','osaTraceMode','InstrumentInterfaceState','powerInterfaceEnabled','spectrumInterfaceEnabled','beamInterfaceEnabled','scopeInterfaceEnabled')){
             if($types -notlike "*$needle*"){ throw "Web UI config type missing: $needle" }
           }
-          foreach($needle in @('FolderBrowserDialog','app.pickExperimentFolder','OsaSamplePoints','OsaVideoBandwidthHz','OsaTraceMode')){ if($hostSource -notlike "*$needle*"){ throw "WebUiHost workstation contract missing: $needle" } }
+          foreach($needle in @('FolderBrowserDialog','app.pickExperimentFolder','Power1DisplayUnit','Power1AxisMin','ScopeActiveChannel','ScopeCh1VoltsDiv','ScopeCh2VoltsDiv','OsaSamplePoints','OsaVideoBandwidthHz','OsaTraceMode')){ if($hostSource -notlike "*$needle*"){ throw "WebUiHost workstation contract missing: $needle" } }
+          foreach($needle in @('niceTimeStep','span<10','visibleX','axis-inline-editor','axis-unit-select','axis-limit-change')){
+            if($plot -notlike "*$needle*"){ throw "PlotCanvas industrial-axis contract missing: $needle" }
+          }
           foreach($needle in @('Ophir Juno','Yokogawa AQ6370D','BeamSquared','Tektronix MSO44','InstrumentProviderFactory')){
             if($backend -notlike "*$needle*"){ throw "Instrument backend contract missing: $needle" }
           }
           if($css -notmatch 'grid-template-columns:minmax\(0,1fr\) 360px' -or $css -notmatch 'module-side-tabs' -or $css -notmatch 'metric-value-chip'){
             throw 'Workstation layout / side-pane / Dashboard metric-chip CSS missing.'
           }
+          foreach($needle in @('folder-current-name','state-ok','state-warn','state-offline','state-error','scope-channel-board','beam-frame-quality','align-items:baseline')){
+            if($css -notlike "*$needle*"){ throw "Industrial UI CSS contract missing: $needle" }
+          }
+          if($css -notmatch '\.topbar \.module-toggle\.active\{color:#4fb5df'){ throw 'Acquisition-selection color must stay separate from green health status.' }
 
       - name: Verify real-hardware driver contract
         shell: pwsh
@@ -161,7 +182,7 @@ jobs:
           foreach($needle in @('10001','open \"anonymous\"',':STAT:OPER:EVEN?',':SENSE:CORRECTION:WAVELENGTH:SHIFT',':TRACE:DATA:X? TRA',':TRACE:DATA:Y? TRA','*IDN?')){
             if($aq -notlike "*$needle*"){ throw "AQ6370D driver contract missing: $needle" }
           }
-          foreach($needle in @('4000',':ACQUIRE:STOPAFTER RUNSTOP',':ACQUIRE:STATE RUN',':WFMOUTPRE:XINCR?',':WFMOUTPRE:XZERO?',':WFMOUTPRE:PT_OFF?',':CURVE?','SignalMath.Fft')){
+          foreach($needle in @('4000','ScopeCh1VoltsDiv','ScopeCh2VoltsDiv','ScopeCh1Coupling','ScopeCh2Coupling',':ACQUIRE:STOPAFTER RUNSTOP',':ACQUIRE:STATE RUN',':WFMOUTPRE:XINCR?',':WFMOUTPRE:XZERO?',':WFMOUTPRE:PT_OFF?',':CURVE?','SignalMath.Fft')){
             if($tek -notlike "*$needle*"){ throw "Tektronix MSO44 driver contract missing: $needle" }
           }
           foreach($needle in @('M2.Automation.dll','LaserBench.BeamSquaredBridge.exe','SNAPSHOT')){

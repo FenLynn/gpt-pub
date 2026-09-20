@@ -87,9 +87,12 @@ internal sealed class TektronixMso44Worker : HardwareWorkerBase
 
     private string SettingsSignature() => string.Join("|",
         Config.ScopeTimeSpan.ToString("R", CultureInfo.InvariantCulture),
-        Config.ScopeVoltsDiv.ToString("R", CultureInfo.InvariantCulture),
-        Config.ScopeOffset.ToString("R", CultureInfo.InvariantCulture),
-        Config.ScopeCoupling,
+        Config.ScopeCh1VoltsDiv.ToString("R", CultureInfo.InvariantCulture),
+        Config.ScopeCh1Offset.ToString("R", CultureInfo.InvariantCulture),
+        Config.ScopeCh1Coupling,
+        Config.ScopeCh2VoltsDiv.ToString("R", CultureInfo.InvariantCulture),
+        Config.ScopeCh2Offset.ToString("R", CultureInfo.InvariantCulture),
+        Config.ScopeCh2Coupling,
         Config.ScopeTriggerSource,
         Config.ScopeTriggerLevel.ToString("R", CultureInfo.InvariantCulture),
         Config.ScopeTriggerSlope,
@@ -99,20 +102,26 @@ internal sealed class TektronixMso44Worker : HardwareWorkerBase
     private async Task ApplySettingsAsync(ScpiTcpConnection connection, CancellationToken token)
     {
         var secondsPerDivision = Math.Max(1e-9, Config.ScopeTimeSpan / 1000.0 / 10.0);
-        var voltsPerDivision = Math.Max(1e-6, Config.ScopeVoltsDiv);
-        var coupling = (Config.ScopeCoupling ?? "DC").Trim().ToUpperInvariant();
-        if (coupling is not ("DC" or "AC" or "GND")) coupling = "DC";
+        static string Coupling(string? value)
+        {
+            var coupling=(value??"DC").Trim().ToUpperInvariant();
+            return coupling is "DC" or "AC" or "GND" ? coupling : "DC";
+        }
+        var ch1VoltsPerDivision = Math.Max(1e-6, Config.ScopeCh1VoltsDiv);
+        var ch2VoltsPerDivision = Math.Max(1e-6, Config.ScopeCh2VoltsDiv);
+        var ch1Coupling = Coupling(Config.ScopeCh1Coupling);
+        var ch2Coupling = Coupling(Config.ScopeCh2Coupling);
         var triggerSource = Config.ScopeTriggerSource.Equals("CH2", StringComparison.OrdinalIgnoreCase) ? "CH2" : "CH1";
         var slope = Config.ScopeTriggerSlope.Equals("FALLING", StringComparison.OrdinalIgnoreCase) ? "FALL" : "RISE";
         var acquisition = (Config.ScopeAcquisition ?? "SAMPLE").Trim().ToUpperInvariant();
 
         await connection.WriteLineAsync($":HORIZONTAL:SCALE {InstrumentParse.ScpiNumber(secondsPerDivision)}", token);
-        foreach (var channel in new[] { "CH1", "CH2" })
-        {
-            await connection.WriteLineAsync($":{channel}:SCALE {InstrumentParse.ScpiNumber(voltsPerDivision)}", token);
-            await connection.WriteLineAsync($":{channel}:OFFSET {InstrumentParse.ScpiNumber(Config.ScopeOffset)}", token);
-            await connection.WriteLineAsync($":{channel}:COUPLING {coupling}", token);
-        }
+        await connection.WriteLineAsync($":CH1:SCALE {InstrumentParse.ScpiNumber(ch1VoltsPerDivision)}", token);
+        await connection.WriteLineAsync($":CH1:OFFSET {InstrumentParse.ScpiNumber(Config.ScopeCh1Offset)}", token);
+        await connection.WriteLineAsync($":CH1:COUPLING {ch1Coupling}", token);
+        await connection.WriteLineAsync($":CH2:SCALE {InstrumentParse.ScpiNumber(ch2VoltsPerDivision)}", token);
+        await connection.WriteLineAsync($":CH2:OFFSET {InstrumentParse.ScpiNumber(Config.ScopeCh2Offset)}", token);
+        await connection.WriteLineAsync($":CH2:COUPLING {ch2Coupling}", token);
 
         await connection.WriteLineAsync($":TRIGGER:A:EDGE:SOURCE {triggerSource}", token);
         await connection.WriteLineAsync($":TRIGGER:A:LEVEL:{triggerSource} {InstrumentParse.ScpiNumber(Config.ScopeTriggerLevel)}", token);

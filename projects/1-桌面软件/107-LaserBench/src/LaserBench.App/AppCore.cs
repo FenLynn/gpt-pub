@@ -89,9 +89,17 @@ internal sealed class AppConfig
     public bool BeamShowX { get; set; } = true;
     public bool BeamShowY { get; set; } = true;
 
+    // Legacy shared scope values remain for configuration compatibility.
     public double ScopeVoltsDiv { get; set; } = 0.25;
     public double ScopeOffset { get; set; }
     public string ScopeCoupling { get; set; } = "DC";
+    public int ScopeActiveChannel { get; set; } = 1;
+    public double ScopeCh1VoltsDiv { get; set; } = 0.25;
+    public double ScopeCh1Offset { get; set; }
+    public string ScopeCh1Coupling { get; set; } = "DC";
+    public double ScopeCh2VoltsDiv { get; set; } = 0.25;
+    public double ScopeCh2Offset { get; set; }
+    public string ScopeCh2Coupling { get; set; } = "DC";
     public string ScopeTriggerSource { get; set; } = "CH1";
     public double ScopeTriggerLevel { get; set; }
     public string ScopeTriggerSlope { get; set; } = "RISING";

@@ -88,6 +88,13 @@ export interface LaserSnapshot {
     scopeVoltsDiv: number
     scopeOffset: number
     scopeCoupling: string
+    scopeActiveChannel: number
+    scopeCh1VoltsDiv: number
+    scopeCh1Offset: number
+    scopeCh1Coupling: string
+    scopeCh2VoltsDiv: number
+    scopeCh2Offset: number
+    scopeCh2Coupling: string
     scopeTriggerSource: string
     scopeTriggerLevel: number
     scopeTriggerSlope: string

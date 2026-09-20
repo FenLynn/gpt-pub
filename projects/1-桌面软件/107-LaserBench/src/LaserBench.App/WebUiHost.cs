@@ -346,7 +346,14 @@ internal sealed class WebUiHost : IDisposable
 
         if (v.TryGetProperty("scopeVoltsDiv",out var svd) && svd.ValueKind==JsonValueKind.Number) _config.ScopeVoltsDiv=Math.Clamp(Math.Abs(svd.GetDouble()),0.001,1000);
         if (v.TryGetProperty("scopeOffset",out var so) && so.ValueKind==JsonValueKind.Number) _config.ScopeOffset=Math.Clamp(so.GetDouble(),-1000,1000);
-        if (v.TryGetProperty("scopeCoupling",out var scp) && scp.ValueKind==JsonValueKind.String) _config.ScopeCoupling=(scp.GetString()??"DC").Trim().ToUpperInvariant();
+        if (v.TryGetProperty("scopeCoupling",out var scp) && scp.ValueKind==JsonValueKind.String) _config.ScopeCoupling=NormalizeScopeCoupling(scp.GetString());
+        if (v.TryGetProperty("scopeActiveChannel",out var sacn) && sacn.ValueKind==JsonValueKind.Number) _config.ScopeActiveChannel=Math.Clamp(sacn.GetInt32(),1,2);
+        if (v.TryGetProperty("scopeCh1VoltsDiv",out var sc1v) && sc1v.ValueKind==JsonValueKind.Number) _config.ScopeCh1VoltsDiv=Math.Clamp(Math.Abs(sc1v.GetDouble()),0.001,1000);
+        if (v.TryGetProperty("scopeCh1Offset",out var sc1o) && sc1o.ValueKind==JsonValueKind.Number) _config.ScopeCh1Offset=Math.Clamp(sc1o.GetDouble(),-1000,1000);
+        if (v.TryGetProperty("scopeCh1Coupling",out var sc1c) && sc1c.ValueKind==JsonValueKind.String) _config.ScopeCh1Coupling=NormalizeScopeCoupling(sc1c.GetString());
+        if (v.TryGetProperty("scopeCh2VoltsDiv",out var sc2v) && sc2v.ValueKind==JsonValueKind.Number) _config.ScopeCh2VoltsDiv=Math.Clamp(Math.Abs(sc2v.GetDouble()),0.001,1000);
+        if (v.TryGetProperty("scopeCh2Offset",out var sc2o) && sc2o.ValueKind==JsonValueKind.Number) _config.ScopeCh2Offset=Math.Clamp(sc2o.GetDouble(),-1000,1000);
+        if (v.TryGetProperty("scopeCh2Coupling",out var sc2c) && sc2c.ValueKind==JsonValueKind.String) _config.ScopeCh2Coupling=NormalizeScopeCoupling(sc2c.GetString());
         if (v.TryGetProperty("scopeTriggerSource",out var sts) && sts.ValueKind==JsonValueKind.String) _config.ScopeTriggerSource=(sts.GetString()??"CH1").Trim().ToUpperInvariant();
         if (v.TryGetProperty("scopeTriggerLevel",out var stl) && stl.ValueKind==JsonValueKind.Number) _config.ScopeTriggerLevel=Math.Clamp(stl.GetDouble(),-1000,1000);
         if (v.TryGetProperty("scopeTriggerSlope",out var stsl) && stsl.ValueKind==JsonValueKind.String) _config.ScopeTriggerSlope=(stsl.GetString()??"RISING").Trim().ToUpperInvariant();
@@ -388,6 +395,12 @@ internal sealed class WebUiHost : IDisposable
     {
         var unit=(value??string.Empty).Trim();
         return unit.Length>12 ? unit[..12] : unit;
+    }
+
+    private static string NormalizeScopeCoupling(string? value)
+    {
+        var coupling=(value??"DC").Trim().ToUpperInvariant();
+        return coupling is "DC" or "AC" or "GND" ? coupling : "DC";
     }
 
     private object ProbeInterfaces(JsonElement? value)
@@ -553,6 +566,9 @@ internal sealed class WebUiHost : IDisposable
                 beamRunMode=_config.BeamRunMode, beamWidthMethod=_config.BeamWidthMethod, beamAutoOutlier=_config.BeamAutoOutlier,
                 beamShowX=_config.BeamShowX, beamShowY=_config.BeamShowY,
                 scopeVoltsDiv=_config.ScopeVoltsDiv, scopeOffset=_config.ScopeOffset, scopeCoupling=_config.ScopeCoupling,
+                scopeActiveChannel=_config.ScopeActiveChannel,
+                scopeCh1VoltsDiv=_config.ScopeCh1VoltsDiv, scopeCh1Offset=_config.ScopeCh1Offset, scopeCh1Coupling=_config.ScopeCh1Coupling,
+                scopeCh2VoltsDiv=_config.ScopeCh2VoltsDiv, scopeCh2Offset=_config.ScopeCh2Offset, scopeCh2Coupling=_config.ScopeCh2Coupling,
                 scopeTriggerSource=_config.ScopeTriggerSource, scopeTriggerLevel=_config.ScopeTriggerLevel,
                 scopeTriggerSlope=_config.ScopeTriggerSlope, scopeAcquisition=_config.ScopeAcquisition, scopeAverage=_config.ScopeAverage,
                 powerInterfaceEnabled=_config.PowerInterfaceEnabled, powerInterfaceEndpoint=_config.PowerInterfaceEndpoint,
