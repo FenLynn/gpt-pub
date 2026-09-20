@@ -2338,6 +2338,22 @@ function App() {
   const selectedColor =
     primaryOverride.color ||
     effectivePalette[primaryIndex % effectivePalette.length];
+  const markerHollow = primaryOverride.markerHollow ?? false;
+  const markerFillColor =
+    primaryOverride.markerFillColor ?? selectedColor;
+  const markerEdgeColor =
+    primaryOverride.markerEdgeColor ?? selectedColor;
+  const markerEdgeWidth =
+    primaryOverride.markerEdgeWidthPt ??
+    (markerHollow
+      ? 0.8
+      : activeFigure?.templateId === "xy-scatter" ||
+        activeFigure?.templateId === "xy-errorbar"
+      ? 0
+      : 0.55);
+  const errorBarWidth = primaryOverride.errorBarWidthPt ?? 0.8;
+  const errorBarCapSize = primaryOverride.errorBarCapSizePt ?? 0;
+  const errorBarColor = primaryOverride.errorBarColor ?? selectedColor;
   const visible = primaryOverride.visible ?? true;
   const surfaceTemplate = activeFigure?.templateId === "surface-3d";
   const contourTemplate = activeFigure?.templateId === "contour";
@@ -4151,6 +4167,101 @@ function App() {
                         </div>
 
                         <div className="prop-row">
+                          <label>点填充</label>
+                          <select
+                            value={markerHollow ? "hollow" : "filled"}
+                            disabled={!markerVisible}
+                            onChange={(event) =>
+                              updateSelectedSeries({
+                                markerHollow: event.target.value === "hollow"
+                              })
+                            }
+                          >
+                            <option value="filled">实心</option>
+                            <option value="hollow">空心</option>
+                          </select>
+                        </div>
+
+                        {!markerHollow && (
+                          <div className="prop-row">
+                            <label>填充颜色</label>
+                            <div className="control-with-reset color-control">
+                              <input
+                                type="color"
+                                disabled={!markerVisible}
+                                value={markerFillColor}
+                                onChange={(event) =>
+                                  updateSelectedSeries({
+                                    markerFillColor: event.target.value
+                                  })
+                                }
+                              />
+                              <span>{markerFillColor.toUpperCase()}</span>
+                              <ResetIcon
+                                visible={primaryOverride.markerFillColor !== undefined}
+                                onReset={() =>
+                                  resetSelectedSeriesField("markerFillColor")
+                                }
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="prop-row">
+                          <label>边框颜色</label>
+                          <div className="control-with-reset color-control">
+                            <input
+                              type="color"
+                              disabled={!markerVisible}
+                              value={markerEdgeColor}
+                              onChange={(event) =>
+                                updateSelectedSeries({
+                                  markerEdgeColor: event.target.value
+                                })
+                              }
+                            />
+                            <span>{markerEdgeColor.toUpperCase()}</span>
+                            <ResetIcon
+                              visible={primaryOverride.markerEdgeColor !== undefined}
+                              onReset={() =>
+                                resetSelectedSeriesField("markerEdgeColor")
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="prop-row">
+                          <label>边框宽度</label>
+                          <div className="control-with-reset">
+                            <div className="compact-number">
+                              <input
+                                type="number"
+                                min="0"
+                                max="4"
+                                step="0.05"
+                                value={markerEdgeWidth}
+                                disabled={!markerVisible}
+                                onChange={(event) =>
+                                  updateSelectedSeries({
+                                    markerEdgeWidthPt: Math.max(
+                                      0,
+                                      Number(event.target.value)
+                                    )
+                                  })
+                                }
+                              />
+                              <span>pt</span>
+                            </div>
+                            <ResetIcon
+                              visible={primaryOverride.markerEdgeWidthPt !== undefined}
+                              onReset={() =>
+                                resetSelectedSeriesField("markerEdgeWidthPt")
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="prop-row">
                           <label>最多标记</label>
                           <div className="compact-number">
                             <input
@@ -4180,6 +4291,75 @@ function App() {
                               : "显示全部点"}
                           </span>
                         </div>
+
+                        {activeFigure.templateId === "xy-errorbar" && (
+                          <>
+                            <div className="section-divider">误差棒</div>
+                            <div className="prop-row">
+                              <label>误差线宽</label>
+                              <div className="compact-number">
+                                <input
+                                  type="number"
+                                  min="0.2"
+                                  max="5"
+                                  step="0.05"
+                                  value={errorBarWidth}
+                                  onChange={(event) =>
+                                    updateSelectedSeries({
+                                      errorBarWidthPt: Math.max(
+                                        0.2,
+                                        Number(event.target.value)
+                                      )
+                                    })
+                                  }
+                                />
+                                <span>pt</span>
+                              </div>
+                            </div>
+                            <div className="prop-row">
+                              <label>端帽长度</label>
+                              <div className="compact-number">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="20"
+                                  step="0.5"
+                                  value={errorBarCapSize}
+                                  onChange={(event) =>
+                                    updateSelectedSeries({
+                                      errorBarCapSizePt: Math.max(
+                                        0,
+                                        Number(event.target.value)
+                                      )
+                                    })
+                                  }
+                                />
+                                <span>pt</span>
+                              </div>
+                            </div>
+                            <div className="prop-row">
+                              <label>误差颜色</label>
+                              <div className="control-with-reset color-control">
+                                <input
+                                  type="color"
+                                  value={errorBarColor}
+                                  onChange={(event) =>
+                                    updateSelectedSeries({
+                                      errorBarColor: event.target.value
+                                    })
+                                  }
+                                />
+                                <span>{errorBarColor.toUpperCase()}</span>
+                                <ResetIcon
+                                  visible={primaryOverride.errorBarColor !== undefined}
+                                  onReset={() =>
+                                    resetSelectedSeriesField("errorBarColor")
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
 
