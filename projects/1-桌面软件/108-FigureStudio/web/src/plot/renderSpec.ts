@@ -180,7 +180,9 @@ function baseXYTrace(
       dash: override.lineStyle ?? (isFit ? "dash" : "solid")
     },
     marker: {
-      color,
+      color: override.markerHollow
+        ? "rgba(0,0,0,0)"
+        : override.markerFillColor ?? color,
       size: ptToPx(markerSizePt),
       symbol: override.markerSymbol ?? "circle",
       maxdisplayed:
@@ -188,8 +190,15 @@ function baseXYTrace(
           ? Math.max(1, Math.round(markerMaxDisplayed))
           : 0,
       line: {
-        color,
-        width: ptToPx(modeDefault === "markers" ? 0 : 0.55)
+        color: override.markerEdgeColor ?? color,
+        width: ptToPx(
+          override.markerEdgeWidthPt ??
+            (override.markerHollow
+              ? 0.8
+              : modeDefault === "markers"
+              ? 0
+              : 0.55)
+        )
       }
     },
     hovertemplate:
@@ -559,9 +568,15 @@ export function buildTraces(args: {
         type: "data",
         array: errorSeries.values,
         visible: true,
-        color: trace.line?.color,
-        thickness: ptToPx(0.8),
-        width: 0
+        color:
+          figure.seriesOverrides[main.id]?.errorBarColor ??
+          trace.line?.color,
+        thickness: ptToPx(
+          figure.seriesOverrides[main.id]?.errorBarWidthPt ?? 0.8
+        ),
+        width: ptToPx(
+          figure.seriesOverrides[main.id]?.errorBarCapSizePt ?? 0
+        )
       };
     }
     return [trace];
