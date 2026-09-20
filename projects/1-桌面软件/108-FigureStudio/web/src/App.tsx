@@ -59,6 +59,7 @@ import type {
 import {
   buildLayout,
   buildTraces,
+  DESIGN_DPI,
   orderSeries,
   PNG_DPI,
   resolveCanvasMm
@@ -1995,11 +1996,18 @@ function App() {
     const node = plotRef.current as any;
     if (!node || !activeFigure) return;
 
+    const physicalCanvas = resolveCanvasMm(preset, activeFigure);
+    const exportWidthPx =
+      physicalCanvas.widthMm * (DESIGN_DPI / 25.4);
+    const exportHeightPx =
+      physicalCanvas.heightMm * (DESIGN_DPI / 25.4);
     const dataUrl = await Plotly.toImage(node, {
       format,
       filename: activeFigure.name,
-      width: layout.width,
-      height: layout.height,
+      // Keep fractional design pixels here. Rounding the 96 dpi preview first
+      // introduces a 2–3 px error after scaling to 600 dpi.
+      width: exportWidthPx,
+      height: exportHeightPx,
       scale: format === "png" ? PNG_SCALE : 1
     });
 
