@@ -2300,6 +2300,17 @@ function App() {
   const markerSymbol = primaryOverride.markerSymbol ?? "circle";
   const markerSize =
     primaryOverride.markerSizePt ?? publicationMetrics.markerSizePt;
+  const automaticMarkerCap =
+    markerVisible &&
+    lineVisible &&
+    activeFigure?.templateId !== "xy-scatter" &&
+    activeFigure?.templateId !== "xy-errorbar"
+      ? publicationMode === "quad-panel"
+        ? 22
+        : 28
+      : 0;
+  const markerMaxDisplayed =
+    primaryOverride.markerMaxDisplayed ?? automaticMarkerCap;
   const opacity = primaryOverride.opacity ?? 1;
   const primaryIndex =
     primarySeries && plotDataset
@@ -4105,6 +4116,37 @@ function App() {
                             />
                             <span>pt</span>
                           </div>
+                        </div>
+
+                        <div className="prop-row">
+                          <label>最多标记</label>
+                          <div className="compact-number">
+                            <input
+                              type="number"
+                              min="0"
+                              max="5000"
+                              step="1"
+                              value={markerMaxDisplayed}
+                              disabled={!markerVisible}
+                              onChange={(event) =>
+                                updateSelectedSeries({
+                                  markerMaxDisplayed: Math.max(
+                                    0,
+                                    Math.round(Number(event.target.value))
+                                  )
+                                })
+                              }
+                            />
+                            <span>个</span>
+                          </div>
+                        </div>
+                        <div className="prop-row prop-muted">
+                          <label>标记策略</label>
+                          <span>
+                            {markerMaxDisplayed > 0
+                              ? "均匀抽样显示"
+                              : "显示全部点"}
+                          </span>
                         </div>
                       </>
                     )}
