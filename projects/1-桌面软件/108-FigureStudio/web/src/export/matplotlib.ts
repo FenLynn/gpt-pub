@@ -848,7 +848,7 @@ else:
                 if marker_hollow
                 else 0.0
                 if template in ("xy-scatter", "xy-errorbar")
-                else 0.55
+                else 0.45
             )
             common = dict(
                 label=label,
