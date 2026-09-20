@@ -110,7 +110,8 @@ internal sealed class Aq6370dWorker : HardwareWorkerBase
         Config.OsaSamplePoints,
         Config.OsaTraceMode,
         Config.OsaSweepMode,
-        Config.OsaWavelengthReference);
+        Config.OsaWavelengthReference,
+        Config.OsaWavelengthOffsetNm.ToString("R", CultureInfo.InvariantCulture));
 
     private async Task ApplySettingsAsync(ScpiTcpConnection connection, CancellationToken token)
     {
@@ -128,6 +129,7 @@ internal sealed class Aq6370dWorker : HardwareWorkerBase
         await connection.WriteLineAsync(":SENSE:SWEEP:POINTS:AUTO OFF", token);
         await connection.WriteLineAsync($":SENSE:SWEEP:POINTS {points}", token);
         await connection.WriteLineAsync($":SENSE:CORRECTION:RVELOCITY:MEDIUM {(Config.OsaWavelengthReference.Equals("VACUUM", StringComparison.OrdinalIgnoreCase) ? "VACUUM" : "AIR")}", token);
+        await connection.WriteLineAsync($":SENSE:CORRECTION:WAVELENGTH:SHIFT {InstrumentParse.ScpiNumber(Config.OsaWavelengthOffsetNm)}NM", token);
 
         switch ((Config.OsaTraceMode ?? "WRITE").Trim().ToUpperInvariant())
         {

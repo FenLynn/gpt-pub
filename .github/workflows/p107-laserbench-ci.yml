@@ -122,7 +122,7 @@ jobs:
             'app.probeInterfaces',
             '立即重新探测',
             '本地平滑点数',
-            '本地显示偏移',
+            '波长偏移（nm）',
             'BeamSquared 只读桥',
             'Run / rail / Ultracal',
             'show-axis-labels',
@@ -158,7 +158,7 @@ jobs:
           foreach($needle in @('ScanUSB','OpenUSBDevice','GetMeasurementMode','SetMeasurementMode','StartStream','GetData','CoLMMeasurement')){
             if($juno -notlike "*$needle*"){ throw "Ophir Juno driver contract missing: $needle" }
           }
-          foreach($needle in @('10001','open \"anonymous\"',':STAT:OPER:EVEN?',':TRACE:DATA:X? TRA',':TRACE:DATA:Y? TRA','*IDN?')){
+          foreach($needle in @('10001','open \"anonymous\"',':STAT:OPER:EVEN?',':SENSE:CORRECTION:WAVELENGTH:SHIFT',':TRACE:DATA:X? TRA',':TRACE:DATA:Y? TRA','*IDN?')){
             if($aq -notlike "*$needle*"){ throw "AQ6370D driver contract missing: $needle" }
           }
           foreach($needle in @('4000',':ACQUIRE:STOPAFTER RUNSTOP',':ACQUIRE:STATE RUN',':WFMOUTPRE:XINCR?',':WFMOUTPRE:XZERO?',':WFMOUTPRE:PT_OFF?',':CURVE?','SignalMath.Fft')){
