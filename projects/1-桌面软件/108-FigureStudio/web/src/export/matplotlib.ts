@@ -400,7 +400,7 @@ def configure_axis(axis_obj, side="left"):
     axis_obj.tick_params(
         axis="y",
         which="minor",
-        width=axis_width * 0.85,
+        width=axis_width * 0.75,
         length=max(2.8, PRESET["minorTickLengthPt"] * 1.45) if O.get("axisStyle", "regular") == "bold" else PRESET["minorTickLengthPt"],
     )
     plt.setp(axis_obj.get_yticklabels(), rotation=angle)
@@ -452,7 +452,7 @@ def configure_x(axis_obj):
     axis_obj.tick_params(
         axis="x",
         which="minor",
-        width=axis_width * 0.85,
+        width=axis_width * 0.75,
         length=max(2.8, PRESET["minorTickLengthPt"] * 1.45) if O.get("axisStyle", "regular") == "bold" else PRESET["minorTickLengthPt"],
     )
     plt.setp(axis_obj.get_xticklabels(), rotation=O.get("xTickAngle", 0))
