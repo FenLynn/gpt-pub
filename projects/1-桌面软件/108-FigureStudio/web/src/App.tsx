@@ -4151,21 +4151,29 @@ function App() {
 
                         <div className="prop-row">
                           <label>点大小</label>
-                          <div className="compact-number">
-                            <input
-                              type="number"
-                              min="1"
-                              max="16"
-                              step="0.25"
-                              value={markerSize}
-                              disabled={!markerVisible}
-                              onChange={(event) =>
-                                updateSelectedSeries({
-                                  markerSizePt: Number(event.target.value)
-                                })
+                          <div className="control-with-reset">
+                            <div className="compact-number">
+                              <input
+                                type="number"
+                                min="1"
+                                max="16"
+                                step="0.25"
+                                value={markerSize}
+                                disabled={!markerVisible}
+                                onChange={(event) =>
+                                  updateSelectedSeries({
+                                    markerSizePt: Number(event.target.value)
+                                  })
+                                }
+                              />
+                              <span>pt</span>
+                            </div>
+                            <ResetIcon
+                              visible={primaryOverride.markerSizePt !== undefined}
+                              onReset={() =>
+                                resetSelectedSeriesField("markerSizePt")
                               }
                             />
-                            <span>pt</span>
                           </div>
                         </div>
 
@@ -4266,24 +4274,32 @@ function App() {
 
                         <div className="prop-row">
                           <label>最多标记</label>
-                          <div className="compact-number">
-                            <input
-                              type="number"
-                              min="0"
-                              max="5000"
-                              step="1"
-                              value={markerMaxDisplayed}
-                              disabled={!markerVisible}
-                              onChange={(event) =>
-                                updateSelectedSeries({
-                                  markerMaxDisplayed: Math.max(
-                                    0,
-                                    Math.round(Number(event.target.value))
-                                  )
-                                })
+                          <div className="control-with-reset">
+                            <div className="compact-number">
+                              <input
+                                type="number"
+                                min="0"
+                                max="5000"
+                                step="1"
+                                value={markerMaxDisplayed}
+                                disabled={!markerVisible}
+                                onChange={(event) =>
+                                  updateSelectedSeries({
+                                    markerMaxDisplayed: Math.max(
+                                      0,
+                                      Math.round(Number(event.target.value))
+                                    )
+                                  })
+                                }
+                              />
+                              <span>个</span>
+                            </div>
+                            <ResetIcon
+                              visible={primaryOverride.markerMaxDisplayed !== undefined}
+                              onReset={() =>
+                                resetSelectedSeriesField("markerMaxDisplayed")
                               }
                             />
-                            <span>个</span>
                           </div>
                         </div>
                         <div className="prop-row prop-muted">
@@ -4300,44 +4316,60 @@ function App() {
                             <div className="section-divider">误差棒</div>
                             <div className="prop-row">
                               <label>误差线宽</label>
-                              <div className="compact-number">
-                                <input
-                                  type="number"
-                                  min="0.2"
-                                  max="5"
-                                  step="0.05"
-                                  value={errorBarWidth}
-                                  onChange={(event) =>
-                                    updateSelectedSeries({
-                                      errorBarWidthPt: Math.max(
-                                        0.2,
-                                        Number(event.target.value)
-                                      )
-                                    })
+                              <div className="control-with-reset">
+                                <div className="compact-number">
+                                  <input
+                                    type="number"
+                                    min="0.2"
+                                    max="5"
+                                    step="0.05"
+                                    value={errorBarWidth}
+                                    onChange={(event) =>
+                                      updateSelectedSeries({
+                                        errorBarWidthPt: Math.max(
+                                          0.2,
+                                          Number(event.target.value)
+                                        )
+                                      })
+                                    }
+                                  />
+                                  <span>pt</span>
+                                </div>
+                                <ResetIcon
+                                  visible={primaryOverride.errorBarWidthPt !== undefined}
+                                  onReset={() =>
+                                    resetSelectedSeriesField("errorBarWidthPt")
                                   }
                                 />
-                                <span>pt</span>
                               </div>
                             </div>
                             <div className="prop-row">
                               <label>端帽长度</label>
-                              <div className="compact-number">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="20"
-                                  step="0.5"
-                                  value={errorBarCapSize}
-                                  onChange={(event) =>
-                                    updateSelectedSeries({
-                                      errorBarCapSizePt: Math.max(
-                                        0,
-                                        Number(event.target.value)
-                                      )
-                                    })
+                              <div className="control-with-reset">
+                                <div className="compact-number">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="20"
+                                    step="0.5"
+                                    value={errorBarCapSize}
+                                    onChange={(event) =>
+                                      updateSelectedSeries({
+                                        errorBarCapSizePt: Math.max(
+                                          0,
+                                          Number(event.target.value)
+                                        )
+                                      })
+                                    }
+                                  />
+                                  <span>pt</span>
+                                </div>
+                                <ResetIcon
+                                  visible={primaryOverride.errorBarCapSizePt !== undefined}
+                                  onReset={() =>
+                                    resetSelectedSeriesField("errorBarCapSizePt")
                                   }
                                 />
-                                <span>pt</span>
                               </div>
                             </div>
                             <div className="prop-row">
