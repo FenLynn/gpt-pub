@@ -1,4 +1,5 @@
 import type { Dataset, FigureSpec, PresetDefinition } from "../model";
+import { resolvePublicationMetrics } from "../plot/publication";
 
 function autoAxisTitle(name: string, unit?: string): string {
   return unit ? name + " (" + unit + ")" : name;
@@ -25,6 +26,7 @@ export function generateMatplotlibScript(
   preset: PresetDefinition
 ): string {
   const o = figure.figureOverrides;
+  const metrics = resolvePublicationMetrics(preset, figure);
   const ratio =
     o.aspectMode === "16:9"
       ? 16 / 9
@@ -33,7 +35,7 @@ export function generateMatplotlibScript(
       : o.aspectMode === "custom"
       ? (o.customAspectWidth ?? 4) / (o.customAspectHeight ?? 3)
       : 4 / 3;
-  const widthIn = preset.widthMm / 25.4;
+  const widthIn = metrics.widthMm / 25.4;
   const heightIn = widthIn / ratio;
 
   const order = orderedSeriesIds(dataset, figure);
@@ -78,10 +80,15 @@ export function generateMatplotlibScript(
     metadata: dataset.metadata ?? {},
     preset: {
       fontFamily: preset.fontFamily,
-      fontSizePt: preset.fontSizePt,
-      lineWidthPt: preset.lineWidthPt,
-      axisWidthPt: preset.axisWidthPt,
-      markerSizePt: preset.markerSizePt,
+      fontSizePt: metrics.fontSizePt,
+      lineWidthPt: metrics.lineWidthPt,
+      axisWidthPt: metrics.axisWidthPt,
+      markerSizePt: metrics.markerSizePt,
+      majorTickLengthPt: metrics.majorTickLengthPt,
+      minorTickLengthPt: metrics.minorTickLengthPt,
+      axisTitleScale: metrics.axisTitleScale,
+      plotTitleScale: metrics.plotTitleScale,
+      legendScale: metrics.legendScale,
       showGrid: preset.showGrid,
       palette: preset.palette
     },
@@ -379,13 +386,13 @@ def configure_axis(axis_obj, side="left"):
         labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
-        length=5.0 if O.get("axisStyle", "regular") == "bold" else 3.6,
+        length=max(4.5, PRESET["majorTickLengthPt"] * 1.4) if O.get("axisStyle", "regular") == "bold" else PRESET["majorTickLengthPt"],
     )
     axis_obj.tick_params(
         axis="y",
         which="minor",
         width=axis_width * 0.85,
-        length=3.1 if O.get("axisStyle", "regular") == "bold" else 2.2,
+        length=max(2.8, PRESET["minorTickLengthPt"] * 1.45) if O.get("axisStyle", "regular") == "bold" else PRESET["minorTickLengthPt"],
     )
     plt.setp(axis_obj.get_yticklabels(), rotation=angle)
 
@@ -431,31 +438,31 @@ def configure_x(axis_obj):
         labelsize=O.get("tickLabelSizePt", font_size * 0.96),
         colors=O.get("tickLabelColor", "#17191c"),
         width=axis_width,
-        length=5.0 if O.get("axisStyle", "regular") == "bold" else 3.6,
+        length=max(4.5, PRESET["majorTickLengthPt"] * 1.4) if O.get("axisStyle", "regular") == "bold" else PRESET["majorTickLengthPt"],
     )
     axis_obj.tick_params(
         axis="x",
         which="minor",
         width=axis_width * 0.85,
-        length=3.1 if O.get("axisStyle", "regular") == "bold" else 2.2,
+        length=max(2.8, PRESET["minorTickLengthPt"] * 1.45) if O.get("axisStyle", "regular") == "bold" else PRESET["minorTickLengthPt"],
     )
     plt.setp(axis_obj.get_xticklabels(), rotation=O.get("xTickAngle", 0))
 
 def apply_titles(axis_obj):
     axis_obj.set_xlabel(
         P["autoTitles"]["x"],
-        fontsize=O.get("axisTitleSizePt", font_size * 1.08),
+        fontsize=O.get("axisTitleSizePt", font_size * PRESET["axisTitleScale"]),
         color=O.get("axisTitleColor", "#17191c"),
     )
     axis_obj.set_ylabel(
         P["autoTitles"]["y"],
-        fontsize=O.get("axisTitleSizePt", font_size * 1.08),
+        fontsize=O.get("axisTitleSizePt", font_size * PRESET["axisTitleScale"]),
         color=O.get("axisTitleColor", "#17191c"),
     )
     if O.get("plotTitle"):
         axis_obj.set_title(
             O["plotTitle"],
-            fontsize=O.get("plotTitleSizePt", font_size * 1.18),
+            fontsize=O.get("plotTitleSizePt", font_size * PRESET["plotTitleScale"]),
             color=O.get("plotTitleColor", "#17191c"),
         )
 
@@ -481,7 +488,7 @@ def legend_kwargs():
     }
     kwargs = {
         "frameon": O.get("legendFrame", False),
-        "fontsize": O.get("legendFontSizePt", font_size * 0.94),
+        "fontsize": O.get("legendFontSizePt", font_size * PRESET["legendScale"]),
         "ncol": max(1, int(O.get("legendColumns", 1))),
     }
     if position == "outside-right":
@@ -850,7 +857,7 @@ else:
         right_label_color = O.get("axisTitleColor") or right_axis_color or "#17191c"
         ax2.set_ylabel(
             P["autoTitles"]["rightY"],
-            fontsize=O.get("axisTitleSizePt", font_size * 1.08),
+            fontsize=O.get("axisTitleSizePt", font_size * PRESET["axisTitleScale"]),
             color=right_label_color,
         )
         if right_axis_color is not None and O.get("tickLabelColor") is None:
