@@ -60,6 +60,7 @@ internal sealed class WebUiHost : IDisposable
         "app.refreshData",
         "app.openFolder",
         "app.pickExperimentFolder",
+        "app.probeInterfaces",
         "beam.setZ",
         "beam.setAttenuation"
     };
@@ -241,6 +242,7 @@ internal sealed class WebUiHost : IDisposable
                 "app.refreshData" => BuildSnapshot(),
                 "app.openFolder" => OpenFolder(request.Params),
                 "app.pickExperimentFolder" => PickExperimentFolder(),
+                "app.probeInterfaces" => ProbeInterfaces(request.Params),
                 "beam.setZ" => SetBeamZ(request.Params),
                 "beam.setAttenuation" => SetBeamAttenuation(request.Params),
                 _ => throw new InvalidOperationException("不允许的界面命令。")
@@ -367,6 +369,30 @@ internal sealed class WebUiHost : IDisposable
         return new { snapshot=BuildSnapshot() };
     }
 
+    private object ProbeInterfaces(JsonElement? value)
+    {
+        if (_provider is not IInstrumentRuntimeControl control)
+            return new { message = "当前 Provider 不支持运行时硬件 Probe。", snapshot = BuildSnapshot() };
+
+        ModuleKind? kind = null;
+        if (value.HasValue && value.Value.ValueKind == JsonValueKind.Object &&
+            value.Value.TryGetProperty("kind", out var kindProperty) && kindProperty.ValueKind == JsonValueKind.String)
+        {
+            kind = (kindProperty.GetString() ?? string.Empty).Trim().ToLowerInvariant() switch
+            {
+                "power" => ModuleKind.Power,
+                "spectrum" => ModuleKind.Spectrum,
+                "beam" => ModuleKind.Beam,
+                "scope" => ModuleKind.Scope,
+                "" => null,
+                _ => throw new InvalidOperationException("未知硬件 Probe 模块。")
+            };
+        }
+
+        control.RequestProbe(kind);
+        return new { message = kind is null ? "已请求重新探测全部真实接口。" : $"已请求重新探测 {kind}。", snapshot = BuildSnapshot() };
+    }
+
     private object PickExperimentFolder()
     {
         Directory.CreateDirectory(AppPaths.ExpDir);
@@ -436,6 +462,8 @@ internal sealed class WebUiHost : IDisposable
     private object BuildSnapshot()
     {
         var snap = _provider.Snapshot(_config);
+        var runtime = _provider as IInstrumentRuntimeStatusSource;
+        var interfaceStates = runtime?.InterfaceStatuses ?? InstrumentBackendRegistry.InspectAll(_config);
         var firstHistory = _provider.PowerHistory(0, _config.PowerWindow, 720);
         var end = firstHistory.LastOrDefault().Time;
         var colors = new[] { "#075ee6", "#ff8200", "#08a84f" };
@@ -457,8 +485,8 @@ internal sealed class WebUiHost : IDisposable
 
         return new
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.4.27",
-            mode = _provider.IsSimulator ? "SIM" : "HW",
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.5.0",
+            mode = runtime?.DataPlaneMode ?? (_provider.IsSimulator ? "SIM" : "HW"),
             timestamp = snap.Timestamp,
             label = _config.ConfirmedLabel,
             capturing = _form.IsCapturing,
@@ -507,11 +535,12 @@ internal sealed class WebUiHost : IDisposable
                 beamInterfaceEnabled=_config.BeamInterfaceEnabled, beamInterfaceEndpoint=_config.BeamInterfaceEndpoint,
                 scopeInterfaceEnabled=_config.ScopeInterfaceEnabled, scopeInterfaceEndpoint=_config.ScopeInterfaceEndpoint
             },
-            interfaces = InstrumentBackendRegistry.InspectAll(_config).Select(x => new
+            interfaces = interfaceStates.Select(x => new
             {
                 kind=x.Kind.ToString().ToLowerInvariant(),
                 x.DriverId, x.DeviceName, x.VendorSoftware, x.InterfaceName,
-                x.Enabled, x.DataPlaneReady, x.Endpoint, x.State, x.Message
+                x.Enabled, x.DataPlaneReady, x.Endpoint, x.State, x.Message,
+                x.Identity, x.LastSampleAt, x.FailureCount
             }).ToArray(),
             data = BuildDataSummary(),
             devices = BuildDevices(),
@@ -545,6 +574,7 @@ internal sealed class WebUiHost : IDisposable
             },
             scope = new
             {
+                sampleRate = snap.ScopeSampleRateSaPerSecond,
                 time = new object[]
                 {
                     new { name = _config.Scope1Alias.ToUpperInvariant(), color = "#075ee6", points = scopeTime.Select(p => new { x = p.X, y = p.Ch1 }).ToArray() },

@@ -55,6 +55,7 @@ internal sealed class MainForm : Form
         {
             try { _captureCancellation?.Cancel(); } catch { }
             try { if (_recorder?.IsRecording == true) _recorder.Stop(); } catch (Exception ex) { StartupDiagnostics.Crash("recorder shutdown", ex); }
+            try { if (_provider is IDisposable disposableProvider) disposableProvider.Dispose(); } catch (Exception ex) { StartupDiagnostics.Crash("instrument provider shutdown", ex); }
             try { if (_config is not null) AppConfigStore.Save(_config); } catch (Exception ex) { StartupDiagnostics.Crash("config save on close", ex); }
             try { _webUi?.Dispose(); } catch (Exception ex) { StartupDiagnostics.Crash("webui shutdown", ex); }
         };
@@ -74,12 +75,12 @@ internal sealed class MainForm : Form
             var providerSelection = InstrumentProviderFactory.Create(_config);
             StartupDiagnostics.Stage("instrument-interfaces", string.Join("; ", providerSelection.Interfaces.Select(x => $"{x.Kind}:{x.State}:{x.Endpoint}")));
 
-            SetBootText("LaserBench\r\n正在启动 Simulator 数据平面...");
-            StartupDiagnostics.Stage("simulator", "begin");
+            SetBootText("LaserBench\r\n正在启动混合仪器数据平面...");
+            StartupDiagnostics.Stage("instrument-dataplane", "begin");
             _provider = providerSelection.Provider;
             _captureService = new CaptureService(_provider);
             var probe = _provider.Snapshot(_config);
-            StartupDiagnostics.Stage("simulator", $"source={providerSelection.DataSource}; power={probe.Power.Count}; spectrum={probe.Spectrum.Count}; beam={probe.Beam.Count}");
+            StartupDiagnostics.Stage("instrument-dataplane", $"source={providerSelection.DataSource}; power={probe.Power.Count}; spectrum={probe.Spectrum.Count}; beam={probe.Beam.Count}");
 
             if (!_safeMode)
             {

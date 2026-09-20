@@ -137,6 +137,39 @@ internal static class Program
                 interfaceStates.Any(x => x.DataPlaneReady))
                 errors.Add("instrument interface registry contract failed");
 
+            var aqEndpoint = InstrumentEndpoint.Parse("TCPIP0::192.0.2.10::10001::SOCKET", 10001);
+            var tekEndpoint = InstrumentEndpoint.Parse("192.0.2.20:4000", 4000);
+            if (aqEndpoint.Host != "192.0.2.10" || aqEndpoint.Port != 10001 ||
+                tekEndpoint.Host != "192.0.2.20" || tekEndpoint.Port != 4000 ||
+                !InstrumentEndpoint.IsAutomatic("TCPIP::AUTO"))
+                errors.Add("instrument endpoint parser contract failed");
+
+            var csvProbe = InstrumentParse.CsvDoubles("1.0,2.5,-3.25");
+            if (csvProbe.Length != 3 || Math.Abs(csvProbe[1] - 2.5) > 1e-9)
+                errors.Add("SCPI CSV parser contract failed");
+
+            var syntheticSpectrum = Enumerable.Range(0, 801)
+                .Select(i =>
+                {
+                    var x = 1078.0 + i * 0.005;
+                    var y = -75.0 + 70.0 * Math.Exp(-0.5 * Math.Pow((x - 1080.0) / 0.32, 2));
+                    return new SpectrumPoint(x, y);
+                }).ToArray();
+            var spectrumAnalysis = SignalMath.AnalyzeSpectrum(syntheticSpectrum, DateTime.Now);
+            if (Math.Abs(spectrumAnalysis.CenterWavelength - 1080.0) > 0.02 ||
+                spectrumAnalysis.Linewidth3Db < 0.6 || spectrumAnalysis.Linewidth3Db > 0.9)
+                errors.Add("hardware spectrum analysis contract failed");
+
+            const int fftCount = 2048;
+            const double fftRate = 100000.0;
+            var fftA = Enumerable.Range(0, fftCount).Select(i => Math.Sin(2 * Math.PI * 5000.0 * i / fftRate)).ToArray();
+            var fftB = Enumerable.Range(0, fftCount).Select(i => 0.5 * Math.Sin(2 * Math.PI * 12000.0 * i / fftRate)).ToArray();
+            var fft = SignalMath.Fft(fftA, fftB, fftRate);
+            var peakA = fft.OrderByDescending(x => x.Ch1).FirstOrDefault();
+            var peakB = fft.OrderByDescending(x => x.Ch2).FirstOrDefault();
+            if (Math.Abs(peakA.X - 5.0) > 0.15 || Math.Abs(peakB.X - 12.0) > 0.15)
+                errors.Add("local FFT contract failed");
+
             try
             {
                 var webUiRoot = WebUiAssets.Extract();
@@ -191,6 +224,15 @@ internal static class Program
                 },
                 neverOverwrite = Path.GetFileNameWithoutExtension(second).EndsWith("_1", StringComparison.Ordinal),
                 simulator = snapshot.Power.Count >= 2 && snapshot.Spectrum.Count >= 100,
+                driverCore = new
+                {
+                    aqEndpoint = aqEndpoint.ToString(),
+                    tekEndpoint = tekEndpoint.ToString(),
+                    spectrumCenterNm = spectrumAnalysis.CenterWavelength,
+                    spectrum3DbNm = spectrumAnalysis.Linewidth3Db,
+                    fftPeakCh1Khz = peakA.X,
+                    fftPeakCh2Khz = peakB.X
+                },
                 interfaces = interfaceStates.Select(x => new { kind=x.Kind.ToString(), x.State, x.Enabled, x.DataPlaneReady, x.Endpoint }).ToArray(),
                 captureFiles = capture.Files.Select(Path.GetFileName).ToArray(),
                 first = Path.GetFileName(first),

@@ -281,6 +281,7 @@ internal sealed class MeasurementSnapshot
     public required IReadOnlyList<BeamPoint> Beam { get; init; }
     public required IReadOnlyList<ScopePoint> ScopeTime { get; init; }
     public required IReadOnlyList<ScopePoint> ScopeFft { get; init; }
+    public double ScopeSampleRateSaPerSecond { get; init; }
     public double CenterWavelength { get; init; }
     public double Linewidth3Db { get; init; }
     public double LinewidthRms { get; init; }
@@ -372,6 +373,7 @@ internal sealed class SimulatorProvider : IInstrumentProvider
             Beam = beam,
             ScopeTime = scopeTime,
             ScopeFft = scopeFft,
+            ScopeSampleRateSaPerSecond = 2_500_000,
             CenterWavelength = center,
             Linewidth3Db = linewidth,
             LinewidthRms = 2.20 + 0.02 * Math.Cos(t / 68.0),
@@ -434,6 +436,28 @@ internal sealed class CaptureService
     {
         var requestedAt = DateTime.Now;
         var result = new CaptureResult { RequestedAt = requestedAt };
+
+        if (_provider is IInstrumentRuntimeStatusSource runtime)
+        {
+            var missing = runtime.InterfaceStatuses
+                .Where(status => !status.DataPlaneReady)
+                .Where(status => status.Kind switch
+                {
+                    ModuleKind.Power => config.PowerInterfaceEnabled && config.CapturePower,
+                    ModuleKind.Spectrum => config.SpectrumInterfaceEnabled && config.CaptureSpectrum,
+                    ModuleKind.Beam => config.BeamInterfaceEnabled && config.CaptureBeam,
+                    ModuleKind.Scope => config.ScopeInterfaceEnabled && config.CaptureScope,
+                    _ => false
+                })
+                .Select(status => $"{status.DeviceName}: {status.State} - {status.Message}")
+                .ToArray();
+            if (missing.Length > 0)
+            {
+                result.Errors.Add("已选择真实硬件采集，但以下设备尚未 ready：\n" + string.Join("\n", missing));
+                return result;
+            }
+        }
+
         var directory = AppPaths.ResolveExperimentDirectory(config);
         var snapshot = _provider.Snapshot(config);
         var label = config.ConfirmedLabel;

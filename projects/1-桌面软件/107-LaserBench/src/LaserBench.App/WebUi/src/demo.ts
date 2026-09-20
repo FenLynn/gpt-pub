@@ -79,7 +79,7 @@ export function createDemoSnapshot(): LaserSnapshot {
   const p2 = powerSeries(1, '#ff8200', 'back', 'kW')
   const p3 = powerSeries(2, '#08a84f', 'eta', '%')
   return {
-    version: '0.4.27', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
+    version: '0.5.0', mode: 'SIM', timestamp: new Date().toISOString(), label: '13A', capturing: false, captureState:'idle', lastCaptureMessage:'尚未执行采集', lastCaptureAt:null, recording: false,
     captureSelection: { power: true, spectrum: true, beam: true, scope: false },
     config: {
       experimentFolder: '', autoScreenshot: false,
@@ -96,10 +96,10 @@ export function createDemoSnapshot(): LaserSnapshot {
       scopeInterfaceEnabled:false, scopeInterfaceEndpoint:'TCPIP::AUTO'
     },
     interfaces: [
-      { kind:'power', driverId:'ophir-juno-lmmeasurement', deviceName:'Ophir Juno', vendorSoftware:'OphirLMMeasurement', interfaceName:'.NET / COM SDK', enabled:false, dataPlaneReady:false, endpoint:'AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' },
-      { kind:'spectrum', driverId:'yokogawa-aq6370d', deviceName:'Yokogawa AQ6370D', vendorSoftware:'Yokogawa', interfaceName:'TCP/IP / SCPI / VISA', enabled:false, dataPlaneReady:false, endpoint:'TCPIP::AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' },
-      { kind:'beam', driverId:'spiricon-beamsquared-sp920', deviceName:'Ophir Spiricon SP920', vendorSoftware:'BeamSquared', interfaceName:'BeamSquared API / SDK', enabled:false, dataPlaneReady:false, endpoint:'AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' },
-      { kind:'scope', driverId:'tektronix-mso44', deviceName:'Tektronix MSO44', vendorSoftware:'TekVISA', interfaceName:'VISA / SCPI', enabled:false, dataPlaneReady:false, endpoint:'TCPIP::AUTO', state:'disabled', message:'未启用真实接口；当前数据平面保持 Simulator。' }
+      { kind:'power', driverId:'ophir-juno-lmmeasurement', deviceName:'Ophir Juno', vendorSoftware:'Ophir StarLab / OphirLMMeasurement', interfaceName:'USB + COM Automation', enabled:false, dataPlaneReady:false, endpoint:'AUTO', state:'disabled', message:'真实接口未启用。', identity:'', lastSampleAt:null, failureCount:0 },
+      { kind:'spectrum', driverId:'yokogawa-aq6370d', deviceName:'Yokogawa AQ6370D', vendorSoftware:'Yokogawa', interfaceName:'Ethernet TCP/SCPI :10001', enabled:false, dataPlaneReady:false, endpoint:'TCPIP::AUTO', state:'disabled', message:'真实接口未启用。', identity:'', lastSampleAt:null, failureCount:0 },
+      { kind:'beam', driverId:'spiricon-beamsquared-sp920', deviceName:'Ophir Spiricon SP920 / BeamSquared', vendorSoftware:'Ophir BeamSquared', interfaceName:'.NET Framework automation bridge', enabled:false, dataPlaneReady:false, endpoint:'AUTO', state:'disabled', message:'真实接口未启用。', identity:'', lastSampleAt:null, failureCount:0 },
+      { kind:'scope', driverId:'tektronix-mso44', deviceName:'Tektronix MSO44', vendorSoftware:'Tektronix', interfaceName:'Ethernet raw TCP/SCPI :4000', enabled:false, dataPlaneReady:false, endpoint:'TCPIP::AUTO', state:'disabled', message:'真实接口未启用。', identity:'', lastSampleAt:null, failureCount:0 }
     ],
     data: { experimentFolder: new Date().toISOString().slice(0,10), fileCount:0, files: [], pictureCount: 0, videoCount: 0 },
     devices: [
@@ -110,6 +110,6 @@ export function createDemoSnapshot(): LaserSnapshot {
     power: { traces:[p1,p2,p3] },
     spectrum: { centerWavelength:1080.21, linewidth3Db:2.03, linewidthRms:2.18, power:3.2, traces:spectrum() },
     beam: { z:0, attenuation:30, m2x:1.08, m2y:1.12, m2mean:1.10, spotWidthX:118, spotWidthY:130, caustic:caustic() },
-    scope: { time:scopeTime(), fft:scopeFft() }
+    scope: { sampleRate:2500000, time:scopeTime(), fft:scopeFft() }
   }
 }

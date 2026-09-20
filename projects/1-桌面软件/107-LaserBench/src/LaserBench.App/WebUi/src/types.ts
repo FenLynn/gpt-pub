@@ -11,13 +11,16 @@ export interface InstrumentInterfaceState {
   enabled: boolean
   dataPlaneReady: boolean
   endpoint: string
-  state: 'disabled'|'configured'|'invalid'
+  state: 'disabled'|'configured'|'awaiting_endpoint'|'connecting'|'authenticating'|'streaming'|'ready'|'faulted'|'dependency_missing'|'invalid'
   message: string
+  identity: string
+  lastSampleAt: string | null
+  failureCount: number
 }
 
 export interface LaserSnapshot {
   version: string
-  mode: 'SIM' | 'HW'
+  mode: 'SIM' | 'HW' | 'MIXED' | 'WAITING'
   timestamp: string
   label: string
   capturing: boolean
@@ -118,6 +121,7 @@ export interface LaserSnapshot {
     caustic: PlotSeries[]
   }
   scope: {
+    sampleRate: number
     time: PlotSeries[]
     fft: PlotSeries[]
   }
