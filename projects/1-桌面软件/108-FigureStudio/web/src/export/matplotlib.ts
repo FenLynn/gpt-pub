@@ -1,5 +1,8 @@
 import type { Dataset, FigureSpec, PresetDefinition } from "../model";
-import { resolvePublicationMetrics } from "../plot/publication";
+import {
+  resolvePublicationMetrics,
+  resolveSeriesPalette
+} from "../plot/publication";
 
 function autoAxisTitle(name: string, unit?: string): string {
   return unit ? name + " (" + unit + ")" : name;
@@ -27,6 +30,7 @@ export function generateMatplotlibScript(
 ): string {
   const o = figure.figureOverrides;
   const metrics = resolvePublicationMetrics(preset, figure);
+  const palette = resolveSeriesPalette(preset, figure);
   const ratio =
     o.aspectMode === "16:9"
       ? 16 / 9
@@ -90,7 +94,7 @@ export function generateMatplotlibScript(
       plotTitleScale: metrics.plotTitleScale,
       legendScale: metrics.legendScale,
       showGrid: preset.showGrid,
-      palette: preset.palette
+      palette
     },
     autoTitles: {
       x: o.xTitle ?? autoAxisTitle(dataset.x.name, dataset.x.unit),
