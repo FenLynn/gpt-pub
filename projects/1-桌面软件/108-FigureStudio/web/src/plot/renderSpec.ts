@@ -281,6 +281,10 @@ export function buildTraces(args: {
     const colorbar = {
       thickness: 11,
       outlinewidth: 0,
+      ticks: figure.figureOverrides.tickDirection === "outside" ? "outside" : "inside",
+      ticklen: ptToPx(metrics.minorTickLengthPt),
+      tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
+      tickcolor: figure.figureOverrides.tickLabelColor ?? "#17191c",
       len: 0.88,
       tickfont: {
         family: fieldFontFamily,
@@ -413,6 +417,10 @@ export function buildTraces(args: {
         colorbar: {
           thickness: 11,
           outlinewidth: 0,
+          ticks: figure.figureOverrides.tickDirection === "outside" ? "outside" : "inside",
+          ticklen: ptToPx(metrics.minorTickLengthPt),
+          tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
+          tickcolor: figure.figureOverrides.tickLabelColor ?? "#17191c",
           len: 0.66,
           x: 1.06,
           xpad: 4,
