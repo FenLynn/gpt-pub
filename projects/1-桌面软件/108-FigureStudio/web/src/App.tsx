@@ -5599,7 +5599,7 @@ function App() {
                           step="0.25"
                           value={
                             activeFigure.figureOverrides.legendFontSizePt ??
-                            effectiveFontSizePt * 0.92
+                            effectiveFontSizePt * publicationMetrics.legendScale
                           }
                           onChange={(event) =>
                             setFigureField(
