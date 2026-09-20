@@ -1,5 +1,6 @@
 import { resolveFieldRowCoordinates } from "../data/field";
 import { normalizePlotlyMathText } from "../lib/mathText";
+import { resolvePublicationMetrics } from "./publication";
 import type {
   Dataset,
   PlotColumn,
@@ -58,7 +59,7 @@ export function resolveCanvasMm(
     overrides.customAspectWidth,
     overrides.customAspectHeight
   );
-  const widthMm = preset.widthMm;
+  const widthMm = resolvePublicationMetrics(preset, figure).widthMm;
   const heightMm = widthMm / ratio;
   return { widthMm, heightMm, ratio, aspectMode };
 }
@@ -123,6 +124,7 @@ function baseXYTrace(
   yValues?: Array<number | null>
 ) {
   const override = figure.seriesOverrides[series.id] || {};
+  const metrics = resolvePublicationMetrics(preset, figure);
   const isFit = /fit|拟合/i.test(series.name);
   const lineVisible =
     override.lineVisible ??
@@ -130,8 +132,8 @@ function baseXYTrace(
   const markerVisible =
     override.markerVisible ??
     (modeDefault === "markers" || modeDefault === "lines+markers");
-  const lineWidthPt = override.lineWidthPt ?? preset.lineWidthPt;
-  const markerSizePt = override.markerSizePt ?? preset.markerSizePt;
+  const lineWidthPt = override.lineWidthPt ?? metrics.lineWidthPt;
+  const markerSizePt = override.markerSizePt ?? metrics.markerSizePt;
   const color =
     override.color || preset.palette[sourceIndex % preset.palette.length];
   const opacity = override.opacity ?? 1;
@@ -191,6 +193,7 @@ export function buildTraces(args: {
   preset: PresetDefinition;
 }) {
   const { dataset, figure, preset } = args;
+  const metrics = resolvePublicationMetrics(preset, figure);
   const template = figure.templateId;
   const mappedSeries = orderSeries(
     dataset,
@@ -244,7 +247,7 @@ export function buildTraces(args: {
       figure.figureOverrides.fontFamily ?? preset.fontFamily
     );
     const fieldFontSizePt =
-      figure.figureOverrides.fontSizePt ?? preset.fontSizePt;
+      figure.figureOverrides.fontSizePt ?? metrics.fontSizePt;
     const colorbar = {
       thickness: 11,
       outlinewidth: 0,
@@ -314,7 +317,7 @@ export function buildTraces(args: {
               size: ptToPx(
                 (figure.figureOverrides.tickLabelSizePt ??
                   figure.figureOverrides.fontSizePt ??
-                  preset.fontSizePt) * 0.9
+                  metrics.fontSizePt) * 0.9
               ),
               color: figure.figureOverrides.tickLabelColor ?? "#17191c"
             }
@@ -390,7 +393,7 @@ export function buildTraces(args: {
             size: ptToPx(
               (figure.figureOverrides.tickLabelSizePt ??
                 figure.figureOverrides.fontSizePt ??
-                preset.fontSizePt) * 0.96
+                metrics.fontSizePt) * 0.96
             ),
             color: figure.figureOverrides.tickLabelColor ?? "#17191c"
           },
@@ -407,7 +410,7 @@ export function buildTraces(args: {
                   size: ptToPx(
                     figure.figureOverrides.axisTitleSizePt ??
                       (figure.figureOverrides.fontSizePt ??
-                        preset.fontSizePt) * 1.08
+                        metrics.fontSizePt) * 1.08
                   ),
                   color: figure.figureOverrides.axisTitleColor ?? "#17191c"
                 }
@@ -489,7 +492,7 @@ export function buildTraces(args: {
           size: ptToPx(
             (figure.figureOverrides.tickLabelSizePt ??
               figure.figureOverrides.fontSizePt ??
-              preset.fontSizePt) * 0.9
+              metrics.fontSizePt) * 0.9
           ),
           color: "#ffffff"
         },
@@ -500,7 +503,7 @@ export function buildTraces(args: {
           size: ptToPx(
             (figure.figureOverrides.tickLabelSizePt ??
               figure.figureOverrides.fontSizePt ??
-              preset.fontSizePt) * 0.9
+              metrics.fontSizePt) * 0.9
           ),
           color: figure.figureOverrides.tickLabelColor ?? "#17191c"
         },
@@ -767,26 +770,33 @@ export function buildLayout(args: {
 }) {
   const { dataset, figure, preset, displayText } = args;
   const overrides = figure.figureOverrides;
+  const metrics = resolvePublicationMetrics(preset, figure);
   const canvas = resolveCanvasMm(preset, figure);
   const fontFamily = plotFontFamily(overrides.fontFamily || preset.fontFamily);
-  const fontSizePt = overrides.fontSizePt ?? preset.fontSizePt;
+  const fontSizePt = overrides.fontSizePt ?? metrics.fontSizePt;
   const fontSizePx = ptToPx(fontSizePt);
   const axisStyle = overrides.axisStyle ?? "regular";
   const axisWidthPt =
     axisStyle === "bold"
-      ? Math.max(1, preset.axisWidthPt * 1.45)
-      : preset.axisWidthPt;
+      ? Math.max(1, metrics.axisWidthPt * 1.45)
+      : metrics.axisWidthPt;
   const axisWidthPx = ptToPx(axisWidthPt);
-  const majorTickLengthPt = axisStyle === "bold" ? 5 : 3.5;
-  const minorTickLengthPt = axisStyle === "bold" ? 3 : 2;
+  const majorTickLengthPt =
+    axisStyle === "bold"
+      ? Math.max(4.5, metrics.majorTickLengthPt * 1.4)
+      : metrics.majorTickLengthPt;
+  const minorTickLengthPt =
+    axisStyle === "bold"
+      ? Math.max(2.8, metrics.minorTickLengthPt * 1.45)
+      : metrics.minorTickLengthPt;
   const tickLabelSizePx = ptToPx(
     overrides.tickLabelSizePt ?? fontSizePt * 0.96
   );
   const axisTitleSizePx = ptToPx(
-    overrides.axisTitleSizePt ?? fontSizePt * 1.08
+    overrides.axisTitleSizePt ?? fontSizePt * metrics.axisTitleScale
   );
   const plotTitleSizePx = ptToPx(
-    overrides.plotTitleSizePt ?? fontSizePt * 1.18
+    overrides.plotTitleSizePt ?? fontSizePt * metrics.plotTitleScale
   );
   const background = overrides.background ?? "#ffffff";
   const tickDirection = overrides.tickDirection ?? "outside";
@@ -1056,20 +1066,26 @@ export function buildLayout(args: {
     margin: {
       // These are minimum content-safe margins, not decorative whitespace.
       // automargin may only expand them when real tick/title content requires it.
-      l: Math.round(mmToPx(hasYTitle ? 10.2 : 6.2)),
+      l: Math.round(
+        mmToPx((hasYTitle ? 10.2 : 6.2) * metrics.outerMarginScale)
+      ),
       r: Math.round(
         mmToPx(
           outsideRightLegend
-            ? 22
+            ? 22 * metrics.outerMarginScale
             : isDoubleY
-            ? 10.2
+            ? 10.2 * metrics.outerMarginScale
             : isField2D || figure.templateId === "surface-3d"
-            ? 8
-            : 2.2
+            ? 8 * metrics.outerMarginScale
+            : 2.2 * metrics.outerMarginScale
         )
       ),
-      t: Math.round(mmToPx(hasPlotTitle ? 7.2 : 2.2)),
-      b: Math.round(mmToPx(hasXTitle ? 9.2 : 5.8)),
+      t: Math.round(
+        mmToPx((hasPlotTitle ? 7.2 : 2.2) * metrics.outerMarginScale)
+      ),
+      b: Math.round(
+        mmToPx((hasXTitle ? 9.2 : 5.8) * metrics.outerMarginScale)
+      ),
       pad: 0,
       autoexpand: true
     },
@@ -1129,7 +1145,7 @@ export function buildLayout(args: {
       font: {
         family: fontFamily,
         size: ptToPx(
-          overrides.legendFontSizePt ?? fontSizePt * 0.94
+          overrides.legendFontSizePt ?? fontSizePt * metrics.legendScale
         ),
         color: overrides.legendFontColor ?? "#17191c"
       }
