@@ -400,6 +400,7 @@ def configure_axis(axis_obj, side="left"):
     axis_obj.tick_params(
         axis="y",
         which="minor",
+        direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
         width=axis_width * 0.75,
         length=max(2.8, PRESET["minorTickLengthPt"] * 1.45) if O.get("axisStyle", "regular") == "bold" else PRESET["minorTickLengthPt"],
     )
@@ -452,6 +453,7 @@ def configure_x(axis_obj):
     axis_obj.tick_params(
         axis="x",
         which="minor",
+        direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
         width=axis_width * 0.75,
         length=max(2.8, PRESET["minorTickLengthPt"] * 1.45) if O.get("axisStyle", "regular") == "bold" else PRESET["minorTickLengthPt"],
     )
@@ -904,8 +906,12 @@ else:
 
     finish_2d_axes(ax)
     if template == "double-y" and left_axis_color is not None:
-        if O.get("tickLabelColor") is None:
-            ax.tick_params(axis="y", colors=left_axis_color)
+        ax.tick_params(
+            axis="y",
+            which="both",
+            color=left_axis_color,
+            labelcolor=O.get("tickLabelColor", left_axis_color),
+        )
         if O.get("axisTitleColor") is None:
             ax.yaxis.label.set_color(left_axis_color)
         ax.spines["left"].set_color(left_axis_color)
@@ -919,8 +925,13 @@ else:
             fontsize=O.get("axisTitleSizePt", font_size * PRESET["axisTitleScale"]),
             color=right_label_color,
         )
-        if right_axis_color is not None and O.get("tickLabelColor") is None:
-            ax2.tick_params(axis="y", colors=right_axis_color)
+        if right_axis_color is not None:
+            ax2.tick_params(
+                axis="y",
+                which="both",
+                color=right_axis_color,
+                labelcolor=O.get("tickLabelColor", right_axis_color),
+            )
         for spine in ax2.spines.values():
             spine.set_linewidth(axis_width)
         ax2.spines["left"].set_visible(False)
