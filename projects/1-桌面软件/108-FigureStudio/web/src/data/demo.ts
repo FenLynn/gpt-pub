@@ -383,7 +383,7 @@ export function createInitialProject(
     figureOverrides: {
       publicationMode: "single",
       aspectMode: "4:3",
-      tickDirection: "outside",
+      tickDirection: "inside",
       minorTicks: false,
       gridVisible: false,
       legendPosition: "top-right",
