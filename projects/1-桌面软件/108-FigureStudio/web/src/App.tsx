@@ -2304,7 +2304,10 @@ function App() {
   const lineWidth =
     primaryOverride.lineWidthPt ?? publicationMetrics.lineWidthPt;
   const lineStyle = primaryOverride.lineStyle ?? "solid";
-  const lineVisible = primaryOverride.lineVisible ?? true;
+  const lineVisible =
+    primaryOverride.lineVisible ??
+    (activeFigure?.templateId !== "xy-scatter" &&
+      activeFigure?.templateId !== "xy-errorbar");
   const markerVisible =
     primaryOverride.markerVisible ??
     (activeFigure?.templateId === "xy-scatter" ||
