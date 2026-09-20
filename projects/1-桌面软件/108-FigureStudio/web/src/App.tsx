@@ -30,6 +30,7 @@ import type {
   AxisScale,
   AxisStylePreset,
   CellValue,
+  ColorCycleId,
   ColorScaleId,
   Column,
   ColumnRole,
@@ -65,7 +66,10 @@ import {
   resolveCanvasMm
 } from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
-import { resolvePublicationMetrics } from "./plot/publication";
+import {
+  resolvePublicationMetrics,
+  resolveSeriesPalette
+} from "./plot/publication";
 import { templates } from "./plot/templates";
 import { checkFigure } from "./project/checker";
 import {
@@ -1883,6 +1887,7 @@ function App() {
       presetId: activeFigure.presetId,
       figureOverrides: {
         publicationMode: source.publicationMode,
+        colorCycle: source.colorCycle,
         aspectMode: source.aspectMode,
         customAspectWidth: source.customAspectWidth,
         customAspectHeight: source.customAspectHeight,
@@ -2327,9 +2332,12 @@ function App() {
           plotDataset.ys.findIndex((series) => series.id === primarySeries.id)
         )
       : 0;
+  const effectivePalette = activeFigure
+    ? resolveSeriesPalette(preset, activeFigure)
+    : preset.palette;
   const selectedColor =
     primaryOverride.color ||
-    preset.palette[primaryIndex % preset.palette.length];
+    effectivePalette[primaryIndex % effectivePalette.length];
   const visible = primaryOverride.visible ?? true;
   const surfaceTemplate = activeFigure?.templateId === "surface-3d";
   const contourTemplate = activeFigure?.templateId === "contour";
@@ -3593,6 +3601,22 @@ function App() {
                         <option value="4:3">4 : 3</option>
                         <option value="3:2">3 : 2</option>
                         <option value="custom">自定义</option>
+                      </select>
+                    </div>
+
+                    <div className="prop-row">
+                      <label>配色</label>
+                      <select
+                        value={activeFigure.figureOverrides.colorCycle ?? "matplotlib"}
+                        onChange={(event) =>
+                          setFigureField(
+                            "colorCycle",
+                            event.target.value as ColorCycleId
+                          )
+                        }
+                      >
+                        <option value="matplotlib">Matplotlib T10</option>
+                        <option value="matlab">MATLAB gem</option>
                       </select>
                     </div>
 
