@@ -381,6 +381,7 @@ export function createInitialProject(
     templateId: "xy-line",
     presetId: "scientific",
     figureOverrides: {
+      publicationMode: "single",
       aspectMode: "4:3",
       tickDirection: "outside",
       minorTicks: false,
