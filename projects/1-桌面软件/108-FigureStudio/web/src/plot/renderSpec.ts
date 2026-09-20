@@ -1105,24 +1105,24 @@ export function buildLayout(args: {
       // These are minimum content-safe margins, not decorative whitespace.
       // automargin may only expand them when real tick/title content requires it.
       l: Math.round(
-        mmToPx((hasYTitle ? 10.2 : 6.2) * metrics.outerMarginScale)
+        mmToPx((hasYTitle ? 10.8 : 6.5) * metrics.outerMarginScale)
       ),
       r: Math.round(
         mmToPx(
           outsideRightLegend
             ? 22 * metrics.outerMarginScale
             : isDoubleY
-            ? 10.2 * metrics.outerMarginScale
+            ? 10.8 * metrics.outerMarginScale
             : isField2D || figure.templateId === "surface-3d"
-            ? 8 * metrics.outerMarginScale
-            : 2.2 * metrics.outerMarginScale
+            ? 8.5 * metrics.outerMarginScale
+            : 4.2 * metrics.outerMarginScale
         )
       ),
       t: Math.round(
-        mmToPx((hasPlotTitle ? 7.2 : 2.2) * metrics.outerMarginScale)
+        mmToPx((hasPlotTitle ? 8.0 : 3.8) * metrics.outerMarginScale)
       ),
       b: Math.round(
-        mmToPx((hasXTitle ? 9.2 : 5.8) * metrics.outerMarginScale)
+        mmToPx((hasXTitle ? 9.6 : 6.2) * metrics.outerMarginScale)
       ),
       pad: 0,
       autoexpand: true
