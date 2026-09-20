@@ -69,3 +69,23 @@ export function resolvePublicationMetrics(
     outerMarginScale: 0.88
   };
 }
+
+
+export const MATLAB_GEM_COLORS = [
+  "#1171BE",
+  "#DD5400",
+  "#EDB120",
+  "#8516D1",
+  "#3BAA32",
+  "#2FBEF0",
+  "#D1048B"
+];
+
+export function resolveSeriesPalette(
+  preset: PresetDefinition,
+  figure: FigureSpec
+): string[] {
+  return figure.figureOverrides.colorCycle === "matlab"
+    ? MATLAB_GEM_COLORS
+    : preset.palette;
+}
