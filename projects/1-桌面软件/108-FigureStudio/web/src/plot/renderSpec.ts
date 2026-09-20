@@ -1137,7 +1137,12 @@ export function buildLayout(args: {
           y: 0.985,
           yanchor: "top",
           automargin: true,
-          pad: { t: 2, b: 2, l: 0, r: 0 },
+          pad: {
+            t: 0,
+            b: Math.round(ptToPx(metrics.plotTitlePadPt)),
+            l: 0,
+            r: 0
+          },
           font: {
             family: fontFamily,
             size: plotTitleSizePx,
@@ -1294,7 +1299,7 @@ export function buildLayout(args: {
     range: xRange,
     title: {
       text: resolvedXTitle,
-      standoff: Math.round(mmToPx(0.9)),
+      standoff: Math.round(ptToPx(metrics.axisTitlePadPt)),
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
@@ -1318,7 +1323,7 @@ export function buildLayout(args: {
     tickangle: overrides.xTickAngle ?? 0,
     minor: {
       ...commonAxis.minor,
-      tickcolor: isDoubleY ? leftYColor : commonAxis.minor.tickcolor,
+      tickcolor: commonAxis.minor.tickcolor,
       dtick:
         !xIsCategorical &&
         overrides.minorTicks &&
@@ -1349,7 +1354,7 @@ export function buildLayout(args: {
     },
     title: {
       text: resolvedYTitle,
-      standoff: Math.round(mmToPx(0.7)),
+      standoff: Math.round(ptToPx(metrics.axisTitlePadPt)),
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
@@ -1401,7 +1406,7 @@ export function buildLayout(args: {
       },
       title: {
         text: resolvedRightYTitle,
-        standoff: Math.round(mmToPx(0.7)),
+        standoff: Math.round(ptToPx(metrics.axisTitlePadPt)),
         font: {
           family: fontFamily,
           size: axisTitleSizePx,
