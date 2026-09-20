@@ -177,7 +177,8 @@ function baseXYTrace(
           ? Math.max(0.65, lineWidthPt * 0.9)
           : lineWidthPt
       ),
-      dash: override.lineStyle ?? (isFit ? "dash" : "solid")
+      dash: override.lineStyle ?? (isFit ? "dash" : "solid"),
+      simplify: false
     },
     marker: {
       color: override.markerHollow
@@ -197,7 +198,7 @@ function baseXYTrace(
               ? 0.8
               : modeDefault === "markers"
               ? 0
-              : 0.55)
+              : 0.45)
         )
       }
     },
