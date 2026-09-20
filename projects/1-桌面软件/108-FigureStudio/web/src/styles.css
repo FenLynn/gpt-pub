@@ -739,6 +739,19 @@ button:disabled {
   display: block;
 }
 
+/* Publication preview: favor precise SVG geometry over browser speed hints. */
+.plot-host svg {
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+}
+
+.plot-host .scatterlayer path.js-line,
+.plot-host .contourlayer path,
+.plot-host .barlayer path {
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+}
+
 .empty-document,
 .empty-inspector {
   display: grid;
