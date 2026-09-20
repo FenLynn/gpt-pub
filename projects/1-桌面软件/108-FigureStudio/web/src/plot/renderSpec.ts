@@ -1004,7 +1004,7 @@ export function buildLayout(args: {
     minor: {
       ticks: overrides.minorTicks ? tickDirection : "",
       ticklen: overrides.minorTicks ? ptToPx(minorTickLengthPt) : 0,
-      tickwidth: axisWidthPx * 0.85,
+      tickwidth: axisWidthPx * 0.75,
       tickcolor: "#202328",
       showgrid: false
     }
