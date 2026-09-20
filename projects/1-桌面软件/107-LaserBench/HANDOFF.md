@@ -10,7 +10,7 @@ p107-stable
 main
 ```
 
-当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 为 **v0.5.2 Industrial Detail Audit** 开发候选，建立在 v0.5.1 Channel Workstation 与 v0.5.0 Real Hardware Data Plane 之上，尚未提升 stable。
+当前稳定候选基线：**v0.4.10 Maintenance Baseline**。当前 `p107-exp` 为 **v0.5.3 v0.5.1 Visual Restore / Top Acquisition Icons Only** 开发候选，建立在 v0.5.1 Channel Workstation 与 v0.5.0 Real Hardware Data Plane 之上，尚未提升 stable。
 
 v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/Settings、Portable 安全保存、截图录像和 Windows GUI smoke。v0.4.10 不增加实验功能，主要把 v0.3/v0.4 演进后遗留的规则、依赖和状态记录重新对齐，并修正 Scope 配置一致性。
 
@@ -36,7 +36,7 @@ v0.4.x 已完成 Vue/WebView2 工作台、Simulator、统一采集状态、Data/
 - v0.5.0 已将 `InstrumentProviderFactory` 切到 `HybridInstrumentProvider`：Juno=USB/COM STA worker，AQ6370D=TCP/SCPI worker，BeamSquared=net48 Automation bridge，MSO44=raw TCP/SCPI worker。本模块真实接口关闭时才使用 Simulator；启用真实接口但尚未 ready 时绝不伪装为 Simulator 数据。`DataPlaneReady=true` 只能由后台 worker 在成功读取真实样本后产生。
 - v0.5.0 最终 UI/Driver 边界按“看得见的控件必须真有效”收口：AQ6370D 面板不再暴露无官方命令依据的 VBW / 未映射峰值阈值，本地平滑明确标注为本地处理；波长偏移在真机模式通过官方 WAVELENGTH:SHIFT 下发、Simulator 才本地模拟；BeamSquared 真机模式锁定 Z/Att/自动浏览和 Simulator M² 参数，只保留结果读取与 X/Y 显示开关，防止把未实现的机械/分析控制伪装成已接通。
 - v0.5.1 对生产 Web UI 做统一工业设计收口：PlotCanvas 的 major tick/grid 共源、时间轴避免重复分钟标签、轴端数字支持直接输入；Dashboard metric 数字/单位 baseline 统一，Spectrum 补齐 nm/dBm 单位；当前实验文件夹名以内嵌无框文本显示。模块静态图标用绿/黄/灰/红表达健康状态，顶栏采集选择改蓝青色。
-- v0.5.2 做第二轮工业细节审计：顶栏四个采集选择器完全无框、无底、无角标，Power 动画柱改窄且无描边；Dashboard graph-overlay 从浮动卡片改成 34 px 壳体内嵌标题行；统一 1 px 边线、2 px 级小圆角、30 px 控件高度，右栏折叠柄与 Big Readout 控件重新锁定中心线；Plot focused gutter 从 68/52 收至 64/48 并限制 Legend 溢出。
+- v0.5.3 按用户实机视觉反馈撤销 v0.5.2 的广泛 UI restyle：Dashboard、独立页、右栏、PlotCanvas、文字和分隔线全部恢复 v0.5.1 视觉。唯一保留的新视觉是顶栏四个蓝色采集动态图标无框嵌入，以及 Power 四条 2.7 px 窄柱；Driver / AppConfig / 通道功能保持 v0.5.1/v0.5.0 当前实现。
 - Power 顶部 power/math 通道矩阵和 Scope 顶部 CH1/CH2 现在都是真正的右栏上下文入口；Power 显示单位/范围按通道持久化，Scope CH1/CH2 的 V/div、Offset、Coupling 分别持久化并由 MSO44 Driver 分别下发。Beam 独立页增加不伪造真机状态的 Frame Quality 条。
 
 ## 当前产品不变量

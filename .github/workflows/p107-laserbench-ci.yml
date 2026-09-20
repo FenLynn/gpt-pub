@@ -90,21 +90,14 @@ jobs:
           }
           if($app -notmatch 'class="bar b1" x="3\.0" y="10" width="2\.7"' -or
              $app -notmatch 'class="bar b4" x="18\.3" y="8" width="2\.7"'){
-            throw 'Power acquisition bars are not using the thin non-overlapping geometry.'
+            throw 'Power acquisition icon bars must stay thin and separated.'
           }
-          $polishIndex=$css.IndexOf('/* v0.5.2 — industrial detail audit')
-          if($polishIndex -lt 0){ throw 'v0.5.2 industrial detail audit CSS block is missing.' }
-          $polish=$css.Substring($polishIndex)
-          foreach($needle in @(
-            '.topbar .module-toggle.active::after{display:none',
-            '.topbar .module-toggle.active{',
-            'background:transparent!important',
-            '.dashboard-grid:not(.focus-mode) .graph-overlay{',
-            'position:static!important',
-            '.graph-overlay .panel-mark.selected.state-error',
-            '.module-pane-collapse{'
-          )){
-            if($polish -notlike "*$needle*"){ throw "Industrial polish contract missing: $needle" }
+          if($css -like '*v0.5.2 — industrial detail audit*'){
+            throw 'Rejected v0.5.2 broad UI restyling is still present.'
+          }
+          if($css -notlike '*v0.5.3 — user-directed rollback: ONLY refine the four top acquisition icons.*' -or
+             $css -notmatch '\.topbar \.module-toggle\.active::after\{[\s\S]*?display:none'){
+            throw 'Top acquisition icon-only polish contract is missing.'
           }
 
       - name: Verify workstation UI contract
@@ -135,8 +128,6 @@ jobs:
             'activeScopeVoltsDiv',
             'scopeCh1VoltsDiv',
             'beam-frame-quality',
-            ':aria-pressed="snapshot.captureSelection.power"',
-            ':aria-pressed="snapshot.captureSelection.scope"',
             '波长范围',
             'M² 分析',
             '触发 / 采集',

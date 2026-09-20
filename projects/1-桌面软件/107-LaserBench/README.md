@@ -2,7 +2,7 @@
 
 LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与实验数据整理桌面软件。
 
-当前开发版本为 **v0.5.2（p107-exp）**，稳定候选仍为 v0.4.10。v0.5.2 在 v0.5.1 功能结构不变的前提下进行完整工业 UI 细节审计：顶栏采集图标取消按钮框与勾选角标，Power 四条动画柱改为窄条并去除描边；Dashboard 标题区改为壳体内嵌结构；顶栏、Dashboard、独立页右栏、通道入口、折叠按钮、Big Readout 与 Plot 的字体、边距和边线重新统一。真实硬件仍必须经过目标 Windows + 实机验证后才能提升 stable。
+当前开发版本为 **v0.5.3（p107-exp）**，稳定候选仍为 v0.4.10。v0.5.3 明确撤回 v0.5.2 对 Dashboard 分隔线、文字尺度、子页布局、右栏和 Plot 几何的广泛视觉重排，恢复 v0.5.1 的页面设计；本轮只保留顶栏 Power / Spectrum / Beam / Scope 四个蓝色采集动态图标的无框自然嵌入，以及 Power 四条窄柱不互遮。后台驱动、通道逻辑和数据平面不回退。真实硬件仍必须经过目标 Windows + 实机验证后才能提升 stable。
 
 ## 当前能力
 
@@ -11,16 +11,16 @@ LaserBench 是面向激光实验室的高密度多仪器观测、统一采集与
 - 启动过程写入 `logs/startup.log`，未处理异常写入 `logs/crash.log`，支持 `LaserBench.App.exe --safe`。
 - 内置 Power、Spectrum、Beam、Scope 四类 Simulator，无真实硬件也可完整验证 Dashboard、Test、保存、截图和录像链路。
 - Dashboard 使用原生 Windows 标题栏、极窄顶栏和窄折叠导航；四象限中图占绝对主体。模块标题行与壳体同底色并稍微放宽高度，刻度字号提高一级，避免下半区过度拥挤。
-- Dashboard 壳体统一冷深蓝灰；**只有真实 Plot / 图像绘图区使用白底**，模块容器、标题区和页面底板不使用白色卡片。v0.5.2 进一步取消 Dashboard 顶部信息条的浮动卡片边框、阴影和 blur，改为 34 px 内嵌壳体标题行，四象限之间只保留单像素结构线。
+- Dashboard 壳体统一冷深蓝灰；**只有真实 Plot / 图像绘图区使用白底**，模块容器、标题区和页面底板不再使用白色卡片。
 - Beam 光斑视图去掉色条/比例尺，支持滚轮缩放、左键拖动、双击复位；左边界和上下边界与相邻 Plot 数据区对齐。
-- 顶部四个采集选择图标使用内联 SVG + CSS 动画，并用蓝青色表示“本次采集选中”。v0.5.2 将四个选择器改为完全无框、无背景、无勾选角标的自然嵌入图标，仅用颜色变化表达选择状态；Power 四条动画柱改为 2.7 px 窄条、无描边，避免相邻柱视觉粘连。模块左上角静态图标继续只表示运行健康状态：绿色正常、黄色连接/警告、灰色离线、红色错误。
+- 顶部四个采集选择图标使用内联 SVG + CSS 动画，并用蓝青色表示“本次采集选中”。v0.5.3 只对这里做视觉改动：四个图标无边框、无背景、无角落 ✓，自然嵌入顶栏；Power 四条动画柱缩为 2.7 px 并去除 stroke，避免互相粘连。Dashboard 与各子页其余布局、文字和分隔视觉回到 v0.5.1。模块左上角静态图标继续表示运行健康状态：绿色正常、黄色连接/警告、灰色离线、红色错误。
 - 所有绘图内部网格为虚线；major tick 与 grid line 由同一组坐标值生成，不再出现网格与刻度错位。时间轴按显示跨度自动选择 ≥10 s 的合理间隔，小于 10 s 时只保留一个时间标签，避免同一分钟出现重复 HH:mm。独立页轴端数字可点击直接输入范围，Power 纵轴还可在轴旁直接切换 kW/W/mW；Dashboard 仍不常显 X/Y 轴标题。
 - Power 独立页把 power1–power4 / math1–math4 组织成顶部 4×2 通道矩阵；点击通道即切换右栏上下文。每个现有 Power 通道可独立设置显示名称、kW/W/mW 显示单位与纵轴范围，Math 通道可自定义显示单位；移动平均、Offset、Scale、Normalize、Power density、Zero、当前值归一化和 Pass/Fail 继续保留。Dashboard 共用物理功率 Y 轴始终保持 provider canonical kW，避免不同通道选择 W/mW 后破坏共享曲线比例；单位切换只作用于读数与 Power 独立页显示轴。Dashboard 显示选择与 Test 采集选择严格分离，数学通道继续使用独立右轴。
 - Spectrum 独立页保留 Center/Span、RBW、Sensitivity、Average、Sweep、采样点数、Trace mode、空气/真空基准等已经有 AQ6370D 命令映射的采集参数；本地平滑、参考光谱和峰值标记被明确归入 LaserBench 本地显示处理；波长偏移则在 AQ6370D 真机模式下通过官方 `:SENSE:CORRECTION:WAVELENGTH:SHIFT` 下发，Simulator 才本地模拟，避免重复偏移。v0.4.27 曾加入但没有 AQ6370D 官方命令依据的 VBW 与未映射峰值阈值已从当前操作面板移除，避免“能改 UI、不能改仪器”的假控制。
 - Beam 独立页左侧在正方形 2D 光斑上方增加低高度 Frame Quality 条，Simulator 可给出过亮/正常/偏暗提示；真实 BeamSquared 尚未映射厂商 frame-quality API 时只显示中性“等待映射”，不伪造真机质量。左/右工作区按共同上下基线重新约束；Simulator 下仍保留 Z / 播放 / Attenuation 以及 D4σ/FWHM、outlier 等实验工作流。**真实 BeamSquared 接口启用后，这些尚未映射/可能引发机械运动的控制会自动锁定**；v0.5.0 的 bridge 只读取 RunStatus、BeamWidth 与 M²，Run / rail / Ultracal 和厂商分析算法继续由 BeamSquared 管理。X/Y 曲线显示属于 LaserBench 本地显示控制。
 - Scope Dashboard 与独立页保持 **FFT 在上、时域在下**；独立页 CH1/CH2 改为顶部可点击通道入口，右栏随当前通道切换显示名称、显示开关、独立 Volts/div、Offset、Coupling。MSO44 真机 Driver 同样分别下发 CH1/CH2 SCALE/OFFSET/COUPLING；触发与 Acquisition 参数仍为公共设置。
 - Dashboard 关键结果可点击进入 **Big Readout**，不同指标允许同时弹出多个读数窗；同一指标只保留一个实例并可再次点击提到最前。每个窗独立拖动、等比例缩放和黑/白显示；左上状态/名称常显，右上控制与右下缩放手柄默认隐藏，hover 时才显示。**Big Readout 只在 Dashboard 显示，切到任何独立模块页时全部隐藏，返回 Dashboard 后恢复。**
-- 四个模块可从侧栏进入独立工作页；标题图标/名称/关键读数合并在工作站标题区，右侧参数面板可折叠并拆为“设置 / 结果”。v0.5.2 把右栏输入框、Select、Tab、折叠柄和结果行统一为平面 1 px 结构线和 30 px 控件高度，去除多余阴影与圆角；Plot 独立页 gutter 再次收紧，轴标题、刻度和 Legend 采用统一字号。Beam 光斑视窗保持正方形并与 caustic 图上下边框对齐。Power 独立页下方范围条继续与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
+- 四个模块可从侧栏进入独立工作页；v0.4.26 将标题图标/名称/关键读数合并成更高的工作站标题区，右侧参数面板可折叠，并拆为“设置 / 结果”两个页签。设置参数使用中文，结果页同时列出测量结果、当前测试参数和接口状态。独立页坐标刻度、轴标题与 Legend 放大，坐标 gutter 与壳体同色，只有真实 Plot 矩形白底；Beam 光斑视窗保持正方形并与 caustic 图上下边框对齐。Power 独立页下方范围条继续与 Dashboard 复用同一对左右手柄与同一显示窗口状态。旧 WinForms 的拖出浮窗/拖回嵌入交互尚未在 Web UI 生产版恢复。
 - 顶栏实验工作流为“文件夹 → 当前目录名 → Label → Power / Spectrum / Beam / Scope 采集源 → Run”。文件夹图标使用暖橙棕色，右侧无边框文本只显示最后一级目录名（根目录时显示盘符/根名），仍只有文件夹图标可打开 Windows 原生 FolderBrowserDialog。Dashboard 数值 chip 使用对称上下 padding，数字与单位严格按文字 baseline 对齐。
 - v0.5.0 将真实仪器从“控制层骨架”推进到**实际通信数据平面**。Power 使用 Ophir StarLab 安装的 `OphirLMMeasurement.CoLMMeasurement` COM（STA thread：ScanUSB → OpenUSBDevice → StartStream → GetData）；Spectrum 直接通过 AQ6370D Ethernet socket/SCPI（10001、LAN authentication、TRA X/Y）；Scope 直接通过 MSO44 raw TCP/SCPI（4000、WFMOutpre/CURVe?）读取真实时域并在 LaserBench 本地 FFT；BeamSquared 因官方 Automation 依赖 .NET Framework/.NET Remoting，使用独立 net48 `LaserBench.BeamSquaredBridge.exe` 与 .NET 8 主进程隔离。
 - 四个模块采用**独立混合数据平面**：某模块真实接口关闭时才使用该模块 Simulator；一旦用户启用真实接口，在实际设备 ready 前该模块不会静默回退 Simulator。Power 真机可与 Spectrum Simulator 同时运行，反之亦然。
