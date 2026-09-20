@@ -244,6 +244,12 @@ plt.rcParams.update({
     "lines.antialiased": True,
     "patch.antialiased": True,
     "path.simplify": False,
+    "grid.color": "#dde1e4",
+    "grid.linewidth": 0.4,
+    "grid.alpha": 1.0,
+    "axes3d.xaxis.panecolor": (0.97, 0.97, 0.97, 0.65),
+    "axes3d.yaxis.panecolor": (0.97, 0.97, 0.97, 0.65),
+    "axes3d.zaxis.panecolor": (0.97, 0.97, 0.97, 0.65),
     "mathtext.fontset": "stix" if preferred_font == "Times New Roman" else "dejavusans",
     "svg.fonttype": "none",
     "pdf.fonttype": 42,
@@ -588,6 +594,14 @@ if template == "surface-3d":
     )
     if O.get("colorbarVisible", True):
         cb = fig.colorbar(surf, ax=ax, shrink=0.66, pad=0.10)
+        cb.outline.set_linewidth(0)
+        cb.ax.tick_params(
+            direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
+            width=axis_width * 0.75,
+            length=PRESET["minorTickLengthPt"],
+            colors=O.get("tickLabelColor", "#17191c"),
+            labelsize=O.get("tickLabelSizePt", font_size * 0.96),
+        )
         if O.get("colorbarTitle"):
             cb.set_label(O["colorbarTitle"])
     ax.set_box_aspect((4, 4, 3))
@@ -692,6 +706,14 @@ elif template in ("heatmap", "contour"):
 
     if O.get("colorbarVisible", True) and artist is not None:
         cb = fig.colorbar(artist, ax=ax)
+        cb.outline.set_linewidth(0)
+        cb.ax.tick_params(
+            direction="in" if O.get("tickDirection", "inside") == "inside" else "out",
+            width=axis_width * 0.75,
+            length=PRESET["minorTickLengthPt"],
+            colors=O.get("tickLabelColor", "#17191c"),
+            labelsize=O.get("tickLabelSizePt", font_size * 0.96),
+        )
         if O.get("colorbarTitle"):
             cb.set_label(O["colorbarTitle"])
     finish_2d_axes(ax)
