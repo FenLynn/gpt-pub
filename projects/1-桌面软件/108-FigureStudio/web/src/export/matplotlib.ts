@@ -809,6 +809,21 @@ else:
             )
             linestyle = mpl_linestyle(line_style_value) if line_visible else "None"
             marker = mpl_marker(style.get("markerSymbol", "circle")) if marker_visible else None
+            automatic_marker_cap = (
+                22
+                if O.get("publicationMode", "single") == "quad-panel"
+                else 28
+            ) if marker_visible and line_visible and template not in ("xy-scatter", "xy-errorbar") else 0
+            marker_max_displayed = int(
+                style.get("markerMaxDisplayed", automatic_marker_cap)
+            )
+            markevery = (
+                max(1, int(math.ceil(len(y) / marker_max_displayed)))
+                if marker is not None
+                and marker_max_displayed > 0
+                and len(y) > marker_max_displayed
+                else None
+            )
             default_line_width = float(PRESET["lineWidthPt"])
             line_width = float(
                 style["lineWidthPt"]
@@ -826,6 +841,7 @@ else:
                 linestyle=linestyle,
                 marker=marker,
                 markersize=float(style.get("markerSizePt", PRESET["markerSizePt"])),
+                markevery=markevery,
                 markeredgecolor=color,
                 markeredgewidth=0.0 if template in ("xy-scatter", "xy-errorbar") else 0.55,
             )
