@@ -25,28 +25,7 @@ def slab_rt(
     gap_um: np.ndarray | float,
     polarization: str,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Power transmittance and reflectance of high/gap/high dielectric stack.
-
-    Parameters
-    ----------
-    n_high:
-        Real refractive index of identical incident and exit half spaces.
-    n_gap:
-        Real refractive index of the lossless gap layer.
-    wavelength_um:
-        Vacuum wavelength in micrometres.
-    theta_rad:
-        Incidence angle(s) in the high-index medium, measured from normal.
-    gap_um:
-        Gap thickness in micrometres.
-    polarization:
-        "TE" or "TM".
-
-    Returns
-    -------
-    T, R:
-        Arrays of power transmittance and reflectance.
-    """
+    """Power transmittance and reflectance of high/gap/high dielectric stack."""
     gap = np.asarray(gap_um, dtype=float)
     if n_high <= 0 or n_gap <= 0 or wavelength_um <= 0 or np.any(gap < 0):
         raise ValueError("indices/wavelength must be positive and gap non-negative")
@@ -63,14 +42,13 @@ def slab_rt(
     cos0 = np.cos(theta).astype(complex)
     sin_gap = (n_high / n_gap) * sin0
     cos_gap = _positive_branch_cosine(1.0 - sin_gap**2)
-    cos_exit = cos0  # symmetric high-index output medium
+    cos_exit = cos0
 
     if pol == "TE":
         q0 = n_high * cos0
         q1 = n_gap * cos_gap
         q2 = n_high * cos_exit
     else:
-        # Tangential-field optical admittance for TM polarization.
         q0 = n_high / cos0
         q1 = n_gap / cos_gap
         q2 = n_high / cos_exit
@@ -88,8 +66,6 @@ def slab_rt(
     t = 2.0 * q0 / denominator
     r = (q0 * m11 + q0 * q2 * m12 - m21 - q2 * m22) / denominator
 
-    # Incident and exit media are identical and lossless, hence the admittance
-    # ratio is unity. Keep the general real-admittance ratio for clarity.
     T = (np.real(q2) / np.real(q0)) * np.abs(t) ** 2
     R = np.abs(r) ** 2
     return np.real_if_close(T).astype(float), np.real_if_close(R).astype(float)
@@ -101,6 +77,29 @@ def critical_angle_rad(n_high: float, n_gap: float) -> float:
     return float(np.arcsin(n_gap / n_high))
 
 
+def repeated_encounter_rate_factor_from_reflectance(
+    reflectance: np.ndarray | float,
+) -> np.ndarray:
+    """Dimensionless exact leakage-rate factor for repeated identical encounters.
+
+    If each encounter leaves a fraction R in the original guide and encounters
+    occur at rate nu_hit per unit axial length, then
+
+        P(z) = P(0) * R**(nu_hit*z)
+             = P(0) * exp[-nu_hit * (-ln R) * z],
+
+    hence k_ray = nu_hit * g with g = -ln(R).
+
+    This is exact for a repeated identical ray encounter. The weak-transfer
+    approximation g ~= T follows from R = 1-T and -ln(1-T) ~= T.
+    """
+    r = np.asarray(reflectance, dtype=float)
+    if np.any(r <= 0.0) or np.any(r > 1.0 + 1e-12):
+        raise ValueError("reflectance must satisfy 0 < R <= 1")
+    r = np.minimum(r, 1.0)
+    return -np.log(r)
+
+
 def logistic_normalized(gap_um: np.ndarray | float, center_um: float, scale_um: float):
     """Normalized logistic coupling used as the comparison target."""
     w = np.asarray(gap_um, dtype=float)
@@ -108,25 +107,20 @@ def logistic_normalized(gap_um: np.ndarray | float, center_um: float, scale_um: 
 
 
 def logarithmic_sensitivity(
-    t_minus: np.ndarray,
-    t_plus: np.ndarray,
+    value_minus: np.ndarray,
+    value_plus: np.ndarray,
     total_gap_change_um: float,
 ) -> np.ndarray:
-    """Average |Delta ln(T)| / Delta w across a finite gap interval."""
+    """Average |Delta ln(value)| / Delta w across a finite gap interval."""
     if total_gap_change_um <= 0:
         raise ValueError("total_gap_change_um must be positive")
-    if np.any(t_minus <= 0) or np.any(t_plus <= 0):
-        raise ValueError("transmittance must be positive")
-    return np.abs(np.log(t_plus / t_minus)) / total_gap_change_um
+    if np.any(value_minus <= 0) or np.any(value_plus <= 0):
+        raise ValueError("values must be positive")
+    return np.abs(np.log(value_plus / value_minus)) / total_gap_change_um
 
 
 def logistic_target_sensitivity(scale_um: float) -> float:
-    """Sensitivity from center-scale to center+scale of a logistic curve.
-
-    k(center-scale) / k0 = e/(1+e)
-    k(center+scale) / k0 = 1/(1+e)
-    so |Delta ln k| = 1 across total width 2*scale.
-    """
+    """Sensitivity from center-scale to center+scale of a logistic curve."""
     if scale_um <= 0:
         raise ValueError("scale_um must be positive")
     return 1.0 / (2.0 * scale_um)

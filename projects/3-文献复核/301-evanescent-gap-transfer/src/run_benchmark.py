@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the public planar-FTIR sensitivity benchmark."""
+"""Run exact planar-FTIR and repeated-encounter sensitivity benchmarks."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from ftir import (
     logarithmic_sensitivity,
     logistic_normalized,
     logistic_target_sensitivity,
+    repeated_encounter_rate_factor_from_reflectance,
     slab_rt,
 )
 
@@ -33,7 +34,19 @@ def angle_grid(n_high: float, n_gap: float, max_deg: float, points: int) -> np.n
     return np.linspace(theta_c + 1e-8, theta_max, points)
 
 
-def nominal_scan(cfg: dict) -> list[dict]:
+def metric_values(
+    transmission: np.ndarray,
+    reflectance: np.ndarray,
+    metric: str,
+) -> np.ndarray:
+    if metric == "transmission":
+        return transmission
+    if metric == "encounter_rate_factor":
+        return repeated_encounter_rate_factor_from_reflectance(reflectance)
+    raise ValueError(f"unknown metric: {metric}")
+
+
+def nominal_scan(cfg: dict, metric: str) -> list[dict]:
     nh = float(cfg["n_high"])
     lam = float(cfg["wavelength_um"])
     wc = float(cfg["gap_center_um"])
@@ -44,19 +57,24 @@ def nominal_scan(cfg: dict) -> list[dict]:
     for ng in cfg["n_gap_values"]:
         theta = angle_grid(nh, float(ng), cfg["theta_max_deg"], cfg["theta_points"])
         for pol in ("TE", "TM"):
-            tm, _ = slab_rt(nh, ng, lam, theta, wc - s, pol)
-            tc, _ = slab_rt(nh, ng, lam, theta, wc, pol)
-            tp, _ = slab_rt(nh, ng, lam, theta, wc + s, pol)
-            sensitivity = logarithmic_sensitivity(tm, tp, total)
+            tm, rm = slab_rt(nh, ng, lam, theta, wc - s, pol)
+            tc, rc = slab_rt(nh, ng, lam, theta, wc, pol)
+            tp, rp = slab_rt(nh, ng, lam, theta, wc + s, pol)
+
+            vm = metric_values(tm, rm, metric)
+            vc = metric_values(tc, rc, metric)
+            vp = metric_values(tp, rp, metric)
+            sensitivity = logarithmic_sensitivity(vm, vp, total)
 
             for cutoff in cfg["transmission_cutoffs"]:
-                mask = tc >= float(cutoff)
+                mask = (tc >= float(cutoff)) & np.isfinite(sensitivity)
                 if not np.any(mask):
                     continue
                 eligible = np.flatnonzero(mask)
                 i = eligible[np.argmax(sensitivity[mask])]
                 rows.append(
                     {
+                        "metric": metric,
                         "n_high": nh,
                         "n_gap": float(ng),
                         "polarization": pol,
@@ -64,43 +82,43 @@ def nominal_scan(cfg: dict) -> list[dict]:
                         "max_log_sensitivity_per_um": float(sensitivity[i]),
                         "angle_deg": float(np.rad2deg(theta[i])),
                         "T_mid": float(tc[i]),
-                        "T_plus_over_T_minus": float(tp[i] / tm[i]),
+                        "R_mid": float(rc[i]),
+                        "value_mid": float(vc[i]),
+                        "value_plus_over_value_minus": float(vp[i] / vm[i]),
                     }
                 )
     return rows
 
 
-def broad_stress_scan(cfg: dict) -> dict:
+def broad_stress_scan(cfg: dict, metric: str) -> dict:
     b = cfg["broad_scan"]
     lam = float(cfg["wavelength_um"])
     wc = float(cfg["gap_center_um"])
     s = float(cfg["gap_half_width_um"])
     total = 2.0 * s
 
-    best = {
-        "max_log_sensitivity_per_um": -np.inf,
-        "n_high": None,
-        "n_gap": None,
-        "polarization": None,
-        "angle_deg": None,
-        "T_minus": None,
-        "T_mid": None,
-        "T_plus": None,
-        "T_plus_over_T_minus": None,
-    }
+    best = {"max_log_sensitivity_per_um": -np.inf}
 
     for nh in np.linspace(b["n_high_min"], b["n_high_max"], b["n_high_points"]):
         gap_max = nh - float(b["n_gap_offset_max"])
         for ng in np.linspace(b["n_gap_min"], gap_max, b["n_gap_points"]):
             theta = angle_grid(float(nh), float(ng), cfg["theta_max_deg"], b["theta_points"])
             for pol in ("TE", "TM"):
-                tm, _ = slab_rt(nh, ng, lam, theta, wc - s, pol)
-                tc, _ = slab_rt(nh, ng, lam, theta, wc, pol)
-                tp, _ = slab_rt(nh, ng, lam, theta, wc + s, pol)
-                sensitivity = logarithmic_sensitivity(tm, tp, total)
-                i = int(np.argmax(sensitivity))
+                tm, rm = slab_rt(nh, ng, lam, theta, wc - s, pol)
+                tc, rc = slab_rt(nh, ng, lam, theta, wc, pol)
+                tp, rp = slab_rt(nh, ng, lam, theta, wc + s, pol)
+                vm = metric_values(tm, rm, metric)
+                vc = metric_values(tc, rc, metric)
+                vp = metric_values(tp, rp, metric)
+                sensitivity = logarithmic_sensitivity(vm, vp, total)
+                finite = np.isfinite(sensitivity)
+                if not np.any(finite):
+                    continue
+                eligible = np.flatnonzero(finite)
+                i = eligible[np.argmax(sensitivity[finite])]
                 if sensitivity[i] > best["max_log_sensitivity_per_um"]:
                     best = {
+                        "metric": metric,
                         "max_log_sensitivity_per_um": float(sensitivity[i]),
                         "n_high": float(nh),
                         "n_gap": float(ng),
@@ -109,7 +127,11 @@ def broad_stress_scan(cfg: dict) -> dict:
                         "T_minus": float(tm[i]),
                         "T_mid": float(tc[i]),
                         "T_plus": float(tp[i]),
-                        "T_plus_over_T_minus": float(tp[i] / tm[i]),
+                        "R_mid": float(rc[i]),
+                        "value_minus": float(vm[i]),
+                        "value_mid": float(vc[i]),
+                        "value_plus": float(vp[i]),
+                        "value_plus_over_value_minus": float(vp[i] / vm[i]),
                     }
 
     target = logistic_target_sensitivity(s)
@@ -126,25 +148,52 @@ def write_csv(rows: list[dict], path: Path) -> None:
         writer.writerows(rows)
 
 
-def make_plots(cfg: dict, rows: list[dict], output: Path) -> None:
+def metric_summary(cfg: dict, rows: list[dict], broad: dict) -> dict:
+    target = logistic_target_sensitivity(cfg["gap_half_width_um"])
+    nominal_max = max(r["max_log_sensitivity_per_um"] for r in rows)
+    informative = max(
+        r["max_log_sensitivity_per_um"]
+        for r in rows
+        if np.isclose(r["T_mid_cutoff"], 0.1)
+    )
+    return {
+        "target_log_sensitivity_per_um": target,
+        "nominal_scan_max_log_sensitivity_per_um": nominal_max,
+        "nominal_scan_max_with_T_mid_ge_0p1_per_um": informative,
+        "target_to_nominal_max_factor": target / nominal_max,
+        "target_to_informative_max_factor": target / informative,
+        "broad_stress": broad,
+    }
+
+
+def make_plots(
+    cfg: dict,
+    transmission_rows: list[dict],
+    rate_rows: list[dict],
+    output: Path,
+) -> None:
     output.mkdir(parents=True, exist_ok=True)
     target = logistic_target_sensitivity(cfg["gap_half_width_um"])
 
-    selected = [r for r in rows if np.isclose(r["T_mid_cutoff"], 0.1)]
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
-    for pol in ("TE", "TM"):
-        pr = [r for r in selected if r["polarization"] == pol]
-        ax.plot(
-            [r["n_gap"] for r in pr],
-            [r["max_log_sensitivity_per_um"] for r in pr],
-            marker="o",
-            label=f"exact FTIR, {pol}, T(center)>=0.1",
-        )
+    for rows, label_prefix, marker in (
+        (transmission_rows, "T", "o"),
+        (rate_rows, "-ln(R)", "s"),
+    ):
+        selected = [r for r in rows if np.isclose(r["T_mid_cutoff"], 0.1)]
+        for pol in ("TE", "TM"):
+            pr = [r for r in selected if r["polarization"] == pol]
+            ax.plot(
+                [r["n_gap"] for r in pr],
+                [r["max_log_sensitivity_per_um"] for r in pr],
+                marker=marker,
+                label=f"{label_prefix}, {pol}, T(center)>=0.1",
+            )
     ax.axhline(target, linestyle="--", label=f"3.2 nm target = {target:.1f} /um")
     ax.set_xlabel("gap refractive index")
-    ax.set_ylabel("max average |Delta ln T| / Delta w (1/um)")
-    ax.set_title("Planar FTIR sensitivity versus nanometre-scale target")
-    ax.legend()
+    ax.set_ylabel("max average logarithmic sensitivity (1/um)")
+    ax.set_title("Planar FTIR local and repeated-encounter rate sensitivity")
+    ax.legend(fontsize=8)
     ax.grid(True, alpha=0.25)
     fig.tight_layout()
     fig.savefig(output / "max_sensitivity.svg")
@@ -166,7 +215,12 @@ def make_plots(cfg: dict, rows: list[dict], output: Path) -> None:
 
     logistic = logistic_normalized(gaps, wc, scale)
     logistic0 = logistic_normalized(wc, wc, scale)
-    ax.plot((gaps - wc) * 1000.0, logistic / logistic0, linestyle="--", label="reference logistic / center")
+    ax.plot(
+        (gaps - wc) * 1000.0,
+        logistic / logistic0,
+        linestyle="--",
+        label="reference logistic / center",
+    )
     ax.set_xlabel("gap offset from center (nm)")
     ax.set_ylabel("normalized response")
     ax.set_title("Local gap response: exact FTIR versus reference logistic")
@@ -190,33 +244,23 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=True)
 
     cfg = load_config(args.config)
-    rows = nominal_scan(cfg)
-    broad = broad_stress_scan(cfg)
 
-    write_csv(rows, output / "nominal_scan.csv")
-    (output / "broad_stress.json").write_text(
-        json.dumps(broad, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    t_rows = nominal_scan(cfg, "transmission")
+    g_rows = nominal_scan(cfg, "encounter_rate_factor")
+    t_broad = broad_stress_scan(cfg, "transmission")
+    g_broad = broad_stress_scan(cfg, "encounter_rate_factor")
 
-    target = logistic_target_sensitivity(cfg["gap_half_width_um"])
-    nominal_max = max(r["max_log_sensitivity_per_um"] for r in rows)
-    informative = max(
-        r["max_log_sensitivity_per_um"]
-        for r in rows
-        if np.isclose(r["T_mid_cutoff"], 0.1)
-    )
+    write_csv(t_rows, output / "nominal_transmission_scan.csv")
+    write_csv(g_rows, output / "nominal_encounter_rate_scan.csv")
+
     summary = {
-        "target_log_sensitivity_per_um": target,
-        "nominal_scan_max_log_sensitivity_per_um": nominal_max,
-        "nominal_scan_max_with_T_mid_ge_0p1_per_um": informative,
-        "target_to_nominal_max_factor": target / nominal_max,
-        "target_to_informative_max_factor": target / informative,
-        "broad_stress": broad,
+        "transmission": metric_summary(cfg, t_rows, t_broad),
+        "encounter_rate_factor": metric_summary(cfg, g_rows, g_broad),
     }
     (output / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    make_plots(cfg, rows, output)
+    make_plots(cfg, t_rows, g_rows, output)
 
     print(json.dumps(summary, indent=2, sort_keys=True))
 
