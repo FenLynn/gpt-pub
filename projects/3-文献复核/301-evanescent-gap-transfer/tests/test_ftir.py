@@ -9,6 +9,7 @@ sys.path.insert(0, str(HERE / "src"))
 from ftir import (  # noqa: E402
     critical_angle_rad,
     logistic_target_sensitivity,
+    repeated_encounter_rate_factor_from_reflectance,
     slab_rt,
 )
 
@@ -44,9 +45,6 @@ def test_reference_logistic_target():
 
 
 def test_reference_planar_ftir_is_far_below_target():
-    # This is a regression check, not a universal theorem.  At n_gap=1.38,
-    # the exact planar model is expected to be O(10)/um or lower across the
-    # 3.2 nm interval, far below the 312.5/um reference target.
     n_high = 1.45
     n_gap = 1.38
     tc = critical_angle_rad(n_high, n_gap)
@@ -58,3 +56,17 @@ def test_reference_planar_ftir_is_far_below_target():
         tp, _ = slab_rt(n_high, n_gap, 1.018, theta, w0 + s, pol)
         sensitivity = np.abs(np.log(tp / tm)) / (2 * s)
         assert np.max(sensitivity) < 10.0
+
+
+def test_repeated_encounter_rate_factor_is_exact():
+    r = np.array([0.2, 0.5, 0.9])
+    g = repeated_encounter_rate_factor_from_reflectance(r)
+    encounters = 7.25
+    assert np.allclose(np.exp(-encounters * g), r**encounters)
+
+
+def test_weak_transfer_rate_factor_reduces_to_transmission():
+    t = np.array([1e-6, 1e-5, 1e-4])
+    r = 1.0 - t
+    g = repeated_encounter_rate_factor_from_reflectance(r)
+    assert np.allclose(g, t, rtol=6e-5, atol=0.0)
