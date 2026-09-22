@@ -35,3 +35,11 @@
 ## 项目内容
 
 每个项目至少说明正式来源、复核对象、原文参数、自主假设、运行方法、结果差异和复现边界。只能保存合法获取并允许公开的资料；出版物原图和论文全文不进入仓库，复现图必须由本项目代码重新生成。
+
+## 当前项目
+
+| 编号 | 项目 | 复核对象 | 当前结论 |
+|---|---|---|---|
+| PUB-P301 | [Evanescent gap-transfer benchmark](301-evanescent-gap-transfer/) | 公开 logistic gap-sensitivity 与 exact planar Maxwell/FTIR 对照 | 部分复现 |
+
+下一个未占用编号：`PUB-P302`。
