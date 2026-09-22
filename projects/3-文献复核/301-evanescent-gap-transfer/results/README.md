@@ -1,45 +1,65 @@
 # Benchmark results
 
-## Evidence
+## Latest evidence
 
-- GitHub Actions run: https://github.com/FenLynn/gpt-pub/actions/runs/35757458900
-- validated head: `8f86d8f13b2c773746ec40a026ff7f1ae98f2bd2`
-- tests: **5 passed**
-- Artifact: `p301-gap-transfer-results`, ID `10707953306`
-- Artifact SHA-256: `28bc49cb277ee8e3e4b7f04c59f70a1536d58989e87d5a93c62bbdab6f1ef2f6`
+- GitHub Actions run: https://github.com/FenLynn/gpt-pub/actions/runs/35758669720
+- validated head: `fb8c9d84470b9c9e9b5ad02264390afd3ca09a2a`
+- tests: **7 passed**
+- Artifact: `p301-gap-transfer-results`
+- Artifact ID: `10709190547`
+- Artifact SHA-256: `4088249f33a5ecac73325c3e6c0f89f6e34a5714bb9410d0a8d805f661df64e0`
 
-## Result
+## Reference target
 
-The reference 3.2 nm transition requires
+The public logistic model requires
 
-[
-S_{mathrm{target}}=312.5~mumathrm{m}^{-1}.
-]
+```math
+S_{target}=312.5~\mu\mathrm{m}^{-1}
+```
 
-For the declared nominal dielectric-index scan, the exact planar Maxwell model gives a maximum finite-interval logarithmic sensitivity of
+over the 3.2 nm reference interval.
 
-[
-S_{mathrm{FTIR,max}}=8.4161~mumathrm{m}^{-1},
-]
+## A. Local transmission
 
-so the target is **37.13× larger**. Restricting the comparison to points with center-gap transmission (T_{mathrm{mid}}ge 0.1) gives
+Declared nominal scan:
 
-[
-S_{mathrm{FTIR,max},Tge0.1}=7.4222~mumathrm{m}^{-1},
-]
+- maximum \(|\Delta\ln T|/\Delta w\): **8.4161104 µm⁻¹**;
+- maximum with \(T_{mid}\ge0.1\): **7.4222386 µm⁻¹**;
+- target / nominal max: **37.131×**;
+- target / strong-transfer max: **42.103×**.
 
-or a **42.10×** gap to the target.
+Broad stress scan:
 
-The deliberately broad stress scan reaches
+- maximum: **13.4008477 µm⁻¹**;
+- target / broad maximum: **23.319×**;
+- location: \(n_h=1.46\), \(n_g=1.00\), TM, 89.9°;
+- \(T_{mid}=2.0951\times10^{-7}\).
 
-[
-13.4008~mumathrm{m}^{-1},
-]
+## B. Exact repeated-encounter leakage rate
 
-still **23.32× below** the target. That maximum occurs at the deliberately extreme boundary (n_h=1.46), (n_g=1.00), TM, (89.9^circ), where center transmission is only (2.10	imes10^{-7}), so it does not represent a useful strong-transfer state.
+For repeated identical encounters,
 
-## Scope of the conclusion
+```math
+k_{ray}=\nu_{hit}[-\ln R].
+```
 
-**Partial reproduction / mechanism check:** within the declared passive, smooth, planar, fixed-contact-topology dielectric-gap model, local FTIR transmission is far too weakly dependent on a 3.2 nm gap change to reproduce the reference logistic transition.
+Because \(\nu_{hit}\) is independent of gap in this fixed-geometry subproblem, the relevant coupling-rate gap sensitivity is that of \(-\ln R\).
 
-This result does **not** claim that a complete multimode side-coupled fiber cannot exhibit a sharp effective coupling transition. The effective longitudinal coupling coefficient can additionally depend on contact geometry, encounter fraction, bending, mode/ray population and other transport physics not included in this local benchmark.
+Declared nominal scan:
+
+- maximum \(|\Delta\ln[-\ln R]|/\Delta w\): **8.4162004 µm⁻¹**;
+- maximum with \(T_{mid}\ge0.1\): **7.8274463 µm⁻¹**;
+- target / nominal max: **37.131×**;
+- target / strong-transfer max: **39.924×**.
+
+Broad stress scan:
+
+- maximum: **13.4008483 µm⁻¹**;
+- target / broad maximum: **23.319×**;
+- same extreme boundary state as the local-transmission maximum.
+
+## Interpretation
+
+Replacing the weak-transfer proxy \(T\) with the exact repeated-encounter factor \(-\ln R\) changes the relevant sensitivity only modestly in the useful-transfer region and negligibly at the broad-scan maximum. Therefore **repeated identical encounters with a fixed encounter rate do not create the missing 20–40× sensitivity**.
+
+This is a deliberately narrow result. It does not model a changing contact arc, changing encounter fraction, bending-induced geometry change, or longitudinal evolution of the ray/mode population. Those state-dependent effects remain candidate mechanisms for a sharp effective longitudinal coupling coefficient.
