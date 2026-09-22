@@ -22,7 +22,7 @@ def slab_rt(
     n_gap: float,
     wavelength_um: float,
     theta_rad: np.ndarray | float,
-    gap_um: float,
+    gap_um: np.ndarray | float,
     polarization: str,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Power transmittance and reflectance of high/gap/high dielectric stack.
@@ -47,7 +47,8 @@ def slab_rt(
     T, R:
         Arrays of power transmittance and reflectance.
     """
-    if n_high <= 0 or n_gap <= 0 or wavelength_um <= 0 or gap_um < 0:
+    gap = np.asarray(gap_um, dtype=float)
+    if n_high <= 0 or n_gap <= 0 or wavelength_um <= 0 or np.any(gap < 0):
         raise ValueError("indices/wavelength must be positive and gap non-negative")
 
     pol = polarization.upper()
@@ -74,7 +75,7 @@ def slab_rt(
         q1 = n_gap / cos_gap
         q2 = n_high / cos_exit
 
-    delta = 2.0 * np.pi * n_gap * cos_gap * gap_um / wavelength_um
+    delta = 2.0 * np.pi * n_gap * cos_gap * gap / wavelength_um
     c = np.cos(delta)
     s = np.sin(delta)
 
