@@ -1,0 +1,26 @@
+{
+  "evidence": {
+    "workflow_run": 35757458900,
+    "head_sha": "8f86d8f13b2c773746ec40a026ff7f1ae98f2bd2",
+    "artifact_id": 10707953306,
+    "artifact_sha256": "28bc49cb277ee8e3e4b7f04c59f70a1536d58989e87d5a93c62bbdab6f1ef2f6",
+    "tests": "5 passed"
+  },
+  "target_log_sensitivity_per_um": 312.5,
+  "nominal_scan_max_log_sensitivity_per_um": 8.416110416682985,
+  "nominal_scan_max_with_T_mid_ge_0p1_per_um": 7.422238596985997,
+  "target_to_nominal_max_factor": 37.13116683694422,
+  "target_to_informative_max_factor": 42.10320052590322,
+  "broad_stress": {
+    "n_high": 1.46,
+    "n_gap": 1.0,
+    "polarization": "TM",
+    "angle_deg": 89.9,
+    "T_minus": 2.1405009535020303e-7,
+    "T_mid": 2.0950846507993685e-7,
+    "T_plus": 2.050650745276392e-7,
+    "T_plus_over_T_minus": 0.9580237476284997,
+    "max_log_sensitivity_per_um": 13.400847675703087,
+    "target_to_broad_max_factor": 23.319420350295445
+  }
+}
