@@ -1,0 +1,57 @@
+name: P301 evanescent gap-transfer benchmark
+
+on:
+  push:
+    branches:
+      - p301-exp
+    paths:
+      - "projects/3-文献复核/301-evanescent-gap-transfer/**"
+      - ".github/workflows/p301-evanescent-gap-transfer.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "projects/3-文献复核/301-evanescent-gap-transfer/**"
+      - ".github/workflows/p301-evanescent-gap-transfer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: projects/3-文献复核/301-evanescent-gap-transfer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: projects/3-文献复核/301-evanescent-gap-transfer/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m pytest -q
+
+      - name: Run benchmark
+        env:
+          OUTPUT_ROOT: ${{ runner.temp }}/p301-gap-transfer-results
+        run: python src/run_benchmark.py --config config/benchmark.json
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: p301-gap-transfer-results
+          path: ${{ runner.temp }}/p301-gap-transfer-results
+          if-no-files-found: error
+          retention-days: 30
