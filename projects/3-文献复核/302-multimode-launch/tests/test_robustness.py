@@ -8,6 +8,7 @@ from src.robustness import (
     dimensionless_residual,
     launch_difference,
     occupied_phase_space_fraction,
+    nonabsorbing_apparent_coupling,
     selectivity_boundary,
     small_signal_cladding_absorption,
 )
@@ -100,3 +101,12 @@ def test_strong_mixing_suppresses_launch_difference():
         - dimensionless_residual(1.0, mixing_depth=40.0, **args)
     )
     assert strong < 0.08 * weak
+
+
+def test_nonabsorbing_apparent_coupling_is_launch_and_length_dependent():
+    full_short = nonabsorbing_apparent_coupling(1.0, 2.0, 0.2, bins=800)
+    under_short = nonabsorbing_apparent_coupling(0.84, 2.0, 0.2, bins=800)
+    full_long = nonabsorbing_apparent_coupling(1.0, 2.0, 2.0, bins=800)
+
+    assert under_short < full_short
+    assert full_long < full_short
