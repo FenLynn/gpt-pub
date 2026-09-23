@@ -173,3 +173,46 @@ def small_signal_cladding_absorption(
     if absorption_cross_section < 0.0 or dopant_density < 0.0:
         raise ValueError("material parameters must be non-negative")
     return core_ratio**2 * absorption_cross_section * dopant_density
+
+
+def nonabsorbing_passive_residual(
+    fill: float,
+    mean_coupling: float,
+    length: float,
+    bins: int = 400,
+) -> float:
+    if not (0.0 < fill <= 1.0):
+        raise ValueError("fill must lie in (0, 1]")
+    if mean_coupling < 0.0 or length < 0.0:
+        raise ValueError("mean_coupling and length must be non-negative")
+    if bins < 32:
+        raise ValueError("bins must be >= 32")
+    if length == 0.0:
+        return 1.0
+
+    dx = 1.0 / bins
+    x = (np.arange(bins, dtype=float) + 0.5) * dx
+    weight = np.asarray(impact_pdf(x, fill), dtype=float) * dx
+    weight /= weight.sum()
+    q = mean_coupling * np.asarray(collision_shape(x), dtype=float) / mean_collision_shape(1.0)
+    return float(np.sum(weight * 0.5 * (1.0 + np.exp(-2.0 * q * length))))
+
+
+def nonabsorbing_apparent_coupling(
+    fill: float,
+    mean_coupling: float,
+    length: float,
+    bins: int = 400,
+) -> float:
+    if length <= 0.0:
+        raise ValueError("length must be positive")
+    residual = nonabsorbing_passive_residual(
+        fill,
+        mean_coupling,
+        length,
+        bins=bins,
+    )
+    exchange = 2.0 * residual - 1.0
+    if not (0.0 < exchange <= 1.0):
+        raise ValueError("invalid residual for symmetric nonabsorbing inversion")
+    return float(-math.log(exchange) / (2.0 * length))
