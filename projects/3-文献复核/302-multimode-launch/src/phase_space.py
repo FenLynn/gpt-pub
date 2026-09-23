@@ -186,6 +186,29 @@ def first_crossover_length(
     return None
 
 
+def fit_apparent_coupling(
+    target_residual: float,
+    absorption: float,
+    length: float,
+    k_max: float = 1e3,
+) -> float:
+    """Fit a scalar symmetric coupling rate to one passive-guide residual value."""
+    if not (0.0 < target_residual <= 1.0):
+        raise ValueError('target_residual must lie in (0, 1]')
+    if absorption < 0.0 or length <= 0.0 or k_max <= 0.0:
+        raise ValueError('absorption must be non-negative and length, k_max positive')
+    if math.isclose(target_residual, 1.0, rel_tol=0.0, abs_tol=1e-14):
+        return 0.0
+
+    def objective(k: float) -> float:
+        return channel_residual(k, absorption, length) - target_residual
+
+    lo = 0.0
+    hi = k_max
+    if objective(hi) > 0.0:
+        raise ValueError('target residual is below the scalar model range for k_max')
+    return float(brentq(objective, lo, hi, xtol=1e-12, rtol=1e-11))
+
 @dataclass(frozen=True)
 class ScanRow:
     fill: float
