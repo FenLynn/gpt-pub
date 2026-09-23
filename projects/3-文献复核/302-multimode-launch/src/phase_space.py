@@ -8,7 +8,43 @@ from scipy.integrate import quad
 from scipy.optimize import brentq
 from scipy.special import ellipe, ellipk
 from scipy.sparse import bmat, csr_matrix, diags
-from scipy.sparse.linalg import expm_multiply
+
+
+def uniformization_action(
+    matrix,
+    vector: np.ndarray,
+    time: float = 1.0,
+    tolerance: float = 1e-13,
+    max_terms: int = 10000,
+) -> np.ndarray:
+    """Positivity-preserving exponential action for a Metzler loss generator."""
+    if time < 0.0:
+        raise ValueError("time must be non-negative")
+    vector = np.asarray(vector, dtype=float)
+    if time == 0.0:
+        return vector.copy()
+
+    matrix = csr_matrix(matrix)
+    rate = float(np.max(-matrix.diagonal()))
+    if rate <= 0.0:
+        return vector.copy()
+
+    step = diags(np.ones(matrix.shape[0]), format="csr") + matrix / rate
+    mean = rate * time
+    weight = math.exp(-mean)
+    state = vector.copy()
+    result = weight * state
+    cumulative = weight
+
+    for n in range(1, max_terms + 1):
+        if 1.0 - cumulative <= tolerance:
+            return np.asarray(result, dtype=float)
+        state = step @ state
+        weight *= mean / n
+        result += weight * state
+        cumulative += weight
+
+    raise RuntimeError("uniformization series did not converge")
 
 
 def _check_unit_interval(value: float, name: str, *, strict_zero: bool = False) -> None:
@@ -236,8 +272,7 @@ def bgk_residual_fraction(
         format='csr',
     )
     y0 = np.concatenate([initial, np.zeros(bins)])
-    scaled = block * length
-    yz = expm_multiply(scaled, y0, traceA=float(scaled.diagonal().sum()))
+    yz = uniformization_action(block, y0, time=length)
     return float(yz[:bins].sum())
 
 def nonabsorbing_floor(fill: float, core_ratio: float) -> float:
