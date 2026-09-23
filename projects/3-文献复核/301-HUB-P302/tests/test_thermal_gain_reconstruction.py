@@ -139,3 +139,37 @@ def test_out_of_range_residual_is_rejected():
         pass
     else:
         raise AssertionError("out-of-range residual must be rejected")
+
+
+
+def test_decreasing_residual_reference_is_supported():
+    temperatures = np.linspace(25.0, 125.0, 1001)
+    residual = 0.9 - 0.004 * (temperatures - 25.0)
+    absorbed = 0.5 + 0.001 * (temperatures - 25.0)
+    observed_T = np.array([35.0, 60.0, 90.0, 115.0])
+    observed_R = 0.9 - 0.004 * (observed_T - 25.0)
+    true_gain = 0.075
+    observed_A = 0.5 + 0.001 * (observed_T - 25.0)
+    powers = (observed_T - 25.0) / (true_gain * observed_A)
+
+    reconstructed = reconstruct_thermal_gain(
+        reference_temperatures=temperatures,
+        reference_residual_fraction=residual,
+        reference_absorbed_fraction=absorbed,
+        ambient_temperature=25.0,
+        input_power=powers,
+        observed_residual_fraction=observed_R,
+    )
+
+    assert np.allclose(
+        reconstructed.inferred_temperature,
+        observed_T,
+        rtol=0.0,
+        atol=2e-10,
+    )
+    assert np.allclose(
+        reconstructed.thermal_gain,
+        true_gain,
+        rtol=2e-12,
+        atol=2e-12,
+    )
