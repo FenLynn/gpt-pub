@@ -170,6 +170,61 @@ def beta_for_equal_transfer(
         raise ValueError('no finite beta below pi/2 reaches the target')
     return float(brentq(objective, lo, hi, xtol=1e-13, rtol=1e-12))
 
+
+def asymmetric_channel_passive(
+    q12: float,
+    q21: float,
+    length: float,
+) -> float:
+    """Passive-guide fraction for a nonabsorbing asymmetric two-guide channel."""
+    if q12 < 0.0 or q21 < 0.0 or length < 0.0:
+        raise ValueError("q12, q21, and length must be non-negative")
+    if length == 0.0:
+        return 1.0
+    total = q12 + q21
+    if total == 0.0:
+        return 1.0
+    plateau = q21 / total
+    return float(plateau + (1.0 - plateau) * math.exp(-total * length))
+
+
+def asymmetric_channel_active(
+    q12: float,
+    q21: float,
+    length: float,
+) -> float:
+    """Second-guide fraction for a nonabsorbing asymmetric two-guide channel."""
+    if q12 < 0.0 or q21 < 0.0 or length < 0.0:
+        raise ValueError("q12, q21, and length must be non-negative")
+    total = q12 + q21
+    if total == 0.0:
+        return 0.0
+    return float(q12 / total * (1.0 - math.exp(-total * length)))
+
+
+def asymmetric_equilibrium(q12: float, q21: float) -> tuple[float, float]:
+    """Long-distance guide fractions for a nonabsorbing asymmetric channel."""
+    if q12 < 0.0 or q21 < 0.0:
+        raise ValueError("q12 and q21 must be non-negative")
+    total = q12 + q21
+    if total == 0.0:
+        raise ValueError("at least one directional coupling rate must be positive")
+    return float(q21 / total), float(q12 / total)
+
+
+def infer_asymmetric_rates(
+    passive_plateau: float,
+    transient_rate: float,
+) -> tuple[float, float]:
+    """Recover q12 and q21 from the passive plateau and q12+q21."""
+    if not (0.0 <= passive_plateau <= 1.0):
+        raise ValueError("passive_plateau must lie in [0, 1]")
+    if transient_rate < 0.0:
+        raise ValueError("transient_rate must be non-negative")
+    q21 = passive_plateau * transient_rate
+    q12 = (1.0 - passive_plateau) * transient_rate
+    return float(q12), float(q21)
+
 def channel_residual(q: float, a: float, length: float) -> float:
     """Passive-guide residual for one incoherent channel with symmetric exchange q and active loss a."""
     if q < 0.0 or a < 0.0 or length < 0.0:
