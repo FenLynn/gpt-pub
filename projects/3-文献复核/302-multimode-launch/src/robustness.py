@@ -98,7 +98,7 @@ def dimensionless_residual(
     )
 
     y0 = np.concatenate([initial, np.zeros(bins)])
-    y1 = expm_multiply(block, y0)
+    y1 = expm_multiply(block, y0, traceA=float(block.diagonal().sum()))
     return float(y1[:bins].sum())
 
 
