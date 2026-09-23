@@ -212,6 +212,19 @@ def asymmetric_equilibrium(q12: float, q21: float) -> tuple[float, float]:
     return float(q21 / total), float(q12 / total)
 
 
+
+def reverse_equilibrium_transfer_fractions(
+    q12: float,
+    q21: float,
+) -> tuple[float, float]:
+    """Equilibrium transfer fractions for opposite launches in one fixed asymmetric device."""
+    if q12 < 0.0 or q21 < 0.0:
+        raise ValueError("q12 and q21 must be non-negative")
+    total = q12 + q21
+    if total == 0.0:
+        raise ValueError("at least one directional coupling rate must be positive")
+    return float(q12 / total), float(q21 / total)
+
 def infer_asymmetric_rates(
     passive_plateau: float,
     transient_rate: float,
