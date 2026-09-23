@@ -1,0 +1,21 @@
+{
+  "temperature_max": 220.0,
+  "temperature_points": 45,
+  "beta_max_deg": 10.0,
+  "index_ratio": 0.9,
+  "radius_optical": 100.0,
+  "gap0_optical": 0.0,
+  "gap_per_temperature": 0.001,
+  "damage_extra_gap_optical": 0.22,
+  "coupling_scale": 1500.0,
+  "thermal_gain": 80.0,
+  "absorption_length": 3.0,
+  "opening_per_temperature": 0.001,
+  "critical_free_opening": 0.08,
+  "preload_opening": [0.0, 0.02, 0.04],
+  "pump_max": 4.0,
+  "pump_points": 81,
+  "n_beta": 28,
+  "n_impact": 28,
+  "n_phi": 64
+}
