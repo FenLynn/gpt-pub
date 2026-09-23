@@ -99,3 +99,47 @@ def feedback_suppression_factor(
         raise ValueError("suppression bound requires positive semidefinite feedback")
     inverse = np.linalg.inv(np.eye(len(m)) + p * m)
     return float(np.linalg.norm(inverse, ord=2))
+
+
+
+def implicit_fixed_point_response(
+    input_power: float,
+    fixed_point_state_jacobian: np.ndarray,
+    fixed_point_power_derivative: np.ndarray,
+    residual_fraction: float,
+    residual_state_gradient: np.ndarray,
+    residual_explicit_power_derivative: float = 0.0,
+) -> DistributedResponse:
+    p = float(input_power)
+    jx = np.asarray(fixed_point_state_jacobian, dtype=float)
+    hp = np.asarray(fixed_point_power_derivative, dtype=float)
+    grad = np.asarray(residual_state_gradient, dtype=float)
+    r = float(residual_fraction)
+    rp = float(residual_explicit_power_derivative)
+
+    if p < 0.0:
+        raise ValueError("input_power must be non-negative")
+    if hp.ndim != 1 or grad.ndim != 1 or hp.shape != grad.shape:
+        raise ValueError("power derivative and residual gradient must be equal 1D arrays")
+    if jx.shape != (len(hp), len(hp)):
+        raise ValueError("fixed-point state jacobian has incompatible shape")
+    if not (
+        np.all(np.isfinite(jx))
+        and np.all(np.isfinite(hp))
+        and np.all(np.isfinite(grad))
+        and np.isfinite(r)
+        and np.isfinite(rp)
+    ):
+        raise ValueError("all inputs must be finite")
+
+    state_derivative = np.linalg.solve(
+        np.eye(len(hp), dtype=float) - jx,
+        hp,
+    )
+    fraction_derivative = rp + float(grad @ state_derivative)
+    absolute_derivative = r + p * fraction_derivative
+
+    return DistributedResponse(
+        state_derivative=state_derivative,
+        residual_power_derivative=float(absolute_derivative),
+    )
