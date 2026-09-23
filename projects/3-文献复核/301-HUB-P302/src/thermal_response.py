@@ -54,3 +54,32 @@ def thermal_response_from_fractions(
         residual_thermal_elasticity=float(xi_r),
         absorption_thermal_elasticity=float(xi_a),
     )
+
+
+
+def thermal_gain_log_conditioning(
+    temperature: float,
+    ambient_temperature: float,
+    residual_fraction: float,
+    absorbed_fraction: float,
+    residual_temperature_derivative: float,
+    absorption_temperature_derivative: float,
+) -> float:
+    T = float(temperature)
+    Ta = float(ambient_temperature)
+    R = float(residual_fraction)
+    A = float(absorbed_fraction)
+    Rt = float(residual_temperature_derivative)
+    At = float(absorption_temperature_derivative)
+
+    if T <= Ta:
+        raise ValueError("conditioning requires temperature above ambient")
+    if R <= 0.0 or A <= 0.0:
+        raise ValueError("fractions must be positive")
+
+    rise = T - Ta
+    xi_r = rise * Rt / R
+    xi_a = -rise * At / A
+    if xi_r == 0.0:
+        return float("inf")
+    return float((1.0 + xi_a) / xi_r)
