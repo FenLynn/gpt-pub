@@ -170,8 +170,29 @@ def residual_fraction(
         a = a0 * core_overlap(x, core_ratio)
         return impact_pdf(x, fill) * channel_residual(q, a, length)
 
-    value, _ = quad(integrand, 0.0, fill, epsabs=2e-10, epsrel=2e-9, limit=400)
-    return float(value)
+    split = min(fill, core_ratio)
+    total = 0.0
+    if split > 0.0:
+        value, _ = quad(
+            integrand,
+            0.0,
+            split,
+            epsabs=1e-9,
+            epsrel=1e-8,
+            limit=300,
+        )
+        total += value
+    if split < fill:
+        value, _ = quad(
+            integrand,
+            split,
+            fill,
+            epsabs=1e-9,
+            epsrel=1e-8,
+            limit=300,
+        )
+        total += value
+    return float(total)
 
 
 def bgk_residual_fraction(
