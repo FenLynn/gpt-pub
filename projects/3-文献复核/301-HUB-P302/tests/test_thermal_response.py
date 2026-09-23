@@ -12,7 +12,10 @@ from phenomenological_closure import (  # noqa: E402
     logistic_coupling,
     residual_power_derivative_at_temperature,
 )
-from thermal_response import thermal_response_from_fractions  # noqa: E402
+from thermal_response import (  # noqa: E402
+    thermal_gain_log_conditioning,
+    thermal_response_from_fractions,
+)
 
 
 BASE = dict(
@@ -91,3 +94,46 @@ def test_ambient_boundary_has_zero_feedback_correction():
     assert response.input_power == 0.0
     assert response.residual_log_slope == 0.0
     assert response.residual_power_derivative == 0.02
+
+
+
+def test_gain_conditioning_is_inverse_observable_log_slope():
+    for T in [70.0, 90.0, 105.0, 125.0, 145.0]:
+        def fractions(temp):
+            k = logistic_coupling(
+                temp,
+                BASE["coupling_high"],
+                BASE["coupling_low"],
+                BASE["coupling_midpoint_temperature"],
+                BASE["coupling_temperature_width"],
+            )
+            return coupled_power_fractions(
+                k, BASE["absorption"], BASE["length"]
+            )
+
+        state = fractions(T)
+        Rt = _derivative(lambda temp: fractions(temp).pump_fraction, T)
+        At = _derivative(lambda temp: fractions(temp).absorbed_fraction, T)
+        response = thermal_response_from_fractions(
+            temperature=T,
+            ambient_temperature=BASE["ambient_temperature"],
+            thermal_gain=BASE["thermal_gain"],
+            residual_fraction=state.pump_fraction,
+            absorbed_fraction=state.absorbed_fraction,
+            residual_temperature_derivative=Rt,
+            absorption_temperature_derivative=At,
+        )
+        conditioning = thermal_gain_log_conditioning(
+            temperature=T,
+            ambient_temperature=BASE["ambient_temperature"],
+            residual_fraction=state.pump_fraction,
+            absorbed_fraction=state.absorbed_fraction,
+            residual_temperature_derivative=Rt,
+            absorption_temperature_derivative=At,
+        )
+        assert np.isclose(
+            conditioning * response.residual_log_slope,
+            1.0,
+            rtol=2e-12,
+            atol=2e-12,
+        )
