@@ -9,6 +9,7 @@ sys.path.insert(0, str(HERE / "src"))
 from published_validation import (  # noqa: E402
     fit_ambient_threshold_line,
     predict_threshold_power,
+    residual_secant_audit,
 )
 
 
@@ -39,3 +40,25 @@ def test_li2026_fig9_three_point_audit_is_stable():
     assert np.isclose(fit.max_abs_residual, 0.33, rtol=1e-10)
     assert fit.relative_rmse < 0.03
     assert fit.condition_gain_span_fraction < 0.07
+
+
+
+def test_2023_precursor_residual_secant_audit():
+    audit = residual_secant_audit(
+        input_power_1=7.2,
+        input_power_2=11.77,
+        residual_ratio_1=0.0405,
+        residual_ratio_2=0.1101,
+    )
+    assert np.isclose(audit.residual_power_1, 0.2916, rtol=1e-13)
+    assert np.isclose(audit.residual_power_2, 1.295877, rtol=1e-13)
+    assert np.isclose(
+        audit.absolute_residual_secant,
+        0.2197542669584245,
+        rtol=1e-12,
+    )
+    assert np.isclose(
+        audit.log_ratio_log_power_secant,
+        2.0348773641058355,
+        rtol=1e-12,
+    )
