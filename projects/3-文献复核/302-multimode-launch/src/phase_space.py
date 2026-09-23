@@ -236,7 +236,8 @@ def bgk_residual_fraction(
         format='csr',
     )
     y0 = np.concatenate([initial, np.zeros(bins)])
-    yz = expm_multiply(block * length, y0)
+    scaled = block * length
+    yz = expm_multiply(scaled, y0, traceA=float(scaled.diagonal().sum()))
     return float(yz[:bins].sum())
 
 def nonabsorbing_floor(fill: float, core_ratio: float) -> float:
