@@ -16,7 +16,7 @@ def _prepare_monotone_reference(
     temperatures: np.ndarray,
     residual_fraction: np.ndarray,
     absorbed_fraction: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     T = np.asarray(temperatures, dtype=float)
     R = np.asarray(residual_fraction, dtype=float)
     A = np.asarray(absorbed_fraction, dtype=float)
@@ -34,9 +34,9 @@ def _prepare_monotone_reference(
 
     dR = np.diff(R)
     if np.all(dR > 0.0):
-        return T, R, A
+        return T, A, R, T
     if np.all(dR < 0.0):
-        return T[::-1], R[::-1], A[::-1]
+        return T, A, R[::-1], T[::-1]
     raise ValueError("residual reference must be strictly monotone")
 
 
@@ -48,7 +48,7 @@ def reconstruct_thermal_gain(
     input_power: np.ndarray,
     observed_residual_fraction: np.ndarray,
 ) -> ThermalGainReconstruction:
-    Tref, Rref, Aref = _prepare_monotone_reference(
+    Tref, Aref, Rinv, Tinv = _prepare_monotone_reference(
         reference_temperatures,
         reference_residual_fraction,
         reference_absorbed_fraction,
@@ -65,12 +65,12 @@ def reconstruct_thermal_gain(
     if np.any(~np.isfinite(P)) or np.any(~np.isfinite(Robs)):
         raise ValueError("observed arrays must be finite")
 
-    rmin = float(Rref[0])
-    rmax = float(Rref[-1])
+    rmin = float(Rinv[0])
+    rmax = float(Rinv[-1])
     if np.any(Robs < rmin) or np.any(Robs > rmax):
         raise ValueError("observed residual fraction lies outside reference range")
 
-    inferred_T = np.interp(Robs, Rref, Tref)
+    inferred_T = np.interp(Robs, Rinv, Tinv)
     inferred_A = np.interp(inferred_T, Tref, Aref)
     rise = inferred_T - float(ambient_temperature)
     if np.any(rise < 0.0):
