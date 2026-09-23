@@ -111,25 +111,39 @@ def channel_quadrature(
     n_impact: int = 64,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return normalized channel weights and q=(a/f)k_channel."""
-    beta, wb, impact, wx = _quadrature(beta_max_rad, n_beta, n_impact)
+    beta_max = _check_beta_max(beta_max_rad)
+    if n_beta < 8 or n_impact < 8:
+        raise ValueError("quadrature orders must be >= 8")
+
+    zb, wb = np.polynomial.legendre.leggauss(int(n_beta))
+    zt, wt = np.polynomial.legendre.leggauss(int(n_impact))
+
+    beta = 0.5 * (zb + 1.0) * beta_max
+    wb = 0.5 * beta_max * wb
+    impact_angle = 0.25 * np.pi * (zt + 1.0)
+    wt = 0.25 * np.pi * wt
+    impact = np.sin(impact_angle)
+
     tavg = _average_transmission(beta, impact, index_ratio, optical_gap)
 
-    beta_max = float(beta_max_rad)
     p_beta = (
         2.0
         * np.sin(beta)
         * np.cos(beta)
         / (np.sin(beta_max) ** 2)
     )
-    p_impact = 4.0 * np.sqrt(1.0 - impact**2) / np.pi
+    p_impact_angle = 4.0 * np.cos(impact_angle) ** 2 / np.pi
 
-    weights = (wb * p_beta)[:, None] * (wx * p_impact)[None, :]
+    weights = (
+        (wb * p_beta)[:, None]
+        * (wt * p_impact_angle)[None, :]
+    )
     weights = weights / np.sum(weights)
 
     q = (
         np.tan(beta)[:, None]
         * tavg
-        / (2.0 * np.sqrt(1.0 - impact[None, :] ** 2))
+        / (2.0 * np.cos(impact_angle)[None, :])
     )
     return weights, q
 
