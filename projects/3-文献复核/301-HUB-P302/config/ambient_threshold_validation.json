@@ -1,4 +1,8 @@
 {
   "ambient_temperature_c": [13.0, 10.0, 7.0],
-  "threshold_power_kw": [7.30, 8.37, 8.45]
+  "threshold_power_kw": [7.30, 8.37, 8.45],
+  "precursor_2023": {
+    "input_power_kw": [7.2, 11.77],
+    "residual_ratio": [0.0405, 0.1101]
+  }
 }
