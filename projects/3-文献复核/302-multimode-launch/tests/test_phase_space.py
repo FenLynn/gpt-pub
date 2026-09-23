@@ -4,6 +4,10 @@ from scipy.integrate import quad
 
 from src.phase_space import (
     angular_mean_sec,
+    asymmetric_channel_active,
+    asymmetric_channel_passive,
+    asymmetric_equilibrium,
+    infer_asymmetric_rates,
     angular_mean_tan,
     channel_residual,
     first_crossover_length,
@@ -152,3 +156,46 @@ def test_strong_mixing_erases_most_launch_memory():
         - bgk_residual_fraction(1.0, mixing=20.0, **args)
     )
     assert dstrong < 0.08 * d0
+
+
+def test_asymmetric_channel_conserves_power():
+    q12 = 2.0
+    q21 = 0.5
+    for z in (0.0, 0.2, 1.0, 5.0):
+        p1 = asymmetric_channel_passive(q12, q21, z)
+        p2 = asymmetric_channel_active(q12, q21, z)
+        assert abs((p1 + p2) - 1.0) < 1e-13
+
+
+def test_symmetric_channel_has_half_half_plateau():
+    p1, p2 = asymmetric_equilibrium(1.7, 1.7)
+    assert abs(p1 - 0.5) < 1e-14
+    assert abs(p2 - 0.5) < 1e-14
+
+
+def test_asymmetric_plateau_encodes_directionality():
+    q12 = 4.0
+    q21 = 1.0
+    p1, p2 = asymmetric_equilibrium(q12, q21)
+    assert abs(p1 - 0.2) < 1e-14
+    assert abs(p2 - 0.8) < 1e-14
+    assert abs(asymmetric_channel_passive(q12, q21, 20.0) - p1) < 1e-12
+
+
+def test_plateau_and_transient_rate_recover_directional_rates():
+    q12 = 3.2
+    q21 = 0.8
+    plateau, _ = asymmetric_equilibrium(q12, q21)
+    inferred_q12, inferred_q21 = infer_asymmetric_rates(plateau, q12 + q21)
+    assert abs(inferred_q12 - q12) < 1e-14
+    assert abs(inferred_q21 - q21) < 1e-14
+
+
+def test_symmetric_launch_changes_transient_not_plateau():
+    # Two different symmetric microscopic rates represent different launch-weighted
+    # transient populations; both retain the same 50/50 nonabsorbing equilibrium.
+    slow = asymmetric_channel_passive(0.8, 0.8, 0.5)
+    fast = asymmetric_channel_passive(1.4, 1.4, 0.5)
+    assert slow != fast
+    assert abs(asymmetric_channel_passive(0.8, 0.8, 20.0) - 0.5) < 1e-12
+    assert abs(asymmetric_channel_passive(1.4, 1.4, 20.0) - 0.5) < 1e-12
