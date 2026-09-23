@@ -152,15 +152,29 @@ def selectivity_boundary(
             bins=bins,
         )
 
-    lo = f(0.0)
-    hi = f(1.0)
-    if lo == 0.0:
-        return 0.0
-    if hi == 0.0:
-        return 1.0
-    if lo * hi > 0.0:
+    left = 0.0
+    right = 1.0
+    f_left = f(left)
+    f_right = f(right)
+    if f_left == 0.0:
+        return left
+    if f_right == 0.0:
+        return right
+    if f_left * f_right > 0.0:
         return None
-    return float(brentq(f, 0.0, 1.0, xtol=1e-9, rtol=1e-8))
+
+    for _ in range(40):
+        mid = 0.5 * (left + right)
+        f_mid = f(mid)
+        if abs(f_mid) < 1e-10 or right - left < 1e-8:
+            return float(mid)
+        if f_left * f_mid <= 0.0:
+            right = mid
+            f_right = f_mid
+        else:
+            left = mid
+            f_left = f_mid
+    return float(0.5 * (left + right))
 
 
 def small_signal_cladding_absorption(
