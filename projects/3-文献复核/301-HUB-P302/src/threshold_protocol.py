@@ -65,3 +65,38 @@ def from_log_slope(
         raise ValueError("residual_fraction must be positive")
     rp = r * s / p
     return threshold_metrics(p, r, rp)
+
+
+
+@dataclass(frozen=True)
+class NormalizedDegradationMetrics:
+    normalized_residual: float
+    log_power_derivative: float
+
+
+def normalized_degradation_metrics(
+    input_power: float,
+    residual_fraction: float,
+    residual_fraction_derivative: float,
+    low_plateau: float,
+    high_plateau: float,
+) -> NormalizedDegradationMetrics:
+    p = float(input_power)
+    r = float(residual_fraction)
+    rp = float(residual_fraction_derivative)
+    rlo = float(low_plateau)
+    rhi = float(high_plateau)
+
+    if p <= 0.0:
+        raise ValueError("input_power must be positive")
+    if not rhi > rlo:
+        raise ValueError("require high_plateau > low_plateau")
+
+    span = rhi - rlo
+    u = (r - rlo) / span
+    psi = p * rp / span
+
+    return NormalizedDegradationMetrics(
+        normalized_residual=float(u),
+        log_power_derivative=float(psi),
+    )
