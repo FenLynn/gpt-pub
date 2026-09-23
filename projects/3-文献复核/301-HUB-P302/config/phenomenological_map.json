@@ -1,0 +1,9 @@
+{
+  "absorption": [0.5, 1.0, 2.5, 5.0],
+  "coupling_high": [0.5, 1.0, 2.5, 5.0],
+  "coupling_low": [0.01, 0.05, 0.2],
+  "ambient_offset": [2.0, 5.0, 10.0],
+  "derivative_threshold": [0.025, 0.05, 0.1],
+  "x_max": 12.0,
+  "scan_points": 801
+}
