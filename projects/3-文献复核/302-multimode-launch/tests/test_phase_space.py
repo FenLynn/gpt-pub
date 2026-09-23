@@ -7,6 +7,7 @@ from src.phase_space import (
     angular_mean_tan,
     channel_residual,
     first_crossover_length,
+    fit_apparent_coupling,
     impact_cdf,
     impact_pdf,
     mean_collision_shape,
@@ -88,3 +89,27 @@ def test_crossover_exists_for_canonical_case():
     root = first_crossover_length(0.84, 1.0, 1.0, 5.0, 0.3, z_min=1e-4, z_max=20.0)
     assert root is not None
     assert abs(root - 1.079041593657417) < 2e-7
+
+
+def test_apparent_coupling_can_reverse_launch_ranking_with_length():
+    core_ratio = 0.3
+    absorption = 5.0 * core_ratio**2
+
+    short_z = 0.2
+    k_full_short = fit_apparent_coupling(
+        residual_fraction(1.0, short_z, 1.0, 5.0, core_ratio), absorption, short_z
+    )
+    k_under_short = fit_apparent_coupling(
+        residual_fraction(0.84, short_z, 1.0, 5.0, core_ratio), absorption, short_z
+    )
+    assert k_under_short < k_full_short
+
+    long_z = 5.0
+    k_full_long = fit_apparent_coupling(
+        residual_fraction(1.0, long_z, 1.0, 5.0, core_ratio), absorption, long_z
+    )
+    k_under_long = fit_apparent_coupling(
+        residual_fraction(0.84, long_z, 1.0, 5.0, core_ratio), absorption, long_z
+    )
+    assert k_under_long > k_full_long
+    assert k_under_long / k_full_long > 1.15
