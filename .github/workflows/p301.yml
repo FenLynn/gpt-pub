@@ -46,4 +46,6 @@ jobs:
       - name: Compute
         env:
           OUTPUT_ROOT: ${{ runner.temp }}/pub-p301
-        run: python src/run_benchmark.py --config config/benchmark.json
+        run: |
+          python src/run_benchmark.py --config config/benchmark.json
+          python src/run_transport.py --config config/transport.json
