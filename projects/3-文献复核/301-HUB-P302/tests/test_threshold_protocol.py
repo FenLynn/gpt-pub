@@ -10,6 +10,7 @@ from threshold_protocol import (  # noqa: E402
     from_absolute_derivative,
     from_log_slope,
     threshold_metrics,
+    normalized_degradation_metrics,
 )
 
 
@@ -188,3 +189,76 @@ def test_absolute_derivative_is_invariant_to_horizontal_power_scaling():
     for item in metrics[1:]:
         assert np.isclose(item.residual_power_derivative, d0, rtol=1e-14)
         assert np.isclose(item.residual_fraction_log_slope, s0, rtol=1e-14)
+
+
+
+def test_affine_normalized_metrics_ignore_vertical_offset_and_scale():
+    p = 8.0
+    rlo = 0.02
+    rhi = 0.12
+    r = 0.065
+    rp = 0.009
+
+    base = normalized_degradation_metrics(
+        input_power=p,
+        residual_fraction=r,
+        residual_fraction_derivative=rp,
+        low_plateau=rlo,
+        high_plateau=rhi,
+    )
+
+    for offset, scale in [(0.03, 2.5), (-0.01, 0.7), (0.2, 4.0)]:
+        transformed = normalized_degradation_metrics(
+            input_power=p,
+            residual_fraction=offset + scale * r,
+            residual_fraction_derivative=scale * rp,
+            low_plateau=offset + scale * rlo,
+            high_plateau=offset + scale * rhi,
+        )
+        assert np.isclose(
+            transformed.normalized_residual,
+            base.normalized_residual,
+            rtol=1e-14,
+            atol=1e-14,
+        )
+        assert np.isclose(
+            transformed.log_power_derivative,
+            base.log_power_derivative,
+            rtol=1e-14,
+            atol=1e-14,
+        )
+
+
+def test_affine_normalized_metrics_ignore_horizontal_scale_at_matched_coordinate():
+    # u(p) = logistic-like normalized response at matched x=P/q.
+    x = 1.4
+    rlo = 0.02
+    rhi = 0.12
+    span = rhi - rlo
+
+    def u(xval):
+        return xval**2 / (1.0 + xval**2)
+
+    def du_dx(xval):
+        return 2.0 * xval / (1.0 + xval**2) ** 2
+
+    metrics = []
+    for q in [0.5, 2.0, 8.0]:
+        p = q * x
+        r = rlo + span * u(x)
+        rp = span * du_dx(x) / q
+        metrics.append(
+            normalized_degradation_metrics(
+                input_power=p,
+                residual_fraction=r,
+                residual_fraction_derivative=rp,
+                low_plateau=rlo,
+                high_plateau=rhi,
+            )
+        )
+
+    u0 = metrics[0].normalized_residual
+    psi0 = metrics[0].log_power_derivative
+    for item in metrics[1:]:
+        assert np.isclose(item.normalized_residual, u0, rtol=1e-14)
+        assert np.isclose(item.log_power_derivative, psi0, rtol=1e-14)
