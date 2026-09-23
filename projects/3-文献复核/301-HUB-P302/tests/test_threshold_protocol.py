@@ -95,3 +95,33 @@ def test_liu_absolute_threshold_implies_residual_fraction_below_threshold_for_po
     )
     assert metrics.residual_fraction_derivative > 0.0
     assert r < 0.025
+
+
+
+def test_2023_baseline_exceeds_liu_absolute_threshold():
+    # Li et al. 2023 report a low-power residual ratio near 4.05%.
+    # If the ratio is locally flat, dP_res/dP equals that baseline ratio,
+    # already above the 2.5% absolute-derivative convention used in Liu 2024.
+    baseline = threshold_metrics(
+        input_power=5.0,
+        residual_fraction=0.0405,
+        residual_fraction_derivative=0.0,
+    )
+    assert np.isclose(baseline.residual_power_derivative, 0.0405)
+    assert baseline.residual_power_derivative > 0.025
+    assert np.isclose(baseline.residual_fraction_log_slope, 0.0)
+
+
+def test_fixed_absolute_threshold_is_not_baseline_invariant():
+    low_baseline = from_absolute_derivative(
+        input_power=8.0,
+        residual_fraction=0.015,
+        residual_power_derivative=0.025,
+    )
+    high_baseline = from_absolute_derivative(
+        input_power=8.0,
+        residual_fraction=0.0405,
+        residual_power_derivative=0.025,
+    )
+    assert low_baseline.residual_fraction_derivative > 0.0
+    assert high_baseline.residual_fraction_derivative < 0.0
