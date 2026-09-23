@@ -133,3 +133,28 @@ def test_actual_smooth_closed_loop_is_unique():
     ]
     temps = np.array([x[0] for x in result])
     assert np.all(np.diff(temps) >= 0.0)
+
+
+def test_smooth_negative_feedback_suppresses_thermal_slope():
+    undamaged, _ = synthetic_tables()
+    gain = 80.0
+    absorption_length = 3.0
+    pump = 1.4
+    step = 1e-4
+
+    tm = smooth_equilibrium(
+        pump - step, gain, absorption_length, undamaged
+    )[0]
+    t0, residual0, _ = smooth_equilibrium(
+        pump, gain, absorption_length, undamaged
+    )
+    tp = smooth_equilibrium(
+        pump + step, gain, absorption_length, undamaged
+    )[0]
+
+    closed_loop_slope = (tp - tm) / (2.0 * step)
+    frozen_absorption_slope = gain * (1.0 - residual0)
+
+    assert t0 > 0.0
+    assert closed_loop_slope > 0.0
+    assert closed_loop_slope < frozen_absorption_slope
