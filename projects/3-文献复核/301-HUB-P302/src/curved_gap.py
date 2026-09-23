@@ -50,11 +50,32 @@ def arc_transfer_average(
     weights = 0.5 * np.pi * w
     gap = local_curved_gap(phi, radius_optical, minimum_gap_optical)
 
-    theta = np.asarray(theta_rad, dtype=float)[..., None]
-    gap_b = gap.reshape((1,) * (theta.ndim - 1) + (gap.size,))
+    theta_values = np.asarray(theta_rad, dtype=float)
+    critical = np.arcsin(eta)
+    if np.any(theta_values <= critical):
+        raise ValueError(
+            "curved-gap kernel currently requires total internal reflection "
+            "for all supplied incidence angles"
+        )
+
+    # In the TIR regime transmission decays exponentially with gap.  Very
+    # large curved gaps can overflow a raw characteristic-matrix evaluation,
+    # so discard tails once the smallest evanescent exponent exceeds 40.
+    decay_min = 2.0 * np.pi * np.sqrt(
+        np.min(np.sin(theta_values) ** 2 - eta**2)
+    )
+    max_gap = 40.0 / decay_min
+    active = gap <= max_gap
+    safe_gap = np.minimum(gap, max_gap)
+
+    theta = theta_values[..., None]
+    gap_b = safe_gap.reshape((1,) * theta_values.ndim + (gap.size,))
     te, _ = slab_rt(1.0, eta, 1.0, theta, gap_b, "TE")
     tm, _ = slab_rt(1.0, eta, 1.0, theta, gap_b, "TM")
     transmission = 0.5 * (te + tm)
+    transmission = transmission * active.reshape(
+        (1,) * theta_values.ndim + (gap.size,)
+    )
 
     # Integral over facing half-circumference, divided by total 2*pi wall arc.
     return np.sum(transmission * weights, axis=-1) / (2.0 * np.pi)
