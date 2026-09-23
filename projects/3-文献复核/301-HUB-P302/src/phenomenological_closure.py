@@ -253,3 +253,84 @@ def midpoint_metrics(
         absorption_elasticity=float(absorption_elasticity),
         constitutive_sharpness=float(constitutive_sharpness),
     )
+
+
+
+def logistic_coupling_derivative(
+    temperature: float,
+    high: float,
+    low: float,
+    midpoint: float,
+    width: float,
+) -> float:
+    hi = float(high)
+    lo = float(low)
+    w = float(width)
+    if hi < lo or lo < 0.0:
+        raise ValueError("require high >= low >= 0")
+    if w <= 0.0:
+        raise ValueError("width must be positive")
+    if hi == lo:
+        return 0.0
+
+    k = logistic_coupling(temperature, hi, lo, midpoint, w)
+    f = (k - lo) / (hi - lo)
+    return -(hi - lo) * f * (1.0 - f) / w
+
+
+def residual_power_derivative_at_temperature(
+    temperature: float,
+    ambient_temperature: float,
+    absorption: float,
+    length: float,
+    coupling_high: float,
+    coupling_low: float,
+    coupling_midpoint_temperature: float,
+    coupling_temperature_width: float,
+) -> float:
+    T = float(temperature)
+    Tamb = float(ambient_temperature)
+    if T < Tamb:
+        raise ValueError("temperature must be >= ambient_temperature")
+
+    k = logistic_coupling(
+        T,
+        coupling_high,
+        coupling_low,
+        coupling_midpoint_temperature,
+        coupling_temperature_width,
+    )
+    state = coupled_power_fractions(k, absorption, length)
+    if state.absorbed_fraction <= 0.0:
+        return state.pump_fraction
+
+    R_k = _central_derivative(
+        lambda kval: coupled_power_fractions(
+            kval, absorption, length
+        ).pump_fraction,
+        k,
+    )
+    A_k = _central_derivative(
+        lambda kval: coupled_power_fractions(
+            kval, absorption, length
+        ).absorbed_fraction,
+        k,
+    )
+    k_T = logistic_coupling_derivative(
+        T,
+        coupling_high,
+        coupling_low,
+        coupling_midpoint_temperature,
+        coupling_temperature_width,
+    )
+    delta_T = T - Tamb
+    denominator = (
+        1.0
+        - delta_T
+        * (A_k / state.absorbed_fraction)
+        * k_T
+    )
+    return float(
+        state.pump_fraction
+        + delta_T * R_k * k_T / denominator
+    )
