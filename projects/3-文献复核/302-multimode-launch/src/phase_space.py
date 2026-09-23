@@ -104,6 +104,34 @@ def angular_mean_sec(beta_max: float) -> float:
     return 2.0 / (1.0 + math.cos(beta_max))
 
 
+def mean_transfer_factor(fill: float, beta_max: float) -> float:
+    """Separable zero-gap mean transfer factor for centered circular launch."""
+    return mean_collision_shape(fill) * angular_mean_tan(beta_max)
+
+
+def mean_absorption_factor(fill: float, beta_max: float, core_ratio: float) -> float:
+    """Separable central-core path-overlap factor per unit axial length."""
+    return mean_core_overlap(fill, core_ratio) * angular_mean_sec(beta_max)
+
+
+def beta_for_equal_transfer(
+    reference_fill: float,
+    reference_beta_max: float,
+    test_fill: float,
+) -> float:
+    """Angular cutoff required for test_fill to match the reference mean transfer factor."""
+    target = mean_transfer_factor(reference_fill, reference_beta_max)
+    spatial = mean_collision_shape(test_fill)
+
+    def objective(beta: float) -> float:
+        return spatial * angular_mean_tan(beta) - target
+
+    lo = 1e-12
+    hi = math.pi / 2.0 - 1e-8
+    if objective(hi) < 0.0:
+        raise ValueError('no finite beta below pi/2 reaches the target')
+    return float(brentq(objective, lo, hi, xtol=1e-13, rtol=1e-12))
+
 def channel_residual(q: float, a: float, length: float) -> float:
     """Passive-guide residual for one incoherent channel with symmetric exchange q and active loss a."""
     if q < 0.0 or a < 0.0 or length < 0.0:
