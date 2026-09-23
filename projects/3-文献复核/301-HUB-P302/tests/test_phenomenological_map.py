@@ -15,6 +15,7 @@ from phenomenological_map import (  # noqa: E402
     dimensionless_state,
     first_turning_point,
     high_temperature_derivative_limit,
+    recover_two_ambient_scales,
 )
 
 
@@ -166,3 +167,55 @@ def test_turning_power_obeys_temperature_scale_law():
     p1 = scale1 * tp.input_scale
     p2 = scale2 * tp.input_scale
     assert np.isclose(p1, p2, rtol=1e-14, atol=1e-14)
+
+
+
+def test_two_ambient_curves_recover_absolute_temperature_scale():
+    width = 8.0
+    midpoint = 100.0
+    ambient1 = 25.0
+    ambient2 = 35.0
+    gain1 = 0.08
+    gain2 = 0.10
+
+    x01 = (midpoint - ambient1) / width
+    x02 = (midpoint - ambient2) / width
+    q1 = width / gain1
+    q2 = width / gain2
+
+    recovered = recover_two_ambient_scales(
+        ambient_temperature_1=ambient1,
+        ambient_temperature_2=ambient2,
+        ambient_offset_1=x01,
+        ambient_offset_2=x02,
+        power_scale_1=q1,
+        power_scale_2=q2,
+    )
+
+    assert np.isclose(recovered.temperature_width, width)
+    assert np.isclose(recovered.midpoint_temperature, midpoint)
+    assert np.isclose(recovered.thermal_gain_1, gain1)
+    assert np.isclose(recovered.thermal_gain_2, gain2)
+
+
+def test_two_ambient_recovery_allows_condition_specific_thermal_gain():
+    width = 5.5
+    midpoint = 92.0
+    ambient1 = 20.0
+    ambient2 = 40.0
+    x01 = (midpoint - ambient1) / width
+    x02 = (midpoint - ambient2) / width
+
+    recovered = recover_two_ambient_scales(
+        ambient_temperature_1=ambient1,
+        ambient_temperature_2=ambient2,
+        ambient_offset_1=x01,
+        ambient_offset_2=x02,
+        power_scale_1=width / 0.06,
+        power_scale_2=width / 0.11,
+    )
+
+    assert np.isclose(recovered.temperature_width, width)
+    assert np.isclose(recovered.midpoint_temperature, midpoint)
+    assert np.isclose(recovered.thermal_gain_1, 0.06)
+    assert np.isclose(recovered.thermal_gain_2, 0.11)
