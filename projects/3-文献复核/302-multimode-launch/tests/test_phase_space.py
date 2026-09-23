@@ -14,6 +14,7 @@ from src.phase_space import (
     mean_transfer_factor,
     mean_absorption_factor,
     beta_for_equal_transfer,
+    bgk_residual_fraction,
     mean_core_overlap,
     nonabsorbing_floor,
     residual_fraction,
@@ -131,3 +132,23 @@ def test_spatial_underfill_can_be_compensated_by_larger_angular_fill():
     assert abs(mean_transfer_factor(0.84, beta_test) / mean_transfer_factor(1.0, beta_ref) - 1.0) < 1e-11
     na_ratio = math.sin(beta_test) / math.sin(beta_ref)
     assert abs(na_ratio - 1.1197156342419028) < 2e-10
+
+
+def test_bgk_zero_mixing_matches_independent_channel_quadrature():
+    args = dict(length=2.0, q0=1.0, a0=5.0, core_ratio=0.3)
+    exact = residual_fraction(0.84, **args)
+    discrete = bgk_residual_fraction(0.84, mixing=0.0, bins=320, **args)
+    assert abs(discrete - exact) < 2e-3
+
+
+def test_strong_mixing_erases_most_launch_memory():
+    args = dict(length=5.0, q0=1.0, a0=5.0, core_ratio=0.3, bins=200)
+    d0 = abs(
+        bgk_residual_fraction(0.84, mixing=0.0, **args)
+        - bgk_residual_fraction(1.0, mixing=0.0, **args)
+    )
+    dstrong = abs(
+        bgk_residual_fraction(0.84, mixing=20.0, **args)
+        - bgk_residual_fraction(1.0, mixing=20.0, **args)
+    )
+    assert dstrong < 0.08 * d0
