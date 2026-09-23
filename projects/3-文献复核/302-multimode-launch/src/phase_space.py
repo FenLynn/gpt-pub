@@ -7,6 +7,8 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import brentq
 from scipy.special import ellipe, ellipk
+from scipy.sparse import bmat, csr_matrix, diags
+from scipy.sparse.linalg import expm_multiply
 
 
 def _check_unit_interval(value: float, name: str, *, strict_zero: bool = False) -> None:
@@ -171,6 +173,50 @@ def residual_fraction(
     value, _ = quad(integrand, 0.0, fill, epsabs=2e-10, epsrel=2e-9, limit=400)
     return float(value)
 
+
+def bgk_residual_fraction(
+    fill: float,
+    length: float,
+    q0: float,
+    a0: float,
+    core_ratio: float,
+    mixing: float,
+    bins: int = 160,
+) -> float:
+    """Residual from a conservative BGK relaxation model on impact-parameter space."""
+    _check_unit_interval(fill, 'fill', strict_zero=True)
+    _check_unit_interval(core_ratio, 'core_ratio', strict_zero=True)
+    if length < 0.0 or q0 < 0.0 or a0 < 0.0 or mixing < 0.0:
+        raise ValueError('length, q0, a0, and mixing must be non-negative')
+    if bins < 16:
+        raise ValueError('bins must be >= 16')
+    if length == 0.0:
+        return 1.0
+
+    dx = 1.0 / bins
+    x = (np.arange(bins, dtype=float) + 0.5) * dx
+    equilibrium = impact_pdf(x, 1.0) * dx
+    equilibrium /= equilibrium.sum()
+    initial = impact_pdf(x, fill) * dx
+    initial /= initial.sum()
+
+    q = q0 * collision_shape(x)
+    a = a0 * core_overlap(x, core_ratio)
+    qd = diags(q, format='csr')
+    ad = diags(a, format='csr')
+    eye = diags(np.ones(bins), format='csr')
+    if mixing == 0.0:
+        mix = csr_matrix((bins, bins))
+    else:
+        mix = mixing * (csr_matrix(np.outer(equilibrium, np.ones(bins))) - eye)
+
+    block = bmat(
+        [[mix - qd, qd], [qd, mix - qd - ad]],
+        format='csr',
+    )
+    y0 = np.concatenate([initial, np.zeros(bins)])
+    yz = expm_multiply(block * length, y0)
+    return float(yz[:bins].sum())
 
 def nonabsorbing_floor(fill: float, core_ratio: float) -> float:
     """Infinite-length residual in the ideal no-mixing ray model with zero absorption for x>=core_ratio."""
