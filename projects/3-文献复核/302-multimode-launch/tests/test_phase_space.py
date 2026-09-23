@@ -8,6 +8,7 @@ from src.phase_space import (
     asymmetric_channel_passive,
     asymmetric_equilibrium,
     infer_asymmetric_rates,
+    reverse_equilibrium_transfer_fractions,
     angular_mean_tan,
     channel_residual,
     first_crossover_length,
@@ -199,3 +200,10 @@ def test_symmetric_launch_changes_transient_not_plateau():
     assert slow != fast
     assert abs(asymmetric_channel_passive(0.8, 0.8, 20.0) - 0.5) < 1e-12
     assert abs(asymmetric_channel_passive(1.4, 1.4, 20.0) - 0.5) < 1e-12
+
+
+def test_fixed_directional_rates_require_reverse_plateau_complementarity():
+    f12, f21 = reverse_equilibrium_transfer_fractions(3.0, 1.0)
+    assert abs(f12 + f21 - 1.0) < 1e-14
+    assert abs(f12 - 0.75) < 1e-14
+    assert abs(f21 - 0.25) < 1e-14
