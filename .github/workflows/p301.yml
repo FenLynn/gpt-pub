@@ -50,3 +50,4 @@ jobs:
           python src/run_benchmark.py --config config/benchmark.json
           python src/run_transport.py --config config/transport.json
           python src/run_power_flow.py --config config/power_flow.json
+          python src/run_curved_gap.py --config config/curved_gap.json
