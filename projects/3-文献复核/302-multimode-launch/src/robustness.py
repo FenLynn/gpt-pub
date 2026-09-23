@@ -5,7 +5,6 @@ import math
 import numpy as np
 from scipy.optimize import brentq
 from scipy.sparse import bmat, csr_matrix, diags
-from scipy.sparse.linalg import expm_multiply
 
 try:
     from .phase_space import (
@@ -13,6 +12,7 @@ try:
         core_overlap,
         impact_pdf,
         mean_collision_shape,
+        uniformization_action,
     )
 except ImportError:
     from phase_space import (
@@ -20,6 +20,7 @@ except ImportError:
         core_overlap,
         impact_pdf,
         mean_collision_shape,
+        uniformization_action,
     )
 
 
@@ -98,7 +99,7 @@ def dimensionless_residual(
     )
 
     y0 = np.concatenate([initial, np.zeros(bins)])
-    y1 = expm_multiply(block, y0, traceA=float(block.diagonal().sum()))
+    y1 = uniformization_action(block, y0)
     return float(y1[:bins].sum())
 
 
