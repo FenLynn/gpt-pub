@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from published_validation import fit_ambient_threshold_line
+from published_validation import fit_ambient_threshold_line, residual_secant_audit
 
 
 def main() -> None:
@@ -66,7 +66,30 @@ def main() -> None:
             {name: getattr(fit, name) for name in fit.__dataclass_fields__}
         )
 
-    print("compute: ok ambient-threshold validation")
+    precursor = cfg.get("precursor_2023")
+    if precursor:
+        audit = residual_secant_audit(
+            input_power_1=precursor["input_power_kw"][0],
+            input_power_2=precursor["input_power_kw"][1],
+            residual_ratio_1=precursor["residual_ratio"][0],
+            residual_ratio_2=precursor["residual_ratio"][1],
+        )
+        with (output / "precursor_residual_secant.csv").open(
+            "w", encoding="utf-8", newline=""
+        ) as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=list(audit.__dataclass_fields__),
+            )
+            writer.writeheader()
+            writer.writerow(
+                {
+                    name: getattr(audit, name)
+                    for name in audit.__dataclass_fields__
+                }
+            )
+
+    print("compute: ok published validation")
 
 
 if __name__ == "__main__":
