@@ -56,3 +56,4 @@ jobs:
           python src/run_phenomenological_closure.py --config config/phenomenological_closure.json
           python src/run_phenomenological_map.py --config config/phenomenological_map.json
           python src/run_phenomenological_identifiability.py --config config/phenomenological_identifiability.json
+          python src/run_asymmetric_coupling.py --config config/asymmetric_coupling.json
