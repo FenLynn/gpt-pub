@@ -125,3 +125,66 @@ def test_fixed_absolute_threshold_is_not_baseline_invariant():
     )
     assert low_baseline.residual_fraction_derivative > 0.0
     assert high_baseline.residual_fraction_derivative < 0.0
+
+
+
+def test_log_slope_is_invariant_to_multiplicative_residual_scaling():
+    p = 9.0
+    r = 0.018
+    rp = 0.0032
+    base = threshold_metrics(p, r, rp)
+    for scale in [0.4, 2.5, 7.0]:
+        scaled = threshold_metrics(p, scale * r, scale * rp)
+        assert np.isclose(
+            scaled.residual_fraction_log_slope,
+            base.residual_fraction_log_slope,
+            rtol=1e-14,
+            atol=1e-14,
+        )
+        assert np.isclose(
+            scaled.residual_power_derivative,
+            scale * base.residual_power_derivative,
+            rtol=1e-14,
+            atol=1e-14,
+        )
+
+
+def test_excess_absolute_derivative_is_invariant_to_additive_baseline():
+    p = 9.0
+    r = 0.018
+    rp = 0.0032
+    base = threshold_metrics(p, r, rp)
+    base_excess = base.residual_power_derivative - base.residual_fraction
+
+    for offset in [0.01, 0.03, 0.08]:
+        shifted = threshold_metrics(p, r + offset, rp)
+        shifted_excess = (
+            shifted.residual_power_derivative - shifted.residual_fraction
+        )
+        assert np.isclose(
+            shifted_excess,
+            base_excess,
+            rtol=1e-14,
+            atol=1e-14,
+        )
+
+
+def test_absolute_derivative_is_invariant_to_horizontal_power_scaling():
+    # R(P) = r0 + a (P/q)^2. At matched normalized coordinate p=P/q,
+    # D = R + P dR/dP is independent of q.
+    r0 = 0.015
+    a = 0.004
+    normalized_power = 1.7
+
+    metrics = []
+    for q in [0.5, 2.0, 8.0]:
+        p = q * normalized_power
+        r = r0 + a * normalized_power**2
+        rp = 2.0 * a * normalized_power / q
+        metrics.append(threshold_metrics(p, r, rp))
+
+    d0 = metrics[0].residual_power_derivative
+    s0 = metrics[0].residual_fraction_log_slope
+    for item in metrics[1:]:
+        assert np.isclose(item.residual_power_derivative, d0, rtol=1e-14)
+        assert np.isclose(item.residual_fraction_log_slope, s0, rtol=1e-14)
