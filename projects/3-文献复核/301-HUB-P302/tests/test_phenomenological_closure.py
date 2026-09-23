@@ -12,6 +12,7 @@ from phenomenological_closure import (  # noqa: E402
     drive_from_temperature,
     logistic_coupling,
     midpoint_metrics,
+    residual_power_derivative_at_temperature,
     solve_temperature,
 )
 
@@ -201,3 +202,86 @@ def test_midpoint_slope_saturates_for_sharp_constitutive_law():
     assert all(b > a for a, b in zip(slopes, slopes[1:]))
     assert slopes[-1] < limits[-1]
     assert abs(slopes[-1] / limits[-1] - 1.0) < 0.01
+
+
+
+def test_absolute_residual_derivative_matches_finite_difference():
+    for T0 in [55.0, 85.0, 100.0, 120.0, 145.0]:
+        P0, _, _ = drive_from_temperature(temperature=T0, **BASE)
+        analytic = residual_power_derivative_at_temperature(
+            temperature=T0,
+            ambient_temperature=BASE["ambient_temperature"],
+            absorption=BASE["absorption"],
+            length=BASE["length"],
+            coupling_high=BASE["coupling_high"],
+            coupling_low=BASE["coupling_low"],
+            coupling_midpoint_temperature=BASE["coupling_midpoint_temperature"],
+            coupling_temperature_width=BASE["coupling_temperature_width"],
+        )
+        eps = 2e-5
+        p_plus = P0 * (1.0 + eps)
+        p_minus = P0 * (1.0 - eps)
+
+        def absolute_residual(P):
+            T = solve_temperature(input_power=P, **BASE)
+            k = logistic_coupling(
+                T,
+                BASE["coupling_high"],
+                BASE["coupling_low"],
+                BASE["coupling_midpoint_temperature"],
+                BASE["coupling_temperature_width"],
+            )
+            return P * coupled_power_fractions(
+                k, BASE["absorption"], BASE["length"]
+            ).pump_fraction
+
+        numerical = (
+            absolute_residual(p_plus) - absolute_residual(p_minus)
+        ) / (p_plus - p_minus)
+        assert np.isclose(analytic, numerical, rtol=5e-6, atol=5e-8)
+
+
+def test_turning_derivative_is_invariant_under_temperature_scale_symmetry():
+    lam = 1.8
+    scaled = dict(BASE)
+    scaled["coupling_temperature_width"] *= lam
+    scaled["coupling_midpoint_temperature"] = (
+        BASE["ambient_temperature"]
+        + lam
+        * (
+            BASE["coupling_midpoint_temperature"]
+            - BASE["ambient_temperature"]
+        )
+    )
+    scaled["thermal_gain"] *= lam
+
+    for x in [-1.5, -0.5, 0.0, 0.7, 1.5]:
+        t1 = (
+            BASE["coupling_midpoint_temperature"]
+            + BASE["coupling_temperature_width"] * x
+        )
+        t2 = (
+            scaled["coupling_midpoint_temperature"]
+            + scaled["coupling_temperature_width"] * x
+        )
+        d1 = residual_power_derivative_at_temperature(
+            temperature=t1,
+            ambient_temperature=BASE["ambient_temperature"],
+            absorption=BASE["absorption"],
+            length=BASE["length"],
+            coupling_high=BASE["coupling_high"],
+            coupling_low=BASE["coupling_low"],
+            coupling_midpoint_temperature=BASE["coupling_midpoint_temperature"],
+            coupling_temperature_width=BASE["coupling_temperature_width"],
+        )
+        d2 = residual_power_derivative_at_temperature(
+            temperature=t2,
+            ambient_temperature=scaled["ambient_temperature"],
+            absorption=scaled["absorption"],
+            length=scaled["length"],
+            coupling_high=scaled["coupling_high"],
+            coupling_low=scaled["coupling_low"],
+            coupling_midpoint_temperature=scaled["coupling_midpoint_temperature"],
+            coupling_temperature_width=scaled["coupling_temperature_width"],
+        )
+        assert np.isclose(d1, d2, rtol=5e-10, atol=5e-12)
