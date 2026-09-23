@@ -10,6 +10,7 @@ from pathlib import Path
 from phenomenological_closure import (
     drive_from_temperature,
     midpoint_metrics,
+    residual_power_derivative_at_temperature,
 )
 
 
@@ -49,16 +50,13 @@ def main() -> None:
         if T < common["ambient_temperature"]:
             continue
         P, state, k = drive_from_temperature(temperature=T, **common)
-        rows.append(
-            {
-                "normalized_temperature": float(x),
+        derivative = residual_power_derivative_at_temperature(\n            temperature=T,\n            ambient_temperature=common["ambient_temperature"],\n            absorption=common["absorption"],\n            length=common["length"],\n            coupling_high=common["coupling_high"],\n            coupling_low=common["coupling_low"],\n            coupling_midpoint_temperature=common["coupling_midpoint_temperature"],\n            coupling_temperature_width=common["coupling_temperature_width"],\n        )\n        rows.append(\n            {\n                "normalized_temperature": float(x),
                 "temperature": T,
                 "input_power": P,
                 "coupling": k,
                 "pump_fraction": state.pump_fraction,
                 "active_fraction": state.active_fraction,
-                "absorbed_fraction": state.absorbed_fraction,
-            }
+                "absorbed_fraction": state.absorbed_fraction,\n                "residual_power_derivative": derivative,\n            }
         )
 
     with (output / "phenomenological_curve.csv").open(
