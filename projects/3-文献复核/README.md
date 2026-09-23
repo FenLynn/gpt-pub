@@ -25,5 +25,6 @@
 | 编号 | 标识 | 路径 |
 |---|---|---|
 | PUB-P301 | HUB-P302 | [`301-HUB-P302/`](301-HUB-P302/) |
+| PUB-P302 | multimode-launch | [`302-multimode-launch/`](302-multimode-launch/) |
 
-下一个未占用编号：`PUB-P302`。
+下一个未占用编号：`PUB-P303`.

@@ -1,0 +1,196 @@
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+import numpy as np
+from scipy.integrate import quad
+from scipy.optimize import brentq
+from scipy.special import ellipe, ellipk
+
+
+def _check_unit_interval(value: float, name: str, *, strict_zero: bool = False) -> None:
+    lower_ok = value > 0.0 if strict_zero else value >= 0.0
+    if not (lower_ok and value <= 1.0):
+        op = '(0, 1]' if strict_zero else '[0, 1]'
+        raise ValueError(f'{name} must lie in {op}')
+
+
+def impact_pdf(x: float | np.ndarray, fill: float) -> float | np.ndarray:
+    """Normalized impact-parameter density for a centered spatially underfilled disk."""
+    _check_unit_interval(fill, 'fill', strict_zero=True)
+    arr = np.asarray(x, dtype=float)
+    out = np.zeros_like(arr)
+    mask = (arr >= 0.0) & (arr <= fill)
+    out[mask] = 4.0 / (math.pi * fill**2) * np.sqrt(np.maximum(fill**2 - arr[mask] ** 2, 0.0))
+    if np.isscalar(x):
+        return float(out)
+    return out
+
+
+def impact_cdf(cut: float, fill: float) -> float:
+    """CDF of normalized impact parameter x=b/R."""
+    _check_unit_interval(fill, 'fill', strict_zero=True)
+    if cut <= 0.0:
+        return 0.0
+    if cut >= fill:
+        return 1.0
+    y = cut / fill
+    return 2.0 / math.pi * (math.asin(y) + y * math.sqrt(1.0 - y**2))
+
+
+def collision_shape(x: float | np.ndarray) -> float | np.ndarray:
+    """Spatial part of the circular-wall collision rate, proportional to 1/sqrt(1-x^2)."""
+    arr = np.asarray(x, dtype=float)
+    if np.any((arr < 0.0) | (arr >= 1.0)):
+        raise ValueError('x must lie in [0, 1)')
+    out = 1.0 / np.sqrt(1.0 - arr**2)
+    if np.isscalar(x):
+        return float(out)
+    return out
+
+
+def mean_collision_shape(fill: float) -> float:
+    """Exact expectation of collision_shape over the underfilled impact distribution."""
+    _check_unit_interval(fill, 'fill', strict_zero=True)
+    if math.isclose(fill, 1.0, rel_tol=0.0, abs_tol=1e-14):
+        return 4.0 / math.pi
+    m = fill**2
+    return 4.0 / (math.pi * fill**2) * (ellipe(m) - (1.0 - m) * ellipk(m))
+
+
+def core_overlap(x: float | np.ndarray, core_ratio: float) -> float | np.ndarray:
+    """Ray path-length fraction inside a centered circular inner core."""
+    _check_unit_interval(core_ratio, 'core_ratio', strict_zero=True)
+    arr = np.asarray(x, dtype=float)
+    if np.any((arr < 0.0) | (arr >= 1.0)):
+        raise ValueError('x must lie in [0, 1)')
+    out = np.zeros_like(arr)
+    mask = arr < core_ratio
+    out[mask] = np.sqrt(core_ratio**2 - arr[mask] ** 2) / np.sqrt(1.0 - arr[mask] ** 2)
+    if np.isscalar(x):
+        return float(out)
+    return out
+
+
+def mean_core_overlap(fill: float, core_ratio: float) -> float:
+    _check_unit_interval(fill, 'fill', strict_zero=True)
+    _check_unit_interval(core_ratio, 'core_ratio', strict_zero=True)
+    upper = min(fill, core_ratio)
+    value, _ = quad(
+        lambda x: impact_pdf(x, fill) * core_overlap(x, core_ratio),
+        0.0,
+        upper,
+        epsabs=1e-12,
+        epsrel=1e-11,
+        limit=300,
+    )
+    return float(value)
+
+
+def angular_mean_tan(beta_max: float) -> float:
+    """Mean tan(beta) for a uniformly filled transverse-k disk up to beta_max."""
+    if not (0.0 < beta_max < math.pi / 2.0):
+        raise ValueError('beta_max must lie in (0, pi/2)')
+    s = math.sin(beta_max)
+    c = math.cos(beta_max)
+    return (beta_max - s * c) / (s * s)
+
+
+def angular_mean_sec(beta_max: float) -> float:
+    """Mean sec(beta) for a uniformly filled transverse-k disk up to beta_max."""
+    if not (0.0 < beta_max < math.pi / 2.0):
+        raise ValueError('beta_max must lie in (0, pi/2)')
+    return 2.0 / (1.0 + math.cos(beta_max))
+
+
+def channel_residual(q: float, a: float, length: float) -> float:
+    """Passive-guide residual for one incoherent channel with symmetric exchange q and active loss a."""
+    if q < 0.0 or a < 0.0 or length < 0.0:
+        raise ValueError('q, a, and length must be non-negative')
+    if length == 0.0:
+        return 1.0
+    if q == 0.0:
+        return 1.0
+    delta = math.sqrt(4.0 * q * q + a * a)
+    s = 2.0 * q + a
+    lp = (-s + delta) / 2.0
+    lm = (-s - delta) / 2.0
+    return (
+        0.5 * (1.0 + a / delta) * math.exp(lp * length)
+        + 0.5 * (1.0 - a / delta) * math.exp(lm * length)
+    )
+
+
+def residual_fraction(
+    fill: float,
+    length: float,
+    q0: float,
+    a0: float,
+    core_ratio: float,
+) -> float:
+    """Impact-averaged residual for the minimal independent-channel circular model."""
+    _check_unit_interval(fill, 'fill', strict_zero=True)
+    _check_unit_interval(core_ratio, 'core_ratio', strict_zero=True)
+    if length < 0.0 or q0 < 0.0 or a0 < 0.0:
+        raise ValueError('length, q0, and a0 must be non-negative')
+
+    def integrand(x: float) -> float:
+        q = q0 * collision_shape(x)
+        a = a0 * core_overlap(x, core_ratio)
+        return impact_pdf(x, fill) * channel_residual(q, a, length)
+
+    value, _ = quad(integrand, 0.0, fill, epsabs=2e-10, epsrel=2e-9, limit=400)
+    return float(value)
+
+
+def nonabsorbing_floor(fill: float, core_ratio: float) -> float:
+    """Infinite-length residual in the ideal no-mixing ray model with zero absorption for x>=core_ratio."""
+    _check_unit_interval(fill, 'fill', strict_zero=True)
+    _check_unit_interval(core_ratio, 'core_ratio', strict_zero=True)
+    return 0.5 * (1.0 - impact_cdf(core_ratio, fill))
+
+
+def first_crossover_length(
+    fill_a: float,
+    fill_b: float,
+    q0: float,
+    a0: float,
+    core_ratio: float,
+    z_min: float = 1e-6,
+    z_max: float = 1e3,
+    points: int = 400,
+) -> float | None:
+    """First positive crossing of two residual curves on a logarithmic search grid."""
+    if not (0.0 < z_min < z_max):
+        raise ValueError('require 0 < z_min < z_max')
+    if points < 3:
+        raise ValueError('points must be >= 3')
+
+    def delta(z: float) -> float:
+        return residual_fraction(fill_a, z, q0, a0, core_ratio) - residual_fraction(
+            fill_b, z, q0, a0, core_ratio
+        )
+
+    grid = np.geomspace(z_min, z_max, points)
+    prev_z = float(grid[0])
+    prev_v = delta(prev_z)
+    for z in grid[1:]:
+        z = float(z)
+        value = delta(z)
+        if prev_v == 0.0:
+            return prev_z
+        if value == 0.0 or prev_v * value < 0.0:
+            return float(brentq(delta, prev_z, z, xtol=1e-11, rtol=1e-10))
+        prev_z, prev_v = z, value
+    return None
+
+
+@dataclass(frozen=True)
+class ScanRow:
+    fill: float
+    core_ratio: float
+    mean_collision: float
+    mean_core_overlap: float
+    residual: float
+    floor: float
