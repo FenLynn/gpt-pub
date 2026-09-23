@@ -63,3 +63,12 @@ def test_gain_can_grow_only_in_very_small_residual_tail():
         a_values, q_values, minimum_residual=1e-3
     )
     assert gain_tail > gain_visible
+
+
+def test_absorbed_fraction_is_monotone_in_coupling_over_wide_scan():
+    q_values = np.logspace(-5, 3, 500)
+    for a in np.logspace(-3, 3, 25):
+        residual = np.array([
+            residual_power(q, a) for q in q_values
+        ])
+        assert np.all(np.diff(residual) <= 2e-12)
