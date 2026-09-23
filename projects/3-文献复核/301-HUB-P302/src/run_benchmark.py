@@ -262,7 +262,7 @@ def main() -> None:
     )
     make_plots(cfg, t_rows, g_rows, output)
 
-    print(json.dumps(summary, indent=2, sort_keys=True))
+    print("compute: ok")
 
 
 if __name__ == "__main__":
