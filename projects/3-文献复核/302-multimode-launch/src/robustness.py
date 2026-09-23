@@ -7,12 +7,20 @@ from scipy.optimize import brentq
 from scipy.sparse import bmat, csr_matrix, diags
 from scipy.sparse.linalg import expm_multiply
 
-from phase_space import (
-    collision_shape,
-    core_overlap,
-    impact_pdf,
-    mean_collision_shape,
-)
+try:
+    from .phase_space import (
+        collision_shape,
+        core_overlap,
+        impact_pdf,
+        mean_collision_shape,
+    )
+except ImportError:
+    from phase_space import (
+        collision_shape,
+        core_overlap,
+        impact_pdf,
+        mean_collision_shape,
+    )
 
 
 def occupied_phase_space_fraction(spatial_fill: float, angular_fill: float) -> float:
