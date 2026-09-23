@@ -54,4 +54,4 @@ jobs:
           python src/run_distributed_power.py --config config/distributed_power.json
           python src/run_closed_loop.py --config config/closed_loop.json
           python src/run_phenomenological_closure.py --config config/phenomenological_closure.json
-          python src/run_phenomenological_map.py --config config/phenomenological_map.json
+          python src/run_phenomenological_map.py --config config/phenomenological_map.json\n          python src/run_phenomenological_identifiability.py --config config/phenomenological_identifiability.json
