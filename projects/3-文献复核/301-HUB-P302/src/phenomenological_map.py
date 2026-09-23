@@ -243,3 +243,48 @@ def first_turning_point(
         f_prev = f_now
 
     return None
+
+
+
+@dataclass(frozen=True)
+class TwoAmbientRecovery:
+    temperature_width: float
+    midpoint_temperature: float
+    thermal_gain_1: float
+    thermal_gain_2: float
+
+
+def recover_two_ambient_scales(
+    ambient_temperature_1: float,
+    ambient_temperature_2: float,
+    ambient_offset_1: float,
+    ambient_offset_2: float,
+    power_scale_1: float,
+    power_scale_2: float,
+) -> TwoAmbientRecovery:
+    t1 = float(ambient_temperature_1)
+    t2 = float(ambient_temperature_2)
+    x1 = float(ambient_offset_1)
+    x2 = float(ambient_offset_2)
+    q1 = float(power_scale_1)
+    q2 = float(power_scale_2)
+    if t1 == t2:
+        raise ValueError("ambient temperatures must be distinct")
+    if x1 == x2:
+        raise ValueError("ambient offsets must be distinct")
+    if q1 <= 0.0 or q2 <= 0.0:
+        raise ValueError("power scales must be positive")
+
+    width = (t2 - t1) / (x1 - x2)
+    if width <= 0.0:
+        raise ValueError("ambient temperatures and offsets are inconsistent")
+    midpoint = t1 + width * x1
+    gain1 = width / q1
+    gain2 = width / q2
+
+    return TwoAmbientRecovery(
+        temperature_width=float(width),
+        midpoint_temperature=float(midpoint),
+        thermal_gain_1=float(gain1),
+        thermal_gain_2=float(gain2),
+    )
