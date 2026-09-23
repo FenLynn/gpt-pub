@@ -50,13 +50,27 @@ def main() -> None:
         if T < common["ambient_temperature"]:
             continue
         P, state, k = drive_from_temperature(temperature=T, **common)
-        derivative = residual_power_derivative_at_temperature(\n            temperature=T,\n            ambient_temperature=common["ambient_temperature"],\n            absorption=common["absorption"],\n            length=common["length"],\n            coupling_high=common["coupling_high"],\n            coupling_low=common["coupling_low"],\n            coupling_midpoint_temperature=common["coupling_midpoint_temperature"],\n            coupling_temperature_width=common["coupling_temperature_width"],\n        )\n        rows.append(\n            {\n                "normalized_temperature": float(x),
+        derivative = residual_power_derivative_at_temperature(
+            temperature=T,
+            ambient_temperature=common["ambient_temperature"],
+            absorption=common["absorption"],
+            length=common["length"],
+            coupling_high=common["coupling_high"],
+            coupling_low=common["coupling_low"],
+            coupling_midpoint_temperature=common["coupling_midpoint_temperature"],
+            coupling_temperature_width=common["coupling_temperature_width"],
+        )
+        rows.append(
+            {
+                "normalized_temperature": float(x),
                 "temperature": T,
                 "input_power": P,
                 "coupling": k,
                 "pump_fraction": state.pump_fraction,
                 "active_fraction": state.active_fraction,
-                "absorbed_fraction": state.absorbed_fraction,\n                "residual_power_derivative": derivative,\n            }
+                "absorbed_fraction": state.absorbed_fraction,
+                "residual_power_derivative": derivative,
+            }
         )
 
     with (output / "phenomenological_curve.csv").open(
