@@ -46,4 +46,6 @@ jobs:
       - name: Compute
         env:
           OUTPUT_ROOT: ${{ runner.temp }}/pub-p302
-        run: python src/run_scan.py --config config/scan.json
+        run: |
+          python src/run_scan.py --config config/scan.json
+          python src/run_robustness.py --config config/robustness.json
