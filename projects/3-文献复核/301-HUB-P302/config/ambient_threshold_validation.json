@@ -1,0 +1,4 @@
+{
+  "ambient_temperature_c": [13.0, 10.0, 7.0],
+  "threshold_power_kw": [7.30, 8.37, 8.45]
+}
