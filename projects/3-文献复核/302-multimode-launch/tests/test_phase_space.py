@@ -11,6 +11,9 @@ from src.phase_space import (
     impact_cdf,
     impact_pdf,
     mean_collision_shape,
+    mean_transfer_factor,
+    mean_absorption_factor,
+    beta_for_equal_transfer,
     mean_core_overlap,
     nonabsorbing_floor,
     residual_fraction,
@@ -113,3 +116,18 @@ def test_apparent_coupling_can_reverse_launch_ranking_with_length():
     )
     assert k_under_long > k_full_long
     assert k_under_long / k_full_long > 1.15
+
+
+def test_separable_launch_factors():
+    beta = math.radians(18.5)
+    c = 0.3
+    assert mean_transfer_factor(0.84, beta) < mean_transfer_factor(1.0, beta)
+    assert mean_absorption_factor(0.84, beta, c) > mean_absorption_factor(1.0, beta, c)
+
+
+def test_spatial_underfill_can_be_compensated_by_larger_angular_fill():
+    beta_ref = math.radians(18.5)
+    beta_test = beta_for_equal_transfer(1.0, beta_ref, 0.84)
+    assert abs(mean_transfer_factor(0.84, beta_test) / mean_transfer_factor(1.0, beta_ref) - 1.0) < 1e-11
+    na_ratio = math.sin(beta_test) / math.sin(beta_ref)
+    assert abs(na_ratio - 1.1197156342419028) < 2e-10
