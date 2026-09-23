@@ -146,3 +146,58 @@ def test_loop_gain_is_nonnegative_for_decreasing_coupling():
     assert metrics.residual_elasticity > 0.0
     assert metrics.absorption_elasticity > 0.0
     assert metrics.log_slope > 0.0
+
+
+def test_optical_length_rate_scaling_invariance():
+    base = coupled_power_fractions(0.7, absorption=0.5, length=3.0)
+    scale = 4.25
+    scaled = coupled_power_fractions(
+        0.7 / scale,
+        absorption=0.5 / scale,
+        length=3.0 * scale,
+    )
+    assert np.isclose(base.pump_fraction, scaled.pump_fraction, rtol=2e-13, atol=2e-13)
+    assert np.isclose(base.active_fraction, scaled.active_fraction, rtol=2e-13, atol=2e-13)
+    assert np.isclose(base.absorbed_fraction, scaled.absorbed_fraction, rtol=2e-13, atol=2e-13)
+
+
+def test_full_thermal_curve_is_invariant_under_length_rate_scaling():
+    scale = 3.5
+    scaled = dict(BASE)
+    scaled["length"] *= scale
+    scaled["absorption"] /= scale
+    scaled["coupling_high"] /= scale
+    scaled["coupling_low"] /= scale
+
+    for x in np.linspace(-2.0, 2.0, 9):
+        T = (
+            BASE["coupling_midpoint_temperature"]
+            + BASE["coupling_temperature_width"] * x
+        )
+        P1, state1, _ = drive_from_temperature(temperature=T, **BASE)
+        P2, state2, _ = drive_from_temperature(temperature=T, **scaled)
+        assert np.isclose(P1, P2, rtol=2e-12, atol=2e-10)
+        assert np.isclose(
+            state1.pump_fraction,
+            state2.pump_fraction,
+            rtol=2e-12,
+            atol=2e-12,
+        )
+
+
+def test_midpoint_slope_saturates_for_sharp_constitutive_law():
+    widths = [8.0, 2.0, 0.5, 0.125, 0.03125]
+    slopes = []
+    limits = []
+    for width in widths:
+        params = dict(BASE)
+        params["coupling_temperature_width"] = width
+        metrics = midpoint_metrics(**params)
+        slopes.append(metrics.log_slope)
+        limits.append(
+            metrics.residual_elasticity / metrics.absorption_elasticity
+        )
+
+    assert all(b > a for a, b in zip(slopes, slopes[1:]))
+    assert slopes[-1] < limits[-1]
+    assert abs(slopes[-1] / limits[-1] - 1.0) < 0.01
