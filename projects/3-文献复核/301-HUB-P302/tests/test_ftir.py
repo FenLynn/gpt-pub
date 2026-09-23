@@ -70,3 +70,12 @@ def test_weak_transfer_rate_factor_reduces_to_transmission():
     r = 1.0 - t
     g = repeated_encounter_rate_factor_from_reflectance(r)
     assert np.allclose(g, t, rtol=6e-5, atol=0.0)
+
+
+def test_planar_maxwell_has_optical_length_scale_invariance():
+    theta = np.deg2rad(80.0)
+    for pol in ("TE", "TM"):
+        t1, r1 = slab_rt(1.45, 1.38, 1.018, theta, 0.35, pol)
+        t2, r2 = slab_rt(1.45, 1.38, 2.036, theta, 0.70, pol)
+        assert np.isclose(t1, t2, rtol=1e-12, atol=1e-13)
+        assert np.isclose(r1, r2, rtol=1e-12, atol=1e-13)
