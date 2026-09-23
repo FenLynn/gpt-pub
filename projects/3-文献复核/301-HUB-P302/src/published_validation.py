@@ -86,3 +86,55 @@ def predict_threshold_power(
     if np.any(ta >= tstar):
         raise ValueError("ambient temperature must remain below turning temperature")
     return (tstar - ta) / gain
+
+
+
+@dataclass(frozen=True)
+class ResidualSecantAudit:
+    input_power_1: float
+    input_power_2: float
+    residual_ratio_1: float
+    residual_ratio_2: float
+    residual_power_1: float
+    residual_power_2: float
+    residual_ratio_secant: float
+    absolute_residual_secant: float
+    log_ratio_log_power_secant: float
+
+
+def residual_secant_audit(
+    input_power_1: float,
+    input_power_2: float,
+    residual_ratio_1: float,
+    residual_ratio_2: float,
+) -> ResidualSecantAudit:
+    import math
+
+    p1 = float(input_power_1)
+    p2 = float(input_power_2)
+    r1 = float(residual_ratio_1)
+    r2 = float(residual_ratio_2)
+    if not (0.0 < p1 < p2):
+        raise ValueError("require 0 < input_power_1 < input_power_2")
+    if not (0.0 < r1 < 1.0 and 0.0 < r2 < 1.0):
+        raise ValueError("residual ratios must lie in (0, 1)")
+    if r2 <= r1:
+        raise ValueError("this audit expects an increasing residual ratio")
+
+    pr1 = p1 * r1
+    pr2 = p2 * r2
+    ratio_secant = (r2 - r1) / (p2 - p1)
+    absolute_secant = (pr2 - pr1) / (p2 - p1)
+    log_secant = math.log(r2 / r1) / math.log(p2 / p1)
+
+    return ResidualSecantAudit(
+        input_power_1=p1,
+        input_power_2=p2,
+        residual_ratio_1=r1,
+        residual_ratio_2=r2,
+        residual_power_1=float(pr1),
+        residual_power_2=float(pr2),
+        residual_ratio_secant=float(ratio_secant),
+        absolute_residual_secant=float(absolute_secant),
+        log_ratio_log_power_secant=float(log_secant),
+    )
