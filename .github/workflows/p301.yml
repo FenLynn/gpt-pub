@@ -49,3 +49,4 @@ jobs:
         run: |
           python src/run_benchmark.py --config config/benchmark.json
           python src/run_transport.py --config config/transport.json
+          python src/run_power_flow.py --config config/power_flow.json
