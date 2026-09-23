@@ -53,4 +53,4 @@ jobs:
           python src/run_curved_gap.py --config config/curved_gap.json
           python src/run_distributed_power.py --config config/distributed_power.json
           python src/run_closed_loop.py --config config/closed_loop.json
-          python src/run_thermoelastic_cell.py --config config/thermoelastic_cell.json
+          python src/run_thermoelastic_cell.py --config config/thermoelastic_cell.json\n          python src/run_phenomenological_closure.py --config config/phenomenological_closure.json
