@@ -171,6 +171,97 @@ def beta_for_equal_transfer(
     return float(brentq(objective, lo, hi, xtol=1e-13, rtol=1e-12))
 
 
+
+def weighted_nonabsorbing_residual(
+    rates: np.ndarray,
+    weights: np.ndarray,
+    length: float,
+) -> float:
+    """Passive-guide residual for a symmetric nonabsorbing mixture of coupling rates."""
+    rates = np.asarray(rates, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if rates.shape != weights.shape or rates.ndim != 1:
+        raise ValueError("rates and weights must be one-dimensional arrays of equal shape")
+    if np.any(rates < 0.0) or np.any(weights < 0.0) or length < 0.0:
+        raise ValueError("rates, weights, and length must be non-negative")
+    total = float(weights.sum())
+    if total <= 0.0:
+        raise ValueError("weights must have positive sum")
+    w = weights / total
+    return float(0.5 * (1.0 + np.sum(w * np.exp(-2.0 * rates * length))))
+
+
+def weighted_dark_fraction(
+    rates: np.ndarray,
+    weights: np.ndarray,
+    tolerance: float = 0.0,
+) -> float:
+    """Normalized weight in channels with rate <= tolerance."""
+    rates = np.asarray(rates, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if rates.shape != weights.shape or rates.ndim != 1:
+        raise ValueError("rates and weights must be one-dimensional arrays of equal shape")
+    if np.any(rates < 0.0) or np.any(weights < 0.0) or tolerance < 0.0:
+        raise ValueError("rates, weights, and tolerance must be non-negative")
+    total = float(weights.sum())
+    if total <= 0.0:
+        raise ValueError("weights must have positive sum")
+    return float(weights[rates <= tolerance].sum() / total)
+
+
+def symmetric_mixture_plateau(
+    rates: np.ndarray,
+    weights: np.ndarray,
+    tolerance: float = 0.0,
+) -> float:
+    """Infinite-length passive-guide plateau for a symmetric mixture with dark channels."""
+    dark = weighted_dark_fraction(rates, weights, tolerance=tolerance)
+    return float(0.5 * (1.0 + dark))
+
+
+def symmetric_initial_moments(
+    rates: np.ndarray,
+    weights: np.ndarray,
+) -> tuple[float, float, float]:
+    """Return mean rate, second moment, and variance from a symmetric rate mixture."""
+    rates = np.asarray(rates, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if rates.shape != weights.shape or rates.ndim != 1:
+        raise ValueError("rates and weights must be one-dimensional arrays of equal shape")
+    if np.any(rates < 0.0) or np.any(weights < 0.0):
+        raise ValueError("rates and weights must be non-negative")
+    total = float(weights.sum())
+    if total <= 0.0:
+        raise ValueError("weights must have positive sum")
+    w = weights / total
+    mean = float(np.sum(w * rates))
+    second = float(np.sum(w * rates * rates))
+    return mean, second, float(second - mean * mean)
+
+
+def asymmetric_initial_moments(
+    q12: np.ndarray,
+    q21: np.ndarray,
+    weights: np.ndarray,
+) -> tuple[float, float, float]:
+    """Matched-population moments: <q12>, <q21>, and Var(q12+q21)."""
+    q12 = np.asarray(q12, dtype=float)
+    q21 = np.asarray(q21, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if q12.shape != q21.shape or q12.shape != weights.shape or q12.ndim != 1:
+        raise ValueError("q12, q21, and weights must be one-dimensional arrays of equal shape")
+    if np.any(q12 < 0.0) or np.any(q21 < 0.0) or np.any(weights < 0.0):
+        raise ValueError("rates and weights must be non-negative")
+    total = float(weights.sum())
+    if total <= 0.0:
+        raise ValueError("weights must have positive sum")
+    w = weights / total
+    s = q12 + q21
+    m12 = float(np.sum(w * q12))
+    m21 = float(np.sum(w * q21))
+    var_s = float(np.sum(w * s * s) - np.sum(w * s) ** 2)
+    return m12, m21, var_s
+
 def asymmetric_channel_passive(
     q12: float,
     q21: float,
