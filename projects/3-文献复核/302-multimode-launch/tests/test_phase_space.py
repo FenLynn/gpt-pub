@@ -10,6 +10,7 @@ from src.phase_space import (
     asymmetric_equilibrium,
     infer_asymmetric_rates,
     reverse_equilibrium_transfer_fractions,
+    short_length_moment_tomography,
     symmetric_initial_moments,
     symmetric_mixture_plateau,
     weighted_dark_fraction,
@@ -250,3 +251,34 @@ def test_asymmetric_matched_population_recovers_total_rate_variance():
     assert abs(m12 - np.average(q12, weights=weights)) < 1e-14
     assert abs(m21 - np.average(q21, weights=weights)) < 1e-14
     assert abs(var_s - np.average((s - np.average(s, weights=weights))**2, weights=weights)) < 1e-14
+
+
+def test_short_length_moment_tomography_matches_weighted_moments():
+    import numpy as np
+    q12 = np.array([0.4, 1.0, 1.8])
+    q21 = np.array([0.3, 0.7, 1.2])
+    absorption = np.array([2.0, 0.5, 3.0])
+    weights = np.array([0.2, 0.3, 0.5])
+    mean_q, curvature, aq = short_length_moment_tomography(
+        q12, q21, absorption, weights
+    )
+    assert abs(mean_q - np.average(q12, weights=weights)) < 1e-14
+    assert abs(curvature - np.average(q12 * (q12 + q21), weights=weights)) < 1e-14
+    assert abs(aq - np.average(absorption * q12, weights=weights)) < 1e-14
+
+
+def test_total_power_quadratic_loss_is_absorption_coupling_moment():
+    # For one channel: P_total(L)=1-0.5*a*q12*L^2+O(L^3).
+    q12 = 1.2
+    q21 = 0.8
+    absorption = 3.0
+    import numpy as np
+    mean_q, curvature, aq = short_length_moment_tomography(
+        np.array([q12]),
+        np.array([q21]),
+        np.array([absorption]),
+        np.array([1.0]),
+    )
+    assert abs(mean_q - q12) < 1e-14
+    assert abs(curvature - q12 * (q12 + q21)) < 1e-14
+    assert abs(aq - absorption * q12) < 1e-14
