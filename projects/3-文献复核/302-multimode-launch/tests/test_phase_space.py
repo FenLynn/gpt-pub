@@ -4,11 +4,16 @@ from scipy.integrate import quad
 
 from src.phase_space import (
     angular_mean_sec,
+    asymmetric_initial_moments,
     asymmetric_channel_active,
     asymmetric_channel_passive,
     asymmetric_equilibrium,
     infer_asymmetric_rates,
     reverse_equilibrium_transfer_fractions,
+    symmetric_initial_moments,
+    symmetric_mixture_plateau,
+    weighted_dark_fraction,
+    weighted_nonabsorbing_residual,
     angular_mean_tan,
     channel_residual,
     first_crossover_length,
@@ -207,3 +212,41 @@ def test_fixed_directional_rates_require_reverse_plateau_complementarity():
     assert abs(f12 + f21 - 1.0) < 1e-14
     assert abs(f12 - 0.75) < 1e-14
     assert abs(f21 - 0.25) < 1e-14
+
+
+def test_dark_channels_shift_symmetric_plateau():
+    import numpy as np
+    rates = np.array([0.0, 1.0, 2.0])
+    weights = np.array([0.2, 0.3, 0.5])
+    assert abs(weighted_dark_fraction(rates, weights) - 0.2) < 1e-14
+    assert abs(symmetric_mixture_plateau(rates, weights) - 0.6) < 1e-14
+    assert abs(weighted_nonabsorbing_residual(rates, weights, 50.0) - 0.6) < 1e-12
+
+
+def test_no_dark_channels_recover_half_half_plateau():
+    import numpy as np
+    rates = np.array([0.4, 1.0, 2.0])
+    weights = np.array([0.2, 0.3, 0.5])
+    assert abs(symmetric_mixture_plateau(rates, weights) - 0.5) < 1e-14
+
+
+def test_symmetric_initial_derivatives_encode_rate_variance():
+    import numpy as np
+    rates = np.array([0.5, 1.0, 2.0])
+    weights = np.array([0.2, 0.3, 0.5])
+    mean, second, variance = symmetric_initial_moments(rates, weights)
+    assert abs(mean - np.average(rates, weights=weights)) < 1e-14
+    assert abs(second - np.average(rates**2, weights=weights)) < 1e-14
+    assert abs(variance - np.average((rates - mean)**2, weights=weights)) < 1e-14
+
+
+def test_asymmetric_matched_population_recovers_total_rate_variance():
+    import numpy as np
+    q12 = np.array([0.5, 1.0, 2.0])
+    q21 = np.array([0.2, 0.8, 1.0])
+    weights = np.array([0.25, 0.25, 0.5])
+    m12, m21, var_s = asymmetric_initial_moments(q12, q21, weights)
+    s = q12 + q21
+    assert abs(m12 - np.average(q12, weights=weights)) < 1e-14
+    assert abs(m21 - np.average(q21, weights=weights)) < 1e-14
+    assert abs(var_s - np.average((s - np.average(s, weights=weights))**2, weights=weights)) < 1e-14
