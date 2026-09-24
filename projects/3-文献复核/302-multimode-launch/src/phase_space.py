@@ -126,6 +126,22 @@ def mean_core_overlap(fill: float, core_ratio: float) -> float:
     return float(value)
 
 
+
+def mean_absorption_transfer_product(fill: float, core_ratio: float) -> float:
+    """Dimensionless <core_overlap(x)*collision_shape(x)> for centered spatial launch."""
+    _check_unit_interval(fill, "fill", strict_zero=True)
+    _check_unit_interval(core_ratio, "core_ratio", strict_zero=True)
+    upper = min(fill, core_ratio)
+    value, _ = quad(
+        lambda x: impact_pdf(x, fill) * core_overlap(x, core_ratio) * collision_shape(x),
+        0.0,
+        upper,
+        epsabs=1e-12,
+        epsrel=1e-11,
+        limit=300,
+    )
+    return float(value)
+
 def angular_mean_tan(beta_max: float) -> float:
     """Mean tan(beta) for a uniformly filled transverse-k disk up to beta_max."""
     if not (0.0 < beta_max < math.pi / 2.0):
