@@ -256,6 +256,24 @@ def symmetric_initial_moments(
 
 
 
+
+def leading_short_length_limits(
+    q12: float,
+    q21: float,
+    absorption: float,
+    relative_bias: float = 0.05,
+) -> tuple[float, float]:
+    """Leading-order length limits for slope and total-curvature finite-difference bias."""
+    if q12 < 0.0 or q21 < 0.0 or absorption < 0.0:
+        raise ValueError("rates and absorption must be non-negative")
+    if not (0.0 < relative_bias < 1.0):
+        raise ValueError("relative_bias must lie in (0, 1)")
+    s = q12 + q21
+    slope_limit = math.inf if s == 0.0 else 2.0 * relative_bias / s
+    curvature_scale = s + absorption
+    curvature_limit = math.inf if curvature_scale == 0.0 else 3.0 * relative_bias / curvature_scale
+    return float(slope_limit), float(curvature_limit)
+
 def short_length_moment_tomography(
     q12: np.ndarray,
     q21: np.ndarray,
