@@ -239,6 +239,42 @@ def symmetric_initial_moments(
     return mean, second, float(second - mean * mean)
 
 
+
+def short_length_moment_tomography(
+    q12: np.ndarray,
+    q21: np.ndarray,
+    absorption: np.ndarray,
+    weights: np.ndarray,
+) -> tuple[float, float, float]:
+    """Return <q12>, <q12(q12+q21)>, and <absorption*q12> for guide-1 launch."""
+    q12 = np.asarray(q12, dtype=float)
+    q21 = np.asarray(q21, dtype=float)
+    absorption = np.asarray(absorption, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if (
+        q12.shape != q21.shape
+        or q12.shape != absorption.shape
+        or q12.shape != weights.shape
+        or q12.ndim != 1
+    ):
+        raise ValueError("all inputs must be one-dimensional arrays of equal shape")
+    if (
+        np.any(q12 < 0.0)
+        or np.any(q21 < 0.0)
+        or np.any(absorption < 0.0)
+        or np.any(weights < 0.0)
+    ):
+        raise ValueError("rates, absorption, and weights must be non-negative")
+    total = float(weights.sum())
+    if total <= 0.0:
+        raise ValueError("weights must have positive sum")
+    w = weights / total
+    s = q12 + q21
+    mean_q12 = float(np.sum(w * q12))
+    coupling_curvature = float(np.sum(w * q12 * s))
+    absorption_coupling = float(np.sum(w * absorption * q12))
+    return mean_q12, coupling_curvature, absorption_coupling
+
 def asymmetric_initial_moments(
     q12: np.ndarray,
     q21: np.ndarray,
