@@ -27,6 +27,7 @@ from src.phase_space import (
     mean_absorption_transfer_product,
     beta_for_equal_transfer,
     bgk_residual_fraction,
+    leading_short_length_limits,
     mean_core_overlap,
     nonabsorbing_floor,
     residual_fraction,
@@ -296,3 +297,20 @@ def test_underfill_can_reduce_transfer_but_increase_absorption_transfer_cross_mo
     assert abs(cross_ratio - 1.189573298555148) < 2e-10
     assert transfer_ratio < 1.0
     assert cross_ratio > 1.0
+
+
+def test_leading_short_length_limits_match_scalar_expansion():
+    slope_limit, curvature_limit = leading_short_length_limits(
+        q12=2.0,
+        q21=2.0,
+        absorption=1.25568,
+        relative_bias=0.05,
+    )
+    assert abs(slope_limit - 0.025) < 1e-14
+    assert abs(curvature_limit - (0.15 / 5.25568)) < 1e-14
+
+
+def test_leading_short_length_limits_double_for_ten_percent_slope_tolerance():
+    l5, _ = leading_short_length_limits(2.0, 2.0, 1.25568, 0.05)
+    l10, _ = leading_short_length_limits(2.0, 2.0, 1.25568, 0.10)
+    assert abs(l10 / l5 - 2.0) < 1e-14
