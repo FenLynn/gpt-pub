@@ -24,6 +24,7 @@ from src.phase_space import (
     mean_collision_shape,
     mean_transfer_factor,
     mean_absorption_factor,
+    mean_absorption_transfer_product,
     beta_for_equal_transfer,
     bgk_residual_fraction,
     mean_core_overlap,
@@ -282,3 +283,16 @@ def test_total_power_quadratic_loss_is_absorption_coupling_moment():
     assert abs(mean_q - q12) < 1e-14
     assert abs(curvature - q12 * (q12 + q21)) < 1e-14
     assert abs(aq - absorption * q12) < 1e-14
+
+
+def test_underfill_can_reduce_transfer_but_increase_absorption_transfer_cross_moment():
+    core_ratio = 0.12
+    transfer_ratio = mean_collision_shape(0.84) / mean_collision_shape(1.0)
+    cross_ratio = (
+        mean_absorption_transfer_product(0.84, core_ratio)
+        / mean_absorption_transfer_product(1.0, core_ratio)
+    )
+    assert abs(transfer_ratio - 0.8856069698734197) < 2e-12
+    assert abs(cross_ratio - 1.189573298555148) < 2e-10
+    assert transfer_ratio < 1.0
+    assert cross_ratio > 1.0
