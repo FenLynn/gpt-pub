@@ -1,0 +1,51 @@
+name: PUB-P302
+
+on:
+  push:
+    branches:
+      - p302-exp
+    paths:
+      - "projects/3-文献复核/302-multimode-launch/**"
+      - ".github/workflows/p302.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "projects/3-文献复核/302-multimode-launch/**"
+      - ".github/workflows/p302.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: projects/3-文献复核/302-multimode-launch
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: projects/3-文献复核/302-multimode-launch/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Tests
+        run: python -m pytest -q
+
+      - name: Compute
+        env:
+          OUTPUT_ROOT: ${{ runner.temp }}/pub-p302
+        run: |
+          python src/run_scan.py --config config/scan.json
+          python src/run_robustness.py --config config/robustness.json
