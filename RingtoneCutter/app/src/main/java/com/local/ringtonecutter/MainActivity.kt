@@ -80,9 +80,9 @@ class MainActivity : AppCompatActivity() {
         }
         scroll.addView(
             root,
-            ScrollView.LayoutParams(
-                ScrollView.LayoutParams.MATCH_PARENT,
-                ScrollView.LayoutParams.WRAP_CONTENT
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
             )
         )
 
@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 15f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
-        val hint = TextView(this).apply {
+        val trimHint = TextView(this).apply {
             text = "拖动两端选择范围"
             textSize = 12f
             setTextColor(Color.rgb(105, 105, 110))
@@ -158,7 +158,7 @@ class MainActivity : AppCompatActivity() {
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         times.addView(startTime, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        times.addView(hint)
+        times.addView(trimHint)
         times.addView(endTime, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         trimPanel.addView(times)
 
@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity() {
         val name = queryDisplayName(uri) ?: "video"
         val duration = durationMs / 1000f
 
-        fileInfo.text = "$name  ·  \${formatTime(duration)}"
+        fileInfo.text = "$name  ·  ${formatTime(duration)}"
         nameEdit.setText(name.substringBeforeLast('.').take(60))
 
         (videoView.tag as View).visibility = View.VISIBLE
@@ -288,13 +288,13 @@ class MainActivity : AppCompatActivity() {
             var output: File? = null
             try {
                 input = copyUriToCache(uri)
-                output = File(cacheDir, "ringtone_\${System.currentTimeMillis()}.mp3")
+                output = File(cacheDir, "ringtone_${System.currentTimeMillis()}.mp3")
 
                 val cmd = buildString {
                     append("-hide_banner -y ")
-                    append("-ss \${sec(start)} ")
-                    append("-i \${quote(input.absolutePath)} ")
-                    append("-t \${sec(length)} ")
+                    append("-ss ${sec(start)} ")
+                    append("-i ${quote(input.absolutePath)} ")
+                    append("-t ${sec(length)} ")
                     append("-vn -map 0:a:0? ")
                     append("-c:a libmp3lame -q:a 2 ")
                     append("-map_metadata -1 ")
@@ -322,7 +322,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     } catch (e: Exception) {
                         runOnUiThread {
-                            setExporting(false, "保存失败：\${e.message ?: "未知错误"}")
+                            setExporting(false, "保存失败：${e.message ?: "未知错误"}")
                         }
                     } finally {
                         inputFile.delete()
@@ -333,7 +333,7 @@ class MainActivity : AppCompatActivity() {
                 input?.delete()
                 output?.delete()
                 runOnUiThread {
-                    setExporting(false, "处理失败：\${e.message ?: "未知错误"}")
+                    setExporting(false, "处理失败：${e.message ?: "未知错误"}")
                 }
             }
         }.start()
@@ -342,7 +342,7 @@ class MainActivity : AppCompatActivity() {
     private fun copyUriToCache(uri: Uri): File {
         val sourceName = queryDisplayName(uri) ?: "input.mp4"
         val ext = sourceName.substringAfterLast('.', "mp4").take(8).ifBlank { "mp4" }
-        val target = File(cacheDir, "input_\${System.currentTimeMillis()}.$ext")
+        val target = File(cacheDir, "input_${System.currentTimeMillis()}.$ext")
         contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "无法读取视频" }
             target.outputStream().use { output -> input.copyTo(output) }
@@ -395,8 +395,8 @@ class MainActivity : AppCompatActivity() {
             val exists = contentResolver.query(
                 collection,
                 arrayOf(MediaStore.Audio.Media._ID),
-                "\${MediaStore.Audio.Media.DISPLAY_NAME}=? AND \${MediaStore.Audio.Media.RELATIVE_PATH}=?",
-                arrayOf(candidate, "\${Environment.DIRECTORY_RINGTONES}/"),
+                "${MediaStore.Audio.Media.DISPLAY_NAME}=? AND ${MediaStore.Audio.Media.RELATIVE_PATH}=?",
+                arrayOf(candidate, "${Environment.DIRECTORY_RINGTONES}/"),
                 null
             )?.use { it.moveToFirst() } ?: false
 
@@ -460,7 +460,7 @@ class MainActivity : AppCompatActivity() {
         String.format(Locale.US, "%.3f", v)
 
     private fun quote(path: String): String =
-        "\"\${path.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        "\"${path.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
     private fun dp(v: Int): Int =
         (v * resources.displayMetrics.density + 0.5f).toInt()
