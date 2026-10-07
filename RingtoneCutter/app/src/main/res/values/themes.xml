@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.RingtoneCutter" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#202124</item>
+        <item name="colorPrimaryVariant">#202124</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F7F7F8</item>
+        <item name="android:navigationBarColor">#F7F7F8</item>
+        <item name="android:windowBackground">#F7F7F8</item>
+    </style>
+</resources>
