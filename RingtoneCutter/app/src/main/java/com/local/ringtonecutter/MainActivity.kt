@@ -21,6 +21,7 @@ import android.widget.VideoView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.FFmpegKitConfig
 import com.arthenica.ffmpegkit.ReturnCode
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.RangeSlider
@@ -164,6 +165,7 @@ class MainActivity : AppCompatActivity() {
         startTime = TextView(this).apply {
             text = "开始  00:00.0"
             textSize = 15f
+            setTextColor(Color.rgb(45, 45, 48))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         val trimHint = TextView(this).apply {
@@ -174,6 +176,7 @@ class MainActivity : AppCompatActivity() {
         endTime = TextView(this).apply {
             text = "结束  00:00.0"
             textSize = 15f
+            setTextColor(Color.rgb(45, 45, 48))
             gravity = Gravity.END
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
@@ -204,6 +207,8 @@ class MainActivity : AppCompatActivity() {
         }
         nameEdit = TextInputEditText(this).apply {
             hint = "例如：我的铃声"
+            setTextColor(Color.rgb(35, 35, 38))
+            setHintTextColor(Color.rgb(135, 135, 140))
             isSingleLine = true
         }
         nameBox.addView(nameEdit)
@@ -305,6 +310,17 @@ class MainActivity : AppCompatActivity() {
         val safeName = sanitizeFileName(
             nameEdit.text?.toString().orEmpty().trim().ifBlank { "我的铃声" }
         )
+
+        val libraries = try {
+            FFmpegKitConfig.getExternalLibraries()
+        } catch (_: Throwable) {
+            emptyList<String>()
+        }
+        if (libraries.none { it.equals("lame", ignoreCase = true) }) {
+            setExporting(false, "当前安装包缺少 MP3(LAME) 编码器")
+            return
+        }
+
         setExporting(true, "正在提取音频…")
 
         Thread {
@@ -319,7 +335,7 @@ class MainActivity : AppCompatActivity() {
                     append("-ss ${sec(start)} ")
                     append("-i ${quote(input.absolutePath)} ")
                     append("-t ${sec(length)} ")
-                    append("-vn -map 0:a:0? ")
+                    append("-vn -map 0:a:0 ")
                     append("-c:a libmp3lame -b:a 192k ")
                     append("-map_metadata -1 ")
                     append(quote(output.absolutePath))
@@ -340,8 +356,12 @@ class MainActivity : AppCompatActivity() {
                                 toast("MP3 已保存")
                             }
                         } else {
+                            val detail = summarizeFfmpegError(
+                                try { session.allLogsAsString } catch (_: Throwable) { "" }
+                            )
                             runOnUiThread {
-                                setExporting(false, "提取失败：视频可能没有音轨")
+                                setExporting(false, "提取失败：$detail")
+                                toast("提取失败，下面已显示具体原因")
                             }
                         }
                     } catch (e: Exception) {
@@ -461,6 +481,24 @@ class MainActivity : AppCompatActivity() {
         nameEdit.isEnabled = !value
         progressBar.visibility = if (value) View.VISIBLE else View.GONE
         statusText.text = text
+    }
+
+    private fun summarizeFfmpegError(logs: String): String {
+        val lines = logs.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { it.startsWith("ffmpeg version", ignoreCase = true) }
+            .toList()
+
+        val preferred = lines.lastOrNull {
+            it.contains("error", ignoreCase = true) ||
+            it.contains("invalid", ignoreCase = true) ||
+            it.contains("encoder", ignoreCase = true) ||
+            it.contains("stream", ignoreCase = true) ||
+            it.contains("audio", ignoreCase = true)
+        } ?: lines.lastOrNull()
+
+        return preferred?.take(180) ?: "FFmpeg 返回失败，未提供详细日志"
     }
 
     private fun sanitizeFileName(name: String): String =
