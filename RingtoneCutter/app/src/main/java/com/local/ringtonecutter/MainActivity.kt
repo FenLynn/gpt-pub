@@ -174,10 +174,12 @@ class MainActivity : AppCompatActivity() {
         val nameBox = TextInputLayout(this).apply {
             hint = "文件名"
             boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
-            boxCornerRadiusTopStart = dp(14).toFloat()
-            boxCornerRadiusTopEnd = dp(14).toFloat()
-            boxCornerRadiusBottomStart = dp(14).toFloat()
-            boxCornerRadiusBottomEnd = dp(14).toFloat()
+            setBoxCornerRadii(
+                dp(14).toFloat(),
+                dp(14).toFloat(),
+                dp(14).toFloat(),
+                dp(14).toFloat()
+            )
         }
         nameEdit = TextInputEditText(this).apply {
             hint = "例如：我的铃声"
