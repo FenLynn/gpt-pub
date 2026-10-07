@@ -21,14 +21,13 @@ jobs:
           tar -xzf /tmp/repo.tar.gz --strip-components=1 -C /tmp/repo
           cp -a /tmp/repo/RingtoneCutter "$GITHUB_WORKSPACE/RingtoneCutter"
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+      - name: Prepare Gradle
+        shell: bash
+        run: |
+          java -version
+          curl -fL --retry 5 --retry-delay 2             "https://services.gradle.org/distributions/gradle-8.9-bin.zip"             -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
 
       - name: Show Android SDK
         shell: bash
@@ -39,7 +38,7 @@ jobs:
 
       - name: Build debug APK
         working-directory: RingtoneCutter
-        run: gradle --no-daemon --stacktrace assembleDebug
+        run: /tmp/gradle-8.9/bin/gradle --no-daemon --stacktrace assembleDebug
 
       - name: Collect APK
         shell: bash
