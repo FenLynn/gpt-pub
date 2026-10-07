@@ -2,7 +2,7 @@ name: Build Ringtone Cutter APK
 
 on:
   push:
-    branches: [ "ringtone-cutter-fix-20261008" ]
+    branches: [ "ringtone-cutter-build-20261007" ]
     paths:
       - "RingtoneCutter/**"
       - ".github/workflows/ringtone-cutter-build.yml"
@@ -16,7 +16,7 @@ jobs:
       - name: Fetch source tarball
         shell: bash
         run: |
-          curl -fL --retry 5 --retry-delay 2             "https://codeload.github.com/FenLynn/gpt-pub/tar.gz/refs/heads/ringtone-cutter-fix-20261008"             -o /tmp/repo.tar.gz
+          curl -fL --retry 5 --retry-delay 2             "https://codeload.github.com/FenLynn/gpt-pub/tar.gz/refs/heads/ringtone-cutter-build-20261007"             -o /tmp/repo.tar.gz
           mkdir -p /tmp/repo
           tar -xzf /tmp/repo.tar.gz --strip-components=1 -C /tmp/repo
           cp -a /tmp/repo/RingtoneCutter "$GITHUB_WORKSPACE/RingtoneCutter"
