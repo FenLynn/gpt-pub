@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var videoView: VideoView
     private lateinit var startTime: TextView
     private lateinit var endTime: TextView
+    private lateinit var previewTime: TextView
     private lateinit var rangeSlider: RangeSlider
     private lateinit var nameEdit: TextInputEditText
     private lateinit var progressBar: ProgressBar
@@ -62,7 +63,9 @@ class MainActivity : AppCompatActivity() {
         }
         rangeSlider.addOnChangeListener { slider, value, fromUser ->
             if (fromUser) {
+                videoView.pause()
                 updateTimeLabels(slider)
+                previewTime.text = "当前预览  " + formatTime(value)
                 videoView.seekTo((value * 1000f).toInt())
             }
         }
@@ -117,6 +120,13 @@ class MainActivity : AppCompatActivity() {
         root.addView(fileInfo, lpTop(12))
 
         videoView = VideoView(this)
+        previewTime = TextView(this).apply {
+            text = "当前预览  00:00.0"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.argb(180, 0, 0, 0))
+            setPadding(dp(12), dp(7), dp(12), dp(7))
+        }
         val videoFrame = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             visibility = View.GONE
@@ -126,6 +136,16 @@ class MainActivity : AppCompatActivity() {
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
+            )
+            addView(
+                previewTime,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                ).apply {
+                    bottomMargin = dp(12)
+                }
             )
         }
         root.addView(videoFrame, lpTop(18, dp(220)))
@@ -142,7 +162,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         startTime = TextView(this).apply {
-            text = "00:00.0"
+            text = "开始  00:00.0"
             textSize = 15f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
@@ -152,7 +172,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.rgb(105, 105, 110))
         }
         endTime = TextView(this).apply {
-            text = "00:00.0"
+            text = "结束  00:00.0"
             textSize = 15f
             gravity = Gravity.END
             setTypeface(typeface, android.graphics.Typeface.BOLD)
@@ -168,6 +188,7 @@ class MainActivity : AppCompatActivity() {
             values = listOf(0f, 1f)
             setMinSeparationValue(0.1f)
             isTickVisible = false
+            setLabelFormatter { formatTime(it) }
         }
         trimPanel.addView(rangeSlider, lpTop(4))
 
@@ -256,13 +277,14 @@ class MainActivity : AppCompatActivity() {
         rangeSlider.values = listOf(0f, duration.coerceAtLeast(0.1f))
         rangeSlider.setMinSeparationValue(0.1f)
         updateTimeLabels(rangeSlider)
+        previewTime.text = "当前预览  00:00.0"
         statusText.text = "保存位置：系统 Ringtones"
     }
 
     private fun updateTimeLabels(slider: RangeSlider) {
         val v = slider.values.sorted()
-        startTime.text = formatTime(v[0])
-        endTime.text = formatTime(v[1])
+        startTime.text = "开始  " + formatTime(v[0])
+        endTime.text = "结束  " + formatTime(v[1])
     }
 
     private fun exportMp3() {
@@ -298,7 +320,7 @@ class MainActivity : AppCompatActivity() {
                     append("-i ${quote(input.absolutePath)} ")
                     append("-t ${sec(length)} ")
                     append("-vn -map 0:a:0? ")
-                    append("-c:a libmp3lame -q:a 2 ")
+                    append("-c:a libmp3lame -b:a 192k ")
                     append("-map_metadata -1 ")
                     append(quote(output.absolutePath))
                 }
@@ -434,6 +456,7 @@ class MainActivity : AppCompatActivity() {
         isExporting = value
         chooseButton.isEnabled = !value
         exportButton.isEnabled = !value
+        exportButton.text = if (value) "正在导出…" else "导出 MP3"
         rangeSlider.isEnabled = !value
         nameEdit.isEnabled = !value
         progressBar.visibility = if (value) View.VISIBLE else View.GONE
