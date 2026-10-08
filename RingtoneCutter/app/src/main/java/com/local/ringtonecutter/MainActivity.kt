@@ -24,6 +24,7 @@ import android.widget.VideoView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.RangeSlider
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fullButton: MaterialButton
     private lateinit var nameButton: MaterialButton
     private lateinit var fileInfo: TextView
+    private lateinit var videoCard: MaterialCardView
     private lateinit var videoFrame: FrameLayout
     private lateinit var videoView: VideoView
     private lateinit var previewTime: TextView
@@ -119,6 +121,7 @@ class MainActivity : AppCompatActivity() {
         fullButton = findViewById(R.id.fullButton)
         nameButton = findViewById(R.id.nameButton)
         fileInfo = findViewById(R.id.fileInfo)
+        videoCard = findViewById(R.id.videoCard)
         videoFrame = findViewById(R.id.videoFrame)
         videoView = findViewById(R.id.videoView)
         previewTime = findViewById(R.id.previewTime)
@@ -243,8 +246,10 @@ class MainActivity : AppCompatActivity() {
         updateNameButton()
 
         fileInfo.text = sourceName + "  ·  " + formatTime(currentDuration)
+        videoCard.visibility = View.VISIBLE
         videoFrame.visibility = View.VISIBLE
         trimPanel.visibility = View.VISIBLE
+        exportButton.isEnabled = true
 
         videoView.setMediaController(null)
         videoView.setVideoURI(uri)
