@@ -63,6 +63,7 @@ function workBands(){
 }
 
 function singleTimelinePanel(a){
+  const pairedIds=new Set(a.pairs.flat().map(p=>p.recordId));
   const ins=a.punches.filter(p=>p.direction==='进'), outs=a.punches.filter(p=>p.direction==='出');
   const pairs=a.pairs.map(([x,y],i)=>`<span class="rail-presence" style="left:${pct(x.time)}%;width:${Math.max(.35,pct(y.time)-pct(x.time))}%;--i:${i}"></span>`).join('');
   return `<div class="timeline-topline">
@@ -74,13 +75,13 @@ function singleTimelinePanel(a){
         ${timelineAxis()}
         <div class="attendance-rail">
           <div class="rail-label">进</div>
-          <div class="rail-lane in-lane">${ins.map((p,i)=>railMarker(p,'in',i)).join('')}</div>
+          <div class="rail-lane in-lane">${ins.map((p,i)=>railMarker(p,'in',i,!pairedIds.has(p.recordId))).join('')}</div>
 
           <div class="rail-label muted">在岗</div>
           <div class="rail-lane presence-lane">${workBands()}${pairs}</div>
 
           <div class="rail-label">出</div>
-          <div class="rail-lane out-lane">${outs.map((p,i)=>railMarker(p,'out',i)).join('')}</div>
+          <div class="rail-lane out-lane">${outs.map((p,i)=>railMarker(p,'out',i,!pairedIds.has(p.recordId))).join('')}</div>
         </div>
       </div>
     </div>
@@ -90,8 +91,8 @@ function singleTimelinePanel(a){
     </div>`;
 }
 
-function railMarker(p,kind,i){
-  return `<button class="rail-marker ${kind}" data-record="${p.recordId}" style="left:${pct(p.time)}%;--i:${i}" title="${p.time} ${p.direction}">
+function railMarker(p,kind,i,unpaired=false){
+  return `<button class="rail-marker ${kind} ${unpaired?'unpaired':''}" data-record="${p.recordId}" style="left:${pct(p.time)}%;--i:${i}" title="${p.time} ${p.direction}${unpaired?' · 未形成完整配对':''}">
     <i></i><time>${p.time.slice(0,5)}</time>
   </button>`;
 }
