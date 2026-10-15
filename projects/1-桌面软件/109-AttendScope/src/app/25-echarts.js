@@ -517,6 +517,99 @@ function mountStatusBarChart(chart,items){
   });
 }
 
+function dateRangeRender(data){
+  return function(params,api){
+    const item=data[params.dataIndex];
+    if(!item)return null;
+    const start=api.coord([api.value(0),api.value(2)]);
+    const end=api.coord([api.value(1),api.value(2)]);
+    const h=Math.max(3,Math.min(5,api.size([0,1])[1]*.28));
+    return {
+      type:'rect',
+      shape:{x:start[0],y:start[1]-h/2,width:Math.max(1,end[0]-start[0]),height:h,r:3},
+      style:{fill:'#78a7c2',opacity:.82}
+    };
+  };
+}
+
+function mountDayTimeline(ctx){
+  const el=document.getElementById('attendanceDayChart');
+  if(!el||!window.echarts)return;
+  const chart=initAttendChart(el);if(!chart)return;
+  const ranges=[];
+  const ins=[];
+  const outs=[];
+  ctx.items.forEach((a,row)=>{
+    a.pairs.forEach(([x,y])=>ranges.push({
+      value:[minutes(x.time),minutes(y.time),row],
+      employeeId:a.employee.id,day:a.day,status:a.status,
+      start:x.time,end:y.time
+    }));
+    a.punches.forEach(p=>{
+      const obj={value:[minutes(p.time),row],employeeId:a.employee.id,day:a.day,time:p.time,direction:p.direction,status:a.status};
+      (p.direction==='进'?ins:outs).push(obj);
+    });
+  });
+
+  chart.setOption({
+    animationDuration:380,
+    grid:{left:62,right:18,top:12,bottom:32},
+    tooltip:{
+      trigger:'item',confine:true,
+      extraCssText:'border-radius:10px;box-shadow:0 12px 32px rgba(25,45,62,.15);',
+      formatter:p=>{
+        const d=p.data||{};
+        const a=ctx.items[d.value?.[2]??d.value?.[1]];
+        if(!a)return '';
+        if(p.seriesId==='day-ranges')return `<b>${a.employee.name}</b><br>${d.start}–${d.end}<br><span style="color:#aebdca">${a.status}</span>`;
+        return `<b>${a.employee.name}</b><br>${d.time} · ${d.direction}<br><span style="color:#aebdca">${a.status}</span>`;
+      }
+    },
+    xAxis:{
+      type:'value',min:360,max:1320,
+      axisLine:{lineStyle:{color:'#cbd8e1'}},axisTick:{show:false},
+      axisLabel:{color:AS_CHART_COLORS.muted,fontSize:8,formatter:v=>minuteText(v),hideOverlap:true},
+      splitNumber:8,
+      splitLine:{show:true,lineStyle:{color:'rgba(190,205,216,.25)'}}
+    },
+    yAxis:{
+      type:'category',inverse:true,
+      data:ctx.items.map(a=>a.employee.name),
+      axisLine:{show:false},axisTick:{show:false},
+      axisLabel:{color:'#607487',fontSize:8,width:48,overflow:'truncate',margin:8},
+      splitLine:{show:true,lineStyle:{color:'rgba(222,231,237,.42)'}}
+    },
+    series:[
+      {
+        id:'day-work',type:'line',data:[],silent:true,symbol:'none',lineStyle:{opacity:0},
+        markArea:{
+          silent:true,itemStyle:{color:'rgba(126,166,193,.055)'},
+          data:[[{xAxis:510},{xAxis:720}],[{xAxis:840},{xAxis:1050}]]
+        },z:0
+      },
+      {
+        id:'day-ranges',type:'custom',coordinateSystem:'cartesian2d',
+        renderItem:dateRangeRender(ranges),data:ranges,
+        encode:{x:[0,1],y:2},clip:true,z:3
+      },
+      {
+        id:'day-in',name:'进',type:'scatter',data:ins,
+        symbol:'rect',symbolSize:[2.2,6],symbolOffset:[0,-3],
+        itemStyle:{color:AS_CHART_COLORS.in,opacity:.9},z:6
+      },
+      {
+        id:'day-out',name:'出',type:'scatter',data:outs,
+        symbol:'rect',symbolSize:[2.2,6],symbolOffset:[0,3],
+        itemStyle:{color:AS_CHART_COLORS.out,opacity:.9},z:6
+      }
+    ]
+  });
+  chart.on('click',p=>{
+    const d=p.data;
+    if(d?.employeeId&&d?.day)selectCell(d.employeeId,d.day);
+  });
+}
+
 function mountStatsCharts(ctx){
   if(!window.echarts)return;
   if(ctx.type==='overall')mountOverallStats(ctx);
@@ -529,6 +622,7 @@ function mountAnalysisVisuals(ctx){
   if(!window.echarts)return;
   requestAnimationFrame(()=>{
     if(state.analysisTab==='timeline'&&ctx.type==='cell')mountAttendanceTimeline(ctx.analysis);
+    if(state.analysisTab==='timeline'&&ctx.type==='date')mountDayTimeline(ctx);
     if(state.analysisTab==='stats')mountStatsCharts(ctx);
   });
 }
