@@ -1,4 +1,4 @@
-import { useMemo, type RefObject } from "react";
+import { useMemo, useRef, type RefObject } from "react";
 import type { FigureSpec } from "../model";
 
 /**
@@ -56,6 +56,7 @@ export interface PrecisionSvgProps {
   onSelectSeries: (id: string, additive?: boolean) => void;
   onAxisClick: () => void;
   onLegendClick: () => void;
+  onLegendDrag: (x: number, y: number) => void;
 }
 const fnum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const finite = (v: unknown): number | undefined => fnum(v) ? v : undefined;
@@ -181,7 +182,8 @@ export function supportsPrecisionSvg(figure: FigureSpec): boolean {
     ...Object.values(figure.seriesOverrides).map(x => x.legendLabel)];
   return !texts.some(t => t && (/[$\\]/.test(t) || /<\/?(?:sup|sub)>/i.test(t)));
 }
-export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisClick,onLegendClick}: PrecisionSvgProps) {
+export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisClick,onLegendClick,onLegendDrag}: PrecisionSvgProps) {
+  const drag = useRef<{ clientX:number;clientY:number;initialX:number;initialY:number } | null>(null);
   const width = Math.max(1, Number(layout.width) || 640), height = Math.max(1, Number(layout.height) || 480);
   const plot = useMemo(() => {
     const margin = layout.margin || {};
@@ -292,7 +294,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
           onClick={e=>{if(sid){e.stopPropagation();onSelectSeries(sid,e.ctrlKey||e.metaKey);}}}
           style={{cursor:sid?"pointer":"default"}}>
           {doLines(tr) && <path d={path} fill="none" stroke={color} strokeWidth={widthLine}
-             strokeDasharray={DASH[tr.line?.dash??"solid"]} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>}
+             strokeDasharray={DASH[tr.line?.dash??"solid"]} strokeLinecap="round" strokeLinejoin="round"/>}
           {tr.error_y?.array?.map((v,i)=>{
             const p=pairs[i],dy=tr.y?.[i]; if(!p||!fnum(v)||!fnum(dy))return null;
             const hi=projectY(dy+Math.abs(v)),lo=projectY(dy-Math.abs(v));if(!fnum(hi)||!fnum(lo))return null;
@@ -307,7 +309,42 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
         </g>;
       })}
     </g>
-    {layout.showlegend && legendItems.length>0 && <g onClick={onLegendClick} style={{cursor:"pointer"}}>
+    {layout.showlegend && legendItems.length>0 && <g onClick={onLegendClick} style={{cursor:"grab",touchAction:"none"}}
+      onPointerDown={event => {
+        if (event.button !== 0 || !svgRef.current) return;
+        onLegendClick();
+        drag.current={clientX:event.clientX,clientY:event.clientY,initialX:legend.x??0.98,initialY:legend.y??0.985};
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }}
+      onPointerMove={event => {
+        if (!drag.current || !svgRef.current) return;
+        const bounds=svgRef.current.getBoundingClientRect();
+        if (bounds.width<=0 || bounds.height<=0) return;
+        const dx=(event.clientX-drag.current.clientX)*width/bounds.width;
+        const dy=(event.clientY-drag.current.clientY)*height/bounds.height;
+        event.currentTarget.setAttribute("transform","translate("+dx+","+dy+")");
+      }}
+      onPointerUp={event => {
+        const current=drag.current;
+        if (!current || !svgRef.current) return;
+        drag.current=null;
+        const bounds=svgRef.current.getBoundingClientRect();
+        if (bounds.width>0 && bounds.height>0) {
+          const dx=(event.clientX-current.clientX)*width/bounds.width;
+          const dy=(event.clientY-current.clientY)*height/bounds.height;
+          onLegendDrag(
+            clamp(current.initialX+dx/(plot.right-plot.left),-1,2),
+            clamp(current.initialY-dy/(plot.bottom-plot.top),-1,2)
+          );
+        }
+        event.currentTarget.removeAttribute("transform");
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onPointerCancel={event => {
+        drag.current=null;
+        event.currentTarget.removeAttribute("transform");
+      }}>
       {Number(legend.borderwidth??0)>0 && <rect x={lX-6} y={lY-4} width={lw+12} height={lhTotal+8}
         fill={legend.bgcolor??"#fff"} stroke={legend.bordercolor??"#cdd2d7"} strokeWidth={legend.borderwidth}/>}
       {legendItems.map((tr,i)=>{
