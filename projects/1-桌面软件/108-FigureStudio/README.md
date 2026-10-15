@@ -160,3 +160,16 @@ Figure 文档与数据绑定正式分离。左侧项目树可以直接“新建�
 P108 当前把 Matplotlib 官方 Gallery 作为科研单图的主要视觉参考之一，但不机械复制 API。重点对齐的是出版语义：稳定色循环、合理线宽 / marker、向外 Tick、克制网格、按需要显示图例、Errorbar / Bar / Field / 3D 的典型表达。
 
 新建项目中增加“常用图验收”文件夹，内置 Scatter、Errorbar、Bar、Grouped Bar、Stacked Bar 的可点击 QA 示例。该文件夹用于开发和交互验收，不改变 .sfig schema 0.5。
+
+## 精细 SVG 画布实验（p108-exp）
+
+本阶段新增纯浏览器原生 SVG 精细画布，不依赖 CDN、Python 或新 npm 绘图库。它消费与 Plotly 相同的 `FigureSpec`、`buildTraces()` 和 `buildLayout()`，不另建样式事实源；显示的 SVG 节点即 SVG 导出事实源，PNG 由同一 SVG 栅格化生成。
+
+- 当前覆盖：XY 折线、散点、线加点、误差棒、光谱、偏移光谱、瀑布、双 Y 轴共 8 类。
+- 原有 14 种图型、全部右侧数据/曲线/轴/图例/出版检查器数值控件、项目保存、撤销与 Python 脚本导出全部保留；Web 工具栏可切换 **精细 SVG / Plotly 兼容**。
+- 栅格场图、Contour、3D Surface、Bar 类、分类 X 或含复杂 LaTeX 内容的图仍自动使用原 Plotly；不伪称 SVG 等效支持。
+- 新增可独立编辑、重置及设为默认的出版几何值：轴框开口/四边框、轴线宽（pt）、主/次刻度长度（pt）、轴/图标题间距（pt）、四侧留白（mm）；也传递给原 Plotly 布局。
+- 实测曲线默认按原采样点直连，使用 SVG `round` cap/join 提高边缘精细度；不自动使用插值平滑改变谱峰信息。
+- 当前限制：精细 SVG 模式暂未复制 Plotly 的滚轮缩放、鼠标拖动图例与完整 MathJax 布局；需要这些交互时切换 **Plotly 兼容**，已有位置、数字、数据和样式不会丢失。正式接管画布前需完成功能、图像、性能和浏览器回归测试。
+- .sfig 文件保持 schema 0.5，新配置均为可选 `figureOverrides`；自动兼容旧数据。
+- GitHub Pages 仍是开发预览入口而非 Release；构建通过不等于浏览器实机与站点实际可访问性已经验收。
