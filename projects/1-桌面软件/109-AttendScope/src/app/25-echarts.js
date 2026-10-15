@@ -1,13 +1,13 @@
 /* AttendScope ECharts integration — Apache ECharts 6.1.0, vendored locally. */
 const AS_CHART_COLORS={
-  ink:'#526577',
+  ink:'#111820',
   text:'#4b6074',
   muted:'#91a0ad',
   grid:'rgba(185,201,213,.26)',
-  in:'#5f88d7',
-  out:'#8a79d2',
-  first:'#2f6fc9',
-  last:'#6d59c7',
+  in:'#3698c9',
+  out:'#e29355',
+  first:'#147fc0',
+  last:'#cf6c37',
   normal:'#7fbd92',
   suspect:'#e4bb62',
   problem:'#d77773',
@@ -144,49 +144,64 @@ function timelineEventRender(data){
     const color=timelineEventColor(item);
     const isIn=item.kind==='in';
     const edge=item.edge;
-    const stemEnd=axis[1]+(isIn?-7:7);
-    const arrowTip=axis[1]+(isIn?-1:1);
     const count=item.records.length;
+
+    const shaftTop=isIn?p[1]+5:axis[1]+9;
+    const shaftBottom=isIn?axis[1]-9:p[1]-5;
+    const headTip=axis[1]+(isIn?-1:1);
+    const headBase=axis[1]+(isIn?-13:13);
+
     const children=[
       {
         type:'line',
-        shape:{x1:p[0],y1:p[1],x2:p[0],y2:stemEnd},
-        style:{stroke:color,lineWidth:edge?2.15:1.65,lineCap:'round',opacity:.93}
-      },
-      {
-        type:'circle',
-        shape:{cx:p[0],cy:arrowTip,r:2.1},
-        style:{fill:color,opacity:.95}
+        shape:{x1:p[0],y1:shaftTop,x2:p[0],y2:shaftBottom},
+        style:{
+          stroke:color,
+          lineWidth:edge?6:5,
+          lineCap:'round',
+          opacity:1,
+          shadowBlur:edge?6:0,
+          shadowColor:edge?'rgba(20,70,110,.14)':'transparent'
+        }
       },
       {
         type:'polygon',
-        shape:{points:isIn?[[p[0]-3.6,stemEnd-1],[p[0]+3.6,stemEnd-1],[p[0],arrowTip]]:[[p[0]-3.6,stemEnd+1],[p[0]+3.6,stemEnd+1],[p[0],arrowTip]]},
-        style:{fill:color,opacity:.98}
+        shape:{points:isIn
+          ?[[p[0]-8,headBase],[p[0]+8,headBase],[p[0],headTip]]
+          :[[p[0]-8,headBase],[p[0]+8,headBase],[p[0],headTip]]},
+        style:{fill:color,opacity:1}
+      },
+      {
+        type:'circle',
+        shape:{cx:p[0],cy:axis[1],r:5},
+        style:{fill:color,stroke:'#ffffff',lineWidth:1.6,opacity:1}
       }
     ];
+
     if(edge){
       children.push({
         type:'circle',
-        shape:{cx:p[0],cy:arrowTip,r:7.5},
-        style:{fill:color,opacity:.07}
+        shape:{cx:p[0],cy:axis[1],r:10},
+        style:{fill:color,opacity:.10}
       });
     }
+
     if(count>1){
       children.push({
         type:'text',
         style:{
-          x:p[0]+7,
+          x:p[0]+11,
           y:p[1]+(isIn?-1:1),
           text:'×'+count,
-          fill:'#596a7c',
-          backgroundColor:'rgba(241,246,250,.98)',
-          borderColor:'rgba(194,207,219,.72)',
-          borderWidth:1,
-          font:'650 9px Segoe UI, Microsoft YaHei',
-          padding:[3,5],
-          borderRadius:8,
+          fill:'#ffffff',
+          backgroundColor:color,
+          font:'700 10px Segoe UI, Microsoft YaHei',
+          padding:[3,6],
+          borderRadius:9,
           align:'left',
-          verticalAlign:'middle'
+          verticalAlign:'middle',
+          shadowBlur:5,
+          shadowColor:'rgba(35,55,75,.12)'
         }
       });
     }
@@ -267,7 +282,7 @@ function mountAttendanceTimeline(a){
         type:'value',min:-1.35,max:1.35,interval:1,
         axisLine:{show:false},axisTick:{show:false},
         axisLabel:{
-          color:'#718394',fontSize:10,fontWeight:650,
+          color:'#64798b',fontSize:11,fontWeight:700,
           formatter:v=>v===1?'进':v===-1?'出':''
         },
         splitLine:{show:false}
@@ -288,26 +303,26 @@ function mountAttendanceTimeline(a){
         filterMode:'none',minValueSpan:30,
         left:46,right:22,bottom:14,height:42,
         showDetail:true,realtime:true,brushSelect:false,
-        backgroundColor:'rgba(245,249,252,.92)',
-        borderColor:'rgba(205,218,228,.72)',
+        backgroundColor:'rgba(235,239,243,.95)',
+        borderColor:'rgba(205,214,222,.72)',
         borderRadius:10,
-        fillerColor:'rgba(95,136,215,.10)',
+        fillerColor:'rgba(54,152,201,.16)',
         dataBackground:{
-          lineStyle:{color:'#c3d0da',width:1,opacity:.72},
-          areaStyle:{color:'rgba(150,170,190,.08)'}
+          lineStyle:{color:'#c2cbd2',width:1,opacity:.80},
+          areaStyle:{color:'rgba(170,180,188,.12)'}
         },
         selectedDataBackground:{
-          lineStyle:{color:'#7897d7',width:1},
-          areaStyle:{color:'rgba(95,136,215,.10)'}
+          lineStyle:{color:'#3698c9',width:1.4},
+          areaStyle:{color:'rgba(54,152,201,.16)'}
         },
-        handleIcon:'path://M-2,-10 C-2,-12 2,-12 2,-10 L2,10 C2,12 -2,12 -2,10 Z',
-        handleSize:'72%',
+        handleIcon:'path://M-3,-11 C-3,-13 3,-13 3,-11 L3,11 C3,13 -3,13 -3,11 Z',
+        handleSize:'82%',
         handleStyle:{
-          color:'#ffffff',borderColor:'#7897d7',borderWidth:1.2,
-          shadowBlur:4,shadowColor:'rgba(63,89,122,.10)'
+          color:'#3698c9',borderColor:'#3698c9',borderWidth:1,
+          shadowBlur:4,shadowColor:'rgba(54,152,201,.18)'
         },
-        moveHandleSize:4,
-        moveHandleStyle:{color:'#7897d7',opacity:.36},
+        moveHandleSize:5,
+        moveHandleStyle:{color:'#3698c9',opacity:.55},
         textStyle:{color:'#8091a0',fontSize:8},
         labelFormatter:v=>minuteText(v)
       }
@@ -339,8 +354,8 @@ function mountAttendanceTimeline(a){
           const y=api.coord([0,0])[1];
           const x1=cs.x+2,x2=cs.x+cs.width-7;
           return {type:'group',children:[
-            {type:'line',shape:{x1,y1:y,x2,y2:y},style:{stroke:'#53677a',lineWidth:1.05,opacity:.78,lineCap:'round'}},
-            {type:'polygon',shape:{points:[[x2,y-3],[x2+6,y],[x2,y+3]]},style:{fill:'#53677a',opacity:.78}}
+            {type:'line',shape:{x1,y1:y,x2,y2:y},style:{stroke:'#111820',lineWidth:2.8,opacity:.96,lineCap:'round'}},
+            {type:'polygon',shape:{points:[[x2,y-6],[x2+11,y],[x2,y+6]]},style:{fill:'#111820',opacity:1}}
           ]};
         },
         z:3
