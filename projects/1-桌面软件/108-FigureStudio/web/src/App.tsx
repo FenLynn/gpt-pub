@@ -81,6 +81,8 @@ import {
 const AUTOSAVE_KEY = "figurestudio-p108-autosave-v05";
 const VISUAL_QA_MODE =
   new URLSearchParams(window.location.search).get("qa") === "1";
+const NATURE_GALLERY_MODE =
+  new URLSearchParams(window.location.search).get("gallery") === "1";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
@@ -434,7 +436,9 @@ function App() {
     ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
   ]);
   const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
-    initialBookId
+    NATURE_GALLERY_MODE && initialFigureId
+      ? { type: "figure", id: initialFigureId }
+      : initialBookId
       ? { type: "book", id: initialBookId }
       : { type: "figure", id: initialFigureId }
   );
@@ -1058,7 +1062,11 @@ function App() {
       )
     );
     setOpenDocs(docs);
-    setActiveDoc(docs[0] ?? { type: "figure", id: figureId ?? "" });
+    setActiveDoc(
+      (NATURE_GALLERY_MODE && figureId
+        ? { type: "figure", id: figureId } as DocumentRef
+        : docs[0]) ?? { type: "figure", id: figureId ?? "" }
+    );
     setExplorerSelection(null);
   }
 
