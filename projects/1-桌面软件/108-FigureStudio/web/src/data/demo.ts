@@ -1,4 +1,5 @@
 import { defaultDataRef } from "./adapter";
+import { createNatureDecaySheet, createNatureKineticsSheet, createNatureGallery } from "./natureGallery";
 import type {
   DataBook,
   DataSheet,
@@ -42,28 +43,28 @@ export function createSpectrumSheet(): DataSheet {
     columns: [
       {
         id: "wavelength",
-        name: "波长",
+        name: "Wavelength",
         unit: "nm",
         role: "X",
         values: x
       },
       {
         id: "measured",
-        name: "测量数据",
+        name: "Measured",
         unit: "dBm",
         role: "Y",
         values: measured
       },
       {
         id: "fit",
-        name: "高斯拟合",
+        name: "Gaussian fit",
         unit: "dBm",
         role: "Y",
         values: fit
       },
       {
         id: "sigma",
-        name: "标准差",
+        name: "Uncertainty",
         unit: "dB",
         role: "YErr",
         values: sigma
@@ -83,7 +84,7 @@ export function createFieldSheet(): DataSheet {
 
   columns.push({
     id: "x-position",
-    name: "横向位置",
+    name: "Horizontal position",
     unit: "mm",
     role: "X" as const,
     values: x
@@ -125,7 +126,7 @@ export function createFieldSheet(): DataSheet {
           value
         ])
       ),
-      rowAxisName: "纵向位置",
+      rowAxisName: "Vertical position",
       rowAxisUnit: "mm"
     }
   };
@@ -166,21 +167,21 @@ export function createDualYAxisSheet(): DataSheet {
     columns: [
       {
         id: "pump-current",
-        name: "泵浦电流",
+        name: "Pump current",
         unit: "A",
         role: "X",
         values: current
       },
       {
         id: "output-power",
-        name: "输出功率",
+        name: "Output power",
         unit: "W",
         role: "Y",
         values: output
       },
       {
         id: "efficiency",
-        name: "光光效率",
+        name: "Optical efficiency",
         unit: "%",
         role: "Y",
         values: efficiency
@@ -199,7 +200,7 @@ export function createWaterfallSheet(): DataSheet {
 
   columns.push({
     id: "waterfall-wavelength",
-    name: "波长",
+    name: "Wavelength",
     unit: "nm",
     role: "X",
     values: wavelength
@@ -271,28 +272,28 @@ export function createScatterErrorbarSheet(): DataSheet {
     columns: [
       {
         id: "temperature",
-        name: "温度",
+        name: "Temperature",
         unit: "°C",
         role: "X",
         values: temperature
       },
       {
         id: "sample-a",
-        name: "样品 A",
+        name: "Sample A",
         unit: "a.u.",
         role: "Y",
         values: sampleA
       },
       {
         id: "sample-b",
-        name: "样品 B",
+        name: "Sample B",
         unit: "a.u.",
         role: "Y",
         values: sampleB
       },
       {
         id: "response-error",
-        name: "测量不确定度",
+        name: "Measurement uncertainty",
         unit: "a.u.",
         role: "YErr",
         values: uncertainty
@@ -302,7 +303,7 @@ export function createScatterErrorbarSheet(): DataSheet {
 }
 
 export function createBarSheet(): DataSheet {
-  const categories = ["条件 A", "条件 B", "条件 C", "条件 D", "条件 E"];
+  const categories = ["A", "B", "C", "D", "E"];
   const fundamental = [62, 58, 66, 71, 68];
   const higherOrder = [24, 29, 20, 18, 21];
   const loss = categories.map(
@@ -316,27 +317,27 @@ export function createBarSheet(): DataSheet {
     columns: [
       {
         id: "condition",
-        name: "实验条件",
+        name: "Condition",
         role: "X",
         values: categories
       },
       {
         id: "fundamental",
-        name: "基模",
+        name: "Fundamental mode",
         unit: "%",
         role: "Y",
         values: fundamental
       },
       {
         id: "higher-order",
-        name: "高阶模",
+        name: "Higher-order modes",
         unit: "%",
         role: "Y",
         values: higherOrder
       },
       {
         id: "loss",
-        name: "其他损耗",
+        name: "Other losses",
         unit: "%",
         role: "Y",
         values: loss
@@ -393,6 +394,7 @@ export function createInitialProject(
   };
 
   const folders = [
+    { id: "folder-nature", name: "Nature Gallery · 13 samples" },
     { id: "folder-experiment", name: "实验数据" },
     { id: "folder-paper", name: "论文" },
     ...(includeVisualQa
@@ -406,6 +408,24 @@ export function createInitialProject(
   const waterfallSheet = createWaterfallSheet();
   const scatterErrorbarSheet = createScatterErrorbarSheet();
   const barSheet = createBarSheet();
+  const natureDecaySheet = createNatureDecaySheet();
+  const natureKineticsSheet = createNatureKineticsSheet();
+  const natureFigures = createNatureGallery(defaults, {
+    spectrum: spectrumSheet,
+    dualY: doubleYSheet,
+    waterfall: waterfallSheet,
+    scatter: scatterErrorbarSheet,
+    field: fieldSheet,
+    bar: barSheet,
+    decay: natureDecaySheet,
+    kinetics: natureKineticsSheet
+  });
+  const natureBook: DataBook = {
+    id: id("book-nature"),
+    name: "Synthetic kinetics and decay",
+    folderId: "folder-nature",
+    sheets: [natureDecaySheet, natureKineticsSheet]
+  };
 
   const spectrumBook: DataBook = {
     id: id("book-spectrum"),
@@ -442,8 +462,8 @@ export function createInitialProject(
     defaults,
     "folder-paper",
     {
-      xTitle: "$\\lambda$ (nm)",
-      yTitle: "光谱功率 (dBm)"
+      xTitle: "Wavelength (nm)",
+      yTitle: "Spectral power (dBm)"
     }
   );
 
@@ -454,9 +474,9 @@ export function createInitialProject(
     defaults,
     "folder-paper",
     {
-      xTitle: "泵浦电流 (A)",
-      yTitle: "输出功率 (W)",
-      rightYTitle: "光光效率 (%)",
+      xTitle: "Pump current (A)",
+      yTitle: "Output power (W)",
+      rightYTitle: "Optical efficiency (%)",
       legendPosition: "top-left",
       legendOrientation: "vertical"
     },
@@ -492,11 +512,11 @@ export function createInitialProject(
     defaults,
     "folder-paper",
     {
-      xTitle: "横向位置 (mm)",
-      yTitle: "纵向位置 (mm)",
+      xTitle: "Horizontal position (mm)",
+      yTitle: "Vertical position (mm)",
       legendVisible: false,
       colorScale: "Viridis",
-      colorbarTitle: "归一化强度"
+      colorbarTitle: "Normalized intensity"
     }
   );
 
@@ -507,11 +527,11 @@ export function createInitialProject(
     defaults,
     "folder-paper",
     {
-      xTitle: "横向位置 (mm)",
-      yTitle: "纵向位置 (mm)",
+      xTitle: "Horizontal position (mm)",
+      yTitle: "Vertical position (mm)",
       legendVisible: false,
       colorScale: "Viridis",
-      colorbarTitle: "归一化强度",
+      colorbarTitle: "Normalized intensity",
       contourLevels: 12,
       contourFill: true,
       contourLines: true
@@ -525,12 +545,12 @@ export function createInitialProject(
     defaults,
     "folder-paper",
     {
-      xTitle: "横向位置 (mm)",
-      yTitle: "纵向位置 (mm)",
+      xTitle: "Horizontal position (mm)",
+      yTitle: "Vertical position (mm)",
       legendVisible: false,
       colorScale: "RdBu",
       reverseColorScale: true,
-      zTitle: "归一化强度 (a.u.)"
+      zTitle: "Normalized intensity (a.u.)"
     }
   );
 
@@ -541,8 +561,8 @@ export function createInitialProject(
     defaults,
     "folder-gallery",
     {
-      xTitle: "温度 (°C)",
-      yTitle: "归一化响应 (a.u.)",
+      xTitle: "Temperature (°C)",
+      yTitle: "Normalized response (a.u.)",
       legendPosition: "outside-right"
     },
     {
@@ -566,8 +586,8 @@ export function createInitialProject(
     defaults,
     "folder-gallery",
     {
-      xTitle: "温度 (°C)",
-      yTitle: "样品 A 响应 (a.u.)",
+      xTitle: "Temperature (°C)",
+      yTitle: "Sample A response (a.u.)",
       legendVisible: false
     },
     {
@@ -587,7 +607,7 @@ export function createInitialProject(
     defaults,
     "folder-gallery",
     {
-      yTitle: "占比 (%)",
+      yTitle: "Fraction (%)",
       barLabelsVisible: true,
       barLabelDecimals: 0,
       barLabelPosition: "outside"
@@ -606,7 +626,7 @@ export function createInitialProject(
     defaults,
     "folder-gallery",
     {
-      yTitle: "占比 (%)",
+      yTitle: "Fraction (%)",
       barGap: 0.18,
       barGroupGap: 0.06,
       barLabelsVisible: true,
@@ -628,7 +648,7 @@ export function createInitialProject(
     defaults,
     "folder-gallery",
     {
-      yTitle: "占比 (%)",
+      yTitle: "Fraction (%)",
       barGap: 0.22,
       barLabelsVisible: true,
       barLabelDecimals: 0,
@@ -649,12 +669,14 @@ export function createInitialProject(
     name: "未命名项目",
     folders,
     dataBooks: [
+      natureBook,
       spectrumBook,
       fieldBook,
       commonPlotsBook,
       ...(includeVisualQa ? [galleryBook] : [])
     ],
     figures: [
+      ...natureFigures,
       spectrumFigure,
       doubleYFigure,
       waterfallFigure,
@@ -671,7 +693,7 @@ export function createInitialProject(
           ]
         : [])
     ],
-    activeFigureId: spectrumFigure.id,
+    activeFigureId: natureFigures[0].id,
     defaults: {
       templateId: defaults.templateId,
       presetId: defaults.presetId,
