@@ -1,5 +1,6 @@
 function render(){
   if(!state.analysisTab) state.analysisTab='overview';
+  if(typeof disposeAttendCharts==='function')disposeAttendCharts();
   document.getElementById('app').innerHTML=layoutHtml();
   bind();
   renderCalendar();
@@ -234,6 +235,7 @@ function analysisContext(){
 
 function renderAnalysisPanel(){
   const body=document.getElementById('analysisBody'); if(!body)return;
+  if(typeof disposeAnalysisCharts==='function')disposeAnalysisCharts();
   const ctx=analysisContext();
   document.getElementById('analysisTitle').textContent=ctx.title;
   document.getElementById('analysisEyebrow').textContent=ctx.eyebrow;
@@ -246,6 +248,7 @@ function renderAnalysisPanel(){
   else body.innerHTML=analysisOverviewHtml(ctx);
 
   bindAnalysisPanel(ctx);
+  if(typeof mountAnalysisVisuals==='function')mountAnalysisVisuals(ctx);
 }
 
 function analysisSelectionBadge(ctx){
