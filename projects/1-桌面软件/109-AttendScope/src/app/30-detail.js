@@ -1,4 +1,35 @@
-function renderDetail(){const body=document.getElementById('detailBody'),title=document.getElementById('detailTitle'),sub=document.getElementById('detailSub'),tools=document.getElementById('detailTools');const s=state.selection;tools.innerHTML='';if(s.type==='overall'){title.textContent='月度总览';sub.textContent='工作日质量、每日问题趋势与问题人员排行';body.innerHTML=overallDetail();bindDetail();return}if(s.type==='person'){const e=EMPLOYEES.find(x=>x.id===s.employeeId);title.textContent=`${e.name} · 10 月个人视图`;sub.textContent=`${e.department} · 点击下方日期可进入个人当天时间轴`;body.innerHTML=personDetail(e);bindDetail();return}if(s.type==='date'){title.textContent=`10 月 ${s.day} 日 · 全员视图`;sub.textContent=`周${weekdayLabel(s.day)} · ${dayTypeText(dayType(s.day))} · 时间轴按人员展开`;tools.innerHTML='<button class="btn" id="dayOnlyIssues">只看异常</button>';body.innerHTML=dateDetail(s.day,false);bindDetail();return}const e=EMPLOYEES.find(x=>x.id===s.employeeId),a=state.analysis.get(`${e.id}|${s.day}`);title.textContent=`${e.name} · ${isoDate(s.day)}`;sub.textContent=`${a.status} · 点击任一打卡点查看原始记录`;tools.innerHTML='<button class="btn" id="zoomOut">−</button><button class="btn" id="zoomReset">100%</button><button class="btn" id="zoomIn">＋</button>';body.innerHTML=cellDetail(a);bindDetail()}
+function renderDetail(){
+  const body=document.getElementById('detailBody'),title=document.getElementById('detailTitle'),sub=document.getElementById('detailSub'),tools=document.getElementById('detailTools');
+  const s=state.selection;
+  tools.innerHTML='';
+  if(s.type==='overall'){
+    title.textContent='时间轴';
+    sub.textContent='从矩阵选择人员、日期或某个状态方块';
+    body.innerHTML='<div class="detail-placeholder"><span class="placeholder-line"></span><strong>选择一个状态方块查看当天打卡轨迹</strong><small>也可以先点击日期查看当天全员时间轴</small></div>';
+    return;
+  }
+  if(s.type==='person'){
+    const e=EMPLOYEES.find(x=>x.id===s.employeeId);
+    title.textContent=e.name;
+    sub.textContent='已选择人员 · 再点击上方任意日期方块进入当天时间轴';
+    body.innerHTML='<div class="detail-placeholder"><span class="placeholder-person"></span><strong>已聚焦 '+e.name+'</strong><small>右侧可以查看本月概览、异常与统计</small></div>';
+    return;
+  }
+  if(s.type==='date'){
+    title.textContent=`10 月 ${s.day} 日 · 全员时间轴`;
+    sub.textContent=`周${weekdayLabel(s.day)} · ${dayTypeText(dayType(s.day))}`;
+    tools.innerHTML='<button class="btn" id="dayOnlyIssues">只看异常</button>';
+    body.innerHTML=dateDetail(s.day,false);
+    bindDetail();
+    return;
+  }
+  const e=EMPLOYEES.find(x=>x.id===s.employeeId),a=state.analysis.get(`${e.id}|${s.day}`);
+  title.textContent=`${e.name} · ${pad(s.day)} 日`;
+  sub.textContent=`${a.status} · 点击打卡点查看原始记录`;
+  tools.innerHTML='<button class="btn" id="zoomOut">−</button><button class="btn" id="zoomReset">100%</button><button class="btn" id="zoomIn">＋</button>';
+  body.innerHTML=cellDetail(a);
+  bindDetail();
+}
 function dayTypeText(t){return {work:'工作日',adjust:'调休工作日',rest:'休息日',holiday:'节假日'}[t]}
 function overallDetail(){const work=workAnalyses(),problems=work.filter(x=>x.severity==='problem'),sus=work.filter(x=>x.severity==='suspect');const byDay=Array.from({length:31},(_,i)=>{const d=i+1,arr=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${d}`));return {label:pad(d),value:arr.filter(x=>x.severity==='problem'||x.severity==='suspect').length}});const byEmp=EMPLOYEES.map(e=>({label:e.name,value:Array.from({length:31},(_,i)=>state.analysis.get(`${e.id}|${i+1}`)).filter(x=>x.severity==='problem'||x.severity==='suspect').length})).sort((a,b)=>b.value-a.value).slice(0,8);return `${summary([{l:'工作日人次',v:work.length},{l:'明确问题',v:problems.length},{l:'疑似异常',v:sus.length},{l:'平均确认在岗',v:fmtMinutes(avg(work.filter(x=>x.presence>0).map(x=>x.presence)))},{l:'未处理异常',v:problems.length+sus.length}])}<div class="chart-grid"><div class="mini-chart"><b>每日问题数</b><div class="bar-list">${bars(byDay.filter(x=>isWorkday(+x.label)),50,'daybar')}</div></div><div class="mini-chart"><b>问题人员 TOP 8</b><div class="bar-list">${bars(byEmp,Math.max(1,...byEmp.map(x=>x.value)),'empbar')}</div></div></div>`}
 function personDetail(e){const arr=Array.from({length:31},(_,i)=>state.analysis.get(`${e.id}|${i+1}`)),work=arr.filter(x=>isWorkday(x.day)),st=statsFor(work),pres=work.filter(x=>x.presence>0);const dayBars=arr.map(x=>({label:pad(x.day),value:Math.round(x.presence/60),severity:x.severity}));return `${summary([{l:'工作日',v:work.length},{l:'明确问题',v:st.problems},{l:'疑似异常',v:st.suspects},{l:'平均在岗',v:fmtMinutes(avg(pres.map(x=>x.presence)))},{l:'请假/出差',v:work.filter(x=>x.marker).length}])}<div class="chart-grid"><div class="mini-chart"><b>每日确认在岗时长（小时）</b><div class="bar-list">${bars(dayBars,10,'personday')}</div></div><div class="mini-chart"><b>状态构成</b>${donut(st)}</div></div>`}
