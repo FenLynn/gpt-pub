@@ -944,3 +944,112 @@ button{font-family:inherit}
 }
 .echarts-date-chart{width:100%;min-height:430px}
 .multi-rail-wrap,.multi-rail-list{display:none!important}
+
+
+/* P109 UI v6.1: cool refined timeline reference */
+.refined-head{
+  align-items:center;
+  min-height:44px;
+  margin-bottom:7px;
+}
+.timeline-title-stack{display:grid!important;gap:3px}
+.timeline-title-stack span{
+  font-size:8.5px!important;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  color:#9aa7b2!important
+}
+.timeline-title-stack strong{
+  font-size:15px!important;
+  letter-spacing:-.18px!important;
+  color:#31495e!important
+}
+.timeline-facts{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  color:#82919e;
+  font-size:8.8px
+}
+.timeline-facts span{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.timeline-facts b{font-size:10px;font-weight:680;color:#506579;font-variant-numeric:tabular-nums}
+.fact-dot{width:6px;height:6px;border-radius:50%;background:#8fa4b6}
+.fact-dot.first{background:#5f88d7}
+.fact-dot.last{background:#8a79d2}
+
+.refined-frame{
+  border-color:rgba(207,220,229,.66);
+  border-radius:15px;
+  background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);
+  box-shadow:none;
+}
+.refined-chart{height:340px}
+.timeline-footline{
+  min-height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  border-bottom:1px solid rgba(219,228,235,.68)
+}
+.timeline-footline>small{
+  color:#9aa7b2;
+  font-size:8.3px;
+  white-space:nowrap
+}
+.refined-legend{
+  padding:7px 1px 6px;
+  min-height:0;
+  gap:8px 14px
+}
+.refined-legend i{
+  width:14px;
+  height:1.5px;
+  border-radius:999px
+}
+.refined-legend i:after{border-top-width:2.5px;border-bottom-width:2.5px;border-left-width:4px;top:-1.8px}
+.refined-legend i.in{background:#5f88d7;color:#5f88d7}
+.refined-legend i.out{background:#8a79d2;color:#8a79d2}
+.refined-legend b{background:#5c6f82;color:#fff;box-shadow:none}
+.refined-evidence{
+  margin-top:0;
+  min-height:58px;
+  padding:12px 2px 0;
+  border-top:0
+}
+.refined-evidence>span{color:#97a4af}
+.refined-evidence>strong{color:#607486;font-weight:600}
+
+/* make the navigator feel like part of the chart, not a separate control */
+.refined-frame svg{display:block}
+.refined-frame [style*="cursor: ew-resize"],
+.refined-frame [style*="cursor: move"]{transition:opacity .15s ease}
+
+/* slightly quieter panel so the chart itself leads */
+.analysis-panel{
+  background:rgba(253,254,255,.96);
+  border-color:rgba(207,220,229,.72);
+  box-shadow:0 10px 32px rgba(43,72,95,.028),inset 0 1px 0 rgba(255,255,255,.94)
+}
+.analysis-body{padding-top:15px}
+.analysis-tabs{border-bottom-color:rgba(218,227,234,.68)}
+.analysis-tabs button.active{color:#5a78a8}
+.analysis-tabs button.active:after{background:#7897d7}
+.selection-chip{background:#f1f5f8;color:#64798a}
+
+/* match stats to the same cool, fine visual language */
+.echarts-stat-section{
+  border-bottom-color:rgba(218,227,234,.62)
+}
+.echarts-stat-chart{
+  border-radius:10px;
+  background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(249,252,254,.36))
+}
+.chart-head{padding:0 1px}
+.chart-head strong{color:#52687b;font-size:10px}
+.chart-head small{color:#9aa7b2}
+
+@media(max-width:1500px){
+  .timeline-facts{gap:9px}
+  .timeline-footline{align-items:flex-start;flex-direction:column;gap:0;padding-bottom:5px}
+}
