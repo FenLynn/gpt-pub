@@ -155,62 +155,30 @@ function navigatorEventMarks(a){
 }
 
 function singleTimelinePanel(a){
-  const r=timelineRangeFor(a);
-  const ins=a.punches.filter(p=>p.direction==='进').sort((x,y)=>x.time.localeCompare(y.time));
-  const outs=a.punches.filter(p=>p.direction==='出').sort((x,y)=>x.time.localeCompare(y.time));
-  const firstIn=ins[0]?.recordId||'';
-  const lastOut=outs[outs.length-1]?.recordId||'';
-  const inClusters=clusterTimelineEvents(ins,r);
-  const outClusters=clusterTimelineEvents(outs,r);
-  const left=globalPctMinute(r.start),width=globalPctMinute(r.end-r.start);
-
-  return `<div class="dual-timeline">
+  const r=(typeof timelineRange==='function')?timelineRange(a):{start:480,end:1080};
+  return `<div class="echarts-timeline-shell">
     <div class="timeline-window-head">
       <div>
-        <span>局部时间轴</span>
-        <strong id="timelineWindowLabel">${timeLabelFromMinute(r.start)}–${timeLabelFromMinute(r.end)}</strong>
+        <span>局部窗口</span>
+        <strong id="timelineWindowLabel">${minuteText(r.start)}–${minuteText(r.end)}</strong>
       </div>
-      <small>拖动下方窗口移动 · 拉左右手柄缩放</small>
+      <small>拖动底部缩放条移动 · 拉动手柄放大 · 滚轮也可缩放</small>
     </div>
-
-    <div class="local-timeline">
-      <div class="local-plot">
-        ${localWorkBands(r)}
-        <div class="time-arrow-axis"><span></span></div>
-        <span class="lane-caption in">进</span>
-        <span class="lane-caption out">出</span>
-        ${localTimelineTicks(r)}
-        ${inClusters.map(g=>eventArrow(g,'in',r,firstIn)).join('')}
-        ${outClusters.map(g=>eventArrow(g,'out',r,lastOut)).join('')}
-      </div>
+    <div class="echarts-timeline-frame">
+      <div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="进出打卡双时间轴"></div>
     </div>
-
-    <div class="timeline-key">
-      <span><i class="key-in"></i>进入</span>
-      <span><i class="key-out"></i>离开</span>
-      <span><i class="key-first"></i>最早进入</span>
-      <span><i class="key-last"></i>最晚离开</span>
-      <span><b>×N</b>当前尺度自动合并</span>
+    <div class="echarts-timeline-legend">
+      <span><i class="in"></i>进入</span>
+      <span><i class="out"></i>离开</span>
+      <span><i class="first"></i>最早进入</span>
+      <span><i class="last"></i>最晚离开</span>
+      <span><b>×N</b>缩放后自动拆分</span>
     </div>
-
-    <div class="navigator-head"><span>全天</span><small>00:00–24:00</small></div>
-    <div class="timeline-navigator" data-dual-nav data-range-key="${r.key}">
-      <div class="navigator-axis"></div>
-      ${navigatorTicks()}
-      ${navigatorEventMarks(a)}
-      <div class="navigator-window" data-nav-window style="left:${left}%;width:${width}%">
-        <button class="navigator-handle left" data-nav-handle="left" aria-label="调整开始时间"></button>
-        <span class="navigator-grip"></span>
-        <button class="navigator-handle right" data-nav-handle="right" aria-label="调整结束时间"></button>
-      </div>
-    </div>
-
     <div class="timeline-evidence" id="timelineEvidence">
-      <span>点击箭头</span><strong>查看准确时间与原始记录</strong>
+      <span>点击箭头</span><strong>查看准确时间与原始来源</strong>
     </div>
   </div>`;
 }
-
 function focusTimelineCluster(start,end){
   const r=state.timelineRange;if(!r)return;
   const current=r.end-r.start,center=(start+end)/2;
@@ -287,60 +255,31 @@ function dateRailRow(a,i){
 }
 
 function analysisStatsHtml(ctx){
+  let mainTitle='趋势',mainSub='',secondTitle='分布',secondSub='';
   if(ctx.type==='overall'){
-    const byDay=Array.from({length:31},(_,i)=>{
-      const d=i+1, arr=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${d}`));
-      return {day:d,value:arr.filter(x=>x.severity==='problem'||x.severity==='suspect').length,work:isWorkday(d)};
-    });
-    const byEmp=EMPLOYEES.map(e=>({name:e.name,value:Array.from({length:31},(_,i)=>state.analysis.get(`${e.id}|${i+1}`)).filter(x=>x.severity==='problem'||x.severity==='suspect').length})).sort((a,b)=>b.value-a.value).slice(0,8);
-    return `<div class="chart-block"><div class="chart-head"><strong>每日异常</strong><small>工作日</small></div>${verticalBars(byDay.filter(x=>x.work),50,'day')}</div>
-    <div class="chart-block"><div class="chart-head"><strong>问题人员</strong><small>TOP 8</small></div>${horizontalBars(byEmp)}</div>`;
+    mainTitle='每日异常趋势';mainSub='工作日';
+    secondTitle='问题人员';secondSub='TOP 8';
+  }else if(ctx.type==='person'){
+    mainTitle='每日确认在岗';mainSub='小时';
+    secondTitle='状态分布';secondSub='本月';
+  }else if(ctx.type==='date'){
+    mainTitle='当天状态';mainSub=ctx.items.length+' 人';
+    secondTitle='首次到岗';secondSub='时间分布';
+  }else{
+    mainTitle='本月在岗趋势';mainSub=ctx.employee.name;
+    secondTitle='本月状态';secondSub=pad(ctx.day)+' 日已选中';
   }
-
-  if(ctx.type==='person'){
-    const days=Array.from({length:31},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`));
-    const vals=days.map(a=>({day:a.day,value:Math.round(a.presence/60*10)/10,severity:a.severity,work:isWorkday(a.day)}));
-    return `<div class="chart-block"><div class="chart-head"><strong>每日确认在岗</strong><small>小时</small></div>${verticalBars(vals.filter(x=>x.work),10,'day')}</div>
-    <div class="chart-block"><div class="chart-head"><strong>状态分布</strong><small>本月</small></div>${statusBars(days)}</div>`;
-  }
-
-  if(ctx.type==='date') return `<div class="chart-block"><div class="chart-head"><strong>当天状态</strong><small>${ctx.items.length} 人</small></div>${statusBars(ctx.items)}</div>
-    <div class="chart-block"><div class="chart-head"><strong>到岗时间</strong><small>首次进入</small></div>${arrivalDistribution(ctx.items)}</div>`;
-
-  const a=ctx.analysis, month=Array.from({length:31},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`)).filter(x=>isWorkday(x.day)&&x.presence>0);
-  const monthAvg=avg(month.map(x=>x.presence));
-  const pctOfAvg=monthAvg?Math.round(a.presence/monthAvg*100):0;
-  return `<div class="compare-stat"><span>当天确认在岗</span><strong>${fmtMinutes(a.presence)}</strong><i><b style="width:${Math.min(100,pctOfAvg)}%"></b></i><small>个人本月平均 ${fmtMinutes(monthAvg)} · 当天约 ${pctOfAvg}%</small></div>
-    <div class="chart-block"><div class="chart-head"><strong>本月状态</strong><small>${ctx.employee.name}</small></div>${statusBars(month)}</div>`;
+  return `<div class="echarts-stat-stack">
+    <section class="echarts-stat-section">
+      <div class="chart-head"><strong>${mainTitle}</strong><small>${mainSub}</small></div>
+      <div id="statsChartMain" class="echarts-stat-chart"></div>
+    </section>
+    <section class="echarts-stat-section secondary">
+      <div class="chart-head"><strong>${secondTitle}</strong><small>${secondSub}</small></div>
+      <div id="statsChartSecondary" class="echarts-stat-chart compact"></div>
+    </section>
+  </div>`;
 }
-
-function verticalBars(items,max,kind){
-  if(!items.length)return '<div class="analysis-empty">无数据</div>';
-  return `<div class="vbars">${items.map(x=>{const attr=state.selection.type==='person'?`data-analysis-cell="${state.selection.employeeId}|${x.day}"`:`data-analysis-day="${x.day}"`;return `<button ${attr} class="vbar ${x.severity||''}" title="${pad(x.day)} 日 · ${x.value}"><i style="height:${Math.max(3,Math.min(100,x.value/max*100))}%"></i><span>${x.day}</span></button>`}).join('')}</div>`;
-}
-
-function horizontalBars(items){
-  const max=Math.max(1,...items.map(x=>x.value));
-  return `<div class="hbars">${items.map(x=>`<div class="hbar"><span>${x.name}</span><i><b style="width:${x.value/max*100}%"></b></i><strong>${x.value}</strong></div>`).join('')}</div>`;
-}
-
-function statusBars(items){
-  const rows=[
-    ['正常',items.filter(x=>x.severity==='normal').length,'normal'],
-    ['疑似',items.filter(x=>x.severity==='suspect').length,'suspect'],
-    ['问题',items.filter(x=>x.severity==='problem').length,'problem'],
-    ['请假/出差',items.filter(x=>x.marker).length,'excused']
-  ], max=Math.max(1,...rows.map(x=>x[1]));
-  return `<div class="status-bars">${rows.map(x=>`<div><span>${x[0]}</span><i><b class="${x[2]}" style="width:${x[1]/max*100}%"></b></i><strong>${x[1]}</strong></div>`).join('')}</div>`;
-}
-
-function arrivalDistribution(items){
-  const bins=[['≤08:30',0],['08:31–08:45',0],['08:46–09:00',0],['>09:00',0],['无',0]];
-  items.forEach(a=>{if(!a.firstIn)bins[4][1]++;else{const m=minutes(a.firstIn);if(m<=510)bins[0][1]++;else if(m<=525)bins[1][1]++;else if(m<=540)bins[2][1]++;else bins[3][1]++}});
-  const max=Math.max(1,...bins.map(x=>x[1]));
-  return `<div class="status-bars">${bins.map(x=>`<div><span>${x[0]}</span><i><b style="width:${x[1]/max*100}%"></b></i><strong>${x[1]}</strong></div>`).join('')}</div>`;
-}
-
 function analysisRecordsHtml(ctx){
   let records=[];
   if(ctx.type==='cell') records=ctx.analysis.punches;
