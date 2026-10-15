@@ -242,7 +242,11 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     const tx = isX ? (plot.left+plot.right)/2
       : opposite ? Math.min(width-8, plot.right+labelHeight+pad+titleHeight)
       : Math.max(8, plot.left-labelHeight-pad-titleHeight);
-    const ty = isX ? Math.min(height-7, plot.bottom+labelHeight+pad+titleHeight) : (plot.top+plot.bottom)/2;
+    // Tick labels and the X title need separate line boxes. The old 1-line
+    // estimate made "Wavelength (nm)" visibly collide with tick numbers.
+    const ty = isX
+      ? Math.min(height-3, plot.bottom+labelShift+labelHeight*1.65+pad+titleHeight)
+      : (plot.top+plot.bottom)/2;
     const title = axis.title?.text;
     return <g key={"axis-"+side} onClick={onAxisClick}>
       {majorNodes}{minorNodes}
