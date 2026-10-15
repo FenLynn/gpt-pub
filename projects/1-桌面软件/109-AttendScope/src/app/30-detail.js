@@ -235,23 +235,16 @@ function bindDualTimeline(){
 }
 
 function dateTimelinePanel(day,items){
-  return `<div class="timeline-topline"><span>${pad(day)} 日 · ${items.length} 人</span><small>点击任意一行进入个人当天</small></div>
-  <div class="multi-rail-wrap">
-    ${timelineAxis()}
-    <div class="multi-rail-list">
-      ${items.map((a,i)=>dateRailRow(a,i)).join('')}
+  const height=Math.max(430,items.length*18+72);
+  return `<div class="date-echarts-shell">
+    <div class="timeline-window-head">
+      <div><span>当天全员</span><strong>${pad(day)} 日 · ${items.length} 人</strong></div>
+      <small>蓝灰细线表示可确认在岗区间 · 点击任意记录进入个人当天</small>
+    </div>
+    <div class="echarts-date-frame">
+      <div id="attendanceDayChart" class="echarts-date-chart" style="height:${height}px"></div>
     </div>
   </div>`;
-}
-
-function dateRailRow(a,i){
-  const pairBars=a.pairs.map(([x,y])=>`<span class="mini-presence" style="left:${pct(x.time)}%;width:${Math.max(.35,pct(y.time)-pct(x.time))}%"></span>`).join('');
-  const marks=a.punches.map(p=>`<span class="mini-mark ${p.direction==='进'?'in':'out'}" style="left:${pct(p.time)}%"></span>`).join('');
-  return `<button class="multi-rail-row" data-analysis-cell="${a.employee.id}|${a.day}" style="--delay:${Math.min(i*8,180)}ms">
-    <span class="multi-name">${a.employee.name}</span>
-    <span class="multi-track">${workBands()}${pairBars}${marks}</span>
-    <span class="multi-state ${a.severity}">${a.status}</span>
-  </button>`;
 }
 
 function analysisStatsHtml(ctx){
