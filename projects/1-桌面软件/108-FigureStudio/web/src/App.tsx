@@ -412,12 +412,21 @@ function pngDataUrlWithDpi(dataUrl: string, dpi: number): string {
 }
 
 function App() {
-  const initialProject = useMemo(
-    () => createInitialProject(readUserDefaults(), VISUAL_QA_MODE),
-    []
-  );
+  const initialProject = useMemo(() => {
+    const result = createInitialProject(readUserDefaults(), VISUAL_QA_MODE);
+    if (NATURE_GALLERY_MODE) {
+      const params = new URLSearchParams(window.location.search);
+      const requested = Number(params.get("sample") ?? 1);
+      const index = Number.isInteger(requested) ? Math.max(1, Math.min(14, requested)) : 1;
+      const name = "N" + String(index).padStart(2, "0");
+      const selected = result.figures.find(figure => figure.name.startsWith(name));
+      if (selected) result.activeFigureId = selected.id;
+    }
+    return result;
+  }, []);
   const initialBookId = initialProject.dataBooks[0]?.id ?? "";
-  const initialFigureId = initialProject.figures[0]?.id ?? "";
+  const initialFigureId = initialProject.activeFigureId ||
+    initialProject.figures[0]?.id || "";
 
   const history = useHistoryState<ProjectState>(initialProject);
   const project = history.value;
