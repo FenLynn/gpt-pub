@@ -168,6 +168,8 @@ export interface SeriesOverride {
 }
 
 export interface FigureOverrides {
+  figureWidthMm?: number;
+  figureHeightMm?: number;
   publicationMode?: PublicationMode;
   colorCycle?: ColorCycleId;
   fontFamily?: "Arial" | "Times New Roman";
