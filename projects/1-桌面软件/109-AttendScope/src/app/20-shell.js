@@ -88,11 +88,7 @@ function layoutHtml(){
               <h2>月度状态</h2>
               <p>点击姓名、日期或状态方块。</p>
             </div>
-            <div class="matrix-actions">
-              <span id="filterNote"></span>
-              <button class="icon-btn" id="matrixShrink" title="紧凑">−</button>
-              <button class="icon-btn" id="matrixGrow" title="放大">＋</button>
-            </div>
+            <div class="matrix-actions"><span id="filterNote"></span></div>
           </div>
           <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
         </section>
@@ -138,9 +134,6 @@ function bind(){
   document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.onclick=()=>{state.analysisTab=b.dataset.analysisTab;renderAnalysisPanel()});
 
   document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};state.analysisTab='overview';render()};
-  document.getElementById('matrixShrink').onclick=()=>{state.compact=true;renderMatrix()};
-  document.getElementById('matrixGrow').onclick=()=>{state.compact=false;renderMatrix()};
-
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
   importBtn.onclick=e=>{e.stopPropagation();popover.classList.toggle('open')};
   document.getElementById('app').onclick=e=>{if(!e.target.closest('.import-anchor'))popover.classList.remove('open')};
@@ -190,8 +183,10 @@ function matrixVisible(a){
 
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
-  const cell=state.compact?19:23,row=state.compact?27:31,nameW=82;
-  el.style.setProperty('--cell',cell+'px'); el.style.setProperty('--row',row+'px'); el.style.setProperty('--name',nameW+'px');
+  const cell=23,row=30,nameW=88;
+  el.style.setProperty('--cell',cell+'px');
+  el.style.setProperty('--row',row+'px');
+  el.style.setProperty('--name',nameW+'px');
   el.style.gridTemplateColumns=`${nameW}px repeat(31,${cell}px)`;
 
   let html='<div class="m-corner">人员</div>';
