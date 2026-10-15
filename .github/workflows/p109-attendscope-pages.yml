@@ -24,6 +24,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Reject any project-level Pages deployment
+        shell: bash
+        run: |
+          if grep -E 'actions/deploy-pages|pages:[[:space:]]*write' .github/workflows/p109-attendscope-pages.yml; then
+            echo "::error::P109 must not overwrite shared P108/P109 Pages"
+            exit 1
+          fi
       - name: Scope gate
         shell: bash
         run: |
