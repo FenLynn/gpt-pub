@@ -1,11 +1,10 @@
 function render(){
-  if(!state.inspectorTab) state.inspectorTab='overview';
+  if(!state.analysisTab) state.analysisTab='overview';
   document.getElementById('app').innerHTML=layoutHtml();
   bind();
   renderCalendar();
   renderMatrix();
-  renderInspector();
-  renderDetail();
+  renderAnalysisPanel();
 }
 
 function layoutHtml(){
@@ -18,13 +17,25 @@ function layoutHtml(){
         <div class="brand-sub">P109 · Offline</div>
       </div>
     </div>
+
     <div class="month-switch">
-      <button class="icon-btn" disabled aria-label="上个月">‹</button>
-      <div><strong>2026 年 10 月</strong><small>50 人 · 月度考勤</small></div>
-      <button class="icon-btn" disabled aria-label="下个月">›</button>
+      <button class="icon-btn" disabled>‹</button>
+      <div><strong>2026 年 10 月</strong><small>月度考勤 · 50 人</small></div>
+      <button class="icon-btn" disabled>›</button>
     </div>
+
     <div class="top-actions">
       <span class="save-state ${state.saved?'saved':'dirty'}"><i></i>${state.saved?'已保存':'未保存'}</span>
+      <div class="import-anchor">
+        <button class="text-btn" id="importBtn">导入</button>
+        <div class="import-popover" id="importPopover">
+          ${importMenuRow('考勤记录','attendanceInput','sampleAttendance')}
+          ${importMenuRow('请假','leaveInput','sampleLeave')}
+          ${importMenuRow('出差','tripInput','sampleTrip')}
+          <div class="import-divider"></div>
+          <button class="import-reset" id="resetDemo">恢复模拟数据</button>
+        </div>
+      </div>
       <button class="text-btn" id="connectDir">项目目录</button>
       <button class="text-btn" id="exportTable">导出</button>
       <button class="text-btn" id="printReport">PDF</button>
@@ -50,16 +61,18 @@ function layoutHtml(){
       </section>
 
       <section class="side-section month-meta">
-        <div class="side-label">本月设置</div>
-        <div class="meta-row"><span>工作时间</span><b>08:30–17:30</b></div>
-        <div class="meta-row"><span>午间</span><b>12:00–14:00</b></div>
+        <div class="side-label">本月</div>
+        <div class="meta-row"><span>工作</span><b>08:30–12:00</b></div>
+        <div class="meta-row"><span>下午</span><b>14:00–17:30</b></div>
         <div class="meta-row"><span>人员</span><b>50</b></div>
-        <div class="meta-row"><span>请假 / 出差</span><b>${state.leaves.length} / ${state.trips.length}</b></div>
-        <div class="meta-row"><span>项目目录</span><b class="${state.projectDir?'ok':'muted'}">${state.projectDir?'已连接':'未连接'}</b></div>
+        <div class="meta-row"><span>请假</span><b>${state.leaves.length}</b></div>
+        <div class="meta-row"><span>出差</span><b>${state.trips.length}</b></div>
+        <div class="meta-row"><span>原始记录</span><b>${state.records.length.toLocaleString()}</b></div>
+        <div class="meta-row"><span>目录</span><b class="${state.projectDir?'ok':'muted'}">${state.projectDir?'已连接':'未连接'}</b></div>
       </section>
 
       <section class="side-section side-legend">
-        <div class="side-label">状态</div>
+        <div class="side-label">显示</div>
         <button class="legend-filter ${state.filter==='all'?'active':''}" data-filter="all"><i class="neutral"></i><span>全部</span></button>
         <button class="legend-filter ${state.filter==='problem'?'active':''}" data-filter="problem"><i class="problem"></i><span>明确问题</span></button>
         <button class="legend-filter ${state.filter==='suspect'?'active':''}" data-filter="suspect"><i class="suspect"></i><span>疑似异常</span></button>
@@ -68,12 +81,12 @@ function layoutHtml(){
     </aside>
 
     <main class="workspace">
-      <div class="workspace-grid">
+      <div class="workbench">
         <section class="matrix-zone">
           <div class="section-head">
             <div>
               <h2>月度状态</h2>
-              <p>日期横向，人员纵向。颜色只表示状态，点击方块查看当天证据。</p>
+              <p>点击姓名、日期或状态方块。</p>
             </div>
             <div class="matrix-actions">
               <span id="filterNote"></span>
@@ -84,31 +97,25 @@ function layoutHtml(){
           <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
         </section>
 
-        <aside class="inspector">
-          <div class="inspector-head">
-            <div id="inspectorEyebrow">2026 年 10 月</div>
-            <h3 id="inspectorTitle">全月概览</h3>
+        <section class="analysis-panel">
+          <div class="analysis-head">
+            <div>
+              <div class="analysis-eyebrow" id="analysisEyebrow">2026 年 10 月</div>
+              <h2 id="analysisTitle">全月概览</h2>
+            </div>
+            <div class="selection-status" id="selectionStatus"></div>
           </div>
-          <nav class="inspector-tabs" aria-label="右侧信息">
-            <button data-inspector-tab="overview">概览</button>
-            <button data-inspector-tab="issues">异常</button>
-            <button data-inspector-tab="stats">统计</button>
-            <button data-inspector-tab="data">数据</button>
-          </nav>
-          <div class="inspector-body" id="inspectorBody"></div>
-        </aside>
-      </div>
 
-      <section class="detail">
-        <div class="detail-head">
-          <div>
-            <div class="detail-kicker" id="detailSub">选择日期或状态方块</div>
-            <div class="detail-title" id="detailTitle">时间轴</div>
-          </div>
-          <div class="timeline-tools" id="detailTools"></div>
-        </div>
-        <div class="detail-body" id="detailBody"></div>
-      </section>
+          <nav class="analysis-tabs">
+            <button data-analysis-tab="overview">概览</button>
+            <button data-analysis-tab="timeline">时间轴</button>
+            <button data-analysis-tab="stats">统计</button>
+            <button data-analysis-tab="records">记录</button>
+          </nav>
+
+          <div class="analysis-body" id="analysisBody"></div>
+        </section>
+      </div>
     </main>
   </div>
 
@@ -118,15 +125,35 @@ function layoutHtml(){
   `;
 }
 
+function importMenuRow(title,input,sample){
+  return `<div class="import-menu-row"><span>${title}</span><div><button data-open="${input}">导入</button><button id="${sample}">样例</button></div></div>`;
+}
+
 function bind(){
   document.getElementById('attendanceInput').onchange=e=>handleFile(e,importAttendance);
   document.getElementById('leaveInput').onchange=e=>handleFile(e,importLeaves);
   document.getElementById('tripInput').onchange=e=>handleFile(e,importTrips);
+
   document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;render()});
-  document.querySelectorAll('[data-inspector-tab]').forEach(b=>b.onclick=()=>{state.inspectorTab=b.dataset.inspectorTab;renderInspector()});
-  document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};render()};
+  document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.onclick=()=>{state.analysisTab=b.dataset.analysisTab;renderAnalysisPanel()});
+
+  document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};state.analysisTab='overview';render()};
   document.getElementById('matrixShrink').onclick=()=>{state.compact=true;renderMatrix()};
   document.getElementById('matrixGrow').onclick=()=>{state.compact=false;renderMatrix()};
+
+  const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
+  importBtn.onclick=e=>{e.stopPropagation();popover.classList.toggle('open')};
+  document.addEventListener('click',e=>{if(!e.target.closest('.import-anchor'))popover.classList.remove('open')},{once:true});
+
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
+  document.getElementById('sampleAttendance').onclick=downloadAttendance;
+  document.getElementById('sampleLeave').onclick=downloadLeaves;
+  document.getElementById('sampleTrip').onclick=downloadTrips;
+  document.getElementById('resetDemo').onclick=()=>{
+    Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='all'; state.analysisTab='overview';
+    state.revisions=[]; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
+  };
+
   document.getElementById('connectDir').onclick=connectProjectDir;
   document.getElementById('exportTable').onclick=exportTraditionalTable;
   document.getElementById('printReport').onclick=()=>window.print();
@@ -135,8 +162,7 @@ function bind(){
 }
 
 async function handleFile(e,fn){
-  const file=e.target.files?.[0];
-  if(!file)return;
+  const file=e.target.files?.[0]; if(!file)return;
   try{await fn(file)}catch(err){toast(err.message,true)}finally{e.target.value=''}
 }
 
@@ -163,26 +189,28 @@ function matrixVisible(a){
 }
 
 function renderMatrix(){
-  const el=document.getElementById('matrix');
-  if(!el)return;
-  const cell=state.compact?20:24,row=state.compact?28:32,nameW=82;
-  el.style.setProperty('--cell',cell+'px');
-  el.style.setProperty('--row',row+'px');
-  el.style.setProperty('--name',nameW+'px');
+  const el=document.getElementById('matrix'); if(!el)return;
+  const cell=state.compact?19:23,row=state.compact?27:31,nameW=82;
+  el.style.setProperty('--cell',cell+'px'); el.style.setProperty('--row',row+'px'); el.style.setProperty('--name',nameW+'px');
   el.style.gridTemplateColumns=`${nameW}px repeat(31,${cell}px)`;
 
   let html='<div class="m-corner">人员</div>';
   for(let d=1;d<=31;d++){
-    const type=dayType(d),selected=state.selection.type==='date'&&state.selection.day===d?' selected':'';
-    html+=`<button class="m-date ${type}${selected}" data-date="${d}" title="${isoDate(d)} · ${dayTypeText(type)}"><b>${d}</b><span>${weekdayLabel(d)}</span></button>`;
+    const type=dayType(d),sel=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d?' selected':'';
+    html+=`<button class="m-date ${type}${sel}" data-date="${d}" title="${isoDate(d)} · ${dayTypeText(type)}"><b>${d}</b><span>${weekdayLabel(d)}</span></button>`;
   }
 
   for(const e of EMPLOYEES){
-    html+=`<button class="m-name ${state.selection.type==='person'&&state.selection.employeeId===e.id?'selected':''}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span>${e.name}</span><small>${e.department}</small></button>`;
+    const rowSelected=(state.selection.type==='person'||state.selection.type==='cell')&&state.selection.employeeId===e.id;
+    html+=`<button class="m-name ${rowSelected?'selected':''}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span>${e.name}</span></button>`;
     for(let d=1;d<=31;d++){
-      const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a),selected=state.selection.type==='cell'&&state.selection.employeeId===e.id&&state.selection.day===d;
+      const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
+      const selected=state.selection.type==='cell'&&state.selection.employeeId===e.id&&state.selection.day===d;
+      const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
       const cls=a.severity==='problem'?'s-problem':a.severity==='suspect'?'s-suspect':a.severity==='rest'?'s-rest':a.severity==='excused'?'s-excused':a.status==='非工作日出勤'?'s-overtime':'s-normal';
-      html+=`<div class="m-cell"><button class="${cls} ${selected?'selected':''}" style="opacity:${visible?1:.12}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n${a.status}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${a.marker?`<i class="corner-mark ${a.marker}"></i>`:''}</button></div>`;
+      html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''}">
+        <button class="${cls} ${selected?'selected':''}" style="opacity:${visible?1:.10}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n${a.status}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${a.marker?`<i class="corner-mark ${a.marker}"></i>`:''}</button>
+      </div>`;
     }
   }
   el.innerHTML=html;
@@ -190,111 +218,59 @@ function renderMatrix(){
   el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date));
   el.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.cell.split('|');selectCell(id,+d)});
   const note=document.getElementById('filterNote');
-  if(note)note.textContent=state.filter==='all'?'':({problem:'只看明确问题',suspect:'只看疑似',excused:'只看请假/出差',unresolved:'只看待核实',overtime:'只看非工作日出勤'}[state.filter]||'已筛选');
+  if(note)note.textContent=state.filter==='all'?'':({problem:'明确问题',suspect:'疑似异常',excused:'请假 / 出差',unresolved:'待核实',overtime:'非工作日出勤'}[state.filter]||'已筛选');
 }
 
-function inspectorContext(){
+function analysisContext(){
   const s=state.selection;
   if(s.type==='person'){
     const e=EMPLOYEES.find(x=>x.id===s.employeeId);
-    return {title:e.name,eyebrow:`${e.department} · 2026 年 10 月`,items:Array.from({length:31},(_,i)=>state.analysis.get(`${e.id}|${i+1}`))};
+    return {type:'person',title:e.name,eyebrow:`${e.department} · 2026 年 10 月`,employee:e,items:Array.from({length:31},(_,i)=>state.analysis.get(`${e.id}|${i+1}`))};
   }
   if(s.type==='date'){
-    return {title:`10 月 ${s.day} 日`,eyebrow:`周${weekdayLabel(s.day)} · ${dayTypeText(dayType(s.day))}`,items:EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${s.day}`))};
+    return {type:'date',title:`10 月 ${s.day} 日`,eyebrow:`周${weekdayLabel(s.day)} · ${dayTypeText(dayType(s.day))}`,day:s.day,items:EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${s.day}`))};
   }
   if(s.type==='cell'){
     const e=EMPLOYEES.find(x=>x.id===s.employeeId),a=state.analysis.get(`${e.id}|${s.day}`);
-    return {title:e.name,eyebrow:`${isoDate(s.day)} · ${a.status}`,items:[a]};
+    return {type:'cell',title:e.name,eyebrow:`${isoDate(s.day)} · ${a.status}`,employee:e,day:s.day,analysis:a,items:[a]};
   }
-  return {title:'全月概览',eyebrow:'2026 年 10 月',items:workAnalyses()};
+  return {type:'overall',title:'全月概览',eyebrow:'2026 年 10 月',items:workAnalyses()};
 }
 
-function renderInspector(){
-  const body=document.getElementById('inspectorBody');
-  if(!body)return;
-  const ctx=inspectorContext();
-  document.getElementById('inspectorTitle').textContent=ctx.title;
-  document.getElementById('inspectorEyebrow').textContent=ctx.eyebrow;
-  document.querySelectorAll('[data-inspector-tab]').forEach(b=>b.classList.toggle('active',b.dataset.inspectorTab===state.inspectorTab));
-  if(state.inspectorTab==='issues') body.innerHTML=inspectorIssues(ctx.items);
-  else if(state.inspectorTab==='stats') body.innerHTML=inspectorStats(ctx.items);
-  else if(state.inspectorTab==='data') body.innerHTML=inspectorData();
-  else body.innerHTML=inspectorOverview(ctx.items);
-  bindInspector();
+function renderAnalysisPanel(){
+  const body=document.getElementById('analysisBody'); if(!body)return;
+  const ctx=analysisContext();
+  document.getElementById('analysisTitle').textContent=ctx.title;
+  document.getElementById('analysisEyebrow').textContent=ctx.eyebrow;
+  document.getElementById('selectionStatus').innerHTML=analysisSelectionBadge(ctx);
+  document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.classList.toggle('active',b.dataset.analysisTab===state.analysisTab));
+
+  if(state.analysisTab==='timeline') body.innerHTML=analysisTimelineHtml(ctx);
+  else if(state.analysisTab==='stats') body.innerHTML=analysisStatsHtml(ctx);
+  else if(state.analysisTab==='records') body.innerHTML=analysisRecordsHtml(ctx);
+  else body.innerHTML=analysisOverviewHtml(ctx);
+
+  bindAnalysisPanel(ctx);
 }
 
-function inspectorOverview(items){
-  const st=statsFor(items),pres=items.filter(x=>x.presence>0),excused=items.filter(x=>x.marker).length,overtime=items.filter(x=>x.status==='非工作日出勤').length;
-  return `<div class="metric-list">
-    ${metricLine('正常',st.normal,'normal')}
-    ${metricLine('明确问题',st.problems,'problem')}
-    ${metricLine('疑似异常',st.suspects,'suspect')}
-    ${metricLine('请假 / 出差',excused,'excused')}
-    ${overtime?metricLine('非工作日出勤',overtime,'overtime'):''}
-  </div>
-  <div class="inspector-separator"></div>
-  <div class="quiet-stat"><span>平均确认在岗</span><strong>${fmtMinutes(avg(pres.map(x=>x.presence)))}</strong></div>
-  <div class="quiet-stat"><span>当前范围</span><strong>${items.length} 个单元</strong></div>`;
+function analysisSelectionBadge(ctx){
+  if(ctx.type==='cell'){
+    const tone=ctx.analysis.severity==='problem'?'problem':ctx.analysis.severity==='suspect'?'suspect':'normal';
+    return `<span class="selection-chip ${tone}"><i></i>${ctx.analysis.status}</span>`;
+  }
+  return '';
 }
 
-function metricLine(label,value,tone){
-  return `<button class="metric-line" data-metric-filter="${tone}"><span><i class="${tone}"></i>${label}</span><strong>${value}</strong></button>`;
+function bindAnalysisPanel(ctx){
+  document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.onclick=()=>{state.analysisTab=b.dataset.analysisTab;renderAnalysisPanel()});
+  document.querySelectorAll('[data-analysis-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.analysisCell.split('|');selectCell(id,+d)});
+  document.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>showRecord(b.dataset.record));
+  document.querySelectorAll('[data-dayrecord]').forEach(b=>b.onclick=()=>showRecord(b.dataset.dayrecord));
+  const zi=document.getElementById('zoomIn'),zo=document.getElementById('zoomOut'),zr=document.getElementById('zoomReset');
+  if(zi)zi.onclick=()=>applyTimelineZoom(.2); if(zo)zo.onclick=()=>applyTimelineZoom(-.2); if(zr)zr.onclick=()=>resetTimelineZoom();
+  bindTimelineGestures();
 }
 
-function inspectorIssues(items){
-  const issues=items.filter(x=>x.severity==='problem'||x.severity==='suspect').sort((a,b)=>a.severity===b.severity?0:(a.severity==='problem'?-1:1)).slice(0,24);
-  if(!issues.length)return '<div class="inspector-empty"><span>✓</span><strong>当前范围没有待核实异常</strong></div>';
-  return `<div class="issue-list">${issues.map(a=>`<button class="issue-row" data-issue-cell="${a.employee.id}|${a.day}">
-    <i class="${a.severity}"></i>
-    <span><b>${a.employee.name}</b><small>${pad(a.day)} 日 · ${a.status}</small></span>
-    <em>›</em>
-  </button>`).join('')}</div>`;
-}
-
-function inspectorStats(items){
-  const byStatus=[
-    {label:'正常',value:items.filter(x=>x.severity==='normal').length,tone:'normal'},
-    {label:'疑似',value:items.filter(x=>x.severity==='suspect').length,tone:'suspect'},
-    {label:'问题',value:items.filter(x=>x.severity==='problem').length,tone:'problem'},
-    {label:'请假/出差',value:items.filter(x=>x.marker).length,tone:'excused'}
-  ];
-  const max=Math.max(1,...byStatus.map(x=>x.value));
-  const durations=items.filter(x=>x.presence>0).map(x=>x.presence);
-  return `<div class="inspector-chart-title">状态分布</div>
-  <div class="micro-bars">${byStatus.map(x=>`<div class="micro-row"><span>${x.label}</span><i><b class="${x.tone}" style="width:${x.value/max*100}%"></b></i><strong>${x.value}</strong></div>`).join('')}</div>
-  <div class="inspector-separator"></div>
-  <div class="inspector-chart-title">时长</div>
-  <div class="quiet-stat"><span>平均</span><strong>${fmtMinutes(avg(durations))}</strong></div>
-  <div class="quiet-stat"><span>最长</span><strong>${fmtMinutes(durations.length?Math.max(...durations):0)}</strong></div>
-  <div class="quiet-stat"><span>有打卡单元</span><strong>${durations.length}</strong></div>`;
-}
-
-function inspectorData(){
-  return `<div class="data-actions">
-    ${dataAction('考勤记录','XLSX / CSV','attendanceInput','sampleAttendance')}
-    ${dataAction('请假','独立 XLSX / CSV','leaveInput','sampleLeave')}
-    ${dataAction('出差','独立 XLSX / CSV','tripInput','sampleTrip')}
-  </div>
-  <div class="inspector-separator"></div>
-  <button class="wide-quiet-btn" id="resetDemo">恢复 50 人模拟数据</button>
-  <div class="data-footnote">原始文件只读保存，人工处理不会覆盖 raw。</div>`;
-}
-
-function dataAction(title,sub,inputId,sampleId){
-  return `<div class="data-row"><div><strong>${title}</strong><small>${sub}</small></div><div><button class="mini-action" data-open="${inputId}">导入</button><button class="mini-action" id="${sampleId}">样例</button></div></div>`;
-}
-
-function bindInspector(){
-  document.querySelectorAll('[data-inspector-tab]').forEach(b=>b.onclick=()=>{state.inspectorTab=b.dataset.inspectorTab;renderInspector()});
-  document.querySelectorAll('[data-issue-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.issueCell.split('|');selectCell(id,+d)});
-  document.querySelectorAll('[data-metric-filter]').forEach(b=>b.onclick=()=>{const x=b.dataset.metricFilter;state.filter=x==='normal'?'all':x;render()});
-  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
-  const a=document.getElementById('sampleAttendance'),l=document.getElementById('sampleLeave'),t=document.getElementById('sampleTrip'),r=document.getElementById('resetDemo');
-  if(a)a.onclick=downloadAttendance;if(l)l.onclick=downloadLeaves;if(t)t.onclick=downloadTrips;
-  if(r)r.onclick=()=>{Object.assign(state,generateMock());state.selection={type:'overall'};state.filter='all';state.revisions=[];state.saved=false;reanalyze();render();toast('已恢复模拟数据')};
-}
-
-function selectPerson(id){state.selection={type:'person',employeeId:id};render()}
-function selectDate(d){state.selection={type:'date',day:d};render()}
-function selectCell(id,d){state.selection={type:'cell',employeeId:id,day:d};state.zoom=1;render();scrollDetail()}
-function scrollDetail(){setTimeout(()=>document.querySelector('.detail')?.scrollIntoView({behavior:'smooth',block:'start'}),40)}
+function selectPerson(id){state.selection={type:'person',employeeId:id};state.analysisTab='overview';render()}
+function selectDate(d){state.selection={type:'date',day:d};state.analysisTab='timeline';render()}
+function selectCell(id,d){state.selection={type:'cell',employeeId:id,day:d};state.analysisTab='timeline';state.zoom=1;render()}
