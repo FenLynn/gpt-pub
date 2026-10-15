@@ -160,9 +160,9 @@ function timelineEventRender(data){
           stroke:color,
           lineWidth:edge?6:5,
           lineCap:'round',
-          opacity:1,
-          shadowBlur:edge?6:0,
-          shadowColor:edge?'rgba(20,70,110,.14)':'transparent'
+          opacity:1
+          // No shadow filter on zero-width SVG lines. Chrome clips the
+          // filtered first/last shafts even though the ZRender geometry exists.
         }
       },
       {
