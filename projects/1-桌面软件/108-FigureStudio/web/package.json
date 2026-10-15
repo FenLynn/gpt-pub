@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
+    "test:gallery": "esbuild tests/nature-gallery.test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.cache/nature-gallery.test.mjs && node node_modules/.cache/nature-gallery.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
