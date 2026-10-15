@@ -89,6 +89,4 @@ jobs:
             echo "::error::ECharts slider dataZoom runtime is missing"
             exit 1
           }
-          cat <<'NODE' >/dev/null
-          NODE
 
