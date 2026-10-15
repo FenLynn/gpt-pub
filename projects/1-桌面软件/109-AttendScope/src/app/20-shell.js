@@ -143,7 +143,7 @@ function bind(){
 
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
   importBtn.onclick=e=>{e.stopPropagation();popover.classList.toggle('open')};
-  document.addEventListener('click',e=>{if(!e.target.closest('.import-anchor'))popover.classList.remove('open')},{once:true});
+  document.getElementById('app').onclick=e=>{if(!e.target.closest('.import-anchor'))popover.classList.remove('open')};
 
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
   document.getElementById('sampleAttendance').onclick=downloadAttendance;
