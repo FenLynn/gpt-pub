@@ -1,4 +1,4 @@
-name: P109 AttendScope Pages
+name: P109 AttendScope CI
 
 on:
   push:
@@ -11,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: p109-attendscope-pages
@@ -84,32 +82,3 @@ jobs:
           console.log('Local ECharts', echarts.version, 'OK');
           NODE
 
-  deploy:
-    environment:
-      name: p109-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: validate
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - name: Assemble static Pages site
-        shell: bash
-        run: |
-          mkdir -p _site/p109
-          cp -a "projects/1-桌面软件/109-AttendScope/." _site/p109/
-          rm -rf _site/p109/data/*/*/raw _site/p109/data/*/*/working _site/p109/data/*/*/snapshots _site/p109/data/*/*/branches _site/p109/data/*/*/output || true
-          cat > _site/index.html <<'HTML'
-          <!doctype html>
-          <html lang="zh-CN">
-          <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0; url=./p109/"><title>AttendScope P109</title></head>
-          <body><p><a href="./p109/">打开 AttendScope P109</a></p></body>
-          </html>
-          HTML
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
