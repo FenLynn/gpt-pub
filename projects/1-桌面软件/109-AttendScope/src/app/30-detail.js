@@ -62,39 +62,198 @@ function workBands(){
   return `<span class="rail-work am" style="left:${pct('08:30')}%;width:${pct('12:00')-pct('08:30')}%"></span><span class="rail-work pm" style="left:${pct('14:00')}%;width:${pct('17:30')-pct('14:00')}%"></span>`;
 }
 
-function singleTimelinePanel(a){
-  const pairedIds=new Set(a.pairs.flat().map(p=>p.recordId));
-  const ins=a.punches.filter(p=>p.direction==='进'), outs=a.punches.filter(p=>p.direction==='出');
-  const pairs=a.pairs.map(([x,y],i)=>`<span class="rail-presence" style="left:${pct(x.time)}%;width:${Math.max(.35,pct(y.time)-pct(x.time))}%;--i:${i}"></span>`).join('');
-  return `<div class="timeline-topline">
-      <span>06:00–22:00</span>
-      <div class="timeline-zoom"><button id="zoomOut">−</button><button id="zoomReset">${Math.round(state.zoom*100)}%</button><button id="zoomIn">＋</button></div>
-    </div>
-    <div class="rail-viewport" data-timeline-viewport>
-      <div class="rail-inner" data-timeline-inner style="width:${100*state.zoom}%">
-        ${timelineAxis()}
-        <div class="attendance-rail">
-          <div class="rail-label">进</div>
-          <div class="rail-lane in-lane">${ins.map((p,i)=>railMarker(p,'in',i,!pairedIds.has(p.recordId))).join('')}</div>
-
-          <div class="rail-label muted">在岗</div>
-          <div class="rail-lane presence-lane">${workBands()}${pairs}</div>
-
-          <div class="rail-label">出</div>
-          <div class="rail-lane out-lane">${outs.map((p,i)=>railMarker(p,'out',i,!pairedIds.has(p.recordId))).join('')}</div>
-        </div>
-      </div>
-    </div>
-    <div class="timeline-legend"><span><i class="work"></i>应工作</span><span><i class="presence"></i>确认在岗</span><span>黄色节点 = 记录完整性需核实</span></div>
-    <div class="timeline-evidence" id="timelineEvidence">
-      <span>点击打卡点</span><strong>查看准确时间和原始来源</strong>
-    </div>`;
+function timelineRangeFor(a){
+  const key=`${a.employee.id}|${a.day}`;
+  if(!state.timelineRange||state.timelineRange.key!==key) state.timelineRange={key,start:480,end:1080};
+  return state.timelineRange;
 }
 
-function railMarker(p,kind,i,unpaired=false){
-  return `<button class="rail-marker ${kind} ${unpaired?'unpaired':''}" data-record="${p.recordId}" style="left:${pct(p.time)}%;--i:${i}" title="${p.time} ${p.direction}${unpaired?' · 未形成完整配对':''}">
-    <i></i><time>${p.time.slice(0,5)}</time>
+function clampTimelineRange(start,end,key){
+  const minSpan=30;
+  let s=Math.max(0,Math.min(1440-minSpan,start));
+  let e=Math.max(s+minSpan,Math.min(1440,end));
+  if(e>1440){e=1440;s=Math.max(0,e-Math.max(minSpan,end-start))}
+  return {key,start:Math.round(s),end:Math.round(e)};
+}
+
+function localPctMinute(m,r){return (m-r.start)/(r.end-r.start)*100}
+function globalPctMinute(m){return m/1440*100}
+function timeLabelFromMinute(m){const x=Math.max(0,Math.min(1440,Math.round(m)));return `${pad(Math.floor(x/60)%24)}:${pad(x%60)}`}
+
+function localTimelineTicks(r){
+  const span=r.end-r.start;
+  const step=span<=120?15:span<=300?30:span<=720?60:120;
+  const first=Math.ceil(r.start/step)*step;
+  let html='';
+  for(let m=first;m<=r.end;m+=step){
+    const left=localPctMinute(m,r);
+    html+=`<span class="local-tick" style="left:${left}%"><i></i><b>${timeLabelFromMinute(m)}</b></span>`;
+  }
+  return html;
+}
+
+function localWorkBands(r){
+  const bands=[[510,720],[840,1050]];
+  return bands.map(([s,e])=>{
+    const a=Math.max(s,r.start),b=Math.min(e,r.end);
+    if(b<=a)return '';
+    return `<span class="local-work-band" style="left:${localPctMinute(a,r)}%;width:${localPctMinute(b,r)-localPctMinute(a,r)}%"></span>`;
+  }).join('');
+}
+
+function clusterTimelineEvents(events,r){
+  const visible=events.map(p=>({p,m:minutes(p.time)})).filter(x=>x.m>=r.start&&x.m<=r.end).sort((x,y)=>x.m-y.m);
+  if(!visible.length)return [];
+  const threshold=Math.max(.75,(r.end-r.start)/70);
+  const out=[]; let cur=[visible[0]];
+  for(let i=1;i<visible.length;i++){
+    if(visible[i].m-visible[i-1].m<=threshold)cur.push(visible[i]);
+    else{out.push(cur);cur=[visible[i]]}
+  }
+  out.push(cur);
+  return out.map(group=>({
+    records:group.map(x=>x.p),
+    start:group[0].m,
+    end:group[group.length-1].m,
+    minute:group.reduce((s,x)=>s+x.m,0)/group.length
+  }));
+}
+
+function eventArrow(cluster,kind,r,edgeId){
+  const count=cluster.records.length;
+  const left=localPctMinute(cluster.minute,r);
+  const edge=cluster.records.some(p=>p.recordId===edgeId);
+  const title=count===1
+    ? `${cluster.records[0].time} ${cluster.records[0].direction}`
+    : `${timeLabelFromMinute(cluster.start)}–${timeLabelFromMinute(cluster.end)} · ${count} 条`;
+  const attrs=count===1
+    ? `data-record="${cluster.records[0].recordId}"`
+    : `data-cluster-start="${cluster.start}" data-cluster-end="${cluster.end}"`;
+  return `<button class="event-arrow ${kind} ${edge?(kind==='in'?'edge-first':'edge-last'):''} ${count>1?'clustered':''}" style="left:${left}%" ${attrs} title="${title}">
+    <span class="arrow-shaft"></span><span class="arrow-head"></span>
+    ${count>1?`<b class="cluster-count">×${count}</b>`:''}
+    <time>${count===1?cluster.records[0].time.slice(0,5):timeLabelFromMinute(cluster.minute)}</time>
   </button>`;
+}
+
+function navigatorTicks(){
+  return [0,360,720,1080,1440].map(m=>`<span class="navigator-tick" style="left:${globalPctMinute(m)}%">${m===1440?'24':pad(Math.floor(m/60))}</span>`).join('');
+}
+
+function navigatorEventMarks(a){
+  return a.punches.map(p=>`<i class="navigator-event ${p.direction==='进'?'in':'out'}" style="left:${globalPctMinute(minutes(p.time))}%"></i>`).join('');
+}
+
+function singleTimelinePanel(a){
+  const r=timelineRangeFor(a);
+  const ins=a.punches.filter(p=>p.direction==='进').sort((x,y)=>x.time.localeCompare(y.time));
+  const outs=a.punches.filter(p=>p.direction==='出').sort((x,y)=>x.time.localeCompare(y.time));
+  const firstIn=ins[0]?.recordId||'';
+  const lastOut=outs[outs.length-1]?.recordId||'';
+  const inClusters=clusterTimelineEvents(ins,r);
+  const outClusters=clusterTimelineEvents(outs,r);
+  const left=globalPctMinute(r.start),width=globalPctMinute(r.end-r.start);
+
+  return `<div class="dual-timeline">
+    <div class="timeline-window-head">
+      <div>
+        <span>局部时间轴</span>
+        <strong id="timelineWindowLabel">${timeLabelFromMinute(r.start)}–${timeLabelFromMinute(r.end)}</strong>
+      </div>
+      <small>拖动下方窗口移动 · 拉左右手柄缩放</small>
+    </div>
+
+    <div class="local-timeline">
+      <div class="local-plot">
+        ${localWorkBands(r)}
+        <div class="time-arrow-axis"><span></span></div>
+        <span class="lane-caption in">进</span>
+        <span class="lane-caption out">出</span>
+        ${localTimelineTicks(r)}
+        ${inClusters.map(g=>eventArrow(g,'in',r,firstIn)).join('')}
+        ${outClusters.map(g=>eventArrow(g,'out',r,lastOut)).join('')}
+      </div>
+    </div>
+
+    <div class="timeline-key">
+      <span><i class="key-in"></i>进入</span>
+      <span><i class="key-out"></i>离开</span>
+      <span><i class="key-first"></i>最早进入</span>
+      <span><i class="key-last"></i>最晚离开</span>
+      <span><b>×N</b>当前尺度自动合并</span>
+    </div>
+
+    <div class="navigator-head"><span>全天</span><small>00:00–24:00</small></div>
+    <div class="timeline-navigator" data-dual-nav data-range-key="${r.key}">
+      <div class="navigator-axis"></div>
+      ${navigatorTicks()}
+      ${navigatorEventMarks(a)}
+      <div class="navigator-window" data-nav-window style="left:${left}%;width:${width}%">
+        <button class="navigator-handle left" data-nav-handle="left" aria-label="调整开始时间"></button>
+        <span class="navigator-grip"></span>
+        <button class="navigator-handle right" data-nav-handle="right" aria-label="调整结束时间"></button>
+      </div>
+    </div>
+
+    <div class="timeline-evidence" id="timelineEvidence">
+      <span>点击箭头</span><strong>查看准确时间与原始记录</strong>
+    </div>
+  </div>`;
+}
+
+function focusTimelineCluster(start,end){
+  const r=state.timelineRange;if(!r)return;
+  const current=r.end-r.start,center=(start+end)/2;
+  const nextSpan=Math.max(30,current/3);
+  state.timelineRange=clampTimelineRange(center-nextSpan/2,center+nextSpan/2,r.key);
+  renderAnalysisPanel();
+}
+
+function bindDualTimeline(){
+  document.querySelectorAll('[data-cluster-start]').forEach(b=>b.onclick=()=>focusTimelineCluster(+b.dataset.clusterStart,+b.dataset.clusterEnd));
+  const nav=document.querySelector('[data-dual-nav]'); if(!nav)return;
+  const r=state.timelineRange;if(!r)return;
+  let mode='',startX=0,base=null,draft=null,moved=false;
+
+  function minuteAt(clientX){
+    const box=nav.getBoundingClientRect();
+    return Math.max(0,Math.min(1440,(clientX-box.left)/Math.max(1,box.width)*1440));
+  }
+  function updateWindow(range){
+    const win=nav.querySelector('[data-nav-window]');if(!win)return;
+    win.style.left=globalPctMinute(range.start)+'%';
+    win.style.width=globalPctMinute(range.end-range.start)+'%';
+    const label=document.getElementById('timelineWindowLabel');
+    if(label)label.textContent=`${timeLabelFromMinute(range.start)}–${timeLabelFromMinute(range.end)}`;
+  }
+
+  nav.onpointerdown=e=>{
+    const handle=e.target.closest('[data-nav-handle]'),win=e.target.closest('[data-nav-window]');
+    if(!handle&&!win){
+      const span=r.end-r.start,center=minuteAt(e.clientX);
+      state.timelineRange=clampTimelineRange(center-span/2,center+span/2,r.key);
+      renderAnalysisPanel();
+      return;
+    }
+    mode=handle?handle.dataset.navHandle:'move';
+    startX=e.clientX;base={...r};draft={...r};moved=false;
+    nav.setPointerCapture?.(e.pointerId);e.preventDefault();
+  };
+  nav.onpointermove=e=>{
+    if(!mode)return;
+    const box=nav.getBoundingClientRect(),delta=(e.clientX-startX)/Math.max(1,box.width)*1440;
+    if(Math.abs(e.clientX-startX)>2)moved=true;
+    if(mode==='move') draft=clampTimelineRange(base.start+delta,base.end+delta,r.key);
+    else if(mode==='left') draft=clampTimelineRange(Math.min(base.end-30,base.start+delta),base.end,r.key);
+    else draft=clampTimelineRange(base.start,Math.max(base.start+30,base.end+delta),r.key);
+    updateWindow(draft);
+  };
+  nav.onpointerup=nav.onpointercancel=e=>{
+    if(!mode)return;
+    state.timelineRange=draft||r;mode='';
+    try{nav.releasePointerCapture?.(e.pointerId)}catch(_){}
+    renderAnalysisPanel();
+  };
 }
 
 function dateTimelinePanel(day,items){
