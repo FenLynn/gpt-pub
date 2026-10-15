@@ -39,7 +39,7 @@ type Layout = {
   xaxis?: Axis; yaxis?: Axis; yaxis2?: Axis;
   margin?: { l?: number; r?: number; t?: number; b?: number };
   font?: { family?: string; size?: number; color?: string };
-  title?: { text?: string; font?: { family?: string; size?: number; color?: string } };
+  title?: { text?: string; font?: { family?: string; size?: number; color?: string }; pad?: {b?:number} };
   legend?: {
     x?: number; y?: number; xanchor?: string; yanchor?: string;
     orientation?: string; bgcolor?: string; bordercolor?: string; borderwidth?: number;
@@ -79,9 +79,15 @@ const rangeOf = (traces: DataTrace[], key: "x" | "y", axisId?: string) => {
 };
 function resolveDomain(axis: Axis, values: number[]): [number, number] {
   const log = axis.type === "log";
-  const usable = values.filter(v => fnum(v) && (!log || v > 0));
-  let low = usable.length ? Math.min(...usable) : log ? 0.1 : 0;
-  let high = usable.length ? Math.max(...usable) : log ? 10 : 1;
+  // Avoid Math.min(...100k) stack overflows on real instrument spectra.
+  let low = Number.POSITIVE_INFINITY, high = Number.NEGATIVE_INFINITY;
+  for (const value of values) {
+    if (!fnum(value) || (log && value <= 0)) continue;
+    if (value < low) low = value;
+    if (value > high) high = value;
+  }
+  if (!Number.isFinite(low)) low = log ? 0.1 : 0;
+  if (!Number.isFinite(high)) high = log ? 10 : 1;
   if (axis.range?.length === 2 && axis.range.every(fnum)) {
     const start = log ? Math.pow(10, axis.range[0]) : axis.range[0];
     const end = log ? Math.pow(10, axis.range[1]) : axis.range[1];
@@ -211,7 +217,6 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     const majorNodes = major.map((v,i) => {
       const pos = fn(v);
       if (!fnum(pos) || (isX ? pos < plot.left-0.1 || pos > plot.right+0.1 : pos < plot.top-0.1 || pos > plot.bottom+0.1)) return null;
-      const lx = isX ? pos : base, ly = isX ? base : pos;
       const labelX = isX ? pos : base+(opposite?labelShift:-labelShift);
       const labelY = isX ? base+labelShift+(font.size??10)*0.85 : pos+(font.size??10)*0.34;
       return <g key={"mj-"+side+"-"+i}>
@@ -227,8 +232,13 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
       const len=axis.minor?.ticklen??2.4;
       return <path key={"mn-"+side+"-"+i} d={isX?"M "+coord(pos)+" "+base+" v "+coord(tickSign*len):"M "+base+" "+coord(pos)+" h "+coord(tickSign*len)} stroke={axis.minor?.tickcolor??axis.tickcolor??baseColor} strokeWidth={axis.minor?.tickwidth??0.6}/>;
     });
-    const tx = isX ? (plot.left+plot.right)/2 : opposite ? width-8 : 14;
-    const ty = isX ? height-7 : (plot.top+plot.bottom)/2;
+    const pad = axis.title?.standoff ?? 5;
+    const labelHeight = axis.tickfont?.size ?? textSize;
+    const titleHeight = axis.title?.font?.size ?? textSize*1.08;
+    const tx = isX ? (plot.left+plot.right)/2
+      : opposite ? Math.min(width-8, plot.right+labelHeight+pad+titleHeight)
+      : Math.max(8, plot.left-labelHeight-pad-titleHeight);
+    const ty = isX ? Math.min(height-7, plot.bottom+labelHeight+pad+titleHeight) : (plot.top+plot.bottom)/2;
     const title = axis.title?.text;
     return <g key={"axis-"+side} onClick={onAxisClick}>
       {majorNodes}{minorNodes}
@@ -239,8 +249,11 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
   const legendItems = traces.filter(t=>t.showlegend!==false && t.name);
   const legend = layout.legend ?? {};
   const lfont = legend.font?.size ?? textSize*0.93;
-  const lh = lfont + 7, lw = Math.max(60, ...legendItems.map(t=>(t.name?.length??0)*lfont*0.56+35));
-  const lhTotal = legend.orientation==="h" ? lh : lh*legendItems.length;
+  const lh = lfont + 7;
+  const cols = legend.orientation==="h" ? Math.max(1,Math.min(legendItems.length, figure.figureOverrides.legendColumns ?? legendItems.length)) : 1;
+  const itemWidth = Math.max(legend.itemwidth ?? 30, 40, ...legendItems.map(t=>(t.name?.length??0)*lfont*0.56+35));
+  const lw = cols * itemWidth;
+  const lhTotal = lh * Math.ceil(legendItems.length/cols);
   const lx = plot.left+(legend.x??0.98)*(plot.right-plot.left);
   const ly = plot.bottom-(legend.y??0.985)*(plot.bottom-plot.top);
   const lX = lx-(legend.xanchor==="right"?lw:legend.xanchor==="center"?lw/2:0);
@@ -252,13 +265,13 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     role="img" aria-label={figure.name+"，精细 SVG 绘图"}>
     <defs><clipPath id={uid}><rect x={plot.left} y={plot.top} width={Math.max(1,plot.right-plot.left)} height={Math.max(1,plot.bottom-plot.top)}/></clipPath></defs>
     <rect width={width} height={height} fill={bg}/>
-    {layout.title?.text && <text x={width/2} y={Math.max(15,plot.top-11)} fill={layout.title.font?.color??baseColor}
+    {layout.title?.text && <text x={width/2} y={Math.max(15,plot.top-7-(layout.title.pad?.b??0))} fill={layout.title.font?.color??baseColor}
       fontFamily={layout.title.font?.family??baseFont} fontSize={layout.title.font?.size??textSize*1.15} textAnchor="middle">{layout.title.text}</text>}
     {axisNodes(xAxis,"x",xDomain,xp)}
     {axisNodes(yAxis,"y",yDomain,yp)}
     {rightAxis && axisNodes(rightAxis,"y2",rDomain,rp)}
-    {xAxis.mirror && <path d={"M "+plot.left+" "+plot.top+" H "+plot.right} stroke={xAxis.linecolor??"#252c34"} strokeWidth={xAxis.linewidth??0.8}/>}
-    {yAxis.mirror && !rightAxis && <path d={"M "+plot.right+" "+plot.top+" V "+plot.bottom} stroke={yAxis.linecolor??"#252c34"} strokeWidth={yAxis.linewidth??0.8}/>}
+    {figure.figureOverrides.frameStyle==="boxed" && xAxis.mirror && <path d={"M "+plot.left+" "+plot.top+" H "+plot.right} stroke={xAxis.linecolor??"#252c34"} strokeWidth={xAxis.linewidth??0.8}/>}
+    {figure.figureOverrides.frameStyle==="boxed" && yAxis.mirror && !rightAxis && <path d={"M "+plot.right+" "+plot.top+" V "+plot.bottom} stroke={yAxis.linecolor??"#252c34"} strokeWidth={yAxis.linewidth??0.8}/>} 
     <g clipPath={"url(#"+uid+")"}>
       {traces.map((tr,index)=>{
         const sid = tr.meta?.figureStudioSeriesId;
@@ -298,8 +311,8 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
       {Number(legend.borderwidth??0)>0 && <rect x={lX-6} y={lY-4} width={lw+12} height={lhTotal+8}
         fill={legend.bgcolor??"#fff"} stroke={legend.bordercolor??"#cdd2d7"} strokeWidth={legend.borderwidth}/>}
       {legendItems.map((tr,i)=>{
-        const tx=legend.orientation==="h"?lX+i*(lw+6):lX;
-        const ty=legend.orientation==="h"?lY:lY+i*lh;
+        const tx=lX+(i%cols)*itemWidth;
+        const ty=lY+Math.floor(i/cols)*lh;
         return <g key={"legend-"+i}>
           <path d={"M "+tx+" "+(ty+lh/2)+" h 18"} stroke={tr.line?.color??"#26749b"} strokeWidth={tr.line?.width??1.3}
              strokeLinecap="round" strokeDasharray={DASH[tr.line?.dash??"solid"]}/>
