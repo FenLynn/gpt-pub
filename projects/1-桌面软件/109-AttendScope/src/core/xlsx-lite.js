@@ -61,10 +61,22 @@
   }
   function parseCsvText(text){
     const rows=[]; let row=[], cur='', q=false;
-    for(let i=0;i<text.length;i++){const ch=text[i]; if(q){if(ch==='"'&&text[i+1]==='"'){cur+='"';i++}else if(ch==='"')q=false;else cur+=ch}else{if(ch==='"')q=true;else if(ch===','){row.push(cur);cur=''}else if(ch==='
-'){row.push(cur.replace(/$/,''));rows.push(row);row=[];cur=''}else cur+=ch}}
-    row.push(cur.replace(/$/,'')); if(row.some(x=>x!==''))rows.push(row); if(!rows.length)return [];
-    const headers=rows[0].map(x=>String(x).trim()); return rows.slice(1).filter(r=>r.some(Boolean)).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
+    for(let i=0;i<text.length;i++){
+      const ch=text[i], code=text.charCodeAt(i);
+      if(q){
+        if(ch==='"'&&text[i+1]==='"'){cur+='"';i++}
+        else if(ch==='"') q=false;
+        else cur+=ch;
+      }else{
+        if(ch==='"') q=true;
+        else if(ch===','){row.push(cur);cur=''}
+        else if(code===10){row.push(cur);rows.push(row);row=[];cur=''}
+        else if(code!==13) cur+=ch;
+      }
+    }
+    row.push(cur); if(row.some(x=>x!==''))rows.push(row); if(!rows.length)return [];
+    const headers=rows[0].map(x=>String(x).trim());
+    return rows.slice(1).filter(r=>r.some(v=>String(v??'')!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
   }
   async function readTable(file){
     const name=file.name.toLowerCase(); if(name.endsWith('.csv')) return {sheet:'CSV',headers:[],rows:parseCsvText(await file.text())};
