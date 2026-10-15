@@ -187,10 +187,12 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
   const width = Math.max(1, Number(layout.width) || 640), height = Math.max(1, Number(layout.height) || 480);
   const plot = useMemo(() => {
     const margin = layout.margin || {};
-    return {
-      left: Math.max(35, margin.l ?? 40), right: width - Math.max(20, margin.r ?? 20),
-      top: Math.max(24, margin.t ?? 25), bottom: height - Math.max(27, margin.b ?? 30)
-    };
+    // Respect every user-entered margin value. Earlier hard-coded minima
+    // silently ignored valid physical mm controls on the SVG renderer.
+    const left = margin.l ?? 40, right = width - (margin.r ?? 20);
+    const top = margin.t ?? 25, bottom = height - (margin.b ?? 30);
+    return { left, right: Math.max(left + 1, right),
+      top, bottom: Math.max(top + 1, bottom) };
   }, [layout, width, height]);
   const xAxis = layout.xaxis ?? {}, yAxis = layout.yaxis ?? {}, rightAxis = layout.yaxis2;
   const xDomain = resolveDomain(xAxis, rangeOf(traces,"x"));
