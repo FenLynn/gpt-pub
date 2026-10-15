@@ -156,26 +156,34 @@ function navigatorEventMarks(a){
 
 function singleTimelinePanel(a){
   const r=(typeof timelineRange==='function')?timelineRange(a):{start:480,end:1080};
-  return `<div class="echarts-timeline-shell">
-    <div class="timeline-window-head">
-      <div>
-        <span>局部窗口</span>
+  const ins=a.punches.filter(p=>p.direction==='进').sort((x,y)=>x.time.localeCompare(y.time));
+  const outs=a.punches.filter(p=>p.direction==='出').sort((x,y)=>x.time.localeCompare(y.time));
+  const first=ins[0]?.time?.slice(0,5)||'—';
+  const last=outs[outs.length-1]?.time?.slice(0,5)||'—';
+  return `<div class="echarts-timeline-shell refined">
+    <div class="timeline-window-head refined-head">
+      <div class="timeline-title-stack">
+        <span>局部时间</span>
         <strong id="timelineWindowLabel">${minuteText(r.start)}–${minuteText(r.end)}</strong>
       </div>
-      <small>拖动底部缩放条移动 · 拉动手柄放大 · 滚轮也可缩放</small>
+      <div class="timeline-facts">
+        <span><i class="fact-dot first"></i>最早进入 <b>${first}</b></span>
+        <span><i class="fact-dot last"></i>最晚离开 <b>${last}</b></span>
+      </div>
     </div>
-    <div class="echarts-timeline-frame">
-      <div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="进出打卡双时间轴"></div>
+    <div class="echarts-timeline-frame refined-frame">
+      <div id="attendanceTimelineChart" class="echarts-timeline-chart refined-chart" role="img" aria-label="进出打卡双时间轴"></div>
     </div>
-    <div class="echarts-timeline-legend">
-      <span><i class="in"></i>进入</span>
-      <span><i class="out"></i>离开</span>
-      <span><i class="first"></i>最早进入</span>
-      <span><i class="last"></i>最晚离开</span>
-      <span><b>×N</b>缩放后自动拆分</span>
+    <div class="timeline-footline">
+      <div class="echarts-timeline-legend refined-legend">
+        <span><i class="in"></i>进入</span>
+        <span><i class="out"></i>离开</span>
+        <span><b>×N</b>重叠记录</span>
+      </div>
+      <small>拖动下方选区移动 · 拉动两侧手柄缩放 · 滚轮缩放</small>
     </div>
-    <div class="timeline-evidence" id="timelineEvidence">
-      <span>点击箭头</span><strong>查看准确时间与原始来源</strong>
+    <div class="timeline-evidence refined-evidence" id="timelineEvidence">
+      <span>选择一个箭头</span><strong>查看准确时间和原始来源</strong>
     </div>
   </div>`;
 }
