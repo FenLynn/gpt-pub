@@ -57,7 +57,7 @@ jobs:
           # OpenXML namespace URIs inside xlsx-lite.js are schema identifiers only.
           test -f "$APP/index.html"
           test -f "$APP/src/core/xlsx-lite.js"
-          test -f "$APP/src/vendor/echarts.common.min.js"
+          test -f "$APP/src/vendor/echarts.min.js"
           test -f "$APP/src/vendor/ECHARTS-LICENSE.txt"
           test -f "$APP/src/app/00-state.js"
           test -f "$APP/src/app/10-analysis.js"
@@ -69,10 +69,10 @@ jobs:
         shell: bash
         run: |
           node --check "projects/1-桌面软件/109-AttendScope/src/core/xlsx-lite.js"
-          node --check "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.common.min.js"
+          node --check "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
           for f in projects/1-桌面软件/109-AttendScope/src/app/*.js; do node --check "$f"; done
           node - <<'NODE'
-          const echarts = require('./projects/1-桌面软件/109-AttendScope/src/vendor/echarts.common.min.js');
+          const echarts = require('./projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js');
           if (echarts.version !== '6.1.0') {
             throw new Error('Unexpected local ECharts version: ' + echarts.version);
           }
@@ -80,5 +80,15 @@ jobs:
             throw new Error('Local ECharts runtime is incomplete');
           }
           console.log('Local ECharts', echarts.version, 'OK');
+          NODE
+          grep -q 'series.custom' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js" || {
+            echo "::error::Full ECharts custom-series runtime is missing"
+            exit 1
+          }
+          grep -q 'dataZoom.slider' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js" || {
+            echo "::error::ECharts slider dataZoom runtime is missing"
+            exit 1
+          }
+          cat <<'NODE' >/dev/null
           NODE
 
