@@ -7,7 +7,8 @@ import { presets } from "../src/plot/presets";
 import { buildLayout, buildTraces, resolveCanvasMm, mmToPx } from "../src/plot/renderSpec";
 import { PrecisionSvg, supportsPrecisionSvg } from "../src/plot/PrecisionSvg";
 
-const project = createInitialProject(undefined, true);
+for (const includeVisualQa of [false, true]) {
+const project = createInitialProject(undefined, includeVisualQa);
 const gallery = project.figures.filter(f => f.folderId === "folder-nature");
 assert.equal(gallery.length, 14, "All 14 Nature visual cases must be accessible");
 assert.equal(project.folders.filter(f => f.id === "folder-nature").length, 1);
@@ -29,10 +30,20 @@ for (let n=0; n<gallery.length; n++) {
   assert.ok(ctx, figure.name+" lost the source sheet");
   const dataset = sheetToDataset(ctx!.sheet, figure);
   assert.ok(dataset.ys.length>0, figure.name+" has no series");
+  assert.ok(dataset.x.values.length>0 &&
+    dataset.x.values.some(v=>typeof v==="number" && Number.isFinite(v)) ||
+    dataset.x.values.some(v=>typeof v==="string" && v.length>0),
+    figure.name+" has no actual X values");
+  assert.ok(dataset.ys.some(y=>y.values.some(v=>typeof v==="number" && Number.isFinite(v))),
+    figure.name+" has no actual numeric Y samples");
   const layout = buildLayout({dataset,figure,preset:presets.nature});
   const traces = buildTraces({dataset,figure,preset:presets.nature});
   assert.ok(layout.width>0 && layout.height>0);
   assert.ok(traces.length>0,figure.name+" produced zero traces");
+  for(const tr of traces as Array<{x?:unknown[];y?:unknown[]}>) {
+    if (!Array.isArray(tr.x) || !Array.isArray(tr.y)) continue; // 2D field matrix
+    assert.ok(tr.x.length>0 && tr.y.length>0, figure.name+" contains a blank XY trace");
+  }
   assert.ok(figure.figureOverrides.axisLineWidthPt!>=0.25 &&
     figure.figureOverrides.axisLineWidthPt!<=1.0);
   const mm = resolveCanvasMm(presets.nature,figure);
@@ -54,4 +65,5 @@ for (let n=0; n<gallery.length; n++) {
       figure.name+" contains invalid geometry");
   }
 }
-console.log("Nature gallery smoke OK: 14 figures, 11 precision SVG, 3 Plotly fallback");
+}
+console.log("Nature gallery smoke OK: 14 figures × (normal+QA), 11 precision SVG, 3 Plotly fallback");
