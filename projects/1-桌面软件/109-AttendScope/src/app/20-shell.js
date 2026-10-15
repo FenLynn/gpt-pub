@@ -261,11 +261,11 @@ function bindAnalysisPanel(ctx){
   document.querySelectorAll('[data-analysis-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.analysisCell.split('|');if(id&&d)selectCell(id,+d)});document.querySelectorAll('[data-analysis-day]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.analysisDay));
   document.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>showRecord(b.dataset.record));
   document.querySelectorAll('[data-dayrecord]').forEach(b=>b.onclick=()=>showRecord(b.dataset.dayrecord));
-  const zi=document.getElementById('zoomIn'),zo=document.getElementById('zoomOut'),zr=document.getElementById('zoomReset');
-  if(zi)zi.onclick=()=>applyTimelineZoom(.2); if(zo)zo.onclick=()=>applyTimelineZoom(-.2); if(zr)zr.onclick=()=>resetTimelineZoom();
-  bindTimelineGestures();document.querySelectorAll('[data-revise]').forEach(b=>b.onclick=()=>reviseCurrent(b.dataset.revise));
+  bindTimelineGestures();
+  bindDualTimeline();
+  document.querySelectorAll('[data-revise]').forEach(b=>b.onclick=()=>reviseCurrent(b.dataset.revise));
 }
 
 function selectPerson(id){state.selection={type:'person',employeeId:id};state.analysisTab='overview';render()}
 function selectDate(d){state.selection={type:'date',day:d};state.analysisTab='timeline';render()}
-function selectCell(id,d){state.selection={type:'cell',employeeId:id,day:d};state.analysisTab='timeline';state.zoom=1;render()}
+function selectCell(id,d){state.selection={type:'cell',employeeId:id,day:d};state.analysisTab='timeline';state.zoom=1;state.timelineRange=null;render()}
