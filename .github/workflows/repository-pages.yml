@@ -77,7 +77,7 @@ jobs:
           APP="source-p109/projects/1-桌面软件/109-AttendScope"
           test -s "$APP/index.html"
           test -s "$APP/project.json"
-          test -s "$APP/src/vendor/echarts.common.min.js"
+          test -s "$APP/src/vendor/echarts.min.js"
           test -s "$APP/src/vendor/ECHARTS-LICENSE.txt"
           test -s "$APP/src/core/xlsx-lite.js"
           test -s "$APP/src/app/00-state.js"
@@ -91,10 +91,14 @@ jobs:
             exit 1
           fi
           node --check "$APP/src/core/xlsx-lite.js"
-          node --check "$APP/src/vendor/echarts.common.min.js"
+          node --check "$APP/src/vendor/echarts.min.js"
+          test -s "$APP/tests/smoke.cjs"
+          node --check "$APP/tests/smoke.cjs"
+          grep -q 'series.custom' "$APP/src/vendor/echarts.min.js"
+          grep -q 'dataZoom.slider' "$APP/src/vendor/echarts.min.js"
           for f in "$APP"/src/app/*.js; do node --check "$f"; done
           node - <<'NODE'
-          const echarts = require('./source-p109/projects/1-桌面软件/109-AttendScope/src/vendor/echarts.common.min.js');
+          const echarts = require('./source-p109/projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js');
           if (echarts.version !== '6.1.0' || typeof echarts.init !== 'function') throw new Error('P109 ECharts bundle validation failed');
           NODE
 
@@ -147,7 +151,7 @@ jobs:
           test -s _site/p109/index.html
           test -d _site/p108/assets
           test -s _site/p109/src/app/00-state.js
-          test -s _site/p109/src/vendor/echarts.common.min.js
+          test -s _site/p109/src/vendor/echarts.min.js
           test -s _site/preview-build.txt
           if find _site -type d | grep -Ei '/(raw|working|snapshots|branches|output)(/|$)'; then
             echo "::error::Potential private data directory present in public artifact"
