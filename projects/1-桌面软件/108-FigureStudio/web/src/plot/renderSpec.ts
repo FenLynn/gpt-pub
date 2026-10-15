@@ -62,9 +62,12 @@ export function resolveCanvasMm(
     overrides.customAspectWidth,
     overrides.customAspectHeight
   );
-  const widthMm = resolvePublicationMetrics(preset, figure).widthMm;
-  const heightMm = widthMm / ratio;
-  return { widthMm, heightMm, ratio, aspectMode };
+  const defaultWidth = resolvePublicationMetrics(preset, figure).widthMm;
+  const widthMm = Number.isFinite(overrides.figureWidthMm) && (overrides.figureWidthMm ?? 0) > 0
+    ? overrides.figureWidthMm! : defaultWidth;
+  const heightMm = Number.isFinite(overrides.figureHeightMm) && (overrides.figureHeightMm ?? 0) > 0
+    ? overrides.figureHeightMm! : widthMm / ratio;
+  return { widthMm, heightMm, ratio: widthMm / heightMm, aspectMode };
 }
 
 export function orderSeries(
