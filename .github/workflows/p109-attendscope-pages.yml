@@ -1,4 +1,4 @@
-name: P109 AttendScope Pages
+name: P109 AttendScope CI
 
 on:
   push:
@@ -11,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: p109-attendscope-pages
@@ -83,56 +81,3 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  deploy:
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: p109-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Prepare Pages site
-        shell: bash
-        run: |
-          mkdir -p _site/p109
-          cp -a "projects/1-桌面软件/109-AttendScope/." _site/p109/
-          cat > _site/index.html <<'HTML'
-          <!doctype html>
-          <html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=./p109/"><title>AttendScope</title></head><body><a href="./p109/">AttendScope</a></body></html>
-          HTML
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-  verify-live:
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up browser to verify fixed public URL
-        shell: bash
-        run: |
-          npm install --prefix "$RUNNER_TEMP/p109-playwright" --no-save --no-audit --no-fund playwright@1.58.2
-          command -v google-chrome || command -v chromium || command -v chromium-browser
-      - name: Verify deployed time axis and dataZoom in browser
-        shell: bash
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/p109-playwright/node_modules/playwright
-          P109_URL: https://fenlynn.github.io/gpt-pub/p109/
-        run: |
-          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
-          export CHROME_BIN
-          node "projects/1-桌面软件/109-AttendScope/tests/smoke.cjs"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: p109-pages-browser-screenshots
-          path: p109-smoke-artifacts
-          retention-days: 7
-          if-no-files-found: ignore
