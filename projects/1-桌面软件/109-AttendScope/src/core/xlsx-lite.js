@@ -41,7 +41,7 @@
     const rid=first.getAttribute('r:id')||first.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
     const relDoc=parseXml(zip['xl/_rels/workbook.xml.rels']); let target='worksheets/sheet1.xml';
     for(const rel of relDoc.getElementsByTagName('Relationship')) if(rel.getAttribute('Id')===rid) target=rel.getAttribute('Target')||target;
-    target=target.replace(/^//,'').replace(/^xl//,''); const sheetPath='xl/'+target.replace(/^.//,'');
+    while(target.startsWith('/')) target=target.slice(1); if(target.startsWith('xl/')) target=target.slice(3); if(target.startsWith('./')) target=target.slice(2); const sheetPath='xl/'+target;
     const sd=zip[sheetPath]; if(!sd) throw new Error('找不到工作表：'+sheetPath);
     const doc=parseXml(sd); const rows=[];
     for(const r of doc.getElementsByTagName('row')){
