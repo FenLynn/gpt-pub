@@ -39,6 +39,7 @@ async function inspect(browser){
     const element=document.getElementById('attendanceTimelineChart');
     const inst=window.echarts?.getInstanceByDom(element);
     const svg=element?.querySelector('svg');
+    const svgArrowPaths=[...(svg?.querySelectorAll('path[stroke]')||[])].filter(p=>['#147fc0','#3698c9','#e29355','#cf6c37'].includes(p.getAttribute('stroke'))&&/^M[0-9.-]+ [0-9.-]+L/.test(p.getAttribute('d')||''));
     const shapes=inst?.getZr()?.storage?.getDisplayList()||[];
     const display=shapes.map(el=>el.type);
     const arrowShafts=shapes.filter(el=>el.type==='line'&&(el.style?.lineWidth||0)>=4.5&&Math.abs((el.shape?.y2||0)-(el.shape?.y1||0))>=35);
@@ -52,6 +53,8 @@ async function inspect(browser){
       svgChars:svg?.outerHTML?.length||0,
       displayTypes:display.reduce((r,t)=>(r[t]=(r[t]||0)+1,r),{}),
       arrowShafts:arrowShafts.length,
+      svgArrowPaths:svgArrowPaths.length,
+      clippedArrowPaths:svgArrowPaths.filter(p=>p.hasAttribute('filter')).length,
       shaftCoordinates:arrowShafts.map(s=>({x:s.shape.x1,y1:s.shape.y1,y2:s.shape.y2,color:s.style.stroke})),
       range:state.timelineRange,
       cellSize:document.querySelector('.m-cell button')?.getBoundingClientRect().width,
@@ -68,6 +71,8 @@ async function inspect(browser){
   if(snapshot.svgChars<2500)throw Error('Chart SVG empty or too small: '+snapshot.svgChars);
   if(!snapshot.displayTypes.polygon)throw Error('No arrowhead polygons rendered');
   if(snapshot.arrowShafts<chosen.count)throw Error('Some punch arrows are truncated or missing: '+snapshot.arrowShafts+' of '+chosen.count);
+  if(snapshot.svgArrowPaths<chosen.count)throw Error('Some punch arrow shafts are absent from the actual SVG DOM');
+  if(snapshot.clippedArrowPaths>0)throw Error('Chrome-visible SVG arrow shafts carry broken filter: '+snapshot.clippedArrowPaths);
   if(snapshot.cellSize>18)throw Error('Matrix cells too large '+snapshot.cellSize);
   if(snapshot.nameWidth>80)throw Error('Matrix names too wide '+snapshot.nameWidth);
   if(errors.length)throw Error('Browser errors: '+JSON.stringify(errors));
