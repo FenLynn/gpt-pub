@@ -1,0 +1,183 @@
+name: GPT-Pub Unified Pages
+
+# One repository, one complete Pages deployment. Project CI never deploys.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/repository-pages.yml"
+      - "docs/repository-pages.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repository-pages.yml"
+      - "docs/repository-pages.md"
+  workflow_run:
+    workflows:
+      - P108 FigureStudio CI
+      - P109 AttendScope CI
+    types: [completed]
+    branches: [p108-exp, p109-exp]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpt-pub-one-pages-site
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build complete P108 + P109 site
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout P108 development source
+        uses: actions/checkout@v4
+        with:
+          ref: p108-exp
+          path: source-p108
+          persist-credentials: false
+
+      - name: Checkout P109 development source
+        uses: actions/checkout@v4
+        with:
+          ref: p109-exp
+          path: source-p109
+          persist-credentials: false
+
+      - name: Capture exact source commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "P108_SHA=$(git -C source-p108 rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "P109_SHA=$(git -C source-p109 rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build P108 React application
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="source-p108/projects/1-桌面软件/108-FigureStudio/web"
+          npm --prefix "$APP" install --no-audit --no-fund
+          npm --prefix "$APP" run build
+          test -s "$APP/dist/index.html"
+          test -d "$APP/dist/assets"
+
+      - name: Validate P109 offline application
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="source-p109/projects/1-桌面软件/109-AttendScope"
+          test -s "$APP/index.html"
+          test -s "$APP/project.json"
+          test -s "$APP/src/vendor/echarts.common.min.js"
+          test -s "$APP/src/vendor/ECHARTS-LICENSE.txt"
+          test -s "$APP/src/core/xlsx-lite.js"
+          test -s "$APP/src/app/00-state.js"
+          test -s "$APP/src/app/25-echarts.js"
+          if grep -InE 'https?://' "$APP/index.html"; then
+            echo "::error::P109 HTML unexpectedly requests a remote URL"
+            exit 1
+          fi
+          if grep -RInE 'fetch[[:space:]]*\\(|XMLHttpRequest|WebSocket[[:space:]]*\\(|EventSource[[:space:]]*\\(|sendBeacon[[:space:]]*\\(' "$APP/src"; then
+            echo "::error::P109 runtime source contains a network API"
+            exit 1
+          fi
+          node --check "$APP/src/core/xlsx-lite.js"
+          node --check "$APP/src/vendor/echarts.common.min.js"
+          for f in "$APP"/src/app/*.js; do node --check "$f"; done
+          node - <<'NODE'
+          const echarts = require('./source-p109/projects/1-桌面软件/109-AttendScope/src/vendor/echarts.common.min.js');
+          if (echarts.version !== '6.1.0' || typeof echarts.init !== 'function') throw new Error('P109 ECharts bundle validation failed');
+          NODE
+
+      - name: Assemble entire public site
+        shell: bash
+        run: |
+          set -euo pipefail
+          P108="source-p108/projects/1-桌面软件/108-FigureStudio/web/dist"
+          P109="source-p109/projects/1-桌面软件/109-AttendScope"
+          mkdir -p "_site/p108" "_site/p109"
+          cp -a "$P108/." "_site/p108/"
+          # Explicit runtime allowlist avoids exposing any project data, raw
+          # attendance, internal histories, snapshots or unpublished records.
+          cp "$P109/index.html" "$P109/project.json" "_site/p109/"
+          cp -a "$P109/src" "$P109/config" "_site/p109/"
+          cat > "_site/index.html" <<'HTML'
+          <!doctype html>
+          <html lang="zh-CN">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>GPT-Pub 在线预览</title>
+            <style>
+              body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f7f9fb;color:#202833;margin:0;padding:10vh 24px}
+              main{max-width:650px;margin:auto}
+              h1{font-size:26px;letter-spacing:-.5px}
+              a{display:block;padding:22px 26px;margin:16px 0;border:1px solid #dbe2ea;border-radius:14px;background:#fff;color:#2067a0;text-decoration:none;box-shadow:0 3px 14px #152b4810}
+              a:hover{border-color:#7ea5c7}
+              small{display:block;color:#667789;margin-top:6px}
+            </style>
+          </head>
+          <body><main>
+            <h1>GPT-Pub 在线预览</h1>
+            <p>两个项目独立更新，同时在线。</p>
+            <a href="./p108/">P108 · FigureStudio<small>科研矢量绘图编辑器</small></a>
+            <a href="./p109/">P109 · AttendScope<small>离线考勤分析工作台</small></a>
+          </main></body></html>
+          HTML
+          cat > "_site/preview-build.txt" <<EOF
+          P108_SHA=$P108_SHA
+          P109_SHA=$P109_SHA
+          EOF
+
+      - name: Assert both public entries are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s _site/index.html
+          test -s _site/p108/index.html
+          test -s _site/p109/index.html
+          test -d _site/p108/assets
+          test -s _site/p109/src/app/00-state.js
+          test -s _site/p109/src/vendor/echarts.common.min.js
+          test -s _site/preview-build.txt
+          if find _site -type d | grep -Ei '/(raw|working|snapshots|branches|output)(/|$)'; then
+            echo "::error::Potential private data directory present in public artifact"
+            exit 1
+          fi
+          printf 'P108 %s, P109 %s\n' "$P108_SHA" "$P109_SHA"
+
+      - name: Configure Pages
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/configure-pages@v5
+
+      - name: Upload the complete Pages artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: Publish complete site
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy exactly one complete site
+        id: deployment
+        uses: actions/deploy-pages@v4
