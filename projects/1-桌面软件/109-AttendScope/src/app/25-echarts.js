@@ -1,13 +1,13 @@
 /* AttendScope ECharts integration — Apache ECharts 6.1.0, vendored locally. */
 const AS_CHART_COLORS={
-  ink:'#25313d',
-  text:'#506579',
-  muted:'#8b9aa8',
-  grid:'rgba(190,205,216,.34)',
-  in:'#3a9d78',
-  out:'#d68a4d',
-  first:'#2c7fd1',
-  last:'#cf5968',
+  ink:'#526577',
+  text:'#4b6074',
+  muted:'#91a0ad',
+  grid:'rgba(185,201,213,.26)',
+  in:'#5f88d7',
+  out:'#8a79d2',
+  first:'#2f6fc9',
+  last:'#6d59c7',
   normal:'#7fbd92',
   suspect:'#e4bb62',
   problem:'#d77773',
@@ -21,7 +21,7 @@ let __attendCharts=[];
 function registerAttendTheme(){
   if(!window.echarts||window.__attendThemeRegistered)return;
   echarts.registerTheme('attendScope',{
-    color:['#4f98c8','#7fbd92','#e1b75f','#d77773','#8d80bb','#6aa6a0'],
+    color:['#5f88d7','#8a79d2','#7ba8c7','#9aa9c8','#6e9ab5','#9d8bd6'],
     backgroundColor:'transparent',
     textStyle:{
       fontFamily:'Segoe UI, Microsoft YaHei, PingFang SC, sans-serif',
@@ -44,10 +44,11 @@ function registerAttendTheme(){
       splitLine:{lineStyle:{color:AS_CHART_COLORS.grid}}
     },
     tooltip:{
-      backgroundColor:'rgba(31,43,55,.96)',
-      borderWidth:0,
-      padding:[8,10],
-      textStyle:{color:'#f7fafc',fontSize:10}
+      backgroundColor:'rgba(250,252,254,.98)',
+      borderColor:'rgba(194,207,219,.78)',
+      borderWidth:1,
+      padding:[9,11],
+      textStyle:{color:'#42566a',fontSize:10}
     }
   });
   window.__attendThemeRegistered=true;
@@ -143,48 +144,55 @@ function timelineEventRender(data){
     const color=timelineEventColor(item);
     const isIn=item.kind==='in';
     const edge=item.edge;
-    const lineEnd=axis[1]+(isIn?-8:8);
-    const headY=axis[1]+(isIn?-1:1);
-    const tri=isIn
-      ? [[p[0]-4,lineEnd],[p[0]+4,lineEnd],[p[0],headY]]
-      : [[p[0]-4,lineEnd],[p[0]+4,lineEnd],[p[0],headY]];
+    const stemEnd=axis[1]+(isIn?-7:7);
+    const arrowTip=axis[1]+(isIn?-1:1);
     const count=item.records.length;
-    const labelY=p[1]+(isIn?-17:17);
     const children=[
       {
         type:'line',
-        shape:{x1:p[0],y1:p[1],x2:p[0],y2:lineEnd},
-        style:{stroke:color,lineWidth:edge?2.5:2,lineCap:'round',shadowBlur:edge?5:0,shadowColor:edge?color:'transparent',opacity:.94}
+        shape:{x1:p[0],y1:p[1],x2:p[0],y2:stemEnd},
+        style:{stroke:color,lineWidth:edge?2.15:1.65,lineCap:'round',opacity:.93}
+      },
+      {
+        type:'circle',
+        shape:{cx:p[0],cy:arrowTip,r:2.1},
+        style:{fill:color,opacity:.95}
       },
       {
         type:'polygon',
-        shape:{points:tri},
+        shape:{points:isIn?[[p[0]-3.6,stemEnd-1],[p[0]+3.6,stemEnd-1],[p[0],arrowTip]]:[[p[0]-3.6,stemEnd+1],[p[0]+3.6,stemEnd+1],[p[0],arrowTip]]},
         style:{fill:color,opacity:.98}
       }
     ];
+    if(edge){
+      children.push({
+        type:'circle',
+        shape:{cx:p[0],cy:arrowTip,r:7.5},
+        style:{fill:color,opacity:.07}
+      });
+    }
     if(count>1){
       children.push({
         type:'text',
         style:{
-          x:p[0]+8,y:labelY,text:'×'+count,
-          fill:'#fff',backgroundColor:'#253746',
-          font:'700 9px Segoe UI, Microsoft YaHei',
-          padding:[3,5],borderRadius:8,
-          align:'left',verticalAlign:'middle',
-          shadowBlur:6,shadowColor:'rgba(26,45,60,.12)'
+          x:p[0]+7,
+          y:p[1]+(isIn?-1:1),
+          text:'×'+count,
+          fill:'#596a7c',
+          backgroundColor:'rgba(241,246,250,.98)',
+          borderColor:'rgba(194,207,219,.72)',
+          borderWidth:1,
+          font:'650 9px Segoe UI, Microsoft YaHei',
+          padding:[3,5],
+          borderRadius:8,
+          align:'left',
+          verticalAlign:'middle'
         }
-      });
-    }else if(edge){
-      children.push({
-        type:'circle',
-        shape:{cx:p[0],cy:headY,r:8},
-        style:{fill:color,opacity:.10}
       });
     }
     return {type:'group',children};
   };
 }
-
 function densityData(a){
   const bins=[];
   for(let m=0;m<=1440;m+=30)bins.push([m,0]);
@@ -204,7 +212,7 @@ function timelineTooltipFormatter(params){
     : `${item.records[0].time} · ${item.records[0].direction}`;
   const tag=item.edge==='first'?'最早进入':item.edge==='last'?'最晚离开':'';
   const rows=item.records.slice(0,5).map(p=>`<div style="margin-top:4px;color:#cbd6df">${p.time} &nbsp; ${p.direction}</div>`).join('');
-  return `<div style="min-width:120px"><div style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:${color}"></i><b style="font-size:11px">${head}</b></div>${tag?`<div style="margin-top:4px;color:#8fc4ee">${tag}</div>`:''}${item.records.length>1?rows:''}</div>`;
+  return `<div style="min-width:132px"><div style="display:flex;align-items:center;gap:7px"><i style="width:7px;height:7px;border-radius:50%;background:${color}"></i><b style="font-size:11px;color:#31475b">${head}</b></div>${tag?`<div style="margin-top:5px;color:#6f7fd0">${tag}</div>`:''}${item.records.length>1?rows:''}</div>`;
 }
 
 function mountAttendanceTimeline(a){
@@ -240,26 +248,26 @@ function mountAttendanceTimeline(a){
       confine:true,
       transitionDuration:.15,
       formatter:timelineTooltipFormatter,
-      extraCssText:'border-radius:10px;box-shadow:0 12px 32px rgba(25,45,62,.16);'
+      extraCssText:'border-radius:11px;box-shadow:0 10px 28px rgba(52,76,96,.10);backdrop-filter:blur(10px);'
     },
     xAxis:{
       type:'value',min:0,max:1440,
       axisLine:{show:false},
       axisTick:{show:false},
       axisLabel:{
-        color:AS_CHART_COLORS.muted,fontSize:9,margin:11,
+        color:'#93a2af',fontSize:8.5,margin:10,
         formatter:v=>minuteText(v),
         hideOverlap:true
       },
-      splitNumber:10,
-      splitLine:{show:true,lineStyle:{color:'rgba(184,200,212,.26)',width:1}}
+      splitNumber:8,
+      splitLine:{show:true,lineStyle:{color:'rgba(185,201,213,.20)',width:1,type:'dashed'}}
     },
     yAxis:[
       {
         type:'value',min:-1.35,max:1.35,interval:1,
         axisLine:{show:false},axisTick:{show:false},
         axisLabel:{
-          color:'#64798b',fontSize:10,fontWeight:650,
+          color:'#718394',fontSize:10,fontWeight:650,
           formatter:v=>v===1?'进':v===-1?'出':''
         },
         splitLine:{show:false}
@@ -280,26 +288,26 @@ function mountAttendanceTimeline(a){
         filterMode:'none',minValueSpan:30,
         left:46,right:22,bottom:14,height:42,
         showDetail:true,realtime:true,brushSelect:false,
-        backgroundColor:'#f4f8fb',
-        borderColor:'#d8e3ea',
-        borderRadius:8,
-        fillerColor:'rgba(60,143,202,.13)',
+        backgroundColor:'rgba(245,249,252,.92)',
+        borderColor:'rgba(205,218,228,.72)',
+        borderRadius:10,
+        fillerColor:'rgba(95,136,215,.10)',
         dataBackground:{
-          lineStyle:{color:'#b8cbd8',width:1,opacity:.8},
-          areaStyle:{color:'rgba(133,171,197,.12)'}
+          lineStyle:{color:'#c3d0da',width:1,opacity:.72},
+          areaStyle:{color:'rgba(150,170,190,.08)'}
         },
         selectedDataBackground:{
-          lineStyle:{color:'#6fa5c8',width:1},
-          areaStyle:{color:'rgba(77,147,193,.14)'}
+          lineStyle:{color:'#7897d7',width:1},
+          areaStyle:{color:'rgba(95,136,215,.10)'}
         },
-        handleIcon:'path://M-1,-9 L1,-9 L1,9 L-1,9 Z',
-        handleSize:'78%',
+        handleIcon:'path://M-2,-10 C-2,-12 2,-12 2,-10 L2,10 C2,12 -2,12 -2,10 Z',
+        handleSize:'72%',
         handleStyle:{
-          color:'#fff',borderColor:'#4f96ca',borderWidth:1.5,
-          shadowBlur:5,shadowColor:'rgba(36,99,142,.14)'
+          color:'#ffffff',borderColor:'#7897d7',borderWidth:1.2,
+          shadowBlur:4,shadowColor:'rgba(63,89,122,.10)'
         },
-        moveHandleSize:5,
-        moveHandleStyle:{color:'#4f96ca',opacity:.55},
+        moveHandleSize:4,
+        moveHandleStyle:{color:'#7897d7',opacity:.36},
         textStyle:{color:'#8091a0',fontSize:8},
         labelFormatter:v=>minuteText(v)
       }
@@ -329,10 +337,10 @@ function mountAttendanceTimeline(a){
         renderItem:(params,api)=>{
           const cs=params.coordSys;
           const y=api.coord([0,0])[1];
-          const x1=cs.x+2,x2=cs.x+cs.width-8;
+          const x1=cs.x+2,x2=cs.x+cs.width-7;
           return {type:'group',children:[
-            {type:'line',shape:{x1,y1:y,x2,y2:y},style:{stroke:AS_CHART_COLORS.ink,lineWidth:1.45,opacity:.94}},
-            {type:'polygon',shape:{points:[[x2,y-4],[x2+8,y],[x2,y+4]]},style:{fill:AS_CHART_COLORS.ink}}
+            {type:'line',shape:{x1,y1:y,x2,y2:y},style:{stroke:'#53677a',lineWidth:1.05,opacity:.78,lineCap:'round'}},
+            {type:'polygon',shape:{points:[[x2,y-3],[x2+6,y],[x2,y+3]]},style:{fill:'#53677a',opacity:.78}}
           ]};
         },
         z:3
