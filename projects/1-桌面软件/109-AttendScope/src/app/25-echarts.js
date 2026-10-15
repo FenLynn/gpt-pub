@@ -73,7 +73,7 @@ function disposeAnalysisCharts(){disposeAttendCharts()}
 function initAttendChart(el){
   if(!el||!window.echarts)return null;
   registerAttendTheme();
-  return rememberAttendChart(echarts.init(el,'attendScope',{renderer:'canvas',devicePixelRatio:Math.min(window.devicePixelRatio||1,2)}),el);
+  return rememberAttendChart(echarts.init(el,'attendScope',{renderer:'svg'}),el);
 }
 
 function minuteText(v){
@@ -359,7 +359,7 @@ function mountAttendanceTimeline(a){
     cancelAnimationFrame(raf);
     raf=requestAnimationFrame(()=>{
       clusterData=timelineClusterData(a,state.timelineRange,chart.getWidth());
-      chart.setOption({series:[eventSeries()]},{replaceMerge:[]});
+      chart.setOption({series:[eventSeries()]});
     });
   }
 
@@ -491,7 +491,7 @@ function mountCellStats(ctx){
         {type:'scatter',symbolSize:10,data:days.map((a,i)=>a.day===ctx.day?[i,+(a.presence/60).toFixed(2)]:null).filter(Boolean),itemStyle:{color:'#2c7fd1',borderColor:'#fff',borderWidth:2}}
       ]
     });
-    main.on('click',p=>{const a=days[p.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
+    main.on('click',p=>{if(p.seriesType==='scatter'){selectCell(ctx.employee.id,ctx.day);return}const a=days[p.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
   }
   if(sub)mountStatusBarChart(sub,days);
 }
