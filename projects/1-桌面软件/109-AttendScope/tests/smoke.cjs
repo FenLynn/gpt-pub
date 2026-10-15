@@ -52,6 +52,7 @@ async function inspect(browser){
       svgChars:svg?.outerHTML?.length||0,
       displayTypes:display.reduce((r,t)=>(r[t]=(r[t]||0)+1,r),{}),
       arrowShafts:arrowShafts.length,
+      shaftCoordinates:arrowShafts.map(s=>({x:s.shape.x1,y1:s.shape.y1,y2:s.shape.y2,color:s.style.stroke})),
       range:state.timelineRange,
       cellSize:document.querySelector('.m-cell button')?.getBoundingClientRect().width,
       nameWidth:document.querySelector('.m-name')?.getBoundingClientRect().width,
