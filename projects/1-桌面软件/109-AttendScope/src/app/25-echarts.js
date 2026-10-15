@@ -139,22 +139,23 @@ function timelineEventRender(data){
   return function(params,api){
     const item=data[params.dataIndex];
     if(!item)return null;
-    const p=api.coord([api.value(0),api.value(1)]);
+    // Use the same physical centerline for every arrow. Avoid custom-series
+    // y-value layout differences that previously hid the first/last shafts.
     const axis=api.coord([api.value(0),0]);
     const color=timelineEventColor(item);
     const isIn=item.kind==='in';
     const edge=item.edge;
     const count=item.records.length;
 
-    const shaftTop=isIn?p[1]+5:axis[1]+9;
-    const shaftBottom=isIn?axis[1]-9:p[1]-5;
-    const headTip=axis[1]+(isIn?-1:1);
-    const headBase=axis[1]+(isIn?-13:13);
+    const stemStart=axis[1]+(isIn?-58:58);
+    const stemEnd=axis[1]+(isIn?-14:14);
+    const headTip=axis[1]+(isIn?-2:2);
+    const headBase=axis[1]+(isIn?-15:15);
 
     const children=[
       {
         type:'line',
-        shape:{x1:p[0],y1:shaftTop,x2:p[0],y2:shaftBottom},
+        shape:{x1:axis[0],y1:stemStart,x2:axis[0],y2:stemEnd},
         style:{
           stroke:color,
           lineWidth:edge?6:5,
@@ -167,13 +168,13 @@ function timelineEventRender(data){
       {
         type:'polygon',
         shape:{points:isIn
-          ?[[p[0]-8,headBase],[p[0]+8,headBase],[p[0],headTip]]
-          :[[p[0]-8,headBase],[p[0]+8,headBase],[p[0],headTip]]},
+          ?[[axis[0]-8,headBase],[axis[0]+8,headBase],[axis[0],headTip]]
+          :[[axis[0]-8,headBase],[axis[0]+8,headBase],[axis[0],headTip]]},
         style:{fill:color,opacity:1}
       },
       {
         type:'circle',
-        shape:{cx:p[0],cy:axis[1],r:5},
+        shape:{cx:axis[0],cy:axis[1],r:5},
         style:{fill:color,stroke:'#ffffff',lineWidth:1.6,opacity:1}
       }
     ];
@@ -181,7 +182,7 @@ function timelineEventRender(data){
     if(edge){
       children.push({
         type:'circle',
-        shape:{cx:p[0],cy:axis[1],r:10},
+        shape:{cx:axis[0],cy:axis[1],r:10},
         style:{fill:color,opacity:.10}
       });
     }
@@ -190,8 +191,8 @@ function timelineEventRender(data){
       children.push({
         type:'text',
         style:{
-          x:p[0]+11,
-          y:p[1]+(isIn?-1:1),
+          x:axis[0]+11,
+          y:stemStart,
           text:'×'+count,
           fill:'#ffffff',
           backgroundColor:color,
