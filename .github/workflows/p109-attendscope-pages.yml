@@ -59,16 +59,30 @@ jobs:
           # OpenXML namespace URIs inside xlsx-lite.js are schema identifiers only.
           test -f "$APP/index.html"
           test -f "$APP/src/core/xlsx-lite.js"
+          test -f "$APP/src/vendor/echarts.common.min.js"
+          test -f "$APP/src/vendor/ECHARTS-LICENSE.txt"
           test -f "$APP/src/app/00-state.js"
           test -f "$APP/src/app/10-analysis.js"
           test -f "$APP/src/app/20-shell.js"
+          test -f "$APP/src/app/25-echarts.js"
           test -f "$APP/src/app/30-detail.js"
           test -f "$APP/src/app/40-storage.js"
       - name: JavaScript syntax check
         shell: bash
         run: |
           node --check "projects/1-桌面软件/109-AttendScope/src/core/xlsx-lite.js"
+          node --check "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.common.min.js"
           for f in projects/1-桌面软件/109-AttendScope/src/app/*.js; do node --check "$f"; done
+          node - <<'NODE'
+          const echarts = require('./projects/1-桌面软件/109-AttendScope/src/vendor/echarts.common.min.js');
+          if (echarts.version !== '6.1.0') {
+            throw new Error('Unexpected local ECharts version: ' + echarts.version);
+          }
+          if (typeof echarts.init !== 'function' || typeof echarts.registerTheme !== 'function') {
+            throw new Error('Local ECharts runtime is incomplete');
+          }
+          console.log('Local ECharts', echarts.version, 'OK');
+          NODE
 
   deploy:
     environment:
