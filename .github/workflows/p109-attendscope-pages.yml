@@ -44,16 +44,19 @@ jobs:
         shell: bash
         run: |
           APP="projects/1-桌面软件/109-AttendScope"
-          if grep -InE '<(script|link)[^>]+(src|href)=["'"'][[:space:]]*https?://' "$APP/index.html"; then
-            echo "::error::HTML contains a remote script or stylesheet"
+          if grep -InE 'https?://' "$APP/index.html"; then
+            echo "::error::HTML contains a remote URL"
             exit 1
           fi
-          if grep -RInE '(fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(|import[[:space:]]*\([[:space:]]*["'"']https?://)' "$APP/src"; then
+          if grep -RInE 'https?://' "$APP/src/app" "$APP/src/css"; then
+            echo "::error::Application source contains a remote URL"
+            exit 1
+          fi
+          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src"; then
             echo "::error::Runtime source contains a network-capable call"
             exit 1
           fi
-          # OpenXML namespace URIs inside the local XLSX reader are schema identifiers,
-          # not network requests; they are intentionally allowed.
+          # OpenXML namespace URIs inside xlsx-lite.js are schema identifiers only.
           test -f "$APP/index.html"
           test -f "$APP/src/core/xlsx-lite.js"
           test -f "$APP/src/app/00-state.js"
