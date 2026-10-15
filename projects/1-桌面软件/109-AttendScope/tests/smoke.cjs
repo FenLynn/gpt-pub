@@ -60,6 +60,7 @@ async function inspect(browser){
     };
   });
   await page.screenshot({path:path.join(artifacts,mode+'-timeline.png'),fullPage:false});
+  fs.writeFileSync(path.join(artifacts,mode+'-timeline.svg'),await page.locator('#attendanceTimelineChart svg').evaluate(node=>node.outerHTML),'utf8');
   console.log('P109_TIMELINE_SNAPSHOT '+JSON.stringify({chosen,...snapshot}));
   if(!snapshot.chartMounted)throw Error('Timeline chart instance not mounted');
   if(snapshot.customSeries<2)throw Error('Expected axis arrow AND punch arrow custom series');
