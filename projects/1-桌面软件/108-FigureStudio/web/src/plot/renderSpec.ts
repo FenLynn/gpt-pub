@@ -822,18 +822,21 @@ export function buildLayout(args: {
   const fontSizePx = ptToPx(fontSizePt);
   const axisStyle = overrides.axisStyle ?? "regular";
   const axisWidthPt =
-    axisStyle === "bold"
+    overrides.axisLineWidthPt ??
+    (axisStyle === "bold"
       ? Math.max(1, metrics.axisWidthPt * 1.45)
-      : metrics.axisWidthPt;
+      : metrics.axisWidthPt);
   const axisWidthPx = ptToPx(axisWidthPt);
   const majorTickLengthPt =
-    axisStyle === "bold"
+    overrides.majorTickLengthPt ??
+    (axisStyle === "bold"
       ? Math.max(4.5, metrics.majorTickLengthPt * 1.4)
-      : metrics.majorTickLengthPt;
+      : metrics.majorTickLengthPt);
   const minorTickLengthPt =
-    axisStyle === "bold"
+    overrides.minorTickLengthPt ??
+    (axisStyle === "bold"
       ? Math.max(2.8, metrics.minorTickLengthPt * 1.45)
-      : metrics.minorTickLengthPt;
+      : metrics.minorTickLengthPt);
   const tickLabelSizePx = ptToPx(
     overrides.tickLabelSizePt ?? fontSizePt * 0.96
   );
@@ -992,7 +995,7 @@ export function buildLayout(args: {
 
   const commonAxis = {
     showline: true,
-    mirror: true,
+    mirror: overrides.frameStyle !== "open",
     linewidth: axisWidthPx,
     linecolor: "#202328",
     ticks: tickDirection,
@@ -1113,10 +1116,10 @@ export function buildLayout(args: {
       // These are minimum content-safe margins, not decorative whitespace.
       // automargin may only expand them when real tick/title content requires it.
       l: Math.round(
-        mmToPx((hasYTitle ? 10.8 : 6.5) * metrics.outerMarginScale)
+        mmToPx(overrides.marginLeftMm ?? ((hasYTitle ? 10.8 : 6.5) * metrics.outerMarginScale))
       ),
       r: Math.round(
-        mmToPx(
+        mmToPx(overrides.marginRightMm ?? (
           outsideRightLegend
             ? 22 * metrics.outerMarginScale
             : isDoubleY
@@ -1124,13 +1127,13 @@ export function buildLayout(args: {
             : isField2D || figure.templateId === "surface-3d"
             ? 8.5 * metrics.outerMarginScale
             : 4.2 * metrics.outerMarginScale
-        )
+        ))
       ),
       t: Math.round(
-        mmToPx((hasPlotTitle ? 8.0 : 3.8) * metrics.outerMarginScale)
+        mmToPx(overrides.marginTopMm ?? ((hasPlotTitle ? 8.0 : 3.8) * metrics.outerMarginScale))
       ),
       b: Math.round(
-        mmToPx((hasXTitle ? 9.6 : 6.2) * metrics.outerMarginScale)
+        mmToPx(overrides.marginBottomMm ?? ((hasXTitle ? 9.6 : 6.2) * metrics.outerMarginScale))
       ),
       pad: 0,
       autoexpand: true
@@ -1147,7 +1150,7 @@ export function buildLayout(args: {
           automargin: true,
           pad: {
             t: 0,
-            b: Math.round(ptToPx(metrics.plotTitlePadPt)),
+            b: Math.round(ptToPx((overrides.plotTitlePadPt ?? metrics.plotTitlePadPt))),
             l: 0,
             r: 0
           },
@@ -1307,7 +1310,7 @@ export function buildLayout(args: {
     range: xRange,
     title: {
       text: resolvedXTitle,
-      standoff: Math.round(ptToPx(metrics.axisTitlePadPt)),
+      standoff: Math.round(ptToPx((overrides.axisTitlePadPt ?? metrics.axisTitlePadPt))),
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
@@ -1362,7 +1365,7 @@ export function buildLayout(args: {
     },
     title: {
       text: resolvedYTitle,
-      standoff: Math.round(ptToPx(metrics.axisTitlePadPt)),
+      standoff: Math.round(ptToPx((overrides.axisTitlePadPt ?? metrics.axisTitlePadPt))),
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
@@ -1414,7 +1417,7 @@ export function buildLayout(args: {
       },
       title: {
         text: resolvedRightYTitle,
-        standoff: Math.round(ptToPx(metrics.axisTitlePadPt)),
+        standoff: Math.round(ptToPx((overrides.axisTitlePadPt ?? metrics.axisTitlePadPt))),
         font: {
           family: fontFamily,
           size: axisTitleSizePx,
