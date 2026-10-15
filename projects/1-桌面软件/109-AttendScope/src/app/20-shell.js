@@ -184,7 +184,7 @@ function matrixVisible(a){
 
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
-  const cell=18,row=20,nameW=78;
+  const cell=17,row=18,nameW=58;
   el.style.setProperty('--cell',cell+'px');
   el.style.setProperty('--row',row+'px');
   el.style.setProperty('--name',nameW+'px');
