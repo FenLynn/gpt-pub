@@ -211,7 +211,7 @@ function timelineTooltipFormatter(params){
     ? `${minuteText(item.start)}–${minuteText(item.end)} · ${item.records.length} 条`
     : `${item.records[0].time} · ${item.records[0].direction}`;
   const tag=item.edge==='first'?'最早进入':item.edge==='last'?'最晚离开':'';
-  const rows=item.records.slice(0,5).map(p=>`<div style="margin-top:4px;color:#cbd6df">${p.time} &nbsp; ${p.direction}</div>`).join('');
+  const rows=item.records.slice(0,5).map(p=>`<div style="margin-top:4px;color:#75879a">${p.time} &nbsp; ${p.direction}</div>`).join('');
   return `<div style="min-width:132px"><div style="display:flex;align-items:center;gap:7px"><i style="width:7px;height:7px;border-radius:50%;background:${color}"></i><b style="font-size:11px;color:#31475b">${head}</b></div>${tag?`<div style="margin-top:5px;color:#6f7fd0">${tag}</div>`:''}${item.records.length>1?rows:''}</div>`;
 }
 
