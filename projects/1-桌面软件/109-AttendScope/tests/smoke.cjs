@@ -39,7 +39,9 @@ async function inspect(browser){
     const element=document.getElementById('attendanceTimelineChart');
     const inst=window.echarts?.getInstanceByDom(element);
     const svg=element?.querySelector('svg');
-    const display=inst?.getZr()?.storage?.getDisplayList()?.map(el=>el.type)||[];
+    const shapes=inst?.getZr()?.storage?.getDisplayList()||[];
+    const display=shapes.map(el=>el.type);
+    const arrowShafts=shapes.filter(el=>el.type==='line'&&(el.style?.lineWidth||0)>=4.5&&Math.abs((el.shape?.y2||0)-(el.shape?.y1||0))>=35);
     return {
       title:document.getElementById('analysisTitle')?.textContent,
       echartsVersion:window.echarts?.version,
@@ -49,6 +51,7 @@ async function inspect(browser){
       dataZoom:inst?.getOption()?.dataZoom?.map(x=>x.type)||[],
       svgChars:svg?.outerHTML?.length||0,
       displayTypes:display.reduce((r,t)=>(r[t]=(r[t]||0)+1,r),{}),
+      arrowShafts:arrowShafts.length,
       range:state.timelineRange,
       cellSize:document.querySelector('.m-cell button')?.getBoundingClientRect().width,
       nameWidth:document.querySelector('.m-name')?.getBoundingClientRect().width,
@@ -62,6 +65,7 @@ async function inspect(browser){
   if(!snapshot.dataZoom.includes('slider'))throw Error('Slider dataZoom missing');
   if(snapshot.svgChars<2500)throw Error('Chart SVG empty or too small: '+snapshot.svgChars);
   if(!snapshot.displayTypes.polygon)throw Error('No arrowhead polygons rendered');
+  if(snapshot.arrowShafts<chosen.count)throw Error('Some punch arrows are truncated or missing: '+snapshot.arrowShafts+' of '+chosen.count);
   if(snapshot.cellSize>18)throw Error('Matrix cells too large '+snapshot.cellSize);
   if(snapshot.nameWidth>80)throw Error('Matrix names too wide '+snapshot.nameWidth);
   if(errors.length)throw Error('Browser errors: '+JSON.stringify(errors));
@@ -71,7 +75,7 @@ async function inspect(browser){
     const chart=echarts.getInstanceByDom(el);
     chart.dispatchAction({type:'dataZoom',dataZoomId:'slider',startValue:490,endValue:740});
   });
-  await page.waitForFunction(()=>state.timelineRange&&Math.abs(state.timelineRange.start-490)<8&&Math.abs(state.timelineRange.end-740)<8,{timeout:8000});
+  await page.waitForFunction(()=>state.timelineRange&&Math.abs(state.timelineRange.start-490)<8&&Math.abs(state.timelineRange.end-740)<8,undefined,{timeout:8000});
   const range=await page.evaluate(()=>({...state.timelineRange}));
   console.log('P109_ZOOM_OK '+JSON.stringify(range));
 
