@@ -56,6 +56,50 @@ jobs:
           npm --prefix "$APP_DIR" run build
           npm --prefix "$APP_DIR" run test:gallery
 
+      - name: Check Nature gallery in headless Chromium
+        shell: bash
+        env:
+          APP_DIR: projects/1-桌面软件/108-FigureStudio/web
+        run: |
+          set -euo pipefail
+          BROWSER="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [[ -z "$BROWSER" ]]; then
+            echo "::error::Chromium not available for P108 browser smoke"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/p108-site/gpt-pub/p108" "$RUNNER_TEMP/p108-screenshots"
+          cp -a "$APP_DIR/dist/." "$RUNNER_TEMP/p108-site/gpt-pub/p108/"
+          python3 -m http.server 4173 --directory "$RUNNER_TEMP/p108-site" > "$RUNNER_TEMP/p108-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in {1..25}; do
+            if curl --fail --silent "http://127.0.0.1:4173/gpt-pub/p108/index.html" > /dev/null; then break; fi
+            sleep 0.2
+          done
+          curl --fail --silent "http://127.0.0.1:4173/gpt-pub/p108/index.html" > /dev/null
+          for number in 1 5 7 8 14; do
+            printf -v label 'N%02d' "$number"
+            "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1440,900 --virtual-time-budget=8000 \
+              --screenshot="$RUNNER_TEMP/p108-screenshots/$label.png" \
+              --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?gallery=1&sample=$number" \
+              > "$RUNNER_TEMP/p108-screenshots/$label.html" 2>"$RUNNER_TEMP/p108-screenshots/$label.stderr"
+            test -s "$RUNNER_TEMP/p108-screenshots/$label.png"
+            if ! grep -q "aria-label=\"$label" "$RUNNER_TEMP/p108-screenshots/$label.html"; then
+              echo "::error::$label precision SVG did not render in browser"
+              tail -n 25 "$RUNNER_TEMP/p108-screenshots/$label.stderr"
+              exit 1
+            fi
+            echo "Browser preview $label OK"
+          done
+
+      - name: Upload browser screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: p108-nature-visual-qa
+          path: ${{ runner.temp }}/p108-screenshots/*.png
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Keep validated P108 preview build
         uses: actions/upload-artifact@v4
         with:
