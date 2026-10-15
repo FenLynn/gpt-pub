@@ -27,7 +27,7 @@ jobs:
       - name: Reject any project-level Pages deployment
         shell: bash
         run: |
-          if grep -E 'actions/deploy-pages|pages:[[:space:]]*write' .github/workflows/p109-attendscope-pages.yml; then
+          if awk '/^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*actions\/deploy-pages@/ {bad=1} /^[[:space:]]+pages:[[:space:]]+write([[:space:]]|$)/ {bad=1} END{exit bad ? 0 : 1}' .github/workflows/p109-attendscope-pages.yml; then
             echo "::error::P109 must not overwrite shared P108/P109 Pages"
             exit 1
           fi
