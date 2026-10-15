@@ -684,6 +684,7 @@ function App() {
   const precisionAvailable = Boolean(
     activeFigure && supportsPrecisionSvg(activeFigure) &&
     plotDataset?.x.values.every(v => v === null || typeof v === "number") &&
+    !plotDataset?.x.name.match(/[$\\]/) &&
     (activeFigure.dataRef?.yColumnIds ?? []).every(id =>
       !plotDataset?.ys.find(series => series.id === id)?.name.match(/[$\\]/)
     )
@@ -3015,6 +3016,20 @@ function App() {
                         onSelectSeries={selectSeries}
                         onAxisClick={() => setInspectorTab("axis")}
                         onLegendClick={() => setInspectorTab("legend")}
+                        onLegendDrag={(x, y) => {
+                          patchActiveFigure((figure) => ({
+                            ...figure,
+                            figureOverrides: {
+                              ...figure.figureOverrides,
+                              legendPosition: "custom",
+                              legendX: x,
+                              legendY: y,
+                              legendXAnchor: (layout.legend?.xanchor ?? "left") as LegendXAnchor,
+                              legendYAnchor: (layout.legend?.yanchor ?? "top") as LegendYAnchor
+                            }
+                          }));
+                          setInspectorTab("legend");
+                        }}
                       />
                     ) : (
                       <div
