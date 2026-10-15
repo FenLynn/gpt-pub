@@ -1,4 +1,4 @@
-name: P109 AttendScope CI
+name: P109 AttendScope Pages
 
 on:
   push:
@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: p109-attendscope-pages
@@ -19,74 +21,118 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: P109 scope gate
+      - name: Scope gate
         shell: bash
         run: |
           git fetch origin main
           while IFS= read -r file; do
             case "$file" in
-              projects/1-桌面软件/109-AttendScope/*|.github/workflows/p109-attendscope-pages.yml|目录.md|projects/1-桌面软件/README.md)
-                ;;
-              *)
-                echo "::error file=$file::P109 branch contains an out-of-scope change"
-                exit 1
-                ;;
+              projects/1-桌面软件/109-AttendScope/*|.github/workflows/p109-attendscope-pages.yml|目录.md|projects/1-桌面软件/README.md) ;;
+              *) echo "::error file=$file::Out-of-scope P109 change"; exit 1 ;;
             esac
           done < <(git -c core.quotepath=false diff --name-only origin/main...HEAD)
-      - name: Offline dependency guard
+      - name: Strict offline guard
         shell: bash
         run: |
           APP="projects/1-桌面软件/109-AttendScope"
-          if grep -InE 'https?://' "$APP/index.html"; then
-            echo "::error::HTML contains a remote URL"
-            exit 1
-          fi
-          if grep -RInE 'https?://' "$APP/src/app" "$APP/src/css"; then
-            echo "::error::Application source contains a remote URL"
-            exit 1
-          fi
-          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src"; then
-            echo "::error::Runtime source contains a network-capable call"
-            exit 1
-          fi
-          # OpenXML namespace URIs inside xlsx-lite.js are schema identifiers only.
           test -f "$APP/index.html"
           test -f "$APP/src/core/xlsx-lite.js"
           test -f "$APP/src/vendor/echarts.min.js"
           test -f "$APP/src/vendor/ECHARTS-LICENSE.txt"
-          test -f "$APP/src/app/00-state.js"
-          test -f "$APP/src/app/10-analysis.js"
-          test -f "$APP/src/app/20-shell.js"
           test -f "$APP/src/app/25-echarts.js"
-          test -f "$APP/src/app/30-detail.js"
-          test -f "$APP/src/app/40-storage.js"
-      - name: JavaScript syntax check
+          test -f "$APP/tests/smoke.cjs"
+          if grep -InE 'https?://' "$APP/index.html"; then echo "::error::Remote HTML dependencies"; exit 1; fi
+          if grep -RInE 'https?://' "$APP/src/app" "$APP/src/css"; then echo "::error::Remote application URLs"; exit 1; fi
+          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src"; then echo "::error::Runtime network call"; exit 1; fi
+      - name: Syntax and ECharts runtime
         shell: bash
         run: |
           node --check "projects/1-桌面软件/109-AttendScope/src/core/xlsx-lite.js"
           node --check "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
           for f in projects/1-桌面软件/109-AttendScope/src/app/*.js; do node --check "$f"; done
+          node --check "projects/1-桌面软件/109-AttendScope/tests/smoke.cjs"
           node - <<'NODE'
-          const echarts = require('./projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js');
-          if (echarts.version !== '6.1.0') {
-            throw new Error('Unexpected local ECharts version: ' + echarts.version);
-          }
-          if (typeof echarts.init !== 'function' || typeof echarts.registerTheme !== 'function') {
-            throw new Error('Local ECharts runtime is incomplete');
-          }
-          console.log('Local ECharts', echarts.version, 'OK');
+          const e=require('./projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js');
+          if(e.version!=='6.1.0'||typeof e.init!=='function')throw Error('Local ECharts invalid');
           NODE
-          grep -q 'series.custom' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js" || {
-            echo "::error::Full ECharts custom-series runtime is missing"
-            exit 1
-          }
-          grep -q 'dataZoom.slider' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js" || {
-            echo "::error::ECharts slider dataZoom runtime is missing"
-            exit 1
-          }
+          grep -q 'series.custom' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
+          grep -q 'dataZoom.slider' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
+      - name: Set up real Chromium browser test
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/p109-playwright" --no-save --no-audit --no-fund playwright@1.58.2
+          command -v google-chrome || command -v chromium || command -v chromium-browser
+      - name: Test actual offline UI and SVG arrows
+        shell: bash
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/p109-playwright/node_modules/playwright
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          export CHROME_BIN
+          node "projects/1-桌面软件/109-AttendScope/tests/smoke.cjs"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p109-offline-browser-screenshots
+          path: p109-smoke-artifacts
+          retention-days: 7
+          if-no-files-found: ignore
 
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: p109-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Pages site
+        shell: bash
+        run: |
+          mkdir -p _site/p109
+          cp -a "projects/1-桌面软件/109-AttendScope/." _site/p109/
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=./p109/"><title>AttendScope</title></head><body><a href="./p109/">AttendScope</a></body></html>
+          HTML
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  verify-live:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up browser to verify fixed public URL
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/p109-playwright" --no-save --no-audit --no-fund playwright@1.58.2
+          command -v google-chrome || command -v chromium || command -v chromium-browser
+      - name: Verify deployed time axis and dataZoom in browser
+        shell: bash
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/p109-playwright/node_modules/playwright
+          P109_URL: https://fenlynn.github.io/gpt-pub/p109/
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          export CHROME_BIN
+          node "projects/1-桌面软件/109-AttendScope/tests/smoke.cjs"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p109-pages-browser-screenshots
+          path: p109-smoke-artifacts
+          retention-days: 7
+          if-no-files-found: ignore
