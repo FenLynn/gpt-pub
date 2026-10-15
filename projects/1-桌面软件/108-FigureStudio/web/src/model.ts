@@ -217,6 +217,16 @@ export interface FigureOverrides {
   rightYMax?: number;
   tickDirection?: TickDirection;
   axisStyle?: AxisStylePreset;
+  frameStyle?: "open" | "boxed";
+  axisLineWidthPt?: number;
+  majorTickLengthPt?: number;
+  minorTickLengthPt?: number;
+  axisTitlePadPt?: number;
+  plotTitlePadPt?: number;
+  marginLeftMm?: number;
+  marginRightMm?: number;
+  marginTopMm?: number;
+  marginBottomMm?: number;
   xMajorTickStep?: number;
   xMinorTickStep?: number;
   yMajorTickStep?: number;
