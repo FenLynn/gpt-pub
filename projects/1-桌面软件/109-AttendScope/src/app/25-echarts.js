@@ -245,6 +245,11 @@ function mountAttendanceTimeline(a){
       name:'打卡',
       type:'custom',
       coordinateSystem:'cartesian2d',
+      // Fixed event geometry must never animate from the centerline.
+      // Earlier morph transitions left the first/last arrow shafts invisible.
+      animation:false,
+      animationDuration:0,
+      animationDurationUpdate:0,
       renderItem:timelineEventRender(clusterData),
       dimensions:['minute','lane','count'],
       encode:{x:0,y:1,tooltip:[0,2]},
