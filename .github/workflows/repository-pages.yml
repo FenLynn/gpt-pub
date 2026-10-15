@@ -86,7 +86,7 @@ jobs:
             echo "::error::P109 HTML unexpectedly requests a remote URL"
             exit 1
           fi
-          if grep -RInE 'fetch[[:space:]]*\\(|XMLHttpRequest|WebSocket[[:space:]]*\\(|EventSource[[:space:]]*\\(|sendBeacon[[:space:]]*\\(' "$APP/src"; then
+          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src"; then
             echo "::error::P109 runtime source contains a network API"
             exit 1
           fi
