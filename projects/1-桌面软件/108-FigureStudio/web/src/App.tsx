@@ -1905,6 +1905,8 @@ function App() {
       presetId: activeFigure.presetId,
       figureOverrides: {
         publicationMode: source.publicationMode,
+        figureWidthMm: source.figureWidthMm,
+        figureHeightMm: source.figureHeightMm,
         colorCycle: source.colorCycle,
         aspectMode: source.aspectMode,
         customAspectWidth: source.customAspectWidth,
@@ -3723,6 +3725,31 @@ function App() {
                       </select>
                     </div>
 
+                    <div className="section-divider">成图尺寸 · mm</div>
+                    {([
+                      ["figureWidthMm", "画布宽度"],
+                      ["figureHeightMm", "画布高度"]
+                    ] as const).map(([field, label]) => (
+                      <div className="prop-row" key={field}>
+                        <label>{label}</label>
+                        <div className="control-with-reset">
+                          <input
+                            type="number"
+                            min="20"
+                            max="350"
+                            step="0.25"
+                            placeholder="预设 / 比例"
+                            value={activeFigure.figureOverrides[field] ?? ""}
+                            onChange={(event) => setFigureField(
+                              field,
+                              event.target.value === "" ? undefined : Number(event.target.value)
+                            )}
+                          />
+                          <ResetIcon visible={activeFigure.figureOverrides[field] !== undefined}
+                            onReset={() => resetFigureField(field)} />
+                        </div>
+                      </div>
+                    ))}
                     <div className="section-divider">版面留白 · mm</div>
                     {([
                       ["marginLeftMm", "左边距"],
