@@ -370,3 +370,9 @@ button{font-family:inherit}
 @media(prefers-reduced-motion:reduce){
   .rail-inner,.rail-presence,.multi-rail-row,.import-popover,.compact-issue-list button,.records-list button,.timeline-evidence.record-enter,.record-evidence.record-enter{animation:none!important;transition:none!important}
 }
+
+/* P109 timeline v4.1 precision refinements */
+.rail-axis-scale>span:first-child{left:0!important;transform:none}
+.rail-axis-scale>span:last-child{left:100%!important;transform:translateX(-100%)}
+.rail-marker.unpaired i{background:#d5a744;box-shadow:0 0 0 4px rgba(255,255,255,.9),0 0 0 5px rgba(213,167,68,.18)}
+.rail-marker.unpaired:hover i,.rail-marker.unpaired.selected i{box-shadow:0 0 0 5px rgba(255,255,255,.96),0 0 0 7px rgba(213,167,68,.18),0 3px 10px rgba(45,72,94,.12)}
