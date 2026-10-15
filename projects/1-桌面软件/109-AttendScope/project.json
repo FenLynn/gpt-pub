@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "projectId": "P109-AttendScope",
+  "projectName": "AttendScope",
+  "appVersion": "0.1.0-preview",
+  "analysisEngineVersion": "0.1.0",
+  "timezone": "Asia/Shanghai",
+  "current": {"year": 2026, "month": 10},
+  "storageModel": "folder-first",
+  "offlineOnly": true,
+  "notes": "运行时不请求网络；GitHub Pages 仅用于静态预览。"
+}

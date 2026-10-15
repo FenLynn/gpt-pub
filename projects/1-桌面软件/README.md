@@ -17,6 +17,7 @@
 | P103 | [DavBridge](103-DavBridge/) | v0.4 候选源码已纳入主线 | `103-DavBridge/` |
 | P104 | [CodexHandoff](104-CodexHandoff/) | v1.0.0-alpha.1 Tauri 重构开发中 | `104-CodexHandoff/` |
 | P105 | [LocalSub](105-LocalSub/) | v0.1.1-dev 候选源码已纳入主线 | `105-LocalSub/` |
+| P109 | [AttendScope](109-AttendScope/) | v0.1.0-preview 开发中 | `109-AttendScope/` |
 
 ## 分支模型
 
@@ -27,7 +28,11 @@
 | P103 | `p103-exp` | `p103-stable` | `main` |
 | P104 | `p104-exp` | `p104-stable` | `main` |
 | P105 | `p105-exp` | `p105-stable` | `main` |
+| P109 | `p109-exp` | `p109-stable` | `main` |
 
 默认流程：`main → exp → stable → main → 标签与 Release → 回流 exp/stable`。
 
 各项目长期分支相对最新 `main` 只能修改本项目目录、本项目 CI 与必要状态记录；项目长期分支不得互相合并。
+
+
+> 编号说明：P106–P108 已在仓库现有长期项目分支中占用，因此新项目 AttendScope 使用 P109；本分支不导入 P106–P108 的未合并项目内容。

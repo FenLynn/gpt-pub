@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "employees": [
+    {
+      "id": "E001",
+      "name": "员工01",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E002",
+      "name": "员工02",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E003",
+      "name": "员工03",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E004",
+      "name": "员工04",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E005",
+      "name": "员工05",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E006",
+      "name": "员工06",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E007",
+      "name": "员工07",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E008",
+      "name": "员工08",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E009",
+      "name": "员工09",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E010",
+      "name": "员工10",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E011",
+      "name": "员工11",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E012",
+      "name": "员工12",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E013",
+      "name": "员工13",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E014",
+      "name": "员工14",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E015",
+      "name": "员工15",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E016",
+      "name": "员工16",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E017",
+      "name": "员工17",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E018",
+      "name": "员工18",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E019",
+      "name": "员工19",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E020",
+      "name": "员工20",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E021",
+      "name": "员工21",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E022",
+      "name": "员工22",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E023",
+      "name": "员工23",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E024",
+      "name": "员工24",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E025",
+      "name": "员工25",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E026",
+      "name": "员工26",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E027",
+      "name": "员工27",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E028",
+      "name": "员工28",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E029",
+      "name": "员工29",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E030",
+      "name": "员工30",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E031",
+      "name": "员工31",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E032",
+      "name": "员工32",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E033",
+      "name": "员工33",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E034",
+      "name": "员工34",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E035",
+      "name": "员工35",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E036",
+      "name": "员工36",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E037",
+      "name": "员工37",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E038",
+      "name": "员工38",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E039",
+      "name": "员工39",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E040",
+      "name": "员工40",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E041",
+      "name": "员工41",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E042",
+      "name": "员工42",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E043",
+      "name": "员工43",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E044",
+      "name": "员工44",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E045",
+      "name": "员工45",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E046",
+      "name": "员工46",
+      "department": "综合",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E047",
+      "name": "员工47",
+      "department": "研发",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E048",
+      "name": "员工48",
+      "department": "生产",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E049",
+      "name": "员工49",
+      "department": "质检",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    },
+    {
+      "id": "E050",
+      "name": "员工50",
+      "department": "保障",
+      "activeFrom": "2026-01-01",
+      "activeTo": null
+    }
+  ]
+}

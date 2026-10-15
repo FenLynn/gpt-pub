@@ -1,0 +1,92 @@
+name: P109 AttendScope Pages
+
+on:
+  push:
+    branches:
+      - p109-exp
+    paths:
+      - "projects/1-桌面软件/109-AttendScope/**"
+      - ".github/workflows/p109-attendscope-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: p109-attendscope-pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: P109 scope gate
+        shell: bash
+        run: |
+          git fetch origin main
+          while IFS= read -r file; do
+            case "$file" in
+              projects/1-桌面软件/109-AttendScope/*|.github/workflows/p109-attendscope-pages.yml|目录.md|projects/1-桌面软件/README.md)
+                ;;
+              *)
+                echo "::error file=$file::P109 branch contains an out-of-scope change"
+                exit 1
+                ;;
+            esac
+          done < <(git -c core.quotepath=false diff --name-only origin/main...HEAD)
+      - name: Offline dependency guard
+        shell: bash
+        run: |
+          APP="projects/1-桌面软件/109-AttendScope"
+          if grep -RInE 'https?://|//cdn\.|unpkg\.|jsdelivr\.|fonts\.googleapis' "$APP/index.html" "$APP/src"; then
+            echo "::error::Runtime source contains a network dependency"
+            exit 1
+          fi
+          test -f "$APP/index.html"
+          test -f "$APP/src/core/xlsx-lite.js"
+          test -f "$APP/src/app/00-state.js"
+          test -f "$APP/src/app/10-analysis.js"
+          test -f "$APP/src/app/20-shell.js"
+          test -f "$APP/src/app/30-detail.js"
+          test -f "$APP/src/app/40-storage.js"
+      - name: JavaScript syntax check
+        shell: bash
+        run: |
+          node --check "projects/1-桌面软件/109-AttendScope/src/core/xlsx-lite.js"
+          for f in projects/1-桌面软件/109-AttendScope/src/app/*.js; do node --check "$f"; done
+
+  deploy:
+    environment:
+      name: p109-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble static Pages site
+        shell: bash
+        run: |
+          mkdir -p _site/p109
+          cp -a "projects/1-桌面软件/109-AttendScope/." _site/p109/
+          rm -rf _site/p109/data/*/*/raw _site/p109/data/*/*/working _site/p109/data/*/*/snapshots _site/p109/data/*/*/branches _site/p109/data/*/*/output || true
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="zh-CN">
+          <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0; url=./p109/"><title>AttendScope P109</title></head>
+          <body><p><a href="./p109/">打开 AttendScope P109</a></p></body>
+          </html>
+          HTML
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

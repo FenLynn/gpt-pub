@@ -1,0 +1,7 @@
+# Never commit real user data or local exports.
+data/*/*/raw/
+data/*/*/working/
+data/*/*/snapshots/
+data/*/*/branches/
+data/*/*/output/
+*.local.json
