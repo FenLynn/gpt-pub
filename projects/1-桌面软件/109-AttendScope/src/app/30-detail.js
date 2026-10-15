@@ -76,6 +76,16 @@ function clampTimelineRange(start,end,key){
   return {key,start:Math.round(s),end:Math.round(e)};
 }
 
+function moveTimelineRange(base,delta){
+  const span=base.end-base.start;
+  const start=Math.max(0,Math.min(1440-span,base.start+delta));
+  return {key:base.key,start:Math.round(start),end:Math.round(start+span)};
+}
+function rangeAround(center,span,key){
+  const width=Math.max(30,Math.min(1440,span));
+  const start=Math.max(0,Math.min(1440-width,center-width/2));
+  return {key,start:Math.round(start),end:Math.round(start+width)};
+}
 function localPctMinute(m,r){return (m-r.start)/(r.end-r.start)*100}
 function globalPctMinute(m){return m/1440*100}
 function timeLabelFromMinute(m){const x=Math.max(0,Math.min(1440,Math.round(m)));return `${pad(Math.floor(x/60)%24)}:${pad(x%60)}`}
@@ -205,7 +215,7 @@ function focusTimelineCluster(start,end){
   const r=state.timelineRange;if(!r)return;
   const current=r.end-r.start,center=(start+end)/2;
   const nextSpan=Math.max(30,current/3);
-  state.timelineRange=clampTimelineRange(center-nextSpan/2,center+nextSpan/2,r.key);
+  state.timelineRange=rangeAround(center,nextSpan,r.key);
   renderAnalysisPanel();
 }
 
@@ -231,7 +241,7 @@ function bindDualTimeline(){
     const handle=e.target.closest('[data-nav-handle]'),win=e.target.closest('[data-nav-window]');
     if(!handle&&!win){
       const span=r.end-r.start,center=minuteAt(e.clientX);
-      state.timelineRange=clampTimelineRange(center-span/2,center+span/2,r.key);
+      state.timelineRange=rangeAround(center,span,r.key);
       renderAnalysisPanel();
       return;
     }
@@ -243,7 +253,7 @@ function bindDualTimeline(){
     if(!mode)return;
     const box=nav.getBoundingClientRect(),delta=(e.clientX-startX)/Math.max(1,box.width)*1440;
     if(Math.abs(e.clientX-startX)>2)moved=true;
-    if(mode==='move') draft=clampTimelineRange(base.start+delta,base.end+delta,r.key);
+    if(mode==='move') draft=moveTimelineRange(base,delta);
     else if(mode==='left') draft=clampTimelineRange(Math.min(base.end-30,base.start+delta),base.end,r.key);
     else draft=clampTimelineRange(base.start,Math.max(base.start+30,base.end+delta),r.key);
     updateWindow(draft);
