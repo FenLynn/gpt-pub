@@ -422,9 +422,9 @@ export function createInitialProject(
   });
   const natureBook: DataBook = {
     id: id("book-nature"),
-    name: "Synthetic kinetics and decay",
+    name: "Synthetic Nature Gallery data",
     folderId: "folder-nature",
-    sheets: [natureDecaySheet, natureKineticsSheet]
+    sheets: [natureDecaySheet, natureKineticsSheet, scatterErrorbarSheet, barSheet]
   };
 
   const spectrumBook: DataBook = {
@@ -446,13 +446,6 @@ export function createInitialProject(
     name: "常用图型示例",
     folderId: "folder-experiment",
     sheets: [doubleYSheet, waterfallSheet]
-  };
-
-  const galleryBook: DataBook = {
-    id: id("book-gallery"),
-    name: "Matplotlib 验收数据",
-    folderId: "folder-gallery",
-    sheets: [scatterErrorbarSheet, barSheet]
   };
 
   const spectrumFigure = makeFigure(
@@ -672,8 +665,7 @@ export function createInitialProject(
       natureBook,
       spectrumBook,
       fieldBook,
-      commonPlotsBook,
-      ...(includeVisualQa ? [galleryBook] : [])
+      commonPlotsBook
     ],
     figures: [
       ...natureFigures,
