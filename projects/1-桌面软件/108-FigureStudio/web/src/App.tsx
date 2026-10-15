@@ -66,6 +66,7 @@ import {
   resolveCanvasMm
 } from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
+import { PrecisionSvg, supportsPrecisionSvg } from "./plot/PrecisionSvg";
 import {
   resolvePublicationMetrics,
   resolveSeriesPalette
@@ -82,6 +83,7 @@ const VISUAL_QA_MODE =
   new URLSearchParams(window.location.search).get("qa") === "1";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
+const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
 const PNG_SCALE = PNG_DPI / 96;
 
 const ROLE_OPTIONS: Array<{ value: ColumnRole; label: string }> = [
@@ -419,6 +421,7 @@ function App() {
   const project = history.value;
 
   const plotRef = useRef<HTMLDivElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dataInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
@@ -455,6 +458,9 @@ function App() {
   const [selectedColumnId, setSelectedColumnId] = useState("");
   const [selectedSeriesIds, setSelectedSeriesIds] = useState<string[]>([]);
   const [previewScale, setPreviewScale] = useState(1);
+  const [rendererMode, setRendererMode] = useState<"precision" | "plotly">(
+    () => localStorage.getItem(RENDER_MODE_KEY) === "plotly" ? "plotly" : "precision"
+  );
   const [uiScale, setUiScale] = useState(readUiScale);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("series");
   const [dataInspectorTab, setDataInspectorTab] = useState<"data" | "column">("data");
@@ -674,6 +680,17 @@ function App() {
     [plotDataset, activeFigure, preset]
   );
 
+  // All existing inspector controls, file fields and 14 Plotly templates are preserved.
+  const precisionAvailable = Boolean(
+    activeFigure && supportsPrecisionSvg(activeFigure) &&
+    plotDataset?.x.values.every(v => v === null || typeof v === "number") &&
+    (activeFigure.dataRef?.yColumnIds ?? []).every(id =>
+      !plotDataset?.ys.find(series => series.id === id)?.name.match(/[$\\]/)
+    )
+  );
+  const usePrecision = rendererMode === "precision" && precisionAvailable;
+  useEffect(() => { localStorage.setItem(RENDER_MODE_KEY, rendererMode); }, [rendererMode]);
+
   const checkItems = useMemo(
     () =>
       plotDataset && activeFigure
@@ -800,7 +817,7 @@ function App() {
 
   useEffect(() => {
     const node = plotRef.current as any;
-    if (!node || !activeFigure) return;
+    if (!node || !activeFigure || usePrecision) return;
 
     const config = {
       responsive: false,
@@ -935,7 +952,7 @@ function App() {
       node.removeAllListeners?.("plotly_relayout");
       node.removeEventListener("click", handleDomClick);
     };
-  }, [activeFigure, history, layout, orderedSeries, selectSeries, traces]);
+  }, [activeFigure, history, layout, orderedSeries, selectSeries, traces, usePrecision]);
 
   const patchProject = useCallback(
     (updater: (current: ProjectState) => ProjectState) => {
@@ -1981,6 +1998,7 @@ function App() {
   }
 
   async function resetView() {
+    if (usePrecision) { showToast("精细 SVG 已显示完整数据范围"); return; }
     if (!plotRef.current || !activeFigure) return;
     if (activeFigure.templateId === "surface-3d") {
       await Plotly.relayout(plotRef.current, {
@@ -1998,6 +2016,38 @@ function App() {
   }
 
   async function exportFigure(format: "svg" | "png") {
+    if (usePrecision && svgRef.current && activeFigure) {
+      // Serialize the exact SVG currently displayed. No independent redraw on export.
+      const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
+      const physical = resolveCanvasMm(preset, activeFigure);
+      clone.setAttribute("width", physical.widthMm + "mm");
+      clone.setAttribute("height", physical.heightMm + "mm");
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      const xml = new XMLSerializer().serializeToString(clone);
+      const svgUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+      const filename = activeFigure.name.replace(/[\\/:*?"<>|]+/g, "-");
+      if (format === "svg") {
+        downloadDataUrl(svgUrl, filename + ".svg");
+        showToast("已导出当前画布 SVG");
+        return;
+      }
+      try {
+        const image = new Image();
+        image.src = svgUrl;
+        await image.decode();
+        const surface = document.createElement("canvas");
+        surface.width = Math.round(physical.widthMm * PNG_DPI / 25.4);
+        surface.height = Math.round(physical.heightMm * PNG_DPI / 25.4);
+        const context = surface.getContext("2d");
+        if (!context) throw new Error("Canvas 不可用");
+        context.drawImage(image, 0, 0, surface.width, surface.height);
+        downloadDataUrl(pngDataUrlWithDpi(surface.toDataURL("image/png"), PNG_DPI), filename + "-600dpi.png");
+        showToast("已从当前 SVG 画布导出 600 dpi PNG");
+      } catch (error) {
+        showToast("精细 SVG PNG 导出失败：" + String(error));
+      }
+      return;
+    }
     const node = plotRef.current as any;
     if (!node || !activeFigure) return;
 
@@ -2869,6 +2919,17 @@ function App() {
                   </label>
 
                   <label>
+                    <span>画布</span>
+                    <select
+                      value={precisionAvailable ? rendererMode : "plotly"}
+                      onChange={(event) => setRendererMode(event.target.value as "precision" | "plotly")}
+                      title="精细 SVG 为可回退实验；未覆盖的图型、分类轴与复杂 LaTeX 仍由 Plotly 原样绘制"
+                    >
+                      <option value="precision" disabled={!precisionAvailable}>精细 SVG</option>
+                      <option value="plotly">Plotly 兼容</option>
+                    </select>
+                  </label>
+                  <label>
                     <span>样式</span>
                     <select
                       value={activeFigure.presetId}
@@ -2935,14 +2996,26 @@ function App() {
                       transform: "scale(" + previewScale + ")"
                     }}
                   >
-                    <div
-                      ref={plotRef}
-                      className="plot-host"
-                      style={{
-                        width: layout.width + "px",
-                        height: layout.height + "px"
-                      }}
-                    />
+                    {usePrecision && activeFigure ? (
+                      <PrecisionSvg
+                        figure={activeFigure}
+                        layout={layout}
+                        traces={traces as any[]}
+                        svgRef={svgRef}
+                        onSelectSeries={selectSeries}
+                        onAxisClick={() => setInspectorTab("axis")}
+                        onLegendClick={() => setInspectorTab("legend")}
+                      />
+                    ) : (
+                      <div
+                        ref={plotRef}
+                        className="plot-host"
+                        style={{
+                          width: layout.width + "px",
+                          height: layout.height + "px"
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
