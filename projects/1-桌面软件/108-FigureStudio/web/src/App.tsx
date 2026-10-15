@@ -1914,6 +1914,16 @@ function App() {
         zTitle: source.zTitle,
         tickDirection: source.tickDirection,
         axisStyle: source.axisStyle,
+        frameStyle: source.frameStyle,
+        axisLineWidthPt: source.axisLineWidthPt,
+        majorTickLengthPt: source.majorTickLengthPt,
+        minorTickLengthPt: source.minorTickLengthPt,
+        axisTitlePadPt: source.axisTitlePadPt,
+        plotTitlePadPt: source.plotTitlePadPt,
+        marginLeftMm: source.marginLeftMm,
+        marginRightMm: source.marginRightMm,
+        marginTopMm: source.marginTopMm,
+        marginBottomMm: source.marginBottomMm,
         xReverse: source.xReverse,
         yReverse: source.yReverse,
         rightYReverse: source.rightYReverse,
@@ -3698,6 +3708,33 @@ function App() {
                       </select>
                     </div>
 
+                    <div className="section-divider">版面留白 · mm</div>
+                    {([
+                      ["marginLeftMm", "左边距"],
+                      ["marginRightMm", "右边距"],
+                      ["marginTopMm", "上边距"],
+                      ["marginBottomMm", "下边距"]
+                    ] as const).map(([field, label]) => (
+                      <div className="prop-row" key={field}>
+                        <label>{label}</label>
+                        <div className="control-with-reset">
+                          <input
+                            type="number"
+                            min="0"
+                            max="80"
+                            step="0.25"
+                            placeholder="自动"
+                            value={activeFigure.figureOverrides[field] ?? ""}
+                            onChange={(event) => setFigureField(
+                              field,
+                              event.target.value === "" ? undefined : Number(event.target.value)
+                            )}
+                          />
+                          <ResetIcon visible={activeFigure.figureOverrides[field] !== undefined}
+                            onReset={() => resetFigureField(field)} />
+                        </div>
+                      </div>
+                    ))}
                     <div className="prop-row">
                       <label>配色</label>
                       <select
@@ -5063,6 +5100,43 @@ function App() {
                                                 <option value="bold">加粗</option>
                                               </select>
                                             </div>
+                                            <div className="prop-row">
+                                              <label>轴框样式</label>
+                                              <select
+                                                value={activeFigure.figureOverrides.frameStyle ?? (usePrecision ? "open" : "boxed")}
+                                                onChange={(event) => setFigureField("frameStyle", event.target.value as "open" | "boxed")}
+                                              >
+                                                <option value="open">精细开口轴</option>
+                                                <option value="boxed">四边框</option>
+                                              </select>
+                                            </div>
+                                            {([
+                                              ["axisLineWidthPt", "坐标轴线宽", 0.05],
+                                              ["majorTickLengthPt", "主刻度长度", 0.25],
+                                              ["minorTickLengthPt", "次刻度长度", 0.25],
+                                              ["axisTitlePadPt", "轴标题间距", 0.25],
+                                              ["plotTitlePadPt", "图标题间距", 0.25]
+                                            ] as const).map(([field, label, step]) => (
+                                              <div className="prop-row" key={field}>
+                                                <label>{label} (pt)</label>
+                                                <div className="control-with-reset">
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="40"
+                                                    step={step}
+                                                    placeholder="自动"
+                                                    value={activeFigure.figureOverrides[field] ?? ""}
+                                                    onChange={(event) => setFigureField(
+                                                      field,
+                                                      event.target.value === "" ? undefined : Number(event.target.value)
+                                                    )}
+                                                  />
+                                                  <ResetIcon visible={activeFigure.figureOverrides[field] !== undefined}
+                                                    onReset={() => resetFigureField(field)} />
+                                                </div>
+                                              </div>
+                                            ))}
                                             <div className="prop-row">
                                               <label>刻度方向</label>
                                               <select
