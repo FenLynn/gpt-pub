@@ -184,16 +184,16 @@ function matrixVisible(a){
 
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
-  const cell=23,row=30,nameW=88;
+  const cell=18,row=20,nameW=78;
   el.style.setProperty('--cell',cell+'px');
   el.style.setProperty('--row',row+'px');
   el.style.setProperty('--name',nameW+'px');
   el.style.gridTemplateColumns=`${nameW}px repeat(31,${cell}px)`;
 
-  let html='<div class="m-corner">人员</div>';
+  let html='<div class="m-corner"></div>';
   for(let d=1;d<=31;d++){
     const type=dayType(d),sel=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d?' selected':'';
-    html+=`<button class="m-date ${type}${sel}" data-date="${d}" title="${isoDate(d)} · ${dayTypeText(type)}"><b>${d}</b><span>${weekdayLabel(d)}</span></button>`;
+    html+=`<button class="m-date ${type}${sel}" data-date="${d}" title="${isoDate(d)} · 周${weekdayLabel(d)} · ${dayTypeText(type)}"><b>${pad(d)}</b></button>`;
   }
 
   for(const e of EMPLOYEES){
