@@ -146,7 +146,7 @@ function analysisStatsHtml(ctx){
 
 function verticalBars(items,max,kind){
   if(!items.length)return '<div class="analysis-empty">无数据</div>';
-  return `<div class="vbars">${items.map(x=>`<button data-analysis-cell="${kind==='day'&&state.selection.employeeId?state.selection.employeeId+'|'+x.day:''}" class="vbar ${x.severity||''}" title="${pad(x.day)} 日 · ${x.value}"><i style="height:${Math.max(3,Math.min(100,x.value/max*100))}%"></i><span>${x.day}</span></button>`).join('')}</div>`;
+  return `<div class="vbars">${items.map(x=>{const attr=state.selection.type==='person'?`data-analysis-cell="${state.selection.employeeId}|${x.day}"`:`data-analysis-day="${x.day}"`;return `<button ${attr} class="vbar ${x.severity||''}" title="${pad(x.day)} 日 · ${x.value}"><i style="height:${Math.max(3,Math.min(100,x.value/max*100))}%"></i><span>${x.day}</span></button>`}).join('')}</div>`;
 }
 
 function horizontalBars(items){
