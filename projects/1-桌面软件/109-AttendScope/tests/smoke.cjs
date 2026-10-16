@@ -30,7 +30,7 @@ async function run(){
  });
  console.log('R13_LAYOUT '+JSON.stringify(layout));
  if(layout.month!=='2026-10'||layout.tabs!==4||layout.defaultFilter!=='main'||layout.recordCount<3600||
-    Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-873)>2||layout.ratio<2.7||layout.ratio>3.3||
+    Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<2.7||layout.ratio>3.3||
     layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
  await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
@@ -49,9 +49,9 @@ async function run(){
   return state.selection.type==='person'&&frame!==null&&
     !document.querySelector('.m-cell.row-focus').style.background&&
     getComputedStyle(frame).borderTopColor.includes('139, 90, 226')&&
-    !document.querySelector('.matrix-selection-frame.focus-col');
+    !!document.querySelector('.matrix-selection-frame.focus-col.inactive');
  },'Continuous violet row frame');
- await page.screenshot({path:path.join(out,'r13-row.png')});
+ await page.screenshot({path:path.join(out,'r14-iteration-row.png')});
  // Calendar keeps person context regardless of chart tab.
  await page.locator('.cal-day[data-day="9"]').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
@@ -59,16 +59,19 @@ async function run(){
    document.querySelector('.m-cell.cell-focus .selected')&&
    getComputedStyle(document.querySelector('.m-cell.cell-focus .selected')).boxShadow.includes('135, 89, 219'),
  'Person/calendar cell focus not lifted');
- await page.screenshot({path:path.join(out,'r13-cell.png')});
- const arrow=await page.evaluate(()=>{
+ await page.screenshot({path:path.join(out,'r14-iteration-timeline.png')});
+ const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
-  const lines=chart.getZr().storage.getDisplayList().filter(x=>x.type==='line'&&x.style?.lineWidth>=5&&
-    Math.abs((x.shape?.y2||0)-(x.shape?.y1||0))>18);
-  return {n:lines.length,up:lines.some(x=>x.shape.y2>x.shape.y1),down:lines.some(x=>x.shape.y2<x.shape.y1),
-   arrows:state.prefs.arrowsTowardLine,mini:!!document.getElementById('timelineMini'),range:state.timelineRange};
+  const opts=chart.getOption();
+  const data=r14TrackData(state.analysis.get('E001|9'));
+  return {ids:opts.series.map(s=>s.id), zoom:opts.dataZoom.map(z=>z.type),
+   rails:data.tracks.map(t=>t.key),rects:data.bars.length,arrows:data.events.length,
+   oldMini:!!document.getElementById('timelineMini'),settings:r14Prefs().timelineTracks};
  });
- console.log('R13_TIMELINE '+JSON.stringify(arrow));
- if(arrow.n<2||!arrow.up||!arrow.down||!arrow.mini||!arrow.arrows)throw Error('Arrow convergence / minimap missing');
+ console.log('R14_TIMELINE '+JSON.stringify(tracks));
+ if(tracks.oldMini||tracks.zoom.filter(z=>z==='slider').length!==1||!tracks.ids.includes('bands')||
+    !tracks.rails.includes('actual')||!tracks.rails.includes('rules')||
+    tracks.arrows<2||tracks.rects<2)throw Error('Multiple time tracks/single overview failed');
  await page.locator('[data-chart-tab="overview"]').click();
  await page.waitForSelector('#overviewTrendChart svg');
  await check(page,()=>{
@@ -93,19 +96,34 @@ async function run(){
  await check(page,()=>!rawDialog&&!!document.querySelector('.analysis-body #rawPane'),'Popout failed to dock');
  // Whole column plus top-left All.
  await page.locator('#matrixAll').click();
- await check(page,()=>state.selection.type==='overall'&&!document.querySelector('.matrix-selection-frame')&&
+ await check(page,()=>state.selection.type==='overall'&&![...document.querySelectorAll('.matrix-selection-frame')].some(e=>!e.classList.contains('inactive'))&&
   !document.querySelector('.m-cell.cell-focus'),'All should clear focus');
  await page.locator('.m-date[data-date="10"]').click();
  await check(page,()=>state.selection.type==='date'&&!!document.querySelector('.matrix-selection-frame.focus-col'),'Column outline');
- await page.screenshot({path:path.join(out,'r13-column.png')});
- // Settings are functional and applied to snapshot/working state.
+ await page.screenshot({path:path.join(out,'r14-iteration-column.png')});
+ // Full settings center and five configurable columns.
  await page.locator('#settingsBtn').click();
+ await page.waitForSelector('.r14-settings-nav button');
+ await page.screenshot({path:path.join(out,'r14-iteration-settings.png')});
+ await check(page,()=>document.querySelectorAll('[data-settings-section]').length===7,'Settings missing categories');
+ await page.locator('[data-settings-section="matrix"]').click();
+ await page.locator('#settingGlow').fill('1.4');
+ await page.locator('#settingRestContrast').fill('1.3');
+ await page.locator('[data-settings-section="timeline"]').click();
+ await page.locator('#settingTrack_leave').check();
+ await page.locator('[data-settings-section="table"]').click();
+ await page.locator('#settingTableKind').selectOption('attendance');
+ await page.locator('[data-config-column="datetime"] input[type=number]').fill('190');
+ await page.locator('[data-config-column="row"] input[type=checkbox]').uncheck();
+ await page.screenshot({path:path.join(out,'r14-iteration-columns.png')});
+ await page.locator('[data-settings-section="appearance"]').click();
  await page.locator('#settingFont').selectOption('1.08');
  await page.locator('#settingMotion').uncheck();
- await page.locator('#settingArrows').uncheck();
  await page.locator('#settingsApply').click();
  await check(page,()=>state.prefs.fontScale===1.08&&state.prefs.motion===false&&
-  state.prefs.arrowsTowardLine===false&&workingPayload().prefs.arrowsTowardLine===false,'Settings not persisted');
+    state.prefs.matrix.glow===1.4&&state.prefs.tableColumns.attendance.datetime.width===190&&
+    state.prefs.tableColumns.attendance.row.visible===false&&workingPayload().prefs.matrix.glow===1.4,
+  'Settings data persistence failed');
  await page.locator('#monthMenuButton').click();
  await page.locator('.month-choice[data-month="11"]').click();
  await check(page,()=>MONTH===11&&state.records.length===0&&state.analysis.size===1500,'Empty November workspace');
@@ -122,7 +140,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R13',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R14',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

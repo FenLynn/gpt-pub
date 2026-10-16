@@ -34,8 +34,7 @@ function attendPlotHtml(ctx){
   if(tab==='timeline'){
     if(day){
       const range=timelineRange(day);
-      return top+'<div class="plot-axis"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="进出打卡时间轴"></div>'+
-        timelineMiniMapHtml(day,range)+'</div>';
+      return top+'<div class="plot-axis"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div></div>';
     }
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
@@ -50,7 +49,10 @@ function attendInsightHtml(ctx){
     out+='<div class="insight-state '+tone+'">'+safeTableText(item.status)+'</div>';
     out+=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
       insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
-      insightMetric('在岗',fmtMinutes(item.presence))+insightMetric('记录',item.punches.length+' 条');
+      insightMetric('在岗',fmtMinutes(item.presence))+insightMetric('记录',item.punches.length+' 条')+
+      insightMetric('有效区间',item.pairs.length+' 段')+
+      (item.leaves.length?insightMetric('请假',item.leaves.length+' 条'):'')+
+      (item.trips.length?insightMetric('出差',item.trips.length+' 条'):'');
     if(item.issues.length)out+='<p class="insight-issue">'+safeTableText(item.issues.join('、'))+'</p>';
     if(ctx.employee)out+='<div class="insight-actions"><button data-revise="resolved">已核实</button><button data-revise="note">加说明</button><button data-revise="clear" class="danger">清除修订</button></div>';
     return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
@@ -135,7 +137,14 @@ function renderRawTable(ctx){
   if(count)count.textContent=data.length+' 条';
   const node=document.getElementById('rawDataTable');
   if(!node)return;
-  const col=(title,field,width,minWidth=43)=>({title,field,width,minWidth,formatter:'plaintext',headerSort:true,tooltip:true});
+  const p=typeof r14Prefs==='function'?r14Prefs():state.prefs||{};
+  const prefs=p.tableColumns?.[kind]||{};
+  const col=(title,field,width,minWidth=43)=>{
+    const opt=prefs[field]||{};
+    return {title,field,minWidth,formatter:'plaintext',headerSort:true,tooltip:true,
+      visible:opt.visible!==false,width:opt.width&&opt.width>=48?Math.min(500,opt.width):undefined,
+      widthGrow:Math.max(1,Math.round(width/65))};
+  };
   const withName=ctx.type!=='person'&&ctx.type!=='cell';
   const columns=(kind==='outing'||kind==='overtime')?[
     ...(withName?[col('姓名','name',74,55)]:[]),

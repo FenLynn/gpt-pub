@@ -1,0 +1,169 @@
+/* P109 R14 settings workspace: sections and persistable presentation. */
+const R14_SETTING_SECTIONS=[
+ ['appearance','外观','字体、界面密度与动效'],
+ ['matrix','矩阵','选中效果与工作日区分'],
+ ['timeline','时间轴','轨道、事件与缩放'],
+ ['table','原始表格','可见列与宽度'],
+ ['rules','考勤规则','上下班时间与容差'],
+ ['data','数据与模拟','数据隔离及生成说明'],
+ ['advanced','高级','离线行为与版本信息']
+];
+const R14_TABLE_FIELDS={
+ attendance:[['name','姓名'],['datetime','打卡时间'],['direction','进出'],['source','来源文件'],['sheet','工作表'],['row','行号'],['recordId','记录 ID']],
+ trip:[['name','姓名'],['startDate','起始日期'],['endDate','结束日期'],['type','类型'],['place','地点'],['note','备注'],['source','来源文件'],['row','行号']],
+ leave:[['name','姓名'],['date','日期'],['start','开始'],['end','结束'],['type','假别'],['note','备注'],['source','来源文件'],['row','行号']],
+ outing:[['name','姓名'],['startDate','开始日期'],['endDate','结束日期'],['start','开始时间'],['end','结束时间'],['type','事项'],['note','备注'],['source','来源文件']],
+ overtime:[['name','姓名'],['date','日期'],['start','开始时间'],['end','结束时间'],['type','事项'],['note','备注'],['source','来源文件']]
+};
+function r14Prefs(){
+  const p=state.prefs||{};
+  if(!p.tableColumns)p.tableColumns={};
+  if(!p.timelineTracks)p.timelineTracks={rules:true,actual:true,leave:true,trip:true,outing:true,events:true};
+  if(!p.matrix)p.matrix={ids:true,crosshair:true,glow:1,restContrast:1};
+  return p;
+}
+function settingSelect(id,label,options){
+ return '<label class="r14-setting-row"><span>'+label+'</span><select id="'+id+'">'+options.map(([v,t])=>'<option value="'+v+'">'+t+'</option>').join('')+'</select></label>';
+}
+function settingCheck(id,label,desc=''){
+ return '<label class="r14-setting-row"><span>'+label+(desc?'<small>'+desc+'</small>':'')+'</span><input type="checkbox" id="'+id+'"></label>';
+}
+function settingRange(id,label,min,max,step){
+ return '<label class="r14-setting-row"><span>'+label+'</span><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'"><output id="'+id+'Val"></output></label>';
+}
+function sectionCard(title,description,items){
+ return '<div class="r14-settings-card"><div class="r14-section-intro"><h4>'+title+'</h4><p>'+description+'</p></div>'+items+'</div>';
+}
+function settingsContent(section){
+ switch(section){
+ case 'appearance':return sectionCard('界面外观','遵循 MATQ / DavBridge 风格，减少装饰性注释，增强可读性。',
+   settingSelect('settingFont','全局字号',[['1','标准 · 100%'],['1.08','舒适 · 108%'],['1.16','放大 · 116%']])+
+   settingCheck('settingMotion','平滑过渡动画','减少突兀闪烁，关闭后适用低性能设备'));
+ case 'matrix':return sectionCard('矩阵显示','紫色代表确定选择，蓝色代表鼠标预览。状态颜色不随选择改变。',
+   settingCheck('settingIds','显示人员编号')+
+   settingCheck('settingCrosshair','显示十字参考框','点击单格时两方向淡化，悬停时显示蓝色预选')+
+   settingRange('settingGlow','紫色发光强度',.5,1.8,.1)+
+   settingRange('settingRestContrast','休息日底色强度',.6,1.8,.1));
+ case 'timeline':return sectionCard('时间轴轨道','默认显示法定工作、实际在岗和打卡证据，业务轨道在有记录时显示。',
+   settingCheck('settingArrows','箭头朝向时间线')+
+   Object.entries({rules:'法定工作区间',actual:'实际在岗区间',leave:'请假区间',trip:'出差区间',outing:'外出区间',events:'进出事件'}).map(([id,t])=>
+     settingCheck('settingTrack_'+id,t)).join(''));
+ case 'table':return sectionCard('原始数据列管理','按类别保存显示和列宽；留空宽度则自动铺满，不改变任何原始数据。',
+   settingSelect('settingTableKind','数据类别',[
+    ['attendance','考勤'],['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']])+
+   '<div id="settingsColumns" class="r14-column-editor"></div>');
+ case 'rules':return sectionCard('班次与判据','应用后重新计算当前月的考勤分析，原始打卡记录保持不变。',
+   [['amStart','上午上班'],['amEnd','上午下班'],['pmStart','下午上班'],['pmEnd','下午下班']].map(([k,label])=>
+    '<label class="r14-setting-row"><span>'+label+'</span><input type="time" id="r14Rule_'+k+'"></label>').join('')+
+   '<label class="r14-setting-row"><span>迟到宽限（分钟）</span><input id="r14Grace" type="number" min="0" max="120" step="1"></label>'+
+   '<label class="r14-setting-row"><span>重复打卡判定（秒）</span><input id="r14Dup" type="number" min="0" max="1800" step="10"></label>');
+ case 'data':return sectionCard('数据与模拟','全部数据在本地浏览器解析与计算，不上传服务端。',
+   '<div class="r14-readonly"><strong>当前工作空间</strong><span>'+monthKey()+'</span></div>'+
+   '<div class="r14-readonly"><strong>原始考勤</strong><span>'+state.records.length+' 条</span></div>'+
+   '<div class="r14-readonly"><strong>原始请假 / 出差</strong><span>'+state.leaves.length+' / '+state.trips.length+' 条</span></div>'+
+   '<p class="r14-setting-note">复杂演示打卡包含同向重复、连续短间隔进出和晚间返岗。演示数据仅属于 2026 年 10 月。</p>');
+ default:return sectionCard('本地运行','所有核心脚本和绘图库均本地提供，当前为实验预览版本。',
+   '<div class="r14-readonly"><strong>应用</strong><span>AttendScope P109</span></div>'+
+   '<div class="r14-readonly"><strong>版本</strong><span>R14 · v0.1.0-preview</span></div>'+
+   '<div class="r14-readonly"><strong>存储</strong><span>当前月份 working / snapshots</span></div>');
+ }
+}
+function r14SettingsMarkup(){
+ return '<div class="settings-overlay hidden" id="settingsOverlay"><section class="settings-modal r14-settings" role="dialog" aria-modal="true" aria-labelledby="settingsHeading">'+
+ '<header class="r14-settings-top"><div><strong id="settingsHeading">偏好设置</strong><span>AttendScope / 工作空间</span></div>'+
+ '<button id="settingsClose" title="关闭设置" aria-label="关闭设置">×</button></header>'+
+ '<div class="r14-settings-body"><nav class="r14-settings-nav">'+R14_SETTING_SECTIONS.map(([id,name])=>
+  '<button type="button" data-settings-section="'+id+'" class="'+(id==='appearance'?'active':'')+'">'+name+'</button>').join('')+'</nav>'+
+ '<section id="settingsContent" class="r14-settings-content"></section></div>'+
+ '<footer class="r14-settings-foot"><span>修改仅影响本地工作空间</span><button id="settingsCancel">取消</button><button id="settingsApply">应用并保存设置</button></footer>'+
+ '</section></div>';
+}
+let r14SettingsDraft=null;
+function bindSettings(){
+ const overlay=document.getElementById('settingsOverlay'),content=document.getElementById('settingsContent');
+ if(!overlay||!content)return;
+ let section='appearance';
+ function writeCurrentSection(){
+  content.innerHTML=settingsContent(section);
+  const d=r14SettingsDraft,p=d.prefs;
+  const set=(id,value)=>{const e=document.getElementById(id);if(e){if(e.type==='checkbox')e.checked=!!value;else e.value=String(value)}};
+  if(section==='appearance'){set('settingFont',p.fontScale||1);set('settingMotion',p.motion!==false)}
+  if(section==='matrix'){
+   const m=p.matrix||{};set('settingIds',m.ids!==false);set('settingCrosshair',m.crosshair!==false);
+   set('settingGlow',m.glow||1);set('settingRestContrast',m.restContrast||1);
+   for(const k of ['Glow','RestContrast']){const input=document.getElementById('setting'+k);const output=document.getElementById('setting'+k+'Val');
+    input.oninput=()=>{output.textContent=Number(input.value).toFixed(1)+'×'};
+    input.dispatchEvent(new Event('input'))}
+  }
+  if(section==='timeline'){
+   set('settingArrows',p.arrowsTowardLine!==false);
+   for(const k of Object.keys(p.timelineTracks||{}))set('settingTrack_'+k,p.timelineTracks[k]);
+  }
+  if(section==='rules'){
+   for(const k of ['amStart','amEnd','pmStart','pmEnd'])set('r14Rule_'+k,d.rules[k]);
+   set('r14Grace',d.rules.grace);set('r14Dup',d.rules.dupSeconds);
+  }
+  if(section==='table'){
+   set('settingTableKind',d.tableKind||'attendance');
+   document.getElementById('settingTableKind').onchange=e=>{captureDraft();d.tableKind=e.target.value;writeColumns()};
+   writeColumns();
+  }
+ }
+ function writeColumns(){
+  const d=r14SettingsDraft,kind=d.tableKind||'attendance',target=document.getElementById('settingsColumns');
+  target.innerHTML='<div class="r14-column-head"><span>字段</span><span>可见</span><span>列宽 / px</span></div>'+
+   R14_TABLE_FIELDS[kind].map(([field,label])=>{
+    const v=d.prefs.tableColumns[kind]?.[field]||{};
+    return '<div class="r14-column-row" data-config-column="'+field+'"><span>'+label+'</span><input type="checkbox" '+(v.visible===false?'':'checked')+' aria-label="'+label+' 可见">'+
+    '<input type="number" min="48" max="500" step="10" value="'+(v.width||'')+'" placeholder="自适应" aria-label="'+label+' 列宽"></div>';
+   }).join('');
+ }
+ function captureDraft(){
+  if(!r14SettingsDraft)return;
+  const d=r14SettingsDraft,p=d.prefs;
+  const get=id=>document.getElementById(id),v=id=>get(id)?.value,ch=id=>get(id)?.checked;
+  if(section==='appearance'){p.fontScale=Number(v('settingFont')||p.fontScale||1);p.motion=!!ch('settingMotion')}
+  if(section==='matrix'){p.matrix={ids:!!ch('settingIds'),crosshair:!!ch('settingCrosshair'),glow:Number(v('settingGlow')||1),restContrast:Number(v('settingRestContrast')||1)}}
+  if(section==='timeline'){
+   p.arrowsTowardLine=!!ch('settingArrows');
+   for(const k of Object.keys(p.timelineTracks))p.timelineTracks[k]=!!ch('settingTrack_'+k);
+  }
+  if(section==='rules'){for(const k of ['amStart','amEnd','pmStart','pmEnd'])d.rules[k]=v('r14Rule_'+k)||d.rules[k];
+   d.rules.grace=Number(v('r14Grace'));d.rules.dupSeconds=Number(v('r14Dup'))}
+  if(section==='table'){
+   const kind=d.tableKind||'attendance';p.tableColumns[kind]??={};
+   document.querySelectorAll('[data-config-column]').forEach(row=>{
+    const [visible,width]=row.querySelectorAll('input');
+    p.tableColumns[kind][row.dataset.configColumn]={visible:visible.checked,width:width.value?Number(width.value):null};
+   });
+  }
+ }
+ function choose(id){
+  captureDraft();section=id;
+  document.querySelectorAll('[data-settings-section]').forEach(b=>b.classList.toggle('active',b.dataset.settingsSection===id));
+  writeCurrentSection();
+ }
+ const close=()=>{overlay.classList.add('hidden');r14SettingsDraft=null};
+ document.getElementById('settingsBtn').onclick=()=>{
+  const p=r14Prefs();r14SettingsDraft={prefs:JSON.parse(JSON.stringify(p)),rules:{...RULES},tableKind:state.rawDataTab||'attendance'};
+  section='appearance';overlay.classList.remove('hidden');
+  document.querySelectorAll('[data-settings-section]').forEach(b=>b.classList.toggle('active',b.dataset.settingsSection==='appearance'));
+  writeCurrentSection();
+ };
+ document.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>choose(b.dataset.settingsSection));
+ document.getElementById('settingsClose').onclick=close;
+ document.getElementById('settingsCancel').onclick=close;
+ overlay.onclick=e=>{if(e.target===overlay)close()};
+ document.getElementById('settingsApply').onclick=()=>{
+  captureDraft();
+  const d=r14SettingsDraft;
+  if(!d)return;
+  const time=['amStart','amEnd','pmStart','pmEnd'].map(k=>d.rules[k]);
+  if(time.some(t=>!/^\d\d:\d\d$/.test(t))||!(minutes(time[0])<minutes(time[1])&&minutes(time[1])<minutes(time[2])&&minutes(time[2])<minutes(time[3]))||
+    !Number.isFinite(d.rules.grace)||d.rules.grace<0||d.rules.grace>120||!Number.isFinite(d.rules.dupSeconds)||d.rules.dupSeconds<0||d.rules.dupSeconds>1800){
+    toast('请检查工作时段、宽限与重复判定参数',true);return;
+  }
+  Object.assign(RULES,d.rules);state.prefs=d.prefs;state.saved=false;rememberMonth();reanalyze();close();render();
+  toast('设置已应用，保存工作空间后持久保留');
+ };
+}

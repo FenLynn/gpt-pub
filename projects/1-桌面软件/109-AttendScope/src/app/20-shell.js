@@ -1,4 +1,5 @@
 function render(){
+  if(typeof r14Prefs==='function')r14Prefs();
   if(!state.analysisTab) state.analysisTab='overview';
   if(typeof disposeAttendCharts==='function')disposeAttendCharts();
   document.getElementById('app').innerHTML=layoutHtml();
@@ -108,20 +109,7 @@ function layoutHtml(){
     </main>
   </div>
 
-  <div id="settingsOverlay" class="settings-overlay hidden">
-    <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsHeading">
-      <div class="settings-heading"><strong id="settingsHeading">工作台设置</strong><button id="settingsClose" aria-label="关闭设置">×</button></div>
-      <label class="settings-row">字体缩放 <select id="settingFont"><option value="1">标准</option><option value="1.08">舒适</option><option value="1.16">放大</option></select></label>
-      <label class="settings-row">过渡动画 <input id="settingMotion" type="checkbox" checked></label>
-      <label class="settings-row">时间轴箭头朝向主线 <input id="settingArrows" type="checkbox" checked></label>
-      <div class="settings-heading secondary">当前月份上班规则</div>
-      <label class="settings-row">上午上班 <input id="settingAmStart" type="time"></label>
-      <label class="settings-row">上午下班 <input id="settingAmEnd" type="time"></label>
-      <label class="settings-row">下午上班 <input id="settingPmStart" type="time"></label>
-      <label class="settings-row">下午下班 <input id="settingPmEnd" type="time"></label>
-      <button class="settings-save" id="settingsApply">应用设置</button>
-    </section>
-  </div>
+  ${r14SettingsMarkup()}
   <input class="hidden" id="attendanceInput" type="file" accept=".xlsx,.csv">
   <input class="hidden" id="leaveInput" type="file" accept=".xlsx,.csv">
   <input class="hidden" id="tripInput" type="file" accept=".xlsx,.csv">
@@ -234,7 +222,7 @@ function renderMatrix(){
   for(const e of EMPLOYEES){
     const rowSelected=(state.selection.type==='person'||state.selection.type==='cell')&&state.selection.employeeId===e.id;
     const letters=Array.from(e.name).slice(0,4).map(ch=>`<span>${escapeNameChar(ch)}</span>`).join('');
-    html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span class="name-letters">${letters}</span></button>`;
+    html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span class="m-name-num">${String(EMPLOYEES.indexOf(e)+1).padStart(2,'0')}</span><span class="name-letters">${letters}</span></button>`;
     for(let d=1;d<=31;d++){
       if(d>monthDays()){html+='<div class="m-cell inactive"></div>';continue}
       const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
@@ -246,27 +234,35 @@ function renderMatrix(){
       </div>`;
     }
   }
-  if(state.selection.type==='person'||state.selection.type==='date'){
-    const sel=state.selection;
-    html+='<div class="matrix-selection-frame '+(sel.type==='person'?'focus-row':'focus-col')+'" style="'+
-      (sel.type==='person'
-        ?'--focus-row:'+EMPLOYEES.findIndex(e=>e.id===sel.employeeId)
-        :'--focus-col:'+(sel.day-1))+'"></div>';
-  }
+  const selectedRow=(state.selection.type==='person'||state.selection.type==='cell')
+    ?EMPLOYEES.findIndex(e=>e.id===state.selection.employeeId):-1;
+  const selectedCol=(state.selection.type==='date'||state.selection.type==='cell')
+    ?state.selection.day-1:-1;
+  html+='<div class="matrix-selection-frame focus-row '+(selectedRow<0?'inactive':'')+
+    ' '+(state.selection.type==='cell'?'soft':'')+'" style="--focus-row:'+Math.max(0,selectedRow)+'"></div>';
+  html+='<div class="matrix-selection-frame focus-col '+(selectedCol<0?'inactive':'')+
+    ' '+(state.selection.type==='cell'?'soft':'')+'" style="--focus-col:'+Math.max(0,selectedCol)+'"></div>';
+  html+='<div class="matrix-preview-frame focus-row inactive"></div><div class="matrix-preview-frame focus-col inactive"></div>';
   el.innerHTML=html;
   document.getElementById('matrixAll').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
   el.querySelectorAll('.m-name[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
   el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date));
   el.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.cell.split('|');selectCell(id,+d)});
+  const hoverRow=el.querySelector('.matrix-preview-frame.focus-row');
+  const hoverCol=el.querySelector('.matrix-preview-frame.focus-col');
+  const clearHover=()=>{hoverRow?.classList.add('inactive');hoverCol?.classList.add('inactive')};
   el.onpointerover=e=>{
-    const n=e.target.closest('[data-cell],[data-emp],[data-date]');if(!n)return;
-    const emp=n.dataset.emp||n.dataset.cell?.split('|')[0];
-    const day=n.dataset.day||n.dataset.date||n.dataset.cell?.split('|')[1];
-    el.querySelectorAll('.hover-row,.hover-col').forEach(x=>x.classList.remove('hover-row','hover-col'));
-    if(emp)el.querySelectorAll('[data-emp="'+emp+'"]').forEach(x=>x.classList.add('hover-row'));
-    if(day)el.querySelectorAll('[data-day="'+day+'"],.m-date[data-date="'+day+'"]').forEach(x=>x.classList.add('hover-col'));
+    const n=e.target.closest('[data-cell],.m-name[data-emp],.m-date[data-date]');if(!n){clearHover();return}
+    const id=n.dataset.cell?.split('|')[0]||n.dataset.emp||'';
+    const d=Number(n.dataset.date||n.dataset.cell?.split('|')[1]||0);
+    const ix=EMPLOYEES.findIndex(emp=>emp.id===id);
+    const enabled=state.prefs?.matrix?.crosshair!==false;
+    hoverRow.classList.toggle('inactive',!enabled||ix<0);
+    hoverCol.classList.toggle('inactive',!enabled||d<1||d>monthDays());
+    if(ix>=0)hoverRow.style.setProperty('--focus-row',ix);
+    if(d>=1)hoverCol.style.setProperty('--focus-col',d-1);
   };
-  el.onpointerleave=()=>el.querySelectorAll('.hover-row,.hover-col').forEach(x=>x.classList.remove('hover-row','hover-col'));
+  el.onpointerleave=clearHover;
 }
 
 function analysisContext(){
@@ -340,29 +336,3 @@ function monthChoicesHtml(year){
 
 function escapeNameChar(ch){return String(ch).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-function bindSettings(){
-  const overlay=document.getElementById('settingsOverlay');
-  const open=()=>{overlay.classList.remove('hidden');
-    document.getElementById('settingFont').value=String(state.prefs.fontScale);
-    document.getElementById('settingMotion').checked=state.prefs.motion;
-    document.getElementById('settingArrows').checked=state.prefs.arrowsTowardLine!==false;
-    for(const [k,id] of [['amStart','settingAmStart'],['amEnd','settingAmEnd'],['pmStart','settingPmStart'],['pmEnd','settingPmEnd']])
-      document.getElementById(id).value=RULES[k];
-  };
-  document.getElementById('settingsBtn').onclick=open;
-  document.getElementById('settingsClose').onclick=()=>overlay.classList.add('hidden');
-  overlay.onclick=e=>{if(e.target===overlay)overlay.classList.add('hidden')};
-  document.getElementById('settingsApply').onclick=()=>{
-    const values={};for(const [k,id] of [['amStart','settingAmStart'],['amEnd','settingAmEnd'],['pmStart','settingPmStart'],['pmEnd','settingPmEnd']])values[k]=document.getElementById(id).value;
-    if(Object.values(values).some(x=>!/^\d\d:\d\d$/.test(x))||
-      !(minutes(values.amStart)<minutes(values.amEnd)&&minutes(values.amEnd)<minutes(values.pmStart)&&minutes(values.pmStart)<minutes(values.pmEnd))){
-      toast('工作时间区间无效',true);return
-    }
-    Object.assign(RULES,values);
-    state.prefs.fontScale=Number(document.getElementById('settingFont').value);
-    state.prefs.motion=document.getElementById('settingMotion').checked;
-    state.prefs.arrowsTowardLine=document.getElementById('settingArrows').checked;
-    state.saved=false;rememberMonth();reanalyze();render();
-    toast('设置已应用，请保存工作空间');
-  };
-}
