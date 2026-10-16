@@ -7,6 +7,7 @@ import { presets } from "../src/plot/presets";
 import { buildLayout, buildTraces, resolveCanvasMm, mmToPx } from "../src/plot/renderSpec";
 import { PrecisionSvg, supportsPrecisionSvg } from "../src/plot/PrecisionSvg";
 import { LorentzFigure } from "../src/plot/LorentzFigure";
+import { LorentzInspector } from "../src/plot/LorentzInspector";
 import { encodeProject, decodeProject } from "../src/project/projectIO";
 
 for (const includeVisualQa of [false, true]) {
@@ -119,6 +120,47 @@ for (let n=0; n<gallery.length; n++) {
     assert.equal(intersect(boxes[i],boxes[j]),0,
       boxes[i].id+" overlaps "+boxes[j].id);
   }
+  // Callouts and legends must not mask the actual scientific data.
+  const x0=golden!.figureOverrides.xMin??.4;
+  const x1=golden!.figureOverrides.xMax??1.6;
+  const y0=golden!.figureOverrides.yMin??-3.9;
+  const y1=golden!.figureOverrides.yMax??7.8;
+  const plotW=(c.plotRight??1160)-(c.plotLeft??104);
+  const panelH=((c.plotBottom??932)-(c.plotTop??65)-c.panelGap)/2;
+  for(const box of boxes){
+    const columns=box.panel==="top"?ds.ys.slice(0,2):ds.ys.slice(2,3);
+    for(const column of columns){
+      for(let k=0;k<ds.x.values.length;k++){
+        const xx=ds.x.values[k],yy=column.values[k];
+        if(typeof xx!=="number"||typeof yy!=="number")continue;
+        const px=(c.plotLeft??104)+(xx-x0)/(x1-x0)*plotW;
+        const py=box.panel==="top"
+          ?(c.plotTop??65)+(y1-yy)/(y1-y0)*panelH
+          :bottomStart+(c.phaseMax-yy)/(c.phaseMax-c.phaseMin)*panelH;
+        assert.ok(!(px>=box.x-1&&px<=box.x+box.w+1&&py>=box.y-1&&py<=box.y+box.h+1),
+          box.id+" obscures actual "+column.id+" data at "+xx);
+      }
+    }
+  }
+  const inspector=renderToStaticMarkup(createElement(LorentzInspector,{
+    value:c,selectedId:"absorption",onSelect:()=>{},onChange:()=>{}
+  }));
+  assert.ok(inspector.includes("lorentz-group")&&inspector.includes("自动换行宽度"),
+    "Inspector must expose independent annotation width and grouped controls");
+  const markerFigure={...golden!,seriesOverrides:{
+    ...golden!.seriesOverrides,
+    "lorentz-real":{...golden!.seriesOverrides["lorentz-real"],
+      markerVisible:true,markerSymbol:"diamond" as const,markerMaxDisplayed:25,lineVisible:false}
+  }};
+  const markerMarkup=renderToStaticMarkup(createElement(LorentzFigure,{
+    figure:markerFigure,dataset:ds,width:Number(ll.width),height:Number(ll.height),
+    svgRef:createRef<SVGSVGElement>(),onSelectSeries:()=>{},
+    onSelectAnnotation:()=>{},onMoveAnnotation:()=>{},onAxisClick:()=>{},onLegendClick:()=>{}
+  }));
+  assert.ok(markerMarkup.includes('data-marker-series-id="lorentz-real"'),
+    "Editable marker settings must render in the SVG canvas");
+  assert.ok(!markerMarkup.includes('data-series-id="lorentz-real"'),
+    "lineVisible=false must hide only the line, not the markers");
   const longFigure={...golden!,lorentz:{...c,annotations:[{
     ...c.annotations[0],text:"A very long user-editable scientific note with symbols χ(ω), phase lag and multiple lines",
     maxWidth:155
