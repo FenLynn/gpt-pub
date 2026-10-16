@@ -251,7 +251,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     // Tick labels and the X title need separate line boxes. The old 1-line
     // estimate made "Wavelength (nm)" visibly collide with tick numbers.
     const ty = isX
-      ? Math.min(height-3, plot.bottom+labelShift+labelHeight*1.65+pad+titleHeight)
+      ? Math.min(height-3, plot.bottom+labelShift+labelHeight*1.42+pad+titleHeight)
       : (plot.top+plot.bottom)/2;
     const title = axis.title?.text;
     return <g key={"axis-"+side} onClick={onAxisClick}>
@@ -268,15 +268,28 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
   const legendItems = traces.filter(t=>t.showlegend!==false && t.name);
   const legend = layout.legend ?? {};
   const lfont = legend.font?.size ?? textSize*0.93;
-  const lh = lfont + 7;
+  const sampleLength = GOLDEN_STYLE.legend.sampleLengthPx;
+  const textGap = GOLDEN_STYLE.legend.textGapPx;
+  const padX = GOLDEN_STYLE.legend.paddingXPx;
+  const padY = GOLDEN_STYLE.legend.paddingYPx;
+  const lh = Math.max(lfont * 1.18, lfont + GOLDEN_STYLE.legend.rowGapPx);
   const cols = legend.orientation==="h" ? Math.max(1,Math.min(legendItems.length, figure.figureOverrides.legendColumns ?? legendItems.length)) : 1;
-  const itemWidth = Math.max(legend.itemwidth ?? 30, 40, ...legendItems.map(t=>plainSvgMathFallback(t.name).length*lfont*0.56+35));
-  const lw = cols * itemWidth;
-  const lhTotal = lh * Math.ceil(legendItems.length/cols);
+  const itemWidth = Math.max(
+    legend.itemwidth ?? sampleLength,
+    GOLDEN_STYLE.legend.minItemWidthPx,
+    ...legendItems.map(t=>plainSvgMathFallback(t.name).length*lfont*0.52+sampleLength+textGap)
+  );
+  const rows = Math.ceil(legendItems.length/cols);
+  const contentWidth = cols * itemWidth;
+  const contentHeight = lh * rows;
+  const boxWidth = contentWidth + padX * 2;
+  const boxHeight = contentHeight + padY * 2;
   const lx = plot.left+(legend.x??0.98)*(plot.right-plot.left);
   const ly = plot.bottom-(legend.y??0.985)*(plot.bottom-plot.top);
-  const lX = lx-(legend.xanchor==="right"?lw:legend.xanchor==="center"?lw/2:0);
-  const lY = ly-(legend.yanchor==="bottom"?lhTotal:legend.yanchor==="middle"?lhTotal/2:0);
+  const boxX = lx-(legend.xanchor==="right"?boxWidth:legend.xanchor==="center"?boxWidth/2:0);
+  const boxY = ly-(legend.yanchor==="bottom"?boxHeight:legend.yanchor==="middle"?boxHeight/2:0);
+  const lX = boxX + padX;
+  const lY = boxY + padY;
   const doMarkers = (tr:DataTrace)=> (tr.mode??"").includes("markers");
   const doLines = (tr:DataTrace)=> (tr.mode??"").includes("lines");
   return <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" width={width} height={height}
@@ -293,8 +306,8 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     {axisNodes(xAxis,"x",xDomain,xp)}
     {axisNodes(yAxis,"y",yDomain,yp)}
     {rightAxis && axisNodes(rightAxis,"y2",rDomain,rp)}
-    {figure.figureOverrides.frameStyle==="boxed" && xAxis.mirror && <path d={"M "+plot.left+" "+plot.top+" H "+plot.right} stroke={xAxis.linecolor??"#252c34"} strokeWidth={xAxis.linewidth??0.8}/>}
-    {figure.figureOverrides.frameStyle==="boxed" && yAxis.mirror && !rightAxis && <path d={"M "+plot.right+" "+plot.top+" V "+plot.bottom} stroke={yAxis.linecolor??"#252c34"} strokeWidth={yAxis.linewidth??0.8}/>} 
+    {figure.figureOverrides.frameStyle==="boxed" && xAxis.mirror && <path d={"M "+plot.left+" "+plot.top+" H "+plot.right} stroke={xAxis.linecolor??GOLDEN_STYLE.stroke.axisColor} strokeWidth={xAxis.linewidth??0.8}/>}
+    {figure.figureOverrides.frameStyle==="boxed" && yAxis.mirror && !rightAxis && <path d={"M "+plot.right+" "+plot.top+" V "+plot.bottom} stroke={yAxis.linecolor??GOLDEN_STYLE.stroke.axisColor} strokeWidth={yAxis.linewidth??0.8}/>} 
     <g clipPath={"url(#"+uid+")"}>
       {traces.map((tr,index)=>{
         const sid = tr.meta?.figureStudioSeriesId;
@@ -366,19 +379,19 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
         drag.current=null;
         event.currentTarget.removeAttribute("transform");
       }}>
-      {Number(legend.borderwidth??0)>0 && <rect x={lX-6} y={lY-4} width={lw+12} height={lhTotal+8}
+      {Number(legend.borderwidth??0)>0 && <rect x={boxX} y={boxY} width={boxWidth} height={boxHeight}
         rx="1.5" fill={legend.bgcolor??GOLDEN_STYLE.legend.background} stroke={legend.bordercolor??GOLDEN_STYLE.legend.borderColor} strokeWidth={legend.borderwidth}/>}
       {legendItems.map((tr,i)=>{
         const tx=lX+(i%cols)*itemWidth;
         const ty=lY+Math.floor(i/cols)*lh;
         return <g key={"legend-"+i}>
-          <path d={"M "+tx+" "+(ty+lh/2)+" h 18"} stroke={tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.line?.width??1.3}
+          <path d={"M "+tx+" "+(ty+lh/2)+" h "+sampleLength} stroke={tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.line?.width??1.3}
              strokeLinecap="round" strokeDasharray={DASH[tr.line?.dash??"solid"]}/>
-          {doMarkers(tr) && <g transform={"translate("+(tx+9)+","+(ty+lh/2)+")"} fill={tr.marker?.color??tr.line?.color??GOLDEN_STYLE.palette[0]}
+          {doMarkers(tr) && <g transform={"translate("+(tx+sampleLength/2)+","+(ty+lh/2)+")"} fill={tr.marker?.color??tr.line?.color??GOLDEN_STYLE.palette[0]}
              stroke={tr.marker?.line?.color??tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.marker?.line?.width??0.5}>
              {markerShape(tr.marker?.symbol,0,0,Math.min(tr.marker?.size??5,8))}
           </g>}
-          <SvgMathText text={tr.name} x={tx+24} y={ty+lh/2+lfont*0.34}
+          <SvgMathText text={tr.name} x={tx+sampleLength+textGap} y={ty+lh/2+lfont*0.34}
             fill={legend.font?.color??baseColor}
             fontFamily={legend.font?.family??baseFont}
             fontSize={lfont} textAnchor="start"/>

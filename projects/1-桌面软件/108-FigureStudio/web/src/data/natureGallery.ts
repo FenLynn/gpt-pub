@@ -65,8 +65,8 @@ export function createNatureGallery(
     gridVisible: true, axisLineWidthPt: 0.58,
     majorTickLengthPt: GOLDEN_STYLE.stroke.majorTickLengthPt,
     minorTickLengthPt: GOLDEN_STYLE.stroke.minorTickLengthPt, axisTitlePadPt: 3.1,
-    marginLeftMm: 13.5, marginRightMm: 5.5, marginTopMm: 5.5,
-    marginBottomMm: 12, legendFrame: true,
+    marginLeftMm: 12.5, marginRightMm: 4.5, marginTopMm: 4.5,
+    marginBottomMm: 10.5, legendFrame: true,
     legendBorderColor: GOLDEN_STYLE.legend.borderColor,
     legendBorderWidthPt: GOLDEN_STYLE.stroke.legendBorderPt,
     legendBackground: GOLDEN_STYLE.legend.background,
@@ -126,7 +126,7 @@ export function createNatureGallery(
       ["nature-decay-a","nature-decay-b"]),
     make(sheets.dualY, "N08 · Dual-axis performance", "double-y",
       { xTitle:"Pump current (A)",yTitle:"Output power (W)",rightYTitle:"Efficiency (%)",
-        marginRightMm:15,legendPosition:"top-left" },
+        marginRightMm:13.5,legendPosition:"top-left" },
       { "output-power":{color:blue,yAxis:"left",lineWidthPt:1.0},
         efficiency:{color:vermilion,yAxis:"right",lineWidthPt:1.0} },
       ["output-power","efficiency"]),
@@ -153,9 +153,10 @@ export function createNatureGallery(
     make(sheets.kinetics, "N14 · Double-column kinetic comparison", "xy-line",
       { figureWidthMm:183,figureHeightMm:72,
         xTitle:"Time (s)",yTitle:"Normalized response (a.u.)",
-        marginLeftMm:14,marginRightMm:8,marginBottomMm:12,legendPosition:"top-left" },
-      { "nature-kinetics-control":{color:blue,lineWidthPt:0.98},
-        "nature-kinetics-treatment":{color:vermilion,lineWidthPt:0.98,lineStyle:"dash"} },
+        fontSizePt:7.4,tickLabelSizePt:6.7,axisTitleSizePt:7.55,legendFontSizePt:6.75,
+        marginLeftMm:12.5,marginRightMm:5.5,marginTopMm:4.2,marginBottomMm:10.5,legendPosition:"top-left" },
+      { "nature-kinetics-control":{color:blue,lineWidthPt:1.08},
+        "nature-kinetics-treatment":{color:vermilion,lineWidthPt:1.08,lineStyle:"dash"} },
       ["nature-kinetics-control","nature-kinetics-treatment"])
   ];
 }

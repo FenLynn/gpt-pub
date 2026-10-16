@@ -33,15 +33,31 @@ export const GOLDEN_STYLE = {
     axisColor: "#39434b",
     tickStrokeColor: "#4d5359",
     gridColor: "#77818a",
-    gridRgba: "rgba(119,129,138,0.14)",
-    gridWidthPx: 0.45
+    gridRgba: "rgba(119,129,138,0.085)",
+    gridWidthPx: 0.42
   },
   legend: {
     background: "#ffffff",
-    backgroundOpacity: 0.95,
+    backgroundOpacity: 0.94,
     borderColor: "#d4d9dd",
-    sampleLengthPx: 31,
-    rowGapPx: 7
+    sampleLengthPx: 22,
+    textGapPx: 7,
+    paddingXPx: 7,
+    paddingYPx: 5,
+    rowGapPx: 4,
+    minItemWidthPx: 36
+  },
+  spacing: {
+    leftWithTitleMm: 12,
+    leftCompactMm: 6,
+    rightMm: 4,
+    doubleYRightMm: 10.5,
+    fieldRightMm: 8.2,
+    outsideLegendRightMm: 21,
+    topWithTitleMm: 7.2,
+    topCompactMm: 3.2,
+    bottomWithTitleMm: 9.2,
+    bottomCompactMm: 5.4
   },
   annotation: {
     background: "#ffffff",

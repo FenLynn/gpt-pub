@@ -1112,24 +1112,30 @@ export function buildLayout(args: {
       // These are minimum content-safe margins, not decorative whitespace.
       // automargin may only expand them when real tick/title content requires it.
       l: Math.round(
-        mmToPx(overrides.marginLeftMm ?? ((hasYTitle ? 10.8 : 6.5) * metrics.outerMarginScale))
+        mmToPx(overrides.marginLeftMm ?? ((hasYTitle
+          ? GOLDEN_STYLE.spacing.leftWithTitleMm
+          : GOLDEN_STYLE.spacing.leftCompactMm) * metrics.outerMarginScale))
       ),
       r: Math.round(
         mmToPx(overrides.marginRightMm ?? (
           outsideRightLegend
-            ? 22 * metrics.outerMarginScale
+            ? GOLDEN_STYLE.spacing.outsideLegendRightMm * metrics.outerMarginScale
             : isDoubleY
-            ? 10.8 * metrics.outerMarginScale
+            ? GOLDEN_STYLE.spacing.doubleYRightMm * metrics.outerMarginScale
             : isField2D || figure.templateId === "surface-3d"
-            ? 8.5 * metrics.outerMarginScale
-            : 4.2 * metrics.outerMarginScale
+            ? GOLDEN_STYLE.spacing.fieldRightMm * metrics.outerMarginScale
+            : GOLDEN_STYLE.spacing.rightMm * metrics.outerMarginScale
         ))
       ),
       t: Math.round(
-        mmToPx(overrides.marginTopMm ?? ((hasPlotTitle ? 8.0 : 3.8) * metrics.outerMarginScale))
+        mmToPx(overrides.marginTopMm ?? ((hasPlotTitle
+          ? GOLDEN_STYLE.spacing.topWithTitleMm
+          : GOLDEN_STYLE.spacing.topCompactMm) * metrics.outerMarginScale))
       ),
       b: Math.round(
-        mmToPx(overrides.marginBottomMm ?? ((hasXTitle ? 9.6 : 6.2) * metrics.outerMarginScale))
+        mmToPx(overrides.marginBottomMm ?? ((hasXTitle
+          ? GOLDEN_STYLE.spacing.bottomWithTitleMm
+          : GOLDEN_STYLE.spacing.bottomCompactMm) * metrics.outerMarginScale))
       ),
       pad: 0,
       autoexpand: true

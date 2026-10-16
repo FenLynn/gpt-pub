@@ -28,6 +28,10 @@ assert.equal(gallery[0].figureOverrides.fontFamily, "Times New Roman",
   "Nature gallery typography must match the Lorentz Golden family");
 assert.equal(gallery[0].figureOverrides.legendFrame, true,
   "Golden scientific legends should use the Lorentz light frame by default");
+assert.equal(GOLDEN_STYLE.stroke.gridRgba, "rgba(119,129,138,0.085)",
+  "General plot grids must stay as subtle as the Lorentz Golden reference");
+assert.ok((gallery[13].figureOverrides.fontSizePt ?? 0) > (gallery[0].figureOverrides.fontSizePt ?? 0),
+  "Double-column Golden samples need readable typography rather than a visually tiny single-column scale");
 
 for (let n=0; n<gallery.length; n++) {
   const figure = gallery[n];
@@ -82,6 +86,10 @@ for (let n=0; n<gallery.length; n++) {
     assert.ok(svg.startsWith("<svg"),figure.name+" did not render SVG");
     assert.ok(svg.includes('data-style-family="'+GOLDEN_STYLE.id+'"'),
       figure.name+" did not inherit FigureStudio Golden Style");
+    if ((layout as any).showlegend) {
+      assert.ok(svg.includes('rx="1.5"'),
+        figure.name+" Golden legend should use the compact framed geometry");
+    }
     assert.ok(svg.includes(plainSvgMathFallback(xTitle)) && svg.includes(plainSvgMathFallback(yTitle)),
       figure.name+" lost readable SVG axis labels");
     assert.ok(svg.includes('viewBox="0 0 '),figure.name+" missing exact SVG viewbox");
