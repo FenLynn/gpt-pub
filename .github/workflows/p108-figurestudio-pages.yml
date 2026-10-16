@@ -133,7 +133,9 @@ jobs:
           grep -q 'data-series-id="lorentz-real"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-series-id="lorentz-phase"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-testid="lorentz-inspector"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
-          echo "Lorentz Golden: normal FigureStudio Graph editor, worksheet-driven SVG, editable inspector OK"
+          grep -q '双面板 · 线图' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          grep -q 'Nature 双栏 · 183 mm' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          echo "Lorentz Golden: real two-panel Graph editor, Nature double-column, editable SVG inspector OK"
 
       - name: Upload browser screenshots
         if: always()
