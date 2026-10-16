@@ -99,10 +99,10 @@ async function run(){
   const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
   const dots=document.querySelectorAll('.r15-punch-dot').length;
   return tr[0]==='rules'&&tr[1]==='events'&&tr.indexOf('actual')>tr.indexOf('events')&&
-    dots===new Set(plotAnalysis(analysisContext()).punches.map(p=>minutes(p.time)+'|'+p.direction)).size&&!!document.getElementById('r15PunchPreview');
+    dots===new Set(plotAnalysis(analysisContext()).punches.map(p=>Math.floor(minutes(p.time))+'|'+p.direction)).size&&!!document.getElementById('r15PunchPreview');
  },'Music track order or punch-dot overview incorrect');
  await check(page,()=>{
-   const dup=[...state.analysis.values()].find(a=>a.punches.length>new Set(a.punches.map(p=>minutes(p.time)+'|'+p.direction)).size);
+   const dup=[...state.analysis.values()].find(a=>a.punches.length>new Set(a.punches.map(p=>Math.floor(minutes(p.time))+'|'+p.direction)).size);
    return !!dup&&r14TrackData(dup).events.length<dup.punches.length;
  },'Repeated punches are not clustered in the event model');
 
