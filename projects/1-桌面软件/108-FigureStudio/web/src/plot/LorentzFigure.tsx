@@ -88,8 +88,9 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     const data=series(id)?.values??[];
     const step=Math.max(1,Math.ceil(data.length/clamp(override?.markerMaxDisplayed??80,1,1601)));
     const markers=override?.markerVisible?data.flatMap((v,i)=>{
-      if(i%step!==0||!finite(v)||!finite(dataset.x.values[i])||dataset.x.values[i]!<xMin||dataset.x.values[i]!>xMax)return [];
-      const px=x(dataset.x.values[i] as number),py=y(v),rr=markerSize/2;
+      const xx=dataset.x.values[i];
+      if(i%step!==0||!finite(v)||!finite(xx)||xx<xMin||xx>xMax)return [];
+      const px=x(xx),py=y(v),rr=markerSize/2;
       const stroke=override?.markerEdgeColor??color(id);
       const fill=override?.markerHollow?"#fff":(override?.markerFillColor??color(id));
       const edge=(override?.markerEdgeWidthPt??.5)*1.5;
