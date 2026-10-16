@@ -150,8 +150,20 @@ for (let n=0; n<gallery.length; n++) {
     "3D scene needs publication-safe vertical breathing room");
   assert.deepEqual(surfaceLayout.scene?.camera?.eye,GOLDEN_STYLE.field.surfaceCameraEye,
     "3D Golden camera should remain stable across redraws");
-  assert.ok(surfaceLayout.scene?.xaxis?.title?.font?.size < surfaceLayout.font.size,
-    "3D axis titles need a compact scale to avoid clipping in a single-column figure");
+  assert.equal(surfaceLayout.scene?.xaxis?.title?.text,"",
+    "Native WebGL x-title must stay disabled to prevent scene clipping");
+  assert.equal(surfaceLayout.scene?.yaxis?.title?.text,"",
+    "Native WebGL y-title must stay disabled to prevent scene clipping");
+  assert.equal(surfaceLayout.scene?.zaxis?.title?.text,"",
+    "Native WebGL z-title must stay disabled to prevent scene clipping");
+  assert.equal(surfaceLayout.annotations?.length,3,
+    "3D Golden surface must use three publication-safe paper labels");
+  assert.equal(surfaceLayout.annotations?.[0]?.text,
+    surfaceGolden!.figureOverrides.xTitle,
+    "3D paper x-label must preserve the user's full title");
+  assert.equal(surfaceLayout.annotations?.[1]?.text,
+    surfaceGolden!.figureOverrides.yTitle,
+    "3D paper y-label must preserve the user's full title");
   assert.ok(surfaceLayout.scene?.xaxis?.tickfont?.size < surfaceLayout.font.size,
     "3D tick labels need a compact scale to preserve scene breathing room");
 

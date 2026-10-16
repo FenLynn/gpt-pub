@@ -432,7 +432,7 @@ export function buildTraces(args: {
           tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
           tickcolor: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor,
           len: GOLDEN_STYLE.field.colorbarLength3d,
-          x: 0.84,
+          x: 0.88,
           xanchor: "left",
           xpad: 4,
           tickfont: {
@@ -1255,14 +1255,7 @@ export function buildLayout(args: {
         y: [...GOLDEN_STYLE.field.surfaceDomainY]
       },
       xaxis: {
-        title: {
-          text: resolvedXTitle,
-          font: {
-            family: fontFamily,
-            size: sceneAxisTitleSizePx,
-            color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
-          }
-        },
+        title: { text: "" },
         showbackground: true,
         backgroundcolor: GOLDEN_STYLE.field.planeBackground,
         showline: true,
@@ -1281,14 +1274,7 @@ export function buildLayout(args: {
         }
       },
       yaxis: {
-        title: {
-          text: resolvedYTitle,
-          font: {
-            family: fontFamily,
-            size: sceneAxisTitleSizePx,
-            color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
-          }
-        },
+        title: { text: "" },
         showbackground: true,
         backgroundcolor: GOLDEN_STYLE.field.planeBackground,
         showline: true,
@@ -1307,14 +1293,7 @@ export function buildLayout(args: {
         }
       },
       zaxis: {
-        title: {
-          text: normalizePlotlyMathText(overrides.zTitle ?? "Z"),
-          font: {
-            family: fontFamily,
-            size: sceneAxisTitleSizePx,
-            color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
-          }
-        },
+        title: { text: "" },
         showbackground: true,
         backgroundcolor: GOLDEN_STYLE.field.planeBackground,
         showline: true,
@@ -1338,6 +1317,35 @@ export function buildLayout(args: {
       aspectmode: "manual",
       aspectratio: { ...GOLDEN_STYLE.field.surfaceAspect }
     };
+    const labelColor =
+      overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor;
+    const surfaceLabel = (
+      text: string,
+      spec: { x: number; y: number; angle: number }
+    ) => ({
+      text,
+      x: spec.x,
+      y: spec.y,
+      xref: "paper",
+      yref: "paper",
+      xanchor: "center",
+      yanchor: "middle",
+      showarrow: false,
+      textangle: spec.angle,
+      font: {
+        family: fontFamily,
+        size: sceneAxisTitleSizePx,
+        color: labelColor
+      }
+    });
+    layout.annotations = [
+      surfaceLabel(resolvedXTitle, GOLDEN_STYLE.field.surfaceLabels.x),
+      surfaceLabel(resolvedYTitle, GOLDEN_STYLE.field.surfaceLabels.y),
+      surfaceLabel(
+        normalizePlotlyMathText(overrides.zTitle ?? "Z"),
+        GOLDEN_STYLE.field.surfaceLabels.z
+      )
+    ];
     return layout;
   }
 
