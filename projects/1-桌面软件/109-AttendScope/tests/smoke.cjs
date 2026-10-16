@@ -19,7 +19,7 @@ async function run(){
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
  await page.goto(url,{waitUntil:'load',timeout:60000});
- await page.waitForSelector('#overviewTrendChart svg',{timeout:20000});
+ try{await page.waitForSelector('#overviewTrendChart svg',{timeout:20000})}catch(e){await page.screenshot({path:path.join(out,'r14-diagnostic.png')});console.error('R14_PAGE_ERRORS',JSON.stringify(errors));throw e}
  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
  const layout=await page.evaluate(()=>{
   const w=s=>document.querySelector(s).getBoundingClientRect().width;
@@ -48,7 +48,7 @@ async function run(){
   const frame=document.querySelector('.matrix-selection-frame.focus-row');
   return state.selection.type==='person'&&frame!==null&&
     !document.querySelector('.m-cell.row-focus').style.background&&
-    getComputedStyle(frame).borderTopColor.includes('139, 90, 226')&&
+    getComputedStyle(frame).borderTopColor.startsWith('rgb(130, 87, 217)')&&
     !!document.querySelector('.matrix-selection-frame.focus-col.inactive');
  },'Continuous violet row frame');
  await page.screenshot({path:path.join(out,'r14-iteration-row.png')});
