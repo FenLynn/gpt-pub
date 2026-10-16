@@ -25,16 +25,24 @@ function analysisOverviewHtml(ctx){
   }
 
   const issues=items.filter(x=>x.severity==='problem'||x.severity==='suspect').slice(0,8);
-  return `<div class="overview-rows">
-    ${overviewRow('当前范围',items.length+' 个单元')}
-    ${overviewRow('正常',st.normal)}
-    ${overviewRow('明确问题',st.problems)}
-    ${overviewRow('疑似异常',st.suspects)}
-    ${overviewRow('请假 / 出差',items.filter(x=>x.marker).length)}
-    ${overviewRow('平均确认在岗',fmtMinutes(avg(pres.map(x=>x.presence))))}
+  return `<div class="overview-grid">
+    <section class="overview-summary">
+      <div class="overview-section-title">考勤汇总</div>
+      <div class="overview-rows">
+        ${overviewRow('当前范围',items.length+' 个单元')}
+        ${overviewRow('正常',st.normal)}
+        ${overviewRow('明确问题',st.problems)}
+        ${overviewRow('疑似异常',st.suspects)}
+        ${overviewRow('请假 / 出差',items.filter(x=>x.marker).length)}
+        ${overviewRow('平均确认在岗',fmtMinutes(avg(pres.map(x=>x.presence))))}
+      </div>
+    </section>
+    <section class="overview-attention">
+      <div class="analysis-subhead"><span>需要关注</span><small>${issues.length?'点击直接定位':'当前没有异常'}</small></div>
+      ${issues.length?`<div class="compact-issue-list">${issues.map(a=>`<button data-analysis-cell="${a.employee.id}|${a.day}"><i class="${a.severity}"></i><span><b>${a.employee.name}</b><small>${pad(a.day)} 日 · ${a.status}</small></span><em>›</em></button>`).join('')}</div>`:'<div class="analysis-empty">没有需要处理的异常</div>'}
+    </section>
   </div>
-  <div class="analysis-subhead"><span>需要关注</span><small>${issues.length?'点击直接定位':'当前没有异常'}</small></div>
-  ${issues.length?`<div class="compact-issue-list">${issues.map(a=>`<button data-analysis-cell="${a.employee.id}|${a.day}"><i class="${a.severity}"></i><span><b>${a.employee.name}</b><small>${pad(a.day)} 日 · ${a.status}</small></span><em>›</em></button>`).join('')}</div>`:'<div class="analysis-empty">没有需要处理的异常</div>'}`;
+  ${ctx.type==='overall'?'<section class="overview-trend"><div class="chart-head"><strong>每日异常趋势</strong><small>点击日期查看当天</small></div><div id="overviewTrendChart" class="overview-trend-chart"></div></section>':''}`;
 }
 
 function overviewRow(label,value){
