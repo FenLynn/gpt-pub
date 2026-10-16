@@ -88,12 +88,55 @@ for (let n=0; n<gallery.length; n++) {
   assert.ok(markup.includes('data-annotation-id="resonance"'),"phase annotation missing");
   assert.ok(!markup.includes("NaN")&&!markup.includes("Infinity"),"invalid Lorentz SVG coordinates");
   assert.equal(golden!.lorentz!.annotations.length,6);
+  assert.equal(golden!.folderId,"folder-golden","Golden Graph should not inflate 14 Nature cases");
+  const readBox=(kind:"annotation-id"|"legend-panel",id:string)=>{
+    const match=markup.match(new RegExp('data-'+kind+'="'+id+'" data-box-x="([^"]+)" data-box-y="([^"]+)" data-box-width="([^"]+)" data-box-height="([^"]+)"'));
+    assert.ok(match,"Missing geometry for "+id);
+    return {x:Number(match[1]),y:Number(match[2]),w:Number(match[3]),h:Number(match[4])};
+  };
+  const boxes=[
+    ...golden!.lorentz!.annotations.map(a=>({...readBox("annotation-id",a.id),id:a.id,panel:a.panel})),
+    {...readBox("legend-panel","top"),id:"top legend",panel:"top" as const},
+    {...readBox("legend-panel","bottom"),id:"bottom legend",panel:"bottom" as const}
+  ];
+  const c=golden!.lorentz!;
+  const top=c.plotTop??65, bottom=c.plotBottom??932;
+  const topEnd=top+(bottom-top-c.panelGap)/2;
+  const bottomStart=topEnd+c.panelGap;
+  for(const box of boxes){
+    assert.ok(box.x>=c.plotLeft!-2&&box.x+box.w<=c.plotRight!+2,
+      box.id+" extends beyond horizontal plot area");
+    const minY=box.panel==="top"?top:bottomStart;
+    const maxY=box.panel==="top"?topEnd:bottom;
+    assert.ok(box.y>=minY-2&&box.y+box.h<=maxY+2,
+      box.id+" extends beyond its panel");
+  }
+  const intersect=(a:typeof boxes[number],b:typeof boxes[number])=>
+    Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*
+    Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+  for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
+    if(boxes[i].panel!==boxes[j].panel)continue;
+    assert.equal(intersect(boxes[i],boxes[j]),0,
+      boxes[i].id+" overlaps "+boxes[j].id);
+  }
+  const longFigure={...golden!,lorentz:{...c,annotations:[{
+    ...c.annotations[0],text:"A very long user-editable scientific note with symbols χ(ω), phase lag and multiple lines",
+    maxWidth:155
+  }]}};
+  const wrapped=renderToStaticMarkup(createElement(LorentzFigure,{
+    figure:longFigure,dataset:ds,width:Number(ll.width),height:Number(ll.height),
+    svgRef:createRef<SVGSVGElement>(),onSelectSeries:()=>{},
+    onSelectAnnotation:()=>{},onMoveAnnotation:()=>{},onAxisClick:()=>{},onLegendClick:()=>{}
+  }));
+  const wrapWidth=wrapped.match(/data-annotation-id="absorption" data-box-x="[^"]+" data-box-y="[^"]+" data-box-width="([^"]+)"/);
+  assert.ok(wrapWidth&&Number(wrapWidth[1])<=155,"Long annotations must wrap within user-defined width");
+
   assert.equal(golden!.figureOverrides.figureWidthMm,183);
   const roundTrip=decodeProject(encodeProject(project));
   const restored=roundTrip.figures.find(f=>f.id===golden!.id);
   assert.ok(restored?.lorentz,"Lorentz composition lost on .sfig roundtrip");
   assert.equal(restored.lorentz.annotations.length,6);
-  assert.equal(restored.lorentz.annotations[0].arrowX,635);
+  assert.equal(restored.lorentz.annotations[0].arrowX,632);
   assert.equal(restored.seriesOverrides["lorentz-phase"].color,"#674080");
 }
 console.log("Nature gallery smoke OK: 14 Nature figures + real editable Lorentz Graph, normal+QA");
