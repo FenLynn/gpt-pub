@@ -162,3 +162,4 @@ export function LorentzInspector({value,selectedId,onSelect,onChange}:Props){
       </div>
     </details>
   </section>;
+}
