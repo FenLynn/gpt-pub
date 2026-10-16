@@ -77,7 +77,7 @@ async function connectProjectDir(){
       }
       const active=project.current||{year:YEAR,month:MONTH};
       const key=active.year+'-'+pad(active.month);
-      if(state.monthStores.has(key))switchMonth(active.year,active.month);
+      if(state.monthStores.has(key))switchMonth(active.year,active.month,false,false);
     }
     await ensureProjectSkeleton();render();toast(project?'已连接并载入月度工作空间':'已创建项目目录');
   }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true)}
