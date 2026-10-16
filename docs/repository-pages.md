@@ -94,3 +94,11 @@ GitHub Pages 的 deploy-pages 每次部署整个站点。P108 与 P109 以前各
 - Canonical filter is rendered as a colored dropdown: regular = green/yellow/red judgments, while trip/leave/outing/overtime remain four independent behavior colors. Judgment and behavior dimensions are not merged.
 - Timeline keeps one broad 0:00–24:00 zoom control, scheduled rail above, punch rail in the middle, actual/behavior rails below. Overlapping punches are clustered per minute/direction and shown as grouped punch dots.
 - Raw grid keeps the employee column visible. Shared Pages must retain P108 and publish exact P109_SHA above. No Release.
+
+## 2026-10-17 P109 R17 unified violet selection language
+
+- P109 source SHA: `065f1555bc6aab7b387ec125100f9c7f40732e28`.
+- Offline Chromium CI: [#38930382047](https://github.com/FenLynn/gpt-pub/actions/runs/38930382047) SUCCESS.
+- Removed the nested violet borders on the selected employee/date anchors. Name/date now use a violet tint only; the row/column crosshair supplies the single outer violet outline.
+- The tint and outline deliberately use different violet strengths to preserve hierarchy without double framing. Existing single-cell float/glow, judgment/behavior palettes and timeline remain unchanged.
+- Shared Pages must preserve P108 and publish exact P109_SHA above.
