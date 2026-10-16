@@ -647,11 +647,42 @@ function mountStatsCharts(ctx){
   else mountCellStats(ctx);
 }
 
+function mountOverviewTrend(){
+  const el=document.getElementById('overviewTrendChart');
+  if(!el)return;
+  const chart=initAttendChart(el);
+  if(!chart)return;
+  const rows=Array.from({length:31},(_,i)=>{
+    const day=i+1;
+    const list=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${day}`));
+    return {day,problem:list.filter(a=>a.severity==='problem').length,suspect:list.filter(a=>a.severity==='suspect').length};
+  }).filter(x=>isWorkday(x.day));
+  chart.setOption({
+    grid:{left:30,right:15,top:12,bottom:26},
+    tooltip:{
+      trigger:'axis',confine:true,
+      axisPointer:{type:'line',lineStyle:{color:'#abc8d9',width:1}},
+      formatter:p=>{
+        const d=rows[p[0]?.dataIndex];return d?`${pad(d.day)} 日<br>明确异常 ${d.problem}<br>待核实 ${d.suspect}`:'';
+      }
+    },
+    legend:{show:false},
+    xAxis:{type:'category',boundaryGap:false,data:rows.map(x=>pad(x.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#dae5ec'}},axisLabel:{fontSize:9,color:'#9aa8b3',interval:2}},
+    yAxis:{type:'value',min:0,minInterval:1,axisTick:{show:false},axisLine:{show:false},axisLabel:{fontSize:9,color:'#9aa8b3'},splitLine:{lineStyle:{color:'rgba(199,215,225,.37)',type:'dashed'}}},
+    series:[
+      {name:'明确异常',type:'line',smooth:.34,symbol:'none',data:rows.map(x=>x.problem),lineStyle:{width:2,color:'#da8e8a'},areaStyle:{color:'rgba(218,142,138,.07)'},itemStyle:{color:'#da8e8a'}},
+      {name:'待核实',type:'line',smooth:.34,symbol:'none',data:rows.map(x=>x.suspect),lineStyle:{width:2,color:'#e5c477'},itemStyle:{color:'#e5c477'}}
+    ]
+  });
+  chart.on('click',p=>{const day=rows[p.dataIndex]?.day;if(day)selectDate(day)});
+}
+
 function mountAnalysisVisuals(ctx){
   if(!window.echarts)return;
   requestAnimationFrame(()=>{
     if(state.analysisTab==='timeline'&&ctx.type==='cell')mountAttendanceTimeline(ctx.analysis);
     if(state.analysisTab==='timeline'&&ctx.type==='date')mountDayTimeline(ctx);
     if(state.analysisTab==='stats')mountStatsCharts(ctx);
+    if(state.analysisTab==='overview'&&ctx.type==='overall')mountOverviewTrend();
   });
 }
