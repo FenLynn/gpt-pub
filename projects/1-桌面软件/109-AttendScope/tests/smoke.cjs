@@ -1,201 +1,139 @@
-/* P109 end-to-end browser smoke. Tests file:// (offline) and deployed HTTPS. */
+/* Offline browser acceptance: 20% widths, glow selection, plot+raw Tabulator. */
 'use strict';
-const fs=require('fs');
-const path=require('path');
-const {pathToFileURL}=require('url');
+const fs=require('fs'),path=require('path'),{pathToFileURL}=require('url');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-
-const root=path.resolve(__dirname,'..');
-const artifacts=path.join(process.cwd(),'p109-smoke-artifacts');
+const root=path.resolve(__dirname,'..'),artifacts=path.join(process.cwd(),'p109-smoke-artifacts');
 fs.mkdirSync(artifacts,{recursive:true});
 const mode=process.env.P109_URL?'pages':'offline';
 const url=process.env.P109_URL||pathToFileURL(path.join(root,'index.html')).href;
-const errors=[];
-const requests=[];
-
-async function inspect(browser){
+const errors=[],requests=[];
+const eq=(a,b,tol=1)=>Math.abs(a-b)<=tol;
+async function run(browser){
   const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1});
   const page=await context.newPage();
-  page.on('pageerror',err=>errors.push('PAGEERROR '+err.stack));
-  page.on('console',msg=>{if(msg.type()==='error')errors.push('CONSOLE '+msg.text())});
-  page.on('request',req=>{if(/^https?:/.test(req.url()))requests.push(req.url())});
-  page.on('requestfailed',req=>errors.push('REQUEST FAILED '+req.url()+' '+req.failure()?.errorText));
-
-  const response=await page.goto(url,{waitUntil:'load',timeout:45000});
-  await page.waitForSelector('#matrix button[data-cell]',{timeout:20000});
-  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
+  page.on('pageerror',e=>errors.push('PAGEERROR '+e.message));
+  page.on('console',m=>{if(m.type()==='error')errors.push('CONSOLE '+m.text())});
+  page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url())});
+  page.on('requestfailed',r=>errors.push('REQUEST FAILED '+r.url()));
+  await page.goto(url,{waitUntil:'load',timeout:45000});
+  await page.waitForSelector('#matrix [data-cell]',{timeout:20000});
+  await page.waitForSelector('#overviewTrendChart svg',{timeout:18000});
+  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:18000});
   const shell=await page.evaluate(()=>{
-    const rect=selector=>{const x=document.querySelector(selector);if(!x)return null;const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}};
-    const color=selector=>{const x=document.querySelector(selector);return x?getComputedStyle(x).backgroundColor:null};
-    const statuses=[...state.analysis.values()];
-    const overtime=statuses.find(a=>a.status==='非工作日出勤');
-    const overtimeSelector=overtime?`[data-cell="${overtime.employee.id}|${overtime.day}"]`:null;
+    const w=s=>document.querySelector(s)?.getBoundingClientRect().width||0;
+    const b=s=>document.querySelector(s)?.getBoundingClientRect();
     return {
-      topbar:rect('.topbar'),month:rect('#monthMenuButton'),matrix:rect('.matrix'),
-      matrixWrap:rect('.matrix-wrap'),analysis:rect('.analysis-panel'),
-      personHeader:rect('.m-name'),cell:rect('.m-cell button'),
-      monthInSidebar:!!document.querySelector('.sidebar #monthMenuButton'),
-      middleHeading:!!document.querySelector('.matrix-zone .section-head'),
-      normal:color('.s-normal'),suspect:color('.s-suspect'),problem:color('.s-problem'),
-      overtime:overtimeSelector?color(overtimeSelector):null,
-      nameLetters:document.querySelector('.m-name .name-letters')?.children.length
+      sidebar:w('.sidebar'),matrix:w('.matrix'),frame:w('.matrix-wrap'),
+      leftPlot:w('.inspector-plot'),rightData:w('.inspector-insight'),top:b('.inspector-top'),bottom:b('.inspector-bottom'),
+      plotSvg:!!document.querySelector('#overviewTrendChart svg'),lib:typeof Tabulator,
+      raw:rawTabulator?.getDataCount(),all:state.records.length,
+      dateFont:parseFloat(getComputedStyle(document.querySelector('.m-date b')).fontSize),
+      footer:document.querySelector('.matrix-footer'),count:document.querySelector('#rawRowCount')?.textContent,
+      holiday: getComputedStyle(document.querySelector('.m-cell.day-holiday')).backgroundColor,
+      work: getComputedStyle(document.querySelector('.m-cell.day-work')).backgroundColor
     };
   });
-  console.log('P109_UI_GEOMETRY '+JSON.stringify(shell));
-  if(shell.topbar.height>46)throw Error('Top toolbar is too tall '+shell.topbar.height);
-  if(!shell.monthInSidebar||shell.middleHeading)throw Error('Month selector / matrix heading placement regressed');
-  if(Math.abs(shell.personHeader.width-70)>1)throw Error('Name column regressed');
-  if(Math.abs(shell.cell.width-19)>1||Math.abs(shell.matrix.width-721)>1)throw Error('30% matrix enlargement regressed');
-  if(Math.abs(shell.matrixWrap.y-shell.analysis.y)>3)throw Error('Matrix and analysis panel not top-aligned');
-  if(!shell.overtime||shell.overtime===shell.normal)throw Error('Overtime not assigned distinct light blue');
-  if(shell.nameLetters!==3)throw Error('Three-character demo name does not use justified glyph layout');
-  await page.locator('#monthMenuButton').click();
-  if(!await page.locator('#monthPopover').evaluate(el=>el.classList.contains('open')))throw Error('Month selector does not open');
-  await page.locator('.month-choice.active').click();
-  if(await page.locator('#monthPopover').evaluate(el=>el.classList.contains('open')))throw Error('Month selector does not close');
-  await page.waitForTimeout(220);
-  await page.evaluate(()=>{document.querySelector('.sidebar').scrollLeft=0});
-  await page.screenshot({path:path.join(artifacts,mode+'-matrix.png'),fullPage:false});
+  console.log('P109_WORKBENCH_GEOMETRY '+JSON.stringify(shell));
+  if(!eq(shell.sidebar,212)||!eq(shell.matrix,866.5)||!eq(shell.frame,883))throw Error('20% widths missing');
+  if(!eq(shell.raw,shell.all)||shell.lib!=='function')throw Error('Actual raw table not mounted');
+  if(shell.footer||!shell.top||!shell.bottom)throw Error('Missing top/bottom split or footer remains');
+  if(shell.leftPlot/shell.rightData<2.2||shell.leftPlot/shell.rightData>3.6)throw Error('Upper 3:1 ratio regressed');
+  if(shell.holiday===shell.work)throw Error('Holiday shading indistinguishable');
+  if(shell.dateFont<11)throw Error('Date headers unreadable');
+  await page.screenshot({path:path.join(artifacts,mode+'-overview.png'),fullPage:false});
+  // Select entire employee row and confirm 31 luminous cells.
+  await page.locator('.m-name[data-emp="E001"]').click();
+  await page.waitForSelector('#overviewTrendChart svg');
+  const row=await page.evaluate(()=>({
+    state:state.selection.type, lit:document.querySelectorAll('.m-cell.row-focus').length,
+    header:document.querySelector('.m-name.selected')?.dataset.emp,
+    raw:rawTabulator?.getDataCount(),
+    expected:state.records.filter(r=>r.employeeId==='E001').length
+  }));
+  if(row.state!=='person'||row.lit!==31||row.header!=='E001'||row.raw!==row.expected)throw Error('Row highlight/raw filter broken '+JSON.stringify(row));
+  await page.screenshot({path:path.join(artifacts,mode+'-row-glow.png'),fullPage:false});
+  // Select entire day column; all 50 staff rows must glow.
+  await page.locator('.m-date[data-date="9"]').click();
+  await page.waitForSelector('#attendanceDayChart svg');
+  const col=await page.evaluate(()=>({
+    state:state.selection.type,lit:document.querySelectorAll('.m-cell.col-focus').length,
+    raw:rawTabulator?.getDataCount(),
+    expected:state.records.filter(r=>r.datetime.startsWith('2026-10-09')).length
+  }));
+  if(col.state!=='date'||col.lit!==50||col.raw!==col.expected)throw Error('Column selection/raw filter broken '+JSON.stringify(col));
+  await page.screenshot({path:path.join(artifacts,mode+'-column-glow.png'),fullPage:false});
+  // A person-day cell must light both axes and the intersection, without changing severity color.
   const chosen=await page.evaluate(()=>{
-    const item=[...state.analysis.values()].find(x=>x.punches.length>=4&&x.firstIn&&x.lastOut&&isWorkday(x.day));
-    return item?{id:item.employee.id,day:item.day,count:item.punches.length,status:item.status}:null;
+    const a=[...state.analysis.values()].find(x=>x.punches.length>=4&&x.firstIn&&x.lastOut&&isWorkday(x.day));
+    return a?{id:a.employee.id,day:a.day,count:a.punches.length}:null;
   });
-  if(!chosen)throw Error('No employee-day with 4 punch records available');
-
-  const cell=`[data-cell="${chosen.id}|${chosen.day}"]`;
-  await page.locator(cell).click();
-  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:12000});
-  await page.waitForTimeout(900);
-
-  const snapshot=await page.evaluate(()=>{
-    const element=document.getElementById('attendanceTimelineChart');
-    const inst=window.echarts?.getInstanceByDom(element);
-    const svg=element?.querySelector('svg');
-    const svgArrowPaths=[...(svg?.querySelectorAll('path[stroke]')||[])].filter(p=>['#126fba','#208ece','#d98950','#ca6f39'].includes(p.getAttribute('stroke'))&&/^M[0-9.-]+ [0-9.-]+L/.test(p.getAttribute('d')||''));
-    const shapes=inst?.getZr()?.storage?.getDisplayList()||[];
-    const display=shapes.map(el=>el.type);
-    const arrowShafts=shapes.filter(el=>el.type==='line'&&(el.style?.lineWidth||0)>=4.5&&Math.abs((el.shape?.y2||0)-(el.shape?.y1||0))>=35);
+  if(!chosen)throw Error('No example punch group');
+  const selector='[data-cell="'+chosen.id+'|'+chosen.day+'"]';
+  await page.locator(selector).click();
+  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:15000});
+  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
+  const cell=await page.evaluate(()=>{
+    const c=document.querySelector('.m-cell.cell-focus');
+    const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
+    const list=chart?.getZr().storage.getDisplayList()||[];
+    const shafts=list.filter(x=>x.type==='line'&&(x.style?.lineWidth||0)>=4.5&&Math.abs((x.shape?.y2||0)-(x.shape?.y1||0))>=35);
     return {
-      title:document.getElementById('analysisTitle')?.textContent,
-      echartsVersion:window.echarts?.version,
-      dimensions:element?{width:element.getBoundingClientRect().width,height:element.getBoundingClientRect().height}:null,
-      chartMounted:!!inst,
-      customSeries:inst?.getOption()?.series?.filter(s=>s.type==='custom').length||0,
-      dataZoom:inst?.getOption()?.dataZoom?.map(x=>x.type)||[],
-      svgChars:svg?.outerHTML?.length||0,
-      displayTypes:display.reduce((r,t)=>(r[t]=(r[t]||0)+1,r),{}),
-      arrowShafts:arrowShafts.length,
-      arrowOrientationCorrect:arrowShafts.every(line=>{
-        const col=(line.style.stroke||'').toLowerCase();
-        if(['#126fba','#208ece'].includes(col))return line.shape.y2<line.shape.y1;
-        if(['#ca6f39','#d98950'].includes(col))return line.shape.y2>line.shape.y1;
-        return true;
-      }),
-      svgArrowPaths:svgArrowPaths.length,
-      clippedArrowPaths:svgArrowPaths.filter(p=>p.hasAttribute('filter')).length,
-      shaftCoordinates:arrowShafts.map(s=>({x:s.shape.x1,y1:s.shape.y1,y2:s.shape.y2,color:s.style.stroke})),
-      range:state.timelineRange,
-      cellSize:document.querySelector('.m-cell button')?.getBoundingClientRect().width,
-      nameWidth:document.querySelector('.m-name')?.getBoundingClientRect().width,
-      matrixWidth:document.querySelector('.matrix')?.getBoundingClientRect().width
+      state:state.selection.type, row:document.querySelectorAll('.m-cell.row-focus').length,
+      col:document.querySelectorAll('.m-cell.col-focus').length,cell:document.querySelectorAll('.m-cell.cell-focus').length,
+      glow:getComputedStyle(c).boxShadow,raw:rawTabulator?.getDataCount(),
+      punches:state.analysis.get(state.selection.employeeId+'|'+state.selection.day).punches.length,
+      svg:document.querySelector('#attendanceTimelineChart svg')?.outerHTML.length,
+      zoom:chart?.getOption().dataZoom.map(z=>z.type),shafts:shafts.length,
+      directions:shafts.every(s=>(['#208ece','#126fba'].includes(String(s.style.stroke).toLowerCase())?s.shape.y2<s.shape.y1:
+        ['#d98950','#ca6f39'].includes(String(s.style.stroke).toLowerCase())?s.shape.y2>s.shape.y1:true))
     };
   });
-  await page.screenshot({path:path.join(artifacts,mode+'-timeline.png'),fullPage:false});
-  if(!await page.locator('.daily-facts .daily-fact').count())throw Error('Daily metrics not present');
-  const evidence=page.locator('.punch-chips [data-record]').first();
-  if(await evidence.count()){
-    await evidence.click();
-    if(!await page.locator('#timelineEvidence .evidence-main').count())throw Error('Raw evidence drilldown not shown');
-  }
-
-  fs.writeFileSync(path.join(artifacts,mode+'-timeline.svg'),await page.locator('#attendanceTimelineChart svg').evaluate(node=>node.outerHTML),'utf8');
-  console.log('P109_TIMELINE_SNAPSHOT '+JSON.stringify({chosen,...snapshot}));
-  if(!snapshot.chartMounted)throw Error('Timeline chart instance not mounted');
-  if(snapshot.customSeries<2)throw Error('Expected axis arrow AND punch arrow custom series');
-  if(!snapshot.dataZoom.includes('slider'))throw Error('Slider dataZoom missing');
-  if(snapshot.svgChars<2500)throw Error('Chart SVG empty or too small: '+snapshot.svgChars);
-  if(!snapshot.displayTypes.polygon)throw Error('No arrowhead polygons rendered');
-  if(snapshot.arrowShafts<chosen.count)throw Error('Some punch arrows are truncated or missing: '+snapshot.arrowShafts+' of '+chosen.count);
-  if(!snapshot.arrowOrientationCorrect)throw Error('IN must point up and OUT must point down');
-  if(snapshot.svgArrowPaths<chosen.count)throw Error('Some punch arrow shafts are absent from the actual SVG DOM');
-  if(snapshot.clippedArrowPaths>0)throw Error('Chrome-visible SVG arrow shafts carry broken filter: '+snapshot.clippedArrowPaths);
-  if(Math.abs(snapshot.cellSize-19)>1)throw Error('Cell size regressed');
-  if(Math.abs(snapshot.nameWidth-70)>1)throw Error('Name size regressed');
-  if(errors.length)throw Error('Browser errors: '+JSON.stringify(errors));
-
+  console.log('P109_CELL_GLOW '+JSON.stringify({chosen,...cell}));
+  if(cell.state!=='cell'||cell.row!==31||cell.col!==50||cell.cell!==1)throw Error('Cell cross glow broken');
+  if(!cell.glow.includes('rgba')||cell.raw!==cell.punches)throw Error('Cell focus styling/data broken');
+  if(cell.svg<2500||!cell.zoom?.includes('slider')||cell.shafts<chosen.count||!cell.directions)throw Error('Chart arrows or zoom broken');
+  await page.screenshot({path:path.join(artifacts,mode+'-cell-glow.png'),fullPage:false});
+  await page.locator('#rawDataTable .tabulator-row').first().click();
+  await page.waitForSelector('#timelineEvidence .evidence-main',{timeout:8000});
+  const first=await page.evaluate(()=>rawTabulator.getData('active').length);
+  if(first!==chosen.count)throw Error('Record drilldown filtered rows inaccurate');
+  await page.locator('[data-raw-tab="leave"]').click();
+  await page.waitForFunction(()=>state.rawDataTab==='leave'&&!!document.querySelector('#rawDataTable .tabulator'));
+  const leave=await page.evaluate(()=>({n:rawTabulator?.getDataCount(),expect:rawForContext(analysisContext()).length,columns:rawTabulator?.getColumns().map(c=>c.getField())}));
+  if(leave.n!==leave.expect||!leave.columns?.includes('date'))throw Error('Leave raw table failed '+JSON.stringify(leave));
+  await page.locator('[data-raw-tab="trip"]').click();
+  await page.waitForFunction(()=>state.rawDataTab==='trip'&&!!document.querySelector('#rawDataTable .tabulator'));
+  const trip=await page.evaluate(()=>({n:rawTabulator?.getDataCount(),expect:rawForContext(analysisContext()).length,columns:rawTabulator?.getColumns().map(c=>c.getField())}));
+  if(trip.n!==trip.expect||!trip.columns?.includes('startDate'))throw Error('Trip raw table failed '+JSON.stringify(trip));
+  await page.locator('[data-raw-tab="attendance"]').click();
+  await page.waitForSelector('#rawDataTable .tabulator-row');
   await page.evaluate(()=>{
-    const el=document.getElementById('attendanceTimelineChart');
-    const chart=echarts.getInstanceByDom(el);
+    const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
     chart.dispatchAction({type:'dataZoom',dataZoomId:'slider',startValue:490,endValue:740});
   });
   await page.waitForFunction(()=>state.timelineRange&&Math.abs(state.timelineRange.start-490)<8&&Math.abs(state.timelineRange.end-740)<8,undefined,{timeout:8000});
-  const range=await page.evaluate(()=>({...state.timelineRange}));
-  console.log('P109_ZOOM_OK '+JSON.stringify(range));
-
-  await page.locator('.m-date[data-date="9"]').click();
-  await page.waitForSelector('#attendanceDayChart svg',{timeout:12000});
-  await page.waitForTimeout(350);
-  console.log('P109_DAY_CHART_OK '+await page.locator('#attendanceDayChart svg').count());
-  await page.screenshot({path:path.join(artifacts,mode+'-day.png'),fullPage:false});
-
-  await page.locator('button[data-analysis-tab="stats"]').click();
-  await page.waitForSelector('#statsChartMain svg',{timeout:12000});
-  console.log('P109_STATS_CHART_OK '+await page.locator('#statsChartMain svg').count());
-
-  await page.locator('button[data-analysis-tab="overview"]').click();
-  await page.waitForSelector('.overview-rows');
-  // MATQ/DavBridge/LocalSub visual QA: every context renders meaningful
-  // content, and fixed 31-day geometry remains aligned at desktop sizes.
-  await page.locator('[data-emp="E001"]').click();
-  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
-  await page.waitForTimeout(800);
-  await page.screenshot({path:path.join(artifacts,mode+'-person.png'),fullPage:false});
-  await page.locator('.m-date[data-date="9"]').click();
-  await page.waitForSelector('#attendanceDayChart svg',{timeout:12000});
-  await page.locator('button[data-analysis-tab="overview"]').click();
-  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
-  await page.waitForTimeout(600);
-  await page.screenshot({path:path.join(artifacts,mode+'-date-overview.png'),fullPage:false});
-  await page.locator('#clearSelection').click();
-  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
-
-  for(const dimensions of [{width:1600,height:900},{width:1366,height:768}]){
-    await page.setViewportSize(dimensions);
-    await page.waitForTimeout(380);
-    const layout=await page.evaluate(()=>{
-      const bb=id=>{const r=document.querySelector(id).getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};
-      return {matrix:bb('.matrix-wrap'),analysis:bb('.analysis-panel'),topbar:bb('.topbar'),width:innerWidth,grid:bb('.matrix')};
+  for(const dim of [{width:1600,height:900},{width:1366,height:768}]){
+    await page.setViewportSize(dim);
+    await page.waitForTimeout(350);
+    const geo=await page.evaluate(()=>{
+      const b=s=>{const x=document.querySelector(s).getBoundingClientRect();return {x:x.x,y:x.y,w:x.width,right:x.right}};
+      return {sidebar:b('.sidebar'),matrix:b('.matrix-wrap'),plot:b('.inspector-plot'),insight:b('.inspector-insight'),bottom:b('.inspector-bottom'),scroller:document.querySelector('.workspace').scrollWidth,client:document.querySelector('.workspace').clientWidth};
     });
-    console.log('P109_DESKTOP_VIEWPORT '+JSON.stringify({dimensions,layout}));
-    if(Math.abs(layout.matrix.w-(dimensions.width<=1450?706:737))>2||Math.abs(layout.grid.w-(dimensions.width<=1450?690:721))>2)
-      throw Error('Matrix geometry changed at '+dimensions.width);
-    if(layout.analysis.x-layout.matrix.right<8||layout.analysis.right>dimensions.width+2)
-      throw Error('Analysis area overlaps or overflows viewport at '+dimensions.width);
-    if(layout.topbar.h>48)throw Error('Toolbar height regressed');
-    const font=await page.evaluate(()=>({
-      body:parseFloat(getComputedStyle(document.body).fontSize),
-      date:parseFloat(getComputedStyle(document.querySelector('.m-date b')).fontSize),
-      name:parseFloat(getComputedStyle(document.querySelector('.name-letters>span')).fontSize),
-      tab:parseFloat(getComputedStyle(document.querySelector('.analysis-tabs button')).fontSize)
-    }));
-    if(font.body<13||font.date<10||font.name<12||font.tab<13)throw Error('Legibility regression '+JSON.stringify(font));
-    await page.screenshot({path:path.join(artifacts,mode+'-'+dimensions.width+'-overview.png'),fullPage:false});
-    await page.locator(cell).click();
-    await page.waitForSelector('#attendanceTimelineChart svg',{timeout:12000});
-    await page.waitForTimeout(240);
-    await page.screenshot({path:path.join(artifacts,mode+'-'+dimensions.width+'-timeline.png'),fullPage:false});
-    await page.locator('#clearSelection').click();
+    const frame=dim.width<=1450?851:883,side=dim.width<=1450?202:212;
+    if(!eq(geo.matrix.w,frame)||!eq(geo.sidebar.w,side))throw Error('Responsive widths wrong '+JSON.stringify({dim,geo}));
+    if(geo.plot.right>geo.insight.x+2||geo.plot.x>=geo.insight.x)throw Error('Top areas overlap');
+    if(geo.bottom.y<=geo.plot.y)throw Error('Raw pane no longer below plot');
+    if(geo.scroller<=geo.client&&dim.width===1366)throw Error('Narrow viewport overflow must scroll, not crush panels');
+    await page.screenshot({path:path.join(artifacts,mode+'-'+dim.width+'-layout.png'),fullPage:false});
   }
-  if(mode==='offline'&&requests.some(x=>/^https?:/.test(x)))throw Error('Offline file page made HTTP(S) requests '+JSON.stringify(requests));
-  if(errors.length)throw Error('Browser errors: '+JSON.stringify(errors));
-  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({mode,url,chosen,requests:requests.length}));
+  if(mode==='offline'&&requests.length)throw Error('Offline page requested HTTP: '+JSON.stringify(requests));
+  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
+  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({mode,sha:'P109_20pct_tabulator',punches:chosen.count,errors:errors.length,requests:requests.length}));
   await context.close();
 }
-
 (async()=>{
-  const bin=process.env.CHROME_BIN;
-  const browser=await chromium.launch({headless:true,...(bin?{executablePath:bin}:{channel:'chrome'})});
-  try{await inspect(browser)}
-  catch(e){console.error('P109_BROWSER_SMOKE_FAIL',e.stack||String(e));console.error('BROWSER_ERRORS',JSON.stringify(errors));process.exitCode=1}
-  finally{await browser.close()}
-})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+ const bin=process.env.CHROME_BIN;
+ const browser=await chromium.launch({headless:true,...(bin?{executablePath:bin}:{channel:'chrome'})});
+ try{await run(browser)}catch(e){console.error('P109_BROWSER_SMOKE_FAIL',e.stack||String(e));console.error(JSON.stringify(errors));process.exitCode=1}
+ finally{await browser.close()}
+})().catch(e=>{console.error(e.stack||String(e));process.exitCode=1});

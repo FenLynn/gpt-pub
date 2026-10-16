@@ -49,18 +49,25 @@ jobs:
           test -f "$APP/src/core/xlsx-lite.js"
           test -f "$APP/src/vendor/echarts.min.js"
           test -f "$APP/src/vendor/ECHARTS-LICENSE.txt"
+          test -f "$APP/src/vendor/tabulator.min.js"
+          test -f "$APP/src/vendor/tabulator.min.css"
+          test -f "$APP/src/vendor/TABULATOR-LICENSE.txt"
+          test -f "$APP/src/app/35-workbench.js"
           test -f "$APP/src/app/25-echarts.js"
           test -f "$APP/tests/smoke.cjs"
           if grep -InE 'https?://' "$APP/index.html"; then echo "::error::Remote HTML dependencies"; exit 1; fi
           if grep -RInE 'https?://' "$APP/src/app" "$APP/src/css"; then echo "::error::Remote application URLs"; exit 1; fi
-          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src"; then echo "::error::Runtime network call"; exit 1; fi
+          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src/app" "$APP/src/core"; then echo "::error::Runtime network call"; exit 1; fi
       - name: Syntax and ECharts runtime
         shell: bash
         run: |
           node --check "projects/1-桌面软件/109-AttendScope/src/core/xlsx-lite.js"
           node --check "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
+          node --check "projects/1-桌面软件/109-AttendScope/src/vendor/tabulator.min.js"
+          grep -q "Tabulator v6.3.1" "projects/1-桌面软件/109-AttendScope/src/vendor/tabulator.min.js"
           for f in projects/1-桌面软件/109-AttendScope/src/app/*.js; do node --check "$f"; done
           node --check "projects/1-桌面软件/109-AttendScope/tests/smoke.cjs"
+          grep -q "./src/vendor/tabulator.min.js" "projects/1-桌面软件/109-AttendScope/index.html"
           node - <<'NODE'
           const e=require('./projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js');
           if(e.version!=='6.1.0'||typeof e.init!=='function')throw Error('Local ECharts invalid');

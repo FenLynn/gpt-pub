@@ -715,12 +715,9 @@ function mountFocusedOverviewChart(ctx){
 function mountAnalysisVisuals(ctx){
   if(!window.echarts)return;
   requestAnimationFrame(()=>{
-    if(state.analysisTab==='timeline'&&ctx.type==='cell')mountAttendanceTimeline(ctx.analysis);
-    if(state.analysisTab==='timeline'&&ctx.type==='date')mountDayTimeline(ctx);
-    if(state.analysisTab==='stats')mountStatsCharts(ctx);
-    if(state.analysisTab==='overview'){
-      if(ctx.type==='overall')mountOverviewTrend();
-      else if(ctx.type==='person'||ctx.type==='date')mountFocusedOverviewChart(ctx);
-    }
+    if(ctx.type==='cell')mountAttendanceTimeline(ctx.analysis);
+    else if(ctx.type==='date')mountDayTimeline(ctx);
+    else if(ctx.type==='overall')mountOverviewTrend();
+    else mountFocusedOverviewChart(ctx);
   });
 }

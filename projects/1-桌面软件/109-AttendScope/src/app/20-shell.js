@@ -90,15 +90,6 @@ function layoutHtml(){
       <div class="workbench">
         <section class="matrix-zone" aria-label="50人员工31天月度考勤状态矩阵">
           <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
-          <div class="matrix-footer">
-            <span class="matrix-footnote">50 人 <i>·</i> 31 天 <span id="filterNote"></span></span>
-            <div class="matrix-legend">
-              <span><i class="normal"></i>正常</span>
-              <span><i class="suspect"></i>待核实</span>
-              <span><i class="problem"></i>异常</span>
-              <span><i class="overtime"></i>加班</span>
-            </div>
-          </div>
         </section>
 
         <section class="analysis-panel">
@@ -109,13 +100,6 @@ function layoutHtml(){
             </div>
             <div class="selection-status" id="selectionStatus"></div>
           </div>
-
-          <nav class="analysis-tabs">
-            <button data-analysis-tab="overview">概览</button>
-            <button data-analysis-tab="timeline">时间轴</button>
-            <button data-analysis-tab="stats">统计</button>
-            <button data-analysis-tab="records">记录</button>
-          </nav>
 
           <div class="analysis-body" id="analysisBody"></div>
         </section>
@@ -139,7 +123,6 @@ function bind(){
   document.getElementById('tripInput').onchange=e=>handleFile(e,importTrips);
 
   document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;render()});
-  document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.onclick=()=>{state.analysisTab=b.dataset.analysisTab;renderAnalysisPanel()});
 
   document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};state.analysisTab='overview';render()};
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
@@ -220,13 +203,13 @@ function renderMatrix(){
   for(const e of EMPLOYEES){
     const rowSelected=(state.selection.type==='person'||state.selection.type==='cell')&&state.selection.employeeId===e.id;
     const letters=Array.from(e.name).slice(0,4).map(ch=>`<span>${escapeNameChar(ch)}</span>`).join('');
-    html+=`<button class="m-name ${rowSelected?'selected':''}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span class="name-letters">${letters}</span></button>`;
+    html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span class="name-letters">${letters}</span></button>`;
     for(let d=1;d<=31;d++){
       const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
       const selected=state.selection.type==='cell'&&state.selection.employeeId===e.id&&state.selection.day===d;
       const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
       const cls=a.status==='非工作日出勤'?'s-overtime':a.severity==='problem'?'s-problem':a.severity==='suspect'?'s-suspect':a.severity==='rest'?'s-rest':'s-normal';
-      html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''}">
+      html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''} ${selected?'cell-focus':''} ${Number(e.id.slice(1))%2?'':'row-alt'} day-${dayType(d)}" data-emp="${e.id}" data-day="${d}">
         <button class="${cls} ${selected?'selected':''}" style="opacity:${visible?1:.10}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n${a.status}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${a.marker?`<i class="corner-mark ${a.marker}"></i>`:''}</button>
       </div>`;
     }
@@ -235,8 +218,15 @@ function renderMatrix(){
   el.querySelectorAll('[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
   el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date));
   el.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.cell.split('|');selectCell(id,+d)});
-  const note=document.getElementById('filterNote');
-  if(note)note.textContent=state.filter==='all'?'':({problem:'明确问题',suspect:'疑似异常',excused:'请假 / 出差',unresolved:'待核实',overtime:'非工作日出勤'}[state.filter]||'已筛选');
+  el.onpointerover=e=>{
+    const n=e.target.closest('[data-cell],[data-emp],[data-date]');if(!n)return;
+    const emp=n.dataset.emp||n.dataset.cell?.split('|')[0];
+    const day=n.dataset.day||n.dataset.date||n.dataset.cell?.split('|')[1];
+    el.querySelectorAll('.hover-row,.hover-col').forEach(x=>x.classList.remove('hover-row','hover-col'));
+    if(emp)el.querySelectorAll('[data-emp="'+emp+'"]').forEach(x=>x.classList.add('hover-row'));
+    if(day)el.querySelectorAll('[data-day="'+day+'"],.m-date[data-date="'+day+'"]').forEach(x=>x.classList.add('hover-col'));
+  };
+  el.onpointerleave=()=>el.querySelectorAll('.hover-row,.hover-col').forEach(x=>x.classList.remove('hover-row','hover-col'));
 }
 
 function analysisContext(){
@@ -262,15 +252,11 @@ function renderAnalysisPanel(){
   document.getElementById('analysisTitle').textContent=ctx.title;
   document.getElementById('analysisEyebrow').textContent=ctx.eyebrow;
   document.getElementById('selectionStatus').innerHTML=analysisSelectionBadge(ctx);
-  document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.classList.toggle('active',b.dataset.analysisTab===state.analysisTab));
-
-  if(state.analysisTab==='timeline') body.innerHTML=analysisTimelineHtml(ctx);
-  else if(state.analysisTab==='stats') body.innerHTML=analysisStatsHtml(ctx);
-  else if(state.analysisTab==='records') body.innerHTML=analysisRecordsHtml(ctx);
-  else body.innerHTML=analysisOverviewHtml(ctx);
-
+  if(typeof disposeRawTable==='function')disposeRawTable();
+  body.innerHTML=attendWorkbenchHtml(ctx);
   bindAnalysisPanel(ctx);
-  if(typeof mountAnalysisVisuals==='function')mountAnalysisVisuals(ctx);
+  mountAnalysisVisuals(ctx);
+  mountRawTable(ctx);
 }
 
 function analysisSelectionBadge(ctx){
@@ -282,10 +268,9 @@ function analysisSelectionBadge(ctx){
 }
 
 function bindAnalysisPanel(ctx){
-  document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.onclick=()=>{state.analysisTab=b.dataset.analysisTab;renderAnalysisPanel()});
   document.querySelectorAll('[data-analysis-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.analysisCell.split('|');if(id&&d)selectCell(id,+d)});document.querySelectorAll('[data-analysis-day]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.analysisDay));
   document.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>showRecord(b.dataset.record));
-  document.querySelectorAll('[data-show-records]').forEach(b=>b.onclick=()=>{state.analysisTab='records';renderAnalysisPanel()});
+  document.querySelectorAll('[data-show-records]').forEach(b=>b.onclick=()=>{state.rawDataTab='attendance';renderRawTable(ctx)});
   document.querySelectorAll('[data-dayrecord]').forEach(b=>b.onclick=()=>showRecord(b.dataset.dayrecord));
   document.querySelectorAll('[data-revise]').forEach(b=>b.onclick=()=>reviseCurrent(b.dataset.revise));
 }

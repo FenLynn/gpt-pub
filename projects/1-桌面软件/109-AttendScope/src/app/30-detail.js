@@ -364,7 +364,7 @@ function showRecord(id){
   const box=document.getElementById('timelineEvidence'); if(!box)return;
   box.classList.remove('record-enter');
   box.innerHTML=`<div class="evidence-main"><span class="evidence-direction ${p.direction==='进'?'in':'out'}">${p.direction}</span><strong>${p.time}</strong><small>${p.name}</small></div>
-    <div class="evidence-source"><span>${p.source}</span><small>${p.sheet||'—'} · 行 ${p.row||'—'} · ${p.recordId}</small></div>`;
+    <div class="evidence-source"><span>${escapeNameText(p.source)}</span><small>${escapeNameText(p.sheet||'—')} · 行 ${p.row||'—'} · ${escapeNameText(p.recordId)}</small></div>`;
   requestAnimationFrame(()=>box.classList.add('record-enter'));
 }
 
