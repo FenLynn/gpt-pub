@@ -8,10 +8,11 @@ const AS_CHART_COLORS={
   out:'#d98950',
   first:'#126fba',
   last:'#ca6f39',
-  normal:'#85cca3',
-  suspect:'#e8c777',
-  problem:'#e39792',
-  excused:'#b1d9ee',
+  normal:'#78caa0',
+  suspect:'#e6c36f',
+  problem:'#e6c36f',
+  absent:'#e58f90',
+  excused:'#5eaddc',
   accent:'#2288d8',
   area:'rgba(80,151,198,.10)'
 };
@@ -85,7 +86,7 @@ function minuteText(v){
 
 function timelineRange(a){
   const key=`${a.employee.id}|${a.day}`;
-  if(!state.timelineRange||state.timelineRange.key!==key)state.timelineRange={key,start:480,end:1080};
+  if(!state.timelineRange||state.timelineRange.key!==key)state.timelineRange={key,start:360,end:1320};
   return state.timelineRange;
 }
 
@@ -452,7 +453,7 @@ function mountOverallStats(ctx){
         emphasis:{focus:'series'}
       }]
     });
-    main.on('click',p=>{const d=+p.name;if(d)selectDate(d)});
+    main.on('click',p=>{const d=+p.name;if(d)selectDate(d,true)});
   }
   if(sub){
     const rows=EMPLOYEES.map(e=>({
@@ -532,10 +533,9 @@ function mountCellStats(ctx){
 
 function mountStatusBarChart(chart,items){
   const rows=[
-    ['正常',items.filter(x=>x.severity==='normal').length,AS_CHART_COLORS.normal],
-    ['疑似',items.filter(x=>x.severity==='suspect').length,AS_CHART_COLORS.suspect],
-    ['问题',items.filter(x=>x.severity==='problem').length,AS_CHART_COLORS.problem],
-    ['请假/出差',items.filter(x=>x.marker).length,AS_CHART_COLORS.excused]
+    ['正常',items.filter(x=>attendanceJudgment(x)==='normal').length,ATTEND_STATUS_COLORS.normal],
+    ['异常',items.filter(x=>attendanceJudgment(x)==='anomaly').length,ATTEND_STATUS_COLORS.anomaly],
+    ['缺勤',items.filter(x=>attendanceJudgment(x)==='absent').length,ATTEND_STATUS_COLORS.absent]
   ].filter(x=>x[1]>0).reverse();
   chart.setOption({
     grid:{left:66,right:22,top:8,bottom:12},
@@ -679,7 +679,7 @@ function mountOverviewTrend(){
       {name:'待核实',type:'line',smooth:false,symbol:'none',data:rows.map(x=>x.suspect),lineStyle:{width:2,color:'#e5c477'},itemStyle:{color:'#e5c477'}}
     ]
   });
-  chart.on('click',p=>{const day=rows[p.dataIndex]?.day;if(day)selectDate(day)});
+  chart.on('click',p=>{const day=rows[p.dataIndex]?.day;if(day)selectDate(day,true)});
 }
 
 function mountFocusedOverviewChart(ctx){
@@ -690,10 +690,9 @@ function mountFocusedOverviewChart(ctx){
   if(ctx.type==='date'){
     const items=ctx.items;
     const rows=[
-      {name:'正常',value:items.filter(a=>a.severity==='normal').length,color:'#85cca3'},
-      {name:'待核实',value:items.filter(a=>a.severity==='suspect').length,color:'#e8c777'},
-      {name:'明确异常',value:items.filter(a=>a.severity==='problem').length,color:'#e39792'},
-      {name:'非工作日加班',value:items.filter(a=>a.status==='非工作日出勤').length,color:'#b1d9ee'}
+      {name:'正常',value:items.filter(a=>attendanceJudgment(a)==='normal').length,color:ATTEND_STATUS_COLORS.normal},
+      {name:'异常',value:items.filter(a=>attendanceJudgment(a)==='anomaly').length,color:ATTEND_STATUS_COLORS.anomaly},
+      {name:'缺勤',value:items.filter(a=>attendanceJudgment(a)==='absent').length,color:ATTEND_STATUS_COLORS.absent}
     ].reverse();
     chart.setOption({
       grid:{left:103,right:36,top:14,bottom:10},
@@ -713,7 +712,7 @@ function mountFocusedOverviewChart(ctx){
     yAxis:{type:'value',min:0,axisTick:{show:false},axisLine:{show:false},axisLabel:{color:'#879bad',fontSize:10,formatter:v=>v+'h'},splitLine:{lineStyle:{color:'rgba(175,198,214,.40)',type:'dashed'}}},
     series:[{type:'line',smooth:false,showSymbol:true,symbolSize:8,
       data:days.map(a=>({value:a.status==='未导入'?null:+(a.presence/60).toFixed(2),
-        itemStyle:{color:({normal:'#70c99b',absent:'#e3c06d',anomaly:'#e58d8c',overtime:'#79b9dc',leave:'#e6a67d',trip:'#69bcb4',outing:'#e0a458'})[attendanceCategory(a)]||'#bac7ce',borderColor:'#fff',borderWidth:1.5}})),
+        itemStyle:{color:categoryColor(attendanceJudgment(a)),borderColor:'#fff',borderWidth:1.5}})),
       lineStyle:{width:2.5,color:'#4f9bdb'},itemStyle:{color:'#4f9bdb'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(32,139,222,.20)'},{offset:1,color:'rgba(32,139,222,.015)'}])}}]
   });
   chart.on('click',ev=>{const a=days[ev.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});

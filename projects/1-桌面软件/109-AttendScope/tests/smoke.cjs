@@ -39,9 +39,19 @@ async function run(){
  if(countBefore<25)throw Error('Default main status filter not active');
  await page.locator('#statusFilter').selectOption('trip');
  await check(page,()=>state.filter==='trip'&&document.querySelectorAll('.m-cell button:not(.filtered-out).s-trip').length>0,'Trip filter missing');
- await page.locator('#statusFilter').selectOption('all');
- await check(page,()=>document.querySelectorAll('.m-cell button.filtered-out').length===0,'All should show all cells');
+ await check(page,()=>{
+   const statuses=['normal','anomaly','absent'];
+   return statuses.every(kind=>[...state.analysis.values()].some(a=>attendanceJudgment(a)===kind))&&
+     [...state.analysis.values()].some(a=>attendanceBehaviors(a).includes('trip')&&attendanceJudgment(a)!=='trip');
+ },'Judgment and behavior are not independent');
+ for(const status of ['normal','anomaly','absent']) {
+   await page.locator('#statusFilter').selectOption(status);
+   await check(page,()=>state.filter!=='all'&&document.querySelectorAll('.m-cell button:not(.filtered-out).s-'+state.filter).length>0,'Judgment filter failed');
+ }
  await page.locator('#statusFilter').selectOption('main');
+ await check(page,()=>[...document.querySelectorAll('.m-cell button:not(.filtered-out)')].every(b=>['s-normal','s-anomaly','s-absent'].some(c=>b.classList.contains(c))),'Default surface mixes behaviors');
+ await check(page,()=>categoryColor('anomaly')==='#e6c36f'&&categoryColor('absent')==='#e58f90'&&
+   categoryColor('normal')==='#78caa0'&&new Set(Object.values(ATTEND_BEHAVIOR_COLORS)).size===4,'Judgment or behavior palette not canonical');
  // Row focus is a single violet outline, no colored row fill.
  await page.locator('.m-name[data-emp="E001"]').click();
  await check(page,()=>{
@@ -52,6 +62,20 @@ async function run(){
     !!document.querySelector('.matrix-selection-frame.focus-col.inactive');
  },'Continuous violet row frame');
  await page.screenshot({path:path.join(out,'r14-iteration-row.png')});
+ await check(page,()=>{
+  const name=document.querySelector('.m-name.selected');
+  const c=getComputedStyle(name);
+  return c.borderLeftStyle==='solid'&&c.borderLeftWidth!=='0px'&&c.borderLeftColor.includes('130, 87, 217')&&
+   parseInt(getComputedStyle(name.querySelector('.name-letters span')).fontWeight)<600;
+ },'Name cell violet border or normal name weight missing');
+ await page.locator('.m-date[data-date="10"]').click();
+ await check(page,()=>state.selection.type==='date'&&state.selection.day===10&&
+   !document.querySelector('.matrix-selection-frame.focus-col').classList.contains('inactive'),
+   'Clicking top date must select all employees');
+ await page.locator('.m-name[data-emp="E001"]').click();
+ await check(page,()=>state.selection.type==='person'&&state.selection.employeeId==='E001',
+  'Clicking name must always select whole person month');
+
  // Blue hover frames preview both axes, independent of purple selection.
  await page.locator('.m-cell[data-emp="E003"][data-day="14"] button').hover();
  await check(page,()=>{
@@ -71,6 +95,13 @@ async function run(){
    getComputedStyle(document.querySelector('.m-cell.cell-focus .selected')).boxShadow.includes('135, 89, 219'),
  'Person/calendar cell focus not lifted');
  await page.screenshot({path:path.join(out,'r14-iteration-timeline.png')});
+ await check(page,()=>{
+  const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
+  const dots=document.querySelectorAll('.r15-punch-dot').length;
+  return tr[0]==='rules'&&tr[1]==='events'&&tr.indexOf('actual')>tr.indexOf('events')&&
+    dots===plotAnalysis(analysisContext()).punches.length&&!!document.getElementById('r15PunchPreview');
+ },'Music track order or punch-dot overview incorrect');
+
  await check(page,()=>{
   const ctx=analysisContext(),a=plotAnalysis(ctx),data=r14TrackData(a);
   const frames=document.querySelectorAll('.matrix-selection-frame:not(.inactive)');
@@ -104,7 +135,11 @@ async function run(){
    await check(page,()=>!!rawTabulator&&rawTabulator.options.pagination===false&&!document.getElementById('rawPrev'),
      'Raw table still paginates');
  }
- await page.locator('#rawFloat').click();
+ await page.locator('.m-name[data-emp="E001"]').click();
+ await page.waitForSelector('#rawDataTable.tabulator');
+ await check(page,()=>rawTabulator.getColumns().some(c=>c.getField()==='name'&&c.isVisible()),
+   'Employee name must remain visible in single person raw grid');
+  await page.locator('#rawFloat').click();
  await page.waitForSelector('#rawDialogOverlay .raw-dialog');
  const r0=await page.locator('.raw-dialog').boundingBox();
  await page.mouse.move(r0.x+135,r0.y+16);await page.mouse.down();
@@ -120,6 +155,14 @@ async function run(){
  await page.locator('.m-date[data-date="10"]').click();
  await check(page,()=>state.selection.type==='date'&&!!document.querySelector('.matrix-selection-frame.focus-col'),'Column outline');
  await page.screenshot({path:path.join(out,'r14-iteration-column.png')});
+ await page.locator('.m-cell[data-emp="E001"][data-day="3"] button').click();
+ await check(page,()=>{
+   const cell=document.querySelector('.m-cell.cell-focus button.selected');
+   return state.selection.type==='cell'&&state.selection.day===3&&
+     getComputedStyle(cell).boxShadow.includes('132, 86, 214')&&
+     getComputedStyle(cell).opacity==='1';
+ },'Non-working day cell must still float and glow violet');
+
  // Full settings center and five configurable columns.
  await page.locator('#settingsBtn').click();
  await page.waitForSelector('.r14-settings-nav button');

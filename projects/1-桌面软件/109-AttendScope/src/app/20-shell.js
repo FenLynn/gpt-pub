@@ -202,6 +202,7 @@ function matrixVisible(a){
     ?['normal','absent','anomaly'].includes(category):category===state.filter);
 }
 function updateMatrixFilter(){
+  document.getElementById('matrix')?.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
   document.querySelectorAll('.m-cell button[data-cell]').forEach(button=>{
     const [id,d]=button.dataset.cell.split('|'),a=state.analysis.get(id+'|'+d);
     button.classList.toggle('filtered-out',!matrixVisible(a));
@@ -244,6 +245,7 @@ function renderMatrix(){
     ' '+(state.selection.type==='cell'?'soft':'')+'" style="--focus-col:'+Math.max(0,selectedCol)+'"></div>';
   html+='<div class="matrix-preview-frame focus-row inactive"></div><div class="matrix-preview-frame focus-col inactive"></div>';
   el.innerHTML=html;
+  el.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
   document.getElementById('matrixAll').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
   el.querySelectorAll('.m-name[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
   el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date));

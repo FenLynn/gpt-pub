@@ -34,7 +34,7 @@ function attendPlotHtml(ctx){
   if(tab==='timeline'){
     if(day){
       const range=timelineRange(day);
-      return top+'<div class="plot-axis"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div class="r14-day-edges"><span>0:00</span><span>24:00</span></div></div>';
+      return top+'<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="法定、打卡、实际在岗与行为区间的多轨时间轴"></div>'+r15PunchPreview(day)+'</div>';
     }
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
@@ -45,7 +45,7 @@ function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx),st=statsFor(ctx.items);
   let out='<div class="insight-heading">'+({overview:'总览数据',timeline:'时间轴数据',stats:'统计数据',issues:'异常数据'}[tab])+'</div>';
   if(tab==='timeline'&&item){
-    const tone=item.severity==='problem'?'problem':item.severity==='suspect'?'suspect':'normal';
+    const tone=attendanceJudgment(item)==='absent'?'absent':attendanceJudgment(item)==='anomaly'?'anomaly':'normal';
     out+='<div class="insight-state '+tone+'">'+safeTableText(item.status)+'</div>';
     out+=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
       insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
@@ -58,28 +58,36 @@ function attendInsightHtml(ctx){
     return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
   }
   if(tab==='issues'){
-    out+=insightMetric('明确异常',st.problems,'tone-problem')+insightMetric('待核实',st.suspects,'tone-warn')+
-      insightMetric('总计',st.problems+st.suspects+' 项');
-    const critical=ctx.items.filter(a=>a.severity==='problem'||a.severity==='suspect').slice(0,3);
+    const anomalies=ctx.items.filter(a=>attendanceJudgment(a)==='anomaly').length;
+    const absences=ctx.items.filter(a=>attendanceJudgment(a)==='absent').length;
+    out+=insightMetric('异常',anomalies,'tone-warn')+insightMetric('缺勤',absences,'tone-problem')+
+      insightMetric('合计',anomalies+absences+' 项');
+    const critical=ctx.items.filter(a=>['anomaly','absent'].includes(attendanceJudgment(a))).slice(0,3);
     out+='<div class="insight-issue-list">'+critical.map(a=>'<button data-analysis-cell="'+a.employee.id+'|'+a.day+'">'+pad(a.day)+'日 '+safeTableText(a.employee.name)+' · '+safeTableText(a.status)+'</button>').join('')+'</div>';
     return out;
   }
   if(tab==='stats'){
     const focus=ctx.items.filter(a=>isWorkday(a.day)),pres=focus.filter(a=>a.presence>0);
-    out+=insightMetric('有效天数',focus.length)+insightMetric('正常',st.normal,'tone-ok')+
-      insightMetric('待核实',st.suspects,'tone-warn')+insightMetric('异常',st.problems,'tone-problem');
+    out+=insightMetric('有效天数',focus.length)+
+      insightMetric('正常',focus.filter(a=>attendanceJudgment(a)==='normal').length,'tone-ok')+
+      insightMetric('异常',focus.filter(a=>attendanceJudgment(a)==='anomaly').length,'tone-warn')+
+      insightMetric('缺勤',focus.filter(a=>attendanceJudgment(a)==='absent').length,'tone-problem');
     return out+insightMetric('平均在岗',fmtMinutes(pres.length?pres.reduce((n,a)=>n+a.presence,0)/pres.length:0));
   }
   const pres=ctx.items.filter(a=>isWorkday(a.day)&&a.presence>0);
   if(ctx.type==='person'||ctx.type==='cell'){
     const items=ctx.type==='cell'?Array.from({length:monthDays()},(_,i)=>state.analysis.get(ctx.employee.id+'|'+(i+1))):ctx.items;
     const sum=statsFor(items);
-    out+=insightMetric('工作日',items.filter(a=>isWorkday(a.day)).length)+insightMetric('正常',sum.normal,'tone-ok')+
-      insightMetric('异常',sum.problems,'tone-problem')+insightMetric('待核实',sum.suspects,'tone-warn');
+    out+=insightMetric('工作日',items.filter(a=>isWorkday(a.day)).length)+
+      insightMetric('正常',items.filter(a=>attendanceJudgment(a)==='normal').length,'tone-ok')+
+      insightMetric('异常',items.filter(a=>attendanceJudgment(a)==='anomaly').length,'tone-warn')+
+      insightMetric('缺勤',items.filter(a=>attendanceJudgment(a)==='absent').length,'tone-problem');
     return out;
   }
-  return out+insightMetric('人员',EMPLOYEES.length+' 人')+insightMetric('正常',st.normal,'tone-ok')+
-    insightMetric('异常',st.problems,'tone-problem')+insightMetric('待核实',st.suspects,'tone-warn')+
+  return out+insightMetric('人员',EMPLOYEES.length+' 人')+
+    insightMetric('正常',ctx.items.filter(a=>attendanceJudgment(a)==='normal').length,'tone-ok')+
+    insightMetric('异常',ctx.items.filter(a=>attendanceJudgment(a)==='anomaly').length,'tone-warn')+
+    insightMetric('缺勤',ctx.items.filter(a=>attendanceJudgment(a)==='absent').length,'tone-problem')+
     insightMetric('平均在岗',fmtMinutes(pres.length?pres.reduce((n,a)=>n+a.presence,0)/pres.length:0));
 }
 function rawForContext(ctx){
@@ -142,10 +150,10 @@ function renderRawTable(ctx){
   const col=(title,field,width,minWidth=43)=>{
     const opt=prefs[field]||{};
     return {title,field,minWidth,formatter:'plaintext',headerSort:true,tooltip:true,
-      visible:opt.visible!==false,width:opt.width&&opt.width>=48?Math.min(500,opt.width):undefined,
+      visible:field==='name'||opt.visible!==false,frozen:field==='name',width:opt.width&&opt.width>=48?Math.min(500,opt.width):undefined,
       widthGrow:Math.max(1,Math.round(width/65))};
   };
-  const withName=ctx.type!=='person'&&ctx.type!=='cell';
+  const withName=true; // The employee column stays visible in every context.
   const columns=(kind==='outing'||kind==='overtime')?[
     ...(withName?[col('姓名','name',74,55)]:[]),
     ...(kind==='outing'?[col('开始','startDate',104),col('结束','endDate',104)]:[col('日期','date',110)]),
@@ -247,4 +255,14 @@ function timelineMiniMapHtml(a,range){
   return '<div class="timeline-mini"><span>0:00</span><div class="mini-frame" id="timelineMini">'+
     '<svg viewBox="0 0 720 28" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>'+
     '<div class="mini-selection" id="miniSelection" style="left:'+left+';width:'+width+'"></div></div><span>24:00</span></div>';
+}
+
+function r15PunchPreview(a){
+  const events=a.punches||[];
+  const dots=events.map(p=>{
+    const left=(Math.max(0,Math.min(1440,minutes(p.time)))/1440*100).toFixed(4);
+    return '<i class="r15-punch-dot '+(p.direction==='进'?'in':'out')+'" style="left:'+left+'%" title="'+safeTableText(p.time)+'"></i>';
+  }).join('');
+  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+dots+'</div>'+
+         '<div class="r14-day-edges"><span>0:00</span><span>24:00</span></div>';
 }

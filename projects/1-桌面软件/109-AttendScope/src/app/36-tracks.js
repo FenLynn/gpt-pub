@@ -50,7 +50,8 @@ function mountAttendanceTimeline(a){
   yAxis:[
    {type:'category',inverse:true,data:model.tracks.map(t=>t.title),
     axisLine:{show:false},axisTick:{show:false},axisLabel:{fontSize:11,color:'#647e92',fontWeight:650},
-    splitLine:{show:true,lineStyle:{color:'#eef3f6'}}},
+    splitLine:{show:true,lineStyle:{color:'#e9eff5'}},
+    splitArea:{show:true,areaStyle:{color:['#f8fafc','#fff']}}},
    {type:'value',min:0,max:shade,show:false}
   ],
   dataZoom:[
@@ -81,6 +82,12 @@ function mountAttendanceTimeline(a){
        shape:{x:Math.min(p[0],q[0]),y:p[1]-rowSize/2,width:Math.max(1,Math.abs(q[0]-p[0])),height:rowSize,r:5},
        style:{fill:d.color,opacity:.91}};
     },z:4},
+   {id:'event-baseline',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
+    data:model.tracks.some(t=>t.key==='events')?[[0,1440,model.tracks.findIndex(t=>t.key==='events')]]:[],
+    renderItem:(params,api)=>{const from=api.coord([0,api.value(2)]),to=api.coord([1440,api.value(2)]);
+      return {type:'line',shape:{x1:from[0],y1:from[1],x2:to[0],y2:to[1]},
+        style:{stroke:'#72869c',lineWidth:1.6,opacity:.75}};
+    },z:5},
    {id:'punches',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,
     data:model.events,
     renderItem:(params,api)=>{
