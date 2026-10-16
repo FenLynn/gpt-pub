@@ -56,6 +56,14 @@ jobs:
           npm --prefix "$APP_DIR" run build
           npm --prefix "$APP_DIR" run test:gallery
 
+      - name: Install CJK fonts for visual QA
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+          fc-match -f '%{family}\\n' 'Noto Sans CJK SC'
+
       - name: Check Nature gallery in headless Chromium
         shell: bash
         env:
