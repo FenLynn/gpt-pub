@@ -780,6 +780,14 @@ button:disabled {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.inspector-tabs.lorentz-tabs {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.inspector-tabs.lorentz-tabs button {
+  padding-inline: 1px;
+  font-size: .72rem;
+}
+
 .data-inspector-tabs {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
