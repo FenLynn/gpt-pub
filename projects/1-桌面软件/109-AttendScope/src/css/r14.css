@@ -121,3 +121,21 @@ font-feature-settings:"kern" 1;letter-spacing:0}
  .m-name .name-letters{width:55px;max-width:55px}
 }
 @media(max-width:1320px){:root{--matrix-name:77px;--matrix-grid:805.5px;--matrix-frame:822px}}
+
+/* R14 visual pass two, checked against 1920px screenshot. */
+.m-name .name-letters span{font-size:12.4px;font-weight:660}
+.m-name .m-name-num{font-size:9.5px;color:#95a8b8}
+.r14-day-edges{position:absolute;bottom:0;left:76px;right:12px;display:flex;align-items:center;justify-content:space-between;
+ font:600 10px/1 "Segoe UI Variable",sans-serif;color:#7a8c9d;pointer-events:none}
+.plot-axis .echarts-timeline-chart{padding-bottom:9px}
+.r14-appearance-preview{border:1px solid #e3edf5;border-radius:10px;background:linear-gradient(128deg,#fafcff,#f1f7fd);
+ padding:16px 19px;margin-top:23px;display:flex;flex-direction:column;gap:10px}
+.r14-appearance-preview>span{font-size:11px;color:#8098ab}
+.r14-appearance-preview strong{font-size:16px;letter-spacing:-.25px;color:#2e5069}
+.r14-appearance-preview p{font-size:12px;margin:0;color:#758d9f}
+.r14-appearance-preview div{display:flex;gap:7px;align-items:center;margin-top:4px}
+.r14-appearance-preview i{display:block;width:16px;height:16px;border-radius:4px}
+.r14-appearance-preview .green{background:#85cca3}
+.r14-appearance-preview .yellow{background:#e8c777}
+.r14-appearance-preview .red{background:#e39792}
+.r14-appearance-preview em{font-size:11px;color:#748b9c;margin-left:8px;font-style:normal}

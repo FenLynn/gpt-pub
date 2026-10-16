@@ -34,7 +34,7 @@ function attendPlotHtml(ctx){
   if(tab==='timeline'){
     if(day){
       const range=timelineRange(day);
-      return top+'<div class="plot-axis"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div></div>';
+      return top+'<div class="plot-axis"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div class="r14-day-edges"><span>0:00</span><span>24:00</span></div></div>';
     }
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';

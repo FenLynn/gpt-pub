@@ -18,6 +18,10 @@ function r14TrackData(a){
   {from:minutes(RULES.pmStart),to:minutes(RULES.pmEnd),title:'下午法定工作'}]:[];
  add('rules','法定工作','#94b9d4',required);
  add('actual','实际在岗','#72c5a4',a.pairs.map(([p,q])=>({from:minutes(p.time),to:minutes(q.time),title:p.time+'–'+q.time})));
+ const allTimes=a.punches.map(p=>minutes(p.time)).sort((x,y)=>x-y);
+ add('span','首末打卡','#a9bad0',allTimes.length>1?
+  [{from:allTimes[0],to:allTimes[allTimes.length-1],title:'首末打卡跨度'}]:[]);
+
  add('leave','请假','#e4aa79',a.leaves.map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:p.type||'请假'})));
  add('trip','出差','#68bdb6',a.trips.map(p=>({from:minutes(p.start||'00:00'),to:minutes(p.end||'24:00'),title:p.type||'出差'})));
  const outing=(state.outings||[]).filter(p=>p.employeeId===a.employee.id&&a.date>=p.startDate&&a.date<=p.endDate);
@@ -63,6 +67,10 @@ function mountAttendanceTimeline(a){
    }
   ],
   series:[
+   {id:'day-density',type:'line',yAxisIndex:1,xAxisIndex:0,data:density,silent:true,
+    showSymbol:false,animation:false,step:'middle',
+    lineStyle:{color:'#788797',opacity:.02},
+    areaStyle:{color:'rgba(107,118,130,.02)'},z:-2},
    {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,
     data:model.bars,
     renderItem:(params,api)=>{
@@ -86,10 +94,7 @@ function mountAttendanceTimeline(a){
       {type:'polygon',shape:{points:[[p[0]-4,y1+sign*(toward?6:-6)],[p[0]+4,y1+sign*(toward?6:-6)],[p[0],y1]]},style:{fill:color}},
       {type:'circle',shape:{cx:p[0],cy:p[1],r:2.5},style:{stroke:color,fill:'#fff',lineWidth:1.3}}
      ]};
-    },z:7},
-   {id:'day-density',type:'line',yAxisIndex:1,xAxisIndex:0,data:density,silent:true,
-    showSymbol:false,animation:false,lineStyle:{color:'#788797',opacity:.02},
-    areaStyle:{color:'rgba(107,118,130,.02)'},z:-2}
+    },z:7}
   ]
  };
  chart.setOption(timelineOption);

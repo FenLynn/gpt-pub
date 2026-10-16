@@ -18,7 +18,7 @@ const R14_TABLE_FIELDS={
 function r14Prefs(){
   const p=state.prefs||{};
   if(!p.tableColumns)p.tableColumns={};
-  if(!p.timelineTracks)p.timelineTracks={rules:true,actual:true,leave:true,trip:true,outing:true,events:true};
+  if(!p.timelineTracks)p.timelineTracks={rules:true,actual:true,span:true,leave:true,trip:true,outing:true,events:true};
   if(!p.matrix)p.matrix={ids:true,crosshair:true,glow:1,restContrast:1};
   return p;
 }
@@ -38,7 +38,8 @@ function settingsContent(section){
  switch(section){
  case 'appearance':return sectionCard('界面外观','遵循 MATQ / DavBridge 风格，减少装饰性注释，增强可读性。',
    settingSelect('settingFont','全局字号',[['1','标准 · 100%'],['1.08','舒适 · 108%'],['1.16','放大 · 116%']])+
-   settingCheck('settingMotion','平滑过渡动画','减少突兀闪烁，关闭后适用低性能设备'));
+   settingCheck('settingMotion','平滑过渡动画','减少突兀闪烁，关闭后适用低性能设备')+
+   '<div class="r14-appearance-preview"><span>界面排版预览</span><strong>出勤情况 · 2026 年 10 月</strong><p>清晰的中文、统一的数字和克制的色彩</p><div><i class="green"></i><i class="yellow"></i><i class="red"></i><em>正常 · 待核实 · 异常</em></div></div>');
  case 'matrix':return sectionCard('矩阵显示','紫色代表确定选择，蓝色代表鼠标预览。状态颜色不随选择改变。',
    settingCheck('settingIds','显示人员编号')+
    settingCheck('settingCrosshair','显示十字参考框','点击单格时两方向淡化，悬停时显示蓝色预选')+
@@ -46,7 +47,7 @@ function settingsContent(section){
    settingRange('settingRestContrast','休息日底色强度',.6,1.8,.1));
  case 'timeline':return sectionCard('时间轴轨道','默认显示法定工作、实际在岗和打卡证据，业务轨道在有记录时显示。',
    settingCheck('settingArrows','箭头朝向时间线')+
-   Object.entries({rules:'法定工作区间',actual:'实际在岗区间',leave:'请假区间',trip:'出差区间',outing:'外出区间',events:'进出事件'}).map(([id,t])=>
+   Object.entries({rules:'法定工作区间',actual:'实际在岗区间',span:'首末打卡跨度',leave:'请假区间',trip:'出差区间',outing:'外出区间',events:'进出事件'}).map(([id,t])=>
      settingCheck('settingTrack_'+id,t)).join(''));
  case 'table':return sectionCard('原始数据列管理','按类别保存显示和列宽；留空宽度则自动铺满，不改变任何原始数据。',
    settingSelect('settingTableKind','数据类别',[
