@@ -67,6 +67,12 @@ jobs:
           NODE
           grep -q 'series.custom' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
           grep -q 'dataZoom.slider' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
+      - name: Install CJK fonts for accurate visual screenshots
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fonts-noto-cjk
+          fc-list :lang=zh family | head -n 3
       - name: Set up real Chromium browser test
         shell: bash
         run: |
