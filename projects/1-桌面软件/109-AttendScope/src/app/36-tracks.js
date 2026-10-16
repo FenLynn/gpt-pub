@@ -94,7 +94,7 @@ function mountAttendanceTimeline(a){
      return {type:'group',children:[
       {type:'line',shape:{x1:p[0],y1:y0,x2:p[0],y2:y1},style:{stroke:color,lineWidth:3.1,lineCap:'round'}},
       {type:'polygon',shape:{points:[[p[0]-5,y1+sign*(toward?7:-7)],[p[0]+5,y1+sign*(toward?7:-7)],[p[0],y1]]},style:{fill:color}},
-      {type:'circle',shape:{cx:p[0],cy:p[1],r:2.5},style:{stroke:color,fill:'#fff',lineWidth:1.3}}
+      {type:'circle',shape:{cx:p[0],cy:p[1],r:d.count>1?4:2.5},style:{stroke:color,fill:'#fff',lineWidth:d.count>1?2:1.3}}
      ]};
     },z:7}
   ]
