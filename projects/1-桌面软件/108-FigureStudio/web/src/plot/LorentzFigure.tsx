@@ -82,11 +82,38 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   </g>;
   const curve=(id:string,y:(v:number)=>number)=>{
     const override=figure.seriesOverrides[id];
-    if(override?.visible===false||override?.lineVisible===false)return null;
+    if(override?.visible===false)return null;
     const dash=override?.lineStyle==="dash"?"9 5":override?.lineStyle==="dot"?"2 4":override?.lineStyle==="dashdot"?"10 4 2 4":undefined;
-    return <path data-series-id={id} d={points(id,y)} fill="none" stroke={color(id)} strokeWidth={lineWidth(id)}
-      strokeDasharray={dash} strokeLinejoin="round" strokeLinecap="round" opacity={override?.opacity??1}
-      onClick={e=>{e.stopPropagation();onSelectSeries(id)}} style={{cursor:"pointer"}}/>;
+    const markerSize=clamp((override?.markerSizePt??4)*1.2,1.5,30);
+    const data=series(id)?.values??[];
+    const step=Math.max(1,Math.ceil(data.length/clamp(override?.markerMaxDisplayed??80,1,1601)));
+    const markers=override?.markerVisible?data.flatMap((v,i)=>{
+      if(i%step!==0||!finite(v)||!finite(dataset.x.values[i])||dataset.x.values[i]!<xMin||dataset.x.values[i]!>xMax)return [];
+      const px=x(dataset.x.values[i] as number),py=y(v),rr=markerSize/2;
+      const stroke=override?.markerEdgeColor??color(id);
+      const fill=override?.markerHollow?"#fff":(override?.markerFillColor??color(id));
+      const edge=(override?.markerEdgeWidthPt??.5)*1.5;
+      const props={fill,stroke,strokeWidth:edge,opacity:override?.opacity??1};
+      const symbol=override?.markerSymbol??"circle";
+      const d=symbol==="diamond"
+        ?"M"+px+" "+(py-rr)+"L"+(px+rr)+" "+py+"L"+px+" "+(py+rr)+"L"+(px-rr)+" "+py+"Z"
+        :symbol==="triangle-up"
+        ?"M"+px+" "+(py-rr)+"L"+(px+rr)+" "+(py+rr)+"L"+(px-rr)+" "+(py+rr)+"Z"
+        :symbol==="triangle-down"
+        ?"M"+px+" "+(py+rr)+"L"+(px+rr)+" "+(py-rr)+"L"+(px-rr)+" "+(py-rr)+"Z"
+        :symbol==="cross"||symbol==="x"
+        ?"M"+(px-rr)+" "+py+"H"+(px+rr)+"M"+px+" "+(py-rr)+"V"+(py+rr)
+        :"M"+(px-rr)+" "+(py-rr)+"h"+(2*rr)+"v"+(2*rr)+"h-"+(2*rr)+"Z";
+      return [<g key={i} onClick={e=>{e.stopPropagation();onSelectSeries(id)}} style={{cursor:"pointer"}}>
+        {symbol==="circle"?<circle cx={px} cy={py} r={rr} {...props}/>:<path d={d} {...props} fill={symbol==="cross"||symbol==="x"?"none":fill} transform={symbol==="x"?"rotate(45 "+px+" "+py+")":undefined}/>}
+      </g>];
+    }):null;
+    return <g>
+      {override?.lineVisible!==false&&<path data-series-id={id} d={points(id,y)} fill="none" stroke={color(id)} strokeWidth={lineWidth(id)}
+        strokeDasharray={dash} strokeLinejoin="round" strokeLinecap="round" opacity={override?.opacity??1}
+        onClick={e=>{e.stopPropagation();onSelectSeries(id)}} style={{cursor:"pointer"}}/>}
+      {markers&&<g data-marker-series-id={id}>{markers}</g>}
+    </g>;
   };
   const legend=(xx:number,yy:number,ids:string[],bottom=false)=>{
     const entries=ids.filter(id=>(id!=="__band__"||c.bandOpacity>0)&&(id==="__band__"||figure.seriesOverrides[id]?.visible!==false&&figure.seriesOverrides[id]?.showInLegend!==false));
