@@ -258,10 +258,16 @@ function timelineMiniMapHtml(a,range){
 }
 
 function r15PunchPreview(a){
-  const events=a.punches||[];
-  const dots=events.map(p=>{
-    const left=(Math.max(0,Math.min(1440,minutes(p.time)))/1440*100).toFixed(4);
-    return '<i class="r15-punch-dot '+(p.direction==='进'?'in':'out')+'" style="left:'+left+'%" title="'+safeTableText(p.time)+'"></i>';
+  const grouped=new Map();
+  for(const p of (a.punches||[])){
+    const minute=minutes(p.time),key=minute+'|'+p.direction;
+    if(!grouped.has(key))grouped.set(key,{minute,direction:p.direction,times:[]});
+    grouped.get(key).times.push(p.time);
+  }
+  const dots=[...grouped.values()].map(g=>{
+    const left=(Math.max(0,Math.min(1440,g.minute))/1440*100).toFixed(4);
+    const multi=g.times.length>1?' multi':'';
+    return '<i class="r15-punch-dot '+(g.direction==='进'?'in':'out')+multi+'" data-count="'+g.times.length+'" style="left:'+left+'%" title="'+safeTableText(g.times.join(' / '))+'"></i>';
   }).join('');
   return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+dots+'</div>'+
          '<div class="r14-day-edges"><span>0:00</span><span>24:00</span></div>';
