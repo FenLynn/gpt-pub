@@ -50,3 +50,9 @@ GitHub Pages 的 deploy-pages 每次部署整个站点。P108 与 P109 以前各
 - 实测依据：`P109 AttendScope CI #38848874386`，包含无网络 file:// Chromium、中文字体、1920/1600/1366 布局、单人时间轴、证据下钻和多上下文 ECharts 测试；结论 success。
 - 固定线上入口：`https://fenlynn.github.io/gpt-pub/p109/`。统一发布依然要同时保留 P108；应从发布成功日志中验证 P109_SHA 等于上述源码提交，再称该网页已更新。
 - 本次只是源码候选的共享预览，不做正式标签或 Release，不提升 P109 exp 到 stable/main。
+
+## 2026-10-16 P109 可读性改版预览同步
+
+- 源码目标：`p109-exp@baf7d4ab4cedf352cae45357250e9587f32f728c`，对应 P109 CI [#38851017828](https://github.com/FenLynn/gpt-pub/actions/runs/38851017828) 成功。
+- 矩阵大屏 554→721px（增加约 30.1%），字体、姓名和日期显示提升；右侧精简重复说明，保持时间轴/证据交互。
+- 此记录仅触发完整共享站点重建，依照统一部署核验 `P109_SHA` 和 P108/P109 双入口后才可宣称上线。没有独立 Pages 发布、正式标签或 Release。
