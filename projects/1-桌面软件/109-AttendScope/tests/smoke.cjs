@@ -85,6 +85,12 @@ async function inspect(browser){
       svgChars:svg?.outerHTML?.length||0,
       displayTypes:display.reduce((r,t)=>(r[t]=(r[t]||0)+1,r),{}),
       arrowShafts:arrowShafts.length,
+      arrowOrientationCorrect:arrowShafts.every(line=>{
+        const col=(line.style.stroke||'').toLowerCase();
+        if(['#126fba','#208ece'].includes(col))return line.shape.y2<line.shape.y1;
+        if(['#ca6f39','#d98950'].includes(col))return line.shape.y2>line.shape.y1;
+        return true;
+      }),
       svgArrowPaths:svgArrowPaths.length,
       clippedArrowPaths:svgArrowPaths.filter(p=>p.hasAttribute('filter')).length,
       shaftCoordinates:arrowShafts.map(s=>({x:s.shape.x1,y1:s.shape.y1,y2:s.shape.y2,color:s.style.stroke})),
@@ -103,6 +109,7 @@ async function inspect(browser){
   if(snapshot.svgChars<2500)throw Error('Chart SVG empty or too small: '+snapshot.svgChars);
   if(!snapshot.displayTypes.polygon)throw Error('No arrowhead polygons rendered');
   if(snapshot.arrowShafts<chosen.count)throw Error('Some punch arrows are truncated or missing: '+snapshot.arrowShafts+' of '+chosen.count);
+  if(!snapshot.arrowOrientationCorrect)throw Error('IN must point up and OUT must point down');
   if(snapshot.svgArrowPaths<chosen.count)throw Error('Some punch arrow shafts are absent from the actual SVG DOM');
   if(snapshot.clippedArrowPaths>0)throw Error('Chrome-visible SVG arrow shafts carry broken filter: '+snapshot.clippedArrowPaths);
   if(snapshot.cellSize>15.2)throw Error('Matrix cells too large '+snapshot.cellSize);
@@ -132,13 +139,21 @@ async function inspect(browser){
   await page.waitForSelector('.overview-rows');
   // MATQ/DavBridge/LocalSub visual QA: every context renders meaningful
   // content, and fixed 31-day geometry remains aligned at desktop sizes.
+  if(!await page.locator('.daily-facts .daily-fact').count())throw Error('Daily metrics not present');
+  const evidence=page.locator('.punch-chips [data-record]').first();
+  if(await evidence.count()){
+    await evidence.click();
+    if(!await page.locator('#timelineEvidence .evidence-main').count())throw Error('Raw evidence drilldown not shown');
+  }
   await page.locator('[data-emp="E001"]').click();
   await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
+  await page.waitForTimeout(800);
   await page.screenshot({path:path.join(artifacts,mode+'-person.png'),fullPage:false});
   await page.locator('.m-date[data-date="9"]').click();
   await page.waitForSelector('#attendanceDayChart svg',{timeout:12000});
   await page.locator('button[data-analysis-tab="overview"]').click();
   await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
+  await page.waitForTimeout(600);
   await page.screenshot({path:path.join(artifacts,mode+'-date-overview.png'),fullPage:false});
   await page.locator('#clearSelection').click();
   await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
