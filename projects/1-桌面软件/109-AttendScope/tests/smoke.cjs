@@ -23,6 +23,7 @@ async function inspect(browser){
 
   const response=await page.goto(url,{waitUntil:'load',timeout:45000});
   await page.waitForSelector('#matrix button[data-cell]',{timeout:20000});
+  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
   const shell=await page.evaluate(()=>{
     const rect=selector=>{const x=document.querySelector(selector);if(!x)return null;const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}};
     const color=selector=>{const x=document.querySelector(selector);return x?getComputedStyle(x).backgroundColor:null};
