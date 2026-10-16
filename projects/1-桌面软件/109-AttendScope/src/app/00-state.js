@@ -19,7 +19,11 @@ function generateMock(){
   const records=[];
   for(const emp of EMPLOYEES){const ei=Number(emp.id.slice(1));for(let d=1;d<=31;d++){
     const typ=dayType(d); const key=(ei*37+d*19)%100; let sc='normal';
-    if(!isWorkday(d)){if((ei+d)%17===0)sc='overtime';else continue}
+    if(!isWorkday(d)){
+      // Stable, reproducible 2D hash; avoids artificial diagonal overtime bands.
+      if(seeded(ei*1013+d*2719+ei*ei*19+d*d*73+ei*d*137)<.07)sc='overtime';
+      else continue
+    }
     else if(key<4)sc='absent'; else if(key<9)sc='late'; else if(key<13)sc='early'; else if(key<17)sc='multiin'; else if(key<21)sc='multiout'; else if(key<24)sc='missingout'; else if(key<27)sc='missingin'; else if(key<31)sc='longout'; else if(key<36)sc='duplicate';
     const seed=ei*100+d;
     if(sc==='absent')continue;
