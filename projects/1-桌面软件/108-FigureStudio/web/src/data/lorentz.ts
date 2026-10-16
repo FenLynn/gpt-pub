@@ -30,7 +30,7 @@ export const defaultLorentzComposition: LorentzComposition = {
   phaseYTitle:"Phase Lag, φ (degrees)",
   panelGap:52,phaseMin:0,phaseMax:195,phaseMajorTickStep:45,phaseMinorTickStep:15,markerRadius:6.5,referenceLineWidth:1.4,topMin:-3.9,topMax:7.8,
   resonanceX:1,bandStart:.92,bandEnd:1.07,bandColor:"#a44b3d",bandOpacity:.055,
-  gridOpacity:.11,topLegendX:792,topLegendY:78,bottomLegendX:800,bottomLegendY:890,
+  gridOpacity:.11,topLegendX:745,topLegendY:78,bottomLegendX:800,bottomLegendY:890,
   showReferenceLines:true,showResonanceMarkers:true,
   annotations:[
     {id:"absorption",panel:"top",x:220,y:102,text:"Absorption Peak (ω = ω₀)\nIm[χ] ∝ 1/γ",color:"#873c30",fontSizePt:9.5,background:"#ffffff",backgroundOpacity:.93,borderColor:"#c5c5c5",borderWidthPt:.5,arrowX:635,arrowY:107},
