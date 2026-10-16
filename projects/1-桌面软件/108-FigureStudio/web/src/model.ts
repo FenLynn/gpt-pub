@@ -308,6 +308,7 @@ export interface LorentzAnnotation {
   borderWidthPt: number;
   arrowX?: number;
   arrowY?: number;
+  maxWidth?: number;
   visible?: boolean;
 }
 export interface LorentzComposition {
@@ -316,6 +317,16 @@ export interface LorentzComposition {
   bottomTitle: string;
   phaseYTitle: string;
   panelGap: number;
+  /** Optional layout controls preserve old .sfig v0.5 files. SVG reference coordinates. */
+  plotLeft?: number;
+  plotRight?: number;
+  plotTop?: number;
+  plotBottom?: number;
+  titleWeight?: number;
+  topLegendWidth?: number;
+  bottomLegendWidth?: number;
+  legendRowHeight?: number;
+  bandLegendLabel?: string;
   phaseMin: number;
   phaseMax: number;
   phaseMajorTickStep: number;
