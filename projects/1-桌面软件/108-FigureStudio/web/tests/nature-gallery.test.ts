@@ -6,10 +6,11 @@ import { findSheet, sheetToDataset } from "../src/data/adapter";
 import { presets } from "../src/plot/presets";
 import { buildLayout, buildTraces, resolveCanvasMm, mmToPx } from "../src/plot/renderSpec";
 import { PrecisionSvg, supportsPrecisionSvg } from "../src/plot/PrecisionSvg";
+import { LorentzFigure } from "../src/plot/LorentzFigure";
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
-const gallery = project.figures.filter(f => f.folderId === "folder-nature");
+const gallery = project.figures.filter(f => f.folderId === "folder-nature" && /^N\\d{2} ·/.test(f.name));
 assert.equal(gallery.length, 14, "All 14 Nature visual cases must be accessible");
 assert.equal(project.folders.filter(f => f.id === "folder-nature").length, 1);
 assert.equal(gallery.filter(f => supportsPrecisionSvg(f)).length, 11,
@@ -65,5 +66,27 @@ for (let n=0; n<gallery.length; n++) {
       figure.name+" contains invalid geometry");
   }
 }
+  const golden=project.figures.find(f=>f.lorentz?.kind==="lorentz-two-panel");
+  assert.ok(golden,"Lorentz golden Graph must exist in ordinary project");
+  assert.equal(golden!.dataRef?.sheetId,"sheet-lorentz-golden");
+  const source=findSheet(project,golden!.dataRef!.sheetId);
+  assert.ok(source,"Lorentz editable source sheet must exist");
+  assert.equal(source!.sheet.columns[0].values.length,1601);
+  const ds=sheetToDataset(source!.sheet,golden!);
+  assert.deepEqual(ds.ys.map(y=>y.id),["lorentz-real","lorentz-imag","lorentz-phase"]);
+  const ll=buildLayout({dataset:ds,figure:golden!,preset:presets.nature});
+  const markup=renderToStaticMarkup(createElement(LorentzFigure,{
+    figure:golden!,dataset:ds,width:Number(ll.width),height:Number(ll.height),
+    svgRef:createRef<SVGSVGElement>(),onSelectSeries:()=>{},
+    onSelectAnnotation:()=>{},onMoveAnnotation:()=>{},onAxisClick:()=>{},onLegendClick:()=>{}
+  }));
+  assert.ok(markup.includes("data-series-id=\\\"lorentz-real\\\""),"real dispersion missing");
+  assert.ok(markup.includes("data-series-id=\\\"lorentz-imag\\\""),"absorption missing");
+  assert.ok(markup.includes("data-series-id=\\\"lorentz-phase\\\""),"phase lag missing");
+  assert.ok(markup.includes("data-annotation-id=\\\"absorption\\\""),"annotation missing");
+  assert.ok(markup.includes("data-annotation-id=\\\"resonance\\\""),"phase annotation missing");
+  assert.ok(!markup.includes("NaN")&&!markup.includes("Infinity"),"invalid Lorentz SVG coordinates");
+  assert.equal(golden!.lorentz!.annotations.length,6);
+  assert.equal(golden!.figureOverrides.figureWidthMm,183);
 }
-console.log("Nature gallery smoke OK: 14 figures × (normal+QA), 11 precision SVG, 3 Plotly fallback");
+console.log("Nature gallery smoke OK: 14 Nature figures + real editable Lorentz Graph, normal+QA");
