@@ -86,3 +86,11 @@ GitHub Pages 的 deploy-pages 每次部署整个站点。P108 与 P109 以前各
 - 判断和行为两套数据维度：正常绿、异常黄、缺勤红；出差蓝、请假橙、外出青、加班粉。默认仅红黄绿，行为筛选独立；右侧图表同源颜色。
 - R15 音轨顺序：上方法定工作轨、中间打卡基线/事件箭头、下方实际在岗/首末跨度/业务轨。单一宽幅缩放条、全天打卡点缩略，原始表格始终保留固定姓名列。
 - 唯一共享 Pages 发布包含 P108 和 P109；`P109_SHA` 必须等于以上 SHA，不发布正式 Release。
+
+## 2026-10-16 P109 R16 screenshot-refined matrix and timeline
+
+- Source: `583a38dab97a4a138a0b26b53403c2a0cf648e82`; offline Chromium [#38918553846](https://github.com/FenLynn/gpt-pub/actions/runs/38918553846) SUCCESS.
+- Visual review used the actual CI screenshots after the user's R15 screenshot. Name/date anchors now have complete violet boxes; soft violet row/column crosshair remains for cell focus. Employee text remains normal weight.
+- Canonical filter is rendered as a colored dropdown: regular = green/yellow/red judgments, while trip/leave/outing/overtime remain four independent behavior colors. Judgment and behavior dimensions are not merged.
+- Timeline keeps one broad 0:00–24:00 zoom control, scheduled rail above, punch rail in the middle, actual/behavior rails below. Overlapping punches are clustered per minute/direction and shown as grouped punch dots.
+- Raw grid keeps the employee column visible. Shared Pages must retain P108 and publish exact P109_SHA above. No Release.
