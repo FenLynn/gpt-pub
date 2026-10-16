@@ -23,6 +23,35 @@ async function inspect(browser){
 
   const response=await page.goto(url,{waitUntil:'load',timeout:45000});
   await page.waitForSelector('#matrix button[data-cell]',{timeout:20000});
+  const shell=await page.evaluate(()=>{
+    const rect=selector=>{const x=document.querySelector(selector);if(!x)return null;const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}};
+    const color=selector=>{const x=document.querySelector(selector);return x?getComputedStyle(x).backgroundColor:null};
+    const statuses=[...state.analysis.values()];
+    const overtime=statuses.find(a=>a.status==='非工作日出勤');
+    const overtimeSelector=overtime?`[data-cell="${overtime.employee.id}|${overtime.day}"]`:null;
+    return {
+      topbar:rect('.topbar'),month:rect('#monthMenuButton'),matrix:rect('.matrix'),
+      matrixWrap:rect('.matrix-wrap'),analysis:rect('.analysis-panel'),
+      personHeader:rect('.m-name'),cell:rect('.m-cell button'),
+      monthInSidebar:!!document.querySelector('.sidebar #monthMenuButton'),
+      middleHeading:!!document.querySelector('.matrix-zone .section-head'),
+      normal:color('.s-normal'),suspect:color('.s-suspect'),problem:color('.s-problem'),
+      overtime:overtimeSelector?color(overtimeSelector):null,
+      nameLetters:document.querySelector('.m-name .name-letters')?.children.length
+    };
+  });
+  console.log('P109_UI_GEOMETRY '+JSON.stringify(shell));
+  if(shell.topbar.height>46)throw Error('Top toolbar is too tall '+shell.topbar.height);
+  if(!shell.monthInSidebar||shell.middleHeading)throw Error('Month selector / matrix heading placement regressed');
+  if(Math.abs(shell.personHeader.width-58)>1)throw Error('Four-character name column width regressed '+shell.personHeader.width);
+  if(shell.cell.width!==15||Math.abs(shell.matrix.width-554)>1)throw Error('Matrix no longer fixed compact width');
+  if(Math.abs(shell.matrixWrap.y-shell.analysis.y)>3)throw Error('Matrix and analysis panel not top-aligned');
+  if(!shell.overtime||shell.overtime===shell.normal)throw Error('Overtime not assigned distinct light blue');
+  if(shell.nameLetters!==4)throw Error('Name not split into four glyphs for justified spacing');
+  await page.locator('#monthMenuButton').click();
+  if(!await page.locator('#monthPopover').evaluate(el=>el.classList.contains('open')))throw Error('Month selector does not open');
+  await page.locator('.month-choice.active').click();
+  if(await page.locator('#monthPopover').evaluate(el=>el.classList.contains('open')))throw Error('Month selector does not close');
   await page.screenshot({path:path.join(artifacts,mode+'-matrix.png'),fullPage:false});
   const chosen=await page.evaluate(()=>{
     const item=[...state.analysis.values()].find(x=>x.punches.length>=4&&x.firstIn&&x.lastOut&&isWorkday(x.day));
@@ -73,8 +102,8 @@ async function inspect(browser){
   if(snapshot.arrowShafts<chosen.count)throw Error('Some punch arrows are truncated or missing: '+snapshot.arrowShafts+' of '+chosen.count);
   if(snapshot.svgArrowPaths<chosen.count)throw Error('Some punch arrow shafts are absent from the actual SVG DOM');
   if(snapshot.clippedArrowPaths>0)throw Error('Chrome-visible SVG arrow shafts carry broken filter: '+snapshot.clippedArrowPaths);
-  if(snapshot.cellSize>18)throw Error('Matrix cells too large '+snapshot.cellSize);
-  if(snapshot.nameWidth>80)throw Error('Matrix names too wide '+snapshot.nameWidth);
+  if(snapshot.cellSize>15.2)throw Error('Matrix cells too large '+snapshot.cellSize);
+  if(snapshot.nameWidth>59)throw Error('Matrix names too wide '+snapshot.nameWidth);
   if(errors.length)throw Error('Browser errors: '+JSON.stringify(errors));
 
   await page.evaluate(()=>{
