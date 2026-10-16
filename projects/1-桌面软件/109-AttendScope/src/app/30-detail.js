@@ -42,7 +42,10 @@ function analysisOverviewHtml(ctx){
       ${issues.length?`<div class="compact-issue-list">${issues.map(a=>`<button data-analysis-cell="${a.employee.id}|${a.day}"><i class="${a.severity}"></i><span><b>${a.employee.name}</b><small>${pad(a.day)} 日 · ${a.status}</small></span><em>›</em></button>`).join('')}</div>`:'<div class="analysis-empty">没有需要处理的异常</div>'}
     </section>
   </div>
-  ${ctx.type==='overall'?'<section class="overview-trend"><div class="chart-head"><strong>每日异常趋势</strong><small>点击日期查看当天</small></div><div id="overviewTrendChart" class="overview-trend-chart"></div></section>':''}`;
+  <section class="overview-trend">
+    <div class="chart-head"><strong>${ctx.type==='person'?'每日确认在岗':ctx.type==='date'?'当日状态分布':'每日异常趋势'}</strong><small>${ctx.type==='person'?'点击日期查看时间轴':ctx.type==='date'?'当日 50 人的状态':'点击日期查看当天'}</small></div>
+    <div id="overviewTrendChart" class="overview-trend-chart"></div>
+  </section>`;
 }
 
 function overviewRow(label,value){
