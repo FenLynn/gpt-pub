@@ -1,23 +1,28 @@
 'use strict';
 const XLSX=window.AttendScopeXLSX;
-const YEAR=2026, MONTH=10;
+let YEAR=2026, MONTH=10;
+function monthKey(){return `${YEAR}-${pad(MONTH)}`}
+function monthDays(){return new Date(YEAR,MONTH,0).getDate()}
+function periodText(){return `${YEAR} 年 ${MONTH} 月`}
+function monthISO(){return monthKey()}
+function groupOf(e){return state.groups?.[e.id]||e.department+'组'}
 const DEMO_NAMES=["陈思远","林嘉禾","周亦宁","王若溪","李知夏","赵书言","沈清越","吴念安","郑予安","许慕白","苏晚晴","何景川","唐诗雨","陆明哲","韩子墨","顾一诺","宋雨桐","徐嘉宁","叶星辰","程安然","梁沐阳","杨可心","邓嘉祺","谢云舟","蒋书瑶","郭亦凡","夏知意","冯沐辰","傅清歌","曹锦程","姜乐言","董予希","段芷晴","钟书航","秦若楠","方之恒","黎星遥","彭思齐","余可欣","袁清禾","施景行","高雨薇","江知远","邵思涵","罗映雪","齐航","林安","欧阳晨曦","司马知远","白若曦"];
 const EMPLOYEES=Array.from({length:50},(_,i)=>({id:'E'+String(i+1).padStart(3,'0'),name:DEMO_NAMES[i],department:['综合','研发','生产','质检','保障'][i%5]}));
 const RULES={amStart:'08:30',amEnd:'12:00',pmStart:'14:00',pmEnd:'17:30',grace:5,dupSeconds:120};
-const state={records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'all',zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true};
+const state={records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'all',zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true,groups:Object.fromEntries(EMPLOYEES.map(e=>[e.id,e.department+'组'])),monthStores:new Map(),chartTab:'overview',chartDay:null,rawDataTab:'attendance',rawPageSize:25,rawPage:1,rawPopout:false};
 const scenarioNames={normal:'正常',late:'迟到',early:'早退',absent:'缺勤',multiin:'多进一出',multiout:'一进多出',missingout:'缺少出',missingin:'缺少进',longout:'长时间外出',duplicate:'疑似重复打卡',overtime:'非工作日出勤'};
 function pad(n){return String(n).padStart(2,'0')} function isoDate(d){return `${YEAR}-${pad(MONTH)}-${pad(d)}`}
 function minutes(t){const [h,m,s='0']=String(t).split(':');return +h*60 + +m + (+s)/60}
 function fmtMinutes(m){if(m==null||!Number.isFinite(m))return '—';const h=Math.floor(m/60),mi=Math.round(m%60);return `${h}h ${pad(mi)}m`}
 function weekdayLabel(d){return ['日','一','二','三','四','五','六'][new Date(YEAR,MONTH-1,d).getDay()]}
-function dayType(d){const ds=isoDate(d); if(d>=1&&d<=7)return 'holiday'; if(ds==='2026-10-10')return 'adjust'; const wd=new Date(YEAR,MONTH-1,d).getDay(); return wd===0||wd===6?'rest':'work'}
+function dayType(d){if(d>monthDays()||d<1)return 'outside';const ds=isoDate(d); if(YEAR===2026&&MONTH===10&&d>=1&&d<=7)return 'holiday'; if(ds==='2026-10-10')return 'adjust'; const wd=new Date(YEAR,MONTH-1,d).getDay(); return wd===0||wd===6?'rest':'work'}
 function isWorkday(d){const t=dayType(d);return t==='work'||t==='adjust'}
 function seeded(n){let x=(n*9301+49297)%233280;return x/233280}
 function jitter(base,delta,seed){const m=minutes(base)+Math.floor((seeded(seed)*2-1)*delta);return `${pad(Math.floor(m/60))}:${pad(Math.floor(m%60))}:${pad(Math.floor(seeded(seed+17)*60))}`}
 function rec(emp,d,time,dir,scenario,idx){return {recordId:`demo:${emp.id}:${pad(d)}:${idx}`,employeeId:emp.id,name:emp.name,datetime:`${isoDate(d)} ${time}`,time,direction:dir,source:'模拟考勤_2026年10月.xlsx',sheet:'考勤',row:1000+d*100+Number(emp.id.slice(1))*10+idx,scenario}}
 function generateMock(){
   const records=[];
-  for(const emp of EMPLOYEES){const ei=Number(emp.id.slice(1));for(let d=1;d<=31;d++){
+  for(const emp of EMPLOYEES){const ei=Number(emp.id.slice(1));for(let d=1;d<=monthDays();d++){
     const typ=dayType(d); const key=(ei*37+d*19)%100; let sc='normal';
     if(!isWorkday(d)){
       // Stable, reproducible 2D hash; avoids artificial diagonal overtime bands.

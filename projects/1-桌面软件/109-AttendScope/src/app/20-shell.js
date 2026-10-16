@@ -16,6 +16,16 @@ function layoutHtml(){
       <strong class="brand-title">AttendScope</strong>
       <span class="brand-mode">离线考勤</span>
     </div>
+    <div class="month-anchor top-month">
+        <button id="monthMenuButton" class="month-button" aria-expanded="false" aria-label="切换或新建月份">
+          <span>${periodText()}</span><i class="chevron"></i>
+        </button>
+        <div class="month-popover" id="monthPopover">
+          <div class="month-popover-head"><button id="yearPrev" aria-label="上一年">‹</button><b id="browseYear">${YEAR}</b><button id="yearNext" aria-label="下一年">›</button></div>
+          <div class="month-choices" id="monthChoices">${monthChoicesHtml(YEAR)}</div>
+          <p>点选月份；尚无数据的月份可直接新建。</p>
+        </div>
+      </div>
     <div class="top-actions">
       <span class="save-state ${state.saved?'saved':'dirty'}"><i></i>${state.saved?'已保存':'未保存'}</span>
       <div class="import-anchor">
@@ -40,21 +50,6 @@ function layoutHtml(){
   <div class="layout">
     <aside class="sidebar">
       <section class="side-section calendar-section">
-        <div class="month-navigation">
-          <span class="side-label">当前月份</span>
-          <div class="month-anchor">
-            <button id="monthMenuButton" class="month-button" aria-expanded="false" aria-label="选择考勤月份">
-              <span>2026 年 10 月</span><i class="chevron"></i>
-            </button>
-            <div class="month-popover" id="monthPopover">
-              <div class="month-popover-head">2026 年 · 选择月份</div>
-              <div class="month-choices">
-                ${Array.from({length:12},(_,i)=>`<button class="month-choice ${i===9?'active':''}" data-month="${i+1}" ${i!==9?'disabled title="尚未导入该月份数据"':''}>${pad(i+1)}</button>`).join('')}
-              </div>
-              <p>当前演示项目仅有 2026 年 10 月的数据。</p>
-            </div>
-          </div>
-        </div>
         <div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">总览</button></div>
         <div class="calendar-grid" id="calendar"></div>
         <div class="calendar-key">
@@ -66,12 +61,12 @@ function layoutHtml(){
       </section>
 
       <section class="side-section month-meta">
-        <div class="side-label">本月</div>
+        <div class="side-label">当前月信息</div>
         <div class="meta-row"><span>工作</span><b>08:30–12:00</b></div>
         <div class="meta-row"><span>下午</span><b>14:00–17:30</b></div>
-        <div class="meta-row"><span>人员</span><b>50</b></div>
-        <div class="meta-row"><span>请假</span><b>${state.leaves.length}</b></div>
-        <div class="meta-row"><span>出差</span><b>${state.trips.length}</b></div>
+        <div class="meta-row"><span>人员</span><b>${EMPLOYEES.length} 人</b></div>
+        <div class="meta-row"><span>请假</span><b>${state.leaves.length} 人次</b></div>
+        <div class="meta-row"><span>出差</span><b>${state.trips.length} 人次</b></div>
         <div class="meta-row"><span>原始记录</span><b>${state.records.length.toLocaleString()}</b></div>
         <div class="meta-row"><span>目录</span><b class="${state.projectDir?'ok':'muted'}">${state.projectDir?'已连接':'未连接'}</b></div>
       </section>
@@ -89,16 +84,12 @@ function layoutHtml(){
     <main class="workspace">
       <div class="workbench">
         <section class="matrix-zone" aria-label="50人员工31天月度考勤状态矩阵">
-          <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
+          <div class="matrix-wrap" id="matrixScroll"><div class="matrix" id="matrix"></div></div>
         </section>
 
         <section class="analysis-panel">
           <div class="analysis-head">
-            <div>
-              <div class="analysis-eyebrow" id="analysisEyebrow">2026 年 10 月</div>
-              <h2 id="analysisTitle">全月概览</h2>
-            </div>
-            <div class="selection-status" id="selectionStatus"></div>
+            <h2 id="analysisTitle">月度总览</h2>
           </div>
 
           <div class="analysis-body" id="analysisBody"></div>
@@ -134,10 +125,21 @@ function bind(){
     monthPopover.classList.toggle('open');
     monthButton.setAttribute('aria-expanded',String(monthPopover.classList.contains('open')));
   };
-  monthPopover.querySelectorAll('.month-choice:not(:disabled)').forEach(button=>button.onclick=()=>{
-    monthPopover.classList.remove('open');
-    monthButton.setAttribute('aria-expanded','false');
-  });
+  let browseYear=YEAR;
+  const bindMonthChoices=()=>{
+    document.getElementById('browseYear').textContent=browseYear;
+    document.getElementById('monthChoices').innerHTML=monthChoicesHtml(browseYear);
+    document.querySelectorAll('.month-choice').forEach(button=>button.onclick=()=>{
+      const month=Number(button.dataset.month);
+      if(chooseMonth(browseYear,month)){
+        monthPopover.classList.remove('open');
+        monthButton.setAttribute('aria-expanded','false');
+      }
+    });
+  };
+  document.getElementById('yearPrev').onclick=()=>{browseYear--;bindMonthChoices()};
+  document.getElementById('yearNext').onclick=()=>{browseYear++;bindMonthChoices()};
+  bindMonthChoices();
   document.getElementById('app').onclick=e=>{
     if(!e.target.closest('.import-anchor'))popover.classList.remove('open');
     if(!e.target.closest('.month-anchor')){
@@ -151,7 +153,8 @@ function bind(){
   document.getElementById('sampleLeave').onclick=downloadLeaves;
   document.getElementById('sampleTrip').onclick=downloadTrips;
   document.getElementById('resetDemo').onclick=()=>{
-    Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='all'; state.analysisTab='overview';
+    if(YEAR!==2026||MONTH!==10){toast('演示数据仅用于 2026 年 10 月',true);return}
+    Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='all'; state.chartTab='overview';
     state.revisions=[]; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
   };
 
@@ -172,7 +175,7 @@ function renderCalendar(){
   el.innerHTML=heads.map(x=>`<div class="cal-head">${x}</div>`).join('');
   const first=(new Date(YEAR,MONTH-1,1).getDay()+6)%7;
   for(let i=0;i<first;i++)el.insertAdjacentHTML('beforeend','<div></div>');
-  for(let d=1;d<=31;d++){
+  for(let d=1;d<=monthDays();d++){
     const type=dayType(d),sel=state.selection.day===d?' selected':'';
     el.insertAdjacentHTML('beforeend',`<button class="cal-day ${type}${sel}" data-day="${d}" title="${dayTypeText(type)}">${d}</button>`);
   }
@@ -196,8 +199,9 @@ function renderMatrix(){
 
   let html='<div class="m-corner">姓名</div>';
   for(let d=1;d<=31;d++){
+    const invalid=d>monthDays();
     const type=dayType(d),sel=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d?' selected':'';
-    html+=`<button class="m-date ${type}${sel}" data-date="${d}" title="${isoDate(d)} · 周${weekdayLabel(d)} · ${dayTypeText(type)}"><b>${pad(d)}</b></button>`;
+    html+=`<button class="m-date ${type}${sel}" data-date="${d}" ${invalid?'disabled':''} title="${invalid?'无此日期':isoDate(d)+' · '+dayTypeText(type)}"><b>${invalid?'':pad(d)}</b></button>`;
   }
 
   for(const e of EMPLOYEES){
@@ -205,6 +209,7 @@ function renderMatrix(){
     const letters=Array.from(e.name).slice(0,4).map(ch=>`<span>${escapeNameChar(ch)}</span>`).join('');
     html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span class="name-letters">${letters}</span></button>`;
     for(let d=1;d<=31;d++){
+      if(d>monthDays()){html+='<div class="m-cell inactive"></div>';continue}
       const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
       const selected=state.selection.type==='cell'&&state.selection.employeeId===e.id&&state.selection.day===d;
       const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
@@ -230,31 +235,30 @@ function renderMatrix(){
 }
 
 function analysisContext(){
-  const s=state.selection;
-  if(s.type==='person'){
-    const e=EMPLOYEES.find(x=>x.id===s.employeeId);
-    return {type:'person',title:e.name,eyebrow:`${e.department} · 2026 年 10 月`,employee:e,items:Array.from({length:31},(_,i)=>state.analysis.get(`${e.id}|${i+1}`))};
+  const sel=state.selection,period=monthKey();
+  if(sel.type==='person'||sel.type==='cell'){
+    const e=EMPLOYEES.find(x=>x.id===sel.employeeId);
+    if(!e)return {type:'overall',title:period+' 全月总览',items:workAnalyses()};
+    const items=Array.from({length:monthDays()},(_,i)=>state.analysis.get(e.id+'|'+(i+1)));
+    if(sel.type==='person')return {type:'person',title:period+' '+groupOf(e)+' '+e.name,employee:e,items};
+    const a=state.analysis.get(e.id+'|'+sel.day);
+    return {type:'cell',title:isoDate(sel.day)+' '+groupOf(e)+' '+e.name,employee:e,day:sel.day,analysis:a,items:[a]};
   }
-  if(s.type==='date'){
-    return {type:'date',title:`10 月 ${s.day} 日`,eyebrow:`周${weekdayLabel(s.day)} · ${dayTypeText(dayType(s.day))}`,day:s.day,items:EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${s.day}`))};
-  }
-  if(s.type==='cell'){
-    const e=EMPLOYEES.find(x=>x.id===s.employeeId),a=state.analysis.get(`${e.id}|${s.day}`);
-    return {type:'cell',title:e.name,eyebrow:`${isoDate(s.day)} · ${a.status}`,employee:e,day:s.day,analysis:a,items:[a]};
-  }
-  return {type:'overall',title:'全月概览',eyebrow:'2026 年 10 月',items:workAnalyses()};
+  if(sel.type==='date')return {type:'date',title:isoDate(sel.day),day:sel.day,items:EMPLOYEES.map(e=>state.analysis.get(e.id+'|'+sel.day))};
+  return {type:'overall',title:period+' 全月总览',items:workAnalyses()};
 }
 
 function renderAnalysisPanel(){
   const body=document.getElementById('analysisBody'); if(!body)return;
   if(typeof disposeAnalysisCharts==='function')disposeAnalysisCharts();
   const ctx=analysisContext();
-  document.getElementById('analysisTitle').textContent=ctx.title;
-  document.getElementById('analysisEyebrow').textContent=ctx.eyebrow;
-  document.getElementById('selectionStatus').innerHTML=analysisSelectionBadge(ctx);
+  document.getElementById('analysisTitle').innerHTML=(ctx.employee
+    ?'<span class="head-date">'+(ctx.type==='cell'?isoDate(ctx.day):monthKey())+'</span><button class="head-group" data-edit-group="'+ctx.employee.id+'" title="点击编辑组别">'+escapeNameChar(groupOf(ctx.employee))+' ✎</button><strong>'+escapeNameChar(ctx.employee.name)+'</strong>'
+    :'<span class="head-date">'+escapeNameChar(ctx.title)+'</span>');
   if(typeof disposeRawTable==='function')disposeRawTable();
   body.innerHTML=attendWorkbenchHtml(ctx);
   bindAnalysisPanel(ctx);
+  document.querySelectorAll('[data-edit-group]').forEach(b=>b.onclick=()=>setPersonGroup(b.dataset.editGroup));
   mountAnalysisVisuals(ctx);
   mountRawTable(ctx);
 }
@@ -275,8 +279,26 @@ function bindAnalysisPanel(ctx){
   document.querySelectorAll('[data-revise]').forEach(b=>b.onclick=()=>reviseCurrent(b.dataset.revise));
 }
 
-function selectPerson(id){state.selection={type:'person',employeeId:id};state.analysisTab='overview';render()}
-function selectDate(d){state.selection={type:'date',day:d};state.analysisTab='timeline';render()}
-function selectCell(id,d){state.selection={type:'cell',employeeId:id,day:d};state.analysisTab='timeline';state.zoom=1;state.timelineRange=null;render()}
+function selectPerson(id){state.selection={type:'person',employeeId:id};state.chartTab='overview';state.chartDay=nearestRecordedDay(id);state.rawPage=1;render()}
+function selectDate(d){
+  if(d<1||d>monthDays())return;
+  const sel=state.selection;
+  if((sel.type==='person'||sel.type==='cell')&&state.chartTab==='timeline'){
+    state.selection={type:'cell',employeeId:sel.employeeId,day:d};
+    state.chartDay=d;state.timelineRange=null;
+  }else{state.selection={type:'date',day:d};state.chartTab='overview'}
+  state.rawPage=1;render();
+}
+function selectCell(id,d){
+  if(d<1||d>monthDays())return;
+  state.selection={type:'cell',employeeId:id,day:d};
+  state.chartTab='timeline';state.chartDay=d;state.timelineRange=null;state.rawPage=1;render();
+}
+function monthChoicesHtml(year){
+  return Array.from({length:12},(_,i)=>{
+    const month=i+1,active=year===YEAR&&month===MONTH,exists=monthExists(year,month);
+    return '<button class="month-choice '+(active?'active':exists?'has-data':'new-month')+'" data-month="'+month+'" title="'+(exists?'进入已有工作空间':'新建空白月度工作空间')+'">'+pad(month)+(exists?'':' +')+'</button>';
+  }).join('');
+}
 
 function escapeNameChar(ch){return String(ch).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}

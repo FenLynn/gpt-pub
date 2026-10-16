@@ -1,0 +1,52 @@
+/* Month-scoped datasets, with independent in-memory workspaces and global manual groups. */
+function rememberMonth(){
+  state.monthStores.set(monthKey(),{
+    records:state.records,leaves:state.leaves,trips:state.trips,
+    revisions:state.revisions,revisionSeq:state.revisionSeq,
+    imports:state.imports,saved:state.saved
+  });
+}
+function monthExists(year,month){return state.monthStores.has(year+'-'+pad(month))}
+function switchMonth(year,month,create=false){
+  if(!Number.isInteger(year)||year<2000||year>2100||!Number.isInteger(month)||month<1||month>12)return;
+  const key=year+'-'+pad(month);
+  if(!state.monthStores.has(key)){
+    if(!create){toast('该月份尚未创建，请点击「新建月份」',true);return false}
+    state.monthStores.set(key,{records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false});
+  }
+  if(key!==monthKey())rememberMonth();
+  YEAR=year;MONTH=month;
+  const next=state.monthStores.get(key);
+  state.records=next.records;state.leaves=next.leaves;state.trips=next.trips;
+  state.revisions=next.revisions;state.revisionSeq=next.revisionSeq;
+  state.imports=next.imports;state.saved=next.saved;
+  state.selection={type:'overall'};state.filter='all';state.chartTab='overview';
+  state.chartDay=null;state.rawPage=1;state.timelineRange=null;
+  reanalyze();render();
+  return true;
+}
+function chooseMonth(year,month){
+  if(monthExists(year,month))return switchMonth(year,month);
+  if(window.confirm(year+' 年 '+month+' 月尚无数据。\n是否新建该月份的空白工作空间？')){
+    return switchMonth(year,month,true);
+  }
+  return false;
+}
+function nearestRecordedDay(employeeId){
+  const days=state.records.filter(x=>x.employeeId===employeeId&&x.datetime.startsWith(monthKey()+'-'))
+    .map(x=>Number(x.datetime.slice(8,10))).filter(d=>d>=1&&d<=monthDays());
+  return days.length?Math.max(...days):monthDays();
+}
+function setPersonGroup(employeeId){
+  const e=EMPLOYEES.find(x=>x.id===employeeId);if(!e)return;
+  const current=groupOf(e);
+  const value=window.prompt('设置 '+e.name+' 的组别（可输入已有或新组名）',current);
+  if(value===null)return;
+  const text=value.trim();
+  if(!text||text.length>24){toast('组别应为 1–24 个字符',true);return}
+  state.groups[e.id]=text;
+  state.saved=false;
+  rememberMonth();
+  render();
+}
+function calendarCount(){return monthDays()}

@@ -432,7 +432,7 @@ function mountOverallStats(ctx){
   const main=initAttendChart(document.getElementById('statsChartMain'));
   const sub=initAttendChart(document.getElementById('statsChartSecondary'));
   if(main){
-    const data=Array.from({length:31},(_,i)=>{
+    const data=Array.from({length:monthDays()},(_,i)=>{
       const d=i+1,arr=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${d}`));
       return [String(d),arr.filter(x=>x.severity==='problem'||x.severity==='suspect').length,isWorkday(d)];
     }).filter(x=>x[2]);
@@ -452,7 +452,7 @@ function mountOverallStats(ctx){
   }
   if(sub){
     const rows=EMPLOYEES.map(e=>({
-      name:e.name,value:Array.from({length:31},(_,i)=>state.analysis.get(`${e.id}|${i+1}`)).filter(x=>x.severity==='problem'||x.severity==='suspect').length,id:e.id
+      name:e.name,value:Array.from({length:monthDays()},(_,i)=>state.analysis.get(`${e.id}|${i+1}`)).filter(x=>x.severity==='problem'||x.severity==='suspect').length,id:e.id
     })).sort((a,b)=>b.value-a.value).slice(0,8).reverse();
     sub.setOption({
       grid:{left:54,right:22,top:8,bottom:12},
@@ -468,7 +468,7 @@ function mountOverallStats(ctx){
 function mountPersonStats(ctx){
   const main=initAttendChart(document.getElementById('statsChartMain'));
   const sub=initAttendChart(document.getElementById('statsChartSecondary'));
-  const days=Array.from({length:31},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`));
+  const days=Array.from({length:monthDays()},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`));
   if(main){
     const work=days.filter(a=>isWorkday(a.day));
     main.setOption({
@@ -509,7 +509,7 @@ function mountDateStats(ctx){
 function mountCellStats(ctx){
   const main=initAttendChart(document.getElementById('statsChartMain'));
   const sub=initAttendChart(document.getElementById('statsChartSecondary'));
-  const days=Array.from({length:31},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`)).filter(a=>isWorkday(a.day));
+  const days=Array.from({length:monthDays()},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`)).filter(a=>isWorkday(a.day));
   if(main){
     main.setOption({
       grid:{left:36,right:14,top:14,bottom:28},
@@ -653,7 +653,7 @@ function mountOverviewTrend(){
   if(!el)return;
   const chart=initAttendChart(el);
   if(!chart)return;
-  const rows=Array.from({length:31},(_,i)=>{
+  const rows=Array.from({length:monthDays()},(_,i)=>{
     const day=i+1;
     const list=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${day}`));
     return {day,problem:list.filter(a=>a.severity==='problem').length,suspect:list.filter(a=>a.severity==='suspect').length};
@@ -698,10 +698,10 @@ function mountFocusedOverviewChart(ctx){
       yAxis:{type:'category',data:rows.map(a=>a.name),axisTick:{show:false},axisLine:{show:false},axisLabel:{color:'#617b91',fontSize:11}},
       series:[{type:'bar',barWidth:13,showBackground:true,backgroundStyle:{color:'#f0f5f8',borderRadius:7},data:rows.map(a=>({value:a.value,itemStyle:{color:a.color,borderRadius:[0,7,7,0]}})),label:{show:true,position:'right',color:'#3b586e',fontSize:11,fontWeight:650}}]
     });
-    chart.on('click',()=>{state.analysisTab='stats';renderAnalysisPanel()});
+    chart.on('click',()=>{state.chartTab='stats';renderAnalysisPanel()});
     return;
   }
-  const days=Array.from({length:31},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`)).filter(a=>isWorkday(a.day));
+  const days=Array.from({length:monthDays()},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`)).filter(a=>isWorkday(a.day));
   chart.setOption({
     grid:{left:42,right:16,top:14,bottom:28},
     tooltip:{trigger:'axis',confine:true,formatter:ps=>{const d=days[ps[0]?.dataIndex];return d?`${pad(d.day)} 日 · ${d.status}<br>确认在岗：${fmtMinutes(d.presence)}`:''}},
@@ -715,9 +715,15 @@ function mountFocusedOverviewChart(ctx){
 function mountAnalysisVisuals(ctx){
   if(!window.echarts)return;
   requestAnimationFrame(()=>{
-    if(ctx.type==='cell')mountAttendanceTimeline(ctx.analysis);
-    else if(ctx.type==='date')mountDayTimeline(ctx);
+    const tab=state.chartTab||'overview';
+    if(tab==='timeline'){
+      const day=plotAnalysis(ctx);
+      if(day)mountAttendanceTimeline(day);
+      else if(ctx.type==='date')mountDayTimeline(ctx);
+    }else if(tab==='stats')mountStatsCharts(ctx);
+    else if(tab==='issues')mountIssueChart(ctx);
     else if(ctx.type==='overall')mountOverviewTrend();
+    else if(ctx.type==='cell')mountFocusedOverviewChart({type:'person',employee:ctx.employee,items:Array.from({length:monthDays()},(_,i)=>state.analysis.get(ctx.employee.id+'|'+(i+1)))});
     else mountFocusedOverviewChart(ctx);
   });
 }

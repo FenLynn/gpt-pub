@@ -1,15 +1,144 @@
-function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
-function downloadAttendance(){const rows=state.records.map(x=>({姓名:x.name,打卡时间:x.datetime,进出:x.direction}));downloadBlob(XLSX.writeXlsx(rows,'考勤'),'模拟考勤_2026年10月.xlsx')}
-function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(x=>({姓名:x.name,日期:x.date,开始时间:x.start,结束时间:x.end,类型:x.type,备注:x.note})),'请假'),'模拟请假_2026年10月.xlsx')}
-function downloadTrips(){downloadBlob(XLSX.writeXlsx(state.trips.map(x=>({姓名:x.name,开始日期:x.startDate,结束日期:x.endDate,类型:x.type,地点:x.place,备注:x.note})),'出差'),'模拟出差_2026年10月.xlsx')}
-function exportTraditionalTable(){const rows=[];for(const e of EMPLOYEES)for(let d=1;d<=31;d++){const a=state.analysis.get(`${e.id}|${d}`);rows.push({姓名:e.name,部门:e.department,日期:a.date,星期:'周'+weekdayLabel(d),日期性质:a.dayType==='adjust'?'调休工作日':a.dayType==='work'?'工作日':a.dayType==='holiday'?'节假日':'休息日',状态:a.status,严重度:a.severity==='problem'?'明确问题':a.severity==='suspect'?'疑似异常':a.severity==='excused'?'请假/出差':a.severity==='rest'?'休息':'正常',首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),异常数:a.issues.length,异常摘要:a.issues.join('；'),业务标记:a.marker==='leave'?'请假':a.marker==='trip'?'出差':'',人工处理:state.revisions.some(r=>r.key===`${e.id}|${d}`)?'是':'否'});}downloadBlob(XLSX.writeXlsx(rows,'每日考勤明细'),'2026年10月_每日考勤明细_纯表格.xlsx');toast('已导出纯表格 XLSX，不含图表')}
-async function connectProjectDir(){if(!window.showDirectoryPicker){toast('当前浏览器不支持直接目录读写。请使用最新版 Chrome/Edge；仍可使用下载方式保存。',true);return}try{state.projectDir=await showDirectoryPicker({mode:'readwrite'});await ensureProjectSkeleton();render();toast('项目目录已连接')}catch(e){if(e.name!=='AbortError')toast(e.message,true)}}
-async function dir(root,n){return root.getDirectoryHandle(n,{create:true})}async function writeFile(handle,name,data){const fh=await handle.getFileHandle(name,{create:true}),w=await fh.createWritable();await w.write(data);await w.close()}
-async function ensureProjectSkeleton(){if(!state.projectDir)return;const c=await dir(state.projectDir,'config'),cal=await dir(c,'calendar'),data=await dir(state.projectDir,'data'),y=await dir(data,'2026'),m=await dir(y,'10');await dir(m,'raw');await dir(m,'working');await dir(m,'snapshots');await dir(m,'branches');await dir(m,'output');await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));await writeFile(c,'employees.json',JSON.stringify({schemaVersion:1,employees:EMPLOYEES},null,2));await writeFile(c,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));await writeFile(cal,'2026.json',JSON.stringify({schemaVersion:1,year:2026,overrides:{'2026-10-01':'holiday','2026-10-02':'holiday','2026-10-03':'holiday','2026-10-04':'holiday','2026-10-05':'holiday','2026-10-06':'holiday','2026-10-07':'holiday','2026-10-10':'adjusted-work'}},null,2))}
-async function persistImportedFile(file,type,count){state.imports.push({id:String(state.imports.length+1).padStart(4,'0'),type,name:file.name,count,importedAt:new Date().toISOString()});if(!state.projectDir)return;const data=await dir(state.projectDir,'data'),y=await dir(data,'2026'),m=await dir(y,'10'),raw=await dir(m,'raw'),td=await dir(raw,type),bd=await dir(td,String(state.imports.length).padStart(4,'0'));await writeFile(bd,file.name,await file.arrayBuffer())}
-function projectPayload(){return {schemaVersion:1,projectId:'P109-AttendScope',projectName:'AttendScope',appVersion:'0.1.0-preview',analysisEngineVersion:'0.1.0',current:{year:2026,month:10},activeContext:{type:'main'},updatedAt:new Date().toISOString(),imports:state.imports.map(x=>({id:x.id,type:x.type,name:x.name,count:x.count,importedAt:x.importedAt}))}}
-function workingPayload(){return {schemaVersion:1,context:'working',savedAt:new Date().toISOString(),leaves:state.leaves,trips:state.trips,revisions:state.revisions,imports:state.imports,analysis:[...state.analysis.values()].map(a=>({employeeId:a.employee.id,date:a.date,severity:a.severity,status:a.status,firstIn:a.firstIn,lastOut:a.lastOut,presence:a.presence,issues:a.issues,marker:a.marker}))}}
-async function saveWorking(){const payload=JSON.stringify(workingPayload(),null,2);if(state.projectDir){try{await ensureProjectSkeleton();const data=await dir(state.projectDir,'data'),y=await dir(data,'2026'),m=await dir(y,'10'),w=await dir(m,'working');await writeFile(w,'state.json',payload);await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));state.saved=true;render();toast('已保存到项目目录 working/state.json');return}catch(e){toast('目录保存失败：'+e.message,true)}}downloadBlob(new Blob([payload],{type:'application/json'}),'AttendScope_2026-10_working.json');state.saved=true;render();toast('已下载工作状态 JSON（兼容保存模式）')}
-async function freezeSnapshot(){const id='F'+String(Date.now()).slice(-8),manifest={schemaVersion:1,snapshotId:id,year:2026,month:10,createdAt:new Date().toISOString(),appVersion:'0.1.0-preview',analysisEngineVersion:'0.1.0',sourceImports:state.imports,parentSnapshot:null},snapshot={manifest,config:{employees:EMPLOYEES,rules:RULES,calendar:{holidays:['2026-10-01','2026-10-02','2026-10-03','2026-10-04','2026-10-05','2026-10-06','2026-10-07'],adjustedWork:['2026-10-10']}},working:workingPayload()};const txt=JSON.stringify(snapshot,null,2);if(state.projectDir){try{const data=await dir(state.projectDir,'data'),y=await dir(data,'2026'),m=await dir(y,'10'),ss=await dir(m,'snapshots'),fd=await dir(ss,id);await writeFile(fd,'snapshot.json',txt);toast(`已冻结 ${id}；后续配置修改不会影响该快照`);return}catch(e){toast('冻结写入失败：'+e.message,true)}}downloadBlob(new Blob([txt],{type:'application/json'}),`AttendScope_2026-10_${id}.json`);toast(`已下载冻结快照 ${id}`)}
-function toast(msg,error=false){document.querySelector('.toast')?.remove();const el=document.createElement('div');el.className='toast';el.style.background=error?'#b42318':'#1f2937';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3200)}
-const demo=generateMock();state.records=demo.records;state.leaves=demo.leaves;state.trips=demo.trips;reanalyze();render();
+/* P109 month-scoped persistence. Raw imports are copied into their month, never rewritten. */
+function downloadBlob(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),500);
+}
+function downloadAttendance(){downloadBlob(XLSX.writeXlsx(state.records.map(r=>({姓名:r.name,打卡时间:r.datetime,进出:r.direction})),'考勤'),'考勤_'+monthKey()+'.xlsx')}
+function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note})),'请假'),'请假_'+monthKey()+'.xlsx')}
+function downloadTrips(){downloadBlob(XLSX.writeXlsx(state.trips.map(r=>({姓名:r.name,开始日期:r.startDate,结束日期:r.endDate,类型:r.type,地点:r.place,备注:r.note})),'出差'),'出差_'+monthKey()+'.xlsx')}
+function exportTraditionalTable(){
+  const rows=[];
+  for(const e of EMPLOYEES)for(let d=1;d<=monthDays();d++){
+    const a=state.analysis.get(e.id+'|'+d);
+    rows.push({姓名:e.name,部门:e.department,组别:groupOf(e),日期:a.date,星期:'周'+weekdayLabel(d),
+      日期性质:a.dayType==='adjust'?'调休工作日':a.dayType==='work'?'工作日':a.dayType==='holiday'?'节假日':'休息日',
+      状态:a.status,严重度:a.severity==='problem'?'明确问题':a.severity==='suspect'?'疑似异常':a.severity==='excused'?'请假/出差':a.severity==='rest'?'休息':'正常',
+      首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),
+      异常摘要:a.issues.join('；'),业务标记:a.marker==='leave'?'请假':a.marker==='trip'?'出差':'',
+      人工处理:state.revisions.some(r=>r.key===e.id+'|'+d)?'是':'否'});
+  }
+  downloadBlob(XLSX.writeXlsx(rows,'每日考勤明细'),monthKey()+'_每日考勤明细.xlsx');
+  toast('已导出当前月份的考勤明细');
+}
+async function dir(root,n){return root.getDirectoryHandle(n,{create:true})}
+async function existingDir(root,n){return root.getDirectoryHandle(n,{create:false})}
+async function writeFile(handle,name,data){
+  const f=await handle.getFileHandle(name,{create:true}),w=await f.createWritable();
+  await w.write(data);await w.close();
+}
+async function readJSON(handle,name){
+  try{const fh=await handle.getFileHandle(name,{create:false});return JSON.parse(await (await fh.getFile()).text())}
+  catch(e){if(e.name==='NotFoundError')return null;throw e}
+}
+async function monthDirectory(y=YEAR,m=MONTH){
+  const data=await dir(state.projectDir,'data'),year=await dir(data,String(y));
+  return dir(year,pad(m));
+}
+async function ensureProjectSkeleton(){
+  if(!state.projectDir)return;
+  const config=await dir(state.projectDir,'config'),calendar=await dir(config,'calendar');
+  const m=await monthDirectory();
+  for(const part of ['raw','working','snapshots','branches','output'])await dir(m,part);
+  await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
+  await writeFile(config,'employees.json',JSON.stringify({schemaVersion:2,employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)}))},null,2));
+  await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
+  const calendarFile=String(YEAR)+'.json';
+  if(!await readJSON(calendar,calendarFile)){
+    await writeFile(calendar,calendarFile,JSON.stringify({schemaVersion:1,year:YEAR,overrides:YEAR===2026?
+      {'2026-10-01':'holiday','2026-10-02':'holiday','2026-10-03':'holiday','2026-10-04':'holiday','2026-10-05':'holiday','2026-10-06':'holiday','2026-10-07':'holiday','2026-10-10':'adjusted-work'}:{}},null,2));
+  }
+}
+function normalizeSavedMonth(payload){
+  if(!payload||!Array.isArray(payload.records))return null;
+  return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true};
+}
+async function connectProjectDir(){
+  if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return}
+  try{
+    const handle=await showDirectoryPicker({mode:'readwrite'});
+    const project=await readJSON(handle,'project.json');
+    state.projectDir=handle;
+    if(project?.projectId==='P109-AttendScope'){
+      const conf=await existingDir(handle,'config').catch(()=>null);
+      if(conf){const people=await readJSON(conf,'employees.json');if(people?.employees)
+        for(const e of people.employees)if(e.id&&e.group)state.groups[e.id]=e.group}
+      const monthKeys=new Set([...(project.months||[]),monthKey()]);
+      for(const key of monthKeys){
+        if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(key))continue;
+        const [yr,mo]=key.split('-');
+        try{
+          const data=await existingDir(handle,'data');
+          const year=await existingDir(data,yr),month=await existingDir(year,mo);
+          const work=await existingDir(month,'working');
+          const stored=normalizeSavedMonth(await readJSON(work,'state.json'));
+          if(stored)state.monthStores.set(key,stored);
+        }catch(e){if(e.name!=='NotFoundError')throw e}
+      }
+      const active=project.current||{year:YEAR,month:MONTH};
+      const key=active.year+'-'+pad(active.month);
+      if(state.monthStores.has(key))switchMonth(active.year,active.month);
+    }
+    await ensureProjectSkeleton();render();toast(project?'已连接并载入月度工作空间':'已创建项目目录');
+  }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true)}
+}
+async function persistImportedFile(file,type,count){
+  state.imports.push({id:String(state.imports.length+1).padStart(4,'0'),type,name:file.name,count,importedAt:new Date().toISOString()});
+  rememberMonth();
+  if(!state.projectDir)return;
+  const m=await monthDirectory(),raw=await dir(m,'raw'),sub=await dir(raw,type);
+  const folder=await dir(sub,String(state.imports.length).padStart(4,'0'));
+  await writeFile(folder,file.name,await file.arrayBuffer());
+}
+function projectPayload(){
+  rememberMonth();
+  return {schemaVersion:2,projectId:'P109-AttendScope',projectName:'AttendScope',appVersion:'0.1.0-preview',
+    analysisEngineVersion:'0.1.0',current:{year:YEAR,month:MONTH},
+    months:[...state.monthStores.keys()].sort(),updatedAt:new Date().toISOString()};
+}
+function workingPayload(){
+  return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
+    records:state.records,leaves:state.leaves,trips:state.trips,
+    revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
+    groups:state.groups,
+    analysis:[...state.analysis.values()].map(a=>({employeeId:a.employee.id,date:a.date,severity:a.severity,status:a.status,
+      firstIn:a.firstIn,lastOut:a.lastOut,presence:a.presence,issues:a.issues,marker:a.marker}))};
+}
+async function saveWorking(){
+  const payload=JSON.stringify(workingPayload(),null,2);
+  if(state.projectDir){
+    try{
+      await ensureProjectSkeleton();
+      const m=await monthDirectory(),w=await dir(m,'working');
+      await writeFile(w,'state.json',payload);
+      state.saved=true;rememberMonth();
+      await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
+      render();toast('已保存 '+monthKey()+' 的工作状态');return;
+    }catch(e){toast('目录保存失败：'+e.message,true);return}
+  }
+  downloadBlob(new Blob([payload],{type:'application/json'}),'AttendScope_'+monthKey()+'_working.json');
+  state.saved=true;rememberMonth();render();toast('已下载当前月份工作状态 JSON');
+}
+async function freezeSnapshot(){
+  const id='F'+Date.now(),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
+    appVersion:'0.1.0-preview',sourceImports:state.imports,parentSnapshot:null};
+  const snapshot={manifest,config:{employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:RULES},working:workingPayload()};
+  const txt=JSON.stringify(snapshot,null,2);
+  if(state.projectDir){
+    try{
+      await ensureProjectSkeleton();
+      const m=await monthDirectory(),snapshots=await dir(m,'snapshots'),folder=await dir(snapshots,id);
+      await writeFile(folder,'snapshot.json',txt);toast('已冻结 '+monthKey()+' · '+id);return;
+    }catch(e){toast('冻结失败：'+e.message,true);return}
+  }
+  downloadBlob(new Blob([txt],{type:'application/json'}),'AttendScope_'+monthKey()+'_'+id+'.json');
+  toast('已下载不可变冻结快照 '+id);
+}
+function toast(msg,error=false){
+  document.querySelector('.toast')?.remove();const el=document.createElement('div');
+  el.className='toast';el.style.background=error?'#b42318':'#1f2937';el.textContent=msg;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),3200);
+}
+const demo=generateMock();
+state.records=demo.records;state.leaves=demo.leaves;state.trips=demo.trips;
+rememberMonth();reanalyze();render();
