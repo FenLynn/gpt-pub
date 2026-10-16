@@ -38,27 +38,27 @@ export const defaultLorentzComposition: LorentzComposition = {
   annotations:[
     {id:"absorption",panel:"top",x:215,y:140,
       text:"Absorption maximum\nω = ω₀,  Im χ ∝ 1/γ",
-      color:"#89463b",fontSizePt:9,background:"#ffffff",backgroundOpacity:.88,
+      color:"#89463b",fontSizePt:8,background:"#ffffff",backgroundOpacity:.88,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:275,arrowX:632,arrowY:106},
     {id:"normal",panel:"top",x:170,y:235,
       text:"Normal dispersion\n(dn/dω > 0)",
-      color:"#315b72",fontSizePt:8.8,background:"#ffffff",backgroundOpacity:.84,
+      color:"#315b72",fontSizePt:8,background:"#ffffff",backgroundOpacity:.84,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:240},
     {id:"anomalous",panel:"top",x:435,y:410,
       text:"Anomalous dispersion\n(dn/dω < 0)",
-      color:"#89463b",fontSizePt:8.8,background:"#ffffff",backgroundOpacity:.84,
+      color:"#89463b",fontSizePt:8,background:"#ffffff",backgroundOpacity:.84,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:240},
     {id:"in-phase",panel:"bottom",x:165,y:634,
       text:"Low frequency  (ω ≪ ω₀)\nφ → 0° · in-phase response",
-      color:"#315b72",fontSizePt:8.8,background:"#ffffff",backgroundOpacity:.88,
+      color:"#315b72",fontSizePt:8,background:"#ffffff",backgroundOpacity:.88,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:300},
     {id:"resonance",panel:"bottom",x:765,y:812,
       text:"At resonance  (ω = ω₀)\nφ = 90° · maximum dissipation",
-      color:"#89463b",fontSizePt:8.8,background:"#ffffff",backgroundOpacity:.88,
+      color:"#89463b",fontSizePt:8,background:"#ffffff",backgroundOpacity:.88,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:340},
-    {id:"out-phase",panel:"bottom",x:875,y:626,
+    {id:"out-phase",panel:"bottom",x:875,y:651,
       text:"High frequency  (ω ≫ ω₀)\nφ → 180° · inertial response",
-      color:"#694b7c",fontSizePt:8.8,background:"#ffffff",backgroundOpacity:.88,
+      color:"#694b7c",fontSizePt:8,background:"#ffffff",backgroundOpacity:.88,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:275}
   ]
 };
@@ -71,19 +71,19 @@ export function createLorentzFigure(sheet:DataSheet,defaults:UserDefaults):Figur
     figureOverrides:{
       ...defaults.figureOverrides,
       figureWidthMm:183,figureHeightMm:155,aspectMode:"custom",
-      fontFamily:"Times New Roman",fontSizePt:9.5,tickLabelSizePt:9.5,axisTitleSizePt:11,
-      plotTitleSizePt:11,axisLineWidthPt:.6,majorTickLengthPt:4.5,minorTickLengthPt:2.3,
+      fontFamily:"Times New Roman",fontSizePt:9,tickLabelSizePt:8,axisTitleSizePt:9.2,
+      plotTitleSizePt:9.5,axisLineWidthPt:.55,majorTickLengthPt:4,minorTickLengthPt:2,
       frameStyle:"boxed",tickDirection:"inside",minorTicks:true,gridVisible:true,
       xTitle:"Normalized Driving Frequency, ω/ω₀",yTitle:"Susceptibility, χ(ω) (a.u.)",
       xAutoRange:false,xMin:.4,xMax:1.6,
       yAutoRange:false,yMin:-3.9,yMax:7.8,
-      legendVisible:true,legendFrame:true,legendFontSizePt:9,legendBackground:"#ffffff",
+      legendVisible:true,legendFrame:true,legendFontSizePt:8.2,legendBorderWidthPt:.3,legendBackground:"#ffffff",
       background:"#ffffff",marginLeftMm:13,marginRightMm:4,marginTopMm:6,marginBottomMm:10
     },
     seriesOverrides:{
-      "lorentz-real":{color:"#305b76",lineWidthPt:1.2,legendLabel:"Re χ(ω)   Dispersion"},
-      "lorentz-imag":{color:"#a44b3d",lineWidthPt:1.2,legendLabel:"Im χ(ω)   Absorption"},
-      "lorentz-phase":{color:"#674080",lineWidthPt:1.2,legendLabel:"Phase lag  φ(ω)"}
+      "lorentz-real":{color:"#305b76",lineWidthPt:1.1,legendLabel:"Re χ(ω)   Dispersion"},
+      "lorentz-imag":{color:"#a44b3d",lineWidthPt:1.1,legendLabel:"Im χ(ω)   Absorption"},
+      "lorentz-phase":{color:"#674080",lineWidthPt:1.1,legendLabel:"Phase lag  φ(ω)"}
     },
     seriesOrder:["lorentz-real","lorentz-imag","lorentz-phase"],
     lorentz:structuredClone(defaultLorentzComposition)
