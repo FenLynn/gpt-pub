@@ -77,17 +77,25 @@ function layoutHtml(){
       </section>
 
       <section class="side-section state-select-wrap">
-        <label for="statusFilter" class="side-label">状态筛选</label>
-        <select id="statusFilter" aria-label="状态筛选">
-          <option value="main">常规 · 正常 / 异常 / 缺勤</option>
-          <option value="normal">正常</option>
-          <option value="anomaly">异常</option>
-          <option value="absent">缺勤</option>
-          <option value="overtime">加班</option>
-          <option value="leave">请假</option>
-          <option value="trip">出差</option>
-          <option value="outing">外出</option>
-        </select>
+        <div class="side-label">状态筛选</div>
+        <div class="status-filter-control">
+          <button id="statusFilterButton" class="status-filter-button" type="button" aria-expanded="false" aria-haspopup="listbox">
+            ${statusFilterLabel(state.filter)}
+          </button>
+          <div id="statusFilterMenu" class="status-filter-menu" role="listbox">
+            ${statusFilterMenuHtml()}
+          </div>
+          <select id="statusFilter" class="status-filter-native" aria-label="状态筛选">
+            <option value="main">常规</option>
+            <option value="normal">正常</option>
+            <option value="anomaly">异常</option>
+            <option value="absent">缺勤</option>
+            <option value="overtime">加班</option>
+            <option value="leave">请假</option>
+            <option value="trip">出差</option>
+            <option value="outing">外出</option>
+          </select>
+        </div>
       </section>
     </aside>
 
@@ -124,8 +132,22 @@ function bind(){
   document.getElementById('leaveInput').onchange=e=>handleFile(e,importLeaves);
   document.getElementById('tripInput').onchange=e=>handleFile(e,importTrips);
 
-  const filter=document.getElementById('statusFilter');filter.value=state.filter;
-  filter.onchange=()=>{state.filter=filter.value;updateMatrixFilter()};
+  const filter=document.getElementById('statusFilter');
+  const filterButton=document.getElementById('statusFilterButton');
+  const filterMenu=document.getElementById('statusFilterMenu');
+  filter.value=state.filter;
+  const syncFilterButton=()=>{filterButton.innerHTML=statusFilterLabel(state.filter)};
+  filter.onchange=()=>{
+    state.filter=filter.value;updateMatrixFilter();syncFilterButton();
+    filterMenu.classList.remove('open');filterButton.setAttribute('aria-expanded','false');
+  };
+  filterButton.onclick=e=>{
+    e.stopPropagation();filterMenu.classList.toggle('open');
+    filterButton.setAttribute('aria-expanded',String(filterMenu.classList.contains('open')));
+  };
+  filterMenu.querySelectorAll('[data-filter-value]').forEach(button=>button.onclick=e=>{
+    e.stopPropagation();filter.value=button.dataset.filterValue;filter.dispatchEvent(new Event('change'));
+  });
   bindSettings();
 
   document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
@@ -158,6 +180,10 @@ function bind(){
     if(!e.target.closest('.month-anchor')){
       monthPopover.classList.remove('open');
       monthButton.setAttribute('aria-expanded','false');
+    }
+    if(!e.target.closest('.status-filter-control')){
+      filterMenu.classList.remove('open');
+      filterButton.setAttribute('aria-expanded','false');
     }
   };
 
@@ -341,3 +367,21 @@ function monthChoicesHtml(year){
 
 function escapeNameChar(ch){return String(ch).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
+
+const STATUS_FILTER_ITEMS=[
+ ['main','常规','multi'],['normal','正常','normal'],['anomaly','异常','anomaly'],['absent','缺勤','absent'],
+ ['trip','出差','trip'],['leave','请假','leave'],['outing','外出','outing'],['overtime','加班','overtime']
+];
+function statusFilterSwatch(kind){
+ if(kind==='multi')return '<span class="status-filter-dots"><i class="normal"></i><i class="anomaly"></i><i class="absent"></i></span>';
+ return '<i class="status-filter-dot '+kind+'"></i>';
+}
+function statusFilterLabel(value){
+ const item=STATUS_FILTER_ITEMS.find(x=>x[0]===value)||STATUS_FILTER_ITEMS[0];
+ return '<span class="status-filter-current">'+statusFilterSwatch(item[2])+'<b>'+item[1]+'</b></span><i class="chevron"></i>';
+}
+function statusFilterMenuHtml(){
+ return STATUS_FILTER_ITEMS.map(([value,label,kind])=>
+  '<button type="button" role="option" data-filter-value="'+value+'">'+statusFilterSwatch(kind)+'<span>'+label+'</span></button>'
+ ).join('');
+}
