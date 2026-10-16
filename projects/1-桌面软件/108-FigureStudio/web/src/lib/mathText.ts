@@ -213,3 +213,87 @@ export async function resolveSafeMathText(value: string | undefined): Promise<Sa
     return { text: visibleFallback(value, segments), state: "invalid" };
   }
 }
+
+
+export interface MathSvgGeometry {
+  innerSvg: string;
+  minX: number;
+  minY: number;
+  width: number;
+  height: number;
+}
+
+const mathSvgCache = new Map<string, Promise<MathSvgGeometry | null>>();
+
+export function hasLatexMath(value: string | undefined): boolean {
+  if (!value || hasUnbalancedMathDelimiters(value)) return false;
+  return latexSegments(value).length > 0;
+}
+
+export function mathJaxExpressionForText(value: string | undefined): string | null {
+  if (!value || hasUnbalancedMathDelimiters(value)) return null;
+  const segments = latexSegments(value);
+  if (!segments.length) return null;
+  return mathJaxExpression(value, segments);
+}
+
+/**
+ * Readable SVG fallback while MathJax is starting. This is intentionally
+ * transient: valid math is replaced by real MathJax SVG paths in-browser.
+ */
+export function plainSvgMathFallback(value: string | undefined): string {
+  if (!value) return "";
+  if (hasUnbalancedMathDelimiters(value)) return value;
+  const segments = latexSegments(value);
+  if (!segments.length) return value;
+  return (visibleFallback(value, segments) ?? value)
+    .replace(/<\/?(?:sub|sup)>/gi, "");
+}
+
+/**
+ * Convert mixed plain text + $...$ / \(...\) math to a self-contained SVG
+ * fragment. MathJax is bundled locally by FigureStudio. No CDN is used.
+ */
+export async function renderMathTextSvg(
+  value: string | undefined
+): Promise<MathSvgGeometry | null> {
+  const expression = mathJaxExpressionForText(value);
+  if (!expression) return null;
+  const cached = mathSvgCache.get(expression);
+  if (cached) return cached;
+
+  const task = (async () => {
+    if (typeof window === "undefined") return null;
+    const mathJax = (window as any).MathJax;
+    if (!mathJax?.tex2svgPromise) return null;
+    try {
+      if (mathJax.startup?.promise) await mathJax.startup.promise;
+      const node = await mathJax.tex2svgPromise(expression, { display: false });
+      if (
+        node?.querySelector?.('[data-mml-node="merror"]') ||
+        node?.querySelector?.(".merror")
+      ) return null;
+      const svg = node?.querySelector?.("svg") as SVGSVGElement | null;
+      if (!svg) return null;
+      const parts = (svg.getAttribute("viewBox") ?? "")
+        .trim()
+        .split(/\s+/)
+        .map(Number);
+      if (parts.length !== 4 || parts.some(v => !Number.isFinite(v))) return null;
+      const [minX, minY, width, height] = parts;
+      if (!(width > 0) || !(height > 0)) return null;
+      return {
+        innerSvg: svg.innerHTML,
+        minX,
+        minY,
+        width,
+        height
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  mathSvgCache.set(expression, task);
+  return task;
+}
