@@ -36,9 +36,9 @@ export const defaultLorentzComposition: LorentzComposition = {
     {id:"absorption",panel:"top",x:220,y:102,text:"Absorption Peak (ω = ω₀)\nIm[χ] ∝ 1/γ",color:"#873c30",fontSizePt:9.5,background:"#ffffff",backgroundOpacity:.93,borderColor:"#c5c5c5",borderWidthPt:.5,arrowX:635,arrowY:107},
     {id:"normal",panel:"top",x:164,y:235,text:"Normal Dispersion\n(dn/dω > 0)",color:"#315b72",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5},
     {id:"anomalous",panel:"top",x:468,y:402,text:"Anomalous Dispersion\n(dn/dω < 0)",color:"#873c30",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5},
-    {id:"in-phase",panel:"bottom",x:160,y:860,text:"ω ≪ ω₀ : φ → 0°\nIn-phase elastic tracking",color:"#315b72",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5},
-    {id:"resonance",panel:"bottom",x:736,y:740,text:"Resonance Lag: 90°\nMaximum dissipation",color:"#873c30",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5},
-    {id:"out-phase",panel:"bottom",x:860,y:601,text:"ω ≫ ω₀ : φ → 180°\nOut-of-phase inertial response",color:"#69457c",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5}
+    {id:"in-phase",panel:"bottom",x:160,y:860,text:"ω ≪ ω₀ : φ → 0°\n(In-phase elastic tracking, pure refractive n)",color:"#315b72",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5},
+    {id:"resonance",panel:"bottom",x:736,y:740,text:"Resonance Lag: 90°\n(Velocity in phase with E(t) → Max dissipation)",color:"#873c30",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5},
+    {id:"out-phase",panel:"bottom",x:860,y:601,text:"ω ≫ ω₀ : φ → 180°\n(Out-of-phase inertial response, free-carrier-like shielding)",color:"#69457c",fontSizePt:9,background:"#ffffff",backgroundOpacity:.92,borderColor:"#c5c5c5",borderWidthPt:.5}
   ]
 };
 export function createLorentzFigure(sheet:DataSheet,defaults:UserDefaults):FigureSpec{
