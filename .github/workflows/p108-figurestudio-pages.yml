@@ -103,6 +103,15 @@ jobs:
             --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=lorentz" \
             > "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html" 2>"$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.stderr"
           test -s "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.png"
+          echo "Lorentz DOM bytes: $(wc -c < "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html")"
+          for pattern in 'Lorentz oscillator editable' 'data-series-id="lorentz-real"' 'data-testid="lorentz-inspector"'; do
+            if ! grep -q "$pattern" "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"; then
+              echo "::error::Lorentz browser DOM missing: $pattern"
+              grep -oE '(<title>[^<]+|aria-label="[^"]+"|data-testid="[^"]+"|data-series-id="[^"]+")' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html" | head -n 25 || true
+              tail -n 30 "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.stderr" || true
+              exit 1
+            fi
+          done
           grep -q 'aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-series-id="lorentz-real"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-series-id="lorentz-phase"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
@@ -110,12 +119,16 @@ jobs:
           echo "Lorentz Golden: normal FigureStudio Graph editor, worksheet-driven SVG, editable inspector OK"
 
       - name: Upload browser screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: p108-nature-visual-qa
-          path: ${{ runner.temp }}/p108-screenshots/*.png
+          path: |
+            ${{ runner.temp }}/p108-screenshots/*.png
+            ${{ runner.temp }}/p108-screenshots/Lorentz-Golden.html
+            ${{ runner.temp }}/p108-screenshots/Lorentz-Golden.stderr
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Keep validated P108 preview build
         uses: actions/upload-artifact@v4
