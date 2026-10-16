@@ -431,8 +431,9 @@ export function buildTraces(args: {
           ticklen: ptToPx(metrics.minorTickLengthPt),
           tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
           tickcolor: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor,
-          len: 0.66,
-          x: 1.06,
+          len: GOLDEN_STYLE.field.colorbarLength3d,
+          x: 0.92,
+          xanchor: "left",
           xpad: 4,
           tickfont: {
             family: plotFontFamily(
@@ -1235,8 +1236,20 @@ export function buildLayout(args: {
   };
 
   if (figure.templateId === "surface-3d") {
+    layout.margin = {
+      l: Math.round(mmToPx(overrides.marginLeftMm ?? 6.5)),
+      r: Math.round(mmToPx(overrides.marginRightMm ?? 14)),
+      t: Math.round(mmToPx(overrides.marginTopMm ?? 4.5)),
+      b: Math.round(mmToPx(overrides.marginBottomMm ?? 11)),
+      pad: 0,
+      autoexpand: false
+    };
     layout.scene = {
       bgcolor: background,
+      domain: {
+        x: [...GOLDEN_STYLE.field.surfaceDomainX],
+        y: [...GOLDEN_STYLE.field.surfaceDomainY]
+      },
       xaxis: {
         title: {
           text: resolvedXTitle,
@@ -1316,10 +1329,10 @@ export function buildLayout(args: {
         }
       },
       camera: {
-        eye: { x: 1.45, y: 1.45, z: 1.12 }
+        eye: { ...GOLDEN_STYLE.field.surfaceCameraEye }
       },
       aspectmode: "manual",
-      aspectratio: { x: 1, y: 1, z: 0.75 }
+      aspectratio: { ...GOLDEN_STYLE.field.surfaceAspect }
     };
     return layout;
   }

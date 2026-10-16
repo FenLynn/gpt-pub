@@ -144,6 +144,12 @@ for (let n=0; n<gallery.length; n++) {
     "3D scene planes must use the Golden neutral background");
   assert.equal(surfaceLayout.scene?.xaxis?.gridcolor,GOLDEN_STYLE.field.sceneGridColor,
     "3D scene grid must use the Golden neutral grid");
+  assert.deepEqual(surfaceLayout.scene?.domain?.x,[...GOLDEN_STYLE.field.surfaceDomainX],
+    "3D scene needs publication-safe horizontal breathing room");
+  assert.deepEqual(surfaceLayout.scene?.domain?.y,[...GOLDEN_STYLE.field.surfaceDomainY],
+    "3D scene needs publication-safe vertical breathing room");
+  assert.deepEqual(surfaceLayout.scene?.camera?.eye,GOLDEN_STYLE.field.surfaceCameraEye,
+    "3D Golden camera should remain stable across redraws");
 
   const golden=project.figures.find(f=>f.lorentz?.kind==="lorentz-two-panel");
   assert.ok(golden,"Lorentz golden Graph must exist in ordinary project");

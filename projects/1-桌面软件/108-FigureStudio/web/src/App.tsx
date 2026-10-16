@@ -2066,7 +2066,7 @@ function App() {
     if (!plotRef.current || !activeFigure) return;
     if (activeFigure.templateId === "surface-3d") {
       await Plotly.relayout(plotRef.current, {
-        "scene.camera": { eye: { x: 1.45, y: 1.45, z: 1.12 } }
+        "scene.camera": { eye: { ...GOLDEN_STYLE.field.surfaceCameraEye } }
       });
     } else {
       await Plotly.relayout(plotRef.current, {

@@ -385,8 +385,8 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
         const tx=lX+(i%cols)*itemWidth;
         const ty=lY+Math.floor(i/cols)*lh;
         return <g key={"legend-"+i}>
-          <path d={"M "+tx+" "+(ty+lh/2)+" h "+sampleLength} stroke={tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.line?.width??1.3}
-             strokeLinecap="round" strokeDasharray={DASH[tr.line?.dash??"solid"]}/>
+          {doLines(tr) && <path d={"M "+tx+" "+(ty+lh/2)+" h "+sampleLength} stroke={tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.line?.width??1.3}
+             strokeLinecap="round" strokeDasharray={DASH[tr.line?.dash??"solid"]}/>}
           {doMarkers(tr) && <g transform={"translate("+(tx+sampleLength/2)+","+(ty+lh/2)+")"} fill={tr.marker?.color??tr.line?.color??GOLDEN_STYLE.palette[0]}
              stroke={tr.marker?.line?.color??tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.marker?.line?.width??0.5}>
              {markerShape(tr.marker?.symbol,0,0,Math.min(tr.marker?.size??5,8))}
