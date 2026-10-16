@@ -13,18 +13,9 @@ function layoutHtml(){
   <header class="topbar">
     <div class="brand">
       <div class="logo" aria-hidden="true"><span></span></div>
-      <div class="brand-copy">
-        <div class="brand-title">AttendScope</div>
-        <div class="brand-sub">P109 · Offline</div>
-      </div>
+      <strong class="brand-title">AttendScope</strong>
+      <span class="brand-mode">离线考勤</span>
     </div>
-
-    <div class="month-switch">
-      <button class="icon-btn" disabled>‹</button>
-      <div><strong>2026 年 10 月</strong><small>月度考勤 · 50 人</small></div>
-      <button class="icon-btn" disabled>›</button>
-    </div>
-
     <div class="top-actions">
       <span class="save-state ${state.saved?'saved':'dirty'}"><i></i>${state.saved?'已保存':'未保存'}</span>
       <div class="import-anchor">
@@ -38,8 +29,9 @@ function layoutHtml(){
         </div>
       </div>
       <button class="text-btn" id="connectDir">项目目录</button>
-      <button class="text-btn" id="exportTable">导出</button>
+      <button class="text-btn" id="exportTable">导出表格</button>
       <button class="text-btn" id="printReport">PDF</button>
+      <span class="action-divider"></span>
       <button class="text-btn" id="saveBtn">保存</button>
       <button class="primary-btn" id="freezeBtn">冻结</button>
     </div>
@@ -48,10 +40,22 @@ function layoutHtml(){
   <div class="layout">
     <aside class="sidebar">
       <section class="side-section calendar-section">
-        <div class="side-heading">
-          <div><strong>十月</strong><span>2026</span></div>
-          <button class="quiet-link" id="clearSelection">总览</button>
+        <div class="month-navigation">
+          <span class="side-label">当前月份</span>
+          <div class="month-anchor">
+            <button id="monthMenuButton" class="month-button" aria-expanded="false" aria-label="选择考勤月份">
+              <span>2026 年 10 月</span><i class="chevron"></i>
+            </button>
+            <div class="month-popover" id="monthPopover">
+              <div class="month-popover-head">2026 年 · 选择月份</div>
+              <div class="month-choices">
+                ${Array.from({length:12},(_,i)=>`<button class="month-choice ${i===9?'active':''}" data-month="${i+1}" ${i!==9?'disabled title="尚未导入该月份数据"':''}>${pad(i+1)}</button>`).join('')}
+              </div>
+              <p>当前演示项目仅有 2026 年 10 月的数据。</p>
+            </div>
+          </div>
         </div>
+        <div class="calendar-caption"><span>月历 · 工作安排</span><button class="quiet-link" id="clearSelection">总览</button></div>
         <div class="calendar-grid" id="calendar"></div>
         <div class="calendar-key">
           <span><i class="work"></i>工作</span>
@@ -73,25 +77,28 @@ function layoutHtml(){
       </section>
 
       <section class="side-section side-legend">
-        <div class="side-label">显示</div>
-        <button class="legend-filter ${state.filter==='all'?'active':''}" data-filter="all"><i class="neutral"></i><span>全部</span></button>
-        <button class="legend-filter ${state.filter==='problem'?'active':''}" data-filter="problem"><i class="problem"></i><span>明确问题</span></button>
-        <button class="legend-filter ${state.filter==='suspect'?'active':''}" data-filter="suspect"><i class="suspect"></i><span>疑似异常</span></button>
-        <button class="legend-filter ${state.filter==='excused'?'active':''}" data-filter="excused"><i class="excused"></i><span>请假 / 出差</span></button>
+        <div class="side-label">状态筛选</div>
+        <button class="legend-filter ${state.filter==='all'?'active':''}" data-filter="all"><i class="neutral"></i><span>全部状态</span></button>
+        <button class="legend-filter ${state.filter==='problem'?'active':''}" data-filter="problem"><i class="problem"></i><span>明确异常</span></button>
+        <button class="legend-filter ${state.filter==='suspect'?'active':''}" data-filter="suspect"><i class="suspect"></i><span>待核实</span></button>
+        <button class="legend-filter ${state.filter==='overtime'?'active':''}" data-filter="overtime"><i class="overtime"></i><span>非工作日加班</span></button>
+        <button class="legend-filter ${state.filter==='excused'?'active':''}" data-filter="excused"><i class="neutral"></i><span>请假 / 出差</span></button>
       </section>
     </aside>
 
     <main class="workspace">
       <div class="workbench">
-        <section class="matrix-zone">
-          <div class="section-head">
-            <div>
-              <h2>月度状态</h2>
-              <p>点击姓名、日期或状态方块。</p>
-            </div>
-            <div class="matrix-actions"><span id="filterNote"></span></div>
-          </div>
+        <section class="matrix-zone" aria-label="50人员工31天月度考勤状态矩阵">
           <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
+          <div class="matrix-footer">
+            <span class="matrix-footnote">50 人 <i>·</i> 31 天 <span id="filterNote"></span></span>
+            <div class="matrix-legend">
+              <span><i class="normal"></i>正常</span>
+              <span><i class="suspect"></i>待核实</span>
+              <span><i class="problem"></i>异常</span>
+              <span><i class="overtime"></i>加班</span>
+            </div>
+          </div>
         </section>
 
         <section class="analysis-panel">
@@ -136,8 +143,25 @@ function bind(){
 
   document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};state.analysisTab='overview';render()};
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
-  importBtn.onclick=e=>{e.stopPropagation();popover.classList.toggle('open')};
-  document.getElementById('app').onclick=e=>{if(!e.target.closest('.import-anchor'))popover.classList.remove('open')};
+  const monthButton=document.getElementById('monthMenuButton'),monthPopover=document.getElementById('monthPopover');
+  importBtn.onclick=e=>{e.stopPropagation();monthPopover.classList.remove('open');popover.classList.toggle('open')};
+  monthButton.onclick=e=>{
+    e.stopPropagation();
+    popover.classList.remove('open');
+    monthPopover.classList.toggle('open');
+    monthButton.setAttribute('aria-expanded',String(monthPopover.classList.contains('open')));
+  };
+  monthPopover.querySelectorAll('.month-choice:not(:disabled)').forEach(button=>button.onclick=()=>{
+    monthPopover.classList.remove('open');
+    monthButton.setAttribute('aria-expanded','false');
+  });
+  document.getElementById('app').onclick=e=>{
+    if(!e.target.closest('.import-anchor'))popover.classList.remove('open');
+    if(!e.target.closest('.month-anchor')){
+      monthPopover.classList.remove('open');
+      monthButton.setAttribute('aria-expanded','false');
+    }
+  };
 
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
   document.getElementById('sampleAttendance').onclick=downloadAttendance;
@@ -184,13 +208,13 @@ function matrixVisible(a){
 
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
-  const cell=17,row=18,nameW=58;
+  const cell=16,row=16,nameW=58;
   el.style.setProperty('--cell',cell+'px');
   el.style.setProperty('--row',row+'px');
   el.style.setProperty('--name',nameW+'px');
   el.style.gridTemplateColumns=`${nameW}px repeat(31,${cell}px)`;
 
-  let html='<div class="m-corner"></div>';
+  let html='<div class="m-corner">姓名</div>';
   for(let d=1;d<=31;d++){
     const type=dayType(d),sel=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d?' selected':'';
     html+=`<button class="m-date ${type}${sel}" data-date="${d}" title="${isoDate(d)} · 周${weekdayLabel(d)} · ${dayTypeText(type)}"><b>${pad(d)}</b></button>`;
@@ -198,12 +222,13 @@ function renderMatrix(){
 
   for(const e of EMPLOYEES){
     const rowSelected=(state.selection.type==='person'||state.selection.type==='cell')&&state.selection.employeeId===e.id;
-    html+=`<button class="m-name ${rowSelected?'selected':''}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span>${e.name}</span></button>`;
+    const letters=Array.from(e.name).slice(0,4).map(ch=>`<span>${escapeNameChar(ch)}</span>`).join('');
+    html+=`<button class="m-name ${rowSelected?'selected':''}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span class="name-letters">${letters}</span></button>`;
     for(let d=1;d<=31;d++){
       const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
       const selected=state.selection.type==='cell'&&state.selection.employeeId===e.id&&state.selection.day===d;
       const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
-      const cls=a.severity==='problem'?'s-problem':a.severity==='suspect'?'s-suspect':a.severity==='rest'?'s-rest':a.severity==='excused'?'s-excused':a.status==='非工作日出勤'?'s-overtime':'s-normal';
+      const cls=a.status==='非工作日出勤'?'s-overtime':a.severity==='problem'?'s-problem':a.severity==='suspect'?'s-suspect':a.severity==='rest'?'s-rest':'s-normal';
       html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''}">
         <button class="${cls} ${selected?'selected':''}" style="opacity:${visible?1:.10}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n${a.status}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${a.marker?`<i class="corner-mark ${a.marker}"></i>`:''}</button>
       </div>`;
@@ -270,3 +295,5 @@ function bindAnalysisPanel(ctx){
 function selectPerson(id){state.selection={type:'person',employeeId:id};state.analysisTab='overview';render()}
 function selectDate(d){state.selection={type:'date',day:d};state.analysisTab='timeline';render()}
 function selectCell(id,d){state.selection={type:'cell',employeeId:id,day:d};state.analysisTab='timeline';state.zoom=1;state.timelineRange=null;render()}
+
+function escapeNameChar(ch){return String(ch).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
