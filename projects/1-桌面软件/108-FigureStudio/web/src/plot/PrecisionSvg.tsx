@@ -2,6 +2,7 @@ import { useMemo, useRef, type RefObject } from "react";
 import type { FigureSpec } from "../model";
 import { plainSvgMathFallback } from "../lib/mathText";
 import { SvgMathText } from "./SvgMathText";
+import { GOLDEN_STYLE } from "./goldenStyle";
 
 /**
  * Experimental publication SVG renderer.
@@ -206,8 +207,8 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
   const yp = projector(yAxis,yDomain,plot.bottom,plot.top);
   const rp = projector(rightAxis ?? yAxis,rDomain,plot.bottom,plot.top);
   const uid = "fs-svg-" + figure.id.replace(/[^a-z0-9_-]/gi,"");
-  const baseFont = layout.font?.family ?? "Arial, sans-serif";
-  const baseColor = layout.font?.color ?? "#202328";
+  const baseFont = layout.font?.family ?? GOLDEN_STYLE.typography.sansFamily;
+  const baseColor = layout.font?.color ?? GOLDEN_STYLE.typography.textColor;
   const textSize = layout.font?.size ?? 11;
   const bg = layout.paper_bgcolor ?? "#fff";
   const textOf = (v?: string) => v ?? "";
@@ -228,8 +229,8 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
       const labelX = isX ? pos : base+(opposite?labelShift:-labelShift);
       const labelY = isX ? base+labelShift+(font.size??10)*0.85 : pos+(font.size??10)*0.34;
       return <g key={"mj-"+side+"-"+i}>
-        {axis.showgrid && !opposite && <line x1={isX?pos:plot.left} x2={isX?pos:plot.right} y1={isX?plot.top:pos} y2={isX?plot.bottom:pos} stroke={axis.gridcolor??"#e3e7ec"} strokeWidth={axis.gridwidth??0.5}/>}
-        <path d={isX?"M "+coord(pos)+" "+base+" v "+coord(tickSign*tickLen):"M "+base+" "+coord(pos)+" h "+coord(tickSign*tickLen)} fill="none" stroke={axis.tickcolor??baseColor} strokeWidth={axis.tickwidth??0.85}/>
+        {axis.showgrid && !opposite && <line x1={isX?pos:plot.left} x2={isX?pos:plot.right} y1={isX?plot.top:pos} y2={isX?plot.bottom:pos} stroke={axis.gridcolor??GOLDEN_STYLE.stroke.gridRgba} strokeWidth={axis.gridwidth??0.5}/>}
+        <path d={isX?"M "+coord(pos)+" "+base+" v "+coord(tickSign*tickLen):"M "+base+" "+coord(pos)+" h "+coord(tickSign*tickLen)} fill="none" stroke={axis.tickcolor??GOLDEN_STYLE.stroke.tickStrokeColor} strokeWidth={axis.tickwidth??0.85}/>
         <SvgMathText text={formatTick(v,axis)} x={labelX} y={labelY} fill={c}
           fontSize={font.size??textSize} fontFamily={font.family??baseFont}
           textAnchor={isX?"middle":opposite?"start":"end"} rotate={axis.tickangle}/>
@@ -239,7 +240,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
       const pos=fn(v);if (!fnum(pos)) return null;
       if (isX ? pos<plot.left||pos>plot.right : pos<plot.top||pos>plot.bottom) return null;
       const len=axis.minor?.ticklen??2.4;
-      return <path key={"mn-"+side+"-"+i} d={isX?"M "+coord(pos)+" "+base+" v "+coord(tickSign*len):"M "+base+" "+coord(pos)+" h "+coord(tickSign*len)} stroke={axis.minor?.tickcolor??axis.tickcolor??baseColor} strokeWidth={axis.minor?.tickwidth??0.6}/>;
+      return <path key={"mn-"+side+"-"+i} d={isX?"M "+coord(pos)+" "+base+" v "+coord(tickSign*len):"M "+base+" "+coord(pos)+" h "+coord(tickSign*len)} stroke={axis.minor?.tickcolor??axis.tickcolor??GOLDEN_STYLE.stroke.tickStrokeColor} strokeWidth={axis.minor?.tickwidth??0.6}/>;
     });
     const pad = axis.title?.standoff ?? 5;
     const labelHeight = axis.tickfont?.size ?? textSize;
@@ -255,7 +256,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     const title = axis.title?.text;
     return <g key={"axis-"+side} onClick={onAxisClick}>
       {majorNodes}{minorNodes}
-      <path d={isX?"M "+plot.left+" "+base+" H "+plot.right:"M "+base+" "+plot.top+" V "+plot.bottom} stroke={axis.linecolor??"#252c34"} strokeWidth={axis.linewidth??0.9} fill="none"/>
+      <path d={isX?"M "+plot.left+" "+base+" H "+plot.right:"M "+base+" "+plot.top+" V "+plot.bottom} stroke={axis.linecolor??GOLDEN_STYLE.stroke.axisColor} strokeWidth={axis.linewidth??0.9} fill="none"/>
       {title && <SvgMathText text={textOf(title)} x={tx} y={ty}
         rotate={!isX ? (opposite?90:-90) : undefined}
         fill={axis.title?.font?.color??baseColor}
@@ -279,7 +280,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
   const doMarkers = (tr:DataTrace)=> (tr.mode??"").includes("markers");
   const doLines = (tr:DataTrace)=> (tr.mode??"").includes("lines");
   return <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" width={width} height={height}
-    viewBox={"0 0 "+width+" "+height} style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}
+    viewBox={"0 0 "+width+" "+height} data-style-family={GOLDEN_STYLE.id} style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}
     role="img" aria-label={figure.name+"，精细 SVG 绘图"}>
     <defs><clipPath id={uid}><rect x={plot.left} y={plot.top} width={Math.max(1,plot.right-plot.left)} height={Math.max(1,plot.bottom-plot.top)}/></clipPath></defs>
     <rect width={width} height={height} fill={bg}/>
@@ -307,7 +308,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
         let path="";
         let started=false;
         pairs.forEach(p=>{if(!p){started=false;return;}path+=(started?"L":"M")+coord(p.x)+" "+coord(p.y)+" ";started=true;});
-        const color = tr.line?.color??"#26749b", widthLine = tr.line?.width??1.3;
+        const color = tr.line?.color??GOLDEN_STYLE.palette[0], widthLine = tr.line?.width??1.3;
         const maxMarkers = tr.marker?.maxdisplayed??0;
         const stride = maxMarkers>0?Math.max(1,Math.ceil(pairs.length/maxMarkers)):1;
         return <g key={"trace-"+index} opacity={tr.opacity??1}
@@ -366,15 +367,15 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
         event.currentTarget.removeAttribute("transform");
       }}>
       {Number(legend.borderwidth??0)>0 && <rect x={lX-6} y={lY-4} width={lw+12} height={lhTotal+8}
-        fill={legend.bgcolor??"#fff"} stroke={legend.bordercolor??"#cdd2d7"} strokeWidth={legend.borderwidth}/>}
+        rx="1.5" fill={legend.bgcolor??GOLDEN_STYLE.legend.background} stroke={legend.bordercolor??GOLDEN_STYLE.legend.borderColor} strokeWidth={legend.borderwidth}/>}
       {legendItems.map((tr,i)=>{
         const tx=lX+(i%cols)*itemWidth;
         const ty=lY+Math.floor(i/cols)*lh;
         return <g key={"legend-"+i}>
-          <path d={"M "+tx+" "+(ty+lh/2)+" h 18"} stroke={tr.line?.color??"#26749b"} strokeWidth={tr.line?.width??1.3}
+          <path d={"M "+tx+" "+(ty+lh/2)+" h 18"} stroke={tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.line?.width??1.3}
              strokeLinecap="round" strokeDasharray={DASH[tr.line?.dash??"solid"]}/>
-          {doMarkers(tr) && <g transform={"translate("+(tx+9)+","+(ty+lh/2)+")"} fill={tr.marker?.color??tr.line?.color??"#26749b"}
-             stroke={tr.marker?.line?.color??tr.line?.color??"#26749b"} strokeWidth={tr.marker?.line?.width??0.5}>
+          {doMarkers(tr) && <g transform={"translate("+(tx+9)+","+(ty+lh/2)+")"} fill={tr.marker?.color??tr.line?.color??GOLDEN_STYLE.palette[0]}
+             stroke={tr.marker?.line?.color??tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.marker?.line?.width??0.5}>
              {markerShape(tr.marker?.symbol,0,0,Math.min(tr.marker?.size??5,8))}
           </g>}
           <SvgMathText text={tr.name} x={tx+24} y={ty+lh/2+lfont*0.34}

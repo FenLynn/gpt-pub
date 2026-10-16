@@ -4,6 +4,7 @@ import {
   resolvePublicationMetrics,
   resolveSeriesPalette
 } from "./publication";
+import { GOLDEN_STYLE } from "./goldenStyle";
 import type {
   Dataset,
   PlotColumn,
@@ -201,7 +202,7 @@ function baseXYTrace(
               ? 0.8
               : modeDefault === "markers"
               ? 0
-              : 0.45)
+              : GOLDEN_STYLE.stroke.markerEdgePt)
         )
       }
     },
@@ -1000,26 +1001,26 @@ export function buildLayout(args: {
     showline: true,
     mirror: overrides.frameStyle !== "open",
     linewidth: axisWidthPx,
-    linecolor: "#202328",
+    linecolor: GOLDEN_STYLE.stroke.axisColor,
     ticks: tickDirection,
     ticklen: ptToPx(majorTickLengthPt),
     tickwidth: axisWidthPx,
-    tickcolor: "#202328",
+    tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
     tickfont: {
       family: fontFamily,
       size: tickLabelSizePx,
-      color: overrides.tickLabelColor ?? "#17191c"
+      color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
     },
     showgrid: gridVisible,
-    gridcolor: "#e3e6e9",
-    gridwidth: 0.45,
+    gridcolor: GOLDEN_STYLE.stroke.gridRgba,
+    gridwidth: GOLDEN_STYLE.stroke.gridWidthPx,
     zeroline: false,
     automargin: true,
     minor: {
       ticks: overrides.minorTicks ? tickDirection : "",
       ticklen: overrides.minorTicks ? ptToPx(minorTickLengthPt) : 0,
       tickwidth: axisWidthPx * 0.75,
-      tickcolor: "#202328",
+      tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
       showgrid: false
     }
   };
@@ -1160,7 +1161,7 @@ export function buildLayout(args: {
           font: {
             family: fontFamily,
             size: plotTitleSizePx,
-            color: overrides.plotTitleColor ?? "#17191c"
+            color: overrides.plotTitleColor ?? GOLDEN_STYLE.typography.titleColor
           }
         }
       : undefined,
@@ -1171,7 +1172,7 @@ export function buildLayout(args: {
     font: {
       family: fontFamily,
       size: fontSizePx,
-      color: "#17191c"
+      color: GOLDEN_STYLE.typography.textColor
     },
     legend: {
       ...legendPosition,
@@ -1182,15 +1183,15 @@ export function buildLayout(args: {
             overrides.legendBackgroundOpacity ?? 1
           )
         : overrides.legendFrame
-        ? "rgba(255,255,255,0.90)"
+        ? "rgba(255,255,255," + GOLDEN_STYLE.legend.backgroundOpacity + ")"
         : "rgba(255,255,255,0)",
-      bordercolor: overrides.legendBorderColor ?? "#cdd2d7",
+      bordercolor: overrides.legendBorderColor ?? GOLDEN_STYLE.legend.borderColor,
       borderwidth: overrides.legendFrame
-        ? ptToPx(overrides.legendBorderWidthPt ?? 0.6)
+        ? ptToPx(overrides.legendBorderWidthPt ?? GOLDEN_STYLE.stroke.legendBorderPt)
         : 0,
       traceorder: "normal",
       itemsizing: "constant",
-      itemwidth: Math.max(30, overrides.legendItemWidthPx ?? 30),
+      itemwidth: Math.max(GOLDEN_STYLE.legend.sampleLengthPx, overrides.legendItemWidthPx ?? GOLDEN_STYLE.legend.sampleLengthPx),
       entrywidthmode:
         legendOrientation === "horizontal" && legendColumns > 1
           ? "fraction"
@@ -1221,24 +1222,24 @@ export function buildLayout(args: {
           font: {
             family: fontFamily,
             size: axisTitleSizePx,
-            color: overrides.axisTitleColor ?? "#17191c"
+            color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
           }
         },
         showbackground: true,
         backgroundcolor: "#f7f7f7",
         showline: true,
-        linecolor: "#202328",
+        linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
         gridcolor: "#dde1e4",
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
         ticklen: ptToPx(majorTickLengthPt),
-        tickcolor: "#202328",
+        tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
         tickfont: {
           family: fontFamily,
           size: tickLabelSizePx,
-          color: overrides.tickLabelColor ?? "#17191c"
+          color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
         }
       },
       yaxis: {
@@ -1247,24 +1248,24 @@ export function buildLayout(args: {
           font: {
             family: fontFamily,
             size: axisTitleSizePx,
-            color: overrides.axisTitleColor ?? "#17191c"
+            color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
           }
         },
         showbackground: true,
         backgroundcolor: "#f7f7f7",
         showline: true,
-        linecolor: "#202328",
+        linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
         gridcolor: "#dde1e4",
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
         ticklen: ptToPx(majorTickLengthPt),
-        tickcolor: "#202328",
+        tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
         tickfont: {
           family: fontFamily,
           size: tickLabelSizePx,
-          color: overrides.tickLabelColor ?? "#17191c"
+          color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
         }
       },
       zaxis: {
@@ -1273,24 +1274,24 @@ export function buildLayout(args: {
           font: {
             family: fontFamily,
             size: axisTitleSizePx,
-            color: overrides.axisTitleColor ?? "#17191c"
+            color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
           }
         },
         showbackground: true,
         backgroundcolor: "#f7f7f7",
         showline: true,
-        linecolor: "#202328",
+        linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
         gridcolor: "#dde1e4",
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
         ticklen: ptToPx(majorTickLengthPt),
-        tickcolor: "#202328",
+        tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
         tickfont: {
           family: fontFamily,
           size: tickLabelSizePx,
-          color: overrides.tickLabelColor ?? "#17191c"
+          color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
         }
       },
       camera: {
@@ -1317,7 +1318,7 @@ export function buildLayout(args: {
       font: {
         family: fontFamily,
         size: axisTitleSizePx,
-        color: overrides.axisTitleColor ?? "#17191c"
+        color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
       }
     },
     dtick:

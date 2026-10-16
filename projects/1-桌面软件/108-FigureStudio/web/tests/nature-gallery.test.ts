@@ -10,6 +10,7 @@ import { LorentzFigure } from "../src/plot/LorentzFigure";
 import { LorentzInspector } from "../src/plot/LorentzInspector";
 import { encodeProject, decodeProject } from "../src/project/projectIO";
 import { mathJaxExpressionForText, plainSvgMathFallback } from "../src/lib/mathText";
+import { GOLDEN_STYLE } from "../src/plot/goldenStyle";
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
@@ -47,6 +48,13 @@ for (let n=0; n<gallery.length; n++) {
   const traces = buildTraces({dataset,figure,preset:presets.nature});
   assert.ok(layout.width>0 && layout.height>0);
   assert.ok(traces.length>0,figure.name+" produced zero traces");
+  const goldenAxis=(layout as any).xaxis;
+  if(goldenAxis){
+    assert.equal(goldenAxis.linecolor,GOLDEN_STYLE.stroke.axisColor,
+      figure.name+" must inherit the Lorentz Golden axis language");
+    assert.equal(goldenAxis.tickcolor,GOLDEN_STYLE.stroke.tickStrokeColor,
+      figure.name+" must inherit the Lorentz Golden tick language");
+  }
   for(const tr of traces as Array<{x?:unknown[];y?:unknown[]}>) {
     if (!Array.isArray(tr.x) || !Array.isArray(tr.y)) continue; // 2D field matrix
     assert.ok(tr.x.length>0 && tr.y.length>0, figure.name+" contains a blank XY trace");
@@ -64,6 +72,8 @@ for (let n=0; n<gallery.length; n++) {
       onLegendDrag:()=>{}
     }));
     assert.ok(svg.startsWith("<svg"),figure.name+" did not render SVG");
+    assert.ok(svg.includes('data-style-family="'+GOLDEN_STYLE.id+'"'),
+      figure.name+" did not inherit FigureStudio Golden Style");
     assert.ok(svg.includes(plainSvgMathFallback(xTitle)) && svg.includes(plainSvgMathFallback(yTitle)),
       figure.name+" lost readable SVG axis labels");
     assert.ok(svg.includes('viewBox="0 0 '),figure.name+" missing exact SVG viewbox");
@@ -86,6 +96,8 @@ for (let n=0; n<gallery.length; n++) {
     svgRef:createRef<SVGSVGElement>(),onSelectSeries:()=>{},
     onSelectAnnotation:()=>{},onMoveAnnotation:()=>{},onAxisClick:()=>{},onLegendClick:()=>{}
   }));
+  assert.ok(markup.includes('data-style-family="'+GOLDEN_STYLE.id+'"'),
+    "Lorentz must remain the canonical FigureStudio Golden Style renderer");
   assert.ok(markup.includes('data-series-id="lorentz-real"'),"real dispersion missing");
   assert.ok(markup.includes('data-series-id="lorentz-imag"'),"absorption missing");
   assert.ok(markup.includes('data-series-id="lorentz-phase"'),"phase lag missing");

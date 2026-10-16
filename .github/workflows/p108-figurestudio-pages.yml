@@ -99,6 +99,7 @@ jobs:
             fi
             if [[ "$number" == "1" ]]; then
               grep -q 'data-math-rendered="true"' "$RUNNER_TEMP/p108-screenshots/$label.html"
+              grep -q 'data-style-family="figurestudio-golden-v1"' "$RUNNER_TEMP/p108-screenshots/$label.html"
               if grep -q 'data-math-pending="true"' "$RUNNER_TEMP/p108-screenshots/$label.html"; then
                 echo "::error::N01 still contains pending LaTeX instead of MathJax SVG"
                 exit 1
@@ -138,6 +139,7 @@ jobs:
             fi
           done
           grep -q 'aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          grep -q 'data-style-family="figurestudio-golden-v1"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-series-id="lorentz-real"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-series-id="lorentz-phase"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-testid="lorentz-inspector"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"

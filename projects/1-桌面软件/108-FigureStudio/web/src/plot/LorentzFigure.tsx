@@ -3,6 +3,7 @@ import type { Dataset, FigureSpec, LorentzAnnotation } from "../model";
 import { defaultLorentzComposition } from "../data/lorentz";
 import { plainSvgMathFallback } from "../lib/mathText";
 import { SvgMathText } from "./SvgMathText";
+import { GOLDEN_STYLE } from "./goldenStyle";
 
 interface Props {
   figure:FigureSpec;
@@ -36,14 +37,14 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const bottomY=(v:number)=>bottomTop+(c.phaseMax-v)/(c.phaseMax-c.phaseMin||1)*panelHeight;
   // 1 pt = 96/72 CSS px; the fixed SVG viewBox must preserve real publication typography.
   const ptScale=(96/72)*W/Math.max(1,width);
-  const baseSize=(o.tickLabelSizePt??9.5)*ptScale;
-  const axisColor=o.axisTitleColor??"#34383d";
-  const font=o.fontFamily==="Arial"?"Arial,sans-serif":'"Times New Roman",Georgia,serif';
-  const titleFont=(o.plotTitleSizePt??12)*ptScale;
-  const axisFont=(o.axisTitleSizePt??11)*ptScale;
-  const axisWidth=(o.axisLineWidthPt??.7)*ptScale;
-  const majorLen=(o.majorTickLengthPt??4.5)*ptScale;
-  const minorLen=(o.minorTickLengthPt??2.3)*ptScale;
+  const baseSize=(o.tickLabelSizePt??GOLDEN_STYLE.typography.referenceTickPt)*ptScale;
+  const axisColor=o.axisTitleColor??GOLDEN_STYLE.typography.axisTitleColor;
+  const font=o.fontFamily==="Arial"?GOLDEN_STYLE.typography.sansFamily:GOLDEN_STYLE.typography.serifFamily;
+  const titleFont=(o.plotTitleSizePt??GOLDEN_STYLE.typography.referencePlotTitlePt)*ptScale;
+  const axisFont=(o.axisTitleSizePt??GOLDEN_STYLE.typography.referenceAxisTitlePt)*ptScale;
+  const axisWidth=(o.axisLineWidthPt??GOLDEN_STYLE.stroke.referenceAxisPt)*ptScale;
+  const majorLen=(o.majorTickLengthPt??GOLDEN_STYLE.stroke.majorTickLengthPt)*ptScale;
+  const minorLen=(o.minorTickLengthPt??GOLDEN_STYLE.stroke.minorTickLengthPt)*ptScale;
   const majorX=numberTicks(xMin,xMax,o.xMajorTickStep??.2);
   const minorX=o.minorTicks?numberTicks(xMin,xMax,o.xMinorTickStep??.05):[];
   const majorTop=numberTicks(topMin,topMax,o.yMajorTickStep??2);
@@ -59,7 +60,11 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   };
   const [realId,imagId,phaseId]=figure.dataRef?.yColumnIds??["lorentz-real","lorentz-imag","lorentz-phase"];
   const series=(id:string)=>dataset.ys.find(q=>q.id===id);
-  const palette:Record<string,string>={"lorentz-real":"#305b76","lorentz-imag":"#a44b3d","lorentz-phase":"#674080"};
+  const palette:Record<string,string>={
+    "lorentz-real":GOLDEN_STYLE.palette[0],
+    "lorentz-imag":GOLDEN_STYLE.palette[1],
+    "lorentz-phase":GOLDEN_STYLE.palette[2]
+  };
   const color=(id:string)=>figure.seriesOverrides[id]?.color??palette[id]??"#333";
   const lineWidth=(id:string)=>(figure.seriesOverrides[id]?.lineWidthPt??1.35)*ptScale;
   const points=(id:string,y:(v:number)=>number)=>{
@@ -74,15 +79,15 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     return path.trim();
   };
   const axis=(top:number,ys:number[],minorYs:number[],projectY:(v:number)=>number,labels:boolean)=><g fontFamily={font} fontSize={baseSize} fill={o.tickLabelColor??"#262626"} onClick={onAxisClick} style={{cursor:"pointer"}}>
-    {o.gridVisible&&<g stroke="#777" strokeWidth=".8" opacity={clamp(c.gridOpacity,0,1)}>
+    {o.gridVisible&&<g stroke={GOLDEN_STYLE.stroke.gridColor} strokeWidth={GOLDEN_STYLE.stroke.gridWidthPx} opacity={clamp(c.gridOpacity,0,1)}>
       {majorX.map(v=><line key={"gx"+v} x1={x(v)} x2={x(v)} y1={top} y2={top+panelHeight}/>)}
       {ys.map(v=><line key={"gy"+v} x1={LEFT} x2={RIGHT} y1={projectY(v)} y2={projectY(v)}/>)}
     </g>}
-    {o.frameStyle==="open" ? <path d={"M"+LEFT+" "+top+"V"+(top+panelHeight)+"H"+RIGHT} fill="none" stroke="#39434b" strokeWidth={axisWidth}/> : <rect x={LEFT} y={top} width={RIGHT-LEFT} height={panelHeight} fill="none" stroke="#39434b" strokeWidth={axisWidth}/>}
-    {majorX.map(v=><g key={"x"+v}><path d={"M"+x(v)+" "+top+"v"+(o.tickDirection==="outside"?-majorLen:majorLen)+" M"+x(v)+" "+(top+panelHeight)+"v"+(o.tickDirection==="outside"?majorLen:-majorLen)} fill="none" stroke="#4d5359" strokeWidth={axisWidth*.8}/>{labels&&<text x={x(v)} y={top+panelHeight+25} textAnchor="middle">{axisTick(v,"x")}</text>}</g>)}
-    {minorX.map(v=><path key={"mx"+v} d={"M"+x(v)+" "+top+"v"+(o.tickDirection==="outside"?-minorLen:minorLen)+" M"+x(v)+" "+(top+panelHeight)+"v"+(o.tickDirection==="outside"?minorLen:-minorLen)} stroke="#4d5359" strokeWidth={axisWidth*.65}/>)} 
-    {minorYs.map(v=><path key={"my"+v} d={"M"+LEFT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?-minorLen:minorLen)+" M"+RIGHT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?minorLen:-minorLen)} stroke="#4d5359" strokeWidth={axisWidth*.65}/>)} 
-    {ys.map(v=><g key={"y"+v}><path d={"M"+LEFT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?-majorLen:majorLen)+" M"+RIGHT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?majorLen:-majorLen)} stroke="#4d5359" strokeWidth={axisWidth*.8}/><text x={LEFT-13} y={projectY(v)+baseSize*.35} textAnchor="end">{labels?fmt(v)+"°":axisTick(v,"y")}</text></g>)}
+    {o.frameStyle==="open" ? <path d={"M"+LEFT+" "+top+"V"+(top+panelHeight)+"H"+RIGHT} fill="none" stroke={GOLDEN_STYLE.stroke.axisColor} strokeWidth={axisWidth}/> : <rect x={LEFT} y={top} width={RIGHT-LEFT} height={panelHeight} fill="none" stroke={GOLDEN_STYLE.stroke.axisColor} strokeWidth={axisWidth}/>}
+    {majorX.map(v=><g key={"x"+v}><path d={"M"+x(v)+" "+top+"v"+(o.tickDirection==="outside"?-majorLen:majorLen)+" M"+x(v)+" "+(top+panelHeight)+"v"+(o.tickDirection==="outside"?majorLen:-majorLen)} fill="none" stroke={GOLDEN_STYLE.stroke.tickStrokeColor} strokeWidth={axisWidth*.8}/>{labels&&<text x={x(v)} y={top+panelHeight+25} textAnchor="middle">{axisTick(v,"x")}</text>}</g>)}
+    {minorX.map(v=><path key={"mx"+v} d={"M"+x(v)+" "+top+"v"+(o.tickDirection==="outside"?-minorLen:minorLen)+" M"+x(v)+" "+(top+panelHeight)+"v"+(o.tickDirection==="outside"?minorLen:-minorLen)} stroke={GOLDEN_STYLE.stroke.tickStrokeColor} strokeWidth={axisWidth*.65}/>)} 
+    {minorYs.map(v=><path key={"my"+v} d={"M"+LEFT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?-minorLen:minorLen)+" M"+RIGHT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?minorLen:-minorLen)} stroke={GOLDEN_STYLE.stroke.tickStrokeColor} strokeWidth={axisWidth*.65}/>)} 
+    {ys.map(v=><g key={"y"+v}><path d={"M"+LEFT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?-majorLen:majorLen)+" M"+RIGHT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?majorLen:-majorLen)} stroke={GOLDEN_STYLE.stroke.tickStrokeColor} strokeWidth={axisWidth*.8}/><text x={LEFT-13} y={projectY(v)+baseSize*.35} textAnchor="end">{labels?fmt(v)+"°":axisTick(v,"y")}</text></g>)}
   </g>;
   const curve=(id:string,y:(v:number)=>number)=>{
     const override=figure.seriesOverrides[id];
@@ -133,7 +138,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       <defs><clipPath id={id}><rect x={xx+44} y={boxY} width={Math.max(0,legendWidth-67)} height={boxH}/></clipPath></defs>
       {o.legendFrame!==false&&<rect x={boxX} y={boxY} width={legendWidth} height={boxH}
         rx="1.5" fill={o.legendBackground??"#fff"} fillOpacity={o.legendBackgroundOpacity??.95}
-        stroke={o.legendBorderColor??"#d4d9dd"} strokeWidth={(o.legendBorderWidthPt??.45)*ptScale}/>}
+        stroke={o.legendBorderColor??GOLDEN_STYLE.legend.borderColor} strokeWidth={(o.legendBorderWidthPt??GOLDEN_STYLE.stroke.legendBorderPt)*ptScale}/>}
       {entries.map((entry,i)=>{
         const yyRow=yy+i*row,label=fullLabel(entry);
         return <g key={entry}>
@@ -230,7 +235,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const peak=series(imagId),phase=series(phaseId);
   const nearest=(values:(number|null)[]|undefined,xx:number)=>{if(!values?.length)return 0;let best=0,d=Infinity;dataset.x.values.forEach((v,i)=>{if(finite(v)&&Math.abs(v-xx)<d){best=i;d=Math.abs(v-xx)}});return values[best]??0;};
   const resonanceX=clamp(c.resonanceX,xMin,xMax);
-  return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} data-pt-scale={ptScale} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}>
+  return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} data-pt-scale={ptScale} data-style-family={GOLDEN_STYLE.id} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}>
     <defs><clipPath id="lorentz-top-figure-clip"><rect x={LEFT} y={TOP} width={RIGHT-LEFT} height={panelHeight}/></clipPath><clipPath id="lorentz-bottom-figure-clip"><rect x={LEFT} y={bottomTop} width={RIGHT-LEFT} height={panelHeight}/></clipPath></defs>
     <g>
       <SvgMathText text={c.topTitle} x={LEFT} y={TOP-13}
