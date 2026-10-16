@@ -9,6 +9,7 @@ import { PrecisionSvg, supportsPrecisionSvg } from "../src/plot/PrecisionSvg";
 import { LorentzFigure } from "../src/plot/LorentzFigure";
 import { LorentzInspector } from "../src/plot/LorentzInspector";
 import { encodeProject, decodeProject } from "../src/project/projectIO";
+import { mathJaxExpressionForText, plainSvgMathFallback } from "../src/lib/mathText";
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
@@ -28,7 +29,10 @@ for (let n=0; n<gallery.length; n++) {
   assert.ok(xTitle && yTitle, figure.name+" must have explicit English axes");
   assert.ok(/^[\x20-\x7e\u00b0]+$/.test(xTitle), figure.name+" non-English X");
   assert.ok(/^[\x20-\x7e\u00b0]+$/.test(yTitle), figure.name+" non-English Y");
-  assert.ok(!xTitle.includes("$") && !yTitle.includes("$"), "No MathJax fallback");
+  if(n===0){
+    assert.ok(xTitle.includes("$\\lambda$"),"N01 must exercise normal FigureStudio $...$ math syntax");
+    assert.ok(mathJaxExpressionForText(xTitle)?.includes("\\lambda"),"LaTeX expression should retain lambda");
+  }
   const ctx = findSheet(project, figure.dataRef!.sheetId);
   assert.ok(ctx, figure.name+" lost the source sheet");
   const dataset = sheetToDataset(ctx!.sheet, figure);
@@ -60,8 +64,8 @@ for (let n=0; n<gallery.length; n++) {
       onLegendDrag:()=>{}
     }));
     assert.ok(svg.startsWith("<svg"),figure.name+" did not render SVG");
-    assert.ok(svg.includes(xTitle) && svg.includes(yTitle),
-      figure.name+" lost English axis labels");
+    assert.ok(svg.includes(plainSvgMathFallback(xTitle)) && svg.includes(plainSvgMathFallback(yTitle)),
+      figure.name+" lost readable SVG axis labels");
     assert.ok(svg.includes('viewBox="0 0 '),figure.name+" missing exact SVG viewbox");
     assert.ok(svg.includes("<path"),figure.name+" does not contain editable vector paths");
     assert.ok(!svg.includes("NaN") && !svg.includes("Infinity"),
@@ -87,6 +91,14 @@ for (let n=0; n<gallery.length; n++) {
   assert.ok(markup.includes('data-series-id="lorentz-phase"'),"phase lag missing");
   assert.ok(markup.includes('data-annotation-id="absorption"'),"annotation missing");
   assert.ok(markup.includes('data-annotation-id="resonance"'),"phase annotation missing");
+  assert.ok(golden!.figureOverrides.xTitle?.includes("$\\omega/\\omega_0$"));
+  assert.ok(golden!.figureOverrides.yTitle?.includes("$\\chi(\\omega)$"));
+  assert.ok(golden!.lorentz!.phaseYTitle.includes("$\\phi$"));
+  assert.ok(golden!.lorentz!.annotations.some(a=>a.text.includes("$\\omega=\\omega_0$")));
+  assert.ok(markup.includes('data-math-pending="true"'),
+    "SSR must retain a visible math fallback until browser MathJax resolves");
+  assert.ok(mathJaxExpressionForText("Coefficient $\\alpha_0$")?.includes("\\alpha_0"),
+    "FigureStudio must parse $\\alpha$ syntax without rewriting the source");
   assert.ok(!markup.includes("NaN")&&!markup.includes("Infinity"),"invalid Lorentz SVG coordinates");
   const ptScale=Number(markup.match(/data-pt-scale="([^"]+)"/)?.[1]);
   assert.ok(Number.isFinite(ptScale)&&Math.abs(ptScale*Number(ll.width)/1200-96/72)<1e-9,
@@ -194,5 +206,8 @@ for (let n=0; n<gallery.length; n++) {
   assert.equal(restored.lorentz.annotations.length,6);
   assert.equal(restored.lorentz.annotations[0].arrowX,632);
   assert.equal(restored.seriesOverrides["lorentz-phase"].color,"#674080");
+  assert.equal(restored.figureOverrides.xTitle,golden!.figureOverrides.xTitle,
+    ".sfig must preserve the original LaTeX source string");
+  assert.equal(restored.lorentz.phaseYTitle,golden!.lorentz!.phaseYTitle);
 }
 console.log("Nature gallery smoke OK: 14 Nature figures + real editable Lorentz Graph, normal+QA");
