@@ -67,6 +67,8 @@ import {
 } from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
 import { PrecisionSvg, supportsPrecisionSvg } from "./plot/PrecisionSvg";
+import { LorentzFigure } from "./plot/LorentzFigure";
+import { LorentzInspector } from "./plot/LorentzInspector";
 import {
   resolvePublicationMetrics,
   resolveSeriesPalette
@@ -83,6 +85,8 @@ const VISUAL_QA_MODE =
   new URLSearchParams(window.location.search).get("qa") === "1";
 const NATURE_GALLERY_MODE =
   new URLSearchParams(window.location.search).get("gallery") === "1";
+const LORENTZ_GOLDEN_MODE =
+  new URLSearchParams(window.location.search).get("golden") === "lorentz";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
@@ -414,7 +418,10 @@ function pngDataUrlWithDpi(dataUrl: string, dpi: number): string {
 function App() {
   const initialProject = useMemo(() => {
     const result = createInitialProject(readUserDefaults(), VISUAL_QA_MODE);
-    if (NATURE_GALLERY_MODE) {
+    if (LORENTZ_GOLDEN_MODE) {
+      const golden = result.figures.find(figure => figure.lorentz?.kind === "lorentz-two-panel");
+      if (golden) result.activeFigureId = golden.id;
+    } else if (NATURE_GALLERY_MODE) {
       const params = new URLSearchParams(window.location.search);
       const requested = Number(params.get("sample") ?? 1);
       const index = Number.isInteger(requested) ? Math.max(1, Math.min(14, requested)) : 1;
@@ -445,7 +452,7 @@ function App() {
     ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
   ]);
   const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
-    NATURE_GALLERY_MODE && initialFigureId
+    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE) && initialFigureId
       ? { type: "figure", id: initialFigureId }
       : initialBookId
       ? { type: "book", id: initialBookId }
@@ -475,7 +482,8 @@ function App() {
     () => localStorage.getItem(RENDER_MODE_KEY) === "plotly" ? "plotly" : "precision"
   );
   const [uiScale, setUiScale] = useState(readUiScale);
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("series");
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>(LORENTZ_GOLDEN_MODE ? "annotation" : "series");
+  const [selectedLorentzAnnotation, setSelectedLorentzAnnotation] = useState("absorption");
   const [dataInspectorTab, setDataInspectorTab] = useState<"data" | "column">("data");
   const [showColumnMeta, setShowColumnMeta] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -702,7 +710,8 @@ function App() {
       !plotDataset?.ys.find(series => series.id === id)?.name.match(/[$\\]/)
     )
   );
-  const usePrecision = rendererMode === "precision" && precisionAvailable;
+  const isLorentz = activeFigure?.lorentz?.kind === "lorentz-two-panel";
+  const usePrecision = Boolean(isLorentz || (rendererMode === "precision" && precisionAvailable));
   useEffect(() => { localStorage.setItem(RENDER_MODE_KEY, rendererMode); }, [rendererMode]);
 
   const checkItems = useMemo(
@@ -2506,6 +2515,7 @@ function App() {
     ...(!fieldTemplate
       ? ([["legend", "图例"]] as Array<[InspectorTab, string]>)
       : []),
+    ...(isLorentz ? ([["annotation", "标注"]] as Array<[InspectorTab, string]>) : []),
     ["check", warningCount ? "检查 " + warningCount : "检查"]
   ];
   const barTemplate =
@@ -2933,6 +2943,8 @@ function App() {
                     <span>图型</span>
                     <select
                       value={activeFigure.templateId}
+                      disabled={Boolean(isLorentz)}
+                      title={isLorentz ? "双面板组合图通过数据簿、曲线、图形、坐标轴和标注页编辑" : undefined}
                       onChange={(event) =>
                         patchActiveFigure((figure) => ({
                           ...figure,
@@ -2951,12 +2963,13 @@ function App() {
                   <label>
                     <span>画布</span>
                     <select
-                      value={precisionAvailable ? rendererMode : "plotly"}
+                      value={isLorentz ? "precision" : precisionAvailable ? rendererMode : "plotly"}
+                      disabled={Boolean(isLorentz)}
                       onChange={(event) => setRendererMode(event.target.value as "precision" | "plotly")}
                       title="精细 SVG 为可回退实验；未覆盖的图型、分类轴与复杂 LaTeX 仍由 Plotly 原样绘制"
                     >
                       <option value="precision" disabled={!precisionAvailable}>精细 SVG</option>
-                      <option value="plotly">Plotly 兼容</option>
+                      <option value="plotly" disabled={Boolean(isLorentz)}>Plotly 兼容</option>
                     </select>
                   </label>
                   <label>
@@ -2996,7 +3009,8 @@ function App() {
                   <button type="button" onClick={() => void exportFigure("png")}>PNG</button>
                   <button
                     type="button"
-                    disabled={figureInput?.state !== "ready"}
+                    disabled={figureInput?.state !== "ready" || Boolean(isLorentz)}
+                    title={isLorentz ? "多面板样图请使用当前 SVG/PNG 所见即所得导出" : undefined}
                     onClick={() =>
                       downloadMatplotlibScript(
                         plotDataset,
@@ -3026,7 +3040,22 @@ function App() {
                       transform: "scale(" + previewScale + ")"
                     }}
                   >
-                    {usePrecision && activeFigure ? (
+                    {isLorentz && activeFigure ? (
+                      <LorentzFigure
+                        figure={activeFigure}
+                        dataset={plotDataset}
+                        width={Number(layout.width)}
+                        height={Number(layout.height)}
+                        svgRef={svgRef}
+                        onSelectSeries={selectSeries}
+                        onSelectAnnotation={(id) => { setSelectedLorentzAnnotation(id); setInspectorTab("annotation"); }}
+                        onMoveAnnotation={(id, x, y) => patchActiveFigure(figure => ({ ...figure,
+                          lorentz: figure.lorentz ? { ...figure.lorentz, annotations: figure.lorentz.annotations.map(a => a.id === id ? { ...a, x, y } : a) } : undefined
+                        }))}
+                        onAxisClick={() => setInspectorTab("axis")}
+                        onLegendClick={() => setInspectorTab("annotation")}
+                      />
+                    ) : usePrecision && activeFigure ? (
                       <PrecisionSvg
                         figure={activeFigure}
                         layout={layout}
@@ -6218,6 +6247,15 @@ function App() {
                       </div>
                     </div>
                   </section>
+                )}
+
+                {inspectorTab === "annotation" && isLorentz && (
+                  <LorentzInspector
+                    value={activeFigure.lorentz}
+                    selectedId={selectedLorentzAnnotation}
+                    onSelect={setSelectedLorentzAnnotation}
+                    onChange={(value) => patchActiveFigure(figure => ({ ...figure, lorentz: value }))}
+                  />
                 )}
 
                 {inspectorTab === "check" && (
