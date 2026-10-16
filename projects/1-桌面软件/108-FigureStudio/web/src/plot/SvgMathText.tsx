@@ -98,12 +98,15 @@ export function SvgMathText({
   // MathJax SVG uses a 1000-unit em coordinate system with baseline at y=0.
   const scale = fontSize / 1000;
   const renderWidth = geometry.width * scale;
-  const renderHeight = geometry.height * scale;
   const left =
     textAnchor === "middle" ? x - renderWidth / 2 :
     textAnchor === "end" ? x - renderWidth :
     x;
-  const top = y + geometry.minY * scale;
+  // Paint MathJax directly into the parent SVG coordinate system. A nested
+  // <svg> viewport plus a scaled parent paper can be composited as a bitmap by
+  // Chromium at fractional preview scales. Direct path geometry stays vector
+  // all the way to the screen and to SVG export.
+  const originX = left - geometry.minX * scale;
 
   return <g
     className={className}
@@ -112,17 +115,12 @@ export function SvgMathText({
     data-math-source={text}
     data-math-rendered="true"
   >
-    <svg
-      x={left}
-      y={top}
-      width={renderWidth}
-      height={renderHeight}
-      viewBox={geometry.minX + " " + geometry.minY + " " + geometry.width + " " + geometry.height}
-      overflow="visible"
-      xmlns="http://www.w3.org/2000/svg"
-      xmlnsXlink="http://www.w3.org/1999/xlink"
+    <g
+      transform={"translate(" + originX + " " + y + ") scale(" + scale + ")"}
+      fill={fill}
       style={{ color: fill }}
       aria-hidden="true"
+      data-math-vector-root="true"
       dangerouslySetInnerHTML={{ __html: geometry.innerSvg }}
     />
   </g>;

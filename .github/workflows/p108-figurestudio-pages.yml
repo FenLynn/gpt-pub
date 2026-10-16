@@ -144,6 +144,11 @@ jobs:
           grep -q '双面板 · 线图' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'Nature 双栏 · 183 mm' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           test "$(grep -o 'data-math-rendered="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html" | wc -l)" -ge 8
+          test "$(grep -o 'data-math-vector-root="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html" | wc -l)" -ge 8
+          grep -q 'data-vector-preview="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          grep -q 'data-testid="canvas-zoom-in"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          grep -q 'data-testid="canvas-zoom-out"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          grep -q 'data-canvas-zoom="1.00"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           if grep -q 'data-math-pending="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"; then
             echo "::error::Lorentz Golden still contains pending LaTeX instead of MathJax SVG"
             exit 1

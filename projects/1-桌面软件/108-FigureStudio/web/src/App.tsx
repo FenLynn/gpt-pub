@@ -91,6 +91,17 @@ const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
 const PNG_SCALE = PNG_DPI / 96;
+const CANVAS_ZOOM_MIN = 0.25;
+const CANVAS_ZOOM_MAX = 4;
+
+function clampCanvasZoom(value: number): number {
+  return Math.min(CANVAS_ZOOM_MAX, Math.max(CANVAS_ZOOM_MIN, value));
+}
+
+function readInitialCanvasZoom(): number {
+  const value = Number(new URLSearchParams(window.location.search).get("zoom") ?? "1");
+  return Number.isFinite(value) ? clampCanvasZoom(value) : 1;
+}
 
 const ROLE_OPTIONS: Array<{ value: ColumnRole; label: string }> = [
   { value: "X", label: "X" },
@@ -477,7 +488,10 @@ function App() {
     useState<ExplorerSelection | null>(null);
   const [selectedColumnId, setSelectedColumnId] = useState("");
   const [selectedSeriesIds, setSelectedSeriesIds] = useState<string[]>([]);
+  // previewScale is the automatic fit-to-window scale. canvasZoom is the
+  // user's inspection magnification on top of that fit scale.
   const [previewScale, setPreviewScale] = useState(1);
+  const [canvasZoom, setCanvasZoom] = useState(readInitialCanvasZoom);
   const [rendererMode, setRendererMode] = useState<"precision" | "plotly">(
     () => localStorage.getItem(RENDER_MODE_KEY) === "plotly" ? "plotly" : "precision"
   );
@@ -2037,7 +2051,11 @@ function App() {
   }
 
   async function resetView() {
-    if (usePrecision) { showToast("精细 SVG 已显示完整数据范围"); return; }
+    setCanvasZoom(1);
+    if (usePrecision) {
+      showToast("已恢复适配窗口 · 矢量画布 100%");
+      return;
+    }
     if (!plotRef.current || !activeFigure) return;
     if (activeFigure.templateId === "surface-3d") {
       await Plotly.relayout(plotRef.current, {
@@ -2545,8 +2563,9 @@ function App() {
     activeSheet?.columns[0];
   const dataReadOnly = activeSheet?.source.kind === "linked";
 
-  const scaledWidth = Math.max(1, Number(layout.width) * previewScale);
-  const scaledHeight = Math.max(1, Number(layout.height) * previewScale);
+  const displayScale = previewScale * canvasZoom;
+  const scaledWidth = Math.max(1, Number(layout.width) * displayScale);
+  const scaledHeight = Math.max(1, Number(layout.height) * displayScale);
 
   const rootFolders = project.folders.filter((folder) => !folder.parentId);
   const rootBooks = project.dataBooks.filter((book) => !book.folderId);
@@ -3020,6 +3039,33 @@ function App() {
                   >
                     源数据
                   </button>
+                  <span className="canvas-zoom-group" aria-label="画布缩放">
+                    <button
+                      type="button"
+                      data-testid="canvas-zoom-out"
+                      title="缩小画布（Ctrl/⌘ + 滚轮也可）"
+                      onClick={() => setCanvasZoom((value) => clampCanvasZoom(value / 1.2))}
+                    >
+                      −
+                    </button>
+                    <button
+                      type="button"
+                      className="canvas-zoom-readout"
+                      data-testid="canvas-zoom-fit"
+                      title="恢复适配窗口"
+                      onClick={() => setCanvasZoom(1)}
+                    >
+                      {Math.round(canvasZoom * 100)}%
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="canvas-zoom-in"
+                      title="放大画布（Ctrl/⌘ + 滚轮也可）"
+                      onClick={() => setCanvasZoom((value) => clampCanvasZoom(value * 1.2))}
+                    >
+                      ＋
+                    </button>
+                  </span>
                   <button type="button" onClick={() => void resetView()}>重置</button>
                   <button type="button" onClick={() => void exportFigure("svg")}>SVG</button>
                   <button type="button" onClick={() => void exportFigure("png")}>PNG</button>
@@ -3040,7 +3086,33 @@ function App() {
                 </div>
               </div>
 
-              <div ref={canvasRef} className="canvas-area">
+              <div
+                ref={canvasRef}
+                className="canvas-area"
+                data-canvas-zoom={canvasZoom.toFixed(2)}
+                onWheel={(event) => {
+                  if (!(event.ctrlKey || event.metaKey)) return;
+                  event.preventDefault();
+                  const node = canvasRef.current;
+                  if (!node) return;
+                  const current = canvasZoom;
+                  const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+                  const next = clampCanvasZoom(current * factor);
+                  if (Math.abs(next - current) < 1e-6) return;
+
+                  const bounds = node.getBoundingClientRect();
+                  const localX = event.clientX - bounds.left;
+                  const localY = event.clientY - bounds.top;
+                  const contentX = node.scrollLeft + localX;
+                  const contentY = node.scrollTop + localY;
+                  setCanvasZoom(next);
+                  window.requestAnimationFrame(() => {
+                    const ratio = next / current;
+                    node.scrollLeft = Math.max(0, contentX * ratio - localX);
+                    node.scrollTop = Math.max(0, contentY * ratio - localY);
+                  });
+                }}
+              >
                 <div
                   className="scaled-paper-shell"
                   style={{
@@ -3049,11 +3121,15 @@ function App() {
                   }}
                 >
                   <div
-                    className="figure-paper"
-                    style={{
+                    className={usePrecision ? "figure-paper is-vector-preview" : "figure-paper"}
+                    data-vector-preview={usePrecision ? "true" : "false"}
+                    style={usePrecision ? {
+                      width: scaledWidth + "px",
+                      height: scaledHeight + "px"
+                    } : {
                       width: layout.width + "px",
                       height: layout.height + "px",
-                      transform: "scale(" + previewScale + ")"
+                      transform: "scale(" + displayScale + ")"
                     }}
                   >
                     {isLorentz && activeFigure ? (
