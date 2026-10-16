@@ -97,6 +97,14 @@ jobs:
               tail -n 25 "$RUNNER_TEMP/p108-screenshots/$label.stderr"
               exit 1
             fi
+            if [[ "$number" == "1" ]]; then
+              grep -q 'data-math-rendered="true"' "$RUNNER_TEMP/p108-screenshots/$label.html"
+              if grep -q 'data-math-pending="true"' "$RUNNER_TEMP/p108-screenshots/$label.html"; then
+                echo "::error::N01 still contains pending LaTeX instead of MathJax SVG"
+                exit 1
+              fi
+              echo "Browser preview N01 MathJax SVG OK"
+            fi
             echo "Browser preview $label OK"
           done
 
@@ -135,7 +143,12 @@ jobs:
           grep -q 'data-testid="lorentz-inspector"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q '双面板 · 线图' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'Nature 双栏 · 183 mm' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
-          echo "Lorentz Golden: real two-panel Graph editor, Nature double-column, editable SVG inspector OK"
+          test "$(grep -o 'data-math-rendered="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html" | wc -l)" -ge 8
+          if grep -q 'data-math-pending="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"; then
+            echo "::error::Lorentz Golden still contains pending LaTeX instead of MathJax SVG"
+            exit 1
+          fi
+          echo "Lorentz Golden: real two-panel Graph editor + MathJax SVG labels/annotations OK"
 
       - name: Upload browser screenshots
         if: always()
@@ -144,8 +157,8 @@ jobs:
           name: p108-nature-visual-qa
           path: |
             ${{ runner.temp }}/p108-screenshots/*.png
-            ${{ runner.temp }}/p108-screenshots/Lorentz-Golden.html
-            ${{ runner.temp }}/p108-screenshots/Lorentz-Golden.stderr
+            ${{ runner.temp }}/p108-screenshots/*.html
+            ${{ runner.temp }}/p108-screenshots/*.stderr
           retention-days: 7
           if-no-files-found: warn
 
