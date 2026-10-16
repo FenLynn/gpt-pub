@@ -260,7 +260,7 @@ function timelineMiniMapHtml(a,range){
 function r15PunchPreview(a){
   const grouped=new Map();
   for(const p of (a.punches||[])){
-    const minute=minutes(p.time),key=minute+'|'+p.direction;
+    const raw=minutes(p.time),minute=Math.floor(raw),key=minute+'|'+p.direction;
     if(!grouped.has(key))grouped.set(key,{minute,direction:p.direction,times:[]});
     grouped.get(key).times.push(p.time);
   }
