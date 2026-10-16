@@ -1932,3 +1932,121 @@ button:disabled {
   padding: calc(5px * var(--ui-scale)) calc(6px * var(--ui-scale));
   font-size: 0.67rem;
 }
+
+
+/* P108 Lorentz Golden: object inspector, no ellipsized parameter names or endless flat form. */
+.lorentz-inspector .lorentz-hint {
+  margin: 4px 0 12px;
+  color: #6b7680;
+  font-size: 0.77rem;
+  line-height: 1.5;
+}
+.lorentz-inspector .lorentz-group {
+  margin: 7px 0;
+  border: 1px solid #dce2e6;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+}
+.lorentz-inspector .lorentz-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 37px;
+  padding: 7px 10px;
+  cursor: pointer;
+  user-select: none;
+  color: #35434e;
+  font-size: 0.85rem;
+  font-weight: 650;
+  list-style: none;
+}
+.lorentz-inspector .lorentz-group > summary::-webkit-details-marker { display: none; }
+.lorentz-inspector .lorentz-group > summary::before {
+  content: "›";
+  display: inline-block;
+  font-size: 1.18rem;
+  font-weight: 400;
+  color: #7e8993;
+  transition: transform .12s ease;
+}
+.lorentz-inspector .lorentz-group[open] > summary::before { transform: rotate(90deg); }
+.lorentz-inspector .lorentz-group > summary > span {
+  margin-left: auto;
+  color: #87919a;
+  font-size: 0.72rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.lorentz-inspector .lorentz-group[open] > summary {
+  border-bottom: 1px solid #e6eaed;
+  background: #fafbfc;
+}
+.lorentz-inspector .lorentz-group-body {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px 12px;
+}
+.lorentz-inspector .prop-row {
+  grid-template-columns: minmax(108px, .92fr) minmax(0, 1fr);
+  gap: 9px;
+  min-height: 31px;
+  font-size: 0.8rem;
+}
+.lorentz-inspector .prop-row > label {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  color: #54616b;
+}
+.lorentz-inspector .prop-row > input[type="checkbox"] {
+  justify-self: start;
+  width: 17px;
+  height: 17px;
+  accent-color: #607d93;
+}
+.lorentz-inspector .prop-row > input[type="color"] {
+  min-height: 28px;
+  padding: 3px;
+}
+.lorentz-inspector .lorentz-text-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  padding: 3px 0;
+}
+.lorentz-inspector .lorentz-text-row > textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 51px;
+  padding: 7px 8px;
+  resize: vertical;
+  border: 1px solid #cfd6dc;
+  border-radius: 4px;
+  background: #fff;
+  color: #303a43;
+  font: inherit;
+  line-height: 1.4;
+}
+.lorentz-inspector .lorentz-text-row > textarea:focus {
+  outline: 1px solid #8299aa;
+  border-color: #8299aa;
+}
+.lorentz-inspector .lorentz-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 1px 0 5px;
+}
+.lorentz-inspector .lorentz-actions button {
+  min-height: 29px;
+  border: 1px solid #d5dce1;
+  border-radius: 4px;
+  background: #f7f9fa;
+  color: #4b5d69;
+  cursor: pointer;
+  font-size: 0.76rem;
+}
+.lorentz-inspector .lorentz-actions button:hover { background: #edf2f5; }
+.lorentz-inspector .lorentz-actions button:disabled { opacity: .45; cursor: default; }
