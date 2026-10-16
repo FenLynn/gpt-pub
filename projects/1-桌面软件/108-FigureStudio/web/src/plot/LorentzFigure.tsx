@@ -83,28 +83,89 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       onClick={e=>{e.stopPropagation();onSelectSeries(id)}} style={{cursor:"pointer"}}/>;
   };
   const legend=(xx:number,yy:number,ids:string[],bottom=false)=>{
-    const entries=ids.filter(id=>figure.seriesOverrides[id]?.visible!==false&&figure.seriesOverrides[id]?.showInLegend!==false);
+    const entries=ids.filter(id=>(id!=="__band__"||c.bandOpacity>0)&&(id==="__band__"||figure.seriesOverrides[id]?.visible!==false&&figure.seriesOverrides[id]?.showInLegend!==false));
     if(o.legendVisible===false||!entries.length)return null;
-    const f=(o.legendFontSizePt??9.5)*1.7;
-    const width=bottom?360:366,row=26;
-    return <g onClick={onLegendClick} style={{cursor:"pointer"}} fontFamily={font} fontSize={f}>
-      {o.legendFrame!==false&&<rect x={xx-12} y={yy-21} width={width} height={entries.length*row+13} fill={o.legendBackground??"#fff"} fillOpacity={o.legendBackgroundOpacity??.94} stroke={o.legendBorderColor??"#c6c6c6"} strokeWidth={(o.legendBorderWidthPt??.6)*1.6}/>}
-      {entries.map((id,i)=><g key={id}>{id==="__band__"?<rect x={xx} y={yy+i*row-9} width="34" height="14" fill={c.bandColor} fillOpacity={Math.max(.15,c.bandOpacity*2)} stroke="none"/>:<path d={"M"+xx+" "+(yy+i*row)+"h34"} stroke={color(id)} strokeWidth={lineWidth(id)}/>}<text x={xx+46} y={yy+i*row+5} fill="#262626">{id==="__band__"?"Anomalous dispersion zone":figure.seriesOverrides[id]?.legendLabel??series(id)?.name??id}</text></g>)}
+    const f=(o.legendFontSizePt??9)*1.7,row=clamp(c.legendRowHeight??25,18,52);
+    const legendWidth=clamp(bottom?(c.bottomLegendWidth??270):(c.topLegendWidth??298),145,500);
+    const boxX=xx-12,boxY=yy-f-7,boxH=entries.length*row+15;
+    const id=bottom?"lorentz-legend-bottom-clip":"lorentz-legend-top-clip";
+    const fullLabel=(entry:string)=>entry==="__band__"?(c.bandLegendLabel??"Resonant band"):(figure.seriesOverrides[entry]?.legendLabel??series(entry)?.name??entry);
+    return <g data-legend-panel={bottom?"bottom":"top"} data-box-x={boxX} data-box-y={boxY} data-box-width={legendWidth} data-box-height={boxH}
+      onClick={onLegendClick} style={{cursor:"pointer"}} fontFamily={font} fontSize={f}>
+      <defs><clipPath id={id}><rect x={xx+44} y={boxY} width={Math.max(0,legendWidth-67)} height={boxH}/></clipPath></defs>
+      {o.legendFrame!==false&&<rect x={boxX} y={boxY} width={legendWidth} height={boxH}
+        rx="1.5" fill={o.legendBackground??"#fff"} fillOpacity={o.legendBackgroundOpacity??.95}
+        stroke={o.legendBorderColor??"#d4d9dd"} strokeWidth={(o.legendBorderWidthPt??.45)*1.6}/>}
+      {entries.map((entry,i)=>{
+        const yyRow=yy+i*row,label=fullLabel(entry);
+        return <g key={entry}>
+          <title>{label}</title>
+          {entry==="__band__"
+            ?<rect x={xx} y={yyRow-9} width="31" height="13" fill={c.bandColor} fillOpacity={Math.max(.18,c.bandOpacity*3)} stroke="none"/>
+            :<path d={"M"+xx+" "+yyRow+"h31"} stroke={color(entry)} strokeWidth={lineWidth(entry)} strokeLinecap="round"/>}
+          <text x={xx+44} y={yyRow+f*.31} fill={o.legendTextColor??"#313940"} clipPath={"url(#"+id+")"}>{label}</text>
+        </g>;
+      })}
     </g>;
+  };
+  const charWidth=(ch:string,size:number)=>{
+    if(ch===" ")return size*.28;
+    if(/[il.,;:!|]/.test(ch))return size*.27;
+    if(/[MW@%]/.test(ch))return size*.8;
+    if(/[^\u0000-\u007f]/.test(ch))return size*.69;
+    return size*.53;
+  };
+  const textWidth=(value:string,size:number)=>Array.from(value).reduce((w,ch)=>w+charWidth(ch,size),0);
+  const wrapText=(text:string,maxWidth:number,size:number)=>{
+    const out:string[]=[];
+    for(const original of text.split("\n")){
+      const tokens=original.split(/(\s+)/).filter(Boolean);
+      let line="";
+      for(const token of tokens){
+        if(textWidth(line+token,size)<=maxWidth){line+=token;continue;}
+        if(line.trim()){out.push(line.trimEnd());line="";}
+        for(const ch of Array.from(token.trimStart())){
+          if(line&&textWidth(line+ch,size)>maxWidth){out.push(line);line="";}
+          line+=ch;
+        }
+      }
+      out.push(line.trimEnd());
+    }
+    return out;
   };
   const renderAnnotation=(a:LorentzAnnotation)=>{
     if(a.visible===false)return null;
-    const lines=a.text.split("\n"),size=a.fontSizePt*1.7,lineHeight=size*1.25;
-    const width=Math.max(...lines.map(t=>t.length))*size*.54+20;
-    const height=lines.length*lineHeight+12;
-    return <g key={a.id} data-annotation-id={a.id} style={{cursor:"move",touchAction:"none"}}
+    const size=clamp(a.fontSizePt*1.7,8,48),lineHeight=size*1.3;
+    const maxWidth=clamp(a.maxWidth??300,100,600);
+    const lines=wrapText(a.text,maxWidth-20,size);
+    const contentWidth=Math.max(0,...lines.map(t=>textWidth(t,size)));
+    const boxW=Math.min(maxWidth,contentWidth+22),boxH=lines.length*lineHeight+13;
+    const boxX=a.x-9,boxY=a.y-size-8;
+    const hasArrow=finite(a.arrowX)&&finite(a.arrowY);
+    const startX=hasArrow?clamp(a.arrowX!,boxX,boxX+boxW):0;
+    const startY=hasArrow?clamp(a.arrowY!,boxY,boxY+boxH):0;
+    const dx=hasArrow?a.arrowX!-startX:0,dy=hasArrow?a.arrowY!-startY:0;
+    const dist=Math.hypot(dx,dy);
+    const arrowHead=dist>0?{
+      x:a.arrowX!,y:a.arrowY!,ux:dx/dist,uy:dy/dist
+    }:null;
+    return <g key={a.id} data-annotation-id={a.id} data-box-x={boxX} data-box-y={boxY}
+      data-box-width={boxW} data-box-height={boxH} style={{cursor:"move",touchAction:"none"}}
       onPointerDown={e=>{if(e.button!==0)return;e.stopPropagation();onSelectAnnotation(a.id);drag.current={id:a.id,clientX:e.clientX,clientY:e.clientY,x:a.x,y:a.y};e.currentTarget.setPointerCapture(e.pointerId)}}
       onPointerMove={e=>{if(!drag.current||drag.current.id!==a.id||!svgRef.current)return;const bounds=svgRef.current.getBoundingClientRect();const dx=(e.clientX-drag.current.clientX)*W/bounds.width,dy=(e.clientY-drag.current.clientY)*H/bounds.height;e.currentTarget.setAttribute("transform","translate("+dx+" "+dy+")")}}
-      onPointerUp={e=>{const d=drag.current;if(!d||d.id!==a.id||!svgRef.current)return;drag.current=null;const bounds=svgRef.current.getBoundingClientRect();const xx=clamp(d.x+(e.clientX-d.clientX)*W/bounds.width,0,W),yy=clamp(d.y+(e.clientY-d.clientY)*H/bounds.height,0,H);e.currentTarget.removeAttribute("transform");e.currentTarget.releasePointerCapture(e.pointerId);onMoveAnnotation(a.id,Number(xx.toFixed(1)),Number(yy.toFixed(1)))}}
+      onPointerUp={e=>{const d=drag.current;if(!d||d.id!==a.id||!svgRef.current)return;drag.current=null;const bounds=svgRef.current.getBoundingClientRect();const xx=clamp(d.x+(e.clientX-d.clientX)*W/bounds.width,0,W),yy=clamp(d.y+(e.clientY-d.clientY)*H/bounds.height,0,H);e.currentTarget.removeAttribute("transform");e.currentTarget.releasePointerCapture(e.pointerId);if(Math.abs(xx-d.x)+Math.abs(yy-d.y)>.2)onMoveAnnotation(a.id,Number(xx.toFixed(1)),Number(yy.toFixed(1)))}}
       onPointerCancel={e=>{drag.current=null;e.currentTarget.removeAttribute("transform")}}>
-      {finite(a.arrowX)&&finite(a.arrowY)&&<g stroke={a.color} fill="none" strokeWidth="1.5"><path d={"M"+(a.x+width/2)+" "+(a.y-8)+"L"+a.arrowX+" "+a.arrowY}/><path d={"M"+a.arrowX+" "+a.arrowY+"l-8 -4m8 4l-4 -8"}/></g>}
-      <rect x={a.x-6} y={a.y-size} width={width} height={height} fill={a.background} fillOpacity={a.backgroundOpacity} stroke={a.borderColor} strokeWidth={a.borderWidthPt*1.6}/>
-      {lines.map((t,i)=><text key={i} x={a.x} y={a.y+i*lineHeight} fontFamily={font} fontSize={size} fontWeight={i===0?"bold":"normal"} fill={a.color}>{t}</text>)}
+      <title>{a.text}</title>
+      {arrowHead&&dist>6&&<g stroke={a.color} fill="none" strokeWidth="1.15" opacity=".8" pointerEvents="none">
+        <path d={"M"+startX+" "+startY+"L"+arrowHead.x+" "+arrowHead.y}/>
+        <path d={"M"+(arrowHead.x-arrowHead.ux*9-arrowHead.uy*3.5)+" "+(arrowHead.y-arrowHead.uy*9+arrowHead.ux*3.5)+"L"+arrowHead.x+" "+arrowHead.y+"L"+(arrowHead.x-arrowHead.ux*9+arrowHead.uy*3.5)+" "+(arrowHead.y-arrowHead.uy*9-arrowHead.ux*3.5)}/>
+      </g>}
+      <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="1.5"
+        fill={a.background} fillOpacity={a.backgroundOpacity}
+        stroke={a.borderColor} strokeWidth={a.borderWidthPt*1.6}/>
+      {lines.map((t,i)=><text key={i} x={a.x} y={a.y+i*lineHeight}
+        fontFamily={font} fontSize={size} fontWeight={i===0?600:400}
+        fill={a.color} opacity={i===0?1:.92}>{t}</text>)}
     </g>;
   };
   const peak=series(imagId),phase=series(phaseId);
