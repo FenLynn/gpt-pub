@@ -2953,7 +2953,7 @@ function App() {
                         }))
                       }
                     >
-                      {templates.map((template) => (
+                      {isLorentz ? <option value="xy-line">双面板 · 线图</option> : templates.map((template) => (
                         <option key={template.id} value={template.id}>
                           {template.label}
                         </option>
@@ -2986,7 +2986,12 @@ function App() {
                     >
                       {presetOrder.map((id) => (
                         <option key={id} value={id}>
-                          {presets[id].label}
+                          {id === "nature" && activeFigure.figureOverrides.figureWidthMm !== undefined &&
+                            Math.abs(activeFigure.figureOverrides.figureWidthMm - presets.nature.widthMm) > 1
+                            ? activeFigure.figureOverrides.figureWidthMm >= 170
+                              ? "Nature 双栏 · " + activeFigure.figureOverrides.figureWidthMm + " mm"
+                              : "Nature 自定义 · " + activeFigure.figureOverrides.figureWidthMm + " mm"
+                            : presets[id].label}
                         </option>
                       ))}
                     </select>
