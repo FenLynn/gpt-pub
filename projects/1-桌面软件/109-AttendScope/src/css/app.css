@@ -78,7 +78,7 @@ button:focus-visible{outline:2px solid rgba(76,137,178,.55);outline-offset:2px}
 }
 .month-button:hover,.month-button[aria-expanded="true"]{border-color:#b9d0df;background:#f8fbfd}
 .chevron{display:block;width:7px;height:7px;border-right:1.6px solid #7791a4;border-bottom:1.6px solid #7791a4;transform:rotate(45deg) translateY(-2px)}
-.month-popover{left:0;right:auto;top:calc(100% + 6px);width:210px;padding:13px}
+.month-popover{left:0;right:auto;top:calc(100% + 6px);width:min(210px,calc(var(--sidebar) - 28px));padding:11px}
 .month-popover-head{font-size:10px;font-weight:670;color:#506579;margin-bottom:10px}
 .month-choices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
 .month-choice{border:0;border-radius:6px;height:30px;background:#f3f6f8;color:#8193a0;font-size:10px}
