@@ -82,6 +82,8 @@ for (let n=0; n<gallery.length; n++) {
     assert.ok(barTrace.marker?.line?.width>0,"Golden bars need a fine publication edge");
     assert.equal((layout as any).xaxis?.showgrid,false,"Golden bar plots should suppress vertical grid lines");
     assert.equal((layout as any).yaxis?.showgrid,true,"Golden bar plots should retain subtle horizontal guides");
+    assert.equal(figure.seriesOverrides.fundamental?.legendLabel,"Fundamental",
+      "Golden stacked-bar sample should keep the outside legend compact");
   }
   assert.ok(figure.figureOverrides.axisLineWidthPt!>=0.25 &&
     figure.figureOverrides.axisLineWidthPt!<=1.0);
@@ -110,6 +112,20 @@ for (let n=0; n<gallery.length; n++) {
       figure.name+" contains invalid geometry");
   }
 }
+  const surfaceGolden=project.figures.find(f=>f.templateId==="surface-3d");
+  assert.ok(surfaceGolden,"Golden defaults must include a 3D scientific surface");
+  const surfaceSource=findSheet(project,surfaceGolden!.dataRef!.sheetId);
+  assert.ok(surfaceSource,"3D Golden surface source sheet missing");
+  const surfaceDataset=sheetToDataset(surfaceSource!.sheet,surfaceGolden!);
+  const surfaceTraces=buildTraces({dataset:surfaceDataset,figure:surfaceGolden!,preset:presets.scientific}) as any[];
+  const surfaceLayout=buildLayout({dataset:surfaceDataset,figure:surfaceGolden!,preset:presets.scientific}) as any;
+  assert.equal(surfaceTraces[0]?.colorscale,"Cividis",
+    "3D intensity surfaces should inherit the restrained Golden field scale");
+  assert.equal(surfaceLayout.scene?.xaxis?.backgroundcolor,GOLDEN_STYLE.field.planeBackground,
+    "3D scene planes must use the Golden neutral background");
+  assert.equal(surfaceLayout.scene?.xaxis?.gridcolor,GOLDEN_STYLE.field.sceneGridColor,
+    "3D scene grid must use the Golden neutral grid");
+
   const golden=project.figures.find(f=>f.lorentz?.kind==="lorentz-two-panel");
   assert.ok(golden,"Lorentz golden Graph must exist in ordinary project");
   assert.equal(golden!.dataRef?.sheetId,"sheet-lorentz-golden");

@@ -529,7 +529,7 @@ export function createInitialProject(
       xTitle: "Horizontal position (mm)",
       yTitle: "Vertical position (mm)",
       legendVisible: false,
-      colorScale: "Viridis",
+      colorScale: "Cividis",
       colorbarTitle: "Normalized intensity"
     }
   );
@@ -544,7 +544,7 @@ export function createInitialProject(
       xTitle: "Horizontal position (mm)",
       yTitle: "Vertical position (mm)",
       legendVisible: false,
-      colorScale: "Viridis",
+      colorScale: "Cividis",
       colorbarTitle: "Normalized intensity",
       contourLevels: 12,
       contourFill: true,
@@ -562,8 +562,8 @@ export function createInitialProject(
       xTitle: "Horizontal position (mm)",
       yTitle: "Vertical position (mm)",
       legendVisible: false,
-      colorScale: "RdBu",
-      reverseColorScale: true,
+      colorScale: "Cividis",
+      reverseColorScale: false,
       zTitle: "Normalized intensity (a.u.)"
     }
   );
