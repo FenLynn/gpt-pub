@@ -14,7 +14,7 @@ interface Props {
   onAxisClick:()=>void;
   onLegendClick:()=>void;
 }
-const W=1200,H=1010,LEFT=98,RIGHT=1168,TOP=55,BOTTOM=935;
+const W=1200,H=1010;
 const finite=(v:unknown):v is number=>typeof v==="number"&&Number.isFinite(v);
 const clamp=(v:number,lo:number,hi:number)=>Math.min(hi,Math.max(lo,v));
 const numberTicks=(lo:number,hi:number,step:number)=>{if(!finite(step)||step<=0||hi<=lo)return [];const start=Math.ceil((lo-1e-9)/step)*step;const count=Math.min(150,Math.max(0,Math.floor((hi-start+step*1e-6)/step)+1));return Array.from({length:count},(_,i)=>Number((start+i*step).toFixed(8)));};
@@ -22,15 +22,18 @@ function fmt(n:number){return Number(n.toFixed(4)).toString();}
 export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries,onSelectAnnotation,onMoveAnnotation,onAxisClick,onLegendClick}:Props){
   const drag=useRef<{id:string;clientX:number;clientY:number;x:number;y:number}|null>(null);
   const c=figure.lorentz??defaultLorentzComposition,o=figure.figureOverrides;
-  const gap=clamp(c.panelGap,10,150),panelHeight=(BOTTOM-TOP-gap)/2,bottomTop=TOP+panelHeight+gap;
+  const LEFT=clamp(c.plotLeft??104,60,500),RIGHT=clamp(c.plotRight??1160,LEFT+320,W-18);
+  const TOP=clamp(c.plotTop??65,48,210),BOTTOM=clamp(c.plotBottom??932,TOP+420,H-68);
+  const gap=clamp(c.panelGap,16,150),panelHeight=(BOTTOM-TOP-gap)/2,bottomTop=TOP+panelHeight+gap;
   const xMin=o.xAutoRange===false&&finite(o.xMin)?o.xMin:.4;
   const xMax=o.xAutoRange===false&&finite(o.xMax)?o.xMax:1.6;
-  const x=(v:number)=>LEFT+(v-xMin)/(xMax-xMin||1)*(RIGHT-LEFT);
+  const x=(v:number)=>LEFT+(o.xReverse?1-(v-xMin)/(xMax-xMin||1):(v-xMin)/(xMax-xMin||1))*(RIGHT-LEFT);
   const topMin=finite(o.yMin)&&o.yAutoRange===false?o.yMin:c.topMin;
   const topMax=finite(o.yMax)&&o.yAutoRange===false?o.yMax:c.topMax;
-  const topY=(v:number)=>TOP+(topMax-v)/(topMax-topMin||1)*panelHeight;
+  const topY=(v:number)=>TOP+(o.yReverse?(v-topMin):(topMax-v))/(topMax-topMin||1)*panelHeight;
   const bottomY=(v:number)=>bottomTop+(c.phaseMax-v)/(c.phaseMax-c.phaseMin||1)*panelHeight;
   const baseSize=(o.tickLabelSizePt??9.5)*1.7;
+  const axisColor=o.axisTitleColor??"#34383d";
   const font=o.fontFamily==="Arial"?"Arial,sans-serif":'"Times New Roman",Georgia,serif';
   const titleFont=(o.plotTitleSizePt??12)*1.7;
   const axisFont=(o.axisTitleSizePt??11)*1.7;
@@ -55,7 +58,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     for(let i=0;i<Math.min(dataset.x.values.length,data.length);i++){
       const xx=dataset.x.values[i],yy=data[i];
       if(!finite(xx)||!finite(yy)||xx<xMin||xx>xMax){started=false;continue;}
-      path+=(started?"L":"M")+x(xx).toFixed(2)+" "+y(yy).toFixed(2)+" ";
+      path+=(started?"L":"M")+x(xx).toFixed(3)+" "+y(yy).toFixed(3)+" ";
       started=true;
     }
     return path.trim();
@@ -71,8 +74,14 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     {minorYs.map(v=><path key={"my"+v} d={"M"+LEFT+" "+projectY(v)+"h"+minorLen+" M"+RIGHT+" "+projectY(v)+"h-"+minorLen} stroke="#333" strokeWidth={axisWidth*.65}/>)}
     {ys.map(v=><g key={"y"+v}><path d={"M"+LEFT+" "+projectY(v)+"h"+majorLen+" M"+RIGHT+" "+projectY(v)+"h-"+majorLen} stroke="#333" strokeWidth={axisWidth*.8}/><text x={LEFT-11} y={projectY(v)+baseSize*.35} textAnchor="end">{labels?fmt(v)+"°":fmt(v)}</text></g>)}
   </g>;
-  const curve=(id:string,y:(v:number)=>number)=>
-    figure.seriesOverrides[id]?.visible===false?null:<path data-series-id={id} d={points(id,y)} fill="none" stroke={color(id)} strokeWidth={lineWidth(id)} strokeLinejoin="round" strokeLinecap="round" opacity={figure.seriesOverrides[id]?.opacity??1} onClick={e=>{e.stopPropagation();onSelectSeries(id)}} style={{cursor:"pointer"}}/>;
+  const curve=(id:string,y:(v:number)=>number)=>{
+    const override=figure.seriesOverrides[id];
+    if(override?.visible===false||override?.lineVisible===false)return null;
+    const dash=override?.lineStyle==="dash"?"9 5":override?.lineStyle==="dot"?"2 4":override?.lineStyle==="dashdot"?"10 4 2 4":undefined;
+    return <path data-series-id={id} d={points(id,y)} fill="none" stroke={color(id)} strokeWidth={lineWidth(id)}
+      strokeDasharray={dash} strokeLinejoin="round" strokeLinecap="round" opacity={override?.opacity??1}
+      onClick={e=>{e.stopPropagation();onSelectSeries(id)}} style={{cursor:"pointer"}}/>;
+  };
   const legend=(xx:number,yy:number,ids:string[],bottom=false)=>{
     const entries=ids.filter(id=>figure.seriesOverrides[id]?.visible!==false&&figure.seriesOverrides[id]?.showInLegend!==false);
     if(o.legendVisible===false||!entries.length)return null;
@@ -101,9 +110,9 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const peak=series(imagId),phase=series(phaseId);
   const nearest=(values:(number|null)[]|undefined,xx:number)=>{if(!values?.length)return 0;let best=0,d=Infinity;dataset.x.values.forEach((v,i)=>{if(finite(v)&&Math.abs(v-xx)<d){best=i;d=Math.abs(v-xx)}});return values[best]??0;};
   const resonanceX=clamp(c.resonanceX,xMin,xMax);
-  return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg}}>
+  return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}>
     <defs><clipPath id="lorentz-top-figure-clip"><rect x={LEFT} y={TOP} width={RIGHT-LEFT} height={panelHeight}/></clipPath><clipPath id="lorentz-bottom-figure-clip"><rect x={LEFT} y={bottomTop} width={RIGHT-LEFT} height={panelHeight}/></clipPath></defs>
-    <g fontFamily={font} fontSize={titleFont} fontWeight="bold" fill="#151515"><text x={LEFT} y={TOP-13}>{c.topTitle}</text><text x={LEFT} y={bottomTop-14}>{c.bottomTitle}</text></g>
+    <g fontFamily={font} fontSize={titleFont} fontWeight={c.titleWeight??600} fill={o.plotTitleColor??"#262b30"}><text x={LEFT} y={TOP-13}>{c.topTitle}</text><text x={LEFT} y={bottomTop-14}>{c.bottomTitle}</text></g>
     {c.bandOpacity>0&&<rect x={x(c.bandStart)} y={TOP} width={x(c.bandEnd)-x(c.bandStart)} height={panelHeight} fill={c.bandColor} opacity={clamp(c.bandOpacity,0,1)}/>}
     {axis(TOP,majorTop,minorTop,topY,false)}
     <g clipPath="url(#lorentz-top-figure-clip)">
@@ -112,7 +121,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       {c.showReferenceLines&&<line x1={x(resonanceX)} x2={x(resonanceX)} y1={TOP} y2={TOP+panelHeight} stroke="#777" strokeWidth={c.referenceLineWidth} strokeDasharray="7 5"/>}
     </g>
     {c.showResonanceMarkers&&peak&&<circle cx={x(resonanceX)} cy={topY(nearest(peak.values,resonanceX))} r={c.markerRadius} fill={color(imagId)}/>}
-    <text transform={"translate(34 "+(TOP+panelHeight/2)+") rotate(-90)"} textAnchor="middle" fontFamily={font} fontSize={axisFont}>{o.yTitle??"Susceptibility, χ(ω) (a.u.)"}</text>
+    <text transform={"translate(36 "+(TOP+panelHeight/2)+") rotate(-90)"} textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}>{o.yTitle??"Susceptibility, χ(ω) (a.u.)"}</text>
     {legend(c.topLegendX,c.topLegendY,[realId,imagId,"__band__"])}
     {axis(bottomTop,majorBottom,minorBottom,bottomY,true)}
     <g clipPath="url(#lorentz-bottom-figure-clip)">
@@ -120,8 +129,8 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       {c.showReferenceLines&&<><line x1={x(resonanceX)} x2={x(resonanceX)} y1={bottomTop} y2={BOTTOM} stroke="#777" strokeWidth={c.referenceLineWidth} strokeDasharray="7 5"/><line x1={LEFT} x2={RIGHT} y1={bottomY(90)} y2={bottomY(90)} stroke={color(imagId)} strokeDasharray="2 4" strokeWidth="1.2"/></>}
     </g>
     {c.showResonanceMarkers&&phase&&<circle cx={x(resonanceX)} cy={bottomY(nearest(phase.values,resonanceX))} r={c.markerRadius} fill={color(imagId)}/>}
-    <text transform={"translate(34 "+(bottomTop+panelHeight/2)+") rotate(-90)"} textAnchor="middle" fontFamily={font} fontSize={axisFont}>{c.phaseYTitle}</text>
-    <text x={(LEFT+RIGHT)/2} y={BOTTOM+48} textAnchor="middle" fontFamily={font} fontSize={axisFont}>{o.xTitle??"Normalized Driving Frequency, ω/ω₀"}</text>
+    <text transform={"translate(36 "+(bottomTop+panelHeight/2)+") rotate(-90)"} textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}>{c.phaseYTitle}</text>
+    <text x={(LEFT+RIGHT)/2} y={BOTTOM+48} textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}>{o.xTitle??"Normalized Driving Frequency, ω/ω₀"}</text>
     {legend(c.bottomLegendX,c.bottomLegendY,[phaseId],true)}
     {c.annotations.map(renderAnnotation)}
   </svg>;
