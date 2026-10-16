@@ -318,6 +318,10 @@ export interface LorentzComposition {
   panelGap: number;
   phaseMin: number;
   phaseMax: number;
+  phaseMajorTickStep: number;
+  phaseMinorTickStep: number;
+  markerRadius: number;
+  referenceLineWidth: number;
   topMin: number;
   topMax: number;
   resonanceX: number;
