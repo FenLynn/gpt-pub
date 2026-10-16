@@ -7,14 +7,14 @@ function rememberMonth(){
   });
 }
 function monthExists(year,month){return state.monthStores.has(year+'-'+pad(month))}
-function switchMonth(year,month,create=false){
+function switchMonth(year,month,create=false,preserveCurrent=true){
   if(!Number.isInteger(year)||year<2000||year>2100||!Number.isInteger(month)||month<1||month>12)return;
   const key=year+'-'+pad(month);
   if(!state.monthStores.has(key)){
     if(!create){toast('该月份尚未创建，请点击「新建月份」',true);return false}
     state.monthStores.set(key,{records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false});
   }
-  if(key!==monthKey())rememberMonth();
+  if(key!==monthKey()&&preserveCurrent)rememberMonth();
   YEAR=year;MONTH=month;
   const next=state.monthStores.get(key);
   state.records=next.records;state.leaves=next.leaves;state.trips=next.trips;
