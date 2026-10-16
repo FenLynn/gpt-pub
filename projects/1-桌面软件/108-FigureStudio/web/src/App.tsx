@@ -69,6 +69,7 @@ import { presetOrder, presets } from "./plot/presets";
 import { PrecisionSvg, supportsPrecisionSvg } from "./plot/PrecisionSvg";
 import { LorentzFigure } from "./plot/LorentzFigure";
 import { LorentzInspector } from "./plot/LorentzInspector";
+import { GOLDEN_STYLE } from "./plot/goldenStyle";
 import {
   resolvePublicationMetrics,
   resolveSeriesPalette
@@ -85,8 +86,9 @@ const VISUAL_QA_MODE =
   new URLSearchParams(window.location.search).get("qa") === "1";
 const NATURE_GALLERY_MODE =
   new URLSearchParams(window.location.search).get("gallery") === "1";
-const LORENTZ_GOLDEN_MODE =
-  new URLSearchParams(window.location.search).get("golden") === "lorentz";
+const GOLDEN_TARGET = new URLSearchParams(window.location.search).get("golden");
+const LORENTZ_GOLDEN_MODE = GOLDEN_TARGET === "lorentz";
+const SURFACE_GOLDEN_MODE = GOLDEN_TARGET === "surface";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
@@ -432,6 +434,9 @@ function App() {
     if (LORENTZ_GOLDEN_MODE) {
       const golden = result.figures.find(figure => figure.lorentz?.kind === "lorentz-two-panel");
       if (golden) result.activeFigureId = golden.id;
+    } else if (SURFACE_GOLDEN_MODE) {
+      const goldenSurface = result.figures.find(figure => figure.templateId === "surface-3d");
+      if (goldenSurface) result.activeFigureId = goldenSurface.id;
     } else if (NATURE_GALLERY_MODE) {
       const params = new URLSearchParams(window.location.search);
       const requested = Number(params.get("sample") ?? 1);
@@ -463,7 +468,7 @@ function App() {
     ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
   ]);
   const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
-    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE) && initialFigureId
+    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE || SURFACE_GOLDEN_MODE) && initialFigureId
       ? { type: "figure", id: initialFigureId }
       : initialBookId
       ? { type: "book", id: initialBookId }
@@ -496,7 +501,9 @@ function App() {
     () => localStorage.getItem(RENDER_MODE_KEY) === "plotly" ? "plotly" : "precision"
   );
   const [uiScale, setUiScale] = useState(readUiScale);
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>(LORENTZ_GOLDEN_MODE ? "annotation" : "series");
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>(
+    LORENTZ_GOLDEN_MODE ? "annotation" : SURFACE_GOLDEN_MODE ? "figure" : "series"
+  );
   const [selectedLorentzAnnotation, setSelectedLorentzAnnotation] = useState("absorption");
   const [dataInspectorTab, setDataInspectorTab] = useState<"data" | "column">("data");
   const [showColumnMeta, setShowColumnMeta] = useState(false);
@@ -2434,7 +2441,13 @@ function App() {
       activeFigure?.templateId === "xy-errorbar");
   const markerSymbol = primaryOverride.markerSymbol ?? "circle";
   const markerSize =
-    primaryOverride.markerSizePt ?? publicationMetrics.markerSizePt;
+    primaryOverride.markerSizePt ??
+    (activeFigure?.templateId === "xy-scatter"
+      ? GOLDEN_STYLE.marker.scatterSizePt
+      : activeFigure?.templateId === "xy-line-marker" ||
+        activeFigure?.templateId === "xy-errorbar"
+      ? GOLDEN_STYLE.marker.connectedSizePt
+      : publicationMetrics.markerSizePt);
   const automaticMarkerCap =
     markerVisible &&
     lineVisible &&
@@ -2468,13 +2481,12 @@ function App() {
   const markerEdgeWidth =
     primaryOverride.markerEdgeWidthPt ??
     (markerHollow
-      ? 0.8
-      : activeFigure?.templateId === "xy-scatter" ||
-        activeFigure?.templateId === "xy-errorbar"
-      ? 0
-      : 0.45);
-  const errorBarWidth = primaryOverride.errorBarWidthPt ?? 0.8;
-  const errorBarCapSize = primaryOverride.errorBarCapSizePt ?? 0;
+      ? GOLDEN_STYLE.marker.hollowEdgePt
+      : GOLDEN_STYLE.marker.edgePt);
+  const errorBarWidth =
+    primaryOverride.errorBarWidthPt ?? GOLDEN_STYLE.marker.errorLinePt;
+  const errorBarCapSize =
+    primaryOverride.errorBarCapSizePt ?? GOLDEN_STYLE.marker.errorCapPt;
   const errorBarColor = primaryOverride.errorBarColor ?? selectedColor;
   const visible = primaryOverride.visible ?? true;
   const surfaceTemplate = activeFigure?.templateId === "surface-3d";
@@ -4009,7 +4021,7 @@ function App() {
                               disabled={xAxisCategorical}
                               value={
                                 activeFigure.figureOverrides.waterfallXOffset ??
-                                0.5
+                                GOLDEN_STYLE.stackedSpectrum.waterfallXOffset
                               }
                               onChange={(event) =>
                                 setFigureField(
@@ -4028,8 +4040,9 @@ function App() {
                             value={
                               waterfallTemplate
                                 ? activeFigure.figureOverrides.waterfallYOffset ??
-                                  5
-                                : activeFigure.figureOverrides.offsetStep ?? 5
+                                  GOLDEN_STYLE.stackedSpectrum.waterfallYOffset
+                                : activeFigure.figureOverrides.offsetStep ??
+                                  GOLDEN_STYLE.stackedSpectrum.offsetStep
                             }
                             onChange={(event) =>
                               setFigureField(
@@ -4055,7 +4068,7 @@ function App() {
                         <div className="prop-row">
                           <label>色图</label>
                           <select
-                            value={activeFigure.figureOverrides.colorScale ?? "Viridis"}
+                            value={activeFigure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale}
                             onChange={(event) =>
                               setFigureField(
                                 "colorScale",

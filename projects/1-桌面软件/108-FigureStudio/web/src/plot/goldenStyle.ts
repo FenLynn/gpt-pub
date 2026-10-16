@@ -82,6 +82,22 @@ export const GOLDEN_STYLE = {
     gap: 0.22,
     groupGap: 0.08
   },
+  marker: {
+    scatterSizePt: 3,
+    connectedSizePt: 2.7,
+    edgePt: 0.4,
+    hollowEdgePt: 0.55,
+    errorLinePt: 0.55,
+    errorCapPt: 2
+  },
+  stackedSpectrum: {
+    lineWidthPt: 0.82,
+    baseOpacity: 0.58,
+    opacityStep: 0.09,
+    offsetStep: 6,
+    waterfallXOffset: 0.22,
+    waterfallYOffset: 4.2
+  },
   palette: [
     "#305b76",
     "#a44b3d",

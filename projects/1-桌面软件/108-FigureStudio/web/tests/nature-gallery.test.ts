@@ -77,6 +77,25 @@ for (let n=0; n<gallery.length; n++) {
     assert.equal(fieldTrace.colorscale,"Cividis",figure.name+" should use the restrained Golden field scale");
     assert.ok(fieldTrace.colorbar?.outlinewidth>0,figure.name+" colorbar should use a light Golden outline");
   }
+  if(n===3){
+    const scatterTraces=traces as any[];
+    assert.ok(scatterTraces.every(trace=>trace.marker?.line?.width>0),
+      "Golden scatter markers need a fine publication edge");
+  }
+  if(n===4){
+    const errorTrace=(traces as any[])[0];
+    assert.equal(errorTrace.error_y?.thickness,GOLDEN_STYLE.marker.errorLinePt * 96 / 72,
+      "Golden error bars must use the lighter Lorentz-derived stroke");
+    assert.equal(errorTrace.error_y?.width,GOLDEN_STYLE.marker.errorCapPt * 96 / 72,
+      "Golden error bars must keep compact visible caps");
+  }
+  if(n===8 || n===9){
+    const stackTraces=traces as any[];
+    assert.ok(stackTraces.every(trace=>trace.line?.color===GOLDEN_STYLE.palette[0]),
+      "Golden stacked spectra should use one coherent muted hue");
+    assert.ok(stackTraces[0]?.opacity < stackTraces[stackTraces.length-1]?.opacity,
+      "Golden stacked spectra should use a restrained depth opacity ramp");
+  }
   if(n===12){
     const barTrace=(traces as any[])[0];
     assert.ok(barTrace.marker?.line?.width>0,"Golden bars need a fine publication edge");

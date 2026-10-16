@@ -85,7 +85,7 @@ jobs:
             sleep 0.2
           done
           curl --fail --silent "http://127.0.0.1:4173/gpt-pub/p108/index.html" > /dev/null
-          for number in 1 5 7 8 14; do
+          for number in 1 4 5 6 7 8 9 10 14; do
             printf -v label 'N%02d' "$number"
             "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1440,900 --virtual-time-budget=8000 \
               --screenshot="$RUNNER_TEMP/p108-screenshots/$label.png" \
@@ -124,6 +124,18 @@ jobs:
             fi
             echo "Browser preview $label Plotly Golden OK"
           done
+
+          "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1500,950 --virtual-time-budget=9000 \
+            --screenshot="$RUNNER_TEMP/p108-screenshots/Surface-Golden.png" \
+            --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=surface" \
+            > "$RUNNER_TEMP/p108-screenshots/Surface-Golden.html" 2>"$RUNNER_TEMP/p108-screenshots/Surface-Golden.stderr"
+          test -s "$RUNNER_TEMP/p108-screenshots/Surface-Golden.png"
+          if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Golden.html"; then
+            echo "::error::3D Golden surface did not render through WebGL"
+            tail -n 30 "$RUNNER_TEMP/p108-screenshots/Surface-Golden.stderr" || true
+            exit 1
+          fi
+          echo "Browser preview Surface Golden OK"
 
       - name: Check Lorentz in the actual FigureStudio Graph editor
         shell: bash

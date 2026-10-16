@@ -141,7 +141,13 @@ function baseXYTrace(
     override.markerVisible ??
     (modeDefault === "markers" || modeDefault === "lines+markers");
   const lineWidthPt = override.lineWidthPt ?? metrics.lineWidthPt;
-  const markerSizePt = override.markerSizePt ?? metrics.markerSizePt;
+  const markerSizePt =
+    override.markerSizePt ??
+    (modeDefault === "markers"
+      ? GOLDEN_STYLE.marker.scatterSizePt
+      : modeDefault === "lines+markers"
+      ? GOLDEN_STYLE.marker.connectedSizePt
+      : metrics.markerSizePt);
   const automaticMarkerCap =
     markerVisible &&
     lineVisible &&
@@ -199,10 +205,8 @@ function baseXYTrace(
         width: ptToPx(
           override.markerEdgeWidthPt ??
             (override.markerHollow
-              ? 0.8
-              : modeDefault === "markers"
-              ? 0
-              : GOLDEN_STYLE.stroke.markerEdgePt)
+              ? GOLDEN_STYLE.marker.hollowEdgePt
+              : GOLDEN_STYLE.marker.edgePt)
         )
       }
     },
@@ -587,10 +591,10 @@ export function buildTraces(args: {
           figure.seriesOverrides[main.id]?.errorBarColor ??
           trace.line?.color,
         thickness: ptToPx(
-          figure.seriesOverrides[main.id]?.errorBarWidthPt ?? 0.8
+          figure.seriesOverrides[main.id]?.errorBarWidthPt ?? GOLDEN_STYLE.marker.errorLinePt
         ),
         width: ptToPx(
-          figure.seriesOverrides[main.id]?.errorBarCapSizePt ?? 0
+          figure.seriesOverrides[main.id]?.errorBarCapSizePt ?? GOLDEN_STYLE.marker.errorCapPt
         )
       };
     }
@@ -606,15 +610,15 @@ export function buildTraces(args: {
 
   const offsetStep =
     template === "offset-spectrum"
-      ? figure.figureOverrides.offsetStep ?? 5
+      ? figure.figureOverrides.offsetStep ?? GOLDEN_STYLE.stackedSpectrum.offsetStep
       : 0;
   const waterfallYOffset =
     template === "waterfall"
-      ? figure.figureOverrides.waterfallYOffset ?? 5
+      ? figure.figureOverrides.waterfallYOffset ?? GOLDEN_STYLE.stackedSpectrum.waterfallYOffset
       : 0;
   const waterfallXOffset =
     template === "waterfall"
-      ? figure.figureOverrides.waterfallXOffset ?? 0.5
+      ? figure.figureOverrides.waterfallXOffset ?? GOLDEN_STYLE.stackedSpectrum.waterfallXOffset
       : 0;
   const xIsNumeric = dataset.x.values.every(
     (value) => value === null || typeof value === "number"
@@ -648,6 +652,19 @@ export function buildTraces(args: {
           ? value + index * waterfallXOffset
           : value
       );
+    }
+
+    if (template === "waterfall" || template === "offset-spectrum") {
+      if (figure.seriesOverrides[column.id]?.lineWidthPt === undefined) {
+        trace.line.width = ptToPx(GOLDEN_STYLE.stackedSpectrum.lineWidthPt);
+      }
+      if (figure.seriesOverrides[column.id]?.opacity === undefined) {
+        trace.opacity = Math.min(
+          1,
+          GOLDEN_STYLE.stackedSpectrum.baseOpacity +
+            index * GOLDEN_STYLE.stackedSpectrum.opacityStep
+        );
+      }
     }
 
     if (template === "double-y") {
