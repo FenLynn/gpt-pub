@@ -32,7 +32,7 @@ async function run(){
  if(layout.month!=='2026-10'||layout.tabs!==4||layout.defaultFilter!=='main'||layout.recordCount<3600||
     Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<2.7||layout.ratio>3.3||
     layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
- await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('settingsBtn')&&
+ await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===8&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
     document.querySelectorAll('.calendar-key span').length===3,'R13 controls not mounted');
  const countBefore=await page.evaluate(()=>document.querySelectorAll('.m-cell button.filtered-out').length);
@@ -99,7 +99,7 @@ async function run(){
   const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
   const dots=document.querySelectorAll('.r15-punch-dot').length;
   return tr[0]==='rules'&&tr[1]==='events'&&tr.indexOf('actual')>tr.indexOf('events')&&
-    dots===plotAnalysis(analysisContext()).punches.length&&!!document.getElementById('r15PunchPreview');
+    dots===new Set(plotAnalysis(analysisContext()).punches.map(p=>minutes(p.time)+'|'+p.direction)).size&&!!document.getElementById('r15PunchPreview')&&document.querySelectorAll('.r15-punch-dot.multi').length>0;
  },'Music track order or punch-dot overview incorrect');
 
  await check(page,()=>{
