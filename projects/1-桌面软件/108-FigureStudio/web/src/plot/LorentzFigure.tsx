@@ -32,14 +32,16 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const topMax=finite(o.yMax)&&o.yAutoRange===false?o.yMax:c.topMax;
   const topY=(v:number)=>TOP+(o.yReverse?(v-topMin):(topMax-v))/(topMax-topMin||1)*panelHeight;
   const bottomY=(v:number)=>bottomTop+(c.phaseMax-v)/(c.phaseMax-c.phaseMin||1)*panelHeight;
-  const baseSize=(o.tickLabelSizePt??9.5)*1.7;
+  // 1 pt = 96/72 CSS px; the fixed SVG viewBox must preserve real publication typography.
+  const ptScale=(96/72)*W/Math.max(1,width);
+  const baseSize=(o.tickLabelSizePt??9.5)*ptScale;
   const axisColor=o.axisTitleColor??"#34383d";
   const font=o.fontFamily==="Arial"?"Arial,sans-serif":'"Times New Roman",Georgia,serif';
-  const titleFont=(o.plotTitleSizePt??12)*1.7;
-  const axisFont=(o.axisTitleSizePt??11)*1.7;
-  const axisWidth=(o.axisLineWidthPt??.7)*2;
-  const majorLen=(o.majorTickLengthPt??4.5)*1.55;
-  const minorLen=(o.minorTickLengthPt??2.3)*1.55;
+  const titleFont=(o.plotTitleSizePt??12)*ptScale;
+  const axisFont=(o.axisTitleSizePt??11)*ptScale;
+  const axisWidth=(o.axisLineWidthPt??.7)*ptScale;
+  const majorLen=(o.majorTickLengthPt??4.5)*ptScale;
+  const minorLen=(o.minorTickLengthPt??2.3)*ptScale;
   const majorX=numberTicks(xMin,xMax,o.xMajorTickStep??.2);
   const minorX=o.minorTicks?numberTicks(xMin,xMax,o.xMinorTickStep??.05):[];
   const majorTop=numberTicks(topMin,topMax,o.yMajorTickStep??2);
@@ -57,7 +59,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const series=(id:string)=>dataset.ys.find(q=>q.id===id);
   const palette:Record<string,string>={"lorentz-real":"#305b76","lorentz-imag":"#a44b3d","lorentz-phase":"#674080"};
   const color=(id:string)=>figure.seriesOverrides[id]?.color??palette[id]??"#333";
-  const lineWidth=(id:string)=>(figure.seriesOverrides[id]?.lineWidthPt??1.35)*2.15;
+  const lineWidth=(id:string)=>(figure.seriesOverrides[id]?.lineWidthPt??1.35)*ptScale;
   const points=(id:string,y:(v:number)=>number)=>{
     const data=series(id)?.values??[];
     let path="",started=false;
@@ -84,7 +86,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     const override=figure.seriesOverrides[id];
     if(override?.visible===false)return null;
     const dash=override?.lineStyle==="dash"?"9 5":override?.lineStyle==="dot"?"2 4":override?.lineStyle==="dashdot"?"10 4 2 4":undefined;
-    const markerSize=clamp((override?.markerSizePt??4)*1.2,1.5,30);
+    const markerSize=clamp((override?.markerSizePt??4)*ptScale,1.5,60);
     const data=series(id)?.values??[];
     const step=Math.max(1,Math.ceil(data.length/clamp(override?.markerMaxDisplayed??80,1,1601)));
     const markers=override?.markerVisible?data.flatMap((v,i)=>{
@@ -93,7 +95,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       const px=x(xx),py=y(v),rr=markerSize/2;
       const stroke=override?.markerEdgeColor??color(id);
       const fill=override?.markerHollow?"#fff":(override?.markerFillColor??color(id));
-      const edge=(override?.markerEdgeWidthPt??.5)*1.5;
+      const edge=(override?.markerEdgeWidthPt??.5)*ptScale;
       const props={fill,stroke,strokeWidth:edge,opacity:override?.opacity??1};
       const symbol=override?.markerSymbol??"circle";
       const d=symbol==="diamond"
@@ -119,7 +121,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const legend=(xx:number,yy:number,ids:string[],bottom=false)=>{
     const entries=ids.filter(id=>(id!=="__band__"||c.bandOpacity>0)&&(id==="__band__"||figure.seriesOverrides[id]?.visible!==false&&figure.seriesOverrides[id]?.showInLegend!==false));
     if(o.legendVisible===false||!entries.length)return null;
-    const f=(o.legendFontSizePt??9)*1.7,row=clamp(c.legendRowHeight??25,18,52);
+    const f=(o.legendFontSizePt??9)*ptScale,row=clamp(c.legendRowHeight??25,18,52);
     const legendWidth=clamp(bottom?(c.bottomLegendWidth??270):(c.topLegendWidth??298),145,500);
     const boxX=xx-12,boxY=yy-f-7,boxH=entries.length*row+15;
     const id=bottom?"lorentz-legend-bottom-clip":"lorentz-legend-top-clip";
@@ -129,7 +131,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       <defs><clipPath id={id}><rect x={xx+44} y={boxY} width={Math.max(0,legendWidth-67)} height={boxH}/></clipPath></defs>
       {o.legendFrame!==false&&<rect x={boxX} y={boxY} width={legendWidth} height={boxH}
         rx="1.5" fill={o.legendBackground??"#fff"} fillOpacity={o.legendBackgroundOpacity??.95}
-        stroke={o.legendBorderColor??"#d4d9dd"} strokeWidth={(o.legendBorderWidthPt??.45)*1.6}/>}
+        stroke={o.legendBorderColor??"#d4d9dd"} strokeWidth={(o.legendBorderWidthPt??.45)*ptScale}/>}
       {entries.map((entry,i)=>{
         const yyRow=yy+i*row,label=fullLabel(entry);
         return <g key={entry}>
@@ -169,7 +171,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   };
   const renderAnnotation=(a:LorentzAnnotation)=>{
     if(a.visible===false)return null;
-    const size=clamp(a.fontSizePt*1.7,8,48),lineHeight=size*1.3;
+    const size=clamp(a.fontSizePt*ptScale,8,100),lineHeight=size*1.3;
     const maxWidth=clamp(a.maxWidth??300,100,600);
     const lines=wrapText(a.text,maxWidth-20,size);
     const contentWidth=Math.max(0,...lines.map(t=>textWidth(t,size)));
@@ -196,7 +198,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       </g>}
       <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="1.5"
         fill={a.background} fillOpacity={a.backgroundOpacity}
-        stroke={a.borderColor} strokeWidth={a.borderWidthPt*1.6}/>
+        stroke={a.borderColor} strokeWidth={a.borderWidthPt*ptScale}/>
       {lines.map((t,i)=><text key={i} x={a.x} y={a.y+i*lineHeight}
         fontFamily={font} fontSize={size} fontWeight={i===0?600:400}
         fill={a.color} opacity={i===0?1:.92}>{t}</text>)}
