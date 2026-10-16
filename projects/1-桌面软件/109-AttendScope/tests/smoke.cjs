@@ -52,6 +52,17 @@ async function run(){
     !!document.querySelector('.matrix-selection-frame.focus-col.inactive');
  },'Continuous violet row frame');
  await page.screenshot({path:path.join(out,'r14-iteration-row.png')});
+ // Blue hover frames preview both axes, independent of purple selection.
+ await page.locator('.m-cell[data-emp="E003"][data-day="14"] button').hover();
+ await check(page,()=>{
+  const row=document.querySelector('.matrix-preview-frame.focus-row');
+  const col=document.querySelector('.matrix-preview-frame.focus-col');
+  return !row.classList.contains('inactive')&&!col.classList.contains('inactive')&&
+    getComputedStyle(row).borderTopColor.includes('39, 139, 208');
+ },'Blue hover crosshair not visible');
+ await page.screenshot({path:path.join(out,'r14-iteration-hover.png')});
+ await page.mouse.move(4,4);
+
  // Calendar keeps person context regardless of chart tab.
  await page.locator('.cal-day[data-day="9"]').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
@@ -60,6 +71,14 @@ async function run(){
    getComputedStyle(document.querySelector('.m-cell.cell-focus .selected')).boxShadow.includes('135, 89, 219'),
  'Person/calendar cell focus not lifted');
  await page.screenshot({path:path.join(out,'r14-iteration-timeline.png')});
+ await check(page,()=>{
+  const ctx=analysisContext(),a=plotAnalysis(ctx),data=r14TrackData(a);
+  const frames=document.querySelectorAll('.matrix-selection-frame:not(.inactive)');
+  const zoom=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart')).getOption().dataZoom;
+  return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
+    data.tracks.some(x=>x.key==='span')&&zoom.filter(z=>z.type==='slider').length===1;
+ },'Soft violet cross or time span lane failed');
+
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
   const opts=chart.getOption();

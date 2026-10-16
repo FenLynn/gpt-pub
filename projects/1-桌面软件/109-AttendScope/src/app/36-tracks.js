@@ -60,8 +60,8 @@ function mountAttendanceTimeline(a){
      left:76,right:12,bottom:13,height:29,minValueSpan:30,filterMode:'none',
      showDetail:false,realtime:true,brushSelect:false,showDataShadow:true,
      backgroundColor:'#b6bec8',fillerColor:'rgba(237,241,246,.93)',borderColor:'#b0bcca',
-     dataBackground:{lineStyle:{color:'#6d7b89',width:1.4},areaStyle:{color:'rgba(98,110,125,.65)'}},
-     selectedDataBackground:{lineStyle:{color:'#42566c',width:1.5},areaStyle:{color:'rgba(194,203,213,.63)'}},
+     dataBackground:{lineStyle:{color:'#6d7b89',width:1.4},areaStyle:{color:'rgba(98,110,125,.78)'}},
+     selectedDataBackground:{lineStyle:{color:'#42566c',width:1.9},areaStyle:{color:'rgba(194,203,213,.63)'}},
      handleSize:'85%',handleStyle:{color:'#65788d',borderColor:'#65788d'},
      moveHandleStyle:{color:'#708196',opacity:.7}
    }
@@ -87,11 +87,11 @@ function mountAttendanceTimeline(a){
      const d=model.events[params.dataIndex];if(!d)return null;
      const p=api.coord([api.value(0),api.value(1)]);
      const sign=d.p.direction==='进'?-1:1,toward=state.prefs.arrowsTowardLine!==false;
-     const y0=p[1]+sign*(toward?15:4),y1=p[1]+sign*(toward?3:15);
+     const y0=p[1]+sign*(toward?20:5),y1=p[1]+sign*(toward?4:20);
      const color=sign<0?'#258ccd':'#d78851';
      return {type:'group',children:[
-      {type:'line',shape:{x1:p[0],y1:y0,x2:p[0],y2:y1},style:{stroke:color,lineWidth:2.5,lineCap:'round'}},
-      {type:'polygon',shape:{points:[[p[0]-4,y1+sign*(toward?6:-6)],[p[0]+4,y1+sign*(toward?6:-6)],[p[0],y1]]},style:{fill:color}},
+      {type:'line',shape:{x1:p[0],y1:y0,x2:p[0],y2:y1},style:{stroke:color,lineWidth:3.1,lineCap:'round'}},
+      {type:'polygon',shape:{points:[[p[0]-5,y1+sign*(toward?7:-7)],[p[0]+5,y1+sign*(toward?7:-7)],[p[0],y1]]},style:{fill:color}},
       {type:'circle',shape:{cx:p[0],cy:p[1],r:2.5},style:{stroke:color,fill:'#fff',lineWidth:1.3}}
      ]};
     },z:7}

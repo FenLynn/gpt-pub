@@ -139,3 +139,20 @@ font-feature-settings:"kern" 1;letter-spacing:0}
 .r14-appearance-preview .yellow{background:#e8c777}
 .r14-appearance-preview .red{background:#e39792}
 .r14-appearance-preview em{font-size:11px;color:#748b9c;margin-left:8px;font-style:normal}
+
+/* R14 visual pass three: clarity after the second screenshot inspection. */
+.calendar-caption{font-size:13.5px;font-weight:750}
+.cal-day{font-size:12.7px}
+.calendar-key{font-size:11px!important}
+.meta-row{font-size:12.6px}
+.meta-row b{font-size:12.7px}
+.side-label{font-size:12.5px}
+.m-name .name-letters span{font-size:12.7px}
+.m-date b{font-size:12.4px}
+.inspector-insight .insight-row span{font-size:12px}
+.inspector-insight .insight-row strong{font-size:14px}
+.raw-table .tabulator-cell{font-size:12.4px}
+.raw-table .tabulator-col-title{font-size:12.3px}
+.r14-settings-nav button{font-size:13.2px}
+.r14-section-intro p{font-size:12.5px}
+.timeline-top-legend{font-size:11.5px;gap:14px}
