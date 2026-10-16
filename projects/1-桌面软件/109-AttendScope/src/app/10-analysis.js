@@ -8,6 +8,16 @@ async function importTrips(file){const t=await XLSX.readTable(file);const out=[]
 function leaveFor(empId,date){return state.leaves.filter(x=>x.employeeId===empId&&x.date===date)}
 function tripFor(empId,date){return state.trips.filter(x=>x.employeeId===empId&&date>=x.startDate&&date<=x.endDate)}
 function intervalOverlap(a1,a2,b1,b2){return Math.max(0,Math.min(a2,b2)-Math.max(a1,b1))}
+function attendanceCategory(a){
+  if(a.marker==='trip')return 'trip';
+  if(a.marker==='leave')return 'leave';
+  if(state.outings?.some(x=>x.employeeId===a.employee.id&&a.date>=x.startDate&&a.date<=x.endDate))return 'outing';
+  if(a.status==='非工作日出勤'||state.overtimeEntries?.some(x=>x.employeeId===a.employee.id&&x.date===a.date))return 'overtime';
+  if(a.status==='缺勤')return 'absent';
+  if(a.severity==='problem'||a.severity==='suspect')return 'anomaly';
+  if(a.severity==='normal')return 'normal';
+  return 'rest';
+}
 function analyzeDay(emp,d){const date=isoDate(d), punches=state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date).sort((a,b)=>a.datetime.localeCompare(b.datetime));const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),typ=dayType(d);let severity='normal',status='正常',issues=[];let pairs=[],pending=null;
   for(let i=0;i<punches.length;i++){const p=punches[i],prev=punches[i-1];if(prev&&prev.direction===p.direction){const diff=Math.abs(minutes(p.time)-minutes(prev.time));issues.push(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:'连续'+p.direction);severity='suspect'}if(p.direction==='进'){if(pending)severity='suspect';pending=p}else if(p.direction==='出'){if(pending){pairs.push([pending,p]);pending=null}else severity='suspect'}}if(pending){issues.push('存在未闭合进入记录');severity='suspect'}
   const fullExcused=trips.length>0||leaves.some(l=>minutes(l.start)<=minutes(RULES.amStart)&&minutes(l.end)>=minutes(RULES.pmEnd));

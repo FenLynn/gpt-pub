@@ -147,11 +147,13 @@ function timelineEventRender(data){
     const edge=item.edge;
     const count=item.records.length;
 
-    // IN points upward, OUT downward, as in the approved timeline reference.
-    const stemStart=axis[1]+(isIn?-9:9);
-    const stemEnd=axis[1]+(isIn?-46:46);
-    const headTip=axis[1]+(isIn?-60:60);
-    const headBase=axis[1]+(isIn?-45:45);
+    // Default R13: event arrows converge on the timeline. Can be reversed in Settings.
+    const towards=state.prefs?.arrowsTowardLine!==false;
+    const sign=isIn?-1:1;
+    const stemStart=axis[1]+sign*(towards?54:9);
+    const stemEnd=axis[1]+sign*(towards?20:45);
+    const headTip=axis[1]+sign*(towards?5:60);
+    const headBase=axis[1]+sign*(towards?20:45);
 
     const children=[
       {
@@ -264,7 +266,7 @@ function mountAttendanceTimeline(a){
   const option={
     animation:true,
     animationThreshold:500,
-    grid:{left:40,right:16,top:15,bottom:80,containLabel:false},
+    grid:{left:21,right:10,top:8,bottom:86,containLabel:false},
     tooltip:{
       trigger:'item',
       confine:true,
@@ -308,28 +310,28 @@ function mountAttendanceTimeline(a){
         id:'slider',type:'slider',xAxisIndex:0,
         startValue:range.start,endValue:range.end,
         filterMode:'none',minValueSpan:30,
-        left:40,right:16,bottom:10,height:32,
-        showDetail:true,realtime:true,brushSelect:false,
-        backgroundColor:'rgba(240,247,251,.95)',
-        borderColor:'rgba(205,214,222,.72)',
+        left:30,right:16,bottom:22,height:28,
+        showDetail:false,realtime:true,brushSelect:false,
+        backgroundColor:'#edf0f3',
+        borderColor:'#cdd5dc',
         borderRadius:10,
-        fillerColor:'rgba(34,136,216,.14)',
+        fillerColor:'rgba(80,87,100,.32)',
         dataBackground:{
-          lineStyle:{color:'#c2cbd2',width:1,opacity:.80},
-          areaStyle:{color:'rgba(170,180,188,.12)'}
+          lineStyle:{color:'#b0bac4',width:1.2,opacity:.9},
+          areaStyle:{color:'rgba(193,200,208,.38)'}
         },
         selectedDataBackground:{
-          lineStyle:{color:'#2288d8',width:1.4},
-          areaStyle:{color:'rgba(34,136,216,.13)'}
+          lineStyle:{color:'#5c6674',width:1.6},
+          areaStyle:{color:'rgba(96,104,114,.31)'}
         },
         handleIcon:'path://M-3,-11 C-3,-13 3,-13 3,-11 L3,11 C3,13 -3,13 -3,11 Z',
         handleSize:'82%',
         handleStyle:{
-          color:'#2288d8',borderColor:'#2288d8',borderWidth:1,
+          color:'#646d80',borderColor:'#646d80',borderWidth:1,
           shadowBlur:4,shadowColor:'rgba(54,152,201,.18)'
         },
         moveHandleSize:5,
-        moveHandleStyle:{color:'#2288d8',opacity:.55},
+        moveHandleStyle:{color:'#6a7485',opacity:.65},
         textStyle:{color:'#8091a0',fontSize:11},
         labelFormatter:v=>minuteText(v)
       }
@@ -384,6 +386,8 @@ function mountAttendanceTimeline(a){
     start=Math.max(0,Math.min(1440,Math.round(start)));
     end=Math.max(start+30,Math.min(1440,Math.round(end)));
     state.timelineRange={key:range.key,start,end};
+    const mini=document.getElementById('miniSelection');
+    if(mini){mini.style.left=(start/1440*100)+'%';mini.style.width=((end-start)/1440*100)+'%'}
     const label=document.getElementById('timelineWindowLabel');
     if(label)label.textContent=`${minuteText(start)}–${minuteText(end)}`;
     cancelAnimationFrame(raf);
@@ -707,7 +711,10 @@ function mountFocusedOverviewChart(ctx){
     tooltip:{trigger:'axis',confine:true,formatter:ps=>{const d=days[ps[0]?.dataIndex];return d?`${pad(d.day)} 日 · ${d.status}<br>确认在岗：${fmtMinutes(d.presence)}`:''}},
     xAxis:{type:'category',boundaryGap:false,data:days.map(a=>pad(a.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#d9e5ed'}},axisLabel:{fontSize:10,color:'#879bad',interval:1}},
     yAxis:{type:'value',min:0,axisTick:{show:false},axisLine:{show:false},axisLabel:{color:'#879bad',fontSize:10,formatter:v=>v+'h'},splitLine:{lineStyle:{color:'rgba(175,198,214,.40)',type:'dashed'}}},
-    series:[{type:'line',smooth:false,showSymbol:true,symbolSize:5,data:days.map(a=>+(a.presence/60).toFixed(2)),lineStyle:{width:2.6,color:'#208bde'},itemStyle:{color:'#208bde'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(32,139,222,.20)'},{offset:1,color:'rgba(32,139,222,.015)'}])}}]
+    series:[{type:'line',smooth:false,showSymbol:true,symbolSize:8,
+      data:days.map(a=>({value:a.status==='未导入'?null:+(a.presence/60).toFixed(2),
+        itemStyle:{color:({normal:'#70c99b',absent:'#e3c06d',anomaly:'#e58d8c',overtime:'#79b9dc',leave:'#e6a67d',trip:'#69bcb4',outing:'#e0a458'})[attendanceCategory(a)]||'#bac7ce',borderColor:'#fff',borderWidth:1.5}})),
+      lineStyle:{width:2.5,color:'#4f9bdb'},itemStyle:{color:'#4f9bdb'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(32,139,222,.20)'},{offset:1,color:'rgba(32,139,222,.015)'}])}}]
   });
   chart.on('click',ev=>{const a=days[ev.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
 }

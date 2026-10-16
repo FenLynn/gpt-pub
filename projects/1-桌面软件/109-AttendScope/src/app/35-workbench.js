@@ -24,16 +24,18 @@ function attendPlotHtml(ctx){
   const tab=state.chartTab||'overview',day=plotAnalysis(ctx);
   const switcher=tab==='timeline'&&day?'<select id="timelineDayPicker" aria-label="时间轴日期">'+
     Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+'</select>':'';
+  const legend=tab==='timeline'&&day
+    ?'<div class="timeline-top-legend"><span class="event-in">● 进</span><span class="event-out">● 出</span><span class="event-duplicated">✧ 重复事件</span><span class="event-window" id="timelineWindowLabel">'+minuteText(timelineRange(day).start)+'–'+minuteText(timelineRange(day).end)+'</span></div>':'';
   const top='<div class="chart-mode-tabs">'+CHART_TABS.map(([id,label])=>
     '<button data-chart-tab="'+id+'" class="'+(tab===id?'active':'')+'">'+label+'</button>').join('')+'</div>'+
-    '<div class="plot-heading"><strong>'+plotTitle(ctx)+'</strong>'+switcher+'</div>';
+    '<div class="plot-heading"><strong>'+plotTitle(ctx)+'</strong>'+switcher+'</div>'+legend;
   if(tab==='issues')return top+'<div id="issueChart" class="plot-chart"></div>';
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
     if(day){
       const range=timelineRange(day);
-      return top+'<div class="plot-axis"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="进出打卡时间轴"></div></div>'+
-        '<div class="plot-legend"><span><i class="in"></i>进入</span><span><i class="out"></i>离开</span><b id="timelineWindowLabel">'+minuteText(range.start)+'–'+minuteText(range.end)+'</b></div>';
+      return top+'<div class="plot-axis"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="进出打卡时间轴"></div>'+
+        timelineMiniMapHtml(day,range)+'</div>';
     }
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
@@ -79,14 +81,14 @@ function attendInsightHtml(ctx){
     insightMetric('平均在岗',fmtMinutes(pres.length?pres.reduce((n,a)=>n+a.presence,0)/pres.length:0));
 }
 function rawForContext(ctx){
-  const tab=state.rawDataTab||'attendance',pool=tab==='leave'?state.leaves:tab==='trip'?state.trips:state.records;
+  const tab=state.rawDataTab||'attendance',pool=({attendance:state.records,leave:state.leaves,trip:state.trips,outing:state.outings||[],overtime:state.overtimeEntries||[]})[tab]||[];
   const day=(ctx.type==='cell'||ctx.type==='date')?ctx.day:
     ctx.type==='person'&&state.chartTab==='timeline'?plotAnalysis(ctx)?.day:null;
   const date=day?isoDate(day):null;
   return pool.filter(r=>{
     if((ctx.type==='person'||ctx.type==='cell')&&r.employeeId!==ctx.employee.id)return false;
     if(!date)return true;
-    return tab==='trip'?date>=r.startDate&&date<=r.endDate:(tab==='leave'?r.date:r.datetime?.slice(0,10))===date;
+    return tab==='trip'||tab==='outing'?date>=r.startDate&&date<=r.endDate:(tab==='leave'||tab==='overtime'?r.date:r.datetime?.slice(0,10))===date;
   });
 }
 function attendWorkbenchHtml(ctx){
@@ -94,11 +96,9 @@ function attendWorkbenchHtml(ctx){
   return '<div class="inspector-top"><section class="inspector-plot">'+attendPlotHtml(ctx)+'</section>'+
     '<aside class="inspector-insight">'+attendInsightHtml(ctx)+'</aside></div>'+
     '<section class="inspector-bottom" id="rawPane" aria-label="原始记录"><div class="raw-toolbar"><strong>原始数据</strong>'+
-    '<div class="raw-tabs">'+[['attendance','考勤'],['leave','请假'],['trip','出差']].map(([id,name])=>
+    '<div class="raw-tabs">'+[['attendance','考勤'],['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']].map(([id,name])=>
       '<button data-raw-tab="'+id+'" class="'+(tab===id?'active':'')+'">'+name+'</button>').join('')+'</div>'+
-    '<span class="raw-count" id="rawRowCount"></span>'+
-    '<div class="raw-page-controls"><label>每页 <select id="rawPageSize"><option>12</option><option>25</option><option>50</option><option>100</option></select></label>'+
-    '<button id="rawPrev" aria-label="上一页">‹</button><span id="rawPageLabel">1 / 1</span><button id="rawNext" aria-label="下一页">›</button></div>'+
+    '<span class="raw-count" id="rawRowCount"></span>'+ 
     '<button class="raw-float-btn" id="rawFloat" title="弹出可拖动、可缩放表格" aria-label="弹出原始表格">⛶</button></div>'+
     '<div id="rawDataTable" class="raw-table" aria-label="原始表格"></div></section>';
 }
@@ -123,26 +123,8 @@ function disposeRawTable(){
 function mountRawTable(ctx){
   mountPlotTabs(ctx);
   document.querySelectorAll('[data-raw-tab]').forEach(btn=>btn.onclick=()=>{state.rawDataTab=btn.dataset.rawTab;state.rawPage=1;renderRawTable(ctx)});
-  document.getElementById('rawPageSize').onchange=e=>{
-    state.rawPageSize=Number(e.target.value);state.rawPage=1;
-    if(rawTabulator){rawTabulator.setPageSize(state.rawPageSize);rawTabulator.setPage(1);updateRawPager()}
-  };
-  document.getElementById('rawPrev').onclick=async()=>{
-    if(rawTabulator&&rawTabulator.getPage()>1){await rawTabulator.previousPage();state.rawPage=rawTabulator.getPage();updateRawPager()}
-  };
-  document.getElementById('rawNext').onclick=async()=>{
-    if(rawTabulator&&rawTabulator.getPage()<rawTabulator.getPageMax()){await rawTabulator.nextPage();state.rawPage=rawTabulator.getPage();updateRawPager()}
-  };
   document.getElementById('rawFloat').onclick=toggleRawPopout;
   renderRawTable(ctx);
-}
-function updateRawPager(){
-  if(!rawTabulator)return;
-  const p=rawTabulator.getPage()||1,max=Math.max(1,rawTabulator.getPageMax()||1);
-  const label=document.getElementById('rawPageLabel');
-  if(label)label.textContent=p+' / '+max;
-  const prev=document.getElementById('rawPrev'),next=document.getElementById('rawNext');
-  if(prev)prev.disabled=p<=1;if(next)next.disabled=p>=max;
 }
 function renderRawTable(ctx){
   if(rawDialog)closeRawPopout();
@@ -151,13 +133,16 @@ function renderRawTable(ctx){
   document.querySelectorAll('[data-raw-tab]').forEach(b=>b.classList.toggle('active',b.dataset.rawTab===kind));
   const count=document.getElementById('rawRowCount');
   if(count)count.textContent=data.length+' 条';
-  const size=document.getElementById('rawPageSize');
-  if(size)size.value=String(state.rawPageSize||25);
   const node=document.getElementById('rawDataTable');
   if(!node)return;
   const col=(title,field,width,minWidth=43)=>({title,field,width,minWidth,formatter:'plaintext',headerSort:true,tooltip:true});
   const withName=ctx.type!=='person'&&ctx.type!=='cell';
-  const columns=kind==='leave'?[
+  const columns=(kind==='outing'||kind==='overtime')?[
+    ...(withName?[col('姓名','name',74,55)]:[]),
+    ...(kind==='outing'?[col('开始','startDate',104),col('结束','endDate',104)]:[col('日期','date',110)]),
+    col('开始','start',70),col('结束','end',70),col('事项','type',95),
+    col('说明','note',155),col('来源','source',150)
+  ]:kind==='leave'?[
     ...(withName?[col('姓名','name',70,54)]:[]),col('日期','date',105,83),col('开始','start',64),
     col('结束','end',64),col('类型','type',80),col('备注','note',110),col('文件','source',130),col('行号','row',54)]:
     kind==='trip'?[
@@ -167,12 +152,11 @@ function renderRawTable(ctx){
         col('文件','source',150,95),col('行','row',49)];
   rawTabulator=new Tabulator(node,{
     data:data.map((r,i)=>({...r,__id:i+1})),index:'__id',height:'100%',layout:'fitColumns',
-    responsiveLayout:'hide',placeholder:'该范围没有原始记录',
-    pagination:true,paginationMode:'local',paginationSize:state.rawPageSize||25,
+    responsiveLayout:'hide',placeholder:'该范围暂无'+({attendance:'考勤',trip:'出差',leave:'请假',outing:'外出',overtime:'加班'}[kind]||'')+'记录（接口已预留）',
+    pagination:false,
     columns,initialSort:kind==='attendance'?[{column:'datetime',dir:'asc'}]:[]
   });
-  rawTabulator.on('tableBuilt',()=>{updateRawPager();rawTabulator.redraw(true)});
-  rawTabulator.on('pageLoaded',p=>{state.rawPage=p;updateRawPager()});
+  rawTabulator.on('tableBuilt',()=>{rawTabulator.redraw(true)});
   rawTabulator.on('rowClick',(event,row)=>{
     if(kind!=='attendance')return;
     const record=row.getData(),day=Number(record.datetime.slice(8,10));
@@ -182,7 +166,6 @@ function renderRawTable(ctx){
     selectCell(record.employeeId,day);
     requestAnimationFrame(()=>requestAnimationFrame(()=>showRecord(record.recordId)));
   });
-  requestAnimationFrame(updateRawPager);
 }
 function toggleRawPopout(){if(rawDialog)closeRawPopout();else openRawPopout()}
 function openRawPopout(){
@@ -244,4 +227,15 @@ function mountIssueChart(ctx){
       {type:'bar',name:'待核实',stack:'a',data:sus,barMaxWidth:16,itemStyle:{color:'#e9cb7f',borderRadius:[3,3,0,0]}}]
   });
   chart.on('click',p=>{const d=Number(names[p.dataIndex]);if(ctx.employee)selectCell(ctx.employee.id,d);else selectDate(d)});
+}
+
+function timelineMiniMapHtml(a,range){
+  const counts=new Array(72).fill(0);
+  for(const p of a.punches){const i=Math.min(71,Math.floor(minutes(p.time)/20));counts[i]++}
+  const max=Math.max(1,...counts);
+  const bars=counts.map((n,i)=>n?'<rect x="'+(i*10+2)+'" y="'+(25-n/max*22)+'" width="5" height="'+(n/max*22)+'" rx="1"/>':'').join('');
+  const left=(range.start/1440*100).toFixed(3)+'%',width=((range.end-range.start)/1440*100).toFixed(3)+'%';
+  return '<div class="timeline-mini"><span>0:00</span><div class="mini-frame" id="timelineMini">'+
+    '<svg viewBox="0 0 720 28" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>'+
+    '<div class="mini-selection" id="miniSelection" style="left:'+left+';width:'+width+'"></div></div><span>24:00</span></div>';
 }

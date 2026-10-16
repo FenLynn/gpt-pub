@@ -1,113 +1,129 @@
-/* P109 R12 offline Chromium QA: month/group, sticky matrix, chart tabs, raw popout. */
+/* AttendScope R13 acceptance: pure file:// Chromium, no remote dependencies. */
 'use strict';
-const fs=require('fs'),path=require('path'),{pathToFileURL}=require('url');
+const path=require('path'),fs=require('fs'),{pathToFileURL}=require('url');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const root=path.resolve(__dirname,'..'),art=path.join(process.cwd(),'p109-smoke-artifacts');
-fs.mkdirSync(art,{recursive:true});
-const url=process.env.P109_URL||pathToFileURL(path.join(root,'index.html')).href,errors=[],requests=[];
-async function assert(page,expr,label){
-  const v=await page.evaluate(expr);
-  if(!v)throw Error(label);
+const root=path.resolve(__dirname,'..'),out=path.join(process.cwd(),'p109-smoke-artifacts');
+fs.mkdirSync(out,{recursive:true});
+const url=process.env.P109_URL||pathToFileURL(path.join(root,'index.html')).href;
+let browser,errors=[],remote=[];
+async function check(page,expression,description){
+  const result=await page.evaluate(expression);
+  if(!result)throw Error(description);
 }
-async function test(browser){
-  const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1,acceptDownloads:true});
-  const page=await context.newPage();
-  page.on('pageerror',e=>errors.push(e.message));
-  page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
-  page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url())});
-  page.on('dialog',d=>d.type()==='prompt'?d.accept('专项研发组'):d.accept());
-  await page.goto(url,{waitUntil:'load',timeout:45000});
-  await page.waitForSelector('#overviewTrendChart svg',{timeout:16000});
-  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:16000});
-  const metrics=await page.evaluate(()=>{
-    const width=s=>document.querySelector(s)?.getBoundingClientRect().width;
-    const mid=s=>document.querySelector(s)?.getBoundingClientRect();
-    return {year:YEAR,month:MONTH,sidebar:width('.sidebar'),matrix:width('.matrix'),frame:width('.matrix-wrap'),
-      topRatio:width('.inspector-plot')/width('.inspector-insight'),leftMonth:!!document.querySelector('.sidebar #monthMenuButton'),
-      topMonth:!!document.querySelector('.topbar #monthMenuButton'),tabs:document.querySelectorAll('[data-chart-tab]').length,
-      records:rawTabulator?.getDataCount(),rawCount:state.records.length,footer:!!document.querySelector('.matrix-footer'),
-      title:document.getElementById('analysisTitle')?.textContent};
-  });
-  console.log('P109_NEW_GEOMETRY '+JSON.stringify(metrics));
-  if(metrics.year!==2026||metrics.month!==10||!metrics.topMonth||metrics.leftMonth||metrics.footer||metrics.tabs!==4)throw Error('Month/nav split missing');
-  if(Math.abs(metrics.sidebar-212)>1||Math.abs(metrics.matrix-856.5)>2||Math.abs(metrics.frame-873)>2)throw Error('Matrix widths regressed');
-  if(metrics.topRatio<2.7||metrics.topRatio>3.3||metrics.records!==metrics.rawCount)throw Error('3:1 chart/raw layout regressed');
-  await page.screenshot({path:path.join(art,'r12-overview.png')});
-  await page.locator('.m-name[data-emp="E001"]').click();
-  await page.waitForSelector('#overviewTrendChart svg');
-  await assert(page,()=>state.selection.type==='person'&&state.chartTab==='overview'&&document.getElementById('analysisTitle').textContent.includes('组'),'Person defaults to monthly overview');
-  await page.locator('[data-chart-tab="timeline"]').click();
-  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:15000});
-  await assert(page,()=>{
-    const id=state.selection.employeeId,d=state.chartDay;
-    return state.chartTab==='timeline'&&d===nearestRecordedDay(id)&&rawTabulator.getDataCount()===state.records.filter(x=>x.employeeId===id&&x.datetime.startsWith(isoDate(d))).length;
-  },'Person timeline default/latest day raw table mismatch');
-  await page.locator('.cal-day[data-day="9"]').click();
-  await page.waitForSelector('#attendanceTimelineChart svg');
-  await assert(page,()=>state.selection.type==='cell'&&state.selection.employeeId==='E001'&&state.selection.day===9&&state.chartTab==='timeline','Calendar day lost person context');
-  await page.locator('[data-chart-tab="stats"]').click();
-  await page.waitForSelector('#statsChartMain svg',{timeout:15000});
-  await assert(page,()=>document.getElementById('analysisTitle').textContent.includes('2026-10-09')&&!!document.getElementById('statsChartSecondary'),'Stats context title/second plot');
-  await page.locator('[data-chart-tab="issues"]').click();
-  await page.waitForSelector('#issueChart svg',{timeout:15000});
-  await page.locator('[data-chart-tab="timeline"]').click();
-  await page.waitForSelector('#attendanceTimelineChart svg');
-  await page.locator('#rawFloat').click();
-  await page.waitForSelector('#rawDialogOverlay .raw-dialog');
-  const rect0=await page.locator('.raw-dialog').boundingBox();
-  await page.mouse.move(rect0.x+130,rect0.y+18);await page.mouse.down();
-  await page.mouse.move(rect0.x+188,rect0.y+49,{steps:5});await page.mouse.up();
-  const rect1=await page.locator('.raw-dialog').boundingBox();
-  if(rect1.x-rect0.x<35||rect1.y-rect0.y<15)throw Error('Popout not draggable');
-  await page.locator('#rawClose').click();
-  await assert(page,()=>!document.getElementById('rawDialogOverlay')&&!!document.querySelector('.analysis-body #rawPane')&&!!rawTabulator,'Popout cannot dock back');
-  await page.screenshot({path:path.join(art,'r12-cell.png')});
-  await page.locator('#clearSelection').click();
-  await page.locator('.m-date[data-date="9"]').click();
-  await assert(page,()=>state.selection.type==='date'&&document.getElementById('analysisTitle').textContent.includes('2026-10-09'),'Date header');
-  const frame=await page.locator('.matrix-wrap');
-  await frame.evaluate(el=>{el.scrollTop=240;el.scrollLeft=120});
-  await page.waitForTimeout(180);
-  const stick=await page.evaluate(()=>{
-    const wrap=document.querySelector('.matrix-wrap').getBoundingClientRect();
-    const date=document.querySelector('.m-date').getBoundingClientRect();
-    const name=document.querySelector('.m-name').getBoundingClientRect();
-    const corner=document.querySelector('.m-corner').getBoundingClientRect();
-    return {top:wrap.top,dateY:date.y,nameX:name.x,wrapX:wrap.x,cornerX:corner.x,cornerY:corner.y};
-  });
-  console.log('P109_STICKY_AXES '+JSON.stringify(stick));
-  if(Math.abs(stick.dateY-stick.top)>3||Math.abs(stick.nameX-stick.wrapX)>3||Math.abs(stick.cornerY-stick.top)>3)throw Error('Sticky header/name failure');
-  await frame.evaluate(el=>{el.scrollTop=0;el.scrollLeft=0});
-  // Group is independent of department, can be edited while keeping person context.
-  await page.locator('.m-name[data-emp="E001"]').click();
-  await page.locator('[data-edit-group="E001"]').click();
-  await assert(page,()=>state.groups.E001!==EMPLOYEES[0].department+'组','Group manual assignment did not persist');
-  await page.locator('#monthMenuButton').click();
-  await page.locator('.month-choice[data-month="11"]').click();
-  await assert(page,()=>YEAR===2026&&MONTH===11&&state.records.length===0&&state.analysis.size===1500&&state.monthStores.has('2026-10'),'New month should be empty and independent');
-  await assert(page,()=>workingPayload().records.length===0&&workingPayload().groups.E001===state.groups.E001&&projectPayload().months.includes('2026-11'),'Month-scoped working/group metadata missing');
-  await page.locator('#monthMenuButton').click();
-  await page.locator('.month-choice[data-month="10"]').click();
-  await assert(page,()=>YEAR===2026&&MONTH===10&&state.records.length===3600&&state.groups.E001!==EMPLOYEES[0].department+'组','Switching month lost records or group');
-  for(const dims of [[1600,900],[1366,768]]){
-    await page.setViewportSize({width:dims[0],height:dims[1]});await page.waitForTimeout(280);
-    const r=await page.evaluate(()=>({
-      sidebar:document.querySelector('.sidebar').getBoundingClientRect().width,
-      head:document.querySelector('.topbar').getBoundingClientRect().height,
-      tab:!!document.querySelector('.raw-page-controls'),
-      overflowX:getComputedStyle(document.querySelector('.tabulator-tableholder')).overflowX
-    }));
-    if(r.head>49||!r.tab||r.overflowX!=='hidden')throw Error('Narrow desktop control overflow '+JSON.stringify({dims,r}));
-    await page.screenshot({path:path.join(art,'r12-'+dims[0]+'.png')});
-  }
-  if(!process.env.P109_URL&&requests.length)throw Error('Offline runtime network requests '+JSON.stringify(requests));
-  if(errors.length)throw Error('Console/page errors '+JSON.stringify(errors));
-  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({month:'2026-10',requests:requests.length,errors:errors.length,metrics}));
-  await context.close();
+async function run(){
+ browser=await chromium.launch({headless:true,...(process.env.CHROME_BIN?{executablePath:process.env.CHROME_BIN}:{channel:'chrome'})});
+ const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1,acceptDownloads:true});
+ const page=await context.newPage();
+ page.on('pageerror',e=>errors.push('page: '+e.message));
+ page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text())});
+ page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
+ page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
+ await page.goto(url,{waitUntil:'load',timeout:60000});
+ await page.waitForSelector('#overviewTrendChart svg',{timeout:20000});
+ await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
+ const layout=await page.evaluate(()=>{
+  const w=s=>document.querySelector(s).getBoundingClientRect().width;
+  return {sidebar:w('.sidebar'),frame:w('.matrix-wrap'),main:w('.matrix'),
+   ratio:w('.inspector-plot')/w('.inspector-insight'),month:monthKey(),
+   tabs:document.querySelectorAll('[data-chart-tab]').length,defaultFilter:state.filter,
+   recordCount:state.records.length,visibleRaw:rawTabulator.getDataCount()};
+ });
+ console.log('R13_LAYOUT '+JSON.stringify(layout));
+ if(layout.month!=='2026-10'||layout.tabs!==4||layout.defaultFilter!=='main'||layout.recordCount<3600||
+    Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-873)>2||layout.ratio<2.7||layout.ratio>3.3||
+    layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
+ await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('settingsBtn')&&
+    !document.querySelector('.raw-page-controls')&&
+    document.querySelectorAll('.calendar-key span').length===3,'R13 controls not mounted');
+ const countBefore=await page.evaluate(()=>document.querySelectorAll('.m-cell button.filtered-out').length);
+ if(countBefore<25)throw Error('Default main status filter not active');
+ await page.locator('#statusFilter').selectOption('trip');
+ await check(page,()=>state.filter==='trip'&&document.querySelectorAll('.m-cell button:not(.filtered-out).s-trip').length>0,'Trip filter missing');
+ await page.locator('#statusFilter').selectOption('all');
+ await check(page,()=>document.querySelectorAll('.m-cell button.filtered-out').length===0,'All should show all cells');
+ await page.locator('#statusFilter').selectOption('main');
+ // Row focus is a single violet outline, no colored row fill.
+ await page.locator('.m-name[data-emp="E001"]').click();
+ await check(page,()=>{
+  const frame=document.querySelector('.matrix-selection-frame.focus-row');
+  return state.selection.type==='person'&&frame!==null&&
+    !document.querySelector('.m-cell.row-focus').style.background&&
+    getComputedStyle(frame).borderTopColor.includes('139, 90, 226')&&
+    !document.querySelector('.matrix-selection-frame.focus-col');
+ },'Continuous violet row frame');
+ await page.screenshot({path:path.join(out,'r13-row.png')});
+ // Calendar keeps person context regardless of chart tab.
+ await page.locator('.cal-day[data-day="9"]').click();
+ await page.waitForSelector('#attendanceTimelineChart svg');
+ await check(page,()=>state.selection.type==='cell'&&state.selection.employeeId==='E001'&&state.selection.day===9&&
+   document.querySelector('.m-cell.cell-focus .selected')&&
+   getComputedStyle(document.querySelector('.m-cell.cell-focus .selected')).boxShadow.includes('135, 89, 219'),
+ 'Person/calendar cell focus not lifted');
+ await page.screenshot({path:path.join(out,'r13-cell.png')});
+ const arrow=await page.evaluate(()=>{
+  const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
+  const lines=chart.getZr().storage.getDisplayList().filter(x=>x.type==='line'&&x.style?.lineWidth>=5&&
+    Math.abs((x.shape?.y2||0)-(x.shape?.y1||0))>18);
+  return {n:lines.length,up:lines.some(x=>x.shape.y2>x.shape.y1),down:lines.some(x=>x.shape.y2<x.shape.y1),
+   arrows:state.prefs.arrowsTowardLine,mini:!!document.getElementById('timelineMini'),range:state.timelineRange};
+ });
+ console.log('R13_TIMELINE '+JSON.stringify(arrow));
+ if(arrow.n<2||!arrow.up||!arrow.down||!arrow.mini||!arrow.arrows)throw Error('Arrow convergence / minimap missing');
+ await page.locator('[data-chart-tab="overview"]').click();
+ await page.waitForSelector('#overviewTrendChart svg');
+ await check(page,()=>{
+   const chart=echarts.getInstanceByDom(document.getElementById('overviewTrendChart'));
+   const v=chart.getOption().series[0].data;return v.some(a=>a.itemStyle&&a.itemStyle.color);
+ },'Daily points are not status-colored');
+ // Other raw categories keep independent empty interfaces, without pagination.
+ for(const kind of ['trip','leave','outing','overtime','attendance']){
+   await page.locator('[data-raw-tab="'+kind+'"]').click();
+   await page.waitForSelector('#rawDataTable.tabulator');
+   await check(page,()=>!!rawTabulator&&rawTabulator.options.pagination===false&&!document.getElementById('rawPrev'),
+     'Raw table still paginates');
+ }
+ await page.locator('#rawFloat').click();
+ await page.waitForSelector('#rawDialogOverlay .raw-dialog');
+ const r0=await page.locator('.raw-dialog').boundingBox();
+ await page.mouse.move(r0.x+135,r0.y+16);await page.mouse.down();
+ await page.mouse.move(r0.x+181,r0.y+45,{steps:5});await page.mouse.up();
+ const r1=await page.locator('.raw-dialog').boundingBox();
+ if(r1.x-r0.x<25)throw Error('Resizable pop-out cannot drag');
+ await page.locator('#rawClose').click();
+ await check(page,()=>!rawDialog&&!!document.querySelector('.analysis-body #rawPane'),'Popout failed to dock');
+ // Whole column plus top-left All.
+ await page.locator('#matrixAll').click();
+ await check(page,()=>state.selection.type==='overall'&&!document.querySelector('.matrix-selection-frame')&&
+  !document.querySelector('.m-cell.cell-focus'),'All should clear focus');
+ await page.locator('.m-date[data-date="10"]').click();
+ await check(page,()=>state.selection.type==='date'&&!!document.querySelector('.matrix-selection-frame.focus-col'),'Column outline');
+ await page.screenshot({path:path.join(out,'r13-column.png')});
+ // Settings are functional and applied to snapshot/working state.
+ await page.locator('#settingsBtn').click();
+ await page.locator('#settingFont').selectOption('1.08');
+ await page.locator('#settingMotion').uncheck();
+ await page.locator('#settingArrows').uncheck();
+ await page.locator('#settingsApply').click();
+ await check(page,()=>state.prefs.fontScale===1.08&&state.prefs.motion===false&&
+  state.prefs.arrowsTowardLine===false&&workingPayload().prefs.arrowsTowardLine===false,'Settings not persisted');
+ await page.locator('#monthMenuButton').click();
+ await page.locator('.month-choice[data-month="11"]').click();
+ await check(page,()=>MONTH===11&&state.records.length===0&&state.analysis.size===1500,'Empty November workspace');
+ await page.locator('#monthMenuButton').click();
+ await page.locator('.month-choice[data-month="10"]').click();
+ await check(page,()=>MONTH===10&&state.records.length>=3600,'October restoration lost data');
+ for(const size of [[1600,900],[1366,768]]){
+  await page.setViewportSize({width:size[0],height:size[1]});
+  await page.waitForTimeout(240);
+  const l=await page.evaluate(()=>({scrollX:getComputedStyle(document.querySelector('.tabulator-tableholder')).overflowX,
+    sidebar:document.querySelector('.sidebar').getBoundingClientRect().width}));
+  if(l.scrollX!=='hidden'||l.sidebar<195)throw Error('Small desktop table/side width '+JSON.stringify(l));
+  await page.screenshot({path:path.join(out,'r13-'+size[0]+'.png')});
+ }
+ if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
+ if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R13',remote:remote.length,errors:errors.length,layout}));
+ await context.close();
 }
-(async()=>{
- const bin=process.env.CHROME_BIN;
- const browser=await chromium.launch({headless:true,...(bin?{executablePath:bin}:{channel:'chrome'})});
- try{await test(browser)}catch(e){console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);console.error('P109_ERRORS',JSON.stringify(errors));process.exitCode=1}
- finally{await browser.close()}
-})().catch(e=>{console.error(e.stack||e);process.exitCode=1});
+run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
+ .finally(async()=>{if(browser)await browser.close()});

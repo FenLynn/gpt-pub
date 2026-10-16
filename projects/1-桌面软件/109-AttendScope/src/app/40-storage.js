@@ -51,7 +51,7 @@ async function ensureProjectSkeleton(){
 function normalizeSavedMonth(payload){
   if(!payload||!Array.isArray(payload.records))return null;
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
-    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true};
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],rules:payload.rules||null,prefs:payload.prefs||null};
 }
 async function connectProjectDir(){
   if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return}
@@ -100,6 +100,7 @@ function workingPayload(){
   return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
+    outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,
     analysis:[...state.analysis.values()].map(a=>({employeeId:a.employee.id,date:a.date,severity:a.severity,status:a.status,
       firstIn:a.firstIn,lastOut:a.lastOut,presence:a.presence,issues:a.issues,marker:a.marker}))};

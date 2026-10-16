@@ -9,7 +9,7 @@ function groupOf(e){return state.groups?.[e.id]||e.department+'组'}
 const DEMO_NAMES=["陈思远","林嘉禾","周亦宁","王若溪","李知夏","赵书言","沈清越","吴念安","郑予安","许慕白","苏晚晴","何景川","唐诗雨","陆明哲","韩子墨","顾一诺","宋雨桐","徐嘉宁","叶星辰","程安然","梁沐阳","杨可心","邓嘉祺","谢云舟","蒋书瑶","郭亦凡","夏知意","冯沐辰","傅清歌","曹锦程","姜乐言","董予希","段芷晴","钟书航","秦若楠","方之恒","黎星遥","彭思齐","余可欣","袁清禾","施景行","高雨薇","江知远","邵思涵","罗映雪","齐航","林安","欧阳晨曦","司马知远","白若曦"];
 const EMPLOYEES=Array.from({length:50},(_,i)=>({id:'E'+String(i+1).padStart(3,'0'),name:DEMO_NAMES[i],department:['综合','研发','生产','质检','保障'][i%5]}));
 const RULES={amStart:'08:30',amEnd:'12:00',pmStart:'14:00',pmEnd:'17:30',grace:5,dupSeconds:120};
-const state={records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'all',zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true,groups:Object.fromEntries(EMPLOYEES.map(e=>[e.id,e.department+'组'])),monthStores:new Map(),chartTab:'overview',chartDay:null,rawDataTab:'attendance',rawPageSize:25,rawPage:1,rawPopout:false};
+const state={records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'main',zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true,groups:Object.fromEntries(EMPLOYEES.map(e=>[e.id,e.department+'组'])),monthStores:new Map(),chartTab:'overview',chartDay:null,rawDataTab:'attendance',rawPageSize:25,rawPage:1,rawPopout:false,outings:[],overtimeEntries:[],prefs:{fontScale:1,motion:true,arrowsTowardLine:true}};
 const scenarioNames={normal:'正常',late:'迟到',early:'早退',absent:'缺勤',multiin:'多进一出',multiout:'一进多出',missingout:'缺少出',missingin:'缺少进',longout:'长时间外出',duplicate:'疑似重复打卡',overtime:'非工作日出勤'};
 function pad(n){return String(n).padStart(2,'0')} function isoDate(d){return `${YEAR}-${pad(MONTH)}-${pad(d)}`}
 function minutes(t){const [h,m,s='0']=String(t).split(':');return +h*60 + +m + (+s)/60}
@@ -41,6 +41,21 @@ function generateMock(){
     if(sc==='missingout')base.splice(1,1);
     if(sc==='missingin')base.splice(2,1);
     if(sc==='duplicate')base.splice(1,0,rec(emp,d,plusSeconds(i1,35),'进',sc,7));
+    // Deterministic stress cases: repeated in/out, burst swipes, and short departures.
+    if((ei*13+d*17)%41===0){
+      base.push(rec(emp,d,'09:14:06','进','rapid-swipes',8),
+        rec(emp,d,'09:16:11','出','rapid-swipes',9),
+        rec(emp,d,'09:17:24','进','rapid-swipes',10),
+        rec(emp,d,'09:20:35','出','rapid-swipes',11),
+        rec(emp,d,'09:22:41','进','rapid-swipes',12),
+        rec(emp,d,'09:24:59','出','rapid-swipes',13));
+    }
+    if((ei*11+d*7)%67===0){
+      base.push(rec(emp,d,'18:18:00','进','evening-reentry',14),
+        rec(emp,d,'18:27:00','出','evening-reentry',15),
+        rec(emp,d,'18:35:00','进','evening-reentry',16),
+        rec(emp,d,'19:16:00','出','evening-reentry',17));
+    }
     records.push(...base);
   }}
   const leaves=[
