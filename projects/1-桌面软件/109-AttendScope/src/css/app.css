@@ -839,7 +839,7 @@ html,body{font-family:"Inter","Segoe UI Variable","Noto Sans SC","PingFang SC","
 .cal-day:hover{background:#f5f1fa}
 .cal-day.rest,.cal-day.holiday{background:#f1f4f8;color:#899eaf}
 .cal-day.adjust{background:#e9f3fb;color:#467c9f}
-#statusFilter{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23627d94' stroke-width='2' d='m7 10 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 11px center;background-size:16px;width:100%;height:38px;border:1px solid #d5e4ef;border-radius:9px;padding:0 28px 0 11px;color:#38586f;font-weight:625;font-size:11.5px}
+#statusFilter{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='urn:svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23627d94' stroke-width='2' d='m7 10 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 11px center;background-size:16px;width:100%;height:38px;border:1px solid #d5e4ef;border-radius:9px;padding:0 28px 0 11px;color:#38586f;font-weight:625;font-size:11.5px}
 #statusFilter:focus{outline:2px solid rgba(126,83,206,.2);border-color:#a986dc}
 .state-select-wrap{margin-bottom:0}
 .m-corner{font-weight:760!important;font-size:12px;cursor:pointer}
