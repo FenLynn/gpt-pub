@@ -442,7 +442,7 @@ function mountOverallStats(ctx){
       xAxis:{type:'category',data:data.map(x=>x[0]),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
       yAxis:{type:'value',minInterval:1,...chartAxisCommon()},
       series:[{
-        type:'line',data:data.map(x=>x[1]),smooth:.34,showSymbol:false,
+        type:'line',data:data.map(x=>x[1]),smooth:false,showSymbol:false,
         lineStyle:{color:AS_CHART_COLORS.accent,width:2},
         areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(60,143,202,.20)'},{offset:1,color:'rgba(60,143,202,.015)'}])},
         emphasis:{focus:'series'}
@@ -517,7 +517,7 @@ function mountCellStats(ctx){
       xAxis:{type:'category',data:days.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
       yAxis:{type:'value',min:0,max:10,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
       series:[
-        {type:'line',data:days.map(a=>+(a.presence/60).toFixed(2)),smooth:.28,showSymbol:false,lineStyle:{color:'#5a9bc5',width:2},areaStyle:{color:'rgba(90,155,197,.06)'}},
+        {type:'line',data:days.map(a=>a.status==='未导入'?null:+(a.presence/60).toFixed(2)),smooth:.28,showSymbol:false,lineStyle:{color:'#5a9bc5',width:2},areaStyle:{color:'rgba(90,155,197,.06)'}},
         {type:'scatter',symbolSize:10,data:days.map((a,i)=>a.day===ctx.day?[i,+(a.presence/60).toFixed(2)]:null).filter(Boolean),itemStyle:{color:'#2c7fd1',borderColor:'#fff',borderWidth:2}}
       ]
     });
@@ -671,8 +671,8 @@ function mountOverviewTrend(){
     xAxis:{type:'category',boundaryGap:false,data:rows.map(x=>pad(x.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#dae5ec'}},axisLabel:{fontSize:11,color:'#9aa8b3',interval:2}},
     yAxis:{type:'value',min:0,minInterval:1,axisTick:{show:false},axisLine:{show:false},axisLabel:{fontSize:11,color:'#9aa8b3'},splitLine:{lineStyle:{color:'rgba(199,215,225,.37)',type:'dashed'}}},
     series:[
-      {name:'明确异常',type:'line',smooth:.34,symbol:'none',data:rows.map(x=>x.problem),lineStyle:{width:2,color:'#da8e8a'},areaStyle:{color:'rgba(218,142,138,.07)'},itemStyle:{color:'#da8e8a'}},
-      {name:'待核实',type:'line',smooth:.34,symbol:'none',data:rows.map(x=>x.suspect),lineStyle:{width:2,color:'#e5c477'},itemStyle:{color:'#e5c477'}}
+      {name:'明确异常',type:'line',smooth:false,symbol:'none',data:rows.map(x=>x.problem),lineStyle:{width:2,color:'#da8e8a'},areaStyle:{color:'rgba(218,142,138,.07)'},itemStyle:{color:'#da8e8a'}},
+      {name:'待核实',type:'line',smooth:false,symbol:'none',data:rows.map(x=>x.suspect),lineStyle:{width:2,color:'#e5c477'},itemStyle:{color:'#e5c477'}}
     ]
   });
   chart.on('click',p=>{const day=rows[p.dataIndex]?.day;if(day)selectDate(day)});
@@ -707,7 +707,7 @@ function mountFocusedOverviewChart(ctx){
     tooltip:{trigger:'axis',confine:true,formatter:ps=>{const d=days[ps[0]?.dataIndex];return d?`${pad(d.day)} 日 · ${d.status}<br>确认在岗：${fmtMinutes(d.presence)}`:''}},
     xAxis:{type:'category',boundaryGap:false,data:days.map(a=>pad(a.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#d9e5ed'}},axisLabel:{fontSize:10,color:'#879bad',interval:1}},
     yAxis:{type:'value',min:0,axisTick:{show:false},axisLine:{show:false},axisLabel:{color:'#879bad',fontSize:10,formatter:v=>v+'h'},splitLine:{lineStyle:{color:'rgba(175,198,214,.40)',type:'dashed'}}},
-    series:[{type:'line',smooth:.3,showSymbol:false,symbolSize:7,data:days.map(a=>+(a.presence/60).toFixed(2)),lineStyle:{width:2.6,color:'#208bde'},itemStyle:{color:'#208bde'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(32,139,222,.20)'},{offset:1,color:'rgba(32,139,222,.015)'}])}}]
+    series:[{type:'line',smooth:false,showSymbol:true,symbolSize:5,data:days.map(a=>+(a.presence/60).toFixed(2)),lineStyle:{width:2.6,color:'#208bde'},itemStyle:{color:'#208bde'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(32,139,222,.20)'},{offset:1,color:'rgba(32,139,222,.015)'}])}}]
   });
   chart.on('click',ev=>{const a=days[ev.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
 }
