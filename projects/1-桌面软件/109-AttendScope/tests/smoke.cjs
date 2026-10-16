@@ -98,11 +98,11 @@ async function run(browser){
   const first=await page.evaluate(()=>rawTabulator.getData('active').length);
   if(first!==chosen.count)throw Error('Record drilldown filtered rows inaccurate');
   await page.locator('[data-raw-tab="leave"]').click();
-  await page.waitForFunction(()=>state.rawDataTab==='leave'&&!!document.querySelector('#rawDataTable .tabulator'));
+  await page.waitForFunction(()=>state.rawDataTab==='leave'&&!!document.querySelector('#rawDataTable.tabulator')&&!!document.querySelector('#rawDataTable .tabulator-col'));
   const leave=await page.evaluate(()=>({n:rawTabulator?.getDataCount(),expect:rawForContext(analysisContext()).length,columns:rawTabulator?.getColumns().map(c=>c.getField())}));
   if(leave.n!==leave.expect||!leave.columns?.includes('date'))throw Error('Leave raw table failed '+JSON.stringify(leave));
   await page.locator('[data-raw-tab="trip"]').click();
-  await page.waitForFunction(()=>state.rawDataTab==='trip'&&!!document.querySelector('#rawDataTable .tabulator'));
+  await page.waitForFunction(()=>state.rawDataTab==='trip'&&!!document.querySelector('#rawDataTable.tabulator')&&!!document.querySelector('#rawDataTable .tabulator-col'));
   const trip=await page.evaluate(()=>({n:rawTabulator?.getDataCount(),expect:rawForContext(analysisContext()).length,columns:rawTabulator?.getColumns().map(c=>c.getField())}));
   if(trip.n!==trip.expect||!trip.columns?.includes('startDate'))throw Error('Trip raw table failed '+JSON.stringify(trip));
   await page.locator('[data-raw-tab="attendance"]').click();
