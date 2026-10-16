@@ -71,7 +71,7 @@ async function inspect(browser){
     const element=document.getElementById('attendanceTimelineChart');
     const inst=window.echarts?.getInstanceByDom(element);
     const svg=element?.querySelector('svg');
-    const svgArrowPaths=[...(svg?.querySelectorAll('path[stroke]')||[])].filter(p=>['#147fc0','#3698c9','#e29355','#cf6c37'].includes(p.getAttribute('stroke'))&&/^M[0-9.-]+ [0-9.-]+L/.test(p.getAttribute('d')||''));
+    const svgArrowPaths=[...(svg?.querySelectorAll('path[stroke]')||[])].filter(p=>['#126fba','#208ece','#d98950','#ca6f39'].includes(p.getAttribute('stroke'))&&/^M[0-9.-]+ [0-9.-]+L/.test(p.getAttribute('d')||''));
     const shapes=inst?.getZr()?.storage?.getDisplayList()||[];
     const display=shapes.map(el=>el.type);
     const arrowShafts=shapes.filter(el=>el.type==='line'&&(el.style?.lineWidth||0)>=4.5&&Math.abs((el.shape?.y2||0)-(el.shape?.y1||0))>=35);
@@ -130,6 +130,39 @@ async function inspect(browser){
 
   await page.locator('button[data-analysis-tab="overview"]').click();
   await page.waitForSelector('.overview-rows');
+  // MATQ/DavBridge/LocalSub visual QA: every context renders meaningful
+  // content, and fixed 31-day geometry remains aligned at desktop sizes.
+  await page.locator('[data-emp="E001"]').click();
+  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
+  await page.screenshot({path:path.join(artifacts,mode+'-person.png'),fullPage:false});
+  await page.locator('.m-date[data-date="9"]').click();
+  await page.waitForSelector('#attendanceDayChart svg',{timeout:12000});
+  await page.locator('button[data-analysis-tab="overview"]').click();
+  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
+  await page.screenshot({path:path.join(artifacts,mode+'-date-overview.png'),fullPage:false});
+  await page.locator('#clearSelection').click();
+  await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
+
+  for(const dimensions of [{width:1600,height:900},{width:1366,height:768}]){
+    await page.setViewportSize(dimensions);
+    await page.waitForTimeout(380);
+    const layout=await page.evaluate(()=>{
+      const bb=id=>{const r=document.querySelector(id).getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};
+      return {matrix:bb('.matrix-wrap'),analysis:bb('.analysis-panel'),topbar:bb('.topbar'),width:innerWidth,grid:bb('.matrix')};
+    });
+    console.log('P109_DESKTOP_VIEWPORT '+JSON.stringify({dimensions,layout}));
+    if(Math.abs(layout.matrix.w-570)>2||Math.abs(layout.grid.w-554)>2)
+      throw Error('Matrix geometry changed at '+dimensions.width);
+    if(layout.analysis.x-layout.matrix.right<8||layout.analysis.right>dimensions.width+2)
+      throw Error('Analysis area overlaps or overflows viewport at '+dimensions.width);
+    if(layout.topbar.h>48)throw Error('Toolbar height regressed');
+    await page.screenshot({path:path.join(artifacts,mode+'-'+dimensions.width+'-overview.png'),fullPage:false});
+    await page.locator(cell).click();
+    await page.waitForSelector('#attendanceTimelineChart svg',{timeout:12000});
+    await page.waitForTimeout(240);
+    await page.screenshot({path:path.join(artifacts,mode+'-'+dimensions.width+'-timeline.png'),fullPage:false});
+    await page.locator('#clearSelection').click();
+  }
   if(mode==='offline'&&requests.some(x=>/^https?:/.test(x)))throw Error('Offline file page made HTTP(S) requests '+JSON.stringify(requests));
   if(errors.length)throw Error('Browser errors: '+JSON.stringify(errors));
   console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({mode,url,chosen,requests:requests.length}));
