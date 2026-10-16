@@ -17,28 +17,26 @@ function r14TrackData(a){
   {from:minutes(RULES.amStart),to:minutes(RULES.amEnd),title:'上午法定工作'},
   {from:minutes(RULES.pmStart),to:minutes(RULES.pmEnd),title:'下午法定工作'}]:[];
  add('rules','法定工作','#94b9d4',required);
- add('actual','实际在岗','#72c5a4',a.pairs.map(([p,q])=>({from:minutes(p.time),to:minutes(q.time),title:p.time+'–'+q.time})));
- const allTimes=a.punches.map(p=>minutes(p.time)).sort((x,y)=>x-y);
- add('span','首末打卡','#a9bad0',allTimes.length>1?
-  [{from:allTimes[0],to:allTimes[allTimes.length-1],title:'首末打卡跨度'}]:[]);
-
- add('leave','请假','#e4aa79',a.leaves.map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:p.type||'请假'})));
- add('trip','出差','#68bdb6',a.trips.map(p=>({from:minutes(p.start||'00:00'),to:minutes(p.end||'24:00'),title:p.type||'出差'})));
- const outing=(state.outings||[]).filter(p=>p.employeeId===a.employee.id&&a.date>=p.startDate&&a.date<=p.endDate);
- add('outing','外出','#d8ae6d',outing.map(p=>({from:minutes(p.start||'00:00'),to:minutes(p.end||'24:00'),title:p.type||'外出'})));
  add('events','打卡事件','#648ca7',[]);
+ add('actual','实际在岗',ATTEND_STATUS_COLORS.normal,a.pairs.map(([p,q])=>({from:minutes(p.time),to:minutes(q.time),title:p.time+'–'+q.time})));
+ const allTimes=a.punches.map(p=>minutes(p.time)).sort((x,y)=>x-y);
+ add('span','首末跨度','#a9bad0',allTimes.length>1?
+  [{from:allTimes[0],to:allTimes[allTimes.length-1],title:'首末打卡跨度'}]:[]);
+ add('trip','出差',ATTEND_BEHAVIOR_COLORS.trip,a.trips.map(p=>({from:minutes(p.start||'00:00'),to:minutes(p.end||'24:00'),title:p.type||'出差'})));
+ add('leave','请假',ATTEND_BEHAVIOR_COLORS.leave,a.leaves.map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:p.type||'请假'})));
+ const outing=(state.outings||[]).filter(p=>p.employeeId===a.employee.id&&a.date>=p.startDate&&a.date<=p.endDate);
+ add('outing','外出',ATTEND_BEHAVIOR_COLORS.outing,outing.map(p=>({from:minutes(p.start||'00:00'),to:minutes(p.end||'24:00'),title:p.type||'外出'})));
+ const overtime=(state.overtimeEntries||[]).filter(p=>p.employeeId===a.employee.id&&p.date===a.date);
+ add('overtime','加班',ATTEND_BEHAVIOR_COLORS.overtime,overtime.map(p=>({from:minutes(p.start||'17:30'),to:minutes(p.end||'20:00'),title:p.type||'加班'})));
  return {tracks,bars,events};
 }
 function mountAttendanceTimeline(a){
  const el=document.getElementById('attendanceTimelineChart');if(!el||!window.echarts)return;
  const chart=initAttendChart(el);if(!chart)return;
  const range=timelineRange(a),model=r14TrackData(a);
- const density=Array.from({length:73},(_,i)=>[i*20,0]);
- for(const p of a.punches){density[Math.min(72,Math.max(0,Math.round(minutes(p.time)/20)))][1]++}
- const rowSize=Math.min(23,Math.max(12,160/Math.max(2,model.tracks.length)));
- const shade=Math.max(2,...density.map(p=>p[1]))+1;
+ // Only actual punch dots appear in the single zoom slider, not a synthetic density line.
  const timelineOption={
-  animation:false,grid:{left:76,right:12,top:10,bottom:70},
+  animation:false,grid:{left:76,right:12,top:9,bottom:65},
   tooltip:{trigger:'item',confine:true,formatter:p=>{
    const d=p.data||{};
    return d.p?'<b>'+d.p.time+'</b> · '+d.p.direction:
@@ -52,14 +50,14 @@ function mountAttendanceTimeline(a){
     axisLine:{show:false},axisTick:{show:false},axisLabel:{fontSize:11,color:'#647e92',fontWeight:650},
     splitLine:{show:true,lineStyle:{color:'#e9eff5'}},
     splitArea:{show:true,areaStyle:{color:['#f8fafc','#fff']}}},
-   {type:'value',min:0,max:shade,show:false}
+   {type:'value',min:0,max:3,show:false}
   ],
   dataZoom:[
    {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,
      minValueSpan:30,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
    {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,
      left:76,right:12,bottom:13,height:29,minValueSpan:30,filterMode:'none',
-     showDetail:false,realtime:true,brushSelect:false,showDataShadow:true,
+     showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
      backgroundColor:'#b6bec8',fillerColor:'rgba(237,241,246,.93)',borderColor:'#b0bcca',
      dataBackground:{lineStyle:{color:'#6d7b89',width:1.4},areaStyle:{color:'rgba(98,110,125,.78)'}},
      selectedDataBackground:{lineStyle:{color:'#42566c',width:1.9},areaStyle:{color:'rgba(194,203,213,.63)'}},
@@ -68,19 +66,16 @@ function mountAttendanceTimeline(a){
    }
   ],
   series:[
-   {id:'day-density',type:'line',yAxisIndex:1,xAxisIndex:0,data:density,silent:true,
-    showSymbol:false,animation:false,step:'middle',
-    lineStyle:{color:'#788797',opacity:.02},
-    areaStyle:{color:'rgba(107,118,130,.02)'},z:-2},
    {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,
     data:model.bars,
     renderItem:(params,api)=>{
      const d=model.bars[params.dataIndex];if(!d)return null;
      const p=api.coord([api.value(0),api.value(2)]);
      const q=api.coord([api.value(1),api.value(2)]);
+     const h=Math.max(8,Math.abs(api.size([0,1])[1])-2);
      return {type:'rect',
-       shape:{x:Math.min(p[0],q[0]),y:p[1]-rowSize/2,width:Math.max(1,Math.abs(q[0]-p[0])),height:rowSize,r:5},
-       style:{fill:d.color,opacity:.91}};
+       shape:{x:Math.min(p[0],q[0]),y:p[1]-h/2,width:Math.max(1,Math.abs(q[0]-p[0])),height:h,r:3},
+       style:{fill:d.color,opacity:.9,stroke:'#fff',lineWidth:.6}};
     },z:4},
    {id:'event-baseline',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.tracks.some(t=>t.key==='events')?[[0,1440,model.tracks.findIndex(t=>t.key==='events')]]:[],
