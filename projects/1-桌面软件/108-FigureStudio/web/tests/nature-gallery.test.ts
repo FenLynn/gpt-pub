@@ -37,7 +37,8 @@ for (let n=0; n<gallery.length; n++) {
   const figure = gallery[n];
   assert.ok(figure.name.startsWith("N"+String(n+1).padStart(2,"0")),figure.name);
   assert.equal(figure.presetId,"nature");
-  assert.equal(figure.figureOverrides.fontSizePt,6.5);
+  assert.equal(figure.figureOverrides.fontSizePt,n===13?7.4:6.5,
+    figure.name+" Golden typography scale");
   const { xTitle, yTitle } = figure.figureOverrides;
   assert.ok(xTitle && yTitle, figure.name+" must have explicit English axes");
   assert.ok(/^[\x20-\x7e\u00b0]+$/.test(xTitle), figure.name+" non-English X");
