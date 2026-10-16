@@ -102,7 +102,7 @@ async function test(browser){
   }
   if(!process.env.P109_URL&&requests.length)throw Error('Offline runtime network requests '+JSON.stringify(requests));
   if(errors.length)throw Error('Console/page errors '+JSON.stringify(errors));
-  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({month:monthKey(),requests:requests.length,errors:errors.length,metrics}));
+  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({month:'2026-10',requests:requests.length,errors:errors.length,metrics}));
   await context.close();
 }
 (async()=>{
