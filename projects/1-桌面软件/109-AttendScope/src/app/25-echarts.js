@@ -1,18 +1,18 @@
 /* AttendScope ECharts integration — Apache ECharts 6.1.0, vendored locally. */
 const AS_CHART_COLORS={
-  ink:'#111820',
-  text:'#4b6074',
-  muted:'#91a0ad',
+  ink:'#203247',
+  text:'#4e6880',
+  muted:'#899fb1',
   grid:'rgba(185,201,213,.26)',
-  in:'#3698c9',
-  out:'#e29355',
-  first:'#147fc0',
-  last:'#cf6c37',
-  normal:'#7fbd92',
-  suspect:'#e4bb62',
-  problem:'#d77773',
-  excused:'#83add1',
-  accent:'#3c8fca',
+  in:'#208ece',
+  out:'#d98950',
+  first:'#126fba',
+  last:'#ca6f39',
+  normal:'#85cca3',
+  suspect:'#e8c777',
+  problem:'#e39792',
+  excused:'#b1d9ee',
+  accent:'#2288d8',
   area:'rgba(80,151,198,.10)'
 };
 
@@ -21,7 +21,7 @@ let __attendCharts=[];
 function registerAttendTheme(){
   if(!window.echarts||window.__attendThemeRegistered)return;
   echarts.registerTheme('attendScope',{
-    color:['#5f88d7','#8a79d2','#7ba8c7','#9aa9c8','#6e9ab5','#9d8bd6'],
+    color:['#2288d8','#85cca3','#e8c777','#e39792','#9cc7e8','#74aacb'],
     backgroundColor:'transparent',
     textStyle:{
       fontFamily:'Segoe UI, Microsoft YaHei, PingFang SC, sans-serif',
@@ -147,10 +147,11 @@ function timelineEventRender(data){
     const edge=item.edge;
     const count=item.records.length;
 
-    const stemStart=axis[1]+(isIn?-58:58);
-    const stemEnd=axis[1]+(isIn?-14:14);
-    const headTip=axis[1]+(isIn?-2:2);
-    const headBase=axis[1]+(isIn?-15:15);
+    // IN points upward, OUT downward, as in the approved timeline reference.
+    const stemStart=axis[1]+(isIn?-9:9);
+    const stemEnd=axis[1]+(isIn?-46:46);
+    const headTip=axis[1]+(isIn?-60:60);
+    const headBase=axis[1]+(isIn?-45:45);
 
     const children=[
       {
@@ -263,7 +264,7 @@ function mountAttendanceTimeline(a){
   const option={
     animation:true,
     animationThreshold:500,
-    grid:{left:46,right:22,top:18,bottom:102,containLabel:false},
+    grid:{left:48,right:24,top:19,bottom:90,containLabel:false},
     tooltip:{
       trigger:'item',
       confine:true,
@@ -307,28 +308,28 @@ function mountAttendanceTimeline(a){
         id:'slider',type:'slider',xAxisIndex:0,
         startValue:range.start,endValue:range.end,
         filterMode:'none',minValueSpan:30,
-        left:46,right:22,bottom:14,height:42,
+        left:48,right:24,bottom:13,height:37,
         showDetail:true,realtime:true,brushSelect:false,
-        backgroundColor:'rgba(235,239,243,.95)',
+        backgroundColor:'rgba(240,247,251,.95)',
         borderColor:'rgba(205,214,222,.72)',
         borderRadius:10,
-        fillerColor:'rgba(54,152,201,.16)',
+        fillerColor:'rgba(34,136,216,.14)',
         dataBackground:{
           lineStyle:{color:'#c2cbd2',width:1,opacity:.80},
           areaStyle:{color:'rgba(170,180,188,.12)'}
         },
         selectedDataBackground:{
-          lineStyle:{color:'#3698c9',width:1.4},
-          areaStyle:{color:'rgba(54,152,201,.16)'}
+          lineStyle:{color:'#2288d8',width:1.4},
+          areaStyle:{color:'rgba(34,136,216,.13)'}
         },
         handleIcon:'path://M-3,-11 C-3,-13 3,-13 3,-11 L3,11 C3,13 -3,13 -3,11 Z',
         handleSize:'82%',
         handleStyle:{
-          color:'#3698c9',borderColor:'#3698c9',borderWidth:1,
+          color:'#2288d8',borderColor:'#2288d8',borderWidth:1,
           shadowBlur:4,shadowColor:'rgba(54,152,201,.18)'
         },
         moveHandleSize:5,
-        moveHandleStyle:{color:'#3698c9',opacity:.55},
+        moveHandleStyle:{color:'#2288d8',opacity:.55},
         textStyle:{color:'#8091a0',fontSize:8},
         labelFormatter:v=>minuteText(v)
       }
@@ -360,8 +361,8 @@ function mountAttendanceTimeline(a){
           const y=api.coord([0,0])[1];
           const x1=cs.x+2,x2=cs.x+cs.width-7;
           return {type:'group',children:[
-            {type:'line',shape:{x1,y1:y,x2,y2:y},style:{stroke:'#111820',lineWidth:2.8,opacity:.96,lineCap:'round'}},
-            {type:'polygon',shape:{points:[[x2,y-6],[x2+11,y],[x2,y+6]]},style:{fill:'#111820',opacity:1}}
+            {type:'line',shape:{x1,y1:y,x2,y2:y},style:{stroke:'#203247',lineWidth:2.4,opacity:.96,lineCap:'round'}},
+            {type:'polygon',shape:{points:[[x2,y-6],[x2+11,y],[x2,y+6]]},style:{fill:'#203247',opacity:1}}
           ]};
         },
         z:3
