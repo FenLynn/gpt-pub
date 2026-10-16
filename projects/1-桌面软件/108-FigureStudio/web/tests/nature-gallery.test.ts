@@ -88,6 +88,20 @@ for (let n=0; n<gallery.length; n++) {
   assert.ok(markup.includes('data-annotation-id="absorption"'),"annotation missing");
   assert.ok(markup.includes('data-annotation-id="resonance"'),"phase annotation missing");
   assert.ok(!markup.includes("NaN")&&!markup.includes("Infinity"),"invalid Lorentz SVG coordinates");
+  const ptScale=Number(markup.match(/data-pt-scale="([^"]+)"/)?.[1]);
+  assert.ok(Number.isFinite(ptScale)&&Math.abs(ptScale*Number(ll.width)/1200-96/72)<1e-9,
+    "Physical point units must equal 1/72 inch at the exported figure width");
+  const narrower={...golden!,figureOverrides:{...golden!.figureOverrides,figureWidthMm:89}};
+  const narrowerLayout=buildLayout({dataset:ds,figure:narrower,preset:presets.nature});
+  const narrowerMarkup=renderToStaticMarkup(createElement(LorentzFigure,{
+    figure:narrower,dataset:ds,width:Number(narrowerLayout.width),height:Number(narrowerLayout.height),
+    svgRef:createRef<SVGSVGElement>(),onSelectSeries:()=>{},
+    onSelectAnnotation:()=>{},onMoveAnnotation:()=>{},onAxisClick:()=>{},onLegendClick:()=>{}
+  }));
+  const narrowerScale=Number(narrowerMarkup.match(/data-pt-scale="([^"]+)"/)?.[1]);
+  assert.ok(Math.abs(narrowerScale*Number(narrowerLayout.width)/1200-96/72)<1e-9,
+    "Changing figure mm must not change the physical point size");
+
   assert.equal(golden!.lorentz!.annotations.length,6);
   assert.equal(golden!.folderId,"folder-golden","Golden Graph should not inflate 14 Nature cases");
   const readBox=(kind:"annotation-id"|"legend-panel",id:string)=>{
