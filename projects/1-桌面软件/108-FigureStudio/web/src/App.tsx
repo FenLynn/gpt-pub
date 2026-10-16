@@ -3333,7 +3333,7 @@ function App() {
             </>
           ) : activeFigure && plotDataset ? (
             <>
-              <div className="inspector-tabs">
+              <div className={isLorentz ? "inspector-tabs lorentz-tabs" : "inspector-tabs"}>
                 {graphInspectorTabs.map(([id, label]) => (
                   <button
                     key={id}
