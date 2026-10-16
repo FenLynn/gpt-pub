@@ -11,7 +11,7 @@ function r14TrackData(a){
    const from=Math.max(0,Math.min(1440,+s.from)),to=Math.max(0,Math.min(1440,+s.to));
    if(to>from)bars.push({value:[from,to,lane],color,title:s.title||title});
   }
-  if(key==='events'){const groups=new Map();for(const p of a.punches){const minute=minutes(p.time),k=minute+'|'+p.direction;if(!groups.has(k))groups.set(k,{minute,records:[]});groups.get(k).records.push(p)}for(const g of groups.values())events.push({value:[g.minute,lane],p:g.records[0],records:g.records,count:g.records.length})}
+  if(key==='events'){const groups=new Map();for(const p of a.punches){const raw=minutes(p.time),minute=Math.floor(raw),k=minute+'|'+p.direction;if(!groups.has(k))groups.set(k,{minute,records:[]});groups.get(k).records.push(p)}for(const g of groups.values())events.push({value:[g.minute,lane],p:g.records[0],records:g.records,count:g.records.length})}
  };
  const required=isWorkday(a.day)?[
   {from:minutes(RULES.amStart),to:minutes(RULES.amEnd),title:'上午法定工作'},
