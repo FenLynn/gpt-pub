@@ -226,13 +226,13 @@ function mountIssueChart(ctx){
     const id=ctx.employee.id;
     for(let d=1;d<=monthDays();d++){
       const a=state.analysis.get(id+'|'+d);if(!isWorkday(d))continue;
-      names.push(pad(d));bad.push(a.severity==='problem'?1:0);sus.push(a.severity==='suspect'?1:0);
+      names.push(pad(d));bad.push(attendanceJudgment(a)==='absent'?1:0);sus.push(attendanceJudgment(a)==='anomaly'?1:0);
     }
   }else{
     for(let d=1;d<=monthDays();d++){
       if(!isWorkday(d))continue;
       const set=EMPLOYEES.map(e=>state.analysis.get(e.id+'|'+d));
-      names.push(pad(d));bad.push(set.filter(a=>a.severity==='problem').length);sus.push(set.filter(a=>a.severity==='suspect').length);
+      names.push(pad(d));bad.push(set.filter(a=>attendanceJudgment(a)==='absent').length);sus.push(set.filter(a=>attendanceJudgment(a)==='anomaly').length);
     }
   }
   chart.setOption({
@@ -240,10 +240,10 @@ function mountIssueChart(ctx){
     tooltip:{trigger:'axis'},legend:{show:false},
     xAxis:{type:'category',data:names,axisLabel:{fontSize:11,interval:2,color:'#71899b'},axisTick:{show:false}},
     yAxis:{type:'value',minInterval:1,axisLabel:{color:'#71899b'},splitLine:{lineStyle:{type:'dashed',color:'#e7eef4'}}},
-    series:[{type:'bar',name:'明确异常',stack:'a',data:bad,barMaxWidth:16,itemStyle:{color:'#e69b96',borderRadius:[3,3,0,0]}},
-      {type:'bar',name:'待核实',stack:'a',data:sus,barMaxWidth:16,itemStyle:{color:'#e9cb7f',borderRadius:[3,3,0,0]}}]
+    series:[{type:'bar',name:'缺勤',stack:'a',data:bad,barMaxWidth:16,itemStyle:{color:ATTEND_STATUS_COLORS.absent,borderRadius:[3,3,0,0]}},
+      {type:'bar',name:'异常',stack:'a',data:sus,barMaxWidth:16,itemStyle:{color:ATTEND_STATUS_COLORS.anomaly,borderRadius:[3,3,0,0]}}]
   });
-  chart.on('click',p=>{const d=Number(names[p.dataIndex]);if(ctx.employee)selectCell(ctx.employee.id,d);else selectDate(d)});
+  chart.on('click',p=>{const d=Number(names[p.dataIndex]);if(ctx.employee)selectCell(ctx.employee.id,d);else selectDate(d,true)});
 }
 
 function timelineMiniMapHtml(a,range){
