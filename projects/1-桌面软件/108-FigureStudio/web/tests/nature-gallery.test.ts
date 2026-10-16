@@ -10,7 +10,7 @@ import { LorentzFigure } from "../src/plot/LorentzFigure";
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
-const gallery = project.figures.filter(f => f.folderId === "folder-nature" && /^N\\d{2} ·/.test(f.name));
+const gallery = project.figures.filter(f => f.folderId === "folder-nature" && f.name.startsWith("N") && f.name.includes(" · "));
 assert.equal(gallery.length, 14, "All 14 Nature visual cases must be accessible");
 assert.equal(project.folders.filter(f => f.id === "folder-nature").length, 1);
 assert.equal(gallery.filter(f => supportsPrecisionSvg(f)).length, 11,
@@ -80,11 +80,11 @@ for (let n=0; n<gallery.length; n++) {
     svgRef:createRef<SVGSVGElement>(),onSelectSeries:()=>{},
     onSelectAnnotation:()=>{},onMoveAnnotation:()=>{},onAxisClick:()=>{},onLegendClick:()=>{}
   }));
-  assert.ok(markup.includes("data-series-id=\\\"lorentz-real\\\""),"real dispersion missing");
-  assert.ok(markup.includes("data-series-id=\\\"lorentz-imag\\\""),"absorption missing");
-  assert.ok(markup.includes("data-series-id=\\\"lorentz-phase\\\""),"phase lag missing");
-  assert.ok(markup.includes("data-annotation-id=\\\"absorption\\\""),"annotation missing");
-  assert.ok(markup.includes("data-annotation-id=\\\"resonance\\\""),"phase annotation missing");
+  assert.ok(markup.includes('data-series-id="lorentz-real"'),"real dispersion missing");
+  assert.ok(markup.includes('data-series-id="lorentz-imag"'),"absorption missing");
+  assert.ok(markup.includes('data-series-id="lorentz-phase"'),"phase lag missing");
+  assert.ok(markup.includes('data-annotation-id="absorption"'),"annotation missing");
+  assert.ok(markup.includes('data-annotation-id="resonance"'),"phase annotation missing");
   assert.ok(!markup.includes("NaN")&&!markup.includes("Infinity"),"invalid Lorentz SVG coordinates");
   assert.equal(golden!.lorentz!.annotations.length,6);
   assert.equal(golden!.figureOverrides.figureWidthMm,183);
