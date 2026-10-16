@@ -52,7 +52,7 @@ export const defaultLorentzComposition: LorentzComposition = {
       text:"Low frequency  $(\\omega\\ll\\omega_0)$\n$\\phi\\to0^\\circ$ · in-phase response",
       color:"#315b72",fontSizePt:8,background:"#ffffff",backgroundOpacity:.88,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:300},
-    {id:"resonance",panel:"bottom",x:765,y:812,
+    {id:"resonance",panel:"bottom",x:765,y:778,
       text:"At resonance  $(\\omega=\\omega_0)$\n$\\phi=90^\\circ$ · maximum dissipation",
       color:"#89463b",fontSizePt:8,background:"#ffffff",backgroundOpacity:.88,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:340},
