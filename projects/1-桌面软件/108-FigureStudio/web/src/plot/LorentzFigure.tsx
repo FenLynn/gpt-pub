@@ -207,7 +207,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const peak=series(imagId),phase=series(phaseId);
   const nearest=(values:(number|null)[]|undefined,xx:number)=>{if(!values?.length)return 0;let best=0,d=Infinity;dataset.x.values.forEach((v,i)=>{if(finite(v)&&Math.abs(v-xx)<d){best=i;d=Math.abs(v-xx)}});return values[best]??0;};
   const resonanceX=clamp(c.resonanceX,xMin,xMax);
-  return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}>
+  return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} data-pt-scale={ptScale} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}>
     <defs><clipPath id="lorentz-top-figure-clip"><rect x={LEFT} y={TOP} width={RIGHT-LEFT} height={panelHeight}/></clipPath><clipPath id="lorentz-bottom-figure-clip"><rect x={LEFT} y={bottomTop} width={RIGHT-LEFT} height={panelHeight}/></clipPath></defs>
     <g fontFamily={font} fontSize={titleFont} fontWeight={c.titleWeight??600} fill={o.plotTitleColor??"#262b30"}><text x={LEFT} y={TOP-13}>{c.topTitle}</text><text x={LEFT} y={bottomTop-14}>{c.bottomTitle}</text></g>
     {c.bandOpacity>0&&<rect x={Math.min(x(c.bandStart),x(c.bandEnd))} y={TOP} width={Math.abs(x(c.bandEnd)-x(c.bandStart))} height={panelHeight} fill={c.bandColor} opacity={clamp(c.bandOpacity,0,1)}/>}
