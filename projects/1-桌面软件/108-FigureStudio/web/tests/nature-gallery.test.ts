@@ -150,6 +150,10 @@ for (let n=0; n<gallery.length; n++) {
     "3D scene needs publication-safe vertical breathing room");
   assert.deepEqual(surfaceLayout.scene?.camera?.eye,GOLDEN_STYLE.field.surfaceCameraEye,
     "3D Golden camera should remain stable across redraws");
+  assert.ok(surfaceLayout.scene?.xaxis?.title?.font?.size < surfaceLayout.font.size,
+    "3D axis titles need a compact scale to avoid clipping in a single-column figure");
+  assert.ok(surfaceLayout.scene?.xaxis?.tickfont?.size < surfaceLayout.font.size,
+    "3D tick labels need a compact scale to preserve scene breathing room");
 
   const golden=project.figures.find(f=>f.lorentz?.kind==="lorentz-two-panel");
   assert.ok(golden,"Lorentz golden Graph must exist in ordinary project");

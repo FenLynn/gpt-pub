@@ -432,7 +432,7 @@ export function buildTraces(args: {
           tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
           tickcolor: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor,
           len: GOLDEN_STYLE.field.colorbarLength3d,
-          x: 0.92,
+          x: 0.84,
           xanchor: "left",
           xpad: 4,
           tickfont: {
@@ -1236,6 +1236,10 @@ export function buildLayout(args: {
   };
 
   if (figure.templateId === "surface-3d") {
+    const sceneAxisTitleSizePx =
+      axisTitleSizePx * GOLDEN_STYLE.field.surfaceAxisTitleScale;
+    const sceneTickLabelSizePx =
+      tickLabelSizePx * GOLDEN_STYLE.field.surfaceTickScale;
     layout.margin = {
       l: Math.round(mmToPx(overrides.marginLeftMm ?? 6.5)),
       r: Math.round(mmToPx(overrides.marginRightMm ?? 14)),
@@ -1255,7 +1259,7 @@ export function buildLayout(args: {
           text: resolvedXTitle,
           font: {
             family: fontFamily,
-            size: axisTitleSizePx,
+            size: sceneAxisTitleSizePx,
             color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
           }
         },
@@ -1272,7 +1276,7 @@ export function buildLayout(args: {
         tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
         tickfont: {
           family: fontFamily,
-          size: tickLabelSizePx,
+          size: sceneTickLabelSizePx,
           color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
         }
       },
@@ -1281,7 +1285,7 @@ export function buildLayout(args: {
           text: resolvedYTitle,
           font: {
             family: fontFamily,
-            size: axisTitleSizePx,
+            size: sceneAxisTitleSizePx,
             color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
           }
         },
@@ -1298,7 +1302,7 @@ export function buildLayout(args: {
         tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
         tickfont: {
           family: fontFamily,
-          size: tickLabelSizePx,
+          size: sceneTickLabelSizePx,
           color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
         }
       },
@@ -1307,7 +1311,7 @@ export function buildLayout(args: {
           text: normalizePlotlyMathText(overrides.zTitle ?? "Z"),
           font: {
             family: fontFamily,
-            size: axisTitleSizePx,
+            size: sceneAxisTitleSizePx,
             color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
           }
         },
@@ -1324,7 +1328,7 @@ export function buildLayout(args: {
         tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
         tickfont: {
           family: fontFamily,
-          size: tickLabelSizePx,
+          size: sceneTickLabelSizePx,
           color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
         }
       },
