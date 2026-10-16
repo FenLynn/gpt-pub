@@ -80,7 +80,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     const width=bottom?360:366,row=26;
     return <g onClick={onLegendClick} style={{cursor:"pointer"}} fontFamily={font} fontSize={f}>
       {o.legendFrame!==false&&<rect x={xx-12} y={yy-21} width={width} height={entries.length*row+13} fill={o.legendBackground??"#fff"} fillOpacity={o.legendBackgroundOpacity??.94} stroke={o.legendBorderColor??"#c6c6c6"} strokeWidth={(o.legendBorderWidthPt??.6)*1.6}/>}
-      {entries.map((id,i)=><g key={id}><path d={"M"+xx+" "+(yy+i*row)+"h34"} stroke={color(id)} strokeWidth={lineWidth(id)}/><text x={xx+46} y={yy+i*row+5} fill="#262626">{figure.seriesOverrides[id]?.legendLabel??series(id)?.name??id}</text></g>)}
+      {entries.map((id,i)=><g key={id}>{id==="__band__"?<rect x={xx} y={yy+i*row-9} width="34" height="14" fill={c.bandColor} fillOpacity={Math.max(.15,c.bandOpacity*2)} stroke="none"/>:<path d={"M"+xx+" "+(yy+i*row)+"h34"} stroke={color(id)} strokeWidth={lineWidth(id)}/>}<text x={xx+46} y={yy+i*row+5} fill="#262626">{id==="__band__"?"Anomalous dispersion zone":figure.seriesOverrides[id]?.legendLabel??series(id)?.name??id}</text></g>)}
     </g>;
   };
   const renderAnnotation=(a:LorentzAnnotation)=>{
@@ -113,7 +113,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     </g>
     {c.showResonanceMarkers&&peak&&<circle cx={x(resonanceX)} cy={topY(nearest(peak.values,resonanceX))} r={c.markerRadius} fill={color(imagId)}/>}
     <text transform={"translate(34 "+(TOP+panelHeight/2)+") rotate(-90)"} textAnchor="middle" fontFamily={font} fontSize={axisFont}>{o.yTitle??"Susceptibility, χ(ω) (a.u.)"}</text>
-    {legend(c.topLegendX,c.topLegendY,[realId,imagId])}
+    {legend(c.topLegendX,c.topLegendY,[realId,imagId,"__band__"])}
     {axis(bottomTop,majorBottom,minorBottom,bottomY,true)}
     <g clipPath="url(#lorentz-bottom-figure-clip)">
       {curve(phaseId,bottomY)}
