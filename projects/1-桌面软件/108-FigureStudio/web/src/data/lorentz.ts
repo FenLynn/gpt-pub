@@ -44,7 +44,7 @@ export const defaultLorentzComposition: LorentzComposition = {
       text:"Normal dispersion\n(dn/dω > 0)",
       color:"#315b72",fontSizePt:8.8,background:"#ffffff",backgroundOpacity:.84,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:240},
-    {id:"anomalous",panel:"top",x:495,y:410,
+    {id:"anomalous",panel:"top",x:435,y:410,
       text:"Anomalous dispersion\n(dn/dω < 0)",
       color:"#89463b",fontSizePt:8.8,background:"#ffffff",backgroundOpacity:.84,
       borderColor:"#d8dde0",borderWidthPt:.3,maxWidth:240},
