@@ -1339,10 +1339,10 @@ export function buildLayout(args: {
       }
     });
     layout.annotations = [
-      surfaceLabel(resolvedXTitle, GOLDEN_STYLE.field.surfaceLabels.x),
-      surfaceLabel(resolvedYTitle, GOLDEN_STYLE.field.surfaceLabels.y),
+      surfaceLabel(String(resolvedXTitle ?? ""), GOLDEN_STYLE.field.surfaceLabels.x),
+      surfaceLabel(String(resolvedYTitle ?? ""), GOLDEN_STYLE.field.surfaceLabels.y),
       surfaceLabel(
-        normalizePlotlyMathText(overrides.zTitle ?? "Z"),
+        String(normalizePlotlyMathText(overrides.zTitle ?? "Z") ?? ""),
         GOLDEN_STYLE.field.surfaceLabels.z
       )
     ];
