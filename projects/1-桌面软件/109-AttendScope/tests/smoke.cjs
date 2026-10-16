@@ -47,11 +47,13 @@ async function inspect(browser){
   if(shell.cell.width!==15||Math.abs(shell.matrix.width-554)>1)throw Error('Matrix no longer fixed compact width');
   if(Math.abs(shell.matrixWrap.y-shell.analysis.y)>3)throw Error('Matrix and analysis panel not top-aligned');
   if(!shell.overtime||shell.overtime===shell.normal)throw Error('Overtime not assigned distinct light blue');
-  if(shell.nameLetters!==4)throw Error('Name not split into four glyphs for justified spacing');
+  if(shell.nameLetters!==3)throw Error('Three-character demo name does not use justified glyph layout');
   await page.locator('#monthMenuButton').click();
   if(!await page.locator('#monthPopover').evaluate(el=>el.classList.contains('open')))throw Error('Month selector does not open');
   await page.locator('.month-choice.active').click();
   if(await page.locator('#monthPopover').evaluate(el=>el.classList.contains('open')))throw Error('Month selector does not close');
+  await page.waitForTimeout(220);
+  await page.evaluate(()=>{document.querySelector('.sidebar').scrollLeft=0});
   await page.screenshot({path:path.join(artifacts,mode+'-matrix.png'),fullPage:false});
   const chosen=await page.evaluate(()=>{
     const item=[...state.analysis.values()].find(x=>x.punches.length>=4&&x.firstIn&&x.lastOut&&isWorkday(x.day));
