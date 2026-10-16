@@ -63,15 +63,19 @@ async function run(){
  },'Continuous violet row frame');
  await page.screenshot({path:path.join(out,'r14-iteration-row.png')});
  await check(page,()=>{
-  const name=document.querySelector('.m-name.selected');
-  const c=getComputedStyle(name);
-  return c.borderLeftStyle==='solid'&&c.borderLeftWidth!=='0px'&&c.borderLeftColor.includes('130, 87, 217')&&
+  const name=document.querySelector('.m-name.selected'),c=getComputedStyle(name);
+  return c.borderLeftWidth==='0px'&&c.boxShadow==='none'&&
+   c.backgroundColor.includes('130, 87, 217')&&
    parseInt(getComputedStyle(name.querySelector('.name-letters span')).fontWeight)<600;
- },'Name cell violet border or normal name weight missing');
+ },'Name anchor should use violet tint without a second border');
  await page.locator('.m-date[data-date="10"]').click();
  await check(page,()=>state.selection.type==='date'&&state.selection.day===10&&
    !document.querySelector('.matrix-selection-frame.focus-col').classList.contains('inactive'),
    'Clicking top date must select all employees');
+ await check(page,()=>{
+   const date=document.querySelector('.m-date.selected'),c=getComputedStyle(date),b=getComputedStyle(date.querySelector('b'));
+   return c.borderTopWidth==='0px'&&c.boxShadow==='none'&&c.backgroundColor.includes('130, 87, 217')&&b.borderTopWidth==='0px';
+ },'Date anchor should use violet tint without nested border');
  await page.locator('.m-name[data-emp="E001"]').click();
  await check(page,()=>state.selection.type==='person'&&state.selection.employeeId==='E001',
   'Clicking name must always select whole person month');
