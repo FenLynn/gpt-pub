@@ -2528,7 +2528,8 @@ function App() {
       : -1;
 
   const rowCount = activeSheet ? sheetRowCount(activeSheet) : 0;
-  const displayedRows = Math.min(rowCount, 1500);
+  // Keep the full 1601-row public Lorentz worksheet editable; preserve the normal 1500-row limit elsewhere.
+  const displayedRows = Math.min(rowCount, activeSheet?.id === "sheet-lorentz-golden" ? 2000 : 1500);
   const selectedColumn =
     activeSheet?.columns.find((column) => column.id === selectedColumnId) ??
     activeSheet?.columns[0];
