@@ -215,7 +215,7 @@ function renderMatrix(){
     }
   }
   el.innerHTML=html;
-  el.querySelectorAll('[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
+  el.querySelectorAll('.m-name[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
   el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date));
   el.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.cell.split('|');selectCell(id,+d)});
   el.onpointerover=e=>{
