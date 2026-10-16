@@ -101,6 +101,13 @@ async function inspect(browser){
     };
   });
   await page.screenshot({path:path.join(artifacts,mode+'-timeline.png'),fullPage:false});
+  if(!await page.locator('.daily-facts .daily-fact').count())throw Error('Daily metrics not present');
+  const evidence=page.locator('.punch-chips [data-record]').first();
+  if(await evidence.count()){
+    await evidence.click();
+    if(!await page.locator('#timelineEvidence .evidence-main').count())throw Error('Raw evidence drilldown not shown');
+  }
+
   fs.writeFileSync(path.join(artifacts,mode+'-timeline.svg'),await page.locator('#attendanceTimelineChart svg').evaluate(node=>node.outerHTML),'utf8');
   console.log('P109_TIMELINE_SNAPSHOT '+JSON.stringify({chosen,...snapshot}));
   if(!snapshot.chartMounted)throw Error('Timeline chart instance not mounted');
@@ -139,12 +146,6 @@ async function inspect(browser){
   await page.waitForSelector('.overview-rows');
   // MATQ/DavBridge/LocalSub visual QA: every context renders meaningful
   // content, and fixed 31-day geometry remains aligned at desktop sizes.
-  if(!await page.locator('.daily-facts .daily-fact').count())throw Error('Daily metrics not present');
-  const evidence=page.locator('.punch-chips [data-record]').first();
-  if(await evidence.count()){
-    await evidence.click();
-    if(!await page.locator('#timelineEvidence .evidence-main').count())throw Error('Raw evidence drilldown not shown');
-  }
   await page.locator('[data-emp="E001"]').click();
   await page.waitForSelector('#overviewTrendChart svg',{timeout:12000});
   await page.waitForTimeout(800);
