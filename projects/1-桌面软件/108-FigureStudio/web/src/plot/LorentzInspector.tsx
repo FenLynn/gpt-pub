@@ -24,6 +24,10 @@ export function LorentzInspector({value,selectedId,onSelect,onChange}:Props){
   {number("面板间距","panelGap",1)}
   {number("下图 Y 最小","phaseMin",5)}
   {number("下图 Y 最大","phaseMax",5)}
+  {number("下图主刻度间隔","phaseMajorTickStep",5)}
+  {number("下图次刻度间隔","phaseMinorTickStep",5)}
+  {number("共振点半径","markerRadius",.5)}
+  {number("参考线宽度","referenceLineWidth",.1)}
   {number("共振位置","resonanceX",.01)}
   {bool("共振虚线","showReferenceLines")}
   {bool("共振标记","showResonanceMarkers")}
@@ -46,7 +50,7 @@ export function LorentzInspector({value,selectedId,onSelect,onChange}:Props){
   </div>
   {active&&<>
    <div className="prop-row"><label>文字内容</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={active.text} onChange={e=>patchAnnotation({text:e.target.value})}/></div>
-   <div className="prop-row"><label>面板</label><select value={active.panel} onChange={e=>patchAnnotation({panel:e.target.value as "top"|"bottom"})}><option value="top">上图</option><option value="bottom">下图</option></select></div>
+   <div className="prop-row"><label>面板</label><select value={active.panel} onChange={e=>{const next=e.target.value as "top"|"bottom";patchAnnotation({panel:next,y:active.y+(next===active.panel?0:next==="bottom"?468:-468)})}}><option value="top">上图</option><option value="bottom">下图</option></select></div>
    <div className="prop-row"><label>显示</label><input type="checkbox" checked={active.visible!==false} onChange={e=>patchAnnotation({visible:e.target.checked})}/></div>
    {annNum("位置 X","x",1)}
    {annNum("位置 Y","y",1)}
