@@ -678,12 +678,49 @@ function mountOverviewTrend(){
   chart.on('click',p=>{const day=rows[p.dataIndex]?.day;if(day)selectDate(day)});
 }
 
+function mountFocusedOverviewChart(ctx){
+  const el=document.getElementById('overviewTrendChart');
+  if(!el)return;
+  const chart=initAttendChart(el);
+  if(!chart)return;
+  if(ctx.type==='date'){
+    const items=ctx.items;
+    const rows=[
+      {name:'正常',value:items.filter(a=>a.severity==='normal').length,color:'#85cca3'},
+      {name:'待核实',value:items.filter(a=>a.severity==='suspect').length,color:'#e8c777'},
+      {name:'明确异常',value:items.filter(a=>a.severity==='problem').length,color:'#e39792'},
+      {name:'非工作日加班',value:items.filter(a=>a.status==='非工作日出勤').length,color:'#b1d9ee'}
+    ].reverse();
+    chart.setOption({
+      grid:{left:103,right:36,top:14,bottom:10},
+      tooltip:{trigger:'item',confine:true,formatter:params=>params.name+'：'+params.value+' 人'},
+      xAxis:{type:'value',show:false},
+      yAxis:{type:'category',data:rows.map(a=>a.name),axisTick:{show:false},axisLine:{show:false},axisLabel:{color:'#617b91',fontSize:11}},
+      series:[{type:'bar',barWidth:13,showBackground:true,backgroundStyle:{color:'#f0f5f8',borderRadius:7},data:rows.map(a=>({value:a.value,itemStyle:{color:a.color,borderRadius:[0,7,7,0]}})),label:{show:true,position:'right',color:'#3b586e',fontSize:11,fontWeight:650}}]
+    });
+    chart.on('click',()=>{state.analysisTab='stats';renderAnalysisPanel()});
+    return;
+  }
+  const days=Array.from({length:31},(_,i)=>state.analysis.get(`${ctx.employee.id}|${i+1}`)).filter(a=>isWorkday(a.day));
+  chart.setOption({
+    grid:{left:42,right:16,top:14,bottom:28},
+    tooltip:{trigger:'axis',confine:true,formatter:ps=>{const d=days[ps[0]?.dataIndex];return d?`${pad(d.day)} 日 · ${d.status}<br>确认在岗：${fmtMinutes(d.presence)}`:''}},
+    xAxis:{type:'category',boundaryGap:false,data:days.map(a=>pad(a.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#d9e5ed'}},axisLabel:{fontSize:10,color:'#879bad',interval:1}},
+    yAxis:{type:'value',min:0,axisTick:{show:false},axisLine:{show:false},axisLabel:{color:'#879bad',fontSize:10,formatter:v=>v+'h'},splitLine:{lineStyle:{color:'rgba(175,198,214,.40)',type:'dashed'}}},
+    series:[{type:'line',smooth:.3,showSymbol:false,symbolSize:7,data:days.map(a=>+(a.presence/60).toFixed(2)),lineStyle:{width:2.6,color:'#208bde'},itemStyle:{color:'#208bde'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(32,139,222,.20)'},{offset:1,color:'rgba(32,139,222,.015)'}])}}]
+  });
+  chart.on('click',ev=>{const a=days[ev.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
+}
+
 function mountAnalysisVisuals(ctx){
   if(!window.echarts)return;
   requestAnimationFrame(()=>{
     if(state.analysisTab==='timeline'&&ctx.type==='cell')mountAttendanceTimeline(ctx.analysis);
     if(state.analysisTab==='timeline'&&ctx.type==='date')mountDayTimeline(ctx);
     if(state.analysisTab==='stats')mountStatsCharts(ctx);
-    if(state.analysisTab==='overview'&&ctx.type==='overall')mountOverviewTrend();
+    if(state.analysisTab==='overview'){
+      if(ctx.type==='overall')mountOverviewTrend();
+      else if(ctx.type==='person'||ctx.type==='date')mountFocusedOverviewChart(ctx);
+    }
   });
 }
