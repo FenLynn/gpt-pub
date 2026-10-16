@@ -48,7 +48,7 @@ function registerAttendTheme(){
       borderColor:'rgba(194,207,219,.78)',
       borderWidth:1,
       padding:[9,11],
-      textStyle:{color:'#42566a',fontSize:10}
+      textStyle:{color:'#42566a',fontSize:12}
     }
   });
   window.__attendThemeRegistered=true;
@@ -264,7 +264,7 @@ function mountAttendanceTimeline(a){
   const option={
     animation:true,
     animationThreshold:500,
-    grid:{left:48,right:24,top:19,bottom:90,containLabel:false},
+    grid:{left:40,right:16,top:15,bottom:80,containLabel:false},
     tooltip:{
       trigger:'item',
       confine:true,
@@ -277,7 +277,7 @@ function mountAttendanceTimeline(a){
       axisLine:{show:false},
       axisTick:{show:false},
       axisLabel:{
-        color:'#93a2af',fontSize:8.5,margin:10,
+        color:'#93a2af',fontSize:11,margin:10,
         formatter:v=>minuteText(v),
         hideOverlap:true
       },
@@ -308,7 +308,7 @@ function mountAttendanceTimeline(a){
         id:'slider',type:'slider',xAxisIndex:0,
         startValue:range.start,endValue:range.end,
         filterMode:'none',minValueSpan:30,
-        left:48,right:24,bottom:13,height:37,
+        left:40,right:16,bottom:10,height:32,
         showDetail:true,realtime:true,brushSelect:false,
         backgroundColor:'rgba(240,247,251,.95)',
         borderColor:'rgba(205,214,222,.72)',
@@ -330,7 +330,7 @@ function mountAttendanceTimeline(a){
         },
         moveHandleSize:5,
         moveHandleStyle:{color:'#2288d8',opacity:.55},
-        textStyle:{color:'#8091a0',fontSize:8},
+        textStyle:{color:'#8091a0',fontSize:11},
         labelFormatter:v=>minuteText(v)
       }
     ],
@@ -439,7 +439,7 @@ function mountOverallStats(ctx){
     main.setOption({
       grid:{left:34,right:12,top:14,bottom:26},
       tooltip:chartTooltipAxis(),
-      xAxis:{type:'category',data:data.map(x=>x[0]),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:8,interval:1}},
+      xAxis:{type:'category',data:data.map(x=>x[0]),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
       yAxis:{type:'value',minInterval:1,...chartAxisCommon()},
       series:[{
         type:'line',data:data.map(x=>x[1]),smooth:.34,showSymbol:false,
@@ -474,8 +474,8 @@ function mountPersonStats(ctx){
     main.setOption({
       grid:{left:36,right:14,top:14,bottom:28},
       tooltip:{...chartTooltipAxis(),formatter:p=>{const q=p[0],a=work[q.dataIndex];return `${pad(a.day)} 日<br>确认在岗 <b>${(a.presence/60).toFixed(1)} h</b><br>${a.status}`}},
-      xAxis:{type:'category',data:work.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:8,interval:1}},
-      yAxis:{type:'value',min:0,max:10,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:8,formatter:v=>v+'h'}},
+      xAxis:{type:'category',data:work.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
+      yAxis:{type:'value',min:0,max:10,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
       series:[{
         type:'line',data:work.map(a=>+(a.presence/60).toFixed(2)),smooth:.28,showSymbol:false,
         lineStyle:{color:'#5899c3',width:2},areaStyle:{color:'rgba(88,153,195,.07)'}
@@ -514,8 +514,8 @@ function mountCellStats(ctx){
     main.setOption({
       grid:{left:36,right:14,top:14,bottom:28},
       tooltip:{...chartTooltipAxis(),formatter:p=>{const a=days[p[0].dataIndex];return `${pad(a.day)} 日<br>${a.status}<br>在岗 ${(a.presence/60).toFixed(1)} h`}},
-      xAxis:{type:'category',data:days.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:8,interval:1}},
-      yAxis:{type:'value',min:0,max:10,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:8,formatter:v=>v+'h'}},
+      xAxis:{type:'category',data:days.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
+      yAxis:{type:'value',min:0,max:10,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
       series:[
         {type:'line',data:days.map(a=>+(a.presence/60).toFixed(2)),smooth:.28,showSymbol:false,lineStyle:{color:'#5a9bc5',width:2},areaStyle:{color:'rgba(90,155,197,.06)'}},
         {type:'scatter',symbolSize:10,data:days.map((a,i)=>a.day===ctx.day?[i,+(a.presence/60).toFixed(2)]:null).filter(Boolean),itemStyle:{color:'#2c7fd1',borderColor:'#fff',borderWidth:2}}
@@ -583,7 +583,7 @@ function mountDayTimeline(ctx){
 
   chart.setOption({
     animationDuration:380,
-    grid:{left:62,right:18,top:12,bottom:32},
+    grid:{left:66,right:14,top:12,bottom:34},
     tooltip:{
       trigger:'item',confine:true,
       extraCssText:'border-radius:10px;box-shadow:0 12px 32px rgba(25,45,62,.15);',
@@ -598,7 +598,7 @@ function mountDayTimeline(ctx){
     xAxis:{
       type:'value',min:360,max:1320,
       axisLine:{lineStyle:{color:'#cbd8e1'}},axisTick:{show:false},
-      axisLabel:{color:AS_CHART_COLORS.muted,fontSize:8,formatter:v=>minuteText(v),hideOverlap:true},
+      axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>minuteText(v),hideOverlap:true},
       splitNumber:8,
       splitLine:{show:true,lineStyle:{color:'rgba(190,205,216,.25)'}}
     },
@@ -606,7 +606,7 @@ function mountDayTimeline(ctx){
       type:'category',inverse:true,
       data:ctx.items.map(a=>a.employee.name),
       axisLine:{show:false},axisTick:{show:false},
-      axisLabel:{color:'#607487',fontSize:8,width:48,overflow:'truncate',margin:8},
+      axisLabel:{color:'#607487',fontSize:10.5,width:48,overflow:'truncate',margin:8},
       splitLine:{show:true,lineStyle:{color:'rgba(222,231,237,.42)'}}
     },
     series:[
@@ -668,8 +668,8 @@ function mountOverviewTrend(){
       }
     },
     legend:{show:false},
-    xAxis:{type:'category',boundaryGap:false,data:rows.map(x=>pad(x.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#dae5ec'}},axisLabel:{fontSize:9,color:'#9aa8b3',interval:2}},
-    yAxis:{type:'value',min:0,minInterval:1,axisTick:{show:false},axisLine:{show:false},axisLabel:{fontSize:9,color:'#9aa8b3'},splitLine:{lineStyle:{color:'rgba(199,215,225,.37)',type:'dashed'}}},
+    xAxis:{type:'category',boundaryGap:false,data:rows.map(x=>pad(x.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#dae5ec'}},axisLabel:{fontSize:11,color:'#9aa8b3',interval:2}},
+    yAxis:{type:'value',min:0,minInterval:1,axisTick:{show:false},axisLine:{show:false},axisLabel:{fontSize:11,color:'#9aa8b3'},splitLine:{lineStyle:{color:'rgba(199,215,225,.37)',type:'dashed'}}},
     series:[
       {name:'明确异常',type:'line',smooth:.34,symbol:'none',data:rows.map(x=>x.problem),lineStyle:{width:2,color:'#da8e8a'},areaStyle:{color:'rgba(218,142,138,.07)'},itemStyle:{color:'#da8e8a'}},
       {name:'待核实',type:'line',smooth:.34,symbol:'none',data:rows.map(x=>x.suspect),lineStyle:{width:2,color:'#e5c477'},itemStyle:{color:'#e5c477'}}

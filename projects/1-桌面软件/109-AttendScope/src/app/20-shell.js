@@ -55,7 +55,7 @@ function layoutHtml(){
             </div>
           </div>
         </div>
-        <div class="calendar-caption"><span>月历 · 工作安排</span><button class="quiet-link" id="clearSelection">总览</button></div>
+        <div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">总览</button></div>
         <div class="calendar-grid" id="calendar"></div>
         <div class="calendar-key">
           <span><i class="work"></i>工作</span>
@@ -208,11 +208,8 @@ function matrixVisible(a){
 
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
-  const cell=16,row=16,nameW=58;
-  el.style.setProperty('--cell',cell+'px');
-  el.style.setProperty('--row',row+'px');
-  el.style.setProperty('--name',nameW+'px');
-  el.style.gridTemplateColumns=`${nameW}px repeat(31,${cell}px)`;
+  // Matrix dimensions are shared CSS variables, including responsive sizing.
+  el.style.gridTemplateColumns='var(--matrix-name) repeat(31,var(--matrix-cell))';
 
   let html='<div class="m-corner">姓名</div>';
   for(let d=1;d<=31;d++){

@@ -38,12 +38,12 @@ function analysisOverviewHtml(ctx){
       </div>
     </section>
     <section class="overview-attention">
-      <div class="analysis-subhead"><span>需要关注</span><small>${issues.length?'点击直接定位':'当前没有异常'}</small></div>
+      <div class="analysis-subhead"><span>需要关注</span></div>
       ${issues.length?`<div class="compact-issue-list">${issues.map(a=>`<button data-analysis-cell="${a.employee.id}|${a.day}"><i class="${a.severity}"></i><span><b>${a.employee.name}</b><small>${pad(a.day)} 日 · ${a.status}</small></span><em>›</em></button>`).join('')}</div>`:'<div class="analysis-empty">没有需要处理的异常</div>'}
     </section>
   </div>
   <section class="overview-trend">
-    <div class="chart-head"><strong>${ctx.type==='person'?'每日确认在岗':ctx.type==='date'?'当日状态分布':'每日异常趋势'}</strong><small>${ctx.type==='person'?'点击日期查看时间轴':ctx.type==='date'?'当日 50 人的状态':'点击日期查看当天'}</small></div>
+    <div class="chart-head"><strong>${ctx.type==='person'?'每日确认在岗':ctx.type==='date'?'当日状态分布':'每日异常趋势'}</strong></div>
     <div id="overviewTrendChart" class="overview-trend-chart"></div>
   </section>`;
 }
@@ -176,16 +176,16 @@ function singleTimelinePanel(a){
   const examples=a.punches.slice(0,8);
   return `<div class="daily-studio">
     <div class="daily-facts" aria-label="当日关键数据">
-      <div class="daily-fact"><small>首次进入</small><strong class="fact-blue">${first}</strong><span>IN · 进入记录</span></div>
-      <div class="daily-fact"><small>最后离开</small><strong class="fact-orange">${last}</strong><span>OUT · 离开记录</span></div>
-      <div class="daily-fact"><small>确认在岗</small><strong>${confirmed}</strong><span>仅计可确认时段</span></div>
-      <div class="daily-fact"><small>原始打卡</small><strong>${a.punches.length}<em> 条</em></strong><span>${a.marker==='leave'?'已登记请假':a.marker==='trip'?'已登记出差':'原始记录可追溯'}</span></div>
+      <div class="daily-fact"><small>首次进入</small><strong class="fact-blue">${first}</strong></div>
+      <div class="daily-fact"><small>最后离开</small><strong class="fact-orange">${last}</strong></div>
+      <div class="daily-fact"><small>确认在岗</small><strong>${confirmed}</strong></div>
+      <div class="daily-fact"><small>原始打卡</small><strong>${a.punches.length}<em> 条</em></strong></div>
     </div>
     <section class="chart-surface">
       <div class="chart-surface-title">
-        <div><span class="eyebrow">PUNCH ACTIVITY</span><h3>打卡时间分布</h3></div>
+        <h3>打卡时间分布</h3>
         <div class="chart-window">
-          <span>局部窗口</span>
+          
           <strong id="timelineWindowLabel">${minuteText(r.start)}–${minuteText(r.end)}</strong>
         </div>
       </div>
@@ -196,22 +196,19 @@ function singleTimelinePanel(a){
         <div class="echarts-timeline-legend refined-legend">
           <span><i class="in"></i>进入</span>
           <span><i class="out"></i>离开</span>
-          <span><b>×N</b>重叠打卡</span>
+          
         </div>
-        <small>底部蓝色选区可拖动和缩放</small>
+        
       </div>
     </section>
     <div class="daily-bottom">
       <section class="daily-record-panel">
-        <div class="mini-section-head"><h3>打卡证据</h3><span>${a.punches.length} 条原始记录</span></div>
+        <div class="mini-section-head"><h3>打卡证据</h3></div>
         <div class="punch-chips">
           ${examples.map(p=>`<button class="punch-chip ${p.direction==='进'?'in':'out'}" data-record="${p.recordId}" title="${p.time} · ${p.source}"><span>${p.direction}</span><b>${p.time.slice(0,5)}</b></button>`).join('')||'<span class="quiet-empty">当天无打卡记录</span>'}
           ${a.punches.length>examples.length?`<button class="punch-chip more" data-show-records>全部 ${a.punches.length} 条</button>`:''}
         </div>
-        <div class="timeline-evidence refined-evidence" id="timelineEvidence">
-          <span>点击箭头或记录查看来源</span>
-          <strong>记录不会修改原始文件</strong>
-        </div>
+        <div class="timeline-evidence refined-evidence" id="timelineEvidence"></div>
       </section>
       <section class="daily-findings-panel">
         <div class="mini-section-head"><h3>核查结论</h3><span class="finding-severity ${a.severity}">${a.status}</span></div>

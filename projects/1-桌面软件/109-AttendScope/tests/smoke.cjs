@@ -44,8 +44,8 @@ async function inspect(browser){
   console.log('P109_UI_GEOMETRY '+JSON.stringify(shell));
   if(shell.topbar.height>46)throw Error('Top toolbar is too tall '+shell.topbar.height);
   if(!shell.monthInSidebar||shell.middleHeading)throw Error('Month selector / matrix heading placement regressed');
-  if(Math.abs(shell.personHeader.width-58)>1)throw Error('Four-character name column width regressed '+shell.personHeader.width);
-  if(shell.cell.width!==15||Math.abs(shell.matrix.width-554)>1)throw Error('Matrix no longer fixed compact width');
+  if(Math.abs(shell.personHeader.width-70)>1)throw Error('Name column regressed');
+  if(Math.abs(shell.cell.width-19)>1||Math.abs(shell.matrix.width-721)>1)throw Error('30% matrix enlargement regressed');
   if(Math.abs(shell.matrixWrap.y-shell.analysis.y)>3)throw Error('Matrix and analysis panel not top-aligned');
   if(!shell.overtime||shell.overtime===shell.normal)throw Error('Overtime not assigned distinct light blue');
   if(shell.nameLetters!==3)throw Error('Three-character demo name does not use justified glyph layout');
@@ -119,8 +119,8 @@ async function inspect(browser){
   if(!snapshot.arrowOrientationCorrect)throw Error('IN must point up and OUT must point down');
   if(snapshot.svgArrowPaths<chosen.count)throw Error('Some punch arrow shafts are absent from the actual SVG DOM');
   if(snapshot.clippedArrowPaths>0)throw Error('Chrome-visible SVG arrow shafts carry broken filter: '+snapshot.clippedArrowPaths);
-  if(snapshot.cellSize>15.2)throw Error('Matrix cells too large '+snapshot.cellSize);
-  if(snapshot.nameWidth>59)throw Error('Matrix names too wide '+snapshot.nameWidth);
+  if(Math.abs(snapshot.cellSize-19)>1)throw Error('Cell size regressed');
+  if(Math.abs(snapshot.nameWidth-70)>1)throw Error('Name size regressed');
   if(errors.length)throw Error('Browser errors: '+JSON.stringify(errors));
 
   await page.evaluate(()=>{
@@ -167,11 +167,18 @@ async function inspect(browser){
       return {matrix:bb('.matrix-wrap'),analysis:bb('.analysis-panel'),topbar:bb('.topbar'),width:innerWidth,grid:bb('.matrix')};
     });
     console.log('P109_DESKTOP_VIEWPORT '+JSON.stringify({dimensions,layout}));
-    if(Math.abs(layout.matrix.w-570)>2||Math.abs(layout.grid.w-554)>2)
+    if(Math.abs(layout.matrix.w-(dimensions.width<=1450?706:737))>2||Math.abs(layout.grid.w-(dimensions.width<=1450?690:721))>2)
       throw Error('Matrix geometry changed at '+dimensions.width);
     if(layout.analysis.x-layout.matrix.right<8||layout.analysis.right>dimensions.width+2)
       throw Error('Analysis area overlaps or overflows viewport at '+dimensions.width);
     if(layout.topbar.h>48)throw Error('Toolbar height regressed');
+    const font=await page.evaluate(()=>({
+      body:parseFloat(getComputedStyle(document.body).fontSize),
+      date:parseFloat(getComputedStyle(document.querySelector('.m-date b')).fontSize),
+      name:parseFloat(getComputedStyle(document.querySelector('.name-letters>span')).fontSize),
+      tab:parseFloat(getComputedStyle(document.querySelector('.analysis-tabs button')).fontSize)
+    }));
+    if(font.body<13||font.date<10||font.name<12||font.tab<13)throw Error('Legibility regression '+JSON.stringify(font));
     await page.screenshot({path:path.join(artifacts,mode+'-'+dimensions.width+'-overview.png'),fullPage:false});
     await page.locator(cell).click();
     await page.waitForSelector('#attendanceTimelineChart svg',{timeout:12000});
