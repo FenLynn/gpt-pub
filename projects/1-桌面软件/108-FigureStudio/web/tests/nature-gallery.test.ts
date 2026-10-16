@@ -7,6 +7,7 @@ import { presets } from "../src/plot/presets";
 import { buildLayout, buildTraces, resolveCanvasMm, mmToPx } from "../src/plot/renderSpec";
 import { PrecisionSvg, supportsPrecisionSvg } from "../src/plot/PrecisionSvg";
 import { LorentzFigure } from "../src/plot/LorentzFigure";
+import { encodeProject, decodeProject } from "../src/project/projectIO";
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
@@ -88,5 +89,11 @@ for (let n=0; n<gallery.length; n++) {
   assert.ok(!markup.includes("NaN")&&!markup.includes("Infinity"),"invalid Lorentz SVG coordinates");
   assert.equal(golden!.lorentz!.annotations.length,6);
   assert.equal(golden!.figureOverrides.figureWidthMm,183);
+  const roundTrip=decodeProject(encodeProject(project));
+  const restored=roundTrip.figures.find(f=>f.id===golden!.id);
+  assert.ok(restored?.lorentz,"Lorentz composition lost on .sfig roundtrip");
+  assert.equal(restored.lorentz.annotations.length,6);
+  assert.equal(restored.lorentz.annotations[0].arrowX,635);
+  assert.equal(restored.seriesOverrides["lorentz-phase"].color,"#674080");
 }
 console.log("Nature gallery smoke OK: 14 Nature figures + real editable Lorentz Graph, normal+QA");
