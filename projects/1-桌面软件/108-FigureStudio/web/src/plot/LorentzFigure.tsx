@@ -103,7 +103,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
           {entry==="__band__"
             ?<rect x={xx} y={yyRow-9} width="31" height="13" fill={c.bandColor} fillOpacity={Math.max(.18,c.bandOpacity*3)} stroke="none"/>
             :<path d={"M"+xx+" "+yyRow+"h31"} stroke={color(entry)} strokeWidth={lineWidth(entry)} strokeLinecap="round"/>}
-          <text x={xx+44} y={yyRow+f*.31} fill={o.legendTextColor??"#313940"} clipPath={"url(#"+id+")"}>{label}</text>
+          <text x={xx+44} y={yyRow+f*.31} fill={o.legendFontColor??"#313940"} clipPath={"url(#"+id+")"}>{label}</text>
         </g>;
       })}
     </g>;
