@@ -7,7 +7,8 @@ import { SvgMathText } from "./SvgMathText";
  * Experimental publication SVG renderer.
  * Consumes the SAME resolved layout/traces as Plotly, not a second parameter
  * schema. Every existing inspector value stays editable and round-trippable.
- * Unsupported plot families and rich MathJax remain on the legacy renderer.
+ * Unsupported plot families remain on the legacy renderer. $...$ math is
+ * rendered by bundled MathJax directly into the same SVG DOM.
  * Paths connect measured samples directly: no visually misleading smoothing.
  */
 type DataTrace = {
