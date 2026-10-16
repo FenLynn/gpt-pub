@@ -1,6 +1,8 @@
 import { useRef, type RefObject } from "react";
 import type { Dataset, FigureSpec, LorentzAnnotation } from "../model";
 import { defaultLorentzComposition } from "../data/lorentz";
+import { plainSvgMathFallback } from "../lib/mathText";
+import { SvgMathText } from "./SvgMathText";
 
 interface Props {
   figure:FigureSpec;
@@ -139,7 +141,11 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
           {entry==="__band__"
             ?<rect x={xx} y={yyRow-9} width="31" height="13" fill={c.bandColor} fillOpacity={Math.max(.18,c.bandOpacity*3)} stroke="none"/>
             :<path d={"M"+xx+" "+yyRow+"h31"} stroke={color(entry)} strokeWidth={lineWidth(entry)} strokeLinecap="round"/>}
-          <text x={xx+44} y={yyRow+f*.31} fill={o.legendFontColor??"#313940"} clipPath={"url(#"+id+")"}>{label}</text>
+          <g clipPath={"url(#"+id+")"}>
+            <SvgMathText text={label} x={xx+44} y={yyRow+f*.31}
+              fill={o.legendFontColor??"#313940"} fontFamily={font}
+              fontSize={f} textAnchor="start"/>
+          </g>
         </g>;
       })}
     </g>;
@@ -151,15 +157,32 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
     if(/[^\u0000-\u007f]/.test(ch))return size*.69;
     return size*.53;
   };
-  const textWidth=(value:string,size:number)=>Array.from(value).reduce((w,ch)=>w+charWidth(ch,size),0);
+  const textWidth=(value:string,size:number)=>
+    Array.from(plainSvgMathFallback(value)).reduce((w,ch)=>w+charWidth(ch,size),0);
+  const wrapTokens=(line:string)=>{
+    const out:string[]=[];
+    const math=/\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|\\\([\s\S]+?\\\)/g;
+    let cursor=0,match:RegExpExecArray|null;
+    while((match=math.exec(line))){
+      const plain=line.slice(cursor,match.index);
+      if(plain) out.push(...plain.split(/(\s+)/).filter(Boolean));
+      out.push(match[0]);
+      cursor=match.index+match[0].length;
+    }
+    const tail=line.slice(cursor);
+    if(tail) out.push(...tail.split(/(\s+)/).filter(Boolean));
+    return out;
+  };
   const wrapText=(text:string,maxWidth:number,size:number)=>{
     const out:string[]=[];
     for(const original of text.split("\n")){
-      const tokens=original.split(/(\s+)/).filter(Boolean);
+      const tokens=wrapTokens(original);
       let line="";
       for(const token of tokens){
         if(textWidth(line+token,size)<=maxWidth){line+=token;continue;}
         if(line.trim()){out.push(line.trimEnd());line="";}
+        const isMath=/^\$\$[\s\S]+\$\$$|^\$[^$]+\$$|^\\\([\s\S]+\\\)$/.test(token);
+        if(isMath){line=token;continue;}
         for(const ch of Array.from(token.trimStart())){
           if(line&&textWidth(line+ch,size)>maxWidth){out.push(line);line="";}
           line+=ch;
@@ -199,9 +222,9 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="1.5"
         fill={a.background} fillOpacity={a.backgroundOpacity}
         stroke={a.borderColor} strokeWidth={a.borderWidthPt*ptScale}/>
-      {lines.map((t,i)=><text key={i} x={a.x} y={a.y+i*lineHeight}
+      {lines.map((t,i)=><SvgMathText key={i} text={t} x={a.x} y={a.y+i*lineHeight}
         fontFamily={font} fontSize={size} fontWeight={i===0?600:400}
-        fill={a.color} opacity={i===0?1:.92}>{t}</text>)}
+        fill={a.color} opacity={i===0?1:.92} textAnchor="start"/>)} 
     </g>;
   };
   const peak=series(imagId),phase=series(phaseId);
@@ -209,7 +232,14 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const resonanceX=clamp(c.resonanceX,xMin,xMax);
   return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} data-pt-scale={ptScale} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}>
     <defs><clipPath id="lorentz-top-figure-clip"><rect x={LEFT} y={TOP} width={RIGHT-LEFT} height={panelHeight}/></clipPath><clipPath id="lorentz-bottom-figure-clip"><rect x={LEFT} y={bottomTop} width={RIGHT-LEFT} height={panelHeight}/></clipPath></defs>
-    <g fontFamily={font} fontSize={titleFont} fontWeight={c.titleWeight??600} fill={o.plotTitleColor??"#262b30"}><text x={LEFT} y={TOP-13}>{c.topTitle}</text><text x={LEFT} y={bottomTop-14}>{c.bottomTitle}</text></g>
+    <g>
+      <SvgMathText text={c.topTitle} x={LEFT} y={TOP-13}
+        fontFamily={font} fontSize={titleFont} fontWeight={c.titleWeight??600}
+        fill={o.plotTitleColor??"#262b30"} textAnchor="start"/>
+      <SvgMathText text={c.bottomTitle} x={LEFT} y={bottomTop-14}
+        fontFamily={font} fontSize={titleFont} fontWeight={c.titleWeight??600}
+        fill={o.plotTitleColor??"#262b30"} textAnchor="start"/>
+    </g>
     {c.bandOpacity>0&&<rect x={Math.min(x(c.bandStart),x(c.bandEnd))} y={TOP} width={Math.abs(x(c.bandEnd)-x(c.bandStart))} height={panelHeight} fill={c.bandColor} opacity={clamp(c.bandOpacity,0,1)}/>}
     {axis(TOP,majorTop,minorTop,topY,false)}
     <g clipPath="url(#lorentz-top-figure-clip)">
@@ -218,7 +248,9 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       {c.showReferenceLines&&<line x1={x(resonanceX)} x2={x(resonanceX)} y1={TOP} y2={TOP+panelHeight} stroke="#777" strokeWidth={c.referenceLineWidth} strokeDasharray="7 5"/>}
     </g>
     {c.showResonanceMarkers&&peak&&<circle cx={x(resonanceX)} cy={topY(nearest(peak.values,resonanceX))} r={c.markerRadius} fill={color(imagId)}/>}
-    <text transform={"translate(36 "+(TOP+panelHeight/2)+") rotate(-90)"} textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}>{o.yTitle??"Susceptibility, χ(ω) (a.u.)"}</text>
+    <SvgMathText text={o.yTitle??"Susceptibility, $\\chi(\\omega)$ (a.u.)"}
+      x={36} y={TOP+panelHeight/2} rotate={-90}
+      textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}/>
     {legend(c.topLegendX,c.topLegendY,[realId,imagId,"__band__"])}
     {axis(bottomTop,majorBottom,minorBottom,bottomY,true)}
     <g clipPath="url(#lorentz-bottom-figure-clip)">
@@ -226,8 +258,11 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       {c.showReferenceLines&&<><line x1={x(resonanceX)} x2={x(resonanceX)} y1={bottomTop} y2={BOTTOM} stroke="#777" strokeWidth={c.referenceLineWidth} strokeDasharray="7 5"/><line x1={LEFT} x2={RIGHT} y1={bottomY(90)} y2={bottomY(90)} stroke={color(imagId)} strokeDasharray="2 4" strokeWidth="1.2"/></>}
     </g>
     {c.showResonanceMarkers&&phase&&<circle cx={x(resonanceX)} cy={bottomY(nearest(phase.values,resonanceX))} r={c.markerRadius} fill={color(imagId)}/>}
-    <text transform={"translate(36 "+(bottomTop+panelHeight/2)+") rotate(-90)"} textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}>{c.phaseYTitle}</text>
-    <text x={(LEFT+RIGHT)/2} y={BOTTOM+48} textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}>{o.xTitle??"Normalized Driving Frequency, ω/ω₀"}</text>
+    <SvgMathText text={c.phaseYTitle} x={36} y={bottomTop+panelHeight/2} rotate={-90}
+      textAnchor="middle" fontFamily={font} fontSize={axisFont} fill={axisColor}/>
+    <SvgMathText text={o.xTitle??"Normalized Driving Frequency, $\\omega/\\omega_0$"}
+      x={(LEFT+RIGHT)/2} y={BOTTOM+48} textAnchor="middle"
+      fontFamily={font} fontSize={axisFont} fill={axisColor}/>
     {legend(c.bottomLegendX,c.bottomLegendY,[phaseId],true)}
     {c.annotations.map(renderAnnotation)}
   </svg>;
