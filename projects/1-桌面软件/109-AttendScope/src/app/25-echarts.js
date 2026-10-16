@@ -660,7 +660,7 @@ function mountOverviewTrend(){
   const rows=Array.from({length:monthDays()},(_,i)=>{
     const day=i+1;
     const list=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${day}`));
-    return {day,problem:list.filter(a=>a.severity==='problem').length,suspect:list.filter(a=>a.severity==='suspect').length};
+    return {day,anomaly:list.filter(a=>attendanceJudgment(a)==='anomaly').length,absent:list.filter(a=>attendanceJudgment(a)==='absent').length};
   }).filter(x=>isWorkday(x.day));
   chart.setOption({
     grid:{left:30,right:15,top:12,bottom:26},
@@ -668,15 +668,15 @@ function mountOverviewTrend(){
       trigger:'axis',confine:true,
       axisPointer:{type:'line',lineStyle:{color:'#abc8d9',width:1}},
       formatter:p=>{
-        const d=rows[p[0]?.dataIndex];return d?`${pad(d.day)} 日<br>明确异常 ${d.problem}<br>待核实 ${d.suspect}`:'';
+        const d=rows[p[0]?.dataIndex];return d?`${pad(d.day)} 日<br>异常 ${d.anomaly}<br>缺勤 ${d.absent}`:'';
       }
     },
     legend:{show:false},
     xAxis:{type:'category',boundaryGap:false,data:rows.map(x=>pad(x.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#dae5ec'}},axisLabel:{fontSize:11,color:'#9aa8b3',interval:2}},
     yAxis:{type:'value',min:0,minInterval:1,axisTick:{show:false},axisLine:{show:false},axisLabel:{fontSize:11,color:'#9aa8b3'},splitLine:{lineStyle:{color:'rgba(199,215,225,.37)',type:'dashed'}}},
     series:[
-      {name:'明确异常',type:'line',smooth:false,symbol:'none',data:rows.map(x=>x.problem),lineStyle:{width:2,color:'#da8e8a'},areaStyle:{color:'rgba(218,142,138,.07)'},itemStyle:{color:'#da8e8a'}},
-      {name:'待核实',type:'line',smooth:false,symbol:'none',data:rows.map(x=>x.suspect),lineStyle:{width:2,color:'#e5c477'},itemStyle:{color:'#e5c477'}}
+      {name:'异常',type:'line',smooth:false,symbol:'none',data:rows.map(x=>x.anomaly),lineStyle:{width:2,color:ATTEND_STATUS_COLORS.anomaly},areaStyle:{color:'rgba(230,195,111,.09)'},itemStyle:{color:ATTEND_STATUS_COLORS.anomaly}},
+      {name:'缺勤',type:'line',smooth:false,symbol:'none',data:rows.map(x=>x.absent),lineStyle:{width:2,color:ATTEND_STATUS_COLORS.absent},itemStyle:{color:ATTEND_STATUS_COLORS.absent}}
     ]
   });
   chart.on('click',p=>{const day=rows[p.dataIndex]?.day;if(day)selectDate(day,true)});
