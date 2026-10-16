@@ -4796,7 +4796,7 @@ function App() {
                               min="0"
                               max="4"
                               step="0.1"
-                              value={primaryOverride.barBorderWidthPt ?? 0}
+                              value={primaryOverride.barBorderWidthPt ?? GOLDEN_STYLE.bar.borderWidthPt}
                               onChange={(event) =>
                                 updateSelectedSeries({
                                   barBorderWidthPt: Number(event.target.value)
@@ -4815,7 +4815,7 @@ function App() {
                               max="90"
                               step="1"
                               value={Math.round(
-                                (activeFigure.figureOverrides.barGap ?? 0.2) * 100
+                                (activeFigure.figureOverrides.barGap ?? GOLDEN_STYLE.bar.gap) * 100
                               )}
                               onChange={(event) =>
                                 setFigureField(
@@ -4836,7 +4836,7 @@ function App() {
                               max="90"
                               step="1"
                               value={Math.round(
-                                (activeFigure.figureOverrides.barGroupGap ?? 0.08) *
+                                (activeFigure.figureOverrides.barGroupGap ?? GOLDEN_STYLE.bar.groupGap) *
                                   100
                               )}
                               onChange={(event) =>
@@ -6207,7 +6207,7 @@ function App() {
                         type="color"
                         value={
                           activeFigure.figureOverrides.legendFontColor ??
-                          "#17191c"
+                          GOLDEN_STYLE.typography.textColor
                         }
                         onChange={(event) =>
                           setFigureField(
@@ -6226,7 +6226,7 @@ function App() {
                           max="120"
                           step="2"
                           value={
-                            activeFigure.figureOverrides.legendItemWidthPx ?? 30
+                            activeFigure.figureOverrides.legendItemWidthPx ?? Math.max(30, GOLDEN_STYLE.legend.sampleLengthPx)
                           }
                           onChange={(event) =>
                             setFigureField(
@@ -6247,7 +6247,7 @@ function App() {
                           type="color"
                           value={
                             activeFigure.figureOverrides.legendBackground ??
-                            "#ffffff"
+                            GOLDEN_STYLE.legend.background
                           }
                           onChange={(event) =>
                             setFigureField(
@@ -6283,7 +6283,7 @@ function App() {
                           step="5"
                           value={Math.round(
                             (activeFigure.figureOverrides
-                              .legendBackgroundOpacity ?? 1) * 100
+                              .legendBackgroundOpacity ?? GOLDEN_STYLE.legend.backgroundOpacity) * 100
                           )}
                           onChange={(event) =>
                             setFigureField(
@@ -6316,7 +6316,7 @@ function App() {
                         }
                         value={
                           activeFigure.figureOverrides.legendBorderColor ??
-                          "#cdd2d7"
+                          GOLDEN_STYLE.legend.borderColor
                         }
                         onChange={(event) =>
                           setFigureField(
@@ -6339,7 +6339,7 @@ function App() {
                           }
                           value={
                             activeFigure.figureOverrides.legendBorderWidthPt ??
-                            0.6
+                            GOLDEN_STYLE.stroke.legendBorderPt
                           }
                           onChange={(event) =>
                             setFigureField(

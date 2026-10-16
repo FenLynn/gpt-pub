@@ -67,6 +67,15 @@ for (let n=0; n<gallery.length; n++) {
       figure.name+" must inherit the Lorentz Golden axis language");
     assert.equal(goldenAxis.tickcolor,GOLDEN_STYLE.stroke.tickStrokeColor,
       figure.name+" must inherit the Lorentz Golden tick language");
+    const goldenLegend=(layout as any).legend;
+    if(goldenLegend){
+      assert.equal(goldenLegend.font?.color,GOLDEN_STYLE.typography.textColor,
+        figure.name+" legend text must inherit Golden typography");
+      if(figure.figureOverrides.legendFrame){
+        assert.equal(goldenLegend.bordercolor,GOLDEN_STYLE.legend.borderColor,
+          figure.name+" framed legend must inherit the Golden border");
+      }
+    }
   }
   for(const tr of traces as Array<{x?:unknown[];y?:unknown[]}>) {
     if (!Array.isArray(tr.x) || !Array.isArray(tr.y)) continue; // 2D field matrix

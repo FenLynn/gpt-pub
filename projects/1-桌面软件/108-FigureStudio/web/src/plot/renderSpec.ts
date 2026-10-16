@@ -1202,7 +1202,7 @@ export function buildLayout(args: {
       bgcolor: overrides.legendBackground
         ? rgba(
             overrides.legendBackground,
-            overrides.legendBackgroundOpacity ?? 1
+            overrides.legendBackgroundOpacity ?? GOLDEN_STYLE.legend.backgroundOpacity
           )
         : overrides.legendFrame
         ? "rgba(255,255,255," + GOLDEN_STYLE.legend.backgroundOpacity + ")"
@@ -1227,7 +1227,7 @@ export function buildLayout(args: {
         size: ptToPx(
           overrides.legendFontSizePt ?? fontSizePt * metrics.legendScale
         ),
-        color: overrides.legendFontColor ?? "#17191c"
+        color: overrides.legendFontColor ?? GOLDEN_STYLE.typography.textColor
       }
     },
     barmode: figure.templateId === "stacked-bar" ? "stack" : "group",
