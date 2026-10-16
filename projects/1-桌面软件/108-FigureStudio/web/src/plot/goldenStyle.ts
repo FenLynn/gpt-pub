@@ -65,6 +65,23 @@ export const GOLDEN_STYLE = {
     borderColor: "#d8dde0",
     borderWidthPt: 0.3
   },
+  field: {
+    colorScale: "Cividis",
+    colorbarThicknessPx: 10,
+    colorbarOutlinePt: 0.3,
+    colorbarLength2d: 0.84,
+    colorbarLength3d: 0.68,
+    contourLinePt: 0.35,
+    contourLineColor: "rgba(57,67,75,0.52)",
+    planeBackground: "#f8f8f6",
+    sceneGridColor: "#d9dde0"
+  },
+  bar: {
+    borderColor: "rgba(57,67,75,0.34)",
+    borderWidthPt: 0.3,
+    gap: 0.22,
+    groupGap: 0.08
+  },
   palette: [
     "#305b76",
     "#a44b3d",

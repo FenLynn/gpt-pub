@@ -283,19 +283,20 @@ export function buildTraces(args: {
     const fieldFontSizePt =
       figure.figureOverrides.fontSizePt ?? metrics.fontSizePt;
     const colorbar = {
-      thickness: 11,
-      outlinewidth: 0,
+      thickness: GOLDEN_STYLE.field.colorbarThicknessPx,
+      outlinewidth: ptToPx(GOLDEN_STYLE.field.colorbarOutlinePt),
+      outlinecolor: GOLDEN_STYLE.legend.borderColor,
       ticks: figure.figureOverrides.tickDirection === "outside" ? "outside" : "inside",
       ticklen: ptToPx(metrics.minorTickLengthPt),
       tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
-      tickcolor: figure.figureOverrides.tickLabelColor ?? "#17191c",
-      len: 0.88,
+      tickcolor: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.stroke.tickStrokeColor,
+      len: GOLDEN_STYLE.field.colorbarLength2d,
       tickfont: {
         family: fieldFontFamily,
         size: ptToPx(
           figure.figureOverrides.tickLabelSizePt ?? fieldFontSizePt * 0.96
         ),
-        color: figure.figureOverrides.tickLabelColor ?? "#17191c"
+        color: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
       },
       title: figure.figureOverrides.colorbarTitle
         ? {
@@ -309,7 +310,7 @@ export function buildTraces(args: {
                 figure.figureOverrides.axisTitleSizePt ??
                   fieldFontSizePt * 1.08
               ),
-              color: figure.figureOverrides.axisTitleColor ?? "#17191c"
+              color: figure.figureOverrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
             }
           }
         : undefined
@@ -334,7 +335,7 @@ export function buildTraces(args: {
           x: dataset.x.values,
           y: yValues,
           z: zValues,
-          colorscale: figure.figureOverrides.colorScale ?? "Viridis",
+          colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
           reversescale: figure.figureOverrides.reverseColorScale ?? false,
           showscale: figure.figureOverrides.colorbarVisible ?? true,
           zauto: false,
@@ -357,12 +358,12 @@ export function buildTraces(args: {
                   figure.figureOverrides.fontSizePt ??
                   metrics.fontSizePt) * 0.9
               ),
-              color: figure.figureOverrides.tickLabelColor ?? "#17191c"
+              color: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
             }
           },
           line: {
-            width: contourLines ? ptToPx(0.45) : 0,
-            color: "rgba(32,35,40,0.72)"
+            width: contourLines ? ptToPx(GOLDEN_STYLE.field.contourLinePt) : 0,
+            color: GOLDEN_STYLE.field.contourLineColor
           },
           colorbar,
           hovertemplate:
@@ -378,7 +379,7 @@ export function buildTraces(args: {
         x: dataset.x.values,
         y: yValues,
         z: zValues,
-        colorscale: figure.figureOverrides.colorScale ?? "Viridis",
+        colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
         reversescale: figure.figureOverrides.reverseColorScale ?? false,
         showscale: figure.figureOverrides.colorbarVisible ?? true,
         zauto: zAuto,
@@ -406,7 +407,7 @@ export function buildTraces(args: {
         x: surfaceX,
         y: resolveFieldRowCoordinates(dataset, series),
         z: series.map((column) => column.values),
-        colorscale: figure.figureOverrides.colorScale ?? "Viridis",
+        colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
         reversescale: figure.figureOverrides.reverseColorScale ?? false,
         showscale: figure.figureOverrides.colorbarVisible ?? true,
         cauto: figure.figureOverrides.zAutoRange !== false,
@@ -419,12 +420,13 @@ export function buildTraces(args: {
             ? figure.figureOverrides.zMax
             : undefined,
         colorbar: {
-          thickness: 11,
-          outlinewidth: 0,
+          thickness: GOLDEN_STYLE.field.colorbarThicknessPx,
+          outlinewidth: ptToPx(GOLDEN_STYLE.field.colorbarOutlinePt),
+          outlinecolor: GOLDEN_STYLE.legend.borderColor,
           ticks: figure.figureOverrides.tickDirection === "outside" ? "outside" : "inside",
           ticklen: ptToPx(metrics.minorTickLengthPt),
           tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
-          tickcolor: figure.figureOverrides.tickLabelColor ?? "#17191c",
+          tickcolor: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor,
           len: 0.66,
           x: 1.06,
           xpad: 4,
@@ -437,7 +439,7 @@ export function buildTraces(args: {
                 figure.figureOverrides.fontSizePt ??
                 metrics.fontSizePt) * 0.96
             ),
-            color: figure.figureOverrides.tickLabelColor ?? "#17191c"
+            color: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
           },
           title: figure.figureOverrides.colorbarTitle
             ? {
@@ -454,7 +456,7 @@ export function buildTraces(args: {
                       (figure.figureOverrides.fontSizePt ??
                         metrics.fontSizePt) * 1.08
                   ),
-                  color: figure.figureOverrides.axisTitleColor ?? "#17191c"
+                  color: figure.figureOverrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
                 }
               }
             : { text: "" }
@@ -517,8 +519,8 @@ export function buildTraces(args: {
         marker: {
           color: markerColor,
           line: {
-            color: override.barBorderColor ?? fillColor,
-            width: ptToPx(override.barBorderWidthPt ?? 0)
+            color: override.barBorderColor ?? GOLDEN_STYLE.bar.borderColor,
+            width: ptToPx(override.barBorderWidthPt ?? GOLDEN_STYLE.bar.borderWidthPt)
           }
         },
         texttemplate: labelVisible
@@ -547,7 +549,7 @@ export function buildTraces(args: {
               figure.figureOverrides.fontSizePt ??
               metrics.fontSizePt) * 0.9
           ),
-          color: figure.figureOverrides.tickLabelColor ?? "#17191c"
+          color: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
         },
         hovertemplate:
           "<b>" +
@@ -877,6 +879,10 @@ export function buildLayout(args: {
   const isDoubleY = figure.templateId === "double-y";
   const isField2D =
     figure.templateId === "heatmap" || figure.templateId === "contour";
+  const isBarLike =
+    figure.templateId === "bar" ||
+    figure.templateId === "grouped-bar" ||
+    figure.templateId === "stacked-bar";
   const fieldSeriesForTicks = isField2D
     ? orderSeries(
         dataset,
@@ -1207,8 +1213,8 @@ export function buildLayout(args: {
       }
     },
     barmode: figure.templateId === "stacked-bar" ? "stack" : "group",
-    bargap: overrides.barGap ?? 0.2,
-    bargroupgap: overrides.barGroupGap ?? 0.08
+    bargap: overrides.barGap ?? GOLDEN_STYLE.bar.gap,
+    bargroupgap: overrides.barGroupGap ?? GOLDEN_STYLE.bar.groupGap
   };
 
   if (figure.templateId === "surface-3d") {
@@ -1224,11 +1230,11 @@ export function buildLayout(args: {
           }
         },
         showbackground: true,
-        backgroundcolor: "#f7f7f7",
+        backgroundcolor: GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
-        gridcolor: "#dde1e4",
+        gridcolor: GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
@@ -1250,11 +1256,11 @@ export function buildLayout(args: {
           }
         },
         showbackground: true,
-        backgroundcolor: "#f7f7f7",
+        backgroundcolor: GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
-        gridcolor: "#dde1e4",
+        gridcolor: GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
@@ -1276,11 +1282,11 @@ export function buildLayout(args: {
           }
         },
         showbackground: true,
-        backgroundcolor: "#f7f7f7",
+        backgroundcolor: GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
-        gridcolor: "#dde1e4",
+        gridcolor: GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
@@ -1303,6 +1309,7 @@ export function buildLayout(args: {
 
   layout.xaxis = {
     ...commonAxis,
+    showgrid: isBarLike ? false : commonAxis.showgrid,
     type: xIsCategorical ? "category" : xScale,
     autorange: xRange
       ? false

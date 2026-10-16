@@ -72,6 +72,17 @@ for (let n=0; n<gallery.length; n++) {
     if (!Array.isArray(tr.x) || !Array.isArray(tr.y)) continue; // 2D field matrix
     assert.ok(tr.x.length>0 && tr.y.length>0, figure.name+" contains a blank XY trace");
   }
+  if(n===10 || n===11){
+    const fieldTrace=(traces as any[])[0];
+    assert.equal(fieldTrace.colorscale,"Cividis",figure.name+" should use the restrained Golden field scale");
+    assert.ok(fieldTrace.colorbar?.outlinewidth>0,figure.name+" colorbar should use a light Golden outline");
+  }
+  if(n===12){
+    const barTrace=(traces as any[])[0];
+    assert.ok(barTrace.marker?.line?.width>0,"Golden bars need a fine publication edge");
+    assert.equal((layout as any).xaxis?.showgrid,false,"Golden bar plots should suppress vertical grid lines");
+    assert.equal((layout as any).yaxis?.showgrid,true,"Golden bar plots should retain subtle horizontal guides");
+  }
   assert.ok(figure.figureOverrides.axisLineWidthPt!>=0.25 &&
     figure.figureOverrides.axisLineWidthPt!<=1.0);
   const mm = resolveCanvasMm(presets.nature,figure);
