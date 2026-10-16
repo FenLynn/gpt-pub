@@ -293,6 +293,47 @@ export interface FigureDataRef {
   zColumnId?: string;
 }
 
+/** Editable two-panel composition stored in the ordinary .sfig FigureSpec. */
+export interface LorentzAnnotation {
+  id: string;
+  panel: "top" | "bottom";
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  fontSizePt: number;
+  background: string;
+  backgroundOpacity: number;
+  borderColor: string;
+  borderWidthPt: number;
+  arrowX?: number;
+  arrowY?: number;
+  visible?: boolean;
+}
+export interface LorentzComposition {
+  kind: "lorentz-two-panel";
+  topTitle: string;
+  bottomTitle: string;
+  phaseYTitle: string;
+  panelGap: number;
+  phaseMin: number;
+  phaseMax: number;
+  topMin: number;
+  topMax: number;
+  resonanceX: number;
+  bandStart: number;
+  bandEnd: number;
+  bandColor: string;
+  bandOpacity: number;
+  gridOpacity: number;
+  topLegendX: number;
+  topLegendY: number;
+  bottomLegendX: number;
+  bottomLegendY: number;
+  showReferenceLines: boolean;
+  showResonanceMarkers: boolean;
+  annotations: LorentzAnnotation[];
+}
 export interface FigureSpec {
   id: string;
   name: string;
@@ -304,6 +345,7 @@ export interface FigureSpec {
   seriesOverrides: Record<string, SeriesOverride>;
   seriesOrder: string[];
   datasetId?: string;
+  lorentz?: LorentzComposition;
 }
 
 export interface ProjectDefaults {
@@ -352,4 +394,5 @@ export type InspectorTab =
   | "series"
   | "axis"
   | "legend"
+  | "annotation"
   | "check";
