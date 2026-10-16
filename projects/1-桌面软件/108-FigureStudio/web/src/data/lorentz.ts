@@ -65,7 +65,7 @@ export const defaultLorentzComposition: LorentzComposition = {
 export function createLorentzFigure(sheet:DataSheet,defaults:UserDefaults):FigureSpec{
   const ref=defaultDataRef(sheet);
   return {
-    id:"figure-lorentz-golden",name:"Golden · Lorentz oscillator (a,b)",folderId:"folder-nature",
+    id:"figure-lorentz-golden",name:"Golden · Lorentz oscillator (a,b)",folderId:"folder-golden",
     dataRef:{...ref,yColumnIds:["lorentz-real","lorentz-imag","lorentz-phase"]},
     templateId:"xy-line",presetId:"nature",
     figureOverrides:{
