@@ -2056,6 +2056,16 @@ function App() {
 
   async function exportFigure(format: "svg" | "png") {
     if (usePrecision && svgRef.current && activeFigure) {
+      // MathJax updates the same SVG DOM asynchronously. Never export a transient
+      // raw-$...$ fallback: wait briefly for the actual vector math paths.
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        if (!svgRef.current?.querySelector('[data-math-pending="true"]')) break;
+        await new Promise(resolve => window.setTimeout(resolve, 50));
+      }
+      if (svgRef.current?.querySelector('[data-math-pending="true"]')) {
+        showToast("LaTeX 仍在排版，请稍后再导出");
+        return;
+      }
       // Serialize the exact SVG currently displayed. No independent redraw on export.
       const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
       const physical = resolveCanvasMm(preset, activeFigure);
