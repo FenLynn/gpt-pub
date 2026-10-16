@@ -1,5 +1,7 @@
 import { useMemo, useRef, type RefObject } from "react";
 import type { FigureSpec } from "../model";
+import { plainSvgMathFallback } from "../lib/mathText";
+import { SvgMathText } from "./SvgMathText";
 
 /**
  * Experimental publication SVG renderer.
@@ -174,13 +176,14 @@ function markerShape(symbol: string | undefined, x: number, y: number, size: num
     default: return <circle cx={x} cy={y} r={r}/>;
   }
 }
-/** Detect unsupported rich math before selecting this renderer. MathJax is never silently flattened. */
+/** Native SVG now supports $...$ math through bundled MathJax SVG paths. */
 export function supportsPrecisionSvg(figure: FigureSpec): boolean {
   if (["heatmap", "contour", "surface-3d", "bar", "grouped-bar", "stacked-bar"].includes(figure.templateId)) return false;
   const o = figure.figureOverrides;
   const texts = [o.plotTitle, o.xTitle, o.yTitle, o.rightYTitle,
     ...Object.values(figure.seriesOverrides).map(x => x.legendLabel)];
-  return !texts.some(t => t && (/[$\\]/.test(t) || /<\/?(?:sup|sub)>/i.test(t)));
+  // Legacy HTML sup/sub markup stays on Plotly; LaTeX delimiters are first-class here.
+  return !texts.some(t => t && /<\/?(?:sup|sub)>/i.test(t));
 }
 export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisClick,onLegendClick,onLegendDrag}: PrecisionSvgProps) {
   const drag = useRef<{ clientX:number;clientY:number;initialX:number;initialY:number } | null>(null);
@@ -226,8 +229,9 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
       return <g key={"mj-"+side+"-"+i}>
         {axis.showgrid && !opposite && <line x1={isX?pos:plot.left} x2={isX?pos:plot.right} y1={isX?plot.top:pos} y2={isX?plot.bottom:pos} stroke={axis.gridcolor??"#e3e7ec"} strokeWidth={axis.gridwidth??0.5}/>}
         <path d={isX?"M "+coord(pos)+" "+base+" v "+coord(tickSign*tickLen):"M "+base+" "+coord(pos)+" h "+coord(tickSign*tickLen)} fill="none" stroke={axis.tickcolor??baseColor} strokeWidth={axis.tickwidth??0.85}/>
-        <text x={labelX} y={labelY} fill={c} fontSize={font.size??textSize} fontFamily={font.family??baseFont} textAnchor={isX?"middle":opposite?"start":"end"}
-           transform={axis.tickangle?"rotate("+axis.tickangle+" "+labelX+" "+labelY+")":undefined}>{formatTick(v,axis)}</text>
+        <SvgMathText text={formatTick(v,axis)} x={labelX} y={labelY} fill={c}
+          fontSize={font.size??textSize} fontFamily={font.family??baseFont}
+          textAnchor={isX?"middle":opposite?"start":"end"} rotate={axis.tickangle}/>
       </g>;
     });
     const minorNodes = minor.map((v,i) => {
@@ -251,7 +255,12 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     return <g key={"axis-"+side} onClick={onAxisClick}>
       {majorNodes}{minorNodes}
       <path d={isX?"M "+plot.left+" "+base+" H "+plot.right:"M "+base+" "+plot.top+" V "+plot.bottom} stroke={axis.linecolor??"#252c34"} strokeWidth={axis.linewidth??0.9} fill="none"/>
-      {title && <text x={tx} y={ty} transform={!isX?"rotate("+(opposite?90:-90)+" "+tx+" "+ty+")":undefined} fill={axis.title?.font?.color??baseColor} fontFamily={axis.title?.font?.family??baseFont} fontSize={axis.title?.font?.size??textSize*1.08} textAnchor="middle">{textOf(title)}</text>}
+      {title && <SvgMathText text={textOf(title)} x={tx} y={ty}
+        rotate={!isX ? (opposite?90:-90) : undefined}
+        fill={axis.title?.font?.color??baseColor}
+        fontFamily={axis.title?.font?.family??baseFont}
+        fontSize={axis.title?.font?.size??textSize*1.08}
+        textAnchor="middle"/>}
     </g>;
   };
   const legendItems = traces.filter(t=>t.showlegend!==false && t.name);
@@ -259,7 +268,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
   const lfont = legend.font?.size ?? textSize*0.93;
   const lh = lfont + 7;
   const cols = legend.orientation==="h" ? Math.max(1,Math.min(legendItems.length, figure.figureOverrides.legendColumns ?? legendItems.length)) : 1;
-  const itemWidth = Math.max(legend.itemwidth ?? 30, 40, ...legendItems.map(t=>(t.name?.length??0)*lfont*0.56+35));
+  const itemWidth = Math.max(legend.itemwidth ?? 30, 40, ...legendItems.map(t=>plainSvgMathFallback(t.name).length*lfont*0.56+35));
   const lw = cols * itemWidth;
   const lhTotal = lh * Math.ceil(legendItems.length/cols);
   const lx = plot.left+(legend.x??0.98)*(plot.right-plot.left);
@@ -273,8 +282,12 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     role="img" aria-label={figure.name+"，精细 SVG 绘图"}>
     <defs><clipPath id={uid}><rect x={plot.left} y={plot.top} width={Math.max(1,plot.right-plot.left)} height={Math.max(1,plot.bottom-plot.top)}/></clipPath></defs>
     <rect width={width} height={height} fill={bg}/>
-    {layout.title?.text && <text x={width/2} y={Math.max(15,plot.top-7-(layout.title.pad?.b??0))} fill={layout.title.font?.color??baseColor}
-      fontFamily={layout.title.font?.family??baseFont} fontSize={layout.title.font?.size??textSize*1.15} textAnchor="middle">{layout.title.text}</text>}
+    {layout.title?.text && <SvgMathText text={layout.title.text}
+      x={width/2} y={Math.max(15,plot.top-7-(layout.title.pad?.b??0))}
+      fill={layout.title.font?.color??baseColor}
+      fontFamily={layout.title.font?.family??baseFont}
+      fontSize={layout.title.font?.size??textSize*1.15}
+      fontWeight={600} textAnchor="middle"/>}
     {axisNodes(xAxis,"x",xDomain,xp)}
     {axisNodes(yAxis,"y",yDomain,yp)}
     {rightAxis && axisNodes(rightAxis,"y2",rDomain,rp)}
@@ -363,7 +376,10 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
              stroke={tr.marker?.line?.color??tr.line?.color??"#26749b"} strokeWidth={tr.marker?.line?.width??0.5}>
              {markerShape(tr.marker?.symbol,0,0,Math.min(tr.marker?.size??5,8))}
           </g>}
-          <text x={tx+24} y={ty+lh/2+lfont*0.34} fill={legend.font?.color??baseColor} fontFamily={legend.font?.family??baseFont} fontSize={lfont}>{tr.name}</text>
+          <SvgMathText text={tr.name} x={tx+24} y={ty+lh/2+lfont*0.34}
+            fill={legend.font?.color??baseColor}
+            fontFamily={legend.font?.family??baseFont}
+            fontSize={lfont} textAnchor="start"/>
         </g>;
       })}
     </g>}
