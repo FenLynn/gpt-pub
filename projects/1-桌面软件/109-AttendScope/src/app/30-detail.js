@@ -168,33 +168,62 @@ function singleTimelinePanel(a){
   const outs=a.punches.filter(p=>p.direction==='出').sort((x,y)=>x.time.localeCompare(y.time));
   const first=ins[0]?.time?.slice(0,5)||'—';
   const last=outs[outs.length-1]?.time?.slice(0,5)||'—';
-  return `<div class="echarts-timeline-shell refined">
-    <div class="timeline-window-head refined-head">
-      <div class="timeline-title-stack">
-        <span>局部时间</span>
-        <strong id="timelineWindowLabel">${minuteText(r.start)}–${minuteText(r.end)}</strong>
-      </div>
-      <div class="timeline-facts">
-        <span><i class="fact-dot first"></i>最早进入 <b>${first}</b></span>
-        <span><i class="fact-dot last"></i>最晚离开 <b>${last}</b></span>
-      </div>
+  const issues=a.issues.length?a.issues.join(' · '):'未检出需要核实的打卡问题';
+  const confirmed=fmtMinutes(a.presence);
+  const examples=a.punches.slice(0,8);
+  return `<div class="daily-studio">
+    <div class="daily-facts" aria-label="当日关键数据">
+      <div class="daily-fact"><small>首次进入</small><strong class="fact-blue">${first}</strong><span>IN · 进入记录</span></div>
+      <div class="daily-fact"><small>最后离开</small><strong class="fact-orange">${last}</strong><span>OUT · 离开记录</span></div>
+      <div class="daily-fact"><small>确认在岗</small><strong>${confirmed}</strong><span>仅计可确认时段</span></div>
+      <div class="daily-fact"><small>原始打卡</small><strong>${a.punches.length}<em> 条</em></strong><span>${a.marker==='leave'?'已登记请假':a.marker==='trip'?'已登记出差':'原始记录可追溯'}</span></div>
     </div>
-    <div class="echarts-timeline-frame refined-frame">
-      <div id="attendanceTimelineChart" class="echarts-timeline-chart refined-chart" role="img" aria-label="进出打卡双时间轴"></div>
-    </div>
-    <div class="timeline-footline">
-      <div class="echarts-timeline-legend refined-legend">
-        <span><i class="in"></i>进入</span>
-        <span><i class="out"></i>离开</span>
-        <span><b>×N</b>重叠记录</span>
+    <section class="chart-surface">
+      <div class="chart-surface-title">
+        <div><span class="eyebrow">PUNCH ACTIVITY</span><h3>打卡时间分布</h3></div>
+        <div class="chart-window">
+          <span>局部窗口</span>
+          <strong id="timelineWindowLabel">${minuteText(r.start)}–${minuteText(r.end)}</strong>
+        </div>
       </div>
-      <small>拖动下方选区移动 · 拉动两侧手柄缩放 · 滚轮缩放</small>
-    </div>
-    <div class="timeline-evidence refined-evidence" id="timelineEvidence">
-      <span>选择一个箭头</span><strong>查看准确时间和原始来源</strong>
+      <div class="echarts-timeline-frame refined-frame">
+        <div id="attendanceTimelineChart" class="echarts-timeline-chart refined-chart" role="img" aria-label="进出打卡双时间轴"></div>
+      </div>
+      <div class="timeline-footline">
+        <div class="echarts-timeline-legend refined-legend">
+          <span><i class="in"></i>进入</span>
+          <span><i class="out"></i>离开</span>
+          <span><b>×N</b>重叠打卡</span>
+        </div>
+        <small>底部蓝色选区可拖动和缩放</small>
+      </div>
+    </section>
+    <div class="daily-bottom">
+      <section class="daily-record-panel">
+        <div class="mini-section-head"><h3>打卡证据</h3><span>${a.punches.length} 条原始记录</span></div>
+        <div class="punch-chips">
+          ${examples.map(p=>`<button class="punch-chip ${p.direction==='进'?'in':'out'}" data-record="${p.recordId}" title="${p.time} · ${p.source}"><span>${p.direction}</span><b>${p.time.slice(0,5)}</b></button>`).join('')||'<span class="quiet-empty">当天无打卡记录</span>'}
+          ${a.punches.length>examples.length?`<button class="punch-chip more" data-show-records>全部 ${a.punches.length} 条</button>`:''}
+        </div>
+        <div class="timeline-evidence refined-evidence" id="timelineEvidence">
+          <span>点击箭头或记录查看来源</span>
+          <strong>记录不会修改原始文件</strong>
+        </div>
+      </section>
+      <section class="daily-findings-panel">
+        <div class="mini-section-head"><h3>核查结论</h3><span class="finding-severity ${a.severity}">${a.status}</span></div>
+        <p class="finding-copy">${escapeNameText(issues)}</p>
+        <div class="overview-actions">
+          <button class="soft-action" data-revise="resolved">标记已核实</button>
+          <button class="soft-action" data-revise="note">添加说明</button>
+          <button class="soft-action danger" data-revise="clear">清除修订</button>
+        </div>
+      </section>
     </div>
   </div>`;
 }
+function escapeNameText(x){return String(x).replace(/[&<>"']/g,v=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[v]))}
+
 function focusTimelineCluster(start,end){
   const r=state.timelineRange;if(!r)return;
   const current=r.end-r.start,center=(start+end)/2;
@@ -251,15 +280,20 @@ function bindDualTimeline(){
 }
 
 function dateTimelinePanel(day,items){
-  const height=Math.max(430,items.length*18+72);
+  const height=Math.max(440,items.length*18+72);
+  const problem=items.filter(a=>a.severity==='problem').length;
+  const suspect=items.filter(a=>a.severity==='suspect').length;
   return `<div class="date-echarts-shell">
-    <div class="timeline-window-head">
-      <div><span>当天全员</span><strong>${pad(day)} 日 · ${items.length} 人</strong></div>
-      <small>蓝灰细线表示可确认在岗区间 · 点击任意记录进入个人当天</small>
+    <div class="date-summary">
+      <span>当日 <b>${items.length}</b> 人</span>
+      <span><i class="mini-dot bad"></i>明确异常 <b>${problem}</b></span>
+      <span><i class="mini-dot warn"></i>待核实 <b>${suspect}</b></span>
+      <small>点击任一进出记录查看个人时间轴</small>
     </div>
-    <div class="echarts-date-frame">
-      <div id="attendanceDayChart" class="echarts-date-chart" style="height:${height}px"></div>
-    </div>
+    <section class="chart-surface">
+      <div class="chart-surface-title"><div><span class="eyebrow">DAY VIEW</span><h3>${pad(day)} 日 · 全员打卡分布</h3></div></div>
+      <div class="echarts-date-frame"><div id="attendanceDayChart" class="echarts-date-chart" style="height:${height}px"></div></div>
+    </section>
   </div>`;
 }
 
