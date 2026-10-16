@@ -3054,7 +3054,7 @@ function App() {
                           lorentz: figure.lorentz ? { ...figure.lorentz, annotations: figure.lorentz.annotations.map(a => a.id === id ? { ...a, x, y } : a) } : undefined
                         }))}
                         onAxisClick={() => setInspectorTab("axis")}
-                        onLegendClick={() => setInspectorTab("annotation")}
+                        onLegendClick={() => setInspectorTab("legend")}
                       />
                     ) : usePrecision && activeFigure ? (
                       <PrecisionSvg
