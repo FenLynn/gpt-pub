@@ -20,6 +20,14 @@ assert.equal(project.folders.filter(f => f.id === "folder-nature").length, 1);
 assert.equal(gallery.filter(f => supportsPrecisionSvg(f)).length, 11,
   "Eleven XY samples should use real SVG; heatmap/contour/bar remain on Plotly");
 assert.equal(gallery.filter(f => !supportsPrecisionSvg(f)).length, 3);
+assert.equal(gallery[0].seriesOverrides.measured?.color, GOLDEN_STYLE.palette[0],
+  "Nature gallery must visibly inherit the Lorentz Golden palette");
+assert.equal(gallery[7].seriesOverrides.efficiency?.color, GOLDEN_STYLE.palette[1],
+  "Double-Y gallery sample must use the muted Golden palette");
+assert.equal(gallery[0].figureOverrides.fontFamily, "Times New Roman",
+  "Nature gallery typography must match the Lorentz Golden family");
+assert.equal(gallery[0].figureOverrides.legendFrame, true,
+  "Golden scientific legends should use the Lorentz light frame by default");
 
 for (let n=0; n<gallery.length; n++) {
   const figure = gallery[n];

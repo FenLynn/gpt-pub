@@ -1,5 +1,6 @@
 import { defaultDataRef } from "./adapter";
 import type { DataSheet, FigureSpec, UserDefaults } from "../model";
+import { GOLDEN_STYLE } from "../plot/goldenStyle";
 
 function id(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
@@ -54,15 +55,22 @@ export function createNatureGallery(
   }
 ): FigureSpec[] {
   const common: FigureSpec["figureOverrides"] = {
-    publicationMode: "single", aspectMode: "4:3", fontFamily: "Arial",
-    fontSizePt: 6.5, tickLabelSizePt: 6.1, axisTitleSizePt: 6.5,
-    plotTitleSizePt: 7, legendFontSizePt: 5.9,
-    background: "#ffffff", axisTitleColor: "#202328", tickLabelColor: "#202328",
-    frameStyle: "open", tickDirection: "outside", minorTicks: false,
-    gridVisible: false, axisLineWidthPt: 0.58,
-    majorTickLengthPt: 2.6, minorTickLengthPt: 1.4, axisTitlePadPt: 2.7,
+    publicationMode: "single", aspectMode: "4:3", fontFamily: "Times New Roman",
+    fontSizePt: 6.5, tickLabelSizePt: 5.9, axisTitleSizePt: 6.65,
+    plotTitleSizePt: 6.9, legendFontSizePt: 5.95,
+    background: "#ffffff",
+    axisTitleColor: GOLDEN_STYLE.typography.axisTitleColor,
+    tickLabelColor: GOLDEN_STYLE.typography.tickColor,
+    frameStyle: "boxed", tickDirection: "inside", minorTicks: true,
+    gridVisible: true, axisLineWidthPt: 0.58,
+    majorTickLengthPt: GOLDEN_STYLE.stroke.majorTickLengthPt,
+    minorTickLengthPt: GOLDEN_STYLE.stroke.minorTickLengthPt, axisTitlePadPt: 3.1,
     marginLeftMm: 13.5, marginRightMm: 5.5, marginTopMm: 5.5,
-    marginBottomMm: 12, legendFrame: false,
+    marginBottomMm: 12, legendFrame: true,
+    legendBorderColor: GOLDEN_STYLE.legend.borderColor,
+    legendBorderWidthPt: GOLDEN_STYLE.stroke.legendBorderPt,
+    legendBackground: GOLDEN_STYLE.legend.background,
+    legendBackgroundOpacity: GOLDEN_STYLE.legend.backgroundOpacity,
     legendOrientation: "vertical", legendPosition: "top-right"
   };
   const make = (
@@ -81,20 +89,20 @@ export function createNatureGallery(
       seriesOverrides: series, seriesOrder: [...seriesOrder]
     };
   };
-  const blue="#0072B2", vermilion="#D55E00", green="#009E73";
+  const blue=GOLDEN_STYLE.palette[0], vermilion=GOLDEN_STYLE.palette[1], green=GOLDEN_STYLE.palette[3];
   return [
     make(sheets.spectrum, "N01 · Emission spectrum", "spectrum",
       { xTitle:"Wavelength, $\\lambda$ (nm)",yTitle:"Spectral power (dBm)",legendPosition:"top-left" },
-      { measured:{color:blue,lineWidthPt:0.82},fit:{color:vermilion,lineWidthPt:0.72,lineStyle:"dash"} },
+      { measured:{color:blue,lineWidthPt:1.0},fit:{color:vermilion,lineWidthPt:0.88,lineStyle:"dash"} },
       ["measured","fit"]),
     make(sheets.spectrum, "N02 · Peak detail", "spectrum",
       { xTitle:"Wavelength (nm)",yTitle:"Spectral power (dBm)",
         xAutoRange:false,xMin:1056,xMax:1078,xMajorTickStep:5,legendVisible:false },
-      { measured:{color:blue,lineWidthPt:0.78} }, ["measured"]),
+      { measured:{color:blue,lineWidthPt:0.96} }, ["measured"]),
     make(sheets.kinetics, "N03 · Kinetic trajectories", "xy-line",
       { xTitle:"Time (s)",yTitle:"Normalized response (a.u.)",legendPosition:"bottom-right" },
-      { "nature-kinetics-control":{color:blue,lineWidthPt:0.82},
-        "nature-kinetics-treatment":{color:vermilion,lineWidthPt:0.82} },
+      { "nature-kinetics-control":{color:blue,lineWidthPt:1.0},
+        "nature-kinetics-treatment":{color:vermilion,lineWidthPt:1.0} },
       ["nature-kinetics-control","nature-kinetics-treatment"]),
     make(sheets.scatter, "N04 · Group comparison", "xy-scatter",
       { xTitle:"Temperature (°C)",yTitle:"Response (a.u.)",legendPosition:"top-left" },
@@ -108,19 +116,19 @@ export function createNatureGallery(
         errorBarWidthPt:0.55,errorBarCapSizePt:2,errorBarColor:blue} }, ["sample-a"]),
     make(sheets.scatter, "N06 · Connected measurements", "xy-line-marker",
       { xTitle:"Temperature (°C)",yTitle:"Response (a.u.)",legendPosition:"bottom-right" },
-      { "sample-a":{color:blue,lineWidthPt:0.75,markerSymbol:"circle",markerSizePt:2.7},
-        "sample-b":{color:vermilion,lineWidthPt:0.75,markerSymbol:"square",markerSizePt:2.7} },
+      { "sample-a":{color:blue,lineWidthPt:0.92,markerSymbol:"circle",markerSizePt:2.7},
+        "sample-b":{color:vermilion,lineWidthPt:0.92,markerSymbol:"square",markerSizePt:2.7} },
       ["sample-a","sample-b"]),
     make(sheets.decay, "N07 · Logarithmic decay", "xy-line",
       { xTitle:"Time (ms)",yTitle:"Signal amplitude (a.u.)",yScale:"log",legendPosition:"top-right" },
-      { "nature-decay-a":{color:blue,lineWidthPt:0.8},
-        "nature-decay-b":{color:vermilion,lineWidthPt:0.8} },
+      { "nature-decay-a":{color:blue,lineWidthPt:0.98},
+        "nature-decay-b":{color:vermilion,lineWidthPt:0.98} },
       ["nature-decay-a","nature-decay-b"]),
     make(sheets.dualY, "N08 · Dual-axis performance", "double-y",
       { xTitle:"Pump current (A)",yTitle:"Output power (W)",rightYTitle:"Efficiency (%)",
         marginRightMm:15,legendPosition:"top-left" },
-      { "output-power":{color:blue,yAxis:"left",lineWidthPt:0.82},
-        efficiency:{color:vermilion,yAxis:"right",lineWidthPt:0.82} },
+      { "output-power":{color:blue,yAxis:"left",lineWidthPt:1.0},
+        efficiency:{color:vermilion,yAxis:"right",lineWidthPt:1.0} },
       ["output-power","efficiency"]),
     make(sheets.waterfall, "N09 · Offset spectra", "offset-spectrum",
       { xTitle:"Wavelength (nm)",yTitle:"Spectral power + offset (dBm)",
@@ -146,8 +154,8 @@ export function createNatureGallery(
       { figureWidthMm:183,figureHeightMm:72,
         xTitle:"Time (s)",yTitle:"Normalized response (a.u.)",
         marginLeftMm:14,marginRightMm:8,marginBottomMm:12,legendPosition:"top-left" },
-      { "nature-kinetics-control":{color:blue,lineWidthPt:0.8},
-        "nature-kinetics-treatment":{color:vermilion,lineWidthPt:0.8,lineStyle:"dash"} },
+      { "nature-kinetics-control":{color:blue,lineWidthPt:0.98},
+        "nature-kinetics-treatment":{color:vermilion,lineWidthPt:0.98,lineStyle:"dash"} },
       ["nature-kinetics-control","nature-kinetics-treatment"])
   ];
 }

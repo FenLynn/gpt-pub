@@ -8,6 +8,7 @@ import type {
   ProjectState,
   UserDefaults
 } from "../model";
+import { GOLDEN_STYLE } from "../plot/goldenStyle";
 
 function id(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
@@ -385,12 +386,28 @@ export function createInitialProject(
     figureOverrides: {
       publicationMode: "single",
       aspectMode: "4:3",
+      fontFamily: "Times New Roman",
+      fontSizePt: GOLDEN_STYLE.typography.referenceBodyPt,
+      tickLabelSizePt: GOLDEN_STYLE.typography.referenceTickPt,
+      axisTitleSizePt: GOLDEN_STYLE.typography.referenceAxisTitlePt,
+      plotTitleSizePt: GOLDEN_STYLE.typography.referencePlotTitlePt,
+      legendFontSizePt: GOLDEN_STYLE.typography.referenceLegendPt,
+      axisTitleColor: GOLDEN_STYLE.typography.axisTitleColor,
+      tickLabelColor: GOLDEN_STYLE.typography.tickColor,
+      axisLineWidthPt: GOLDEN_STYLE.stroke.referenceAxisPt,
+      majorTickLengthPt: GOLDEN_STYLE.stroke.majorTickLengthPt,
+      minorTickLengthPt: GOLDEN_STYLE.stroke.minorTickLengthPt,
       tickDirection: "inside",
-      minorTicks: false,
-      gridVisible: false,
+      minorTicks: true,
+      gridVisible: true,
+      frameStyle: "boxed",
       legendPosition: "top-right",
       legendOrientation: "vertical",
-      legendFrame: false
+      legendFrame: true,
+      legendBackground: GOLDEN_STYLE.legend.background,
+      legendBackgroundOpacity: GOLDEN_STYLE.legend.backgroundOpacity,
+      legendBorderColor: GOLDEN_STYLE.legend.borderColor,
+      legendBorderWidthPt: GOLDEN_STYLE.stroke.legendBorderPt
     }
   };
 
@@ -480,11 +497,11 @@ export function createInitialProject(
     {
       "output-power": {
         yAxis: "left",
-        color: "#1F77B4"
+        color: GOLDEN_STYLE.palette[0]
       },
       efficiency: {
         yAxis: "right",
-        color: "#FF7F0E"
+        color: GOLDEN_STYLE.palette[1]
       }
     }
   );
@@ -564,12 +581,12 @@ export function createInitialProject(
     },
     {
       "sample-a": {
-        color: "#1F77B4",
+        color: GOLDEN_STYLE.palette[0],
         markerSymbol: "circle",
         markerSizePt: 4.8
       },
       "sample-b": {
-        color: "#FF7F0E",
+        color: GOLDEN_STYLE.palette[1],
         markerSymbol: "square",
         markerSizePt: 4.8
       }
@@ -589,7 +606,7 @@ export function createInitialProject(
     },
     {
       "sample-a": {
-        color: "#1F77B4",
+        color: GOLDEN_STYLE.palette[0],
         lineVisible: false,
         markerVisible: true,
         markerSizePt: 4.8
@@ -611,7 +628,7 @@ export function createInitialProject(
     },
     {
       fundamental: {
-        color: "#1F77B4"
+        color: GOLDEN_STYLE.palette[0]
       }
     }
   );
@@ -632,9 +649,9 @@ export function createInitialProject(
       legendPosition: "outside-right"
     },
     {
-      fundamental: { color: "#1F77B4" },
-      "higher-order": { color: "#FF7F0E" },
-      loss: { color: "#2CA02C" }
+      fundamental: { color: GOLDEN_STYLE.palette[0] },
+      "higher-order": { color: GOLDEN_STYLE.palette[1] },
+      loss: { color: GOLDEN_STYLE.palette[3] }
     }
   );
 
@@ -653,9 +670,9 @@ export function createInitialProject(
       legendPosition: "outside-right"
     },
     {
-      fundamental: { color: "#1F77B4" },
-      "higher-order": { color: "#FF7F0E" },
-      loss: { color: "#2CA02C" }
+      fundamental: { color: GOLDEN_STYLE.palette[0] },
+      "higher-order": { color: GOLDEN_STYLE.palette[1] },
+      loss: { color: GOLDEN_STYLE.palette[3] }
     }
   );
 

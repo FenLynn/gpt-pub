@@ -1052,19 +1052,11 @@ export function buildLayout(args: {
   const rightSeries = doubleYAxisSeries.filter(
     (series) => doubleYAxisSide(series) === "right"
   );
-  const seriesColor = (series: PlotColumn | undefined) => {
-    if (!series) return "#17191c";
-    const sourceIndex = Math.max(
-      0,
-      dataset.ys.findIndex((item) => item.id === series.id)
-    );
-    return (
-      figure.seriesOverrides[series.id]?.color ??
-      palette[sourceIndex % palette.length]
-    );
-  };
-  const leftYColor = seriesColor(leftSeries[0]);
-  const rightYColor = seriesColor(rightSeries[0]);
+  // Golden Style keeps axes neutral even for a double-Y plot. Series identity
+  // is carried by the curves and legend, matching the Lorentz reference and
+  // avoiding the louder "colored spine" look.
+  const leftYColor = overrides.axisTitleColor ?? GOLDEN_STYLE.stroke.axisColor;
+  const rightYColor = overrides.axisTitleColor ?? GOLDEN_STYLE.stroke.axisColor;
   const automaticLegendSeriesCount =
     figure.templateId === "bar" || figure.templateId === "xy-errorbar"
       ? Math.min(1, visibleSeries(dataset, figure).length)
@@ -1359,13 +1351,13 @@ export function buildLayout(args: {
       ? "reversed"
       : true,
     range: yRange,
-    linecolor: isDoubleY ? leftYColor : commonAxis.linecolor,
-    tickcolor: isDoubleY ? leftYColor : commonAxis.tickcolor,
+    linecolor: isDoubleY ? GOLDEN_STYLE.stroke.axisColor : commonAxis.linecolor,
+    tickcolor: isDoubleY ? GOLDEN_STYLE.stroke.tickStrokeColor : commonAxis.tickcolor,
     tickfont: {
       ...commonAxis.tickfont,
       color:
         overrides.tickLabelColor ??
-        (isDoubleY ? leftYColor : "#17191c")
+        (isDoubleY ? leftYColor : GOLDEN_STYLE.typography.tickColor)
     },
     title: {
       text: resolvedYTitle,
@@ -1375,7 +1367,7 @@ export function buildLayout(args: {
         size: axisTitleSizePx,
         color:
           overrides.axisTitleColor ??
-          (isDoubleY ? leftYColor : "#17191c")
+          (isDoubleY ? leftYColor : GOLDEN_STYLE.typography.tickColor)
       }
     },
     dtick:
@@ -1413,11 +1405,11 @@ export function buildLayout(args: {
         ? "reversed"
         : true,
       range: rightYRange,
-      linecolor: rightYColor,
-      tickcolor: rightYColor,
+      linecolor: GOLDEN_STYLE.stroke.axisColor,
+      tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
       tickfont: {
         ...commonAxis.tickfont,
-        color: overrides.tickLabelColor ?? rightYColor
+        color: overrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor
       },
       title: {
         text: resolvedRightYTitle,
@@ -1425,7 +1417,7 @@ export function buildLayout(args: {
         font: {
           family: fontFamily,
           size: axisTitleSizePx,
-          color: overrides.axisTitleColor ?? rightYColor
+          color: overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor
         }
       },
       showgrid: false,
@@ -1443,7 +1435,7 @@ export function buildLayout(args: {
       tickangle: overrides.rightYTickAngle ?? 0,
       minor: {
         ...commonAxis.minor,
-        tickcolor: rightYColor,
+        tickcolor: GOLDEN_STYLE.stroke.tickStrokeColor,
         showgrid: false,
         dtick:
           overrides.minorTicks &&
