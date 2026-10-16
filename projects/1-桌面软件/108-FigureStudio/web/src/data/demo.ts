@@ -395,6 +395,7 @@ export function createInitialProject(
   };
 
   const folders = [
+    { id: "folder-golden", name: "Golden Reference · 双面板" },
     { id: "folder-nature", name: "Nature Gallery · 14 samples" },
     { id: "folder-experiment", name: "实验数据" },
     { id: "folder-paper", name: "论文" },
