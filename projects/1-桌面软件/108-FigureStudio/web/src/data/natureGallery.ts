@@ -84,7 +84,7 @@ export function createNatureGallery(
   const blue="#0072B2", vermilion="#D55E00", green="#009E73";
   return [
     make(sheets.spectrum, "N01 · Emission spectrum", "spectrum",
-      { xTitle:"Wavelength (nm)",yTitle:"Spectral power (dBm)",legendPosition:"top-left" },
+      { xTitle:"Wavelength, $\\lambda$ (nm)",yTitle:"Spectral power (dBm)",legendPosition:"top-left" },
       { measured:{color:blue,lineWidthPt:0.82},fit:{color:vermilion,lineWidthPt:0.72,lineStyle:"dash"} },
       ["measured","fit"]),
     make(sheets.spectrum, "N02 · Peak detail", "spectrum",
