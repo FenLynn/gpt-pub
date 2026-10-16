@@ -7,7 +7,7 @@ interface Props {
   dataset:Dataset;
   width:number;
   height:number;
-  svgRef:RefObject<SVGSVGElement|null>;
+  svgRef:RefObject<SVGSVGElement>;
   onSelectSeries:(id:string)=>void;
   onSelectAnnotation:(id:string)=>void;
   onMoveAnnotation:(id:string,x:number,y:number)=>void;
