@@ -1,4 +1,5 @@
 import { defaultDataRef } from "./adapter";
+import { createLorentzSheet, createLorentzFigure } from "./lorentz";
 import { createNatureDecaySheet, createNatureKineticsSheet, createNatureGallery } from "./natureGallery";
 import type {
   DataBook,
@@ -408,8 +409,10 @@ export function createInitialProject(
   const waterfallSheet = createWaterfallSheet();
   const scatterErrorbarSheet = createScatterErrorbarSheet();
   const barSheet = createBarSheet();
+  const lorentzSheet = createLorentzSheet();
   const natureDecaySheet = createNatureDecaySheet();
   const natureKineticsSheet = createNatureKineticsSheet();
+  const lorentzFigure = createLorentzFigure(lorentzSheet, defaults);
   const natureFigures = createNatureGallery(defaults, {
     spectrum: spectrumSheet,
     dualY: doubleYSheet,
@@ -424,7 +427,7 @@ export function createInitialProject(
     id: id("book-nature"),
     name: "Synthetic Nature Gallery data",
     folderId: "folder-nature",
-    sheets: [natureDecaySheet, natureKineticsSheet, scatterErrorbarSheet, barSheet]
+    sheets: [lorentzSheet, natureDecaySheet, natureKineticsSheet, scatterErrorbarSheet, barSheet]
   };
 
   const spectrumBook: DataBook = {
@@ -669,6 +672,7 @@ export function createInitialProject(
     ],
     figures: [
       ...natureFigures,
+      lorentzFigure,
       spectrumFigure,
       doubleYFigure,
       waterfallFigure,
