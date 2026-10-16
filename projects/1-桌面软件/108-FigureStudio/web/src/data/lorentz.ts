@@ -28,7 +28,7 @@ export const defaultLorentzComposition: LorentzComposition = {
   topTitle:"(a) Complex Frequency Response of the Lorentz Oscillator",
   bottomTitle:"(b) Phase Lag Between Driving Electric Field and Electron Displacement",
   phaseYTitle:"Phase Lag, φ (degrees)",
-  panelGap:52,phaseMin:0,phaseMax:195,topMin:-3.9,topMax:7.8,
+  panelGap:52,phaseMin:0,phaseMax:195,phaseMajorTickStep:45,phaseMinorTickStep:15,markerRadius:6.5,referenceLineWidth:1.4,topMin:-3.9,topMax:7.8,
   resonanceX:1,bandStart:.92,bandEnd:1.07,bandColor:"#a44b3d",bandOpacity:.055,
   gridOpacity:.11,topLegendX:792,topLegendY:78,bottomLegendX:800,bottomLegendY:890,
   showReferenceLines:true,showResonanceMarkers:true,
