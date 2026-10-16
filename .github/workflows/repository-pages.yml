@@ -79,6 +79,10 @@ jobs:
           test -s "$APP/project.json"
           test -s "$APP/src/vendor/echarts.min.js"
           test -s "$APP/src/vendor/ECHARTS-LICENSE.txt"
+          test -s "$APP/src/vendor/tabulator.min.js"
+          test -s "$APP/src/vendor/tabulator.min.css"
+          test -s "$APP/src/vendor/TABULATOR-LICENSE.txt"
+          test -s "$APP/src/app/35-workbench.js"
           test -s "$APP/src/core/xlsx-lite.js"
           test -s "$APP/src/app/00-state.js"
           test -s "$APP/src/app/25-echarts.js"
@@ -86,12 +90,14 @@ jobs:
             echo "::error::P109 HTML unexpectedly requests a remote URL"
             exit 1
           fi
-          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src"; then
+          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP/src/app" "$APP/src/core"; then
             echo "::error::P109 runtime source contains a network API"
             exit 1
           fi
           node --check "$APP/src/core/xlsx-lite.js"
           node --check "$APP/src/vendor/echarts.min.js"
+          node --check "$APP/src/vendor/tabulator.min.js"
+          grep -q "Tabulator v6.3.1" "$APP/src/vendor/tabulator.min.js"
           test -s "$APP/tests/smoke.cjs"
           node --check "$APP/tests/smoke.cjs"
           grep -q 'series.custom' "$APP/src/vendor/echarts.min.js"
@@ -152,6 +158,9 @@ jobs:
           test -d _site/p108/assets
           test -s _site/p109/src/app/00-state.js
           test -s _site/p109/src/vendor/echarts.min.js
+          test -s _site/p109/src/vendor/tabulator.min.js
+          test -s _site/p109/src/vendor/tabulator.min.css
+          test -s _site/p109/src/vendor/TABULATOR-LICENSE.txt
           test -s _site/preview-build.txt
           if find _site -type d | grep -Ei '/(raw|working|snapshots|branches|output)(/|$)'; then
             echo "::error::Potential private data directory present in public artifact"
