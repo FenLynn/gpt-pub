@@ -47,6 +47,12 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   const minorTop=o.minorTicks?numberTicks(topMin,topMax,o.yMinorTickStep??.5):[];
   const minorBottom=o.minorTicks?numberTicks(c.phaseMin,c.phaseMax,c.phaseMinorTickStep||15):[];
   const bg=o.background??"#fff";
+  const axisTick=(v:number,axis:"x"|"y")=>{
+    const decimals=axis==="x"?o.xTickDecimals:o.yTickDecimals;
+    const prefix=axis==="x"?o.xTickPrefix:o.yTickPrefix;
+    const suffix=axis==="x"?o.xTickSuffix:o.yTickSuffix;
+    return (prefix??"")+(decimals===undefined?fmt(v):v.toFixed(clamp(decimals,0,8)))+(suffix??"");
+  };
   const [realId,imagId,phaseId]=figure.dataRef?.yColumnIds??["lorentz-real","lorentz-imag","lorentz-phase"];
   const series=(id:string)=>dataset.ys.find(q=>q.id===id);
   const palette:Record<string,string>={"lorentz-real":"#305b76","lorentz-imag":"#a44b3d","lorentz-phase":"#674080"};
@@ -68,11 +74,11 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
       {majorX.map(v=><line key={"gx"+v} x1={x(v)} x2={x(v)} y1={top} y2={top+panelHeight}/>)}
       {ys.map(v=><line key={"gy"+v} x1={LEFT} x2={RIGHT} y1={projectY(v)} y2={projectY(v)}/>)}
     </g>}
-    <rect x={LEFT} y={top} width={RIGHT-LEFT} height={panelHeight} fill="none" stroke="#262626" strokeWidth={axisWidth}/>
-    {majorX.map(v=><g key={"x"+v}><path d={"M"+x(v)+" "+top+"v"+majorLen+" M"+x(v)+" "+(top+panelHeight)+"v-"+majorLen} fill="none" stroke="#333" strokeWidth={axisWidth*.8}/>{labels&&<text x={x(v)} y={top+panelHeight+24} textAnchor="middle">{fmt(v)}</text>}</g>)}
-    {minorX.map(v=><path key={"mx"+v} d={"M"+x(v)+" "+top+"v"+minorLen+" M"+x(v)+" "+(top+panelHeight)+"v-"+minorLen} stroke="#333" strokeWidth={axisWidth*.65}/>)}
-    {minorYs.map(v=><path key={"my"+v} d={"M"+LEFT+" "+projectY(v)+"h"+minorLen+" M"+RIGHT+" "+projectY(v)+"h-"+minorLen} stroke="#333" strokeWidth={axisWidth*.65}/>)}
-    {ys.map(v=><g key={"y"+v}><path d={"M"+LEFT+" "+projectY(v)+"h"+majorLen+" M"+RIGHT+" "+projectY(v)+"h-"+majorLen} stroke="#333" strokeWidth={axisWidth*.8}/><text x={LEFT-11} y={projectY(v)+baseSize*.35} textAnchor="end">{labels?fmt(v)+"°":fmt(v)}</text></g>)}
+    {o.frameStyle==="open" ? <path d={"M"+LEFT+" "+top+"V"+(top+panelHeight)+"H"+RIGHT} fill="none" stroke="#39434b" strokeWidth={axisWidth}/> : <rect x={LEFT} y={top} width={RIGHT-LEFT} height={panelHeight} fill="none" stroke="#39434b" strokeWidth={axisWidth}/>}
+    {majorX.map(v=><g key={"x"+v}><path d={"M"+x(v)+" "+top+"v"+(o.tickDirection==="outside"?-majorLen:majorLen)+" M"+x(v)+" "+(top+panelHeight)+"v"+(o.tickDirection==="outside"?majorLen:-majorLen)} fill="none" stroke="#4d5359" strokeWidth={axisWidth*.8}/>{labels&&<text x={x(v)} y={top+panelHeight+25} textAnchor="middle">{axisTick(v,"x")}</text>}</g>)}
+    {minorX.map(v=><path key={"mx"+v} d={"M"+x(v)+" "+top+"v"+(o.tickDirection==="outside"?-minorLen:minorLen)+" M"+x(v)+" "+(top+panelHeight)+"v"+(o.tickDirection==="outside"?minorLen:-minorLen)} stroke="#4d5359" strokeWidth={axisWidth*.65}/>)} 
+    {minorYs.map(v=><path key={"my"+v} d={"M"+LEFT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?-minorLen:minorLen)+" M"+RIGHT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?minorLen:-minorLen)} stroke="#4d5359" strokeWidth={axisWidth*.65}/>)} 
+    {ys.map(v=><g key={"y"+v}><path d={"M"+LEFT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?-majorLen:majorLen)+" M"+RIGHT+" "+projectY(v)+"h"+(o.tickDirection==="outside"?majorLen:-majorLen)} stroke="#4d5359" strokeWidth={axisWidth*.8}/><text x={LEFT-13} y={projectY(v)+baseSize*.35} textAnchor="end">{labels?fmt(v)+"°":axisTick(v,"y")}</text></g>)}
   </g>;
   const curve=(id:string,y:(v:number)=>number)=>{
     const override=figure.seriesOverrides[id];
@@ -174,7 +180,7 @@ export function LorentzFigure({figure,dataset,width,height,svgRef,onSelectSeries
   return <svg ref={svgRef} width={width} height={height} viewBox={"0 0 "+W+" "+H} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FigureStudio Lorentz oscillator editable two-panel scientific figure" style={{display:"block",background:bg,shapeRendering:"geometricPrecision",textRendering:"geometricPrecision"}}>
     <defs><clipPath id="lorentz-top-figure-clip"><rect x={LEFT} y={TOP} width={RIGHT-LEFT} height={panelHeight}/></clipPath><clipPath id="lorentz-bottom-figure-clip"><rect x={LEFT} y={bottomTop} width={RIGHT-LEFT} height={panelHeight}/></clipPath></defs>
     <g fontFamily={font} fontSize={titleFont} fontWeight={c.titleWeight??600} fill={o.plotTitleColor??"#262b30"}><text x={LEFT} y={TOP-13}>{c.topTitle}</text><text x={LEFT} y={bottomTop-14}>{c.bottomTitle}</text></g>
-    {c.bandOpacity>0&&<rect x={x(c.bandStart)} y={TOP} width={x(c.bandEnd)-x(c.bandStart)} height={panelHeight} fill={c.bandColor} opacity={clamp(c.bandOpacity,0,1)}/>}
+    {c.bandOpacity>0&&<rect x={Math.min(x(c.bandStart),x(c.bandEnd))} y={TOP} width={Math.abs(x(c.bandEnd)-x(c.bandStart))} height={panelHeight} fill={c.bandColor} opacity={clamp(c.bandOpacity,0,1)}/>}
     {axis(TOP,majorTop,minorTop,topY,false)}
     <g clipPath="url(#lorentz-top-figure-clip)">
       {curve(realId,topY)}
