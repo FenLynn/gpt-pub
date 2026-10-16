@@ -210,6 +210,17 @@ button:focus-visible{outline:2px solid rgba(76,137,178,.55);outline-offset:2px}
 .analysis-tabs button.active{color:#3e7d9e;font-weight:670}
 .analysis-tabs button.active:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:#79acc6}
 .analysis-body{flex:1;min-height:0;overflow:auto;padding:17px 19px 18px;scrollbar-width:thin;scrollbar-color:#d7e2e9 transparent}
+.analysis-panel{container-type:inline-size}
+.overview-grid{display:grid;grid-template-columns:minmax(230px,.9fr) minmax(300px,1.12fr);gap:29px;align-items:start}
+.overview-summary,.overview-attention{min-width:0}
+.overview-section-title{height:29px;display:flex;align-items:center;font-size:11px;color:#5a6d7e;font-weight:660}
+.overview-attention .analysis-subhead{height:29px;margin:0;align-items:center}
+.overview-trend{margin-top:25px;padding-top:16px;border-top:1px solid #e9eef1}
+.overview-trend-chart{width:100%;height:224px}
+@container(max-width:750px){
+  .overview-grid{grid-template-columns:1fr;gap:15px}
+  .overview-trend{margin-top:20px}
+}
 .overview-status{padding:4px 0 15px;border-bottom:1px solid #e9eef1}
 .status-title{display:flex;align-items:center;gap:9px}
 .status-title strong{font-size:15px;font-weight:680;color:#3b5163}
