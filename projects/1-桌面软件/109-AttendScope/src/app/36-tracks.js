@@ -39,7 +39,7 @@ function mountAttendanceTimeline(a){
   animation:false,grid:{left:76,right:12,top:9,bottom:65},
   tooltip:{trigger:'item',confine:true,formatter:p=>{
    const d=p.data||{};
-   return d.p?'<b>'+d.p.time+'</b> · '+d.p.direction:
+   return d.p?'<b>'+d.p.time+'</b> · '+d.p.direction+(d.count>1?'<div>同分钟 '+d.count+' 条</div>':''):
     '<b>'+(d.title||'区间')+'</b><div>'+minuteText(d.value?.[0]||0)+'–'+minuteText(d.value?.[1]||0)+'</div>';
   }},
   xAxis:{type:'value',min:0,max:1440,interval:240,axisLine:{show:false},axisTick:{show:false},
