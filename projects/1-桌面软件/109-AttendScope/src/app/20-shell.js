@@ -288,6 +288,7 @@ function bindAnalysisPanel(ctx){
   document.querySelectorAll('[data-analysis-tab]').forEach(b=>b.onclick=()=>{state.analysisTab=b.dataset.analysisTab;renderAnalysisPanel()});
   document.querySelectorAll('[data-analysis-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.analysisCell.split('|');if(id&&d)selectCell(id,+d)});document.querySelectorAll('[data-analysis-day]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.analysisDay));
   document.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>showRecord(b.dataset.record));
+  document.querySelectorAll('[data-show-records]').forEach(b=>b.onclick=()=>{state.analysisTab='records';renderAnalysisPanel()});
   document.querySelectorAll('[data-dayrecord]').forEach(b=>b.onclick=()=>showRecord(b.dataset.dayrecord));
   document.querySelectorAll('[data-revise]').forEach(b=>b.onclick=()=>reviseCurrent(b.dataset.revise));
 }
