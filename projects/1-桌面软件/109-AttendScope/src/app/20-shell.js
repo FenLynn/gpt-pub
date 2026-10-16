@@ -79,11 +79,10 @@ function layoutHtml(){
       <section class="side-section state-select-wrap">
         <label for="statusFilter" class="side-label">状态筛选</label>
         <select id="statusFilter" aria-label="状态筛选">
-          <option value="main">默认 · 正常 / 缺勤 / 异常</option>
-          <option value="all">全部</option>
+          <option value="main">常规 · 正常 / 异常 / 缺勤</option>
           <option value="normal">正常</option>
-          <option value="absent">缺勤</option>
           <option value="anomaly">异常</option>
+          <option value="absent">缺勤</option>
           <option value="overtime">加班</option>
           <option value="leave">请假</option>
           <option value="trip">出差</option>
@@ -197,16 +196,20 @@ function renderCalendar(){
 }
 
 function matrixVisible(a){
-  const category=attendanceCategory(a);
-  return state.filter==='all'||(state.filter==='main'
-    ?['normal','absent','anomaly'].includes(category):category===state.filter);
+ const judgment=attendanceJudgment(a);
+ return state.filter==='main'?['normal','anomaly','absent'].includes(judgment):
+   ['trip','leave','outing','overtime'].includes(state.filter)?
+   attendanceBehaviors(a).includes(state.filter):judgment===state.filter;
 }
 function updateMatrixFilter(){
-  document.getElementById('matrix')?.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
-  document.querySelectorAll('.m-cell button[data-cell]').forEach(button=>{
-    const [id,d]=button.dataset.cell.split('|'),a=state.analysis.get(id+'|'+d);
-    button.classList.toggle('filtered-out',!matrixVisible(a));
-  });
+ document.getElementById('matrix')?.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
+ document.querySelectorAll('.m-cell button[data-cell]').forEach(button=>{
+   const [id,d]=button.dataset.cell.split('|'),a=state.analysis.get(id+'|'+d);
+   const selected=state.selection.type==='cell'&&state.selection.employeeId===id&&state.selection.day===+d;
+   const category=matrixCategory(a);
+   button.className='s-'+category+(selected?' selected':'')+(!matrixVisible(a)&&!selected?' filtered-out':'');
+   button.style.setProperty('--status-color',categoryColor(category));
+ });
 }
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
@@ -229,9 +232,9 @@ function renderMatrix(){
       const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
       const selected=state.selection.type==='cell'&&state.selection.employeeId===e.id&&state.selection.day===d;
       const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
-      const category=attendanceCategory(a),cls='s-'+category;
+      const category=matrixCategory(a),cls='s-'+category,behaviors=attendanceBehaviors(a);
       html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''} ${selected?'cell-focus':''} ${Number(e.id.slice(1))%2?'':'row-alt'} day-${dayType(d)}" data-emp="${e.id}" data-day="${d}">
-        <button class="${cls} ${visible?'':'filtered-out'} ${selected?'selected':''}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n${a.status}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${a.marker?`<i class="corner-mark ${a.marker}"></i>`:''}</button>
+        <button class="${cls} ${visible||selected?'':'filtered-out'} ${selected?'selected':''}" style="--status-color:${categoryColor(category)}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n判断：${a.status} · 行为：${behaviors.join(' / ')||'无'}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${behaviors.length?`<i class="corner-mark behavior-${behaviors[0]}"></i>`:''}</button>
       </div>`;
     }
   }
@@ -248,7 +251,7 @@ function renderMatrix(){
   el.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
   document.getElementById('matrixAll').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
   el.querySelectorAll('.m-name[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
-  el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date));
+  el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date,true));
   el.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.cell.split('|');selectCell(id,+d)});
   const hoverRow=el.querySelector('.matrix-preview-frame.focus-row');
   const hoverCol=el.querySelector('.matrix-preview-frame.focus-col');
@@ -313,16 +316,16 @@ function bindAnalysisPanel(ctx){
 }
 
 function selectPerson(id){state.selection={type:'person',employeeId:id};state.chartTab='overview';state.chartDay=nearestRecordedDay(id);state.rawPage=1;render()}
-function selectDate(d){
-  if(d<1||d>monthDays())return;
-  const sel=state.selection;
-  if(sel.type==='person'||sel.type==='cell'){
-    state.selection={type:'cell',employeeId:sel.employeeId,day:d};
-    state.chartDay=d;state.chartTab='timeline';state.timelineRange=null;
-  }else{
-    state.selection={type:'date',day:d};state.chartTab='overview';
-  }
-  state.rawPage=1;render();
+function selectDate(d,allPeople=false){
+ if(d<1||d>monthDays())return;
+ const sel=state.selection;
+ if(!allPeople&&(sel.type==='person'||sel.type==='cell')){
+  state.selection={type:'cell',employeeId:sel.employeeId,day:d};
+  state.chartDay=d;state.chartTab='timeline';state.timelineRange=null;
+ }else{
+  state.selection={type:'date',day:d};state.chartTab='overview';state.chartDay=d;
+ }
+ state.rawPage=1;render();
 }
 function selectCell(id,d){
   if(d<1||d>monthDays())return;
