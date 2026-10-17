@@ -1,5 +1,5 @@
 /* P109 right-hand analysis: filter-aware charting, compact insight and linked raw evidence. */
-let rawTabulator=null,rawDialog=null,rawDialogOrigin=null,rawMove=null;
+let rawTabulator=null,rawDialog=null,rawDialogOrigin=null,rawMove=null,pendingRawHighlight=null;
 const CHART_TABS=[['overview','总览'],['timeline','时间轴'],['stats','统计'],['issues','异常']];
 const FILTER_LABELS={main:'常规',normal:'正常',anomaly:'异常',absent:'缺勤',trip:'出差',leave:'请假',outing:'外出',overtime:'加班'};
 const JUDGMENT_LABELS={normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'};
@@ -171,19 +171,21 @@ function disposeRawTable(){
 }
 function rawEvidenceKey(kind,r){return kind==='attendance'?r.recordId:r.id}
 function clearRawLinkedHighlight(){document.querySelectorAll('.raw-linked-highlight').forEach(el=>el.classList.remove('raw-linked-highlight'))}
+function applyPendingRawHighlight(){
+  if(!pendingRawHighlight||!rawTabulator)return;
+  const {kind,keys}=pendingRawHighlight;
+  const rows=rawTabulator.getRows().filter(r=>keys.has(rawEvidenceKey(kind,r.getData())));
+  if(!rows.length)return;
+  clearRawLinkedHighlight();
+  rows.forEach(r=>r.getElement().classList.add('raw-linked-highlight'));
+  try{rawTabulator.scrollToRow(rows[0],'center',false)}catch(_){}
+  pendingRawHighlight=null;
+}
 function focusRawEvidence(kind,key){
   if(!key)return;
-  const keys=new Set(Array.isArray(key)?key:[key]);
+  pendingRawHighlight={kind,keys:new Set(Array.isArray(key)?key:[key])};
   state.rawDataTab=kind;
   renderRawTable(analysisContext());
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    if(!rawTabulator)return;
-    const rows=rawTabulator.getRows().filter(r=>keys.has(rawEvidenceKey(kind,r.getData())));
-    if(!rows.length)return;
-    clearRawLinkedHighlight();
-    rows.forEach(r=>r.getElement().classList.add('raw-linked-highlight'));
-    try{rawTabulator.scrollToRow(rows[0],'center',false)}catch(_){}
-  }));
 }
 function mountRawTable(ctx){
   mountPlotTabs(ctx);
@@ -228,7 +230,7 @@ function renderRawTable(ctx){
     pagination:false,
     columns,initialSort:kind==='attendance'?[{column:'datetime',dir:'asc'}]:[]
   });
-  rawTabulator.on('tableBuilt',()=>{rawTabulator.redraw(true);clearRawLinkedHighlight()});
+  rawTabulator.on('tableBuilt',()=>{rawTabulator.redraw(true);requestAnimationFrame(applyPendingRawHighlight)});
   rawTabulator.on('rowClick',(event,row)=>{
     if(kind!=='attendance')return;
     const record=row.getData(),day=Number(record.datetime.slice(8,10));
