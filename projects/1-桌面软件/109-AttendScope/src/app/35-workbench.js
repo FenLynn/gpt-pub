@@ -30,13 +30,12 @@ function plotTitle(ctx){
   return currentFilterLabel()+(ctx.type==='person'||ctx.type==='cell'?'每日分布':ctx.type==='date'?'当日分布':'趋势');
 }
 function manualJudgmentHtml(item){
-  const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item),current=attendanceJudgment(item);
+  const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item);
   return '<section class="insight-card status-card">'+
-    '<div class="insight-card-head"><span>状态</span><b class="current-status '+current+'">'+JUDGMENT_LABELS[current]+'</b></div>'+
-    '<div class="judgment-line"><span>初始判断</span><b class="judgment-chip '+initial+'">'+JUDGMENT_LABELS[initial]+'</b></div>'+
-    '<div class="manual-caption"><span>人工判定</span>'+(manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复初始判断">恢复</button>':'')+'</div>'+
+    '<div class="judgment-line auto-line"><span>自动</span><b class="auto-judgment '+initial+'">'+JUDGMENT_LABELS[initial]+'</b></div>'+
+    '<div class="manual-caption"><span>人工</span>'+(manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复自动判断">恢复</button>':'')+'</div>'+
     '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
-      [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>'<button type="button" role="radio" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+JUDGMENT_LABELS[x]+'">'+t+'</button>').join('')+
+      [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>'<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+t+'">'+(manual===x?t:'')+'</button>').join('')+
     '</div>'+
   '</section>';
 }
