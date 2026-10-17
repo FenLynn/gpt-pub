@@ -98,9 +98,9 @@ function mountAttendanceTimeline(a){
    ]};
  };
  const railRender=(params,api)=>{
-   const d=params.data,track=model.tracks[d.value[2]];if(!track)return null;
+   const lane=api.value(2),track=model.tracks[lane];if(!track)return null;
    const key=track.key;if(!['trip','leave','outing','overtime'].includes(key))return null;
-   const p=api.coord([0,d.value[2]]),q=api.coord([1440,d.value[2]]);
+   const p=api.coord([0,lane]),q=api.coord([1440,lane]);
    const active=state.filter===key,rowH=Math.max(22,Math.abs(api.size([0,1])[1])),h=Math.max(8,Math.min(11,rowH*.34));
    return {type:'group',children:[
      {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:h/2},
