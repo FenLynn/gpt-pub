@@ -22,8 +22,25 @@ assert.equal(PUBLICATION_PALETTES["sea-salt-coral"].colors[2],"#F4A7AE");
 assert.equal(PUBLICATION_PALETTES["burgundy-slate"].colors[0],"#713E50");
 assert.ok(templates.some(t=>t.id==="surface-projection-3d"),
   "Three-direction 3D projection must be a first-class template");
+assert.ok(templates.some(t=>t.id==="publication-board"),
+  "Publication Style Board must be a first-class template");
 for (const id of ["pca-ellipse","volcano","ridgeline"] as const) {
   assert.ok(templates.some(t=>t.id===id),id+" must be a first-class scientific template");
+}
+
+const boardProject=createInitialProject(undefined,false);
+const publicationBoards=boardProject.figures.filter(
+  figure=>figure.publicationBoard?.kind==="publication-palette-board"
+);
+assert.equal(publicationBoards.length,7,
+  "Default FigureStudio workspace must expose all seven publication boards");
+assert.equal(boardProject.activeFigureId,publicationBoards[0]?.id,
+  "FigureStudio should open directly on the first publication board");
+for(const [index,board] of publicationBoards.entries()){
+  assert.equal(board.templateId,"publication-board");
+  assert.equal(board.publicationBoard?.boardNumber,index+1);
+  assert.equal(board.figureOverrides.figureWidthMm,183);
+  assert.equal(board.figureOverrides.figureHeightMm,238);
 }
 
 for (const includeVisualQa of [false, true]) {

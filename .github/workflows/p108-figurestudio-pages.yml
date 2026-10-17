@@ -125,6 +125,18 @@ jobs:
             echo "Browser preview $label Plotly Golden OK"
           done
 
+          for board in golden sunny-blue-bamboo mist-blue-celadon sea-salt-coral apricot-haze burgundy-slate nature-aurora; do
+            label="Board-${board}"
+            "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1680,1180 --virtual-time-budget=9000 \
+              --screenshot="$RUNNER_TEMP/p108-screenshots/$label.png" \
+              --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?board=$board" \
+              > "$RUNNER_TEMP/p108-screenshots/$label.html" 2>"$RUNNER_TEMP/p108-screenshots/$label.stderr"
+            test -s "$RUNNER_TEMP/p108-screenshots/$label.png"
+            grep -q 'data-publication-board="true"' "$RUNNER_TEMP/p108-screenshots/$label.html"
+            grep -q "data-palette-id=\"$board\"" "$RUNNER_TEMP/p108-screenshots/$label.html"
+            echo "Browser publication board $board OK"
+          done
+
           for spec in "pca:PCA-Golden" "volcano:Volcano-Golden" "ridgeline:Ridgeline-Golden"; do
             mode="${spec%%:*}"
             label="${spec#*:}"
