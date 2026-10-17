@@ -392,6 +392,96 @@ export function createBarSheet(): DataSheet {
   };
 }
 
+export function createPcaEllipseSheet(): DataSheet {
+  const groups = [
+    { id: "pca-a", name: "Cluster A", cx: -3.0, cy: 1.6, sx: 1.15, sy: 0.72, phase: 0.2 },
+    { id: "pca-b", name: "Cluster B", cx: 3.0, cy: 1.8, sx: 1.05, sy: 0.82, phase: 1.1 },
+    { id: "pca-c", name: "Cluster C", cx: -2.1, cy: -2.2, sx: 0.92, sy: 0.72, phase: 2.0 },
+    { id: "pca-d", name: "Cluster D", cx: 3.2, cy: -2.0, sx: 1.0, sy: 0.68, phase: 2.8 }
+  ];
+  const count = 24;
+  const x: number[] = [];
+  const ys = groups.map(() => [] as Array<number | null>);
+  groups.forEach((group, groupIndex) => {
+    for (let i = 0; i < count; i += 1) {
+      const t = (2 * Math.PI * i) / count + group.phase;
+      const radial = 0.62 + 0.26 * (0.5 + 0.5 * Math.sin(i * 2.37 + groupIndex));
+      const xv = group.cx + group.sx * radial * Math.cos(t) + 0.16 * Math.sin(i * 1.71);
+      const yv = group.cy + group.sy * radial * Math.sin(t) + 0.12 * Math.cos(i * 1.29);
+      x.push(Number(xv.toFixed(4)));
+      ys.forEach((values, index) => values.push(index === groupIndex ? Number(yv.toFixed(4)) : null));
+    }
+  });
+  return {
+    id: id("sheet-pca-ellipse"),
+    name: "PCA 置信椭圆",
+    source: { kind: "embedded" },
+    columns: [
+      { id: "pc1", name: "PC1", unit: "%", role: "X", values: x },
+      ...groups.map((group,index) => ({
+        id: group.id,
+        name: group.name,
+        unit: "%",
+        role: "Y" as const,
+        values: ys[index]
+      }))
+    ]
+  };
+}
+
+export function createVolcanoSheet(): DataSheet {
+  const x: number[] = [];
+  const significance: number[] = [];
+  for (let i = 0; i < 360; i += 1) {
+    const u = (i + 0.5) / 360;
+    const folded = ((i * 97) % 359) / 359;
+    const fc = (folded - 0.5) * 8 + 0.28 * Math.sin(i * 1.73);
+    const centerPenalty = Math.exp(-Math.pow(fc / 1.25, 2));
+    const sig = 0.45 + 0.72 * Math.abs(fc) +
+      2.4 * Math.pow(0.5 + 0.5 * Math.sin(i * 2.11 + u), 2) * (1 - 0.62 * centerPenalty);
+    x.push(Number(fc.toFixed(4)));
+    significance.push(Number(Math.min(9.6, sig).toFixed(4)));
+  }
+  return {
+    id: id("sheet-volcano"),
+    name: "Volcano",
+    source: { kind: "embedded" },
+    columns: [
+      { id: "log2fc", name: "log2 fold change", role: "X", values: x },
+      { id: "neglog10p", name: "-log10(p)", role: "Y", values: significance }
+    ]
+  };
+}
+
+export function createRidgelineSheet(): DataSheet {
+  const x = Array.from({ length: 180 }, (_v,index) =>
+    Number((-4 + (10 * index) / 179).toFixed(4))
+  );
+  const series = Array.from({ length: 6 }, (_v,index) => {
+    const center = -0.8 + index * 0.42;
+    const shoulder = 1.7 - index * 0.16;
+    return {
+      id: "ridge-" + String(index + 1),
+      name: "Group " + String(index + 1),
+      role: "Y" as const,
+      values: x.map((value) => {
+        const main = Math.exp(-0.5 * Math.pow((value - center) / (0.72 + index * 0.035), 2));
+        const secondary = 0.28 * Math.exp(-0.5 * Math.pow((value - shoulder) / 0.58, 2));
+        return Number((main + secondary).toFixed(6));
+      })
+    };
+  });
+  return {
+    id: id("sheet-ridgeline"),
+    name: "Ridgeline",
+    source: { kind: "embedded" },
+    columns: [
+      { id: "ridge-x", name: "Expression level", unit: "log2", role: "X", values: x },
+      ...series
+    ]
+  };
+}
+
 function makeFigure(
   sheet: DataSheet,
   name: string,
@@ -472,6 +562,9 @@ export function createInitialProject(
   const waterfallSheet = createWaterfallSheet();
   const scatterErrorbarSheet = createScatterErrorbarSheet();
   const barSheet = createBarSheet();
+  const pcaEllipseSheet = createPcaEllipseSheet();
+  const volcanoSheet = createVolcanoSheet();
+  const ridgelineSheet = createRidgelineSheet();
   const lorentzSheet = createLorentzSheet();
   const natureDecaySheet = createNatureDecaySheet();
   const natureKineticsSheet = createNatureKineticsSheet();
@@ -511,7 +604,7 @@ export function createInitialProject(
     id: id("book-common"),
     name: "常用图型示例",
     folderId: "folder-experiment",
-    sheets: [doubleYSheet, waterfallSheet]
+    sheets: [doubleYSheet, waterfallSheet, pcaEllipseSheet, volcanoSheet, ridgelineSheet]
   };
 
   const spectrumFigure = makeFigure(
@@ -633,6 +726,58 @@ export function createInitialProject(
       surfaceProjectionContourCount: 12,
       surfaceProjectionLineWidthPt: 0.45,
       surfaceProjectionUseColorMap: true
+    }
+  );
+
+  const pcaFigure = makeFigure(
+    pcaEllipseSheet,
+    "Fig S3 · PCA confidence ellipses",
+    "pca-ellipse",
+    defaults,
+    "folder-paper",
+    {
+      xTitle: "PC1 (37.1%)",
+      yTitle: "PC2 (21.4%)",
+      colorCycle: "sea-salt-coral",
+      legendPosition: "top-right",
+      pcaEllipseScale: 2.15,
+      pcaEllipseFillOpacity: 0.14
+    }
+  );
+
+  const volcanoFigure = makeFigure(
+    volcanoSheet,
+    "Fig S4 · Volcano plot",
+    "volcano",
+    defaults,
+    "folder-paper",
+    {
+      xTitle: "$\\log_2$ fold change",
+      yTitle: "$-\\log_{10}(p)$",
+      colorCycle: "sea-salt-coral",
+      legendVisible: false,
+      volcanoXThreshold: 1,
+      volcanoYThreshold: 1.301,
+      volcanoPointOpacity: 0.62,
+      gridVisible: false
+    }
+  );
+
+  const ridgelineFigure = makeFigure(
+    ridgelineSheet,
+    "Fig S5 · Density ridges",
+    "ridgeline",
+    defaults,
+    "folder-paper",
+    {
+      xTitle: "Expression level ($\\log_2$)",
+      yTitle: "",
+      colorCycle: "mist-blue-celadon",
+      legendVisible: false,
+      ridgelineOffset: 1,
+      ridgelineScale: 0.88,
+      ridgelineFillOpacity: 0.32,
+      gridVisible: false
     }
   );
 
@@ -766,6 +911,9 @@ export function createInitialProject(
       contourFigure,
       surfaceFigure,
       projectedSurfaceFigure,
+      pcaFigure,
+      volcanoFigure,
+      ridgelineFigure,
       ...(includeVisualQa
         ? [
             scatterFigure,
