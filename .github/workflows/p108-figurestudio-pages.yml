@@ -169,8 +169,9 @@ jobs:
           grep -q 'data-interactive3d="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-scene-dragmode="orbit"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-scroll-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
-          grep -q 'data-testid="canvas-pan-toggle"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-testid="surface-3d-interaction"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-canvas-direct-pan="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-canvas-direct-wheel-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
 
           if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"; then
             echo "::error::3D projection template did not render through WebGL"
