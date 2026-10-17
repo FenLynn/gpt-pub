@@ -371,10 +371,10 @@ function r15PunchPreview(a){
     bins.get(bucket)[p.direction==='进'?'in':'out']++;
   }
   const bars=[...bins.values()].map(g=>{
-    const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(12,1.5+total*1.35);
+    const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(10,2+total*1.4);
     return '<span class="r15-punch-stack" style="left:'+left+'%;width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
-      (g.in?'<i class="in" style="height:'+Math.min(18,5+g.in*3)+'px"></i>':'')+
-      (g.out?'<i class="out" style="height:'+Math.min(18,5+g.out*3)+'px"></i>':'')+
+      (g.in?'<i class="in" style="height:'+Math.min(11,3+g.in*2)+'px"></i>':'')+
+      (g.out?'<i class="out" style="height:'+Math.min(11,3+g.out*2)+'px"></i>':'')+
     '</span>';
   }).join('');
   return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+bars+'</div>'+
