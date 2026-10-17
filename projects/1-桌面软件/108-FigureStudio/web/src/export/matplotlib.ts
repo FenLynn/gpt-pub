@@ -132,6 +132,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
+from matplotlib.patches import Ellipse
 from matplotlib.ticker import MultipleLocator, FixedLocator, NullFormatter, FuncFormatter, EngFormatter
 
 P = json.loads(${payloadLiteral})
@@ -793,6 +794,13 @@ else:
 
         y = finite_array(series[key])
         current_x = x.copy()
+        if template == "ridgeline":
+            ridge_offset = max(0.1, float(O.get("ridgelineOffset", 1.0)))
+            ridge_scale = max(0.05, min(3.0, float(O.get("ridgelineScale", 0.88))))
+            finite_y = y[np.isfinite(y)]
+            ridge_max = max(1e-12, float(np.max(finite_y))) if finite_y.size else 1.0
+            ridge_baseline = plotted * ridge_offset
+            y = ridge_baseline + np.maximum(y, 0) / ridge_max * ridge_offset * ridge_scale
         if template == "offset-spectrum":
             y = y + plotted * float(O.get("offsetStep", 5))
         elif template == "waterfall":
@@ -807,6 +815,32 @@ else:
             axis_side = "right"
 
         color = color_for(key, source_index)
+        if template == "volcano":
+            if plotted > 0:
+                continue
+            x_threshold = max(0.0, float(O.get("volcanoXThreshold", 1.0)))
+            y_threshold = max(0.0, float(O.get("volcanoYThreshold", 1.301)))
+            point_alpha = max(0.1, min(1.0, float(O.get("volcanoPointOpacity", 0.62))))
+            neutral = "#aeb5ba"
+            point_colors = []
+            for xv, yv in zip(current_x, y):
+                if not np.isfinite(xv) or not np.isfinite(yv):
+                    point_colors.append(neutral)
+                elif yv >= y_threshold and xv <= -x_threshold:
+                    point_colors.append(palette[0])
+                elif yv >= y_threshold and xv >= x_threshold:
+                    point_colors.append(palette[1 % len(palette)])
+                else:
+                    point_colors.append(neutral)
+            ax.scatter(current_x, y, c=point_colors,
+                       s=float(style.get("markerSizePt", 2.7)) ** 2,
+                       alpha=point_alpha, edgecolors="none")
+            threshold_color = "#697178"
+            ax.axvline(-x_threshold, color=threshold_color, linewidth=0.7, linestyle="--")
+            ax.axvline(x_threshold, color=threshold_color, linewidth=0.7, linestyle="--")
+            ax.axhline(y_threshold, color=threshold_color, linewidth=0.7, linestyle="--")
+            plotted += 1
+            continue
         if template == "double-y":
             if axis_side == "right" and right_axis_color is None:
                 right_axis_color = color
@@ -875,8 +909,8 @@ else:
                     ),
                 )
         else:
-            line_default = template not in ("xy-scatter", "xy-errorbar")
-            marker_default = template in ("xy-scatter", "xy-line-marker", "xy-errorbar")
+            line_default = template not in ("xy-scatter", "xy-errorbar", "pca-ellipse")
+            marker_default = template in ("xy-scatter", "xy-line-marker", "xy-errorbar", "pca-ellipse")
             line_visible = style.get("lineVisible", line_default)
             marker_visible = style.get("markerVisible", marker_default)
             series_name = str(names.get(key, key))
@@ -955,10 +989,40 @@ else:
                 )
             elif template != "xy-errorbar":
                 target.plot(current_x, y, **common)
+                if template == "pca-ellipse":
+                    mask = np.isfinite(current_x) & np.isfinite(y)
+                    px, py = current_x[mask], y[mask]
+                    if len(px) >= 3:
+                        covariance = np.cov(px, py)
+                        values, vectors = np.linalg.eigh(covariance)
+                        order_idx = values.argsort()[::-1]
+                        values, vectors = values[order_idx], vectors[:, order_idx]
+                        ellipse_scale = max(0.25, min(6.0, float(O.get("pcaEllipseScale", 2.45))))
+                        angle = math.degrees(math.atan2(vectors[1,0], vectors[0,0]))
+                        target.add_patch(Ellipse(
+                            (float(np.mean(px)), float(np.mean(py))),
+                            width=2 * ellipse_scale * math.sqrt(max(0.0, float(values[0]))),
+                            height=2 * ellipse_scale * math.sqrt(max(0.0, float(values[1]))),
+                            angle=angle, facecolor=color, edgecolor=color,
+                            alpha=max(0.0, min(0.6, float(O.get("pcaEllipseFillOpacity", 0.14)))),
+                            linewidth=0.7, zorder=0
+                        ))
+                elif template == "ridgeline":
+                    target.fill_between(
+                        current_x, ridge_baseline, y, color=color,
+                        alpha=max(0.0, min(0.8, float(O.get("ridgelineFillOpacity", 0.32)))),
+                        linewidth=0
+                    )
 
         plotted += 1
 
     finish_2d_axes(ax)
+    if template == "ridgeline":
+        ridge_offset = max(0.1, float(O.get("ridgelineOffset", 1.0)))
+        ridge_labels = [str(names.get(key, key)) for key in keys if key in series]
+        ax.set_yticks([index * ridge_offset for index in range(len(ridge_labels))])
+        ax.set_yticklabels(ridge_labels)
+        ax.grid(False, axis="y")
     if template == "double-y" and left_axis_color is not None:
         ax.tick_params(
             axis="y",
