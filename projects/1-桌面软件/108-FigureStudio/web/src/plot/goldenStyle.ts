@@ -82,12 +82,12 @@ export const GOLDEN_STYLE = {
     surfaceDomainY: [0.13, 0.95],
     surfaceCameraEye: { x: 1.34, y: 1.34, z: 0.96 },
     surfaceAspect: { x: 1, y: 1, z: 0.64 },
-    projectionDomainX: [0.015, 0.88],
-    projectionDomainY: [0.045, 0.995],
-    projectionCameraEye: { x: 1.06, y: 1.13, z: 0.73 },
-    projectionAspect: { x: 1.18, y: 1.18, z: 0.76 },
-    projectionColorbarX: 0.915,
-    projectionColorbarLength: 0.74,
+    projectionDomainX: [0.055, 0.86],
+    projectionDomainY: [0.075, 0.98],
+    projectionCameraEye: { x: 1.26, y: 1.32, z: 0.92 },
+    projectionAspect: { x: 1.12, y: 1.12, z: 0.68 },
+    projectionColorbarX: 0.905,
+    projectionColorbarLength: 0.70,
     surfaceAxisTitleScale: 0.82,
     surfaceTickScale: 0.86,
     surfaceLabels: {
@@ -96,19 +96,19 @@ export const GOLDEN_STYLE = {
       z: { x: 0.055, y: 0.55, angle: -90 }
     },
     projectionLabels: {
-      x: { x: 0.68, y: 0.035, angle: -27 },
-      y: { x: 0.20, y: 0.035, angle: 27 },
-      z: { x: 0.025, y: 0.55, angle: -90 }
+      x: { x: 0.70, y: 0.048, angle: -25 },
+      y: { x: 0.23, y: 0.048, angle: 25 },
+      z: { x: 0.050, y: 0.55, angle: -90 }
     },
     contourLinePt: 0.35,
     contourLineColor: "rgba(57,67,75,0.52)",
     planeBackground: "#f8f8f6",
     sceneGridColor: "#d9dde0",
-    projectionWallBackground: "rgba(248,248,246,0.32)",
-    projectionFloorBackground: "rgba(52,142,149,0.92)",
-    projectionGridColor: "rgba(135,145,153,0.30)",
-    projectionFloorGridColor: "rgba(255,255,255,0.72)",
-    projectionLineColor: "rgba(57,67,75,0.62)"
+    projectionWallBackground: "#fbfbfa",
+    projectionFloorBackground: "#f4f6f6",
+    projectionGridColor: "rgba(86,98,106,0.14)",
+    projectionFloorGridColor: "rgba(86,98,106,0.18)",
+    projectionLineColor: "rgba(48,94,109,0.64)"
   },
   bar: {
     borderColor: "rgba(57,67,75,0.34)",

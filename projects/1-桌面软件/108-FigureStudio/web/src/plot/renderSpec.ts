@@ -1684,7 +1684,7 @@ export function buildLayout(args: {
         gridcolor: projectionSurface
           ? GOLDEN_STYLE.field.projectionGridColor
           : GOLDEN_STYLE.field.sceneGridColor,
-        gridwidth: ptToPx(0.4),
+        gridwidth: ptToPx(0.28),
         zeroline: false,
         ticks: tickDirection,
         ticklen: ptToPx(majorTickLengthPt),
@@ -1707,7 +1707,7 @@ export function buildLayout(args: {
         gridcolor: projectionSurface
           ? GOLDEN_STYLE.field.projectionGridColor
           : GOLDEN_STYLE.field.sceneGridColor,
-        gridwidth: ptToPx(0.4),
+        gridwidth: ptToPx(0.28),
         zeroline: false,
         ticks: tickDirection,
         ticklen: ptToPx(majorTickLengthPt),
@@ -1732,7 +1732,7 @@ export function buildLayout(args: {
         gridcolor: projectionSurface
           ? GOLDEN_STYLE.field.projectionFloorGridColor
           : GOLDEN_STYLE.field.sceneGridColor,
-        gridwidth: ptToPx(0.4),
+        gridwidth: ptToPx(0.28),
         zeroline: false,
         ticks: tickDirection,
         ticklen: ptToPx(majorTickLengthPt),

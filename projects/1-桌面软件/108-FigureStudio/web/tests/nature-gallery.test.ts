@@ -246,8 +246,8 @@ for (let n=0; n<gallery.length; n++) {
     "3D publication preview should densify the source grid without mutating source data");
   assert.ok(projectedTraces[0]?.y?.length > projectedDataset.ys.length,
     "3D surface smoothing should increase the rendered Y grid density");
-  assert.equal(projectedTraces[0]?.meta?.figureStudioSurfaceInterpolationFactor,4,
-    "3D sample should use the adjustable four-times publication interpolation");
+  assert.equal(projectedTraces[0]?.meta?.figureStudioSurfaceInterpolationFactor,5,
+    "3D sample should use the adjustable five-times publication interpolation");
   assert.equal(projectedTraces[0]?.lighting?.ambient,0.62);
   assert.equal(projectedTraces[0]?.lighting?.diffuse,0.86);
   assert.equal(projectedTraces[0]?.contours?.z?.project?.z,true,"3D floor projection missing");
@@ -289,11 +289,15 @@ for (let n=0; n<gallery.length; n++) {
   assert.equal(projectedLayout.scene?.yaxis?.backgroundcolor,GOLDEN_STYLE.field.projectionWallBackground,
     "Projected 3D y-wall should stay translucent and visible");
   assert.equal(projectedLayout.scene?.zaxis?.backgroundcolor,GOLDEN_STYLE.field.projectionFloorBackground,
-    "Projected 3D floor should use the reference-like teal plane");
+    "Projected 3D floor should use the neutral publication plane");
   assert.equal(projectedLayout.scene?.zaxis?.gridcolor,GOLDEN_STYLE.field.projectionFloorGridColor,
-    "Projected 3D floor grid should remain pale over the teal plane");
+    "Projected 3D floor grid should remain restrained over the neutral plane");
   assert.equal(projectedSurface!.figureOverrides.surfaceProjectionLineWidthPt,0.72,
     "Projected side-wall contours need visible publication weight");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionContourCount,9,
+    "Projected publication contours should stay sparse enough to avoid visual chatter");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionUseColorMap,false,
+    "Projected wall contours should default to one restrained publication ink");
 
   const surfaceGolden=project.figures.find(f=>f.templateId==="surface-3d");
   assert.ok(surfaceGolden,"Golden defaults must include a 3D scientific surface");
