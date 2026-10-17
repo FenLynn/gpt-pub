@@ -1,4 +1,4 @@
-/* R19 compact audio timeline: scheduled windows are background bands, punches cluster by zoom. */
+/* R22 layered timeline: restore the earlier separated lanes while keeping schedule as background. */
 function r19PunchClusters(a,range,width,lane){
   const span=Math.max(30,range.end-range.start),px=Math.max(240,width||800);
   const mergeMinutes=Math.max(.45,span/px*11);
@@ -10,7 +10,7 @@ function r19PunchClusters(a,range,width,lane){
       if(!group.length)return;
       const values=group.map(p=>minutes(p.time));
       out.push({
-        value:[values.reduce((n,x)=>n+x,0)/values.length,.5,lane],
+        value:[values.reduce((n,x)=>n+x,0)/values.length,lane],
         p:group[0],records:[...group],count:group.length,direction,
         start:Math.min(...values),end:Math.max(...values)
       });
@@ -24,10 +24,6 @@ function r19PunchClusters(a,range,width,lane){
     flush();
   }
   return out.sort((x,y)=>x.value[0]-y.value[0]);
-}
-function r19LaneY(coordSys,lane,count){
-  const pitch=30,total=Math.max(0,(count-1)*pitch);
-  return coordSys.y+(coordSys.height-total)/2+lane*pitch;
 }
 function r19BehaviorVisible(key){
   const behaviorKeys=['trip','leave','outing','overtime'];
@@ -83,44 +79,41 @@ function mountAttendanceTimeline(a){
  let model=r14TrackData(a,range,chart.getWidth());
  const bandRender=(params,api)=>{
    const d=model.bars[params.dataIndex];if(!d)return null;
-   const p=api.coord([api.value(0),.5]),q=api.coord([api.value(1),.5]);
+   const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
    const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0]));
-   const y=r19LaneY(params.coordSys,api.value(2),model.tracks.length);
-   const h=d.track==='actual'?11:7;
-   const children=[{type:'rect',shape:{x,y:y-h/2,width:w,height:h,r:h/2},
-     style:{fill:d.color,opacity:d.track==='actual'?.92:.84,stroke:'rgba(255,255,255,.94)',lineWidth:.65}}];
-   if(w>46)children.push({type:'text',style:{
-     x:x+w-6,y,text:d.title,fill:'#3e5668',font:'600 9px "Segoe UI Variable", sans-serif',
+   const rowH=Math.max(28,Math.abs(api.size([0,1])[1]));
+   const h=d.track==='actual'?Math.max(13,Math.min(16,rowH*.34)):Math.max(8,Math.min(11,rowH*.25));
+   const children=[{type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:h/2},
+     style:{fill:d.color,opacity:d.track==='actual'?.94:.86,stroke:'rgba(255,255,255,.96)',lineWidth:.75,
+       shadowBlur:d.track==='actual'?2:0,shadowColor:'rgba(58,80,96,.10)'}}];
+   if(w>54)children.push({type:'text',style:{
+     x:x+w-7,y:p[1],text:d.title,fill:'#3e5668',font:'600 9px "Segoe UI Variable", sans-serif',
      align:'right',verticalAlign:'middle'
    }});
    return {type:'group',children};
  };
  const eventRender=(params,api)=>{
    const d=model.events[params.dataIndex];if(!d)return null;
-   const x=api.coord([api.value(0),.5])[0],y=r19LaneY(params.coordSys,api.value(2),model.tracks.length);
-   const sign=d.direction==='进'?-1:1,toward=state.prefs.arrowsTowardLine!==false;
-   const count=d.count||1,thickness=Math.min(8,2+Math.log2(Math.max(1,count))*1.8);
-   const len=Math.min(22,14+Math.log2(Math.max(1,count))*2.1);
-   const y0=y+sign*(toward?len:4),y1=y+sign*(toward?2:len);
-   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(3.6,thickness*.64);
+   const p=api.coord([api.value(0),api.value(1)]),sign=d.direction==='进'?-1:1,toward=state.prefs.arrowsTowardLine!==false;
+   const count=d.count||1,thickness=Math.min(9,2.3+Math.log2(Math.max(1,count))*2);
+   const len=Math.min(23,14+Math.log2(Math.max(1,count))*2.35);
+   const y0=p[1]+sign*(toward?len:4),y1=p[1]+sign*(toward?3:len);
+   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4,thickness*.72);
    return {type:'group',children:[
-    {type:'line',shape:{x1:x,y1:y0,x2:x,y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.9}},
-    {type:'polygon',shape:{points:[[x-half,y1+sign*(toward?5:-5)],[x+half,y1+sign*(toward?5:-5)],[x,y1]]},style:{fill:color,opacity:.94}}
+    {type:'line',shape:{x1:p[0],y1:y0,x2:p[0],y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.93}},
+    {type:'polygon',shape:{points:[[p[0]-half,y1+sign*(toward?5.5:-5.5)],[p[0]+half,y1+sign*(toward?5.5:-5.5)],[p[0],y1]]},style:{fill:color,opacity:.96}},
+    {type:'circle',shape:{cx:p[0],cy:p[1],r:Math.min(4.4,2.6+Math.log2(Math.max(1,count))*.55)},
+      style:{stroke:color,fill:'#fff',lineWidth:1.35,opacity:.98}}
    ]};
  };
- const laneRailRender=(params,api)=>{
-   const lane=api.value(2),y=r19LaneY(params.coordSys,lane,model.tracks.length);
-   const x0=api.coord([0,.5])[0],x1=api.coord([1440,.5])[0];
-   return {type:'line',shape:{x1:x0,y1:y,x2:x1,y2:y},style:{stroke:'#edf2f5',lineWidth:1,opacity:.9}};
- };
  const scheduleRender=(params,api)=>{
-   const from=api.value(0),to=api.value(1),x0=api.coord([from,.5])[0],x1=api.coord([to,.5])[0];
-   const first=r19LaneY(params.coordSys,0,model.tracks.length),last=r19LaneY(params.coordSys,Math.max(0,model.tracks.length-1),model.tracks.length);
-   return {type:'rect',shape:{x:Math.min(x0,x1),y:first-14,width:Math.abs(x1-x0),height:Math.max(28,last-first+28),r:3},
-     style:{fill:'rgba(144,164,181,.055)',stroke:'rgba(144,164,181,.09)',lineWidth:.55}};
+   const from=api.value(0),to=api.value(1);
+   const x0=api.coord([from,0])[0],x1=api.coord([to,0])[0],cs=params.coordSys;
+   return {type:'rect',shape:{x:Math.min(x0,x1),y:cs.y+5,width:Math.abs(x1-x0),height:Math.max(10,cs.height-10),r:5},
+     style:{fill:'rgba(144,164,181,.050)',stroke:'rgba(144,164,181,.085)',lineWidth:.6}};
  };
  const option={
-  animation:false,grid:{left:6,right:8,top:9,bottom:76},
+  animation:false,grid:{left:6,right:8,top:10,bottom:86},
   tooltip:{trigger:'item',confine:true,backgroundColor:'#fff',borderColor:'#dce8f1',textStyle:{fontSize:11,color:'#385870'},
    formatter:p=>{
     const d=p.data||{};
@@ -131,26 +124,25 @@ function mountAttendanceTimeline(a){
     return '<b>'+(d.title||'区间')+'</b><div>'+minuteText(d.value?.[0]||0)+'–'+minuteText(d.value?.[1]||0)+'</div>';
    }},
   xAxis:{type:'value',min:0,max:1440,interval:240,axisLine:{show:false},axisTick:{show:false},
-   axisLabel:{fontSize:10,color:'#7f95a6',margin:10,formatter:minuteText},splitLine:{show:true,lineStyle:{type:'dashed',color:'#eef3f6'}}},
-  yAxis:{type:'value',min:0,max:1,show:false},
+   axisLabel:{fontSize:10,color:'#7d93a5',margin:12,formatter:minuteText},
+   splitLine:{show:true,lineStyle:{type:'dashed',color:'#edf2f6'}}},
+  yAxis:{type:'category',inverse:true,data:model.tracks.map(t=>t.key),axisLine:{show:false},axisTick:{show:false},axisLabel:{show:false},
+   splitLine:{show:true,lineStyle:{color:'#edf2f6'}},splitArea:{show:true,areaStyle:{color:['#fbfcfd','#fff']}}},
   dataZoom:[
    {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
-   {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:6,right:8,bottom:12,height:30,
+   {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:6,right:8,bottom:10,height:30,
     minValueSpan:15,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
-    backgroundColor:'#edf3f7',fillerColor:'rgba(210,222,232,.48)',borderColor:'#d9e3ea',
-    handleSize:'82%',handleStyle:{color:'#8ea1b1',borderColor:'#7f94a5'},moveHandleStyle:{color:'#96a9b8',opacity:.55}}
+    backgroundColor:'#f0f5f8',fillerColor:'rgba(205,220,230,.54)',borderColor:'#dce6ed',
+    handleSize:'82%',handleStyle:{color:'#94a7b6',borderColor:'#8399aa'},moveHandleStyle:{color:'#9aabb9',opacity:.48}}
   ],
   series:[
    {id:'schedule',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.workWindows.map(x=>[x[0],x[1]]),renderItem:scheduleRender,z:1},
-   {id:'lane-rails',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
-    data:model.tracks.map((_,i)=>[0,1440,i]),renderItem:laneRailRender,z:2},
    {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.bars,renderItem:bandRender,z:4},
    {id:'event-baseline',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.eventLane>=0?[[0,1440,model.eventLane]]:[],renderItem:(params,api)=>{
-      const y=r19LaneY(params.coordSys,api.value(2),model.tracks.length);
-      const x0=api.coord([0,.5])[0],x1=api.coord([1440,.5])[0];
-      return {type:'line',shape:{x1:x0,y1:y,x2:x1,y2:y},style:{stroke:'#bac8d2',lineWidth:1.05,opacity:.8}};
+      const p=api.coord([0,api.value(2)]),q=api.coord([1440,api.value(2)]);
+      return {type:'line',shape:{x1:p[0],y1:p[1],x2:q[0],y2:q[1]},style:{stroke:'#aebdc8',lineWidth:1.05,opacity:.82}};
     },z:5},
    {id:'punches',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.events,renderItem:eventRender,z:7}
   ]
@@ -173,9 +165,9 @@ function mountAttendanceTimeline(a){
    state.timelineRange={key:range.key,start,end};
    model=r14TrackData(a,state.timelineRange,chart.getWidth());
    chart.setOption({
+    yAxis:{data:model.tracks.map(t=>t.key)},
     series:[
      {id:'schedule',data:model.workWindows.map(x=>[x[0],x[1]])},
-     {id:'lane-rails',data:model.tracks.map((_,i)=>[0,1440,i])},
      {id:'bands',data:model.bars},
      {id:'event-baseline',data:model.eventLane>=0?[[0,1440,model.eventLane]]:[]},
      {id:'punches',data:model.events}
