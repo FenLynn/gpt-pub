@@ -113,3 +113,15 @@ GitHub Pages 的 deploy-pages 每次部署整个站点。P108 与 P109 以前各
 - Trip/leave/outing/overtime colors are distinct; punch colors use a separate neutral palette. Actual attendance bar follows the active judgment color.
 - Chart/timeline evidence links to Tabulator rows with automatic scrolling and highlighted raw records. Demo data includes a single E011 day with all four behavior rails and denser behavior samples overall.
 - Shared Pages must preserve P108 and publish exact P109_SHA above. No Release.
+
+## 2026-10-17 P109 R19 compact timeline and linked evidence polish
+
+- P109 source SHA: `6158fc44b667208b84a8f08d23cb9b58b2035ee7`.
+- Offline Chromium CI: [#38998145675](https://github.com/FenLynn/gpt-pub/actions/runs/38998145675) SUCCESS.
+- Scheduled work is no longer a dedicated track. It is rendered as a faint background window directly inside the timeline, freeing vertical space.
+- Timeline lanes are compact audio-style rails. Dense same-direction punches merge into thicker arrows at broad zoom and split as the user zooms in. The overview strip uses stronger in/out vertical density bars.
+- Actual attendance bars use judgment colors. Trip, leave, outing and overtime retain distinct behavior colors. Punch colors remain separate from judgment/behavior palettes.
+- Clicking linked timeline intervals or punch clusters routes to the corresponding raw-data category and highlights/scrolls the matching Tabulator rows.
+- Person/date selection anchors keep violet tint but enlarge the text instead of scaling the whole header cell, improving alignment with the single crosshair frame.
+- The save-state dot is replaced by a semantic check/exclamation mark. The right inspector remains compact, and the lower raw-data area receives more vertical space.
+- Shared Pages must preserve P108 and publish exact P109_SHA above. No Release.
