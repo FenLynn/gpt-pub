@@ -26,7 +26,7 @@ function r19PunchClusters(a,range,width,lane){
   return out.sort((x,y)=>x.value[0]-y.value[0]);
 }
 function r19LaneY(coordSys,lane,count){
-  const pitch=28,total=Math.max(0,(count-1)*pitch);
+  const pitch=30,total=Math.max(0,(count-1)*pitch);
   return coordSys.y+(coordSys.height-total)/2+lane*pitch;
 }
 function r19BehaviorVisible(key){
@@ -85,11 +85,12 @@ function mountAttendanceTimeline(a){
    const d=model.bars[params.dataIndex];if(!d)return null;
    const p=api.coord([api.value(0),.5]),q=api.coord([api.value(1),.5]);
    const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0]));
-   const y=r19LaneY(params.coordSys,api.value(2),model.tracks.length),h=6;
-   const children=[{type:'rect',shape:{x,y:y-h/2,width:w,height:h,r:3},
-     style:{fill:d.color,opacity:.94,stroke:'rgba(255,255,255,.82)',lineWidth:.55}}];
-   if(w>34)children.push({type:'text',style:{
-     x:x+w-4,y,text:d.title,fill:'#405466',font:'600 9px "Segoe UI Variable", sans-serif',
+   const y=r19LaneY(params.coordSys,api.value(2),model.tracks.length);
+   const h=d.track==='actual'?11:7;
+   const children=[{type:'rect',shape:{x,y:y-h/2,width:w,height:h,r:h/2},
+     style:{fill:d.color,opacity:d.track==='actual'?.92:.84,stroke:'rgba(255,255,255,.94)',lineWidth:.65}}];
+   if(w>46)children.push({type:'text',style:{
+     x:x+w-6,y,text:d.title,fill:'#3e5668',font:'600 9px "Segoe UI Variable", sans-serif',
      align:'right',verticalAlign:'middle'
    }});
    return {type:'group',children};
@@ -98,36 +99,28 @@ function mountAttendanceTimeline(a){
    const d=model.events[params.dataIndex];if(!d)return null;
    const x=api.coord([api.value(0),.5])[0],y=r19LaneY(params.coordSys,api.value(2),model.tracks.length);
    const sign=d.direction==='进'?-1:1,toward=state.prefs.arrowsTowardLine!==false;
-   const count=d.count||1,thickness=Math.min(13,2.4+Math.log2(Math.max(1,count))*3.25);
-   const len=Math.min(24,14+Math.log2(Math.max(1,count))*3);
-   const y0=y+sign*(toward?len:3),y1=y+sign*(toward?1.5:len);
-   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4.5,thickness*.72);
-   const children=[
-    {type:'line',shape:{x1:x,y1:y0,x2:x,y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.96}},
-    {type:'polygon',shape:{points:[[x-half,y1+sign*(toward?6:-6)],[x+half,y1+sign*(toward?6:-6)],[x,y1]]},style:{fill:color,opacity:.98}}
-   ];
-   if(count>1){
-    const text=count>99?'99+':String(count),badgeW=text.length>2?18:14,badgeY=y+(d.direction==='进'?-13:3);
-    children.push({type:'rect',shape:{x:x+5,y:badgeY,width:badgeW,height:11,r:5.5},
-      style:{fill:color,stroke:'#fff',lineWidth:1,opacity:.98}});
-    children.push({type:'text',style:{x:x+5+badgeW/2,y:badgeY+5.5,text,fill:'#fff',
-      font:'700 8px "Segoe UI Variable", sans-serif',align:'center',verticalAlign:'middle'}});
-   }
-   return {type:'group',children};
+   const count=d.count||1,thickness=Math.min(8,2+Math.log2(Math.max(1,count))*1.8);
+   const len=Math.min(22,14+Math.log2(Math.max(1,count))*2.1);
+   const y0=y+sign*(toward?len:4),y1=y+sign*(toward?2:len);
+   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(3.6,thickness*.64);
+   return {type:'group',children:[
+    {type:'line',shape:{x1:x,y1:y0,x2:x,y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.9}},
+    {type:'polygon',shape:{points:[[x-half,y1+sign*(toward?5:-5)],[x+half,y1+sign*(toward?5:-5)],[x,y1]]},style:{fill:color,opacity:.94}}
+   ]};
  };
  const laneRailRender=(params,api)=>{
    const lane=api.value(2),y=r19LaneY(params.coordSys,lane,model.tracks.length);
    const x0=api.coord([0,.5])[0],x1=api.coord([1440,.5])[0];
-   return {type:'line',shape:{x1:x0,y1:y,x2:x1,y2:y},style:{stroke:'#e4ebf0',lineWidth:1,opacity:.9}};
+   return {type:'line',shape:{x1:x0,y1:y,x2:x1,y2:y},style:{stroke:'#edf2f5',lineWidth:1,opacity:.9}};
  };
  const scheduleRender=(params,api)=>{
    const from=api.value(0),to=api.value(1),x0=api.coord([from,.5])[0],x1=api.coord([to,.5])[0];
    const first=r19LaneY(params.coordSys,0,model.tracks.length),last=r19LaneY(params.coordSys,Math.max(0,model.tracks.length-1),model.tracks.length);
    return {type:'rect',shape:{x:Math.min(x0,x1),y:first-14,width:Math.abs(x1-x0),height:Math.max(28,last-first+28),r:3},
-     style:{fill:'rgba(144,164,181,.075)',stroke:'rgba(144,164,181,.13)',lineWidth:.6}};
+     style:{fill:'rgba(144,164,181,.055)',stroke:'rgba(144,164,181,.09)',lineWidth:.55}};
  };
  const option={
-  animation:false,grid:{left:6,right:8,top:7,bottom:62},
+  animation:false,grid:{left:6,right:8,top:9,bottom:76},
   tooltip:{trigger:'item',confine:true,backgroundColor:'#fff',borderColor:'#dce8f1',textStyle:{fontSize:11,color:'#385870'},
    formatter:p=>{
     const d=p.data||{};
@@ -138,14 +131,14 @@ function mountAttendanceTimeline(a){
     return '<b>'+(d.title||'区间')+'</b><div>'+minuteText(d.value?.[0]||0)+'–'+minuteText(d.value?.[1]||0)+'</div>';
    }},
   xAxis:{type:'value',min:0,max:1440,interval:240,axisLine:{show:false},axisTick:{show:false},
-   axisLabel:{fontSize:10,color:'#8296a8',formatter:minuteText},splitLine:{show:true,lineStyle:{type:'dashed',color:'#edf2f5'}}},
+   axisLabel:{fontSize:10,color:'#7f95a6',margin:10,formatter:minuteText},splitLine:{show:true,lineStyle:{type:'dashed',color:'#eef3f6'}}},
   yAxis:{type:'value',min:0,max:1,show:false},
   dataZoom:[
    {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
-   {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:6,right:8,bottom:13,height:30,
+   {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:6,right:8,bottom:12,height:30,
     minValueSpan:15,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
-    backgroundColor:'#aeb7c1',fillerColor:'rgba(239,242,246,.94)',borderColor:'#aab5c0',
-    handleSize:'88%',handleStyle:{color:'#647487',borderColor:'#647487'},moveHandleStyle:{color:'#738397',opacity:.68}}
+    backgroundColor:'#edf3f7',fillerColor:'rgba(210,222,232,.48)',borderColor:'#d9e3ea',
+    handleSize:'82%',handleStyle:{color:'#8ea1b1',borderColor:'#7f94a5'},moveHandleStyle:{color:'#96a9b8',opacity:.55}}
   ],
   series:[
    {id:'schedule',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
@@ -157,7 +150,7 @@ function mountAttendanceTimeline(a){
     data:model.eventLane>=0?[[0,1440,model.eventLane]]:[],renderItem:(params,api)=>{
       const y=r19LaneY(params.coordSys,api.value(2),model.tracks.length);
       const x0=api.coord([0,.5])[0],x1=api.coord([1440,.5])[0];
-      return {type:'line',shape:{x1:x0,y1:y,x2:x1,y2:y},style:{stroke:'#8897a6',lineWidth:1.25,opacity:.82}};
+      return {type:'line',shape:{x1:x0,y1:y,x2:x1,y2:y},style:{stroke:'#bac8d2',lineWidth:1.05,opacity:.8}};
     },z:5},
    {id:'punches',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.events,renderItem:eventRender,z:7}
   ]
