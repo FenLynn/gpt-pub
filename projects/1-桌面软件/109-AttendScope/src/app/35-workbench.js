@@ -52,21 +52,23 @@ function setManualStatusForCurrent(status){
 }
 function timelineLegendHtml(item){
   const judgment=attendanceJudgment(item);
-  const behaviors=behaviorFilterActive()?[state.filter]:[];
   return '<div class="timeline-top-legend">'+
     (isWorkday(item.day)?'<span class="legend-schedule"><i></i>工作时段</span>':'')+
     '<span class="legend-event in"><i></i>进</span><span class="legend-event out"><i></i>出</span>'+
     '<span class="legend-band judgment '+judgment+'"><i></i>'+JUDGMENT_LABELS[judgment]+'</span>'+
-    behaviors.map(k=>'<span class="legend-band '+k+'"><i></i>'+FILTER_LABELS[k]+'</span>').join('')+
   '</div>';
+}
+function timelineHeaderToolsHtml(ctx){
+  if((state.chartTab||'overview')!=='timeline')return '';
+  const day=plotAnalysis(ctx);if(!day)return '';
+  const switcher='<select id="timelineDayPicker" aria-label="时间轴日期">'+
+    Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
+  '</select>';
+  return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+switcher+'</div>';
 }
 function attendPlotHtml(ctx){
   const tab=state.chartTab||'overview',day=plotAnalysis(ctx);
-  const switcher=tab==='timeline'&&day?'<select id="timelineDayPicker" aria-label="时间轴日期">'+
-    Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+'</select>':'';
-  const heading=tab==='timeline'&&day
-    ?'<div class="plot-heading timeline-heading">'+timelineLegendHtml(day)+switcher+'</div>'
-    :'<div class="plot-heading"><strong>'+plotTitle(ctx)+'</strong></div>';
+  const heading=tab==='timeline'&&day?'':'<div class="plot-heading"><strong>'+plotTitle(ctx)+'</strong></div>';
   const top='<div class="chart-mode-tabs">'+CHART_TABS.map(([id,label])=>
     '<button data-chart-tab="'+id+'" class="'+(tab===id?'active':'')+'">'+label+'</button>').join('')+'</div>'+heading;
   if(tab==='issues')return top+'<div id="issueChart" class="plot-chart"></div>';
@@ -106,17 +108,23 @@ function timelineBehaviorSummaryRow(item,key){
   return '<div class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){
-  let out=manualJudgmentHtml(item);
-  out+='<section class="insight-card metric-card attendance-card"><div class="insight-card-head"><span>考勤记录</span><b>'+item.punches.length+' 条</b></div><div class="insight-metric-list">'+
+  const selected=state.insightTab==='behavior'?'behavior':'summary';
+  let summary=manualJudgmentHtml(item);
+  summary+='<section class="insight-flat-section attendance-card"><div class="insight-card-head"><span>考勤记录</span><b>'+item.punches.length+' 条</b></div><div class="insight-metric-list">'+
     insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
     insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
     insightMetric('在岗',fmtMinutes(item.presence))+
   '</div></section>';
-  out+='<section class="insight-card behavior-summary-card"><div class="insight-card-head"><span>行为区间</span><b>全天</b></div>'+
+  if(item.issues.length)summary+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
+  const behavior='<section class="insight-flat-section behavior-summary-card"><div class="insight-card-head"><span>行为区间</span><b>全天</b></div>'+
     ['trip','leave','outing','overtime'].map(key=>timelineBehaviorSummaryRow(item,key)).join('')+
   '</section>';
-  if(item.issues.length)out+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
-  return out;
+  return '<div class="insight-tabs" role="tablist">'+
+    '<button type="button" data-insight-tab="summary" class="'+(selected==='summary'?'active':'')+'" role="tab" aria-selected="'+(selected==='summary')+'">概况</button>'+
+    '<button type="button" data-insight-tab="behavior" class="'+(selected==='behavior'?'active':'')+'" role="tab" aria-selected="'+(selected==='behavior')+'">行为</button>'+
+  '</div>'+
+  '<div class="insight-pane '+(selected==='summary'?'active':'')+'" data-insight-pane="summary">'+summary+'</div>'+
+  '<div class="insight-pane '+(selected==='behavior'?'active':'')+'" data-insight-pane="behavior">'+behavior+'</div>';
 }
 function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx),view=analysisViewItems(ctx);
