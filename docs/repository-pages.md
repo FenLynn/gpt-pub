@@ -102,3 +102,14 @@ GitHub Pages 的 deploy-pages 每次部署整个站点。P108 与 P109 以前各
 - Removed the nested violet borders on the selected employee/date anchors. Name/date now use a violet tint only; the row/column crosshair supplies the single outer violet outline.
 - The tint and outline deliberately use different violet strengths to preserve hierarchy without double framing. Existing single-cell float/glow, judgment/behavior palettes and timeline remain unchanged.
 - Shared Pages must preserve P108 and publish exact P109_SHA above.
+
+## 2026-10-17 P109 R18 filter-linked analysis, manual judgment, adaptive audio timeline
+
+- P109 source SHA: `2192410aa2720c8c1bba07d942257c7e1e47865a`.
+- Offline Chromium CI: [#38996237062](https://github.com/FenLynn/gpt-pub/actions/runs/38996237062) SUCCESS.
+- Left status/behavior filter now drives the right overview, statistics and raw-data category. The inspector header is 33 px and the right summary rail is reduced to about 122 px.
+- Judgment and behavior remain orthogonal. Manual red/yellow/green overrides are month-persistent, can switch between initial/manual views, and optionally show a ✓ marker (enabled by default).
+- Timeline uses maximum horizontal width: scheduled reference above, punch baseline in the middle, attendance/behavior bars below. Nearby punches merge adaptively into thicker arrows at broad zoom and split when zoomed in; the 0:00–24:00 overview uses separate in/out vertical bars.
+- Trip/leave/outing/overtime colors are distinct; punch colors use a separate neutral palette. Actual attendance bar follows the active judgment color.
+- Chart/timeline evidence links to Tabulator rows with automatic scrolling and highlighted raw records. Demo data includes a single E011 day with all four behavior rails and denser behavior samples overall.
+- Shared Pages must preserve P108 and publish exact P109_SHA above. No Release.
