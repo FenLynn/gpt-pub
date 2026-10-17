@@ -112,6 +112,7 @@ function layoutHtml(){
         <section class="analysis-panel">
           <div class="analysis-head">
             <h2 id="analysisTitle">月度总览</h2>
+            <div class="analysis-head-tools" id="analysisHeadTools"></div>
           </div>
 
           <div class="analysis-body" id="analysisBody"></div>
@@ -335,6 +336,8 @@ function renderAnalysisPanel(){
   document.getElementById('analysisTitle').innerHTML=(ctx.employee
     ?'<span class="head-date">'+(ctx.type==='cell'?isoDate(ctx.day):monthKey())+'</span><button class="head-group" data-edit-group="'+ctx.employee.id+'" title="点击编辑组别">'+escapeNameChar(groupOf(ctx.employee))+' ✎</button><strong>'+escapeNameChar(ctx.employee.name)+'</strong>'
     :'<span class="head-date">'+escapeNameChar(ctx.title)+'</span>');
+  const headTools=document.getElementById('analysisHeadTools');
+  if(headTools)headTools.innerHTML=typeof timelineHeaderToolsHtml==='function'?timelineHeaderToolsHtml(ctx):'';
   if(typeof disposeRawTable==='function')disposeRawTable();
   body.innerHTML=attendWorkbenchHtml(ctx);
   bindAnalysisPanel(ctx);
@@ -359,6 +362,14 @@ function bindAnalysisPanel(ctx){
   document.querySelectorAll('[data-revise]').forEach(b=>b.onclick=()=>reviseCurrent(b.dataset.revise));
   document.querySelectorAll('[data-manual-status]').forEach(b=>b.onclick=()=>setManualStatusForCurrent(b.dataset.manualStatus));
   document.querySelectorAll('[data-manual-clear]').forEach(b=>b.onclick=()=>setManualStatusForCurrent(null));
+  document.querySelectorAll('[data-insight-tab]').forEach(b=>b.onclick=()=>{
+    state.insightTab=b.dataset.insightTab;
+    document.querySelectorAll('[data-insight-tab]').forEach(x=>{
+      const active=x.dataset.insightTab===state.insightTab;
+      x.classList.toggle('active',active);x.setAttribute('aria-selected',String(active));
+    });
+    document.querySelectorAll('[data-insight-pane]').forEach(x=>x.classList.toggle('active',x.dataset.insightPane===state.insightTab));
+  });
 }
 
 function selectPerson(id){state.selection={type:'person',employeeId:id};state.chartTab='overview';state.chartDay=nearestRecordedDay(id);state.rawPage=1;render()}
