@@ -793,8 +793,46 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.figure-actions .canvas-pan-toggle {
+  border: 1px solid #d6dce1;
+  background: #fff;
+}
+
+.figure-actions .canvas-pan-toggle.is-active {
+  border-color: #8ca3b6;
+  background: #e6eef4;
+  color: #294f6b;
+  box-shadow: inset 0 0 0 1px rgba(74, 105, 130, 0.08);
+}
+
+.surface-interaction-hint {
+  display: inline-flex;
+  height: calc(26px * var(--ui-scale));
+  align-items: center;
+  padding: 0 calc(7px * var(--ui-scale));
+  border: 1px solid #c9d7e2;
+  border-radius: 999px;
+  background: #edf4f8;
+  color: #446d8c;
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .plot-host {
   display: block;
+}
+
+.plot-host.is-interactive-3d,
+.plot-host.is-interactive-3d .gl-container,
+.plot-host.is-interactive-3d canvas {
+  cursor: grab;
+}
+
+.plot-host.is-interactive-3d:active,
+.plot-host.is-interactive-3d .gl-container:active,
+.plot-host.is-interactive-3d canvas:active {
+  cursor: grabbing;
 }
 
 /* Publication preview: favor precise SVG geometry over browser speed hints. */

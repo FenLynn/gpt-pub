@@ -1414,7 +1414,11 @@ export function buildLayout(args: {
       : undefined,
     showlegend: effectiveLegendVisible,
     hovermode: "closest",
-    dragmode: figure.templateId === "surface-3d" ? "orbit" : "zoom",
+    dragmode:
+      figure.templateId === "surface-3d" ||
+      figure.templateId === "surface-projection-3d"
+        ? "orbit"
+        : "zoom",
     uirevision: figure.id,
     font: {
       family: fontFamily,
@@ -1515,6 +1519,8 @@ export function buildLayout(args: {
         };
     layout.scene = {
       bgcolor: background,
+      dragmode: "orbit",
+      uirevision: figure.id,
       domain: {
         x: [...(projectionSurface
           ? GOLDEN_STYLE.field.projectionDomainX

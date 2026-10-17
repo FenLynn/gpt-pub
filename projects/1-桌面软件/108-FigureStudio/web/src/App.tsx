@@ -482,6 +482,7 @@ function App() {
   const plotRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const plotCameraRef = useRef<Record<string, any>>({});
   const canvasPanRef = useRef<{
     pointerId: number;
     clientX: number;
@@ -528,6 +529,7 @@ function App() {
   const [previewScale, setPreviewScale] = useState(1);
   const [canvasZoom, setCanvasZoom] = useState(readInitialCanvasZoom);
   const [canvasPanReady, setCanvasPanReady] = useState(false);
+  const [canvasPanLocked, setCanvasPanLocked] = useState(false);
   const [canvasPanning, setCanvasPanning] = useState(false);
   const [rendererMode, setRendererMode] = useState<"precision" | "plotly">(
     () => localStorage.getItem(RENDER_MODE_KEY) === "plotly" ? "plotly" : "precision"
@@ -852,6 +854,12 @@ function App() {
   }, [activeFigure?.id, orderedSeries, selectedSeriesIds]);
 
   useEffect(() => {
+    setCanvasPanLocked(false);
+    setCanvasPanning(false);
+    canvasPanRef.current = null;
+  }, [activeFigure?.id]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const command = event.ctrlKey || event.metaKey;
       if (!command) return;
@@ -952,11 +960,30 @@ function App() {
     const node = plotRef.current as any;
     if (!node || !activeFigure || usePrecision) return;
 
+    const interactive3D =
+      activeFigure.templateId === "surface-3d" ||
+      activeFigure.templateId === "surface-projection-3d";
+    const savedCamera = interactive3D
+      ? plotCameraRef.current[activeFigure.id]
+      : undefined;
+    const interactiveLayout =
+      interactive3D && savedCamera
+        ? {
+            ...layout,
+            scene: {
+              ...layout.scene,
+              camera: savedCamera
+            }
+          }
+        : layout;
+
     const config = {
       responsive: false,
       displaylogo: false,
       displayModeBar: false,
-      scrollZoom: activeFigure.templateId !== "surface-3d",
+      scrollZoom: true,
+      staticPlot: false,
+      doubleClick: "reset+autosize",
       editable: false,
       edits: {
         annotationPosition: false,
@@ -990,7 +1017,13 @@ function App() {
 
     let cancelled = false;
 
-    Plotly.react(node, traces, layout, config).then(() => {
+    node.dataset.interactive3d = interactive3D ? "true" : "false";
+    node.dataset.sceneDragmode = interactive3D
+      ? String(interactiveLayout.scene?.dragmode ?? "orbit")
+      : "";
+    node.dataset.scrollZoom = "true";
+
+    Plotly.react(node, traces, interactiveLayout, config).then(() => {
       if (cancelled) return;
 
       node.removeAllListeners?.("plotly_click");
@@ -1021,6 +1054,21 @@ function App() {
       });
 
       node.on?.("plotly_relayout", (event: Record<string, unknown>) => {
+        const changedCamera =
+          interactive3D &&
+          Object.keys(event).some(
+            (key) => key === "scene.camera" || key.startsWith("scene.camera.")
+          );
+        if (changedCamera) {
+          const liveCamera = node?._fullLayout?.scene?.camera;
+          if (liveCamera) {
+            plotCameraRef.current[activeFigure.id] = JSON.parse(
+              JSON.stringify(liveCamera)
+            );
+            node.dataset.cameraPersisted = "true";
+          }
+        }
+
         const changedLegend =
           typeof event["legend.x"] === "number" ||
           typeof event["legend.y"] === "number" ||
@@ -1080,6 +1128,9 @@ function App() {
 
     return () => {
       cancelled = true;
+      delete node.dataset.interactive3d;
+      delete node.dataset.sceneDragmode;
+      delete node.dataset.scrollZoom;
       node.removeAllListeners?.("plotly_click");
       node.removeAllListeners?.("plotly_legendclick");
       node.removeAllListeners?.("plotly_relayout");
@@ -2172,6 +2223,7 @@ function App() {
       activeFigure.templateId === "surface-3d" ||
       activeFigure.templateId === "surface-projection-3d"
     ) {
+      delete plotCameraRef.current[activeFigure.id];
       await Plotly.relayout(plotRef.current, {
         "scene.camera": {
           eye: {
@@ -3218,6 +3270,29 @@ function App() {
                       1:1
                     </button>
                   </span>
+                  <button
+                    type="button"
+                    className={"canvas-pan-toggle" + (canvasPanLocked ? " is-active" : "")}
+                    data-testid="canvas-pan-toggle"
+                    aria-pressed={canvasPanLocked}
+                    title={
+                      surfaceTemplate
+                        ? "拖动整个画布；关闭时左键可旋转 3D。也可随时按空格+左键或中键拖动画布"
+                        : "拖动整个画布；也可随时按空格+左键或中键拖动"
+                    }
+                    onClick={() => setCanvasPanLocked((value) => !value)}
+                  >
+                    画布拖动
+                  </button>
+                  {surfaceTemplate && (
+                    <span
+                      className="surface-interaction-hint"
+                      data-testid="surface-3d-interaction"
+                      title="3D 交互：左键拖动旋转，滚轮缩放；画布移动请用“画布拖动”或空格/中键"
+                    >
+                      3D：左键旋转 · 滚轮缩放
+                    </span>
+                  )}
                   <button type="button" onClick={() => void resetView()}>重置</button>
                   <button type="button" onClick={() => void exportFigure("svg")}>SVG</button>
                   <button type="button" onClick={() => void exportFigure("png")}>PNG</button>
@@ -3242,17 +3317,22 @@ function App() {
                 ref={canvasRef}
                 className={
                   "canvas-area" +
-                  (canvasPanReady ? " is-pan-ready" : "") +
+                  (canvasPanReady || canvasPanLocked ? " is-pan-ready" : "") +
                   (canvasPanning ? " is-panning" : "")
                 }
                 data-canvas-zoom={canvasZoom.toFixed(2)}
                 data-canvas-display-scale={displayScale.toFixed(2)}
                 data-canvas-pan-ready={canvasPanReady ? "true" : "false"}
-                title="Ctrl/⌘ + 滚轮缩放 · 空格 + 左键拖动或中键拖动画布"
+                data-canvas-pan-locked={canvasPanLocked ? "true" : "false"}
+                title={
+                  surfaceTemplate && !canvasPanLocked
+                    ? "3D：左键旋转 · 滚轮缩放 · Ctrl/⌘+滚轮缩放画布 · 空格/中键移动画布"
+                    : "Ctrl/⌘ + 滚轮缩放画布 · 空格 + 左键 / 中键 / 画布拖动开关"
+                }
                 onPointerDownCapture={(event) => {
                   const shouldPan =
                     event.button === 1 ||
-                    (event.button === 0 && canvasPanReady);
+                    (event.button === 0 && (canvasPanReady || canvasPanLocked));
                   if (!shouldPan) return;
                   const node = canvasRef.current;
                   if (!node) return;
@@ -3391,7 +3471,8 @@ function App() {
                     ) : (
                       <div
                         ref={plotRef}
-                        className="plot-host"
+                        className={"plot-host" + (surfaceTemplate ? " is-interactive-3d" : "")}
+                        data-3d-interactive={surfaceTemplate ? "true" : "false"}
                         style={{
                           width: layout.width + "px",
                           height: layout.height + "px"

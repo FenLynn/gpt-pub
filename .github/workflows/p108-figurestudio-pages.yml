@@ -165,6 +165,13 @@ jobs:
             > "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html" 2>"$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.stderr"
           test -s "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.png"
           grep -q 'Surface with three-direction contour projections' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-3d-interactive="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-interactive3d="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-scene-dragmode="orbit"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-scroll-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-testid="canvas-pan-toggle"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-testid="surface-3d-interaction"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+
           if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"; then
             echo "::error::3D projection template did not render through WebGL"
             tail -n 30 "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.stderr" || true
