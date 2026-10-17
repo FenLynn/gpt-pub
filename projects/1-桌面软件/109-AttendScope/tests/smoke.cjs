@@ -40,8 +40,8 @@ async function run(){
  await check(page,()=>{
    const head=document.querySelector('.analysis-head').getBoundingClientRect();
    const insight=document.querySelector('.inspector-insight').getBoundingClientRect();
-   return head.height<=35&&insight.width>=162&&insight.width<=174;
- },'Right title or R24 insight geometry regressed');
+   return head.height<=35&&insight.width>=148&&insight.width<=160;
+ },'Right title or R25 compact insight geometry regressed');
  const countBefore=await page.evaluate(()=>document.querySelectorAll('.m-cell button.filtered-out').length);
  if(countBefore<25)throw Error('Default main status filter not active');
  await page.locator('#statusFilter').selectOption('trip');
@@ -123,7 +123,7 @@ async function run(){
      parseFloat(getComputedStyle(cross).opacity)>.5&&
      parseFloat(getComputedStyle(focus).opacity)>.95;
  },'Matrix focus should dim unrelated cells and preserve the selected cross');
- await page.screenshot({path:path.join(out,'r24-primary-timeline.png')});
+ await page.screenshot({path:path.join(out,'r25-primary-timeline.png')});
  await check(page,()=>{
   const data=r14TrackData(plotAnalysis(analysisContext())),tr=data.tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
@@ -151,11 +151,13 @@ async function run(){
   const keys=data.tracks.map(t=>t.key);
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
     JSON.stringify(keys)===JSON.stringify(['in','out','trip','leave','outing','overtime'])&&data.workWindows.length===2&&
-    zoom.filter(z=>z.type==='slider').length===1&&slider.height===34&&
-    slider.backgroundColor==='#e9edf0'&&slider.fillerColor==='#ffffff'&&
+    zoom.filter(z=>z.type==='slider').length===1&&slider.height===34&&slider.handleSize==='100%'&&
     ticks.length===5&&barHeight>=previewHeight-1&&opt.grid[0].left===12&&opt.grid[0].right===12&&
-    slider.left===12&&slider.right===12&&opt.grid[0].bottom>=104&&opt.yAxis[0].type==='category';
- },'R24 six lanes, aligned gray-white zoom or external ruler failed');
+    slider.left===12&&slider.right===12&&opt.grid[0].bottom>=104&&opt.yAxis[0].type==='category'&&
+    !!document.querySelector('.analysis-head-tools #timelineDayPicker')&&
+    document.querySelectorAll('.analysis-head-tools .timeline-top-legend span').length>=4&&
+    getComputedStyle(preview,'::before').top!=='auto';
+ },'R25 six lanes, aligned overview, centered divider or title-bar tools failed');
 
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
@@ -205,7 +207,7 @@ async function run(){
      radios.filter(x=>x.getAttribute('aria-checked')==='true').length===1&&
      radios.find(x=>x.dataset.manualStatus==='absent')?.classList.contains('active');
  },manualTarget,'Manual segmented judgment/check mark failed');
- await page.screenshot({path:path.join(out,'r24-manual-segment.png')});
+ await page.screenshot({path:path.join(out,'r25-manual-segment.png')});
  await page.locator('[data-judgment-mode="initial"]').click();
  await check(page,({id,day})=>{
    const cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
@@ -228,14 +230,19 @@ async function run(){
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,()=>{
    const keys=r14TrackData(state.analysis.get('E011|23')).tracks.map(t=>t.key),insight=document.querySelector('.inspector-insight');
-   const rows=[...insight.querySelectorAll('.insight-behavior-row')];
    return JSON.stringify(keys)===JSON.stringify(['in','out','trip','leave','outing','overtime'])&&
-     insight?.querySelector('.insight-heading strong')?.textContent==='个人'&&
-     rows.length===4&&['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
-     rows.find(r=>r.classList.contains('leave'))?.classList.contains('active')&&
-     ['首进','末出','在岗'].every(k=>[...insight.querySelectorAll('.insight-row span')].some(x=>x.textContent===k));
- },'Behavior filter must preserve the complete personal timeline summary');
- await page.screenshot({path:path.join(out,'r24-leave-timeline.png')});
+     insight.querySelectorAll('[data-insight-tab]').length===2&&
+     document.querySelector('[data-insight-pane="summary"]')?.classList.contains('active')&&
+     ['首进','末出','在岗'].every(k=>[...insight.querySelectorAll('[data-insight-pane="summary"] .insight-row span')].some(x=>x.textContent===k));
+ },'Behavior filter must keep complete personal summary and compact insight tabs');
+ await page.locator('[data-insight-tab="behavior"]').click();
+ await check(page,()=>{
+   const pane=document.querySelector('[data-insight-pane="behavior"]'),rows=[...pane.querySelectorAll('.insight-behavior-row')];
+   return pane.classList.contains('active')&&rows.length===4&&
+     ['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
+     rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
+ },'Behavior insight tab did not expose all four intervals');
+ await page.screenshot({path:path.join(out,'r25-leave-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
  // A stress day should merge close punches at wide range and split them naturally as the time window narrows.
@@ -323,7 +330,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R24',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R25',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
