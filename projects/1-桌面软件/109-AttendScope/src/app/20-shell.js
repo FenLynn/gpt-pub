@@ -289,6 +289,10 @@ function renderMatrix(){
   html+='<div class="matrix-preview-frame focus-row inactive"></div><div class="matrix-preview-frame focus-col inactive"></div>';
   el.innerHTML=html;
   el.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
+  el.classList.remove('focus-person','focus-date','focus-cell');
+  if(state.selection.type==='person')el.classList.add('focus-person');
+  if(state.selection.type==='date')el.classList.add('focus-date');
+  if(state.selection.type==='cell')el.classList.add('focus-cell');
   document.getElementById('matrixAll').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
   el.querySelectorAll('.m-name[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
   el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date,true));
