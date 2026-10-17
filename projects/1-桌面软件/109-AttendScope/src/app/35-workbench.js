@@ -33,9 +33,10 @@ function manualJudgmentHtml(item){
   const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item);
   return '<div class="manual-judgment">'+
     '<div class="judgment-line"><span>初始</span><b class="judgment-chip '+initial+'">'+JUDGMENT_LABELS[initial]+'</b></div>'+
-    '<div class="judgment-line"><span>人工</span><div class="manual-status-buttons">'+
-      [['normal','正'],['anomaly','异'],['absent','缺']].map(([x,t])=>'<button type="button" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+JUDGMENT_LABELS[x]+'">'+t+'</button>').join('')+
-      (manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复初始判断">×</button>':'')+
+    '<div class="judgment-line manual-line"><span>人工</span><div class="manual-status-wrap">'+
+      '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
+      [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>'<button type="button" role="radio" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+JUDGMENT_LABELS[x]+'">'+t+'</button>').join('')+
+      '</div>'+(manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复初始判断">恢复</button>':'')+
     '</div></div></div>';
 }
 function setManualStatusForCurrent(status){
@@ -373,10 +374,11 @@ function r15PunchPreview(a){
   const bars=[...bins.values()].map(g=>{
     const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(10,2+total*1.4);
     return '<span class="r15-punch-stack" style="left:'+left+'%;width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
-      (g.in?'<i class="in" style="height:'+Math.min(11,3+g.in*2)+'px"></i>':'')+
-      (g.out?'<i class="out" style="height:'+Math.min(11,3+g.out*2)+'px"></i>':'')+
+      (g.in?'<i class="in"></i>':'')+
+      (g.out?'<i class="out"></i>':'')+
     '</span>';
   }).join('');
-  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+bars+'</div>'+
-         '<div class="r14-day-edges"><span>0:00</span><span>24:00</span></div>';
+  const ticks=[[0,'0:00','start'],[360,'6:00',''],[720,'12:00',''],[1080,'18:00',''],[1440,'24:00','end']]
+    .map(([m,t,edge])=>'<span class="r15-mini-tick '+edge+'" style="left:'+(m/1440*100)+'%">'+t+'</span>').join('');
+  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+bars+ticks+'</div>';
 }
