@@ -842,7 +842,7 @@ export function buildTraces(args: {
       type: "surface",
       x: denseSurface.x,
       y: denseSurface.y,
-      z: denseSurface.y.map(() => denseSurface.x.map(() => floorZ)),
+      z: denseSurface.y.map(() => denseSurface.x.map(() => floorZ + zSpan * 0.006)),
       surfacecolor: denseSurface.z,
       colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
       reversescale: figure.figureOverrides.reverseColorScale ?? false,
@@ -850,7 +850,7 @@ export function buildTraces(args: {
       cmin: zLow,
       cmax: zHigh,
       showscale: false,
-      opacity: 0.18,
+      opacity: 0.26,
       hoverinfo: "skip",
       meta: {
         figureStudioProjectionPlane: "floor",

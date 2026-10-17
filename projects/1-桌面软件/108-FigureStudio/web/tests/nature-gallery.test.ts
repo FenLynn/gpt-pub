@@ -255,7 +255,7 @@ for (let n=0; n<gallery.length; n++) {
   assert.equal(projectedTraces[1]?.type,"surface","Soft floor projection plane missing");
   assert.equal(projectedTraces[1]?.meta?.figureStudioProjectionPlane,"floor");
   assert.equal(projectedTraces[1]?.meta?.figureStudioProjectionStyle,"soft-scalar");
-  assert.equal(projectedTraces[1]?.opacity,0.18);
+  assert.equal(projectedTraces[1]?.opacity,0.26);
   assert.equal(projectedTraces[1]?.showscale,false);
   assert.equal(projectedSurface!.figureOverrides.colorScale,"Viridis");
   const projectedPhysical=resolveCanvasMm(presets.scientific,projectedSurface!);
