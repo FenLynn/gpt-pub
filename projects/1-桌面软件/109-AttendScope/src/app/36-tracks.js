@@ -89,7 +89,7 @@ function mountAttendanceTimeline(a){
    const d=model.events[params.dataIndex];if(!d)return null;
    const p=api.coord([api.value(0),api.value(1)]),sign=d.direction==='进'?-1:1,toward=state.prefs.arrowsTowardLine!==false;
    const count=d.count||1,thickness=Math.min(9,2.4+Math.log2(Math.max(1,count))*2);
-   const len=Math.min(31,22+Math.log2(Math.max(1,count))*2.7);
+   const len=Math.min(34,27+Math.log2(Math.max(1,count))*2.6);
    const y0=p[1]+sign*(toward?len:4),y1=p[1]+sign*(toward?3:len);
    const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4.2,thickness*.72);
    return {type:'group',children:[
@@ -102,18 +102,26 @@ function mountAttendanceTimeline(a){
    const key=track.key;if(!['trip','leave','outing','overtime'].includes(key))return null;
    const p=api.coord([0,lane]),q=api.coord([1440,lane]);
    const active=state.filter===key,rowH=Math.max(22,Math.abs(api.size([0,1])[1])),h=Math.max(8,Math.min(11,rowH*.34));
+   return {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:h/2},
+     style:{fill:track.color,opacity:active?.15:.062,stroke:track.color,lineWidth:active?.9:.5}};
+ };
+ const railLabelRender=(params,api)=>{
+   const lane=api.value(2),track=model.tracks[lane];if(!track)return null;
+   const key=track.key;if(!['trip','leave','outing','overtime'].includes(key))return null;
+   const q=api.coord([1440,lane]),active=state.filter===key;
    return {type:'group',children:[
-     {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:h/2},
-       style:{fill:track.color,opacity:active?.13:.055,stroke:track.color,lineWidth:active?.8:.45}},
-     {type:'text',style:{x:q[0]-5,y:p[1],text:track.title,fill:track.color,opacity:active?.95:.58,
-       font:(active?'650 ':'560 ')+'9px "Segoe UI Variable", sans-serif',align:'right',verticalAlign:'middle'}}
+     {type:'rect',shape:{x:q[0]-39,y:q[1]-8,width:37,height:16,r:5},
+       style:{fill:'rgba(255,255,255,.86)',stroke:'rgba(210,220,228,.66)',lineWidth:.55}},
+     {type:'circle',shape:{cx:q[0]-31,cy:q[1],r:2.3},style:{fill:track.color,opacity:active?1:.78}},
+     {type:'text',style:{x:q[0]-25,y:q[1],text:track.title,fill:active?'#425b6d':'#667b8b',
+       font:(active?'700 ':'600 ')+'8.5px "Segoe UI Variable", sans-serif',align:'left',verticalAlign:'middle'}}
    ]};
  };
  const scheduleRender=(params,api)=>{
    const from=api.value(0),to=api.value(1);
    const x0=api.coord([from,0])[0],x1=api.coord([to,0])[0],cs=params.coordSys;
    return {type:'rect',shape:{x:Math.min(x0,x1),y:cs.y+4,width:Math.abs(x1-x0),height:Math.max(12,cs.height-8),r:6},
-     style:{fill:'rgba(132,155,173,.11)',stroke:'rgba(122,145,164,.18)',lineWidth:.7}};
+     style:{fill:'rgba(132,155,173,.14)',stroke:'rgba(122,145,164,.22)',lineWidth:.75}};
  };
  const option={
   animation:state.prefs.motion!==false,animationDuration:180,animationEasing:'cubicOut',
@@ -136,15 +144,17 @@ function mountAttendanceTimeline(a){
    {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
    {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:10,right:10,bottom:28,height:38,
     minValueSpan:15,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
-    backgroundColor:'#edf2f5',fillerColor:'rgba(163,196,219,.68)',borderColor:'#d4e0e8',
-    handleSize:'84%',handleStyle:{color:'#7f99ab',borderColor:'#6d899d',borderWidth:1},
-    moveHandleStyle:{color:'#7f99ab',opacity:.62}}
+    backgroundColor:'#edf2f5',fillerColor:'rgba(138,184,216,.78)',borderColor:'#ccdbe5',
+    handleSize:'84%',handleStyle:{color:'#6f8da1',borderColor:'#5f7f94',borderWidth:1},
+    moveHandleStyle:{color:'#6f8da1',opacity:.68}}
   ],
   series:[
    {id:'schedule',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.workWindows.map(x=>[x[0],x[1]]),renderItem:scheduleRender,z:1},
    {id:'behavior-rails',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.tracks.map((_,i)=>[0,1440,i]),renderItem:railRender,z:2},
+   {id:'behavior-labels',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:false,
+    data:model.tracks.map((_,i)=>[0,1440,i]),renderItem:railLabelRender,z:6},
    {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.bars,renderItem:bandRender,z:4},
    {id:'event-baseline',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.eventLane>=0?[[0,1440,model.eventLane]]:[],renderItem:(params,api)=>{
@@ -176,6 +186,7 @@ function mountAttendanceTimeline(a){
     series:[
      {id:'schedule',data:model.workWindows.map(x=>[x[0],x[1]])},
      {id:'behavior-rails',data:model.tracks.map((_,i)=>[0,1440,i])},
+     {id:'behavior-labels',data:model.tracks.map((_,i)=>[0,1440,i])},
      {id:'bands',data:model.bars},
      {id:'event-baseline',data:model.eventLane>=0?[[0,1440,model.eventLane]]:[]},
      {id:'punches',data:model.events}
