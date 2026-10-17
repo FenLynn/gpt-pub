@@ -1,4 +1,4 @@
-/* R22 layered timeline: restore the earlier separated lanes while keeping schedule as background. */
+/* R23 timeline: strong schedule windows, long punch arrows, fixed behavior rails and aligned overview. */
 function r19PunchClusters(a,range,width,lane){
   const span=Math.max(30,range.end-range.start),px=Math.max(240,width||800);
   const mergeMinutes=Math.max(.45,span/px*11);
@@ -25,19 +25,21 @@ function r19PunchClusters(a,range,width,lane){
   }
   return out.sort((x,y)=>x.value[0]-y.value[0]);
 }
-function r19BehaviorVisible(key){
-  const behaviorKeys=['trip','leave','outing','overtime'];
-  if(!behaviorKeys.includes(key))return true;
-  return behaviorFilterActive()&&state.filter===key;
+function r23BehaviorSegments(a,key){
+  if(key==='trip')return (a.trips||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',sourceIds:[p.id]}));
+  if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',sourceIds:[p.id]}));
+  if(key==='outing')return (a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'外出',sourceIds:[p.id]}));
+  if(key==='overtime')return (a.overtime||[]).map(p=>({from:minutes(p.start||'17:30'),to:minutes(p.end||'20:00'),title:'加班',sourceIds:[p.id]}));
+  return [];
 }
 function r14TrackData(a,range=timelineRange(a),width=800){
  const prefs=typeof r14Prefs==='function'?r14Prefs().timelineTracks:{};
  const tracks=[],bars=[];
- const add=(key,title,color,segments)=>{
-  if(prefs[key]===false||!r19BehaviorVisible(key))return;
-  if(!segments.length&&key!=='actual')return;
+ const add=(key,title,color,segments,{always=false}={})=>{
+  const source=prefs[key]===false?[]:segments;
+  if(!always&&!source.length&&key!=='actual')return;
   const lane=tracks.length;tracks.push({key,title,color});
-  for(const seg of segments){
+  for(const seg of source){
    const from=Math.max(0,Math.min(1440,+seg.from)),to=Math.max(0,Math.min(1440,+seg.to));
    if(to>from)bars.push({
      value:[from,to,lane],color,title:seg.title||title,track:key,
@@ -56,19 +58,10 @@ function r14TrackData(a,range=timelineRange(a),width=800){
    from:minutes(p.time),to:minutes(q.time),
    title:JUDGMENT_LABELS[attendanceJudgment(a)]+'在岗',
    sourceIds:[p.recordId,q.recordId]
- })));
- add('trip','出差',ATTEND_BEHAVIOR_COLORS.trip,a.trips.map(p=>({
-   from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',sourceIds:[p.id]
- })));
- add('leave','请假',ATTEND_BEHAVIOR_COLORS.leave,a.leaves.map(p=>({
-   from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',sourceIds:[p.id]
- })));
- add('outing','外出',ATTEND_BEHAVIOR_COLORS.outing,(a.outings||[]).map(p=>({
-   from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'外出',sourceIds:[p.id]
- })));
- add('overtime','加班',ATTEND_BEHAVIOR_COLORS.overtime,(a.overtime||[]).map(p=>({
-   from:minutes(p.start||'17:30'),to:minutes(p.end||'20:00'),title:'加班',sourceIds:[p.id]
- })));
+ })),{always:true});
+ for(const [key,title] of [['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']]){
+   add(key,title,ATTEND_BEHAVIOR_COLORS[key],r23BehaviorSegments(a,key),{always:true});
+ }
  const events=eventLane>=0?r19PunchClusters(a,range,width,eventLane):[];
  return {tracks,bars,events,eventLane,workWindows};
 }
@@ -81,13 +74,13 @@ function mountAttendanceTimeline(a){
    const d=model.bars[params.dataIndex];if(!d)return null;
    const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
    const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0]));
-   const rowH=Math.max(28,Math.abs(api.size([0,1])[1]));
-   const h=d.track==='actual'?Math.max(13,Math.min(16,rowH*.34)):Math.max(8,Math.min(11,rowH*.25));
+   const rowH=Math.max(22,Math.abs(api.size([0,1])[1]));
+   const h=d.track==='actual'?Math.max(14,Math.min(17,rowH*.52)):Math.max(7,Math.min(10,rowH*.31));
    const children=[{type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:h/2},
-     style:{fill:d.color,opacity:d.track==='actual'?.94:.86,stroke:'rgba(255,255,255,.96)',lineWidth:.75,
-       shadowBlur:d.track==='actual'?2:0,shadowColor:'rgba(58,80,96,.10)'}}];
-   if(w>54)children.push({type:'text',style:{
-     x:x+w-7,y:p[1],text:d.title,fill:'#3e5668',font:'600 9px "Segoe UI Variable", sans-serif',
+     style:{fill:d.color,opacity:d.track==='actual'?.95:.9,stroke:'rgba(255,255,255,.96)',lineWidth:.7,
+       shadowBlur:d.track==='actual'?2:0,shadowColor:'rgba(52,74,91,.10)'}}];
+   if(w>58)children.push({type:'text',style:{
+     x:x+w-7,y:p[1],text:d.title,fill:'#385064',font:'600 9px "Segoe UI Variable", sans-serif',
      align:'right',verticalAlign:'middle'
    }});
    return {type:'group',children};
@@ -95,25 +88,36 @@ function mountAttendanceTimeline(a){
  const eventRender=(params,api)=>{
    const d=model.events[params.dataIndex];if(!d)return null;
    const p=api.coord([api.value(0),api.value(1)]),sign=d.direction==='进'?-1:1,toward=state.prefs.arrowsTowardLine!==false;
-   const count=d.count||1,thickness=Math.min(9,2.3+Math.log2(Math.max(1,count))*2);
-   const len=Math.min(23,14+Math.log2(Math.max(1,count))*2.35);
+   const count=d.count||1,thickness=Math.min(9,2.4+Math.log2(Math.max(1,count))*2);
+   const len=Math.min(31,22+Math.log2(Math.max(1,count))*2.7);
    const y0=p[1]+sign*(toward?len:4),y1=p[1]+sign*(toward?3:len);
-   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4,thickness*.72);
+   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4.2,thickness*.72);
    return {type:'group',children:[
-    {type:'line',shape:{x1:p[0],y1:y0,x2:p[0],y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.93}},
-    {type:'polygon',shape:{points:[[p[0]-half,y1+sign*(toward?5.5:-5.5)],[p[0]+half,y1+sign*(toward?5.5:-5.5)],[p[0],y1]]},style:{fill:color,opacity:.96}},
-    {type:'circle',shape:{cx:p[0],cy:p[1],r:Math.min(4.4,2.6+Math.log2(Math.max(1,count))*.55)},
-      style:{stroke:color,fill:'#fff',lineWidth:1.35,opacity:.98}}
+    {type:'line',shape:{x1:p[0],y1:y0,x2:p[0],y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.96}},
+    {type:'polygon',shape:{points:[[p[0]-half,y1+sign*(toward?6:-6)],[p[0]+half,y1+sign*(toward?6:-6)],[p[0],y1]]},style:{fill:color,opacity:.98}}
+   ]};
+ };
+ const railRender=(params,api)=>{
+   const d=params.data,track=model.tracks[d.value[2]];if(!track)return null;
+   const key=track.key;if(!['trip','leave','outing','overtime'].includes(key))return null;
+   const p=api.coord([0,d.value[2]]),q=api.coord([1440,d.value[2]]);
+   const active=state.filter===key,rowH=Math.max(22,Math.abs(api.size([0,1])[1])),h=Math.max(8,Math.min(11,rowH*.34));
+   return {type:'group',children:[
+     {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:h/2},
+       style:{fill:track.color,opacity:active?.13:.055,stroke:track.color,lineWidth:active?.8:.45}},
+     {type:'text',style:{x:q[0]-5,y:p[1],text:track.title,fill:track.color,opacity:active?.95:.58,
+       font:(active?'650 ':'560 ')+'9px "Segoe UI Variable", sans-serif',align:'right',verticalAlign:'middle'}}
    ]};
  };
  const scheduleRender=(params,api)=>{
    const from=api.value(0),to=api.value(1);
    const x0=api.coord([from,0])[0],x1=api.coord([to,0])[0],cs=params.coordSys;
-   return {type:'rect',shape:{x:Math.min(x0,x1),y:cs.y+5,width:Math.abs(x1-x0),height:Math.max(10,cs.height-10),r:5},
-     style:{fill:'rgba(144,164,181,.050)',stroke:'rgba(144,164,181,.085)',lineWidth:.6}};
+   return {type:'rect',shape:{x:Math.min(x0,x1),y:cs.y+4,width:Math.abs(x1-x0),height:Math.max(12,cs.height-8),r:6},
+     style:{fill:'rgba(132,155,173,.11)',stroke:'rgba(122,145,164,.18)',lineWidth:.7}};
  };
  const option={
-  animation:false,grid:{left:6,right:8,top:10,bottom:86},
+  animation:state.prefs.motion!==false,animationDuration:180,animationEasing:'cubicOut',
+  grid:{left:10,right:10,top:10,bottom:112},
   tooltip:{trigger:'item',confine:true,backgroundColor:'#fff',borderColor:'#dce8f1',textStyle:{fontSize:11,color:'#385870'},
    formatter:p=>{
     const d=p.data||{};
@@ -124,25 +128,28 @@ function mountAttendanceTimeline(a){
     return '<b>'+(d.title||'区间')+'</b><div>'+minuteText(d.value?.[0]||0)+'–'+minuteText(d.value?.[1]||0)+'</div>';
    }},
   xAxis:{type:'value',min:0,max:1440,interval:240,axisLine:{show:false},axisTick:{show:false},
-   axisLabel:{fontSize:10,color:'#7d93a5',margin:12,formatter:minuteText},
-   splitLine:{show:true,lineStyle:{type:'dashed',color:'#edf2f6'}}},
+   axisLabel:{fontSize:10,color:'#748a9c',margin:13,formatter:minuteText},
+   splitLine:{show:true,lineStyle:{type:'dashed',color:'#e8eef3'}}},
   yAxis:{type:'category',inverse:true,data:model.tracks.map(t=>t.key),axisLine:{show:false},axisTick:{show:false},axisLabel:{show:false},
-   splitLine:{show:true,lineStyle:{color:'#edf2f6'}},splitArea:{show:true,areaStyle:{color:['#fbfcfd','#fff']}}},
+   splitLine:{show:true,lineStyle:{color:'#eef2f5'}},splitArea:{show:false}},
   dataZoom:[
    {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
-   {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:6,right:8,bottom:10,height:30,
+   {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:10,right:10,bottom:28,height:38,
     minValueSpan:15,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
-    backgroundColor:'#f0f5f8',fillerColor:'rgba(205,220,230,.54)',borderColor:'#dce6ed',
-    handleSize:'82%',handleStyle:{color:'#94a7b6',borderColor:'#8399aa'},moveHandleStyle:{color:'#9aabb9',opacity:.48}}
+    backgroundColor:'#edf2f5',fillerColor:'rgba(163,196,219,.68)',borderColor:'#d4e0e8',
+    handleSize:'84%',handleStyle:{color:'#7f99ab',borderColor:'#6d899d',borderWidth:1},
+    moveHandleStyle:{color:'#7f99ab',opacity:.62}}
   ],
   series:[
    {id:'schedule',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.workWindows.map(x=>[x[0],x[1]]),renderItem:scheduleRender,z:1},
+   {id:'behavior-rails',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
+    data:model.tracks.map((_,i)=>[0,1440,i]),renderItem:railRender,z:2},
    {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.bars,renderItem:bandRender,z:4},
    {id:'event-baseline',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
     data:model.eventLane>=0?[[0,1440,model.eventLane]]:[],renderItem:(params,api)=>{
       const p=api.coord([0,api.value(2)]),q=api.coord([1440,api.value(2)]);
-      return {type:'line',shape:{x1:p[0],y1:p[1],x2:q[0],y2:q[1]},style:{stroke:'#aebdc8',lineWidth:1.05,opacity:.82}};
+      return {type:'line',shape:{x1:p[0],y1:p[1],x2:q[0],y2:q[1]},style:{stroke:'#a8b7c3',lineWidth:1.1,opacity:.82}};
     },z:5},
    {id:'punches',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.events,renderItem:eventRender,z:7}
   ]
@@ -168,6 +175,7 @@ function mountAttendanceTimeline(a){
     yAxis:{data:model.tracks.map(t=>t.key)},
     series:[
      {id:'schedule',data:model.workWindows.map(x=>[x[0],x[1]])},
+     {id:'behavior-rails',data:model.tracks.map((_,i)=>[0,1440,i])},
      {id:'bands',data:model.bars},
      {id:'event-baseline',data:model.eventLane>=0?[[0,1440,model.eventLane]]:[]},
      {id:'punches',data:model.events}
