@@ -240,6 +240,14 @@ for (let n=0; n<gallery.length; n++) {
     "Projected 3D scene should use the wider reference-like aspect");
   assert.equal(projectedLayout.scene?.xaxis?.gridcolor,GOLDEN_STYLE.field.projectionGridColor,
     "Projected 3D scene should use lighter side-wall grids");
+  assert.equal(projectedLayout.scene?.xaxis?.backgroundcolor,GOLDEN_STYLE.field.projectionWallBackground,
+    "Projected 3D x-wall should stay translucent and visible");
+  assert.equal(projectedLayout.scene?.yaxis?.backgroundcolor,GOLDEN_STYLE.field.projectionWallBackground,
+    "Projected 3D y-wall should stay translucent and visible");
+  assert.equal(projectedLayout.scene?.zaxis?.backgroundcolor,GOLDEN_STYLE.field.projectionFloorBackground,
+    "Projected 3D floor should use the reference-like teal plane");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionLineWidthPt,0.72,
+    "Projected side-wall contours need visible publication weight");
 
   const surfaceGolden=project.figures.find(f=>f.templateId==="surface-3d");
   assert.ok(surfaceGolden,"Golden defaults must include a 3D scientific surface");

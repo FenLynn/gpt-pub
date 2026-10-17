@@ -770,7 +770,7 @@ export function createInitialProject(
       surfaceProjectionY: true,
       surfaceProjectionContourCount: 11,
       surfaceProjectionFloorGap: 0.32,
-      surfaceProjectionLineWidthPt: 0.58,
+      surfaceProjectionLineWidthPt: 0.72,
       surfaceProjectionUseColorMap: true
     }
   );

@@ -1527,7 +1527,7 @@ export function buildLayout(args: {
         title: { text: "" },
         showbackground: true,
         backgroundcolor: projectionSurface
-          ? GOLDEN_STYLE.field.projectionPaneBackground
+          ? GOLDEN_STYLE.field.projectionWallBackground
           : GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
@@ -1550,7 +1550,7 @@ export function buildLayout(args: {
         title: { text: "" },
         showbackground: true,
         backgroundcolor: projectionSurface
-          ? GOLDEN_STYLE.field.projectionPaneBackground
+          ? GOLDEN_STYLE.field.projectionWallBackground
           : GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
@@ -1575,7 +1575,7 @@ export function buildLayout(args: {
         range: projectionZRange,
         showbackground: true,
         backgroundcolor: projectionSurface
-          ? GOLDEN_STYLE.field.projectionPaneBackground
+          ? GOLDEN_STYLE.field.projectionFloorBackground
           : GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
