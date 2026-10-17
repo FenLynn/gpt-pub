@@ -113,7 +113,7 @@ async function run(){
    document.querySelector('.m-cell.cell-focus .selected')&&
    getComputedStyle(document.querySelector('.m-cell.cell-focus .selected')).boxShadow.includes('135, 89, 219'),
  'Person/calendar cell focus not lifted');
- await page.screenshot({path:path.join(out,'r21-primary-timeline.png')});
+ await page.screenshot({path:path.join(out,'r22-primary-timeline.png')});
  await check(page,()=>{
   const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
@@ -140,8 +140,8 @@ async function run(){
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
     !data.tracks.some(x=>x.key==='span'||x.key==='rules')&&data.workWindows.length===2&&
     zoom.filter(z=>z.type==='slider').length===1&&slider.height===30&&
-    ticks.length===5&&barHeight>=previewHeight-5&&opt.grid[0].bottom>=72;
- },'Soft violet cross, timeline spacing or embedded mini ruler failed');
+    ticks.length===5&&barHeight>=previewHeight-1&&opt.grid[0].bottom>=84&&opt.yAxis[0].type==='category';
+ },'Separated timeline lanes, axis spacing or embedded mini ruler failed');
 
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
@@ -308,7 +308,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R21',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R22',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
