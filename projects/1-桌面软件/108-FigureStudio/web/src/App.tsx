@@ -1167,9 +1167,9 @@ function App() {
     const previewLayout = interactive3D
       ? scalePlotlyLayoutForPreview(interactiveLayout, previewRenderScale)
       : interactiveLayout;
-    const previewTraces = interactive3D
-      ? scalePlotlyTracesForPreview(traces as any[], previewRenderScale)
-      : traces;
+    // Keep Plotly/WebGL data traces immutable. Scaling trace objects can
+    // invalidate Plotly's cleanData assumptions for surface traces.
+    const previewTraces = traces;
     const config = {
       responsive: false,
       displaylogo: false,
