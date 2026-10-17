@@ -82,6 +82,12 @@ export const GOLDEN_STYLE = {
     surfaceDomainY: [0.13, 0.95],
     surfaceCameraEye: { x: 1.34, y: 1.34, z: 0.96 },
     surfaceAspect: { x: 1, y: 1, z: 0.64 },
+    projectionDomainX: [0.015, 0.88],
+    projectionDomainY: [0.045, 0.995],
+    projectionCameraEye: { x: 1.06, y: 1.13, z: 0.73 },
+    projectionAspect: { x: 1.18, y: 1.18, z: 0.76 },
+    projectionColorbarX: 0.915,
+    projectionColorbarLength: 0.74,
     surfaceAxisTitleScale: 0.82,
     surfaceTickScale: 0.86,
     surfaceLabels: {
@@ -89,12 +95,18 @@ export const GOLDEN_STYLE = {
       y: { x: 0.25, y: 0.055, angle: 30 },
       z: { x: 0.055, y: 0.55, angle: -90 }
     },
+    projectionLabels: {
+      x: { x: 0.68, y: 0.035, angle: -27 },
+      y: { x: 0.20, y: 0.035, angle: 27 },
+      z: { x: 0.025, y: 0.55, angle: -90 }
+    },
     contourLinePt: 0.35,
     contourLineColor: "rgba(57,67,75,0.52)",
     planeBackground: "#f8f8f6",
     sceneGridColor: "#d9dde0",
-    projectionPaneBackground: "rgba(248,248,246,0.58)",
-    projectionLineColor: "rgba(57,67,75,0.48)"
+    projectionPaneBackground: "rgba(248,248,246,0.18)",
+    projectionGridColor: "rgba(135,145,153,0.24)",
+    projectionLineColor: "rgba(57,67,75,0.58)"
   },
   bar: {
     borderColor: "rgba(57,67,75,0.34)",

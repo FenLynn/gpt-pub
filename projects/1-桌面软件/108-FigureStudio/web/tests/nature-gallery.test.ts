@@ -224,11 +224,22 @@ for (let n=0; n<gallery.length; n++) {
   assert.ok(projectedSource,"3D projection source sheet missing");
   const projectedDataset=sheetToDataset(projectedSource!.sheet,projectedSurface!);
   const projectedTraces=buildTraces({dataset:projectedDataset,figure:projectedSurface!,preset:presets.scientific}) as any[];
+  const projectedLayout=buildLayout({dataset:projectedDataset,figure:projectedSurface!,preset:presets.scientific}) as any;
   assert.equal(projectedTraces[0]?.type,"surface");
   assert.equal(projectedTraces[0]?.contours?.z?.project?.z,true,"3D floor projection missing");
   assert.equal(projectedTraces[0]?.contours?.x?.project?.x,true,"3D x-wall projection missing");
   assert.equal(projectedTraces[0]?.contours?.y?.project?.y,true,"3D y-wall projection missing");
   assert.equal(projectedSurface!.figureOverrides.colorScale,"Viridis");
+  assert.deepEqual(projectedLayout.scene?.domain?.x,[...GOLDEN_STYLE.field.projectionDomainX],
+    "Projected 3D scene should use the expanded horizontal domain");
+  assert.deepEqual(projectedLayout.scene?.domain?.y,[...GOLDEN_STYLE.field.projectionDomainY],
+    "Projected 3D scene should use the expanded vertical domain");
+  assert.deepEqual(projectedLayout.scene?.camera?.eye,GOLDEN_STYLE.field.projectionCameraEye,
+    "Projected 3D scene should use the reference-like camera");
+  assert.deepEqual(projectedLayout.scene?.aspectratio,GOLDEN_STYLE.field.projectionAspect,
+    "Projected 3D scene should use the wider reference-like aspect");
+  assert.equal(projectedLayout.scene?.xaxis?.gridcolor,GOLDEN_STYLE.field.projectionGridColor,
+    "Projected 3D scene should use lighter side-wall grids");
 
   const surfaceGolden=project.figures.find(f=>f.templateId==="surface-3d");
   assert.ok(surfaceGolden,"Golden defaults must include a 3D scientific surface");

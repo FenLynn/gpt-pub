@@ -647,8 +647,12 @@ export function buildTraces(args: {
           ticklen: ptToPx(metrics.minorTickLengthPt),
           tickwidth: ptToPx(metrics.axisWidthPt * 0.75),
           tickcolor: figure.figureOverrides.tickLabelColor ?? GOLDEN_STYLE.typography.tickColor,
-          len: GOLDEN_STYLE.field.colorbarLength3d,
-          x: 0.88,
+          len: projectionTemplate
+            ? GOLDEN_STYLE.field.projectionColorbarLength
+            : GOLDEN_STYLE.field.colorbarLength3d,
+          x: projectionTemplate
+            ? GOLDEN_STYLE.field.projectionColorbarX
+            : 0.88,
           xanchor: "left",
           xpad: 4,
           tickfont: {
@@ -1492,19 +1496,32 @@ export function buildLayout(args: {
       axisTitleSizePx * GOLDEN_STYLE.field.surfaceAxisTitleScale;
     const sceneTickLabelSizePx =
       tickLabelSizePx * GOLDEN_STYLE.field.surfaceTickScale;
-    layout.margin = {
-      l: Math.round(mmToPx(overrides.marginLeftMm ?? 6.5)),
-      r: Math.round(mmToPx(overrides.marginRightMm ?? 14)),
-      t: Math.round(mmToPx(overrides.marginTopMm ?? 4.5)),
-      b: Math.round(mmToPx(overrides.marginBottomMm ?? 11)),
-      pad: 0,
-      autoexpand: false
-    };
+    layout.margin = projectionSurface
+      ? {
+          l: Math.round(mmToPx(overrides.marginLeftMm ?? 2.8)),
+          r: Math.round(mmToPx(overrides.marginRightMm ?? 10.5)),
+          t: Math.round(mmToPx(overrides.marginTopMm ?? 2.2)),
+          b: Math.round(mmToPx(overrides.marginBottomMm ?? 6.8)),
+          pad: 0,
+          autoexpand: false
+        }
+      : {
+          l: Math.round(mmToPx(overrides.marginLeftMm ?? 6.5)),
+          r: Math.round(mmToPx(overrides.marginRightMm ?? 14)),
+          t: Math.round(mmToPx(overrides.marginTopMm ?? 4.5)),
+          b: Math.round(mmToPx(overrides.marginBottomMm ?? 11)),
+          pad: 0,
+          autoexpand: false
+        };
     layout.scene = {
       bgcolor: background,
       domain: {
-        x: [...GOLDEN_STYLE.field.surfaceDomainX],
-        y: [...GOLDEN_STYLE.field.surfaceDomainY]
+        x: [...(projectionSurface
+          ? GOLDEN_STYLE.field.projectionDomainX
+          : GOLDEN_STYLE.field.surfaceDomainX)],
+        y: [...(projectionSurface
+          ? GOLDEN_STYLE.field.projectionDomainY
+          : GOLDEN_STYLE.field.surfaceDomainY)]
       },
       xaxis: {
         title: { text: "" },
@@ -1515,7 +1532,9 @@ export function buildLayout(args: {
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
-        gridcolor: GOLDEN_STYLE.field.sceneGridColor,
+        gridcolor: projectionSurface
+          ? GOLDEN_STYLE.field.projectionGridColor
+          : GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
@@ -1536,7 +1555,9 @@ export function buildLayout(args: {
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
-        gridcolor: GOLDEN_STYLE.field.sceneGridColor,
+        gridcolor: projectionSurface
+          ? GOLDEN_STYLE.field.projectionGridColor
+          : GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
@@ -1559,7 +1580,9 @@ export function buildLayout(args: {
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
-        gridcolor: GOLDEN_STYLE.field.sceneGridColor,
+        gridcolor: projectionSurface
+          ? GOLDEN_STYLE.field.projectionGridColor
+          : GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
         ticks: tickDirection,
@@ -1572,10 +1595,18 @@ export function buildLayout(args: {
         }
       },
       camera: {
-        eye: { ...GOLDEN_STYLE.field.surfaceCameraEye }
+        eye: {
+          ...(projectionSurface
+            ? GOLDEN_STYLE.field.projectionCameraEye
+            : GOLDEN_STYLE.field.surfaceCameraEye)
+        }
       },
       aspectmode: "manual",
-      aspectratio: { ...GOLDEN_STYLE.field.surfaceAspect }
+      aspectratio: {
+        ...(projectionSurface
+          ? GOLDEN_STYLE.field.projectionAspect
+          : GOLDEN_STYLE.field.surfaceAspect)
+      }
     };
     const labelColor =
       overrides.axisTitleColor ?? GOLDEN_STYLE.typography.axisTitleColor;
@@ -1598,12 +1629,15 @@ export function buildLayout(args: {
         color: labelColor
       }
     });
+    const labelPositions = projectionSurface
+      ? GOLDEN_STYLE.field.projectionLabels
+      : GOLDEN_STYLE.field.surfaceLabels;
     layout.annotations = [
-      surfaceLabel(String(resolvedXTitle ?? ""), GOLDEN_STYLE.field.surfaceLabels.x),
-      surfaceLabel(String(resolvedYTitle ?? ""), GOLDEN_STYLE.field.surfaceLabels.y),
+      surfaceLabel(String(resolvedXTitle ?? ""), labelPositions.x),
+      surfaceLabel(String(resolvedYTitle ?? ""), labelPositions.y),
       surfaceLabel(
         String(normalizePlotlyMathText(overrides.zTitle ?? "Z") ?? ""),
-        GOLDEN_STYLE.field.surfaceLabels.z
+        labelPositions.z
       )
     ];
     return layout;

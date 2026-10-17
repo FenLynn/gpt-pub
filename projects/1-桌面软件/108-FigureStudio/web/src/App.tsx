@@ -2168,9 +2168,18 @@ function App() {
       return;
     }
     if (!plotRef.current || !activeFigure) return;
-    if (activeFigure.templateId === "surface-3d") {
+    if (
+      activeFigure.templateId === "surface-3d" ||
+      activeFigure.templateId === "surface-projection-3d"
+    ) {
       await Plotly.relayout(plotRef.current, {
-        "scene.camera": { eye: { ...GOLDEN_STYLE.field.surfaceCameraEye } }
+        "scene.camera": {
+          eye: {
+            ...(activeFigure.templateId === "surface-projection-3d"
+              ? GOLDEN_STYLE.field.projectionCameraEye
+              : GOLDEN_STYLE.field.surfaceCameraEye)
+          }
+        }
       });
     } else {
       await Plotly.relayout(plotRef.current, {
