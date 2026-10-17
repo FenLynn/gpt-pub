@@ -51,7 +51,7 @@ async function ensureProjectSkeleton(){
 function normalizeSavedMonth(payload){
   if(!payload||!Array.isArray(payload.records))return null;
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
-    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],rules:payload.rules||null,prefs:payload.prefs||null};
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null};
 }
 async function connectProjectDir(){
   if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return}
@@ -100,7 +100,7 @@ function workingPayload(){
   return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
-    outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],rules:{...RULES},prefs:{...state.prefs},
+    outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,
     analysis:[...state.analysis.values()].map(a=>({employeeId:a.employee.id,date:a.date,severity:a.severity,status:a.status,
       firstIn:a.firstIn,lastOut:a.lastOut,presence:a.presence,issues:a.issues,marker:a.marker}))};
@@ -141,5 +141,5 @@ function toast(msg,error=false){
   document.body.appendChild(el);setTimeout(()=>el.remove(),3200);
 }
 const demo=generateMock();
-state.records=demo.records;state.leaves=demo.leaves;state.trips=demo.trips;
+state.records=demo.records;state.leaves=demo.leaves;state.trips=demo.trips;state.outings=demo.outings||[];state.overtimeEntries=demo.overtimeEntries||[];state.manualStatuses={};state.judgmentMode='initial';
 rememberMonth();reanalyze();render();

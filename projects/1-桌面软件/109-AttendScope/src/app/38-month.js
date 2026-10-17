@@ -3,7 +3,7 @@ function rememberMonth(){
   state.monthStores.set(monthKey(),{
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,
-    imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],
+    imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},judgmentMode:state.judgmentMode||'initial',
     rules:{...RULES},prefs:{...state.prefs}
   });
 }
@@ -13,7 +13,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   const key=year+'-'+pad(month);
   if(!state.monthStores.has(key)){
     if(!create){toast('该月份尚未创建，请点击「新建月份」',true);return false}
-    state.monthStores.set(key,{records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],rules:{...RULES},prefs:{...state.prefs}});
+    state.monthStores.set(key,{records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},judgmentMode:'initial',rules:{...RULES},prefs:{...state.prefs}});
   }
   if(key!==monthKey()&&preserveCurrent)rememberMonth();
   YEAR=year;MONTH=month;
@@ -21,7 +21,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   state.records=next.records;state.leaves=next.leaves;state.trips=next.trips;
   state.revisions=next.revisions;state.revisionSeq=next.revisionSeq;
   state.imports=next.imports;state.saved=next.saved;
-  state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];
+  state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
   if(next.rules)Object.assign(RULES,next.rules);
   if(next.prefs)state.prefs={...state.prefs,...next.prefs};
   state.selection={type:'overall'};state.filter='main';state.chartTab='overview';

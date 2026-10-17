@@ -360,6 +360,7 @@ function bindTimelineGestures(){
 
 function showRecord(id){
   const p=state.records.find(x=>x.recordId===id); if(!p)return;
+  if(typeof focusRawEvidence==='function')focusRawEvidence('attendance',id);
   document.querySelectorAll('[data-record]').forEach(x=>x.classList.toggle('selected',x.dataset.record===id));
   const box=document.getElementById('timelineEvidence'); if(!box)return;
   box.classList.remove('record-enter');

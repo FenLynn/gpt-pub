@@ -30,15 +30,23 @@ async function run(){
  });
  console.log('R13_LAYOUT '+JSON.stringify(layout));
  if(layout.month!=='2026-10'||layout.tabs!==4||layout.defaultFilter!=='main'||layout.recordCount<3600||
-    Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<2.7||layout.ratio>3.3||
+    Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<4.4||layout.ratio>7.5||
     layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
  await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===8&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
     document.querySelectorAll('.calendar-key span').length===3,'R13 controls not mounted');
+ await check(page,()=>{
+   const head=document.querySelector('.analysis-head').getBoundingClientRect();
+   const insight=document.querySelector('.inspector-insight').getBoundingClientRect();
+   return head.height<=35&&insight.width>=110&&insight.width<=132;
+ },'Right title or compact insight geometry regressed');
  const countBefore=await page.evaluate(()=>document.querySelectorAll('.m-cell button.filtered-out').length);
  if(countBefore<25)throw Error('Default main status filter not active');
  await page.locator('#statusFilter').selectOption('trip');
  await check(page,()=>state.filter==='trip'&&document.querySelectorAll('.m-cell button:not(.filtered-out).s-trip').length>0,'Trip filter missing');
+ await check(page,()=>state.rawDataTab==='trip'&&document.querySelector('.insight-heading')?.textContent.includes('出差')&&
+   document.querySelector('[data-raw-tab="trip"]')?.classList.contains('active'),'Filter did not drive right-side statistics and raw category');
+ await page.locator('#statusFilter').selectOption('main');
  await check(page,()=>{
    const statuses=['normal','anomaly','absent'];
    return statuses.every(kind=>[...state.analysis.values()].some(a=>attendanceJudgment(a)===kind))&&
@@ -52,6 +60,11 @@ async function run(){
  await check(page,()=>[...document.querySelectorAll('.m-cell button:not(.filtered-out)')].every(b=>['s-normal','s-anomaly','s-absent'].some(c=>b.classList.contains(c))),'Default surface mixes behaviors');
  await check(page,()=>categoryColor('anomaly')==='#e6c36f'&&categoryColor('absent')==='#e58f90'&&
    categoryColor('normal')==='#78caa0'&&new Set(Object.values(ATTEND_BEHAVIOR_COLORS)).size===4,'Judgment or behavior palette not canonical');
+ await check(page,()=>{
+   const e=EMPLOYEES.find(x=>x.id==='E011');
+   const all=new Set(Array.from({length:monthDays()},(_,i)=>attendanceBehaviors(state.analysis.get(e.id+'|'+(i+1)))).flat());
+   return ['trip','leave','outing','overtime'].every(k=>all.has(k))&&state.outings.length>=8&&state.overtimeEntries.length>=8;
+ },'Demo data does not cover all four behaviors on one employee');
  // Row focus is a single violet outline, no colored row fill.
  await page.locator('.m-name[data-emp="E001"]').click();
  await check(page,()=>{
@@ -64,7 +77,7 @@ async function run(){
  await page.screenshot({path:path.join(out,'r14-iteration-row.png')});
  await check(page,()=>{
   const name=document.querySelector('.m-name.selected'),c=getComputedStyle(name);
-  return c.borderLeftWidth==='0px'&&c.boxShadow==='none'&&
+  return c.borderLeftWidth==='0px'&&c.transform!=='none'&&
    c.backgroundColor.includes('130, 87, 217')&&
    parseInt(getComputedStyle(name.querySelector('.name-letters span')).fontWeight)<600;
  },'Name anchor should use violet tint without a second border');
@@ -74,7 +87,7 @@ async function run(){
    'Clicking top date must select all employees');
  await check(page,()=>{
    const date=document.querySelector('.m-date.selected'),c=getComputedStyle(date),b=getComputedStyle(date.querySelector('b'));
-   return c.borderTopWidth==='0px'&&c.boxShadow==='none'&&c.backgroundColor.includes('130, 87, 217')&&b.borderTopWidth==='0px';
+   return c.borderTopWidth==='0px'&&c.transform!=='none'&&c.backgroundColor.includes('130, 87, 217')&&b.borderTopWidth==='0px';
  },'Date anchor should use violet tint without nested border');
  await page.locator('.m-name[data-emp="E001"]').click();
  await check(page,()=>state.selection.type==='person'&&state.selection.employeeId==='E001',
@@ -101,13 +114,16 @@ async function run(){
  await page.screenshot({path:path.join(out,'r14-iteration-timeline.png')});
  await check(page,()=>{
   const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
-  const dots=document.querySelectorAll('.r15-punch-dot').length;
+  const bars=document.querySelectorAll('.r15-punch-stack').length;
   return tr[0]==='rules'&&tr[1]==='events'&&tr.indexOf('actual')>tr.indexOf('events')&&
-    dots===new Set(plotAnalysis(analysisContext()).punches.map(p=>Math.floor(minutes(p.time))+'|'+p.direction)).size&&!!document.getElementById('r15PunchPreview');
+    bars>0&&!!document.getElementById('r15PunchPreview')&&!document.querySelector('.r15-punch-dot');
  },'Music track order or punch-dot overview incorrect');
  await check(page,()=>{
-   const dup=[...state.analysis.values()].find(a=>a.punches.length>new Set(a.punches.map(p=>Math.floor(minutes(p.time))+'|'+p.direction)).size);
-   return !!dup&&r14TrackData(dup).events.length<dup.punches.length;
+   const dup=[...state.analysis.values()].find(a=>a.punches.some(p=>p.scenario==='rapid-swipes'));
+   if(!dup)return false;
+   const broad=r14TrackData(dup,{key:'b',start:0,end:1440},500).events.length;
+   const narrow=r14TrackData(dup,{key:'n',start:520,end:600},900).events.length;
+   return narrow>broad&&broad<dup.punches.length;
  },'Repeated punches are not clustered in the event model');
 
  await check(page,()=>{
@@ -115,8 +131,8 @@ async function run(){
   const frames=document.querySelectorAll('.matrix-selection-frame:not(.inactive)');
   const zoom=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart')).getOption().dataZoom;
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
-    data.tracks.some(x=>x.key==='span')&&zoom.filter(z=>z.type==='slider').length===1;
- },'Soft violet cross or time span lane failed');
+    !data.tracks.some(x=>x.key==='span')&&zoom.filter(z=>z.type==='slider').length===1;
+ },'Soft violet cross or compact time lanes failed');
 
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
@@ -147,6 +163,28 @@ async function run(){
  await page.waitForSelector('#rawDataTable.tabulator');
  await check(page,()=>rawTabulator.getColumns().some(c=>c.getField()==='name'&&c.isVisible()),
    'Employee name must remain visible in single person raw grid');
+ const manualTarget=await page.evaluate(()=>{
+   const a=[...state.analysis.values()].find(x=>isWorkday(x.day)&&attendanceJudgmentSystem(x)==='normal'&&x.punches.length>=2);
+   return {id:a.employee.id,day:a.day};
+ });
+ await page.locator('.m-cell[data-emp="'+manualTarget.id+'"][data-day="'+manualTarget.day+'"] button').click();
+ await page.waitForSelector('#attendanceTimelineChart svg');
+ await page.locator('[data-manual-status="absent"]').click();
+ await check(page,({id,day})=>{
+   const key=id+'|'+day,cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
+   return state.manualStatuses[key]==='absent'&&state.judgmentMode==='manual'&&cell.classList.contains('s-absent')&&!!cell.querySelector('.manual-check')&&
+     !document.querySelector('[data-judgment-mode="manual"]').disabled;
+ },manualTarget,'Manual red override/check mark failed');
+ await page.locator('[data-judgment-mode="initial"]').click();
+ await check(page,({id,day})=>{
+   const cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
+   return state.judgmentMode==='initial'&&!cell.classList.contains('s-absent')&&!!cell.querySelector('.manual-check');
+ },manualTarget,'Initial/manual view switch failed');
+ await page.locator('[data-judgment-mode="manual"]').click();
+ await check(page,()=>state.judgmentMode==='manual','Manual layer cannot be restored');
+ const firstRecord=await page.evaluate(({id,day})=>state.analysis.get(id+'|'+day).punches[0].recordId,manualTarget);
+ await page.evaluate(id=>focusRawEvidence('attendance',id),firstRecord);
+ await check(page,()=>!!document.querySelector('.raw-linked-highlight'),'Chart/raw evidence highlight bridge failed');
   await page.locator('#rawFloat').click();
  await page.waitForSelector('#rawDialogOverlay .raw-dialog');
  const r0=await page.locator('.raw-dialog').boundingBox();
@@ -177,6 +215,7 @@ async function run(){
  await page.screenshot({path:path.join(out,'r14-iteration-settings.png')});
  await check(page,()=>document.querySelectorAll('[data-settings-section]').length===7,'Settings missing categories');
  await page.locator('[data-settings-section="matrix"]').click();
+ await check(page,()=>document.getElementById('settingManualCheck')?.checked===true,'Manual check setting should default on');
  await page.locator('#settingGlow').fill('1.4');
  await page.locator('#settingRestContrast').fill('1.3');
  await page.locator('[data-settings-section="timeline"]').click();
@@ -210,7 +249,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R14',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R18',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

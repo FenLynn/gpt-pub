@@ -9,7 +9,7 @@ function groupOf(e){return state.groups?.[e.id]||e.department+'组'}
 const DEMO_NAMES=["陈思远","林嘉禾","周亦宁","王若溪","李知夏","赵书言","沈清越","吴念安","郑予安","许慕白","苏晚晴","何景川","唐诗雨","陆明哲","韩子墨","顾一诺","宋雨桐","徐嘉宁","叶星辰","程安然","梁沐阳","杨可心","邓嘉祺","谢云舟","蒋书瑶","郭亦凡","夏知意","冯沐辰","傅清歌","曹锦程","姜乐言","董予希","段芷晴","钟书航","秦若楠","方之恒","黎星遥","彭思齐","余可欣","袁清禾","施景行","高雨薇","江知远","邵思涵","罗映雪","齐航","林安","欧阳晨曦","司马知远","白若曦"];
 const EMPLOYEES=Array.from({length:50},(_,i)=>({id:'E'+String(i+1).padStart(3,'0'),name:DEMO_NAMES[i],department:['综合','研发','生产','质检','保障'][i%5]}));
 const RULES={amStart:'08:30',amEnd:'12:00',pmStart:'14:00',pmEnd:'17:30',grace:5,dupSeconds:120};
-const state={records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'main',zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true,groups:Object.fromEntries(EMPLOYEES.map(e=>[e.id,e.department+'组'])),monthStores:new Map(),chartTab:'overview',chartDay:null,rawDataTab:'attendance',rawPageSize:25,rawPage:1,rawPopout:false,outings:[],overtimeEntries:[],prefs:{fontScale:1,motion:true,arrowsTowardLine:true}};
+const state={records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'main',judgmentMode:'initial',manualStatuses:{},zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true,groups:Object.fromEntries(EMPLOYEES.map(e=>[e.id,e.department+'组'])),monthStores:new Map(),chartTab:'overview',chartDay:null,rawDataTab:'attendance',rawPageSize:25,rawPage:1,rawPopout:false,outings:[],overtimeEntries:[],prefs:{fontScale:1,motion:true,arrowsTowardLine:true}};
 const scenarioNames={normal:'正常',late:'迟到',early:'早退',absent:'缺勤',multiin:'多进一出',multiout:'一进多出',missingout:'缺少出',missingin:'缺少进',longout:'长时间外出',duplicate:'疑似重复打卡',overtime:'非工作日出勤'};
 function pad(n){return String(n).padStart(2,'0')} function isoDate(d){return `${YEAR}-${pad(MONTH)}-${pad(d)}`}
 function minutes(t){const [h,m,s='0']=String(t).split(':');return +h*60 + +m + (+s)/60}
@@ -59,13 +59,38 @@ function generateMock(){
     records.push(...base);
   }}
   const leaves=[
-    leave('E003',8,'08:30','12:00','事假','上午请假'),leave('E007',9,'14:00','17:30','病假','下午请假'),leave('E012',12,'08:30','17:30','年假','全天年假'),leave('E019',16,'08:30','10:30','事假','早间请假'),leave('E024',20,'15:00','17:30','病假','下午部分请假'),leave('E031',22,'08:30','17:30','年假','全天年假'),leave('E038',27,'08:30','12:00','调休假','上午请假'),leave('E046',30,'14:00','17:30','事假','下午请假')
+    leave('E003',8,'08:30','12:00','事假','上午请假'),leave('E007',9,'14:00','17:30','病假','下午请假'),leave('E011',14,'09:30','12:00','事假','研发评审后请假'),
+    leave('E012',12,'08:30','17:30','年假','全天年假'),leave('E019',16,'08:30','10:30','事假','早间请假'),leave('E024',20,'15:00','17:30','病假','下午部分请假'),
+    leave('E031',22,'08:30','17:30','年假','全天年假'),leave('E038',27,'08:30','12:00','调休假','上午请假'),leave('E046',30,'14:00','17:30','事假','下午请假'),
+    leave('E002',21,'10:00','12:00','事假','短时请假'),leave('E018',28,'08:30','14:30','病假','跨午间请假'),leave('E035',15,'14:00','17:30','年假','下午年假')
   ];
   const trips=[
-    trip('E005',8,9,'客户现场','武汉','两日出差'),trip('E014',13,13,'外出会议','上海','全天会议'),trip('E021',19,21,'项目出差','成都','三日项目'),trip('E029',23,23,'现场支持','宜昌','全天支持'),trip('E041',26,27,'供应商拜访','深圳','两日拜访'),trip('E049',30,30,'培训','杭州','全天培训')
+    trip('E005',8,9,'客户现场','武汉','两日出差'),trip('E011',19,20,'项目联调','成都','研发联调出差'),trip('E014',13,13,'外出会议','上海','全天会议'),
+    trip('E021',19,21,'项目出差','成都','三日项目'),trip('E029',23,23,'现场支持','宜昌','全天支持'),trip('E041',26,27,'供应商拜访','深圳','两日拜访'),
+    trip('E049',30,30,'培训','杭州','全天培训'),trip('E008',27,28,'客户验收','长沙','两日验收'),trip('E033',12,13,'技术交流','南京','两日交流')
   ];
-  return {records,leaves,trips};
+  const outings=[
+    outing('E011',16,16,'10:10','11:45','外出办事','园区服务中心'),outing('E011',23,23,'14:20','16:10','客户沟通','市内客户现场'),
+    outing('E004',12,12,'09:35','11:10','材料送检','检测中心'),outing('E009',15,15,'15:05','16:40','商务外出','合作单位'),
+    outing('E017',20,20,'10:00','12:00','现场协调','生产现场'),outing('E026',22,22,'13:40','16:20','设备验收','供应商工厂'),
+    outing('E032',29,29,'09:10','11:50','银行业务','政务中心'),outing('E044',14,14,'14:15','17:00','会议外出','集团总部'),
+    outing('E050',28,28,'08:50','10:20','样品递送','客户现场')
+  ];
+  const overtimeEntries=[
+    overtimeEntry('E011',24,'18:05','21:10','项目加班','版本联调'),overtimeEntry('E011',10,'17:45','20:20','周末加班','发布准备'),
+    overtimeEntry('E006',17,'18:00','20:30','研发加班','算法验证'),overtimeEntry('E015',25,'09:00','15:30','周末加班','生产支持'),
+    overtimeEntry('E023',21,'18:10','22:00','项目加班','现场问题处理'),overtimeEntry('E034',30,'18:00','20:15','月末加班','数据收尾'),
+    overtimeEntry('E042',18,'09:20','17:10','周末加班','设备维护'),overtimeEntry('E047',29,'18:15','21:45','研发加班','测试收口')
+  ];
+  // Add a denser cross-section so one screen can exercise all business rails and filters.
+  for(let i=1;i<=50;i+=6){const id='E'+String(i).padStart(3,'0'),d=8+(i*3)%19;leaves.push(leave(id,d,'14:00','17:30','事假','演示批量请假'))}
+  for(let i=2;i<=50;i+=8){const id='E'+String(i).padStart(3,'0'),d=9+(i*5)%17;trips.push(trip(id,d,Math.min(30,d+1),'项目出差','外地','演示批量出差'))}
+  for(let i=4;i<=50;i+=7){const id='E'+String(i).padStart(3,'0'),d=11+(i*4)%17;outings.push(outing(id,d,d,'09:40','11:20','外出办事','演示批量外出'))}
+  for(let i=5;i<=50;i+=7){const id='E'+String(i).padStart(3,'0'),d=12+(i*5)%18;overtimeEntries.push(overtimeEntry(id,d,'18:05','20:40','项目加班','演示批量加班'))}
+  return {records,leaves,trips,outings,overtimeEntries};
 }
 function plusSeconds(t,s){let [h,m,ss]=t.split(':').map(Number);let x=h*3600+m*60+ss+s;return `${pad(Math.floor(x/3600)%24)}:${pad(Math.floor(x%3600/60))}:${pad(x%60)}`}
 function leave(id,d,start,end,type,note){const e=EMPLOYEES.find(x=>x.id===id);return {id:`L-${id}-${d}`,employeeId:id,name:e.name,date:isoDate(d),start,end,type,note}}
-function trip(id,ds,de,type,place,note){const e=EMPLOYEES.find(x=>x.id===id);return {id:`T-${id}-${ds}`,employeeId:id,name:e.name,startDate:isoDate(ds),endDate:isoDate(de),type,place,note}}
+function trip(id,ds,de,type,place,note){const e=EMPLOYEES.find(x=>x.id===id);return {id:`T-${id}-${ds}`,employeeId:id,name:e.name,startDate:isoDate(ds),endDate:isoDate(de),type,place,note,source:'模拟出差_2026年10月.xlsx',row:5000+ds+Number(id.slice(1))*10}}
+function outing(id,ds,de,start,end,type,note){const e=EMPLOYEES.find(x=>x.id===id);return {id:`O-${id}-${ds}-${start}`,employeeId:id,name:e.name,startDate:isoDate(ds),endDate:isoDate(de),start,end,type,note,source:'模拟外出_2026年10月.xlsx',row:6000+ds+Number(id.slice(1))*10}}
+function overtimeEntry(id,d,start,end,type,note){const e=EMPLOYEES.find(x=>x.id===id);return {id:`OT-${id}-${d}-${start}`,employeeId:id,name:e.name,date:isoDate(d),start,end,type,note,source:'模拟加班_2026年10月.xlsx',row:7000+d+Number(id.slice(1))*10}}

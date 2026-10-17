@@ -4,10 +4,10 @@ const AS_CHART_COLORS={
   text:'#4e6880',
   muted:'#899fb1',
   grid:'rgba(185,201,213,.26)',
-  in:'#208ece',
-  out:'#d98950',
-  first:'#126fba',
-  last:'#ca6f39',
+  in:'#415b6d',
+  out:'#8b6650',
+  first:'#334d60',
+  last:'#76533e',
   normal:'#78caa0',
   suspect:'#e6c36f',
   problem:'#e6c36f',
@@ -86,7 +86,7 @@ function minuteText(v){
 
 function timelineRange(a){
   const key=`${a.employee.id}|${a.day}`;
-  if(!state.timelineRange||state.timelineRange.key!==key)state.timelineRange={key,start:360,end:1320};
+  if(!state.timelineRange||state.timelineRange.key!==key)state.timelineRange={key,start:300,end:1380};
   return state.timelineRange;
 }
 
@@ -718,6 +718,37 @@ function mountFocusedOverviewChart(ctx){
   chart.on('click',ev=>{const a=days[ev.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
 }
 
+function mountFilteredOverview(ctx){
+  const el=document.getElementById('overviewTrendChart');if(!el)return;
+  const chart=initAttendChart(el);if(!chart)return;
+  const filter=state.filter,color=['normal','anomaly','absent'].includes(filter)?categoryColor(filter):ATTEND_BEHAVIOR_COLORS[filter]||AS_CHART_COLORS.accent;
+  if(ctx.type==='date'){
+    const view=analysisViewItems(ctx);
+    chart.setOption({
+      grid:{left:18,right:18,top:22,bottom:16},
+      tooltip:{trigger:'item',formatter:()=>currentFilterLabel()+'：'+view.length+' 人'},
+      xAxis:{type:'value',show:false},yAxis:{type:'category',data:[currentFilterLabel()],axisLine:{show:false},axisTick:{show:false},axisLabel:{fontSize:11,color:'#617b91'}},
+      series:[{type:'bar',barWidth:16,data:[{value:view.length,itemStyle:{color,borderRadius:[0,8,8,0]}}],label:{show:true,position:'right',formatter:'{c} 人',color:'#425d73',fontSize:11}}]
+    });
+    return;
+  }
+  const person=ctx.employee||null;
+  const rows=Array.from({length:monthDays()},(_,i)=>{
+    const day=i+1;
+    const list=person?[state.analysis.get(person.id+'|'+day)]:EMPLOYEES.map(e=>state.analysis.get(e.id+'|'+day));
+    const value=list.filter(a=>state.filter==='main'?true:analysisViewItems({items:[a]}).length>0).length;
+    return {day,value};
+  }).filter(x=>isWorkday(x.day)||behaviorFilterActive());
+  chart.setOption({
+    grid:{left:30,right:12,top:12,bottom:26},
+    tooltip:{trigger:'axis',confine:true,formatter:p=>{const d=rows[p[0]?.dataIndex];return d?pad(d.day)+' 日 · '+currentFilterLabel()+' '+d.value+(person?'':' 人'):''}},
+    xAxis:{type:'category',data:rows.map(x=>pad(x.day)),axisTick:{show:false},axisLine:{lineStyle:{color:'#dae5ec'}},axisLabel:{fontSize:10,color:'#8a9eae',interval:1}},
+    yAxis:{type:'value',min:0,minInterval:1,axisLine:{show:false},axisTick:{show:false},axisLabel:{fontSize:10,color:'#8a9eae'},splitLine:{lineStyle:{color:'rgba(199,215,225,.34)',type:'dashed'}}},
+    series:[{type:'bar',barMaxWidth:14,data:rows.map(x=>({value:x.value,itemStyle:{color,borderRadius:[4,4,0,0]}}))}]
+  });
+  chart.on('click',p=>{const d=rows[p.dataIndex]?.day;if(!d)return;if(person)selectCell(person.id,d);else selectDate(d,true)});
+}
+
 function mountAnalysisVisuals(ctx){
   if(!window.echarts)return;
   requestAnimationFrame(()=>{
@@ -728,6 +759,7 @@ function mountAnalysisVisuals(ctx){
       else if(ctx.type==='date')mountDayTimeline(ctx);
     }else if(tab==='stats')mountStatsCharts(ctx);
     else if(tab==='issues')mountIssueChart(ctx);
+    else if(state.filter!=='main')mountFilteredOverview(ctx.type==='cell'?{type:'person',employee:ctx.employee,items:Array.from({length:monthDays()},(_,i)=>state.analysis.get(ctx.employee.id+'|'+(i+1)))}:ctx);
     else if(ctx.type==='overall')mountOverviewTrend();
     else if(ctx.type==='cell')mountFocusedOverviewChart({type:'person',employee:ctx.employee,items:Array.from({length:monthDays()},(_,i)=>state.analysis.get(ctx.employee.id+'|'+(i+1)))});
     else mountFocusedOverviewChart(ctx);

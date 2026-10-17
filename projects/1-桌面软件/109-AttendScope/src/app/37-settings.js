@@ -18,8 +18,9 @@ const R14_TABLE_FIELDS={
 function r14Prefs(){
   const p=state.prefs||{};
   if(!p.tableColumns)p.tableColumns={};
-  if(!p.timelineTracks)p.timelineTracks={rules:true,actual:true,span:true,leave:true,trip:true,outing:true,overtime:true,events:true};
-  if(!p.matrix)p.matrix={ids:true,crosshair:true,glow:1,restContrast:1};
+  if(!p.timelineTracks)p.timelineTracks={rules:true,actual:true,leave:true,trip:true,outing:true,overtime:true,events:true};
+  if(!p.matrix)p.matrix={ids:true,crosshair:true,glow:1,restContrast:1,showManualCheck:true};
+  if(p.matrix.showManualCheck==null)p.matrix.showManualCheck=true;
   return p;
 }
 function settingSelect(id,label,options){
@@ -43,11 +44,12 @@ function settingsContent(section){
  case 'matrix':return sectionCard('矩阵显示','紫色代表确定选择，蓝色代表鼠标预览。状态颜色不随选择改变。',
    settingCheck('settingIds','显示人员编号')+
    settingCheck('settingCrosshair','显示十字参考框','点击单格时两方向淡化，悬停时显示蓝色预选')+
+   settingCheck('settingManualCheck','显示人工确认 √','人工修改过红黄绿判断后，在方块右上角显示确认标记')+
    settingRange('settingGlow','紫色发光强度',.5,1.8,.1)+
    settingRange('settingRestContrast','休息日底色强度',.6,1.8,.1));
  case 'timeline':return sectionCard('时间轴轨道','默认显示法定工作、实际在岗和打卡证据，业务轨道在有记录时显示。',
    settingCheck('settingArrows','箭头朝向时间线')+
-   Object.entries({rules:'法定工作区间',events:'中轴打卡事件',actual:'实际在岗区间',span:'首末跨度',trip:'出差区间',leave:'请假区间',outing:'外出区间',overtime:'加班区间'}).map(([id,t])=>
+   Object.entries({rules:'法定工作区间',events:'中轴打卡事件',actual:'实际在岗区间',trip:'出差区间',leave:'请假区间',outing:'外出区间',overtime:'加班区间'}).map(([id,t])=>
      settingCheck('settingTrack_'+id,t)).join(''));
  case 'table':return sectionCard('原始数据列管理','按类别保存显示和列宽；留空宽度则自动铺满，不改变任何原始数据。',
    settingSelect('settingTableKind','数据类别',[
@@ -90,7 +92,7 @@ function bindSettings(){
   const set=(id,value)=>{const e=document.getElementById(id);if(e){if(e.type==='checkbox')e.checked=!!value;else e.value=String(value)}};
   if(section==='appearance'){set('settingFont',p.fontScale||1);set('settingMotion',p.motion!==false)}
   if(section==='matrix'){
-   const m=p.matrix||{};set('settingIds',m.ids!==false);set('settingCrosshair',m.crosshair!==false);
+   const m=p.matrix||{};set('settingIds',m.ids!==false);set('settingCrosshair',m.crosshair!==false);set('settingManualCheck',m.showManualCheck!==false);
    set('settingGlow',m.glow||1);set('settingRestContrast',m.restContrast||1);
    for(const k of ['Glow','RestContrast']){const input=document.getElementById('setting'+k);const output=document.getElementById('setting'+k+'Val');
     input.oninput=()=>{output.textContent=Number(input.value).toFixed(1)+'×'};
@@ -124,7 +126,7 @@ function bindSettings(){
   const d=r14SettingsDraft,p=d.prefs;
   const get=id=>document.getElementById(id),v=id=>get(id)?.value,ch=id=>get(id)?.checked;
   if(section==='appearance'){p.fontScale=Number(v('settingFont')||p.fontScale||1);p.motion=!!ch('settingMotion')}
-  if(section==='matrix'){p.matrix={ids:!!ch('settingIds'),crosshair:!!ch('settingCrosshair'),glow:Number(v('settingGlow')||1),restContrast:Number(v('settingRestContrast')||1)}}
+  if(section==='matrix'){p.matrix={ids:!!ch('settingIds'),crosshair:!!ch('settingCrosshair'),showManualCheck:!!ch('settingManualCheck'),glow:Number(v('settingGlow')||1),restContrast:Number(v('settingRestContrast')||1)}}
   if(section==='timeline'){
    p.arrowsTowardLine=!!ch('settingArrows');
    for(const k of Object.keys(p.timelineTracks))p.timelineTracks[k]=!!ch('settingTrack_'+k);

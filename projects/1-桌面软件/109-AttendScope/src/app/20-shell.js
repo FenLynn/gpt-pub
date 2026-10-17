@@ -96,6 +96,10 @@ function layoutHtml(){
             <option value="outing">外出</option>
           </select>
         </div>
+        <div class="judgment-mode-switch" id="judgmentModeSwitch" aria-label="判断显示模式">
+          <button type="button" data-judgment-mode="initial" class="${state.judgmentMode!=='manual'?'active':''}">初始</button>
+          <button type="button" data-judgment-mode="manual" class="${state.judgmentMode==='manual'?'active':''}" ${hasManualStatuses()?'':'disabled'}>人工</button>
+        </div>
       </section>
     </aside>
 
@@ -138,8 +142,13 @@ function bind(){
   filter.value=state.filter;
   const syncFilterButton=()=>{filterButton.innerHTML=statusFilterLabel(state.filter)};
   filter.onchange=()=>{
-    state.filter=filter.value;updateMatrixFilter();syncFilterButton();
+    state.filter=filter.value;
+    if(['trip','leave','outing','overtime'].includes(state.filter))state.rawDataTab=state.filter;
+    else state.rawDataTab='attendance';
+    state.chartTab='overview';
+    updateMatrixFilter();syncFilterButton();
     filterMenu.classList.remove('open');filterButton.setAttribute('aria-expanded','false');
+    renderAnalysisPanel();
   };
   filterButton.onclick=e=>{
     e.stopPropagation();filterMenu.classList.toggle('open');
@@ -147,6 +156,11 @@ function bind(){
   };
   filterMenu.querySelectorAll('[data-filter-value]').forEach(button=>button.onclick=e=>{
     e.stopPropagation();filter.value=button.dataset.filterValue;filter.dispatchEvent(new Event('change'));
+  });
+  document.querySelectorAll('[data-judgment-mode]').forEach(button=>button.onclick=()=>{
+    const mode=button.dataset.judgmentMode;
+    if(mode==='manual'&&!hasManualStatuses())return;
+    state.judgmentMode=mode;state.saved=false;rememberMonth();render();
   });
   bindSettings();
 
@@ -194,7 +208,7 @@ function bind(){
   document.getElementById('resetDemo').onclick=()=>{
     if(YEAR!==2026||MONTH!==10){toast('演示数据仅用于 2026 年 10 月',true);return}
     Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='main'; state.chartTab='overview';
-    state.revisions=[]; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
+    state.revisions=[];state.manualStatuses={};state.judgmentMode='initial'; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
   };
 
   document.getElementById('connectDir').onclick=connectProjectDir;
@@ -260,7 +274,7 @@ function renderMatrix(){
       const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
       const category=matrixCategory(a),cls='s-'+category,behaviors=attendanceBehaviors(a);
       html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''} ${selected?'cell-focus':''} ${Number(e.id.slice(1))%2?'':'row-alt'} day-${dayType(d)}" data-emp="${e.id}" data-day="${d}">
-        <button class="${cls} ${visible||selected?'':'filtered-out'} ${selected?'selected':''}" style="--status-color:${categoryColor(category)}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n判断：${a.status} · 行为：${behaviors.join(' / ')||'无'}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${behaviors.length?`<i class="corner-mark behavior-${behaviors[0]}"></i>`:''}</button>
+        <button class="${cls} ${visible||selected?'':'filtered-out'} ${selected?'selected':''}" style="--status-color:${categoryColor(category)}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n初始：${attendanceJudgmentSystem(a)} · 当前：${attendanceJudgment(a)}\n行为：${behaviors.join(' / ')||'无'}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${manualStatusFor(a)&&state.prefs?.matrix?.showManualCheck!==false?'<i class="manual-check">✓</i>':''}</button>
       </div>`;
     }
   }
@@ -327,7 +341,7 @@ function renderAnalysisPanel(){
 
 function analysisSelectionBadge(ctx){
   if(ctx.type==='cell'){
-    const tone=ctx.analysis.severity==='problem'?'problem':ctx.analysis.severity==='suspect'?'suspect':'normal';
+    const tone=attendanceJudgment(ctx.analysis);
     return `<span class="selection-chip ${tone}"><i></i>${ctx.analysis.status}</span>`;
   }
   return '';
@@ -339,6 +353,8 @@ function bindAnalysisPanel(ctx){
   document.querySelectorAll('[data-show-records]').forEach(b=>b.onclick=()=>{state.rawDataTab='attendance';renderRawTable(ctx)});
   document.querySelectorAll('[data-dayrecord]').forEach(b=>b.onclick=()=>showRecord(b.dataset.dayrecord));
   document.querySelectorAll('[data-revise]').forEach(b=>b.onclick=()=>reviseCurrent(b.dataset.revise));
+  document.querySelectorAll('[data-manual-status]').forEach(b=>b.onclick=()=>setManualStatusForCurrent(b.dataset.manualStatus));
+  document.querySelectorAll('[data-manual-clear]').forEach(b=>b.onclick=()=>setManualStatusForCurrent(null));
 }
 
 function selectPerson(id){state.selection={type:'person',employeeId:id};state.chartTab='overview';state.chartDay=nearestRecordedDay(id);state.rawPage=1;render()}
