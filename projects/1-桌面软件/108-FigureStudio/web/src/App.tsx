@@ -106,6 +106,192 @@ function clampCanvasZoom(value: number): number {
   return Math.min(CANVAS_ZOOM_MAX, Math.max(CANVAS_ZOOM_MIN, value));
 }
 
+function scaledPx(value: unknown, scale: number): unknown {
+  return typeof value === "number" && Number.isFinite(value) ? value * scale : value;
+}
+
+function scalePlotlyFont(font: any, scale: number): any {
+  return font
+    ? { ...font, size: scaledPx(font.size, scale) }
+    : font;
+}
+
+function scalePlotlyAxis(axis: any, scale: number): any {
+  if (!axis) return axis;
+  return {
+    ...axis,
+    linewidth: scaledPx(axis.linewidth, scale),
+    tickwidth: scaledPx(axis.tickwidth, scale),
+    ticklen: scaledPx(axis.ticklen, scale),
+    gridwidth: scaledPx(axis.gridwidth, scale),
+    tickfont: scalePlotlyFont(axis.tickfont, scale),
+    title: axis.title
+      ? {
+          ...axis.title,
+          standoff: scaledPx(axis.title.standoff, scale),
+          font: scalePlotlyFont(axis.title.font, scale)
+        }
+      : axis.title,
+    minor: axis.minor
+      ? {
+          ...axis.minor,
+          tickwidth: scaledPx(axis.minor.tickwidth, scale),
+          ticklen: scaledPx(axis.minor.ticklen, scale)
+        }
+      : axis.minor
+  };
+}
+
+function scalePlotlyColorbar(colorbar: any, scale: number): any {
+  if (!colorbar) return colorbar;
+  return {
+    ...colorbar,
+    thickness: scaledPx(colorbar.thickness, scale),
+    borderwidth: scaledPx(colorbar.borderwidth, scale),
+    outlinewidth: scaledPx(colorbar.outlinewidth, scale),
+    tickwidth: scaledPx(colorbar.tickwidth, scale),
+    ticklen: scaledPx(colorbar.ticklen, scale),
+    tickfont: scalePlotlyFont(colorbar.tickfont, scale),
+    title: colorbar.title
+      ? {
+          ...colorbar.title,
+          font: scalePlotlyFont(colorbar.title.font, scale)
+        }
+      : colorbar.title
+  };
+}
+
+function scalePlotlyLayoutForPreview(layout: any, scale: number): any {
+  const s = Math.max(0.05, scale);
+  const scaledSceneAxis = (axis: any) => {
+    const next = scalePlotlyAxis(axis, s);
+    return next
+      ? {
+          ...next,
+          backgroundcolor: axis?.backgroundcolor
+        }
+      : next;
+  };
+  return {
+    ...layout,
+    width: Math.max(1, Number(layout.width ?? 1) * s),
+    height: Math.max(1, Number(layout.height ?? 1) * s),
+    margin: layout.margin
+      ? {
+          ...layout.margin,
+          l: scaledPx(layout.margin.l, s),
+          r: scaledPx(layout.margin.r, s),
+          t: scaledPx(layout.margin.t, s),
+          b: scaledPx(layout.margin.b, s),
+          pad: scaledPx(layout.margin.pad, s)
+        }
+      : layout.margin,
+    font: scalePlotlyFont(layout.font, s),
+    title: layout.title
+      ? {
+          ...layout.title,
+          font: scalePlotlyFont(layout.title.font, s),
+          pad: layout.title.pad
+            ? {
+                ...layout.title.pad,
+                l: scaledPx(layout.title.pad.l, s),
+                r: scaledPx(layout.title.pad.r, s),
+                t: scaledPx(layout.title.pad.t, s),
+                b: scaledPx(layout.title.pad.b, s)
+              }
+            : layout.title.pad
+        }
+      : layout.title,
+    xaxis: scalePlotlyAxis(layout.xaxis, s),
+    yaxis: scalePlotlyAxis(layout.yaxis, s),
+    yaxis2: scalePlotlyAxis(layout.yaxis2, s),
+    legend: layout.legend
+      ? {
+          ...layout.legend,
+          borderwidth: scaledPx(layout.legend.borderwidth, s),
+          itemwidth: scaledPx(layout.legend.itemwidth, s),
+          font: scalePlotlyFont(layout.legend.font, s)
+        }
+      : layout.legend,
+    annotations: Array.isArray(layout.annotations)
+      ? layout.annotations.map((annotation: any) => ({
+          ...annotation,
+          ax: scaledPx(annotation.ax, s),
+          ay: scaledPx(annotation.ay, s),
+          arrowwidth: scaledPx(annotation.arrowwidth, s),
+          borderwidth: scaledPx(annotation.borderwidth, s),
+          borderpad: scaledPx(annotation.borderpad, s),
+          font: scalePlotlyFont(annotation.font, s)
+        }))
+      : layout.annotations,
+    shapes: Array.isArray(layout.shapes)
+      ? layout.shapes.map((shape: any) => ({
+          ...shape,
+          line: shape.line
+            ? { ...shape.line, width: scaledPx(shape.line.width, s) }
+            : shape.line
+        }))
+      : layout.shapes,
+    coloraxis: layout.coloraxis
+      ? {
+          ...layout.coloraxis,
+          colorbar: scalePlotlyColorbar(layout.coloraxis.colorbar, s)
+        }
+      : layout.coloraxis,
+    scene: layout.scene
+      ? {
+          ...layout.scene,
+          xaxis: scaledSceneAxis(layout.scene.xaxis),
+          yaxis: scaledSceneAxis(layout.scene.yaxis),
+          zaxis: scaledSceneAxis(layout.scene.zaxis)
+        }
+      : layout.scene
+  };
+}
+
+function scalePlotlyTracesForPreview(traces: any[], scale: number): any[] {
+  const s = Math.max(0.05, scale);
+  return traces.map((trace) => ({
+    ...trace,
+    line: trace.line
+      ? { ...trace.line, width: scaledPx(trace.line.width, s) }
+      : trace.line,
+    marker: trace.marker
+      ? {
+          ...trace.marker,
+          size:
+            typeof trace.marker.size === "number"
+              ? trace.marker.size * s
+              : trace.marker.size,
+          line: trace.marker.line
+            ? {
+                ...trace.marker.line,
+                width: scaledPx(trace.marker.line.width, s)
+              }
+            : trace.marker.line
+        }
+      : trace.marker,
+    error_y: trace.error_y
+      ? {
+          ...trace.error_y,
+          thickness: scaledPx(trace.error_y.thickness, s),
+          width: scaledPx(trace.error_y.width, s)
+        }
+      : trace.error_y,
+    colorbar: scalePlotlyColorbar(trace.colorbar, s),
+    contours: trace.contours
+      ? Object.fromEntries(
+          Object.entries(trace.contours).map(([key, value]: [string, any]) => [
+            key,
+            value && typeof value === "object"
+              ? { ...value, width: scaledPx(value.width, s) }
+              : value
+          ])
+        )
+      : trace.contours
+  }));
+}
+
 function readInitialCanvasZoom(): number {
   const value = Number(new URLSearchParams(window.location.search).get("zoom") ?? "1");
   return Number.isFinite(value) ? clampCanvasZoom(value) : 1;
@@ -974,6 +1160,25 @@ function App() {
             }
           }
         : layout;
+    const previewRenderScale = Math.max(0.1, displayScale);
+    const previewLayout = scalePlotlyLayoutForPreview(
+      interactiveLayout,
+      previewRenderScale
+    );
+    const previewTraces = scalePlotlyTracesForPreview(
+      traces as any[],
+      previewRenderScale
+    );
+    const glPixelRatio = interactive3D
+      ? Math.max(
+          1.5,
+          Math.min(
+            2.5,
+            (window.devicePixelRatio || 1) *
+              (previewRenderScale < 1 ? 2 : 1.5)
+          )
+        )
+      : undefined;
 
     const config = {
       responsive: false,
@@ -982,6 +1187,7 @@ function App() {
       scrollZoom: true,
       staticPlot: false,
       doubleClick: "reset+autosize",
+      plotGlPixelRatio: glPixelRatio,
       editable: false,
       edits: {
         annotationPosition: false,
@@ -1020,8 +1226,13 @@ function App() {
       ? String(interactiveLayout.scene?.dragmode ?? "orbit")
       : "";
     node.dataset.scrollZoom = "true";
+    node.dataset.previewRenderScale = previewRenderScale.toFixed(3);
+    node.dataset.cssTransformScaling = "false";
+    if (interactive3D) {
+      node.dataset.glPixelRatio = Number(glPixelRatio ?? 1).toFixed(2);
+    }
 
-    Plotly.react(node, traces, interactiveLayout, config).then(() => {
+    Plotly.react(node, previewTraces, previewLayout, config).then(() => {
       if (cancelled) return;
 
       node.removeAllListeners?.("plotly_click");
@@ -1129,12 +1340,24 @@ function App() {
       delete node.dataset.interactive3d;
       delete node.dataset.sceneDragmode;
       delete node.dataset.scrollZoom;
+      delete node.dataset.previewRenderScale;
+      delete node.dataset.cssTransformScaling;
+      delete node.dataset.glPixelRatio;
       node.removeAllListeners?.("plotly_click");
       node.removeAllListeners?.("plotly_legendclick");
       node.removeAllListeners?.("plotly_relayout");
       node.removeEventListener("click", handleDomClick);
     };
-  }, [activeFigure, history, layout, orderedSeries, selectSeries, traces, usePrecision]);
+  }, [
+    activeFigure,
+    displayScale,
+    history,
+    layout,
+    orderedSeries,
+    selectSeries,
+    traces,
+    usePrecision
+  ]);
 
   const patchProject = useCallback(
     (updater: (current: ProjectState) => ProjectState) => {
@@ -3403,15 +3626,16 @@ function App() {
                   }}
                 >
                   <div
-                    className={usePrecision ? "figure-paper is-vector-preview" : "figure-paper"}
+                    className={
+                      usePrecision
+                        ? "figure-paper is-vector-preview"
+                        : "figure-paper is-native-resolution-preview"
+                    }
                     data-vector-preview={usePrecision ? "true" : "false"}
-                    style={usePrecision ? {
+                    data-native-resolution-preview={!usePrecision ? "true" : "false"}
+                    style={{
                       width: scaledWidth + "px",
                       height: scaledHeight + "px"
-                    } : {
-                      width: layout.width + "px",
-                      height: layout.height + "px",
-                      transform: "scale(" + displayScale + ")"
                     }}
                   >
                     {isPublicationBoard && activeFigure ? (
@@ -3466,8 +3690,8 @@ function App() {
                         className={"plot-host" + (surfaceTemplate ? " is-interactive-3d" : "")}
                         data-3d-interactive={surfaceTemplate ? "true" : "false"}
                         style={{
-                          width: layout.width + "px",
-                          height: layout.height + "px"
+                          width: scaledWidth + "px",
+                          height: scaledHeight + "px"
                         }}
                       />
                     )}
