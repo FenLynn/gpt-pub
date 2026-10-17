@@ -134,6 +134,50 @@ export function createFieldSheet(): DataSheet {
   };
 }
 
+export function createPeaksProjectionSheet(): DataSheet {
+  const x = Array.from({ length: 49 }, (_v, i) =>
+    Number((-3 + (6 * i) / 48).toFixed(4))
+  );
+  const columns: DataSheet["columns"] = [{
+    id: "peaks-x",
+    name: "x",
+    role: "X",
+    values: x
+  }];
+  const rowCoordinates: number[] = [];
+  const rowCoordinateByColumnId: Record<string, number> = {};
+  const peaks = (xv: number, yv: number) =>
+    3 * Math.pow(1 - xv, 2) * Math.exp(-(xv * xv) - Math.pow(yv + 1, 2))
+    - 10 * (xv / 5 - Math.pow(xv, 3) - Math.pow(yv, 5)) *
+      Math.exp(-(xv * xv) - yv * yv)
+    - (1 / 3) * Math.exp(-Math.pow(xv + 1, 2) - yv * yv);
+
+  for (let row = 0; row < 41; row += 1) {
+    const y = Number((-3 + (6 * row) / 40).toFixed(4));
+    const rowId = "peaks-row-" + String(row + 1);
+    rowCoordinates.push(y);
+    rowCoordinateByColumnId[rowId] = y;
+    columns.push({
+      id: rowId,
+      name: y.toFixed(2),
+      unit: "a.u.",
+      role: "Y",
+      values: x.map((xv) => Number(peaks(xv, y).toFixed(6)))
+    });
+  }
+  return {
+    id: id("sheet-peaks-projection"),
+    name: "Peaks 三向投影",
+    source: { kind: "embedded" },
+    columns,
+    metadata: {
+      rowCoordinates,
+      rowCoordinateByColumnId,
+      rowAxisName: "y"
+    }
+  };
+}
+
 export function createDualYAxisSheet(): DataSheet {
   const current: number[] = [];
   const output: number[] = [];
@@ -423,6 +467,7 @@ export function createInitialProject(
 
   const spectrumSheet = createSpectrumSheet();
   const fieldSheet = createFieldSheet();
+  const peaksProjectionSheet = createPeaksProjectionSheet();
   const doubleYSheet = createDualYAxisSheet();
   const waterfallSheet = createWaterfallSheet();
   const scatterErrorbarSheet = createScatterErrorbarSheet();
@@ -459,7 +504,7 @@ export function createInitialProject(
     id: id("book-field"),
     name: "二维光场数据",
     folderId: "folder-experiment",
-    sheets: [fieldSheet]
+    sheets: [fieldSheet, peaksProjectionSheet]
   };
 
   const commonPlotsBook: DataBook = {
@@ -565,6 +610,29 @@ export function createInitialProject(
       colorScale: "Cividis",
       reverseColorScale: false,
       zTitle: "Normalized intensity (a.u.)"
+    }
+  );
+
+  const projectedSurfaceFigure = makeFigure(
+    peaksProjectionSheet,
+    "Fig S2 · 3D 曲面三向投影",
+    "surface-projection-3d",
+    defaults,
+    "folder-paper",
+    {
+      xTitle: "x",
+      yTitle: "y",
+      zTitle: "z = peaks(x, y)",
+      plotTitle: "Surface with three-direction contour projections",
+      legendVisible: false,
+      colorScale: "Viridis",
+      colorbarTitle: "z",
+      surfaceProjectionFloor: true,
+      surfaceProjectionX: true,
+      surfaceProjectionY: true,
+      surfaceProjectionContourCount: 12,
+      surfaceProjectionLineWidthPt: 0.45,
+      surfaceProjectionUseColorMap: true
     }
   );
 
@@ -697,6 +765,7 @@ export function createInitialProject(
       heatmapFigure,
       contourFigure,
       surfaceFigure,
+      projectedSurfaceFigure,
       ...(includeVisualQa
         ? [
             scatterFigure,

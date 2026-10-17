@@ -244,7 +244,8 @@ export function buildTraces(args: {
   const fieldTemplate =
     template === "heatmap" ||
     template === "contour" ||
-    template === "surface-3d";
+    template === "surface-3d" ||
+    template === "surface-projection-3d";
   const series = fieldTemplate
     ? mappedSeries
     : mappedSeries.filter(
@@ -402,18 +403,63 @@ export function buildTraces(args: {
     ];
   }
 
-  if (template === "surface-3d") {
+  if (template === "surface-3d" || template === "surface-projection-3d") {
+    const projectionTemplate = template === "surface-projection-3d";
     const surfaceX = dataset.x.values.every(
       (value) => value === null || typeof value === "number"
     )
       ? dataset.x.values
       : dataset.x.values.map((_value, index) => index + 1);
+    const surfaceY = resolveFieldRowCoordinates(dataset, series);
+    const surfaceZ = series.map((column) => column.values);
+    const finiteX = surfaceX.filter(
+      (value): value is number => typeof value === "number" && Number.isFinite(value)
+    );
+    const finiteY = surfaceY.filter((value) => Number.isFinite(value));
+    const finiteZ = surfaceZ.flat().filter(
+      (value): value is number => typeof value === "number" && Number.isFinite(value)
+    );
+    const bound = (values: number[], fallback: [number, number]): [number, number] => {
+      if (!values.length) return fallback;
+      let low = Math.min(...values), high = Math.max(...values);
+      if (!(high > low)) { low -= 0.5; high += 0.5; }
+      return [low, high];
+    };
+    const [xLow, xHigh] = bound(finiteX, [0, 1]);
+    const [yLow, yHigh] = bound(finiteY, [0, 1]);
+    const [zLow, zHigh] = bound(finiteZ, [0, 1]);
+    const projectionCount = Math.max(
+      4,
+      Math.min(40, Math.round(figure.figureOverrides.surfaceProjectionContourCount ?? 12))
+    );
+    const projectionWidth = ptToPx(
+      figure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.45
+    );
+    const projectionUseColorMap =
+      figure.figureOverrides.surfaceProjectionUseColorMap ?? true;
+    const contourSpec = (
+      low: number,
+      high: number,
+      projected: boolean,
+      axis: "x" | "y" | "z"
+    ) => ({
+      show: projectionTemplate && projected,
+      start: low,
+      end: high,
+      size: (high - low) / Math.max(1, projectionCount - 1),
+      width: projectionWidth,
+      usecolormap: projectionUseColorMap,
+      color: projectionUseColorMap
+        ? undefined
+        : GOLDEN_STYLE.field.projectionLineColor,
+      project: { [axis]: projectionTemplate && projected }
+    });
     return [
       {
         type: "surface",
         x: surfaceX,
-        y: resolveFieldRowCoordinates(dataset, series),
-        z: series.map((column) => column.values),
+        y: surfaceY,
+        z: surfaceZ,
         colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
         reversescale: figure.figureOverrides.reverseColorScale ?? false,
         showscale: figure.figureOverrides.colorbarVisible ?? true,
@@ -426,6 +472,28 @@ export function buildTraces(args: {
           figure.figureOverrides.zAutoRange === false
             ? figure.figureOverrides.zMax
             : undefined,
+        contours: projectionTemplate
+          ? {
+              z: contourSpec(
+                zLow,
+                zHigh,
+                figure.figureOverrides.surfaceProjectionFloor ?? true,
+                "z"
+              ),
+              x: contourSpec(
+                xLow,
+                xHigh,
+                figure.figureOverrides.surfaceProjectionX ?? true,
+                "x"
+              ),
+              y: contourSpec(
+                yLow,
+                yHigh,
+                figure.figureOverrides.surfaceProjectionY ?? true,
+                "y"
+              )
+            }
+          : undefined,
         colorbar: {
           thickness: GOLDEN_STYLE.field.colorbarThicknessPx,
           outlinewidth: ptToPx(GOLDEN_STYLE.field.colorbarOutlinePt),
@@ -928,6 +996,7 @@ export function buildLayout(args: {
   const continuousXY =
     !isField2D &&
     figure.templateId !== "surface-3d" &&
+    figure.templateId !== "surface-projection-3d" &&
     figure.templateId !== "bar" &&
     figure.templateId !== "grouped-bar" &&
     figure.templateId !== "stacked-bar";
@@ -1240,7 +1309,12 @@ export function buildLayout(args: {
     bargroupgap: overrides.barGroupGap ?? GOLDEN_STYLE.bar.groupGap
   };
 
-  if (figure.templateId === "surface-3d") {
+  if (
+    figure.templateId === "surface-3d" ||
+    figure.templateId === "surface-projection-3d"
+  ) {
+    const projectionSurface =
+      figure.templateId === "surface-projection-3d";
     const sceneAxisTitleSizePx =
       axisTitleSizePx * GOLDEN_STYLE.field.surfaceAxisTitleScale;
     const sceneTickLabelSizePx =
@@ -1262,7 +1336,9 @@ export function buildLayout(args: {
       xaxis: {
         title: { text: "" },
         showbackground: true,
-        backgroundcolor: GOLDEN_STYLE.field.planeBackground,
+        backgroundcolor: projectionSurface
+          ? GOLDEN_STYLE.field.projectionPaneBackground
+          : GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
@@ -1281,7 +1357,9 @@ export function buildLayout(args: {
       yaxis: {
         title: { text: "" },
         showbackground: true,
-        backgroundcolor: GOLDEN_STYLE.field.planeBackground,
+        backgroundcolor: projectionSurface
+          ? GOLDEN_STYLE.field.projectionPaneBackground
+          : GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
@@ -1300,7 +1378,9 @@ export function buildLayout(args: {
       zaxis: {
         title: { text: "" },
         showbackground: true,
-        backgroundcolor: GOLDEN_STYLE.field.planeBackground,
+        backgroundcolor: projectionSurface
+          ? GOLDEN_STYLE.field.projectionPaneBackground
+          : GOLDEN_STYLE.field.planeBackground,
         showline: true,
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,

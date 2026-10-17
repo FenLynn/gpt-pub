@@ -89,6 +89,7 @@ const NATURE_GALLERY_MODE =
 const GOLDEN_TARGET = new URLSearchParams(window.location.search).get("golden");
 const LORENTZ_GOLDEN_MODE = GOLDEN_TARGET === "lorentz";
 const SURFACE_GOLDEN_MODE = GOLDEN_TARGET === "surface";
+const SURFACE_PROJECTION_MODE = GOLDEN_TARGET === "surface-projection";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
@@ -437,6 +438,11 @@ function App() {
     } else if (SURFACE_GOLDEN_MODE) {
       const goldenSurface = result.figures.find(figure => figure.templateId === "surface-3d");
       if (goldenSurface) result.activeFigureId = goldenSurface.id;
+    } else if (SURFACE_PROJECTION_MODE) {
+      const projectedSurface = result.figures.find(
+        figure => figure.templateId === "surface-projection-3d"
+      );
+      if (projectedSurface) result.activeFigureId = projectedSurface.id;
     } else if (NATURE_GALLERY_MODE) {
       const params = new URLSearchParams(window.location.search);
       const requested = Number(params.get("sample") ?? 1);
@@ -475,7 +481,7 @@ function App() {
     ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
   ]);
   const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
-    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE || SURFACE_GOLDEN_MODE) && initialFigureId
+    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE || SURFACE_GOLDEN_MODE || SURFACE_PROJECTION_MODE) && initialFigureId
       ? { type: "figure", id: initialFigureId }
       : initialBookId
       ? { type: "book", id: initialBookId }
@@ -511,7 +517,11 @@ function App() {
   );
   const [uiScale, setUiScale] = useState(readUiScale);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>(
-    LORENTZ_GOLDEN_MODE ? "annotation" : SURFACE_GOLDEN_MODE ? "figure" : "series"
+    LORENTZ_GOLDEN_MODE
+      ? "annotation"
+      : SURFACE_GOLDEN_MODE || SURFACE_PROJECTION_MODE
+      ? "figure"
+      : "series"
   );
   const [selectedLorentzAnnotation, setSelectedLorentzAnnotation] = useState("absorption");
   const [dataInspectorTab, setDataInspectorTab] = useState<"data" | "column">("data");
@@ -2090,7 +2100,13 @@ function App() {
         contourLevels: source.contourLevels,
         contourFill: source.contourFill,
         contourLines: source.contourLines,
-        contourLabels: source.contourLabels
+        contourLabels: source.contourLabels,
+        surfaceProjectionFloor: source.surfaceProjectionFloor,
+        surfaceProjectionX: source.surfaceProjectionX,
+        surfaceProjectionY: source.surfaceProjectionY,
+        surfaceProjectionContourCount: source.surfaceProjectionContourCount,
+        surfaceProjectionLineWidthPt: source.surfaceProjectionLineWidthPt,
+        surfaceProjectionUseColorMap: source.surfaceProjectionUseColorMap
       }
     };
 
@@ -2535,7 +2551,11 @@ function App() {
     primaryOverride.errorBarCapSizePt ?? GOLDEN_STYLE.marker.errorCapPt;
   const errorBarColor = primaryOverride.errorBarColor ?? selectedColor;
   const visible = primaryOverride.visible ?? true;
-  const surfaceTemplate = activeFigure?.templateId === "surface-3d";
+  const surfaceTemplate =
+    activeFigure?.templateId === "surface-3d" ||
+    activeFigure?.templateId === "surface-projection-3d";
+  const surfaceProjectionTemplate =
+    activeFigure?.templateId === "surface-projection-3d";
   const contourTemplate = activeFigure?.templateId === "contour";
   const field2DTemplate =
     activeFigure?.templateId === "heatmap" || contourTemplate;
@@ -4049,7 +4069,7 @@ function App() {
                     <div className="prop-row">
                       <label>配色</label>
                       <select
-                        value={activeFigure.figureOverrides.colorCycle ?? "matplotlib"}
+                        value={activeFigure.figureOverrides.colorCycle ?? "golden"}
                         onChange={(event) =>
                           setFigureField(
                             "colorCycle",
@@ -4057,6 +4077,10 @@ function App() {
                           )
                         }
                       >
+                        <option value="golden">Golden · Lorentz</option>
+                        <option value="mist-blue-celadon">雾蓝青瓷</option>
+                        <option value="sea-salt-coral">海盐珊瑚</option>
+                        <option value="burgundy-slate">勃艮第灰</option>
                         <option value="matplotlib">Matplotlib T10</option>
                         <option value="matlab">MATLAB gem</option>
                       </select>
@@ -4309,6 +4333,50 @@ function App() {
                               }
                             />
                           </div>
+                        )}
+
+                        {surfaceProjectionTemplate && (
+                          <>
+                            <div className="section-divider">三向等高投影</div>
+                            <div className="prop-row">
+                              <label>底面 Z</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionFloor ?? true}
+                                onChange={(value) => setFigureField("surfaceProjectionFloor", value)} />
+                            </div>
+                            <div className="prop-row">
+                              <label>X 侧壁</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionX ?? true}
+                                onChange={(value) => setFigureField("surfaceProjectionX", value)} />
+                            </div>
+                            <div className="prop-row">
+                              <label>Y 侧壁</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionY ?? true}
+                                onChange={(value) => setFigureField("surfaceProjectionY", value)} />
+                            </div>
+                            <div className="prop-row">
+                              <label>投影级数</label>
+                              <input type="number" min="4" max="40" step="1"
+                                value={activeFigure.figureOverrides.surfaceProjectionContourCount ?? 12}
+                                onChange={(event) => setFigureField(
+                                  "surfaceProjectionContourCount",
+                                  Math.max(4,Math.min(40,Number(event.target.value)))
+                                )} />
+                            </div>
+                            <div className="prop-row">
+                              <label>投影线宽</label>
+                              <div className="compact-number">
+                                <input type="number" min="0.1" max="2" step="0.05"
+                                  value={activeFigure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.45}
+                                  onChange={(event) => setFigureField("surfaceProjectionLineWidthPt",Number(event.target.value))} />
+                                <span>pt</span>
+                              </div>
+                            </div>
+                            <div className="prop-row">
+                              <label>跟随色图</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionUseColorMap ?? true}
+                                onChange={(value) => setFigureField("surfaceProjectionUseColorMap", value)} />
+                            </div>
+                          </>
                         )}
 
                         {contourTemplate && (
