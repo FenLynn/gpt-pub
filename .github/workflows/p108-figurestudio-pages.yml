@@ -85,7 +85,7 @@ jobs:
             sleep 0.2
           done
           curl --fail --silent "http://127.0.0.1:4173/gpt-pub/p108/index.html" > /dev/null
-          for number in 1 4 5 6 7 8 9 10 14; do
+          for number in 1 4 5 6 7 8 9 10 11 12 13 14; do
             printf -v label 'N%02d' "$number"
             "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1440,900 --virtual-time-budget=8000 \
               --screenshot="$RUNNER_TEMP/p108-screenshots/$label.png" \
@@ -107,22 +107,6 @@ jobs:
               echo "Browser preview N01 MathJax SVG OK"
             fi
             echo "Browser preview $label OK"
-          done
-
-          # Plotly-rendered Golden Style families need their own browser QA.
-          for number in 11 12 13; do
-            printf -v label 'N%02d' "$number"
-            "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1440,900 --virtual-time-budget=8000 \
-              --screenshot="$RUNNER_TEMP/p108-screenshots/$label.png" \
-              --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?gallery=1&sample=$number" \
-              > "$RUNNER_TEMP/p108-screenshots/$label.html" 2>"$RUNNER_TEMP/p108-screenshots/$label.stderr"
-            test -s "$RUNNER_TEMP/p108-screenshots/$label.png"
-            if ! grep -q 'class="main-svg"' "$RUNNER_TEMP/p108-screenshots/$label.html"; then
-              echo "::error::$label Plotly Golden family did not render"
-              tail -n 25 "$RUNNER_TEMP/p108-screenshots/$label.stderr" || true
-              exit 1
-            fi
-            echo "Browser preview $label Plotly Golden OK"
           done
 
           for board in golden sunny-blue-bamboo mist-blue-celadon sea-salt-coral apricot-haze burgundy-slate nature-aurora; do
@@ -176,6 +160,8 @@ jobs:
           grep -q 'data-testid="surface-3d-interaction"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-canvas-direct-pan="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-canvas-direct-wheel-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q '3D 曲面质量' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q '曲面细分' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
 
           "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1500,950 --virtual-time-budget=9000 \
             --screenshot="$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.png" \
