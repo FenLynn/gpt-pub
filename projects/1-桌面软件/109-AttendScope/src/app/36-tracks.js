@@ -58,16 +58,17 @@ function r14TrackData(a,range=timelineRange(a),width=800){
 function mountAttendanceTimeline(a){
   const el=document.getElementById('attendanceTimelineChart');if(!el||!window.echarts)return;
   const chart=initAttendChart(el);if(!chart)return;
-  const SIDE=12,SLIDER_BOTTOM=32,SLIDER_HEIGHT=34;
+  const SIDE=12,SLIDER_BOTTOM=30,SLIDER_HEIGHT=34;
   const range=timelineRange(a);
   let model=r14TrackData(a,range,chart.getWidth());
-  const behaviorLaneHeight=(api)=>Math.max(11,Math.min(15,Math.abs(api.size([0,1])[1])*.46));
+  const behaviorRowHeight=(api)=>Math.max(1,Math.abs(api.size([0,1])[1]));
+  const behaviorLaneHeight=(api)=>behaviorRowHeight(api);
   const bandRender=(params,api)=>{
     const d=model.bars[params.dataIndex];if(!d)return null;
     const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
-    const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=behaviorLaneHeight(api);
-    const children=[{type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:h/2},
-      style:{fill:d.color,opacity:.94,stroke:'rgba(255,255,255,.94)',lineWidth:.8}}];
+    const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=Math.max(1,behaviorLaneHeight(api)-.5);
+    const children=[{type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
+      style:{fill:d.color,opacity:.94,stroke:'rgba(255,255,255,.46)',lineWidth:.45}}];
     if(w>54)children.push({type:'text',style:{
       x:x+w-7,y:p[1],text:d.title,fill:'#344d61',font:'650 9px "Segoe UI Variable", sans-serif',
       align:'right',verticalAlign:'middle'
@@ -91,9 +92,9 @@ function mountAttendanceTimeline(a){
   };
   const railRender=(params,api)=>{
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
-    const p=api.coord([0,lane]),q=api.coord([1440,lane]),h=behaviorLaneHeight(api),active=state.filter===track.key;
-    return {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:h/2},
-      style:{fill:track.color,opacity:active?.13:.055,stroke:track.color,lineWidth:active?.9:.5}};
+    const p=api.coord([0,lane]),q=api.coord([1440,lane]),h=Math.max(1,behaviorLaneHeight(api)+.5),active=state.filter===track.key;
+    return {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:0},
+      style:{fill:track.color,opacity:active?.055:.028,stroke:'rgba(255,255,255,.32)',lineWidth:.35}};
   };
   const railLabelRender=(params,api)=>{
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
@@ -108,8 +109,8 @@ function mountAttendanceTimeline(a){
   };
   const scheduleRender=(params,api)=>{
     const x0=api.coord([api.value(0),0])[0],x1=api.coord([api.value(1),0])[0],cs=params.coordSys;
-    return {type:'rect',shape:{x:Math.min(x0,x1),y:cs.y+4,width:Math.abs(x1-x0),height:Math.max(12,cs.height-8),r:6},
-      style:{fill:'rgba(132,155,173,.13)',stroke:'rgba(122,145,164,.20)',lineWidth:.75}};
+    return {type:'rect',shape:{x:Math.min(x0,x1),y:cs.y,width:Math.abs(x1-x0),height:Math.max(1,cs.height),r:0},
+      style:{fill:'rgba(132,155,173,.042)',stroke:'rgba(122,145,164,.065)',lineWidth:.35}};
   };
   const baselineRender=(params,api)=>{
     const x0=api.coord([0,0])[0],x1=api.coord([1440,0])[0];
@@ -137,13 +138,13 @@ function mountAttendanceTimeline(a){
       {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
       {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:SIDE,right:SIDE,bottom:SLIDER_BOTTOM,height:SLIDER_HEIGHT,
         minValueSpan:15,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
-        backgroundColor:'#e9edf0',fillerColor:'#ffffff',borderColor:'#d6dee4',
-        handleSize:'62%',handleStyle:{color:'#8a9aa6',borderColor:'#708592',borderWidth:1},
-        moveHandleStyle:{color:'#8a9aa6',opacity:.62}}
+        backgroundColor:'#edf0f2',fillerColor:'#ffffff',borderColor:'#d9dfe4',
+        handleSize:'100%',handleStyle:{color:'#8999a5',borderColor:'#718693',borderWidth:1},
+        moveHandleStyle:{color:'#8999a5',opacity:.58}}
     ],
     series:[
       {id:'schedule',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
-        data:model.workWindows.map(x=>[x[0],x[1]]),renderItem:scheduleRender,z:1},
+        data:model.workWindows.map(x=>[x[0],x[1]]),renderItem:scheduleRender,z:0},
       {id:'behavior-rails',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
         data:[2,3,4,5].map(i=>[0,1440,i]),renderItem:railRender,z:2},
       {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.bars,renderItem:bandRender,z:4},
