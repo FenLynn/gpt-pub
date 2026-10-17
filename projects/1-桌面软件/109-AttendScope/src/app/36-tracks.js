@@ -66,9 +66,9 @@ function mountAttendanceTimeline(a){
   const bandRender=(params,api)=>{
     const d=model.bars[params.dataIndex];if(!d)return null;
     const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
-    const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=Math.max(1,behaviorLaneHeight(api)-.5);
+    const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=Math.max(1,behaviorLaneHeight(api)+.5);
     const children=[{type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
-      style:{fill:d.color,opacity:.94,stroke:'rgba(255,255,255,.46)',lineWidth:.45}}];
+      style:{fill:d.color,opacity:.94,stroke:'transparent',lineWidth:0}}];
     if(w>54)children.push({type:'text',style:{
       x:x+w-7,y:p[1],text:d.title,fill:'#344d61',font:'650 9px "Segoe UI Variable", sans-serif',
       align:'right',verticalAlign:'middle'
@@ -94,7 +94,7 @@ function mountAttendanceTimeline(a){
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
     const p=api.coord([0,lane]),q=api.coord([1440,lane]),h=Math.max(1,behaviorLaneHeight(api)+.5),active=state.filter===track.key;
     return {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:0},
-      style:{fill:track.color,opacity:active?.055:.028,stroke:'rgba(255,255,255,.32)',lineWidth:.35}};
+      style:{fill:track.color,opacity:active?.052:.024,stroke:'transparent',lineWidth:0}};
   };
   const railLabelRender=(params,api)=>{
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
