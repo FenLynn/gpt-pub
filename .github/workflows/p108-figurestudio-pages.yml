@@ -169,9 +169,27 @@ jobs:
           grep -q 'data-interactive3d="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-scene-dragmode="orbit"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-scroll-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-css-transform-scaling="false"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-preview-render-scale="' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-gl-pixel-ratio="' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-native-resolution-preview="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-testid="surface-3d-interaction"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-canvas-direct-pan="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-canvas-direct-wheel-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+
+          "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1500,950 --virtual-time-budget=9000 \
+            --screenshot="$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.png" \
+            --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=surface-projection&zoom=2" \
+            > "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html" 2>"$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.stderr"
+          test -s "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.png"
+          grep -q 'data-canvas-zoom="2.00"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
+          grep -q 'data-css-transform-scaling="false"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
+          grep -q 'data-native-resolution-preview="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
+          grep -q 'data-gl-pixel-ratio="' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
+          if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"; then
+            echo "::error::200% 3D preview did not rerender WebGL at native size"
+            exit 1
+          fi
 
           if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"; then
             echo "::error::3D projection template did not render through WebGL"

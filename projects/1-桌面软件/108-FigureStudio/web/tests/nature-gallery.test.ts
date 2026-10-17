@@ -16,6 +16,7 @@ import {
 } from "../src/plot/goldenStyle";
 import { PUBLICATION_PALETTES } from "../src/plot/palettes";
 import { templates } from "../src/plot/templates";
+import { buildSurfaceVectorSvg } from "../src/export/surfaceVectorSvg";
 
 assert.equal(PUBLICATION_PALETTES["mist-blue-celadon"].colors[0],"#4F6D8A");
 assert.equal(PUBLICATION_PALETTES["sea-salt-coral"].colors[3],"#F4A7AE");
@@ -230,6 +231,26 @@ for (let n=0; n<gallery.length; n++) {
   assert.equal(projectedTraces[0]?.contours?.x?.project?.x,true,"3D x-wall projection missing");
   assert.equal(projectedTraces[0]?.contours?.y?.project?.y,true,"3D y-wall projection missing");
   assert.equal(projectedSurface!.figureOverrides.colorScale,"Viridis");
+  const projectedPhysical=resolveCanvasMm(presets.scientific,projectedSurface!);
+  const vectorSurfaceSvg=buildSurfaceVectorSvg({
+    trace: projectedTraces[0],
+    figure: projectedSurface!,
+    layout: projectedLayout,
+    width: Number(projectedLayout.width),
+    height: Number(projectedLayout.height),
+    widthMm: projectedPhysical.widthMm,
+    heightMm: projectedPhysical.heightMm,
+    camera: projectedLayout.scene?.camera
+  });
+  assert.match(vectorSurfaceSvg,/data-figurestudio-vector-surface="true"/);
+  assert.match(vectorSurfaceSvg,/<polygon /,
+    "3D SVG export must contain vector surface polygons");
+  assert.match(vectorSurfaceSvg,/<linearGradient /,
+    "3D SVG export must contain a vector colorbar gradient");
+  assert.doesNotMatch(vectorSurfaceSvg,/<image\b/,
+    "3D SVG export must never embed the WebGL raster canvas");
+  assert.ok((vectorSurfaceSvg.match(/<path /g)?.length ?? 0)>20,
+    "3D projection SVG should preserve contour/axis vector paths");
   assert.deepEqual(projectedLayout.scene?.domain?.x,[...GOLDEN_STYLE.field.projectionDomainX],
     "Projected 3D scene should use the expanded horizontal domain");
   assert.deepEqual(projectedLayout.scene?.domain?.y,[...GOLDEN_STYLE.field.projectionDomainY],
