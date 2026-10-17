@@ -40,6 +40,9 @@ export const templates: TemplateDefinition[] = [
   { id: "offset-spectrum", label: "堆叠光谱", family: "XY", input: { ...seriesInput, minSeries: 2 } },
   { id: "waterfall", label: "瀑布图", family: "XY", input: { ...seriesInput, minSeries: 2 } },
   { id: "double-y", label: "双 Y 轴", family: "XY", input: { ...seriesInput, minSeries: 2 } },
+  { id: "pca-ellipse", label: "PCA + 置信椭圆", family: "XY", input: { ...seriesInput, minSeries: 2 } },
+  { id: "volcano", label: "Volcano / 火山图", family: "XY", input: seriesInput },
+  { id: "ridgeline", label: "Ridgeline / 山脊密度", family: "XY", input: { ...seriesInput, minSeries: 2 } },
   { id: "bar", label: "柱状图", family: "Bar", input: seriesInput },
   {
     id: "grouped-bar",

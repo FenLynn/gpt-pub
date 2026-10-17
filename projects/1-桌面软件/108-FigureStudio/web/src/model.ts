@@ -89,6 +89,9 @@ export type PlotTemplateId =
   | "offset-spectrum"
   | "waterfall"
   | "double-y"
+  | "pca-ellipse"
+  | "volcano"
+  | "ridgeline"
   | "bar"
   | "grouped-bar"
   | "stacked-bar"
@@ -297,6 +300,15 @@ export interface FigureOverrides {
   surfaceProjectionFloorGap?: number;
   surfaceProjectionLineWidthPt?: number;
   surfaceProjectionUseColorMap?: boolean;
+
+  pcaEllipseScale?: number;
+  pcaEllipseFillOpacity?: number;
+  volcanoXThreshold?: number;
+  volcanoYThreshold?: number;
+  volcanoPointOpacity?: number;
+  ridgelineOffset?: number;
+  ridgelineScale?: number;
+  ridgelineFillOpacity?: number;
 }
 
 export interface FigureDataRef {

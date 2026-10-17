@@ -124,6 +124,49 @@ function visibleSeries(dataset: Dataset, figure: FigureSpec): PlotColumn[] {
   );
 }
 
+function rgbaFromHex(color: string, alpha: number): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return color;
+  const value = Number.parseInt(match[1], 16);
+  return "rgba(" +
+    ((value >> 16) & 255) + "," +
+    ((value >> 8) & 255) + "," +
+    (value & 255) + "," +
+    Math.max(0, Math.min(1, alpha)) + ")";
+}
+
+function ellipsePolygon(
+  x: number[],
+  y: number[],
+  scale: number
+): { x: number[]; y: number[] } | undefined {
+  const pairs = x.map((value,index)=>[value,y[index]] as const)
+    .filter(([a,b])=>Number.isFinite(a)&&Number.isFinite(b));
+  if (pairs.length < 3) return undefined;
+  const mx = pairs.reduce((sum,[a])=>sum+a,0)/pairs.length;
+  const my = pairs.reduce((sum,[,b])=>sum+b,0)/pairs.length;
+  let cxx=0, cyy=0, cxy=0;
+  for (const [a,b] of pairs) {
+    const dx=a-mx, dy=b-my;
+    cxx+=dx*dx; cyy+=dy*dy; cxy+=dx*dy;
+  }
+  const denom=Math.max(1,pairs.length-1);
+  cxx/=denom; cyy/=denom; cxy/=denom;
+  const root=Math.sqrt(Math.max(0,(cxx-cyy)*(cxx-cyy)+4*cxy*cxy));
+  const l1=Math.max(0,(cxx+cyy+root)/2);
+  const l2=Math.max(0,(cxx+cyy-root)/2);
+  const angle=0.5*Math.atan2(2*cxy,cxx-cyy);
+  const ca=Math.cos(angle), sa=Math.sin(angle);
+  const a=scale*Math.sqrt(l1), b=scale*Math.sqrt(l2);
+  const ex:number[]=[], ey:number[]=[];
+  for(let i=0;i<=96;i+=1){
+    const t=2*Math.PI*i/96, ct=Math.cos(t), st=Math.sin(t);
+    ex.push(mx+a*ct*ca-b*st*sa);
+    ey.push(my+a*ct*sa+b*st*ca);
+  }
+  return {x:ex,y:ey};
+}
+
 function baseXYTrace(
   dataset: Dataset,
   figure: FigureSpec,
@@ -251,6 +294,108 @@ export function buildTraces(args: {
     : mappedSeries.filter(
         (item) => figure.seriesOverrides[item.id]?.visible !== false
       );
+
+  if (template === "pca-ellipse") {
+    const ellipseScale = Math.max(0.25, Math.min(6, figure.figureOverrides.pcaEllipseScale ?? 2.45));
+    const fillOpacity = Math.max(0, Math.min(0.6, figure.figureOverrides.pcaEllipseFillOpacity ?? 0.14));
+    return series.flatMap((column, index) => {
+      const color = figure.seriesOverrides[column.id]?.color ?? palette[index % palette.length];
+      const points = dataset.x.values.map((xValue, pointIndex) => {
+        const yValue = column.values[pointIndex];
+        return typeof xValue === "number" && Number.isFinite(xValue) &&
+          typeof yValue === "number" && Number.isFinite(yValue)
+          ? { x: xValue, y: yValue }
+          : undefined;
+      }).filter((point): point is {x:number;y:number} => Boolean(point));
+      const ellipse = ellipsePolygon(
+        points.map(point=>point.x),
+        points.map(point=>point.y),
+        ellipseScale
+      );
+      const scatter = baseXYTrace(dataset,figure,preset,column,index,"markers");
+      const ellipseTrace = ellipse ? {
+        type: "scatter",
+        mode: "lines",
+        x: ellipse.x,
+        y: ellipse.y,
+        name: normalizePlotlyMathText(column.name + " confidence"),
+        showlegend: false,
+        hoverinfo: "skip",
+        line: { color, width: ptToPx(0.7), simplify: false },
+        fill: "toself",
+        fillcolor: rgbaFromHex(color,fillOpacity),
+        meta: { figureStudioSeriesId: column.id }
+      } : undefined;
+      return ellipseTrace ? [ellipseTrace,scatter] : [scatter];
+    });
+  }
+
+  if (template === "volcano") {
+    const column = series[0];
+    if (!column) return [];
+    const xThreshold = Math.max(0, figure.figureOverrides.volcanoXThreshold ?? 1);
+    const yThreshold = Math.max(0, figure.figureOverrides.volcanoYThreshold ?? 1.301);
+    const opacity = Math.max(0.1, Math.min(1, figure.figureOverrides.volcanoPointOpacity ?? 0.62));
+    const neutral = "#aeb5ba";
+    const x = dataset.x.values;
+    const y = column.values;
+    const colors = x.map((xValue,index) => {
+      const yValue=y[index];
+      if(typeof xValue!=="number"||!Number.isFinite(xValue)||
+         typeof yValue!=="number"||!Number.isFinite(yValue)) return neutral;
+      if(yValue>=yThreshold && xValue<=-xThreshold) return palette[0];
+      if(yValue>=yThreshold && xValue>=xThreshold) return palette[1] ?? palette[0];
+      return neutral;
+    });
+    return [{
+      type:"scatter",
+      mode:"markers",
+      x,
+      y,
+      name:normalizePlotlyMathText(column.name),
+      showlegend:false,
+      meta:{figureStudioSeriesId:column.id},
+      opacity,
+      marker:{
+        color:colors,
+        size:ptToPx(figure.seriesOverrides[column.id]?.markerSizePt ?? 2.7),
+        line:{color:"rgba(57,67,75,0.20)",width:ptToPx(0.2)}
+      },
+      hovertemplate:"log2 FC=%{x:.3g}<br>-log10(p)=%{y:.3g}<extra></extra>"
+    }];
+  }
+
+  if (template === "ridgeline") {
+    const offset=Math.max(0.1,figure.figureOverrides.ridgelineOffset ?? 1);
+    const scale=Math.max(0.05,Math.min(3,figure.figureOverrides.ridgelineScale ?? 0.88));
+    const fillOpacity=Math.max(0,Math.min(0.8,figure.figureOverrides.ridgelineFillOpacity ?? 0.32));
+    return series.map((column,index)=>{
+      const color=figure.seriesOverrides[column.id]?.color ?? palette[index%palette.length];
+      const pairs=dataset.x.values.map((xValue,pointIndex)=>{
+        const yValue=column.values[pointIndex];
+        return typeof xValue==="number"&&Number.isFinite(xValue)&&
+          typeof yValue==="number"&&Number.isFinite(yValue)
+          ? {x:xValue,y:yValue}:undefined;
+      }).filter((p):p is {x:number;y:number}=>Boolean(p));
+      const maxValue=Math.max(1e-12,...pairs.map(p=>Math.max(0,p.y)));
+      const baseline=index*offset;
+      const xs=pairs.map(p=>p.x);
+      const top=pairs.map(p=>baseline+(Math.max(0,p.y)/maxValue)*offset*scale);
+      return {
+        type:"scatter",
+        mode:"lines",
+        x:[...xs,...[...xs].reverse()],
+        y:[...top,...xs.map(()=>baseline).reverse()],
+        name:normalizePlotlyMathText(column.name),
+        showlegend:false,
+        meta:{figureStudioSeriesId:column.id},
+        line:{color,width:ptToPx(0.72),simplify:false},
+        fill:"toself",
+        fillcolor:rgbaFromHex(color,fillOpacity),
+        hoverinfo:"skip"
+      };
+    });
+  }
 
   if (template === "heatmap" || template === "contour") {
     const xIsNumeric = dataset.x.values.every(
@@ -966,6 +1111,8 @@ export function buildLayout(args: {
   const yScale = overrides.yScale ?? "linear";
   const rightYScale = overrides.rightYScale ?? "linear";
   const isDoubleY = figure.templateId === "double-y";
+  const isRidgeline = figure.templateId === "ridgeline";
+  const isVolcano = figure.templateId === "volcano";
   const isField2D =
     figure.templateId === "heatmap" || figure.templateId === "contour";
   const isBarLike =
@@ -1613,6 +1760,32 @@ export function buildLayout(args: {
             : undefined
       }
     };
+  }
+
+  if (isVolcano) {
+    const xThreshold=Math.max(0,overrides.volcanoXThreshold ?? 1);
+    const yThreshold=Math.max(0,overrides.volcanoYThreshold ?? 1.301);
+    layout.shapes=[
+      {type:"line",xref:"x",yref:"paper",x0:-xThreshold,x1:-xThreshold,y0:0,y1:1,
+       line:{color:"rgba(57,67,75,0.55)",width:1,dash:"dash"}},
+      {type:"line",xref:"x",yref:"paper",x0:xThreshold,x1:xThreshold,y0:0,y1:1,
+       line:{color:"rgba(57,67,75,0.55)",width:1,dash:"dash"}},
+      {type:"line",xref:"paper",yref:"y",x0:0,x1:1,y0:yThreshold,y1:yThreshold,
+       line:{color:"rgba(57,67,75,0.55)",width:1,dash:"dash"}}
+    ];
+  }
+
+  if (isRidgeline) {
+    const ridgeSeries=orderSeries(dataset,figure.seriesOrder,figure.dataRef?.yColumnIds)
+      .filter(series=>figure.seriesOverrides[series.id]?.visible!==false);
+    const offset=Math.max(0.1,overrides.ridgelineOffset ?? 1);
+    layout.yaxis.tickmode="array";
+    layout.yaxis.tickvals=ridgeSeries.map((_series,index)=>index*offset);
+    layout.yaxis.ticktext=ridgeSeries.map(series=>normalizePlotlyMathText(
+      figure.seriesOverrides[series.id]?.legendLabel ?? series.name
+    ));
+    layout.yaxis.showgrid=false;
+    layout.yaxis.title={...layout.yaxis.title,text:resolvedYTitle || ""};
   }
 
   const equalFieldAspect =
