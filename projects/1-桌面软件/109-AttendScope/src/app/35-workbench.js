@@ -50,7 +50,7 @@ function setManualStatusForCurrent(status){
 }
 function timelineLegendHtml(item){
   const judgment=attendanceJudgment(item);
-  const behaviors=attendanceBehaviors(item).filter(k=>!behaviorFilterActive()||state.filter===k);
+  const behaviors=behaviorFilterActive()?[state.filter]:[];
   return '<div class="timeline-top-legend">'+
     (isWorkday(item.day)?'<span class="legend-schedule"><i></i>工作时段</span>':'')+
     '<span class="legend-event in"><i></i>进</span><span class="legend-event out"><i></i>出</span>'+
@@ -76,10 +76,36 @@ function attendPlotHtml(ctx){
   }
   return top+'<div id="overviewTrendChart" class="overview-trend-chart plot-chart"></div>';
 }
+function timelineBehaviorRows(item,key){
+  return ({trip:item.trips||[],leave:item.leaves||[],outing:item.outings||[],overtime:item.overtime||[]})[key]||[];
+}
+function timelineBehaviorClock(row,key,edge){
+  const fallback=key==='overtime'
+    ?(edge==='start'?'17:30':'20:00')
+    :(edge==='start'?RULES.amStart:RULES.pmEnd);
+  return row?.[edge]||fallback;
+}
+function timelineBehaviorInsight(item,key){
+  const rows=timelineBehaviorRows(item,key),label=FILTER_LABELS[key]||'行为';
+  if(!rows.length)return insightMetric('记录','0 项')+'<p class="insight-issue">当日无'+label+'记录</p>';
+  const starts=rows.map(r=>timelineBehaviorClock(r,key,'start')).sort((a,b)=>minutes(a)-minutes(b));
+  const ends=rows.map(r=>timelineBehaviorClock(r,key,'end')).sort((a,b)=>minutes(a)-minutes(b));
+  let out=insightMetric('记录',rows.length+' 项')+
+    insightMetric('时长',fmtMinutes(behaviorMinutes(item,key)))+
+    insightMetric('开始',starts[0]||'—')+
+    insightMetric('结束',ends[ends.length-1]||'—');
+  const first=rows[0],detail=key==='trip'?(first.place||first.type):first.type;
+  if(detail)out+=insightMetric(key==='trip'&&first.place?'地点':'类型',detail);
+  return out;
+}
 function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx),view=analysisViewItems(ctx);
   let out='<div class="insight-heading">'+currentFilterLabel()+' · '+({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab])+'</div>';
   if(tab==='timeline'&&item){
+    if(behaviorFilterActive()){
+      out+=timelineBehaviorInsight(item,state.filter);
+      return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
+    }
     out+=manualJudgmentHtml(item);
     out+=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
       insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
