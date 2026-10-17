@@ -92,7 +92,9 @@ export const GOLDEN_STYLE = {
     contourLinePt: 0.35,
     contourLineColor: "rgba(57,67,75,0.52)",
     planeBackground: "#f8f8f6",
-    sceneGridColor: "#d9dde0"
+    sceneGridColor: "#d9dde0",
+    projectionPaneBackground: "rgba(248,248,246,0.58)",
+    projectionLineColor: "rgba(57,67,75,0.48)"
   },
   bar: {
     borderColor: "rgba(57,67,75,0.34)",

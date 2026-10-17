@@ -72,7 +72,13 @@ export interface ProjectFolder {
 
 export type PresetId = "scientific" | "nature" | "presentation";
 export type PublicationMode = "single" | "quad-panel";
-export type ColorCycleId = "matplotlib" | "matlab";
+export type ColorCycleId =
+  | "golden"
+  | "mist-blue-celadon"
+  | "sea-salt-coral"
+  | "burgundy-slate"
+  | "matplotlib"
+  | "matlab";
 export type AspectMode = "16:9" | "4:3" | "3:2" | "custom";
 export type PlotTemplateId =
   | "xy-line"
@@ -88,7 +94,8 @@ export type PlotTemplateId =
   | "stacked-bar"
   | "heatmap"
   | "contour"
-  | "surface-3d";
+  | "surface-3d"
+  | "surface-projection-3d";
 export type LineStyle = "solid" | "dash" | "dot" | "dashdot";
 export type MarkerSymbol =
   | "circle"
@@ -283,6 +290,12 @@ export interface FigureOverrides {
   contourLines?: boolean;
   contourLabels?: boolean;
 
+  surfaceProjectionFloor?: boolean;
+  surfaceProjectionX?: boolean;
+  surfaceProjectionY?: boolean;
+  surfaceProjectionContourCount?: number;
+  surfaceProjectionLineWidthPt?: number;
+  surfaceProjectionUseColorMap?: boolean;
 }
 
 export interface FigureDataRef {

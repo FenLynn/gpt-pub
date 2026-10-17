@@ -55,7 +55,8 @@ export const templates: TemplateDefinition[] = [
   },
   { id: "heatmap", label: "热图 / 光斑图", family: "Field", input: matrixInput },
   { id: "contour", label: "等高线 / Contour", family: "Field", input: { ...matrixInput, minSeries: 2 } },
-  { id: "surface-3d", label: "3D 曲面", family: "3D", input: matrixInput }
+  { id: "surface-3d", label: "3D 曲面", family: "3D", input: matrixInput },
+  { id: "surface-projection-3d", label: "3D 曲面 + 三向投影", family: "3D", input: matrixInput }
 ];
 
 export function templateDefinition(id: PlotTemplateId): TemplateDefinition {

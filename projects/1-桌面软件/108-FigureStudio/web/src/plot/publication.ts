@@ -4,6 +4,7 @@ import type {
   PublicationMode
 } from "../model";
 import { GOLDEN_STYLE, goldenTypography } from "./goldenStyle";
+import { publicationPalette } from "./palettes";
 
 export interface PublicationMetrics {
   mode: PublicationMode;
@@ -100,7 +101,7 @@ export function resolveSeriesPalette(
   preset: PresetDefinition,
   figure: FigureSpec
 ): string[] {
-  return figure.figureOverrides.colorCycle === "matlab"
-    ? MATLAB_GEM_COLORS
-    : [...GOLDEN_STYLE.palette];
+  if (figure.figureOverrides.colorCycle === "matlab") return MATLAB_GEM_COLORS;
+  if (figure.figureOverrides.colorCycle === "matplotlib") return [...preset.palette];
+  return [...publicationPalette(figure.figureOverrides.colorCycle).colors];
 }
