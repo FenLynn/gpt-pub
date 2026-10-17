@@ -19,6 +19,7 @@ import {
 import { resolveFigureInput } from "./data/figureInput";
 import { resolveFieldRowCoordinates } from "./data/field";
 import { downloadMatplotlibScript } from "./export/matplotlib";
+import { buildSurfaceVectorSvg } from "./export/surfaceVectorSvg";
 import { useHistoryState } from "./hooks/useHistoryState";
 import { parseDelimitedText } from "./lib/csv";
 import {
@@ -2466,6 +2467,60 @@ function App() {
   }
 
   async function exportFigure(format: "svg" | "png") {
+    const vectorSurface =
+      activeFigure &&
+      (activeFigure.templateId === "surface-3d" ||
+        activeFigure.templateId === "surface-projection-3d");
+    if (vectorSurface && activeFigure) {
+      const surfaceTrace = (traces as any[]).find((trace) => trace?.type === "surface");
+      if (!surfaceTrace) {
+        showToast("3D 矢量导出失败：没有找到曲面数据");
+        return;
+      }
+      const physical = resolveCanvasMm(preset, activeFigure);
+      const liveCamera =
+        plotCameraRef.current[activeFigure.id] ??
+        (plotRef.current as any)?._fullLayout?.scene?.camera ??
+        layout.scene?.camera;
+      const xml = buildSurfaceVectorSvg({
+        trace: surfaceTrace,
+        figure: activeFigure,
+        layout,
+        width: Number(layout.width),
+        height: Number(layout.height),
+        widthMm: physical.widthMm,
+        heightMm: physical.heightMm,
+        camera: liveCamera
+      });
+      const svgUrl =
+        "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+      const filename = activeFigure.name.replace(/[\\/:*?"<>|]+/g, "-");
+      if (format === "svg") {
+        downloadDataUrl(svgUrl, filename + "-vector.svg");
+        showToast("已导出真正矢量 3D SVG");
+        return;
+      }
+      try {
+        const image = new Image();
+        image.src = svgUrl;
+        await image.decode();
+        const surface = document.createElement("canvas");
+        surface.width = Math.round(physical.widthMm * PNG_DPI / 25.4);
+        surface.height = Math.round(physical.heightMm * PNG_DPI / 25.4);
+        const context = surface.getContext("2d");
+        if (!context) throw new Error("Canvas 不可用");
+        context.drawImage(image, 0, 0, surface.width, surface.height);
+        downloadDataUrl(
+          pngDataUrlWithDpi(surface.toDataURL("image/png"), PNG_DPI),
+          filename + "-vector-600dpi.png"
+        );
+        showToast("已从矢量 3D 曲面导出 600 dpi PNG");
+      } catch (error) {
+        showToast("3D 矢量 PNG 导出失败：" + String(error));
+      }
+      return;
+    }
+
     if (usePrecision && svgRef.current && activeFigure) {
       // MathJax updates the same SVG DOM asynchronously. Never export a transient
       // raw-$...$ fallback: wait briefly for the actual vector math paths.
