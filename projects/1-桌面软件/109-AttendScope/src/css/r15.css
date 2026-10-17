@@ -158,7 +158,7 @@
  border:0!important;
  border-right:1px solid #e3edf4!important;
  border-radius:0!important;
- background:rgba(130,87,217,.14)!important;
+ background:rgba(130,87,217,.17)!important;
  box-shadow:none!important;
  color:#6f42bf!important;
 }
@@ -176,7 +176,7 @@
  border:0!important;
  border-bottom:1px solid #e1e9f0!important;
  border-radius:0!important;
- background:rgba(130,87,217,.16)!important;
+ background:rgba(130,87,217,.19)!important;
  box-shadow:none!important;
  color:#6941b2!important;
 }
@@ -307,7 +307,7 @@
 .judgment-mode-switch button.active{background:#fff;color:#4f3f79;box-shadow:0 1px 4px rgba(51,69,87,.09);font-weight:650}
 .judgment-mode-switch button:disabled{opacity:.34;cursor:not-allowed}
 .m-name.selected,.m-date.selected{
- transform:scale(1.055)!important;position:sticky!important;box-shadow:0 2px 8px rgba(82,56,125,.15)!important;
+ transform:scale(1.10)!important;position:sticky!important;box-shadow:0 3px 10px rgba(82,56,125,.18)!important;
 }
 .m-name.selected{transform-origin:right center!important;z-index:31!important}
 .m-date.selected{transform-origin:center bottom!important;z-index:42!important}
