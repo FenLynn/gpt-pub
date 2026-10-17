@@ -107,6 +107,7 @@ export const GOLDEN_STYLE = {
     projectionWallBackground: "rgba(248,248,246,0.32)",
     projectionFloorBackground: "rgba(52,142,149,0.92)",
     projectionGridColor: "rgba(135,145,153,0.30)",
+    projectionFloorGridColor: "rgba(255,255,255,0.72)",
     projectionLineColor: "rgba(57,67,75,0.62)"
   },
   bar: {

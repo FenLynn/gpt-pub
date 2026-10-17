@@ -246,6 +246,8 @@ for (let n=0; n<gallery.length; n++) {
     "Projected 3D y-wall should stay translucent and visible");
   assert.equal(projectedLayout.scene?.zaxis?.backgroundcolor,GOLDEN_STYLE.field.projectionFloorBackground,
     "Projected 3D floor should use the reference-like teal plane");
+  assert.equal(projectedLayout.scene?.zaxis?.gridcolor,GOLDEN_STYLE.field.projectionFloorGridColor,
+    "Projected 3D floor grid should remain pale over the teal plane");
   assert.equal(projectedSurface!.figureOverrides.surfaceProjectionLineWidthPt,0.72,
     "Projected side-wall contours need visible publication weight");
 
