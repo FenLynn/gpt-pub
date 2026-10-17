@@ -1161,7 +1161,7 @@ function App() {
             }
           }
         : layout;
-    const previewRenderScale = Math.max(0.1, displayScale);
+    const previewRenderScale = Math.max(0.1, previewScale * canvasZoom);
     const previewLayout = scalePlotlyLayoutForPreview(
       interactiveLayout,
       previewRenderScale
@@ -1351,8 +1351,9 @@ function App() {
     };
   }, [
     activeFigure,
-    displayScale,
+    canvasZoom,
     history,
+    previewScale,
     layout,
     orderedSeries,
     selectSeries,
