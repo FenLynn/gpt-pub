@@ -125,3 +125,10 @@ GitHub Pages 的 deploy-pages 每次部署整个站点。P108 与 P109 以前各
 - Person/date selection anchors keep violet tint but enlarge the text instead of scaling the whole header cell, improving alignment with the single crosshair frame.
 - The save-state dot is replaced by a semantic check/exclamation mark. The right inspector remains compact, and the lower raw-data area receives more vertical space.
 - Shared Pages must preserve P108 and publish exact P109_SHA above. No Release.
+
+## 2026-10-17 P109 R21 预览发布链修复
+
+- 发现 R20/R21 的 `P109 AttendScope CI` 虽然在 `p109-exp` 成功，但统一 Pages 没有收到后续 `workflow_run`，导致线上 `/p109/` 仍停留在 R19，所以用户看到“什么都没改”。
+- 根因：`.github/workflows/p109-attendscope-pages.yml` 只存在于 `p109-exp`，默认分支 `main` 没有注册该工作流。统一 Pages 的 `workflow_run` 监听无法稳定识别这条项目 CI。
+- 修复：把同一份只读 QA 工作流登记到 `main`。它仍只在 `p109-exp` push 时执行，不增加 Pages 权限，不改变单一发布者原则。
+- 本次共享预览目标：`p109-exp@2bafc68bb571461f14debea9ab959281f7ed1c8c`，P109 CI run `39007619239` success。主线合并本记录会立即触发统一 Pages 重建，发布时仍同时保留 P108/P109。
