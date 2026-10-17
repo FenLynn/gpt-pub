@@ -100,22 +100,31 @@ function timelineBehaviorInsight(item,key){
   if(detail)out+=insightMetric(key==='trip'&&first.place?'地点':'类型',detail);
   return out+'</div></section>';
 }
+function timelineBehaviorSummaryRow(item,key){
+  const rows=timelineBehaviorRows(item,key),active=state.filter===key;
+  const value=rows.length?(rows.length+'项 · '+fmtMinutes(behaviorMinutes(item,key))):'—';
+  return '<div class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
+}
+function timelineFullInsightHtml(item){
+  let out=manualJudgmentHtml(item);
+  out+='<section class="insight-card metric-card attendance-card"><div class="insight-card-head"><span>考勤记录</span><b>'+item.punches.length+' 条</b></div><div class="insight-metric-list">'+
+    insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
+    insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
+    insightMetric('在岗',fmtMinutes(item.presence))+
+  '</div></section>';
+  out+='<section class="insight-card behavior-summary-card"><div class="insight-card-head"><span>行为区间</span><b>全天</b></div>'+
+    ['trip','leave','outing','overtime'].map(key=>timelineBehaviorSummaryRow(item,key)).join('')+
+  '</section>';
+  if(item.issues.length)out+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
+  return out;
+}
 function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx),view=analysisViewItems(ctx);
   const tabLabel=({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab]);
-  let out='<div class="insight-heading"><strong>'+currentFilterLabel()+'</strong><span>'+tabLabel+'</span></div>';
+  const heading=tab==='timeline'&&item?'个人':currentFilterLabel();
+  let out='<div class="insight-heading"><strong>'+heading+'</strong><span>'+tabLabel+'</span></div>';
   if(tab==='timeline'&&item){
-    if(behaviorFilterActive()){
-      out+=timelineBehaviorInsight(item,state.filter);
-      return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
-    }
-    out+=manualJudgmentHtml(item);
-    out+='<section class="insight-card metric-card"><div class="insight-card-head"><span>当日记录</span><b>'+item.punches.length+' 条</b></div><div class="insight-metric-list">'+
-      insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
-      insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
-      insightMetric('在岗',fmtMinutes(item.presence))+
-    '</div></section>';
-    if(item.issues.length)out+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
+    out+=timelineFullInsightHtml(item);
     return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
   }
   if(state.filter!=='main'){
