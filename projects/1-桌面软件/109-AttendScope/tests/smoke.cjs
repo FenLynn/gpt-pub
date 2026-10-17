@@ -188,15 +188,13 @@ async function run(){
  // One demonstrator day carries every behavior color in the same audio-track chart.
  await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
- const behaviorDebug=await page.evaluate(()=>{
-   const a=state.analysis.get('E011|23'),m=r14TrackData(a);
-   return {filter:state.filter,behaviors:attendanceBehaviors(a),keys:m.tracks.map(t=>t.key),windows:m.workWindows.length,
-     counts:{trip:a.trips.length,leave:a.leaves.length,outing:a.outings.length,overtime:a.overtime.length}};
- });
- console.log('R19_BEHAVIOR '+JSON.stringify(behaviorDebug));
+ await check(page,()=>{
+   const a=state.analysis.get('E011|23'),m=r14TrackData(a),keys=m.tracks.map(t=>t.key);
+   const actual=m.bars.find(x=>x.track==='actual');
+   return ['events','actual','trip','leave','outing','overtime'].every(k=>keys.includes(k))&&!keys.includes('rules')&&
+     m.workWindows.length===2&&actual?.sourceIds?.length===2;
+ },'All behavior rails/scheduled background/linked attendance evidence are not ready');
  await page.screenshot({path:path.join(out,'r19-all-behavior-timeline.png')});
- if(!['events','actual','trip','leave','outing','overtime'].every(k=>behaviorDebug.keys.includes(k))||behaviorDebug.keys.includes('rules')||behaviorDebug.windows!==2)
-   throw Error('All behavior rails are not visible on the demonstrator day');
  await page.locator('#statusFilter').selectOption('outing');
  await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
