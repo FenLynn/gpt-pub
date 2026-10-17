@@ -113,7 +113,7 @@ async function run(){
    document.querySelector('.m-cell.cell-focus .selected')&&
    getComputedStyle(document.querySelector('.m-cell.cell-focus .selected')).boxShadow.includes('135, 89, 219'),
  'Person/calendar cell focus not lifted');
- await page.screenshot({path:path.join(out,'r14-iteration-timeline.png')});
+ await page.screenshot({path:path.join(out,'r21-primary-timeline.png')});
  await check(page,()=>{
   const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
@@ -131,10 +131,17 @@ async function run(){
  await check(page,()=>{
   const ctx=analysisContext(),a=plotAnalysis(ctx),data=r14TrackData(a);
   const frames=document.querySelectorAll('.matrix-selection-frame:not(.inactive)');
-  const zoom=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart')).getOption().dataZoom;
+  const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
+  const opt=chart.getOption(),zoom=opt.dataZoom;
+  const ticks=document.querySelectorAll('.r15-mini-tick'),preview=document.getElementById('r15PunchPreview');
+  const bar=preview?.querySelector('.r15-punch-stack i');
+  const barHeight=bar?.getBoundingClientRect().height||0,previewHeight=preview?.getBoundingClientRect().height||0;
+  const slider=zoom.find(z=>z.type==='slider');
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
-    !data.tracks.some(x=>x.key==='span'||x.key==='rules')&&data.workWindows.length===2&&zoom.filter(z=>z.type==='slider').length===1;
- },'Soft violet cross or compact time lanes failed');
+    !data.tracks.some(x=>x.key==='span'||x.key==='rules')&&data.workWindows.length===2&&
+    zoom.filter(z=>z.type==='slider').length===1&&slider.height===30&&
+    ticks.length===5&&barHeight>=previewHeight-5&&opt.grid[0].bottom>=72;
+ },'Soft violet cross, timeline spacing or embedded mini ruler failed');
 
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
@@ -174,9 +181,15 @@ async function run(){
  await page.locator('[data-manual-status="absent"]').click();
  await check(page,({id,day})=>{
    const key=id+'|'+day,cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
+   const group=document.querySelector('.manual-status-buttons');
+   const radios=[...group.querySelectorAll('[data-manual-status]')];
    return state.manualStatuses[key]==='absent'&&state.judgmentMode==='manual'&&cell.classList.contains('s-absent')&&!!cell.querySelector('.manual-check')&&
-     !document.querySelector('[data-judgment-mode="manual"]').disabled;
- },manualTarget,'Manual red override/check mark failed');
+     !document.querySelector('[data-judgment-mode="manual"]').disabled&&
+     getComputedStyle(group).display==='grid'&&radios.length===3&&
+     radios.filter(x=>x.getAttribute('aria-checked')==='true').length===1&&
+     radios.find(x=>x.dataset.manualStatus==='absent')?.classList.contains('active');
+ },manualTarget,'Manual segmented judgment/check mark failed');
+ await page.screenshot({path:path.join(out,'r21-manual-segment.png')});
  await page.locator('[data-judgment-mode="initial"]').click();
  await check(page,({id,day})=>{
    const cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
@@ -295,7 +308,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R18',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R21',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
