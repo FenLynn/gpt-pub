@@ -1185,6 +1185,12 @@ function App() {
       staticPlot: false,
       doubleClick: "reset+autosize",
       editable: false,
+      // Plotly's WebGL canvas otherwise remains visibly stair-stepped on
+      // desktop 1x displays even when the layout itself is rendered at the
+      // fitted paper size.
+      plotGlPixelRatio: interactive3D
+        ? Math.min(3, Math.max(2, window.devicePixelRatio || 1))
+        : undefined,
       edits: {
         annotationPosition: false,
         annotationTail: false,
@@ -2410,6 +2416,12 @@ function App() {
         surfaceProjectionFloorGap: source.surfaceProjectionFloorGap,
         surfaceProjectionLineWidthPt: source.surfaceProjectionLineWidthPt,
         surfaceProjectionUseColorMap: source.surfaceProjectionUseColorMap,
+        surfaceInterpolationFactor: source.surfaceInterpolationFactor,
+        surfaceAmbient: source.surfaceAmbient,
+        surfaceDiffuse: source.surfaceDiffuse,
+        surfaceSpecular: source.surfaceSpecular,
+        surfaceRoughness: source.surfaceRoughness,
+        surfaceFresnel: source.surfaceFresnel,
         pcaEllipseScale: source.pcaEllipseScale,
         pcaEllipseFillOpacity: source.pcaEllipseFillOpacity,
         volcanoXThreshold: source.volcanoXThreshold,
@@ -4882,6 +4894,58 @@ function App() {
                               }
                             />
                           </div>
+                        )}
+
+                        {surfaceTemplate && (
+                          <>
+                            <div className="section-divider">3D 曲面质量</div>
+                            <div className="prop-row">
+                              <label>曲面细分</label>
+                              <div className="compact-number">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="6"
+                                  step="1"
+                                  value={activeFigure.figureOverrides.surfaceInterpolationFactor ?? 4}
+                                  onChange={(event) =>
+                                    setFigureField(
+                                      "surfaceInterpolationFactor",
+                                      Math.max(1, Math.min(6, Math.round(Number(event.target.value))))
+                                    )
+                                  }
+                                />
+                                <span>×</span>
+                              </div>
+                            </div>
+                            {[
+                              ["环境光", "surfaceAmbient", 0.62],
+                              ["漫反射", "surfaceDiffuse", 0.86],
+                              ["镜面光", "surfaceSpecular", 0.16],
+                              ["粗糙度", "surfaceRoughness", 0.72],
+                              ["边缘反射", "surfaceFresnel", 0.06]
+                            ].map(([label, key, fallback]) => (
+                              <div className="prop-row" key={String(key)}>
+                                <label>{String(label)}</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="1"
+                                  step="0.02"
+                                  value={
+                                    (activeFigure.figureOverrides as any)[String(key)] ??
+                                    Number(fallback)
+                                  }
+                                  onChange={(event) =>
+                                    setFigureField(
+                                      String(key) as keyof FigureOverrides,
+                                      Math.max(0, Math.min(1, Number(event.target.value))) as any
+                                    )
+                                  }
+                                />
+                              </div>
+                            ))}
+                          </>
                         )}
 
                         {surfaceProjectionTemplate && (

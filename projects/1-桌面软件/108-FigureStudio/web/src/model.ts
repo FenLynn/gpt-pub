@@ -304,6 +304,12 @@ export interface FigureOverrides {
   surfaceProjectionFloorGap?: number;
   surfaceProjectionLineWidthPt?: number;
   surfaceProjectionUseColorMap?: boolean;
+  surfaceInterpolationFactor?: number;
+  surfaceAmbient?: number;
+  surfaceDiffuse?: number;
+  surfaceSpecular?: number;
+  surfaceRoughness?: number;
+  surfaceFresnel?: number;
 
   pcaEllipseScale?: number;
   pcaEllipseFillOpacity?: number;

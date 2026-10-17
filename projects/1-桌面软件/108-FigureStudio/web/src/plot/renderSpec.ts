@@ -270,6 +270,139 @@ function baseXYTrace(
   };
 }
 
+const SURFACE_MAX_RENDER_CELLS = 140000;
+
+function clampSurfaceUnit(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function surfaceCubic(
+  p0: number,
+  p1: number,
+  p2: number,
+  p3: number,
+  t: number
+): number {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const value =
+    0.5 *
+    ((2 * p1) +
+      (-p0 + p2) * t +
+      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+      (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+  // Keep the display interpolation inside the local sample envelope. This
+  // prevents publication smoothing from inventing ringing extrema.
+  const low = Math.min(p0, p1, p2, p3);
+  const high = Math.max(p0, p1, p2, p3);
+  return Math.max(low, Math.min(high, value));
+}
+
+function surfaceLineSample(
+  values: Array<number | null>,
+  index: number,
+  t: number
+): number | null {
+  const at = (i: number) => values[Math.max(0, Math.min(values.length - 1, i))] ?? null;
+  const p0 = at(index - 1);
+  const p1 = at(index);
+  const p2 = at(index + 1);
+  const p3 = at(index + 2);
+  if (p1 === null || p2 === null) return p1 ?? p2;
+  if (p0 === null || p3 === null) return p1 + (p2 - p1) * t;
+  return surfaceCubic(p0, p1, p2, p3, t);
+}
+
+function densifySurfaceGrid(
+  xInput: unknown[],
+  yInput: unknown[],
+  zInput: unknown[][],
+  requestedFactor: number
+): {
+  x: number[];
+  y: number[];
+  z: Array<Array<number | null>>;
+  factor: number;
+} {
+  const x = xInput.map((value) =>
+    typeof value === "number" && Number.isFinite(value) ? value : Number.NaN
+  );
+  const y = yInput.map((value) =>
+    typeof value === "number" && Number.isFinite(value) ? value : Number.NaN
+  );
+  const z = zInput.map((row) =>
+    row.map((value) =>
+      typeof value === "number" && Number.isFinite(value) ? value : null
+    )
+  );
+  if (
+    x.length < 2 ||
+    y.length < 2 ||
+    z.length !== y.length ||
+    z.some((row) => row.length !== x.length) ||
+    x.some((value) => !Number.isFinite(value)) ||
+    y.some((value) => !Number.isFinite(value))
+  ) {
+    return {
+      x: x.map((value, index) => Number.isFinite(value) ? value : index),
+      y: y.map((value, index) => Number.isFinite(value) ? value : index),
+      z,
+      factor: 1
+    };
+  }
+
+  const requested = Math.max(1, Math.min(6, Math.round(requestedFactor)));
+  const baseCells = Math.max(1, (x.length - 1) * (y.length - 1));
+  const safeFactor = Math.max(
+    1,
+    Math.min(
+      requested,
+      Math.floor(Math.sqrt(SURFACE_MAX_RENDER_CELLS / baseCells))
+    )
+  );
+  if (safeFactor <= 1) return { x, y, z, factor: 1 };
+
+  const interpolateAxis = (values: number[]) =>
+    Array.from(
+      { length: (values.length - 1) * safeFactor + 1 },
+      (_unused, denseIndex) => {
+        const position = denseIndex / safeFactor;
+        const index = Math.min(values.length - 2, Math.floor(position));
+        const t = denseIndex === (values.length - 1) * safeFactor
+          ? 1
+          : position - index;
+        return values[index] + (values[index + 1] - values[index]) * t;
+      }
+    );
+
+  const denseX = interpolateAxis(x);
+  const denseY = interpolateAxis(y);
+  const denseZ = denseY.map((_value, denseRow) => {
+    const yPosition = denseRow / safeFactor;
+    const yIndex = Math.min(y.length - 2, Math.floor(yPosition));
+    const ty = denseRow === (y.length - 1) * safeFactor
+      ? 1
+      : yPosition - yIndex;
+
+    return denseX.map((_xValue, denseColumn) => {
+      const xPosition = denseColumn / safeFactor;
+      const xIndex = Math.min(x.length - 2, Math.floor(xPosition));
+      const tx = denseColumn === (x.length - 1) * safeFactor
+        ? 1
+        : xPosition - xIndex;
+
+      const rowSamples: Array<number | null> = [];
+      for (let offset = -1; offset <= 2; offset += 1) {
+        const sourceRow = z[Math.max(0, Math.min(z.length - 1, yIndex + offset))];
+        rowSamples.push(surfaceLineSample(sourceRow, xIndex, tx));
+      }
+      return surfaceLineSample(rowSamples, 1, ty);
+    });
+  });
+
+  return { x: denseX, y: denseY, z: denseZ, factor: safeFactor };
+}
+
 export function buildTraces(args: {
   dataset: Dataset;
   figure: FigureSpec;
@@ -557,6 +690,12 @@ export function buildTraces(args: {
       : dataset.x.values.map((_value, index) => index + 1);
     const surfaceY = resolveFieldRowCoordinates(dataset, series);
     const surfaceZ = series.map((column) => column.values);
+    const denseSurface = densifySurfaceGrid(
+      surfaceX,
+      surfaceY,
+      surfaceZ,
+      figure.figureOverrides.surfaceInterpolationFactor ?? 4
+    );
     const finiteX = surfaceX.filter(
       (value): value is number => typeof value === "number" && Number.isFinite(value)
     );
@@ -602,9 +741,13 @@ export function buildTraces(args: {
     return [
       {
         type: "surface",
-        x: surfaceX,
-        y: surfaceY,
-        z: surfaceZ,
+        x: denseSurface.x,
+        y: denseSurface.y,
+        z: denseSurface.z,
+        meta: {
+          figureStudioSurfaceInterpolationFactor: denseSurface.factor,
+          figureStudioSurfaceSourceShape: [surfaceY.length, surfaceX.length]
+        },
         colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
         reversescale: figure.figureOverrides.reverseColorScale ?? false,
         showscale: figure.figureOverrides.colorbarVisible ?? true,
@@ -687,11 +830,11 @@ export function buildTraces(args: {
             : { text: "" }
         },
         lighting: {
-          ambient: 0.82,
-          diffuse: 0.72,
-          specular: 0.08,
-          roughness: 0.92,
-          fresnel: 0.03
+          ambient: clampSurfaceUnit(figure.figureOverrides.surfaceAmbient ?? 0.62),
+          diffuse: clampSurfaceUnit(figure.figureOverrides.surfaceDiffuse ?? 0.86),
+          specular: clampSurfaceUnit(figure.figureOverrides.surfaceSpecular ?? 0.16),
+          roughness: clampSurfaceUnit(figure.figureOverrides.surfaceRoughness ?? 0.72),
+          fresnel: clampSurfaceUnit(figure.figureOverrides.surfaceFresnel ?? 0.06)
         },
         lightposition: { x: 100, y: 160, z: 220 },
         hovertemplate: "X=%{x:.4g}<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"

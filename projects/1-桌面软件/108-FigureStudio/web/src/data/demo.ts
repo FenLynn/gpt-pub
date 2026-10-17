@@ -747,7 +747,13 @@ export function createInitialProject(
       legendVisible: false,
       colorScale: "Cividis",
       reverseColorScale: false,
-      zTitle: "Normalized intensity (a.u.)"
+      zTitle: "Normalized intensity (a.u.)",
+      surfaceInterpolationFactor: 4,
+      surfaceAmbient: 0.62,
+      surfaceDiffuse: 0.86,
+      surfaceSpecular: 0.16,
+      surfaceRoughness: 0.72,
+      surfaceFresnel: 0.06
     }
   );
 
@@ -771,7 +777,13 @@ export function createInitialProject(
       surfaceProjectionContourCount: 11,
       surfaceProjectionFloorGap: 0.32,
       surfaceProjectionLineWidthPt: 0.72,
-      surfaceProjectionUseColorMap: true
+      surfaceProjectionUseColorMap: true,
+      surfaceInterpolationFactor: 4,
+      surfaceAmbient: 0.62,
+      surfaceDiffuse: 0.86,
+      surfaceSpecular: 0.16,
+      surfaceRoughness: 0.72,
+      surfaceFresnel: 0.06
     }
   );
 

@@ -6,6 +6,8 @@ import { findSheet, sheetToDataset } from "../src/data/adapter";
 import { presets } from "../src/plot/presets";
 import { buildLayout, buildTraces, resolveCanvasMm, mmToPx } from "../src/plot/renderSpec";
 import { PrecisionSvg, supportsPrecisionSvg } from "../src/plot/PrecisionSvg";
+import { FieldSvg } from "../src/plot/FieldSvg";
+import { BarSvg } from "../src/plot/BarSvg";
 import { LorentzFigure } from "../src/plot/LorentzFigure";
 import { LorentzInspector } from "../src/plot/LorentzInspector";
 import { encodeProject, decodeProject } from "../src/project/projectIO";
@@ -52,9 +54,9 @@ const project = createInitialProject(undefined, includeVisualQa);
 const gallery = project.figures.filter(f => f.folderId === "folder-nature" && f.name.startsWith("N") && f.name.includes(" · "));
 assert.equal(gallery.length, 14, "All 14 Nature visual cases must be accessible");
 assert.equal(project.folders.filter(f => f.id === "folder-nature").length, 1);
-assert.equal(gallery.filter(f => supportsPrecisionSvg(f)).length, 11,
-  "Eleven XY samples should use real SVG; heatmap/contour/bar remain on Plotly");
-assert.equal(gallery.filter(f => !supportsPrecisionSvg(f)).length, 3);
+assert.equal(gallery.filter(f => supportsPrecisionSvg(f)).length, 14,
+  "All 14 Nature samples should remain on native SVG-capable renderers");
+assert.equal(gallery.filter(f => !supportsPrecisionSvg(f)).length, 0);
 assert.equal(gallery[0].seriesOverrides.measured?.color, GOLDEN_STYLE.palette[0],
   "Nature gallery must visibly inherit the Lorentz Golden palette");
 assert.equal(gallery[7].seriesOverrides.efficiency?.color, GOLDEN_STYLE.palette[1],
@@ -165,11 +167,21 @@ for (let n=0; n<gallery.length; n++) {
   if(n===13) assert.equal(mm.heightMm,72,"Double-column height should be independent");
   assert.ok(Math.abs(layout.width-mmToPx(mm.widthMm))<1.0);
   if(supportsPrecisionSvg(figure)) {
-    const svg = renderToStaticMarkup(createElement(PrecisionSvg, {
-      figure, layout, traces, svgRef:createRef<SVGSVGElement>(),
-      onSelectSeries:()=>{}, onAxisClick:()=>{}, onLegendClick:()=>{},
-      onLegendDrag:()=>{}
-    }));
+    const svg = figure.templateId==="heatmap" || figure.templateId==="contour"
+      ? renderToStaticMarkup(createElement(FieldSvg, {
+          figure, layout, traces:traces as any[], svgRef:createRef<SVGSVGElement>(),
+          onAxisClick:()=>{}
+        }))
+      : figure.templateId==="bar" || figure.templateId==="grouped-bar" || figure.templateId==="stacked-bar"
+      ? renderToStaticMarkup(createElement(BarSvg, {
+          figure, layout, traces:traces as any[], svgRef:createRef<SVGSVGElement>(),
+          onAxisClick:()=>{}, onSelectSeries:()=>{}
+        }))
+      : renderToStaticMarkup(createElement(PrecisionSvg, {
+          figure, layout, traces, svgRef:createRef<SVGSVGElement>(),
+          onSelectSeries:()=>{}, onAxisClick:()=>{}, onLegendClick:()=>{},
+          onLegendDrag:()=>{}
+        }));
     assert.ok(svg.startsWith("<svg"),figure.name+" did not render SVG");
     assert.ok(svg.includes('data-style-family="'+GOLDEN_STYLE.id+'"'),
       figure.name+" did not inherit FigureStudio Golden Style");
@@ -227,6 +239,14 @@ for (let n=0; n<gallery.length; n++) {
   const projectedTraces=buildTraces({dataset:projectedDataset,figure:projectedSurface!,preset:presets.scientific}) as any[];
   const projectedLayout=buildLayout({dataset:projectedDataset,figure:projectedSurface!,preset:presets.scientific}) as any;
   assert.equal(projectedTraces[0]?.type,"surface");
+  assert.ok(projectedTraces[0]?.x?.length > projectedDataset.x.values.length,
+    "3D publication preview should densify the source grid without mutating source data");
+  assert.ok(projectedTraces[0]?.y?.length > projectedDataset.ys.length,
+    "3D surface smoothing should increase the rendered Y grid density");
+  assert.equal(projectedTraces[0]?.meta?.figureStudioSurfaceInterpolationFactor,4,
+    "3D sample should use the adjustable four-times publication interpolation");
+  assert.equal(projectedTraces[0]?.lighting?.ambient,0.62);
+  assert.equal(projectedTraces[0]?.lighting?.diffuse,0.86);
   assert.equal(projectedTraces[0]?.contours?.z?.project?.z,true,"3D floor projection missing");
   assert.equal(projectedTraces[0]?.contours?.x?.project?.x,true,"3D x-wall projection missing");
   assert.equal(projectedTraces[0]?.contours?.y?.project?.y,true,"3D y-wall projection missing");
