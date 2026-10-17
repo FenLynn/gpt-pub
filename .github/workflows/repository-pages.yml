@@ -34,17 +34,51 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout P108 development source
+      - name: Resolve independent project source refs
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
+          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          p108_ref="p108-exp"
+          p109_ref="p109-exp"
+          current_p108=""
+          current_p109=""
+          state_file="$RUNNER_TEMP/preview-build.txt"
+
+          if curl -fsSL --retry 2 --retry-delay 1 "https://fenlynn.github.io/gpt-pub/preview-build.txt" -o "$state_file"; then
+            current_p108="$(awk -F= '$1=="P108_SHA"{print $2}' "$state_file" | tr -d '\r')"
+            current_p109="$(awk -F= '$1=="P109_SHA"{print $2}' "$state_file" | tr -d '\r')"
+          fi
+
+          if [[ "$EVENT_NAME" == "workflow_run" && "$TRIGGER_WORKFLOW" == "P109 AttendScope CI" ]]; then
+            p109_ref="$TRIGGER_SHA"
+            [[ -n "$current_p108" ]] && p108_ref="$current_p108"
+          elif [[ "$EVENT_NAME" == "workflow_run" && "$TRIGGER_WORKFLOW" == "P108 FigureStudio CI" ]]; then
+            p108_ref="$TRIGGER_SHA"
+            [[ -n "$current_p109" ]] && p109_ref="$current_p109"
+          elif [[ -n "$current_p108" && -n "$current_p109" ]]; then
+            p108_ref="$current_p108"
+            p109_ref="$current_p109"
+          fi
+
+          echo "P108_REF=$p108_ref" >> "$GITHUB_ENV"
+          echo "P109_REF=$p109_ref" >> "$GITHUB_ENV"
+          printf 'Resolved preview refs: P108=%s P109=%s\n' "$p108_ref" "$p109_ref"
+
+      - name: Checkout P108 preview source
         uses: actions/checkout@v4
         with:
-          ref: p108-exp
+          ref: ${{ env.P108_REF }}
           path: source-p108
           persist-credentials: false
 
-      - name: Checkout P109 development source
+      - name: Checkout P109 preview source
         uses: actions/checkout@v4
         with:
-          ref: p109-exp
+          ref: ${{ env.P109_REF }}
           path: source-p109
           persist-credentials: false
 
@@ -120,6 +154,15 @@ jobs:
           # attendance, internal histories, snapshots or unpublished records.
           cp "$P109/index.html" "$P109/project.json" "_site/p109/"
           cp -a "$P109/src" "$P109/config" "_site/p109/"
+          python - <<'PY'
+          from pathlib import Path
+          import os, re
+          p = Path("_site/p109/index.html")
+          s = p.read_text(encoding="utf-8")
+          token = os.environ["P109_SHA"][:12]
+          s = re.sub(r'(\./src/[^"\']+)(["\'])', lambda m: f"{m.group(1)}?v={token}{m.group(2)}", s)
+          p.write_text(s, encoding="utf-8")
+          PY
           cat > "_site/index.html" <<'HTML'
           <!doctype html>
           <html lang="zh-CN">
