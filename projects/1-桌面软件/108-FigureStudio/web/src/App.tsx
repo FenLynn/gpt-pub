@@ -90,6 +90,9 @@ const GOLDEN_TARGET = new URLSearchParams(window.location.search).get("golden");
 const LORENTZ_GOLDEN_MODE = GOLDEN_TARGET === "lorentz";
 const SURFACE_GOLDEN_MODE = GOLDEN_TARGET === "surface";
 const SURFACE_PROJECTION_MODE = GOLDEN_TARGET === "surface-projection";
+const PCA_GOLDEN_MODE = GOLDEN_TARGET === "pca";
+const VOLCANO_GOLDEN_MODE = GOLDEN_TARGET === "volcano";
+const RIDGELINE_GOLDEN_MODE = GOLDEN_TARGET === "ridgeline";
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
@@ -443,6 +446,15 @@ function App() {
         figure => figure.templateId === "surface-projection-3d"
       );
       if (projectedSurface) result.activeFigureId = projectedSurface.id;
+    } else if (PCA_GOLDEN_MODE) {
+      const selected = result.figures.find(figure => figure.templateId === "pca-ellipse");
+      if (selected) result.activeFigureId = selected.id;
+    } else if (VOLCANO_GOLDEN_MODE) {
+      const selected = result.figures.find(figure => figure.templateId === "volcano");
+      if (selected) result.activeFigureId = selected.id;
+    } else if (RIDGELINE_GOLDEN_MODE) {
+      const selected = result.figures.find(figure => figure.templateId === "ridgeline");
+      if (selected) result.activeFigureId = selected.id;
     } else if (NATURE_GALLERY_MODE) {
       const params = new URLSearchParams(window.location.search);
       const requested = Number(params.get("sample") ?? 1);
@@ -481,7 +493,8 @@ function App() {
     ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
   ]);
   const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
-    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE || SURFACE_GOLDEN_MODE || SURFACE_PROJECTION_MODE) && initialFigureId
+    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE || SURFACE_GOLDEN_MODE || SURFACE_PROJECTION_MODE ||
+      PCA_GOLDEN_MODE || VOLCANO_GOLDEN_MODE || RIDGELINE_GOLDEN_MODE) && initialFigureId
       ? { type: "figure", id: initialFigureId }
       : initialBookId
       ? { type: "book", id: initialBookId }
@@ -519,7 +532,8 @@ function App() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>(
     LORENTZ_GOLDEN_MODE
       ? "annotation"
-      : SURFACE_GOLDEN_MODE || SURFACE_PROJECTION_MODE
+      : SURFACE_GOLDEN_MODE || SURFACE_PROJECTION_MODE ||
+        PCA_GOLDEN_MODE || VOLCANO_GOLDEN_MODE || RIDGELINE_GOLDEN_MODE
       ? "figure"
       : "series"
   );
@@ -2107,7 +2121,15 @@ function App() {
         surfaceProjectionContourCount: source.surfaceProjectionContourCount,
         surfaceProjectionFloorGap: source.surfaceProjectionFloorGap,
         surfaceProjectionLineWidthPt: source.surfaceProjectionLineWidthPt,
-        surfaceProjectionUseColorMap: source.surfaceProjectionUseColorMap
+        surfaceProjectionUseColorMap: source.surfaceProjectionUseColorMap,
+        pcaEllipseScale: source.pcaEllipseScale,
+        pcaEllipseFillOpacity: source.pcaEllipseFillOpacity,
+        volcanoXThreshold: source.volcanoXThreshold,
+        volcanoYThreshold: source.volcanoYThreshold,
+        volcanoPointOpacity: source.volcanoPointOpacity,
+        ridgelineOffset: source.ridgelineOffset,
+        ridgelineScale: source.ridgelineScale,
+        ridgelineFillOpacity: source.ridgelineFillOpacity
       }
     };
 
@@ -2587,6 +2609,9 @@ function App() {
   const waterfallTemplate = activeFigure?.templateId === "waterfall";
   const offsetSpectrumTemplate =
     activeFigure?.templateId === "offset-spectrum";
+  const pcaEllipseTemplate = activeFigure?.templateId === "pca-ellipse";
+  const volcanoTemplate = activeFigure?.templateId === "volcano";
+  const ridgelineTemplate = activeFigure?.templateId === "ridgeline";
   const doubleYAxisSide = (
     seriesId: string,
     fallbackIndex: number
@@ -3755,7 +3780,91 @@ function App() {
                             })}
                         </div>
 
-                        {fieldTemplate && (
+                        {pcaEllipseTemplate && (
+                      <>
+                        <div className="section-divider">PCA 置信椭圆</div>
+                        <div className="prop-row">
+                          <label>椭圆尺度</label>
+                          <input type="number" min="0.25" max="6" step="0.05"
+                            value={activeFigure.figureOverrides.pcaEllipseScale ?? 2.45}
+                            onChange={(event) => setFigureField("pcaEllipseScale",Number(event.target.value))} />
+                        </div>
+                        <div className="prop-row">
+                          <label>填充透明</label>
+                          <div className="compact-number">
+                            <input type="number" min="0" max="60" step="1"
+                              value={Math.round((activeFigure.figureOverrides.pcaEllipseFillOpacity ?? 0.14)*100)}
+                              onChange={(event) => setFigureField(
+                                "pcaEllipseFillOpacity",
+                                Math.max(0,Math.min(0.6,Number(event.target.value)/100))
+                              )} />
+                            <span>%</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {volcanoTemplate && (
+                      <>
+                        <div className="section-divider">Volcano 阈值</div>
+                        <div className="prop-row">
+                          <label>|log₂FC|</label>
+                          <input type="number" min="0" step="0.1"
+                            value={activeFigure.figureOverrides.volcanoXThreshold ?? 1}
+                            onChange={(event) => setFigureField("volcanoXThreshold",Math.max(0,Number(event.target.value)))} />
+                        </div>
+                        <div className="prop-row">
+                          <label>−log₁₀(p)</label>
+                          <input type="number" min="0" step="0.05"
+                            value={activeFigure.figureOverrides.volcanoYThreshold ?? 1.301}
+                            onChange={(event) => setFigureField("volcanoYThreshold",Math.max(0,Number(event.target.value)))} />
+                        </div>
+                        <div className="prop-row">
+                          <label>点透明度</label>
+                          <div className="compact-number">
+                            <input type="number" min="10" max="100" step="1"
+                              value={Math.round((activeFigure.figureOverrides.volcanoPointOpacity ?? 0.62)*100)}
+                              onChange={(event) => setFigureField(
+                                "volcanoPointOpacity",
+                                Math.max(0.1,Math.min(1,Number(event.target.value)/100))
+                              )} />
+                            <span>%</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {ridgelineTemplate && (
+                      <>
+                        <div className="section-divider">Ridgeline 布局</div>
+                        <div className="prop-row">
+                          <label>层间距</label>
+                          <input type="number" min="0.1" max="5" step="0.05"
+                            value={activeFigure.figureOverrides.ridgelineOffset ?? 1}
+                            onChange={(event) => setFigureField("ridgelineOffset",Math.max(0.1,Number(event.target.value)))} />
+                        </div>
+                        <div className="prop-row">
+                          <label>峰高</label>
+                          <input type="number" min="0.05" max="3" step="0.05"
+                            value={activeFigure.figureOverrides.ridgelineScale ?? 0.88}
+                            onChange={(event) => setFigureField("ridgelineScale",Math.max(0.05,Math.min(3,Number(event.target.value))))} />
+                        </div>
+                        <div className="prop-row">
+                          <label>填充透明</label>
+                          <div className="compact-number">
+                            <input type="number" min="0" max="80" step="1"
+                              value={Math.round((activeFigure.figureOverrides.ridgelineFillOpacity ?? 0.32)*100)}
+                              onChange={(event) => setFigureField(
+                                "ridgelineFillOpacity",
+                                Math.max(0,Math.min(0.8,Number(event.target.value)/100))
+                              )} />
+                            <span>%</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {fieldTemplate && (
                           <div className="field-data-note">
                             <strong>矩阵模式</strong>
                             <span>
