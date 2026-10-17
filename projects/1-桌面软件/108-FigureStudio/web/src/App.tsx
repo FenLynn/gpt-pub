@@ -68,6 +68,7 @@ import {
 import { presetOrder, presets } from "./plot/presets";
 import { PrecisionSvg, supportsPrecisionSvg } from "./plot/PrecisionSvg";
 import { LorentzFigure } from "./plot/LorentzFigure";
+import { PublicationBoard } from "./plot/PublicationBoard";
 import { LorentzInspector } from "./plot/LorentzInspector";
 import { GOLDEN_STYLE } from "./plot/goldenStyle";
 import {
@@ -93,6 +94,7 @@ const SURFACE_PROJECTION_MODE = GOLDEN_TARGET === "surface-projection";
 const PCA_GOLDEN_MODE = GOLDEN_TARGET === "pca";
 const VOLCANO_GOLDEN_MODE = GOLDEN_TARGET === "volcano";
 const RIDGELINE_GOLDEN_MODE = GOLDEN_TARGET === "ridgeline";
+const BOARD_TARGET = new URLSearchParams(window.location.search).get("board");
 const USER_DEFAULTS_KEY = "figurestudio-p108-user-defaults-v02";
 const UI_SCALE_KEY = "figurestudio-p108-ui-scale";
 const RENDER_MODE_KEY = "figurestudio-p108-render-mode";
@@ -455,6 +457,11 @@ function App() {
     } else if (RIDGELINE_GOLDEN_MODE) {
       const selected = result.figures.find(figure => figure.templateId === "ridgeline");
       if (selected) result.activeFigureId = selected.id;
+    } else if (BOARD_TARGET) {
+      const selected = result.figures.find(
+        figure => figure.publicationBoard?.paletteId === BOARD_TARGET
+      );
+      if (selected) result.activeFigureId = selected.id;
     } else if (NATURE_GALLERY_MODE) {
       const params = new URLSearchParams(window.location.search);
       const requested = Number(params.get("sample") ?? 1);
@@ -493,12 +500,9 @@ function App() {
     ...(initialFigureId ? [{ type: "figure", id: initialFigureId } as DocumentRef] : [])
   ]);
   const [activeDoc, setActiveDoc] = useState<DocumentRef>(() =>
-    (NATURE_GALLERY_MODE || LORENTZ_GOLDEN_MODE || SURFACE_GOLDEN_MODE || SURFACE_PROJECTION_MODE ||
-      PCA_GOLDEN_MODE || VOLCANO_GOLDEN_MODE || RIDGELINE_GOLDEN_MODE) && initialFigureId
+    initialFigureId
       ? { type: "figure", id: initialFigureId }
-      : initialBookId
-      ? { type: "book", id: initialBookId }
-      : { type: "figure", id: initialFigureId }
+      : { type: "book", id: initialBookId }
   );
   const [activeSheetByBook, setActiveSheetByBook] = useState<Record<string, string>>(
     () =>
@@ -765,7 +769,13 @@ function App() {
     )
   );
   const isLorentz = activeFigure?.lorentz?.kind === "lorentz-two-panel";
-  const usePrecision = Boolean(isLorentz || (rendererMode === "precision" && precisionAvailable));
+  const isPublicationBoard =
+    activeFigure?.publicationBoard?.kind === "publication-palette-board";
+  const usePrecision = Boolean(
+    isLorentz ||
+    isPublicationBoard ||
+    (rendererMode === "precision" && precisionAvailable)
+  );
   useEffect(() => { localStorage.setItem(RENDER_MODE_KEY, rendererMode); }, [rendererMode]);
 
   const checkItems = useMemo(
@@ -811,7 +821,8 @@ function App() {
     const isFieldTemplate =
       activeFigure?.templateId === "heatmap" ||
       activeFigure?.templateId === "contour" ||
-      activeFigure?.templateId === "surface-3d";
+      activeFigure?.templateId === "surface-3d" ||
+      activeFigure?.templateId === "surface-projection-3d";
     if (
       isFieldTemplate &&
       (inspectorTab === "series" || inspectorTab === "legend")
@@ -1172,9 +1183,9 @@ function App() {
     );
     setOpenDocs(docs);
     setActiveDoc(
-      (NATURE_GALLERY_MODE && figureId
+      (figureId
         ? { type: "figure", id: figureId } as DocumentRef
-        : docs[0]) ?? { type: "figure", id: figureId ?? "" }
+        : docs[0]) ?? { type: "figure", id: "" }
     );
     setExplorerSelection(null);
   }
@@ -2637,19 +2648,24 @@ function App() {
           doubleYAxisSide(series.id, index) === "right"
       )
     : undefined;
-  const graphInspectorTabs: Array<[InspectorTab, string]> = [
-    ["data", "数据"],
-    ["figure", fieldTemplate ? "图 / 色图" : "图"],
-    ...(!fieldTemplate
-      ? ([["series", "曲线"]] as Array<[InspectorTab, string]>)
-      : []),
-    ["axis", surfaceTemplate ? "标题" : "轴"],
-    ...(!fieldTemplate
-      ? ([["legend", "图例"]] as Array<[InspectorTab, string]>)
-      : []),
-    ...(isLorentz ? ([["annotation", "标注"]] as Array<[InspectorTab, string]>) : []),
-    ["check", warningCount ? "检查 " + warningCount : "检查"]
-  ];
+  const graphInspectorTabs: Array<[InspectorTab, string]> = isPublicationBoard
+    ? [
+        ["figure", "样板"],
+        ["check", warningCount ? "检查 " + warningCount : "检查"]
+      ]
+    : [
+        ["data", "数据"],
+        ["figure", fieldTemplate ? "图 / 色图" : "图"],
+        ...(!fieldTemplate
+          ? ([["series", "曲线"]] as Array<[InspectorTab, string]>)
+          : []),
+        ["axis", surfaceTemplate ? "标题" : "轴"],
+        ...(!fieldTemplate
+          ? ([["legend", "图例"]] as Array<[InspectorTab, string]>)
+          : []),
+        ...(isLorentz ? ([["annotation", "标注"]] as Array<[InspectorTab, string]>) : []),
+        ["check", warningCount ? "检查 " + warningCount : "检查"]
+      ];
   const barTemplate =
     activeFigure?.templateId === "bar" ||
     activeFigure?.templateId === "grouped-bar" ||
@@ -3309,7 +3325,14 @@ function App() {
                       transform: "scale(" + displayScale + ")"
                     }}
                   >
-                    {isLorentz && activeFigure ? (
+                    {isPublicationBoard && activeFigure ? (
+                      <PublicationBoard
+                        figure={activeFigure}
+                        width={Number(layout.width)}
+                        height={Number(layout.height)}
+                        svgRef={svgRef}
+                      />
+                    ) : isLorentz && activeFigure ? (
                       <LorentzFigure
                         figure={activeFigure}
                         dataset={plotDataset}
@@ -4188,9 +4211,12 @@ function App() {
                         }
                       >
                         <option value="golden">Golden · Lorentz</option>
+                        <option value="sunny-blue-bamboo">晴蓝竹影</option>
                         <option value="mist-blue-celadon">雾蓝青瓷</option>
                         <option value="sea-salt-coral">海盐珊瑚</option>
+                        <option value="apricot-haze">杏桃浅岚</option>
                         <option value="burgundy-slate">勃艮第灰</option>
+                        <option value="nature-aurora">Nature Aurora</option>
                         <option value="matplotlib">Matplotlib T10</option>
                         <option value="matlab">MATLAB gem</option>
                       </select>
