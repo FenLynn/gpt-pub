@@ -148,7 +148,7 @@ jobs:
             --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=surface-projection" \
             > "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html" 2>"$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.stderr"
           test -s "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.png"
-          grep -q 'Surface with three-direction contour projections' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'Surface with clean scalar projection' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-3d-interactive="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-interactive3d="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-scene-dragmode="orbit"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
@@ -162,6 +162,7 @@ jobs:
           grep -q 'data-canvas-direct-wheel-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q '3D 曲面质量' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q '曲面细分' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q '柔和底面' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
 
           "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1500,950 --virtual-time-budget=9000 \
             --screenshot="$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.png" \

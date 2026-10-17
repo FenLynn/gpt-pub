@@ -4950,26 +4950,26 @@ function App() {
 
                         {surfaceProjectionTemplate && (
                           <>
-                            <div className="section-divider">三向等高投影</div>
+                            <div className="section-divider">投影</div>
                             <div className="prop-row">
-                              <label>底面 Z</label>
+                              <label>柔和底面</label>
                               <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionFloor ?? true}
                                 onChange={(value) => setFigureField("surfaceProjectionFloor", value)} />
                             </div>
                             <div className="prop-row">
-                              <label>X 侧壁</label>
-                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionX ?? true}
+                              <label>X 侧壁线</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionX ?? false}
                                 onChange={(value) => setFigureField("surfaceProjectionX", value)} />
                             </div>
                             <div className="prop-row">
-                              <label>Y 侧壁</label>
-                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionY ?? true}
+                              <label>Y 侧壁线</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionY ?? false}
                                 onChange={(value) => setFigureField("surfaceProjectionY", value)} />
                             </div>
                             <div className="prop-row">
                               <label>投影级数</label>
                               <input type="number" min="4" max="40" step="1"
-                                value={activeFigure.figureOverrides.surfaceProjectionContourCount ?? 12}
+                                value={activeFigure.figureOverrides.surfaceProjectionContourCount ?? 6}
                                 onChange={(event) => setFigureField(
                                   "surfaceProjectionContourCount",
                                   Math.max(4,Math.min(40,Number(event.target.value)))
@@ -4979,7 +4979,7 @@ function App() {
                               <label>底面间距</label>
                               <div className="compact-number">
                                 <input type="number" min="0" max="1" step="0.05"
-                                  value={activeFigure.figureOverrides.surfaceProjectionFloorGap ?? 0.28}
+                                  value={activeFigure.figureOverrides.surfaceProjectionFloorGap ?? 0.18}
                                   onChange={(event) => setFigureField(
                                     "surfaceProjectionFloorGap",
                                     Math.max(0,Math.min(1,Number(event.target.value)))
@@ -4991,14 +4991,14 @@ function App() {
                               <label>投影线宽</label>
                               <div className="compact-number">
                                 <input type="number" min="0.1" max="2" step="0.05"
-                                  value={activeFigure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.45}
+                                  value={activeFigure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.32}
                                   onChange={(event) => setFigureField("surfaceProjectionLineWidthPt",Number(event.target.value))} />
                                 <span>pt</span>
                               </div>
                             </div>
                             <div className="prop-row">
-                              <label>跟随色图</label>
-                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionUseColorMap ?? true}
+                              <label>侧壁跟随色图</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionUseColorMap ?? false}
                                 onChange={(value) => setFigureField("surfaceProjectionUseColorMap", value)} />
                             </div>
                           </>

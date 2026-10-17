@@ -250,9 +250,13 @@ for (let n=0; n<gallery.length; n++) {
     "3D sample should use the adjustable five-times publication interpolation");
   assert.equal(projectedTraces[0]?.lighting?.ambient,0.62);
   assert.equal(projectedTraces[0]?.lighting?.diffuse,0.86);
-  assert.equal(projectedTraces[0]?.contours?.z?.project?.z,true,"3D floor projection missing");
-  assert.equal(projectedTraces[0]?.contours?.x?.project?.x,true,"3D x-wall projection missing");
-  assert.equal(projectedTraces[0]?.contours?.y?.project?.y,true,"3D y-wall projection missing");
+  assert.equal(projectedTraces[0]?.contours,undefined,
+    "Default publication surface must not carry contour ink across the 3D mesh");
+  assert.equal(projectedTraces[1]?.type,"surface","Soft floor projection plane missing");
+  assert.equal(projectedTraces[1]?.meta?.figureStudioProjectionPlane,"floor");
+  assert.equal(projectedTraces[1]?.meta?.figureStudioProjectionStyle,"soft-scalar");
+  assert.equal(projectedTraces[1]?.opacity,0.18);
+  assert.equal(projectedTraces[1]?.showscale,false);
   assert.equal(projectedSurface!.figureOverrides.colorScale,"Viridis");
   const projectedPhysical=resolveCanvasMm(presets.scientific,projectedSurface!);
   const vectorSurfaceSvg=buildSurfaceVectorSvg({
@@ -292,12 +296,14 @@ for (let n=0; n<gallery.length; n++) {
     "Projected 3D floor should use the neutral publication plane");
   assert.equal(projectedLayout.scene?.zaxis?.gridcolor,GOLDEN_STYLE.field.projectionFloorGridColor,
     "Projected 3D floor grid should remain restrained over the neutral plane");
-  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionLineWidthPt,0.72,
-    "Projected side-wall contours need visible publication weight");
-  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionContourCount,9,
-    "Projected publication contours should stay sparse enough to avoid visual chatter");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionLineWidthPt,0.32,
+    "Optional wall contours should remain hairline-light");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionContourCount,6,
+    "Optional wall contours should stay sparse enough to avoid visual chatter");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionX,false);
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionY,false);
   assert.equal(projectedSurface!.figureOverrides.surfaceProjectionUseColorMap,false,
-    "Projected wall contours should default to one restrained publication ink");
+    "Optional wall contours should default to one restrained publication ink");
 
   const surfaceGolden=project.figures.find(f=>f.templateId==="surface-3d");
   assert.ok(surfaceGolden,"Golden defaults must include a 3D scientific surface");

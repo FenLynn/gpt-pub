@@ -714,18 +714,18 @@ export function buildTraces(args: {
     const [zLow, zHigh] = bound(finiteZ, [0, 1]);
     const projectionCount = Math.max(
       4,
-      Math.min(40, Math.round(figure.figureOverrides.surfaceProjectionContourCount ?? 12))
+      Math.min(24, Math.round(figure.figureOverrides.surfaceProjectionContourCount ?? 6))
     );
     const projectionWidth = ptToPx(
-      figure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.45
+      figure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.32
     );
     const projectionUseColorMap =
-      figure.figureOverrides.surfaceProjectionUseColorMap ?? true;
+      figure.figureOverrides.surfaceProjectionUseColorMap ?? false;
     const contourSpec = (
       low: number,
       high: number,
       projected: boolean,
-      axis: "x" | "y" | "z"
+      axis: "x" | "y"
     ) => ({
       show: projectionTemplate && projected,
       start: low,
@@ -738,8 +738,17 @@ export function buildTraces(args: {
         : GOLDEN_STYLE.field.projectionLineColor,
       project: { [axis]: projectionTemplate && projected }
     });
-    return [
-      {
+    const sideX = projectionTemplate && (figure.figureOverrides.surfaceProjectionX ?? false);
+    const sideY = projectionTemplate && (figure.figureOverrides.surfaceProjectionY ?? false);
+    const floorProjection =
+      projectionTemplate && (figure.figureOverrides.surfaceProjectionFloor ?? true);
+    const zSpan = Math.max(1e-9, zHigh - zLow);
+    const floorGap = Math.max(
+      0,
+      Math.min(1, figure.figureOverrides.surfaceProjectionFloorGap ?? 0.18)
+    );
+    const floorZ = zLow - zSpan * floorGap;
+    const mainSurface = {
         type: "surface",
         x: denseSurface.x,
         y: denseSurface.y,
@@ -760,28 +769,17 @@ export function buildTraces(args: {
           figure.figureOverrides.zAutoRange === false
             ? figure.figureOverrides.zMax
             : undefined,
-        contours: projectionTemplate
-          ? {
-              z: contourSpec(
-                zLow,
-                zHigh,
-                figure.figureOverrides.surfaceProjectionFloor ?? true,
-                "z"
-              ),
-              x: contourSpec(
-                xLow,
-                xHigh,
-                figure.figureOverrides.surfaceProjectionX ?? true,
-                "x"
-              ),
-              y: contourSpec(
-                yLow,
-                yHigh,
-                figure.figureOverrides.surfaceProjectionY ?? true,
-                "y"
-              )
-            }
-          : undefined,
+        // Keep the publication surface itself clean. Optional side-wall
+        // sections are off by default and floor projection is rendered as a
+        // separate low-opacity scalar plane below, never as contour ink
+        // crawling across the surface.
+        contours:
+          projectionTemplate && (sideX || sideY)
+            ? {
+                x: contourSpec(xLow, xHigh, sideX, "x"),
+                y: contourSpec(yLow, yHigh, sideY, "y")
+              }
+            : undefined,
         colorbar: {
           thickness: GOLDEN_STYLE.field.colorbarThicknessPx,
           outlinewidth: ptToPx(GOLDEN_STYLE.field.colorbarOutlinePt),
@@ -838,8 +836,35 @@ export function buildTraces(args: {
         },
         lightposition: { x: 100, y: 160, z: 220 },
         hovertemplate: "X=%{x:.4g}<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
+      };
+    if (!floorProjection) return [mainSurface];
+    const floorPlane = {
+      type: "surface",
+      x: denseSurface.x,
+      y: denseSurface.y,
+      z: denseSurface.y.map(() => denseSurface.x.map(() => floorZ)),
+      surfacecolor: denseSurface.z,
+      colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
+      reversescale: figure.figureOverrides.reverseColorScale ?? false,
+      cauto: false,
+      cmin: zLow,
+      cmax: zHigh,
+      showscale: false,
+      opacity: 0.18,
+      hoverinfo: "skip",
+      meta: {
+        figureStudioProjectionPlane: "floor",
+        figureStudioProjectionStyle: "soft-scalar"
+      },
+      lighting: {
+        ambient: 1,
+        diffuse: 0,
+        specular: 0,
+        roughness: 1,
+        fresnel: 0
       }
-    ];
+    };
+    return [mainSurface, floorPlane];
   }
 
   if (
