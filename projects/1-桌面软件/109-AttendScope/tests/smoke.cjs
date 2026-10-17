@@ -6,9 +6,10 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.cwd(),'p109-smoke-
 fs.mkdirSync(out,{recursive:true});
 const url=process.env.P109_URL||pathToFileURL(path.join(root,'index.html')).href;
 let browser,errors=[],remote=[];
-async function check(page,expression,description){
-  const result=await page.evaluate(expression);
-  if(!result)throw Error(description);
+async function check(page,expression,argOrDescription,maybeDescription){
+  const hasArg=arguments.length>=4;
+  const result=hasArg?await page.evaluate(expression,argOrDescription):await page.evaluate(expression);
+  if(!result)throw Error(hasArg?maybeDescription:argOrDescription);
 }
 async function run(){
  browser=await chromium.launch({headless:true,...(process.env.CHROME_BIN?{executablePath:process.env.CHROME_BIN}:{channel:'chrome'})});
