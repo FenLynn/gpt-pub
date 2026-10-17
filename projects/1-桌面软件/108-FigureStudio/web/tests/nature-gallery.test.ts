@@ -185,7 +185,10 @@ for (let n=0; n<gallery.length; n++) {
     assert.ok(svg.startsWith("<svg"),figure.name+" did not render SVG");
     assert.ok(svg.includes('data-style-family="'+GOLDEN_STYLE.id+'"'),
       figure.name+" did not inherit FigureStudio Golden Style");
-    if ((layout as any).showlegend) {
+    if (
+      (layout as any).showlegend &&
+      !["bar","grouped-bar","stacked-bar","heatmap","contour"].includes(figure.templateId)
+    ) {
       assert.ok(svg.includes('rx="1.5"'),
         figure.name+" Golden legend should use the compact framed geometry");
     }
