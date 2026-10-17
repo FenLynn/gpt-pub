@@ -442,11 +442,14 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
       {legendItems.map((tr,i)=>{
         const tx=lX+(i%cols)*itemWidth;
         const ty=lY+Math.floor(i/cols)*lh;
+        const legendMarkerColor = Array.isArray(tr.marker?.color)
+          ? tr.marker?.color[0] ?? tr.line?.color ?? GOLDEN_STYLE.palette[0]
+          : tr.marker?.color ?? tr.line?.color ?? GOLDEN_STYLE.palette[0];
         return <g key={"legend-"+i}>
           {doLines(tr) && <path d={"M "+tx+" "+(ty+lh/2)+" h "+sampleLength} stroke={tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.line?.width??1.3}
              strokeLinecap="round" strokeDasharray={DASH[tr.line?.dash??"solid"]}/>}
-          {doMarkers(tr) && <g transform={"translate("+(tx+sampleLength/2)+","+(ty+lh/2)+")"} fill={tr.marker?.color??tr.line?.color??GOLDEN_STYLE.palette[0]}
-             stroke={tr.marker?.line?.color??tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.marker?.line?.width??0.5}>
+          {doMarkers(tr) && <g transform={"translate("+(tx+sampleLength/2)+","+(ty+lh/2)+")"} fill={legendMarkerColor}
+             stroke={tr.marker?.line?.color??legendMarkerColor} strokeWidth={tr.marker?.line?.width??0.5}>
              {markerShape(tr.marker?.symbol,0,0,Math.min(tr.marker?.size??5,8))}
           </g>}
           <SvgMathText text={tr.name} x={tx+sampleLength+textGap} y={ty+lh/2+lfont*0.32}

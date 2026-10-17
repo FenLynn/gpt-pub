@@ -156,11 +156,11 @@ export function FieldSvg({figure,layout,traces,svgRef,onAxisClick}:Props){
         </g>;
       })}
     </g>
-    {layout.xaxis?.showgrid&&xTicks.map((v,i)=><path key={"xg-"+i} d={"M "+xp(v)+" "+top+" V "+bottom} stroke={gridColor} strokeWidth={layout.xaxis?.gridwidth??.5}/>)}
-    {layout.yaxis?.showgrid&&yTicks.map((v,i)=><path key={"yg-"+i} d={"M "+left+" "+yp(v)+" H "+right} stroke={gridColor} strokeWidth={layout.yaxis?.gridwidth??.5}/>)}
+    {layout.xaxis?.showgrid&&xTicks.map((v:number,i:number)=><path key={"xg-"+i} d={"M "+xp(v)+" "+top+" V "+bottom} stroke={gridColor} strokeWidth={layout.xaxis?.gridwidth??.5}/>)}
+    {layout.yaxis?.showgrid&&yTicks.map((v:number,i:number)=><path key={"yg-"+i} d={"M "+left+" "+yp(v)+" H "+right} stroke={gridColor} strokeWidth={layout.yaxis?.gridwidth??.5}/>)}
     <g onClick={onAxisClick}>
       <path d={"M "+left+" "+bottom+" H "+right+" M "+left+" "+top+" V "+bottom} fill="none" stroke={axisColor} strokeWidth={layout.xaxis?.linewidth??.9}/>
-      {xTicks.map((v,i)=>{
+      {xTicks.map((v:number,i:number)=>{
         const x=xp(v),label=xLabels?.[i]??fmt(v); return <g key={"xt-"+i}>
           <path d={"M "+x+" "+bottom+" v "+(layout.xaxis?.ticklen??4)} stroke={layout.xaxis?.tickcolor??axisColor} strokeWidth={layout.xaxis?.tickwidth??.8}/>
           <text x={x} y={bottom+(layout.xaxis?.ticklen??4)+tickSize+3} textAnchor="middle"

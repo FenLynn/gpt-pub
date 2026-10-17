@@ -78,7 +78,7 @@ export function BarSvg({figure,layout,traces,svgRef,onAxisClick,onSelectSeries}:
     </g>
     <g onClick={onAxisClick}>
       <path d={"M "+left+" "+bottom+" H "+right+" M "+left+" "+top+" V "+bottom} fill="none" stroke={axisColor} strokeWidth={layout.yaxis?.linewidth??.9}/>
-      {categories.map((label,i)=>{const x=left+(i+.5)*groupW;return <g key={label+i}>
+      {categories.map((label:string,i:number)=>{const x=left+(i+.5)*groupW;return <g key={label+i}>
         <path d={"M "+x+" "+bottom+" v "+(layout.xaxis?.ticklen??4)} stroke={layout.xaxis?.tickcolor??axisColor} strokeWidth={layout.xaxis?.tickwidth??.8}/>
         <text x={x} y={bottom+(layout.xaxis?.ticklen??4)+tickSize+3} textAnchor="middle"
           fontFamily={layout.xaxis?.tickfont?.family??fontFamily} fontSize={layout.xaxis?.tickfont?.size??tickSize}
