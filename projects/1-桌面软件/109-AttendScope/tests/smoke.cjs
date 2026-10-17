@@ -60,8 +60,14 @@ async function run(){
  }
  await page.locator('#statusFilter').selectOption('main');
  await check(page,()=>[...document.querySelectorAll('.m-cell button:not(.filtered-out)')].every(b=>['s-normal','s-anomaly','s-absent'].some(c=>b.classList.contains(c))),'Default surface mixes behaviors');
- await check(page,()=>categoryColor('anomaly')==='#e6c36f'&&categoryColor('absent')==='#e58f90'&&
-   categoryColor('normal')==='#78caa0'&&new Set(Object.values(ATTEND_BEHAVIOR_COLORS)).size===4,'Judgment or behavior palette not canonical');
+ await check(page,()=>{
+   const statuses=Object.values(ATTEND_STATUS_COLORS).filter(x=>x!==ATTEND_STATUS_COLORS.rest);
+   const behaviors=Object.values(ATTEND_BEHAVIOR_COLORS),events=Object.values(ATTEND_EVENT_COLORS);
+   return categoryColor('anomaly')==='#e6c36f'&&categoryColor('absent')==='#e58f90'&&categoryColor('normal')==='#78caa0'&&
+     ATTEND_BEHAVIOR_COLORS.leave==='#8a6fd1'&&ATTEND_BEHAVIOR_COLORS.outing==='#3c9dc4'&&
+     ATTEND_EVENT_COLORS.in==='#1f5a9f'&&ATTEND_EVENT_COLORS.out==='#8a5b3d'&&
+     new Set([...statuses,...behaviors,...events]).size===statuses.length+behaviors.length+events.length;
+ },'Judgment, behavior and punch palettes must stay visually unique');
  await check(page,()=>{
    const e=EMPLOYEES.find(x=>x.id==='E011');
    const all=new Set(Array.from({length:monthDays()},(_,i)=>attendanceBehaviors(state.analysis.get(e.id+'|'+(i+1)))).flat());
@@ -123,7 +129,7 @@ async function run(){
      parseFloat(getComputedStyle(cross).opacity)>.5&&
      parseFloat(getComputedStyle(focus).opacity)>.95;
  },'Matrix focus should dim unrelated cells and preserve the selected cross');
- await page.screenshot({path:path.join(out,'r25-primary-timeline.png')});
+ await page.screenshot({path:path.join(out,'r26-primary-timeline.png')});
  await check(page,()=>{
   const data=r14TrackData(plotAnalysis(analysisContext())),tr=data.tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
@@ -156,8 +162,10 @@ async function run(){
     slider.left===12&&slider.right===12&&opt.grid[0].bottom>=104&&opt.yAxis[0].type==='category'&&
     !!document.querySelector('.analysis-head-tools #timelineDayPicker')&&
     document.querySelectorAll('.analysis-head-tools .timeline-top-legend span').length>=4&&
-    getComputedStyle(preview,'::before').top!=='auto';
- },'R25 six lanes, aligned overview, centered divider or title-bar tools failed');
+    getComputedStyle(preview,'::before').display==='none'&&
+    Math.abs((bar?.getBoundingClientRect().top||0)-preview.getBoundingClientRect().top)<1.1&&
+    Math.abs((bar?.getBoundingClientRect().bottom||0)-preview.getBoundingClientRect().bottom)<1.1;
+ },'R26 six lanes, clipped overview markers or title-bar tools failed');
 
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
@@ -201,13 +209,18 @@ async function run(){
    const key=id+'|'+day,cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
    const group=document.querySelector('.manual-status-buttons');
    const radios=[...group.querySelectorAll('[data-manual-status]')];
+   const active=radios.find(x=>x.dataset.manualStatus==='absent');
+   const inactive=radios.filter(x=>x!==active);
+   const auto=document.querySelector('.auto-judgment');
    return state.manualStatuses[key]==='absent'&&state.judgmentMode==='manual'&&cell.classList.contains('s-absent')&&!!cell.querySelector('.manual-check')&&
      !document.querySelector('[data-judgment-mode="manual"]').disabled&&
      getComputedStyle(group).display==='grid'&&radios.length===3&&
      radios.filter(x=>x.getAttribute('aria-checked')==='true').length===1&&
-     radios.find(x=>x.dataset.manualStatus==='absent')?.classList.contains('active');
- },manualTarget,'Manual segmented judgment/check mark failed');
- await page.screenshot({path:path.join(out,'r25-manual-segment.png')});
+     active?.classList.contains('active')&&active.textContent.trim()==='缺勤'&&
+     inactive.every(x=>x.textContent.trim()==='')&&auto?.textContent.trim().length>0&&
+     getComputedStyle(active).color==='rgb(255, 255, 255)';
+ },manualTarget,'Manual color blocks must show text only on the selected state');
+ await page.screenshot({path:path.join(out,'r26-manual-segment.png')});
  await page.locator('[data-judgment-mode="initial"]').click();
  await check(page,({id,day})=>{
    const cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
@@ -242,7 +255,7 @@ async function run(){
      ['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
      rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
  },'Behavior insight tab did not expose all four intervals');
- await page.screenshot({path:path.join(out,'r25-leave-timeline.png')});
+ await page.screenshot({path:path.join(out,'r26-leave-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
  // A stress day should merge close punches at wide range and split them naturally as the time window narrows.
@@ -330,7 +343,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R25',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R26',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
