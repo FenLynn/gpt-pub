@@ -185,7 +185,7 @@ async function run(){
  await check(page,()=>state.judgmentMode==='manual','Manual layer cannot be restored');
  const firstRecord=await page.evaluate(({id,day})=>state.analysis.get(id+'|'+day).punches[0].recordId,manualTarget);
  await page.evaluate(id=>focusRawEvidence('attendance',id),firstRecord);
- await check(page,()=>!!document.querySelector('.raw-linked-highlight'),'Chart/raw evidence highlight bridge failed');
+ await page.waitForSelector('.raw-linked-highlight',{timeout:5000});
   await page.locator('#rawFloat').click();
  await page.waitForSelector('#rawDialogOverlay .raw-dialog');
  const r0=await page.locator('.raw-dialog').boundingBox();
