@@ -11,7 +11,7 @@ function intervalOverlap(a1,a2,b1,b2){return Math.max(0,Math.min(a2,b2)-Math.max
 /* R15: judgments and behaviors are independent dimensions. Purple is selection only. */
 const ATTEND_STATUS_COLORS=Object.freeze({normal:'#78caa0',anomaly:'#e6c36f',absent:'#e58f90',rest:'#eef2f6'});
 const ATTEND_BEHAVIOR_COLORS=Object.freeze({trip:'#4c8ed9',leave:'#e9954f',outing:'#36afa8',overtime:'#c96e9e'});
-const ATTEND_EVENT_COLORS=Object.freeze({in:'#415b6d',out:'#8b6650'});
+const ATTEND_EVENT_COLORS=Object.freeze({in:'#45a7df',out:'#efa05e'});
 function manualStatusKey(aOrId,day){
   return typeof aOrId==='string'?aOrId+'|'+day:aOrId.employee.id+'|'+aOrId.day;
 }
