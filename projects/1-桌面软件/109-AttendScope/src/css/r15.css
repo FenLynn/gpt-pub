@@ -584,3 +584,89 @@
 }
 .timeline-heading{margin-bottom:3px!important}
 .plot-axis.music-track-panel{padding:0!important}
+
+
+/* R24: focus the matrix, lock six timeline lanes, and simplify the overview to gray/white. */
+.matrix .m-cell,
+.matrix .m-name,
+.matrix .m-date{
+  transition:opacity .18s ease,filter .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.matrix.focus-person .m-cell:not(.row-focus),
+.matrix.focus-date .m-cell:not(.col-focus),
+.matrix.focus-cell .m-cell:not(.row-focus):not(.col-focus){
+  opacity:.24!important;
+  filter:saturate(.45) brightness(1.035)!important;
+}
+.matrix.focus-cell .m-cell.row-focus:not(.cell-focus),
+.matrix.focus-cell .m-cell.col-focus:not(.cell-focus){
+  opacity:.62!important;
+  filter:saturate(.78)!important;
+}
+.matrix.focus-person .m-name:not(.selected){opacity:.28!important}
+.matrix.focus-person .m-date:not(.selected){opacity:.72!important}
+.matrix.focus-date .m-date:not(.selected){opacity:.28!important}
+.matrix.focus-date .m-name:not(.selected){opacity:.72!important}
+.matrix.focus-cell .m-name:not(.selected),
+.matrix.focus-cell .m-date:not(.selected){opacity:.28!important}
+.matrix.focus-person .m-cell.row-focus,
+.matrix.focus-date .m-cell.col-focus,
+.matrix.focus-cell .m-cell.cell-focus{
+  opacity:1!important;filter:none!important;
+}
+.matrix.focus-cell .m-cell.cell-focus button.selected{
+  transform:translateY(-1px) scale(1.15)!important;
+}
+.matrix.focus-person .matrix-selection-frame.focus-row,
+.matrix.focus-date .matrix-selection-frame.focus-col{opacity:.9!important}
+.matrix.focus-cell .matrix-selection-frame{opacity:.26!important}
+
+.inspector-top{grid-template-columns:minmax(0,1fr) 168px!important}
+.inspector-insight{
+  width:168px!important;min-width:168px!important;max-width:168px!important;
+  padding:10px 10px 8px!important;background:#fbfcfd!important;
+}
+.insight-heading{margin-bottom:7px!important}
+.insight-card{margin-bottom:7px!important;padding:7px 8px!important;border-radius:8px!important}
+.status-card .manual-status-buttons{margin-top:1px}
+.attendance-card .insight-card-head,
+.behavior-summary-card .insight-card-head{margin-bottom:4px!important}
+.insight-metric-list .insight-row{min-height:25px!important;padding:4px 1px!important}
+.behavior-summary-card{padding-bottom:5px!important}
+.insight-behavior-row{
+  display:flex;align-items:center;justify-content:space-between;gap:5px;
+  min-height:25px;padding:4px 1px;border-top:1px solid #eff3f5;
+}
+.insight-behavior-row:first-of-type{border-top:0}
+.insight-behavior-row span{
+  display:inline-flex;align-items:center;gap:5px;color:#718694;font-size:9px;white-space:nowrap;
+}
+.insight-behavior-row span i{
+  width:6px;height:6px;border-radius:2px;opacity:.82;flex:none;
+}
+.insight-behavior-row.trip span i{background:var(--behavior-trip)}
+.insight-behavior-row.leave span i{background:var(--behavior-leave)}
+.insight-behavior-row.outing span i{background:var(--behavior-outing)}
+.insight-behavior-row.overtime span i{background:var(--behavior-overtime)}
+.insight-behavior-row strong{
+  color:#405b6e;font-size:9px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.insight-behavior-row.active{
+  margin:0 -4px;padding-left:5px;padding-right:5px;border-radius:5px;background:#f1f4f6;
+}
+.insight-behavior-row.active strong{color:#2f4d61}
+
+.music-track-panel .r15-punch-preview{
+  left:12px!important;right:12px!important;bottom:32px!important;height:34px!important;
+  overflow:hidden!important;border-radius:3px!important;background:transparent!important;
+}
+.r15-punch-stack{
+  top:0!important;height:34px!important;bottom:auto!important;
+}
+.r15-punch-stack i{height:34px!important;max-height:34px!important}
+.r23-mini-ticks{
+  left:12px!important;right:12px!important;bottom:9px!important;height:12px!important;
+  color:#748796!important;
+}
+.plot-axis.music-track-panel{overflow:visible!important}
+.music-track-panel .echarts-timeline-chart{overflow:visible!important}
