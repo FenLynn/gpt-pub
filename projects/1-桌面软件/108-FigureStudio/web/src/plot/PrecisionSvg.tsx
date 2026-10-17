@@ -65,7 +65,8 @@ export interface PrecisionSvgProps {
 const fnum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const finite = (v: unknown): number | undefined => fnum(v) ? v : undefined;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const coord = (v: number) => Number(v.toFixed(3));
+// Preserve sub-pixel vector geometry for dense traces inspected at 200–400%.
+const coord = (v: number) => Number(v.toFixed(4));
 const DASH: Record<string, string | undefined> = { solid: undefined, dash: "5 3", dot: "1 2.7", dashdot: "5 2 1 2" };
 const rangeOf = (traces: DataTrace[], key: "x" | "y", axisId?: string) => {
   const values: number[] = [];
@@ -272,7 +273,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
   const textGap = GOLDEN_STYLE.legend.textGapPx;
   const padX = GOLDEN_STYLE.legend.paddingXPx;
   const padY = GOLDEN_STYLE.legend.paddingYPx;
-  const lh = Math.max(lfont * 1.18, lfont + GOLDEN_STYLE.legend.rowGapPx);
+  const lh = Math.max(lfont * 1.16, lfont + GOLDEN_STYLE.legend.rowGapPx);
   const cols = legend.orientation==="h" ? Math.max(1,Math.min(legendItems.length, figure.figureOverrides.legendColumns ?? legendItems.length)) : 1;
   const itemWidth = Math.max(
     legend.itemwidth ?? sampleLength,
@@ -391,7 +392,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
              stroke={tr.marker?.line?.color??tr.line?.color??GOLDEN_STYLE.palette[0]} strokeWidth={tr.marker?.line?.width??0.5}>
              {markerShape(tr.marker?.symbol,0,0,Math.min(tr.marker?.size??5,8))}
           </g>}
-          <SvgMathText text={tr.name} x={tx+sampleLength+textGap} y={ty+lh/2+lfont*0.34}
+          <SvgMathText text={tr.name} x={tx+sampleLength+textGap} y={ty+lh/2+lfont*0.32}
             fill={legend.font?.color??baseColor}
             fontFamily={legend.font?.family??baseFont}
             fontSize={lfont} textAnchor="start"/>

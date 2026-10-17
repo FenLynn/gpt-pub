@@ -4,7 +4,10 @@ import {
   resolvePublicationMetrics,
   resolveSeriesPalette
 } from "./publication";
-import { GOLDEN_STYLE } from "./goldenStyle";
+import {
+  GOLDEN_STYLE,
+  goldenTickIntervalTarget
+} from "./goldenStyle";
 import type {
   Dataset,
   PlotColumn,
@@ -1006,19 +1009,21 @@ export function buildLayout(args: {
           overrides.rightYReverse ?? false
         )
       : undefined;
+  const xTickIntervals = goldenTickIntervalTarget(canvas.widthMm, "x");
+  const yTickIntervals = goldenTickIntervalTarget(canvas.heightMm, "y");
   const xAutoTickStep =
     !xIsCategorical &&
     xScale === "linear" &&
     !overrides.xMajorTickStep
-      ? matplotlibNiceTickStep(xRange ?? fieldXTickRange)
+      ? matplotlibNiceTickStep(xRange ?? fieldXTickRange, xTickIntervals)
       : undefined;
   const yAutoTickStep =
     yScale === "linear" && !overrides.yMajorTickStep
-      ? matplotlibNiceTickStep(yRange ?? fieldYTickRange)
+      ? matplotlibNiceTickStep(yRange ?? fieldYTickRange, yTickIntervals)
       : undefined;
   const rightYAutoTickStep =
     rightYScale === "linear" && !overrides.rightYMajorTickStep
-      ? matplotlibNiceTickStep(rightYRange)
+      ? matplotlibNiceTickStep(rightYRange, yTickIntervals)
       : undefined;
 
   const commonAxis = {

@@ -22,6 +22,13 @@ export const GOLDEN_STYLE = {
     axisTitleColor: "#34383d",
     tickColor: "#262626"
   },
+  ticks: {
+    xSpacingMm: 15.5,
+    ySpacingMm: 13.5,
+    minIntervals: 4,
+    maxXIntervals: 8,
+    maxYIntervals: 7
+  },
   stroke: {
     referenceAxisPt: 0.55,
     referenceCurvePt: 1.1,
@@ -130,4 +137,16 @@ export function goldenTypography(basePt: number) {
     plotTitlePt: ref.referencePlotTitlePt * scale,
     legendPt: ref.referenceLegendPt * scale
   };
+}
+
+
+export function goldenTickIntervalTarget(
+  lengthMm: number,
+  axis: "x" | "y"
+): number {
+  const config = GOLDEN_STYLE.ticks;
+  const spacing = axis === "x" ? config.xSpacingMm : config.ySpacingMm;
+  const maximum = axis === "x" ? config.maxXIntervals : config.maxYIntervals;
+  const raw = Math.round(Math.max(1, lengthMm) / spacing);
+  return Math.max(config.minIntervals, Math.min(maximum, raw));
 }

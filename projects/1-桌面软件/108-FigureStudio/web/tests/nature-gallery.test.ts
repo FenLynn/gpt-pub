@@ -10,7 +10,10 @@ import { LorentzFigure } from "../src/plot/LorentzFigure";
 import { LorentzInspector } from "../src/plot/LorentzInspector";
 import { encodeProject, decodeProject } from "../src/project/projectIO";
 import { mathJaxExpressionForText, plainSvgMathFallback } from "../src/lib/mathText";
-import { GOLDEN_STYLE } from "../src/plot/goldenStyle";
+import {
+  GOLDEN_STYLE,
+  goldenTickIntervalTarget
+} from "../src/plot/goldenStyle";
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
@@ -32,6 +35,12 @@ assert.equal(GOLDEN_STYLE.stroke.gridRgba, "rgba(119,129,138,0.085)",
   "General plot grids must stay as subtle as the Lorentz Golden reference");
 assert.ok((gallery[13].figureOverrides.fontSizePt ?? 0) > (gallery[0].figureOverrides.fontSizePt ?? 0),
   "Double-column Golden samples need readable typography rather than a visually tiny single-column scale");
+assert.equal(goldenTickIntervalTarget(89,"x"),6,
+  "Nature single-column x axes should target six clean intervals");
+assert.equal(goldenTickIntervalTarget(183,"x"),8,
+  "Nature double-column x axes should cap at eight intervals");
+assert.equal(goldenTickIntervalTarget(55,"y"),4,
+  "Short scientific y axes should stay visually quiet");
 
 for (let n=0; n<gallery.length; n++) {
   const figure = gallery[n];
@@ -67,6 +76,10 @@ for (let n=0; n<gallery.length; n++) {
       figure.name+" must inherit the Lorentz Golden axis language");
     assert.equal(goldenAxis.tickcolor,GOLDEN_STYLE.stroke.tickStrokeColor,
       figure.name+" must inherit the Lorentz Golden tick language");
+    if(goldenAxis.type==="linear" && !figure.figureOverrides.xMajorTickStep){
+      assert.ok(goldenAxis.dtick>0,
+        figure.name+" should receive a physical-size-aware automatic x tick step");
+    }
     const goldenLegend=(layout as any).legend;
     if(goldenLegend){
       assert.equal(goldenLegend.font?.color,GOLDEN_STYLE.typography.textColor,
