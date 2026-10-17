@@ -1533,7 +1533,7 @@ export function buildLayout(args: {
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
         gridcolor: projectionSurface
-          ? GOLDEN_STYLE.field.projectionFloorGridColor
+          ? GOLDEN_STYLE.field.projectionGridColor
           : GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
@@ -1581,7 +1581,7 @@ export function buildLayout(args: {
         linecolor: GOLDEN_STYLE.stroke.axisColor,
         linewidth: axisWidthPx,
         gridcolor: projectionSurface
-          ? GOLDEN_STYLE.field.projectionGridColor
+          ? GOLDEN_STYLE.field.projectionFloorGridColor
           : GOLDEN_STYLE.field.sceneGridColor,
         gridwidth: ptToPx(0.4),
         zeroline: false,
