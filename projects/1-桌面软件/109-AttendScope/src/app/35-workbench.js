@@ -30,14 +30,15 @@ function plotTitle(ctx){
   return currentFilterLabel()+(ctx.type==='person'||ctx.type==='cell'?'每日分布':ctx.type==='date'?'当日分布':'趋势');
 }
 function manualJudgmentHtml(item){
-  const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item);
-  return '<div class="manual-judgment">'+
-    '<div class="judgment-line"><span>初始</span><b class="judgment-chip '+initial+'">'+JUDGMENT_LABELS[initial]+'</b></div>'+
-    '<div class="judgment-line manual-line"><span>人工</span><div class="manual-status-wrap">'+
-      '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
+  const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item),current=attendanceJudgment(item);
+  return '<section class="insight-card status-card">'+
+    '<div class="insight-card-head"><span>状态</span><b class="current-status '+current+'">'+JUDGMENT_LABELS[current]+'</b></div>'+
+    '<div class="judgment-line"><span>初始判断</span><b class="judgment-chip '+initial+'">'+JUDGMENT_LABELS[initial]+'</b></div>'+
+    '<div class="manual-caption"><span>人工判定</span>'+(manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复初始判断">恢复</button>':'')+'</div>'+
+    '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
       [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>'<button type="button" role="radio" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+JUDGMENT_LABELS[x]+'">'+t+'</button>').join('')+
-      '</div>'+(manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复初始判断">恢复</button>':'')+
-    '</div></div></div>';
+    '</div>'+
+  '</section>';
 }
 function setManualStatusForCurrent(status){
   const sel=state.selection;
@@ -88,29 +89,32 @@ function timelineBehaviorClock(row,key,edge){
 }
 function timelineBehaviorInsight(item,key){
   const rows=timelineBehaviorRows(item,key),label=FILTER_LABELS[key]||'行为';
-  if(!rows.length)return insightMetric('记录','0 项')+'<p class="insight-issue">当日无'+label+'记录</p>';
+  if(!rows.length)return '<section class="insight-card metric-card"><div class="insight-card-head"><span>当日'+label+'</span><b>0 项</b></div><p class="insight-empty">暂无记录</p></section>';
   const starts=rows.map(r=>timelineBehaviorClock(r,key,'start')).sort((a,b)=>minutes(a)-minutes(b));
   const ends=rows.map(r=>timelineBehaviorClock(r,key,'end')).sort((a,b)=>minutes(a)-minutes(b));
-  let out=insightMetric('记录',rows.length+' 项')+
+  let out='<section class="insight-card metric-card"><div class="insight-card-head"><span>当日'+label+'</span><b>'+rows.length+' 项</b></div><div class="insight-metric-list">'+
     insightMetric('时长',fmtMinutes(behaviorMinutes(item,key)))+
     insightMetric('开始',starts[0]||'—')+
     insightMetric('结束',ends[ends.length-1]||'—');
   const first=rows[0],detail=key==='trip'?(first.place||first.type):first.type;
   if(detail)out+=insightMetric(key==='trip'&&first.place?'地点':'类型',detail);
-  return out;
+  return out+'</div></section>';
 }
 function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx),view=analysisViewItems(ctx);
-  let out='<div class="insight-heading">'+currentFilterLabel()+' · '+({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab])+'</div>';
+  const tabLabel=({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab]);
+  let out='<div class="insight-heading"><strong>'+currentFilterLabel()+'</strong><span>'+tabLabel+'</span></div>';
   if(tab==='timeline'&&item){
     if(behaviorFilterActive()){
       out+=timelineBehaviorInsight(item,state.filter);
       return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
     }
     out+=manualJudgmentHtml(item);
-    out+=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
+    out+='<section class="insight-card metric-card"><div class="insight-card-head"><span>当日记录</span><b>'+item.punches.length+' 条</b></div><div class="insight-metric-list">'+
+      insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
       insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
-      insightMetric('在岗',fmtMinutes(item.presence))+insightMetric('记录',item.punches.length+' 条');
+      insightMetric('在岗',fmtMinutes(item.presence))+
+    '</div></section>';
     if(item.issues.length)out+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
     return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
   }
@@ -372,13 +376,13 @@ function r15PunchPreview(a){
     bins.get(bucket)[p.direction==='进'?'in':'out']++;
   }
   const bars=[...bins.values()].map(g=>{
-    const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(10,2+total*1.4);
+    const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(9,2+total*1.35);
     return '<span class="r15-punch-stack" style="left:'+left+'%;width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
       (g.in?'<i class="in"></i>':'')+
       (g.out?'<i class="out"></i>':'')+
     '</span>';
   }).join('');
-  const ticks=[[0,'0:00','start'],[360,'6:00',''],[720,'12:00',''],[1080,'18:00',''],[1440,'24:00','end']]
-    .map(([m,t,edge])=>'<span class="r15-mini-tick '+edge+'" style="left:'+(m/1440*100)+'%">'+t+'</span>').join('');
-  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+bars+ticks+'</div>';
+  const ticks=['0:00','6:00','12:00','18:00','24:00'].map(t=>'<span>'+t+'</span>').join('');
+  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+bars+'</div>'+
+    '<div class="r23-mini-ticks" aria-hidden="true">'+ticks+'</div>';
 }
