@@ -132,3 +132,9 @@ GitHub Pages 的 deploy-pages 每次部署整个站点。P108 与 P109 以前各
 - 根因：`.github/workflows/p109-attendscope-pages.yml` 只存在于 `p109-exp`，默认分支 `main` 没有注册该工作流。统一 Pages 的 `workflow_run` 监听无法稳定识别这条项目 CI。
 - 修复：把同一份只读 QA 工作流登记到 `main`。它仍只在 `p109-exp` push 时执行，不增加 Pages 权限，不改变单一发布者原则。
 - 本次共享预览目标：`p109-exp@2bafc68bb571461f14debea9ab959281f7ed1c8c`，P109 CI run `39007619239` success。主线合并本记录会立即触发统一 Pages 重建，发布时仍同时保留 P108/P109。
+
+## 2026-10-17 P109 预览缓存刷新
+
+- 统一 Pages 在组装 P109 时，按当前 `P109_SHA` 给所有 `./src/*` CSS/JS/资源引用追加版本查询参数。
+- 这样每次 P109 预览部署都会产生新的资源 URL，避免浏览器继续复用上一轮同文件名的缓存，导致“仓库已经改了但页面看起来完全没变”。
+- 仅处理共享 Pages 产物，不改离线源文件路径，不影响 file:// 运行。
