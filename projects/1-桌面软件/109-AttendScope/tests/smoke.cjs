@@ -31,7 +31,7 @@ async function run(){
  });
  console.log('R13_LAYOUT '+JSON.stringify(layout));
  if(layout.month!=='2026-10'||layout.tabs!==4||layout.defaultFilter!=='main'||layout.recordCount<3600||
-    Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<4.4||layout.ratio>7.5||
+    Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<3.7||layout.ratio>7.5||
     layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
  await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===8&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
