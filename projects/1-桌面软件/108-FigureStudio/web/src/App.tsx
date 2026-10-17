@@ -68,6 +68,8 @@ import {
 } from "./plot/renderSpec";
 import { presetOrder, presets } from "./plot/presets";
 import { PrecisionSvg, supportsPrecisionSvg } from "./plot/PrecisionSvg";
+import { FieldSvg } from "./plot/FieldSvg";
+import { BarSvg } from "./plot/BarSvg";
 import { LorentzFigure } from "./plot/LorentzFigure";
 import { PublicationBoard } from "./plot/PublicationBoard";
 import { LorentzInspector } from "./plot/LorentzInspector";
@@ -952,10 +954,22 @@ function App() {
   const isLorentz = activeFigure?.lorentz?.kind === "lorentz-two-panel";
   const isPublicationBoard =
     activeFigure?.publicationBoard?.kind === "publication-palette-board";
+  const isVectorField =
+    activeFigure?.templateId === "heatmap" ||
+    activeFigure?.templateId === "contour";
+  const isVectorBar =
+    activeFigure?.templateId === "bar" ||
+    activeFigure?.templateId === "grouped-bar" ||
+    activeFigure?.templateId === "stacked-bar";
+  const isVector3D =
+    activeFigure?.templateId === "surface-3d" ||
+    activeFigure?.templateId === "surface-projection-3d";
   const usePrecision = Boolean(
     isLorentz ||
     isPublicationBoard ||
-    (rendererMode === "precision" && precisionAvailable)
+    isVectorField ||
+    isVectorBar ||
+    (!isVector3D && precisionAvailable)
   );
   useEffect(() => { localStorage.setItem(RENDER_MODE_KEY, rendererMode); }, [rendererMode]);
 
@@ -3440,13 +3454,19 @@ function App() {
                   <label>
                     <span>画布</span>
                     <select
-                      value={isLorentz ? "precision" : precisionAvailable ? rendererMode : "plotly"}
-                      disabled={Boolean(isLorentz)}
+                      value={isVector3D ? "plotly" : usePrecision ? "precision" : "plotly"}
+                      disabled={isVector3D || usePrecision}
                       onChange={(event) => setRendererMode(event.target.value as "precision" | "plotly")}
-                      title="精细 SVG 为可回退实验；未覆盖的图型、分类轴与复杂 LaTeX 仍由 Plotly 原样绘制"
+                      title={
+                        isVector3D
+                          ? "3D 交互采用 WebGL；SVG 导出使用 FigureStudio 真矢量投影器"
+                          : usePrecision
+                          ? "2D 固定使用 FigureStudio SVG 矢量渲染，支持无损缩放"
+                          : "该兼容图型暂由 Plotly 绘制"
+                      }
                     >
-                      <option value="precision" disabled={!precisionAvailable}>精细 SVG</option>
-                      <option value="plotly" disabled={Boolean(isLorentz)}>Plotly 兼容</option>
+                      <option value="precision">SVG 矢量</option>
+                      <option value="plotly">WebGL / Plotly</option>
                     </select>
                   </label>
                   <label>
@@ -3708,6 +3728,23 @@ function App() {
                         }))}
                         onAxisClick={() => setInspectorTab("axis")}
                         onLegendClick={() => setInspectorTab("legend")}
+                      />
+                    ) : isVectorField && activeFigure ? (
+                      <FieldSvg
+                        figure={activeFigure}
+                        layout={layout}
+                        traces={traces as any[]}
+                        svgRef={svgRef}
+                        onAxisClick={() => setInspectorTab("axis")}
+                      />
+                    ) : isVectorBar && activeFigure ? (
+                      <BarSvg
+                        figure={activeFigure}
+                        layout={layout}
+                        traces={traces as any[]}
+                        svgRef={svgRef}
+                        onAxisClick={() => setInspectorTab("axis")}
+                        onSelectSeries={selectSeries}
                       />
                     ) : usePrecision && activeFigure ? (
                       <PrecisionSvg

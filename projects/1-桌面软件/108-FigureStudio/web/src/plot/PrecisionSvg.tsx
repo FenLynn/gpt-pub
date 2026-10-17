@@ -200,7 +200,7 @@ function markerShape(symbol: string | undefined, x: number, y: number, size: num
 }
 /** Native SVG now supports $...$ math through bundled MathJax SVG paths. */
 export function supportsPrecisionSvg(figure: FigureSpec): boolean {
-  if (["heatmap", "contour", "surface-3d", "surface-projection-3d", "bar", "grouped-bar", "stacked-bar"].includes(figure.templateId)) return false;
+  if (["surface-3d", "surface-projection-3d"].includes(figure.templateId)) return false;
   const o = figure.figureOverrides;
   const texts = [o.plotTitle, o.xTitle, o.yTitle, o.rightYTitle,
     ...Object.values(figure.seriesOverrides).map(x => x.legendLabel)];
