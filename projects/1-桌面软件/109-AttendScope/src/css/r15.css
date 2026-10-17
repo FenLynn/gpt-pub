@@ -205,12 +205,12 @@
 
 /* R18: filter-driven inspector, compact audio tracks and manual judgment workflow. */
 :root{
- --behavior-trip:#4c8ed9;
- --behavior-leave:#e9954f;
- --behavior-outing:#36afa8;
- --behavior-overtime:#c96e9e;
- --event-in:#45a7df;
- --event-out:#efa05e;
+ --behavior-trip:#6b7fd7;
+ --behavior-leave:#8a6fd1;
+ --behavior-outing:#3c9dc4;
+ --behavior-overtime:#c876a0;
+ --event-in:#1f5a9f;
+ --event-out:#8a5b3d;
 }
 .analysis-head{
  min-height:33px!important;height:33px!important;padding:0 10px!important;
@@ -757,4 +757,65 @@
 }
 .r23-mini-ticks{
   left:12px!important;right:12px!important;bottom:8px!important;height:12px!important;
+}
+
+
+/* R26: clearer work windows, neutral empty rails, unique punch colors, compact status blocks. */
+.timeline-top-legend .legend-schedule i{
+  background:rgba(132,155,173,.26)!important;
+  border-color:rgba(122,145,164,.32)!important;
+}
+.timeline-top-legend .legend-event.in i{background:var(--event-in)!important}
+.timeline-top-legend .legend-event.out i{background:var(--event-out)!important}
+
+.status-card .auto-line{
+  min-height:26px;margin:0 0 6px;padding:0;
+}
+.status-card .auto-line>span,
+.status-card .manual-caption>span{
+  font-size:9px!important;color:#7c8f9d!important;
+}
+.auto-judgment{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:42px;height:21px;padding:0 7px;border-radius:5px;
+  color:#fff!important;font-size:9px!important;font-weight:700!important;
+}
+.auto-judgment.normal{background:var(--judgment-normal)!important}
+.auto-judgment.anomaly{background:var(--judgment-anomaly)!important}
+.auto-judgment.absent{background:var(--judgment-absent)!important}
+.auto-judgment.rest{background:#aeb9c2!important}
+.status-card .manual-caption{margin:0 0 5px!important}
+.status-card .manual-status-buttons{
+  width:100%!important;display:grid!important;grid-template-columns:repeat(3,1fr)!important;
+  gap:4px!important;padding:0!important;background:transparent!important;box-shadow:none!important;
+}
+.status-card .manual-status-buttons button{
+  height:23px!important;border:0!important;border-radius:5px!important;
+  padding:0!important;font-size:9px!important;font-weight:700!important;line-height:23px!important;
+  color:#fff!important;box-shadow:none!important;opacity:.42;
+}
+.status-card .manual-status-buttons button.normal{background:var(--judgment-normal)!important}
+.status-card .manual-status-buttons button.anomaly{background:var(--judgment-anomaly)!important}
+.status-card .manual-status-buttons button.absent{background:var(--judgment-absent)!important}
+.status-card .manual-status-buttons button.active{
+  opacity:1!important;color:#fff!important;box-shadow:0 1px 3px rgba(44,61,74,.14)!important;
+}
+.status-card .manual-status-buttons button:hover{opacity:.7}
+.status-card .manual-status-buttons button.active:hover{opacity:1}
+.status-card .manual-clear{
+  color:#81919d!important;background:transparent!important;
+  font-size:8px!important;padding:0 2px!important;
+}
+
+.music-track-panel .r15-punch-preview::before{display:none!important}
+.music-track-panel .r15-punch-preview{
+  overflow:hidden!important;
+}
+.music-track-panel .r15-punch-stack{
+  top:0!important;bottom:0!important;height:100%!important;
+  overflow:hidden!important;align-items:stretch!important;
+}
+.music-track-panel .r15-punch-stack i{
+  top:0!important;bottom:0!important;height:100%!important;max-height:none!important;
+  border-radius:0!important;box-shadow:none!important;
 }
