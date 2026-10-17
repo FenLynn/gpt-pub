@@ -129,12 +129,11 @@ function timelineFullInsightHtml(item){
 function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx),view=analysisViewItems(ctx);
   const tabLabel=({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab]);
-  const heading=tab==='timeline'&&item?'个人':currentFilterLabel();
-  let out='<div class="insight-heading"><strong>'+heading+'</strong><span>'+tabLabel+'</span></div>';
   if(tab==='timeline'&&item){
-    out+=timelineFullInsightHtml(item);
-    return out+'<div id="timelineEvidence" class="insight-evidence"></div>';
+    return timelineFullInsightHtml(item)+'<div id="timelineEvidence" class="insight-evidence"></div>';
   }
+  const heading=currentFilterLabel();
+  let out='<div class="insight-heading"><strong>'+heading+'</strong><span>'+tabLabel+'</span></div>';
   if(state.filter!=='main'){
     const people=new Set(view.map(a=>a.employee.id)).size,days=new Set(view.map(a=>a.date)).size;
     if(behaviorFilterActive()){
