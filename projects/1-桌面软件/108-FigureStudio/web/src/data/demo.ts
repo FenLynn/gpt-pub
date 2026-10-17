@@ -9,6 +9,10 @@ import type {
   UserDefaults
 } from "../model";
 import { GOLDEN_STYLE } from "../plot/goldenStyle";
+import {
+  PUBLICATION_PALETTE_ORDER,
+  PUBLICATION_PALETTES
+} from "../plot/palettes";
 
 function id(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
@@ -482,6 +486,43 @@ export function createRidgelineSheet(): DataSheet {
   };
 }
 
+function createPublicationBoardFigure(
+  sheet: DataSheet,
+  defaults: UserDefaults,
+  paletteId: (typeof PUBLICATION_PALETTE_ORDER)[number],
+  boardNumber: number
+): FigureSpec {
+  const palette = PUBLICATION_PALETTES[paletteId];
+  const figure = makeFigure(
+    sheet,
+    "Style Board " + String(boardNumber).padStart(2,"0") + " · " + palette.label,
+    "publication-board",
+    defaults,
+    "folder-palettes",
+    {
+      publicationMode: "single",
+      aspectMode: "custom",
+      customAspectWidth: 3,
+      customAspectHeight: 4,
+      figureWidthMm: 183,
+      figureHeightMm: 238,
+      colorCycle: paletteId,
+      background: "#ffffff",
+      gridVisible: false,
+      legendVisible: false,
+      plotTitle: ""
+    }
+  );
+  return {
+    ...figure,
+    publicationBoard: {
+      kind: "publication-palette-board",
+      paletteId,
+      boardNumber
+    }
+  };
+}
+
 function makeFigure(
   sheet: DataSheet,
   name: string,
@@ -546,6 +587,7 @@ export function createInitialProject(
   };
 
   const folders = [
+    { id: "folder-palettes", name: "Publication Style Boards · 顶刊配色样板" },
     { id: "folder-golden", name: "Golden Reference · 双面板" },
     { id: "folder-nature", name: "Nature Gallery · 14 samples" },
     { id: "folder-experiment", name: "实验数据" },
@@ -556,6 +598,9 @@ export function createInitialProject(
   ];
 
   const spectrumSheet = createSpectrumSheet();
+  const paletteBoards = PUBLICATION_PALETTE_ORDER.map((paletteId,index) =>
+    createPublicationBoardFigure(spectrumSheet,defaults,paletteId,index+1)
+  );
   const fieldSheet = createFieldSheet();
   const peaksProjectionSheet = createPeaksProjectionSheet();
   const doubleYSheet = createDualYAxisSheet();
@@ -902,6 +947,7 @@ export function createInitialProject(
       commonPlotsBook
     ],
     figures: [
+      ...paletteBoards,
       ...natureFigures,
       lorentzFigure,
       spectrumFigure,
@@ -924,7 +970,7 @@ export function createInitialProject(
           ]
         : [])
     ],
-    activeFigureId: natureFigures[0].id,
+    activeFigureId: paletteBoards[0].id,
     defaults: {
       templateId: defaults.templateId,
       presetId: defaults.presetId,
