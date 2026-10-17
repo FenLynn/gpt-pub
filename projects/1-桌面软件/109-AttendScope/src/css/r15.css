@@ -670,3 +670,91 @@
 }
 .plot-axis.music-track-panel{overflow:visible!important}
 .music-track-panel .echarts-timeline-chart{overflow:visible!important}
+
+
+/* R25: compact connected behavior rails, title-bar tools, flat insight tabs. */
+.analysis-head{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;
+}
+.analysis-head h2{
+  min-width:0;flex:1 1 auto;margin:0!important;
+}
+.analysis-head h2 .head-date,
+.analysis-head h2 .head-group,
+.analysis-head h2 strong{
+  font-size:11px!important;line-height:1!important;
+}
+.analysis-head h2 .head-date{font-weight:500!important}
+.analysis-head h2 .head-group{font-weight:600!important;padding:2px 5px!important}
+.analysis-head h2 strong{font-weight:650!important}
+.analysis-head-tools{
+  flex:none;display:flex;align-items:center;min-width:0;
+}
+.analysis-head-timeline-tools{
+  display:flex;align-items:center;gap:10px;min-width:0;
+}
+.analysis-head-timeline-tools .timeline-top-legend{
+  display:flex;align-items:center;gap:9px;padding:0!important;min-width:0;
+}
+.analysis-head-timeline-tools .timeline-top-legend span{
+  font-size:9.5px!important;color:#6c8292!important;
+}
+.analysis-head-timeline-tools #timelineDayPicker{
+  height:24px!important;font-size:10px!important;padding:2px 20px 2px 7px!important;
+  border:1px solid #d8e2e9!important;border-radius:6px!important;background:#fff!important;
+}
+.inspector-plot .chart-mode-tabs{margin-top:0!important}
+.inspector-plot .chart-mode-tabs + .plot-axis{margin-top:0!important}
+
+.inspector-top{grid-template-columns:minmax(0,1fr) 154px!important}
+.inspector-insight{
+  width:154px!important;min-width:154px!important;max-width:154px!important;
+  padding:0 10px 6px!important;background:#fbfcfd!important;
+}
+.insight-tabs{
+  display:grid;grid-template-columns:1fr 1fr;height:34px;margin:0 -10px 6px;
+  border-bottom:1px solid #e7edf2;background:#fff;
+}
+.insight-tabs button{
+  position:relative;border:0;background:transparent;color:#748896;
+  font-size:10.5px;font-weight:600;cursor:pointer;
+}
+.insight-tabs button.active{color:#2f6fa7;font-weight:700}
+.insight-tabs button.active::after{
+  content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;background:#2f91d2;
+}
+.insight-pane{display:none}
+.insight-pane.active{display:block}
+.inspector-insight .insight-card,
+.inspector-insight .insight-flat-section{
+  margin:0!important;padding:7px 0!important;border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important;
+}
+.inspector-insight .insight-card + .insight-flat-section,
+.inspector-insight .insight-flat-section + .insight-flat-section,
+.inspector-insight .behavior-summary-card{
+  border-top:1px solid #edf1f4!important;
+}
+.inspector-insight .status-card{padding-top:3px!important}
+.inspector-insight .insight-card:hover{box-shadow:none!important;transform:none!important}
+.inspector-insight .insight-card-head{margin-bottom:4px!important}
+.inspector-insight .manual-status-buttons{border-radius:6px!important}
+.inspector-insight .insight-behavior-row{min-height:25px!important}
+
+.music-track-panel .r15-punch-preview{
+  left:12px!important;right:12px!important;bottom:30px!important;height:34px!important;
+  overflow:hidden!important;border-radius:2px!important;background:transparent!important;
+}
+.music-track-panel .r15-punch-preview::before{
+  content:"";position:absolute;left:0;right:0;top:50%;height:1px;
+  background:#cfd7dd;transform:translateY(-.5px);z-index:1;
+}
+.r15-punch-stack{
+  top:0!important;bottom:auto!important;height:34px!important;z-index:3!important;
+}
+.r15-punch-stack i{
+  height:34px!important;max-height:34px!important;border-radius:0!important;
+}
+.r23-mini-ticks{
+  left:12px!important;right:12px!important;bottom:8px!important;height:12px!important;
+}
