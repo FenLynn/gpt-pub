@@ -130,6 +130,19 @@ jobs:
             --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=surface" \
             > "$RUNNER_TEMP/p108-screenshots/Surface-Golden.html" 2>"$RUNNER_TEMP/p108-screenshots/Surface-Golden.stderr"
           test -s "$RUNNER_TEMP/p108-screenshots/Surface-Golden.png"
+
+          "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1500,950 --virtual-time-budget=9000 \
+            --screenshot="$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.png" \
+            --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=surface-projection" \
+            > "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html" 2>"$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.stderr"
+          test -s "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.png"
+          grep -q 'Surface with three-direction contour projections' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"; then
+            echo "::error::3D projection template did not render through WebGL"
+            tail -n 30 "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.stderr" || true
+            exit 1
+          fi
+
           if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Golden.html"; then
             echo "::error::3D Golden surface did not render through WebGL"
             tail -n 30 "$RUNNER_TEMP/p108-screenshots/Surface-Golden.stderr" || true

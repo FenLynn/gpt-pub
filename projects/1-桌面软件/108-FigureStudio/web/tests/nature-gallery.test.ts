@@ -14,6 +14,14 @@ import {
   GOLDEN_STYLE,
   goldenTickIntervalTarget
 } from "../src/plot/goldenStyle";
+import { PUBLICATION_PALETTES } from "../src/plot/palettes";
+import { templates } from "../src/plot/templates";
+
+assert.equal(PUBLICATION_PALETTES["mist-blue-celadon"].colors[0],"#4F6D8A");
+assert.equal(PUBLICATION_PALETTES["sea-salt-coral"].colors[2],"#F4A7AE");
+assert.equal(PUBLICATION_PALETTES["burgundy-slate"].colors[0],"#713E50");
+assert.ok(templates.some(t=>t.id==="surface-projection-3d"),
+  "Three-direction 3D projection must be a first-class template");
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
@@ -153,6 +161,18 @@ for (let n=0; n<gallery.length; n++) {
       figure.name+" contains invalid geometry");
   }
 }
+  const projectedSurface=project.figures.find(f=>f.templateId==="surface-projection-3d");
+  assert.ok(projectedSurface,"Initial project must expose the new 3D projection template");
+  const projectedSource=findSheet(project,projectedSurface!.dataRef!.sheetId);
+  assert.ok(projectedSource,"3D projection source sheet missing");
+  const projectedDataset=sheetToDataset(projectedSource!.sheet,projectedSurface!);
+  const projectedTraces=buildTraces({dataset:projectedDataset,figure:projectedSurface!,preset:presets.scientific}) as any[];
+  assert.equal(projectedTraces[0]?.type,"surface");
+  assert.equal(projectedTraces[0]?.contours?.z?.project?.z,true,"3D floor projection missing");
+  assert.equal(projectedTraces[0]?.contours?.x?.project?.x,true,"3D x-wall projection missing");
+  assert.equal(projectedTraces[0]?.contours?.y?.project?.y,true,"3D y-wall projection missing");
+  assert.equal(projectedSurface!.figureOverrides.colorScale,"Viridis");
+
   const surfaceGolden=project.figures.find(f=>f.templateId==="surface-3d");
   assert.ok(surfaceGolden,"Golden defaults must include a 3D scientific surface");
   const surfaceSource=findSheet(project,surfaceGolden!.dataRef!.sheetId);
