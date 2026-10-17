@@ -43,6 +43,7 @@ export const templates: TemplateDefinition[] = [
   { id: "pca-ellipse", label: "PCA + 置信椭圆", family: "XY", input: { ...seriesInput, minSeries: 2 } },
   { id: "volcano", label: "Volcano / 火山图", family: "XY", input: seriesInput },
   { id: "ridgeline", label: "Ridgeline / 山脊密度", family: "XY", input: { ...seriesInput, minSeries: 2 } },
+  { id: "publication-board", label: "Publication Style Board", family: "Layout", input: seriesInput },
   { id: "bar", label: "柱状图", family: "Bar", input: seriesInput },
   {
     id: "grouped-bar",

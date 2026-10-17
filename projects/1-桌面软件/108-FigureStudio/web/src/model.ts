@@ -74,9 +74,12 @@ export type PresetId = "scientific" | "nature" | "presentation";
 export type PublicationMode = "single" | "quad-panel";
 export type ColorCycleId =
   | "golden"
+  | "sunny-blue-bamboo"
   | "mist-blue-celadon"
   | "sea-salt-coral"
+  | "apricot-haze"
   | "burgundy-slate"
+  | "nature-aurora"
   | "matplotlib"
   | "matlab";
 export type AspectMode = "16:9" | "4:3" | "3:2" | "custom";
@@ -92,6 +95,7 @@ export type PlotTemplateId =
   | "pca-ellipse"
   | "volcano"
   | "ridgeline"
+  | "publication-board"
   | "bar"
   | "grouped-bar"
   | "stacked-bar"
@@ -375,6 +379,12 @@ export interface LorentzComposition {
   showResonanceMarkers: boolean;
   annotations: LorentzAnnotation[];
 }
+export interface PublicationBoardComposition {
+  kind: "publication-palette-board";
+  paletteId: Exclude<ColorCycleId, "matplotlib" | "matlab">;
+  boardNumber: number;
+}
+
 export interface FigureSpec {
   id: string;
   name: string;
@@ -387,6 +397,7 @@ export interface FigureSpec {
   seriesOrder: string[];
   datasetId?: string;
   lorentz?: LorentzComposition;
+  publicationBoard?: PublicationBoardComposition;
 }
 
 export interface ProjectDefaults {
