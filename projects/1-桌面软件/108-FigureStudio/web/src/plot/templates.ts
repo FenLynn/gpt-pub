@@ -10,7 +10,7 @@ export interface TemplateInputDefinition {
 export interface TemplateDefinition {
   id: PlotTemplateId;
   label: string;
-  family: "XY" | "Bar" | "Field" | "3D";
+  family: "XY" | "Bar" | "Field" | "3D" | "Layout";
   input: TemplateInputDefinition;
 }
 

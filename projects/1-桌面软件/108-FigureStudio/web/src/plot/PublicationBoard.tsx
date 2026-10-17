@@ -8,7 +8,7 @@ interface Props {
   figure: FigureSpec;
   width: number;
   height: number;
-  svgRef: RefObject<SVGSVGElement | null>;
+  svgRef: RefObject<SVGSVGElement>;
 }
 
 const SERIF = '"Times New Roman", Georgia, serif';
