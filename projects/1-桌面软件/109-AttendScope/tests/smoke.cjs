@@ -40,8 +40,8 @@ async function run(){
  await check(page,()=>{
    const head=document.querySelector('.analysis-head').getBoundingClientRect();
    const insight=document.querySelector('.inspector-insight').getBoundingClientRect();
-   return head.height<=35&&insight.width>=110&&insight.width<=132;
- },'Right title or compact insight geometry regressed');
+   return head.height<=35&&insight.width>=148&&insight.width<=164;
+ },'Right title or R23 insight geometry regressed');
  const countBefore=await page.evaluate(()=>document.querySelectorAll('.m-cell button.filtered-out').length);
  if(countBefore<25)throw Error('Default main status filter not active');
  await page.locator('#statusFilter').selectOption('trip');
@@ -113,13 +113,14 @@ async function run(){
    document.querySelector('.m-cell.cell-focus .selected')&&
    getComputedStyle(document.querySelector('.m-cell.cell-focus .selected')).boxShadow.includes('135, 89, 219'),
  'Person/calendar cell focus not lifted');
- await page.screenshot({path:path.join(out,'r22-primary-timeline.png')});
+ await page.screenshot({path:path.join(out,'r23-primary-timeline.png')});
  await check(page,()=>{
   const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
-  return tr[0]==='events'&&tr.indexOf('actual')>tr.indexOf('events')&&
+  return tr[0]==='events'&&tr[1]==='actual'&&
+    ['trip','leave','outing','overtime'].every(k=>tr.includes(k))&&tr.length===6&&
     bars>0&&!!document.getElementById('r15PunchPreview')&&!document.querySelector('.r15-punch-dot');
- },'Music track order or punch-dot overview incorrect');
+ },'R23 fixed track order or punch overview incorrect');
  await check(page,()=>{
    const dup=[...state.analysis.values()].find(a=>a.punches.some(p=>p.scenario==='rapid-swipes'));
    if(!dup)return false;
@@ -133,15 +134,18 @@ async function run(){
   const frames=document.querySelectorAll('.matrix-selection-frame:not(.inactive)');
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
   const opt=chart.getOption(),zoom=opt.dataZoom;
-  const ticks=document.querySelectorAll('.r15-mini-tick'),preview=document.getElementById('r15PunchPreview');
+  const ticks=document.querySelectorAll('.r23-mini-ticks span'),preview=document.getElementById('r15PunchPreview');
   const bar=preview?.querySelector('.r15-punch-stack i');
   const barHeight=bar?.getBoundingClientRect().height||0,previewHeight=preview?.getBoundingClientRect().height||0;
   const slider=zoom.find(z=>z.type==='slider');
+  const keys=data.tracks.map(t=>t.key);
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
     !data.tracks.some(x=>x.key==='span'||x.key==='rules')&&data.workWindows.length===2&&
-    zoom.filter(z=>z.type==='slider').length===1&&slider.height===30&&
-    ticks.length===5&&barHeight>=previewHeight-1&&opt.grid[0].bottom>=84&&opt.yAxis[0].type==='category';
- },'Separated timeline lanes, axis spacing or embedded mini ruler failed');
+    ['trip','leave','outing','overtime'].every(k=>keys.includes(k))&&
+    zoom.filter(z=>z.type==='slider').length===1&&slider.height===38&&
+    ticks.length===5&&barHeight>=previewHeight-1&&opt.grid[0].left===10&&opt.grid[0].right===10&&
+    slider.left===10&&slider.right===10&&opt.grid[0].bottom>=108&&opt.yAxis[0].type==='category';
+ },'R23 fixed behavior rails, aligned zoom or external ruler failed');
 
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
@@ -189,7 +193,7 @@ async function run(){
      radios.filter(x=>x.getAttribute('aria-checked')==='true').length===1&&
      radios.find(x=>x.dataset.manualStatus==='absent')?.classList.contains('active');
  },manualTarget,'Manual segmented judgment/check mark failed');
- await page.screenshot({path:path.join(out,'r21-manual-segment.png')});
+ await page.screenshot({path:path.join(out,'r23-manual-segment.png')});
  await page.locator('[data-judgment-mode="initial"]').click();
  await check(page,({id,day})=>{
    const cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
@@ -198,29 +202,28 @@ async function run(){
  await page.locator('[data-judgment-mode="manual"]').click();
  await check(page,()=>state.judgmentMode==='manual','Manual layer cannot be restored');
 
- // The active left filter is the contract for the right timeline: regular attendance must not leak behavior rails.
+ // All four business rails stay visible; the left filter changes emphasis and right-side semantics.
  await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,()=>{
    const a=state.analysis.get('E011|23'),m=r14TrackData(a),keys=m.tracks.map(t=>t.key);
    const actual=m.bars.find(x=>x.track==='actual');
-   return ['events','actual'].every(k=>keys.includes(k))&&
-     !['trip','leave','outing','overtime','rules'].some(k=>keys.includes(k))&&
-     m.workWindows.length===2&&actual?.sourceIds?.length===2;
- },'Regular filter leaked behavior rails or lost scheduled/attendance evidence');
- await page.screenshot({path:path.join(out,'r20-regular-timeline.png')});
+   return ['events','actual','trip','leave','outing','overtime'].every(k=>keys.includes(k))&&
+     !keys.includes('rules')&&m.workWindows.length===2&&actual?.sourceIds?.length===2;
+ },'R23 fixed business rails or scheduled/attendance evidence missing');
+ await page.screenshot({path:path.join(out,'r23-regular-timeline.png')});
  await page.locator('#statusFilter').selectOption('outing');
  await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,()=>{
    const keys=r14TrackData(state.analysis.get('E011|23')).tracks.map(t=>t.key);
    const insight=document.querySelector('.inspector-insight');
-   return keys.includes('outing')&&!keys.includes('trip')&&!keys.includes('leave')&&!keys.includes('overtime')&&
+   return ['trip','leave','outing','overtime'].every(k=>keys.includes(k))&&
      insight?.querySelector('.insight-heading')?.textContent.includes('外出')&&
-     !insight?.querySelector('.manual-judgment')&&
+     !!insight?.querySelector('.insight-card.metric-card')&&
      [...insight.querySelectorAll('.insight-row span')].some(x=>x.textContent==='时长');
- },'Behavior filter did not narrow timeline rails and behavior-specific metrics');
- await page.screenshot({path:path.join(out,'r20-outing-timeline.png')});
+ },'Behavior filter did not keep fixed rails and switch right-side metrics');
+ await page.screenshot({path:path.join(out,'r23-outing-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
  // A stress day should merge close punches at wide range and split them naturally as the time window narrows.
@@ -308,7 +311,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R22',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R23',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
