@@ -422,3 +422,9 @@
  left:6px!important;right:8px!important;
 }
 .r14-day-edges{left:6px!important;right:8px!important}
+
+
+/* R19.1 vertical balance: give the raw evidence table more permanent room. */
+.analysis-body{
+ grid-template-rows:minmax(220px,45%) minmax(230px,1fr)!important;
+}

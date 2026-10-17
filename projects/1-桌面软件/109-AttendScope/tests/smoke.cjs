@@ -186,10 +186,10 @@ async function run(){
  await check(page,()=>state.judgmentMode==='manual','Manual layer cannot be restored');
 
  // One demonstrator day carries every behavior color in the same audio-track chart.
- await page.locator('.m-cell[data-emp="E011"][data-day="24"] button').click();
+ await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
  const behaviorDebug=await page.evaluate(()=>{
-   const a=state.analysis.get('E011|24'),m=r14TrackData(a);
+   const a=state.analysis.get('E011|23'),m=r14TrackData(a);
    return {filter:state.filter,behaviors:attendanceBehaviors(a),keys:m.tracks.map(t=>t.key),windows:m.workWindows.length,
      counts:{trip:a.trips.length,leave:a.leaves.length,outing:a.outings.length,overtime:a.overtime.length}};
  });
@@ -198,10 +198,10 @@ async function run(){
  if(!['events','actual','trip','leave','outing','overtime'].every(k=>behaviorDebug.keys.includes(k))||behaviorDebug.keys.includes('rules')||behaviorDebug.windows!==2)
    throw Error('All behavior rails are not visible on the demonstrator day');
  await page.locator('#statusFilter').selectOption('outing');
- await page.locator('.m-cell[data-emp="E011"][data-day="24"] button').click();
+ await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,()=>{
-   const keys=r14TrackData(state.analysis.get('E011|24')).tracks.map(t=>t.key);
+   const keys=r14TrackData(state.analysis.get('E011|23')).tracks.map(t=>t.key);
    return keys.includes('outing')&&!keys.includes('trip')&&!keys.includes('leave')&&!keys.includes('overtime')&&
      document.querySelector('.insight-heading')?.textContent.includes('外出');
  },'Behavior filter did not narrow the timeline/right insight');
