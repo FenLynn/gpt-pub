@@ -129,12 +129,12 @@ jobs:
               --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=$mode" \
               > "$RUNNER_TEMP/p108-screenshots/$label.html" 2>"$RUNNER_TEMP/p108-screenshots/$label.stderr"
             test -s "$RUNNER_TEMP/p108-screenshots/$label.png"
-            if ! grep -q 'class="main-svg"' "$RUNNER_TEMP/p108-screenshots/$label.html"; then
-              echo "::error::$label advanced scientific template did not render"
+            if ! grep -q 'data-vector-preview="true"' "$RUNNER_TEMP/p108-screenshots/$label.html"; then
+              echo "::error::$label native SVG scientific template did not render"
               tail -n 30 "$RUNNER_TEMP/p108-screenshots/$label.stderr" || true
               exit 1
             fi
-            echo "Browser preview $label OK"
+            echo "Browser preview $label native SVG OK"
           done
 
           "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1500,950 --virtual-time-budget=9000 \
