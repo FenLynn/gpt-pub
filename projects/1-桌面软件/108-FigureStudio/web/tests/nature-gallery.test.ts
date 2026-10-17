@@ -22,6 +22,9 @@ assert.equal(PUBLICATION_PALETTES["sea-salt-coral"].colors[2],"#F4A7AE");
 assert.equal(PUBLICATION_PALETTES["burgundy-slate"].colors[0],"#713E50");
 assert.ok(templates.some(t=>t.id==="surface-projection-3d"),
   "Three-direction 3D projection must be a first-class template");
+for (const id of ["pca-ellipse","volcano","ridgeline"] as const) {
+  assert.ok(templates.some(t=>t.id===id),id+" must be a first-class scientific template");
+}
 
 for (const includeVisualQa of [false, true]) {
 const project = createInitialProject(undefined, includeVisualQa);
@@ -161,6 +164,40 @@ for (let n=0; n<gallery.length; n++) {
       figure.name+" contains invalid geometry");
   }
 }
+  const pcaFigure=project.figures.find(f=>f.templateId==="pca-ellipse");
+  assert.ok(pcaFigure,"PCA ellipse example must exist");
+  const pcaSource=findSheet(project,pcaFigure!.dataRef!.sheetId);
+  assert.ok(pcaSource,"PCA source data missing");
+  const pcaDataset=sheetToDataset(pcaSource!.sheet,pcaFigure!);
+  const pcaTraces=buildTraces({dataset:pcaDataset,figure:pcaFigure!,preset:presets.scientific}) as any[];
+  const pcaLayout=buildLayout({dataset:pcaDataset,figure:pcaFigure!,preset:presets.scientific}) as any;
+  assert.ok(pcaTraces.some(trace=>trace.fill==="toself"),"PCA confidence ellipse fill missing");
+  assert.ok(pcaTraces.some(trace=>trace.mode==="markers"),"PCA group markers missing");
+  assert.equal(pcaFigure!.figureOverrides.colorCycle,"sea-salt-coral");
+  assert.ok(pcaLayout.xaxis && pcaLayout.yaxis,"PCA publication axes missing");
+
+  const volcanoFigure=project.figures.find(f=>f.templateId==="volcano");
+  assert.ok(volcanoFigure,"Volcano example must exist");
+  const volcanoSource=findSheet(project,volcanoFigure!.dataRef!.sheetId);
+  assert.ok(volcanoSource,"Volcano source data missing");
+  const volcanoDataset=sheetToDataset(volcanoSource!.sheet,volcanoFigure!);
+  const volcanoTraces=buildTraces({dataset:volcanoDataset,figure:volcanoFigure!,preset:presets.scientific}) as any[];
+  const volcanoLayout=buildLayout({dataset:volcanoDataset,figure:volcanoFigure!,preset:presets.scientific}) as any;
+  assert.ok(Array.isArray(volcanoTraces[0]?.marker?.color),"Volcano significance coloring missing");
+  assert.equal(volcanoLayout.shapes?.length,3,"Volcano must expose ±FC and p-value threshold guides");
+  assert.equal(volcanoFigure!.figureOverrides.legendVisible,false);
+
+  const ridgeFigure=project.figures.find(f=>f.templateId==="ridgeline");
+  assert.ok(ridgeFigure,"Ridgeline example must exist");
+  const ridgeSource=findSheet(project,ridgeFigure!.dataRef!.sheetId);
+  assert.ok(ridgeSource,"Ridgeline source data missing");
+  const ridgeDataset=sheetToDataset(ridgeSource!.sheet,ridgeFigure!);
+  const ridgeTraces=buildTraces({dataset:ridgeDataset,figure:ridgeFigure!,preset:presets.scientific}) as any[];
+  const ridgeLayout=buildLayout({dataset:ridgeDataset,figure:ridgeFigure!,preset:presets.scientific}) as any;
+  assert.ok(ridgeTraces.every(trace=>trace.fill==="toself"),"Ridgeline filled distributions missing");
+  assert.equal(ridgeLayout.yaxis?.ticktext?.length,6,"Ridgeline group labels missing");
+  assert.equal(ridgeFigure!.figureOverrides.colorCycle,"mist-blue-celadon");
+
   const projectedSurface=project.figures.find(f=>f.templateId==="surface-projection-3d");
   assert.ok(projectedSurface,"Initial project must expose the new 3D projection template");
   const projectedSource=findSheet(project,projectedSurface!.dataRef!.sheetId);
