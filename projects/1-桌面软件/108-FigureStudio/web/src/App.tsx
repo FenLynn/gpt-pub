@@ -1188,7 +1188,7 @@ function App() {
       scrollZoom: true,
       staticPlot: false,
       doubleClick: "reset+autosize",
-      plotGlPixelRatio: glPixelRatio,
+      ...(interactive3D ? { plotGlPixelRatio: glPixelRatio } : {}),
       editable: false,
       edits: {
         annotationPosition: false,
