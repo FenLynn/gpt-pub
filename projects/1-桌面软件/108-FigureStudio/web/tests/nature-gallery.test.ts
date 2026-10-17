@@ -18,8 +18,11 @@ import { PUBLICATION_PALETTES } from "../src/plot/palettes";
 import { templates } from "../src/plot/templates";
 
 assert.equal(PUBLICATION_PALETTES["mist-blue-celadon"].colors[0],"#4F6D8A");
-assert.equal(PUBLICATION_PALETTES["sea-salt-coral"].colors[2],"#F4A7AE");
+assert.equal(PUBLICATION_PALETTES["sea-salt-coral"].colors[3],"#F4A7AE");
 assert.equal(PUBLICATION_PALETTES["burgundy-slate"].colors[0],"#713E50");
+assert.equal(PUBLICATION_PALETTES["sunny-blue-bamboo"].colors[0],"#DFF0F5");
+assert.equal(PUBLICATION_PALETTES["apricot-haze"].colors[0],"#FAD6C9");
+assert.equal(PUBLICATION_PALETTES["nature-aurora"].colors[1],"#7FA4C8");
 assert.ok(templates.some(t=>t.id==="surface-projection-3d"),
   "Three-direction 3D projection must be a first-class template");
 assert.ok(templates.some(t=>t.id==="publication-board"),
