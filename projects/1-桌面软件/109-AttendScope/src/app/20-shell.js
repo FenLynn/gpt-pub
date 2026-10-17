@@ -30,7 +30,7 @@ function layoutHtml(){
         </div>
       </div>
     <div class="month-actions">
-      <span class="save-state ${state.saved?'saved':'dirty'}"><i></i>${state.saved?'已保存':'未保存'}</span>
+      <span class="save-state ${state.saved?'saved':'dirty'}"><b aria-hidden="true">${state.saved?'✓':'!'}</b>${state.saved?'已保存':'未保存'}</span>
       <div class="import-anchor">
         <button class="text-btn" id="importBtn">导入</button>
         <div class="import-popover" id="importPopover">

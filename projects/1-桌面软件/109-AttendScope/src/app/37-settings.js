@@ -47,9 +47,9 @@ function settingsContent(section){
    settingCheck('settingManualCheck','显示人工确认 √','人工修改过红黄绿判断后，在方块右上角显示确认标记')+
    settingRange('settingGlow','紫色发光强度',.5,1.8,.1)+
    settingRange('settingRestContrast','休息日底色强度',.6,1.8,.1));
- case 'timeline':return sectionCard('时间轴轨道','默认显示法定工作、实际在岗和打卡证据，业务轨道在有记录时显示。',
+ case 'timeline':return sectionCard('时间轴轨道','法定工作时间作为淡灰背景直接铺在时间轴内，不再单独占一条轨道；业务轨道仅在有记录时显示。',
    settingCheck('settingArrows','箭头朝向时间线')+
-   Object.entries({rules:'法定工作区间',events:'中轴打卡事件',actual:'实际在岗区间',trip:'出差区间',leave:'请假区间',outing:'外出区间',overtime:'加班区间'}).map(([id,t])=>
+   Object.entries({rules:'法定时段背景',events:'中轴打卡事件',actual:'实际在岗区间',trip:'出差区间',leave:'请假区间',outing:'外出区间',overtime:'加班区间'}).map(([id,t])=>
      settingCheck('settingTrack_'+id,t)).join(''));
  case 'table':return sectionCard('原始数据列管理','按类别保存显示和列宽；留空宽度则自动铺满，不改变任何原始数据。',
    settingSelect('settingTableKind','数据类别',[

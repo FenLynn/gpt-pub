@@ -486,7 +486,7 @@ function mountPersonStats(ctx){
         lineStyle:{color:'#5899c3',width:2},areaStyle:{color:'rgba(88,153,195,.07)'}
       }]
     });
-    main.on('click',p=>{const a=work[p.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
+    main.on('click',p=>{const a=work[p.dataIndex];if(a)selectCellAndFocusEvidence(ctx.employee.id,a.day)});
   }
   if(sub)mountStatusBarChart(sub,days);
 }
@@ -526,7 +526,7 @@ function mountCellStats(ctx){
         {type:'scatter',symbolSize:10,data:days.map((a,i)=>a.day===ctx.day?[i,+(a.presence/60).toFixed(2)]:null).filter(Boolean),itemStyle:{color:'#2c7fd1',borderColor:'#fff',borderWidth:2}}
       ]
     });
-    main.on('click',p=>{if(p.seriesType==='scatter'){selectCell(ctx.employee.id,ctx.day);return}const a=days[p.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
+    main.on('click',p=>{if(p.seriesType==='scatter'){selectCellAndFocusEvidence(ctx.employee.id,ctx.day);return}const a=days[p.dataIndex];if(a)selectCellAndFocusEvidence(ctx.employee.id,a.day)});
   }
   if(sub)mountStatusBarChart(sub,days);
 }
@@ -640,7 +640,7 @@ function mountDayTimeline(ctx){
   });
   chart.on('click',p=>{
     const d=p.data;
-    if(d?.employeeId&&d?.day)selectCell(d.employeeId,d.day);
+    if(d?.employeeId&&d?.day)selectCellAndFocusEvidence(d.employeeId,d.day);
   });
 }
 
@@ -715,7 +715,7 @@ function mountFocusedOverviewChart(ctx){
         itemStyle:{color:categoryColor(attendanceJudgment(a)),borderColor:'#fff',borderWidth:1.5}})),
       lineStyle:{width:2.5,color:'#4f9bdb'},itemStyle:{color:'#4f9bdb'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(32,139,222,.20)'},{offset:1,color:'rgba(32,139,222,.015)'}])}}]
   });
-  chart.on('click',ev=>{const a=days[ev.dataIndex];if(a)selectCell(ctx.employee.id,a.day)});
+  chart.on('click',ev=>{const a=days[ev.dataIndex];if(a)selectCellAndFocusEvidence(ctx.employee.id,a.day)});
 }
 
 function mountFilteredOverview(ctx){
@@ -746,7 +746,7 @@ function mountFilteredOverview(ctx){
     yAxis:{type:'value',min:0,minInterval:1,axisLine:{show:false},axisTick:{show:false},axisLabel:{fontSize:10,color:'#8a9eae'},splitLine:{lineStyle:{color:'rgba(199,215,225,.34)',type:'dashed'}}},
     series:[{type:'bar',barMaxWidth:14,data:rows.map(x=>({value:x.value,itemStyle:{color,borderRadius:[4,4,0,0]}}))}]
   });
-  chart.on('click',p=>{const d=rows[p.dataIndex]?.day;if(!d)return;if(person)selectCell(person.id,d);else selectDate(d,true)});
+  chart.on('click',p=>{const d=rows[p.dataIndex]?.day;if(!d)return;if(person)selectCellAndFocusEvidence(person.id,d);else selectDate(d,true)});
 }
 
 function mountAnalysisVisuals(ctx){

@@ -34,7 +34,7 @@ function manualJudgmentHtml(item){
   return '<div class="manual-judgment">'+
     '<div class="judgment-line"><span>初始</span><b class="judgment-chip '+initial+'">'+JUDGMENT_LABELS[initial]+'</b></div>'+
     '<div class="judgment-line"><span>人工</span><div class="manual-status-buttons">'+
-      ['normal','anomaly','absent'].map(x=>'<button type="button" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+JUDGMENT_LABELS[x]+'">'+JUDGMENT_LABELS[x]+'</button>').join('')+
+      [['normal','正'],['anomaly','异'],['absent','缺']].map(([x,t])=>'<button type="button" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+JUDGMENT_LABELS[x]+'">'+t+'</button>').join('')+
       (manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复初始判断">×</button>':'')+
     '</div></div></div>';
 }
@@ -49,8 +49,10 @@ function setManualStatusForCurrent(status){
   state.saved=false;rememberMonth();render();
 }
 function timelineLegendHtml(item){
-  const judgment=attendanceJudgment(item),behaviors=attendanceBehaviors(item);
+  const judgment=attendanceJudgment(item);
+  const behaviors=attendanceBehaviors(item).filter(k=>!behaviorFilterActive()||state.filter===k);
   return '<div class="timeline-top-legend">'+
+    (isWorkday(item.day)?'<span class="legend-schedule"><i></i>工作时段</span>':'')+
     '<span class="legend-event in"><i></i>进</span><span class="legend-event out"><i></i>出</span>'+
     '<span class="legend-band judgment '+judgment+'"><i></i>'+JUDGMENT_LABELS[judgment]+'</span>'+
     behaviors.map(k=>'<span class="legend-band '+k+'"><i></i>'+FILTER_LABELS[k]+'</span>').join('')+
@@ -187,6 +189,27 @@ function focusRawEvidence(kind,key){
   state.rawDataTab=kind;
   renderRawTable(analysisContext());
 }
+function evidenceForAnalysis(a){
+  if(!a)return null;
+  const filter=state.filter;
+  if(filter==='trip'&&a.trips?.[0])return {kind:'trip',keys:[a.trips[0].id]};
+  if(filter==='leave'&&a.leaves?.[0])return {kind:'leave',keys:[a.leaves[0].id]};
+  if(filter==='outing'&&a.outings?.[0])return {kind:'outing',keys:[a.outings[0].id]};
+  if(filter==='overtime'&&a.overtime?.[0])return {kind:'overtime',keys:[a.overtime[0].id]};
+  if(a.punches?.length)return {kind:'attendance',keys:a.punches.map(p=>p.recordId)};
+  for(const [kind,rows] of [['trip',a.trips],['leave',a.leaves],['outing',a.outings],['overtime',a.overtime]]){
+    if(rows?.[0])return {kind,keys:[rows[0].id]};
+  }
+  return null;
+}
+function focusAnalysisEvidence(a){
+  const target=evidenceForAnalysis(a);if(target)focusRawEvidence(target.kind,target.keys);
+}
+function selectCellAndFocusEvidence(employeeId,day){
+  const a=state.analysis.get(employeeId+'|'+day);
+  selectCell(employeeId,day);
+  requestAnimationFrame(()=>focusAnalysisEvidence(a));
+}
 function mountRawTable(ctx){
   mountPlotTabs(ctx);
   document.querySelectorAll('[data-raw-tab]').forEach(btn=>btn.onclick=()=>{state.rawDataTab=btn.dataset.rawTab;state.rawPage=1;renderRawTable(ctx)});
@@ -300,7 +323,7 @@ function mountIssueChart(ctx){
     series:[{type:'bar',name:'缺勤',stack:'a',data:bad,barMaxWidth:16,itemStyle:{color:ATTEND_STATUS_COLORS.absent,borderRadius:[3,3,0,0]}},
       {type:'bar',name:'异常',stack:'a',data:sus,barMaxWidth:16,itemStyle:{color:ATTEND_STATUS_COLORS.anomaly,borderRadius:[3,3,0,0]}}]
   });
-  chart.on('click',p=>{const d=Number(names[p.dataIndex]);if(ctx.employee)selectCell(ctx.employee.id,d);else selectDate(d,true)});
+  chart.on('click',p=>{const d=Number(names[p.dataIndex]);if(ctx.employee)selectCellAndFocusEvidence(ctx.employee.id,d);else selectDate(d,true)});
 }
 
 function timelineMiniMapHtml(a,range){

@@ -36,6 +36,7 @@ async function run(){
  await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===8&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
     document.querySelectorAll('.calendar-key span').length===3,'R13 controls not mounted');
+ await check(page,()=>document.querySelector('.save-state.saved b')?.textContent==='✓'&&!document.querySelector('.save-state i'),'Save state should be semantic, not an unexplained dot');
  await check(page,()=>{
    const head=document.querySelector('.analysis-head').getBoundingClientRect();
    const insight=document.querySelector('.inspector-insight').getBoundingClientRect();
@@ -78,8 +79,8 @@ async function run(){
  await page.screenshot({path:path.join(out,'r14-iteration-row.png')});
  await check(page,()=>{
   const name=document.querySelector('.m-name.selected'),c=getComputedStyle(name);
-  return c.borderLeftWidth==='0px'&&c.transform!=='none'&&
-   c.backgroundColor.includes('130, 87, 217')&&
+  return c.borderLeftWidth==='0px'&&c.transform==='none'&&
+   c.backgroundColor.includes('130, 87, 217')&&getComputedStyle(name.querySelector('.name-letters')).transform!=='none'&&
    parseInt(getComputedStyle(name.querySelector('.name-letters span')).fontWeight)<600;
  },'Name anchor should use violet tint without a second border');
  await page.locator('.m-date[data-date="10"]').click();
@@ -88,7 +89,7 @@ async function run(){
    'Clicking top date must select all employees');
  await check(page,()=>{
    const date=document.querySelector('.m-date.selected'),c=getComputedStyle(date),b=getComputedStyle(date.querySelector('b'));
-   return c.borderTopWidth==='0px'&&c.transform!=='none'&&c.backgroundColor.includes('130, 87, 217')&&b.borderTopWidth==='0px';
+   return c.borderTopWidth==='0px'&&c.transform==='none'&&c.backgroundColor.includes('130, 87, 217')&&b.transform!=='none'&&b.borderTopWidth==='0px';
  },'Date anchor should use violet tint without nested border');
  await page.locator('.m-name[data-emp="E001"]').click();
  await check(page,()=>state.selection.type==='person'&&state.selection.employeeId==='E001',
@@ -116,7 +117,7 @@ async function run(){
  await check(page,()=>{
   const tr=r14TrackData(plotAnalysis(analysisContext())).tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
-  return tr[0]==='rules'&&tr[1]==='events'&&tr.indexOf('actual')>tr.indexOf('events')&&
+  return tr[0]==='events'&&tr.indexOf('actual')>tr.indexOf('events')&&
     bars>0&&!!document.getElementById('r15PunchPreview')&&!document.querySelector('.r15-punch-dot');
  },'Music track order or punch-dot overview incorrect');
  await check(page,()=>{
@@ -132,7 +133,7 @@ async function run(){
   const frames=document.querySelectorAll('.matrix-selection-frame:not(.inactive)');
   const zoom=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart')).getOption().dataZoom;
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
-    !data.tracks.some(x=>x.key==='span')&&zoom.filter(z=>z.type==='slider').length===1;
+    !data.tracks.some(x=>x.key==='span'||x.key==='rules')&&data.workWindows.length===2&&zoom.filter(z=>z.type==='slider').length===1;
  },'Soft violet cross or compact time lanes failed');
 
  const tracks=await page.evaluate(()=>{
@@ -140,12 +141,12 @@ async function run(){
   const opts=chart.getOption();
   const data=r14TrackData(state.analysis.get('E001|9'));
   return {ids:opts.series.map(s=>s.id), zoom:opts.dataZoom.map(z=>z.type),
-   rails:data.tracks.map(t=>t.key),rects:data.bars.length,arrows:data.events.length,
+   rails:data.tracks.map(t=>t.key),rects:data.bars.length,arrows:data.events.length,windows:data.workWindows.length,
    oldMini:!!document.getElementById('timelineMini'),settings:r14Prefs().timelineTracks};
  });
  console.log('R14_TIMELINE '+JSON.stringify(tracks));
  if(tracks.oldMini||tracks.zoom.filter(z=>z==='slider').length!==1||!tracks.ids.includes('bands')||
-    !tracks.rails.includes('actual')||!tracks.rails.includes('rules')||
+    !tracks.rails.includes('actual')||tracks.rails.includes('rules')||tracks.windows!==2||!tracks.ids.includes('schedule')||
     tracks.arrows<2||tracks.rects<2)throw Error('Multiple time tracks/single overview failed');
  await page.locator('[data-chart-tab="overview"]').click();
  await page.waitForSelector('#overviewTrendChart svg');
@@ -189,9 +190,18 @@ async function run(){
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,()=>{
    const a=state.analysis.get('E011|24'),keys=r14TrackData(a).tracks.map(t=>t.key);
-   return ['rules','events','actual','trip','leave','outing','overtime'].every(k=>keys.includes(k));
+   return ['events','actual','trip','leave','outing','overtime'].every(k=>keys.includes(k))&&!keys.includes('rules')&&r14TrackData(a).workWindows.length===2;
  },'All behavior rails are not visible on the demonstrator day');
- await page.screenshot({path:path.join(out,'r18-all-behavior-timeline.png')});
+ await page.screenshot({path:path.join(out,'r19-all-behavior-timeline.png')});
+ await page.locator('#statusFilter').selectOption('outing');
+ await page.locator('.m-cell[data-emp="E011"][data-day="24"] button').click();
+ await page.waitForSelector('#attendanceTimelineChart svg');
+ await check(page,()=>{
+   const keys=r14TrackData(state.analysis.get('E011|24')).tracks.map(t=>t.key);
+   return keys.includes('outing')&&!keys.includes('trip')&&!keys.includes('leave')&&!keys.includes('overtime')&&
+     document.querySelector('.insight-heading')?.textContent.includes('外出');
+ },'Behavior filter did not narrow the timeline/right insight');
+ await page.locator('#statusFilter').selectOption('main');
 
  // A stress day should merge close punches at wide range and split them after zooming in.
  const stress=await page.evaluate(()=>{
@@ -200,7 +210,7 @@ async function run(){
  });
  await page.locator('.m-cell[data-emp="'+stress.id+'"][data-day="'+stress.day+'"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
- await page.screenshot({path:path.join(out,'r18-clustered-punches.png')});
+ await page.screenshot({path:path.join(out,'r19-clustered-punches.png')});
 
  // Return to the manually edited cell before linked-raw verification.
  await page.locator('.m-cell[data-emp="'+manualTarget.id+'"][data-day="'+manualTarget.day+'"] button').click();
