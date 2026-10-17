@@ -164,90 +164,83 @@ function scalePlotlyColorbar(colorbar: any, scale: number): any {
 
 function scalePlotlyLayoutForPreview(layout: any, scale: number): any {
   const s = Math.max(0.05, scale);
-  const scaledSceneAxis = (axis: any) => {
-    const next = scalePlotlyAxis(axis, s);
-    return next
-      ? {
-          ...next,
-          backgroundcolor: axis?.backgroundcolor
-        }
-      : next;
+  const scaleNumberField = (target: any, key: string) => {
+    if (typeof target?.[key] === "number" && Number.isFinite(target[key])) {
+      return { ...target, [key]: target[key] * s };
+    }
+    return target;
   };
-  return {
+  const scaleSafeFont = (font: any) => {
+    if (!font || typeof font !== "object") return font;
+    return typeof font.size === "number"
+      ? { ...font, size: font.size * s }
+      : font;
+  };
+  const scaleSafeSceneAxis = (axis: any) => {
+    if (!axis || typeof axis !== "object") return axis;
+    let next = { ...axis };
+    for (const key of ["linewidth", "tickwidth", "ticklen", "gridwidth"]) {
+      next = scaleNumberField(next, key);
+    }
+    if (axis.tickfont && typeof axis.tickfont === "object") {
+      next.tickfont = scaleSafeFont(axis.tickfont);
+    }
+    if (axis.title && typeof axis.title === "object") {
+      next.title = {
+        ...axis.title,
+        ...(axis.title.font && typeof axis.title.font === "object"
+          ? { font: scaleSafeFont(axis.title.font) }
+          : {})
+      };
+    }
+    return next;
+  };
+
+  const next: any = {
     ...layout,
     width: Math.max(1, Number(layout.width ?? 1) * s),
-    height: Math.max(1, Number(layout.height ?? 1) * s),
-    margin: layout.margin
-      ? {
-          ...layout.margin,
-          l: scaledPx(layout.margin.l, s),
-          r: scaledPx(layout.margin.r, s),
-          t: scaledPx(layout.margin.t, s),
-          b: scaledPx(layout.margin.b, s),
-          pad: scaledPx(layout.margin.pad, s)
-        }
-      : layout.margin,
-    font: scalePlotlyFont(layout.font, s),
-    title: layout.title
-      ? {
-          ...layout.title,
-          font: scalePlotlyFont(layout.title.font, s),
-          pad: layout.title.pad
-            ? {
-                ...layout.title.pad,
-                l: scaledPx(layout.title.pad.l, s),
-                r: scaledPx(layout.title.pad.r, s),
-                t: scaledPx(layout.title.pad.t, s),
-                b: scaledPx(layout.title.pad.b, s)
-              }
-            : layout.title.pad
-        }
-      : layout.title,
-    xaxis: scalePlotlyAxis(layout.xaxis, s),
-    yaxis: scalePlotlyAxis(layout.yaxis, s),
-    yaxis2: scalePlotlyAxis(layout.yaxis2, s),
-    legend: layout.legend
-      ? {
-          ...layout.legend,
-          borderwidth: scaledPx(layout.legend.borderwidth, s),
-          itemwidth: scaledPx(layout.legend.itemwidth, s),
-          font: scalePlotlyFont(layout.legend.font, s)
-        }
-      : layout.legend,
-    annotations: Array.isArray(layout.annotations)
-      ? layout.annotations.map((annotation: any) => ({
-          ...annotation,
-          ax: scaledPx(annotation.ax, s),
-          ay: scaledPx(annotation.ay, s),
-          arrowwidth: scaledPx(annotation.arrowwidth, s),
-          borderwidth: scaledPx(annotation.borderwidth, s),
-          borderpad: scaledPx(annotation.borderpad, s),
-          font: scalePlotlyFont(annotation.font, s)
-        }))
-      : layout.annotations,
-    shapes: Array.isArray(layout.shapes)
-      ? layout.shapes.map((shape: any) => ({
-          ...shape,
-          line: shape.line
-            ? { ...shape.line, width: scaledPx(shape.line.width, s) }
-            : shape.line
-        }))
-      : layout.shapes,
-    coloraxis: layout.coloraxis
-      ? {
-          ...layout.coloraxis,
-          colorbar: scalePlotlyColorbar(layout.coloraxis.colorbar, s)
-        }
-      : layout.coloraxis,
-    scene: layout.scene
-      ? {
-          ...layout.scene,
-          xaxis: scaledSceneAxis(layout.scene.xaxis),
-          yaxis: scaledSceneAxis(layout.scene.yaxis),
-          zaxis: scaledSceneAxis(layout.scene.zaxis)
-        }
-      : layout.scene
+    height: Math.max(1, Number(layout.height ?? 1) * s)
   };
+
+  if (layout.margin && typeof layout.margin === "object") {
+    next.margin = { ...layout.margin };
+    for (const key of ["l", "r", "t", "b", "pad"]) {
+      next.margin = scaleNumberField(next.margin, key);
+    }
+  }
+  if (layout.font && typeof layout.font === "object") {
+    next.font = scaleSafeFont(layout.font);
+  }
+  if (layout.title && typeof layout.title === "object") {
+    next.title = {
+      ...layout.title,
+      ...(layout.title.font && typeof layout.title.font === "object"
+        ? { font: scaleSafeFont(layout.title.font) }
+        : {})
+    };
+  }
+  if (Array.isArray(layout.annotations)) {
+    next.annotations = layout.annotations.map((annotation: any) => {
+      if (!annotation || typeof annotation !== "object") return annotation;
+      const scaled = { ...annotation };
+      if (annotation.font && typeof annotation.font === "object") {
+        scaled.font = scaleSafeFont(annotation.font);
+      }
+      for (const key of ["ax", "ay", "arrowwidth", "borderwidth", "borderpad"]) {
+        if (typeof scaled[key] === "number") scaled[key] *= s;
+      }
+      return scaled;
+    });
+  }
+  if (layout.scene && typeof layout.scene === "object") {
+    next.scene = {
+      ...layout.scene,
+      xaxis: scaleSafeSceneAxis(layout.scene.xaxis),
+      yaxis: scaleSafeSceneAxis(layout.scene.yaxis),
+      zaxis: scaleSafeSceneAxis(layout.scene.zaxis)
+    };
+  }
+  return next;
 }
 
 function scalePlotlyTracesForPreview(traces: any[], scale: number): any[] {
