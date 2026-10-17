@@ -29,6 +29,13 @@ function alpha(hex:string,a:number):string {
   const [r,g,b]=rgb(hex);
   return "rgba("+r+","+g+","+b+","+Math.max(0,Math.min(1,a))+")";
 }
+function luminance(hex:string):number {
+  const [r,g,b]=rgb(hex).map(v=>{
+    const c=v/255;
+    return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);
+  });
+  return 0.2126*r+0.7152*g+0.0722*b;
+}
 function path(points:Array<[number,number]>):string {
   return points.map((p,i)=>(i?"L":"M")+p[0].toFixed(2)+" "+p[1].toFixed(2)).join(" ");
 }
@@ -39,13 +46,13 @@ function Panel(props:{
 }) {
   const {x,y,w,h,letter,title,accent,tint,children}=props;
   return <g transform={"translate("+x+" "+y+")"}>
-    <rect width={w} height={h} rx="7" fill="#fff" stroke="#e4e8eb" strokeWidth="1"/>
-    <rect width={w} height="38" rx="7" fill={tint}/>
-    <rect y="31" width={w} height="7" fill={tint}/>
-    <rect x="0" y="0" width="38" height="38" rx="7" fill={accent}/>
-    <rect x="31" y="0" width="7" height="38" fill={accent}/>
-    <text x="19" y="26" textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize="22" fill="#fff">{letter}</text>
-    <text x="51" y="25.5" fontFamily={SERIF} fontWeight="600" fontSize="18" fill="#25313c">{title}</text>
+    <rect width={w} height={h} rx="7" fill="#fff" stroke="#edf0f2" strokeWidth=".8"/>
+    <rect width={w} height="40" rx="7" fill={tint}/>
+    <rect y="33" width={w} height="7" fill={tint}/>
+    <rect x="0" y="0" width="40" height="40" rx="7" fill={accent}/>
+    <rect x="33" y="0" width="7" height="40" fill={accent}/>
+    <text x="20" y="27" textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize="22" fill="#fff">{letter}</text>
+    <text x="53" y="27" fontFamily={SERIF} fontWeight="600" fontSize="19" fill="#25313c">{title}</text>
     <g transform="translate(0 38)">{children}</g>
   </g>;
 }
@@ -201,8 +208,8 @@ function HeatmapPanel({w,h,c,gradientId}:{w:number;h:number;c:string[];gradientI
 
 function SurfacePanel({w,h,c,gradientId}:{w:number;h:number;c:string[];gradientId:string}) {
   const project=(x:number,y:number,z:number):[number,number]=>[
-    w*.49+(x-y)*31,
-    h*.58+(x+y)*14-z*28
+    w*.47+(x-y)*38,
+    h*.56+(x+y)*17-z*36
   ];
   const zf=(x:number,y:number)=>1.15*Math.exp(-.55*((x-.55)**2+(y+.25)**2))-.62*Math.exp(-.8*((x+1.1)**2+(y-.8)**2))+.28*Math.sin(x*1.45)*Math.cos(y*1.25);
   const quads:ReactNode[]=[];
@@ -225,7 +232,7 @@ function SurfacePanel({w,h,c,gradientId}:{w:number;h:number;c:string[];gradientI
     </g>
     {quads}
     <path d={"M 38 "+(h*.79)+" L "+(w*.47)+" "+(h*.91)+" L "+(w-30)+" "+(h*.79)} fill="none" stroke="#727a80" strokeWidth=".8"/>
-    <rect x={w-28} y="52" width="9" height="116" rx="2" fill={"url(#"+gradientId+")"}/>
+    <rect x={w-22} y="42" width="9" height="142" rx="2" fill={"url(#"+gradientId+")"}/>
     <text x={w/2} y={h-8} textAnchor="middle" fontFamily={SERIF} fontSize="12" fill="#2f3941">x / y / z projection</text>
   </g>;
 }
@@ -238,9 +245,12 @@ export function PublicationBoard({figure,width,height,svgRef}:Props) {
     : composition?.paletteId ?? "golden";
   const palette=publicationPalette(requested);
   const colors=[...palette.colors];
-  const primary=colors.find(color=>color.toUpperCase()!=="#F5F7FA"&&color.toUpperCase()!=="#F7FAFC"&&color.toUpperCase()!=="#FAF5E8") ?? colors[0];
-  const accent=mix(primary,"#172433",.28);
-  const tint=mix(primary,"#ffffff",.86);
+  const primary=colors.reduce((best,color)=>
+    luminance(color)<luminance(best)?color:best,colors[0]);
+  const dataColors=colors.filter(color=>luminance(color)<0.82);
+  while(dataColors.length<5) dataColors.push(mix(primary,"#ffffff",0.24+dataColors.length*0.08));
+  const accent=mix(primary,"#172433",.18);
+  const tint=mix(primary,"#ffffff",.80);
   const scale=Math.min(width/1200,height/1560);
   const ox=(width-1200*scale)/2, oy=(height-1560*scale)/2;
   const panelW=350,panelH=330,gapX=25,gapY=24,startX=50,startY=330;
@@ -267,32 +277,32 @@ export function PublicationBoard({figure,width,height,svgRef}:Props) {
     </defs>
     <g transform={"translate("+ox+" "+oy+") scale("+scale+")"}>
       <rect width="1200" height="1560" fill="#fff"/>
-      <rect x="50" y="54" width="64" height="5" rx="2.5" fill={primary}/>
-      <text x="50" y="118" fontFamily={SERIF} fontWeight="700" fontSize="50" fill={accent}>
-        {palette.id==="golden" ? "FigureStudio · Golden Lorentz" : "科研配色 · "+palette.label}
+      <rect x="538" y="46" width="124" height="5" rx="2.5" fill={primary}/>
+      <text x="600" y="116" textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize="58" fill={accent}>
+        {"科研配色 · "+palette.label}
       </text>
-      <text x="50" y="157" fontFamily={SERIF} fontSize="21" fill="#5b6670">{palette.englishLabel+" · "+palette.description}</text>
-      <text x="50" y="195" fontFamily={SANS} fontSize="12" letterSpacing="1.5" fill="#899198">PUBLICATION STYLE BOARD · GOLDEN GEOMETRY / PALETTE SKIN</text>
+      <text x="600" y="158" textAnchor="middle" fontFamily={SERIF} fontSize="22" fill="#59656f">{palette.englishLabel+" / "+palette.description}</text>
+      <text x="600" y="194" textAnchor="middle" fontFamily={SANS} fontSize="12" letterSpacing="1.65" fill="#899198">PUBLICATION STYLE BOARD · GOLDEN GEOMETRY × PALETTE SKIN</text>
 
       {swatches.map((color,i)=>{
         const x=50+i*137;
         return <g key={color+i}>
-          <rect x={x} y="220" width="118" height="58" rx="8" fill={color} stroke="#e1e5e8" strokeWidth=".7"/>
-          <text x={x+59} y="300" textAnchor="middle" fontFamily={SANS} fontWeight="600" fontSize="14" fill="#34404a">{color.toUpperCase()}</text>
+          <rect x={x} y="218" width="118" height="64" rx="9" fill={color} stroke="#e1e5e8" strokeWidth=".7"/>
+          <text x={x+59} y="305" textAnchor="middle" fontFamily={SANS} fontWeight="600" fontSize="14.5" fill="#34404a">{color.toUpperCase()}</text>
         </g>;
       })}
 
-      <Panel x={startX} y={startY} w={panelW} h={panelH} letter="a" title="PCA scores" accent={primary} tint={tint}><PcaPanel w={panelW} h={panelH-38} c={colors}/></Panel>
-      <Panel x={startX+panelW+gapX} y={startY} w={panelW} h={panelH} letter="b" title="Spectral distribution" accent={primary} tint={tint}><SpectraPanel w={panelW} h={panelH-38} c={colors}/></Panel>
-      <Panel x={startX+(panelW+gapX)*2} y={startY} w={panelW} h={panelH} letter="c" title="Volcano plot" accent={primary} tint={tint}><VolcanoPanel w={panelW} h={panelH-38} c={colors}/></Panel>
+      <Panel x={startX} y={startY} w={panelW} h={panelH} letter="a" title="PCA scores" accent={primary} tint={tint}><PcaPanel w={panelW} h={panelH-38} c={dataColors}/></Panel>
+      <Panel x={startX+panelW+gapX} y={startY} w={panelW} h={panelH} letter="b" title="Spectral distribution" accent={primary} tint={tint}><SpectraPanel w={panelW} h={panelH-38} c={dataColors}/></Panel>
+      <Panel x={startX+(panelW+gapX)*2} y={startY} w={panelW} h={panelH} letter="c" title="Volcano plot" accent={primary} tint={tint}><VolcanoPanel w={panelW} h={panelH-38} c={dataColors}/></Panel>
 
-      <Panel x={startX} y={startY+panelH+gapY} w={panelW} h={panelH} letter="d" title="Response curves" accent={primary} tint={tint}><ResponsePanel w={panelW} h={panelH-38} c={colors}/></Panel>
-      <Panel x={startX+panelW+gapX} y={startY+panelH+gapY} w={panelW} h={panelH} letter="e" title="Density ridges" accent={primary} tint={tint}><RidgePanel w={panelW} h={panelH-38} c={colors}/></Panel>
-      <Panel x={startX+(panelW+gapX)*2} y={startY+panelH+gapY} w={panelW} h={panelH} letter="f" title="Group response" accent={primary} tint={tint}><BarPanel w={panelW} h={panelH-38} c={colors}/></Panel>
+      <Panel x={startX} y={startY+panelH+gapY} w={panelW} h={panelH} letter="d" title="Response curves" accent={primary} tint={tint}><ResponsePanel w={panelW} h={panelH-38} c={dataColors}/></Panel>
+      <Panel x={startX+panelW+gapX} y={startY+panelH+gapY} w={panelW} h={panelH} letter="e" title="Density ridges" accent={primary} tint={tint}><RidgePanel w={panelW} h={panelH-38} c={dataColors}/></Panel>
+      <Panel x={startX+(panelW+gapX)*2} y={startY+panelH+gapY} w={panelW} h={panelH} letter="f" title="Group response" accent={primary} tint={tint}><BarPanel w={panelW} h={panelH-38} c={dataColors}/></Panel>
 
-      <Panel x={startX} y={startY+(panelH+gapY)*2} w={panelW} h={panelH} letter="g" title="Association" accent={primary} tint={tint}><AssociationPanel w={panelW} h={panelH-38} c={colors}/></Panel>
-      <Panel x={startX+panelW+gapX} y={startY+(panelH+gapY)*2} w={panelW} h={panelH} letter="h" title="Correlation heatmap" accent={primary} tint={tint}><HeatmapPanel w={panelW} h={panelH-38} c={colors} gradientId={heatGradientId}/></Panel>
-      <Panel x={startX+(panelW+gapX)*2} y={startY+(panelH+gapY)*2} w={panelW} h={panelH} letter="i" title="3D surface projection" accent={primary} tint={tint}><SurfacePanel w={panelW} h={panelH-38} c={colors} gradientId={gradientId}/></Panel>
+      <Panel x={startX} y={startY+(panelH+gapY)*2} w={panelW} h={panelH} letter="g" title="Association" accent={primary} tint={tint}><AssociationPanel w={panelW} h={panelH-38} c={dataColors}/></Panel>
+      <Panel x={startX+panelW+gapX} y={startY+(panelH+gapY)*2} w={panelW} h={panelH} letter="h" title="Correlation heatmap" accent={primary} tint={tint}><HeatmapPanel w={panelW} h={panelH-38} c={dataColors} gradientId={heatGradientId}/></Panel>
+      <Panel x={startX+(panelW+gapX)*2} y={startY+(panelH+gapY)*2} w={panelW} h={panelH} letter="i" title="3D surface projection" accent={primary} tint={tint}><SurfacePanel w={panelW} h={panelH-38} c={dataColors} gradientId={gradientId}/></Panel>
 
       <path d="M 50 1452 H 1150" stroke="#dfe3e6" strokeWidth="1"/>
       <text x="50" y="1492" fontFamily={SANS} fontSize="14" fill="#7b858d">FigureStudio Publication System · palette + geometry + plot-family profile</text>

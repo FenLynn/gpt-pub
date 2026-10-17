@@ -818,6 +818,14 @@ function App() {
   }, [activeSheet, selectedColumnId]);
 
   useEffect(() => {
+    if (
+      activeFigure?.publicationBoard?.kind === "publication-palette-board" &&
+      inspectorTab !== "figure" &&
+      inspectorTab !== "check"
+    ) {
+      setInspectorTab("figure");
+      return;
+    }
     const isFieldTemplate =
       activeFigure?.templateId === "heatmap" ||
       activeFigure?.templateId === "contour" ||
@@ -4199,6 +4207,12 @@ function App() {
                         </div>
                       </div>
                     ))}
+                    {isPublicationBoard && (
+                      <div className="column-role-help publication-mode-note" data-publication-board-inspector="true">
+                        <strong>Publication Style Board</strong>
+                        <p>当前画布是可导出的顶刊风格样板。切换下面“配色”即可实时查看同一 Golden Geometry 在不同科研色系下的完整 3 × 3 图板。</p>
+                      </div>
+                    )}
                     <div className="prop-row">
                       <label>配色</label>
                       <select
