@@ -104,7 +104,7 @@ export function generateMatplotlibScript(
         o.yTitle ??
         (figure.templateId === "heatmap" ||
         figure.templateId === "contour" ||
-        figure.templateId === "surface-3d"
+        (figure.templateId === "surface-3d" || figure.templateId === "surface-projection-3d")
           ? autoAxisTitle(
               dataset.metadata?.rowAxisName ?? "Y",
               dataset.metadata?.rowAxisUnit
@@ -275,7 +275,7 @@ def mpl_cmap(name):
     return base + "_r" if O.get("reverseColorScale", False) else base
 
 def visible_keys():
-    field_template = template in ("heatmap", "contour", "surface-3d")
+    field_template = template in ("heatmap", "contour", "surface-3d", "surface-projection-3d")
     return [
         key for key in order
         if key in series and (
@@ -559,7 +559,7 @@ def add_legend(axis_obj, secondary=None):
 
 keys = visible_keys()
 
-if template == "surface-3d":
+if template in ("surface-3d", "surface-projection-3d"):
     ax = fig.add_subplot(111, projection="3d")
     z = np.array([finite_array(series[key]) for key in keys], dtype=float)
     row_map = P["metadata"].get("rowCoordinateByColumnId") or {}
@@ -589,9 +589,36 @@ if template == "surface-3d":
         X, Y, z,
         cmap=cmap_name,
         linewidth=0,
-        antialiased=False,
+        antialiased=True,
         **kwargs
     )
+    if template == "surface-projection-3d":
+        contour_count = max(
+            4, min(40, int(O.get("surfaceProjectionContourCount", 12)))
+        )
+        contour_width = float(O.get("surfaceProjectionLineWidthPt", 0.45))
+        finite_z = z[np.isfinite(z)]
+        z_floor = float(np.min(finite_z)) if finite_z.size else 0.0
+        x_low = float(np.nanmin(X))
+        y_high = float(np.nanmax(Y))
+        if O.get("surfaceProjectionFloor", True):
+            ax.contour(
+                X, Y, z, zdir="z", offset=z_floor,
+                levels=contour_count, cmap=cmap_name,
+                linewidths=contour_width
+            )
+        if O.get("surfaceProjectionX", True):
+            ax.contour(
+                X, Y, z, zdir="x", offset=x_low,
+                levels=contour_count, cmap=cmap_name,
+                linewidths=contour_width
+            )
+        if O.get("surfaceProjectionY", True):
+            ax.contour(
+                X, Y, z, zdir="y", offset=y_high,
+                levels=contour_count, cmap=cmap_name,
+                linewidths=contour_width
+            )
     if O.get("colorbarVisible", True):
         cb = fig.colorbar(surf, ax=ax, shrink=0.66, pad=0.10)
         cb.outline.set_linewidth(0)

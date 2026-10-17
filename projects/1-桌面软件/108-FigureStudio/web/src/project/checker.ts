@@ -37,7 +37,10 @@ export function checkFigure(
   const publication = resolvePublicationMetrics(preset, figure);
   const field2DTemplate =
     figure.templateId === "heatmap" || figure.templateId === "contour";
-  const fieldTemplate = field2DTemplate || figure.templateId === "surface-3d";
+  const fieldTemplate =
+    field2DTemplate ||
+    figure.templateId === "surface-3d" ||
+    figure.templateId === "surface-projection-3d";
   const doubleYTemplate = figure.templateId === "double-y";
   const waterfallTemplate = figure.templateId === "waterfall";
   const mainSeriesIds = new Set(
