@@ -185,34 +185,45 @@ async function run(){
  await page.locator('[data-judgment-mode="manual"]').click();
  await check(page,()=>state.judgmentMode==='manual','Manual layer cannot be restored');
 
- // One demonstrator day carries every behavior color in the same audio-track chart.
+ // The active left filter is the contract for the right timeline: regular attendance must not leak behavior rails.
  await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,()=>{
    const a=state.analysis.get('E011|23'),m=r14TrackData(a),keys=m.tracks.map(t=>t.key);
    const actual=m.bars.find(x=>x.track==='actual');
-   return ['events','actual','trip','leave','outing','overtime'].every(k=>keys.includes(k))&&!keys.includes('rules')&&
+   return ['events','actual'].every(k=>keys.includes(k))&&
+     !['trip','leave','outing','overtime','rules'].some(k=>keys.includes(k))&&
      m.workWindows.length===2&&actual?.sourceIds?.length===2;
- },'All behavior rails/scheduled background/linked attendance evidence are not ready');
- await page.screenshot({path:path.join(out,'r19-all-behavior-timeline.png')});
+ },'Regular filter leaked behavior rails or lost scheduled/attendance evidence');
+ await page.screenshot({path:path.join(out,'r20-regular-timeline.png')});
  await page.locator('#statusFilter').selectOption('outing');
  await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,()=>{
    const keys=r14TrackData(state.analysis.get('E011|23')).tracks.map(t=>t.key);
+   const insight=document.querySelector('.inspector-insight');
    return keys.includes('outing')&&!keys.includes('trip')&&!keys.includes('leave')&&!keys.includes('overtime')&&
-     document.querySelector('.insight-heading')?.textContent.includes('外出');
- },'Behavior filter did not narrow the timeline/right insight');
+     insight?.querySelector('.insight-heading')?.textContent.includes('外出')&&
+     !insight?.querySelector('.manual-judgment')&&
+     [...insight.querySelectorAll('.insight-row span')].some(x=>x.textContent==='时长');
+ },'Behavior filter did not narrow timeline rails and behavior-specific metrics');
+ await page.screenshot({path:path.join(out,'r20-outing-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
- // A stress day should merge close punches at wide range and split them after zooming in.
+ // A stress day should merge close punches at wide range and split them naturally as the time window narrows.
  const stress=await page.evaluate(()=>{
    const a=[...state.analysis.values()].find(x=>x.punches.some(p=>p.scenario==='rapid-swipes'));
    return {id:a.employee.id,day:a.day};
  });
  await page.locator('.m-cell[data-emp="'+stress.id+'"][data-day="'+stress.day+'"] button').click();
  await page.waitForSelector('#attendanceTimelineChart svg');
- await page.screenshot({path:path.join(out,'r19-clustered-punches.png')});
+ await check(page,({id,day})=>{
+   const a=state.analysis.get(id+'|'+day);
+   const wide=r19PunchClusters(a,{start:0,end:1440},800,0);
+   const narrow=r19PunchClusters(a,{start:480,end:600},800,0);
+   return wide.some(x=>x.count>1)&&narrow.length>wide.length;
+ },stress,'Rapid punches do not merge at overview scale and split at narrow scale');
+ await page.screenshot({path:path.join(out,'r20-clustered-punches.png')});
 
  // Return to the manually edited cell before linked-raw verification.
  await page.locator('.m-cell[data-emp="'+manualTarget.id+'"][data-day="'+manualTarget.day+'"] button').click();
