@@ -21,8 +21,10 @@ type DataTrace = {
   yaxis?: string;
   meta?: { figureStudioSeriesId?: string };
   line?: { color?: string; width?: number; dash?: string };
+  fill?: string;
+  fillcolor?: string;
   marker?: {
-    color?: string; size?: number; symbol?: string; maxdisplayed?: number;
+    color?: string | string[]; size?: number; symbol?: string; maxdisplayed?: number;
     line?: { color?: string; width?: number };
   };
   opacity?: number;
@@ -32,6 +34,7 @@ type Axis = {
   type?: string; range?: number[]; autorange?: boolean | string;
   dtick?: number; tickformat?: string; tickprefix?: string; ticksuffix?: string;
   tickangle?: number; tickfont?: { size?: number; family?: string; color?: string };
+  tickmode?: string; tickvals?: unknown[]; ticktext?: unknown[];
   title?: { text?: string; font?: { size?: number; family?: string; color?: string }; standoff?: number };
   linecolor?: string; linewidth?: number; tickcolor?: string;
   ticks?: string; ticklen?: number; tickwidth?: number;
@@ -51,6 +54,11 @@ type Layout = {
     itemwidth?: number;
   };
   showlegend?: boolean; paper_bgcolor?: string;
+  shapes?: Array<{
+    type?: string; xref?: string; yref?: string;
+    x0?: number; x1?: number; y0?: number; y1?: number;
+    line?: { color?: string; width?: number; dash?: string };
+  }>;
 };
 export interface PrecisionSvgProps {
   figure: FigureSpec;
@@ -126,6 +134,9 @@ function niceStep(span: number): number {
   return (scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 2.5 ? 2.5 : scaled <= 5 ? 5 : 10) * pow;
 }
 function ticks(axis: Axis, domain: [number, number], minor = false): number[] {
+  if (!minor && axis.tickmode === "array" && Array.isArray(axis.tickvals)) {
+    return axis.tickvals.filter(fnum);
+  }
   const low = Math.min(...domain), high = Math.max(...domain);
   if (axis.type === "log") {
     const output: number[] = [];
@@ -155,7 +166,15 @@ function ticks(axis: Axis, domain: [number, number], minor = false): number[] {
   }
   return out;
 }
-function formatTick(v: number, axis: Axis) {
+function formatTick(v: number, axis: Axis, tickIndex?: number) {
+  if (
+    axis.tickmode === "array" &&
+    Array.isArray(axis.ticktext) &&
+    typeof tickIndex === "number" &&
+    axis.ticktext[tickIndex] !== undefined
+  ) {
+    return String(axis.ticktext[tickIndex]);
+  }
   let label = "";
   const fm = axis.tickformat ?? "";
   const precision = Number(fm.match(/\.(\d+)/)?.[1] ?? 0);
@@ -181,7 +200,7 @@ function markerShape(symbol: string | undefined, x: number, y: number, size: num
 }
 /** Native SVG now supports $...$ math through bundled MathJax SVG paths. */
 export function supportsPrecisionSvg(figure: FigureSpec): boolean {
-  if (["heatmap", "contour", "surface-3d", "surface-projection-3d", "bar", "grouped-bar", "stacked-bar", "pca-ellipse", "volcano", "ridgeline"].includes(figure.templateId)) return false;
+  if (["heatmap", "contour", "surface-3d", "surface-projection-3d", "bar", "grouped-bar", "stacked-bar"].includes(figure.templateId)) return false;
   const o = figure.figureOverrides;
   const texts = [o.plotTitle, o.xTitle, o.yTitle, o.rightYTitle,
     ...Object.values(figure.seriesOverrides).map(x => x.legendLabel)];
@@ -232,7 +251,7 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
       return <g key={"mj-"+side+"-"+i}>
         {axis.showgrid && !opposite && <line x1={isX?pos:plot.left} x2={isX?pos:plot.right} y1={isX?plot.top:pos} y2={isX?plot.bottom:pos} stroke={axis.gridcolor??GOLDEN_STYLE.stroke.gridRgba} strokeWidth={axis.gridwidth??0.5}/>}
         <path d={isX?"M "+coord(pos)+" "+base+" v "+coord(tickSign*tickLen):"M "+base+" "+coord(pos)+" h "+coord(tickSign*tickLen)} fill="none" stroke={axis.tickcolor??GOLDEN_STYLE.stroke.tickStrokeColor} strokeWidth={axis.tickwidth??0.85}/>
-        <SvgMathText text={formatTick(v,axis)} x={labelX} y={labelY} fill={c}
+        <SvgMathText text={formatTick(v,axis,i)} x={labelX} y={labelY} fill={c}
           fontSize={font.size??textSize} fontFamily={font.family??baseFont}
           textAnchor={isX?"middle":opposite?"start":"end"} rotate={axis.tickangle}/>
       </g>;
@@ -308,8 +327,34 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
     {axisNodes(yAxis,"y",yDomain,yp)}
     {rightAxis && axisNodes(rightAxis,"y2",rDomain,rp)}
     {figure.figureOverrides.frameStyle==="boxed" && xAxis.mirror && <path d={"M "+plot.left+" "+plot.top+" H "+plot.right} stroke={xAxis.linecolor??GOLDEN_STYLE.stroke.axisColor} strokeWidth={xAxis.linewidth??0.8}/>}
-    {figure.figureOverrides.frameStyle==="boxed" && yAxis.mirror && !rightAxis && <path d={"M "+plot.right+" "+plot.top+" V "+plot.bottom} stroke={yAxis.linecolor??GOLDEN_STYLE.stroke.axisColor} strokeWidth={yAxis.linewidth??0.8}/>} 
+    {figure.figureOverrides.frameStyle==="boxed" && yAxis.mirror && !rightAxis && <path d={"M "+plot.right+" "+plot.top+" V "+plot.bottom} stroke={yAxis.linecolor??GOLDEN_STYLE.stroke.axisColor} strokeWidth={yAxis.linewidth??0.8}/>}
     <g clipPath={"url(#"+uid+")"}>
+      {(layout.shapes ?? []).map((shape,index) => {
+        if (shape.type && shape.type !== "line") return null;
+        const xOf = (value:number|undefined, ref:string|undefined) => {
+          if (!fnum(value)) return NaN;
+          return ref === "paper"
+            ? plot.left + value * (plot.right - plot.left)
+            : xp(value);
+        };
+        const yOf = (value:number|undefined, ref:string|undefined) => {
+          if (!fnum(value)) return NaN;
+          return ref === "paper"
+            ? plot.bottom - value * (plot.bottom - plot.top)
+            : yp(value);
+        };
+        const x0=xOf(shape.x0,shape.xref), x1=xOf(shape.x1,shape.xref);
+        const y0=yOf(shape.y0,shape.yref), y1=yOf(shape.y1,shape.yref);
+        if (![x0,x1,y0,y1].every(fnum)) return null;
+        return <path key={"shape-"+index}
+          d={"M "+coord(x0)+" "+coord(y0)+" L "+coord(x1)+" "+coord(y1)}
+          fill="none"
+          stroke={shape.line?.color ?? GOLDEN_STYLE.stroke.tickStrokeColor}
+          strokeWidth={shape.line?.width ?? 1}
+          strokeDasharray={DASH[shape.line?.dash ?? "solid"]}
+        />;
+      })}
+
       {traces.map((tr,index)=>{
         const sid = tr.meta?.figureStudioSeriesId;
         const projectY = tr.yaxis==="y2" ? rp : yp;
@@ -328,6 +373,11 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
         return <g key={"trace-"+index} opacity={tr.opacity??1}
           onClick={e=>{if(sid){e.stopPropagation();onSelectSeries(sid,e.ctrlKey||e.metaKey);}}}
           style={{cursor:sid?"pointer":"default"}}>
+          {tr.fill === "toself" && path && <path
+             d={path.trim()+" Z"}
+             fill={tr.fillcolor ?? color}
+             stroke="none"
+          />}
           {doLines(tr) && <path d={path} fill="none" stroke={color} strokeWidth={widthLine}
              strokeDasharray={DASH[tr.line?.dash??"solid"]} strokeLinecap="round" strokeLinejoin="round"/>}
           {tr.error_y?.array?.map((v,i)=>{
@@ -336,11 +386,18 @@ export function PrecisionSvg({figure,layout,traces,svgRef,onSelectSeries,onAxisC
             const cap=tr.error_y?.width??0;
             return <path key={"err-"+i} d={"M "+p.x+" "+coord(hi)+" V "+coord(lo)+" M "+coord(p.x-cap)+" "+coord(hi)+" H "+coord(p.x+cap)+" M "+coord(p.x-cap)+" "+coord(lo)+" H "+coord(p.x+cap)} fill="none" stroke={tr.error_y?.color??color} strokeWidth={tr.error_y?.thickness??1} strokeLinecap="square"/>;
           })}
-          {doMarkers(tr) && pairs.filter((p,i)=>p && i%stride===0).map((p,i)=>p &&
-            <g key={"mk-"+i} fill={["cross","x"].includes(tr.marker?.symbol??"")?"none":tr.marker?.color??color}
-              stroke={tr.marker?.line?.color??color} strokeWidth={tr.marker?.line?.width??0.5}>
+          {doMarkers(tr) && pairs.filter((p,i)=>p && i%stride===0).map((p,i)=> {
+            if (!p) return null;
+            const markerColor = Array.isArray(tr.marker?.color)
+              ? tr.marker?.color[p.i] ?? color
+              : tr.marker?.color ?? color;
+            return <g key={"mk-"+i}
+              fill={["cross","x"].includes(tr.marker?.symbol??"")?"none":markerColor}
+              stroke={tr.marker?.line?.color??markerColor}
+              strokeWidth={tr.marker?.line?.width??0.5}>
               {markerShape(tr.marker?.symbol,p.x,p.y,tr.marker?.size??5)}
-            </g>)}
+            </g>;
+          })}
         </g>;
       })}
     </g>
