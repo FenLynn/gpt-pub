@@ -30,8 +30,9 @@ function r19LaneY(coordSys,lane,count){
   return coordSys.y+(coordSys.height-total)/2+lane*pitch;
 }
 function r19BehaviorVisible(key){
-  if(!behaviorFilterActive())return true;
-  return !['trip','leave','outing','overtime'].includes(key)||state.filter===key;
+  const behaviorKeys=['trip','leave','outing','overtime'];
+  if(!behaviorKeys.includes(key))return true;
+  return behaviorFilterActive()&&state.filter===key;
 }
 function r14TrackData(a,range=timelineRange(a),width=800){
  const prefs=typeof r14Prefs==='function'?r14Prefs().timelineTracks:{};
@@ -97,14 +98,22 @@ function mountAttendanceTimeline(a){
    const d=model.events[params.dataIndex];if(!d)return null;
    const x=api.coord([api.value(0),.5])[0],y=r19LaneY(params.coordSys,api.value(2),model.tracks.length);
    const sign=d.direction==='进'?-1:1,toward=state.prefs.arrowsTowardLine!==false;
-   const count=d.count||1,thickness=Math.min(9,2.25+Math.log2(Math.max(1,count))*2.2);
-   const len=Math.min(23,14+Math.log2(Math.max(1,count))*2.7);
+   const count=d.count||1,thickness=Math.min(13,2.4+Math.log2(Math.max(1,count))*3.25);
+   const len=Math.min(24,14+Math.log2(Math.max(1,count))*3);
    const y0=y+sign*(toward?len:3),y1=y+sign*(toward?1.5:len);
-   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4,thickness*.8);
-   return {type:'group',children:[
-    {type:'line',shape:{x1:x,y1:y0,x2:x,y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.95}},
-    {type:'polygon',shape:{points:[[x-half,y1+sign*(toward?6:-6)],[x+half,y1+sign*(toward?6:-6)],[x,y1]]},style:{fill:color,opacity:.97}}
-   ]};
+   const color=d.direction==='进'?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4.5,thickness*.72);
+   const children=[
+    {type:'line',shape:{x1:x,y1:y0,x2:x,y2:y1},style:{stroke:color,lineWidth:thickness,lineCap:'round',opacity:.96}},
+    {type:'polygon',shape:{points:[[x-half,y1+sign*(toward?6:-6)],[x+half,y1+sign*(toward?6:-6)],[x,y1]]},style:{fill:color,opacity:.98}}
+   ];
+   if(count>1){
+    const text=count>99?'99+':String(count),badgeW=text.length>2?18:14,badgeY=y+(d.direction==='进'?-13:3);
+    children.push({type:'rect',shape:{x:x+5,y:badgeY,width:badgeW,height:11,r:5.5},
+      style:{fill:color,stroke:'#fff',lineWidth:1,opacity:.98}});
+    children.push({type:'text',style:{x:x+5+badgeW/2,y:badgeY+5.5,text,fill:'#fff',
+      font:'700 8px "Segoe UI Variable", sans-serif',align:'center',verticalAlign:'middle'}});
+   }
+   return {type:'group',children};
  };
  const laneRailRender=(params,api)=>{
    const lane=api.value(2),y=r19LaneY(params.coordSys,lane,model.tracks.length);
