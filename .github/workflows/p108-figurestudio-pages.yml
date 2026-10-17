@@ -171,7 +171,7 @@ jobs:
           grep -q 'data-scroll-zoom="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-css-transform-scaling="false"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-preview-render-scale="' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
-          grep -q 'data-gl-pixel-ratio="' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
+          grep -q 'data-webgl-sizing="native-display-pixels"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-native-resolution-preview="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-testid="surface-3d-interaction"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
           grep -q 'data-canvas-direct-pan="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Golden.html"
@@ -185,7 +185,7 @@ jobs:
           grep -q 'data-canvas-zoom="2.00"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
           grep -q 'data-css-transform-scaling="false"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
           grep -q 'data-native-resolution-preview="true"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
-          grep -q 'data-gl-pixel-ratio="' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
+          grep -q 'data-webgl-sizing="native-display-pixels"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"
           if ! grep -q 'class="gl-container"' "$RUNNER_TEMP/p108-screenshots/Surface-Projection-Zoom-200.html"; then
             echo "::error::200% 3D preview did not rerender WebGL at native size"
             exit 1

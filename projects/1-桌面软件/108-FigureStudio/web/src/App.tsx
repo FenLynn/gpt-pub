@@ -1170,17 +1170,6 @@ function App() {
     const previewTraces = interactive3D
       ? scalePlotlyTracesForPreview(traces as any[], previewRenderScale)
       : traces;
-    const glPixelRatio = interactive3D
-      ? Math.max(
-          1.5,
-          Math.min(
-            2.5,
-            (window.devicePixelRatio || 1) *
-              (previewRenderScale < 1 ? 2 : 1.5)
-          )
-        )
-      : undefined;
-
     const config = {
       responsive: false,
       displaylogo: false,
@@ -1188,7 +1177,6 @@ function App() {
       scrollZoom: true,
       staticPlot: false,
       doubleClick: "reset+autosize",
-      ...(interactive3D ? { plotGlPixelRatio: glPixelRatio } : {}),
       editable: false,
       edits: {
         annotationPosition: false,
@@ -1230,7 +1218,7 @@ function App() {
     node.dataset.previewRenderScale = previewRenderScale.toFixed(3);
     node.dataset.cssTransformScaling = interactive3D ? "false" : "true";
     if (interactive3D) {
-      node.dataset.glPixelRatio = Number(glPixelRatio ?? 1).toFixed(2);
+      node.dataset.webglSizing = "native-display-pixels";
     }
 
     Plotly.react(node, previewTraces, previewLayout, config).then(() => {
@@ -1343,7 +1331,7 @@ function App() {
       delete node.dataset.scrollZoom;
       delete node.dataset.previewRenderScale;
       delete node.dataset.cssTransformScaling;
-      delete node.dataset.glPixelRatio;
+      delete node.dataset.webglSizing;
       node.removeAllListeners?.("plotly_click");
       node.removeAllListeners?.("plotly_legendclick");
       node.removeAllListeners?.("plotly_relayout");
