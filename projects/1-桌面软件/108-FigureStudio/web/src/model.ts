@@ -294,6 +294,7 @@ export interface FigureOverrides {
   surfaceProjectionX?: boolean;
   surfaceProjectionY?: boolean;
   surfaceProjectionContourCount?: number;
+  surfaceProjectionFloorGap?: number;
   surfaceProjectionLineWidthPt?: number;
   surfaceProjectionUseColorMap?: boolean;
 }

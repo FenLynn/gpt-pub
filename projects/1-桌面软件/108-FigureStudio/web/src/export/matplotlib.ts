@@ -598,7 +598,12 @@ if template in ("surface-3d", "surface-projection-3d"):
         )
         contour_width = float(O.get("surfaceProjectionLineWidthPt", 0.45))
         finite_z = z[np.isfinite(z)]
-        z_floor = float(np.min(finite_z)) if finite_z.size else 0.0
+        z_min = float(np.min(finite_z)) if finite_z.size else 0.0
+        z_max = float(np.max(finite_z)) if finite_z.size else 1.0
+        z_span = max(1e-12, z_max - z_min)
+        floor_gap = max(0.0, min(1.0, float(O.get("surfaceProjectionFloorGap", 0.28))))
+        z_floor = z_min - z_span * floor_gap
+        ax.set_zlim(z_floor, z_max + z_span * 0.06)
         x_low = float(np.nanmin(X))
         y_high = float(np.nanmax(Y))
         if O.get("surfaceProjectionFloor", True):

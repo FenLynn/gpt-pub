@@ -1315,6 +1315,32 @@ export function buildLayout(args: {
   ) {
     const projectionSurface =
       figure.templateId === "surface-projection-3d";
+    const projectionSeries = projectionSurface
+      ? orderSeries(dataset, figure.seriesOrder, figure.dataRef?.yColumnIds)
+      : [];
+    const projectionZValues = projectionSeries.flatMap((series) =>
+      finiteNumericValues(series.values)
+    );
+    const projectionZMin = projectionZValues.length
+      ? Math.min(...projectionZValues)
+      : 0;
+    const projectionZMax = projectionZValues.length
+      ? Math.max(...projectionZValues)
+      : 1;
+    const projectionZSpan = Math.max(
+      1e-9,
+      projectionZMax - projectionZMin
+    );
+    const projectionFloorGap = Math.max(
+      0,
+      Math.min(1, overrides.surfaceProjectionFloorGap ?? 0.28)
+    );
+    const projectionZRange = projectionSurface
+      ? [
+          projectionZMin - projectionZSpan * projectionFloorGap,
+          projectionZMax + projectionZSpan * 0.06
+        ]
+      : undefined;
     const sceneAxisTitleSizePx =
       axisTitleSizePx * GOLDEN_STYLE.field.surfaceAxisTitleScale;
     const sceneTickLabelSizePx =
@@ -1377,6 +1403,8 @@ export function buildLayout(args: {
       },
       zaxis: {
         title: { text: "" },
+        autorange: projectionSurface ? false : true,
+        range: projectionZRange,
         showbackground: true,
         backgroundcolor: projectionSurface
           ? GOLDEN_STYLE.field.projectionPaneBackground

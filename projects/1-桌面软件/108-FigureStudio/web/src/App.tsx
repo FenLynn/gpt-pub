@@ -2105,6 +2105,7 @@ function App() {
         surfaceProjectionX: source.surfaceProjectionX,
         surfaceProjectionY: source.surfaceProjectionY,
         surfaceProjectionContourCount: source.surfaceProjectionContourCount,
+        surfaceProjectionFloorGap: source.surfaceProjectionFloorGap,
         surfaceProjectionLineWidthPt: source.surfaceProjectionLineWidthPt,
         surfaceProjectionUseColorMap: source.surfaceProjectionUseColorMap
       }
@@ -4361,6 +4362,18 @@ function App() {
                                   "surfaceProjectionContourCount",
                                   Math.max(4,Math.min(40,Number(event.target.value)))
                                 )} />
+                            </div>
+                            <div className="prop-row">
+                              <label>底面间距</label>
+                              <div className="compact-number">
+                                <input type="number" min="0" max="1" step="0.05"
+                                  value={activeFigure.figureOverrides.surfaceProjectionFloorGap ?? 0.28}
+                                  onChange={(event) => setFigureField(
+                                    "surfaceProjectionFloorGap",
+                                    Math.max(0,Math.min(1,Number(event.target.value)))
+                                  )} />
+                                <span>×Δz</span>
+                              </div>
                             </div>
                             <div className="prop-row">
                               <label>投影线宽</label>
