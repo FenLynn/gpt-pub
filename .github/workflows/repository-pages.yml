@@ -120,6 +120,15 @@ jobs:
           # attendance, internal histories, snapshots or unpublished records.
           cp "$P109/index.html" "$P109/project.json" "_site/p109/"
           cp -a "$P109/src" "$P109/config" "_site/p109/"
+          python - <<'PY'
+          from pathlib import Path
+          import os, re
+          p = Path("_site/p109/index.html")
+          s = p.read_text(encoding="utf-8")
+          token = os.environ["P109_SHA"][:12]
+          s = re.sub(r'(\./src/[^"\']+)(["\'])', lambda m: f"{m.group(1)}?v={token}{m.group(2)}", s)
+          p.write_text(s, encoding="utf-8")
+          PY
           cat > "_site/index.html" <<'HTML'
           <!doctype html>
           <html lang="zh-CN">
