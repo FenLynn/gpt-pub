@@ -183,6 +183,28 @@ async function run(){
  },manualTarget,'Initial/manual view switch failed');
  await page.locator('[data-judgment-mode="manual"]').click();
  await check(page,()=>state.judgmentMode==='manual','Manual layer cannot be restored');
+
+ // One demonstrator day carries every behavior color in the same audio-track chart.
+ await page.locator('.m-cell[data-emp="E011"][data-day="24"] button').click();
+ await page.waitForSelector('#attendanceTimelineChart svg');
+ await check(page,()=>{
+   const a=state.analysis.get('E011|24'),keys=r14TrackData(a).tracks.map(t=>t.key);
+   return ['rules','events','actual','trip','leave','outing','overtime'].every(k=>keys.includes(k));
+ },'All behavior rails are not visible on the demonstrator day');
+ await page.screenshot({path:path.join(out,'r18-all-behavior-timeline.png')});
+
+ // A stress day should merge close punches at wide range and split them after zooming in.
+ const stress=await page.evaluate(()=>{
+   const a=[...state.analysis.values()].find(x=>x.punches.some(p=>p.scenario==='rapid-swipes'));
+   return {id:a.employee.id,day:a.day};
+ });
+ await page.locator('.m-cell[data-emp="'+stress.id+'"][data-day="'+stress.day+'"] button').click();
+ await page.waitForSelector('#attendanceTimelineChart svg');
+ await page.screenshot({path:path.join(out,'r18-clustered-punches.png')});
+
+ // Return to the manually edited cell before linked-raw verification.
+ await page.locator('.m-cell[data-emp="'+manualTarget.id+'"][data-day="'+manualTarget.day+'"] button').click();
+ await page.waitForSelector('#attendanceTimelineChart svg');
  const firstRecord=await page.evaluate(({id,day})=>state.analysis.get(id+'|'+day).punches[0].recordId,manualTarget);
  await page.evaluate(id=>focusRawEvidence('attendance',id),firstRecord);
  await page.waitForSelector('.raw-linked-highlight',{timeout:5000});
