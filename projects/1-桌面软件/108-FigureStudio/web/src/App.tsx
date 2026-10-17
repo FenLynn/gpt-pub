@@ -1161,15 +1161,15 @@ function App() {
             }
           }
         : layout;
-    const previewRenderScale = Math.max(0.1, previewScale * canvasZoom);
-    const previewLayout = scalePlotlyLayoutForPreview(
-      interactiveLayout,
-      previewRenderScale
-    );
-    const previewTraces = scalePlotlyTracesForPreview(
-      traces as any[],
-      previewRenderScale
-    );
+    const previewRenderScale = interactive3D
+      ? Math.max(0.1, previewScale * canvasZoom)
+      : 1;
+    const previewLayout = interactive3D
+      ? scalePlotlyLayoutForPreview(interactiveLayout, previewRenderScale)
+      : interactiveLayout;
+    const previewTraces = interactive3D
+      ? scalePlotlyTracesForPreview(traces as any[], previewRenderScale)
+      : traces;
     const glPixelRatio = interactive3D
       ? Math.max(
           1.5,
@@ -1228,7 +1228,7 @@ function App() {
       : "";
     node.dataset.scrollZoom = "true";
     node.dataset.previewRenderScale = previewRenderScale.toFixed(3);
-    node.dataset.cssTransformScaling = "false";
+    node.dataset.cssTransformScaling = interactive3D ? "false" : "true";
     if (interactive3D) {
       node.dataset.glPixelRatio = Number(glPixelRatio ?? 1).toFixed(2);
     }
@@ -3685,14 +3685,26 @@ function App() {
                     className={
                       usePrecision
                         ? "figure-paper is-vector-preview"
-                        : "figure-paper is-native-resolution-preview"
+                        : surfaceTemplate
+                        ? "figure-paper is-native-resolution-preview"
+                        : "figure-paper"
                     }
                     data-vector-preview={usePrecision ? "true" : "false"}
-                    data-native-resolution-preview={!usePrecision ? "true" : "false"}
-                    style={{
-                      width: scaledWidth + "px",
-                      height: scaledHeight + "px"
-                    }}
+                    data-native-resolution-preview={
+                      !usePrecision && surfaceTemplate ? "true" : "false"
+                    }
+                    style={
+                      usePrecision || surfaceTemplate
+                        ? {
+                            width: scaledWidth + "px",
+                            height: scaledHeight + "px"
+                          }
+                        : {
+                            width: layout.width + "px",
+                            height: layout.height + "px",
+                            transform: "scale(" + displayScale + ")"
+                          }
+                    }
                   >
                     {isPublicationBoard && activeFigure ? (
                       <PublicationBoard
@@ -3745,10 +3757,17 @@ function App() {
                         ref={plotRef}
                         className={"plot-host" + (surfaceTemplate ? " is-interactive-3d" : "")}
                         data-3d-interactive={surfaceTemplate ? "true" : "false"}
-                        style={{
-                          width: scaledWidth + "px",
-                          height: scaledHeight + "px"
-                        }}
+                        style={
+                          surfaceTemplate
+                            ? {
+                                width: scaledWidth + "px",
+                                height: scaledHeight + "px"
+                              }
+                            : {
+                                width: layout.width + "px",
+                                height: layout.height + "px"
+                              }
+                        }
                       />
                     )}
                   </div>
