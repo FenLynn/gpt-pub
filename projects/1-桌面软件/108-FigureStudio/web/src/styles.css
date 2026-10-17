@@ -720,6 +720,19 @@ button:disabled {
   scrollbar-gutter: stable both-edges;
 }
 
+.canvas-area.is-pan-ready {
+  cursor: grab;
+}
+
+.canvas-area.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.canvas-area.is-panning .figure-paper {
+  pointer-events: none;
+}
+
 .scaled-paper-shell {
   position: relative;
   flex: 0 0 auto;
@@ -771,6 +784,12 @@ button:disabled {
 .figure-actions .canvas-zoom-readout {
   min-width: calc(48px * var(--ui-scale));
   border-inline: 1px solid #e1e5e8;
+  font-variant-numeric: tabular-nums;
+}
+
+.figure-actions .canvas-one-to-one {
+  min-width: calc(36px * var(--ui-scale));
+  border-left: 1px solid #e1e5e8;
   font-variant-numeric: tabular-nums;
 }
 

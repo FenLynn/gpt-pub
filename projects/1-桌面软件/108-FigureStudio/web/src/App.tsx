@@ -457,6 +457,13 @@ function App() {
   const plotRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const canvasPanRef = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
   const dataInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const dataActionRef = useRef<
@@ -497,6 +504,8 @@ function App() {
   // user's inspection magnification on top of that fit scale.
   const [previewScale, setPreviewScale] = useState(1);
   const [canvasZoom, setCanvasZoom] = useState(readInitialCanvasZoom);
+  const [canvasPanReady, setCanvasPanReady] = useState(false);
+  const [canvasPanning, setCanvasPanning] = useState(false);
   const [rendererMode, setRendererMode] = useState<"precision" | "plotly">(
     () => localStorage.getItem(RENDER_MODE_KEY) === "plotly" ? "plotly" : "precision"
   );
@@ -823,6 +832,43 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [history, project, showToast]);
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null) => {
+      const element = target instanceof HTMLElement ? target : null;
+      return Boolean(
+        element &&
+          (element.isContentEditable ||
+            element.tagName === "INPUT" ||
+            element.tagName === "TEXTAREA" ||
+            element.tagName === "SELECT")
+      );
+    };
+    const handlePanKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || isEditableTarget(event.target)) return;
+      event.preventDefault();
+      setCanvasPanReady(true);
+    };
+    const handlePanKeyUp = (event: KeyboardEvent) => {
+      if (event.code !== "Space") return;
+      setCanvasPanReady(false);
+      setCanvasPanning(false);
+      canvasPanRef.current = null;
+    };
+    const handleBlur = () => {
+      setCanvasPanReady(false);
+      setCanvasPanning(false);
+      canvasPanRef.current = null;
+    };
+    window.addEventListener("keydown", handlePanKeyDown);
+    window.addEventListener("keyup", handlePanKeyUp);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keydown", handlePanKeyDown);
+      window.removeEventListener("keyup", handlePanKeyUp);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeFigure) return;
@@ -3064,10 +3110,12 @@ function App() {
                       type="button"
                       className="canvas-zoom-readout"
                       data-testid="canvas-zoom-fit"
-                      title="恢复适配窗口"
+                      title={"适配窗口 · 当前显示比例 " + Math.round(displayScale * 100) + "%"}
                       onClick={() => setCanvasZoom(1)}
                     >
-                      {Math.round(canvasZoom * 100)}%
+                      {Math.abs(canvasZoom - 1) < 0.005
+                        ? "适配"
+                        : Math.round(canvasZoom * 100) + "%"}
                     </button>
                     <button
                       type="button"
@@ -3076,6 +3124,19 @@ function App() {
                       onClick={() => setCanvasZoom((value) => clampCanvasZoom(value * 1.2))}
                     >
                       ＋
+                    </button>
+                    <button
+                      type="button"
+                      className="canvas-one-to-one"
+                      data-testid="canvas-zoom-one-to-one"
+                      title="1:1 显示设计像素，不改变导出尺寸"
+                      onClick={() =>
+                        setCanvasZoom(
+                          clampCanvasZoom(1 / Math.max(0.0001, previewScale))
+                        )
+                      }
+                    >
+                      1:1
                     </button>
                   </span>
                   <button type="button" onClick={() => void resetView()}>重置</button>
@@ -3100,8 +3161,66 @@ function App() {
 
               <div
                 ref={canvasRef}
-                className="canvas-area"
+                className={
+                  "canvas-area" +
+                  (canvasPanReady ? " is-pan-ready" : "") +
+                  (canvasPanning ? " is-panning" : "")
+                }
                 data-canvas-zoom={canvasZoom.toFixed(2)}
+                data-canvas-display-scale={displayScale.toFixed(2)}
+                data-canvas-pan-ready={canvasPanReady ? "true" : "false"}
+                title="Ctrl/⌘ + 滚轮缩放 · 空格 + 左键拖动或中键拖动画布"
+                onPointerDownCapture={(event) => {
+                  const shouldPan =
+                    event.button === 1 ||
+                    (event.button === 0 && canvasPanReady);
+                  if (!shouldPan) return;
+                  const node = canvasRef.current;
+                  if (!node) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  canvasPanRef.current = {
+                    pointerId: event.pointerId,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    scrollLeft: node.scrollLeft,
+                    scrollTop: node.scrollTop
+                  };
+                  setCanvasPanning(true);
+                  node.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  const pan = canvasPanRef.current;
+                  const node = canvasRef.current;
+                  if (!pan || !node || pan.pointerId !== event.pointerId) return;
+                  node.scrollLeft =
+                    pan.scrollLeft - (event.clientX - pan.clientX);
+                  node.scrollTop =
+                    pan.scrollTop - (event.clientY - pan.clientY);
+                }}
+                onPointerUp={(event) => {
+                  const pan = canvasPanRef.current;
+                  const node = canvasRef.current;
+                  if (!pan || pan.pointerId !== event.pointerId) return;
+                  canvasPanRef.current = null;
+                  setCanvasPanning(false);
+                  if (node?.hasPointerCapture(event.pointerId)) {
+                    node.releasePointerCapture(event.pointerId);
+                  }
+                }}
+                onPointerCancel={(event) => {
+                  const pan = canvasPanRef.current;
+                  const node = canvasRef.current;
+                  if (!pan || pan.pointerId !== event.pointerId) return;
+                  canvasPanRef.current = null;
+                  setCanvasPanning(false);
+                  if (node?.hasPointerCapture(event.pointerId)) {
+                    node.releasePointerCapture(event.pointerId);
+                  }
+                }}
+                onAuxClick={(event) => {
+                  if (event.button === 1) event.preventDefault();
+                }}
                 onWheel={(event) => {
                   if (!(event.ctrlKey || event.metaKey)) return;
                   event.preventDefault();

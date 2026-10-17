@@ -178,12 +178,26 @@ jobs:
           grep -q 'data-vector-preview="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-testid="canvas-zoom-in"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-testid="canvas-zoom-out"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          grep -q 'data-testid="canvas-zoom-one-to-one"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-canvas-zoom="1.00"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+
+          "$BROWSER" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --window-size=1600,1050 --virtual-time-budget=9000 \
+            --screenshot="$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.png" \
+            --dump-dom "http://127.0.0.1:4173/gpt-pub/p108/?golden=lorentz&zoom=2" \
+            > "$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.html" 2>"$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.stderr"
+          test -s "$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.png"
+          grep -q 'data-canvas-zoom="2.00"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.html"
+          grep -q 'data-canvas-display-scale="' "$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.html"
+          test "$(grep -o 'data-math-vector-root="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.html" | wc -l)" -ge 8
+          if grep -q 'data-math-pending="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Zoom-200.html"; then
+            echo "::error::Lorentz 200% view still contains pending LaTeX"
+            exit 1
+          fi
           if grep -q 'data-math-pending="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"; then
             echo "::error::Lorentz Golden still contains pending LaTeX instead of MathJax SVG"
             exit 1
           fi
-          echo "Lorentz Golden: real two-panel Graph editor + MathJax SVG labels/annotations OK"
+          echo "Lorentz Golden: real two-panel Graph editor + MathJax SVG labels/annotations + 200% vector inspection OK"
 
       - name: Upload browser screenshots
         if: always()
