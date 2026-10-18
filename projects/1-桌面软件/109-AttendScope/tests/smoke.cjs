@@ -129,7 +129,7 @@ async function run(){
      parseFloat(getComputedStyle(cross).opacity)>.5&&
      parseFloat(getComputedStyle(focus).opacity)>.95;
  },'Matrix focus should dim unrelated cells and preserve the selected cross');
- await page.screenshot({path:path.join(out,'r26-primary-timeline.png')});
+ await page.screenshot({path:path.join(out,'r27-primary-timeline.png')});
  await check(page,()=>{
   const data=r14TrackData(plotAnalysis(analysisContext())),tr=data.tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
@@ -211,16 +211,25 @@ async function run(){
    const radios=[...group.querySelectorAll('[data-manual-status]')];
    const active=radios.find(x=>x.dataset.manualStatus==='absent');
    const inactive=radios.filter(x=>x!==active);
-   const auto=document.querySelector('.auto-judgment');
-   return state.manualStatuses[key]==='absent'&&state.judgmentMode==='manual'&&cell.classList.contains('s-absent')&&!!cell.querySelector('.manual-check')&&
+   const initial=document.querySelector('.initial-judgment');
+   const checkMark=cell.querySelector('.manual-check'),box=checkMark?.getBoundingClientRect(),parent=cell.getBoundingClientRect();
+   return state.manualStatuses[key]==='absent'&&state.judgmentMode==='manual'&&cell.classList.contains('s-absent')&&!!checkMark&&
      !document.querySelector('[data-judgment-mode="manual"]').disabled&&
      getComputedStyle(group).display==='grid'&&radios.length===3&&
      radios.filter(x=>x.getAttribute('aria-checked')==='true').length===1&&
      active?.classList.contains('active')&&active.textContent.trim()==='缺勤'&&
-     inactive.every(x=>x.textContent.trim()==='')&&auto?.textContent.trim().length>0&&
-     getComputedStyle(active).color==='rgb(255, 255, 255)';
- },manualTarget,'Manual color blocks must show text only on the selected state');
- await page.screenshot({path:path.join(out,'r26-manual-segment.png')});
+     inactive.every(x=>x.textContent.trim()==='')&&initial?.textContent.trim().length>0&&
+     initial?.hasAttribute('data-manual-clear')&&getComputedStyle(active).color==='rgb(255, 255, 255)'&&
+     box.left>=parent.left&&box.top>=parent.top&&box.right<=parent.right+.5&&box.bottom<=parent.bottom+.5;
+ },manualTarget,'R27 status blocks or contained matrix check failed');
+ await page.screenshot({path:path.join(out,'r27-manual-segment.png')});
+ await page.locator('.initial-judgment').click();
+ await check(page,({id,day})=>{
+   const key=id+'|'+day;
+   return !state.manualStatuses[key]&&document.querySelector('.status-control-row.initial-row>span')?.textContent==='初始'&&
+     document.querySelectorAll('.status-control-row.manual-row [data-manual-status]').length===3;
+ },manualTarget,'Initial status button must restore the selected day');
+ await page.locator('[data-manual-status="absent"]').click();
  await page.locator('[data-judgment-mode="initial"]').click();
  await check(page,({id,day})=>{
    const cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
@@ -255,7 +264,7 @@ async function run(){
      ['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
      rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
  },'Behavior insight tab did not expose all four intervals');
- await page.screenshot({path:path.join(out,'r26-leave-timeline.png')});
+ await page.screenshot({path:path.join(out,'r27-leave-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
  // A stress day should merge close punches at wide range and split them naturally as the time window narrows.
@@ -343,7 +352,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R26',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R27',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
