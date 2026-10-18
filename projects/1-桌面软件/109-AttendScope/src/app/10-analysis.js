@@ -36,7 +36,7 @@ function applyImportRoster(plan,meta){
   }
   EMPLOYEES=plan.people;
   for(const e of EMPLOYEES)if(!state.groups[e.id])state.groups[e.id]=(e.department==='未分类'?'未分组':e.department+'组');
-  state.isDemo=false;
+  state.isDemo=!!state.isDemo&&!plan.resetDemo;
 }
 function acceptImportedRows(kind,rows,plan,skipped=0){
   if(kind==='attendance')state.records=rows;

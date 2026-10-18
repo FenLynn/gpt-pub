@@ -166,6 +166,14 @@ async function run(){
     document.querySelectorAll('.analysis-head-tools .timeline-top-legend span').length>=4&&
     getComputedStyle(preview,'::before').display==='none'&&bar&&
     preview.dataset.geometryReady==='true'&&
+    (()=>{
+      const svg=document.querySelector('#attendanceTimelineChart svg');
+      const target=[...svg.querySelectorAll('path,rect')].filter(n=>(n.getAttribute('fill')||'').toLowerCase()==='#edf0f2')
+        .map(n=>n.getBoundingClientRect()).filter(r=>r.width>200&&r.height>=25&&r.height<=45)
+        .sort((a,b)=>b.width-a.width)[0],frame=preview.getBoundingClientRect();
+      return target&&Math.abs(frame.top-target.top)<1&&Math.abs(frame.left-target.left)<1&&
+        Math.abs(frame.width-target.width)<1&&Math.abs(frame.height-target.height)<1;
+    })()&&
     [...preview.querySelectorAll('.r15-punch-stack')].every(n=>{
       const r=n.getBoundingClientRect(),outer=preview.getBoundingClientRect();
       return r.top>=outer.top&&r.bottom<=outer.bottom&&r.left>=outer.left-.5&&r.right<=outer.right+.5;
@@ -306,6 +314,14 @@ async function run(){
    })&&g.value[0]>=r.start&&g.value[0]<=r.end);
  },stress,'R31 visible-range clustering includes offscreen records');
  await page.screenshot({path:path.join(out,'r20-clustered-punches.png')});
+ await page.evaluate(()=>{
+   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
+   chart.dispatchAction({type:'dataZoom',dataZoomId:'slider',startValue:520,endValue:600});
+ });
+ await page.waitForTimeout(220);
+ await check(page,()=>state.timelineRange?.start>=519&&state.timelineRange?.end<=601,
+   'R34 zoomed cluster range is not linked to the timeline');
+ await page.screenshot({path:path.join(out,'r34-zoomed-cluster.png')});
 
  // Return to the manually edited cell before linked-raw verification.
  await page.locator('.m-cell[data-emp="'+manualTarget.id+'"][data-day="'+manualTarget.day+'"] button').click();
