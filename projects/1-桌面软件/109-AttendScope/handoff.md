@@ -4,8 +4,8 @@
 > 仓库：`FenLynn/gpt-pub`  
 > 项目：`projects/1-桌面软件/109-AttendScope/`  
 > 日常开发分支：`p109-exp`  
-> 代码基线（写入本 handoff 前）：`b65717a99d54deae18c45142272d98e71e27c2be`  
-> 对应 P109 CI：#193，success。  
+> R34 功能基线：`94d2bb12c97957899615bee90d46c16f450176a1`（R29 历史基线：`b65717a99d54deae18c45142272d98e71e27c2be`）  
+> 对应 R34 P109 CI：#202，success（#193 为历史 R29）。  
 > 不要直接把 `p109-stable` / `main` 当开发分支。
 
 ## 1. 接手后的第一步
@@ -224,3 +224,18 @@
 
 > P109 当前最大的风险不是“功能不会做”，而是修改范围失控。  
 > 后续宁可一次只改 1–3 个视觉问题，也不要把一个局部反馈扩展成新的时间轴版本。
+
+## 12. R30–R34 修复后的最新交接（2026-10-18）
+
+在继承上述 R29 确定的六轨、人工状态和最小修改原则的同时，请注意以下新事实：
+
+1. **活动实现**：`src/app/36-tracks.js` 是唯一活动 `mountAttendanceTimeline`；`25-echarts.js` 中旧函数已改名为 `legacyMountAttendanceTimeline`，不得恢复同名覆盖。
+2. **navigator**：现在由 `syncNavigator()` 从 ECharts SVG 的背景矩形获取真实可见坐标，使用 CSS 自定义属性向标记覆盖层传递 left/top/width/height。浏览器回归已比较实际 SVG 与 HTML 覆盖层的矩形。
+3. **聚合**：`r19PunchClusters()` 只接受当前窗口内的记录，并限制整组跨度；缩放后的箭头必须对应真实时间坐标。已增加局部缩放 Chromium 截图。
+4. **真实名册**：导入真实考勤会询问是否丢弃当前演示数据，员工列表、组别和事实层进入当前月 working/snapshot；跨月恢复不可从其他月误取演示名单。多份独立导入文件不覆盖 raw。
+5. **导出**：传统 XLSX 包含系统/人工/最终判定且输出中文。需要保留四类业务区间与默认月矩阵一致性的设计。
+6. **尚缺**：Windows File System Access 真机验收、相同姓名不同人员的唯一编号处理；总览/统计 UI 未最终确定，不应自行大改。
+7. **分支与 Pages**：只在 `p109-exp` 继续；P109 CI 成功后共享 Unified Pages 组装 P108+P109。严禁恢复 P109 专用 Pages deploy。
+8. **最新功能回归**：CI #202 成功，源提交 `94d2bb12c97957899615bee90d46c16f450176a1`。本 handoff 如有 R29 的“当前最新”历史说法，以本节与实时 Git/CI 为准。
+
+请在新的会话开始时首先比较最新 `p109-exp` 与 `main`，检查最新 P109 CI/Unified Pages，并阅读本文件与阶段记录。后续变更应尽量只触及相关实现和测试，实际看 Chromium 截图后再汇报。
