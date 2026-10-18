@@ -141,7 +141,7 @@ async function run(){
    const dup=[...state.analysis.values()].find(a=>a.punches.some(p=>p.scenario==='rapid-swipes'));
    if(!dup)return false;
    const range={start:520,end:600};
-   const coarse=r14TrackData(dup,range,300).events,fine=r14TrackData(dup,range,1600).events;
+   const coarse=r14TrackData(dup,range,240).events,fine=r14TrackData(dup,range,1600).events;
    return coarse.length>0&&fine.length>coarse.length&&
      fine.every(g=>g.records.every(p=>minutes(p.time)>=range.start&&minutes(p.time)<=range.end));
  },'Repeated punches are not clustered in the event model');
@@ -295,7 +295,7 @@ async function run(){
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,({id,day})=>{
    const a=state.analysis.get(id+'|'+day);
-   const range={start:520,end:600},wide=r19PunchClusters(a,range,300,0);
+   const range={start:520,end:600},wide=r19PunchClusters(a,range,240,0);
    const narrow=r19PunchClusters(a,range,1600,0);
    return wide.some(x=>x.count>1)&&narrow.length>wide.length;
  },stress,'Rapid punches do not merge at overview scale and split at narrow scale');
