@@ -1,0 +1,11 @@
+{
+  "ambient_temperature": 0.0,
+  "thermal_gain": 1.0,
+  "absorption": 1.0,
+  "length": 1.0,
+  "coupling_high": 2.0,
+  "coupling_low": 0.05,
+  "coupling_midpoint_temperature": 5.0,
+  "coupling_temperature_width": 0.5,
+  "normalized_temperature": [-4, -3, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 3, 4]
+}
