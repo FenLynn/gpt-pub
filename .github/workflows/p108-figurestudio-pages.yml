@@ -229,7 +229,7 @@ jobs:
           grep -q 'data-series-id="lorentz-phase"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'data-testid="lorentz-inspector"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q '架构' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
-          grep -q '单 Y' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
+          grep -q '双面板组合' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           grep -q 'Nature 双栏 · 183 mm' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html"
           test "$(grep -o 'data-math-rendered="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html" | wc -l)" -ge 8
           test "$(grep -o 'data-math-vector-root="true"' "$RUNNER_TEMP/p108-screenshots/Lorentz-Golden.html" | wc -l)" -ge 8
