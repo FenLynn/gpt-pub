@@ -394,12 +394,13 @@ function r15PunchPreview(a){
   const bins=new Map();
   for(const p of (a.punches||[])){
     const minute=Math.floor(minutes(p.time)),bucket=Math.floor(minute/3)*3;
-    if(!bins.has(bucket))bins.set(bucket,{minute:bucket,in:0,out:0});
-    bins.get(bucket)[p.direction==='进'?'in':'out']++;
+    if(!bins.has(bucket))bins.set(bucket,{minute:bucket,sum:0,in:0,out:0});
+    const bin=bins.get(bucket);bin[p.direction==='进'?'in':'out']++;bin.sum+=minutes(p.time);
   }
   const bars=[...bins.values()].map(g=>{
-    const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(9,2+total*1.35);
-    return '<span class="r15-punch-stack" style="left:'+left+'%;width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
+    const total=g.in+g.out,center=g.sum/total,left=(center/1440*100).toFixed(5),width=Math.min(9,2+total*1.35);
+    const range=state.timelineRange,inside=range&&center>=range.start&&center<=range.end;
+    return '<span class="r15-punch-stack '+(inside?'inside':'outside')+'" data-nav-minute="'+center+'" style="left:clamp('+(width/2)+'px,'+left+'%,calc(100% - '+(width/2)+'px));width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
       (g.in?'<i class="in"></i>':'')+
       (g.out?'<i class="out"></i>':'')+
     '</span>';

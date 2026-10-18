@@ -921,3 +921,25 @@
 }
 .status-control-row .manual-status-buttons button.initial-disabled:hover,
 .status-control-row .manual-status-buttons button:disabled:hover{opacity:.15!important}
+
+/* R30: align navigator marks to the real ECharts slider SVG rectangle. */
+.music-track-panel .r15-punch-preview{
+  left:var(--p109-nav-left,12px)!important;
+  top:var(--p109-nav-top,calc(100% - 70px))!important;
+  right:auto!important;bottom:auto!important;
+  width:var(--p109-nav-width,calc(100% - 24px))!important;
+  height:var(--p109-nav-height,34px)!important;
+  overflow:hidden!important;box-sizing:border-box!important;
+  border-radius:2px!important;pointer-events:none!important;
+}
+.music-track-panel .r15-punch-stack{
+  top:1px!important;bottom:1px!important;height:auto!important;
+  overflow:hidden!important;box-sizing:border-box!important;
+  transform:translateX(-50%)!important;
+}
+.music-track-panel .r15-punch-stack i{
+  height:100%!important;max-height:100%!important;
+  border-radius:0!important;box-shadow:none!important;
+}
+.music-track-panel .r15-punch-stack.inside i{opacity:.56!important}
+.music-track-panel .r15-punch-stack.outside i{opacity:.16!important}

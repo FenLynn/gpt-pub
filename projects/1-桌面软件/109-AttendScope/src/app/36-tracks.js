@@ -1,9 +1,9 @@
 /* R29 timeline: restore proven R27 geometry; only pin labels and refine lane guides. */
 function r19PunchClusters(a,range,width,fixedLane=null){
   const span=Math.max(30,range.end-range.start),px=Math.max(240,width||800);
-  const mergeMinutes=Math.max(.45,span/px*11),out=[];
+  const mergeMinutes=Math.max(.45,span/Math.max(160,px-24)*11),maxGroupSpan=Math.max(.8,mergeMinutes*1.6),out=[];
   for(const direction of ['进','出']){
-    const rows=a.punches.filter(p=>p.direction===direction).sort((x,y)=>minutes(x.time)-minutes(y.time));
+    const rows=a.punches.filter(p=>p.direction===direction&&Number.isFinite(minutes(p.time))&&minutes(p.time)>=range.start&&minutes(p.time)<=range.end).sort((x,y)=>minutes(x.time)-minutes(y.time));
     let group=[];
     const flush=()=>{
       if(!group.length)return;
@@ -18,7 +18,7 @@ function r19PunchClusters(a,range,width,fixedLane=null){
     };
     for(const p of rows){
       const m=minutes(p.time);
-      if(group.length&&m-minutes(group[group.length-1].time)>mergeMinutes)flush();
+      if(group.length&&(m-minutes(group[group.length-1].time)>mergeMinutes||m-minutes(group[0].time)>maxGroupSpan))flush();
       group.push(p);
     }
     flush();
@@ -85,7 +85,8 @@ function mountAttendanceTimeline(a){
     const yIn=api.coord([api.value(0),0])[1],yOut=api.coord([api.value(0),1])[1];
     const baseline=(yIn+yOut)/2,toward=state.prefs.arrowsTowardLine!==false;
     const count=d.count||1,thickness=Math.min(8.5,2.35+Math.log2(Math.max(1,count))*1.9);
-    const len=Math.min(34,27+Math.log2(Math.max(1,count))*2.5);
+    const laneHeight=behaviorRowHeight(api);
+    const len=Math.max(10,Math.min(34,laneHeight-3,27+Math.log2(Math.max(1,count))*2.5));
     const isIn=d.direction==='进',sign=isIn?-1:1;
     const y0=baseline+sign*(toward?len:3),y1=baseline+sign*(toward?3:len);
     const color=isIn?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4,thickness*.68);
@@ -170,6 +171,33 @@ function mountAttendanceTimeline(a){
     ]
   };
   chart.setOption(option);
+  // Locate the rendered slider track; the HTML marks must share its actual SVG bounds.
+  const syncNavigator=()=>{
+    const preview=document.getElementById('r15PunchPreview');
+    if(!preview||!preview.isConnected)return;
+    const svg=el.querySelector('svg');
+    const candidates=svg?[...svg.querySelectorAll('path,rect')].filter(n=>{
+      const fill=(n.getAttribute('fill')||'').toLowerCase();
+      return fill==='#edf0f2'||fill==='rgb(237,240,242)';
+    }).map(n=>n.getBoundingClientRect()).filter(r=>r.width>el.clientWidth*.4&&r.height>=25&&r.height<=45):[];
+    if(!candidates.length){preview.dataset.geometryReady='false';return}
+    const r=candidates.sort((a,b)=>b.width-a.width)[0],parent=preview.parentElement.getBoundingClientRect();
+    preview.style.setProperty('--p109-nav-left',(r.left-parent.left)+'px');
+    preview.style.setProperty('--p109-nav-top',(r.top-parent.top)+'px');
+    preview.style.setProperty('--p109-nav-width',r.width+'px');
+    preview.style.setProperty('--p109-nav-height',r.height+'px');
+    preview.dataset.geometryReady='true';
+  };
+  const syncNavSelection=()=>{
+    const r=state.timelineRange||range;
+    document.getElementById('r15PunchPreview')?.querySelectorAll('[data-nav-minute]').forEach(node=>{
+      const minute=Number(node.dataset.navMinute),inside=minute>=r.start&&minute<=r.end;
+      node.classList.toggle('inside',inside);node.classList.toggle('outside',!inside);
+    });
+  };
+  syncNavSelection();
+  chart.on('finished',syncNavigator);
+  requestAnimationFrame(syncNavigator);
   chart.on('click',p=>{
     const d=p.data||{};
     if(p.seriesId==='punches'&&d.records?.length){focusRawEvidence('attendance',d.records.map(r=>r.recordId));return}
@@ -181,6 +209,7 @@ function mountAttendanceTimeline(a){
     start=Math.max(0,Math.min(1440,+start));end=Math.max(start+15,Math.min(1440,+end));
     state.timelineRange={key:range.key,start,end};
     model=r14TrackData(a,state.timelineRange,chart.getWidth());
+    syncNavSelection();
     chart.setOption({
       series:[
         {id:'schedule',data:model.workWindows.map(x=>[x[0],x[1]])},

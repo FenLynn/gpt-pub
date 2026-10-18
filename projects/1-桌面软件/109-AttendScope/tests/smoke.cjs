@@ -164,8 +164,13 @@ async function run(){
     !!document.querySelector('.analysis-head-tools #timelineDayPicker')&&
     document.querySelectorAll('.analysis-head-tools .timeline-top-legend span').length>=4&&
     getComputedStyle(preview,'::before').display==='none'&&bar&&
-    Math.abs(bar.getBoundingClientRect().top-preview.getBoundingClientRect().top)<1.1&&
-    Math.abs(bar.getBoundingClientRect().bottom-preview.getBoundingClientRect().bottom)<1.1&&
+    preview.dataset.geometryReady==='true'&&
+    [...preview.querySelectorAll('.r15-punch-stack')].every(n=>{
+      const r=n.getBoundingClientRect(),outer=preview.getBoundingClientRect();
+      return r.top>=outer.top&&r.bottom<=outer.bottom&&r.left>=outer.left-.5&&r.right<=outer.right+.5;
+    })&&
+    bar.getBoundingClientRect().top>=preview.getBoundingClientRect().top&&
+    bar.getBoundingClientRect().bottom<=preview.getBoundingClientRect().bottom&&
     labels.length===4&&labels.every(x=>{
       const fs=parseFloat(getComputedStyle(x).fontSize),right=document.getElementById('attendanceTimelineChart').getBoundingClientRect().right;
       return fs>=13&&fs<=15.5&&Math.abs(x.getBoundingClientRect().right-(right-20))<24&&
@@ -293,6 +298,12 @@ async function run(){
    const narrow=r19PunchClusters(a,{start:480,end:600},800,0);
    return wide.some(x=>x.count>1)&&narrow.length>wide.length;
  },stress,'Rapid punches do not merge at overview scale and split at narrow scale');
+ await check(page,({id,day})=>{
+   const a=state.analysis.get(id+'|'+day),r={start:520,end:560},events=r19PunchClusters(a,r,800);
+   return events.every(g=>g.records.every(p=>{
+     const t=minutes(p.time);return t>=r.start&&t<=r.end;
+   })&&g.value[0]>=r.start&&g.value[0]<=r.end);
+ },stress,'R31 visible-range clustering includes offscreen records');
  await page.screenshot({path:path.join(out,'r20-clustered-punches.png')});
 
  // Return to the manually edited cell before linked-raw verification.
