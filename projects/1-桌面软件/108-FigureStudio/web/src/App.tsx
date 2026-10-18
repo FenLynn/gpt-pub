@@ -4950,26 +4950,26 @@ function App() {
 
                         {surfaceProjectionTemplate && (
                           <>
-                            <div className="section-divider">投影</div>
+                            <div className="section-divider">三向精细等高投影</div>
                             <div className="prop-row">
-                              <label>柔和底面</label>
+                              <label>底面等高</label>
                               <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionFloor ?? true}
                                 onChange={(value) => setFigureField("surfaceProjectionFloor", value)} />
                             </div>
                             <div className="prop-row">
-                              <label>X 侧壁线</label>
-                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionX ?? false}
+                              <label>X 侧壁等高</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionX ?? true}
                                 onChange={(value) => setFigureField("surfaceProjectionX", value)} />
                             </div>
                             <div className="prop-row">
-                              <label>Y 侧壁线</label>
-                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionY ?? false}
+                              <label>Y 侧壁等高</label>
+                              <MiniSwitch checked={activeFigure.figureOverrides.surfaceProjectionY ?? true}
                                 onChange={(value) => setFigureField("surfaceProjectionY", value)} />
                             </div>
                             <div className="prop-row">
                               <label>投影级数</label>
                               <input type="number" min="4" max="40" step="1"
-                                value={activeFigure.figureOverrides.surfaceProjectionContourCount ?? 6}
+                                value={activeFigure.figureOverrides.surfaceProjectionContourCount ?? 10}
                                 onChange={(event) => setFigureField(
                                   "surfaceProjectionContourCount",
                                   Math.max(4,Math.min(40,Number(event.target.value)))
@@ -4991,7 +4991,7 @@ function App() {
                               <label>投影线宽</label>
                               <div className="compact-number">
                                 <input type="number" min="0.1" max="2" step="0.05"
-                                  value={activeFigure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.32}
+                                  value={activeFigure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.28}
                                   onChange={(event) => setFigureField("surfaceProjectionLineWidthPt",Number(event.target.value))} />
                                 <span>pt</span>
                               </div>

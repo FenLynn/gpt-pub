@@ -72,7 +72,7 @@ function contourSegments(
   const segments:Array<[V3,V3]>=[];
   const edge=(a:V3,b:V3):V3|undefined=>{
     const da=a[2]-level,db=b[2]-level;
-    if((da<0&&db<0)||(da>0&&db>0)||a[2]===b[2])return undefined;
+    if((da<0&&db<0)||(da>0&&db>0)||Math.abs(a[2]-b[2])<1e-14)return undefined;
     const t=(level-a[2])/(b[2]-a[2]);
     if(t<0||t>1||!Number.isFinite(t))return undefined;
     return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,level];
@@ -84,13 +84,71 @@ function contourSegments(
       const p11:[number,number,number]=[xs[i+1],ys[j+1],finite(z[j+1]?.[i+1],NaN)];
       const p01:[number,number,number]=[xs[i],ys[j+1],finite(z[j+1]?.[i],NaN)];
       if(![p00,p10,p11,p01].every(p=>Number.isFinite(p[2])))continue;
+      const values=[p00[2],p10[2],p11[2],p01[2]];
       const hit=[edge(p00,p10),edge(p10,p11),edge(p11,p01),edge(p01,p00)]
         .filter((p):p is V3=>Boolean(p));
       if(hit.length===2)segments.push([hit[0],hit[1]]);
-      else if(hit.length===4){segments.push([hit[0],hit[1]],[hit[2],hit[3]]);}
+      else if(hit.length===4){
+        const center=values.reduce((sum,value)=>sum+value,0)/4;
+        if(center>=level)segments.push([hit[0],hit[1]],[hit[2],hit[3]]);
+        else segments.push([hit[0],hit[3]],[hit[1],hit[2]]);
+      }
     }
   }
   return segments;
+}
+function stitchContours(segments:Array<[V3,V3]>):V3[][]{
+  if(!segments.length)return[];
+  const key=(p:V3)=>p[0].toFixed(8)+":"+p[1].toFixed(8);
+  const adjacency=new Map<string,Array<{index:number;end:0|1}>>();
+  const add=(p:V3,index:number,end:0|1)=>{
+    const k=key(p),list=adjacency.get(k)??[];
+    list.push({index,end});adjacency.set(k,list);
+  };
+  segments.forEach((seg,index)=>{add(seg[0],index,0);add(seg[1],index,1);});
+  const visited=new Set<number>();
+  const walk=(startIndex:number,startEnd:0|1)=>{
+    const points:V3[]=[segments[startIndex][startEnd]];
+    let index=startIndex,end=startEnd;
+    while(!visited.has(index)){
+      visited.add(index);
+      const other=(end===0?1:0) as 0|1;
+      const nextPoint=segments[index][other];
+      points.push(nextPoint);
+      const next=(adjacency.get(key(nextPoint))??[]).find(item=>!visited.has(item.index));
+      if(!next)break;
+      index=next.index;end=next.end;
+    }
+    return points;
+  };
+  const lines:V3[][]=[];
+  segments.forEach((seg,index)=>{
+    if(visited.has(index))return;
+    const d0=adjacency.get(key(seg[0]))?.length??0;
+    const d1=adjacency.get(key(seg[1]))?.length??0;
+    if(d0===1||d1===1)lines.push(walk(index,d0===1?0:1));
+  });
+  segments.forEach((_seg,index)=>{if(!visited.has(index))lines.push(walk(index,0));});
+  return lines.filter(line=>line.length>=2);
+}
+function smoothContour(points:V3[]):V3[]{
+  if(points.length<3)return points;
+  const first=points[0],last=points[points.length-1];
+  const closed=Math.abs(first[0]-last[0])<1e-8&&Math.abs(first[1]-last[1])<1e-8;
+  const src=closed?points.slice(0,-1):points;
+  if(src.length<3)return points;
+  const out:V3[]=[];
+  if(!closed)out.push(src[0]);
+  const edgeCount=closed?src.length:src.length-1;
+  for(let i=0;i<edgeCount;i+=1){
+    const a=src[i],b=src[(i+1)%src.length];
+    out.push(
+      [a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25,a[2]],
+      [a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75,a[2]]
+    );
+  }
+  if(!closed)out.push(src[src.length-1]);else out.push(out[0]);
+  return out;
 }
 
 export interface SurfaceVectorSvgInput {
@@ -169,7 +227,11 @@ export function buildSurfaceVectorSvg(input:SurfaceVectorSvgInput):string{
   const pstr=(p:V2)=>p[0].toFixed(2)+","+p[1].toFixed(2);
   const line=(a:V3,b:V3,stroke:string,width0=.7,dash="")=>{
     const pa=project(a),pb=project(b);
-    return '<path d="M '+pstr(pa)+' L '+pstr(pb)+'" fill="none" stroke="'+stroke+'" stroke-width="'+width0+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
+    return '<path d="M '+pstr(pa)+' L '+pstr(pb)+'" fill="none" stroke="'+stroke+'" stroke-width="'+width0+'" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
+  };
+  const path=(points:V3[],stroke:string,width0=.7)=>{
+    if(points.length<2)return "";
+    return '<path d="'+points.map((point,index)=>(index?'L ':'M ')+pstr(project(point))).join(" ")+'" fill="none" stroke="'+stroke+'" stroke-width="'+width0+'" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
   };
   const floor=[
     surfacePoint(xmin,ymin,zfloor),surfacePoint(xmax,ymin,zfloor),
@@ -197,32 +259,35 @@ export function buildSurfaceVectorSvg(input:SurfaceVectorSvgInput):string{
   }
   quads.sort((a,b)=>b.d-a.d);
   const projection=figure.templateId==="surface-projection-3d";
-  const count=Math.max(4,Math.min(28,Math.round(figure.figureOverrides.surfaceProjectionContourCount??12)));
+  const count=Math.max(4,Math.min(28,Math.round(figure.figureOverrides.surfaceProjectionContourCount??10)));
   const levels=Array.from({length:count},(_,i)=>zmin+(zmax-zmin)*(i+1)/(count+1));
+  const useColorMap=figure.figureOverrides.surfaceProjectionUseColorMap??false;
+  const requestedWidth=Math.max(.12,Math.min(1.5,figure.figureOverrides.surfaceProjectionLineWidthPt??.28));
+  const floorLineZ=zfloor+(zmax-zmin)*.008;
+  const xWall=xmin+(xmax-xmin)*.002;
+  const yWall=ymax-(ymax-ymin)*.002;
   let contours="";
   if(projection){
-    levels.forEach((level,li)=>{
-      const color=colorAt((level-zmin)/(zmax-zmin||1));
-      const opacity=.82;
-      for(const seg of contourSegments(xs,ys,zv,level)){
-        const floorA=surfacePoint(seg[0][0],seg[0][1],zfloor);
-        const floorB=surfacePoint(seg[1][0],seg[1][1],zfloor);
+    levels.forEach(level=>{
+      const color=useColorMap?colorAt((level-zmin)/(zmax-zmin||1)):"#2f5360";
+      const lines=stitchContours(contourSegments(xs,ys,zv,level)).map(smoothContour);
+      for(const contour of lines){
         if(figure.figureOverrides.surfaceProjectionFloor??true)
-          contours+=line(floorA,floorB,color,.72);
+          contours+=path(
+            contour.map(point=>surfacePoint(point[0],point[1],floorLineZ)),
+            color,requestedWidth*1.45
+          );
         if(figure.figureOverrides.surfaceProjectionX??true)
-          contours+=line(
-            surfacePoint(xmin,seg[0][1],level),
-            surfacePoint(xmin,seg[1][1],level),
-            color,.64
+          contours+=path(
+            contour.map(point=>surfacePoint(xWall,point[1],level)),
+            color,requestedWidth*1.25
           );
         if(figure.figureOverrides.surfaceProjectionY??true)
-          contours+=line(
-            surfacePoint(seg[0][0],ymax,level),
-            surfacePoint(seg[1][0],ymax,level),
-            color,.64
+          contours+=path(
+            contour.map(point=>surfacePoint(point[0],yWall,level)),
+            color,requestedWidth*1.25
           );
       }
-      void li; void opacity;
     });
   }
   const axisColor="#404a52",gridColor="#d8dde1";
@@ -260,7 +325,7 @@ export function buildSurfaceVectorSvg(input:SurfaceVectorSvgInput):string{
   const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+input.widthMm+'mm" height="'+input.heightMm+'mm" viewBox="0 0 '+width+' '+height+'" data-figurestudio-vector-surface="true">'+
     defs+'<rect width="100%" height="100%" fill="#ffffff"/>'+
     '<text x="'+(width/2)+'" y="31" text-anchor="middle" font-family="Times New Roman, Georgia, serif" font-size="18" fill="#222a30">'+esc(title)+'</text>'+
-    gridPlane+contours+quads.map(q=>q.xml).join("")+axes+
+    gridPlane+'<g data-projection-contours="refined">'+contours+'</g>'+quads.map(q=>q.xml).join("")+axes+
     tickText(ticks(xmin,xmax),"x")+tickText(ticks(ymin,ymax),"y")+tickText(ticks(zmin,zmax),"z")+
     '<text x="'+(xEnd[0]+14)+'" y="'+(xEnd[1]+20)+'" font-family="Times New Roman, Georgia, serif" font-size="13" fill="'+axisColor+'">'+esc(xTitle)+'</text>'+
     '<text x="'+(yEnd[0]-14)+'" y="'+(yEnd[1]+20)+'" font-family="Times New Roman, Georgia, serif" font-size="13" fill="'+axisColor+'">'+esc(yTitle)+'</text>'+

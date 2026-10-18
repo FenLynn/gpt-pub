@@ -403,6 +403,203 @@ function densifySurfaceGrid(
   return { x: denseX, y: denseY, z: denseZ, factor: safeFactor };
 }
 
+
+type SurfaceContourPoint = [number, number, number];
+type SurfaceContourSegment = [SurfaceContourPoint, SurfaceContourPoint];
+
+function surfaceContourSegments(
+  xs: number[],
+  ys: number[],
+  z: Array<Array<number | null>>,
+  level: number
+): SurfaceContourSegment[] {
+  const segments: SurfaceContourSegment[] = [];
+  const edge = (
+    a: SurfaceContourPoint,
+    b: SurfaceContourPoint
+  ): SurfaceContourPoint | undefined => {
+    const da = a[2] - level;
+    const db = b[2] - level;
+    if (
+      !Number.isFinite(a[2]) ||
+      !Number.isFinite(b[2]) ||
+      (da < 0 && db < 0) ||
+      (da > 0 && db > 0) ||
+      Math.abs(a[2] - b[2]) < 1e-14
+    ) return undefined;
+    const t = (level - a[2]) / (b[2] - a[2]);
+    if (!Number.isFinite(t) || t < 0 || t > 1) return undefined;
+    return [
+      a[0] + (b[0] - a[0]) * t,
+      a[1] + (b[1] - a[1]) * t,
+      level
+    ];
+  };
+
+  for (let row = 0; row < ys.length - 1; row += 1) {
+    for (let column = 0; column < xs.length - 1; column += 1) {
+      const values = [
+        z[row]?.[column],
+        z[row]?.[column + 1],
+        z[row + 1]?.[column + 1],
+        z[row + 1]?.[column]
+      ];
+      if (values.some((value) => value === null || !Number.isFinite(value))) continue;
+      const p00: SurfaceContourPoint = [xs[column], ys[row], values[0] as number];
+      const p10: SurfaceContourPoint = [xs[column + 1], ys[row], values[1] as number];
+      const p11: SurfaceContourPoint = [xs[column + 1], ys[row + 1], values[2] as number];
+      const p01: SurfaceContourPoint = [xs[column], ys[row + 1], values[3] as number];
+      const hits = [
+        edge(p00, p10),
+        edge(p10, p11),
+        edge(p11, p01),
+        edge(p01, p00)
+      ].filter((point): point is SurfaceContourPoint => Boolean(point));
+
+      if (hits.length === 2) {
+        segments.push([hits[0], hits[1]]);
+      } else if (hits.length === 4) {
+        const center =
+          ((values[0] as number) +
+            (values[1] as number) +
+            (values[2] as number) +
+            (values[3] as number)) / 4;
+        if (center >= level) {
+          segments.push([hits[0], hits[1]], [hits[2], hits[3]]);
+        } else {
+          segments.push([hits[0], hits[3]], [hits[1], hits[2]]);
+        }
+      }
+    }
+  }
+  return segments;
+}
+
+function stitchSurfaceContourSegments(
+  segments: SurfaceContourSegment[]
+): SurfaceContourPoint[][] {
+  if (!segments.length) return [];
+  const key = (point: SurfaceContourPoint) =>
+    point[0].toFixed(8) + ":" + point[1].toFixed(8);
+  const adjacency = new Map<string, Array<{ index: number; end: 0 | 1 }>>();
+  const add = (point: SurfaceContourPoint, index: number, end: 0 | 1) => {
+    const id = key(point);
+    const list = adjacency.get(id) ?? [];
+    list.push({ index, end });
+    adjacency.set(id, list);
+  };
+  segments.forEach((segment, index) => {
+    add(segment[0], index, 0);
+    add(segment[1], index, 1);
+  });
+
+  const visited = new Set<number>();
+  const walk = (startIndex: number, startEnd: 0 | 1) => {
+    const start = segments[startIndex][startEnd];
+    const line: SurfaceContourPoint[] = [start];
+    let index = startIndex;
+    let end = startEnd;
+    while (!visited.has(index)) {
+      visited.add(index);
+      const otherEnd = (end === 0 ? 1 : 0) as 0 | 1;
+      const nextPoint = segments[index][otherEnd];
+      line.push(nextPoint);
+      const options = adjacency.get(key(nextPoint)) ?? [];
+      const next = options.find((candidate) => !visited.has(candidate.index));
+      if (!next) break;
+      index = next.index;
+      end = next.end;
+    }
+    return line;
+  };
+
+  const lines: SurfaceContourPoint[][] = [];
+  segments.forEach((segment, index) => {
+    if (visited.has(index)) return;
+    const degree0 = adjacency.get(key(segment[0]))?.length ?? 0;
+    const degree1 = adjacency.get(key(segment[1]))?.length ?? 0;
+    if (degree0 === 1 || degree1 === 1) {
+      lines.push(walk(index, degree0 === 1 ? 0 : 1));
+    }
+  });
+  segments.forEach((_segment, index) => {
+    if (!visited.has(index)) lines.push(walk(index, 0));
+  });
+  return lines.filter((line) => line.length >= 2);
+}
+
+function smoothSurfaceContourLine(
+  points: SurfaceContourPoint[]
+): SurfaceContourPoint[] {
+  if (points.length < 3) return points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const closed =
+    Math.abs(first[0] - last[0]) < 1e-8 &&
+    Math.abs(first[1] - last[1]) < 1e-8;
+  const source = closed ? points.slice(0, -1) : points;
+  if (source.length < 3) return points;
+  const smoothed: SurfaceContourPoint[] = [];
+  if (!closed) smoothed.push(source[0]);
+  const edgeCount = closed ? source.length : source.length - 1;
+  for (let index = 0; index < edgeCount; index += 1) {
+    const a = source[index];
+    const b = source[(index + 1) % source.length];
+    smoothed.push(
+      [
+        a[0] * 0.75 + b[0] * 0.25,
+        a[1] * 0.75 + b[1] * 0.25,
+        a[2]
+      ],
+      [
+        a[0] * 0.25 + b[0] * 0.75,
+        a[1] * 0.25 + b[1] * 0.75,
+        a[2]
+      ]
+    );
+  }
+  if (!closed) smoothed.push(source[source.length - 1]);
+  else smoothed.push(smoothed[0]);
+  return smoothed;
+}
+
+function projectionContourColor(
+  t: number,
+  useColorMap: boolean,
+  colorScale: string
+): string {
+  if (!useColorMap) return "rgba(43,73,86,0.76)";
+  const viridis = [
+    [0, [68, 1, 84]],
+    [0.25, [59, 82, 139]],
+    [0.5, [33, 145, 140]],
+    [0.75, [94, 201, 98]],
+    [1, [253, 231, 37]]
+  ] as const;
+  const cividis = [
+    [0, [0, 34, 78]],
+    [0.25, [65, 78, 108]],
+    [0.5, [124, 124, 120]],
+    [0.75, [188, 173, 108]],
+    [1, [254, 232, 56]]
+  ] as const;
+  const stops = colorScale.toLowerCase().includes("cividis") ? cividis : viridis;
+  const x = Math.max(0, Math.min(1, t));
+  let left = stops[0], right = stops[stops.length - 1];
+  for (let index = 1; index < stops.length; index += 1) {
+    if (x <= stops[index][0]) {
+      left = stops[index - 1];
+      right = stops[index];
+      break;
+    }
+  }
+  const local = (x - left[0]) / Math.max(1e-9, right[0] - left[0]);
+  const rgb = left[1].map((value, index) =>
+    Math.round(value + (right[1][index] - value) * local)
+  );
+  return "rgba(" + rgb.join(",") + ",0.78)";
+}
+
 export function buildTraces(args: {
   dataset: Dataset;
   figure: FigureSpec;
@@ -714,32 +911,15 @@ export function buildTraces(args: {
     const [zLow, zHigh] = bound(finiteZ, [0, 1]);
     const projectionCount = Math.max(
       4,
-      Math.min(24, Math.round(figure.figureOverrides.surfaceProjectionContourCount ?? 6))
+      Math.min(24, Math.round(figure.figureOverrides.surfaceProjectionContourCount ?? 10))
     );
     const projectionWidth = ptToPx(
-      figure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.32
+      figure.figureOverrides.surfaceProjectionLineWidthPt ?? 0.28
     );
     const projectionUseColorMap =
       figure.figureOverrides.surfaceProjectionUseColorMap ?? false;
-    const contourSpec = (
-      low: number,
-      high: number,
-      projected: boolean,
-      axis: "x" | "y"
-    ) => ({
-      show: projectionTemplate && projected,
-      start: low,
-      end: high,
-      size: (high - low) / Math.max(1, projectionCount - 1),
-      width: projectionWidth,
-      usecolormap: projectionUseColorMap,
-      color: projectionUseColorMap
-        ? undefined
-        : GOLDEN_STYLE.field.projectionLineColor,
-      project: { [axis]: projectionTemplate && projected }
-    });
-    const sideX = projectionTemplate && (figure.figureOverrides.surfaceProjectionX ?? false);
-    const sideY = projectionTemplate && (figure.figureOverrides.surfaceProjectionY ?? false);
+    const sideX = projectionTemplate && (figure.figureOverrides.surfaceProjectionX ?? true);
+    const sideY = projectionTemplate && (figure.figureOverrides.surfaceProjectionY ?? true);
     const floorProjection =
       projectionTemplate && (figure.figureOverrides.surfaceProjectionFloor ?? true);
     const zSpan = Math.max(1e-9, zHigh - zLow);
@@ -769,17 +949,10 @@ export function buildTraces(args: {
           figure.figureOverrides.zAutoRange === false
             ? figure.figureOverrides.zMax
             : undefined,
-        // Keep the publication surface itself clean. Optional side-wall
-        // sections are off by default and floor projection is rendered as a
-        // separate low-opacity scalar plane below, never as contour ink
-        // crawling across the surface.
-        contours:
-          projectionTemplate && (sideX || sideY)
-            ? {
-                x: contourSpec(xLow, xHigh, sideX, "x"),
-                y: contourSpec(yLow, yHigh, sideY, "y")
-              }
-            : undefined,
+        // Projection contours are computed by FigureStudio and rendered as
+        // independent scatter3d line layers. The publication surface itself
+        // stays clean, so no contour ink crawls across the mesh.
+        contours: undefined,
         colorbar: {
           thickness: GOLDEN_STYLE.field.colorbarThicknessPx,
           outlinewidth: ptToPx(GOLDEN_STYLE.field.colorbarOutlinePt),
@@ -837,34 +1010,129 @@ export function buildTraces(args: {
         lightposition: { x: 100, y: 160, z: 220 },
         hovertemplate: "X=%{x:.4g}<br>Y=%{y:.4g}<br>Z=%{z:.4g}<extra></extra>"
       };
-    if (!floorProjection) return [mainSurface];
-    const floorPlane = {
-      type: "surface",
-      x: denseSurface.x,
-      y: denseSurface.y,
-      z: denseSurface.y.map(() => denseSurface.x.map(() => floorZ + zSpan * 0.006)),
-      surfacecolor: denseSurface.z,
-      colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
-      reversescale: figure.figureOverrides.reverseColorScale ?? false,
-      cauto: false,
-      cmin: zLow,
-      cmax: zHigh,
-      showscale: false,
-      opacity: 0.26,
-      hoverinfo: "skip",
-      meta: {
-        figureStudioProjectionPlane: "floor",
-        figureStudioProjectionStyle: "soft-scalar"
-      },
-      lighting: {
-        ambient: 1,
-        diffuse: 0,
-        specular: 0,
-        roughness: 1,
-        fresnel: 0
+    const projectionTraces: any[] = [];
+    const xSpan = Math.max(1e-9, xHigh - xLow);
+    const ySpan = Math.max(1e-9, yHigh - yLow);
+    const floorPlaneZ = floorZ + zSpan * 0.004;
+    const floorContourZ = floorZ + zSpan * 0.012;
+    const xWall = xLow + xSpan * 0.003;
+    const yWall = yHigh - ySpan * 0.003;
+    const colorScale = String(
+      figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale
+    );
+
+    if (projectionTemplate && (floorProjection || sideX || sideY)) {
+      const levels = Array.from(
+        { length: projectionCount },
+        (_unused, index) =>
+          zLow + (zHigh - zLow) * (index + 1) / (projectionCount + 1)
+      );
+      for (const level of levels) {
+        const rawSegments = surfaceContourSegments(
+          denseSurface.x,
+          denseSurface.y,
+          denseSurface.z,
+          level
+        );
+        const contourLines = stitchSurfaceContourSegments(rawSegments)
+          .map(smoothSurfaceContourLine)
+          .filter((line) => line.length >= 2);
+        if (!contourLines.length) continue;
+
+        const traceX: Array<number | null> = [];
+        const traceY: Array<number | null> = [];
+        const traceZ: Array<number | null> = [];
+        const append = (
+          line: SurfaceContourPoint[],
+          axis: "floor" | "x" | "y"
+        ) => {
+          for (const point of line) {
+            if (axis === "floor") {
+              traceX.push(point[0]);
+              traceY.push(point[1]);
+              traceZ.push(floorContourZ);
+            } else if (axis === "x") {
+              traceX.push(xWall);
+              traceY.push(point[1]);
+              traceZ.push(level);
+            } else {
+              traceX.push(point[0]);
+              traceY.push(yWall);
+              traceZ.push(level);
+            }
+          }
+          traceX.push(null);
+          traceY.push(null);
+          traceZ.push(null);
+        };
+        for (const line of contourLines) {
+          if (floorProjection) append(line, "floor");
+          if (sideX) append(line, "x");
+          if (sideY) append(line, "y");
+        }
+        projectionTraces.push({
+          type: "scatter3d",
+          mode: "lines",
+          x: traceX,
+          y: traceY,
+          z: traceZ,
+          showlegend: false,
+          hoverinfo: "skip",
+          connectgaps: false,
+          line: {
+            width: Math.max(1.05, projectionWidth * 1.2),
+            color: projectionContourColor(
+              (level - zLow) / Math.max(1e-9, zHigh - zLow),
+              projectionUseColorMap,
+              colorScale
+            )
+          },
+          meta: {
+            figureStudioProjectionStyle: "refined-contour",
+            figureStudioProjectionLevel: level,
+            figureStudioProjectionAxes: [
+              ...(floorProjection ? ["floor"] : []),
+              ...(sideX ? ["x"] : []),
+              ...(sideY ? ["y"] : [])
+            ]
+          }
+        });
       }
-    };
-    return [mainSurface, floorPlane];
+    }
+
+    const traces: any[] = [mainSurface];
+    if (floorProjection) {
+      traces.push({
+        type: "surface",
+        x: denseSurface.x,
+        y: denseSurface.y,
+        z: denseSurface.y.map(() =>
+          denseSurface.x.map(() => floorPlaneZ)
+        ),
+        surfacecolor: denseSurface.z,
+        colorscale: figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale,
+        reversescale: figure.figureOverrides.reverseColorScale ?? false,
+        cauto: false,
+        cmin: zLow,
+        cmax: zHigh,
+        showscale: false,
+        opacity: 0.18,
+        hoverinfo: "skip",
+        meta: {
+          figureStudioProjectionPlane: "floor",
+          figureStudioProjectionStyle: "soft-scalar"
+        },
+        lighting: {
+          ambient: 1,
+          diffuse: 0,
+          specular: 0,
+          roughness: 1,
+          fresnel: 0
+        }
+      });
+    }
+    traces.push(...projectionTraces);
+    return traces;
   }
 
   if (

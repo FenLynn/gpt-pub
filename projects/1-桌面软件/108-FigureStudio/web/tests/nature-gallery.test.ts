@@ -255,8 +255,20 @@ for (let n=0; n<gallery.length; n++) {
   assert.equal(projectedTraces[1]?.type,"surface","Soft floor projection plane missing");
   assert.equal(projectedTraces[1]?.meta?.figureStudioProjectionPlane,"floor");
   assert.equal(projectedTraces[1]?.meta?.figureStudioProjectionStyle,"soft-scalar");
-  assert.equal(projectedTraces[1]?.opacity,0.26);
+  assert.equal(projectedTraces[1]?.opacity,0.18);
   assert.equal(projectedTraces[1]?.showscale,false);
+  const refinedContours=projectedTraces.filter(
+    trace=>trace.type==="scatter3d"&&trace.meta?.figureStudioProjectionStyle==="refined-contour"
+  );
+  assert.ok(refinedContours.length>=8,
+    "Refined 3D projection should expose a useful family of contour levels");
+  assert.ok(refinedContours.every(trace=>trace.mode==="lines"&&trace.hoverinfo==="skip"),
+    "Refined projection contours must stay as clean line-only layers");
+  assert.ok(refinedContours.every(trace=>
+    trace.meta?.figureStudioProjectionAxes?.includes("floor")&&
+    trace.meta?.figureStudioProjectionAxes?.includes("x")&&
+    trace.meta?.figureStudioProjectionAxes?.includes("y")
+  ),"Every refined contour level must project to floor, X wall and Y wall");
   assert.equal(projectedSurface!.figureOverrides.colorScale,"Viridis");
   const projectedPhysical=resolveCanvasMm(presets.scientific,projectedSurface!);
   const vectorSurfaceSvg=buildSurfaceVectorSvg({
@@ -274,6 +286,8 @@ for (let n=0; n<gallery.length; n++) {
     "3D SVG export must contain vector surface polygons");
   assert.match(vectorSurfaceSvg,/<linearGradient /,
     "3D SVG export must contain a vector colorbar gradient");
+  assert.match(vectorSurfaceSvg,/data-projection-contours="refined"/,
+    "3D SVG export must preserve FigureStudio refined contour projections");
   assert.doesNotMatch(vectorSurfaceSvg,/<image\b/,
     "3D SVG export must never embed the WebGL raster canvas");
   assert.ok((vectorSurfaceSvg.match(/<path /g)?.length ?? 0)>20,
@@ -296,12 +310,12 @@ for (let n=0; n<gallery.length; n++) {
     "Projected 3D floor should use the neutral publication plane");
   assert.equal(projectedLayout.scene?.zaxis?.gridcolor,GOLDEN_STYLE.field.projectionFloorGridColor,
     "Projected 3D floor grid should remain restrained over the neutral plane");
-  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionLineWidthPt,0.32,
-    "Optional wall contours should remain hairline-light");
-  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionContourCount,6,
-    "Optional wall contours should stay sparse enough to avoid visual chatter");
-  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionX,false);
-  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionY,false);
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionLineWidthPt,0.28,
+    "Projected contours should remain hairline-light");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionContourCount,10,
+    "Projected contours should retain enough levels for scientific detail");
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionX,true);
+  assert.equal(projectedSurface!.figureOverrides.surfaceProjectionY,true);
   assert.equal(projectedSurface!.figureOverrides.surfaceProjectionUseColorMap,false,
     "Optional wall contours should default to one restrained publication ink");
 
