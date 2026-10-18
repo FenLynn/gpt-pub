@@ -207,6 +207,7 @@ function baseXYTrace(
     override.markerMaxDisplayed ?? automaticMarkerCap;
   const color =
     override.color || palette[sourceIndex % palette.length];
+  const lineColor = override.lineColor ?? color;
   const opacity = override.opacity ?? 1;
   const xIsNumeric = dataset.x.values.every(
     (value) => value === null || typeof value === "number"
@@ -215,7 +216,7 @@ function baseXYTrace(
   let mode = "";
   if (lineVisible) mode += "lines";
   if (markerVisible) mode += (mode ? "+" : "") + "markers";
-  if (!mode) mode = "lines";
+  if (!mode) mode = "none";
 
   return {
     type: "scatter",
@@ -227,7 +228,7 @@ function baseXYTrace(
     y: yValues ?? series.values,
     opacity,
     line: {
-      color,
+      color: lineColor,
       width: ptToPx(
         isFit && override.lineWidthPt === undefined
           ? Math.max(0.65, lineWidthPt * 0.9)
@@ -236,6 +237,10 @@ function baseXYTrace(
       dash: override.lineStyle ?? (isFit ? "dash" : "solid"),
       simplify: false
     },
+    fill: override.fillVisible ? "tozeroy" : undefined,
+    fillcolor: override.fillVisible
+      ? rgbaFromHex(override.fillColor ?? color, override.fillOpacity ?? 0.16)
+      : undefined,
     marker: {
       color: override.markerHollow
         ? "rgba(0,0,0,0)"
@@ -1298,44 +1303,8 @@ export function buildTraces(args: {
     });
   }
 
-  if (template === "xy-errorbar") {
-    const main = series[0];
-    if (!main) return [];
-    const sourceIndex = Math.max(
-      0,
-      dataset.ys.findIndex((item) => item.id === main.id)
-    );
-    const trace = baseXYTrace(
-      dataset,
-      figure,
-      preset,
-      main,
-      sourceIndex,
-      "markers"
-    ) as any;
-    const errorId = figure.figureOverrides.errorSeriesId;
-    const errorSeries = dataset.ys.find((column) => column.id === errorId);
-    if (errorSeries) {
-      trace.error_y = {
-        type: "data",
-        array: errorSeries.values,
-        visible: true,
-        color:
-          figure.seriesOverrides[main.id]?.errorBarColor ??
-          trace.line?.color,
-        thickness: ptToPx(
-          figure.seriesOverrides[main.id]?.errorBarWidthPt ?? GOLDEN_STYLE.marker.errorLinePt
-        ),
-        width: ptToPx(
-          figure.seriesOverrides[main.id]?.errorBarCapSizePt ?? GOLDEN_STYLE.marker.errorCapPt
-        )
-      };
-    }
-    return [trace];
-  }
-
   const modeDefault =
-    template === "xy-scatter"
+    template === "xy-scatter" || template === "xy-errorbar"
       ? "markers"
       : template === "xy-line-marker"
       ? "lines+markers"
@@ -1378,6 +1347,31 @@ export function buildTraces(args: {
       modeDefault,
       yValues
     ) as any;
+
+    const errorId =
+      figure.dataRef?.yErrorColumnId ?? figure.figureOverrides.errorSeriesId;
+    const errorSeries = dataset.ys.find((item) => item.id === errorId);
+    const errorVisible =
+      figure.seriesOverrides[column.id]?.errorBarVisible ??
+      (template === "xy-errorbar" && index === 0);
+    if (errorVisible && errorSeries) {
+      trace.error_y = {
+        type: "data",
+        array: errorSeries.values,
+        visible: true,
+        color:
+          figure.seriesOverrides[column.id]?.errorBarColor ??
+          trace.line?.color,
+        thickness: ptToPx(
+          figure.seriesOverrides[column.id]?.errorBarWidthPt ??
+            GOLDEN_STYLE.marker.errorLinePt
+        ),
+        width: ptToPx(
+          figure.seriesOverrides[column.id]?.errorBarCapSizePt ??
+            GOLDEN_STYLE.marker.errorCapPt
+        )
+      };
+    }
 
     if (template === "waterfall" && waterfallXOffset !== 0 && xIsNumeric) {
       trace.x = dataset.x.values.map((value) =>

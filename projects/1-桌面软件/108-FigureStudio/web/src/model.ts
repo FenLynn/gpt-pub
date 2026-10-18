@@ -163,6 +163,7 @@ export interface SeriesOverride {
   lineVisible?: boolean;
   lineWidthPt?: number;
   lineStyle?: LineStyle;
+  lineColor?: string;
   markerVisible?: boolean;
   markerSymbol?: MarkerSymbol;
   markerSizePt?: number;
@@ -171,9 +172,13 @@ export interface SeriesOverride {
   markerFillColor?: string;
   markerEdgeColor?: string;
   markerEdgeWidthPt?: number;
+  errorBarVisible?: boolean;
   errorBarWidthPt?: number;
   errorBarCapSizePt?: number;
   errorBarColor?: string;
+  fillVisible?: boolean;
+  fillColor?: string;
+  fillOpacity?: number;
   color?: string;
   opacity?: number;
   barBorderColor?: string;

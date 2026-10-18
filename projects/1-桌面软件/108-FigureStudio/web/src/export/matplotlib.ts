@@ -960,7 +960,7 @@ else:
             )
             common = dict(
                 label=label,
-                color=color,
+                color=style.get("lineColor", color),
                 alpha=alpha,
                 linewidth=line_width,
                 linestyle=linestyle,
@@ -989,6 +989,15 @@ else:
                 )
             elif template != "xy-errorbar":
                 target.plot(current_x, y, **common)
+                if bool(style.get("fillVisible", False)):
+                    target.fill_between(
+                        current_x,
+                        y,
+                        0,
+                        color=style.get("fillColor", color),
+                        alpha=max(0.0, min(1.0, float(style.get("fillOpacity", 0.16)))),
+                        linewidth=0,
+                    )
                 if template == "pca-ellipse":
                     mask = np.isfinite(current_x) & np.isfinite(y)
                     px, py = current_x[mask], y[mask]

@@ -7,7 +7,7 @@ export interface TemplateInputDefinition {
   yError?: "optional" | "required";
 }
 
-export type PlotSystemId =
+export type PlotArchitectureId =
   | "single-y"
   | "double-y"
   | "waterfall"
@@ -17,32 +17,19 @@ export type PlotSystemId =
   | "analysis"
   | "layout";
 
-export type SingleYAppearanceId =
-  | "line"
-  | "markers"
-  | "line-marker"
-  | "errorbar"
-  | "spectrum";
-
 export interface TemplateDefinition {
   id: PlotTemplateId;
   label: string;
   family: "XY" | "Bar" | "Field" | "3D" | "Layout";
-  system: PlotSystemId;
+  architecture: PlotArchitectureId;
   input: TemplateInputDefinition;
 }
 
-export interface PlotSystemDefinition {
-  id: PlotSystemId;
+export interface PlotArchitectureDefinition {
+  id: PlotArchitectureId;
   label: string;
   description: string;
   defaultTemplateId: PlotTemplateId;
-}
-
-export interface SingleYAppearanceDefinition {
-  id: SingleYAppearanceId;
-  label: string;
-  templateId: PlotTemplateId;
 }
 
 const seriesInput: TemplateInputDefinition = {
@@ -58,63 +45,63 @@ const matrixInput: TemplateInputDefinition = {
 };
 
 export const templates: TemplateDefinition[] = [
-  { id: "xy-line", label: "线", family: "XY", system: "single-y", input: seriesInput },
-  { id: "xy-scatter", label: "点", family: "XY", system: "single-y", input: seriesInput },
-  { id: "xy-line-marker", label: "点线", family: "XY", system: "single-y", input: seriesInput },
+  { id: "xy-line", label: "线", family: "XY", architecture: "single-y", input: seriesInput },
+  { id: "xy-scatter", label: "点", family: "XY", architecture: "single-y", input: seriesInput },
+  { id: "xy-line-marker", label: "点线", family: "XY", architecture: "single-y", input: seriesInput },
   {
     id: "xy-errorbar",
     label: "误差棒",
     family: "XY",
-    system: "single-y",
+    architecture: "single-y",
     input: { ...seriesInput, yError: "required" }
   },
-  { id: "spectrum", label: "光谱", family: "XY", system: "single-y", input: seriesInput },
+  { id: "spectrum", label: "光谱", family: "XY", architecture: "single-y", input: seriesInput },
 
-  { id: "double-y", label: "双 Y 轴", family: "XY", system: "double-y", input: { ...seriesInput, minSeries: 2 } },
+  { id: "double-y", label: "双 Y 轴", family: "XY", architecture: "double-y", input: { ...seriesInput, minSeries: 2 } },
 
-  { id: "offset-spectrum", label: "Y 偏移 / 堆叠", family: "XY", system: "waterfall", input: { ...seriesInput, minSeries: 2 } },
-  { id: "waterfall", label: "XY 瀑布", family: "XY", system: "waterfall", input: { ...seriesInput, minSeries: 2 } },
+  { id: "offset-spectrum", label: "Y 偏移 / 堆叠", family: "XY", architecture: "waterfall", input: { ...seriesInput, minSeries: 2 } },
+  { id: "waterfall", label: "XY 瀑布", family: "XY", architecture: "waterfall", input: { ...seriesInput, minSeries: 2 } },
 
-  { id: "bar", label: "单组柱", family: "Bar", system: "bar", input: seriesInput },
+  { id: "bar", label: "单组柱", family: "Bar", architecture: "bar", input: seriesInput },
   {
     id: "grouped-bar",
     label: "分组柱",
     family: "Bar",
-    system: "bar",
+    architecture: "bar",
     input: { ...seriesInput, minSeries: 2 }
   },
   {
     id: "stacked-bar",
     label: "堆叠柱",
     family: "Bar",
-    system: "bar",
+    architecture: "bar",
     input: { ...seriesInput, minSeries: 2 }
   },
 
-  { id: "heatmap", label: "热图 / 光斑", family: "Field", system: "field-2d", input: matrixInput },
-  { id: "contour", label: "等高线", family: "Field", system: "field-2d", input: { ...matrixInput, minSeries: 2 } },
+  { id: "heatmap", label: "热图 / 光斑", family: "Field", architecture: "field-2d", input: matrixInput },
+  { id: "contour", label: "等高线", family: "Field", architecture: "field-2d", input: { ...matrixInput, minSeries: 2 } },
 
-  { id: "surface-3d", label: "3D 曲面", family: "3D", system: "surface-3d", input: matrixInput },
-  { id: "surface-projection-3d", label: "3D 曲面 + 三向投影", family: "3D", system: "surface-3d", input: matrixInput },
+  { id: "surface-3d", label: "3D 曲面", family: "3D", architecture: "surface-3d", input: matrixInput },
+  { id: "surface-projection-3d", label: "3D 曲面 + 三向投影", family: "3D", architecture: "surface-3d", input: matrixInput },
 
-  { id: "pca-ellipse", label: "PCA + 置信椭圆", family: "XY", system: "analysis", input: { ...seriesInput, minSeries: 2 } },
-  { id: "volcano", label: "Volcano / 火山图", family: "XY", system: "analysis", input: seriesInput },
-  { id: "ridgeline", label: "Ridgeline / 山脊密度", family: "XY", system: "analysis", input: { ...seriesInput, minSeries: 2 } },
+  { id: "pca-ellipse", label: "PCA + 置信椭圆", family: "XY", architecture: "analysis", input: { ...seriesInput, minSeries: 2 } },
+  { id: "volcano", label: "Volcano / 火山图", family: "XY", architecture: "analysis", input: seriesInput },
+  { id: "ridgeline", label: "Ridgeline / 山脊密度", family: "XY", architecture: "analysis", input: { ...seriesInput, minSeries: 2 } },
 
-  { id: "publication-board", label: "Publication Style Board", family: "Layout", system: "layout", input: seriesInput }
+  { id: "publication-board", label: "Publication Style Board", family: "Layout", architecture: "layout", input: seriesInput }
 ];
 
-export const plotSystems: PlotSystemDefinition[] = [
+export const plotArchitectures: PlotArchitectureDefinition[] = [
   {
     id: "single-y",
     label: "单 Y",
-    description: "共享一个 Y 坐标轴。点、线、点线、多曲线都属于这一体系。",
+    description: "共享一个 Y 坐标轴。任意数量的数据组都可独立设置 Line、Symbol、Error Bar 和 Fill。",
     defaultTemplateId: "xy-line"
   },
   {
     id: "double-y",
     label: "双 Y",
-    description: "同一 X 轴，两套独立 Y 轴。",
+    description: "同一 X 轴，两套独立 Y 轴。每个数据组可自由分配到左 Y 或右 Y，并独立设置表达元素。",
     defaultTemplateId: "double-y"
   },
   {
@@ -155,14 +142,6 @@ export const plotSystems: PlotSystemDefinition[] = [
   }
 ];
 
-export const singleYAppearances: SingleYAppearanceDefinition[] = [
-  { id: "line", label: "线", templateId: "xy-line" },
-  { id: "markers", label: "点", templateId: "xy-scatter" },
-  { id: "line-marker", label: "点线", templateId: "xy-line-marker" },
-  { id: "errorbar", label: "误差棒", templateId: "xy-errorbar" },
-  { id: "spectrum", label: "光谱", templateId: "spectrum" }
-];
-
 export function templateDefinition(id: PlotTemplateId): TemplateDefinition {
   return templates.find((item) => item.id === id) ?? templates[0];
 }
@@ -171,34 +150,25 @@ export function templateLabel(id: PlotTemplateId): string {
   return templateDefinition(id).label;
 }
 
-export function plotSystemIdForTemplate(id: PlotTemplateId): PlotSystemId {
+export function plotArchitectureIdForTemplate(id: PlotTemplateId): PlotArchitectureId {
   return templateDefinition(id).system;
 }
 
-export function plotSystemDefinition(id: PlotSystemId): PlotSystemDefinition {
-  return plotSystems.find((item) => item.id === id) ?? plotSystems[0];
+export function plotArchitectureDefinition(id: PlotArchitectureId): PlotArchitectureDefinition {
+  return plotArchitectures.find((item) => item.id === id) ?? plotArchitectures[0];
 }
 
-export function templatesForSystem(id: PlotSystemId): TemplateDefinition[] {
-  return templates.filter((item) => item.system === id);
+export function templatesForArchitecture(id: PlotArchitectureId): TemplateDefinition[] {
+  return templates.filter((item) => item.architecture === id);
 }
 
-export function defaultTemplateForSystem(id: PlotSystemId): PlotTemplateId {
-  return plotSystemDefinition(id).defaultTemplateId;
+export function defaultTemplateForArchitecture(id: PlotArchitectureId): PlotTemplateId {
+  return plotArchitectureDefinition(id).defaultTemplateId;
 }
 
-export function singleYAppearanceForTemplate(
-  id: PlotTemplateId
-): SingleYAppearanceId {
-  return (
-    singleYAppearances.find((item) => item.templateId === id)?.id ?? "line"
-  );
-}
-
-export function templateForSingleYAppearance(
-  id: SingleYAppearanceId
-): PlotTemplateId {
-  return (
-    singleYAppearances.find((item) => item.id === id)?.templateId ?? "xy-line"
-  );
+export function architectureVariants(
+  id: PlotArchitectureId
+): TemplateDefinition[] {
+  if (id === "single-y" || id === "double-y") return [];
+  return templates.filter((item) => item.architecture === id);
 }

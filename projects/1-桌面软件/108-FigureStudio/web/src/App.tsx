@@ -79,15 +79,11 @@ import {
   resolveSeriesPalette
 } from "./plot/publication";
 import {
-  defaultTemplateForSystem,
-  plotSystemIdForTemplate,
-  plotSystems,
-  singleYAppearanceForTemplate,
-  singleYAppearances,
-  templateForSingleYAppearance,
-  templatesForSystem,
-  type PlotSystemId,
-  type SingleYAppearanceId
+  architectureVariants,
+  defaultTemplateForArchitecture,
+  plotArchitectureIdForTemplate,
+  plotArchitectures,
+  type PlotArchitectureId
 } from "./plot/templates";
 import { checkFigure } from "./project/checker";
 import {
@@ -2097,6 +2093,20 @@ function App() {
     });
   }
 
+  function resetSelectedSeriesFields(fields: Array<keyof SeriesOverride>) {
+    if (!selectedSeries.length) return;
+    patchActiveFigure((figure) => {
+      const next = { ...figure.seriesOverrides };
+      for (const id of selectedSeries) {
+        const value = { ...(next[id] || {}) };
+        for (const field of fields) delete value[field];
+        if (Object.keys(value).length === 0) delete next[id];
+        else next[id] = value;
+      }
+      return { ...figure, seriesOverrides: next };
+    });
+  }
+
   function createFolder() {
     const name = window.prompt("新文件夹名称", "新文件夹");
     if (!name?.trim()) return;
@@ -2932,6 +2942,7 @@ function App() {
   const selectedColor =
     primaryOverride.color ||
     effectivePalette[primaryIndex % effectivePalette.length];
+  const lineColor = primaryOverride.lineColor ?? selectedColor;
   const markerHollow = primaryOverride.markerHollow ?? false;
   const markerFillColor =
     primaryOverride.markerFillColor ?? selectedColor;
@@ -2947,7 +2958,29 @@ function App() {
   const errorBarCapSize =
     primaryOverride.errorBarCapSizePt ?? GOLDEN_STYLE.marker.errorCapPt;
   const errorBarColor = primaryOverride.errorBarColor ?? selectedColor;
+  const fillColor = primaryOverride.fillColor ?? selectedColor;
+  const fillOpacity = primaryOverride.fillOpacity ?? 0.16;
   const visible = primaryOverride.visible ?? true;
+  const activeArchitecture = activeFigure
+    ? plotArchitectureIdForTemplate(activeFigure.templateId)
+    : "single-y";
+  const ordinaryXYArchitecture =
+    activeArchitecture === "single-y" ||
+    activeArchitecture === "double-y" ||
+    activeArchitecture === "waterfall";
+  const hasMappedYError = Boolean(activeFigure?.dataRef?.yErrorColumnId);
+  const quickSeriesStyle =
+    lineVisible && markerVisible
+      ? markerHollow
+        ? "line-hollow-symbol"
+        : "line-symbol"
+      : lineVisible
+      ? "line"
+      : markerVisible
+      ? markerHollow
+        ? "hollow-symbol"
+        : "symbol"
+      : "custom";
   const surfaceTemplate =
     activeFigure?.templateId === "surface-3d" ||
     activeFigure?.templateId === "surface-projection-3d";
@@ -2979,7 +3012,7 @@ function App() {
     fieldTemplate && plotDataset
       ? resolveFieldRowCoordinates(plotDataset, fieldRowSeries)
       : [];
-  const doubleYTemplate = activeFigure?.templateId === "double-y";
+  const doubleYTemplate = activeArchitecture === "double-y";
   const waterfallTemplate = activeFigure?.templateId === "waterfall";
   const offsetSpectrumTemplate =
     activeFigure?.templateId === "offset-spectrum";
@@ -3453,92 +3486,66 @@ function App() {
               <div className="figure-toolbar">
                 <div className="toolbar-selects">
                   <label>
-                    <span>图类</span>
+                    <span>架构</span>
                     <select
                       value={
                         isLorentz
                           ? "single-y"
-                          : plotSystemIdForTemplate(activeFigure.templateId)
+                          : plotArchitectureIdForTemplate(activeFigure.templateId)
                       }
                       disabled={Boolean(isLorentz)}
                       title={
                         isLorentz
                           ? "双面板组合图通过数据簿、曲线、图形、坐标轴和标注页编辑"
-                          : "按坐标系和数据组织选择图类。点、线、点线和多曲线都属于单 Y。"
+                          : "这里只选择坐标与图层架构。点、线、点线不是图架构，而是每组数据自己的表达元素。"
                       }
                       onChange={(event) =>
                         patchActiveFigure((figure) => ({
                           ...figure,
-                          templateId: defaultTemplateForSystem(
-                            event.target.value as PlotSystemId
+                          templateId: defaultTemplateForArchitecture(
+                            event.target.value as PlotArchitectureId
                           )
                         }))
                       }
                     >
                       {isLorentz ? (
-                        <option value="single-y">单 Y</option>
+                        <option value="single-y">双面板组合</option>
                       ) : (
-                        plotSystems.map((system) => (
-                          <option key={system.id} value={system.id}>
-                            {system.label}
+                        plotArchitectures.map((architecture) => (
+                          <option key={architecture.id} value={architecture.id}>
+                            {architecture.label}
                           </option>
                         ))
                       )}
                     </select>
                   </label>
 
-                  <label>
-                    <span>
-                      {plotSystemIdForTemplate(activeFigure.templateId) === "single-y"
-                        ? "表现"
-                        : "类型"}
-                    </span>
-                    <select
-                      value={
-                        isLorentz
-                          ? "line"
-                          : plotSystemIdForTemplate(activeFigure.templateId) === "single-y"
-                          ? singleYAppearanceForTemplate(activeFigure.templateId)
-                          : activeFigure.templateId
-                      }
-                      disabled={Boolean(isLorentz)}
-                      title={
-                        plotSystemIdForTemplate(activeFigure.templateId) === "single-y"
-                          ? "只改变单 Y 图的默认系列表现。多条 Y 仍属于同一个单 Y 图。"
-                          : "选择当前图类下的具体组织方式"
-                      }
-                      onChange={(event) => {
-                        const system = plotSystemIdForTemplate(activeFigure.templateId);
-                        patchActiveFigure((figure) => ({
-                          ...figure,
-                          templateId:
-                            system === "single-y"
-                              ? templateForSingleYAppearance(
-                                  event.target.value as SingleYAppearanceId
-                                )
-                              : event.target.value as PlotTemplateId
-                        }));
-                      }}
-                    >
-                      {isLorentz ? (
-                        <option value="line">线</option>
-                      ) : plotSystemIdForTemplate(activeFigure.templateId) === "single-y" ? (
-                        singleYAppearances.map((appearance) => (
-                          <option key={appearance.id} value={appearance.id}>
-                            {appearance.label}
-                          </option>
-                        ))
-                      ) : (
-                        templatesForSystem(
-                          plotSystemIdForTemplate(activeFigure.templateId)
+                  {!isLorentz &&
+                    architectureVariants(
+                      plotArchitectureIdForTemplate(activeFigure.templateId)
+                    ).length > 1 && (
+                    <label>
+                      <span>子型</span>
+                      <select
+                        value={activeFigure.templateId}
+                        title="只选择当前架构内部的结构变体"
+                        onChange={(event) =>
+                          patchActiveFigure((figure) => ({
+                            ...figure,
+                            templateId: event.target.value as PlotTemplateId
+                          }))
+                        }
+                      >
+                        {architectureVariants(
+                          plotArchitectureIdForTemplate(activeFigure.templateId)
                         ).map((template) => (
                           <option key={template.id} value={template.id}>
                             {template.label}
                           </option>
-                        ))
-                      )}
-                    </select>
-                  </label>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
                   <label>
                     <span>画布</span>
@@ -4520,7 +4527,7 @@ function App() {
                           </div>
                         )}
 
-                        {activeFigure.templateId === "xy-errorbar" && (
+                        {ordinaryXYArchitecture && (
                           <>
                             <div className="section-divider">辅助列</div>
                             <div className="prop-row">
@@ -5196,7 +5203,7 @@ function App() {
                       })}
                     </div>
 
-                    <div className="section-divider">样式</div>
+                    <div className="section-divider">数据组</div>
 
                     <div className="prop-row">
                       <label>显示</label>
@@ -5242,6 +5249,82 @@ function App() {
                       </div>
                     </div>
 
+                    <div className="prop-row">
+                      <label>系列基准色</label>
+                      <div className="control-with-reset color-control">
+                        <input
+                          type="color"
+                          value={selectedColor}
+                          onChange={(event) =>
+                            updateSelectedSeries({ color: event.target.value })
+                          }
+                        />
+                        <span>{selectedColor.toUpperCase()}</span>
+                        <ResetIcon
+                          visible={primaryOverride.color !== undefined}
+                          onReset={() => resetSelectedSeriesField("color")}
+                        />
+                      </div>
+                    </div>
+
+                    {ordinaryXYArchitecture && !barTemplate && (
+                      <div className="prop-row">
+                        <label>快速预设</label>
+                        <select
+                          value={quickSeriesStyle}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            if (value === "default") {
+                              resetSelectedSeriesFields([
+                                "lineVisible",
+                                "markerVisible",
+                                "markerHollow"
+                              ]);
+                            } else if (value === "line") {
+                              updateSelectedSeries({
+                                lineVisible: true,
+                                markerVisible: false
+                              });
+                            } else if (value === "symbol") {
+                              updateSelectedSeries({
+                                lineVisible: false,
+                                markerVisible: true,
+                                markerHollow: false
+                              });
+                            } else if (value === "hollow-symbol") {
+                              updateSelectedSeries({
+                                lineVisible: false,
+                                markerVisible: true,
+                                markerHollow: true
+                              });
+                            } else if (value === "line-symbol") {
+                              updateSelectedSeries({
+                                lineVisible: true,
+                                markerVisible: true,
+                                markerHollow: false
+                              });
+                            } else if (value === "line-hollow-symbol") {
+                              updateSelectedSeries({
+                                lineVisible: true,
+                                markerVisible: true,
+                                markerHollow: true
+                              });
+                            }
+                          }}
+                        >
+                          <option value="default">恢复主题默认</option>
+                          {quickSeriesStyle === "custom" && (
+                            <option value="custom">自定义组合</option>
+                          )}
+                          <option value="line">线</option>
+                          <option value="symbol">点</option>
+                          <option value="hollow-symbol">空心点</option>
+                          <option value="line-symbol">线 + 点</option>
+                          <option value="line-hollow-symbol">线 + 空心点</option>
+                        </select>
+                      </div>
+                    )}
+
                     {doubleYTemplate && (
                       <div className="prop-row">
                         <label>绘制到 Y 轴</label>
@@ -5264,14 +5347,38 @@ function App() {
 
                     {!barTemplate && (
                       <>
+                        <div className="section-divider">Line · 线</div>
                         <div className="prop-row">
-                          <label>线条</label>
+                          <label>显示线</label>
                           <MiniSwitch
                             checked={lineVisible}
                             onChange={(value) =>
                               updateSelectedSeries({ lineVisible: value })
                             }
                           />
+                        </div>
+
+                        <div className="prop-row">
+                          <label>线颜色</label>
+                          <div className="control-with-reset color-control">
+                            <input
+                              type="color"
+                              disabled={!lineVisible}
+                              value={lineColor}
+                              onChange={(event) =>
+                                updateSelectedSeries({
+                                  lineColor: event.target.value
+                                })
+                              }
+                            />
+                            <span>{lineColor.toUpperCase()}</span>
+                            <ResetIcon
+                              visible={primaryOverride.lineColor !== undefined}
+                              onReset={() =>
+                                resetSelectedSeriesField("lineColor")
+                              }
+                            />
+                          </div>
                         </div>
 
                         <div className="prop-row">
@@ -5316,23 +5423,28 @@ function App() {
                           </div>
                         </div>
 
+                        <div className="section-divider">Symbol · 点</div>
                         <div className="prop-row">
-                          <label>数据点</label>
+                          <label>显示点</label>
+                          <MiniSwitch
+                            checked={markerVisible}
+                            onChange={(value) =>
+                              updateSelectedSeries({ markerVisible: value })
+                            }
+                          />
+                        </div>
+
+                        <div className="prop-row">
+                          <label>点形状</label>
                           <select
-                            value={markerVisible ? markerSymbol : "none"}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              if (value === "none") {
-                                updateSelectedSeries({ markerVisible: false });
-                              } else {
-                                updateSelectedSeries({
-                                  markerVisible: true,
-                                  markerSymbol: value as MarkerSymbol
-                                });
-                              }
-                            }}
+                            value={markerSymbol}
+                            disabled={!markerVisible}
+                            onChange={(event) =>
+                              updateSelectedSeries({
+                                markerSymbol: event.target.value as MarkerSymbol
+                              })
+                            }
                           >
-                            <option value="none">无</option>
                             <option value="circle">圆点</option>
                             <option value="square">方形</option>
                             <option value="diamond">菱形</option>
@@ -5505,9 +5617,30 @@ function App() {
                           </span>
                         </div>
 
-                        {activeFigure.templateId === "xy-errorbar" && (
+                        {ordinaryXYArchitecture && (
                           <>
-                            <div className="section-divider">误差棒</div>
+                            <div className="section-divider">Error Bar · 误差棒</div>
+                            <div className="prop-row">
+                              <label>显示误差棒</label>
+                              <MiniSwitch
+                                checked={
+                                  primaryOverride.errorBarVisible ??
+                                  activeFigure.templateId === "xy-errorbar"
+                                }
+                                disabled={!hasMappedYError}
+                                onChange={(value) =>
+                                  updateSelectedSeries({
+                                    errorBarVisible: value
+                                  })
+                                }
+                              />
+                            </div>
+                            {!hasMappedYError && (
+                              <div className="prop-row prop-muted">
+                                <label>误差数据</label>
+                                <span>先在“数据”页映射 Y 误差列</span>
+                              </div>
+                            )}
                             <div className="prop-row">
                               <label>误差线宽</label>
                               <div className="control-with-reset">
@@ -5517,6 +5650,7 @@ function App() {
                                     min="0.2"
                                     max="5"
                                     step="0.05"
+                                    disabled={!hasMappedYError}
                                     value={errorBarWidth}
                                     onChange={(event) =>
                                       updateSelectedSeries({
@@ -5546,6 +5680,7 @@ function App() {
                                     min="0"
                                     max="20"
                                     step="0.5"
+                                    disabled={!hasMappedYError}
                                     value={errorBarCapSize}
                                     onChange={(event) =>
                                       updateSelectedSeries({
@@ -5571,6 +5706,7 @@ function App() {
                               <div className="control-with-reset color-control">
                                 <input
                                   type="color"
+                                  disabled={!hasMappedYError}
                                   value={errorBarColor}
                                   onChange={(event) =>
                                     updateSelectedSeries({
@@ -5587,8 +5723,64 @@ function App() {
                                 />
                               </div>
                             </div>
+
+                            <div className="section-divider">Fill · 填充</div>
+                            <div className="prop-row">
+                              <label>曲线下填充</label>
+                              <MiniSwitch
+                                checked={primaryOverride.fillVisible ?? false}
+                                onChange={(value) =>
+                                  updateSelectedSeries({ fillVisible: value })
+                                }
+                              />
+                            </div>
+                            <div className="prop-row">
+                              <label>填充颜色</label>
+                              <div className="control-with-reset color-control">
+                                <input
+                                  type="color"
+                                  disabled={!(primaryOverride.fillVisible ?? false)}
+                                  value={fillColor}
+                                  onChange={(event) =>
+                                    updateSelectedSeries({
+                                      fillColor: event.target.value
+                                    })
+                                  }
+                                />
+                                <span>{fillColor.toUpperCase()}</span>
+                                <ResetIcon
+                                  visible={primaryOverride.fillColor !== undefined}
+                                  onReset={() =>
+                                    resetSelectedSeriesField("fillColor")
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="prop-row">
+                              <label>填充透明度</label>
+                              <div className="compact-number">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="5"
+                                  disabled={!(primaryOverride.fillVisible ?? false)}
+                                  value={Math.round(fillOpacity * 100)}
+                                  onChange={(event) =>
+                                    updateSelectedSeries({
+                                      fillOpacity: Math.max(
+                                        0,
+                                        Math.min(1, Number(event.target.value) / 100)
+                                      )
+                                    })
+                                  }
+                                />
+                                <span>%</span>
+                              </div>
+                            </div>
                           </>
                         )}
+
                       </>
                     )}
 
@@ -5630,27 +5822,28 @@ function App() {
                       </div>
                     )}
 
-                    <div className="prop-row">
-                      <label>{barTemplate ? "填充颜色" : "颜色"}</label>
-                      <div className="control-with-reset color-control">
-                        <input
-                          type="color"
-                          disabled={
-                            barTemplate &&
-                            (primaryOverride.barColorMode ?? "series") === "points"
-                          }
-                          value={selectedColor}
-                          onChange={(event) =>
-                            updateSelectedSeries({ color: event.target.value })
-                          }
-                        />
-                        <span>{selectedColor.toUpperCase()}</span>
-                        <ResetIcon
-                          visible={primaryOverride.color !== undefined}
-                          onReset={() => resetSelectedSeriesField("color")}
-                        />
+                    {barTemplate && (
+                      <div className="prop-row">
+                        <label>填充颜色</label>
+                        <div className="control-with-reset color-control">
+                          <input
+                            type="color"
+                            disabled={
+                              (primaryOverride.barColorMode ?? "series") === "points"
+                            }
+                            value={selectedColor}
+                            onChange={(event) =>
+                              updateSelectedSeries({ color: event.target.value })
+                            }
+                          />
+                          <span>{selectedColor.toUpperCase()}</span>
+                          <ResetIcon
+                            visible={primaryOverride.color !== undefined}
+                            onReset={() => resetSelectedSeriesField("color")}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {barTemplate && (
                       <>

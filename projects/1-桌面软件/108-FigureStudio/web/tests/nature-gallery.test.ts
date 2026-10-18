@@ -18,12 +18,11 @@ import {
 } from "../src/plot/goldenStyle";
 import { PUBLICATION_PALETTES } from "../src/plot/palettes";
 import {
-  defaultTemplateForSystem,
-  plotSystemIdForTemplate,
-  plotSystems,
-  singleYAppearanceForTemplate,
-  templates,
-  templatesForSystem
+  architectureVariants,
+  defaultTemplateForArchitecture,
+  plotArchitectureIdForTemplate,
+  plotArchitectures,
+  templates
 } from "../src/plot/templates";
 import { buildSurfaceVectorSvg } from "../src/export/surfaceVectorSvg";
 
@@ -37,21 +36,66 @@ assert.ok(templates.some(t=>t.id==="surface-projection-3d"),
   "Three-direction 3D projection must be a first-class template");
 assert.ok(templates.some(t=>t.id==="publication-board"),
   "Publication Style Board must be a first-class template");
-assert.equal(plotSystemIdForTemplate("xy-line"),"single-y");
-assert.equal(plotSystemIdForTemplate("xy-scatter"),"single-y");
-assert.equal(plotSystemIdForTemplate("xy-line-marker"),"single-y");
-assert.equal(plotSystemIdForTemplate("xy-errorbar"),"single-y");
-assert.equal(plotSystemIdForTemplate("double-y"),"double-y");
-assert.equal(plotSystemIdForTemplate("waterfall"),"waterfall");
-assert.equal(singleYAppearanceForTemplate("xy-line-marker"),"line-marker");
-assert.equal(defaultTemplateForSystem("single-y"),"xy-line");
-assert.ok(templatesForSystem("single-y").length>=5,
-  "Single-Y must be a system containing line/point/point-line/error variants");
-assert.ok(plotSystems.some(system=>system.id==="double-y"));
-assert.ok(plotSystems.some(system=>system.id==="waterfall"));
+assert.equal(plotArchitectureIdForTemplate("xy-line"),"single-y");
+assert.equal(plotArchitectureIdForTemplate("xy-scatter"),"single-y");
+assert.equal(plotArchitectureIdForTemplate("xy-line-marker"),"single-y");
+assert.equal(plotArchitectureIdForTemplate("xy-errorbar"),"single-y");
+assert.equal(plotArchitectureIdForTemplate("double-y"),"double-y");
+assert.equal(plotArchitectureIdForTemplate("waterfall"),"waterfall");
+assert.equal(defaultTemplateForArchitecture("single-y"),"xy-line");
+assert.equal(architectureVariants("single-y").length,0,
+  "Single-Y must not expose point/line as architecture subtypes");
+assert.ok(plotArchitectures.some(system=>system.id==="double-y"));
+assert.ok(plotArchitectures.some(system=>system.id==="waterfall"));
 for (const id of ["pca-ellipse","volcano","ridgeline"] as const) {
   assert.ok(templates.some(t=>t.id===id),id+" must be a first-class scientific template");
 }
+
+const mixedDataset:any={
+  id:"mixed",name:"mixed",
+  x:{id:"x",name:"X",role:"X",values:[0,1,2]},
+  ys:[
+    {id:"a",name:"A",role:"Y",values:[1,2,3]},
+    {id:"b",name:"B",role:"Y",values:[3,2,1]},
+    {id:"c",name:"C",role:"Y",values:[2,3,2]},
+    {id:"err",name:"Err",role:"YErr",values:[0.1,0.2,0.1]}
+  ]
+};
+const mixedFigure:any={
+  id:"mixed-figure",name:"Mixed single Y",
+  templateId:"xy-line",presetId:"nature",
+  dataRef:{sheetId:"mixed-sheet",xColumnId:"x",yColumnIds:["a","b","c"],yErrorColumnId:"err"},
+  figureOverrides:{},seriesOrder:["a","b","c"],
+  seriesOverrides:{
+    a:{lineVisible:true,markerVisible:false,lineColor:"#112233"},
+    b:{lineVisible:false,markerVisible:true,markerSymbol:"diamond",errorBarVisible:true},
+    c:{lineVisible:true,markerVisible:true,fillVisible:true,fillOpacity:0.2}
+  }
+};
+const mixedTraces=buildTraces({dataset:mixedDataset,figure:mixedFigure,preset:presets.nature}) as any[];
+assert.deepEqual(mixedTraces.map(trace=>trace.mode),["lines","markers","lines+markers"],
+  "One single-Y architecture must allow line, point and line+point series simultaneously");
+assert.equal(mixedTraces[0].line.color,"#112233",
+  "Line color must be independently editable from the series base color");
+assert.ok(mixedTraces[1].error_y,
+  "Error Bar must be a per-series element instead of a figure architecture");
+assert.equal(mixedTraces[2].fill,"tozeroy",
+  "Fill must be a composable per-series element");
+
+const mixedDouble:any={
+  ...mixedFigure,
+  id:"mixed-double",
+  templateId:"double-y",
+  seriesOverrides:{
+    ...mixedFigure.seriesOverrides,
+    a:{...mixedFigure.seriesOverrides.a,yAxis:"right"},
+    b:{...mixedFigure.seriesOverrides.b,yAxis:"left"},
+    c:{...mixedFigure.seriesOverrides.c,yAxis:"right"}
+  }
+};
+const mixedDoubleTraces=buildTraces({dataset:mixedDataset,figure:mixedDouble,preset:presets.nature}) as any[];
+assert.deepEqual(mixedDoubleTraces.map(trace=>trace.yaxis),["y2","y","y2"],
+  "Every series in double-Y must independently choose left or right axis");
 
 const boardProject=createInitialProject(undefined,false);
 const publicationBoards=boardProject.figures.filter(
