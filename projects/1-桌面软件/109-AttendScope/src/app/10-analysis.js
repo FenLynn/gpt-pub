@@ -1,10 +1,105 @@
 function excelSerialToDateTime(n){if(typeof n!=='number')return String(n??'');const ms=(n-25569)*86400000;const d=new Date(ms);return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`}
 function aliases(obj,names){for(const n of names)if(Object.prototype.hasOwnProperty.call(obj,n)&&obj[n]!==''&&obj[n]!=null)return obj[n];return ''}
-async function importAttendance(file){const t=await XLSX.readTable(file);const rows=t.rows;const out=[];let rowNo=2;
-  for(const r of rows){const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();let dt=aliases(r,['打卡时间','时间','datetime','DateTime']);const dir=String(aliases(r,['进出','方向','状态','direction'])).trim();if(typeof dt==='number')dt=excelSerialToDateTime(dt);dt=String(dt).replace('T',' ');const emp=EMPLOYEES.find(e=>e.name===name);if(!emp||!/^(进|出)$/.test(dir)||!(dt.startsWith(monthISO()+'-')&&Number(dt.slice(8,10))>=1&&Number(dt.slice(8,10))<=monthDays())){rowNo++;continue}const time=dt.slice(11,19)||'00:00:00';out.push({recordId:`import:${Date.now()}:${rowNo}`,employeeId:emp.id,name,datetime:dt,time,direction:dir,source:file.name,sheet:t.sheet,row:rowNo,scenario:'import'});rowNo++}
-  if(!out.length)throw new Error('未识别到有效考勤记录，请确认列名包含“姓名 / 打卡时间 / 进出”。'); state.records=out;await persistImportedFile(file,'attendance',out.length);state.saved=false;reanalyze();render();toast(`已导入 ${out.length} 条考勤记录`)}
-async function importLeaves(file){const t=await XLSX.readTable(file);const out=[];let rowNo=2;for(const r of t.rows){const name=String(aliases(r,['姓名','人员','员工姓名'])).trim();const emp=EMPLOYEES.find(e=>e.name===name);let date=String(aliases(r,['日期','请假日期','date'])).slice(0,10);if(typeof aliases(r,['日期','请假日期','date'])==='number')date=excelSerialToDateTime(aliases(r,['日期','请假日期','date'])).slice(0,10);if(!emp||!date||!date.startsWith(monthISO()))continue;out.push({id:`LI-${Date.now()}-${rowNo}`,employeeId:emp.id,name,date,start:String(aliases(r,['开始时间','开始','start'])||'08:30').slice(0,5),end:String(aliases(r,['结束时间','结束','end'])||'17:30').slice(0,5),type:String(aliases(r,['类型','假别','type'])||'请假'),note:String(aliases(r,['备注','说明','note'])||''),source:file.name,row:rowNo});rowNo++}if(!out.length)throw new Error('未识别到有效请假记录。');state.leaves=out;await persistImportedFile(file,'leave',out.length);state.saved=false;reanalyze();render();toast(`已导入 ${out.length} 条请假记录`)}
-async function importTrips(file){const t=await XLSX.readTable(file);const out=[];let rowNo=2;for(const r of t.rows){const name=String(aliases(r,['姓名','人员','员工姓名'])).trim(),emp=EMPLOYEES.find(e=>e.name===name);let sd=aliases(r,['开始日期','起始日期','startDate']),ed=aliases(r,['结束日期','截止日期','endDate']);if(typeof sd==='number')sd=excelSerialToDateTime(sd).slice(0,10);if(typeof ed==='number')ed=excelSerialToDateTime(ed).slice(0,10);sd=String(sd).slice(0,10);ed=String(ed||sd).slice(0,10);if(!emp||!sd||sd>monthISO()+'-'+pad(monthDays())||ed<monthISO()+'-01')continue;out.push({id:`TI-${Date.now()}-${rowNo}`,employeeId:emp.id,name,startDate:sd,endDate:ed,type:String(aliases(r,['类型','事项','type'])||'出差'),place:String(aliases(r,['地点','目的地','place'])||''),note:String(aliases(r,['备注','说明','note'])||''),source:file.name,row:rowNo});rowNo++}if(!out.length)throw new Error('未识别到有效出差记录。');state.trips=out;await persistImportedFile(file,'trip',out.length);state.saved=false;reanalyze();render();toast(`已导入 ${out.length} 条出差记录`)}
+// Imported people are identified by an editable month-scoped roster, never by
+// public demo names. Parse and validate before changing any live data.
+function sourceRow(r,i){return Number(r.__rowNumber)||i+2}
+function importedDate(v){
+  return (typeof v==='number'?excelSerialToDateTime(v):String(v??'')).replace('T',' ').trim();
+}
+function importRosterPlan(names,kind){
+  const unique=[...new Set(names.map(x=>String(x).trim()).filter(Boolean))];
+  if(!unique.length)throw new Error('导入文件没有有效员工姓名');
+  const unknown=unique.filter(name=>!EMPLOYEES.some(e=>e.name===name));
+  const resetDemo=state.isDemo&&(kind==='attendance'||unknown.length>0);
+  if(resetDemo&&!window.confirm('当前工作空间包含演示人员与数据。导入将建立本月实际人员名册，并清除演示数据。是否继续？'))
+    throw new Error('用户取消了演示数据替换');
+  const people=resetDemo?[]:EMPLOYEES.map(e=>({...e}));
+  const byName=new Map(people.map(e=>[e.name,e]));
+  let nextId=Math.max(0,...people.map(e=>Number(e.id.slice(1))||0));
+  for(const name of unique){
+    if(byName.has(name))continue;
+    const employee={id:'E'+String(++nextId).padStart(3,'0'),name,department:'未分类'};
+    people.push(employee);byName.set(name,employee);
+  }
+  return {people,byName,resetDemo};
+}
+function applyImportRoster(plan,meta){
+  if(plan.resetDemo){
+    state.records=[];state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
+    state.manualStatuses={};state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
+    state.imports=[meta];state.groups={};
+  }
+  EMPLOYEES=plan.people;
+  for(const e of EMPLOYEES)if(!state.groups[e.id])state.groups[e.id]=(e.department==='未分类'?'未分组':e.department+'组');
+  state.isDemo=false;
+}
+function acceptImportedRows(kind,rows,plan){
+  if(kind==='attendance')state.records=rows;
+  else if(kind==='leave')state.leaves=rows;
+  else if(kind==='trip')state.trips=rows;
+  state.saved=false;rememberMonth();reanalyze();render();
+  toast('已导入 '+rows.length+' 条'+({attendance:'考勤',leave:'请假',trip:'出差'}[kind])+'记录；员工 '+EMPLOYEES.length+' 人');
+}
+async function importAttendance(file){
+  const t=await XLSX.readTable(file),parsed=[];
+  t.rows.forEach((r,i)=>{
+    const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
+    const datetime=importedDate(aliases(r,['打卡时间','时间','datetime','DateTime']));
+    const direction=String(aliases(r,['进出','方向','状态','direction'])).trim();
+    if(!name||!/^(进|出)$/.test(direction)||!new RegExp('^'+monthISO()+'-\\d\\d \\d\\d:\\d\\d').test(datetime)
+      ||!Number.isFinite(minutes(datetime.slice(11))))return;
+    const day=Number(datetime.slice(8,10));
+    if(day<1||day>monthDays())return;
+    parsed.push({name,datetime,time:datetime.slice(11,19),direction,row:sourceRow(r,i)});
+  });
+  if(!parsed.length)throw new Error('未识别到本月有效考勤记录，请确认姓名、打卡时间与进出列');
+  const plan=importRosterPlan(parsed.map(r=>r.name),'attendance');
+  const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+  const out=parsed.map(r=>{
+    const employee=plan.byName.get(r.name);
+    return {recordId:'import:'+importId+':'+r.row,importId,employeeId:employee.id,name:r.name,
+      datetime:r.datetime,time:r.time,direction:r.direction,source:file.name,sheet:t.sheet,row:r.row,scenario:'import'};
+  });
+  const meta=await persistImportedFile(file,'attendance',out.length,importId);
+  applyImportRoster(plan,meta);acceptImportedRows('attendance',out,plan);
+}
+async function importLeaves(file){
+  const t=await XLSX.readTable(file),parsed=[];
+  t.rows.forEach((r,i)=>{
+    const name=String(aliases(r,['姓名','人员','员工姓名'])).trim();
+    const date=importedDate(aliases(r,['日期','请假日期','date'])).slice(0,10);
+    if(!name||!new RegExp('^'+monthISO()+'-\\d\\d$').test(date)||Number(date.slice(8,10))>monthDays())return;
+    parsed.push({name,date,row:sourceRow(r,i),start:String(aliases(r,['开始时间','开始','start'])||RULES.amStart).slice(0,5),
+      end:String(aliases(r,['结束时间','结束','end'])||RULES.pmEnd).slice(0,5),
+      type:String(aliases(r,['类型','假别','type'])||'请假'),note:String(aliases(r,['备注','说明','note'])||'')});
+  });
+  if(!parsed.length)throw new Error('未识别到本月有效请假记录');
+  const plan=importRosterPlan(parsed.map(r=>r.name),'leave');
+  const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+  const out=parsed.map(r=>({id:'LI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
+    ...r,source:file.name,sheet:t.sheet}));
+  const meta=await persistImportedFile(file,'leave',out.length,importId);
+  applyImportRoster(plan,meta);acceptImportedRows('leave',out,plan);
+}
+async function importTrips(file){
+  const t=await XLSX.readTable(file),parsed=[];
+  t.rows.forEach((r,i)=>{
+    const name=String(aliases(r,['姓名','人员','员工姓名'])).trim();
+    const startDate=importedDate(aliases(r,['开始日期','起始日期','startDate'])).slice(0,10);
+    const endDate=importedDate(aliases(r,['结束日期','截止日期','endDate'])||startDate).slice(0,10);
+    if(!name||!/^\\d{4}-\\d\\d-\\d\\d$/.test(startDate)||!/^\\d{4}-\\d\\d-\\d\\d$/.test(endDate)
+      ||startDate>endDate||startDate>monthISO()+'-'+pad(monthDays())||endDate<monthISO()+'-01')return;
+    parsed.push({name,startDate,endDate,row:sourceRow(r,i),type:String(aliases(r,['类型','事项','type'])||'出差'),
+      place:String(aliases(r,['地点','目的地','place'])||''),note:String(aliases(r,['备注','说明','note'])||'')});
+  });
+  if(!parsed.length)throw new Error('未识别到本月有效出差记录');
+  const plan=importRosterPlan(parsed.map(r=>r.name),'trip');
+  const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+  const out=parsed.map(r=>({id:'TI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
+    ...r,source:file.name,sheet:t.sheet}));
+  const meta=await persistImportedFile(file,'trip',out.length,importId);
+  applyImportRoster(plan,meta);acceptImportedRows('trip',out,plan);
+}
 function leaveFor(empId,date){return state.leaves.filter(x=>x.employeeId===empId&&x.date===date)}
 function tripFor(empId,date){return state.trips.filter(x=>x.employeeId===empId&&date>=x.startDate&&date<=x.endDate)}
 function intervalOverlap(a1,a2,b1,b2){return Math.max(0,Math.min(a2,b2)-Math.max(a1,b1))}

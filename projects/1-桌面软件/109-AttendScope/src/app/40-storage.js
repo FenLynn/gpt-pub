@@ -55,6 +55,7 @@ async function ensureProjectSkeleton(){
 function normalizeSavedMonth(payload){
   if(!payload||!Array.isArray(payload.records))return null;
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
+    employees:payload.employees||null,groups:payload.groups||null,isDemo:!!payload.isDemo,calendarOverrides:payload.calendarOverrides||null,
     revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null};
 }
 async function connectProjectDir(){
@@ -72,8 +73,13 @@ async function connectProjectDir(){
         const cal=caldir?await readJSON(caldir,String(YEAR)+'.json'):null;
         if(cal?.overrides)state.calendarOverrides={...cal.overrides};
       }
-      if(conf){const people=await readJSON(conf,'employees.json');if(people?.employees)
-        for(const e of people.employees)if(e.id&&e.group)state.groups[e.id]=e.group}
+      if(conf){
+        const people=await readJSON(conf,'employees.json');
+        if(people?.employees?.length){
+          EMPLOYEES=people.employees.map(e=>({id:e.id,name:e.name,department:e.department||'未分类'}));
+          for(const e of people.employees)if(e.id&&e.group)state.groups[e.id]=e.group;
+        }
+      }
       const monthKeys=new Set([...(project.months||[]),monthKey()]);
       for(const key of monthKeys){
         if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(key))continue;
@@ -93,13 +99,22 @@ async function connectProjectDir(){
     await ensureProjectSkeleton();render();toast(project?'已连接并载入月度工作空间':'已创建项目目录');
   }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true)}
 }
-async function persistImportedFile(file,type,count){
-  state.imports.push({id:String(state.imports.length+1).padStart(4,'0'),type,name:file.name,count,importedAt:new Date().toISOString()});
-  rememberMonth();
-  if(!state.projectDir)return;
-  const m=await monthDirectory(),raw=await dir(m,'raw'),sub=await dir(raw,type);
-  const folder=await dir(sub,String(state.imports.length).padStart(4,'0'));
-  await writeFile(folder,file.name,await file.arrayBuffer());
+async function persistImportedFile(file,type,count,importId){
+  const bytes=await file.arrayBuffer();
+  let sha256=null;
+  if(globalThis.crypto?.subtle){
+    const digest=await crypto.subtle.digest('SHA-256',bytes);
+    sha256=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
+  }
+  const meta={id:importId,type,name:file.name,count,sha256,importedAt:new Date().toISOString()};
+  if(state.projectDir){
+    const m=await monthDirectory(),raw=await dir(m,'raw'),sub=await dir(raw,type);
+    const exists=await existingDir(sub,importId).then(()=>true,e=>e.name==='NotFoundError'?false:Promise.reject(e));
+    if(exists)throw new Error('导入目录已存在，拒绝覆盖原始文件');
+    const folder=await dir(sub,importId);
+    await writeFile(folder,file.name,bytes);
+  }
+  state.imports.push(meta);rememberMonth();return meta;
 }
 function projectPayload(){
   rememberMonth();
@@ -109,6 +124,7 @@ function projectPayload(){
 }
 function workingPayload(){
   return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
+    employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...state.calendarOverrides},
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
