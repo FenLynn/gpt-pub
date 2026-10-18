@@ -151,7 +151,7 @@ export function templateLabel(id: PlotTemplateId): string {
 }
 
 export function plotArchitectureIdForTemplate(id: PlotTemplateId): PlotArchitectureId {
-  return templateDefinition(id).system;
+  return templateDefinition(id).architecture;
 }
 
 export function plotArchitectureDefinition(id: PlotArchitectureId): PlotArchitectureDefinition {
