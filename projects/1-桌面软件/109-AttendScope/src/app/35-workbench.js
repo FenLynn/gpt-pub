@@ -32,10 +32,13 @@ function plotTitle(ctx){
 function manualJudgmentHtml(item){
   const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item);
   return '<section class="insight-card status-card">'+
-    '<div class="judgment-line auto-line"><span>自动</span><b class="auto-judgment '+initial+'">'+JUDGMENT_LABELS[initial]+'</b></div>'+
-    '<div class="manual-caption"><span>人工</span>'+(manual?'<button type="button" class="manual-clear" data-manual-clear title="恢复自动判断">恢复</button>':'')+'</div>'+
-    '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
-      [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>'<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+t+'">'+(manual===x?t:'')+'</button>').join('')+
+    '<div class="status-control-row initial-row"><span>初始</span>'+
+      '<button type="button" class="initial-judgment '+initial+'" data-manual-clear title="恢复初始判断">'+JUDGMENT_LABELS[initial]+'</button>'+
+    '</div>'+
+    '<div class="status-control-row manual-row"><span>人工</span>'+
+      '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
+        [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>'<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+t+'">'+(manual===x?t:'')+'</button>').join('')+
+      '</div>'+
     '</div>'+
   '</section>';
 }
