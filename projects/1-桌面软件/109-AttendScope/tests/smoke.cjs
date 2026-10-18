@@ -381,7 +381,7 @@ async function run(){
    const key=a.employee.id+'|'+a.day;state.manualStatuses[key]='absent';state.judgmentMode='manual';
    const row=traditionalRows().find(r=>r.姓名===a.employee.name&&r.日期===a.date);
    delete state.manualStatuses[key];state.judgmentMode='initial';
-   return row.系统判定==='normal'&&row.人工判定==='absent'&&row.最终判定==='absent'&&row.人工处理==='是';
+   return row.系统判定==='正常'&&row.人工判定==='缺勤'&&row.最终判定==='缺勤'&&row.人工处理==='是';
  },'R33 export lost final manual judgment');
  const imported=await page.evaluate(async()=>{
    const csv='姓名,打卡时间,进出\n测试甲,2026-10-09 08:24:11,进\n测试甲,2026-10-09 17:44:05,出';
@@ -391,11 +391,17 @@ async function run(){
      state.records.length===2&&state.records[0].row===2&&state.records[1].row===3&&
      state.records.every(x=>x.importId===state.imports[0].id)&&state.analysis.size===monthDays();
    if(!valid)return {valid:false};
-   const saved=workingPayload();
+   const leave='姓名,日期,开始时间,结束时间,类型\n测试甲,2026-10-09,08:30,12:00,事假';
+    await importLeaves(new File([leave],'请假样例.csv',{type:'text/csv'}));
+    const trip='姓名,开始日期,结束日期,类型,地点\n测试甲,2026-10-10,2026-10-11,出差,测试地点';
+    await importTrips(new File([trip],'出差样例.csv',{type:'text/csv'}));
+    const related=state.leaves.length===1&&state.trips.length===1&&
+      state.leaves[0].employeeId===id&&state.trips[0].employeeId===id&&state.imports.length===3;
+    const saved=workingPayload();
    switchMonth(2026,11);switchMonth(2026,10);
    const restored=EMPLOYEES.length===1&&EMPLOYEES[0].id===id&&
      state.records.length===2&&state.analysis.size===monthDays()&&
-     saved.employees.length===1;
+     saved.employees.length===1&&state.leaves.length===1&&state.trips.length===1&&related;
    state.calendarOverrides['2026-10-09']='holiday';
    const calendar=dayType(9)==='holiday';delete state.calendarOverrides['2026-10-09'];
    return {valid,restored,calendar};
@@ -403,7 +409,7 @@ async function run(){
  if(!imported.valid||!imported.restored||!imported.calendar)throw Error('R33 roster/import/month/calendar failed '+JSON.stringify(imported));
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R29',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R34',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
