@@ -583,9 +583,13 @@ function projectionContourColor(
     [0.75, [188, 173, 108]],
     [1, [254, 232, 56]]
   ] as const;
-  const stops = colorScale.toLowerCase().includes("cividis") ? cividis : viridis;
+  const stops: ReadonlyArray<
+    readonly [number, readonly [number, number, number]]
+  > = colorScale.toLowerCase().includes("cividis") ? cividis : viridis;
   const x = Math.max(0, Math.min(1, t));
-  let left = stops[0], right = stops[stops.length - 1];
+  let left: readonly [number, readonly [number, number, number]] = stops[0];
+  let right: readonly [number, readonly [number, number, number]] =
+    stops[stops.length - 1];
   for (let index = 1; index < stops.length; index += 1) {
     if (x <= stops[index][0]) {
       left = stops[index - 1];
