@@ -883,3 +883,18 @@
 .music-track-panel .r15-punch-stack i{
   top:0!important;bottom:0!important;height:100%!important;max-height:100%!important;
 }
+
+
+/* R28: navigator markers are subordinate to main arrows; fixed labels stay readable. */
+.music-track-panel .r15-punch-stack{opacity:1!important}
+.music-track-panel .r15-punch-stack.inside i{
+  opacity:.56!important;
+  filter:saturate(.82) brightness(1.08);
+}
+.music-track-panel .r15-punch-stack.outside i{
+  opacity:.16!important;
+  filter:saturate(.52) brightness(1.2);
+}
+.music-track-panel .r15-punch-preview{
+  clip-path:inset(0 round 2px);
+}
