@@ -30,14 +30,17 @@ function plotTitle(ctx){
   return currentFilterLabel()+(ctx.type==='person'||ctx.type==='cell'?'每日分布':ctx.type==='date'?'当日分布':'趋势');
 }
 function manualJudgmentHtml(item){
-  const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item);
+  const initial=attendanceJudgmentSystem(item),rawManual=manualStatusFor(item),manual=rawManual===initial?null:rawManual;
   return '<section class="insight-card status-card">'+
     '<div class="status-control-row initial-row"><span>初始</span>'+
       '<button type="button" class="initial-judgment '+initial+'" data-manual-clear title="恢复初始判断">'+JUDGMENT_LABELS[initial]+'</button>'+
     '</div>'+
     '<div class="status-control-row manual-row"><span>人工</span>'+
       '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
-        [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>'<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+x+'" title="人工改为'+t+'">'+(manual===x?t:'')+'</button>').join('')+
+        [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>{
+          const locked=x===initial;
+          return '<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+(locked?'initial-disabled ':'')+x+'" '+(locked?'disabled aria-disabled="true"':'')+' title="'+(locked?'与初始判断相同，不能作为人工修改':'人工改为'+t)+'">'+(manual===x?t:'')+'</button>';
+        }).join('')+
       '</div>'+
     '</div>'+
   '</section>';
@@ -47,7 +50,8 @@ function setManualStatusForCurrent(status){
   const employeeId=sel.type==='cell'||sel.type==='person'?sel.employeeId:null;
   const day=sel.type==='cell'?sel.day:sel.type==='person'?(state.chartDay||nearestRecordedDay(sel.employeeId)):null;
   if(!employeeId||!day)return;
-  const key=employeeId+'|'+day;state.manualStatuses??={};
+  const key=employeeId+'|'+day,item=state.analysis.get(key);state.manualStatuses??={};
+  if(status&&item&&status===attendanceJudgmentSystem(item))return;
   if(status)state.manualStatuses[key]=status;else delete state.manualStatuses[key];
   if(status)state.judgmentMode='manual';else if(!hasManualStatuses())state.judgmentMode='initial';
   state.saved=false;rememberMonth();render();
@@ -387,7 +391,20 @@ function timelineMiniMapHtml(a,range){
 }
 
 function r15PunchPreview(a){
+  const bins=new Map();
+  for(const p of (a.punches||[])){
+    const minute=Math.floor(minutes(p.time)),bucket=Math.floor(minute/3)*3;
+    if(!bins.has(bucket))bins.set(bucket,{minute:bucket,in:0,out:0});
+    bins.get(bucket)[p.direction==='进'?'in':'out']++;
+  }
+  const bars=[...bins.values()].map(g=>{
+    const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(9,2+total*1.35);
+    return '<span class="r15-punch-stack" style="left:'+left+'%;width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
+      (g.in?'<i class="in"></i>':'')+
+      (g.out?'<i class="out"></i>':'')+
+    '</span>';
+  }).join('');
   const ticks=['0:00','6:00','12:00','18:00','24:00'].map(t=>'<span>'+t+'</span>').join('');
-  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true"></div>'+
+  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+bars+'</div>'+
     '<div class="r23-mini-ticks" aria-hidden="true">'+ticks+'</div>';
 }
