@@ -1,4 +1,4 @@
-/* R24 timeline: exactly six lanes, with the time baseline between In and Out. */
+/* R28 timeline: six lanes, navigator-aligned plot, fixed behavior labels, and schedule boundaries. */
 function r19PunchClusters(a,range,width,fixedLane=null){
   const span=Math.max(30,range.end-range.start),px=Math.max(240,width||800);
   const mergeMinutes=Math.max(.45,span/px*11),out=[];
@@ -59,21 +59,37 @@ function mountAttendanceTimeline(a){
   const el=document.getElementById('attendanceTimelineChart');if(!el||!window.echarts)return;
   const chart=initAttendChart(el);if(!chart)return;
   const SIDE=12,SLIDER_BOTTOM=30,SLIDER_HEIGHT=34;
-  const range=timelineRange(a);
-  let model=r14TrackData(a,range,chart.getWidth());
+  const initialRange=timelineRange(a);
+  let currentRange={...initialRange};
+  let model=r14TrackData(a,currentRange,chart.getWidth());
+  const gridForRange=r=>{
+    const usable=Math.max(160,chart.getWidth()-SIDE*2);
+    const left=SIDE+usable*(r.start/1440);
+    const right=SIDE+usable*((1440-r.end)/1440);
+    return {left,right,top:10,bottom:106};
+  };
+  const syncPreview=()=>{
+    const preview=document.getElementById('r15PunchPreview');if(!preview)return;
+    preview.innerHTML=model.events.map(e=>{
+      const minute=e.value[0],left=(minute/1440*100).toFixed(4),count=e.count||1;
+      const width=Math.min(10,2+count*1.25),inside=minute>=currentRange.start&&minute<=currentRange.end;
+      const cls=e.direction==='进'?'in':'out';
+      return '<span class="r15-punch-stack '+(inside?'inside':'outside')+'" style="left:'+left+'%;width:'+width+'px" title="'+e.direction+' '+count+'"><i class="'+cls+'"></i></span>';
+    }).join('');
+  };
   const behaviorRowHeight=(api)=>Math.max(1,Math.abs(api.size([0,1])[1]));
   const behaviorLaneHeight=(api)=>behaviorRowHeight(api);
   const behaviorGradient={
-    trip:['rgba(107,127,215,.18)','rgba(107,127,215,.56)'],
-    leave:['rgba(138,111,209,.16)','rgba(138,111,209,.54)'],
-    outing:['rgba(60,157,196,.16)','rgba(60,157,196,.54)'],
-    overtime:['rgba(200,118,160,.16)','rgba(200,118,160,.54)']
+    trip:['rgba(107,127,215,.12)','rgba(107,127,215,.42)'],
+    leave:['rgba(138,111,209,.11)','rgba(138,111,209,.40)'],
+    outing:['rgba(60,157,196,.11)','rgba(60,157,196,.40)'],
+    overtime:['rgba(200,118,160,.11)','rgba(200,118,160,.40)']
   };
   const bandRender=(params,api)=>{
     const d=model.bars[params.dataIndex];if(!d)return null;
     const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
     const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=Math.max(1,behaviorLaneHeight(api)+.5);
-    const colors=behaviorGradient[d.track]||['rgba(120,140,160,.18)','rgba(120,140,160,.5)'];
+    const colors=behaviorGradient[d.track]||['rgba(120,140,160,.12)','rgba(120,140,160,.38)'];
     return {type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
       style:{fill:new echarts.graphic.LinearGradient(0,0,1,0,[
         {offset:0,color:colors[0]},{offset:1,color:colors[1]}
@@ -96,32 +112,42 @@ function mountAttendanceTimeline(a){
   };
   const railRender=(params,api)=>{
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
-    const p=api.coord([0,lane]),q=api.coord([1440,lane]),h=Math.max(1,behaviorLaneHeight(api)+.5);
+    const p=api.coord([currentRange.start,lane]),q=api.coord([currentRange.end,lane]),h=Math.max(1,behaviorLaneHeight(api)+.5);
     return {type:'rect',shape:{x:p[0],y:p[1]-h/2,width:Math.max(1,q[0]-p[0]),height:h,r:0},
       style:{fill:'rgba(235,239,242,.58)',stroke:'rgba(220,226,231,.38)',lineWidth:.35}};
   };
   const railLabelRender=(params,api)=>{
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
-    const q=api.coord([1440,lane]),active=state.filter===track.key;
+    const y=api.coord([currentRange.end,lane])[1],active=state.filter===track.key;
     return {type:'text',style:{
-      x:q[0]-5,y:q[1],text:track.title,fill:active?track.color:'#6f8190',
-      font:(active?'700 ':'600 ')+'9px "Segoe UI Variable", sans-serif',
-      align:'right',verticalAlign:'middle'
+      x:chart.getWidth()-SIDE-6,y,text:track.title,fill:active?track.color:'#617586',
+      font:(active?'760 ':'700 ')+'17px "Segoe UI Variable", sans-serif',
+      align:'right',verticalAlign:'middle',textShadowColor:'rgba(255,255,255,.95)',textShadowBlur:3
     }};
   };
   const scheduleRender=(params,api)=>{
-    const x0=api.coord([api.value(0),0])[0],x1=api.coord([api.value(1),0])[0],cs=params.coordSys;
-    return {type:'rect',shape:{x:Math.min(x0,x1),y:cs.y,width:Math.abs(x1-x0),height:Math.max(1,cs.height),r:0},
-      style:{fill:'rgba(132,155,173,.085)',stroke:'rgba(122,145,164,.105)',lineWidth:.45}};
+    const from=api.value(0),to=api.value(1);
+    const x0=api.coord([from,0])[0],x1=api.coord([to,0])[0];
+    const y0=api.coord([from,0])[1],y1=api.coord([from,1])[1],rowH=behaviorRowHeight(api);
+    const top=Math.min(y0,y1)-rowH/2,bottom=Math.max(y0,y1)+rowH/2;
+    return {type:'rect',shape:{x:Math.min(x0,x1),y:top,width:Math.abs(x1-x0),height:Math.max(1,bottom-top),r:0},
+      style:{fill:'rgba(132,155,173,.105)',stroke:'rgba(122,145,164,.13)',lineWidth:.45}};
+  };
+  const workBoundaryRender=(params,api)=>{
+    const x=api.coord([api.value(0),2])[0];
+    const y2=api.coord([api.value(0),2])[1],y5=api.coord([api.value(0),5])[1],rowH=behaviorRowHeight(api);
+    return {type:'line',shape:{x1:x,y1:Math.min(y2,y5)-rowH/2,x2:x,y2:Math.max(y2,y5)+rowH/2},
+      style:{stroke:'rgba(118,137,151,.34)',lineWidth:.8,lineDash:[3,4]}};
   };
   const baselineRender=(params,api)=>{
-    const x0=api.coord([0,0])[0],x1=api.coord([1440,0])[0];
-    const y0=api.coord([0,0])[1],y1=api.coord([0,1])[1],y=(y0+y1)/2;
+    const x0=api.coord([currentRange.start,0])[0],x1=api.coord([currentRange.end,0])[0];
+    const y0=api.coord([currentRange.start,0])[1],y1=api.coord([currentRange.start,1])[1],y=(y0+y1)/2;
     return {type:'line',shape:{x1:x0,y1:y,x2:x1,y2:y},style:{stroke:'#aab8c3',lineWidth:1.15,opacity:.88}};
   };
+  const workBoundaries=()=>model.workWindows.flatMap(w=>[w[0],w[1]]).map(x=>[x]);
   const option={
     animation:state.prefs.motion!==false,animationDuration:180,animationEasing:'cubicOut',
-    grid:{left:SIDE,right:SIDE,top:10,bottom:106},
+    grid:gridForRange(currentRange),
     tooltip:{trigger:'item',confine:true,backgroundColor:'#fff',borderColor:'#dce8f1',textStyle:{fontSize:11,color:'#385870'},
       formatter:p=>{
         const d=p.data||{};
@@ -137,8 +163,8 @@ function mountAttendanceTimeline(a){
     yAxis:{type:'category',inverse:true,data:model.tracks.map(t=>t.key),axisLine:{show:false},axisTick:{show:false},axisLabel:{show:false},
       splitLine:{show:false},splitArea:{show:false}},
     dataZoom:[
-      {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
-      {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:SIDE,right:SIDE,bottom:SLIDER_BOTTOM,height:SLIDER_HEIGHT,
+      {id:'inside',type:'inside',xAxisIndex:0,startValue:currentRange.start,endValue:currentRange.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
+      {id:'slider',type:'slider',xAxisIndex:0,startValue:currentRange.start,endValue:currentRange.end,left:SIDE,right:SIDE,bottom:SLIDER_BOTTOM,height:SLIDER_HEIGHT,
         minValueSpan:15,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
         backgroundColor:'#edf0f2',fillerColor:'#ffffff',borderColor:'#d9dfe4',
         handleSize:'100%',handleStyle:{color:'#8999a5',borderColor:'#718693',borderWidth:1},
@@ -149,15 +175,18 @@ function mountAttendanceTimeline(a){
         data:model.workWindows.map(x=>[x[0],x[1]]),renderItem:scheduleRender,z:0},
       {id:'behavior-rails',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
         data:[2,3,4,5].map(i=>[0,1440,i]),renderItem:railRender,z:2},
+      {id:'work-boundaries',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
+        data:workBoundaries(),renderItem:workBoundaryRender,z:3},
       {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.bars,renderItem:bandRender,z:4},
       {id:'event-baseline',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
         data:[[0,1440]],renderItem:baselineRender,z:5},
       {id:'behavior-labels',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:false,
-        data:[2,3,4,5].map(i=>[0,1440,i]),renderItem:railLabelRender,z:6},
+        data:[2,3,4,5].map(i=>[0,1440,i]),renderItem:railLabelRender,z:9},
       {id:'punches',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.events,renderItem:eventRender,z:7}
     ]
   };
   chart.setOption(option);
+  syncPreview();
   chart.on('click',p=>{
     const d=p.data||{};
     if(p.seriesId==='punches'&&d.records?.length){focusRawEvidence('attendance',d.records.map(r=>r.recordId));return}
@@ -167,14 +196,18 @@ function mountAttendanceTimeline(a){
     const q=e.batch?.[0]||e;let start=q.startValue,end=q.endValue;
     if(start==null||end==null){if(q.start==null||q.end==null)return;start=q.start*14.4;end=q.end*14.4}
     start=Math.max(0,Math.min(1440,+start));end=Math.max(start+15,Math.min(1440,+end));
-    state.timelineRange={key:range.key,start,end};
-    model=r14TrackData(a,state.timelineRange,chart.getWidth());
+    currentRange={key:initialRange.key,start,end};
+    state.timelineRange=currentRange;
+    model=r14TrackData(a,currentRange,chart.getWidth());
     chart.setOption({
+      grid:gridForRange(currentRange),
       series:[
         {id:'schedule',data:model.workWindows.map(x=>[x[0],x[1]])},
+        {id:'work-boundaries',data:workBoundaries()},
         {id:'bands',data:model.bars},
         {id:'punches',data:model.events}
       ]
     });
+    syncPreview();
   });
 }
