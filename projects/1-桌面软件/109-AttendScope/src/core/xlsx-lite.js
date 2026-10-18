@@ -52,11 +52,12 @@
         else {const ve=c.getElementsByTagName('v')[0]; const raw=ve?ve.textContent:''; if(t==='s') val=shared[Number(raw)]??''; else if(t==='b') val=raw==='1'; else if(raw!==''&&!Number.isNaN(Number(raw))) val=Number(raw); else val=raw}
         arr[idx]=val;
       }
+      arr.__rowNumber=Number(r.getAttribute('r'))||rows.length+1;
       rows.push(arr);
     }
     if(!rows.length)return {sheet:first.getAttribute('name')||'Sheet1',rows:[]};
     const headers=rows[0].map(x=>String(x??'').trim());
-    const objects=rows.slice(1).filter(r=>r.some(v=>v!==undefined&&v!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
+    const objects=rows.slice(1).filter(r=>r.some(v=>v!==undefined&&v!=='')).map(r=>{const obj=Object.fromEntries(headers.map((h,i)=>[h,r[i]??'']));obj.__rowNumber=r.__rowNumber;return obj;});
     return {sheet:first.getAttribute('name')||'Sheet1',headers,rows:objects};
   }
   function parseCsvText(text){
@@ -76,7 +77,7 @@
     }
     row.push(cur); if(row.some(x=>x!==''))rows.push(row); if(!rows.length)return [];
     const headers=rows[0].map(x=>String(x).trim());
-    return rows.slice(1).filter(r=>r.some(v=>String(v??'')!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
+    return rows.slice(1).map((r,i)=>r.some(v=>String(v??'')!=='')?{...Object.fromEntries(headers.map((h,j)=>[h,r[j]??''])),__rowNumber:i+2}:null).filter(Boolean);
   }
   async function readTable(file){
     const name=file.name.toLowerCase(); if(name.endsWith('.csv')) return {sheet:'CSV',headers:[],rows:parseCsvText(await file.text())};

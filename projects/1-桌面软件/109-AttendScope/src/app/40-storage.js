@@ -6,19 +6,23 @@ function downloadBlob(blob,name){
 function downloadAttendance(){downloadBlob(XLSX.writeXlsx(state.records.map(r=>({姓名:r.name,打卡时间:r.datetime,进出:r.direction})),'考勤'),'考勤_'+monthKey()+'.xlsx')}
 function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note})),'请假'),'请假_'+monthKey()+'.xlsx')}
 function downloadTrips(){downloadBlob(XLSX.writeXlsx(state.trips.map(r=>({姓名:r.name,开始日期:r.startDate,结束日期:r.endDate,类型:r.type,地点:r.place,备注:r.note})),'出差'),'出差_'+monthKey()+'.xlsx')}
-function exportTraditionalTable(){
+function traditionalRows(){
   const rows=[];
   for(const e of EMPLOYEES)for(let d=1;d<=monthDays();d++){
     const a=state.analysis.get(e.id+'|'+d);
     rows.push({姓名:e.name,部门:e.department,组别:groupOf(e),日期:a.date,星期:'周'+weekdayLabel(d),
       日期性质:a.dayType==='adjust'?'调休工作日':a.dayType==='work'?'工作日':a.dayType==='holiday'?'节假日':'休息日',
       状态:a.status,严重度:a.severity==='problem'?'明确问题':a.severity==='suspect'?'疑似异常':a.severity==='excused'?'请假/出差':a.severity==='rest'?'休息':'正常',
+      系统判定:attendanceJudgmentSystem(a),人工判定:manualStatusFor(a)||'',最终判定:attendanceJudgment(a),
       首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),
       异常摘要:a.issues.join('；'),业务标记:a.marker==='leave'?'请假':a.marker==='trip'?'出差':'',
-      人工处理:state.revisions.some(r=>r.key===e.id+'|'+d)?'是':'否'});
+      人工处理:(state.revisions.some(r=>r.key===e.id+'|'+d)||!!manualStatusFor(a))?'是':'否'});
   }
-  downloadBlob(XLSX.writeXlsx(rows,'每日考勤明细'),monthKey()+'_每日考勤明细.xlsx');
-  toast('已导出当前月份的考勤明细');
+  return rows;
+}
+function exportTraditionalTable(){
+  downloadBlob(XLSX.writeXlsx(traditionalRows(),'每日考勤明细'),monthKey()+'_每日考勤明细.xlsx');
+  toast('已导出当前月份的考勤明细（含系统、人工及最终判定）');
 }
 async function dir(root,n){return root.getDirectoryHandle(n,{create:true})}
 async function existingDir(root,n){return root.getDirectoryHandle(n,{create:false})}
@@ -39,9 +43,9 @@ async function ensureProjectSkeleton(){
   const config=await dir(state.projectDir,'config'),calendar=await dir(config,'calendar');
   const m=await monthDirectory();
   for(const part of ['raw','working','snapshots','branches','output'])await dir(m,part);
-  await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
-  await writeFile(config,'employees.json',JSON.stringify({schemaVersion:2,employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)}))},null,2));
-  await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
+  if(!await readJSON(state.projectDir,'project.json'))await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
+  if(!await readJSON(config,'employees.json'))await writeFile(config,'employees.json',JSON.stringify({schemaVersion:2,employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)}))},null,2));
+  if(!await readJSON(config,'work_rules.json'))await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
   const calendarFile=String(YEAR)+'.json';
   if(!await readJSON(calendar,calendarFile)){
     await writeFile(calendar,calendarFile,JSON.stringify({schemaVersion:1,year:YEAR,overrides:YEAR===2026?
@@ -61,6 +65,13 @@ async function connectProjectDir(){
     state.projectDir=handle;
     if(project?.projectId==='P109-AttendScope'){
       const conf=await existingDir(handle,'config').catch(()=>null);
+      if(conf){
+        const savedRules=await readJSON(conf,'work_rules.json');
+        if(savedRules)for(const k of ['amStart','amEnd','pmStart','pmEnd','grace','dupSeconds'])if(savedRules[k]!=null)RULES[k]=savedRules[k];
+        const caldir=await existingDir(conf,'calendar').catch(()=>null);
+        const cal=caldir?await readJSON(caldir,String(YEAR)+'.json'):null;
+        if(cal?.overrides)state.calendarOverrides={...cal.overrides};
+      }
       if(conf){const people=await readJSON(conf,'employees.json');if(people?.employees)
         for(const e of people.employees)if(e.id&&e.group)state.groups[e.id]=e.group}
       const monthKeys=new Set([...(project.months||[]),monthKey()]);
@@ -112,6 +123,9 @@ async function saveWorking(){
       await ensureProjectSkeleton();
       const m=await monthDirectory(),w=await dir(m,'working');
       await writeFile(w,'state.json',payload);
+      const config=await dir(state.projectDir,'config');
+      await writeFile(config,'employees.json',JSON.stringify({schemaVersion:2,employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)}))},null,2));
+      await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
       state.saved=true;rememberMonth();
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
       render();toast('已保存 '+monthKey()+' 的工作状态');return;
@@ -121,14 +135,17 @@ async function saveWorking(){
   state.saved=true;rememberMonth();render();toast('已下载当前月份工作状态 JSON');
 }
 async function freezeSnapshot(){
-  const id='F'+Date.now(),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
+  const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
     appVersion:'0.1.0-preview',sourceImports:state.imports,parentSnapshot:null};
-  const snapshot={manifest,config:{employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:RULES},working:workingPayload()};
+  const snapshot={manifest,config:{employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}},working:workingPayload()};
   const txt=JSON.stringify(snapshot,null,2);
   if(state.projectDir){
     try{
       await ensureProjectSkeleton();
-      const m=await monthDirectory(),snapshots=await dir(m,'snapshots'),folder=await dir(snapshots,id);
+      const m=await monthDirectory(), snapshots=await dir(m,'snapshots');
+      const already=await existingDir(snapshots,id).then(()=>true,e=>e.name==='NotFoundError'?false:Promise.reject(e));
+      if(already)throw new Error('快照编号已存在，拒绝覆盖');
+      const folder=await dir(snapshots,id);
       await writeFile(folder,'snapshot.json',txt);toast('已冻结 '+monthKey()+' · '+id);return;
     }catch(e){toast('冻结失败：'+e.message,true);return}
   }

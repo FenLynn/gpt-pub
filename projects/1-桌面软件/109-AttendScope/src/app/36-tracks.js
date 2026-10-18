@@ -44,16 +44,16 @@ function r14TrackData(a,range=timelineRange(a),width=800){
   const bars=[];
   for(const key of ['trip','leave','outing','overtime']){
     const lane=tracks.findIndex(t=>t.key===key),track=tracks[lane];
-    for(const seg of r23BehaviorSegments(a,key)){
+    for(const seg of (state.prefs?.timelineTracks?.[key]===false?[]:r23BehaviorSegments(a,key))){
       const from=Math.max(0,Math.min(1440,+seg.from)),to=Math.max(0,Math.min(1440,+seg.to));
       if(to>from)bars.push({value:[from,to,lane],color:track.color,title:seg.title||track.title,track:key,sourceIds:seg.sourceIds||null});
     }
   }
-  const workWindows=!isWorkday(a.day)?[]:[
+  const workWindows=!isWorkday(a.day)||state.prefs?.timelineTracks?.rules===false?[]:[
     [minutes(RULES.amStart),minutes(RULES.amEnd)],
     [minutes(RULES.pmStart),minutes(RULES.pmEnd)]
   ];
-  return {tracks,bars,events:r19PunchClusters(a,range,width),workWindows};
+  return {tracks,bars,events:state.prefs?.timelineTracks?.events===false?[]:r19PunchClusters(a,range,width),workWindows};
 }
 function mountAttendanceTimeline(a){
   const el=document.getElementById('attendanceTimelineChart');if(!el||!window.echarts)return;

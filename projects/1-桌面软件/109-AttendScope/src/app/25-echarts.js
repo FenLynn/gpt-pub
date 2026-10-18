@@ -235,7 +235,7 @@ function timelineTooltipFormatter(params){
   return `<div style="min-width:132px"><div style="display:flex;align-items:center;gap:7px"><i style="width:7px;height:7px;border-radius:50%;background:${color}"></i><b style="font-size:11px;color:#31475b">${head}</b></div>${tag?`<div style="margin-top:5px;color:#6f7fd0">${tag}</div>`:''}${item.records.length>1?rows:''}</div>`;
 }
 
-function mountAttendanceTimeline(a){
+function legacyMountAttendanceTimeline(a){
   const el=document.getElementById('attendanceTimelineChart');
   if(!el||!window.echarts)return;
   const chart=initAttendChart(el);
@@ -480,7 +480,7 @@ function mountPersonStats(ctx){
       grid:{left:36,right:14,top:14,bottom:28},
       tooltip:{...chartTooltipAxis(),formatter:p=>{const q=p[0],a=work[q.dataIndex];return `${pad(a.day)} 日<br>确认在岗 <b>${(a.presence/60).toFixed(1)} h</b><br>${a.status}`}},
       xAxis:{type:'category',data:work.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
-      yAxis:{type:'value',min:0,max:10,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
+      yAxis:{type:'value',min:0,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
       series:[{
         type:'line',data:work.map(a=>+(a.presence/60).toFixed(2)),smooth:.28,showSymbol:false,
         lineStyle:{color:'#5899c3',width:2},areaStyle:{color:'rgba(88,153,195,.07)'}
@@ -520,7 +520,7 @@ function mountCellStats(ctx){
       grid:{left:36,right:14,top:14,bottom:28},
       tooltip:{...chartTooltipAxis(),formatter:p=>{const a=days[p[0].dataIndex];return `${pad(a.day)} 日<br>${a.status}<br>在岗 ${(a.presence/60).toFixed(1)} h`}},
       xAxis:{type:'category',data:days.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
-      yAxis:{type:'value',min:0,max:10,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
+      yAxis:{type:'value',min:0,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
       series:[
         {type:'line',data:days.map(a=>a.status==='未导入'?null:+(a.presence/60).toFixed(2)),smooth:.28,showSymbol:false,lineStyle:{color:'#5a9bc5',width:2},areaStyle:{color:'rgba(90,155,197,.06)'}},
         {type:'scatter',symbolSize:10,data:days.map((a,i)=>a.day===ctx.day?[i,+(a.presence/60).toFixed(2)]:null).filter(Boolean),itemStyle:{color:'#2c7fd1',borderColor:'#fff',borderWidth:2}}

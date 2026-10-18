@@ -67,8 +67,8 @@ function layoutHtml(){
 
       <section class="side-section month-meta">
         <div class="side-label">当前月信息</div>
-        <div class="meta-row"><span>工作</span><b>08:30–12:00</b></div>
-        <div class="meta-row"><span>下午</span><b>14:00–17:30</b></div>
+        <div class="meta-row"><span>工作</span><b>${RULES.amStart}–${RULES.amEnd}</b></div>
+        <div class="meta-row"><span>下午</span><b>${RULES.pmStart}–${RULES.pmEnd}</b></div>
         <div class="meta-row"><span>人员</span><b>${EMPLOYEES.length} 人</b></div>
         <div class="meta-row"><span>请假</span><b>${state.leaves.length} 人次</b></div>
         <div class="meta-row"><span>出差</span><b>${state.trips.length} 人次</b></div>
@@ -105,7 +105,7 @@ function layoutHtml(){
 
     <main class="workspace">
       <div class="workbench">
-        <section class="matrix-zone" aria-label="50人员工31天月度考勤状态矩阵">
+        <section class="matrix-zone" aria-label="月度员工考勤状态矩阵">
           <div class="matrix-wrap" id="matrixScroll"><div class="matrix" id="matrix"></div></div>
         </section>
 
@@ -289,6 +289,7 @@ function renderMatrix(){
     ' '+(state.selection.type==='cell'?'soft':'')+'" style="--focus-col:'+Math.max(0,selectedCol)+'"></div>';
   html+='<div class="matrix-preview-frame focus-row inactive"></div><div class="matrix-preview-frame focus-col inactive"></div>';
   el.innerHTML=html;
+  el.style.setProperty('--matrix-rows',String(EMPLOYEES.length));
   el.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
   el.classList.remove('focus-person','focus-date','focus-cell');
   if(state.selection.type==='person')el.classList.add('focus-person');

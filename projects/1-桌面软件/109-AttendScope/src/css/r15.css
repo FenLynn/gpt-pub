@@ -346,7 +346,7 @@
  top:33px!important;
  left:calc(var(--matrix-name) + var(--focus-col) * var(--matrix-cell))!important;
  width:var(--matrix-cell)!important;
- height:calc(50 * var(--matrix-row))!important;
+ height:calc(var(--matrix-rows,50) * var(--matrix-row))!important;
 }
 .matrix-preview-frame.focus-row{
  top:calc(33px + var(--focus-row) * var(--matrix-row))!important;
@@ -356,7 +356,7 @@
  top:33px!important;
  left:calc(var(--matrix-name) + var(--focus-col) * var(--matrix-cell))!important;
  width:var(--matrix-cell)!important;
- height:calc(50 * var(--matrix-row))!important;
+ height:calc(var(--matrix-rows,50) * var(--matrix-row))!important;
 }
 .corner-mark{display:none!important}
 

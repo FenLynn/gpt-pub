@@ -47,9 +47,9 @@ function settingsContent(section){
    settingCheck('settingManualCheck','显示人工确认 √','人工修改过红黄绿判断后，在方块右上角显示确认标记')+
    settingRange('settingGlow','紫色发光强度',.5,1.8,.1)+
    settingRange('settingRestContrast','休息日底色强度',.6,1.8,.1));
- case 'timeline':return sectionCard('时间轴轨道','法定工作时间作为淡灰背景直接铺在时间轴内，不再单独占一条轨道；业务轨道仅在有记录时显示。',
+ case 'timeline':return sectionCard('时间轴轨道','法定工作时间作为淡灰背景直接铺在时间轴内，不再单独占一条轨道；六条轨道始终保留；开关只控制记录绘制，不删除轨道。',
    settingCheck('settingArrows','箭头朝向时间线')+
-   Object.entries({rules:'法定时段背景',events:'中轴打卡事件',actual:'实际在岗区间',trip:'出差区间',leave:'请假区间',outing:'外出区间',overtime:'加班区间'}).map(([id,t])=>
+   Object.entries({rules:'法定时段背景',events:'中轴打卡事件',trip:'出差区间',leave:'请假区间',outing:'外出区间',overtime:'加班区间'}).map(([id,t])=>
      settingCheck('settingTrack_'+id,t)).join(''));
  case 'table':return sectionCard('原始数据列管理','按类别保存显示和列宽；留空宽度则自动铺满，不改变任何原始数据。',
    settingSelect('settingTableKind','数据类别',[
@@ -67,7 +67,7 @@ function settingsContent(section){
    '<p class="r14-setting-note">复杂演示打卡包含同向重复、连续短间隔进出和晚间返岗。演示数据仅属于 2026 年 10 月。</p>');
  default:return sectionCard('本地运行','所有核心脚本和绘图库均本地提供，当前为实验预览版本。',
    '<div class="r14-readonly"><strong>应用</strong><span>AttendScope P109</span></div>'+
-   '<div class="r14-readonly"><strong>版本</strong><span>R14 · v0.1.0-preview</span></div>'+
+   '<div class="r14-readonly"><strong>版本</strong><span>R32 · v0.1.0-preview</span></div>'+
    '<div class="r14-readonly"><strong>存储</strong><span>当前月份 working / snapshots</span></div>');
  }
 }
@@ -129,7 +129,7 @@ function bindSettings(){
   if(section==='matrix'){p.matrix={ids:!!ch('settingIds'),crosshair:!!ch('settingCrosshair'),showManualCheck:!!ch('settingManualCheck'),glow:Number(v('settingGlow')||1),restContrast:Number(v('settingRestContrast')||1)}}
   if(section==='timeline'){
    p.arrowsTowardLine=!!ch('settingArrows');
-   for(const k of Object.keys(p.timelineTracks))p.timelineTracks[k]=!!ch('settingTrack_'+k);
+   for(const k of ['rules','events','trip','leave','outing','overtime'])p.timelineTracks[k]=!!ch('settingTrack_'+k);
   }
   if(section==='rules'){for(const k of ['amStart','amEnd','pmStart','pmEnd'])d.rules[k]=v('r14Rule_'+k)||d.rules[k];
    d.rules.grace=Number(v('r14Grace'));d.rules.dupSeconds=Number(v('r14Dup'))}

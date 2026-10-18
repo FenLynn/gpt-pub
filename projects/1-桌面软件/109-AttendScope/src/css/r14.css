@@ -35,7 +35,7 @@ font-feature-settings:"kern" 1;letter-spacing:0}
 }
 .matrix-selection-frame.focus-col,.matrix-preview-frame.focus-col{
  top:31px!important;left:calc(var(--matrix-name) + var(--focus-col) * var(--matrix-cell) - 2px);
- width:calc(var(--matrix-cell) + 4px);height:calc(50 * var(--matrix-row) + 4px)
+ width:calc(var(--matrix-cell) + 4px);height:calc(var(--matrix-rows,50) * var(--matrix-row) + 4px)
 }
 .m-cell.row-focus,.m-cell.col-focus,.m-cell.cell-focus,.m-cell.hover-row,.m-cell.hover-col{
  box-shadow:none!important;border:0!important;background:transparent!important;filter:none!important
