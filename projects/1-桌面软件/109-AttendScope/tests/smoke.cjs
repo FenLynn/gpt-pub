@@ -129,7 +129,7 @@ async function run(){
      parseFloat(getComputedStyle(cross).opacity)>.5&&
      parseFloat(getComputedStyle(focus).opacity)>.95;
  },'Matrix focus should dim unrelated cells and preserve the selected cross');
- await page.screenshot({path:path.join(out,'r27-primary-timeline.png')});
+ await page.screenshot({path:path.join(out,'r28-primary-timeline.png')});
  await check(page,()=>{
   const data=r14TrackData(plotAnalysis(analysisContext())),tr=data.tracks.map(x=>x.key);
   const bars=document.querySelectorAll('.r15-punch-stack').length;
@@ -155,17 +155,22 @@ async function run(){
   const barHeight=bar?.getBoundingClientRect().height||0,previewHeight=preview?.getBoundingClientRect().height||0;
   const slider=zoom.find(z=>z.type==='slider');
   const keys=data.tracks.map(t=>t.key);
+  const first=data.events[0],stack=preview?.querySelector('.r15-punch-stack');
+  const px=first?chart.convertToPixel({xAxisIndex:0},first.value[0]):null;
+  const sx=stack?stack.getBoundingClientRect().left+stack.getBoundingClientRect().width/2:null;
+  const labels=[...document.querySelectorAll('#attendanceTimelineChart svg text')].filter(x=>['出差','请假','外出','加班'].includes(x.textContent.trim()));
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
     JSON.stringify(keys)===JSON.stringify(['in','out','trip','leave','outing','overtime'])&&data.workWindows.length===2&&
     zoom.filter(z=>z.type==='slider').length===1&&slider.height===34&&slider.handleSize==='100%'&&
-    ticks.length===5&&barHeight>=previewHeight-1&&opt.grid[0].left===12&&opt.grid[0].right===12&&
-    slider.left===12&&slider.right===12&&opt.grid[0].bottom>=104&&opt.yAxis[0].type==='category'&&
-    !!document.querySelector('.analysis-head-tools #timelineDayPicker')&&
+    ticks.length===5&&barHeight>=previewHeight-1&&slider.left===12&&slider.right===12&&opt.grid[0].bottom>=104&&
+    opt.yAxis[0].type==='category'&&!!document.querySelector('.analysis-head-tools #timelineDayPicker')&&
     document.querySelectorAll('.analysis-head-tools .timeline-top-legend span').length>=4&&
     getComputedStyle(preview,'::before').display==='none'&&
     Math.abs((bar?.getBoundingClientRect().top||0)-preview.getBoundingClientRect().top)<1.1&&
-    Math.abs((bar?.getBoundingClientRect().bottom||0)-preview.getBoundingClientRect().bottom)<1.1;
- },'R26 six lanes, clipped overview markers or title-bar tools failed');
+    Math.abs((bar?.getBoundingClientRect().bottom||0)-preview.getBoundingClientRect().bottom)<1.1&&
+    (px==null||sx==null||Math.abs(px-sx)<2.5)&&labels.length===4&&
+    labels.every(x=>parseFloat(getComputedStyle(x).fontSize)>=16);
+ },'R28 navigator alignment, fixed behavior labels or clipped markers failed');
 
  const tracks=await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
@@ -179,8 +184,9 @@ async function run(){
  if(tracks.oldMini||tracks.zoom.filter(z=>z==='slider').length!==1||!tracks.ids.includes('bands')||
     JSON.stringify(tracks.rails)!==JSON.stringify(['in','out','trip','leave','outing','overtime'])||
     tracks.windows!==2||!tracks.ids.includes('schedule')||!tracks.ids.includes('event-baseline')||
-    !tracks.ids.includes('behavior-rails')||!tracks.ids.includes('behavior-labels')||tracks.arrows<2)
-    throw Error('R24 six fixed lanes/single overview failed');
+    !tracks.ids.includes('behavior-rails')||!tracks.ids.includes('behavior-labels')||
+    !tracks.ids.includes('work-boundaries')||tracks.arrows<2)
+    throw Error('R28 six fixed lanes/navigator alignment failed');
  await page.locator('[data-chart-tab="overview"]').click();
  await page.waitForSelector('#overviewTrendChart svg');
  await check(page,()=>{
@@ -222,7 +228,7 @@ async function run(){
      initial?.hasAttribute('data-manual-clear')&&getComputedStyle(active).color==='rgb(255, 255, 255)'&&
      box.left>=parent.left&&box.top>=parent.top&&box.right<=parent.right+.5&&box.bottom<=parent.bottom+.5;
  },manualTarget,'R27 status blocks or contained matrix check failed');
- await page.screenshot({path:path.join(out,'r27-manual-segment.png')});
+ await page.screenshot({path:path.join(out,'r28-manual-segment.png')});
  await page.locator('.initial-judgment').click();
  await check(page,({id,day})=>{
    const key=id+'|'+day;
@@ -233,8 +239,8 @@ async function run(){
  await page.locator('[data-judgment-mode="initial"]').click();
  await check(page,({id,day})=>{
    const cell=document.querySelector('.m-cell[data-emp="'+id+'"][data-day="'+day+'"] button');
-   return state.judgmentMode==='initial'&&!cell.classList.contains('s-absent')&&!!cell.querySelector('.manual-check');
- },manualTarget,'Initial/manual view switch failed');
+   return state.judgmentMode==='initial'&&!cell.classList.contains('s-absent')&&!cell.querySelector('.manual-check');
+ },manualTarget,'Initial judgment view must hide manual matrix markers');
  await page.locator('[data-judgment-mode="manual"]').click();
  await check(page,()=>state.judgmentMode==='manual','Manual layer cannot be restored');
 
@@ -264,7 +270,7 @@ async function run(){
      ['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
      rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
  },'Behavior insight tab did not expose all four intervals');
- await page.screenshot({path:path.join(out,'r27-leave-timeline.png')});
+ await page.screenshot({path:path.join(out,'r28-leave-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
  // A stress day should merge close punches at wide range and split them naturally as the time window narrows.
@@ -352,7 +358,7 @@ async function run(){
  }
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R27',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R28',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
