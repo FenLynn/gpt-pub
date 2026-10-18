@@ -156,7 +156,9 @@ async function run(){
   const slider=zoom.find(z=>z.type==='slider');
   const keys=data.tracks.map(t=>t.key);
   const first=data.events[0],stack=preview?.querySelector('.r15-punch-stack');
-  const px=first?chart.convertToPixel({xAxisIndex:0},first.value[0]):null;
+  const chartRect=document.getElementById('attendanceTimelineChart').getBoundingClientRect();
+  const localPx=first?chart.convertToPixel({xAxisIndex:0},first.value[0]):null;
+  const px=localPx==null?null:chartRect.left+localPx;
   const sx=stack?stack.getBoundingClientRect().left+stack.getBoundingClientRect().width/2:null;
   const labels=[...document.querySelectorAll('#attendanceTimelineChart svg text')].filter(x=>['出差','请假','外出','加班'].includes(x.textContent.trim()));
   return frames.length===2&&[...frames].every(x=>x.classList.contains('soft'))&&
