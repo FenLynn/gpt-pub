@@ -78,7 +78,17 @@ import {
   resolvePublicationMetrics,
   resolveSeriesPalette
 } from "./plot/publication";
-import { templates } from "./plot/templates";
+import {
+  defaultTemplateForSystem,
+  plotSystemIdForTemplate,
+  plotSystems,
+  singleYAppearanceForTemplate,
+  singleYAppearances,
+  templateForSingleYAppearance,
+  templatesForSystem,
+  type PlotSystemId,
+  type SingleYAppearanceId
+} from "./plot/templates";
 import { checkFigure } from "./project/checker";
 import {
   downloadProject,
@@ -3443,23 +3453,90 @@ function App() {
               <div className="figure-toolbar">
                 <div className="toolbar-selects">
                   <label>
-                    <span>图型</span>
+                    <span>图类</span>
                     <select
-                      value={activeFigure.templateId}
+                      value={
+                        isLorentz
+                          ? "single-y"
+                          : plotSystemIdForTemplate(activeFigure.templateId)
+                      }
                       disabled={Boolean(isLorentz)}
-                      title={isLorentz ? "双面板组合图通过数据簿、曲线、图形、坐标轴和标注页编辑" : undefined}
+                      title={
+                        isLorentz
+                          ? "双面板组合图通过数据簿、曲线、图形、坐标轴和标注页编辑"
+                          : "按坐标系和数据组织选择图类。点、线、点线和多曲线都属于单 Y。"
+                      }
                       onChange={(event) =>
                         patchActiveFigure((figure) => ({
                           ...figure,
-                          templateId: event.target.value as PlotTemplateId
+                          templateId: defaultTemplateForSystem(
+                            event.target.value as PlotSystemId
+                          )
                         }))
                       }
                     >
-                      {isLorentz ? <option value="xy-line">双面板 · 线图</option> : templates.map((template) => (
-                        <option key={template.id} value={template.id}>
-                          {template.label}
-                        </option>
-                      ))}
+                      {isLorentz ? (
+                        <option value="single-y">单 Y</option>
+                      ) : (
+                        plotSystems.map((system) => (
+                          <option key={system.id} value={system.id}>
+                            {system.label}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>
+                      {plotSystemIdForTemplate(activeFigure.templateId) === "single-y"
+                        ? "表现"
+                        : "类型"}
+                    </span>
+                    <select
+                      value={
+                        isLorentz
+                          ? "line"
+                          : plotSystemIdForTemplate(activeFigure.templateId) === "single-y"
+                          ? singleYAppearanceForTemplate(activeFigure.templateId)
+                          : activeFigure.templateId
+                      }
+                      disabled={Boolean(isLorentz)}
+                      title={
+                        plotSystemIdForTemplate(activeFigure.templateId) === "single-y"
+                          ? "只改变单 Y 图的默认系列表现。多条 Y 仍属于同一个单 Y 图。"
+                          : "选择当前图类下的具体组织方式"
+                      }
+                      onChange={(event) => {
+                        const system = plotSystemIdForTemplate(activeFigure.templateId);
+                        patchActiveFigure((figure) => ({
+                          ...figure,
+                          templateId:
+                            system === "single-y"
+                              ? templateForSingleYAppearance(
+                                  event.target.value as SingleYAppearanceId
+                                )
+                              : event.target.value as PlotTemplateId
+                        }));
+                      }}
+                    >
+                      {isLorentz ? (
+                        <option value="line">线</option>
+                      ) : plotSystemIdForTemplate(activeFigure.templateId) === "single-y" ? (
+                        singleYAppearances.map((appearance) => (
+                          <option key={appearance.id} value={appearance.id}>
+                            {appearance.label}
+                          </option>
+                        ))
+                      ) : (
+                        templatesForSystem(
+                          plotSystemIdForTemplate(activeFigure.templateId)
+                        ).map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.label}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </label>
 

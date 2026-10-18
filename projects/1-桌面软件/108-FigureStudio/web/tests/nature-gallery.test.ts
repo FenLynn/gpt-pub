@@ -17,7 +17,14 @@ import {
   goldenTickIntervalTarget
 } from "../src/plot/goldenStyle";
 import { PUBLICATION_PALETTES } from "../src/plot/palettes";
-import { templates } from "../src/plot/templates";
+import {
+  defaultTemplateForSystem,
+  plotSystemIdForTemplate,
+  plotSystems,
+  singleYAppearanceForTemplate,
+  templates,
+  templatesForSystem
+} from "../src/plot/templates";
 import { buildSurfaceVectorSvg } from "../src/export/surfaceVectorSvg";
 
 assert.equal(PUBLICATION_PALETTES["mist-blue-celadon"].colors[0],"#4F6D8A");
@@ -30,6 +37,18 @@ assert.ok(templates.some(t=>t.id==="surface-projection-3d"),
   "Three-direction 3D projection must be a first-class template");
 assert.ok(templates.some(t=>t.id==="publication-board"),
   "Publication Style Board must be a first-class template");
+assert.equal(plotSystemIdForTemplate("xy-line"),"single-y");
+assert.equal(plotSystemIdForTemplate("xy-scatter"),"single-y");
+assert.equal(plotSystemIdForTemplate("xy-line-marker"),"single-y");
+assert.equal(plotSystemIdForTemplate("xy-errorbar"),"single-y");
+assert.equal(plotSystemIdForTemplate("double-y"),"double-y");
+assert.equal(plotSystemIdForTemplate("waterfall"),"waterfall");
+assert.equal(singleYAppearanceForTemplate("xy-line-marker"),"line-marker");
+assert.equal(defaultTemplateForSystem("single-y"),"xy-line");
+assert.ok(templatesForSystem("single-y").length>=5,
+  "Single-Y must be a system containing line/point/point-line/error variants");
+assert.ok(plotSystems.some(system=>system.id==="double-y"));
+assert.ok(plotSystems.some(system=>system.id==="waterfall"));
 for (const id of ["pca-ellipse","volcano","ridgeline"] as const) {
   assert.ok(templates.some(t=>t.id===id),id+" must be a first-class scientific template");
 }
