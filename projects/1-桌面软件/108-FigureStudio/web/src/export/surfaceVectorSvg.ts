@@ -268,27 +268,51 @@ export function buildSurfaceVectorSvg(input:SurfaceVectorSvgInput):string{
   const yWall=ymax-(ymax-ymin)*.002;
   let contours="";
   if(projection){
-    levels.forEach(level=>{
-      const color=useColorMap?colorAt((level-zmin)/(zmax-zmin||1)):"#2f5360";
-      const lines=stitchContours(contourSegments(xs,ys,zv,level)).map(smoothContour);
-      for(const contour of lines){
-        if(figure.figureOverrides.surfaceProjectionFloor??true)
+    if(figure.figureOverrides.surfaceProjectionFloor??true){
+      levels.forEach(level=>{
+        const color=useColorMap?colorAt((level-zmin)/(zmax-zmin||1)):"#2f5360";
+        const lines=stitchContours(contourSegments(xs,ys,zv,level)).map(smoothContour);
+        for(const contour of lines){
           contours+=path(
             contour.map(point=>surfacePoint(point[0],point[1],floorLineZ)),
             color,requestedWidth*1.45
           );
-        if(figure.figureOverrides.surfaceProjectionX??true)
-          contours+=path(
-            contour.map(point=>surfacePoint(xWall,point[1],level)),
-            color,requestedWidth*1.25
-          );
-        if(figure.figureOverrides.surfaceProjectionY??true)
-          contours+=path(
-            contour.map(point=>surfacePoint(point[0],yWall,level)),
-            color,requestedWidth*1.25
-          );
+        }
+      });
+    }
+    const sideCount=Math.max(5,Math.min(10,Math.round(count*.7)));
+    const sliceIndices=(length:number)=>[
+      ...new Set(Array.from({length:sideCount},(_,i)=>
+        Math.round((i+1)*(length-1)/(sideCount+1))
+      ))
+    ].filter(index=>index>0&&index<length-1);
+
+    if(figure.figureOverrides.surfaceProjectionX??true){
+      for(const column of sliceIndices(xs.length)){
+        const points:V3[]=[];
+        for(let row=0;row<ys.length;row+=1){
+          const value=zv[row]?.[column];
+          if(Number.isFinite(value))points.push(surfacePoint(xWall,ys[row],value));
+        }
+        if(points.length>=2){
+          const color=useColorMap?colorAt((xs[column]-xmin)/(xmax-xmin||1)):"#2f5360";
+          contours+=path(points,color,requestedWidth*1.22);
+        }
       }
-    });
+    }
+    if(figure.figureOverrides.surfaceProjectionY??true){
+      for(const row of sliceIndices(ys.length)){
+        const points:V3[]=[];
+        for(let column=0;column<xs.length;column+=1){
+          const value=zv[row]?.[column];
+          if(Number.isFinite(value))points.push(surfacePoint(xs[column],yWall,value));
+        }
+        if(points.length>=2){
+          const color=useColorMap?colorAt((ys[row]-ymin)/(ymax-ymin||1)):"#2f5360";
+          contours+=path(points,color,requestedWidth*1.22);
+        }
+      }
+    }
   }
   const axisColor="#404a52",gridColor="#d8dde1";
   let axes="";

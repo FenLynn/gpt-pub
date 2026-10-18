@@ -260,15 +260,24 @@ for (let n=0; n<gallery.length; n++) {
   const refinedContours=projectedTraces.filter(
     trace=>trace.type==="scatter3d"&&trace.meta?.figureStudioProjectionStyle==="refined-contour"
   );
+  const xProfiles=projectedTraces.filter(
+    trace=>trace.type==="scatter3d"&&trace.meta?.figureStudioProjectionStyle==="refined-side-profile"&&
+      trace.meta?.figureStudioProjectionAxis==="x"
+  );
+  const yProfiles=projectedTraces.filter(
+    trace=>trace.type==="scatter3d"&&trace.meta?.figureStudioProjectionStyle==="refined-side-profile"&&
+      trace.meta?.figureStudioProjectionAxis==="y"
+  );
   assert.ok(refinedContours.length>=8,
-    "Refined 3D projection should expose a useful family of contour levels");
-  assert.ok(refinedContours.every(trace=>trace.mode==="lines"&&trace.hoverinfo==="skip"),
-    "Refined projection contours must stay as clean line-only layers");
-  assert.ok(refinedContours.every(trace=>
-    trace.meta?.figureStudioProjectionAxes?.includes("floor")&&
-    trace.meta?.figureStudioProjectionAxes?.includes("x")&&
-    trace.meta?.figureStudioProjectionAxes?.includes("y")
-  ),"Every refined contour level must project to floor, X wall and Y wall");
+    "Refined floor projection should expose a useful family of z-contour levels");
+  assert.ok(xProfiles.length>=5,
+    "X-wall projection should preserve multiple smooth constant-x profiles");
+  assert.ok(yProfiles.length>=5,
+    "Y-wall projection should preserve multiple smooth constant-y profiles");
+  assert.ok([...refinedContours,...xProfiles,...yProfiles].every(
+    trace=>trace.mode==="lines"&&trace.hoverinfo==="skip"
+  ),"All refined 3D projection layers must stay clean and line-only");
+  assert.ok(refinedContours.every(trace=>trace.meta?.figureStudioProjectionAxis==="floor"));
   assert.equal(projectedSurface!.figureOverrides.colorScale,"Viridis");
   const projectedPhysical=resolveCanvasMm(presets.scientific,projectedSurface!);
   const vectorSurfaceSvg=buildSurfaceVectorSvg({

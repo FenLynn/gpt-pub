@@ -1025,7 +1025,7 @@ export function buildTraces(args: {
       figure.figureOverrides.colorScale ?? GOLDEN_STYLE.field.colorScale
     );
 
-    if (projectionTemplate && (floorProjection || sideX || sideY)) {
+    if (projectionTemplate && floorProjection) {
       const levels = Array.from(
         { length: projectionCount },
         (_unused, index) =>
@@ -1042,37 +1042,18 @@ export function buildTraces(args: {
           .map(smoothSurfaceContourLine)
           .filter((line) => line.length >= 2);
         if (!contourLines.length) continue;
-
         const traceX: Array<number | null> = [];
         const traceY: Array<number | null> = [];
         const traceZ: Array<number | null> = [];
-        const append = (
-          line: SurfaceContourPoint[],
-          axis: "floor" | "x" | "y"
-        ) => {
+        for (const line of contourLines) {
           for (const point of line) {
-            if (axis === "floor") {
-              traceX.push(point[0]);
-              traceY.push(point[1]);
-              traceZ.push(floorContourZ);
-            } else if (axis === "x") {
-              traceX.push(xWall);
-              traceY.push(point[1]);
-              traceZ.push(level);
-            } else {
-              traceX.push(point[0]);
-              traceY.push(yWall);
-              traceZ.push(level);
-            }
+            traceX.push(point[0]);
+            traceY.push(point[1]);
+            traceZ.push(floorContourZ);
           }
           traceX.push(null);
           traceY.push(null);
           traceZ.push(null);
-        };
-        for (const line of contourLines) {
-          if (floorProjection) append(line, "floor");
-          if (sideX) append(line, "x");
-          if (sideY) append(line, "y");
         }
         projectionTraces.push({
           type: "scatter3d",
@@ -1093,12 +1074,103 @@ export function buildTraces(args: {
           },
           meta: {
             figureStudioProjectionStyle: "refined-contour",
-            figureStudioProjectionLevel: level,
-            figureStudioProjectionAxes: [
-              ...(floorProjection ? ["floor"] : []),
-              ...(sideX ? ["x"] : []),
-              ...(sideY ? ["y"] : [])
-            ]
+            figureStudioProjectionAxis: "floor",
+            figureStudioProjectionLevel: level
+          }
+        });
+      }
+    }
+
+    const sideCount = Math.max(
+      5,
+      Math.min(10, Math.round(projectionCount * 0.7))
+    );
+    const sliceIndices = (length: number) => {
+      const indices = Array.from(
+        { length: sideCount },
+        (_unused, index) =>
+          Math.round((index + 1) * (length - 1) / (sideCount + 1))
+      );
+      return [...new Set(indices)].filter(
+        (index) => index > 0 && index < length - 1
+      );
+    };
+
+    if (projectionTemplate && sideX) {
+      for (const column of sliceIndices(denseSurface.x.length)) {
+        const xLevel = denseSurface.x[column];
+        const lineX: number[] = [];
+        const lineY: number[] = [];
+        const lineZ: number[] = [];
+        for (let row = 0; row < denseSurface.y.length; row += 1) {
+          const value = denseSurface.z[row]?.[column];
+          if (value === null || !Number.isFinite(value)) continue;
+          lineX.push(xWall);
+          lineY.push(denseSurface.y[row]);
+          lineZ.push(value as number);
+        }
+        if (lineX.length < 2) continue;
+        projectionTraces.push({
+          type: "scatter3d",
+          mode: "lines",
+          x: lineX,
+          y: lineY,
+          z: lineZ,
+          showlegend: false,
+          hoverinfo: "skip",
+          connectgaps: false,
+          line: {
+            width: Math.max(1, projectionWidth),
+            color: projectionContourColor(
+              (xLevel - xLow) / xSpan,
+              projectionUseColorMap,
+              colorScale
+            )
+          },
+          meta: {
+            figureStudioProjectionStyle: "refined-side-profile",
+            figureStudioProjectionAxis: "x",
+            figureStudioProjectionLevel: xLevel
+          }
+        });
+      }
+    }
+
+    if (projectionTemplate && sideY) {
+      for (const row of sliceIndices(denseSurface.y.length)) {
+        const yLevel = denseSurface.y[row];
+        const lineX: number[] = [];
+        const lineY: number[] = [];
+        const lineZ: number[] = [];
+        for (let column = 0; column < denseSurface.x.length; column += 1) {
+          const value = denseSurface.z[row]?.[column];
+          if (value === null || !Number.isFinite(value)) continue;
+          lineX.push(denseSurface.x[column]);
+          lineY.push(yWall);
+          lineZ.push(value as number);
+        }
+        if (lineX.length < 2) continue;
+        projectionTraces.push({
+          type: "scatter3d",
+          mode: "lines",
+          x: lineX,
+          y: lineY,
+          z: lineZ,
+          showlegend: false,
+          hoverinfo: "skip",
+          connectgaps: false,
+          line: {
+            width: Math.max(1, projectionWidth),
+            color: projectionContourColor(
+              (yLevel - yLow) / ySpan,
+              projectionUseColorMap,
+              colorScale
+            )
+          },
+          meta: {
+            figureStudioProjectionStyle: "refined-side-profile",
+            figureStudioProjectionAxis: "y",
+            figureStudioProjectionLevel: yLevel
           }
         });
       }
