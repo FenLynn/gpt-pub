@@ -898,3 +898,26 @@
 .music-track-panel .r15-punch-preview{
   clip-path:inset(0 round 2px);
 }
+
+
+/* R29: restore the proven timeline geometry; tighten only navigator clipping and manual-state affordance. */
+.music-track-panel .r15-punch-preview{
+  bottom:30px!important;height:34px!important;
+  box-sizing:border-box!important;overflow:hidden!important;
+  clip-path:inset(0 round 2px)!important;
+}
+.music-track-panel .r15-punch-stack{
+  top:0!important;bottom:0!important;height:auto!important;
+  overflow:hidden!important;align-items:stretch!important;
+}
+.music-track-panel .r15-punch-stack i{
+  top:0!important;bottom:0!important;height:100%!important;max-height:none!important;
+  margin:0!important;border-radius:0!important;box-shadow:none!important;
+}
+.status-control-row .manual-status-buttons button.initial-disabled,
+.status-control-row .manual-status-buttons button:disabled{
+  opacity:.15!important;cursor:not-allowed!important;filter:saturate(.58) brightness(1.08)!important;
+  box-shadow:none!important;
+}
+.status-control-row .manual-status-buttons button.initial-disabled:hover,
+.status-control-row .manual-status-buttons button:disabled:hover{opacity:.15!important}
