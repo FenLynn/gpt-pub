@@ -387,20 +387,7 @@ function timelineMiniMapHtml(a,range){
 }
 
 function r15PunchPreview(a){
-  const bins=new Map();
-  for(const p of (a.punches||[])){
-    const minute=Math.floor(minutes(p.time)),bucket=Math.floor(minute/3)*3;
-    if(!bins.has(bucket))bins.set(bucket,{minute:bucket,in:0,out:0});
-    bins.get(bucket)[p.direction==='进'?'in':'out']++;
-  }
-  const bars=[...bins.values()].map(g=>{
-    const left=(g.minute/1440*100).toFixed(4),total=g.in+g.out,width=Math.min(9,2+total*1.35);
-    return '<span class="r15-punch-stack" style="left:'+left+'%;width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
-      (g.in?'<i class="in"></i>':'')+
-      (g.out?'<i class="out"></i>':'')+
-    '</span>';
-  }).join('');
   const ticks=['0:00','6:00','12:00','18:00','24:00'].map(t=>'<span>'+t+'</span>').join('');
-  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true">'+bars+'</div>'+
+  return '<div class="r15-punch-preview" id="r15PunchPreview" aria-hidden="true"></div>'+
     '<div class="r23-mini-ticks" aria-hidden="true">'+ticks+'</div>';
 }
