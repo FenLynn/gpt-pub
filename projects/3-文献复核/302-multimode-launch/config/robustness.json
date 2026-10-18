@@ -1,0 +1,25 @@
+{
+  "coupling_depth": 10,
+  "absorption_depth": 6.2784,
+  "core_ratio": 0.12,
+  "reference_fill": 1,
+  "test_fill": 0.84,
+  "mixing_depths": [
+    0,
+    1,
+    5,
+    10,
+    20,
+    40
+  ],
+  "uniform_absorption_fractions": [
+    0,
+    0.3,
+    0.5,
+    0.7,
+    1
+  ],
+  "spatial_fill": 0.84,
+  "angular_fill": 1,
+  "bins": 72
+}
