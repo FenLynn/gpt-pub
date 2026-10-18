@@ -275,7 +275,7 @@ function renderMatrix(){
       const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
       const category=matrixCategory(a),cls='s-'+category,behaviors=attendanceBehaviors(a);
       html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''} ${selected?'cell-focus':''} ${Number(e.id.slice(1))%2?'':'row-alt'} day-${dayType(d)}" data-emp="${e.id}" data-day="${d}">
-        <button class="${cls} ${visible||selected?'':'filtered-out'} ${selected?'selected':''}" style="--status-color:${categoryColor(category)}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n初始：${attendanceJudgmentSystem(a)} · 当前：${attendanceJudgment(a)}\n行为：${behaviors.join(' / ')||'无'}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${manualStatusFor(a)&&state.prefs?.matrix?.showManualCheck!==false?'<i class="manual-check">✓</i>':''}</button>
+        <button class="${cls} ${visible||selected?'':'filtered-out'} ${selected?'selected':''}" style="--status-color:${categoryColor(category)}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n初始：${attendanceJudgmentSystem(a)} · 当前：${attendanceJudgment(a)}\n行为：${behaviors.join(' / ')||'无'}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${state.judgmentMode==='manual'&&manualStatusFor(a)&&state.prefs?.matrix?.showManualCheck!==false?'<i class="manual-check">✓</i>':''}</button>
       </div>`;
     }
   }
