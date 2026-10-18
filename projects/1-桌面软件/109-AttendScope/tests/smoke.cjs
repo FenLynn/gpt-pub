@@ -140,9 +140,10 @@ async function run(){
  await check(page,()=>{
    const dup=[...state.analysis.values()].find(a=>a.punches.some(p=>p.scenario==='rapid-swipes'));
    if(!dup)return false;
-   const broad=r14TrackData(dup,{key:'b',start:0,end:1440},500).events.length;
-   const narrow=r14TrackData(dup,{key:'n',start:520,end:600},900).events.length;
-   return narrow>broad&&broad<dup.punches.length;
+   const range={start:520,end:600};
+   const coarse=r14TrackData(dup,range,300).events,fine=r14TrackData(dup,range,1600).events;
+   return coarse.length>0&&fine.length>coarse.length&&
+     fine.every(g=>g.records.every(p=>minutes(p.time)>=range.start&&minutes(p.time)<=range.end));
  },'Repeated punches are not clustered in the event model');
 
  await check(page,()=>{
@@ -294,8 +295,8 @@ async function run(){
  await page.waitForSelector('#attendanceTimelineChart svg');
  await check(page,({id,day})=>{
    const a=state.analysis.get(id+'|'+day);
-   const wide=r19PunchClusters(a,{start:0,end:1440},800,0);
-   const narrow=r19PunchClusters(a,{start:480,end:600},800,0);
+   const range={start:520,end:600},wide=r19PunchClusters(a,range,300,0);
+   const narrow=r19PunchClusters(a,range,1600,0);
    return wide.some(x=>x.count>1)&&narrow.length>wide.length;
  },stress,'Rapid punches do not merge at overview scale and split at narrow scale');
  await check(page,({id,day})=>{
