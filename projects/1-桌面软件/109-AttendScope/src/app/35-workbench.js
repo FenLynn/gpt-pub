@@ -392,17 +392,7 @@ function mountIssueChart(ctx){
   chart.on('click',p=>{const d=Number(names[p.dataIndex]);if(ctx.employee)selectCellAndFocusEvidence(ctx.employee.id,d);else selectDate(d,true)});
 }
 
-function timelineMiniMapHtml(a,range){
-  const counts=new Array(72).fill(0);
-  for(const p of a.punches){const i=Math.min(71,Math.floor(minutes(p.time)/20));counts[i]++}
-  const max=Math.max(1,...counts);
-  const bars=counts.map((n,i)=>n?'<rect x="'+(i*10+2)+'" y="'+(25-n/max*22)+'" width="5" height="'+(n/max*22)+'" rx="1"/>':'').join('');
-  const left=(range.start/1440*100).toFixed(3)+'%',width=((range.end-range.start)/1440*100).toFixed(3)+'%';
-  return '<div class="timeline-mini"><span>0:00</span><div class="mini-frame" id="timelineMini">'+
-    '<svg viewBox="0 0 720 28" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>'+
-    '<div class="mini-selection" id="miniSelection" style="left:'+left+';width:'+width+'"></div></div><span>24:00</span></div>';
-}
-
+/* Navigator has a single active implementation: r15PunchPreview. */
 function r15PunchPreview(a){
   const bins=new Map();
   for(const p of (a.punches||[])){

@@ -20,6 +20,9 @@ async function run(){
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
  await page.goto(url,{waitUntil:'load',timeout:60000});
+ await check(page,()=>typeof legacyMountAttendanceTimeline==='undefined'&&typeof analysisTimelineHtml==='undefined'&&
+  typeof timelineMiniMapHtml==='undefined'&&typeof mountAttendanceTimeline==='function',
+  'R38 retired chart renderers remain active');
  await page.screenshot({path:path.join(out,'r37-all.png')});
  await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===4&&
    !!document.querySelector('#scopeSummary .scope-stat-row')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
