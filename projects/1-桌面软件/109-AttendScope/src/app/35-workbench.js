@@ -39,7 +39,8 @@ function manualJudgmentHtml(item){
       '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
         [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>{
           const locked=x===initial;
-          return '<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+(locked?'initial-disabled ':'')+x+'" '+(locked?'disabled aria-disabled="true"':'')+' title="'+(locked?'与初始判断相同，不能作为人工修改':'人工改为'+t)+'">'+(manual===x?t:'')+'</button>';
+          const label=state.workspaceMode==='classic'?(manual===x?t:''):t;
+          return '<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+(locked?'initial-disabled ':'')+x+'" '+(locked?'disabled aria-disabled="true"':'')+' title="'+(locked?'与初始判断相同，不能作为人工修改':'人工改为'+t)+'">'+label+'</button>';
         }).join('')+
       '</div>'+
     '</div>'+

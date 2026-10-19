@@ -372,3 +372,175 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
  .workspace-mode-person .person-day-number{font-size:12.5px}
  .workspace-mode-person .analysis-body{grid-template-rows:minmax(230px,65%) minmax(165px,1fr)!important}
 }
+
+
+/* R42 — fixed matrix geometry: no phantom scrollbars or excess bottom padding. */
+.workspace-mode-all .matrix-zone,.workspace-mode-group .matrix-zone{
+ --matrix-name:98px;
+ --matrix-row:27px;
+ --matrix-grid:calc(var(--matrix-name) + 31 * var(--matrix-cell));
+ width:calc(var(--matrix-grid) + 16px)!important;
+ max-width:100%!important;
+ height:min(calc(29px + var(--scope-count,50) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
+ min-height:0!important;
+}
+.workspace-mode-group .matrix-zone{
+ height:min(calc(29px + var(--scope-count,10) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
+}
+.workspace-mode-all .matrix-wrap,.workspace-mode-group .matrix-wrap{
+ box-sizing:border-box!important;
+ width:calc(var(--matrix-grid) + 16px)!important;
+ max-width:100%!important;
+ padding:0 12px 0 0!important;
+ overflow-x:hidden!important;
+ overflow-y:auto!important;
+ scrollbar-gutter:stable;
+}
+.workspace-mode-group .matrix-wrap{
+ scrollbar-gutter:auto;
+}
+.workspace-mode-all .matrix,.workspace-mode-group .matrix{
+ box-sizing:content-box!important;
+ width:var(--matrix-grid)!important;
+ min-width:var(--matrix-grid)!important;
+ max-width:var(--matrix-grid)!important;
+ grid-template-columns:var(--matrix-name) repeat(31,var(--matrix-cell))!important;
+}
+.workspace-mode-all .m-name,.workspace-mode-group .m-name{
+ padding:0 5px!important;gap:5px!important;justify-content:center!important;
+}
+.workspace-mode-all .m-name .name-letters,.workspace-mode-group .m-name .name-letters{
+ width:4em!important;min-width:4em!important;max-width:4em!important;
+ text-align:justify;text-align-last:justify;white-space:nowrap;
+}
+.workspace-mode-all .m-corner,.workspace-mode-group .m-corner{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ text-align:center!important;padding:0!important;
+}
+
+/* R42 — keep Chinese filter labels on one line in an upward scrollable menu. */
+.layout:not(.workspace-mode-classic) .status-filter-menu.open{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ gap:2px!important;
+}
+.layout:not(.workspace-mode-classic) .status-filter-menu button,
+.layout:not(.workspace-mode-classic) .status-filter-current,
+.layout:not(.workspace-mode-classic) .status-filter-current b{
+ white-space:nowrap!important;
+ overflow-wrap:normal!important;
+ word-break:keep-all!important;
+}
+.layout:not(.workspace-mode-classic) .status-filter-menu button{
+ font-size:12px!important;min-height:30px!important;
+}
+
+/* R42 — single balanced title row; day pills match the height of their controls. */
+.workspace-mode-person .person-toolbar{
+ height:54px!important;min-height:54px!important;
+ align-items:center!important;gap:12px!important;padding:0 0 5px!important;
+}
+.workspace-mode-person .person-strip{
+ gap:8px!important;align-items:center!important;
+}
+.workspace-mode-person .person-strip-label{
+ font-size:13px!important;line-height:30px!important;height:30px!important;
+}
+.workspace-mode-person .person-day{
+ height:30px!important;min-height:30px!important;
+ padding:2px 1px 3px!important;border-radius:4px!important;
+}
+.workspace-mode-person .person-day-number{font-size:12px!important;line-height:1!important}
+.workspace-mode-person .person-day-status{height:3px!important;width:78%!important}
+.workspace-mode-person .person-day-nav{
+ height:30px!important;align-items:center!important;gap:3px!important;
+}
+.workspace-mode-person #timelineDayPicker,
+.workspace-mode-person #personalDayPrev,
+.workspace-mode-person #personalDayNext{
+ height:30px!important;min-height:30px!important;
+ align-self:center!important;vertical-align:middle!important;
+}
+.workspace-mode-person #personalDayPrev,.workspace-mode-person #personalDayNext{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ line-height:1!important;padding:0!important;font-size:20px!important;
+}
+
+/* R42 — restore timeline/table balance; right panel text is genuinely readable. */
+.workspace-mode-person .workbench{
+ height:calc(100vh - var(--topbar) - 86px)!important;
+ min-height:460px!important;
+}
+.workspace-mode-person .analysis-body{
+ grid-template-rows:minmax(245px,57%) minmax(185px,1fr)!important;
+ gap:10px!important;
+ padding:8px!important;
+}
+.workspace-mode-person .inspector-insight{
+ padding:12px 15px!important;
+}
+.workspace-mode-person .insight-tabs{
+ margin:-12px -15px 12px!important;
+ height:40px!important;
+}
+.workspace-mode-person .insight-tabs button{font-size:14px!important}
+.workspace-mode-person .insight-card-head,.workspace-mode-person .insight-card-head span,
+.workspace-mode-person .insight-card-head b{font-size:14px!important}
+.workspace-mode-person .insight-row span{font-size:14px!important}
+.workspace-mode-person .insight-row strong{font-size:16px!important}
+.workspace-mode-person .insight-metric-list{font-size:14px!important}
+.workspace-mode-person .insight-metric-list span{font-size:14px!important}
+.workspace-mode-person .insight-metric-list strong{font-size:16px!important}
+.workspace-mode-person .insight-issue,.workspace-mode-person .insight-evidence{font-size:13px!important;line-height:1.55!important}
+.workspace-mode-person .insight-behavior-row span,.workspace-mode-person .insight-behavior-row strong{
+ font-size:14px!important;
+}
+.workspace-mode-person .status-control-row{
+ display:grid!important;
+ grid-template-columns:43px minmax(0,1fr)!important;
+ align-items:center!important;gap:8px!important;min-height:36px!important;
+}
+.workspace-mode-person .status-control-row>span{
+ font-size:13px!important;color:#627789!important;font-weight:600!important;
+}
+.workspace-mode-person .initial-judgment{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ justify-self:start!important;
+ width:auto!important;min-width:84px!important;height:31px!important;
+ padding:0 14px!important;border-radius:6px!important;
+ font-size:14px!important;line-height:1!important;box-shadow:none!important;
+ border:1px solid transparent!important;
+}
+.workspace-mode-person .initial-judgment.normal{background:#e8f5ec!important;color:#23774e!important}
+.workspace-mode-person .initial-judgment.anomaly{background:#fff4da!important;color:#926b18!important}
+.workspace-mode-person .initial-judgment.absent{background:#fae9ea!important;color:#a44e54!important}
+.workspace-mode-person .initial-judgment.rest{background:#edf1f3!important;color:#657987!important}
+.workspace-mode-person .status-control-row .manual-status-buttons{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:6px!important;margin:0!important;min-height:0!important;
+}
+.workspace-mode-person .status-control-row .manual-status-buttons button{
+ height:31px!important;line-height:1!important;
+ font-size:13px!important;font-weight:650!important;
+ border-radius:6px!important;border:1px solid #dce4e9!important;
+ background:#fff!important;color:#556c7d!important;
+ opacity:1!important;box-shadow:none!important;
+ transition:background .14s,border-color .14s!important;
+}
+.workspace-mode-person .status-control-row .manual-status-buttons button.active.normal{
+ background:#4caa7a!important;color:#fff!important;border-color:#4caa7a!important;
+}
+.workspace-mode-person .status-control-row .manual-status-buttons button.active.anomaly{
+ background:#c79b39!important;color:#fff!important;border-color:#c79b39!important;
+}
+.workspace-mode-person .status-control-row .manual-status-buttons button.active.absent{
+ background:#c77075!important;color:#fff!important;border-color:#c77075!important;
+}
+.workspace-mode-person .status-control-row .manual-status-buttons button.initial-disabled{
+ background:#f3f5f6!important;color:#b1bdc5!important;
+ border-color:#ecf0f2!important;opacity:.7!important;
+}
+@media(max-width:1450px){
+ .workspace-mode-person .analysis-body{
+  grid-template-rows:minmax(230px,57%) minmax(175px,1fr)!important;
+ }
+}
