@@ -252,3 +252,8 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
 .side-view-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:9px;align-items:center;padding:11px 0 8px;border-top:1px solid #e5eaf0}
 .side-view-row label{font-size:12px;font-weight:600;color:#576f81}
 .side-view-row .side-select{height:31px;min-height:31px;font-size:12px}
+
+/* R40: single-row strip also fills shorter months without empty trailing cells. */
+.person-days{grid-template-columns:repeat(var(--r40-days,31),minmax(0,1fr))}
+.person-day-number{font-size:13px}
+@media(max-width:1450px){.person-day-number{font-size:12px}}

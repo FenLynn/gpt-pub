@@ -125,6 +125,15 @@ async function run(){
     !!mark.querySelector('.person-day-status.'+tone)&&getComputedStyle(mark.querySelector('.person-day-check')).right==='1px';
  },'R40 manual override status strip check or color mismatch');
  await page.screenshot({path:path.join(out,'r40-person-month-strip.png')});
+ await page.setViewportSize({width:1366,height:768});
+ await check(page,()=>{
+  const days=document.querySelectorAll('.person-day'),bounds=document.querySelector('.person-days').getBoundingClientRect(),
+   cal=document.querySelector('.side-calendar').getBoundingClientRect();
+  return days.length===monthDays()&&Math.abs(days[0].getBoundingClientRect().top-days[days.length-1].getBoundingClientRect().top)<1&&
+    bounds.right<=innerWidth+2&&cal.bottom<=innerHeight+2;
+ },'R40 1366px personal month strip must remain one row and calendar visible');
+ await page.screenshot({path:path.join(out,'r40-person-1366.png')});
+ await page.setViewportSize({width:1920,height:1080});
  await page.evaluate(()=>{
   const prior=state.__r40Restore;
   if(prior.old==null)delete state.manualStatuses[prior.key];else state.manualStatuses[prior.key]=prior.old;

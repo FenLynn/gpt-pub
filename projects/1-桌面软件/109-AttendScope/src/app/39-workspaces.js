@@ -54,7 +54,7 @@ function personMonthStripHtml(){
     '<span class="person-day-status '+tone+'"></span></button>';
  }).join('');
  return '<div class="person-strip" aria-label="个人整月考勤"><span class="person-strip-label">月度考勤</span>'+
-  '<div class="person-days">'+days+'</div></div>';
+  '<div class="person-days" style="--r40-days:'+monthDays()+'">'+days+'</div></div>';
 }
 function workspaceSidebarHtml(){
  const mode=state.workspaceMode||'all',groups=workspaceGroups();
@@ -67,7 +67,7 @@ function workspaceSidebarHtml(){
   (mode==='all'?'<option value="">全部</option>':'')+
   groups.map(g=>'<option value="'+escapeNameChar(g)+'" '+(g===group?'selected':'')+'>'+escapeNameChar(g)+'</option>').join('')+'</select></div>';
  const personControl=mode==='data'?'':'<div class="side-inline"><label for="workspacePerson">人员</label>'+
-  '<select class="side-select" id="workspacePerson"><option value="">全部</option>'+
+  '<select class="side-select" id="workspacePerson">'+(mode==='person'?'':'<option value="">全部</option>')+
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
     escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
  const sub=mode==='person'?'<div class="side-subnav">'+CHART_TABS.map(([id,name])=>
@@ -90,7 +90,7 @@ function workspaceToolbarHtml(){
  if(mode==='all'||mode==='group')return '<div class="workspace-toolbar"><div><strong>'+(mode==='all'?'全员考勤':'分组考勤')+'</strong>'+
   '<span>'+periodText()+' · '+(mode==='group'?escapeNameChar(state.selectedGroup||'未分组'):'全部员工')+'</span></div>'+
   '<span class="workspace-hint">'+scopeVisibleEmployees().length+' 位人员</span></div><section id="scopeSummary" class="scope-summary"></section>';
- if(mode==='person')return '<div class="workspace-toolbar"><div><strong>个人分析</strong><span>'+periodText()+' · 详细核查与证据</span></div></div>';
+ if(mode==='person')return '<div class="workspace-toolbar"><div><strong>个人分析</strong></div></div>';
  if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>'+periodText()+' · 原始记录、员工与规则</span></div></div>';
  return '';
 }
@@ -105,7 +105,7 @@ function bindWorkspaceNavigation(){
  if(view)view.onchange=()=>{state.chartTab=view.value;renderAnalysisPanel()};
  const person=document.getElementById('workspacePerson');
  if(person)person.onchange=()=>{
-   if(!person.value){state.selection={type:'overall'};render();return}
+   if(!person.value){if(state.workspaceMode==='person')return;state.selection={type:'overall'};render();return}
    if(state.workspaceMode==='person')selectPerson(person.value);
    else selectMatrixRow(person.value);
  };
@@ -143,7 +143,7 @@ function navigateWorkspace(mode){
 function scopeAnalysisItems(){
  const people=scopeVisibleEmployees(),ids=new Set(people.map(e=>e.id));
  let items=workAnalyses().filter(a=>ids.has(a.employee.id));
- if(state.selection.type==='date')items=items.filter(a=>a.day===state.selection.day);
+ // Selecting a matrix date highlights the column; monthly charts stay monthly.
  return {people,items};
 }
 function renderScopeSummary(){
