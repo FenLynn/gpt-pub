@@ -52,8 +52,9 @@ function layoutHtml(){
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
     </div>
   </header>
+  <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
 
-  <div class="layout">
+  <div class="layout workspace-mode-${state.workspaceMode||'all'}">
     <aside class="sidebar">
       <section class="side-section calendar-section">
         <div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>
@@ -104,6 +105,7 @@ function layoutHtml(){
     </aside>
 
     <main class="workspace">
+      ${workspaceToolbarHtml()}
       <div class="workbench">
         <section class="matrix-zone" aria-label="月度员工考勤状态矩阵">
           <div class="matrix-wrap" id="matrixScroll"><div class="matrix" id="matrix"></div></div>
@@ -164,6 +166,7 @@ function bind(){
     state.judgmentMode=mode;state.saved=false;rememberMonth();render();
   });
   bindSettings();
+  bindWorkspaceNavigation();
 
   document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
@@ -254,6 +257,7 @@ function updateMatrixFilter(){
 }
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
+  const visibleEmployees=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
   // Matrix dimensions are shared CSS variables, including responsive sizing.
   el.style.gridTemplateColumns='var(--matrix-name) repeat(31,var(--matrix-cell))';
 
@@ -264,7 +268,7 @@ function renderMatrix(){
     html+=`<button class="m-date ${type}${sel}" data-date="${d}" ${invalid?'disabled':''} title="${invalid?'无此日期':isoDate(d)+' · '+dayTypeText(type)}"><b>${invalid?'':pad(d)}</b></button>`;
   }
 
-  for(const e of EMPLOYEES){
+  for(const e of visibleEmployees){
     const rowSelected=(state.selection.type==='person'||state.selection.type==='cell')&&state.selection.employeeId===e.id;
     const letters=Array.from(e.name).slice(0,4).map(ch=>`<span>${escapeNameChar(ch)}</span>`).join('');
     html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${escapeNameChar(e.id)}" title="${escapeNameChar(e.name)} · ${escapeNameChar(e.department)}"><span class="m-name-num">${String(EMPLOYEES.indexOf(e)+1).padStart(2,'0')}</span><span class="name-letters">${letters}</span></button>`;
@@ -280,7 +284,7 @@ function renderMatrix(){
     }
   }
   const selectedRow=(state.selection.type==='person'||state.selection.type==='cell')
-    ?EMPLOYEES.findIndex(e=>e.id===state.selection.employeeId):-1;
+    ?visibleEmployees.findIndex(e=>e.id===state.selection.employeeId):-1;
   const selectedCol=(state.selection.type==='date'||state.selection.type==='cell')
     ?state.selection.day-1:-1;
   html+='<div class="matrix-selection-frame focus-row '+(selectedRow<0?'inactive':'')+
@@ -289,7 +293,7 @@ function renderMatrix(){
     ' '+(state.selection.type==='cell'?'soft':'')+'" style="--focus-col:'+Math.max(0,selectedCol)+'"></div>';
   html+='<div class="matrix-preview-frame focus-row inactive"></div><div class="matrix-preview-frame focus-col inactive"></div>';
   el.innerHTML=html;
-  el.style.setProperty('--matrix-rows',String(EMPLOYEES.length));
+  el.style.setProperty('--matrix-rows',String(visibleEmployees.length));
   el.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
   el.classList.remove('focus-person','focus-date','focus-cell');
   if(state.selection.type==='person')el.classList.add('focus-person');
@@ -306,7 +310,7 @@ function renderMatrix(){
     const n=e.target.closest('[data-cell],.m-name[data-emp],.m-date[data-date]');if(!n){clearHover();return}
     const id=n.dataset.cell?.split('|')[0]||n.dataset.emp||'';
     const d=Number(n.dataset.date||n.dataset.cell?.split('|')[1]||0);
-    const ix=EMPLOYEES.findIndex(emp=>emp.id===id);
+    const ix=visibleEmployees.findIndex(emp=>emp.id===id);
     const enabled=state.prefs?.matrix?.crosshair!==false;
     hoverRow.classList.toggle('inactive',!enabled||ix<0);
     hoverCol.classList.toggle('inactive',!enabled||d<1||d>monthDays());
@@ -331,6 +335,8 @@ function analysisContext(){
 }
 
 function renderAnalysisPanel(){
+  if(state.workspaceMode==='all'||state.workspaceMode==='group'){renderScopeSummary();return}
+  if(state.workspaceMode==='data'){renderDataWorkspace();return}
   const body=document.getElementById('analysisBody'); if(!body)return;
   if(typeof disposeAnalysisCharts==='function')disposeAnalysisCharts();
   const ctx=analysisContext();
@@ -373,7 +379,7 @@ function bindAnalysisPanel(ctx){
   });
 }
 
-function selectPerson(id){state.selection={type:'person',employeeId:id};state.chartTab='overview';state.chartDay=nearestRecordedDay(id);state.rawPage=1;render()}
+function selectPerson(id){if(state.workspaceMode!=='classic')state.workspaceMode='person';state.selection={type:'person',employeeId:id};state.chartTab='overview';state.chartDay=nearestRecordedDay(id);state.rawPage=1;render()}
 function selectDate(d,allPeople=false){
  if(d<1||d>monthDays())return;
  const sel=state.selection;
@@ -387,6 +393,7 @@ function selectDate(d,allPeople=false){
 }
 function selectCell(id,d){
   if(d<1||d>monthDays())return;
+  if(state.workspaceMode!=='classic')state.workspaceMode='person';
   state.selection={type:'cell',employeeId:id,day:d};
   state.chartTab='timeline';state.chartDay=d;state.timelineRange=null;state.rawPage=1;render();
 }

@@ -1,0 +1,64 @@
+
+/* R37: analysis-scoped workspaces. Existing six-lane timeline CSS stays untouched. */
+.workspace-navigation{position:sticky;top:var(--topbar);z-index:55;display:flex;align-items:center;gap:6px;
+ min-height:43px;padding:5px 18px;background:#fff;border-bottom:1px solid #e2ebf2;overflow-x:auto}
+.workspace-navigation button{border:0;background:transparent;color:#637c91;font-size:12px;font-weight:660;
+ padding:9px 20px;border-radius:8px;white-space:nowrap;transition:background .14s,color .14s}
+.workspace-navigation button:hover{background:#f0f5f9;color:#366d96}
+.workspace-navigation button.active{background:#e7f2fb;color:#1675b9}
+.workspace-toolbar{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:2px 2px 12px}
+.workspace-toolbar>div{display:flex;flex-direction:column;gap:4px}
+.workspace-toolbar strong{font-size:17px;color:#223c53}
+.workspace-toolbar span{color:#7c90a0;font-size:11px}
+.workspace-toolbar label{color:#617b90;font-size:11px;white-space:nowrap}
+.workspace-toolbar select{margin-left:7px;min-width:180px;max-width:300px;min-height:32px;background:white;
+ border:1px solid #d7e4ed;border-radius:7px;padding:4px 8px;color:#29455c}
+.workspace-mode-all .workbench,.workspace-mode-group .workbench,.workspace-mode-data .workbench{
+ min-width:0!important;max-width:100%!important;display:block!important;height:auto!important;min-height:0!important}
+.workspace-mode-all .analysis-panel,.workspace-mode-group .analysis-panel{display:none!important}
+.workspace-mode-all .matrix-zone,.workspace-mode-group .matrix-zone{
+ width:100%!important;max-width:100%!important;min-width:0!important;height:calc(100vh - 285px);min-height:400px}
+.workspace-mode-all .matrix-wrap,.workspace-mode-group .matrix-wrap{
+ width:100%!important;max-width:100%!important;min-width:0!important}
+.workspace-mode-all .matrix,.workspace-mode-group .matrix{
+ --matrix-cell:clamp(24px,calc((100vw - var(--sidebar) - 133px)/31),38px);
+ --matrix-grid:calc(var(--matrix-name) + 31 * var(--matrix-cell));
+ width:var(--matrix-grid)!important;max-width:none!important;min-width:var(--matrix-grid)!important;
+ margin-left:auto;margin-right:auto}
+.scope-summary{margin-bottom:12px}
+.scope-stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.scope-stat{background:#fff;border:1px solid #e1e9f0;border-radius:10px;padding:10px 16px;display:flex;flex-direction:column;gap:3px}
+.scope-stat span{font-size:11px;color:#7890a3}
+.scope-stat strong{font-size:20px;font-variant-numeric:tabular-nums;color:#274158}
+.scope-stat.normal strong{color:#428c67}.scope-stat.anomaly strong{color:#b18c36}.scope-stat.absent strong{color:#b46b6b}
+.scope-subheading{font-weight:690;font-size:12px;color:#365269;margin:10px 0}
+.scope-subheading small{font-size:10px;font-weight:400;color:#879aac;margin-left:8px}
+.scope-group-list{margin-bottom:8px}
+.scope-group-links{display:flex;flex-wrap:wrap;gap:7px}
+.scope-group-links button{min-width:128px;display:flex;align-items:flex-start;flex-direction:column;gap:4px;
+ border:1px solid #dde8f1;border-radius:8px;background:#fff;padding:8px 12px;color:#345671}
+.scope-group-links button:hover{border-color:#95c4e6;background:#f5fafe}
+.scope-group-links span{font-size:10px;color:#8195a4}
+.scope-attention{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+.scope-attention>strong{font-size:11px;color:#996f52;margin-right:3px}
+.scope-attention button{border:0;border-radius:5px;background:#faf0e8;color:#996d4a;padding:5px 8px;font-size:10px}
+.workspace-mode-person .workbench,.workspace-mode-data .workbench{grid-template-columns:minmax(0,1fr)!important;
+ min-width:0!important;max-width:100%!important}
+.workspace-mode-person .matrix-zone,.workspace-mode-data .matrix-zone{display:none!important}
+.workspace-mode-person .analysis-panel,.workspace-mode-data .analysis-panel{min-width:0!important;width:100%}
+.workspace-mode-person .inspector-plot{min-width:0}
+.workspace-mode-data .layout{min-width:0}
+.workspace-mode-data .sidebar{display:none!important}
+.layout.workspace-mode-data{grid-template-columns:minmax(0,1fr)!important}
+.workspace-mode-data .analysis-body{display:block!important}
+.workspace-mode-data .inspector-bottom{height:calc(100vh - 285px);min-height:370px}
+.workspace-mode-data .raw-table{height:calc(100% - 44px)}
+.data-management{display:flex;flex-direction:column;gap:12px;height:100%}
+.data-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.data-summary section{background:#f7fafd;padding:12px;border:1px solid #e5edf3;border-radius:9px;display:flex;flex-direction:column;gap:6px}
+.data-summary span{font-size:11px;color:#72899c}.data-summary strong{font-size:16px;color:#29495f}
+.data-import-actions{display:flex;gap:7px;flex-wrap:wrap}
+.data-import-actions button{border:1px solid #d6e5f0;background:#fff;color:#3c6886;border-radius:7px;padding:8px 13px;font-size:11px}
+.data-import-actions button:hover{background:#edf6fb}
+@media(max-width:960px){.scope-stat-row,.data-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+.workspace-navigation button{padding:9px 12px}}

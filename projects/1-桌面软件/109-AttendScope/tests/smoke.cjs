@@ -20,6 +20,24 @@ async function run(){
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
  await page.goto(url,{waitUntil:'load',timeout:60000});
+ await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===4&&
+   !!document.querySelector('#scopeSummary .scope-stat-row')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
+ await page.locator('[data-workspace="group"]').click();
+ await check(page,()=>{
+   const members=EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup).length;
+   return state.workspaceMode==='group'&&members>0&&document.querySelectorAll('.m-name[data-emp]').length===members&&
+      !!document.getElementById('workspaceGroup');
+ },'R37 group roster does not constrain matrix');
+ await page.locator('.m-name[data-emp]').first().click();
+ await page.waitForSelector('#overviewTrendChart svg',{timeout:20000});
+ await check(page,()=>state.workspaceMode==='person'&&state.selection.type==='person'&&!!document.getElementById('workspacePerson'),
+   'R37 group-to-person drilldown failed');
+ await page.locator('[data-workspace="data"]').click();
+ await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
+ await check(page,()=>state.workspaceMode==='data'&&!!document.getElementById('dataSave')&&
+   rawTabulator?.getDataCount()===state.records.length,'R37 data page evidence browser missing');
+ // Preserve the R29-R34 visual/behavior regression suite in a private compatibility mode.
+ await page.evaluate(()=>{state.workspaceMode='classic';state.selection={type:'overall'};state.chartTab='overview';render()});
  try{await page.waitForSelector('#overviewTrendChart svg',{timeout:20000})}catch(e){await page.screenshot({path:path.join(out,'r14-diagnostic.png')});console.error('R14_PAGE_ERRORS',JSON.stringify(errors));throw e}
  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
  const layout=await page.evaluate(()=>{
