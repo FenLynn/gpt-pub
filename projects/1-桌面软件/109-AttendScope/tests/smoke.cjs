@@ -282,11 +282,15 @@ async function run(){
  await check(page,()=>getComputedStyle(document.querySelector('.workspace-mode-data .analysis-head')).display==='none',
  'R39 duplicate data heading');
  await page.locator('.workspace-mode-data .cal-day[data-day="9"]').click();
+ await page.waitForFunction(()=>state.workspaceMode==='data'&&state.selection.type==='date'&&state.selection.day===9&&
+  !!rawTabulator&&rawTabulator.getDataCount()<state.records.length,null,{timeout:12000});
  await check(page,()=>state.workspaceMode==='data'&&state.selection.type==='date'&&state.selection.day===9&&
    rawTabulator.getData().every(r=>(r.datetime||'').slice(0,10)==='2026-10-09')&&
    rawTabulator.getDataCount()<state.records.length,
  'R39 data-management calendar must filter source records');
  await page.locator('.workspace-mode-data #clearSelection').click();
+ await page.waitForFunction(()=>state.workspaceMode==='data'&&state.selection.type==='overall'&&
+  !!rawTabulator&&rawTabulator.getDataCount()===state.records.length,null,{timeout:12000});
  await check(page,()=>state.workspaceMode==='data'&&state.selection.type==='overall'&&
    rawTabulator.getDataCount()===state.records.length,
  'R39 clearing date must preserve current workspace');
