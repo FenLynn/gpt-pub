@@ -33,6 +33,25 @@ async function run(){
     name.textContent===EMPLOYEES[0].name&&!name.querySelector('span')&&
     document.querySelector('.matrix-wrap').getBoundingClientRect().top<210;
  },'R39 system header, left filters, fixed calendar or compact matrix failed');
+ await check(page,()=>{
+  const controls=document.querySelector('.top-global-actions').getBoundingClientRect();
+  const nav=document.querySelector('.workspace-navigation').getBoundingClientRect();
+  const wrap=document.querySelector('.matrix-wrap').getBoundingClientRect();
+  const matrix=document.querySelector('.matrix').getBoundingClientRect();
+  const scope=document.querySelector('#scopeInsights').getBoundingClientRect();
+  const name=document.querySelector('.m-name .name-letters');
+  return controls.left>=nav.right&&scope.left>=wrap.right&&
+   matrix.width>wrap.width*.95&&matrix.width<=wrap.width&&
+   getComputedStyle(name).textAlignLast==='justify'&&name.getBoundingClientRect().width>=48;
+ },'R41 right-aligned global actions, no dead columns, or four-char name justification');
+ await page.locator('#statusFilterButton').click();
+ await check(page,()=>{
+  const menu=document.querySelector('#statusFilterMenu').getBoundingClientRect();
+  const trigger=document.querySelector('#statusFilterButton').getBoundingClientRect();
+  return document.querySelector('#statusFilterMenu').classList.contains('open')&&menu.bottom<trigger.top&&menu.top>=0;
+ },'R41 status menu should open upward fully visible');
+ await page.locator('#statusFilterButton').click();
+ await page.screenshot({path:path.join(out,'r41-all.png')});
  await page.screenshot({path:path.join(out,'r37-all.png')});
  // R40: left navigation is two simple inline selectors; selecting a name highlights the row.
  await page.locator('#workspacePerson').selectOption('E001');
@@ -64,6 +83,9 @@ async function run(){
  },'R40 all-staff scoped analytics failed');
  await page.locator('#workspaceScopeGroup').selectOption({index:1});
  await check(page,()=>state.workspaceMode==='group'&&!!document.querySelector('#workspaceGroup'),'R39 left group filter did not drill down');
+ await check(page,()=>!!document.querySelector('#workspaceGroup option[value=""]')&&!!document.querySelector('#scopeStatusChart svg'),
+  'R41 group all-option or status composition chart missing');
+ await page.screenshot({path:path.join(out,'r41-group.png')});
  await page.screenshot({path:path.join(out,'r37-group.png')});
  await check(page,()=>{
    const members=EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup).length;
@@ -76,6 +98,17 @@ async function run(){
    const x=work.filter(a=>attendanceJudgment(a)==='absent').length;
    return Number(document.querySelectorAll('#scopeInsights .scope-insight-numbers strong')[3].textContent)===x;
  },'R40 group charts must use group-only data');
+ await check(page,()=>{
+  const row=document.querySelector('.matrix .m-name[data-emp]');
+  const edge=document.querySelector('.matrix .m-cell[data-day="31"]');
+  const frame=document.querySelector('.matrix-wrap');
+  const last=edge?.getBoundingClientRect().right-frame?.getBoundingClientRect().right;
+  return row&&Number.isFinite(last)&&last<=1&&last>-18;
+ },'R41 31st matrix column should be flush with its frame');
+ await page.locator('#workspaceGroup').selectOption('');
+ await check(page,()=>state.workspaceMode==='all'&&!!document.querySelector('#workspaceScopeGroup'),
+  'R41 group all-option must return to full-staff analysis');
+ await page.locator('#workspaceScopeGroup').selectOption({index:1});
  await page.locator('.m-name[data-emp]').first().click();
  await check(page,()=>state.workspaceMode==='group'&&state.selection.type==='person'&&
   !document.querySelector('.matrix-selection-frame.focus-row')?.classList.contains('inactive'),
@@ -124,6 +157,18 @@ async function run(){
   return !!mark.querySelector('.person-day-check')&&
     !!mark.querySelector('.person-day-status.'+tone)&&getComputedStyle(mark.querySelector('.person-day-check')).right==='1px';
  },'R40 manual override status strip check or color mismatch');
+ await check(page,()=>{
+  const tb=document.querySelector('.person-toolbar').getBoundingClientRect();
+  const strip=document.querySelector('.person-strip').getBoundingClientRect();
+  const prev=document.querySelector('#personalDayPrev').getBoundingClientRect();
+  const insight=document.querySelector('.workspace-mode-person .inspector-insight').getBoundingClientRect();
+  const panel=document.querySelector('.workspace-mode-person .inspector-top').getBoundingClientRect();
+  return tb.height<85&&Math.abs(strip.top-tb.top)<25&&prev.right<=tb.right+1&&
+   insight.width>=310&&insight.width<=panel.width*.5&&
+   getComputedStyle(document.querySelector('.workspace-mode-person .analysis-head')).display==='none'&&
+   !!document.querySelector('#personalViewSelect');
+ },'R41 personal date controls must align with title and insight width must grow');
+ await page.screenshot({path:path.join(out,'r41-person.png')});
  await page.screenshot({path:path.join(out,'r40-person-month-strip.png')});
  await page.setViewportSize({width:1366,height:768});
  await check(page,()=>{
@@ -155,6 +200,13 @@ async function run(){
    }));
    console.error('R40_DATA_DEBUG',JSON.stringify(debug),'PAGE_ERRORS',JSON.stringify(errors));throw e;
  }
+ await check(page,()=>{
+  const col=rawTabulator?.getColumnDefinitions()[0];
+  const cell=document.querySelector('#rawDataTable .tabulator-cell');
+  const h=document.querySelector('#rawDataTable .tabulator-col-title');
+  return col?.hozAlign==='center'&&col?.headerHozAlign==='center'&&
+    getComputedStyle(cell).textAlign==='center'&&getComputedStyle(h).textAlign==='center';
+ },'R41 raw table headers and values should be centered');
  await page.screenshot({path:path.join(out,'r37-data.png')});
  await check(page,()=>getComputedStyle(document.querySelector('.workspace-mode-data .analysis-head')).display==='none',
  'R39 duplicate data heading');
