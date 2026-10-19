@@ -420,8 +420,11 @@ function changePersonalDay(day){
 function selectDate(d,allPeople=false){
  if(d<1||d>monthDays())return;
  const sel=state.selection;
- if(!allPeople&&(state.workspaceMode==='person'||state.workspaceMode==='classic')&&(sel.type==='person'||sel.type==='cell')){
-  changePersonalDay(d);return;
+ if(!allPeople&&(sel.type==='person'||sel.type==='cell')&&(state.workspaceMode==='person'||state.workspaceMode==='classic')){
+  if(state.workspaceMode==='person'){changePersonalDay(d);return}
+  // Keep the legacy six-track browser regression workflow in classic mode.
+  state.selection={type:'cell',employeeId:sel.employeeId,day:d};
+  state.chartDay=d;state.chartTab='timeline';state.timelineRange=null;
  }else{
   state.selection={type:'date',day:d};state.chartTab='overview';state.chartDay=d;
  }
