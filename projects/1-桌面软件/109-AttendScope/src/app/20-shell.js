@@ -20,6 +20,7 @@ function layoutHtml(){
       <span class="brand-mode">离线考勤</span>
     </div>
     <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
+    <div class="top-global-actions">
     <div class="month-anchor top-month">
         <button id="monthMenuButton" class="month-button" aria-expanded="false" aria-label="切换或新建月份">
           <span>${periodText()}</span><i class="chevron"></i>
@@ -51,6 +52,7 @@ function layoutHtml(){
       <button class="text-btn" id="printReport">PDF</button>
       <span class="action-divider"></span>
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
+    </div>
     </div>
   </header>
 
@@ -108,10 +110,12 @@ function layoutHtml(){
 
     <main class="workspace">
       ${workspaceToolbarHtml()}
+      ${state.workspaceMode==='person'?personMonthStripHtml():''}
       <div class="workbench">
         <section class="matrix-zone" aria-label="月度员工考勤状态矩阵">
           <div class="matrix-wrap" id="matrixScroll"><div class="matrix" id="matrix"></div></div>
         </section>
+        ${['all','group'].includes(state.workspaceMode)?'<aside id="scopeInsights" class="scope-insights" aria-label="统计分析"></aside>':''}
 
         <section class="analysis-panel">
           <div class="analysis-head">
@@ -122,7 +126,6 @@ function layoutHtml(){
           <div class="analysis-body" id="analysisBody"></div>
         </section>
       </div>
-      ${state.workspaceMode==='group'?'<section class="scope-details" id="scopeDetails"></section>':''}
     </main>
   </div>
 
@@ -243,7 +246,7 @@ function renderCalendar(){
   const first=(new Date(YEAR,MONTH-1,1).getDay()+6)%7;
   for(let i=0;i<first;i++)el.insertAdjacentHTML('beforeend','<div></div>');
   for(let d=1;d<=monthDays();d++){
-    const type=dayType(d),sel=state.selection.day===d?' selected':'';
+    const type=dayType(d),selectedDay=state.workspaceMode==='person'?(state.chartDay||state.selection.day):state.selection.day,sel=selectedDay===d?' selected':'';
     el.insertAdjacentHTML('beforeend',`<button class="cal-day ${type}${sel}" data-day="${d}" title="${dayTypeText(type)}"><span>${d}</span></button>`);
   }
   el.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.day));
@@ -311,7 +314,7 @@ function renderMatrix(){
   if(state.selection.type==='date')el.classList.add('focus-date');
   if(state.selection.type==='cell')el.classList.add('focus-cell');
   document.getElementById('matrixAll').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
-  el.querySelectorAll('.m-name[data-emp]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.emp));
+  el.querySelectorAll('.m-name[data-emp]').forEach(b=>b.onclick=()=>{if(state.workspaceMode==='classic')selectPerson(b.dataset.emp);else selectMatrixRow(b.dataset.emp)});
   el.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.date,true));
   el.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.cell.split('|');selectCell(id,+d)});
   const hoverRow=el.querySelector('.matrix-preview-frame.focus-row');
@@ -390,13 +393,35 @@ function bindAnalysisPanel(ctx){
   });
 }
 
-function selectPerson(id){const scoped=state.workspaceMode!=='classic';if(scoped)state.workspaceMode='person';state.selection={type:'person',employeeId:id};state.chartTab=scoped?'timeline':'overview';state.chartDay=nearestRecordedDay(id);state.timelineRange=null;state.rawPage=1;render()}
+function selectMatrixRow(id){
+ if(!EMPLOYEES.some(e=>e.id===id))return;
+ state.selection={type:'person',employeeId:id};
+ state.chartDay=nearestRecordedDay(id);
+ render();
+}
+function selectPerson(id){
+ const scoped=state.workspaceMode!=='classic';
+ if(scoped)state.workspaceMode='person';
+ state.selection={type:'person',employeeId:id};
+ state.chartTab=scoped?'timeline':'overview';
+ state.chartDay=nearestRecordedDay(id);
+ state.timelineRange=null;state.rawPage=1;render();
+}
+function changePersonalDay(day){
+ const d=Number(day);
+ if(!Number.isInteger(d)||d<1||d>monthDays())return;
+ const employeeId=state.selection.employeeId||EMPLOYEES[0]?.id;
+ if(!employeeId)return;
+ state.workspaceMode='person';
+ state.selection={type:'cell',employeeId,day:d};
+ state.chartDay=d;state.chartTab='timeline';state.timelineRange=null;state.rawPage=1;
+ render();
+}
 function selectDate(d,allPeople=false){
  if(d<1||d>monthDays())return;
  const sel=state.selection;
  if(!allPeople&&(sel.type==='person'||sel.type==='cell')){
-  state.selection={type:'cell',employeeId:sel.employeeId,day:d};
-  state.chartDay=d;state.chartTab='timeline';state.timelineRange=null;
+  changePersonalDay(d);return;
  }else{
   state.selection={type:'date',day:d};state.chartTab='overview';state.chartDay=d;
  }

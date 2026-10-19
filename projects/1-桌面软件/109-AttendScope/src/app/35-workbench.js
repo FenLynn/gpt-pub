@@ -71,9 +71,9 @@ function timelineLegendHtml(item){
 function timelineHeaderToolsHtml(ctx){
   if((state.chartTab||'overview')!=='timeline')return '';
   const day=plotAnalysis(ctx);if(!day)return '';
-  const switcher='<select id="timelineDayPicker" aria-label="时间轴日期">'+
+  const switcher='<button id="personalDayPrev" type="button" aria-label="上一天" '+(day.day<=1?'disabled':'')+'>‹</button><select id="timelineDayPicker" aria-label="时间轴日期">'+
     Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
-  '</select>';
+  '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(day.day>=monthDays()?'disabled':'')+'>›</button>';
   return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+switcher+'</div>';
 }
 function attendPlotHtml(ctx){
@@ -218,11 +218,15 @@ function mountPlotTabs(ctx){
   });
   const picker=document.getElementById('timelineDayPicker');
   if(picker)picker.onchange=()=>{
+    if(state.workspaceMode==='person'){changePersonalDay(picker.value);return}
     state.chartDay=Number(picker.value);
     if(ctx.type==='cell')state.selection.day=state.chartDay;
     state.timelineRange=null;state.rawPage=1;
     renderAnalysisPanel();renderMatrix();renderCalendar();
   };
+  const prev=document.getElementById('personalDayPrev'),next=document.getElementById('personalDayNext');
+  if(prev)prev.onclick=()=>changePersonalDay((state.chartDay||1)-1);
+  if(next)next.onclick=()=>changePersonalDay((state.chartDay||1)+1);
 }
 function disposeRawTable(){
   if(rawDialog)closeRawPopout();

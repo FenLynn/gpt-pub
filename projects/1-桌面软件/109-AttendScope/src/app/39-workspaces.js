@@ -34,6 +34,28 @@ function sidebarFilterHtml(){
   '<button type="button" data-judgment-mode="initial" class="'+(state.judgmentMode!=='manual'?'active':'')+'">初始</button>'+
   '<button type="button" data-judgment-mode="manual" class="'+(state.judgmentMode==='manual'?'active':'')+'" '+(hasManualStatuses()?'':'disabled')+'>人工</button></div></section>';
 }
+
+/* Shared month-strip palette: work/rest/holiday use exactly the calendar dayType;
+   status and manual override are sourced from the common analyzed facts. */
+function personMonthStripHtml(){
+ const id=state.selection.employeeId||EMPLOYEES[0]?.id;
+ if(!id)return '';
+ const selected=state.chartDay||state.selection.day||1;
+ const days=Array.from({length:monthDays()},(_,i)=>{
+  const day=i+1,info=state.analysis.get(id+'|'+day),type=dayType(day);
+  const rawManual=info?manualStatusFor(info):null;
+  const final=rawManual||attendanceJudgmentSystem(info);
+  const tone=final==='normal'?'normal':final==='anomaly'?'anomaly':final==='absent'?'absent':'rest';
+  const title=isoDate(day)+' · '+dayTypeText(type)+' · '+({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'}[final]||final)+(rawManual?' · 人工修正':'');
+  return '<button type="button" class="person-day '+type+' '+(selected===day?'selected':'')+
+    '" data-person-day="'+day+'" title="'+escapeNameChar(title)+'" aria-current="'+(selected===day?'date':'false')+'">'+
+    '<span class="person-day-number">'+pad(day)+'</span>'+
+    (rawManual?'<span class="person-day-check" aria-label="人工修正">✓</span>':'')+
+    '<span class="person-day-status '+tone+'"></span></button>';
+ }).join('');
+ return '<div class="person-strip" aria-label="个人整月考勤"><span class="person-strip-label">月度考勤</span>'+
+  '<div class="person-days">'+days+'</div></div>';
+}
 function workspaceSidebarHtml(){
  const mode=state.workspaceMode||'all',groups=workspaceGroups();
  const groupOptions=groups.map(g=>'<option value="'+escapeNameChar(g)+'" '+(mode==='group'&&g===state.selectedGroup?'selected':'')+'>'+escapeNameChar(g)+'</option>').join('');
@@ -68,12 +90,13 @@ function workspaceToolbarHtml(){
 }
 function bindWorkspaceNavigation(){
  document.querySelectorAll('[data-workspace]').forEach(b=>b.onclick=()=>navigateWorkspace(b.dataset.workspace));
+ document.querySelectorAll('[data-person-day]').forEach(b=>b.onclick=()=>changePersonalDay(b.dataset.personDay));
  const scope=document.getElementById('workspaceScopeGroup');
  if(scope)scope.onchange=()=>{if(scope.value){state.workspaceMode='group';state.selectedGroup=scope.value;state.scopeSearch='';state.attentionOnly=false;render()}};
  const g=document.getElementById('workspaceGroup');
  if(g)g.onchange=()=>{state.selectedGroup=g.value;state.selection={type:'overall'};render()};
  const person=document.getElementById('workspacePerson');
- if(person)person.onchange=()=>selectPerson(person.value);
+ if(person)person.onchange=()=>state.workspaceMode==='person'?selectPerson(person.value):selectMatrixRow(person.value);
  const search=document.getElementById('workspaceSearch');
  if(search)search.oninput=()=>{state.scopeSearch=search.value;renderMatrix();renderScopeSummary()};
  const attention=document.getElementById('scopeAttentionToggle');
