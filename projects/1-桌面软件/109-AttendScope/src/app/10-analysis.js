@@ -6,7 +6,10 @@ function sourceRow(r,i){return Number(r.__rowNumber)||i+2}
 function validClock(t){return /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(String(t))}
 function importClock(v,fallback){
   if(typeof v==='number'&&v>=0&&v<1){const m=Math.round(v*1440);return pad(Math.floor(m/60)%24)+':'+pad(m%60)}
-  const t=String(v??'').slice(0,5);return validClock(t)?t:fallback;
+  if(v==null||String(v).trim()==='')return fallback;
+  const t=String(v).trim().slice(0,5);
+  if(!validClock(t))throw new Error('导入文件包含无效时间：'+String(v).slice(0,40));
+  return t;
 }
 function importedDate(v){
   return (typeof v==='number'?excelSerialToDateTime(v):String(v??'')).replace('T',' ').trim();
@@ -59,6 +62,7 @@ async function importAttendance(file){
   });
   if(!parsed.length)throw new Error('未识别到本月有效考勤记录，请确认姓名、打卡时间与进出列');
   const plan=importRosterPlan(parsed.map(r=>r.name),'attendance');
+  if(!plan.resetDemo&&!state.isDemo&&state.records.length&&!window.confirm('本月已有考勤记录，新文件将替换当前考勤工作数据（历史 raw 文件不会删除）。是否继续？'))throw new Error('已取消考勤覆盖');
   const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   const out=parsed.map(r=>{
     const employee=plan.byName.get(r.name);
@@ -80,6 +84,7 @@ async function importLeaves(file){
   });
   if(!parsed.length)throw new Error('未识别到本月有效请假记录');
   const plan=importRosterPlan(parsed.map(r=>r.name),'leave');
+  if(!plan.resetDemo&&state.leaves.length&&!window.confirm('本月已有请假记录，新文件将替换当前请假工作数据。是否继续？'))throw new Error('已取消请假覆盖');
   const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   const out=parsed.map(r=>({id:'LI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
     ...r,source:file.name,sheet:t.sheet}));
@@ -99,6 +104,7 @@ async function importTrips(file){
   });
   if(!parsed.length)throw new Error('未识别到本月有效出差记录');
   const plan=importRosterPlan(parsed.map(r=>r.name),'trip');
+  if(!plan.resetDemo&&state.trips.length&&!window.confirm('本月已有出差记录，新文件将替换当前出差工作数据。是否继续？'))throw new Error('已取消出差覆盖');
   const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   const out=parsed.map(r=>({id:'TI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
     ...r,source:file.name,sheet:t.sheet}));

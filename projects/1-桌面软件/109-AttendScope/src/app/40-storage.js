@@ -16,7 +16,7 @@ function traditionalRows(){
       状态:a.status,严重度:a.severity==='problem'?'明确问题':a.severity==='suspect'?'疑似异常':a.severity==='excused'?'请假/出差':a.severity==='rest'?'休息':'正常',
       系统判定:judgmentChinese(attendanceJudgmentSystem(a)),人工判定:manualStatusFor(a)?judgmentChinese(manualStatusFor(a)):'',最终判定:judgmentChinese(attendanceJudgment(a)),
       首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),
-      异常摘要:a.issues.join('；'),业务标记:a.marker==='leave'?'请假':a.marker==='trip'?'出差':'',
+      异常摘要:a.issues.join('；'),业务标记:attendanceBehaviors(a).map(k=>({trip:'出差',leave:'请假',outing:'外出',overtime:'加班'})[k]).join('；'),
       人工处理:(state.revisions.some(r=>r.key===e.id+'|'+d)||!!manualStatusFor(a))?'是':'否'});
   }
   return rows;
@@ -64,6 +64,7 @@ async function connectProjectDir(){
   try{
     const handle=await showDirectoryPicker({mode:'readwrite'});
     const project=await readJSON(handle,'project.json');
+    if(project&&project.projectId!=='P109-AttendScope')throw new Error('所选目录不是 AttendScope 项目，请更换目录，避免覆盖其他数据');
     state.projectDir=handle;
     if(project?.projectId==='P109-AttendScope'){
       const conf=await existingDir(handle,'config').catch(()=>null);

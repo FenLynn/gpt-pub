@@ -267,7 +267,7 @@ function renderMatrix(){
   for(const e of EMPLOYEES){
     const rowSelected=(state.selection.type==='person'||state.selection.type==='cell')&&state.selection.employeeId===e.id;
     const letters=Array.from(e.name).slice(0,4).map(ch=>`<span>${escapeNameChar(ch)}</span>`).join('');
-    html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${e.id}" title="${e.name} · ${e.department}"><span class="m-name-num">${String(EMPLOYEES.indexOf(e)+1).padStart(2,'0')}</span><span class="name-letters">${letters}</span></button>`;
+    html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${escapeNameChar(e.id)}" title="${escapeNameChar(e.name)} · ${escapeNameChar(e.department)}"><span class="m-name-num">${String(EMPLOYEES.indexOf(e)+1).padStart(2,'0')}</span><span class="name-letters">${letters}</span></button>`;
     for(let d=1;d<=31;d++){
       if(d>monthDays()){html+='<div class="m-cell inactive"></div>';continue}
       const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
@@ -275,7 +275,7 @@ function renderMatrix(){
       const colSelected=(state.selection.type==='date'||state.selection.type==='cell')&&state.selection.day===d;
       const category=matrixCategory(a),cls='s-'+category,behaviors=attendanceBehaviors(a);
       html+=`<div class="m-cell ${rowSelected?'row-focus':''} ${colSelected?'col-focus':''} ${selected?'cell-focus':''} ${Number(e.id.slice(1))%2?'':'row-alt'} day-${dayType(d)}" data-emp="${e.id}" data-day="${d}">
-        <button class="${cls} ${visible||selected?'':'filtered-out'} ${selected?'selected':''}" style="--status-color:${categoryColor(category)}" data-cell="${e.id}|${d}" title="${e.name} · ${isoDate(d)}\n初始：${attendanceJudgmentSystem(a)} · 当前：${attendanceJudgment(a)}\n行为：${behaviors.join(' / ')||'无'}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${state.judgmentMode==='manual'&&manualStatusFor(a)&&state.prefs?.matrix?.showManualCheck!==false?'<i class="manual-check">✓</i>':''}</button>
+        <button class="${cls} ${visible||selected?'':'filtered-out'} ${selected?'selected':''}" style="--status-color:${categoryColor(category)}" data-cell="${escapeNameChar(e.id)}|${d}" title="${escapeNameChar(e.name)} · ${isoDate(d)}\n初始：${attendanceJudgmentSystem(a)} · 当前：${attendanceJudgment(a)}\n行为：${behaviors.join(' / ')||'无'}\n首进 ${a.firstIn||'—'} · 末出 ${a.lastOut||'—'}">${state.judgmentMode==='manual'&&manualStatusFor(a)&&state.prefs?.matrix?.showManualCheck!==false?'<i class="manual-check">✓</i>':''}</button>
       </div>`;
     }
   }

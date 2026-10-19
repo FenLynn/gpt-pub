@@ -86,10 +86,10 @@
   const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[n]=c>>>0}return t})();
   function crc32(bytes){let c=0xffffffff;for(const b of bytes)c=crcTable[(c^b)&255]^(c>>>8);return (c^0xffffffff)>>>0}
   function push16(a,n){a.push(n&255,(n>>>8)&255)} function push32(a,n){a.push(n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255)}
-  function zipStore(files){const out=[], central=[]; let offset=0; const now=new Date(), dosTime=((now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1))&0xffff, dosDate=(((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate())&0xffff;
-    for(const f of files){const name=TE.encode(f.name), data=typeof f.data==='string'?TE.encode(f.data):f.data, crc=crc32(data), local=[]; push32(local,0x04034b50);push16(local,20);push16(local,0x0800);push16(local,0);push16(local,dosTime);push16(local,dosDate);push32(local,crc);push32(local,data.length);push32(local,data.length);push16(local,name.length);push16(local,0);local.push(...name); out.push(...local,...data);
-      const cen=[];push32(cen,0x02014b50);push16(cen,20);push16(cen,20);push16(cen,0x0800);push16(cen,0);push16(cen,dosTime);push16(cen,dosDate);push32(cen,crc);push32(cen,data.length);push32(cen,data.length);push16(cen,name.length);push16(cen,0);push16(cen,0);push16(cen,0);push16(cen,0);push32(cen,0);push32(cen,offset);cen.push(...name);central.push(...cen);offset+=local.length+data.length}
-    const cdOffset=out.length;out.push(...central);const e=[];push32(e,0x06054b50);push16(e,0);push16(e,0);push16(e,files.length);push16(e,files.length);push32(e,central.length);push32(e,cdOffset);push16(e,0);out.push(...e);return new Uint8Array(out)}
+  function zipStore(files){const out=[], central=[]; let offset=0, centralLength=0; const now=new Date(), dosTime=((now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1))&0xffff, dosDate=(((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate())&0xffff;
+    for(const f of files){const name=TE.encode(f.name), data=typeof f.data==='string'?TE.encode(f.data):f.data, crc=crc32(data), local=[]; push32(local,0x04034b50);push16(local,20);push16(local,0x0800);push16(local,0);push16(local,dosTime);push16(local,dosDate);push32(local,crc);push32(local,data.length);push32(local,data.length);push16(local,name.length);push16(local,0);local.push(...name); out.push(Uint8Array.from(local),data);
+      const cen=[];push32(cen,0x02014b50);push16(cen,20);push16(cen,20);push16(cen,0x0800);push16(cen,0);push16(cen,dosTime);push16(cen,dosDate);push32(cen,crc);push32(cen,data.length);push32(cen,data.length);push16(cen,name.length);push16(cen,0);push16(cen,0);push16(cen,0);push16(cen,0);push32(cen,0);push32(cen,offset);cen.push(...name);central.push(Uint8Array.from(cen));centralLength+=cen.length;offset+=local.length+data.length}
+    const cdOffset=offset;const e=[];push32(e,0x06054b50);push16(e,0);push16(e,0);push16(e,files.length);push16(e,files.length);push32(e,centralLength);push32(e,cdOffset);push16(e,0);return new Blob([...out,...central,Uint8Array.from(e)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
   function colName(n){let s='';n++;while(n){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26)}return s}
   function writeXlsx(rows,sheetName='Sheet1'){
     if(!rows.length)rows=[{}]; const headers=Object.keys(rows[0]);
@@ -101,7 +101,7 @@
       {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlText(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`},
       {name:'xl/_rels/workbook.xml.rels',data:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'},
       {name:'xl/worksheets/sheet1.xml',data:sheet}
-    ]; return new Blob([zipStore(files)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    ]; return zipStore(files);
   }
   global.AttendScopeXLSX={readTable,writeXlsx,parseCsvText};
 })(window);

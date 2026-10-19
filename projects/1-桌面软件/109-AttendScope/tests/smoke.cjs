@@ -423,6 +423,20 @@ async function run(){
    return {valid,restored,calendar};
  });
  if(!imported.valid||!imported.restored||!imported.calendar)throw Error('R33 roster/import/month/calendar failed '+JSON.stringify(imported));
+ // R35: actual large XLSX bytes must round-trip, not just return matching preview fields.
+ await check(page,async()=>{
+   const rows=Array.from({length:6000},(_,i)=>({姓名:'测试'+i,打卡时间:'2026-10-09 08:31:04',进出:'进',备注:'测试数据'+i}));
+   const file=XLSX.writeXlsx(rows,'批量导出'),raw=await file.arrayBuffer();
+   if(raw.byteLength<200000)return false;
+   const parsed=await XLSX.readTable(new File([file],'batch.xlsx'));
+   return parsed.rows.length===rows.length&&parsed.rows[5999].姓名==='测试5999'&&parsed.rows[5999].进出==='进';
+ },'R35 large XLSX round-trip failed');
+ await check(page,()=>{
+   const a=[...state.analysis.values()].find(x=>x.leaves?.length||x.trips?.length);
+   const row=traditionalRows().find(r=>r.姓名===a.employee.name&&r.日期===a.date);
+   return !!row&&row.业务标记.length>0;
+ },'R35 export lost behavior tags');
+
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R34',remote:remote.length,errors:errors.length,layout}));
