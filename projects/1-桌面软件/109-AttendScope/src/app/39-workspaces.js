@@ -80,6 +80,9 @@ function workspaceSidebarHtml(){
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
+  (mode==='person'?'<div class="side-view-row"><label for="personalViewSelect">分析视图</label><select class="side-select" id="personalViewSelect">'+
+    CHART_TABS.map(([id,label])=>'<option value="'+id+'" '+(state.chartTab===id?'selected':'')+'>'+label+'</option>').join('')+
+   '</select></div>':'')+
   (mode==='data'?'':sidebarFilterHtml())+'</div>';
 }
 function workspaceToolbarHtml(){
@@ -98,6 +101,8 @@ function bindWorkspaceNavigation(){
  if(scope)scope.onchange=()=>{if(scope.value){state.workspaceMode='group';state.selectedGroup=scope.value;state.scopeSearch='';state.attentionOnly=false;render()}};
  const g=document.getElementById('workspaceGroup');
  if(g)g.onchange=()=>{state.selectedGroup=g.value;state.selection={type:'overall'};render()};
+ const view=document.getElementById('personalViewSelect');
+ if(view)view.onchange=()=>{state.chartTab=view.value;renderAnalysisPanel()};
  const person=document.getElementById('workspacePerson');
  if(person)person.onchange=()=>{
    if(!person.value){state.selection={type:'overall'};render();return}

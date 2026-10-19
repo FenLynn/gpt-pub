@@ -247,3 +247,8 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
  .person-day{height:42px}
  .person-day-number{font-size:10px}
 }
+
+/* R40: compact personal analysis select under the calendar. */
+.side-view-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:9px;align-items:center;padding:11px 0 8px;border-top:1px solid #e5eaf0}
+.side-view-row label{font-size:12px;font-weight:600;color:#576f81}
+.side-view-row .side-select{height:31px;min-height:31px;font-size:12px}

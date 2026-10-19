@@ -130,7 +130,7 @@ async function run(){
   if(prior.old==null)delete state.manualStatuses[prior.key];else state.manualStatuses[prior.key]=prior.old;
   state.judgmentMode=prior.mode;delete state.__r40Restore;render();
  });
- await check(page,()=>!!document.querySelector('.side-controls [data-sidebar-chart="timeline"]')&&
+ await check(page,()=>!!document.querySelector('#personalViewSelect option[value="timeline"]')&&
   getComputedStyle(document.querySelector('.chart-mode-tabs')).display==='none',
   'R39 personal subnavigation should be on left only');
  await page.locator('[data-workspace="data"]').click();
