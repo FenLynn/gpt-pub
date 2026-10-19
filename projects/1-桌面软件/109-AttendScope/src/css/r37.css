@@ -422,8 +422,9 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
 
 /* R42 — keep Chinese filter labels on one line in an upward scrollable menu. */
 .layout:not(.workspace-mode-classic) .status-filter-menu.open{
- display:grid!important;grid-template-columns:minmax(0,1fr)!important;
- gap:2px!important;
+ display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:3px!important;
 }
 .layout:not(.workspace-mode-classic) .status-filter-menu button,
 .layout:not(.workspace-mode-classic) .status-filter-current,
@@ -566,3 +567,33 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
 }
 /* Date cells gain the label's previous width; no redundant month-strip caption. */
 .workspace-mode-person .person-days{min-width:0}
+
+
+/* R44 · avoid the scrollbar entirely: short two-column popup, not a scrollbox.
+   The popup stays inside the left sidebar while opening upward over the calendar. */
+.layout:not(.workspace-mode-classic) .side-bottom .status-filter-menu{
+ left:auto!important;right:0!important;
+ width:min(192px,calc(var(--p109-side) - 24px))!important;
+ box-sizing:border-box!important;
+ height:auto!important;max-height:none!important;
+ overflow:visible!important;overflow-x:visible!important;overflow-y:visible!important;
+ scrollbar-width:none!important;
+}
+.layout:not(.workspace-mode-classic) .side-bottom .status-filter-menu.open{
+ display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ grid-auto-rows:minmax(29px,auto);
+ gap:3px!important;
+}
+.layout:not(.workspace-mode-classic) .side-bottom .status-filter-menu button{
+ min-width:0!important;min-height:29px!important;
+ padding:5px 5px!important;gap:5px!important;
+ display:flex;align-items:center;
+ white-space:nowrap!important;
+}
+.layout:not(.workspace-mode-classic) .side-bottom .status-filter-menu button:first-child{
+ grid-column:1/-1;
+}
+.layout:not(.workspace-mode-classic) .side-bottom .status-filter-menu::-webkit-scrollbar{
+ display:none!important;width:0!important;height:0!important;
+}

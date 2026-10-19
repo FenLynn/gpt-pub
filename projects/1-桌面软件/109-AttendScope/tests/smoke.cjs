@@ -52,10 +52,13 @@ async function run(){
  },'R41 status menu should open upward fully visible');
  await check(page,()=>{
   const list=document.getElementById('statusFilterMenu'),buttons=[...list.querySelectorAll('button')];
-  return getComputedStyle(list).gridTemplateColumns.split(' ').length===1&&
-    getComputedStyle(list).overflowY==='visible'&&list.scrollHeight<=list.clientHeight+1&&
+  const bounds=list.getBoundingClientRect(),sidebar=document.querySelector('.sidebar').getBoundingClientRect();
+  const cols=getComputedStyle(list).gridTemplateColumns.split(' ').filter(Boolean);
+  return cols.length===2&&getComputedStyle(list).overflowY==='visible'&&
+    list.scrollHeight<=list.clientHeight+1&&bounds.left>=sidebar.left&&bounds.right<=sidebar.right&&
+    bounds.top>=0&&buttons.length===8&&
     buttons.every(b=>getComputedStyle(b).whiteSpace==='nowrap'&&b.scrollHeight<=b.clientHeight+1);
- },'R42 Chinese status labels must stay one line');
+ },'R44 two-column status picker must fit without scrollbars');
  await page.locator('#statusFilterButton').click();
  // Explicit Personal tab starts on day one; matrix cell drilldowns retain the clicked day.
  await page.locator('[data-workspace="person"]').click();
