@@ -41,7 +41,7 @@ async function run(){
   const scope=document.querySelector('#scopeInsights').getBoundingClientRect();
   const name=document.querySelector('.m-name .name-letters');
   return controls.left>=nav.right&&scope.left>=wrap.right&&
-   matrix.width>wrap.width*.95&&matrix.width<=wrap.width&&
+   matrix.width>wrap.width*.94&&matrix.width<=wrap.width&&
    getComputedStyle(name).textAlignLast==='justify'&&name.getBoundingClientRect().width>=48;
  },'R41 right-aligned global actions, no dead columns, or four-char name justification');
  await page.locator('#statusFilterButton').click();
@@ -50,7 +50,21 @@ async function run(){
   const trigger=document.querySelector('#statusFilterButton').getBoundingClientRect();
   return document.querySelector('#statusFilterMenu').classList.contains('open')&&menu.bottom<trigger.top&&menu.top>=0;
  },'R41 status menu should open upward fully visible');
+ await check(page,()=>{
+  const list=document.getElementById('statusFilterMenu'),buttons=[...list.querySelectorAll('button')];
+  return getComputedStyle(list).gridTemplateColumns.split(' ').length===1&&
+    buttons.every(b=>getComputedStyle(b).whiteSpace==='nowrap'&&b.scrollHeight<=b.clientHeight+1);
+ },'R42 Chinese status labels must stay one line');
  await page.locator('#statusFilterButton').click();
+ await check(page,()=>{
+  const wrap=document.querySelector('.matrix-wrap'),grid=document.querySelector('.matrix'),
+    edge=grid.querySelector('.m-cell[data-day="31"]').getBoundingClientRect(),
+    corner=document.querySelector('.m-corner');
+  return wrap.scrollWidth<=wrap.clientWidth+1&&
+    getComputedStyle(wrap).overflowX==='hidden'&&
+    wrap.getBoundingClientRect().right-edge.right>=8&&wrap.getBoundingClientRect().right-edge.right<40&&
+    getComputedStyle(corner).justifyContent==='center';
+ },'R42 all-staff month grid must not scroll horizontally');
  await page.screenshot({path:path.join(out,'r41-all.png')});
  await page.screenshot({path:path.join(out,'r37-all.png')});
  // R40: left navigation is two simple inline selectors; selecting a name highlights the row.
@@ -103,7 +117,11 @@ async function run(){
   const edge=document.querySelector('.matrix .m-cell[data-day="31"]');
   const frame=document.querySelector('.matrix-wrap');
   const last=edge?.getBoundingClientRect().right-frame?.getBoundingClientRect().right;
-  return row&&Number.isFinite(last)&&last<=1&&last>-18;
+  const grid=document.querySelector('.matrix'),scroller=document.querySelector('.matrix-wrap');
+   return row&&Number.isFinite(last)&&last<=-8&&last>-23&&
+    scroller.scrollWidth<=scroller.clientWidth+1&&
+    scroller.scrollHeight<=scroller.clientHeight+2&&
+    grid.getBoundingClientRect().bottom<=scroller.getBoundingClientRect().bottom+2;
  },'R41 31st matrix column should be flush with its frame');
  await page.locator('#workspaceGroup').selectOption('');
  await check(page,()=>state.workspaceMode==='all'&&!!document.querySelector('#workspaceScopeGroup'),
@@ -166,8 +184,19 @@ async function run(){
   return tb.height<85&&Math.abs(strip.top-tb.top)<25&&prev.right<=tb.right+1&&
    insight.width>=310&&insight.width<=panel.width*.5&&
    getComputedStyle(document.querySelector('.workspace-mode-person .analysis-head')).display==='none'&&
-   !!document.querySelector('#personalViewSelect');
+   !document.querySelector('#personalViewSelect')&&
+   getComputedStyle(document.querySelector('.workspace-mode-person .status-control-row>span')).fontSize==='13px';
  },'R41 personal date controls must align with title and insight width must grow');
+ await check(page,()=>{
+  const body=document.querySelector('.workspace-mode-person .analysis-body').getBoundingClientRect();
+  const top=document.querySelector('.workspace-mode-person .inspector-top').getBoundingClientRect();
+  const raw=document.querySelector('.workspace-mode-person .inspector-bottom').getBoundingClientRect();
+  const initial=document.querySelector('.workspace-mode-person .initial-judgment');
+  const buttons=[...document.querySelectorAll('.workspace-mode-person .manual-status-buttons button')];
+  return top.height>body.height*.50&&top.height<body.height*.66&&raw.height>=160&&
+    getComputedStyle(initial).fontSize==='14px'&&buttons.every(b=>b.textContent.trim().length>0);
+ },'R42 six-lane and raw table height or clean judgment buttons failed');
+ await page.screenshot({path:path.join(out,'r42-person.png')});
  await page.screenshot({path:path.join(out,'r41-person.png')});
  await page.screenshot({path:path.join(out,'r40-person-month-strip.png')});
  await page.setViewportSize({width:1366,height:768});
@@ -185,7 +214,7 @@ async function run(){
   state.judgmentMode=prior.mode;delete state.__r40Restore;render();
  });
  // The personal statistics tab is functional, not a decorative navigation label.
- await page.locator('#personalViewSelect').selectOption('stats');
+ await page.evaluate(()=>{state.chartTab='stats';renderAnalysisPanel()});
  await page.waitForSelector('#statsChartMain svg',{timeout:15000});
  await page.waitForSelector('#statsChartSecondary svg',{timeout:15000});
  await check(page,()=>{
@@ -198,11 +227,11 @@ async function run(){
     figure.xAxis[0].data.length===full.length&&figure.series[0].data.length===full.length&&value===full.length;
  },'R41 personal statistics must represent the entire employee month, not selected day');
  await page.screenshot({path:path.join(out,'r41-person-stats.png')});
- await page.locator('#personalViewSelect').selectOption('timeline');
+ await page.evaluate(()=>{state.chartTab='timeline';renderAnalysisPanel()});
  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:15000});
- await check(page,()=>!!document.querySelector('#personalViewSelect option[value="timeline"]')&&
+ await check(page,()=>!document.querySelector('#personalViewSelect')&&
   getComputedStyle(document.querySelector('.chart-mode-tabs')).display==='none',
-  'R39 personal subnavigation should be on left only');
+  'R42 duplicate personal analysis selector must be absent');
  await page.locator('[data-workspace="data"]').click();
  try{await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:10000})}
  catch(e){

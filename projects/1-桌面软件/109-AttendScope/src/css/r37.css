@@ -379,24 +379,26 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
  --matrix-name:98px;
  --matrix-row:27px;
  --matrix-grid:calc(var(--matrix-name) + 31 * var(--matrix-cell));
- width:calc(var(--matrix-grid) + 16px)!important;
+ width:calc(var(--matrix-grid) + 32px)!important;
  max-width:100%!important;
- height:min(calc(29px + var(--scope-count,50) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
+ height:min(calc(30px + var(--scope-count,50) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
  min-height:0!important;
 }
 .workspace-mode-group .matrix-zone{
- height:min(calc(29px + var(--scope-count,10) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
+ width:calc(var(--matrix-grid) + 16px)!important;
+ height:min(calc(30px + var(--scope-count,10) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
 }
 .workspace-mode-all .matrix-wrap,.workspace-mode-group .matrix-wrap{
  box-sizing:border-box!important;
- width:calc(var(--matrix-grid) + 16px)!important;
+ width:calc(var(--matrix-grid) + 32px)!important;
  max-width:100%!important;
  padding:0 12px 0 0!important;
  overflow-x:hidden!important;
  overflow-y:auto!important;
- scrollbar-gutter:stable;
+ scrollbar-gutter:auto;
 }
 .workspace-mode-group .matrix-wrap{
+ width:calc(var(--matrix-grid) + 16px)!important;
  scrollbar-gutter:auto;
 }
 .workspace-mode-all .matrix,.workspace-mode-group .matrix{
