@@ -294,8 +294,8 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
 .layout:not(.workspace-mode-classic) .side-bottom{position:relative;z-index:22}
 .layout:not(.workspace-mode-classic) .status-filter-control{position:relative;z-index:23}
 .layout:not(.workspace-mode-classic) .status-filter-menu{
- top:auto!important;bottom:calc(100% + 6px)!important;max-height:min(280px,45vh);
- overflow-y:auto;z-index:80!important}
+ top:auto!important;bottom:calc(100% + 6px)!important;max-height:none!important;
+ overflow:visible!important;scrollbar-width:none;z-index:80!important}
 .layout:not(.workspace-mode-classic) .status-filter-button[aria-expanded="true"] .chevron{
  transform:rotate(225deg) translateY(-1px)}
 
@@ -546,3 +546,23 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
   grid-template-rows:minmax(230px,57%) minmax(175px,1fr)!important;
  }
 }
+
+
+/* R43: frame the personal raw evidence table on both sides, with a subtle
+ * neutral frozen-name divider (same weight as all other table separators). */
+.workspace-mode-person #rawPane{
+ box-sizing:border-box!important;
+ border-left:1px solid #e5ebf0!important;
+ border-right:1px solid #e5ebf0!important;
+}
+.raw-table .tabulator-header .tabulator-col.tabulator-frozen,
+.raw-table .tabulator-row .tabulator-cell.tabulator-frozen{
+ box-shadow:none!important;
+ border-right:1px solid #e5ebf0!important;
+}
+.raw-table .tabulator-header .tabulator-col.tabulator-frozen::after,
+.raw-table .tabulator-row .tabulator-cell.tabulator-frozen::after{
+ box-shadow:none!important;
+}
+/* Date cells gain the label's previous width; no redundant month-strip caption. */
+.workspace-mode-person .person-days{min-width:0}

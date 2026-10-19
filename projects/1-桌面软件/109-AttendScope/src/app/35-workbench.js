@@ -81,7 +81,7 @@ function timelineHeaderToolsHtml(ctx){
 }
 function attendPlotHtml(ctx){
   const tab=state.chartTab||'overview',day=plotAnalysis(ctx);
-  const heading=tab==='timeline'&&day?'':'<div class="plot-heading"><strong>'+plotTitle(ctx)+'</strong></div>';
+  const heading=state.workspaceMode==='person'||(tab==='timeline'&&day)?'':'<div class="plot-heading"><strong>'+plotTitle(ctx)+'</strong></div>';
   const top='<div class="chart-mode-tabs">'+CHART_TABS.map(([id,label])=>
     '<button data-chart-tab="'+id+'" class="'+(tab===id?'active':'')+'">'+label+'</button>').join('')+'</div>'+heading;
   if(tab==='issues')return top+'<div id="issueChart" class="plot-chart"></div>';

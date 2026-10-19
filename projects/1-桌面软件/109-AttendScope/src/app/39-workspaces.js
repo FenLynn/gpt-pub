@@ -58,7 +58,7 @@ function personMonthStripHtml(){
   '<select id="timelineDayPicker" aria-label="时间轴日期">'+
    Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(selected===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
   '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(selected>=monthDays()?'disabled':'')+'>›</button></div>';
- return '<div class="person-strip" aria-label="个人整月考勤"><span class="person-strip-label">月度考勤</span>'+
+ return '<div class="person-strip" aria-label="个人整月考勤">'+
   '<div class="person-days" style="--r40-days:'+monthDays()+'">'+days+'</div>'+switcher+'</div>';
 }
 function workspaceSidebarHtml(){
@@ -132,9 +132,12 @@ function navigateWorkspace(mode){
  state.workspaceMode=mode;state.scopeSearch='';state.attentionOnly=false;
  if(mode==='all'||mode==='group'||mode==='data'){state.selection={type:'overall'};state.chartTab='overview'}
  if(mode==='group'&&!workspaceGroups().includes(state.selectedGroup))state.selectedGroup=workspaceGroups()[0]||'未分组';
- if(mode==='person'&&!['person','cell'].includes(state.selection.type)){
-  const e=EMPLOYEES[0];if(e){state.selection={type:'person',employeeId:e.id};state.chartDay=nearestRecordedDay(e.id)}
-  state.chartTab='timeline';state.timelineRange=null;
+ if(mode==='person'){
+  // An explicit visit to Personal starts on day 1 in timeline mode.
+  // Matrix-cell drilldowns use selectCell() and retain their clicked date.
+  const id=EMPLOYEES.find(e=>e.id===state.selection.employeeId)?.id||EMPLOYEES[0]?.id;
+  state.selection=id?{type:'cell',employeeId:id,day:1}:{type:'overall'};
+  state.chartDay=1;state.chartTab='timeline';state.timelineRange=null;state.rawPage=1;
  }
  render();
 }

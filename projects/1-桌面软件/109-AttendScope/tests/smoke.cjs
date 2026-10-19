@@ -53,9 +53,22 @@ async function run(){
  await check(page,()=>{
   const list=document.getElementById('statusFilterMenu'),buttons=[...list.querySelectorAll('button')];
   return getComputedStyle(list).gridTemplateColumns.split(' ').length===1&&
+    getComputedStyle(list).overflowY==='visible'&&list.scrollHeight<=list.clientHeight+1&&
     buttons.every(b=>getComputedStyle(b).whiteSpace==='nowrap'&&b.scrollHeight<=b.clientHeight+1);
  },'R42 Chinese status labels must stay one line');
  await page.locator('#statusFilterButton').click();
+ // Explicit Personal tab starts on day one; matrix cell drilldowns retain the clicked day.
+ await page.locator('[data-workspace="person"]').click();
+ await page.waitForSelector('#attendanceTimelineChart svg',{timeout:15000});
+ await check(page,()=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&
+   state.chartDay===1&&state.selection.day===1&&state.selection.type==='cell'&&
+   !!document.querySelector('.cal-day[data-day="1"].selected')&&
+   !!document.querySelector('.person-day[data-person-day="1"].selected')&&
+   !document.querySelector('.person-strip-label')&&!document.querySelector('.plot-heading')&&
+   !document.querySelector('.workspace-mode-person .inspector-plot')?.textContent.includes('常规每日分布'),
+ 'R43 personal navigation must open first-day timeline without redundant titles');
+ await page.screenshot({path:path.join(out,'r43-person-first-day.png')});
+ await page.locator('[data-workspace="all"]').click();
  await check(page,()=>{
   const wrap=document.querySelector('.matrix-wrap'),grid=document.querySelector('.matrix'),
     edge=grid.querySelector('.m-cell[data-day="31"]').getBoundingClientRect(),
@@ -193,7 +206,14 @@ async function run(){
   const raw=document.querySelector('.workspace-mode-person .inspector-bottom').getBoundingClientRect();
   const initial=document.querySelector('.workspace-mode-person .initial-judgment');
   const buttons=[...document.querySelectorAll('.workspace-mode-person .manual-status-buttons button')];
+  const evidence=document.querySelector('.workspace-mode-person #rawPane');
+  const edges=getComputedStyle(evidence);
+  const frozen=document.querySelector('.workspace-mode-person .raw-table .tabulator-cell.tabulator-frozen');
   return top.height>body.height*.50&&top.height<body.height*.66&&raw.height>=160&&
+    edges.borderLeftStyle==='solid'&&edges.borderRightStyle==='solid'&&
+    parseFloat(edges.borderLeftWidth)===1&&parseFloat(edges.borderRightWidth)===1&&
+    (!frozen||(getComputedStyle(frozen).borderRightColor==='rgb(229, 235, 240)'&&
+       getComputedStyle(frozen).boxShadow==='none'))&&
     getComputedStyle(initial).fontSize==='14px'&&buttons.every(b=>b.textContent.trim().length>0);
  },'R42 six-lane and raw table height or clean judgment buttons failed');
  await page.screenshot({path:path.join(out,'r42-person.png')});
