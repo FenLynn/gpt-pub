@@ -52,7 +52,11 @@ function setManualStatusForCurrent(status){
   if(!employeeId||!day)return;
   const key=employeeId+'|'+day,item=state.analysis.get(key);state.manualStatuses??={};
   if(status&&item&&status===attendanceJudgmentSystem(item))return;
+  const before=manualStatusFor(item),system=attendanceJudgmentSystem(item);
+  if(before===status)return;
   if(status)state.manualStatuses[key]=status;else delete state.manualStatuses[key];
+  state.revisions.push({id:'R'+(++state.revisionSeq),key,action:'manual-status',
+    from:before||system,to:status||system,time:new Date().toISOString(),note:'人工判定变更'});
   if(status)state.judgmentMode='manual';else if(!hasManualStatuses())state.judgmentMode='initial';
   state.saved=false;rememberMonth();render();
 }

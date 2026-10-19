@@ -20,9 +20,11 @@ async function run(){
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
  await page.goto(url,{waitUntil:'load',timeout:60000});
+ await page.screenshot({path:path.join(out,'r37-all.png')});
  await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===4&&
    !!document.querySelector('#scopeSummary .scope-stat-row')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
  await page.locator('[data-workspace="group"]').click();
+ await page.screenshot({path:path.join(out,'r37-group.png')});
  await check(page,()=>{
    const members=EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup).length;
    return state.workspaceMode==='group'&&members>0&&document.querySelectorAll('.m-name[data-emp]').length===members&&
@@ -30,12 +32,39 @@ async function run(){
  },'R37 group roster does not constrain matrix');
  await page.locator('.m-name[data-emp]').first().click();
  await page.waitForSelector('#overviewTrendChart svg',{timeout:20000});
+ await page.screenshot({path:path.join(out,'r37-person.png')});
  await check(page,()=>state.workspaceMode==='person'&&state.selection.type==='person'&&!!document.getElementById('workspacePerson'),
    'R37 group-to-person drilldown failed');
  await page.locator('[data-workspace="data"]').click();
  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
+ await page.screenshot({path:path.join(out,'r37-data.png')});
  await check(page,()=>state.workspaceMode==='data'&&!!document.getElementById('dataSave')&&
    rawTabulator?.getDataCount()===state.records.length,'R37 data page evidence browser missing');
+ // R37: all-staff layout remains usable at 1366x768 without horizontal page clipping.
+ await page.setViewportSize({width:1366,height:768});
+ await page.locator('[data-workspace="all"]').click();
+ await check(page,()=>{
+   const matrix=document.querySelector('.matrix-wrap').getBoundingClientRect();
+   return matrix.right<=innerWidth+2&&document.documentElement.scrollWidth<=innerWidth+3&&
+    !!document.querySelector('#scopeSummary .scope-stat-row');
+ },'R37 1366px all-staff viewport overflow');
+ await page.screenshot({path:path.join(out,'r37-all-1366.png')});
+ await page.setViewportSize({width:1920,height:1080});
+ // R36: malformed timestamps must be rejected, and final export cannot depend
+ // on whether the operator is currently viewing the initial or manual layer.
+ await check(page,()=>{
+   if(strictISODate('2026-02-30')||strictISODate('2026-10-32'))return false;
+   if(strictDateTime('2026-10-09 08:30:00junk'))return false;
+   try{importClock('08:30garbage','08:00');return false}catch(e){}
+   const a=[...state.analysis.values()].find(x=>isWorkday(x.day)&&attendanceJudgmentSystem(x)==='normal');
+   const key=a.employee.id+'|'+a.day;
+   const prev=state.manualStatuses[key],mode=state.judgmentMode;
+   state.manualStatuses[key]='absent';state.judgmentMode='initial';
+   const row=traditionalRows().find(x=>x.姓名===a.employee.name&&x.日期===a.date);
+   if(prev==null)delete state.manualStatuses[key];else state.manualStatuses[key]=prev;
+   state.judgmentMode=mode;
+   return row.系统判定==='正常'&&row.最终判定==='缺勤';
+ },'R36 date validation or export verdict not independent of display mode');
  // Preserve the R29-R34 visual/behavior regression suite in a private compatibility mode.
  await page.evaluate(()=>{state.workspaceMode='classic';state.selection={type:'overall'};state.chartTab='overview';render()});
  try{await page.waitForSelector('#overviewTrendChart svg',{timeout:20000})}catch(e){await page.screenshot({path:path.join(out,'r14-diagnostic.png')});console.error('R14_PAGE_ERRORS',JSON.stringify(errors));throw e}

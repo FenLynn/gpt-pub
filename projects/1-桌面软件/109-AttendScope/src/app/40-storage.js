@@ -14,7 +14,7 @@ function traditionalRows(){
     rows.push({姓名:e.name,部门:e.department,组别:groupOf(e),日期:a.date,星期:'周'+weekdayLabel(d),
       日期性质:a.dayType==='adjust'?'调休工作日':a.dayType==='work'?'工作日':a.dayType==='holiday'?'节假日':'休息日',
       状态:a.status,严重度:a.severity==='problem'?'明确问题':a.severity==='suspect'?'疑似异常':a.severity==='excused'?'请假/出差':a.severity==='rest'?'休息':'正常',
-      系统判定:judgmentChinese(attendanceJudgmentSystem(a)),人工判定:manualStatusFor(a)?judgmentChinese(manualStatusFor(a)):'',最终判定:judgmentChinese(attendanceJudgment(a)),
+      系统判定:judgmentChinese(attendanceJudgmentSystem(a)),人工判定:manualStatusFor(a)?judgmentChinese(manualStatusFor(a)):'',最终判定:judgmentChinese(manualStatusFor(a)||attendanceJudgmentSystem(a)),
       首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),
       异常摘要:a.issues.join('；'),业务标记:attendanceBehaviors(a).map(k=>({trip:'出差',leave:'请假',outing:'外出',overtime:'加班'})[k]).join('；'),
       人工处理:(state.revisions.some(r=>r.key===e.id+'|'+d)||!!manualStatusFor(a))?'是':'否'});
