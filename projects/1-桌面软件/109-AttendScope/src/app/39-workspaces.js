@@ -14,94 +14,121 @@ function workspaceNavHtml(){
   '<button type="button" data-workspace="'+id+'" class="'+(state.workspaceMode===id?'active':'')+'" aria-current="'+(state.workspaceMode===id?'page':'false')+'">'+label+'</button>'
  ).join('');
 }
+
+/* Modern pages reuse one data model and route page-scoped controls into the sidebar. */
+function scopeVisibleEmployees(){
+ const query=String(state.scopeSearch||'').trim().toLocaleLowerCase();
+ let people=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
+ if(query)people=people.filter(e=>(e.name+' '+e.id+' '+e.department+' '+groupOf(e)).toLocaleLowerCase().includes(query));
+ if(state.attentionOnly)people=people.filter(e=>[...state.analysis.values()].some(a=>a.employee.id===e.id&&isWorkday(a.day)&&['anomaly','absent'].includes(attendanceJudgment(a))));
+ return people;
+}
+function sidebarFilterHtml(){
+ const options=[['main','常规'],['normal','正常'],['anomaly','异常'],['absent','缺勤'],['overtime','加班'],['leave','请假'],['trip','出差'],['outing','外出']];
+ return '<section class="side-filter state-select-wrap"><label class="side-label" for="statusFilter">状态筛选</label>'+
+  '<div class="status-filter-control"><button type="button" id="statusFilterButton" class="status-filter-button" aria-expanded="false">'+statusFilterLabel(state.filter)+'</button>'+
+  '<div id="statusFilterMenu" class="status-filter-menu" role="listbox">'+statusFilterMenuHtml()+'</div>'+
+  '<select id="statusFilter" class="status-filter-native" aria-label="状态筛选">'+
+  options.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('')+'</select></div>'+
+  '<div class="side-label">判定视图</div><div class="judgment-mode-switch" id="judgmentModeSwitch" aria-label="判断显示模式">'+
+  '<button type="button" data-judgment-mode="initial" class="'+(state.judgmentMode!=='manual'?'active':'')+'">初始</button>'+
+  '<button type="button" data-judgment-mode="manual" class="'+(state.judgmentMode==='manual'?'active':'')+'" '+(hasManualStatuses()?'':'disabled')+'>人工</button></div></section>';
+}
+function workspaceSidebarHtml(){
+ const mode=state.workspaceMode||'all',groups=workspaceGroups();
+ const groupOptions=groups.map(g=>'<option value="'+escapeNameChar(g)+'" '+(mode==='group'&&g===state.selectedGroup?'selected':'')+'>'+escapeNameChar(g)+'</option>').join('');
+ const context=mode==='all'?'<label class="side-label" for="workspaceScopeGroup">组别</label>'+
+  '<select class="side-select" id="workspaceScopeGroup"><option value="">全部组别</option>'+groupOptions+'</select>'
+ :mode==='group'?'<label class="side-label" for="workspaceGroup">当前组别</label>'+
+  '<select class="side-select" id="workspaceGroup">'+groupOptions+'</select>'
+ :mode==='person'?'<label class="side-label" for="workspacePerson">当前员工</label><select class="side-select" id="workspacePerson">'+
+  EMPLOYEES.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===(state.selection.employeeId||EMPLOYEES[0]?.id)?'selected':'')+'>'+escapeNameChar(e.name)+' · '+escapeNameChar(groupOf(e))+'</option>').join('')+'</select>'
+ :'';
+ const search=mode==='all'||mode==='group'?'<label class="side-label" for="workspaceSearch">查找人员</label>'+
+  '<input id="workspaceSearch" class="side-search" type="search" autocomplete="off" placeholder="姓名或编号" value="'+escapeNameChar(state.scopeSearch||'')+'">'+
+  '<button id="scopeAttentionToggle" class="side-attention '+(state.attentionOnly?'active':'')+'" type="button">仅显示待核查人员 <span>›</span></button>':'';
+ const sub=mode==='person'?'<div class="side-label">分析视图</div><div class="side-subnav">'+
+  CHART_TABS.map(([id,name])=>'<button data-sidebar-chart="'+id+'" type="button" class="'+(state.chartTab===id?'active':'')+'">'+name+'</button>').join('')+'</div>'
+ :mode==='data'?'<div class="side-label">管理内容</div><div class="side-subnav">'+
+  [['records','原始记录'],['roster','员工名册'],['rules','工作规则'],['imports','导入与快照']].map(([id,name])=>'<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+'</div>':'';
+ return '<div class="side-controls"><div class="side-current">'+({all:'全员范围',group:'组别范围',person:'人员分析',data:'数据管理'}[mode]||'当前视图')+'</div>'+
+  context+search+sub+(mode==='data'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':sidebarFilterHtml())+'</div>'+
+  '<section class="side-calendar calendar-section"><div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
+  '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span><span><i class="rest"></i>休息日</span>'+
+  '<span><i class="adjust"></i>调休上班</span></div></section>';
+}
 function workspaceToolbarHtml(){
- const mode=state.workspaceMode||'all',g=workspaceGroups();
- if(mode==='group'){
-  if(!g.includes(state.selectedGroup))state.selectedGroup=g[0]||'未分组';
-  return '<div class="workspace-toolbar"><div><strong>分组分析</strong><span>按组查看月度矩阵与异常人员</span></div><label>组别 <select id="workspaceGroup">'+
-    g.map(x=>'<option value="'+escapeNameChar(x)+'" '+(x===state.selectedGroup?'selected':'')+'>'+escapeNameChar(x)+'</option>').join('')+'</select></label></div>'+
-    '<section id="scopeSummary" class="scope-summary"></section>';
- }
- if(mode==='all')return '<div class="workspace-toolbar"><div><strong>全员分析</strong><span>通过矩阵发现异常，点击员工或日期下钻</span></div><span class="workspace-hint">'+EMPLOYEES.length+' 位人员</span></div>'+
-    '<section id="scopeSummary" class="scope-summary"></section>';
- if(mode==='person'){
-  const e=(state.selection.type==='person'||state.selection.type==='cell')?state.selection.employeeId:null;
-  return '<div class="workspace-toolbar"><div><strong>个人分析</strong><span>保留原有六轨时间轴与原始打卡证据</span></div><label>员工 <select id="workspacePerson">'+
-    EMPLOYEES.map(x=>'<option value="'+escapeNameChar(x.id)+'" '+(x.id===e?'selected':'')+'>'+escapeNameChar(x.name)+' · '+escapeNameChar(groupOf(x))+'</option>').join('')+'</select></label></div>';
- }
- if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>导入、人员名册、原始证据及保存状态</span></div><span class="workspace-hint">当前月 '+monthKey()+'</span></div>';
+ const mode=state.workspaceMode||'all';
+ if(mode==='all'||mode==='group')return '<div class="workspace-toolbar"><div><strong>'+(mode==='all'?'全员考勤':'分组考勤')+'</strong>'+
+  '<span>'+periodText()+' · '+(mode==='group'?escapeNameChar(state.selectedGroup||'未分组'):'全部员工')+'</span></div>'+
+  '<span class="workspace-hint">'+scopeVisibleEmployees().length+' 位人员</span></div><section id="scopeSummary" class="scope-summary"></section>';
+ if(mode==='person')return '<div class="workspace-toolbar"><div><strong>个人分析</strong><span>'+periodText()+' · 详细核查与证据</span></div></div>';
+ if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>'+periodText()+' · 原始记录、员工与规则</span></div></div>';
  return '';
 }
 function bindWorkspaceNavigation(){
  document.querySelectorAll('[data-workspace]').forEach(b=>b.onclick=()=>navigateWorkspace(b.dataset.workspace));
+ const scope=document.getElementById('workspaceScopeGroup');
+ if(scope)scope.onchange=()=>{if(scope.value){state.workspaceMode='group';state.selectedGroup=scope.value;state.scopeSearch='';state.attentionOnly=false;render()}};
  const g=document.getElementById('workspaceGroup');
  if(g)g.onchange=()=>{state.selectedGroup=g.value;state.selection={type:'overall'};render()};
- const p=document.getElementById('workspacePerson');
- if(p)p.onchange=()=>selectPerson(p.value);
+ const person=document.getElementById('workspacePerson');
+ if(person)person.onchange=()=>selectPerson(person.value);
+ const search=document.getElementById('workspaceSearch');
+ if(search)search.oninput=()=>{state.scopeSearch=search.value;renderMatrix();renderScopeSummary()};
+ const attention=document.getElementById('scopeAttentionToggle');
+ if(attention)attention.onclick=()=>{state.attentionOnly=!state.attentionOnly;render()};
+ document.querySelectorAll('[data-sidebar-chart]').forEach(b=>b.onclick=()=>{
+  state.chartTab=b.dataset.sidebarChart;
+  document.querySelectorAll('[data-sidebar-chart]').forEach(x=>x.classList.toggle('active',x.dataset.sidebarChart===state.chartTab));
+  renderAnalysisPanel();
+ });
+ document.querySelectorAll('.side-controls [data-data-section]').forEach(b=>b.onclick=()=>{
+  state.dataSection=b.dataset.dataSection;
+  document.querySelectorAll('.side-controls [data-data-section]').forEach(x=>x.classList.toggle('active',x.dataset.dataSection===state.dataSection));
+  renderDataWorkspace();
+ });
 }
 function navigateWorkspace(mode){
  if(!WORKSPACE_ITEMS.some(x=>x[0]===mode))return;
- state.workspaceMode=mode;
- if(mode==='all'||mode==='group'||mode==='data'){
-  state.selection={type:'overall'};state.chartTab='overview';
- }
+ state.workspaceMode=mode;state.scopeSearch='';state.attentionOnly=false;
+ if(mode==='all'||mode==='group'||mode==='data'){state.selection={type:'overall'};state.chartTab='overview'}
  if(mode==='group'&&!workspaceGroups().includes(state.selectedGroup))state.selectedGroup=workspaceGroups()[0]||'未分组';
  if(mode==='person'&&!['person','cell'].includes(state.selection.type)){
-  const e=EMPLOYEES[0];
-  if(e){state.selection={type:'person',employeeId:e.id};state.chartDay=nearestRecordedDay(e.id)}
+  const e=EMPLOYEES[0];if(e){state.selection={type:'person',employeeId:e.id};state.chartDay=nearestRecordedDay(e.id)}
   state.chartTab='timeline';state.timelineRange=null;
  }
  render();
 }
 function scopeAnalysisItems(){
- const people=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
- const ids=new Set(people.map(e=>e.id));
- let all=workAnalyses().filter(a=>ids.has(a.employee.id));
- if(state.selection.type==='date')all=all.filter(a=>a.day===state.selection.day);
- return {people,items:all};
+ const people=scopeVisibleEmployees(),ids=new Set(people.map(e=>e.id));
+ let items=workAnalyses().filter(a=>ids.has(a.employee.id));
+ if(state.selection.type==='date')items=items.filter(a=>a.day===state.selection.day);
+ return {people,items};
 }
 function renderScopeSummary(){
  const el=document.getElementById('scopeSummary');if(!el)return;
- const {people,items}=scopeAnalysisItems();
- const counts={normal:0,anomaly:0,absent:0};
+ const {people,items}=scopeAnalysisItems(),counts={normal:0,anomaly:0,absent:0};
  for(const a of items){const status=attendanceJudgment(a);if(status in counts)counts[status]++}
- const stats=[
- ['人员',people.length+' 人',''],
- ['正常',counts.normal+' 人日','normal'],
- ['异常',counts.anomaly+' 人日','anomaly'],
- ['缺勤',counts.absent+' 人日','absent']
- ];
- const groupInfo=workspaceGroups().map(group=>{
-  const rows=workAnalyses().filter(a=>groupOf(a.employee)===group),issues=rows.filter(a=>['anomaly','absent'].includes(attendanceJudgment(a))).length;
-  return {group,people:EMPLOYEES.filter(e=>groupOf(e)===group).length,issues};
- });
- const groupList=state.workspaceMode==='all'?'<div class="scope-group-list"><div class="scope-subheading">组别概览 <small>选择后进入分组分析</small></div><div class="scope-group-links">'+
-   groupInfo.map(x=>'<button data-open-group="'+escapeNameChar(x.group)+'"><strong>'+escapeNameChar(x.group)+'</strong><span>'+x.people+' 人 · '+x.issues+' 异常/缺勤人日</span></button>').join('')+'</div></div>':'';
- const attention=items.filter(a=>['anomaly','absent'].includes(attendanceJudgment(a))).slice(0,8);
- el.innerHTML='<div class="scope-stat-row">'+stats.map(([name,value,cls])=>'<div class="scope-stat '+cls+'"><span>'+name+'</span><strong>'+value+'</strong></div>').join('')+'</div>'+
-  groupList+'<div class="scope-subheading">月度考勤矩阵 <small>红色缺勤 · 黄色异常 · 绿色正常，点击姓名或单元格查看个人</small></div>'+
-  (attention.length?'<div class="scope-attention"><strong>待关注</strong>'+attention.map(a=>
-    '<button data-scope-person="'+escapeNameChar(a.employee.id)+'" data-scope-day="'+a.day+'">'+escapeNameChar(a.employee.name)+' · '+pad(a.day)+' 日</button>').join('')+'</div>':'');
- el.querySelectorAll('[data-open-group]').forEach(b=>b.onclick=()=>{
-  state.workspaceMode='group';state.selectedGroup=b.dataset.openGroup;state.selection={type:'overall'};render();
- });
- el.querySelectorAll('[data-scope-person]').forEach(b=>b.onclick=()=>selectCell(b.dataset.scopePerson,+b.dataset.scopeDay));
+ const metrics=[['人员',people.length,'人',''],['正常',counts.normal,'人日','normal'],['异常',counts.anomaly,'人日','anomaly'],['缺勤',counts.absent,'人日','absent']];
+ el.innerHTML='<div class="scope-stat-inline" aria-label="考勤摘要">'+metrics.map(([name,value,unit,tone])=>
+  '<span class="scope-metric '+tone+'"><small>'+name+'</small><strong>'+value+'</strong><small>'+unit+'</small></span>').join('')+
+  '<span class="scope-stat-caption">当前范围 · 单位：人日</span></div>'+
+  '<div class="matrix-toolbar"><strong>月度考勤矩阵</strong><span class="matrix-toolbar-legend">'+
+  '<span><i class="normal"></i>正常</span><span><i class="anomaly"></i>异常</span><span><i class="absent"></i>缺勤</span></span>'+
+  '<span class="matrix-toolbar-summary">待核查 '+(counts.anomaly+counts.absent)+' 人日</span></div>';
  const details=document.getElementById('scopeDetails');
  if(details){
-  const personnel=people.map(e=>{
-    const records=workAnalyses().filter(a=>a.employee.id===e.id);
-    return {e,normal:records.filter(a=>attendanceJudgment(a)==='normal').length,
-      anomaly:records.filter(a=>attendanceJudgment(a)==='anomaly').length,
-      absent:records.filter(a=>attendanceJudgment(a)==='absent').length};
-  }).sort((a,b)=>(b.anomaly+b.absent)-(a.anomaly+a.absent));
-  details.innerHTML='<div class="scope-subheading">组内人员 <small>优先显示需要关注的员工，点击进入个人时间轴</small></div>'+
-    '<div class="scope-member-list">'+personnel.map(x=>
-      '<button data-member-id="'+escapeNameChar(x.e.id)+'"><strong>'+escapeNameChar(x.e.name)+'</strong>'+
-      '<span>正常 '+x.normal+'</span><span class="warn">异常 '+x.anomaly+'</span>'+
-      '<span class="danger">缺勤 '+x.absent+'</span><b aria-hidden="true">›</b></button>').join('')+'</div>';
+  const peopleRows=people.map(e=>{const rows=workAnalyses().filter(a=>a.employee.id===e.id);
+   return {e,normal:rows.filter(a=>attendanceJudgment(a)==='normal').length,
+    anomaly:rows.filter(a=>attendanceJudgment(a)==='anomaly').length,absent:rows.filter(a=>attendanceJudgment(a)==='absent').length};
+  }).sort((x,y)=>(y.anomaly+y.absent)-(x.anomaly+x.absent));
+  details.innerHTML='<div class="scope-subheading">组内人员 <small>按异常与缺勤人日排序，点击核查个人</small></div>'+
+   '<div class="scope-member-list">'+peopleRows.map(x=>'<button data-member-id="'+escapeNameChar(x.e.id)+'"><strong>'+
+    escapeNameChar(x.e.name)+'</strong><span>正常 '+x.normal+'</span><span class="warn">异常 '+x.anomaly+
+    '</span><span class="danger">缺勤 '+x.absent+'</span><b aria-hidden="true">›</b></button>').join('')+'</div>';
   details.querySelectorAll('[data-member-id]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.memberId));
  }
- const title=document.getElementById('analysisTitle');if(title)title.textContent=state.workspaceMode==='group'?state.selectedGroup+' · 考勤分析':'全员考勤分析';
 }
 function dataPanelHtml(section){
  if(section==='roster'){
@@ -138,19 +165,11 @@ function dataPanelHtml(section){
 }
 function dataWorkspaceHtml(){
  const section=state.dataSection||'records';
- return '<div class="data-management">'+
-  '<div class="data-summary">'+
-    '<section><span>员工</span><strong>'+EMPLOYEES.length+'</strong></section>'+
-    '<section><span>打卡记录</span><strong>'+state.records.length+'</strong></section>'+
-    '<section><span>请假 / 出差</span><strong>'+state.leaves.length+' / '+state.trips.length+'</strong></section>'+
-    '<section><span>工作目录</span><strong>'+(state.projectDir?'已连接':'未连接')+'</strong></section>'+
-  '</div>'+
-  '<div class="data-import-actions"><button data-open="attendanceInput">导入考勤</button><button data-open="leaveInput">导入请假</button>'+
-  '<button data-open="tripInput">导入出差</button><button id="dataSave">保存工作状态</button><button id="dataFreeze">冻结快照</button></div>'+
-  '<div class="data-section-tabs" role="tablist">'+[
-    ['records','原始记录'],['roster','员工名册'],['rules','工作规则'],['imports','导入与快照']
-   ].map(([id,label])=>'<button type="button" data-data-section="'+id+'" class="'+(id===section?'active':'')+'" role="tab" aria-selected="'+(id===section)+'">'+label+'</button>').join('')+
-  '</div><div class="data-section-panel">'+dataPanelHtml(section)+'</div></div>';
+ return '<div class="data-management"><div class="data-stat-inline">'+
+  '<span>人员 <strong>'+EMPLOYEES.length+'</strong></span><span>打卡 <strong>'+state.records.length.toLocaleString()+'</strong></span>'+
+  '<span>请假 <strong>'+state.leaves.length+'</strong></span><span>出差 <strong>'+state.trips.length+'</strong></span>'+
+  '<span class="data-dir-state">'+(state.projectDir?'已连接本地目录':'本地目录未连接')+'</span></div>'+
+  '<div class="data-section-panel">'+dataPanelHtml(section)+'</div></div>';
 }
 function renderDataWorkspace(){
  const body=document.getElementById('analysisBody');if(!body)return;
@@ -159,11 +178,6 @@ function renderDataWorkspace(){
  if(typeof disposeRawTable==='function')disposeRawTable();
  body.innerHTML=dataWorkspaceHtml();
  body.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
- document.getElementById('dataSave').onclick=saveWorking;
- document.getElementById('dataFreeze').onclick=freezeSnapshot;
- body.querySelectorAll('[data-data-section]').forEach(b=>b.onclick=()=>{
-   state.dataSection=b.dataset.dataSection;renderDataWorkspace();
- });
  body.querySelectorAll('[data-edit-roster-group]').forEach(b=>b.onclick=()=>setPersonGroup(b.dataset.editRosterGroup));
  const edit=body.querySelector('#dataEditRules');if(edit)edit.onclick=()=>document.getElementById('settingsBtn').click();
  if((state.dataSection||'records')==='records')mountRawTable({type:'overall',items:workAnalyses()});

@@ -19,6 +19,7 @@ function layoutHtml(){
       <strong class="brand-title">AttendScope</strong>
       <span class="brand-mode">离线考勤</span>
     </div>
+    <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
     <div class="month-anchor top-month">
         <button id="monthMenuButton" class="month-button" aria-expanded="false" aria-label="切换或新建月份">
           <span>${periodText()}</span><i class="chevron"></i>
@@ -52,10 +53,10 @@ function layoutHtml(){
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
     </div>
   </header>
-  <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
 
   <div class="layout workspace-mode-${state.workspaceMode||'all'}">
     <aside class="sidebar">
+      ${state.workspaceMode==='classic'?`
       <section class="side-section calendar-section">
         <div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>
         <div class="calendar-grid" id="calendar"></div>
@@ -102,6 +103,7 @@ function layoutHtml(){
           <button type="button" data-judgment-mode="manual" class="${state.judgmentMode==='manual'?'active':''}" ${hasManualStatuses()?'':'disabled'}>人工</button>
         </div>
       </section>
+`:workspaceSidebarHtml()}
     </aside>
 
     <main class="workspace">
@@ -169,7 +171,7 @@ function bind(){
   bindSettings();
   bindWorkspaceNavigation();
 
-  document.getElementById('clearSelection').onclick=()=>{state.selection={type:'overall'};state.chartTab='overview';render()};
+  document.getElementById('clearSelection').onclick=()=>{if(state.workspaceMode==='classic'){state.selection={type:'overall'};state.chartTab='overview';render()}else navigateWorkspace('all')};
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
   const monthButton=document.getElementById('monthMenuButton'),monthPopover=document.getElementById('monthPopover');
   importBtn.onclick=e=>{e.stopPropagation();monthPopover.classList.remove('open');popover.classList.toggle('open')};
@@ -258,7 +260,7 @@ function updateMatrixFilter(){
 }
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
-  const visibleEmployees=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
+  const visibleEmployees=state.workspaceMode==='classic'?EMPLOYEES:scopeVisibleEmployees();
   el.closest('.matrix-zone')?.style.setProperty('--scope-count',String(visibleEmployees.length));
   // Matrix dimensions are shared CSS variables, including responsive sizing.
   el.style.gridTemplateColumns='var(--matrix-name) repeat(31,var(--matrix-cell))';
@@ -273,7 +275,7 @@ function renderMatrix(){
   for(const e of visibleEmployees){
     const rowSelected=(state.selection.type==='person'||state.selection.type==='cell')&&state.selection.employeeId===e.id;
     const letters=Array.from(e.name).slice(0,4).map(ch=>`<span>${escapeNameChar(ch)}</span>`).join('');
-    html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${escapeNameChar(e.id)}" title="${escapeNameChar(e.name)} · ${escapeNameChar(e.department)}"><span class="m-name-num">${String(EMPLOYEES.indexOf(e)+1).padStart(2,'0')}</span><span class="name-letters">${letters}</span></button>`;
+    html+=`<button class="m-name ${rowSelected?'selected':''} ${Number(e.id.slice(1))%2?'':'row-alt'}" data-emp="${escapeNameChar(e.id)}" title="${escapeNameChar(e.name)} · ${escapeNameChar(e.department)}"><span class="m-name-num">${String(EMPLOYEES.indexOf(e)+1).padStart(2,'0')}</span><span class="name-letters">${state.workspaceMode==='classic'?letters:escapeNameChar(e.name)}</span></button>`;
     for(let d=1;d<=31;d++){
       if(d>monthDays()){html+='<div class="m-cell inactive"></div>';continue}
       const a=state.analysis.get(`${e.id}|${d}`),visible=matrixVisible(a);
