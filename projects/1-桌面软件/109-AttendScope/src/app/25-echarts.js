@@ -152,10 +152,11 @@ function mountPersonStats(ctx){
   if(main){
     const work=days.filter(a=>isWorkday(a.day));
     main.setOption({
-      grid:{left:36,right:14,top:14,bottom:28},
+      animation:false,
+      grid:{left:44,right:14,top:14,bottom:32},
       tooltip:{...chartTooltipAxis(),formatter:p=>{const q=p[0],a=work[q.dataIndex];return `${pad(a.day)} 日<br>确认在岗 <b>${(a.presence/60).toFixed(1)} h</b><br>${a.status}`}},
-      xAxis:{type:'category',data:work.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,interval:1}},
-      yAxis:{type:'value',min:0,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:10.5,formatter:v=>v+'h'}},
+      xAxis:{type:'category',data:work.map(a=>String(a.day)),boundaryGap:false,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:12,interval:1}},
+      yAxis:{type:'value',min:0,...chartAxisCommon(),axisLabel:{color:AS_CHART_COLORS.muted,fontSize:12,formatter:v=>v+'h'}},
       series:[{
         type:'line',data:work.map(a=>+(a.presence/60).toFixed(2)),smooth:.28,showSymbol:false,
         lineStyle:{color:'#5899c3',width:2},areaStyle:{color:'rgba(88,153,195,.07)'}
@@ -213,15 +214,16 @@ function mountStatusBarChart(chart,items){
     ['缺勤',items.filter(x=>attendanceJudgment(x)==='absent').length,ATTEND_STATUS_COLORS.absent]
   ].filter(x=>x[1]>0).reverse();
   chart.setOption({
-    grid:{left:66,right:22,top:8,bottom:12},
+    animation:false,
+    grid:{left:70,right:28,top:8,bottom:12},
     tooltip:{trigger:'item',confine:true},
     xAxis:{type:'value',show:false},
-    yAxis:{type:'category',data:rows.map(x=>x[0]),axisLine:{show:false},axisTick:{show:false},axisLabel:{color:AS_CHART_COLORS.text,fontSize:9}},
+    yAxis:{type:'category',data:rows.map(x=>x[0]),axisLine:{show:false},axisTick:{show:false},axisLabel:{color:AS_CHART_COLORS.text,fontSize:12}},
     series:[{
-      type:'bar',barWidth:8,
+      type:'bar',barWidth:12,
       data:rows.map(x=>({value:x[1],itemStyle:{color:x[2],borderRadius:[0,5,5,0]}})),
       showBackground:true,backgroundStyle:{color:'rgba(211,223,231,.40)',borderRadius:5},
-      label:{show:true,position:'right',color:AS_CHART_COLORS.text,fontSize:9}
+      label:{show:true,position:'right',color:AS_CHART_COLORS.text,fontSize:12}
     }]
   });
 }
