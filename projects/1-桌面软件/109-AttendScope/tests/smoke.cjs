@@ -34,6 +34,23 @@ async function run(){
     document.querySelector('.matrix-wrap').getBoundingClientRect().top<210;
  },'R39 system header, left filters, fixed calendar or compact matrix failed');
  await page.screenshot({path:path.join(out,'r37-all.png')});
+ // R39: left-side search is live, not merely a cosmetic input.
+ await page.locator('#workspaceSearch').fill('陈思远');
+ await check(page,()=>state.scopeSearch==='陈思远'&&document.querySelectorAll('.m-name[data-emp]').length===1&&
+   document.querySelector('.workspace-toolbar .workspace-hint')?.textContent.includes('1 位'),
+   'R39 left personnel search and scoped count not synchronized');
+ await page.locator('#workspaceSearch').fill('');
+ await check(page,()=>document.querySelectorAll('.m-name[data-emp]').length===EMPLOYEES.length,'R39 search reset failed');
+ await page.setViewportSize({width:1600,height:900});
+ await check(page,()=>{
+   const cal=document.querySelector('.side-calendar').getBoundingClientRect();
+   const frame=document.querySelector('.matrix-wrap').getBoundingClientRect();
+   const m=document.querySelector('.matrix').getBoundingClientRect();
+   return cal.bottom<=innerHeight+2&&m.width>=frame.width*.94&&m.width<=frame.width+6&&
+    document.documentElement.scrollWidth<=innerWidth+3;
+ },'R39 1600px responsive calendar/matrix regression');
+ await page.screenshot({path:path.join(out,'r39-all-1600.png')});
+ await page.setViewportSize({width:1920,height:1080});
  await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===4&&
    !!document.querySelector('#scopeSummary .scope-stat-inline')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
  await page.locator('#workspaceScopeGroup').selectOption({index:1});
