@@ -386,7 +386,7 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
 }
 .workspace-mode-group .matrix-zone{
  width:calc(var(--matrix-grid) + 16px)!important;
- height:min(calc(30px + var(--scope-count,10) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
+ height:min(calc(36px + var(--scope-count,10) * var(--matrix-row)),calc(100vh - var(--topbar) - 76px))!important;
 }
 .workspace-mode-all .matrix-wrap,.workspace-mode-group .matrix-wrap{
  box-sizing:border-box!important;
