@@ -134,7 +134,18 @@ async function run(){
   getComputedStyle(document.querySelector('.chart-mode-tabs')).display==='none',
   'R39 personal subnavigation should be on left only');
  await page.locator('[data-workspace="data"]').click();
- await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
+ try{await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:10000})}
+ catch(e){
+   const debug=await page.evaluate(()=>({
+     mode:state.workspaceMode,section:state.dataSection,tab:state.rawDataTab,
+     rawLength:state.records.length,hasTable:!!document.getElementById('rawDataTable'),
+     tableMarkup:document.getElementById('rawDataTable')?.outerHTML.slice(0,550),
+     tabulatorCount:rawTabulator?.getDataCount(),visibleRows:document.querySelectorAll('#rawDataTable .tabulator-row').length,
+     panel:document.querySelector('.data-management')?.getBoundingClientRect().toJSON(),
+     tableRect:document.getElementById('rawDataTable')?.getBoundingClientRect().toJSON()
+   }));
+   console.error('R40_DATA_DEBUG',JSON.stringify(debug),'PAGE_ERRORS',JSON.stringify(errors));throw e;
+ }
  await page.screenshot({path:path.join(out,'r37-data.png')});
  await check(page,()=>getComputedStyle(document.querySelector('.workspace-mode-data .analysis-head')).display==='none',
  'R39 duplicate data heading');
