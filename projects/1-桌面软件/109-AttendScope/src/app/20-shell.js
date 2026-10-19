@@ -420,7 +420,7 @@ function changePersonalDay(day){
 function selectDate(d,allPeople=false){
  if(d<1||d>monthDays())return;
  const sel=state.selection;
- if(!allPeople&&(sel.type==='person'||sel.type==='cell')){
+ if(!allPeople&&(state.workspaceMode==='person'||state.workspaceMode==='classic')&&(sel.type==='person'||sel.type==='cell')){
   changePersonalDay(d);return;
  }else{
   state.selection={type:'date',day:d};state.chartTab='overview';state.chartDay=d;

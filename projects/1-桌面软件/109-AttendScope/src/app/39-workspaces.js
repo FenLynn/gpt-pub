@@ -143,6 +143,7 @@ function scopeAnalysisItems(){
 }
 function renderScopeSummary(){
  const target=document.getElementById('scopeSummary');if(!target)return;
+ if(typeof disposeAttendCharts==='function')disposeAttendCharts();
  const {people,items}=scopeAnalysisItems();
  const hint=document.querySelector('.workspace-toolbar .workspace-hint');if(hint)hint.textContent=people.length+' 人';
  target.innerHTML=''; // The monthly grid is the main visual: all metrics live in the right pane.

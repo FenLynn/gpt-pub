@@ -27,20 +27,21 @@ async function run(){
   const nav=document.querySelector('.workspace-navigation'),bar=document.querySelector('.topbar');
   const side=document.querySelector('.sidebar'),cal=document.querySelector('.side-calendar'),name=document.querySelector('.m-name .name-letters');
   return nav.parentElement===bar&&document.querySelectorAll('.workspace-navigation').length===1&&
-    !!side.querySelector('#statusFilter')&&!!side.querySelector('#workspaceScopeGroup')&&
+    !!side.querySelector('#statusFilter')&&!!side.querySelector('#workspaceScopeGroup')&&!!side.querySelector('#workspacePerson')&&
     !document.querySelector('.scope-group-links')&&!document.querySelector('.scope-stat-row')&&
     cal.getBoundingClientRect().bottom<=innerHeight+2&&cal.getBoundingClientRect().top>side.getBoundingClientRect().top+100&&
     name.textContent===EMPLOYEES[0].name&&!name.querySelector('span')&&
     document.querySelector('.matrix-wrap').getBoundingClientRect().top<210;
  },'R39 system header, left filters, fixed calendar or compact matrix failed');
  await page.screenshot({path:path.join(out,'r37-all.png')});
- // R39: left-side search is live, not merely a cosmetic input.
- await page.locator('#workspaceSearch').fill('陈思远');
- await check(page,()=>state.scopeSearch==='陈思远'&&document.querySelectorAll('.m-name[data-emp]').length===1&&
-   document.querySelector('.workspace-toolbar .workspace-hint')?.textContent.includes('1 位'),
-   'R39 left personnel search and scoped count not synchronized');
- await page.locator('#workspaceSearch').fill('');
- await check(page,()=>document.querySelectorAll('.m-name[data-emp]').length===EMPLOYEES.length,'R39 search reset failed');
+ // R40: left navigation is two simple inline selectors; selecting a name highlights the row.
+ await page.locator('#workspacePerson').selectOption('E001');
+ await check(page,()=>state.workspaceMode==='all'&&state.selection.type==='person'&&state.selection.employeeId==='E001'&&
+   !document.querySelector('.matrix-selection-frame.focus-row')?.classList.contains('inactive'),
+   'R40 person selector must only highlight monthly row');
+ await page.locator('#workspacePerson').selectOption('');
+ await check(page,()=>document.querySelectorAll('.m-name[data-emp]').length===EMPLOYEES.length,
+   'R40 returning to all employees failed');
  await page.setViewportSize({width:1600,height:900});
  await check(page,()=>{
    const cal=document.querySelector('.side-calendar').getBoundingClientRect();
@@ -52,7 +53,15 @@ async function run(){
  await page.screenshot({path:path.join(out,'r39-all-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
  await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===4&&
-   !!document.querySelector('#scopeSummary .scope-stat-inline')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
+   !!document.querySelector('#scopeInsights .scope-insight-numbers')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
+ await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
+ await check(page,()=>{
+   const day=Array.from({length:monthDays()},(_,i)=>i+1).filter(isWorkday);
+   const work=workAnalyses().filter(a=>day.includes(a.day));
+   const n=work.filter(a=>attendanceJudgment(a)==='anomaly').length;
+   return +document.querySelectorAll('#scopeInsights .scope-insight-numbers strong')[2].textContent===n&&
+      !!document.querySelector('#scopeCompareChart svg');
+ },'R40 all-staff scoped analytics failed');
  await page.locator('#workspaceScopeGroup').selectOption({index:1});
  await check(page,()=>state.workspaceMode==='group'&&!!document.querySelector('#workspaceGroup'),'R39 left group filter did not drill down');
  await page.screenshot({path:path.join(out,'r37-group.png')});
@@ -61,11 +70,66 @@ async function run(){
    return state.workspaceMode==='group'&&members>0&&document.querySelectorAll('.m-name[data-emp]').length===members&&
       !!document.getElementById('workspaceGroup');
  },'R37 group roster does not constrain matrix');
+ await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
+ await check(page,()=>{
+   const work=workAnalyses().filter(a=>isWorkday(a.day)&&groupOf(a.employee)===state.selectedGroup);
+   const x=work.filter(a=>attendanceJudgment(a)==='absent').length;
+   return Number(document.querySelectorAll('#scopeInsights .scope-insight-numbers strong')[3].textContent)===x;
+ },'R40 group charts must use group-only data');
  await page.locator('.m-name[data-emp]').first().click();
+ await check(page,()=>state.workspaceMode==='group'&&state.selection.type==='person'&&
+  !document.querySelector('.matrix-selection-frame.focus-row')?.classList.contains('inactive'),
+  'R40 row name should not navigate out of group matrix');
+ await page.locator('.m-cell button[data-cell]').first().click();
  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:20000});
  await page.screenshot({path:path.join(out,'r37-person.png')});
- await check(page,()=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&state.selection.type==='person'&&!!document.getElementById('workspacePerson'),
+ await check(page,()=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&state.selection.type==='cell'&&!!document.getElementById('workspacePerson'),
    'R37 group-to-person drilldown failed');
+ await check(page,()=>{
+  const nodes=[...document.querySelectorAll('.person-day')];
+  const work=nodes.find(b=>b.dataset.personDay==='9');
+  const rest=nodes.find(b=>b.dataset.personDay==='11');
+  const holiday=nodes.find(b=>b.dataset.personDay==='3');
+  return nodes.length===monthDays()&&work?.classList.contains('work')&&
+   rest?.classList.contains('rest')&&holiday?.classList.contains('holiday')&&
+   !!document.getElementById('personalDayPrev')&&!!document.getElementById('personalDayNext');
+ },'R40 month strip work/rest/holiday styling or navigation missing');
+ await page.locator('[data-person-day="9"]').click();
+ await check(page,()=>state.chartDay===9&&state.selection.day===9&&
+   document.querySelector('.cal-day[data-day="9"]').classList.contains('selected')&&
+   document.querySelector('.person-day[data-person-day="9"]').classList.contains('selected'),
+ 'R40 strip/calendar/timeline 9th day not synchronized');
+ await page.locator('#personalDayNext').click();
+ await check(page,()=>state.chartDay===10&&state.selection.day===10&&
+   document.querySelector('.cal-day[data-day="10"]').classList.contains('selected'),'R40 next-day switch failed');
+ await page.locator('.side-calendar .cal-day[data-day="11"]').click();
+ await check(page,()=>state.chartDay===11&&state.selection.day===11&&
+   document.querySelector('.person-day[data-person-day="11"]').classList.contains('selected'),
+ 'R40 left calendar must update personal month strip');
+ await page.locator('#timelineDayPicker').selectOption('12');
+ await check(page,()=>state.chartDay===12&&state.selection.day===12&&
+  document.querySelector('.cal-day[data-day="12"]').classList.contains('selected'),
+ 'R40 date dropdown must share date navigator');
+ // Simulated manual correction: narrow strip inherits the final status color,
+ // with the violet check inside the date tile, independent of the active view.
+ await page.evaluate(()=>{
+  const emp=state.selection.employeeId,day=9,a=state.analysis.get(emp+'|'+day);
+  state.__r40Restore={key:emp+'|'+day,old:state.manualStatuses[emp+'|'+day],mode:state.judgmentMode};
+  state.manualStatuses[emp+'|'+day]=attendanceJudgmentSystem(a)==='absent'?'normal':'absent';
+  render();
+ });
+ await check(page,()=>{
+  const mark=document.querySelector('.person-day[data-person-day="9"]'),a=state.analysis.get(state.selection.employeeId+'|9');
+  const tone=manualStatusFor(a);
+  return !!mark.querySelector('.person-day-check')&&
+    !!mark.querySelector('.person-day-status.'+tone)&&getComputedStyle(mark.querySelector('.person-day-check')).right==='1px';
+ },'R40 manual override status strip check or color mismatch');
+ await page.screenshot({path:path.join(out,'r40-person-month-strip.png')});
+ await page.evaluate(()=>{
+  const prior=state.__r40Restore;
+  if(prior.old==null)delete state.manualStatuses[prior.key];else state.manualStatuses[prior.key]=prior.old;
+  state.judgmentMode=prior.mode;delete state.__r40Restore;render();
+ });
  await check(page,()=>!!document.querySelector('.side-controls [data-sidebar-chart="timeline"]')&&
   getComputedStyle(document.querySelector('.chart-mode-tabs')).display==='none',
   'R39 personal subnavigation should be on left only');
@@ -102,7 +166,7 @@ async function run(){
  await check(page,()=>{
    const matrix=document.querySelector('.matrix-wrap').getBoundingClientRect();
    return matrix.right<=innerWidth+2&&document.documentElement.scrollWidth<=innerWidth+3&&
-    !!document.querySelector('#scopeSummary .scope-stat-inline');
+    !!document.querySelector('#scopeInsights .scope-insight-numbers');
  },'R37 1366px all-staff viewport overflow');
  await check(page,()=>{
    const cal=document.querySelector('.side-calendar').getBoundingClientRect(),
