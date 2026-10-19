@@ -306,7 +306,16 @@ function renderRawTable(ctx){
     pagination:false,
     columns,initialSort:kind==='attendance'?[{column:'datetime',dir:'asc'}]:[]
   });
-  rawTabulator.on('tableBuilt',()=>{rawTabulator.redraw(true);requestAnimationFrame(applyPendingRawHighlight)});
+  const instance=rawTabulator;
+  instance.on('tableBuilt',()=>{
+    // tableBuilt may resolve after this view has been replaced or destroyed.
+    // Only the owning, connected instance may measure/redraw its DOM.
+    requestAnimationFrame(()=>{
+      if(rawTabulator!==instance||!node.isConnected||!instance.element)return;
+      instance.redraw(true);
+      applyPendingRawHighlight();
+    });
+  });
   rawTabulator.on('rowClick',(event,row)=>{
     if(kind!=='attendance')return;
     const record=row.getData(),day=Number(record.datetime.slice(8,10));
