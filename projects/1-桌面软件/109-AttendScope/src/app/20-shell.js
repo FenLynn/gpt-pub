@@ -401,9 +401,9 @@ function selectMatrixRow(id){
 function selectPerson(id){
  const scoped=state.workspaceMode!=='classic';
  if(scoped)state.workspaceMode='person';
- state.selection={type:'person',employeeId:id};
+ state.selection=scoped?{type:'cell',employeeId:id,day:1}:{type:'person',employeeId:id};
  state.chartTab=scoped?'timeline':'overview';
- state.chartDay=nearestRecordedDay(id);
+ state.chartDay=scoped?1:nearestRecordedDay(id);
  state.timelineRange=null;state.rawPage=1;render();
 }
 function changePersonalDay(day){

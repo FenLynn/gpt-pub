@@ -68,6 +68,12 @@ async function run(){
    !document.querySelector('.workspace-mode-person .inspector-plot')?.textContent.includes('常规每日分布'),
  'R43 personal navigation must open first-day timeline without redundant titles');
  await page.screenshot({path:path.join(out,'r43-person-first-day.png')});
+ const secondPerson=await page.locator('#workspacePerson option').nth(1).getAttribute('value');
+ await page.locator('#workspacePerson').selectOption(secondPerson);
+ await check(page,(personId)=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&
+    state.chartDay===1&&state.selection.type==='cell'&&state.selection.day===1&&
+    state.selection.employeeId===personId&&!!document.querySelector('#attendanceTimelineChart svg'),
+    secondPerson,'R43 choosing a new person must begin on first-day timeline');
  await page.locator('[data-workspace="all"]').click();
  await check(page,()=>{
   const wrap=document.querySelector('.matrix-wrap'),grid=document.querySelector('.matrix'),
