@@ -15,7 +15,7 @@ async function run(){
  browser=await chromium.launch({headless:true,...(process.env.CHROME_BIN?{executablePath:process.env.CHROME_BIN}:{channel:'chrome'})});
  const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1,acceptDownloads:true});
  const page=await context.newPage();
- page.on('pageerror',e=>errors.push('page: '+e.message));
+ page.on('pageerror',e=>errors.push('page: '+(e.stack||e.message)));
  page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text())});
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
