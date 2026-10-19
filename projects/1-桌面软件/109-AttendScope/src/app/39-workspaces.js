@@ -109,6 +109,7 @@ function scopeAnalysisItems(){
 function renderScopeSummary(){
  const el=document.getElementById('scopeSummary');if(!el)return;
  const {people,items}=scopeAnalysisItems(),counts={normal:0,anomaly:0,absent:0};
+ const hint=document.querySelector('.workspace-toolbar .workspace-hint');if(hint)hint.textContent=people.length+' 位人员';
  for(const a of items){const status=attendanceJudgment(a);if(status in counts)counts[status]++}
  const metrics=[['人员',people.length,'人',''],['正常',counts.normal,'人日','normal'],['异常',counts.anomaly,'人日','anomaly'],['缺勤',counts.absent,'人日','absent']];
  el.innerHTML='<div class="scope-stat-inline" aria-label="考勤摘要">'+metrics.map(([name,value,unit,tone])=>
@@ -168,7 +169,7 @@ function dataWorkspaceHtml(){
  return '<div class="data-management"><div class="data-stat-inline">'+
   '<span>人员 <strong>'+EMPLOYEES.length+'</strong></span><span>打卡 <strong>'+state.records.length.toLocaleString()+'</strong></span>'+
   '<span>请假 <strong>'+state.leaves.length+'</strong></span><span>出差 <strong>'+state.trips.length+'</strong></span>'+
-  '<span class="data-dir-state">'+(state.projectDir?'已连接本地目录':'本地目录未连接')+'</span></div>'+
+  '<span class="data-dir-state">'+(state.selection.type==='date'?'仅显示 '+isoDate(state.selection.day)+' · ':'')+(state.projectDir?'已连接本地目录':'本地目录未连接')+'</span></div>'+
   '<div class="data-section-panel">'+dataPanelHtml(section)+'</div></div>';
 }
 function renderDataWorkspace(){
@@ -180,5 +181,5 @@ function renderDataWorkspace(){
  body.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
  body.querySelectorAll('[data-edit-roster-group]').forEach(b=>b.onclick=()=>setPersonGroup(b.dataset.editRosterGroup));
  const edit=body.querySelector('#dataEditRules');if(edit)edit.onclick=()=>document.getElementById('settingsBtn').click();
- if((state.dataSection||'records')==='records')mountRawTable({type:'overall',items:workAnalyses()});
+ if((state.dataSection||'records')==='records')mountRawTable(state.selection.type==='date'?{type:'date',day:state.selection.day,items:[]}: {type:'overall',items:workAnalyses()});
 }

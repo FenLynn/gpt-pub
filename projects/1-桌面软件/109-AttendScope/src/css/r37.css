@@ -146,3 +146,7 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
  .data-roster-head,.data-roster-row{grid-template-columns:65px minmax(80px,1fr) 70px 75px 80px}
  .data-rules-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* R39 screenshot review: data area uses exactly one title, no redundant heading inside its table. */
+.workspace-mode-data .analysis-head{display:none!important}
+.workspace-mode-data .data-section-panel .inspector-bottom{height:calc(100vh - 187px)}

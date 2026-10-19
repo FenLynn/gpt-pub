@@ -55,6 +55,17 @@ async function run(){
  await page.locator('[data-workspace="data"]').click();
  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
  await page.screenshot({path:path.join(out,'r37-data.png')});
+ await check(page,()=>getComputedStyle(document.querySelector('.workspace-mode-data .analysis-head')).display==='none',
+ 'R39 duplicate data heading');
+ await page.locator('.workspace-mode-data .cal-day[data-day="9"]').click();
+ await check(page,()=>state.workspaceMode==='data'&&state.selection.type==='date'&&state.selection.day===9&&
+   rawTabulator.getData().every(r=>(r.datetime||'').slice(0,10)==='2026-10-09')&&
+   rawTabulator.getDataCount()<state.records.length,
+ 'R39 data-management calendar must filter source records');
+ await page.locator('.workspace-mode-data #clearSelection').click();
+ await check(page,()=>state.workspaceMode==='data'&&state.selection.type==='overall'&&
+   rawTabulator.getDataCount()===state.records.length,
+ 'R39 clearing date must preserve current workspace');
  await check(page,()=>state.workspaceMode==='data'&&!!document.querySelector('.side-calendar')&&
    rawTabulator?.getDataCount()===state.records.length,'R37 data page evidence browser missing');
  await page.locator('[data-data-section="roster"]').click();

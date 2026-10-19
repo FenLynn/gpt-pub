@@ -171,7 +171,14 @@ function bind(){
   bindSettings();
   bindWorkspaceNavigation();
 
-  document.getElementById('clearSelection').onclick=()=>{if(state.workspaceMode==='classic'){state.selection={type:'overall'};state.chartTab='overview';render()}else navigateWorkspace('all')};
+  document.getElementById('clearSelection').onclick=()=>{
+    if(state.workspaceMode==='person'){
+      const employeeId=state.selection.employeeId||EMPLOYEES[0]?.id;
+      state.selection=employeeId?{type:'person',employeeId}:{type:'overall'};
+    }else state.selection={type:'overall'};
+    if(state.workspaceMode==='classic')state.chartTab='overview';
+    render();
+  };
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
   const monthButton=document.getElementById('monthMenuButton'),monthPopover=document.getElementById('monthPopover');
   importBtn.onclick=e=>{e.stopPropagation();monthPopover.classList.remove('open');popover.classList.toggle('open')};
