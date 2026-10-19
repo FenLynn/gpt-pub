@@ -139,7 +139,10 @@ function timelineFullInsightHtml(item){
   '<div class="insight-pane '+(selected==='behavior'?'active':'')+'" data-insight-pane="behavior">'+behavior+'</div>';
 }
 function attendInsightHtml(ctx){
-  const tab=state.chartTab||'overview',item=plotAnalysis(ctx),view=analysisViewItems(ctx);
+  const tab=state.chartTab||'overview',item=plotAnalysis(ctx);
+  // Personal statistics and issues summarize this employee's month, not the selected day.
+  const monthly=state.workspaceMode==='person'&&ctx.employee&&tab!=='timeline';
+  const view=monthly?Array.from({length:monthDays()},(_,i)=>state.analysis.get(ctx.employee.id+'|'+(i+1))):analysisViewItems(ctx);
   const tabLabel=({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab]);
   if(tab==='timeline'&&item){
     return timelineFullInsightHtml(item)+'<div id="timelineEvidence" class="insight-evidence"></div>';

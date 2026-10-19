@@ -163,7 +163,7 @@ function mountPersonStats(ctx){
     });
     main.on('click',p=>{const a=work[p.dataIndex];if(a)selectCellAndFocusEvidence(ctx.employee.id,a.day)});
   }
-  if(sub)mountStatusBarChart(sub,days);
+  if(sub)mountStatusBarChart(sub,days.filter(a=>isWorkday(a.day)));
 }
 
 function mountDateStats(ctx){
@@ -322,6 +322,7 @@ function mountDayTimeline(ctx){
 function mountStatsCharts(ctx){
   if(!window.echarts)return;
   if(ctx.type==='overall')mountOverallStats(ctx);
+  else if(ctx.employee&&state.workspaceMode==='person')mountPersonStats(ctx);
   else if(ctx.type==='person')mountPersonStats(ctx);
   else if(ctx.type==='date')mountDateStats(ctx);
   else mountCellStats(ctx);

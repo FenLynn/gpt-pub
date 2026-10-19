@@ -190,8 +190,13 @@ async function run(){
  await page.waitForSelector('#statsChartSecondary svg',{timeout:15000});
  await check(page,()=>{
   const charts=['statsChartMain','statsChartSecondary'].map(id=>echarts.getInstanceByDom(document.getElementById(id)));
-  return state.chartTab==='stats'&&charts.every(x=>x&&!x.isDisposed()&&x.getOption().series.length>0);
- },'R41 personal statistics view needs two actual ECharts series');
+  const full=Array.from({length:monthDays()},(_,i)=>state.analysis.get(state.selection.employeeId+'|'+(i+1))).filter(a=>isWorkday(a.day));
+  const figure=charts[0]?.getOption();
+  const value=Number([...document.querySelectorAll('.inspector-insight .insight-row')]
+    .find(x=>x.querySelector('span')?.textContent==='有效天数')?.querySelector('strong')?.textContent);
+  return state.chartTab==='stats'&&charts.every(x=>x&&!x.isDisposed()&&x.getOption().series.length>0)&&
+    figure.xAxis[0].data.length===full.length&&figure.series[0].data.length===full.length&&value===full.length;
+ },'R41 personal statistics must represent the entire employee month, not selected day');
  await page.screenshot({path:path.join(out,'r41-person-stats.png')});
  await page.locator('#personalViewSelect').selectOption('timeline');
  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:15000});
