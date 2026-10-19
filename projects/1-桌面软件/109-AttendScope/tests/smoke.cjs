@@ -23,10 +23,21 @@ async function run(){
  await check(page,()=>typeof legacyMountAttendanceTimeline==='undefined'&&typeof analysisTimelineHtml==='undefined'&&
   typeof timelineMiniMapHtml==='undefined'&&typeof mountAttendanceTimeline==='function',
   'R38 retired chart renderers remain active');
+ await check(page,()=>{
+  const nav=document.querySelector('.workspace-navigation'),bar=document.querySelector('.topbar');
+  const side=document.querySelector('.sidebar'),cal=document.querySelector('.side-calendar'),name=document.querySelector('.m-name .name-letters');
+  return nav.parentElement===bar&&document.querySelectorAll('.workspace-navigation').length===1&&
+    !!side.querySelector('#statusFilter')&&!!side.querySelector('#workspaceScopeGroup')&&
+    !document.querySelector('.scope-group-links')&&!document.querySelector('.scope-stat-row')&&
+    cal.getBoundingClientRect().bottom<=innerHeight+2&&cal.getBoundingClientRect().top>side.getBoundingClientRect().top+100&&
+    name.textContent===EMPLOYEES[0].name&&!name.querySelector('span')&&
+    document.querySelector('.matrix-wrap').getBoundingClientRect().top<210;
+ },'R39 system header, left filters, fixed calendar or compact matrix failed');
  await page.screenshot({path:path.join(out,'r37-all.png')});
  await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===4&&
-   !!document.querySelector('#scopeSummary .scope-stat-row')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
- await page.locator('[data-workspace="group"]').click();
+   !!document.querySelector('#scopeSummary .scope-stat-inline')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
+ await page.locator('#workspaceScopeGroup').selectOption({index:1});
+ await check(page,()=>state.workspaceMode==='group'&&!!document.querySelector('#workspaceGroup'),'R39 left group filter did not drill down');
  await page.screenshot({path:path.join(out,'r37-group.png')});
  await check(page,()=>{
    const members=EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup).length;
@@ -38,10 +49,13 @@ async function run(){
  await page.screenshot({path:path.join(out,'r37-person.png')});
  await check(page,()=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&state.selection.type==='person'&&!!document.getElementById('workspacePerson'),
    'R37 group-to-person drilldown failed');
+ await check(page,()=>!!document.querySelector('.side-controls [data-sidebar-chart="timeline"]')&&
+  getComputedStyle(document.querySelector('.chart-mode-tabs')).display==='none',
+  'R39 personal subnavigation should be on left only');
  await page.locator('[data-workspace="data"]').click();
  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
  await page.screenshot({path:path.join(out,'r37-data.png')});
- await check(page,()=>state.workspaceMode==='data'&&!!document.getElementById('dataSave')&&
+ await check(page,()=>state.workspaceMode==='data'&&!!document.querySelector('.side-calendar')&&
    rawTabulator?.getDataCount()===state.records.length,'R37 data page evidence browser missing');
  await page.locator('[data-data-section="roster"]').click();
  await check(page,()=>document.querySelectorAll('.data-roster-row').length===EMPLOYEES.length,
@@ -60,8 +74,14 @@ async function run(){
  await check(page,()=>{
    const matrix=document.querySelector('.matrix-wrap').getBoundingClientRect();
    return matrix.right<=innerWidth+2&&document.documentElement.scrollWidth<=innerWidth+3&&
-    !!document.querySelector('#scopeSummary .scope-stat-row');
+    !!document.querySelector('#scopeSummary .scope-stat-inline');
  },'R37 1366px all-staff viewport overflow');
+ await check(page,()=>{
+   const cal=document.querySelector('.side-calendar').getBoundingClientRect(),
+   matrix=document.querySelector('.matrix').getBoundingClientRect(),
+   wrap=document.querySelector('.matrix-wrap').getBoundingClientRect();
+   return cal.bottom<=innerHeight+2&&matrix.width>wrap.width*.94&&matrix.width<=wrap.width+6;
+ },'R39 1366 calendar visibility or horizontal matrix use');
  await page.screenshot({path:path.join(out,'r37-all-1366.png')});
  await page.setViewportSize({width:1920,height:1080});
  // R36: malformed timestamps must be rejected, and final export cannot depend
