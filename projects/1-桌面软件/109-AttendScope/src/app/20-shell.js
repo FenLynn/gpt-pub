@@ -110,7 +110,6 @@ function layoutHtml(){
 
     <main class="workspace">
       ${workspaceToolbarHtml()}
-      ${state.workspaceMode==='person'?personMonthStripHtml():''}
       <div class="workbench">
         <section class="matrix-zone" aria-label="月度员工考勤状态矩阵">
           <div class="matrix-wrap" id="matrixScroll"><div class="matrix" id="matrix"></div></div>

@@ -53,8 +53,13 @@ function personMonthStripHtml(){
     (rawManual?'<span class="person-day-check" aria-label="人工修正">✓</span>':'')+
     '<span class="person-day-status '+tone+'"></span></button>';
  }).join('');
+ const switcher='<div class="person-day-nav" aria-label="日期切换">'+
+  '<button id="personalDayPrev" type="button" aria-label="上一天" '+(selected<=1?'disabled':'')+'>‹</button>'+
+  '<select id="timelineDayPicker" aria-label="时间轴日期">'+
+   Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(selected===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
+  '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(selected>=monthDays()?'disabled':'')+'>›</button></div>';
  return '<div class="person-strip" aria-label="个人整月考勤"><span class="person-strip-label">月度考勤</span>'+
-  '<div class="person-days" style="--r40-days:'+monthDays()+'">'+days+'</div></div>';
+  '<div class="person-days" style="--r40-days:'+monthDays()+'">'+days+'</div>'+switcher+'</div>';
 }
 function workspaceSidebarHtml(){
  const mode=state.workspaceMode||'all',groups=workspaceGroups();
@@ -64,7 +69,7 @@ function workspaceSidebarHtml(){
  const groupControl=mode==='data'?'':'<div class="side-inline"><label for="'+
   (mode==='all'?'workspaceScopeGroup':mode==='group'?'workspaceGroup':'workspacePersonGroup')+'">组别</label>'+
   '<select class="side-select" id="'+(mode==='all'?'workspaceScopeGroup':mode==='group'?'workspaceGroup':'workspacePersonGroup')+'">'+
-  (mode==='all'?'<option value="">全部</option>':'')+
+  (mode==='all'||mode==='group'?'<option value="">全部</option>':'')+
   groups.map(g=>'<option value="'+escapeNameChar(g)+'" '+(g===group?'selected':'')+'>'+escapeNameChar(g)+'</option>').join('')+'</select></div>';
  const personControl=mode==='data'?'':'<div class="side-inline"><label for="workspacePerson">人员</label>'+
   '<select class="side-select" id="workspacePerson">'+(mode==='person'?'':'<option value="">全部</option>')+
@@ -90,7 +95,7 @@ function workspaceToolbarHtml(){
  if(mode==='all'||mode==='group')return '<div class="workspace-toolbar"><div><strong>'+(mode==='all'?'全员考勤':'分组考勤')+'</strong>'+
   '<span>'+periodText()+' · '+(mode==='group'?escapeNameChar(state.selectedGroup||'未分组'):'全部员工')+'</span></div>'+
   '<span class="workspace-hint">'+scopeVisibleEmployees().length+' 位人员</span></div><section id="scopeSummary" class="scope-summary"></section>';
- if(mode==='person')return '<div class="workspace-toolbar"><div><strong>个人分析</strong></div></div>';
+ if(mode==='person')return '<div class="workspace-toolbar person-toolbar"><strong>个人分析</strong>'+personMonthStripHtml()+'</div>';
  if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>'+periodText()+' · 原始记录、员工与规则</span></div></div>';
  return '';
 }
@@ -100,7 +105,7 @@ function bindWorkspaceNavigation(){
  const scope=document.getElementById('workspaceScopeGroup');
  if(scope)scope.onchange=()=>{if(scope.value){state.workspaceMode='group';state.selectedGroup=scope.value;state.scopeSearch='';state.attentionOnly=false;render()}};
  const g=document.getElementById('workspaceGroup');
- if(g)g.onchange=()=>{state.selectedGroup=g.value;state.selection={type:'overall'};render()};
+ if(g)g.onchange=()=>{if(!g.value){navigateWorkspace('all');return}state.selectedGroup=g.value;state.selection={type:'overall'};render()};
  const view=document.getElementById('personalViewSelect');
  if(view)view.onchange=()=>{state.chartTab=view.value;renderAnalysisPanel()};
  const person=document.getElementById('workspacePerson');
@@ -167,7 +172,8 @@ function renderScopeSummary(){
   '<div class="scope-insight-rate">异常及缺勤 '+(total?(issue/total*100).toFixed(1):'0.0')+'% <small>工作人日</small></div>'+
   '<div class="scope-insight-chart-title">每日异常趋势</div><div id="scopeDailyChart" class="scope-chart"></div>'+
   '<div class="scope-insight-chart-title">'+(state.workspaceMode==='group'?'组内人员':'组别比较')+'</div>'+
-  '<div id="scopeCompareChart" class="scope-chart"></div>';
+  '<div id="scopeCompareChart" class="scope-chart"></div>'+ 
+  '<div class="scope-insight-chart-title">状态构成</div><div id="scopeStatusChart" class="scope-chart scope-chart-composition"></div>';
  mountScopeAnalytics(people,work);
 }
 function mountScopeAnalytics(people,work){
@@ -192,6 +198,17 @@ function mountScopeAnalytics(people,work){
   return work.filter(a=>ids.has(a.employee.id)&&['anomaly','absent'].includes(attendanceJudgment(a))).length;
  });
  const entries=categories.map((name,i)=>({name,value:values[i]})).sort((a,b)=>b.value-a.value).slice(0,8).reverse();
+ const composition=initAttendChart(document.getElementById('scopeStatusChart'));
+ if(composition){
+  const items=[
+   {name:'正常',value:work.filter(a=>attendanceJudgment(a)==='normal').length,itemStyle:{color:'#76c49c'}},
+   {name:'异常',value:work.filter(a=>attendanceJudgment(a)==='anomaly').length,itemStyle:{color:'#dfbe72'}},
+   {name:'缺勤',value:work.filter(a=>attendanceJudgment(a)==='absent').length,itemStyle:{color:'#db9395'}}
+  ].filter(x=>x.value);
+  composition.setOption({animation:false,tooltip:{trigger:'item',formatter:'{b}: {c} 人日 ({d}%)'},
+   legend:{orient:'vertical',right:14,top:'middle',textStyle:{fontSize:12,color:'#647b8b'},itemWidth:10,itemHeight:10},
+   series:[{type:'pie',radius:['48%','72%'],center:['34%','51%'],label:{show:false},itemStyle:{borderRadius:2,borderColor:'#fff',borderWidth:2},data:items}]});
+ }
  const second=initAttendChart(document.getElementById('scopeCompareChart'));
  if(second){
   second.setOption({animation:false,grid:{left:65,right:15,top:8,bottom:16,containLabel:false},

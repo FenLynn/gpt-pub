@@ -71,6 +71,8 @@ function timelineLegendHtml(item){
 function timelineHeaderToolsHtml(ctx){
   if((state.chartTab||'overview')!=='timeline')return '';
   const day=plotAnalysis(ctx);if(!day)return '';
+  // R41 personal date navigation lives alongside the full-month strip in the only title row.
+  if(state.workspaceMode==='person')return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+'</div>';
   const switcher='<button id="personalDayPrev" type="button" aria-label="上一天" '+(day.day<=1?'disabled':'')+'>‹</button><select id="timelineDayPicker" aria-label="时间轴日期">'+
     Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
   '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(day.day>=monthDays()?'disabled':'')+'>›</button>';
@@ -291,6 +293,7 @@ function renderRawTable(ctx){
   const col=(title,field,width,minWidth=43)=>{
     const opt=prefs[field]||{};
     return {title,field,minWidth,formatter:'plaintext',headerSort:true,tooltip:true,
+      hozAlign:'center',headerHozAlign:'center',
       visible:field==='name'||opt.visible!==false,frozen:field==='name',width:opt.width&&opt.width>=48?Math.min(500,opt.width):undefined,
       widthGrow:Math.max(1,Math.round(width/65))};
   };
