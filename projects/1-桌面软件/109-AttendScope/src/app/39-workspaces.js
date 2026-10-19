@@ -128,7 +128,7 @@ function dataPanelHtml(section){
   return '<div class="data-note">原始导入文件与本月工作状态分开保存。冻结快照用于保留当时的完整工作副本。</div>'+
    '<div class="data-import-history"><div class="scope-subheading">本月导入记录 <small>'+imports.length+' 份</small></div>'+
    (imports.length?imports.map(x=>'<div class="data-import-item"><strong>'+escapeNameChar(x.name||'未命名')+'</strong>'+
-    '<span>'+escapeNameChar(x.type||'')+' · '+Number(x.count||0)+' 条</span><small>'+escapeNameChar(x.importedAt||'')+'</small></div>').join('')+
+    '<span>'+escapeNameChar(x.type||'')+' · '+Number(x.count||0)+' 条</span><small>'+escapeNameChar(x.importedAt||'')+'</small></div>').join('')
     :'<p>当前月份尚无真实文件导入。演示数据不作为真实导入记录。</p>')+'</div>';
  }
  return '<section class="inspector-bottom" id="rawPane"><div class="raw-toolbar"><strong>原始记录</strong><div class="raw-tabs">'+
