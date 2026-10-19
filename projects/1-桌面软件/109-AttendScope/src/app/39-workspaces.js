@@ -83,7 +83,7 @@ function workspaceSidebarHtml(){
   (mode==='person'?'<div class="side-view-row"><label for="personalViewSelect">分析视图</label><select class="side-select" id="personalViewSelect">'+
     CHART_TABS.map(([id,label])=>'<option value="'+id+'" '+(state.chartTab===id?'selected':'')+'>'+label+'</option>').join('')+
    '</select></div>':'')+
-  (mode==='data'?'':sidebarFilterHtml())+'</div>';
+  (mode==='data'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':sidebarFilterHtml())+'</div>';
 }
 function workspaceToolbarHtml(){
  const mode=state.workspaceMode||'all';
