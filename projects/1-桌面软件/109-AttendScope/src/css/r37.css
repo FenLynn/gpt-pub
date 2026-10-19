@@ -355,3 +355,20 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
  .workspace-mode-person #timelineDayPicker{min-width:61px;font-size:12px}
  .workspace-mode-all .matrix-zone,.workspace-mode-group .matrix-zone{--matrix-cell:clamp(19px,calc(1.5vw - .49px),28px)}
 }
+
+/* R41 visual review: give more height to the six-lane chart, not an empty raw grid. */
+.workspace-mode-person .analysis-body{
+ grid-template-rows:minmax(255px,69%) minmax(180px,1fr)!important;
+}
+.workspace-mode-person .person-day-number{font-size:14px}
+.workspace-mode-person .insight-card-head{margin-bottom:7px!important}
+.workspace-mode-person .insight-behavior-row{min-height:32px!important;padding:5px 1px!important}
+.workspace-mode-person .manual-status-buttons{min-height:36px}
+.workspace-mode-person .insight-tabs button{font-weight:680}
+.workspace-mode-all .scope-insight-numbers span,.workspace-mode-group .scope-insight-numbers span{font-size:13px}
+.workspace-mode-all .scope-insight-chart-title,.workspace-mode-group .scope-insight-chart-title{font-size:14px}
+.workspace-mode-all .scope-insight-rate,.workspace-mode-group .scope-insight-rate{font-size:13px}
+@media(max-width:1450px){
+ .workspace-mode-person .person-day-number{font-size:12.5px}
+ .workspace-mode-person .analysis-body{grid-template-rows:minmax(230px,65%) minmax(165px,1fr)!important}
+}

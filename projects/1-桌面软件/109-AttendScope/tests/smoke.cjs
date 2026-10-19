@@ -184,6 +184,17 @@ async function run(){
   if(prior.old==null)delete state.manualStatuses[prior.key];else state.manualStatuses[prior.key]=prior.old;
   state.judgmentMode=prior.mode;delete state.__r40Restore;render();
  });
+ // The personal statistics tab is functional, not a decorative navigation label.
+ await page.locator('#personalViewSelect').selectOption('stats');
+ await page.waitForSelector('#statsChartMain svg',{timeout:15000});
+ await page.waitForSelector('#statsChartSecondary svg',{timeout:15000});
+ await check(page,()=>{
+  const charts=['statsChartMain','statsChartSecondary'].map(id=>echarts.getInstanceByDom(document.getElementById(id)));
+  return state.chartTab==='stats'&&charts.every(x=>x&&!x.isDisposed()&&x.getOption().series.length>0);
+ },'R41 personal statistics view needs two actual ECharts series');
+ await page.screenshot({path:path.join(out,'r41-person-stats.png')});
+ await page.locator('#personalViewSelect').selectOption('timeline');
+ await page.waitForSelector('#attendanceTimelineChart svg',{timeout:15000});
  await check(page,()=>!!document.querySelector('#personalViewSelect option[value="timeline"]')&&
   getComputedStyle(document.querySelector('.chart-mode-tabs')).display==='none',
   'R39 personal subnavigation should be on left only');
