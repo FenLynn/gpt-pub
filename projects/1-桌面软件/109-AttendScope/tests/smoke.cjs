@@ -31,9 +31,9 @@ async function run(){
       !!document.getElementById('workspaceGroup');
  },'R37 group roster does not constrain matrix');
  await page.locator('.m-name[data-emp]').first().click();
- await page.waitForSelector('#overviewTrendChart svg',{timeout:20000});
+ await page.waitForSelector('#attendanceTimelineChart svg',{timeout:20000});
  await page.screenshot({path:path.join(out,'r37-person.png')});
- await check(page,()=>state.workspaceMode==='person'&&state.selection.type==='person'&&!!document.getElementById('workspacePerson'),
+ await check(page,()=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&state.selection.type==='person'&&!!document.getElementById('workspacePerson'),
    'R37 group-to-person drilldown failed');
  await page.locator('[data-workspace="data"]').click();
  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});

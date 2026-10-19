@@ -86,6 +86,21 @@ function renderScopeSummary(){
   state.workspaceMode='group';state.selectedGroup=b.dataset.openGroup;state.selection={type:'overall'};render();
  });
  el.querySelectorAll('[data-scope-person]').forEach(b=>b.onclick=()=>selectCell(b.dataset.scopePerson,+b.dataset.scopeDay));
+ const details=document.getElementById('scopeDetails');
+ if(details){
+  const personnel=people.map(e=>{
+    const records=workAnalyses().filter(a=>a.employee.id===e.id);
+    return {e,normal:records.filter(a=>attendanceJudgment(a)==='normal').length,
+      anomaly:records.filter(a=>attendanceJudgment(a)==='anomaly').length,
+      absent:records.filter(a=>attendanceJudgment(a)==='absent').length};
+  }).sort((a,b)=>(b.anomaly+b.absent)-(a.anomaly+a.absent));
+  details.innerHTML='<div class="scope-subheading">组内人员 <small>优先显示需要关注的员工，点击进入个人时间轴</small></div>'+
+    '<div class="scope-member-list">'+personnel.map(x=>
+      '<button data-member-id="'+escapeNameChar(x.e.id)+'"><strong>'+escapeNameChar(x.e.name)+'</strong>'+
+      '<span>正常 '+x.normal+'</span><span class="warn">异常 '+x.anomaly+'</span>'+
+      '<span class="danger">缺勤 '+x.absent+'</span><b aria-hidden="true">›</b></button>').join('')+'</div>';
+  details.querySelectorAll('[data-member-id]').forEach(b=>b.onclick=()=>selectPerson(b.dataset.memberId));
+ }
  const title=document.getElementById('analysisTitle');if(title)title.textContent=state.workspaceMode==='group'?state.selectedGroup+' · 考勤分析':'全员考勤分析';
 }
 function dataWorkspaceHtml(){

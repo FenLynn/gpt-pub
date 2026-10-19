@@ -120,6 +120,7 @@ function layoutHtml(){
           <div class="analysis-body" id="analysisBody"></div>
         </section>
       </div>
+      ${state.workspaceMode==='group'?'<section class="scope-details" id="scopeDetails"></section>':''}
     </main>
   </div>
 
@@ -258,6 +259,7 @@ function updateMatrixFilter(){
 function renderMatrix(){
   const el=document.getElementById('matrix'); if(!el)return;
   const visibleEmployees=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
+  el.closest('.matrix-zone')?.style.setProperty('--scope-count',String(visibleEmployees.length));
   // Matrix dimensions are shared CSS variables, including responsive sizing.
   el.style.gridTemplateColumns='var(--matrix-name) repeat(31,var(--matrix-cell))';
 
@@ -379,7 +381,7 @@ function bindAnalysisPanel(ctx){
   });
 }
 
-function selectPerson(id){if(state.workspaceMode!=='classic')state.workspaceMode='person';state.selection={type:'person',employeeId:id};state.chartTab='overview';state.chartDay=nearestRecordedDay(id);state.rawPage=1;render()}
+function selectPerson(id){const scoped=state.workspaceMode!=='classic';if(scoped)state.workspaceMode='person';state.selection={type:'person',employeeId:id};state.chartTab=scoped?'timeline':'overview';state.chartDay=nearestRecordedDay(id);state.timelineRange=null;state.rawPage=1;render()}
 function selectDate(d,allPeople=false){
  if(d<1||d>monthDays())return;
  const sel=state.selection;

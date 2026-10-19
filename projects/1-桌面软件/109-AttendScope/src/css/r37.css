@@ -62,3 +62,22 @@
 .data-import-actions button:hover{background:#edf6fb}
 @media(max-width:960px){.scope-stat-row,.data-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 .workspace-navigation button{padding:9px 12px}}
+
+/* R37 review: compact group matrix and maintain sidebar position below the workspace tabs. */
+.layout.workspace-mode-all,.layout.workspace-mode-group,.layout.workspace-mode-person,.layout.workspace-mode-data{
+ min-height:calc(100vh - var(--topbar) - 43px)}
+.layout.workspace-mode-all .sidebar,.layout.workspace-mode-group .sidebar,.layout.workspace-mode-person .sidebar{
+ top:calc(var(--topbar) + 43px);height:calc(100vh - var(--topbar) - 43px)}
+.workspace-mode-group .matrix-zone{
+ height:min(calc(115px + var(--scope-count,10) * var(--matrix-row)),calc(100vh - 260px))!important;
+ min-height:300px!important}
+.scope-details{margin:12px 0 20px}
+.scope-member-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}
+.scope-member-list button{display:flex;align-items:center;gap:10px;border:1px solid #e1e9f0;border-radius:8px;
+ padding:10px 14px;text-align:left;background:#fff;color:#61798e}
+.scope-member-list button:hover{background:#f2f8fc;border-color:#afd1e8}
+.scope-member-list button strong{margin-right:auto;color:#2e4d64;font-size:12px}
+.scope-member-list button span{font-size:10px;white-space:nowrap}
+.scope-member-list button span.warn{color:#b28d37}
+.scope-member-list button span.danger{color:#bd6867}
+.scope-member-list button b{font-size:17px;color:#8aa9c0}
