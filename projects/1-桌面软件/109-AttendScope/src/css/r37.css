@@ -81,3 +81,27 @@
 .scope-member-list button span.warn{color:#b28d37}
 .scope-member-list button span.danger{color:#bd6867}
 .scope-member-list button b{font-size:17px;color:#8aa9c0}
+
+/* R37 data-management sub-sections share one panel, without creating new datasets. */
+.data-section-tabs{display:flex;gap:6px;border-bottom:1px solid #e7edf2;padding-bottom:7px;flex-wrap:wrap}
+.data-section-tabs button{background:transparent;color:#758c9f;border:0;border-radius:6px;padding:7px 13px;font-size:11px;font-weight:660}
+.data-section-tabs button.active{background:#e9f4fc;color:#2478b3}
+.data-section-panel{min-height:0;flex:1}
+.workspace-mode-data .data-section-panel .inspector-bottom{height:calc(100vh - 315px);min-height:340px}
+.data-note{font-size:11px;color:#68859a;padding:12px 4px;line-height:1.7}
+.data-roster-table{max-height:calc(100vh - 340px);overflow-y:auto;border:1px solid #e2eaf0;border-radius:9px}
+.data-roster-head,.data-roster-row{display:grid;grid-template-columns:110px minmax(130px,1.1fr) minmax(130px,1fr) minmax(130px,1fr) 105px;align-items:center;gap:10px;padding:10px 14px}
+.data-roster-head{position:sticky;top:0;background:#f5f9fc;font-size:10px;color:#71879b;z-index:1}
+.data-roster-row{border-top:1px solid #edf2f5;background:#fff;color:#587387;font-size:11px}
+.data-roster-row strong{color:#2d4b63}
+.data-roster-row button,.data-rule-edit{border:1px solid #d7e7f2;background:#fff;color:#3779a6;border-radius:6px;padding:6px 9px;font-size:11px}
+.data-rules-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:14px}
+.data-rules-grid>div{display:flex;flex-direction:column;gap:7px;border:1px solid #e2eaf1;border-radius:8px;padding:15px;background:#fff}
+.data-rules-grid span{font-size:11px;color:#758b9d}
+.data-rules-grid strong{font-size:14px;color:#29495f}
+.data-import-history{border:1px solid #e1eaf1;border-radius:9px;background:#fff;padding:13px}
+.data-import-item{display:flex;gap:18px;padding:11px 8px;border-top:1px solid #ecf1f5;font-size:11px;align-items:center}
+.data-import-item strong{color:#35566e;margin-right:auto}
+.data-import-item span{color:#6a8799}.data-import-item small{color:#8ea0ae}
+@media(max-width:820px){.data-roster-head,.data-roster-row{grid-template-columns:65px minmax(90px,1fr) 80px 80px 90px}
+ .data-rules-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

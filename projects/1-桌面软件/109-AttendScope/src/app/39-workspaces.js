@@ -103,7 +103,41 @@ function renderScopeSummary(){
  }
  const title=document.getElementById('analysisTitle');if(title)title.textContent=state.workspaceMode==='group'?state.selectedGroup+' · 考勤分析':'全员考勤分析';
 }
+function dataPanelHtml(section){
+ if(section==='roster'){
+  return '<div class="data-note">员工 ID 是记录关联的唯一键。组别可编辑；对于同名人员，请在正式导入前确认身份。</div>'+
+  '<div class="data-roster-table"><div class="data-roster-head"><span>人员 ID</span><span>姓名</span><span>部门</span><span>组别</span><span>操作</span></div>'+
+  EMPLOYEES.map(e=>'<div class="data-roster-row"><span>'+escapeNameChar(e.id)+'</span><strong>'+escapeNameChar(e.name)+'</strong>'+
+   '<span>'+escapeNameChar(e.department)+'</span><span>'+escapeNameChar(groupOf(e))+'</span>'+
+   '<button data-edit-roster-group="'+escapeNameChar(e.id)+'">修改组别</button></div>').join('')+'</div>';
+ }
+ if(section==='rules'){
+  return '<div class="data-note">以下为当前月份使用的规则；修改时将重新计算系统判定，不修改原始打卡。</div>'+
+    '<div class="data-rules-grid">'+[
+      ['上午时段',RULES.amStart+'–'+RULES.amEnd],
+      ['下午时段',RULES.pmStart+'–'+RULES.pmEnd],
+      ['迟到宽限',RULES.grace+' 分钟'],
+      ['重复打卡',RULES.dupSeconds+' 秒'],
+      ['日历调整',Object.keys(state.calendarOverrides||{}).filter(k=>k.startsWith(monthKey()+'-')).length+' 天'],
+      ['人工判定',Object.keys(state.manualStatuses||{}).length+' 个']
+    ].map(([label,value])=>'<div><span>'+label+'</span><strong>'+escapeNameChar(value)+'</strong></div>').join('')+
+    '</div><button class="data-rule-edit" id="dataEditRules">在设置中修改班次与规则</button>';
+ }
+ if(section==='imports'){
+  const imports=state.imports||[];
+  return '<div class="data-note">原始导入文件与本月工作状态分开保存。冻结快照用于保留当时的完整工作副本。</div>'+
+   '<div class="data-import-history"><div class="scope-subheading">本月导入记录 <small>'+imports.length+' 份</small></div>'+
+   (imports.length?imports.map(x=>'<div class="data-import-item"><strong>'+escapeNameChar(x.name||'未命名')+'</strong>'+
+    '<span>'+escapeNameChar(x.type||'')+' · '+Number(x.count||0)+' 条</span><small>'+escapeNameChar(x.importedAt||'')+'</small></div>').join('')+
+    :'<p>当前月份尚无真实文件导入。演示数据不作为真实导入记录。</p>')+'</div>';
+ }
+ return '<section class="inspector-bottom" id="rawPane"><div class="raw-toolbar"><strong>原始记录</strong><div class="raw-tabs">'+
+   [['attendance','考勤'],['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']].map(([id,name])=>'<button data-raw-tab="'+id+'">'+name+'</button>').join('')+
+  '</div><span class="raw-count" id="rawRowCount"></span><button class="raw-float-btn" id="rawFloat" title="弹出原始表格">⛶</button></div>'+
+  '<div id="rawDataTable" class="raw-table" aria-label="原始表格"></div></section>';
+}
 function dataWorkspaceHtml(){
+ const section=state.dataSection||'records';
  return '<div class="data-management">'+
   '<div class="data-summary">'+
     '<section><span>员工</span><strong>'+EMPLOYEES.length+'</strong></section>'+
@@ -113,10 +147,10 @@ function dataWorkspaceHtml(){
   '</div>'+
   '<div class="data-import-actions"><button data-open="attendanceInput">导入考勤</button><button data-open="leaveInput">导入请假</button>'+
   '<button data-open="tripInput">导入出差</button><button id="dataSave">保存工作状态</button><button id="dataFreeze">冻结快照</button></div>'+
-  '<section class="inspector-bottom" id="rawPane"><div class="raw-toolbar"><strong>原始记录</strong><div class="raw-tabs">'+
-   [['attendance','考勤'],['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']].map(([id,name])=>'<button data-raw-tab="'+id+'">'+name+'</button>').join('')+
-  '</div><span class="raw-count" id="rawRowCount"></span><button class="raw-float-btn" id="rawFloat" title="弹出原始表格">⛶</button></div>'+
-  '<div id="rawDataTable" class="raw-table" aria-label="原始表格"></div></section></div>';
+  '<div class="data-section-tabs" role="tablist">'+[
+    ['records','原始记录'],['roster','员工名册'],['rules','工作规则'],['imports','导入与快照']
+   ].map(([id,label])=>'<button type="button" data-data-section="'+id+'" class="'+(id===section?'active':'')+'" role="tab" aria-selected="'+(id===section)+'">'+label+'</button>').join('')+
+  '</div><div class="data-section-panel">'+dataPanelHtml(section)+'</div></div>';
 }
 function renderDataWorkspace(){
  const body=document.getElementById('analysisBody');if(!body)return;
@@ -127,5 +161,10 @@ function renderDataWorkspace(){
  body.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
  document.getElementById('dataSave').onclick=saveWorking;
  document.getElementById('dataFreeze').onclick=freezeSnapshot;
- mountRawTable({type:'overall',items:workAnalyses()});
+ body.querySelectorAll('[data-data-section]').forEach(b=>b.onclick=()=>{
+   state.dataSection=b.dataset.dataSection;renderDataWorkspace();
+ });
+ body.querySelectorAll('[data-edit-roster-group]').forEach(b=>b.onclick=()=>setPersonGroup(b.dataset.editRosterGroup));
+ const edit=body.querySelector('#dataEditRules');if(edit)edit.onclick=()=>document.getElementById('settingsBtn').click();
+ if((state.dataSection||'records')==='records')mountRawTable({type:'overall',items:workAnalyses()});
 }
