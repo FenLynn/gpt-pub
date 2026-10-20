@@ -170,25 +170,51 @@ function analysisPairMinutes(pairs,start,end){
  return pairs.reduce((total,[enter,exit])=>total+
    intervalOverlap(minutes(enter.time),minutes(exit.time),minutes(start),minutes(end)),0);
 }
+// Minutes are a union of intervals, not a sum of overlapping registrations.
+function analysisUnionMinutes(intervals){
+ const sorted=intervals.filter(([a,b])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a)
+  .sort((a,b)=>a[0]-b[0]);
+ let total=0,start=null,end=null;
+ for(const [a,b] of sorted){
+  if(start===null){start=a;end=b}
+  else if(a<=end)end=Math.max(end,b);
+  else{total+=end-start;start=a;end=b}
+ }
+ return start===null?0:total+end-start;
+}
 function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
  const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?+RULES.overtimeMinMinutes:30;
- if(registered.length)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'已登记加班，不重复推算'};
  if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'打卡进出配对待核'};
- // Ordinary working days: only complete post-shift exit evidence.
- // Early arrivals and the scheduled lunch break must never become overtime.
- let raw=0;
- if(isWorkday(day)){
-  raw=pairs.reduce((sum,[a,b])=>sum+
-    intervalOverlap(minutes(a.time),minutes(b.time),minutes(RULES.pmEnd),1440),0);
- }else{
-  raw=pairs.reduce((sum,[a,b])=>sum+Math.max(0,minutes(b.time)-minutes(a.time)),0);
-  // A continuous, non-split rest-day gate interval does not establish
-  // work through the scheduled midday break.
-  raw-=analysisPairMinutes(pairs,RULES.amEnd,RULES.pmStart);
+ // Count only complete gate intervals, intersecting the eligible clock windows.
+ // On a rest day, lunch never becomes inferred overtime.
+ const windows=isWorkday(day)?[[minutes(RULES.pmEnd),1440]]:
+   [[0,minutes(RULES.amEnd)],[minutes(RULES.pmStart),1440]];
+ const eligible=[];
+ for(const [enter,exit] of pairs){
+  const a=minutes(enter.time),b=minutes(exit.time);
+  for(const [start,end] of windows){
+   const from=Math.max(a,start),to=Math.min(b,end);
+   if(to>from)eligible.push([from,to]);
+  }
  }
+ const total=analysisUnionMinutes(eligible);
+ // Registered overtime is an independent fact: remove only its overlap with
+ // the candidate intervals, never discard unrelated, fully-paired time.
+ const deductions=[];
+ for(const r of registered){
+  const start=minutes(r.start||''),end=minutes(r.end||'');
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)continue;
+  for(const [a,b] of eligible){
+   const from=Math.max(start,a),to=Math.min(end,b);
+   if(to>from)deductions.push([from,to]);
+  }
+ }
+ const raw=Math.max(0,total-analysisUnionMinutes(deductions));
  const value=raw+1e-8>=minMinutes?raw:0;
- return {minutes:value,rawMinutes:Math.max(0,raw),threshold:minMinutes,
-   reason:value?'基于完整进出记录的待核候选':'不足阈值或无完整加班进出'};
+ const reason=value?'完整进出记录推算，待核'+(deductions.length?'（已扣除登记重叠时段）':''):
+   deductions.length?'与已登记加班重叠或剩余时长不足阈值':
+   '不足阈值或无完整加班进出';
+ return {minutes:value,rawMinutes:raw,threshold:minMinutes,reason};
 }
 function analyzeDay(emp,d){
  const date=isoDate(d),punches=state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date)
