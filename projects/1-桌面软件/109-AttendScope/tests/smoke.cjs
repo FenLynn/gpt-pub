@@ -414,6 +414,62 @@ async function run(){
    RULES.overtimeMinMinutes=previous.threshold;
   }
  },'R49 lunch clock-gap evidence, threshold, registered-event exclusion and inferred overtime failed');
+ // R50: the two-layer sidebar, browser-like workspace history and redundant
+ // statistical normalizations are visible and functionally connected.
+ await check(page,()=>{
+   const buttons=[...document.querySelectorAll('.side-primary-nav .side-views button')];
+   const label=document.querySelector('.side-refinements-title');
+   return buttons.length===2&&buttons[0].textContent.includes('01')&&
+     buttons[1].textContent.includes('02')&&label?.textContent==='辅助筛选'&&
+     !!document.getElementById('asNavBack')&&!!document.getElementById('asNavForward');
+ },'R50 primary/subordinate sidebar hierarchy or history controls missing');
+ await check(page,()=>{
+   const initial=asNavSnapshot(),next=initial.workspaceMode==='person'?'all':'person';
+   navigateWorkspace(next);
+   if(asNavHistory.back.length===0||document.getElementById('asNavBack').disabled)return false;
+   asNavGo('back');
+   const back=asNavSnapshot();
+   if(back.workspaceMode!==initial.workspaceMode||back.analyticsPage!==initial.analyticsPage||
+     JSON.stringify(back.selection)!==JSON.stringify(initial.selection))return false;
+   if(document.getElementById('asNavForward').disabled)return false;
+   asNavGo('forward');
+   if(state.workspaceMode!==next)return false;
+   asNavGo('back');
+   return state.workspaceMode===initial.workspaceMode;
+ },'R50 backward/forward workspace and selection history failed');
+ await check(page,()=>{
+   const original={workspaceMode:state.workspaceMode,statsConfig:state.statsConfig,
+     selection:state.selection};
+   try{
+    state.workspaceMode='person';state.selection={type:'cell',employeeId:EMPLOYEES[0].id,day:1};
+    state.statsConfig={family:'overtime',metric:'candidatePeople',compare:'days',
+      aggregate:'perPerson',chart:'bar',limit:10,sort:'desc'};
+    const person=asStatPrefs();
+    if(person.metric==='candidatePeople'||person.aggregate==='perPerson')return false;
+    state.workspaceMode='all';state.statsConfig={...state.statsConfig,family:'leave',
+      metric:'people',compare:'people',aggregate:'perPerson'};
+    const ranked=asStatPrefs();
+    if(ranked.metric==='people'||ranked.aggregate==='perPerson')return false;
+    const ledger=new Map();
+    const data=asStatRows();
+    if(data.rankRows.some(row=>row.raw<=0))return false;
+    return true;
+   }finally{
+    state.workspaceMode=original.workspaceMode;
+    state.selection=original.selection;state.statsConfig=original.statsConfig;
+   }
+ },'R50 redundant zero/one metrics, duplicate per-person normalization or zero rankings');
+ await check(page,()=>{
+   const old=asNavSnapshot();
+   state.analyticsPage='stats';render();
+   const label=document.querySelector('.as-stats-filters label');
+   const select=label?.querySelector('select');
+   const aligned=!!select&&Math.abs(select.getBoundingClientRect().top-
+     label.getBoundingClientRect().top)<16&&
+     getComputedStyle(label).gridTemplateColumns.split(' ').length>=2;
+   asNavGo('back');
+   return aligned&&state.analyticsPage===old.analyticsPage;
+ },'R50 statistics labels are not horizontally aligned with selects');
  // R45: test the shared ledger before rendering charts. Every imported event is
  // represented once, including multi-day trips that span several person-days.
  await check(page,()=>{
@@ -1019,18 +1075,37 @@ async function run(){
     await importLeaves(new File([leave],'请假样例.csv',{type:'text/csv'}));
     const trip='姓名,开始日期,结束日期,类型,地点\n测试甲,2026-10-10,2026-10-11,出差,测试地点';
     await importTrips(new File([trip],'出差样例.csv',{type:'text/csv'}));
+    const outing='姓名,开始日期,结束日期,开始时间,结束时间,类型\\n测试甲,2026-10-09,2026-10-09,10:00,11:00,业务外出';
+    await importOutings(new File([outing],'外出样例.csv',{type:'text/csv'}));
+    const overtime='姓名,日期,开始时间,结束时间,类型\\n测试甲,2026-10-09,18:00,19:00,登记加班';
+    await importOvertime(new File([overtime],'加班样例.csv',{type:'text/csv'}));
     const related=state.leaves.length===1&&state.trips.length===1&&
-      state.leaves[0].employeeId===id&&state.trips[0].employeeId===id&&state.imports.length===3;
+      state.outings.length===1&&state.overtimeEntries.length===1&&
+      state.leaves[0].employeeId===id&&state.trips[0].employeeId===id&&
+      state.outings[0].employeeId===id&&state.overtimeEntries[0].employeeId===id&&
+      state.imports.length===5;
     const saved=workingPayload();
    switchMonth(2026,11);switchMonth(2026,10);
    const restored=EMPLOYEES.length===1&&EMPLOYEES[0].id===id&&
      state.records.length===2&&state.analysis.size===monthDays()&&
-     saved.employees.length===1&&state.leaves.length===1&&state.trips.length===1&&related;
+     saved.employees.length===1&&state.leaves.length===1&&state.trips.length===1&&
+     state.outings.length===1&&state.overtimeEntries.length===1&&related;
    state.calendarOverrides['2026-10-09']='holiday';
    const calendar=dayType(9)==='holiday';delete state.calendarOverrides['2026-10-09'];
    return {valid,restored,calendar};
  });
- if(!imported.valid||!imported.restored||!imported.calendar)throw Error('R33 roster/import/month/calendar failed '+JSON.stringify(imported));
+ if(!imported.valid||!imported.restored||!imported.calendar)throw Error('R33/R50 roster/5-type import/month/calendar failed '+JSON.stringify(imported));
+ await check(page,()=>{
+   const before=EMPLOYEES;
+   try{
+    EMPLOYEES=[{id:'E991',name:'同名员工',department:'测试'},
+      {id:'E992',name:'同名员工',department:'测试'}];
+    try{importRosterPlan(['同名员工'],'leave');return false}
+    catch(e){if(!e.message.includes('同名'))return false}
+    try{validateImportIdentityRows([{姓名:'乙',工号:'01'},{姓名:'乙',工号:'02'}]);return false}
+    catch(e){return e.message.includes('同名异工号')}
+   }finally{EMPLOYEES=before}
+ },'R50 ambiguous employee identity silently merged');
  // R35: actual large XLSX bytes must round-trip, not just return matching preview fields.
  await check(page,async()=>{
    const rows=Array.from({length:6000},(_,i)=>({姓名:'测试'+i,打卡时间:'2026-10-09 08:31:04',进出:'进',备注:'测试数据'+i}));
