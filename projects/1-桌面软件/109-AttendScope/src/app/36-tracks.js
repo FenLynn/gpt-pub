@@ -84,8 +84,8 @@ function mountAttendanceTimeline(a){
     if(d.origin==='auto'){
       const y=p[1]-h/2,accepted=d.accepted!==false,children=[
         {type:'rect',shape:{x,y,width:w,height:h,r:0},
-          style:{fill:accepted?'rgba(181,108,144,.32)':'rgba(181,108,144,.075)',
-            stroke:accepted?'rgba(177,91,135,.3)':'rgba(181,108,144,.13)',lineWidth:.5}}
+          style:{fill:accepted?'rgba(184,109,150,.34)':'rgba(191,129,162,.19)',
+            stroke:accepted?'rgba(177,91,135,.33)':'rgba(185,120,157,.23)',lineWidth:.5}}
       ];
       // Separate derived time from solid registered bands by a clipped
       // diagonal hatch. Cancelled time becomes very faint but remains visible.
@@ -93,7 +93,7 @@ function mountAttendanceTimeline(a){
        const size=Math.min(6,w-offset);
        children.push({type:'line',shape:{x1:x+offset,y1:y+h-1,
          x2:x+offset+size,y2:y+1},style:{
-           stroke:accepted?'rgba(155,66,121,.43)':'rgba(155,66,121,.09)',lineWidth:1.15}});
+           stroke:accepted?'rgba(155,66,121,.50)':'rgba(171,104,141,.25)',lineWidth:1.15}});
       }
       return {type:'group',children};
     }
@@ -233,7 +233,8 @@ function mountAttendanceTimeline(a){
       const left=Math.max(x1[0],0),right=Math.min(x2[0],chart.getWidth());
       if(right<=left||right<0||left>=chart.getWidth())continue;
       const box=document.createElement('div');
-      box.className='overtime-review-actions'+(seg.accepted?'':' is-excluded');
+      box.className='overtime-review-actions'+(seg.accepted?'':' is-excluded')+
+        (state.overtimeHoverId===seg.segmentId?' is-hovered':'');
       box.dataset.autoOvertimeId=seg.segmentId;
       box.style.left=Math.max(0,Math.min(right-45,chart.getWidth()-48))+'px';
       box.style.top=Math.max(0,x1[1]-lineH/2+2)+'px';
@@ -247,11 +248,28 @@ function mountAttendanceTimeline(a){
        btn.onclick=e=>{e.stopPropagation();setAutoOvertimeDecision(seg.segmentId,accepted)};
        box.appendChild(btn);
       }
+      box.onpointerenter=()=>box.classList.add('is-hovered');
+      box.onpointerleave=()=>box.classList.remove('is-hovered');
       overlay.appendChild(box);
     }
   };
   chart.on('finished',()=>{syncNavigator();syncOvertimeControls()});
   requestAnimationFrame(()=>{syncNavigator();syncOvertimeControls()});
+  chart.on('mouseover',p=>{
+    const segment=p?.data?.segmentId;
+    if(p.seriesId==='bands'&&segment){
+      state.overtimeHoverId=segment;
+      overlayHighlight(segment);
+    }
+  });
+  chart.on('mouseout',p=>{
+    if(p?.data?.segmentId){state.overtimeHoverId='';
+      overlayHighlight('');}
+  });
+  function overlayHighlight(segmentId){
+    document.querySelectorAll('#overtimeReviewLayer .overtime-review-actions').forEach(el=>
+      el.classList.toggle('is-hovered',!!segmentId&&el.dataset.autoOvertimeId===segmentId));
+  }
   chart.on('click',p=>{
     const d=p.data||{};
     if(p.seriesId==='punches'&&d.records?.length){focusRawEvidence('attendance',d.records.map(r=>r.recordId));return}
