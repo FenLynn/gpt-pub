@@ -8,6 +8,12 @@ function monthISO(){return monthKey()}
 function groupOf(e){return state.groups?.[e.id]||e.department+'组'}
 const DEMO_NAMES=["陈思远","林嘉禾","周亦宁","王若溪","李知夏","赵书言","沈清越","吴念安","郑予安","许慕白","苏晚晴","何景川","唐诗雨","陆明哲","韩子墨","顾一诺","宋雨桐","徐嘉宁","叶星辰","程安然","梁沐阳","杨可心","邓嘉祺","谢云舟","蒋书瑶","郭亦凡","夏知意","冯沐辰","傅清歌","曹锦程","姜乐言","董予希","段芷晴","钟书航","秦若楠","方之恒","黎星遥","彭思齐","余可欣","袁清禾","施景行","高雨薇","江知远","邵思涵","罗映雪","齐航","林安","欧阳晨曦","司马知远","白若曦"];
 let EMPLOYEES=Array.from({length:50},(_,i)=>({id:'E'+String(i+1).padStart(3,'0'),name:DEMO_NAMES[i],department:['综合','研发','生产','质检','保障'][i%5]}));
+// One visually related family for registered and inferred overtime; never use red anomaly tint.
+const OVERTIME_VISUALS=Object.freeze({
+ registered:Object.freeze({top:'#bf6971',bottom:'#e5a3aa',hoverTop:'#a94451',hoverBottom:'#d8818c'}),
+ auto:Object.freeze({top:'#d99196',bottom:'#efc1c2',hoverTop:'#c36e78',hoverBottom:'#e6a0a7'}),
+ excluded:Object.freeze({top:'#ebc4c7',bottom:'#f5dddf'})
+});
 const RULES={amStart:'08:30',amEnd:'11:40',pmStart:'13:30',pmEnd:'17:10',
  grace:5,graceAmStart:5,graceAmEnd:0,gracePmStart:5,gracePmEnd:0,
  dupSeconds:120,overtimeMinMinutes:30};
