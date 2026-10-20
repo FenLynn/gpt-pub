@@ -326,6 +326,90 @@ async function run(){
  },'R39 1366 calendar visibility or horizontal matrix use');
  await page.screenshot({path:path.join(out,'r37-all-1366.png')});
  await page.setViewportSize({width:1920,height:1080});
+ // R45: test the shared ledger before rendering charts. Every imported event is
+ // represented once, including multi-day trips that span several person-days.
+ await check(page,()=>{
+  const ledger=asStatLedger(),people=EMPLOYEES,days=Array.from({length:monthDays()},(_,i)=>i+1);
+  const counts=k=>asStatValue(ledger,k,'count',people,days);
+  const eligible=state.records.filter(r=>r.datetime.startsWith(monthISO()+'-')&&people.some(e=>e.id===r.employeeId)).length;
+  return counts('punch')===eligible&&counts('leave')===state.leaves.length&&
+    counts('trip')===state.trips.length&&counts('outing')===state.outings.length&&
+    counts('overtime')===state.overtimeEntries.length&&
+    asStatValue(ledger,'trip','days',people,days)>=counts('trip')&&
+    asStatValue(ledger,'trip','estimatedHours',people,days)>0;
+ },'R45 event ledger counts, trip days or time units inconsistent');
+ await page.locator('.workspace-mode-all [data-as-view="stats"]').click();
+ await page.waitForSelector('#asStatChart svg',{timeout:20000});
+ await check(page,()=>state.analyticsPage==='stats'&&state.workspaceMode==='all'&&
+   document.querySelector('.as-stats')&&document.querySelectorAll('.side-views button').length===2&&
+   !!echarts.getInstanceByDom(document.getElementById('asStatChart'))&&
+   !document.querySelector('.stats-active .workbench')?.getBoundingClientRect().height,
+  'R45 all-staff statistics view missing or old matrix not hidden');
+ await check(page,()=>{
+  const chart=document.querySelector('.as-stats-chart').getBoundingClientRect();
+  const rank=document.querySelector('.as-stats-rank').getBoundingClientRect();
+  return chart.width>400&&rank.width>=270&&rank.left>chart.left&&
+    document.documentElement.scrollWidth<=innerWidth+3;
+ },'R45 1920 analytics layout overflow');
+ await page.screenshot({path:path.join(out,'r45-all-stats-1920.png')});
+ await page.locator('#asStatFamily').selectOption('overtime');
+ await page.locator('#asStatMetric').selectOption('hours');
+ await page.locator('#asStatCompare').selectOption('groups');
+ await page.locator('#asStatAggregate').selectOption('perPerson');
+ await check(page,()=>{
+  const data=asStatRows(),all=Array.from({length:monthDays()},(_,i)=>i+1),
+    full=asStatValue(data.ledger,'overtime','hours',EMPLOYEES,all);
+  const grouped=data.rows.reduce((sum,r)=>sum+r.raw,0);
+  return data.compare==='groups'&&Math.abs(full-grouped)<1e-6&&
+    data.rows.every(r=>Math.abs(r.value-(r.peopleCount?r.raw/r.peopleCount:0))<1e-8);
+ },'R45 per-capita group ranking must reconcile with the whole workforce');
+ await page.locator('[data-as-chart="line"]').click();
+ await check(page,()=>state.statsConfig.chart==='line'&&
+  echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption().series[0].type==='line',
+ 'R45 chart-type switch failed');
+ await page.locator('#asStatCompare').selectOption('days');
+ await page.locator('#asStatLimit').selectOption('5');
+ await check(page,()=>asStatRows().rows.length===monthDays()&&asStatRows().visible.length===monthDays()&&
+  document.querySelectorAll('.as-stats-rank-row').length===monthDays(),
+  'R45 daily trend should retain all month days even with top-5 preference');
+ await page.locator('#asStatCompare').selectOption('groups');
+ await page.locator('[data-as-chart="bar"]').click();
+ const exported=page.waitForEvent('download');
+ await page.locator('#asStatsExport').click();
+ const csv=await exported;
+ if(!csv.suggestedFilename().includes('overtime'))throw Error('R45 statistics export filename incorrect');
+ await page.setViewportSize({width:1366,height:768});
+ await check(page,()=>{
+  const region=document.querySelector('.as-stats'),buttons=document.querySelector('.as-stats-rank-table');
+  return region.getBoundingClientRect().right<=innerWidth+1&&buttons.getBoundingClientRect().width>=250&&
+    document.documentElement.scrollWidth<=innerWidth+3;
+ },'R45 1366 statistics responsiveness');
+ await page.screenshot({path:path.join(out,'r45-all-stats-1366.png')});
+ await page.setViewportSize({width:1600,height:900});
+ await page.screenshot({path:path.join(out,'r45-all-stats-1600.png')});
+ await page.setViewportSize({width:1920,height:1080});
+ // Ranked groups open that group's analytics without losing the shared metric.
+ await page.locator('.as-stats-rank-row').first().click();
+ await page.waitForSelector('#asStatChart svg',{timeout:15000});
+ await check(page,()=>state.workspaceMode==='group'&&state.analyticsPage==='stats'&&
+  state.statsConfig.compare==='people'&&asStatRows().people.every(e=>groupOf(e)===state.selectedGroup),
+  'R45 group comparison drilldown did not scope to group');
+ await page.screenshot({path:path.join(out,'r45-group-stats.png')});
+ await page.locator('.as-stats-rank-row').first().click();
+ await page.waitForSelector('#asStatChart svg',{timeout:15000});
+ await check(page,()=>state.workspaceMode==='person'&&state.analyticsPage==='stats'&&
+  state.statsConfig.compare==='days'&&asStatRows().people.length===1,
+  'R45 group member drilldown not scoped to individual');
+ await page.screenshot({path:path.join(out,'r45-person-stats.png')});
+ await page.locator('.as-stats-rank-row').nth(8).click();
+ await page.waitForSelector('#attendanceTimelineChart svg',{timeout:16000});
+ await check(page,()=>state.workspaceMode==='person'&&state.analyticsPage==='main'&&
+  state.chartDay===9&&state.selection.day===9,
+ 'R45 selected daily statistic must open personal timeline and sync calendar');
+ // Legacy matrix/time-axis QA below starts from the normal All view.
+ await page.locator('[data-workspace="all"]').click();
+ await check(page,()=>state.workspaceMode==='all'&&state.analyticsPage==='main',
+  'R45 route back to matrix must work');
  // R36: malformed timestamps must be rejected, and final export cannot depend
  // on whether the operator is currently viewing the initial or manual layer.
  await check(page,()=>{
