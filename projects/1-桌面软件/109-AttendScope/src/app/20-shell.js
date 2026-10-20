@@ -8,7 +8,8 @@ function render(){
   bind();
   renderCalendar();
   renderMatrix();
-  renderAnalysisPanel();
+  if(state.analyticsPage==='stats'&&['all','group','person'].includes(state.workspaceMode))renderStatisticsWorkspace();
+  else renderAnalysisPanel();
 }
 
 function layoutHtml(){
@@ -56,7 +57,7 @@ function layoutHtml(){
     </div>
   </header>
 
-  <div class="layout workspace-mode-${state.workspaceMode||'all'}">
+  <div class="layout workspace-mode-${state.workspaceMode||'all'} ${state.analyticsPage==='stats'?'stats-active':''}">
     <aside class="sidebar">
       ${state.workspaceMode==='classic'?`
       <section class="side-section calendar-section">
@@ -125,6 +126,7 @@ function layoutHtml(){
           <div class="analysis-body" id="analysisBody"></div>
         </section>
       </div>
+      ${state.analyticsPage==='stats'&&['all','group','person'].includes(state.workspaceMode)?'<section id="statisticsWorkspace" class="stats-workspace"></section>':''}
     </main>
   </div>
 
@@ -156,7 +158,8 @@ function bind(){
     state.chartTab='overview';
     updateMatrixFilter();syncFilterButton();
     filterMenu.classList.remove('open');filterButton.setAttribute('aria-expanded','false');
-    renderAnalysisPanel();
+    if(state.analyticsPage==='stats')renderStatisticsWorkspace();
+    else renderAnalysisPanel();
   };
   filterButton.onclick=e=>{
     e.stopPropagation();filterMenu.classList.toggle('open');

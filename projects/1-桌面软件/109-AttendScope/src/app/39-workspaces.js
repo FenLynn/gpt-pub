@@ -75,10 +75,15 @@ function workspaceSidebarHtml(){
   '<select class="side-select" id="workspacePerson">'+(mode==='person'?'':'<option value="">全部</option>')+
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
     escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
+ const view=mode==='data'?'':'<nav class="side-views" aria-label="分析视图">'+
+  '<button type="button" data-as-view="main" class="'+(state.analyticsPage!=='stats'?'active':'')+'">'+
+   (mode==='person'?'单日时间轴':'考勤矩阵')+'</button>'+
+  '<button type="button" data-as-view="stats" class="'+(state.analyticsPage==='stats'?'active':'')+'">'+
+   (mode==='all'?'总体统计':mode==='group'?'组别统计':'个人统计')+'</button></nav>';
  const sub=mode==='data'?'<div class="side-subnav">'+
   [['records','原始记录'],['roster','员工名册'],['rules','工作规则'],['imports','导入与快照']].map(([id,name])=>
   '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+'</div>':'';
- return '<div class="side-controls">'+groupControl+personControl+(mode==='data'?sub:'')+'</div>'+
+ return '<div class="side-controls">'+view+groupControl+personControl+(mode==='data'?sub:'')+'</div>'+
    '<div class="side-bottom"><section class="side-calendar calendar-section">'+
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
@@ -96,6 +101,12 @@ function workspaceToolbarHtml(){
 }
 function bindWorkspaceNavigation(){
  document.querySelectorAll('[data-workspace]').forEach(b=>b.onclick=()=>navigateWorkspace(b.dataset.workspace));
+ document.querySelectorAll('[data-as-view]').forEach(b=>b.onclick=()=>{
+   const next=b.dataset.asView;
+   if(state.analyticsPage===next)return;
+   state.analyticsPage=next;
+   render();
+ });
  document.querySelectorAll('[data-person-day]').forEach(b=>b.onclick=()=>changePersonalDay(b.dataset.personDay));
  const scope=document.getElementById('workspaceScopeGroup');
  if(scope)scope.onchange=()=>{if(scope.value){state.workspaceMode='group';state.selectedGroup=scope.value;state.scopeSearch='';state.attentionOnly=false;render()}};
@@ -129,7 +140,8 @@ function bindWorkspaceNavigation(){
 }
 function navigateWorkspace(mode){
  if(!WORKSPACE_ITEMS.some(x=>x[0]===mode))return;
- state.workspaceMode=mode;state.scopeSearch='';state.attentionOnly=false;
+ state.workspaceMode=mode;state.scopeSearch='';state.attentionOnly=false;state.analyticsPage='main';
+ if(state.statsConfig)state.statsConfig.compare=asStatDefaultCompare(mode);
  if(mode==='all'||mode==='group'||mode==='data'){state.selection={type:'overall'};state.chartTab='overview'}
  if(mode==='group'&&!workspaceGroups().includes(state.selectedGroup))state.selectedGroup=workspaceGroups()[0]||'未分组';
  if(mode==='person'){
