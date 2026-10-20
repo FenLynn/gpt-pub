@@ -566,5 +566,5 @@ function renderStatisticsWorkspace(){
  // Changes reconstruct the controls; keep their keyboard focus in place.
  const next=focusId?document.getElementById(focusId):
   focusChart?node.querySelector('[data-as-chart="'+focusChart+'"]'):null;
- if(next&&node.contains(next))next.focus({preventScroll:true});
+ if(next&&(node.contains(next)||aside?.contains(next)))next.focus({preventScroll:true});
 }
