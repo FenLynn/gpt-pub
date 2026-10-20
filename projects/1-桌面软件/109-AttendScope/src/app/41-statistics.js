@@ -392,18 +392,21 @@ function renderStatisticsWorkspace(){
   c.compare=asStatDefaultCompare(state.statsScope);
   c.chart=state.statsScope==='person'?'line':'bar';
   state.statsExpandedKey='';
-  render();
+  // Only the statistical workbench needs redrawing; keep header, scroll and
+  // keyboard focus stable, while recording scope changes in view history.
+  asNavTrack();renderStatisticsWorkspace();
  };
  const groupSelect=node.querySelector('#asStatsGroup');
  if(groupSelect)groupSelect.onchange=e=>{
   state.statsGroup=e.target.value;
   state.statsPersonId=EMPLOYEES.find(p=>groupOf(p)===state.statsGroup)?.id||'';
   state.statsExpandedKey='';
-  render();
+  asNavTrack();renderStatisticsWorkspace();
  };
  const personSelect=node.querySelector('#asStatsPerson');
  if(personSelect)personSelect.onchange=e=>{
-  state.statsPersonId=e.target.value;state.statsExpandedKey='';render();
+  state.statsPersonId=e.target.value;state.statsExpandedKey='';
+  asNavTrack();renderStatisticsWorkspace();
  };
  node.querySelector('#asStatFamily').onchange=e=>{
   c.family=e.target.value;c.metric=asStatFamily(c.family)[2][0][0];
