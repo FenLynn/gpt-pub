@@ -149,12 +149,23 @@ function asStatLedger(){
   }
   if(first!=null)add('outing','count',id,first,1);
  });
- apply(state.overtimeEntries,'overtime',(r,id)=>{
-  if(!String(r.date||'').startsWith(monthISO()+'-'))return;
-  const d=Number(String(r.date).slice(8,10));
-  add('overtime','count',id,d,1);
-  add('overtime','presence',id,d,1);
-  putInterval('overtime',id,d,r.start,r.end,false);
+ const registeredByDay=new Map();
+ apply(attendanceAdjacentRows('overtimeEntries'),'overtime',(r,id)=>{
+  const date=String(r.date||''),clockStart=minutes(r.start),clockEnd=minutes(r.end);
+  if(!date||!Number.isFinite(clockStart)||!Number.isFinite(clockEnd))return;
+  const start=attendanceUtcMinute(date,r.start),
+   finish=attendanceUtcMinute(date,r.end)+(clockEnd<clockStart?1440:0);
+  if(finish<=start||finish-start>1440)return;
+  if(date.startsWith(monthISO()+'-'))add('overtime','count',id,Number(date.slice(8,10)),1);
+  for(let day=1;day<=dayCount;day++){
+   const dayStart=attendanceUtcMinute(isoDate(day)),dayEnd=dayStart+1440;
+   if(start>=dayEnd||finish<=dayStart)continue;
+   const x=Math.max(start,dayStart)-dayStart,y=Math.min(finish,dayEnd)-dayStart;
+   const key=id+'|'+day,list=registeredByDay.get(key)||[];
+   list.push([x,y]);registeredByDay.set(key,list);
+   add('overtime','presence',id,day,1);
+   putInterval('overtime',id,day,attendanceClock(x),attendanceClock(y),false);
+  }
  });
  // User-included inferred intervals coexist with registered overtime. They are
  // disjoint by construction; both use the same hour/people/count ledger keys.
@@ -170,7 +181,8 @@ function asStatLedger(){
    const session=seg.id||seg.sessionFrom+'|'+seg.sessionTo;
    if(!distinctSessions.has(session)){
     distinctSessions.add(session);
-    add('overtime','count',a.employee.id,a.day,1);
+    if(attendanceDateFromMinute(seg.sessionFrom??attendanceUtcMinute(a.date,attendanceClock(seg.from)))===a.date)
+     add('overtime','count',a.employee.id,a.day,1);
    }
   }
   add('overtime','presence',a.employee.id,a.day,1);
@@ -191,8 +203,7 @@ function asStatLedger(){
   if(kind==='overtime'){
    // Registered-only amount is calculated from its separate source, excluding
    // inferred segments, to keep an auditable disaggregation.
-   const rows=state.overtimeEntries.filter(x=>x.employeeId===id&&Number(String(x.date).slice(8,10))===Number(d));
-   const registered=analysisUnionMinutes(rows.map(x=>[minutes(x.start),minutes(x.end)]));
+   const registered=analysisUnionMinutes(registeredByDay.get(id+'|'+d)||[]);
    add(kind,'registeredHours',id,Number(d),registered/60);
   }
  }
