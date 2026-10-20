@@ -128,8 +128,7 @@ function timelineFullInsightHtml(item){
     insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
     insightMetric('在岗',fmtMinutes(item.presence))+
     insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+
-    insightMetric('加班候选',item.autoOvertime?.minutes?
-      fmtMinutes(item.autoOvertime.minutes)+' · 待核':item.autoOvertime?.reason||'—')+
+    (item.autoOvertime?.minutes?insightMetric('加班候选',fmtMinutes(item.autoOvertime.minutes)+' · 待核'):'')+
   '</div></section>';
   if(item.lunchEvidence==='未分段（工时按班次扣午休）')
     summary+='<p class="insight-issue">午休未分段：班内工时按上午／下午时段计算，不能证明午休期间实际工作。</p>';

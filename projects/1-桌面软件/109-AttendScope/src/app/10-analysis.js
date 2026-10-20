@@ -172,7 +172,7 @@ function analysisPairMinutes(pairs,start,end){
 }
 function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
  const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?+RULES.overtimeMinMinutes:30;
- if(registered.length)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'当天已有登记加班'};
+ if(registered.length)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'已登记加班，不重复推算'};
  if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'打卡进出配对待核'};
  // Ordinary working days: only complete post-shift exit evidence.
  // Early arrivals and the scheduled lunch break must never become overtime.
