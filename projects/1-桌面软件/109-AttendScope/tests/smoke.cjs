@@ -345,10 +345,65 @@ async function run(){
    exact.minutes===5&&exact.segments.length===1&&
    before.minutes===0&&before.rawMinutes<5&&
    two.minutes===10&&two.segments.length===2&&
-   registered.minutes===0&&registered.rawMinutes===7&&
+   registered.minutes===7&&registered.rawMinutes===7&&
+   registered.segments.length===2&&
+   registered.segments.every(seg=>seg.sessionFrom===1030&&seg.sessionTo===1045)&&
    settings.includes('id="r14OvertimeMin"')&&
    settings.includes('step="1"')&&settings.includes('min="1"');
  },'R58 every disjoint interval requires its own editable five-minute threshold');
+ // R60: consecutive 'in' punches without an intervening 'out' are
+ // ONE continuous attendance visit. Threshold checks the original visit,
+ // while registered entries affect only accounting, not attendance identity.
+ await check(page,()=>{
+  const saved={records:state.records,leaves:state.leaves,trips:state.trips,
+   outings:state.outings,overtimeEntries:state.overtimeEntries,
+   analysis:state.analysis,review:{...(state.overtimeReview||{})},rules:{...RULES}};
+  const e=EMPLOYEES[0],day=8,date=isoDate(day);
+  const punch=arr=>arr.map(([clock,direction],i)=>({
+   employeeId:e.id,datetime:date+' '+clock,time:clock,direction,recordId:'r60:'+i
+  }));
+  try{
+   state.leaves=[];state.trips=[];state.outings=[];
+   state.overtimeEntries=[];RULES.overtimeMinMinutes=5;
+   state.records=punch([['17:05','进'],['17:18','进'],['18:27','进'],['18:35','进'],['19:16','出']]);
+   const frozen=JSON.stringify(state.records);
+   const continuous=analyzeDay(e,day);
+   if(continuous.pairs.length!==1||continuous.pairs[0][0].time!=='17:05'||
+      continuous.pairs[0][1].time!=='19:16'||continuous.autoOvertime.minutes!==126||
+      continuous.autoOvertime.segments.length!==1||
+      continuous.autoOvertime.reason.includes('配对待核'))return false;
+   // A registration inside the same physical visit creates accounting
+   // fragments but never multiple reviews/threshold sessions.
+   state.overtimeEntries=[{id:'R60-reg',employeeId:e.id,date,start:'18:00',end:'18:20'}];
+   const withRegistered=analyzeDay(e,day);
+   if(withRegistered.autoOvertime.minutes!==106||
+      withRegistered.autoOvertime.segments.length!==2||
+      withRegistered.autoOvertime.segments[0].id!==withRegistered.autoOvertime.segments[1].id)return false;
+   state.analysis=new Map([[e.id+'|'+day,withRegistered]]);
+   const ledger=asStatLedger();
+   const check=m=>asStatValue(ledger,'overtime',m,[e],[day]);
+   if(Math.abs(check('hours')-126/60)>1e-8||
+      Math.abs(check('candidateHours')-106/60)>1e-8||
+      check('count')!==2)return false;
+   state.overtimeReview[withRegistered.autoOvertime.segments[0].id]=false;
+   const excluded=analyzeDay(e,day);
+   if(activeAutoOvertimeSegments(excluded).length||JSON.stringify(state.records)!==frozen)return false;
+   state.analysis=new Map([[e.id+'|'+day,excluded]]);
+   const after=asStatLedger();
+   if(Math.abs(asStatValue(after,'overtime','hours',[e],[day])-20/60)>1e-8)return false;
+   // A real 'out' in the middle does create two visits: no pooling of
+   // independent four-minute sessions into a valid eight-minute one.
+   const separate=estimateOvertimeCandidate([
+    [{time:'17:11'},{time:'17:15'}],[{time:'18:00'},{time:'18:04'}]
+   ],day,[],false);
+   return separate.minutes===0&&separate.segments.length===0;
+  }finally{
+   Object.assign(state,{records:saved.records,leaves:saved.leaves,trips:saved.trips,
+    outings:saved.outings,overtimeEntries:saved.overtimeEntries,analysis:saved.analysis,
+    overtimeReview:saved.review});
+   Object.assign(RULES,saved.rules);
+  }
+ },'R60 repeated in punches retain original session; registered overlap must not split a single review');
  // R56: new 08:30–11:40 / 13:30–17:10 shift, independent
  // 5/0/5/0-minute tolerances, derived-only overtime and source immutability.
  await check(page,()=>{
@@ -607,7 +662,7 @@ async function run(){
    return !!pal&&opts?.series?.length===1&&fill?.colorStops?.[0]?.color===pal.top&&
     fill?.colorStops?.[1]?.color===pal.bottom&&
     opts.series[0].emphasis.itemStyle.color===pal.hover&&
-    opts.xAxis[0].axisLabel.rotate>=85;
+    opts.xAxis[0].axisLabel.rotate<=34;
   },family,'R58 statistics family color or name angle mismatched');
  }
  // R58b: normal is green, but abnormal/absent judgments must not
@@ -642,7 +697,10 @@ async function run(){
    data.rankRows.length===data.rows.length&&plotCount===data.rows.length&&
    opts.series[0].type==='bar'&&opts.xAxis[0].type==='category'&&
    opts.yAxis[0].type==='value'&&opts.xAxis[0].axisLabel.interval===0&&
-   opts.xAxis[0].axisLabel.rotate>=59&&barWidth>=3&&barWidth<=25&&
+   opts.xAxis[0].axisLabel.rotate===34&&
+   opts.xAxis[0].axisLabel.formatter('张三',0)==='张三'&&
+   opts.xAxis[0].axisLabel.formatter('李四',1)==='\n李四'&&
+   opts.grid[0].bottom===95&&barWidth>=3&&barWidth<=25&&
    document.querySelector('[data-as-chart="line"]').disabled&&
    document.querySelector('.as-stats-chart-context')?.textContent.includes('全员');
  },'R54 all people must render, not just 12; bar width adapts to density');
@@ -686,11 +744,11 @@ async function run(){
   const o=echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption();
   const legend=document.querySelector('.as-stats-stack-legend');
   return o.series.length===2&&o.series.every(v=>v.stack==='overtime'&&v.type==='bar')&&
-   o.xAxis[0].axisLabel.rotate>=80&&
+   o.xAxis[0].axisLabel.rotate===34&&
    !!legend&&legend.textContent.includes('登记加班')&&legend.textContent.includes('自动加班')&&
    !document.querySelector('.timeline-auto-dock')&&
    !!OVERTIME_VISUALS.registered&&!Object.values(OVERTIME_VISUALS).some(v=>v.hatch);
- },'R57 overtime columns must be solid, red/rose paired and names steeply tilted');
+ },'R60 overtime columns must be red/rose, fully emphasized, with flatter labels');
  await page.evaluate(()=>{
   const chart=echarts.getInstanceByDom(document.getElementById('asStatChart'));
   const original=chart.dispatchAction.bind(chart);
