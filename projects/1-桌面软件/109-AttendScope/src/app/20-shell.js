@@ -81,8 +81,8 @@ function layoutHtml(){
     <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
     <div class="top-global-actions">
     <div class="top-history" role="group" aria-label="页面浏览历史">
-      <button id="asNavBack" type="button" title="返回上一个界面" aria-label="返回上一个界面" ${asNavHistory.back.length?'':'disabled'}>←</button>
-      <button id="asNavForward" type="button" title="前进到下一个界面" aria-label="前进到下一个界面" ${asNavHistory.forward.length?'':'disabled'}>→</button>
+      <button id="asNavBack" type="button" title="返回上一个界面" aria-label="返回上一个界面" ${asNavHistory.back.length?'':'disabled'}><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false"><path d="m14.5 6.5-5.5 5.5 5.5 5.5"/></svg></button>
+      <button id="asNavForward" type="button" title="前进到下一个界面" aria-label="前进到下一个界面" ${asNavHistory.forward.length?'':'disabled'}><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false"><path d="m9.5 6.5 5.5 5.5-5.5 5.5"/></svg></button>
     </div>
     <div class="month-anchor top-month">
         <button id="monthMenuButton" class="month-button" aria-expanded="false" aria-label="切换或新建月份">
