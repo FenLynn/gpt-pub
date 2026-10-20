@@ -483,3 +483,35 @@ html{scrollbar-gutter:stable}
 .overtime-review-btn.chosen{background:#d2a7bf;color:#633951;font-weight:750}
 .overtime-review-actions.is-excluded .overtime-review-btn.chosen{background:#eee0e8;color:#b188a0}
 .overtime-review-btn:hover,.overtime-review-btn:focus-visible{background:#f1dce7;color:#793d61;outline:none}
+
+/* R55 · Automatic overtime discoverability. */
+.person-day.has-auto-overtime{position:relative}
+.person-day.has-auto-overtime::after{
+ content:"";position:absolute;right:2px;top:3px;width:5px;height:5px;
+ border-radius:50%;background:#c279a2;box-shadow:0 0 0 1.5px rgba(255,255,255,.9);
+ pointer-events:none;
+}
+.timeline-auto-tools{
+ display:flex;gap:6px;align-items:center;min-width:0;
+ padding-left:9px;border-left:1px solid #e6eaf0;color:#8a617a;
+ font-size:11px;white-space:nowrap;
+}
+.timeline-auto-label{display:inline-flex;align-items:center;gap:5px;font-weight:680;color:#9b587c}
+.timeline-auto-label::before{content:"";width:12px;height:7px;border:1px solid #d09cb8;
+ background:repeating-linear-gradient(125deg,rgba(184,110,155,.5) 0px,rgba(184,110,155,.5) 2px,rgba(250,243,248,.7) 2px,rgba(250,243,248,.7) 5px);
+ border-radius:2px}
+.timeline-auto-tools button{
+ border:1px solid #eadbe5;background:#fff7fb;border-radius:6px;
+ color:#995a7b;padding:4px 7px;font:inherit;font-weight:670;
+ cursor:pointer;white-space:nowrap;
+}
+.timeline-auto-tools button:hover{background:#f7eaf1;border-color:#d7afc7}
+.timeline-auto-tools button:focus-visible{outline:2px solid #d7a5c5;outline-offset:1px}
+.timeline-auto-none{color:#9d98a1;overflow:hidden;text-overflow:ellipsis}
+.overtime-review-actions{z-index:3;opacity:1}
+.overtime-review-actions.is-excluded{opacity:.64}
+@media(max-width:1200px){
+ .analysis-head-timeline-tools{flex-wrap:wrap;row-gap:5px}
+ .timeline-auto-tools{font-size:10px}
+ .timeline-auto-none{display:none}
+}
