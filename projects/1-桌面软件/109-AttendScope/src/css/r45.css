@@ -486,8 +486,10 @@ html{scrollbar-gutter:stable}
 
 /* R55 · Automatic overtime discoverability. */
 .person-day.has-auto-overtime{position:relative}
+.person-day.has-auto-overtime::after{z-index:1}
+.person-day-check{z-index:1;}
 .person-day.has-auto-overtime::after{
- content:"";position:absolute;right:2px;top:3px;width:5px;height:5px;
+ content:"";position:absolute;left:2px;top:3px;width:5px;height:5px;
  border-radius:50%;background:#c279a2;box-shadow:0 0 0 1.5px rgba(255,255,255,.9);
  pointer-events:none;
 }
