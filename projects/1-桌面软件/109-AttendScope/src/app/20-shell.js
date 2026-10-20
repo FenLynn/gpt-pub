@@ -415,6 +415,7 @@ function changePersonalDay(day){
  const employeeId=state.selection.employeeId||EMPLOYEES[0]?.id;
  if(!employeeId)return;
  state.workspaceMode='person';
+ state.analyticsPage='main'; // Statistics date drilldown must reveal the six-track view.
  state.selection={type:'cell',employeeId,day:d};
  state.chartDay=d;state.chartTab='timeline';state.timelineRange=null;state.rawPage=1;
  render();
