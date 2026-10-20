@@ -69,7 +69,7 @@ function workspaceSidebarHtml(){
   '<p class="stats-side-description">统一统计全员、组别和个人。切换范围与指标请使用主页面顶部的筛选。</p>'+
   '<div class="stats-side-symbol"><span>数据范围</span><strong>'+EMPLOYEES.length+' 人</strong></div>'+
   '</div><div class="side-bottom"><section class="side-calendar calendar-section">'+
-  '<div class="calendar-caption"><span>月历</span></div>'+
+  '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
   '<div id="calendar" class="calendar-grid"></div>'+
   '<div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
