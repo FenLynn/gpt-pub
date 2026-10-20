@@ -1,4 +1,53 @@
+/* R50: local route history, independent from editable attendance data.
+ * Only view context is stored; raw records and working/snapshot state are untouched. */
+const asNavHistory={back:[],forward:[],current:null,restoring:false};
+function asNavSnapshot(){
+ return {year:YEAR,month:MONTH,workspaceMode:state.workspaceMode||'all',
+  analyticsPage:state.analyticsPage||'main',selectedGroup:state.selectedGroup||null,
+  selection:{...(state.selection||{type:'overall'})},chartDay:state.chartDay||null,
+  chartTab:state.chartTab||'overview',dataSection:state.dataSection||'records',
+  filter:state.filter||'main',statsConfig:state.statsConfig?{...state.statsConfig}:null};
+}
+function asNavTrack(){
+ const next=asNavSnapshot(),history=asNavHistory;
+ if(!history.restoring&&history.current&&JSON.stringify(next)!==JSON.stringify(history.current)){
+  history.back.push(history.current);
+  if(history.back.length>40)history.back.shift();
+  history.forward.length=0;
+ }
+ history.current=next;
+}
+// A changed chart/filter setting is a refinement of the current screen, not
+// a new history entry; the next drilldown still returns to that exact screen.
+function asNavRefreshCurrent(){if(!asNavHistory.restoring)asNavHistory.current=asNavSnapshot()}
+function asNavGo(direction){
+ const history=asNavHistory,source=direction==='back'?history.back:history.forward,
+  other=direction==='back'?history.forward:history.back;
+ if(!source.length)return;
+ const target=source.pop(),previous=asNavSnapshot();
+ history.restoring=true;
+ try{
+  if(target.year!==YEAR||target.month!==MONTH){
+   if(!switchMonth(target.year,target.month,false,true)){
+    source.push(target);return;
+   }
+  }
+  other.push(previous);
+  state.workspaceMode=target.workspaceMode;
+  state.analyticsPage=target.analyticsPage;
+  state.selectedGroup=target.selectedGroup;
+  state.selection={...target.selection};
+  state.chartDay=target.chartDay;
+  state.chartTab=target.chartTab;
+  state.dataSection=target.dataSection;
+  state.filter=target.filter;
+  state.statsConfig=target.statsConfig?{...target.statsConfig}:null;
+  state.rawPage=1;state.timelineRange=null;
+  render();
+ }finally{history.restoring=false;history.current=asNavSnapshot()}
+}
 function render(){
+  asNavTrack();
   if(typeof r14Prefs==='function')r14Prefs();
   if(!state.analysisTab) state.analysisTab='overview';
   if(typeof disposeAttendCharts==='function')disposeAttendCharts();
@@ -22,6 +71,10 @@ function layoutHtml(){
     </div>
     <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
     <div class="top-global-actions">
+    <div class="top-history" role="group" aria-label="页面浏览历史">
+      <button id="asNavBack" type="button" title="返回上一个界面" aria-label="返回上一个界面" ${asNavHistory.back.length?'':'disabled'}>←</button>
+      <button id="asNavForward" type="button" title="前进到下一个界面" aria-label="前进到下一个界面" ${asNavHistory.forward.length?'':'disabled'}>→</button>
+    </div>
     <div class="month-anchor top-month">
         <button id="monthMenuButton" class="month-button" aria-expanded="false" aria-label="切换或新建月份">
           <span>${periodText()}</span><i class="chevron"></i>
@@ -160,6 +213,7 @@ function bind(){
     filterMenu.classList.remove('open');filterButton.setAttribute('aria-expanded','false');
     if(state.analyticsPage==='stats')renderStatisticsWorkspace();
     else renderAnalysisPanel();
+    asNavRefreshCurrent();
   };
   filterButton.onclick=e=>{
     e.stopPropagation();filterMenu.classList.toggle('open');
@@ -175,6 +229,8 @@ function bind(){
   });
   bindSettings();
   bindWorkspaceNavigation();
+  document.getElementById('asNavBack').onclick=()=>asNavGo('back');
+  document.getElementById('asNavForward').onclick=()=>asNavGo('forward');
 
   document.getElementById('clearSelection').onclick=()=>{
     if(state.workspaceMode==='person'){
