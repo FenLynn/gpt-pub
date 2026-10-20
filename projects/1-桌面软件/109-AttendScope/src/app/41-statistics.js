@@ -407,8 +407,11 @@ function renderStatisticsWorkspace(){
  const focusId=inside?oldFocus.id:'';
  const focusChart=inside?oldFocus.dataset?.asChart:null;
  const c=asStatPrefs();
+ const aside=document.getElementById('statsSidebarControls');
+ if(aside)aside.innerHTML=statisticsSidebarControlsHtml();
  node.innerHTML=statisticsWorkspaceHtml();
- node.querySelector('#asStatsScope').onchange=e=>{
+ const scope=document.getElementById('asStatsScope');
+ if(scope)scope.onchange=e=>{
   state.statsScope=e.target.value;
   state.statsGroup=asStatScopeGroup();
   if(state.statsScope==='person')state.statsPersonId=
@@ -416,22 +419,22 @@ function renderStatisticsWorkspace(){
   c.compare=asStatDefaultCompare(state.statsScope);
   c.chart=state.statsScope==='person'?'line':'bar';
   state.statsExpandedKey='';
-  // Only the statistical workbench needs redrawing; keep header, scroll and
-  // keyboard focus stable, while recording scope changes in view history.
   asNavTrack();renderStatisticsWorkspace();
  };
- const groupSelect=node.querySelector('#asStatsGroup');
+ const groupSelect=document.getElementById('asStatsGroup');
  if(groupSelect)groupSelect.onchange=e=>{
   state.statsGroup=e.target.value;
   state.statsPersonId=EMPLOYEES.find(p=>groupOf(p)===state.statsGroup)?.id||'';
   state.statsExpandedKey='';
   asNavTrack();renderStatisticsWorkspace();
  };
- const personSelect=node.querySelector('#asStatsPerson');
+ const personSelect=document.getElementById('asStatsPerson');
  if(personSelect)personSelect.onchange=e=>{
   state.statsPersonId=e.target.value;state.statsExpandedKey='';
   asNavTrack();renderStatisticsWorkspace();
  };
+ const exportButton=document.getElementById('asStatsExport');
+ if(exportButton)exportButton.onclick=asStatExport;
  node.querySelector('#asStatFamily').onchange=e=>{
   c.family=e.target.value;c.metric=asStatFamily(c.family)[2][0][0];
   if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';
@@ -476,7 +479,6 @@ function renderStatisticsWorkspace(){
   b.ondblclick=()=>asStatDrill(b.dataset.asRank);
  });
  node.querySelectorAll('[data-as-drill]').forEach(b=>b.onclick=()=>asStatDrill(b.dataset.asDrill));
- node.querySelector('#asStatsExport').onclick=asStatExport;
  if(typeof asNavRefreshCurrent==='function')asNavRefreshCurrent();
  const data=asStatRows(),chart=initAttendChart(document.getElementById('asStatChart'));
  node.querySelector('.as-stats-chart').classList.toggle('is-empty',!data.rows.some(r=>r.raw>0));
