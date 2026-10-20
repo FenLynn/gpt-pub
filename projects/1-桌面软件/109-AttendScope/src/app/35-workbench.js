@@ -89,8 +89,7 @@ function timelineHeaderToolsHtml(ctx){
   if((state.chartTab||'overview')!=='timeline')return '';
   const day=plotAnalysis(ctx);if(!day)return '';
   // R41 personal date navigation lives alongside the full-month strip in the only title row.
-  if(state.workspaceMode==='person')return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+
-    timelineAutoOvertimeToolsHtml(day)+'</div>';
+  if(state.workspaceMode==='person')return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+'</div>';
   const switcher='<button id="personalDayPrev" type="button" aria-label="上一天" '+(day.day<=1?'disabled':'')+'>‹</button><select id="timelineDayPicker" aria-label="时间轴日期">'+
     Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
   '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(day.day>=monthDays()?'disabled':'')+'>›</button>';
@@ -105,7 +104,9 @@ function attendPlotHtml(ctx){
   if(tab==='issues')return top+'<div id="issueChart" class="plot-chart"></div>';
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
-    if(day)return top+'<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动加班计入选择"></div>'+r15PunchPreview(day)+'</div>';
+    if(day)return top+(state.workspaceMode==='person'?
+      '<div class="timeline-auto-dock">'+timelineAutoOvertimeToolsHtml(day)+'</div>':'')+
+      '<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动加班计入选择"></div>'+r15PunchPreview(day)+'</div>';
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
   }
