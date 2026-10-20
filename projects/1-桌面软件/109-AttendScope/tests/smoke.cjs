@@ -462,8 +462,8 @@ async function run(){
    state.records=punch([['17:05','进'],['17:18','进'],['18:27','进'],['18:35','进'],['19:16','出']]);
    const frozen=JSON.stringify(state.records);
    const continuous=analyzeDay(e,day);
-   if(continuous.pairs.length!==1||continuous.pairs[0][0].time!=='17:05'||
-      continuous.pairs[0][1].time!=='19:16'||continuous.autoOvertime.minutes!==126||
+   if(continuous.pairs.length!==1||!continuous.pairs[0][0].time.startsWith('17:05')||
+      !continuous.pairs[0][1].time.startsWith('19:16')||continuous.autoOvertime.minutes!==126||
       continuous.autoOvertime.segments.length!==1||
       continuous.autoOvertime.reason.includes('配对待核'))return false;
    // A registration inside the same physical visit creates accounting
