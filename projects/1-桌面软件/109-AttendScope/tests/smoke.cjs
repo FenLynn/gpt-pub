@@ -988,7 +988,10 @@ async function run(){
    const key=a.employee.id+'|'+a.day;state.manualStatuses[key]='absent';state.judgmentMode='manual';
    const row=traditionalRows().find(r=>r.姓名===a.employee.name&&r.日期===a.date);
    delete state.manualStatuses[key];state.judgmentMode='initial';
-   return row.系统判定==='正常'&&row.人工判定==='缺勤'&&row.最终判定==='缺勤'&&row.人工处理==='是';
+   return row.系统判定==='正常'&&row.人工判定==='缺勤'&&row.最终判定==='缺勤'&&row.人工处理==='是'&&
+    row.班内工时分钟===Math.round(a.workMinutes||0)&&
+    row.加班候选分钟===Math.round(a.autoOvertime?.minutes||0)&&
+    row.午休证据===a.lunchEvidence;
  },'R33 export lost final manual judgment');
  const imported=await page.evaluate(async()=>{
    const csv='姓名,打卡时间,进出\n测试甲,2026-10-09 08:24:11,进\n测试甲,2026-10-09 17:44:05,出';
