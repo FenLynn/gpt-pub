@@ -63,8 +63,8 @@ function settingsContent(section){
      ['gracePmStart','下午上班冗余（分钟）'],['gracePmEnd','下午下班冗余（分钟）']].map(([key,label])=>
     '<label class="r14-setting-row"><span>'+label+'</span><input id="r14Rule_'+key+'" type="number" min="0" max="120" step="1"></label>').join('')+
    '<label class="r14-setting-row"><span>重复打卡判定（秒）</span><input id="r14Dup" type="number" min="0" max="1800" step="10"></label>'+
-   '<label class="r14-setting-row"><span>加班候选最短时长（分钟）</span><input id="r14OvertimeMin" type="number" min="0" max="240" step="5"></label>'+
-   '<p class="r14-setting-note">工作日仅推算下班后的完整进出，非工作日按完整进出扣除午休；均为待核候选，不替代加班审批。</p>');
+   '<label class="r14-setting-row"><span>加班候选最短时长（分钟）</span><input id="r14OvertimeMin" type="number" min="1" max="240" step="1"></label>'+
+   '<p class="r14-setting-note">默认每段至少 5 分钟：先扣除登记加班重叠，再逐段核算。多段不足门槛的时间不会累计凑数。人工 ×/✓ 只修改统计纳入，不改变原始打卡，也不代表正式审批。</p>');
  case 'data':return sectionCard('数据与模拟','全部数据在本地浏览器解析与计算，不上传服务端。',
    '<div class="r14-readonly"><strong>当前工作空间</strong><span>'+monthKey()+'</span></div>'+
    '<div class="r14-readonly"><strong>原始考勤</strong><span>'+state.records.length+' 条</span></div>'+
@@ -112,7 +112,7 @@ function bindSettings(){
    for(const k of ['amStart','amEnd','pmStart','pmEnd'])set('r14Rule_'+k,d.rules[k]);
    for(const k of ['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'])
     set('r14Rule_'+k,d.rules[k]??(k.endsWith('Start')?(d.rules.grace??5):0));
-   set('r14Dup',d.rules.dupSeconds);set('r14OvertimeMin',d.rules.overtimeMinMinutes??30);
+   set('r14Dup',d.rules.dupSeconds);set('r14OvertimeMin',d.rules.overtimeMinMinutes??5);
   }
   if(section==='table'){
    set('settingTableKind',d.tableKind||'attendance');
@@ -178,7 +178,7 @@ function bindSettings(){
     !['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'].every(k=>
       Number.isInteger(d.rules[k])&&d.rules[k]>=0&&d.rules[k]<=120)||
     !Number.isFinite(d.rules.dupSeconds)||d.rules.dupSeconds<0||d.rules.dupSeconds>1800||
-    !Number.isFinite(d.rules.overtimeMinMinutes)||d.rules.overtimeMinMinutes<0||d.rules.overtimeMinMinutes>240){
+    !Number.isInteger(d.rules.overtimeMinMinutes)||d.rules.overtimeMinMinutes<1||d.rules.overtimeMinMinutes>240){
     toast('请检查工作时段、宽限与重复判定参数',true);return;
   }
   Object.assign(RULES,d.rules);state.prefs=d.prefs;state.saved=false;rememberMonth();reanalyze();close();render();
