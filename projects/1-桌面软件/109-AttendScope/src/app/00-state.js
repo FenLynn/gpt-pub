@@ -44,7 +44,7 @@ function generateMock(){
     // R55: deterministic, explicitly labeled DEMO-ONLY workday examples.
     // These exercise the full automatic-overtime calculation without changing
     // any imported punch or inventing overtime in real employee records.
-    if(sc==='normal'&&((ei===1&&d===8)||(ei===7&&d===12)||(ei===18&&d===20)))
+    if(sc==='normal'&&((ei===1&&d===12)||(ei===7&&d===12)||(ei===18&&d===21)))
       base[3]=rec(emp,d,'19:05:00','出','auto-overtime-demo',4);
     // Deterministic stress cases: repeated in/out, burst swipes, and short departures.
     if((ei*13+d*17)%41===0){
