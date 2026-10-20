@@ -234,6 +234,7 @@ function mountAttendanceTimeline(a){
       if(right<=left||right<0||left>=chart.getWidth())continue;
       const box=document.createElement('div');
       box.className='overtime-review-actions'+(seg.accepted?'':' is-excluded');
+      box.dataset.autoOvertimeId=seg.segmentId;
       box.style.left=Math.max(0,Math.min(right-45,chart.getWidth()-48))+'px';
       box.style.top=Math.max(0,x1[1]-lineH/2+2)+'px';
       for(const [accepted,glyph,word] of [[false,'×','排除'],[true,'✓','纳入']]){
