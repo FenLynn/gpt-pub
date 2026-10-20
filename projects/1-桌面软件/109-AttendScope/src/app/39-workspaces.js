@@ -64,6 +64,16 @@ function personMonthStripHtml(){
 }
 function workspaceSidebarHtml(){
  const mode=state.workspaceMode||'all',groups=workspaceGroups();
+ if(mode==='stats')return '<div class="side-controls stats-side-controls">'+
+  '<div class="side-current">统计分析</div>'+
+  '<p class="stats-side-description">统一统计全员、组别和个人。切换范围与指标请使用主页面顶部的筛选。</p>'+
+  '<div class="stats-side-symbol"><span>数据范围</span><strong>'+EMPLOYEES.length+' 人</strong></div>'+
+  '</div><div class="side-bottom"><section class="side-calendar calendar-section">'+
+  '<div class="calendar-caption"><span>月历</span></div>'+
+  '<div id="calendar" class="calendar-grid"></div>'+
+  '<div class="calendar-key"><span><i class="work"></i>工作日</span>'+
+  '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
+  '<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div></div>';
  const group=mode==='group'?state.selectedGroup:mode==='person'?groupOf(EMPLOYEES.find(e=>e.id===state.selection.employeeId)||EMPLOYEES[0]):'';
  const candidates=mode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):
    mode==='person'?EMPLOYEES.filter(e=>groupOf(e)===group):EMPLOYEES;
