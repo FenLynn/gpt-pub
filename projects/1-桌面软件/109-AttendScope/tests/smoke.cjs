@@ -460,11 +460,28 @@ async function run(){
  await page.setViewportSize({width:1366,height:768});
  await check(page,()=>{
   const region=document.querySelector('.as-stats'),buttons=document.querySelector('.as-stats-rank-table');
+  const filters=[...document.querySelectorAll('.as-stats-filters label')];
+  const top=filters[0].getBoundingClientRect().top;
+  const line=filters.every(e=>Math.abs(e.getBoundingClientRect().top-top)<2&&
+    e.getBoundingClientRect().width>=155);
+  const visible=filters.every(e=>{
+    const select=e.querySelector('select'),rect=select.getBoundingClientRect();
+    return rect.right<=region.getBoundingClientRect().right&&rect.left>=region.getBoundingClientRect().left;
+  });
   return region.getBoundingClientRect().right<=innerWidth+1&&buttons.getBoundingClientRect().width>=250&&
-    document.documentElement.scrollWidth<=innerWidth+3;
- },'R45 1366 statistics responsiveness');
+    line&&visible&&document.documentElement.scrollWidth<=innerWidth+3;
+ },'R48 1366: five filters must fit one row without clipping or horizontal page scroll');
+ await page.waitForTimeout(380); // screenshot after the deliberate short ECharts transition, never a correctness check
+ await page.screenshot({path:path.join(out,'r48-all-stats-1366.png')});
  await page.screenshot({path:path.join(out,'r45-all-stats-1366.png')});
  await page.setViewportSize({width:1600,height:900});
+ await check(page,()=>{
+  const controls=[...document.querySelectorAll('.as-stats-filters label')];
+  const y=controls[0].getBoundingClientRect().top;
+  return controls.length===5&&controls.every(x=>Math.abs(x.getBoundingClientRect().top-y)<2);
+ },'R48 1600 one-row filter regression');
+ await page.waitForTimeout(350);
+ await page.screenshot({path:path.join(out,'r48-all-stats-1600.png')});
  await page.screenshot({path:path.join(out,'r45-all-stats-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
  // Ranked groups open that group's analytics without losing the shared metric.

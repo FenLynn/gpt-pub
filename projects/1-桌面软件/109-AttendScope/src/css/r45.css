@@ -104,3 +104,20 @@
 .as-stats-rank-row.is-linked .as-rank-name,.as-stats-rank-row.is-linked strong{color:#1b699b}
 .as-stats-filters select:focus-visible{outline:2px solid #5ca6d7;outline-offset:2px}
 @media(max-width:1450px){.as-stats-chart-empty{left:15%;right:15%}}
+
+
+/* R48: real desktop widths use a single horizontal filter line.
+ * The original 3+2 layout wasted almost a whole row at 1366 pixels. */
+@media(min-width:1211px){
+ .as-stats-filters{
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  gap:10px!important;
+  padding:13px 14px!important;
+ }
+ .as-stats-filters label{min-width:0}
+ .as-stats-filters select{max-width:100%;min-width:0;font-size:13.5px}
+ .as-stats-inline{padding:17px 1px 13px!important;gap:18px}
+}
+@media(min-width:1051px) and (max-width:1210px){
+ .as-stats-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
