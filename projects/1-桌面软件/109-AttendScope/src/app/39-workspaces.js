@@ -189,6 +189,19 @@ function renderScopeSummary(){
   '<div class="scope-insight-chart-title">状态构成</div><div id="scopeStatusChart" class="scope-chart scope-chart-composition"></div>';
  mountScopeAnalytics(people,work);
 }
+/* Muted translucent jade: one shared bar palette for every P109 comparison. */
+function asSoftBarGradient(horizontal=true){
+ const stops=horizontal?[
+  {offset:0,color:'rgba(155,191,176,.48)'},
+  {offset:.55,color:'rgba(108,163,144,.68)'},
+  {offset:1,color:'rgba(63,127,108,.78)'}
+ ]:[
+  {offset:0,color:'rgba(63,127,108,.78)'},
+  {offset:.55,color:'rgba(108,163,144,.68)'},
+  {offset:1,color:'rgba(155,191,176,.48)'}
+ ];
+ return new echarts.graphic.LinearGradient(0,0,horizontal?1:0,horizontal?0:1,stops);
+}
 function mountScopeAnalytics(people,work){
  if(!window.echarts)return;
  const byDay=Array.from({length:monthDays()},(_,i)=>i+1).filter(d=>isWorkday(d));
@@ -200,8 +213,8 @@ function mountScopeAnalytics(people,work){
       axisLabel:{color:'#788c9d',fontSize:11,interval:Math.max(0,Math.floor(byDay.length/9))}},
    yAxis:{type:'value',minInterval:1,splitLine:{lineStyle:{color:'#ecf0f3'}},axisLabel:{fontSize:11,color:'#8699a7'}},
    series:[{name:'异常/缺勤',type:'line',data:daily,symbolSize:5,smooth:false,
-     lineStyle:{color:'#6198b8',width:2},itemStyle:{color:'#6198b8'},
-     areaStyle:{color:'rgba(102,160,190,.10)'}}]});
+     lineStyle:{color:'#648d7e',width:2},itemStyle:{color:'#648d7e'},
+     areaStyle:{color:'rgba(104,155,134,.075)'}}]});
   first.on('click',event=>{const day=byDay[event.dataIndex];if(day)selectDate(day,true)});
  }
  const all=state.workspaceMode!=='group';
@@ -228,10 +241,9 @@ function mountScopeAnalytics(people,work){
    tooltip:{trigger:'item',formatter:p=>escapeNameChar(p.name)+' · '+p.value+' 人日'},
    xAxis:{type:'value',show:false},yAxis:{type:'category',data:entries.map(x=>x.name),
      axisLine:{show:false},axisTick:{show:false},axisLabel:{color:'#536e82',fontSize:11,overflow:'truncate',width:59}},
-   series:[{type:'bar',data:entries.map(x=>x.value),barWidth:12,
-     itemStyle:{color:new echarts.graphic.LinearGradient(0,0,1,0,[
-       {offset:0,color:'#9ccde5'},{offset:1,color:'#397fae'}]),borderRadius:[0,3,3,0]},
-     showBackground:true,backgroundStyle:{color:'#eef2f5'}}]});
+   series:[{type:'bar',data:entries.map(x=>x.value),barWidth:11,
+     itemStyle:{color:asSoftBarGradient(true),opacity:.9,borderRadius:[0,6,6,0]},
+     showBackground:true,backgroundStyle:{color:'rgba(107,149,130,.06)'}}]});
  }
 }
 function dataPanelHtml(section){
