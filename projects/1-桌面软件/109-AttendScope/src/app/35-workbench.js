@@ -117,7 +117,9 @@ function timelineBehaviorInsight(item,key){
 }
 function timelineBehaviorSummaryRow(item,key){
   const rows=timelineBehaviorRows(item,key),active=state.filter===key;
-  const value=rows.length?(rows.length+'项 · '+fmtMinutes(behaviorMinutes(item,key))):'—';
+  const recorded=rows.length?(rows.length+'项 · '+fmtMinutes(behaviorMinutes(item,key))):'—';
+  const value=key==='overtime'&&item.autoOvertime?.minutes>0?
+    (rows.length?recorded+' · ':'')+'推算待核 '+fmtMinutes(item.autoOvertime.minutes):recorded;
   return '<div class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){

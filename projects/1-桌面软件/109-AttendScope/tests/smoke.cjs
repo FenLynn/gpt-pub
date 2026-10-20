@@ -361,6 +361,20 @@ async function run(){
    if(noonOnly.severity!=='suspect'||noonOnly.issues.includes('早退'))return fail('noonOnly',{severity:noonOnly.severity,issues:noonOnly.issues});
    const afterHours=dayResult(day,[['08:25','进'],['12:04','出'],['13:56','进'],['19:00','出']]);
    if(afterHours.autoOvertime.minutes!==90||afterHours.workMinutes!==420)return fail('afterHours',{auto:afterHours.autoOvertime,work:afterHours.workMinutes});
+   const originalAnalysis=state.analysis;
+   try{
+    state.analysis=new Map([[emp.id+'|'+day,afterHours]]);
+    const ledger=asStatLedger(),get=(metric)=>asStatValue(ledger,'overtime',metric,[emp],[day]);
+    if(get('candidateHours')!==1.5||get('candidateDays')!==1||
+       get('candidatePeople')!==1||get('hours')!==0||get('count')!==0)
+      return fail('statistics',{hours:get('candidateHours'),days:get('candidateDays'),people:get('candidatePeople'),registeredHours:get('hours')});
+    if(!timelineFullInsightHtml(afterHours).includes('加班候选')||
+       !timelineBehaviorSummaryRow(afterHours,'overtime').includes('推算待核'))
+      return fail('visualSummary','not labeled as candidate');
+    if(workingPayload().rules.overtimeMinMinutes!==30||
+       !settingsContent('rules').includes('r14OvertimeMin'))
+      return fail('settings','threshold missing from persisted rules or settings');
+   }finally{state.analysis=originalAnalysis}
    const recorded=dayResult(day,[['08:25','进'],['19:00','出']],
      [{id:'registered',employeeId:emp.id,date,start:'18:00',end:'19:00'}]);
    if(recorded.autoOvertime.minutes!==0||!recorded.autoOvertime.reason.includes('已登记'))return fail('recorded',recorded.autoOvertime);
