@@ -221,7 +221,15 @@ function mountAttendanceTimeline(a){
     if(!overlay||!overlay.isConnected)return;
     overlay.replaceChildren();
     const lineH=Math.max(14,(chart.getHeight()-116)/6);
+    // Registration can mask part of one continuous punch-backed session.
+    // All residual bars share a review ID: provide ONE decision control at
+    // the rightmost residual fragment, not duplicate ×/✓ for each fragment.
+    const groups=new Map();
     for(const seg of model.bars.filter(d=>d.track==='overtime'&&d.origin==='auto')){
+      const prior=groups.get(seg.segmentId);
+      if(!prior||seg.value[1]>prior.value[1])groups.set(seg.segmentId,seg);
+    }
+    for(const seg of groups.values()){
       const from=seg.value[0],to=seg.value[1];
       const x1=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[from,5]);
       const x2=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[to,5]);
