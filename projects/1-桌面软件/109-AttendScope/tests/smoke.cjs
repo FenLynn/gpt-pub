@@ -1061,6 +1061,7 @@ async function run(){
    return row.系统判定==='正常'&&row.人工判定==='缺勤'&&row.最终判定==='缺勤'&&row.人工处理==='是'&&
     row.班内工时分钟===Math.round(a.workMinutes||0)&&
     row.加班候选分钟===Math.round(a.autoOvertime?.minutes||0)&&
+    row.加班候选说明===(a.autoOvertime?.reason||'')&&
     row.午休证据===a.lunchEvidence;
  },'R33 export lost final manual judgment');
  const imported=await page.evaluate(async()=>{
