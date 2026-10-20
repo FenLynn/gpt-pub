@@ -11,14 +11,26 @@ const AS_STAT_FAMILIES=[
 ];
 function asStatFamily(k){return AS_STAT_FAMILIES.find(f=>f[0]===k)||AS_STAT_FAMILIES[0]}
 function asStatDefaultCompare(mode){return mode==='person'?'days':mode==='group'?'people':'groups'}
+function asStatVisibleMetrics(family,compare,mode){
+ // Distinct-person indicators against single people are just 0/1 and add
+ // no information. Keep person counts for cross-group/monthly trends instead.
+ return asStatFamily(family)[2].filter(m=>
+  !( ['people','candidatePeople'].includes(m[0])&&(mode==='person'||compare==='people')));
+}
 function asStatPrefs(){
  if(!state.statsConfig)state.statsConfig={family:'leave',metric:'hours',compare:null,aggregate:'total',chart:'bar',limit:10,sort:'desc'};
- const cfg=state.statsConfig,f=asStatFamily(cfg.family);
- if(!f[2].some(m=>m[0]===cfg.metric))cfg.metric=f[2][0][0];
+ const cfg=state.statsConfig;
  if(!['groups','people','days'].includes(cfg.compare))cfg.compare=asStatDefaultCompare(state.workspaceMode);
  if(state.workspaceMode==='person')cfg.compare='days';
+ const metrics=asStatVisibleMetrics(cfg.family,cfg.compare,state.workspaceMode);
+ if(!metrics.some(m=>m[0]===cfg.metric))cfg.metric=metrics[0][0];
  if(!['total','perPerson','per100'].includes(cfg.aggregate))cfg.aggregate='total';
- if(cfg.metric==='people'||cfg.metric==='candidatePeople')cfg.aggregate='total';
+ // An individual's per-person value equals the total; don't offer a
+ // mathematically identical normalization beside the raw value.
+ if(cfg.compare==='people'||state.workspaceMode==='person'){
+  if(cfg.aggregate==='perPerson')cfg.aggregate='total';
+ }
+ if(['people','candidatePeople'].includes(cfg.metric))cfg.aggregate='total';
  return cfg;
 }
 function asStatMetric(){const c=asStatPrefs();return asStatFamily(c.family)[2].find(m=>m[0]===c.metric)}
@@ -184,8 +196,9 @@ function asStatRows(){
  else counted.sort((a,b)=>c.sort==='asc'?a.value-b.value||a.label.localeCompare(b.label,'zh-CN'):
   b.value-a.value||a.label.localeCompare(b.label,'zh-CN'));
  const chartRows=compare==='days'?counted:counted.slice(0,c.limit==='all'?counted.length:Number(c.limit)||10);
- const rankPool=compare==='days'?counted.filter(r=>r.value>0).sort((a,b)=>
-   c.sort==='asc'?a.value-b.value||a.key-b.key:b.value-a.value||a.key-b.key):counted;
+ const nonzero=counted.filter(r=>r.raw>0);
+ const rankPool=compare==='days'?nonzero.sort((a,b)=>
+   c.sort==='asc'?a.value-b.value||a.key-b.key:b.value-a.value||a.key-b.key):nonzero;
  const rankRows=rankPool.slice(0,c.limit==='all'?rankPool.length:Number(c.limit)||10);
  const grand=asStatValue(ledger,c.family,c.metric,people,days);
  const scheduled=days.filter(isWorkday).length*people.length;
@@ -209,20 +222,25 @@ function statisticsWorkspaceHtml(){
   c.family==='overtime'?'登记加班与自动推算候选严格分开；候选只来自完整进出记录，不等于审批加班':
   c.family==='punch'?'每条原始打卡计一次，重复打卡仍按实际记录计入':
   '工作日的考勤状态与当前初始／人工判定视图保持一致';
- const unavailable=(c.family==='outing'&&!state.outings?.length)||(c.family==='overtime'&&!state.overtimeEntries?.length);
+ const unavailable=(c.family==='outing'&&!state.outings?.length)||
+  (c.family==='overtime'?(c.metric.startsWith('candidate')?
+   ![...state.analysis.values()].some(a=>a.autoOvertime?.minutes>0):
+   !state.overtimeEntries?.length):false);
+ const aggregateOptions=[['total','总量'],['perPerson','人均'],['per100','每百应出勤人日']]
+   .filter(x=>x[0]!=='perPerson'||(c.compare!=='people'&&mode!=='person'));
  return '<section class="as-stats" aria-label="考勤统计工作台">'+
   '<header class="as-stats-heading"><div><h2>'+escapeNameChar(personLabel)+' · 统计分析</h2>'+
   '<span>'+escapeNameChar(periodText())+' · '+selected.people.length+' 人</span></div>'+
   '<button id="asStatsExport" type="button" class="as-stats-export" title="导出当前指标的明细 CSV">导出数据 ↗</button></header>'+
   '<div class="as-stats-filters" aria-label="统计图表筛选">'+
    '<label>业务<select id="asStatFamily">'+asStatOptions(AS_STAT_FAMILIES.map(f=>[f[0],f[1]]),c.family)+'</select></label>'+
-   '<label>指标<select id="asStatMetric">'+asStatOptions(f[2].map(m=>[m[0],m[1]]),c.metric)+'</select></label>'+
+   '<label>指标<select id="asStatMetric">'+asStatOptions(asStatVisibleMetrics(c.family,c.compare,mode).map(m=>[m[0],m[1]]),c.metric)+'</select></label>'+
    '<label>对比对象<select id="asStatCompare">'+asStatOptions(comparisons,c.compare)+'</select></label>'+
-   '<label>统计方式<select id="asStatAggregate">'+asStatOptions([['total','总量'],['perPerson','人均'],['per100','每百应出勤人日']],c.aggregate)+'</select></label>'+
+   '<label>统计方式<select id="asStatAggregate">'+asStatOptions(aggregateOptions,c.aggregate)+'</select></label>'+
    '<label>排序范围<select id="asStatLimit">'+asStatOptions([['5','前 5'],['10','前 10'],['all','全部']],String(c.limit))+'</select></label>'+
   '</div>'+
   '<div class="as-stats-inline" aria-live="polite">'+
-   '<div><span>当前指标</span><strong>'+escapeNameChar(met[1])+'</strong></div>'+
+
    '<div><span>'+ (c.aggregate==='total'?'范围总量':c.aggregate==='perPerson'?'人均':'每百人日')+'</span>'+
    '<strong>'+asStatNumber(selected.total)+' <small>'+escapeNameChar(selected.effectiveUnit)+'</small></strong></div>'+
    '<div><span>员工</span><strong>'+selected.people.length+' <small>人</small></strong></div>'+
@@ -233,7 +251,7 @@ function statisticsWorkspaceHtml(){
    '<button type="button" data-as-chart="line" aria-pressed="'+(c.chart==='line')+'" class="'+(c.chart==='line'?'active':'')+'">折线</button></div></div>'+
    '<div id="asStatChart" class="as-stats-chart-canvas" aria-label="交互式统计图表"></div>'+
   '<div class="as-stats-chart-empty">当前指标没有可绘制的记录</div></div>'+
-   '<div class="as-stats-rank"><div class="as-stats-rank-head"><h3>排行榜 · 明细</h3>'+
+   '<div class="as-stats-rank"><div class="as-stats-rank-head"><h3>排行 · 点击下钻</h3>'+
     '<button id="asStatSort" type="button" title="调整排名方向">'+(c.sort==='desc'?'降序 ↓':'升序 ↑')+'</button></div>'+
    '<div class="as-stats-rank-table" id="asStatRankTable">'+
    (selected.rankRows.length?selected.rankRows.map((r,i)=>'<button class="as-stats-rank-row" data-as-rank="'+escapeNameChar(r.key)+'" type="button" title="查看'+escapeNameChar(r.label)+'">'+
@@ -300,6 +318,7 @@ function renderStatisticsWorkspace(){
  node.querySelectorAll('[data-as-chart]').forEach(b=>b.onclick=()=>{c.chart=b.dataset.asChart;renderStatisticsWorkspace()});
  node.querySelectorAll('[data-as-rank]').forEach(b=>b.onclick=()=>asStatDrill(b.dataset.asRank));
  node.querySelector('#asStatsExport').onclick=asStatExport;
+ if(typeof asNavRefreshCurrent==='function')asNavRefreshCurrent();
  const data=asStatRows(),chart=initAttendChart(document.getElementById('asStatChart'));
  node.querySelector('.as-stats-chart').classList.toggle('is-empty',!data.rows.some(r=>r.raw>0));
  if(!chart)return;
@@ -308,6 +327,9 @@ function renderStatisticsWorkspace(){
  // ranked item is at the top, just as it is in the ranking table.
  const rows=!isDay&&!line?data.visible.slice().reverse():data.visible;
  const cat=rows.map(x=>x.label),values=rows.map(x=>Number(x.value.toFixed(3)));
+ const gradient=line?'#5799c7':new echarts.graphic.LinearGradient(0,0,!isDay?1:0,!isDay?0:1,
+  !isDay?[{offset:0,color:'#add8eb'},{offset:.55,color:'#6fb4d8'},{offset:1,color:'#347eae'}]:
+   [{offset:0,color:'#3f8fc2'},{offset:1,color:'#b4dced'}]);
  chart.setOption({animation:state.prefs?.motion!==false,animationDuration:290,
   grid:isDay||line?{top:23,bottom:40,left:52,right:21}:{top:14,bottom:30,left:92,right:42,containLabel:false},
   tooltip:{trigger:'axis',axisPointer:{type:'shadow'},formatter:p=>{
@@ -322,7 +344,7 @@ function renderStatisticsWorkspace(){
     axisLine:{show:false},axisTick:{show:false}}:
    {type:'value',min:0,axisLabel:{fontSize:12,color:'#73899c'},splitLine:{lineStyle:{color:'#eaf0f3'}},axisLine:{show:false}},
   series:[{type:line?'line':'bar',data:values,barMaxWidth:22,smooth:false,symbolSize:7,
-   itemStyle:{color:'#5799c7',borderRadius:line?0:[0,4,4,0]},lineStyle:{width:2.5,color:'#5799c7'},
+   itemStyle:{color:gradient,borderRadius:line?0:!isDay?[0,5,5,0]:[5,5,0,0]},lineStyle:{width:2.5,color:'#5799c7'},
    areaStyle:line?{color:'rgba(91,158,202,.07)'}:undefined,
    showBackground:!line&&!isDay,backgroundStyle:{color:'#f0f5f8'}}]});
  // Rank cells and chart marks refer to the same comparison entity.
