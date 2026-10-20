@@ -28,7 +28,7 @@ function asStatVisibleMetrics(family,compare,mode){
   !( ['people','candidatePeople'].includes(m[0])&&(mode==='person'||compare==='people')));
 }
 function asStatPrefs(){
- if(!state.statsConfig)state.statsConfig={family:'leave',metric:'hours',compare:null,aggregate:'total',chart:'bar',limit:10,sort:'desc'};
+ if(!state.statsConfig)state.statsConfig={family:'leave',metric:'hours',compare:null,aggregate:'total',chart:'bar',limit:'all',sort:'desc'};
  const cfg=state.statsConfig;
  const mode=asStatScopeMode();
  if(!['groups','people','days'].includes(cfg.compare))cfg.compare=asStatDefaultCompare(mode);
@@ -404,7 +404,8 @@ function renderStatisticsWorkspace(){
  if(!node||state.workspaceMode!=='stats')return;
  if(typeof disposeAttendCharts==='function')disposeAttendCharts();
  const oldFocus=document.activeElement,inside=node.contains(oldFocus);
- const focusId=inside?oldFocus.id:'';
+ const sidebarFocus=document.getElementById('statsSidebarControls')?.contains(oldFocus);
+ const focusId=(inside||sidebarFocus)?oldFocus.id:'';
  const focusChart=inside?oldFocus.dataset?.asChart:null;
  const c=asStatPrefs();
  const aside=document.getElementById('statsSidebarControls');
@@ -452,7 +453,19 @@ function renderStatisticsWorkspace(){
  node.querySelector('#asStatSort').onclick=()=>{c.sort=c.sort==='desc'?'asc':'desc';renderStatisticsWorkspace()};
  node.querySelectorAll('[data-as-chart]').forEach(b=>b.onclick=()=>{c.chart=b.dataset.asChart;renderStatisticsWorkspace()});
  const toggleRank=(key,scroll=false)=>{
-  const match=asStatRows().rankRows.find(r=>r.key===key);
+  const data=asStatRows();
+  let match=data.rankRows.find(r=>r.key===key);
+  if(!match&&scroll&&c.limit!=='all'){
+   match=data.rows.find(r=>r.key===key);
+   if(match){
+    c.limit='all';
+    state.statsExpandedKey=match.type+'|'+match.key;
+    renderStatisticsWorkspace();
+    const trigger=[...document.querySelectorAll('[data-as-rank]')].find(b=>b.dataset.asRank===key);
+    trigger?.scrollIntoView({block:'nearest',inline:'nearest'});
+   }
+   return;
+  }
   if(!match)return;
   const token=match.type+'|'+match.key;
   state.statsExpandedKey=state.statsExpandedKey===token?'':token;
