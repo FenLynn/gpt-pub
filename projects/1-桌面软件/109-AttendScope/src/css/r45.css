@@ -328,6 +328,13 @@ html{scrollbar-gutter:stable}
  color:#81978c;font-size:11px}
 .as-rank-detail-grid strong{color:#3f6152;font-weight:650;font-size:12px;
  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.as-rank-breakdown{display:grid;gap:6px;margin-top:12px;padding:10px 0 3px;border-top:1px solid #e8f0eb}
+.as-rank-breakdown>span{font-size:11px;font-weight:700;color:#769083}
+.as-rank-breakdown>div{display:flex;gap:10px;align-items:center;justify-content:space-between;
+ font-size:12px;color:#6d8579}
+.as-rank-breakdown>div strong{font-size:12px;color:#416653;font-weight:690;white-space:nowrap}
+.as-rank-breakdown>p{margin:1px 0 3px;color:#617c6e;font-size:12px;line-height:1.5}
+.as-rank-breakdown-empty{font-size:11px;color:#92a59b}
 .as-rank-drill{display:inline-flex;gap:7px;align-items:center;margin-top:12px;
  min-height:29px;padding:0 9px;background:#edf5ef;border:1px solid #d9e8dd;
  border-radius:6px;color:#3c7960;font-size:12px;font-weight:700;cursor:pointer}
