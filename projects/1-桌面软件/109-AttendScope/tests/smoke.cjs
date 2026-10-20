@@ -793,8 +793,8 @@ async function run(){
    opts.series[0].type==='bar'&&opts.xAxis[0].type==='category'&&
    opts.yAxis[0].type==='value'&&opts.xAxis[0].axisLabel.interval===0&&
    opts.xAxis[0].axisLabel.rotate===34&&
-   opts.xAxis[0].axisLabel.formatter('张三',0)==='张三'&&
-   opts.xAxis[0].axisLabel.formatter('李四',1)==='\n李四'&&
+   !opts.xAxis[0].axisLabel.formatter&&
+   opts.xAxis[0].axisLabel.margin===11&&
    opts.grid[0].bottom===95&&barWidth>=3&&barWidth<=25&&
    document.querySelector('[data-as-chart="line"]').disabled&&
    document.querySelector('.as-stats-chart-context')?.textContent.includes('全员');
