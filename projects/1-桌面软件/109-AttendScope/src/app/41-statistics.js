@@ -1,5 +1,18 @@
 /* R45: one auditable attendance statistics ledger for every analysis scope.
  * No remote services, no duplicate interpretation of employee-day verdicts. */
+const AS_STAT_PALETTES=Object.freeze({
+ leave:{top:'#8064c9',bottom:'#c0afe9',hover:'#6245b1'},
+ trip:{top:'#6377d1',bottom:'#aab9f1',hover:'#4159b5'},
+ outing:{top:'#3594b9',bottom:'#a1d7e9',hover:'#237499'},
+ overtime:{top:OVERTIME_VISUALS.registered.top,bottom:OVERTIME_VISUALS.registered.bottom,hover:'#a94451'},
+ punch:{top:'#5089c8',bottom:'#a9c9ed',hover:'#316dae'},
+ status:{top:'#54a78b',bottom:'#b2ddca',hover:'#348269'}
+});
+function asStatPalette(family,metric){
+ if(family==='overtime'&&metric?.startsWith('candidate'))return {
+  top:OVERTIME_VISUALS.auto.top,bottom:OVERTIME_VISUALS.auto.bottom,hover:OVERTIME_VISUALS.auto.hoverTop};
+ return AS_STAT_PALETTES[family]||AS_STAT_PALETTES.punch;
+}
 const AS_STAT_FAMILIES=[
  ['leave','请假',[['hours','记载请假工时','小时'],['count','请假记录数','条'],['people','涉及人数','人']]],
  ['trip','出差',[['days','出差日数','人日'],['estimatedHours','折算出差工时','小时'],['count','出差记录数','次'],['people','涉及人数','人']]],
@@ -512,7 +525,7 @@ function renderStatisticsWorkspace(){
  const autoValues=isOvertimeStack?rows.map(r=>normalized('candidateHours',r)):[];
  const slot=(Math.max(230,chart.getWidth())-72)/Math.max(1,rows.length);
  const barWidth=Math.max(3,Math.min(54,Math.floor(slot*(rows.length<=8?.62:.70))));
- const many=rows.length>=30,angle=isDay?58:many?82:rows.length>14?73:61;
+ const many=rows.length>=30,angle=many?89:isDay?85:rows.length>14?88:86;
  const formatTop=(p,topOnly=false)=>{
    const i=p.dataIndex;
    if(isOvertimeStack){
@@ -523,6 +536,9 @@ function renderStatisticsWorkspace(){
  };
  const labelStyle={show:numberLabels&&!line,position:'top',color:'#48617e',
   distance:3,fontSize:many?9:11,fontWeight:600};
+ const ordinaryPalette=asStatPalette(c.family,c.metric);
+ const ordinaryGradient=new echarts.graphic.LinearGradient(0,0,0,1,[
+  {offset:0,color:ordinaryPalette.top},{offset:1,color:ordinaryPalette.bottom}]);
  const redBar=(palette)=>new echarts.graphic.LinearGradient(0,0,0,1,[
    {offset:0,color:palette.top},{offset:1,color:palette.bottom}]);
  const baseBar={barWidth,barMaxWidth:54,barMinHeight:values.some(v=>v>0)?1:0};
@@ -543,17 +559,17 @@ function renderStatisticsWorkspace(){
   ...baseBar,id:'statistics-primary',name:asStatMetric()[1]||'统计值',
   type:line?'line':'bar',data:values,smooth:false,
   showSymbol:!many||!line,symbol:'circle',symbolSize:6,
-  itemStyle:{color:line?'#648ed1':asSoftBarGradient(false),opacity:1,
+  itemStyle:{color:ordinaryGradient,opacity:1,
     borderRadius:line?0:[Math.min(5,barWidth/3),Math.min(5,barWidth/3),0,0]},
   emphasis:{focus:'none',scale:true,scaleSize:2,
-    itemStyle:{color:'#3779d3',opacity:1,shadowBlur:8,shadowColor:'rgba(75,116,190,.22)'},
+    itemStyle:{color:ordinaryPalette.hover,opacity:1,shadowBlur:8,shadowColor:'rgba(72,84,125,.18)'},
     lineStyle:{width:3},symbolSize:10},
-  lineStyle:{width:2.15,color:'#648ed1'},
+  lineStyle:{width:2.15,color:ordinaryPalette.top},
   areaStyle:line?{color:'rgba(126,170,236,.055)'}:undefined,
   label:{...labelStyle,formatter:p=>formatTop(p)}
  }];
  chart.setOption({animation:state.prefs?.motion!==false,animationDuration:220,
-  grid:{top:numberLabels?45:20,bottom:many?141:isDay?105:119,left:49,right:18,containLabel:false},
+  grid:{top:numberLabels?45:20,bottom:many?155:isDay?131:145,left:49,right:18,containLabel:false},
   tooltip:{trigger:'item',axisPointer:{type:'none'},confine:true,
    // Tie the floating card to the top of the active bar, including hover
    // forwarded from a row in the right-hand ranking.
@@ -571,7 +587,7 @@ function renderStatisticsWorkspace(){
         ' '+unit+'<br>自动 '+asStatNumber(autoValues[p.dataIndex])+' '+unit:'');
    }},
   xAxis:{type:'category',data:cat,boundaryGap:!line,
-   axisLabel:{fontSize:many?12:13,color:'#687f9d',interval:0,rotate:angle,
+   axisLabel:{fontSize:many?13:14,color:'#687f9d',interval:0,rotate:angle,
     hideOverlap:false,align:'right',margin:12},
    axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe5ee'}}},
   yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#8895a9'},
