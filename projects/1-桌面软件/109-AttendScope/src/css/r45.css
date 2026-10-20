@@ -105,69 +105,172 @@
 .as-stats-filters select:focus-visible{outline:2px solid #5ca6d7;outline-offset:2px}
 @media(max-width:1450px){.as-stats-chart-empty{left:15%;right:15%}}
 
+/* R51 · Single authoritative refinement of P109 interactive surfaces.
+   Popup surfaces overlay; selected view is a highlight, not an enclosing card.
+   Keep controls compact and the viewport width stable when scrollbars appear. */
+html{scrollbar-gutter:stable}
+.topbar{overflow:visible}
+.topbar .top-global-actions{gap:8px;min-width:0}
+.topbar .top-history{
+ display:inline-flex;flex:0 0 auto;align-items:center;gap:1px;
+ padding:0 8px 0 0;margin-right:0;
+ border:0;border-right:1px solid #e6ebeb;border-radius:0;
+ background:transparent;box-shadow:none;
+}
+.top-history button{
+ display:grid;place-items:center;width:30px;height:30px;padding:0;
+ border:0;border-radius:7px;background:transparent;box-shadow:none;
+ color:#617579;opacity:1;cursor:pointer;
+ transition:background .15s ease,color .15s ease,opacity .15s ease;
+}
+.top-history button svg{fill:none;stroke:currentColor;stroke-width:1.8;
+ stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.top-history button:hover:not(:disabled){color:#2c5a54;background:rgba(91,137,123,.09);box-shadow:none}
+.top-history button:active:not(:disabled){background:rgba(91,137,123,.14)}
+.top-history button:disabled{color:#b9c5c5;opacity:.52;cursor:default}
+.top-history button:focus-visible{outline:2px solid #9cbdb1;outline-offset:1px}
 
-/* R48: real desktop widths use a single horizontal filter line.
- * The original 3+2 layout wasted almost a whole row at 1366 pixels. */
-@media(min-width:1211px){
- .as-stats-filters{
-  grid-template-columns:repeat(5,minmax(0,1fr))!important;
-  gap:10px!important;
-  padding:13px 14px!important;
+/* Main views: discrete text highlight, no filled selection rectangle and
+   no mini-card around the 01/02 index. Secondary filters sit farther inward. */
+.side-primary-nav{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e8eeee}
+.side-primary-title{font-size:11px;font-weight:630;letter-spacing:.025em;color:#90a09e;
+ padding:0 11px 7px}
+.side-primary-nav .side-views{display:grid;gap:3px;margin:0}
+.side-primary-nav .side-views button{
+ position:relative;display:grid;grid-template-columns:26px minmax(0,1fr);
+ align-items:center;justify-content:start;gap:8px;
+ min-height:41px;padding:6px 10px 6px 13px;
+ background:transparent!important;border:0!important;border-radius:5px;
+ color:#71827f;font-size:13px;font-weight:560;text-align:left;
+ box-shadow:none!important;
+}
+.side-primary-nav .side-views button:hover{background:rgba(105,148,133,.055)!important;color:#3c6b61}
+.side-primary-nav .side-views button.active{
+ color:#2b6557;font-weight:720;
+ background:transparent!important;border:0!important;box-shadow:none!important;
+}
+.side-primary-nav .side-views button.active::after{display:none!important}
+.side-primary-nav .side-views button.active::before{
+ content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;
+ border-radius:4px;background:#74aa96;
+}
+.side-view-index,.side-primary-nav .side-views button.active .side-view-index{
+ display:block;min-width:0;height:auto;padding:0;border:0!important;border-radius:0;
+ background:transparent!important;color:#97a9a4;font-size:11px;
+ font-variant-numeric:tabular-nums;font-weight:620;line-height:1.5;box-shadow:none!important;
+}
+.side-primary-nav .side-views button.active .side-view-index{color:#4e947b;font-weight:760}
+.side-view-text{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-refinements{
+ margin:9px 0 0 17px;padding:7px 0 1px 11px;
+ border-left:1px solid #e3ece9;background:transparent;
+}
+.side-refinements-title{margin-bottom:4px;color:#94a7a1;font-weight:630;font-size:10px}
+.layout:not(.workspace-mode-classic) .side-bottom .side-refinements .side-filter{
+ display:grid;grid-template-columns:52px minmax(0,1fr)!important;
+ gap:5px;align-items:center;padding:7px 0 0!important;
+ margin:0!important;border:0!important;
+}
+.side-refinements .side-filter .side-label{
+ margin:0;color:#80928e;font-size:11px;font-weight:580;
+}
+.side-refinements .side-filter .status-filter-control{min-width:0;width:100%}
+.side-refinements .status-filter-button{
+ min-width:0;width:100%;height:30px!important;
+ padding-inline:8px;border:1px solid #e0e9e6;border-radius:6px;
+ background:#fff;color:#526d65;font-size:11.5px;
+ box-shadow:none;
+}
+.side-refinements .status-filter-button:hover{border-color:#c4d8cf;background:#fafcfb}
+.side-refinements .judgment-mode-switch{
+ width:100%;min-width:0;margin:0;border-radius:6px;
+ background:#f2f6f4;border:1px solid #edf1ef;
+}
+.side-refinements .judgment-mode-switch button{font-size:11.5px}
+.side-refinements .status-filter-menu{font-size:12px}
+.layout:not(.workspace-mode-classic) .side-bottom .status-filter-menu{
+ position:absolute!important;left:auto!important;right:0!important;
+ top:auto!important;bottom:calc(100% + 7px)!important;
+ width:min(188px,calc(var(--p109-side) - 25px))!important;
+ background:#fff;border:1px solid #e1e9e6;border-radius:9px;
+ box-shadow:0 12px 28px rgba(49,87,73,.12);
+}
+.layout:not(.workspace-mode-classic) .side-bottom .status-filter-menu button:hover{
+ background:#edf5f0;color:#366f5a;
+}
+
+/* Top popovers must float above the content and never participate in layout. */
+.topbar .month-popover,.topbar .import-popover{
+ position:absolute!important;z-index:140;
+ top:calc(100% + 8px)!important;
+ right:0;max-height:min(440px,calc(100vh - var(--topbar) - 15px));
+}
+.topbar .month-popover{left:auto;width:220px}
+.topbar .import-popover{width:248px}
+.topbar .month-popover.open,.topbar .import-popover.open{
+ pointer-events:auto;visibility:visible;
+}
+.month-actions,.month-anchor,.import-anchor{min-width:0}
+.as-stats{max-width:1800px}
+/* Narrow native selects without consuming entire grid tracks. At 1366px all
+   five controls retain one line; smaller layouts wrap without overlapping. */
+.as-stats-filters{
+ display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;
+ justify-content:flex-start;gap:10px 13px!important;
+ padding:11px 14px!important;
+ border:1px solid #e8eeeb;border-radius:10px;background:#fff;
+}
+.as-stats-filters label{
+ display:grid!important;grid-template-columns:max-content minmax(0,1fr);
+ align-items:center;gap:7px!important;flex:0 0 auto;min-width:155px;
+ margin:0;color:#70877d;font-size:12px;line-height:1.2;
+ font-weight:610;white-space:nowrap;
+}
+.as-stats-filters label:nth-child(1){width:155px}
+.as-stats-filters label:nth-child(2){width:250px}
+.as-stats-filters label:nth-child(3){width:190px}
+.as-stats-filters label:nth-child(4){width:208px}
+.as-stats-filters label:nth-child(5){width:155px}
+.as-stats-filters select{
+ width:100%;min-width:0;max-width:100%;
+ height:33px;padding:0 25px 0 9px;
+ appearance:none;-webkit-appearance:none;
+ border:1px solid #dce7e1;border-radius:7px;
+ background-color:#fbfcfb;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath d='m7 10 5 5 5-5' fill='none' stroke='%237b9186' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7'/%3E%3C/svg%3E");
+ background-position:right 7px center;background-repeat:no-repeat;
+ color:#3e5b51;font-size:12px!important;font-weight:610;
+ box-shadow:none;cursor:pointer;
+ transition:border-color .16s ease,background-color .16s ease;
+}
+.as-stats-filters select:hover{border-color:#bdd5c9;background-color:#fff}
+.as-stats-filters select:focus-visible{
+ outline:2px solid rgba(109,167,142,.55);outline-offset:1px;
+}
+.as-stats-rank-table{scrollbar-gutter:stable}
+.as-stats-rank-row:hover,.as-stats-rank-row.is-linked{background:#f0f7f2}
+.as-stats-rank-row.is-linked .as-rank-name,
+.as-stats-rank-row.is-linked strong{color:#3c7b66}
+.as-stats-chart-switch button.active{color:#3e7868;box-shadow:0 1px 3px rgba(80,115,96,.1)}
+.as-stats-export:hover{border-color:#bfd8cb;background:#f6faf7}
+@media(max-width:1320px){
+ .topbar .top-global-actions{gap:5px}
+ .top-history button{width:27px;height:28px}
+}
+@media(max-width:1200px){
+ .as-stats-filters{gap:9px 12px!important}
+ .as-stats-filters label:nth-child(2){width:240px}
+}
+@media(max-width:820px){
+ .topbar{overflow:visible!important}
+ .as-stats-filters{gap:8px!important;padding:10px!important}
+ .as-stats-filters label{width:calc(50% - 5px)!important;min-width:155px}
+}
+@media(prefers-reduced-motion:reduce){
+ .top-history button,.as-stats-filters select,.side-primary-nav .side-views button{
+  transition:none!important;
  }
- .as-stats-filters label{min-width:0}
- .as-stats-filters select{max-width:100%;min-width:0;font-size:13.5px}
- .as-stats-inline{padding:17px 1px 13px!important;gap:18px}
 }
-@media(min-width:1051px) and (max-width:1210px){
- .as-stats-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
-}
-
-
-/* R50: page hierarchy and compact horizontal statistics filters. */
-.topbar .top-history{display:inline-flex;align-items:center;gap:3px;margin-right:2px;
- padding:2px;background:#f2f6f9;border:1px solid #e2eaf0;border-radius:8px;flex:0 0 auto}
-.top-history button{width:27px;height:28px;border:0;border-radius:6px;background:transparent;
- color:#376f95;font-size:19px;line-height:1;display:grid;place-items:center;cursor:pointer;
- transition:background .17s ease,color .17s ease}
-.top-history button:hover:not(:disabled){background:#fff;color:#155d8b;box-shadow:0 1px 4px #dbe8f0}
-.top-history button:disabled{color:#bdc9d0;cursor:default}
-.top-history button:focus-visible{outline:2px solid #65a7d0;outline-offset:1px}
-.side-primary-nav{margin-bottom:14px;padding-bottom:13px;border-bottom:1px solid #e6edf2}
-.side-primary-title{padding:0 9px 10px;font-size:11px;font-weight:680;letter-spacing:.4px;color:#8297a6}
-.side-primary-nav .side-views{display:grid;gap:6px;margin:0}
-.side-primary-nav .side-views button{display:grid;grid-template-columns:31px minmax(0,1fr);
- gap:9px;align-items:center;justify-content:start;min-height:43px;text-align:left;padding:6px 11px;
- border:1px solid transparent;border-radius:8px;font-size:13px}
-.side-primary-nav .side-views button.active{background:#e5f1fa;border-color:#d1e4f1;color:#1e628f}
-.side-primary-nav .side-views button.active::after{display:none}
-.side-view-index{display:grid;place-items:center;height:27px;background:#f1f5f8;
- border:1px solid #e4ebf1;border-radius:6px;color:#8aa0b0;font-size:11px;font-weight:740;font-variant-numeric:tabular-nums}
-.side-primary-nav .side-views button.active .side-view-index{background:#d5e9f7;border-color:#bad8ed;color:#2874a3}
-.side-view-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.side-refinements{margin-top:7px;margin-left:8px;padding:7px 0 2px 10px;border-left:2px solid #e3ebf1}
-.side-refinements-title{font-size:10px;font-weight:700;letter-spacing:.2px;color:#91a3b0;margin:0 0 3px}
-.side-refinements .side-filter{border:0!important;margin:0!important;padding:5px 0 0!important;
- grid-template-columns:57px minmax(0,1fr);gap:6px}
-.side-refinements .side-filter .side-label{font-size:11px;font-weight:580;color:#718798}
-.side-refinements .status-filter-button{background:#fff;border:1px solid #dce7ef;border-radius:7px;
- box-shadow:none;color:#3a6077}
-.side-refinements .judgment-mode-switch{background:#f0f4f7;border-radius:7px}
-.side-refinements .side-filter-menu{font-size:12px}
-.as-stats-filters{align-items:center;padding-block:11px}
-.as-stats-filters label{display:grid;grid-template-columns:max-content minmax(0,1fr);
- align-items:center;gap:8px;min-width:0;white-space:nowrap;font-size:12px}
-.as-stats-filters select{height:34px;min-width:0;max-width:100%;font-size:13px}
-.as-stats-inline{padding-top:15px}
-@media(max-width:1450px){
- .topbar .top-global-actions{gap:6px}
- .top-history button{width:25px;height:26px}
- .as-stats-filters{column-gap:8px!important;padding-inline:10px!important}
- .as-stats-filters label{gap:5px;font-size:11.5px}
- .as-stats-filters select{font-size:12px;padding-inline:5px}
-}
-@media(max-width:780px){
- .as-stats-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
- .as-stats-filters label{grid-template-columns:max-content minmax(0,1fr)}
-}
-@media(prefers-reduced-motion:reduce){.top-history button{transition:none!important}}
-.reduce-animations .top-history button{transition:none!important}
+.reduce-animations .top-history button,
+.reduce-animations .as-stats-filters select,
+.reduce-animations .side-primary-nav .side-views button{transition:none!important}
