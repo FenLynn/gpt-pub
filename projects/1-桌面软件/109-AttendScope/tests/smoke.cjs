@@ -610,6 +610,19 @@ async function run(){
     opts.xAxis[0].axisLabel.rotate>=85;
   },family,'R58 statistics family color or name angle mismatched');
  }
+ // R58b: normal is green, but abnormal/absent judgments must not
+ // silently inherit a normal-work green fill.
+ await page.locator('#asStatFamily').selectOption('status');
+ for(const m of ['normal','anomaly','absent','issue','late','early']){
+  await page.locator('#asStatMetric').selectOption(m);
+  await check(page,m=>{
+   const pal=asStatPalette('status',m);
+   const opts=echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption();
+   return opts.series[0].itemStyle.color.colorStops[0].color===pal.top&&
+     opts.series[0].emphasis.itemStyle.color===pal.hover&&
+     (m==='normal'||pal.top!==AS_STAT_PALETTES.status.top);
+  },m,'R58 verdict colors must communicate normal, abnormal and absent accurately');
+ }
  await page.locator('#asStatFamily').selectOption('overtime');
  await page.locator('#asStatMetric').selectOption('registeredHours');
  await check(page,()=>{
