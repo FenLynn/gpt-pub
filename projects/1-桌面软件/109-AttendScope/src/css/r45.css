@@ -121,3 +121,53 @@
 @media(min-width:1051px) and (max-width:1210px){
  .as-stats-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+
+/* R50: page hierarchy and compact horizontal statistics filters. */
+.topbar .top-history{display:inline-flex;align-items:center;gap:3px;margin-right:2px;
+ padding:2px;background:#f2f6f9;border:1px solid #e2eaf0;border-radius:8px;flex:0 0 auto}
+.top-history button{width:27px;height:28px;border:0;border-radius:6px;background:transparent;
+ color:#376f95;font-size:19px;line-height:1;display:grid;place-items:center;cursor:pointer;
+ transition:background .17s ease,color .17s ease}
+.top-history button:hover:not(:disabled){background:#fff;color:#155d8b;box-shadow:0 1px 4px #dbe8f0}
+.top-history button:disabled{color:#bdc9d0;cursor:default}
+.top-history button:focus-visible{outline:2px solid #65a7d0;outline-offset:1px}
+.side-primary-nav{margin-bottom:14px;padding-bottom:13px;border-bottom:1px solid #e6edf2}
+.side-primary-title{padding:0 9px 10px;font-size:11px;font-weight:680;letter-spacing:.4px;color:#8297a6}
+.side-primary-nav .side-views{display:grid;gap:6px;margin:0}
+.side-primary-nav .side-views button{display:grid;grid-template-columns:31px minmax(0,1fr);
+ gap:9px;align-items:center;justify-content:start;min-height:43px;text-align:left;padding:6px 11px;
+ border:1px solid transparent;border-radius:8px;font-size:13px}
+.side-primary-nav .side-views button.active{background:#e5f1fa;border-color:#d1e4f1;color:#1e628f}
+.side-primary-nav .side-views button.active::after{display:none}
+.side-view-index{display:grid;place-items:center;height:27px;background:#f1f5f8;
+ border:1px solid #e4ebf1;border-radius:6px;color:#8aa0b0;font-size:11px;font-weight:740;font-variant-numeric:tabular-nums}
+.side-primary-nav .side-views button.active .side-view-index{background:#d5e9f7;border-color:#bad8ed;color:#2874a3}
+.side-view-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-refinements{margin-top:7px;margin-left:8px;padding:7px 0 2px 10px;border-left:2px solid #e3ebf1}
+.side-refinements-title{font-size:10px;font-weight:700;letter-spacing:.2px;color:#91a3b0;margin:0 0 3px}
+.side-refinements .side-filter{border:0!important;margin:0!important;padding:5px 0 0!important;
+ grid-template-columns:57px minmax(0,1fr);gap:6px}
+.side-refinements .side-filter .side-label{font-size:11px;font-weight:580;color:#718798}
+.side-refinements .status-filter-button{background:#fff;border:1px solid #dce7ef;border-radius:7px;
+ box-shadow:none;color:#3a6077}
+.side-refinements .judgment-mode-switch{background:#f0f4f7;border-radius:7px}
+.side-refinements .side-filter-menu{font-size:12px}
+.as-stats-filters{align-items:center;padding-block:11px}
+.as-stats-filters label{display:grid;grid-template-columns:max-content minmax(0,1fr);
+ align-items:center;gap:8px;min-width:0;white-space:nowrap;font-size:12px}
+.as-stats-filters select{height:34px;min-width:0;max-width:100%;font-size:13px}
+.as-stats-inline{padding-top:15px}
+@media(max-width:1450px){
+ .topbar .top-global-actions{gap:6px}
+ .top-history button{width:25px;height:26px}
+ .as-stats-filters{column-gap:8px!important;padding-inline:10px!important}
+ .as-stats-filters label{gap:5px;font-size:11.5px}
+ .as-stats-filters select{font-size:12px;padding-inline:5px}
+}
+@media(max-width:780px){
+ .as-stats-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .as-stats-filters label{grid-template-columns:max-content minmax(0,1fr)}
+}
+@media(prefers-reduced-motion:reduce){.top-history button{transition:none!important}}
+.reduce-animations .top-history button{transition:none!important}
