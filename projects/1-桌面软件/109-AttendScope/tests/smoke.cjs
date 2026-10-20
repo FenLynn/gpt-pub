@@ -377,7 +377,21 @@ async function run(){
    }finally{state.analysis=originalAnalysis}
    const recorded=dayResult(day,[['08:25','进'],['19:00','出']],
      [{id:'registered',employeeId:emp.id,date,start:'18:00',end:'19:00'}]);
-   if(recorded.autoOvertime.minutes!==0||!recorded.autoOvertime.reason.includes('已登记'))return fail('recorded',recorded.autoOvertime);
+   if(recorded.autoOvertime.minutes!==30||!recorded.autoOvertime.reason.includes('扣除'))
+     return fail('registeredPartialOverlap',recorded.autoOvertime);
+   const fullRegistered=dayResult(day,[['08:25','进'],['19:00','出']],
+     [{id:'full',employeeId:emp.id,date,start:'17:30',end:'19:00'}]);
+   if(fullRegistered.autoOvertime.minutes!==0||!fullRegistered.autoOvertime.reason.includes('已登记'))
+     return fail('registeredFullOverlap',fullRegistered.autoOvertime);
+   const duplicateRegistered=dayResult(day,[['08:25','进'],['19:00','出']],[
+     {id:'overlap1',employeeId:emp.id,date,start:'17:30',end:'18:45'},
+     {id:'overlap2',employeeId:emp.id,date,start:'18:30',end:'19:00'}]);
+   if(duplicateRegistered.autoOvertime.minutes!==0)
+     return fail('registeredUnionNoDoubleSubtraction',duplicateRegistered.autoOvertime);
+   const boundedRegistered=dayResult(day,[['08:25','进'],['19:00','出']],
+     [{id:'middle',employeeId:emp.id,date,start:'18:00',end:'18:20'}]);
+   if(boundedRegistered.autoOvertime.minutes!==70)
+     return fail('registeredMiddleGap',boundedRegistered.autoOvertime);
    const threshold=dayResult(day,[['08:25','进'],['17:52','出']]);
    if(threshold.autoOvertime.minutes!==0||threshold.autoOvertime.rawMinutes!==22)return fail('threshold',threshold.autoOvertime);
    RULES.overtimeMinMinutes=15;
