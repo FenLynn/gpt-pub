@@ -87,7 +87,7 @@ function attendPlotHtml(ctx){
   if(tab==='issues')return top+'<div id="issueChart" class="plot-chart"></div>';
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
-    if(day)return top+'<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div>'+r15PunchPreview(day)+'</div>';
+    if(day)return top+'<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动加班计入选择"></div>'+r15PunchPreview(day)+'</div>';
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
   }
@@ -118,8 +118,11 @@ function timelineBehaviorInsight(item,key){
 function timelineBehaviorSummaryRow(item,key){
   const rows=timelineBehaviorRows(item,key),active=state.filter===key;
   const recorded=rows.length?(rows.length+'项 · '+fmtMinutes(behaviorMinutes(item,key))):'—';
-  const value=key==='overtime'&&item.autoOvertime?.minutes>0?
-    (rows.length?recorded+' · ':'')+'推算待核 '+fmtMinutes(item.autoOvertime.minutes):recorded;
+  const included=activeAutoOvertimeSegments(item);
+ const acceptedMinutes=included.reduce((sum,seg)=>sum+seg.minutes,0);
+ const value=key==='overtime'&&item.autoOvertime?.segments?.length?
+    (rows.length?recorded+' · ':'')+'自动纳入 '+fmtMinutes(acceptedMinutes)+
+    (included.length<item.autoOvertime.segments.length?' · 已排除 '+(item.autoOvertime.segments.length-included.length)+' 段':''):recorded;
   return '<div class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){
@@ -130,7 +133,8 @@ function timelineFullInsightHtml(item){
     insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
     insightMetric('在岗',fmtMinutes(item.presence))+
     insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+
-    (item.autoOvertime?.minutes?insightMetric('加班候选',fmtMinutes(item.autoOvertime.minutes)+' · 待核'):'')+
+    (item.autoOvertime?.minutes?insightMetric('自动加班（已勾选）',
+      fmtMinutes(activeAutoOvertimeSegments(item).reduce((sum,seg)=>sum+seg.minutes,0))+' · 待核'):'')+
   '</div></section>';
   if(item.lunchEvidence==='未分段（工时按班次扣午休）')
     summary+='<p class="insight-issue">午休未分段：班内工时按上午／下午时段计算，不能证明午休期间实际工作。</p>';
