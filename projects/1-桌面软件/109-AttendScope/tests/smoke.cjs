@@ -622,6 +622,60 @@ async function run(){
  await check(page,()=>asStatRows().visible.length===EMPLOYEES.length,
   'R54 all staff did not return when switching back to people');
  await page.screenshot({path:path.join(out,'r52-top-people-bars.png')});
+ // R57: overtime is one column composed of two closely related reds.
+ // A hover, whether originating from the chart or the ranking, emphasizes
+ // both stacked components for exactly one person. The previous column is
+ // always downplayed and tooltip anchors to the populated upper segment.
+ await page.locator('#asStatFamily').selectOption('overtime');
+ await page.locator('#asStatMetric').selectOption('hours');
+ await page.locator('#asStatCompare').selectOption('people');
+ await check(page,()=>{
+  const o=echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption();
+  const legend=document.querySelector('.as-stats-stack-legend');
+  return o.series.length===2&&o.series.every(v=>v.stack==='overtime'&&v.type==='bar')&&
+   o.xAxis[0].axisLabel.rotate>=80&&
+   !!legend&&legend.textContent.includes('登记加班')&&legend.textContent.includes('自动加班')&&
+   !document.querySelector('.timeline-auto-dock')&&
+   !!OVERTIME_VISUALS.registered&&!Object.values(OVERTIME_VISUALS).some(v=>v.hatch);
+ },'R57 overtime columns must be solid, red/rose paired and names steeply tilted');
+ await page.evaluate(()=>{
+  const chart=echarts.getInstanceByDom(document.getElementById('asStatChart'));
+  const original=chart.dispatchAction.bind(chart);
+  state.__r57Actions=[];
+  chart.dispatchAction=function(action,...rest){
+   if(['highlight','downplay','showTip'].includes(action?.type))
+    state.__r57Actions.push({...action});
+   return original(action,...rest);
+  };
+  state.__r57DispatchRestore=()=>{chart.dispatchAction=original;};
+ });
+ await page.locator('.as-stats-rank-row').nth(0).hover();
+ await check(page,()=>{
+  const actions=state.__r57Actions||[],links=document.querySelectorAll('.as-stats-rank-row.is-linked');
+  const marks=actions.filter(a=>a.type==='highlight');
+  const tips=actions.filter(a=>a.type==='showTip');
+  return links.length===1&&marks.length>=2&&
+   marks.slice(-2).map(a=>a.seriesIndex).join(',')==='0,1'&&
+   marks.slice(-2).every(a=>a.dataIndex===marks[marks.length-1].dataIndex)&&
+   tips.length>0;
+ },'R57 hover must highlight the full stack, not only the upper red segment');
+ await page.locator('.as-stats-rank-row').nth(1).hover();
+ await check(page,()=>{
+  const actions=state.__r57Actions||[],down=actions.filter(a=>a.type==='downplay');
+  const marks=actions.filter(a=>a.type==='highlight');
+  return down.length>0&&marks.length>=4&&
+   marks.slice(-2).map(a=>a.seriesIndex).join(',')==='0,1'&&
+   marks[marks.length-1].dataIndex!==marks[marks.length-3].dataIndex&&
+   document.querySelectorAll('.as-stats-rank-row.is-linked').length===1;
+ },'R57 switching hovered person must downplay previous full stack');
+ await page.locator('.as-stats-heading h2').hover();
+ await check(page,()=>document.querySelectorAll('.as-stats-rank-row.is-linked').length===0,
+  'R57 leaving full column must clear the only current highlight');
+ await page.evaluate(()=>{state.__r57DispatchRestore?.();delete state.__r57DispatchRestore;delete state.__r57Actions});
+ await page.screenshot({path:path.join(out,'r57-overtime-red-stack.png')});
+ await page.locator('#asStatFamily').selectOption('punch');
+ await page.locator('#asStatMetric').selectOption('count');
+
  const firstRank=page.locator('.as-stats-rank-row').first();
  await firstRank.click();
  await check(page,()=>{
@@ -730,16 +784,17 @@ async function run(){
   state.chartDay=1;state.chartTab='timeline';state.timelineRange=null;
   render();
  });
- await page.waitForSelector('#autoOvertimeNext',{timeout:15000});
  await check(page,()=>document.querySelectorAll('.person-day.has-auto-overtime').length>0&&
-  document.getElementById('autoOvertimeNext').textContent.includes('自动加班'),
-  'R55 auto-overtime dates must be discoverable in strip and header');
- await page.locator('#autoOvertimeNext').click();
+  !document.getElementById('autoOvertimeNext')&&
+  !document.querySelector('.timeline-auto-dock')&&
+  !!document.querySelector('.person-day.has-auto-overtime[data-person-day="12"]'),
+  'R57 no top-right callout; keep candidate-day indicators');
+ await page.locator('.person-day.has-auto-overtime[data-person-day="12"]').click();
  await check(page,()=>{
   const a=state.analysis.get('E001|'+state.chartDay),bars=r14TrackData(a).bars;
   return a?.autoOvertime.segments.length>0&&
    bars.some(b=>b.origin==='auto'&&b.segmentId===a.autoOvertime.segments[0].id);
- },'R55 candidate-day navigation did not open a real derived band');
+ },'R57 tapping the marked date must reveal its actual automatic interval');
  await page.waitForSelector('#overtimeReviewLayer [data-auto-overtime-id]',{timeout:15000});
  await page.screenshot({path:path.join(out,'r55-auto-overtime-navigation.png')});
  // R53: an inferred segment has an independent, persistent inclusion toggle.
@@ -762,7 +817,7 @@ async function run(){
   const active=[...controls].some(btn=>btn.textContent==='✓'&&btn.getAttribute('aria-pressed')==='true');
   return !!segment&&segment.accepted&&active&&
    r14TrackData(a).bars.some(b=>b.origin==='auto'&&b.segmentId===info.id&&b.accepted);
- },overtimePick,'R53 default auto-overtime candidate must render as selected hatch with ✓/×');
+ },overtimePick,'R57 solid automatic-overtime band must retain editable ✓/×');
  await page.screenshot({path:path.join(out,'r53-auto-overtime-included.png')});
  await page.evaluate(info=>{
   const a=state.analysis.get(info.employee+'|'+info.day),seg=a.autoOvertime.segments.find(s=>s.id===info.id);
