@@ -65,16 +65,6 @@ function employeeAutoOvertimeDays(employeeId){
  return Array.from({length:monthDays()},(_,i)=>state.analysis.get(employeeId+'|'+(i+1)))
   .filter(a=>a?.autoOvertime?.segments?.length).map(a=>a.day);
 }
-function timelineAutoOvertimeToolsHtml(item){
- const days=employeeAutoOvertimeDays(item.employee.id);
- if(!days.length)return '';
- const current=days.indexOf(item.day),next=days[(current+1+days.length)%days.length];
- return '<div class="timeline-auto-tools">'+
-  '<button type="button" id="autoOvertimeNext" data-employee="'+escapeNameChar(item.employee.id)+
-  '" data-day="'+next+'" title="定位下一天有自动加班候选的日期；人工 ✓/× 优先于推算">'+
-  '<i class="timeline-auto-hatch" aria-hidden="true"></i>自动加班 <strong>'+days.length+
-  '</strong> <span aria-hidden="true">↗</span></button></div>';
-}
 function timelineLegendHtml(item){
   const judgment=attendanceJudgment(item);
   return '<div class="timeline-top-legend">'+
@@ -91,8 +81,7 @@ function timelineHeaderToolsHtml(ctx){
   const switcher='<button id="personalDayPrev" type="button" aria-label="上一天" '+(day.day<=1?'disabled':'')+'>‹</button><select id="timelineDayPicker" aria-label="时间轴日期">'+
     Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
   '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(day.day>=monthDays()?'disabled':'')+'>›</button>';
-  return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+
-    timelineAutoOvertimeToolsHtml(day)+switcher+'</div>';
+  return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+switcher+'</div>';
 }
 function attendPlotHtml(ctx){
   const tab=state.chartTab||'overview',day=plotAnalysis(ctx);
@@ -102,8 +91,7 @@ function attendPlotHtml(ctx){
   if(tab==='issues')return top+'<div id="issueChart" class="plot-chart"></div>';
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
-    if(day)return top+(state.workspaceMode==='person'?
-      '<div class="timeline-auto-dock">'+timelineAutoOvertimeToolsHtml(day)+'</div>':'')+
+    if(day)return top+
       '<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动加班计入选择"></div>'+r15PunchPreview(day)+'</div>';
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
@@ -251,17 +239,6 @@ function mountPlotTabs(ctx){
     if(state.chartTab==='timeline'&&ctx.employee&&!state.chartDay)state.chartDay=nearestRecordedDay(ctx.employee.id);
     renderAnalysisPanel();
   });
-  const jump=document.getElementById('autoOvertimeNext');
-  if(jump)jump.onclick=()=>{
-   const targetDay=Number(jump.dataset.day),employeeId=jump.dataset.employee;
-   if(!targetDay||!employeeId)return;
-   if(state.workspaceMode!=='person'){
-    state.workspaceMode='person';state.selection={type:'cell',employeeId,day:targetDay};
-    state.chartTab='timeline';state.chartDay=targetDay;state.timelineRange=null;
-    render();return;
-   }
-   changePersonalDay(targetDay);
-  };
   const picker=document.getElementById('timelineDayPicker');
   if(picker)picker.onchange=()=>{
     if(state.workspaceMode==='person'){changePersonalDay(picker.value);return}
