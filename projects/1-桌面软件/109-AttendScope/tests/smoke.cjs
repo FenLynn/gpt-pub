@@ -366,10 +366,11 @@ async function run(){
     state.analysis=new Map([[emp.id+'|'+day,afterHours]]);
     const ledger=asStatLedger(),get=(metric)=>asStatValue(ledger,'overtime',metric,[emp],[day]);
     if(get('candidateHours')!==1.5||get('candidateDays')!==1||
-       get('candidatePeople')!==1||get('hours')!==0||get('count')!==0)
+       get('candidatePeople')!==1||get('hours')!==1.5||get('count')!==1||
+       get('registeredHours')!==0)
       return fail('statistics',{hours:get('candidateHours'),days:get('candidateDays'),people:get('candidatePeople'),registeredHours:get('hours')});
-    if(!timelineFullInsightHtml(afterHours).includes('加班候选')||
-       !timelineBehaviorSummaryRow(afterHours,'overtime').includes('推算待核'))
+    if(!timelineFullInsightHtml(afterHours).includes('自动加班')||
+       !timelineBehaviorSummaryRow(afterHours,'overtime').includes('自动纳入'))
       return fail('visualSummary','not labeled as candidate');
     if(workingPayload().rules.overtimeMinMinutes!==30||
        !settingsContent('rules').includes('r14OvertimeMin'))
@@ -508,16 +509,19 @@ async function run(){
   const distinctPunchPeople=new Set(state.records.filter(r=>r.datetime.startsWith(monthISO()+'-')).map(r=>r.employeeId)).size;
   return counts('punch')===eligible&&asStatValue(ledger,'punch','people',people,days)===distinctPunchPeople&&counts('leave')===state.leaves.length&&
     counts('trip')===state.trips.length&&counts('outing')===state.outings.length&&
-    counts('overtime')===state.overtimeEntries.length&&
+    counts('overtime')===state.overtimeEntries.length+
+     [...state.analysis.values()].reduce((sum,a)=>sum+activeAutoOvertimeSegments(a).length,0)&&
     asStatValue(ledger,'trip','days',people,days)>=counts('trip')&&
     asStatValue(ledger,'trip','estimatedHours',people,days)>0;
  },'R45 event ledger counts, trip days or time units inconsistent');
  // R45 iteration 3: independently inject overlapping mock events; original working
  // rows are restored in a finally block and are never written to raw/snapshot.
  await check(page,()=>{
-  const prior={leaves:state.leaves,trips:state.trips,outings:state.outings,overtimeEntries:state.overtimeEntries};
+  const prior={leaves:state.leaves,trips:state.trips,outings:state.outings,
+    overtimeEntries:state.overtimeEntries,analysis:state.analysis};
   const id=EMPLOYEES[0].id,who=[EMPLOYEES[0]],day=9,all=Array.from({length:monthDays()},(_,i)=>i+1);
   try{
+   state.analysis=new Map();
    state.leaves=[
     {id:'R45-L1',employeeId:id,date:isoDate(day),start:'08:30',end:'10:30'},
     {id:'R45-L2',employeeId:id,date:isoDate(day),start:'09:00',end:'11:00'}];
@@ -571,8 +575,9 @@ async function run(){
   return state.workspaceMode==='stats'&&state.statsScope==='all'&&
    document.querySelector('[data-workspace="stats"].active')!==null&&
    !!document.getElementById('asStatsScope')&&
-   getComputedStyle(layout.querySelector('.sidebar')).display==='none'&&
-   chart.width>400&&rank.width>280&&rank.left>chart.left&&
+   getComputedStyle(layout.querySelector('.sidebar')).display==='flex'&&
+   document.getElementById('calendar')?.children.length>0&&
+   chart.width>400&&rank.width>=250&&rank.width<=324&&rank.left>chart.left&&
    !!echarts.getInstanceByDom(document.getElementById('asStatChart'))&&h.textContent.includes('考勤统计');
  },'R52 top-level statistics route, width, or chart missing');
  await check(page,()=>{
@@ -589,7 +594,8 @@ async function run(){
  await check(page,()=>{
   const data=asStatRows(),opts=echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption();
   return data.compare==='people'&&data.visible.length<=12&&data.rankRows.length>12&&
-   opts.series[0].type==='bar'&&opts.yAxis[0].type==='category'&&
+   opts.series[0].type==='bar'&&opts.xAxis[0].type==='category'&&
+   opts.yAxis[0].type==='value'&&opts.xAxis[0].axisLabel.rotate>30&&
    document.querySelector('[data-as-chart="line"]').disabled&&
    document.querySelector('.as-stats-chart-hint')!==null;
  },'R52 all-people ranking plotted too many bars or allowed spaghetti lines');
@@ -601,6 +607,7 @@ async function run(){
   const entry=row?.closest('.as-rank-entry');
   return row?.getAttribute('aria-expanded')==='true'&&
     !entry?.querySelector('.as-rank-detail')?.hidden&&
+    !entry.querySelector('.as-rank-detail-grid')&&
     !!entry.querySelector('[data-as-drill]')&&state.workspaceMode==='stats';
  },'R52 single rank click must disclose details without navigation');
  await firstRank.click();
