@@ -224,6 +224,29 @@ function asStatRows(){
 }
 function asStatOptions(items,selected){return items.map(([key,label])=>
  '<option value="'+key+'" '+(selected===key?'selected':'')+'>'+escapeNameChar(label)+'</option>').join('')}
+function asStatRankBreakdown(row,data){
+ const cfg=asStatPrefs(),family=cfg.family,metric=cfg.metric;
+ // Use the same shared ledger as the plot; do not calculate new verdicts.
+ if(row.type==='day'&&asStatScopeMode()==='person'){
+  const a=state.analysis.get((asStatScopePerson()||'')+'|'+Number(row.key));
+  if(!a)return '';
+  return '<div class="as-rank-breakdown"><span>当日打卡证据</span><p>首进 '+escapeNameChar(a.firstIn?.slice(0,5)||'—')+
+   ' · 末出 '+escapeNameChar(a.lastOut?.slice(0,5)||'—')+
+   ' · 班内工时 '+asStatNumber((a.workMinutes||0)/60)+' 小时</p>'+
+   (a.lunchEvidence?'<p>'+escapeNameChar(a.lunchEvidence)+'</p>':'')+'</div>';
+ }
+ const dimensions=row.type==='group'?row.people.map(e=>({label:e.name,people:[e],days:row.days})):
+  row.type==='person'?row.days.map(d=>({label:pad(d)+' 日',people:row.people,days:[d]})):
+  asStatScopeMode()==='all'?workspaceGroups().map(g=>({
+    label:g,people:row.people.filter(e=>groupOf(e)===g),days:row.days
+  })):row.people.map(e=>({label:e.name,people:[e],days:row.days}));
+ const ranked=dimensions.map(d=>({...d,value:asStatValue(data.ledger,family,metric,d.people,d.days)}))
+  .filter(d=>d.value>0).sort((a,b)=>b.value-a.value).slice(0,5);
+ if(!ranked.length)return '<p class="as-rank-breakdown-empty">当前范围没有可细分记录</p>';
+ return '<div class="as-rank-breakdown"><span>主要贡献明细（原始量）</span>'+
+  ranked.map(d=>'<div><span>'+escapeNameChar(d.label)+'</span><strong>'+
+   asStatNumber(d.value)+' '+escapeNameChar(data.unit)+'</strong></div>').join('')+'</div>';
+}
 function statisticsWorkspaceHtml(){
  const c=asStatPrefs(),met=asStatMetric(),mode=asStatScopeMode();
  const groups=workspaceGroups(),scopeGroup=asStatScopeGroup()||groups[0]||'';
@@ -268,6 +291,7 @@ function statisticsWorkspaceHtml(){
    '<span>涉及人员<strong>'+r.peopleCount+' 人</strong></span>'+
    '<span>应出勤<strong>'+r.scheduled+' 人日</strong></span>'+
    (c.aggregate!=='total'?'<span>原始总量<strong>'+asStatNumber(r.raw)+' '+escapeNameChar(selected.unit)+'</strong></span>':'')+
+   '</div><div class="as-rank-breakdown-slot">'+(expanded?asStatRankBreakdown(r,selected):'')+
    '</div><button class="as-rank-drill" type="button" data-as-drill="'+escapeNameChar(r.key)+'">进入下级分析 <span aria-hidden="true">↗</span></button></div></div>';
  }).join(''):'<p class="as-stats-empty">本月暂无该指标的记录</p>';
  return '<section class="as-stats" aria-label="考勤统计工作台">'+
@@ -406,6 +430,10 @@ function renderStatisticsWorkspace(){
    trigger?.classList.toggle('is-expanded',expanded);
    if(detail)detail.hidden=!expanded;
    entry.classList.toggle('is-expanded',expanded);
+   if(expanded){
+    const slot=entry.querySelector('.as-rank-breakdown-slot');
+    if(slot)slot.innerHTML=asStatRankBreakdown(match,asStatRows());
+   }
   });
   if(scroll&&state.statsExpandedKey){
    const target=[...node.querySelectorAll('[data-as-rank]')].find(b=>b.dataset.asRank===key);
