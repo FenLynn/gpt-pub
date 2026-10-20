@@ -35,8 +35,8 @@ function generateMock(){
     const seed=ei*100+d;
     if(sc==='absent')continue;
     if(sc==='overtime'){records.push(rec(emp,d,jitter('09:10',25,seed),'进',sc,1),rec(emp,d,jitter('16:40',45,seed+1),'出',sc,2));continue}
-    let i1=jitter('08:18',10,seed),o1=jitter('12:04',8,seed+1),i2=jitter('13:52',8,seed+2),o2=jitter('17:42',12,seed+3);
-    if(sc==='late')i1=jitter('08:52',12,seed); if(sc==='early')o2=jitter('16:54',18,seed+3); if(sc==='longout'){o1=jitter('11:25',8,seed+1);i2=jitter('15:05',12,seed+2)}
+    let i1=jitter('08:18',10,seed),o1=jitter('11:44',5,seed+1),i2=jitter('13:25',5,seed+2),o2=jitter('17:17',6,seed+3);
+    if(sc==='late')i1=jitter('08:52',12,seed); if(sc==='early')o2=jitter('16:54',12,seed+3); if(sc==='longout'){o1=jitter('11:09',8,seed+1);i2=jitter('14:45',12,seed+2)}
     const base=[rec(emp,d,i1,'进',sc,1),rec(emp,d,o1,'出',sc,2),rec(emp,d,i2,'进',sc,3),rec(emp,d,o2,'出',sc,4)];
     if(sc==='multiin')base.splice(1,0,rec(emp,d,jitter('10:15',20,seed+9),'进',sc,5));
     if(sc==='multiout')base.splice(3,0,rec(emp,d,jitter('15:30',25,seed+11),'出',sc,6));
