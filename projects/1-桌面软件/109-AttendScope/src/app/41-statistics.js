@@ -478,29 +478,35 @@ function renderStatisticsWorkspace(){
  node.querySelector('.as-stats-chart').classList.toggle('is-empty',!data.rows.some(r=>r.raw>0));
  if(!chart)return;
  const isDay=data.compare==='days',line=c.chart==='line';
- // ECharts' category Y axis grows upward: reverse the bar data so the largest
- // ranked item is at the top, just as it is in the ranking table.
- const rows=!isDay&&!line?data.visible.slice().reverse():data.visible;
- const cat=rows.map(x=>x.label),values=rows.map(x=>Number(x.value.toFixed(3)));
- const gradient=line?'#648d7e':asSoftBarGradient(!isDay);
- chart.setOption({animation:state.prefs?.motion!==false,animationDuration:290,
-  grid:isDay||line?{top:23,bottom:40,left:52,right:21}:{top:14,bottom:30,left:92,right:42,containLabel:false},
-  tooltip:{trigger:'axis',axisPointer:{type:'shadow'},formatter:p=>{
-   const point=p[0],row=rows[point.dataIndex];
-   return escapeNameChar(row.label)+'<br><b>'+asStatNumber(row.value)+' '+escapeNameChar(data.effectiveUnit)+'</b>'+
-    '<br>范围 '+row.peopleCount+' 人 · '+row.scheduled+' 应出勤人日';
+ // Categorical labels belong beneath their bars; draw every item vertically.
+ // The plot may have fewer marks, but always fills the full plot card.
+ const rows=data.visible,cat=rows.map(x=>x.label),
+   values=rows.map(x=>Number(x.value.toFixed(3)));
+ const gradient=line?'#648d7e':asSoftBarGradient(false);
+ chart.setOption({animation:state.prefs?.motion!==false,animationDuration:260,
+  grid:{top:20,bottom:isDay?78:105,left:47,right:18,containLabel:false},
+  tooltip:{trigger:'item',axisPointer:{type:'none'},confine:true,formatter:p=>{
+   const row=rows[p.dataIndex];if(!row)return '';
+   return escapeNameChar(row.label)+'<br><b>'+asStatNumber(row.value)+' '+
+    escapeNameChar(data.effectiveUnit)+'</b><br>范围 '+row.peopleCount+' 人';
   }},
-  xAxis:!isDay&&!line?{type:'value',axisLabel:{fontSize:12,color:'#73899c'},splitLine:{lineStyle:{color:'#eaf0f3'}},axisLine:{show:false}}:
-   {type:'category',data:cat,axisLabel:{fontSize:12,color:'#668196',interval:isDay?Math.max(0,Math.floor(cat.length/12)):0},
-    axisTick:{show:false},axisLine:{lineStyle:{color:'#d9e4eb'}}},
-  yAxis:!isDay&&!line?{type:'category',data:cat,axisLabel:{fontSize:13,color:'#466477',width:79,overflow:'truncate'},
-    axisLine:{show:false},axisTick:{show:false}}:
-   {type:'value',min:0,axisLabel:{fontSize:12,color:'#73899c'},splitLine:{lineStyle:{color:'#eaf0f3'}},axisLine:{show:false}},
-  series:[{type:line?'line':'bar',data:values,barMaxWidth:16,smooth:false,symbolSize:6,
-   itemStyle:{color:gradient,opacity:line?1:.9,borderRadius:line?0:!isDay?[0,7,7,0]:[7,7,0,0]},
+  xAxis:{type:'category',data:cat,boundaryGap:!line,
+   axisLabel:{fontSize:isDay?11:12,color:'#607f73',interval:0,rotate:isDay?42:49,
+    hideOverlap:false,align:'right',margin:13},
+   axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe9e3'}}},
+  yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#80958c'},
+   splitLine:{lineStyle:{color:'rgba(105,145,126,.10)'}},axisLine:{show:false}},
+  series:[{id:'statistics-primary',name:met?.[1]||'统计值',
+   type:line?'line':'bar',data:values,barMaxWidth:31,barMinHeight:values.some(v=>v>0)?1:0,
+   smooth:false,showSymbol:true,symbol:'circle',symbolSize:5.5,
+   itemStyle:{color:gradient,opacity:line?1:.79,borderRadius:line?0:[5,5,0,0]},
+   emphasis:{focus:'self',scale:true,scaleSize:2,
+    itemStyle:{color:line?'#37735f':'rgba(59,126,100,.98)',opacity:1,
+     shadowBlur:8,shadowColor:'rgba(47,105,81,.19)'},
+    lineStyle:{width:3.2},symbolSize:11},
    lineStyle:{width:2.2,color:'#648d7e'},
-   areaStyle:line?{color:'rgba(103,153,129,.06)'}:undefined,
-   showBackground:!line&&!isDay,backgroundStyle:{color:'rgba(107,149,130,.055)'}}]});
+   areaStyle:line?{color:'rgba(103,153,129,.045)'}:undefined,
+   showBackground:false}]});
  // Rank cells and chart marks refer to the same comparison entity.
  const ranking=[...node.querySelectorAll('[data-as-rank]')];
  const emphasize=(key,show)=>{
