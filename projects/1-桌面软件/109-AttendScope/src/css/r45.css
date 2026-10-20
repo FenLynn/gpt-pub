@@ -358,3 +358,121 @@ html{scrollbar-gutter:stable}
  .as-rank-detail{padding-left:16px}
 }
 @media(prefers-reduced-motion:reduce){.as-rank-entry .as-rank-chevron{transition:none}}
+
+/* R53 · Unified statistical canvas with the familiar left sidebar. */
+.layout.workspace-mode-stats{
+ display:grid!important;grid-template-columns:var(--p109-side) minmax(0,1fr)!important;
+ min-height:calc(100vh - var(--topbar));width:100%;max-width:100%;
+}
+.layout.workspace-mode-stats>.sidebar{
+ display:flex!important;flex-direction:column;position:sticky;top:var(--topbar);
+ width:var(--p109-side);height:calc(100vh - var(--topbar));min-height:0;
+ overflow:hidden;padding:0 13px 12px;background:#f8fafb;border-right:1px solid #e5eaf0;
+}
+.stats-side-controls{padding:23px 10px 12px}
+.stats-side-description{margin:8px 0 20px;color:#859890;font-size:12px;line-height:1.8}
+.stats-side-symbol{display:flex;align-items:center;justify-content:space-between;
+ border-top:1px solid #e6eeea;padding:15px 0;color:#8ba097;font-size:12px}
+.stats-side-symbol strong{color:#406859;font-size:14px;font-weight:700}
+.layout.workspace-mode-stats>.workspace{
+ width:auto!important;max-width:none!important;min-width:0;min-height:0;
+ padding:13px 16px 13px!important;overflow:hidden!important;
+}
+.layout.workspace-mode-stats .stats-workspace{display:block!important;width:100%;min-height:0!important}
+.layout.workspace-mode-stats .as-stats{
+ display:flex;flex-direction:column;max-width:none;min-width:0;width:100%;
+ height:calc(100vh - var(--topbar) - 26px);min-height:550px;
+}
+.layout.workspace-mode-stats .as-stats-heading{
+ display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;
+ flex-wrap:nowrap!important;gap:14px;padding:2px 0 12px;min-height:43px;
+}
+.layout.workspace-mode-stats .as-stats-heading h2{
+ margin:0;line-height:34px;font-size:20px;white-space:nowrap;font-weight:740;
+}
+.layout.workspace-mode-stats .as-stats-heading-actions{
+ display:flex;flex-wrap:nowrap;gap:10px;min-width:0;
+}
+.layout.workspace-mode-stats .as-stats-scope{padding:2px 4px;white-space:nowrap;flex-wrap:nowrap}
+.layout.workspace-mode-stats .as-stats-heading-actions .as-stats-export{flex:0 0 auto}
+.layout.workspace-mode-stats .as-stats-filters{flex:0 0 auto}
+.layout.workspace-mode-stats .as-stats-inline{flex:0 0 auto;padding:14px 1px!important;gap:20px}
+.layout.workspace-mode-stats .as-stats-inline strong{font-size:18px}
+.layout.workspace-mode-stats .as-stats-visual{
+ display:grid;flex:1 1 auto;min-height:355px;min-width:0;
+ grid-template-columns:minmax(0,1fr) minmax(256px,308px)!important;
+ gap:12px;align-items:stretch;
+}
+.layout.workspace-mode-stats .as-stats-chart{
+ display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px 13px 10px!important;
+}
+.layout.workspace-mode-stats .as-stats-chart-header{flex:0 0 auto;min-height:32px}
+.layout.workspace-mode-stats .as-stats-chart-canvas{
+ display:block;width:100%;height:auto!important;min-height:285px;
+ flex:1 1 auto;align-self:stretch;
+}
+.layout.workspace-mode-stats .as-stats-rank{
+ display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px 0 0!important;
+}
+.layout.workspace-mode-stats .as-stats-rank-head{flex:0 0 auto;padding:0 12px 10px}
+.layout.workspace-mode-stats .as-stats-rank-table{
+ flex:1 1 auto;min-height:0;max-height:none!important;
+ overflow-y:auto;scrollbar-gutter:stable;padding-bottom:4px;
+}
+.layout.workspace-mode-stats .as-stats-foot{flex:0 0 auto;padding:9px 2px 0;font-size:11.5px}
+.as-rank-entry .as-stats-rank-row{
+ grid-template-columns:20px minmax(0,1fr) auto auto 10px;
+ gap:6px;padding:9px 10px;min-height:39px;
+}
+.as-rank-entry .as-rank-name{font-size:12px}
+.as-rank-entry .as-rank-index{font-size:10px}
+.as-rank-entry .as-rank-unit{font-size:10px}
+.as-rank-entry .as-stats-rank-row strong{font-size:13px}
+.as-rank-detail{padding:7px 10px 10px 34px}
+.as-rank-breakdown{margin:0;padding:2px 0;border:0;gap:0}
+.as-rank-breakdown>div{padding:7px 0;border-bottom:1px solid rgba(107,153,126,.09)}
+.as-rank-breakdown>div:last-child{border-bottom:0}
+.as-rank-drill{margin-top:7px;min-height:24px;font-size:10.5px}
+.as-stats-rank-row.is-linked{background:transparent!important}
+.as-stats-rank-row.is-linked .as-rank-name,
+.as-stats-rank-row.is-linked strong{color:#287f5b!important;font-weight:760}
+.as-rank-entry.is-expanded>.as-stats-rank-row{background:#f5faf6!important}
+.as-stats-chart .as-stats-chart-hint{font-size:10.5px;line-height:1.3;margin-top:-3px}
+/* Only explicit automatic intervals expose the inclusion controls.
+   The layer is positioned over ECharts without disturbing its dataZoom. */
+.music-track-panel{position:relative}
+.overtime-review-layer{position:absolute;inset:0;z-index:14;pointer-events:none;overflow:hidden}
+.overtime-review-actions{position:absolute;display:flex;align-items:center;gap:1px;
+ height:20px;padding:2px;background:rgba(255,255,255,.90);
+ border:1px solid rgba(178,107,145,.36);border-radius:5px;
+ pointer-events:auto;box-shadow:0 1px 3px rgba(95,57,80,.08)}
+.overtime-review-actions.is-excluded{background:rgba(255,255,255,.65);opacity:.5}
+.overtime-review-btn{display:grid;place-items:center;width:20px;height:16px;
+ padding:0;border:0;border-radius:3px;background:transparent;
+ color:#a07c91;font-size:13px;line-height:1;cursor:pointer}
+.overtime-review-btn.chosen{background:#d2a7bf;color:#633951;font-weight:750}
+.overtime-review-actions.is-excluded .overtime-review-btn.chosen{background:#eee0e8;color:#b188a0}
+.overtime-review-btn:hover,.overtime-review-btn:focus-visible{background:#f1dce7;color:#793d61;outline:none}
+@media(max-width:1300px){
+ .layout.workspace-mode-stats .as-stats-visual{
+  grid-template-columns:minmax(0,1fr) minmax(240px,270px)!important}
+ .layout.workspace-mode-stats .as-stats-heading h2{font-size:18px}
+ .layout.workspace-mode-stats .as-stats-heading-actions{gap:5px}
+ .as-stats-scope select{max-width:130px}
+}
+@media(max-width:1040px){
+ .layout.workspace-mode-stats .as-stats{height:auto;min-height:calc(100vh - var(--topbar) - 26px)}
+ .layout.workspace-mode-stats .as-stats-heading{flex-wrap:wrap!important}
+ .layout.workspace-mode-stats .as-stats-visual{
+  grid-template-columns:minmax(0,1fr)!important}
+ .layout.workspace-mode-stats .as-stats-chart-canvas{min-height:360px}
+ .layout.workspace-mode-stats .as-stats-rank-table{min-height:285px;max-height:450px!important}
+}
+@media(max-width:780px){
+ .layout.workspace-mode-stats{grid-template-columns:minmax(0,1fr)!important}
+ .layout.workspace-mode-stats>.sidebar{display:none!important}
+ .layout.workspace-mode-stats .as-stats-heading-actions{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){
+ .overtime-review-btn,.as-stats-rank-row{transition:none!important}
+}
