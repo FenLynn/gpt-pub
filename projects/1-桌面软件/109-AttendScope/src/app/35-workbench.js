@@ -287,7 +287,10 @@ function selectCellAndFocusEvidence(employeeId,day){
 }
 function mountRawTable(ctx){
   mountPlotTabs(ctx);
-  document.querySelectorAll('[data-raw-tab]').forEach(btn=>btn.onclick=()=>{state.rawDataTab=btn.dataset.rawTab;state.rawPage=1;renderRawTable(ctx)});
+  document.querySelectorAll('[data-raw-tab]').forEach(btn=>btn.onclick=()=>{
+   state.rawDataTab=btn.dataset.rawTab;state.rawPage=1;
+   asNavTrack();asNavUpdateButtons();renderRawTable(ctx);
+  });
   document.getElementById('rawFloat').onclick=toggleRawPopout;
   renderRawTable(ctx);
 }
