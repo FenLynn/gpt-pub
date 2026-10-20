@@ -544,7 +544,7 @@ function renderStatisticsWorkspace(){
  const barWidth=Math.max(3,Math.min(54,Math.floor(slot*(rows.length<=8?.62:.70))));
  // User preference: flatter names, never near-vertical.
  const many=rows.length>=30,angle=isDay?27:many?34:rows.length>14?28:20;
- const staggerLabels=rows.length>=24;
+ // All employee labels share one baseline; staggered newlines were misaligning names.
  const formatTop=(p,topOnly=false)=>{
    const i=p.dataIndex;
    if(isOvertimeStack){
@@ -607,8 +607,7 @@ function renderStatisticsWorkspace(){
    }},
   xAxis:{type:'category',data:cat,boundaryGap:!line,
    axisLabel:{fontSize:many?12:13,color:'#687f9d',interval:0,rotate:angle,
-    hideOverlap:false,align:'right',margin:10,lineHeight:17,
-    formatter:(value,index)=>staggerLabels&&index%2===1?'\n'+value:value},
+    hideOverlap:false,align:'right',margin:11,lineHeight:17},
    axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe5ee'}}},
   yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#8895a9'},
    splitLine:{lineStyle:{color:'rgba(100,123,158,.11)'}},axisLine:{show:false}},
