@@ -87,7 +87,9 @@ async function connectProjectDir(){
       const conf=await existingDir(handle,'config').catch(()=>null);
       if(conf){
         const savedRules=await readJSON(conf,'work_rules.json');
-        if(savedRules)for(const k of ['amStart','amEnd','pmStart','pmEnd','grace','dupSeconds','overtimeMinMinutes'])if(savedRules[k]!=null)RULES[k]=savedRules[k];
+        if(savedRules)for(const k of ['amStart','amEnd','pmStart','pmEnd','grace','graceAmStart','graceAmEnd','gracePmStart','gracePmEnd','dupSeconds','overtimeMinMinutes'])if(savedRules[k]!=null)RULES[k]=savedRules[k];
+        if(savedRules&&savedRules.graceAmStart==null)RULES.graceAmStart=Number(savedRules.grace??5);
+        if(savedRules&&savedRules.gracePmStart==null)RULES.gracePmStart=Number(savedRules.grace??5);
         const caldir=await existingDir(conf,'calendar').catch(()=>null);
         const years=new Set([YEAR,...(project.months||[]).map(k=>Number(String(k).slice(0,4))).filter(Number.isInteger)]);
         for(const yr of years){
