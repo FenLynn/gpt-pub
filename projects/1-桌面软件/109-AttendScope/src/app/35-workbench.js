@@ -61,6 +61,22 @@ function setManualStatusForCurrent(status){
   if(status)state.judgmentMode='manual';else if(!hasManualStatuses())state.judgmentMode='initial';
   state.saved=false;rememberMonth();render();
 }
+function employeeAutoOvertimeDays(employeeId){
+ return Array.from({length:monthDays()},(_,i)=>state.analysis.get(employeeId+'|'+(i+1)))
+  .filter(a=>a?.autoOvertime?.segments?.length).map(a=>a.day);
+}
+function timelineAutoOvertimeToolsHtml(item){
+ const days=employeeAutoOvertimeDays(item.employee.id),minutesCount=
+  (item.autoOvertime?.segments||[]).reduce((n,s)=>n+s.minutes,0);
+ const current=days.indexOf(item.day),next=days[(current+1+days.length)%days.length];
+ const count=days.length;
+ return '<div class="timeline-auto-tools">'+
+  '<span class="timeline-auto-label" title="✓ 是纳入统计，不代表正式审批">'+
+  '自动加班'+(minutesCount?' '+fmtMinutes(minutesCount):' · 本日无候选')+'</span>'+
+  (count?'<button type="button" id="autoOvertimeNext" data-employee="'+escapeNameChar(item.employee.id)+
+  '" data-day="'+next+'" title="打开该员工有自动加班候选的日期">查找候选 '+count+' 天 →</button>':
+  '<span class="timeline-auto-none">本月没有符合完整打卡与时长阈值的候选</span>')+'</div>';
+}
 function timelineLegendHtml(item){
   const judgment=attendanceJudgment(item);
   return '<div class="timeline-top-legend">'+
@@ -73,11 +89,13 @@ function timelineHeaderToolsHtml(ctx){
   if((state.chartTab||'overview')!=='timeline')return '';
   const day=plotAnalysis(ctx);if(!day)return '';
   // R41 personal date navigation lives alongside the full-month strip in the only title row.
-  if(state.workspaceMode==='person')return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+'</div>';
+  if(state.workspaceMode==='person')return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+
+    timelineAutoOvertimeToolsHtml(day)+'</div>';
   const switcher='<button id="personalDayPrev" type="button" aria-label="上一天" '+(day.day<=1?'disabled':'')+'>‹</button><select id="timelineDayPicker" aria-label="时间轴日期">'+
     Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(day.day===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
   '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(day.day>=monthDays()?'disabled':'')+'>›</button>';
-  return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+switcher+'</div>';
+  return '<div class="analysis-head-timeline-tools">'+timelineLegendHtml(day)+
+    timelineAutoOvertimeToolsHtml(day)+switcher+'</div>';
 }
 function attendPlotHtml(ctx){
   const tab=state.chartTab||'overview',day=plotAnalysis(ctx);
@@ -234,6 +252,17 @@ function mountPlotTabs(ctx){
     if(state.chartTab==='timeline'&&ctx.employee&&!state.chartDay)state.chartDay=nearestRecordedDay(ctx.employee.id);
     renderAnalysisPanel();
   });
+  const jump=document.getElementById('autoOvertimeNext');
+  if(jump)jump.onclick=()=>{
+   const targetDay=Number(jump.dataset.day),employeeId=jump.dataset.employee;
+   if(!targetDay||!employeeId)return;
+   if(state.workspaceMode!=='person'){
+    state.workspaceMode='person';state.selection={type:'cell',employeeId,day:targetDay};
+    state.chartTab='timeline';state.chartDay=targetDay;state.timelineRange=null;
+    render();return;
+   }
+   changePersonalDay(targetDay);
+  };
   const picker=document.getElementById('timelineDayPicker');
   if(picker)picker.onchange=()=>{
     if(state.workspaceMode==='person'){changePersonalDay(picker.value);return}
