@@ -342,40 +342,41 @@ async function run(){
    return analyzeDay(emp,d);
   };
   const split=[['08:25','进'],['12:04','出'],['13:56','进'],['17:35','出']];
+  const fail=(caseName,detail)=>{throw Error('R49_CASE '+caseName+' '+JSON.stringify(detail))};
   try{
    state.trips=[];state.outings=[];RULES.overtimeMinMinutes=30;
    const ordinary=dayResult(day,split);
    if(ordinary.severity!=='normal'||ordinary.workMinutes!==420||
-     ordinary.autoOvertime.minutes!==0||ordinary.lunchEvidence!=='有午休进出')return false;
+     ordinary.autoOvertime.minutes!==0||ordinary.lunchEvidence!=='有午休进出')return fail('ordinary',{severity:ordinary.severity,work:ordinary.workMinutes,auto:ordinary.autoOvertime,lunch:ordinary.lunchEvidence,issues:ordinary.issues});
    const continuous=dayResult(day,[['08:25','进'],['19:00','出']]);
    if(continuous.workMinutes!==420||continuous.autoOvertime.minutes!==90||
-     continuous.lunchEvidence!=='未分段（工时按班次扣午休）')return false;
+     continuous.lunchEvidence!=='未分段（工时按班次扣午休）')return fail('continuous',{work:continuous.workMinutes,auto:continuous.autoOvertime,lunch:continuous.lunchEvidence});
    const lateLunch=dayResult(day,[['08:25','进'],['12:00','出'],['14:17','进'],['17:35','出']]);
    if(lateLunch.severity!=='suspect'||!lateLunch.issues.some(x=>x.includes('午休返岗'))||
-     lateLunch.issues.some(x=>x==='迟到'||x==='早退'))return false;
+     lateLunch.issues.some(x=>x==='迟到'||x==='早退'))return fail('lateLunch',{severity:lateLunch.severity,issues:lateLunch.issues});
    const missingPm=dayResult(day,[['08:25','进'],['12:00','出'],['14:00','进']]);
    if(missingPm.severity!=='suspect'||missingPm.issues.includes('早退')||
-     missingPm.autoOvertime.minutes!==0)return false;
+     missingPm.autoOvertime.minutes!==0)return fail('missingPm',{severity:missingPm.severity,issues:missingPm.issues,auto:missingPm.autoOvertime});
    const noonOnly=dayResult(day,[['08:25','进'],['12:00','出']]);
-   if(noonOnly.severity!=='suspect'||noonOnly.issues.includes('早退'))return false;
+   if(noonOnly.severity!=='suspect'||noonOnly.issues.includes('早退'))return fail('noonOnly',{severity:noonOnly.severity,issues:noonOnly.issues});
    const afterHours=dayResult(day,[['08:25','进'],['12:04','出'],['13:56','进'],['19:00','出']]);
-   if(afterHours.autoOvertime.minutes!==90||afterHours.workMinutes!==420)return false;
+   if(afterHours.autoOvertime.minutes!==90||afterHours.workMinutes!==420)return fail('afterHours',{auto:afterHours.autoOvertime,work:afterHours.workMinutes});
    const recorded=dayResult(day,[['08:25','进'],['19:00','出']],
      [{id:'registered',employeeId:emp.id,date,start:'18:00',end:'19:00'}]);
-   if(recorded.autoOvertime.minutes!==0||!recorded.autoOvertime.reason.includes('已登记'))return false;
+   if(recorded.autoOvertime.minutes!==0||!recorded.autoOvertime.reason.includes('已登记'))return fail('recorded',recorded.autoOvertime);
    const threshold=dayResult(day,[['08:25','进'],['17:52','出']]);
-   if(threshold.autoOvertime.minutes!==0||threshold.autoOvertime.rawMinutes!==22)return false;
+   if(threshold.autoOvertime.minutes!==0||threshold.autoOvertime.rawMinutes!==22)return fail('threshold',threshold.autoOvertime);
    RULES.overtimeMinMinutes=15;
    const lowered=dayResult(day,[['08:25','进'],['17:52','出']]);
-   if(lowered.autoOvertime.minutes!==22)return false;
+   if(lowered.autoOvertime.minutes!==22)return fail('lowered',lowered.autoOvertime);
    RULES.overtimeMinMinutes=30;
    const rest=dayResult(restDay,[['09:00','进'],['15:00','出']]);
-   if(rest.autoOvertime.minutes!==240||rest.workMinutes!==240)return false;
+   if(rest.autoOvertime.minutes!==240||rest.workMinutes!==240)return fail('rest',{auto:rest.autoOvertime,work:rest.workMinutes,dayType:dayType(restDay)});
    const restIncomplete=dayResult(restDay,[['09:00','进']]);
-   if(restIncomplete.autoOvertime.minutes!==0||restIncomplete.severity!=='suspect')return false;
+   if(restIncomplete.autoOvertime.minutes!==0||restIncomplete.severity!=='suspect')return fail('restIncomplete',{severity:restIncomplete.severity,auto:restIncomplete.autoOvertime});
    const excused=dayResult(day,[['08:25','进'],['12:00','出'],['14:25','进'],['17:35','出']],[],
      [{employeeId:emp.id,date,start:'14:00',end:'14:25'}]);
-   if(excused.issues.some(x=>x.includes('午休返岗')))return false;
+   if(excused.issues.some(x=>x.includes('午休返岗')))return fail('excused',excused.issues);
    return true;
   }finally{
    Object.assign(state,{
