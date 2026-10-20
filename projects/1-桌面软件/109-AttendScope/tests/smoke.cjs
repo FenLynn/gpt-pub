@@ -408,11 +408,25 @@ async function run(){
    state.statsConfig.compare='days';renderStatisticsWorkspace();
    return asStatRows().rankRows.length===0&&
     !!document.querySelector('.as-stats-empty')&&
+    document.querySelector('.as-stats-chart').classList.contains('is-empty')&&
     document.querySelectorAll('.as-stats-rank-row').length===0;
   }finally{
    state.outings=prev;state.statsConfig=cfg;renderStatisticsWorkspace();
   }
  },'R45 empty dataset must have an honest no-record state');
+ await check(page,()=>document.querySelector('[data-as-chart="bar"]').getAttribute('aria-pressed')==='true',
+ 'R47 chart toggle must communicate selected mode');
+ await page.locator('#asStatFamily').focus();
+ await page.locator('#asStatFamily').selectOption('trip');
+ await check(page,()=>document.activeElement?.id==='asStatFamily'&&
+  !!document.querySelector('#asStatChart svg'),'R47 changing a metric must retain focus and chart');
+ await page.locator('#asStatFamily').selectOption('leave');
+ await page.locator('.as-stats-rank-row').first().hover();
+ await check(page,()=>document.querySelector('.as-stats-rank-row.is-linked')!==null,
+ 'R47 rank hover must connect to plotted comparison');
+ await page.locator('#asStatsExport').hover();
+ await check(page,()=>document.querySelector('.as-stats-rank-row.is-linked')===null,
+ 'R47 rank highlight must clear on pointer exit');
  await page.screenshot({path:path.join(out,'r45-all-stats-1920.png')});
  await page.locator('#asStatFamily').selectOption('overtime');
  await page.locator('#asStatMetric').selectOption('hours');

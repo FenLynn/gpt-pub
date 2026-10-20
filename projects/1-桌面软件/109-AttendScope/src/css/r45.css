@@ -88,3 +88,19 @@
 .as-stats-inline strong{color:#255f86}
 .as-stats-rank-row:hover .as-rank-name{color:#1e668f}
 .as-stats-chart-switch button:focus-visible,.as-stats-rank-head button:focus-visible{outline:2px solid #5296c4;outline-offset:2px}
+
+
+/* R47 interactive polish: linked chart/rank hover and deliberate empty states. */
+.as-stats-chart{position:relative}
+.as-stats-chart-empty{
+ display:none;position:absolute;left:25%;right:25%;top:45%;z-index:2;
+ align-items:center;justify-content:center;text-align:center;
+ color:#8298a9;background:rgba(250,252,253,.95);border:1px dashed #d9e5ec;
+ border-radius:9px;padding:16px;font-size:14px;font-weight:580;pointer-events:none;
+}
+.as-stats-chart.is-empty .as-stats-chart-empty{display:flex}
+.as-stats-chart.is-empty .as-stats-chart-canvas{opacity:.38}
+.as-stats-rank-row.is-linked{background:#eaf5fc}
+.as-stats-rank-row.is-linked .as-rank-name,.as-stats-rank-row.is-linked strong{color:#1b699b}
+.as-stats-filters select:focus-visible{outline:2px solid #5ca6d7;outline-offset:2px}
+@media(max-width:1450px){.as-stats-chart-empty{left:15%;right:15%}}

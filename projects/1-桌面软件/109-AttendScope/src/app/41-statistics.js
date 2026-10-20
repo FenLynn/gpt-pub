@@ -214,7 +214,7 @@ function statisticsWorkspaceHtml(){
    '<label>统计方式<select id="asStatAggregate">'+asStatOptions([['total','总量'],['perPerson','人均'],['per100','每百应出勤人日']],c.aggregate)+'</select></label>'+
    '<label>排序范围<select id="asStatLimit">'+asStatOptions([['5','前 5'],['10','前 10'],['all','全部']],String(c.limit))+'</select></label>'+
   '</div>'+
-  '<div class="as-stats-inline">'+
+  '<div class="as-stats-inline" aria-live="polite">'+
    '<div><span>当前指标</span><strong>'+escapeNameChar(met[1])+'</strong></div>'+
    '<div><span>'+ (c.aggregate==='total'?'范围总量':c.aggregate==='perPerson'?'人均':'每百人日')+'</span>'+
    '<strong>'+asStatNumber(selected.total)+' <small>'+escapeNameChar(selected.effectiveUnit)+'</small></strong></div>'+
@@ -222,9 +222,10 @@ function statisticsWorkspaceHtml(){
    '<div><span>应出勤</span><strong>'+selected.scheduled+' <small>人日</small></strong></div></div>'+
   '<div class="as-stats-visual"><div class="as-stats-chart"><div class="as-stats-chart-header">'+
    '<h3>'+escapeNameChar(met[1])+' · '+escapeNameChar(comparisons.find(x=>x[0]===c.compare)?.[1]||'统计')+'</h3>'+
-   '<div class="as-stats-chart-switch"><button type="button" data-as-chart="bar" class="'+(c.chart==='bar'?'active':'')+'">柱状</button>'+
-   '<button type="button" data-as-chart="line" class="'+(c.chart==='line'?'active':'')+'">折线</button></div></div>'+
-   '<div id="asStatChart" class="as-stats-chart-canvas" aria-label="交互式统计图表"></div></div>'+
+   '<div class="as-stats-chart-switch"><button type="button" data-as-chart="bar" aria-pressed="'+(c.chart==='bar')+'" class="'+(c.chart==='bar'?'active':'')+'">柱状</button>'+
+   '<button type="button" data-as-chart="line" aria-pressed="'+(c.chart==='line')+'" class="'+(c.chart==='line'?'active':'')+'">折线</button></div></div>'+
+   '<div id="asStatChart" class="as-stats-chart-canvas" aria-label="交互式统计图表"></div>'+
+  '<div class="as-stats-chart-empty">当前指标没有可绘制的记录</div></div>'+
    '<div class="as-stats-rank"><div class="as-stats-rank-head"><h3>排行榜 · 明细</h3>'+
     '<button id="asStatSort" type="button" title="调整排名方向">'+(c.sort==='desc'?'降序 ↓':'升序 ↑')+'</button></div>'+
    '<div class="as-stats-rank-table" id="asStatRankTable">'+
@@ -270,6 +271,9 @@ function renderStatisticsWorkspace(){
  const node=document.getElementById('statisticsWorkspace');
  if(!node||state.analyticsPage!=='stats'||state.workspaceMode==='data'||state.workspaceMode==='classic')return;
  if(typeof disposeAttendCharts==='function')disposeAttendCharts();
+ const oldFocus=document.activeElement,inside=node.contains(oldFocus);
+ const focusId=inside?oldFocus.id:'';
+ const focusChart=inside?oldFocus.dataset?.asChart:null;
  const c=asStatPrefs();
  node.innerHTML=statisticsWorkspaceHtml();
  node.querySelector('#asStatFamily').onchange=e=>{
@@ -290,6 +294,7 @@ function renderStatisticsWorkspace(){
  node.querySelectorAll('[data-as-rank]').forEach(b=>b.onclick=()=>asStatDrill(b.dataset.asRank));
  node.querySelector('#asStatsExport').onclick=asStatExport;
  const data=asStatRows(),chart=initAttendChart(document.getElementById('asStatChart'));
+ node.querySelector('.as-stats-chart').classList.toggle('is-empty',!data.rows.some(r=>r.raw>0));
  if(!chart)return;
  const isDay=data.compare==='days',line=c.chart==='line';
  // ECharts' category Y axis grows upward: reverse the bar data so the largest
@@ -313,5 +318,27 @@ function renderStatisticsWorkspace(){
    itemStyle:{color:'#5799c7',borderRadius:line?0:[0,4,4,0]},lineStyle:{width:2.5,color:'#5799c7'},
    areaStyle:line?{color:'rgba(91,158,202,.07)'}:undefined,
    showBackground:!line&&!isDay,backgroundStyle:{color:'#f0f5f8'}}]});
+ // Rank cells and chart marks refer to the same comparison entity.
+ const ranking=[...node.querySelectorAll('[data-as-rank]')];
+ const emphasize=(key,show)=>{
+  ranking.forEach(b=>b.classList.toggle('is-linked',show&&b.dataset.asRank===key));
+  const idx=rows.findIndex(r=>r.key===key);
+  if(idx<0)return;
+  chart.dispatchAction({type:show?'highlight':'downplay',seriesIndex:0,dataIndex:idx});
+  if(show)chart.dispatchAction({type:'showTip',seriesIndex:0,dataIndex:idx});
+  else chart.dispatchAction({type:'hideTip'});
+ };
+ ranking.forEach(b=>{
+  b.addEventListener('mouseenter',()=>emphasize(b.dataset.asRank,true));
+  b.addEventListener('mouseleave',()=>emphasize(b.dataset.asRank,false));
+  b.addEventListener('focus',()=>emphasize(b.dataset.asRank,true));
+  b.addEventListener('blur',()=>emphasize(b.dataset.asRank,false));
+ });
+ chart.on('mouseover',e=>{const item=rows[e.dataIndex];if(item)emphasize(item.key,true)});
+ chart.on('globalout',()=>ranking.forEach(b=>b.classList.remove('is-linked')));
  chart.on('click',e=>{const row=rows[e.dataIndex];if(row)asStatDrill(row.key)});
+ // Changes reconstruct the controls; keep their keyboard focus in place.
+ const next=focusId?document.getElementById(focusId):
+  focusChart?node.querySelector('[data-as-chart="'+focusChart+'"]'):null;
+ if(next&&node.contains(next))next.focus({preventScroll:true});
 }
