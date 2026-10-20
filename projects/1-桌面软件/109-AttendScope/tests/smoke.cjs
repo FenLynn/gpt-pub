@@ -329,6 +329,26 @@ async function run(){
  },'R39 1366 calendar visibility or horizontal matrix use');
  await page.screenshot({path:path.join(out,'r37-all-1366.png')});
  await page.setViewportSize({width:1920,height:1080});
+ // R58: the fresh default is five minutes, assessed per isolated interval.
+ await check(page,()=>{
+  if(RULES.overtimeMinMinutes!==5)return false;
+  const pair=(begin,end)=>[{time:begin},{time:end}];
+  const evaluate=ls=>estimateOvertimeCandidate(ls,8,[]);
+  const short=evaluate([pair('17:11','17:14'),pair('18:00','18:04')]);
+  const exact=evaluate([pair('17:10','17:15')]);
+  const before=evaluate([pair('17:10:30','17:15:29')]);
+  const two=evaluate([pair('17:10','17:15'),pair('18:00','18:05')]);
+  const registered=estimateOvertimeCandidate([pair('17:10','17:25')],8,[
+    {start:'17:14',end:'17:22'}]);
+  const settings=settingsContent('rules');
+  return short.rawMinutes===7&&short.minutes===0&&short.segments.length===0&&
+   exact.minutes===5&&exact.segments.length===1&&
+   before.minutes===0&&before.rawMinutes<5&&
+   two.minutes===10&&two.segments.length===2&&
+   registered.minutes===0&&registered.rawMinutes===7&&
+   settings.includes('id="r14OvertimeMin"')&&
+   settings.includes('step="1"')&&settings.includes('min="1"');
+ },'R58 every disjoint interval requires its own editable five-minute threshold');
  // R56: new 08:30–11:40 / 13:30–17:10 shift, independent
  // 5/0/5/0-minute tolerances, derived-only overtime and source immutability.
  await check(page,()=>{
@@ -577,6 +597,26 @@ async function run(){
    ['inline-flex','flex'].includes(getComputedStyle(label).display)&&
    asStatPrefs().compare==='people'&&!!line?.disabled;
  },'R55 categorical chart must disable chronological line mode');
+ // R58: each statistical family gets its own accessible gradient and hover shade.
+ for(const family of ['leave','trip','outing','punch','status']){
+  await page.locator('#asStatFamily').selectOption(family);
+  await check(page,family=>{
+   const pal=AS_STAT_PALETTES[family],
+    chart=echarts.getInstanceByDom(document.getElementById('asStatChart')),
+    opts=chart?.getOption(),fill=opts?.series?.[0]?.itemStyle?.color;
+   return !!pal&&opts?.series?.length===1&&fill?.colorStops?.[0]?.color===pal.top&&
+    fill?.colorStops?.[1]?.color===pal.bottom&&
+    opts.series[0].emphasis.itemStyle.color===pal.hover&&
+    opts.xAxis[0].axisLabel.rotate>=85;
+  },family,'R58 statistics family color or name angle mismatched');
+ }
+ await page.locator('#asStatFamily').selectOption('overtime');
+ await page.locator('#asStatMetric').selectOption('registeredHours');
+ await check(page,()=>{
+  const p=asStatPalette('overtime','registeredHours'),a=asStatPalette('overtime','candidateHours');
+  return p.top===OVERTIME_VISUALS.registered.top&&
+   a.top===OVERTIME_VISUALS.auto.top&&p.top!==a.top;
+ },'R58 overtime registration and automatic colors must differ');
  await page.locator('#asStatFamily').selectOption('punch');
  await page.locator('#asStatMetric').selectOption('count');
  await page.locator('#asStatCompare').selectOption('people');
@@ -789,6 +829,13 @@ async function run(){
   !document.querySelector('.timeline-auto-dock')&&
   !!document.querySelector('.person-day.has-auto-overtime[data-person-day="12"]'),
   'R57 no top-right callout; keep candidate-day indicators');
+ await check(page,()=>{
+  const marked=document.querySelector('.person-day.has-auto-overtime[data-person-day="12"]');
+  const marker=getComputedStyle(marked,'::after'),manual=marked.querySelector('.person-day-check')||
+    document.querySelector('.person-day-check');
+  return marker.left==='2px'&&marker.right!=='2px'&&
+    (!manual||getComputedStyle(manual).right==='1px');
+ },'R58 overtime dot is left and manual check is right');
  await page.locator('.person-day.has-auto-overtime[data-person-day="12"]').click();
  await check(page,()=>{
   const a=state.analysis.get('E001|'+state.chartDay),bars=r14TrackData(a).bars;
