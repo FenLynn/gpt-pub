@@ -470,6 +470,55 @@ async function run(){
    asNavGo('back');
    return aligned&&state.analyticsPage===old.analyticsPage;
  },'R50 statistics labels are not horizontally aligned with selects');
+ // R51: selected primary view highlights text only; index is not a nested tile.
+ await check(page,()=>{
+  const active=document.querySelector('.side-primary-nav .side-views button.active');
+  const index=active?.querySelector('.side-view-index');
+  const refinements=document.querySelector('.side-refinements');
+  const views=document.querySelector('.side-primary-nav');
+  const style=active&&getComputedStyle(active),num=index&&getComputedStyle(index);
+  return !!style&&!!num&&style.backgroundColor==='rgba(0, 0, 0, 0)'&&
+   parseFloat(style.borderTopWidth)===0&&num.backgroundColor==='rgba(0, 0, 0, 0)'&&
+   refinements.getBoundingClientRect().left>views.getBoundingClientRect().left+12;
+ },'R51 active sidebar view must be a text highlight, not enclosing boxes');
+ await check(page,()=>{
+  const a=document.getElementById('asNavBack'),b=document.getElementById('asNavForward');
+  return a.querySelector('svg path')&&b.querySelector('svg path')&&
+    getComputedStyle(a).borderWidth==='0px'&&
+    getComputedStyle(a.closest('.top-history')).backgroundColor==='rgba(0, 0, 0, 0)';
+ },'R51 unobtrusive icon navigation must not render boxed arrows');
+ // Popup open/close must not move the top-level controls or create document overflow.
+ const headerBefore=await page.evaluate(()=>{
+  const nav=document.querySelector('.workspace-navigation').getBoundingClientRect();
+  const month=document.getElementById('monthMenuButton').getBoundingClientRect();
+  return {navX:nav.x,monthX:month.x,top:month.top};
+ });
+ await page.locator('#importBtn').click();
+ await check(page,()=>getComputedStyle(document.getElementById('importPopover')).position==='absolute'&&
+   document.getElementById('importPopover').classList.contains('open'),
+   'R51 import menu must be an overlay');
+ await page.locator('#monthMenuButton').click();
+ await check(page,()=>getComputedStyle(document.getElementById('monthPopover')).position==='absolute'&&
+   document.getElementById('monthPopover').classList.contains('open'),
+   'R51 month dropdown must be an overlay');
+ await page.locator('#monthMenuButton').click();
+ await page.locator('#statusFilterButton').click();
+ await check(page,()=>getComputedStyle(document.getElementById('statusFilterMenu')).position==='absolute'&&
+   document.getElementById('statusFilterMenu').classList.contains('open'),
+   'R51 sidebar dropdown must float over calendar');
+ await page.locator('#statusFilterButton').click();
+ await check(page,expected=>{
+  const nav=document.querySelector('.workspace-navigation').getBoundingClientRect();
+  const month=document.getElementById('monthMenuButton').getBoundingClientRect();
+  return Math.abs(nav.x-expected.navX)<1&&Math.abs(month.x-expected.monthX)<1&&
+   Math.abs(month.top-expected.top)<1&&
+   document.documentElement.scrollWidth<=innerWidth+3;
+ },headerBefore,'R51 popup toggles displaced the top bar or introduced sideways overflow');
+ await check(page,()=>{
+  const colors=asSoftBarGradient(true).colorStops;
+  return colors.length===3&&colors.every(x=>x.color.startsWith('rgba('))&&
+   getComputedStyle(document.documentElement).scrollbarGutter==='stable';
+ },'R51 translucent non-blue bars and stable viewport gutter missing');
  // R45: test the shared ledger before rendering charts. Every imported event is
  // represented once, including multi-day trips that span several person-days.
  await check(page,()=>{
