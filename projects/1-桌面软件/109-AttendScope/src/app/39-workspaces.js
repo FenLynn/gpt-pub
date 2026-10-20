@@ -273,7 +273,10 @@ function dataPanelHtml(section){
     '<div class="data-rules-grid">'+[
       ['上午时段',RULES.amStart+'–'+RULES.amEnd],
       ['下午时段',RULES.pmStart+'–'+RULES.pmEnd],
-      ['迟到宽限',RULES.grace+' 分钟'],
+      ['上午上班冗余',RULES.graceAmStart+' 分钟'],
+      ['上午下班冗余',RULES.graceAmEnd+' 分钟'],
+      ['下午上班冗余',RULES.gracePmStart+' 分钟'],
+      ['下午下班冗余',RULES.gracePmEnd+' 分钟'],
       ['重复打卡',RULES.dupSeconds+' 秒'],
       ['日历调整',Object.keys(state.calendarOverrides||{}).filter(k=>k.startsWith(monthKey()+'-')).length+' 天'],
       ['人工判定',Object.keys(state.manualStatuses||{}).length+' 个']
