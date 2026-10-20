@@ -30,7 +30,7 @@ function r23BehaviorSegments(a,key){
   if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',sourceIds:[p.id]}));
   if(key==='outing')return (a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'外出',sourceIds:[p.id]}));
   if(key==='overtime')return [
-   ...(a.overtime||[]).map(p=>({from:minutes(p.start||'17:30'),to:minutes(p.end||'20:00'),
+   ...(a.overtime||[]).map(p=>({from:minutes(p.start||RULES.pmEnd),to:minutes(p.end||'20:00'),
     title:'登记加班',origin:'registered',sourceIds:[p.id]})),
    ...(a.autoOvertime?.segments||[]).map(p=>({from:p.from,to:p.to,
     title:p.accepted!==false?'自动加班 · 已勾选':'自动加班 · 已取消',
@@ -75,27 +75,21 @@ function mountAttendanceTimeline(a){
     trip:['rgba(107,127,215,.18)','rgba(107,127,215,.56)'],
     leave:['rgba(138,111,209,.16)','rgba(138,111,209,.54)'],
     outing:['rgba(60,157,196,.16)','rgba(60,157,196,.54)'],
-    overtime:['rgba(200,118,160,.16)','rgba(200,118,160,.54)']
+    overtime:['rgba(191,105,113,.39)','rgba(229,163,170,.78)']
   };
   const bandRender=(params,api)=>{
     const d=model.bars[params.dataIndex];if(!d)return null;
     const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
     const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=Math.max(1,behaviorLaneHeight(api)+.5);
-    if(d.origin==='auto'){
-      const y=p[1]-h/2,accepted=d.accepted!==false,children=[
-        {type:'rect',shape:{x,y,width:w,height:h,r:0},
-          style:{fill:accepted?'rgba(184,109,150,.34)':'rgba(191,129,162,.19)',
-            stroke:accepted?'rgba(177,91,135,.33)':'rgba(185,120,157,.23)',lineWidth:.5}}
-      ];
-      // Separate derived time from solid registered bands by a clipped
-      // diagonal hatch. Cancelled time becomes very faint but remains visible.
-      for(let offset=0;offset<w;offset+=9){
-       const size=Math.min(6,w-offset);
-       children.push({type:'line',shape:{x1:x+offset,y1:y+h-1,
-         x2:x+offset+size,y2:y+1},style:{
-           stroke:accepted?'rgba(155,66,121,.50)':'rgba(171,104,141,.25)',lineWidth:1.15}});
-      }
-      return {type:'group',children};
+    if(d.track==='overtime'){
+      const kind=d.origin==='auto'?'auto':'registered';
+      const palette=d.accepted===false?OVERTIME_VISUALS.excluded:OVERTIME_VISUALS[kind];
+      return {type:'rect',
+        shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
+        style:{fill:new echarts.graphic.LinearGradient(0,0,1,0,[
+          {offset:0,color:palette.top},{offset:1,color:palette.bottom}
+        ]),stroke:'rgba(163,84,99,.18)',lineWidth:.45}
+      };
     }
     const colors=behaviorGradient[d.track]||['rgba(120,140,160,.18)','rgba(120,140,160,.5)'];
     return {type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
@@ -110,7 +104,9 @@ function mountAttendanceTimeline(a){
     const baseline=(yIn+yOut)/2,toward=state.prefs.arrowsTowardLine!==false;
     const count=d.count||1,thickness=Math.min(8.5,2.35+Math.log2(Math.max(1,count))*1.9);
     const laneHeight=behaviorRowHeight(api);
-    const len=Math.max(10,Math.min(34,laneHeight-3,27+Math.log2(Math.max(1,count))*2.5));
+    // Baseline is between the two punch rows. Each arrow should span its
+    // complete half of the two-row band, rather than stopping at 34px.
+    const len=Math.max(10,laneHeight-4);
     const isIn=d.direction==='进',sign=isIn?-1:1;
     const y0=baseline+sign*(toward?len:3),y1=baseline+sign*(toward?3:len);
     const color=isIn?ATTEND_EVENT_COLORS.in:ATTEND_EVENT_COLORS.out,half=Math.max(4,thickness*.68);
