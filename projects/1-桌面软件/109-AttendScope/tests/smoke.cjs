@@ -329,6 +329,100 @@ async function run(){
  },'R39 1366 calendar visibility or horizontal matrix use');
  await page.screenshot({path:path.join(out,'r37-all-1366.png')});
  await page.setViewportSize({width:1920,height:1080});
+ // R61: same-baseline staff labels; nonworkday uninterrupted presence
+ // never gets an imaginary lunch break. Overnight hours split at midnight
+ // but remain ONE physical session, even across the month boundary.
+ await check(page,()=>{
+  const preserved={
+   records:state.records,leaves:state.leaves,trips:state.trips,outings:state.outings,
+   overtimeEntries:state.overtimeEntries,analysis:state.analysis,
+   overtimeReview:{...(state.overtimeReview||{})},monthStores:state.monthStores,
+   year:YEAR,month:MONTH
+  };
+  const e=EMPLOYEES[0];
+  const make=(date,clock,direction,i)=>({
+   employeeId:e.id,recordId:'r61:'+date+':'+i,
+   datetime:date+' '+clock,time:clock,direction
+  });
+  const approx=(x,y)=>Math.abs(x-y)<1e-8;
+  try{
+   state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
+   state.overtimeReview={};state.monthStores=new Map();
+   YEAR=2026;MONTH=10;
+   const sundayDate='2026-10-11';
+   state.records=[make(sundayDate,'09:00:00','进',1),
+     make(sundayDate,'15:00:00','出',2)];
+   const weekend=analyzeDay(e,11);
+   if(!approx(weekend.autoOvertime.minutes,360)||
+      weekend.autoOvertime.segments.length!==1||
+      !weekend.lunchEvidence.includes('不扣午休'))return false;
+   const in9=make('2026-10-09','20:00:00','进',1),
+     out10=make('2026-10-10','02:00:00','出',2);
+   state.records=[in9,out10];
+   const before=analyzeDay(e,9),after=analyzeDay(e,10),original=JSON.stringify(state.records);
+   if(!approx(before.autoOvertime.minutes,240)||!approx(after.autoOvertime.minutes,120)||
+    before.autoOvertime.segments[0].id!==after.autoOvertime.segments[0].id||
+    timelineRange(before).start!==0||timelineRange(before).end!==1440||
+    timelineRange(after).start!==0||timelineRange(after).end!==1440)return false;
+   state.analysis=new Map([[e.id+'|9',before],[e.id+'|10',after]]);
+   let ledger=asStatLedger();
+   const val=(m,d)=>asStatValue(ledger,'overtime',m,[e],d);
+   if(!approx(val('hours',[9]),4)||!approx(val('hours',[10]),2)||
+     val('count',[9,10])!==1||!approx(val('candidateHours',[9,10]),6))return false;
+   // A 23:00–01:00 registration clips to 1h on each date, and its
+   // overlap is subtracted from inferred time without double counting.
+   state.overtimeEntries=[{id:'r61-registered',employeeId:e.id,
+     date:'2026-10-09',start:'23:00',end:'01:00'}];
+   const reg9=analyzeDay(e,9),reg10=analyzeDay(e,10);
+   state.analysis=new Map([[e.id+'|9',reg9],[e.id+'|10',reg10]]);
+   ledger=asStatLedger();
+   if(!approx(val('registeredHours',[9]),1)||
+      !approx(val('registeredHours',[10]),1)||
+      !approx(val('candidateHours',[9]),3)||
+      !approx(val('candidateHours',[10]),1)||
+      !approx(val('hours',[9,10]),6)||
+      val('count',[9,10])!==2)return false;
+   const reviewId=reg9.autoOvertime.segments[0].id;
+   state.overtimeReview[reviewId]=false;
+   if(activeAutoOvertimeSegments(analyzeDay(e,9)).length||
+      activeAutoOvertimeSegments(analyzeDay(e,10)).length||
+      JSON.stringify(state.records)!==original)return false;
+   delete state.overtimeReview[reviewId];
+   // A seven-minute visit from 23:58 to 00:05 counts 2+5 minutes,
+   // whereas a four-minute visit cannot be pooled across midnight.
+   state.overtimeEntries=[];
+   state.records=[make('2026-10-09','23:58:00','进',3),
+     make('2026-10-10','00:05:00','出',4)];
+   if(!approx(analyzeDay(e,9).autoOvertime.minutes,2)||
+      !approx(analyzeDay(e,10).autoOvertime.minutes,5))return false;
+   state.records=[make('2026-10-09','23:58:00','进',3),
+     make('2026-10-10','00:02:00','出',5)];
+   if(analyzeDay(e,9).autoOvertime.minutes||analyzeDay(e,10).autoOvertime.minutes)return false;
+   // Month end: exit in next month's imported records or in a loaded
+   // adjoining workspace must still complete exactly the same visit.
+   const octIn=make('2026-10-31','20:00:00','进',6),
+     novOut=make('2026-11-01','02:00:00','出',7);
+   state.records=[octIn,novOut];
+   if(!approx(analyzeDay(e,31).autoOvertime.minutes,240))return false;
+   state.records=[octIn];
+   state.monthStores.set('2026-11',{records:[novOut],overtimeEntries:[]});
+   if(!approx(analyzeDay(e,31).autoOvertime.minutes,240))return false;
+   state.monthStores.set('2026-10',{records:[octIn],overtimeEntries:[]});
+   state.records=[novOut];YEAR=2026;MONTH=11;
+   const nov=analyzeDay(e,1);
+   if(!approx(nov.autoOvertime.minutes,120))return false;
+   const uniform=statisticsWorkspaceHtml.toString().includes('as-stats-chart-context')&&
+    !renderStatisticsWorkspace.toString().includes('staggerLabels');
+   return uniform;
+  }finally{
+   Object.assign(state,{records:preserved.records,leaves:preserved.leaves,
+    trips:preserved.trips,outings:preserved.outings,overtimeEntries:preserved.overtimeEntries,
+    analysis:preserved.analysis,overtimeReview:preserved.overtimeReview,
+    monthStores:preserved.monthStores});
+   YEAR=preserved.year;MONTH=preserved.month;
+   state.timelineRange=null;
+  }
+ },'R61 weekend noon, midnight 4+2, cross-month 4+2, registration union and uniform staff labels');
  // R58: the fresh default is five minutes, assessed per isolated interval.
  await check(page,()=>{
   if(RULES.overtimeMinMinutes!==5)return false;
@@ -467,7 +561,8 @@ async function run(){
    if(threshold.autoOvertime.rawMinutes!==22||threshold.autoOvertime.minutes!==0)
       fail('threshold',threshold.autoOvertime);
    const weekend=examine(restDay,[['09:00','进'],['15:00','出']]);
-   if(weekend.autoOvertime.minutes!==250)fail('weekend lunch deduction',weekend.autoOvertime);
+   if(weekend.autoOvertime.minutes!==360||weekend.autoOvertime.segments.length!==1)
+    fail('weekend uninterrupted noon overtime',weekend.autoOvertime);
    return true;
   }finally{
    Object.assign(state,{records:previous.records,leaves:previous.leaves,trips:previous.trips,
