@@ -580,13 +580,17 @@ async function run(){
    chart.width>400&&rank.width>=250&&rank.width<=324&&rank.left>chart.left&&
    !!echarts.getInstanceByDom(document.getElementById('asStatChart'))&&h.textContent.includes('考勤统计');
  },'R52 top-level statistics route, width, or chart missing');
+ // An earlier saved view may be a time-series. Explicitly select a
+ // categorical comparison before asserting the categorical-only chart rule.
+ await page.locator('#asStatCompare').selectOption('people');
  await check(page,()=>{
   const selected=document.getElementById('asStatsScope');
   const label=document.querySelector('.as-stats-filters label');
-  return selected.value==='all'&&label.querySelector('select')&&
-   getComputedStyle(label).display==='inline-flex'&&
-   !document.querySelector('.as-stats-chart-switch [data-as-chart="line"]:not(:disabled)');
- },'R52 categorical trend should not allow a line chart');
+  const line=document.querySelector('[data-as-chart="line"]');
+  return selected?.value==='all'&&!!label?.querySelector('select')&&
+   ['inline-flex','flex'].includes(getComputedStyle(label).display)&&
+   asStatPrefs().compare==='people'&&!!line?.disabled;
+ },'R55 categorical chart must disable chronological line mode');
  await page.locator('#asStatFamily').selectOption('punch');
  await page.locator('#asStatMetric').selectOption('count');
  await page.locator('#asStatCompare').selectOption('people');
