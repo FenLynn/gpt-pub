@@ -584,7 +584,7 @@ async function run(){
   const selected=document.getElementById('asStatsScope');
   const label=document.querySelector('.as-stats-filters label');
   return selected.value==='all'&&label.querySelector('select')&&
-   getComputedStyle(label).display==='grid'&&
+   getComputedStyle(label).display==='inline-flex'&&
    !document.querySelector('.as-stats-chart-switch [data-as-chart="line"]:not(:disabled)');
  },'R52 categorical trend should not allow a line chart');
  await page.locator('#asStatFamily').selectOption('punch');
@@ -593,12 +593,16 @@ async function run(){
  await page.locator('#asStatLimit').selectOption('all');
  await check(page,()=>{
   const data=asStatRows(),opts=echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption();
-  return data.compare==='people'&&data.visible.length<=12&&data.rankRows.length>12&&
+  const plotCount=opts.series[0].data.length,barWidth=opts.series[0].barWidth;
+  return data.compare==='people'&&data.visible.length===data.rows.length&&
+   data.visible.length===asStatRows().people.length&&data.visible.length>12&&
+   data.rankRows.length===data.rows.length&&plotCount===data.rows.length&&
    opts.series[0].type==='bar'&&opts.xAxis[0].type==='category'&&
-   opts.yAxis[0].type==='value'&&opts.xAxis[0].axisLabel.rotate>30&&
+   opts.yAxis[0].type==='value'&&opts.xAxis[0].axisLabel.interval===0&&
+   opts.xAxis[0].axisLabel.rotate>=59&&barWidth>=3&&barWidth<=25&&
    document.querySelector('[data-as-chart="line"]').disabled&&
-   document.querySelector('.as-stats-chart-hint')!==null;
- },'R52 all-people ranking plotted too many bars or allowed spaghetti lines');
+   document.querySelector('.as-stats-chart-context')?.textContent.includes('全员');
+ },'R54 all people must render, not just 12; bar width adapts to density');
  await page.screenshot({path:path.join(out,'r52-top-people-bars.png')});
  const firstRank=page.locator('.as-stats-rank-row').first();
  await firstRank.click();
@@ -632,9 +636,17 @@ async function run(){
   const f=[...document.querySelectorAll('.as-stats-filters label')],top=f[0].getBoundingClientRect().top;
   const widths=Object.fromEntries(['Family','Metric','Compare','Aggregate','Limit'].map(k=>
    [k,document.getElementById('asStat'+k)?.getBoundingClientRect().width||0]));
+  const heading=document.querySelector('.as-stats-heading');
+  const title=heading.querySelector('h2').getBoundingClientRect();
+  const total=heading.querySelector('.as-stats-total').getBoundingClientRect();
+  const sidebar=document.getElementById('statsSidebarControls');
   return f.length===5&&f.every(e=>Math.abs(e.getBoundingClientRect().top-top)<2)&&
-   widths.Family<=130&&widths.Metric<=225&&widths.Compare<=150&&
-   widths.Aggregate<=165&&widths.Limit<=110&&
+   widths.Family<=130&&widths.Metric<=175&&widths.Compare<=135&&
+   widths.Aggregate<=142&&widths.Limit<=105&&
+   Math.abs(title.top-total.top)<22&&
+   sidebar?.contains(document.getElementById('asStatsScope'))&&
+   sidebar?.contains(document.getElementById('asStatsExport'))&&
+   !document.querySelector('.as-stats-inline')&&!document.querySelector('.as-stats-foot')&&
    document.documentElement.scrollWidth<=innerWidth+3;
  },'R52 five compact filters must remain aligned at 1366px');
  await page.screenshot({path:path.join(out,'r52-top-groups-1366.png')});
