@@ -11,8 +11,14 @@ const AS_STAT_FAMILIES=[
 ];
 function asStatFamily(k){return AS_STAT_FAMILIES.find(f=>f[0]===k)||AS_STAT_FAMILIES[0]}
 function asStatScopeMode(){return state.workspaceMode==='stats'?(state.statsScope||'all'):state.workspaceMode}
-function asStatScopeGroup(){return state.workspaceMode==='stats'?state.statsGroup:state.selectedGroup}
-function asStatScopePerson(){return state.workspaceMode==='stats'?state.statsPersonId:state.selection.employeeId}
+function asStatScopeGroup(){
+ return state.workspaceMode==='stats'?(state.statsGroup||workspaceGroups()[0]||''):state.selectedGroup;
+}
+function asStatScopePerson(){
+ return state.workspaceMode==='stats'?(state.statsPersonId||
+  EMPLOYEES.find(e=>groupOf(e)===asStatScopeGroup())?.id||EMPLOYEES[0]?.id):
+  state.selection.employeeId;
+}
 function asStatDefaultCompare(mode){return mode==='person'?'days':mode==='group'?'people':'groups'}
 function asStatVisibleMetrics(family,compare,mode){
  // Distinct-person indicators against single people are just 0/1 and add
@@ -299,20 +305,35 @@ function statisticsWorkspaceHtml(){
   '<span>单击排行展开详情，双击或使用“进入下级分析”导航；图表按相同方式操作</span></div></section>';
 }
 function asStatDrill(key){
- const data=asStatRows(),row=data.rows.find(r=>r.key===key);
+ const row=asStatRows().rows.find(r=>r.key===key);
  if(!row)return;
+ state.statsExpandedKey='';
  if(row.type==='group'){
-  state.workspaceMode='group';state.selectedGroup=row.key;
-  state.selection={type:'overall'};state.analyticsPage='stats';state.statsConfig.compare='people';render();return;
+  state.statsScope='group';state.statsGroup=row.key;
+  state.statsPersonId=EMPLOYEES.find(e=>groupOf(e)===row.key)?.id||'';
+  state.statsConfig.compare='people';state.statsConfig.chart='bar';
+  render();return;
  }
  if(row.type==='person'){
-  state.workspaceMode='person';state.selection={type:'cell',employeeId:row.key,day:1};
-  state.chartDay=1;state.chartTab='timeline';state.analyticsPage='stats';state.statsConfig.compare='days';
-  state.statsConfig.chart='line';state.statsConfig.aggregate='total';render();return;
+  state.statsScope='person';state.statsPersonId=row.key;
+  state.statsGroup=groupOf(EMPLOYEES.find(e=>e.id===row.key));
+  state.statsConfig.compare='days';state.statsConfig.chart='line';
+  state.statsConfig.aggregate='total';render();return;
  }
  if(row.type==='day'){
-  if(state.workspaceMode==='person')changePersonalDay(Number(key));
-  else{state.analyticsPage='main';state.selection={type:'date',day:Number(key)};render()}
+  const day=Number(key),scope=asStatScopeMode();
+  if(scope==='person'){
+   state.workspaceMode='person';state.analyticsPage='main';
+   state.selection={type:'cell',employeeId:asStatScopePerson(),day};
+   state.chartDay=day;state.chartTab='timeline';
+   state.timelineRange=null;state.rawPage=1;
+  }else{
+   state.workspaceMode=scope==='group'?'group':'all';
+   if(scope==='group')state.selectedGroup=asStatScopeGroup();
+   state.analyticsPage='main';state.selection={type:'date',day};
+   state.chartDay=day;state.chartTab='overview';
+  }
+  render();
  }
 }
 function asStatCSVCell(value){
@@ -329,13 +350,34 @@ function asStatExport(){
 }
 function renderStatisticsWorkspace(){
  const node=document.getElementById('statisticsWorkspace');
- if(!node||state.analyticsPage!=='stats'||state.workspaceMode==='data'||state.workspaceMode==='classic')return;
+ if(!node||state.workspaceMode!=='stats')return;
  if(typeof disposeAttendCharts==='function')disposeAttendCharts();
  const oldFocus=document.activeElement,inside=node.contains(oldFocus);
  const focusId=inside?oldFocus.id:'';
  const focusChart=inside?oldFocus.dataset?.asChart:null;
  const c=asStatPrefs();
  node.innerHTML=statisticsWorkspaceHtml();
+ node.querySelector('#asStatsScope').onchange=e=>{
+  state.statsScope=e.target.value;
+  state.statsGroup=asStatScopeGroup();
+  if(state.statsScope==='person')state.statsPersonId=
+    EMPLOYEES.find(p=>groupOf(p)===state.statsGroup)?.id||EMPLOYEES[0]?.id||'';
+  c.compare=asStatDefaultCompare(state.statsScope);
+  c.chart=state.statsScope==='person'?'line':'bar';
+  state.statsExpandedKey='';
+  render();
+ };
+ const groupSelect=node.querySelector('#asStatsGroup');
+ if(groupSelect)groupSelect.onchange=e=>{
+  state.statsGroup=e.target.value;
+  state.statsPersonId=EMPLOYEES.find(p=>groupOf(p)===state.statsGroup)?.id||'';
+  state.statsExpandedKey='';
+  render();
+ };
+ const personSelect=node.querySelector('#asStatsPerson');
+ if(personSelect)personSelect.onchange=e=>{
+  state.statsPersonId=e.target.value;state.statsExpandedKey='';render();
+ };
  node.querySelector('#asStatFamily').onchange=e=>{
   c.family=e.target.value;c.metric=asStatFamily(c.family)[2][0][0];
   if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';
@@ -344,14 +386,38 @@ function renderStatisticsWorkspace(){
  node.querySelector('#asStatMetric').onchange=e=>{c.metric=e.target.value;if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';renderStatisticsWorkspace()};
  node.querySelector('#asStatCompare').onchange=e=>{
   c.compare=e.target.value;
-  if(c.compare==='days')c.chart='line';else c.chart='bar';
+  c.chart=c.compare==='days'?'line':'bar';
+  state.statsExpandedKey='';
   renderStatisticsWorkspace();
  };
  node.querySelector('#asStatAggregate').onchange=e=>{c.aggregate=e.target.value;renderStatisticsWorkspace()};
  node.querySelector('#asStatLimit').onchange=e=>{c.limit=e.target.value;renderStatisticsWorkspace()};
  node.querySelector('#asStatSort').onclick=()=>{c.sort=c.sort==='desc'?'asc':'desc';renderStatisticsWorkspace()};
  node.querySelectorAll('[data-as-chart]').forEach(b=>b.onclick=()=>{c.chart=b.dataset.asChart;renderStatisticsWorkspace()});
- node.querySelectorAll('[data-as-rank]').forEach(b=>b.onclick=()=>asStatDrill(b.dataset.asRank));
+ const toggleRank=(key,scroll=false)=>{
+  const match=asStatRows().rankRows.find(r=>r.key===key);
+  if(!match)return;
+  const token=match.type+'|'+match.key;
+  state.statsExpandedKey=state.statsExpandedKey===token?'':token;
+  node.querySelectorAll('.as-rank-entry').forEach(entry=>{
+   const trigger=entry.querySelector('[data-as-rank]'),detail=entry.querySelector('.as-rank-detail');
+   const expanded=!!trigger&&trigger.dataset.asRank===key&&state.statsExpandedKey===token;
+   trigger?.setAttribute('aria-expanded',String(expanded));
+   trigger?.classList.toggle('is-expanded',expanded);
+   if(detail)detail.hidden=!expanded;
+   entry.classList.toggle('is-expanded',expanded);
+  });
+  if(scroll&&state.statsExpandedKey){
+   const target=[...node.querySelectorAll('[data-as-rank]')].find(b=>b.dataset.asRank===key);
+   target?.scrollIntoView({block:'nearest',inline:'nearest'});
+  }
+  if(typeof asNavRefreshCurrent==='function')asNavRefreshCurrent();
+ };
+ node.querySelectorAll('[data-as-rank]').forEach(b=>{
+  b.onclick=()=>toggleRank(b.dataset.asRank);
+  b.ondblclick=()=>asStatDrill(b.dataset.asRank);
+ });
+ node.querySelectorAll('[data-as-drill]').forEach(b=>b.onclick=()=>asStatDrill(b.dataset.asDrill));
  node.querySelector('#asStatsExport').onclick=asStatExport;
  if(typeof asNavRefreshCurrent==='function')asNavRefreshCurrent();
  const data=asStatRows(),chart=initAttendChart(document.getElementById('asStatChart'));
@@ -399,7 +465,8 @@ function renderStatisticsWorkspace(){
  });
  chart.on('mouseover',e=>{const item=rows[e.dataIndex];if(item)emphasize(item.key,true)});
  chart.on('globalout',()=>ranking.forEach(b=>b.classList.remove('is-linked')));
- chart.on('click',e=>{const row=rows[e.dataIndex];if(row)asStatDrill(row.key)});
+ chart.on('click',e=>{const row=rows[e.dataIndex];if(row)toggleRank(row.key,true)});
+ chart.on('dblclick',e=>{const row=rows[e.dataIndex];if(row)asStatDrill(row.key)});
  // Changes reconstruct the controls; keep their keyboard focus in place.
  const next=focusId?document.getElementById(focusId):
   focusChart?node.querySelector('[data-as-chart="'+focusChart+'"]'):null;
