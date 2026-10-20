@@ -711,8 +711,9 @@ async function run(){
   const a=state.analysis.get(info.employee+'|'+info.day),seg=a.autoOvertime.segments.find(s=>s.id===info.id);
   const before=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
   state.__r53Before={hours:before,minutes:seg.minutes};
-  setAutoOvertimeDecision(info.id,false);
  },overtimePick);
+ await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"] .overtime-review-btn').first().click();
+ await page.waitForSelector('[data-auto-overtime-id="'+overtimePick.id+'"].is-excluded');
  await check(page,info=>{
   const a=state.analysis.get(info.employee+'|'+info.day),seg=a.autoOvertime.segments.find(s=>s.id===info.id);
   const after=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
@@ -722,7 +723,8 @@ async function run(){
    workingPayload().overtimeReview[info.id]===false&&layer;
  },overtimePick,'R53 × must fade segment, persist exclusion and remove its minutes from total');
  await page.screenshot({path:path.join(out,'r53-auto-overtime-excluded.png')});
- await page.evaluate(info=>setAutoOvertimeDecision(info.id,true),overtimePick);
+ await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"] .overtime-review-btn').nth(1).click();
+ await page.waitForSelector('[data-auto-overtime-id="'+overtimePick.id+'"]:not(.is-excluded)');
  await check(page,info=>{
   const a=state.analysis.get(info.employee+'|'+info.day),seg=a.autoOvertime.segments.find(s=>s.id===info.id);
   const after=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
