@@ -405,11 +405,14 @@ async function run(){
   state.statsConfig.aggregate==='total'&&asStatRows().people.length===1,
   'R45 group member drilldown not scoped to individual');
  await page.screenshot({path:path.join(out,'r45-person-stats.png')});
- await page.locator('.as-stats-rank-row').nth(8).click();
+ const rankedDay=Number(await page.locator('.as-stats-rank-row').first().getAttribute('data-as-rank'));
+ if(!rankedDay)throw Error('R45 expected a real, nonzero daily metric in the selected demo employee');
+ await page.locator('.as-stats-rank-row').first().click();
  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:16000});
- await check(page,()=>state.workspaceMode==='person'&&state.analyticsPage==='main'&&
-  state.chartDay===9&&state.selection.day===9,
- 'R45 selected daily statistic must open personal timeline and sync calendar');
+ await check(page,day=>state.workspaceMode==='person'&&state.analyticsPage==='main'&&
+  state.chartDay===day&&state.selection.day===day&&
+  document.querySelector('.cal-day[data-day="'+day+'"].selected')!==null,
+ rankedDay,'R45 ranked nonzero day must open the matching timeline and calendar');
  // Legacy matrix/time-axis QA below starts from the normal All view.
  await page.locator('[data-workspace="all"]').click();
  await check(page,()=>state.workspaceMode==='all'&&state.analyticsPage==='main',
