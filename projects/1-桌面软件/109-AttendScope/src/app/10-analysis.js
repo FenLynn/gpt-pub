@@ -220,9 +220,12 @@ function attendanceJudgmentSystem(a){
   if(a.severity==='normal')return 'normal';
   return 'rest';
 }
-function attendanceJudgment(a,mode=state.judgmentMode||'initial'){
+function attendanceJudgment(a,mode='final'){
   const initial=attendanceJudgmentSystem(a);
-  return mode==='manual'?(manualStatusFor(a)||initial):initial;
+  // The initial system verdict is a comparison view only. Every canonical
+  // output/aggregate reads the operator's final verdict first, without
+  // modifying the source punches or the original automated diagnosis.
+  return mode==='initial'?initial:(manualStatusFor(a)||initial);
 }
 function attendanceBehaviors(a){
   const results=[];
@@ -236,7 +239,8 @@ function attendanceBehaviors(a){
 }
 function attendanceCategory(a){return attendanceJudgment(a)}
 function matrixCategory(a,filter=state.filter){
-  return ['trip','leave','outing','overtime'].includes(filter)&&attendanceBehaviors(a).includes(filter)?filter:attendanceJudgment(a);
+  return ['trip','leave','outing','overtime'].includes(filter)&&attendanceBehaviors(a).includes(filter)?filter:
+   attendanceJudgment(a,state.judgmentMode==='initial'?'initial':'final');
 }
 function categoryColor(category){return ATTEND_STATUS_COLORS[category]||ATTEND_BEHAVIOR_COLORS[category]||ATTEND_STATUS_COLORS.rest}
 function outingFor(empId,date){return (state.outings||[]).filter(x=>x.employeeId===empId&&date>=x.startDate&&date<=x.endDate)}
