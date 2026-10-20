@@ -377,8 +377,18 @@ function analyzeDay(emp,d){
  const lunchEvidence=crossesLunch?'未分段（工时按班次扣午休）':
   morningPair&&lunchReturn?'有午休进出':'未明确';
  const autoOvertime=estimateOvertimeCandidate(pairs,d,overtime,pairingUncertain);
+ // A recalculated interval must not inherit a past exclusion from a DIFFERENT
+ // imported evidence set even if its visible clock boundaries are identical.
+ const sourceEvidence=[
+  ...punches.map(p=>p.recordId||p.importId+'|'+p.datetime+'|'+p.direction),
+  ...overtime.map(p=>p.id||p.start+'|'+p.end)
+ ].join('|');
+ let sourceHash=2166136261;
+ for(let i=0;i<sourceEvidence.length;i++)
+  sourceHash=Math.imul(sourceHash^sourceEvidence.charCodeAt(i),16777619)>>>0;
+ const evidenceSuffix=sourceHash.toString(36);
  autoOvertime.segments=autoOvertime.segments.map(seg=>{
-  const id='auto:'+emp.id+':'+date+':'+Math.round(seg.from*60)+'-'+Math.round(seg.to*60);
+  const id='auto:'+emp.id+':'+date+':'+Math.round(seg.from*60)+'-'+Math.round(seg.to*60)+':'+evidenceSuffix;
   return {...seg,id,employeeId:emp.id,date,origin:'auto',
    accepted:state.overtimeReview?.[id]!==false};
  });
