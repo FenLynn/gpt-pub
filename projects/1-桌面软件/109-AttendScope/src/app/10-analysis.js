@@ -404,11 +404,15 @@ function analyzeDay(emp,d){
   if(fullExcused){status=trips.length?'出差':leaves.length?'请假':'外出';severity='excused'}
   else{status='缺勤';severity='problem';issues.push('工作日无打卡')}
  }else{
-  const grace=Number(RULES.grace)||0,firstMinute=firstIn?minutes(firstIn.time):null;
+  const morningGrace=Number(RULES.graceAmStart??RULES.grace??5)||0,
+    morningEndGrace=Number(RULES.graceAmEnd??0)||0,
+    afternoonGrace=Number(RULES.gracePmStart??RULES.grace??5)||0,
+    afternoonEndGrace=Number(RULES.gracePmEnd??0)||0,
+    firstMinute=firstIn?minutes(firstIn.time):null;
   const morningEvidence=pairs.some(([x,y])=>minutes(x.time)<=lunchStart&&minutes(y.time)>minutes(RULES.amStart));
   const afternoonEvidence=pairs.some(([x,y])=>minutes(y.time)>lunchEnd&&minutes(x.time)<minutes(RULES.pmEnd));
   if(firstIn&&!morningLeave){
-   if(morningEvidence&&firstMinute>minutes(RULES.amStart)+grace){
+   if(morningEvidence&&firstMinute>minutes(RULES.amStart)+morningGrace){
     severity='problem';issues.push('迟到');status='迟到';
    }else if(!morningEvidence&&firstMinute>lunchStart){
     suspect('上午缺少完整出勤证据（待核）');
@@ -418,22 +422,31 @@ function analyzeDay(emp,d){
    const lastMinute=minutes(lastOut.time);
    // Without any complete afternoon exit, a lunchtime "出" cannot
    // establish a definite early departure.
-   if(afternoonEvidence&&!pending&&lastMinute<minutes(RULES.pmEnd)-grace){
+   if(afternoonEvidence&&!pending&&lastMinute<minutes(RULES.pmEnd)-afternoonEndGrace){
     severity='problem';issues.push('早退');status=status==='迟到'?'迟到/早退':'早退';
    }else if(!afternoonEvidence||pending){
     suspect('下午进出记录不完整（待核）');
    }
   }
-  if(morningPair&&!morningLeave&&minutes(morningPair[1].time)<lunchStart-grace){
-   suspect('午休提前离岗（待核）');
+  if(morningPair&&!morningLeave&&minutes(morningPair[1].time)<lunchStart-morningEndGrace){
+   if(!pairingUncertain){
+    if(!issues.includes('上午早退'))issues.push('上午早退');
+    severity='problem';status=status.includes('迟到')?'迟到/早退':'早退';
+   }else suspect('午休提前离岗（待核）');
   }
   if(morningPair&&lunchReturn&&!afternoonLeave){
    const returnMinute=minutes(lunchReturn[0].time);
    const covered=[...leaves,...outings].some(row=>
-     minutes(row.start||'00:00')<=lunchEnd+grace&&
-     minutes(row.end||'00:00')>=returnMinute-grace);
-   if(returnMinute>lunchEnd+grace&&!covered&&!trips.length)
-    suspect('午休返岗偏晚（待核）');
+     minutes(row.start||'00:00')<=lunchEnd+afternoonGrace&&
+     minutes(row.end||'00:00')>=returnMinute-afternoonGrace);
+   if(returnMinute>lunchEnd+afternoonGrace&&!covered&&!trips.length){
+    // Completed afternoon evidence permits a definite late check; missing
+    // afternoon punches remain an uncertainty, never a fabricated absence.
+    if(afternoonEvidence&&!pairingUncertain){
+     issues.push('下午迟到');severity='problem';
+     status=status==='迟到'?'上午/下午迟到':status==='早退'?'迟到/早退':'下午迟到';
+    }else suspect('午休返岗偏晚（待核）');
+   }
   }
   if((!firstIn||!lastOut)&&severity!=='problem')suspect('打卡记录不完整（待核）');
   if(severity==='suspect'&&status==='正常')status='疑似打卡异常';
