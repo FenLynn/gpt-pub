@@ -661,8 +661,12 @@ async function run(){
     const select=e.querySelector('select'),rect=select.getBoundingClientRect();
     return rect.right<=region.getBoundingClientRect().right&&rect.left>=region.getBoundingClientRect().left;
   });
+  const widths=Object.fromEntries(['Family','Metric','Compare','Aggregate','Limit'].map(k=>
+    [k,document.getElementById('asStat'+k)?.getBoundingClientRect().width||0]));
+  const compact=widths.Family<=130&&widths.Metric<=225&&widths.Compare<=150&&
+    widths.Aggregate<=165&&widths.Limit<=110;
   return region.getBoundingClientRect().right<=innerWidth+1&&buttons.getBoundingClientRect().width>=250&&
-    line&&visible&&document.documentElement.scrollWidth<=innerWidth+3;
+    line&&visible&&compact&&document.documentElement.scrollWidth<=innerWidth+3;
  },'R48 1366: five filters must fit one row without clipping or horizontal page scroll');
  await page.waitForTimeout(380); // screenshot after the deliberate short ECharts transition, never a correctness check
  await page.screenshot({path:path.join(out,'r48-all-stats-1366.png')});
