@@ -1075,9 +1075,9 @@ async function run(){
     await importLeaves(new File([leave],'请假样例.csv',{type:'text/csv'}));
     const trip='姓名,开始日期,结束日期,类型,地点\n测试甲,2026-10-10,2026-10-11,出差,测试地点';
     await importTrips(new File([trip],'出差样例.csv',{type:'text/csv'}));
-    const outing='姓名,开始日期,结束日期,开始时间,结束时间,类型\\n测试甲,2026-10-09,2026-10-09,10:00,11:00,业务外出';
+    const outing='姓名,开始日期,结束日期,开始时间,结束时间,类型\n测试甲,2026-10-09,2026-10-09,10:00,11:00,业务外出';
     await importOutings(new File([outing],'外出样例.csv',{type:'text/csv'}));
-    const overtime='姓名,日期,开始时间,结束时间,类型\\n测试甲,2026-10-09,18:00,19:00,登记加班';
+    const overtime='姓名,日期,开始时间,结束时间,类型\n测试甲,2026-10-09,18:00,19:00,登记加班';
     await importOvertime(new File([overtime],'加班样例.csv',{type:'text/csv'}));
     const related=state.leaves.length===1&&state.trips.length===1&&
       state.outings.length===1&&state.overtimeEntries.length===1&&
