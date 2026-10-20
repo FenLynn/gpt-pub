@@ -11,6 +11,18 @@ const AS_STAT_PALETTES=Object.freeze({
 function asStatPalette(family,metric){
  if(family==='overtime'&&metric?.startsWith('candidate'))return {
   top:OVERTIME_VISUALS.auto.top,bottom:OVERTIME_VISUALS.auto.bottom,hover:OVERTIME_VISUALS.auto.hoverTop};
+ if(family==='status'){
+  // Verdict meanings must remain legible: absence and lateness are not
+  // represented by the same green as normal attendance.
+  const verdictColors={
+   anomaly:{top:'#caa351',bottom:'#ebd8a5',hover:'#aa7d2f'},
+   absent:{top:'#cb757f',bottom:'#ecc1c4',hover:'#ac4f5c'},
+   issue:{top:'#bc8a65',bottom:'#e8c5a8',hover:'#996440'},
+   late:{top:'#c18461',bottom:'#ebbea5',hover:'#a05d3b'},
+   early:{top:'#bf8069',bottom:'#ebbfad',hover:'#9c5d45'}
+  };
+  return verdictColors[metric]||AS_STAT_PALETTES.status;
+ }
  return AS_STAT_PALETTES[family]||AS_STAT_PALETTES.punch;
 }
 const AS_STAT_FAMILIES=[
