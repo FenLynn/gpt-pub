@@ -603,6 +603,34 @@ async function run(){
    document.querySelector('[data-as-chart="line"]').disabled&&
    document.querySelector('.as-stats-chart-context')?.textContent.includes('全员');
  },'R54 all people must render, not just 12; bar width adapts to density');
+ // R54 hover is exclusive: leaving one ranking item clears its bar emphasis.
+ await page.locator('.as-stats-rank-row').nth(0).hover();
+ await check(page,()=>{
+  const linked=[...document.querySelectorAll('.as-stats-rank-row.is-linked')];
+  return linked.length===1&&linked[0].dataset.asRank===
+   document.querySelector('.as-stats-rank-row')?.dataset.asRank;
+ },'R54 first hovered rank must be the only active item');
+ await page.locator('.as-stats-rank-row').nth(1).hover();
+ await check(page,()=>{
+  const linked=[...document.querySelectorAll('.as-stats-rank-row.is-linked')];
+  return linked.length===1&&linked[0].dataset.asRank===
+   document.querySelectorAll('.as-stats-rank-row')[1].dataset.asRank;
+ },'R54 changing hover must clear the previously highlighted bar');
+ await page.locator('.as-stats-heading h2').hover();
+ await check(page,()=>document.querySelectorAll('.as-stats-rank-row.is-linked').length===0,
+  'R54 pointer leave must clear the active highlight');
+ const fullBarWidth=await page.evaluate(()=>echarts.getInstanceByDom(
+  document.getElementById('asStatChart')).getOption().series[0].barWidth);
+ await page.locator('#asStatCompare').selectOption('groups');
+ await check(page,oldWidth=>{
+  const chart=echarts.getInstanceByDom(document.getElementById('asStatChart'));
+  const opts=chart.getOption();
+  return asStatRows().visible.length===workspaceGroups().length&&
+   opts.series[0].barWidth>oldWidth&&opts.series[0].barWidth<=54;
+ },fullBarWidth,'R54 category-aware bar width did not grow for fewer groups');
+ await page.locator('#asStatCompare').selectOption('people');
+ await check(page,()=>asStatRows().visible.length===EMPLOYEES.length,
+  'R54 all staff did not return when switching back to people');
  await page.screenshot({path:path.join(out,'r52-top-people-bars.png')});
  const firstRank=page.locator('.as-stats-rank-row').first();
  await firstRank.click();
