@@ -6,8 +6,17 @@ function downloadBlob(blob,name){
 function downloadAttendance(){downloadBlob(XLSX.writeXlsx(state.records.map(r=>({姓名:r.name,打卡时间:r.datetime,进出:r.direction})),'考勤'),'考勤_'+monthKey()+'.xlsx')}
 function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note})),'请假'),'请假_'+monthKey()+'.xlsx')}
 function downloadTrips(){downloadBlob(XLSX.writeXlsx(state.trips.map(r=>({姓名:r.name,开始日期:r.startDate,结束日期:r.endDate,类型:r.type,地点:r.place,备注:r.note})),'出差'),'出差_'+monthKey()+'.xlsx')}
-function downloadOutings(){downloadBlob(XLSX.writeXlsx(state.outings.map(r=>({姓名:r.name,开始日期:r.startDate||r.date,结束日期:r.endDate||r.date,开始时间:r.start,结束时间:r.end,类型:r.type,地点:r.place,备注:r.note})),'外出'),'外出_'+monthKey()+'.xlsx')}
-function downloadOvertimeEntries(){downloadBlob(XLSX.writeXlsx(state.overtimeEntries.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note})),'加班'),'登记加班_'+monthKey()+'.xlsx')}
+function downloadOutings(){
+ const rows=state.outings.map(r=>({姓名:r.name,开始日期:r.startDate||r.date,结束日期:r.endDate||r.date,
+  开始时间:r.start,结束时间:r.end,类型:r.type,地点:r.place,备注:r.note}));
+ if(!rows.length)rows.push({姓名:'',开始日期:'',结束日期:'',开始时间:'',结束时间:'',类型:'',地点:'',备注:''});
+ downloadBlob(XLSX.writeXlsx(rows,'外出'),'外出_'+monthKey()+'.xlsx');
+}
+function downloadOvertimeEntries(){
+ const rows=state.overtimeEntries.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note}));
+ if(!rows.length)rows.push({姓名:'',日期:'',开始时间:'',结束时间:'',类型:'',备注:''});
+ downloadBlob(XLSX.writeXlsx(rows,'加班'),'登记加班_'+monthKey()+'.xlsx');
+}
 function judgmentChinese(k){return ({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'})[k]||k}
 function traditionalRows(){
   const rows=[];
@@ -19,7 +28,7 @@ function traditionalRows(){
       系统判定:judgmentChinese(attendanceJudgmentSystem(a)),人工判定:manualStatusFor(a)?judgmentChinese(manualStatusFor(a)):'',最终判定:judgmentChinese(manualStatusFor(a)||attendanceJudgmentSystem(a)),
       首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),
       班内工时分钟:Math.round(a.workMinutes||0),加班候选分钟:Math.round(a.autoOvertime?.minutes||0),
-      午休证据:a.lunchEvidence||'',加班候选说明:a.autoOvertime?.minutes?'打卡推算，尚未确认':'',
+      午休证据:a.lunchEvidence||'',加班候选说明:a.autoOvertime?.reason||'',
       登记加班记录数:a.overtime?.length||0,
       异常摘要:a.issues.join('；'),业务标记:attendanceBehaviors(a).map(k=>({trip:'出差',leave:'请假',outing:'外出',overtime:'加班'})[k]).join('；'),
       人工处理:(state.revisions.some(r=>r.key===e.id+'|'+d)||!!manualStatusFor(a))?'是':'否'});
