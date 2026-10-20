@@ -279,7 +279,7 @@ function analysisUnionSegments(intervals){
  return merged;
 }
 function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
- const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?+RULES.overtimeMinMinutes:30;
+ const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?Math.max(1,+RULES.overtimeMinMinutes):5;
  if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,
   reason:'打卡进出配对待核',segments:[]};
  const windows=isWorkday(day)?[[minutes(RULES.pmEnd),1440]]:
@@ -306,15 +306,18 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
   }
   if(cursor<end)unregistered.push([cursor,end]);
  }
- const segments=analysisUnionSegments(unregistered);
- const raw=analysisUnionMinutes(segments);
- const reached=raw+1e-8>=minMinutes;
- const reason=reached?'完整进出记录自动推算，供人工核查'+
+ // Threshold applies to EACH disjoint interval after subtracting registered
+ // time. Several short intervals must never combine to form one overtime.
+ const unfiltered=analysisUnionSegments(unregistered);
+ const raw=analysisUnionMinutes(unfiltered);
+ const qualified=unfiltered.filter(([from,to])=>to-from+1e-8>=minMinutes);
+ const eligibleMinutes=analysisUnionMinutes(qualified);
+ const reason=eligibleMinutes>0?'完整进出记录逐段自动推算，供人工核查'+
    (registeredIntervals.length?'（已扣除登记重叠时段）':''):
-   registeredIntervals.length?'与已登记加班重叠或剩余时长不足阈值':
-   '不足阈值或无完整加班进出';
- return {minutes:reached?raw:0,rawMinutes:raw,threshold:minMinutes,reason,
-  segments:reached?segments.map(([from,to])=>({from,to,minutes:to-from})):[]};
+   registeredIntervals.length?'与登记加班重叠，或单段时长不足阈值':
+   '单段时长不足阈值或无完整加班进出';
+ return {minutes:eligibleMinutes,rawMinutes:raw,threshold:minMinutes,reason,
+  segments:qualified.map(([from,to])=>({from,to,minutes:to-from}))};
 }
 // A checkmark is an inclusion decision for calculated time, not formal approval.
 function activeAutoOvertimeSegments(a){
