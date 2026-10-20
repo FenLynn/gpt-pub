@@ -523,3 +523,41 @@ html{scrollbar-gutter:stable}
  .timeline-auto-tools{font-size:10px}
  .timeline-auto-none{display:none}
 }
+
+/* R56: automatic overtime review appears on hover, not as persistent floating buttons. */
+.overtime-review-actions{
+ opacity:0!important;transform:translateY(-2px);transition:opacity .12s ease,transform .12s ease;
+ box-shadow:0 2px 7px rgba(79,48,69,.11);
+}
+.overtime-review-actions:is(.is-hovered,:hover,:focus-within){
+ opacity:1!important;transform:translateY(0);
+}
+.overtime-review-actions.is-excluded:is(.is-hovered,:hover,:focus-within){opacity:1!important}
+.timeline-auto-dock{justify-content:flex-end;background:transparent;border-bottom:0;padding:1px 7px 2px}
+.timeline-auto-tools{margin-left:auto!important;border-left:0!important}
+.timeline-auto-tools button{display:flex;align-items:center;gap:5px;padding:5px 9px!important;
+ border-radius:7px;background:#fff9fc;color:#975c7d;font-size:11px}
+.timeline-auto-tools button strong{font-variant-numeric:tabular-nums;color:#7e4365}
+.timeline-auto-tools button .timeline-auto-hatch{
+ width:11px;height:8px;border-radius:2px;border:1px solid #c98aac;
+ background:repeating-linear-gradient(125deg,#ce9db7 0px,#ce9db7 2px,#f7eaf2 2px,#f7eaf2 4px)
+}
+.layout.workspace-mode-stats .as-stats-filters label{
+ display:flex!important;flex-direction:row!important;align-items:center!important;
+ justify-content:flex-start!important;min-height:32px;gap:6px!important;
+}
+.layout.workspace-mode-stats .as-stats-filters select,
+.layout.workspace-mode-stats .as-stats-filters select:focus,
+.layout.workspace-mode-stats .as-stats-filters select:focus-visible,
+.stats-side-field select:focus,.stats-side-field select:focus-visible{
+ outline:none!important;box-shadow:none!important;
+}
+.layout.workspace-mode-stats .as-stats-filters select:focus-visible,
+.stats-side-field select:focus-visible{border-color:#9db6d7!important}
+.as-stats-stack-legend{display:flex;align-items:center;justify-content:center;gap:17px;
+ color:#7e8fa3;font-size:11px;min-height:23px;margin-bottom:1px}
+.as-stats-stack-legend span{display:inline-flex;align-items:center;gap:5px}
+.as-stats-stack-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.as-stats-stack-legend .legend-registered{background:linear-gradient(#7ea9ef,#bed5fa)}
+.as-stats-stack-legend .legend-automatic{background:linear-gradient(#d49ab6,#ebccd9)}
+@media(prefers-reduced-motion:reduce){.overtime-review-actions{transition:none}}
