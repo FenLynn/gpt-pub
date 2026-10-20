@@ -161,12 +161,17 @@ function asStatLedger(){
  for(const a of state.analysis.values()){
   const active=activeAutoOvertimeSegments(a);
   if(!active.length)continue;
+  const distinctSessions=new Set();
   for(const seg of active){
    const key='overtime|'+a.employee.id+'|'+a.day;
    const intervals=coveredIntervals.get(key)||[];
    intervals.push([seg.from,seg.to]);
    coveredIntervals.set(key,intervals);
-   add('overtime','count',a.employee.id,a.day,1);
+   const session=seg.id||seg.sessionFrom+'|'+seg.sessionTo;
+   if(!distinctSessions.has(session)){
+    distinctSessions.add(session);
+    add('overtime','count',a.employee.id,a.day,1);
+   }
   }
   add('overtime','presence',a.employee.id,a.day,1);
  }
@@ -537,7 +542,9 @@ function renderStatisticsWorkspace(){
  const autoValues=isOvertimeStack?rows.map(r=>normalized('candidateHours',r)):[];
  const slot=(Math.max(230,chart.getWidth())-72)/Math.max(1,rows.length);
  const barWidth=Math.max(3,Math.min(54,Math.floor(slot*(rows.length<=8?.62:.70))));
- const many=rows.length>=30,angle=many?89:isDay?85:rows.length>14?88:86;
+ // User preference: flatter names, never near-vertical.
+ const many=rows.length>=30,angle=isDay?27:many?34:rows.length>14?28:20;
+ const staggerLabels=rows.length>=24;
  const formatTop=(p,topOnly=false)=>{
    const i=p.dataIndex;
    if(isOvertimeStack){
@@ -581,7 +588,7 @@ function renderStatisticsWorkspace(){
   label:{...labelStyle,formatter:p=>formatTop(p)}
  }];
  chart.setOption({animation:state.prefs?.motion!==false,animationDuration:220,
-  grid:{top:numberLabels?45:20,bottom:many?155:isDay?131:145,left:49,right:18,containLabel:false},
+  grid:{top:numberLabels?45:20,bottom:many?95:isDay?76:72,left:49,right:18,containLabel:false},
   tooltip:{trigger:'item',axisPointer:{type:'none'},confine:true,
    // Tie the floating card to the top of the active bar, including hover
    // forwarded from a row in the right-hand ranking.
@@ -599,8 +606,9 @@ function renderStatisticsWorkspace(){
         ' '+unit+'<br>自动 '+asStatNumber(autoValues[p.dataIndex])+' '+unit:'');
    }},
   xAxis:{type:'category',data:cat,boundaryGap:!line,
-   axisLabel:{fontSize:many?13:14,color:'#687f9d',interval:0,rotate:angle,
-    hideOverlap:false,align:'right',margin:12},
+   axisLabel:{fontSize:many?12:13,color:'#687f9d',interval:0,rotate:angle,
+    hideOverlap:false,align:'right',margin:10,lineHeight:17,
+    formatter:(value,index)=>staggerLabels&&index%2===1?'\n'+value:value},
    axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe5ee'}}},
   yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#8895a9'},
    splitLine:{lineStyle:{color:'rgba(100,123,158,.11)'}},axisLine:{show:false}},
