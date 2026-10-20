@@ -164,45 +164,130 @@ function behaviorMinutes(a,kind){
   if(kind==='trip')return a.trips.length?Math.max(0,minutes(RULES.amEnd)-minutes(RULES.amStart))+Math.max(0,minutes(RULES.pmEnd)-minutes(RULES.pmStart)):0;
   return intervals.reduce((sum,x)=>sum+Math.max(0,minutes(x.end||'00:00')-minutes(x.start||'00:00')),0);
 }
+/* R49: lunch gaps and inferred overtime are evidence, not approval decisions.
+ * Never synthesize raw overtime rows or modify imported punches. */
+function analysisPairMinutes(pairs,start,end){
+ return pairs.reduce((total,[enter,exit])=>total+
+   intervalOverlap(minutes(enter.time),minutes(exit.time),minutes(start),minutes(end)),0);
+}
+function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
+ const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?+RULES.overtimeMinMinutes:30;
+ if(registered.length)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'当天已有登记加班'};
+ if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'打卡进出配对待核'};
+ // Ordinary working days: only complete post-shift exit evidence.
+ // Early arrivals and the scheduled lunch break must never become overtime.
+ let raw=0;
+ if(isWorkday(day)){
+  raw=pairs.reduce((sum,[a,b])=>sum+
+    intervalOverlap(minutes(a.time),minutes(b.time),minutes(RULES.pmEnd),1440),0);
+ }else{
+  raw=pairs.reduce((sum,[a,b])=>sum+Math.max(0,minutes(b.time)-minutes(a.time)),0);
+  // A continuous, non-split rest-day gate interval does not establish
+  // work through the scheduled midday break.
+  raw-=analysisPairMinutes(pairs,RULES.amEnd,RULES.pmStart);
+ }
+ const value=raw+1e-8>=minMinutes?raw:0;
+ return {minutes:value,rawMinutes:Math.max(0,raw),threshold:minMinutes,
+   reason:value?'基于完整进出记录的待核候选':'不足阈值或无完整加班进出'};
+}
 function analyzeDay(emp,d){
-  const date=isoDate(d),punches=state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date).sort((a,b)=>a.datetime.localeCompare(b.datetime));
-  const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),outings=outingFor(emp.id,date),overtime=overtimeFor(emp.id,date),typ=dayType(d);
-  let severity='normal',status='正常',issues=[],pairs=[],pending=null;
-  for(let i=0;i<punches.length;i++){
-    const p=punches[i],prev=punches[i-1];
-    if(prev&&prev.direction===p.direction){
-      const diff=Math.abs(minutes(p.time)-minutes(prev.time));
-      issues.push(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:'连续'+p.direction);severity='suspect'
-    }
-    if(p.direction==='进'){if(pending)severity='suspect';pending=p}
-    else if(p.direction==='出'){if(pending){pairs.push([pending,p]);pending=null}else severity='suspect'}
+ const date=isoDate(d),punches=state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date)
+   .sort((a,b)=>a.datetime.localeCompare(b.datetime));
+ const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),outings=outingFor(emp.id,date),
+   overtime=overtimeFor(emp.id,date),typ=dayType(d);
+ let severity='normal',status='正常',issues=[],pairs=[],pending=null,pairingUncertain=false;
+ const suspect=message=>{
+  if(!issues.includes(message))issues.push(message);
+  if(severity!=='problem')severity='suspect';
+ };
+ for(let i=0;i<punches.length;i++){
+  const p=punches[i],prev=punches[i-1];
+  if(prev&&prev.direction===p.direction){
+   const diff=Math.abs(minutes(p.time)-minutes(prev.time));
+   suspect(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:'连续'+p.direction);
+   pairingUncertain=true;
   }
-  if(pending){issues.push('存在未闭合进入记录');severity='suspect'}
-  const covers=(rows,start,end)=>rows.some(x=>minutes(x.start||'00:00')<=minutes(start)&&minutes(x.end||'24:00')>=minutes(end));
-  const overlapEnough=(rows,start,end,need=180)=>rows.some(x=>intervalOverlap(minutes(x.start||'00:00'),minutes(x.end||'24:00'),minutes(start),minutes(end))>=need);
-  const fullExcused=trips.length>0||covers(leaves,RULES.amStart,RULES.pmEnd)||covers(outings,RULES.amStart,RULES.pmEnd);
-  const morningLeave=trips.length>0||overlapEnough(leaves,RULES.amStart,RULES.amEnd)||overlapEnough(outings,RULES.amStart,RULES.amEnd);
-  const afternoonLeave=trips.length>0||overlapEnough(leaves,RULES.pmStart,RULES.pmEnd)||overlapEnough(outings,RULES.pmStart,RULES.pmEnd);
-  let presence=pairs.reduce((sum,[x,y])=>sum+Math.max(0,minutes(y.time)-minutes(x.time)),0);
-  const firstIn=punches.find(p=>p.direction==='进'),lastOut=[...punches].reverse().find(p=>p.direction==='出');
-  if(!state.records.length&&!state.leaves.length&&!state.trips.length&&!state.outings?.length&&!state.overtimeEntries?.length){status='未导入';severity='rest';return pack()}
-  if(!isWorkday(d)){
-    if(punches.length||overtime.length){status='非工作日加班';severity='normal'}
-    else{status=typ==='holiday'?'节假日':'休息';severity='rest'}
-    return pack()
+  if(p.direction==='进'){
+   if(pending)pairingUncertain=true;
+   pending=p;
+  }else if(p.direction==='出'){
+   if(pending){pairs.push([pending,p]);pending=null}
+   else{pairingUncertain=true;suspect('缺少对应进入记录')}
   }
-  if(!punches.length){
-    if(fullExcused){status=trips.length?'出差':leaves.length?'请假':'外出';severity='excused'}
-    else{status='缺勤';severity='problem';issues.push('工作日无打卡')}
-  }else{
-    if(firstIn&&!morningLeave&&minutes(firstIn.time)>minutes(RULES.amStart)+RULES.grace){severity='problem';issues.push('迟到');status='迟到'}
-    if(lastOut&&!afternoonLeave&&minutes(lastOut.time)<minutes(RULES.pmEnd)-RULES.grace){severity='problem';issues.push('早退');status=status==='迟到'?'迟到/早退':'早退'}
-    if((!firstIn||!lastOut)&&severity!=='problem'){severity='suspect';status='记录不完整'}
-    if(severity==='suspect'&&status==='正常')status='疑似打卡异常';
-    if((leaves.length||trips.length||outings.length)&&severity==='normal')status=trips.length?'出差覆盖':leaves.length?'请假覆盖':'外出覆盖';
-  }
-  function pack(){return {employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,marker:''}}
+ }
+ if(pending){suspect('存在未闭合进入记录');pairingUncertain=true}
+ const covers=(rows,start,end)=>rows.some(x=>minutes(x.start||'00:00')<=minutes(start)&&minutes(x.end||'24:00')>=minutes(end));
+ const overlapEnough=(rows,start,end,need=180)=>rows.some(x=>
+   intervalOverlap(minutes(x.start||'00:00'),minutes(x.end||'24:00'),minutes(start),minutes(end))>=need);
+ const fullExcused=trips.length>0||covers(leaves,RULES.amStart,RULES.pmEnd)||covers(outings,RULES.amStart,RULES.pmEnd);
+ const morningLeave=trips.length>0||overlapEnough(leaves,RULES.amStart,RULES.amEnd)||overlapEnough(outings,RULES.amStart,RULES.amEnd);
+ const afternoonLeave=trips.length>0||overlapEnough(leaves,RULES.pmStart,RULES.pmEnd)||overlapEnough(outings,RULES.pmStart,RULES.pmEnd);
+ const lunchStart=minutes(RULES.amEnd),lunchEnd=minutes(RULES.pmStart);
+ const workMinutes=analysisPairMinutes(pairs,RULES.amStart,RULES.amEnd)+
+  analysisPairMinutes(pairs,RULES.pmStart,RULES.pmEnd);
+ const presence=pairs.reduce((sum,[x,y])=>sum+Math.max(0,minutes(y.time)-minutes(x.time)),0);
+ const firstIn=punches.find(p=>p.direction==='进');
+ const lastOut=[...punches].reverse().find(p=>p.direction==='出');
+ const morningPair=pairs.find(([x,y])=>minutes(x.time)<lunchStart&&
+   minutes(y.time)>=lunchStart-90&&minutes(y.time)<=lunchEnd);
+ const lunchReturn=pairs.find(([x,y])=>minutes(x.time)>=lunchStart-10&&
+   minutes(x.time)<=lunchEnd+120&&minutes(y.time)>lunchEnd);
+ const crossesLunch=pairs.some(([x,y])=>minutes(x.time)<lunchStart&&minutes(y.time)>lunchEnd);
+ const lunchEvidence=crossesLunch?'未分段（工时按班次扣午休）':
+  morningPair&&lunchReturn?'有午休进出':'未明确';
+ const autoOvertime=estimateOvertimeCandidate(pairs,d,overtime,pairingUncertain);
+ if(!state.records.length&&!state.leaves.length&&!state.trips.length&&!state.outings?.length&&!state.overtimeEntries?.length){
+  status='未导入';severity='rest';return pack();
+ }
+ if(!isWorkday(d)){
+  if(punches.length||overtime.length){status='非工作日有出勤记录';severity=pairingUncertain?'suspect':'normal'}
+  else{status=typ==='holiday'?'节假日':'休息';severity='rest'}
   return pack();
+ }
+ if(!punches.length){
+  if(fullExcused){status=trips.length?'出差':leaves.length?'请假':'外出';severity='excused'}
+  else{status='缺勤';severity='problem';issues.push('工作日无打卡')}
+ }else{
+  const grace=Number(RULES.grace)||0,firstMinute=firstIn?minutes(firstIn.time):null;
+  const morningEvidence=pairs.some(([x,y])=>minutes(x.time)<=lunchStart&&minutes(y.time)>minutes(RULES.amStart));
+  const afternoonEvidence=pairs.some(([x,y])=>minutes(y.time)>lunchEnd&&minutes(x.time)<minutes(RULES.pmEnd));
+  if(firstIn&&!morningLeave){
+   if(morningEvidence&&firstMinute>minutes(RULES.amStart)+grace){
+    severity='problem';issues.push('迟到');status='迟到';
+   }else if(!morningEvidence&&firstMinute>lunchStart){
+    suspect('上午缺少完整出勤证据（待核）');
+   }
+  }
+  if(lastOut&&!afternoonLeave){
+   const lastMinute=minutes(lastOut.time);
+   // Without any complete afternoon exit, a lunchtime "出" cannot
+   // establish a definite early departure.
+   if(afternoonEvidence&&!pending&&lastMinute<minutes(RULES.pmEnd)-grace){
+    severity='problem';issues.push('早退');status=status==='迟到'?'迟到/早退':'早退';
+   }else if(!afternoonEvidence||pending){
+    suspect('下午进出记录不完整（待核）');
+   }
+  }
+  if(morningPair&&!morningLeave&&minutes(morningPair[1].time)<lunchStart-grace){
+   suspect('午休提前离岗（待核）');
+  }
+  if(morningPair&&lunchReturn&&!afternoonLeave){
+   const returnMinute=minutes(lunchReturn[0].time);
+   const covered=[...leaves,...outings].some(row=>
+     minutes(row.start||'00:00')<=lunchEnd+grace&&
+     minutes(row.end||'00:00')>=returnMinute-grace);
+   if(returnMinute>lunchEnd+grace&&!covered&&!trips.length)
+    suspect('午休返岗偏晚（待核）');
+  }
+  if((!firstIn||!lastOut)&&severity!=='problem')suspect('打卡记录不完整（待核）');
+  if(severity==='suspect'&&status==='正常')status='疑似打卡异常';
+  if((leaves.length||trips.length||outings.length)&&severity==='normal')
+   status=trips.length?'出差覆盖':leaves.length?'请假覆盖':'外出覆盖';
+ }
+ function pack(){return {employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
+  severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,workMinutes,
+  lunchEvidence,autoOvertime,marker:''}}
+ return pack();
 }
 function reanalyze(){state.analysis=new Map();for(const e of EMPLOYEES)for(let d=1;d<=monthDays();d++)state.analysis.set(`${e.id}|${d}`,analyzeDay(e,d))}
 function statsFor(items){const total=items.length,problems=items.filter(x=>x.severity==='problem').length,suspects=items.filter(x=>x.severity==='suspect').length,normal=items.filter(x=>x.severity==='normal').length,rest=items.filter(x=>x.severity==='rest').length,excused=items.filter(x=>x.severity==='excused').length;return {total,problems,suspects,normal,rest,excused}}

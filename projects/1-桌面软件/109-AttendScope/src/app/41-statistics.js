@@ -4,7 +4,8 @@ const AS_STAT_FAMILIES=[
  ['leave','请假',[['hours','记载请假工时','小时'],['count','请假记录数','条'],['people','涉及人数','人']]],
  ['trip','出差',[['days','出差日数','人日'],['estimatedHours','折算出差工时','小时'],['count','出差记录数','次'],['people','涉及人数','人']]],
  ['outing','外出',[['hours','记载外出时长','小时'],['count','外出记录数','次'],['people','涉及人数','人']]],
- ['overtime','加班',[['hours','记载加班时长','小时'],['count','加班记录数','次'],['people','涉及人数','人']]],
+ ['overtime','加班',[['hours','记载加班时长','小时'],['count','加班记录数','次'],['people','涉及人数','人'],
+  ['candidateHours','自动推算候选工时','小时'],['candidateDays','加班候选人日','人日'],['candidatePeople','加班候选人数','人']]],
  ['punch','打卡',[['count','打卡记录数','次'],['people','打卡人数','人']]],
  ['status','考勤状态',[['normal','正常工作人日','人日'],['anomaly','异常工作人日','人日'],['absent','缺勤工作人日','人日'],['issue','异常及缺勤人日','人日'],['late','迟到人日','人日'],['early','早退人日','人日']]]
 ];
@@ -17,7 +18,7 @@ function asStatPrefs(){
  if(!['groups','people','days'].includes(cfg.compare))cfg.compare=asStatDefaultCompare(state.workspaceMode);
  if(state.workspaceMode==='person')cfg.compare='days';
  if(!['total','perPerson','per100'].includes(cfg.aggregate))cfg.aggregate='total';
- if(cfg.metric==='people')cfg.aggregate='total';
+ if(cfg.metric==='people'||cfg.metric==='candidatePeople')cfg.aggregate='total';
  return cfg;
 }
 function asStatMetric(){const c=asStatPrefs();return asStatFamily(c.family)[2].find(m=>m[0]===c.metric)}
@@ -127,6 +128,11 @@ function asStatLedger(){
   add('punch','presence',id,day,1);
  });
  for(const a of state.analysis.values()){
+  if(a.autoOvertime?.minutes>0){
+   add('overtime','candidateHours',a.employee.id,a.day,a.autoOvertime.minutes/60);
+   add('overtime','candidateDays',a.employee.id,a.day,1);
+   add('overtime','candidatePresence',a.employee.id,a.day,1);
+  }
   if(!isWorkday(a.day))continue;
   const id=a.employee.id,k=attendanceJudgment(a);
   if(['normal','anomaly','absent'].includes(k))add('status',k,id,a.day,1);
@@ -139,14 +145,15 @@ function asStatLedger(){
 function asStatValue(ledger,family,metric,persons,days){
  const ids=new Set(persons.map(e=>e.id));
  const dateSet=new Set(days);
- if(metric==='people'){
+ if(metric==='people'||metric==='candidatePeople'){
   // Count distinct employee IDs in the selected date window, not only the
   // first calendar day where a multi-day event happened to be recorded.
   const seen=new Set();
   for(const [key,value] of ledger){
    if(value<=0)continue;
    const [k,m,id,day]=key.split('|');
-   if(k===family&&m==='presence'&&ids.has(id)&&dateSet.has(Number(day)))seen.add(id);
+   if(k===family&&m===(metric==='candidatePeople'?'candidatePresence':'presence')&&
+      ids.has(id)&&dateSet.has(Number(day)))seen.add(id);
   }
   return seen.size;
  }
@@ -199,7 +206,7 @@ function statisticsWorkspaceHtml(){
  const warning=c.family==='trip'?'出差日数按自然日去重；工时按设定工作时段折算，不代表实际出差时长':
   c.family==='leave'?'请假按记录逐条计数，时长扣午休并合并重叠区间；记录数不等于申请次数':
   c.family==='outing'?'外出时长来自记录区间并去除重叠时段；跨日记录按每日时段折算':
-  c.family==='overtime'?'仅统计有来源的加班记录，重叠时段不重复计时；跨日需核查':
+  c.family==='overtime'?'登记加班与自动推算候选严格分开；候选只来自完整进出记录，不等于审批加班':
   c.family==='punch'?'每条原始打卡计一次，重复打卡仍按实际记录计入':
   '工作日的考勤状态与当前初始／人工判定视图保持一致';
  const unavailable=(c.family==='outing'&&!state.outings?.length)||(c.family==='overtime'&&!state.overtimeEntries?.length);
@@ -278,10 +285,10 @@ function renderStatisticsWorkspace(){
  node.innerHTML=statisticsWorkspaceHtml();
  node.querySelector('#asStatFamily').onchange=e=>{
   c.family=e.target.value;c.metric=asStatFamily(c.family)[2][0][0];
-  if(c.aggregate==='per100'&&c.metric==='people')c.aggregate='total';
+  if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';
   renderStatisticsWorkspace();
  };
- node.querySelector('#asStatMetric').onchange=e=>{c.metric=e.target.value;if(c.metric==='people')c.aggregate='total';renderStatisticsWorkspace()};
+ node.querySelector('#asStatMetric').onchange=e=>{c.metric=e.target.value;if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';renderStatisticsWorkspace()};
  node.querySelector('#asStatCompare').onchange=e=>{
   c.compare=e.target.value;
   if(c.compare==='days')c.chart='line';else c.chart='bar';
