@@ -199,16 +199,17 @@ function renderScopeSummary(){
   '<div class="scope-insight-chart-title">状态构成</div><div id="scopeStatusChart" class="scope-chart scope-chart-composition"></div>';
  mountScopeAnalytics(people,work);
 }
-/* Muted translucent jade: one shared bar palette for every P109 comparison. */
+/* R54: quiet Apple/Material-inspired indigo-blue on neutral surfaces.
+ * Gradient is intentionally subtle; only the active mark gets strong contrast. */
 function asSoftBarGradient(horizontal=true){
  const stops=horizontal?[
-  {offset:0,color:'rgba(155,191,176,.48)'},
-  {offset:.55,color:'rgba(108,163,144,.68)'},
-  {offset:1,color:'rgba(63,127,108,.78)'}
+  {offset:0,color:'rgba(191,211,243,.82)'},
+  {offset:.54,color:'rgba(143,180,235,.83)'},
+  {offset:1,color:'rgba(107,153,221,.90)'}
  ]:[
-  {offset:0,color:'rgba(63,127,108,.78)'},
-  {offset:.55,color:'rgba(108,163,144,.68)'},
-  {offset:1,color:'rgba(155,191,176,.48)'}
+  {offset:0,color:'rgba(108,155,224,.90)'},
+  {offset:.54,color:'rgba(150,186,237,.84)'},
+  {offset:1,color:'rgba(192,213,245,.78)'}
  ];
  return new echarts.graphic.LinearGradient(0,0,horizontal?1:0,horizontal?0:1,stops);
 }
