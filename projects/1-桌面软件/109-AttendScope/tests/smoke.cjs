@@ -729,6 +729,33 @@ async function run(){
  await page.locator('#asNavBack').click();
  await check(page,()=>state.workspaceMode==='stats'&&state.statsScope==='person'&&
   !!document.getElementById('asStatsPerson'),'R52 back navigation lost statistical context');
+ // R55: an explicitly labelled DEMO date has a genuine complete-pair
+ // candidate. Check both the source evidence and the user-visible route.
+ await check(page,()=>{
+  const a=state.analysis.get('E001|12');
+  return state.isDemo&&!!a&&a.autoOvertime?.minutes===95&&
+   a.autoOvertime.segments.length===1&&
+   a.autoOvertime.segments[0].from===1050&&
+   a.autoOvertime.segments[0].to===1145;
+ },'R55 demonstrable 95-minute weekday auto overtime missing');
+ await page.evaluate(()=>{
+  state.workspaceMode='person';state.analyticsPage='main';
+  state.selection={type:'cell',employeeId:'E001',day:1};
+  state.chartDay=1;state.chartTab='timeline';state.timelineRange=null;
+  render();
+ });
+ await page.waitForSelector('#autoOvertimeNext',{timeout:15000});
+ await check(page,()=>document.querySelectorAll('.person-day.has-auto-overtime').length>0&&
+  document.getElementById('autoOvertimeNext').textContent.includes('候选'),
+  'R55 auto-overtime dates must be discoverable in strip and header');
+ await page.locator('#autoOvertimeNext').click();
+ await check(page,()=>{
+  const a=state.analysis.get('E001|'+state.chartDay),bars=r14TrackData(a).bars;
+  return a?.autoOvertime.segments.length>0&&
+   bars.some(b=>b.origin==='auto'&&b.segmentId===a.autoOvertime.segments[0].id);
+ },'R55 candidate-day navigation did not open a real derived band');
+ await page.waitForSelector('#overtimeReviewLayer [data-auto-overtime-id]',{timeout:15000});
+ await page.screenshot({path:path.join(out,'r55-auto-overtime-navigation.png')});
  // R53: an inferred segment has an independent, persistent inclusion toggle.
  // Use existing synthetic/demo records only; revert revisions after the test.
  const overtimePick=await page.evaluate(()=>{
