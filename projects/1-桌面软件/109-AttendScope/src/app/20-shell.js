@@ -308,7 +308,7 @@ function bind(){
   document.getElementById('resetDemo').onclick=()=>{
     if(YEAR!==2026||MONTH!==10){toast('演示数据仅用于 2026 年 10 月',true);return}
     Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='main'; state.chartTab='overview';
-    state.revisions=[];state.manualStatuses={};state.judgmentMode='initial'; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
+    state.revisions=[];state.manualStatuses={};state.overtimeReview={};state.judgmentMode='initial'; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
   };
 
   document.getElementById('connectDir').onclick=connectProjectDir;
