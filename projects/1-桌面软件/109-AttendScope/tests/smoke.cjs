@@ -338,6 +338,49 @@ async function run(){
     asStatValue(ledger,'trip','days',people,days)>=counts('trip')&&
     asStatValue(ledger,'trip','estimatedHours',people,days)>0;
  },'R45 event ledger counts, trip days or time units inconsistent');
+ // R45 iteration 3: independently inject overlapping mock events; original working
+ // rows are restored in a finally block and are never written to raw/snapshot.
+ await check(page,()=>{
+  const prior={leaves:state.leaves,trips:state.trips,outings:state.outings,overtimeEntries:state.overtimeEntries};
+  const id=EMPLOYEES[0].id,who=[EMPLOYEES[0]],day=9,all=Array.from({length:monthDays()},(_,i)=>i+1);
+  try{
+   state.leaves=[
+    {id:'R45-L1',employeeId:id,date:isoDate(day),start:'08:30',end:'10:30'},
+    {id:'R45-L2',employeeId:id,date:isoDate(day),start:'09:00',end:'11:00'}];
+   state.trips=[
+    {id:'R45-T1',employeeId:id,startDate:isoDate(9),endDate:isoDate(10)},
+    {id:'R45-T2',employeeId:id,startDate:isoDate(10),endDate:isoDate(12)}];
+   state.outings=[
+    {id:'R45-O1',employeeId:id,startDate:isoDate(day),endDate:isoDate(day),start:'13:00',end:'14:00'},
+    {id:'R45-O2',employeeId:id,startDate:isoDate(day),endDate:isoDate(day),start:'13:30',end:'14:30'}];
+   state.overtimeEntries=[
+    {id:'R45-OT1',employeeId:id,date:isoDate(day),start:'18:00',end:'19:00'},
+    {id:'R45-OT2',employeeId:id,date:isoDate(day),start:'18:30',end:'19:30'}];
+   const fact=asStatLedger(),get=(k,m,days=[day])=>asStatValue(fact,k,m,who,days);
+   return Math.abs(get('leave','hours')-2.5)<1e-8&&get('leave','count')===2&&
+     Math.abs(get('outing','hours')-1.5)<1e-8&&get('outing','count')===2&&
+     Math.abs(get('overtime','hours')-1.5)<1e-8&&get('overtime','count')===2&&
+     get('trip','days',all)===4&&get('trip','count',all)===2&&
+     Math.abs(get('trip','estimatedHours',all)-asStatWorkMinutes()*3/60)<1e-8;
+  }finally{Object.assign(state,prior)}
+ },'R45 overlap union or multi-day trip counting inconsistent');
+ await check(page,()=>{
+  const item=[...state.analysis.values()].find(a=>isWorkday(a.day)&&attendanceJudgmentSystem(a)==='normal');
+  if(!item)return false;
+  const id=item.employee.id,day=item.day,person=[item.employee],key=id+'|'+day;
+  const previous=state.manualStatuses[key],mode=state.judgmentMode;
+  try{
+   state.judgmentMode='initial';
+   const prior=asStatValue(asStatLedger(),'status','normal',person,[day]);
+   state.manualStatuses[key]='absent';state.judgmentMode='manual';
+   const manual=asStatLedger();
+   return prior===1&&asStatValue(manual,'status','normal',person,[day])===0&&
+     asStatValue(manual,'status','absent',person,[day])===1;
+  }finally{
+   if(previous==null)delete state.manualStatuses[key];else state.manualStatuses[key]=previous;
+   state.judgmentMode=mode;
+  }
+ },'R45 initial/manual status facts must share one verdict source');
  await page.locator('.workspace-mode-all [data-as-view="stats"]').click();
  await page.waitForSelector('#asStatChart svg',{timeout:20000});
  await check(page,()=>state.analyticsPage==='stats'&&state.workspaceMode==='all'&&
@@ -351,6 +394,19 @@ async function run(){
   return chart.width>400&&rank.width>=270&&rank.left>chart.left&&
     document.documentElement.scrollWidth<=innerWidth+3;
  },'R45 1920 analytics layout overflow');
+ // Empty categories must be visibly empty instead of manufacturing 0-value ranks.
+ await check(page,()=>{
+  const prev=state.outings,cfg={...state.statsConfig};
+  try{
+   state.outings=[];state.statsConfig.family='outing';state.statsConfig.metric='hours';
+   state.statsConfig.compare='days';renderStatisticsWorkspace();
+   return asStatRows().rankRows.length===0&&
+    !!document.querySelector('.as-stats-empty')&&
+    document.querySelectorAll('.as-stats-rank-row').length===0;
+  }finally{
+   state.outings=prev;state.statsConfig=cfg;renderStatisticsWorkspace();
+  }
+ },'R45 empty dataset must have an honest no-record state');
  await page.screenshot({path:path.join(out,'r45-all-stats-1920.png')});
  await page.locator('#asStatFamily').selectOption('overtime');
  await page.locator('#asStatMetric').selectOption('hours');
