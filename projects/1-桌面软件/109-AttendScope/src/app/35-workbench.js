@@ -66,16 +66,14 @@ function employeeAutoOvertimeDays(employeeId){
   .filter(a=>a?.autoOvertime?.segments?.length).map(a=>a.day);
 }
 function timelineAutoOvertimeToolsHtml(item){
- const days=employeeAutoOvertimeDays(item.employee.id),minutesCount=
-  (item.autoOvertime?.segments||[]).reduce((n,s)=>n+s.minutes,0);
+ const days=employeeAutoOvertimeDays(item.employee.id);
+ if(!days.length)return '';
  const current=days.indexOf(item.day),next=days[(current+1+days.length)%days.length];
- const count=days.length;
  return '<div class="timeline-auto-tools">'+
-  '<span class="timeline-auto-label" title="✓ 是纳入统计，不代表正式审批">'+
-  '自动加班'+(minutesCount?' '+fmtMinutes(minutesCount):' · 本日无候选')+'</span>'+
-  (count?'<button type="button" id="autoOvertimeNext" data-employee="'+escapeNameChar(item.employee.id)+
-  '" data-day="'+next+'" title="打开该员工有自动加班候选的日期">查找候选 '+count+' 天 →</button>':
-  '<span class="timeline-auto-none">本月没有符合完整打卡与时长阈值的候选</span>')+'</div>';
+  '<button type="button" id="autoOvertimeNext" data-employee="'+escapeNameChar(item.employee.id)+
+  '" data-day="'+next+'" title="定位下一天有自动加班候选的日期；人工 ✓/× 优先于推算">'+
+  '<i class="timeline-auto-hatch" aria-hidden="true"></i>自动加班 <strong>'+days.length+
+  '</strong> <span aria-hidden="true">↗</span></button></div>';
 }
 function timelineLegendHtml(item){
   const judgment=attendanceJudgment(item);
