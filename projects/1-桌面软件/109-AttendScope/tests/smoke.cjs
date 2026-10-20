@@ -326,95 +326,78 @@ async function run(){
  },'R39 1366 calendar visibility or horizontal matrix use');
  await page.screenshot({path:path.join(out,'r37-all-1366.png')});
  await page.setViewportSize({width:1920,height:1080});
- // R49: workday lunch anomalies and candidate overtime are conservative,
- // derived-only measurements. Synthetic data never enters the saved working set.
+ // R56: new 08:30–11:40 / 13:30–17:10 shift, independent
+ // 5/0/5/0-minute tolerances, derived-only overtime and source immutability.
  await check(page,()=>{
-  const previous={
-   records:state.records,leaves:state.leaves,trips:state.trips,outings:state.outings,
-   overtimeEntries:state.overtimeEntries,threshold:RULES.overtimeMinMinutes
-  };
-  const emp=EMPLOYEES[0],day=8,date=isoDate(day),restDay=11;
-  const make=(d,sequence)=>sequence.map(([time,direction],i)=>({
-   employeeId:emp.id,datetime:isoDate(d)+' '+time,time,direction,recordId:'r49:'+i
-  }));
-  const dayResult=(d,sequence,registered=[],leaves=[])=>{
-   state.records=make(d,sequence);state.overtimeEntries=registered;state.leaves=leaves;
+  const previous={records:state.records,leaves:state.leaves,trips:state.trips,
+   outings:state.outings,overtimeEntries:state.overtimeEntries,
+   analysis:state.analysis,manualStatuses:state.manualStatuses,rules:{...RULES}};
+  const emp=EMPLOYEES[0],day=8,date=isoDate(day),restDay=11,
+    make=(d,sequence)=>sequence.map(([time,direction],i)=>({
+      employeeId:emp.id,datetime:isoDate(d)+' '+time,time,direction,recordId:'r56:'+i
+    }));
+  const examine=(d,sequence,registered=[],leave=[])=>{
+   state.records=make(d,sequence);state.overtimeEntries=registered;state.leaves=leave;
    return analyzeDay(emp,d);
   };
-  const split=[['08:25','进'],['12:04','出'],['13:56','进'],['17:35','出']];
-  const fail=(caseName,detail)=>{throw Error('R49_CASE '+caseName+' '+JSON.stringify(detail))};
+  const fail=(name,data)=>{throw Error('R56_CASE '+name+' '+JSON.stringify(data))};
   try{
    state.trips=[];state.outings=[];RULES.overtimeMinMinutes=30;
-   const ordinary=dayResult(day,split);
-   if(ordinary.severity!=='normal'||ordinary.workMinutes!==420||
-     ordinary.autoOvertime.minutes!==0||ordinary.lunchEvidence!=='有午休进出')return fail('ordinary',{severity:ordinary.severity,work:ordinary.workMinutes,auto:ordinary.autoOvertime,lunch:ordinary.lunchEvidence,issues:ordinary.issues});
-   const continuous=dayResult(day,[['08:25','进'],['19:00','出']]);
-   if(continuous.workMinutes!==420||continuous.autoOvertime.minutes!==90||
-     continuous.lunchEvidence!=='未分段（工时按班次扣午休）')return fail('continuous',{work:continuous.workMinutes,auto:continuous.autoOvertime,lunch:continuous.lunchEvidence});
-   const lateLunch=dayResult(day,[['08:25','进'],['12:00','出'],['14:17','进'],['17:35','出']]);
-   if(lateLunch.severity!=='suspect'||!lateLunch.issues.some(x=>x.includes('午休返岗'))||
-     lateLunch.issues.some(x=>x==='迟到'||x==='早退'))return fail('lateLunch',{severity:lateLunch.severity,issues:lateLunch.issues});
-   const missingPm=dayResult(day,[['08:25','进'],['12:00','出'],['14:00','进']]);
-   if(missingPm.severity!=='suspect'||missingPm.issues.includes('早退')||
-     missingPm.autoOvertime.minutes!==0)return fail('missingPm',{severity:missingPm.severity,issues:missingPm.issues,auto:missingPm.autoOvertime});
-   const noonOnly=dayResult(day,[['08:25','进'],['12:00','出']]);
-   if(noonOnly.severity!=='suspect'||noonOnly.issues.includes('早退'))return fail('noonOnly',{severity:noonOnly.severity,issues:noonOnly.issues});
-   const afterHours=dayResult(day,[['08:25','进'],['12:04','出'],['13:56','进'],['19:00','出']]);
-   if(afterHours.autoOvertime.minutes!==90||afterHours.workMinutes!==420)return fail('afterHours',{auto:afterHours.autoOvertime,work:afterHours.workMinutes});
-   const originalAnalysis=state.analysis;
-   try{
-    state.analysis=new Map([[emp.id+'|'+day,afterHours]]);
-    const ledger=asStatLedger(),get=(metric)=>asStatValue(ledger,'overtime',metric,[emp],[day]);
-    if(get('candidateHours')!==1.5||get('candidateDays')!==1||
-       get('candidatePeople')!==1||get('hours')!==1.5||get('count')!==1||
-       get('registeredHours')!==0)
-      return fail('statistics',{hours:get('candidateHours'),days:get('candidateDays'),people:get('candidatePeople'),registeredHours:get('hours')});
-    if(!timelineFullInsightHtml(afterHours).includes('自动加班')||
-       !timelineBehaviorSummaryRow(afterHours,'overtime').includes('自动纳入'))
-      return fail('visualSummary','not labeled as candidate');
-    if(workingPayload().rules.overtimeMinMinutes!==30||
-       !settingsContent('rules').includes('r14OvertimeMin'))
-      return fail('settings','threshold missing from persisted rules or settings');
-   }finally{state.analysis=originalAnalysis}
-   const recorded=dayResult(day,[['08:25','进'],['19:00','出']],
-     [{id:'registered',employeeId:emp.id,date,start:'18:00',end:'19:00'}]);
-   if(recorded.autoOvertime.minutes!==30||!recorded.autoOvertime.reason.includes('扣除'))
-     return fail('registeredPartialOverlap',recorded.autoOvertime);
-   const fullRegistered=dayResult(day,[['08:25','进'],['19:00','出']],
-     [{id:'full',employeeId:emp.id,date,start:'17:30',end:'19:00'}]);
-   if(fullRegistered.autoOvertime.minutes!==0||!fullRegistered.autoOvertime.reason.includes('已登记'))
-     return fail('registeredFullOverlap',fullRegistered.autoOvertime);
-   const duplicateRegistered=dayResult(day,[['08:25','进'],['19:00','出']],[
-     {id:'overlap1',employeeId:emp.id,date,start:'17:30',end:'18:45'},
-     {id:'overlap2',employeeId:emp.id,date,start:'18:30',end:'19:00'}]);
-   if(duplicateRegistered.autoOvertime.minutes!==0)
-     return fail('registeredUnionNoDoubleSubtraction',duplicateRegistered.autoOvertime);
-   const boundedRegistered=dayResult(day,[['08:25','进'],['19:00','出']],
-     [{id:'middle',employeeId:emp.id,date,start:'18:00',end:'18:20'}]);
-   if(boundedRegistered.autoOvertime.minutes!==70)
-     return fail('registeredMiddleGap',boundedRegistered.autoOvertime);
-   const threshold=dayResult(day,[['08:25','进'],['17:52','出']]);
-   if(threshold.autoOvertime.minutes!==0||threshold.autoOvertime.rawMinutes!==22)return fail('threshold',threshold.autoOvertime);
-   RULES.overtimeMinMinutes=15;
-   const lowered=dayResult(day,[['08:25','进'],['17:52','出']]);
-   if(lowered.autoOvertime.minutes!==22)return fail('lowered',lowered.autoOvertime);
-   RULES.overtimeMinMinutes=30;
-   const rest=dayResult(restDay,[['09:00','进'],['15:00','出']]);
-   if(rest.autoOvertime.minutes!==240||rest.workMinutes!==240)return fail('rest',{auto:rest.autoOvertime,work:rest.workMinutes,dayType:dayType(restDay)});
-   const restIncomplete=dayResult(restDay,[['09:00','进']]);
-   if(restIncomplete.autoOvertime.minutes!==0||restIncomplete.severity!=='suspect')return fail('restIncomplete',{severity:restIncomplete.severity,auto:restIncomplete.autoOvertime});
-   const excused=dayResult(day,[['08:25','进'],['12:00','出'],['14:25','进'],['17:35','出']],[],
-     [{employeeId:emp.id,date,start:'14:00',end:'14:25'}]);
-   if(excused.issues.some(x=>x.includes('午休返岗')))return fail('excused',excused.issues);
+   const ordinary=examine(day,[['08:25','进'],['11:45','出'],['13:25','进'],['17:15','出']]);
+   if(ordinary.severity!=='normal'||ordinary.workMinutes!==410||
+      ordinary.autoOvertime.minutes!==0||ordinary.lunchEvidence!=='有午休进出')
+      fail('ordinary',{severity:ordinary.severity,minutes:ordinary.workMinutes,issues:ordinary.issues});
+   const continuous=examine(day,[['08:25','进'],['19:00','出']]);
+   if(continuous.workMinutes!==410||continuous.autoOvertime.minutes!==110)
+      fail('continuous',continuous.autoOvertime);
+   const lateMorning=examine(day,[['08:36','进'],['11:45','出'],['13:25','进'],['17:15','出']]);
+   if(!lateMorning.issues.includes('迟到'))fail('morning late',lateMorning.issues);
+   const earlyMorning=examine(day,[['08:25','进'],['11:39','出'],['13:25','进'],['17:15','出']]);
+   if(!earlyMorning.issues.includes('上午早退'))fail('morning early',earlyMorning.issues);
+   const lateAfternoon=examine(day,[['08:25','进'],['11:45','出'],['13:36','进'],['17:15','出']]);
+   if(!lateAfternoon.issues.includes('下午迟到'))fail('afternoon late',lateAfternoon.issues);
+   const earlyAfternoon=examine(day,[['08:25','进'],['11:45','出'],['13:25','进'],['17:09','出']]);
+   if(!earlyAfternoon.issues.includes('早退'))fail('afternoon early',earlyAfternoon.issues);
+   const incomplete=examine(day,[['08:25','进'],['11:45','出'],['13:25','进']]);
+   if(incomplete.severity!=='suspect'||incomplete.autoOvertime.minutes)
+      fail('incomplete',incomplete.issues);
+   const afterHours=examine(day,[['08:25','进'],['11:45','出'],['13:25','进'],['19:00','出']]);
+   if(afterHours.autoOvertime.minutes!==110||afterHours.workMinutes!==410)
+      fail('after hours',afterHours.autoOvertime);
+   state.analysis=new Map([[emp.id+'|'+day,afterHours]]);
+   const value=m=>asStatValue(asStatLedger(),'overtime',m,[emp],[day]);
+   if(Math.abs(value('hours')-110/60)>1e-8||
+      Math.abs(value('candidateHours')-110/60)>1e-8||
+      value('candidateDays')!==1||value('registeredHours')!==0)
+      fail('ledger',{total:value('hours'),candidate:value('candidateHours')});
+   if(!settingsContent('rules').includes('r14Rule_graceAmStart')||
+      !settingsContent('rules').includes('r14Rule_gracePmEnd')||
+      workingPayload().rules.gracePmStart!==5)
+      fail('settings',workingPayload().rules);
+   const frozen=JSON.stringify(state.records);
+   const seg=afterHours.autoOvertime.segments[0];
+   state.overtimeReview[seg.id]=false;
+   const rejected=analyzeDay(emp,day);
+   if(activeAutoOvertimeSegments(rejected).length!==0||
+      JSON.stringify(state.records)!==frozen)fail('manual priority',rejected.autoOvertime);
+   delete state.overtimeReview[seg.id];
+   const middle=examine(day,[['08:25','进'],['19:00','出']],
+    [{id:'R',employeeId:emp.id,date,start:'18:00',end:'18:20'}]);
+   if(middle.autoOvertime.minutes!==90||middle.autoOvertime.segments.length!==2)
+      fail('registered subtraction',middle.autoOvertime);
+   const threshold=examine(day,[['08:25','进'],['17:32','出']]);
+   if(threshold.autoOvertime.rawMinutes!==22||threshold.autoOvertime.minutes!==0)
+      fail('threshold',threshold.autoOvertime);
+   const weekend=examine(restDay,[['09:00','进'],['15:00','出']]);
+   if(weekend.autoOvertime.minutes!==250)fail('weekend lunch deduction',weekend.autoOvertime);
    return true;
   }finally{
-   Object.assign(state,{
-    records:previous.records,leaves:previous.leaves,trips:previous.trips,
-    outings:previous.outings,overtimeEntries:previous.overtimeEntries
-   });
-   RULES.overtimeMinMinutes=previous.threshold;
+   Object.assign(state,{records:previous.records,leaves:previous.leaves,trips:previous.trips,
+    outings:previous.outings,overtimeEntries:previous.overtimeEntries,
+    analysis:previous.analysis,manualStatuses:previous.manualStatuses});
+   Object.assign(RULES,previous.rules);
   }
- },'R49 lunch clock-gap evidence, threshold, registered-event exclusion and inferred overtime failed');
+ },'R56 separated tolerances, overtime evidence and manual exclusion source safety');
  // R52: exactly one top-level statistics route; the old left statistics
  // switchers must no longer compete with group/person selection.
  await check(page,()=>{
@@ -733,11 +716,11 @@ async function run(){
  // candidate. Check both the source evidence and the user-visible route.
  await check(page,()=>{
   const a=state.analysis.get('E001|12');
-  return state.isDemo&&!!a&&a.autoOvertime?.minutes===95&&
+  return state.isDemo&&!!a&&a.autoOvertime?.minutes===115&&
    a.autoOvertime.segments.length===1&&
    a.autoOvertime.segments[0].from===1050&&
    a.autoOvertime.segments[0].to===1145;
- },'R55 demonstrable 95-minute weekday auto overtime missing');
+ },'R56 demonstrable 115-minute weekday auto overtime missing');
  await page.evaluate(()=>{
   state.workspaceMode='person';state.analyticsPage='main';
   state.selection={type:'cell',employeeId:'E001',day:1};
