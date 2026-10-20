@@ -685,6 +685,56 @@ async function run(){
  await page.locator('#asNavBack').click();
  await check(page,()=>state.workspaceMode==='stats'&&state.statsScope==='person'&&
   !!document.getElementById('asStatsPerson'),'R52 back navigation lost statistical context');
+ // R53: an inferred segment has an independent, persistent inclusion toggle.
+ // Use existing synthetic/demo records only; revert revisions after the test.
+ const overtimePick=await page.evaluate(()=>{
+  const a=[...state.analysis.values()].find(x=>x.autoOvertime?.segments?.some(s=>s.accepted!==false));
+  if(!a)return null;
+  const original={revisions:state.revisions.slice(),revisionSeq:state.revisionSeq,saved:state.saved};
+  state.__r53Restore=original;
+  state.workspaceMode='person';state.analyticsPage='main';
+  state.selection={type:'cell',employeeId:a.employee.id,day:a.day};
+  state.chartDay=a.day;state.chartTab='timeline';state.timelineRange=null;render();
+  return {id:a.autoOvertime.segments.find(s=>s.accepted!==false).id,employee:a.employee.id,day:a.day};
+ });
+ if(!overtimePick)throw Error('R53 demo must contain at least one complete automatic overtime interval');
+ await page.waitForSelector('#overtimeReviewLayer .overtime-review-actions',{timeout:16000});
+ await check(page,info=>{
+  const a=state.analysis.get(info.employee+'|'+info.day),segment=a?.autoOvertime?.segments?.find(s=>s.id===info.id);
+  const controls=document.querySelectorAll('#overtimeReviewLayer .overtime-review-btn');
+  const active=[...controls].some(btn=>btn.textContent==='✓'&&btn.getAttribute('aria-pressed')==='true');
+  return !!segment&&segment.accepted&&active&&
+   r14TrackData(a).bars.some(b=>b.origin==='auto'&&b.segmentId===info.id&&b.accepted);
+ },overtimePick,'R53 default auto-overtime candidate must render as selected hatch with ✓/×');
+ await page.screenshot({path:path.join(out,'r53-auto-overtime-included.png')});
+ await page.evaluate(info=>{
+  const a=state.analysis.get(info.employee+'|'+info.day),seg=a.autoOvertime.segments.find(s=>s.id===info.id);
+  const before=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
+  state.__r53Before={hours:before,minutes:seg.minutes};
+  setAutoOvertimeDecision(info.id,false);
+ },overtimePick);
+ await check(page,info=>{
+  const a=state.analysis.get(info.employee+'|'+info.day),seg=a.autoOvertime.segments.find(s=>s.id===info.id);
+  const after=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
+  const layer=[...document.querySelectorAll('.overtime-review-actions')].some(n=>n.classList.contains('is-excluded'));
+  return seg.accepted===false&&state.overtimeReview[info.id]===false&&
+   Math.abs(after-(state.__r53Before.hours-state.__r53Before.minutes/60))<1e-8&&
+   workingPayload().overtimeReview[info.id]===false&&layer;
+ },overtimePick,'R53 × must fade segment, persist exclusion and remove its minutes from total');
+ await page.screenshot({path:path.join(out,'r53-auto-overtime-excluded.png')});
+ await page.evaluate(info=>setAutoOvertimeDecision(info.id,true),overtimePick);
+ await check(page,info=>{
+  const a=state.analysis.get(info.employee+'|'+info.day),seg=a.autoOvertime.segments.find(s=>s.id===info.id);
+  const after=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
+  return seg.accepted===true&&state.overtimeReview[info.id]!==false&&
+   Math.abs(after-state.__r53Before.hours)<1e-8;
+ },overtimePick,'R53 ✓ must restore time and avoid doubling registered minutes');
+ await page.evaluate(()=>{
+  const old=state.__r53Restore;
+  if(old){state.revisions=old.revisions;state.revisionSeq=old.revisionSeq;state.saved=old.saved}
+  delete state.__r53Restore;delete state.__r53Before;
+  rememberMonth();
+ });
  // Legacy matrix/time-axis QA below starts from the normal All view.
  await page.locator('[data-workspace="all"]').click();
  await check(page,()=>state.workspaceMode==='all'&&state.analyticsPage==='main'&&
