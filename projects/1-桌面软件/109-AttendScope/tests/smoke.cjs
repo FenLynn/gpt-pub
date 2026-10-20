@@ -796,7 +796,27 @@ async function run(){
    bars.some(b=>b.origin==='auto'&&b.segmentId===a.autoOvertime.segments[0].id);
  },'R57 tapping the marked date must reveal its actual automatic interval');
  await page.waitForSelector('#overtimeReviewLayer [data-auto-overtime-id]',{timeout:15000});
- await page.screenshot({path:path.join(out,'r55-auto-overtime-navigation.png')});
+ await check(page,()=>{
+   const chart=echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'));
+   const series=chart.getOption().series,band=series.find(s=>s.id==='bands'),
+     punch=series.find(s=>s.id==='punches');
+   if(typeof band?.renderItem!=='function'||typeof punch?.renderItem!=='function')return false;
+   const day=state.analysis.get('E001|12'),model=r14TrackData(day);
+   const index=model.bars.findIndex(b=>b.origin==='auto');
+   if(index<0||!model.events.length)return false;
+   const interval=model.bars[index],rowHeight=45;
+   const api={value:i=>interval.value[i],coord:point=>[point[0],point[1]*rowHeight],
+     size:()=>[0,rowHeight]};
+   const shape=band.renderItem({dataIndex:index},api);
+   const arrow=punch.renderItem({dataIndex:0},{value:i=>model.events[0].value[i],
+     coord:point=>[point[0],point[1]*rowHeight],size:()=>[0,rowHeight]});
+   const line=arrow?.children?.find(el=>el.type==='line');
+   return shape?.type==='rect'&&shape.shape.height>=rowHeight-1&&
+    Array.isArray(shape.style?.fill?.colorStops)&&
+    Math.abs(line?.shape.y2-line?.shape.y1)>=rowHeight*.80&&
+    Math.abs(line?.shape.y2-line?.shape.y1)<=rowHeight;
+ },'R57 automatic overtime should draw a solid gradient and punch arrows must fill the lane height');
+ await page.screenshot({path:path.join(out,'r57-solid-overtime-timeline.png')});
  // R53: an inferred segment has an independent, persistent inclusion toggle.
  // Use existing synthetic/demo records only; revert revisions after the test.
  const overtimePick=await page.evaluate(()=>{
