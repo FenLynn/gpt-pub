@@ -721,9 +721,9 @@ async function run(){
   const a=state.analysis.get('E001|12');
   return state.isDemo&&!!a&&a.autoOvertime?.minutes===115&&
    a.autoOvertime.segments.length===1&&
-   a.autoOvertime.segments[0].from===1050&&
+   a.autoOvertime.segments[0].from===1030&&
    a.autoOvertime.segments[0].to===1145;
- },'R56 demonstrable 115-minute weekday auto overtime missing');
+ },'R56 weekday candidate must start at 17:10 and end at 19:05');
  await page.evaluate(()=>{
   state.workspaceMode='person';state.analyticsPage='main';
   state.selection={type:'cell',employeeId:'E001',day:1};
@@ -732,7 +732,7 @@ async function run(){
  });
  await page.waitForSelector('#autoOvertimeNext',{timeout:15000});
  await check(page,()=>document.querySelectorAll('.person-day.has-auto-overtime').length>0&&
-  document.getElementById('autoOvertimeNext').textContent.includes('候选'),
+  document.getElementById('autoOvertimeNext').textContent.includes('自动加班'),
   'R55 auto-overtime dates must be discoverable in strip and header');
  await page.locator('#autoOvertimeNext').click();
  await check(page,()=>{
@@ -769,6 +769,7 @@ async function run(){
   const before=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
   state.__r53Before={hours:before,minutes:seg.minutes};
  },overtimePick);
+ await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"]').hover();
  await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"] .overtime-review-btn').first().click();
  await page.waitForSelector('[data-auto-overtime-id="'+overtimePick.id+'"].is-excluded');
  await check(page,info=>{
@@ -780,6 +781,7 @@ async function run(){
    workingPayload().overtimeReview[info.id]===false&&layer;
  },overtimePick,'R53 × must fade segment, persist exclusion and remove its minutes from total');
  await page.screenshot({path:path.join(out,'r53-auto-overtime-excluded.png')});
+ await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"]').hover();
  await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"] .overtime-review-btn').nth(1).click();
  await page.waitForSelector('[data-auto-overtime-id="'+overtimePick.id+'"]:not(.is-excluded)');
  await check(page,info=>{
