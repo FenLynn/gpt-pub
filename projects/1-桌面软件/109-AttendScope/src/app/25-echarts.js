@@ -86,7 +86,13 @@ function minuteText(v){
 
 function timelineRange(a){
   const key=`${a.employee.id}|${a.day}`;
-  if(!state.timelineRange||state.timelineRange.key!==key)state.timelineRange={key,start:300,end:1380};
+  if(!state.timelineRange||state.timelineRange.key!==key){
+   // A midnight-spanning session cannot be displayed in the legacy
+   // 05:00–23:00 viewport: the last/first hours would be cropped.
+   const touchesMidnight=(a.pairs||[]).some(([x,y])=>minutes(x.time)<1||minutes(y.time)>=1440)||
+    (a.autoOvertime?.segments||[]).some(s=>s.from<1||s.to>=1440);
+   state.timelineRange={key,start:touchesMidnight?0:300,end:touchesMidnight?1440:1380};
+  }
   return state.timelineRange;
 }
 
