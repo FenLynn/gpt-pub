@@ -345,15 +345,18 @@ function asStatDrill(key){
   state.statsConfig.aggregate='total';render();return;
  }
  if(row.type==='day'){
-  const day=Number(key),scope=asStatScopeMode();
+  // Capture the source scope before changing workspaces. Otherwise the helper
+  // would read a different (or unset) ID after switching to personal analysis.
+  const day=Number(key),scope=asStatScopeMode(),
+    sourcePerson=asStatScopePerson(),sourceGroup=asStatScopeGroup();
   if(scope==='person'){
    state.workspaceMode='person';state.analyticsPage='main';
-   state.selection={type:'cell',employeeId:asStatScopePerson(),day};
+   state.selection={type:'cell',employeeId:sourcePerson,day};
    state.chartDay=day;state.chartTab='timeline';
    state.timelineRange=null;state.rawPage=1;
   }else{
    state.workspaceMode=scope==='group'?'group':'all';
-   if(scope==='group')state.selectedGroup=asStatScopeGroup();
+   if(scope==='group')state.selectedGroup=sourceGroup;
    state.analyticsPage='main';state.selection={type:'date',day};
    state.chartDay=day;state.chartTab='overview';
   }
