@@ -284,3 +284,70 @@ html{scrollbar-gutter:stable}
 .reduce-animations .top-history button,
 .reduce-animations .as-stats-filters select,
 .reduce-animations .side-primary-nav .side-views button{transition:none!important}
+
+/* R52: one full-width statistical workbench, independent of matrix scopes. */
+.layout.workspace-mode-stats{display:block!important;width:100%;max-width:100%;min-height:calc(100vh - var(--topbar))}
+.layout.workspace-mode-stats>.sidebar{display:none!important}
+.layout.workspace-mode-stats>.workspace{
+ width:100%;max-width:100%;min-width:0;overflow:visible!important;
+ padding:16px clamp(18px,2.2vw,38px) 24px!important;
+}
+.layout.workspace-mode-stats .workspace>.workspace-toolbar,
+.layout.workspace-mode-stats .workspace>.workbench{display:none!important}
+.layout.workspace-mode-stats .stats-workspace{display:block!important;min-height:0}
+.layout.workspace-mode-stats .as-stats{max-width:none;width:100%}
+.layout.workspace-mode-stats .as-stats-heading{gap:18px;align-items:center;padding:4px 0 17px}
+.as-stats-heading-actions{display:flex;align-items:center;justify-content:flex-end;
+ flex-wrap:wrap;gap:13px;min-width:0}
+.as-stats-scope{display:flex;align-items:center;flex-wrap:wrap;gap:9px;
+ padding:4px 6px;border:1px solid #e4ede8;border-radius:9px;background:#fff}
+.as-stats-scope label{display:inline-flex;align-items:center;gap:7px;min-width:0;
+ font-size:12px;font-weight:620;color:#6c8479;white-space:nowrap}
+.as-stats-scope select{height:29px;padding:0 23px 0 9px;min-width:75px;max-width:230px;
+ border-radius:6px;border:1px solid #dce7e0;cursor:pointer;
+ background-color:#fbfdfb;color:#345c4c;font-size:12px;font-weight:630}
+.as-stats-scope #asStatsGroup{width:140px}
+.as-stats-scope #asStatsPerson{width:135px}
+.as-stats-scope select:focus-visible{outline:2px solid #9ac7b0;outline-offset:2px}
+.as-stats-chart-switch button:disabled{opacity:.34;cursor:not-allowed}
+.as-stats-chart-switch button:disabled:hover{background:transparent}
+.as-stats-chart-hint{margin:1px 0 0;padding:0 6px;text-align:center;
+ color:#8da199;font-size:11.5px}
+.as-stats-rank-table{scrollbar-gutter:stable;overscroll-behavior:contain}
+.as-rank-entry{border-bottom:1px solid #edf1ee}
+.as-rank-entry>.as-stats-rank-row{border-bottom:0;min-height:43px}
+.as-rank-entry .as-rank-chevron{font-size:18px;transition:transform .17s ease,color .17s ease;
+ transform-origin:center}
+.as-rank-entry.is-expanded>.as-stats-rank-row{background:#f1f7f3}
+.as-rank-entry.is-expanded .as-rank-chevron{transform:rotate(180deg);color:#3c8065}
+.as-rank-detail{padding:11px 15px 13px 48px;background:#f8fbf9;border-top:1px solid #eaf2ed}
+.as-rank-detail[hidden]{display:none!important}
+.as-rank-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:9px 15px}
+.as-rank-detail-grid>span{display:flex;flex-direction:column;gap:3px;min-width:0;
+ color:#81978c;font-size:11px}
+.as-rank-detail-grid strong{color:#3f6152;font-weight:650;font-size:12px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.as-rank-drill{display:inline-flex;gap:7px;align-items:center;margin-top:12px;
+ min-height:29px;padding:0 9px;background:#edf5ef;border:1px solid #d9e8dd;
+ border-radius:6px;color:#3c7960;font-size:12px;font-weight:700;cursor:pointer}
+.as-rank-drill:hover{background:#e1eee4;border-color:#c2dac8}
+.as-stats-chart,.as-stats-rank{min-height:0}
+.as-stats-chart-canvas{height:355px}
+@media(max-width:1400px){
+ .layout.workspace-mode-stats>.workspace{padding-inline:20px!important}
+ .as-stats-visual{grid-template-columns:minmax(0,1.55fr) minmax(290px,1fr)}
+ .as-stats-heading h2{font-size:21px}
+}
+@media(max-width:990px){
+ .as-stats-heading{flex-wrap:wrap}
+ .as-stats-heading-actions{justify-content:flex-start}
+ .as-stats-visual{grid-template-columns:minmax(0,1fr)}
+ .as-stats-chart-canvas{height:320px}
+}
+@media(max-width:600px){
+ .as-stats-scope{width:100%;flex-wrap:wrap}
+ .as-stats-heading-actions{width:100%}
+ .as-rank-detail{padding-left:16px}
+}
+@media(prefers-reduced-motion:reduce){.as-rank-entry .as-rank-chevron{transition:none}}
