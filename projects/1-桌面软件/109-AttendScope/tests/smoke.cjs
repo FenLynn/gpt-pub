@@ -634,6 +634,25 @@ async function run(){
  await page.setViewportSize({width:1600,height:900});
  await page.screenshot({path:path.join(out,'r52-top-groups-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
+ // A double-click on a group row drills into that group, not a generic tab.
+ const groupKey=await page.locator('.as-stats-rank-row').first().getAttribute('data-as-rank');
+ await page.locator('.as-stats-rank-row').first().dblclick();
+ await check(page,key=>state.workspaceMode==='stats'&&state.statsScope==='group'&&
+  state.statsGroup===key&&state.statsConfig.compare==='people',groupKey,
+  'R52 double-click group row must enter the selected team');
+ await page.locator('.as-stats-rank-row').first().click();
+ await check(page,()=>!!document.querySelector('.as-rank-breakdown-slot .as-rank-breakdown')&&
+  !document.querySelector('.as-rank-entry.is-expanded .as-rank-detail')?.hidden,
+  'R52 rank disclosure must contain real source-ledger breakdown');
+ const personKey=await page.locator('.as-stats-rank-row').first().getAttribute('data-as-rank');
+ await page.locator('.as-rank-entry.is-expanded [data-as-drill]').first().click();
+ await check(page,key=>state.workspaceMode==='stats'&&state.statsScope==='person'&&
+  state.statsPersonId===key&&asStatRows().people.length===1,personKey,
+  'R52 explicit drill action must open the selected employee');
+ await page.locator('#asNavBack').click();
+ await page.locator('#asNavBack').click();
+ await check(page,()=>state.workspaceMode==='stats'&&state.statsScope==='all'&&
+  !!document.getElementById('asStatsScope'),'R52 back history lost all-staff statistics');
  await page.locator('#asStatsScope').selectOption('group');
  await check(page,()=>{
   const group=state.statsGroup||workspaceGroups()[0];
