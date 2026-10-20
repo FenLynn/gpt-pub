@@ -130,8 +130,8 @@ function layoutHtml(){
   </header>
 
   <div class="layout workspace-mode-${state.workspaceMode||'all'} ${state.analyticsPage==='stats'?'stats-active':''}">
-    ${state.workspaceMode==='stats'?'':'<aside class="sidebar">'}
-      ${state.workspaceMode==='stats'?'':state.workspaceMode==='classic'?`
+    <aside class="sidebar">
+      ${state.workspaceMode==='classic'?`
       <section class="side-section calendar-section">
         <div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>
         <div class="calendar-grid" id="calendar"></div>
@@ -179,7 +179,7 @@ function layoutHtml(){
         </div>
       </section>
 `:workspaceSidebarHtml()}
-    ${state.workspaceMode==='stats'?'':'</aside>'}
+    </aside>
 
     <main class="workspace">
       ${workspaceToolbarHtml()}
