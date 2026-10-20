@@ -75,11 +75,13 @@ function workspaceSidebarHtml(){
   '<select class="side-select" id="workspacePerson">'+(mode==='person'?'':'<option value="">全部</option>')+
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
     escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
- const view=mode==='data'?'':'<nav class="side-views" aria-label="分析视图">'+
+ const view=mode==='data'?'':'<section class="side-primary-nav"><div class="side-primary-title">分析视图</div>'+
+  '<nav class="side-views" aria-label="分析视图">'+
   '<button type="button" data-as-view="main" class="'+(state.analyticsPage!=='stats'?'active':'')+'">'+
-   (mode==='person'?'单日时间轴':'考勤矩阵')+'</button>'+
+   '<span class="side-view-index">01</span><span class="side-view-text">'+(mode==='person'?'单日时间轴':'考勤矩阵')+'</span></button>'+
   '<button type="button" data-as-view="stats" class="'+(state.analyticsPage==='stats'?'active':'')+'">'+
-   (mode==='all'?'总体统计':mode==='group'?'组别统计':'个人统计')+'</button></nav>';
+   '<span class="side-view-index">02</span><span class="side-view-text">'+
+   (mode==='all'?'总体统计':mode==='group'?'组别统计':'个人统计')+'</span></button></nav></section>';
  const sub=mode==='data'?'<div class="side-subnav">'+
   [['records','原始记录'],['roster','员工名册'],['rules','工作规则'],['imports','导入与快照']].map(([id,name])=>
   '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+'</div>':'';
@@ -88,7 +90,8 @@ function workspaceSidebarHtml(){
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
-  (mode==='data'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':sidebarFilterHtml())+'</div>';
+  (mode==='data'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
+   '<div class="side-refinements"><div class="side-refinements-title">辅助筛选</div>'+sidebarFilterHtml()+'</div>')+'</div>';
 }
 function workspaceToolbarHtml(){
  const mode=state.workspaceMode||'all';
@@ -131,6 +134,7 @@ function bindWorkspaceNavigation(){
   state.chartTab=b.dataset.sidebarChart;
   document.querySelectorAll('[data-sidebar-chart]').forEach(x=>x.classList.toggle('active',x.dataset.sidebarChart===state.chartTab));
   renderAnalysisPanel();
+  asNavRefreshCurrent();
  });
  document.querySelectorAll('.side-controls [data-data-section]').forEach(b=>b.onclick=()=>{
   state.dataSection=b.dataset.dataSection;
@@ -223,7 +227,9 @@ function mountScopeAnalytics(people,work){
    tooltip:{trigger:'item',formatter:p=>escapeNameChar(p.name)+' · '+p.value+' 人日'},
    xAxis:{type:'value',show:false},yAxis:{type:'category',data:entries.map(x=>x.name),
      axisLine:{show:false},axisTick:{show:false},axisLabel:{color:'#536e82',fontSize:11,overflow:'truncate',width:59}},
-   series:[{type:'bar',data:entries.map(x=>x.value),barWidth:12,itemStyle:{color:'#8caec4',borderRadius:[0,3,3,0]},
+   series:[{type:'bar',data:entries.map(x=>x.value),barWidth:12,
+     itemStyle:{color:new echarts.graphic.LinearGradient(0,0,1,0,[
+       {offset:0,color:'#9ccde5'},{offset:1,color:'#397fae'}]),borderRadius:[0,3,3,0]},
      showBackground:true,backgroundStyle:{color:'#eef2f5'}}]});
  }
 }
