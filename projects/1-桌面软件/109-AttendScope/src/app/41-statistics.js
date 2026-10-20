@@ -315,6 +315,7 @@ function statisticsWorkspaceHtml(){
    (selected.people[0]?.name||'个人')+
     (selected.people[0]&&EMPLOYEES.filter(e=>e.name===selected.people[0].name).length>1?
       ' · '+selected.people[0].id:'');
+ const overtimeStack=c.family==='overtime'&&c.metric==='hours'&&c.chart==='bar';
  const ranking=selected.rankRows.length?selected.rankRows.map((r,i)=>{
   const detailId='asRankDetail'+i,expanded=state.statsExpandedKey===r.type+'|'+r.key;
   return '<div class="as-rank-entry"><button class="as-stats-rank-row'+(expanded?' is-expanded':'')+
@@ -346,6 +347,9 @@ function statisticsWorkspaceHtml(){
    '<div class="as-stats-chart-switch"><button type="button" data-as-chart="bar" aria-pressed="'+(c.chart==='bar')+'" class="'+(c.chart==='bar'?'active':'')+'">柱状</button>'+
    '<button type="button" data-as-chart="line" aria-pressed="'+(c.chart==='line')+'" class="'+(c.chart==='line'?'active':'')+
     '" '+(selected.compare==='days'?'':'disabled title="日期趋势才适合折线图"')+'>折线</button></div></div>'+
+   (overtimeStack?'<div class="as-stats-stack-legend" aria-label="加班颜色图例">'+
+    '<span><i class="legend-registered"></i>登记加班</span>'+
+    '<span><i class="legend-automatic"></i>自动加班（已纳入）</span></div>':'')+
    '<div id="asStatChart" class="as-stats-chart-canvas" aria-label="交互式统计图表，包含本范围全部数据"></div>'+
    '<div class="as-stats-chart-empty">当前指标没有可绘制的记录</div></div>'+
    '<div class="as-stats-rank"><div class="as-stats-rank-head"><h3>排行榜</h3>'+
@@ -497,38 +501,78 @@ function renderStatisticsWorkspace(){
  node.querySelector('.as-stats-chart').classList.toggle('is-empty',!data.rows.some(r=>r.raw>0));
  if(!chart)return;
  const isDay=data.compare==='days',line=c.chart==='line';
- const rows=data.visible,cat=rows.map(x=>x.label),
-   values=rows.map(x=>Number(x.value.toFixed(3)));
- // Responsive bar width is derived from available slot space, not a hard 12-item
- // cap: five categories get broad columns, 55 people get narrow distinct marks.
+ const rows=data.visible,cat=rows.map(x=>x.label),values=rows.map(x=>Number(x.value.toFixed(3)));
+ const isOvertimeStack=c.family==='overtime'&&c.metric==='hours'&&!line;
+ const numberLabels=state.prefs?.showBarValues===true;
+ const denominator=r=>c.aggregate==='perPerson'?r.people.length:
+    c.aggregate==='per100'?r.days.filter(isWorkday).length*r.people.length/100:1;
+ const normalized=(metric,r)=>{const d=denominator(r);
+   return d?asStatValue(data.ledger,'overtime',metric,r.people,r.days)/d:0};
+ const registeredValues=isOvertimeStack?rows.map(r=>normalized('registeredHours',r)):[];
+ const autoValues=isOvertimeStack?rows.map(r=>normalized('candidateHours',r)):[];
  const slot=(Math.max(230,chart.getWidth())-72)/Math.max(1,rows.length);
  const barWidth=Math.max(3,Math.min(54,Math.floor(slot*(rows.length<=8?.62:.70))));
- const many=rows.length>=30,angle=isDay?48:many?73:rows.length>14?59:46;
- const gradient=line?'#648ed1':asSoftBarGradient(false);
+ const many=rows.length>=30,angle=isDay?49:many?73:rows.length>14?61:46;
+ const formatTop=(p,topOnly=false)=>{
+   const i=p.dataIndex;
+   if(isOvertimeStack){
+     if(topOnly&&autoValues[i]>1e-8)return '';
+     if(!topOnly&&autoValues[i]<=1e-8)return '';
+   }
+   return rows[i]?.value?asStatNumber(rows[i].value):'';
+ };
+ const labelStyle={show:numberLabels&&!line,position:'top',color:'#48617e',
+  distance:3,fontSize:many?9:11,fontWeight:600};
+ const baseBar={barWidth,barMaxWidth:54,barMinHeight:values.some(v=>v>0)?1:0,
+   emphasis:{focus:'none',itemStyle:{color:'#3679d4',shadowBlur:8,shadowColor:'rgba(75,116,190,.22)'}}};
+ const series=isOvertimeStack?[
+   {...baseBar,id:'overtime-registered',name:'登记加班',type:'bar',stack:'overtime',
+    data:registeredValues,itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+      {offset:0,color:'#7ea9ef'},{offset:1,color:'#bed5fa'}])},
+    label:{...labelStyle,formatter:p=>formatTop(p,true)}},
+   {...baseBar,id:'overtime-automatic',name:'自动加班（已纳入）',type:'bar',stack:'overtime',
+    data:autoValues,itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+      {offset:0,color:'#d49ab6'},{offset:1,color:'#ebccd9'}])},
+    label:{...labelStyle,formatter:p=>formatTop(p,false)}}
+ ]:[{
+  ...baseBar,id:'statistics-primary',name:asStatMetric()[1]||'统计值',
+  type:line?'line':'bar',data:values,smooth:false,
+  showSymbol:!many||!line,symbol:'circle',symbolSize:6,
+  itemStyle:{color:line?'#648ed1':asSoftBarGradient(false),opacity:1,
+    borderRadius:line?0:[Math.min(5,barWidth/3),Math.min(5,barWidth/3),0,0]},
+  emphasis:{focus:'none',scale:true,scaleSize:2,
+    itemStyle:{color:'#3779d3',opacity:1,shadowBlur:8,shadowColor:'rgba(75,116,190,.22)'},
+    lineStyle:{width:3},symbolSize:10},
+  lineStyle:{width:2.15,color:'#648ed1'},
+  areaStyle:line?{color:'rgba(126,170,236,.055)'}:undefined,
+  label:{...labelStyle,formatter:p=>formatTop(p)}
+ }];
  chart.setOption({animation:state.prefs?.motion!==false,animationDuration:220,
-  grid:{top:20,bottom:many?100:isDay?78:92,left:49,right:16,containLabel:false},
-  tooltip:{trigger:'item',axisPointer:{type:'none'},confine:true,formatter:p=>{
-   const row=rows[p.dataIndex];if(!row)return '';
-   return escapeNameChar(row.label)+'<br><b>'+asStatNumber(row.value)+' '+
-    escapeNameChar(data.effectiveUnit)+'</b><br>范围 '+row.peopleCount+' 人';
-  }},
+  grid:{top:numberLabels?45:20,bottom:many?125:isDay?91:108,left:49,right:18,containLabel:false},
+  tooltip:{trigger:'item',axisPointer:{type:'none'},confine:true,
+   // Tie the floating card to the top of the active bar, including hover
+   // forwarded from a row in the right-hand ranking.
+   position:(pt,params,dom,rect,size)=>{
+     const width=size.contentSize[0],height=size.contentSize[1];
+     const x=rect?rect.x+rect.width/2:pt[0],y=rect?rect.y:pt[1];
+     return [Math.max(8,Math.min(size.viewSize[0]-width-8,x-width/2)),
+       Math.max(8,Math.min(size.viewSize[1]-height-8,y-height-11))];
+   },
+   formatter:p=>{
+    const row=rows[p.dataIndex];if(!row)return '';
+    const name=escapeNameChar(row.label),unit=escapeNameChar(data.effectiveUnit);
+    return '<b>'+name+'</b><br>总计 '+asStatNumber(row.value)+' '+unit+
+      (isOvertimeStack?'<br>登记 '+asStatNumber(registeredValues[p.dataIndex])+
+        ' '+unit+'<br>自动 '+asStatNumber(autoValues[p.dataIndex])+' '+unit:'');
+   }},
   xAxis:{type:'category',data:cat,boundaryGap:!line,
-   axisLabel:{fontSize:many?10:12,color:'#718198',interval:0,rotate:angle,
-    hideOverlap:false,align:'right',margin:9},
+   axisLabel:{fontSize:many?12:13,color:'#687f9d',interval:0,rotate:angle,
+    hideOverlap:false,align:'right',margin:12},
    axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe5ee'}}},
   yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#8895a9'},
    splitLine:{lineStyle:{color:'rgba(100,123,158,.11)'}},axisLine:{show:false}},
-  series:[{id:'statistics-primary',name:asStatMetric()[1]||'统计值',
-   type:line?'line':'bar',data:values,barWidth:line?undefined:barWidth,
-   barMaxWidth:54,barMinHeight:values.some(v=>v>0)?1:0,
-   smooth:false,showSymbol:!many||!line,symbol:'circle',symbolSize:6,
-   itemStyle:{color:gradient,opacity:1,borderRadius:line?0:[Math.min(5,barWidth/3),Math.min(5,barWidth/3),0,0]},
-   emphasis:{focus:'none',scale:true,scaleSize:2,
-    itemStyle:{color:'#3779d3',opacity:1,shadowBlur:8,shadowColor:'rgba(75,116,190,.22)'},
-    lineStyle:{width:3},symbolSize:10},
-   lineStyle:{width:2.15,color:'#648ed1'},
-   areaStyle:line?{color:'rgba(126,170,236,.055)'}:undefined,
-   showBackground:false}]});
+  series
+ });
  // Exactly one live hover target at a time. Never accumulate ECharts
  // programmatic highlight states when moving between bars or ranking rows.
  const ranking=[...node.querySelectorAll('[data-as-rank]')];
@@ -537,7 +581,7 @@ function renderStatisticsWorkspace(){
   if(hoveredKey===null)return;
   hoveredKey=null;
   ranking.forEach(b=>b.classList.remove('is-linked'));
-  chart.dispatchAction({type:'downplay',seriesIndex:0});
+  chart.dispatchAction({type:'downplay'});
   chart.dispatchAction({type:'hideTip'});
  };
  const hoverOne=key=>{
@@ -547,8 +591,8 @@ function renderStatisticsWorkspace(){
   if(idx<0)return;
   hoveredKey=key;
   ranking.forEach(b=>b.classList.toggle('is-linked',b.dataset.asRank===key));
-  chart.dispatchAction({type:'highlight',seriesIndex:0,dataIndex:idx});
-  chart.dispatchAction({type:'showTip',seriesIndex:0,dataIndex:idx});
+  chart.dispatchAction({type:'highlight',seriesIndex:isOvertimeStack?1:0,dataIndex:idx});
+  chart.dispatchAction({type:'showTip',seriesIndex:isOvertimeStack?1:0,dataIndex:idx});
  };
  ranking.forEach(b=>{
   b.addEventListener('pointerenter',()=>hoverOne(b.dataset.asRank));
