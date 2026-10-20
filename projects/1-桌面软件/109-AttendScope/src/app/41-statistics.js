@@ -512,7 +512,7 @@ function renderStatisticsWorkspace(){
  const autoValues=isOvertimeStack?rows.map(r=>normalized('candidateHours',r)):[];
  const slot=(Math.max(230,chart.getWidth())-72)/Math.max(1,rows.length);
  const barWidth=Math.max(3,Math.min(54,Math.floor(slot*(rows.length<=8?.62:.70))));
- const many=rows.length>=30,angle=isDay?49:many?73:rows.length>14?61:46;
+ const many=rows.length>=30,angle=isDay?58:many?82:rows.length>14?73:61;
  const formatTop=(p,topOnly=false)=>{
    const i=p.dataIndex;
    if(isOvertimeStack){
@@ -523,16 +523,21 @@ function renderStatisticsWorkspace(){
  };
  const labelStyle={show:numberLabels&&!line,position:'top',color:'#48617e',
   distance:3,fontSize:many?9:11,fontWeight:600};
- const baseBar={barWidth,barMaxWidth:54,barMinHeight:values.some(v=>v>0)?1:0,
-   emphasis:{focus:'none',itemStyle:{color:'#3679d4',shadowBlur:8,shadowColor:'rgba(75,116,190,.22)'}}};
+ const redBar=(palette)=>new echarts.graphic.LinearGradient(0,0,0,1,[
+   {offset:0,color:palette.top},{offset:1,color:palette.bottom}]);
+ const baseBar={barWidth,barMaxWidth:54,barMinHeight:values.some(v=>v>0)?1:0};
  const series=isOvertimeStack?[
    {...baseBar,id:'overtime-registered',name:'登记加班',type:'bar',stack:'overtime',
-    data:registeredValues,itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
-      {offset:0,color:'#7ea9ef'},{offset:1,color:'#bed5fa'}])},
+    data:registeredValues,itemStyle:{color:redBar(OVERTIME_VISUALS.registered)},
+    emphasis:{focus:'none',itemStyle:{color:redBar({
+      top:OVERTIME_VISUALS.registered.hoverTop,bottom:OVERTIME_VISUALS.registered.hoverBottom
+    }),shadowBlur:8,shadowColor:'rgba(150,67,84,.17)'}},
     label:{...labelStyle,formatter:p=>formatTop(p,true)}},
    {...baseBar,id:'overtime-automatic',name:'自动加班（已纳入）',type:'bar',stack:'overtime',
-    data:autoValues,itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
-      {offset:0,color:'#d49ab6'},{offset:1,color:'#ebccd9'}])},
+    data:autoValues,itemStyle:{color:redBar(OVERTIME_VISUALS.auto)},
+    emphasis:{focus:'none',itemStyle:{color:redBar({
+      top:OVERTIME_VISUALS.auto.hoverTop,bottom:OVERTIME_VISUALS.auto.hoverBottom
+    }),shadowBlur:8,shadowColor:'rgba(150,67,84,.17)'}},
     label:{...labelStyle,formatter:p=>formatTop(p,false)}}
  ]:[{
   ...baseBar,id:'statistics-primary',name:asStatMetric()[1]||'统计值',
@@ -548,7 +553,7 @@ function renderStatisticsWorkspace(){
   label:{...labelStyle,formatter:p=>formatTop(p)}
  }];
  chart.setOption({animation:state.prefs?.motion!==false,animationDuration:220,
-  grid:{top:numberLabels?45:20,bottom:many?125:isDay?91:108,left:49,right:18,containLabel:false},
+  grid:{top:numberLabels?45:20,bottom:many?141:isDay?105:119,left:49,right:18,containLabel:false},
   tooltip:{trigger:'item',axisPointer:{type:'none'},confine:true,
    // Tie the floating card to the top of the active bar, including hover
    // forwarded from a row in the right-hand ranking.
@@ -591,8 +596,14 @@ function renderStatisticsWorkspace(){
   if(idx<0)return;
   hoveredKey=key;
   ranking.forEach(b=>b.classList.toggle('is-linked',b.dataset.asRank===key));
-  chart.dispatchAction({type:'highlight',seriesIndex:isOvertimeStack?1:0,dataIndex:idx});
-  chart.dispatchAction({type:'showTip',seriesIndex:isOvertimeStack?1:0,dataIndex:idx});
+  if(isOvertimeStack){
+   // Whole stacked column is one hovered datum. Preserve the distinct red
+   // fills but brighten *both* components; never leave another column lit.
+   chart.dispatchAction({type:'highlight',seriesIndex:0,dataIndex:idx});
+   chart.dispatchAction({type:'highlight',seriesIndex:1,dataIndex:idx});
+  }else chart.dispatchAction({type:'highlight',seriesIndex:0,dataIndex:idx});
+  const anchor=isOvertimeStack&&autoValues[idx]>1e-8?1:0;
+  chart.dispatchAction({type:'showTip',seriesIndex:anchor,dataIndex:idx});
  };
  ranking.forEach(b=>{
   b.addEventListener('pointerenter',()=>hoverOne(b.dataset.asRank));
