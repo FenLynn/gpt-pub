@@ -161,6 +161,16 @@ html{scrollbar-gutter:stable}
 }
 .side-primary-nav .side-views button.active .side-view-index{color:#4e947b;font-weight:760}
 .side-view-text{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Data-management subpages share the same quiet selected-state language. */
+.side-subnav button.active{
+ background:transparent!important;color:#336f5d;font-weight:720;
+ box-shadow:inset 3px 0 0 #84b29d;border-radius:3px;
+}
+.side-subnav button:hover{background:rgba(107,153,133,.065)!important}
+.side-calendar .cal-day.selected{
+ background:rgba(126,176,153,.17)!important;
+ color:#367b64!important;box-shadow:none!important;font-weight:750;
+}
 .side-refinements{
  margin:9px 0 0 17px;padding:7px 0 1px 11px;
  border-left:1px solid #e3ece9;background:transparent;
