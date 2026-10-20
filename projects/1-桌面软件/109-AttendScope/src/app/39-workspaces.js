@@ -47,8 +47,11 @@ function personMonthStripHtml(){
   const rawManual=info?manualStatusFor(info):null;
   const final=rawManual||attendanceJudgmentSystem(info);
   const tone=final==='normal'?'normal':final==='anomaly'?'anomaly':final==='absent'?'absent':'rest';
-  const title=isoDate(day)+' · '+dayTypeText(type)+' · '+({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'}[final]||final)+(rawManual?' · 人工修正':'');
+  const hasAuto=(info?.autoOvertime?.segments?.length||0)>0;
+  const title=isoDate(day)+' · '+dayTypeText(type)+' · '+({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'}[final]||final)+
+   (hasAuto?' · 有自动加班候选':'')+(rawManual?' · 人工修正':'');
   return '<button type="button" class="person-day '+type+' '+(selected===day?'selected':'')+
+    (hasAuto?' has-auto-overtime':'')+
     '" data-person-day="'+day+'" title="'+escapeNameChar(title)+'" aria-current="'+(selected===day?'date':'false')+'">'+
     '<span class="person-day-number">'+pad(day)+'</span>'+
     (rawManual?'<span class="person-day-check" aria-label="人工修正">✓</span>':'')+
