@@ -137,7 +137,10 @@ function asStatLedger(){
   const active=activeAutoOvertimeSegments(a);
   if(!active.length)continue;
   for(const seg of active){
-   putInterval('overtime',a.employee.id,a.day,minuteText(seg.from),minuteText(seg.to),false);
+   const key='overtime|'+a.employee.id+'|'+a.day;
+   const intervals=coveredIntervals.get(key)||[];
+   intervals.push([seg.from,seg.to]);
+   coveredIntervals.set(key,intervals);
    add('overtime','count',a.employee.id,a.day,1);
   }
   add('overtime','presence',a.employee.id,a.day,1);
