@@ -273,7 +273,8 @@ function attendanceClock(value){
  return pad(Math.floor(m/60))+':'+pad(m%60)+':'+pad(seconds);
 }
 function attendanceNeighborDates(){
- const first=attendanceUtcMinute(isoDate(1)),last=attendanceUtcMinute(isoDate(monthDays()+1));
+ const first=Date.UTC(YEAR,MONTH-1,1)/60000,
+  last=Date.UTC(YEAR,MONTH,1)/60000;
  return {first,last,previous:attendanceDateFromMinute(first-1),
   next:attendanceDateFromMinute(last)};
 }
