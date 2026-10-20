@@ -295,29 +295,38 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
  const valid=analysisUnionSegments(eligible);
  const registeredIntervals=analysisUnionSegments(registered.map(r=>[
   minutes(r.start||''),minutes(r.end||'')]));
- const unregistered=[];
+ // Decide the 5-minute threshold on the continuous in→out evidence first.
+ // Registered overtime is an accounting overlay, not an 'out' punch and must
+ // NOT break one session into several independent threshold candidates.
+ const sessions=valid.filter(([start,end])=>end-start+1e-8>=minMinutes);
+ const residual=[],raw=[];
  for(const [begin,end] of valid){
-  let cursor=begin;
+  let cursor=begin,fragments=[];
   for(const [regStart,regEnd] of registeredIntervals){
    if(regEnd<=cursor||regStart>=end)continue;
-   if(regStart>cursor)unregistered.push([cursor,Math.min(regStart,end)]);
+   if(regStart>cursor)fragments.push([cursor,Math.min(regStart,end)]);
    cursor=Math.max(cursor,Math.min(end,regEnd));
    if(cursor>=end)break;
   }
-  if(cursor<end)unregistered.push([cursor,end]);
+  if(cursor<end)fragments.push([cursor,end]);
+  const all=analysisUnionSegments(fragments);
+  raw.push(...all);
+  // Fragments keep the identity of their continuous punch-backed session.
+  // A 4-minute leftover from a 15-minute session is eligible; a separate
+  // 4-minute punch session is not. Both are still non-overlapping with raw
+  // registered entries in the statistics ledger.
+  if(end-begin+1e-8>=minMinutes){
+   for(const [from,to] of all)residual.push({from,to,minutes:to-from,
+      sessionFrom:begin,sessionTo:end});
+  }
  }
- // Threshold applies to EACH disjoint interval after subtracting registered
- // time. Several short intervals must never combine to form one overtime.
- const unfiltered=analysisUnionSegments(unregistered);
- const raw=analysisUnionMinutes(unfiltered);
- const qualified=unfiltered.filter(([from,to])=>to-from+1e-8>=minMinutes);
- const eligibleMinutes=analysisUnionMinutes(qualified);
- const reason=eligibleMinutes>0?'完整进出记录逐段自动推算，供人工核查'+
-   (registeredIntervals.length?'（已扣除登记重叠时段）':''):
-   registeredIntervals.length?'与登记加班重叠，或单段时长不足阈值':
-   '单段时长不足阈值或无完整加班进出';
- return {minutes:eligibleMinutes,rawMinutes:raw,threshold:minMinutes,reason,
-  segments:qualified.map(([from,to])=>({from,to,minutes:to-from}))};
+ const rawMinutes=analysisUnionMinutes(raw),
+   countedMinutes=residual.reduce((sum,s)=>sum+s.minutes,0);
+ const reason=countedMinutes>0?'依据完整进出打卡按连续在岗区间计算；与登记加班重叠时段只在统计中扣除':
+  registeredIntervals.length?'已由登记加班覆盖，或完整在岗区间不足阈值':
+  '无完整进出区间，或每段连续在岗时间均不足阈值';
+ return {minutes:countedMinutes,rawMinutes,threshold:minMinutes,reason,
+  segments:residual};
 }
 // A checkmark is an inclusion decision for calculated time, not formal approval.
 function activeAutoOvertimeSegments(a){
@@ -352,12 +361,15 @@ function analyzeDay(emp,d){
   const p=punches[i],prev=punches[i-1];
   if(prev&&prev.direction===p.direction){
    const diff=Math.abs(minutes(p.time)-minutes(prev.time));
-   suspect(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:'连续'+p.direction);
-   pairingUncertain=true;
+   suspect(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:'连续'+p.direction+
+     (p.direction==='进'?'（无离开记录，按连续在岗计算）':''));
+   // Additional 'in' punches inside one open visit do not prove an exit.
+   // Keep the original entry; only genuinely unpaired/contradictory punches
+   // can invalidate inferred overtime.
+   if(p.direction!=='进')pairingUncertain=true;
   }
   if(p.direction==='进'){
-   if(pending)pairingUncertain=true;
-   pending=p;
+   if(!pending)pending=p;
   }else if(p.direction==='出'){
    if(pending){pairs.push([pending,p]);pending=null}
    else{pairingUncertain=true;suspect('缺少对应进入记录')}
@@ -395,7 +407,10 @@ function analyzeDay(emp,d){
   sourceHash=Math.imul(sourceHash^sourceEvidence.charCodeAt(i),16777619)>>>0;
  const evidenceSuffix=sourceHash.toString(36);
  autoOvertime.segments=autoOvertime.segments.map(seg=>{
-  const id='auto:'+emp.id+':'+date+':'+Math.round(seg.from*60)+'-'+Math.round(seg.to*60)+':'+evidenceSuffix;
+  // Shared ID links residual fragments to ONE uninterrupted in→out session.
+  // One ×/✓ decision covers all of its parts, not only a fragment.
+  const id='auto:'+emp.id+':'+date+':'+Math.round(seg.sessionFrom*60)+'-'+
+   Math.round(seg.sessionTo*60)+':'+evidenceSuffix;
   return {...seg,id,employeeId:emp.id,date,origin:'auto',
    accepted:state.overtimeReview?.[id]!==false};
  });
