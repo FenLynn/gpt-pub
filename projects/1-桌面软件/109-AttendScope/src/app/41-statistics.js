@@ -484,54 +484,71 @@ function renderStatisticsWorkspace(){
  node.querySelector('.as-stats-chart').classList.toggle('is-empty',!data.rows.some(r=>r.raw>0));
  if(!chart)return;
  const isDay=data.compare==='days',line=c.chart==='line';
- // Categorical labels belong beneath their bars; draw every item vertically.
- // The plot may have fewer marks, but always fills the full plot card.
  const rows=data.visible,cat=rows.map(x=>x.label),
    values=rows.map(x=>Number(x.value.toFixed(3)));
- const gradient=line?'#648d7e':asSoftBarGradient(false);
- chart.setOption({animation:state.prefs?.motion!==false,animationDuration:260,
-  grid:{top:20,bottom:isDay?78:105,left:47,right:18,containLabel:false},
+ // Responsive bar width is derived from available slot space, not a hard 12-item
+ // cap: five categories get broad columns, 55 people get narrow distinct marks.
+ const slot=(Math.max(230,chart.getWidth())-72)/Math.max(1,rows.length);
+ const barWidth=Math.max(3,Math.min(54,Math.floor(slot*(rows.length<=8?.62:.70))));
+ const many=rows.length>=30,angle=isDay?48:many?73:rows.length>14?59:46;
+ const gradient=line?'#648ed1':asSoftBarGradient(false);
+ chart.setOption({animation:state.prefs?.motion!==false,animationDuration:220,
+  grid:{top:20,bottom:many?100:isDay?78:92,left:49,right:16,containLabel:false},
   tooltip:{trigger:'item',axisPointer:{type:'none'},confine:true,formatter:p=>{
    const row=rows[p.dataIndex];if(!row)return '';
    return escapeNameChar(row.label)+'<br><b>'+asStatNumber(row.value)+' '+
     escapeNameChar(data.effectiveUnit)+'</b><br>范围 '+row.peopleCount+' 人';
   }},
   xAxis:{type:'category',data:cat,boundaryGap:!line,
-   axisLabel:{fontSize:isDay?11:12,color:'#607f73',interval:0,rotate:isDay?42:49,
-    hideOverlap:false,align:'right',margin:13},
-   axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe9e3'}}},
-  yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#80958c'},
-   splitLine:{lineStyle:{color:'rgba(105,145,126,.10)'}},axisLine:{show:false}},
+   axisLabel:{fontSize:many?10:12,color:'#718198',interval:0,rotate:angle,
+    hideOverlap:false,align:'right',margin:9},
+   axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe5ee'}}},
+  yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#8895a9'},
+   splitLine:{lineStyle:{color:'rgba(100,123,158,.11)'}},axisLine:{show:false}},
   series:[{id:'statistics-primary',name:asStatMetric()[1]||'统计值',
-   type:line?'line':'bar',data:values,barMaxWidth:31,barMinHeight:values.some(v=>v>0)?1:0,
-   smooth:false,showSymbol:true,symbol:'circle',symbolSize:5.5,
-   itemStyle:{color:gradient,opacity:line?1:.79,borderRadius:line?0:[5,5,0,0]},
-   emphasis:{focus:'self',scale:true,scaleSize:2,
-    itemStyle:{color:line?'#37735f':'rgba(59,126,100,.98)',opacity:1,
-     shadowBlur:8,shadowColor:'rgba(47,105,81,.19)'},
-    lineStyle:{width:3.2},symbolSize:11},
-   lineStyle:{width:2.2,color:'#648d7e'},
-   areaStyle:line?{color:'rgba(103,153,129,.045)'}:undefined,
+   type:line?'line':'bar',data:values,barWidth:line?undefined:barWidth,
+   barMaxWidth:54,barMinHeight:values.some(v=>v>0)?1:0,
+   smooth:false,showSymbol:!many||!line,symbol:'circle',symbolSize:6,
+   itemStyle:{color:gradient,opacity:1,borderRadius:line?0:[Math.min(5,barWidth/3),Math.min(5,barWidth/3),0,0]},
+   emphasis:{focus:'none',scale:true,scaleSize:2,
+    itemStyle:{color:'#3779d3',opacity:1,shadowBlur:8,shadowColor:'rgba(75,116,190,.22)'},
+    lineStyle:{width:3},symbolSize:10},
+   lineStyle:{width:2.15,color:'#648ed1'},
+   areaStyle:line?{color:'rgba(126,170,236,.055)'}:undefined,
    showBackground:false}]});
- // Rank cells and chart marks refer to the same comparison entity.
+ // Exactly one live hover target at a time. Never accumulate ECharts
+ // programmatic highlight states when moving between bars or ranking rows.
  const ranking=[...node.querySelectorAll('[data-as-rank]')];
- const emphasize=(key,show)=>{
-  ranking.forEach(b=>b.classList.toggle('is-linked',show&&b.dataset.asRank===key));
+ let hoveredKey=null;
+ const clearHover=()=>{
+  if(hoveredKey===null)return;
+  hoveredKey=null;
+  ranking.forEach(b=>b.classList.remove('is-linked'));
+  chart.dispatchAction({type:'downplay',seriesIndex:0});
+  chart.dispatchAction({type:'hideTip'});
+ };
+ const hoverOne=key=>{
+  if(key===hoveredKey)return;
+  clearHover();
   const idx=rows.findIndex(r=>r.key===key);
   if(idx<0)return;
-  chart.dispatchAction({type:show?'highlight':'downplay',seriesIndex:0,dataIndex:idx});
-  if(show)chart.dispatchAction({type:'showTip',seriesIndex:0,dataIndex:idx});
-  else chart.dispatchAction({type:'hideTip'});
+  hoveredKey=key;
+  ranking.forEach(b=>b.classList.toggle('is-linked',b.dataset.asRank===key));
+  chart.dispatchAction({type:'highlight',seriesIndex:0,dataIndex:idx});
+  chart.dispatchAction({type:'showTip',seriesIndex:0,dataIndex:idx});
  };
  ranking.forEach(b=>{
-  b.addEventListener('mouseenter',()=>emphasize(b.dataset.asRank,true));
-  b.addEventListener('mouseleave',()=>emphasize(b.dataset.asRank,false));
-  b.addEventListener('focus',()=>emphasize(b.dataset.asRank,true));
-  b.addEventListener('blur',()=>emphasize(b.dataset.asRank,false));
+  b.addEventListener('pointerenter',()=>hoverOne(b.dataset.asRank));
+  b.addEventListener('pointerleave',clearHover);
+  b.addEventListener('focus',()=>hoverOne(b.dataset.asRank));
+  b.addEventListener('blur',clearHover);
  });
- chart.on('mouseover',e=>{const item=rows[e.dataIndex];if(item)emphasize(item.key,true)});
- chart.on('globalout',()=>ranking.forEach(b=>b.classList.remove('is-linked')));
- chart.on('click',e=>{const row=rows[e.dataIndex];if(row)toggleRank(row.key,true)});
+ chart.on('mouseover',e=>{const item=rows[e.dataIndex];if(item)hoverOne(item.key)});
+ chart.on('mouseout',clearHover);
+ chart.on('globalout',clearHover);
+ chart.getZr().on('globalout',clearHover);
+ chart.getDom().addEventListener('pointerleave',clearHover);
+ chart.on('click',e=>{const row=rows[e.dataIndex];clearHover();if(row)toggleRank(row.key,true)});
  chart.on('dblclick',e=>{const row=rows[e.dataIndex];if(row)asStatDrill(row.key)});
  // Changes reconstruct the controls; keep their keyboard focus in place.
  const next=focusId?document.getElementById(focusId):
