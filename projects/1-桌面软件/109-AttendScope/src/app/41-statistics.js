@@ -5,7 +5,7 @@ const AS_STAT_FAMILIES=[
  ['trip','出差',[['days','出差日数','人日'],['estimatedHours','折算出差工时','小时'],['count','出差记录数','次'],['people','涉及人数','人']]],
  ['outing','外出',[['hours','记载外出时长','小时'],['count','外出记录数','次'],['people','涉及人数','人']]],
  ['overtime','加班',[['hours','加班合计时长','小时'],['registeredHours','登记加班时长','小时'],
-  ['count','加班段数','段'],['people','涉及人数','人'],
+  ['count','加班条目数','条'],['people','涉及人数','人'],
   ['candidateHours','自动推算候选工时','小时'],['candidateDays','加班候选人日','人日'],['candidatePeople','加班候选人数','人']]],
  ['punch','打卡',[['count','打卡记录数','次'],['people','打卡人数','人']]],
  ['status','考勤状态',[['normal','正常工作人日','人日'],['anomaly','异常工作人日','人日'],['absent','缺勤工作人日','人日'],['issue','异常及缺勤人日','人日'],['late','迟到人日','人日'],['early','早退人日','人日']]]
