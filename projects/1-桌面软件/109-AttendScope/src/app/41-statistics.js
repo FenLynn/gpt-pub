@@ -131,7 +131,7 @@ function asStatRows(){
  let compare=c.compare;
  if(state.workspaceMode==='person')compare='days';
  const entries=compare==='groups'?groups.map(name=>({label:name,key:name,type:'group',people:EMPLOYEES.filter(e=>groupOf(e)===name),days})):
-  compare==='people'?people.map(e=>({label:e.name,key:e.id,type:'person',people:[e],days})):
+  compare==='people'?people.map(e=>({label:people.filter(x=>x.name===e.name).length>1?e.name+' · '+e.id:e.name,key:e.id,type:'person',people:[e],days})):
    days.map(d=>({label:pad(d)+' 日',key:String(d),type:'day',people,days:[d]}));
  const counted=entries.map(e=>{
   const raw=asStatValue(ledger,c.family,c.metric,e.people,e.days);
@@ -143,13 +143,16 @@ function asStatRows(){
  if(compare==='days')counted.sort((a,b)=>+a.key-+b.key);
  else counted.sort((a,b)=>c.sort==='asc'?a.value-b.value||a.label.localeCompare(b.label,'zh-CN'):
   b.value-a.value||a.label.localeCompare(b.label,'zh-CN'));
- const ranks=(compare==='days'?counted:counted.slice(0,c.limit==='all'?counted.length:Number(c.limit)||10));
+ const chartRows=compare==='days'?counted:counted.slice(0,c.limit==='all'?counted.length:Number(c.limit)||10);
+ const rankPool=compare==='days'?counted.filter(r=>r.value>0).sort((a,b)=>
+   c.sort==='asc'?a.value-b.value||a.key-b.key:b.value-a.value||a.key-b.key):counted;
+ const rankRows=rankPool.slice(0,c.limit==='all'?rankPool.length:Number(c.limit)||10);
  const grand=asStatValue(ledger,c.family,c.metric,people,days);
  const scheduled=days.filter(isWorkday).length*people.length;
  const unit=asStatMetric()[2],effectiveUnit=c.aggregate==='perPerson'?unit+'/人':c.aggregate==='per100'?unit+'/百人日':unit;
  const total= c.aggregate==='perPerson'?(people.length?grand/people.length:0):
   c.aggregate==='per100'?(scheduled?grand/scheduled*100:0):grand;
- return {people,ledger,rows:counted,visible:ranks,compare,grand,total,effectiveUnit,scheduled,unit};
+ return {people,ledger,rows:counted,visible:chartRows,rankRows,compare,grand,total,effectiveUnit,scheduled,unit};
 }
 function asStatOptions(items,selected){return items.map(([key,label])=>
  '<option value="'+key+'" '+(selected===key?'selected':'')+'>'+escapeNameChar(label)+'</option>').join('')}
@@ -192,11 +195,11 @@ function statisticsWorkspaceHtml(){
    '<div class="as-stats-rank"><div class="as-stats-rank-head"><h3>排行榜 · 明细</h3>'+
     '<button id="asStatSort" type="button" title="调整排名方向">'+(c.sort==='desc'?'降序 ↓':'升序 ↑')+'</button></div>'+
    '<div class="as-stats-rank-table" id="asStatRankTable">'+
-   selected.visible.map((r,i)=>'<button class="as-stats-rank-row" data-as-rank="'+escapeNameChar(r.key)+'" type="button" title="查看'+escapeNameChar(r.label)+'">'+
+   (selected.rankRows.length?selected.rankRows.map((r,i)=>'<button class="as-stats-rank-row" data-as-rank="'+escapeNameChar(r.key)+'" type="button" title="查看'+escapeNameChar(r.label)+'">'+
      '<span class="as-rank-index">'+String(i+1).padStart(2,'0')+'</span>'+
      '<span class="as-rank-name">'+escapeNameChar(r.label)+'</span>'+
      '<strong>'+asStatNumber(r.value)+'</strong><span class="as-rank-unit">'+escapeNameChar(selected.effectiveUnit)+'</span>'+
-     '<span class="as-rank-chevron">›</span></button>').join('')+'</div></div></div>'+
+     '<span class="as-rank-chevron">›</span></button>').join(''):'<p class="as-stats-empty">本月暂无该指标的记录</p>')+'</div></div></div>'+
   '<div class="as-stats-foot"><span>'+escapeNameChar(warning)+'</span>'+
   (unavailable?'<strong>当前未导入此类记录</strong>':'')+
   '<span>点击图表或排行可进入对应组别、人员或日期</span></div></section>';
@@ -210,7 +213,8 @@ function asStatDrill(key){
  }
  if(row.type==='person'){
   state.workspaceMode='person';state.selection={type:'cell',employeeId:row.key,day:1};
-  state.chartDay=1;state.chartTab='timeline';state.analyticsPage='stats';state.statsConfig.compare='days';render();return;
+  state.chartDay=1;state.chartTab='timeline';state.analyticsPage='stats';state.statsConfig.compare='days';
+  state.statsConfig.chart='line';state.statsConfig.aggregate='total';render();return;
  }
  if(row.type==='day'){
   if(state.workspaceMode==='person')changePersonalDay(Number(key));
@@ -236,7 +240,11 @@ function renderStatisticsWorkspace(){
   renderStatisticsWorkspace();
  };
  node.querySelector('#asStatMetric').onchange=e=>{c.metric=e.target.value;if(c.metric==='people')c.aggregate='total';renderStatisticsWorkspace()};
- node.querySelector('#asStatCompare').onchange=e=>{c.compare=e.target.value;renderStatisticsWorkspace()};
+ node.querySelector('#asStatCompare').onchange=e=>{
+  c.compare=e.target.value;
+  if(c.compare==='days')c.chart='line';else c.chart='bar';
+  renderStatisticsWorkspace();
+ };
  node.querySelector('#asStatAggregate').onchange=e=>{c.aggregate=e.target.value;renderStatisticsWorkspace()};
  node.querySelector('#asStatLimit').onchange=e=>{c.limit=e.target.value;renderStatisticsWorkspace()};
  node.querySelector('#asStatSort').onclick=()=>{c.sort=c.sort==='desc'?'asc':'desc';renderStatisticsWorkspace()};
@@ -245,8 +253,11 @@ function renderStatisticsWorkspace(){
  node.querySelector('#asStatsExport').onclick=asStatExport;
  const data=asStatRows(),chart=initAttendChart(document.getElementById('asStatChart'));
  if(!chart)return;
- const rows=data.visible,cat=rows.map(x=>x.label),values=rows.map(x=>Number(x.value.toFixed(3)));
  const isDay=data.compare==='days',line=c.chart==='line';
+ // ECharts' category Y axis grows upward: reverse the bar data so the largest
+ // ranked item is at the top, just as it is in the ranking table.
+ const rows=!isDay&&!line?data.visible.slice().reverse():data.visible;
+ const cat=rows.map(x=>x.label),values=rows.map(x=>Number(x.value.toFixed(3)));
  chart.setOption({animation:state.prefs?.motion!==false,animationDuration:290,
   grid:isDay||line?{top:23,bottom:40,left:52,right:21}:{top:14,bottom:30,left:92,right:42,containLabel:false},
   tooltip:{trigger:'axis',axisPointer:{type:'shadow'},formatter:p=>{

@@ -69,3 +69,14 @@
 }
 @media(prefers-reduced-motion:reduce){.as-stats,.side-views button,.as-stats-rank-row{animation:none!important;transition:none!important}}
 .reduce-animations .as-stats,.reduce-animations .side-views button,.reduce-animations .as-stats-rank-row{animation:none!important;transition:none!important}
+
+
+/* R45 review 2: clearer secondary labels and restrained empty states. */
+.as-stats-empty{font-size:13px;color:#8ca0ae;padding:23px 16px;margin:0;text-align:center}
+.as-stats-filters label{font-size:13px;color:#647f91}
+.as-stats-filters select{font-size:14px}
+.as-stats-inline span{font-size:13px}
+.as-stats-rank-row{min-height:43px}
+.as-rank-name{font-size:14px}
+.as-stats-rank-row strong{font-size:15px}
+.as-stats-foot{font-size:12.5px;line-height:1.55}

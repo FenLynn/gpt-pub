@@ -369,9 +369,12 @@ async function run(){
  'R45 chart-type switch failed');
  await page.locator('#asStatCompare').selectOption('days');
  await page.locator('#asStatLimit').selectOption('5');
- await check(page,()=>asStatRows().rows.length===monthDays()&&asStatRows().visible.length===monthDays()&&
-  document.querySelectorAll('.as-stats-rank-row').length===monthDays(),
-  'R45 daily trend should retain all month days even with top-5 preference');
+ await check(page,()=>{
+  const d=asStatRows(),ranking=d.rankRows,shown=document.querySelectorAll('.as-stats-rank-row').length;
+  return d.rows.length===monthDays()&&d.visible.length===monthDays()&&
+   ranking.length<=5&&shown===ranking.length&&
+   ranking.every(r=>r.value>0)&&ranking.every((r,i)=>!i||r.value<=ranking[i-1].value);
+ },'R45 date chart must remain chronological while its ranking is positive-only and sorted');
  await page.locator('#asStatCompare').selectOption('groups');
  await page.locator('[data-as-chart="bar"]').click();
  const exported=page.waitForEvent('download');
@@ -398,7 +401,8 @@ async function run(){
  await page.locator('.as-stats-rank-row').first().click();
  await page.waitForSelector('#asStatChart svg',{timeout:15000});
  await check(page,()=>state.workspaceMode==='person'&&state.analyticsPage==='stats'&&
-  state.statsConfig.compare==='days'&&asStatRows().people.length===1,
+  state.statsConfig.compare==='days'&&state.statsConfig.chart==='line'&&
+  state.statsConfig.aggregate==='total'&&asStatRows().people.length===1,
   'R45 group member drilldown not scoped to individual');
  await page.screenshot({path:path.join(out,'r45-person-stats.png')});
  await page.locator('.as-stats-rank-row').nth(8).click();
