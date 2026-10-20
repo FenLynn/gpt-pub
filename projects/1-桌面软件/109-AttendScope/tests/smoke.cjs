@@ -304,7 +304,10 @@ async function run(){
   'R37 data management missing real roster');
  await page.screenshot({path:path.join(out,'r37-roster.png')});
  await page.locator('[data-data-section="rules"]').click();
- await check(page,()=>document.querySelectorAll('.data-rules-grid>div').length===6&&!!document.getElementById('dataEditRules'),
+ await check(page,()=>document.querySelectorAll('.data-rules-grid>div').length===9&&
+   document.querySelector('.data-rules-grid')?.textContent.includes('上午上班冗余')&&
+   document.querySelector('.data-rules-grid')?.textContent.includes('下午下班冗余')&&
+   !!document.getElementById('dataEditRules'),
   'R37 data management missing rules');
  await page.locator('[data-data-section="imports"]').click();
  await check(page,()=>!!document.querySelector('.data-import-history'),'R37 imports not available');
