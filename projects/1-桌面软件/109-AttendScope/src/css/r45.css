@@ -558,6 +558,6 @@ html{scrollbar-gutter:stable}
  color:#7e8fa3;font-size:11px;min-height:23px;margin-bottom:1px}
 .as-stats-stack-legend span{display:inline-flex;align-items:center;gap:5px}
 .as-stats-stack-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
-.as-stats-stack-legend .legend-registered{background:linear-gradient(#7ea9ef,#bed5fa)}
-.as-stats-stack-legend .legend-automatic{background:linear-gradient(#d49ab6,#ebccd9)}
+.as-stats-stack-legend .legend-registered{background:linear-gradient(#bf6971,#e5a3aa)}
+.as-stats-stack-legend .legend-automatic{background:linear-gradient(#d99196,#efc1c2)}
 @media(prefers-reduced-motion:reduce){.overtime-review-actions{transition:none}}
