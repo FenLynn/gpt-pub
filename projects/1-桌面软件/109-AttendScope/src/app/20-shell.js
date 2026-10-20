@@ -6,6 +6,7 @@ function asNavSnapshot(){
   analyticsPage:state.analyticsPage||'main',selectedGroup:state.selectedGroup||null,
   selection:{...(state.selection||{type:'overall'})},chartDay:state.chartDay||null,
   chartTab:state.chartTab||'overview',dataSection:state.dataSection||'records',
+  rawDataTab:state.rawDataTab||'attendance',insightTab:state.insightTab||'summary',
   filter:state.filter||'main',statsConfig:state.statsConfig?{...state.statsConfig}:null};
 }
 function asNavTrack(){
@@ -16,6 +17,12 @@ function asNavTrack(){
   history.forward.length=0;
  }
  history.current=next;
+ asNavUpdateButtons();
+}
+function asNavUpdateButtons(){
+ const back=document.getElementById('asNavBack'),forward=document.getElementById('asNavForward');
+ if(back)back.disabled=!asNavHistory.back.length;
+ if(forward)forward.disabled=!asNavHistory.forward.length;
 }
 // A changed chart/filter setting is a refinement of the current screen, not
 // a new history entry; the next drilldown still returns to that exact screen.
@@ -40,6 +47,8 @@ function asNavGo(direction){
   state.chartDay=target.chartDay;
   state.chartTab=target.chartTab;
   state.dataSection=target.dataSection;
+  state.rawDataTab=target.rawDataTab;
+  state.insightTab=target.insightTab;
   state.filter=target.filter;
   state.statsConfig=target.statsConfig?{...target.statsConfig}:null;
   state.rawPage=1;state.timelineRange=null;
@@ -456,6 +465,7 @@ function bindAnalysisPanel(ctx){
       x.classList.toggle('active',active);x.setAttribute('aria-selected',String(active));
     });
     document.querySelectorAll('[data-insight-pane]').forEach(x=>x.classList.toggle('active',x.dataset.insightPane===state.insightTab));
+    asNavRefreshCurrent();
   });
 }
 
