@@ -4,6 +4,7 @@ const WORKSPACE_ITEMS=[
  ['all','全员分析','users'],
  ['group','分组分析','layers'],
  ['person','个人分析','person'],
+ ['stats','统计分析','chart'],
  ['data','数据管理','database']
 ];
 function workspaceGroups(){
@@ -75,13 +76,8 @@ function workspaceSidebarHtml(){
   '<select class="side-select" id="workspacePerson">'+(mode==='person'?'':'<option value="">全部</option>')+
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
     escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
- const view=mode==='data'?'':'<section class="side-primary-nav"><div class="side-primary-title">分析视图</div>'+
-  '<nav class="side-views" aria-label="分析视图">'+
-  '<button type="button" data-as-view="main" class="'+(state.analyticsPage!=='stats'?'active':'')+'">'+
-   '<span class="side-view-index">01</span><span class="side-view-text">'+(mode==='person'?'单日时间轴':'考勤矩阵')+'</span></button>'+
-  '<button type="button" data-as-view="stats" class="'+(state.analyticsPage==='stats'?'active':'')+'">'+
-   '<span class="side-view-index">02</span><span class="side-view-text">'+
-   (mode==='all'?'总体统计':mode==='group'?'组别统计':'个人统计')+'</span></button></nav></section>';
+ // Statistical metrics live in one top-level workspace, not three sidebar clones.
+ const view='';
  const sub=mode==='data'?'<div class="side-subnav">'+
   [['records','原始记录'],['roster','员工名册'],['rules','工作规则'],['imports','导入与快照']].map(([id,name])=>
   '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+'</div>':'';
@@ -145,7 +141,13 @@ function bindWorkspaceNavigation(){
 }
 function navigateWorkspace(mode){
  if(!WORKSPACE_ITEMS.some(x=>x[0]===mode))return;
- state.workspaceMode=mode;state.scopeSearch='';state.attentionOnly=false;state.analyticsPage='main';
+ state.workspaceMode=mode;state.scopeSearch='';state.attentionOnly=false;
+ state.analyticsPage=mode==='stats'?'stats':'main';
+ if(mode==='stats'){
+  state.statsScope=state.statsScope||'all';
+  if(typeof asStatPrefs==='function')asStatPrefs();
+  render();return;
+ }
  if(state.statsConfig)state.statsConfig.compare=asStatDefaultCompare(mode);
  if(mode==='all'||mode==='group'||mode==='data'){state.selection={type:'overall'};state.chartTab='overview'}
  if(mode==='group'&&!workspaceGroups().includes(state.selectedGroup))state.selectedGroup=workspaceGroups()[0]||'未分组';
